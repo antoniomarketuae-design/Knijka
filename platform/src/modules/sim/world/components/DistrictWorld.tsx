@@ -1,0 +1,80 @@
+"use client";
+
+/**
+ * <DistrictWorld/> — the drivable Sofia district. Mount INSIDE an R3F
+ * <Canvas> (and inside <Physics> unless physics={false}).
+ *
+ * The component is presentation-only: signal phase logic, zones and speed
+ * limits live in sim/runtime (WorldRuntime). Wire the lamp state with
+ * `getSignalPhase={(nodeId) => worldRuntime.signalPhase(nodeId)}`.
+ *
+ * Lighting is owned by sim/environment — this scene only needs an ambient +
+ * directional light to look right; `night` toggles window/streetlight glow
+ * to match the environment's time of day.
+ *
+ * ODbL: any product surface showing this world must also render
+ * <OsmAttribution/> in its HUD (docs/simulation/17 §5).
+ */
+
+import { useMemo } from "react";
+import type { SignalPhase } from "../../contracts";
+import { buildWorldGeometry } from "../builders/buildWorldGeometry";
+import type { BuildWorldOptions, District, WorldGeometry, WorldQuality } from "../types";
+import { QUALITY_PRESETS } from "./quality";
+import { StaticWorld } from "./StaticWorld";
+import { WorldColliders } from "./WorldColliders";
+import { WorldPropsGroup } from "./WorldProps";
+
+export interface DistrictWorldProps {
+  /** Parsed content/world/district-v1.json (see assertDistrict). */
+  district: District;
+  /** Render quality preset (default "med"): shadows, texture size, tree density. */
+  quality?: WorldQuality;
+  /** Night mode: lit windows + streetlight glow. Default false. */
+  night?: boolean;
+  /** Lamp state per signal node id — wire to WorldRuntime.signalPhase. Default: all green. */
+  getSignalPhase?: (signalNodeId: string) => SignalPhase;
+  /**
+   * Base URL serving content/signs/svg (b1/b2/v26/d11). Default
+   * "/content/signs/svg"; pass null to keep the built-in procedural sign
+   * faces (visually equivalent).
+   */
+  signSvgBaseUrl?: string | null;
+  /** Include static rapier colliders (default true; needs <Physics> parent). */
+  physics?: boolean;
+  /** Pure-builder options (hand-polish junction overrides, tree density, seed). */
+  buildOptions?: BuildWorldOptions;
+  /** Reuse a prebuilt geometry (skips the ~200 ms build; overrides district). */
+  prebuilt?: WorldGeometry;
+}
+
+export function DistrictWorld({
+  district,
+  quality = "med",
+  night = false,
+  getSignalPhase,
+  signSvgBaseUrl = "/content/signs/svg",
+  physics = true,
+  buildOptions,
+  prebuilt,
+}: DistrictWorldProps) {
+  const world = useMemo(
+    () => prebuilt ?? buildWorldGeometry(district, buildOptions),
+    [district, buildOptions, prebuilt],
+  );
+  const preset = QUALITY_PRESETS[quality];
+
+  return (
+    <group name="district-world">
+      <StaticWorld world={world} preset={preset} night={night} />
+      <WorldPropsGroup
+        world={world}
+        preset={preset}
+        night={night}
+        getSignalPhase={getSignalPhase}
+        signSvgBaseUrl={signSvgBaseUrl}
+      />
+      {physics ? <WorldColliders colliders={world.colliders} /> : null}
+    </group>
+  );
+}

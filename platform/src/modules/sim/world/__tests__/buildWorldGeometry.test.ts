@@ -1,0 +1,348 @@
+/**
+ * Builder tests on BOTH a synthetic micro-district (exact expectations) and
+ * the real content/world/district-v1.json (structural invariants + budget).
+ */
+import fs from "node:fs";
+import path from "node:path";
+import { beforeAll, describe, expect, it } from "vitest";
+import { buildWorldGeometry } from "../builders/buildWorldGeometry";
+import {
+  CURB_HEIGHT_M,
+  LANE_WIDTH_M,
+  ROAD_Y,
+  SIDEWALK_TOP_Y,
+} from "../builders/constants";
+import { assertDistrict, type District, type WorldGeometry } from "../types";
+
+// ---------------------------------------------------------------------------
+// Synthetic micro-district: a signalized + crossing X-junction, one entry.
+// ---------------------------------------------------------------------------
+
+function syntheticDistrict(): District {
+  const nodes = [
+    { id: "nC", x: 0, y: 0 },
+    { id: "nN", x: 0, y: 120 },
+    { id: "nS", x: 0, y: -120 },
+    { id: "nE", x: 120, y: 0 },
+    { id: "nW", x: -120, y: 0 },
+  ];
+  const mkEdge = (
+    id: string,
+    from: string,
+    to: string,
+    cls: string,
+    lanes: number,
+    geometry: [number, number][],
+  ) => ({
+    id,
+    from,
+    to,
+    class: cls,
+    name: null,
+    oneway: false,
+    roundabout: false,
+    lanes,
+    lanesSource: "tag" as const,
+    maxspeed: 50,
+    maxspeedSource: "default" as const,
+    length: 120,
+    geometry,
+  });
+  return {
+    format: "district-v1",
+    meta: {
+      district: "test",
+      label: "Test",
+      boundsLocalMeters: { minX: -120, minY: -120, maxX: 120, maxY: 120 },
+      attribution: {
+        text: "Map data © OpenStreetMap contributors",
+        license: "ODbL 1.0",
+        licenseUrl: "https://opendatacommons.org/licenses/odbl/1-0/",
+        copyrightUrl: "https://www.openstreetmap.org/copyright",
+      },
+    },
+    roads: {
+      nodes,
+      edges: [
+        mkEdge("eN", "nC", "nN", "secondary", 4, [
+          [0, 0],
+          [0, 120],
+        ]),
+        mkEdge("eS", "nC", "nS", "secondary", 4, [
+          [0, 0],
+          [0, -120],
+        ]),
+        mkEdge("eE", "nC", "nE", "residential", 2, [
+          [0, 0],
+          [120, 0],
+        ]),
+        mkEdge("eW", "nC", "nW", "residential", 2, [
+          [0, 0],
+          [-120, 0],
+        ]),
+      ],
+    },
+    intersections: [{ id: "nC", x: 0, y: 0, degree: 4, signalized: true }],
+    crossings: [
+      { id: "x1", x: 0, y: 30, kind: "marked", signalized: false, edgeId: "eN" },
+    ],
+    roundabouts: [],
+    buildings: [
+      {
+        id: "b1",
+        height: 15,
+        heightSource: "levels",
+        footprint: [
+          [30, 30],
+          [50, 30],
+          [50, 50],
+          [30, 50],
+        ],
+      },
+    ],
+    spawnPoints: [],
+  };
+}
+
+describe("buildWorldGeometry on a synthetic X-junction", () => {
+  let world: WorldGeometry;
+  beforeAll(() => {
+    world = buildWorldGeometry(syntheticDistrict(), { seed: 7 });
+  });
+
+  it("builds one ribbon per edge and one junction patch", () => {
+    expect(world.stats.ribbons).toBe(4);
+    expect(world.stats.skippedRibbons).toBe(0);
+    // 4 dead ends produce no patches; the center node does.
+    expect(world.stats.junctionPatches).toBe(1);
+  });
+
+  it("road ribbons have the correct width from lane counts", () => {
+    // First ribbon is eN (4 lanes): first two vertices are the L/R pair of
+    // the first cross-section -> distance = 4 * 3.25 m.
+    const pos = world.roadSurface.positions;
+    const dx = pos[0]! - pos[3]!;
+    const dz = pos[2]! - pos[5]!;
+    expect(Math.hypot(dx, dz)).toBeCloseTo(4 * LANE_WIDTH_M, 3);
+  });
+
+  it("all road surface normals point up and sit at ROAD_Y", () => {
+    const { normals, positions } = world.roadSurface;
+    for (let i = 0; i < normals.length; i += 3) {
+      expect(normals[i + 1]).toBeCloseTo(1);
+      expect(positions[i + 1]).toBeCloseTo(ROAD_Y);
+    }
+  });
+
+  it("road triangles face upward (CCW after world mapping)", () => {
+    const { positions, indices } = world.roadSurface;
+    for (let t = 0; t < indices.length; t += 3) {
+      const [a, b, c] = [indices[t]! * 3, indices[t + 1]! * 3, indices[t + 2]! * 3];
+      const abx = positions[b]! - positions[a]!;
+      const abz = positions[b + 2]! - positions[a + 2]!;
+      const acx = positions[c]! - positions[a]!;
+      const acz = positions[c + 2]! - positions[a + 2]!;
+      // y of cross product (flat triangle): abz*acx - abx*acz
+      expect(abz * acx - abx * acz).toBeGreaterThan(0);
+    }
+  });
+
+  it("sidewalk tops sit exactly one curb above the road", () => {
+    const pos = world.sidewalks.positions;
+    let sawTop = 0;
+    for (let i = 1; i < pos.length; i += 3) {
+      const y = pos[i]!;
+      expect(y).toBeGreaterThanOrEqual(-1e-6);
+      expect(y).toBeLessThanOrEqual(SIDEWALK_TOP_Y + 1e-6);
+      if (Math.abs(y - SIDEWALK_TOP_Y) < 1e-6) sawTop++;
+    }
+    expect(sawTop).toBeGreaterThan(0);
+    expect(SIDEWALK_TOP_Y - ROAD_Y).toBeCloseTo(CURB_HEIGHT_M);
+  });
+
+  it("paints a stop line per signalized approach and one zebra", () => {
+    expect(world.stats.stopLines).toBe(4);
+    expect(world.stats.zebraCrossings).toBe(1);
+    expect(world.stats.markingQuads).toBeGreaterThan(4);
+  });
+
+  it("places one traffic light per approach with the junction node id", () => {
+    expect(world.trafficLights.length).toBe(4);
+    for (const tl of world.trafficLights) {
+      expect(tl.nodeId).toBe("nC");
+      // Poles stand outside the roadway but near the junction.
+      const d = Math.hypot(tl.position[0], tl.position[2]);
+      expect(d).toBeGreaterThan(LANE_WIDTH_M);
+      expect(d).toBeLessThan(30);
+    }
+  });
+
+  it("places limit-50 signs at district entry roads", () => {
+    expect(world.stats.signs.limit50).toBeGreaterThanOrEqual(1);
+  });
+
+  it("extrudes the building with 4 wall variants buckets and a roof", () => {
+    const total = world.buildingWalls.reduce((s, w) => s + w.positions.length, 0);
+    expect(total).toBeGreaterThan(0);
+    expect(world.buildingRoofs.indices.length).toBeGreaterThanOrEqual(6);
+    // Roof height = building height.
+    expect(world.buildingRoofs.positions[1]).toBeCloseTo(15);
+    // Ground-floor band: some wall vertices carry the darker tint.
+    const walls = world.buildingWalls.find((w) => w.positions.length > 0)!;
+    expect(walls.colors).toBeDefined();
+    const tints = new Set<number>();
+    for (let i = 0; i < walls.colors!.length; i += 3) tints.add(walls.colors![i]!);
+    expect(tints.size).toBe(2);
+  });
+
+  it("ground collider top face sits at the road surface", () => {
+    const g = world.colliders.ground;
+    expect(g.position[1] + g.halfExtents[1]).toBeCloseTo(ROAD_Y);
+    // Covers the district bounds + margin.
+    expect(g.halfExtents[0]).toBeGreaterThan(120);
+    expect(g.halfExtents[2]).toBeGreaterThan(120);
+  });
+
+  it("collider meshes are valid indexed trimeshes", () => {
+    for (const c of [world.colliders.sidewalks, world.colliders.buildings]) {
+      expect(c.positions.length % 3).toBe(0);
+      expect(c.indices.length % 3).toBe(0);
+      expect(c.indices.length).toBeGreaterThan(0);
+      const maxIdx = Math.max(...Array.from(c.indices));
+      expect(maxIdx).toBeLessThan(c.positions.length / 3);
+    }
+  });
+
+  it("is deterministic for a fixed seed", () => {
+    const again = buildWorldGeometry(syntheticDistrict(), { seed: 7 });
+    expect(Array.from(again.roadSurface.positions)).toEqual(
+      Array.from(world.roadSurface.positions),
+    );
+    expect(again.trees).toEqual(world.trees);
+    expect(again.stats).toEqual(world.stats);
+  });
+
+  it("junction radius overrides move the ribbon cut (hand-polish hook)", () => {
+    const wide = buildWorldGeometry(syntheticDistrict(), {
+      seed: 7,
+      junctionRadiusOverrides: { nC: 20 },
+    });
+    // eN ribbon starts further from the center -> first vertex further out.
+    const zDefault = Math.abs(world.roadSurface.positions[2]!);
+    const zWide = Math.abs(wide.roadSurface.positions[2]!);
+    expect(zWide).toBeGreaterThan(zDefault + 5);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Real district
+// ---------------------------------------------------------------------------
+
+function loadRealDistrict(): District {
+  const candidates = [
+    path.join(process.cwd(), "content", "world", "district-v1.json"),
+    path.resolve(process.cwd(), "..", "content", "world", "district-v1.json"),
+  ];
+  for (const file of candidates) {
+    if (fs.existsSync(file)) {
+      return assertDistrict(JSON.parse(fs.readFileSync(file, "utf8")));
+    }
+  }
+  throw new Error(`district-v1.json not found in: ${candidates.join(", ")}`);
+}
+
+describe("buildWorldGeometry on the real district (Студентски град)", () => {
+  let district: District;
+  let world: WorldGeometry;
+  beforeAll(() => {
+    district = loadRealDistrict();
+    world = buildWorldGeometry(district);
+  });
+
+  it("covers every edge with a ribbon or a junction patch", () => {
+    expect(world.stats.ribbons + world.stats.skippedRibbons).toBe(
+      district.roads.edges.length,
+    );
+    expect(world.stats.ribbons).toBeGreaterThan(250);
+    expect(world.stats.junctionPatches).toBeGreaterThan(100);
+  });
+
+  it("produces no NaN/infinite coordinates anywhere", () => {
+    const buffers = [
+      world.roadSurface,
+      world.junctionSurface,
+      world.sidewalks,
+      world.markings,
+      world.terrain,
+      world.buildingRoofs,
+      ...world.buildingWalls,
+    ];
+    for (const mesh of buffers) {
+      for (let i = 0; i < mesh.positions.length; i++) {
+        expect(Number.isFinite(mesh.positions[i])).toBe(true);
+      }
+    }
+    for (const list of [world.trafficLights, world.signs, world.streetlights, world.trees]) {
+      for (const t of list) {
+        expect(t.position.every(Number.isFinite)).toBe(true);
+        expect(Number.isFinite(t.yaw)).toBe(true);
+      }
+    }
+  });
+
+  it("places traffic lights only at signalized intersections", () => {
+    expect(world.trafficLights.length).toBeGreaterThan(10);
+    const signalized = new Set(
+      district.intersections.filter((i) => i.signalized).map((i) => i.id),
+    );
+    for (const tl of world.trafficLights) {
+      expect(signalized.has(tl.nodeId)).toBe(true);
+    }
+  });
+
+  it("places the BG sign set (give-way, stop, limit-50, roundabout)", () => {
+    expect(world.stats.signs.giveWay).toBeGreaterThan(5);
+    expect(world.stats.signs.limit50).toBeGreaterThanOrEqual(1);
+    // One mapped roundabout -> its entries carry Д11.
+    expect(world.stats.signs.roundabout).toBeGreaterThanOrEqual(2);
+  });
+
+  it("paints zebras for marked/signal crossings that sit on drivable edges", () => {
+    const paintable = district.crossings.filter(
+      (c) => c.edgeId && (c.kind === "marked" || c.kind === "signals"),
+    ).length;
+    expect(world.stats.zebraCrossings).toBeGreaterThan(paintable * 0.8);
+    expect(world.stats.zebraCrossings).toBeLessThanOrEqual(paintable);
+  });
+
+  it("keeps the ODbL attribution visible in the build output", () => {
+    expect(world.attribution.text).toContain("OpenStreetMap contributors");
+    expect(world.attribution.copyrightUrl).toContain("openstreetmap.org/copyright");
+  });
+
+  it("stays inside the performance budget", () => {
+    expect(world.stats.drawCallEstimate).toBeLessThanOrEqual(150);
+    expect(world.stats.triangles).toBeLessThan(900_000);
+    expect(world.stats.trees).toBeGreaterThan(200);
+    expect(world.stats.trees).toBeLessThan(4000);
+    expect(world.stats.streetlights).toBeGreaterThan(50);
+  });
+
+  it("terrain stays at/below road level near roads and within relief bounds", () => {
+    const pos = world.terrain.positions;
+    for (let i = 1; i < pos.length; i += 3) {
+      expect(pos[i]!).toBeLessThanOrEqual(0.3);
+      expect(pos[i]!).toBeGreaterThanOrEqual(-0.011);
+    }
+  });
+
+  it("is deterministic end to end", () => {
+    const again = buildWorldGeometry(district);
+    expect(again.stats).toEqual(world.stats);
+    expect(again.markings.positions.length).toBe(world.markings.positions.length);
+    // Spot-check a buffer for byte equality.
+    expect(Array.from(again.sidewalks.indices.slice(0, 300))).toEqual(
+      Array.from(world.sidewalks.indices.slice(0, 300)),
+    );
+  });
+});

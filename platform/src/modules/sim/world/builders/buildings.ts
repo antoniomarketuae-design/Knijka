@@ -1,0 +1,124 @@
+/**
+ * Buildings: footprint rings extruded to flat-roof prisms.
+ * - Walls merged into one mesh PER facade palette variant (4 variants,
+ *   deterministic per building id) — 4 draw calls total.
+ * - Wall UVs: u = perimeter meters, v = height meters, both / FACADE_TILE_M
+ *   so the facade texture (4x4 window bays) tiles at true scale.
+ * - Ground floor: darker band via vertex colors (extra vertex row at
+ *   GROUND_BAND_M) — free, no extra material.
+ * - Roofs merged into one mesh (flat, ear-clip triangulated).
+ * - Collider: wall quads only, merged into a single trimesh.
+ */
+
+import type { DistrictBuilding } from "../types";
+import {
+  FACADE_TILE_M,
+  FACADE_VARIANTS,
+  GROUND_BAND_M,
+  GROUND_BAND_TINT,
+} from "./constants";
+import { hashString, toCCW, triangulate, type Vec2 } from "./math2d";
+import { MeshAccumulator, toWorld, UP } from "./mesh";
+
+export interface BuildingBuildResult {
+  walls: MeshAccumulator[];
+  roofs: MeshAccumulator;
+  collider: MeshAccumulator;
+  /** District-space AABBs (minX, minY, maxX, maxY) for prop placement. */
+  aabbs: [number, number, number, number][];
+  count: number;
+}
+
+export function facadeVariant(buildingId: string, height: number): number {
+  const h = hashString(buildingId);
+  // Tall blocks skew toward the panel-block palette (variant 0) — Студентски
+  // град is panelka country.
+  if (height >= 15 && h % 3 !== 0) return 0;
+  return h % FACADE_VARIANTS;
+}
+
+function buildOne(
+  wallAcc: MeshAccumulator,
+  roofAcc: MeshAccumulator,
+  colliderAcc: MeshAccumulator,
+  b: DistrictBuilding,
+): [number, number, number, number] {
+  const ring = toCCW(b.footprint as Vec2[]);
+  const h = Math.max(3, b.height);
+  const bandTop = Math.min(GROUND_BAND_M, h - 0.5);
+  const dark: [number, number, number] = [GROUND_BAND_TINT, GROUND_BAND_TINT, GROUND_BAND_TINT];
+  const light: [number, number, number] = [1, 1, 1];
+
+  let minX = Infinity;
+  let minY = Infinity;
+  let maxX = -Infinity;
+  let maxY = -Infinity;
+  let perim = 0;
+
+  for (let i = 0; i < ring.length; i++) {
+    const p0 = ring[i] as Vec2;
+    const p1 = ring[(i + 1) % ring.length] as Vec2;
+    minX = Math.min(minX, p0[0]);
+    minY = Math.min(minY, p0[1]);
+    maxX = Math.max(maxX, p0[0]);
+    maxY = Math.max(maxY, p0[1]);
+    const dx = p1[0] - p0[0];
+    const dy = p1[1] - p0[1];
+    const segLen = Math.hypot(dx, dy);
+    if (segLen < 1e-6) continue;
+    // CCW ring -> interior on the left -> outward normal = right of travel.
+    const nx = dy / segLen;
+    const ny = -dx / segLen;
+    const n: [number, number, number] = [nx, 0, -ny];
+    const u0 = perim / FACADE_TILE_M;
+    const u1 = (perim + segLen) / FACADE_TILE_M;
+    perim += segLen;
+
+    // Wall as two stacked quads: ground band (dark tint) + upper floors.
+    // Vertical wall along travel (b0, b1, t1, t0) faces right = outward.
+    const rows: [number, number, [number, number, number]][] = [
+      [0, bandTop, dark],
+      [bandTop, h, light],
+    ];
+    for (const [y0, y1, tint] of rows) {
+      const b0 = wallAcc.vertex(toWorld(p0[0], p0[1], y0), n, [u0, y0 / FACADE_TILE_M], tint);
+      const b1 = wallAcc.vertex(toWorld(p1[0], p1[1], y0), n, [u1, y0 / FACADE_TILE_M], tint);
+      const t1 = wallAcc.vertex(toWorld(p1[0], p1[1], y1), n, [u1, y1 / FACADE_TILE_M], tint);
+      const t0 = wallAcc.vertex(toWorld(p0[0], p0[1], y1), n, [u0, y1 / FACADE_TILE_M], tint);
+      wallAcc.quad(b0, b1, t1, t0);
+    }
+
+    // Collider: single full-height quad.
+    const cb0 = colliderAcc.vertex(toWorld(p0[0], p0[1], 0), n, [0, 0]);
+    const cb1 = colliderAcc.vertex(toWorld(p1[0], p1[1], 0), n, [0, 0]);
+    const ct1 = colliderAcc.vertex(toWorld(p1[0], p1[1], h), n, [0, 0]);
+    const ct0 = colliderAcc.vertex(toWorld(p0[0], p0[1], h), n, [0, 0]);
+    colliderAcc.quad(cb0, cb1, ct1, ct0);
+  }
+
+  // Roof: ear-clip the ring at height h (CCW input -> up-facing output).
+  const tris = triangulate(ring);
+  const roofIdx = ring.map((p) =>
+    roofAcc.vertex(toWorld(p[0], p[1], h), UP, [p[0] / 9, p[1] / 9]),
+  );
+  for (let i = 0; i < tris.length; i += 3) {
+    roofAcc.tri(roofIdx[tris[i]!]!, roofIdx[tris[i + 1]!]!, roofIdx[tris[i + 2]!]!);
+  }
+
+  return [minX, minY, maxX, maxY];
+}
+
+export function buildBuildings(buildings: DistrictBuilding[]): BuildingBuildResult {
+  const walls = Array.from({ length: FACADE_VARIANTS }, () => new MeshAccumulator(true));
+  const roofs = new MeshAccumulator();
+  const collider = new MeshAccumulator();
+  const aabbs: [number, number, number, number][] = [];
+  let count = 0;
+  for (const b of buildings) {
+    if (!b.footprint || b.footprint.length < 3) continue;
+    const variant = facadeVariant(b.id, b.height);
+    aabbs.push(buildOne(walls[variant]!, roofs, collider, b));
+    count++;
+  }
+  return { walls, roofs, collider, aabbs, count };
+}
