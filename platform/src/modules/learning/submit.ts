@@ -1,0 +1,126 @@
+/**
+ * Answer submission: grading + persistence.
+ *
+ * Grading: exact set match between selected option ids and the correct option
+ * ids — this handles "single" (exactly the one correct option) and "multi"
+ * (select ALL correct options, no extras — the official exam format has no
+ * partial credit, docs/education/32) with one rule.
+ *
+ * Persistence: one QuestionAttempt + a Progress upsert per concept the
+ * question maps to, in a single transaction (LearningStore.recordAnswer).
+ * QuestionAttempt.points stores the question's official weight (1|2|3);
+ * earned points are derivable via `correct`.
+ *
+ * masteryBefore/masteryAfter are averaged over the question's concepts
+ * (most questions map to exactly one concept).
+ */
+
+import { getContentRepo } from "@/lib/content/repo";
+import type { LawRef } from "@/lib/content/types";
+import { applyAnswer } from "./mastery";
+import { schedule } from "./scheduler";
+import { getLearningStore, type ProgressUpdate } from "./store";
+
+/** Contexts this module records. Exams are owned by the exam module. */
+export type AnswerContext = "practice" | "micro";
+
+export interface SubmitAnswerResult {
+  correct: boolean;
+  correctOptionIds: string[];
+  explanationBg: string;
+  lawRefs: LawRef[];
+  /** Avg mastery across the question's concepts before this answer (0..1). */
+  masteryBefore: number;
+  /** Avg mastery across the question's concepts after this answer (0..1). */
+  masteryAfter: number;
+}
+
+export async function submitAnswer(
+  userId: string,
+  questionId: string,
+  selectedOptionIds: string[],
+  context: AnswerContext,
+  now: Date = new Date(),
+): Promise<SubmitAnswerResult> {
+  const repo = getContentRepo();
+  const store = getLearningStore();
+
+  const question = repo.questionById(questionId);
+  if (!question) {
+    throw new Error(`submitAnswer: unknown question "${questionId}"`);
+  }
+
+  const knownOptionIds = new Set(question.options.map((o) => o.id));
+  for (const id of selectedOptionIds) {
+    if (!knownOptionIds.has(id)) {
+      throw new Error(
+        `submitAnswer: option "${id}" does not belong to question "${questionId}"`,
+      );
+    }
+  }
+
+  const correctOptionIds = question.options
+    .filter((o) => o.correct)
+    .map((o) => o.id);
+  const correct = sameSet(selectedOptionIds, correctOptionIds);
+
+  // ---- Per-concept mastery + schedule updates -----------------------------
+  const progress = await store.getProgress(userId);
+  const byConcept = new Map(progress.map((p) => [p.conceptId, p]));
+
+  const updates: ProgressUpdate[] = [];
+  let masteryBeforeSum = 0;
+  let masteryAfterSum = 0;
+
+  for (const conceptId of question.conceptIds) {
+    const row = byConcept.get(conceptId);
+    const masteryState = {
+      mastery: row?.mastery ?? 0,
+      lapses: row?.lapses ?? 0,
+    };
+    const scheduleState = { reps: row?.reps ?? 0, dueAt: row?.dueAt ?? null };
+
+    const nextMastery = applyAnswer(masteryState, correct, question.points);
+    const nextSchedule = schedule(scheduleState, correct, now);
+
+    masteryBeforeSum += masteryState.mastery;
+    masteryAfterSum += nextMastery.mastery;
+    updates.push({
+      conceptId,
+      mastery: nextMastery.mastery,
+      lapses: nextMastery.lapses,
+      reps: nextSchedule.reps,
+      dueAt: nextSchedule.dueAt,
+    });
+  }
+
+  await store.recordAnswer(
+    userId,
+    {
+      questionId: question.id,
+      context,
+      correct,
+      points: question.points,
+      answeredAt: now,
+    },
+    updates,
+  );
+
+  const conceptCount = Math.max(1, question.conceptIds.length);
+  return {
+    correct,
+    correctOptionIds,
+    explanationBg: question.explanationBg,
+    lawRefs: question.lawRefs,
+    masteryBefore: masteryBeforeSum / conceptCount,
+    masteryAfter: masteryAfterSum / conceptCount,
+  };
+}
+
+function sameSet(a: string[], b: string[]): boolean {
+  const setA = new Set(a);
+  const setB = new Set(b);
+  if (setA.size !== setB.size) return false;
+  for (const x of setA) if (!setB.has(x)) return false;
+  return true;
+}
