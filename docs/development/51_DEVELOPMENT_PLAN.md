@@ -24,8 +24,13 @@
 
 TypeScript strict everywhere · module public APIs only (doc 05) · every content item `status`-tracked · conventional commits · main always deployable · secrets in env, never committed · cost instrumentation on every LLM call. Full standards doc (52) grows as patterns settle — rules are added when a second instance appears, not speculatively.
 
-## Live Status
+## Live Status (updated 2026-07-07, end of day 1)
 
-- ✅ P0 started: repo initialized, docs committed, scaffold running, content contracts published
-- 🔄 P1 launched: content factory workflow (curriculum architect → per-topic question writers → per-topic auditors → graph consistency) + sign-catalog agent
-- 🔄 Vehicle-feel spike agent launched (P4 de-risk, feeds hour-40 checkpoint)
+- ✅ **P0 Foundations** — repo, scaffold, Prisma data model, auth, local DB, deploy-ready build
+- ✅ **P1 Content** — 16 topics, 152 concepts, **680 audited original questions** (waves 1+2), 64 signs; 188 flagged for founder review (excluded from exams); review file: content/review/FLAGGED-FOR-REVIEW.md
+- ✅ **P2 Learning Core** — practice engine (mastery, SM-2-lite, prerequisite gating), official-format mock exams (45/97/87/40:00), theory + exam UIs, readiness v1; verified end-to-end in browser
+- ✅ **P3 Monetization layer** — AI tutor (grounded, cost-tracked; awaiting ANTHROPIC_API_KEY), gamification (XP/streaks/achievements/missions), Stripe one-time packs + free-tier quotas (awaiting Stripe keys)
+- ✅ **P4 Sim Core (foundations)** — vehicle physics in /simulator (harness = CI gate), Sofia Студентски град district from OSM (doc 17), rule engine on official taxonomy + 13-step pre-drive machine
+- ⏭ **P5 next** — assemble driving lessons: district rendering in the sim scene, SimTick emission from the 3D world to the rule engine, 8 scored lessons, AI debrief wiring
+- Then **P6** — PWA packaging, onboarding, landing polish, deploy, content review pass, launch
+- Tests: **340 passing** · build green · ~23 commits
