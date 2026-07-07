@@ -36,12 +36,19 @@ import {
   type SubmitExamActionResult,
   type SubmitExamInput,
 } from "@/components/exam/types";
+import { trackActivity } from "@/modules/gamification";
+import { requireEntitlementForExam } from "@/modules/payments";
 
 const ATTEMPT_ID_RE = /^[A-Za-z0-9_-]{1,64}$/;
 
 /** „Започни пробен изпит" — form action on /exams. */
 export async function startExamAction(): Promise<void> {
   const user = await requireUser();
+
+  // Free tier: one mock exam total; packs unlock unlimited attempts.
+  if (!(await requireEntitlementForExam(user.id))) {
+    redirect("/pricing?status=exam-limit");
+  }
 
   let attemptId: string;
   try {
@@ -84,6 +91,12 @@ export async function submitExamAction(
       parsed.answers,
       parsed.clientElapsedSec,
     );
+
+    await trackActivity(user.id, {
+      type: "exam_completed",
+      passed: result.passed,
+      score: result.score,
+    });
 
     const summary: ResultSummary = {
       attemptId: result.attemptId,

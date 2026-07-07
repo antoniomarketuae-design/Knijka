@@ -8,9 +8,13 @@
  */
 
 import "@/lib/content/loader";
+import { redirect } from "next/navigation";
 import type { PracticeSubmitResult } from "@/components/theory/types";
+import { getContentRepo } from "@/lib/content/repo";
 import { requireUser } from "@/modules/auth";
+import { trackActivity } from "@/modules/gamification";
 import { submitAnswer } from "@/modules/learning";
+import { checkPracticeQuota } from "@/modules/payments";
 
 const MAX_ID_LENGTH = 120;
 const MAX_SELECTED_OPTIONS = 12;
@@ -41,12 +45,23 @@ export async function submitPracticeAnswer(
     throw new Error("submitPracticeAnswer: invalid selectedOptionIds");
   }
 
+  // Free tier: 20 practice questions per Sofia day; packs lift the limit.
+  const quota = await checkPracticeQuota(user.id);
+  if (!quota.allowed) redirect("/pricing?status=quota");
+
   const result = await submitAnswer(
     user.id,
     questionId,
     [...new Set(selectedOptionIds)],
     "practice",
   );
+
+  const weight = getContentRepo().questionById(questionId)?.points ?? 1;
+  await trackActivity(user.id, {
+    type: "practice_answer",
+    correct: result.correct,
+    points: weight,
+  });
 
   // Constrain the return value to exactly what the UI renders.
   return {

@@ -10,6 +10,7 @@ import {
   IconGear,
   IconHome,
   IconMenu,
+  IconStar,
   IconTrophy,
   IconWheel,
   IconX,
@@ -29,6 +30,7 @@ const NAV_ITEMS: NavItem[] = [
   { href: "/simulator", labelBg: "Симулатор", icon: IconWheel, soon: true },
   { href: "/tutor", labelBg: "AI Учител", icon: IconBot },
   { href: "/leaderboard", labelBg: "Класация", icon: IconTrophy },
+  { href: "/pricing", labelBg: "Планове", icon: IconStar },
   { href: "/settings", labelBg: "Настройки", icon: IconGear },
 ];
 

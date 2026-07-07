@@ -4,15 +4,20 @@ import {
   getTopicOverview as learningGetTopicOverview,
 } from "@/modules/learning";
 import { requireUser } from "@/modules/auth";
+import {
+  getSummary as gamificationGetSummary,
+  getDailyMission as gamificationGetDailyMission,
+  getRecentAchievements as gamificationGetRecentAchievements,
+} from "@/modules/gamification";
 import type { Topic } from "@/lib/content/types";
 
 /* ============================================================================
  * DASHBOARD DATA LAYER (server-only)
  * ============================================================================
  * Readiness, topic overview, profile and continue-lesson are REAL (learning +
- * auth modules). Gamification is read from the DB but nothing awards XP yet;
- * daily missions and achievements return empty until the gamification module
- * lands (P3) — the dashboard's empty states cover them honestly.
+ * auth modules). Gamification (XP/level/streak, daily mission, achievements)
+ * is served by the gamification module; XP is awarded by trackActivity()
+ * call sites in the practice and exam actions.
  * Components import ONLY types from this file (`import type`), so the server
  * imports above never reach the client bundle.
  * ========================================================================== */
@@ -95,8 +100,6 @@ export interface StudentProfile {
 
 /* ------------------------------------------------------------- real API */
 
-const XP_PER_LEVEL = 400;
-
 export async function getStudentProfile(): Promise<StudentProfile> {
   const user = await requireUser();
   const first = (user.name ?? "").trim().split(/\s+/)[0];
@@ -172,34 +175,26 @@ export async function getContinueLesson(): Promise<ContinueLesson | null> {
 
 export async function getGamification(): Promise<GamificationSummary> {
   const user = await requireUser();
-  const { db } = await import("@/lib/db");
-  const row = await db.gamificationState.findUnique({
-    where: { userId: user.id },
-  });
-
-  const xp = row?.xp ?? 0;
-  const today = new Date();
-  const sameDay = (d: Date) =>
-    d.getFullYear() === today.getFullYear() &&
-    d.getMonth() === today.getMonth() &&
-    d.getDate() === today.getDate();
-
-  return {
-    xp,
-    level: 1 + Math.floor(xp / XP_PER_LEVEL),
-    xpIntoLevel: xp % XP_PER_LEVEL,
-    xpForNextLevel: XP_PER_LEVEL,
-    streakDays: row?.streak ?? 0,
-    streakActiveToday: row?.lastActiveDay ? sameDay(row.lastActiveDay) : false,
-  };
+  // Level math (1 + floor(xp/400)) and Sofia-day streak logic live in the
+  // gamification module; the summary shape matches 1:1.
+  return gamificationGetSummary(user.id);
 }
 
-/** P3 — gamification module will generate these; empty states cover it. */
+/** Deterministic per (user, Sofia day); progress derived from today's attempts. */
 export async function getDailyMission(): Promise<DailyMission | null> {
-  return null;
+  const user = await requireUser();
+  return gamificationGetDailyMission(user.id);
 }
 
-/** P3 — no achievement engine yet; honest empty list. */
+/** Newest 4 earned achievements (daily-mission markers filtered out). */
 export async function getRecentAchievements(): Promise<Achievement[]> {
-  return [];
+  const user = await requireUser();
+  const recent = await gamificationGetRecentAchievements(user.id, 4);
+  return recent.map((a) => ({
+    id: a.id,
+    titleBg: a.titleBg,
+    descriptionBg: a.descriptionBg,
+    icon: a.icon,
+    earnedAt: a.earnedAt,
+  }));
 }
