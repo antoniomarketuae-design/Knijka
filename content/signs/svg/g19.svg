@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" role="img" aria-labelledby="t">
+<title id="t">Г19 — Задължителни вериги за сняг най-малко на две от двигателните колела</title>
+<circle cx="100" cy="100" r="90" fill="#0057a8"/><circle cx="100" cy="100" r="84" fill="none" stroke="#fff" stroke-width="5"/>
+<circle cx="100" cy="104" r="40" fill="none" stroke="#fff" stroke-width="11"/>
+<path d="M 62,104 L 84,86 L 100,104 L 116,86 L 138,104 M 84,86 L 84,122 M 116,86 L 116,122" fill="none" stroke="#fff" stroke-width="7"/>
+</svg>

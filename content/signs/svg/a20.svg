@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" role="img" aria-labelledby="t">
+<title id="t">А20 — Велосипедисти и водачи на индивидуално електрическо превозно средство</title>
+<polygon points="100,22 186,170 14,170" fill="#fff" stroke="#c1121f" stroke-width="16" stroke-linejoin="round"/>
+<g fill="#1d1d1b"><g transform="translate(100,130) scale(1)" fill="none" stroke="#1d1d1b" stroke-width="7">
+<circle cx="-30" cy="18" r="20"/><circle cx="30" cy="18" r="20"/>
+<path d="M -30,18 L -14,-12 H 16 L 30,18 M -14,-12 L 2,18 H -30 M 16,-12 l -4,-8 h 12 M -14,-12 h -8"/>
+</g></g>
+</svg>

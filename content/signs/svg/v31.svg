@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" role="img" aria-labelledby="t">
+<title id="t">В31 — Край на забраната за изпреварване на моторни превозни средства</title>
+<defs><clipPath id="cc"><circle cx="100" cy="100" r="82"/></clipPath></defs>
+<circle cx="100" cy="100" r="88" fill="#fff" stroke="#b3b3b3" stroke-width="8"/>
+<g transform="translate(62,102) scale(0.95)" fill="#8a8a8a">
+<path d="M -40,8 q0,-8 8,-10 l10,-2 8,-9 q2,-3 7,-3 h16 q5,0 7,3 l8,9 12,3 q6,2 6,9 v6 h-8 a9,9 0 0 0 -18,0 h-30 a9,9 0 0 0 -18,0 h-8 z"/>
+<circle cx="-22" cy="14" r="7"/><circle cx="26" cy="14" r="7"/>
+</g><g transform="translate(138,102) scale(0.95)" fill="#8a8a8a">
+<path d="M -40,8 q0,-8 8,-10 l10,-2 8,-9 q2,-3 7,-3 h16 q5,0 7,3 l8,9 12,3 q6,2 6,9 v6 h-8 a9,9 0 0 0 -18,0 h-30 a9,9 0 0 0 -18,0 h-8 z"/>
+<circle cx="-22" cy="14" r="7"/><circle cx="26" cy="14" r="7"/>
+</g>
+<g clip-path="url(#cc)" stroke="#1d1d1b" stroke-width="6">
+<line x1="10" y1="130" x2="130" y2="10"/><line x1="30" y1="170" x2="170" y2="30"/><line x1="70" y1="190" x2="190" y2="70"/>
+</g>
+</svg>

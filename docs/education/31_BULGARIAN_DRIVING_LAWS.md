@@ -9,7 +9,7 @@
 | **ЗДвП** (Закон за движението по пътищата, 1999) | Core traffic law; categories чл. 150а; ages чл. 151 | Latest major amendment ДВ бр. 64/05.08.2025, in force 07.09.2025 (average-speed enforcement, e-scooter/pedestrian/cyclist rules) — [consolidated PDF](https://rta.government.bg/upload/9167/zdvp.pdf) |
 | **Наредба № 37** от 02.08.2002 | Training of candidate drivers | Amended through ДВ бр. 77/10.09.2024, in force 12.12.2024 — [official PDF](https://rta.government.bg/upload/642/n37.pdf) |
 | **Наредба № 38** от 16.04.2004 | Examinations | Amended through ДВ бр. 77/10.09.2024 — [official PDF](https://rta.government.bg/upload/9175/n38.pdf) |
-| **Наредба № РД-02-21-1** от 23.11.2023 (МРРБ) | Road signs/signalization — appears to supersede Наредба № 18/2001 | Repeal relationship **[UNVERIFIED — confirm before building sign catalog]** — [mrrb.bg](https://www.mrrb.bg/bg/naredba-rd-02-21-1-ot-23-11-2023-g-za-signalizaciya-na-putistata-s-putni-znaci/) |
+| **Наредба № РД-02-21-1** от 23.11.2023 (МРРБ) | Road signs/signalization | **Verified current** (ДВ бр. 101/2023, in force Aug 2024); Наредба № 18/2001 explicitly repealed (ДВ бр. 98/2024). All sign lawRefs cite the 2023 ordinance — [mrrb.bg](https://www.mrrb.bg/bg/naredba-rd-02-21-1-ot-23-11-2023-g-za-signalizaciya-na-putistata-s-putni-znaci/) |
 
 ### Pending 2026 drafts — TRACK THESE (content must update when adopted)
 - **НИД Наредба № 37** (consultation closed 04.04.2026): fully electronic training records with geolocation, **mandatory night-driving hours**, training expires after 2 years — [strategy.bg/12192](https://www.strategy.bg/bg/public-consultations/12192)
@@ -33,6 +33,6 @@
 
 ## Open Legal Items (carried in risk register)
 
-1. Confirm Наредба № 18 (2001) vs РД-02-21-1 (2023) supersession before sign catalog build.
+1. ~~Confirm Наредба № 18 (2001) vs РД-02-21-1 (2023) supersession~~ — **RESOLVED 2026-07-07**: 2023 ordinance current, № 18 repealed (ДВ бр. 98/2024).
 2. Written ИААА position on commercial reuse of the official exam-question масив (see doc 32 — the single biggest content dependency).
 3. Verify post-ДВ-77/2024 consolidated Наредба № 38 чл. 39 text + the 10.12.2024 Методика before hard-coding exam scoring.

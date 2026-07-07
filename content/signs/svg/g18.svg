@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" role="img" aria-labelledby="t">
+<title id="t">Г18 — Край на задължителната минимална скорост</title>
+<circle cx="100" cy="100" r="90" fill="#0057a8"/><circle cx="100" cy="100" r="84" fill="none" stroke="#fff" stroke-width="5"/>
+<text x="100" y="126" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-weight="bold" font-size="72" fill="#fff">50</text><line x1="44" y1="156" x2="156" y2="44" stroke="#c1121f" stroke-width="14"/>
+</svg>

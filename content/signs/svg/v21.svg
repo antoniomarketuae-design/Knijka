@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" role="img" aria-labelledby="t">
+<title id="t">В21 — Забранено е завиването надясно</title>
+<circle cx="100" cy="100" r="88" fill="#fff" stroke="#c1121f" stroke-width="20"/>
+<path d="M 88,152 V 116 Q 88,96 108,96 H 116" fill="none" stroke="#1d1d1b" stroke-width="14"/>
+<polygon points="114,82 144,96 114,110" fill="#1d1d1b"/><line x1="46" y1="46" x2="154" y2="154" stroke="#c1121f" stroke-width="14"/>
+</svg>

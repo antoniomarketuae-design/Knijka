@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" role="img" aria-labelledby="t">
+<title id="t">Е22 — Допустими максимални скорости на движение</title>
+<rect x="22" y="8" width="156" height="184" rx="10" fill="#fff" stroke="#1d1d1b" stroke-width="4"/>
+<text x="100" y="34" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-weight="bold" font-size="22" fill="#1d1d1b">BG · BULGARIA</text>
+<line x1="30" y1="42" x2="170" y2="42" stroke="#1d1d1b" stroke-width="3"/>
+<g font-family="Arial, Helvetica, sans-serif" font-weight="bold" font-size="26" fill="#1d1d1b">
+<g transform="translate(52,74)"><polygon points="-14,0 0,-13 14,0 10,0 10,12 -10,12 -10,0" /></g><text x="120" y="86">50</text>
+<g transform="translate(52,110)"><path d="M -12,14 L -2,-10 M 12,14 L 2,-10" stroke="#1d1d1b" stroke-width="5" fill="none"/></g><text x="120" y="122">90</text>
+<g transform="translate(52,146) scale(0.24) translate(-100,-104)"><g fill="#1d1d1b">
+<polygon points="60,162 80,46 90,46 78,162"/><polygon points="140,162 120,46 110,46 122,162"/>
+<rect x="44" y="88" width="112" height="18" rx="9"/></g><line x1="100" y1="30" x2="100" y2="46" stroke="#fff" stroke-width="0"/></g><text x="108" y="158">120</text>
+<g transform="translate(52,180) scale(0.24) translate(-100,-104)"><g fill="#1d1d1b">
+<polygon points="60,162 80,46 90,46 78,162"/><polygon points="140,162 120,46 110,46 122,162"/>
+<rect x="44" y="88" width="112" height="18" rx="9"/></g></g><text x="108" y="190">140</text>
+</g>
+</svg>

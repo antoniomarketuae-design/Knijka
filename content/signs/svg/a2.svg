@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" role="img" aria-labelledby="t">
+<title id="t">А2 — Опасен завой наляво</title>
+<polygon points="100,22 186,170 14,170" fill="#fff" stroke="#c1121f" stroke-width="16" stroke-linejoin="round"/>
+<g fill="#1d1d1b"><path d="M 110,155 V 122 Q 110,104 92,104 H 86" fill="none" stroke="#1d1d1b" stroke-width="13"/>
+<polygon points="88,91 60,104 88,117"/></g>
+</svg>
