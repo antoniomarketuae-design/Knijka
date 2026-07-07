@@ -1,0 +1,8 @@
+{
+  "file": "content/questions/alkohol-i-godnost.json",
+  "total": 20,
+  "fixed": 3,
+  "flaggedLegal": 2,
+  "removed": 0,
+  "notes": "Structure: 20 questions, all ids unique, all 8 conceptIds resolve in concepts.json; single/multi correct-option counts valid throughout; points mix exactly 40/40/20 and type mix 60/40 per SCHEMA.md. Fixes: q-007 — option b and explanation claimed a positive roadside drug test is itself a crime; NK chl. 343b requires ustanovena upotreba (confirmed by blood test), reworded to zero-tolerance framing without overstating; q-011 — '2-3 sekundi mikroson sa okolo 75 metra' at 90 km/h corrected to 50-75 m (25 m/s); q-016 — stem was near-listovki phrasing ('Koga vodachat ima pravo da izpolzva mobilen telefon...'), rewritten as an original second-person scenario, options aligned. Legal flags kept: q-019 and q-020 remain status needs-review with honest 'chl. 151?' refs (glasses-condition and medical-certificate content is legally sound, exact article basis unverified per docs/education/31). Verified correct against docs 31/32 and current law: 0.5 promille limit (ZDvP chl. 5), >1.2 promille crime (NK chl. 343b), vehicle confiscation post-2023 (q-003d), blood-sample right and refusal sanctions (ZDvP chl. 174), hands-free-only rule (chl. 104a). Nothing irredeemable; removed: 0."
+}

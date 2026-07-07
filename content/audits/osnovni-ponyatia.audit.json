@@ -1,0 +1,8 @@
+{
+  "file": "content/questions/osnovni-ponyatia.json",
+  "total": 22,
+  "fixed": 2,
+  "flaggedLegal": 4,
+  "removed": 0,
+  "notes": "Adversarial audit vs SCHEMA.md, docs/education/31+32 and Bulgarian traffic law. STRUCTURE: all 22 pass — ids unique, all conceptIds resolve in concepts.json, exactly 1 correct per single and 2+ per multi, points in {1,2,3}; mix 64% single / 36% multi, points 41%/41%/18% (within guidance). LEGAL: all correct answers verified — § 6 ДР definitions (participants, pedestrian pushing a bicycle, road elements, МПС excl. rail so trolleybus yes / tram no), чл. 5 obligations, чл. 7 signal hierarchy (regulator > light > sign > marking), чл. 8/15 keep-right, чл. 104а hands-free only, чл. 137а belts, чл. 150а cat. B (3.5 t, 8+1 seats, trailer ≤750 kg); q-013 '3 months before 18' confirmed by doc 31. FIXED: q-osnovni-011 option a used wrong term 'насрещното платно' (платно = whole carriageway per § 6 ДР) → 'лентата за насрещно движение'; q-osnovni-009 literary 'понечва' → 'се кани' (teen register). FLAGGED (pre-existing needs-review kept, refs carry honest '?' per schema rule 2): q-005 (banket ban — answer correct, exact чл. 15 alinea unconfirmed), q-009 (littering — чл. 5 point unconfirmed), q-013 (correct per doc 31, Наредба 37 article unconfirmed; note pending 2026 НИД Наредба 37 may change training rules), q-019 (child restraint — чл. 137в likely correct but unverified). NO listovki-like phrasing found — scenario wording is original. REMOVED: none."
+}

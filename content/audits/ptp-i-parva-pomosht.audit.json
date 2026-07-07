@@ -1,0 +1,8 @@
+{
+  "file": "content/questions/ptp-i-parva-pomosht.json",
+  "total": 22,
+  "fixed": 19,
+  "flaggedLegal": 1,
+  "removed": 0,
+  "notes": "SYSTEMIC DEFECT FIXED: every correct answer sat at option 'a' (and multi corrects were always the leading options) — reshuffled options with relabeled ids in 19/22 questions; distribution now a/b/c/d mixed. Legal verification: q-ptp-006 чл. 125 ЗДвП confirmed (police attend at injured / fault dispute / alcohol suspicion) — '?' removed, needs-review→draft; q-ptp-007 Наредба № Iз-41 чл. 5 confirmed as basis for двустранен протокол (material damage + agreement) — needs-review→draft; q-ptp-011 100 m triangle rule on motorway confirmed per чл. 97 ЗДвП — needs-review→draft. q-ptp-009 KEPT needs-review: correct answer stands (leaving scene with injured = criminal liability regardless of fault), but 'реален затвор' overstated and НК basis corrected to чл. 140 (неоказване на помощ, fault-independent) + чл. 343, ал. 3 (fleeing after culpably caused ПТП) — exact qualification flagged with [REVIEW] in explanationBg. Content otherwise accurate: ПТП definition (§ 6 ДР), чл. 123/124 duties, 30 m triangle (чл. 97), CPR 100–120/min and 30:2, recovery position, helmet-stays-on rule, embedded-object rule all check out against docs 31/32 and standard ERC first-aid guidance. No listovki-copied phrasing detected (scenario-based original wording); Bulgarian reads natural for a 17-year-old. Points mix 9×1/9×2/4×3 and 64/36 single/multi within schema guidance. Zero removals — no irredeemable items."
+}

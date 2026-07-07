@@ -1,0 +1,8 @@
+{
+  "file": "content/questions/krastovishta.json",
+  "total": 20,
+  "fixed": 20,
+  "flaggedLegal": 2,
+  "removed": 0,
+  "notes": "Systemic defect caught and fixed: in the original file EVERY correct answer sat at the top of the options list (all 12 singles had 'a' correct; all 8 multis had correct sets starting at a/b) — a student could pass by always picking the first options. Correct positions redistributed across a-d in all 20 questions (ids kept sequential, texts unchanged). Legal verification against docs/education/31-32 and ЗДвП: чл. 47/48/37/50/50а/7/25 applications all accurate, incl. roundabout priority (чл. 50а, 2017) and stop-while-barriers-rising (чл. 52). Confirmed previously uncertain refs and upgraded needs-review -> draft with '?' removed: q-009/q-011 (чл. 36 turning positioning), q-016 (чл. 51), q-017 (чл. 52), q-018 (чл. 54). Left needs-review (flaggedLegal=2): q-019 (answer correct but no confident ЗДвП article for junction-blocking; ref stays 'чл. 47?') and q-020 (flashing-yellow meaning ref 'ППЗДвП чл. 31?' unverified; also reworded option 'те задължава да преминеш' -> 'можеш да преминеш, но само с повишено внимание' for accuracy). Minor language fix q-013 ('в отсрещната му част' -> 'в отсрещната част на кръга'). All conceptIds resolve in concepts.json; ids unique; points mix 8x1/8x2/4x3 and 12 single/8 multi match SCHEMA guidance; phrasing is scenario-based and original, no listovki-like items found; nothing irredeemable, 0 removed. JSON re-validated: parses, exactly-one-correct on singles, 2+ on multis."
+}

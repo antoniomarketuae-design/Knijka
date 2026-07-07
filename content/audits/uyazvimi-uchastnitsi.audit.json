@@ -1,0 +1,8 @@
+{
+  "file": "content/questions/uyazvimi-uchastnitsi.json",
+  "total": 22,
+  "fixed": 8,
+  "flaggedLegal": 4,
+  "removed": 0,
+  "notes": "Adversarial audit 2026-07-07. Schema: all 22 questions valid — ids q-uyazvimi-001..022 unique repo-wide, all 11 conceptIds resolve in concepts.json, single questions have exactly 1 correct option, multi have 2-3, mix is 13 single / 9 multi (59/41) and points 41%x1 / 41%x2 / 18%x3, within contract guidance. Legal: correct answers verified against ZDvP and docs 31/32; no wrong answers found. Fixed lawRefs where the article is certain, removing dishonest '?' suffixes: chl. 42 (overtaking side distance, q-010/q-012), chl. 80 (cyclists, q-012), chl. 80a (IEPS, q-013), chl. 25 (joining traffic, q-020), chl. 108+113 (pedestrians, q-022); dropped unverifiable secondary ref 'chl. 66?' from q-019 (chl. 116 carries the answer). Flagged needs-review per SCHEMA hard rule 2 (uncertain refs must not stay draft): q-014 (IEPS details post DV 64/2025), q-017 (residential-zone article, guess corrected 61->62), q-018 (exit-from-zone article 63?), q-021 (pedestrian-zone regime ref in Naredba RD-02-21-1/2023); REVIEW issue prepended to each explanationBg. No listovki-like phrasing detected — all items are original scenario-based wording. Bulgarian is natural, second-person, teen-appropriate; no rewrites needed. Nothing removed."
+}

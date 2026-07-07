@@ -1,0 +1,27 @@
+{
+  "audit": "graph-integrity",
+  "date": "2026-07-07",
+  "scope": [
+    "content/topics.json",
+    "content/concepts.json",
+    "content/questions/*.json (16 files)",
+    "content/signs/signs.json (included in global id-uniqueness check)"
+  ],
+  "stats": {
+    "topics": 16,
+    "concepts": 152,
+    "questionFiles": 16,
+    "questions": 339,
+    "signs": 64,
+    "conceptsCovered": 152
+  },
+  "checks": {
+    "globalIdUniqueness": { "ok": true, "duplicates": [] },
+    "referencesResolve": { "ok": true, "danglingRefs": [] },
+    "dependsOnAcyclic": { "ok": true, "cycles": [] },
+    "everyTopicHasQuestions": { "ok": true, "topicsWithoutQuestions": [], "detail": "1:1 mapping between the 16 topic slugs and the 16 files in content/questions/; every file parses and is non-empty." },
+    "everyConceptExercised": { "ok": true, "uncoveredConcepts": [], "detail": "All 152 concepts are referenced by at least one question via conceptIds. No wave-2 coverage gaps." }
+  },
+  "fixesApplied": [],
+  "notes": "Full pass, no mechanical breakages found and nothing modified. All ids are unique across topics, concepts, questions and signs; every topicId/conceptIds/dependsOn reference resolves; the dependsOn graph is acyclic; every topic has a matching non-empty question file; every concept is exercised. One out-of-scope content observation carried over from predimstvo.audit.json note (7): in concepts.json the lawRefs of c-right-hand-rule ('чл. 48?') and c-priority-road ('чл. 50') appear swapped (дясното = чл. 50, път с предимство = чл. 48) — legal-content issue, not a graph defect; left for the legal-accuracy reviewer."
+}
