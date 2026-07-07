@@ -16,5 +16,8 @@ export type {
 export { submitAnswer } from "./submit";
 export type { AnswerContext, SubmitAnswerResult } from "./submit";
 
+export { applyGradedAnswers } from "./examFeed";
+export type { GradedAnswer } from "./examFeed";
+
 export { getReadiness, getTopicOverview } from "./readiness";
 export type { ConceptReadiness, Readiness, TopicOverview } from "./readiness";

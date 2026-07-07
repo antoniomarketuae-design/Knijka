@@ -54,6 +54,11 @@ export interface LearningStore {
     attempt: AttemptRecord,
     updates: ProgressUpdate[],
   ): Promise<void>;
+  /**
+   * Progress-only upserts (no QuestionAttempt) — used by the exam mastery
+   * feed, where the exam module already owns the attempt rows.
+   */
+  upsertProgress(userId: string, updates: ProgressUpdate[]): Promise<void>;
 }
 
 function createPrismaStore(): LearningStore {
@@ -81,6 +86,31 @@ function createPrismaStore(): LearningStore {
         select: { questionId: true },
       });
       return [...new Set(rows.map((r) => r.questionId))];
+    },
+
+    async upsertProgress(userId, updates) {
+      const db = await getDb();
+      await db.$transaction(
+        updates.map((u) =>
+          db.progress.upsert({
+            where: { userId_conceptId: { userId, conceptId: u.conceptId } },
+            create: {
+              userId,
+              conceptId: u.conceptId,
+              mastery: u.mastery,
+              reps: u.reps,
+              lapses: u.lapses,
+              dueAt: u.dueAt,
+            },
+            update: {
+              mastery: u.mastery,
+              reps: u.reps,
+              lapses: u.lapses,
+              dueAt: u.dueAt,
+            },
+          }),
+        ),
+      );
     },
 
     async recordAnswer(userId, attempt, updates) {

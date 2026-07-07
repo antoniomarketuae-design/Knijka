@@ -186,6 +186,21 @@ export async function submitExam(
       })),
   );
 
+  // Feed graded answers into per-concept mastery (learning module).
+  // Best-effort: a mastery-feed failure must never lose a graded exam.
+  try {
+    const { applyGradedAnswers } = await import("@/modules/learning");
+    await applyGradedAnswers(
+      userId,
+      grade.perQuestion
+        .filter((p) => answeredIds.has(p.questionId))
+        .map((p) => ({ questionId: p.questionId, correct: p.correct })),
+      now,
+    );
+  } catch (err) {
+    console.warn("exam: mastery feed failed (grade persisted)", err);
+  }
+
   return { attemptId, late, ...grade, passed };
 }
 

@@ -231,4 +231,13 @@ export class FakeLearningStore implements LearningStore {
       this.seedProgress(userId, { ...u, updatedAt: attempt.answeredAt });
     }
   }
+
+  async upsertProgress(
+    userId: string,
+    updates: ProgressUpdate[],
+  ): Promise<void> {
+    for (const u of updates) {
+      this.seedProgress(userId, { ...u, updatedAt: new Date() });
+    }
+  }
 }
