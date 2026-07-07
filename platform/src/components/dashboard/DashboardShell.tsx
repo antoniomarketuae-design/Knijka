@@ -27,7 +27,7 @@ const NAV_ITEMS: NavItem[] = [
   { href: "/dashboard", labelBg: "Начало", icon: IconHome },
   { href: "/theory", labelBg: "Теория", icon: IconBook },
   { href: "/exams", labelBg: "Изпити", icon: IconClipboardCheck },
-  { href: "/simulator", labelBg: "Симулатор", icon: IconWheel, soon: true },
+  { href: "/simulator", labelBg: "Симулатор", icon: IconWheel },
   { href: "/tutor", labelBg: "AI Учител", icon: IconBot },
   { href: "/leaderboard", labelBg: "Класация", icon: IconTrophy },
   { href: "/pricing", labelBg: "Планове", icon: IconStar },
