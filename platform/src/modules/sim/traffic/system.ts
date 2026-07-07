@@ -1,0 +1,236 @@
+/**
+ * TrafficSystem — owns all agents and advances them in ONE per-frame update.
+ *
+ * Update order inside a frame: pedestrians first (vehicles then react to
+ * fresh crossing occupancy), then vehicles in fixed index order. Pedestrian
+ * gap checks read vehicle poses from the previous frame — one frame of
+ * staleness is invisible at 60 Hz and keeps the pass order simple.
+ *
+ * Determinism: (seed, district, config, dt sequence) fully determine the
+ * playback. All randomness is drawn at init or from per-agent streams; the
+ * update path allocates nothing and iterates in fixed order.
+ */
+
+import { buildLaneGraph, type LaneGraph } from "./graph";
+import {
+  buildPedRoute,
+  createPedestrianAgent,
+  updatePedestrian,
+  type PedestrianAgent,
+  type PedestrianEnv,
+} from "./pedestrians";
+import { mulberry32, rngRange } from "./rng";
+import { buildRoutes, type TrafficRoute } from "./routes";
+import {
+  createVehicleAgent,
+  updateVehicle,
+  type NodeReservation,
+  type VehicleAgent,
+  type VehicleEnv,
+} from "./vehicles";
+import {
+  DEFAULT_TRAFFIC_CONFIG,
+  type TrafficConfig,
+  type TrafficDistrict,
+  type TrafficPedestrianState,
+  type TrafficSystem,
+  type TrafficSystemStats,
+  type TrafficUpdateContext,
+  type TrafficVehicleState,
+} from "./types";
+
+const MAX_DT_SEC = 0.1;
+const VEHICLE_COLOR_VARIANTS = 4;
+const PED_COLOR_VARIANTS = 4;
+
+class TrafficSystemImpl implements TrafficSystem {
+  readonly vehicles: TrafficVehicleState[] = [];
+  readonly pedestrians: TrafficPedestrianState[] = [];
+  readonly stats: TrafficSystemStats;
+  timeSec = 0;
+
+  private readonly graph: LaneGraph;
+  private readonly routes: TrafficRoute[];
+  private readonly vehicleAgents: VehicleAgent[] = [];
+  private readonly pedestrianAgents: PedestrianAgent[] = [];
+  private readonly crossingCounts = new Map<string, number>();
+  private readonly reservations = new Map<string, NodeReservation>();
+  private readonly vehicleEnv: VehicleEnv;
+  private readonly pedestrianEnv: PedestrianEnv;
+
+  constructor(district: TrafficDistrict, cfg: TrafficConfig) {
+    const rng = mulberry32(cfg.seed);
+    this.graph = buildLaneGraph(district, {
+      laneWidthM: cfg.laneWidthM,
+      excludedRoadClasses: cfg.excludedRoadClasses,
+      crossingSignalRadiusM: 45,
+    });
+
+    // Reservation slots for every unsignalized intersection.
+    for (const ix of district.intersections) {
+      if (!ix.signalized && ix.degree >= 3) {
+        this.reservations.set(ix.id, { holder: -1, renewedAt: -Infinity });
+      }
+    }
+    for (const crossing of district.crossings) {
+      this.crossingCounts.set(crossing.id, 0);
+    }
+
+    // --- Vehicles: a few loops, agents spread around each loop.
+    const routeCount = Math.max(1, Math.ceil(cfg.vehicleCount / 2));
+    this.routes = buildRoutes(this.graph, routeCount, rng);
+    if (this.routes.length > 0) {
+      const perRoute = new Map<number, number>();
+      for (let i = 0; i < cfg.vehicleCount; i++) {
+        perRoute.set(i % this.routes.length, (perRoute.get(i % this.routes.length) ?? 0) + 1);
+      }
+      const placed = new Map<number, number>();
+      for (let i = 0; i < cfg.vehicleCount; i++) {
+        const ri = i % this.routes.length;
+        const route = this.routes[ri];
+        const n = perRoute.get(ri) ?? 1;
+        const k = placed.get(ri) ?? 0;
+        placed.set(ri, k + 1);
+        // Even spacing around the loop + a little seeded jitter.
+        const loopS =
+          ((route.totalLength * k) / n + rngRange(rng, 0, Math.min(15, route.totalLength / (n * 4)))) %
+          route.totalLength;
+        const agent = createVehicleAgent(
+          i,
+          route,
+          loopS,
+          rngRange(rng, 0.82, 1.0),
+          Math.floor(rng() * VEHICLE_COLOR_VARIANTS),
+        );
+        this.vehicleAgents.push(agent);
+        this.vehicles.push(agent.state);
+      }
+    }
+
+    // --- Pedestrians: loops anchored on seeded-shuffled crossings.
+    const edgeById = new Map(district.roads.edges.map((e) => [e.id, e]));
+    const candidates = [...district.crossings].sort((a, b) => (a.id < b.id ? -1 : 1));
+    // Fisher-Yates with the master stream.
+    for (let i = candidates.length - 1; i > 0; i--) {
+      const j = Math.floor(rng() * (i + 1));
+      const tmp = candidates[i];
+      candidates[i] = candidates[j];
+      candidates[j] = tmp;
+    }
+    let pedId = 0;
+    for (let pass = 0; pass < 2 && pedId < cfg.pedestrianCount; pass++) {
+      for (const crossing of candidates) {
+        if (pedId >= cfg.pedestrianCount) break;
+        const edge = edgeById.get(crossing.edgeId);
+        if (!edge) continue;
+        const route = buildPedRoute(crossing, edge, cfg.laneWidthM, rng);
+        if (!route) continue;
+        const agent = createPedestrianAgent(
+          pedId,
+          route,
+          mulberry32(cfg.seed ^ (0x9e3779b9 + pedId * 0x85ebca6b)),
+          Math.floor(rng() * PED_COLOR_VARIANTS),
+          cfg,
+        );
+        this.pedestrianAgents.push(agent);
+        this.pedestrians.push(agent.state);
+        pedId++;
+      }
+    }
+
+    this.vehicleEnv = {
+      cfg,
+      graph: this.graph,
+      agents: this.vehicleAgents,
+      reservations: this.reservations,
+      crossingCounts: this.crossingCounts,
+      signalPhase: () => "green",
+      timeSec: 0,
+      hasPlayer: false,
+      playerX: 0,
+      playerY: 0,
+      playerSpeedMps: 0,
+      playerDirX: 0,
+      playerDirY: 1,
+    };
+    this.pedestrianEnv = {
+      cfg,
+      graph: this.graph,
+      vehicles: this.vehicleAgents,
+      crossingCounts: this.crossingCounts,
+      signalPhase: () => "green",
+      hasPlayer: false,
+      playerX: 0,
+      playerY: 0,
+      playerSpeedKmh: 0,
+    };
+
+    // Publish initial poses (dt = 0 moves nothing, only samples polylines).
+    for (const agent of this.pedestrianAgents) updatePedestrian(agent, 0, this.pedestrianEnv);
+    for (const agent of this.vehicleAgents) updateVehicle(agent, 0, this.vehicleEnv);
+
+    this.stats = {
+      vehicleCount: this.vehicleAgents.length,
+      pedestrianCount: this.pedestrianAgents.length,
+      routeCount: this.routes.length,
+      laneCount: this.graph.lanes.length,
+    };
+  }
+
+  update(dtSec: number, ctx: TrafficUpdateContext): void {
+    const dt = dtSec > MAX_DT_SEC ? MAX_DT_SEC : dtSec;
+    if (!(dt > 0)) return;
+    this.timeSec += dt;
+
+    const vEnv = this.vehicleEnv;
+    const pEnv = this.pedestrianEnv;
+    vEnv.signalPhase = ctx.signalPhase;
+    pEnv.signalPhase = ctx.signalPhase;
+    vEnv.timeSec = this.timeSec;
+    if (ctx.playerPos) {
+      vEnv.hasPlayer = true;
+      pEnv.hasPlayer = true;
+      vEnv.playerX = ctx.playerPos.x;
+      vEnv.playerY = ctx.playerPos.y;
+      pEnv.playerX = ctx.playerPos.x;
+      pEnv.playerY = ctx.playerPos.y;
+      const kmh = ctx.playerSpeedKmh ?? 50; // unknown speed = assume moving
+      vEnv.playerSpeedMps = kmh / 3.6;
+      pEnv.playerSpeedKmh = kmh;
+      if (ctx.playerHeadingDeg !== undefined) {
+        const rad = (ctx.playerHeadingDeg * Math.PI) / 180;
+        vEnv.playerDirX = Math.sin(rad); // 0 deg = north (+y), cw positive
+        vEnv.playerDirY = Math.cos(rad);
+      } else {
+        vEnv.playerDirX = 0;
+        vEnv.playerDirY = 0; // no heading -> never "aligned", treated static
+      }
+    } else {
+      vEnv.hasPlayer = false;
+      pEnv.hasPlayer = false;
+    }
+
+    for (let i = 0; i < this.pedestrianAgents.length; i++) {
+      updatePedestrian(this.pedestrianAgents[i], dt, pEnv);
+    }
+    for (let i = 0; i < this.vehicleAgents.length; i++) {
+      updateVehicle(this.vehicleAgents[i], dt, vEnv);
+    }
+  }
+
+  pedestrianOnCrossing(crossingId: string): boolean {
+    return (this.crossingCounts.get(crossingId) ?? 0) > 0;
+  }
+}
+
+/**
+ * Build the scripted traffic for a district. Do it once per session (route
+ * precomputation walks the whole road graph); the returned system is then
+ * O(agents) per frame with zero allocations.
+ */
+export function createTrafficSystem(
+  district: TrafficDistrict,
+  config?: Partial<TrafficConfig>,
+): TrafficSystem {
+  return new TrafficSystemImpl(district, { ...DEFAULT_TRAFFIC_CONFIG, ...config });
+}
