@@ -3,7 +3,7 @@ import Link from "next/link";
 import { RegisterForm } from "./register-form";
 
 export const metadata: Metadata = {
-  title: "Регистрация | AI Driving Academy",
+  title: "Регистрация | Книжка.AI",
 };
 
 export default function RegisterPage() {

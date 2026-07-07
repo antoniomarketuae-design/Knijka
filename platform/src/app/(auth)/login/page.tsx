@@ -3,7 +3,7 @@ import Link from "next/link";
 import { LoginForm } from "./login-form";
 
 export const metadata: Metadata = {
-  title: "Вход | AI Driving Academy",
+  title: "Вход | Книжка.AI",
 };
 
 type Props = {

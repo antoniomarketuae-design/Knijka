@@ -10,7 +10,7 @@ export default function AuthLayout({
           href="/"
           className="mb-6 block text-center text-sm font-semibold tracking-wide opacity-70 hover:opacity-100"
         >
-          AI Driving Academy
+          Книжка.AI
         </Link>
         <div className="rounded-2xl border border-black/10 p-6 shadow-sm dark:border-white/15">
           {children}
