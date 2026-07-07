@@ -108,7 +108,8 @@ export function RegisterForm() {
         return;
       }
 
-      router.push("/dashboard");
+      // New account → one-time onboarding (it forwards to /dashboard).
+      router.push("/onboarding");
       router.refresh();
     } catch {
       setFormError("Нещо се обърка. Опитай отново.");
