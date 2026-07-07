@@ -47,10 +47,14 @@ export class Vehicle {
   private steeringWheel: THREE.Object3D | null = null;
 
   private steer = 0;
+  /** Low-passed lateral acceleration (m/s², car-local, + = left). */
+  private aLatSmooth = 0;
+  private readonly prevVel = new THREE.Vector3();
 
   // Scratch objects (no per-frame allocation).
   private readonly tmpQ = new THREE.Quaternion();
   private readonly tmpV = new THREE.Vector3();
+  private readonly tmpV2 = new THREE.Vector3();
   private readonly spawnRotation: THREE.Quaternion;
 
   constructor(world: World, scene: THREE.Scene) {
@@ -135,7 +139,10 @@ export class Vehicle {
   // ---------------------------------------------------------------------------
   update(input: VehicleInput, dt: number): void {
     const c = this.controller;
-    const speedMs = c.currentVehicleSpeed(); // m/s, signed (+ forward)
+    // Forward speed from the body velocity (controller.currentVehicleSpeed()
+    // uses |linvel| and spikes on suspension jolts — measured +250 km/h
+    // single-frame glitches in the harness).
+    const speedMs = this.forwardSpeedMs();
     const speedKmh = speedMs * 3.6;
     const absKmh = Math.abs(speedKmh);
 
@@ -203,6 +210,9 @@ export class Vehicle {
       );
     }
 
+    // --- Body-roll coupling (see tuning.ts: rapier suppresses roll torque) --
+    this.applyRollCoupling(dt);
+
     // --- Software anti-roll bars ---------------------------------------------
     this.applyAntiRollAxle(FL, FR, T.ANTI_ROLL_FRONT, dt);
     this.applyAntiRollAxle(RL, RR, T.ANTI_ROLL_REAR, dt);
@@ -250,11 +260,13 @@ export class Vehicle {
     this.body.resetForces(true);
     this.body.resetTorques(true);
     this.steer = 0;
+    this.aLatSmooth = 0;
+    this.prevVel.set(0, 0, 0);
   }
 
   /** Signed speed in km/h (+ forward). */
   get speedKmh(): number {
-    return this.controller.currentVehicleSpeed() * 3.6;
+    return this.forwardSpeedMs() * 3.6;
   }
 
   /** Narrow debug readout (numeric tuning harness + future debug HUD). */
@@ -295,6 +307,43 @@ export class Vehicle {
   }
 
   // ---------------------------------------------------------------------------
+
+  /** Signed forward speed (m/s): body velocity projected on the +Z axis. */
+  private forwardSpeedMs(): number {
+    const v = this.body.linvel();
+    const r = this.body.rotation();
+    this.tmpQ.set(r.x, r.y, r.z, r.w);
+    this.tmpV.set(0, 0, 1).applyQuaternion(this.tmpQ);
+    return this.tmpV.x * v.x + this.tmpV.y * v.y + this.tmpV.z * v.z;
+  }
+
+  /**
+   * Lateral-force → roll-torque coupling. Measures lateral acceleration
+   * (finite difference, low-passed), then applies τ = m · aLat · arm about
+   * the forward axis. Restores the body lean that rapier's side-impulse
+   * placement suppresses; springs/dampers/ARBs then fight it realistically.
+   */
+  private applyRollCoupling(dt: number): void {
+    const vel = this.body.linvel();
+    const r = this.body.rotation();
+    this.tmpQ.set(r.x, r.y, r.z, r.w);
+
+    // Measured acceleration over the previous step, projected on car left (+X).
+    this.tmpV.set((vel.x - this.prevVel.x) / dt, (vel.y - this.prevVel.y) / dt, (vel.z - this.prevVel.z) / dt);
+    this.prevVel.set(vel.x, vel.y, vel.z);
+    this.tmpV2.set(1, 0, 0).applyQuaternion(this.tmpQ);
+    let aLat = this.tmpV.dot(this.tmpV2);
+    aLat = THREE.MathUtils.clamp(aLat, -T.ROLL_COUPLING_MAX_LAT, T.ROLL_COUPLING_MAX_LAT);
+    this.aLatSmooth += (aLat - this.aLatSmooth) * Math.min(1, T.ROLL_COUPLING_LP * dt);
+
+    // Torque about the forward axis: accel to the left (+) → lean right (out).
+    const magnitude = T.CHASSIS_MASS * this.aLatSmooth * T.ROLL_COUPLING_ARM * dt;
+    this.tmpV.set(0, 0, 1).applyQuaternion(this.tmpQ);
+    this.body.applyTorqueImpulse(
+      { x: this.tmpV.x * magnitude, y: this.tmpV.y * magnitude, z: this.tmpV.z * magnitude },
+      true,
+    );
+  }
 
   /**
    * Anti-roll bar: push the chassis up on the compressed side, pull it down

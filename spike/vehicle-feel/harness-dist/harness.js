@@ -14,14 +14,16 @@ var CHASSIS_HALF_EXTENTS = {
 /** Total vehicle mass (kg). ~compact hatchback with driver. */
 var CHASSIS_MASS = 1220;
 /**
-* Centre of mass offset from the collider centre (m). Lowering it is THE
-* anti-flip lever for raycast vehicles (COM ends up near sill height).
+* Centre of mass offset from the collider centre (m). Lowering it is the
+* main anti-flip lever for raycast vehicles. -0.15 puts the COM ~0.48 m
+* above ground — realistic for a compact (measured: brake dive doubled vs
+* the initial -0.32 slam-it-to-the-floor value, with flip margin intact).
 * Slightly forward (+Z) because the engine sits over the front axle → mild
 * understeer + nose-heavy braking, correct for a FWD compact.
 */
 var COM_OFFSET = {
 	x: 0,
-	y: -.32,
+	y: -.15,
 	z: .08
 };
 /**
@@ -78,8 +80,16 @@ var SUSPENSION_DAMPING_RELAXATION = 3.1;
 var SUSPENSION_MAX_TRAVEL = .24;
 /** Per-wheel force cap (N). Static load ≈ 3000 N/wheel; allow ~4 g spikes. */
 var SUSPENSION_MAX_FORCE = 26e3;
+/**
+* Front tyre μ. Slightly LOWER than rear → terminal understeer, not spin.
+* Harness-checked: μ 1.4 caps lateral accel ≈ 13-14 m/s², BELOW the static
+* rollover threshold g·(track/2)/comHeight ≈ 15.5 m/s² — the tyres let go
+* before the car can trip over itself. Raising μ past ~1.8 removes that
+* safety margin.
+*/
+var FRICTION_SLIP_FRONT = 1.4;
 /** Rear tyre μ. Keep ≥ front or the learner car oversteers. */
-var FRICTION_SLIP_REAR = 2.2;
+var FRICTION_SLIP_REAR = 1.5;
 /**
 * Available TOTAL tractive force (N) vs speed (km/h) — piecewise-linear,
 * split across the driven wheels. Stands in for engine torque × gearing;
@@ -131,11 +141,14 @@ var STEER_SPEED = 3.2;
 var STEER_RETURN_SPEED = 4.8;
 /**
 * Software anti-roll bar stiffness (N per metre of left/right compression
-* difference). Front stiffer than rear → understeer balance. Set both to 0
-* to feel the raw spring roll (educational: the car leans a LOT).
+* difference). Front stiffer than rear → understeer balance. These work
+* WITH the roll coupling below: coupling creates the lean, springs + ARBs
+* decide how much of it survives.
 */
-var ANTI_ROLL_FRONT = 7e3;
-var ANTI_ROLL_REAR = 5e3;
+var ANTI_ROLL_FRONT = 4500;
+var ANTI_ROLL_REAR = 3e3;
+/** Effective lever arm (m) between COM and side-force line of action. */
+var ROLL_COUPLING_ARM = .35;
 /** Quadratic air drag (N per (m/s)²). 0.42 ≈ Cd 0.32 × 2.2 m² frontal. */
 var AERO_DRAG = .42;
 /**
@@ -187,8 +200,12 @@ var Vehicle = class {
 	wheelSpins = [];
 	steeringWheel = null;
 	steer = 0;
+	/** Low-passed lateral acceleration (m/s², car-local, + = left). */
+	aLatSmooth = 0;
+	prevVel = new THREE.Vector3();
 	tmpQ = new THREE.Quaternion();
 	tmpV = new THREE.Vector3();
+	tmpV2 = new THREE.Vector3();
 	spawnRotation;
 	constructor(world, scene) {
 		this.spawnRotation = new THREE.Quaternion().setFromAxisAngle(UP, SPAWN.yawRad);
@@ -232,7 +249,7 @@ var Vehicle = class {
 			this.controller.setWheelSuspensionRelaxation(i, SUSPENSION_DAMPING_RELAXATION);
 			this.controller.setWheelMaxSuspensionTravel(i, SUSPENSION_MAX_TRAVEL);
 			this.controller.setWheelMaxSuspensionForce(i, SUSPENSION_MAX_FORCE);
-			this.controller.setWheelFrictionSlip(i, isFront ? 2 : FRICTION_SLIP_REAR);
+			this.controller.setWheelFrictionSlip(i, isFront ? FRICTION_SLIP_FRONT : FRICTION_SLIP_REAR);
 			this.controller.setWheelSideFrictionStiffness(i, 1);
 		}
 		this.buildVisuals();
@@ -240,7 +257,7 @@ var Vehicle = class {
 	}
 	update(input, dt) {
 		const c = this.controller;
-		const speedMs = c.currentVehicleSpeed();
+		const speedMs = this.forwardSpeedMs();
 		const speedKmh = speedMs * 3.6;
 		const absKmh = Math.abs(speedKmh);
 		const f = THREE.MathUtils.clamp((absKmh - 15) / 95, 0, 1);
@@ -287,6 +304,7 @@ var Vehicle = class {
 				z: -vel.z * k
 			}, true);
 		}
+		this.applyRollCoupling(dt);
 		this.applyAntiRollAxle(FL, FR, ANTI_ROLL_FRONT, dt);
 		this.applyAntiRollAxle(RL, RR, ANTI_ROLL_REAR, dt);
 		c.updateVehicle(dt, void 0, void 0, (col) => col.handle !== this.collider.handle);
@@ -334,10 +352,12 @@ var Vehicle = class {
 		this.body.resetForces(true);
 		this.body.resetTorques(true);
 		this.steer = 0;
+		this.aLatSmooth = 0;
+		this.prevVel.set(0, 0, 0);
 	}
 	/** Signed speed in km/h (+ forward). */
 	get speedKmh() {
-		return this.controller.currentVehicleSpeed() * 3.6;
+		return this.forwardSpeedMs() * 3.6;
 	}
 	/** Narrow debug readout (numeric tuning harness + future debug HUD). */
 	debugState() {
@@ -374,6 +394,38 @@ var Vehicle = class {
 		let g = 1;
 		for (const threshold of GEAR_UPSHIFT_KMH) if (v > threshold) g++;
 		return String(g);
+	}
+	/** Signed forward speed (m/s): body velocity projected on the +Z axis. */
+	forwardSpeedMs() {
+		const v = this.body.linvel();
+		const r = this.body.rotation();
+		this.tmpQ.set(r.x, r.y, r.z, r.w);
+		this.tmpV.set(0, 0, 1).applyQuaternion(this.tmpQ);
+		return this.tmpV.x * v.x + this.tmpV.y * v.y + this.tmpV.z * v.z;
+	}
+	/**
+	* Lateral-force → roll-torque coupling. Measures lateral acceleration
+	* (finite difference, low-passed), then applies τ = m · aLat · arm about
+	* the forward axis. Restores the body lean that rapier's side-impulse
+	* placement suppresses; springs/dampers/ARBs then fight it realistically.
+	*/
+	applyRollCoupling(dt) {
+		const vel = this.body.linvel();
+		const r = this.body.rotation();
+		this.tmpQ.set(r.x, r.y, r.z, r.w);
+		this.tmpV.set((vel.x - this.prevVel.x) / dt, (vel.y - this.prevVel.y) / dt, (vel.z - this.prevVel.z) / dt);
+		this.prevVel.set(vel.x, vel.y, vel.z);
+		this.tmpV2.set(1, 0, 0).applyQuaternion(this.tmpQ);
+		let aLat = this.tmpV.dot(this.tmpV2);
+		aLat = THREE.MathUtils.clamp(aLat, -12, 12);
+		this.aLatSmooth += (aLat - this.aLatSmooth) * Math.min(1, 10 * dt);
+		const magnitude = CHASSIS_MASS * this.aLatSmooth * ROLL_COUPLING_ARM * dt;
+		this.tmpV.set(0, 0, 1).applyQuaternion(this.tmpQ);
+		this.body.applyTorqueImpulse({
+			x: this.tmpV.x * magnitude,
+			y: this.tmpV.y * magnitude,
+			z: this.tmpV.z * magnitude
+		}, true);
 	}
 	/**
 	* Anti-roll bar: push the chassis up on the compressed side, pull it down
@@ -495,7 +547,7 @@ function makeRig(setup) {
 		z: 0
 	});
 	world.timestep = FIXED_DT;
-	world.createCollider(RAPIER.ColliderDesc.cuboid(500, 1, 500).setTranslation(0, -1, 0).setFriction(1));
+	world.createCollider(RAPIER.ColliderDesc.cuboid(4e3, 1, 4e3).setTranslation(0, -1, 0).setFriction(1));
 	setup?.(world);
 	return {
 		world,
@@ -540,25 +592,31 @@ console.log("rapier initialized (headless)\n");
 	const t50 = [];
 	const t90 = [];
 	const t100 = [];
-	let top = 0;
+	let peakInstant = 0;
+	let sustained = 0;
+	const window = [];
 	const startX = rig.vehicle.debugState().position.x;
-	for (let i = 0; i < 1800; i++) {
+	const RUN_S = 45;
+	for (let i = 0; i < 60 * RUN_S; i++) {
 		step(rig, {
 			...IDLE,
 			throttle: 1
 		});
 		const v = rig.vehicle.speedKmh;
-		top = Math.max(top, v);
+		peakInstant = Math.max(peakInstant, v);
+		window.push(v);
+		if (window.length > 60) window.shift();
+		if (window.length === 60) sustained = Math.max(sustained, window.reduce((a, b) => a + b, 0) / 60);
 		const t = i / 60;
 		if (v >= 50 && t50.length === 0) t50.push(t);
 		if (v >= 90 && t90.length === 0) t90.push(t);
 		if (v >= 100 && t100.length === 0) t100.push(t);
 	}
 	const endX = rig.vehicle.debugState().position.x;
-	console.log("[full throttle 30 s]");
+	console.log(`[full throttle ${RUN_S} s]`);
 	console.log(`  direction check    moved ${fmt(endX - startX, 0)} m in +X (must be positive)`);
 	console.log(`  0-50 / 0-90 / 0-100  ${fmt(t50[0] ?? -1, 1)} / ${fmt(t90[0] ?? -1, 1)} / ${fmt(t100[0] ?? -1, 1)} s`);
-	console.log(`  top speed          ${fmt(top, 1)} km/h (target ~130-140)\n`);
+	console.log(`  top speed          ${fmt(sustained, 1)} km/h sustained, ${fmt(peakInstant, 1)} peak instant (target ~130-140)\n`);
 }
 {
 	const rig = makeRig();
@@ -625,7 +683,7 @@ console.log("rapier initialized (headless)\n");
 }
 {
 	const rig = makeRig((world) => {
-		world.createCollider(RAPIER.ColliderDesc.cuboid(.15, .06, .8).setTranslation(25, .06, -39.3).setFriction(.9));
+		world.createCollider(RAPIER.ColliderDesc.cuboid(1, .06, .8).setTranslation(25, .06, -39.3).setFriction(.9));
 	});
 	for (let i = 0; i < 60; i++) step(rig, IDLE);
 	let maxRoll = 0;
@@ -709,6 +767,31 @@ console.log("rapier initialized (headless)\n");
 	console.log(`  heading change     started at 90 deg, now ${fmt(headingDeg, 0)} deg (should rotate well past 90)`);
 	console.log(`  min up.y           ${fmt(minUpY, 3)} (no flip)`);
 	console.log(`  end speed          ${fmt(Math.abs(rig.vehicle.speedKmh), 1)} km/h\n`);
+}
+{
+	const rig = makeRig();
+	for (let i = 0; i < 60; i++) step(rig, IDLE);
+	let minV = 0;
+	for (let i = 0; i < 480; i++) {
+		step(rig, {
+			...IDLE,
+			brake: 1
+		});
+		minV = Math.min(minV, rig.vehicle.speedKmh);
+	}
+	const gearInReverse = rig.vehicle.gear;
+	let crossedZeroAt = -1;
+	for (let i = 0; i < 360; i++) {
+		step(rig, {
+			...IDLE,
+			throttle: 1
+		});
+		if (crossedZeroAt < 0 && rig.vehicle.speedKmh > -.5) crossedZeroAt = i / 60;
+	}
+	console.log("[reverse state machine]");
+	console.log(`  max reverse speed  ${fmt(-minV, 1)} km/h (cap 25)`);
+	console.log(`  gear display       ${gearInReverse} (expected R)`);
+	console.log(`  throttle from reverse: stopped after ${fmt(crossedZeroAt, 2)} s, now ${fmt(rig.vehicle.speedKmh, 1)} km/h forward\n`);
 }
 console.log("harness done");
 //#endregion

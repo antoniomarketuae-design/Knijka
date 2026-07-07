@@ -49,12 +49,14 @@ export const CHASSIS_HALF_EXTENTS = { x: 0.85, y: 0.35, z: 2.02 };
 /** Total vehicle mass (kg). ~compact hatchback with driver. */
 export const CHASSIS_MASS = 1220;
 /**
- * Centre of mass offset from the collider centre (m). Lowering it is THE
- * anti-flip lever for raycast vehicles (COM ends up near sill height).
+ * Centre of mass offset from the collider centre (m). Lowering it is the
+ * main anti-flip lever for raycast vehicles. -0.15 puts the COM ~0.48 m
+ * above ground — realistic for a compact (measured: brake dive doubled vs
+ * the initial -0.32 slam-it-to-the-floor value, with flip margin intact).
  * Slightly forward (+Z) because the engine sits over the front axle → mild
  * understeer + nose-heavy braking, correct for a FWD compact.
  */
-export const COM_OFFSET = { x: 0, y: -0.32, z: 0.08 };
+export const COM_OFFSET = { x: 0, y: -0.15, z: 0.08 };
 /**
  * Multipliers on the analytic box inertia. Real cars carry mass in the
  * corners (wheels, engine) so inertia is higher than a uniform box —
@@ -106,10 +108,16 @@ export const SUSPENSION_MAX_FORCE = 26000;
 // ---------------------------------------------------------------------------
 // Tyres (see cheat-sheet point 5)
 // ---------------------------------------------------------------------------
-/** Front tyre μ. Slightly LOWER than rear → terminal understeer, not spin. */
-export const FRICTION_SLIP_FRONT = 2.0;
+/**
+ * Front tyre μ. Slightly LOWER than rear → terminal understeer, not spin.
+ * Harness-checked: μ 1.4 caps lateral accel ≈ 13-14 m/s², BELOW the static
+ * rollover threshold g·(track/2)/comHeight ≈ 15.5 m/s² — the tyres let go
+ * before the car can trip over itself. Raising μ past ~1.8 removes that
+ * safety margin.
+ */
+export const FRICTION_SLIP_FRONT = 1.4;
 /** Rear tyre μ. Keep ≥ front or the learner car oversteers. */
-export const FRICTION_SLIP_REAR = 2.2;
+export const FRICTION_SLIP_REAR = 1.5;
 /** Lateral stiffness multiplier at normal driving (rapier default 1.0). */
 export const SIDE_FRICTION_STIFFNESS = 1.0;
 
@@ -190,11 +198,27 @@ export const STEERING_WHEEL_VISUAL_RATIO = 6;
 // ---------------------------------------------------------------------------
 /**
  * Software anti-roll bar stiffness (N per metre of left/right compression
- * difference). Front stiffer than rear → understeer balance. Set both to 0
- * to feel the raw spring roll (educational: the car leans a LOT).
+ * difference). Front stiffer than rear → understeer balance. These work
+ * WITH the roll coupling below: coupling creates the lean, springs + ARBs
+ * decide how much of it survives.
  */
-export const ANTI_ROLL_FRONT = 7000;
-export const ANTI_ROLL_REAR = 5000;
+export const ANTI_ROLL_FRONT = 4500;
+export const ANTI_ROLL_REAR = 3000;
+
+// ---------------------------------------------------------------------------
+// Body-roll coupling — the fix for "raycast cars corner totally flat"
+// ---------------------------------------------------------------------------
+// Rapier (like Bullet) applies tyre side impulses NEAR THE COM HEIGHT
+// (Bullet's rollInfluence ≈ 0.1, not exposed in the JS API), so lateral
+// force produces almost no roll torque: measured 0.3° at 0.66 g — a
+// go-kart, not a hatchback. We restore the missing physics by applying an
+// explicit torque about the forward axis: τ = mass · aLat · ROLL_ARM.
+/** Effective lever arm (m) between COM and side-force line of action. */
+export const ROLL_COUPLING_ARM = 0.35;
+/** Clamp on the lateral accel (m/s²) fed to the coupling (curb spikes). */
+export const ROLL_COUPLING_MAX_LAT = 12;
+/** Low-pass rate (1/s) for measured lateral accel — kills raycast jitter. */
+export const ROLL_COUPLING_LP = 10;
 /** Quadratic air drag (N per (m/s)²). 0.42 ≈ Cd 0.32 × 2.2 m² frontal. */
 export const AERO_DRAG = 0.42;
 /**

@@ -20,6 +20,9 @@ import type { VehicleInput } from './input';
 
 const IDLE: VehicleInput = { throttle: 0, brake: 0, steer: 0, handbrake: false };
 
+/** Per-2-s telemetry inside the acceleration run (debugging aid). */
+const TELEMETRY = false;
+
 interface Rig {
   world: World;
   vehicle: Vehicle;
@@ -28,7 +31,9 @@ interface Rig {
 function makeRig(setup?: (world: World) => void): Rig {
   const world = new RAPIER.World({ x: 0, y: T.GRAVITY, z: 0 });
   world.timestep = T.FIXED_DT;
-  world.createCollider(RAPIER.ColliderDesc.cuboid(500, 1, 500).setTranslation(0, -1, 0).setFriction(1));
+  // 8 km slab: the 45 s top-speed run covers ~1.5 km — first harness version
+  // used 1 km and the car drove off the edge, "reaching" 295 km/h in freefall.
+  world.createCollider(RAPIER.ColliderDesc.cuboid(4000, 1, 4000).setTranslation(0, -1, 0).setFriction(1));
   setup?.(world);
   const scene = new THREE.Scene();
   const vehicle = new Vehicle(world, scene);
@@ -81,22 +86,38 @@ console.log('rapier initialized (headless)\n');
   const t50: number[] = [];
   const t90: number[] = [];
   const t100: number[] = [];
-  let top = 0;
+  let peakInstant = 0;
+  let sustained = 0;
+  const window: number[] = [];
   const startX = rig.vehicle.debugState().position.x;
-  for (let i = 0; i < 60 * 30; i++) {
+  const RUN_S = 45;
+  for (let i = 0; i < 60 * RUN_S; i++) {
     step(rig, { ...IDLE, throttle: 1 });
     const v = rig.vehicle.speedKmh;
-    top = Math.max(top, v);
+    peakInstant = Math.max(peakInstant, v);
+    window.push(v);
+    if (window.length > 60) window.shift();
+    if (window.length === 60) {
+      sustained = Math.max(sustained, window.reduce((a, b) => a + b, 0) / 60);
+    }
     const t = i / 60;
     if (v >= 50 && t50.length === 0) t50.push(t);
     if (v >= 90 && t90.length === 0) t90.push(t);
     if (v >= 100 && t100.length === 0) t100.push(t);
+    if (TELEMETRY && i % 120 === 119) {
+      const d = rig.vehicle.debugState();
+      const a = attitude(rig);
+      console.log(
+        `    t=${fmt(t, 1)}s v=${fmt(v, 1)}km/h pos=(${fmt(d.position.x, 0)},${fmt(d.position.y, 2)},${fmt(d.position.z, 0)}) ` +
+          `upY=${fmt(a.upY, 3)} susp=${d.suspensionLengths.map((s) => fmt(s, 2)).join(',')} contact=${d.wheelsInContact.join(',')}`,
+      );
+    }
   }
   const endX = rig.vehicle.debugState().position.x;
-  console.log('[full throttle 30 s]');
+  console.log(`[full throttle ${RUN_S} s]`);
   console.log(`  direction check    moved ${fmt(endX - startX, 0)} m in +X (must be positive)`);
   console.log(`  0-50 / 0-90 / 0-100  ${fmt(t50[0] ?? -1, 1)} / ${fmt(t90[0] ?? -1, 1)} / ${fmt(t100[0] ?? -1, 1)} s`);
-  console.log(`  top speed          ${fmt(top, 1)} km/h (target ~130-140)\n`);
+  console.log(`  top speed          ${fmt(sustained, 1)} km/h sustained, ${fmt(peakInstant, 1)} peak instant (target ~130-140)\n`);
 }
 
 // --- 3. Braking from 90 ------------------------------------------------------
@@ -165,10 +186,11 @@ console.log('rapier initialized (headless)\n');
 // --- 5. Curb strike at ~50 km/h ----------------------------------------------
 {
   // 12 cm box curb across the RIGHT wheel path only (car faces +X, right = +Z
-  // world at spawn). Sharp-edged worst case.
+  // world at spawn). Sharp-edged worst case. 2 m long along the direction of
+  // travel so the 60 Hz wheel rays (0.27 m/step at 58 km/h) cannot skip it.
   const rig = makeRig((world) => {
     world.createCollider(
-      RAPIER.ColliderDesc.cuboid(0.15, 0.06, 0.8).setTranslation(25, 0.06, -39.3).setFriction(0.9),
+      RAPIER.ColliderDesc.cuboid(1.0, 0.06, 0.8).setTranslation(25, 0.06, -39.3).setFriction(0.9),
     );
   });
   for (let i = 0; i < 60; i++) step(rig, IDLE);
@@ -245,6 +267,29 @@ console.log('rapier initialized (headless)\n');
   console.log(`  heading change     started at 90 deg, now ${fmt(headingDeg, 0)} deg (should rotate well past 90)`);
   console.log(`  min up.y           ${fmt(minUpY, 3)} (no flip)`);
   console.log(`  end speed          ${fmt(Math.abs(rig.vehicle.speedKmh), 1)} km/h\n`);
+}
+
+// --- 8. Reverse logic ----------------------------------------------------------
+{
+  const rig = makeRig();
+  for (let i = 0; i < 60; i++) step(rig, IDLE);
+  // Hold brake from standstill → should reverse, capped at REVERSE_MAX_KMH.
+  let minV = 0;
+  for (let i = 0; i < 60 * 8; i++) {
+    step(rig, { ...IDLE, brake: 1 });
+    minV = Math.min(minV, rig.vehicle.speedKmh);
+  }
+  const gearInReverse = rig.vehicle.gear;
+  // Now throttle: must BRAKE to a stop first, then drive forward.
+  let crossedZeroAt = -1;
+  for (let i = 0; i < 60 * 6; i++) {
+    step(rig, { ...IDLE, throttle: 1 });
+    if (crossedZeroAt < 0 && rig.vehicle.speedKmh > -0.5) crossedZeroAt = i / 60;
+  }
+  console.log('[reverse state machine]');
+  console.log(`  max reverse speed  ${fmt(-minV, 1)} km/h (cap ${T.REVERSE_MAX_KMH})`);
+  console.log(`  gear display       ${gearInReverse} (expected R)`);
+  console.log(`  throttle from reverse: stopped after ${fmt(crossedZeroAt, 2)} s, now ${fmt(rig.vehicle.speedKmh, 1)} km/h forward\n`);
 }
 
 console.log('harness done');
