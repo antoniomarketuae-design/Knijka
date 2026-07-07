@@ -52,7 +52,7 @@ model QuestionAttempt {
   questionId String // → content/questions/*.json
   context    String // practice | exam | micro (in-sim)
   correct    Boolean
-  points     Int
+  points     Int // the question's official weight (1|2|3), NOT points earned
   answeredAt DateTime @default(now())
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
