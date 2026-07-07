@@ -1,0 +1,14 @@
+{
+  "name": "ai-driver-osm-pipeline",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "OSM -> world pipeline: fetch a Sofia district from Overpass, build content/world/district-v1.json (road graph, intersections, crossings, buildings, spawn points). Zero runtime dependencies (Node >= 18 built-in fetch).",
+  "scripts": {
+    "fetch": "node fetch.mjs",
+    "build": "node build.mjs"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
