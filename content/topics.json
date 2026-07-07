@@ -1,0 +1,130 @@
+[
+  {
+    "id": "t-basics",
+    "order": 1,
+    "slug": "osnovni-ponyatia",
+    "titleBg": "Основни понятия и задължения",
+    "titleEn": "Basic concepts and core obligations",
+    "descriptionBg": "Кой кой е на пътя, от какво се състои пътят, основните задължения на водача и златните правила: движение вдясно, колани, телефон, йерархия на сигналите."
+  },
+  {
+    "id": "t-vehicle",
+    "order": 2,
+    "slug": "prevozno-sredstvo",
+    "titleBg": "Автомобилът и подготовката за път",
+    "titleEn": "The vehicle and pre-drive preparation",
+    "descriptionBg": "Управлението на автомобила, гуми, спирачки, светлини, огледала и мъртви зони, задължително оборудване и проверката преди потегляне."
+  },
+  {
+    "id": "t-signs",
+    "order": 3,
+    "slug": "patni-znatsi",
+    "titleBg": "Пътни знаци",
+    "titleEn": "Road signs",
+    "descriptionBg": "Групите пътни знаци от А до Ж, допълнителните табели, зоната на действие на забраните и временната сигнализация при ремонти."
+  },
+  {
+    "id": "t-signals-markings",
+    "order": 4,
+    "slug": "signali-i-markirovka",
+    "titleBg": "Светофари, маркировка и регулировчик",
+    "titleEn": "Traffic lights, road markings and traffic controllers",
+    "descriptionBg": "Сигналите на светофара и на регулировчика, надлъжната и напречната маркировка и сигналите, които самият водач подава."
+  },
+  {
+    "id": "t-priority",
+    "order": 5,
+    "slug": "predimstvo",
+    "titleBg": "Предимство",
+    "titleEn": "Right of way",
+    "descriptionBg": "Кой минава пръв: правилото на дясното, път с предимство, завой наляво срещу насрещните, трамваи, автомобили със специален режим и излизане от двор или паркинг."
+  },
+  {
+    "id": "t-junctions",
+    "order": 6,
+    "slug": "krastovishta",
+    "titleBg": "Кръстовища, кръгови движения и жп прелези",
+    "titleEn": "Junctions, roundabouts and railway crossings",
+    "descriptionBg": "Как се преминава през всеки вид кръстовище — равнозначно, със знаци, със светофар, кръгово — плюс правилата на железопътния прелез."
+  },
+  {
+    "id": "t-speed",
+    "order": 7,
+    "slug": "skorost-i-distantsia",
+    "titleBg": "Скорост и дистанция",
+    "titleEn": "Speed and following distance",
+    "descriptionBg": "Ограниченията на скоростта, съобразената скорост, времето за реакция, спирачният път и безопасната дистанция — физиката, която решава дали ще спреш навреме."
+  },
+  {
+    "id": "t-maneuvers",
+    "order": 8,
+    "slug": "manevri-i-izprevarvane",
+    "titleBg": "Маневри, ленти и изпреварване",
+    "titleEn": "Manoeuvres, lanes and overtaking",
+    "descriptionBg": "Безопасното извършване на маневри: избор и смяна на лента, включване в движението, изпреварване и неговите забрани, разминаване, движение назад и обратен завой."
+  },
+  {
+    "id": "t-vulnerable",
+    "order": 9,
+    "slug": "uyazvimi-uchastnitsi",
+    "titleBg": "Пешеходци и уязвими участници",
+    "titleEn": "Pedestrians and vulnerable road users",
+    "descriptionBg": "Пешеходни пътеки, деца, велосипедисти, тротинетки, мотористи, жилищни и пешеходни зони — хората, които законът защитава най-строго."
+  },
+  {
+    "id": "t-roads",
+    "order": 10,
+    "slug": "magistrali-i-izvangradsko",
+    "titleBg": "Магистрали и извънградски пътища",
+    "titleEn": "Motorways and rural roads",
+    "descriptionBg": "Правилата на автомагистралата и скоростния път, включване и напускане, забраните, тунелите, планинските пътища и поведение при повреда."
+  },
+  {
+    "id": "t-parking",
+    "order": 11,
+    "slug": "spirane-i-parkirane",
+    "titleBg": "Спиране, престой и паркиране",
+    "titleEn": "Stopping, standing and parking",
+    "descriptionBg": "Разликата между спиране, престой и паркиране, къде е забранено, знаците и зоните, безопасното напускане на автомобила и какво става с неправилно паркираните коли."
+  },
+  {
+    "id": "t-conditions",
+    "order": 12,
+    "slug": "nosht-i-uslozhneni-uslovia",
+    "titleBg": "Нощно шофиране и усложнени условия",
+    "titleEn": "Night driving and adverse conditions",
+    "descriptionBg": "Шофиране на тъмно, дълги и къси светлини, заслепяване, дъжд и аквапланинг, мъгла, сняг и лед, занасяне и препятствия на пътя."
+  },
+  {
+    "id": "t-fitness",
+    "order": 13,
+    "slug": "alkohol-i-godnost",
+    "titleBg": "Алкохол, умора и годност за шофиране",
+    "titleEn": "Alcohol, fatigue and fitness to drive",
+    "descriptionBg": "Алкохол и наркотици зад волана, проверките на пътя, умората, лекарствата, разсейването и здравословните изисквания към водача."
+  },
+  {
+    "id": "t-admin",
+    "order": 14,
+    "slug": "dokumenti-i-sanktsii",
+    "titleBg": "Документи, нарушения и санкции",
+    "titleEn": "Documents, violations and penalties",
+    "descriptionBg": "Какво трябва да носиш в колата, книжка и категории, ГТП и застраховка, контролни точки, глоби, отнемане на книжката и как протича проверка от полицията."
+  },
+  {
+    "id": "t-accidents",
+    "order": 15,
+    "slug": "ptp-i-parva-pomosht",
+    "titleBg": "ПТП и първа помощ",
+    "titleEn": "Traffic accidents and first aid",
+    "descriptionBg": "Какво е ПТП и какво си длъжен да направиш: обезопасяване, кога се вика полиция, двустранен протокол и първите животоспасяващи стъпки до пристигане на помощ."
+  },
+  {
+    "id": "t-eco-defensive",
+    "order": 16,
+    "slug": "eko-i-zashtitno-shofirane",
+    "titleBg": "Икономично и защитно шофиране",
+    "titleEn": "Eco-driving and defensive driving",
+    "descriptionBg": "Как да предвиждаш опасностите преди да са станали проблем, да пазиш пространство около себе си и да караш плавно, евтино и чисто."
+  }
+]

@@ -1,0 +1,1522 @@
+[
+  {
+    "id": "c-road-participants",
+    "topicId": "t-basics",
+    "titleBg": "Участници в движението",
+    "titleEn": "Road users",
+    "summaryBg": "Участник в движението е всеки, който се намира на пътя — водачи, пешеходци, пътници, колоездачи. Правилата важат за всички, но към водачите изискванията са най-строги, защото те управляват машина, която може да нарани.",
+    "dependsOn": [],
+    "lawRefs": [{ "act": "ЗДвП", "ref": "§ 6 ДР" }],
+    "difficulty": 1
+  },
+  {
+    "id": "c-road-elements",
+    "topicId": "t-basics",
+    "titleBg": "Елементи на пътя",
+    "titleEn": "Elements of the road",
+    "summaryBg": "Пътят се състои от платно за движение, ленти, банкет, тротоар, а понякога и разделителна ивица или велоалея. Всеки елемент е предназначен за определени участници — колата се движи по платното, пешеходецът по тротоара.",
+    "dependsOn": [],
+    "lawRefs": [{ "act": "ЗДвП", "ref": "§ 6 ДР" }],
+    "difficulty": 1
+  },
+  {
+    "id": "c-vehicle-types",
+    "topicId": "t-basics",
+    "titleBg": "Видове пътни превозни средства",
+    "titleEn": "Types of road vehicles",
+    "summaryBg": "Законът различава леки и товарни автомобили, автобуси, мотоциклети и мотопеди, трамваи, самоходни машини и други. От вида на превозното средство зависят категорията за управление и някои специални правила.",
+    "dependsOn": [],
+    "lawRefs": [{ "act": "ЗДвП", "ref": "чл. 149" }],
+    "difficulty": 1
+  },
+  {
+    "id": "c-driver-obligations",
+    "topicId": "t-basics",
+    "titleBg": "Основни задължения на водача",
+    "titleEn": "Core obligations of the driver",
+    "summaryBg": "Водачът е длъжен да не създава опасност и пречки за движението, да не поставя в опасност живота и здравето на хората и да не управлява след алкохол или наркотици. Това е основата, върху която стъпват всички останали правила.",
+    "dependsOn": ["c-road-participants"],
+    "lawRefs": [{ "act": "ЗДвП", "ref": "чл. 5" }],
+    "difficulty": 1
+  },
+  {
+    "id": "c-right-side-rule",
+    "topicId": "t-basics",
+    "titleBg": "Движение в дясната част на платното",
+    "titleEn": "Keep-right rule",
+    "summaryBg": "В България се движим от дясната страна на пътя и се придържаме възможно най-вдясно в платното. Лявата част се използва само за изпреварване, заобикаляне или завиване наляво.",
+    "dependsOn": ["c-road-elements"],
+    "lawRefs": [{ "act": "ЗДвП", "ref": "чл. 8" }, { "act": "ЗДвП", "ref": "чл. 15" }],
+    "difficulty": 1
+  },
+  {
+    "id": "c-license-categories",
+    "topicId": "t-basics",
+    "titleBg": "Категории и възраст за шофиране",
+    "titleEn": "Licence categories and age limits",
+    "summaryBg": "Категория B ти позволява да управляваш автомобил до 3,5 тона и до 8 места без мястото на водача. Книжка се взима на 18 години, а обучението може да започне 3 месеца по-рано.",
+    "dependsOn": [],
+    "lawRefs": [{ "act": "ЗДвП", "ref": "чл. 150а" }, { "act": "ЗДвП", "ref": "чл. 151" }],
+    "difficulty": 1
+  },
+  {
+    "id": "c-signal-hierarchy",
+    "topicId": "t-basics",
+    "titleBg": "Йерархия на сигналите и правилата",
+    "titleEn": "Hierarchy of signals and rules",
+    "summaryBg": "Когато сигналите си противоречат, важи редът: регулировчик, после светофар, после пътни знаци, после маркировка, и накрая общите правила. Регулировчикът винаги е най-силен — дори срещу червен светофар.",
+    "dependsOn": ["c-driver-obligations"],
+    "lawRefs": [{ "act": "ЗДвП", "ref": "чл. 7" }],
+    "difficulty": 2
+  },
+  {
+    "id": "c-seatbelts",
+    "topicId": "t-basics",
+    "titleBg": "Предпазни колани",
+    "titleEn": "Seat belts",
+    "summaryBg": "Коланът е задължителен за водача и всички пътници, на всяка седалка, при всяко пътуване. При удар с 50 км/ч тялото без колан удря арматурата със сила колкото падане от третия етаж.",
+    "dependsOn": ["c-driver-obligations"],
+    "lawRefs": [{ "act": "ЗДвП", "ref": "чл. 137а" }],
+    "difficulty": 1
+  },
+  {
+    "id": "c-child-safety",
+    "topicId": "t-basics",
+    "titleBg": "Превоз на деца в автомобила",
+    "titleEn": "Carrying children in the car",
+    "summaryBg": "Децата под определен ръст и възраст пътуват в обезопасителна система — столче или седалка, подходяща за теглото им. Дете не се вози в скута на пътник и не се оставя само в автомобила.",
+    "dependsOn": ["c-seatbelts"],
+    "lawRefs": [{ "act": "ЗДвП", "ref": "чл. 137в?" }],
+    "difficulty": 2
+  },
+  {
+    "id": "c-phone-use",
+    "topicId": "t-basics",
+    "titleBg": "Телефон зад волана",
+    "titleEn": "Phone use while driving",
+    "summaryBg": "Използването на телефон по време на движение е забранено, освен с устройство свободни ръце. Едно поглеждане към екрана при 90 км/ч означава 25 метра каране на сляпо.",
+    "dependsOn": ["c-driver-obligations"],
+    "lawRefs": [{ "act": "ЗДвП", "ref": "чл. 104а" }],
+    "difficulty": 1
+  },
+  {
+    "id": "c-vehicle-controls",
+    "topicId": "t-vehicle",
+    "titleBg": "Основни управления на автомобила",
+    "titleEn": "Main vehicle controls",
+    "summaryBg": "Волан, педали, скоростен лост, ръчна спирачка и контролните уреди на таблото — водачът трябва да ги владее, без да ги търси с поглед. Контролните лампи предупреждават за проблем, преди той да е станал опасен.",
+    "dependsOn": [],
+    "lawRefs": [{ "act": "ЗДвП", "ref": "чл. 20" }],
+    "difficulty": 1
+  },
+  {
+    "id": "c-tyres",
+    "topicId": "t-vehicle",
+    "titleBg": "Гуми и сцепление",
+    "titleEn": "Tyres and grip",
+    "summaryBg": "Гумите са единствената връзка на колата с пътя — четири петна с размер на длан. Дълбочината на протектора, налягането и сезонността решават колко бързо ще спреш; от 15 ноември до 1 март гумите трябва да са зимни или с протектор поне 4 мм.",
+    "dependsOn": [],
+    "lawRefs": [{ "act": "ЗДвП", "ref": "чл. 139" }],
+    "difficulty": 1
+  },
+  {
+    "id": "c-brakes",
+    "topicId": "t-vehicle",
+    "titleBg": "Спирачна система",
+    "titleEn": "Braking system",
+    "summaryBg": "Автомобилът има работна спирачка, спирачка за паркиране и спирачно действие на двигателя. Признаци за проблем са дълъг ход на педала, дърпане встрани и слаб ефект — с такава кола не се потегля.",
+    "dependsOn": ["c-vehicle-controls"],
+    "lawRefs": [{ "act": "ЗДвП", "ref": "чл. 139" }],
+    "difficulty": 2
+  },
+  {
+    "id": "c-abs-systems",
+    "topicId": "t-vehicle",
+    "titleBg": "Системи за безопасност: ABS, ESP, въздушни възглавници",
+    "titleEn": "Safety systems: ABS, ESP, airbags",
+    "summaryBg": "ABS не съкращава магически спирачния път — тя пази колелата от блокиране, за да можеш да завиваш, докато спираш. ESP гаси започващо занасяне, а възглавниците работят само заедно с колан.",
+    "dependsOn": ["c-brakes"],
+    "lawRefs": [{ "act": "ЗДвП", "ref": "чл. 20" }],
+    "difficulty": 2
+  },
+  {
+    "id": "c-lights-overview",
+    "topicId": "t-vehicle",
+    "titleBg": "Светлини на автомобила",
+    "titleEn": "Vehicle lights",
+    "summaryBg": "Къси и дълги светлини осветяват пътя, габаритите и стоповете те правят видим, мигачите съобщават намеренията ти, а аварийните сигнализират опасност. Трябва да знаеш кой ключ какво пали, без да гледаш.",
+    "dependsOn": ["c-vehicle-controls"],
+    "lawRefs": [{ "act": "ЗДвП", "ref": "чл. 70" }],
+    "difficulty": 1
+  },
+  {
+    "id": "c-daytime-lights",
+    "topicId": "t-vehicle",
+    "titleBg": "Светлини през деня",
+    "titleEn": "Daytime running lights",
+    "summaryBg": "В България къси светлини или дневни светлини се движат включени денонощно, целогодишно. Целта не е ти да виждаш, а другите да те виждат отдалеч.",
+    "dependsOn": ["c-lights-overview"],
+    "lawRefs": [{ "act": "ЗДвП", "ref": "чл. 70" }],
+    "difficulty": 1
+  },
+  {
+    "id": "c-mirrors-blind-spots",
+    "topicId": "t-vehicle",
+    "titleBg": "Огледала и мъртви зони",
+    "titleEn": "Mirrors and blind spots",
+    "summaryBg": "Огледалата не показват всичко — от двете страни на колата има мъртви зони, в които се скрива цял автомобил или мотор. Затова преди маневра се гледа огледало плюс кратък поглед през рамо.",
+    "dependsOn": ["c-vehicle-controls"],
+    "lawRefs": [{ "act": "ЗДвП", "ref": "чл. 25" }],
+    "difficulty": 2
+  },
+  {
+    "id": "c-pre-drive-check",
+    "topicId": "t-vehicle",
+    "titleBg": "Проверка преди потегляне",
+    "titleEn": "Pre-drive check",
+    "summaryBg": "Преди път се проверяват гуми, светлини, чистота на стъклата и огледалата, и се наглася позицията на седалката, волана и огледалата. На практическия изпит изпитващият задава въпроси точно върху тези проверки.",
+    "dependsOn": ["c-vehicle-controls", "c-tyres", "c-lights-overview"],
+    "lawRefs": [{ "act": "ЗДвП", "ref": "чл. 139" }],
+    "difficulty": 1
+  },
+  {
+    "id": "c-technical-condition",
+    "topicId": "t-vehicle",
+    "titleBg": "Техническа изправност",
+    "titleEn": "Roadworthiness",
+    "summaryBg": "По пътищата се движат само технически изправни автомобили — с работещи спирачки, управление, светлини и гуми в норма. Неизправност, която застрашава безопасността, означава спиране от движение.",
+    "dependsOn": ["c-tyres", "c-brakes"],
+    "lawRefs": [{ "act": "ЗДвП", "ref": "чл. 139" }],
+    "difficulty": 2
+  },
+  {
+    "id": "c-mandatory-equipment",
+    "topicId": "t-vehicle",
+    "titleBg": "Задължително оборудване",
+    "titleEn": "Mandatory equipment",
+    "summaryBg": "В колата задължително има обезопасителен триъгълник, аптечка, пожарогасител и светлоотразителна жилетка. Жилетката се облича винаги, когато слизаш на платното извън населено място — тя се носи в купето, не в багажника.",
+    "dependsOn": [],
+    "lawRefs": [{ "act": "ЗДвП", "ref": "чл. 139" }],
+    "difficulty": 1
+  },
+  {
+    "id": "c-loading-passengers",
+    "topicId": "t-vehicle",
+    "titleBg": "Превоз на пътници и товари",
+    "titleEn": "Carrying passengers and loads",
+    "summaryBg": "Пътниците са най-много колкото местата по документи, а товарът не бива да пречи на видимостта, да стърчи необозначен или да застрашава останалите. Незакрепен багаж при спиране се превръща в снаряд.",
+    "dependsOn": ["c-driver-obligations"],
+    "lawRefs": [{ "act": "ЗДвП", "ref": "чл. 127?" }, { "act": "ЗДвП", "ref": "чл. 132?" }],
+    "difficulty": 2
+  },
+  {
+    "id": "c-sign-groups",
+    "topicId": "t-signs",
+    "titleBg": "Групи пътни знаци",
+    "titleEn": "Road sign groups",
+    "summaryBg": "Знаците са подредени в групи: А — предупредителни за опасност, Б — за предимство, В — забранителни, Г — задължителни предписания, Д — специални предписания, Е — допълнителна информация, плюс табели и знаци за направления. Формата и цветът издават групата от пръв поглед.",
+    "dependsOn": ["c-signal-hierarchy"],
+    "lawRefs": [{ "act": "ЗДвП", "ref": "чл. 6" }, { "act": "Наредба № РД-02-21-1/2023", "ref": "групи А–Ж?" }],
+    "difficulty": 1
+  },
+  {
+    "id": "c-warning-signs",
+    "topicId": "t-signs",
+    "titleBg": "Предупредителни знаци (група А)",
+    "titleEn": "Warning signs (group A)",
+    "summaryBg": "Триъгълни с червен кант, те предупреждават за опасност напред: остър завой, стеснение, деца, жп прелез. Извън населено място се поставят по-далеч от опасността, защото скоростите са по-високи.",
+    "dependsOn": ["c-sign-groups"],
+    "lawRefs": [{ "act": "Наредба № РД-02-21-1/2023", "ref": "група А?" }],
+    "difficulty": 1
+  },
+  {
+    "id": "c-priority-signs",
+    "topicId": "t-signs",
+    "titleBg": "Знаци за предимство (група Б)",
+    "titleEn": "Priority signs (group B)",
+    "summaryBg": "Малка, но решаваща група: те казват кой минава пръв на кръстовището. Тук са „Пропусни движещите се по пътя с предимство“, „Спри!“, „Път с предимство“ и знакът за предимство на насрещното движение.",
+    "dependsOn": ["c-sign-groups"],
+    "lawRefs": [{ "act": "Наредба № РД-02-21-1/2023", "ref": "група Б?" }],
+    "difficulty": 1
+  },
+  {
+    "id": "c-stop-give-way-signs",
+    "topicId": "t-signs",
+    "titleBg": "Знаците Б1 „Пропусни“ и Б2 „Спри“",
+    "titleEn": "Signs B1 give way and B2 stop",
+    "summaryBg": "Б1 (обърнат триъгълник) те задължава да пропуснеш движещите се по пътя с предимство — спираш само ако е нужно. Б2 (осмоъгълникът STOP) изисква пълно спиране винаги, дори пътят да изглежда празен.",
+    "dependsOn": ["c-priority-signs"],
+    "lawRefs": [{ "act": "ЗДвП", "ref": "чл. 50" }],
+    "difficulty": 1
+  },
+  {
+    "id": "c-prohibition-signs",
+    "topicId": "t-signs",
+    "titleBg": "Забранителни знаци (група В)",
+    "titleEn": "Prohibition signs (group C)",
+    "summaryBg": "Кръгли с червен кант, те въвеждат забрани: за влизане, изпреварване, скорост, престой. Забраната започва от знака и важи до отменянето ѝ, а знаците с кос черен ринг я отменят.",
+    "dependsOn": ["c-sign-groups"],
+    "lawRefs": [{ "act": "Наредба № РД-02-21-1/2023", "ref": "група В?" }],
+    "difficulty": 2
+  },
+  {
+    "id": "c-mandatory-signs",
+    "topicId": "t-signs",
+    "titleBg": "Задължителни знаци (група Г)",
+    "titleEn": "Mandatory signs (group D)",
+    "summaryBg": "Кръгли и сини, те не забраняват, а нареждат: движение само направо, само надясно, задължителен обходен път, минимална скорост. Изпълняваш ги, освен ако регулировчик не нареди друго.",
+    "dependsOn": ["c-sign-groups"],
+    "lawRefs": [{ "act": "Наредба № РД-02-21-1/2023", "ref": "група Г?" }],
+    "difficulty": 1
+  },
+  {
+    "id": "c-special-rules-signs",
+    "topicId": "t-signs",
+    "titleBg": "Знаци със специални предписания (група Д)",
+    "titleEn": "Special regulation signs (group E)",
+    "summaryBg": "Правоъгълни знаци, които въвеждат режим за цяла зона или път: еднопосочно движение, пешеходна зона, жилищна зона, автомагистрала, пешеходна пътека. Много от тях работят по двойки — начало и край на режима.",
+    "dependsOn": ["c-sign-groups"],
+    "lawRefs": [{ "act": "Наредба № РД-02-21-1/2023", "ref": "група Д?" }],
+    "difficulty": 2
+  },
+  {
+    "id": "c-info-signs",
+    "topicId": "t-signs",
+    "titleBg": "Указателни знаци (група Е)",
+    "titleEn": "Information signs (group F)",
+    "summaryBg": "Дават полезна информация: болница, паркинг, бензиностанция, подлез, еднопосочен път. Те не заповядват нищо, но ти помагат да планираш и да не се озовеш в грешната лента в последния момент.",
+    "dependsOn": ["c-sign-groups"],
+    "lawRefs": [{ "act": "Наредба № РД-02-21-1/2023", "ref": "група Е?" }],
+    "difficulty": 1
+  },
+  {
+    "id": "c-direction-signs",
+    "topicId": "t-signs",
+    "titleBg": "Знаци за направления и разстояния (група Ж)",
+    "titleEn": "Direction and distance signs (group G)",
+    "summaryBg": "Големите табели преди кръстовища и изходи показват посоки, номера на пътища и разстояния. Чети ги рано и се престроявай навреме — рязката смяна на лента пред изхода е класическа причина за ПТП.",
+    "dependsOn": ["c-sign-groups"],
+    "lawRefs": [{ "act": "Наредба № РД-02-21-1/2023", "ref": "група Ж?" }],
+    "difficulty": 1
+  },
+  {
+    "id": "c-additional-plates",
+    "topicId": "t-signs",
+    "titleBg": "Допълнителни табели (група Т)",
+    "titleEn": "Additional plates (group T)",
+    "summaryBg": "Малките табели под знака уточняват действието му: разстояние до опасността, дължина на участъка, дни и часове, вид превозни средства. Знак с табела се чете винаги като едно цяло.",
+    "dependsOn": ["c-sign-groups"],
+    "lawRefs": [{ "act": "Наредба № РД-02-21-1/2023", "ref": "група Т?" }],
+    "difficulty": 2
+  },
+  {
+    "id": "c-sign-scope",
+    "topicId": "t-signs",
+    "titleBg": "Зона на действие и отменяне на забраните",
+    "titleEn": "Scope and cancellation of prohibitions",
+    "summaryBg": "Забраната от знак действа от мястото му до следващото кръстовище, до знак за край на забраната или до разстоянието, посочено на табела. Краят на населеното място също отменя някои ограничения.",
+    "dependsOn": ["c-prohibition-signs", "c-additional-plates"],
+    "lawRefs": [{ "act": "Наредба № РД-02-21-1/2023", "ref": "зона на действие?" }],
+    "difficulty": 2
+  },
+  {
+    "id": "c-temporary-signalization",
+    "topicId": "t-signs",
+    "titleBg": "Временна сигнализация при ремонти",
+    "titleEn": "Temporary signalization at road works",
+    "summaryBg": "При ремонт временните знаци и оранжевата маркировка имат предимство пред постоянните — следваш тях. В ремонтен участък очаквай стеснение, работници на платното и внезапни спирания.",
+    "dependsOn": ["c-sign-groups"],
+    "lawRefs": [{ "act": "Наредба № РД-02-21-1/2023", "ref": "временна сигнализация?" }],
+    "difficulty": 2
+  },
+  {
+    "id": "c-traffic-light-signals",
+    "topicId": "t-signals-markings",
+    "titleBg": "Сигнали на светофара",
+    "titleEn": "Traffic light signals",
+    "summaryBg": "Червено означава спри преди стоп-линията, зелено — премини, ако пътят е свободен. Жълтото също забранява преминаването — освен ако си толкова близо, че не можеш да спреш безопасно.",
+    "dependsOn": ["c-signal-hierarchy"],
+    "lawRefs": [{ "act": "ППЗДвП", "ref": "чл. 31?" }],
+    "difficulty": 1
+  },
+  {
+    "id": "c-additional-sections",
+    "topicId": "t-signals-markings",
+    "titleBg": "Допълнителни секции със стрелки",
+    "titleEn": "Additional arrow sections",
+    "summaryBg": "Светещата зелена стрелка отстрани на светофара разрешава движение само в нейната посока — дори основният сигнал да е червен. Внимание: при завиване със стрелка често пресичаш пътя на пешеходци със зелено.",
+    "dependsOn": ["c-traffic-light-signals"],
+    "lawRefs": [{ "act": "ППЗДвП", "ref": "чл. 31?" }],
+    "difficulty": 2
+  },
+  {
+    "id": "c-flashing-yellow",
+    "topicId": "t-signals-markings",
+    "titleBg": "Мигаща жълта светлина",
+    "titleEn": "Flashing yellow light",
+    "summaryBg": "Мигащото жълто не спира никого — то само предупреждава: премини внимателно. Кръстовището тогава е нерегулирано и важат знаците, а ако няма знаци — правилото на дясното.",
+    "dependsOn": ["c-traffic-light-signals"],
+    "lawRefs": [{ "act": "ППЗДвП", "ref": "чл. 31?" }],
+    "difficulty": 2
+  },
+  {
+    "id": "c-lane-control-signals",
+    "topicId": "t-signals-markings",
+    "titleBg": "Светофари над пътните ленти",
+    "titleEn": "Lane control signals",
+    "summaryBg": "Над отделни ленти може да светят зелена стрелка надолу — лентата е разрешена, или червен X — забранена. Използват се при реверсивно движение, в тунели и на пунктове за проверка.",
+    "dependsOn": ["c-traffic-light-signals"],
+    "lawRefs": [{ "act": "ППЗДвП", "ref": "чл. 33?" }],
+    "difficulty": 2
+  },
+  {
+    "id": "c-regulator-signals",
+    "topicId": "t-signals-markings",
+    "titleBg": "Сигнали на регулировчика",
+    "titleEn": "Traffic controller signals",
+    "summaryBg": "Вдигната ръка означава „внимание, спри“; хоризонтално изпънати ръце или спуснати ръце определят откъде е разрешено преминаването. Сигналите на регулировчика отменят и светофара, и знаците.",
+    "dependsOn": ["c-signal-hierarchy"],
+    "lawRefs": [{ "act": "ППЗДвП", "ref": "чл. 66?" }],
+    "difficulty": 3
+  },
+  {
+    "id": "c-longitudinal-markings",
+    "topicId": "t-signals-markings",
+    "titleBg": "Надлъжна пътна маркировка",
+    "titleEn": "Longitudinal road markings",
+    "summaryBg": "Прекъснатата линия може да се пресича, непрекъснатата — не, а двойната непрекъсната е абсолютна граница. Комбинираната линия се чете според тази, която е от твоята страна.",
+    "dependsOn": ["c-signal-hierarchy"],
+    "lawRefs": [{ "act": "Наредба № 2/2001", "ref": "надлъжна маркировка?" }],
+    "difficulty": 1
+  },
+  {
+    "id": "c-transverse-markings",
+    "topicId": "t-signals-markings",
+    "titleBg": "Напречна маркировка",
+    "titleEn": "Transverse markings",
+    "summaryBg": "Стоп-линията показва къде точно се спира при знак Б2 или червен светофар, а „зебрата“ очертава пешеходната пътека. Линията от триъгълници дублира знака „Пропусни движещите се по пътя с предимство“.",
+    "dependsOn": ["c-longitudinal-markings"],
+    "lawRefs": [{ "act": "Наредба № 2/2001", "ref": "напречна маркировка?" }],
+    "difficulty": 1
+  },
+  {
+    "id": "c-other-markings",
+    "topicId": "t-signals-markings",
+    "titleBg": "Стрелки, надписи и специални ленти",
+    "titleEn": "Arrows, inscriptions and special lanes",
+    "summaryBg": "Стрелките на платното задължават да се движиш в посоката им от съответната лента, надписът BUS маркира лента за автобуси, а жълтата зигзаг линия — спирка. Ако си в лента със стрелка за завиване, трябва да завиеш.",
+    "dependsOn": ["c-longitudinal-markings"],
+    "lawRefs": [{ "act": "Наредба № 2/2001", "ref": "други маркировки?" }],
+    "difficulty": 2
+  },
+  {
+    "id": "c-driver-signals",
+    "topicId": "t-signals-markings",
+    "titleBg": "Сигналите, които подава водачът",
+    "titleEn": "Signals given by the driver",
+    "summaryBg": "Преди всяка маневра подаваш навременен и ясен сигнал с мигач и го изключваш след маневрата. Мигачът не ти дава предимство — той само съобщава намерение.",
+    "dependsOn": ["c-signal-hierarchy"],
+    "lawRefs": [{ "act": "ЗДвП", "ref": "чл. 25" }],
+    "difficulty": 1
+  },
+  {
+    "id": "c-special-regime-vehicles",
+    "topicId": "t-signals-markings",
+    "titleBg": "Автомобили със специален режим на движение",
+    "titleEn": "Emergency vehicles with special regime",
+    "summaryBg": "Линейки, полиция и пожарна със синя или червена мигаща светлина и сирена могат да нарушават някои правила. Чуеш ли сирена, установи откъде идва, преди да реагираш.",
+    "dependsOn": ["c-traffic-light-signals"],
+    "lawRefs": [{ "act": "ЗДвП", "ref": "чл. 91" }],
+    "difficulty": 2
+  },
+  {
+    "id": "c-priority-concept",
+    "topicId": "t-priority",
+    "titleBg": "Какво означава предимство",
+    "titleEn": "The concept of right of way",
+    "summaryBg": "Предимство означава правото да преминеш пръв, а насрещният да те пропусне. Но предимството се дава, не се взима — ако другият не спира, твоето право не те пази от удара.",
+    "dependsOn": ["c-road-participants"],
+    "lawRefs": [{ "act": "ЗДвП", "ref": "§ 6 ДР" }],
+    "difficulty": 1
+  },
+  {
+    "id": "c-right-hand-rule",
+    "topicId": "t-priority",
+    "titleBg": "Правилото на дясното",
+    "titleEn": "Right-hand priority rule",
+    "summaryBg": "На кръстовище на равнозначни пътища пропускаш превозните средства, които идват отдясно. Това е резервното правило — важи само когато няма регулировчик, светофар и знаци за предимство.",
+    "dependsOn": ["c-priority-concept"],
+    "lawRefs": [{ "act": "ЗДвП", "ref": "чл. 48?" }],
+    "difficulty": 2
+  },
+  {
+    "id": "c-priority-road",
+    "topicId": "t-priority",
+    "titleBg": "Път с предимство",
+    "titleEn": "Priority road",
+    "summaryBg": "Знакът „Път с предимство“ (жълтият ромб) ти дава предимство на всички кръстовища по пътя, докато знак не отбележи края му. Идващите от другите пътища имат Б1 или Б2 и са длъжни да те пропуснат.",
+    "dependsOn": ["c-priority-concept", "c-priority-signs"],
+    "lawRefs": [{ "act": "ЗДвП", "ref": "чл. 50" }],
+    "difficulty": 1
+  },
+  {
+    "id": "c-give-way-stop-behavior",
+    "topicId": "t-priority",
+    "titleBg": "Поведение при Б1 и Б2 на кръстовище",
+    "titleEn": "Behaviour at give way and stop signs",
+    "summaryBg": "При Б1 намаляваш и пропускаш всички по пътя с предимство; спираш само ако иначе ще ги засечеш. При Б2 спираш напълно на стоп-линията, оглеждаш се и потегляш едва когато пътят е чист.",
+    "dependsOn": ["c-stop-give-way-signs", "c-priority-road"],
+    "lawRefs": [{ "act": "ЗДвП", "ref": "чл. 50" }],
+    "difficulty": 2
+  },
+  {
+    "id": "c-left-turn-oncoming",
+    "topicId": "t-priority",
+    "titleBg": "Завой наляво: пропусни насрещните",
+    "titleEn": "Left turn: yield to oncoming traffic",
+    "summaryBg": "При завиване наляво пропускаш насрещно движещите се направо или надясно — те имат предимство, дори всички да сте на зелено. Това е една от най-често провалящите изпита ситуации.",
+    "dependsOn": ["c-priority-concept"],
+    "lawRefs": [{ "act": "ЗДвП", "ref": "чл. 37" }],
+    "difficulty": 2
+  },
+  {
+    "id": "c-tram-priority",
+    "topicId": "t-priority",
+    "titleBg": "Предимство на трамваите",
+    "titleEn": "Tram priority",
+    "summaryBg": "Релсовите превозни средства по правило имат предимство пред останалите, независимо откъде идват — освен ако знаци или светофар не казват друго. Трамваят спира много по-дълго от кола, затова не заставай на релсите.",
+    "dependsOn": ["c-priority-concept"],
+    "lawRefs": [{ "act": "ЗДвП", "ref": "чл. 49?" }],
+    "difficulty": 2
+  },
+  {
+    "id": "c-emergency-priority",
+    "topicId": "t-priority",
+    "titleBg": "Пропускане на автомобили със специален режим",
+    "titleEn": "Yielding to emergency vehicles",
+    "summaryBg": "При сигнал на линейка, полиция или пожарна си длъжен да осигуриш път — отбий вдясно, а при нужда спри. На кръстовище не влизай пред тях, дори да си на зелено.",
+    "dependsOn": ["c-special-regime-vehicles", "c-priority-concept"],
+    "lawRefs": [{ "act": "ЗДвП", "ref": "чл. 92" }],
+    "difficulty": 2
+  },
+  {
+    "id": "c-exit-from-adjacent",
+    "topicId": "t-priority",
+    "titleBg": "Излизане от двор, гараж или паркинг",
+    "titleEn": "Exiting a yard, garage or parking lot",
+    "summaryBg": "Когато излизаш на пътя от двор, гараж, паркинг, бензиностанция или земен път, пропускаш всички — и превозните средства, и пешеходците по тротоара. Тук нямаш никакво предимство.",
+    "dependsOn": ["c-priority-concept"],
+    "lawRefs": [{ "act": "ЗДвП", "ref": "чл. 25?" }],
+    "difficulty": 2
+  },
+  {
+    "id": "c-bus-pullout",
+    "topicId": "t-priority",
+    "titleBg": "Автобус, потеглящ от спирка",
+    "titleEn": "Bus pulling out from a stop",
+    "summaryBg": "В населено място си длъжен да осигуриш възможност на автобус от редовните линии да потегли от спирката, когато е подал мигач. Намали и го изчакай, вместо да ускоряваш покрай него.",
+    "dependsOn": ["c-priority-concept"],
+    "lawRefs": [{ "act": "ЗДвП", "ref": "чл. 68?" }],
+    "difficulty": 2
+  },
+  {
+    "id": "c-junction-types",
+    "topicId": "t-junctions",
+    "titleBg": "Видове кръстовища",
+    "titleEn": "Types of junctions",
+    "summaryBg": "Кръстовище е мястото, където пътищата се пресичат или свързват на едно ниво. Според регулирането то е: с регулировчик, със светофар, със знаци за предимство или на равнозначни пътища — и за всяко важи различна логика на предимството.",
+    "dependsOn": ["c-road-elements"],
+    "lawRefs": [{ "act": "ЗДвП", "ref": "§ 6 ДР" }],
+    "difficulty": 1
+  },
+  {
+    "id": "c-junction-approach",
+    "topicId": "t-junctions",
+    "titleBg": "Приближаване към кръстовище",
+    "titleEn": "Approaching a junction",
+    "summaryBg": "Към всяко кръстовище приближаваш със скорост, която позволява да спреш и да пропуснеш тези с предимство. Първо определи вида на кръстовището, после кой има предимство, и чак тогава действай.",
+    "dependsOn": ["c-junction-types", "c-priority-concept"],
+    "lawRefs": [{ "act": "ЗДвП", "ref": "чл. 47?" }],
+    "difficulty": 1
+  },
+  {
+    "id": "c-equal-junction",
+    "topicId": "t-junctions",
+    "titleBg": "Равнозначно кръстовище",
+    "titleEn": "Junction of equal roads",
+    "summaryBg": "Без знаци и светофар важи правилото на дясното: пропускаш идващия отдясно, а левият пропуска теб. Ако четири коли пристигнат едновременно, се разбирате с поглед и жест — законът не решава този случай.",
+    "dependsOn": ["c-junction-types", "c-right-hand-rule"],
+    "lawRefs": [{ "act": "ЗДвП", "ref": "чл. 48?" }],
+    "difficulty": 2
+  },
+  {
+    "id": "c-signed-junction",
+    "topicId": "t-junctions",
+    "titleBg": "Кръстовище със знаци за предимство",
+    "titleEn": "Junction controlled by priority signs",
+    "summaryBg": "Знаците разделят пътищата на главен и второстепенен: движещите се по пътя с предимство минават първи. Внимавай — между колите на второстепенния ред пак важи правилото на дясното.",
+    "dependsOn": ["c-junction-types", "c-priority-road", "c-give-way-stop-behavior"],
+    "lawRefs": [{ "act": "ЗДвП", "ref": "чл. 50" }],
+    "difficulty": 2
+  },
+  {
+    "id": "c-light-junction",
+    "topicId": "t-junctions",
+    "titleBg": "Светофарно кръстовище",
+    "titleEn": "Traffic-light junction",
+    "summaryBg": "Светофарът отменя знаците за предимство, но не и правилото за завой наляво срещу насрещните. При отпадане на светофара (мигащо жълто или изключен) кръстовището се управлява от знаците под светофара.",
+    "dependsOn": ["c-junction-types", "c-traffic-light-signals", "c-flashing-yellow"],
+    "lawRefs": [{ "act": "ЗДвП", "ref": "чл. 7" }],
+    "difficulty": 2
+  },
+  {
+    "id": "c-turning-right",
+    "topicId": "t-junctions",
+    "titleBg": "Завиване надясно",
+    "titleEn": "Turning right",
+    "summaryBg": "Завиваш надясно от крайната дясна лента, с включен десен мигач, като завършваш завоя в дясната лента на новия път. Преди завоя провери за велосипедисти и пешеходци отдясно.",
+    "dependsOn": ["c-junction-approach", "c-driver-signals"],
+    "lawRefs": [{ "act": "ЗДвП", "ref": "чл. 36?" }],
+    "difficulty": 2
+  },
+  {
+    "id": "c-turning-left-junction",
+    "topicId": "t-junctions",
+    "titleBg": "Завиване наляво на кръстовище",
+    "titleEn": "Turning left at a junction",
+    "summaryBg": "За завой наляво се престрояваш в крайната лява лента (или най-лявата разрешена), пропускаш насрещните и завиваш. На двупосочен път завоят се прави около центъра на кръстовището, без да го „режеш“.",
+    "dependsOn": ["c-junction-approach", "c-left-turn-oncoming", "c-driver-signals"],
+    "lawRefs": [{ "act": "ЗДвП", "ref": "чл. 36?" }, { "act": "ЗДвП", "ref": "чл. 37" }],
+    "difficulty": 2
+  },
+  {
+    "id": "c-roundabout-rules",
+    "topicId": "t-junctions",
+    "titleBg": "Кръгово движение: кой е с предимство",
+    "titleEn": "Roundabouts: who has priority",
+    "summaryBg": "От 2017 г. правилото е ясно: който вече е в кръга, има предимство, а влизащият пропуска. Знаците на входа обикновено дублират това, но винаги проверявай — има и изключения със светофари.",
+    "dependsOn": ["c-junction-types"],
+    "lawRefs": [{ "act": "ЗДвП", "ref": "чл. 50а" }],
+    "difficulty": 2
+  },
+  {
+    "id": "c-roundabout-behavior",
+    "topicId": "t-junctions",
+    "titleBg": "Движение и излизане от кръговото",
+    "titleEn": "Driving through and exiting a roundabout",
+    "summaryBg": "В кръга се движиш обратно на часовниковата стрелка; при излизане подаваш десен мигач и внимаваш за движещите се в дясната лента. При многолентово кръгово смяната на лента вътре е най-рисковият момент.",
+    "dependsOn": ["c-roundabout-rules", "c-driver-signals"],
+    "lawRefs": [{ "act": "ЗДвП", "ref": "чл. 50а" }],
+    "difficulty": 3
+  },
+  {
+    "id": "c-railway-crossing",
+    "topicId": "t-junctions",
+    "titleBg": "Железопътен прелез",
+    "titleEn": "Railway level crossing",
+    "summaryBg": "Пред прелез намаляваш и преминаваш само ако няма спуснати бариери, червени мигащи светлини или приближаващ влак. Спрял пред прелеза, не потегляй, докато не се увериш, че и двете посоки са чисти — влакът не може да спре за теб.",
+    "dependsOn": ["c-warning-signs", "c-stop-give-way-signs"],
+    "lawRefs": [{ "act": "ЗДвП", "ref": "чл. 51?" }],
+    "difficulty": 2
+  },
+  {
+    "id": "c-junction-blocking",
+    "topicId": "t-junctions",
+    "titleBg": "Не блокирай кръстовището",
+    "titleEn": "Do not block the junction",
+    "summaryBg": "Не навлизай в кръстовище, дори на зелено, ако задръстването отпред ще те принуди да спреш в него и да пречиш на напречното движение. По-добре изчакай един светофарен цикъл, отколкото да запушиш всички.",
+    "dependsOn": ["c-junction-approach"],
+    "lawRefs": [{ "act": "ЗДвП", "ref": "чл. 47?" }],
+    "difficulty": 2
+  },
+  {
+    "id": "c-speed-limits",
+    "topicId": "t-speed",
+    "titleBg": "Ограничения на скоростта за категория B",
+    "titleEn": "Speed limits for category B",
+    "summaryBg": "Ако знак не казва друго: 50 км/ч в населено място, 90 извън него, 120 по скоростен път и 140 по автомагистрала. Това са тавани, не цели — карай според условията.",
+    "dependsOn": ["c-driver-obligations"],
+    "lawRefs": [{ "act": "ЗДвП", "ref": "чл. 21" }],
+    "difficulty": 1
+  },
+  {
+    "id": "c-speed-signs-zone",
+    "topicId": "t-speed",
+    "titleBg": "Знаци и зони за скорост",
+    "titleEn": "Speed limit signs and zones",
+    "summaryBg": "Знакът В26 сваля ограничението под общото, а действието му спира при кръстовище, знак за край или табела с разстояние. В зони „30“ ограничението важи за цялата зона до знака за края ѝ.",
+    "dependsOn": ["c-prohibition-signs", "c-speed-limits", "c-sign-scope"],
+    "lawRefs": [{ "act": "ЗДвП", "ref": "чл. 21" }],
+    "difficulty": 1
+  },
+  {
+    "id": "c-speed-adaptation",
+    "topicId": "t-speed",
+    "titleBg": "Съобразена скорост",
+    "titleEn": "Adapting speed to conditions",
+    "summaryBg": "Длъжен си да караш със скорост, съобразена с видимостта, пътя, трафика и товара — и да можеш да спреш в осветеното или видимото пред теб. Може да нарушиш закона и с 40 км/ч, ако условията изискват 20.",
+    "dependsOn": ["c-speed-limits"],
+    "lawRefs": [{ "act": "ЗДвП", "ref": "чл. 20" }],
+    "difficulty": 2
+  },
+  {
+    "id": "c-reaction-time",
+    "topicId": "t-speed",
+    "titleBg": "Време за реакция",
+    "titleEn": "Reaction time",
+    "summaryBg": "От момента, в който видиш опасността, до натискането на спирачката минава около секунда — а за уморен или разсеян водач повече. За тази секунда при 90 км/ч изминаваш 25 метра, без изобщо да спираш.",
+    "dependsOn": [],
+    "lawRefs": [{ "act": "ЗДвП", "ref": "чл. 20" }],
+    "difficulty": 1
+  },
+  {
+    "id": "c-braking-distance",
+    "topicId": "t-speed",
+    "titleBg": "Спирачен път и скорост",
+    "titleEn": "Braking distance and speed",
+    "summaryBg": "Спирачният път расте с квадрата на скоростта: два пъти по-бързо означава четири пъти по-дълго спиране. Мокър асфалт го удължава почти двойно, а лед — многократно.",
+    "dependsOn": ["c-reaction-time"],
+    "lawRefs": [{ "act": "ЗДвП", "ref": "чл. 20" }],
+    "difficulty": 2
+  },
+  {
+    "id": "c-stopping-distance-total",
+    "topicId": "t-speed",
+    "titleBg": "Общ спирачен път",
+    "titleEn": "Total stopping distance",
+    "summaryBg": "Пълното разстояние за спиране е пътят за реакция плюс спирачния път. При 50 км/ч на сух асфалт това са около 25–30 метра — затова „само с 10 отгоре“ в града често решава дали пешеходецът ще бъде ударен.",
+    "dependsOn": ["c-braking-distance"],
+    "lawRefs": [{ "act": "ЗДвП", "ref": "чл. 20" }],
+    "difficulty": 2
+  },
+  {
+    "id": "c-speed-impact",
+    "topicId": "t-speed",
+    "titleBg": "Скорост и сила на удара",
+    "titleEn": "Speed and impact severity",
+    "summaryBg": "Енергията на удара също расте с квадрата на скоростта: удар при 100 км/ч е четири пъти по-разрушителен от удар при 50. Пешеходец, ударен при 50 км/ч, има в пъти по-малък шанс да оцелее, отколкото при 30.",
+    "dependsOn": ["c-braking-distance"],
+    "lawRefs": [{ "act": "ЗДвП", "ref": "чл. 20" }],
+    "difficulty": 2
+  },
+  {
+    "id": "c-following-distance",
+    "topicId": "t-speed",
+    "titleBg": "Безопасна дистанция",
+    "titleEn": "Safe following distance",
+    "summaryBg": "Дръж дистанция, която ти позволява да спреш, ако предният спре внезапно. Практическо правило: минимум 2 секунди зад предната кола при сухо време, повече при дъжд, нощем и зад мотори.",
+    "dependsOn": ["c-stopping-distance-total"],
+    "lawRefs": [{ "act": "ЗДвП", "ref": "чл. 23" }],
+    "difficulty": 2
+  },
+  {
+    "id": "c-sudden-braking-slow-driving",
+    "topicId": "t-speed",
+    "titleBg": "Рязко спиране и излишно бавно движение",
+    "titleEn": "Sudden braking and needlessly slow driving",
+    "summaryBg": "Забранено е да спираш рязко без причина и да се движиш толкова бавно, че да пречиш на движението. Скоростта ти трябва да е предвидима за останалите — изненадите на пътя раждат верижни удари.",
+    "dependsOn": ["c-speed-adaptation", "c-following-distance"],
+    "lawRefs": [{ "act": "ЗДвП", "ref": "чл. 24?" }],
+    "difficulty": 2
+  },
+  {
+    "id": "c-average-speed-enforcement",
+    "topicId": "t-speed",
+    "titleBg": "Контрол на средната скорост",
+    "titleEn": "Average speed enforcement",
+    "summaryBg": "От септември 2025 г. в България скоростта се контролира и като средна стойност между две камери на участък от пътя. Безсмислено е да натискаш спирачка пред камерата — системата смята цялото ти време за преминаване.",
+    "dependsOn": ["c-speed-limits"],
+    "lawRefs": [{ "act": "ЗДвП", "ref": "ДВ бр. 64/2025?" }],
+    "difficulty": 1
+  },
+  {
+    "id": "c-maneuver-principles",
+    "topicId": "t-maneuvers",
+    "titleBg": "Общи правила при маневри",
+    "titleEn": "General rules for manoeuvres",
+    "summaryBg": "Преди всяка маневра си длъжен да се убедиш, че няма да създадеш опасност — с огледала, поглед през рамо и навременен мигач. Редът е винаги: огледало, сигнал, маневра.",
+    "dependsOn": ["c-mirrors-blind-spots", "c-driver-signals"],
+    "lawRefs": [{ "act": "ЗДвП", "ref": "чл. 25" }],
+    "difficulty": 1
+  },
+  {
+    "id": "c-merging-traffic",
+    "topicId": "t-maneuvers",
+    "titleBg": "Включване в движението",
+    "titleEn": "Merging into traffic",
+    "summaryBg": "При потегляне от тротоара, паркинг или спирка пропускаш всички, които вече се движат по пътя. Мигачът предупреждава, но не ти дава право да принудиш никого да спира.",
+    "dependsOn": ["c-maneuver-principles"],
+    "lawRefs": [{ "act": "ЗДвП", "ref": "чл. 25" }],
+    "difficulty": 1
+  },
+  {
+    "id": "c-lane-choice",
+    "topicId": "t-maneuvers",
+    "titleBg": "Избор на пътна лента",
+    "titleEn": "Choosing a lane",
+    "summaryBg": "В населено място с две и повече ленти в посоката можеш да избираш лентата си; извън населено място се движиш в дясната, а лявата е за изпреварване. Средната лента на трилентов двупосочен път не е „твоя“ по подразбиране.",
+    "dependsOn": ["c-right-side-rule"],
+    "lawRefs": [{ "act": "ЗДвП", "ref": "чл. 15" }, { "act": "ЗДвП", "ref": "чл. 16" }],
+    "difficulty": 2
+  },
+  {
+    "id": "c-lane-change",
+    "topicId": "t-maneuvers",
+    "titleBg": "Смяна на пътна лента",
+    "titleEn": "Changing lanes",
+    "summaryBg": "Който сменя лентата, пропуска движещите се по нея — те са с предимство. Провери огледалото и мъртвата зона, подай мигач и се престрой плавно, без да режеш пътя на никого.",
+    "dependsOn": ["c-lane-choice", "c-maneuver-principles"],
+    "lawRefs": [{ "act": "ЗДвП", "ref": "чл. 25" }],
+    "difficulty": 2
+  },
+  {
+    "id": "c-overtaking-procedure",
+    "topicId": "t-maneuvers",
+    "titleBg": "Изпреварване: как се прави",
+    "titleEn": "Overtaking: the procedure",
+    "summaryBg": "Изпреварваш отляво, след като се убедиш, че насрещното платно е свободно на достатъчно разстояние и никой не изпреварва теб. Връщаш се вдясно, когато виждаш изпреварения в огледалото за обратно виждане.",
+    "dependsOn": ["c-maneuver-principles", "c-lane-change", "c-oncoming-passing"],
+    "lawRefs": [{ "act": "ЗДвП", "ref": "чл. 41" }, { "act": "ЗДвП", "ref": "чл. 42" }],
+    "difficulty": 2
+  },
+  {
+    "id": "c-overtaking-prohibitions",
+    "topicId": "t-maneuvers",
+    "titleBg": "Къде изпреварването е забранено",
+    "titleEn": "Where overtaking is prohibited",
+    "summaryBg": "Не се изпреварва при ограничена видимост — връх на изкачване, завой, пешеходна пътека, кръстовище (с изключения), жп прелез, както и при знак или непрекъсната линия. Ако не виждаш края на маневрата, не я започвай.",
+    "dependsOn": ["c-overtaking-procedure", "c-prohibition-signs", "c-longitudinal-markings"],
+    "lawRefs": [{ "act": "ЗДвП", "ref": "чл. 43?" }],
+    "difficulty": 3
+  },
+  {
+    "id": "c-overtaken-duties",
+    "topicId": "t-maneuvers",
+    "titleBg": "Задължения на изпреварвания",
+    "titleEn": "Duties of the overtaken driver",
+    "summaryBg": "Когато те изпреварват, не ускоряваш и не пречиш — а при нужда се придържаш още по-вдясно. Състезанието с изпреварващия е едно от най-глупавите и опасни неща на пътя.",
+    "dependsOn": ["c-overtaking-procedure"],
+    "lawRefs": [{ "act": "ЗДвП", "ref": "чл. 42?" }],
+    "difficulty": 1
+  },
+  {
+    "id": "c-oncoming-passing",
+    "topicId": "t-maneuvers",
+    "titleBg": "Разминаване",
+    "titleEn": "Passing oncoming vehicles",
+    "summaryBg": "Разминаваш се с насрещните, като се държиш вдясно; при препятствие на твоята половина ти изчакваш, а другият минава. На тесни планински пътища предимство при разминаване има изкачващият се.",
+    "dependsOn": ["c-right-side-rule"],
+    "lawRefs": [{ "act": "ЗДвП", "ref": "чл. 44?" }],
+    "difficulty": 2
+  },
+  {
+    "id": "c-reversing",
+    "topicId": "t-maneuvers",
+    "titleBg": "Движение назад",
+    "titleEn": "Reversing",
+    "summaryBg": "На заден ход пропускаш всички и се движиш само ако си сигурен, че зад теб е чисто — при нужда вземи човек, който да ти дава сигнали отвън. Забранено е на заден ход да пресичаш кръстовище или да се движиш по магистрала.",
+    "dependsOn": ["c-maneuver-principles"],
+    "lawRefs": [{ "act": "ЗДвП", "ref": "чл. 40" }],
+    "difficulty": 2
+  },
+  {
+    "id": "c-u-turn",
+    "topicId": "t-maneuvers",
+    "titleBg": "Обратен завой",
+    "titleEn": "U-turn",
+    "summaryBg": "Обратен завой се прави само при добра видимост и в двете посоки, след пропускане на всички. Забранен е на места с ограничена видимост, на пешеходни пътеки, жп прелези, мостове и там, където знак го забранява.",
+    "dependsOn": ["c-maneuver-principles", "c-left-turn-oncoming"],
+    "lawRefs": [{ "act": "ЗДвП", "ref": "чл. 38?" }],
+    "difficulty": 2
+  },
+  {
+    "id": "c-pedestrian-rights-duties",
+    "topicId": "t-vulnerable",
+    "titleBg": "Правила за пешеходците",
+    "titleEn": "Rules for pedestrians",
+    "summaryBg": "Пешеходците пресичат по пешеходни пътеки, а където няма — на място с добра видимост, без да се застояват на платното. Нощем извън населено място пешеходецът по банкета е почти невидим — очаквай го.",
+    "dependsOn": ["c-road-participants"],
+    "lawRefs": [{ "act": "ЗДвП", "ref": "чл. 108?" }],
+    "difficulty": 1
+  },
+  {
+    "id": "c-general-care-duty",
+    "topicId": "t-vulnerable",
+    "titleBg": "Особено внимание към уязвимите",
+    "titleEn": "Special care for vulnerable road users",
+    "summaryBg": "Водачът е длъжен да бъде внимателен и предпазлив към пешеходците — особено деца, възрастни и хора с увреждания. Правилото е просто: колкото по-крехък е другият, толкова по-голяма е твоята отговорност.",
+    "dependsOn": ["c-driver-obligations"],
+    "lawRefs": [{ "act": "ЗДвП", "ref": "чл. 116" }],
+    "difficulty": 1
+  },
+  {
+    "id": "c-crosswalk-yield",
+    "topicId": "t-vulnerable",
+    "titleBg": "Пропускане на пешеходна пътека",
+    "titleEn": "Yielding at pedestrian crossings",
+    "summaryBg": "Приближавайки пешеходна пътека, си длъжен да пропуснеш стъпилите на нея и преминаващите пешеходци, като при нужда спреш. Никога не изпреварвай и не заобикаляй кола, спряла пред пътека — тя вероятно пропуска човек, когото не виждаш.",
+    "dependsOn": ["c-pedestrian-rights-duties", "c-general-care-duty"],
+    "lawRefs": [{ "act": "ЗДвП", "ref": "чл. 119" }],
+    "difficulty": 2
+  },
+  {
+    "id": "c-children-on-road",
+    "topicId": "t-vulnerable",
+    "titleBg": "Деца на пътя",
+    "titleEn": "Children on the road",
+    "summaryBg": "Дете край пътя означава: свали крака от газта и бъди готов да спреш. Децата са ниски, невидими зад паркирани коли и изскачат след топка, без да поглеждат.",
+    "dependsOn": ["c-general-care-duty"],
+    "lawRefs": [{ "act": "ЗДвП", "ref": "чл. 117" }],
+    "difficulty": 2
+  },
+  {
+    "id": "c-cyclists",
+    "topicId": "t-vulnerable",
+    "titleBg": "Велосипедисти",
+    "titleEn": "Cyclists",
+    "summaryBg": "Изпреварваш велосипедист само с достатъчно странично разстояние и намалена скорост, а при завиване надясно проверяваш за колело в мъртвата зона. Велосипедистът може да се отклони внезапно — заради дупка, шахта или вятър.",
+    "dependsOn": ["c-general-care-duty", "c-overtaking-procedure"],
+    "lawRefs": [{ "act": "ЗДвП", "ref": "чл. 80?" }],
+    "difficulty": 2
+  },
+  {
+    "id": "c-e-scooters",
+    "topicId": "t-vulnerable",
+    "titleBg": "Електрически тротинетки (ИЕПС)",
+    "titleEn": "E-scooters (personal light electric vehicles)",
+    "summaryBg": "Тротинетките се движат по велоалеи, а където няма — вдясно на платното, и за тях важат възрастови и скоростни ограничения. Като водач на кола ги третирай като велосипедисти: непредвидими, бързи и без защита.",
+    "dependsOn": ["c-general-care-duty"],
+    "lawRefs": [{ "act": "ЗДвП", "ref": "чл. 80а?" }],
+    "difficulty": 2
+  },
+  {
+    "id": "c-motorcyclists-visibility",
+    "topicId": "t-vulnerable",
+    "titleBg": "Мотористи и видимост",
+    "titleEn": "Motorcyclists and visibility",
+    "summaryBg": "Мотоциклетът е тесен, ускорява бързо и лесно се губи в мъртвата зона или се „скрива“ зад колона на предното стъкло. Преди завой наляво и смяна на лента гледай два пъти именно за мотор.",
+    "dependsOn": ["c-general-care-duty", "c-mirrors-blind-spots"],
+    "lawRefs": [{ "act": "ЗДвП", "ref": "чл. 20" }],
+    "difficulty": 2
+  },
+  {
+    "id": "c-residential-zone",
+    "topicId": "t-vulnerable",
+    "titleBg": "Жилищна зона",
+    "titleEn": "Residential zone",
+    "summaryBg": "В обозначената жилищна зона пешеходците може да използват цялото платно и игрите на деца са разрешени — колата е гост. Движиш се със скорост на бърз пешеходец и паркираш само на обозначените места.",
+    "dependsOn": ["c-special-rules-signs", "c-general-care-duty"],
+    "lawRefs": [{ "act": "ЗДвП", "ref": "чл. 61?" }],
+    "difficulty": 2
+  },
+  {
+    "id": "c-shared-zones-paths",
+    "topicId": "t-vulnerable",
+    "titleBg": "Пешеходни зони и велоалеи",
+    "titleEn": "Pedestrian zones and cycle paths",
+    "summaryBg": "В пешеходна зона автомобилите по правило не влизат, освен при разрешен режим за зареждане или живеещи. Велоалеята е за велосипедите — не паркирай и не карай по нея, а при пресичането ѝ пропускай движещите се по нея.",
+    "dependsOn": ["c-special-rules-signs", "c-pedestrian-rights-duties"],
+    "lawRefs": [{ "act": "Наредба № РД-02-21-1/2023", "ref": "група Д?" }],
+    "difficulty": 2
+  },
+  {
+    "id": "c-bus-stops-school",
+    "topicId": "t-vulnerable",
+    "titleBg": "Спирки и училищни зони",
+    "titleEn": "Public transport stops and school zones",
+    "summaryBg": "Покрай спирка минаваш с повишено внимание — пътници пресичат пред и зад спрелия автобус, без да гледат. Около училища намали предварително и очаквай деца на платното, особено в началото и края на учебния ден.",
+    "dependsOn": ["c-general-care-duty", "c-children-on-road"],
+    "lawRefs": [{ "act": "ЗДвП", "ref": "чл. 66?" }],
+    "difficulty": 2
+  },
+  {
+    "id": "c-elderly-disabled",
+    "topicId": "t-vulnerable",
+    "titleBg": "Възрастни хора и хора с увреждания",
+    "titleEn": "Elderly and disabled road users",
+    "summaryBg": "Възрастните пресичат бавно и често не чуват или не виждат приближаването ти; хората с бял бастун или инвалидна количка имат нужда от повече време и пространство. Спри и изчакай — натискането на клаксон не ускорява никого.",
+    "dependsOn": ["c-general-care-duty"],
+    "lawRefs": [{ "act": "ЗДвП", "ref": "чл. 116" }],
+    "difficulty": 1
+  },
+  {
+    "id": "c-motorway-rules",
+    "topicId": "t-roads",
+    "titleBg": "Движение по автомагистрала",
+    "titleEn": "Driving on a motorway",
+    "summaryBg": "По магистралата се движат само моторни превозни средства, които могат да поддържат високи скорости; движиш се в дясната лента, а лявата ползваш за изпреварване. Високата скорост изисква по-голяма дистанция и по-ранно планиране на всяко действие.",
+    "dependsOn": ["c-speed-limits", "c-lane-choice"],
+    "lawRefs": [{ "act": "ЗДвП", "ref": "чл. 55" }],
+    "difficulty": 2
+  },
+  {
+    "id": "c-motorway-entry-exit",
+    "topicId": "t-roads",
+    "titleBg": "Включване и напускане на магистралата",
+    "titleEn": "Entering and exiting the motorway",
+    "summaryBg": "Влизаш през лентата за ускоряване, където набираш скоростта на потока и се вливаш, пропускайки движещите се по магистралата. Излизаш през лентата за забавяне — намаляваш в нея, не на самата магистрала.",
+    "dependsOn": ["c-motorway-rules", "c-lane-change"],
+    "lawRefs": [{ "act": "ЗДвП", "ref": "чл. 55" }],
+    "difficulty": 2
+  },
+  {
+    "id": "c-motorway-prohibitions",
+    "topicId": "t-roads",
+    "titleBg": "Забрани на автомагистралата",
+    "titleEn": "Motorway prohibitions",
+    "summaryBg": "На магистрала са забранени спирането и престоят извън аварийната лента, движението назад, обратният завой и навлизането в разделителната ивица. Изпуснат изход не се поправя — продължаваш до следващия.",
+    "dependsOn": ["c-motorway-rules"],
+    "lawRefs": [{ "act": "ЗДвП", "ref": "чл. 58?" }],
+    "difficulty": 2
+  },
+  {
+    "id": "c-expressway",
+    "topicId": "t-roads",
+    "titleBg": "Скоростен път",
+    "titleEn": "Expressway",
+    "summaryBg": "Скоростният път прилича на магистрала — без пресичания на едно ниво и с високи скорости — но ограничението за леки автомобили е 120 км/ч. За него важат по същество магистралните забрани.",
+    "dependsOn": ["c-motorway-rules"],
+    "lawRefs": [{ "act": "ЗДвП", "ref": "чл. 21" }, { "act": "ЗДвП", "ref": "§ 6 ДР" }],
+    "difficulty": 1
+  },
+  {
+    "id": "c-rural-road-risks",
+    "topicId": "t-roads",
+    "titleBg": "Рискове на извънградските пътища",
+    "titleEn": "Rural road hazards",
+    "summaryBg": "Статистически най-тежките катастрофи стават на обикновени извънградски пътища: високи скорости, насрещно движение без разделител, трактори, пешеходци и животни. Дръж се вдясно и изпреварвай само при пълна видимост.",
+    "dependsOn": ["c-speed-adaptation", "c-oncoming-passing"],
+    "lawRefs": [{ "act": "ЗДвП", "ref": "чл. 20" }],
+    "difficulty": 2
+  },
+  {
+    "id": "c-mountain-roads",
+    "topicId": "t-roads",
+    "titleBg": "Планински пътища и дълги наклони",
+    "titleEn": "Mountain roads and long gradients",
+    "summaryBg": "По дълги спускания се слиза на ниска предавка, за да спира двигателят, а не прегретите спирачки. При разминаване на тесен планински път предимство има изкачващото се превозно средство.",
+    "dependsOn": ["c-rural-road-risks", "c-brakes"],
+    "lawRefs": [{ "act": "ЗДвП", "ref": "чл. 44?" }],
+    "difficulty": 2
+  },
+  {
+    "id": "c-tunnels",
+    "topicId": "t-roads",
+    "titleBg": "Движение в тунел",
+    "titleEn": "Driving in tunnels",
+    "summaryBg": "В тунел включваш къси светлини, увеличаваш дистанцията и не спираш освен при авария. При заседнал трафик в тунел се оставя коридор и се гаси двигателят при по-дълъг престой.",
+    "dependsOn": ["c-lights-overview", "c-following-distance"],
+    "lawRefs": [{ "act": "ЗДвП", "ref": "чл. 73?" }],
+    "difficulty": 2
+  },
+  {
+    "id": "c-emergency-lane-breakdown",
+    "topicId": "t-roads",
+    "titleBg": "Повреда на магистралата и аварийна лента",
+    "titleEn": "Breakdown on the motorway and emergency lane",
+    "summaryBg": "При повреда изтегляш колата в аварийната лента, включваш аварийни светлини, обличаш жилетката и поставяш триъгълника на достатъчно разстояние — на магистрала поне 100 метра. Пътниците чакат зад мантинелата, никога в колата или на платното.",
+    "dependsOn": ["c-motorway-rules", "c-mandatory-equipment"],
+    "lawRefs": [{ "act": "ЗДвП", "ref": "чл. 97" }],
+    "difficulty": 2
+  },
+  {
+    "id": "c-stop-parking-definitions",
+    "topicId": "t-parking",
+    "titleBg": "Спиране, престой и паркиране — разликите",
+    "titleEn": "Stopping, standing and parking — the differences",
+    "summaryBg": "Престой е спиране за качване/слизане на пътници или товарене, при което водачът е наблизо; паркиране е всяко друго оставяне на колата. Разликата е важна, защото някои места забраняват само паркирането, а други — и престоя.",
+    "dependsOn": ["c-road-elements"],
+    "lawRefs": [{ "act": "ЗДвП", "ref": "§ 6 ДР" }],
+    "difficulty": 1
+  },
+  {
+    "id": "c-stopping-standing-rules",
+    "topicId": "t-parking",
+    "titleBg": "Как се спира и престоява правилно",
+    "titleEn": "How to stop and stand correctly",
+    "summaryBg": "Спираш възможно най-вдясно, плътно и успоредно на бордюра (освен ако маркировка позволява друго), без да пречиш на движението. Извън населено място за престой се използва банкетът, когато е възможно.",
+    "dependsOn": ["c-stop-parking-definitions"],
+    "lawRefs": [{ "act": "ЗДвП", "ref": "чл. 93?" }],
+    "difficulty": 1
+  },
+  {
+    "id": "c-parking-prohibitions",
+    "topicId": "t-parking",
+    "titleBg": "Къде престоят и паркирането са забранени",
+    "titleEn": "Where standing and parking are prohibited",
+    "summaryBg": "Забранено е на пешеходни пътеки и кръстовища и на по-малко от 5 метра от тях, на спирки, пред входове и гаражи, на места за хора с увреждания, върху тротоар без разрешение и навсякъде, където колата пречи на видимостта или движението. Списъкът е дълъг, но логиката е една: не закривай, не запушвай, не застрашавай.",
+    "dependsOn": ["c-stop-parking-definitions"],
+    "lawRefs": [{ "act": "ЗДвП", "ref": "чл. 98" }],
+    "difficulty": 2
+  },
+  {
+    "id": "c-parking-signs-zones",
+    "topicId": "t-parking",
+    "titleBg": "Знаци и зони за паркиране",
+    "titleEn": "Parking signs and zones",
+    "summaryBg": "Знакът В27 забранява престоя и паркирането, В28 — само паркирането, а табелите уточняват обхвата им. В „синя“ и „зелена“ зона паркираш срещу заплащане в определените часове по общинските правила.",
+    "dependsOn": ["c-prohibition-signs", "c-stop-parking-definitions", "c-sign-scope"],
+    "lawRefs": [{ "act": "Наредба № РД-02-21-1/2023", "ref": "В27–В28?" }],
+    "difficulty": 2
+  },
+  {
+    "id": "c-leaving-vehicle-safely",
+    "topicId": "t-parking",
+    "titleBg": "Безопасно напускане на автомобила",
+    "titleEn": "Leaving the vehicle safely",
+    "summaryBg": "Отваряш вратата само след като си проверил за велосипедисти и коли — „холандската хватка“ с далечната ръка те кара да се обърнеш. Не оставяй колата на място, откъдето може да потегли сама, и не оставяй двигателя работещ без надзор.",
+    "dependsOn": ["c-stopping-standing-rules"],
+    "lawRefs": [{ "act": "ЗДвП", "ref": "чл. 94?" }],
+    "difficulty": 1
+  },
+  {
+    "id": "c-parking-slope-securing",
+    "topicId": "t-parking",
+    "titleBg": "Паркиране на наклон",
+    "titleEn": "Parking on a slope",
+    "summaryBg": "На наклон дърпаш ръчната спирачка, оставяш на скорост (първа нагоре, задна надолу) и завиваш колелата така, че при потегляне колата да опре в бордюра, а не да тръгне към платното.",
+    "dependsOn": ["c-leaving-vehicle-safely"],
+    "lawRefs": [{ "act": "ЗДвП", "ref": "чл. 94?" }],
+    "difficulty": 2
+  },
+  {
+    "id": "c-disabled-spaces",
+    "topicId": "t-parking",
+    "titleBg": "Места за хора с увреждания",
+    "titleEn": "Disabled parking spaces",
+    "summaryBg": "Обозначените места са само за автомобили с валидна карта за хора с увреждания, поставена на видно място. Паркирането там без карта носи глоба и принудително преместване — и е просто грозно.",
+    "dependsOn": ["c-parking-prohibitions"],
+    "lawRefs": [{ "act": "ЗДвП", "ref": "чл. 98?" }],
+    "difficulty": 1
+  },
+  {
+    "id": "c-towing-removal",
+    "topicId": "t-parking",
+    "titleBg": "Репатриране на неправилно паркирани коли",
+    "titleEn": "Removal of illegally parked vehicles",
+    "summaryBg": "Кола, паркирана в нарушение и пречеща на движението, може да бъде принудително преместена („паяк“) за сметка на собственика. Плащаш и глобата, и репатрирането, и загубеното си време.",
+    "dependsOn": ["c-parking-prohibitions"],
+    "lawRefs": [{ "act": "ЗДвП", "ref": "чл. 171" }],
+    "difficulty": 1
+  },
+  {
+    "id": "c-night-visibility",
+    "topicId": "t-conditions",
+    "titleBg": "Шофиране през нощта",
+    "titleEn": "Night driving",
+    "summaryBg": "Нощем виждаш само осветеното от фаровете — затова скоростта трябва да позволява спиране в границите на светлинния сноп. Умората, заслепяването и пешеходците без светлоотразители правят нощта в пъти по-опасна от деня.",
+    "dependsOn": ["c-speed-adaptation", "c-lights-overview"],
+    "lawRefs": [{ "act": "ЗДвП", "ref": "чл. 70" }, { "act": "ЗДвП", "ref": "чл. 20" }],
+    "difficulty": 2
+  },
+  {
+    "id": "c-high-beam-use",
+    "topicId": "t-conditions",
+    "titleBg": "Дълги светлини: кога да и кога не",
+    "titleEn": "High beams: when yes and when no",
+    "summaryBg": "Дългите светлини ползваш на тъмни пътища без насрещно движение. Превключваш на къси при насрещна кола, когато настигаш някого отзад и в осветени участъци — заслепеният водач е сляп водач.",
+    "dependsOn": ["c-night-visibility"],
+    "lawRefs": [{ "act": "ЗДвП", "ref": "чл. 74?" }],
+    "difficulty": 2
+  },
+  {
+    "id": "c-dazzle-handling",
+    "topicId": "t-conditions",
+    "titleBg": "Заслепяване",
+    "titleEn": "Dealing with dazzle",
+    "summaryBg": "При заслепяване намали скоростта, гледай към дясната граница на платното и при нужда спри — не гледай в насрещните фарове. Ако ти заслепяваш някого, той може да не те види изобщо: превключи веднага.",
+    "dependsOn": ["c-high-beam-use"],
+    "lawRefs": [{ "act": "ЗДвП", "ref": "чл. 74?" }],
+    "difficulty": 2
+  },
+  {
+    "id": "c-rain-aquaplaning",
+    "topicId": "t-conditions",
+    "titleBg": "Дъжд и аквапланинг",
+    "titleEn": "Rain and aquaplaning",
+    "summaryBg": "На мокър път сцеплението пада, спирачният път скача, а при дълбока вода гумите могат да „заплуват“ — аквапланинг, при който воланът олеква и колата не слуша. Спасението е превантивно: по-ниска скорост, добри гуми, без резки движения.",
+    "dependsOn": ["c-speed-adaptation", "c-tyres"],
+    "lawRefs": [{ "act": "ЗДвП", "ref": "чл. 20" }],
+    "difficulty": 2
+  },
+  {
+    "id": "c-fog-driving",
+    "topicId": "t-conditions",
+    "titleBg": "Шофиране в мъгла",
+    "titleEn": "Driving in fog",
+    "summaryBg": "В мъгла карай на къси светлини и фарове за мъгла — дългите се отразяват в капките и заслепяват теб самия. Скоростта се смъква драстично, дистанцията расте, а задният фар за мъгла се пали само при наистина гъста мъгла.",
+    "dependsOn": ["c-night-visibility"],
+    "lawRefs": [{ "act": "ЗДвП", "ref": "чл. 76?" }],
+    "difficulty": 3
+  },
+  {
+    "id": "c-winter-ice",
+    "topicId": "t-conditions",
+    "titleBg": "Сняг, лед и зимни условия",
+    "titleEn": "Snow, ice and winter conditions",
+    "summaryBg": "На сняг и лед спирачният път се удължава многократно, а най-коварен е невидимият „черен лед“ по мостове и сенчести участъци. Зимни гуми, удвоена дистанция, плавни движения и потегляне на по-висока предавка при лед.",
+    "dependsOn": ["c-rain-aquaplaning", "c-tyres"],
+    "lawRefs": [{ "act": "ЗДвП", "ref": "чл. 139" }],
+    "difficulty": 2
+  },
+  {
+    "id": "c-skid-control",
+    "topicId": "t-conditions",
+    "titleBg": "Занасяне и как се реагира",
+    "titleEn": "Skidding and how to react",
+    "summaryBg": "При занасяне на задницата гледай и завивай натам, накъдето искаш да отиде колата, и махни крака от газта без рязко спиране. Най-добрата техника срещу занасяне е то изобщо да не започне — скорост според сцеплението.",
+    "dependsOn": ["c-braking-distance", "c-winter-ice"],
+    "lawRefs": [{ "act": "ЗДвП", "ref": "чл. 20" }],
+    "difficulty": 3
+  },
+  {
+    "id": "c-animals-obstacles",
+    "topicId": "t-conditions",
+    "titleBg": "Животни и препятствия на пътя",
+    "titleEn": "Animals and obstacles on the road",
+    "summaryBg": "Извън населено място очаквай животни — особено привечер и през нощта; едно животно рядко е само. При внезапно препятствие спирачка в права линия е по-безопасна от рязко отклоняване в насрещното.",
+    "dependsOn": ["c-rural-road-risks", "c-night-visibility"],
+    "lawRefs": [{ "act": "ЗДвП", "ref": "чл. 20" }],
+    "difficulty": 2
+  },
+  {
+    "id": "c-alcohol-limit",
+    "topicId": "t-fitness",
+    "titleBg": "Алкохол: границата и наказанията",
+    "titleEn": "Alcohol: the limit and penalties",
+    "summaryBg": "Забранено е шофирането с концентрация на алкохол в кръвта над 0,5 промила, а над 1,2 промила е престъпление. Наказанията започват от тежки глоби и отнемане на книжката и стигат до затвор и конфискация на автомобила.",
+    "dependsOn": ["c-driver-obligations"],
+    "lawRefs": [{ "act": "ЗДвП", "ref": "чл. 5" }, { "act": "ЗДвП", "ref": "чл. 174" }],
+    "difficulty": 1
+  },
+  {
+    "id": "c-alcohol-effects",
+    "topicId": "t-fitness",
+    "titleBg": "Как алкохолът влияе на шофирането",
+    "titleEn": "How alcohol affects driving",
+    "summaryBg": "Още под законовата граница алкохолът удължава реакцията, стеснява зрителното поле и — най-опасното — вдига самочувствието, докато сваля уменията. Няма „бърз“ начин за изтрезняване: кафето и студеният душ не работят, само времето.",
+    "dependsOn": ["c-alcohol-limit"],
+    "lawRefs": [{ "act": "ЗДвП", "ref": "чл. 5" }],
+    "difficulty": 1
+  },
+  {
+    "id": "c-drugs-zero",
+    "topicId": "t-fitness",
+    "titleBg": "Наркотици: нулева толерантност",
+    "titleEn": "Drugs: zero tolerance",
+    "summaryBg": "За наркотични вещества няма допустима граница — всяко положително шофиране е престъпление. Тестовете засичат употреба дни след ефекта, така че „снощи беше“ не е защита.",
+    "dependsOn": ["c-driver-obligations"],
+    "lawRefs": [{ "act": "ЗДвП", "ref": "чл. 5" }, { "act": "НК", "ref": "чл. 343б" }],
+    "difficulty": 1
+  },
+  {
+    "id": "c-testing-refusal",
+    "topicId": "t-fitness",
+    "titleBg": "Проверка с дрегер и отказ",
+    "titleEn": "Roadside testing and refusal",
+    "summaryBg": "Полицията проверява с дрегер и тест за наркотици; можеш да поискаш кръвна проба за прецизност. Отказът от проверка се наказва като най-тежкото нарушение — все едно си дал максимално положителна проба.",
+    "dependsOn": ["c-alcohol-limit", "c-drugs-zero"],
+    "lawRefs": [{ "act": "ЗДвП", "ref": "чл. 174" }],
+    "difficulty": 2
+  },
+  {
+    "id": "c-fatigue-microsleep",
+    "topicId": "t-fitness",
+    "titleBg": "Умора и микросън",
+    "titleEn": "Fatigue and microsleep",
+    "summaryBg": "Умореният мозък се изключва за 2–3 секунди, без да усетиш — при 90 км/ч това са 75 метра в безсъзнание. Прозявки, тежки клепачи и „изгубени“ километри значат едно: спри и почини, музиката и отвореният прозорец не помагат.",
+    "dependsOn": ["c-driver-obligations"],
+    "lawRefs": [{ "act": "ЗДвП", "ref": "чл. 5" }],
+    "difficulty": 1
+  },
+  {
+    "id": "c-medicines",
+    "topicId": "t-fitness",
+    "titleBg": "Лекарства и шофиране",
+    "titleEn": "Medicines and driving",
+    "summaryBg": "Някои лекарства — срещу алергии, настинка, болка или безсъние — приспиват и забавят реакциите като алкохол. Чети листовката: щом пише „не шофирайте“, това е правило, не препоръка.",
+    "dependsOn": ["c-drugs-zero"],
+    "lawRefs": [{ "act": "ЗДвП", "ref": "чл. 5" }],
+    "difficulty": 2
+  },
+  {
+    "id": "c-distraction-emotions",
+    "topicId": "t-fitness",
+    "titleBg": "Разсейване и емоции зад волана",
+    "titleEn": "Distraction and emotions behind the wheel",
+    "summaryBg": "Телефонът е най-известният крадец на внимание, но и шумната компания, храненето и силните емоции — гняв, стрес, еуфория — режат концентрацията. Ядосан ли си — дай си пет минути, преди да запалиш двигателя.",
+    "dependsOn": ["c-phone-use"],
+    "lawRefs": [{ "act": "ЗДвП", "ref": "чл. 104а" }],
+    "difficulty": 1
+  },
+  {
+    "id": "c-medical-fitness",
+    "topicId": "t-fitness",
+    "titleBg": "Здравословна годност на водача",
+    "titleEn": "Medical fitness to drive",
+    "summaryBg": "За книжка се изисква медицинско удостоверение — зрение, слух и общо здраве трябва да позволяват безопасно управление. Ако ти е предписано да шофираш с очила или лещи, карането без тях е нарушение.",
+    "dependsOn": ["c-license-categories"],
+    "lawRefs": [{ "act": "ЗДвП", "ref": "чл. 151?" }],
+    "difficulty": 2
+  },
+  {
+    "id": "c-documents-required",
+    "topicId": "t-admin",
+    "titleBg": "Документи, които носиш в колата",
+    "titleEn": "Documents to carry in the car",
+    "summaryBg": "При проверка представяш свидетелство за управление, свидетелството за регистрация на автомобила и полицата „Гражданска отговорност“ (проверява се и електронно). Без тези документи те чака глоба, дори всичко останало да е наред.",
+    "dependsOn": ["c-license-categories"],
+    "lawRefs": [{ "act": "ЗДвП", "ref": "чл. 100" }],
+    "difficulty": 1
+  },
+  {
+    "id": "c-license-validity",
+    "topicId": "t-admin",
+    "titleBg": "Свидетелство за управление: валидност",
+    "titleEn": "Driving licence validity",
+    "summaryBg": "Свидетелството за категория B се издава с валидност 10 години, след което се подновява. Управлението с изтекла книжка е нарушение — следи датата, подновяването не е автоматично.",
+    "dependsOn": ["c-license-categories"],
+    "lawRefs": [{ "act": "ЗБЛД", "ref": "чл. 51?" }],
+    "difficulty": 1
+  },
+  {
+    "id": "c-registration-inspection",
+    "topicId": "t-admin",
+    "titleBg": "Регистрация и годишен технически преглед",
+    "titleEn": "Registration and periodic technical inspection",
+    "summaryBg": "Автомобилът трябва да е регистриран и да има преминат периодичен технически преглед (ГТП). Колата без валиден ГТП формално не може да се движи по пътищата, а при ПТП това утежнява положението ти.",
+    "dependsOn": ["c-technical-condition"],
+    "lawRefs": [{ "act": "ЗДвП", "ref": "чл. 140" }, { "act": "ЗДвП", "ref": "чл. 147" }],
+    "difficulty": 1
+  },
+  {
+    "id": "c-insurance-go",
+    "topicId": "t-admin",
+    "titleBg": "Застраховка „Гражданска отговорност“",
+    "titleEn": "Third-party liability insurance",
+    "summaryBg": "„Гражданска отговорност“ е задължителна и покрива вредите, които ти причиниш на другите — не твоите. Карането без нея носи глоба и сваляне на номерата, а при ПТП плащаш щетите от джоба си.",
+    "dependsOn": ["c-documents-required"],
+    "lawRefs": [{ "act": "Кодекс за застраховането", "ref": "чл. 483" }],
+    "difficulty": 1
+  },
+  {
+    "id": "c-vignette-toll",
+    "topicId": "t-admin",
+    "titleBg": "Винетка и тол такси",
+    "titleEn": "Vignette and tolls",
+    "summaryBg": "За движение по републиканските пътища лекият автомобил трябва да има валидна електронна винетка. Проверката е с камери, а глобата е многократно по-скъпа от самата винетка.",
+    "dependsOn": ["c-documents-required"],
+    "lawRefs": [{ "act": "Закон за пътищата", "ref": "чл. 10?" }],
+    "difficulty": 1
+  },
+  {
+    "id": "c-penalty-points",
+    "topicId": "t-admin",
+    "titleBg": "Контролни точки",
+    "titleEn": "Penalty points system",
+    "summaryBg": "Всеки водач стартира с определен брой контролни точки, а нарушенията ги отнемат; стигнеш ли нулата, губиш книжката и се явяваш отново на изпит. Точките се възстановяват с времето или с курс — но най-евтино е да не ги губиш.",
+    "dependsOn": ["c-license-categories"],
+    "lawRefs": [{ "act": "ЗДвП", "ref": "чл. 157" }, { "act": "Наредба № Iз-2539", "ref": "чл. 2?" }],
+    "difficulty": 2
+  },
+  {
+    "id": "c-fines-tickets",
+    "topicId": "t-admin",
+    "titleBg": "Глоби, фишове и електронни фишове",
+    "titleEn": "Fines, tickets and camera tickets",
+    "summaryBg": "Леките нарушения се наказват с фиш на място, камерите пращат електронен фиш, а по-тежките случаи минават през акт и наказателно постановление. Имаш право да възразиш в срок — но и задължение да платиш, ако не го направиш.",
+    "dependsOn": ["c-driver-obligations"],
+    "lawRefs": [{ "act": "ЗДвП", "ref": "чл. 186" }, { "act": "ЗДвП", "ref": "чл. 189?" }],
+    "difficulty": 2
+  },
+  {
+    "id": "c-license-withdrawal",
+    "topicId": "t-admin",
+    "titleBg": "Отнемане на книжката и спиране от движение",
+    "titleEn": "Licence withdrawal and vehicle immobilisation",
+    "summaryBg": "При тежки нарушения — алкохол, наркотици, голямо превишение, шофиране без книжка — книжката се отнема на място, а автомобилът може да бъде спрян от движение. Това са принудителни мерки, отделни от глобата и точките.",
+    "dependsOn": ["c-penalty-points", "c-alcohol-limit"],
+    "lawRefs": [{ "act": "ЗДвП", "ref": "чл. 171" }, { "act": "ЗДвП", "ref": "чл. 174" }],
+    "difficulty": 2
+  },
+  {
+    "id": "c-new-driver-status",
+    "topicId": "t-admin",
+    "titleBg": "Правила за новите водачи",
+    "titleEn": "Rules for novice drivers",
+    "summaryBg": "През първите две години си „нов водач“ — стартираш с по-малко контролни точки и към теб се гледа по-строго. Статистиката е безмилостна: първите 24 месеца са най-рисковите в целия ти шофьорски живот.",
+    "dependsOn": ["c-penalty-points"],
+    "lawRefs": [{ "act": "Наредба № Iз-2539", "ref": "чл. 3?" }],
+    "difficulty": 1
+  },
+  {
+    "id": "c-police-interaction",
+    "topicId": "t-admin",
+    "titleBg": "Спиране за проверка от полицията",
+    "titleEn": "Being stopped by the police",
+    "summaryBg": "При сигнал със стоп-палка или от патрулка спираш плавно вдясно и оставаш в колата с ръце на волана, освен ако не ти кажат друго. Даваш документите при поискване; учтивото поведение е и твое право, и твое предимство.",
+    "dependsOn": ["c-documents-required"],
+    "lawRefs": [{ "act": "ЗДвП", "ref": "чл. 103" }],
+    "difficulty": 1
+  },
+  {
+    "id": "c-accident-definition",
+    "topicId": "t-accidents",
+    "titleBg": "Какво е пътнотранспортно произшествие",
+    "titleEn": "What counts as a traffic accident",
+    "summaryBg": "ПТП е събитие с участието на движещо се пътно превозно средство, при което има загинал, ранен или материална щета. Дори лека драскотина на паркинг е ПТП със задължения по закон.",
+    "dependsOn": ["c-road-participants"],
+    "lawRefs": [{ "act": "ЗДвП", "ref": "§ 6 ДР" }],
+    "difficulty": 1
+  },
+  {
+    "id": "c-accident-duties",
+    "topicId": "t-accidents",
+    "titleBg": "Задължения на участник в ПТП",
+    "titleEn": "Duties of an accident participant",
+    "summaryBg": "Спираш веднага, проверяваш за пострадали, викаш помощ при нужда и не местиш нищо, ако има ранени. Участник в ПТП няма право да напуска мястото, преди да са изпълнени всички задължения по закона.",
+    "dependsOn": ["c-accident-definition"],
+    "lawRefs": [{ "act": "ЗДвП", "ref": "чл. 123" }],
+    "difficulty": 1
+  },
+  {
+    "id": "c-when-call-police",
+    "topicId": "t-accidents",
+    "titleBg": "Кога се вика полиция и кога стига протокол",
+    "titleEn": "When to call the police vs. bilateral report",
+    "summaryBg": "При пострадали, спор кой е виновен, щета по чужд имот или съмнение за алкохол — задължително полиция. Ако сте двама, съгласни сте кой е виновен и щетите са само материални, попълвате двустранен констативен протокол.",
+    "dependsOn": ["c-accident-duties"],
+    "lawRefs": [{ "act": "ЗДвП", "ref": "чл. 123" }, { "act": "Наредба № Iз-41", "ref": "чл. 5?" }],
+    "difficulty": 2
+  },
+  {
+    "id": "c-scene-safety",
+    "topicId": "t-accidents",
+    "titleBg": "Обезопасяване на местопроизшествието",
+    "titleEn": "Securing the accident scene",
+    "summaryBg": "Първо се погрижи да няма втори удар: аварийни светлини, жилетка, триъгълник на достатъчно разстояние, хората — извън платното и зад мантинелата. Чак след това мисли за снимки и протоколи.",
+    "dependsOn": ["c-accident-duties", "c-mandatory-equipment"],
+    "lawRefs": [{ "act": "ЗДвП", "ref": "чл. 97" }, { "act": "ЗДвП", "ref": "чл. 123" }],
+    "difficulty": 1
+  },
+  {
+    "id": "c-hit-and-run",
+    "topicId": "t-accidents",
+    "titleBg": "Бягство от местопроизшествие",
+    "titleEn": "Hit and run",
+    "summaryBg": "Напускането на ПТП, в което си участник, е тежко нарушение, а при пострадали — престъпление с ефективен затвор. Удариш ли паркирана кола, оставяш контакт или чакаш собственика — тръгването си е бягство.",
+    "dependsOn": ["c-accident-duties"],
+    "lawRefs": [{ "act": "ЗДвП", "ref": "чл. 123" }, { "act": "НК", "ref": "чл. 343?" }],
+    "difficulty": 2
+  },
+  {
+    "id": "c-first-aid-priorities",
+    "topicId": "t-accidents",
+    "titleBg": "Първа помощ: първи стъпки",
+    "titleEn": "First aid: first steps",
+    "summaryBg": "Редът е: обезопаси, огледай пострадалите, звънни на 112 с точно място и брой ранени, действай по указанията. Провери съзнание с говор и леко разтърсване на раменете, после дишане — гледай, слушай, усещай.",
+    "dependsOn": ["c-scene-safety"],
+    "lawRefs": [{ "act": "ЗДвП", "ref": "чл. 123" }],
+    "difficulty": 2
+  },
+  {
+    "id": "c-cpr-basics",
+    "topicId": "t-accidents",
+    "titleBg": "Сърдечен масаж и обдишване",
+    "titleEn": "CPR basics",
+    "summaryBg": "Ако пострадалият не диша, започваш сърдечен масаж: натискания в центъра на гърдите, дълбоки и бързи (около 100–120 в минута), при обучение — редувани с 2 обдишвания след всеки 30 натискания. Не спирай до идването на помощ — по-добре несъвършен масаж, отколкото никакъв.",
+    "dependsOn": ["c-first-aid-priorities"],
+    "lawRefs": [{ "act": "ЗДвП", "ref": "чл. 123" }],
+    "difficulty": 3
+  },
+  {
+    "id": "c-bleeding-control",
+    "topicId": "t-accidents",
+    "titleBg": "Спиране на кръвотечение",
+    "titleEn": "Bleeding control",
+    "summaryBg": "Силно кръвотечение се спира с директен натиск върху раната — с превръзка от аптечката или чиста тъкан, притисната здраво. Забит в раната предмет не се вади: стабилизира се и се чака помощ.",
+    "dependsOn": ["c-first-aid-priorities"],
+    "lawRefs": [{ "act": "ЗДвП", "ref": "чл. 123" }],
+    "difficulty": 2
+  },
+  {
+    "id": "c-victim-handling",
+    "topicId": "t-accidents",
+    "titleBg": "Кога и как се мести пострадал",
+    "titleEn": "When and how to move a casualty",
+    "summaryBg": "Пострадал не се мести освен при пряка опасност — пожар, риск от нов удар — заради възможна травма на гръбнака. Дишащ, но в безсъзнание човек се поставя в стабилно странично положение; каска се сваля само ако пострадалият не диша.",
+    "dependsOn": ["c-first-aid-priorities"],
+    "lawRefs": [{ "act": "ЗДвП", "ref": "чл. 123" }],
+    "difficulty": 3
+  },
+  {
+    "id": "c-defensive-principles",
+    "topicId": "t-eco-defensive",
+    "titleBg": "Принципи на защитното шофиране",
+    "titleEn": "Principles of defensive driving",
+    "summaryBg": "Защитното шофиране означава да очакваш чуждите грешки и да имаш готов план: виждай далеч напред, остави си пространство, бъди видим и предвидим. Целта не е да си прав, а да се прибереш цял.",
+    "dependsOn": ["c-speed-adaptation", "c-following-distance"],
+    "lawRefs": [{ "act": "ЗДвП", "ref": "чл. 5" }],
+    "difficulty": 2
+  },
+  {
+    "id": "c-hazard-perception",
+    "topicId": "t-eco-defensive",
+    "titleBg": "Разпознаване на опасности",
+    "titleEn": "Hazard perception",
+    "summaryBg": "Опасностите пращат сигнали предварително: топка на платното значи дете след нея, автобус на спирка значи пешеходци пред него, стопове в далечината значат колона. Сканирай надалеч, наблизо и в огледалата в постоянен ритъм.",
+    "dependsOn": ["c-defensive-principles"],
+    "lawRefs": [{ "act": "ЗДвП", "ref": "чл. 20" }],
+    "difficulty": 2
+  },
+  {
+    "id": "c-safety-space",
+    "topicId": "t-eco-defensive",
+    "titleBg": "Пространствен буфер около автомобила",
+    "titleEn": "Space cushion around the vehicle",
+    "summaryBg": "Пази си пространство от всички страни: дистанция напред, странично разстояние при изпреварване на колоездачи и паркирани коли, изход встрани при спиране в колона. Пространството е единствената „броня“, която работи преди удара.",
+    "dependsOn": ["c-defensive-principles"],
+    "lawRefs": [{ "act": "ЗДвП", "ref": "чл. 23" }],
+    "difficulty": 2
+  },
+  {
+    "id": "c-eco-techniques",
+    "topicId": "t-eco-defensive",
+    "titleBg": "Техники за икономично шофиране",
+    "titleEn": "Eco-driving techniques",
+    "summaryBg": "Плавно ускоряване, ранно превключване на по-висока предавка, поддържане на равномерна скорост и спиране с двигател вместо с рязка спирачка. Иронията е, че икономичният стил е и най-безопасният.",
+    "dependsOn": ["c-vehicle-controls"],
+    "lawRefs": [{ "act": "Наредба № 37", "ref": "учебна документация?" }],
+    "difficulty": 1
+  },
+  {
+    "id": "c-fuel-factors",
+    "topicId": "t-eco-defensive",
+    "titleBg": "От какво зависи разходът на гориво",
+    "titleEn": "What affects fuel consumption",
+    "summaryBg": "Разходът расте от високи обороти, агресивно шофиране, подналягане в гумите, излишен товар, багажник на покрива и климатик на ниска скорост. Правилното налягане на гумите е най-лесната икономия — и по-къс спирачен път.",
+    "dependsOn": ["c-eco-techniques", "c-tyres"],
+    "lawRefs": [{ "act": "Наредба № 37", "ref": "учебна документация?" }],
+    "difficulty": 1
+  },
+  {
+    "id": "c-environment-impact",
+    "topicId": "t-eco-defensive",
+    "titleBg": "Автомобилът и околната среда",
+    "titleEn": "Cars and the environment",
+    "summaryBg": "Транспортът е основен източник на замърсяване на въздуха в градовете; изправният двигател, плавното каране и гасенето при дълъг престой намаляват емисиите. Не изхвърляй масла и течности в природата — те тровят вода и почва за десетилетия.",
+    "dependsOn": ["c-eco-techniques"],
+    "lawRefs": [{ "act": "Наредба № 37", "ref": "учебна документация?" }],
+    "difficulty": 1
+  },
+  {
+    "id": "c-trip-planning",
+    "topicId": "t-eco-defensive",
+    "titleBg": "Планиране на пътуването",
+    "titleEn": "Trip planning",
+    "summaryBg": "Преди по-дълъг път: провери прогнозата и пътната обстановка, планирай маршрут и почивки на всеки два часа, тръгни отпочинал и без часовникът да те гони. Половината рискови изпреварвания се раждат от закъснение.",
+    "dependsOn": ["c-defensive-principles", "c-fatigue-microsleep"],
+    "lawRefs": [{ "act": "ЗДвП", "ref": "чл. 5" }],
+    "difficulty": 1
+  }
+]

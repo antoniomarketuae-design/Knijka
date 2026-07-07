@@ -1,0 +1,21 @@
+{
+  "name": "vehicle-feel-spike",
+  "private": true,
+  "version": "0.0.1",
+  "description": "Throwaway spike: Rapier DynamicRayCastVehicleController feel test for the driving simulator. Never import from platform/.",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@dimforge/rapier3d-compat": "^0.19.3",
+    "three": "^0.185.1"
+  },
+  "devDependencies": {
+    "@types/three": "^0.185.0",
+    "typescript": "^6.0.3",
+    "vite": "^8.1.3"
+  }
+}

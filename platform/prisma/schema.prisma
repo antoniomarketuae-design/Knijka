@@ -1,0 +1,134 @@
+// Data model per docs/architecture/05_SYSTEM_ARCHITECTURE.md
+// Content (topics/concepts/questions/signs) is file-based in /content — DB stores user state only.
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id           String    @id @default(cuid())
+  email        String    @unique
+  name         String?
+  passwordHash String?
+  birthYear    Int?
+  locale       String    @default("bg")
+  consentAt    DateTime?
+  createdAt    DateTime  @default(now())
+
+  progress         Progress[]
+  questionAttempts QuestionAttempt[]
+  examAttempts     ExamAttempt[]
+  simSessions      SimSession[]
+  entitlements     Entitlement[]
+  gamification     GamificationState?
+  tutorThreads     TutorThread[]
+}
+
+// Per-concept mastery + spaced-repetition state (conceptId → content/concepts.json)
+model Progress {
+  id        String    @id @default(cuid())
+  userId    String
+  conceptId String
+  mastery   Float     @default(0) // 0..1
+  reps      Int       @default(0)
+  lapses    Int       @default(0)
+  dueAt     DateTime?
+  updatedAt DateTime  @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, conceptId])
+  @@index([userId, dueAt])
+}
+
+model QuestionAttempt {
+  id         String   @id @default(cuid())
+  userId     String
+  questionId String // → content/questions/*.json
+  context    String // practice | exam | micro (in-sim)
+  correct    Boolean
+  points     Int
+  answeredAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, questionId])
+}
+
+// Official format: 45 questions / 97 points / >=87 pass / 40 min (docs/education/32)
+model ExamAttempt {
+  id         String    @id @default(cuid())
+  userId     String
+  startedAt  DateTime  @default(now())
+  finishedAt DateTime?
+  score      Int?
+  maxScore   Int       @default(97)
+  passed     Boolean?
+  answers    Json? // [{questionId, optionIds, correct, points}]
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, startedAt])
+}
+
+model SimSession {
+  id         String    @id @default(cuid())
+  userId     String
+  lessonId   String // → sim lesson definitions
+  startedAt  DateTime  @default(now())
+  finishedAt DateTime?
+  score      Int?
+  events     Json? // rule-engine event log (drives replay + debrief)
+  debrief    String? // AI lesson debrief text
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, lessonId])
+}
+
+// One-time packs (docs/business/41 pricing): core | premium_sim
+model Entitlement {
+  id          String    @id @default(cuid())
+  userId      String
+  pack        String
+  purchasedAt DateTime  @default(now())
+  expiresAt   DateTime? // packs are time-boxed (3-4 months), not subscriptions
+  provider    String? // stripe | promo
+  providerRef String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, expiresAt])
+}
+
+model GamificationState {
+  userId        String    @id
+  xp            Int       @default(0)
+  level         Int       @default(1)
+  streak        Int       @default(0)
+  lastActiveDay DateTime?
+  achievements  Json      @default("[]")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// Tutor conversations with cost instrumentation from day one (docs/business/60)
+model TutorThread {
+  id           String   @id @default(cuid())
+  userId       String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  messages     Json     @default("[]")
+  tokensIn     Int      @default(0)
+  tokensOut    Int      @default(0)
+  costMicroUsd Int      @default(0)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, updatedAt])
+}
