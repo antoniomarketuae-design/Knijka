@@ -1,26 +1,133 @@
 @import "tailwindcss";
 
+/* ============================================================
+   Design tokens — dark-first "game launcher" aesthetic.
+   Deep navy/graphite base, one confident accent (electric blue),
+   high contrast, subtle glow on interactive elements.
+   Light mode via prefers-color-scheme override below.
+   ============================================================ */
+
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  /* Base surfaces (dark = default) */
+  --background: #0a101e;
+  --surface: #111b2e;
+  --surface-2: #17233b;
+  --border: #24334d;
+  --border-strong: #33466a;
+
+  /* Text */
+  --foreground: #e6edf7;
+  --muted: #8fa3bf;
+
+  /* The one accent: electric blue */
+  --accent: #3fa1ff;
+  --accent-soft: #7cc4ff;
+  --accent-foreground: #051123;
+  --glow: rgba(63, 161, 255, 0.35);
+  --glow-soft: rgba(63, 161, 255, 0.16);
+
+  /* Semantic status */
+  --success: #2fd08c;
+  --warning: #ffb02e;
+  --danger: #ff6b6b;
+  --flame: #ff8a3d;
+  --gold: #ffc94d;
+}
+
+@media (prefers-color-scheme: light) {
+  :root {
+    --background: #f4f7fc;
+    --surface: #ffffff;
+    --surface-2: #edf2fa;
+    --border: #d8e1ef;
+    --border-strong: #b9c8de;
+
+    --foreground: #0c1526;
+    --muted: #55677f;
+
+    --accent: #1d6fe0;
+    --accent-soft: #5b9df0;
+    --accent-foreground: #ffffff;
+    --glow: rgba(29, 111, 224, 0.22);
+    --glow-soft: rgba(29, 111, 224, 0.1);
+
+    --success: #0e9f6e;
+    --warning: #b45309;
+    --danger: #dc2626;
+    --flame: #ea580c;
+    --gold: #b47d10;
+  }
 }
 
 @theme inline {
   --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  --color-foreground: var(--foreground);
+  --color-muted: var(--muted);
+
+  --color-accent: var(--accent);
+  --color-accent-soft: var(--accent-soft);
+  --color-accent-foreground: var(--accent-foreground);
+
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-danger: var(--danger);
+  --color-flame: var(--flame);
+  --color-gold: var(--gold);
+
+  /* Cyrillic-safe system stack (Geist has no Cyrillic subset). */
+  --font-sans: ui-sans-serif, system-ui, "Segoe UI", Roboto,
+    "Helvetica Neue", Arial, sans-serif;
+  --font-mono: ui-monospace, "Cascadia Code", Consolas, "Courier New",
+    monospace;
+
+  /* Glow shadows for interactive elements */
+  --shadow-glow: 0 0 24px 0 var(--glow);
+  --shadow-glow-sm: 0 0 12px 0 var(--glow-soft);
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-sans);
+}
+
+/* Keyboard accessibility: a single, loud focus signal everywhere. */
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+@layer components {
+  /* The standard hub card */
+  .card {
+    @apply rounded-xl border border-border bg-surface;
+  }
+
+  /* Primary action: bright accent, dark text, glow on hover/focus */
+  .btn-accent {
+    @apply inline-flex items-center justify-center gap-2 rounded-xl bg-accent px-5 py-3 text-sm font-bold text-accent-foreground transition hover:shadow-glow motion-reduce:transition-none;
+  }
+
+  .btn-ghost {
+    @apply inline-flex items-center justify-center gap-2 rounded-xl border border-border px-5 py-3 text-sm font-semibold text-foreground transition hover:border-border-strong hover:bg-surface-2 motion-reduce:transition-none;
+  }
+
+  /* Screen-reader-only helper for labels */
+  .visually-hidden {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+  }
 }
