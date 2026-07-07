@@ -1,0 +1,42 @@
+/**
+ * sim/runtime — public API (module-boundary barrel, docs/architecture/05).
+ *
+ * Implements the WorldRuntime contract from sim/contracts.ts over
+ * content/world/district-v1.json. Pure TypeScript: no React/three/Rapier.
+ */
+
+export { createWorldRuntime, type DistrictWorldRuntime } from "./worldRuntime";
+export {
+  parseDistrict,
+  BG_URBAN_DEFAULT_KMH,
+  type District,
+  type DistrictBounds,
+  type DistrictCrossing,
+  type DistrictEdge,
+  type DistrictIntersection,
+  type DistrictNode,
+  type DistrictRoundabout,
+  type DistrictSpawnPoint,
+  type RoadClass,
+} from "./district";
+export { LANE_WIDTH_M, OFF_ROAD_DISTANCE_M } from "./spatial";
+export { SIGNAL_TIMING, type SignalClusterInfo } from "./signals";
+export { CROSSING_ZONE_RADIUS_M, type PedestrianQuery } from "./zones";
+export { JUNCTION_AREA_RADIUS_M, TURN_THRESHOLD_DEG, TURN_WINDOW_SEC } from "./turns";
+export type { StopLine } from "./stoplines";
+export {
+  buildMinimap,
+  fitViewport,
+  followViewport,
+  worldToCanvas,
+  worldToCanvasX,
+  worldToCanvasY,
+  vehicleMarkerRotationRad,
+  headingUpMapRotationRad,
+  type BuildMinimapOptions,
+  type MinimapData,
+  type MinimapPoint,
+  type MinimapRoad,
+  type MinimapRoadGroup,
+  type MinimapViewport,
+} from "./minimap";
