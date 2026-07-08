@@ -23,6 +23,7 @@ import {
 } from "react";
 import Link from "next/link";
 import { Canvas, useFrame } from "@react-three/fiber";
+import { Environment } from "@react-three/drei";
 import { Physics } from "@react-three/rapier";
 import type { Group } from "three";
 import {
@@ -314,6 +315,19 @@ function ReadyScene({
         gl={{ antialias: true, powerPreference: "high-performance", stencil: false }}
       >
         <SimEnvironment timeOfDay={timeOfDay} rain={rain} quality={level} />
+        {/* HDRI image-based lighting — real sky reflections/ambient for PBR
+            materials and (later) car paint. Daytime only: the HDRI is a day
+            sky. background=false keeps SimEnvironment's animated sky dome.
+            Modest intensity so it complements the sun/hemisphere rig. */}
+        {!isNight ? (
+          <Suspense fallback={null}>
+            <Environment
+              files="/sim/env/sky_clear_1k.hdr"
+              background={false}
+              environmentIntensity={0.4}
+            />
+          </Suspense>
+        ) : null}
         <Suspense fallback={null}>
           <Physics
             gravity={[0, GRAVITY, 0]}

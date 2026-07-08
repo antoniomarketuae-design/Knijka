@@ -20,6 +20,7 @@ import {
   makeRoofTexture,
   makeSidewalkTexture,
 } from "../textures/canvasTextures";
+import { usePbrSet } from "../textures/pbrTextures";
 import { disposeAll, meshDataToGeometry } from "./three-helpers";
 import type { QualityPreset } from "./quality";
 
@@ -120,22 +121,71 @@ export function StaticWorld({
   const textures = useWorldTextures(preset);
   const geometries = useWorldGeometries(world);
 
+  // Real CC0 PBR sets — shared, cached, loaded once. Until they resolve (or on
+  // the server) each mesh falls back to its procedural canvas texture below.
+  const asphalt = usePbrSet("road", preset.anisotropy);
+  const concrete = usePbrSet("sidewalk", preset.anisotropy);
+  const grass = usePbrSet("ground", preset.anisotropy);
+
   const receive = preset.receiveShadows;
   const buildingsCast = preset.castShadows !== "none";
 
   return (
     <group name="world-static">
       <mesh geometry={geometries.terrain} receiveShadow={receive}>
-        <meshStandardMaterial map={textures.grass} roughness={1} metalness={0} />
+        {grass ? (
+          <meshStandardMaterial
+            map={grass.map}
+            normalMap={grass.normalMap}
+            roughnessMap={grass.roughnessMap}
+            aoMap={grass.aoMap ?? undefined}
+            roughness={1}
+            metalness={0}
+          />
+        ) : (
+          <meshStandardMaterial map={textures.grass} roughness={1} metalness={0} />
+        )}
       </mesh>
       <mesh geometry={geometries.road} receiveShadow={receive}>
-        <meshStandardMaterial map={textures.asphalt} roughness={0.96} metalness={0} />
+        {asphalt ? (
+          <meshStandardMaterial
+            map={asphalt.map}
+            normalMap={asphalt.normalMap}
+            roughnessMap={asphalt.roughnessMap}
+            aoMap={asphalt.aoMap ?? undefined}
+            roughness={1}
+            metalness={0}
+          />
+        ) : (
+          <meshStandardMaterial map={textures.asphalt} roughness={0.96} metalness={0} />
+        )}
       </mesh>
       <mesh geometry={geometries.junctions} receiveShadow={receive}>
-        <meshStandardMaterial map={textures.asphalt} roughness={0.96} metalness={0} />
+        {asphalt ? (
+          <meshStandardMaterial
+            map={asphalt.map}
+            normalMap={asphalt.normalMap}
+            roughnessMap={asphalt.roughnessMap}
+            aoMap={asphalt.aoMap ?? undefined}
+            roughness={1}
+            metalness={0}
+          />
+        ) : (
+          <meshStandardMaterial map={textures.asphalt} roughness={0.96} metalness={0} />
+        )}
       </mesh>
       <mesh geometry={geometries.sidewalks} receiveShadow={receive}>
-        <meshStandardMaterial map={textures.sidewalk} roughness={0.92} metalness={0} />
+        {concrete ? (
+          <meshStandardMaterial
+            map={concrete.map}
+            normalMap={concrete.normalMap}
+            roughnessMap={concrete.roughnessMap}
+            roughness={1}
+            metalness={0}
+          />
+        ) : (
+          <meshStandardMaterial map={textures.sidewalk} roughness={0.92} metalness={0} />
+        )}
       </mesh>
       <mesh geometry={geometries.markings}>
         <meshStandardMaterial color={0xe9e7df} roughness={0.85} metalness={0} />

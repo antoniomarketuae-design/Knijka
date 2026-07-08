@@ -8,16 +8,18 @@
  * - SignPoles: shared pole instanced mesh + one instanced plate mesh per
  *   sign kind (textured from the SVG catalog with procedural fallback).
  * - Streetlights: housing + emissive head (night glow).
- * - Trees: 3 low-poly variants, vertex-colored, flat-shaded.
+ * - Trees: 4 real Kenney low-poly GLB models, one instanced mesh each,
+ *   vertex-colored (baked from glTF base colors); procedural blob fallback
+ *   until the GLBs load.
  *
- * Draw calls: 2 (signals) + 5 (signs) + 2 (streetlights) + 3 (trees) = 12.
+ * Draw calls: 2 (signals) + 5 (signs) + 2 (streetlights) + 4 (trees) = 13.
  */
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
 import type { SignalPhase } from "../../contracts";
-import type { SignKind, WorldGeometry } from "../types";
+import type { SignKind, TreePlacement, WorldGeometry } from "../types";
 import { loadSignTextureFromSvg, proceduralSignTexture } from "../textures/signTextures";
 import {
   createInstancedMesh,
@@ -26,7 +28,12 @@ import {
   mergeSafe,
   paintGeometry,
 } from "./three-helpers";
+import { preloadTreeModels, TREE_MODEL_FILES, useTreeModels } from "./treeModels";
 import type { QualityPreset } from "./quality";
+
+// Start fetching + baking the Kenney tree GLBs as soon as this module loads,
+// before any <Trees/> mounts (no-op on the server).
+preloadTreeModels();
 
 const METAL = 0x3c4043;
 const DARK_HOUSING = 0x232527;
@@ -368,6 +375,19 @@ function Streetlights({
 const TRUNK = 0x6b5340;
 const FOLIAGE = [0x5d7a4a, 0x6f8c52, 0x4c6b45];
 
+/**
+ * Deterministic 4-way bucket: fold the builder's variant with a hash of the
+ * (already deterministic) world position so all four GLB models get used while
+ * placement stays fully reproducible.
+ */
+function modelIndexFor(t: TreePlacement): number {
+  const n = TREE_MODEL_FILES.length;
+  const hx = Math.imul(Math.floor(t.position[0]), 73856093);
+  const hz = Math.imul(Math.floor(t.position[2]), 19349663);
+  return (t.variant + (Math.abs(hx ^ hz) % n)) % n;
+}
+
+/** Procedural blob tree — retained as the fallback shown until the GLBs load. */
 function makeTreeGeometry(variant: 0 | 1 | 2): THREE.BufferGeometry {
   const parts: THREE.BufferGeometry[] = [];
   if (variant === 2) {
@@ -404,36 +424,69 @@ function makeTreeGeometry(variant: 0 | 1 | 2): THREE.BufferGeometry {
   return merged;
 }
 
+interface TreeVariantMesh {
+  mesh: THREE.InstancedMesh;
+  /** Set only for the procedural fallback (the GLB geometries are cache-owned). */
+  ownedGeometry: THREE.BufferGeometry | null;
+}
+
 function Trees({ world, preset }: { world: WorldGeometry; preset: QualityPreset }) {
-  const assets = useMemo(() => {
-    // Quality decimation: deterministic slice of the placement list.
+  const models = useTreeModels();
+
+  // Quality decimation: deterministic slice of the placement list.
+  const kept = useMemo(() => {
     const keepEvery = preset.treeFraction >= 1 ? 1 : Math.round(1 / (1 - preset.treeFraction));
-    const kept =
-      preset.treeFraction >= 1
-        ? world.trees
-        : world.trees.filter((_, i) => i % keepEvery !== 0);
+    return preset.treeFraction >= 1
+      ? world.trees
+      : world.trees.filter((_, i) => i % keepEvery !== 0);
+  }, [world.trees, preset.treeFraction]);
+
+  const assets = useMemo(() => {
+    const castShadow = preset.castShadows === "full";
+    if (models) {
+      // Real Kenney GLB trees: one instanced mesh per model, shared material,
+      // placements bucketed deterministically across the four models.
+      const material = new THREE.MeshStandardMaterial({
+        vertexColors: true,
+        roughness: 0.9,
+        metalness: 0,
+      });
+      const buckets: TreePlacement[][] = models.map(() => []);
+      for (const t of kept) buckets[modelIndexFor(t)]!.push(t);
+      const variants: TreeVariantMesh[] = models.map((geometry, i) => ({
+        mesh: createInstancedMesh(geometry, material, buckets[i]!, {
+          castShadow,
+          name: `trees-glb-${i}`,
+        }),
+        ownedGeometry: null,
+      }));
+      return { material, variants };
+    }
+    // Fallback (GLBs not loaded yet / failed): procedural blob trees.
     const material = new THREE.MeshStandardMaterial({
       vertexColors: true,
       flatShading: true,
       roughness: 0.95,
     });
-    const variants = ([0, 1, 2] as const).map((variant) => {
+    const variants: TreeVariantMesh[] = ([0, 1, 2] as const).map((variant) => {
       const geometry = makeTreeGeometry(variant);
       const placements = kept.filter((t) => t.variant === variant);
-      const mesh = createInstancedMesh(geometry, material, placements, {
-        castShadow: preset.castShadows === "full",
-        name: `trees-${variant}`,
-      });
-      return { geometry, mesh };
+      return {
+        mesh: createInstancedMesh(geometry, material, placements, {
+          castShadow,
+          name: `trees-${variant}`,
+        }),
+        ownedGeometry: geometry,
+      };
     });
     return { material, variants };
-  }, [world.trees, preset.treeFraction, preset.castShadows]);
+  }, [models, kept, preset.castShadows]);
 
   useEffect(
     () => () => {
       assets.material.dispose();
       for (const v of assets.variants) {
-        v.geometry.dispose();
+        v.ownedGeometry?.dispose();
         v.mesh.dispose();
       }
     },
