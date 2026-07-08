@@ -1,0 +1,1412 @@
+{
+  "generatedFrom": "workflow wf_f888668c-c7f",
+  "totals": {
+    "simulatable": 332,
+    "partial": 253,
+    "notSimulatable": 431,
+    "questionsCovered": 585,
+    "eventCount": 45
+  },
+  "roadmap": [
+    {
+      "phase": "Phase 1 — Foundations & reuse (extend built primitives)",
+      "events": [
+        "ev-speed-limit",
+        "ev-junction-signalized",
+        "ev-stop-sign",
+        "ev-ped-crossing-marked",
+        "ev-lights-usage",
+        "ev-lane-change",
+        "ev-following-distance",
+        "ev-lane-discipline",
+        "ev-illegal-stop-zone",
+        "ev-speed-for-conditions",
+        "ev-sign-warning",
+        "ev-sign-prohibitory",
+        "ev-markings-response",
+        "ev-seatbelt",
+        "ev-collision",
+        "ev-signaling-discipline",
+        "ev-eco-defensive",
+        "ev-emergency-stop-triangle"
+      ],
+      "rationale": "Highest leverage: 18 events built almost entirely on primitives the engine already has (speed/lane/light/collision/sign/telemetry). Covers ~507 exam points (nearly half the simulatable bank) at the lowest build cost, and lights up telemetry-graded discipline (position, speed, gap, signals) that every later scenario reuses. Extends the built red-light→full-signalized, headlights-night→full lights, lane-change/mirror, and speed/stop primitives.",
+      "effort": "Low per event (reuse) — largest count but cheapest; front-loads coverage."
+    },
+    {
+      "phase": "Phase 2 — Junctions, priority & vulnerable users (NPC actors)",
+      "events": [
+        "ev-junction-uncontrolled",
+        "ev-junction-priority-sign",
+        "ev-merge-giveway",
+        "ev-left-turn-yield-oncoming",
+        "ev-roundabout",
+        "ev-traffic-controller",
+        "ev-ped-unmarked-hazard",
+        "ev-cyclist",
+        "ev-bus-pullout",
+        "ev-tram",
+        "ev-emergency-vehicle",
+        "ev-railway-crossing",
+        "ev-overtake",
+        "ev-uturn-reverse",
+        "ev-oncoming-meeting",
+        "ev-adverse-weather",
+        "ev-zone-regime",
+        "ev-motorway-entry-exit"
+      ],
+      "rationale": "The safety core of the exam: right-of-way and collision-avoidance against live agents. Requires a reusable NPC traffic system + priority solver + pedestrian/cyclist/tram/bus/emergency actors + weather. Highest safety weight (most 'опасна' rows, incl. always-grade railway) and ~468 exam points. Build the NPC/priority framework once and 18 events fall out of it.",
+      "effort": "Medium-high — one-time NPC AI + priority-resolution + actor library; then each event is a scenario config."
+    },
+    {
+      "phase": "Phase 3 — New signals, environments & attention",
+      "events": [
+        "ev-lane-control-signal",
+        "ev-warning-light",
+        "ev-driver-distraction",
+        "ev-animal-hazard",
+        "ev-parking-maneuver",
+        "ev-police-stop-signal",
+        "ev-accident-scene-conduct"
+      ],
+      "rationale": "Genuinely new triggers that are still kinematic (no new vehicle physics): overhead gantry signals, dashboard telltales, in-car distraction/fatigue UI, spawnable animals, parking + Dutch-reach, police-stop actor, and post-crash scene conduct. Lower per-event coverage (~63 points) but each closes a whole topic's only drivable action (admin, fitness, accidents) and adds showcase mechanics.",
+      "effort": "Medium — new props/UI/actors, modest logic; reuses Phase-1/2 systems."
+    },
+    {
+      "phase": "Phase 4 — Advanced vehicle-dynamics physics",
+      "events": [
+        "ev-loss-of-control-recovery",
+        "ev-emergency-braking"
+      ],
+      "rationale": "Deferred because they need new Rapier physics (reduced-friction/aquaplane surfaces, lateral-impulse/wind, ABS/threshold pedal model) that nothing else depends on. Only ~42 points but very high safety value and strong 'feel it to learn it' payoff — worth doing once the friction/brake model exists. Fold-ins captured here: skid/aquaplane/ice + tyre-blowout/servo/crosswind (loss-of-control) and brake-straight-vs-swerve + ABS technique (emergency-braking).",
+      "effort": "High per event — bespoke physics; low count, do last."
+    }
+  ],
+  "events": [
+    {
+      "id": "ev-overtake",
+      "family": "Lanes & maneuvers",
+      "name": "Изпреварване (overtaking)",
+      "status": "new",
+      "trigger": "Slower vehicle ahead in a zone where overtaking may or may not be legal (solid line, crest, junction, bridge, no-overtaking sign, night). Also covers being overtaken (facilitate the pass).",
+      "detection": "Does ego cross to the opposing/adjacent lane to pass; is the line solid, is oncoming clear, is sight distance adequate; as overtaken vehicle, does ego avoid accelerating and keep right.",
+      "success": "Overtake only with a broken/absent centre line, clear oncoming and full sight distance, then return right; when being overtaken, hold speed and keep right (ЗДвП чл. 41–43).",
+      "failure": "Passing over a solid line, at a crest/junction/bridge/pedestrian crossing, into occupied oncoming lane, or accelerating while being overtaken.",
+      "feedback": "Изпреварвай само при чиста насрещна, прекъсната линия и видимост — при знак, мост, завой или кръстовище не се изпреварва.",
+      "policyDefault": "teach-first-then-grade",
+      "worldPrimitives": [
+        "oncoming NPC vehicle",
+        "slower lead NPC",
+        "centre-line marking (solid/broken)",
+        "no-overtaking sign",
+        "sight-distance/crest geometry"
+      ],
+      "buildComplexity": "med",
+      "coverageQuestions": 33,
+      "coverageTopics": [
+        "t-conditions",
+        "t-eco-defensive",
+        "t-junctions",
+        "t-maneuvers",
+        "t-roads",
+        "t-signals-markings",
+        "t-signs",
+        "t-vulnerable"
+      ],
+      "safety": "critical",
+      "examPointsCovered": 75,
+      "lawRef": null,
+      "legalNote": null
+    },
+    {
+      "id": "ev-speed-for-conditions",
+      "family": "Speed & distance",
+      "name": "Скорост, съобразена с условията",
+      "status": "new",
+      "trigger": "Reduced-grip/visibility context: fog, night/low-beam range, sharp bend, icy bridge, rain, steep descent, pedestrian-dense area.",
+      "detection": "Ego speed vs a condition-derived safe speed (stopping distance within visible/clear road).",
+      "success": "Slow below the posted cap so you can stop within the visible clear distance (ЗДвП чл. 20).",
+      "failure": "Holding the sign/limit speed when fog, wet, night or a bend demand slower.",
+      "feedback": "Знакът е таван за идеални условия — в мъгла, дъжд, нощ и завой карай осезаемо по-бавно.",
+      "policyDefault": "teach-first-then-grade",
+      "worldPrimitives": [
+        "fog/rain/night environment states",
+        "reduced-friction surface tag",
+        "curve geometry",
+        "ego speed telemetry"
+      ],
+      "buildComplexity": "low",
+      "coverageQuestions": 27,
+      "coverageTopics": [
+        "t-conditions",
+        "t-eco-defensive",
+        "t-roads",
+        "t-speed",
+        "t-vehicle",
+        "t-vulnerable"
+      ],
+      "safety": "high",
+      "examPointsCovered": 48,
+      "lawRef": null,
+      "legalNote": null
+    },
+    {
+      "id": "ev-illegal-stop-zone",
+      "family": "Stopping & parking",
+      "name": "Забранена зона за спиране/паркиране",
+      "status": "new",
+      "trigger": "Ego attempts to stop/stand where prohibited: crossing, junction, bus/tram stop, bike lane, hatched area, disabled bay, garage entry, narrow street, motorway lane, under V27/V28 sign.",
+      "detection": "Ego reaches v=0 within a prohibited-stop zone tag.",
+      "success": "Do not stop in the tagged zone, even briefly for boarding (ЗДвП чл. 93–98).",
+      "failure": "Coming to rest inside the prohibited zone.",
+      "feedback": "Тук не спираш — на пешеходна, кръстовище, спирка, велоалея, защрихована площ или под знака за забрана.",
+      "policyDefault": "teach-first-then-grade",
+      "worldPrimitives": [
+        "prohibited-stop zone tags",
+        "spawnable V27/V28 signs",
+        "kerb/bay geometry",
+        "ego stop detection"
+      ],
+      "buildComplexity": "low",
+      "coverageQuestions": 29,
+      "coverageTopics": [
+        "t-junctions",
+        "t-parking",
+        "t-roads",
+        "t-signals-markings",
+        "t-signs"
+      ],
+      "safety": "medium",
+      "examPointsCovered": 47,
+      "lawRef": null,
+      "legalNote": null
+    },
+    {
+      "id": "ev-emergency-stop-triangle",
+      "family": "Special",
+      "name": "Обезопасяване при принудително спиране",
+      "status": "new",
+      "trigger": "Breakdown/forced stop on the carriageway or hard shoulder (in-town, rural, motorway, night).",
+      "detection": "Hazard lights on (in-cab, gradeable); vest-before-exit and triangle-at-distance are procedural checklist steps outside the cockpit.",
+      "success": "Hazard lights immediately, vest before leaving the car, triangle 30 m (100 m motorway) behind, wait behind the barrier, call 112 (ЗДвП чл. 97, чл. 101).",
+      "failure": "Only opening the bonnet, staying in-lane, exiting without a vest, or no triangle.",
+      "feedback": "Аварийни светлини + жилетка преди да слезеш + триъгълник зад колата — така те виждат отдалеч.",
+      "policyDefault": "teach-first-then-grade",
+      "worldPrimitives": [
+        "hazard-light control",
+        "hazard triangle + vest props",
+        "distance markers",
+        "breakdown scenario trigger"
+      ],
+      "buildComplexity": "med",
+      "coverageQuestions": 21,
+      "coverageTopics": [
+        "t-accidents",
+        "t-conditions",
+        "t-parking",
+        "t-roads",
+        "t-vehicle"
+      ],
+      "safety": "high",
+      "examPointsCovered": 43,
+      "lawRef": null,
+      "legalNote": null
+    },
+    {
+      "id": "ev-junction-signalized",
+      "family": "Signals & control",
+      "name": "Светофарно кръстовище",
+      "status": "partial",
+      "trigger": "Signalized junction: green/amber-dilemma/red, red+amber, flashing/blinking green, directional-arrow main signal, additional-section arrow, two-section, snow-covered vertical head; plus box-junction gridlock on green.",
+      "detection": "Stop position vs stop-line/phase; does ego run red or a non-matching arrow; on green, does ego enter a junction it cannot clear (box-block).",
+      "success": "Stop on steady amber/red before the line; go on green only if the exit is clear; obey arrow direction; don't block the junction (ППЗДвП чл. 31; ЗДвП чл. 47).",
+      "failure": "Accelerating to beat red, entering on a dark/red arrow, or stopping inside a gridlocked junction.",
+      "feedback": "Червено/жълто спира, зелено пуска при чист изход; стрелката отваря само своята посока, а на зелено не влизаш в задръстено кръстовище.",
+      "policyDefault": "teach-first-then-grade",
+      "worldPrimitives": [
+        "traffic-light controller (all phases)",
+        "additional-section arrows",
+        "stop-line marking",
+        "cross-traffic queue for box-block"
+      ],
+      "buildComplexity": "med",
+      "coverageQuestions": 24,
+      "coverageTopics": [
+        "t-basics",
+        "t-junctions",
+        "t-priority",
+        "t-signals-markings",
+        "t-signs"
+      ],
+      "safety": "critical",
+      "examPointsCovered": 43,
+      "lawRef": null,
+      "legalNote": null
+    },
+    {
+      "id": "ev-lights-usage",
+      "family": "Conditions & equipment",
+      "name": "Използване на светлините",
+      "status": "partial",
+      "trigger": "Contexts requiring a light decision: daytime DRL/low-beam, dusk, tunnel, fog (front/rear fog lamps), oncoming at night (high-beam dip).",
+      "detection": "Light state (DRL/low/high/fog front/fog rear) vs ambient/visibility context.",
+      "success": "DRL or low beam day and night; low beam at dusk/tunnel/fog; dip high beam for oncoming in time; fog lamps only <50 m visibility (ЗДвП чл. 70, 74, 75).",
+      "failure": "Driving dark at dusk/night, keeping high beam on oncoming, or fog lamps on a clear road (dazzle).",
+      "feedback": "Къси/дневни денонощно; на здрач, тунел и мъгла — къси; насрещен нощем — превключи от дълги навреме.",
+      "policyDefault": "teach-first-then-grade",
+      "worldPrimitives": [
+        "light-state model (DRL/low/high/fog)",
+        "dusk/tunnel/fog environment states",
+        "oncoming NPC for dip test"
+      ],
+      "buildComplexity": "med",
+      "coverageQuestions": 28,
+      "coverageTopics": [
+        "t-conditions",
+        "t-eco-defensive",
+        "t-parking",
+        "t-roads",
+        "t-signs",
+        "t-vehicle",
+        "t-vulnerable"
+      ],
+      "safety": "medium",
+      "examPointsCovered": 40,
+      "lawRef": "ЗДвП чл. 74 и чл. 75",
+      "legalNote": "Предни фарове за мъгла — при значително намалена видимост, заедно с къси светлини. Заден червен фар за мъгла — само под 50 м видимост и изключен, ако заслепява."
+    },
+    {
+      "id": "ev-junction-priority-sign",
+      "family": "Junctions & priority",
+      "name": "Кръстовище със знак за предимство",
+      "status": "new",
+      "trigger": "Junction governed by Б1 give-way / priority-road sign / shark-teeth marking / dead traffic light handing control to the sign.",
+      "detection": "Does ego yield to priority-road traffic (stop only if needed for Б1); holder-of-priority keeps watching side roads.",
+      "success": "Give way to traffic on the priority road; with a dead light, the signs below it govern (ЗДвП чл. 7, чл. 50).",
+      "failure": "Entering ahead of priority traffic or misapplying the right-hand rule.",
+      "feedback": "Б1/акулски зъби значи пропусни предимството; изгасне ли светофарът, оживяват знаците под него.",
+      "policyDefault": "teach-first-then-grade",
+      "worldPrimitives": [
+        "priority/give-way signs",
+        "shark-teeth marking",
+        "cross NPC on priority road",
+        "deactivatable traffic light"
+      ],
+      "buildComplexity": "med",
+      "coverageQuestions": 18,
+      "coverageTopics": [
+        "t-basics",
+        "t-junctions",
+        "t-priority",
+        "t-signals-markings",
+        "t-signs"
+      ],
+      "safety": "high",
+      "examPointsCovered": 39,
+      "lawRef": null,
+      "legalNote": null
+    },
+    {
+      "id": "ev-speed-limit",
+      "family": "Signs & zones",
+      "name": "Спазване на скоростното ограничение",
+      "status": "built",
+      "trigger": "Posted max-speed sign, general urban/rural/motorway limit, zone-30, conditional plate ('when wet'), end-of-limit, or blue minimum-speed sign.",
+      "detection": "Ego speed vs the active limit (accounting for sign scope ending at junctions/end signs) — including too-slow vs a minimum-speed sign.",
+      "success": "Keep within the active max (50 urban / 90 open / 140 motorway or posted); don't crawl below a posted minimum (ЗДвП чл. 21).",
+      "failure": "Exceeding the active cap, or going under a mandatory minimum without cause.",
+      "feedback": "Спазвай тавана на знака до кръстовище/край; в града 50, магистрала 140, а синият кръг е минимум.",
+      "policyDefault": "teach-first-then-grade",
+      "worldPrimitives": [
+        "spawnable speed signs + plates",
+        "sign-scope/end logic",
+        "ego speed telemetry"
+      ],
+      "buildComplexity": "low",
+      "coverageQuestions": 25,
+      "coverageTopics": [
+        "t-fitness",
+        "t-maneuvers",
+        "t-roads",
+        "t-signs",
+        "t-speed",
+        "t-vulnerable"
+      ],
+      "safety": "high",
+      "examPointsCovered": 39,
+      "lawRef": null,
+      "legalNote": null
+    },
+    {
+      "id": "ev-following-distance",
+      "family": "Speed & distance",
+      "name": "Дистанция на следване",
+      "status": "new",
+      "trigger": "Ego follows a lead vehicle; gap closes below a safe time-headway.",
+      "detection": "Time/space gap to the lead vehicle vs a 2-second (doubled when wet/icy) threshold.",
+      "success": "Keep at least a 2-second gap, doubled in rain/ice (ЗДвП чл. 23–24).",
+      "failure": "Tailgating within an unsafe headway that cannot absorb a sudden brake.",
+      "feedback": "Дръж поне 2 секунди дистанция — на мокро и лед удвои; който залепва, не може да спре навреме.",
+      "policyDefault": "teach-first-then-grade",
+      "worldPrimitives": [
+        "lead NPC vehicle",
+        "time-headway telemetry",
+        "surface-grip tag"
+      ],
+      "buildComplexity": "low",
+      "coverageQuestions": 21,
+      "coverageTopics": [
+        "t-eco-defensive",
+        "t-roads",
+        "t-speed",
+        "t-vulnerable"
+      ],
+      "safety": "high",
+      "examPointsCovered": 38,
+      "lawRef": null,
+      "legalNote": null
+    },
+    {
+      "id": "ev-eco-defensive",
+      "family": "Speed & distance",
+      "name": "Отбранително и икономично шофиране",
+      "status": "new",
+      "trigger": "Continuous telemetry over smoothness (throttle/brake/steering), anticipation, engine-braking on descents, and cover-brake when another user may violate your right-of-way.",
+      "detection": "Harsh/late braking and jerky inputs; on a descent, coasting/neutral or riding the brake (fade); at a green/priority approach with a possible conflict, whether ego eases off and covers the brake.",
+      "success": "Drive smoothly and read ahead; on grades use engine braking; even with priority, reduce speed and cover the brake before a developing conflict (ЗДвП чл. 20).",
+      "failure": "Harsh late braking, neutral/brake-riding descent, or blind reliance on right-of-way into a conflict.",
+      "feedback": "Карай плавно и предвиждай — дори с предимство свали крак от газта и покрий спирачката, когато друг може да сгреши.",
+      "policyDefault": "teach-first-then-grade",
+      "worldPrimitives": [
+        "input-smoothness telemetry",
+        "grade/descent geometry",
+        "potential-conflict NPC at priority approach"
+      ],
+      "buildComplexity": "low",
+      "coverageQuestions": 19,
+      "coverageTopics": [
+        "t-conditions",
+        "t-eco-defensive",
+        "t-roads",
+        "t-speed",
+        "t-vehicle"
+      ],
+      "safety": "medium",
+      "examPointsCovered": 38,
+      "lawRef": null,
+      "legalNote": null
+    },
+    {
+      "id": "ev-lane-change",
+      "family": "Lanes & maneuvers",
+      "name": "Смяна на лента / престрояване",
+      "status": "partial",
+      "trigger": "Lateral maneuver: lane change, pulling out from parking, pre-turn lane positioning, turn beside a bike lane, with a vehicle possibly in the blind spot.",
+      "detection": "Mirror check + shoulder glance to the blind spot + indicator before the maneuver; does ego force in or take the wrong lane.",
+      "success": "Mirror + shoulder check + signal, yield to traffic already in the lane, position early for turns (ЗДвП чл. 25).",
+      "failure": "Changing on mirror only, no shoulder check, forcing in, or a last-moment lane grab.",
+      "feedback": "Огледало + поглед през рамо в мъртвата зона + мигач, и чак тогава плавно се престрой; сигналът не купува предимство.",
+      "policyDefault": "teach-first-then-grade",
+      "worldPrimitives": [
+        "blind-spot NPC",
+        "shoulder-check/mirror-glance input",
+        "indicator state",
+        "multi-lane geometry"
+      ],
+      "buildComplexity": "med",
+      "coverageQuestions": 21,
+      "coverageTopics": [
+        "t-junctions",
+        "t-maneuvers",
+        "t-priority",
+        "t-roads",
+        "t-signals-markings",
+        "t-signs",
+        "t-vehicle",
+        "t-vulnerable"
+      ],
+      "safety": "high",
+      "examPointsCovered": 35,
+      "lawRef": null,
+      "legalNote": null
+    },
+    {
+      "id": "ev-ped-crossing-marked",
+      "family": "Vulnerable users",
+      "name": "Пешеходец на пешеходна пътека",
+      "status": "built",
+      "trigger": "Marked crossing (zebra/signalized) with a pedestrian on or approaching it, including turn-across-pedestrian and stroller/elderly/blind variants.",
+      "detection": "Does ego yield/stop for a pedestrian on the crossing; does it stop before the stop-line.",
+      "success": "Slow early and give way to pedestrians on/entering the crossing; yield when turning across a crossing (ЗДвП чл. 119).",
+      "failure": "Failing to yield, blocking the crossing, or passing a car stopped at the crossing.",
+      "feedback": "Пешеходец на пътеката има предимство — намали отрано и спри, особено при завой през пътеката.",
+      "policyDefault": "teach-first-then-grade",
+      "worldPrimitives": [
+        "pedestrian NPC",
+        "zebra/crossing marking",
+        "stop-line",
+        "signalized-crossing tie-in"
+      ],
+      "buildComplexity": "med",
+      "coverageQuestions": 21,
+      "coverageTopics": [
+        "t-eco-defensive",
+        "t-junctions",
+        "t-maneuvers",
+        "t-priority",
+        "t-signals-markings",
+        "t-speed",
+        "t-vulnerable"
+      ],
+      "safety": "critical",
+      "examPointsCovered": 34,
+      "lawRef": null,
+      "legalNote": null
+    },
+    {
+      "id": "ev-loss-of-control-recovery",
+      "family": "Conditions & equipment",
+      "name": "Възстановяване при загуба на контрол",
+      "status": "new",
+      "trigger": "Dynamic upset: rear/front skid, aquaplaning, ice, or a sudden disturbance (blown tyre, lost power steering, crosswind gust on a bridge/tunnel exit).",
+      "detection": "Throttle release, steady/countersteer wheel input, absence of abrupt braking/steering, smooth pull-over when required.",
+      "success": "Ease off the throttle, hold/steer gently toward your path, no hard braking; on a blown tyre hold firm and pull over smoothly (ЗДвП чл. 20).",
+      "failure": "Hard braking, sharp steering, yanking the handbrake, or overcorrecting into a spin.",
+      "feedback": "Загубиш ли сцепление или контрол — крак от газта, здраво и меко волан, без рязка спирачка; при спукана гума отбий плавно.",
+      "policyDefault": "teach-first-then-grade",
+      "worldPrimitives": [
+        "reduced-friction/aquaplane surface physics (Rapier)",
+        "lateral-impulse/wind physics",
+        "tyre-blowout/servo-fail model"
+      ],
+      "buildComplexity": "high",
+      "coverageQuestions": 13,
+      "coverageTopics": [
+        "t-conditions",
+        "t-eco-defensive",
+        "t-roads",
+        "t-speed",
+        "t-vehicle"
+      ],
+      "safety": "critical",
+      "examPointsCovered": 33,
+      "lawRef": null,
+      "legalNote": null
+    },
+    {
+      "id": "ev-left-turn-yield-oncoming",
+      "family": "Junctions & priority",
+      "name": "Ляв завой — пропускане на насрещните",
+      "status": "new",
+      "trigger": "Ego turns left across an oncoming stream (and any pedestrians on the entered arm).",
+      "detection": "Does ego wait for a safe gap in oncoming traffic and yield to pedestrians before completing the turn.",
+      "success": "Give way to oncoming traffic and to pedestrians crossing the road you enter (ЗДвП чл. 37).",
+      "failure": "Cutting across the oncoming stream or into pedestrians.",
+      "feedback": "Преди ляв завой пропусни насрещните и пешеходците — ти пресичаш техния път.",
+      "policyDefault": "teach-first-then-grade",
+      "worldPrimitives": [
+        "oncoming NPC stream",
+        "pedestrian NPC on entered arm",
+        "junction geometry"
+      ],
+      "buildComplexity": "med",
+      "coverageQuestions": 13,
+      "coverageTopics": [
+        "t-junctions",
+        "t-priority",
+        "t-signals-markings",
+        "t-vulnerable"
+      ],
+      "safety": "critical",
+      "examPointsCovered": 32,
+      "lawRef": null,
+      "legalNote": null
+    },
+    {
+      "id": "ev-adverse-weather",
+      "family": "Conditions & equipment",
+      "name": "Шофиране при тежки условия",
+      "status": "new",
+      "trigger": "Rain, snow, fog or reduced-grip surface compound conditions across a stretch.",
+      "detection": "Combined speed, following distance, light choice and input smoothness vs the weather state.",
+      "success": "Reduce speed, extend distance, use correct lights and smooth inputs for the weather (ЗДвП чл. 20).",
+      "failure": "Normal speed/gap or wrong lights in rain/snow/fog.",
+      "feedback": "В дъжд, сняг и мъгла — по-бавно, повече дистанция, съответните светлини и плавни движения.",
+      "policyDefault": "teach-first-then-grade",
+      "worldPrimitives": [
+        "weather environment system (rain/snow/fog)",
+        "surface-grip model",
+        "visibility model"
+      ],
+      "buildComplexity": "med",
+      "coverageQuestions": 12,
+      "coverageTopics": [
+        "t-conditions",
+        "t-eco-defensive",
+        "t-roads"
+      ],
+      "safety": "high",
+      "examPointsCovered": 30,
+      "lawRef": null,
+      "legalNote": null
+    },
+    {
+      "id": "ev-merge-giveway",
+      "family": "Junctions & priority",
+      "name": "Включване в движението",
+      "status": "new",
+      "trigger": "Ego joins a traffic stream: from a side road/driveway/parking/residential zone onto a road with moving traffic.",
+      "detection": "Does ego yield to all traffic on the road before entering.",
+      "success": "Give way to everyone already on the road when joining (ЗДвП чл. 25).",
+      "failure": "Pulling out ahead of moving traffic and forcing it to brake.",
+      "feedback": "Включваш ли се в движение (от отбивка, паркинг, жилищна зона) — пропусни всички по платното.",
+      "policyDefault": "teach-first-then-grade",
+      "worldPrimitives": [
+        "through-traffic NPC stream",
+        "merge/driveway geometry",
+        "zone-exit tag"
+      ],
+      "buildComplexity": "med",
+      "coverageQuestions": 16,
+      "coverageTopics": [
+        "t-eco-defensive",
+        "t-junctions",
+        "t-maneuvers",
+        "t-parking",
+        "t-priority",
+        "t-signs",
+        "t-vulnerable"
+      ],
+      "safety": "high",
+      "examPointsCovered": 30,
+      "lawRef": null,
+      "legalNote": null
+    },
+    {
+      "id": "ev-junction-uncontrolled",
+      "family": "Junctions & priority",
+      "name": "Равнозначно кръстовище (правило на дясното)",
+      "status": "new",
+      "trigger": "Unsignalized, unsigned equal junction (or a flashing-yellow/dead light that makes it equal) with a vehicle approaching from the right.",
+      "detection": "Does ego yield to the vehicle coming from the right.",
+      "success": "Give way to traffic from your right at an equal junction (ЗДвП чл. 50).",
+      "failure": "Entering ahead of the vehicle on the right / relying on speed or 'first in'.",
+      "feedback": "Равнозначно кръстовище — пропусни идващия отдясно.",
+      "policyDefault": "teach-first-then-grade",
+      "worldPrimitives": [
+        "cross NPC from the right",
+        "equal-junction geometry",
+        "flashing-yellow/dead-light state"
+      ],
+      "buildComplexity": "med",
+      "coverageQuestions": 17,
+      "coverageTopics": [
+        "t-junctions",
+        "t-priority",
+        "t-signals-markings",
+        "t-signs"
+      ],
+      "safety": "high",
+      "examPointsCovered": 30,
+      "lawRef": null,
+      "legalNote": null
+    },
+    {
+      "id": "ev-markings-response",
+      "family": "Signals & control",
+      "name": "Реакция на пътна маркировка и указателни знаци",
+      "status": "new",
+      "trigger": "Road markings and prescribed-direction signs: solid/broken/double lines, lane arrows, stop-line, hatched (forbidden) area, edge line, temporary orange marking, and mandatory blue-arrow direction signs.",
+      "detection": "Wheel position vs markings; does ego cross a solid line, enter hatching, or drive against the prescribed lane-arrow/mandatory-sign direction; stop before the stop-line.",
+      "success": "Obey the prescribed direction, don't cross solid lines or enter hatched zones, follow temporary orange over permanent (Наредба № 2/2001; ЗДвП чл. 6, чл. 7).",
+      "failure": "Crossing a solid line, driving into hatching, or going against the lane arrow/mandatory sign.",
+      "feedback": "Следвай маркировката, стрелките и сините заповедни знаци; непрекъсната линия не се пресича, защрихованата площ не се застъпва.",
+      "policyDefault": "teach-first-then-grade",
+      "worldPrimitives": [
+        "road-marking system (lines/arrows/hatching/stop-line)",
+        "spawnable mandatory-direction sign",
+        "wheel-position telemetry",
+        "temporary orange marking"
+      ],
+      "buildComplexity": "med",
+      "coverageQuestions": 19,
+      "coverageTopics": [
+        "t-basics",
+        "t-junctions",
+        "t-roads",
+        "t-signals-markings",
+        "t-signs"
+      ],
+      "safety": "medium",
+      "examPointsCovered": 29,
+      "lawRef": null,
+      "legalNote": null
+    },
+    {
+      "id": "ev-traffic-controller",
+      "family": "Signals & control",
+      "name": "Сигнали на регулировчик",
+      "status": "new",
+      "trigger": "Officer directing traffic at a junction (possibly overriding a live/green light), with readable body poses and orientation.",
+      "detection": "Does ego obey the controller's pose (raised arm / chest-or-back facing = stop; side-on with arms out = go) over the light/signs; clear the junction if already inside.",
+      "success": "The controller ranks above lights and signs — stop for a raised arm or when facing his chest/back; proceed when side-on (ЗДвП чл. 7; ППЗДвП чл. 66).",
+      "failure": "Going on green against a stop pose, or stopping/reversing inside the junction on a raised arm.",
+      "feedback": "Регулировчикът е над светофара и знаците — вдигната ръка или гръб/гърди значат спри.",
+      "policyDefault": "teach-first-then-grade",
+      "worldPrimitives": [
+        "traffic-controller actor (animated readable poses + orientation)",
+        "junction geometry",
+        "light-override state"
+      ],
+      "buildComplexity": "med",
+      "coverageQuestions": 10,
+      "coverageTopics": [
+        "t-basics",
+        "t-junctions",
+        "t-priority",
+        "t-signals-markings"
+      ],
+      "safety": "high",
+      "examPointsCovered": 25,
+      "lawRef": null,
+      "legalNote": null
+    },
+    {
+      "id": "ev-cyclist",
+      "family": "Vulnerable users",
+      "name": "Взаимодействие с велосипедист",
+      "status": "new",
+      "trigger": "Cyclist ahead/alongside: overtaking a bike, right-hook on a right turn, bike lane crossing, cyclist hand-signal.",
+      "detection": "Lateral clearance when passing (≥1.5 m); does ego cut across a cyclist when turning right or crossing a bike lane.",
+      "success": "Pass with ≥1.5 m clearance and don't right-hook the cyclist; give way across bike lanes (ЗДвП чл. 40, чл. 42).",
+      "failure": "Passing too close or turning right/across into the cyclist.",
+      "feedback": "Изпреварвай велосипедиста с поне 1,5 м и не го засичай при десен завой; пази велоалеята.",
+      "policyDefault": "teach-first-then-grade",
+      "worldPrimitives": [
+        "cyclist NPC (with hand-signals)",
+        "bike-lane tag",
+        "lateral-clearance telemetry"
+      ],
+      "buildComplexity": "med",
+      "coverageQuestions": 12,
+      "coverageTopics": [
+        "t-eco-defensive",
+        "t-junctions",
+        "t-maneuvers",
+        "t-priority",
+        "t-roads",
+        "t-vulnerable"
+      ],
+      "safety": "critical",
+      "examPointsCovered": 23,
+      "lawRef": "ЗДвП чл. 42 (достатъчно странично разстояние); чл. 25 и чл. 37 при завиване/пресичане на велоалея",
+      "legalNote": "Законът иска „достатъчно странично разстояние“ (чл. 42) — 1.5 м е препоръка за безопасност, не норма. Без чл. 40 (то е за движение назад)."
+    },
+    {
+      "id": "ev-oncoming-meeting",
+      "family": "Junctions & priority",
+      "name": "Разминаване с насрещно движение",
+      "status": "new",
+      "trigger": "Road too narrow for two: obstacle on your half, signed narrowing (Б5/Б6), single-track or mountain grade, narrow bridge.",
+      "detection": "Does ego wait for the oncoming vehicle to clear the pinch when the obstacle is on ego's side / it lacks priority; uphill vehicle keeps priority.",
+      "success": "Yield and wait when the obstacle is on your half or the sign gives the oncoming priority; uphill has priority on grades (ЗДвП чл. 44, чл. 46).",
+      "failure": "Forcing into the pinch against a priority oncoming vehicle (head-on risk).",
+      "feedback": "При тясно, мост или препятствие на твоята страна — изчакай и пропусни насрещния; нагоре по баир предимство има изкачващият.",
+      "policyDefault": "teach-first-then-grade",
+      "worldPrimitives": [
+        "oncoming NPC",
+        "road-narrowing/obstacle geometry",
+        "Б5/Б6 narrowing signs",
+        "grade/incline tag"
+      ],
+      "buildComplexity": "med",
+      "coverageQuestions": 12,
+      "coverageTopics": [
+        "t-maneuvers",
+        "t-priority",
+        "t-roads",
+        "t-signs"
+      ],
+      "safety": "high",
+      "examPointsCovered": 22,
+      "lawRef": null,
+      "legalNote": null
+    },
+    {
+      "id": "ev-parking-maneuver",
+      "family": "Stopping & parking",
+      "name": "Паркиране и обезопасяване",
+      "status": "partial",
+      "trigger": "Parking task: parallel/perpendicular positioning, per-plate orientation, slope securing, and safe exit (door opening).",
+      "detection": "Rightmost/parallel position, wheel-angle + handbrake + gear on a slope, and mirror/shoulder check ('Dutch reach') before opening the door.",
+      "success": "Park rightmost and parallel; on a slope turn the wheels and set the handbrake; check before opening the door into the carriageway (ЗДвП чл. 94, чл. 95).",
+      "failure": "Sloppy positioning, no slope-securing, or dooring a passing cyclist without a check.",
+      "feedback": "Паркирай вдясно и плътно; на наклон завий колелата и вдигни ръчна, и отваряй вратата с оглед назад.",
+      "policyDefault": "teach-first-then-grade",
+      "worldPrimitives": [
+        "parking-bay geometry",
+        "slope tag",
+        "handbrake/gear state",
+        "door-interaction + shoulder-check",
+        "passing cyclist NPC"
+      ],
+      "buildComplexity": "med",
+      "coverageQuestions": 12,
+      "coverageTopics": [
+        "t-parking"
+      ],
+      "safety": "low",
+      "examPointsCovered": 21,
+      "lawRef": null,
+      "legalNote": null
+    },
+    {
+      "id": "ev-uturn-reverse",
+      "family": "Lanes & maneuvers",
+      "name": "Обратен завой и заден ход (забрани)",
+      "status": "new",
+      "trigger": "Attempted U-turn or reversing where prohibited: motorway/expressway, tunnel, junction, across a central reservation, one-way street.",
+      "detection": "Does ego perform a U-turn/reverse in a prohibited location (wrong-way exposure).",
+      "success": "No U-turn or reversing on motorways, in tunnels, at junctions or across the median — drive to a permitted spot (ЗДвП чл. 38, чл. 40).",
+      "failure": "U-turn/reverse in a banned location = driving against traffic.",
+      "feedback": "Без обратен завой и заден ход на магистрала, в тунел, на кръстовище и през разделителна ивица — това е движение срещу трафика.",
+      "policyDefault": "teach-first-then-grade",
+      "worldPrimitives": [
+        "prohibited-maneuver location tags",
+        "median/one-way geometry",
+        "ego heading/direction telemetry"
+      ],
+      "buildComplexity": "med",
+      "coverageQuestions": 14,
+      "coverageTopics": [
+        "t-basics",
+        "t-junctions",
+        "t-maneuvers",
+        "t-parking",
+        "t-priority",
+        "t-roads",
+        "t-vulnerable"
+      ],
+      "safety": "high",
+      "examPointsCovered": 20,
+      "lawRef": "ЗДвП чл. 38 (забрана за обратен завой на определени места); чл. 40 (движение назад)",
+      "legalNote": "Обратен завой на кръстовище по принцип е разрешен; чл. 38 забранява само на конкретни места (лоша видимост, пешеходна пътека, жп прелез, мост/тунел/надлез, при знак). Движение назад през кръстовище е забранено (чл. 40)."
+    },
+    {
+      "id": "ev-ped-unmarked-hazard",
+      "family": "Vulnerable users",
+      "name": "Пешеходна опасност без пътека",
+      "status": "new",
+      "trigger": "Pedestrian hazard off a marked crossing: ball-then-child, jaywalker, wheelchair, child column/procession, someone emerging between parked cars, alighting bus passengers.",
+      "detection": "Does ego slow/brake and be ready to stop for the emerging pedestrian(s).",
+      "success": "Anticipate and slow, ready to stop, for pedestrians entering the road without a crossing; treat a marshalled column as one body (ЗДвП чл. 20, чл. 116, чл. 122).",
+      "failure": "Maintaining speed and striking/near-missing the pedestrian, or cutting through a column.",
+      "feedback": "Дете, топка, слизащ от автобус или спрели коли — намали и бъди готов да спреш, дори без пътека.",
+      "policyDefault": "teach-first-then-grade",
+      "worldPrimitives": [
+        "darting/emerging pedestrian NPC",
+        "parked-car occlusion",
+        "child-column/procession asset",
+        "ball trigger asset"
+      ],
+      "buildComplexity": "med",
+      "coverageQuestions": 12,
+      "coverageTopics": [
+        "t-conditions",
+        "t-eco-defensive",
+        "t-maneuvers",
+        "t-speed",
+        "t-vulnerable"
+      ],
+      "safety": "critical",
+      "examPointsCovered": 20,
+      "lawRef": null,
+      "legalNote": null
+    },
+    {
+      "id": "ev-emergency-vehicle",
+      "family": "Vulnerable users",
+      "name": "Пропускане на автомобил със специален режим",
+      "status": "new",
+      "trigger": "Emergency vehicle with beacon + siren approaches (from behind or crossing), including while ego has green.",
+      "detection": "Does ego pull to the right smoothly and give way (not accelerate, not tailgate it).",
+      "success": "Give unobstructed passage — pull right and, if needed, stop, even on your green (ЗДвП чл. 91–92).",
+      "failure": "Holding speed on green, blocking it, or tailgating the emergency vehicle to slip through.",
+      "feedback": "Чуеш ли сирена и видиш буркан — отбий вдясно и спри; зеленото не е щит срещу линейката.",
+      "policyDefault": "teach-first-then-grade",
+      "worldPrimitives": [
+        "emergency-vehicle NPC (siren + beacon, directional audio)",
+        "pull-over geometry",
+        "junction/green context"
+      ],
+      "buildComplexity": "med",
+      "coverageQuestions": 9,
+      "coverageTopics": [
+        "t-junctions",
+        "t-priority",
+        "t-roads",
+        "t-signals-markings"
+      ],
+      "safety": "high",
+      "examPointsCovered": 20,
+      "lawRef": null,
+      "legalNote": null
+    },
+    {
+      "id": "ev-motorway-entry-exit",
+      "family": "Signs & zones",
+      "name": "Навлизане/движение по магистрала",
+      "status": "new",
+      "trigger": "Motorway/expressway on-ramp merge, lane use, hard-shoulder misuse, exit; min/max speed context.",
+      "detection": "Ramp acceleration and merge yielding; illegal hard-shoulder driving/stopping; speed within band.",
+      "success": "Accelerate on the ramp to traffic speed and merge; use the hard shoulder only for breakdowns; keep within the speed band (ЗДвП чл. 21, чл. 55 и сл.).",
+      "failure": "Merging too slow/forcing in, driving/resting in the hard shoulder, or exceeding 140.",
+      "feedback": "Ускори по рампата до скоростта на потока и се влей; аварийната лента е само за повреда, не за почивка/изпреварване.",
+      "policyDefault": "teach-first-then-grade",
+      "worldPrimitives": [
+        "motorway map + on/off ramps",
+        "merge NPC traffic",
+        "hard-shoulder tag"
+      ],
+      "buildComplexity": "med",
+      "coverageQuestions": 9,
+      "coverageTopics": [
+        "t-basics",
+        "t-maneuvers",
+        "t-priority",
+        "t-roads",
+        "t-signs"
+      ],
+      "safety": "high",
+      "examPointsCovered": 19,
+      "lawRef": null,
+      "legalNote": null
+    },
+    {
+      "id": "ev-roundabout",
+      "family": "Junctions & priority",
+      "name": "Кръгово кръстовище",
+      "status": "new",
+      "trigger": "Roundabout entry with circulating traffic and the mandatory direction sign.",
+      "detection": "Does ego give way to traffic already circulating and travel the correct direction/lane.",
+      "success": "Yield to vehicles in the roundabout and circulate in the signed direction; the sign shows direction, not priority (ЗДвП чл. 37, чл. 50).",
+      "failure": "Forcing entry ahead of circulating traffic or going the wrong way.",
+      "feedback": "На кръговото пропусни движещите се в него и обикаляй в правилната посока; знакът показва посока, не предимство.",
+      "policyDefault": "teach-first-then-grade",
+      "worldPrimitives": [
+        "roundabout geometry",
+        "circulating NPC traffic",
+        "direction sign",
+        "lane-discipline tags"
+      ],
+      "buildComplexity": "med",
+      "coverageQuestions": 10,
+      "coverageTopics": [
+        "t-junctions",
+        "t-priority",
+        "t-signs"
+      ],
+      "safety": "high",
+      "examPointsCovered": 19,
+      "lawRef": "ЗДвП чл. 50а",
+      "legalNote": "Кръговото: пропусни движещите се в кръга (чл. 50а). Знакът Б1 показва посока, не предимство. (Поправено от погрешно чл. 37/50.)"
+    },
+    {
+      "id": "ev-bus-pullout",
+      "family": "Vulnerable users",
+      "name": "Пропускане на потеглящ автобус",
+      "status": "new",
+      "trigger": "In a built-up area, a bus signals and pulls out of a marked stop.",
+      "detection": "Does ego let the indicating bus rejoin traffic.",
+      "success": "Give way to a public-transport bus leaving a stop in town when it has signalled (ЗДвП чл. 100).",
+      "failure": "Overtaking/blocking the bus as it pulls out.",
+      "feedback": "В населено място пропусни автобус, който напуска спирка и е подал мигач.",
+      "policyDefault": "teach-first-then-grade",
+      "worldPrimitives": [
+        "bus NPC + indicator",
+        "bus-stop tag",
+        "built-up-area context"
+      ],
+      "buildComplexity": "med",
+      "coverageQuestions": 7,
+      "coverageTopics": [
+        "t-eco-defensive",
+        "t-maneuvers",
+        "t-priority",
+        "t-vulnerable"
+      ],
+      "safety": "high",
+      "examPointsCovered": 18,
+      "lawRef": "ЗДвП чл. 67",
+      "legalNote": "В населено място намали/спри, за да пуснеш автобус от редовна линия да потегли от обозначена спирка (чл. 67). (Поправено от чл. 100 — то е за документите.)"
+    },
+    {
+      "id": "ev-railway-crossing",
+      "family": "Junctions & priority",
+      "name": "Железопътен прелез",
+      "status": "new",
+      "trigger": "Approaching a level crossing: barriers up/down/lowering, flashing red, Б2 stop, or dark signals.",
+      "detection": "Does ego slow, stop for a lowered/lowering barrier, flashing red or Б2, and check both ways before crossing.",
+      "success": "Stop for a barrier, flashing red or Б2; with dark signals cross only after checking both ways — the train can't stop for you (ЗДвП чл. 51).",
+      "failure": "Crossing on flashing red / a lowering barrier or without stopping at Б2.",
+      "feedback": "Пред прелез намали; при спуснат бариер, мигаща червена или Б2 спираш винаги — влакът не може да спре за теб.",
+      "policyDefault": "always-grade",
+      "worldPrimitives": [
+        "railway crossing (barrier + lights + train)",
+        "train timing/spawn",
+        "Б2 sign"
+      ],
+      "buildComplexity": "med",
+      "coverageQuestions": 10,
+      "coverageTopics": [
+        "t-junctions",
+        "t-priority",
+        "t-signals-markings",
+        "t-signs"
+      ],
+      "safety": "critical",
+      "examPointsCovered": 17,
+      "lawRef": null,
+      "legalNote": null
+    },
+    {
+      "id": "ev-stop-sign",
+      "family": "Junctions & priority",
+      "name": "Знак Б2 „Спри!“",
+      "status": "built",
+      "trigger": "Junction with a Б2 STOP sign, with or without a marked stop-line, possibly with occluded sight lines.",
+      "detection": "Full stop (v=0) at the line/edge of the crossing road; creep-and-stop again where sight is blocked.",
+      "success": "Come to a full stop every time, then proceed only when clear; where blind, stop-creep-stop (ЗДвП чл. 50).",
+      "failure": "Rolling through without a full stop, or entering blind.",
+      "feedback": "Б2 значи пълно спиране винаги — колелата спират на линията, после потегляш, щом е чисто.",
+      "policyDefault": "teach-first-then-grade",
+      "worldPrimitives": [
+        "Б2 sign",
+        "stop-line marking",
+        "occlusion (hedge/building)",
+        "cross NPC traffic"
+      ],
+      "buildComplexity": "med",
+      "coverageQuestions": 9,
+      "coverageTopics": [
+        "t-junctions",
+        "t-priority",
+        "t-signals-markings",
+        "t-signs"
+      ],
+      "safety": "high",
+      "examPointsCovered": 17,
+      "lawRef": null,
+      "legalNote": null
+    },
+    {
+      "id": "ev-lane-discipline",
+      "family": "Lanes & maneuvers",
+      "name": "Дисциплина на движение вдясно",
+      "status": "new",
+      "trigger": "Continuous position on a two-way road / one-way / near a hard shoulder or verge.",
+      "detection": "Lateral position: does ego keep to the right half and as far right as safe; does it drive on the verge/hard shoulder.",
+      "success": "Keep right, as far right as practical; the verge and hard shoulder aren't for driving (ЗДвП чл. 8, чл. 15).",
+      "failure": "Drifting to the centre/left without cause, or driving on the verge/shoulder to jump a queue.",
+      "feedback": "Дръж се вдясно, възможно най-вдясно; банкетът и аварийната лента не са за движение.",
+      "policyDefault": "teach-first-then-grade",
+      "worldPrimitives": [
+        "lane/verge geometry",
+        "lateral-position telemetry",
+        "hard-shoulder tag"
+      ],
+      "buildComplexity": "low",
+      "coverageQuestions": 9,
+      "coverageTopics": [
+        "t-basics",
+        "t-maneuvers",
+        "t-roads"
+      ],
+      "safety": "medium",
+      "examPointsCovered": 15,
+      "lawRef": null,
+      "legalNote": null
+    },
+    {
+      "id": "ev-tram",
+      "family": "Junctions & priority",
+      "name": "Взаимодействие с трамвай",
+      "status": "new",
+      "trigger": "Tram present: crossing tram rails, tram pulling off with equal priority, or passengers at a tram stop.",
+      "detection": "Does ego avoid cutting in front of an approaching tram and yield when it has priority; protect the tram stop.",
+      "success": "Don't cross in front of an approaching tram; give way when it departs equal-priority; protect boarding passengers (ЗДвП чл. 50, чл. 66).",
+      "failure": "Cutting across the rails ahead of a tram or ignoring stop passengers.",
+      "feedback": "Не пресичай пред приближаващ трамвай и му дай предимство, когато тръгва едновременно с теб; пази спирката.",
+      "policyDefault": "teach-first-then-grade",
+      "worldPrimitives": [
+        "tram NPC + rails",
+        "tram-stop tag",
+        "boarding pedestrian NPC"
+      ],
+      "buildComplexity": "med",
+      "coverageQuestions": 8,
+      "coverageTopics": [
+        "t-junctions",
+        "t-maneuvers",
+        "t-priority",
+        "t-vulnerable"
+      ],
+      "safety": "high",
+      "examPointsCovered": 15,
+      "lawRef": null,
+      "legalNote": null
+    },
+    {
+      "id": "ev-sign-warning",
+      "family": "Signs & zones",
+      "name": "Реакция на предупредителен знак (група А)",
+      "status": "new",
+      "trigger": "Warning sign ahead: children, slippery road, uneven surface, sharp bend, animals, etc.",
+      "detection": "Does ego reduce speed and prepare (cover brake) before the hazard, without an unnecessary full stop.",
+      "success": "Slow and be ready to react before the warned hazard (ЗДвП чл. 20).",
+      "failure": "Keeping/raising speed, or panic-stopping needlessly.",
+      "feedback": "Предупредителният знак иска готовност — намали и покрий спирачката преди опасността, без излишно пълно спиране.",
+      "policyDefault": "teach-first-then-grade",
+      "worldPrimitives": [
+        "warning signs (group А)",
+        "hazard geometry ahead",
+        "ego speed telemetry"
+      ],
+      "buildComplexity": "low",
+      "coverageQuestions": 9,
+      "coverageTopics": [
+        "t-priority",
+        "t-signs",
+        "t-vulnerable"
+      ],
+      "safety": "medium",
+      "examPointsCovered": 15,
+      "lawRef": null,
+      "legalNote": null
+    },
+    {
+      "id": "ev-zone-regime",
+      "family": "Signs & zones",
+      "name": "Режим на зона (жилищна/училищна)",
+      "status": "new",
+      "trigger": "Entering a residential or school zone (holds from the entry sign to the end sign, across internal junctions).",
+      "detection": "Speed ≤20/30 cap, full-width pedestrian priority, and (residential) parking only at marked bays — sustained until the end sign.",
+      "success": "Keep the walking-pace cap, give pedestrians priority across the whole street, park only at marked spots (ЗДвП чл. 116).",
+      "failure": "Speeding up after an internal junction, failing to yield to pedestrians, or parking off-bay.",
+      "feedback": "В жилищна/училищна зона — до 20–30 км/ч, пешеходците са с предимство по цялата улица, готов да спреш.",
+      "policyDefault": "teach-first-then-grade",
+      "worldPrimitives": [
+        "zone entry/end signs",
+        "zone tag persisting across junctions",
+        "pedestrian NPCs full-width",
+        "marked-bay tags"
+      ],
+      "buildComplexity": "med",
+      "coverageQuestions": 6,
+      "coverageTopics": [
+        "t-eco-defensive",
+        "t-parking",
+        "t-signs",
+        "t-vulnerable"
+      ],
+      "safety": "high",
+      "examPointsCovered": 14,
+      "lawRef": "ЗДвП чл. 62–63 (жилищна зона)",
+      "legalNote": "Жилищна зона: таван 20 км/ч, предимство на пешеходци по цялата ширина, паркиране само на обозначени места (чл. 62–63). Не чл. 116 (обща грижа)."
+    },
+    {
+      "id": "ev-sign-prohibitory",
+      "family": "Signs & zones",
+      "name": "Забранителен знак — не навлизай/срещу посока",
+      "status": "new",
+      "trigger": "No-entry / one-way against direction / pedestrian-zone entry sign at a street mouth.",
+      "detection": "Does ego enter the prohibited/wrong-way street or a pedestrian zone.",
+      "success": "Do not enter — wrong-way entry means driving into oncoming traffic (ЗДвП чл. 6, чл. 15).",
+      "failure": "Entering against the no-entry/one-way/pedestrian-zone sign.",
+      "feedback": "Знакът за забранено влизане/еднопосочна/пешеходна зона значи не навлизаш — иначе караш срещу трафика.",
+      "policyDefault": "always-grade",
+      "worldPrimitives": [
+        "prohibitory/no-entry signs",
+        "one-way/pedestrian-zone geometry",
+        "ego heading telemetry"
+      ],
+      "buildComplexity": "low",
+      "coverageQuestions": 8,
+      "coverageTopics": [
+        "t-basics",
+        "t-maneuvers",
+        "t-signs",
+        "t-speed"
+      ],
+      "safety": "high",
+      "examPointsCovered": 11,
+      "lawRef": null,
+      "legalNote": null
+    },
+    {
+      "id": "ev-accident-scene-conduct",
+      "family": "Special",
+      "name": "Поведение на местопроизшествие",
+      "status": "new",
+      "trigger": "Ego's vehicle collides with something (parked car, barrier, pedestrian) in-sim.",
+      "detection": "Does ego stop and remain at the scene (vs driving off); does it avoid disturbing the scene; move the car only for property-only damage.",
+      "success": "Stop and stay, secure the scene, don't flee or disturb it, don't drink; move the car only if damage is purely material (ЗДвП чл. 123).",
+      "failure": "Leaving the scene (hit-and-run) or moving the car with an injured party.",
+      "feedback": "След удар спри и остани на място — не бягай, не размествай и не пий алкохол; мести колата само при чисто материални щети.",
+      "policyDefault": "teach-first-then-grade",
+      "worldPrimitives": [
+        "collision detector",
+        "scene state (injury vs material)",
+        "stay/leave detection"
+      ],
+      "buildComplexity": "med",
+      "coverageQuestions": 6,
+      "coverageTopics": [
+        "t-accidents"
+      ],
+      "safety": "high",
+      "examPointsCovered": 10,
+      "lawRef": null,
+      "legalNote": null
+    },
+    {
+      "id": "ev-signaling-discipline",
+      "family": "Lanes & maneuvers",
+      "name": "Дисциплина на сигнализиране (мигач/клаксон)",
+      "status": "new",
+      "trigger": "Any maneuver requiring an indicator, and horn/headlight-flash use contexts.",
+      "detection": "Indicator timing (before the maneuver, cancelled after); horn used only to prevent an accident (not as a greeting in town).",
+      "success": "Signal before and cancel after the maneuver; in town the horn is only to prevent a crash (ЗДвП чл. 25, чл. 71).",
+      "failure": "Signalling only when cars are near, leaving it on, or horn as a greeting.",
+      "feedback": "Сигнализирай преди маневрата и изключи след нея; клаксон в града — само срещу произшествие, не за поздрав.",
+      "policyDefault": "teach-first-then-grade",
+      "worldPrimitives": [
+        "indicator-state telemetry",
+        "horn input",
+        "maneuver detection"
+      ],
+      "buildComplexity": "low",
+      "coverageQuestions": 7,
+      "coverageTopics": [
+        "t-maneuvers",
+        "t-signals-markings"
+      ],
+      "safety": "low",
+      "examPointsCovered": 10,
+      "lawRef": null,
+      "legalNote": null
+    },
+    {
+      "id": "ev-emergency-braking",
+      "family": "Special",
+      "name": "Аварийно спиране (техника и решение)",
+      "status": "new",
+      "trigger": "Sudden in-lane hazard (child, animal, fallen object) demanding a hard stop; a swerve path may lead into oncoming/occupied lane.",
+      "detection": "Pedal force/hold (ABS full-and-hold vs threshold without ABS), retained steering, brake-straight vs unsafe swerve, contact avoidance.",
+      "success": "Brake hard and straight — with ABS press full and hold, without ABS modulate; change lane only if clearly safe (ЗДвП чл. 20).",
+      "failure": "Pumping/easing an ABS stop, locking without ABS, or swerving into greater danger.",
+      "feedback": "Опасност отпред — спирай силно и право; с ABS натисни докрай и задръж, без ABS спирай дозирано, не завивай в насрещното.",
+      "policyDefault": "teach-first-then-grade",
+      "worldPrimitives": [
+        "ABS/threshold brake physics",
+        "spawnable in-lane hazard",
+        "adjacent-hazard lane state"
+      ],
+      "buildComplexity": "high",
+      "coverageQuestions": 4,
+      "coverageTopics": [
+        "t-eco-defensive",
+        "t-vehicle"
+      ],
+      "safety": "critical",
+      "examPointsCovered": 9,
+      "lawRef": null,
+      "legalNote": null
+    },
+    {
+      "id": "ev-driver-distraction",
+      "family": "Conditions & equipment",
+      "name": "Разсейване и годност на водача",
+      "status": "new",
+      "trigger": "Secondary-task or impairment context while moving: phone in hand, dialling nav, headphones, eating, or mounting fatigue on a long/monotonous stretch.",
+      "detection": "Does the driver handle the phone/secondary device while v>0 (vs hands-free); under a fatigue overlay, does the driver stop to rest rather than push on.",
+      "success": "Use only hands-free and set nav before departure; when fatigued, stop at a safe place to rest (ЗДвП чл. 5, чл. 104а).",
+      "failure": "Holding/operating the phone while moving, or driving on through clear fatigue signals.",
+      "feedback": "Остави телефона и вторичните задачи — в движение само „свободни ръце“; усетиш ли умора, спри и си почини, не карай на воля.",
+      "policyDefault": "teach-first-then-grade",
+      "worldPrimitives": [
+        "in-car phone/infotainment prop",
+        "hands-free vs in-hand detection",
+        "fatigue impairment overlay (droop/yawn/drift)"
+      ],
+      "buildComplexity": "med",
+      "coverageQuestions": 7,
+      "coverageTopics": [
+        "t-basics",
+        "t-fitness"
+      ],
+      "safety": "high",
+      "examPointsCovered": 8,
+      "lawRef": null,
+      "legalNote": null
+    },
+    {
+      "id": "ev-warning-light",
+      "family": "Conditions & equipment",
+      "name": "Реакция на контролна лампа",
+      "status": "new",
+      "trigger": "A dashboard telltale lights while driving: oil pressure, battery/charging, temperature, brake system.",
+      "detection": "Colour-appropriate response — red = pull over and stop the engine now; amber = caution, drive to a garage; brake-warning + soft pedal = stop safely, don't continue.",
+      "success": "Red telltale: stop and switch off immediately; amber: reach a garage; a soft brake pedal with the brake light means stop, don't drive on (ЗДвП чл. 20, чл. 139).",
+      "failure": "Driving on with a red light, opening a hot radiator cap, or continuing with failing brakes.",
+      "feedback": "Червена лампа значи спри веднага и угаси; жълта — внимание и до сервиз; не отваряй горещата капачка на радиатора.",
+      "policyDefault": "teach-first-then-grade",
+      "worldPrimitives": [
+        "in-cockpit instrument cluster (telltales)",
+        "fault-injection triggers",
+        "pull-over detection"
+      ],
+      "buildComplexity": "med",
+      "coverageQuestions": 4,
+      "coverageTopics": [
+        "t-vehicle"
+      ],
+      "safety": "medium",
+      "examPointsCovered": 8,
+      "lawRef": null,
+      "legalNote": null
+    },
+    {
+      "id": "ev-animal-hazard",
+      "family": "Vulnerable users",
+      "name": "Животно на пътното платно",
+      "status": "new",
+      "trigger": "Wildlife/livestock enters the carriageway: an animal darting out, or a herd blocking the road (rural/dusk/night).",
+      "detection": "Straight-line emergency braking without swerving into oncoming/ditch for a darting animal; slowing to walking pace, no horn/weaving for a herd.",
+      "success": "Brake straight for a darting animal — don't swerve into oncoming; for a herd slow to walking pace, no horn (ЗДвП чл. 20).",
+      "failure": "Swerving into the opposite lane/ditch, or ploughing/honking through a herd.",
+      "feedback": "Животно на пътя — спирай право и силно, без да завиваш в насрещното или канавката; при стадо намали до ход, без клаксон.",
+      "policyDefault": "teach-first-then-grade",
+      "worldPrimitives": [
+        "spawnable animal NPC (darting)",
+        "herd asset",
+        "rural/night environment",
+        "brake-straight detection"
+      ],
+      "buildComplexity": "med",
+      "coverageQuestions": 4,
+      "coverageTopics": [
+        "t-conditions",
+        "t-roads"
+      ],
+      "safety": "high",
+      "examPointsCovered": 7,
+      "lawRef": null,
+      "legalNote": null
+    },
+    {
+      "id": "ev-lane-control-signal",
+      "family": "Signals & control",
+      "name": "Надлентови сигнали (гантри X/стрелка)",
+      "status": "new",
+      "trigger": "Overhead per-lane gantry signals in a tunnel/motorway: red X (lane closed), green down-arrow (open), diagonal flashing-yellow (vacate lane).",
+      "detection": "Does ego read the signal above its own lane and change out of a red-X lane in time and safely.",
+      "success": "Vacate a lane under a red X into the lane with the green arrow, in good time (ППЗДвП чл. 33).",
+      "failure": "Staying in / stopping under a red-X lane, or misreading a signal as applying to all lanes.",
+      "feedback": "Червен X над лентата я затваря — престрой се навреме към лентата със зелената стрелка.",
+      "policyDefault": "teach-first-then-grade",
+      "worldPrimitives": [
+        "overhead lane-control gantry (X / arrow / diagonal)",
+        "multi-lane/tunnel geometry",
+        "reuses ev-lane-change"
+      ],
+      "buildComplexity": "med",
+      "coverageQuestions": 3,
+      "coverageTopics": [
+        "t-signals-markings"
+      ],
+      "safety": "medium",
+      "examPointsCovered": 5,
+      "lawRef": null,
+      "legalNote": null
+    },
+    {
+      "id": "ev-police-stop-signal",
+      "family": "Special",
+      "name": "Спиране по сигнал на полиция",
+      "status": "new",
+      "trigger": "An officer signals ego to stop: day stop-paddle, night red semicircle light, or an unmarked car's 'Полиция' sign.",
+      "detection": "Does ego decelerate smoothly and pull over to the right at the indicated spot (vs stopping abruptly in-lane or ignoring the signal).",
+      "success": "Decelerate smoothly and pull over to the right where indicated (ЗДвП чл. 103).",
+      "failure": "Ignoring the signal, or braking hard and stopping in the lane.",
+      "feedback": "Дадат ли ти сигнал за спиране (палка, червен диск, надпис „Полиция“) — намали плавно и отбий вдясно на посоченото място.",
+      "policyDefault": "teach-first-then-grade",
+      "worldPrimitives": [
+        "police-stop actor/signal (paddle/light/sign)",
+        "pull-over geometry",
+        "controlled-stop detection"
+      ],
+      "buildComplexity": "med",
+      "coverageQuestions": 3,
+      "coverageTopics": [
+        "t-admin"
+      ],
+      "safety": "medium",
+      "examPointsCovered": 4,
+      "lawRef": null,
+      "legalNote": null
+    },
+    {
+      "id": "ev-seatbelt",
+      "family": "Special",
+      "name": "Предпазен колан",
+      "status": "built",
+      "trigger": "Setting off and driving, with passengers present.",
+      "detection": "Driver belt fastened before/while moving; don't set off with visibly unbelted passengers (incl. rear seats).",
+      "success": "Belt on before setting off, always, at any speed, for driver and passengers including the rear (ЗДвП чл. 137а).",
+      "failure": "Setting off/driving unbelted or with unbelted passengers.",
+      "feedback": "Колан преди потегляне — винаги, на всяка скорост, и за пътниците, включително отзад.",
+      "policyDefault": "teach-first-then-grade",
+      "worldPrimitives": [
+        "belt-state check",
+        "passenger NPC belt state",
+        "set-off gate"
+      ],
+      "buildComplexity": "low",
+      "coverageQuestions": 2,
+      "coverageTopics": [
+        "t-basics"
+      ],
+      "safety": "high",
+      "examPointsCovered": 3,
+      "lawRef": null,
+      "legalNote": null
+    },
+    {
+      "id": "ev-collision",
+      "family": "Special",
+      "name": "Сблъсък (крайно събитие)",
+      "status": "built",
+      "trigger": "Global outcome detector: ego contacts any object, pedestrian or vehicle; also illustrates definitional impacts (reverse scratch, animal strike).",
+      "detection": "Contact event registered; used as the universal fail-state that escalates any active event to опасна.",
+      "success": "No contact — every other event exists to prevent this outcome.",
+      "failure": "Any collision.",
+      "feedback": "Ударът е крайната грешка — всяко закъсняло спиране или засичане тук завършва с щета; карай така, че да го избегнеш.",
+      "policyDefault": "learn-only",
+      "worldPrimitives": [
+        "collision detector (global)",
+        "impact severity model",
+        "event-escalation hook"
+      ],
+      "buildComplexity": "low",
+      "coverageQuestions": 2,
+      "coverageTopics": [
+        "t-accidents"
+      ],
+      "safety": "critical",
+      "examPointsCovered": 2,
+      "lawRef": null,
+      "legalNote": null
+    }
+  ]
+}
