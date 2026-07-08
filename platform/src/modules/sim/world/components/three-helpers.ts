@@ -3,7 +3,37 @@
  */
 
 import * as THREE from "three";
+import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
 import type { MeshData, StaticTransform } from "../types";
+
+/**
+ * mergeGeometries() throws if some inputs are indexed and others are not
+ * ("index attribute exists among all geometries, or in none of them"). Mixing
+ * happens easily — most three.js primitives are indexed but a few operations
+ * yield non-indexed geometry. This normalizes to non-indexed only when a mix
+ * is detected (keeping the common all-indexed fast path) so the merge is
+ * always valid.
+ */
+export function mergeSafe(
+  geoms: THREE.BufferGeometry[],
+  useGroups = false,
+): THREE.BufferGeometry {
+  const allIndexed = geoms.every((g) => g.index !== null);
+  const noneIndexed = geoms.every((g) => g.index === null);
+  if (allIndexed || noneIndexed) {
+    const merged = mergeGeometries(geoms, useGroups);
+    if (!merged) throw new Error("mergeSafe: mergeGeometries returned null");
+    return merged;
+  }
+  const normalized = geoms.map((g) => (g.index !== null ? g.toNonIndexed() : g));
+  const merged = mergeGeometries(normalized, useGroups);
+  // Dispose the temporary conversions we created (originals disposed by caller).
+  normalized.forEach((g, i) => {
+    if (g !== geoms[i]) g.dispose();
+  });
+  if (!merged) throw new Error("mergeSafe: mergeGeometries returned null");
+  return merged;
+}
 
 export function meshDataToGeometry(data: MeshData): THREE.BufferGeometry {
   const g = new THREE.BufferGeometry();

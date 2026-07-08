@@ -16,7 +16,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
-import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
 import type { SignalPhase } from "../../contracts";
 import type { SignKind, WorldGeometry } from "../types";
 import { loadSignTextureFromSvg, proceduralSignTexture } from "../textures/signTextures";
@@ -24,6 +23,7 @@ import {
   createInstancedMesh,
   createOffsetInstancedMesh,
   disposeAll,
+  mergeSafe,
   paintGeometry,
 } from "./three-helpers";
 import type { QualityPreset } from "./quality";
@@ -78,7 +78,7 @@ function TrafficLights({
   const housing = useMemo(() => {
     const pole = new THREE.CylinderGeometry(0.055, 0.07, 3.3, 8).translate(0, 1.65, 0);
     const head = new THREE.BoxGeometry(0.3, 0.82, 0.22).translate(0, 2.82, 0);
-    const geometry = mergeGeometries([pole, head], false);
+    const geometry = mergeSafe([pole, head], false);
     pole.dispose();
     head.dispose();
     const material = new THREE.MeshStandardMaterial({
@@ -310,7 +310,7 @@ function Streetlights({
       .rotateX(Math.PI / 2 - 0.35)
       .translate(0, 5.75, 0.62);
     const head = new THREE.BoxGeometry(0.24, 0.1, 0.62).translate(0, 6.0, 1.28);
-    const geometry = mergeGeometries([pole, arm, head], false);
+    const geometry = mergeSafe([pole, arm, head], false);
     pole.dispose();
     arm.dispose();
     head.dispose();
@@ -399,7 +399,7 @@ function makeTreeGeometry(variant: 0 | 1 | 2): THREE.BufferGeometry {
       );
     }
   }
-  const merged = mergeGeometries(parts, false);
+  const merged = mergeSafe(parts, false);
   for (const p of parts) p.dispose();
   return merged;
 }

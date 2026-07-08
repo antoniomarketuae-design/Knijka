@@ -13,6 +13,20 @@
 import { BoxGeometry, TorusGeometry, type BufferGeometry } from "three";
 import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
 
+/** mergeGeometries throws on a mix of indexed/non-indexed inputs; normalize
+ *  to non-indexed when a mix is present (else keep the fast path). */
+function mergeSafe(geoms: BufferGeometry[], useGroups = false): BufferGeometry {
+  const allIndexed = geoms.every((g) => g.index !== null);
+  const noneIndexed = geoms.every((g) => g.index === null);
+  const list =
+    allIndexed || noneIndexed
+      ? geoms
+      : geoms.map((g) => (g.index !== null ? g.toNonIndexed() : g));
+  const merged = mergeGeometries(list, useGroups);
+  if (!merged) throw new Error("mergeSafe: mergeGeometries returned null");
+  return merged;
+}
+
 export const BODY_URL = "/models/vitok/vitok-body.glb";
 export const WHEEL_URL = "/models/vitok/vitok-wheel.glb";
 
@@ -61,7 +75,7 @@ export function mergedBoxes(specs: readonly BoxSpec[]): BufferGeometry {
     g.translate(s.pos[0], s.pos[1], s.pos[2]);
     return g;
   });
-  const merged = mergeGeometries(parts, false);
+  const merged = mergeSafe(parts, false);
   parts.forEach((p) => p.dispose());
   if (!merged) throw new Error("mergedBoxes: incompatible geometries");
   return merged;
@@ -78,7 +92,7 @@ export function steeringWheelGeometry(): BufferGeometry {
   const spokeV = new BoxGeometry(0.045, 0.155, 0.025);
   spokeV.translate(0, -0.1, 0);
   const hub = new BoxGeometry(0.09, 0.09, 0.045);
-  const merged = mergeGeometries([rim, spokeH, spokeV, hub], false);
+  const merged = mergeSafe([rim, spokeH, spokeV, hub], false);
   rim.dispose();
   spokeH.dispose();
   spokeV.dispose();
