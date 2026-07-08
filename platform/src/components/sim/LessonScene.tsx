@@ -507,6 +507,8 @@ function ControlsHelp() {
     <div className="absolute left-3 top-3 z-10 max-w-[15rem]">
       <button
         type="button"
+        tabIndex={-1}
+        onMouseDown={(e) => e.preventDefault()}
         onClick={() => setOpen((o) => !o)}
         aria-expanded={open}
         className="flex items-center gap-1.5 rounded-lg border border-border bg-background/80 px-2.5 py-1 text-[11px] font-semibold text-muted backdrop-blur transition hover:text-foreground"
