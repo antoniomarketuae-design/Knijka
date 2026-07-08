@@ -23,6 +23,10 @@ import {
   FIXED_DT,
   KILL_PLANE_Y,
   SPAWN,
+  applyDifficulty,
+  createDriveAssistState,
+  DEFAULT_DIFFICULTY,
+  type DifficultyMode,
 } from "@/modules/sim/vehicle";
 import type { SimInput } from "@/modules/sim/engine";
 import type { VehicleSample } from "@/modules/sim/contracts";
@@ -68,6 +72,7 @@ export function VehicleRig({
   sampleRef,
   paused,
   spawn = SPAWN,
+  difficultyRef,
 }: {
   simRef: RefObject<VehicleSim | null>;
   chassisGroupRef: RefObject<Group | null>;
@@ -77,9 +82,12 @@ export function VehicleRig({
   sampleRef: RefObject<VehicleSample>;
   paused: boolean;
   spawn?: VehicleSpawn;
+  /** Current driving-assist mode (Beginner/Normal/Advanced). Read each step. */
+  difficultyRef?: RefObject<DifficultyMode>;
 }) {
   const { world } = useRapier();
   const bodyRef = useRef<RapierRigidBody>(null);
+  const assistRef = useRef(createDriveAssistState());
 
   // Stable identity so @react-three/rapier does not re-apply mass props.
   const massProperties = useMemo(() => chassisMassProperties(), []);
@@ -110,7 +118,12 @@ export function VehicleRig({
   useBeforePhysicsStep(() => {
     const sim = simRef.current;
     if (!sim) return;
-    sim.update(inputRef.current?.read() ?? IDLE_INPUT, FIXED_DT);
+    const raw = inputRef.current?.read() ?? IDLE_INPUT;
+    const mode = difficultyRef?.current ?? DEFAULT_DIFFICULTY;
+    // Shape input for the learner mode (throttle/governor/steer smoothing) —
+    // physics constants untouched, so the CI harness stays valid.
+    const shaped = applyDifficulty(raw, mode, sim.speedKmh, FIXED_DT, assistRef.current);
+    sim.update(shaped, FIXED_DT);
   });
 
   // Render-rate glue: kill-plane rescue, cabin clocks (blink/glance),

@@ -13,12 +13,25 @@ import {
   COCKPIT_DAMPING,
   COCKPIT_EYE,
   COCKPIT_FOV,
+  COCKPIT_LEAN_LATERAL,
+  COCKPIT_LEAN_LONGITUDINAL,
+  COCKPIT_ROLL_GAIN,
+  COCKPIT_PITCH_GAIN,
+  COCKPIT_LOOK_INTO_TURN,
+  COCKPIT_LEAN_DAMPING,
+  ESTIMATE_WHEELBASE,
+  STEER_MAX_ANGLE,
   type VehicleSim,
 } from "@/modules/sim/vehicle";
 import { FpsMeter, type SimTelemetry } from "@/modules/sim/engine";
 import type { CabinControls, MirrorGlanceKind } from "./cabin";
 
 export type CameraMode = "chase" | "cockpit";
+
+/** Clamp to [-limit, +limit]. */
+function clampAbs(v: number, limit: number): number {
+  return v < -limit ? -limit : v > limit ? limit : v;
+}
 
 /** 180° about +Y: cameras look down -Z, the car drives along +Z. */
 const FLIP_Y = new Quaternion(0, 1, 0, 0);
@@ -71,6 +84,8 @@ export function CameraRig({
 }) {
   const fpsMeterRef = useRef(new FpsMeter());
   const lastMode = useRef<CameraMode | null>(null);
+  // Smoothed G-force lean state (cockpit head motion).
+  const leanRef = useRef({ latG: 0, longG: 0, prevSpeedMps: 0 });
 
   // Scratch objects — never allocate in useFrame.
   const scratchRef = useRef({
@@ -85,6 +100,9 @@ export function CameraRig({
     rotSmooth: new Quaternion(),
     glanceQuat: new Quaternion(),
     glanceEuler: new Euler(),
+    sway: new Vector3(),
+    leanQuat: new Quaternion(),
+    leanEuler: new Euler(),
   });
 
   useFrame((state, delta) => {
@@ -108,7 +126,7 @@ export function CameraRig({
       cam.updateProjectionMatrix();
     }
 
-    const { pos, quat, fwd, fwdFlat, desired, look, lookSmooth, eye, rotSmooth, glanceQuat, glanceEuler } =
+    const { pos, quat, fwd, fwdFlat, desired, look, lookSmooth, eye, rotSmooth, glanceQuat, glanceEuler, sway, leanQuat, leanEuler } =
       scratchRef.current;
     chassis.getWorldPosition(pos);
     chassis.getWorldQuaternion(quat);
@@ -139,8 +157,38 @@ export function CameraRig({
       cam.up.set(0, 1, 0);
       cam.lookAt(lookSmooth);
     } else {
+      // --- G-force head motion (immersion; doc 63 §2). Estimate lateral G
+      // kinematically (a = v²·tan(steer)/L) and longitudinal G from the speed
+      // delta, then heavily damp — never feed raw per-frame values. -----------
+      const lean = leanRef.current;
+      const vMps = (sim?.speedKmh ?? 0) / 3.6;
+      const steer = sim?.steerRad ?? 0;
+      const latAccel = (vMps * vMps * Math.tan(steer)) / ESTIMATE_WHEELBASE;
+      const longAccel = (vMps - lean.prevSpeedMps) / Math.max(delta, 1e-3);
+      lean.prevSpeedMps = vMps;
+      const latGTarget = clampAbs(latAccel / 9.81, 1.2);
+      const longGTarget = clampAbs(longAccel / 9.81, 1.2);
+      const kg = switched ? 1 : 1 - Math.exp(-COCKPIT_LEAN_DAMPING * delta);
+      lean.latG += (latGTarget - lean.latG) * kg;
+      lean.longG += (longGTarget - lean.longG) * kg;
+      if (switched) {
+        lean.latG = latGTarget;
+        lean.longG = longGTarget;
+      }
+
+      // Eye position + car-local sway (body thrown OUT of the corner, forward
+      // under braking). +X is car-left, +Z forward.
+      sway.set(
+        -lean.latG * COCKPIT_LEAN_LATERAL,
+        0,
+        -lean.longG * COCKPIT_LEAN_LONGITUDINAL,
+      );
       eye
-        .set(COCKPIT_EYE.x, COCKPIT_EYE.y, COCKPIT_EYE.z)
+        .set(
+          COCKPIT_EYE.x + sway.x,
+          COCKPIT_EYE.y + sway.y,
+          COCKPIT_EYE.z + sway.z,
+        )
         .applyQuaternion(quat)
         .add(pos);
       const k = switched ? 1 : 1 - Math.exp(-COCKPIT_DAMPING * delta);
@@ -150,6 +198,18 @@ export function CameraRig({
       const kr = switched ? 1 : 1 - Math.exp(-COCKPIT_ROT_DAMPING * delta);
       rotSmooth.slerp(quat, kr);
       cam.quaternion.copy(rotSmooth).multiply(FLIP_Y);
+
+      // Head roll INTO the corner, nose-dive pitch on braking, look-into-turn
+      // yaw — small camera-local rotation (YXZ), applied after base orientation.
+      const steerNorm = clampAbs(steer / STEER_MAX_ANGLE, 1);
+      leanEuler.set(
+        lean.longG * COCKPIT_PITCH_GAIN,
+        steerNorm * COCKPIT_LOOK_INTO_TURN,
+        lean.latG * COCKPIT_ROLL_GAIN,
+        "YXZ",
+      );
+      leanQuat.setFromEuler(leanEuler);
+      cam.quaternion.multiply(leanQuat);
 
       // Mirror glance: 350 ms ease-out-and-back head turn toward the mirror.
       const cabin = cabinRef.current;

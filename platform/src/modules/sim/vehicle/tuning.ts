@@ -206,8 +206,9 @@ export const STEER_MIN_SPEED_KMH = 110;
 export const STEER_SPEED = 3.2;
 /** How fast it self-centres (rad/s) — quicker than turn-in, like a caster. */
 export const STEER_RETURN_SPEED = 4.8;
-/** Visual steering-wheel rotation per road-wheel radian (real ~15, readable 6). */
-export const STEERING_WHEEL_VISUAL_RATIO = 6;
+/** Visual steering-wheel rotation per road-wheel radian. ~13 gives ≈±430° at
+ *  full lock — a realistic ~1.2 turns (docs/simulation/63 camera research). */
+export const STEERING_WHEEL_VISUAL_RATIO = 13;
 
 // ---------------------------------------------------------------------------
 // Anti-roll bars & aero — stability without killing body motion
@@ -264,8 +265,29 @@ export const CHASE_LOOK_HEIGHT = 1.1; // m above car origin to aim at
 export const CHASE_STIFFNESS = 5.0; // 1/s exponential follow rate
 export const CHASE_FOV = 60;
 
-/** Driver eye point, chassis-local (LHD: +X is the left/driver side). */
-export const COCKPIT_EYE = { x: 0.34, y: 0.62, z: 0.15 } as const;
-export const COCKPIT_FOV = 68;
+/** Driver eye point, chassis-local (LHD: +X is the left/driver side).
+ *  y ≈ 0.66 above the COM puts the eye ~1.15 m above the road (real sedan
+ *  driver eye height, SAE eyellipse — docs/simulation/63). */
+export const COCKPIT_EYE = { x: 0.34, y: 0.66, z: 0.12 } as const;
+/** Cockpit FOV: ~55° vertical is the natural cockpit value; >65 reads as a
+ *  fishbowl that flattens speed/distance and feels "floating" (sim-racing FOV
+ *  research, docs/simulation/63). */
+export const COCKPIT_FOV = 55;
 /** Cockpit eye-position smoothing rate (1/s) — damps suspension tick. */
 export const COCKPIT_DAMPING = 25;
+
+// --- Cockpit G-force head motion (immersion without nausea; doc 63 §2) -------
+/** Lateral body sway (m) per 1 g lateral — head leans OUT of the corner. */
+export const COCKPIT_LEAN_LATERAL = 0.045;
+/** Longitudinal body sway (m) per 1 g — leans forward under braking. */
+export const COCKPIT_LEAN_LONGITUDINAL = 0.03;
+/** Head roll (rad) per 1 g lateral — rolls INTO the corner. */
+export const COCKPIT_ROLL_GAIN = 0.052; // ≈ 3°
+/** Head pitch (rad) per 1 g longitudinal — nose-dive on braking. */
+export const COCKPIT_PITCH_GAIN = 0.035; // ≈ 2°
+/** Max look-into-turn head yaw (rad) at full steering. */
+export const COCKPIT_LOOK_INTO_TURN = 0.09; // ≈ 5°
+/** G-lean smoothing rate (1/s). */
+export const COCKPIT_LEAN_DAMPING = 6;
+/** Kinematic wheelbase (m) for the lateral-G estimate. */
+export const ESTIMATE_WHEELBASE = 2.5;

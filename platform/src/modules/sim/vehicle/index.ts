@@ -16,5 +16,18 @@ export type { VehicleInput, VehicleDebugState, RapierModule } from "./VehicleSim
 
 export * from "./tuning";
 
+export {
+  applyDifficulty,
+  createDriveAssistState,
+  DIFFICULTY_PRESETS,
+  DIFFICULTY_ORDER,
+  DEFAULT_DIFFICULTY,
+} from "./difficulty";
+export type {
+  DifficultyMode,
+  DifficultyPreset,
+  DriveAssistState,
+} from "./difficulty";
+
 export { clamp, lerp, approach, yawQuat, rotateInto, dot } from "./math";
 export type { Vec3, Quat } from "./math";

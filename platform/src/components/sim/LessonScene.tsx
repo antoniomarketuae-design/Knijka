@@ -35,6 +35,10 @@ import {
   GRAVITY,
   SPAWN,
   CHASE_FOV,
+  DEFAULT_DIFFICULTY,
+  DIFFICULTY_ORDER,
+  DIFFICULTY_PRESETS,
+  type DifficultyMode,
   type VehicleSim,
 } from "@/modules/sim/vehicle";
 import type { VehicleSample } from "@/modules/sim/contracts";
@@ -248,6 +252,11 @@ function ReadyScene({
   const audioRef = useRef<SimAudio | null>(null);
   const sampleRef = useRef<VehicleSample>(createVehicleSample());
   const [cockpit, setCockpit] = useState(true);
+  const [difficulty, setDifficulty] = useState<DifficultyMode>(DEFAULT_DIFFICULTY);
+  const difficultyRef = useRef<DifficultyMode>(DEFAULT_DIFFICULTY);
+  useEffect(() => {
+    difficultyRef.current = difficulty;
+  }, [difficulty]);
 
   // Input + cabin + audio lifecycle.
   useEffect(() => {
@@ -330,6 +339,7 @@ function ReadyScene({
               sampleRef={sampleRef}
               paused={physicsPaused}
               spawn={spawn}
+              difficultyRef={difficultyRef}
             />
             <RuntimeDriver
               runtime={runtime}
@@ -356,6 +366,28 @@ function ReadyScene({
       {/* Controls hint */}
       <div className="pointer-events-none absolute bottom-2 left-1/2 -translate-x-1/2 rounded-full border border-border bg-background/70 px-3 py-1 text-[10px] text-muted backdrop-blur">
         WASD — кормуване · C — изглед · R — рестарт · Esc — пауза
+      </div>
+
+      {/* Difficulty selector — top right */}
+      <div className="absolute right-3 top-3 flex items-center gap-1 rounded-full border border-border bg-background/70 p-1 backdrop-blur">
+        {DIFFICULTY_ORDER.map((mode) => {
+          const active = mode === difficulty;
+          return (
+            <button
+              key={mode}
+              type="button"
+              onClick={() => setDifficulty(mode)}
+              aria-pressed={active}
+              className={`rounded-full px-2.5 py-1 text-[11px] font-semibold transition ${
+                active
+                  ? "bg-accent text-background"
+                  : "text-muted hover:text-foreground"
+              }`}
+            >
+              {DIFFICULTY_PRESETS[mode].labelBg}
+            </button>
+          );
+        })}
       </div>
 
       {menuPaused ? (
