@@ -1,0 +1,189 @@
+/**
+ * sim/lessons — shared types of the lesson subsystem.
+ *
+ * The lesson engine is a PURE orchestration layer above the rule engine
+ * (rules/) and the pre-drive machine (procedures/): it owns objective
+ * progression and the session lifecycle, accumulates every scorable event,
+ * and at the end folds everything through `buildSessionSummary` into an
+ * official-style result. Zero DOM/3D/DB dependencies — the store (store.ts)
+ * is the only impure seam and is injectable, like every other module store.
+ */
+
+import type { LessonObjective, LessonSpec } from "../contracts";
+import type { RuleEngineState, ScorableEvent, SessionSummary, Vec2 } from "../rules";
+import type { PreDriveMachine } from "../procedures";
+
+// ---------------------------------------------------------------------------
+// Objective parameters (typed views over LessonObjective.params)
+// ---------------------------------------------------------------------------
+
+/** Vehicle entered a circular zone (optionally at/below a max speed). */
+export interface ReachZoneParams {
+  kind: "reachZone";
+  x: number;
+  y: number;
+  radiusM: number;
+  /** When set, the zone only completes at/below this speed (km/h). */
+  maxSpeedKmh?: number;
+}
+
+/**
+ * Vehicle crossed a stop line of the given control type near a district node.
+ * The objective tracks PROGRESSION only — running the red is still "passing";
+ * the rule engine adjudicates the violation separately. `nodeId` refers to
+ * district-v1.json; the coordinates are denormalized into the spec so the
+ * lesson engine never needs the world file at runtime.
+ */
+export interface PassSignalParams {
+  kind: "passSignal";
+  /** Intersection/signal node id from district-v1.json (traceability). */
+  nodeId: string;
+  x: number;
+  y: number;
+  /** How close to the node a stopLineCrossed event must occur to count. */
+  radiusM: number;
+  control: "trafficLight" | "stopSign";
+}
+
+/** Accumulate driven distance (odometer over position deltas). */
+export interface DriveDistanceParams {
+  kind: "driveDistance";
+  meters: number;
+}
+
+/**
+ * Come to a full stop from at least `minApproachKmh` without exceeding
+ * `maxDecelMs2` (harsh braking re-arms the attempt — accelerate and retry).
+ */
+export interface SmoothStopParams {
+  kind: "completeManeuver";
+  maneuver: "smoothStop";
+  minApproachKmh: number;
+  maxDecelMs2: number;
+}
+
+/** Enter the roundabout ring, then leave it again (enter + exit = done). */
+export interface RoundaboutParams {
+  kind: "completeManeuver";
+  maneuver: "roundabout";
+  x: number;
+  y: number;
+  /** Inside this radius of the island center counts as "in the roundabout". */
+  enterRadiusM: number;
+  /** Beyond this radius (after entering) counts as "exited". */
+  exitRadiusM: number;
+}
+
+export type ManeuverParams = SmoothStopParams | RoundaboutParams;
+
+export type ObjectiveParams =
+  | ReachZoneParams
+  | PassSignalParams
+  | DriveDistanceParams
+  | ManeuverParams;
+
+// ---------------------------------------------------------------------------
+// Objective runtime state
+// ---------------------------------------------------------------------------
+
+export type ObjectiveStatus = "pending" | "active" | "done";
+
+/** Per-objective evaluator memory (discriminated by evaluator, not by kind). */
+export type ObjectiveEvalState =
+  | { type: "stateless" } // reachZone, passSignal
+  | { type: "driveDistance"; accumulatedM: number; prevPos: Vec2 | null }
+  | {
+      type: "smoothStop";
+      /** True once the vehicle reached the minimum approach speed. */
+      armed: boolean;
+      /** Peak deceleration observed during the current armed attempt, m/s². */
+      maxDecelMs2: number;
+      prevSpeedKmh: number | null;
+      prevT: number | null;
+    }
+  | { type: "roundabout"; entered: boolean };
+
+export interface ObjectiveProgress {
+  spec: LessonObjective;
+  params: ObjectiveParams;
+  status: ObjectiveStatus;
+  /** 0..1 for the HUD progress bar (distance/maneuver phases); 0 when N/A. */
+  progress: number;
+  completedAtSec: number | null;
+}
+
+// ---------------------------------------------------------------------------
+// Lesson session state (the pure reducer state)
+// ---------------------------------------------------------------------------
+
+export type LessonPhase = "preDrive" | "driving" | "completed" | "aborted";
+
+export interface LessonSessionState {
+  lesson: LessonSpec;
+  phase: LessonPhase;
+  isNight: boolean;
+  /** Pre-drive machine — non-null only when lesson.preDrive is true. */
+  preDrive: PreDriveMachine | null;
+  rules: RuleEngineState;
+  objectives: ObjectiveProgress[];
+  evalStates: ObjectiveEvalState[];
+  /** Index of the active objective; === objectives.length when all are done. */
+  currentObjectiveIndex: number;
+  /** Every scorable event of the session (rule engine + pre-drive machine). */
+  events: ScorableEvent[];
+  /** Session time of the last processed tick, seconds. */
+  lastT: number;
+  endedAtSec: number | null;
+}
+
+// ---------------------------------------------------------------------------
+// Result (input for persistence, debrief and the session-end screen)
+// ---------------------------------------------------------------------------
+
+export interface ObjectiveOutcome {
+  id: string;
+  titleBg: string;
+  done: boolean;
+  completedAtSec: number | null;
+}
+
+// ---------------------------------------------------------------------------
+// Gamification hook (integration ask — see note)
+// ---------------------------------------------------------------------------
+
+/**
+ * INTEGRATION ASK (gamification module): the activity event a finished sim
+ * lesson SHOULD report. `GamificationEvent` (modules/gamification/types.ts)
+ * is a CLOSED union of practice_answer | exam_completed, so trackActivity
+ * cannot accept this yet — per module-boundary rules we do NOT widen another
+ * module's contract from here. Once the union gains this member (and
+ * xpForEvent a case for it — suggested: base XP + pass bonus, scaled down for
+ * repeat passes), call `trackActivity(userId, event)` in
+ * src/app/(dashboard)/simulator/actions.ts right after saveSession (the
+ * call site is marked). Until then sim lessons award no XP and the session-end
+ * screen hides the XP chip.
+ */
+export interface SimLessonGamificationEvent {
+  type: "sim_lesson";
+  passed: boolean;
+  /** Penalty points, 0 = perfect (NOT a 0..97 exam score). */
+  score: number;
+}
+
+export interface LessonResult {
+  lessonId: string;
+  /** Official-format fold of every scorable event (rules/summary.ts). */
+  summary: SessionSummary;
+  objectives: ObjectiveOutcome[];
+  /** True when every objective completed (vacuously true for free drive). */
+  completedAll: boolean;
+  aborted: boolean;
+  /**
+   * The lesson verdict: official pass rule AND all objectives done AND not
+   * aborted. A free drive (no objectives) passes purely on the official rule.
+   */
+  passed: boolean;
+  /** Total penalty points (lower is better) — stored in SimSession.score. */
+  score: number;
+  durationSec: number;
+}

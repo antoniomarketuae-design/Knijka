@@ -9,8 +9,9 @@ model name applied to a stylized CC0 base mesh.
 | --- | --- | --- | --- | --- | --- |
 | `vitok/vitok-body.glb` | „Виток" hatchback exterior body (source file `hatchback-sports.glb`, baked wheel nodes hidden at runtime) | [Kenney Car Kit 3.1](https://kenney.nl/assets/car-kit) | Kenney (kenney.nl) | [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/) | 2026-07 |
 | `vitok/vitok-wheel.glb` | Wheel model, instanced ×4 and bound to the physics wheel transforms (source file `wheel-dark.glb`) | [Kenney Car Kit 3.1](https://kenney.nl/assets/car-kit) | Kenney (kenney.nl) | [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/) | 2026-07 |
+| `vitok/Textures/colormap.png` | Shared palette texture referenced by both `.glb` files (relative URI `Textures/colormap.png`) | [Kenney Car Kit 3.1](https://kenney.nl/assets/car-kit) | Kenney (kenney.nl) | [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/) | 2026-07 |
 
-Total binary payload: ~0.22 MB (budget: ≤ 8 MB).
+Total binary payload: ~0.23 MB (budget: ≤ 8 MB).
 
 Notes:
 
@@ -18,5 +19,5 @@ Notes:
 - The cockpit interior (dashboard, instruments, steering wheel, seats,
   mirrors) is built procedurally in code (`src/components/sim/vitok/`) — no
   binary assets, no license obligations.
-- Both `.glb` files are self-contained (the shared `colormap` palette texture
-  is embedded); no external texture files are shipped.
+- The `.glb` files reference the palette texture by RELATIVE uri
+  (`Textures/colormap.png`) — keep the `Textures/` folder next to them.

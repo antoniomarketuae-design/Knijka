@@ -1,17 +1,61 @@
 "use client";
 
-import dynamic from "next/dynamic";
-import { SimLoadingCard } from "@/components/sim/SimLoadingCard";
+/**
+ * /simulator client orchestrator: lesson select ⇄ play shell.
+ *
+ * Progression (which lessons are unlocked) is computed server-side in
+ * page.tsx from persisted SimSessions; this component only navigates between
+ * the two screens and owns the quality preset. After a passed attempt the
+ * unlock state on the server has moved on — "Следващ урок" therefore starts
+ * the next lesson directly, and returning to the select screen refreshes the
+ * server data (router.refresh()).
+ *
+ * NOTE for the 3D integrator: the heavy Three.js/rapier bundle belongs
+ * BEHIND the SceneSlot replacement via next/dynamic + ssr:false (see the
+ * old SimulatorApp wiring in git history / SceneSlot.tsx docs) — the select
+ * screen must stay 3D-free so the route renders instantly.
+ */
 
-// ssr:false is mandatory here (and only legal inside a client component):
-// the simulator bundle pulls in three.js + the rapier physics wasm, which
-// must never execute during SSR or the production build. This also
-// code-splits the whole 3D stack away from every other dashboard route.
-const SimulatorApp = dynamic(() => import("@/components/sim/SimulatorApp"), {
-  ssr: false,
-  loading: () => <SimLoadingCard />,
-});
+import { useRouter } from "next/navigation";
+import { useState } from "react";
+import { LessonPlayShell } from "@/components/sim/lesson-ui/LessonPlayShell";
+import { LessonSelectScreen } from "@/components/sim/lesson-ui/LessonSelectScreen";
+import { useQualityPreset } from "@/components/sim/lesson-ui/QualityPresetSelector";
+import type { LessonEntryView } from "@/components/sim/lesson-ui/types";
 
-export function SimulatorClient() {
-  return <SimulatorApp />;
+export function SimulatorClient({ entries }: { entries: LessonEntryView[] }) {
+  const router = useRouter();
+  const [quality, setQuality] = useQualityPreset();
+  const [activeLessonId, setActiveLessonId] = useState<string | null>(null);
+
+  const active = entries.find((e) => e.lesson.id === activeLessonId) ?? null;
+
+  if (active === null) {
+    return (
+      <LessonSelectScreen
+        entries={entries}
+        quality={quality}
+        onQualityChange={setQuality}
+        onStart={setActiveLessonId}
+      />
+    );
+  }
+
+  const next =
+    entries.find((e) => e.lesson.order === active.lesson.order + 1)?.lesson ?? null;
+
+  return (
+    <LessonPlayShell
+      // Remount (fresh session state) whenever the lesson changes.
+      key={active.lesson.id}
+      lesson={active.lesson}
+      quality={quality}
+      nextLesson={next ? { id: next.id, titleBg: next.titleBg } : null}
+      onExitToSelect={() => {
+        setActiveLessonId(null);
+        router.refresh(); // pull fresh progression after new attempts
+      }}
+      onStartLesson={setActiveLessonId}
+    />
+  );
 }

@@ -8,3 +8,4 @@
 
 export * as rules from "./rules";
 export * as procedures from "./procedures";
+export * as lessons from "./lessons";

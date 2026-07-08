@@ -137,6 +137,7 @@ export class VehicleSim {
   private aLatSmooth = 0;
   private readonly prevVel: Vec3 = { x: 0, y: 0, z: 0 };
   private readonly spawnRotation: Quat;
+  private readonly spawnTranslation: Vec3;
   private disposed = false;
 
   // Scratch objects (no per-frame allocation).
@@ -148,10 +149,15 @@ export class VehicleSim {
    * @param body  The chassis rigid-body with its cuboid collider ALREADY
    *              attached (collider 0 is assumed to be the chassis box).
    */
-  constructor(world: World, body: RigidBody) {
+  constructor(
+    world: World,
+    body: RigidBody,
+    spawn: { x: number; y: number; z: number; yawRad: number } = T.SPAWN,
+  ) {
     this.world = world;
     this.body = body;
-    this.spawnRotation = yawQuat(T.SPAWN.yawRad);
+    this.spawnRotation = yawQuat(spawn.yawRad);
+    this.spawnTranslation = { x: spawn.x, y: spawn.y, z: spawn.z };
     this.chassisColliderHandle = body.collider(0).handle;
 
     // --- Raycast vehicle controller -----------------------------------------
@@ -279,7 +285,7 @@ export class VehicleSim {
   /** Teleport back to spawn with zeroed velocities/forces/filters. */
   reset(): void {
     if (this.disposed) return;
-    this.body.setTranslation({ x: T.SPAWN.x, y: T.SPAWN.y, z: T.SPAWN.z }, true);
+    this.body.setTranslation(this.spawnTranslation, true);
     this.body.setRotation(this.spawnRotation, true);
     this.body.setLinvel({ x: 0, y: 0, z: 0 }, true);
     this.body.setAngvel({ x: 0, y: 0, z: 0 }, true);

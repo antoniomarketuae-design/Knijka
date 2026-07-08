@@ -1,0 +1,70 @@
+/**
+ * sim/lessons — public surface of the lesson subsystem.
+ *
+ * NOTE: the sim module's public API is src/modules/sim/index.ts (module
+ * boundary rule, docs/architecture/05); it re-exports this barrel as
+ * `lessons`. The /simulator route and src/components/sim consume this
+ * sub-barrel directly (same pattern as sim/engine and sim/hud).
+ */
+
+// Contract types lesson consumers need (owned by ../contracts.ts)
+export type { HudEvent, LessonObjective, LessonSpec } from "../contracts";
+
+// Lesson data (specs pinned to district-v1.json)
+export { LESSONS, lessonById, lessonsInOrder } from "./specs";
+
+// Session engine (pure lifecycle reducer)
+export {
+  abortSession,
+  applyPreDriveStep,
+  applyTick,
+  buildLessonResult,
+  createLessonSession,
+  finishSession,
+  type LessonEngineOptions,
+  type LessonStepResult,
+} from "./engine";
+
+// Objective evaluators (exposed for tests/tooling; engine drives them)
+export { createEvalState, parseObjectiveParams, stepObjective } from "./objectives";
+
+// Debrief (template v1 — AI tutor seam documented in debrief.ts)
+export { buildDebrief, type DebriefOutput } from "./debrief";
+
+// Progression / unlock logic
+export {
+  computeProgression,
+  type LessonAttemptRow,
+  type LessonProgressEntry,
+} from "./progression";
+
+// NOTE: the Prisma-backed session store is intentionally NOT re-exported here.
+// This barrel is imported by client components (LessonPlayShell, SceneSlot,
+// LessonScene); re-exporting ./store would drag @/lib/db → pg → node:dns into
+// the browser bundle. Server code imports the store directly from
+// "@/modules/sim/lessons/store".
+
+// Client ↔ server wire format for session finish
+export {
+  gradeFinishWire,
+  parseFinishLessonWire,
+  rebuildRuleEvents,
+  reconcileObjectiveOutcomes,
+  serializeRuleEvents,
+  type FinishLessonWire,
+  type GradedFinishWire,
+  type WireObjectiveOutcome,
+  type WireRuleEvent,
+} from "./wire";
+
+// Shared types
+export type {
+  LessonPhase,
+  LessonResult,
+  LessonSessionState,
+  ObjectiveOutcome,
+  ObjectiveParams,
+  ObjectiveProgress,
+  ObjectiveStatus,
+  SimLessonGamificationEvent,
+} from "./types";

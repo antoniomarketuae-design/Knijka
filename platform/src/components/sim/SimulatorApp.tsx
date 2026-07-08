@@ -5,17 +5,22 @@ import { useEffect, useRef, useState } from "react";
 import type { Group } from "three";
 import { createTelemetry, isTouchOnlyDevice, SimInput } from "@/modules/sim/engine";
 import type { VehicleSim } from "@/modules/sim/vehicle";
+import type { VehicleSample } from "@/modules/sim/contracts";
 import { SimHud } from "@/modules/sim/hud";
+import { CabinControls } from "./cabin";
+import { CabinHud } from "./CabinHud";
 import type { CameraMode } from "./CameraRig";
+import { SimAudio } from "./simAudio";
 import { SimScene } from "./SimScene";
+import { createVehicleSample } from "./vehicleSample";
 
 type Support = "blocked" | "ok";
 
 /**
  * Top-level simulator orchestrator (client-only; the /simulator route mounts
  * it via next/dynamic with ssr:false so the rapier wasm never loads during
- * SSR/build). Owns: touch-only gate, pause menu (Esc), restart, input
- * lifecycle, and the shared mutable refs the R3F scene reads from.
+ * SSR/build). Owns: touch-only gate, pause menu (Esc), restart, input +
+ * cabin + audio lifecycles, and the shared mutable refs the R3F scene reads.
  */
 export default function SimulatorApp() {
   // Feature-detect touch-only devices (never UA sniffing). Safe to do in the
@@ -25,13 +30,18 @@ export default function SimulatorApp() {
   const [paused, setPaused] = useState(false);
   const [sessionKey, setSessionKey] = useState(0);
 
-  // Mutable telemetry channel: written by the render loop, polled by the
-  // HUD. A ref (not state) so 60 writes/s cause zero re-renders.
+  // Mutable channels: written by the render loop, polled by the HUDs.
+  // Refs (not state) so 60 writes/s cause zero re-renders.
   const telemetryRef = useRef(createTelemetry());
   const simRef = useRef<VehicleSim | null>(null);
   const chassisGroupRef = useRef<Group | null>(null);
   const cameraModeRef = useRef<CameraMode>("chase");
   const inputRef = useRef<SimInput | null>(null);
+  const cabinRef = useRef<CabinControls | null>(null);
+  const audioRef = useRef<SimAudio | null>(null);
+  // Rule-engine seam: the latest VehicleSample (contracts.ts), refreshed
+  // every frame by VehicleRig. The world runtime will consume this.
+  const sampleRef = useRef<VehicleSample>(createVehicleSample());
 
   useEffect(() => {
     if (support !== "ok") return;
@@ -43,9 +53,29 @@ export default function SimulatorApp() {
       onTogglePause: () => setPaused((p) => !p),
     });
     inputRef.current = input;
+
+    const audio = new SimAudio();
+    audioRef.current = audio;
+    const cabin = new CabinControls({
+      onSeatbeltToggle: () => audio.click(),
+      onToggleMute: () => audio.toggleMute(),
+    });
+    cabinRef.current = cabin;
+
+    // Autoplay policy: the audio graph may only start from a user gesture.
+    const unlock = () => audio.unlock();
+    window.addEventListener("pointerdown", unlock);
+    window.addEventListener("keydown", unlock);
+
     return () => {
+      window.removeEventListener("pointerdown", unlock);
+      window.removeEventListener("keydown", unlock);
       input.dispose();
       inputRef.current = null;
+      cabin.dispose();
+      cabinRef.current = null;
+      audio.dispose();
+      audioRef.current = null;
     };
   }, [support]);
 
@@ -86,10 +116,14 @@ export default function SimulatorApp() {
           simRef={simRef}
           chassisGroupRef={chassisGroupRef}
           cameraModeRef={cameraModeRef}
+          cabinRef={cabinRef}
+          audioRef={audioRef}
+          sampleRef={sampleRef}
         />
       </div>
 
       <SimHud telemetryRef={telemetryRef} />
+      <CabinHud cabinRef={cabinRef} audioRef={audioRef} />
 
       {paused ? (
         <div
