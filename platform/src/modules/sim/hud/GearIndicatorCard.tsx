@@ -29,10 +29,12 @@ export function GearIndicatorCard({
   gear,
   indicator,
   headlights,
+  seatbeltOn,
 }: {
   gear: number;
   indicator: IndicatorState;
   headlights: HeadlightState;
+  seatbeltOn: boolean;
 }) {
   return (
     <div className="pointer-events-none flex items-center gap-4 rounded-2xl border border-border bg-surface/75 px-4 py-2.5 backdrop-blur-md select-none">
@@ -46,6 +48,21 @@ export function GearIndicatorCard({
       <div className="flex items-center gap-2" aria-label="Мигачи">
         <Arrow active={indicator === "left"} direction="left" />
         <Arrow active={indicator === "right"} direction="right" />
+      </div>
+
+      <div
+        className="flex flex-col items-center"
+        aria-label={seatbeltOn ? "Коланът е поставен" : "Колан не е поставен"}
+      >
+        <span className="text-[9px] font-bold uppercase tracking-wider text-muted">
+          Колан
+        </span>
+        <span
+          className={`text-sm font-black leading-none ${seatbeltOn ? "" : "hud-blink"}`}
+          style={{ color: seatbeltOn ? "var(--success)" : "var(--danger)" }}
+        >
+          {seatbeltOn ? "✓" : "⚠ B"}
+        </span>
       </div>
 
       <div className="flex flex-col items-center" aria-label={`Светлини: ${headlights}`}>

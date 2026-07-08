@@ -56,6 +56,7 @@ interface HudSnapshot {
   gear: number;
   indicator: SimTick["indicator"];
   headlights: SimTick["headlights"];
+  seatbeltOn: boolean;
   objectiveTitle: string | null;
   objectiveIndex: number;
   objectiveTotal: number;
@@ -77,6 +78,7 @@ function snapshotOf(s: LessonSessionState, lastTick: SimTick | null): HudSnapsho
     gear: lastTick?.gear ?? 0,
     indicator: lastTick?.indicator ?? "off",
     headlights: lastTick?.headlights ?? "off",
+    seatbeltOn: lastTick?.seatbeltOn ?? false,
     objectiveTitle: s.phase === "driving" && active ? active.spec.titleBg : null,
     objectiveIndex: s.currentObjectiveIndex + 1,
     objectiveTotal: s.objectives.length,
@@ -302,6 +304,7 @@ export function LessonPlayShell({
               gear={snap.gear}
               indicator={snap.indicator}
               headlights={snap.headlights}
+              seatbeltOn={snap.seatbeltOn}
             />
           </div>
         ) : null}

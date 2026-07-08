@@ -379,7 +379,7 @@ function ReadyScene({
 
       {/* Controls hint */}
       <div className="pointer-events-none absolute bottom-2 left-1/2 -translate-x-1/2 rounded-full border border-border bg-background/70 px-3 py-1 text-[10px] text-muted backdrop-blur">
-        WASD — кормуване · C — изглед · R — рестарт · Esc — пауза
+        WASD — кормуване · B — колан · Q/E/F — огледала · C — изглед · R — рестарт · Esc — пауза
       </div>
 
       {/* Difficulty selector — top right */}
