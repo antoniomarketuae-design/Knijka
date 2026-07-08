@@ -381,10 +381,9 @@ function ReadyScene({
         {cockpit && rain ? <WindshieldDroplets /> : null}
       </Canvas>
 
-      {/* Controls hint */}
-      <div className="pointer-events-none absolute bottom-2 left-1/2 -translate-x-1/2 rounded-full border border-border bg-background/70 px-3 py-1 text-[10px] text-muted backdrop-blur">
-        WASD — кормуване · B — колан · Q/E/F — огледала · C — изглед · R — рестарт · Esc — пауза
-      </div>
+      {/* Controls legend — collapsible, top-left of the canvas (clear of the
+          bottom cards + minimap). */}
+      <ControlsHelp />
 
       {/* Difficulty selector — top right */}
       <div className="absolute right-3 top-3 flex items-center gap-1 rounded-full border border-border bg-background/70 p-1 backdrop-blur">
@@ -489,6 +488,46 @@ function RuntimeDriver({
   });
 
   return null;
+}
+
+/** Collapsible key legend, top-left of the canvas — clear of the bottom HUD
+ *  cards and the minimap. Default open so the keys are visible. */
+function ControlsHelp() {
+  const [open, setOpen] = useState(true);
+  const rows: Array<[string, string]> = [
+    ["W A S D", "кормуване (или стрелки)"],
+    [", .", "мигач ляво / дясно"],
+    ["L", "светлини"],
+    ["B", "предпазен колан"],
+    ["Q E F", "огледала: ляво / дясно / назад"],
+    ["C", "смяна на изглед"],
+    ["R  ·  Esc", "рестарт · пауза"],
+  ];
+  return (
+    <div className="absolute left-3 top-3 z-10 max-w-[15rem]">
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        aria-expanded={open}
+        className="flex items-center gap-1.5 rounded-lg border border-border bg-background/80 px-2.5 py-1 text-[11px] font-semibold text-muted backdrop-blur transition hover:text-foreground"
+      >
+        <span aria-hidden>⌨</span>
+        Клавиши {open ? "▾" : "▸"}
+      </button>
+      {open ? (
+        <div className="mt-1 flex flex-col gap-1 rounded-xl border border-border bg-background/80 p-2.5 backdrop-blur">
+          {rows.map(([k, d]) => (
+            <div key={k} className="flex items-center gap-2 text-[11px]">
+              <kbd className="min-w-[3.75rem] rounded bg-surface px-1.5 py-0.5 text-center font-mono text-[10px] font-bold text-accent">
+                {k}
+              </kbd>
+              <span className="text-muted">{d}</span>
+            </div>
+          ))}
+        </div>
+      ) : null}
+    </div>
+  );
 }
 
 function GateCard({
