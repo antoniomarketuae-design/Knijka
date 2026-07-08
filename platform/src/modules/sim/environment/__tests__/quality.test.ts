@@ -7,27 +7,53 @@ import {
 } from "../quality";
 
 describe("QUALITY_PRESETS", () => {
-  it("low is the no-extras safety net", () => {
+  it("low is the no-extras safety net (no composer, no AO)", () => {
     const low = QUALITY_PRESETS.low;
     expect(low.shadows).toBe(false);
     expect(low.rainParticles).toBe(0);
     expect(low.postprocessing).toBe(false);
+    expect(low.aoEnabled).toBe(false);
+    expect(low.bloom).toBe(false);
+    expect(low.colorGrade).toBe(false);
     expect(low.maxDpr).toBe(1);
   });
 
-  it("med enables shadows and rain but never the composer", () => {
+  it("med runs a lean composer: half-res AO + SMAA, but no bloom/grade", () => {
     const med = QUALITY_PRESETS.med;
     expect(med.shadows).toBe(true);
     expect(med.shadowMapSize).toBe(1024);
     expect(med.rainParticles).toBeGreaterThan(0);
-    expect(med.postprocessing).toBe(false);
+    expect(med.postprocessing).toBe(true);
+    expect(med.aoEnabled).toBe(true);
+    expect(med.aoHalfRes).toBe(true);
+    expect(med.bloom).toBe(false);
+    expect(med.colorGrade).toBe(false);
   });
 
-  it("high is the only level with postprocessing, and it carries MSAA", () => {
+  it("high runs the full composer: AO + bloom + grade", () => {
     const high = QUALITY_PRESETS.high;
     expect(high.postprocessing).toBe(true);
-    expect(high.composerMultisampling).toBeGreaterThan(0);
+    expect(high.aoEnabled).toBe(true);
+    expect(high.aoHalfRes).toBe(true);
+    expect(high.bloom).toBe(true);
+    expect(high.colorGrade).toBe(true);
     expect(high.shadowMapSize).toBe(2048);
+  });
+
+  it("ambient occlusion is enabled exactly on med + high and always half-res", () => {
+    expect(QUALITY_PRESETS.low.aoEnabled).toBe(false);
+    for (const level of ["med", "high"] as const) {
+      const p = QUALITY_PRESETS[level];
+      expect(p.aoEnabled).toBe(true);
+      // Half-res AO keeps it Iris-Xe-safe (≈1 ms) at every level that runs it.
+      expect(p.aoHalfRes).toBe(true);
+    }
+  });
+
+  it("the composer runs at med + high and never at low", () => {
+    expect(QUALITY_PRESETS.low.postprocessing).toBe(false);
+    expect(QUALITY_PRESETS.med.postprocessing).toBe(true);
+    expect(QUALITY_PRESETS.high.postprocessing).toBe(true);
   });
 
   it("cost knobs increase monotonically with level", () => {

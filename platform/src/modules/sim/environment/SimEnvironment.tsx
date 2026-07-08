@@ -1,7 +1,7 @@
 "use client";
 
 // The atmosphere layer: sky, two-light rig, exponential fog, shadows, rain
-// and (high preset only) postprocessing — one component the integrator drops
+// and (med + high presets) postprocessing — one component the integrator drops
 // into the Canvas next to the world.
 //
 //   <SimEnvironment timeOfDay="dusk" rain quality="med" />
@@ -18,12 +18,27 @@
 //
 // Tone mapping: R3F already defaults the renderer to ACES filmic (do NOT
 // pass `flat` on the Canvas); this component re-asserts it defensively while
-// the composer is not in charge. At the high preset the EffectComposer takes
-// over the final image and ACES is re-applied as the last effect in its chain.
+// the composer is not in charge. At med + high the EffectComposer takes over
+// the final image and ACES is re-applied as the LAST effect in its chain.
+// Exposure (SIM_EXPOSURE) is a single global knob that works on both paths:
+// three feeds gl.toneMappingExposure into the composer's ACES shader too.
+//
+// Composer structure by quality level:
+//   low  — none (renderer ACES + canvas MSAA)
+//   med  — N8AO (half-res) → SMAA → ACES ToneMapping
+//   high — N8AO (half-res) → Bloom → HueSaturation + Vignette → SMAA → ACES
 
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, type JSX } from "react";
 import { useFrame, useThree } from "@react-three/fiber";
-import { Bloom, EffectComposer, ToneMapping, Vignette } from "@react-three/postprocessing";
+import {
+  Bloom,
+  EffectComposer,
+  HueSaturation,
+  N8AO,
+  SMAA,
+  ToneMapping,
+  Vignette,
+} from "@react-three/postprocessing";
 import { ToneMappingMode } from "postprocessing";
 import {
   ACESFilmicToneMapping,
@@ -54,6 +69,27 @@ export interface SimEnvironmentProps {
   /** Explicit quality level; omit to follow the quality store ("auto"). */
   quality?: QualityLevel;
 }
+
+/**
+ * Renderer tone-mapping exposure. Applies on BOTH the composer and non-
+ * composer paths (see file header). Kept a hair above 1.0 for a slightly
+ * punchier daytime image; deliberately mild because it is a single global
+ * value shared with the intentionally-dark night rig — pushing it toward the
+ * 1.15 ceiling brightens night too. Tune with human eyes in the 1.0–1.15 band.
+ */
+const SIM_EXPOSURE = 1.05;
+
+/**
+ * N8AO tuning (med + high). World-space radius, so contact darkening stays a
+ * fixed physical size regardless of distance. Small radius = grounding under
+ * the car / at curb & wall bases rather than dimming open tarmac. These three
+ * are the AO "look" knobs most worth a human-eyes pass.
+ */
+const AO_RADIUS_M = 1.5;
+/** How quickly AO fades with world distance between occluder and receiver. */
+const AO_DISTANCE_FALLOFF = 1.0;
+/** AO strength (higher = darker crevices). Conservative so it never reads dirty. */
+const AO_INTENSITY = 1.5;
 
 /** Damping stiffness for time-of-day crossfades (≈2 s to settle). */
 const FADE_LAMBDA = 2.2;
@@ -143,12 +179,19 @@ export function SimEnvironment({ timeOfDay, rain, quality }: SimEnvironmentProps
     const sunTarget = targetRef.current;
     if (!hemi || !sun || !fog || !sunTarget) return;
 
+    // Exposure applies on BOTH paths: the renderer's built-in ACES (no
+    // composer) and the composer's ToneMapping effect (three copies
+    // gl.toneMappingExposure into that effect's ACES shader uniform each
+    // frame). Cheap idempotent write.
+    if (state.gl.toneMappingExposure !== SIM_EXPOSURE) {
+      state.gl.toneMappingExposure = SIM_EXPOSURE;
+    }
+
     // While the composer is not in charge of the final image, keep the
     // renderer on ACES (the composer sets NoToneMapping while mounted and
     // re-applies ACES as its last effect — never fight it there).
     if (!qp.postprocessing && state.gl.toneMapping !== ACESFilmicToneMapping) {
       state.gl.toneMapping = ACESFilmicToneMapping;
-      state.gl.toneMappingExposure = 1;
     }
 
     // First frame snaps to the preset (damp with dt→∞ lands exactly);
@@ -219,6 +262,54 @@ export function SimEnvironment({ timeOfDay, rain, quality }: SimEnvironmentProps
     sun.position.copy(scratch.anchor).addScaledVector(dir, SUN_DISTANCE);
   });
 
+  // The composer's effect chain for this quality level, memoized on the level
+  // flags so it stays a stable array across the frequent rain-fade re-renders
+  // — otherwise the EffectComposer would tear down and rebuild every pass on
+  // each one. Order is load-bearing: N8AO (a Pass) runs first; ToneMapping is
+  // the final Effect so ACES lands on the fully-composited HDR image.
+  const composerChildren = useMemo<JSX.Element[]>(() => {
+    const chain: JSX.Element[] = [];
+    if (qp.aoEnabled) {
+      // Half-res ambient occlusion — the single biggest "flatness" fix. Runs
+      // its own depth pass (no composer normal pass needed).
+      chain.push(
+        <N8AO
+          key="ao"
+          halfRes={qp.aoHalfRes}
+          quality={qp.aoQuality}
+          aoRadius={AO_RADIUS_M}
+          distanceFalloff={AO_DISTANCE_FALLOFF}
+          intensity={AO_INTENSITY}
+          screenSpaceRadius={false}
+        />,
+      );
+    }
+    if (qp.bloom) {
+      // Subtle HDR bloom on the sun disc / bright speculars (high only). Its
+      // convolution attribute makes it its own pass, before tone mapping.
+      chain.push(
+        <Bloom
+          key="bloom"
+          mipmapBlur
+          intensity={0.45}
+          luminanceThreshold={1.0}
+          luminanceSmoothing={0.25}
+        />,
+      );
+    }
+    if (qp.colorGrade) {
+      // Light finishing grade (high only): a touch of saturation + soft
+      // vignette. Merged with SMAA + ToneMapping into one effect pass.
+      chain.push(<HueSaturation key="grade" hue={0} saturation={0.06} />);
+      chain.push(<Vignette key="vignette" eskil={false} offset={0.28} darkness={0.45} />);
+    }
+    // SMAA (the AA that replaces canvas MSAA) then ACES tone map close every
+    // chain; ToneMapping stays LAST so it maps the fully-composited image.
+    chain.push(<SMAA key="smaa" />);
+    chain.push(<ToneMapping key="tonemap" mode={ToneMappingMode.ACES_FILMIC} />);
+    return chain;
+  }, [qp.aoEnabled, qp.aoHalfRes, qp.aoQuality, qp.bloom, qp.colorGrade]);
+
   return (
     <>
       <SkyDome timeOfDay={timeOfDay} />
@@ -251,10 +342,13 @@ export function SimEnvironment({ timeOfDay, rain, quality }: SimEnvironmentProps
         <RainStreaks count={qp.rainParticles} timeOfDay={timeOfDay} />
       )}
       {qp.postprocessing && (
-        <EffectComposer multisampling={qp.composerMultisampling} enableNormalPass={false}>
-          <Bloom mipmapBlur intensity={0.45} luminanceThreshold={1.0} luminanceSmoothing={0.25} />
-          <Vignette eskil={false} offset={0.28} darkness={0.45} />
-          <ToneMapping mode={ToneMappingMode.ACES_FILMIC} />
+        // SMAA (not canvas MSAA) antialiases here: the composer renders
+        // offscreen, so the Canvas `antialias` flag can't reach scene edges.
+        // multisampling=0 for that reason; frameBufferType defaults to
+        // HalfFloat (HDR) which bloom + tone mapping need. Keyed by level so a
+        // rare quality switch rebuilds the pass chain cleanly.
+        <EffectComposer key={`fx-${level}`} multisampling={0} enableNormalPass={false}>
+          {composerChildren}
         </EffectComposer>
       )}
     </>

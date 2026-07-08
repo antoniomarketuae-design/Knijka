@@ -8,6 +8,10 @@ export type QualityLevel = "low" | "med" | "high";
 /** What the user picks in settings; "auto" defers to the probe recommendation. */
 export type QualitySetting = QualityLevel | "auto";
 
+/** N8AO sample budget. Maps to N8AO's `quality` prop (setQualityMode):
+ *  performance = 8 AO / 4 denoise samples; low = 16 / 4; medium = 16 / 8. */
+export type AoQuality = "performance" | "low" | "medium";
+
 export interface QualityPreset {
   level: QualityLevel;
   /** Whether the directional light casts a shadow map at all. */
@@ -18,10 +22,35 @@ export interface QualityPreset {
   shadowRadiusM: number;
   /** Instanced rain streak count (0 = rain particles disabled at this level). */
   rainParticles: number;
-  /** Whether the postprocessing composer (bloom + vignette) is mounted. */
+  /**
+   * Whether the EffectComposer is mounted at all. When true it owns the final
+   * image: N8AO + SMAA + ACES ToneMapping (+ bloom/color-grade at high). When
+   * false the renderer draws directly with its own ACES and canvas MSAA.
+   */
   postprocessing: boolean;
-  /** MSAA samples for the composer's render target (composer bypasses canvas MSAA). */
-  composerMultisampling: number;
+  /**
+   * Screen-space ambient occlusion (N8AO) in the composer — the primary fix
+   * for the "flat" look (grounds objects with contact darkening). Requires
+   * `postprocessing`.
+   */
+  aoEnabled: boolean;
+  /**
+   * Render AO at half resolution (≈1 ms) instead of full-res (≈3–4 ms). Keep
+   * true on integrated GPUs; N8AO depth-aware-upsamples it back cleanly.
+   */
+  aoHalfRes: boolean;
+  /** N8AO sample budget for this level (see AoQuality). */
+  aoQuality: AoQuality;
+  /**
+   * Subtle HDR bloom on the sun disc / bright speculars. High only (too costly
+   * and prone to a "blobby" look at med). Requires `postprocessing`.
+   */
+  bloom: boolean;
+  /**
+   * Subtle finishing grade (vignette + a touch of saturation). High only.
+   * Requires `postprocessing`.
+   */
+  colorGrade: boolean;
   /** Recommended Canvas dpr cap — the integrator wires `dpr={[1, maxDpr]}`. */
   maxDpr: number;
 }
@@ -29,7 +58,9 @@ export interface QualityPreset {
 export const QUALITY_PRESETS: Record<QualityLevel, QualityPreset> = {
   // Iris-Xe-and-below safety net: no shadow map, no particles, no composer,
   // native-ish resolution. The whole environment is then: 1 sky draw call,
-  // 2 lights, exponential fog.
+  // 2 lights, exponential fog. Canvas MSAA (Canvas `antialias`) does the AA
+  // here — this is the only level that relies on it, since the other two run
+  // a composer and antialias with SMAA instead.
   low: {
     level: "low",
     shadows: false,
@@ -37,23 +68,34 @@ export const QUALITY_PRESETS: Record<QualityLevel, QualityPreset> = {
     shadowRadiusM: 45,
     rainParticles: 0,
     postprocessing: false,
-    composerMultisampling: 0,
+    aoEnabled: false,
+    aoHalfRes: true,
+    aoQuality: "performance",
+    bloom: false,
+    colorGrade: false,
     maxDpr: 1.0,
   },
-  // The Iris Xe 60 fps target. One 1024² shadow map, GPU rain, still no
-  // composer — canvas MSAA provides the anti-aliasing for free.
+  // The Iris Xe 60 fps target. One 1024² shadow map, GPU rain, and now a lean
+  // composer: half-res N8AO (the big "flatness" fix) + SMAA + ACES tone map.
+  // No bloom/grade — those are the parts that cost the most and read "blobby"
+  // on a weak GPU. Half-res AO is ≈1 ms; SMAA ≈0.3 ms.
   med: {
     level: "med",
     shadows: true,
     shadowMapSize: 1024,
     shadowRadiusM: 45,
     rainParticles: 800,
-    postprocessing: false,
-    composerMultisampling: 0,
+    postprocessing: true,
+    aoEnabled: true,
+    aoHalfRes: true,
+    aoQuality: "performance",
+    bloom: false,
+    colorGrade: false,
     maxDpr: 1.25,
   },
-  // Discrete-GPU tier: 2048² shadows, denser rain, subtle bloom + vignette
-  // (+ ACES inside the composer, since it bypasses renderer tone mapping).
+  // Discrete-GPU tier: 2048² shadows, denser rain, and the full composer —
+  // half-res N8AO (more samples than med) + subtle bloom + a light vignette/
+  // saturation grade + SMAA + ACES tone map. Still half-res AO to stay safe.
   high: {
     level: "high",
     shadows: true,
@@ -61,7 +103,11 @@ export const QUALITY_PRESETS: Record<QualityLevel, QualityPreset> = {
     shadowRadiusM: 60,
     rainParticles: 1400,
     postprocessing: true,
-    composerMultisampling: 4,
+    aoEnabled: true,
+    aoHalfRes: true,
+    aoQuality: "low",
+    bloom: true,
+    colorGrade: true,
     maxDpr: 1.5,
   },
 };

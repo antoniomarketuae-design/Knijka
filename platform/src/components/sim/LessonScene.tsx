@@ -47,7 +47,11 @@ import type { LessonSpec } from "@/modules/sim/lessons";
 import type { PreDriveStepId } from "@/modules/sim/procedures";
 import type { SimTick } from "@/modules/sim/rules";
 import type { MinimapFrame } from "@/modules/sim/hud";
-import { SimEnvironment, WindshieldDroplets } from "@/modules/sim/environment";
+import {
+  SimEnvironment,
+  WindshieldDroplets,
+  QUALITY_PRESETS,
+} from "@/modules/sim/environment";
 import {
   DistrictWorld,
   buildWorldGeometry,
@@ -305,7 +309,7 @@ function ReadyScene({
     <div className="relative h-full w-full">
       <Canvas
         shadows
-        dpr={[1, level === "low" ? 1 : 1.5]}
+        dpr={[1, QUALITY_PRESETS[level].maxDpr]}
         camera={{
           fov: CHASE_FOV,
           near: 0.1,
