@@ -62,6 +62,35 @@ export interface SmoothStopParams {
   maxDecelMs2: number;
 }
 
+/**
+ * Emergency stop (L5 „Аварийно спиране"): the MIRROR of smoothStop. Reach at
+ * least `minApproachKmh`, then stop with a peak deceleration of AT LEAST
+ * `minDecelMs2` — proving a firm, decisive emergency brake (not a gentle
+ * coast). A soft roll to a halt does NOT complete it. Coordinate-free, exactly
+ * like smoothStop, so it needs no world geometry.
+ */
+export interface EmergencyStopParams {
+  kind: "completeManeuver";
+  maneuver: "emergencyStop";
+  minApproachKmh: number;
+  minDecelMs2: number;
+}
+
+/**
+ * Reverse-park (L7 „Паркиране"): engage reverse gear during the maneuver and
+ * then hold a full stop for `holdSec` continuous seconds. Tests the actual
+ * motor skill (reverse + controlled halt); coordinate-free — the world renders
+ * a bay, but completion is geometry-independent. Not expressible by reachZone
+ * (which requires neither a held stop nor reverse) or smoothStop (forward,
+ * gentle) — hence a dedicated evaluator.
+ */
+export interface ParkInBayParams {
+  kind: "completeManeuver";
+  maneuver: "parkInBay";
+  /** Continuous seconds the vehicle must stay stopped to finish parking. */
+  holdSec: number;
+}
+
 /** Enter the roundabout ring, then leave it again (enter + exit = done). */
 export interface RoundaboutParams {
   kind: "completeManeuver";
@@ -74,7 +103,11 @@ export interface RoundaboutParams {
   exitRadiusM: number;
 }
 
-export type ManeuverParams = SmoothStopParams | RoundaboutParams;
+export type ManeuverParams =
+  | SmoothStopParams
+  | EmergencyStopParams
+  | RoundaboutParams
+  | ParkInBayParams;
 
 export type ObjectiveParams =
   | ReachZoneParams
@@ -101,7 +134,23 @@ export type ObjectiveEvalState =
       prevSpeedKmh: number | null;
       prevT: number | null;
     }
-  | { type: "roundabout"; entered: boolean };
+  | {
+      type: "emergencyStop";
+      /** True once the vehicle reached the minimum approach speed. */
+      armed: boolean;
+      /** Peak deceleration observed during the current armed attempt, m/s². */
+      maxDecelMs2: number;
+      prevSpeedKmh: number | null;
+      prevT: number | null;
+    }
+  | { type: "roundabout"; entered: boolean }
+  | {
+      type: "parkInBay";
+      /** Reverse gear was engaged at some point during the attempt. */
+      usedReverse: boolean;
+      /** Session time the current continuous stop began; null while moving. */
+      stoppedSinceT: number | null;
+    };
 
 export interface ObjectiveProgress {
   spec: LessonObjective;

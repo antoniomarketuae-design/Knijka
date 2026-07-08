@@ -29,7 +29,23 @@ export {
 export { createEvalState, parseObjectiveParams, stepObjective } from "./objectives";
 
 // Debrief (template v1 — AI tutor seam documented in debrief.ts)
-export { buildDebrief, type DebriefOutput } from "./debrief";
+export { buildDebrief, type DebriefContext, type DebriefOutput } from "./debrief";
+
+// In-sim micro-quiz trigger (pure — the theory↔driving closed loop)
+export {
+  QUIZ_TARGET_CONCEPT_IDS,
+  QUIZ_TUNING,
+  conceptForEvent,
+  createQuizTriggerState,
+  observeQuizTick,
+  type MicroQuizOption,
+  type MicroQuizQuestion,
+  type QuizFrequency,
+  type QuizTriggerResult,
+  type QuizTriggerState,
+  type QuizTuning,
+  type TriggeredQuiz,
+} from "./quiz-trigger";
 
 // Progression / unlock logic
 export {
@@ -53,6 +69,7 @@ export {
   serializeRuleEvents,
   type FinishLessonWire,
   type GradedFinishWire,
+  type WireMicroQuiz,
   type WireObjectiveOutcome,
   type WireRuleEvent,
 } from "./wire";

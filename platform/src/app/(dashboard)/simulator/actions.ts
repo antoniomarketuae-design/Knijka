@@ -32,7 +32,40 @@ export async function finishLessonAction(
   if (graded.status === "unknown-lesson") return { ok: false, code: "UNKNOWN_LESSON" };
 
   const { lesson, wire, events, result } = graded;
-  const debrief = buildDebrief(lesson, result);
+
+  // Debrief context (server-only facts the pure engine doesn't own):
+  //  - priorBestScore: the driver's fewest penalty points on THIS lesson so
+  //    far. listSessions runs BEFORE saveSession below, so it excludes this
+  //    attempt → the debrief can coach improvement vs the driver's own best.
+  //  - conceptTitles: names the "practice this next" focus concept.
+  //  - microQuiz: the contextual-quiz tally the client tracked (validated wire).
+  let priorBestScore: number | null = null;
+  try {
+    const rows = await getSimSessionStore().listSessions(user.id);
+    const scores = rows
+      .filter((r) => r.lessonId === lesson.id && r.score !== null)
+      .map((r) => r.score as number);
+    if (scores.length > 0) priorBestScore = Math.min(...scores);
+  } catch {
+    // No history available — improvement coaching is simply skipped.
+  }
+
+  const conceptTitles: Record<string, string> = {};
+  try {
+    const repo = getContentRepo();
+    for (const id of result.summary.conceptIds) {
+      const concept = repo.conceptById(id);
+      if (concept) conceptTitles[id] = concept.titleBg;
+    }
+  } catch {
+    // Content repo unavailable — the debrief falls back to a generic pointer.
+  }
+
+  const debrief = buildDebrief(lesson, result, {
+    microQuiz: wire.microQuiz,
+    priorBestScore,
+    conceptTitles,
+  });
 
   const payload: SimSessionEventsJson = {
     version: 1,

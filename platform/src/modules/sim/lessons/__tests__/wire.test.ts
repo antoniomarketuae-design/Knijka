@@ -68,6 +68,20 @@ describe("parseFinishLessonWire", () => {
       parseFinishLessonWire({ ...valid, finishedAtMs: valid.startedAtMs + 5 * 60 * 60 * 1000 }),
     ).toBeNull(); // absurd duration
   });
+
+  it("accepts and normalizes an optional micro-quiz tally", () => {
+    const parsed = parseFinishLessonWire({ ...valid, microQuiz: { total: 4, correct: 3 } });
+    expect(parsed?.microQuiz).toEqual({ total: 4, correct: 3 });
+    // Absent tally is fine (older/quiet sessions).
+    expect(parseFinishLessonWire(valid)?.microQuiz).toBeUndefined();
+  });
+
+  it("rejects an impossible micro-quiz tally", () => {
+    expect(parseFinishLessonWire({ ...valid, microQuiz: { total: 2, correct: 3 } })).toBeNull();
+    expect(parseFinishLessonWire({ ...valid, microQuiz: { total: -1, correct: 0 } })).toBeNull();
+    expect(parseFinishLessonWire({ ...valid, microQuiz: { total: 999, correct: 1 } })).toBeNull();
+    expect(parseFinishLessonWire({ ...valid, microQuiz: { total: "x", correct: 0 } })).toBeNull();
+  });
 });
 
 describe("reconcileObjectiveOutcomes", () => {
@@ -170,7 +184,9 @@ describe("lesson specs sanity", () => {
     const { LESSONS } = await import("../specs");
     const ids = new Set(LESSONS.map((l) => l.id));
     expect(ids.size).toBe(LESSONS.length);
-    expect([...LESSONS].map((l) => l.order).sort((a, b) => a - b)).toEqual([0, 1, 2, 3, 4]);
+    // Orders are contiguous 0..n-1 (curriculum has no gaps).
+    const orders = [...LESSONS].map((l) => l.order).sort((a, b) => a - b);
+    expect(orders).toEqual(orders.map((_, i) => i));
     // Every lesson spawns at a real district spawn point.
     for (const lesson of LESSONS) {
       expect(lesson.spawn.pointId).toMatch(/^spawn-[1-6]$/);

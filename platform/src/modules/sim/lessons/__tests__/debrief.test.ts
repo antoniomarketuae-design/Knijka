@@ -95,6 +95,52 @@ describe("buildDebrief", () => {
     expect(result.passed).toBe(false);
   });
 
+  it("reports the micro-quiz tally and ties it to theory readiness", () => {
+    const result = resultWithEvents([]);
+    const d = buildDebrief(l0, result, { microQuiz: { total: 4, correct: 3 } });
+    expect(d.text).toContain("Теория в движение:");
+    expect(d.text).toContain("вярно на 3 от 4 въпроса");
+    expect(d.text).toContain("същата готовност");
+  });
+
+  it("omits the micro-quiz section when no quizzes were shown", () => {
+    const d = buildDebrief(l0, resultWithEvents([]), { microQuiz: { total: 0, correct: 0 } });
+    expect(d.text).not.toContain("Теория в движение");
+  });
+
+  it("celebrates beating the prior best score", () => {
+    const result = resultWithEvents([makeViolation("HANDBRAKE_LEFT_ON", 5)]); // 1 pt
+    const d = buildDebrief(l0, result, { priorBestScore: 4 });
+    expect(d.text).toContain("Личен напредък");
+    expect(d.text).toContain("1 т. срещу най-добрите ти 4 т.");
+  });
+
+  it("notes a matched or worse score encouragingly, and skips it on first attempt", () => {
+    const worse = buildDebrief(l0, resultWithEvents([makeViolation("RED_LIGHT_CROSSED", 5)]), {
+      priorBestScore: 2,
+    });
+    expect(worse.text).toContain("остава 2 т.");
+
+    const first = buildDebrief(l0, resultWithEvents([]), { priorBestScore: null });
+    expect(first.text).not.toContain("напредък");
+    expect(first.text).not.toContain("резултат за този урок");
+  });
+
+  it("names the concept behind the most severe mistake as the focus", () => {
+    const result = resultWithEvents([
+      makeViolation("HANDBRAKE_LEFT_ON", 5), // второстепенна → c-vehicle-controls
+      makeViolation("RED_LIGHT_CROSSED", 10), // опасна → c-traffic-light-signals (focus)
+    ]);
+    const d = buildDebrief(l0, result, {
+      conceptTitles: {
+        "c-traffic-light-signals": "Светофари",
+        "c-vehicle-controls": "Управление на автомобила",
+      },
+    });
+    expect(d.text).toContain("започни от „Светофари“");
+    expect(d.text).toContain("най-тежката ти грешка");
+  });
+
   it("flags an unfinished route on an otherwise clean drive", () => {
     const l2 = lessonById("l2-intersections")!;
     let s = createLessonSession(l2);

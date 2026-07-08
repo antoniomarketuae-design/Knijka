@@ -1,21 +1,26 @@
 /**
- * Template debrief generator v1 — a deterministic Bulgarian text built ONLY
- * from rule-engine events (titles/explanations/lawRefs authored in the
- * violation catalog, never free-recalled — ADR-002).
+ * Template debrief generator v1 — a deterministic Bulgarian coaching text built
+ * ONLY from session facts (rule-engine events with titles/explanations/lawRefs
+ * authored in the violation catalog, the micro-quiz tally, the store's prior
+ * best score, and concept titles from the content repo). Nothing is
+ * free-recalled — ADR-002.
  *
- * Structure: verdict → what went well (commendations) → the most important
- * mistakes (grouped, ordered by severity) → what to practice (concept ids
- * that link the mistakes back to the theory knowledge graph).
+ * Structure: verdict → improvement vs the driver's own best → theory-in-motion
+ * (micro-quiz) → what went well → the most important mistakes (grouped, law-
+ * cited, dangerous-first) → what to practice next (the concept behind the worst
+ * mistake, named + linked to theory).
  *
  * ============================ AI DEBRIEF SEAM ============================
  * The tutor layer will later replace/augment `text` with an LLM-written
  * debrief (dialogue tone, personalized). Contract for that layer:
- *  - input: the same LessonResult + this template as the grounding draft;
+ *  - input: the same LessonResult + DebriefContext + this template as the
+ *    grounding draft;
  *  - the LLM may rephrase but must keep every lawRef citation intact and may
  *    NOT introduce legal claims that are not present in the events (ADR-002:
  *    retrieval + citation only, no free recall of Bulgarian law).
- * Callers should treat `buildDebrief` as the fallback when the AI layer is
- * unavailable. Nothing else in this module may call an LLM.
+ * Callers treat `buildDebrief` as the fallback when the AI layer is
+ * unavailable. Nothing else in this module may call an LLM. The concrete
+ * call site is marked `// AI debrief hook` at the bottom of buildDebrief.
  * =========================================================================
  */
 
@@ -34,10 +39,29 @@ export interface DebriefOutput {
   conceptIds: string[];
 }
 
+/**
+ * Session facts the deterministic template can weave in but that the pure
+ * engine does not own (store history, content titles, micro-quiz tally). The
+ * caller (server action) supplies what it has; every field is optional so the
+ * client can render an instant fallback with none of it.
+ */
+export interface DebriefContext {
+  /** Contextual theory checks answered during the drive. */
+  microQuiz?: { total: number; correct: number };
+  /**
+   * Fewest penalty points the driver scored on THIS lesson BEFORE this attempt.
+   * null/undefined = first attempt (no history) → improvement coaching skipped.
+   */
+  priorBestScore?: number | null;
+  /** conceptId → Bulgarian title, for a NAMED "practice this next" pointer. */
+  conceptTitles?: Record<string, string>;
+}
+
 interface MistakeGroup {
   code: string;
   titleBg: string;
   lawRef: string;
+  conceptId: string | undefined;
   severityClass: ViolationEvent["severityClass"];
   severityLabel: string;
   points: number;
@@ -61,7 +85,11 @@ const SEVERITY_RANK: Record<ViolationEvent["severityClass"], number> = {
 const MAX_MISTAKE_LINES = 4;
 const MAX_COMMENDATION_LINES = 3;
 
-export function buildDebrief(lesson: LessonSpec, result: LessonResult): DebriefOutput {
+export function buildDebrief(
+  lesson: LessonSpec,
+  result: LessonResult,
+  context: DebriefContext = {},
+): DebriefOutput {
   const { summary } = result;
   const lines: string[] = [];
 
@@ -93,6 +121,25 @@ export function buildDebrief(lesson: LessonSpec, result: LessonResult): DebriefO
     );
   }
 
+  // -- improvement vs the driver's own best ----------------------------------
+  const improvement = improvementLine(result, context.priorBestScore);
+  if (improvement !== null) lines.push(improvement);
+
+  // -- theory in motion (micro-quiz) -----------------------------------------
+  const quiz = context.microQuiz;
+  if (quiz && quiz.total > 0) {
+    lines.push("");
+    lines.push("Теория в движение:");
+    lines.push(
+      `• Отговори вярно на ${quiz.correct} от ${quiz.total} въпроса по време на карането — те влияят на същата готовност като тренировките в „Теория“.`,
+    );
+    lines.push(
+      quiz.correct === quiz.total
+        ? "• Знанието ти от теорията се пренася на пътя. Точно това търсим."
+        : "• Прегледай темите зад въпросите, на които се поколеба — затова изникват в движение.",
+    );
+  }
+
   // -- what went well ----------------------------------------------------------
   const goodLines = commendationLines(result);
   if (goodLines.length > 0) {
@@ -108,7 +155,7 @@ export function buildDebrief(lesson: LessonSpec, result: LessonResult): DebriefO
   const groups = groupMistakes(summary.mistakes);
   if (groups.length > 0) {
     lines.push("");
-    lines.push("Най-важните грешки:");
+    lines.push("Най-важните грешки (подредени по тежест):");
     for (const g of groups.slice(0, MAX_MISTAKE_LINES)) {
       const times = g.count > 1 ? ` ×${g.count}` : "";
       lines.push(`• ${g.titleBg}${times} — ${g.severityLabel}, ${g.totalPoints} т. (${g.lawRef})`);
@@ -118,24 +165,61 @@ export function buildDebrief(lesson: LessonSpec, result: LessonResult): DebriefO
     }
   }
 
-  // -- what to practice ---------------------------------------------------------
+  // -- what to practice next --------------------------------------------------
   const conceptIds = summary.conceptIds;
   if (conceptIds.length > 0) {
+    // Focus = the concept behind the single most severe mistake (dangerous
+    // first, then most damaging). This is the concrete "start here" pointer.
+    const focusId = groups.length > 0 ? groups[0].conceptId : conceptIds[0];
+    const focusTitle = focusId ? context.conceptTitles?.[focusId] : undefined;
     lines.push("");
-    lines.push(
-      "Какво да упражниш: грешките по-горе са свързани с конкретни теми от теорията — премини ги отново в раздел „Теория“, после повтори урока.",
-    );
+    if (focusTitle) {
+      lines.push(
+        `Какво да упражниш: започни от „${focusTitle}“ — темата зад най-тежката ти грешка. Отвори я в раздел „Теория“, после повтори урока.`,
+      );
+    } else {
+      lines.push(
+        "Какво да упражниш: грешките по-горе са свързани с конкретни теми от теорията — премини ги отново в раздел „Теория“, после повтори урока.",
+      );
+    }
   } else if (!result.passed && !result.aborted && !result.completedAll) {
     lines.push("");
     lines.push("Какво да упражниш: повтори урока и завърши всички задачи от маршрута — карането беше чисто.");
   }
 
+  // AI debrief hook — see the AI DEBRIEF SEAM header. The tutor module would
+  // slot in here: given `lesson`, `result`, `context` and `lines.join("\n")`
+  // as the grounding draft, produce a personalized rephrase (citations intact).
+  // It needs an API key (ADR-002) and is intentionally NOT called now; the
+  // deterministic template below is the shipped + fallback text.
   return { text: lines.join("\n"), conceptIds };
 }
 
 // ---------------------------------------------------------------------------
 // helpers
 // ---------------------------------------------------------------------------
+
+/**
+ * Coaching line comparing this attempt's penalty points to the driver's own
+ * best on this lesson. Aborted attempts (score not comparable) are skipped, as
+ * is the first-ever attempt (no history).
+ */
+function improvementLine(
+  result: LessonResult,
+  priorBestScore: number | null | undefined,
+): string | null {
+  if (result.aborted || priorBestScore === null || priorBestScore === undefined) {
+    return null;
+  }
+  const now = result.score;
+  if (now < priorBestScore) {
+    return `Личен напредък: ${now} т. срещу най-добрите ти ${priorBestScore} т. досега за този урок — свали резултата, продължавай така.`;
+  }
+  if (now === priorBestScore) {
+    return `Изравни най-добрия си резултат за този урок (${priorBestScore} т.). Следващата цел е да го подобриш.`;
+  }
+  return `Най-добрият ти резултат за този урок остава ${priorBestScore} т.; този път допусна повече (${now} т.). Спокойно — повтори го и ще го стигнеш.`;
+}
 
 function commendationLines(result: LessonResult): string[] {
   const seen = new Map<string, number>();
@@ -159,6 +243,7 @@ function groupMistakes(mistakes: ReadonlyArray<ViolationEvent>): MistakeGroup[] 
         code: m.code,
         titleBg: m.titleBg,
         lawRef: m.lawRef,
+        conceptId: m.conceptId,
         severityClass: m.severityClass,
         severityLabel: SEVERITY_LABEL[m.severityClass],
         points: m.points,

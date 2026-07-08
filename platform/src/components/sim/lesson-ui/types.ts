@@ -3,8 +3,32 @@
  * Pure types — no logic; the lesson business logic lives in @/modules/sim.
  */
 
-import type { LessonSpec } from "@/modules/sim/lessons";
+import type { LessonSpec, QuizFrequency } from "@/modules/sim/lessons";
 import type { SessionEndConcept } from "@/modules/sim/hud";
+
+// ---------------------------------------------------------------------------
+// In-sim micro-quiz difficulty setting (persisted like the quality preset)
+// ---------------------------------------------------------------------------
+
+export const MICRO_QUIZ_FREQUENCIES: ReadonlyArray<{
+  id: QuizFrequency;
+  labelBg: string;
+}> = [
+  { id: "off", labelBg: "Изкл." },
+  { id: "occasional", labelBg: "Понякога" },
+  { id: "frequent", labelBg: "Често" },
+];
+
+/** localStorage key for the persisted micro-quiz frequency. */
+export const MICRO_QUIZ_STORAGE_KEY = "sim.quizFrequency";
+
+/** Client-safe result of the submitMicroQuizAnswer server action. */
+export interface MicroQuizAnswerResult {
+  correct: boolean;
+  correctOptionIds: string[];
+  explanationBg: string;
+  lawRefs: Array<{ act: string; ref: string }>;
+}
 
 /**
  * Render quality preset. The environment workstream owns what each preset

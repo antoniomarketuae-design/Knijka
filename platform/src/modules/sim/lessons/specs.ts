@@ -6,12 +6,20 @@
  *
  * Curriculum arc (docs/education — mirrors how driving schools sequence):
  *   L0 free drive → L1 pre-drive + moving off → L2 intersections/priority →
- *   L3 roundabout → L4 pedestrian crossings.
+ *   L3 roundabout → L4 pedestrian crossings → L5 emergency braking →
+ *   L6 night driving → L7 parking.
  *
- * INTEGRATION NOTE (runtime/world): district-v1.json has no stop-sign data —
- * lesson l2's stop-controlled objective expects the world to place a Б2
- * „Спри!" sign + stop line at node n331942490 (383.17, 65.76) and emit
- * stopLineCrossed{control:"stopSign"} there (SimTickEvent contract).
+ * INTEGRATION NOTES (runtime/world):
+ *  - L2: district-v1.json has no stop-sign data — l2's stop-controlled
+ *    objective expects the world to place a Б2 „Спри!" sign + stop line at node
+ *    n331942490 (383.17, 65.76) and emit stopLineCrossed{control:"stopSign"}.
+ *  - L5/L7: the emergencyStop and parkInBay maneuvers are COORDINATE-FREE (like
+ *    L1's smoothStop) — they read only speed/gear from SimTick, so they need no
+ *    world geometry. The world should still render a hazard cue (L5) and a
+ *    marked bay (L7) for immersion; scoring is geometry-independent.
+ *  - L6: environment.timeOfDay "night" flips SimTick.isNight, so the rule engine
+ *    expects headlights on (HEADLIGHTS_OFF_AT_NIGHT). The world must render
+ *    night lighting and set isNight on every tick for this lesson.
  */
 
 import type { LessonSpec } from "../contracts";
@@ -182,6 +190,98 @@ export const LESSONS: readonly LessonSpec[] = [
         titleBg: "Премини покрай пътеката със светофар",
         kind: "reachZone",
         params: { x: -462.04, y: 13.72, radiusM: 20 }, // crossing n3646708715
+      },
+    ],
+  },
+  {
+    id: "l5-emergency-braking",
+    order: 5,
+    titleBg: "Аварийно спиране",
+    descriptionBg:
+      "Набери скорост по правата отсечка, а при внезапна опасност спри аварийно — рязко, докрай и без да губиш контрол. Умението да спреш навреме дели произшествието от разминаването.",
+    conceptIds: [
+      "c-braking-distance",
+      "c-stopping-distance-total",
+      "c-reaction-time",
+      "c-sudden-braking-slow-driving",
+      "c-hazard-perception",
+    ],
+    spawn: { pointId: "spawn-2" }, // ул. Васил Калчев — права отсечка
+    preDrive: false,
+    objectives: [
+      {
+        id: "l5-build-speed",
+        titleBg: "Набери скорост по правата",
+        kind: "driveDistance",
+        params: { meters: 120 },
+      },
+      {
+        id: "l5-emergency-stop",
+        titleBg: "Спри аварийно — рязко и докрай",
+        kind: "completeManeuver",
+        // Reach ≥ 40 km/h, then brake firmly (peak ≥ 5 m/s² ≈ 0.5 g) to a halt.
+        params: { maneuver: "emergencyStop", minApproachKmh: 40, minDecelMs2: 5 },
+      },
+    ],
+  },
+  {
+    id: "l6-night-driving",
+    order: 6,
+    titleBg: "Нощно шофиране",
+    descriptionBg:
+      "Същият квартал, но на тъмно. Кратки светлини, съобразена скорост и повече дистанция — нощем виждаш само толкова, колкото осветяват фаровете. Спри плавно на слабо осветено място.",
+    conceptIds: [
+      "c-night-visibility",
+      "c-lights-overview",
+      "c-high-beam-use",
+      "c-dazzle-handling",
+      "c-speed-adaptation",
+    ],
+    spawn: { pointId: "spawn-6" }, // Проф. Константин Чилов — жилищна улица
+    preDrive: false,
+    environment: { timeOfDay: "night" },
+    objectives: [
+      {
+        id: "l6-night-route",
+        titleBg: "Измини нощния маршрут със светлини",
+        kind: "driveDistance",
+        params: { meters: 400 },
+      },
+      {
+        id: "l6-night-stop",
+        titleBg: "Спри плавно на слабо осветено място",
+        kind: "completeManeuver",
+        params: { maneuver: "smoothStop", minApproachKmh: 20, maxDecelMs2: 3.5 },
+      },
+    ],
+  },
+  {
+    id: "l7-parking",
+    order: 7,
+    titleBg: "Паркиране",
+    descriptionBg:
+      "Придвижи се до мястото и паркирай на заден ход. Овладей огледалата, заден ход и плавното спиране — след това остави колата в покой, спряла напълно на мястото си.",
+    conceptIds: [
+      "c-stopping-standing-rules",
+      "c-parking-prohibitions",
+      "c-reversing",
+      "c-parking-slope-securing",
+      "c-maneuver-principles",
+    ],
+    spawn: { pointId: "spawn-1" }, // ул. Трайко Станоев
+    preDrive: false,
+    objectives: [
+      {
+        id: "l7-approach",
+        titleBg: "Придвижи се към мястото за паркиране",
+        kind: "driveDistance",
+        params: { meters: 50 },
+      },
+      {
+        id: "l7-park",
+        titleBg: "Паркирай на заден ход и спри напълно",
+        kind: "completeManeuver",
+        params: { maneuver: "parkInBay", holdSec: 1.5 },
       },
     ],
   },

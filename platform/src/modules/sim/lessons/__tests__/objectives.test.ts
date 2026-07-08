@@ -171,6 +171,89 @@ describe("completeManeuver / smoothStop", () => {
   });
 });
 
+describe("completeManeuver / emergencyStop", () => {
+  const params = parsed("completeManeuver", {
+    maneuver: "emergencyStop",
+    minApproachKmh: 40,
+    minDecelMs2: 5,
+  });
+  const profile = (pairs: Array<[number, number]>) =>
+    pairs.map(([t, v]) => makeTick({ t, speedKmh: v }));
+
+  it("applies defaults", () => {
+    const p = parsed("completeManeuver", { maneuver: "emergencyStop" });
+    expect(p).toMatchObject({ maneuver: "emergencyStop", minApproachKmh: 40, minDecelMs2: 5 });
+  });
+
+  it("completes on a firm stop from speed (peak decel ≥ 5 m/s²)", () => {
+    // 45 km/h → 0 in 1 s ≈ 12.5 m/s² — a decisive emergency brake.
+    const r = run(params, profile([[0, 45], [1, 0]]));
+    expect(r.done).toBe(true);
+  });
+
+  it("rejects a gentle coast to a halt and re-arms", () => {
+    // 45 km/h → 0 over 5 s ≈ 2.5 m/s² — too soft to be an emergency stop.
+    const soft = run(params, profile([[0, 45], [1, 36], [2, 27], [3, 18], [4, 9], [5, 0]]));
+    expect(soft.done).toBe(false);
+
+    // Re-armed: accelerate again and brake hard => done.
+    let evalState = soft.evalState;
+    let done = false;
+    for (const tick of profile([[6, 42], [7, 0]])) {
+      const r = stepObjective(params, evalState, tick);
+      evalState = r.evalState;
+      if (r.done) done = true;
+    }
+    expect(done).toBe(true);
+  });
+
+  it("does not complete if approach speed was never reached", () => {
+    const r = run(params, profile([[0, 20], [1, 0]]));
+    expect(r.done).toBe(false);
+  });
+});
+
+describe("completeManeuver / parkInBay", () => {
+  const params = parsed("completeManeuver", { maneuver: "parkInBay", holdSec: 1.5 });
+
+  it("applies the holdSec default", () => {
+    const p = parsed("completeManeuver", { maneuver: "parkInBay" });
+    expect(p).toMatchObject({ maneuver: "parkInBay", holdSec: 1.5 });
+  });
+
+  it("completes after reverse gear + a held full stop", () => {
+    const r = run(params, [
+      makeTick({ t: 0, speedKmh: 8, gear: -1 }), // reversing into the bay
+      makeTick({ t: 1, speedKmh: 3, gear: -1 }),
+      makeTick({ t: 2, speedKmh: 0, gear: -1 }), // stop begins at t=2
+      makeTick({ t: 3, speedKmh: 0, gear: 0 }), // held 1 s — not yet
+      makeTick({ t: 3.6, speedKmh: 0, gear: 0 }), // held 1.6 s ≥ 1.5 s => done
+    ]);
+    expect(r.done).toBe(true);
+  });
+
+  it("does not complete without reverse gear", () => {
+    const r = run(params, [
+      makeTick({ t: 0, speedKmh: 5, gear: 1 }),
+      makeTick({ t: 1, speedKmh: 0, gear: 1 }),
+      makeTick({ t: 3, speedKmh: 0, gear: 1 }),
+    ]);
+    expect(r.done).toBe(false);
+  });
+
+  it("resets the stop clock if the car rolls again", () => {
+    const r = run(params, [
+      makeTick({ t: 0, speedKmh: 4, gear: -1 }),
+      makeTick({ t: 1, speedKmh: 0, gear: -1 }), // stop begins
+      makeTick({ t: 1.5, speedKmh: 6, gear: -1 }), // rolled again — clock resets
+      makeTick({ t: 2, speedKmh: 0, gear: -1 }), // new stop begins at t=2
+      makeTick({ t: 3, speedKmh: 0, gear: 0 }), // only 1 s held — not done
+    ]);
+    expect(r.done).toBe(false);
+    expect(r.progress).toBeCloseTo(0.75, 5); // reverse used + currently stopped
+  });
+});
+
 describe("completeManeuver / roundabout", () => {
   const params = parsed("completeManeuver", {
     maneuver: "roundabout",

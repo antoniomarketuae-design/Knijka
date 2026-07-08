@@ -97,6 +97,21 @@ export function parseObjectiveParams(objective: LessonObjective): ObjectiveParam
           maxDecelMs2: num(p.maxDecelMs2) ? p.maxDecelMs2 : 3.5,
         };
       }
+      if (p.maneuver === "emergencyStop") {
+        return {
+          kind: "completeManeuver",
+          maneuver: "emergencyStop",
+          minApproachKmh: num(p.minApproachKmh) ? p.minApproachKmh : 40,
+          minDecelMs2: num(p.minDecelMs2) ? p.minDecelMs2 : 5,
+        };
+      }
+      if (p.maneuver === "parkInBay") {
+        return {
+          kind: "completeManeuver",
+          maneuver: "parkInBay",
+          holdSec: num(p.holdSec) && p.holdSec > 0 ? p.holdSec : 1.5,
+        };
+      }
       if (p.maneuver === "roundabout") {
         if (
           !num(p.x) ||
@@ -137,15 +152,28 @@ export function createEvalState(params: ObjectiveParams): ObjectiveEvalState {
     case "driveDistance":
       return { type: "driveDistance", accumulatedM: 0, prevPos: null };
     case "completeManeuver":
-      return params.maneuver === "smoothStop"
-        ? {
+      switch (params.maneuver) {
+        case "smoothStop":
+          return {
             type: "smoothStop",
             armed: false,
             maxDecelMs2: 0,
             prevSpeedKmh: null,
             prevT: null,
-          }
-        : { type: "roundabout", entered: false };
+          };
+        case "emergencyStop":
+          return {
+            type: "emergencyStop",
+            armed: false,
+            maxDecelMs2: 0,
+            prevSpeedKmh: null,
+            prevT: null,
+          };
+        case "parkInBay":
+          return { type: "parkInBay", usedReverse: false, stoppedSinceT: null };
+        case "roundabout":
+          return { type: "roundabout", entered: false };
+      }
   }
 }
 
@@ -218,9 +246,23 @@ export function stepObjective(
     }
 
     case "completeManeuver":
-      return params.maneuver === "smoothStop"
-        ? stepSmoothStop(params.minApproachKmh, params.maxDecelMs2, prev, tick)
-        : stepRoundabout(params.x, params.y, params.enterRadiusM, params.exitRadiusM, prev, tick);
+      switch (params.maneuver) {
+        case "smoothStop":
+          return stepSmoothStop(params.minApproachKmh, params.maxDecelMs2, prev, tick);
+        case "emergencyStop":
+          return stepEmergencyStop(params.minApproachKmh, params.minDecelMs2, prev, tick);
+        case "parkInBay":
+          return stepParkInBay(params.holdSec, prev, tick);
+        case "roundabout":
+          return stepRoundabout(
+            params.x,
+            params.y,
+            params.enterRadiusM,
+            params.exitRadiusM,
+            prev,
+            tick,
+          );
+      }
   }
 }
 
@@ -267,6 +309,85 @@ function stepSmoothStop(
       prevSpeedKmh: tick.speedKmh,
       prevT: tick.t,
     },
+  };
+}
+
+/**
+ * Emergency stop — the mirror of smoothStop: an armed attempt completes only
+ * when the vehicle reaches a full stop AND its peak deceleration met the
+ * minimum (a firm brake). A gentle coast to a halt leaves it armed (progress
+ * 0.5) so the student accelerates and tries a real emergency brake.
+ */
+function stepEmergencyStop(
+  minApproachKmh: number,
+  minDecelMs2: number,
+  prev: ObjectiveEvalState,
+  tick: SimTick,
+): ObjectiveStepResult {
+  if (prev.type !== "emergencyStop") return { done: false, progress: 0, evalState: prev };
+
+  let { armed, maxDecelMs2: peakDecel } = prev;
+  const { prevSpeedKmh, prevT } = prev;
+
+  if (armed && prevSpeedKmh !== null && prevT !== null && tick.t > prevT) {
+    const decel = ((prevSpeedKmh - tick.speedKmh) * KMH_TO_MS) / (tick.t - prevT);
+    if (decel > peakDecel) peakDecel = decel;
+  }
+
+  if (!armed && tick.speedKmh >= minApproachKmh) {
+    armed = true;
+    peakDecel = 0;
+  }
+
+  let done = false;
+  if (armed && tick.speedKmh <= STOPPED_SPEED_KMH) {
+    if (peakDecel >= minDecelMs2) {
+      done = true;
+    } else {
+      // Too soft to count as an emergency brake — re-arm and try again.
+      armed = false;
+      peakDecel = 0;
+    }
+  }
+
+  return {
+    done,
+    progress: done ? 1 : armed ? 0.5 : 0,
+    evalState: {
+      type: "emergencyStop",
+      armed,
+      maxDecelMs2: peakDecel,
+      prevSpeedKmh: tick.speedKmh,
+      prevT: tick.t,
+    },
+  };
+}
+
+/**
+ * Reverse-park — completes once the vehicle has engaged reverse gear during
+ * the attempt AND then held a full stop continuously for `holdSec`. Rolling
+ * again resets the stop clock (the park is not finished until it's still).
+ */
+function stepParkInBay(
+  holdSec: number,
+  prev: ObjectiveEvalState,
+  tick: SimTick,
+): ObjectiveStepResult {
+  if (prev.type !== "parkInBay") return { done: false, progress: 0, evalState: prev };
+
+  const usedReverse = prev.usedReverse || tick.gear < 0;
+  const stopped = tick.speedKmh <= STOPPED_SPEED_KMH;
+  const stoppedSinceT = stopped ? (prev.stoppedSinceT ?? tick.t) : null;
+
+  const heldFor = stoppedSinceT !== null ? tick.t - stoppedSinceT : 0;
+  const done = usedReverse && stoppedSinceT !== null && heldFor >= holdSec;
+
+  const progress = done ? 1 : usedReverse ? (stopped ? 0.75 : 0.5) : 0.25;
+
+  return {
+    done,
+    progress,
+    evalState: { type: "parkInBay", usedReverse, stoppedSinceT },
   };
 }
 

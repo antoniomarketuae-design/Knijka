@@ -42,6 +42,12 @@ export interface WireObjectiveOutcome {
   completedAtSec: number | null;
 }
 
+/** Contextual micro-quizzes answered during the drive (feeds the debrief). */
+export interface WireMicroQuiz {
+  total: number;
+  correct: number;
+}
+
 export interface FinishLessonWire {
   lessonId: string;
   startedAtMs: number;
@@ -49,12 +55,16 @@ export interface FinishLessonWire {
   aborted: boolean;
   ruleEvents: WireRuleEvent[];
   objectives: WireObjectiveOutcome[];
+  /** Micro-quiz tally, if any quizzes were shown; undefined otherwise. */
+  microQuiz?: WireMicroQuiz;
 }
 
 /** Hard caps — a session cannot legitimately exceed these. */
 const MAX_EVENTS = 500;
 const MAX_DETAIL_LEN = 64;
 const MAX_SESSION_SEC = 4 * 60 * 60;
+/** A session cannot legitimately show more micro-quizzes than this. */
+const MAX_MICRO_QUIZZES = 20;
 
 // ---------------------------------------------------------------------------
 // Client side: serialize
@@ -111,7 +121,10 @@ export function parseFinishLessonWire(value: unknown): FinishLessonWire | null {
     objectives.push({ id: ob.id, done: ob.done, completedAtSec });
   }
 
-  return {
+  const microQuiz = parseMicroQuiz(o.microQuiz);
+  if (microQuiz === "invalid") return null;
+
+  const wire: FinishLessonWire = {
     lessonId: o.lessonId,
     startedAtMs: o.startedAtMs,
     finishedAtMs: o.finishedAtMs,
@@ -119,6 +132,21 @@ export function parseFinishLessonWire(value: unknown): FinishLessonWire | null {
     ruleEvents,
     objectives,
   };
+  if (microQuiz !== null) wire.microQuiz = microQuiz;
+  return wire;
+}
+
+/** Parse an optional micro-quiz tally: null (absent), the value, or "invalid". */
+function parseMicroQuiz(value: unknown): WireMicroQuiz | null | "invalid" {
+  if (value === undefined || value === null) return null;
+  if (typeof value !== "object") return "invalid";
+  const q = value as Record<string, unknown>;
+  if (!isFiniteNum(q.total) || !isFiniteNum(q.correct)) return "invalid";
+  const total = Math.trunc(q.total);
+  const correct = Math.trunc(q.correct);
+  if (total < 0 || total > MAX_MICRO_QUIZZES) return "invalid";
+  if (correct < 0 || correct > total) return "invalid";
+  return { total, correct };
 }
 
 /**

@@ -35,17 +35,33 @@ import {
   buildDebrief,
   buildLessonResult,
   createLessonSession,
+  createQuizTriggerState,
   finishSession,
+  observeQuizTick,
   serializeRuleEvents,
   type LessonResult,
   type LessonSessionState,
   type LessonSpec,
+  type MicroQuizQuestion,
+  type QuizFrequency,
+  type QuizTriggerState,
+  type TriggeredQuiz,
 } from "@/modules/sim/lessons";
 import type { PreDriveStepId } from "@/modules/sim/procedures";
 import type { SimTick } from "@/modules/sim/rules";
 import { finishLessonAction } from "@/app/(dashboard)/simulator/actions";
+import {
+  loadMicroQuizBank,
+  submitMicroQuizAnswer,
+} from "@/app/(dashboard)/simulator/micro-quiz-actions";
+import { MicroQuizOverlay } from "./MicroQuizOverlay";
 import { SceneSlot } from "./SceneSlot";
-import type { FinishLessonActionResult, QualityPreset } from "./types";
+import {
+  MICRO_QUIZ_FREQUENCIES,
+  MICRO_QUIZ_STORAGE_KEY,
+  type FinishLessonActionResult,
+  type QualityPreset,
+} from "./types";
 
 const HUD_POLL_MS = 150;
 
@@ -98,6 +114,79 @@ function snapshotOf(s: LessonSessionState, lastTick: SimTick | null): HudSnapsho
   };
 }
 
+const DEFAULT_QUIZ_FREQUENCY: QuizFrequency = "occasional";
+
+function isQuizFrequency(v: unknown): v is QuizFrequency {
+  return v === "off" || v === "occasional" || v === "frequent";
+}
+
+function readStoredQuizFrequency(): QuizFrequency {
+  // Safe as a lazy useState initializer: this shell mounts client-side only
+  // (after the student picks a lesson), so there is no SSR/hydration pass to
+  // mismatch — no effect + setState dance needed.
+  if (typeof window === "undefined") return DEFAULT_QUIZ_FREQUENCY;
+  try {
+    const stored = window.localStorage.getItem(MICRO_QUIZ_STORAGE_KEY);
+    return isQuizFrequency(stored) ? stored : DEFAULT_QUIZ_FREQUENCY;
+  } catch {
+    return DEFAULT_QUIZ_FREQUENCY;
+  }
+}
+
+/** Persisted micro-quiz difficulty (localStorage). */
+function useQuizFrequency(): [QuizFrequency, (f: QuizFrequency) => void] {
+  const [freq, setFreq] = useState<QuizFrequency>(readStoredQuizFrequency);
+  const update = (f: QuizFrequency) => {
+    setFreq(f);
+    try {
+      window.localStorage.setItem(MICRO_QUIZ_STORAGE_KEY, f);
+    } catch {
+      // Private mode etc. — the in-memory value still applies this session.
+    }
+  };
+  return [freq, update];
+}
+
+function QuizFrequencySelector({
+  value,
+  onChange,
+}: {
+  value: QuizFrequency;
+  onChange: (f: QuizFrequency) => void;
+}) {
+  return (
+    <div
+      role="radiogroup"
+      aria-label="Въпроси по време на карането"
+      className="flex items-center gap-1 rounded-xl border border-border bg-surface p-1"
+      title="Колко често изникват учебни въпроси по време на карането"
+    >
+      <span className="px-1.5 text-[10px] font-bold uppercase tracking-wide text-muted">
+        Въпроси
+      </span>
+      {MICRO_QUIZ_FREQUENCIES.map((f) => {
+        const active = f.id === value;
+        return (
+          <button
+            key={f.id}
+            type="button"
+            role="radio"
+            aria-checked={active}
+            onClick={() => onChange(f.id)}
+            className={`rounded-lg px-2.5 py-1 text-[11px] font-bold transition motion-reduce:transition-none ${
+              active
+                ? "bg-accent text-accent-foreground"
+                : "text-muted hover:bg-surface-2 hover:text-foreground"
+            }`}
+          >
+            {f.labelBg}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
 export function LessonPlayShell({
   lesson,
   quality,
@@ -133,6 +222,51 @@ export function LessonPlayShell({
   const [saveResult, setSaveResult] = useState<FinishLessonActionResult | null>(null);
   const { toasts, push, clear } = useHudToastQueue();
 
+  // -- micro-quiz: the theory↔driving closed loop ------------------------------
+  // The pure trigger lives in a ref (frame-rate, zero re-renders); an active
+  // quiz is React state (it pauses the drive + renders the overlay).
+  const [quizFreq, setQuizFreq] = useQuizFrequency();
+  const quizFreqRef = useRef<QuizFrequency>(quizFreq);
+  const quizBankRef = useRef<MicroQuizQuestion[]>([]);
+  const quizTriggerRef = useRef<QuizTriggerState | null>(null);
+  const quizStatsRef = useRef<{ total: number; correct: number }>({ total: 0, correct: 0 });
+  const [activeQuiz, setActiveQuiz] = useState<TriggeredQuiz | null>(null);
+
+  // Load the concept-linked question bank once per lesson (server-sanitized),
+  // then build the pure trigger from it. No bank ⇒ no quizzes (graceful).
+  useEffect(() => {
+    let cancelled = false;
+    void loadMicroQuizBank(lesson.id).then(
+      (bank) => {
+        if (cancelled) return;
+        quizBankRef.current = bank;
+        quizTriggerRef.current = createQuizTriggerState(quizFreqRef.current, bank);
+      },
+      () => {
+        /* bank load failed — leave the trigger null */
+      },
+    );
+    return () => {
+      cancelled = true;
+    };
+  }, [lesson.id]);
+
+  // Frequency changes apply immediately, keeping the session's counters.
+  useEffect(() => {
+    quizFreqRef.current = quizFreq;
+    if (quizTriggerRef.current) {
+      quizTriggerRef.current = { ...quizTriggerRef.current, frequency: quizFreq };
+    }
+  }, [quizFreq]);
+
+  const handleQuizDone = useCallback((correct: boolean) => {
+    quizStatsRef.current = {
+      total: quizStatsRef.current.total + 1,
+      correct: quizStatsRef.current.correct + (correct ? 1 : 0),
+    };
+    setActiveQuiz(null); // resume the drive
+  }, []);
+
   /** Session clock: prefer the runtime's tick time; wall clock before ticks flow. */
   const nowSec = useCallback((): number => {
     const t = lastTickRef.current?.t ?? 0;
@@ -160,6 +294,7 @@ export function LessonPlayShell({
           done: o.done,
           completedAtSec: o.completedAtSec,
         })),
+        microQuiz: { ...quizStatsRef.current },
       }).then(setSaveResult, () => setSaveResult({ ok: false, code: "SAVE_FAILED" }));
     },
     [lesson.id],
@@ -181,11 +316,22 @@ export function LessonPlayShell({
           setFlash({ titleBg: completed.titleBg, key: ++flashKey.current });
         }
       }
+
+      // Contextual micro-quiz: feed the SAME tick the rules saw to the pure
+      // trigger. Only while driving and not already quizzing; the rate limit +
+      // the pause (which stops onTick) prevent stacking. When one fires we
+      // surface it as React state → overlay + pause.
+      if (state.phase === "driving" && activeQuiz === null && quizTriggerRef.current) {
+        const q = observeQuizTick(quizTriggerRef.current, tick);
+        quizTriggerRef.current = q.state;
+        if (q.quiz) setActiveQuiz(q.quiz);
+      }
+
       // prev was live (guard above), so "completed" here means: the route
       // finished on this very frame → grade and persist (finalize is guarded).
       if (state.phase === "completed") finalize(state);
     },
-    [push, finalize],
+    [push, finalize, activeQuiz],
   );
 
   const handlePreDriveStep = useCallback(
@@ -231,11 +377,23 @@ export function LessonPlayShell({
     setSaveResult(null);
     setFlash(null);
     clear();
+    // Fresh micro-quiz session: reset the tally + rebuild the trigger from the
+    // already-loaded bank.
+    quizStatsRef.current = { total: 0, correct: 0 };
+    setActiveQuiz(null);
+    quizTriggerRef.current =
+      quizBankRef.current.length > 0
+        ? createQuizTriggerState(quizFreqRef.current, quizBankRef.current)
+        : null;
     setSnap(snapshotOf(sessionRef.current, null));
   };
 
   // Debrief: the template is deterministic — render it instantly client-side;
   // the server recomputes + stores the same text and adds the concept links.
+  // Client-side fallback debrief (shown only until the server's richer text
+  // arrives, or if the save fails). The authoritative server debrief carries
+  // the micro-quiz tally, prior-best comparison and concept titles; this
+  // transient fallback stays deterministic and reads no refs during render.
   const debriefText = ended
     ? saveResult?.ok
       ? saveResult.debriefText
@@ -253,7 +411,8 @@ export function LessonPlayShell({
         </button>
         <h1 className="text-lg font-extrabold">{lesson.titleBg}</h1>
         {!ended ? (
-          <div className="ml-auto flex items-center gap-2">
+          <div className="ml-auto flex flex-wrap items-center gap-2">
+            <QuizFrequencySelector value={quizFreq} onChange={setQuizFreq} />
             {lesson.objectives.length === 0 ? (
               <button type="button" className="btn-accent px-4 py-1.5 text-xs" onClick={finishNow}>
                 Завърши сесията
@@ -273,7 +432,7 @@ export function LessonPlayShell({
           <SceneSlot
             lesson={lesson}
             quality={quality}
-            paused={ended}
+            paused={ended || activeQuiz !== null}
             onTick={handleTick}
             onPreDriveStep={handlePreDriveStep}
             onMinimapFrame={setMinimapFrame}
@@ -335,6 +494,16 @@ export function LessonPlayShell({
               onStep={handlePreDriveStep}
             />
           </div>
+        ) : null}
+
+        {/* Micro-quiz — overlay (pauses the drive). Hidden once the session
+            ends so the end screen never competes with it. */}
+        {activeQuiz && !ended ? (
+          <MicroQuizOverlay
+            quiz={activeQuiz}
+            onSubmit={submitMicroQuizAnswer}
+            onDone={handleQuizDone}
+          />
         ) : null}
 
         {/* Session end — overlay */}

@@ -11,13 +11,10 @@ function entryFor(rows: LessonAttemptRow[], lessonId: string) {
 describe("computeProgression", () => {
   it("opens only L0 for a brand-new student", () => {
     const entries = computeProgression(LESSONS, []);
-    expect(entries.map((e) => [e.lesson.id, e.unlocked])).toEqual([
-      ["l0-free-drive", true],
-      ["l1-preparation", false],
-      ["l2-intersections", false],
-      ["l3-roundabout", false],
-      ["l4-crossings", false],
-    ]);
+    expect(entries[0].lesson.id).toBe("l0-free-drive");
+    expect(entries[0].unlocked).toBe(true);
+    // Every subsequent lesson in the chain is locked until its predecessor passes.
+    expect(entries.slice(1).every((e) => !e.unlocked)).toBe(true);
     expect(entries[0].attempts).toBe(0);
     expect(entries[0].bestScore).toBeNull();
   });
@@ -61,7 +58,8 @@ describe("computeProgression", () => {
       { lessonId: "l2-intersections", passed: true, score: 1 },
     ];
     const entries = computeProgression(LESSONS, rows);
-    expect(entries.map((e) => e.unlocked)).toEqual([true, true, true, true, false]);
+    // Passing L0..L2 unlocks through L3 (index 3); everything after stays locked.
+    expect(entries.map((e) => e.unlocked)).toEqual(entries.map((_, i) => i <= 3));
   });
 
   it("L0 stays open no matter what", () => {
