@@ -1,6 +1,6 @@
 # Simulator Realism Upgrade Plan
 
-> Status: v0.9 DRAFT — 2026-07-08. Commissioned after the founder's hands-on visual review. Target: transform the simulator from prototype (~5% realism) to "believable modern" (~80% on the car, ~65–75% on the environment — see the honesty section on why those two numbers differ). Asset-specific sections are being finalized from live market research; the analysis, architecture decision, and plan are complete.
+> Status: v1.0 — 2026-07-08. Commissioned after the founder's hands-on visual review; grounded in four market-research passes. Target: transform the simulator from prototype (~5% realism) to "believable modern" (~85% on the car, ~50–60% on the environment — see §7.1 on why those two numbers differ, and why photoreal-in-browser is a myth). Phase 0 (camera + difficulty) is implemented; Phases 1–4 (assets) await purchase approval.
 
 ## 0. The one decision everything hangs on (read first)
 
@@ -68,7 +68,56 @@ Complexity: S (hours) · M (days) · L (1–2 weeks) · XL (weeks). Priority: Cr
 
 ## 7. Research-grounded asset & technique recommendations
 
-> **Being finalized from four live market-research streams** (browser-realism ceiling, car models, environment/city assets, camera/feel best-practices). This section will contain concrete products, real prices, license terms, and specific technique parameters. Placeholder until they land.
+Grounded in four market-research passes (2026-07-08). All prices/licenses verified against live listings; `[UNVERIFIED]` where a page hid pricing from scrapers.
+
+### 7.1 The browser realism ceiling (the honest numbers)
+
+- **Single car (interior + exterior): 85–95% of photoreal is achievable in-browser.** This is browser 3D's home turf — commercial car configurators (PlayCanvas/Polaris, BMW/Lamborghini R3F builds) already ship it, via HDRI image-based lighting + PBR clearcoat paint/glass + tone mapping + bloom + contact shadows. The founder's "80%" is *beatable* here.
+- **Drivable city on a mid-range laptop: 40–60% realistically — "clean stylized-realism," not photoreal.** Reality check: slowroads.io (a lean, well-optimized Three.js driver) still has **~48% of players below 55fps**. The gap vs Unreal is three specific things the web lacks at scale: **Nanite** (virtualized geometry — 3–5 orders of magnitude more triangles), **Lumen** (real-time global illumination — we substitute baked lightmaps, static only), and **streamed Megascans-density cities**.
+- **WebGPU** is production-ready in Three.js (r171, Sept 2025), ~82–85% browser support — but Firefox lags and we must keep the WebGL2 fallback, so the WebGL2 ceiling is our design target. WebGPU buys more draw calls + cheaper compute effects, not "free Lumen."
+- **Confirms the Path-A recommendation** (§0): stay browser, spend on web-grade assets. Cloud-streaming Unreal would cost **~$0.18–0.53 per user-hour of GPU** — it inverts web economics and would bankrupt a €12.99 teen product.
+
+### 7.2 Techniques, ranked by realism-per-cost (do in this order)
+
+1. **HDRI image-based lighting** (drei `<Environment>`, free CC0 HDRIs from Poly Haven) — the single biggest lever, especially for the car's reflections. Near-zero runtime cost.
+2. **Baked lightmaps** for static geometry (bake in Blender → ship as texture) — our Lumen substitute; makes the city look "rendered." Free at runtime.
+3. **PBR materials + normal/AO/roughness maps** everywhere — the modern-look baseline.
+4. **KTX2/Basis texture compression + Draco/meshopt geometry** — the enabler that lets a weak GPU hold more/better assets (KTX2 stays compressed in VRAM, ~4–6× less memory).
+5. **ACES/AgX tone mapping** (one line) → cinematic. **N8AO half-res** ambient occlusion + **SMAA**. Then **CSM 2-cascade** sun shadows and **instanced vegetation**.
+6. **Avoid on integrated GPUs:** screen-space reflections (unstable/expensive — use a reflective ground plane for wet roads instead), heavy DoF, 8K textures (downsample to 1–2K).
+
+### 7.3 The car (Phase 1 — highest ROI)
+
+**Recommended hero: Digital Dive "Drivable Cars: Sedan — Rigged & Game Ready"** ([Fab/Sketchfab](https://sketchfab.com/3d-models/drivable-cars-sedan-rigged-game-ready-8ef66e479a2d4a00aa615be0efebf818)) — the only found option already **rigged (separate wheels/steering/doors) WITH a modeled interior**, web-appropriate at **38.2k tris**, multi-material IDs for re-skinning to our fictional brand. Price `[UNVERIFIED ~$20–40]`, Fab Standard royalty-free. Buy the matching hatchback for variety. **Minimal Blender work.**
+
+- **Value alternative:** 3DDisco "Generic … With Interior" — **$20**, explicitly *generic* (trademark-clean), glTF-native, ~9–12k tris, 2K PBR; not pre-rigged (separate wheels/steering yourself ~1–2h). Pack of 45 models `[UNVERIFIED ~$40–60]`.
+- **Premium interior:** dragosburian "Generic … with interior" — **$79**, richest cockpit, but 194k tris (decimate to ~120k) and not rigged.
+- **Free fallback / traffic cars:** Quaternius CC0 Cars Bundle ([poly.pizza](https://poly.pizza/bundle/Cars-Bundle-FE5IWe6OMk)) — exterior-only, perfect for AI traffic.
+- **Licensing rule (critical):** buy **only "Generic"/fictional models on Standard/Royalty-Free** licenses — **never real-brand or "Editorial"** (trademark AND copyright cover a real car's shape, not just its badge; removing logos is *not* enough). TurboSquid's license explicitly permits "simulation and training… web applications." Keep every receipt; ship the GLB baked into the app (Draco-compressed), never as a standalone download.
+- **Pipeline (build once, reuse):** Blender (separate wheels/steering into objects, set each origin to its rotation axis) → `gltf-transform optimize --compress draco --texture-compress webp/ktx2 --texture-size 2048` → `gltfjsx` for a typed R3F component. ~½–1 day per hero car.
+
+### 7.4 The environment (Phase 3 — the big lift)
+
+**Hard verdict from research: there is NO viable photoreal "real Sofia" in-browser.** Three dead ends, documented so we never revisit them:
+- **Google Photorealistic 3D Tiles** — killed twice over: (1) **blocked for EU/EEA billing since 8 July 2025** (HTTP 403 — a Bulgarian company literally cannot serve them), and (2) ToS **prohibits offline caching** (must stream+bill every session) and it's **"melted" at street level** (parked cars/awnings fused into the mesh) — not drivable quality anyway.
+- **Cesium OSM Buildings** — just grey extruded OSM boxes (which we already generate ourselves for free) + $149/mo commercial.
+- **Purchasable "Sofia" scenes** (CGTrader/TurboSquid $35–399) — GIS/aerial overview grade, not drivable streets.
+
+**The winning path — keep our OSM topology, replace the visual layer, aim "believable modern European city":**
+1. **Roads & terrain (do first, FREE, biggest impact):** tile CC0 PBR asphalt/concrete/grass ([Poly Haven](https://polyhaven.com/textures), [ambientCG](https://ambientcg.com/)) onto the existing OSM road ribbon + terrain; lane markings as controllable **decals** ([cgbookcase](https://www.cgbookcase.com/textures) road-markings); **curbs & guardrails procedural** (swept profile along OSM edges — free, perfectly aligned).
+2. **Lighting/sky (FREE, huge lift):** one CC0 daytime HDRI (Poly Haven, 1–2K) for IBL + sky dome.
+3. **Buildings + street furniture:** **Synty POLYGON City Pack (~$10–20 one-time)** — cohesive, single texture-atlas so whole buildings draw in one call (web-proven); includes lamps/benches/poles/bins. FBX→glTF is trivial. *Or* a mid-poly PBR modular pack from [Fab](https://www.fab.com/) (~$20–60) if we want more realism than stylized — validate poly/material counts first. **Avoid KitBash3D** ($195/kit, 4M-poly — built for film, wrong tool for web).
+4. **Vegetation:** **Quaternius CC0** trees/bushes (glTF) via **`InstancedMesh`** (100k trees ≈ one draw call) with variant + jitter + distance-billboard LOD. Free. (Kills the icosahedron-blob problem.)
+5. **Building densification:** procedurally generate plausible filler blocks on OSM-empty frontages (fixes the "only 248 buildings" sparsity).
+6. **Signs:** buy/grab a few European sign-post meshes; map **our own Bulgarian sign-face SVGs** as swappable textures (rule engine controls them, correctness stays ours).
+- **⚠ Synty license caveat:** its EULA prohibits use "in datasets utilised by Generative AI Programs, or in the development of Generative AI Programs." We use the models as *static rendered environment art*, not as AI training/generation input, so this is almost certainly fine — but because we market as "AI," keep the assets purely as render art and consider a one-line written confirmation from Synty.
+- **Web-perf guardrails (enforce regardless of kit):** Draco/meshopt geometry, KTX2 1–2K textures, `InstancedMesh`/merged geometry for all repeats, a small shared material set (**draw-call budget is the constraint, not polys**), distance LOD/billboards, one HDRI for IBL.
+
+**Total environment cost:** **$0 fully-free is already a massive upgrade** (CC0 textures + HDRI + Quaternius + procedural curbs); **~$20–60 recommended** (add Synty City); **~$50–150** for a mid-poly Fab realism variant. No subscriptions.
+
+### 7.5 Camera & feel (Phase 0 — DONE this session)
+
+Implemented per the sim-racing/driving-school research: cockpit **FOV 68→55°** (kills the fishbowl that caused "floating"), **eye ~1.15 m above road** at the LHD seat, **G-force head lean** (lateral sway out of corners, roll into them, nose-dive on braking, look-into-turns — subtle, damped, nausea-safe), **realistic ~430° steering-wheel rotation** (was ~190°), and **Beginner/Normal/Advanced modes** (Beginner: throttle ×0.5 + squared curve + 40 km/h governor + smoothed steering). See §9 Phase 0.
 
 ---
 
@@ -86,7 +135,7 @@ Complexity: S (hours) · M (days) · L (1–2 weeks) · XL (weeks). Priority: Cr
 
 ## 9. Phased implementation plan (sequenced by impact-per-effort)
 
-- **Phase 0 — Immediate, no assets (S, days):** speed reduction + Beginner/Normal/Advanced modes + steering smoothing (#4); cockpit camera eye-point/FOV/head-motion fix (#5, partial). Ships a *better-feeling* sim this week while assets are sourced.
+- **Phase 0 — ✅ DONE (2026-07-08):** speed reduction + Beginner/Normal/Advanced modes + steering smoothing (#4); cockpit FOV 68→55, correct eye height, G-force head lean, realistic wheel rotation (#5). Committed; physics harness untouched (input-layer change). The sim already *feels* materially better; assets are the next lever.
 - **Phase 1 — The car (M–L):** buy + integrate the hero car with real interior; bind to physics; finalize cockpit camera against its real geometry; HDRI reflections. **This alone moves perceived quality more than anything else.**
 - **Phase 2 — Render pipeline (L):** HDRI/IBL, PBR materials, postprocessing stack, KTX2/Draco, quality presets. Makes everything already in the scene look modern.
 - **Phase 3 — Environment (XL):** modular building kit + placement pipeline + OSM densification; PBR roads; real vegetation; street furniture/infrastructure; baked lightmaps for the hero corridor.
