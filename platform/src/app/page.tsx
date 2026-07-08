@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import "@/lib/content/loader";
+import { getContentRepo } from "@/lib/content/repo";
 import {
   IconArrowRight,
   IconBook,
@@ -15,27 +17,28 @@ export const metadata: Metadata = {
     "AI академия за шофьорски изпит в България: адаптивна теория, пробни изпити 1:1 с официалния формат и AI учител, който отговаря с цитат от закона.",
 };
 
-const FEATURES = [
-  {
-    icon: IconBot,
-    titleBg: "AI учител",
-    textBg:
-      "Питай „защо това е грешно?“ по всяко време. Учителят отговаря на български и цитира конкретния член от закона — никога не си измисля.",
-  },
-  {
-    icon: IconClipboardCheck,
-    titleBg: "Пробни изпити 1:1 с официалния формат",
-    textBg:
-      "45 въпроса, 97 точки, 40 минути, праг 87 — същият формат и същите тежести на въпросите като на официалния изпит.",
-  },
-  {
-    icon: IconWheel,
-    titleBg: "Симулатор",
-    textBg:
-      "Кокпит шофиране в браузъра по улици с българска пътна обстановка — в разработка, идва след теорията.",
-    soon: true,
-  },
-] as const;
+function buildFeatures(questionsLabel: string) {
+  return [
+    {
+      icon: IconBot,
+      titleBg: "AI учител",
+      textBg:
+        "Питай „защо това е грешно?“ по всяко време. Учителят отговаря на български и цитира конкретния член от закона — никога не си измисля.",
+    },
+    {
+      icon: IconClipboardCheck,
+      titleBg: "Пробни изпити 1:1 с официалния формат",
+      textBg: `45 въпроса, 97 точки, 40 минути, праг 87 — същият формат като на официалния изпит, черпени от ${questionsLabel} оригинални въпроса.`,
+    },
+    {
+      icon: IconWheel,
+      titleBg: "Симулатор",
+      textBg:
+        "Кокпит шофиране в браузъра по улици с българска пътна обстановка — в разработка, идва след теорията.",
+      soon: true,
+    },
+  ] as const;
+}
 
 const LEGAL_LINKS = [
   { href: "/terms", labelBg: "Условия за ползване" },
@@ -44,8 +47,18 @@ const LEGAL_LINKS = [
   { href: "/contact", labelBg: "Контакт" },
 ];
 
-/** Public landing page. */
+/** Public landing page. Counts are read from the content library at build so
+ *  the marketing numbers are always true and grow with the bank. */
 export default function LandingPage() {
+  const repo = getContentRepo();
+  const topicCount = repo.topics().length;
+  const questionCount = repo.questions().length;
+  // Round down to the nearest 100 for an honest, punchy "1000+" claim.
+  const questionsRounded = Math.floor(questionCount / 100) * 100;
+  const questionsLabel =
+    questionsRounded >= 100 ? `над ${questionsRounded}` : `${questionCount}`;
+  const features = buildFeatures(questionsLabel);
+
   return (
     <div className="flex min-h-dvh flex-col">
       {/* Header */}
@@ -115,7 +128,7 @@ export default function LandingPage() {
               </span>
               <span className="flex items-center gap-1.5">
                 <IconBook className="h-4 w-4 text-accent" />
-                16 теми, покриващи цялата материя
+                {questionsLabel} въпроса · {topicCount} теми
               </span>
               <span className="flex items-center gap-1.5">
                 <IconShield className="h-4 w-4 text-accent" />
@@ -135,7 +148,7 @@ export default function LandingPage() {
             Как ще стигнеш до изпита готов
           </h2>
           <ul className="mt-10 grid grid-cols-1 gap-4 md:grid-cols-3">
-            {FEATURES.map(({ icon: Icon, titleBg, textBg, ...f }) => (
+            {features.map(({ icon: Icon, titleBg, textBg, ...f }) => (
               <li
                 key={titleBg}
                 className="card flex flex-col gap-3 p-6 transition hover:border-border-strong hover:shadow-glow-sm motion-reduce:transition-none"

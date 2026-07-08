@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import "@/lib/content/loader";
+import { getContentRepo } from "@/lib/content/repo";
 import { IconBolt } from "@/components/icons";
 import { TopicCard } from "@/components/theory/TopicCard";
 import { requireUser } from "@/modules/auth";
@@ -20,14 +21,18 @@ export default async function TheoryPage() {
   const user = await requireUser();
   const topics = await getTopicOverview(user.id);
   const totalDue = topics.reduce((sum, t) => sum + t.dueCount, 0);
+  const questionCount = getContentRepo().questions().length;
+  const questionsRounded = Math.floor(questionCount / 100) * 100;
+  const questionsLabel =
+    questionsRounded >= 100 ? `над ${questionsRounded}` : `${questionCount}`;
 
   return (
     <div className="flex flex-col gap-6">
       <header>
         <h1 className="text-2xl font-black sm:text-3xl">Теория</h1>
         <p className="mt-1 text-sm text-muted">
-          Всички 16 теми от изпита. Избери тема — или остави двигателя да
-          подбере какво да тренираш.
+          {topics.length} теми · {questionsLabel} въпроса от изпита. Избери тема
+          — или остави двигателя да подбере какво да тренираш.
         </p>
       </header>
 
