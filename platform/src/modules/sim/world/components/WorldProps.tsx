@@ -29,6 +29,7 @@ import {
   paintGeometry,
 } from "./three-helpers";
 import { preloadTreeModels, TREE_MODEL_FILES, useTreeModels } from "./treeModels";
+import { CityBuildings } from "./CityBuildings";
 import type { QualityPreset } from "./quality";
 
 // Start fetching + baking the Kenney tree GLBs as soon as this module loads,
@@ -519,6 +520,7 @@ export function WorldPropsGroup({
 }) {
   return (
     <group name="world-props">
+      <CityBuildings world={world} preset={preset} />
       <TrafficLights world={world} preset={preset} getSignalPhase={getSignalPhase} />
       <SignPoles world={world} preset={preset} signSvgBaseUrl={signSvgBaseUrl} />
       <Streetlights world={world} preset={preset} night={night} />

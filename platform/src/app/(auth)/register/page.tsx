@@ -9,14 +9,17 @@ export const metadata: Metadata = {
 export default function RegisterPage() {
   return (
     <div>
-      <h1 className="mb-1 text-2xl font-bold">Регистрация</h1>
-      <p className="mb-6 text-sm opacity-70">
+      <h1 className="mb-1 font-display text-2xl font-black">Регистрация</h1>
+      <p className="mb-6 text-sm text-muted">
         Създай акаунт и започни подготовката за изпита.
       </p>
       <RegisterForm />
-      <p className="mt-6 text-center text-sm opacity-80">
+      <p className="mt-6 text-center text-sm text-muted">
         Вече имаш акаунт?{" "}
-        <Link href="/login" className="font-medium underline underline-offset-4">
+        <Link
+          href="/login"
+          className="font-semibold text-accent underline-offset-4 hover:underline"
+        >
           Влез
         </Link>
       </p>

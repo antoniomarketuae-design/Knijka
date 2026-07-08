@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { ComponentType, SVGProps } from "react";
 import {
+  IconArrowRight,
   IconBook,
   IconBot,
   IconClipboardCheck,
@@ -57,24 +58,29 @@ export function ModuleGrid() {
             <Link
               href={href}
               aria-disabled={soon || undefined}
-              className={`card group flex h-full flex-col gap-3 p-5 transition motion-reduce:transition-none ${
+              className={`card group flex h-full flex-col gap-3 p-5 transition duration-200 motion-reduce:transition-none ${
                 soon
                   ? "opacity-70"
                   : "hover:-translate-y-0.5 hover:border-border-strong hover:shadow-glow-sm motion-reduce:hover:translate-y-0"
               }`}
             >
               <div className="flex items-center justify-between">
-                <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-accent/15 text-accent">
+                <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-accent/15 text-accent transition group-hover:shadow-glow-sm motion-reduce:transition-none">
                   <Icon className="h-6 w-6" />
                 </span>
                 {soon ? (
-                  <span className="flex items-center gap-1 rounded-full border border-border px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-muted">
+                  <span className="hud-label flex items-center gap-1 rounded-full border border-hair px-2.5 py-1 text-[10px]">
                     <IconLock className="h-3 w-3" />
                     Скоро
                   </span>
-                ) : null}
+                ) : (
+                  <IconArrowRight
+                    aria-hidden
+                    className="h-5 w-5 text-muted transition-transform duration-200 group-hover:translate-x-1 group-hover:text-accent motion-reduce:transition-none"
+                  />
+                )}
               </div>
-              <h3 className="text-base font-extrabold">{titleBg}</h3>
+              <h3 className="font-display text-base font-extrabold">{titleBg}</h3>
               <p className="text-sm leading-relaxed text-muted">
                 {descriptionBg}
               </p>

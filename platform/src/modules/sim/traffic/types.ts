@@ -135,6 +135,12 @@ export interface TrafficConfig {
   laneWidthM: number;
   /** Road classes vehicle routes never use (parking aisles look wrong). */
   excludedRoadClasses: string[];
+  /** Concentrate traffic near this district point (usually the player spawn)
+   *  so agents are visible where the driver actually is. Omit to scatter
+   *  routes across the whole district (legacy behaviour). */
+  anchor?: { x: number; y: number };
+  /** Seed routes + pedestrians within this radius of `anchor`, meters. */
+  anchorRadiusM?: number;
 
   // Vehicle behavior (IDM-lite)
   /** Gentle acceleration, m/s^2. */

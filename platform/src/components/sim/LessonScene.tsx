@@ -59,7 +59,7 @@ import {
   type WorldGeometry,
 } from "@/modules/sim/world";
 import { createWorldRuntime } from "@/modules/sim/runtime";
-import { createTrafficSystem } from "@/modules/sim/traffic";
+import { createTrafficSystem, TrafficLayer } from "@/modules/sim/traffic";
 import { CabinControls } from "./cabin";
 import { SimAudio } from "./simAudio";
 import { CameraRig, type CameraMode } from "./CameraRig";
@@ -152,13 +152,23 @@ export default function LessonScene(props: LessonSceneProps) {
         const runtime = createWorldRuntime(raw);
         const district = assertDistrict(raw);
         const geometry = buildWorldGeometry(district);
-        const traffic = createTrafficSystem(
-          raw as Parameters<typeof createTrafficSystem>[0],
-        );
-        runtime.setPedestrianQuery((id) => traffic.pedestrianOnCrossing(id));
         const spawnPoints = (
           (raw as { spawnPoints?: SpawnPointLike[] }).spawnPoints ?? []
         );
+        // Anchor traffic at the lesson spawn so cars + pedestrians are where the
+        // driver actually is — routes otherwise scatter across the ~1.6 km map
+        // and every agent gets distance-culled (nearest car was ~340 m away).
+        const anchorPose = spawnPose(props.lesson, spawnPoints);
+        const traffic = createTrafficSystem(
+          raw as Parameters<typeof createTrafficSystem>[0],
+          {
+            anchor: { x: anchorPose.x, y: -anchorPose.z },
+            anchorRadiusM: 280,
+            vehicleCount: 26,
+            pedestrianCount: 20,
+          },
+        );
+        runtime.setPedestrianQuery((id) => traffic.pedestrianOnCrossing(id));
         if (alive) {
           setBuilt({
             runtime,
@@ -177,7 +187,7 @@ export default function LessonScene(props: LessonSceneProps) {
     return () => {
       alive = false;
     };
-  }, [touchBlocked]);
+  }, [touchBlocked, props.lesson]);
 
   if (touchBlocked) {
     return (
@@ -305,6 +315,12 @@ function ReadyScene({
     [runtime],
   );
 
+  // A real impact (VehicleRig gates by speed) → queue a collision for the rule
+  // engine, which grades it опасна and terminates the session.
+  const handleCollision = useCallback(() => {
+    runtime.pushCollision("staticObject");
+  }, [runtime]);
+
   return (
     <div className="relative h-full w-full">
       <Canvas
@@ -358,6 +374,7 @@ function ReadyScene({
               paused={physicsPaused}
               spawn={spawn}
               difficultyRef={difficultyRef}
+              onCollision={handleCollision}
             />
             <RuntimeDriver
               runtime={runtime}
@@ -369,6 +386,11 @@ function ReadyScene({
               isNight={isNight}
               paused={physicsPaused}
             />
+            {/* Ambient life — cars + pedestrians. Render-only: RuntimeDriver
+                already steps traffic.update each frame (so it stays in lockstep
+                with the rule engine), so we do NOT pass `runtime` here. Draw
+                distance covers the anchored cluster (fog fades the far edge). */}
+            <TrafficLayer system={traffic} maxDrawDistanceM={420} />
           </Physics>
         </Suspense>
         <CameraRig

@@ -37,9 +37,29 @@ export function buildRoutes(
   count: number,
   rng: Rng,
   opts: RouteOptions = DEFAULT_ROUTE_OPTIONS,
+  /** Prefer loop seeds whose start point is near here (keeps traffic where the
+   *  driver is). Falls back to the nearest lanes if too few are in radius. */
+  preferNear?: { x: number; y: number; radiusM: number },
 ): TrafficRoute[] {
-  const pool = [...graph.loopLanes].sort((a, b) => a - b);
+  let pool = [...graph.loopLanes].sort((a, b) => a - b);
   if (pool.length === 0) return [];
+
+  if (preferNear) {
+    const { x, y, radiusM } = preferNear;
+    const d2 = (li: number) => {
+      const lane = graph.lanes[li];
+      const dx = lane.px[0] - x;
+      const dy = lane.py[0] - y;
+      return dx * dx + dy * dy;
+    };
+    const byDist = [...pool].sort((a, b) => d2(a) - d2(b));
+    const inRadius = byDist.filter((li) => d2(li) <= radiusM * radiusM);
+    // Enough nearby seeds → use them; otherwise take the nearest handful so
+    // traffic still clusters toward the anchor rather than scattering.
+    pool = inRadius.length >= Math.max(6, count * 2)
+      ? inRadius
+      : byDist.slice(0, Math.max(12, count * 3));
+  }
   const routes: TrafficRoute[] = [];
   const usedStartNodes = new Set<string>();
 

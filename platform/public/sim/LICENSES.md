@@ -68,6 +68,28 @@ GLB (glTF binary) format, each < 32 KB.
 - Four varied silhouettes were chosen for scene variety: a round deciduous tree,
   an oak, a fuller detailed tree, and a rounded conifer/pine.
 
+## Buildings (`city/`)
+
+Low-poly building models from the [Kenney City Kit — Commercial](https://kenney.nl/assets/city-kit-commercial)
+(by Kenney), **CC0 1.0**. GLB (glTF binary) format; all share one `colormap.png`
+colour atlas. Placed on the real OSM footprints by the world builder (each model
+tiled along the footprint's long axis), replacing the procedural extruded prisms.
+
+| File | Source | License | Author |
+|------|--------|---------|--------|
+| `city/building-a.glb` … `building-i.glb` (9) | [Kenney City Kit — Commercial](https://kenney.nl/assets/city-kit-commercial) | CC0 1.0 | Kenney |
+| `city/building-skyscraper-a.glb`, `-c.glb`, `-e.glb` (3) | [Kenney City Kit — Commercial](https://kenney.nl/assets/city-kit-commercial) | CC0 1.0 | Kenney |
+| `city/colormap.png` (shared atlas) | [Kenney City Kit — Commercial](https://kenney.nl/assets/city-kit-commercial) | CC0 1.0 | Kenney |
+
+**Notes:**
+- A curated 12-model subset (9 mid-rise + 3 towers) keeps the simulator-route
+  payload to ~1.6 MB. The full kit ships ~40 models incl. low-detail LOD variants
+  and street props (awnings, parasols) — candidates for a later perf/LOD pass.
+- CC0: usable for commercial purposes, no attribution required (credited here as
+  good practice). This replaced the vintage Marlin Studios "City Buildings" pack,
+  whose licence forbids posting its contents on the internet — unusable for a web
+  product (see docs, session 2026-07-08).
+
 ## License reference
 
 CC0 1.0 Universal (Public Domain Dedication): https://creativecommons.org/publicdomain/zero/1.0/

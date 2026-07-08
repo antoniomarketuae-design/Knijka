@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState, useTransition } from "react";
 import { submitPracticeAnswer } from "@/app/(dashboard)/theory/practice/actions";
 import { IconArrowRight, IconCheck, IconTarget, IconX } from "@/components/icons";
+import { Gauge } from "@/components/hud/Gauge";
 import type { PracticeQuestionDto, PracticeSubmitResult } from "./types";
 
 /**
@@ -154,16 +155,16 @@ export function PracticeSession({
   return (
     <section
       aria-label={`Въпрос ${index + 1} от ${questions.length}`}
-      className="card flex flex-col gap-5 p-5 sm:p-6"
+      className="card mx-auto flex w-full max-w-2xl flex-col gap-6 p-5 sm:p-7"
     >
       {/* Progress */}
-      <div className="flex flex-col gap-2">
+      <div className="flex flex-col gap-2.5">
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <p className="text-sm font-bold text-muted">
-            Въпрос <span className="text-foreground">{index + 1}</span> от{" "}
+          <p className="text-sm font-semibold tabular-nums text-muted">
+            Въпрос <span className="font-bold text-foreground">{index + 1}</span> от{" "}
             {questions.length}
             {answeredCount > 0 ? (
-              <span className="ml-2 text-xs font-semibold">
+              <span className="ml-2 text-xs font-semibold text-accent-2">
                 ({correctCount} верни досега)
               </span>
             ) : null}
@@ -174,7 +175,7 @@ export function PracticeSession({
             >
               {badge.labelBg}
             </span>
-            <span className="rounded-full border border-border px-2.5 py-1 text-[11px] font-bold text-muted">
+            <span className="rounded-full border border-hair px-2.5 py-1 font-mono text-[11px] font-bold text-muted">
               {current.points} т.
             </span>
           </div>
@@ -188,7 +189,7 @@ export function PracticeSession({
           className="h-1.5 overflow-hidden rounded-full bg-surface-2"
         >
           <div
-            className="h-full rounded-full bg-accent transition-all motion-reduce:transition-none"
+            className="h-full rounded-full bg-accent transition-[width] duration-500 ease-out motion-reduce:transition-none"
             style={{ width: `${(answeredCount / questions.length) * 100}%` }}
           />
         </div>
@@ -196,7 +197,7 @@ export function PracticeSession({
 
       {/* Question + options */}
       <fieldset className="min-w-0" disabled={isChecking}>
-        <legend className="text-base font-extrabold leading-snug sm:text-lg">
+        <legend className="max-w-[62ch] text-lg font-bold leading-relaxed text-foreground sm:text-xl">
           {current.textBg}
         </legend>
         {current.type === "multi" ? (
@@ -204,28 +205,32 @@ export function PracticeSession({
             Избери всички верни отговори.
           </p>
         ) : null}
-        <ul className="mt-3 flex flex-col gap-2">
+        <ul className="mt-4 flex flex-col gap-2.5">
           {current.options.map((option, optionIndex) => {
             const isSelected = selected.includes(option.id);
             const isCorrectOption =
               result !== null && result.correctOptionIds.includes(option.id);
             const isWrongPick = result !== null && isSelected && !isCorrectOption;
 
-            let stateClasses = "border-border bg-surface-2/60 hover:border-border-strong";
+            let stateClasses =
+              "border-border bg-surface-2/50 hover:border-border-strong hover:bg-surface-2";
             if (result === null) {
-              if (isSelected) stateClasses = "border-accent bg-accent/10 shadow-glow-sm";
+              if (isSelected)
+                stateClasses =
+                  "border-accent bg-accent/10 shadow-glow-sm motion-safe:scale-[1.01]";
             } else if (isCorrectOption) {
-              stateClasses = "border-success bg-success/10";
+              stateClasses =
+                "border-success bg-success/10 shadow-[0_0_18px_-6px_var(--success)] motion-safe:scale-[1.01]";
             } else if (isWrongPick) {
               stateClasses = "border-danger bg-danger/10";
             } else {
-              stateClasses = "border-border opacity-60";
+              stateClasses = "border-border opacity-55";
             }
 
             return (
               <li key={option.id}>
                 <label
-                  className={`flex items-start gap-3 rounded-xl border px-4 py-3 text-sm transition motion-reduce:transition-none ${stateClasses} ${
+                  className={`flex items-start gap-3 rounded-xl border px-4 py-3.5 text-sm transition duration-200 ease-out focus-within:ring-2 focus-within:ring-accent/50 motion-reduce:transition-none motion-reduce:transform-none ${stateClasses} ${
                     result === null ? "cursor-pointer" : "cursor-default"
                   }`}
                 >
@@ -240,7 +245,7 @@ export function PracticeSession({
                   />
                   <span
                     aria-hidden
-                    className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md border border-border bg-surface text-[11px] font-bold text-muted"
+                    className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-md border border-hair bg-surface font-mono text-[11px] font-bold text-muted"
                   >
                     {optionIndex + 1}
                   </span>
@@ -295,7 +300,7 @@ export function PracticeSession({
             {error}
           </p>
         ) : null}
-        <p className="ml-auto hidden text-xs text-muted md:block">
+        <p className="ml-auto hidden font-mono text-[11px] text-muted md:block">
           Клавиши 1–{Math.min(current.options.length, 9)} избират отговор ·
           Enter потвърждава
         </p>
@@ -319,14 +324,14 @@ function FeedbackPanel({
 
   return (
     <div
-      className={`rounded-xl border p-4 ${
+      className={`rounded-xl border p-4 sm:p-5 ${
         result.correct
           ? "border-success/40 bg-success/10"
           : "border-danger/40 bg-danger/10"
       }`}
     >
       <p
-        className={`flex items-center gap-2 text-sm font-extrabold ${
+        className={`flex items-center gap-2 font-display text-sm font-extrabold ${
           result.correct ? "text-success" : "text-danger"
         }`}
       >
@@ -337,20 +342,22 @@ function FeedbackPanel({
         )}
         {result.correct ? "Правилен отговор!" : "Грешен отговор"}
       </p>
-      <p className="mt-2 text-sm leading-relaxed">{result.explanationBg}</p>
+      <p className="mt-2 max-w-[62ch] text-sm leading-relaxed text-foreground">
+        {result.explanationBg}
+      </p>
       {result.lawRefs.length > 0 ? (
         <ul aria-label="Правни основания" className="mt-3 flex flex-wrap gap-1.5">
           {result.lawRefs.map((law) => (
             <li
               key={`${law.act}-${law.ref}`}
-              className="rounded-full border border-border bg-surface px-2.5 py-1 text-[11px] font-bold text-muted"
+              className="rounded-full border border-hair bg-surface px-2.5 py-1 font-mono text-[11px] font-bold text-muted"
             >
               {law.act} {law.ref}
             </li>
           ))}
         </ul>
       ) : null}
-      <p className="mt-3 text-xs font-semibold text-muted">
+      <p className="mt-3 font-mono text-[11px] font-semibold text-muted">
         Усвояване на „{conceptTitleBg}“: {before}% → {after}%{" "}
         <span className={`font-bold ${deltaClass(delta)}`}>
           ({formatDelta(delta)})
@@ -422,14 +429,28 @@ function SessionSummary({ answers }: { answers: AnswerRecord[] }) {
   return (
     <section
       aria-labelledby="session-summary-title"
-      className="card flex flex-col gap-6 p-5 sm:p-8"
+      className="card mx-auto flex w-full max-w-2xl flex-col gap-6 p-5 sm:p-8"
     >
-      <header className="text-center">
-        <h2 id="session-summary-title" className="text-xl font-black sm:text-2xl">
+      <header className="flex flex-col items-center text-center">
+        <h2
+          id="session-summary-title"
+          className="font-display text-xl font-black sm:text-2xl"
+        >
           {headline}
         </h2>
-        <p className="mt-1 text-sm text-muted">{note}</p>
-        <p className="mt-4 text-4xl font-black tabular-nums">
+        <p className="mt-1 max-w-[52ch] text-sm text-muted">{note}</p>
+        <div className="mt-5">
+          <Gauge
+            value={Math.round(ratio * 100)}
+            max={100}
+            unit="% верни"
+            size={168}
+            tone="auto"
+            label=""
+            ariaLabel={`Резултат: ${correctCount} от ${total} верни отговора`}
+          />
+        </div>
+        <p className="mt-3 text-sm font-bold tabular-nums text-muted">
           <span
             className={
               ratio >= 0.8 ? "text-success" : ratio >= 0.5 ? "text-warning" : "text-danger"
@@ -437,19 +458,17 @@ function SessionSummary({ answers }: { answers: AnswerRecord[] }) {
           >
             {correctCount}
           </span>
-          <span className="text-muted"> / {total}</span>
-        </p>
-        <p className="mt-1 text-xs font-bold uppercase tracking-wide text-muted">
-          верни отговора
+          <span> / {total} </span>
+          <span className="text-xs font-semibold uppercase tracking-wide">
+            верни отговора
+          </span>
         </p>
       </header>
 
       {concepts.length > 0 ? (
         <div>
-          <h3 className="text-xs font-bold uppercase tracking-wide text-muted">
-            Промяна в усвояването
-          </h3>
-          <ul className="mt-2 flex flex-col gap-2">
+          <h3 className="hud-label">Промяна в усвояването</h3>
+          <ul className="mt-3 flex flex-col gap-2">
             {concepts.map((c) => {
               const before = toPct(c.before);
               const after = toPct(c.after);
@@ -457,7 +476,7 @@ function SessionSummary({ answers }: { answers: AnswerRecord[] }) {
               return (
                 <li
                   key={c.conceptId}
-                  className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-border bg-surface-2/60 px-4 py-3"
+                  className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-border bg-surface-2/50 px-4 py-3 transition-colors hover:border-border-strong motion-reduce:transition-none"
                 >
                   <div className="min-w-0">
                     <p className="truncate text-sm font-semibold" title={c.titleBg}>
@@ -467,7 +486,7 @@ function SessionSummary({ answers }: { answers: AnswerRecord[] }) {
                       {c.correct}/{c.total} верни
                     </p>
                   </div>
-                  <p className="text-sm font-bold tabular-nums text-muted">
+                  <p className="font-mono text-sm font-bold tabular-nums text-muted">
                     {before}% → <span className="text-foreground">{after}%</span>{" "}
                     <span className={deltaClass(delta)}>({formatDelta(delta)})</span>
                   </p>

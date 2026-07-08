@@ -62,6 +62,11 @@ export interface VehicleSpawn {
   yawRad: number;
 }
 
+/** A contact below this impact speed (km/h) is treated as a gentle nudge /
+ *  curb touch — audible thump only, NOT graded as a collision (which would
+ *  terminate the session). Real crashes into walls/vehicles are above it. */
+const COLLISION_MIN_KMH = 10;
+
 export function VehicleRig({
   simRef,
   chassisGroupRef,
@@ -72,6 +77,7 @@ export function VehicleRig({
   paused,
   spawn = SPAWN,
   difficultyRef,
+  onCollision,
 }: {
   simRef: RefObject<VehicleSim | null>;
   chassisGroupRef: RefObject<Group | null>;
@@ -83,6 +89,8 @@ export function VehicleRig({
   spawn?: VehicleSpawn;
   /** Current driving-assist mode (Beginner/Normal/Advanced). Read each step. */
   difficultyRef?: RefObject<DifficultyMode>;
+  /** Fired on a real (fast-enough) impact so the rule engine can grade it. */
+  onCollision?: (impactKmh: number) => void;
 }) {
   const { world } = useRapier();
   const bodyRef = useRef<RapierRigidBody>(null);
@@ -165,6 +173,7 @@ export function VehicleRig({
       onCollisionEnter={() => {
         const speed = Math.abs(simRef.current?.speedKmh ?? 0);
         audioRef.current?.thump(Math.min(1, speed / 50 + 0.15));
+        if (speed >= COLLISION_MIN_KMH) onCollision?.(speed);
       }}
     >
       <CuboidCollider

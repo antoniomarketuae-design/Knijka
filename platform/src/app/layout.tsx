@@ -1,15 +1,32 @@
 import type { Metadata, Viewport } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Exo_2, IBM_Plex_Sans, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
+/* Cockpit / HUD type system (doc 64). Every face ships a Cyrillic subset —
+   a hard requirement for a Bulgarian product. Variables feed globals.css. */
+
+// Display — squared-geometric, HUD-native (headlines, big readouts).
+const display = Exo_2({
+  variable: "--ff-display",
+  subsets: ["latin", "cyrillic"],
+  weight: ["600", "700", "800", "900"],
+  display: "swap",
 });
 
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
+// Body — IBM Plex Sans handles Bulgarian well (reading surfaces).
+const body = IBM_Plex_Sans({
+  variable: "--ff-body",
+  subsets: ["latin", "cyrillic"],
+  weight: ["400", "500", "600", "700"],
+  display: "swap",
+});
+
+// Telemetry — timers, %, scores, stats.
+const mono = JetBrains_Mono({
+  variable: "--ff-mono",
+  subsets: ["latin", "cyrillic"],
+  weight: ["400", "500", "700"],
+  display: "swap",
 });
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
@@ -60,8 +77,8 @@ export const metadata: Metadata = {
 
 export const viewport: Viewport = {
   themeColor: [
-    { media: "(prefers-color-scheme: dark)", color: "#0a101e" },
-    { media: "(prefers-color-scheme: light)", color: "#f4f7fc" },
+    { media: "(prefers-color-scheme: dark)", color: "#070b14" },
+    { media: "(prefers-color-scheme: light)", color: "#eef3fb" },
   ],
 };
 
@@ -73,7 +90,7 @@ export default function RootLayout({
   return (
     <html
       lang="bg"
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+      className={`${display.variable} ${body.variable} ${mono.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">{children}</body>
     </html>

@@ -20,7 +20,7 @@ import {
   type PedestrianEnv,
 } from "./pedestrians";
 import { mulberry32, rngRange } from "./rng";
-import { buildRoutes, type TrafficRoute } from "./routes";
+import { buildRoutes, DEFAULT_ROUTE_OPTIONS, type TrafficRoute } from "./routes";
 import {
   createVehicleAgent,
   updateVehicle,
@@ -76,9 +76,21 @@ class TrafficSystemImpl implements TrafficSystem {
       this.crossingCounts.set(crossing.id, 0);
     }
 
-    // --- Vehicles: a few loops, agents spread around each loop.
+    // --- Vehicles: a few loops, agents spread around each loop. When an
+    // anchor is set, seed loops near it (and keep them shorter) so cars stay
+    // where the driver is rather than orbiting the far side of the district.
     const routeCount = Math.max(1, Math.ceil(cfg.vehicleCount / 2));
-    this.routes = buildRoutes(this.graph, routeCount, rng);
+    this.routes = buildRoutes(
+      this.graph,
+      routeCount,
+      rng,
+      cfg.anchor
+        ? { minWalkM: 200, maxWalkM: 480, minLoopM: 150 }
+        : DEFAULT_ROUTE_OPTIONS,
+      cfg.anchor
+        ? { x: cfg.anchor.x, y: cfg.anchor.y, radiusM: cfg.anchorRadiusM ?? 260 }
+        : undefined,
+    );
     if (this.routes.length > 0) {
       const perRoute = new Map<number, number>();
       for (let i = 0; i < cfg.vehicleCount; i++) {
@@ -110,12 +122,21 @@ class TrafficSystemImpl implements TrafficSystem {
     // --- Pedestrians: loops anchored on seeded-shuffled crossings.
     const edgeById = new Map(district.roads.edges.map((e) => [e.id, e]));
     const candidates = [...district.crossings].sort((a, b) => (a.id < b.id ? -1 : 1));
-    // Fisher-Yates with the master stream.
-    for (let i = candidates.length - 1; i > 0; i--) {
-      const j = Math.floor(rng() * (i + 1));
-      const tmp = candidates[i];
-      candidates[i] = candidates[j];
-      candidates[j] = tmp;
+    if (cfg.anchor) {
+      // Nearest crossings first so pedestrians populate around the driver.
+      const ax = cfg.anchor.x;
+      const ay = cfg.anchor.y;
+      candidates.sort(
+        (a, b) => Math.hypot(a.x - ax, a.y - ay) - Math.hypot(b.x - ax, b.y - ay),
+      );
+    } else {
+      // Fisher-Yates with the master stream.
+      for (let i = candidates.length - 1; i > 0; i--) {
+        const j = Math.floor(rng() * (i + 1));
+        const tmp = candidates[i];
+        candidates[i] = candidates[j];
+        candidates[j] = tmp;
+      }
     }
     let pedId = 0;
     for (let pass = 0; pass < 2 && pedId < cfg.pedestrianCount; pass++) {

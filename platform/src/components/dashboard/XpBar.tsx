@@ -10,18 +10,18 @@ export function XpBar({ gamification }: { gamification: GamificationSummary }) {
     <div className="flex items-center gap-3">
       <span
         aria-label={`Ниво ${level}`}
-        className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-accent/15 text-base font-black text-accent shadow-glow-sm"
+        className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-accent/15 font-mono text-base font-black tabular-nums text-accent shadow-glow-sm"
       >
         {level}
       </span>
       <div className="min-w-0 flex-1">
-        <div className="mb-1 flex items-baseline justify-between gap-2 text-xs">
-          <span className="font-semibold text-muted">
-            Ниво {level} · {xp.toLocaleString("bg-BG")} XP общо
+        <div className="mb-1 flex items-baseline justify-between gap-2">
+          <span className="truncate font-mono text-xs tabular-nums text-muted">
+            Ниво {level} · {xp.toLocaleString("bg-BG")} XP
           </span>
-          <span className="flex items-center gap-1 font-bold text-accent">
+          <span className="flex shrink-0 items-center gap-1 font-mono text-xs font-bold tabular-nums text-accent">
             <IconBolt className="h-3.5 w-3.5" />
-            {xpIntoLevel}/{xpForNextLevel} XP
+            {xpIntoLevel}/{xpForNextLevel}
           </span>
         </div>
         <div
@@ -33,7 +33,7 @@ export function XpBar({ gamification }: { gamification: GamificationSummary }) {
           className="h-2.5 overflow-hidden rounded-full bg-surface-2"
         >
           <div
-            className="h-full rounded-full bg-gradient-to-r from-accent to-accent-soft"
+            className="h-full rounded-full bg-gradient-to-r from-accent to-accent-2 shadow-glow-sm"
             style={{ width: `${pct}%` }}
           />
         </div>

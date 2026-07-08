@@ -12,10 +12,11 @@ function masteryColor(m: number): string {
 function Bar({ item }: { item: TopicMastery }) {
   const pct = Math.round(item.mastery * 100);
   const started = item.questionsSeen > 0;
+  const color = masteryColor(item.mastery);
 
   return (
     <li className="flex items-center gap-3">
-      <span className="w-6 shrink-0 text-right text-xs font-bold tabular-nums text-muted">
+      <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-surface-2 font-mono text-[11px] font-bold tabular-nums text-muted">
         {item.topic.order}
       </span>
       <div className="min-w-0 flex-1">
@@ -23,7 +24,10 @@ function Bar({ item }: { item: TopicMastery }) {
           <span className="truncate text-xs font-semibold" title={item.topic.titleBg}>
             {item.topic.titleBg}
           </span>
-          <span className="shrink-0 text-xs font-bold tabular-nums text-muted">
+          <span
+            className="shrink-0 font-mono text-xs font-bold tabular-nums"
+            style={{ color: started ? color : "var(--muted)" }}
+          >
             {started ? `${pct}%` : "—"}
           </span>
         </div>
@@ -38,7 +42,11 @@ function Bar({ item }: { item: TopicMastery }) {
         >
           <div
             className="h-full rounded-full"
-            style={{ width: `${Math.max(pct, started ? 2 : 0)}%`, backgroundColor: masteryColor(item.mastery) }}
+            style={{
+              width: `${Math.max(pct, started ? 2 : 0)}%`,
+              backgroundColor: color,
+              boxShadow: started ? `0 0 6px ${color}` : undefined,
+            }}
           />
         </div>
       </div>
@@ -54,9 +62,9 @@ export function TopicMasteryGrid({ readiness }: { readiness: ReadinessSnapshot }
   const { perTopic, weakestConcepts } = readiness;
 
   return (
-    <section aria-labelledby="mastery-title" className="card p-5 sm:p-6">
+    <section aria-labelledby="mastery-title" className="hud-panel p-5 sm:p-6">
       <div className="mb-4 flex items-baseline justify-between gap-2">
-        <h2 id="mastery-title" className="text-base font-extrabold">
+        <h2 id="mastery-title" className="font-display text-base font-extrabold">
           Усвояване по теми
         </h2>
         <Link
@@ -81,16 +89,14 @@ export function TopicMasteryGrid({ readiness }: { readiness: ReadinessSnapshot }
       )}
 
       {weakestConcepts.length > 0 ? (
-        <div className="mt-5 border-t border-border pt-4">
-          <h3 className="text-xs font-bold uppercase tracking-wide text-muted">
-            Препоръчано за упражнение
-          </h3>
+        <div className="mt-5 border-t border-hair pt-4">
+          <h3 className="hud-label">Препоръчано за упражнение</h3>
           <ul className="mt-2 flex flex-wrap gap-2">
             {weakestConcepts.map((c) => (
               <li key={c.conceptId}>
                 <Link
                   href="/theory"
-                  className="inline-flex items-center gap-1.5 rounded-full border border-border bg-surface-2 px-3 py-1.5 text-xs font-semibold transition hover:border-border-strong hover:text-accent motion-reduce:transition-none"
+                  className="inline-flex items-center gap-1.5 rounded-full border border-hair bg-surface-2 px-3 py-1.5 text-xs font-semibold transition duration-200 hover:border-border-strong hover:text-accent motion-reduce:transition-none"
                 >
                   <span
                     aria-hidden

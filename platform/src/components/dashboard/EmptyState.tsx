@@ -11,8 +11,8 @@ export function EmptyState({
   action?: ReactNode;
 }) {
   return (
-    <div className="flex flex-col items-center gap-2 rounded-xl border border-dashed border-border px-6 py-8 text-center">
-      <p className="text-sm font-semibold">{title}</p>
+    <div className="flex flex-col items-center gap-2 rounded-xl border border-dashed border-hair bg-surface-2/20 px-6 py-8 text-center">
+      <p className="font-display text-sm font-bold">{title}</p>
       {hint ? <p className="text-sm text-muted">{hint}</p> : null}
       {action ? <div className="mt-2">{action}</div> : null}
     </div>

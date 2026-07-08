@@ -184,6 +184,21 @@ export interface TreePlacement extends StaticTransform {
   variant: 0 | 1 | 2;
 }
 
+/**
+ * One instanced Kenney building module. Non-uniform scale (unlike
+ * StaticTransform's single scale) because footprints fit width/height/depth
+ * independently. Base sits at world y=0.
+ */
+export interface BuildingInstancePlacement {
+  /** Index into CITY_MODELS / the loaded geometry list. */
+  model: number;
+  position: Vec3Tuple;
+  /** Rotation about +Y (radians); model local +X runs along the footprint's long axis. */
+  yaw: number;
+  /** Fit scale as [width (x), height (y), depth (z)]. */
+  scale: Vec3Tuple;
+}
+
 export interface WorldColliderSet {
   /** One flat box under the whole district (roads drive on its top face). */
   ground: { halfExtents: Vec3Tuple; position: Vec3Tuple };
@@ -203,6 +218,8 @@ export interface WorldStats {
   stopLines: number;
   zebraCrossings: number;
   buildings: number;
+  /** Instanced Kenney building modules placed on the footprints. */
+  buildingInstances: number;
   trafficLights: number;
   signs: Record<SignKind, number>;
   streetlights: number;
@@ -224,10 +241,13 @@ export interface WorldGeometry {
   markings: MeshData;
   /** Ground plane with subtle off-road relief. */
   terrain: MeshData;
-  /** Building walls merged per facade palette variant (index = variant). */
+  /** Building walls merged per facade palette variant (index = variant).
+   *  Kept as data + collider source; the renderer draws `buildingInstances`. */
   buildingWalls: MeshData[];
-  /** All flat roofs merged. */
+  /** All flat roofs merged. Kept as data; not drawn when city models load. */
   buildingRoofs: MeshData;
+  /** Kenney building modules placed on the footprints (the drawn buildings). */
+  buildingInstances: BuildingInstancePlacement[];
   trafficLights: TrafficLightPlacement[];
   signs: SignPlacement[];
   streetlights: StaticTransform[];

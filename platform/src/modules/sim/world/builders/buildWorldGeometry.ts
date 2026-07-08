@@ -13,6 +13,7 @@ import type {
 } from "../types";
 import { ROAD_Y, TERRAIN_MARGIN_M } from "./constants";
 import { buildBuildings } from "./buildings";
+import { buildBuildingInstances, CITY_MODELS } from "./cityBuildings";
 import { buildMarkings } from "./markings";
 import { analyzeNetwork } from "./network";
 import { buildProps } from "./props";
@@ -28,6 +29,7 @@ export function buildWorldGeometry(
   const network = analyzeNetwork(district, options.junctionRadiusOverrides);
   const roads = buildRoads(network);
   const buildings = buildBuildings(district.buildings);
+  const buildingInstances = buildBuildingInstances(district.buildings);
   const props = buildProps(district, network, buildings.aabbs, {
     treeDensity: options.treeDensity ?? 1,
     seed: options.seed ?? DEFAULT_SEED,
@@ -79,16 +81,17 @@ export function buildWorldGeometry(
     stopLines: markings.stopLines,
     zebraCrossings: markings.zebraCrossings,
     buildings: buildings.count,
+    buildingInstances: buildingInstances.length,
     trafficLights: props.trafficLights.length,
     signs: signCounts,
     streetlights: props.streetlights.length,
     trees: props.trees.length,
     vertices,
     triangles,
-    // roads + junctions + sidewalks + markings + terrain + 4 wall variants +
-    // roofs + 3 signal parts + (4 sign faces + 1 pole) + 2 streetlight parts +
-    // 3 tree variants
-    drawCallEstimate: 5 + 4 + 1 + 3 + 5 + 2 + 3,
+    // roads + junctions + sidewalks + markings + terrain + 3 signal parts +
+    // (4 sign faces + 1 pole) + 2 streetlight parts + 4 tree variants +
+    // one instanced draw per Kenney building model
+    drawCallEstimate: 5 + 3 + 5 + 2 + 4 + CITY_MODELS.length,
   };
 
   return {
@@ -99,6 +102,7 @@ export function buildWorldGeometry(
     terrain: terrain.toMeshData(),
     buildingWalls: buildings.walls.map((w) => w.toMeshData()),
     buildingRoofs: buildings.roofs.toMeshData(),
+    buildingInstances,
     trafficLights: props.trafficLights,
     signs: props.signs,
     streetlights: props.streetlights,

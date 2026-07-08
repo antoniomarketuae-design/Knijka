@@ -12,7 +12,7 @@ export function StreakBadge({
 
   return (
     <p
-      className="card flex items-center gap-2 px-4 py-2.5"
+      className="card flex items-center gap-2.5 px-4 py-2.5"
       title={
         lit
           ? "Серията ти е активна за днес."
@@ -21,9 +21,12 @@ export function StreakBadge({
     >
       <IconFlame
         className={`h-6 w-6 ${lit ? "text-flame" : "text-muted"}`}
+        style={lit ? { filter: "drop-shadow(0 0 6px var(--flame))" } : undefined}
       />
-      <span className="text-lg font-black tabular-nums">{streakDays}</span>
-      <span className="text-xs font-semibold leading-tight text-muted">
+      <span className="font-mono text-xl font-black tabular-nums leading-none">
+        {streakDays}
+      </span>
+      <span className="hud-label leading-tight">
         дни
         <br />
         серия

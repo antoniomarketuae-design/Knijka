@@ -3,6 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import "@/lib/content/loader";
 import { IconLock } from "@/components/icons";
+import { AuroraHeader } from "@/components/theory/AuroraHeader";
 import { PracticeSession } from "@/components/theory/PracticeSession";
 import type { PracticeQuestionDto } from "@/components/theory/types";
 import { getContentRepo } from "@/lib/content/repo";
@@ -62,20 +63,20 @@ export default async function PracticePage({ searchParams }: PracticePageProps) 
   );
 
   return (
-    <div className="flex flex-col gap-6">
-      <header>
+    <div className="flex flex-col gap-8">
+      <AuroraHeader intensity="soft">
         <Link href="/theory" className="text-xs font-bold text-accent hover:underline">
           ← Всички теми
         </Link>
-        <h1 className="mt-2 text-2xl font-black sm:text-3xl">
+        <h1 className="mt-3 font-display text-2xl font-black tracking-tight sm:text-3xl">
           {topic ? topic.titleBg : "Умна тренировка"}
         </h1>
-        <p className="mt-1 text-sm text-muted">
+        <p className="mt-2 max-w-[60ch] text-sm leading-relaxed text-muted">
           {topic
             ? "Тренировка по темата — преговори, слаби места и нови понятия."
             : "Двигателят подбра преговорите на падеж и най-слабите ти места."}
         </p>
-      </header>
+      </AuroraHeader>
 
       {questions.length === 0 ? (
         <EmptySession topicTitleBg={topic?.titleBg ?? null} />
@@ -93,16 +94,16 @@ function EmptySession({ topicTitleBg }: { topicTitleBg: string | null }) {
   return (
     <section
       aria-labelledby="empty-session-title"
-      className="card flex flex-col items-center gap-4 p-8 text-center sm:p-12"
+      className="card mx-auto flex w-full max-w-xl flex-col items-center gap-4 p-8 text-center sm:p-12"
     >
       <span
         aria-hidden
-        className="flex h-14 w-14 items-center justify-center rounded-2xl bg-surface-2 text-muted"
+        className="flex h-14 w-14 items-center justify-center rounded-2xl border border-hair bg-surface-2 text-muted"
       >
         <IconLock className="h-7 w-7" />
       </span>
       <div>
-        <h2 id="empty-session-title" className="text-lg font-extrabold">
+        <h2 id="empty-session-title" className="font-display text-lg font-extrabold">
           Засега няма подходящи въпроси
         </h2>
         <p className="mx-auto mt-2 max-w-md text-sm leading-relaxed text-muted">

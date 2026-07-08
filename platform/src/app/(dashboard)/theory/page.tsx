@@ -3,6 +3,7 @@ import Link from "next/link";
 import "@/lib/content/loader";
 import { getContentRepo } from "@/lib/content/repo";
 import { IconBolt } from "@/components/icons";
+import { AuroraHeader } from "@/components/theory/AuroraHeader";
 import { TopicCard } from "@/components/theory/TopicCard";
 import { requireUser } from "@/modules/auth";
 import { getTopicOverview } from "@/modules/learning";
@@ -27,32 +28,38 @@ export default async function TheoryPage() {
     questionsRounded >= 100 ? `над ${questionsRounded}` : `${questionCount}`;
 
   return (
-    <div className="flex flex-col gap-6">
-      <header>
-        <h1 className="text-2xl font-black sm:text-3xl">Теория</h1>
-        <p className="mt-1 text-sm text-muted">
+    <div className="flex flex-col gap-8">
+      <AuroraHeader>
+        <p className="hud-label">Подготовка за изпита</p>
+        <h1 className="mt-2 font-display text-3xl font-black tracking-tight sm:text-4xl">
+          Теория
+        </h1>
+        <p className="mt-2 max-w-[60ch] text-sm leading-relaxed text-muted sm:text-[15px]">
           {topics.length} теми · {questionsLabel} въпроса от изпита. Избери тема
           — или остави двигателя да подбере какво да тренираш.
         </p>
-      </header>
+      </AuroraHeader>
 
       {/* Smart training — the recommended entry point */}
       <section
         aria-labelledby="smart-training-title"
-        className="card flex flex-col gap-4 border-accent/40 p-5 shadow-glow-sm sm:flex-row sm:items-center sm:justify-between sm:p-6"
+        className="hud-panel flex flex-col gap-4 p-5 shadow-glow-sm sm:flex-row sm:items-center sm:justify-between sm:p-6"
       >
         <div className="flex items-start gap-4">
           <span
             aria-hidden
-            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-accent/15 text-accent"
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-accent/15 text-accent ring-1 ring-accent/25"
           >
             <IconBolt className="h-6 w-6" />
           </span>
           <div>
-            <h2 id="smart-training-title" className="text-base font-extrabold">
+            <h2
+              id="smart-training-title"
+              className="font-display text-base font-extrabold sm:text-lg"
+            >
               Умна тренировка
             </h2>
-            <p className="mt-1 text-sm leading-relaxed text-muted">
+            <p className="mt-1 max-w-[54ch] text-sm leading-relaxed text-muted">
               {totalDue > 0
                 ? `${totalDue} ${
                     totalDue === 1 ? "понятие чака" : "понятия чакат"
@@ -71,7 +78,7 @@ export default async function TheoryPage() {
         <h2 id="topics-title" className="visually-hidden">
           Теми
         </h2>
-        <ul className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+        <ul className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-5 xl:grid-cols-3">
           {topics.map((topic) => (
             <li key={topic.topicId}>
               <TopicCard topic={topic} />

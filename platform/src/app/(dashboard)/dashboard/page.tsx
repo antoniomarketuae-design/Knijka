@@ -34,20 +34,31 @@ export default async function DashboardPage() {
     ]);
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="relative flex flex-col gap-6">
+      {/* Projection grid — a HUD casting down from the top of the cluster */}
+      <div
+        aria-hidden
+        className="hud-grid pointer-events-none absolute inset-x-0 top-0 -z-10 h-80 opacity-50"
+        style={{
+          maskImage: "linear-gradient(to bottom, black, transparent)",
+          WebkitMaskImage: "linear-gradient(to bottom, black, transparent)",
+        }}
+      />
+
       {/* Greeting + streak + level/XP */}
-      <header className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+      <header className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
         <div>
-          <h1 className="text-2xl font-black sm:text-3xl">
+          <p className="hud-label">Табло · Категория B</p>
+          <h1 className="mt-1 font-display text-3xl font-black tracking-tight sm:text-4xl">
             Здравей, {profile.firstName}!
           </h1>
           <p className="mt-1 text-sm text-muted">
             Днес е добър ден да станеш по-добър шофьор.
           </p>
         </div>
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-stretch">
           <StreakBadge gamification={gamification} />
-          <div className="card w-full px-4 py-2.5 sm:w-80">
+          <div className="card flex w-full flex-col justify-center px-4 py-2.5 sm:w-80">
             <XpBar gamification={gamification} />
           </div>
         </div>
@@ -63,15 +74,22 @@ export default async function DashboardPage() {
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
         <section
           aria-labelledby="readiness-title"
-          className="card flex flex-col items-center gap-2 p-5 sm:p-6"
+          className="hud-panel flex flex-col items-center gap-3 p-5 sm:p-6"
         >
-          <h2 id="readiness-title" className="self-start text-base font-extrabold">
-            Готовност за изпит
-          </h2>
+          <div className="flex w-full items-center justify-between gap-2">
+            <h2 id="readiness-title" className="font-display text-base font-extrabold">
+              Готовност за изпит
+            </h2>
+            <span className="hud-label">Прогноза</span>
+          </div>
           <ReadinessRing readiness={readiness} />
           <p className="text-center text-xs leading-relaxed text-muted">
-            Прогноза на база твоите отговори. Официалният изпит изисква ≥87 от
-            97 точки.
+            Прогноза на база твоите отговори. Официалният изпит изисква{" "}
+            <span className="font-mono font-bold tabular-nums text-foreground">
+              ≥87
+            </span>{" "}
+            от{" "}
+            <span className="font-mono tabular-nums">97</span> точки.
           </p>
         </section>
 

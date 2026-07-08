@@ -1,55 +1,69 @@
 @import "tailwindcss";
 
 /* ============================================================
-   Design tokens — dark-first "game launcher" aesthetic.
-   Deep navy/graphite base, one confident accent (electric blue),
-   high contrast, subtle glow on interactive elements.
-   Light mode via prefers-color-scheme override below.
+   Design tokens — "Cockpit / Holographic HUD" system (doc 64).
+   The product as a car's instrument cluster: cockpit-black ground,
+   the kept electric blue promoted to the HUD projection colour,
+   holo-cyan for telemetry, glow on interactive elements only.
+   Every legacy token name is preserved (values evolved) so no
+   component breaks; new tokens: --accent-2, --hair, --font-display.
+   Light mode = "daylight HUD" via prefers-color-scheme + data-theme.
    ============================================================ */
 
 :root {
-  /* Base surfaces (dark = default) */
-  --background: #0a101e;
-  --surface: #111b2e;
-  --surface-2: #17233b;
-  --border: #24334d;
-  --border-strong: #33466a;
+  /* Base surfaces (dark = default) — deepened for OLED */
+  --background: #070b14;
+  --surface: #0f1826;
+  --surface-2: #16233b;
+  --border: #1e2c46;
+  --border-strong: #2c4066;
+  /* HUD hairline — cyan/blue projection line used on panels */
+  --hair: rgba(63, 161, 255, 0.16);
 
   /* Text */
-  --foreground: #e6edf7;
-  --muted: #8fa3bf;
+  --foreground: #e7eef9;
+  --muted: #94a6c4;
 
-  /* The one accent: electric blue */
+  /* Brand accent: HUD Blue (KEPT) — the interactive / projection colour */
   --accent: #3fa1ff;
   --accent-soft: #7cc4ff;
-  --accent-foreground: #051123;
+  --accent-foreground: #04070e;
   --glow: rgba(63, 161, 255, 0.35);
   --glow-soft: rgba(63, 161, 255, 0.16);
 
-  /* Semantic status */
-  --success: #2fd08c;
-  --warning: #ffb02e;
-  --danger: #ff6b6b;
-  --flame: #ff8a3d;
-  --gold: #ffc94d;
+  /* Telemetry accent: Holo Cyan (~9:1, UI-text-safe) */
+  --accent-2: #17e1c4;
+  --glow-2: rgba(23, 225, 196, 0.3);
+
+  /* Semantic status — dashboard warning lights */
+  --success: #38e08a;
+  --warning: #ffc24b;
+  --danger: #ff5b49;
+  --flame: #ff6b4a;
+  --gold: #ffcb57;
 }
 
 @media (prefers-color-scheme: light) {
   :root {
-    --background: #f4f7fc;
+    /* "Daylight HUD" */
+    --background: #eef3fb;
     --surface: #ffffff;
-    --surface-2: #edf2fa;
-    --border: #d8e1ef;
-    --border-strong: #b9c8de;
+    --surface-2: #e6eef9;
+    --border: #d3e0f0;
+    --border-strong: #b4c7e0;
+    --hair: rgba(27, 107, 214, 0.18);
 
-    --foreground: #0c1526;
-    --muted: #55677f;
+    --foreground: #0b1524;
+    --muted: #51617c;
 
-    --accent: #1d6fe0;
-    --accent-soft: #5b9df0;
+    --accent: #1b6bd6;
+    --accent-soft: #4c8fe6;
     --accent-foreground: #ffffff;
-    --glow: rgba(29, 111, 224, 0.22);
-    --glow-soft: rgba(29, 111, 224, 0.1);
+    --glow: rgba(27, 107, 214, 0.22);
+    --glow-soft: rgba(27, 107, 214, 0.1);
+
+    --accent-2: #0c9e8b;
+    --glow-2: rgba(12, 158, 139, 0.22);
 
     --success: #0e9f6e;
     --warning: #b45309;
@@ -59,12 +73,60 @@
   }
 }
 
+/* Explicit theme toggle wins over the OS media query, both directions. */
+:root[data-theme="light"] {
+  --background: #eef3fb;
+  --surface: #ffffff;
+  --surface-2: #e6eef9;
+  --border: #d3e0f0;
+  --border-strong: #b4c7e0;
+  --hair: rgba(27, 107, 214, 0.18);
+  --foreground: #0b1524;
+  --muted: #51617c;
+  --accent: #1b6bd6;
+  --accent-soft: #4c8fe6;
+  --accent-foreground: #ffffff;
+  --glow: rgba(27, 107, 214, 0.22);
+  --glow-soft: rgba(27, 107, 214, 0.1);
+  --accent-2: #0c9e8b;
+  --glow-2: rgba(12, 158, 139, 0.22);
+  --success: #0e9f6e;
+  --warning: #b45309;
+  --danger: #dc2626;
+  --flame: #ea580c;
+  --gold: #b47d10;
+}
+
+:root[data-theme="dark"] {
+  --background: #070b14;
+  --surface: #0f1826;
+  --surface-2: #16233b;
+  --border: #1e2c46;
+  --border-strong: #2c4066;
+  --hair: rgba(63, 161, 255, 0.16);
+  --foreground: #e7eef9;
+  --muted: #94a6c4;
+  --accent: #3fa1ff;
+  --accent-soft: #7cc4ff;
+  --accent-foreground: #04070e;
+  --glow: rgba(63, 161, 255, 0.35);
+  --glow-soft: rgba(63, 161, 255, 0.16);
+  --accent-2: #17e1c4;
+  --glow-2: rgba(23, 225, 196, 0.3);
+  --success: #38e08a;
+  --warning: #ffc24b;
+  --danger: #ff5b49;
+  --flame: #ff6b4a;
+  --gold: #ffcb57;
+}
+
 @theme inline {
   --color-background: var(--background);
   --color-surface: var(--surface);
   --color-surface-2: var(--surface-2);
   --color-border: var(--border);
   --color-border-strong: var(--border-strong);
+  --color-hair: var(--hair);
 
   --color-foreground: var(--foreground);
   --color-muted: var(--muted);
@@ -72,6 +134,7 @@
   --color-accent: var(--accent);
   --color-accent-soft: var(--accent-soft);
   --color-accent-foreground: var(--accent-foreground);
+  --color-accent-2: var(--accent-2);
 
   --color-success: var(--success);
   --color-warning: var(--warning);
@@ -79,15 +142,19 @@
   --color-flame: var(--flame);
   --color-gold: var(--gold);
 
-  /* Cyrillic-safe system stack (Geist has no Cyrillic subset). */
-  --font-sans: ui-sans-serif, system-ui, "Segoe UI", Roboto,
-    "Helvetica Neue", Arial, sans-serif;
-  --font-mono: ui-monospace, "Cascadia Code", Consolas, "Courier New",
-    monospace;
+  /* Type system (doc 64). All faces carry a Cyrillic subset.
+     Loaded in layout.tsx via next/font/google → --ff-* variables. */
+  --font-display: var(--ff-display), "Exo 2", ui-sans-serif, system-ui,
+    "Segoe UI", sans-serif;
+  --font-sans: var(--ff-body), "IBM Plex Sans", ui-sans-serif, system-ui,
+    "Segoe UI", Roboto, Arial, sans-serif;
+  --font-mono: var(--ff-mono), "JetBrains Mono", ui-monospace, "Cascadia Code",
+    Consolas, monospace;
 
   /* Glow shadows for interactive elements */
   --shadow-glow: 0 0 24px 0 var(--glow);
   --shadow-glow-sm: 0 0 12px 0 var(--glow-soft);
+  --shadow-glow-2: 0 0 20px 0 var(--glow-2);
 }
 
 body {
@@ -107,6 +174,33 @@ body {
   /* The standard hub card */
   .card {
     @apply rounded-xl border border-border bg-surface;
+  }
+
+  /* HUD instrument panel: glass surface, cyan hairline, faint inner light.
+     Use for dashboard/telemetry panels. Blur is static (never animated). */
+  .hud-panel {
+    border-radius: 1rem;
+    border: 1px solid var(--hair);
+    background: color-mix(in srgb, var(--surface) 82%, transparent);
+    backdrop-filter: blur(10px);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05), var(--shadow-glow-sm);
+  }
+
+  /* Instrument-cluster background grid — static, cheap, no repaint on scroll. */
+  .hud-grid {
+    background-image: linear-gradient(var(--hair) 1px, transparent 1px),
+      linear-gradient(90deg, var(--hair) 1px, transparent 1px);
+    background-size: 44px 44px;
+    background-position: center;
+  }
+
+  /* Uppercase mono label — the "telemetry readout" caption voice. */
+  .hud-label {
+    font-family: var(--font-mono);
+    font-size: 0.7rem;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--muted);
   }
 
   /* Primary action: bright accent, dark text, glow on hover/focus */
@@ -129,5 +223,56 @@ body {
     clip: rect(0, 0, 0, 0);
     white-space: nowrap;
     border: 0;
+  }
+}
+
+/* Filmic grain overlay — kills gradient banding, adds depth. Static, 8% opacity.
+   Apply to a full-bleed ::before or an absolutely-positioned <div aria-hidden>. */
+.grain {
+  position: relative;
+}
+.grain::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.06;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+/* HUD boot-up sweep — a cyan scanline that passes once on mount.
+   Landing / session start only; opt-in via the .hud-sweep class. */
+@keyframes hud-sweep {
+  0% {
+    transform: translateY(-100%);
+    opacity: 0;
+  }
+  15% {
+    opacity: 0.7;
+  }
+  100% {
+    transform: translateY(1200%);
+    opacity: 0;
+  }
+}
+.hud-sweep {
+  animation: hud-sweep 3.2s ease-in-out;
+}
+
+/* Slow aurora drift for the "Calm Reading" surface (theory). GPU-cheap. */
+@keyframes aurora-drift {
+  0%,
+  100% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hud-sweep,
+  .aurora-drift {
+    animation: none !important;
   }
 }

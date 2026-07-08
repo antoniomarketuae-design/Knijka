@@ -66,16 +66,23 @@ function NavLinks({ onNavigate }: { onNavigate?: () => void }) {
               href={href}
               onClick={onNavigate}
               aria-current={active ? "page" : undefined}
-              className={`group flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold transition motion-reduce:transition-none ${
+              className={`group relative flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold transition duration-200 motion-reduce:transition-none ${
                 active
-                  ? "bg-accent/15 text-accent shadow-glow-sm"
+                  ? "bg-accent/10 text-accent shadow-glow-sm"
                   : "text-muted hover:bg-surface-2 hover:text-foreground"
               }`}
             >
+              {/* Active channel indicator — a lit cyan telemetry bar */}
+              <span
+                aria-hidden
+                className={`absolute left-0 top-1/2 h-6 w-[3px] -translate-y-1/2 rounded-r-full bg-accent-2 transition-opacity duration-200 motion-reduce:transition-none ${
+                  active ? "opacity-100 shadow-glow-2" : "opacity-0"
+                }`}
+              />
               <Icon className="h-5 w-5 shrink-0" />
               <span className="flex-1">{labelBg}</span>
               {soon ? (
-                <span className="rounded-full border border-border px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-muted">
+                <span className="hud-label rounded-full border border-hair px-2 py-0.5 text-[10px]">
                   Скоро
                 </span>
               ) : null}
@@ -114,20 +121,24 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="min-h-dvh lg:grid lg:grid-cols-[16rem_1fr]">
-      {/* Desktop sidebar */}
-      <aside className="sticky top-0 hidden h-dvh flex-col gap-6 border-r border-border bg-surface p-4 lg:flex">
+      {/* Desktop sidebar — cockpit console: hairline edge, glass-black ground */}
+      <aside className="sticky top-0 hidden h-dvh flex-col gap-5 border-r border-hair bg-surface p-4 lg:flex">
         <Logo />
-        <nav aria-label="Основна навигация" className="flex-1">
+        <nav aria-label="Основна навигация" className="flex flex-1 flex-col">
+          <p className="hud-label mb-2 px-3">Навигация</p>
           <NavLinks />
         </nav>
-        <p className="px-2 text-xs text-muted">
-          Учиш за категория <strong className="text-foreground">B</strong> ·
-          България
-        </p>
+        <div className="rounded-xl border border-hair bg-surface-2/40 px-3 py-2.5">
+          <p className="hud-label">Обучение</p>
+          <p className="mt-1 text-xs text-muted">
+            Категория <strong className="font-mono font-bold text-foreground">B</strong>{" "}
+            · България
+          </p>
+        </div>
       </aside>
 
-      {/* Mobile topbar */}
-      <header className="sticky top-0 z-40 flex items-center justify-between border-b border-border bg-surface/95 px-4 py-3 backdrop-blur lg:hidden">
+      {/* Mobile topbar — glass HUD strip */}
+      <header className="sticky top-0 z-40 flex items-center justify-between border-b border-hair bg-surface/80 px-4 py-3 backdrop-blur lg:hidden">
         <Logo />
         <button
           ref={openButtonRef}
@@ -135,7 +146,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
           onClick={() => setOpen(true)}
           aria-expanded={open}
           aria-controls="mobile-nav"
-          className="rounded-xl border border-border p-2 text-foreground transition hover:bg-surface-2 motion-reduce:transition-none"
+          className="rounded-xl border border-hair p-2 text-foreground transition hover:bg-surface-2 motion-reduce:transition-none"
         >
           <IconMenu className="h-5 w-5" />
           <span className="visually-hidden">Отвори менюто</span>
@@ -155,7 +166,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
             id="mobile-nav"
             ref={drawerRef}
             tabIndex={-1}
-            className="absolute inset-y-0 left-0 flex w-72 max-w-[85vw] flex-col gap-6 border-r border-border bg-surface p-4 outline-none"
+            className="absolute inset-y-0 left-0 flex w-72 max-w-[85vw] flex-col gap-6 border-r border-hair bg-surface p-4 outline-none"
           >
             <div className="flex items-center justify-between">
               <Logo />
@@ -165,7 +176,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
                   setOpen(false);
                   openButtonRef.current?.focus();
                 }}
-                className="rounded-xl border border-border p-2 text-foreground transition hover:bg-surface-2 motion-reduce:transition-none"
+                className="rounded-xl border border-hair p-2 text-foreground transition hover:bg-surface-2 motion-reduce:transition-none"
               >
                 <IconX className="h-5 w-5" />
                 <span className="visually-hidden">Затвори менюто</span>

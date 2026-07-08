@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { signIn } from "next-auth/react";
 
 const inputClass =
-  "w-full rounded-lg border border-black/15 bg-transparent px-3 py-2 text-sm outline-none focus:border-black/40 dark:border-white/20 dark:focus:border-white/50";
+  "w-full rounded-lg border border-border bg-surface-2/50 px-3 py-2 text-sm text-foreground outline-none transition placeholder:text-muted focus:border-accent focus:shadow-glow-sm motion-reduce:transition-none";
 
 type FieldErrors = Partial<
   Record<"email" | "password" | "name" | "birthYear" | "consent", string>
@@ -135,7 +135,7 @@ export function RegisterForm() {
           className={inputClass}
         />
         {fieldErrors.name && (
-          <p className="mt-1 text-xs text-red-600 dark:text-red-400">{fieldErrors.name}</p>
+          <p className="mt-1 text-xs font-medium text-danger">{fieldErrors.name}</p>
         )}
       </div>
 
@@ -154,7 +154,7 @@ export function RegisterForm() {
           className={inputClass}
         />
         {fieldErrors.email && (
-          <p className="mt-1 text-xs text-red-600 dark:text-red-400">{fieldErrors.email}</p>
+          <p className="mt-1 text-xs font-medium text-danger">{fieldErrors.email}</p>
         )}
       </div>
 
@@ -173,9 +173,9 @@ export function RegisterForm() {
           onChange={(e) => setPassword(e.target.value)}
           className={inputClass}
         />
-        <p className="mt-1 text-xs opacity-60">Поне 8 знака.</p>
+        <p className="mt-1 text-xs text-muted">Поне 8 знака.</p>
         {fieldErrors.password && (
-          <p className="mt-1 text-xs text-red-600 dark:text-red-400">{fieldErrors.password}</p>
+          <p className="mt-1 text-xs font-medium text-danger">{fieldErrors.password}</p>
         )}
       </div>
 
@@ -196,18 +196,18 @@ export function RegisterForm() {
           className={inputClass}
         />
         {fieldErrors.birthYear && (
-          <p className="mt-1 text-xs text-red-600 dark:text-red-400">{fieldErrors.birthYear}</p>
+          <p className="mt-1 text-xs font-medium text-danger">{fieldErrors.birthYear}</p>
         )}
       </div>
 
       <div>
-        <label className="flex items-start gap-2 text-xs leading-relaxed opacity-90">
+        <label className="flex items-start gap-2 text-xs leading-relaxed text-muted">
           <input
             type="checkbox"
             name="consent"
             checked={consent}
             onChange={(e) => setConsent(e.target.checked)}
-            className="mt-0.5 h-4 w-4 shrink-0"
+            className="mt-0.5 h-4 w-4 shrink-0 accent-accent"
           />
           <span>
             {/* GDPR consent stub — final wording pending legal review */}
@@ -218,12 +218,12 @@ export function RegisterForm() {
           </span>
         </label>
         {fieldErrors.consent && (
-          <p className="mt-1 text-xs text-red-600 dark:text-red-400">{fieldErrors.consent}</p>
+          <p className="mt-1 text-xs font-medium text-danger">{fieldErrors.consent}</p>
         )}
       </div>
 
       {formError && (
-        <p role="alert" className="text-sm text-red-600 dark:text-red-400">
+        <p role="alert" className="text-sm font-medium text-danger">
           {formError}
         </p>
       )}
@@ -231,7 +231,7 @@ export function RegisterForm() {
       <button
         type="submit"
         disabled={pending}
-        className="w-full rounded-lg bg-foreground px-4 py-2 text-sm font-semibold text-background transition-opacity hover:opacity-90 disabled:opacity-50"
+        className="btn-accent w-full disabled:opacity-50"
       >
         {pending ? "Моля, изчакай…" : "Създай акаунт"}
       </button>

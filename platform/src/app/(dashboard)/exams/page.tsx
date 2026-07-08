@@ -48,7 +48,10 @@ export default async function ExamsPage({
   return (
     <div className="flex flex-col gap-6">
       <header>
-        <h1 className="text-2xl font-black sm:text-3xl">Пробни изпити</h1>
+        <span className="hud-label">Тренажор · изпитен режим</span>
+        <h1 className="mt-1 font-display text-3xl font-black sm:text-4xl">
+          Пробни изпити
+        </h1>
         <p className="mt-1 text-sm text-muted">
           Същият формат, същата строгост — без изненади в изпитния ден.
         </p>
@@ -64,15 +67,26 @@ export default async function ExamsPage({
       ) : null}
 
       {/* Rules card */}
-      <section aria-labelledby="exam-rules-title" className="card p-5 sm:p-6">
-        <h2 id="exam-rules-title" className="text-base font-extrabold">
-          Официалният формат, едно към едно
-        </h2>
+      <section
+        aria-labelledby="exam-rules-title"
+        className="hud-panel relative overflow-hidden p-5 sm:p-6"
+      >
+        <div aria-hidden className="hud-grid absolute inset-0 opacity-[0.1]" />
 
-        <dl className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <div className="relative flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+          <h2 id="exam-rules-title" className="font-display text-lg font-extrabold">
+            Официалният формат, едно към едно
+          </h2>
+          <span className="hud-label tabular-nums">
+            {EXAM_QUESTION_COUNT} · {EXAM_MAX_POINTS} · {EXAM_PASS_POINTS} ·{" "}
+            {formatClock(EXAM_DURATION_SEC)}
+          </span>
+        </div>
+
+        <dl className="relative mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
           <RuleStat value={String(EXAM_QUESTION_COUNT)} label="въпроса" />
           <RuleStat value={String(EXAM_MAX_POINTS)} label="точки максимум" />
-          <RuleStat value={`≥ ${EXAM_PASS_POINTS}`} label="точки за успех" />
+          <RuleStat value={`≥ ${EXAM_PASS_POINTS}`} label="точки за успех" accent />
           <RuleStat value={formatClock(EXAM_DURATION_SEC)} label="минути време" />
         </dl>
 
@@ -115,11 +129,25 @@ export default async function ExamsPage({
   );
 }
 
-function RuleStat({ value, label }: { value: string; label: string }) {
+function RuleStat({
+  value,
+  label,
+  accent = false,
+}: {
+  value: string;
+  label: string;
+  accent?: boolean;
+}) {
   return (
-    <div className="flex flex-col-reverse rounded-xl bg-surface-2 px-3 py-3 text-center">
-      <dt className="text-xs font-semibold text-muted">{label}</dt>
-      <dd className="text-xl font-black tabular-nums text-accent">{value}</dd>
+    <div className="flex flex-col-reverse gap-1 rounded-xl border border-hair bg-surface-2/60 px-3 py-4 text-center">
+      <dt className="hud-label">{label}</dt>
+      <dd
+        className={`font-mono text-2xl font-bold tabular-nums ${
+          accent ? "text-accent-2" : "text-accent"
+        }`}
+      >
+        {value}
+      </dd>
     </div>
   );
 }
@@ -129,20 +157,20 @@ function HistoryRow({ entry }: { entry: ExamHistoryEntry }) {
   return (
     <Link
       href={`/exams/${entry.attemptId}`}
-      className="card flex flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3 transition hover:border-border-strong hover:bg-surface-2 motion-reduce:transition-none"
+      className="card flex flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3 transition hover:border-border-strong hover:bg-surface-2 hover:shadow-glow-sm motion-reduce:transition-none"
     >
       <span className="min-w-36 text-sm font-semibold">
         {dateFmt.format(entry.startedAt)}
       </span>
 
-      <span className="text-sm tabular-nums text-muted">
+      <span className="font-mono text-sm tabular-nums text-muted">
         {entry.score !== null ? (
           <>
             <strong className="font-bold text-foreground">{entry.score}</strong>/
-            {entry.maxScore} точки
+            {entry.maxScore} т.
           </>
         ) : (
-          "— точки"
+          "— т."
         )}
       </span>
 

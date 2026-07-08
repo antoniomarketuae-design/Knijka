@@ -14,18 +14,19 @@ function masteryColor(mastery: number): string {
 export function TopicCard({ topic }: { topic: TopicOverview }) {
   const pct = Math.round(topic.avgMastery * 100);
   const started = topic.seenConceptCount > 0;
+  const barColor = masteryColor(topic.avgMastery);
 
   return (
     <Link
       href={`/theory/practice?topic=${topic.slug}`}
-      className="card group flex h-full flex-col gap-3 p-5 transition hover:-translate-y-0.5 hover:border-border-strong hover:shadow-glow-sm motion-reduce:transition-none motion-reduce:hover:translate-y-0"
+      className="card group flex h-full flex-col gap-4 p-5 transition duration-200 ease-out hover:-translate-y-0.5 hover:border-border-strong hover:shadow-glow-sm motion-reduce:transition-none motion-reduce:hover:translate-y-0"
     >
       <div className="flex items-center justify-between gap-2">
         <span
           aria-hidden
-          className="flex h-7 w-7 items-center justify-center rounded-lg bg-surface-2 text-xs font-black text-muted"
+          className="flex h-8 w-8 items-center justify-center rounded-lg border border-hair bg-surface-2 font-mono text-xs font-bold text-muted"
         >
-          {topic.order}
+          {String(topic.order).padStart(2, "0")}
         </span>
         {topic.dueCount > 0 ? (
           <span className="rounded-full bg-warning/15 px-2.5 py-1 text-[11px] font-bold text-warning">
@@ -34,14 +35,17 @@ export function TopicCard({ topic }: { topic: TopicOverview }) {
         ) : null}
       </div>
 
-      <h3 className="line-clamp-2 text-sm font-extrabold leading-snug">
+      <h3 className="line-clamp-2 font-display text-[15px] font-bold leading-snug">
         {topic.titleBg}
       </h3>
 
-      <div className="mt-auto flex flex-col gap-1.5">
-        <div className="flex items-baseline justify-between gap-2 text-xs">
-          <span className="font-semibold text-muted">Усвояване</span>
-          <span className="font-bold tabular-nums text-muted">
+      <div className="mt-auto flex flex-col gap-2">
+        <div className="flex items-baseline justify-between gap-2">
+          <span className="hud-label">Усвояване</span>
+          <span
+            className="font-mono text-xs font-bold tabular-nums"
+            style={{ color: started ? barColor : "var(--muted)" }}
+          >
             {started ? `${pct}%` : "—"}
           </span>
         </div>
@@ -55,10 +59,13 @@ export function TopicCard({ topic }: { topic: TopicOverview }) {
           className="h-1.5 overflow-hidden rounded-full bg-surface-2"
         >
           <div
-            className="h-full rounded-full"
+            className="h-full rounded-full transition-[width] duration-500 ease-out motion-reduce:transition-none"
             style={{
               width: `${Math.max(pct, started ? 2 : 0)}%`,
-              backgroundColor: masteryColor(topic.avgMastery),
+              backgroundColor: barColor,
+              boxShadow: started
+                ? `0 0 8px color-mix(in srgb, ${barColor} 45%, transparent)`
+                : "none",
             }}
           />
         </div>
