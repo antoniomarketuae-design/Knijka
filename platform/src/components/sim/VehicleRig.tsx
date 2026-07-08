@@ -34,8 +34,7 @@ import type { CabinControls } from "./cabin";
 import type { SimAudio } from "./simAudio";
 import { updateVehicleSample } from "./vehicleSample";
 import { VitokCockpit } from "./vitok/VitokCockpit";
-import { VitokExterior } from "./vitok/VitokExterior";
-import { VitokWheels } from "./vitok/VitokWheels";
+import { RoadsterBody } from "./RoadsterBody";
 
 /**
  * R3F binding for the React-free VehicleSim physics core.
@@ -174,10 +173,11 @@ export function VehicleRig({
         restitution={CHASSIS_RESTITUTION}
         massProperties={massProperties}
       />
-      {/* „Виток" visuals — everything inside follows the interpolated body. */}
+      {/* Vehicle visuals — everything inside follows the interpolated body.
+          Roadster exterior (glTF) + the existing „Виток" cockpit for the
+          inside view. */}
       <group ref={chassisGroupRef}>
-        <VitokExterior simRef={simRef} inputRef={inputRef} cabinRef={cabinRef} />
-        <VitokWheels simRef={simRef} />
+        <RoadsterBody />
         <VitokCockpit simRef={simRef} inputRef={inputRef} cabinRef={cabinRef} />
       </group>
     </RigidBody>

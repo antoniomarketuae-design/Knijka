@@ -360,7 +360,9 @@ export function LessonPlayShell({
             Сесията не се записа ({saveResult.code}) — резултатът е само локален.
           </span>
         ) : null}
-        <span className="ml-auto">© OpenStreetMap contributors</span>
+        <span className="ml-auto">
+          3D vehicle: Max Hordin (CC-BY 4.0) · © OpenStreetMap contributors
+        </span>
       </div>
     </div>
   );
