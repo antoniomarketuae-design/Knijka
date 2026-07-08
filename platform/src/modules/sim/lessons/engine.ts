@@ -23,8 +23,10 @@ import {
   reduceTick,
   type RuleEngineConfig,
   type RuleEvent,
+  type ScorableEvent,
   type SimTick,
 } from "../rules";
+import { coachStep } from "../scenarios";
 import {
   applyPreDriveAction,
   createPreDriveMachine,
@@ -73,6 +75,7 @@ export function createLessonSession(
     evalStates: objectives.map((o) => createEvalState(o.params)),
     currentObjectiveIndex: 0,
     events: [],
+    scenarioEncounters: {},
     lastT: 0,
     endedAtSec: null,
   };
@@ -155,7 +158,43 @@ export function applyTick(prev: LessonSessionState, tick: SimTick): LessonStepRe
   }
 
   const { state: rules, events: ruleEvents } = reduceTick(prev.rules, tick);
-  const hudEvents = toHudEvents(ruleEvents);
+
+  // Coach the violations: teach-first-then-grade. A first, teachable mistake is
+  // shown live as a lesson (with its law citation) but does NOT count toward the
+  // score; repeats — and any dangerous/terminating error — are graded.
+  let encounters = prev.scenarioEncounters;
+  const hudEvents: HudEvent[] = [];
+  const scoredEvents: ScorableEvent[] = [];
+  for (const e of ruleEvents) {
+    if (e.kind === "commendation") {
+      hudEvents.push({ kind: "commendation", titleBg: e.titleBg });
+      scoredEvents.push(e);
+      continue;
+    }
+    const step = coachStep(encounters, {
+      code: e.code,
+      severityClass: e.severityClass,
+      terminateSession: e.terminateSession,
+    });
+    encounters = step.encounters;
+    if (step.decision.scored) {
+      hudEvents.push({
+        kind: "violation",
+        titleBg: e.titleBg,
+        points: e.points,
+        severity: e.severityClass,
+        lawRef: e.lawRef,
+      });
+      scoredEvents.push(e);
+    } else {
+      hudEvents.push({
+        kind: "lesson",
+        titleBg: e.titleBg,
+        explanationBg: e.explanationBg,
+        lawRef: e.lawRef,
+      });
+    }
+  }
 
   let objectives = prev.objectives;
   let evalStates = prev.evalStates;
@@ -213,7 +252,8 @@ export function applyTick(prev: LessonSessionState, tick: SimTick): LessonStepRe
       currentObjectiveIndex: currentIndex,
       phase,
       endedAtSec,
-      events: ruleEvents.length > 0 ? [...prev.events, ...ruleEvents] : prev.events,
+      events: scoredEvents.length > 0 ? [...prev.events, ...scoredEvents] : prev.events,
+      scenarioEncounters: encounters,
       lastT: Math.max(prev.lastT, tick.t),
     },
     hudEvents,

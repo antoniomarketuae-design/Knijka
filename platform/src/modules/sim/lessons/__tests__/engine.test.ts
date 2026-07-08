@@ -116,6 +116,51 @@ describe("lesson lifecycle without pre-drive", () => {
   });
 });
 
+describe("teach-first-then-grade coaching", () => {
+  const speeding = (t: number) => makeTick({ t, speedKmh: 56 }); // 56 in a 50 zone → minor
+
+  it("teaches a first minor mistake (not scored), then grades the repeat", () => {
+    let s = createLessonSession(microLesson);
+    const hud1: HudEvent[] = [];
+    for (const t of [0, 1, 2, 3]) {
+      const r = applyTick(s, speeding(t));
+      s = r.state;
+      hud1.push(...r.hudEvents);
+    }
+    // First episode → taught: a lesson toast, no violation, nothing scored.
+    expect(hud1.some((e) => e.kind === "lesson")).toBe(true);
+    expect(hud1.some((e) => e.kind === "violation")).toBe(false);
+    expect(s.events.some((e) => e.kind === "violation")).toBe(false);
+
+    // End the episode (back under the limit), then speed again → now graded.
+    s = applyTick(s, makeTick({ t: 4, speedKmh: 40 })).state;
+    const hud2: HudEvent[] = [];
+    for (const t of [5, 6, 7, 8]) {
+      const r = applyTick(s, speeding(t));
+      s = r.state;
+      hud2.push(...r.hudEvents);
+    }
+    expect(hud2.some((e) => e.kind === "violation")).toBe(true);
+    expect(
+      s.events.some((e) => e.kind === "violation" && e.code === "SPEEDING_OVER_LIMIT"),
+    ).toBe(true);
+  });
+
+  it("grades a dangerous mistake from the very first encounter (safety floor)", () => {
+    const s = createLessonSession(microLesson);
+    const r = applyTick(
+      s,
+      tickWithEvents(1, [{ kind: "stopLineCrossed", control: "trafficLight", lightState: "red" }], {
+        speedKmh: 30,
+      }),
+    );
+    expect(r.hudEvents.some((e) => e.kind === "violation" && e.severity === "opasna")).toBe(true);
+    expect(
+      r.state.events.some((e) => e.kind === "violation" && e.code === "RED_LIGHT_CROSSED"),
+    ).toBe(true);
+  });
+});
+
 describe("lesson lifecycle with pre-drive (L1 spec)", () => {
   const l1 = lessonById("l1-preparation")!;
 

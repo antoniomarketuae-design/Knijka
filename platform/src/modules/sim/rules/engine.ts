@@ -81,6 +81,7 @@ export interface RuleEngineState {
   seatbelt: EpisodeState;
   handbrake: EpisodeState;
   headlights: EpisodeState;
+  laneKeeping: EpisodeState;
   crossing: CrossingZoneState | null;
   collisionCooldownUntil: number | null;
   /** Set once a collision occurs — the session grades as terminated. */
@@ -102,6 +103,7 @@ export function createRuleEngine(config?: Partial<RuleEngineConfig>): RuleEngine
     seatbelt: { ...IDLE_EPISODE },
     handbrake: { ...IDLE_EPISODE },
     headlights: { ...IDLE_EPISODE },
+    laneKeeping: { ...IDLE_EPISODE },
     crossing: null,
     collisionCooldownUntil: null,
     terminated: false,
@@ -119,6 +121,7 @@ function cloneState(s: RuleEngineState): RuleEngineState {
     seatbelt: { ...s.seatbelt },
     handbrake: { ...s.handbrake },
     headlights: { ...s.headlights },
+    laneKeeping: { ...s.laneKeeping },
     crossing: s.crossing ? { ...s.crossing } : null,
   };
 }
@@ -261,6 +264,12 @@ export function reduceTick(prev: RuleEngineState, tick: SimTick): ReduceResult {
     )
   ) {
     events.push(makeViolation("HEADLIGHTS_OFF_AT_NIGHT", t));
+  }
+
+  // Lane-keeping: sustained off-centre / straddling positioning while moving.
+  const offCentre = Math.abs(tick.laneOffsetM) > cfg.laneKeepMaxOffsetM;
+  if (stepEpisode(s.laneKeeping, offCentre && moving, !offCentre, t, cfg.laneKeepSustainSec)) {
+    events.push(makeViolation("POOR_LANE_KEEPING", t));
   }
 
   // -- 5. pedestrian-crossing zone: track approach speed while a pedestrian is present

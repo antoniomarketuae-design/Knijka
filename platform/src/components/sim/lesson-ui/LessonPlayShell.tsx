@@ -310,7 +310,11 @@ export function LessonPlayShell({
       lastTickRef.current = tick;
 
       if (hudEvents.length > 0) {
-        push(hudEvents.filter((e) => e.kind === "violation" || e.kind === "commendation"));
+        push(
+          hudEvents.filter(
+            (e) => e.kind === "violation" || e.kind === "commendation" || e.kind === "lesson",
+          ),
+        );
         const completed = hudEvents.find((e) => e.kind === "objectiveComplete");
         if (completed) {
           setFlash({ titleBg: completed.titleBg, key: ++flashKey.current });
@@ -343,7 +347,11 @@ export function LessonPlayShell({
       );
       sessionRef.current = state;
       if (hudEvents.length > 0) {
-        push(hudEvents.filter((e) => e.kind === "violation" || e.kind === "commendation"));
+        push(
+          hudEvents.filter(
+            (e) => e.kind === "violation" || e.kind === "commendation" || e.kind === "lesson",
+          ),
+        );
         const completed = hudEvents.find((e) => e.kind === "objectiveComplete");
         if (completed) {
           setFlash({ titleBg: completed.titleBg, key: ++flashKey.current });

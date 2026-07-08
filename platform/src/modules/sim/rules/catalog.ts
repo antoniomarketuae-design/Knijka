@@ -127,6 +127,14 @@ export const VIOLATIONS: Record<ViolationCode, ViolationSpec> = {
     lawRef: "ЗДвП чл. 70",
     conceptId: "c-night-visibility",
   },
+  POOR_LANE_KEEPING: {
+    severityClass: "vtorostepenna",
+    points: SEVERITY_POINTS.vtorostepenna,
+    titleBg: "Неустойчиво движение в лентата",
+    explanationBg:
+      "Движеше се трайно встрани от средата на лентата — близо до или върху маркировката. Дръж колата в средата на своята лента: така си предвидим за другите и оставяш безопасно разстояние встрани.",
+    lawRef: "ЗДвП чл. 15",
+  },
   PEDESTRIAN_CROSSING_TOO_FAST: {
     severityClass: "opasna",
     points: SEVERITY_POINTS.opasna,

@@ -31,3 +31,11 @@ export {
   type EncounterMode,
   type ScenarioOutcome,
 } from "./policy";
+
+export { scenarioForCode } from "./mapping";
+export {
+  coachStep,
+  coachSession,
+  type CoachInput,
+  type CoachDecision,
+} from "./coach";

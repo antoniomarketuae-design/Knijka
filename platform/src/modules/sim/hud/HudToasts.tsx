@@ -106,6 +106,30 @@ function ToastCard({ event }: { event: HudEvent }) {
     );
   }
 
+  if (event.kind === "lesson") {
+    // A first, teachable encounter — coached, not scored. Framed to teach, not scold.
+    return (
+      <div
+        className="hud-toast-in pointer-events-none w-72 rounded-2xl border bg-surface/85 p-3 backdrop-blur-md"
+        style={{ borderColor: "color-mix(in srgb, var(--accent-2) 55%, transparent)" }}
+      >
+        <span
+          className="text-[10px] font-black uppercase tracking-wide"
+          style={{ color: "var(--accent-2)" }}
+        >
+          📚 Научи
+        </span>
+        <p className="mt-1 text-sm font-bold leading-snug text-foreground">{event.titleBg}</p>
+        <p className="mt-1 text-xs leading-snug text-muted">{event.explanationBg}</p>
+        {event.lawRef ? (
+          <span className="mt-1.5 inline-block rounded-full border border-border px-2 py-0.5 text-[10px] font-semibold text-muted">
+            {event.lawRef}
+          </span>
+        ) : null}
+      </div>
+    );
+  }
+
   // objectiveComplete is rendered by the banner; quiz belongs to the tutor
   // layer (v2) — neither shows as a toast.
   return null;

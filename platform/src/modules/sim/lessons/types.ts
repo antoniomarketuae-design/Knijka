@@ -178,8 +178,11 @@ export interface LessonSessionState {
   evalStates: ObjectiveEvalState[];
   /** Index of the active objective; === objectives.length when all are done. */
   currentObjectiveIndex: number;
-  /** Every scorable event of the session (rule engine + pre-drive machine). */
+  /** Every scorable event of the session (rule engine + pre-drive machine).
+   *  Coached: a first, teachable mistake is shown live but NOT added here. */
   events: ScorableEvent[];
+  /** How many times each scenario has been encountered — drives teach-first-then-grade. */
+  scenarioEncounters: Record<string, number>;
   /** Session time of the last processed tick, seconds. */
   lastT: number;
   endedAtSec: number | null;

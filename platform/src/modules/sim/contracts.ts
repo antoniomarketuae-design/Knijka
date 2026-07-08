@@ -77,5 +77,7 @@ export interface LessonObjective {
 export type HudEvent =
   | { kind: "violation"; titleBg: string; points: number; severity: "opasna" | "osnovna" | "vtorostepenna"; lawRef?: string }
   | { kind: "commendation"; titleBg: string }
+  /** A first, teachable encounter — coached, not scored (teach-first-then-grade). */
+  | { kind: "lesson"; titleBg: string; explanationBg: string; lawRef?: string }
   | { kind: "objectiveComplete"; titleBg: string }
   | { kind: "quiz"; questionId: string };
