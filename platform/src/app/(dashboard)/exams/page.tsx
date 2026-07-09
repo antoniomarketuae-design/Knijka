@@ -71,7 +71,7 @@ export default async function ExamsPage({
         aria-labelledby="exam-rules-title"
         className="hud-panel relative overflow-hidden p-5 sm:p-6"
       >
-        <div aria-hidden className="hud-grid absolute inset-0 opacity-[0.1]" />
+        <div aria-hidden className="hud-grid pointer-events-none absolute inset-0 opacity-[0.1]" />
 
         <div className="relative flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
           <h2 id="exam-rules-title" className="font-display text-lg font-extrabold">

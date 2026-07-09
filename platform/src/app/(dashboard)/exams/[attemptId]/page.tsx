@@ -153,7 +153,7 @@ function ScoreReadout({
       aria-labelledby="exam-result-title"
       className="hud-panel relative overflow-hidden p-6 sm:p-8"
     >
-      <div aria-hidden className="hud-grid absolute inset-0 opacity-[0.12]" />
+      <div aria-hidden className="hud-grid pointer-events-none absolute inset-0 opacity-[0.12]" />
 
       <div className="relative flex flex-col items-center gap-8 sm:flex-row sm:items-center sm:gap-10">
         {/* Signature instrument: score on the official 97-point scale */}
