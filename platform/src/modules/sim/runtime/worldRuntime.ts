@@ -41,6 +41,10 @@ const WRONG_WAY_ANGLE_DEG = 120;
 const PRIORITY_CONFLICT_RADIUS_M = 16;
 /** Look-ahead for oncoming traffic when turning left, meters. */
 const LEFT_TURN_ONCOMING_RADIUS_M = 26;
+/** Distance to the junction node within which the right-hand-rule check arms, meters. */
+const RHR_CORE_RADIUS_M = 9;
+/** Above this speed the driver counts as entering (not creeping/yielding), km/h. */
+const RHR_MOVING_KMH = 3;
 
 /**
  * True when a vehicle heads against a one-way street's flow. `tangent` is the
@@ -76,6 +80,16 @@ export type OncomingQuery = (
   radiusM: number,
 ) => boolean;
 
+/** Is there a vehicle approaching from the player's right near a junction? */
+export type RightConflictQuery = (
+  jx: number,
+  jy: number,
+  px: number,
+  py: number,
+  headingDeg: number,
+  radiusM: number,
+) => boolean;
+
 export interface DistrictWorldRuntime extends WorldRuntime {
   /** Install the traffic module's pedestrian lookup (default: nobody anywhere). */
   setPedestrianQuery(fn: PedestrianQuery | null): void;
@@ -83,6 +97,8 @@ export interface DistrictWorldRuntime extends WorldRuntime {
   setJunctionConflictQuery(fn: JunctionConflictQuery | null): void;
   /** Install the traffic module's oncoming-vehicle lookup (default: none). */
   setOncomingQuery(fn: OncomingQuery | null): void;
+  /** Install the traffic module's from-the-right lookup (default: none). */
+  setRightConflictQuery(fn: RightConflictQuery | null): void;
   /** Physics layer reports a contact; drained into the next sample(). */
   pushCollision(withWhat: CollisionWith): void;
   /** Phase a driver approaching `signalNodeId` on `bearingDeg` sees (renderer helper). */
@@ -91,6 +107,8 @@ export interface DistrictWorldRuntime extends WorldRuntime {
   /** Introspection for tests/devtools. */
   debugStopLines(): readonly StopLine[];
   debugSignalClusters(): readonly SignalClusterInfo[];
+  /** Uncontrolled (right-hand-rule) junction nodes with positions — devtools/tests. */
+  debugUncontrolledJunctions(): ReadonlyArray<{ id: string; x: number; y: number }>;
 }
 
 export function createWorldRuntime(districtJson: District | unknown): DistrictWorldRuntime {
@@ -108,10 +126,24 @@ export function createWorldRuntime(districtJson: District | unknown): DistrictWo
   let pedQuery: PedestrianQuery = () => false;
   let conflictQuery: JunctionConflictQuery = () => false;
   let oncomingQuery: OncomingQuery = () => false;
+  let rightConflictQuery: RightConflictQuery = () => false;
 
   // Junction node positions (district space) for priority conflict lookups.
   const nodePos = new Map<string, { x: number; y: number }>();
   for (const n of district.roads.nodes) nodePos.set(n.id, { x: n.x, y: n.y });
+
+  // Uncontrolled (right-hand-rule) junctions: real junctions (degree >= 3) that
+  // are neither signalized nor guarded by any stop/give-way line → equal
+  // junctions where you give way to the right.
+  const guardedNodeIds = new Set(stopLines.all.map((l) => l.junctionNodeId));
+  const uncontrolledJunctions = district.intersections
+    .filter((it) => !it.signalized && it.degree >= 3 && !guardedNodeIds.has(it.id))
+    .map((it) => ({ id: it.id, x: it.x, y: it.y }));
+  const uncontrolledIds = new Set(uncontrolledJunctions.map((j) => j.id));
+
+  // Right-hand-rule visit tracker (one violation per junction entry).
+  let rhrNode: string | null = null;
+  let rhrFired = false;
 
   // Previous-frame tracking for line-crossing detection.
   let prevEdgeIdx = -1;
@@ -223,10 +255,13 @@ export function createWorldRuntime(districtJson: District | unknown): DistrictWo
       prevS = fix.sM;
 
       // 4. Turns (only inside junction areas).
-      const nearJunction =
-        index.nearestIntersection(v.position.x, v.position.y, JUNCTION_AREA_RADIUS_M) !== null;
+      const nearestIx = index.nearestIntersection(
+        v.position.x,
+        v.position.y,
+        JUNCTION_AREA_RADIUS_M,
+      );
       const beforeTurns = events.length;
-      turns.update(tSec, v.headingDeg, nearJunction, events);
+      turns.update(tSec, v.headingDeg, nearestIx !== null, events);
       // Turning left while oncoming traffic is approaching = failure to yield.
       for (let i = beforeTurns; i < events.length; i++) {
         const te = events[i];
@@ -238,6 +273,36 @@ export function createWorldRuntime(districtJson: District | unknown): DistrictWo
           events.push({ kind: "prioritySituation", situation: "left-turn", violated: true });
           break;
         }
+      }
+
+      // 4b. Right-hand rule: entering an uncontrolled junction's core while a
+      // vehicle approaches from the right = failing to give way. Once per visit.
+      if (nearestIx !== null && uncontrolledIds.has(nearestIx.id)) {
+        if (rhrNode !== nearestIx.id) {
+          rhrNode = nearestIx.id;
+          rhrFired = false;
+        }
+        const dx = nearestIx.x - v.position.x;
+        const dy = nearestIx.y - v.position.y;
+        if (
+          !rhrFired &&
+          dx * dx + dy * dy <= RHR_CORE_RADIUS_M * RHR_CORE_RADIUS_M &&
+          v.speedKmh > RHR_MOVING_KMH &&
+          rightConflictQuery(
+            nearestIx.x,
+            nearestIx.y,
+            v.position.x,
+            v.position.y,
+            v.headingDeg,
+            PRIORITY_CONFLICT_RADIUS_M,
+          )
+        ) {
+          events.push({ kind: "prioritySituation", situation: "right-hand-rule", violated: true });
+          rhrFired = true;
+        }
+      } else {
+        rhrNode = null;
+        rhrFired = false;
       }
 
       // 5. Pedestrian-crossing zones.
@@ -302,6 +367,14 @@ export function createWorldRuntime(districtJson: District | unknown): DistrictWo
 
     setOncomingQuery(fn: OncomingQuery | null): void {
       oncomingQuery = fn ?? (() => false);
+    },
+
+    setRightConflictQuery(fn: RightConflictQuery | null): void {
+      rightConflictQuery = fn ?? (() => false);
+    },
+
+    debugUncontrolledJunctions() {
+      return uncontrolledJunctions;
     },
 
     pushCollision(withWhat: CollisionWith): void {

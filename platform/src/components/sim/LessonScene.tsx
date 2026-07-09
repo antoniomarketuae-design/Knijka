@@ -171,6 +171,9 @@ export default function LessonScene(props: LessonSceneProps) {
         runtime.setPedestrianQuery((id) => traffic.pedestrianOnCrossing(id));
         runtime.setJunctionConflictQuery((x, y, r, b) => traffic.conflictNear(x, y, r, b));
         runtime.setOncomingQuery((px, py, h, r) => traffic.oncomingNear(px, py, h, r));
+        runtime.setRightConflictQuery((jx, jy, px, py, h, r) =>
+          traffic.conflictFromRight(jx, jy, px, py, h, r),
+        );
         if (alive) {
           setBuilt({
             runtime,
