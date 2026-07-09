@@ -258,6 +258,19 @@ export interface TrafficSystem {
     headingDeg: number,
     radiusM: number,
   ): boolean;
+  /**
+   * True when a moving vehicle already circulating a roundabout (centre cx,cy,
+   * within `bandRadiusM`) is on the player's LEFT — the driver must give way
+   * before entering. District space; headingDeg 0 = north, clockwise.
+   */
+  circulatingConflict(
+    cx: number,
+    cy: number,
+    px: number,
+    py: number,
+    headingDeg: number,
+    bandRadiusM: number,
+  ): boolean;
   readonly timeSec: number;
   readonly stats: TrafficSystemStats;
 }

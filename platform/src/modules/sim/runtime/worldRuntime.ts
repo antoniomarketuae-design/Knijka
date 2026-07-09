@@ -47,6 +47,16 @@ const RHR_CORE_RADIUS_M = 9;
 const RHR_MOVING_KMH = 3;
 /** At/below this speed while a conflict is present, the driver is yielding, km/h. */
 const RHR_YIELD_KMH = 8;
+/** How far beyond a roundabout's ring the entry-yield decision zone reaches, meters. */
+const ROUNDABOUT_ENTRY_MARGIN_M = 9;
+/** Extra reach beyond the ring for the circulating-traffic band, meters. */
+const ROUNDABOUT_BAND_EXTRA_M = 6;
+/**
+ * Minimum inward component of the driver's heading (unit) to count as ENTERING
+ * rather than circulating tangentially — guards against flagging a driver who
+ * already holds priority on the ring.
+ */
+const ROUNDABOUT_INWARD_MIN = 0.3;
 
 /**
  * True when a vehicle heads against a one-way street's flow. `tangent` is the
@@ -92,6 +102,16 @@ export type RightConflictQuery = (
   radiusM: number,
 ) => boolean;
 
+/** Is a vehicle already circulating a roundabout (approaching entry from the left)? */
+export type CirculatingQuery = (
+  cx: number,
+  cy: number,
+  px: number,
+  py: number,
+  headingDeg: number,
+  bandRadiusM: number,
+) => boolean;
+
 export interface DistrictWorldRuntime extends WorldRuntime {
   /** Install the traffic module's pedestrian lookup (default: nobody anywhere). */
   setPedestrianQuery(fn: PedestrianQuery | null): void;
@@ -101,6 +121,8 @@ export interface DistrictWorldRuntime extends WorldRuntime {
   setOncomingQuery(fn: OncomingQuery | null): void;
   /** Install the traffic module's from-the-right lookup (default: none). */
   setRightConflictQuery(fn: RightConflictQuery | null): void;
+  /** Install the traffic module's roundabout-circulation lookup (default: none). */
+  setCirculatingQuery(fn: CirculatingQuery | null): void;
   /** Physics layer reports a contact; drained into the next sample(). */
   pushCollision(withWhat: CollisionWith): void;
   /** Phase a driver approaching `signalNodeId` on `bearingDeg` sees (renderer helper). */
@@ -129,6 +151,7 @@ export function createWorldRuntime(districtJson: District | unknown): DistrictWo
   let conflictQuery: JunctionConflictQuery = () => false;
   let oncomingQuery: OncomingQuery = () => false;
   let rightConflictQuery: RightConflictQuery = () => false;
+  let circulatingQuery: CirculatingQuery = () => false;
 
   // Junction node positions (district space) for priority conflict lookups.
   const nodePos = new Map<string, { x: number; y: number }>();
@@ -142,12 +165,17 @@ export function createWorldRuntime(districtJson: District | unknown): DistrictWo
     .filter((it) => !it.signalized && it.degree >= 3 && !guardedNodeIds.has(it.id))
     .map((it) => ({ id: it.id, x: it.x, y: it.y }));
   const uncontrolledIds = new Set(uncontrolledJunctions.map((j) => j.id));
+  const roundabouts = district.roundabouts;
 
   // Right-hand-rule visit tracker (one violation per junction entry).
   let rhrNode: string | null = null;
   let rhrFired = false;
   let rhrConflictSeen = false; // a right-conflict was observed this visit
   let rhrSlowed = false; // driver slowed to yield speed while that conflict held
+  let rbNode: string | null = null; // roundabout currently being approached
+  let rbFired = false;
+  let rbConflictSeen = false; // circulating traffic observed this approach
+  let rbSlowed = false; // driver slowed to yield speed while it was circulating
 
   // Previous-frame tracking for line-crossing detection.
   let prevEdgeIdx = -1;
@@ -326,6 +354,75 @@ export function createWorldRuntime(districtJson: District | unknown): DistrictWo
         rhrSlowed = false;
       }
 
+      // 4c. Roundabout entry: entering the ring (heading inward, at speed) while
+      // a vehicle already circulates from the left = failing to give way. Once
+      // per approach; slowing to let it pass and not barging in is commended on
+      // leaving. Mirrors the right-hand-rule tracker (roundabouts turn CCW, so
+      // the driver with priority is on your left).
+      let nearRb: (typeof roundabouts)[number] | null = null;
+      let nearRbDist2 = Infinity;
+      for (const rb of roundabouts) {
+        const dx = rb.x - v.position.x;
+        const dy = rb.y - v.position.y;
+        const d2 = dx * dx + dy * dy;
+        const reach = rb.radius + ROUNDABOUT_ENTRY_MARGIN_M;
+        if (d2 <= reach * reach && d2 < nearRbDist2) {
+          nearRb = rb;
+          nearRbDist2 = d2;
+        }
+      }
+      if (nearRb !== null) {
+        if (rbNode !== nearRb.id) {
+          rbNode = nearRb.id;
+          rbFired = false;
+          rbConflictSeen = false;
+          rbSlowed = false;
+        }
+        const band = nearRb.radius + ROUNDABOUT_BAND_EXTRA_M;
+        const circulating = circulatingQuery(
+          nearRb.x,
+          nearRb.y,
+          v.position.x,
+          v.position.y,
+          v.headingDeg,
+          band,
+        );
+        if (circulating) {
+          rbConflictSeen = true;
+          if (v.speedKmh <= RHR_YIELD_KMH) rbSlowed = true;
+        }
+        // Inward component of the heading: >0 means driving into the ring (entering),
+        // ~0 means going around it (already has priority) → don't flag.
+        const cdx = nearRb.x - v.position.x;
+        const cdy = nearRb.y - v.position.y;
+        const dist = Math.sqrt(nearRbDist2);
+        const rad = (v.headingDeg * Math.PI) / 180;
+        const inward = dist > 0 ? (cdx * Math.sin(rad) + cdy * Math.cos(rad)) / dist : 0;
+        if (
+          !rbFired &&
+          circulating &&
+          inward >= ROUNDABOUT_INWARD_MIN &&
+          v.speedKmh > RHR_MOVING_KMH
+        ) {
+          events.push({ kind: "prioritySituation", situation: "roundabout", violated: true });
+          rbFired = true;
+        }
+      } else {
+        // Left the roundabout vicinity: reward a correctly-yielded entry.
+        if (rbNode !== null && rbConflictSeen && rbSlowed && !rbFired) {
+          events.push({
+            kind: "prioritySituation",
+            situation: "roundabout",
+            violated: false,
+            yielded: true,
+          });
+        }
+        rbNode = null;
+        rbFired = false;
+        rbConflictSeen = false;
+        rbSlowed = false;
+      }
+
       // 5. Pedestrian-crossing zones.
       zones.update(v.position.x, v.position.y, v.headingDeg, fix.edgeIdx, pedQuery, events);
 
@@ -392,6 +489,10 @@ export function createWorldRuntime(districtJson: District | unknown): DistrictWo
 
     setRightConflictQuery(fn: RightConflictQuery | null): void {
       rightConflictQuery = fn ?? (() => false);
+    },
+
+    setCirculatingQuery(fn: CirculatingQuery | null): void {
+      circulatingQuery = fn ?? (() => false);
     },
 
     debugUncontrolledJunctions() {

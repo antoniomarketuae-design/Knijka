@@ -174,6 +174,9 @@ export default function LessonScene(props: LessonSceneProps) {
         runtime.setRightConflictQuery((jx, jy, px, py, h, r) =>
           traffic.conflictFromRight(jx, jy, px, py, h, r),
         );
+        runtime.setCirculatingQuery((cx, cy, px, py, h, r) =>
+          traffic.circulatingConflict(cx, cy, px, py, h, r),
+        );
         if (alive) {
           setBuilt({
             runtime,

@@ -277,6 +277,49 @@ class TrafficSystemImpl implements TrafficSystem {
   ): boolean {
     return conflictFromRightFor(this.vehicles, jx, jy, px, py, headingDeg, radiusM);
   }
+
+  circulatingConflict(
+    cx: number,
+    cy: number,
+    px: number,
+    py: number,
+    headingDeg: number,
+    bandRadiusM: number,
+  ): boolean {
+    return circulatingConflictFor(this.vehicles, cx, cy, px, py, headingDeg, bandRadiusM);
+  }
+}
+
+/**
+ * Pure "circulating vehicle approaching from the driver's left" test for a
+ * roundabout entry. Right-hand traffic circles counter-clockwise, so a car
+ * already on the ring reaches your entry from the LEFT. True when a moving
+ * vehicle sits within the ring band AND to the driver's left — the driver must
+ * give way to it.
+ */
+export function circulatingConflictFor(
+  vehicles: readonly { x: number; y: number; dirX: number; dirY: number; speedMps: number }[],
+  cx: number,
+  cy: number,
+  px: number,
+  py: number,
+  headingDeg: number,
+  bandRadiusM: number,
+): boolean {
+  const rad = (headingDeg * Math.PI) / 180;
+  // Driver's LEFT vector = forward (sinH,cosH) rotated 90° CCW = (-cosH, sinH).
+  const lx = -Math.cos(rad);
+  const ly = Math.sin(rad);
+  const r2 = bandRadiusM * bandRadiusM;
+  for (const v of vehicles) {
+    const cdx = v.x - cx;
+    const cdy = v.y - cy;
+    if (cdx * cdx + cdy * cdy > r2) continue; // not in / near the ring
+    if (v.speedMps < CONFLICT_MIN_SPEED_MPS) continue; // parked / creeping
+    if ((v.x - px) * lx + (v.y - py) * ly < RIGHT_MIN_M) continue; // not on the left
+    return true;
+  }
+  return false;
 }
 
 /** Pure "vehicle approaching from the player's right near a junction" test. */
