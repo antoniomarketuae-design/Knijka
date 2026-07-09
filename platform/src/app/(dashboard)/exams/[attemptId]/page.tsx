@@ -157,13 +157,19 @@ function ScoreReadout({
 
       <div className="relative flex flex-col items-center gap-8 sm:flex-row sm:items-center sm:gap-10">
         {/* Signature instrument: score on the official 97-point scale */}
+        {/*
+          NB: Gauge is a Client Component — a Server Component may not pass it a
+          function prop (Next throws "Functions cannot be passed directly to
+          Client Components", 500ing every server-rendered completed attempt:
+          history link, reload, direct nav). Gauge already renders the centre
+          number as String(rounded value) by default, so we simply omit `format`.
+        */}
         <Gauge
           value={score}
           max={maxScore}
           size={216}
           tone={passed ? "cyan" : "brand"}
           unit={`/ ${maxScore}`}
-          format={(n) => String(n)}
           ariaLabel={`Резултат: ${score} от ${maxScore} точки. ${
             passed ? "Изпитът е издържан" : "Изпитът не е издържан"
           }. Праг за успех ${passPoints} точки.`}

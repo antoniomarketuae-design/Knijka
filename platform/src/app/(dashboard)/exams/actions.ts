@@ -46,7 +46,15 @@ export async function startExamAction(): Promise<void> {
   const user = await requireUser();
 
   // Free tier: one mock exam total; packs unlock unlimited attempts.
-  if (!(await requireEntitlementForExam(user.id))) {
+  //
+  // DEV ESCAPE HATCH (pre-launch): outside production the free-attempt cap is
+  // bypassed so the team can rehearse the exam repeatedly without wiring up a
+  // payment. Without this, the second „Започни пробен изпит" click silently
+  // bounces to /pricing and the exam appears to "not start". Production keeps
+  // the freemium gate fully intact (1 free exam, then /pricing) — flip this by
+  // removing the guard once a dev entitlement seed exists.
+  const enforceExamLimit = process.env.NODE_ENV === "production";
+  if (enforceExamLimit && !(await requireEntitlementForExam(user.id))) {
     redirect("/pricing?status=exam-limit");
   }
 
