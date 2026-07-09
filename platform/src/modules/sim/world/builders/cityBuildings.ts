@@ -1,17 +1,22 @@
 /**
- * City buildings — places Kenney "City Kit Commercial" (CC0) low-poly models
- * onto the real OSM footprints. This is the VISUAL replacement for the
- * procedural extruded prisms: buildBuildings() still produces the wall/roof
- * mesh data + the collider (physics is unchanged and the renderer keeps the
- * colliders), but the renderer draws these instanced models instead of the
- * flat prisms.
+ * City buildings — places our authored glass-tower models (public/sim/city,
+ * `tower_*.glb`) onto the real OSM footprints. This is the VISUAL replacement
+ * for the procedural extruded prisms: buildBuildings() still produces the
+ * wall/roof mesh data + the collider (physics is unchanged and the renderer
+ * keeps the colliders), but the renderer draws these instanced glass towers
+ * instead of the flat prisms.
  *
- * For each footprint we take its minimum-area oriented bounding box and tile a
- * deterministically-chosen model along the long axis, so a 50 m panelka block
- * becomes a row of façade modules rather than one stretched box (which would
- * smear the windows). Pure + testable: no three.js, no DOM. The CITY_MODELS
- * dimension table is the shared contract with the client loader (cityModels.ts),
- * which normalises every GLB to unit height with its footprint centred on x/z.
+ * Every footprint becomes ONE glass tower (towers are monolithic point/slab
+ * blocks — tiling copies of a tower side-by-side would look wrong). For each
+ * footprint we take its minimum-area oriented bounding box, derive a target
+ * height from the footprint's plan size (bigger plots → taller towers, min/max
+ * clamped) and pick the tower model whose authored floor count matches that
+ * height. The footprint fit is proportion-preserving: the tower is scaled to
+ * cover the plot but never stretched more than STRETCH× beyond the model's own
+ * slender proportions, so a tower never becomes a squished box or a wildly fat
+ * slab. Pure + testable: no three.js, no DOM. The CITY_MODELS dimension table
+ * is the shared contract with the client loader (cityModels.ts), which
+ * normalises every GLB to unit height with its footprint centred on x/z.
  */
 
 import type { BuildingInstancePlacement, DistrictBuilding } from "../types";
@@ -24,36 +29,42 @@ export interface CityModel {
   mw: number;
   /** Native footprint depth ÷ height (z-extent / y-extent) at unit height. */
   md: number;
-  /** Tall tower — only chosen for high buildings. */
-  tall: boolean;
+  /** Authored floor count (parsed from the model) — drives height-class fit. */
+  floors: number;
 }
 
 /**
- * The shipped model set (public/sim/city). `mw`/`md` are measured from each
- * GLB's bounding box (x/y and z/y) and MUST match the loader's unit-height
- * normalisation — they drive the footprint fit.
+ * The shipped glass-tower set (public/sim/city). `mw`/`md` are measured from
+ * each GLB's bounding box (x/y and z/y) at unit height and MUST match the
+ * loader's unit-height normalisation — they drive the footprint fit. `floors`
+ * is the authored storey count (from the file name) and selects which tower
+ * lands on a given plot size.
  */
 export const CITY_MODELS: CityModel[] = [
-  { file: "building-a", mw: 0.68, md: 0.73, tall: false },
-  { file: "building-b", mw: 0.75, md: 0.73, tall: false },
-  { file: "building-c", mw: 0.99, md: 1.22, tall: false },
-  { file: "building-d", mw: 0.65, md: 0.7, tall: false },
-  { file: "building-e", mw: 1.84, md: 1.13, tall: false },
-  { file: "building-f", mw: 0.5, md: 0.61, tall: false },
-  { file: "building-g", mw: 0.57, md: 0.54, tall: false },
-  { file: "building-h", mw: 0.68, md: 0.78, tall: false },
-  { file: "building-i", mw: 0.74, md: 0.77, tall: false },
-  { file: "building-skyscraper-a", mw: 0.47, md: 0.47, tall: true },
-  { file: "building-skyscraper-c", mw: 0.31, md: 0.34, tall: true },
-  { file: "building-skyscraper-e", mw: 0.32, md: 0.3, tall: true },
+  { file: "tower_res_blue_24", mw: 0.246, md: 0.248, floors: 24 },
+  { file: "tower_res_silver_28", mw: 0.212, md: 0.181, floors: 28 },
+  { file: "tower_office_bronze_30", mw: 0.228, md: 0.229, floors: 30 },
+  { file: "tower_office_teal_34", mw: 0.228, md: 0.176, floors: 34 },
+  { file: "tower_res_teal_36", mw: 0.126, md: 0.149, floors: 36 },
+  { file: "tower_twin_a_40", mw: 0.126, md: 0.127, floors: 40 },
+  { file: "tower_twin_b_40", mw: 0.126, md: 0.127, floors: 40 },
+  { file: "tower_office_dark_42", mw: 0.165, md: 0.146, floors: 42 },
+  { file: "tower_res_bronze_46", mw: 0.099, md: 0.117, floors: 46 },
+  { file: "tower_office_grey_50", mw: 0.125, md: 0.109, floors: 50 },
 ];
 
-const REGULAR_IDX = CITY_MODELS.flatMap((m, i) => (m.tall ? [] : [i]));
-const TALL_IDX = CITY_MODELS.flatMap((m, i) => (m.tall ? [i] : []));
-
-const TALL_MIN_H = 24; // buildings >= this pick a tower model
-const MAX_MODULES = 6; // cap on tiled façade modules per footprint
-const DEPTH_STRETCH_CAP = 2.4; // limit depth vs the model's natural depth
+/** World metres per authored storey (sets a tower's rendered height band). */
+const METERS_PER_FLOOR = 3.4;
+/** Height clamp (m). Floor of the shortest tower / ceiling of the tallest. */
+const H_MIN = 42;
+const H_MAX = CITY_MODELS[CITY_MODELS.length - 1]!.floors * METERS_PER_FLOOR; // 50 floors → 170 m
+/** Plan-size (√area, m) → target height gain. Tuned for a tall varied skyline. */
+const AREA_TO_HEIGHT = 6.5;
+/** Max footprint fit stretch vs the model's natural (proportional) footprint. */
+const STRETCH = 1.6;
+/** Keep the rendered height within this band of the model's authored height,
+ *  so a tower is never vertically squished/stretched into an implausible shape. */
+const PROPORTION_BAND = 0.15;
 
 interface OBB {
   cx: number;
@@ -115,9 +126,36 @@ export function orientedBox(ring: Vec2[]): OBB {
   return best ?? { cx: ring[0]?.[0] ?? 0, cy: ring[0]?.[1] ?? 0, angle: 0, w: 6, d: 6 };
 }
 
+function clamp(v: number, lo: number, hi: number): number {
+  return v < lo ? lo : v > hi ? hi : v;
+}
+
 /**
- * One instanced placement per façade module. World space, base at y=0, with a
- * non-uniform (width, height, depth) fit scale on the unit-height model.
+ * Pick the tower model whose authored floor count best matches `targetFloors`,
+ * using a per-building hash to break ties (and split the two 40-floor twins) so
+ * neighbouring plots of the same size don't all resolve to the same tower.
+ */
+function pickModel(targetFloors: number, hash: number): number {
+  let best = 0;
+  let bestScore = Infinity;
+  for (let i = 0; i < CITY_MODELS.length; i++) {
+    // Tiny deterministic jitter breaks exact ties (e.g. twin_a vs twin_b).
+    const jitter = ((hash >>> i) & 1) * 0.25;
+    const score = Math.abs(CITY_MODELS[i]!.floors - targetFloors) + jitter;
+    if (score < bestScore) {
+      bestScore = score;
+      best = i;
+    }
+  }
+  return best;
+}
+
+/**
+ * One instanced glass tower per footprint. World space, base at y=0, with a
+ * non-uniform (width, height, depth) fit scale on the unit-height model. Height
+ * is derived from the footprint's plan size (√area) — not the OSM height — so
+ * the skyline is a tall, varied glass metropolis; the fit is capped so a tower
+ * keeps plausible slender proportions rather than being stretched or squished.
  */
 export function buildBuildingInstances(
   buildings: DistrictBuilding[],
@@ -127,38 +165,40 @@ export function buildBuildingInstances(
     if (!b.footprint || b.footprint.length < 3) continue;
     const ring = toCCW(b.footprint as Vec2[]);
     const box = orientedBox(ring);
-    if (box.w < 1 || box.d < 1) continue;
+    if (box.w < 2 || box.d < 2) continue;
 
-    const H = Math.max(3, b.height);
     const hash = hashString(b.id);
-    const pool = H >= TALL_MIN_H ? TALL_IDX : REGULAR_IDX;
-    const modelIndex = pool[hash % pool.length]!;
+    // Deterministic ±15% skyline jitter from the id (varies equal-size plots).
+    const jitter = 0.85 + ((hash % 1000) / 1000) * 0.3;
+
+    // Height from plan size (√area is the plot's characteristic dimension), so
+    // bigger plots carry taller towers. Clamped to the tower height band.
+    const planSize = Math.sqrt(box.w * box.d);
+    const targetH = clamp(planSize * AREA_TO_HEIGHT * jitter, H_MIN, H_MAX);
+
+    // Choose the tower whose storey count fits, then render within a tight band
+    // of that tower's authored height so it never looks vertically distorted.
+    const modelIndex = pickModel(targetH / METERS_PER_FLOOR, hash);
     const m = CITY_MODELS[modelIndex]!;
+    const authoredH = m.floors * METERS_PER_FLOOR;
+    const H = clamp(targetH, authoredH * (1 - PROPORTION_BAND), authoredH * (1 + PROPORTION_BAND));
 
-    // Tile the long axis: each module's natural width at height H is mw*H.
-    const naturalModuleW = Math.max(0.5, m.mw * H);
-    const n = Math.min(MAX_MODULES, Math.max(1, Math.round(box.w / naturalModuleW)));
-    const moduleW = box.w / n;
-
-    // Scale the unit-height model (native extents mw × 1 × md) to fit.
-    const sx = moduleW / m.mw;
+    // Fit the footprint but cap the stretch vs the model's natural footprint
+    // (mw·H × md·H) so the glass box is neither absurdly fat nor a thin needle.
+    const natW = m.mw * H;
+    const natD = m.md * H;
+    const worldW = clamp(box.w, natW / STRETCH, natW * STRETCH);
+    const worldD = clamp(box.d, natD / STRETCH, natD * STRETCH);
+    const sx = worldW / m.mw;
     const sy = H;
-    const depth = Math.min(box.d, m.md * H * DEPTH_STRETCH_CAP);
-    const sz = depth / m.md;
+    const sz = worldD / m.md;
 
-    const ux = Math.cos(box.angle);
-    const uy = Math.sin(box.angle);
-    for (let k = 0; k < n; k++) {
-      const off = (k - (n - 1) / 2) * moduleW;
-      const mcx = box.cx + ux * off;
-      const mcy = box.cy + uy * off;
-      out.push({
-        model: modelIndex,
-        position: [mcx, 0, -mcy], // district (x,y) -> world (x, 0, -y)
-        yaw: box.angle,
-        scale: [sx, sy, sz],
-      });
-    }
+    out.push({
+      model: modelIndex,
+      position: [box.cx, 0, -box.cy], // district (x,y) -> world (x, 0, -y)
+      yaw: box.angle,
+      scale: [sx, sy, sz],
+    });
   }
   return out;
 }

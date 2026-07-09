@@ -1,15 +1,20 @@
 "use client";
 
 /**
- * CityBuildings — instanced Kenney building modules placed on the OSM
- * footprints (world.buildingInstances). All meshes share a single atlas
- * material, and instances are chunked into a 128 m spatial grid: one
- * InstancedMesh per (model, chunk). Each chunk mesh gets an instance-aware
- * bounding sphere (computeBoundingSphere), so frustum culling works again and
- * off-screen chunks (most of the city, given a ground-level 90° FOV) are
- * skipped in both the color and the shadow pass. This restores GPU headroom
- * vs. the previous "one mesh per model, culling disabled, whole city always
- * drawn" layout.
+ * CityBuildings — instanced authored glass towers placed on the OSM footprints
+ * (world.buildingInstances). Each tower carries multiple PBR materials, so it is
+ * drawn as one InstancedMesh PER material group (glass / mullion / spandrel /
+ * lit windows / …), all sharing the SAME per-instance matrices. The glass
+ * materials reflect the scene HDRI (scene.environment, set by the scene's
+ * <Environment>) automatically via MeshStandardMaterial's envMap sampling — the
+ * signature glass-tower look — and the emissive `glass_lit` windows glow,
+ * brighter at night.
+ *
+ * Instances are chunked into a 128 m spatial grid: one InstancedMesh per
+ * (model, material group, chunk). Each chunk mesh gets an instance-aware
+ * bounding sphere (computeBoundingSphere), so frustum culling works and
+ * off-screen chunks (most of the city, given a ground-level ~90° FOV) are
+ * skipped in both the color and the shadow pass.
  *
  * Falls back to nothing (the procedural walls are gone) until the GLBs load,
  * so a brief empty-lot moment is expected on first paint. Non-uniform per-
@@ -29,6 +34,10 @@ preloadCityModels();
 
 /** Spatial chunk size for frustum-cullable building groups (meters). */
 const CHUNK_M = 128;
+
+/** Emissive intensity of the lit-window material by time of day. */
+const DAY_GLOW = 1.0;
+const NIGHT_GLOW = 3.2;
 
 const _pos = new THREE.Vector3();
 const _quat = new THREE.Quaternion();
@@ -70,33 +79,23 @@ function makeInstanced(
 export function CityBuildings({
   world,
   preset,
+  night = false,
 }: {
   world: WorldGeometry;
   preset: QualityPreset;
+  night?: boolean;
 }) {
   const models = useCityModels();
 
   const assets = useMemo(() => {
     if (!models) return null;
-    // Bump the shared atlas anisotropy to this quality tier (crisper facades at
-    // grazing angles); safe to mutate the cache-owned texture in place.
-    const aniso = Math.min(8, Math.max(1, preset.anisotropy));
-    if (models.texture.anisotropy !== aniso) {
-      models.texture.anisotropy = aniso;
-      models.texture.needsUpdate = true;
-    }
-    const material = new THREE.MeshStandardMaterial({
-      map: models.texture,
-      roughness: 0.82,
-      metalness: 0,
-    });
     const castShadow = preset.castShadows !== "none";
 
     // Bucket placements by (model, 128 m chunk). Only non-empty buckets become
     // meshes, so empty sky over the district costs nothing.
     const buckets = new Map<string, { model: number; list: BuildingInstancePlacement[] }>();
     for (const p of world.buildingInstances) {
-      const model = models.geometries[p.model] ? p.model : 0;
+      const model = models.models[p.model] ? p.model : 0;
       const cx = Math.floor(p.position[0] / CHUNK_M);
       const cz = Math.floor(p.position[2] / CHUNK_M);
       const key = `${model}:${cx}:${cz}`;
@@ -107,26 +106,48 @@ export function CityBuildings({
       }
       bucket.list.push(p);
     }
+
+    // One InstancedMesh per (model, material group, chunk): every group of a
+    // model reuses the same per-instance matrices but its own geometry+material.
     const meshes: THREE.InstancedMesh[] = [];
     for (const [key, bucket] of buckets) {
-      meshes.push(
-        makeInstanced(
-          models.geometries[bucket.model]!,
-          material,
-          bucket.list,
-          castShadow,
-          preset.receiveShadows,
-          `city-buildings-${key}`,
-        ),
-      );
+      const groups = models.models[bucket.model];
+      if (!groups) continue;
+      for (const grp of groups) {
+        meshes.push(
+          makeInstanced(
+            grp.geometry,
+            grp.material,
+            bucket.list,
+            castShadow,
+            preset.receiveShadows,
+            `city-buildings-${key}-${grp.name}`,
+          ),
+        );
+      }
     }
-    return { material, meshes };
-  }, [models, world.buildingInstances, preset.anisotropy, preset.castShadows, preset.receiveShadows]);
+    return { meshes };
+  }, [models, world.buildingInstances, preset.castShadows, preset.receiveShadows]);
+
+  // Night glow — tweak the shared emissive window material in place (cheap; no
+  // mesh rebuild). Materials are cache-owned, like the previous atlas texture.
+  useEffect(() => {
+    if (!models) return;
+    const want = night ? NIGHT_GLOW : DAY_GLOW;
+    for (const groups of models.models) {
+      for (const g of groups) {
+        if (g.name === "glass_lit" && g.material.emissiveIntensity !== want) {
+          g.material.emissiveIntensity = want;
+          g.material.needsUpdate = true;
+        }
+      }
+    }
+  }, [models, night]);
 
   useEffect(
     () => () => {
+      // Dispose only our InstancedMeshes; geometries + materials are cache-owned.
       if (!assets) return;
-      assets.material.dispose();
       for (const m of assets.meshes) m.dispose();
     },
     [assets],

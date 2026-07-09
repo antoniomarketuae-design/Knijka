@@ -1,37 +1,80 @@
 /**
- * Kenney "City Kit Commercial" (CC0) building geometry loader — CLIENT ONLY
- * (GLTFLoader needs the DOM). Loads every model in CITY_MODELS, merges each
- * GLB's primitives into one geometry (keeping UVs), and normalises it to unit
- * height with its footprint centred on x/z and base at y=0 — the exact contract
- * the pure placement builder (cityBuildings.ts) assumes when it fits footprints.
+ * Glass-tower geometry loader — CLIENT ONLY (GLTFLoader needs the DOM).
  *
- * All models share one small colour-atlas (colormap.png), so the renderer uses
- * a single textured material across every instanced mesh. Loading model mirrors
- * treeModels.ts: a reference-counted module cache that loads + bakes once,
- * shares the results, and disposes them when the last consumer unmounts.
+ * Loads every model in CITY_MODELS (the authored `tower_*.glb` glass towers,
+ * Draco-compressed by the asset pipeline — hence createGltfLoader(), NOT a bare
+ * GLTFLoader which throws "no DRACOLoader instance provided"). Unlike the old
+ * Kenney kit (one merged geometry + a shared colormap atlas), each tower carries
+ * its OWN PBR materials — `glass_*` (dark, metal 0, rough 0.05: reflects the
+ * scene HDRI), `mullion` (metallic), `spandrel_*`/`stone`/`crown`, `retail_glass`
+ * and `glass_lit` (emissive warm windows). We keep those materials: this loader
+ * bakes each GLB into one `{ geometry, material }` group PER material so the
+ * renderer can instance them separately and the glass reflects `scene.environment`
+ * (set by the scene's <Environment>) via MeshStandardMaterial's envMap sampling.
+ *
+ * Every group of a model shares one normalisation (computed over the WHOLE
+ * model's bbox): base y=0, footprint centred on x/z, height = 1 — the exact
+ * contract the pure placement builder (cityBuildings.ts) assumes when it fits
+ * footprints, so all of a tower's material groups stay perfectly aligned.
+ *
+ * Loading model mirrors treeModels.ts: a reference-counted module cache that
+ * loads + bakes once, shares the results across every instanced mesh, and
+ * disposes them (geometry + material) when the last consumer unmounts.
  */
 
 import { useEffect, useState } from "react";
 import * as THREE from "three";
-import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import type { GLTF } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { CITY_MODELS } from "../builders/cityBuildings";
+import { createGltfLoader } from "./gltfLoader";
 import { mergeSafe } from "./three-helpers";
 
 const BASE_URL = "/sim/city";
 
-export interface CityAssets {
-  /** Baked geometries, index === CITY_MODELS index. */
-  geometries: THREE.BufferGeometry[];
-  /** Shared colour atlas for every model. */
-  texture: THREE.Texture;
+/** One bake result per glTF material: geometry + its own PBR material. */
+export interface CityMaterialGroup {
+  geometry: THREE.BufferGeometry;
+  material: THREE.MeshStandardMaterial;
+  /** glTF material name (e.g. "glass_grey", "mullion", "glass_lit"). */
+  name: string;
 }
 
-/** Merge a GLB scene's mesh primitives into one geometry, keeping UVs, then
- *  normalise to base y=0, centred x/z, height = 1. */
-function bakeBuilding(scene: THREE.Object3D): THREE.BufferGeometry {
+export interface CityAssets {
+  /** Per model (index === CITY_MODELS index): its material groups. */
+  models: CityMaterialGroup[][];
+}
+
+/**
+ * Clone a glTF-loaded material (so we own + can tweak/dispose it) and give the
+ * glossy glass extra envMap punch so the HDRI reflection reads as real glass.
+ * three already builds correct metalness/roughness/emissive from the glTF (incl.
+ * KHR_materials_emissive_strength → emissiveIntensity on `glass_lit`).
+ */
+function prepMaterial(src: THREE.MeshStandardMaterial): THREE.MeshStandardMaterial {
+  const m = src.clone();
+  // Reflective glass (glass_*, retail_glass) is very smooth; push its
+  // environment reflection so towers mirror the sky/scene. Metals (mullion,
+  // spandrel, crown) get a milder bump.
+  m.envMapIntensity = m.roughness <= 0.12 ? 1.8 : 1.2;
+  m.needsUpdate = true;
+  return m;
+}
+
+/**
+ * Bake a tower GLB scene into one `{ geometry, material }` group per material.
+ * All groups share a single normalisation over the whole model's bounding box:
+ * base y=0, centred on x/z, height = 1.
+ */
+function bakeTowerGroups(scene: THREE.Object3D): CityMaterialGroup[] {
   scene.updateWorldMatrix(true, true);
-  const parts: THREE.BufferGeometry[] = [];
+
+  interface RawPart {
+    geom: THREE.BufferGeometry;
+    material: THREE.MeshStandardMaterial;
+  }
+  const parts: RawPart[] = [];
+  const bbox = new THREE.Box3();
+  bbox.makeEmpty();
 
   scene.traverse((obj) => {
     const mesh = obj as THREE.Mesh;
@@ -43,74 +86,69 @@ function bakeBuilding(scene: THREE.Object3D): THREE.BufferGeometry {
     const g = new THREE.BufferGeometry();
     g.setAttribute("position", posAttr.clone());
     if (src.index) g.setIndex(src.index.clone());
-    g.applyMatrix4(mesh.matrixWorld);
-
-    // Keep UVs (index into the shared atlas); synth a zero fallback so every
-    // part carries the same attribute set (mergeSafe requires consistency).
-    const uv = src.getAttribute("uv");
-    if (uv) g.setAttribute("uv", uv.clone());
-    else g.setAttribute("uv", new THREE.BufferAttribute(new Float32Array(posAttr.count * 2), 2));
-
     const nor = src.getAttribute("normal");
     if (nor) g.setAttribute("normal", nor.clone());
-    else g.computeVertexNormals();
+    const uv = src.getAttribute("uv");
+    if (uv) g.setAttribute("uv", uv.clone());
+    // Bake the node's world transform into the positions/normals.
+    g.applyMatrix4(mesh.matrixWorld);
+    if (!nor) g.computeVertexNormals();
+    // Synth a zero UV fallback so a material group with mixed primitives keeps a
+    // consistent attribute set (mergeSafe requires it).
+    if (!g.getAttribute("uv")) {
+      g.setAttribute("uv", new THREE.BufferAttribute(new Float32Array(posAttr.count * 2), 2));
+    }
 
-    parts.push(g);
+    g.computeBoundingBox();
+    if (g.boundingBox) bbox.union(g.boundingBox);
+
+    const mat = Array.isArray(mesh.material) ? mesh.material[0] : mesh.material;
+    parts.push({ geom: g, material: mat as THREE.MeshStandardMaterial });
   });
 
-  if (parts.length === 0) throw new Error("bakeBuilding: GLB scene has no mesh geometry");
+  if (parts.length === 0) throw new Error("bakeTowerGroups: GLB scene has no mesh geometry");
 
-  const merged = mergeSafe(parts, false);
-  for (const p of parts) p.dispose();
+  // Whole-model normalisation shared by every group.
+  const cx = (bbox.min.x + bbox.max.x) / 2;
+  const cz = (bbox.min.z + bbox.max.z) / 2;
+  const minY = bbox.min.y;
+  const h = bbox.max.y - bbox.min.y;
+  const inv = h > 1e-4 ? 1 / h : 1;
 
-  merged.computeBoundingBox();
-  const bb = merged.boundingBox!;
-  const cx = (bb.min.x + bb.max.x) / 2;
-  const cz = (bb.min.z + bb.max.z) / 2;
-  merged.translate(-cx, -bb.min.y, -cz);
-  const h = bb.max.y - bb.min.y;
-  if (h > 1e-4) merged.scale(1 / h, 1 / h, 1 / h);
-  merged.computeBoundingSphere();
-  return merged;
-}
+  // Group parts by their (shared) material instance.
+  const groups = new Map<THREE.MeshStandardMaterial, THREE.BufferGeometry[]>();
+  for (const p of parts) {
+    let list = groups.get(p.material);
+    if (!list) {
+      list = [];
+      groups.set(p.material, list);
+    }
+    list.push(p.geom);
+  }
 
-function loadTexture(): Promise<THREE.Texture> {
-  return new Promise((resolve, reject) => {
-    new THREE.TextureLoader().load(
-      `${BASE_URL}/colormap.png`,
-      (tex) => {
-        // glTF UVs assume flipY=false. The atlas is 512² of large solid colour
-        // swatches, so: NearestFilter on magnification keeps swatches crisp up
-        // close with zero neighbour bleed, while trilinear mipmapping +
-        // anisotropy on minification kills the facade shimmer/sparkle at
-        // distance and grazing angles (the aliasing only ever appears when the
-        // texture minifies, so mips are safe here). Anisotropy is bumped per
-        // quality by the consumer (see CityBuildings).
-        tex.flipY = false;
-        tex.colorSpace = THREE.SRGBColorSpace;
-        tex.magFilter = THREE.NearestFilter;
-        tex.minFilter = THREE.LinearMipmapLinearFilter;
-        tex.generateMipmaps = true;
-        tex.anisotropy = 8;
-        resolve(tex);
-      },
-      undefined,
-      (err) => reject(err instanceof Error ? err : new Error("colormap load failed")),
-    );
-  });
+  const out: CityMaterialGroup[] = [];
+  for (const [material, geoms] of groups) {
+    const merged = mergeSafe(geoms, false);
+    for (const g of geoms) g.dispose();
+    merged.translate(-cx, -minY, -cz);
+    if (h > 1e-4) merged.scale(inv, inv, inv);
+    merged.computeBoundingSphere();
+    out.push({ geometry: merged, material: prepMaterial(material), name: material.name ?? "" });
+  }
+  return out;
 }
 
 function buildAssets(): Promise<CityAssets> {
-  const loader = new GLTFLoader();
-  const geometries = Promise.all(
+  const loader = createGltfLoader();
+  return Promise.all(
     CITY_MODELS.map(
       (m) =>
-        new Promise<THREE.BufferGeometry>((resolve, reject) => {
+        new Promise<CityMaterialGroup[]>((resolve, reject) => {
           loader.load(
             `${BASE_URL}/${m.file}.glb`,
             (gltf: GLTF) => {
               try {
-                resolve(bakeBuilding(gltf.scene));
+                resolve(bakeTowerGroups(gltf.scene));
               } catch (err) {
                 reject(err instanceof Error ? err : new Error(String(err)));
               }
@@ -120,11 +158,7 @@ function buildAssets(): Promise<CityAssets> {
           );
         }),
     ),
-  );
-  return Promise.all([geometries, loadTexture()]).then(([geoms, texture]) => ({
-    geometries: geoms,
-    texture,
-  }));
+  ).then((models) => ({ models }));
 }
 
 // ---------------------------------------------------------------------------
@@ -164,8 +198,12 @@ function release(): void {
     entry = null;
     e.promise
       .then((assets) => {
-        for (const g of assets.geometries) g.dispose();
-        assets.texture.dispose();
+        for (const groups of assets.models) {
+          for (const g of groups) {
+            g.geometry.dispose();
+            g.material.dispose();
+          }
+        }
       })
       .catch(() => {
         /* load failed — nothing to dispose */
@@ -180,8 +218,8 @@ export function preloadCityModels(): void {
 }
 
 /**
- * Returns the baked building geometries + shared atlas, or null until they load
- * / on the server. Assets are cache-owned — do NOT dispose them from consumers.
+ * Returns the baked per-material tower groups, or null until they load / on the
+ * server. Assets are cache-owned — do NOT dispose them from consumers.
  */
 export function useCityModels(): CityAssets | null {
   const [assets, setAssets] = useState<CityAssets | null>(null);

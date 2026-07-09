@@ -42,7 +42,7 @@ describe("orientedBox", () => {
 });
 
 describe("buildBuildingInstances", () => {
-  const longBlock: DistrictBuilding = {
+  const block: DistrictBuilding = {
     id: "panelka-1",
     height: 12,
     heightSource: "levels",
@@ -54,45 +54,71 @@ describe("buildBuildingInstances", () => {
     ],
   };
 
-  it("tiles a long footprint into multiple modules on the ground", () => {
-    const inst = buildBuildingInstances([longBlock]);
-    expect(inst.length).toBeGreaterThan(1); // a 48 m block is several modules
-    for (const p of inst) {
-      expect(p.position[1]).toBe(0); // base on the ground
-      expect(Number.isFinite(p.position[0])).toBe(true);
-      expect(Number.isFinite(p.position[2])).toBe(true);
-      expect(p.scale[0]).toBeGreaterThan(0);
-      expect(p.scale[1]).toBeCloseTo(12); // height = building height
-      expect(p.scale[2]).toBeGreaterThan(0);
-      expect(p.model).toBeGreaterThanOrEqual(0);
-      expect(p.model).toBeLessThan(CITY_MODELS.length);
-      // Modules sit within the footprint span (world z = -y).
-      expect(p.position[0]).toBeGreaterThanOrEqual(-2);
-      expect(p.position[0]).toBeLessThanOrEqual(50);
-    }
+  it("places exactly one glass tower per footprint, on the ground", () => {
+    const inst = buildBuildingInstances([block]);
+    expect(inst).toHaveLength(1); // towers are monolithic — one per plot
+    const p = inst[0]!;
+    expect(p.position[1]).toBe(0); // base on the ground
+    expect(Number.isFinite(p.position[0])).toBe(true);
+    expect(Number.isFinite(p.position[2])).toBe(true);
+    expect(p.scale[0]).toBeGreaterThan(0);
+    expect(p.scale[2]).toBeGreaterThan(0);
+    expect(p.model).toBeGreaterThanOrEqual(0);
+    expect(p.model).toBeLessThan(CITY_MODELS.length);
+    // Tower is centred on the footprint (world z = -y).
+    expect(p.position[0]).toBeCloseTo(24);
+    expect(p.position[2]).toBeCloseTo(-5);
   });
 
-  it("is deterministic", () => {
-    const a = buildBuildingInstances([longBlock]);
-    const b = buildBuildingInstances([longBlock]);
-    expect(a).toEqual(b);
+  it("derives height from the footprint size, not the OSM height", () => {
+    const inst = buildBuildingInstances([block]);
+    const h = inst[0]!.scale[1];
+    // A tall, believable tower — NOT the 12 m OSM height.
+    expect(h).toBeGreaterThan(40);
+    expect(h).toBeLessThanOrEqual(175);
+    expect(h).not.toBeCloseTo(12);
   });
 
-  it("picks a tower model for tall buildings", () => {
-    const tower: DistrictBuilding = {
-      id: "tower-1",
-      height: 40,
+  it("keeps plausible tower proportions (no absurd footprint stretch)", () => {
+    const inst = buildBuildingInstances([block]);
+    const p = inst[0]!;
+    const m = CITY_MODELS[p.model]!;
+    const H = p.scale[1];
+    // Fit width/depth stay within the capped band of the model's natural
+    // footprint (mw·H × md·H) — never a squished box or a wildly fat slab.
+    const worldW = p.scale[0] * m.mw;
+    const worldD = p.scale[2] * m.md;
+    expect(worldW).toBeGreaterThanOrEqual((m.mw * H) / 1.6 - 1e-6);
+    expect(worldW).toBeLessThanOrEqual(m.mw * H * 1.6 + 1e-6);
+    expect(worldD).toBeGreaterThanOrEqual((m.md * H) / 1.6 - 1e-6);
+    expect(worldD).toBeLessThanOrEqual(m.md * H * 1.6 + 1e-6);
+  });
+
+  it("puts taller towers on bigger footprints", () => {
+    const square = (id: string, s: number): DistrictBuilding => ({
+      id,
+      height: 20,
       heightSource: "height",
       footprint: [
         [0, 0],
-        [16, 0],
-        [16, 16],
-        [0, 16],
+        [s, 0],
+        [s, s],
+        [0, s],
       ],
-    };
-    const inst = buildBuildingInstances([tower]);
-    expect(inst.length).toBeGreaterThan(0);
-    expect(CITY_MODELS[inst[0]!.model]!.tall).toBe(true);
+    });
+    const small = buildBuildingInstances([square("small", 8)])[0]!;
+    const large = buildBuildingInstances([square("large", 40)])[0]!;
+    // Bigger plot → taller authored model AND a taller rendered height.
+    expect(CITY_MODELS[large.model]!.floors).toBeGreaterThan(
+      CITY_MODELS[small.model]!.floors,
+    );
+    expect(large.scale[1]).toBeGreaterThan(small.scale[1]);
+  });
+
+  it("is deterministic", () => {
+    const a = buildBuildingInstances([block]);
+    const b = buildBuildingInstances([block]);
+    expect(a).toEqual(b);
   });
 
   it("skips degenerate footprints", () => {

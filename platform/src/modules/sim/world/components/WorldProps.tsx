@@ -520,7 +520,7 @@ export function WorldPropsGroup({
 }) {
   return (
     <group name="world-props">
-      <CityBuildings world={world} preset={preset} />
+      <CityBuildings world={world} preset={preset} night={night} />
       <TrafficLights world={world} preset={preset} getSignalPhase={getSignalPhase} />
       <SignPoles world={world} preset={preset} signSvgBaseUrl={signSvgBaseUrl} />
       <Streetlights world={world} preset={preset} night={night} />
