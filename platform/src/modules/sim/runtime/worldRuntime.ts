@@ -24,6 +24,7 @@ import type { SimTick, SimTickEvent } from "../rules/types";
 import { BG_URBAN_DEFAULT_KMH, parseDistrict, type District } from "./district";
 import { Locator } from "./locator";
 import { DistrictIndex, makeEdgeHit, OFF_ROAD_DISTANCE_M } from "./spatial";
+import { bearingDeg, signedDeltaDeg } from "./geometry";
 import { SignalController, type SignalClusterInfo } from "./signals";
 import { buildStopLines, type StopLine, type StopLineSet } from "./stoplines";
 import { CrossingZoneTracker, type PedestrianQuery } from "./zones";
@@ -32,6 +33,25 @@ import { JUNCTION_AREA_RADIUS_M, TurnDetector } from "./turns";
 /** A stop line can re-fire only after this long (jitter at the line must not
  * spam RED_LIGHT_CROSSED; a genuine re-approach takes longer anyway). */
 const STOP_LINE_REFIRE_SEC = 5;
+
+/** Heading opposes the one-way's flow by more than this → wrong way. */
+const WRONG_WAY_ANGLE_DEG = 120;
+
+/**
+ * True when a vehicle heads against a one-way street's flow. `tangent` is the
+ * geometry-forward unit direction at the vehicle's position (index.tangentAt);
+ * headingDeg is 0 = north, clockwise. Two-way edges never flag (overtaking into
+ * the oncoming bank is legal there).
+ */
+export function isWrongWay(
+  oneway: boolean,
+  tangent: readonly [number, number],
+  headingDeg: number,
+): boolean {
+  if (!oneway) return false;
+  const forwardDeg = bearingDeg(tangent[0], tangent[1]);
+  return Math.abs(signedDeltaDeg(headingDeg, forwardDeg)) > WRONG_WAY_ANGLE_DEG;
+}
 
 type CollisionWith = "vehicle" | "pedestrian" | "cyclist" | "staticObject";
 
@@ -173,7 +193,12 @@ export function createWorldRuntime(districtJson: District | unknown): DistrictWo
       // 5. Pedestrian-crossing zones.
       zones.update(v.position.x, v.position.y, v.headingDeg, fix.edgeIdx, pedQuery, events);
 
-      const maxSpeedKmh = fix.edgeIdx >= 0 ? index.edgeRt(fix.edgeIdx).edge.maxspeed : defaultLimit;
+      const edgeRt = fix.edgeIdx >= 0 ? index.edgeRt(fix.edgeIdx) : null;
+      const maxSpeedKmh = edgeRt ? edgeRt.edge.maxspeed : defaultLimit;
+      const wrongWay =
+        edgeRt !== null && edgeRt.edge.oneway
+          ? isWrongWay(true, index.tangentAt(fix.edgeIdx, fix.sM), v.headingDeg)
+          : false;
 
       return {
         t: tSec,
@@ -191,6 +216,7 @@ export function createWorldRuntime(districtJson: District | unknown): DistrictWo
         isNight,
         rain,
         leadGapM,
+        wrongWay,
         events,
       };
     },

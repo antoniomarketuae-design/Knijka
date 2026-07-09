@@ -85,6 +85,7 @@ export interface RuleEngineState {
   conditionsSpeed: EpisodeState;
   rainLights: EpisodeState;
   following: EpisodeState;
+  wrongWay: EpisodeState;
   crossing: CrossingZoneState | null;
   collisionCooldownUntil: number | null;
   /** Set once a collision occurs — the session grades as terminated. */
@@ -110,6 +111,7 @@ export function createRuleEngine(config?: Partial<RuleEngineConfig>): RuleEngine
     conditionsSpeed: { ...IDLE_EPISODE },
     rainLights: { ...IDLE_EPISODE },
     following: { ...IDLE_EPISODE },
+    wrongWay: { ...IDLE_EPISODE },
     crossing: null,
     collisionCooldownUntil: null,
     terminated: false,
@@ -131,6 +133,7 @@ function cloneState(s: RuleEngineState): RuleEngineState {
     conditionsSpeed: { ...s.conditionsSpeed },
     rainLights: { ...s.rainLights },
     following: { ...s.following },
+    wrongWay: { ...s.wrongWay },
     crossing: s.crossing ? { ...s.crossing } : null,
   };
 }
@@ -322,6 +325,12 @@ export function reduceTick(prev: RuleEngineState, tick: SimTick): ReduceResult {
     leadGap < safeGapM;
   if (stepEpisode(s.following, tailgating, !tailgating, t, cfg.followSustainSec)) {
     events.push(makeViolation("FOLLOWING_TOO_CLOSE", t));
+  }
+
+  // Wrong way against a one-way street (runtime sets tick.wrongWay).
+  const goingWrongWay = tick.wrongWay === true && moving;
+  if (stepEpisode(s.wrongWay, goingWrongWay, !goingWrongWay, t, cfg.wrongWaySustainSec)) {
+    events.push(makeViolation("WRONG_WAY", t));
   }
 
   // -- 5. pedestrian-crossing zone: track approach speed while a pedestrian is present

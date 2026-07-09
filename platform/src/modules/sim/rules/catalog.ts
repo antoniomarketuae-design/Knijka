@@ -161,6 +161,15 @@ export const VIOLATIONS: Record<ViolationCode, ViolationSpec> = {
       "Движеше се твърде близо до колата пред теб. Дръж поне 2 секунди дистанция — при внезапно спиране това е разликата между спокойно спиране и удар отзад. При дъжд и хлъзгав път увеличи дистанцията.",
     lawRef: "ЗДвП чл. 23",
   },
+  WRONG_WAY: {
+    severityClass: "opasna",
+    points: SEVERITY_POINTS.opasna,
+    titleBg: "Движение в обратна посока по еднопосочна улица",
+    explanationBg:
+      "Движеше се срещу платното на еднопосочна улица. Това е една от най-опасните грешки — насрещните нямат как да те очакват. Влизай в еднопосочна само по посока на движението.",
+    lawRef: "ЗДвП чл. 6",
+    conceptId: "c-sign-groups",
+  },
   PEDESTRIAN_CROSSING_TOO_FAST: {
     severityClass: "opasna",
     points: SEVERITY_POINTS.opasna,
