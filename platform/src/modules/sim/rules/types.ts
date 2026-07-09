@@ -105,6 +105,8 @@ export interface SimTick {
   isNight: boolean;
   /** True in rain / reduced visibility (optional; absent = dry). */
   rain?: boolean;
+  /** Gap in meters to the nearest vehicle ahead in-lane (optional; absent/∞ = clear road). */
+  leadGapM?: number;
   /** Discrete events since the previous tick. */
   events: SimTickEvent[];
 }
@@ -143,6 +145,7 @@ export type ViolationCode =
   | "HEADLIGHTS_OFF_IN_RAIN" // второстепенна: reduced visibility, low beam should be on
   | "POOR_LANE_KEEPING" // второстепенна: sustained off-centre / straddling positioning
   | "SPEED_TOO_FAST_FOR_CONDITIONS" // второстепенна: within the limit but imprudent for rain/night
+  | "FOLLOWING_TOO_CLOSE" // основна: tailgating — under the 2-second gap
   | "PEDESTRIAN_CROSSING_TOO_FAST" // опасна: accident precondition (official list)
   | "PEDESTRIAN_NOT_YIELDED" // опасна
   | "COLLISION" // опасна + session terminate flag (official: exam terminated)
@@ -252,6 +255,15 @@ export interface RuleEngineConfig {
   /** Seconds of driving in rain without low beam before HEADLIGHTS_OFF_IN_RAIN. */
   rainLightsSustainSec: number;
 
+  /** Time-gap target for the 2-second rule, seconds. */
+  followSafeSeconds: number;
+  /** Never flag below this gap floor (crawl / stop-and-go), meters. */
+  followMinGapM: number;
+  /** Only judge following distance above this speed (below = stop-and-go), km/h. */
+  followMinSpeedKmh: number;
+  /** Seconds under the safe gap before FOLLOWING_TOO_CLOSE fires. */
+  followSustainSec: number;
+
   /** Max approach speed inside a crossing zone while a pedestrian is on the crossing, km/h. */
   crossingApproachMaxKmh: number;
   /** Seconds above the approach max before the too-fast violation fires. */
@@ -289,6 +301,11 @@ export const DEFAULT_RULE_CONFIG: RuleEngineConfig = {
   conditionSpeedNightFactor: 0.9,
   conditionsSpeedSustainSec: 3,
   rainLightsSustainSec: 3,
+
+  followSafeSeconds: 1.8,
+  followMinGapM: 4,
+  followMinSpeedKmh: 15,
+  followSustainSec: 2,
 
   crossingApproachMaxKmh: 30,
   crossingTooFastSustainSec: 1,

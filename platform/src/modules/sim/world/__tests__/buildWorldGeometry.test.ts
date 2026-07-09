@@ -277,17 +277,19 @@ describe("buildWorldGeometry on the real district (Студентски град
       world.buildingRoofs,
       ...world.buildingWalls,
     ];
+    // Scan fast and assert once — the buffers hold ~millions of floats, so a
+    // per-element expect() call is what made this test flake near the timeout.
+    let nonFinite = 0;
     for (const mesh of buffers) {
-      for (let i = 0; i < mesh.positions.length; i++) {
-        expect(Number.isFinite(mesh.positions[i])).toBe(true);
-      }
+      const p = mesh.positions;
+      for (let i = 0; i < p.length; i++) if (!Number.isFinite(p[i])) nonFinite++;
     }
     for (const list of [world.trafficLights, world.signs, world.streetlights, world.trees]) {
       for (const t of list) {
-        expect(t.position.every(Number.isFinite)).toBe(true);
-        expect(Number.isFinite(t.yaw)).toBe(true);
+        if (!t.position.every(Number.isFinite) || !Number.isFinite(t.yaw)) nonFinite++;
       }
     }
+    expect(nonFinite).toBe(0);
   });
 
   it("places traffic lights only at signalized intersections", () => {

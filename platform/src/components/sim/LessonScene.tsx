@@ -495,7 +495,12 @@ function RuntimeDriver({
       playerSpeedKmh: sample.speedKmh,
       playerHeadingDeg: sample.headingDeg,
     });
-    const tick = runtime.sample(sample, tRef.current, isNight, rain);
+    const leadGap = traffic.leadGapMeters(
+      sample.position.x,
+      sample.position.y,
+      sample.headingDeg,
+    );
+    const tick = runtime.sample(sample, tRef.current, isNight, rain, leadGap);
     onTick(tick);
 
     const nowMs = tRef.current * 1000;

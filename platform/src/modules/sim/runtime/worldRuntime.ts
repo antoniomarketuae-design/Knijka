@@ -140,7 +140,13 @@ export function createWorldRuntime(districtJson: District | unknown): DistrictWo
       signals.update(dtSec);
     },
 
-    sample(v: VehicleSample, tSec: number, isNight: boolean, rain = false): SimTick {
+    sample(
+      v: VehicleSample,
+      tSec: number,
+      isNight: boolean,
+      rain = false,
+      leadGapM = Infinity,
+    ): SimTick {
       const events: SimTickEvent[] = [];
 
       // 1. Collisions reported by physics since the last tick.
@@ -184,6 +190,7 @@ export function createWorldRuntime(districtJson: District | unknown): DistrictWo
         gear: v.gear,
         isNight,
         rain,
+        leadGapM,
         events,
       };
     },

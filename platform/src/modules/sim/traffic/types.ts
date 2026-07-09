@@ -226,6 +226,12 @@ export interface TrafficSystem {
    * so SimTick crossing events carry real pedestrian state.
    */
   pedestrianOnCrossing(crossingId: string): boolean;
+  /**
+   * Gap in meters (bumper-to-bumper approx) to the nearest vehicle ahead of the
+   * player within a lane-width corridor, or Infinity when the road ahead is
+   * clear. Player pose in district space; headingDeg 0 = north, clockwise.
+   */
+  leadGapMeters(px: number, py: number, headingDeg: number): number;
   readonly timeSec: number;
   readonly stats: TrafficSystemStats;
 }

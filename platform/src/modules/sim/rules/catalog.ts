@@ -153,6 +153,14 @@ export const VIOLATIONS: Record<ViolationCode, ViolationSpec> = {
     lawRef: "ЗДвП чл. 70",
     conceptId: "c-night-visibility",
   },
+  FOLLOWING_TOO_CLOSE: {
+    severityClass: "osnovna",
+    points: SEVERITY_POINTS.osnovna,
+    titleBg: "Несъобразена дистанция",
+    explanationBg:
+      "Движеше се твърде близо до колата пред теб. Дръж поне 2 секунди дистанция — при внезапно спиране това е разликата между спокойно спиране и удар отзад. При дъжд и хлъзгав път увеличи дистанцията.",
+    lawRef: "ЗДвП чл. 23",
+  },
   PEDESTRIAN_CROSSING_TOO_FAST: {
     severityClass: "opasna",
     points: SEVERITY_POINTS.opasna,

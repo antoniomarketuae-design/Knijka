@@ -42,6 +42,10 @@ import {
 const MAX_DT_SEC = 0.1;
 const VEHICLE_COLOR_VARIANTS = 4;
 const PED_COLOR_VARIANTS = 4;
+/** A vehicle counts as "ahead in my path" within this lateral corridor, meters. */
+const LEAD_CORRIDOR_M = 1.8;
+/** Approx sum of the two half-lengths, for a bumper-to-bumper gap, meters. */
+const VEHICLE_LENGTH_M = 4.1;
 
 class TrafficSystemImpl implements TrafficSystem {
   readonly vehicles: TrafficVehicleState[] = [];
@@ -242,6 +246,38 @@ class TrafficSystemImpl implements TrafficSystem {
   pedestrianOnCrossing(crossingId: string): boolean {
     return (this.crossingCounts.get(crossingId) ?? 0) > 0;
   }
+
+  leadGapMeters(px: number, py: number, headingDeg: number): number {
+    return leadGapFor(this.vehicles, px, py, headingDeg);
+  }
+}
+
+/**
+ * Pure gap-to-nearest-vehicle-ahead helper (district space; headingDeg 0 = north,
+ * clockwise). A vehicle counts only when ahead and within a lane-width corridor;
+ * returns bumper-to-bumper metres, or Infinity when the road ahead is clear.
+ */
+export function leadGapFor(
+  vehicles: readonly { x: number; y: number }[],
+  px: number,
+  py: number,
+  headingDeg: number,
+): number {
+  const rad = (headingDeg * Math.PI) / 180;
+  const fx = Math.sin(rad); // forward x (0° = north = +y)
+  const fy = Math.cos(rad); // forward y
+  let best = Infinity;
+  for (const v of vehicles) {
+    const rx = v.x - px;
+    const ry = v.y - py;
+    const fwd = rx * fx + ry * fy;
+    if (fwd <= 0) continue; // not ahead
+    const lat = Math.abs(rx * -fy + ry * fx); // perpendicular offset
+    if (lat > LEAD_CORRIDOR_M) continue; // not in my lane/path
+    const gap = fwd - VEHICLE_LENGTH_M;
+    if (gap < best) best = gap;
+  }
+  return best === Infinity ? Infinity : Math.max(0, best);
 }
 
 /**

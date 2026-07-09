@@ -84,6 +84,7 @@ export interface RuleEngineState {
   laneKeeping: EpisodeState;
   conditionsSpeed: EpisodeState;
   rainLights: EpisodeState;
+  following: EpisodeState;
   crossing: CrossingZoneState | null;
   collisionCooldownUntil: number | null;
   /** Set once a collision occurs — the session grades as terminated. */
@@ -108,6 +109,7 @@ export function createRuleEngine(config?: Partial<RuleEngineConfig>): RuleEngine
     laneKeeping: { ...IDLE_EPISODE },
     conditionsSpeed: { ...IDLE_EPISODE },
     rainLights: { ...IDLE_EPISODE },
+    following: { ...IDLE_EPISODE },
     crossing: null,
     collisionCooldownUntil: null,
     terminated: false,
@@ -128,6 +130,7 @@ function cloneState(s: RuleEngineState): RuleEngineState {
     laneKeeping: { ...s.laneKeeping },
     conditionsSpeed: { ...s.conditionsSpeed },
     rainLights: { ...s.rainLights },
+    following: { ...s.following },
     crossing: s.crossing ? { ...s.crossing } : null,
   };
 }
@@ -305,6 +308,20 @@ export function reduceTick(prev: RuleEngineState, tick: SimTick): ReduceResult {
     stepEpisode(s.rainLights, rainNoLights, !raining || tick.headlights !== "off", t, cfg.rainLightsSustainSec)
   ) {
     events.push(makeViolation("HEADLIGHTS_OFF_IN_RAIN", t));
+  }
+
+  // Following distance (2-second rule) — only above stop-and-go speed and when a
+  // lead vehicle is actually in the tick's gap channel.
+  const leadGap = tick.leadGapM;
+  const safeGapM = Math.max(cfg.followMinGapM, (speed / 3.6) * cfg.followSafeSeconds);
+  const tailgating =
+    moving &&
+    speed >= cfg.followMinSpeedKmh &&
+    leadGap !== undefined &&
+    Number.isFinite(leadGap) &&
+    leadGap < safeGapM;
+  if (stepEpisode(s.following, tailgating, !tailgating, t, cfg.followSustainSec)) {
+    events.push(makeViolation("FOLLOWING_TOO_CLOSE", t));
   }
 
   // -- 5. pedestrian-crossing zone: track approach speed while a pedestrian is present
