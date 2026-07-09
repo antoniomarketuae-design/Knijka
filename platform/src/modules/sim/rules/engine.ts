@@ -441,8 +441,15 @@ function handleTickEvent(
       break;
     }
 
+    case "prioritySituation": {
+      // Phase 2: the worldRuntime priority adjudicator decides `violated`; the
+      // reducer just grades it. `situation` (give-way / uncontrolled / …) is
+      // carried into the detail for the debrief.
+      if (e.violated) out.push(makeViolation("FAILED_TO_YIELD", t, { detail: e.situation }));
+      break;
+    }
+
     case "mirrorGlance": // handled in the tracker pass
-    case "prioritySituation": // reserved for v2 detectors
       break;
   }
 }

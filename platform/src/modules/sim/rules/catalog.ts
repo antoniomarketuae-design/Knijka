@@ -178,6 +178,15 @@ export const VIOLATIONS: Record<ViolationCode, ViolationSpec> = {
       "Дълго време се движеше в лявата лента, без да изпреварваш. Извън изпреварване се движи във възможно най-дясната свободна лента — лявата се освобождава за по-бързите.",
     lawRef: "ЗДвП чл. 15",
   },
+  FAILED_TO_YIELD: {
+    severityClass: "opasna",
+    points: SEVERITY_POINTS.opasna,
+    titleBg: "Непропускане на пътно превозно средство с предимство",
+    explanationBg:
+      "Не пропусна превозно средство, което имаше предимство. На кръстовище без светофар пропускаш идващите отдясно; при знак „Пропусни движението“ — всички по главния път. Предимството се отстъпва, не се взема.",
+    lawRef: "ЗДвП чл. 47",
+    conceptId: "c-priority-concept",
+  },
   PEDESTRIAN_CROSSING_TOO_FAST: {
     severityClass: "opasna",
     points: SEVERITY_POINTS.opasna,

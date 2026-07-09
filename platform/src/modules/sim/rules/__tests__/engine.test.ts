@@ -519,13 +519,21 @@ describe("reducer hygiene", () => {
     expect(state.terminated).toBe(false);
   });
 
-  it("ignores reserved prioritySituation events (v2)", () => {
-    const { events } = drive([
+  it("grades a violated prioritySituation but ignores a satisfied one (Phase 2)", () => {
+    const bad = drive([
       tick(0, {
         speedKmh: 30,
         events: [{ kind: "prioritySituation", situation: "rightHandRule", violated: true }],
       }),
     ]);
-    expect(events).toEqual([]);
+    expect(bad.events.map((e) => e.code)).toEqual(["FAILED_TO_YIELD"]);
+
+    const ok = drive([
+      tick(0, {
+        speedKmh: 30,
+        events: [{ kind: "prioritySituation", situation: "rightHandRule", violated: false }],
+      }),
+    ]);
+    expect(ok.events).toEqual([]);
   });
 });

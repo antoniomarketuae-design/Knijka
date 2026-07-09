@@ -152,6 +152,7 @@ export type ViolationCode =
   | "FOLLOWING_TOO_CLOSE" // основна: tailgating — under the 2-second gap
   | "WRONG_WAY" // опасна: driving against a one-way street
   | "NOT_KEEPING_RIGHT" // второстепенна: hogging a left lane on a multi-lane road
+  | "FAILED_TO_YIELD" // опасна: entered a priority situation without giving way (Phase 2)
   | "PEDESTRIAN_CROSSING_TOO_FAST" // опасна: accident precondition (official list)
   | "PEDESTRIAN_NOT_YIELDED" // опасна
   | "COLLISION" // опасна + session terminate flag (official: exam terminated)

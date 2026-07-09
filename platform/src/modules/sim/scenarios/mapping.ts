@@ -21,6 +21,7 @@ const CODE_TO_SCENARIO: Record<string, string> = {
   FOLLOWING_TOO_CLOSE: "ev-following-distance",
   WRONG_WAY: "ev-sign-prohibitory",
   NOT_KEEPING_RIGHT: "ev-lane-discipline",
+  FAILED_TO_YIELD: "ev-junction-priority-sign",
   PEDESTRIAN_CROSSING_TOO_FAST: "ev-ped-crossing-marked",
   PEDESTRIAN_NOT_YIELDED: "ev-ped-crossing-marked",
   COLLISION: "ev-collision",
