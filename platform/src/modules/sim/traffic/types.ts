@@ -245,6 +245,19 @@ export interface TrafficSystem {
    * oncoming traffic. District space; headingDeg 0 = north, clockwise.
    */
   oncomingNear(px: number, py: number, headingDeg: number, radiusM: number): boolean;
+  /**
+   * True when a moving vehicle near the junction (jx,jy) is on the player's
+   * RIGHT and not travelling the player's own direction — used to grade the
+   * give-way-to-the-right rule at uncontrolled junctions. District space.
+   */
+  conflictFromRight(
+    jx: number,
+    jy: number,
+    px: number,
+    py: number,
+    headingDeg: number,
+    radiusM: number,
+  ): boolean;
   readonly timeSec: number;
   readonly stats: TrafficSystemStats;
 }

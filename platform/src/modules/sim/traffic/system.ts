@@ -52,6 +52,8 @@ const CONFLICT_MIN_SPEED_MPS = 1;
 const CONFLICT_SAME_DIR_DEG = 50;
 /** A vehicle heading more than this off yours (and ahead) counts as oncoming, deg. */
 const ONCOMING_MIN_DEG = 130;
+/** A vehicle must be at least this far to the player's right to count, meters. */
+const RIGHT_MIN_M = 1.5;
 
 class TrafficSystemImpl implements TrafficSystem {
   readonly vehicles: TrafficVehicleState[] = [];
@@ -264,6 +266,46 @@ class TrafficSystemImpl implements TrafficSystem {
   oncomingNear(px: number, py: number, headingDeg: number, radiusM: number): boolean {
     return oncomingNearFor(this.vehicles, px, py, headingDeg, radiusM);
   }
+
+  conflictFromRight(
+    jx: number,
+    jy: number,
+    px: number,
+    py: number,
+    headingDeg: number,
+    radiusM: number,
+  ): boolean {
+    return conflictFromRightFor(this.vehicles, jx, jy, px, py, headingDeg, radiusM);
+  }
+}
+
+/** Pure "vehicle approaching from the player's right near a junction" test. */
+export function conflictFromRightFor(
+  vehicles: readonly { x: number; y: number; dirX: number; dirY: number; speedMps: number }[],
+  jx: number,
+  jy: number,
+  px: number,
+  py: number,
+  headingDeg: number,
+  radiusM: number,
+): boolean {
+  const rad = (headingDeg * Math.PI) / 180;
+  // Player's right vector = forward (sinH,cosH) rotated 90° clockwise = (cosH,-sinH).
+  const rx = Math.cos(rad);
+  const ry = -Math.sin(rad);
+  const r2 = radiusM * radiusM;
+  for (const v of vehicles) {
+    const jdx = v.x - jx;
+    const jdy = v.y - jy;
+    if (jdx * jdx + jdy * jdy > r2) continue; // not near the junction
+    if (v.speedMps < CONFLICT_MIN_SPEED_MPS) continue;
+    if ((v.x - px) * rx + (v.y - py) * ry < RIGHT_MIN_M) continue; // not on the right
+    const vBearing = (Math.atan2(v.dirX, v.dirY) * 180) / Math.PI;
+    const delta = Math.abs((((vBearing - headingDeg) % 360) + 540) % 360 - 180);
+    if (delta < CONFLICT_SAME_DIR_DEG) continue; // same-direction → not a conflict
+    return true;
+  }
+  return false;
 }
 
 /** Pure "oncoming vehicle ahead" test (district space; see interface). */
