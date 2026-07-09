@@ -536,4 +536,18 @@ describe("reducer hygiene", () => {
     ]);
     expect(ok.events).toEqual([]);
   });
+
+  it("commends a prioritySituation the driver actively yielded", () => {
+    const { events } = drive([
+      tick(0, {
+        speedKmh: 30,
+        events: [
+          { kind: "prioritySituation", situation: "rightHandRule", violated: false, yielded: true },
+        ],
+      }),
+    ]);
+    expect(events).toHaveLength(1);
+    expect(events[0].code).toBe("YIELDED_TO_PRIORITY");
+    expect(events[0].kind).toBe("commendation");
+  });
 });

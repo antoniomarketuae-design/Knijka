@@ -60,9 +60,15 @@ export type SimTickEvent =
   /**
    * RESERVED for v2 (right-of-way detectors): the engine adjudicates a
    * priority situation (right-hand rule, left turn vs oncoming, roundabout
-   * entry, emergency vehicle...). Ignored by v1 detectors.
+   * entry, emergency vehicle...). `violated` grades FAILED_TO_YIELD; `yielded`
+   * (resolved a real conflict correctly) earns a positive commendation.
    */
-  | { kind: "prioritySituation"; situation: string; violated: boolean };
+  | {
+      kind: "prioritySituation";
+      situation: string;
+      violated: boolean;
+      yielded?: boolean;
+    };
 
 /**
  * One frame of simulation state. Emitted every physics/render tick (any rate;

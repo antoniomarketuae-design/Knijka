@@ -473,10 +473,12 @@ function handleTickEvent(
     }
 
     case "prioritySituation": {
-      // Phase 2: the worldRuntime priority adjudicator decides `violated`; the
+      // Phase 2: the worldRuntime priority adjudicator decides the outcome; the
       // reducer just grades it. `situation` (give-way / uncontrolled / …) is
-      // carried into the detail for the debrief.
+      // carried into the detail for the debrief. `yielded` = the driver met a
+      // real conflict and resolved it correctly → positive reinforcement.
       if (e.violated) out.push(makeViolation("FAILED_TO_YIELD", t, { detail: e.situation }));
+      else if (e.yielded) out.push(makeCommendation("YIELDED_TO_PRIORITY", t));
       break;
     }
 

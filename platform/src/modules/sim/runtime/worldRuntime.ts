@@ -45,6 +45,8 @@ const LEFT_TURN_ONCOMING_RADIUS_M = 26;
 const RHR_CORE_RADIUS_M = 9;
 /** Above this speed the driver counts as entering (not creeping/yielding), km/h. */
 const RHR_MOVING_KMH = 3;
+/** At/below this speed while a conflict is present, the driver is yielding, km/h. */
+const RHR_YIELD_KMH = 8;
 
 /**
  * True when a vehicle heads against a one-way street's flow. `tangent` is the
@@ -144,6 +146,8 @@ export function createWorldRuntime(districtJson: District | unknown): DistrictWo
   // Right-hand-rule visit tracker (one violation per junction entry).
   let rhrNode: string | null = null;
   let rhrFired = false;
+  let rhrConflictSeen = false; // a right-conflict was observed this visit
+  let rhrSlowed = false; // driver slowed to yield speed while that conflict held
 
   // Previous-frame tracking for line-crossing detection.
   let prevEdgeIdx = -1;
@@ -276,33 +280,50 @@ export function createWorldRuntime(districtJson: District | unknown): DistrictWo
       }
 
       // 4b. Right-hand rule: entering an uncontrolled junction's core while a
-      // vehicle approaches from the right = failing to give way. Once per visit.
+      // vehicle approaches from the right = failing to give way (once per
+      // visit). Slowing for that same conflict and NOT barging in earns a
+      // positive commendation, awarded on leaving the junction.
       if (nearestIx !== null && uncontrolledIds.has(nearestIx.id)) {
         if (rhrNode !== nearestIx.id) {
           rhrNode = nearestIx.id;
           rhrFired = false;
+          rhrConflictSeen = false;
+          rhrSlowed = false;
+        }
+        const rightConflict = rightConflictQuery(
+          nearestIx.x,
+          nearestIx.y,
+          v.position.x,
+          v.position.y,
+          v.headingDeg,
+          PRIORITY_CONFLICT_RADIUS_M,
+        );
+        if (rightConflict) {
+          rhrConflictSeen = true;
+          if (v.speedKmh <= RHR_YIELD_KMH) rhrSlowed = true;
         }
         const dx = nearestIx.x - v.position.x;
         const dy = nearestIx.y - v.position.y;
-        if (
-          !rhrFired &&
-          dx * dx + dy * dy <= RHR_CORE_RADIUS_M * RHR_CORE_RADIUS_M &&
-          v.speedKmh > RHR_MOVING_KMH &&
-          rightConflictQuery(
-            nearestIx.x,
-            nearestIx.y,
-            v.position.x,
-            v.position.y,
-            v.headingDeg,
-            PRIORITY_CONFLICT_RADIUS_M,
-          )
-        ) {
+        const inCore = dx * dx + dy * dy <= RHR_CORE_RADIUS_M * RHR_CORE_RADIUS_M;
+        if (!rhrFired && inCore && v.speedKmh > RHR_MOVING_KMH && rightConflict) {
           events.push({ kind: "prioritySituation", situation: "right-hand-rule", violated: true });
           rhrFired = true;
         }
       } else {
+        // Just left an uncontrolled junction: reward a correctly-yielded
+        // conflict (saw a car from the right, slowed for it, never barged in).
+        if (rhrNode !== null && rhrConflictSeen && rhrSlowed && !rhrFired) {
+          events.push({
+            kind: "prioritySituation",
+            situation: "right-hand-rule",
+            violated: false,
+            yielded: true,
+          });
+        }
         rhrNode = null;
         rhrFired = false;
+        rhrConflictSeen = false;
+        rhrSlowed = false;
       }
 
       // 5. Pedestrian-crossing zones.
