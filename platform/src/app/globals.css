@@ -11,6 +11,10 @@
    ============================================================ */
 
 :root {
+  /* Native controls (date/number/checkbox, autofill, scrollbars) paint in the
+     dark scheme so they match cockpit-black instead of OS-light. */
+  color-scheme: dark;
+
   /* Base surfaces (dark = default) — deepened for OLED */
   --background: #070b14;
   --surface: #0f1826;
@@ -45,6 +49,8 @@
 
 @media (prefers-color-scheme: light) {
   :root {
+    color-scheme: light;
+
     /* "Daylight HUD" */
     --background: #eef3fb;
     --surface: #ffffff;
@@ -75,6 +81,7 @@
 
 /* Explicit theme toggle wins over the OS media query, both directions. */
 :root[data-theme="light"] {
+  color-scheme: light;
   --background: #eef3fb;
   --surface: #ffffff;
   --surface-2: #e6eef9;
@@ -98,6 +105,7 @@
 }
 
 :root[data-theme="dark"] {
+  color-scheme: dark;
   --background: #070b14;
   --surface: #0f1826;
   --surface-2: #16233b;
@@ -163,11 +171,12 @@ body {
   font-family: var(--font-sans);
 }
 
-/* Keyboard accessibility: a single, loud focus signal everywhere. */
+/* Keyboard accessibility: a single, loud focus signal everywhere. The ring
+   follows each control's own border-radius (modern browsers do this), so we
+   never override it — a hard 4px snapped rounded-xl corners into a glitch. */
 :focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
-  border-radius: 4px;
 }
 
 @layer components {
@@ -207,13 +216,43 @@ body {
     color: var(--muted);
   }
 
-  /* Primary action: bright accent, dark text, glow on hover/focus */
+  /* Primary action: bright accent, dark text, glow on hover/focus.
+     State rules below are authored as plain CSS (not @apply variants): press
+     physics (motion-safe) dip the button and drop the glow; disabled dims it and
+     neutralises the hover glow so it never lights up when inert. */
   .btn-accent {
     @apply inline-flex items-center justify-center gap-2 rounded-xl bg-accent px-5 py-3 text-sm font-bold text-accent-foreground transition hover:shadow-glow motion-reduce:transition-none;
+  }
+  .btn-accent:active {
+    box-shadow: none;
+  }
+  .btn-accent:disabled {
+    cursor: not-allowed;
+    opacity: 0.5;
+    box-shadow: none;
+  }
+  .btn-accent:disabled:hover {
+    box-shadow: none;
   }
 
   .btn-ghost {
     @apply inline-flex items-center justify-center gap-2 rounded-xl border border-border px-5 py-3 text-sm font-semibold text-foreground transition hover:border-border-strong hover:bg-surface-2 motion-reduce:transition-none;
+  }
+  .btn-ghost:disabled {
+    cursor: not-allowed;
+    opacity: 0.5;
+  }
+  .btn-ghost:disabled:hover {
+    border-color: var(--border);
+    background-color: transparent;
+  }
+
+  /* Press dip — transform only when the user allows motion. */
+  @media (prefers-reduced-motion: no-preference) {
+    .btn-accent:active,
+    .btn-ghost:active {
+      transform: translateY(1px);
+    }
   }
 
   /* Screen-reader-only helper for labels */

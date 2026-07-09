@@ -30,6 +30,12 @@ interface GaugeProps {
   size?: number;
   /** Colour: fixed brand/cyan, or "auto" to band by value. */
   tone?: Tone;
+  /**
+   * Explicit fill/needle colour (any CSS colour, e.g. "var(--success)"). When
+   * set it wins over `tone` — use it to drive the gauge from meaning (exam
+   * verdict, "just started" onboarding) rather than raw value.
+   */
+  color?: string;
   /** Accessible description of the whole instrument. */
   ariaLabel: string;
   /** Format the centre number (default: rounded integer). */
@@ -63,6 +69,7 @@ export function Gauge({
   label,
   size = 200,
   tone = "brand",
+  color: colorOverride,
   ariaLabel,
   format,
 }: GaugeProps) {
@@ -100,7 +107,7 @@ export function Gauge({
     tone === "auto"
       ? autoColor(target)
       : { color: tone === "cyan" ? "var(--accent-2)" : "var(--accent)", band: label ?? "" };
-  const color = resolved.color;
+  const color = colorOverride ?? resolved.color;
   const bandLabel = label ?? (tone === "auto" ? resolved.band : "");
 
   const shownValue = Math.round(frac * max);

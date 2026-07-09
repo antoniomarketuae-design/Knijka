@@ -8,13 +8,13 @@ import {
   IconLock,
   IconWheel,
 } from "@/components/icons";
+import { isSoon, statusBadge } from "@/components/dashboard/availability";
 
 interface ModuleCard {
   href: string;
   titleBg: string;
   descriptionBg: string;
   icon: ComponentType<SVGProps<SVGSVGElement>>;
-  soon?: boolean;
 }
 
 const MODULES: ModuleCard[] = [
@@ -35,7 +35,6 @@ const MODULES: ModuleCard[] = [
     titleBg: "Симулатор",
     descriptionBg: "Кокпит шофиране в браузъра — в разработка.",
     icon: IconWheel,
-    soon: true,
   },
   {
     href: "/tutor",
@@ -53,40 +52,58 @@ export function ModuleGrid() {
         Модули
       </h2>
       <ul className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        {MODULES.map(({ href, titleBg, descriptionBg, icon: Icon, soon }) => (
-          <li key={href}>
-            <Link
-              href={href}
-              aria-disabled={soon || undefined}
-              className={`card group flex h-full flex-col gap-3 p-5 transition duration-200 motion-reduce:transition-none ${
-                soon
-                  ? "opacity-70"
-                  : "hover:-translate-y-0.5 hover:border-border-strong hover:shadow-glow-sm motion-reduce:hover:translate-y-0"
-              }`}
-            >
+        {MODULES.map(({ href, titleBg, descriptionBg, icon: Icon }) => {
+          const soon = isSoon(href);
+          const badge = statusBadge(href);
+          const inner = (
+            <>
               <div className="flex items-center justify-between">
                 <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-accent/15 text-accent transition group-hover:shadow-glow-sm motion-reduce:transition-none">
                   <Icon className="h-6 w-6" />
                 </span>
-                {soon ? (
-                  <span className="hud-label flex items-center gap-1 rounded-full border border-hair px-2.5 py-1 text-[10px]">
-                    <IconLock className="h-3 w-3" />
-                    Скоро
-                  </span>
-                ) : (
-                  <IconArrowRight
-                    aria-hidden
-                    className="h-5 w-5 text-muted transition-transform duration-200 group-hover:translate-x-1 group-hover:text-accent motion-reduce:transition-none"
-                  />
-                )}
+                <span className="flex items-center gap-2">
+                  {badge ? (
+                    <span className="hud-label flex items-center gap-1 rounded-full border border-hair px-2.5 py-1 text-[10px]">
+                      {soon ? <IconLock className="h-3 w-3" /> : null}
+                      {badge}
+                    </span>
+                  ) : null}
+                  {!soon ? (
+                    <IconArrowRight
+                      aria-hidden
+                      className="h-5 w-5 text-muted transition-transform duration-200 group-hover:translate-x-1 group-hover:text-accent motion-reduce:transition-none"
+                    />
+                  ) : null}
+                </span>
               </div>
               <h3 className="font-display text-base font-extrabold">{titleBg}</h3>
-              <p className="text-sm leading-relaxed text-muted">
-                {descriptionBg}
-              </p>
-            </Link>
-          </li>
-        ))}
+              <p className="text-sm leading-relaxed text-muted">{descriptionBg}</p>
+            </>
+          );
+
+          // Not shipped for launch → an inert card, not a link that navigates
+          // (aria-disabled alone never actually blocked the click).
+          return (
+            <li key={href}>
+              {soon ? (
+                <div
+                  aria-disabled="true"
+                  tabIndex={-1}
+                  className="card group pointer-events-none flex h-full flex-col gap-3 p-5 opacity-70"
+                >
+                  {inner}
+                </div>
+              ) : (
+                <Link
+                  href={href}
+                  className="card group flex h-full flex-col gap-3 p-5 transition duration-200 hover:-translate-y-0.5 hover:border-border-strong hover:shadow-glow-sm motion-reduce:transition-none motion-reduce:hover:translate-y-0"
+                >
+                  {inner}
+                </Link>
+              )}
+            </li>
+          );
+        })}
       </ul>
     </section>
   );

@@ -36,7 +36,7 @@ export function DailyMissionCard({ mission }: { mission: DailyMission | null }) 
               <span className="font-mono text-xs font-bold tabular-nums text-muted">
                 {mission.progress} / {mission.target}
               </span>
-              <span className="flex items-center gap-1 font-mono text-xs font-bold tabular-nums text-gold">
+              <span className="flex items-center gap-1 font-mono text-xs font-bold tabular-nums text-accent">
                 <IconBolt className="h-3.5 w-3.5" />+{mission.xpReward} XP
               </span>
             </div>

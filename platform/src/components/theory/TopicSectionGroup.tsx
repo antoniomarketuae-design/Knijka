@@ -1,11 +1,13 @@
 import type { SectionOverview, TopicOverview } from "@/modules/learning";
 import { SectionCard } from "./SectionCard";
 
-/** Same mastery thresholds as TopicCard / the dashboard — keep them in sync. */
+/** Same mastery thresholds as TopicCard / the dashboard — keep them in sync.
+ *  Started-but-low is neutral accent, not danger-red (a beginner's progress bar
+ *  should encourage, not read like an error). */
 function masteryColor(mastery: number): string {
   if (mastery >= 0.75) return "var(--success)";
   if (mastery >= 0.45) return "var(--warning)";
-  if (mastery > 0) return "var(--danger)";
+  if (mastery > 0) return "var(--accent)";
   return "var(--border-strong)";
 }
 
@@ -41,7 +43,7 @@ export function TopicSectionGroup({
 
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
-            <h3 className="truncate font-display text-[15px] font-bold leading-snug">
+            <h3 className="line-clamp-2 font-display text-[15px] font-bold leading-snug">
               {topic.titleBg}
             </h3>
             {topic.dueCount > 0 ? (
@@ -57,6 +59,7 @@ export function TopicSectionGroup({
               aria-valuenow={pct}
               aria-valuemin={0}
               aria-valuemax={100}
+              aria-valuetext={started ? `${pct}%` : "все още не е започната"}
               className="h-1.5 w-24 shrink-0 overflow-hidden rounded-full bg-surface-2 sm:w-32"
             >
               <div

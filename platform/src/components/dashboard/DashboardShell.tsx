@@ -15,12 +15,12 @@ import {
   IconWheel,
   IconX,
 } from "@/components/icons";
+import { isSoon, statusBadge } from "@/components/dashboard/availability";
 
 interface NavItem {
   href: string;
   labelBg: string;
   icon: ComponentType<SVGProps<SVGSVGElement>>;
-  soon?: boolean;
 }
 
 const NAV_ITEMS: NavItem[] = [
@@ -58,8 +58,46 @@ function NavLinks({ onNavigate }: { onNavigate?: () => void }) {
 
   return (
     <ul className="flex flex-col gap-1">
-      {NAV_ITEMS.map(({ href, labelBg, icon: Icon, soon }) => {
-        const active = pathname === href || pathname.startsWith(`${href}/`);
+      {NAV_ITEMS.map(({ href, labelBg, icon: Icon }) => {
+        const soon = isSoon(href);
+        const badge = statusBadge(href);
+        const active = !soon && (pathname === href || pathname.startsWith(`${href}/`));
+        const inner = (
+          <>
+            {/* Active channel indicator — a lit cyan telemetry bar */}
+            <span
+              aria-hidden
+              className={`absolute left-0 top-1/2 h-6 w-[3px] -translate-y-1/2 rounded-r-full bg-accent-2 transition-opacity duration-200 motion-reduce:transition-none ${
+                active ? "opacity-100 shadow-glow-2" : "opacity-0"
+              }`}
+            />
+            <Icon className="h-5 w-5 shrink-0" />
+            <span className="flex-1">{labelBg}</span>
+            {badge ? (
+              <span className="hud-label rounded-full border border-hair px-2 py-0.5 text-[10px]">
+                {badge}
+              </span>
+            ) : null}
+          </>
+        );
+
+        // "Скоро" items are not real destinations yet (no page, or held for
+        // launch), so they render as an inert affordance — no <Link>, out of the
+        // tab order, no pointer — instead of a link that 404s or looks shipped.
+        if (soon) {
+          return (
+            <li key={href}>
+              <span
+                aria-disabled="true"
+                tabIndex={-1}
+                className="group pointer-events-none relative flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold text-muted opacity-60"
+              >
+                {inner}
+              </span>
+            </li>
+          );
+        }
+
         return (
           <li key={href}>
             <Link
@@ -72,20 +110,7 @@ function NavLinks({ onNavigate }: { onNavigate?: () => void }) {
                   : "text-muted hover:bg-surface-2 hover:text-foreground"
               }`}
             >
-              {/* Active channel indicator — a lit cyan telemetry bar */}
-              <span
-                aria-hidden
-                className={`absolute left-0 top-1/2 h-6 w-[3px] -translate-y-1/2 rounded-r-full bg-accent-2 transition-opacity duration-200 motion-reduce:transition-none ${
-                  active ? "opacity-100 shadow-glow-2" : "opacity-0"
-                }`}
-              />
-              <Icon className="h-5 w-5 shrink-0" />
-              <span className="flex-1">{labelBg}</span>
-              {soon ? (
-                <span className="hud-label rounded-full border border-hair px-2 py-0.5 text-[10px]">
-                  Скоро
-                </span>
-              ) : null}
+              {inner}
             </Link>
           </li>
         );

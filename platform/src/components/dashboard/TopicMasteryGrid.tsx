@@ -2,10 +2,13 @@ import Link from "next/link";
 import type { ReadinessSnapshot, TopicMastery } from "@/components/dashboard/data";
 import { EmptyState } from "@/components/dashboard/EmptyState";
 
+// Kept in sync with TopicCard / TopicSectionGroup. A started-but-low topic reads
+// neutral/accent ("just getting going"), never danger-red — red is for genuine
+// answer-level errors, not an early learner's progress bar.
 function masteryColor(m: number): string {
   if (m >= 0.75) return "var(--success)";
   if (m >= 0.45) return "var(--warning)";
-  if (m > 0) return "var(--danger)";
+  if (m > 0) return "var(--accent)";
   return "var(--border-strong)";
 }
 

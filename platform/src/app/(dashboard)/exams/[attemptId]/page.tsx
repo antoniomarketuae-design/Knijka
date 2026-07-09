@@ -168,7 +168,7 @@ function ScoreReadout({
           value={score}
           max={maxScore}
           size={216}
-          tone={passed ? "cyan" : "brand"}
+          color={verdictColor}
           unit={`/ ${maxScore}`}
           ariaLabel={`Резултат: ${score} от ${maxScore} точки. ${
             passed ? "Изпитът е издържан" : "Изпитът не е издържан"

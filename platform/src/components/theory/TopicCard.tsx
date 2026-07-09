@@ -2,11 +2,12 @@ import Link from "next/link";
 import { IconArrowRight } from "@/components/icons";
 import type { TopicOverview } from "@/modules/learning";
 
-/** Same thresholds as the dashboard's TopicMasteryGrid — keep them in sync. */
+/** Same thresholds as the dashboard's TopicMasteryGrid — keep them in sync.
+ *  Started-but-low is neutral accent, not danger-red. */
 function masteryColor(mastery: number): string {
   if (mastery >= 0.75) return "var(--success)";
   if (mastery >= 0.45) return "var(--warning)";
-  if (mastery > 0) return "var(--danger)";
+  if (mastery > 0) return "var(--accent)";
   return "var(--border-strong)";
 }
 

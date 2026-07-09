@@ -177,9 +177,9 @@ export default function LandingPage() {
                 </span>
               </p>
 
-              <h1 className="mt-6 font-display text-5xl font-black leading-[1.03] tracking-tight sm:text-6xl lg:text-7xl">
-                Вземи книжка.
-                <br />
+              <h1 className="mt-6 text-balance font-display text-5xl font-black leading-[1.03] tracking-tight sm:text-6xl lg:text-7xl">
+                Вземи книжка.{" "}
+                <br className="hidden lg:inline" />
                 С{" "}
                 <span
                   className="text-accent"
@@ -267,21 +267,6 @@ export default function LandingPage() {
                     ariaLabel="Праг за успех на теоретичния изпит: 87 от 97 точки"
                   />
                 </div>
-
-                <div className="relative mt-6 grid grid-cols-3 divide-x divide-hair border-t border-hair pt-4">
-                  {[
-                    { v: "45", k: "въпроса" },
-                    { v: "40", k: "минути" },
-                    { v: "87", k: "праг" },
-                  ].map(({ v, k }) => (
-                    <div key={k} className="px-1 text-center">
-                      <p className="font-mono text-xl font-bold tabular-nums text-foreground">
-                        {v}
-                      </p>
-                      <p className="hud-label mt-1 !text-[0.6rem]">{k}</p>
-                    </div>
-                  ))}
-                </div>
               </div>
             </div>
           </div>
@@ -317,7 +302,7 @@ export default function LandingPage() {
                         Скоро
                       </span>
                     ) : null}
-                    <span className="hud-label !text-[0.65rem] tabular-nums">
+                    <span className="hud-label tabular-nums">
                       {String(i + 1).padStart(2, "0")}
                     </span>
                   </div>
@@ -372,7 +357,7 @@ export default function LandingPage() {
             </p>
             <div className="relative mt-7">
               <Link href="/register" className="btn-accent px-7 py-3.5 text-base">
-                Създай акаунт
+                Започни безплатно
                 <IconArrowRight className="h-4 w-4" />
               </Link>
             </div>

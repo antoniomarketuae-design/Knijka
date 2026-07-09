@@ -20,7 +20,9 @@ const REASON_BADGES: Record<
   { labelBg: string; className: string }
 > = {
   "due-review": { labelBg: "Преговор", className: "bg-warning/15 text-warning" },
-  "weak-concept": { labelBg: "Слабо място", className: "bg-danger/15 text-danger" },
+  // Info tone, not danger: this flags a concept to focus on *before* answering —
+  // it must not wear the same red as a wrong answer.
+  "weak-concept": { labelBg: "Слабо място", className: "bg-accent-2/15 text-accent-2" },
   "new-concept": { labelBg: "Ново", className: "bg-accent/15 text-accent" },
 };
 

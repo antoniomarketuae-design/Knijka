@@ -17,7 +17,7 @@ export function XpBar({ gamification }: { gamification: GamificationSummary }) {
       <div className="min-w-0 flex-1">
         <div className="mb-1 flex items-baseline justify-between gap-2">
           <span className="truncate font-mono text-xs tabular-nums text-muted">
-            Ниво {level} · {xp.toLocaleString("bg-BG")} XP
+            {xp.toLocaleString("bg-BG")} XP
           </span>
           <span className="flex shrink-0 items-center gap-1 font-mono text-xs font-bold tabular-nums text-accent">
             <IconBolt className="h-3.5 w-3.5" />
