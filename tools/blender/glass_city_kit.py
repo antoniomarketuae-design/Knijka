@@ -121,8 +121,11 @@ def tower(name, floors, cx_cols, cy_cols, tint="blue", crown="flat", podium=3, k
     mullion = mat("mullion", (0.52, 0.54, 0.56), rough=0.35, metal=0.9)
     spandrel = mat("spandrel_%s" % tint, tuple(v * 0.7 for v in TINTS[tint]), rough=0.28, metal=0.3)
     stone = mat("stone", (0.72, 0.69, 0.63), rough=0.6)
-    retail = mat("retail_glass", (0.10, 0.14, 0.16), rough=0.05, metal=0.35, coat=0.5)
-    crown_m = mat("crown", (0.30, 0.31, 0.33), rough=0.4, metal=0.6)
+    # Merge to keep material groups low (each group = an InstancedMesh per chunk
+    # in the sim). Retail glazing reuses the tower glass; the crown reuses the
+    # mullion metal. → 5 groups/tower (glass, glass_lit, mullion, spandrel, stone).
+    retail = glass
+    crown_m = mullion
 
     pw, pd = W + 2.0, D + 2.0
     b.box(0, 0, Hbase / 2, pw, pd, Hbase, stone)

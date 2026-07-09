@@ -32,8 +32,11 @@ import type { QualityPreset } from "./quality";
 // server), before any <CityBuildings/> mounts.
 preloadCityModels();
 
-/** Spatial chunk size for frustum-cullable building groups (meters). */
-const CHUNK_M = 128;
+/** Spatial chunk size for frustum-cullable building groups (meters). Larger =
+ *  fewer (model, material, chunk) InstancedMeshes = fewer draw calls, at the
+ *  cost of coarser culling. Authored glass towers carry ~5 material groups each,
+ *  so the chunk count multiplies the draw budget — keep it moderate. */
+const CHUNK_M = 200;
 
 /** Emissive intensity of the lit-window material by time of day. */
 const DAY_GLOW = 1.0;
@@ -89,7 +92,11 @@ export function CityBuildings({
 
   const assets = useMemo(() => {
     if (!models) return null;
-    const castShadow = preset.castShadows !== "none";
+    // Buildings cast shadows only on the "full" (high/discrete-GPU) tier. The
+    // authored towers are ~5 InstancedMeshes each; casting them all on the med
+    // tier (castShadows "buildings") doubles the tower draw budget in the shadow
+    // pass and was the main post-glass FPS regression. They still RECEIVE shadows.
+    const castShadow = preset.castShadows === "full";
 
     // Bucket placements by (model, 128 m chunk). Only non-empty buckets become
     // meshes, so empty sky over the district costs nothing.
