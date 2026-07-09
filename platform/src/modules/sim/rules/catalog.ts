@@ -260,6 +260,15 @@ export const COMMENDATIONS: Record<CommendationCode, CommendationSpec> = {
     explanationBg: "Намали навреме и пропусна пешеходеца на пътеката. Това спасява животи.",
     conceptId: "c-crosswalk-yield",
   },
+  YIELDED_TO_PRIORITY: {
+    titleBg: "Правилно отстъпено предимство",
+    explanationBg: "Пропусна превозното средство с предимство и продължи, когато беше безопасно. Точно така се пази безопасността на кръстовище.",
+    conceptId: "c-priority-concept",
+  },
+  CLEAN_DRIVING: {
+    titleBg: "Чисто и спокойно каране",
+    explanationBg: "Дълъг участък без нито една грешка — плавно, съобразено и предвидимо. Продължавай така.",
+  },
   PREDRIVE_PERFECT: {
     titleBg: "Безупречна подготовка за потегляне",
     explanationBg: "Изпълни цялата процедура преди потегляне без пропуски и в правилния ред.",

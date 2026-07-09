@@ -91,6 +91,8 @@ export interface RuleEngineState {
   collisionCooldownUntil: number | null;
   /** Set once a collision occurs — the session grades as terminated. */
   terminated: boolean;
+  /** Metres driven since the last violation — earns CLEAN_DRIVING commendations. */
+  cleanDistanceM: number;
 }
 
 const IDLE_EPISODE: EpisodeState = { activeSince: null, emitted: false };
@@ -117,6 +119,7 @@ export function createRuleEngine(config?: Partial<RuleEngineConfig>): RuleEngine
     crossing: null,
     collisionCooldownUntil: null,
     terminated: false,
+    cleanDistanceM: 0,
   };
 }
 
@@ -354,6 +357,34 @@ export function reduceTick(prev: RuleEngineState, tick: SimTick): ReduceResult {
       }
     } else {
       z.tooFastSince = null;
+    }
+  }
+
+  // -- 6. positive reinforcement: reward a violation-free driving streak.
+  // A driver still committing a sustained violation (e.g. holding over the
+  // limit — the episode fires once, then stays silent) must NOT accumulate
+  // "clean" distance, so suppress while any episode is fired-and-ongoing.
+  const ongoingViolation = [
+    s.speedingMinor,
+    s.speedingDangerous,
+    s.seatbelt,
+    s.handbrake,
+    s.headlights,
+    s.laneKeeping,
+    s.conditionsSpeed,
+    s.rainLights,
+    s.following,
+    s.wrongWay,
+    s.keepRight,
+  ].some((ep) => ep.emitted && ep.activeSince !== null);
+  if (events.some((e) => e.kind === "violation")) {
+    s.cleanDistanceM = 0; // any fresh mistake resets the streak
+  } else if (!ongoingViolation && !s.terminated && moving && s.prevT !== null) {
+    // Clamp dt so a pause/resume time jump can't fabricate a huge distance.
+    s.cleanDistanceM += (speed / 3.6) * Math.min(t - s.prevT, 2);
+    if (s.cleanDistanceM >= cfg.cleanDrivingDistanceM) {
+      s.cleanDistanceM -= cfg.cleanDrivingDistanceM;
+      events.push(makeCommendation("CLEAN_DRIVING", t));
     }
   }
 

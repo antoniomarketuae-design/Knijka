@@ -165,6 +165,8 @@ export type CommendationCode =
   | "FULL_STOP_AT_STOP_SIGN"
   | "SAFE_LANE_CHANGE" // mirror glance + indicator both done
   | "PEDESTRIAN_YIELDED"
+  | "YIELDED_TO_PRIORITY" // gave way correctly at a priority situation
+  | "CLEAN_DRIVING" // sustained violation-free driving (positive reinforcement)
   | "PREDRIVE_PERFECT";
 
 export interface ViolationEvent {
@@ -274,6 +276,9 @@ export interface RuleEngineConfig {
   /** Seconds against a one-way's flow before WRONG_WAY fires. */
   wrongWaySustainSec: number;
 
+  /** Metres of violation-free driving that earns a CLEAN_DRIVING commendation. */
+  cleanDrivingDistanceM: number;
+
   /** Seconds in a non-rightmost lane (multi-lane) before NOT_KEEPING_RIGHT — long
    *  enough that a normal overtake never trips it. */
   keepRightSustainSec: number;
@@ -323,6 +328,7 @@ export const DEFAULT_RULE_CONFIG: RuleEngineConfig = {
 
   wrongWaySustainSec: 1.5,
   keepRightSustainSec: 8,
+  cleanDrivingDistanceM: 250,
 
   crossingApproachMaxKmh: 30,
   crossingTooFastSustainSec: 1,
