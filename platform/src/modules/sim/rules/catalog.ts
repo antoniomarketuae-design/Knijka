@@ -135,6 +135,24 @@ export const VIOLATIONS: Record<ViolationCode, ViolationSpec> = {
       "Движеше се трайно встрани от средата на лентата — близо до или върху маркировката. Дръж колата в средата на своята лента: така си предвидим за другите и оставяш безопасно разстояние встрани.",
     lawRef: "ЗДвП чл. 15",
   },
+  SPEED_TOO_FAST_FOR_CONDITIONS: {
+    severityClass: "vtorostepenna",
+    points: SEVERITY_POINTS.vtorostepenna,
+    titleBg: "Несъобразена с условията скорост",
+    explanationBg:
+      "Караше в рамките на ограничението, но твърде бързо за условията — дъжд или тъмно. Съобразената скорост е тази, при която можеш да спреш в рамките на видимото платно. При намалена видимост и хлъзгав път намали още.",
+    lawRef: "ЗДвП чл. 20",
+    conceptId: "c-speed-limits",
+  },
+  HEADLIGHTS_OFF_IN_RAIN: {
+    severityClass: "vtorostepenna",
+    points: SEVERITY_POINTS.vtorostepenna,
+    titleBg: "Движение в дъжд без светлини",
+    explanationBg:
+      "Валеше, а караше без къси светлини. При намалена видимост (дъжд, мъгла, сняг) включи късите светлини — не толкова за да виждаш, колкото за да те виждат другите.",
+    lawRef: "ЗДвП чл. 70",
+    conceptId: "c-night-visibility",
+  },
   PEDESTRIAN_CROSSING_TOO_FAST: {
     severityClass: "opasna",
     points: SEVERITY_POINTS.opasna,

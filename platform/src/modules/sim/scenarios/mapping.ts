@@ -16,6 +16,8 @@ const CODE_TO_SCENARIO: Record<string, string> = {
   LANE_CHANGE_WITHOUT_MIRROR_CHECK: "ev-lane-change",
   SEATBELT_OFF_WHILE_MOVING: "ev-seatbelt",
   HEADLIGHTS_OFF_AT_NIGHT: "ev-lights-usage",
+  HEADLIGHTS_OFF_IN_RAIN: "ev-adverse-weather",
+  SPEED_TOO_FAST_FOR_CONDITIONS: "ev-speed-for-conditions",
   PEDESTRIAN_CROSSING_TOO_FAST: "ev-ped-crossing-marked",
   PEDESTRIAN_NOT_YIELDED: "ev-ped-crossing-marked",
   COLLISION: "ev-collision",

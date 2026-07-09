@@ -33,7 +33,7 @@ export interface WorldRuntime {
   /** Advance signal phases etc.; call once per render frame. */
   update(dtSec: number): void;
   /** Produce the authoritative SimTick for the rule engine from a vehicle sample. */
-  sample(v: VehicleSample, tSec: number, isNight: boolean): SimTick;
+  sample(v: VehicleSample, tSec: number, isNight: boolean, rain?: boolean): SimTick;
   /** Current phase for a signal node (world renderer reads this to light the lamps). */
   signalPhase(signalNodeId: string): SignalPhase;
   /** Resolved speed limit at a position (edge maxspeed or BG urban default 50). */

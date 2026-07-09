@@ -384,6 +384,7 @@ function ReadyScene({
               onMinimap={onMinimap}
               minimapPolylines={minimapPolylines}
               isNight={isNight}
+              rain={rain}
               paused={physicsPaused}
             />
             {/* Ambient life — cars + pedestrians. Render-only: RuntimeDriver
@@ -465,6 +466,7 @@ function RuntimeDriver({
   onMinimap,
   minimapPolylines,
   isNight,
+  rain,
   paused,
 }: {
   runtime: ReturnType<typeof createWorldRuntime>;
@@ -474,6 +476,7 @@ function RuntimeDriver({
   onMinimap: (f: MinimapFrame) => void;
   minimapPolylines: MinimapFrame["polylines"];
   isNight: boolean;
+  rain: boolean;
   paused: boolean;
 }) {
   const tRef = useRef(0);
@@ -492,7 +495,7 @@ function RuntimeDriver({
       playerSpeedKmh: sample.speedKmh,
       playerHeadingDeg: sample.headingDeg,
     });
-    const tick = runtime.sample(sample, tRef.current, isNight);
+    const tick = runtime.sample(sample, tRef.current, isNight, rain);
     onTick(tick);
 
     const nowMs = tRef.current * 1000;

@@ -103,6 +103,8 @@ export interface SimTick {
   rpm?: number;
   /** True when the world is in night conditions (engine decides from time-of-day). */
   isNight: boolean;
+  /** True in rain / reduced visibility (optional; absent = dry). */
+  rain?: boolean;
   /** Discrete events since the previous tick. */
   events: SimTickEvent[];
 }
@@ -138,7 +140,9 @@ export type ViolationCode =
   | "SEATBELT_OFF_WHILE_MOVING" // основна
   | "HANDBRAKE_LEFT_ON" // второстепенна
   | "HEADLIGHTS_OFF_AT_NIGHT" // основна
+  | "HEADLIGHTS_OFF_IN_RAIN" // второстепенна: reduced visibility, low beam should be on
   | "POOR_LANE_KEEPING" // второстепенна: sustained off-centre / straddling positioning
+  | "SPEED_TOO_FAST_FOR_CONDITIONS" // второстепенна: within the limit but imprudent for rain/night
   | "PEDESTRIAN_CROSSING_TOO_FAST" // опасна: accident precondition (official list)
   | "PEDESTRIAN_NOT_YIELDED" // опасна
   | "COLLISION" // опасна + session terminate flag (official: exam terminated)
@@ -239,6 +243,15 @@ export interface RuleEngineConfig {
   /** Seconds the off-centre condition must hold before POOR_LANE_KEEPING fires. */
   laneKeepSustainSec: number;
 
+  /** Prudent-speed factor on the posted limit in rain (0.85 = 15% below). */
+  conditionSpeedRainFactor: number;
+  /** Prudent-speed factor on the posted limit at night. */
+  conditionSpeedNightFactor: number;
+  /** Seconds too-fast-for-conditions must hold before it fires. */
+  conditionsSpeedSustainSec: number;
+  /** Seconds of driving in rain without low beam before HEADLIGHTS_OFF_IN_RAIN. */
+  rainLightsSustainSec: number;
+
   /** Max approach speed inside a crossing zone while a pedestrian is on the crossing, km/h. */
   crossingApproachMaxKmh: number;
   /** Seconds above the approach max before the too-fast violation fires. */
@@ -271,6 +284,11 @@ export const DEFAULT_RULE_CONFIG: RuleEngineConfig = {
 
   laneKeepMaxOffsetM: 1.3, // ~straddling the lane line (3.25 m lane → 1.6 m half)
   laneKeepSustainSec: 3, // conservative: only sustained wandering, not a brief drift
+
+  conditionSpeedRainFactor: 0.85,
+  conditionSpeedNightFactor: 0.9,
+  conditionsSpeedSustainSec: 3,
+  rainLightsSustainSec: 3,
 
   crossingApproachMaxKmh: 30,
   crossingTooFastSustainSec: 1,

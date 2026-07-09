@@ -82,6 +82,8 @@ export interface RuleEngineState {
   handbrake: EpisodeState;
   headlights: EpisodeState;
   laneKeeping: EpisodeState;
+  conditionsSpeed: EpisodeState;
+  rainLights: EpisodeState;
   crossing: CrossingZoneState | null;
   collisionCooldownUntil: number | null;
   /** Set once a collision occurs — the session grades as terminated. */
@@ -104,6 +106,8 @@ export function createRuleEngine(config?: Partial<RuleEngineConfig>): RuleEngine
     handbrake: { ...IDLE_EPISODE },
     headlights: { ...IDLE_EPISODE },
     laneKeeping: { ...IDLE_EPISODE },
+    conditionsSpeed: { ...IDLE_EPISODE },
+    rainLights: { ...IDLE_EPISODE },
     crossing: null,
     collisionCooldownUntil: null,
     terminated: false,
@@ -122,6 +126,8 @@ function cloneState(s: RuleEngineState): RuleEngineState {
     handbrake: { ...s.handbrake },
     headlights: { ...s.headlights },
     laneKeeping: { ...s.laneKeeping },
+    conditionsSpeed: { ...s.conditionsSpeed },
+    rainLights: { ...s.rainLights },
     crossing: s.crossing ? { ...s.crossing } : null,
   };
 }
@@ -270,6 +276,35 @@ export function reduceTick(prev: RuleEngineState, tick: SimTick): ReduceResult {
   const offCentre = Math.abs(tick.laneOffsetM) > cfg.laneKeepMaxOffsetM;
   if (stepEpisode(s.laneKeeping, offCentre && moving, !offCentre, t, cfg.laneKeepSustainSec)) {
     events.push(makeViolation("POOR_LANE_KEEPING", t));
+  }
+
+  // Speed for the conditions: within the posted limit, but too fast for rain /
+  // night. (Above the limit is regular speeding, handled above.)
+  const raining = tick.rain === true;
+  const conditionsReduced = raining || tick.isNight;
+  const conditionFactor =
+    (raining ? cfg.conditionSpeedRainFactor : 1) * (tick.isNight ? cfg.conditionSpeedNightFactor : 1);
+  const conditionLimit = limit * conditionFactor;
+  const tooFastForConditions =
+    conditionsReduced && moving && speed > conditionLimit && speed <= gracedLimit;
+  if (
+    stepEpisode(
+      s.conditionsSpeed,
+      tooFastForConditions,
+      !conditionsReduced || speed <= conditionLimit,
+      t,
+      cfg.conditionsSpeedSustainSec,
+    )
+  ) {
+    events.push(makeViolation("SPEED_TOO_FAST_FOR_CONDITIONS", t));
+  }
+
+  // Lights in rain (daytime — night is covered by HEADLIGHTS_OFF_AT_NIGHT).
+  const rainNoLights = raining && !tick.isNight && tick.headlights === "off" && moving;
+  if (
+    stepEpisode(s.rainLights, rainNoLights, !raining || tick.headlights !== "off", t, cfg.rainLightsSustainSec)
+  ) {
+    events.push(makeViolation("HEADLIGHTS_OFF_IN_RAIN", t));
   }
 
   // -- 5. pedestrian-crossing zone: track approach speed while a pedestrian is present
