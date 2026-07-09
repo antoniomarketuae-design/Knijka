@@ -170,6 +170,14 @@ export const VIOLATIONS: Record<ViolationCode, ViolationSpec> = {
     lawRef: "ЗДвП чл. 6",
     conceptId: "c-sign-groups",
   },
+  NOT_KEEPING_RIGHT: {
+    severityClass: "vtorostepenna",
+    points: SEVERITY_POINTS.vtorostepenna,
+    titleBg: "Движение в лявата лента без причина",
+    explanationBg:
+      "Дълго време се движеше в лявата лента, без да изпреварваш. Извън изпреварване се движи във възможно най-дясната свободна лента — лявата се освобождава за по-бързите.",
+    lawRef: "ЗДвП чл. 15",
+  },
   PEDESTRIAN_CROSSING_TOO_FAST: {
     severityClass: "opasna",
     points: SEVERITY_POINTS.opasna,

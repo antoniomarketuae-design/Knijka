@@ -93,6 +93,8 @@ export interface SimTick {
   laneOffsetM: number;
   /** Current lane index; 0 = rightmost, increases leftward. */
   laneId: number;
+  /** Lanes in the current travel direction (optional; absent = unknown/1). */
+  laneCount?: number;
   indicator: IndicatorState;
   headlights: HeadlightState;
   seatbeltOn: boolean;
@@ -149,6 +151,7 @@ export type ViolationCode =
   | "SPEED_TOO_FAST_FOR_CONDITIONS" // второстепенна: within the limit but imprudent for rain/night
   | "FOLLOWING_TOO_CLOSE" // основна: tailgating — under the 2-second gap
   | "WRONG_WAY" // опасна: driving against a one-way street
+  | "NOT_KEEPING_RIGHT" // второстепенна: hogging a left lane on a multi-lane road
   | "PEDESTRIAN_CROSSING_TOO_FAST" // опасна: accident precondition (official list)
   | "PEDESTRIAN_NOT_YIELDED" // опасна
   | "COLLISION" // опасна + session terminate flag (official: exam terminated)
@@ -270,6 +273,10 @@ export interface RuleEngineConfig {
   /** Seconds against a one-way's flow before WRONG_WAY fires. */
   wrongWaySustainSec: number;
 
+  /** Seconds in a non-rightmost lane (multi-lane) before NOT_KEEPING_RIGHT — long
+   *  enough that a normal overtake never trips it. */
+  keepRightSustainSec: number;
+
   /** Max approach speed inside a crossing zone while a pedestrian is on the crossing, km/h. */
   crossingApproachMaxKmh: number;
   /** Seconds above the approach max before the too-fast violation fires. */
@@ -314,6 +321,7 @@ export const DEFAULT_RULE_CONFIG: RuleEngineConfig = {
   followSustainSec: 2,
 
   wrongWaySustainSec: 1.5,
+  keepRightSustainSec: 8,
 
   crossingApproachMaxKmh: 30,
   crossingTooFastSustainSec: 1,

@@ -208,6 +208,7 @@ export function createWorldRuntime(districtJson: District | unknown): DistrictWo
         headingDeg: v.headingDeg,
         laneOffsetM: fix.laneOffsetM,
         laneId: fix.laneId,
+        laneCount: edgeRt ? edgeRt.lanesPerDir : 1,
         indicator: v.indicator,
         headlights: v.headlights,
         seatbeltOn: v.seatbeltOn,

@@ -86,6 +86,7 @@ export interface RuleEngineState {
   rainLights: EpisodeState;
   following: EpisodeState;
   wrongWay: EpisodeState;
+  keepRight: EpisodeState;
   crossing: CrossingZoneState | null;
   collisionCooldownUntil: number | null;
   /** Set once a collision occurs — the session grades as terminated. */
@@ -112,6 +113,7 @@ export function createRuleEngine(config?: Partial<RuleEngineConfig>): RuleEngine
     rainLights: { ...IDLE_EPISODE },
     following: { ...IDLE_EPISODE },
     wrongWay: { ...IDLE_EPISODE },
+    keepRight: { ...IDLE_EPISODE },
     crossing: null,
     collisionCooldownUntil: null,
     terminated: false,
@@ -134,6 +136,7 @@ function cloneState(s: RuleEngineState): RuleEngineState {
     rainLights: { ...s.rainLights },
     following: { ...s.following },
     wrongWay: { ...s.wrongWay },
+    keepRight: { ...s.keepRight },
     crossing: s.crossing ? { ...s.crossing } : null,
   };
 }
@@ -331,6 +334,12 @@ export function reduceTick(prev: RuleEngineState, tick: SimTick): ReduceResult {
   const goingWrongWay = tick.wrongWay === true && moving;
   if (stepEpisode(s.wrongWay, goingWrongWay, !goingWrongWay, t, cfg.wrongWaySustainSec)) {
     events.push(makeViolation("WRONG_WAY", t));
+  }
+
+  // Keep right: prolonged driving in a non-rightmost lane on a multi-lane road.
+  const inLeftLane = tick.laneId > 0 && (tick.laneCount ?? 1) > 1 && moving;
+  if (stepEpisode(s.keepRight, inLeftLane, !inLeftLane, t, cfg.keepRightSustainSec)) {
+    events.push(makeViolation("NOT_KEEPING_RIGHT", t));
   }
 
   // -- 5. pedestrian-crossing zone: track approach speed while a pedestrian is present
