@@ -1,7 +1,8 @@
 # Scenario Engine — Build Progress & Resume Point
 
-**Last updated:** 2026-07-09 · **Branch:** `scenario-engine` · **Status:** Phase-1 done, Phase-2 in progress
+**Last updated:** 2026-07-09 · **Branch:** `scenario-engine` · **Status:** Phase-1 done, Phase-2 in progress (3 adjudicator slices done)
 **Read this first to resume.** Companion: the plan is [65_SCENARIO_BASED_LEARNING_ENGINE.md](../65_SCENARIO_BASED_LEARNING_ENGINE.md).
+**Latest commits (newest first):** `c9ac71e` right-hand-rule adjudicator · `3caf6f5` conflictFromRight query · `0823d5b` this doc · `9ebb997` left-turn yield · `9ab9866` give-way yield · `8f1af51` priority pipeline · (+ Phase-1 & analysis below). **689 tests pass.**
 
 ---
 
@@ -46,7 +47,8 @@ New SimTick fields threaded (all optional): `rain`, `leadGapM`, `wrongWay`, `lan
 - **Pipeline:** the reserved `prioritySituation` SimTick event is now graded by the reducer → `FAILED_TO_YIELD` when `violated` (situation carried in `detail`).
 - **Adjudicator slice 1 — give-way/stop yield:** on crossing a give-way/stop line, `worldRuntime` calls `traffic.conflictNear()` (pure `conflictNearFor` — a moving *crossing/oncoming*, not same-direction, vehicle near the junction) → emits `prioritySituation{give-way}`. Wired via `runtime.setJunctionConflictQuery()` (mirrors `setPedestrianQuery`), `nodePos` map, hook in `fireLine`.
 - **Adjudicator slice 2 — left-turn yield:** on `turnStarted:left` in a junction area, `worldRuntime` calls `traffic.oncomingNear()` (pure `oncomingNearFor` — vehicle *ahead* heading opposite) → emits `prioritySituation{left-turn}`. Wired via `runtime.setOncomingQuery()`, hook after `turns.update`.
-- Integration-tested against real geometry: `runtime/__tests__/priority-conflict.test.ts`, `left-turn-yield.test.ts`.
+- **Adjudicator slice 3 — right-hand rule (commit c9ac71e):** `worldRuntime` classifies uncontrolled equal junctions (`uncontrolledJunctions`: degree≥3, not signalized, no stop line guarding — 93 candidates in this district; `debugUncontrolledJunctions()` accessor) and tracks junction entry (`rhrNode`/`rhrFired`, one per visit). On entering the core (`RHR_CORE_RADIUS_M 9`) while moving with a vehicle from the RIGHT (`traffic.conflictFromRight` / `conflictFromRightFor`, wired via `setRightConflictQuery`) → emits `prioritySituation{right-hand-rule}`.
+- Integration-tested against real geometry: `runtime/__tests__/priority-conflict.test.ts`, `left-turn-yield.test.ts`, `right-hand-rule.test.ts`. Traffic queries unit-tested: `traffic/{conflict,oncoming,right-conflict}.test.ts`.
 
 ## 4. The reusable pattern (how to add a detector)
 
@@ -54,14 +56,13 @@ New SimTick fields threaded (all optional): `rain`, `leadGapM`, `wrongWay`, `lan
 
 **Priority (Phase-2) detector:** worldRuntime detects the situation + calls a traffic query → emits `prioritySituation{situation, violated}`. Reducer already grades it. Add a `set*Query` (mirror `setPedestrianQuery`) if a new traffic query is needed; wire it in `LessonScene`'s load effect next to the others. Pure traffic helpers live in `traffic/system.ts` (`leadGapFor`, `conflictNearFor`, `oncomingNearFor`), unit-tested.
 
-## 5. NEXT TASK (in progress): uncontrolled right-hand rule
+## 5. NEXT TASK: pick from these (right-hand rule is DONE — see §3d slice 3)
 
-Yield to the RIGHT at unsigned/unsignalized junctions. **Bigger than slices 1–2** because uncontrolled junctions have **no crossing/turn event to hook**. Needs:
-1. **Junction classification:** which nodes are "equal/uncontrolled" (right-hand rule) vs priority-road/signalized. Source: `district.intersections[].signalized` + whether any `stopLines` guard the junction (no lines + not signalized ⇒ equal junction). Precompute a set in `worldRuntime`.
-2. **A new junction-entry tracker** — mirror `runtime/zones.ts` `CrossingZoneTracker`: detect the player entering an uncontrolled-junction zone (one-shot per entry, reset on leave).
-3. **A "from the right" traffic query** — like `conflictNear` but filtered to vehicles on the player's RIGHT (perpendicular-right of heading) approaching the junction. Add `traffic.conflictFromRight(px,py,headingDeg,radius)` + pure helper + `setRightConflictQuery`.
-4. On entry with a right-conflict present and no yield → `prioritySituation{situation:"right-hand-rule", violated:true}`.
-Note: also add a **priority-road** guard so a driver WITH priority isn't flagged.
+The three core right-of-way situations (give-way/stop, left-turn, right-hand rule) are live. Candidate next steps, easiest first:
+1. **Roundabout-entry yield** — on entering the roundabout (`district.roundabouts`, `rb-1`), yield to circulating traffic. Reuse the conflict-query pattern; detect entry via proximity to the roundabout center + a "circulating vehicle present" query. Tractable.
+2. **Refine FAILED_TO_YIELD scenarios** — currently all three situations map to one `FAILED_TO_YIELD` code → `ev-junction-priority-sign` (the `detail` distinguishes them). Optionally split into distinct catalog codes/scenarios (ev-junction-uncontrolled, ev-left-turn-yield-oncoming) for finer teach-first tracking + theory linkage.
+3. **NPC actor library** (doc-65 Phase 2, BIGGER) — cyclist, tram, bus-pullout, emergency-vehicle. These need NEW traffic actor *types* (the traffic system only has cars + pedestrians), so it's a traffic-system expansion, not just a query. Highest coverage but most work.
+4. **Priority-road guard** — not strictly needed yet (RHR only fires at equal junctions, and only on right-conflicts, so a priority driver isn't flagged), but revisit if false positives appear on test-drives.
 
 ## 6. Remaining roadmap (doc 65)
 
@@ -78,4 +79,4 @@ Note: also add a **priority-road** guard so a driver WITH priority isn't flagged
 
 ## 8. Verify commands
 
-`cd platform` then: `npx tsc --noEmit` · `npm test` (681 tests) · `npm run build`. All green as of the last commit.
+`cd platform` then: `npx tsc --noEmit` · `npm test` (689 tests) · `npm run build`. All green as of the last commit (`c9ac71e`).
