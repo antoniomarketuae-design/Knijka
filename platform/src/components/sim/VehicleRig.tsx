@@ -35,7 +35,7 @@ import type { CabinControls } from "./cabin";
 import type { SimAudio } from "./simAudio";
 import { updateVehicleSample } from "./vehicleSample";
 import { VitokCockpit } from "./vitok/VitokCockpit";
-import { RoadsterBody } from "./RoadsterBody";
+import { HeroCarBody } from "./HeroCarBody";
 
 /**
  * R3F binding for the React-free VehicleSim physics core.
@@ -202,10 +202,10 @@ export function VehicleRig({
         massProperties={massProperties}
       />
       {/* Vehicle visuals — everything inside follows the interpolated body.
-          Roadster exterior (glTF) + the existing „Виток" cockpit for the
-          inside view. */}
+          Hero "Aurelis GT-E" exterior (Draco glTF) + the existing „Виток"
+          cockpit for the inside view. */}
       <group ref={chassisGroupRef}>
-        <RoadsterBody />
+        <HeroCarBody />
         <VitokCockpit simRef={simRef} inputRef={inputRef} cabinRef={cabinRef} />
 
         {/* Windshield glass — a faint cool-tinted, low-roughness plane raked
