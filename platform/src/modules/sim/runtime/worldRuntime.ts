@@ -39,6 +39,8 @@ const WRONG_WAY_ANGLE_DEG = 120;
 
 /** Radius around a junction to look for conflicting priority traffic, meters. */
 const PRIORITY_CONFLICT_RADIUS_M = 16;
+/** Look-ahead for oncoming traffic when turning left, meters. */
+const LEFT_TURN_ONCOMING_RADIUS_M = 26;
 
 /**
  * True when a vehicle heads against a one-way street's flow. `tangent` is the
@@ -66,11 +68,21 @@ export type JunctionConflictQuery = (
   approachBearingDeg: number,
 ) => boolean;
 
+/** Is there an oncoming vehicle ahead of the player (for turning left across it)? */
+export type OncomingQuery = (
+  px: number,
+  py: number,
+  headingDeg: number,
+  radiusM: number,
+) => boolean;
+
 export interface DistrictWorldRuntime extends WorldRuntime {
   /** Install the traffic module's pedestrian lookup (default: nobody anywhere). */
   setPedestrianQuery(fn: PedestrianQuery | null): void;
   /** Install the traffic module's junction-conflict lookup (default: none). */
   setJunctionConflictQuery(fn: JunctionConflictQuery | null): void;
+  /** Install the traffic module's oncoming-vehicle lookup (default: none). */
+  setOncomingQuery(fn: OncomingQuery | null): void;
   /** Physics layer reports a contact; drained into the next sample(). */
   pushCollision(withWhat: CollisionWith): void;
   /** Phase a driver approaching `signalNodeId` on `bearingDeg` sees (renderer helper). */
@@ -95,6 +107,7 @@ export function createWorldRuntime(districtJson: District | unknown): DistrictWo
   const collisionQueue: CollisionWith[] = [];
   let pedQuery: PedestrianQuery = () => false;
   let conflictQuery: JunctionConflictQuery = () => false;
+  let oncomingQuery: OncomingQuery = () => false;
 
   // Junction node positions (district space) for priority conflict lookups.
   const nodePos = new Map<string, { x: number; y: number }>();
@@ -212,7 +225,20 @@ export function createWorldRuntime(districtJson: District | unknown): DistrictWo
       // 4. Turns (only inside junction areas).
       const nearJunction =
         index.nearestIntersection(v.position.x, v.position.y, JUNCTION_AREA_RADIUS_M) !== null;
+      const beforeTurns = events.length;
       turns.update(tSec, v.headingDeg, nearJunction, events);
+      // Turning left while oncoming traffic is approaching = failure to yield.
+      for (let i = beforeTurns; i < events.length; i++) {
+        const te = events[i];
+        if (
+          te.kind === "turnStarted" &&
+          te.direction === "left" &&
+          oncomingQuery(v.position.x, v.position.y, v.headingDeg, LEFT_TURN_ONCOMING_RADIUS_M)
+        ) {
+          events.push({ kind: "prioritySituation", situation: "left-turn", violated: true });
+          break;
+        }
+      }
 
       // 5. Pedestrian-crossing zones.
       zones.update(v.position.x, v.position.y, v.headingDeg, fix.edgeIdx, pedQuery, events);
@@ -272,6 +298,10 @@ export function createWorldRuntime(districtJson: District | unknown): DistrictWo
 
     setJunctionConflictQuery(fn: JunctionConflictQuery | null): void {
       conflictQuery = fn ?? (() => false);
+    },
+
+    setOncomingQuery(fn: OncomingQuery | null): void {
+      oncomingQuery = fn ?? (() => false);
     },
 
     pushCollision(withWhat: CollisionWith): void {

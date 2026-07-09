@@ -239,6 +239,12 @@ export interface TrafficSystem {
    * give way at a junction. District space; bearings 0 = north, clockwise.
    */
   conflictNear(x: number, y: number, radiusM: number, approachBearingDeg: number): boolean;
+  /**
+   * True when a moving vehicle is AHEAD of the player within `radiusM` and
+   * heading roughly toward them (oncoming) — used to grade turning left across
+   * oncoming traffic. District space; headingDeg 0 = north, clockwise.
+   */
+  oncomingNear(px: number, py: number, headingDeg: number, radiusM: number): boolean;
   readonly timeSec: number;
   readonly stats: TrafficSystemStats;
 }

@@ -50,6 +50,8 @@ const VEHICLE_LENGTH_M = 4.1;
 const CONFLICT_MIN_SPEED_MPS = 1;
 /** Heading within this of your approach = same-direction traffic (not a conflict), deg. */
 const CONFLICT_SAME_DIR_DEG = 50;
+/** A vehicle heading more than this off yours (and ahead) counts as oncoming, deg. */
+const ONCOMING_MIN_DEG = 130;
 
 class TrafficSystemImpl implements TrafficSystem {
   readonly vehicles: TrafficVehicleState[] = [];
@@ -258,6 +260,35 @@ class TrafficSystemImpl implements TrafficSystem {
   conflictNear(x: number, y: number, radiusM: number, approachBearingDeg: number): boolean {
     return conflictNearFor(this.vehicles, x, y, radiusM, approachBearingDeg);
   }
+
+  oncomingNear(px: number, py: number, headingDeg: number, radiusM: number): boolean {
+    return oncomingNearFor(this.vehicles, px, py, headingDeg, radiusM);
+  }
+}
+
+/** Pure "oncoming vehicle ahead" test (district space; see interface). */
+export function oncomingNearFor(
+  vehicles: readonly { x: number; y: number; dirX: number; dirY: number; speedMps: number }[],
+  px: number,
+  py: number,
+  headingDeg: number,
+  radiusM: number,
+): boolean {
+  const rad = (headingDeg * Math.PI) / 180;
+  const fx = Math.sin(rad); // forward x (0° = north = +y)
+  const fy = Math.cos(rad);
+  const r2 = radiusM * radiusM;
+  for (const v of vehicles) {
+    const dx = v.x - px;
+    const dy = v.y - py;
+    if (dx * dx + dy * dy > r2) continue;
+    if (dx * fx + dy * fy <= 0) continue; // must be ahead of the player
+    if (v.speedMps < CONFLICT_MIN_SPEED_MPS) continue;
+    const vBearing = (Math.atan2(v.dirX, v.dirY) * 180) / Math.PI;
+    const delta = Math.abs((((vBearing - headingDeg) % 360) + 540) % 360 - 180);
+    if (delta > ONCOMING_MIN_DEG) return true; // heading roughly opposite → oncoming
+  }
+  return false;
 }
 
 /** Pure "conflicting vehicle near a point" test (district space; see interface). */
