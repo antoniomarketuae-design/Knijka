@@ -79,13 +79,19 @@ function loadTexture(): Promise<THREE.Texture> {
     new THREE.TextureLoader().load(
       `${BASE_URL}/colormap.png`,
       (tex) => {
-        // glTF UVs assume flipY=false; the atlas is small colour swatches, so
-        // nearest filtering avoids neighbour-swatch bleed.
+        // glTF UVs assume flipY=false. The atlas is 512² of large solid colour
+        // swatches, so: NearestFilter on magnification keeps swatches crisp up
+        // close with zero neighbour bleed, while trilinear mipmapping +
+        // anisotropy on minification kills the facade shimmer/sparkle at
+        // distance and grazing angles (the aliasing only ever appears when the
+        // texture minifies, so mips are safe here). Anisotropy is bumped per
+        // quality by the consumer (see CityBuildings).
         tex.flipY = false;
         tex.colorSpace = THREE.SRGBColorSpace;
         tex.magFilter = THREE.NearestFilter;
-        tex.minFilter = THREE.NearestFilter;
-        tex.generateMipmaps = false;
+        tex.minFilter = THREE.LinearMipmapLinearFilter;
+        tex.generateMipmaps = true;
+        tex.anisotropy = 8;
         resolve(tex);
       },
       undefined,

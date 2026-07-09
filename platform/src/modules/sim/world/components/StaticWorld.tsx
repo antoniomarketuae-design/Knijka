@@ -14,6 +14,8 @@
 
 import { useEffect, useMemo } from "react";
 import type * as THREE from "three";
+import { Color } from "three";
+import { useWetness, wetnessToRoadParams } from "@/modules/sim/environment";
 import type { WorldGeometry } from "../types";
 import {
   makeAsphaltTexture,
@@ -58,6 +60,7 @@ interface WorldGeometries {
   sidewalks: THREE.BufferGeometry;
   markings: THREE.BufferGeometry;
   terrain: THREE.BufferGeometry;
+  terrainPaved: THREE.BufferGeometry;
 }
 
 function useWorldGeometries(world: WorldGeometry): WorldGeometries {
@@ -68,6 +71,7 @@ function useWorldGeometries(world: WorldGeometry): WorldGeometries {
       sidewalks: meshDataToGeometry(world.sidewalks),
       markings: meshDataToGeometry(world.markings),
       terrain: meshDataToGeometry(world.terrain),
+      terrainPaved: meshDataToGeometry(world.terrainPaved),
     }),
     [world],
   );
@@ -79,6 +83,7 @@ function useWorldGeometries(world: WorldGeometry): WorldGeometries {
         geometries.sidewalks,
         geometries.markings,
         geometries.terrain,
+        geometries.terrainPaved,
       ]);
     },
     [geometries],
@@ -104,6 +109,19 @@ export function StaticWorld({
 
   const receive = preset.receiveShadows;
 
+  // Wet-road response: as the shared rain channel soaks the asphalt, drop its
+  // roughness (dry matte 1.0 → wet gloss 0.35 so the sky/streetlights smear
+  // into reflections) and darken its albedo. Grass + concrete stay dry-matte.
+  // useWetness re-renders only on quantized 0.01 steps (~a few dozen over the
+  // several-second ramp, none at steady state) — memoized geometries/textures
+  // are untouched, so this only reconciles the road material props.
+  const wetness = useWetness();
+  const wet = useMemo(
+    () => wetnessToRoadParams(wetness, { dryRoughness: 1.0, wetRoughness: 0.35, wetDarken: 0.6 }),
+    [wetness],
+  );
+  const roadTint = useMemo(() => new Color(wet.darken, wet.darken, wet.darken), [wet.darken]);
+
   return (
     <group name="world-static">
       <mesh geometry={geometries.terrain} receiveShadow={receive}>
@@ -120,6 +138,21 @@ export function StaticWorld({
           <meshStandardMaterial map={textures.grass} roughness={1} metalness={0} />
         )}
       </mesh>
+      {/* Paved courtyards/parking (concrete). Co-planar with the grass terrain;
+          shares the concrete PBR set with the sidewalks so no extra upload. */}
+      <mesh geometry={geometries.terrainPaved} receiveShadow={receive}>
+        {concrete ? (
+          <meshStandardMaterial
+            map={concrete.map}
+            normalMap={concrete.normalMap}
+            roughnessMap={concrete.roughnessMap}
+            roughness={1}
+            metalness={0}
+          />
+        ) : (
+          <meshStandardMaterial map={textures.sidewalk} roughness={0.92} metalness={0} />
+        )}
+      </mesh>
       <mesh geometry={geometries.road} receiveShadow={receive}>
         {asphalt ? (
           <meshStandardMaterial
@@ -127,11 +160,17 @@ export function StaticWorld({
             normalMap={asphalt.normalMap}
             roughnessMap={asphalt.roughnessMap}
             aoMap={asphalt.aoMap ?? undefined}
-            roughness={1}
+            color={roadTint}
+            roughness={wet.roughness}
             metalness={0}
           />
         ) : (
-          <meshStandardMaterial map={textures.asphalt} roughness={0.96} metalness={0} />
+          <meshStandardMaterial
+            map={textures.asphalt}
+            color={roadTint}
+            roughness={wet.roughness}
+            metalness={0}
+          />
         )}
       </mesh>
       <mesh geometry={geometries.junctions} receiveShadow={receive}>
@@ -141,11 +180,17 @@ export function StaticWorld({
             normalMap={asphalt.normalMap}
             roughnessMap={asphalt.roughnessMap}
             aoMap={asphalt.aoMap ?? undefined}
-            roughness={1}
+            color={roadTint}
+            roughness={wet.roughness}
             metalness={0}
           />
         ) : (
-          <meshStandardMaterial map={textures.asphalt} roughness={0.96} metalness={0} />
+          <meshStandardMaterial
+            map={textures.asphalt}
+            color={roadTint}
+            roughness={wet.roughness}
+            metalness={0}
+          />
         )}
       </mesh>
       <mesh geometry={geometries.sidewalks} receiveShadow={receive}>

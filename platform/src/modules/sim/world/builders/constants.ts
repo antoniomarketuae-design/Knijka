@@ -99,6 +99,15 @@ export const TERRAIN_MAX_RELIEF_M = 0.25;
 export const TERRAIN_FLAT_NEAR_ROAD_M = 14;
 export const TERRAIN_FULL_RELIEF_M = 38;
 
+/**
+ * Ground-use zoning: terrain cells whose centre is within this distance of any
+ * building footprint are paved (concrete courtyards / parking / plazas of the
+ * built-up fabric) instead of grassed. Everything farther stays grass, so
+ * genuine open space (parks, district edges) reads green while the city core
+ * reads paved — the "park with roads → city" fix, no new assets.
+ */
+export const TERRAIN_PAVE_NEAR_BUILDING_M = 20;
+
 export const STREETLIGHT_SPACING_M = 28;
 export const STREET_TREE_SPACING_M = 22;
 export const PARK_TREE_GRID_M = 18;

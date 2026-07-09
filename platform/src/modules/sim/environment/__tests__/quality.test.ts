@@ -18,7 +18,7 @@ describe("QUALITY_PRESETS", () => {
     expect(low.maxDpr).toBe(1);
   });
 
-  it("med runs a lean composer: half-res AO + SMAA, but no bloom/grade", () => {
+  it("med runs a lean composer: half-res AO + tight bloom + SMAA, but no grade", () => {
     const med = QUALITY_PRESETS.med;
     expect(med.shadows).toBe(true);
     expect(med.shadowMapSize).toBe(1024);
@@ -26,7 +26,9 @@ describe("QUALITY_PRESETS", () => {
     expect(med.postprocessing).toBe(true);
     expect(med.aoEnabled).toBe(true);
     expect(med.aoHalfRes).toBe(true);
-    expect(med.bloom).toBe(false);
+    // Bloom is the cheapest "looks expensive" lever — on at med (mipmap bloom
+    // is ≈0.5 ms). Color grade stays high-only (reads "blobby" on weak GPUs).
+    expect(med.bloom).toBe(true);
     expect(med.colorGrade).toBe(false);
   });
 

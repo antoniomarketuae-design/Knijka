@@ -64,7 +64,8 @@ export function buildWorldGeometry(
     roads.junctions,
     roads.sidewalks,
     markings.markings,
-    terrain,
+    terrain.grass,
+    terrain.paved,
     ...buildings.walls,
     buildings.roofs,
   ];
@@ -88,10 +89,10 @@ export function buildWorldGeometry(
     trees: props.trees.length,
     vertices,
     triangles,
-    // roads + junctions + sidewalks + markings + terrain + 3 signal parts +
-    // (4 sign faces + 1 pole) + 2 streetlight parts + 4 tree variants +
-    // one instanced draw per Kenney building model
-    drawCallEstimate: 5 + 3 + 5 + 2 + 4 + CITY_MODELS.length,
+    // roads + junctions + sidewalks + markings + grass + paved + 3 signal
+    // parts + (4 sign faces + 1 pole) + 2 streetlight parts + 4 tree variants
+    // + buildings (chunked & frustum-culled at runtime; count ~model-order).
+    drawCallEstimate: 5 + 3 + 5 + 2 + 1 + 4 + CITY_MODELS.length,
   };
 
   return {
@@ -99,7 +100,8 @@ export function buildWorldGeometry(
     junctionSurface: roads.junctions.toMeshData(),
     sidewalks: roads.sidewalks.toMeshData(),
     markings: markings.markings.toMeshData(),
-    terrain: terrain.toMeshData(),
+    terrain: terrain.grass.toMeshData(),
+    terrainPaved: terrain.paved.toMeshData(),
     buildingWalls: buildings.walls.map((w) => w.toMeshData()),
     buildingRoofs: buildings.roofs.toMeshData(),
     buildingInstances,

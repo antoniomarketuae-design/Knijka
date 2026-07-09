@@ -25,7 +25,7 @@
 //
 // Composer structure by quality level:
 //   low  — none (renderer ACES + canvas MSAA)
-//   med  — N8AO (half-res) → SMAA → ACES ToneMapping
+//   med  — N8AO (half-res) → Bloom → SMAA → ACES ToneMapping
 //   high — N8AO (half-res) → Bloom → HueSaturation + Vignette → SMAA → ACES
 
 import { useEffect, useMemo, useRef, type JSX } from "react";
@@ -285,15 +285,19 @@ export function SimEnvironment({ timeOfDay, rain, quality }: SimEnvironmentProps
       );
     }
     if (qp.bloom) {
-      // Subtle HDR bloom on the sun disc / bright speculars (high only). Its
-      // convolution attribute makes it its own pass, before tone mapping.
+      // Tight HDR bloom on the sun disc / bright speculars / emissive lights
+      // (med + high). mipmapBlur with a small radius keeps the glow contained
+      // (not "blobby") and cheap on a weak GPU; the high luminance threshold
+      // means only genuinely bright (HDR > 1) pixels bloom. Its convolution
+      // makes it its own pass, before tone mapping.
       chain.push(
         <Bloom
           key="bloom"
           mipmapBlur
-          intensity={0.45}
+          radius={0.5}
+          intensity={0.6}
           luminanceThreshold={1.0}
-          luminanceSmoothing={0.25}
+          luminanceSmoothing={0.2}
         />,
       );
     }
@@ -315,6 +319,10 @@ export function SimEnvironment({ timeOfDay, rain, quality }: SimEnvironmentProps
       <SkyDome timeOfDay={timeOfDay} />
       <fogExp2 ref={fogRef} attach="fog" args={fogArgs} />
       <hemisphereLight ref={hemiRef} intensity={0} />
+      {/* Shadow bias: a small depth bias kills acne while a low normalBias
+          keeps contact shadows attached (0.6 peter-panned them off the ground
+          so objects looked to float). Retuned together for the tight
+          camera-following ortho map. */}
       <directionalLight
         key={level}
         ref={sunRef}
@@ -322,8 +330,8 @@ export function SimEnvironment({ timeOfDay, rain, quality }: SimEnvironmentProps
         castShadow={qp.shadows}
         shadow-mapSize-width={qp.shadowMapSize}
         shadow-mapSize-height={qp.shadowMapSize}
-        shadow-bias={-0.0003}
-        shadow-normalBias={0.6}
+        shadow-bias={-0.0004}
+        shadow-normalBias={0.05}
       >
         <orthographicCamera
           attach="shadow-camera"

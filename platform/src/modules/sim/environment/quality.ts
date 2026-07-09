@@ -42,8 +42,10 @@ export interface QualityPreset {
   /** N8AO sample budget for this level (see AoQuality). */
   aoQuality: AoQuality;
   /**
-   * Subtle HDR bloom on the sun disc / bright speculars. High only (too costly
-   * and prone to a "blobby" look at med). Requires `postprocessing`.
+   * Tight HDR bloom on the sun disc / bright speculars / emissive lights
+   * (headlights, brake lights, signals, streetlights, cluster glow). On at
+   * med + high — mipmapBlur keeps it cheap and the high luminance threshold
+   * keeps it from reading "blobby" on a weak GPU. Requires `postprocessing`.
    */
   bloom: boolean;
   /**
@@ -75,10 +77,12 @@ export const QUALITY_PRESETS: Record<QualityLevel, QualityPreset> = {
     colorGrade: false,
     maxDpr: 1.0,
   },
-  // The Iris Xe 60 fps target. One 1024² shadow map, GPU rain, and now a lean
-  // composer: half-res N8AO (the big "flatness" fix) + SMAA + ACES tone map.
-  // No bloom/grade — those are the parts that cost the most and read "blobby"
-  // on a weak GPU. Half-res AO is ≈1 ms; SMAA ≈0.3 ms.
+  // The Iris Xe 60 fps target. One 1024² shadow map, GPU rain, and a lean
+  // composer: half-res N8AO (the big "flatness" fix) + tight mipmap bloom
+  // (the single cheapest "looks expensive" lever — lights/sun/speculars glow)
+  // + SMAA + ACES tone map. No color grade — that's the part that reads
+  // "blobby" on a weak GPU. Half-res AO is ≈1 ms; mipmap bloom ≈0.5 ms;
+  // SMAA ≈0.3 ms.
   med: {
     level: "med",
     shadows: true,
@@ -89,7 +93,7 @@ export const QUALITY_PRESETS: Record<QualityLevel, QualityPreset> = {
     aoEnabled: true,
     aoHalfRes: true,
     aoQuality: "performance",
-    bloom: false,
+    bloom: true,
     colorGrade: false,
     maxDpr: 1.25,
   },

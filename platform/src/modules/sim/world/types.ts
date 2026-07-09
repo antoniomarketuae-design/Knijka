@@ -239,8 +239,11 @@ export interface WorldGeometry {
   sidewalks: MeshData;
   /** All white paint: lane separators, edge lines, stop lines, zebras. */
   markings: MeshData;
-  /** Ground plane with subtle off-road relief. */
+  /** Open ground (grass): parks, verges, district edges. Subtle off-road relief. */
   terrain: MeshData;
+  /** Paved ground (concrete): courtyards/parking in the built-up fabric.
+   *  Co-planar with `terrain`, shares its vertex positions so there are no seams. */
+  terrainPaved: MeshData;
   /** Building walls merged per facade palette variant (index = variant).
    *  Kept as data + collider source; the renderer draws `buildingInstances`. */
   buildingWalls: MeshData[];

@@ -3,6 +3,12 @@
  * deterministic value-noise relief, flattened near roads and buildings so
  * nothing pokes through the (flat) physics ground plane where you drive.
  * Visual only — the collider stays a flat box (see colliders.ts).
+ *
+ * The single ground grid is split into two co-planar meshes that share the
+ * exact same vertex positions/normals (so there are no seams): `grass` for
+ * open space and `paved` for the built-up fabric — cells near buildings become
+ * concrete courtyards/parking. This "ground-use zoning" is the code-only fix
+ * that turns "park with roads" into "city" (see TERRAIN_PAVE_NEAR_BUILDING_M).
  */
 
 import type { District } from "../types";
@@ -11,19 +17,29 @@ import {
   TERRAIN_FULL_RELIEF_M,
   TERRAIN_MARGIN_M,
   TERRAIN_MAX_RELIEF_M,
+  TERRAIN_PAVE_NEAR_BUILDING_M,
 } from "./constants";
 import { SegmentGrid, valueNoise2D, type Vec2 } from "./math2d";
 import { MeshAccumulator } from "./mesh";
 import type { RoadNetwork } from "./network";
 
 const GRASS_UV_SCALE = 1 / 8;
+/** Concrete pavement tiles finer than grass so courtyards read as pavers. */
+const PAVED_UV_SCALE = 1 / 4;
+
+export interface TerrainMeshes {
+  /** Open ground (parks, verges, district edges). */
+  grass: MeshAccumulator;
+  /** Concrete courtyards/parking within the built-up fabric. */
+  paved: MeshAccumulator;
+}
 
 export function buildTerrain(
   district: District,
   network: RoadNetwork,
   buildingAabbs: [number, number, number, number][],
   segments: number,
-): MeshAccumulator {
+): TerrainMeshes {
   const b = district.meta.boundsLocalMeters;
   const minX = b.minX - TERRAIN_MARGIN_M;
   const minY = b.minY - TERRAIN_MARGIN_M;
@@ -57,47 +73,71 @@ export function buildTerrain(
     return n * TERRAIN_MAX_RELIEF_M * mask * mask;
   };
 
+  const nCols = nx + 1;
+  const idxOf = (i: number, j: number) => j * nCols + i;
+
   // Height grid first, then normals from central differences.
-  const hs = new Float32Array((nx + 1) * (ny + 1));
+  const hs = new Float32Array(nCols * (ny + 1));
   for (let j = 0; j <= ny; j++) {
     for (let i = 0; i <= nx; i++) {
-      hs[j * (nx + 1) + i] = heightAt(minX + i * dx, minY + j * dy);
+      hs[idxOf(i, j)] = heightAt(minX + i * dx, minY + j * dy);
     }
   }
 
-  const acc = new MeshAccumulator();
-  const idxOf = (i: number, j: number) => j * (nx + 1) + i;
-  const vertIdx = new Int32Array((nx + 1) * (ny + 1));
-  for (let j = 0; j <= ny; j++) {
-    for (let i = 0; i <= nx; i++) {
-      const x = minX + i * dx;
-      const y = minY + j * dy;
-      const h = hs[idxOf(i, j)]!;
-      const hl = hs[idxOf(Math.max(0, i - 1), j)]!;
-      const hr = hs[idxOf(Math.min(nx, i + 1), j)]!;
-      const hd = hs[idxOf(i, Math.max(0, j - 1))]!;
-      const hu = hs[idxOf(i, Math.min(ny, j + 1))]!;
-      // District-space gradient -> world normal (y-up, z = -districtY).
-      const gx = (hr - hl) / (2 * dx);
-      const gy = (hu - hd) / (2 * dy);
-      const inv = 1 / Math.hypot(gx, 1, gy);
-      vertIdx[idxOf(i, j)] = acc.vertex(
-        [x, h - 0.01, -y],
-        [-gx * inv, inv, gy * inv],
-        [x * GRASS_UV_SCALE, y * GRASS_UV_SCALE],
-      );
-    }
-  }
+  const grass = new MeshAccumulator();
+  const paved = new MeshAccumulator();
+  // Per-mesh vertex caches — a boundary vertex is emitted into each mesh it
+  // borders (with that mesh's UV scale), so the two meshes tile gap-free.
+  const grassVert = new Int32Array(nCols * (ny + 1)).fill(-1);
+  const pavedVert = new Int32Array(nCols * (ny + 1)).fill(-1);
+
+  const emitVertex = (
+    acc: MeshAccumulator,
+    cache: Int32Array,
+    uvScale: number,
+    i: number,
+    j: number,
+  ): number => {
+    const key = idxOf(i, j);
+    const cached = cache[key]!;
+    if (cached >= 0) return cached;
+    const x = minX + i * dx;
+    const y = minY + j * dy;
+    const h = hs[key]!;
+    const hl = hs[idxOf(Math.max(0, i - 1), j)]!;
+    const hr = hs[idxOf(Math.min(nx, i + 1), j)]!;
+    const hd = hs[idxOf(i, Math.max(0, j - 1))]!;
+    const hu = hs[idxOf(i, Math.min(ny, j + 1))]!;
+    // District-space gradient -> world normal (y-up, z = -districtY).
+    const gx = (hr - hl) / (2 * dx);
+    const gy = (hu - hd) / (2 * dy);
+    const inv = 1 / Math.hypot(gx, 1, gy);
+    const vi = acc.vertex(
+      [x, h - 0.01, -y],
+      [-gx * inv, inv, gy * inv],
+      [x * uvScale, y * uvScale],
+    );
+    cache[key] = vi;
+    return vi;
+  };
+
   for (let j = 0; j < ny; j++) {
     for (let i = 0; i < nx; i++) {
+      // Classify the cell by its centre's proximity to a building footprint.
+      const ccx = minX + (i + 0.5) * dx;
+      const ccy = minY + (j + 0.5) * dy;
+      const isPaved = nearBuilding([ccx, ccy], TERRAIN_PAVE_NEAR_BUILDING_M);
+      const acc = isPaved ? paved : grass;
+      const cache = isPaved ? pavedVert : grassVert;
+      const uvScale = isPaved ? PAVED_UV_SCALE : GRASS_UV_SCALE;
       // District-CCW quad: (i,j) -> (i+1,j) -> (i+1,j+1) -> (i,j+1).
       acc.quad(
-        vertIdx[idxOf(i, j)]!,
-        vertIdx[idxOf(i + 1, j)]!,
-        vertIdx[idxOf(i + 1, j + 1)]!,
-        vertIdx[idxOf(i, j + 1)]!,
+        emitVertex(acc, cache, uvScale, i, j),
+        emitVertex(acc, cache, uvScale, i + 1, j),
+        emitVertex(acc, cache, uvScale, i + 1, j + 1),
+        emitVertex(acc, cache, uvScale, i, j + 1),
       );
     }
   }
-  return acc;
+  return { grass, paved };
 }

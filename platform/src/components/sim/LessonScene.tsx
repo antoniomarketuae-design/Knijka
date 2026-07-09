@@ -59,7 +59,7 @@ import {
   type WorldGeometry,
 } from "@/modules/sim/world";
 import { createWorldRuntime } from "@/modules/sim/runtime";
-import { createTrafficSystem, TrafficLayer } from "@/modules/sim/traffic";
+import { createTrafficSystem, TrafficLayer, type TrafficDistrict } from "@/modules/sim/traffic";
 import { CabinControls } from "./cabin";
 import { SimAudio } from "./simAudio";
 import { CameraRig, type CameraMode } from "./CameraRig";
@@ -340,22 +340,30 @@ function ReadyScene({
           far: 900,
           position: [spawn.x - 6, spawn.y + 2.4, spawn.z],
         }}
-        gl={{ antialias: true, powerPreference: "high-performance", stencil: false }}
+        gl={{
+          // Canvas MSAA only on `low` (no composer). At med/high the composer
+          // renders offscreen and antialiases with SMAA, so a multisampled
+          // backbuffer here is wasted VRAM/fill — turn it off, SMAA owns AA.
+          antialias: !QUALITY_PRESETS[level].postprocessing,
+          powerPreference: "high-performance",
+          stencil: false,
+        }}
       >
         <SimEnvironment timeOfDay={timeOfDay} rain={rain} quality={level} />
         {/* HDRI image-based lighting — real sky reflections/ambient for PBR
-            materials and (later) car paint. Daytime only: the HDRI is a day
-            sky. background=false keeps SimEnvironment's animated sky dome.
-            Modest intensity so it complements the sun/hemisphere rig. */}
-        {!isNight ? (
-          <Suspense fallback={null}>
-            <Environment
-              files="/sim/env/sky_clear_1k.hdr"
-              background={false}
-              environmentIntensity={0.4}
-            />
-          </Suspense>
-        ) : null}
+            materials, glass, mirrors and (later) car paint. background=false
+            keeps SimEnvironment's animated sky dome. Day uses a clear day sky;
+            night uses a dim dusk/urban PMREM so metal/glass/mirrors sample a
+            faint skyline instead of black (a graded mirror feature needs
+            *something* to reflect at night). Intensities stay modest so the
+            IBL complements the sun/hemisphere rig rather than flattening it. */}
+        <Suspense fallback={null}>
+          <Environment
+            files={isNight ? "/sim/env/sky_urban_1k.hdr" : "/sim/env/sky_clear_1k.hdr"}
+            background={false}
+            environmentIntensity={isNight ? 0.12 : 0.4}
+          />
+        </Suspense>
         <Suspense fallback={null}>
           <Physics
             gravity={[0, GRAVITY, 0]}
@@ -383,6 +391,7 @@ function ReadyScene({
               spawn={spawn}
               difficultyRef={difficultyRef}
               onCollision={handleCollision}
+              night={isNight}
             />
             <RuntimeDriver
               runtime={runtime}
@@ -399,7 +408,14 @@ function ReadyScene({
                 already steps traffic.update each frame (so it stays in lockstep
                 with the rule engine), so we do NOT pass `runtime` here. Draw
                 distance covers the anchored cluster (fog fades the far edge). */}
-            <TrafficLayer system={traffic} maxDrawDistanceM={420} />
+            <TrafficLayer
+              system={traffic}
+              maxDrawDistanceM={420}
+              night={isNight}
+              // world `District` ⊇ `TrafficDistrict` (only differs on a field
+              // TrafficLayer doesn't read — crossings.edgeId nullability).
+              district={district as TrafficDistrict}
+            />
           </Physics>
         </Suspense>
         <CameraRig

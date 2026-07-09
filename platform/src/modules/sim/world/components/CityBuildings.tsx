@@ -2,8 +2,14 @@
 
 /**
  * CityBuildings — instanced Kenney building modules placed on the OSM
- * footprints (world.buildingInstances). One InstancedMesh per model, all
- * sharing a single atlas material → ~12 draw calls for the whole city.
+ * footprints (world.buildingInstances). All meshes share a single atlas
+ * material, and instances are chunked into a 128 m spatial grid: one
+ * InstancedMesh per (model, chunk). Each chunk mesh gets an instance-aware
+ * bounding sphere (computeBoundingSphere), so frustum culling works again and
+ * off-screen chunks (most of the city, given a ground-level 90° FOV) are
+ * skipped in both the color and the shadow pass. This restores GPU headroom
+ * vs. the previous "one mesh per model, culling disabled, whole city always
+ * drawn" layout.
  *
  * Falls back to nothing (the procedural walls are gone) until the GLBs load,
  * so a brief empty-lot moment is expected on first paint. Non-uniform per-
@@ -20,6 +26,9 @@ import type { QualityPreset } from "./quality";
 // Start fetching + baking the GLBs as soon as this module loads (no-op on the
 // server), before any <CityBuildings/> mounts.
 preloadCityModels();
+
+/** Spatial chunk size for frustum-cullable building groups (meters). */
+const CHUNK_M = 128;
 
 const _pos = new THREE.Vector3();
 const _quat = new THREE.Quaternion();
@@ -48,9 +57,12 @@ function makeInstanced(
   mesh.castShadow = castShadow;
   mesh.receiveShadow = receiveShadow;
   mesh.matrixAutoUpdate = false;
-  // Instances span the whole district; the base geometry's bounding sphere is
-  // at the origin, so default frustum culling would drop them all.
-  mesh.frustumCulled = false;
+  // Instance-aware bounding sphere (covers just this chunk's instances) so
+  // three's Frustum.intersectsObject can cull the whole chunk when it's off
+  // screen. Without this the per-chunk mesh would fall back to the unit-height
+  // base geometry sphere at the origin and mis-cull.
+  mesh.frustumCulled = true;
+  mesh.computeBoundingSphere();
   mesh.name = name;
   return mesh;
 }
@@ -66,28 +78,50 @@ export function CityBuildings({
 
   const assets = useMemo(() => {
     if (!models) return null;
+    // Bump the shared atlas anisotropy to this quality tier (crisper facades at
+    // grazing angles); safe to mutate the cache-owned texture in place.
+    const aniso = Math.min(8, Math.max(1, preset.anisotropy));
+    if (models.texture.anisotropy !== aniso) {
+      models.texture.anisotropy = aniso;
+      models.texture.needsUpdate = true;
+    }
     const material = new THREE.MeshStandardMaterial({
       map: models.texture,
       roughness: 0.82,
       metalness: 0,
     });
     const castShadow = preset.castShadows !== "none";
-    const buckets: BuildingInstancePlacement[][] = models.geometries.map(() => []);
+
+    // Bucket placements by (model, 128 m chunk). Only non-empty buckets become
+    // meshes, so empty sky over the district costs nothing.
+    const buckets = new Map<string, { model: number; list: BuildingInstancePlacement[] }>();
     for (const p of world.buildingInstances) {
-      (buckets[p.model] ?? buckets[0])!.push(p);
+      const model = models.geometries[p.model] ? p.model : 0;
+      const cx = Math.floor(p.position[0] / CHUNK_M);
+      const cz = Math.floor(p.position[2] / CHUNK_M);
+      const key = `${model}:${cx}:${cz}`;
+      let bucket = buckets.get(key);
+      if (!bucket) {
+        bucket = { model, list: [] };
+        buckets.set(key, bucket);
+      }
+      bucket.list.push(p);
     }
-    const meshes = models.geometries.map((geometry, i) =>
-      makeInstanced(
-        geometry,
-        material,
-        buckets[i]!,
-        castShadow,
-        preset.receiveShadows,
-        `city-buildings-${i}`,
-      ),
-    );
+    const meshes: THREE.InstancedMesh[] = [];
+    for (const [key, bucket] of buckets) {
+      meshes.push(
+        makeInstanced(
+          models.geometries[bucket.model]!,
+          material,
+          bucket.list,
+          castShadow,
+          preset.receiveShadows,
+          `city-buildings-${key}`,
+        ),
+      );
+    }
     return { material, meshes };
-  }, [models, world.buildingInstances, preset.castShadows, preset.receiveShadows]);
+  }, [models, world.buildingInstances, preset.anisotropy, preset.castShadows, preset.receiveShadows]);
 
   useEffect(
     () => () => {
