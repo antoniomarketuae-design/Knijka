@@ -3,11 +3,7 @@
 import { useMemo, useRef, type RefObject } from "react";
 import { useFrame } from "@react-three/fiber";
 import { SRGBColorSpace, type CanvasTexture, type Group, type Object3D } from "three";
-import {
-  COCKPIT_EYE,
-  STEERING_WHEEL_VISUAL_RATIO,
-  type VehicleSim,
-} from "@/modules/sim/vehicle";
+import { COCKPIT_EYE, type VehicleSim } from "@/modules/sim/vehicle";
 import type { SimInput } from "@/modules/sim/engine";
 import type { CabinControls } from "../cabin";
 import {
@@ -53,6 +49,15 @@ function seatSpecs(x: number): BoxSpec[] {
   ];
 }
 
+/**
+ * Visual steering ratio (hands-to-roadwheel-visual). The shared physics
+ * constant STEERING_WHEEL_VISUAL_RATIO was 13×, which whipped the rim to
+ * implausible lock for a normal steer input; a realistic wheel turns only
+ * ~1.5 turns lock-to-lock, so a modest ~3.5× reads far better. Kept local
+ * (visual-only) to avoid touching the physics tuning module.
+ */
+const WHEEL_VISUAL_RATIO = 3.5;
+
 // Cluster plane: 0.30 x 0.15 m mapping the 512x256 canvas -> 0.000586 m/px.
 const PX = 0.3 / CLUSTER_W;
 const NEEDLE_PIVOT_X = (140 - CLUSTER_W / 2) * PX; // dial centre (140,132)
@@ -95,7 +100,7 @@ function makeClusterRuntime(canvas: HTMLCanvasElement): ClusterRuntime {
  * wheel group's local +Z faces forward-away from the driver, so a NEGATIVE
  * rotation about it appears COUNTER-CLOCKWISE from the driver's seat —
  * which is how a real wheel turns for a left turn. Hence
- * `rotation.z = -steerRad * STEERING_WHEEL_VISUAL_RATIO`.
+ * `rotation.z = -steerRad * WHEEL_VISUAL_RATIO`.
  */
 export function VitokCockpit({
   simRef,
@@ -130,7 +135,7 @@ export function VitokCockpit({
     if (!sim) return;
 
     if (steeringRef.current) {
-      steeringRef.current.rotation.z = -sim.steerRad * STEERING_WHEEL_VISUAL_RATIO;
+      steeringRef.current.rotation.z = -sim.steerRad * WHEEL_VISUAL_RATIO;
     }
     if (needleRef.current) {
       needleRef.current.rotation.z = needleAngleRad(sim.speedKmh);

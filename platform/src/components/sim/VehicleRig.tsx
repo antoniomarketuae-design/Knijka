@@ -9,7 +9,8 @@ import {
   useRapier,
   type RapierRigidBody,
 } from "@react-three/rapier";
-import type { Group } from "three";
+import { DoubleSide } from "three";
+import type { Group, PointLight } from "three";
 import type { RigidBody as RapierBody, World as RapierWorld } from "@dimforge/rapier3d-compat";
 import {
   chassisMassProperties,
@@ -78,6 +79,7 @@ export function VehicleRig({
   spawn = SPAWN,
   difficultyRef,
   onCollision,
+  night = false,
 }: {
   simRef: RefObject<VehicleSim | null>;
   chassisGroupRef: RefObject<Group | null>;
@@ -91,10 +93,16 @@ export function VehicleRig({
   difficultyRef?: RefObject<DifficultyMode>;
   /** Fired on a real (fast-enough) impact so the rule engine can grade it. */
   onCollision?: (impactKmh: number) => void;
+  /** Lesson night flag — raises the interior fill light's floor at dusk. The
+   *  cabin's own headlights / night-preview toggle also raise it, so the cabin
+   *  never goes near-black even when this is left at its default. */
+  night?: boolean;
 }) {
   const { world } = useRapier();
   const bodyRef = useRef<RapierRigidBody>(null);
   const assistRef = useRef(createDriveAssistState());
+  // Interior fill light — driven per frame (never re-renders).
+  const fillRef = useRef<PointLight>(null);
 
   // Stable identity so @react-three/rapier does not re-apply mass props.
   const massProperties = useMemo(() => chassisMassProperties(), []);
@@ -148,6 +156,17 @@ export function VehicleRig({
       const chassis = chassisGroupRef.current;
       if (chassis) updateVehicleSample(sampleRef.current, sim, chassis, cabin, input);
     }
+
+    // Interior fill: a soft floor so the cabin isn't near-black in daytime
+    // shadow, rising at dusk (lesson night / N preview) and again when the
+    // driver switches the headlights on — so the dash reads at night.
+    const fill = fillRef.current;
+    if (fill) {
+      const lightsOn = (cabin?.headlights ?? "off") !== "off";
+      const dusk = night || (cabin?.nightPreview ?? false);
+      const target = (dusk ? 0.55 : 0.12) + (lightsOn ? 0.7 : 0);
+      fill.intensity += (target - fill.intensity) * Math.min(1, delta * 6);
+    }
     audioRef.current?.update({
       speedKmh: sim.speedKmh,
       throttle: input?.throttle ?? 0,
@@ -188,6 +207,35 @@ export function VehicleRig({
       <group ref={chassisGroupRef}>
         <RoadsterBody />
         <VitokCockpit simRef={simRef} inputRef={inputRef} cabinRef={cabinRef} />
+
+        {/* Windshield glass — a faint cool-tinted, low-roughness plane raked
+            over the dash so the driver isn't looking through an invisible open
+            frame; its specular catches the sky/HDRI as a light dash reflection.
+            depthWrite off so it never occludes the world behind it. */}
+        <mesh position={[0, 0.6, 0.64]} rotation={[-0.9, 0, 0]}>
+          <planeGeometry args={[1.42, 0.46]} />
+          <meshStandardMaterial
+            color="#243040"
+            transparent
+            opacity={0.14}
+            roughness={0.06}
+            metalness={0.1}
+            side={DoubleSide}
+            depthWrite={false}
+          />
+        </mesh>
+
+        {/* Interior fill light — soft, cabin-local (short range so it doesn't
+            leak onto the street); intensity is animated in useFrame. */}
+        <pointLight
+          ref={fillRef}
+          position={[0, 0.58, 0.05]}
+          color="#ffd9a8"
+          intensity={0.12}
+          distance={2.4}
+          decay={2}
+          castShadow={false}
+        />
       </group>
     </RigidBody>
   );
