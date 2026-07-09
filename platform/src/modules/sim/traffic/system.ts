@@ -46,6 +46,10 @@ const PED_COLOR_VARIANTS = 4;
 const LEAD_CORRIDOR_M = 1.8;
 /** Approx sum of the two half-lengths, for a bumper-to-bumper gap, meters. */
 const VEHICLE_LENGTH_M = 4.1;
+/** Below this speed a vehicle is stopped/parked and makes no priority claim, m/s. */
+const CONFLICT_MIN_SPEED_MPS = 1;
+/** Heading within this of your approach = same-direction traffic (not a conflict), deg. */
+const CONFLICT_SAME_DIR_DEG = 50;
 
 class TrafficSystemImpl implements TrafficSystem {
   readonly vehicles: TrafficVehicleState[] = [];
@@ -250,6 +254,33 @@ class TrafficSystemImpl implements TrafficSystem {
   leadGapMeters(px: number, py: number, headingDeg: number): number {
     return leadGapFor(this.vehicles, px, py, headingDeg);
   }
+
+  conflictNear(x: number, y: number, radiusM: number, approachBearingDeg: number): boolean {
+    return conflictNearFor(this.vehicles, x, y, radiusM, approachBearingDeg);
+  }
+}
+
+/** Pure "conflicting vehicle near a point" test (district space; see interface). */
+export function conflictNearFor(
+  vehicles: readonly { x: number; y: number; dirX: number; dirY: number; speedMps: number }[],
+  x: number,
+  y: number,
+  radiusM: number,
+  approachBearingDeg: number,
+): boolean {
+  const r2 = radiusM * radiusM;
+  for (const v of vehicles) {
+    const dx = v.x - x;
+    const dy = v.y - y;
+    if (dx * dx + dy * dy > r2) continue;
+    if (v.speedMps < CONFLICT_MIN_SPEED_MPS) continue;
+    // Bearing of the vehicle's travel (0 = north, clockwise).
+    const vBearing = (Math.atan2(v.dirX, v.dirY) * 180) / Math.PI;
+    const delta = Math.abs((((vBearing - approachBearingDeg) % 360) + 540) % 360 - 180);
+    if (delta < CONFLICT_SAME_DIR_DEG) continue; // same-direction → not a conflict
+    return true;
+  }
+  return false;
 }
 
 /**

@@ -37,6 +37,9 @@ const STOP_LINE_REFIRE_SEC = 5;
 /** Heading opposes the one-way's flow by more than this → wrong way. */
 const WRONG_WAY_ANGLE_DEG = 120;
 
+/** Radius around a junction to look for conflicting priority traffic, meters. */
+const PRIORITY_CONFLICT_RADIUS_M = 16;
+
 /**
  * True when a vehicle heads against a one-way street's flow. `tangent` is the
  * geometry-forward unit direction at the vehicle's position (index.tangentAt);
@@ -55,9 +58,19 @@ export function isWrongWay(
 
 type CollisionWith = "vehicle" | "pedestrian" | "cyclist" | "staticObject";
 
+/** Is there a conflicting (crossing/oncoming) moving vehicle near (x,y)? */
+export type JunctionConflictQuery = (
+  x: number,
+  y: number,
+  radiusM: number,
+  approachBearingDeg: number,
+) => boolean;
+
 export interface DistrictWorldRuntime extends WorldRuntime {
   /** Install the traffic module's pedestrian lookup (default: nobody anywhere). */
   setPedestrianQuery(fn: PedestrianQuery | null): void;
+  /** Install the traffic module's junction-conflict lookup (default: none). */
+  setJunctionConflictQuery(fn: JunctionConflictQuery | null): void;
   /** Physics layer reports a contact; drained into the next sample(). */
   pushCollision(withWhat: CollisionWith): void;
   /** Phase a driver approaching `signalNodeId` on `bearingDeg` sees (renderer helper). */
@@ -81,6 +94,11 @@ export function createWorldRuntime(districtJson: District | unknown): DistrictWo
   const lineLastFired = new Float64Array(stopLines.all.length).fill(-Infinity);
   const collisionQueue: CollisionWith[] = [];
   let pedQuery: PedestrianQuery = () => false;
+  let conflictQuery: JunctionConflictQuery = () => false;
+
+  // Junction node positions (district space) for priority conflict lookups.
+  const nodePos = new Map<string, { x: number; y: number }>();
+  for (const n of district.roads.nodes) nodePos.set(n.id, { x: n.x, y: n.y });
 
   // Previous-frame tracking for line-crossing detection.
   let prevEdgeIdx = -1;
@@ -102,6 +120,12 @@ export function createWorldRuntime(districtJson: District | unknown): DistrictWo
       events.push({ kind: "stopLineCrossed", control: "trafficLight", lightState: lightStateOf(line) });
     } else {
       events.push({ kind: "stopLineCrossed", control: "stopSign" });
+      // Give-way/stop: crossing into the junction while conflicting traffic is
+      // present now = failing to yield (graded FAILED_TO_YIELD by the reducer).
+      const node = nodePos.get(line.junctionNodeId);
+      if (node && conflictQuery(node.x, node.y, PRIORITY_CONFLICT_RADIUS_M, line.approachBearingDeg)) {
+        events.push({ kind: "prioritySituation", situation: "give-way", violated: true });
+      }
     }
   }
 
@@ -244,6 +268,10 @@ export function createWorldRuntime(districtJson: District | unknown): DistrictWo
 
     setPedestrianQuery(fn: PedestrianQuery | null): void {
       pedQuery = fn ?? (() => false);
+    },
+
+    setJunctionConflictQuery(fn: JunctionConflictQuery | null): void {
+      conflictQuery = fn ?? (() => false);
     },
 
     pushCollision(withWhat: CollisionWith): void {

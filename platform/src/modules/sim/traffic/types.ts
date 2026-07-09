@@ -232,6 +232,13 @@ export interface TrafficSystem {
    * clear. Player pose in district space; headingDeg 0 = north, clockwise.
    */
   leadGapMeters(px: number, py: number, headingDeg: number): number;
+  /**
+   * True when a moving vehicle is within `radiusM` of (x,y) on a CONFLICTING
+   * path — i.e. crossing/oncoming relative to `approachBearingDeg` (your
+   * approach direction), not same-direction traffic. Used to grade failing to
+   * give way at a junction. District space; bearings 0 = north, clockwise.
+   */
+  conflictNear(x: number, y: number, radiusM: number, approachBearingDeg: number): boolean;
   readonly timeSec: number;
   readonly stats: TrafficSystemStats;
 }
