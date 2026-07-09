@@ -1,0 +1,84 @@
+{
+  "image": "markings.png",
+  "size": 1024,
+  "note": "Transparent decal atlas. White = paint (alpha 1). Longitudinal cells (line_*) tile along +V; crosswalk tiles along U.",
+  "cells": {
+    "line_solid": {
+      "px": [
+        0,
+        0,
+        128,
+        1024
+      ],
+      "uv": [
+        0.0,
+        0.0,
+        0.125,
+        1.0
+      ]
+    },
+    "line_dashed": {
+      "px": [
+        128,
+        0,
+        256,
+        1024
+      ],
+      "uv": [
+        0.125,
+        0.0,
+        0.25,
+        1.0
+      ]
+    },
+    "line_double": {
+      "px": [
+        256,
+        0,
+        384,
+        1024
+      ],
+      "uv": [
+        0.25,
+        0.0,
+        0.375,
+        1.0
+      ]
+    },
+    "crosswalk": {
+      "px": [
+        416,
+        24,
+        1024,
+        312
+      ],
+      "uv": [
+        0.40625,
+        0.6953125,
+        1.0,
+        0.9765625
+      ]
+    },
+    "stop_line": {
+      "px": [
+        416,
+        360,
+        1008,
+        484
+      ],
+      "uv": [
+        0.40625,
+        0.52734375,
+        0.984375,
+        0.6484375
+      ]
+    }
+  },
+  "tiling": {
+    "line_solid": "V",
+    "line_dashed": "V",
+    "line_double": "V",
+    "crosswalk": "U",
+    "stop_line": "none"
+  }
+}
