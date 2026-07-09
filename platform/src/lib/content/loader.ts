@@ -19,10 +19,11 @@ import { setContentRepo, type ContentRepo } from "./repo";
 import {
   ConceptsFileSchema,
   QuestionsFileSchema,
+  SectionsFileSchema,
   SignsFileSchema,
   TopicsFileSchema,
 } from "./schemas";
-import type { Concept, Question, Sign, Topic } from "./types";
+import type { Concept, Question, Section, Sign, Topic } from "./types";
 
 if (typeof window !== "undefined") {
   throw new Error(
@@ -38,6 +39,12 @@ export interface RawContent {
   concepts: unknown;
   /** topic slug (questions/<slug>.json basename) -> parsed file contents */
   questionsBySlug: Record<string, unknown>;
+  /**
+   * Parsed sections.json — the presentation-only concept grouping. Optional:
+   * absent (undefined) means "no section layer", which the repo serves as an
+   * empty list. When present it MUST partition every concept exactly once.
+   */
+  sections?: unknown;
   /** Parsed signs/signs.json */
   signs: unknown;
   /** True if the svg asset referenced by a sign exists (path relative to /content). */
@@ -109,6 +116,7 @@ export function buildContentRepo(raw: RawContent): ContentRepo {
   // -- Phase 1: per-file structural validation (zod) -----------------------
   const topics = parseFile<Topic>(TopicsFileSchema, raw.topics, "topics.json");
   const concepts = parseFile<Concept>(ConceptsFileSchema, raw.concepts, "concepts.json");
+  const sections = parseFile<Section>(SectionsFileSchema, raw.sections ?? [], "sections.json");
   const signs = parseFile<Sign>(SignsFileSchema, raw.signs, "signs/signs.json");
   const questionFiles = new Map<string, Question[]>();
   for (const slug of Object.keys(raw.questionsBySlug).sort()) {
@@ -136,6 +144,7 @@ export function buildContentRepo(raw: RawContent): ContentRepo {
   registerIds(topics, "topics.json");
   registerIds(concepts, "concepts.json");
   for (const [slug, questions] of questionFiles) registerIds(questions, `questions/${slug}.json`);
+  registerIds(sections, "sections.json");
   registerIds(signs, "signs/signs.json");
 
   // Topic slugs and orders must be unique (slugs key question files and lookups).
@@ -178,6 +187,41 @@ export function buildContentRepo(raw: RawContent): ContentRepo {
     }
   }
 
+  // Sections: a presentation-only grouping. When a section layer exists it
+  // MUST partition every concept exactly once (no orphan, no duplicate) and a
+  // section may only group concepts of its own parent topic.
+  if (sections.length > 0) {
+    const conceptToSection = new Map<string, string>();
+    for (const section of sections) {
+      if (!topicById.has(section.topicId)) {
+        errors.push(`sections.json: section "${section.id}" references unknown topicId "${section.topicId}"`);
+      }
+      for (const conceptId of section.conceptIds) {
+        const concept = conceptById.get(conceptId);
+        if (!concept) {
+          errors.push(`sections.json: section "${section.id}" references unknown concept "${conceptId}"`);
+          continue;
+        }
+        if (concept.topicId !== section.topicId) {
+          errors.push(
+            `sections.json: section "${section.id}" (topic "${section.topicId}") includes concept "${conceptId}" of topic "${concept.topicId}"`,
+          );
+        }
+        const owner = conceptToSection.get(conceptId);
+        if (owner !== undefined) {
+          errors.push(`sections.json: concept "${conceptId}" appears in multiple sections ("${owner}" and "${section.id}")`);
+        } else {
+          conceptToSection.set(conceptId, section.id);
+        }
+      }
+    }
+    for (const concept of concepts) {
+      if (!conceptToSection.has(concept.id)) {
+        errors.push(`sections.json: concept "${concept.id}" is not assigned to any section`);
+      }
+    }
+  }
+
   // Every sign's svg asset must exist.
   for (const sign of signs) {
     if (!raw.svgExists(sign.svgFile)) {
@@ -201,6 +245,7 @@ export function buildContentRepo(raw: RawContent): ContentRepo {
   // -- Phase 3: indexes + frozen repo ---------------------------------------
   const topicsSorted = deepFreeze([...topics].sort((a, b) => a.order - b.order));
   deepFreeze(concepts);
+  deepFreeze(sections);
   deepFreeze(signs);
 
   const conceptsByTopicId = new Map<string, Concept[]>();
@@ -209,6 +254,16 @@ export function buildContentRepo(raw: RawContent): ContentRepo {
     if (!bucket) conceptsByTopicId.set(concept.topicId, (bucket = []));
     bucket.push(concept);
   }
+
+  // Sections keep file order overall and within each parent topic.
+  const sectionById = new Map(sections.map((s) => [s.id, s]));
+  const sectionsByTopicId = new Map<string, Section[]>();
+  for (const section of sections) {
+    let bucket = sectionsByTopicId.get(section.topicId);
+    if (!bucket) sectionsByTopicId.set(section.topicId, (bucket = []));
+    bucket.push(section);
+  }
+  for (const bucket of sectionsByTopicId.values()) deepFreeze(bucket);
 
   // Flatten questions in curriculum order (topic order, then file order).
   const allQuestions: Question[] = [];
@@ -236,6 +291,7 @@ export function buildContentRepo(raw: RawContent): ContentRepo {
 
   const EMPTY_CONCEPTS: Concept[] = deepFreeze([]);
   const EMPTY_QUESTIONS: Question[] = deepFreeze([]);
+  const EMPTY_SECTIONS: Section[] = deepFreeze([]);
 
   return Object.freeze<ContentRepo>({
     topics: () => topicsSorted,
@@ -252,6 +308,9 @@ export function buildContentRepo(raw: RawContent): ContentRepo {
     questionsByTopic: (topicSlug) => questionsByTopicSlug.get(topicSlug) ?? EMPTY_QUESTIONS,
     questionsByConcept: (conceptId) => questionsByConceptId.get(conceptId) ?? EMPTY_QUESTIONS,
     signs: () => signs,
+    sections: () => sections,
+    sectionById: (id) => sectionById.get(id),
+    sectionsByTopic: (topicId) => sectionsByTopicId.get(topicId) ?? EMPTY_SECTIONS,
   });
 }
 
@@ -303,10 +362,13 @@ function loadRawContentFromDisk(): RawContent {
     }
   }
 
+  const sectionsFile = path.join(contentDir, "sections.json");
+
   return {
     topics: readJson(path.join(contentDir, "topics.json")),
     concepts: readJson(path.join(contentDir, "concepts.json")),
     questionsBySlug,
+    sections: fs.existsSync(sectionsFile) ? readJson(sectionsFile) : undefined,
     signs: readJson(path.join(contentDir, "signs", "signs.json")),
     svgExists: (svgFile) => fs.existsSync(path.join(contentDir, svgFile)),
   };

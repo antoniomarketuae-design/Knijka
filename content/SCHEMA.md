@@ -8,6 +8,7 @@
 content/
   topics.json              # curriculum topics (ordered)
   concepts.json            # knowledge-graph nodes
+  sections.json            # presentation grouping of concepts (finer than topics)
   questions/<topic-slug>.json
   signs/signs.json         # road sign catalog
   audits/<topic-slug>.audit.json
@@ -38,6 +39,27 @@ content/
   "difficulty": 2                     // 1–3
 }]
 ```
+
+## sections.json
+```json
+[{
+  "id": "s-warning-signs",         // "s-" prefix, kebab-case
+  "topicId": "t-signs",            // parent topic
+  "titleBg": "Предупредителни знаци",
+  "conceptIds": ["c-sign-groups", "c-warning-signs"]  // >= 1, all within topicId
+}]
+```
+A **section** is a named, finer-grained study chunk *inside* one topic — a
+PRESENTATION/navigation layer only (docs/architecture/05). The learning engine
+(mastery, SM-2, prerequisite gating, readiness) keys on **concepts**, and the
+mock exam samples on **topicId** + point weights — sections touch neither.
+Section mastery is simply the aggregate of its concepts. Rules:
+
+1. Every `conceptId` must resolve and must belong to the section's `topicId`.
+2. **Sections partition the concept graph: every concept appears in exactly one
+   section — no orphans, no duplicates** (validated at load and in
+   `validate:content`).
+3. Ids globally unique; file order defines display order (within a topic).
 
 ## questions/<topic-slug>.json
 ```json

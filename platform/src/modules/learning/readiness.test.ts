@@ -3,8 +3,10 @@ import { setContentRepo } from "@/lib/content/repo";
 import { FakeLearningStore, makeFixtureRepo } from "./fixtures";
 import {
   computeReadiness,
+  computeSectionOverview,
   computeTopicOverview,
   getReadiness,
+  getSectionOverview,
   recencyFactor,
 } from "./readiness";
 import { setLearningStore, type ProgressRow } from "./store";
@@ -169,5 +171,56 @@ describe("computeTopicOverview", () => {
 
     expect(signs.seenConceptCount).toBe(0);
     expect(signs.avgMastery).toBe(0);
+  });
+});
+
+describe("computeSectionOverview", () => {
+  it("lists sections in topic order, with question counts, zeroed for a fresh user", () => {
+    const overview = computeSectionOverview([], repo, NOW);
+    expect(overview.map((s) => s.sectionId)).toEqual([
+      "s-basics-road",
+      "s-basics-priority",
+      "s-signs-all",
+    ]);
+    // Distinct questions touching each section's concepts (see fixtures.ts):
+    // c-road → q-road-1/2 (2); c-priority → q-prio-1/2 + q-sprio-1 (3);
+    // c-warning → q-warn-1/2 and c-sign-priority → q-sprio-1 (distinct 3).
+    expect(overview.map((s) => s.questionCount)).toEqual([2, 3, 3]);
+    for (const s of overview) {
+      expect(s.seenConceptCount).toBe(0);
+      expect(s.coverage).toBe(0);
+      expect(s.avgMastery).toBe(0);
+      expect(s.dueCount).toBe(0);
+    }
+    expect(overview.find((s) => s.sectionId === "s-signs-all")?.conceptCount).toBe(2);
+  });
+
+  it("aggregates its concepts' mastery and due state", () => {
+    const progress = [
+      row("c-road", 0.8, { dueAt: daysAgo(0.1) }), // due
+      row("c-priority", 0.4, { dueAt: new Date(NOW.getTime() + DAY_MS) }),
+    ];
+    const [road, priority, signs] = computeSectionOverview(progress, repo, NOW);
+
+    expect(road.avgMastery).toBeCloseTo(0.8, 10);
+    expect(road.dueCount).toBe(1);
+    expect(road.coverage).toBe(1);
+
+    expect(priority.avgMastery).toBeCloseTo(0.4, 10);
+    expect(priority.dueCount).toBe(0);
+
+    expect(signs.seenConceptCount).toBe(0);
+    expect(signs.avgMastery).toBe(0);
+  });
+
+  it("getSectionOverview wires store rows through to the pure computation", async () => {
+    const store = new FakeLearningStore();
+    store.seedProgress("u1", { conceptId: "c-road", mastery: 1, updatedAt: NOW });
+    setLearningStore(store);
+
+    const overview = await getSectionOverview("u1", NOW);
+    const road = overview.find((s) => s.sectionId === "s-basics-road");
+    expect(road?.avgMastery).toBe(1);
+    expect(road?.seenConceptCount).toBe(1);
   });
 });

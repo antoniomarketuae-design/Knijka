@@ -30,6 +30,20 @@ export interface Concept {
   difficulty: 1 | 2 | 3;
 }
 
+/**
+ * A named sub-group of a topic's concepts — a finer study chunk than the 16
+ * topics, purely a PRESENTATION/navigation layer (docs/architecture/05). The
+ * learning engine (mastery, SM-2, gating, readiness) keys on concepts, never
+ * on sections. Every concept belongs to exactly one section; a section groups
+ * concepts from a single parent topic (`topicId`).
+ */
+export interface Section {
+  id: string; // "s-" prefix
+  topicId: string; // parent topic; all conceptIds must belong to it
+  titleBg: string;
+  conceptIds: string[]; // >= 1, all within topicId, globally partition-exclusive
+}
+
 export interface QuestionOption {
   id: string;
   textBg: string;

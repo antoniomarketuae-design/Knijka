@@ -24,20 +24,32 @@ interface PracticePageProps {
 /**
  * Practice session bootstrap. Server component: builds the session via the
  * learning engine, strips the correct-answer flags and hands a client-safe
- * payload to <PracticeSession>. `?topic=<slug>` scopes to one topic; without
- * it the engine mixes due reviews + weakest concepts ("Умна тренировка").
+ * payload to <PracticeSession>. `?section=<id>` scopes to one section's
+ * concepts, `?topic=<slug>` to a whole topic; without either the engine mixes
+ * due reviews + weakest concepts ("Умна тренировка").
  */
 export default async function PracticePage({ searchParams }: PracticePageProps) {
   const user = await requireUser();
   const params = await searchParams;
+  const sectionParam =
+    typeof params.section === "string" ? params.section : undefined;
   const topicParam = typeof params.topic === "string" ? params.topic : undefined;
 
   const repo = getContentRepo();
+
+  const section =
+    sectionParam === undefined ? undefined : repo.sectionById?.(sectionParam);
+  if (sectionParam !== undefined && section === undefined) notFound();
+
   const topic = topicParam === undefined ? undefined : repo.topicBySlug(topicParam);
   if (topicParam !== undefined && topic === undefined) notFound();
 
+  // A section scopes to its concepts; a topic to its slug. Section wins if both.
+  const scopeTitleBg = section?.titleBg ?? topic?.titleBg ?? null;
+
   const session = await buildPracticeSession(user.id, {
     topicSlug: topic?.slug,
+    conceptIds: section?.conceptIds,
     size: SESSION_SIZE,
   });
 
@@ -69,17 +81,19 @@ export default async function PracticePage({ searchParams }: PracticePageProps) 
           ← Всички теми
         </Link>
         <h1 className="mt-3 font-display text-2xl font-black tracking-tight sm:text-3xl">
-          {topic ? topic.titleBg : "Умна тренировка"}
+          {scopeTitleBg ?? "Умна тренировка"}
         </h1>
         <p className="mt-2 max-w-[60ch] text-sm leading-relaxed text-muted">
-          {topic
-            ? "Тренировка по темата — преговори, слаби места и нови понятия."
-            : "Двигателят подбра преговорите на падеж и най-слабите ти места."}
+          {section
+            ? "Тренировка по раздела — понятията в него, преговори и нов материал."
+            : topic
+              ? "Тренировка по темата — преговори, слаби места и нови понятия."
+              : "Двигателят подбра преговорите на падеж и най-слабите ти места."}
         </p>
       </AuroraHeader>
 
       {questions.length === 0 ? (
-        <EmptySession topicTitleBg={topic?.titleBg ?? null} />
+        <EmptySession topicTitleBg={scopeTitleBg} />
       ) : (
         /* Fresh key per server render: router.refresh() ("Нова тренировка")
            builds a new session and remounts the client flow from scratch. */

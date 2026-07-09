@@ -178,3 +178,79 @@ export async function getTopicOverview(
   const progress = await getLearningStore().getProgress(userId);
   return computeTopicOverview(progress, getContentRepo(), now);
 }
+
+// ---------------------------------------------------------------------------
+// Per-section dashboard overview
+// ---------------------------------------------------------------------------
+//
+// Sections are a PRESENTATION grouping of concepts (see content/sections.json).
+// A section's stats are the aggregate of its concepts — the very same
+// concept-level mastery the engine already owns. Nothing here feeds the
+// engine; it only powers the finer-grained theory hub navigation.
+
+export interface SectionOverview {
+  sectionId: string;
+  topicId: string;
+  titleBg: string;
+  conceptCount: number;
+  /** Concepts with at least one recorded answer. */
+  seenConceptCount: number;
+  /** seenConceptCount / conceptCount (0 when the section has no concepts). */
+  coverage: number;
+  /** Unweighted average mastery over ALL section concepts, unseen = 0 (0..1). */
+  avgMastery: number;
+  /** Section concepts currently due for review. */
+  dueCount: number;
+  /** Distinct questions touching any of the section's concepts. */
+  questionCount: number;
+}
+
+export function computeSectionOverview(
+  progress: ProgressRow[],
+  repo: ContentRepo,
+  now: Date,
+): SectionOverview[] {
+  const byConcept = new Map(progress.map((p) => [p.conceptId, p]));
+  const topics = [...repo.topics()].sort((a, b) => a.order - b.order);
+  const sectionsByTopic = (topicId: string) =>
+    repo.sectionsByTopic?.(topicId) ??
+    (repo.sections?.() ?? []).filter((s) => s.topicId === topicId);
+
+  // Group by parent topic (topic order), sections in content order within.
+  return topics.flatMap((t) =>
+    sectionsByTopic(t.id).map((section) => {
+      let seen = 0;
+      let due = 0;
+      let masterySum = 0;
+      const questionIds = new Set<string>();
+      for (const conceptId of section.conceptIds) {
+        for (const q of repo.questionsByConcept(conceptId)) questionIds.add(q.id);
+        const row = byConcept.get(conceptId);
+        if (!row) continue;
+        seen += 1;
+        masterySum += row.mastery;
+        if (isDue({ reps: row.reps, dueAt: row.dueAt }, now)) due += 1;
+      }
+      const count = section.conceptIds.length;
+      return {
+        sectionId: section.id,
+        topicId: section.topicId,
+        titleBg: section.titleBg,
+        conceptCount: count,
+        seenConceptCount: seen,
+        coverage: count === 0 ? 0 : seen / count,
+        avgMastery: count === 0 ? 0 : masterySum / count,
+        dueCount: due,
+        questionCount: questionIds.size,
+      };
+    }),
+  );
+}
+
+export async function getSectionOverview(
+  userId: string,
+  now: Date = new Date(),
+): Promise<SectionOverview[]> {
+  const progress = await getLearningStore().getProgress(userId);
+  return computeSectionOverview(progress, getContentRepo(), now);
+}

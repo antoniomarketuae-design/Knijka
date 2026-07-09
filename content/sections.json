@@ -1,0 +1,532 @@
+[
+  {
+    "id": "s-basics-road",
+    "topicId": "t-basics",
+    "titleBg": "Пътят и участниците",
+    "conceptIds": [
+      "c-road-participants",
+      "c-road-elements",
+      "c-vehicle-types"
+    ]
+  },
+  {
+    "id": "s-basics-obligations",
+    "topicId": "t-basics",
+    "titleBg": "Задължения и категории",
+    "conceptIds": [
+      "c-driver-obligations",
+      "c-right-side-rule",
+      "c-signal-hierarchy",
+      "c-license-categories"
+    ]
+  },
+  {
+    "id": "s-basics-safety",
+    "topicId": "t-basics",
+    "titleBg": "Колани, деца и телефон",
+    "conceptIds": [
+      "c-seatbelts",
+      "c-child-safety",
+      "c-phone-use"
+    ]
+  },
+  {
+    "id": "s-vehicle-controls-brakes",
+    "topicId": "t-vehicle",
+    "titleBg": "Управление и спиране",
+    "conceptIds": [
+      "c-vehicle-controls",
+      "c-brakes"
+    ]
+  },
+  {
+    "id": "s-vehicle-tyres-safety",
+    "topicId": "t-vehicle",
+    "titleBg": "Гуми и системи за безопасност",
+    "conceptIds": [
+      "c-tyres",
+      "c-abs-systems"
+    ]
+  },
+  {
+    "id": "s-vehicle-lights-mirrors",
+    "topicId": "t-vehicle",
+    "titleBg": "Светлини и огледала",
+    "conceptIds": [
+      "c-lights-overview",
+      "c-daytime-lights",
+      "c-mirrors-blind-spots"
+    ]
+  },
+  {
+    "id": "s-vehicle-precheck",
+    "topicId": "t-vehicle",
+    "titleBg": "Проверка и оборудване",
+    "conceptIds": [
+      "c-pre-drive-check",
+      "c-technical-condition",
+      "c-mandatory-equipment",
+      "c-loading-passengers"
+    ]
+  },
+  {
+    "id": "s-signs-groups-warning",
+    "topicId": "t-signs",
+    "titleBg": "Групи и предупредителни знаци (А)",
+    "conceptIds": [
+      "c-sign-groups",
+      "c-warning-signs"
+    ]
+  },
+  {
+    "id": "s-signs-priority",
+    "topicId": "t-signs",
+    "titleBg": "Знаци за предимство (Б)",
+    "conceptIds": [
+      "c-priority-signs",
+      "c-stop-give-way-signs"
+    ]
+  },
+  {
+    "id": "s-signs-prohibition-mandatory",
+    "topicId": "t-signs",
+    "titleBg": "Забранителни и задължителни знаци (В, Г)",
+    "conceptIds": [
+      "c-prohibition-signs",
+      "c-mandatory-signs"
+    ]
+  },
+  {
+    "id": "s-signs-special-info",
+    "topicId": "t-signs",
+    "titleBg": "Специални, указателни и за направления (Д, Е, Ж)",
+    "conceptIds": [
+      "c-special-rules-signs",
+      "c-info-signs",
+      "c-direction-signs"
+    ]
+  },
+  {
+    "id": "s-signs-plates-scope",
+    "topicId": "t-signs",
+    "titleBg": "Табели, зона на действие и временни знаци",
+    "conceptIds": [
+      "c-additional-plates",
+      "c-sign-scope",
+      "c-temporary-signalization"
+    ]
+  },
+  {
+    "id": "s-signals-lights",
+    "topicId": "t-signals-markings",
+    "titleBg": "Светофари",
+    "conceptIds": [
+      "c-traffic-light-signals",
+      "c-additional-sections",
+      "c-flashing-yellow",
+      "c-lane-control-signals"
+    ]
+  },
+  {
+    "id": "s-signals-markings",
+    "topicId": "t-signals-markings",
+    "titleBg": "Пътна маркировка",
+    "conceptIds": [
+      "c-longitudinal-markings",
+      "c-transverse-markings",
+      "c-other-markings"
+    ]
+  },
+  {
+    "id": "s-signals-regulator",
+    "topicId": "t-signals-markings",
+    "titleBg": "Регулировчик и сигнали",
+    "conceptIds": [
+      "c-regulator-signals",
+      "c-driver-signals",
+      "c-special-regime-vehicles"
+    ]
+  },
+  {
+    "id": "s-priority-basics",
+    "topicId": "t-priority",
+    "titleBg": "Основи на предимството",
+    "conceptIds": [
+      "c-priority-concept",
+      "c-right-hand-rule",
+      "c-priority-road"
+    ]
+  },
+  {
+    "id": "s-priority-situations",
+    "topicId": "t-priority",
+    "titleBg": "Предимство в конкретни ситуации",
+    "conceptIds": [
+      "c-give-way-stop-behavior",
+      "c-left-turn-oncoming",
+      "c-exit-from-adjacent"
+    ]
+  },
+  {
+    "id": "s-priority-special",
+    "topicId": "t-priority",
+    "titleBg": "Трамваи, спешни и автобуси",
+    "conceptIds": [
+      "c-tram-priority",
+      "c-emergency-priority",
+      "c-bus-pullout"
+    ]
+  },
+  {
+    "id": "s-junctions-types",
+    "topicId": "t-junctions",
+    "titleBg": "Видове кръстовища",
+    "conceptIds": [
+      "c-junction-types",
+      "c-junction-approach",
+      "c-equal-junction"
+    ]
+  },
+  {
+    "id": "s-junctions-signed-light",
+    "topicId": "t-junctions",
+    "titleBg": "Кръстовища със знаци и светофар",
+    "conceptIds": [
+      "c-signed-junction",
+      "c-light-junction",
+      "c-turning-right",
+      "c-turning-left-junction"
+    ]
+  },
+  {
+    "id": "s-junctions-roundabout",
+    "topicId": "t-junctions",
+    "titleBg": "Кръгово движение",
+    "conceptIds": [
+      "c-roundabout-rules",
+      "c-roundabout-behavior"
+    ]
+  },
+  {
+    "id": "s-junctions-rail-blocking",
+    "topicId": "t-junctions",
+    "titleBg": "Жп прелез и блокиране на кръстовище",
+    "conceptIds": [
+      "c-railway-crossing",
+      "c-junction-blocking"
+    ]
+  },
+  {
+    "id": "s-speed-limits",
+    "topicId": "t-speed",
+    "titleBg": "Ограничения и съобразена скорост",
+    "conceptIds": [
+      "c-speed-limits",
+      "c-speed-signs-zone",
+      "c-speed-adaptation",
+      "c-average-speed-enforcement"
+    ]
+  },
+  {
+    "id": "s-speed-braking",
+    "topicId": "t-speed",
+    "titleBg": "Реакция и спирачен път",
+    "conceptIds": [
+      "c-reaction-time",
+      "c-braking-distance",
+      "c-stopping-distance-total"
+    ]
+  },
+  {
+    "id": "s-speed-distance",
+    "topicId": "t-speed",
+    "titleBg": "Дистанция и сила на удара",
+    "conceptIds": [
+      "c-speed-impact",
+      "c-following-distance",
+      "c-sudden-braking-slow-driving"
+    ]
+  },
+  {
+    "id": "s-maneuvers-basics",
+    "topicId": "t-maneuvers",
+    "titleBg": "Основи на маневрите",
+    "conceptIds": [
+      "c-maneuver-principles",
+      "c-merging-traffic"
+    ]
+  },
+  {
+    "id": "s-maneuvers-lanes",
+    "topicId": "t-maneuvers",
+    "titleBg": "Избор и смяна на лента",
+    "conceptIds": [
+      "c-lane-choice",
+      "c-lane-change"
+    ]
+  },
+  {
+    "id": "s-maneuvers-overtaking",
+    "topicId": "t-maneuvers",
+    "titleBg": "Изпреварване",
+    "conceptIds": [
+      "c-overtaking-procedure",
+      "c-overtaking-prohibitions",
+      "c-overtaken-duties"
+    ]
+  },
+  {
+    "id": "s-maneuvers-other",
+    "topicId": "t-maneuvers",
+    "titleBg": "Разминаване, назад и обратен завой",
+    "conceptIds": [
+      "c-oncoming-passing",
+      "c-reversing",
+      "c-u-turn"
+    ]
+  },
+  {
+    "id": "s-vulnerable-pedestrians",
+    "topicId": "t-vulnerable",
+    "titleBg": "Пешеходци и пешеходни пътеки",
+    "conceptIds": [
+      "c-pedestrian-rights-duties",
+      "c-general-care-duty",
+      "c-crosswalk-yield",
+      "c-children-on-road"
+    ]
+  },
+  {
+    "id": "s-vulnerable-two-wheelers",
+    "topicId": "t-vulnerable",
+    "titleBg": "Велосипедисти, тротинетки и мотористи",
+    "conceptIds": [
+      "c-cyclists",
+      "c-e-scooters",
+      "c-motorcyclists-visibility"
+    ]
+  },
+  {
+    "id": "s-vulnerable-zones",
+    "topicId": "t-vulnerable",
+    "titleBg": "Жилищни и пешеходни зони",
+    "conceptIds": [
+      "c-residential-zone",
+      "c-shared-zones-paths"
+    ]
+  },
+  {
+    "id": "s-vulnerable-special",
+    "topicId": "t-vulnerable",
+    "titleBg": "Спирки, училища и специална защита",
+    "conceptIds": [
+      "c-bus-stops-school",
+      "c-elderly-disabled"
+    ]
+  },
+  {
+    "id": "s-roads-motorway",
+    "topicId": "t-roads",
+    "titleBg": "Автомагистрала и скоростен път",
+    "conceptIds": [
+      "c-motorway-rules",
+      "c-motorway-entry-exit",
+      "c-motorway-prohibitions",
+      "c-expressway"
+    ]
+  },
+  {
+    "id": "s-roads-rural",
+    "topicId": "t-roads",
+    "titleBg": "Извънградски и планински пътища",
+    "conceptIds": [
+      "c-rural-road-risks",
+      "c-mountain-roads"
+    ]
+  },
+  {
+    "id": "s-roads-tunnels-breakdown",
+    "topicId": "t-roads",
+    "titleBg": "Тунели и повреда на пътя",
+    "conceptIds": [
+      "c-tunnels",
+      "c-emergency-lane-breakdown"
+    ]
+  },
+  {
+    "id": "s-parking-rules",
+    "topicId": "t-parking",
+    "titleBg": "Спиране, престой и забрани",
+    "conceptIds": [
+      "c-stop-parking-definitions",
+      "c-stopping-standing-rules",
+      "c-parking-prohibitions",
+      "c-parking-signs-zones"
+    ]
+  },
+  {
+    "id": "s-parking-safe-leaving",
+    "topicId": "t-parking",
+    "titleBg": "Безопасно напускане и паркиране на наклон",
+    "conceptIds": [
+      "c-leaving-vehicle-safely",
+      "c-parking-slope-securing"
+    ]
+  },
+  {
+    "id": "s-parking-special-towing",
+    "topicId": "t-parking",
+    "titleBg": "Места за хора с увреждания и репатриране",
+    "conceptIds": [
+      "c-disabled-spaces",
+      "c-towing-removal"
+    ]
+  },
+  {
+    "id": "s-conditions-night",
+    "topicId": "t-conditions",
+    "titleBg": "Нощно шофиране и светлини",
+    "conceptIds": [
+      "c-night-visibility",
+      "c-high-beam-use",
+      "c-dazzle-handling"
+    ]
+  },
+  {
+    "id": "s-conditions-rain-fog",
+    "topicId": "t-conditions",
+    "titleBg": "Дъжд и мъгла",
+    "conceptIds": [
+      "c-rain-aquaplaning",
+      "c-fog-driving"
+    ]
+  },
+  {
+    "id": "s-conditions-winter-hazards",
+    "topicId": "t-conditions",
+    "titleBg": "Зима, занасяне и препятствия",
+    "conceptIds": [
+      "c-winter-ice",
+      "c-skid-control",
+      "c-animals-obstacles"
+    ]
+  },
+  {
+    "id": "s-fitness-alcohol-drugs",
+    "topicId": "t-fitness",
+    "titleBg": "Алкохол и наркотици",
+    "conceptIds": [
+      "c-alcohol-limit",
+      "c-alcohol-effects",
+      "c-drugs-zero",
+      "c-testing-refusal"
+    ]
+  },
+  {
+    "id": "s-fitness-fatigue",
+    "topicId": "t-fitness",
+    "titleBg": "Умора и разсейване",
+    "conceptIds": [
+      "c-fatigue-microsleep",
+      "c-distraction-emotions"
+    ]
+  },
+  {
+    "id": "s-fitness-medical",
+    "topicId": "t-fitness",
+    "titleBg": "Лекарства и годност",
+    "conceptIds": [
+      "c-medicines",
+      "c-medical-fitness"
+    ]
+  },
+  {
+    "id": "s-admin-documents",
+    "topicId": "t-admin",
+    "titleBg": "Документи и валидност",
+    "conceptIds": [
+      "c-documents-required",
+      "c-license-validity",
+      "c-registration-inspection"
+    ]
+  },
+  {
+    "id": "s-admin-insurance-tax",
+    "topicId": "t-admin",
+    "titleBg": "Застраховка, винетка и точки",
+    "conceptIds": [
+      "c-insurance-go",
+      "c-vignette-toll",
+      "c-penalty-points"
+    ]
+  },
+  {
+    "id": "s-admin-penalties",
+    "topicId": "t-admin",
+    "titleBg": "Глоби и отнемане на книжката",
+    "conceptIds": [
+      "c-fines-tickets",
+      "c-license-withdrawal"
+    ]
+  },
+  {
+    "id": "s-admin-newdriver-police",
+    "topicId": "t-admin",
+    "titleBg": "Нови водачи и проверки",
+    "conceptIds": [
+      "c-new-driver-status",
+      "c-police-interaction"
+    ]
+  },
+  {
+    "id": "s-accidents-duties",
+    "topicId": "t-accidents",
+    "titleBg": "ПТП: задължения",
+    "conceptIds": [
+      "c-accident-definition",
+      "c-accident-duties",
+      "c-when-call-police"
+    ]
+  },
+  {
+    "id": "s-accidents-scene",
+    "topicId": "t-accidents",
+    "titleBg": "Обезопасяване и бягство",
+    "conceptIds": [
+      "c-scene-safety",
+      "c-hit-and-run"
+    ]
+  },
+  {
+    "id": "s-accidents-first-aid",
+    "topicId": "t-accidents",
+    "titleBg": "Първа помощ",
+    "conceptIds": [
+      "c-first-aid-priorities",
+      "c-cpr-basics",
+      "c-bleeding-control",
+      "c-victim-handling"
+    ]
+  },
+  {
+    "id": "s-eco-defensive",
+    "topicId": "t-eco-defensive",
+    "titleBg": "Защитно шофиране",
+    "conceptIds": [
+      "c-defensive-principles",
+      "c-hazard-perception",
+      "c-safety-space"
+    ]
+  },
+  {
+    "id": "s-eco-fuel",
+    "topicId": "t-eco-defensive",
+    "titleBg": "Икономично шофиране и планиране",
+    "conceptIds": [
+      "c-eco-techniques",
+      "c-fuel-factors",
+      "c-environment-impact",
+      "c-trip-planning"
+    ]
+  }
+]

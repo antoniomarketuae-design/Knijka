@@ -215,6 +215,26 @@ function checkQuestion(item, index, relFile) {
   }
 }
 
+function checkSection(item, index) {
+  const c = checker("sections.json", index, item);
+  if (!c.require(isPlainObject(item), "section must be an object")) return;
+  c.noUnknownKeys(["id", "topicId", "titleBg", "conceptIds"]);
+  c.require(
+    isNonEmptyString(item.id) && /^s-[a-z0-9-]+$/.test(item.id),
+    'id must be kebab-case with "s-" prefix',
+  );
+  c.require(isNonEmptyString(item.topicId), "topicId must be a non-empty string");
+  c.require(isNonEmptyString(item.titleBg), "titleBg must be a non-empty string");
+  if (c.require(
+    Array.isArray(item.conceptIds) && item.conceptIds.every(isNonEmptyString),
+    "conceptIds must be an array of non-empty strings",
+  )) {
+    if (item.conceptIds.length < 1) c.fail("section must reference at least one concept");
+    const dupes = duplicates(item.conceptIds);
+    if (dupes.length > 0) c.fail(`conceptIds contains duplicate ids: ${dupes.join(", ")}`);
+  }
+}
+
 function checkSign(item, index) {
   const c = checker("signs/signs.json", index, item);
   if (!c.require(isPlainObject(item), "sign must be an object")) return;
@@ -241,6 +261,8 @@ function checkSign(item, index) {
 const topics = readJsonArray("topics.json") ?? [];
 const concepts = readJsonArray("concepts.json") ?? [];
 const signs = readJsonArray(path.join("signs", "signs.json")) ?? [];
+const sectionsFileExists = fs.existsSync(path.join(contentDir, "sections.json"));
+const sections = sectionsFileExists ? (readJsonArray("sections.json") ?? []) : [];
 
 const questionsDir = path.join(contentDir, "questions");
 const questionFiles = new Map(); // slug -> questions[]
@@ -257,6 +279,7 @@ concepts.forEach(checkConcept);
 for (const [slug, questions] of questionFiles) {
   questions.forEach((q, i) => checkQuestion(q, i, `questions/${slug}.json`));
 }
+sections.forEach(checkSection);
 signs.forEach(checkSign);
 
 // --------------------------------------------------------------------------
@@ -277,6 +300,7 @@ function registerIds(items, file) {
 registerIds(topics, "topics.json");
 registerIds(concepts, "concepts.json");
 for (const [slug, questions] of questionFiles) registerIds(questions, `questions/${slug}.json`);
+registerIds(sections, "sections.json");
 registerIds(signs, "signs/signs.json");
 
 for (const slug of duplicates(topics.map((t) => t?.slug))) {
@@ -314,6 +338,45 @@ for (const [slug, questions] of questionFiles) {
           `questions/${slug}.json: question "${question.id}" references unknown concept "${conceptId}"`,
         );
       }
+    }
+  }
+}
+
+// Sections (optional layer): when present, must partition every concept
+// exactly once and only group concepts of their own parent topic.
+if (sections.length > 0) {
+  const conceptTopicById = new Map(
+    concepts.filter((c) => isPlainObject(c) && isNonEmptyString(c.id)).map((c) => [c.id, c.topicId]),
+  );
+  const conceptToSection = new Map();
+  for (const section of sections) {
+    if (!isPlainObject(section)) continue;
+    if (!topicIds.has(section.topicId)) {
+      errors.push(`sections.json: section "${section.id}" references unknown topicId "${section.topicId}"`);
+    }
+    for (const conceptId of Array.isArray(section.conceptIds) ? section.conceptIds : []) {
+      if (!conceptIds.has(conceptId)) {
+        errors.push(`sections.json: section "${section.id}" references unknown concept "${conceptId}"`);
+        continue;
+      }
+      const conceptTopic = conceptTopicById.get(conceptId);
+      if (conceptTopic !== section.topicId) {
+        errors.push(
+          `sections.json: section "${section.id}" (topic "${section.topicId}") includes concept "${conceptId}" of topic "${conceptTopic}"`,
+        );
+      }
+      const owner = conceptToSection.get(conceptId);
+      if (owner !== undefined) {
+        errors.push(`sections.json: concept "${conceptId}" appears in multiple sections ("${owner}" and "${section.id}")`);
+      } else {
+        conceptToSection.set(conceptId, section.id);
+      }
+    }
+  }
+  for (const concept of concepts) {
+    if (!isPlainObject(concept) || !isNonEmptyString(concept.id)) continue;
+    if (!conceptToSection.has(concept.id)) {
+      errors.push(`sections.json: concept "${concept.id}" is not assigned to any section`);
     }
   }
 }
@@ -365,6 +428,7 @@ function statusCounts(items) {
 const rows = [
   ["topics", topics.length, null],
   ["concepts", concepts.length, null],
+  ["sections", sections.length, null],
   ["questions", allQuestions.length, statusCounts(allQuestions)],
   ["signs", signs.length, statusCounts(signs)],
 ];

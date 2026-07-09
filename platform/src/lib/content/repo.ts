@@ -1,4 +1,4 @@
-import type { Concept, Question, Sign, Topic } from "./types";
+import type { Concept, Question, Section, Sign, Topic } from "./types";
 
 /**
  * Read-only access to the versioned learning content in /content.
@@ -18,6 +18,16 @@ export interface ContentRepo {
   questionsByTopic(topicSlug: string): Question[];
   questionsByConcept(conceptId: string): Question[];
   signs(): Sign[];
+  /**
+   * Sections — a presentation-only grouping of concepts (finer than topics).
+   * OPTIONAL so lightweight test fixtures need not implement them; the real
+   * loader always provides all three. Consumers must tolerate `undefined`
+   * (treat as "no sections defined").
+   */
+  sections?(): Section[];
+  sectionById?(id: string): Section | undefined;
+  /** Sections whose parent is `topicId`, in content (file) order. */
+  sectionsByTopic?(topicId: string): Section[];
 }
 
 let repo: ContentRepo | null = null;

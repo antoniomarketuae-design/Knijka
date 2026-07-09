@@ -51,6 +51,13 @@ export interface SessionQuestion {
 export interface PracticeSessionOptions {
   /** Restrict the session to one topic (repo slug). */
   topicSlug?: string;
+  /**
+   * Restrict the session to an explicit set of concepts — used by the theory
+   * hub to launch practice for a single SECTION. Applied on top of any
+   * topicSlug scope; concepts outside the set are excluded. The engine's
+   * bucket ordering and prerequisite gating are otherwise unchanged.
+   */
+  conceptIds?: string[];
   /** Target number of questions (may return fewer). Default 10. */
   size?: number;
   /** Include "needs-review" questions. Default true (practice only). */
@@ -65,6 +72,7 @@ export async function buildPracticeSession(
 ): Promise<SessionQuestion[]> {
   const {
     topicSlug,
+    conceptIds,
     size = DEFAULT_SESSION_SIZE,
     includeUnreviewed = true,
     now = new Date(),
@@ -93,7 +101,11 @@ export async function buildPracticeSession(
   if (topicSlug && scopedTopics.length === 0) {
     throw new Error(`buildPracticeSession: unknown topic slug "${topicSlug}"`);
   }
-  const concepts = scopedTopics.flatMap((t) => repo.conceptsByTopic(t.id));
+  const conceptFilter =
+    conceptIds && conceptIds.length > 0 ? new Set(conceptIds) : null;
+  const concepts = scopedTopics
+    .flatMap((t) => repo.conceptsByTopic(t.id))
+    .filter((c) => conceptFilter === null || conceptFilter.has(c.id));
 
   // ---- Eligibility helpers ------------------------------------------------
   const allowedStatuses = new Set<ContentStatus>(["draft", "approved"]);

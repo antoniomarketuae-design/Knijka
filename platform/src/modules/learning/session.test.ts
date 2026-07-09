@@ -199,4 +199,28 @@ describe("buildPracticeSession", () => {
       buildPracticeSession(USER, { now: NOW, topicSlug: "nope" }),
     ).rejects.toThrow(/unknown topic slug/i);
   });
+
+  it("scopes to an explicit concept set (a section) via conceptIds", async () => {
+    // Unlock c-priority so it is eligible, then restrict to just that concept.
+    store.seedProgress(USER, {
+      conceptId: "c-road",
+      mastery: 0.6,
+      reps: 1,
+      dueAt: daysFromNow(1),
+    });
+
+    const scoped = await buildPracticeSession(USER, {
+      now: NOW,
+      conceptIds: ["c-priority"],
+    });
+    expect(scoped.length).toBeGreaterThan(0);
+    expect(scoped.every((s) => s.conceptId === "c-priority")).toBe(true);
+
+    // An empty/absent set means "no concept filter" — the whole scope is used.
+    const unfiltered = await buildPracticeSession(USER, {
+      now: NOW,
+      conceptIds: [],
+    });
+    expect(unfiltered.some((s) => s.conceptId !== "c-priority")).toBe(true);
+  });
 });

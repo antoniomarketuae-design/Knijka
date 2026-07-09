@@ -18,7 +18,7 @@
  */
 
 import type { ContentRepo } from "@/lib/content/repo";
-import type { Concept, Question, Topic } from "@/lib/content/types";
+import type { Concept, Question, Section, Topic } from "@/lib/content/types";
 import type {
   AttemptRecord,
   LearningStore,
@@ -72,6 +72,18 @@ const CONCEPTS: Concept[] = [
   concept("c-priority", "t-basics", ["c-road"], 2),
   concept("c-warning", "t-signs", [], 1),
   concept("c-sign-priority", "t-signs", ["c-priority"], 3),
+];
+
+// Presentation-only grouping partitioning all four fixture concepts.
+const SECTIONS: Section[] = [
+  { id: "s-basics-road", topicId: "t-basics", titleBg: "Пътят", conceptIds: ["c-road"] },
+  { id: "s-basics-priority", topicId: "t-basics", titleBg: "Предимство", conceptIds: ["c-priority"] },
+  {
+    id: "s-signs-all",
+    topicId: "t-signs",
+    titleBg: "Знаци",
+    conceptIds: ["c-warning", "c-sign-priority"],
+  },
 ];
 
 function question(
@@ -145,6 +157,9 @@ export function makeFixtureRepo(): ContentRepo {
     questionsByConcept: (conceptId) =>
       QUESTIONS.filter((q) => q.conceptIds.includes(conceptId)),
     signs: () => [],
+    sections: () => SECTIONS,
+    sectionById: (id) => SECTIONS.find((s) => s.id === id),
+    sectionsByTopic: (topicId) => SECTIONS.filter((s) => s.topicId === topicId),
   };
 }
 

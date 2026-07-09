@@ -16,6 +16,7 @@ import type {
   LawRef,
   Question,
   QuestionOption,
+  Section,
   Sign,
   Topic,
 } from "./types";
@@ -135,6 +136,27 @@ export const QuestionSchema = z
     }
   });
 
+export const SectionSchema = z
+  .strictObject({
+    id: z.string().regex(/^s-[a-z0-9-]+$/, 'section id must be kebab-case with "s-" prefix'),
+    topicId: z.string().min(1),
+    titleBg: z.string().min(1),
+    conceptIds: z
+      .array(z.string().min(1))
+      .min(1, "section must reference at least one concept"),
+  })
+  .check((ctx) => {
+    const dupes = duplicates(ctx.value.conceptIds);
+    if (dupes.length > 0) {
+      ctx.issues.push({
+        code: "custom",
+        message: `conceptIds contains duplicate ids: ${dupes.join(", ")}`,
+        input: ctx.value,
+        path: ["conceptIds"],
+      });
+    }
+  });
+
 export const SignSchema = z.strictObject({
   id: z.string().regex(/^sign-[a-z0-9-]+$/, 'sign id must be kebab-case with "sign-" prefix'),
   code: z.string().min(1),
@@ -150,6 +172,7 @@ export const SignSchema = z.strictObject({
 export const TopicsFileSchema = z.array(TopicSchema);
 export const ConceptsFileSchema = z.array(ConceptSchema);
 export const QuestionsFileSchema = z.array(QuestionSchema);
+export const SectionsFileSchema = z.array(SectionSchema);
 export const SignsFileSchema = z.array(SignSchema);
 
 /* ------------------------------------------------------------------------ *
@@ -167,5 +190,6 @@ export type SchemasMirrorTypes = [
   Assert<Equals<z.infer<typeof ConceptSchema>, Concept>>,
   Assert<Equals<z.infer<typeof QuestionOptionSchema>, QuestionOption>>,
   Assert<Equals<z.infer<typeof QuestionSchema>, Question>>,
+  Assert<Equals<z.infer<typeof SectionSchema>, Section>>,
   Assert<Equals<z.infer<typeof SignSchema>, Sign>>,
 ];

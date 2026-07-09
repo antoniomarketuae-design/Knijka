@@ -68,6 +68,44 @@ describe("loader on real /content", () => {
     expect(total).toBe(contentRepo.concepts().length);
   });
 
+  it("partitions EVERY concept into exactly one section, with unique section ids", () => {
+    const sections = contentRepo.sections?.() ?? [];
+    expect(sections.length).toBeGreaterThanOrEqual(50); // 50+ finer study chunks
+
+    // Section ids are unique.
+    const ids = sections.map((s) => s.id);
+    expect(new Set(ids).size).toBe(ids.length);
+
+    // Every concept lands in exactly one section — no orphan, no duplicate.
+    const assignments = new Map<string, number>();
+    for (const section of sections) {
+      for (const conceptId of section.conceptIds) {
+        assignments.set(conceptId, (assignments.get(conceptId) ?? 0) + 1);
+      }
+    }
+    for (const concept of contentRepo.concepts()) {
+      expect(assignments.get(concept.id)).toBe(1);
+    }
+    // No section references a concept that does not exist / total count matches.
+    const totalAssigned = [...assignments.values()].reduce((a, b) => a + b, 0);
+    expect(totalAssigned).toBe(contentRepo.concepts().length);
+  });
+
+  it("groups sections under their parent topic; every section concept is in that topic", () => {
+    let total = 0;
+    for (const topic of contentRepo.topics()) {
+      const sections = contentRepo.sectionsByTopic?.(topic.id) ?? [];
+      total += sections.length;
+      for (const section of sections) {
+        expect(section.topicId).toBe(topic.id);
+        for (const conceptId of section.conceptIds) {
+          expect(contentRepo.conceptById(conceptId)?.topicId).toBe(topic.id);
+        }
+      }
+    }
+    expect(total).toBe((contentRepo.sections?.() ?? []).length);
+  });
+
   it("is frozen", () => {
     expect(Object.isFrozen(contentRepo)).toBe(true);
     expect(Object.isFrozen(contentRepo.topics())).toBe(true);
@@ -151,6 +189,10 @@ function fixtureData() {
         },
       ],
     },
+    sections: [
+      { id: "s-root", topicId: "t-basics", titleBg: "Корен", conceptIds: ["c-root"] },
+      { id: "s-leaf", topicId: "t-basics", titleBg: "Лист", conceptIds: ["c-leaf"] },
+    ],
     signs: [
       {
         id: "sign-b2",
@@ -179,6 +221,38 @@ describe("buildContentRepo on fixtures", () => {
     expect(repo.prerequisites("c-leaf").map((c) => c.id)).toEqual(["c-root"]);
     expect(Object.isFrozen(repo)).toBe(true);
     expect(Object.isFrozen(repo.questions())).toBe(true);
+  });
+
+  it("serves sections through the repo API", () => {
+    const repo = build(fixtureData());
+    expect(repo.sections?.()?.map((s) => s.id)).toEqual(["s-root", "s-leaf"]);
+    expect(repo.sectionById?.("s-leaf")?.conceptIds).toEqual(["c-leaf"]);
+    expect(repo.sectionsByTopic?.("t-basics")?.map((s) => s.id)).toEqual(["s-root", "s-leaf"]);
+    expect(Object.isFrozen(repo.sections?.())).toBe(true);
+  });
+
+  it("rejects a section referencing an unknown concept", () => {
+    const data = fixtureData();
+    data.sections[0].conceptIds = ["c-ghost"];
+    expect(() => build(data)).toThrow(/section "s-root" references unknown concept "c-ghost"/);
+  });
+
+  it("rejects a concept assigned to no section (orphan)", () => {
+    const data = fixtureData();
+    data.sections.pop(); // drop s-leaf → c-leaf now uncovered
+    expect(() => build(data)).toThrow(/concept "c-leaf" is not assigned to any section/);
+  });
+
+  it("rejects a concept assigned to more than one section", () => {
+    const data = fixtureData();
+    data.sections[1].conceptIds = ["c-root", "c-leaf"]; // c-root now in both
+    expect(() => build(data)).toThrow(/concept "c-root" appears in multiple sections/);
+  });
+
+  it("rejects a section pointing at an unknown topic", () => {
+    const data = fixtureData();
+    data.sections[0].topicId = "t-ghost";
+    expect(() => build(data)).toThrow(/section "s-root" references unknown topicId "t-ghost"/);
   });
 
   it('rejects a "single" question with 2 correct options', () => {
