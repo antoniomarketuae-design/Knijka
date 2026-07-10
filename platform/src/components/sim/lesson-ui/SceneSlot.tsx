@@ -47,7 +47,12 @@
  */
 
 import dynamic from "next/dynamic";
-import type { LessonSpec } from "@/modules/sim/lessons";
+import type {
+  LessonSpec,
+  NearMissEvent,
+  NearMissStats,
+  StagedEventOutcome,
+} from "@/modules/sim/lessons";
 import type { MinimapFrame } from "@/modules/sim/hud";
 import type { PreDriveStepId } from "@/modules/sim/procedures";
 import type { SimTick } from "@/modules/sim/rules";
@@ -81,6 +86,16 @@ export interface SceneSlotProps {
   /** A1: low-frequency driveline state (ignition/selector/parking brake/
    *  hazards/…) → HUD telltales (GearIndicatorCard). */
   onDriveline?: (snap: DrivelineSnapshot) => void;
+  /** P1: shell-owned fullscreen toggle (QW1 — the shell root is the
+   *  fullscreen element) so the scene's touch overlay can offer ⛶. */
+  onToggleFullscreen?: () => void;
+  /** A8 (additive): a staged encounter resolved — the measurement record
+   *  (reaction time, stop gap, …). The shell folds it via applyStagedOutcome
+   *  so A10's objective locks + A15's end-screen readouts see it. */
+  onStagedOutcome?: (outcome: StagedEventOutcome) => void;
+  /** A11→A15 (additive): a near-miss encounter resolved — session stat only,
+   *  never graded; the shell records it for the end-screen mistake map. */
+  onNearMiss?: (event: NearMissEvent, stats: NearMissStats) => void;
 }
 
 // The heavy Three.js/rapier bundle loads client-side only (rapier wasm must

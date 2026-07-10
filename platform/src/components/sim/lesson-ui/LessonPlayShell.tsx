@@ -30,7 +30,9 @@ import {
 } from "@/modules/sim/hud";
 import {
   abortSession,
+  applyNearMiss,
   applyPreDriveStep,
+  applyStagedOutcome,
   applyTick,
   buildDebrief,
   buildLessonResult,
@@ -39,13 +41,16 @@ import {
   finishSession,
   isDriveLocked,
   observeQuizTick,
+  serializeNearMisses,
   serializeRuleEvents,
   type LessonResult,
   type LessonSessionState,
   type LessonSpec,
   type MicroQuizQuestion,
+  type NearMissEvent,
   type QuizFrequency,
   type QuizTriggerState,
+  type StagedEventOutcome,
   type TeachMoment,
   type TriggeredQuiz,
 } from "@/modules/sim/lessons";
@@ -401,13 +406,20 @@ export function LessonPlayShell({
         // A9: escalation multipliers ride along so the authoritative server
         // grade/debrief carries the same „повторна грешка ×1.5" annotations
         // (validated server-side; official score stays catalog-rebuilt).
-        ruleEvents: serializeRuleEvents(state.events, state.penaltyEscalations),
+        // A15: event positions ride the same refs (validated server-side,
+        // display metadata only); near-misses go as the additive session stat.
+        ruleEvents: serializeRuleEvents(
+          state.events,
+          state.penaltyEscalations,
+          state.eventPositions ?? [],
+        ),
         objectives: r.objectives.map((o) => ({
           id: o.id,
           done: o.done,
           completedAtSec: o.completedAtSec,
         })),
         microQuiz: { ...quizStatsRef.current },
+        nearMisses: serializeNearMisses(state.nearMisses ?? []),
       }).then(setSaveResult, () => setSaveResult({ ok: false, code: "SAVE_FAILED" }));
     },
     [lesson.id],
@@ -462,6 +474,24 @@ export function LessonPlayShell({
     },
     [push, finalize, activeQuiz, teachQueue],
   );
+
+  // A8/A15 measurement channels — ref-resident like the tick path (no
+  // re-render): staged-encounter outcomes feed A10's objective locks +
+  // the end-screen reaction readout; near-misses feed the mistake map
+  // (session stat, never graded). The player's last-tick position stands in
+  // for the near-miss location (clearance is sub-meter).
+  const handleStagedOutcome = useCallback((outcome: StagedEventOutcome) => {
+    if (finalizedRef.current) return;
+    sessionRef.current = applyStagedOutcome(sessionRef.current, outcome);
+  }, []);
+  const handleNearMiss = useCallback((event: NearMissEvent) => {
+    if (finalizedRef.current) return;
+    sessionRef.current = applyNearMiss(
+      sessionRef.current,
+      event,
+      lastTickRef.current?.position ?? null,
+    );
+  }, []);
 
   // A2: the ONLY sink for pre-drive completions. Performed steps arrive from
   // the scene's transition observer (keyboard or cockpit hotspot — same
@@ -663,6 +693,11 @@ export function LessonPlayShell({
             onBlockedDriveAttempt={handleBlockedDriveAttempt}
             onMinimapFrame={setMinimapFrame}
             onDriveline={handleDriveline}
+            // P1: the touch overlay's ⛶ button — same QW1 toggle as key X.
+            onToggleFullscreen={toggleFullscreen}
+            // A8/A15: measurement channels (staged outcomes + near-misses).
+            onStagedOutcome={handleStagedOutcome}
+            onNearMiss={handleNearMiss}
           />
         </div>
 
@@ -764,6 +799,10 @@ export function LessonPlayShell({
               onNextLesson={
                 nextLesson && result.passed ? () => onStartLesson(nextLesson.id) : null
               }
+              // A15 mistake map: the last live minimap frame carries the FULL
+              // district polylines (LessonScene builds them once) — a static
+              // fit-to-route view needs nothing else.
+              mapPolylines={minimapFrame?.polylines ?? null}
             />
           </div>
         ) : null}

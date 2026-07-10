@@ -15,7 +15,15 @@ export {
 } from "./input";
 export type { SimInputCallbacks } from "./input";
 
+export {
+  TouchInputSource,
+  steerFromDrag,
+  pedalFromPointerY,
+  TOUCH_STEER_EXPO,
+  TOUCH_STEER_RANGE_FRACTION,
+} from "./touch";
+
 export { createTelemetry, FpsMeter } from "./telemetry";
 export type { SimTelemetry } from "./telemetry";
 
-export { isTouchOnlyDevice } from "./capabilities";
+export { hasTouchScreen, isTouchOnlyDevice } from "./capabilities";

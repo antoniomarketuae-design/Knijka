@@ -208,6 +208,17 @@ export class CabinControls {
     this.autocancelArmed = false;
   }
 
+  /** P1 touch buttons: direct side toggles with the EXACT semantics of keys
+   *  , and . — same private setIndicator path, so blink phase, auto-cancel
+   *  and the A2 observer cannot tell a touch tap from a keypress. */
+  indicateLeft(): void {
+    this.setIndicator("left");
+  }
+
+  indicateRight(): void {
+    this.setIndicator("right");
+  }
+
   /** Parking brake toggle (key Space / hotspot_parking_brake) — routes the
    *  audio callback exactly like the key path. */
   toggleParkingBrake(): void {

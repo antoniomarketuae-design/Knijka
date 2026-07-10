@@ -28,8 +28,10 @@ import { Physics } from "@react-three/rapier";
 import type { Group } from "three";
 import {
   createTelemetry,
+  hasTouchScreen,
   isTouchOnlyDevice,
   SimInput,
+  TouchInputSource,
 } from "@/modules/sim/engine";
 import {
   FIXED_DT,
@@ -80,6 +82,7 @@ import {
 import { createWorldRuntime } from "@/modules/sim/runtime";
 import { createTrafficSystem, TrafficLayer, type TrafficDistrict } from "@/modules/sim/traffic";
 import { CabinControls, type MirrorGlanceKind } from "./cabin";
+import { TouchControls } from "./TouchControls";
 import { CockpitInteractionContext } from "./vitok/hotspots";
 import { SimAudio } from "./simAudio";
 import { CameraRig, type CameraMode } from "./CameraRig";
@@ -101,6 +104,20 @@ interface SpawnPointLike {
 
 const MINIMAP_MS = 200;
 const MINIMAP_PX_PER_M = 0.5;
+
+/** P1: localStorage key marking the one-time touch orientation hint as seen. */
+const TOUCH_HINT_STORAGE_KEY = "sim.touchHintSeen";
+
+/** The hint replaces the old refusal GateCard: touch-only devices get ONE
+ *  orientation/expectation card, then drive. Fail-open on storage errors. */
+function shouldShowTouchHint(): boolean {
+  if (!isTouchOnlyDevice()) return false;
+  try {
+    return window.localStorage.getItem(TOUCH_HINT_STORAGE_KEY) === null;
+  } catch {
+    return true;
+  }
+}
 
 /**
  * QW10 (doc 68 Phase 0): SimInput with a pre-drive gate. While `driveLocked`
@@ -216,19 +233,20 @@ export interface LessonSceneProps {
    *  past a moving NPC with almost no clearance. Session STAT only (A15's
    *  feedback map); nothing is graded. Carries the running aggregate. */
   onNearMiss?: (event: NearMissEvent, stats: NearMissStats) => void;
+  /** P1: shell-owned fullscreen toggle (QW1 — the shell root is the
+   *  fullscreen element) so the touch overlay can offer the ⛶ button. */
+  onToggleFullscreen?: () => void;
 }
 
 export default function LessonScene(props: LessonSceneProps) {
   const { paused, onTick, onMinimapFrame } = props;
 
-  const [touchBlocked] = useState(() => isTouchOnlyDevice());
   const [built, setBuilt] = useState<Built | null>(null);
   const [loadError, setLoadError] = useState(false);
   const [menuPaused, setMenuPaused] = useState(false);
 
   // Load the district once, build runtime + geometry + traffic client-side.
   useEffect(() => {
-    if (touchBlocked) return;
     let alive = true;
     (async () => {
       try {
@@ -292,17 +310,10 @@ export default function LessonScene(props: LessonSceneProps) {
     return () => {
       alive = false;
     };
-  }, [touchBlocked, props.lesson]);
+  }, [props.lesson]);
 
-  if (touchBlocked) {
-    return (
-      <GateCard
-        icon="⌨️"
-        title="Симулаторът изисква клавиатура"
-        body="Управлява се с клавиши (WASD/стрелки). Отвори тази страница на компютър, за да подкараш колата."
-      />
-    );
-  }
+  // P1: the old touch refusal GateCard is GONE — touch-only devices now get
+  // the TouchControls overlay (ReadyScene) and a one-time orientation hint.
   if (loadError) {
     return (
       <GateCard
@@ -353,6 +364,7 @@ function ReadyScene({
   onDriveline,
   onStagedOutcome,
   onNearMiss,
+  onToggleFullscreen,
 }: LessonSceneProps & {
   built: Built;
   menuPaused: boolean;
@@ -396,6 +408,31 @@ function ReadyScene({
     difficultyRef.current = difficulty;
   }, [difficulty]);
 
+  // P1 touch layer: capability decides the overlay mount (touch laptops
+  // included — the overlay auto-hides while the keyboard is in use, so
+  // keyboard devices see zero change); touch-ONLY devices additionally get
+  // the one-time orientation hint and a collapsed keyboard legend.
+  const [touchCapable] = useState(() => hasTouchScreen());
+  const [touchOnly] = useState(() => isTouchOnlyDevice());
+  const [touchSource] = useState(() => new TouchInputSource());
+  const [showTouchHint, setShowTouchHint] = useState(shouldShowTouchHint);
+  const dismissTouchHint = useCallback(() => {
+    setShowTouchHint(false);
+    try {
+      window.localStorage.setItem(TOUCH_HINT_STORAGE_KEY, "1");
+    } catch {
+      // Private mode — the hint just shows again next session.
+    }
+  }, []);
+
+  // Camera toggle + car reset, shared by the key callbacks (C/R) and the
+  // touch overlay buttons — one code path per action.
+  const toggleCamera = useCallback(() => {
+    cameraModeRef.current =
+      cameraModeRef.current === "chase" ? "cockpit" : "chase";
+    setCockpit(cameraModeRef.current === "cockpit");
+  }, []);
+
   // Mirror of the driveLocked prop so the input lifecycle effect (which runs
   // once) can seed a freshly created input with the current gate state.
   const driveLockedRef = useRef(driveLocked);
@@ -409,6 +446,13 @@ function ReadyScene({
   }, [director]);
   const hazardActiveRef = useRef(false);
 
+  /** Respawn (key R and the touch sheet's „Рестарт") — same code path. */
+  const resetCar = useCallback(() => {
+    simRef.current?.reset();
+    // A8: retry re-stages every staged encounter (fresh attempt seed).
+    directorRef.current?.reset();
+  }, []);
+
   // A2 performed pre-drive: raw transition queues, drained by RuntimeDriver's
   // frame loop and resolved to procedure steps (performedSteps.ts). Driveline
   // events arrive via subscribe (below); glances via the cabin callback (both
@@ -419,19 +463,14 @@ function ReadyScene({
   // Input + cabin + audio lifecycle.
   useEffect(() => {
     const input = new GatedSimInput({
-      onToggleCamera: () => {
-        cameraModeRef.current =
-          cameraModeRef.current === "chase" ? "cockpit" : "chase";
-        setCockpit(cameraModeRef.current === "cockpit");
-      },
-      onReset: () => {
-        simRef.current?.reset();
-        // A8: retry re-stages every staged encounter (fresh attempt seed).
-        directorRef.current?.reset();
-      },
+      onToggleCamera: toggleCamera,
+      onReset: resetCar,
       onTogglePause: () => setMenuPaused(!menuPaused),
     });
     input.driveLocked = driveLockedRef.current;
+    // P1: the touch overlay's axis source joins the SAME read() pipeline
+    // (merged before the QW10 gate + difficulty shaping).
+    if (touchCapable) input.attachTouch(touchSource);
     inputRef.current = input;
     const audio = new SimAudio();
     audioRef.current = audio;
@@ -462,6 +501,7 @@ function ReadyScene({
       window.removeEventListener("pointerdown", unlock);
       window.removeEventListener("keydown", unlock);
       unsubscribeDriveline();
+      touchSource.releaseAll();
       input.dispose();
       inputRef.current = null;
       cabin.dispose();
@@ -650,8 +690,25 @@ function ReadyScene({
       </Canvas>
 
       {/* Controls legend — collapsible, top-left of the canvas (clear of the
-          bottom cards + minimap). */}
-      <ControlsHelp />
+          bottom cards + minimap). Collapsed by default on touch-only devices
+          (the keys are real but secondary there). */}
+      <ControlsHelp defaultOpen={!touchOnly} />
+
+      {/* P1: touch input overlay — mounts on any touch-capable device, hides
+          itself during keyboard use and while paused/quiz/teach/end overlays
+          are up (physicsPaused covers menu pause; props.paused covers the
+          shell's quiz/teach/end states). */}
+      {touchCapable ? (
+        <TouchControls
+          touch={touchSource}
+          cabinRef={cabinRef}
+          hidden={physicsPaused}
+          onToggleCamera={toggleCamera}
+          onPause={() => setMenuPaused(true)}
+          onReset={resetCar}
+          onToggleFullscreen={onToggleFullscreen ?? null}
+        />
+      ) : null}
 
       {/* Difficulty selector — top right */}
       <div className="absolute right-3 top-3 flex items-center gap-1 rounded-full border border-border bg-background/70 p-1 backdrop-blur">
@@ -674,6 +731,33 @@ function ReadyScene({
           );
         })}
       </div>
+
+      {/* P1: one-time touch expectation hint — the refusal GateCard's
+          replacement. Landscape + slider guidance, then never again. */}
+      {showTouchHint ? (
+        <div
+          className="absolute inset-0 z-30 flex items-center justify-center bg-background/80 p-4 backdrop-blur-sm"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Съвети за игра на телефон"
+        >
+          <div className="card flex max-w-sm flex-col gap-3 p-6 text-center">
+            <p className="text-3xl" aria-hidden>
+              📱
+            </p>
+            <h2 className="text-lg font-bold">Караш направо от телефона</h2>
+            <p className="text-sm text-muted">
+              Завърти телефона хоризонтално за най-добър изглед. Управлявай с
+              плъзгачите: воланът е вляво, газта и спирачката — вдясно.
+              Контролите в кабината се докосват направо, а „⚙“ отваря
+              останалите (двигател, скорости, светлини…).
+            </p>
+            <button type="button" autoFocus className="btn-accent" onClick={dismissTouchHint}>
+              Разбрах
+            </button>
+          </div>
+        </div>
+      ) : null}
 
       {menuPaused ? (
         <div
@@ -923,9 +1007,10 @@ function RuntimeDriver({
 }
 
 /** Collapsible key legend, top-left of the canvas — clear of the bottom HUD
- *  cards and the minimap. Default open so the keys are visible. */
-function ControlsHelp() {
-  const [open, setOpen] = useState(true);
+ *  cards and the minimap. Default open so the keys are visible (collapsed on
+ *  touch-only devices, where the touch overlay is the primary input). */
+function ControlsHelp({ defaultOpen = true }: { defaultOpen?: boolean }) {
+  const [open, setOpen] = useState(defaultOpen);
   const rows: Array<[string, string]> = [
     ["W A S D", "кормуване (или стрелки)"],
     ["I", "двигател: старт / стоп"],

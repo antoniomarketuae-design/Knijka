@@ -4,6 +4,7 @@
 // physics step and wires the callbacks.
 
 import { IDLE_INPUT, type VehicleInput } from "../vehicle";
+import type { TouchInputSource } from "./touch";
 
 export interface SimInputCallbacks {
   /** C — chase ↔ cockpit. */
@@ -80,6 +81,8 @@ export class SimInput {
   private throttlePedal = 0;
   private brakePedal = 0;
   private lastReadMs: number | null = null;
+  // P1: optional touch overlay source (TouchControls) — merged LAST in read().
+  private touchSource: TouchInputSource | null = null;
 
   constructor(
     private readonly callbacks: SimInputCallbacks = {},
@@ -96,6 +99,17 @@ export class SimInput {
     window.removeEventListener("keyup", this.onKeyUp);
     window.removeEventListener("blur", this.onBlur);
     this.pressed.clear();
+  }
+
+  /**
+   * P1: attach (or detach with null) the touch overlay's axis source. Touch
+   * merges by PRIORITY inside read() — while a finger owns an axis its value
+   * replaces the keyboard∪gamepad result for that axis (see touch.ts) — so
+   * every downstream consumer (QW10 gate, difficulty shaping, A2 raw-pedal
+   * observers) treats touch exactly like any other device.
+   */
+  attachTouch(source: TouchInputSource | null): void {
+    this.touchSource = source;
   }
 
   /**
@@ -146,6 +160,9 @@ export class SimInput {
     out.handbrake = false;
 
     this.mergeGamepad(out);
+    // Touch merges LAST and by priority (active axis replaces) — inside
+    // read() so GatedSimInput's raw capture + gate see touch pedals too.
+    this.touchSource?.mergeInto(out);
     return out;
   }
 
