@@ -206,9 +206,8 @@ export const STEER_MIN_SPEED_KMH = 110;
 export const STEER_SPEED = 3.2;
 /** How fast it self-centres (rad/s) — quicker than turn-in, like a caster. */
 export const STEER_RETURN_SPEED = 4.8;
-/** Visual steering-wheel rotation per road-wheel radian. ~13 gives ≈±430° at
- *  full lock — a realistic ~1.2 turns (docs/simulation/63 camera research). */
-export const STEERING_WHEEL_VISUAL_RATIO = 13;
+// (STEERING_WHEEL_VISUAL_RATIO removed — the visual wheel ratio is owned by
+// VitokCockpit's WHEEL_VISUAL_RATIO; the old 13× export was an unused fork.)
 
 // ---------------------------------------------------------------------------
 // Anti-roll bars & aero — stability without killing body motion

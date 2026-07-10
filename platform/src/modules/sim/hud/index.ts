@@ -3,9 +3,6 @@
  * client components). Consumed by src/components/sim and the /simulator route.
  */
 
-// Legacy tech-demo HUD (test track) — kept until the integrator retires it.
-export { SimHud } from "./SimHud";
-
 // 2026 lesson HUD
 export { HudStyles } from "./HudStyles";
 export { SpeedCard } from "./SpeedCard";
