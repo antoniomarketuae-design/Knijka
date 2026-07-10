@@ -315,7 +315,13 @@ export const CHASE_FOV = 44;
  * frame-fraction math at the new pose. y 0.74 ≈ 1.23 m above road — upright
  * SUV-ish seating per REF 2; z −0.18 puts the eye ~0.70 m behind the wheel
  * centre (real torso-to-wheel distance, not floating over the dash). */
-export const COCKPIT_EYE = { x: 0.34, y: 0.74, z: -0.18 } as const;
+/** INTERIM TUNE (founder screenshot REF 6): at (0.74, −0.18) + pitch −14° the
+ *  GLB's roof header ate ~25% of the frame top and the windshield became a
+ *  letterbox slit. Eye down to 0.70 (under the header line) and forward to
+ *  −0.10 (header subtends less), pitch relaxed to −8° → windshield ≈ 60%,
+ *  dash+wheel ≈ 37%, header grazes the top edge. Final numbers come from the
+ *  quality-gap lane-12 research (driving-sim cockpit-balance norms). */
+export const COCKPIT_EYE = { x: 0.34, y: 0.7, z: -0.1 } as const;
 /** Cockpit vertical FOV. History: 55 (doc 63) → 40 (QW2 GFOV calibration) →
  *  57 (founder contract, doc 70): at 40 the cabin was amputated — no wheel,
  *  no mirrors, no A-pillars, ~7% dash. 57 trades ~1.3× GFOV minification for
@@ -339,7 +345,7 @@ export const COCKPIT_FOV = 57;
  *   door mirror  (0.91, 0.46, 0.59): −20.3° → ~39% high, ~9% from left ✓
  *   sun visor    (y ≈ 0.93, z 0.55): +14.6° → grazes the top edge ✓
  * Net: interior fills the bottom ~46% of the frame — the doc-70 40–50% band. */
-export const COCKPIT_PITCH_BASE = -0.245; // ≈ −14°
+export const COCKPIT_PITCH_BASE = -0.14; // ≈ −8° (interim; was −14° — see COCKPIT_EYE note)
 /** Cockpit eye-position smoothing rate (1/s) — damps suspension tick. */
 export const COCKPIT_DAMPING = 25;
 
