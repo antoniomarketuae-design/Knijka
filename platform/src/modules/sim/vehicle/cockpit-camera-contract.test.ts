@@ -1,23 +1,44 @@
 // ============================================================================
 // COCKPIT CAMERA CONTRACT — automated acceptance test (doc 71 §4.9 / §6,
-// lane 12 `docs/simulation/quality-gap/12_cockpit_balance.md`).
+// lane 12 `docs/simulation/quality-gap/12_cockpit_balance.md`, REVISED per
+// the founder world-first directive of 2026-07-10).
+//
+// FOUNDER DIRECTIVE (2026-07-10): ≥65–70% of the cockpit frame must be world,
+// interior ≤~30–35%. Camera math proved the v1 interior GLB was the fault:
+// its visor/header line sat at chassis y≈0.71 (headliner 0.77) while the
+// raised eye is ABOVE the old glass top — the window could never exceed ~54%
+// (measured: 21% at the shipped pose). The ASSET was rebuilt
+// (tools/blender/hero_interior_v2.py: headliner y 0.857–0.885, glass-top
+// edge (0.850, z 0.16) above the frame-top ray, slim canopy A-pillars,
+// shaved cowl/binnacle, cluster tucked 2.5 cm lower) and the camera retuned:
+// pitch −5° (band −5…−7°), up-offset +0.05. New acceptance bands:
+//   cowl ≤ 0.33 (world ≥ ~67% of frame height), horizon 0.55–0.62,
+//   header ≥ 0.97 / out of frame.
 //
 // This test IS the contract. It rebuilds the shipped cockpit camera pose
 // (CameraRig's exact quaternion composition: FLIP_Y · pitch) as pure
 // projection math — no WebGL, no R3F — and projects the known interior-GLB
 // landmark points through the camera matrix, asserting the frame-composition
-// bands the founder accepted after rejecting both the hood cam AND the REF 6
-// letterbox. Any future camera tune must keep this green or CONSCIOUSLY
-// change the bands here, in the same commit, with a rationale.
+// bands. Any future camera tune must keep this green or CONSCIOUSLY change
+// the bands here, in the same commit, with a rationale.
 //
 // Landmark provenance (chassis-local: +X car-left, +Y up, +Z forward):
 //  - hotspot_mirror_left/right/rear, screen_cluster, steering_wheel: dumped
 //    from public/sim/vehicles/hero_interior.glb node transforms through the
-//    VitokCockpit mount (yaw-π, y −0.55). Wheel-rim top = wheel node
-//    (0.34, 0.30, 0.52) tilted 64.2° about X, rim radius 0.2045 m.
-//  - dash top / cowl (y 0.48, z 0.70): A3 interior audit (tuning.ts).
-//  - windshield glass base/top: VehicleRig's aperture-refit glass plane —
-//    centre (0, 0.66, 0.76), raked −0.62 rad, half-height 0.275 m.
+//    VitokCockpit mount (yaw-π, y −0.55 — UNCHANGED by the v2 rebuild).
+//    Wheel-rim top = wheel node (0.34, 0.30, 0.52) tilted 64.2° about X,
+//    rim radius 0.2045 m. screen_cluster dropped 2.5 cm in v2 → y 0.399.
+//  - dash top / cowl (y 0.48, z 0.70): the v2 shaved binnacle-hood cap line
+//    (blender bz ≤ 1.036 − (by−0.67)·0.24 → chassis y 0.482 at z 0.70).
+//  - windshield glass base (0.436, 0.92): VehicleRig's tint plane base —
+//    plane centre (0, 0.66, 0.76), raked −0.62 rad, half-height 0.275 m.
+//    The plane predates the v2 aperture; its base still sits sightline-
+//    adjacent to the cowl (≤0.02 of frame height above it).
+//  - glass top / header (0.850, 0.16): v2 header-strip front-bottom edge
+//    (blender by 0.16, bz 1.400) — capped by the GT-E exterior roofline
+//    (skin y 0.886 over the header, 0.907 peak), NOT the founder's ideal
+//    0.95–1.00, but above the frame-top ray at rest, which delivers the
+//    intent (header out of frame).
 //  - road plane y −0.49 (chassis centre sits ~0.49 m above the road).
 // ============================================================================
 
@@ -36,16 +57,16 @@ import {
 
 // --- Landmarks (see provenance above) ---------------------------------------
 const LANDMARKS = {
-  /** Dash-top / cowl line, sampled dead ahead of the camera. */
+  /** Dash-top / cowl line (v2 shaved hood cap), sampled dead ahead. */
   cowl: { x: COCKPIT_EYE.x, y: 0.48, z: 0.7 },
-  /** Windshield GLASS base — must be sightline-coincident with the cowl. */
+  /** Windshield tint-plane base — sightline-adjacent to the cowl. */
   glassBase: { x: COCKPIT_EYE.x, y: 0.436, z: 0.92 },
-  /** Windshield GLASS top = the roof-header line that letterboxed REF 6. */
-  header: { x: COCKPIT_EYE.x, y: 0.884, z: 0.6 },
+  /** v2 glass-top / header-strip front edge — must stay out of frame. */
+  header: { x: COCKPIT_EYE.x, y: 0.85, z: 0.16 },
   /** Steering-wheel rim top (12 o'clock). */
   wheelTop: { x: 0.34, y: 0.484, z: 0.431 },
-  /** Instrument-cluster screen centre (GLB screen_cluster). */
-  cluster: { x: 0.34, y: 0.424, z: 0.7106 },
+  /** Instrument-cluster screen centre (GLB screen_cluster, v2: −2.5 cm). */
+  cluster: { x: 0.34, y: 0.399, z: 0.7106 },
   /** Interior rear-view mirror glass centre (GLB hotspot_mirror_rear). */
   interiorMirror: { x: 0.0, y: 0.687, z: 0.575 },
   /** Left door-mirror glass centre (GLB hotspot_mirror_left). */
@@ -85,7 +106,7 @@ const f = Object.fromEntries(
   Object.entries(LANDMARKS).map(([k, p]) => [k, frameFraction(cam, p)]),
 ) as Record<keyof typeof LANDMARKS, { x: number; y: number }>;
 
-describe("cockpit camera pose (doc 71 §4.9 ruled numbers)", () => {
+describe("cockpit camera pose (founder world-first revision of doc 71 §4.9)", () => {
   it("ships vFOV 47 at the 16:9 reference aspect, under the hard ceiling", () => {
     expect(cockpitVFovForAspect(COCKPIT_ASPECT_REF)).toBeCloseTo(47, 6);
     expect(COCKPIT_FOV).toBe(47);
@@ -94,16 +115,17 @@ describe("cockpit camera pose (doc 71 §4.9 ruled numbers)", () => {
     expect((COCKPIT_HFOV_RAD * 180) / Math.PI).toBeCloseTo(75.41, 1);
   });
 
-  it("pitches 8° down, inside the lane-12 slider band (7–9°)", () => {
+  it("pitches 5° down, inside the founder band (5–7°)", () => {
     const pitchDeg = (-COCKPIT_PITCH_BASE * 180) / Math.PI;
-    expect(pitchDeg).toBeCloseTo(8, 6);
-    expect(pitchDeg).toBeGreaterThanOrEqual(7);
-    expect(pitchDeg).toBeLessThanOrEqual(9);
+    expect(pitchDeg).toBeCloseTo(5, 6);
+    expect(pitchDeg).toBeGreaterThanOrEqual(5);
+    expect(pitchDeg).toBeLessThanOrEqual(7);
   });
 
   it("sits at the design eye point + lane-12 offsets, inside their tolerances", () => {
     // aft −0.30…−0.45 (ruled −0.375), inboard +0.05…+0.15 (ruled +0.10),
-    // up 0…+0.05 (ruled +0.02, resolved to +0.01 against the GT-E GLB cowl).
+    // up 0…+0.05 — resolved to the +0.05 ceiling: the founder cowl cap
+    // (≤0.33) is unreachable from lower eye heights (see tuning.ts).
     expect(COCKPIT_CAM_OFFSET.aft).toBeGreaterThanOrEqual(0.3);
     expect(COCKPIT_CAM_OFFSET.aft).toBeLessThanOrEqual(0.45);
     expect(COCKPIT_CAM_OFFSET.inboard).toBeGreaterThanOrEqual(0.05);
@@ -113,26 +135,29 @@ describe("cockpit camera pose (doc 71 §4.9 ruled numbers)", () => {
   });
 });
 
-describe("frame composition bands at 16:9 (the doc 71 §6 acceptance rows)", () => {
-  it("cowl / dash-top line lands at 0.42–0.46 of frame height", () => {
-    expect(f.cowl.y).toBeGreaterThanOrEqual(0.42);
-    expect(f.cowl.y).toBeLessThanOrEqual(0.46);
+describe("frame composition bands at 16:9 (founder contract: world ≥65%)", () => {
+  it("cowl / dash-top line lands at 0.28–0.33 of frame height", () => {
+    // THE headline band: everything above the cowl line is world, so
+    // cowl ≤ 0.33 ⇔ window ≥ ~67% of frame height (header is out of frame).
+    expect(f.cowl.y).toBeGreaterThanOrEqual(0.28);
+    expect(f.cowl.y).toBeLessThanOrEqual(0.33);
   });
 
-  it("windshield glass base is sightline-coincident with the cowl", () => {
-    // The GT-E dash top slopes away exactly along the camera sightline — if
-    // these ever diverge, a landmark (or the GLB) moved.
-    expect(Math.abs(f.glassBase.y - f.cowl.y)).toBeLessThan(0.01);
+  it("windshield glass base stays sightline-adjacent to the cowl", () => {
+    // VehicleRig's tint plane predates the v2 aperture; its base must stay
+    // within 2% of frame height of the cowl line (v2 measured: +0.009) so
+    // no floating glass edge appears above the dash silhouette.
+    expect(Math.abs(f.glassBase.y - f.cowl.y)).toBeLessThan(0.02);
   });
 
-  it("horizon lands at 0.63–0.68 of frame height", () => {
-    expect(f.horizon.y).toBeGreaterThanOrEqual(0.63);
-    expect(f.horizon.y).toBeLessThanOrEqual(0.68);
+  it("horizon lands at 0.55–0.62 of frame height (founder band)", () => {
+    expect(f.horizon.y).toBeGreaterThanOrEqual(0.55);
+    expect(f.horizon.y).toBeLessThanOrEqual(0.62);
   });
 
-  it("road point 10 m ahead is visible at rows 0.50–0.56 (graded 10–100 m band)", () => {
-    expect(f.road10m.y).toBeGreaterThanOrEqual(0.5);
-    expect(f.road10m.y).toBeLessThanOrEqual(0.56);
+  it("road point 10 m ahead is visible at rows 0.42–0.50 (graded 10–100 m band)", () => {
+    expect(f.road10m.y).toBeGreaterThanOrEqual(0.42);
+    expect(f.road10m.y).toBeLessThanOrEqual(0.5);
     // …and it is world, not dash: strictly above the cowl line.
     expect(f.road10m.y).toBeGreaterThan(f.cowl.y);
   });
@@ -149,24 +174,26 @@ describe("frame composition bands at 16:9 (the doc 71 §6 acceptance rows)", () 
     expect(f.cluster.y).toBeLessThan(f.cowl.y);
   });
 
-  it("roof header intrudes at most ~8% of frame height (REF 6 regression guard)", () => {
-    expect(f.header.y).toBeGreaterThanOrEqual(0.92);
+  it("glass-top / header edge is at ≥0.97 — out of frame at rest", () => {
+    // Founder band: header ≥0.97 or out of frame. The v2 header sits above
+    // the frame-top ray (fy ≈ 1.003); transient G-pitch (≤~2°) may dip it to
+    // ~0.98 under hard acceleration, never into a letterbox.
+    expect(f.header.y).toBeGreaterThanOrEqual(0.97);
   });
 
-  it("interior mirror sits upper-right: clear of the graded road view, fully in frame", () => {
-    // CONSCIOUS BAND CHANGE vs doc 71 §6 (x∈[0.78,0.95], y∈[0.88,0.97]):
-    // lane 12's corner figure assumed (a) the vertical half-angle for the
-    // horizontal projection (an aspect slip — 17° right of axis in a 75.4°
-    // hFOV frame is fx 0.70, not 0.85) and (b) a mirror mounted at the
-    // windshield top like a real sedan. The GT-E GLB authors the glass at
-    // the car centreline near eye height (0, 0.687, 0.575), so from the
-    // ruled aft camera it geometrically CANNOT reach that corner — even at
-    // the tolerance-box extreme (aft −0.30, inboard +0.05) fx tops out at
-    // 0.75. Contract INTENT preserved as: right of centre, above the
-    // horizon line (clear of the graded 10–100 m road band), inside frame.
+  it("interior mirror sits right of the driven lane, clear of the graded road band", () => {
+    // CONSCIOUS BAND CHANGE vs lane 12 (upper-right corner) AND vs the
+    // pre-v2 test (above the horizon line): the GLB authors the mirror
+    // glass at the car centreline near eye height (0, 0.687, 0.575) and the
+    // v2 rebuild deliberately does NOT move it (hotspot proxies, MirrorRig
+    // RTT and glance grading all key off it). The raised +0.05 eye now
+    // looks marginally DOWN at the glass, so it projects just under the
+    // horizon (fy ≈ 0.57). Contract INTENT preserved as: right of the
+    // driver-ahead column (clear of the driven lane), above the 10 m road
+    // row (clear of the graded 10–100 m band dead ahead), fully in frame.
     expect(f.interiorMirror.x).toBeGreaterThanOrEqual(0.6);
     expect(f.interiorMirror.x).toBeLessThanOrEqual(0.95);
-    expect(f.interiorMirror.y).toBeGreaterThan(f.horizon.y);
+    expect(f.interiorMirror.y).toBeGreaterThan(f.road10m.y);
     expect(f.interiorMirror.y).toBeLessThanOrEqual(0.97);
   });
 

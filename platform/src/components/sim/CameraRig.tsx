@@ -49,19 +49,22 @@ const FOV_WIDEN_COCKPIT = 5;
 const FOV_DAMPING = 3;
 
 /**
- * Mirror-glance head turns (rad), derived from the FINAL doc-71 §4.9 pose:
- * camera COCKPIT_EYE (0.24, 0.67, −0.255) with the base view pitched
- * COCKPIT_PITCH_BASE (−8°) vs the door mirrors (±0.905, 0.455, 0.592) and
- * the interior mirror (0, 0.687, 0.575). yaw = atan2(Δx, Δz) (positive looks
- * toward car-left); pitch is measured relative to the PITCHED view axis
- * (glance rotation composes after the base pitch), i.e.
- * atan2(Δy, distXZ) − COCKPIT_PITCH_BASE. The mirrors are already in frame
- * at rest, so the turn centres the glass rather than the old exaggerated whip.
+ * Mirror-glance head turns (rad), derived from the doc-71 §4.9 pose as
+ * revised by the founder world-first directive (2026-07-10): camera
+ * COCKPIT_EYE (0.24, 0.71, −0.255) with the base view pitched
+ * COCKPIT_PITCH_BASE (−5°) vs the door mirrors (±0.905, 0.455, 0.592) and
+ * the interior mirror (0, 0.687, 0.575) — mirror positions UNCHANGED by the
+ * v2 interior rebuild; only the camera moved (up +0.05, pitch −8°→−5°).
+ * yaw = atan2(Δx, Δz) (positive looks toward car-left); pitch is measured
+ * relative to the PITCHED view axis (glance rotation composes after the
+ * base pitch), i.e. atan2(Δy, distXZ) − COCKPIT_PITCH_BASE. The mirrors are
+ * already in frame at rest, so the turn centres the glass rather than the
+ * old exaggerated whip.
  */
 const GLANCE_OFFSETS: Record<MirrorGlanceKind, { yaw: number; pitch: number }> = {
-  left: { yaw: 0.67, pitch: -0.06 },
-  right: { yaw: -0.93, pitch: -0.01 },
-  rear: { yaw: -0.28, pitch: 0.16 },
+  left: { yaw: 0.67, pitch: -0.15 },
+  right: { yaw: -0.93, pitch: -0.09 },
+  rear: { yaw: -0.28, pitch: 0.06 },
 };
 
 /**

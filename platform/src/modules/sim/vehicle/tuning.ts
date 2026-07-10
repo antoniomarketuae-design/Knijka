@@ -293,10 +293,14 @@ export const CALIBRATED_GFOV_DEG = Math.round(
  *  horizontal FOV (Hor+) and the calibration is aspect-independent. */
 export const CHASE_FOV = 44;
 
-// --- Cockpit camera contract (doc 71 §4.9 / lane 12 — FINAL numbers) --------
+// --- Cockpit camera contract (doc 71 §4.9 / lane 12, revised 2026-07-10) ----
 // History: hood cam (eye 0.66/z 0.12, FOV 40, level) → founder rejected;
 // REF 6 overshoot (eye 0.74/z −0.18, FOV 57, pitch −14°) → roof header
-// letterboxed the windshield, rejected; interim (0.70/−0.10, 57, −8°).
+// letterboxed the windshield, rejected; interim (0.70/−0.10, 57, −8°);
+// lane-12 final (up +0.01, pitch −8°) against the v1 interior → founder
+// world-first directive: the v1 GLB's glazing was the fault (window capped
+// at ~21% of frame height from the shipped camera), so the ASSET was rebuilt
+// (hero_interior_v2.py) and the pose retuned to up +0.05 / pitch −5°.
 // Lane-12 research ruling: the REF 2 (City Car Driving) look is a MODERATE
 // lens pulled BEHIND the driver's eye — vFOV 47 at ~0.375 m aft — never a
 // wide lens at the eyeball. The automated acceptance test
@@ -315,16 +319,16 @@ export const COCKPIT_DEP = { x: 0.34, y: 0.66, z: 0.12 } as const;
  * Camera offsets from the DEP (m), per the lane-12 ruling (doc 71 §4.9):
  * aft −0.375 (tolerance −0.30…−0.45) brings dash + both mirror sightlines
  * into a ~75° hFOV frame; inboard +0.10 (+0.05…+0.15) centres the windshield;
- * up +0.02 (0…+0.05) resolved to +0.01 against OUR GLB: the GT-E cowl sits
- * slightly higher relative to the authored eye than lane-12's generic sedan
- * (−11.3° vs −11°), so +0.02 left the cowl at frame 0.423 — 0.003 above the
- * contract floor; +0.01 centres it at 0.435. Within the ruled tolerance.
+ * up resolved to +0.05 (the ruled tolerance ceiling) with the v2 interior:
+ * the founder's world-first directive (window ≥65% of frame height, cowl
+ * ≤0.33) needs the eye at the top of the band — +0.05 puts the shaved GT-E
+ * cowl line at frame 0.327; anything lower leaves it above the 0.33 cap.
  */
-export const COCKPIT_CAM_OFFSET = { aft: 0.375, inboard: 0.1, up: 0.01 } as const;
+export const COCKPIT_CAM_OFFSET = { aft: 0.375, inboard: 0.1, up: 0.05 } as const;
 /**
  * Cockpit camera position, chassis-local = DEP + offsets: a seating position
  * pulled behind and slightly inside the driver's eye — not a hood cam, not
- * an eyeball cam. ~0.78 m behind the wheel rim plane, 1.16 m above road.
+ * an eyeball cam. ~0.78 m behind the wheel rim plane, 1.20 m above road.
  */
 export const COCKPIT_EYE = {
   x: COCKPIT_DEP.x - COCKPIT_CAM_OFFSET.inboard, // inboard = toward car centre
@@ -337,9 +341,10 @@ export const COCKPIT_EYE = {
  * amputated) → 57 (doc 70 overshoot) → 47 FINAL (lane 12): shipped cockpit
  * sims converge on 47–56 v on a single 16:9 screen (CCD ~50h/36v stock, ACC
  * players 50–56, BeamNG 55, Forza dash ~55); 47 ≈ 1.5–2× the true display
- * FOV — the comfort/accuracy sweet spot. A sedan windshield is only ~23° of
- * vertical angle: vFOV 47 + pitch 8° down + the aft offset is what yields
- * interior ≈ 44% / windshield ≈ 55% without a letterbox. On resize the
+ * FOV — the comfort/accuracy sweet spot. With the v2 canopy glazing (glass
+ * top above the frame-top ray), vFOV 47 + pitch 5° down + the aft offset
+ * yields interior ≈ 33% / window ≈ 67% of frame height (founder contract:
+ * world ≥65%, cowl ≤0.33). On resize the
  * HORIZONTAL FOV is held constant instead — see cockpitVFovForAspect().
  */
 export const COCKPIT_FOV = 47;
@@ -375,30 +380,38 @@ export function cockpitVFovForAspect(aspect: number): number {
   return Math.min(vfovDeg, COCKPIT_FOV_MAX);
 }
 /**
- * Constant downward camera pitch (rad, negative = look down): 8° exactly
- * (lane-12 ruling, slider band 7–9°). Every degree of down-pitch moves the
- * roof-header line ~2% of frame height toward the top edge at vFOV 47 — 8°
- * is what kills the REF 6 letterbox while keeping the horizon in the upper
- * third. Frame-fraction table at the shipped pose (COCKPIT_EYE
- * (0.24, 0.67, −0.255), vFOV 47, 16:9; fractions from bottom-left, computed
- * through three's projection in the acceptance test — landmarks chassis-local
- * from the GLB/hotspots):
- *   wheel top      (0.34, 0.484, 0.431): fy 0.36        (rim in frame) ✓
- *   cluster centre (0.34, 0.424, 0.711): fy 0.37        (readable) ✓
- *   dash top/cowl  (y 0.48, z 0.70):     fy 0.435       → interior = bottom ~44% ✓
- *     (the windshield GLASS base (0.436, 0.92) projects to the same line —
- *      the dash top slopes away exactly along the sightline)
- *   10 m road pt   (y −0.49, z 10):      fy 0.53        (10–100 m band clear) ✓
- *   horizon:                             fy 0.66 ✓
- *   int. mirror    (0.00, 0.687, 0.575): fx 0.69 fy 0.69 (upper-right, above
- *      horizon — the GLB authors the mirror at the car centreline near eye
- *      height, so it CANNOT reach lane-12's assumed corner; see test notes)
- *   door mirror L  (0.905, 0.455, 0.592): fx 0.005 fy 0.37 (glass at the left
+ * Constant downward camera pitch (rad, negative = look down): 5° (founder
+ * world-first directive, 2026-07-10, band −5…−7°; −5 keeps the horizon at
+ * 0.60, mid-band). History: −8° was tuned against the v1 interior whose
+ * headliner sat at chassis y 0.77 and whose visor/header line (y 0.71,
+ * z 0.46) capped the windshield at ~21% of frame height from the shipped
+ * camera — an ASSET fault, not a camera fault. The v2 interior
+ * (tools/blender/hero_interior_v2.py) raised the glazing: headliner
+ * y 0.857–0.885, glass-top/header edge (y 0.850, z 0.16) — above the
+ * frame-top ray at rest — long slim A-pillars, shaved cowl/binnacle. With
+ * the opening fixed, less down-pitch is needed and the window spans ≥65%.
+ * Frame-fraction table at the shipped pose (COCKPIT_EYE (0.24, 0.71,
+ * −0.255), vFOV 47, 16:9; fractions from bottom-left, computed through
+ * three's projection in the acceptance test — landmarks chassis-local from
+ * the v2 GLB/hotspots):
+ *   wheel top      (0.34, 0.484, 0.431): fy 0.23        (rim in frame) ✓
+ *   cluster centre (0.34, 0.399, 0.711): fy 0.24        (readable) ✓
+ *   dash top/cowl  (y 0.48, z 0.70):     fy 0.327       → world = top ~67% ✓
+ *     (the windshield GLASS base (0.436, 0.92) projects 0.009 above it —
+ *      the shaved cowl still slopes away along the sightline)
+ *   10 m road pt   (y −0.49, z 10):      fy 0.466       (10–100 m band clear) ✓
+ *   horizon:                             fy 0.60 ✓
+ *   int. mirror    (0.00, 0.687, 0.575): fx 0.69 fy 0.57 (right of the driven
+ *      lane, above the 10 m road row; the GLB authors the glass at the car
+ *      centreline near eye height, UNMOVED in v2 — the raised camera now
+ *      looks marginally down at it, so it sits just under the horizon line)
+ *   door mirror L  (0.905, 0.455, 0.592): fx 0.003 fy 0.26 (glass at the left
  *      frame edge — lane 12: "~37° left from the aft camera") ✓
- *   glass top/roof header (0.884, 0.600): fy 0.966 → header intrusion 3.4%,
- *      well under the ≤8% contract cap (visor line 0.93/0.55 is off-frame) ✓
+ *   glass top/header (y 0.850, z 0.16):  fy 1.003 → header OUT of frame at
+ *      rest (founder band: ≥0.97/out of frame); the old REF 6 letterbox and
+ *      the v1 visor line are gone with the v1 low header ✓
  */
-export const COCKPIT_PITCH_BASE = -(8 * Math.PI) / 180;
+export const COCKPIT_PITCH_BASE = -(5 * Math.PI) / 180;
 /** Cockpit eye-position smoothing rate (1/s) — damps suspension tick. */
 export const COCKPIT_DAMPING = 25;
 
