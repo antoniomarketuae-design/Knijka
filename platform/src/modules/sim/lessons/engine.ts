@@ -33,12 +33,14 @@ import {
   type PreDriveStepId,
 } from "../procedures";
 import { createEvalState, parseObjectiveParams, stepObjective } from "./objectives";
+import { applyEscalations, type PenaltyEscalation } from "./escalation";
 import type {
   LessonPhase,
   LessonResult,
   LessonSessionState,
   ObjectiveProgress,
   ObjectiveOutcome,
+  TeachMoment,
 } from "./types";
 
 // ---------------------------------------------------------------------------
@@ -80,6 +82,8 @@ export function createLessonSession(
     currentObjectiveIndex: 0,
     events: [],
     scenarioEncounters: {},
+    penaltyEscalations: [],
+    lastTeachMomentAtSec: null,
     lastT: 0,
     endedAtSec: null,
   };
@@ -92,7 +96,24 @@ export function createLessonSession(
 export interface LessonStepResult {
   state: LessonSessionState;
   hudEvents: HudEvent[];
+  /**
+   * A9: first-encounter teach moments the shell must PAUSE for (freeze
+   * physics, show the mini-lesson card, resume on acknowledgment). Additive:
+   * only applyTick produces them; several in one result merge into a single
+   * pause (the shell queues the cards).
+   */
+  teachMoments?: TeachMoment[];
 }
+
+/**
+ * A9 rate limit: minimum sim-seconds between two teach-moment PAUSES. Teach
+ * moments landing on the SAME tick still all emit (they merge into one pause);
+ * a later one inside this window downgrades to the classic non-blocking
+ * lesson toast, so a mistake cluster never chains modal interruptions. Sim
+ * time freezes during the pause itself, so the window is measured in actual
+ * driving time.
+ */
+export const TEACH_PAUSE_MIN_GAP_S = 15;
 
 /** Map rule-engine output onto the HUD event contract (toasts). */
 function toHudEvents(events: ReadonlyArray<RuleEvent>): HudEvent[] {
@@ -192,12 +213,16 @@ export function applyTick(prev: LessonSessionState, tick: SimTick): LessonStepRe
 
   const { state: rules, events: ruleEvents } = reduceTick(prev.rules, tick);
 
-  // Coach the violations: teach-first-then-grade. A first, teachable mistake is
-  // shown live as a lesson (with its law citation) but does NOT count toward the
-  // score; repeats — and any dangerous/terminating error — are graded.
+  // Coach the violations: teach-first-then-grade. A first, teachable mistake
+  // PAUSES the sim with a mini-lesson card (A9, doc 65 §5) and does NOT count
+  // toward the score; repeats — and any dangerous/terminating error — are
+  // graded, repeats harder (escalation ×1.5/×2.0 on the training score).
   let encounters = prev.scenarioEncounters;
+  let escalations = prev.penaltyEscalations;
+  let lastTeachAt = prev.lastTeachMomentAtSec;
   const hudEvents: HudEvent[] = [];
   const scoredEvents: ScorableEvent[] = [];
+  const teachMoments: TeachMoment[] = [];
   for (const e of ruleEvents) {
     if (e.kind === "commendation") {
       hudEvents.push({ kind: "commendation", titleBg: e.titleBg });
@@ -211,6 +236,12 @@ export function applyTick(prev: LessonSessionState, tick: SimTick): LessonStepRe
     });
     encounters = step.encounters;
     if (step.decision.scored) {
+      // Graded — QW7 explaining toast, deliberately NON-blocking. This covers
+      // every repeat AND every опасна/terminating mistake: a safety event
+      // (red light run, collision course, missed yield) must never pop a
+      // modal mid-drive — the student may be mid-braking/evasive maneuver,
+      // and interrupting the handling would teach the wrong reflex. The
+      // pause-card treatment is reserved for first-encounter teach moments.
       hudEvents.push({
         kind: "violation",
         titleBg: e.titleBg,
@@ -220,7 +251,48 @@ export function applyTick(prev: LessonSessionState, tick: SimTick): LessonStepRe
         lawRef: e.lawRef,
       });
       scoredEvents.push(e);
+      if (step.decision.penaltyMultiplier > 1) {
+        // Repeat mistake — record the escalation; buildLessonResult folds it
+        // into the effective (training) score. Official points stay as-is.
+        const rec: PenaltyEscalation = {
+          code: e.code,
+          t: e.t,
+          multiplier: step.decision.penaltyMultiplier,
+        };
+        escalations = [...escalations, rec];
+      }
+    } else if (step.decision.mode === "teach") {
+      // First teachable encounter → pause + card, rate-limited: same-tick
+      // moments all emit (the shell merges them into ONE pause with queued
+      // cards); a moment inside the min-gap window after the previous pause
+      // downgrades to the classic lesson toast instead of chaining pauses.
+      const canPause =
+        lastTeachAt === null ||
+        lastTeachAt === tick.t ||
+        tick.t - lastTeachAt >= TEACH_PAUSE_MIN_GAP_S;
+      if (canPause) {
+        teachMoments.push({
+          code: e.code,
+          scenarioId: step.decision.scenarioId,
+          titleBg: e.titleBg,
+          explanationBg: e.explanationBg,
+          lawRef: e.lawRef,
+          severity: e.severityClass,
+          points: e.points,
+          t: e.t,
+        });
+        lastTeachAt = tick.t;
+      } else {
+        hudEvents.push({
+          kind: "lesson",
+          titleBg: e.titleBg,
+          explanationBg: e.explanationBg,
+          lawRef: e.lawRef,
+        });
+      }
     } else {
+      // learn-only scenarios stay ambient: surfaced as a toast, never scored,
+      // never interrupting.
       hudEvents.push({
         kind: "lesson",
         titleBg: e.titleBg,
@@ -288,9 +360,12 @@ export function applyTick(prev: LessonSessionState, tick: SimTick): LessonStepRe
       endedAtSec,
       events: scoredEvents.length > 0 ? [...prev.events, ...scoredEvents] : prev.events,
       scenarioEncounters: encounters,
+      penaltyEscalations: escalations,
+      lastTeachMomentAtSec: lastTeachAt,
       lastT: Math.max(prev.lastT, tick.t),
     },
     hudEvents,
+    teachMoments,
   };
 }
 
@@ -335,6 +410,14 @@ export function buildLessonResult(state: LessonSessionState): LessonResult {
   const completedAll = objectives.every((o) => o.done);
   const aborted = state.phase === "aborted";
 
+  // A9: fold the coach's repeat escalations into the training-layer score.
+  // The official verdict below stays on official base points (see
+  // escalation.ts header for the rationale).
+  const { effectiveTotalPoints, escalated } = applyEscalations(
+    summary.mistakes,
+    state.penaltyEscalations,
+  );
+
   return {
     lessonId: state.lesson.id,
     summary,
@@ -343,6 +426,8 @@ export function buildLessonResult(state: LessonSessionState): LessonResult {
     aborted,
     passed: summary.passed && completedAll && !aborted,
     score: summary.score.totalPoints,
+    effectiveScore: effectiveTotalPoints,
+    escalations: escalated,
     durationSec: state.endedAtSec ?? state.lastT,
   };
 }

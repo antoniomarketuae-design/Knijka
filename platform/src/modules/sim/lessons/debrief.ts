@@ -152,16 +152,32 @@ export function buildDebrief(
   }
 
   // -- mistakes ---------------------------------------------------------------
+  // A9: repeat mistakes graded harder (×1.5/×2.0) — name that per group and
+  // show the training total, keeping the official score clearly separate.
+  const maxEscalationByCode = new Map<string, number>();
+  for (const esc of result.escalations) {
+    const prev = maxEscalationByCode.get(esc.code) ?? 1;
+    if (esc.multiplier > prev) maxEscalationByCode.set(esc.code, esc.multiplier);
+  }
   const groups = groupMistakes(summary.mistakes);
   if (groups.length > 0) {
     lines.push("");
     lines.push("Най-важните грешки (подредени по тежест):");
     for (const g of groups.slice(0, MAX_MISTAKE_LINES)) {
       const times = g.count > 1 ? ` ×${g.count}` : "";
-      lines.push(`• ${g.titleBg}${times} — ${g.severityLabel}, ${g.totalPoints} т. (${g.lawRef})`);
+      const escMult = maxEscalationByCode.get(g.code);
+      const escNote = escMult !== undefined ? ` — повторна грешка ×${fmtPoints(escMult)}` : "";
+      lines.push(
+        `• ${g.titleBg}${times} — ${g.severityLabel}, ${g.totalPoints} т. (${g.lawRef})${escNote}`,
+      );
     }
     if (groups.length > MAX_MISTAKE_LINES) {
       lines.push(`• …и още ${groups.length - MAX_MISTAKE_LINES} вида нарушения — виж пълния списък в резултата.`);
+    }
+    if (result.effectiveScore > result.score) {
+      lines.push(
+        `• Тренировъчен резултат: ${fmtPoints(result.effectiveScore)} т. — повторените грешки тежат повече (×1.5/×2.0). Официалният резултат остава ${result.score} т.`,
+      );
     }
   }
 
@@ -198,6 +214,11 @@ export function buildDebrief(
 // ---------------------------------------------------------------------------
 // helpers
 // ---------------------------------------------------------------------------
+
+/** Escalated values can be half-points (3 × 1.5 = 4.5) — print them cleanly. */
+function fmtPoints(n: number): string {
+  return Number.isInteger(n) ? String(n) : n.toFixed(1);
+}
 
 /**
  * Coaching line comparing this attempt's penalty points to the driver's own

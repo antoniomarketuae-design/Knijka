@@ -8,6 +8,13 @@
  * titles and law refs always come from the catalog, so a tampered client can
  * at worst lie about *which* events happened, never about what they cost.
  * (Full anti-cheat = server-side replay of SimTicks; out of scope for v1.)
+ *
+ * A9 escalation over the wire: a violation ref MAY carry the coach's repeat
+ * multiplier (`penaltyMultiplier`). It is validated against the fixed
+ * escalation set (×1.5/×2.0 only) and applied ONLY to the training-layer
+ * effective score — the official score/verdict is always rebuilt from catalog
+ * base points, so a tampered multiplier can at worst hide/show the „повторна
+ * грешка" annotation, never lower the official result.
  */
 
 import type { LessonSpec } from "../contracts";
@@ -22,6 +29,11 @@ import {
   type ViolationCode,
 } from "../rules";
 import { PRE_DRIVE_STEPS, type PreDriveStepId } from "../procedures";
+import {
+  applyEscalations,
+  isEscalationMultiplier,
+  type PenaltyEscalation,
+} from "./escalation";
 import { lessonById } from "./specs";
 import type { LessonResult, ObjectiveOutcome } from "./types";
 
@@ -34,6 +46,11 @@ export interface WireRuleEvent {
   code: string;
   t: number;
   detail?: string;
+  /**
+   * A9: the coach's repeat escalation for this violation (×1.5 or ×2.0 only;
+   * ×1.0 is implicit/absent). Affects ONLY the effective training score.
+   */
+  penaltyMultiplier?: number;
 }
 
 export interface WireObjectiveOutcome {
@@ -70,10 +87,25 @@ const MAX_MICRO_QUIZZES = 20;
 // Client side: serialize
 // ---------------------------------------------------------------------------
 
-export function serializeRuleEvents(events: ReadonlyArray<ScorableEvent>): WireRuleEvent[] {
+export function serializeRuleEvents(
+  events: ReadonlyArray<ScorableEvent>,
+  escalations: ReadonlyArray<PenaltyEscalation> = [],
+): WireRuleEvent[] {
+  // (code, t) → pending multipliers, consumed once each (mirrors escalation.ts).
+  const pending = new Map<string, number[]>();
+  for (const esc of escalations) {
+    const key = `${esc.code}@${esc.t}`;
+    const list = pending.get(key);
+    if (list) list.push(esc.multiplier);
+    else pending.set(key, [esc.multiplier]);
+  }
   return events.slice(0, MAX_EVENTS).map((e) => {
     const wire: WireRuleEvent = { kind: e.kind, code: e.code, t: e.t };
-    if (e.kind === "violation" && e.detail !== undefined) wire.detail = e.detail;
+    if (e.kind === "violation") {
+      if (e.detail !== undefined) wire.detail = e.detail;
+      const multiplier = pending.get(`${e.code}@${e.t}`)?.shift();
+      if (multiplier !== undefined && multiplier > 1) wire.penaltyMultiplier = multiplier;
+    }
     return wire;
   });
 }
@@ -108,6 +140,12 @@ export function parseFinishLessonWire(value: unknown): FinishLessonWire | null {
     const wire: WireRuleEvent = { kind: e.kind, code: e.code, t: e.t };
     if (typeof e.detail === "string" && e.detail.length <= MAX_DETAIL_LEN) {
       wire.detail = e.detail;
+    }
+    if (e.penaltyMultiplier !== undefined) {
+      // Strict: only the coach's escalation ladder exists (×1.5/×2.0), and
+      // only violations can escalate — anything else is not our payload.
+      if (e.kind !== "violation" || !isEscalationMultiplier(e.penaltyMultiplier)) return null;
+      wire.penaltyMultiplier = e.penaltyMultiplier;
     }
     ruleEvents.push(wire);
   }
@@ -246,6 +284,16 @@ export function gradeFinishWire(input: unknown): GradedFinishWire {
   const summary = buildSessionSummary(events);
   const completedAll = objectives.every((o) => o.done);
 
+  // A9: fold the (validated) wire escalations into the training-layer score.
+  // Official score/verdict stay on catalog base points — see file header.
+  const escalations: PenaltyEscalation[] = [];
+  for (const e of wire.ruleEvents) {
+    if (e.kind === "violation" && e.penaltyMultiplier !== undefined) {
+      escalations.push({ code: e.code, t: e.t, multiplier: e.penaltyMultiplier });
+    }
+  }
+  const { effectiveTotalPoints, escalated } = applyEscalations(summary.mistakes, escalations);
+
   const result: LessonResult = {
     lessonId: lesson.id,
     summary,
@@ -254,6 +302,8 @@ export function gradeFinishWire(input: unknown): GradedFinishWire {
     aborted: wire.aborted,
     passed: summary.passed && completedAll && !wire.aborted,
     score: summary.score.totalPoints,
+    effectiveScore: effectiveTotalPoints,
+    escalations: escalated,
     durationSec: (wire.finishedAtMs - wire.startedAtMs) / 1000,
   };
 

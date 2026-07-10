@@ -46,6 +46,7 @@ import {
   type MicroQuizQuestion,
   type QuizFrequency,
   type QuizTriggerState,
+  type TeachMoment,
   type TriggeredQuiz,
 } from "@/modules/sim/lessons";
 import {
@@ -64,6 +65,7 @@ import {
 } from "@/app/(dashboard)/simulator/micro-quiz-actions";
 import { MicroQuizOverlay } from "./MicroQuizOverlay";
 import { SceneSlot } from "./SceneSlot";
+import { TeachMomentOverlay } from "./TeachMomentOverlay";
 import {
   MICRO_QUIZ_FREQUENCIES,
   MICRO_QUIZ_STORAGE_KEY,
@@ -363,6 +365,18 @@ export function LessonPlayShell({
     setActiveQuiz(null); // resume the drive
   }, []);
 
+  // -- A9: teach-moment pause queue ---------------------------------------------
+  // First-encounter teachable mistakes PAUSE the sim with a mini-lesson card
+  // (doc 65 §5). The engine rate-limits pauses (TEACH_PAUSE_MIN_GAP_S) and a
+  // same-batch cluster lands here as several moments at once — they merge
+  // into ONE pause: the overlay pages through the queue, and the drive
+  // resumes only when the last card is acknowledged. Physics freezing uses
+  // the same `paused` mechanism as the micro-quiz overlay.
+  const [teachQueue, setTeachQueue] = useState<TeachMoment[]>([]);
+  const handleTeachAcknowledged = useCallback(() => {
+    setTeachQueue((q) => q.slice(1));
+  }, []);
+
   /** Session clock: prefer the runtime's tick time; wall clock before ticks flow. */
   const nowSec = useCallback((): number => {
     const t = lastTickRef.current?.t ?? 0;
@@ -384,7 +398,10 @@ export function LessonPlayShell({
         startedAtMs: startedAtMsRef.current ?? Date.now(),
         finishedAtMs: Date.now(),
         aborted: r.aborted,
-        ruleEvents: serializeRuleEvents(state.events),
+        // A9: escalation multipliers ride along so the authoritative server
+        // grade/debrief carries the same „повторна грешка ×1.5" annotations
+        // (validated server-side; official score stays catalog-rebuilt).
+        ruleEvents: serializeRuleEvents(state.events, state.penaltyEscalations),
         objectives: r.objectives.map((o) => ({
           id: o.id,
           done: o.done,
@@ -401,7 +418,7 @@ export function LessonPlayShell({
     (tick: SimTick) => {
       const prev = sessionRef.current;
       if (prev.phase === "completed" || prev.phase === "aborted") return;
-      const { state, hudEvents } = applyTick(prev, tick);
+      const { state, hudEvents, teachMoments } = applyTick(prev, tick);
       sessionRef.current = state;
       lastTickRef.current = tick;
 
@@ -417,11 +434,23 @@ export function LessonPlayShell({
         }
       }
 
+      // A9 teach moments → pause + card. Appending (not replacing) merges a
+      // cluster — and the odd frame that slips in before `paused` propagates
+      // to the scene — into the one already-open pause session.
+      if (teachMoments !== undefined && teachMoments.length > 0) {
+        setTeachQueue((q) => [...q, ...teachMoments]);
+      }
+
       // Contextual micro-quiz: feed the SAME tick the rules saw to the pure
-      // trigger. Only while driving and not already quizzing; the rate limit +
-      // the pause (which stops onTick) prevent stacking. When one fires we
-      // surface it as React state → overlay + pause.
-      if (state.phase === "driving" && activeQuiz === null && quizTriggerRef.current) {
+      // trigger. Only while driving and not already quizzing or teaching; the
+      // rate limit + the pause (which stops onTick) prevent stacking. When
+      // one fires we surface it as React state → overlay + pause.
+      if (
+        state.phase === "driving" &&
+        activeQuiz === null &&
+        teachQueue.length === 0 &&
+        quizTriggerRef.current
+      ) {
         const q = observeQuizTick(quizTriggerRef.current, tick);
         quizTriggerRef.current = q.state;
         if (q.quiz) setActiveQuiz(q.quiz);
@@ -431,7 +460,7 @@ export function LessonPlayShell({
       // finished on this very frame → grade and persist (finalize is guarded).
       if (state.phase === "completed") finalize(state);
     },
-    [push, finalize, activeQuiz],
+    [push, finalize, activeQuiz, teachQueue],
   );
 
   // A2: the ONLY sink for pre-drive completions. Performed steps arrive from
@@ -534,9 +563,11 @@ export function LessonPlayShell({
     lastPreDriveStepAtRef.current = 0;
     blockedToastAtSecRef.current = Number.NEGATIVE_INFINITY;
     // Fresh micro-quiz session: reset the tally + rebuild the trigger from the
-    // already-loaded bank.
+    // already-loaded bank. Teach-moment queue starts empty too (the fresh
+    // engine state re-teaches first encounters from scratch).
     quizStatsRef.current = { total: 0, correct: 0 };
     setActiveQuiz(null);
+    setTeachQueue([]);
     quizTriggerRef.current =
       quizBankRef.current.length > 0
         ? createQuizTriggerState(quizFreqRef.current, quizBankRef.current)
@@ -617,12 +648,16 @@ export function LessonPlayShell({
           <SceneSlot
             lesson={lesson}
             quality={quality}
-            paused={ended || activeQuiz !== null}
+            paused={ended || activeQuiz !== null || teachQueue.length > 0}
             driveLocked={snap.driveLocked && !ended}
             preDriveHighlightStepId={
               // Instruction mode only: pulse the pending step's hotspot(s).
               preDriveMode === "instruction" && !ended ? snap.preDriveNextStepId : null
             }
+            // A7: snapshotOf stores currentObjectiveIndex + 1 — undo the +1 so
+            // the scene's in-world route guidance gets the engine's 0-based
+            // index (=== objectives.length once all are done → guidance hides).
+            activeObjectiveIndex={snap.objectiveIndex - 1}
             onTick={handleTick}
             onPreDriveStep={handlePreDriveStep}
             onBlockedDriveAttempt={handleBlockedDriveAttempt}
@@ -701,6 +736,17 @@ export function LessonPlayShell({
             quiz={activeQuiz}
             onSubmit={submitMicroQuizAnswer}
             onDone={handleQuizDone}
+          />
+        ) : null}
+
+        {/* A9 teach moment — pause + mini-lesson card. A quiz that fired first
+            keeps priority; the teach card shows right after it closes (both
+            hold `paused`, so no drive time passes in between). */}
+        {teachQueue.length > 0 && !activeQuiz && !ended ? (
+          <TeachMomentOverlay
+            moment={teachQueue[0]}
+            remaining={teachQueue.length - 1}
+            onAcknowledge={handleTeachAcknowledged}
           />
         ) : null}
 

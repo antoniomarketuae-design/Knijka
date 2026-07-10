@@ -22,9 +22,20 @@ export {
   createLessonSession,
   finishSession,
   isDriveLocked,
+  TEACH_PAUSE_MIN_GAP_S,
   type LessonEngineOptions,
   type LessonStepResult,
 } from "./engine";
+
+// Repeat-penalty escalation (A9 — pure, shared by client fold + server grading)
+export {
+  ESCALATION_MULTIPLIERS,
+  applyEscalations,
+  isEscalationMultiplier,
+  type AppliedEscalations,
+  type EscalatedMistake,
+  type PenaltyEscalation,
+} from "./escalation";
 
 // Objective evaluators (exposed for tests/tooling; engine drives them)
 export { createEvalState, parseObjectiveParams, stepObjective } from "./objectives";
@@ -85,4 +96,5 @@ export type {
   ObjectiveProgress,
   ObjectiveStatus,
   SimLessonGamificationEvent,
+  TeachMoment,
 } from "./types";

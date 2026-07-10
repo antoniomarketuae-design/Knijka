@@ -64,6 +64,10 @@ export interface SceneSlotProps {
   /** A2 instruction mode: the pending procedure step whose cockpit hotspot(s)
    *  should pulse, or null (practice/assess/driving — no highlights). */
   preDriveHighlightStepId: PreDriveStepId | null;
+  /** A7 route guidance: 0-based index of the ACTIVE objective from the lesson
+   *  engine (≥ objectives.length once all are done). The scene renders the
+   *  in-world ghost route / turn arrows / objective marker from it. */
+  activeObjectiveIndex: number;
   /** Authoritative frame feed → lesson engine (rules + objectives + HUD). */
   onTick: (tick: SimTick) => void;
   /** A2: a pre-drive step was PERFORMED on a real control — the scene's

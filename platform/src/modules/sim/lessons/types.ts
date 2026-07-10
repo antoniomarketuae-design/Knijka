@@ -10,8 +10,15 @@
  */
 
 import type { LessonObjective, LessonSpec } from "../contracts";
-import type { RuleEngineState, ScorableEvent, SessionSummary, Vec2 } from "../rules";
+import type {
+  RuleEngineState,
+  ScorableEvent,
+  SessionSummary,
+  SeverityClass,
+  Vec2,
+} from "../rules";
 import type { PreDriveMachine } from "../procedures";
+import type { EscalatedMistake, PenaltyEscalation } from "./escalation";
 
 // ---------------------------------------------------------------------------
 // Objective parameters (typed views over LessonObjective.params)
@@ -162,6 +169,35 @@ export interface ObjectiveProgress {
 }
 
 // ---------------------------------------------------------------------------
+// Teach moment (A9 — pause + card instead of a drive-by toast)
+// ---------------------------------------------------------------------------
+
+/**
+ * A first, teachable encounter the shell must PAUSE for (doc 65 §5): freeze
+ * physics, show the mini-lesson card with the authored law-cited WHY, resume
+ * on acknowledgment. Emitted by applyTick for teach-mode coach decisions only
+ * — опасна/terminating mistakes never become teach moments (safety floor:
+ * they grade from the first encounter and keep the non-blocking toast, so a
+ * modal never interrupts evasive handling mid-incident).
+ */
+export interface TeachMoment {
+  /** Rule-catalog violation code that triggered the teachable moment. */
+  code: string;
+  /** Scenario event id it maps to (null → coached by its own code). */
+  scenarioId: string | null;
+  titleBg: string;
+  /** Authored explanation from the violation catalog (ADR-002: no free text). */
+  explanationBg: string;
+  /** Legal basis, e.g. "ЗДвП чл. 21" — rendered as the law-ref chip. */
+  lawRef?: string;
+  /** Official class + points a REPEAT would cost — the card states the stake. */
+  severity: SeverityClass;
+  points: number;
+  /** Session time of the mistake, seconds. */
+  t: number;
+}
+
+// ---------------------------------------------------------------------------
 // Lesson session state (the pure reducer state)
 // ---------------------------------------------------------------------------
 
@@ -183,6 +219,17 @@ export interface LessonSessionState {
   events: ScorableEvent[];
   /** How many times each scenario has been encountered — drives teach-first-then-grade. */
   scenarioEncounters: Record<string, number>;
+  /**
+   * Scored repeats the coach graded above ×1.0, in order (A9). Folded into the
+   * result's effective score by buildLessonResult; the base `events` stay
+   * official/catalog-fixed.
+   */
+  penaltyEscalations: PenaltyEscalation[];
+  /**
+   * Session time the last teach-moment PAUSE was emitted (null = none yet) —
+   * the rate limit that keeps a mistake cluster from chaining pauses.
+   */
+  lastTeachMomentAtSec: number | null;
   /** Session time of the last processed tick, seconds. */
   lastT: number;
   endedAtSec: number | null;
@@ -237,5 +284,14 @@ export interface LessonResult {
   passed: boolean;
   /** Total penalty points (lower is better) — stored in SimSession.score. */
   score: number;
+  /**
+   * Training-layer total with repeat escalation applied (×1.5/×2.0 per doc 65;
+   * A9). Always ≥ `score`; fractional halves possible (3 × 1.5 = 4.5). The
+   * official verdict (`passed`/`summary`) is NEVER derived from this — the
+   * exam pass rule stays on official base points.
+   */
+  effectiveScore: number;
+  /** The repeat mistakes that graded harder — debrief shows „повторна ×1.5". */
+  escalations: EscalatedMistake[];
   durationSec: number;
 }
