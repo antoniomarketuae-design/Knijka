@@ -76,6 +76,7 @@ import { CameraRig, type CameraMode } from "./CameraRig";
 import { VehicleRig, type VehicleSpawn } from "./VehicleRig";
 import { createVehicleSample } from "./vehicleSample";
 import { buildMinimapPolylines } from "./lessonMinimap";
+import { RouteGuidance } from "./RouteGuidance";
 import type { QualityPreset } from "./lesson-ui/types";
 
 // Minimal structural mirrors of the district shapes we read here — the runtime
@@ -181,6 +182,10 @@ export interface LessonSceneProps {
   driveLocked: boolean;
   /** A2 instruction mode: pending step whose cockpit hotspot(s) pulse. */
   preDriveHighlightStepId: PreDriveStepId | null;
+  /** A7 route guidance: 0-based index of the active objective (from the
+   *  lesson engine); ≥ objectives.length once all are done. Drives the
+   *  in-world ghost route / turn arrow / objective marker. */
+  activeObjectiveIndex: number;
   onTick: (tick: SimTick) => void;
   /** A2: a step was PERFORMED on a real control (observer-resolved). */
   onPreDriveStep: (stepId: PreDriveStepId, tSec: number) => void;
@@ -308,6 +313,7 @@ function ReadyScene({
   physicsPaused,
   driveLocked,
   preDriveHighlightStepId,
+  activeObjectiveIndex,
   onBlockedDriveAttempt,
   onPreDriveStep,
   onMinimap,
@@ -329,6 +335,16 @@ function ReadyScene({
   const isNight = timeOfDay === "night";
   const level = toLevel(quality);
   const spawn = useMemo(() => spawnPose(lesson, spawnPoints), [lesson, spawnPoints]);
+  // A7: district-space spawn pose — the start of the FIRST guidance route
+  // (before the physics sample goes live). Inverse of the spawnPose mapping.
+  const guidanceSpawnStart = useMemo(
+    () => ({
+      x: spawn.x,
+      y: -spawn.z,
+      headingDeg: 180 - (spawn.yawRad * 180) / Math.PI,
+    }),
+    [spawn],
+  );
 
   // Shared mutable channels (refs → zero re-renders at frame rate).
   const telemetryRef = useRef(createTelemetry());
@@ -540,6 +556,18 @@ function ReadyScene({
             />
           </Physics>
         </Suspense>
+        {/* A7 in-world route guidance: ghost route ribbon + turn chevron +
+            objective marker. Free drive (no objectives) has nothing to
+            follow, so the layer never mounts there (doc 68 A7 / audit B9). */}
+        {lesson.objectives.length > 0 ? (
+          <RouteGuidance
+            district={district}
+            lesson={lesson}
+            activeObjectiveIndex={activeObjectiveIndex}
+            sampleRef={sampleRef}
+            spawnStart={guidanceSpawnStart}
+          />
+        ) : null}
         <CameraRig
           chassisGroupRef={chassisGroupRef}
           simRef={simRef}
