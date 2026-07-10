@@ -1,7 +1,12 @@
 import { describe, expect, it } from "vitest";
-import type { LessonObjective } from "../../contracts";
-import { createEvalState, parseObjectiveParams, stepObjective } from "../objectives";
-import type { ObjectiveEvalState, ObjectiveParams } from "../types";
+import type { LessonObjective, StagedEventOutcome } from "../../contracts";
+import {
+  createEvalState,
+  parseObjectiveParams,
+  stepObjective,
+  type ObjectiveContext,
+} from "../objectives";
+import type { ObjectiveDetail, ObjectiveEvalState, ObjectiveParams } from "../types";
 import { makeTick, tickWithEvents } from "./fixtures";
 
 function parsed(kind: LessonObjective["kind"], params: Record<string, unknown>): ObjectiveParams {
@@ -9,20 +14,26 @@ function parsed(kind: LessonObjective["kind"], params: Record<string, unknown>):
 }
 
 /** Run a tick sequence through one objective, returning done + final state. */
-function run(params: ObjectiveParams, ticks: ReturnType<typeof makeTick>[]) {
+function run(
+  params: ObjectiveParams,
+  ticks: ReturnType<typeof makeTick>[],
+  ctx?: ObjectiveContext,
+) {
   let evalState: ObjectiveEvalState = createEvalState(params);
   let done = false;
   let progress = 0;
+  let detail: ObjectiveDetail | undefined;
   for (const tick of ticks) {
-    const r = stepObjective(params, evalState, tick);
+    const r = stepObjective(params, evalState, tick, ctx);
     evalState = r.evalState;
     progress = r.progress;
+    detail = r.detail;
     if (r.done) {
       done = true;
       break;
     }
   }
-  return { done, progress, evalState };
+  return { done, progress, evalState, detail };
 }
 
 describe("parseObjectiveParams", () => {
@@ -39,6 +50,43 @@ describe("parseObjectiveParams", () => {
   it("applies smoothStop defaults", () => {
     const p = parsed("completeManeuver", { maneuver: "smoothStop" });
     expect(p).toMatchObject({ maneuver: "smoothStop", minApproachKmh: 20, maxDecelMs2: 3.5 });
+  });
+
+  it("A10: emergencyStop without a stagedEventId is a spec error (no speed-only arming)", () => {
+    expect(() => parsed("completeManeuver", { maneuver: "emergencyStop" })).toThrow(/stagedEventId/);
+    expect(() =>
+      parsed("completeManeuver", { maneuver: "emergencyStop", minApproachKmh: 40, minDecelMs2: 5 }),
+    ).toThrow(/stagedEventId/);
+  });
+
+  it("A10: parkInBay without a bay rect is a spec error (no coordinate-free parks)", () => {
+    expect(() => parsed("completeManeuver", { maneuver: "parkInBay", holdSec: 1.5 })).toThrow(/bay/);
+    expect(() =>
+      parsed("completeManeuver", { maneuver: "parkInBay", bay: { x: 0, y: 0, headingDeg: 0, widthM: 0, lengthM: 6 } }),
+    ).toThrow(/bay/);
+  });
+
+  it("A10: parkInBay applies tolerance defaults", () => {
+    const p = parsed("completeManeuver", {
+      maneuver: "parkInBay",
+      bay: { x: 1, y: 2, headingDeg: 45, widthM: 3, lengthM: 6.6 },
+    });
+    expect(p).toMatchObject({ maneuver: "parkInBay", holdSec: 1.5, centerTolM: 0.5, headingTolDeg: 10 });
+  });
+
+  it("A10: requireRedMet is trafficLight-only (a stop sign would deadlock it)", () => {
+    expect(() =>
+      parsed("passSignal", { nodeId: "n1", x: 0, y: 0, radiusM: 10, control: "stopSign", requireRedMet: true }),
+    ).toThrow(/requireRedMet/);
+    const p = parsed("passSignal", {
+      nodeId: "n1",
+      x: 0,
+      y: 0,
+      radiusM: 10,
+      control: "trafficLight",
+      requireRedMet: true,
+    });
+    expect(p).toMatchObject({ kind: "passSignal", requireRedMet: true });
   });
 });
 
@@ -109,6 +157,90 @@ describe("passSignal", () => {
   });
 });
 
+describe("passSignal / requireRedMet (A10 — L2 must meet a red)", () => {
+  const gated = parsed("passSignal", {
+    nodeId: "n5997970086",
+    x: 400,
+    y: 200,
+    radiusM: 30,
+    control: "trafficLight",
+    requireRedMet: true,
+  });
+  const at = (x: number) => ({ position: { x, y: 200 } });
+  const crossGreen = (t: number) =>
+    tickWithEvents(t, [{ kind: "stopLineCrossed", control: "trafficLight", lightState: "green" }], {
+      ...at(400),
+      speedKmh: 20,
+    });
+
+  it("D4 cheat path: a greens-only crossing no longer completes the gated objective", () => {
+    const r = run(gated, [makeTick({ t: 1, ...at(360), speedKmh: 40 }), crossGreen(2)]);
+    expect(r.done).toBe(false);
+    expect(r.progress).toBe(0.5); // crossed, but the run never met a red
+    expect(r.detail).toMatchObject({ kind: "passSignal", redMetHere: false, redsMetInRun: 0 });
+  });
+
+  it("completes after stopping at the light, then proceeding on green (waited out a red)", () => {
+    const r = run(gated, [
+      makeTick({ t: 1, ...at(360), speedKmh: 40 }),
+      makeTick({ t: 2, ...at(395), speedKmh: 0 }), // full stop at the line
+      crossGreen(30),
+    ]);
+    expect(r.done).toBe(true);
+    expect(r.detail).toMatchObject({ kind: "passSignal", redMetHere: true });
+  });
+
+  it("crossing ON red also counts as a met red (progression; the rule engine grades it)", () => {
+    const r = run(gated, [
+      tickWithEvents(2, [{ kind: "stopLineCrossed", control: "trafficLight", lightState: "red" }], {
+        ...at(400),
+        speedKmh: 30,
+      }),
+    ]);
+    expect(r.done).toBe(true);
+    expect(r.detail).toMatchObject({ redMetHere: true });
+  });
+
+  it("a red met earlier in the run (ctx.redsMetInRun) satisfies the gate", () => {
+    const ctx: ObjectiveContext = { stagedOutcomes: [], redsMetInRun: 1 };
+    const r = run(gated, [crossGreen(2)], ctx);
+    expect(r.done).toBe(true);
+  });
+
+  it("a stop OUTSIDE the zone certifies nothing", () => {
+    const r = run(gated, [
+      makeTick({ t: 1, ...at(300), speedKmh: 0 }), // stop 100 m away
+      makeTick({ t: 2, ...at(380), speedKmh: 30 }),
+      crossGreen(3),
+    ]);
+    expect(r.done).toBe(false);
+  });
+
+  it("the in-zone stop is visit-scoped: leaving the zone forgets it", () => {
+    const r = run(gated, [
+      makeTick({ t: 1, ...at(395), speedKmh: 0 }), // stopped at the line…
+      makeTick({ t: 2, ...at(300), speedKmh: 40 }), // …then drove away
+      makeTick({ t: 3, ...at(390), speedKmh: 30 }), // returned, no stop this visit
+      crossGreen(4),
+    ]);
+    expect(r.done).toBe(false);
+  });
+
+  it("stays open after a lucky green until a later red is met at the same junction", () => {
+    let evalState: ObjectiveEvalState = createEvalState(gated);
+    const ctx: ObjectiveContext = { stagedOutcomes: [], redsMetInRun: 0 };
+    // Lucky green crossing…
+    let r = stepObjective(gated, evalState, crossGreen(1), ctx);
+    evalState = r.evalState;
+    expect(r.done).toBe(false);
+    // …loop back, stop at the line, wait the red out, cross on green.
+    r = stepObjective(gated, evalState, makeTick({ t: 40, ...at(396), speedKmh: 0 }), ctx);
+    evalState = r.evalState;
+    r = stepObjective(gated, evalState, crossGreen(70), ctx);
+    expect(r.done).toBe(true);
+  });
+});
+
 describe("driveDistance", () => {
   const params = parsed("driveDistance", { meters: 100 });
 
@@ -171,90 +303,228 @@ describe("completeManeuver / smoothStop", () => {
   });
 });
 
-describe("completeManeuver / emergencyStop", () => {
+describe("completeManeuver / emergencyStop (A10 — stimulus-locked)", () => {
   const params = parsed("completeManeuver", {
     maneuver: "emergencyStop",
-    minApproachKmh: 40,
-    minDecelMs2: 5,
+    stagedEventId: "l5-braking-lead-car",
   });
   const profile = (pairs: Array<[number, number]>) =>
     pairs.map(([t, v]) => makeTick({ t, speedKmh: v }));
-
-  it("applies defaults", () => {
-    const p = parsed("completeManeuver", { maneuver: "emergencyStop" });
-    expect(p).toMatchObject({ maneuver: "emergencyStop", minApproachKmh: 40, minDecelMs2: 5 });
+  const outcome = (over: Partial<StagedEventOutcome> = {}): StagedEventOutcome => ({
+    eventId: "l5-braking-lead-car",
+    kind: "brakingLeadCar",
+    success: true,
+    detail: "stoppedInTime",
+    tSec: 12,
+    reactionTimeSec: 0.6,
+    stopGapM: 4.2,
+    approachSpeedKmh: 48,
+    ...over,
+  });
+  const ctxWith = (...outcomes: StagedEventOutcome[]): ObjectiveContext => ({
+    stagedOutcomes: outcomes,
+    redsMetInRun: 0,
   });
 
-  it("completes on a firm stop from speed (peak decel ≥ 5 m/s²)", () => {
-    // 45 km/h → 0 in 1 s ≈ 12.5 m/s² — a decisive emergency brake.
+  it("D4 cheat path: a hard stop with NO stimulus never completes it", () => {
+    // The exact profile that used to pass (45 km/h → 0 in 1 s ≈ 12.5 m/s²).
     const r = run(params, profile([[0, 45], [1, 0]]));
+    expect(r.done).toBe(false);
+    expect(r.progress).toBe(0);
+    expect(r.detail).toMatchObject({ kind: "emergencyStop", outcome: "pending", band: null });
+
+    // Nor does ANY speed theatrics without an outcome, ever.
+    const wild = run(params, profile([[0, 80], [1, 0], [2, 70], [3, 0], [4, 90], [5, 0]]));
+    expect(wild.done).toBe(false);
+  });
+
+  it("completes from a successful staged outcome, with the reaction time banded", () => {
+    const r = run(params, [makeTick({ t: 13, speedKmh: 0 })], ctxWith(outcome()));
+    expect(r.done).toBe(true);
+    expect(r.detail).toMatchObject({
+      kind: "emergencyStop",
+      outcome: "stoppedInTime",
+      reactionTimeSec: 0.6,
+      band: "otlichen",
+      stopGapM: 4.2,
+    });
+  });
+
+  it("bands the reaction time: <0.8 отличен, <1.2 добър, else бавен", () => {
+    const band = (rt: number) =>
+      run(params, [makeTick({ t: 13 })], ctxWith(outcome({ reactionTimeSec: rt }))).detail;
+    expect(band(0.79)).toMatchObject({ band: "otlichen" });
+    expect(band(0.8)).toMatchObject({ band: "dobur" });
+    expect(band(1.19)).toMatchObject({ band: "dobur" });
+    expect(band(1.2)).toMatchObject({ band: "baven" });
+    expect(band(2.4)).toMatchObject({ band: "baven" });
+  });
+
+  it("fails (stays incomplete) on hitLeadCar and passedWithoutStopping", () => {
+    const hit = run(
+      params,
+      [makeTick({ t: 13 })],
+      ctxWith(outcome({ success: false, detail: "hitLeadCar", stopGapM: 0 })),
+    );
+    expect(hit.done).toBe(false);
+    expect(hit.progress).toBe(0.5); // stimulus fired and was measured — stop not earned
+    expect(hit.detail).toMatchObject({ kind: "emergencyStop", outcome: "hitLeadCar" });
+
+    const swerved = run(
+      params,
+      [makeTick({ t: 13 })],
+      ctxWith(outcome({ success: false, detail: "passedWithoutStopping" })),
+    );
+    expect(swerved.done).toBe(false);
+    expect(swerved.detail).toMatchObject({ outcome: "passedWithoutStopping" });
+  });
+
+  it("a restaged retry can still complete it (last outcome for the event wins)", () => {
+    const r = run(
+      params,
+      [makeTick({ t: 30 })],
+      ctxWith(
+        outcome({ success: false, detail: "hitLeadCar", tSec: 12 }),
+        outcome({ tSec: 28, reactionTimeSec: 1.0 }),
+      ),
+    );
+    expect(r.done).toBe(true);
+    expect(r.detail).toMatchObject({ band: "dobur" });
+  });
+
+  it("ignores outcomes of other staged events", () => {
+    const other = outcome({ eventId: "l2-priority-from-right" });
+    const r = run(params, [makeTick({ t: 13 })], ctxWith(other));
+    expect(r.done).toBe(false);
+  });
+});
+
+describe("completeManeuver / parkInBay (A10 — bay-locked)", () => {
+  // Bay centred at the origin, axis due north: inside ⇔ |x| ≤ 1.5, |y| ≤ 3.3.
+  const params = parsed("completeManeuver", {
+    maneuver: "parkInBay",
+    holdSec: 1.5,
+    bay: { x: 0, y: 0, headingDeg: 0, widthM: 3.0, lengthM: 6.6 },
+  });
+  /** Tick at (x, y) with the given speed/gear/heading (defaults: aligned north). */
+  const at = (
+    t: number,
+    x: number,
+    y: number,
+    over: Partial<ReturnType<typeof makeTick>> = {},
+  ) => makeTick({ t, position: { x, y }, headingDeg: 0, ...over });
+
+  it("D4 cheat path: any-reverse + held-stop ANYWHERE no longer completes it", () => {
+    // The exact sequence that used to pass — but 30 m from the bay.
+    const r = run(params, [
+      at(0, 30, 0, { speedKmh: 8, gear: -1 }),
+      at(1, 30, 0, { speedKmh: 3, gear: -1 }),
+      at(2, 30, 0, { speedKmh: 0, gear: -1 }),
+      at(3, 30, 0, { speedKmh: 0, gear: 0 }),
+      at(3.6, 30, 0, { speedKmh: 0, gear: 0 }),
+    ]);
+    expect(r.done).toBe(false);
+    expect(r.detail).toMatchObject({ kind: "parkInBay", inBay: false, attempts: 0 });
+  });
+
+  it("completes only at rest inside the bay: reversed in, centred, aligned, held", () => {
+    const r = run(params, [
+      at(0, 0, 10, { speedKmh: 15 }), // pulled ahead of the bay
+      at(1, 0.4, 6, { speedKmh: 6, gear: -1 }), // reversing, in the maneuver zone
+      at(2, 0.3, 2, { speedKmh: 4, gear: -1 }), // entering the bay (attempt 1)
+      at(3, 0.1, 0.1, { speedKmh: 0, gear: -1 }), // at rest, centred — hold starts
+      at(4, 0.1, 0.1, { speedKmh: 0, gear: 0 }), // held 1 s — not yet
+      at(4.6, 0.1, 0.1, { speedKmh: 0, gear: 0 }), // held 1.6 s ≥ 1.5 s => done
+    ]);
+    expect(r.done).toBe(true);
+    expect(r.detail).toMatchObject({ kind: "parkInBay", attempts: 1, inBay: true });
+    expect(r.detail?.kind === "parkInBay" && r.detail.alignment).toBe("centered");
+  });
+
+  it("a stop inside the bay WITHOUT reverse does not complete (forward nose-in)", () => {
+    const r = run(params, [
+      at(0, 0, -10, { speedKmh: 20, gear: 2 }), // driving up in D
+      at(1, 0, -2, { speedKmh: 8, gear: 1 }), // nosing in forward
+      at(2, 0, 0, { speedKmh: 0, gear: 1 }),
+      at(4, 0, 0, { speedKmh: 0, gear: 1 }), // held long enough — still not a park
+    ]);
+    expect(r.done).toBe(false);
+  });
+
+  it("reverse banked far from the bay does not count (maneuver zone)", () => {
+    const r = run(params, [
+      at(0, 0, -40, { speedKmh: 5, gear: -1 }), // reverse 40 m away — no credit
+      at(1, 0, -10, { speedKmh: 20, gear: 2 }),
+      at(2, 0, 0, { speedKmh: 0, gear: 1 }), // forward into the bay
+      at(4, 0, 0, { speedKmh: 0, gear: 1 }),
+    ]);
+    expect(r.done).toBe(false);
+  });
+
+  it("a sloppy park (off-centre or crooked) stays open and reports its quality", () => {
+    const offCentre = run(params, [
+      at(0, 1.0, 2.0, { speedKmh: 4, gear: -1 }), // inside, but 1 m off-axis
+      at(1, 1.0, 2.0, { speedKmh: 0, gear: -1 }),
+      at(3, 1.0, 2.0, { speedKmh: 0, gear: 0 }),
+    ]);
+    expect(offCentre.done).toBe(false);
+    expect(offCentre.detail?.kind === "parkInBay" && offCentre.detail.alignment).toBe("sloppy");
+
+    const crooked = run(params, [
+      at(0, 0, 0, { speedKmh: 4, gear: -1, headingDeg: 25 }),
+      at(1, 0, 0, { speedKmh: 0, gear: -1, headingDeg: 25 }),
+      at(3, 0, 0, { speedKmh: 0, gear: 0, headingDeg: 25 }),
+    ]);
+    expect(crooked.done).toBe(false);
+    expect(crooked.detail?.kind === "parkInBay" && crooked.detail.alignment).toBe("sloppy");
+  });
+
+  it("heading is folded to the bay axis (parked facing either way is aligned)", () => {
+    const r = run(params, [
+      at(0, 0, 2, { speedKmh: 4, gear: -1, headingDeg: 184 }),
+      at(1, 0, 0.1, { speedKmh: 0, gear: -1, headingDeg: 184 }),
+      at(3, 0, 0.1, { speedKmh: 0, gear: 0, headingDeg: 184 }),
+    ]);
     expect(r.done).toBe(true);
   });
 
-  it("rejects a gentle coast to a halt and re-arms", () => {
-    // 45 km/h → 0 over 5 s ≈ 2.5 m/s² — too soft to be an emergency stop.
-    const soft = run(params, profile([[0, 45], [1, 36], [2, 27], [3, 18], [4, 9], [5, 0]]));
-    expect(soft.done).toBe(false);
+  it("rolling resets the hold clock", () => {
+    const r = run(params, [
+      at(0, 0, 1, { speedKmh: 4, gear: -1 }),
+      at(1, 0, 0.2, { speedKmh: 0, gear: -1 }), // stop begins
+      at(1.5, 0, 0.3, { speedKmh: 6, gear: -1 }), // rolled — clock resets
+      at(2, 0, 0.2, { speedKmh: 0, gear: -1 }), // new stop begins at t=2
+      at(3, 0, 0.2, { speedKmh: 0, gear: 0 }), // only 1 s held — not done
+    ]);
+    expect(r.done).toBe(false);
+    expect(r.progress).toBeCloseTo(0.9, 5); // in bay, at rest, aligned — holding
+  });
 
-    // Re-armed: accelerate again and brake hard => done.
-    let evalState = soft.evalState;
-    let done = false;
-    for (const tick of profile([[6, 42], [7, 0]])) {
+  it("leaving the bay opens a NEW attempt and revokes the reverse credit", () => {
+    let evalState: ObjectiveEvalState = createEvalState(params);
+    const feed = (tick: ReturnType<typeof makeTick>) => {
       const r = stepObjective(params, evalState, tick);
       evalState = r.evalState;
-      if (r.done) done = true;
-    }
-    expect(done).toBe(true);
-  });
+      return r;
+    };
+    feed(at(0, 0, 8, { speedKmh: 10 }));
+    feed(at(1, 0, 2, { speedKmh: 5, gear: -1 })); // attempt 1 (reversed in)
+    feed(at(2, 0, 8, { speedKmh: 10, gear: 1 })); // pulled out — attempt over
+    feed(at(3, 0, 2, { speedKmh: 5, gear: 1 })); // attempt 2, forward this time
+    const r = feed(at(5, 0, 0, { speedKmh: 0, gear: 1 }));
+    expect(r.detail).toMatchObject({ kind: "parkInBay", attempts: 2 });
+    expect(r.done).toBe(false); // reverse credit from attempt 1 was revoked
 
-  it("does not complete if approach speed was never reached", () => {
-    const r = run(params, profile([[0, 20], [1, 0]]));
-    expect(r.done).toBe(false);
-  });
-});
-
-describe("completeManeuver / parkInBay", () => {
-  const params = parsed("completeManeuver", { maneuver: "parkInBay", holdSec: 1.5 });
-
-  it("applies the holdSec default", () => {
-    const p = parsed("completeManeuver", { maneuver: "parkInBay" });
-    expect(p).toMatchObject({ maneuver: "parkInBay", holdSec: 1.5 });
-  });
-
-  it("completes after reverse gear + a held full stop", () => {
-    const r = run(params, [
-      makeTick({ t: 0, speedKmh: 8, gear: -1 }), // reversing into the bay
-      makeTick({ t: 1, speedKmh: 3, gear: -1 }),
-      makeTick({ t: 2, speedKmh: 0, gear: -1 }), // stop begins at t=2
-      makeTick({ t: 3, speedKmh: 0, gear: 0 }), // held 1 s — not yet
-      makeTick({ t: 3.6, speedKmh: 0, gear: 0 }), // held 1.6 s ≥ 1.5 s => done
-    ]);
-    expect(r.done).toBe(true);
-  });
-
-  it("does not complete without reverse gear", () => {
-    const r = run(params, [
-      makeTick({ t: 0, speedKmh: 5, gear: 1 }),
-      makeTick({ t: 1, speedKmh: 0, gear: 1 }),
-      makeTick({ t: 3, speedKmh: 0, gear: 1 }),
-    ]);
-    expect(r.done).toBe(false);
-  });
-
-  it("resets the stop clock if the car rolls again", () => {
-    const r = run(params, [
-      makeTick({ t: 0, speedKmh: 4, gear: -1 }),
-      makeTick({ t: 1, speedKmh: 0, gear: -1 }), // stop begins
-      makeTick({ t: 1.5, speedKmh: 6, gear: -1 }), // rolled again — clock resets
-      makeTick({ t: 2, speedKmh: 0, gear: -1 }), // new stop begins at t=2
-      makeTick({ t: 3, speedKmh: 0, gear: 0 }), // only 1 s held — not done
-    ]);
-    expect(r.done).toBe(false);
-    expect(r.progress).toBeCloseTo(0.75, 5); // reverse used + currently stopped
+    // Reversing INSIDE the bay to adjust restores the credit for attempt 2.
+    feed(at(6, 0, 0.5, { speedKmh: 3, gear: -1 }));
+    feed(at(7, 0, 0.2, { speedKmh: 0, gear: 0 }));
+    const done = feed(at(8.6, 0, 0.2, { speedKmh: 0, gear: 0 }));
+    expect(done.done).toBe(true);
+    expect(done.detail).toMatchObject({ attempts: 2 });
   });
 });
 
-describe("completeManeuver / roundabout", () => {
+describe("completeManeuver / roundabout (A10 — exit under right indicator)", () => {
   const params = parsed("completeManeuver", {
     maneuver: "roundabout",
     x: -38,
@@ -262,6 +532,12 @@ describe("completeManeuver / roundabout", () => {
     enterRadiusM: 26,
     exitRadiusM: 45,
   });
+  const approach = makeTick({ t: 0, position: { x: 20, y: -343 } }); // 58 m out
+  const inRing = makeTick({ t: 1, position: { x: -30, y: -330 } }); // ~15 m
+  const exiting = (t: number, indicator: "off" | "left" | "right") =>
+    makeTick({ t, position: { x: -38, y: -300 }, indicator }); // 43 m — annulus
+  const out = (t: number, indicator: "off" | "left" | "right" = "off") =>
+    makeTick({ t, position: { x: -38, y: -290 }, indicator }); // 53 m — outside
 
   it("requires entering before exiting counts", () => {
     // Approaching from 100 m away — outside exitRadius means nothing yet.
@@ -269,13 +545,54 @@ describe("completeManeuver / roundabout", () => {
     expect(r.done).toBe(false);
   });
 
-  it("completes after enter → exit", () => {
-    const r = run(params, [
-      makeTick({ t: 0, position: { x: 20, y: -343 } }), // approach (58 m out)
-      makeTick({ t: 1, position: { x: -30, y: -330 } }), // inside ring (~15 m)
-      makeTick({ t: 2, position: { x: -38, y: -300 } }), // exiting (43 m) — not yet
-      makeTick({ t: 3, position: { x: -38, y: -290 } }), // 53 m out — exited
-    ]);
+  it("completes after enter → exit with the right indicator in the exit window", () => {
+    const r = run(params, [approach, inRing, exiting(2, "right"), out(3)]);
     expect(r.done).toBe(true);
+  });
+
+  it("the indicator on the exit-crossing tick itself also counts", () => {
+    const r = run(params, [approach, inRing, out(2, "right")]);
+    expect(r.done).toBe(true);
+  });
+
+  it("D4 cheat path: enter → exit WITHOUT the signal no longer completes, and voids the traversal", () => {
+    let evalState: ObjectiveEvalState = createEvalState(params);
+    let done = false;
+    for (const tick of [approach, inRing, exiting(2, "off"), out(3, "off")]) {
+      const r = stepObjective(params, evalState, tick);
+      evalState = r.evalState;
+      done ||= r.done;
+    }
+    expect(done).toBe(false);
+    // Traversal voided: signaling right NOW, already outside, earns nothing…
+    let r = stepObjective(params, evalState, out(4, "right"));
+    evalState = r.evalState;
+    expect(r.done).toBe(false);
+    expect(r.detail).toMatchObject({ kind: "roundabout", entered: false });
+    // …the student must go around again and exit properly.
+    for (const tick of [
+      makeTick({ t: 5, position: { x: -30, y: -330 } }),
+      makeTick({ t: 6, position: { x: -38, y: -300 }, indicator: "right" }),
+    ]) {
+      r = stepObjective(params, evalState, tick);
+      evalState = r.evalState;
+    }
+    r = stepObjective(params, evalState, out(7));
+    expect(r.done).toBe(true);
+  });
+
+  it("signaling only on the APPROACH (before entering) earns nothing", () => {
+    const signaledApproach = makeTick({
+      t: 0,
+      position: { x: -8, y: -343 }, // 30 m out — inside the annulus, not entered
+      indicator: "right",
+    });
+    const r = run(params, [signaledApproach, inRing, exiting(2, "off"), out(3)]);
+    expect(r.done).toBe(false);
+  });
+
+  it("a LEFT indicator (or none) in the exit window does not count", () => {
+    const r = run(params, [approach, inRing, exiting(2, "left"), out(3)]);
+    expect(r.done).toBe(false);
   });
 });

@@ -45,7 +45,18 @@ export {
 } from "./escalation";
 
 // Objective evaluators (exposed for tests/tooling; engine drives them)
-export { createEvalState, parseObjectiveParams, stepObjective } from "./objectives";
+export {
+  createEvalState,
+  parseObjectiveParams,
+  stepObjective,
+  PARK_CENTER_TOL_M,
+  PARK_HEADING_TOL_DEG,
+  PARK_MANEUVER_ZONE_M,
+  REACTION_BAND_EXCELLENT_MAX_S,
+  REACTION_BAND_GOOD_MAX_S,
+  REACTION_BAND_LABELS_BG,
+  type ObjectiveContext,
+} from "./objectives";
 
 // Debrief (template v1 — AI tutor seam documented in debrief.ts)
 export { buildDebrief, type DebriefContext, type DebriefOutput } from "./debrief";
@@ -98,10 +109,13 @@ export type {
   LessonPhase,
   LessonResult,
   LessonSessionState,
+  ObjectiveDetail,
   ObjectiveOutcome,
   ObjectiveParams,
   ObjectiveProgress,
   ObjectiveStatus,
+  ParkAlignment,
+  ReactionBand,
   SimLessonGamificationEvent,
   TeachMoment,
 } from "./types";

@@ -13,19 +13,34 @@
  *  - L2: district-v1.json has no stop-sign data — l2's stop-controlled
  *    objective expects the world to place a Б2 „Спри!" sign + stop line at node
  *    n331942490 (383.17, 65.76) and emit stopLineCrossed{control:"stopSign"}.
- *  - L5/L7: the emergencyStop and parkInBay maneuvers are COORDINATE-FREE (like
- *    L1's smoothStop) — they read only speed/gear from SimTick, so they need no
- *    world geometry. The RENDER side is now authored here (doc 68 A5): L5
- *    carries a `hazard` ball-dart-out stimulus (TrafficLayer draws/animates it;
- *    the A8 orchestrator will own the trigger) and L7 carries a `parkingBay`
- *    rect (the world markings builder paints it via LESSON_PARKING_BAYS).
- *    Scoring stays geometry-independent until A10 hardens the objectives.
+ *  - L5/L7 (A10 hardened): emergencyStop is STIMULUS-LOCKED — it grades from
+ *    the l5-braking-lead-car StagedEventOutcome (stop without collision;
+ *    reaction time banded), not from a speed profile. parkInBay is BAY-LOCKED
+ *    — it completes only at rest inside the painted bay rect (same values as
+ *    `parkingBay`, single-sourced via L7_PARKING_BAY), aligned and via
+ *    reverse. L5's `hazard` ball-dart-out remains the render-side stimulus
+ *    (TrafficLayer draws it; the A8 orchestrator flips it with the lead-car
+ *    slam).
  *  - L6: environment.timeOfDay "night" flips SimTick.isNight, so the rule engine
  *    expects headlights on (HEADLIGHTS_OFF_AT_NIGHT). The world must render
  *    night lighting and set isNight on every tick for this lesson.
  */
 
 import type { LessonSpec, ParkingBaySpec } from "../contracts";
+
+/**
+ * L7's marked bay — single source for the WORLD paint (LessonSpec.parkingBay
+ * → LESSON_PARKING_BAYS → markings builder) and the GRADED rect (l7-park
+ * objective params.bay, A10): what the student sees painted is exactly what
+ * the evaluator measures against.
+ */
+const L7_PARKING_BAY: ParkingBaySpec = {
+  x: 681.26,
+  y: -199.54,
+  headingDeg: 67.3,
+  widthM: 3.0,
+  lengthM: 6.6,
+};
 
 export const LESSONS: readonly LessonSpec[] = [
   {
@@ -166,6 +181,20 @@ export const LESSONS: readonly LessonSpec[] = [
           y: 275.44,
           radiusM: 30,
           control: "trafficLight",
+          // A10 (audit D4): the L2 run must include at least one MET red —
+          // a full stop at a red followed by proceeding on green (or a
+          // crossing on red, graded separately) at either light of the
+          // route. Lucking greens leaves this final objective open.
+          // FEASIBILITY (verified against runtime/signals.ts SIGNAL_TIMING):
+          // every signal group cycles green 20 s / yellow 3 s / redYellow
+          // 1 s / red 26 s in a fixed 50 s cycle — red is up 52% of the
+          // time, and from any arrival phase a red arrives within ≤ 24 s.
+          // A student who crossed both lights on green simply stops at this
+          // line on re-approach (or waits before crossing) and meets a red
+          // within half a cycle — the gate can never deadlock. The staged
+          // l2-priority-from-right hold at the Б2 junction further staggers
+          // arrival phase, making an all-green luck run rarer to begin with.
+          requireRedMet: true,
         },
       },
     ],
@@ -258,6 +287,10 @@ export const LESSONS: readonly LessonSpec[] = [
         titleBg: "Премини през кръговото и излез от него",
         kind: "completeManeuver",
         // rb-1 ring radius is 19.83 m — enter within 26 m, exit beyond 45 m.
+        // A10: exiting also requires the RIGHT indicator in the exit window
+        // (the „влез с десен мигач на излизане" promise above) — an
+        // unsignaled exit voids the traversal and the student goes around
+        // again. Enforced by the roundabout evaluator itself.
         params: {
           maneuver: "roundabout",
           x: -38.03,
@@ -400,8 +433,13 @@ export const LESSONS: readonly LessonSpec[] = [
         id: "l5-emergency-stop",
         titleBg: "Спри аварийно — рязко и докрай",
         kind: "completeManeuver",
-        // Reach ≥ 40 km/h, then brake firmly (peak ≥ 5 m/s² ≈ 0.5 g) to a halt.
-        params: { maneuver: "emergencyStop", minApproachKmh: 40, minDecelMs2: 5 },
+        // A10 (audit D4): STIMULUS-LOCKED — completes only from the
+        // l5-braking-lead-car StagedEventOutcome above: a full stop without
+        // hitting the lead car ("stoppedInTime"); the measured stimulus →
+        // brake-onset reaction time is banded (<0.8 s отличен / <1.2 s
+        // добър / else бавен) into the objective detail. A hard stop with
+        // no stimulus present no longer counts for anything.
+        params: { maneuver: "emergencyStop", stagedEventId: "l5-braking-lead-car" },
       },
     ],
   },
@@ -457,7 +495,7 @@ export const LESSONS: readonly LessonSpec[] = [
     // inside the 8.125 m scaled carriageway half-width (edge e519275131.0,
     // road heading 67.3° there). The world paints it as a white U — side line
     // toward the road + both end lines; the curb closes the box.
-    parkingBay: { x: 681.26, y: -199.54, headingDeg: 67.3, widthM: 3.0, lengthM: 6.6 },
+    parkingBay: L7_PARKING_BAY,
     objectives: [
       {
         id: "l7-approach",
@@ -469,7 +507,14 @@ export const LESSONS: readonly LessonSpec[] = [
         id: "l7-park",
         titleBg: "Паркирай на заден ход и спри напълно",
         kind: "completeManeuver",
-        params: { maneuver: "parkInBay", holdSec: 1.5 },
+        // A10 (audit D4): BAY-LOCKED — at rest INSIDE the painted rect
+        // (same L7_PARKING_BAY the world paints), centre within 0.5 m,
+        // heading within 10° of the bay axis, reverse used near the bay,
+        // stop held 1.5 s. Any-reverse-anywhere no longer completes it.
+        // Tolerances are the evaluator defaults (PARK_CENTER_TOL_M /
+        // PARK_HEADING_TOL_DEG in objectives.ts); attempts + alignment
+        // quality surface in the objective detail for the debrief.
+        params: { maneuver: "parkInBay", holdSec: 1.5, bay: L7_PARKING_BAY },
       },
     ],
   },

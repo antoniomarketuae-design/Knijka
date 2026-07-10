@@ -9,7 +9,12 @@
  * is the only impure seam and is injectable, like every other module store.
  */
 
-import type { LessonObjective, LessonSpec, StagedEventOutcome } from "../contracts";
+import type {
+  LessonObjective,
+  LessonSpec,
+  ParkingBaySpec,
+  StagedEventOutcome,
+} from "../contracts";
 import type {
   RuleEngineState,
   ScorableEvent,
@@ -50,6 +55,18 @@ export interface PassSignalParams {
   /** How close to the node a stopLineCrossed event must occur to count. */
   radiusM: number;
   control: "trafficLight" | "stopSign";
+  /**
+   * A10 (trafficLight only): the objective completes only if the RUN has met
+   * at least one red — either this objective (or an earlier passSignal
+   * objective, via ObjectiveContext.redsMetInRun) observed a full stop inside
+   * its zone followed by a green-light crossing (waiting out a red), or a
+   * crossing ON red (met the hard way; the rule engine grades that
+   * separately). Guards against a greens-only luck run "passing" L2 without
+   * the student ever handling a red. The signal cycle guarantees feasibility:
+   * every light shows red 26 s of every 50 s (runtime SIGNAL_TIMING), so
+   * stopping at the line always meets a red within ≤ 24 s.
+   */
+  requireRedMet?: boolean;
 }
 
 /** Accumulate driven distance (odometer over position deltas). */
@@ -70,35 +87,58 @@ export interface SmoothStopParams {
 }
 
 /**
- * Emergency stop (L5 „Аварийно спиране"): the MIRROR of smoothStop. Reach at
- * least `minApproachKmh`, then stop with a peak deceleration of AT LEAST
- * `minDecelMs2` — proving a firm, decisive emergency brake (not a gentle
- * coast). A soft roll to a halt does NOT complete it. Coordinate-free, exactly
- * like smoothStop, so it needs no world geometry.
+ * Emergency stop (L5 „Аварийно спиране") — STIMULUS-LOCKED since A10. The
+ * old evaluator armed on speed alone, so any hard stop anywhere completed it
+ * without a hazard ever appearing (audit D4: reaction untrained). Now the
+ * objective is bound to the A8 staged encounter named by `stagedEventId`
+ * (L5: "l5-braking-lead-car"): it completes ONLY from that encounter's
+ * StagedEventOutcome — success requires detail "stoppedInTime" (full stop,
+ * no collision); "hitLeadCar" / "passedWithoutStopping" leave it failed.
+ * The measured reaction time (stimulus onset → first brake application) is
+ * surfaced in the objective detail with a grade band (see REACTION_BAND_*
+ * in objectives.ts). Outcomes are session facts (LessonSessionState
+ * .stagedOutcomes), so an outcome earned before the objective activates
+ * still counts — the behavior was performed and measured.
  */
 export interface EmergencyStopParams {
   kind: "completeManeuver";
   maneuver: "emergencyStop";
-  minApproachKmh: number;
-  minDecelMs2: number;
+  /** Id of the staged encounter (LessonSpec.stagedEvents) this stop grades from. */
+  stagedEventId: string;
 }
 
 /**
- * Reverse-park (L7 „Паркиране"): engage reverse gear during the maneuver and
- * then hold a full stop for `holdSec` continuous seconds. Tests the actual
- * motor skill (reverse + controlled halt); coordinate-free — the world renders
- * a bay, but completion is geometry-independent. Not expressible by reachZone
- * (which requires neither a held stop nor reverse) or smoothStop (forward,
- * gentle) — hence a dedicated evaluator.
+ * Reverse-park (L7 „Паркиране") — BAY-LOCKED since A10. The old evaluator was
+ * coordinate-free, so ANY reverse + ANY held stop anywhere completed it
+ * (audit D4). Now completion requires the car at rest INSIDE the authored
+ * bay rect (A5 `LessonSpec.parkingBay`, denormalized here): centre within
+ * `centerTolM` of the bay centre, heading within `headingTolDeg` of the bay
+ * axis (folded to 180° — the rect is symmetric), reverse gear used during
+ * the current attempt, and the stop held `holdSec` continuous seconds.
+ * Attempts are counted (leaving the bay and re-entering = a new attempt,
+ * which also re-demands reverse); alignment quality goes into the objective
+ * detail for the debrief.
  */
 export interface ParkInBayParams {
   kind: "completeManeuver";
   maneuver: "parkInBay";
   /** Continuous seconds the vehicle must stay stopped to finish parking. */
   holdSec: number;
+  /** The marked bay rect the park must land in (same values as LessonSpec.parkingBay). */
+  bay: ParkingBaySpec;
+  /** Max distance of the car centre from the bay centre at rest, m. */
+  centerTolM: number;
+  /** Max |heading − bay axis| at rest, degrees (folded to the 180° axis). */
+  headingTolDeg: number;
 }
 
-/** Enter the roundabout ring, then leave it again (enter + exit = done). */
+/**
+ * Enter the roundabout ring, then leave it again — WITH the right indicator
+ * on in the exit window (A10; the L3 spec promises „излез с десен мигач").
+ * An unsignaled exit resets the traversal: the student re-enters the ring
+ * and exits properly. The exit window is the annulus between enterRadiusM
+ * and the exit crossing, after having entered.
+ */
 export interface RoundaboutParams {
   kind: "completeManeuver";
   maneuver: "roundabout";
@@ -130,7 +170,20 @@ export type ObjectiveStatus = "pending" | "active" | "done";
 
 /** Per-objective evaluator memory (discriminated by evaluator, not by kind). */
 export type ObjectiveEvalState =
-  | { type: "stateless" } // reachZone, passSignal
+  | { type: "stateless" } // reachZone
+  | {
+      type: "passSignal";
+      /** The matching stop line has been crossed (near the node). */
+      crossed: boolean;
+      /**
+       * Full stop observed inside the zone during the CURRENT visit (resets
+       * on leaving the zone) — the observable signature of waiting at the
+       * light; combined with a green crossing it certifies a met red.
+       */
+      stoppedInZoneVisit: boolean;
+      /** This objective's junction contributed a met red to the run (A10). */
+      redMet: boolean;
+    }
   | { type: "driveDistance"; accumulatedM: number; prevPos: Vec2 | null }
   | {
       type: "smoothStop";
@@ -141,23 +194,79 @@ export type ObjectiveEvalState =
       prevSpeedKmh: number | null;
       prevT: number | null;
     }
+  /**
+   * emergencyStop is outcome-driven since A10 (no tick memory): completion
+   * reads the staged encounter's StagedEventOutcome from ObjectiveContext.
+   */
+  | { type: "emergencyStop" }
   | {
-      type: "emergencyStop";
-      /** True once the vehicle reached the minimum approach speed. */
-      armed: boolean;
-      /** Peak deceleration observed during the current armed attempt, m/s². */
-      maxDecelMs2: number;
-      prevSpeedKmh: number | null;
-      prevT: number | null;
+      type: "roundabout";
+      entered: boolean;
+      /** Right indicator observed in the exit window after entering (A10). */
+      exitSignaled: boolean;
     }
-  | { type: "roundabout"; entered: boolean }
   | {
       type: "parkInBay";
-      /** Reverse gear was engaged at some point during the attempt. */
+      /**
+       * Reverse gear engaged during the CURRENT attempt (reset when the car
+       * leaves the bay — a new attempt must reverse again).
+       */
       usedReverse: boolean;
-      /** Session time the current continuous stop began; null while moving. */
+      /** Session time the current continuous in-bay stop began; null while moving. */
       stoppedSinceT: number | null;
+      /** Car centre currently inside the bay rect. */
+      inBay: boolean;
+      /** Bay entries so far (outside → inside transitions). */
+      attempts: number;
     };
+
+// ---------------------------------------------------------------------------
+// Objective detail (A10) — measurement channel for HUD + debrief
+// ---------------------------------------------------------------------------
+
+/** Final-position quality of a park (debrief: „centred" vs „sloppy"). */
+export type ParkAlignment = "centered" | "acceptable" | "sloppy";
+
+/** Reaction-time grade band for the stimulus-locked emergency stop (A10). */
+export type ReactionBand = "otlichen" | "dobur" | "baven";
+
+/**
+ * Structured per-objective measurements the evaluators surface alongside
+ * done/progress (A10). Additive: only the hardened evaluators emit one; the
+ * engine mirrors it onto ObjectiveProgress and buildLessonResult copies it
+ * onto ObjectiveOutcome so the debrief can cite reaction time, park
+ * alignment, attempts, and the red-light record without re-deriving them.
+ */
+export type ObjectiveDetail =
+  | {
+      kind: "parkInBay";
+      attempts: number;
+      inBay: boolean;
+      /** Distance of car centre from bay centre, m; null while outside the bay. */
+      centerOffsetM: number | null;
+      /** |heading − bay axis| folded to 180°, degrees; null while outside. */
+      headingOffsetDeg: number | null;
+      /** Quality at the current/final in-bay stop; null while moving/outside. */
+      alignment: ParkAlignment | null;
+    }
+  | {
+      kind: "emergencyStop";
+      /** Encounter resolution ("pending" until the staged event resolves). */
+      outcome: "pending" | "stoppedInTime" | "hitLeadCar" | "passedWithoutStopping" | "collision";
+      /** Stimulus onset → first brake application, s (null until measured). */
+      reactionTimeSec: number | null;
+      band: ReactionBand | null;
+      /** Remaining bumper gap at full stop, m. */
+      stopGapM: number | null;
+    }
+  | {
+      kind: "passSignal";
+      /** Reds met across the whole run (all passSignal objectives so far). */
+      redsMetInRun: number;
+      /** This objective's junction contributed a met red. */
+      redMetHere: boolean;
+    }
+  | { kind: "roundabout"; entered: boolean; exitSignaled: boolean };
 
 export interface ObjectiveProgress {
   spec: LessonObjective;
@@ -166,6 +275,8 @@ export interface ObjectiveProgress {
   /** 0..1 for the HUD progress bar (distance/maneuver phases); 0 when N/A. */
   progress: number;
   completedAtSec: number | null;
+  /** A10 measurement channel (attempts, reaction band, …); hardened evaluators only. */
+  detail?: ObjectiveDetail;
 }
 
 // ---------------------------------------------------------------------------
@@ -254,6 +365,8 @@ export interface ObjectiveOutcome {
   titleBg: string;
   done: boolean;
   completedAtSec: number | null;
+  /** A10 measurement channel, carried into the result for the debrief. */
+  detail?: ObjectiveDetail;
 }
 
 // ---------------------------------------------------------------------------

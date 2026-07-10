@@ -32,12 +32,18 @@ import {
   createPreDriveMachine,
   type PreDriveStepId,
 } from "../procedures";
-import { createEvalState, parseObjectiveParams, stepObjective } from "./objectives";
+import {
+  createEvalState,
+  parseObjectiveParams,
+  stepObjective,
+  type ObjectiveContext,
+} from "./objectives";
 import { applyEscalations, type PenaltyEscalation } from "./escalation";
 import type {
   LessonPhase,
   LessonResult,
   LessonSessionState,
+  ObjectiveEvalState,
   ObjectiveProgress,
   ObjectiveOutcome,
   TeachMoment,
@@ -114,6 +120,20 @@ export interface LessonStepResult {
  * driving time.
  */
 export const TEACH_PAUSE_MIN_GAP_S = 15;
+
+/**
+ * Run-wide met-reds tally (A10): completed passSignal objectives keep their
+ * final eval state, so a red met at an earlier junction satisfies a later
+ * requireRedMet gate (L2 — the run must include at least one handled red,
+ * not every junction).
+ */
+function countRedsMet(evalStates: ReadonlyArray<ObjectiveEvalState>): number {
+  let n = 0;
+  for (const s of evalStates) {
+    if (s.type === "passSignal" && s.redMet) n += 1;
+  }
+  return n;
+}
 
 /** Map rule-engine output onto the HUD event contract (toasts). */
 function toHudEvents(events: ReadonlyArray<RuleEvent>): HudEvent[] {
@@ -317,7 +337,15 @@ export function applyTick(prev: LessonSessionState, tick: SimTick): LessonStepRe
     let guard = objectives.length;
     while (currentIndex < objectives.length && guard-- > 0) {
       const current = objectives[currentIndex];
-      const step = stepObjective(current.params, evalStates[currentIndex], tick);
+      // A10 objective context: staged-encounter outcomes recorded so far
+      // (applyStagedOutcome) + the run-wide met-reds tally. Rebuilt per
+      // iteration — a red met by the objective that just completed must be
+      // visible to the next one on the same frame.
+      const ctx: ObjectiveContext = {
+        stagedOutcomes: prev.stagedOutcomes ?? [],
+        redsMetInRun: countRedsMet(evalStates),
+      };
+      const step = stepObjective(current.params, evalStates[currentIndex], tick, ctx);
       evalStates[currentIndex] = step.evalState;
 
       if (!step.done) {
@@ -325,6 +353,7 @@ export function applyTick(prev: LessonSessionState, tick: SimTick): LessonStepRe
           ...current,
           status: "active",
           progress: step.progress,
+          ...(step.detail !== undefined ? { detail: step.detail } : {}),
         };
         break;
       }
@@ -334,6 +363,7 @@ export function applyTick(prev: LessonSessionState, tick: SimTick): LessonStepRe
         status: "done",
         progress: 1,
         completedAtSec: tick.t,
+        ...(step.detail !== undefined ? { detail: step.detail } : {}),
       };
       hudEvents.push({ kind: "objectiveComplete", titleBg: current.spec.titleBg });
       currentIndex += 1;
@@ -376,9 +406,11 @@ export function applyTick(prev: LessonSessionState, tick: SimTick): LessonStepRe
 /**
  * Record one resolved staged encounter on the session (A8). Pure/additive:
  * the GRADED consequences of the encounter arrived through applyTick already
- * (the orchestrator emits only existing SimTick vocabulary) — this only
+ * (the orchestrator emits only existing SimTick vocabulary) — this
  * accumulates the measurement record (reaction time, stop gap, …) that A10
- * locks objectives to and the debrief will cite.
+ * locks objectives to (via ObjectiveContext on the next applyTick — e.g.
+ * L5's emergencyStop completes from the l5-braking-lead-car outcome) and
+ * the debrief will cite.
  */
 export function applyStagedOutcome(
   prev: LessonSessionState,
@@ -423,6 +455,7 @@ export function buildLessonResult(state: LessonSessionState): LessonResult {
     titleBg: o.spec.titleBg,
     done: o.status === "done",
     completedAtSec: o.completedAtSec,
+    ...(o.detail !== undefined ? { detail: o.detail } : {}),
   }));
 
   const completedAll = objectives.every((o) => o.done);
