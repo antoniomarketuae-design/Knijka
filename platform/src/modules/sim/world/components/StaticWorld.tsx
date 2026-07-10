@@ -2,8 +2,9 @@
 
 /**
  * StaticWorld — the merged, non-instanced world meshes: terrain, asphalt
- * (ribbons + junction patches), parking-lane bands, sidewalks, markings and
- * the mid-rise facade-prism buildings (walls per palette variant + roofs).
+ * (ribbons + junction patches), parking-lane bands, the batched road-decal
+ * pass (one atlas, one draw call), sidewalks, markings and the mid-rise
+ * facade-prism buildings (walls per palette variant + roofs).
  * Tall, compact buildings are drawn by <CityBuildings/> instead (instanced
  * glass towers); the builder splits the two sets so they never overlap
  * (doc 68 QW3).
@@ -14,6 +15,7 @@
  */
 
 import { useEffect, useMemo } from "react";
+import { useThree } from "@react-three/fiber";
 import type * as THREE from "three";
 import { Color } from "three";
 import { useWetness, wetnessToRoadParams } from "@/modules/sim/environment";
@@ -25,17 +27,47 @@ import {
   makeRoofTexture,
   makeSidewalkTexture,
 } from "../textures/canvasTextures";
+import { makeDecalAtlasTexture } from "../textures/decalAtlas";
+import { useFacadeTextures, type FacadeSetName } from "../textures/facadeTextures";
+import { macroOnBeforeCompile, macroProgramCacheKey } from "../textures/macroVariation";
 import { usePbrSet } from "../textures/pbrTextures";
 import { disposeAll, meshDataToGeometry } from "./three-helpers";
 import type { QualityPreset } from "./quality";
 
 const FACADE_VARIANT_COUNT = 4;
 
+/**
+ * Facade-prism variant -> baked bay system (doc 71 §4.5). Variant 0 is the
+ * dominant tall-prism palette (buildings.ts skews >=15 m there), so it gets
+ * the punched concrete grid — the panelka-adjacent read; the rest spread the
+ * remaining REF 1 systems across the district.
+ */
+const FACADE_SETS: FacadeSetName[] = ["bay_grid", "bay_band", "bay_strip", "bay_curtain"];
+
+/** Lit-window glow (shared with CityBuildings): golden-hour interiors must
+ *  cross the composer's 0.9 bloom threshold at day (doc 71 §4.3). */
+const FACADE_DAY_GLOW = 2.0;
+const FACADE_NIGHT_GLOW = 3.2;
+
+/**
+ * Spread onto every GROUND material (terrain, paved, road, junctions,
+ * parking lanes, sidewalks): the shared world-space macro-noise hook —
+ * ±22% albedo variation at 40–80 m so big surfaces stop reading uniform,
+ * ONE extra texture fetch, one shared program (doc 71 §4.4). Albedo only —
+ * it never touches roughness, so the wet-road lerp below stays authoritative.
+ */
+const MACRO_VARIATION = {
+  onBeforeCompile: macroOnBeforeCompile,
+  customProgramCacheKey: macroProgramCacheKey,
+} as const;
+
 interface WorldTextures {
   asphalt: THREE.Texture;
   sidewalk: THREE.Texture;
   grass: THREE.Texture;
   roof: THREE.Texture;
+  /** Procedural road-decal atlas (one texture -> one batched draw call). */
+  decals: THREE.Texture;
   facades: { map: THREE.Texture; emissiveMap: THREE.Texture }[];
 }
 
@@ -50,6 +82,9 @@ function useWorldTextures(preset: QualityPreset): WorldTextures {
       sidewalk: withAniso(makeSidewalkTexture(Math.min(512, preset.textureSize))),
       grass: withAniso(makeGrassTexture(preset.textureSize)),
       roof: withAniso(makeRoofTexture(Math.min(512, preset.textureSize))),
+      // 2x the tiling size (a 4x4 atlas shares it across 16 cells), cap 1024
+      // per the world texture budget.
+      decals: withAniso(makeDecalAtlasTexture(Math.min(1024, preset.textureSize * 2))),
       facades: Array.from({ length: FACADE_VARIANT_COUNT }, (_, v) => {
         const pair = makeFacadeTextures(v, Math.min(512, preset.textureSize));
         withAniso(pair.map);
@@ -66,6 +101,7 @@ function useWorldTextures(preset: QualityPreset): WorldTextures {
         textures.sidewalk,
         textures.grass,
         textures.roof,
+        textures.decals,
         ...textures.facades.flatMap((f) => [f.map, f.emissiveMap]),
       ]);
     },
@@ -80,6 +116,7 @@ interface WorldGeometries {
   sidewalks: THREE.BufferGeometry;
   markings: THREE.BufferGeometry;
   parkingLanes: THREE.BufferGeometry;
+  roadDecals: THREE.BufferGeometry;
   terrain: THREE.BufferGeometry;
   terrainPaved: THREE.BufferGeometry;
   walls: THREE.BufferGeometry[];
@@ -94,6 +131,7 @@ function useWorldGeometries(world: WorldGeometry): WorldGeometries {
       sidewalks: meshDataToGeometry(world.sidewalks),
       markings: meshDataToGeometry(world.markings),
       parkingLanes: meshDataToGeometry(world.parkingLanes),
+      roadDecals: meshDataToGeometry(world.roadDecals),
       terrain: meshDataToGeometry(world.terrain),
       terrainPaved: meshDataToGeometry(world.terrainPaved),
       walls: world.buildingWalls.map(meshDataToGeometry),
@@ -109,6 +147,7 @@ function useWorldGeometries(world: WorldGeometry): WorldGeometries {
         geometries.sidewalks,
         geometries.markings,
         geometries.parkingLanes,
+        geometries.roadDecals,
         geometries.terrain,
         geometries.terrainPaved,
         ...geometries.walls,
@@ -153,6 +192,16 @@ export function StaticWorld({
     [wetness],
   );
   const roadTint = useMemo(() => new Color(wet.darken, wet.darken, wet.darken), [wet.darken]);
+  // Decals share the road's wetness response (doc 71 §4.4) with a slightly
+  // glossier wet floor — oil/tar stains go reflective FIRST in rain.
+  const decalWet = useMemo(
+    () => wetnessToRoadParams(wetness, { dryRoughness: 0.95, wetRoughness: 0.3, wetDarken: 0.6 }),
+    [wetness],
+  );
+  const decalTint = useMemo(
+    () => new Color(decalWet.darken, decalWet.darken, decalWet.darken),
+    [decalWet.darken],
+  );
   // Asphalt env response (doc 71 §4.4): 1.5 so the wet-gloss state (roughness
   // 0.35) smears the golden HDRI like damp asphalt — dry roughness ~1.0 keeps
   // it matte, so this only shows where the surface goes smooth.
@@ -169,6 +218,7 @@ export function StaticWorld({
       <mesh geometry={geometries.terrain} receiveShadow={receive}>
         {grass ? (
           <meshStandardMaterial
+            {...MACRO_VARIATION}
             map={grass.map}
             normalMap={grass.normalMap}
             roughnessMap={grass.roughnessMap}
@@ -177,7 +227,12 @@ export function StaticWorld({
             metalness={0}
           />
         ) : (
-          <meshStandardMaterial map={textures.grass} roughness={1} metalness={0} />
+          <meshStandardMaterial
+            {...MACRO_VARIATION}
+            map={textures.grass}
+            roughness={1}
+            metalness={0}
+          />
         )}
       </mesh>
       {/* Paved courtyards/parking (concrete). Co-planar with the grass terrain;
@@ -185,6 +240,7 @@ export function StaticWorld({
       <mesh geometry={geometries.terrainPaved} receiveShadow={receive}>
         {concrete ? (
           <meshStandardMaterial
+            {...MACRO_VARIATION}
             map={concrete.map}
             normalMap={concrete.normalMap}
             roughnessMap={concrete.roughnessMap}
@@ -192,25 +248,36 @@ export function StaticWorld({
             metalness={0}
           />
         ) : (
-          <meshStandardMaterial map={textures.sidewalk} roughness={0.92} metalness={0} />
+          <meshStandardMaterial
+            {...MACRO_VARIATION}
+            map={textures.sidewalk}
+            roughness={0.92}
+            metalness={0}
+          />
         )}
       </mesh>
+      {/* Road ribbons: vertexColors multiplies in the baked wheel-track wear +
+          gutter grime (builders/roads.ts) — composes with the wetness tint. */}
       <mesh geometry={geometries.road} receiveShadow={receive}>
         {asphalt ? (
           <meshStandardMaterial
+            {...MACRO_VARIATION}
             map={asphalt.map}
             normalMap={asphalt.normalMap}
             roughnessMap={asphalt.roughnessMap}
             aoMap={asphalt.aoMap ?? undefined}
             color={roadTint}
+            vertexColors
             roughness={wet.roughness}
             metalness={0}
             envMapIntensity={ROAD_ENV_INTENSITY}
           />
         ) : (
           <meshStandardMaterial
+            {...MACRO_VARIATION}
             map={textures.asphalt}
             color={roadTint}
+            vertexColors
             roughness={wet.roughness}
             metalness={0}
             envMapIntensity={ROAD_ENV_INTENSITY}
@@ -220,6 +287,7 @@ export function StaticWorld({
       <mesh geometry={geometries.junctions} receiveShadow={receive}>
         {asphalt ? (
           <meshStandardMaterial
+            {...MACRO_VARIATION}
             map={asphalt.map}
             normalMap={asphalt.normalMap}
             roughnessMap={asphalt.roughnessMap}
@@ -231,6 +299,7 @@ export function StaticWorld({
           />
         ) : (
           <meshStandardMaterial
+            {...MACRO_VARIATION}
             map={textures.asphalt}
             color={roadTint}
             roughness={wet.roughness}
@@ -243,6 +312,7 @@ export function StaticWorld({
       <mesh geometry={geometries.parkingLanes} receiveShadow={receive}>
         {asphalt ? (
           <meshStandardMaterial
+            {...MACRO_VARIATION}
             map={asphalt.map}
             normalMap={asphalt.normalMap}
             roughnessMap={asphalt.roughnessMap}
@@ -253,6 +323,7 @@ export function StaticWorld({
           />
         ) : (
           <meshStandardMaterial
+            {...MACRO_VARIATION}
             map={textures.asphalt}
             color={parkingTint}
             roughness={wet.roughness}
@@ -261,17 +332,48 @@ export function StaticWorld({
           />
         )}
       </mesh>
+      {/* Batched road decals: cracks/patches/oil/manholes from ONE atlas in
+          ONE draw call. Quads are EXACTLY co-planar with the asphalt — the
+          official three.js decal recipe (polygonOffset -4, no depth write,
+          renderOrder after the road) resolves the tie without Y-lifting,
+          which shears at grazing cockpit angles (doc 71 §4.4). */}
+      {geometries.roadDecals.getAttribute("position") &&
+      geometries.roadDecals.getAttribute("position").count > 0 ? (
+        <mesh geometry={geometries.roadDecals} receiveShadow={receive} renderOrder={1}>
+          <meshStandardMaterial
+            map={textures.decals}
+            transparent
+            depthWrite={false}
+            polygonOffset
+            polygonOffsetFactor={-4}
+            color={decalTint}
+            roughness={decalWet.roughness}
+            metalness={0}
+            envMapIntensity={ROAD_ENV_INTENSITY}
+          />
+        </mesh>
+      ) : null}
+      {/* Sidewalks: vertexColors carries the curb-foot grime + skirt AO tint;
+          the 2 cm top chamfer strip catches the low sun (doc 71 §4.4). */}
       <mesh geometry={geometries.sidewalks} receiveShadow={receive}>
         {concrete ? (
           <meshStandardMaterial
+            {...MACRO_VARIATION}
             map={concrete.map}
             normalMap={concrete.normalMap}
             roughnessMap={concrete.roughnessMap}
+            vertexColors
             roughness={1}
             metalness={0}
           />
         ) : (
-          <meshStandardMaterial map={textures.sidewalk} roughness={0.92} metalness={0} />
+          <meshStandardMaterial
+            {...MACRO_VARIATION}
+            map={textures.sidewalk}
+            vertexColors
+            roughness={0.92}
+            metalness={0}
+          />
         )}
       </mesh>
       <mesh geometry={geometries.markings}>

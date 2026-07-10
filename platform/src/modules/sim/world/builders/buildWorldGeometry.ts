@@ -15,6 +15,7 @@ import type {
 import { ROAD_Y, TERRAIN_MARGIN_M } from "./constants";
 import { buildBuildings } from "./buildings";
 import { buildBuildingInstances, CITY_MODELS } from "./cityBuildings";
+import { buildRoadDecals } from "./decals";
 import { buildMarkings } from "./markings";
 import { analyzeNetwork } from "./network";
 import { buildProps } from "./props";
@@ -29,6 +30,8 @@ export function buildWorldGeometry(
 ): WorldGeometry {
   const network = analyzeNetwork(district, options.junctionRadiusOverrides);
   const roads = buildRoads(network);
+  // Seeded street-wear decal batch (cracks/patches/manholes) — one draw call.
+  const decals = buildRoadDecals(network, options.seed ?? DEFAULT_SEED);
   // Tall, compact buildings become glass-tower instances; every other
   // footprint keeps its facade prism (walls/roofs), so the split below tells
   // the prism builder which ids to leave to the instanced pass (doc 68 QW3).
@@ -73,6 +76,7 @@ export function buildWorldGeometry(
     roads.sidewalks,
     roads.parkingLanes,
     markings.markings,
+    decals.decals,
     terrain.grass,
     terrain.paved,
     ...buildings.walls,
@@ -92,6 +96,7 @@ export function buildWorldGeometry(
     zebraCrossings: markings.zebraCrossings,
     parkingBays: markings.parkingBays,
     parkingLaneStrips: roads.parkingLaneStripCount,
+    roadDecals: decals.count,
     buildings: buildings.count,
     buildingInstances: buildingInstances.length,
     trafficLights: props.trafficLights.length,
@@ -103,12 +108,12 @@ export function buildWorldGeometry(
     parkingKits: props.parkingKits.length,
     vertices,
     triangles,
-    // 12 static meshes (roads, junctions, sidewalks, parking lanes, markings,
-    // grass, paved, 4 facade-wall variants, roofs) + 27 fixed WorldProps
-    // instanced draws (2 signals + 8 signs + 2 streetlights + 4 trees +
-    // 4 furniture + 4 billboards + 2 bus stops + 1 parking kit) + towers
-    // (chunked & frustum-culled at runtime; count ~model-order).
-    drawCallEstimate: 12 + 27 + CITY_MODELS.length,
+    // 13 static meshes (roads, junctions, sidewalks, parking lanes, markings,
+    // road-decal batch, grass, paved, 4 facade-wall variants, roofs) + 27
+    // fixed WorldProps instanced draws (2 signals + 8 signs + 2 streetlights +
+    // 4 trees + 4 furniture + 4 billboards + 2 bus stops + 1 parking kit) +
+    // towers (chunked & frustum-culled at runtime; count ~model-order).
+    drawCallEstimate: 13 + 27 + CITY_MODELS.length,
   };
 
   return {
@@ -117,6 +122,7 @@ export function buildWorldGeometry(
     sidewalks: roads.sidewalks.toMeshData(),
     markings: markings.markings.toMeshData(),
     parkingLanes: roads.parkingLanes.toMeshData(),
+    roadDecals: decals.decals.toMeshData(),
     terrain: terrain.grass.toMeshData(),
     terrainPaved: terrain.paved.toMeshData(),
     buildingWalls: buildings.walls.map((w) => w.toMeshData()),

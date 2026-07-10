@@ -24,6 +24,15 @@ export const JUNCTION_Y = ROAD_Y - 0.003;
 /** Raised curb height — must stay drivable per the vehicle harness. */
 export const CURB_HEIGHT_M = 0.12;
 export const SIDEWALK_TOP_Y = ROAD_Y + CURB_HEIGHT_M;
+/**
+ * Top chamfer on the street-facing curb edge (doc 71 §4.4): a sharp 90° edge
+ * catches no light and reads CG; the 2 cm bevel catching the low golden-hour
+ * sun is what makes street edges read 3D. VISUAL polish only — CURB_HEIGHT_M
+ * and the sidewalk top height are unchanged, so the 12 cm drivable-curb
+ * physics contract holds (the collider merely gains the same 2 cm bevel at
+ * the very top of the face).
+ */
+export const CURB_CHAMFER_M = 0.02;
 /** Scaled with the road cross-section (real ~2 m read like a curb strip). */
 export const SIDEWALK_WIDTH_M = 3.5;
 /** Outer skirt from sidewalk top back down to terrain. */
@@ -73,6 +82,39 @@ export const PARKING_LANE_END_INSET_M = 5;
 /** Parking band tint mesh sits between asphalt and paint (z-fight-safe). */
 export const PARKING_LANE_Y = ROAD_Y + 0.006;
 
+// --- baked ground wear (doc 71 §4.4 vertex-color wear — free at runtime) ----
+
+/**
+ * Wheel-track darkening on road ribbons: two subtle darker bands where tyres
+ * actually run, baked into the road geometry's vertex colors at build time
+ * (multiplies the asphalt map — the racing-sim "groove map" trick for free).
+ * Track offset is from the LANE centre; the car stays real-size under the
+ * perceptual road scale, so a real ~1.6 m axle track (±0.8–0.9 m) applies.
+ */
+export const WHEEL_TRACK_OFFSET_M = 0.9;
+/** Half-width of one darkened wheel band (full band ~1.1 m, soft edges). */
+export const WHEEL_TRACK_BAND_HALF_M = 0.55;
+/** Luminance multiplier at the centre of a wheel band (subtle: ×0.82). */
+export const WHEEL_TRACK_TINT = 0.82;
+/** Gutter grime band against the outer ribbon edges (dirt collects there). */
+export const GUTTER_BAND_M = 0.45;
+export const GUTTER_TINT = 0.86;
+/** AO-ish tint at the curb-face foot (grime shadow where asphalt meets curb). */
+export const CURB_FOOT_TINT = 0.78;
+/** Slight grime on the sidewalk's outer skirt (grounds it against terrain). */
+export const SIDEWALK_SKIRT_TINT = 0.9;
+
+// --- batched road decals (doc 71 §4.4 — ONE quad batch, ONE draw call) ------
+
+/** Average spacing: ~one decal per 40 m of ribbon centreline. */
+export const ROAD_DECAL_SPACING_M = 40;
+/** Decals keep clear of ribbon ends (junction paint: stop lines sit at the
+ *  cut + 0.6 m, zebras hug the mouth — doc 71 "avoid junction paint"). */
+export const ROAD_DECAL_END_INSET_M = 6;
+/** Decals are EXACTLY co-planar with the asphalt (polygonOffset resolves the
+ *  depth tie at render time — never Y-lift, doc 71 §4.4). */
+export const ROAD_DECAL_Y = ROAD_Y;
+
 /** Marking paint dimensions (М-series, stylized). Scaled with the road —
  * textbook paint on an 8 m lane reads like thread (perceptual road scale). */
 export const DASH_LENGTH_M = 5.0;
@@ -85,10 +127,18 @@ export const ZEBRA_STRIPE_ACROSS_M = 0.8; // stripe width across the road
 export const ZEBRA_GAP_M = 0.6;
 export const ZEBRA_LENGTH_M = 6.0; // extent along the road axis
 
-/** Building facade texture bay: one window per 3 m x 3 m. */
+/** Facade bay module (whole-bay UV offsets snap to this). */
 export const FACADE_BAY_M = 3;
-/** Facade texture holds 4x4 bays. */
-export const FACADE_TILE_M = FACADE_BAY_M * 4;
+/**
+ * Baked facade bay texture tile (tools/blender/facade_atlas.py layout.json):
+ * 12 m of facade per U repeat, 3 floors x 3.8 m = 11.4 m per V repeat. The
+ * procedural canvas fallback (4x4 bays) tiles on the same U scale so the
+ * swap to the baked sets doesn't rescale facades mid-load.
+ */
+export const FACADE_TILE_U_M = FACADE_BAY_M * 4;
+export const FACADE_TILE_V_M = 11.4;
+/** Storey height baked into the bay textures (whole-floor V offsets). */
+export const FACADE_FLOOR_M = 3.8;
 /** Darker ground-floor band height (vertex-color multiplier). */
 export const GROUND_BAND_M = 4.0;
 export const GROUND_BAND_TINT = 0.62;

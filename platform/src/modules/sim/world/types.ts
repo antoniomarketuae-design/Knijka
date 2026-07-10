@@ -237,6 +237,8 @@ export interface WorldStats {
   parkingBays: number;
   /** Curbside parking bands on arterial edges (two per qualifying ribbon). */
   parkingLaneStrips: number;
+  /** Batched road decals (one quad each; the whole batch is ONE draw call). */
+  roadDecals: number;
   buildings: number;
   /** Instanced glass towers placed on tall, compact footprints. */
   buildingInstances: number;
@@ -268,6 +270,10 @@ export interface WorldGeometry {
   /** Tinted curbside parking bands on arterial edges (inside the ribbon
    *  width, drawn a hair above the asphalt — doc 68 QW3). */
   parkingLanes: MeshData;
+  /** Batched road-decal quads (cracks/patches/oil/manholes/dirt) — one atlas,
+   *  one draw call, co-planar with the asphalt (doc 71 §4.4). UVs address the
+   *  procedural decal atlas (builders/decals.ts manifest). */
+  roadDecals: MeshData;
   /** Open ground (grass): parks, verges, district edges. Subtle off-road relief. */
   terrain: MeshData;
   /** Paved ground (concrete): courtyards/parking in the built-up fabric.

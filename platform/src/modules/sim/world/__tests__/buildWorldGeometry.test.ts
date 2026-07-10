@@ -8,13 +8,18 @@ import { beforeAll, describe, expect, it } from "vitest";
 import { LESSON_PARKING_BAYS } from "../../lessons/specs";
 import { buildWorldGeometry } from "../builders/buildWorldGeometry";
 import {
+  CURB_CHAMFER_M,
   CURB_HEIGHT_M,
+  GUTTER_TINT,
   LANE_WIDTH_M,
   PARKING_LANE_WIDTH_M,
   PARKING_LANE_Y,
+  ROAD_DECAL_Y,
   ROAD_Y,
   SIDEWALK_TOP_Y,
+  WHEEL_TRACK_TINT,
 } from "../builders/constants";
+import { ribbonCrossSection } from "../builders/roads";
 import { assertDistrict, type District, type WorldGeometry } from "../types";
 
 // ---------------------------------------------------------------------------
@@ -121,13 +126,92 @@ describe("buildWorldGeometry on a synthetic X-junction", () => {
   });
 
   it("road ribbons have the correct width from lane counts (+ parking bands)", () => {
-    // First ribbon is eN (secondary, 4 lanes): first two vertices are the L/R
-    // pair of the first cross-section -> travel lanes + a parking band per
-    // side (QW3 arterial cross-section).
+    // First ribbon is eN (secondary, 4 lanes): the first cross-section row is
+    // the wear-baked station list (left edge ... right edge) -> its extremes
+    // span travel lanes + a parking band per side (QW3 arterial section).
+    const halfWidth = (4 * LANE_WIDTH_M) / 2 + PARKING_LANE_WIDTH_M;
+    const section = ribbonCrossSection(halfWidth, PARKING_LANE_WIDTH_M, 4);
     const pos = world.roadSurface.positions;
-    const dx = pos[0]! - pos[3]!;
-    const dz = pos[2]! - pos[5]!;
+    const first = 0;
+    const last = (section.length - 1) * 3;
+    const dx = pos[first]! - pos[last]!;
+    const dz = pos[first + 2]! - pos[last + 2]!;
     expect(Math.hypot(dx, dz)).toBeCloseTo(4 * LANE_WIDTH_M + 2 * PARKING_LANE_WIDTH_M, 3);
+  });
+
+  it("bakes wheel-track + gutter wear into road vertex colors (doc 71 §4.4)", () => {
+    // Station list: edges carry the gutter tint, each lane two track dips.
+    const halfWidth = (4 * LANE_WIDTH_M) / 2 + PARKING_LANE_WIDTH_M;
+    const section = ribbonCrossSection(halfWidth, PARKING_LANE_WIDTH_M, 4);
+    expect(section[0]!.offset).toBeCloseTo(-halfWidth);
+    expect(section[section.length - 1]!.offset).toBeCloseTo(halfWidth);
+    expect(section[0]!.tint).toBeCloseTo(GUTTER_TINT);
+    expect(section.filter((s) => s.tint === WHEEL_TRACK_TINT).length).toBe(8); // 4 lanes x 2 tracks
+    // Offsets strictly increase (valid quad strip).
+    for (let i = 1; i < section.length; i++) {
+      expect(section[i]!.offset).toBeGreaterThan(section[i - 1]!.offset);
+    }
+    // The built mesh carries one RGB per vertex, all in (0, 1], with both
+    // full-bright and worn vertices present.
+    const colors = world.roadSurface.colors;
+    expect(colors).toBeDefined();
+    expect(colors!.length).toBe(world.roadSurface.positions.length);
+    let worn = 0;
+    let bright = 0;
+    for (let i = 0; i < colors!.length; i += 3) {
+      const c = colors![i]!;
+      expect(c).toBeGreaterThan(0);
+      expect(c).toBeLessThanOrEqual(1);
+      if (Math.abs(c - WHEEL_TRACK_TINT) < 1e-6) worn++; // float32 storage
+      if (c === 1) bright++;
+    }
+    expect(worn).toBeGreaterThan(0);
+    expect(bright).toBeGreaterThan(0);
+  });
+
+  it("scatters seeded road decals as one co-planar quad batch", () => {
+    // 4 ribbons x ~85 m usable at 1/40 m -> a couple of quads each.
+    expect(world.stats.roadDecals).toBeGreaterThanOrEqual(4);
+    expect(world.stats.roadDecals).toBeLessThanOrEqual(12);
+    const { positions, uvs, indices } = world.roadDecals;
+    expect(positions.length / 3).toBe(world.stats.roadDecals * 4);
+    expect(indices.length / 3).toBe(world.stats.roadDecals * 2);
+    for (let i = 1; i < positions.length; i += 3) {
+      expect(positions[i]!).toBeCloseTo(ROAD_DECAL_Y); // EXACTLY co-planar
+    }
+    // Atlas UVs stay inside the texture.
+    for (let i = 0; i < uvs.length; i++) {
+      expect(uvs[i]!).toBeGreaterThanOrEqual(0);
+      expect(uvs[i]!).toBeLessThanOrEqual(1);
+    }
+    // Decal quads face up (CCW after world mapping).
+    for (let t = 0; t < indices.length; t += 3) {
+      const [a, b, c] = [indices[t]! * 3, indices[t + 1]! * 3, indices[t + 2]! * 3];
+      const abx = positions[b]! - positions[a]!;
+      const abz = positions[b + 2]! - positions[a + 2]!;
+      const acx = positions[c]! - positions[a]!;
+      const acz = positions[c + 2]! - positions[a + 2]!;
+      expect(abz * acx - abx * acz).toBeGreaterThan(0);
+    }
+  });
+
+  it("chamfers the curb top without changing the drivable curb height", () => {
+    // The 2 cm sun-catcher strip exists (vertices at TOP - CURB_CHAMFER_M)…
+    const pos = world.sidewalks.positions;
+    let chamfer = 0;
+    for (let i = 1; i < pos.length; i += 3) {
+      if (Math.abs(pos[i]! - (SIDEWALK_TOP_Y - CURB_CHAMFER_M)) < 1e-6) chamfer++;
+    }
+    expect(chamfer).toBeGreaterThan(0);
+    // …while the physics contract holds: top still one 12 cm curb above road.
+    expect(SIDEWALK_TOP_Y - ROAD_Y).toBeCloseTo(CURB_HEIGHT_M);
+    // AO-ish read: curb-foot vertices darker than walkway vertices.
+    const colors = world.sidewalks.colors;
+    expect(colors).toBeDefined();
+    const tints = new Set<number>();
+    for (let i = 0; i < colors!.length; i += 3) tints.add(colors![i]!);
+    expect(Math.min(...tints)).toBeLessThan(0.8); // curb foot grime
+    expect(Math.max(...tints)).toBe(1); // walkway/chamfer full-bright
   });
 
   it("lays tinted parking bands along arterial edges only", () => {
@@ -315,6 +399,7 @@ describe("buildWorldGeometry on the real district (Студентски град
       world.sidewalks,
       world.markings,
       world.parkingLanes,
+      world.roadDecals,
       world.terrain,
       world.buildingRoofs,
       ...world.buildingWalls,
@@ -489,6 +574,16 @@ describe("buildWorldGeometry on the real district (Студентски град
         (k) => Math.hypot(k.position[0] - x, k.position[2] - z) < 0.5,
       );
       expect(hit).toBe(true);
+    }
+  });
+
+  it("scatters street-wear decals at ~1 per 40 m of ribbon (doc 71 §4.4)", () => {
+    // 320 ribbons, mostly 40–200 m -> a few hundred decals, all one batch.
+    expect(world.stats.roadDecals).toBeGreaterThan(150);
+    expect(world.stats.roadDecals).toBeLessThan(1500);
+    expect(world.roadDecals.positions.length / 3).toBe(world.stats.roadDecals * 4);
+    for (let i = 1; i < world.roadDecals.positions.length; i += 3) {
+      expect(world.roadDecals.positions[i]!).toBeCloseTo(ROAD_DECAL_Y);
     }
   });
 

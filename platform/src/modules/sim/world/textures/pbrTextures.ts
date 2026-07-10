@@ -11,10 +11,17 @@
  * textures are disposed. Guarded for SSR — nothing touches the loader unless
  * `window` exists.
  *
- * Tiling: the builder gives road/junction planar UVs of meters/7 and terrain
+ * Tiling — the texel-scale contract (doc 71 §4.4, lane 05 §3):
+ *
+ *     repeat = uvMetresPerUnit / textureRealWorldMetres
+ *
+ * The builder gives road/junction planar UVs of meters/7 and terrain
  * meters/8 (see roads.ts / terrain.ts); sidewalks use a normalised 0..1
- * cross-section with V = metres/2. `repeat` below is therefore chosen so each
- * set tiles at a believable real-world scale (documented per group).
+ * cross-section with V = metres/2. Each group declares the REAL metres its
+ * texture photograph covers (`realWorldSizeM`, from the source page/API) and
+ * the metres one UV unit spans on the consuming meshes (`uvMetresPerUnit`) —
+ * the repeat is COMPUTED, so swapping textures can never silently break
+ * world scale again (the old hand-tuned repeats had grass ~2x stretched).
  *
  * aoMap channel: in three r0.185 Texture.channel defaults to 0, which maps to
  * the geometry's `uv` attribute — the SAME UVs the colour/normal/roughness
@@ -40,19 +47,57 @@ interface GroupConfig {
   dir: string;
   /** true when an ao.png is present. */
   hasAo: boolean;
-  /** UV repeat applied to every map in the set (see per-group notes). */
-  repeat: [number, number];
+  /** Real-world metres one texture tile covers [x, y] (source page/API). */
+  realWorldSizeM: [number, number];
+  /** Metres of surface represented by ONE UV unit on the consumers [u, v]. */
+  uvMetresPerUnit: [number, number];
 }
 
 const GROUPS: Record<PbrGroup, GroupConfig> = {
-  // Asphalt: UV = metres/7, repeat 2 -> a full tile every ~3.5 m of road.
-  road: { dir: "road", hasAo: true, repeat: [2, 2] },
-  // Concrete: U is the 0..1 cross-section, V = metres/2. repeat [2,2] gives
-  // ~1.2 m across the 2 m walkway and ~1 m along its length.
-  sidewalk: { dir: "sidewalk", hasAo: false, repeat: [2, 2] },
-  // Grass: UV = metres/8, repeat 3 -> a full tile every ~2.7 m of terrain.
-  ground: { dir: "ground", hasAo: true, repeat: [3, 3] },
+  // Asphalt031 (ambientCG) publishes NO physical size (API dimension 0) —
+  // adopt doc 71 §4.4's ruling for road-asphalt photo tiles: 3 m. Road and
+  // junction UVs are planar metres/7, so repeat = 7/3 ≈ 2.33 (a full tile
+  // every 3 m of road). Was hand-tuned [2,2] = tiles every 3.5 m (~17%
+  // oversized aggregate).
+  road: {
+    dir: "road",
+    hasAo: true,
+    realWorldSizeM: [3, 3],
+    uvMetresPerUnit: [7, 7],
+  },
+  // Concrete034 (ambientCG API): the photographed patch is 1.10 x 0.55 m.
+  // Sidewalk strips: U is the 0..1 cross-section (the 0.1..0.9 walkway band
+  // spans SIDEWALK_WIDTH_M 3.5 m -> ~4.375 m per U unit), V = metres/2.
+  // repeat = [4.375/1.1, 2/0.55] ≈ [3.98, 3.64] -> true-scale square texels
+  // on the strips. Was [2,2]: ~2x stretched across AND along. The paved
+  // terrain (courtyards) shares this set at planar metres/4 — its tile
+  // comes out ~1.0 x 1.1 m in-world (V stretched 2x vs the 0.55 m photo,
+  // invisible on this featureless smooth plaster; strips win the trade —
+  // they fill the cockpit view).
+  sidewalk: {
+    dir: "sidewalk",
+    hasAo: false,
+    realWorldSizeM: [1.1, 0.55],
+    uvMetresPerUnit: [3.5 / 0.8, 2],
+  },
+  // Grass004 (ambientCG API): 1.40 x 1.40 m. Terrain UVs are planar
+  // metres/8 -> repeat = 8/1.4 ≈ 5.71 (a tile every 1.4 m). Was [3,3] =
+  // tiles every 2.67 m — the ~2x-stretched "mushy lawn" texel-scale bug.
+  ground: {
+    dir: "ground",
+    hasAo: true,
+    realWorldSizeM: [1.4, 1.4],
+    uvMetresPerUnit: [8, 8],
+  },
 };
+
+/** repeat = uvMetresPerUnit / textureRealWorldMetres (per axis). */
+function repeatOf(cfg: GroupConfig): [number, number] {
+  return [
+    cfg.uvMetresPerUnit[0] / cfg.realWorldSizeM[0],
+    cfg.uvMetresPerUnit[1] / cfg.realWorldSizeM[1],
+  ];
+}
 
 const BASE_URL = "/sim/textures";
 
@@ -92,13 +137,14 @@ function loadOne(
 function buildSet(group: PbrGroup): Promise<PbrTextureSet> {
   const cfg = GROUPS[group];
   const base = `${BASE_URL}/${cfg.dir}`;
+  const repeat = repeatOf(cfg);
   const loader = new THREE.TextureLoader();
   return Promise.all([
-    loadOne(loader, `${base}/color.png`, true, cfg.repeat),
-    loadOne(loader, `${base}/normal.png`, false, cfg.repeat),
-    loadOne(loader, `${base}/roughness.png`, false, cfg.repeat),
+    loadOne(loader, `${base}/color.png`, true, repeat),
+    loadOne(loader, `${base}/normal.png`, false, repeat),
+    loadOne(loader, `${base}/roughness.png`, false, repeat),
     cfg.hasAo
-      ? loadOne(loader, `${base}/ao.png`, false, cfg.repeat)
+      ? loadOne(loader, `${base}/ao.png`, false, repeat)
       : Promise.resolve<THREE.Texture | null>(null),
   ]).then(([map, normalMap, roughnessMap, aoMap]) => ({
     map,
