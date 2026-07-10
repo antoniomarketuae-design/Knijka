@@ -20,8 +20,8 @@
 // mirror path (rule-engine sample + camera head-turn).
 //
 // Frame reminder (tuning.ts): chassis-local metres, +X = car LEFT,
-// +Z = forward; the driver (LHD) sits at x +0.34, eye at COCKPIT_EYE
-// (0.34, 0.66, 0.12).
+// +Z = forward; the driver (LHD) sits at x +0.34, eye at COCKPIT_DEP
+// (0.34, 0.66, 0.12) — the camera itself sits aft of it, see COCKPIT_EYE.
 
 import { createContext } from "react";
 import type {

@@ -49,7 +49,8 @@ import { MirrorRig, type MirrorMeshes } from "./MirrorRig";
 // MOUNTING MATH (verified against the GLB node transforms): the file is
 // authored Y-up with the car facing -Z — the same convention as the exterior
 // hero_car.glb — so the sim's existing yaw-π flip applies; at scale 1.0 with
-// a y offset of -0.55 the authored driver eye lands exactly on COCKPIT_EYE.
+// a y offset of -0.55 the authored driver eye lands exactly on COCKPIT_DEP
+// (the design eye point; the camera sits aft of it, see COCKPIT_EYE).
 // Cross-check: authored steering_wheel (-0.34, 0.85, -0.52) → chassis-local
 // (0.34, 0.30, 0.52) — the procedural cockpit's exact wheel mount.
 // ---------------------------------------------------------------------------

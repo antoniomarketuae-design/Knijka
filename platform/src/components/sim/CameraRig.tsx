@@ -12,7 +12,8 @@ import {
   CHASE_STIFFNESS,
   COCKPIT_DAMPING,
   COCKPIT_EYE,
-  COCKPIT_FOV,
+  COCKPIT_FOV_MAX,
+  cockpitVFovForAspect,
   COCKPIT_LEAN_LATERAL,
   COCKPIT_LEAN_LONGITUDINAL,
   COCKPIT_ROLL_GAIN,
@@ -48,19 +49,19 @@ const FOV_WIDEN_COCKPIT = 5;
 const FOV_DAMPING = 3;
 
 /**
- * Mirror-glance head turns (rad), derived from the RETUNED cockpit geometry
- * (doc 70): eye COCKPIT_EYE (0.34, 0.74, −0.18) with the base view pitched
- * COCKPIT_PITCH_BASE (−14°) vs the door mirrors (±0.905, 0.455, 0.592) and
+ * Mirror-glance head turns (rad), derived from the FINAL doc-71 §4.9 pose:
+ * camera COCKPIT_EYE (0.24, 0.67, −0.255) with the base view pitched
+ * COCKPIT_PITCH_BASE (−8°) vs the door mirrors (±0.905, 0.455, 0.592) and
  * the interior mirror (0, 0.687, 0.575). yaw = atan2(Δx, Δz) (positive looks
  * toward car-left); pitch is measured relative to the PITCHED view axis
  * (glance rotation composes after the base pitch), i.e.
- * atan2(Δy, dist) − COCKPIT_PITCH_BASE. The mirrors are already in frame at
- * rest, so the turn centres the glass rather than the old exaggerated whip.
+ * atan2(Δy, distXZ) − COCKPIT_PITCH_BASE. The mirrors are already in frame
+ * at rest, so the turn centres the glass rather than the old exaggerated whip.
  */
 const GLANCE_OFFSETS: Record<MirrorGlanceKind, { yaw: number; pitch: number }> = {
-  left: { yaw: 0.66, pitch: -0.05 },
-  right: { yaw: -1.02, pitch: 0.05 },
-  rear: { yaw: -0.42, pitch: 0.18 },
+  left: { yaw: 0.67, pitch: -0.06 },
+  right: { yaw: -0.93, pitch: -0.01 },
+  rear: { yaw: -0.28, pitch: 0.16 },
 };
 
 /**
@@ -128,7 +129,7 @@ export function CameraRig({
     const switched = mode !== lastMode.current;
     if (switched) {
       lastMode.current = mode;
-      cam.fov = mode === "chase" ? CHASE_FOV : COCKPIT_FOV;
+      cam.fov = mode === "chase" ? CHASE_FOV : cockpitVFovForAspect(cam.aspect);
       cam.updateProjectionMatrix();
     }
 
@@ -138,11 +139,22 @@ export function CameraRig({
     chassis.getWorldQuaternion(quat);
     fwd.set(0, 0, 1).applyQuaternion(quat);
 
-    // Subtle speed-based FOV widen (both cameras).
+    // Base FOV. Chase keeps three's default Hor+ resize (vFOV fixed). The
+    // cockpit instead HOLDS ITS ~75.4° hFOV constant across window shapes
+    // (doc 71 §4.9): vFOV is derived from the live aspect every frame (one
+    // atan — R3F keeps cam.aspect current on resize), so ultrawide/portrait
+    // windows keep the exact horizontal composition the camera contract is
+    // authored for instead of gaining/losing world at the sides.
+    const baseFov = mode === "chase" ? CHASE_FOV : cockpitVFovForAspect(cam.aspect);
+    // Subtle speed-based FOV widen (both cameras). In the cockpit the result
+    // is capped at COCKPIT_FOV_MAX — the lane-12 hard rule (vFOV > ~56 breaks
+    // the graded 10–30 m distance judgments) outranks the widen effect.
     const speedNorm = Math.min(Math.abs(sim?.speedKmh ?? 0) / 130, 1) ** 1.4;
-    const baseFov = mode === "chase" ? CHASE_FOV : COCKPIT_FOV;
     const widen = mode === "chase" ? FOV_WIDEN_CHASE : FOV_WIDEN_COCKPIT;
-    const targetFov = baseFov + widen * speedNorm;
+    const targetFov =
+      mode === "chase"
+        ? baseFov + widen * speedNorm
+        : Math.min(baseFov + widen * speedNorm, COCKPIT_FOV_MAX);
     if (Math.abs(cam.fov - targetFov) > 0.02) {
       cam.fov += (targetFov - cam.fov) * (1 - Math.exp(-FOV_DAMPING * delta));
       cam.updateProjectionMatrix();
@@ -207,9 +219,10 @@ export function CameraRig({
 
       // Head roll INTO the corner, nose-dive pitch on braking, look-into-turn
       // yaw — small camera-local rotation (YXZ), applied after base orientation.
-      // COCKPIT_PITCH_BASE rides the same X axis: the constant downward tilt
-      // that puts the dash-top at ~46% of frame height (doc 70 contract; the
-      // full visibility math lives on the constant in tuning.ts).
+      // COCKPIT_PITCH_BASE rides the same X axis: the constant 8° down tilt
+      // that puts the dash-top at ~44% of frame height (doc 71 §4.9 contract;
+      // the full landmark table lives on the constant in tuning.ts, and the
+      // cockpit-camera-contract test pins it).
       const steerNorm = clampAbs(steer / STEER_MAX_ANGLE, 1);
       leanEuler.set(
         COCKPIT_PITCH_BASE + lean.longG * COCKPIT_PITCH_GAIN,

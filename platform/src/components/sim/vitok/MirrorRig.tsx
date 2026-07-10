@@ -17,8 +17,9 @@
 // suspended around the pass so the main render's shadow maps are reused.
 //
 // PERF BUDGET (documented per doc 68 A4):
-//   targets: rear 256x96 (24.6k px) + 2x 192x128 (24.6k px each) ≈ 0.3 MB
-//   RGBA + depth total.
+//   targets: rear 256x96 (24.6k px) + 2x 192x128 (24.6k px each) ≈ 0.6 MB
+//   RGBA16F + depth total (HalfFloat so the composer tone-maps mirror
+//   content identically to the direct view — see the aim-table comment).
 //   cadence: round-robin, at most ONE mirror pass per frame —
 //     low    = no RTT at all (authored dark-gloss glass stays);
 //     medium = rear only, rendered every 2nd frame  (~0.2-0.4 ms avg/frame);
@@ -34,6 +35,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useFrame, useThree } from "@react-three/fiber";
 import {
+  HalfFloatType,
   MeshBasicMaterial,
   PerspectiveCamera,
   WebGLRenderTarget,
@@ -64,11 +66,44 @@ interface MirrorDef {
   pitch: number;
 }
 
+// AIM TABLE (doc 71 §4.9 / lane 12 §7 — explicit, NOT derived from the GLB
+// mirror-node orientations: those encode the GLASS plane tilted toward the
+// driver's eyes, and a fixed backward camera is our approximation of the
+// reflected view, so the aim is authored here on purpose).
+//
+//   mirror | pos (chassis-local, GLB glass) | yaw    | pitch        | vFOV
+//   rear   | (0, 0.687, 0.575) — 1.18 m up  | 0      | 0 (horizon)  | 14°
+//   left   | (+0.905, 0.455, 0.592)         | 0      | −0.08 ≈ −4.6°| 18°
+//   right  | (−0.905, 0.455, 0.592)         | 0      | −0.08 ≈ −4.6°| 18°
+//
+// Rear looks straight back along −Z with the horizon centred (the glass sits
+// at real eye/horizon height). Door cameras look rearward PARALLEL to the
+// body axis, 4–5° down (lane-12's real-mirror numbers): the ±0.905 m lateral
+// camera position already gives the outboard eye a real glass provides, so
+// road fills the lower two-thirds and horizon rides the upper third.
+//
+// REF 6 post-mortem (why the mirrors were broken, so nobody re-breaks them):
+//  1. far plane 500 < SkyDome radius 520 → EVERY mirror pass clipped the sky
+//     dome and rendered clear-colour black sky (MIRROR_FAR fixes this);
+//  2. 8-bit UNSIGNED_BYTE targets stored the LINEAR pre-composer scene —
+//     HDR >1 clipped and linear quantisation crushed the dark asphalt into
+//     the "dark smear" (HalfFloatType fixes this — see below);
+//  3. the old ∓0.14 outward yaw aimed the left glass ~8° into the roadside
+//     lawn — with the black sky that read as "solid green".
 const MIRROR_DEFS: Record<MirrorKind, MirrorDef> = {
-  rear: { width: 256, height: 96, fovDeg: 14, pos: [0, 0.687, 0.575], yaw: 0, pitch: -0.02 },
-  left: { width: 192, height: 128, fovDeg: 18, pos: [0.905, 0.455, 0.592], yaw: -0.14, pitch: -0.05 },
-  right: { width: 192, height: 128, fovDeg: 18, pos: [-0.905, 0.455, 0.592], yaw: 0.14, pitch: -0.05 },
+  rear: { width: 256, height: 96, fovDeg: 14, pos: [0, 0.687, 0.575], yaw: 0, pitch: 0 },
+  left: { width: 192, height: 128, fovDeg: 18, pos: [0.905, 0.455, 0.592], yaw: 0, pitch: -0.08 },
+  right: { width: 192, height: 128, fovDeg: 18, pos: [-0.905, 0.455, 0.592], yaw: 0, pitch: -0.08 },
 };
+
+/** Mirror-camera near plane (m) — glass positions sit just outside the
+ *  chassis box, nothing legitimate is closer. */
+const MIRROR_NEAR = 0.3;
+/** Mirror-camera far plane (m). MUST exceed the SkyDome radius (520 —
+ *  environment/SkyDome.tsx default): the sky is a mesh dome, and any far
+ *  plane below it clips the entire sky out of the mirror pass, leaving black
+ *  clear-colour "sky" (the REF 6 failure #1 above). */
+const MIRROR_FAR = 560;
 
 /** Which mirrors run RTT per quality tier (lesson-ui preset, fixed for the
  *  life of the scene — the selector lives on the pre-lesson screen). */
@@ -104,14 +139,20 @@ export function MirrorRig({ mirrors, active }: { mirrors: MirrorMeshes; active: 
       const mesh = mirrors[kind];
       if (!mesh) return [];
       const def = MIRROR_DEFS[kind];
+      // HalfFloat target = "exposure locked to main scene" (lane 12 §7): the
+      // main pipeline renders LINEAR HDR and tone-maps in the composer, so
+      // the mirror target must carry linear HDR too — the glass quad is then
+      // graded/tone-mapped by the same composer pass as the directly-seen
+      // world. An 8-bit target here clips HDR and bands the darks (REF 6).
       const target = new WebGLRenderTarget(def.width, def.height, {
         stencilBuffer: false,
+        type: HalfFloatType,
       });
       const camera = new PerspectiveCamera(
         def.fovDeg,
         def.width / def.height,
-        0.3,
-        500,
+        MIRROR_NEAR,
+        MIRROR_FAR,
       );
       camera.position.set(def.pos[0], def.pos[1], def.pos[2]);
       camera.rotation.order = "YXZ";

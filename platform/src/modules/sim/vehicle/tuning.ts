@@ -293,59 +293,112 @@ export const CALIBRATED_GFOV_DEG = Math.round(
  *  horizontal FOV (Hor+) and the calibration is aspect-independent. */
 export const CHASE_FOV = 44;
 
+// --- Cockpit camera contract (doc 71 §4.9 / lane 12 — FINAL numbers) --------
+// History: hood cam (eye 0.66/z 0.12, FOV 40, level) → founder rejected;
+// REF 6 overshoot (eye 0.74/z −0.18, FOV 57, pitch −14°) → roof header
+// letterboxed the windshield, rejected; interim (0.70/−0.10, 57, −8°).
+// Lane-12 research ruling: the REF 2 (City Car Driving) look is a MODERATE
+// lens pulled BEHIND the driver's eye — vFOV 47 at ~0.375 m aft — never a
+// wide lens at the eyeball. The automated acceptance test
+// (vehicle/__tests__/cockpit-camera-contract.test.ts) pins this pose; any
+// future tune must keep it green or consciously change its bands.
+
 /**
- * Driver eye point, chassis-local (LHD: +X is the left/driver side).
- *
- * RETUNED 2026-07-10 to the founder's cockpit-view contract (doc 70 REF 2/3):
- * the interior must fill ~40–50% of the frame bottom — full dash, whole
- * steering wheel, binnacle, left A-pillar base, side-mirror glass, interior
- * rear-view mirror in frame top-right; windshield = upper ~55%.
- *
- * The authored-eye reference of the interior GLB is (0.34, 0.66, 0.12) — the
- * GLB mount in VitokCockpit is calibrated to it and MUST NOT move (hotspot
- * proxies are placed in chassis space against that mount). The CAMERA now
- * sits higher and further back than the authored eye — a seating position,
- * not a hood cam. Key cabin geometry (chassis-local, from the GLB/hotspots):
- *   dash top (cowl)  y ≈ 0.48, z ≈ 0.70
- *   wheel centre     (0.34, 0.30, 0.52), rim radius ≈ 0.19
- *   interior mirror  (0.00, 0.69, 0.58) · left door mirror (0.91, 0.46, 0.59)
- * From the OLD eye (0.66, z 0.12, level view, FOV 40) the dash top sat only
- * ~7% up the frame and the wheel was entirely below the frustum — the exact
- * "hood cam" the founder rejected. See COCKPIT_PITCH_BASE for the full
- * frame-fraction math at the new pose. y 0.74 ≈ 1.23 m above road — upright
- * SUV-ish seating per REF 2; z −0.18 puts the eye ~0.70 m behind the wheel
- * centre (real torso-to-wheel distance, not floating over the dash). */
-/** INTERIM TUNE (founder screenshot REF 6): at (0.74, −0.18) + pitch −14° the
- *  GLB's roof header ate ~25% of the frame top and the windshield became a
- *  letterbox slit. Eye down to 0.70 (under the header line) and forward to
- *  −0.10 (header subtends less), pitch relaxed to −8° → windshield ≈ 60%,
- *  dash+wheel ≈ 37%, header grazes the top edge. Final numbers come from the
- *  quality-gap lane-12 research (driving-sim cockpit-balance norms). */
-export const COCKPIT_EYE = { x: 0.34, y: 0.7, z: -0.1 } as const;
-/** Cockpit vertical FOV. History: 55 (doc 63) → 40 (QW2 GFOV calibration) →
- *  57 (founder contract, doc 70): at 40 the cabin was amputated — no wheel,
- *  no mirrors, no A-pillars, ~7% dash. 57 trades ~1.3× GFOV minification for
- *  the REF 2/3 framing; the founder explicitly chose the cabin-visible look
- *  over pure calibration. At 16:9 the half-hFOV is atan(tan(28.5°)·16/9) ≈
- *  44° — both door-mirror lines of sight fit; only the far ~9° of the
- *  passenger-side dash end falls outside (full dash left-to-right would need
- *  hFOV ≈ 106° = fishbowl; every other contract item holds at 57). */
-export const COCKPIT_FOV = 57;
+ * Driver DESIGN EYE POINT (DEP), chassis-local (LHD: +X = left/driver side):
+ * the authored eye of the interior GLB — VitokCockpit's mount (yaw-π,
+ * y −0.55) is calibrated to it and MUST NOT move (hotspot proxies are placed
+ * in chassis space against that mount). 0.66 + 0.49 ≈ 1.15 m above road —
+ * SAE sedan eye height (lane 12 §5). The CAMERA is defined relative to this.
+ */
+export const COCKPIT_DEP = { x: 0.34, y: 0.66, z: 0.12 } as const;
 /**
- * Constant downward camera pitch (rad, negative = look down) applied to the
- * cockpit view. The contract needs the dash-top/cowl line at ~45% of frame
- * height — impossible with a level camera without a huge FOV. With eye
- * (0.34, 0.74, −0.18), pitch −14° and vFOV 57° the frame spans −42.5°…+14.5°
- * about the horizon; angles below the horizon per landmark (atan Δy/Δz from
- * the eye) → fraction of frame height from the bottom edge:
- *   wheel bottom (y 0.11, z 0.52): −42.0° →  ~1%  (whole wheel just in frame)
- *   wheel top    (y 0.49, z 0.52): −19.7° → ~40%
- *   dash top     (y 0.48, z 0.70): −16.5° → ~46%  → windshield = upper ~54% ✓
- *   int. mirror  (y 0.69, z 0.58):  −4.0° → ~68% high, ~77% from left (top-right) ✓
- *   door mirror  (0.91, 0.46, 0.59): −20.3° → ~39% high, ~9% from left ✓
- *   sun visor    (y ≈ 0.93, z 0.55): +14.6° → grazes the top edge ✓
- * Net: interior fills the bottom ~46% of the frame — the doc-70 40–50% band. */
-export const COCKPIT_PITCH_BASE = -0.14; // ≈ −8° (interim; was −14° — see COCKPIT_EYE note)
+ * Camera offsets from the DEP (m), per the lane-12 ruling (doc 71 §4.9):
+ * aft −0.375 (tolerance −0.30…−0.45) brings dash + both mirror sightlines
+ * into a ~75° hFOV frame; inboard +0.10 (+0.05…+0.15) centres the windshield;
+ * up +0.02 (0…+0.05) resolved to +0.01 against OUR GLB: the GT-E cowl sits
+ * slightly higher relative to the authored eye than lane-12's generic sedan
+ * (−11.3° vs −11°), so +0.02 left the cowl at frame 0.423 — 0.003 above the
+ * contract floor; +0.01 centres it at 0.435. Within the ruled tolerance.
+ */
+export const COCKPIT_CAM_OFFSET = { aft: 0.375, inboard: 0.1, up: 0.01 } as const;
+/**
+ * Cockpit camera position, chassis-local = DEP + offsets: a seating position
+ * pulled behind and slightly inside the driver's eye — not a hood cam, not
+ * an eyeball cam. ~0.78 m behind the wheel rim plane, 1.16 m above road.
+ */
+export const COCKPIT_EYE = {
+  x: COCKPIT_DEP.x - COCKPIT_CAM_OFFSET.inboard, // inboard = toward car centre
+  y: COCKPIT_DEP.y + COCKPIT_CAM_OFFSET.up,
+  z: COCKPIT_DEP.z - COCKPIT_CAM_OFFSET.aft, // aft = behind the driver
+} as const;
+/**
+ * Cockpit vertical FOV at the 16:9 REFERENCE aspect (three.js `fov` is
+ * vertical degrees). History: 55 (doc 63) → 40 (QW2 GFOV calibration — cabin
+ * amputated) → 57 (doc 70 overshoot) → 47 FINAL (lane 12): shipped cockpit
+ * sims converge on 47–56 v on a single 16:9 screen (CCD ~50h/36v stock, ACC
+ * players 50–56, BeamNG 55, Forza dash ~55); 47 ≈ 1.5–2× the true display
+ * FOV — the comfort/accuracy sweet spot. A sedan windshield is only ~23° of
+ * vertical angle: vFOV 47 + pitch 8° down + the aft offset is what yields
+ * interior ≈ 44% / windshield ≈ 55% without a letterbox. On resize the
+ * HORIZONTAL FOV is held constant instead — see cockpitVFovForAspect().
+ */
+export const COCKPIT_FOV = 47;
+/**
+ * HARD CEILING on cockpit vertical FOV (lane 12 §4, research-backed): above
+ * ~56° distance compression makes the 10–30 m judgments we grade (following
+ * gaps, stop lines) systematically wrong, and wider GFOV further corrupts
+ * speed perception (Hussain 2020). Applies to the aspect-derived vFOV AND
+ * after any speed widen. Never raise this.
+ */
+export const COCKPIT_FOV_MAX = 56;
+/** Reference aspect at which COCKPIT_FOV is authored. */
+export const COCKPIT_ASPECT_REF = 16 / 9;
+/**
+ * Horizontal FOV (rad) implied by COCKPIT_FOV at the reference aspect —
+ * ≈ 75.4°. This is the quantity held constant across window shapes.
+ */
+export const COCKPIT_HFOV_RAD =
+  2 * Math.atan(Math.tan((COCKPIT_FOV * Math.PI) / 360) * COCKPIT_ASPECT_REF);
+/**
+ * hFOV-locked vertical FOV for an aspect ratio (deg) — the doc-71 §4.9 resize
+ * ruling. Default three.js behaviour keeps vFOV fixed (Hor+): ultrawide
+ * windows gain world, portrait windows zoom into a slit. Instead hold the
+ * ~75.4° hFOV constant and derive vFOV = 2·atan(tan(hFOV/2)/aspect), so the
+ * horizontal composition (mirrors, A-pillars, lane edges) is identical on
+ * every monitor. Clamped to COCKPIT_FOV_MAX: windows squarer than ~1.45:1
+ * pin at vFOV 56 and give up some hFOV — the distance-judgment hard rule
+ * outranks the hFOV hold. At 16:9 this returns exactly COCKPIT_FOV (47).
+ */
+export function cockpitVFovForAspect(aspect: number): number {
+  if (!Number.isFinite(aspect) || aspect <= 0) return COCKPIT_FOV;
+  const vfovDeg = (2 * Math.atan(Math.tan(COCKPIT_HFOV_RAD / 2) / aspect) * 180) / Math.PI;
+  return Math.min(vfovDeg, COCKPIT_FOV_MAX);
+}
+/**
+ * Constant downward camera pitch (rad, negative = look down): 8° exactly
+ * (lane-12 ruling, slider band 7–9°). Every degree of down-pitch moves the
+ * roof-header line ~2% of frame height toward the top edge at vFOV 47 — 8°
+ * is what kills the REF 6 letterbox while keeping the horizon in the upper
+ * third. Frame-fraction table at the shipped pose (COCKPIT_EYE
+ * (0.24, 0.67, −0.255), vFOV 47, 16:9; fractions from bottom-left, computed
+ * through three's projection in the acceptance test — landmarks chassis-local
+ * from the GLB/hotspots):
+ *   wheel top      (0.34, 0.484, 0.431): fy 0.36        (rim in frame) ✓
+ *   cluster centre (0.34, 0.424, 0.711): fy 0.37        (readable) ✓
+ *   dash top/cowl  (y 0.48, z 0.70):     fy 0.435       → interior = bottom ~44% ✓
+ *     (the windshield GLASS base (0.436, 0.92) projects to the same line —
+ *      the dash top slopes away exactly along the sightline)
+ *   10 m road pt   (y −0.49, z 10):      fy 0.53        (10–100 m band clear) ✓
+ *   horizon:                             fy 0.66 ✓
+ *   int. mirror    (0.00, 0.687, 0.575): fx 0.69 fy 0.69 (upper-right, above
+ *      horizon — the GLB authors the mirror at the car centreline near eye
+ *      height, so it CANNOT reach lane-12's assumed corner; see test notes)
+ *   door mirror L  (0.905, 0.455, 0.592): fx 0.005 fy 0.37 (glass at the left
+ *      frame edge — lane 12: "~37° left from the aft camera") ✓
+ *   glass top/roof header (0.884, 0.600): fy 0.966 → header intrusion 3.4%,
+ *      well under the ≤8% contract cap (visor line 0.93/0.55 is off-frame) ✓
+ */
+export const COCKPIT_PITCH_BASE = -(8 * Math.PI) / 180;
 /** Cockpit eye-position smoothing rate (1/s) — damps suspension tick. */
 export const COCKPIT_DAMPING = 25;
 
