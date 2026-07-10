@@ -262,16 +262,51 @@ export const CHASE_HEIGHT = 2.3; // m above the car
 export const CHASE_LOOK_AHEAD = 3.0; // m ahead of the car to aim at
 export const CHASE_LOOK_HEIGHT = 1.1; // m above car origin to aim at
 export const CHASE_STIFFNESS = 5.0; // 1/s exponential follow rate
-export const CHASE_FOV = 60;
+
+// ---------------------------------------------------------------------------
+// GFOV calibration (QW2 — plan doc 68 Phase 0, research R2 §3.3, audit B3)
+// ---------------------------------------------------------------------------
+// Perceived road width and speed depend on the ratio of the camera's
+// GEOMETRIC field of view (GFOV, what the virtual camera renders) to the
+// DISPLAY field of view (DFOV, the angle the physical screen subtends at the
+// viewer's eye). Research optimum: GFOV ≈ 1.22 × DFOV. An over-wide GFOV
+// minifies the scene → roads read too narrow, speed is underestimated ~10%,
+// and the optic-flow mismatch feeds sim sickness.
+//
+// ASSUMED VIEWING GEOMETRY (documented here; tune in the founder session):
+//   15.6" 16:9 laptop → screen height ≈ 19.4 cm, viewed at ≈ 45 cm
+//   → vertical DFOV = 2·atan(9.7/45) ≈ 24.5°; a 24" desktop monitor at
+//   ≈ 60 cm gives ≈ 28°. Calibrated vertical GFOV ≈ 1.22 × 24.5–28 ≈ 30–34°.
+/** Research-optimum GFOV:DFOV ratio (R2 §3.3). */
+export const GFOV_DISPLAY_RATIO = 1.22;
+/** Vertical DFOV (deg) of the assumed 15.6" laptop viewed at ~45 cm. */
+export const ASSUMED_DISPLAY_VFOV_DEG = 24.5;
+/** Fully calibrated vertical GFOV (deg) for the assumed display — ≈30. */
+export const CALIBRATED_GFOV_DEG = Math.round(
+  ASSUMED_DISPLAY_VFOV_DEG * GFOV_DISPLAY_RATIO,
+);
+
+/** Chase vertical FOV. Was 60 (uncalibrated). 44 = the cockpit's 40 + 4°:
+ *  the third-person frame needs the car plus margins in view, and it is not
+ *  the perceptual reference view. All FOVs here are VERTICAL (three.js
+ *  `fov`); R3F recomputes aspect on resize/fullscreen, so wider windows gain
+ *  horizontal FOV (Hor+) and the calibration is aspect-independent. */
+export const CHASE_FOV = 44;
 
 /** Driver eye point, chassis-local (LHD: +X is the left/driver side).
  *  y ≈ 0.66 above the COM puts the eye ~1.15 m above the road (real sedan
  *  driver eye height, SAE eyellipse — docs/simulation/63). */
 export const COCKPIT_EYE = { x: 0.34, y: 0.66, z: 0.12 } as const;
-/** Cockpit FOV: ~55° vertical is the natural cockpit value; >65 reads as a
- *  fishbowl that flattens speed/distance and feels "floating" (sim-racing FOV
- *  research, docs/simulation/63). */
-export const COCKPIT_FOV = 55;
+/** Cockpit vertical FOV. Was 55 (doc 63's "natural cockpit" pick, made to
+ *  kill a 68° fishbowl before the GFOV research landed). 40 sits just above
+ *  the calibrated 30–34° band (CALIBRATED_GFOV_DEG): the last ~8° are kept
+ *  deliberately so the windshield frame/A-pillars stay in view — pure
+ *  calibration reads as looking through binoculars and amputates the cabin
+ *  (re-triggering doc 63's "floating" complaint). Net effect vs 55: the
+ *  scene renders ~1.4× larger — roads read wider, speed reads faster.
+ *  Founder tune range: down toward CALIBRATED_GFOV_DEG if roads still read
+ *  narrow, up toward the legacy 55 if the cabin feels cropped. */
+export const COCKPIT_FOV = 40;
 /** Cockpit eye-position smoothing rate (1/s) — damps suspension tick. */
 export const COCKPIT_DAMPING = 25;
 

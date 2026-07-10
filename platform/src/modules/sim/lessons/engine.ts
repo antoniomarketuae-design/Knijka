@@ -97,6 +97,7 @@ function toHudEvents(events: ReadonlyArray<RuleEvent>): HudEvent[] {
       ? {
           kind: "violation" as const,
           titleBg: e.titleBg,
+          explanationBg: e.explanationBg,
           points: e.points,
           severity: e.severityClass,
           lawRef: e.lawRef,
@@ -143,6 +144,16 @@ export function applyPreDriveStep(
   };
 }
 
+/**
+ * QW10 (doc 68 Phase 0): while the pre-drive procedure is still running the
+ * vehicle must not move — the 3D scene zeroes the drive inputs into the
+ * physics while this is true and explains why on the first throttle attempt.
+ * Interim gate until real ignition/handbrake state lands (Phase 1 A1).
+ */
+export function isDriveLocked(state: LessonSessionState): boolean {
+  return state.phase === "preDrive";
+}
+
 // ---------------------------------------------------------------------------
 // Driving phase
 // ---------------------------------------------------------------------------
@@ -181,6 +192,7 @@ export function applyTick(prev: LessonSessionState, tick: SimTick): LessonStepRe
       hudEvents.push({
         kind: "violation",
         titleBg: e.titleBg,
+        explanationBg: e.explanationBg,
         points: e.points,
         severity: e.severityClass,
         lawRef: e.lawRef,

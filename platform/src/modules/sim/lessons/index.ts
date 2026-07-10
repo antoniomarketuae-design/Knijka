@@ -21,6 +21,7 @@ export {
   buildLessonResult,
   createLessonSession,
   finishSession,
+  isDriveLocked,
   type LessonEngineOptions,
   type LessonStepResult,
 } from "./engine";

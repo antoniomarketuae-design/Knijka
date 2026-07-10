@@ -40,6 +40,7 @@ import {
   DIFFICULTY_ORDER,
   DIFFICULTY_PRESETS,
   type DifficultyMode,
+  type VehicleInput,
   type VehicleSim,
 } from "@/modules/sim/vehicle";
 import type { VehicleSample } from "@/modules/sim/contracts";
@@ -79,6 +80,39 @@ interface SpawnPointLike {
 
 const MINIMAP_MS = 200;
 const MINIMAP_PX_PER_M = 0.5;
+
+/**
+ * QW10 (doc 68 Phase 0): SimInput with a pre-drive gate. While `driveLocked`
+ * (lesson phase === "preDrive") the drive axes read zero — throttle, brake
+ * (whose standstill overload is reverse) and handbrake — so the physics can
+ * never move the car mid-checklist; steering stays live (harmless while
+ * stationary, keeps the wheel responsive). A throttle press while locked is
+ * latched so the scene can surface the "завърши подготовката" explanation
+ * exactly once per attempt. Interim seam until real ignition/handbrake state
+ * lands (Phase 1 A1) — the physics core and VehicleRig stay untouched.
+ */
+class GatedSimInput extends SimInput {
+  driveLocked = false;
+  private blockedThrottleAttempt = false;
+
+  override read(): VehicleInput {
+    const out = super.read();
+    if (this.driveLocked) {
+      if (out.throttle > 0) this.blockedThrottleAttempt = true;
+      out.throttle = 0;
+      out.brake = 0;
+      out.handbrake = false;
+    }
+    return out;
+  }
+
+  /** True once after a throttle press while locked (one-shot latch). */
+  consumeBlockedDriveAttempt(): boolean {
+    const b = this.blockedThrottleAttempt;
+    this.blockedThrottleAttempt = false;
+    return b;
+  }
+}
 
 /** lesson-ui preset ("medium") → world/environment level ("med"). */
 function toLevel(q: QualityPreset): "low" | "med" | "high" {
@@ -127,8 +161,14 @@ export interface LessonSceneProps {
   lesson: LessonSpec;
   quality: QualityPreset;
   paused: boolean;
+  /** QW10: pre-drive phase — zero the drive inputs, the car must not move. */
+  driveLocked: boolean;
+  /** QW5: completed checklist steps with a real cabin effect (append-only). */
+  preDriveCabinSteps: readonly PreDriveStepId[];
   onTick: (tick: SimTick) => void;
   onPreDriveStep: (stepId: PreDriveStepId, tSec: number) => void;
+  /** QW10: throttle pressed while driveLocked (shell rate-limits the toast). */
+  onBlockedDriveAttempt: () => void;
   onMinimapFrame: (frame: MinimapFrame) => void;
 }
 
@@ -246,6 +286,9 @@ function ReadyScene({
   menuPaused,
   setMenuPaused,
   physicsPaused,
+  driveLocked,
+  preDriveCabinSteps,
+  onBlockedDriveAttempt,
   onMinimap,
   onTickCb,
 }: LessonSceneProps & {
@@ -270,7 +313,7 @@ function ReadyScene({
   const simRef = useRef<VehicleSim | null>(null);
   const chassisGroupRef = useRef<Group | null>(null);
   const cameraModeRef = useRef<CameraMode>("cockpit");
-  const inputRef = useRef<SimInput | null>(null);
+  const inputRef = useRef<GatedSimInput | null>(null);
   const cabinRef = useRef<CabinControls | null>(null);
   const audioRef = useRef<SimAudio | null>(null);
   const sampleRef = useRef<VehicleSample>(createVehicleSample());
@@ -281,9 +324,13 @@ function ReadyScene({
     difficultyRef.current = difficulty;
   }, [difficulty]);
 
+  // Mirror of the driveLocked prop so the input lifecycle effect (which runs
+  // once) can seed a freshly created input with the current gate state.
+  const driveLockedRef = useRef(driveLocked);
+
   // Input + cabin + audio lifecycle.
   useEffect(() => {
-    const input = new SimInput({
+    const input = new GatedSimInput({
       onToggleCamera: () => {
         cameraModeRef.current =
           cameraModeRef.current === "chase" ? "cockpit" : "chase";
@@ -292,6 +339,7 @@ function ReadyScene({
       onReset: () => simRef.current?.reset(),
       onTogglePause: () => setMenuPaused(!menuPaused),
     });
+    input.driveLocked = driveLockedRef.current;
     inputRef.current = input;
     const audio = new SimAudio();
     audioRef.current = audio;
@@ -317,6 +365,22 @@ function ReadyScene({
     // toggle time; re-subscribing every toggle would drop key state.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [setMenuPaused]);
+
+  // QW10: keep the input gate in lockstep with the lesson phase.
+  useEffect(() => {
+    driveLockedRef.current = driveLocked;
+    if (inputRef.current) inputRef.current.driveLocked = driveLocked;
+  }, [driveLocked]);
+
+  // QW5: completed checklist steps set the REAL cabin state they claim (belt,
+  // low beams, left indicator) so the rule engine + telltales agree with what
+  // the student was just told they did. Idempotent re-application of the full
+  // append-only list also covers steps clicked before the cabin mounted.
+  useEffect(() => {
+    const cabin = cabinRef.current;
+    if (!cabin) return;
+    for (const stepId of preDriveCabinSteps) cabin.applyPreDriveStep(stepId);
+  }, [preDriveCabinSteps]);
 
   const getSignalPhase = useCallback(
     (id: string) => runtime.signalPhase(id),
@@ -397,6 +461,8 @@ function ReadyScene({
               runtime={runtime}
               traffic={traffic}
               sampleRef={sampleRef}
+              inputRef={inputRef}
+              onBlockedDriveAttempt={onBlockedDriveAttempt}
               onTick={onTickCb}
               onMinimap={onMinimap}
               minimapPolylines={minimapPolylines}
@@ -486,6 +552,8 @@ function RuntimeDriver({
   runtime,
   traffic,
   sampleRef,
+  inputRef,
+  onBlockedDriveAttempt,
   onTick,
   onMinimap,
   minimapPolylines,
@@ -496,6 +564,8 @@ function RuntimeDriver({
   runtime: ReturnType<typeof createWorldRuntime>;
   traffic: ReturnType<typeof createTrafficSystem>;
   sampleRef: React.RefObject<VehicleSample>;
+  inputRef: React.RefObject<GatedSimInput | null>;
+  onBlockedDriveAttempt: () => void;
   onTick: (t: SimTick) => void;
   onMinimap: (f: MinimapFrame) => void;
   minimapPolylines: MinimapFrame["polylines"];
@@ -507,7 +577,11 @@ function RuntimeDriver({
   const lastMinimapRef = useRef(0);
 
   useFrame((_, delta) => {
+    // QW10: consume the throttle-while-locked latch every frame (so attempts
+    // during a pause never queue up), surface it only on live frames.
+    const blockedAttempt = inputRef.current?.consumeBlockedDriveAttempt() ?? false;
     if (paused) return;
+    if (blockedAttempt) onBlockedDriveAttempt();
     const dt = Math.min(delta, 0.1);
     tRef.current += dt;
     const sample = sampleRef.current;
@@ -555,6 +629,7 @@ function ControlsHelp() {
     ["B", "предпазен колан"],
     ["Q E F", "огледала: ляво / дясно / назад"],
     ["C", "смяна на изглед"],
+    ["X", "цял екран"],
     ["R  ·  Esc", "рестарт · пауза"],
   ];
   return (

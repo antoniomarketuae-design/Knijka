@@ -1,9 +1,13 @@
 "use client";
 
 /**
- * Violation / commendation toasts — right side, newest on top, 4 s lifetime.
+ * Violation / commendation toasts — right side, newest on top.
  * Severity-colored with the official class name and a law-ref chip; the rule
  * engine authors every string (ADR-002 — no free-form AI text in the loop).
+ *
+ * Violation and lesson toasts carry the catalog's authored explanation + law
+ * citation (QW7 — the WHY must be visible at the moment of the mistake), so
+ * they live longer than the short commendation praise.
  *
  * `useHudToastQueue` owns ids + expiry; the component is presentational.
  */
@@ -16,8 +20,18 @@ export interface HudToast {
   event: HudEvent;
 }
 
+/** Short-lived praise ("Браво") — no body text to read. */
 const TOAST_TTL_MS = 4000;
+/** Violation/lesson toasts render 1–3 sentences of explanation — give the
+ * student time to read them (~15 chars/s reading speed at driving load). */
+const TEACHING_TOAST_TTL_MS = 8000;
 const MAX_VISIBLE = 4;
+
+function ttlFor(event: HudEvent): number {
+  return event.kind === "violation" || event.kind === "lesson"
+    ? TEACHING_TOAST_TTL_MS
+    : TOAST_TTL_MS;
+}
 
 export function useHudToastQueue(): {
   toasts: HudToast[];
@@ -40,7 +54,7 @@ export function useHudToastQueue(): {
     for (const toast of added) {
       const timer = window.setTimeout(() => {
         setToasts((prev) => prev.filter((t) => t.id !== toast.id));
-      }, TOAST_TTL_MS);
+      }, ttlFor(toast.event));
       timers.current.push(timer);
     }
   }, []);
@@ -80,6 +94,9 @@ function ToastCard({ event }: { event: HudEvent }) {
           </span>
         </div>
         <p className="mt-1 text-sm font-bold leading-snug text-foreground">{event.titleBg}</p>
+        {/* The WHY — same layout as the "lesson" teaching toast below (QW7):
+            our moat is the law-cited explanation at the moment of learning. */}
+        <p className="mt-1 text-xs leading-snug text-muted">{event.explanationBg}</p>
         {event.lawRef ? (
           <span className="mt-1.5 inline-block rounded-full border border-border px-2 py-0.5 text-[10px] font-semibold text-muted">
             {event.lawRef}

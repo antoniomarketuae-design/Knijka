@@ -10,6 +10,13 @@
 export { createPreDriveState, PRE_DRIVE_STEP_ORDER, PRE_DRIVE_STEPS } from "./steps";
 
 export {
+  applyPreDriveStepToCabin,
+  hasPreDriveCabinEffect,
+  PRE_DRIVE_CABIN_EFFECT_STEPS,
+  type PreDriveCabinState,
+} from "./cabinEffects";
+
+export {
   applyPreDriveAction,
   createPreDriveMachine,
   type PreDriveActionResult,

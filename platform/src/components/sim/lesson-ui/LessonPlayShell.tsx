@@ -37,6 +37,7 @@ import {
   createLessonSession,
   createQuizTriggerState,
   finishSession,
+  isDriveLocked,
   observeQuizTick,
   serializeRuleEvents,
   type LessonResult,
@@ -47,7 +48,7 @@ import {
   type QuizTriggerState,
   type TriggeredQuiz,
 } from "@/modules/sim/lessons";
-import type { PreDriveStepId } from "@/modules/sim/procedures";
+import { hasPreDriveCabinEffect, type PreDriveStepId } from "@/modules/sim/procedures";
 import type { SimTick } from "@/modules/sim/rules";
 import { finishLessonAction } from "@/app/(dashboard)/simulator/actions";
 import {
@@ -65,8 +66,13 @@ import {
 
 const HUD_POLL_MS = 150;
 
+/** QW10: min seconds between two "завърши подготовката" toasts. */
+const BLOCKED_DRIVE_TOAST_COOLDOWN_S = 10;
+
 interface HudSnapshot {
   phase: LessonSessionState["phase"];
+  /** QW10: pre-drive phase — the scene keeps the vehicle stationary. */
+  driveLocked: boolean;
   speedKmh: number;
   limitKmh: number;
   gear: number;
@@ -89,6 +95,7 @@ function snapshotOf(s: LessonSessionState, lastTick: SimTick | null): HudSnapsho
       : null;
   return {
     phase: s.phase,
+    driveLocked: isDriveLocked(s),
     speedKmh: lastTick?.speedKmh ?? 0,
     limitKmh: lastTick?.maxSpeedKmh ?? 50,
     gear: lastTick?.gear ?? 0,
@@ -222,6 +229,62 @@ export function LessonPlayShell({
   const [saveResult, setSaveResult] = useState<FinishLessonActionResult | null>(null);
   const { toasts, push, clear } = useHudToastQueue();
 
+  // -- QW1: fullscreen (immersive) mode ----------------------------------------
+  // The fullscreen ELEMENT is the shell root (not just the canvas): the
+  // browser then hides all surrounding dashboard chrome for free, while the
+  // slim top bar (abort/finish, quiz frequency) stays reachable inside.
+  const rootRef = useRef<HTMLDivElement | null>(null);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+
+  useEffect(() => {
+    const onChange = () => {
+      const fs = document.fullscreenElement;
+      setIsFullscreen(fs !== null && fs === rootRef.current);
+    };
+    document.addEventListener("fullscreenchange", onChange);
+    return () => document.removeEventListener("fullscreenchange", onChange);
+  }, []);
+
+  const toggleFullscreen = useCallback(() => {
+    const el = rootRef.current;
+    if (!el) return;
+    if (document.fullscreenElement) {
+      void document.exitFullscreen().catch(() => {});
+    } else {
+      void el.requestFullscreen({ navigationUI: "hide" }).catch(() => {
+        // Denied (permissions policy / lost activation) — letterboxed play
+        // still works; the ⛶ button and X remain available.
+      });
+    }
+  }, []);
+
+  // Enter fullscreen on lesson start: this shell mounts synchronously from
+  // the start click on the select screen, so the transient user-activation
+  // window of that gesture is still open when this mount effect runs
+  // (Chrome/Firefox). Stricter browsers reject → we stay letterboxed,
+  // no error surfaced (Esc always exits; fullscreenchange syncs state).
+  useEffect(() => {
+    const el = rootRef.current;
+    if (!el || document.fullscreenElement) return;
+    void el.requestFullscreen({ navigationUI: "hide" }).catch(() => {});
+  }, []);
+
+  // X toggles fullscreen (F is taken by the rear-mirror glance). Listed in
+  // the controls legend (LessonScene ControlsHelp).
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.code === "KeyX" && !e.repeat) toggleFullscreen();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [toggleFullscreen]);
+
+  // QW5: checklist completions that carry a real cabin effect (belt/lights/
+  // indicator), in completion order. Append-only per session run — the scene
+  // applies them idempotently to CabinControls so the rule engine + telltales
+  // agree with what the student was just told they did.
+  const [preDriveCabinSteps, setPreDriveCabinSteps] = useState<PreDriveStepId[]>([]);
+
   // -- micro-quiz: the theory↔driving closed loop ------------------------------
   // The pure trigger lives in a ref (frame-rate, zero re-renders); an active
   // quiz is React state (it pauses the drive + renders the overlay).
@@ -340,12 +403,21 @@ export function LessonPlayShell({
 
   const handlePreDriveStep = useCallback(
     (stepId: PreDriveStepId, tSec?: number) => {
-      const { state, hudEvents } = applyPreDriveStep(
-        sessionRef.current,
-        stepId,
-        tSec ?? nowSec(),
-      );
+      const prev = sessionRef.current;
+      const { state, hudEvents } = applyPreDriveStep(prev, stepId, tSec ?? nowSec());
       sessionRef.current = state;
+
+      // QW5: a step that newly completed AND has a real cabin state behind it
+      // (belt / low beams / left indicator) is forwarded to the scene, which
+      // sets that state on CabinControls — the checklist must never claim
+      // something the car doesn't reflect.
+      const newlyCompleted =
+        state.preDrive !== null &&
+        state.preDrive.completedStepIds.includes(stepId) &&
+        !(prev.preDrive?.completedStepIds.includes(stepId) ?? false);
+      if (newlyCompleted && hasPreDriveCabinEffect(stepId)) {
+        setPreDriveCabinSteps((steps) => [...steps, stepId]);
+      }
       if (hudEvents.length > 0) {
         push(
           hudEvents.filter(
@@ -361,6 +433,25 @@ export function LessonPlayShell({
     },
     [push, nowSec],
   );
+
+  // -- QW10: blocked-drive explanation ------------------------------------------
+  // First throttle attempt during the pre-drive phase → one teaching toast
+  // explaining WHY the car stays put; a cooldown keeps repeat presses silent
+  // instead of spamming the queue.
+  const blockedToastAtSecRef = useRef(Number.NEGATIVE_INFINITY);
+  const handleBlockedDriveAttempt = useCallback(() => {
+    const t = nowSec();
+    if (t - blockedToastAtSecRef.current < BLOCKED_DRIVE_TOAST_COOLDOWN_S) return;
+    blockedToastAtSecRef.current = t;
+    push([
+      {
+        kind: "lesson",
+        titleBg: "Завърши подготовката преди потегляне",
+        explanationBg:
+          "Колата остава на място, докато проверките не са готови — колан, огледала, двигател. Мини през стъпките в списъка вляво и завърши с „Потегляне“.",
+      },
+    ]);
+  }, [nowSec, push]);
 
   // -- HUD poll ------------------------------------------------------------------
   useEffect(() => {
@@ -385,6 +476,12 @@ export function LessonPlayShell({
     setSaveResult(null);
     setFlash(null);
     clear();
+    // Fresh pre-drive: the checklist restarts, so the cabin-effect feed and
+    // the blocked-drive toast cooldown restart with it. (The cabin itself
+    // keeps whatever state the previous run set — the student re-confirms it
+    // step by step, idempotently.)
+    setPreDriveCabinSteps([]);
+    blockedToastAtSecRef.current = Number.NEGATIVE_INFINITY;
     // Fresh micro-quiz session: reset the tally + rebuild the trigger from the
     // already-loaded bank.
     quizStatsRef.current = { total: 0, correct: 0 };
@@ -409,7 +506,16 @@ export function LessonPlayShell({
     : null;
 
   return (
-    <div className="flex flex-col gap-3">
+    <div
+      ref={rootRef}
+      className={
+        // Fullscreen: the UA sizes this element to the viewport — become a
+        // padded column so the scene (flex-1) absorbs all remaining height.
+        isFullscreen
+          ? "flex h-full flex-col gap-2 overflow-hidden bg-background p-2"
+          : "flex flex-col gap-3"
+      }
+    >
       <HudStyles />
 
       {/* Top bar */}
@@ -418,31 +524,52 @@ export function LessonPlayShell({
           ← Всички уроци
         </button>
         <h1 className="text-lg font-extrabold">{lesson.titleBg}</h1>
-        {!ended ? (
-          <div className="ml-auto flex flex-wrap items-center gap-2">
-            <QuizFrequencySelector value={quizFreq} onChange={setQuizFreq} />
-            {lesson.objectives.length === 0 ? (
-              <button type="button" className="btn-accent px-4 py-1.5 text-xs" onClick={finishNow}>
-                Завърши сесията
-              </button>
-            ) : (
-              <button type="button" className="btn-ghost px-4 py-1.5 text-xs" onClick={abortNow}>
-                Прекрати урока
-              </button>
-            )}
-          </div>
-        ) : null}
+        <div className="ml-auto flex flex-wrap items-center gap-2">
+          {!ended ? (
+            <>
+              <QuizFrequencySelector value={quizFreq} onChange={setQuizFreq} />
+              {lesson.objectives.length === 0 ? (
+                <button type="button" className="btn-accent px-4 py-1.5 text-xs" onClick={finishNow}>
+                  Завърши сесията
+                </button>
+              ) : (
+                <button type="button" className="btn-ghost px-4 py-1.5 text-xs" onClick={abortNow}>
+                  Прекрати урока
+                </button>
+              )}
+            </>
+          ) : null}
+          {/* QW1: fullscreen toggle — the same control exits (Esc works too). */}
+          <button
+            type="button"
+            className="btn-ghost px-3 py-1.5 text-xs"
+            onClick={toggleFullscreen}
+            aria-pressed={isFullscreen}
+            title={isFullscreen ? "Изход от цял екран (X или Esc)" : "Цял екран (X)"}
+          >
+            <span aria-hidden>⛶</span> {isFullscreen ? "Изход" : "Цял екран"}
+          </button>
+        </div>
       </div>
 
       {/* Scene + HUD overlays */}
-      <div className="relative w-full overflow-hidden rounded-xl border border-border bg-surface">
-        <div className="aspect-video w-full">
+      <div
+        className={`relative w-full overflow-hidden bg-surface ${
+          isFullscreen
+            ? "min-h-0 flex-1 rounded-lg"
+            : "rounded-xl border border-border"
+        }`}
+      >
+        <div className={isFullscreen ? "h-full w-full" : "aspect-video w-full"}>
           <SceneSlot
             lesson={lesson}
             quality={quality}
             paused={ended || activeQuiz !== null}
+            driveLocked={snap.driveLocked && !ended}
+            preDriveCabinSteps={preDriveCabinSteps}
             onTick={handleTick}
             onPreDriveStep={handlePreDriveStep}
+            onBlockedDriveAttempt={handleBlockedDriveAttempt}
             onMinimapFrame={setMinimapFrame}
           />
         </div>
@@ -533,8 +660,15 @@ export function LessonPlayShell({
         ) : null}
       </div>
 
-      {/* Footer: save state + ODbL attribution (required — district meta) */}
-      <div className="flex flex-wrap items-center gap-3 text-xs text-muted">
+      {/* Footer: save state + ODbL attribution (required — district meta).
+          Hidden while fullscreen (immersive chrome-free layout, QW1) UNLESS a
+          save failed — that warning must never be suppressed. Attribution
+          remains visible in every letterboxed state around the session. */}
+      <div
+        className={`flex flex-wrap items-center gap-3 text-xs text-muted ${
+          isFullscreen && !(ended && saveResult && !saveResult.ok) ? "hidden" : ""
+        }`}
+      >
         {ended && saveResult && !saveResult.ok ? (
           <span className="font-semibold text-warning">
             Сесията не се записа ({saveResult.code}) — резултатът е само локален.

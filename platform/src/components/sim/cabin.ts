@@ -7,6 +7,11 @@
 // Key handling mirrors the SimInput pattern (engine/input.ts) but lives here
 // because these are cabin/visual concerns, not driving physics inputs.
 
+import {
+  applyPreDriveStepToCabin,
+  type PreDriveStepId,
+} from "@/modules/sim/procedures";
+
 export type IndicatorSetting = "off" | "left" | "right";
 export type HeadlightSetting = "off" | "low" | "high";
 export type MirrorGlanceKind = "left" | "right" | "rear";
@@ -118,6 +123,34 @@ export class CabinControls {
     const m = this.pendingGlanceSample;
     this.pendingGlanceSample = null;
     return m;
+  }
+
+  /**
+   * QW5 (doc 68 Phase 0): a completed pre-drive checklist step must set the
+   * REAL cabin state it claims (belt / low beams / left indicator), so the
+   * rule engine, HUD telltales and the sim agree with what the student was
+   * just told they did. Idempotent — safe to re-apply the whole completed
+   * list; steps without an underlying state are no-ops (see
+   * procedures/cabinEffects.ts for the full 13-step map).
+   */
+  applyPreDriveStep(stepId: PreDriveStepId): void {
+    const next = applyPreDriveStepToCabin(stepId, {
+      seatbeltOn: this.seatbeltOn,
+      headlights: this.headlights,
+      indicator: this.indicator,
+    });
+    if (next.seatbeltOn !== this.seatbeltOn) {
+      this.seatbeltOn = next.seatbeltOn;
+      this.callbacks.onSeatbeltToggle?.(next.seatbeltOn); // audio click
+    }
+    if (next.headlights !== this.headlights) {
+      this.headlights = next.headlights;
+    }
+    if (next.indicator !== this.indicator) {
+      this.indicator = next.indicator;
+      this.indicatorChangedAt = this.clock; // first blink starts "on"
+      this.autocancelArmed = false;
+    }
   }
 
   private setIndicator(side: Exclude<IndicatorSetting, "off">): void {

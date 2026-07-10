@@ -4,10 +4,15 @@
  * Pre-drive checklist panel — the 13-step procedure (sim/procedures) as a
  * checkable list. The student may click steps in ANY order: wrong order is a
  * learning moment the machine scores, not something the UI prevents. The
- * canonical next step is highlighted with its instruction and key hint.
+ * canonical next step is highlighted with its instruction.
  *
- * Key hints are DISPLAY ONLY — the input layer (SceneSlot integrator) owns
- * actual key bindings and calls `onStep` exactly like a click does.
+ * HONESTY CONTRACT (QW5, doc 68 Phase 0): clicking a step is the ONLY way to
+ * complete it today — there are NO keyboard bindings for checklist steps, so
+ * this panel shows no key hints (the old 1…9/0/F/S/Space badges promised keys
+ * that did nothing and collided with live driving keys). Steps with a real
+ * cabin state (belt / lights / indicator) actually SET it on completion via
+ * the shell (procedures/cabinEffects.ts). Phase 1 A2 replaces this list with
+ * performed cockpit controls and turns it read-only.
  */
 
 import {
@@ -16,33 +21,14 @@ import {
   type PreDriveStepId,
 } from "../procedures";
 
-/** Default display hints, aligned with PRE_DRIVE_STEP_ORDER (1…9, 0, F, S, Space). */
-export const DEFAULT_PRE_DRIVE_KEY_HINTS: Readonly<Record<PreDriveStepId, string>> = {
-  "adjust-seat": "1",
-  "adjust-mirrors": "2",
-  "check-surroundings": "3",
-  "fasten-seatbelt": "4",
-  "check-dashboard": "5",
-  "headlights-on": "6",
-  "start-engine": "7",
-  "press-brake": "8",
-  "select-gear": "9",
-  "release-handbrake": "0",
-  "final-mirror-check": "F",
-  signal: "S",
-  "move-off": "Интервал",
-};
-
 export function PreDriveChecklist({
   completedStepIds,
   wrongOrderStepIds,
   onStep,
-  keyHints = DEFAULT_PRE_DRIVE_KEY_HINTS,
 }: {
   completedStepIds: ReadonlyArray<PreDriveStepId>;
   wrongOrderStepIds: ReadonlyArray<PreDriveStepId>;
   onStep: (stepId: PreDriveStepId) => void;
-  keyHints?: Partial<Record<PreDriveStepId, string>>;
 }) {
   const done = new Set(completedStepIds);
   const wrong = new Set(wrongOrderStepIds);
@@ -59,6 +45,9 @@ export function PreDriveChecklist({
           {done.size}/{PRE_DRIVE_STEP_ORDER.length}
         </span>
       </header>
+      <p className="mb-1 text-[11px] leading-snug text-muted">
+        Натисни стъпка, за да я отбележиш като изпълнена.
+      </p>
 
       <ol className="flex flex-col gap-0.5">
         {PRE_DRIVE_STEP_ORDER.map((id, i) => {
@@ -102,11 +91,6 @@ export function PreDriveChecklist({
                 >
                   {spec.titleBg}
                 </span>
-                {keyHints[id] ? (
-                  <kbd className="rounded-md border border-border bg-surface-2 px-1.5 py-0.5 font-mono text-[10px] font-semibold text-muted">
-                    {keyHints[id]}
-                  </kbd>
-                ) : null}
               </button>
             </li>
           );

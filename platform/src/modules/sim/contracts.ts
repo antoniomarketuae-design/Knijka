@@ -81,7 +81,9 @@ export interface LessonObjective {
 
 /** Events the HUD listens to (toasts, banners). Emitted by lessons/runtime. */
 export type HudEvent =
-  | { kind: "violation"; titleBg: string; points: number; severity: "opasna" | "osnovna" | "vtorostepenna"; lawRef?: string }
+  /** A graded mistake. Carries the catalog's authored WHY (explanationBg) +
+   * law citation — the toast must teach at the moment of the error (QW7). */
+  | { kind: "violation"; titleBg: string; explanationBg: string; points: number; severity: "opasna" | "osnovna" | "vtorostepenna"; lawRef?: string }
   | { kind: "commendation"; titleBg: string }
   /** A first, teachable encounter — coached, not scored (teach-first-then-grade). */
   | { kind: "lesson"; titleBg: string; explanationBg: string; lawRef?: string }

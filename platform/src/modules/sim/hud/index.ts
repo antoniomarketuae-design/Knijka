@@ -16,8 +16,5 @@ export {
   type MinimapPolyline,
   type MinimapTransform,
 } from "./Minimap";
-export {
-  DEFAULT_PRE_DRIVE_KEY_HINTS,
-  PreDriveChecklist,
-} from "./PreDriveChecklist";
+export { PreDriveChecklist } from "./PreDriveChecklist";
 export { SessionEndScreen, type SessionEndConcept } from "./SessionEndScreen";

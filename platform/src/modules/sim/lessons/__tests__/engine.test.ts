@@ -8,6 +8,7 @@ import {
   buildLessonResult,
   createLessonSession,
   finishSession,
+  isDriveLocked,
 } from "../engine";
 import { lessonById } from "../specs";
 import type { LessonSessionState } from "../types";
@@ -88,6 +89,11 @@ describe("lesson lifecycle without pre-drive", () => {
       points: 10,
       lawRef: "ППЗДвП чл. 31",
     });
+    // QW7: the violation toast must carry the catalog's authored WHY — the
+    // law-cited explanation is the teaching moment, not just the title.
+    const hudViolation = r.hudEvents[0];
+    if (hudViolation.kind !== "violation") throw new Error("expected a violation hud event");
+    expect(hudViolation.explanationBg.length).toBeGreaterThan(10);
 
     const result = buildLessonResult(finishSession(s, 2));
     expect(result.passed).toBe(false);
@@ -206,6 +212,44 @@ describe("lesson lifecycle with pre-drive (L1 spec)", () => {
     const r = applyPreDriveStep(s, "adjust-seat", 1);
     expect(r.state).toBe(s);
     expect(r.hudEvents).toHaveLength(0);
+  });
+});
+
+describe("drive lock during pre-drive (QW10)", () => {
+  const l1 = lessonById("l1-preparation")!;
+
+  it("locks the vehicle for the whole checklist and unlocks exactly at move-off", () => {
+    let s = createLessonSession(l1);
+    expect(isDriveLocked(s)).toBe(true);
+
+    // Ticks may flow (rules run from second zero) — the lock must hold.
+    s = applyTick(s, makeTick({ t: 0.5 })).state;
+    expect(isDriveLocked(s)).toBe(true);
+
+    let t = 1;
+    for (const stepId of PRE_DRIVE_STEP_ORDER) {
+      const lockedBefore = isDriveLocked(s);
+      s = applyPreDriveStep(s, stepId, t++).state;
+      if (stepId !== "move-off") {
+        expect(lockedBefore).toBe(true);
+        expect(isDriveLocked(s)).toBe(true);
+      }
+    }
+    expect(s.phase).toBe("driving");
+    expect(isDriveLocked(s)).toBe(false);
+  });
+
+  it("never locks lessons without a pre-drive procedure", () => {
+    const s = createLessonSession(microLesson); // preDrive: false
+    expect(isDriveLocked(s)).toBe(false);
+    expect(isDriveLocked(applyTick(s, makeTick({ t: 1, speedKmh: 30 })).state)).toBe(false);
+  });
+
+  it("stays unlocked after the session ends", () => {
+    let s = createLessonSession(l1);
+    s = applyPreDriveStep(s, "move-off", 1).state; // skip everything → driving
+    s = abortSession(s, 2);
+    expect(isDriveLocked(s)).toBe(false);
   });
 });
 
