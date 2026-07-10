@@ -28,8 +28,8 @@ import { CHASSIS_HALF_EXTENTS, type VehicleSim } from "@/modules/sim/vehicle";
 const HERO_URL = "/sim/vehicles/hero_car.glb";
 /** Local Draco decoder (CSP-safe, no CDN) — copied to public/draco/. */
 const DRACO_PATH = "/draco/";
-/** 0, or Math.PI if the car renders facing backward, after a look. */
-const HERO_YAW = 0;
+/** Founder-confirmed on a real drive: the GLB renders nose backward → flip 180°. */
+const HERO_YAW = Math.PI;
 /** Approx tyre radius (m) for the roll rate (car is scaled to ~real size). */
 const WHEEL_RADIUS_M = 0.34;
 /** Visual front-wheel steer as a fraction of the physics steer angle. */
