@@ -5,6 +5,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { beforeAll, describe, expect, it } from "vitest";
+import { LESSON_PARKING_BAYS } from "../../lessons/specs";
 import { buildWorldGeometry } from "../builders/buildWorldGeometry";
 import {
   CURB_HEIGHT_M,
@@ -236,6 +237,19 @@ describe("buildWorldGeometry on a synthetic X-junction", () => {
     expect(again.stats).toEqual(world.stats);
   });
 
+  it("paints parking bays as 3-stroke U-shapes in the markings mesh (doc 68 A5)", () => {
+    const bare = buildWorldGeometry(syntheticDistrict(), { seed: 7, parkingBays: [] });
+    const withBay = buildWorldGeometry(syntheticDistrict(), {
+      seed: 7,
+      parkingBays: [{ x: 20, y: 30, headingDeg: 90, widthM: 3, lengthM: 6.6 }],
+    });
+    expect(bare.stats.parkingBays).toBe(0);
+    expect(withBay.stats.parkingBays).toBe(1);
+    // U-shape = side line + both end lines = 3 extra quads = 12 extra vertices.
+    expect(withBay.stats.markingQuads).toBe(bare.stats.markingQuads + 3);
+    expect(withBay.markings.positions.length).toBe(bare.markings.positions.length + 12 * 3);
+  });
+
   it("junction radius overrides move the ribbon cut (hand-polish hook)", () => {
     // Default open radius at nC is ~35 m (scaled roads); override past it.
     const wide = buildWorldGeometry(syntheticDistrict(), {
@@ -371,6 +385,20 @@ describe("buildWorldGeometry on the real district (Студентски град
         Math.hypot(s.position[0] - 383.17, s.position[2] - -65.76) < 28,
     );
     expect(near.length).toBe(1);
+  });
+
+  it("paints the lesson-authored L7 bay by default (doc 68 A5)", () => {
+    expect(LESSON_PARKING_BAYS.length).toBeGreaterThanOrEqual(1);
+    expect(world.stats.parkingBays).toBe(LESSON_PARKING_BAYS.length);
+    // The bay's paint vertices land around its authored center (world z = -y).
+    const bay = LESSON_PARKING_BAYS[0]!;
+    const pos = world.markings.positions;
+    let near = 0;
+    for (let i = 0; i < pos.length; i += 3) {
+      if (Math.hypot(pos[i]! - bay.x, pos[i + 2]! - -bay.y) < bay.lengthM) near++;
+    }
+    // 3 quads × 4 vertices minimum.
+    expect(near).toBeGreaterThanOrEqual(12);
   });
 
   it("keeps the ODbL attribution visible in the build output", () => {

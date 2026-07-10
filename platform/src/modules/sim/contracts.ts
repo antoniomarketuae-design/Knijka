@@ -12,6 +12,7 @@
  */
 
 import type { SimTick } from "./rules/types";
+import type { PreDriveMode } from "./procedures/types";
 
 /**
  * PERCEPTUAL ROAD SCALE — the single dial for how exaggerated the road
@@ -78,6 +79,13 @@ export interface LessonSpec {
   /** Whether the 13-step pre-drive procedure runs before driving. */
   preDrive: boolean;
   /**
+   * A2 pre-drive mode (Instruction→Practice→Assess ladder, doc 68 §5).
+   * Default (absent) = "instruction": guided prompts + hotspot highlights,
+   * order coached. "practice" = no guidance, order-tolerant, idle hints.
+   * "assess" = exam-strict order scoring. Only read when `preDrive` is true.
+   */
+  preDriveMode?: PreDriveMode;
+  /**
    * Vehicle state at spawn (A1 driveline). Default (absent) = "cold": engine
    * OFF, selector P, parking brake ON — the pre-drive reality every lesson
    * should start from. "ready" = engine running in D with the brake released;
@@ -88,6 +96,13 @@ export interface LessonSpec {
   objectives: LessonObjective[];
   /** Optional time-of-day/weather override. */
   environment?: { timeOfDay?: "day" | "dusk" | "night"; rain?: boolean };
+  /** Marked parking bay this lesson's park objective targets (L7). The world
+   * paints every lesson-authored bay by default (buildWorldGeometry ←
+   * LESSON_PARKING_BAYS from lessons/specs). */
+  parkingBay?: ParkingBaySpec;
+  /** Sudden-obstacle stimulus for emergency-stop lessons (L5). Render-side
+   * lives in TrafficLayer; the trigger is A8's job. */
+  hazard?: HazardStimulusSpec;
 }
 
 export interface LessonObjective {
@@ -97,6 +112,40 @@ export interface LessonObjective {
    * lessons engine implements; keep this union in sync there. */
   kind: "reachZone" | "passSignal" | "completeManeuver" | "driveDistance";
   params: Record<string, unknown>;
+}
+
+/**
+ * Painted parking-bay rectangle, district space (doc 68 A5): center (x, y),
+ * headingDeg along the street (0 = north, cw), lengthM along the heading,
+ * widthM across it. The world markings builder paints it as a white U-shape
+ * (side line toward the roadway + both end lines; the curb closes the fourth
+ * side). Scoring note: the parkInBay maneuver stays coordinate-free for now —
+ * A10 (objective hardening) is what locks the objective to this rect.
+ */
+export interface ParkingBaySpec {
+  x: number;
+  y: number;
+  headingDeg: number;
+  widthM: number;
+  lengthM: number;
+}
+
+/**
+ * Sudden-obstacle stimulus for emergency-stop lessons (doc 68 A5): a bright
+ * ball darts from (x, y) along the unit direction (dirX, dirY) at speedMps
+ * for travelM meters, crossing the road in front of the student. DATA ONLY —
+ * TrafficLayer renders/animates it while its `hazardActiveRef` is true; the
+ * A8 scenario orchestrator owns WHEN to flip that ref (nothing triggers it
+ * until A8 lands).
+ */
+export interface HazardStimulusSpec {
+  kind: "ballDartOut";
+  x: number;
+  y: number;
+  dirX: number;
+  dirY: number;
+  speedMps: number;
+  travelM: number;
 }
 
 /** Events the HUD listens to (toasts, banners). Emitted by lessons/runtime. */

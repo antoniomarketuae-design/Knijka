@@ -15,14 +15,17 @@
  *    n331942490 (383.17, 65.76) and emit stopLineCrossed{control:"stopSign"}.
  *  - L5/L7: the emergencyStop and parkInBay maneuvers are COORDINATE-FREE (like
  *    L1's smoothStop) — they read only speed/gear from SimTick, so they need no
- *    world geometry. The world should still render a hazard cue (L5) and a
- *    marked bay (L7) for immersion; scoring is geometry-independent.
+ *    world geometry. The RENDER side is now authored here (doc 68 A5): L5
+ *    carries a `hazard` ball-dart-out stimulus (TrafficLayer draws/animates it;
+ *    the A8 orchestrator will own the trigger) and L7 carries a `parkingBay`
+ *    rect (the world markings builder paints it via LESSON_PARKING_BAYS).
+ *    Scoring stays geometry-independent until A10 hardens the objectives.
  *  - L6: environment.timeOfDay "night" flips SimTick.isNight, so the rule engine
  *    expects headlights on (HEADLIGHTS_OFF_AT_NIGHT). The world must render
  *    night lighting and set isNight on every tick for this lesson.
  */
 
-import type { LessonSpec } from "../contracts";
+import type { LessonSpec, ParkingBaySpec } from "../contracts";
 
 export const LESSONS: readonly LessonSpec[] = [
   {
@@ -55,6 +58,10 @@ export const LESSONS: readonly LessonSpec[] = [
     ],
     spawn: { pointId: "spawn-1" }, // ул. Трайко Станоев
     preDrive: true,
+    // A2: first contact with the procedure is GUIDED — prompts + hotspot
+    // highlights, wrong order coached not scored. "practice"/"assess" are the
+    // later rungs of the Instruction→Practice→Assess ladder (doc 68 §5).
+    preDriveMode: "instruction",
     objectives: [
       {
         id: "l1-drive-300m",
@@ -212,6 +219,22 @@ export const LESSONS: readonly LessonSpec[] = [
     ],
     spawn: { pointId: "spawn-2" }, // ул. Васил Калчев — права отсечка
     preDrive: false,
+    // The sudden obstacle: a bright ball darts from the right curb across the
+    // road ~85 m past spawn-2, along ул. Васил Калчев (edge e661825071.0,
+    // road heading 62° there; dart dir = heading − 90°, i.e. right → left).
+    // Start sits 5.6 m right of the centerline (just past the 4.06 m curb of
+    // the 1-lane scaled carriageway); 11.5 m of travel clears the far curb.
+    // TrafficLayer renders it; the A8 orchestrator flips hazardActiveRef when
+    // the student has built speed — until then the ball stays hidden.
+    hazard: {
+      kind: "ballDartOut",
+      x: -152.0,
+      y: 568.2,
+      dirX: -0.4697,
+      dirY: 0.8828,
+      speedMps: 3.5,
+      travelM: 11.5,
+    },
     objectives: [
       {
         id: "l5-build-speed",
@@ -274,6 +297,13 @@ export const LESSONS: readonly LessonSpec[] = [
     ],
     spawn: { pointId: "spawn-1" }, // ул. Трайко Станоев
     preDrive: false,
+    // The marked bay: a curbside parallel bay on the right side of ул. Трайко
+    // Станоев, ~62 m past spawn-1 (just beyond the 50 m approach objective).
+    // Center sits 6.4 m right of the centerline so the 3.0 m-wide paint stays
+    // inside the 8.125 m scaled carriageway half-width (edge e519275131.0,
+    // road heading 67.3° there). The world paints it as a white U — side line
+    // toward the road + both end lines; the curb closes the box.
+    parkingBay: { x: 681.26, y: -199.54, headingDeg: 67.3, widthM: 3.0, lengthM: 6.6 },
     objectives: [
       {
         id: "l7-approach",
@@ -290,6 +320,17 @@ export const LESSONS: readonly LessonSpec[] = [
     ],
   },
 ];
+
+/**
+ * Every lesson-authored painted parking bay (doc 68 A5). The world builder
+ * paints these by default (buildWorldGeometry `options.parkingBays` fallback)
+ * — same curriculum-drives-the-world pattern as the L2 Б2 stop-sign placement
+ * (runtime/stoplines STOP_LINE_OVERRIDES → world props). DATA ONLY, so the
+ * pure world builder can import it without dragging in the lesson engine.
+ */
+export const LESSON_PARKING_BAYS: readonly ParkingBaySpec[] = LESSONS.flatMap((l) =>
+  l.parkingBay ? [l.parkingBay] : [],
+);
 
 /** Lookup by id; undefined for unknown ids (wire input goes through this). */
 export function lessonById(id: string): LessonSpec | undefined {

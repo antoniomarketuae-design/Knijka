@@ -13,6 +13,8 @@
  *   inside WorldGeometry are ALREADY in world space.
  */
 
+import type { ParkingBaySpec } from "../contracts";
+
 // ---------------------------------------------------------------------------
 // district-v1.json shapes
 // ---------------------------------------------------------------------------
@@ -220,6 +222,8 @@ export interface WorldStats {
   markingQuads: number;
   stopLines: number;
   zebraCrossings: number;
+  /** Painted parking-bay U-shapes (lesson-authored, doc 68 A5). */
+  parkingBays: number;
   /** Curbside parking bands on arterial edges (two per qualifying ribbon). */
   parkingLaneStrips: number;
   buildings: number;
@@ -278,6 +282,10 @@ export interface BuildWorldOptions {
   treeDensity?: number;
   /** Deterministic seed for all procedural jitter (default 1337). */
   seed?: number;
+  /** Painted parking-bay rectangles (white U-shapes in the markings mesh).
+   * Default: the lesson-authored bays (lessons/specs LESSON_PARKING_BAYS) —
+   * pass [] to build a bare district. */
+  parkingBays?: readonly ParkingBaySpec[];
 }
 
 export type WorldQuality = "low" | "med" | "high";

@@ -1,10 +1,12 @@
 /**
  * Painted road markings as flat geometry strips slightly above the asphalt:
  * dashed white lane separators, solid edge lines (arterials), stop lines at
- * signalized/stop-controlled approaches, give-way dash lines, and zebra
- * crossings at crossing positions.
+ * signalized/stop-controlled approaches, give-way dash lines, zebra
+ * crossings at crossing positions, and lesson-authored parking-bay U-shapes
+ * (doc 68 A5 — L7's bay).
  */
 
+import type { ParkingBaySpec } from "../../contracts";
 import type { District } from "../types";
 import {
   ARTERIAL_CLASSES,
@@ -33,13 +35,14 @@ import {
   type Vec2,
 } from "./math2d";
 import { MeshAccumulator, toWorld, UP } from "./mesh";
-import type { Approach, RoadNetwork } from "./network";
+import { STOP_LINE_BEYOND_CUT_M, type Approach, type RoadNetwork } from "./network";
 
 export interface MarkingBuildResult {
   markings: MeshAccumulator;
   markingQuads: number;
   stopLines: number;
   zebraCrossings: number;
+  parkingBays: number;
 }
 
 /** Flat quad centered at `p`, extending ±alongHalf along `dir`, ±acrossHalf sideways. */
@@ -120,22 +123,52 @@ function paintStopLine(acc: MeshAccumulator, ap: Approach, dashed: boolean): voi
   const inner = 0.15;
   const outer = ap.halfWidth - ap.parkingM - 0.2;
   const lineDir = rightOfAway;
-  const base = add(ap.cut, mul(away, 0.6)); // just outside the junction mouth
+  // Just outside the junction mouth — the runtime derives its GRADED stop
+  // lines at the same cut + STOP_LINE_BEYOND_CUT_M, so paint and grading
+  // always coincide (runtime/stoplines.ts).
+  const base = add(ap.cut, mul(away, STOP_LINE_BEYOND_CUT_M));
   const from = ap.edge.oneway ? -outer : inner;
   const to = outer;
   if (dashed) {
     const span = to - from;
-    const n = Math.max(2, Math.floor(span / 0.9));
+    const n = Math.max(2, Math.floor(span / 1.8)); // dash pitch scaled with paint
     for (let i = 0; i < n; i++) {
       const t = from + (span * (i + 0.5)) / n;
       // give-way line: short dashes along the stop line direction
-      paintQuad(acc, add(base, mul(lineDir, -t)), lineDir, 0.25, STOP_LINE_WIDTH_M / 2);
+      paintQuad(acc, add(base, mul(lineDir, -t)), lineDir, 0.5, STOP_LINE_WIDTH_M / 2);
     }
   } else {
     const mid = (from + to) / 2;
     const half = (to - from) / 2;
     paintQuad(acc, add(base, mul(lineDir, -mid)), lineDir, half, STOP_LINE_WIDTH_M / 2);
   }
+}
+
+/** Parking-bay stroke width — reads as bay paint next to the 0.25 m dashes. */
+const BAY_LINE_WIDTH_M = 0.25;
+
+/**
+ * Parking bay: white U-shape at the bay rect (district space). Three strokes —
+ * the longitudinal side line on the bay's LEFT edge (toward the roadway for a
+ * bay on the right-hand curb) plus both transverse end lines; the curb closes
+ * the fourth side, exactly how curbside bays are marked. Author a left-curb
+ * bay by flipping headingDeg 180°. Returns quads painted (3).
+ */
+function paintParkingBay(acc: MeshAccumulator, bay: ParkingBaySpec): number {
+  const h = (bay.headingDeg * Math.PI) / 180;
+  const dir: Vec2 = [Math.sin(h), Math.cos(h)];
+  const right = perpRight(dir);
+  const c: Vec2 = [bay.x, bay.y];
+  const halfL = bay.lengthM / 2;
+  const halfW = bay.widthM / 2;
+  const w = BAY_LINE_WIDTH_M;
+  // Side line along the travel direction, on the left (roadway-facing) edge.
+  paintQuad(acc, add(c, mul(right, -halfW)), dir, halfL, w / 2);
+  // End lines across the bay (slight overlap with the side line is coplanar
+  // same-color paint — invisible).
+  paintQuad(acc, add(c, mul(dir, -halfL)), right, halfW, w / 2);
+  paintQuad(acc, add(c, mul(dir, halfL)), right, halfW, w / 2);
+  return 3;
 }
 
 /** Zebra crossing: longitudinal bars across the full road width. */
@@ -164,6 +197,7 @@ export function buildMarkings(
   network: RoadNetwork,
   stopSignEdges: ReadonlySet<string>,
   giveWayEdges: ReadonlySet<string>,
+  parkingBays: readonly ParkingBaySpec[] = [],
 ): MarkingBuildResult {
   const acc = new MeshAccumulator();
   let markingQuads = 0;
@@ -229,5 +263,16 @@ export function buildMarkings(
     zebraCrossings++;
   }
 
-  return { markings: acc, markingQuads, stopLines, zebraCrossings };
+  // -- parking bays (lesson-authored, doc 68 A5) -------------------------------
+  for (const bay of parkingBays) {
+    markingQuads += paintParkingBay(acc, bay);
+  }
+
+  return {
+    markings: acc,
+    markingQuads,
+    stopLines,
+    zebraCrossings,
+    parkingBays: parkingBays.length,
+  };
 }

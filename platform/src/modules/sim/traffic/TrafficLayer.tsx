@@ -19,8 +19,17 @@
  *    are one shared InstancedMesh (spun/steered per frame) — so real cars cost a
  *    fixed handful of draws, not one per agent,
  *  - and (when the district is supplied) drops a deterministic parked-car pass
- *    along residential/arterial curbs so the streets aren't deserted (still the
- *    interim box car — GLB upgrade deferred to keep those always-on draws cheap).
+ *    along residential/arterial curbs so the streets aren't deserted.
+ *
+ * A5 visual-floor pass (doc 68): the parked cars are now the same GLB kit as
+ * the moving fleet — static per-model InstancedMeshes (civilian models only)
+ * + a static shared wheel mesh + blob shadows, placed once. Pedestrians are
+ * articulated: six instanced parts (torso, head, 2 arms, 2 legs) with a
+ * counter-phase leg/arm swing driven by each agent's walkPhase/speed, and
+ * deterministic per-id height/build variation. The layer also renders the L5
+ * sudden-obstacle stimulus (a bright ball darting across the road) when the
+ * lesson supplies `hazard` — dormant until the A8 orchestrator flips
+ * `hazardActiveRef` true.
  *
  * ADR-001: all vehicles are FICTIONAL — no real car-brand names anywhere.
  *
@@ -43,41 +52,34 @@ import { useFrame } from "@react-three/fiber";
 import { useGLTF } from "@react-three/drei";
 import {
   CanvasTexture,
+  CapsuleGeometry,
   Color,
-  DoubleSide,
   DynamicDrawUsage,
   Object3D,
   Quaternion,
+  SphereGeometry,
   Vector3,
   type InstancedMesh,
+  type Mesh,
   type Object3D as AnyObject3D,
 } from "three";
-import type { SignalPhase } from "../contracts";
+import {
+  PERCEPTUAL_ROAD_SCALE,
+  type HazardStimulusSpec,
+  type SignalPhase,
+} from "../contracts";
 import type { TrafficDistrict, TrafficSystem, TrafficUpdateContext } from "./types";
 import {
+  assignCivilianModel,
   buildTrafficFleet,
   disposeTrafficFleet,
   DRACO_DECODER_PATH,
   FLEET_URLS,
 } from "./vehicleFleet";
 
-// Paint palette — expanded to 10 fictional car colours (brick/blue/sand/slate
-// originals + graphite, two silvers, dark green, maroon, muted gold).
-const BODY_COLORS = [
-  "#b9503f",
-  "#4a7dbb",
-  "#d8d3c8",
-  "#46545d",
-  "#2f343a",
-  "#8f9499",
-  "#b9bec2",
-  "#3c5f3a",
-  "#7a2f2a",
-  "#c6a23e",
-];
+// Pedestrian palettes: tops (existing 4 variants) + trousers per variant.
 const PED_COLORS = ["#b8895a", "#6d8a67", "#7a6f9b", "#a0524d"];
-const ROOF_COLOR = "#3d454e"; // opaque cabin/roof shell
-const GLASS_COLOR = "#0f151d"; // tinted greenhouse glazing
+const PED_LEG_COLORS = ["#3a4150", "#4d4439", "#565a5f", "#2f3a4a"];
 const BRAKE_ON = "#ff2a1a"; // brake pressed
 const TAIL_ON = "#7c130b"; // dim tail glow when lights are on at night
 const BRAKE_OFF = "#3a0f0b"; // unlit lens (day)
@@ -85,14 +87,27 @@ const HEAD_COLOR = "#fff2cf"; // warm headlight glow (night)
 const BLINK_ON = "#ff9a1f";
 const BLINK_OFF = "#2a1c08";
 
-// Local-space part offsets (nose = +Z). Moving-car body/wheel/lamp offsets now
-// come from each GLB model's rig (./vehicleFleet); only the parked interim box
-// car and the pedestrian primitives keep hard-coded offsets.
-const CABIN_Y = 1.08; // parked box-car cabin
-const CABIN_Z = -0.35; // parked box-car cabin
-const PED_BODY_Y = 0.82;
-const PED_HEAD_Y = 1.52;
+// Car body/wheel/lamp offsets come from each GLB model's rig (./vehicleFleet).
 const BLOB_Y = 0.03;
+
+// Articulated pedestrian skeleton — scale-1 person ≈ 1.73 m; every joint Y
+// scales with the per-id height factor, lateral offsets with the build factor.
+// Limb geometry is baked origin-at-joint (see pedGeoms) so a single instance
+// matrix (yaw · swing about local X) both places and swings each limb.
+const PED_HIP_Y = 0.76;
+const PED_SHOULDER_Y = 1.42;
+const PED_HEAD_Y = 1.6;
+const PED_SHOULDER_HALF = 0.21; // arm lateral offset from spine
+const PED_HIP_HALF = 0.09; // leg lateral offset from spine
+const PED_LEG_SWING_RAD = 0.55;
+const PED_ARM_SWING_RAD = 0.3;
+/** Walking speed (m/s) at which the swing reaches full amplitude. */
+const PED_SWING_FULL_SPEED_MPS = 1.1;
+
+// L5 hazard ball (doc 68 A5): bright, big enough to read at speed.
+const HAZARD_BALL_RADIUS_M = 0.36;
+const HAZARD_BOUNCE_HEIGHT_M = 0.45;
+const HAZARD_BOUNCE_WAVELENGTH_M = 2.8;
 
 // Cosmetic wheel-steer + turn-signal derivation (visual only — the traffic
 // system carries no steer/turn state, so we read it off the smoothed yaw rate).
@@ -112,11 +127,20 @@ function wrapPi(a: number): number {
   return Math.atan2(Math.sin(a), Math.cos(a));
 }
 
+/** Deterministic 32-bit mix — pedestrian height/build variation per id. */
+function hash32(n: number): number {
+  let h = (n + 0x9e3779b9) >>> 0;
+  h = Math.imul(h ^ (h >>> 16), 0x85ebca6b) >>> 0;
+  h = Math.imul(h ^ (h >>> 13), 0xc2b2ae35) >>> 0;
+  return (h ^ (h >>> 16)) >>> 0;
+}
+
 // ---------------------------------------------------------------------------
 // Parked cars — deterministic instanced placement along residential/arterial
 // curbs, reusing the district edge polylines + lane-width offset (the same
-// curb math the props/sidewalk pass uses). Interim box car; upgrades to the
-// GLB kit later. Gated on the optional `district` prop being supplied.
+// curb math the props/sidewalk pass uses). Rendered as the authored GLB kit
+// (static per-model instances, civilian models only — ./vehicleFleet). Gated
+// on the optional `district` prop being supplied.
 // ---------------------------------------------------------------------------
 const PARK_CLASSES = new Set([
   "residential",
@@ -128,14 +152,17 @@ const PARK_CLASSES = new Set([
 ]);
 const PARK_SPACING_M = 6.6;
 const PARK_END_MARGIN_M = 11;
-const PARK_CAR_HALF_W = 0.95;
+/** Parked-car center offset past the travel lanes: middle of the 4.0 m
+ * curbside parking band (world PARKING_LANE_WIDTH_M / 2 — keep in sync). */
+const PARK_BAND_CENTER_M = 2.0;
 const PARK_CAP = 150;
 
 interface ParkedCar {
   x: number;
   y: number;
   yaw: number;
-  colorIndex: number;
+  /** Fleet model index (civilian pool only — no parked police cruisers). */
+  model: number;
 }
 
 function computeParkedCars(
@@ -158,8 +185,7 @@ function computeParkedCars(
     }
     if (total < 2 * PARK_END_MARGIN_M + PARK_SPACING_M) continue;
 
-    const offset =
-      laneWidthM * Math.max(1, edge.lanes) * 0.5 + PARK_CAR_HALF_W + 0.4;
+    const offset = laneWidthM * Math.max(1, edge.lanes) * 0.5 + PARK_BAND_CENTER_M;
     const stop = total - PARK_END_MARGIN_M;
     let nextAt = PARK_END_MARGIN_M;
     let arc = 0;
@@ -177,14 +203,14 @@ function computeParkedCars(
       const ny = -dx;
       while (nextAt < arc + segLen && nextAt <= stop) {
         const t = nextAt - arc;
-        // Deterministic hash: skip ~1 in 5 slots for natural gaps + pick colour.
+        // Deterministic hash: skip ~1 in 5 slots for natural gaps + pick model.
         const h = ((e * 73856093) ^ (slot * 19349663)) >>> 0;
         if (h % 5 !== 0) {
           out.push({
             x: ax + dx * t + nx * offset,
             y: ay + dy * t + ny * offset,
             yaw: Math.atan2(dx, -dy),
-            colorIndex: h % BODY_COLORS.length,
+            model: assignCivilianModel(h),
           });
           if (out.length >= PARK_CAP) return out;
         }
@@ -239,8 +265,23 @@ export interface TrafficLayerProps {
    * skip parked cars entirely.
    */
   district?: TrafficDistrict | null;
-  /** Lane width used to offset parked cars to the curb (default 3.25 m). */
+  /** Lane width used to offset parked cars to the curb (default: the
+   *  perceptually scaled 3.25 m × PERCEPTUAL_ROAD_SCALE — must match the
+   *  drawn world or parked cars land inside the travel lanes). */
   laneWidthM?: number;
+  /**
+   * L5 sudden-obstacle stimulus (lesson spec `hazard`, doc 68 A5). Render-only:
+   * the ball stays hidden until `hazardActiveRef.current` flips true. Omit on
+   * lessons without a staged hazard.
+   */
+  hazard?: HazardStimulusSpec | null;
+  /**
+   * Trigger for the hazard stimulus — the A8 scenario orchestrator sets this
+   * true when the encounter fires (e.g. player up to speed and within trigger
+   * range) and back to false to reset/re-stage. The layer animates the ball
+   * from the spec's origin along its dart direction while true.
+   */
+  hazardActiveRef?: RefObject<boolean>;
 }
 
 export function TrafficLayer({
@@ -252,7 +293,9 @@ export function TrafficLayer({
   maxDrawDistanceM = 150,
   night = false,
   district = null,
-  laneWidthM = 3.25,
+  laneWidthM = 3.25 * PERCEPTUAL_ROAD_SCALE,
+  hazard = null,
+  hazardActiveRef,
 }: TrafficLayerProps) {
   const nVeh = system.vehicles.length;
   const nPed = system.pedestrians.length;
@@ -275,24 +318,59 @@ export function TrafficLayer({
   const brakeRef = useRef<InstancedMesh>(null);
   const headRef = useRef<InstancedMesh>(null);
   const blinkRef = useRef<InstancedMesh>(null);
+  // Articulated pedestrians: one InstancedMesh per part (arms/legs hold 2
+  // instances per agent — index 2i left, 2i+1 right).
   const pedBlobRef = useRef<InstancedMesh>(null);
-  const pedBodyRef = useRef<InstancedMesh>(null);
+  const pedTorsoRef = useRef<InstancedMesh>(null);
   const pedHeadRef = useRef<InstancedMesh>(null);
+  const pedArmRef = useRef<InstancedMesh>(null);
+  const pedLegRef = useRef<InstancedMesh>(null);
+  // L5 hazard ball (single mesh — one per lesson at most).
+  const hazardBallRef = useRef<Mesh>(null);
+  const hazardBlobRef = useRef<Mesh>(null);
 
-  // Authored GLB fleet: load the kit (Draco), then instance it. Rebuilt only on
-  // remount / system swap; disposed (buffers + merged geometry) on teardown.
+  // Authored GLB fleet: load the kit (Draco), then instance it — moving bodies
+  // + wheels AND the static parked pass over the same rigs. Rebuilt only on
+  // remount / system / placement swap; disposed (buffers + merged geometry) on
+  // teardown.
   const gltfs = useGLTF(FLEET_URLS, DRACO_DECODER_PATH) as unknown as Array<{
     scene: AnyObject3D;
   }>;
   const fleet = useMemo(
-    () => buildTrafficFleet(gltfs.map((g) => g.scene), system.vehicles),
-    [gltfs, system],
+    () =>
+      buildTrafficFleet(
+        gltfs.map((g) => g.scene),
+        system.vehicles,
+        parked.map((p) => p.model),
+      ),
+    [gltfs, system, parked],
   );
   useEffect(() => () => disposeTrafficFleet(fleet), [fleet]);
-  // Parked (static).
-  const parkBodyRef = useRef<InstancedMesh>(null);
-  const parkCabinRef = useRef<InstancedMesh>(null);
-  const parkGlassRef = useRef<InstancedMesh>(null);
+  // Parked-car blob shadows (static, placed with the parked pass).
+  const parkBlobRef = useRef<InstancedMesh>(null);
+
+  // Pedestrian part geometries — origin baked at the joint (shoulder/hip) so
+  // one instance matrix swings the limb; torso origin at the hips. Owned here,
+  // disposed on unmount.
+  const pedGeoms = useMemo(() => {
+    const torso = new CapsuleGeometry(0.155, 0.44, 4, 10);
+    torso.translate(0, 0.375, 0); // origin at the hips, extends up
+    const head = new SphereGeometry(0.135, 10, 8);
+    const arm = new CapsuleGeometry(0.048, 0.5, 3, 8);
+    arm.translate(0, -0.298, 0); // origin at the shoulder, hangs down
+    const leg = new CapsuleGeometry(0.068, 0.62, 3, 8);
+    leg.translate(0, -0.378, 0); // origin at the hip, hangs down
+    return { torso, head, arm, leg };
+  }, []);
+  useEffect(
+    () => () => {
+      pedGeoms.torso.dispose();
+      pedGeoms.head.dispose();
+      pedGeoms.arm.dispose();
+      pedGeoms.leg.dispose();
+    },
+    [pedGeoms],
+  );
 
   // Reused mutable scratch — lives in a ref (the frame loop mutates it every
   // frame, which render-scoped useMemo values must not do) and is (re)built
@@ -310,6 +388,11 @@ export function TrafficLayer({
     brakeState: Int8Array; // cached tail-lamp state key
     blinkState: Int8Array; // cached per-lamp (nVeh*2) lit flag
     blinkClock: number;
+    // Per-pedestrian deterministic body variation (id-hashed).
+    pedHeight: Float32Array; // 0.90..1.12 height scale
+    pedBuild: Float32Array; // 0.88..1.14 lateral build scale
+    // L5 hazard animation clock (seconds since hazardActiveRef went true).
+    hazardT: number;
     // Reused rotation scratch.
     qYaw: Quaternion;
     qRoll: Quaternion; // wheel roll about local X
@@ -330,7 +413,7 @@ export function TrafficLayer({
   useLayoutEffect(() => {
     const color = new Color();
     const qFlat = new Quaternion().setFromAxisAngle(AXIS_X, -Math.PI / 2);
-    scratchRef.current = {
+    const scratch: Scratch = {
       dummy: new Object3D(),
       color,
       playerPos: { x: 0, y: 0 },
@@ -342,6 +425,9 @@ export function TrafficLayer({
       brakeState: new Int8Array(nVeh).fill(-1),
       blinkState: new Int8Array(nVeh * 2).fill(-1),
       blinkClock: 0,
+      pedHeight: new Float32Array(nPed),
+      pedBuild: new Float32Array(nPed),
+      hazardT: 0,
       qYaw: new Quaternion(),
       qRoll: new Quaternion(),
       qWheel: new Quaternion(),
@@ -349,6 +435,7 @@ export function TrafficLayer({
       qBlob: new Quaternion(),
       ctx: { signalPhase: () => "green", playerPos: null },
     };
+    scratchRef.current = scratch;
     // Bodies/wheels (the GLB fleet) manage their own draw usage; only the
     // code-geometry overlays need the dynamic hint here.
     const dynamic = [
@@ -357,51 +444,96 @@ export function TrafficLayer({
       headRef,
       blinkRef,
       pedBlobRef,
-      pedBodyRef,
+      pedTorsoRef,
       pedHeadRef,
+      pedArmRef,
+      pedLegRef,
     ];
     for (const ref of dynamic) {
       ref.current?.instanceMatrix.setUsage(DynamicDrawUsage);
     }
-    const pedBody = pedBodyRef.current;
-    if (pedBody) {
-      for (let i = 0; i < nPed; i++) {
-        pedBody.setColorAt(i, color.set(PED_COLORS[system.pedestrians[i].colorIndex % PED_COLORS.length]));
-      }
-      if (pedBody.instanceColor) pedBody.instanceColor.needsUpdate = true;
+    // Pedestrian variation + clothing colours (set once): torso/arms share the
+    // top colour, legs read as trousers from a darker per-variant palette.
+    const torso = pedTorsoRef.current;
+    const arm = pedArmRef.current;
+    const leg = pedLegRef.current;
+    for (let i = 0; i < nPed; i++) {
+      const p = system.pedestrians[i];
+      const h = hash32(p.id);
+      scratch.pedHeight[i] = 0.9 + ((h & 0xff) / 255) * 0.22;
+      scratch.pedBuild[i] = 0.88 + (((h >>> 8) & 0xff) / 255) * 0.26;
+      const top = PED_COLORS[p.colorIndex % PED_COLORS.length];
+      torso?.setColorAt(i, color.set(top));
+      color.set(top).multiplyScalar(0.92); // sleeves a touch darker
+      arm?.setColorAt(i * 2, color);
+      arm?.setColorAt(i * 2 + 1, color);
+      color.set(PED_LEG_COLORS[p.colorIndex % PED_LEG_COLORS.length]);
+      leg?.setColorAt(i * 2, color);
+      leg?.setColorAt(i * 2 + 1, color);
+    }
+    for (const mesh of [torso, arm, leg]) {
+      if (mesh?.instanceColor) mesh.instanceColor.needsUpdate = true;
     }
   }, [system, nVeh, nPed]);
 
-  // Parked cars: static — placed once (and whenever the placement changes).
+  // Parked cars: static GLB instances — matrices written ONCE per fleet /
+  // placement change (body at the tarmac, 4 wheels at the rig hubs with a
+  // deterministic roll phase so hubcaps don't align, elliptical blob shadow).
   useLayoutEffect(() => {
-    const parkBody = parkBodyRef.current;
-    const parkCabin = parkCabinRef.current;
-    const parkGlass = parkGlassRef.current;
-    if (!parkBody || nPark === 0) return;
+    if (nPark === 0) return;
     const dummy = new Object3D();
-    const color = new Color();
+    const qYaw = new Quaternion();
+    const qRoll = new Quaternion();
+    const qFlat = new Quaternion().setFromAxisAngle(AXIS_X, -Math.PI / 2);
+    const blob = parkBlobRef.current;
+    const wheel = fleet.parkedWheel;
     for (let i = 0; i < nPark; i++) {
       const c = parked[i];
+      const m = fleet.parkedAssign[i];
+      const rig = fleet.models[m].rig;
+      const mesh = fleet.parkedMeshes[m];
+      const s = fleet.parkedSlot[i];
       const tx = c.x;
       const tz = -c.y;
       const cos = Math.cos(c.yaw);
       const sin = Math.sin(c.yaw);
+      // Body (GLB authored ground-relative — origin on the tarmac).
       dummy.scale.set(1, 1, 1);
       dummy.rotation.set(0, c.yaw, 0);
-      dummy.position.set(tx, 0.62, tz);
+      dummy.position.set(tx, 0, tz);
       dummy.updateMatrix();
-      parkBody.setMatrixAt(i, dummy.matrix);
-      parkBody.setColorAt(i, color.set(BODY_COLORS[c.colorIndex % BODY_COLORS.length]));
-      dummy.position.set(tx + CABIN_Z * sin, CABIN_Y, tz + CABIN_Z * cos);
-      dummy.updateMatrix();
-      parkCabin?.setMatrixAt(i, dummy.matrix);
-      parkGlass?.setMatrixAt(i, dummy.matrix);
+      mesh?.setMatrixAt(s, dummy.matrix);
+      // Wheels: static but rendered — yaw · fixed roll phase, model-scaled.
+      const ws = fleet.parkedWheelScale[i];
+      qYaw.setFromAxisAngle(UP, c.yaw);
+      for (let w = 0; w < 4; w++) {
+        const off = rig.wheelOffsets[w];
+        qRoll.setFromAxisAngle(AXIS_X, (i * 4 + w) * 2.4);
+        dummy.quaternion.copy(qYaw).multiply(qRoll);
+        dummy.scale.set(ws, ws, ws);
+        dummy.position.set(
+          tx + off.x * cos + off.z * sin,
+          off.y,
+          tz - off.x * sin + off.z * cos,
+        );
+        dummy.updateMatrix();
+        wheel?.setMatrixAt(i * 4 + w, dummy.matrix);
+      }
+      // Blob shadow (same grounding as the moving fleet).
+      if (blob) {
+        dummy.quaternion.copy(qYaw).multiply(qFlat);
+        dummy.scale.set(rig.halfWidth + 0.34, rig.halfLength + 0.4, 1);
+        dummy.position.set(tx, BLOB_Y, tz);
+        dummy.updateMatrix();
+        blob.setMatrixAt(i, dummy.matrix);
+      }
     }
-    parkBody.instanceMatrix.needsUpdate = true;
-    if (parkBody.instanceColor) parkBody.instanceColor.needsUpdate = true;
-    if (parkCabin) parkCabin.instanceMatrix.needsUpdate = true;
-    if (parkGlass) parkGlass.instanceMatrix.needsUpdate = true;
-  }, [parked, nPark]);
+    for (const mesh of fleet.parkedMeshes) {
+      if (mesh) mesh.instanceMatrix.needsUpdate = true;
+    }
+    if (wheel) wheel.instanceMatrix.needsUpdate = true;
+    if (blob) blob.instanceMatrix.needsUpdate = true;
+  }, [fleet, parked, nPark]);
 
   useFrame((frame, dt) => {
     const scratch = scratchRef.current;
@@ -592,11 +724,13 @@ export function TrafficLayer({
       if (blinkColorDirty && blink.instanceColor) blink.instanceColor.needsUpdate = true;
     }
 
-    // --- Pedestrians.
+    // --- Pedestrians (articulated: torso + head + 2 arms + 2 legs).
     const pedBlob = pedBlobRef.current;
-    const pedBody = pedBodyRef.current;
+    const pedTorso = pedTorsoRef.current;
     const pedHead = pedHeadRef.current;
-    if (pedBlob && pedBody && pedHead) {
+    const pedArm = pedArmRef.current;
+    const pedLeg = pedLegRef.current;
+    if (pedBlob && pedTorso && pedHead && pedArm && pedLeg) {
       for (let i = 0; i < nPed; i++) {
         const p = system.pedestrians[i];
         const tx = p.x;
@@ -609,30 +743,105 @@ export function TrafficLayer({
           dummy.scale.set(0, 0, 0);
           dummy.updateMatrix();
           pedBlob.setMatrixAt(i, dummy.matrix);
-          pedBody.setMatrixAt(i, dummy.matrix);
+          pedTorso.setMatrixAt(i, dummy.matrix);
           pedHead.setMatrixAt(i, dummy.matrix);
+          pedArm.setMatrixAt(i * 2, dummy.matrix);
+          pedArm.setMatrixAt(i * 2 + 1, dummy.matrix);
+          pedLeg.setMatrixAt(i * 2, dummy.matrix);
+          pedLeg.setMatrixAt(i * 2 + 1, dummy.matrix);
           continue;
         }
+        const hgt = scratch.pedHeight[i];
+        const bld = scratch.pedBuild[i];
         const bob = p.speedMps > 0.01 ? Math.sin(p.walkPhase) * 0.04 : 0;
         const yaw = Math.atan2(p.dirX, -p.dirY);
-        // Blob (round, laid flat).
+        const cos = Math.cos(yaw);
+        const sin = Math.sin(yaw);
+        // Counter-phase swing from the accumulated walk phase, damped to zero
+        // as the agent slows (standing pedestrians hold their limbs still).
+        const swing =
+          Math.sin(p.walkPhase) *
+          Math.min(1, p.speedMps / PED_SWING_FULL_SPEED_MPS);
+        // Blob (round, laid flat, sized with the build).
         dummy.quaternion.copy(scratch.qFlat);
-        dummy.scale.set(0.42, 0.42, 1);
+        dummy.scale.set(0.42 * bld, 0.42 * bld, 1);
         dummy.position.set(tx, BLOB_Y, tz);
         dummy.updateMatrix();
         pedBlob.setMatrixAt(i, dummy.matrix);
-        dummy.scale.set(1, 1, 1);
+        // Torso (origin at the hips).
         dummy.rotation.set(0, yaw, 0);
-        dummy.position.set(tx, PED_BODY_Y + bob, tz);
+        dummy.scale.set(bld, hgt, bld);
+        dummy.position.set(tx, PED_HIP_Y * hgt + bob, tz);
         dummy.updateMatrix();
-        pedBody.setMatrixAt(i, dummy.matrix);
-        dummy.position.set(tx, PED_HEAD_Y + bob, tz);
+        pedTorso.setMatrixAt(i, dummy.matrix);
+        // Head (constant size — height variation reads through the joints).
+        dummy.scale.set(1, 1, 1);
+        dummy.position.set(tx, PED_HEAD_Y * hgt + bob, tz);
         dummy.updateMatrix();
         pedHead.setMatrixAt(i, dummy.matrix);
+        // Limbs: instance = yaw · swing about the local side axis; geometry is
+        // origin-at-joint so the same matrix places AND swings. Left limbs at
+        // 2i, right at 2i+1; arms counter-swing their side's leg.
+        scratch.qYaw.setFromAxisAngle(UP, yaw);
+        for (let side = 0; side < 2; side++) {
+          const sign = side === 0 ? 1 : -1;
+          const armX = sign * PED_SHOULDER_HALF * bld;
+          const legX = sign * PED_HIP_HALF * bld;
+          // Arm.
+          scratch.qRoll.setFromAxisAngle(AXIS_X, -sign * swing * PED_ARM_SWING_RAD);
+          scratch.qWheel.copy(scratch.qYaw).multiply(scratch.qRoll);
+          dummy.quaternion.copy(scratch.qWheel);
+          dummy.scale.set(bld, hgt, bld);
+          dummy.position.set(
+            tx + armX * cos,
+            PED_SHOULDER_Y * hgt + bob,
+            tz - armX * sin,
+          );
+          dummy.updateMatrix();
+          pedArm.setMatrixAt(i * 2 + side, dummy.matrix);
+          // Leg.
+          scratch.qRoll.setFromAxisAngle(AXIS_X, sign * swing * PED_LEG_SWING_RAD);
+          scratch.qWheel.copy(scratch.qYaw).multiply(scratch.qRoll);
+          dummy.quaternion.copy(scratch.qWheel);
+          dummy.position.set(
+            tx + legX * cos,
+            PED_HIP_Y * hgt + bob,
+            tz - legX * sin,
+          );
+          dummy.updateMatrix();
+          pedLeg.setMatrixAt(i * 2 + side, dummy.matrix);
+        }
       }
       pedBlob.instanceMatrix.needsUpdate = true;
-      pedBody.instanceMatrix.needsUpdate = true;
+      pedTorso.instanceMatrix.needsUpdate = true;
       pedHead.instanceMatrix.needsUpdate = true;
+      pedArm.instanceMatrix.needsUpdate = true;
+      pedLeg.instanceMatrix.needsUpdate = true;
+    }
+
+    // --- L5 hazard ball (render-only; A8 owns the trigger).
+    const ball = hazardBallRef.current;
+    const ballBlob = hazardBlobRef.current;
+    if (hazard && ball && ballBlob) {
+      if (hazardActiveRef?.current) {
+        scratch.hazardT += dtc;
+        const travelled = Math.min(hazard.speedMps * scratch.hazardT, hazard.travelM);
+        const rolling = travelled < hazard.travelM;
+        const bounce = rolling
+          ? Math.abs(Math.sin((travelled / HAZARD_BOUNCE_WAVELENGTH_M) * Math.PI)) *
+            HAZARD_BOUNCE_HEIGHT_M
+          : 0;
+        const bx = hazard.x + hazard.dirX * travelled;
+        const by = hazard.y + hazard.dirY * travelled;
+        ball.visible = true;
+        ballBlob.visible = true;
+        ball.position.set(bx, HAZARD_BALL_RADIUS_M + bounce, -by);
+        ballBlob.position.set(bx, BLOB_Y, -by);
+      } else {
+        scratch.hazardT = 0;
+        ball.visible = false;
+        ballBlob.visible = false;
+      }
     }
   });
 
@@ -680,7 +889,8 @@ export function TrafficLayer({
         <meshBasicMaterial color="#ffffff" toneMapped={false} />
       </instancedMesh>
 
-      {/* Pedestrians. */}
+      {/* Pedestrians — articulated six-part skeleton, one InstancedMesh per
+          part (arms/legs pack 2 instances per agent). */}
       <instancedMesh ref={pedBlobRef} args={[undefined, undefined, nPed]} frustumCulled={false}>
         <circleGeometry args={[1, 16]} />
         <meshBasicMaterial
@@ -693,38 +903,85 @@ export function TrafficLayer({
           polygonOffsetFactor={-2}
         />
       </instancedMesh>
-      <instancedMesh ref={pedBodyRef} args={[undefined, undefined, nPed]} frustumCulled={false} castShadow>
-        <capsuleGeometry args={[0.22, 0.75, 3, 8]} />
+      <instancedMesh
+        ref={pedTorsoRef}
+        args={[undefined, undefined, nPed]}
+        geometry={pedGeoms.torso}
+        frustumCulled={false}
+        castShadow
+      >
         <meshStandardMaterial color="#ffffff" roughness={0.85} />
       </instancedMesh>
-      <instancedMesh ref={pedHeadRef} args={[undefined, undefined, nPed]} frustumCulled={false} castShadow>
-        <sphereGeometry args={[0.14, 10, 8]} />
+      <instancedMesh
+        ref={pedHeadRef}
+        args={[undefined, undefined, nPed]}
+        geometry={pedGeoms.head}
+        frustumCulled={false}
+        castShadow
+      >
         <meshStandardMaterial color="#c9a184" roughness={0.85} />
       </instancedMesh>
+      <instancedMesh
+        ref={pedArmRef}
+        args={[undefined, undefined, nPed * 2]}
+        geometry={pedGeoms.arm}
+        frustumCulled={false}
+        castShadow
+      >
+        <meshStandardMaterial color="#ffffff" roughness={0.85} />
+      </instancedMesh>
+      <instancedMesh
+        ref={pedLegRef}
+        args={[undefined, undefined, nPed * 2]}
+        geometry={pedGeoms.leg}
+        frustumCulled={false}
+        castShadow
+      >
+        <meshStandardMaterial color="#ffffff" roughness={0.85} />
+      </instancedMesh>
 
-      {/* Parked cars along the curbs (deterministic, static) — only when a
-          district is supplied. */}
+      {/* Parked-car blob shadows — the GLB bodies + wheels themselves live in
+          fleet.group (static per-model InstancedMeshes, placed once above). */}
       {nPark > 0 ? (
+        <instancedMesh ref={parkBlobRef} args={[undefined, undefined, nPark]} frustumCulled={false}>
+          <circleGeometry args={[1, 20]} />
+          <meshBasicMaterial
+            color="#000000"
+            alphaMap={blobTex}
+            transparent
+            opacity={0.5}
+            depthWrite={false}
+            polygonOffset
+            polygonOffsetFactor={-2}
+          />
+        </instancedMesh>
+      ) : null}
+
+      {/* L5 sudden-obstacle ball — hidden until the A8 orchestrator flips
+          hazardActiveRef; mounted only when the lesson stages a hazard. */}
+      {hazard ? (
         <>
-          <instancedMesh ref={parkBodyRef} args={[undefined, undefined, nPark]} frustumCulled={false} castShadow>
-            <boxGeometry args={[1.76, 0.62, 4.1]} />
-            <meshStandardMaterial color="#ffffff" roughness={0.5} metalness={0.25} />
-          </instancedMesh>
-          <instancedMesh ref={parkCabinRef} args={[undefined, undefined, nPark]} frustumCulled={false} castShadow>
-            <boxGeometry args={[1.55, 0.55, 2.05]} />
-            <meshStandardMaterial color={ROOF_COLOR} roughness={0.55} metalness={0.25} />
-          </instancedMesh>
-          <instancedMesh ref={parkGlassRef} args={[undefined, undefined, nPark]} frustumCulled={false}>
-            <boxGeometry args={[1.4, 0.5, 1.86]} />
+          <mesh ref={hazardBallRef} visible={false} castShadow>
+            <sphereGeometry args={[HAZARD_BALL_RADIUS_M, 16, 12]} />
             <meshStandardMaterial
-              color={GLASS_COLOR}
-              roughness={0.08}
-              metalness={0.1}
-              transparent
-              opacity={0.62}
-              side={DoubleSide}
+              color="#ff4b1f"
+              emissive="#7e1600"
+              emissiveIntensity={0.4}
+              roughness={0.55}
             />
-          </instancedMesh>
+          </mesh>
+          <mesh ref={hazardBlobRef} visible={false} rotation={[-Math.PI / 2, 0, 0]}>
+            <circleGeometry args={[0.5, 16]} />
+            <meshBasicMaterial
+              color="#000000"
+              alphaMap={blobTex}
+              transparent
+              opacity={0.5}
+              depthWrite={false}
+              polygonOffset
+              polygonOffsetFactor={-2}
+            />
+          </mesh>
         </>
       ) : null}
     </group>

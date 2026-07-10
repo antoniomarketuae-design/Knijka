@@ -18,8 +18,14 @@
  *    (extracted from the sedan GLB, spin axis local X, hub-centred) drawn 4× per
  *    car. TrafficLayer sets each instance's matrix = car·offset·roll·steer, and a
  *    uniform scale so the shared wheel matches each model's wheel radius.
+ *  - The PARKED pass (doc 68 A5) reuses the exact same rigs: per-model STATIC
+ *    InstancedMeshes over the same merged body geometry + one static shared
+ *    wheel InstancedMesh (4 per parked car, so parked cars keep their wheels).
+ *    Civilian models only (assignCivilianModel — no parked police), matrices
+ *    written once by TrafficLayer's placement effect.
  *
- * Draw calls are therefore bounded by MODELS × body-primitives (+ 2 wheel groups),
+ * Draw calls are therefore bounded by MODELS × body-primitives (+ 2 wheel groups)
+ * for the moving fleet, plus the same bound again for the parked pass —
  * independent of how many cars are on screen. Geometry is authored ground-relative
  * (Y = 0 = tarmac; body floats above, wheels touch down), so instances place the
  * body at Y = 0 and each wheel at Y = its (scaled) radius.
@@ -187,17 +193,30 @@ function extractSharedWheel(scene: Object3D): SharedWheel {
   };
 }
 
+function mix32(n: number): number {
+  let h = (n + 0x9e3779b9) >>> 0;
+  h = Math.imul(h ^ (h >>> 16), 0x85ebca6b) >>> 0;
+  h = Math.imul(h ^ (h >>> 13), 0xc2b2ae35) >>> 0;
+  return (h ^ (h >>> 16)) >>> 0;
+}
+
 /**
  * Deterministic model index from a vehicle id. Police ~1 in 15; everything else
  * spreads across the civilian pool. Stable across sessions (same id => same car).
  */
 export function assignModel(id: number): number {
-  let h = (id + 0x9e3779b9) >>> 0;
-  h = Math.imul(h ^ (h >>> 16), 0x85ebca6b) >>> 0;
-  h = Math.imul(h ^ (h >>> 13), 0xc2b2ae35) >>> 0;
-  h = (h ^ (h >>> 16)) >>> 0;
+  const h = mix32(id);
   if (h % 15 === 0) return POLICE_INDEX;
   return h % CIVILIAN_COUNT;
+}
+
+/**
+ * Deterministic CIVILIAN model index from an arbitrary seed (parked cars —
+ * a parked police cruiser on every street would read wrong). Stable: same
+ * seed => same model.
+ */
+export function assignCivilianModel(seed: number): number {
+  return mix32(seed) % CIVILIAN_COUNT;
 }
 
 export interface TrafficFleet {
@@ -215,6 +234,19 @@ export interface TrafficFleet {
   wheelScale: Float32Array;
   /** veh index -> wheel roll radius (for speed·dt/r). */
   wheelRadius: Float32Array;
+
+  // --- Parked pass (static; matrices written once by TrafficLayer) ---------
+  /** Per model index: static body InstancedMesh (null when no parked car uses
+   *  that model). Shares each model's merged geometry with `models`. */
+  parkedMeshes: (InstancedMesh | null)[];
+  /** Static shared wheel InstancedMesh (nPark*4), null when nPark = 0. */
+  parkedWheel: InstancedMesh | null;
+  /** parked index -> model index (civilian only). */
+  parkedAssign: Int32Array;
+  /** parked index -> instance slot inside its model's parked InstancedMesh. */
+  parkedSlot: Int32Array;
+  /** parked index -> uniform wheel scale. */
+  parkedWheelScale: Float32Array;
 }
 
 const ZERO_MATRIX = new Float32Array(16); // all-zero => scale 0 => nothing drawn
@@ -227,11 +259,14 @@ function hideAll(mesh: InstancedMesh): void {
 /**
  * Build the instanced fleet from the loaded GLB scenes (FLEET order) and the
  * traffic vehicles. Instances start hidden (zero matrix); TrafficLayer positions
- * them on the first frame.
+ * them on the first frame. `parkedModels` (model index per parking slot, from
+ * assignCivilianModel) additionally builds the static parked pass over the
+ * same rigs.
  */
 export function buildTrafficFleet(
   scenes: Object3D[],
   vehicles: readonly TrafficVehicleState[],
+  parkedModels: readonly number[] = [],
 ): TrafficFleet {
   const rigs = scenes.map(extractModelRig);
   const sharedWheel = extractSharedWheel(scenes[0]);
@@ -282,20 +317,76 @@ export function buildTrafficFleet(
     wheelRadius[i] = rig.wheelRadius;
   }
 
-  return { group, models, wheel, assign, slot, wheelScale, wheelRadius };
+  // --- Parked pass: static instances over the SAME rigs/geometry ------------
+  const nPark = parkedModels.length;
+  const parkedAssign = new Int32Array(nPark);
+  const parkedSlot = new Int32Array(nPark);
+  const parkedWheelScale = new Float32Array(nPark);
+  const parkedCounts = new Array(FLEET.length).fill(0);
+  for (let i = 0; i < nPark; i++) {
+    const m = parkedModels[i];
+    parkedAssign[i] = m;
+    parkedSlot[i] = parkedCounts[m]++;
+    parkedWheelScale[i] = rigs[m].wheelRadius / sharedWheel.refRadius;
+  }
+
+  const parkedMeshes = rigs.map((rig, m): InstancedMesh | null => {
+    const count = parkedCounts[m];
+    if (count === 0) return null;
+    // Static draw usage (default) — placed once, never animated.
+    const mesh = new InstancedMesh(rig.bodyGeometry, rig.bodyMaterials, count);
+    mesh.frustumCulled = false;
+    mesh.castShadow = true;
+    mesh.name = `traffic-parked-body-${FLEET[m]}`;
+    hideAll(mesh);
+    group.add(mesh);
+    return mesh;
+  });
+
+  let parkedWheel: InstancedMesh | null = null;
+  if (nPark > 0) {
+    parkedWheel = new InstancedMesh(
+      sharedWheel.geometry,
+      sharedWheel.materials,
+      nPark * 4,
+    );
+    parkedWheel.frustumCulled = false;
+    parkedWheel.name = "traffic-parked-wheels";
+    hideAll(parkedWheel);
+    group.add(parkedWheel);
+  }
+
+  return {
+    group,
+    models,
+    wheel,
+    assign,
+    slot,
+    wheelScale,
+    wheelRadius,
+    parkedMeshes,
+    parkedWheel,
+    parkedAssign,
+    parkedSlot,
+    parkedWheelScale,
+  };
 }
 
 /**
- * Free the buffers this fleet OWNS — instance attributes + the merged geometries.
- * Materials and source primitive geometries belong to the drei GLTF cache (shared,
- * survive remounts) and are deliberately NOT disposed here.
+ * Free the buffers this fleet OWNS — instance attributes (moving + parked) +
+ * the merged geometries (disposed once even though moving and parked meshes
+ * share them). Materials and source primitive geometries belong to the drei
+ * GLTF cache (shared, survive remounts) and are deliberately NOT disposed here.
  */
 export function disposeTrafficFleet(fleet: TrafficFleet): void {
-  for (const model of fleet.models) {
-    if (!model.mesh) continue;
-    model.mesh.dispose();
-    model.mesh.geometry.dispose();
+  for (let m = 0; m < fleet.models.length; m++) {
+    fleet.models[m].mesh?.dispose();
+    fleet.parkedMeshes[m]?.dispose();
+    // Merged body geometry is ours regardless of whether any mesh used it.
+    fleet.models[m].rig.bodyGeometry.dispose();
   }
   fleet.wheel.dispose();
+  fleet.parkedWheel?.dispose();
+  // Shared wheel geometry backs both wheel meshes — dispose once.
   fleet.wheel.geometry.dispose();
 }

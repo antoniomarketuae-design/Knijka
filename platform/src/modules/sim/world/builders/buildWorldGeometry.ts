@@ -4,6 +4,7 @@
  * no DOM: runs identically in the browser and in vitest/node.
  */
 
+import { LESSON_PARKING_BAYS } from "../../lessons/specs";
 import type {
   BuildWorldOptions,
   District,
@@ -38,11 +39,14 @@ export function buildWorldGeometry(
     treeDensity: options.treeDensity ?? 1,
     seed: options.seed ?? DEFAULT_SEED,
   });
+  // Lesson-authored painted bays (L7) by default — the same curriculum-drives-
+  // the-world pattern as the L2 stop-sign placement. Pass [] for a bare build.
   const markings = buildMarkings(
     district,
     network,
     props.stopSignApproaches,
     props.giveWayApproaches,
+    options.parkingBays ?? LESSON_PARKING_BAYS,
   );
   // Terrain resolution is fixed in the pure layer; the renderer decimates by
   // quality via the `terrainSegments` option of its own rebuild if needed.
@@ -86,6 +90,7 @@ export function buildWorldGeometry(
     markingQuads: markings.markingQuads,
     stopLines: markings.stopLines,
     zebraCrossings: markings.zebraCrossings,
+    parkingBays: markings.parkingBays,
     parkingLaneStrips: roads.parkingLaneStripCount,
     buildings: buildings.count,
     buildingInstances: buildingInstances.length,
