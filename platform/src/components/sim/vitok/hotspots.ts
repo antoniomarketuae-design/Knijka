@@ -1,12 +1,17 @@
 // Cockpit hotspots (A2, doc 69 — the naming contract is LOAD-BEARING).
 //
 // Data + context only; the meshes live in VitokCockpit (CockpitHotspots).
-// Each hotspot is an invisible raycast proxy box (slightly larger than its
-// control for fat-finger tolerance — the P1 touch layer inherits them) named
-// EXACTLY per the doc-69 contract, plus a small VISIBLE control body so the
-// dash isn't a bare slab (stalks, starter, hazard triangle, door-mirror
-// housings). When the authored GT-E interior lands (A3) it must expose the
-// same node names and this file's geometry disappears.
+// Each hotspot is an invisible raycast proxy box named EXACTLY per the doc-69
+// contract, positioned AT the matching control of the authored GT-E interior
+// (A3, hero_interior.glb) and slightly larger than it for fat-finger
+// tolerance — the P1 touch layer inherits them. The GLB carries the same
+// hotspot_* node names on the visible control meshes; the proxies remain the
+// raycast layer (doc 69 explicitly allows "a slightly larger invisible proxy
+// box parented to it") so touch targets stay big and hover glow reads as a
+// halo around the real control.
+//
+// Positions below are the GLB node transforms converted to chassis-local
+// metres through the interior mount (yaw π: (x,z) → (−x,−z); y − 0.55).
 //
 // Actions map 1:1 onto CabinControls' public methods / DrivelineState
 // commands — the SAME transitions the keyboard drives, so the procedure
@@ -14,9 +19,9 @@
 // from a keypress. Mirror hotspots fire cabin.glance(...): the already-graded
 // mirror path (rule-engine sample + camera head-turn).
 //
-// Frame reminder (tuning.ts / parts.ts): chassis-local metres, +X = car LEFT,
+// Frame reminder (tuning.ts): chassis-local metres, +X = car LEFT,
 // +Z = forward; the driver (LHD) sits at x +0.34, eye at COCKPIT_EYE
-// (0.34, 0.66, 0.12). The dash front face toward the driver is z ≈ 0.51.
+// (0.34, 0.66, 0.12).
 
 import { createContext } from "react";
 import type {
@@ -24,7 +29,6 @@ import type {
   PreDriveStepId,
 } from "@/modules/sim/procedures";
 import type { MirrorGlanceKind } from "../cabin";
-import type { BoxSpec } from "./parts";
 
 // ---------------------------------------------------------------------------
 // Actions
@@ -58,7 +62,7 @@ export interface CockpitHotspotSpec {
 }
 
 // ---------------------------------------------------------------------------
-// The thirteen doc-69 hotspots
+// The thirteen doc-69 hotspots (positions = A3 GLB controls, chassis-local)
 // ---------------------------------------------------------------------------
 
 export const COCKPIT_HOTSPOTS: readonly CockpitHotspotSpec[] = [
@@ -66,7 +70,7 @@ export const COCKPIT_HOTSPOTS: readonly CockpitHotspotSpec[] = [
     name: "hotspot_engine_start",
     labelBg: "Стартер — двигател",
     keyHint: "I",
-    pos: [0.16, 0.4, 0.5],
+    pos: [0.095, 0.34, 0.757],
     size: [0.08, 0.08, 0.07],
     action: { type: "engineToggle" },
   },
@@ -74,7 +78,7 @@ export const COCKPIT_HOTSPOTS: readonly CockpitHotspotSpec[] = [
     name: "hotspot_belt",
     labelBg: "Предпазен колан",
     keyHint: "B",
-    pos: [0.13, 0.04, -0.1],
+    pos: [0.135, 0.05, -0.22],
     size: [0.09, 0.13, 0.15],
     action: { type: "seatbeltToggle" },
   },
@@ -82,109 +86,90 @@ export const COCKPIT_HOTSPOTS: readonly CockpitHotspotSpec[] = [
     name: "hotspot_gear_selector",
     labelBg: "Скоростен лост (десен бутон: назад към P)",
     keyHint: "[ ]",
-    pos: [0, 0.24, 0.24],
-    size: [0.13, 0.15, 0.13],
+    pos: [0, 0.178, 0.43],
+    size: [0.13, 0.14, 0.16],
     action: { type: "gearStep" },
   },
   {
     name: "hotspot_parking_brake",
     labelBg: "Ръчна спирачка",
     keyHint: "Space",
-    pos: [0, 0.16, 0.0],
-    size: [0.11, 0.08, 0.13],
+    pos: [0.093, 0.144, 0.35],
+    size: [0.1, 0.08, 0.12],
     action: { type: "parkingBrakeToggle" },
   },
   {
     name: "hotspot_indicator_stalk",
     labelBg: "Лост за мигачи",
     keyHint: ", .",
-    pos: [0.5, 0.28, 0.46],
-    size: [0.17, 0.07, 0.12],
+    pos: [0.48, 0.327, 0.587],
+    size: [0.17, 0.08, 0.12],
     action: { type: "indicatorCycle" },
   },
   {
     name: "hotspot_wiper_stalk",
     labelBg: "Лост за чистачки",
     keyHint: "T",
-    pos: [0.18, 0.28, 0.46],
-    size: [0.17, 0.07, 0.12],
+    pos: [0.2, 0.327, 0.587],
+    size: [0.17, 0.08, 0.12],
     action: { type: "wipersToggle" },
   },
   {
     name: "hotspot_headlights",
     labelBg: "Ключ за светлини",
     keyHint: "L",
-    pos: [0.55, 0.38, 0.5],
-    size: [0.09, 0.09, 0.07],
+    pos: [0.655, 0.342, 0.71],
+    size: [0.09, 0.09, 0.08],
     action: { type: "headlightsCycle" },
   },
   {
     name: "hotspot_hazard",
     labelBg: "Аварийни светлини",
     keyHint: "J",
-    pos: [0, 0.435, 0.49],
-    size: [0.08, 0.06, 0.06],
+    pos: [0, 0.338, 0.752],
+    size: [0.08, 0.06, 0.07],
     action: { type: "hazardsToggle" },
   },
   {
     name: "hotspot_horn",
     labelBg: "Клаксон — задръж",
     keyHint: "H",
-    pos: [0.34, 0.3, 0.5],
-    size: [0.12, 0.12, 0.08],
+    pos: [0.34, 0.281, 0.5],
+    size: [0.15, 0.1, 0.12],
     action: { type: "hornHold" },
   },
   {
     name: "hotspot_mirror_left",
     labelBg: "Ляво огледало — поглед",
     keyHint: "Q",
-    pos: [0.88, 0.32, 0.55],
-    size: [0.17, 0.15, 0.11],
+    pos: [0.905, 0.455, 0.592],
+    size: [0.18, 0.14, 0.1],
     action: { type: "glance", mirror: "left" },
   },
   {
     name: "hotspot_mirror_right",
     labelBg: "Дясно огледало — поглед",
     keyHint: "E",
-    pos: [-0.88, 0.32, 0.55],
-    size: [0.17, 0.15, 0.11],
+    pos: [-0.905, 0.455, 0.592],
+    size: [0.18, 0.14, 0.1],
     action: { type: "glance", mirror: "right" },
   },
   {
     name: "hotspot_mirror_rear",
     labelBg: "Вътрешно огледало — поглед",
     keyHint: "F",
-    pos: [0, 0.68, 0.545],
-    size: [0.42, 0.15, 0.09],
+    pos: [0, 0.687, 0.575],
+    size: [0.3, 0.13, 0.09],
     action: { type: "glance", mirror: "rear" },
   },
   {
     name: "hotspot_fog",
     labelBg: "Фарове за мъгла",
     keyHint: "V",
-    pos: [0.55, 0.29, 0.5],
+    pos: [0.585, 0.328, 0.723],
     size: [0.08, 0.06, 0.07],
     action: { type: "fogToggle" },
   },
-];
-
-// ---------------------------------------------------------------------------
-// Visible control bodies (merged into one draw call by VitokCockpit)
-// ---------------------------------------------------------------------------
-
-/** Small visible geometry anchoring each control so hover targets are
- *  discoverable — stalks, starter, rotary, hazard, buckle, mirror housings. */
-export const CONTROL_BODY_SPECS: readonly BoxSpec[] = [
-  { size: [0.045, 0.045, 0.03], pos: [0.16, 0.4, 0.505] }, // starter button
-  { size: [0.06, 0.06, 0.03], pos: [0.55, 0.38, 0.505] }, // headlight rotary
-  { size: [0.05, 0.035, 0.025], pos: [0.55, 0.29, 0.505] }, // fog switch
-  { size: [0.05, 0.04, 0.025], pos: [0, 0.435, 0.497] }, // hazard button
-  { size: [0.13, 0.028, 0.028], pos: [0.485, 0.28, 0.46] }, // indicator stalk
-  { size: [0.13, 0.028, 0.028], pos: [0.205, 0.28, 0.46] }, // wiper stalk
-  { size: [0.05, 0.028, 0.065], pos: [0, 0.145, 0.0] }, // parking-brake switch
-  { size: [0.035, 0.07, 0.045], pos: [0.13, 0.03, -0.1] }, // belt buckle
-  { size: [0.13, 0.1, 0.05], pos: [0.88, 0.32, 0.56] }, // door mirror L (housing)
-  { size: [0.13, 0.1, 0.05], pos: [-0.88, 0.32, 0.56] }, // door mirror R (housing)
 ];
 
 // ---------------------------------------------------------------------------
@@ -192,7 +177,8 @@ export const CONTROL_BODY_SPECS: readonly BoxSpec[] = [
 // ---------------------------------------------------------------------------
 
 export interface CockpitInteraction {
-  /** Hotspots are pointer-active only in the cockpit camera view. */
+  /** Cockpit camera view: hotspots are pointer-active, the interior GLB and
+   *  the A4 mirror RTT render, the exterior shell hides. */
   enabled: boolean;
   /** Instruction mode: the pending procedure step whose hotspot(s) pulse, or
    *  null (practice/assess/driving — no hand-holding). */

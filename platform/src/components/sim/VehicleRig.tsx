@@ -35,7 +35,7 @@ import type { VehicleSample } from "@/modules/sim/contracts";
 import type { CabinControls } from "./cabin";
 import type { SimAudio } from "./simAudio";
 import { updateVehicleSample } from "./vehicleSample";
-import { VitokCockpit } from "./vitok/VitokCockpit";
+import { INTERIOR_LAYER, VitokCockpit } from "./vitok/VitokCockpit";
 import { HeroCarBody } from "./HeroCarBody";
 
 /**
@@ -223,18 +223,25 @@ export function VehicleRig({
         massProperties={massProperties}
       />
       {/* Vehicle visuals — everything inside follows the interpolated body.
-          Hero "Aurelis GT-E" exterior (Draco glTF) + the existing „Виток"
-          cockpit for the inside view. */}
+          Hero "Aurelis GT-E" exterior (Draco glTF, chase view) + the authored
+          GT-E interior via VitokCockpit (cockpit view, A3). */}
       <group ref={chassisGroupRef}>
         <HeroCarBody simRef={simRef} />
         <VitokCockpit simRef={simRef} inputRef={inputRef} cabinRef={cabinRef} />
 
         {/* Windshield glass — a faint cool-tinted, low-roughness plane raked
-            over the dash so the driver isn't looking through an invisible open
-            frame; its specular catches the sky/HDRI as a light dash reflection.
-            depthWrite off so it never occludes the world behind it. */}
-        <mesh position={[0, 0.6, 0.64]} rotation={[-0.9, 0, 0]}>
-          <planeGeometry args={[1.42, 0.46]} />
+            through the A3 interior's windshield opening (the interior GLB has
+            frame/pillars but no glass surface, and the exterior's opaque glass
+            hides in cockpit view — this plane is the only "glass" the driver
+            looks through). Refit to the GLB aperture: cowl ~y0.5/z0.9 up to
+            the header ~y0.85/z0.55. depthWrite off so it never occludes the
+            world; INTERIOR_LAYER so the A4 mirror cameras never see it. */}
+        <mesh
+          position={[0, 0.66, 0.76]}
+          rotation={[-0.62, 0, 0]}
+          onUpdate={(m) => m.layers.set(INTERIOR_LAYER)}
+        >
+          <planeGeometry args={[1.5, 0.55]} />
           <meshStandardMaterial
             color="#243040"
             transparent

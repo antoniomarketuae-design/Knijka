@@ -9,16 +9,19 @@ import {
   useState,
   type RefObject,
 } from "react";
-import { useFrame, type ThreeEvent } from "@react-three/fiber";
-import { Html } from "@react-three/drei";
+import { useFrame, useThree, type ThreeEvent } from "@react-three/fiber";
+import { Html, useGLTF } from "@react-three/drei";
 import {
+  BoxGeometry,
+  BufferAttribute,
+  CanvasTexture,
+  Mesh,
+  MeshBasicMaterial,
   SRGBColorSpace,
-  type CanvasTexture,
-  type Group,
-  type MeshBasicMaterial,
+  type BufferGeometry,
   type Object3D,
 } from "three";
-import { COCKPIT_EYE, type VehicleSim } from "@/modules/sim/vehicle";
+import type { VehicleSim } from "@/modules/sim/vehicle";
 import type { SimInput } from "@/modules/sim/engine";
 import { hotspotsForStep, type CockpitHotspotName } from "@/modules/sim/procedures";
 import type { CabinControls } from "../cabin";
@@ -33,43 +36,39 @@ import {
 import {
   COCKPIT_HOTSPOTS,
   CockpitInteractionContext,
-  CONTROL_BODY_SPECS,
   type HotspotAction,
 } from "./hotspots";
-import { mergedBoxes, steeringWheelGeometry, type BoxSpec } from "./parts";
+import { MirrorRig, type MirrorMeshes } from "./MirrorRig";
 
 // ---------------------------------------------------------------------------
-// Static interior shell — merged into TWO meshes (plastics + seats) so the
-// whole cockpit costs a handful of draw calls. All chassis-local metres;
-// ground at rest is y=-0.63, the driver eye sits at COCKPIT_EYE (LHD).
+// A3 authored interior — the Aurelis GT-E cabin (Draco GLB, 22.5k tris,
+// 6 materials, 2 merged draw groups interior_shell + interior_seats, all 13
+// doc-69 hotspot_* nodes kept separate + screen_cluster / screen_center +
+// the steering_wheel empty parenting steering_wheel_mesh & hotspot_horn).
+//
+// MOUNTING MATH (verified against the GLB node transforms): the file is
+// authored Y-up with the car facing -Z — the same convention as the exterior
+// hero_car.glb — so the sim's existing yaw-π flip applies; at scale 1.0 with
+// a y offset of -0.55 the authored driver eye lands exactly on COCKPIT_EYE.
+// Cross-check: authored steering_wheel (-0.34, 0.85, -0.52) → chassis-local
+// (0.34, 0.30, 0.52) — the procedural cockpit's exact wheel mount.
 // ---------------------------------------------------------------------------
-const SHELL: readonly BoxSpec[] = [
-  { size: [1.56, 0.18, 0.3], pos: [0, 0.35, 0.66] }, // dash body
-  { size: [1.56, 0.06, 0.16], pos: [0, 0.45, 0.58] }, // dash upper lip
-  { size: [0.4, 0.05, 0.2], pos: [0.34, 0.5, 0.62] }, // instrument binnacle hood
-  { size: [0.07, 0.07, 0.3], pos: [0.34, 0.22, 0.42], rot: [-0.45, 0, 0] }, // steering column
-  { size: [1.56, 0.06, 0.14], pos: [0, 0.47, 0.82] }, // cowl (seals dash->hood)
-  { size: [1.5, 0.05, 2.0], pos: [0, -0.28, -0.15] }, // floor
-  { size: [0.28, 0.16, 0.75], pos: [0, 0.05, 0.18] }, // centre console
-  { size: [0.035, 0.16, 0.035], pos: [0, 0.18, 0.25], rot: [0.25, 0, 0] }, // gear lever
-  { size: [0.06, 0.05, 0.06], pos: [0, 0.26, 0.23] }, // gear knob
-  { size: [0.07, 0.46, 0.09], pos: [0.72, 0.6, 0.67], rot: [-0.84, 0, 0] }, // A-pillar L
-  { size: [0.07, 0.46, 0.09], pos: [-0.72, 0.6, 0.67], rot: [-0.84, 0, 0] }, // A-pillar R
-  { size: [1.46, 0.04, 1.15], pos: [0, 0.76, -0.05] }, // headliner
-  { size: [1.46, 0.07, 0.1], pos: [0, 0.74, 0.5] }, // windshield header
-  { size: [0.06, 0.52, 1.15], pos: [0.75, 0.16, 0.15] }, // door card L
-  { size: [0.06, 0.52, 1.15], pos: [-0.75, 0.16, 0.15] }, // door card R
-  { size: [1.4, 0.05, 0.45], pos: [0, 0.28, -1.15] }, // rear parcel shelf
-  { size: [1.4, 0.42, 0.12], pos: [0, 0.05, -0.92] }, // rear seat back
-];
+const INTERIOR_URL = "/sim/vehicles/hero_interior.glb";
+/** Local Draco decoder (CSP-safe, no CDN) — copied to public/draco/. */
+const DRACO_PATH = "/draco/";
+/** Authored car faces -Z (like the exterior GLB) → flip to chassis +Z. */
+const INTERIOR_YAW = Math.PI;
+/** Authored floor→eye calibration: chassis-local y = authored y - 0.55. */
+const INTERIOR_Y_OFFSET = -0.55;
 
-function seatSpecs(x: number): BoxSpec[] {
-  return [
-    { size: [0.5, 0.14, 0.52], pos: [x, -0.05, -0.05] },
-    { size: [0.5, 0.58, 0.13], pos: [x, 0.22, -0.32], rot: [-0.12, 0, 0] },
-    { size: [0.26, 0.17, 0.1], pos: [x, 0.58, -0.38] },
-  ];
-}
+/**
+ * Render layer for everything cabin-local (interior GLB, hotspot proxies,
+ * VehicleRig's windshield plane). The MAIN camera enables it (effect below);
+ * the A4 mirror render-to-texture cameras keep the default layer-0 mask, so
+ * mirror passes see the world but never the cabin — that is the recursion /
+ * self-view guard for the RTT mirrors.
+ */
+export const INTERIOR_LAYER = 2;
 
 /**
  * Visual steering ratio (hands-to-roadwheel-visual). The shared physics
@@ -80,14 +79,13 @@ function seatSpecs(x: number): BoxSpec[] {
  */
 const WHEEL_VISUAL_RATIO = 3.5;
 
-// Cluster plane: 0.30 x 0.15 m mapping the 512x256 canvas -> 0.000586 m/px.
+// Cluster quad: 0.30 x 0.15 m mapping the 512x256 canvas -> 0.000586 m/px.
 const PX = 0.3 / CLUSTER_W;
 const NEEDLE_PIVOT_X = (140 - CLUSTER_W / 2) * PX; // dial centre (140,132)
 const NEEDLE_PIVOT_Y = (CLUSTER_H / 2 - 132) * PX;
 
 /** Mutable cluster redraw state, created lazily on first frame and owned by
- * a plain ref (per-frame mutation is only legal on ref contents). The
- * CanvasTexture itself is JSX-owned so R3F disposes it on unmount. */
+ * a plain ref (per-frame mutation is only legal on ref contents). */
 interface ClusterRuntime {
   ctx: CanvasRenderingContext2D | null;
   lastHash: string;
@@ -112,17 +110,54 @@ function makeClusterRuntime(canvas: HTMLCanvasElement): ClusterRuntime {
 }
 
 /**
- * „Виток" cockpit: enclosing interior shell, working instrument cluster
- * (speedo needle at frame rate; gear / indicators / belt / handbrake /
- * headlight telltales + static fuel on a low-rate CanvasTexture), animated
- * steering wheel, and the interior rear-view mirror.
+ * The A3 GLB ships no UVs (solid-color PBR materials). The screen and mirror
+ * quads need them for the cluster canvas / RTT textures, so synthesize a
+ * planar map from the quad's local XY extents. `mirrorU` bakes the horizontal
+ * mirror-image flip straight into the UVs (a raw rear-facing camera shows
+ * car-left on image-right; a real mirror shows it on the left).
+ */
+function ensureQuadUVs(geometry: BufferGeometry, mirrorU: boolean): void {
+  if (geometry.getAttribute("uv")) return;
+  const pos = geometry.getAttribute("position");
+  geometry.computeBoundingBox();
+  const bb = geometry.boundingBox;
+  if (!bb) return;
+  const w = Math.max(bb.max.x - bb.min.x, 1e-6);
+  const h = Math.max(bb.max.y - bb.min.y, 1e-6);
+  const uv = new Float32Array(pos.count * 2);
+  for (let i = 0; i < pos.count; i++) {
+    const u = (pos.getX(i) - bb.min.x) / w;
+    uv[i * 2] = mirrorU ? 1 - u : u;
+    uv[i * 2 + 1] = (pos.getY(i) - bb.min.y) / h;
+  }
+  geometry.setAttribute("uv", new BufferAttribute(uv, 2));
+}
+
+function asMesh(o: Object3D | undefined): Mesh | null {
+  return o instanceof Mesh ? o : null;
+}
+
+/**
+ * „Виток" cockpit, A3 edition: the authored GT-E interior GLB replaces the
+ * old procedural box shell. Kept live on top of it:
+ *  - the instrument-cluster CanvasTexture, now projected onto the GLB's
+ *    `screen_cluster` quad (UV-synthesized, unmirrored from the driver seat)
+ *    with the 3D speedo needle re-parented onto that quad;
+ *  - the steering-wheel rotation driver, retargeted to the `steering_wheel`
+ *    node (its child hotspot_horn rides the rim, like a real wheel);
+ *  - the doc-69 hotspot layer (invisible enlarged proxy boxes at the GLB
+ *    control positions — P1 touch targets stay big).
+ * The interior renders in the cockpit view only (context.enabled, the
+ * existing view gating) and lives on INTERIOR_LAYER so the A4 mirror cameras
+ * never see the cabin.
  *
- * STEERING WHEEL SIGN (verified: headless probe measured steer input +1
- * (KeyA/left) => steerRad = +0.55 AND chassis yaw toward car-left): the
- * wheel group's local +Z faces forward-away from the driver, so a NEGATIVE
- * rotation about it appears COUNTER-CLOCKWISE from the driver's seat —
- * which is how a real wheel turns for a left turn. Hence
- * `rotation.z = -steerRad * WHEEL_VISUAL_RATIO`.
+ * STEERING WHEEL SIGN (GLB verified: the wheel disc lies in the
+ * steering_wheel empty's local XZ plane — rim X ±0.205 / Z −0.162..0.205,
+ * 12-o'clock accent stripe at +Z — so the spin axis is local +Y, which after
+ * the authored tilt and the yaw-π mount points along chassis (0, 0.44, 0.90):
+ * exactly the old procedural column axis, pointing away from the driver.
+ * Same sign rule as before on that axis: `rotation.y = -steerRad * ratio`
+ * reads counter-clockwise from the driver's seat for a left steer.)
  */
 export function VitokCockpit({
   simRef,
@@ -133,17 +168,55 @@ export function VitokCockpit({
   inputRef: RefObject<SimInput | null>;
   cabinRef: RefObject<CabinControls | null>;
 }) {
-  const steeringRef = useRef<Group>(null);
-  const needleRef = useRef<Object3D>(null);
-  const runtimeRef = useRef<ClusterRuntime | null>(null);
-  const textureRef = useRef<CanvasTexture>(null);
+  const { enabled: cockpitView } = useContext(CockpitInteractionContext);
+  const camera = useThree((s) => s.camera);
+  const raycaster = useThree((s) => s.raycaster);
+  const { scene } = useGLTF(INTERIOR_URL, DRACO_PATH);
 
-  const shellGeometry = useMemo(() => mergedBoxes(SHELL), []);
-  const seatGeometry = useMemo(
-    () => mergedBoxes([...seatSpecs(0.34), ...seatSpecs(-0.36)]),
-    [],
-  );
-  const wheelGeometry = useMemo(() => steeringWheelGeometry(), []);
+  const needleRef = useRef<Object3D | null>(null);
+  const runtimeRef = useRef<ClusterRuntime | null>(null);
+  const textureRef = useRef<CanvasTexture | null>(null);
+
+  // Main camera renders the cabin layer; the default raycaster must also test
+  // it or the layer-2 hotspot proxies would be unclickable (three's Raycaster
+  // defaults to layer 0 only). Mirror cameras keep mask 1 → cabin excluded.
+  useEffect(() => {
+    camera.layers.enable(INTERIOR_LAYER);
+    raycaster.layers.enable(INTERIOR_LAYER);
+    return () => {
+      camera.layers.disable(INTERIOR_LAYER);
+    };
+  }, [camera, raycaster]);
+
+  const { model, wheelNode, clusterMesh, mirrorMeshes } = useMemo(() => {
+    const root = scene.clone(true);
+    root.traverse((o) => {
+      o.layers.set(INTERIOR_LAYER);
+      const mesh = o as Mesh;
+      if (mesh.isMesh) {
+        // No shadow casting: 22.5k tris the shadow pass doesn't need — the
+        // cabin is lit by the fill light + IBL, grounded by the world's AO.
+        mesh.castShadow = false;
+        mesh.receiveShadow = true;
+      }
+    });
+
+    const clusterMesh = asMesh(root.getObjectByName("screen_cluster"));
+    if (clusterMesh) ensureQuadUVs(clusterMesh.geometry, false);
+
+    const mirrorMeshes: MirrorMeshes = {
+      left: asMesh(root.getObjectByName("hotspot_mirror_left")),
+      right: asMesh(root.getObjectByName("hotspot_mirror_right")),
+      rear: asMesh(root.getObjectByName("hotspot_mirror_rear")),
+    };
+    for (const mesh of Object.values(mirrorMeshes)) {
+      if (mesh) ensureQuadUVs(mesh.geometry, true); // mirror-image U flip
+    }
+
+    const wheelNode = root.getObjectByName("steering_wheel") ?? null;
+    return { model: root, wheelNode, clusterMesh, mirrorMeshes };
+  }, [scene]);
+
   const clusterCanvas = useMemo(() => {
     const canvas = document.createElement("canvas");
     canvas.width = CLUSTER_W;
@@ -151,16 +224,58 @@ export function VitokCockpit({
     return canvas;
   }, []);
 
+  // Project the live cluster canvas onto the GLB screen quad and hang the 3D
+  // speedo needle off it (frame-rate sweep over the 10 Hz canvas face). All
+  // resources created here are owned here and disposed on unmount; the quad's
+  // authored material is restored so the cached GLTF scene stays pristine.
+  useEffect(() => {
+    const cluster = clusterMesh;
+    if (!cluster) return;
+    const texture = new CanvasTexture(clusterCanvas);
+    texture.colorSpace = SRGBColorSpace;
+    texture.anisotropy = 4;
+    const material = new MeshBasicMaterial({ map: texture, toneMapped: false });
+    const previousMaterial = cluster.material;
+    cluster.material = material;
+    textureRef.current = texture;
+    // Force a first draw (runtime hash starts empty, but make the texture
+    // upload once even before the first state change).
+    runtimeRef.current = null;
+
+    const needleGeometry = new BoxGeometry(0.066, 0.006, 0.003);
+    needleGeometry.translate(0.025, 0, 0);
+    const needleMaterial = new MeshBasicMaterial({ color: "#ff5533", toneMapped: false });
+    const needle = new Mesh(needleGeometry, needleMaterial);
+    // Dial centre in quad-local metres, floated 4 mm off the glass.
+    needle.position.set(NEEDLE_PIVOT_X, NEEDLE_PIVOT_Y, 0.004);
+    needle.layers.set(INTERIOR_LAYER);
+    cluster.add(needle);
+    needleRef.current = needle;
+
+    return () => {
+      cluster.remove(needle);
+      cluster.material = previousMaterial;
+      needleRef.current = null;
+      textureRef.current = null;
+      texture.dispose();
+      material.dispose();
+      needleGeometry.dispose();
+      needleMaterial.dispose();
+    };
+  }, [clusterMesh, clusterCanvas]);
+
   useFrame((_, delta) => {
     const sim = simRef.current;
     const cabin = cabinRef.current;
     if (!sim) return;
 
-    if (steeringRef.current) {
-      steeringRef.current.rotation.z = -sim.steerRad * WHEEL_VISUAL_RATIO;
+    if (wheelNode) {
+      // Spin about the authored column axis (node-local +Y, see doc above).
+      wheelNode.rotation.y = -sim.steerRad * WHEEL_VISUAL_RATIO;
     }
-    if (needleRef.current) {
-      needleRef.current.rotation.z = needleAngleRad(sim.speedKmh);
+    const needle = needleRef.current;
+    if (needle) {
+      needle.rotation.z = needleAngleRad(sim.speedKmh);
     }
 
     // Cluster face: redrawn only when a telltale changes (blink edges /
@@ -196,73 +311,28 @@ export function VitokCockpit({
     }
   });
 
+  // Cockpit-view-only: the cabin is pure driver-seat perception; the chase
+  // camera sees the exterior GLB instead. visible (not unmount) so the GLTF
+  // graph, canvas texture and mirror targets survive view toggles.
   return (
-    <group>
-      {/* Interior shell + seats: two merged meshes, two draw calls. */}
-      <mesh geometry={shellGeometry}>
-        <meshStandardMaterial color="#171b21" roughness={0.9} />
-      </mesh>
-      <mesh geometry={seatGeometry}>
-        <meshStandardMaterial color="#232a33" roughness={0.95} />
-      </mesh>
+    <group visible={cockpitView}>
+      <primitive
+        object={model}
+        position={[0, INTERIOR_Y_OFFSET, 0]}
+        rotation={[0, INTERIOR_YAW, 0]}
+        dispose={null}
+      />
 
-      {/* Instrument cluster: canvas face + 3D speedo needle.
-          The group is yawed 180° so its local +Z (the plane's front face)
-          points at the driver — the texture reads unmirrored. */}
-      <group position={[0.34, 0.435, 0.625]} rotation={[0, Math.PI, 0]}>
-        <group rotation={[-0.12, 0, 0]}>
-          <mesh>
-            <planeGeometry args={[0.3, 0.15]} />
-            <meshBasicMaterial toneMapped={false}>
-              <canvasTexture
-                ref={textureRef}
-                attach="map"
-                args={[clusterCanvas]}
-                colorSpace={SRGBColorSpace}
-                anisotropy={4}
-              />
-            </meshBasicMaterial>
-          </mesh>
-          <group ref={needleRef} position={[NEEDLE_PIVOT_X, NEEDLE_PIVOT_Y, 0.004]}>
-            <mesh position={[0.025, 0, 0]}>
-              <boxGeometry args={[0.066, 0.006, 0.003]} />
-              <meshBasicMaterial color="#ff5533" toneMapped={false} />
-            </mesh>
-          </group>
-        </group>
-      </group>
+      {/* A4: functional render-to-texture mirrors on the GLB mirror glass. */}
+      <MirrorRig mirrors={mirrorMeshes} active={cockpitView} />
 
-      {/* Steering wheel (tilted toward the driver, animated by steerRad). */}
-      <group position={[COCKPIT_EYE.x, 0.3, 0.52]} rotation={[-0.45, 0, 0]}>
-        <group ref={steeringRef}>
-          <mesh geometry={wheelGeometry}>
-            <meshStandardMaterial color="#10141a" roughness={0.85} />
-          </mesh>
-        </group>
-      </group>
-
-      {/* Interior rear-view mirror, hung from the windshield header and
-          angled toward the driver (glance target of KeyF). */}
-      <group position={[0, 0.68, 0.55]} rotation={[0.08, -0.15, 0]}>
-        <mesh position={[0, 0.05, 0.01]}>
-          <boxGeometry args={[0.04, 0.06, 0.03]} />
-          <meshStandardMaterial color="#171b21" roughness={0.9} />
-        </mesh>
-        <mesh>
-          <boxGeometry args={[0.36, 0.11, 0.03]} />
-          <meshStandardMaterial color="#171b21" roughness={0.9} />
-        </mesh>
-        <mesh position={[0, 0, -0.017]} rotation={[0, Math.PI, 0]}>
-          <planeGeometry args={[0.33, 0.09]} />
-          <meshStandardMaterial color="#5b6b85" roughness={0.15} metalness={0.85} />
-        </mesh>
-      </group>
-
-      {/* A2: named raycast hotspots + visible control bodies (doc 69). */}
+      {/* A2: named raycast hotspots (doc 69). */}
       <CockpitHotspots cabinRef={cabinRef} />
     </group>
   );
 }
+
+useGLTF.preload(INTERIOR_URL, DRACO_PATH);
 
 // ---------------------------------------------------------------------------
 // A2 cockpit hotspots — the doc-69 interactive layer
@@ -276,14 +346,15 @@ const HOTSPOT_PULSE_HZ = 0.7;
 const HOTSPOT_COLOR = "#6db4ff";
 
 /**
- * Named raycast-target meshes per the doc-69 contract: invisible proxy boxes
- * (transparent, opacity 0 — R3F only raycasts objects with handlers, so the
- * rest of the cockpit stays inert) plus one merged mesh of small visible
- * control bodies (stalks / starter / hazard / buckle / mirror housings).
+ * Named raycast-target meshes per the doc-69 contract: invisible enlarged
+ * proxy boxes at the GLB control positions (transparent, opacity 0 — R3F only
+ * raycasts objects with handlers, so the authored control meshes underneath
+ * stay inert and never occlude the proxies). Proxies keep the P1 touch
+ * targets bigger than the visible controls, exactly as doc 69 allows.
  *
  * Interaction contract (doc 68 A2):
- *  - hover  → subtle emissive-style glow + Bulgarian tooltip naming the
- *    control (with its equivalent key — the keys are real, so the hint is
+ *  - hover  → subtle glow around the authored control + Bulgarian tooltip
+ *    naming it (with its equivalent key — the keys are real, so the hint is
  *    honest), pointer cursor;
  *  - click  → the SAME CabinControls/DrivelineState transition as the key
  *    (gear selector: right-click steps back toward P; horn is momentary on
@@ -318,8 +389,6 @@ function CockpitHotspots({ cabinRef }: { cabinRef: RefObject<CabinControls | nul
       }
     };
   }, [enabled, setHover]);
-
-  const controlBodies = useMemo(() => mergedBoxes(CONTROL_BODY_SPECS), []);
 
   const highlightNames = useMemo(
     () => new Set<CockpitHotspotName>(highlightStepId ? hotspotsForStep(highlightStepId) : []),
@@ -385,17 +454,13 @@ function CockpitHotspots({ cabinRef }: { cabinRef: RefObject<CabinControls | nul
 
   return (
     <group>
-      {/* Visible control bodies — one merged mesh, one draw call. */}
-      <mesh geometry={controlBodies}>
-        <meshStandardMaterial color="#2b333e" roughness={0.85} />
-      </mesh>
-
       {enabled
         ? COCKPIT_HOTSPOTS.map((spec) => (
             <mesh
               key={spec.name}
               name={spec.name}
               position={spec.pos as [number, number, number]}
+              onUpdate={(m: Mesh) => m.layers.set(INTERIOR_LAYER)}
               onPointerOver={(e: ThreeEvent<PointerEvent>) => {
                 e.stopPropagation();
                 setHover(spec.name);

@@ -6,9 +6,16 @@
  * Draco-compressed GLB with its OWN PBR materials (deep-gloss paint, tinted
  * glass, chrome, alloys, LED bars), so — unlike the old RoadsterBody — we keep
  * the model's materials and only bump envMapIntensity so the paint/glass reflect
- * the scene HDRI. Exterior shell + separate wheel nodes; no modelled interior,
- * so the cockpit view keeps VitokCockpit (the outward-facing shell backface-culls
- * from inside).
+ * the scene HDRI.
+ *
+ * COCKPIT VIEW HIDES THE EXTERIOR (A3): every material in the GLB is
+ * double-sided and the tinted-glass canopy is OPAQUE near-black, spanning
+ * chassis y 0.31–0.77 — it encloses the driver eye (y 0.66), so from inside
+ * the shell reads as a black box. The authored hero interior (VitokCockpit)
+ * replaces the cabin visuals entirely, so in the cockpit view this component
+ * hides itself (context.enabled from LessonScene's provider). Two accepted
+ * trade-offs while hidden: the car casts no shadow (barely readable from the
+ * driver seat) and the A4 mirror RTT passes don't show the own-car flank.
  *
  * Wheels are rigged: the four `wheel_*` nodes roll about local X from speed and
  * the front pair steers from `sim.steerRad`. Physics / rule-engine grading read
@@ -19,11 +26,12 @@
  * facing if it renders backward.
  */
 
-import { useMemo, useRef, type RefObject } from "react";
+import { useContext, useMemo, useRef, type RefObject } from "react";
 import { useFrame } from "@react-three/fiber";
 import { useGLTF } from "@react-three/drei";
 import { Box3, Mesh, MeshStandardMaterial, Object3D, Vector3 } from "three";
 import { CHASSIS_HALF_EXTENTS, type VehicleSim } from "@/modules/sim/vehicle";
+import { CockpitInteractionContext } from "./vitok/hotspots";
 
 const HERO_URL = "/sim/vehicles/hero_car.glb";
 /** Local Draco decoder (CSP-safe, no CDN) — copied to public/draco/. */
@@ -42,6 +50,8 @@ interface Wheel {
 
 export function HeroCarBody({ simRef }: { simRef?: RefObject<VehicleSim | null> }) {
   const { scene } = useGLTF(HERO_URL, DRACO_PATH);
+  // Cockpit view (context.enabled) → hide the shell; see the header comment.
+  const { enabled: cockpitView } = useContext(CockpitInteractionContext);
   const wheels = useRef<Wheel[]>([]);
   const roll = useRef(0);
 
@@ -96,7 +106,12 @@ export function HeroCarBody({ simRef }: { simRef?: RefObject<VehicleSim | null> 
   });
 
   return (
-    <group scale={scale} position={[0, offsetY, 0]} rotation={[0, HERO_YAW, 0]}>
+    <group
+      visible={!cockpitView}
+      scale={scale}
+      position={[0, offsetY, 0]}
+      rotation={[0, HERO_YAW, 0]}
+    >
       <primitive object={model} />
     </group>
   );
