@@ -11,10 +11,14 @@ export { ObjectiveBanner, type ObjectiveFlash } from "./ObjectiveBanner";
 export { HudToasts, useHudToastQueue, type HudToast } from "./HudToasts";
 export {
   Minimap,
+  MistakeMap,
+  fitMapTransform,
   type MinimapFrame,
   type MinimapMarker,
   type MinimapPolyline,
   type MinimapTransform,
+  type MistakeMapMarker,
+  type MistakeMapMarkerKind,
 } from "./Minimap";
 export { PreDriveChecklist } from "./PreDriveChecklist";
 export { SessionEndScreen, type SessionEndConcept } from "./SessionEndScreen";

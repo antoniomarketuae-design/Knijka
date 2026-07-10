@@ -309,6 +309,51 @@ export interface TeachMoment {
 }
 
 // ---------------------------------------------------------------------------
+// A15 — mistake-map measurement channels (both ADDITIVE)
+// ---------------------------------------------------------------------------
+
+/**
+ * World position of one scored event (A15 mistake map). The rule engine's
+ * ScorableEvent deliberately carries no position (rules/ adjudicates law, not
+ * geometry) — the lessons engine records it here AT EMISSION TIME from the
+ * very SimTick the event fired on, paired back to its event by (kind, code, t)
+ * exactly like PenaltyEscalation pairs. Pre-drive events (no tick in hand)
+ * simply have no record — their mistake rows render without a map marker.
+ */
+export interface EventPosition {
+  kind: "violation" | "commendation";
+  /** Rule-catalog code — pairs with ScorableEvent.code. */
+  code: string;
+  /** Session time of the event, seconds — pairs with ScorableEvent.t. */
+  t: number;
+  /** World position, meters (SimTick.position at emission). */
+  x: number;
+  y: number;
+}
+
+/**
+ * One near-miss encounter as the SESSION records it (A15): the A11 traffic
+ * stat (contracts.ts NearMissEvent) plus the player position the shell
+ * captured when the encounter resolved — clearance is sub-meter, so the
+ * player's own position IS the encounter location for map purposes. Nothing
+ * here is graded (deliberately no ViolationCode); the end screen plots these
+ * as "мина на косъм" rings.
+ */
+export interface SessionNearMiss {
+  /** Session time at resolution, s. */
+  tSec: number;
+  /** What was nearly hit. */
+  kind: "vehicle" | "pedestrian" | "cyclist";
+  /** Tightest body-envelope clearance during the encounter, m (0 = brushed). */
+  clearanceM: number;
+  /** Peak relative speed during the encounter, m/s. */
+  relSpeedMps: number;
+  /** Player world position at resolution, m; null when no tick was in hand. */
+  x: number | null;
+  y: number | null;
+}
+
+// ---------------------------------------------------------------------------
 // Lesson session state (the pure reducer state)
 // ---------------------------------------------------------------------------
 
@@ -354,6 +399,18 @@ export interface LessonSessionState {
    * callback; absent on sessions predating A8.
    */
   stagedOutcomes?: StagedEventOutcome[];
+  /**
+   * A15 (additive): world positions of the SCORED events, recorded by
+   * applyTick from the tick each event fired on — see EventPosition. Only
+   * tick-emitted events appear (pre-drive events carry no position).
+   */
+  eventPositions?: EventPosition[];
+  /**
+   * A15 (additive): near-miss encounters, in resolution order — recorded via
+   * `applyNearMiss` (engine.ts) from LessonScene's onNearMiss callback (A11).
+   * Session stat only; never folds into any score.
+   */
+  nearMisses?: SessionNearMiss[];
 }
 
 // ---------------------------------------------------------------------------
@@ -417,4 +474,13 @@ export interface LessonResult {
   /** The repeat mistakes that graded harder — debrief shows „повторна ×1.5". */
   escalations: EscalatedMistake[];
   durationSec: number;
+  /**
+   * A15 (additive): positions of the scored events for the end-screen mistake
+   * map, paired to summary.mistakes/commendations by (kind, code, t). Absent
+   * on server-graded results rebuilt purely from the wire (positions are
+   * display metadata — the server never grades from them).
+   */
+  eventPositions?: EventPosition[];
+  /** A15 (additive): the session's near-miss encounters ("мина на косъм"). */
+  nearMisses?: SessionNearMiss[];
 }

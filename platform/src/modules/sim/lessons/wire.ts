@@ -35,7 +35,12 @@ import {
   type PenaltyEscalation,
 } from "./escalation";
 import { lessonById } from "./specs";
-import type { LessonResult, ObjectiveOutcome } from "./types";
+import type {
+  EventPosition,
+  LessonResult,
+  ObjectiveOutcome,
+  SessionNearMiss,
+} from "./types";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -51,6 +56,25 @@ export interface WireRuleEvent {
    * ×1.0 is implicit/absent). Affects ONLY the effective training score.
    */
   penaltyMultiplier?: number;
+  /**
+   * A15: world position of the event, meters (both present or both absent).
+   * DISPLAY METADATA ONLY — the server persists it for the mistake map /
+   * future replay and never derives any grading from it (a tampered position
+   * moves a dot on a map, nothing else).
+   */
+  x?: number;
+  y?: number;
+}
+
+/** A15: one near-miss encounter over the wire (session stat, never graded). */
+export interface WireNearMiss {
+  tSec: number;
+  kind: "vehicle" | "pedestrian" | "cyclist";
+  clearanceM: number;
+  relSpeedMps: number;
+  /** Player position at resolution (display metadata, like WireRuleEvent.x/y). */
+  x?: number;
+  y?: number;
 }
 
 export interface WireObjectiveOutcome {
@@ -74,6 +98,8 @@ export interface FinishLessonWire {
   objectives: WireObjectiveOutcome[];
   /** Micro-quiz tally, if any quizzes were shown; undefined otherwise. */
   microQuiz?: WireMicroQuiz;
+  /** A15: near-miss encounters (validated stat; absent on older clients). */
+  nearMisses?: WireNearMiss[];
 }
 
 /** Hard caps — a session cannot legitimately exceed these. */
@@ -82,6 +108,9 @@ const MAX_DETAIL_LEN = 64;
 const MAX_SESSION_SEC = 4 * 60 * 60;
 /** A session cannot legitimately show more micro-quizzes than this. */
 const MAX_MICRO_QUIZZES = 20;
+/** A15 caps: near-miss list size + sane world-coordinate bound, meters. */
+const MAX_NEAR_MISSES = 100;
+const MAX_ABS_COORD_M = 100_000;
 
 // ---------------------------------------------------------------------------
 // Client side: serialize
@@ -90,6 +119,7 @@ const MAX_MICRO_QUIZZES = 20;
 export function serializeRuleEvents(
   events: ReadonlyArray<ScorableEvent>,
   escalations: ReadonlyArray<PenaltyEscalation> = [],
+  positions: ReadonlyArray<EventPosition> = [],
 ): WireRuleEvent[] {
   // (code, t) → pending multipliers, consumed once each (mirrors escalation.ts).
   const pending = new Map<string, number[]>();
@@ -99,12 +129,44 @@ export function serializeRuleEvents(
     if (list) list.push(esc.multiplier);
     else pending.set(key, [esc.multiplier]);
   }
+  // A15: (kind, code, t) → pending positions, consumed once each (same scheme).
+  const pendingPos = new Map<string, Array<{ x: number; y: number }>>();
+  for (const p of positions) {
+    const key = `${p.kind}:${p.code}@${p.t}`;
+    const list = pendingPos.get(key);
+    if (list) list.push({ x: p.x, y: p.y });
+    else pendingPos.set(key, [{ x: p.x, y: p.y }]);
+  }
   return events.slice(0, MAX_EVENTS).map((e) => {
     const wire: WireRuleEvent = { kind: e.kind, code: e.code, t: e.t };
     if (e.kind === "violation") {
       if (e.detail !== undefined) wire.detail = e.detail;
       const multiplier = pending.get(`${e.code}@${e.t}`)?.shift();
       if (multiplier !== undefined && multiplier > 1) wire.penaltyMultiplier = multiplier;
+    }
+    const pos = pendingPos.get(`${e.kind}:${e.code}@${e.t}`)?.shift();
+    if (pos !== undefined) {
+      wire.x = pos.x;
+      wire.y = pos.y;
+    }
+    return wire;
+  });
+}
+
+/** A15: session near-misses → wire (positions may be null → omitted). */
+export function serializeNearMisses(
+  nearMisses: ReadonlyArray<SessionNearMiss>,
+): WireNearMiss[] {
+  return nearMisses.slice(0, MAX_NEAR_MISSES).map((n) => {
+    const wire: WireNearMiss = {
+      tSec: n.tSec,
+      kind: n.kind,
+      clearanceM: n.clearanceM,
+      relSpeedMps: n.relSpeedMps,
+    };
+    if (n.x !== null && n.y !== null) {
+      wire.x = n.x;
+      wire.y = n.y;
     }
     return wire;
   });
@@ -147,6 +209,13 @@ export function parseFinishLessonWire(value: unknown): FinishLessonWire | null {
       if (e.kind !== "violation" || !isEscalationMultiplier(e.penaltyMultiplier)) return null;
       wire.penaltyMultiplier = e.penaltyMultiplier;
     }
+    // A15: optional position — both coordinates, finite, world-plausible.
+    // Malformed positions drop silently (display metadata, not worth a
+    // reject); a half-pair is kept out the same way.
+    if (isPlausibleCoord(e.x) && isPlausibleCoord(e.y)) {
+      wire.x = e.x;
+      wire.y = e.y;
+    }
     ruleEvents.push(wire);
   }
 
@@ -162,6 +231,9 @@ export function parseFinishLessonWire(value: unknown): FinishLessonWire | null {
   const microQuiz = parseMicroQuiz(o.microQuiz);
   if (microQuiz === "invalid") return null;
 
+  const nearMisses = parseNearMisses(o.nearMisses);
+  if (nearMisses === "invalid") return null;
+
   const wire: FinishLessonWire = {
     lessonId: o.lessonId,
     startedAtMs: o.startedAtMs,
@@ -171,7 +243,49 @@ export function parseFinishLessonWire(value: unknown): FinishLessonWire | null {
     objectives,
   };
   if (microQuiz !== null) wire.microQuiz = microQuiz;
+  if (nearMisses !== null) wire.nearMisses = nearMisses;
   return wire;
+}
+
+/** A15: finite number inside the sane world-coordinate bound. */
+function isPlausibleCoord(v: unknown): v is number {
+  return isFiniteNum(v) && Math.abs(v) <= MAX_ABS_COORD_M;
+}
+
+/**
+ * A15: parse the optional near-miss list: null (absent), the validated list,
+ * or "invalid" (a present-but-malformed list is not our payload). Stats are
+ * bounded (clearance 0–50 m, relative speed 0–200 m/s) — generous physical
+ * envelopes, not grading thresholds; nothing here ever scores.
+ */
+function parseNearMisses(value: unknown): WireNearMiss[] | null | "invalid" {
+  if (value === undefined || value === null) return null;
+  if (!Array.isArray(value) || value.length > MAX_NEAR_MISSES) return "invalid";
+  const out: WireNearMiss[] = [];
+  for (const item of value) {
+    if (typeof item !== "object" || item === null) return "invalid";
+    const n = item as Record<string, unknown>;
+    if (n.kind !== "vehicle" && n.kind !== "pedestrian" && n.kind !== "cyclist") {
+      return "invalid";
+    }
+    if (!isFiniteNum(n.tSec) || n.tSec < 0 || n.tSec > MAX_SESSION_SEC) return "invalid";
+    if (!isFiniteNum(n.clearanceM) || n.clearanceM < 0 || n.clearanceM > 50) return "invalid";
+    if (!isFiniteNum(n.relSpeedMps) || n.relSpeedMps < 0 || n.relSpeedMps > 200) {
+      return "invalid";
+    }
+    const wire: WireNearMiss = {
+      tSec: n.tSec,
+      kind: n.kind,
+      clearanceM: n.clearanceM,
+      relSpeedMps: n.relSpeedMps,
+    };
+    if (isPlausibleCoord(n.x) && isPlausibleCoord(n.y)) {
+      wire.x = n.x;
+      wire.y = n.y;
+    }
+    out.push(wire);
+  }
+  return out;
 }
 
 /** Parse an optional micro-quiz tally: null (absent), the value, or "invalid". */

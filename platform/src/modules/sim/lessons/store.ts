@@ -17,7 +17,7 @@
  */
 
 import type { ScorableEvent } from "../rules";
-import type { ObjectiveOutcome } from "./types";
+import type { EventPosition, ObjectiveOutcome, SessionNearMiss } from "./types";
 
 // ---------------------------------------------------------------------------
 // The versioned Json payload of SimSession.events
@@ -35,6 +35,16 @@ export interface SimSessionEventsJson {
   ruleEvents: ScorableEvent[];
   /** Objectives timeline: what was completed and when. */
   objectives: ObjectiveOutcome[];
+  /**
+   * A15 (additive, optional — absent on rows saved before A15):
+   * training-layer score with repeat escalations (A9) so history can show
+   * „официален vs тренировъчен“; event positions + near-misses for future
+   * replay/mistake-map rendering of stored sessions. All display metadata —
+   * verdict/score above stay the only graded truth.
+   */
+  effectiveScore?: number;
+  eventPositions?: EventPosition[];
+  nearMisses?: SessionNearMiss[];
 }
 
 /**
@@ -55,7 +65,7 @@ export function parseSimSessionEvents(value: unknown): SimSessionEventsJson | nu
   ) {
     return null;
   }
-  return {
+  const parsed: SimSessionEventsJson = {
     version: 1,
     passed: o.passed,
     aborted: o.aborted,
@@ -66,6 +76,17 @@ export function parseSimSessionEvents(value: unknown): SimSessionEventsJson | nu
     ruleEvents: o.ruleEvents as ScorableEvent[],
     objectives: o.objectives as ObjectiveOutcome[],
   };
+  // A15 optional fields — same opaque-but-shape-checked treatment.
+  if (typeof o.effectiveScore === "number" && Number.isFinite(o.effectiveScore)) {
+    parsed.effectiveScore = o.effectiveScore;
+  }
+  if (Array.isArray(o.eventPositions)) {
+    parsed.eventPositions = o.eventPositions as EventPosition[];
+  }
+  if (Array.isArray(o.nearMisses)) {
+    parsed.nearMisses = o.nearMisses as SessionNearMiss[];
+  }
+  return parsed;
 }
 
 // ---------------------------------------------------------------------------
@@ -91,11 +112,28 @@ export interface SimSessionListRow {
   passed: boolean;
 }
 
+/**
+ * A15 history row — everything the „История на сесиите“ screen needs: the
+ * stored debrief text plus the parsed events payload (null when the stored
+ * Json is foreign/corrupt — the row still lists with its summary columns).
+ */
+export interface SimSessionDetailRow {
+  id: string;
+  lessonId: string;
+  startedAt: Date;
+  finishedAt: Date | null;
+  score: number | null;
+  debrief: string | null;
+  events: SimSessionEventsJson | null;
+}
+
 export interface SimSessionStore {
   /** One write per finished session (sessions persist only at the end, v1). */
   saveSession(userId: string, input: SaveSimSessionInput): Promise<{ id: string }>;
   /** All sessions of the user, newest first — input for progression. */
   listSessions(userId: string): Promise<SimSessionListRow[]>;
+  /** A15: newest-first detailed rows for the session-history screen. */
+  listRecentSessions(userId: string, limit: number): Promise<SimSessionDetailRow[]>;
 }
 
 // ---------------------------------------------------------------------------
@@ -144,6 +182,33 @@ function createPrismaStore(): SimSessionStore {
         finishedAt: r.finishedAt,
         score: r.score,
         passed: parseSimSessionEvents(r.events)?.passed ?? false,
+      }));
+    },
+
+    async listRecentSessions(userId, limit) {
+      const db = await getDb();
+      const rows = await db.simSession.findMany({
+        where: { userId },
+        orderBy: { startedAt: "desc" },
+        take: Math.max(1, Math.min(limit, 50)),
+        select: {
+          id: true,
+          lessonId: true,
+          startedAt: true,
+          finishedAt: true,
+          score: true,
+          debrief: true,
+          events: true,
+        },
+      });
+      return rows.map((r) => ({
+        id: r.id,
+        lessonId: r.lessonId,
+        startedAt: r.startedAt,
+        finishedAt: r.finishedAt,
+        score: r.score,
+        debrief: r.debrief,
+        events: parseSimSessionEvents(r.events),
       }));
     },
   };

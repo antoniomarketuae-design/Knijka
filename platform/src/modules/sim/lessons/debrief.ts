@@ -25,7 +25,7 @@
  */
 
 import type { LessonSpec } from "../contracts";
-import type { ViolationEvent } from "../rules";
+import { VIOLATIONS, type ViolationCode, type ViolationEvent } from "../rules";
 import type { LessonResult } from "./types";
 
 export interface DebriefOutput {
@@ -170,6 +170,12 @@ export function buildDebrief(
       lines.push(
         `• ${g.titleBg}${times} — ${g.severityLabel}, ${g.totalPoints} т. (${g.lawRef})${escNote}`,
       );
+      // A15: the authored corrective — WHAT the right action was, from the
+      // violation catalog (ADR-002: authored copy, never generated). Part of
+      // the grounding draft for the post-Alpha LLM debrief: the LLM may
+      // rephrase this line but must not invent corrective advice.
+      const corrective = correctiveFor(g.code);
+      if (corrective !== null) lines.push(`  → Правилното действие: ${corrective}`);
     }
     if (groups.length > MAX_MISTAKE_LINES) {
       lines.push(`• …и още ${groups.length - MAX_MISTAKE_LINES} вида нарушения — виж пълния списък в резултата.`);
@@ -179,6 +185,15 @@ export function buildDebrief(
         `• Тренировъчен резултат: ${fmtPoints(result.effectiveScore)} т. — повторените грешки тежат повече (×1.5/×2.0). Официалният резултат остава ${result.score} т.`,
       );
     }
+  }
+
+  // -- near misses (A15 — session fact, nothing graded) -----------------------
+  const nearMissCount = result.nearMisses?.length ?? 0;
+  if (nearMissCount > 0) {
+    lines.push("");
+    lines.push(
+      `Разминавания на косъм: ${nearMissCount}. Не се броят като грешки, но на пътя късметът не е стратегия — виж къде се случиха на картата на грешките и мини оттам по-бавно и по-широко.`,
+    );
   }
 
   // -- what to practice next --------------------------------------------------
@@ -218,6 +233,16 @@ export function buildDebrief(
 /** Escalated values can be half-points (3 × 1.5 = 4.5) — print them cleanly. */
 function fmtPoints(n: number): string {
   return Number.isInteger(n) ? String(n) : n.toFixed(1);
+}
+
+/**
+ * A15: authored corrective action for a violation code (catalog correctiveBg).
+ * Guarded lookup — MistakeGroup.code is a plain string (pre-drive machine and
+ * future codes flow through here), so an unknown code degrades to no line.
+ */
+function correctiveFor(code: string): string | null {
+  if (!(code in VIOLATIONS)) return null;
+  return VIOLATIONS[code as ViolationCode].correctiveBg;
 }
 
 /**

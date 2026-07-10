@@ -119,5 +119,20 @@ export function createFakeSimSessionStore(): FakeSimSessionStore {
         }))
         .reverse();
     },
+    async listRecentSessions(userId, limit) {
+      return rows
+        .filter((r) => r.userId === userId)
+        .map((r) => ({
+          id: r.id,
+          lessonId: r.input.lessonId,
+          startedAt: r.input.startedAt,
+          finishedAt: r.input.finishedAt,
+          score: r.input.score,
+          debrief: r.input.debrief,
+          events: r.input.events,
+        }))
+        .reverse()
+        .slice(0, limit);
+    },
   };
 }

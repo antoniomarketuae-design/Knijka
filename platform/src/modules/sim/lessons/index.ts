@@ -12,6 +12,8 @@ export type {
   HudEvent,
   LessonObjective,
   LessonSpec,
+  NearMissEvent,
+  NearMissStats,
   StagedEventOutcome,
   StagedEventSpec,
 } from "../contracts";
@@ -22,6 +24,7 @@ export { LESSONS, lessonById, lessonsInOrder } from "./specs";
 // Session engine (pure lifecycle reducer)
 export {
   abortSession,
+  applyNearMiss,
   applyPreDriveStep,
   applyStagedOutcome,
   applyTick,
@@ -96,16 +99,19 @@ export {
   parseFinishLessonWire,
   rebuildRuleEvents,
   reconcileObjectiveOutcomes,
+  serializeNearMisses,
   serializeRuleEvents,
   type FinishLessonWire,
   type GradedFinishWire,
   type WireMicroQuiz,
+  type WireNearMiss,
   type WireObjectiveOutcome,
   type WireRuleEvent,
 } from "./wire";
 
 // Shared types
 export type {
+  EventPosition,
   LessonPhase,
   LessonResult,
   LessonSessionState,
@@ -116,6 +122,7 @@ export type {
   ObjectiveStatus,
   ParkAlignment,
   ReactionBand,
+  SessionNearMiss,
   SimLessonGamificationEvent,
   TeachMoment,
 } from "./types";

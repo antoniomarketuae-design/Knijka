@@ -22,8 +22,19 @@ import { LessonPlayShell } from "@/components/sim/lesson-ui/LessonPlayShell";
 import { LessonSelectScreen } from "@/components/sim/lesson-ui/LessonSelectScreen";
 import { useQualityPreset } from "@/components/sim/lesson-ui/QualityPresetSelector";
 import type { LessonEntryView } from "@/components/sim/lesson-ui/types";
+import {
+  SessionHistorySection,
+  type SessionHistoryEntry,
+} from "./session-history";
 
-export function SimulatorClient({ entries }: { entries: LessonEntryView[] }) {
+export function SimulatorClient({
+  entries,
+  history = [],
+}: {
+  entries: LessonEntryView[];
+  /** A15: recent-session rows for „История на сесиите" (server-built). */
+  history?: SessionHistoryEntry[];
+}) {
   const router = useRouter();
   const [quality, setQuality] = useQualityPreset();
   const [activeLessonId, setActiveLessonId] = useState<string | null>(null);
@@ -32,12 +43,16 @@ export function SimulatorClient({ entries }: { entries: LessonEntryView[] }) {
 
   if (active === null) {
     return (
-      <LessonSelectScreen
-        entries={entries}
-        quality={quality}
-        onQualityChange={setQuality}
-        onStart={setActiveLessonId}
-      />
+      <div className="flex flex-col gap-8">
+        <LessonSelectScreen
+          entries={entries}
+          quality={quality}
+          onQualityChange={setQuality}
+          onStart={setActiveLessonId}
+        />
+        {/* A15: past sessions — result + stored debrief on expand. */}
+        <SessionHistorySection entries={history} />
+      </div>
     );
   }
 

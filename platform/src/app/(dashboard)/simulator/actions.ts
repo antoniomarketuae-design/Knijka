@@ -93,6 +93,26 @@ export async function finishLessonAction(
     completedAll: result.completedAll,
     ruleEvents: events,
     objectives: result.objectives,
+    // A15 (all display metadata — the graded truth stays above):
+    //  - effectiveScore: A9 training-layer total, so history can show
+    //    „официален vs тренировъчен“;
+    //  - eventPositions: validated wire positions keyed back to events by
+    //    (kind, code, t) — future replay / stored mistake maps;
+    //  - nearMisses: the A11 session stat.
+    effectiveScore: result.effectiveScore,
+    eventPositions: wire.ruleEvents.flatMap((e) =>
+      e.x !== undefined && e.y !== undefined
+        ? [{ kind: e.kind, code: e.code, t: e.t, x: e.x, y: e.y }]
+        : [],
+    ),
+    nearMisses: (wire.nearMisses ?? []).map((n) => ({
+      tSec: n.tSec,
+      kind: n.kind,
+      clearanceM: n.clearanceM,
+      relSpeedMps: n.relSpeedMps,
+      x: n.x ?? null,
+      y: n.y ?? null,
+    })),
   };
 
   let sessionId: string;

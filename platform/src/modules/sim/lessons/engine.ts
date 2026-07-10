@@ -15,7 +15,12 @@
  * The React shell keeps the state in a ref and re-renders from snapshots.
  */
 
-import type { HudEvent, LessonSpec, StagedEventOutcome } from "../contracts";
+import type {
+  HudEvent,
+  LessonSpec,
+  NearMissEvent,
+  StagedEventOutcome,
+} from "../contracts";
 import {
   buildSessionSummary,
   createRuleEngine,
@@ -40,12 +45,14 @@ import {
 } from "./objectives";
 import { applyEscalations, type PenaltyEscalation } from "./escalation";
 import type {
+  EventPosition,
   LessonPhase,
   LessonResult,
   LessonSessionState,
   ObjectiveEvalState,
   ObjectiveProgress,
   ObjectiveOutcome,
+  SessionNearMiss,
   TeachMoment,
 } from "./types";
 
@@ -379,6 +386,22 @@ export function applyTick(prev: LessonSessionState, tick: SimTick): LessonStepRe
     }
   }
 
+  // A15: record WHERE each scored event happened — the tick in hand at
+  // emission time is the only moment the position is knowable, and the rule
+  // engine deliberately stays position-free (law, not geometry). Paired back
+  // to events by (kind, code, t), same scheme as PenaltyEscalation.
+  let eventPositions = prev.eventPositions;
+  if (scoredEvents.length > 0) {
+    const recs: EventPosition[] = scoredEvents.map((e) => ({
+      kind: e.kind,
+      code: e.code,
+      t: e.t,
+      x: tick.position.x,
+      y: tick.position.y,
+    }));
+    eventPositions = [...(eventPositions ?? []), ...recs];
+  }
+
   return {
     state: {
       ...prev,
@@ -393,6 +416,7 @@ export function applyTick(prev: LessonSessionState, tick: SimTick): LessonStepRe
       penaltyEscalations: escalations,
       lastTeachMomentAtSec: lastTeachAt,
       lastT: Math.max(prev.lastT, tick.t),
+      ...(eventPositions !== undefined ? { eventPositions } : {}),
     },
     hudEvents,
     teachMoments,
@@ -417,6 +441,35 @@ export function applyStagedOutcome(
   outcome: StagedEventOutcome,
 ): LessonSessionState {
   return { ...prev, stagedOutcomes: [...(prev.stagedOutcomes ?? []), outcome] };
+}
+
+// ---------------------------------------------------------------------------
+// Near-miss encounters (A11 stat → A15 mistake map; additive)
+// ---------------------------------------------------------------------------
+
+/**
+ * Record one resolved near-miss encounter (A15). Pure/additive, mirror of
+ * applyStagedOutcome: NOTHING here is graded (a near-miss is deliberately not
+ * a ViolationCode — the contact case already grades as COLLISION); this is
+ * the measurement channel the end-screen mistake map plots as hollow "мина на
+ * косъм" rings. `playerPos` is the shell's last-tick position at resolution —
+ * clearance is sub-meter, so it stands in for the encounter location; null
+ * (no tick yet) keeps the stat but drops the marker.
+ */
+export function applyNearMiss(
+  prev: LessonSessionState,
+  event: NearMissEvent,
+  playerPos: { x: number; y: number } | null,
+): LessonSessionState {
+  const rec: SessionNearMiss = {
+    tSec: event.tSec,
+    kind: event.kind,
+    clearanceM: event.clearanceM,
+    relSpeedMps: event.relSpeedMps,
+    x: playerPos?.x ?? null,
+    y: playerPos?.y ?? null,
+  };
+  return { ...prev, nearMisses: [...(prev.nearMisses ?? []), rec] };
 }
 
 // ---------------------------------------------------------------------------
@@ -480,5 +533,8 @@ export function buildLessonResult(state: LessonSessionState): LessonResult {
     effectiveScore: effectiveTotalPoints,
     escalations: escalated,
     durationSec: state.endedAtSec ?? state.lastT,
+    // A15: the mistake-map channels ride into the result untouched.
+    ...(state.eventPositions !== undefined ? { eventPositions: state.eventPositions } : {}),
+    ...(state.nearMisses !== undefined ? { nearMisses: state.nearMisses } : {}),
   };
 }

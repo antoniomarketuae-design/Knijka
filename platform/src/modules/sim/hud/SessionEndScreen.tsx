@@ -7,13 +7,37 @@
  * mock-exam results, the mistake list with law-ref chips, the debrief text
  * and the follow-up actions.
  *
+ * A15 (feedback v2): learning consolidates where the student sees WHERE it
+ * happened and WHAT the right action was —
+ *  - mistake map: a static MistakeMap panel (same polyline machinery as the
+ *    live minimap) plotting every positioned violation severity-colored,
+ *    near-misses as hollow rings, commendations as subtle dots (toggle);
+ *    tapping a marker scrolls to + flashes the matching row below;
+ *  - per-mistake corrective: the catalog's authored `correctiveBg` line
+ *    („какво трябваше да направя") under every mistake row — ADR-002 copy,
+ *    and the grounding input for the post-Alpha LLM debrief;
+ *  - objective measurements: A10's ObjectiveOutcome.detail rendered on the
+ *    objective rows (reaction time + band, park attempts/alignment, met red,
+ *    signaled roundabout exit).
+ *
  * XP chip: renders only when `xpEarned` is a number — sim lessons award no XP
  * until the gamification event union accepts sim_lesson (see lessons/types.ts).
  */
 
 import Link from "next/link";
-import type { FailReason } from "../rules";
-import type { LessonResult } from "../lessons";
+import { useMemo, useRef, useState } from "react";
+import { VIOLATIONS, type FailReason, type ViolationCode } from "../rules";
+import {
+  REACTION_BAND_LABELS_BG,
+  type LessonResult,
+  type ObjectiveDetail,
+  type ParkAlignment,
+} from "../lessons";
+import {
+  MistakeMap,
+  type MinimapPolyline,
+  type MistakeMapMarker,
+} from "./Minimap";
 
 export interface SessionEndConcept {
   id: string;
@@ -28,10 +52,100 @@ const FAIL_REASON_TEXT: Record<FailReason, string> = {
   "osnovni-points-exceeded": "повече от 6 точки от основни грешки",
 };
 
+const PARK_ALIGNMENT_LABELS: Record<ParkAlignment, string> = {
+  centered: "центрирано",
+  acceptable: "приемливо",
+  sloppy: "неточно",
+};
+
+const NEAR_MISS_KIND_LABELS: Record<"vehicle" | "pedestrian" | "cyclist", string> = {
+  vehicle: "автомобил",
+  pedestrian: "пешеходец",
+  cyclist: "велосипедист",
+};
+
 function clock(tSec: number): string {
   const m = Math.floor(tSec / 60);
   const s = Math.floor(tSec % 60);
   return `${m}:${String(s).padStart(2, "0")}`;
+}
+
+/** A15: the catalog's authored corrective action; null for unknown codes. */
+function correctiveFor(code: string): string | null {
+  if (!(code in VIOLATIONS)) return null;
+  return VIOLATIONS[code as ViolationCode].correctiveBg;
+}
+
+/** A10 measurement channel → one human line on the objective row. */
+function objectiveDetailText(detail: ObjectiveDetail | undefined): string | null {
+  if (detail === undefined) return null;
+  switch (detail.kind) {
+    case "emergencyStop": {
+      if (detail.reactionTimeSec !== null && detail.band !== null) {
+        const gap =
+          detail.stopGapM !== null ? ` · спря на ${detail.stopGapM.toFixed(1)} м` : "";
+        return `Реакция: ${detail.reactionTimeSec.toFixed(2)} с — ${REACTION_BAND_LABELS_BG[detail.band]}${gap}`;
+      }
+      if (detail.outcome === "passedWithoutStopping") return "Подмина опасността, без да спре";
+      if (detail.outcome === "hitLeadCar") return "Удар в спиращата кола отпред";
+      return null;
+    }
+    case "parkInBay": {
+      if (detail.attempts === 0) return null;
+      const parts = [`${detail.attempts} ${detail.attempts === 1 ? "опит" : "опита"}`];
+      if (detail.alignment !== null) {
+        parts.push(`подравняване: ${PARK_ALIGNMENT_LABELS[detail.alignment]}`);
+      }
+      return `Паркиране: ${parts.join(" · ")}`;
+    }
+    case "passSignal":
+      return detail.redMetHere ? "Изчака червения сигнал и потегли на зелено" : null;
+    case "roundabout":
+      return detail.exitSignaled ? "Излезе от кръговото с десен мигач" : null;
+  }
+}
+
+/**
+ * Everything the map + row-linking needs, derived once from the result:
+ * markers carry row keys (`v:i` mistakes, `n:i` near-misses, `c:i`
+ * commendations); positions pair to events by (kind, code, t), consumed once
+ * each — the exact scheme the lessons engine recorded them with.
+ */
+function buildMapModel(result: LessonResult) {
+  const pool = new Map<string, Array<{ x: number; y: number }>>();
+  for (const p of result.eventPositions ?? []) {
+    const key = `${p.kind}:${p.code}@${p.t}`;
+    const list = pool.get(key);
+    if (list) list.push({ x: p.x, y: p.y });
+    else pool.set(key, [{ x: p.x, y: p.y }]);
+  }
+  const take = (kind: string, code: string, t: number) =>
+    pool.get(`${kind}:${code}@${t}`)?.shift() ?? null;
+
+  const mistakeMarkers: MistakeMapMarker[] = [];
+  result.summary.mistakes.forEach((m, i) => {
+    const pos = take("violation", m.code, m.t);
+    if (pos !== null) {
+      mistakeMarkers.push({ id: `v:${i}`, x: pos.x, y: pos.y, kind: m.severityClass });
+    }
+  });
+
+  const nearMissMarkers: MistakeMapMarker[] = [];
+  (result.nearMisses ?? []).forEach((n, i) => {
+    if (n.x !== null && n.y !== null) {
+      nearMissMarkers.push({ id: `n:${i}`, x: n.x, y: n.y, kind: "nearMiss" });
+    }
+  });
+
+  const commendationMarkers: MistakeMapMarker[] = [];
+  result.summary.commendations.forEach((c, i) => {
+    const pos = take("commendation", c.code, c.t);
+    if (pos !== null) {
+      commendationMarkers.push({ id: `c:${i}`, x: pos.x, y: pos.y, kind: "commendation" });
+    }
+  });
+
+  return { mistakeMarkers, nearMissMarkers, commendationMarkers };
 }
 
 export function SessionEndScreen({
@@ -43,6 +157,7 @@ export function SessionEndScreen({
   onRetry,
   nextLessonTitleBg,
   onNextLesson,
+  mapPolylines = null,
 }: {
   lessonTitleBg: string;
   result: LessonResult;
@@ -55,9 +170,51 @@ export function SessionEndScreen({
   nextLessonTitleBg: string | null;
   /** null = next lesson locked (this attempt did not pass). */
   onNextLesson: (() => void) | null;
+  /**
+   * A15: district/route polylines for the static mistake map (the shell
+   * hands over its last live-minimap frame — the polylines are the full
+   * district, so no live vehicle is needed). null → no map panel.
+   */
+  mapPolylines?: MinimapPolyline[] | null;
 }) {
   const { summary } = result;
   const score = summary.score;
+  const nearMisses = result.nearMisses ?? [];
+
+  // -- A15 mistake map state ---------------------------------------------------
+  const [showGood, setShowGood] = useState(false);
+  const [selected, setSelected] = useState<{ key: string; pulse: number } | null>(null);
+  const rowRefs = useRef(new Map<string, HTMLLIElement>());
+  const registerRow = (key: string) => (el: HTMLLIElement | null) => {
+    if (el) rowRefs.current.set(key, el);
+    else rowRefs.current.delete(key);
+  };
+
+  const { mistakeMarkers, nearMissMarkers, commendationMarkers } = useMemo(
+    () => buildMapModel(result),
+    [result],
+  );
+  const markers = useMemo(
+    () => [
+      ...mistakeMarkers,
+      ...nearMissMarkers,
+      ...(showGood ? commendationMarkers : []),
+    ],
+    [mistakeMarkers, nearMissMarkers, commendationMarkers, showGood],
+  );
+  const hasMap = mapPolylines !== null && mapPolylines.length > 0 && markers.length > 0;
+
+  const selectMarker = (key: string) => {
+    setSelected((prev) => ({ key, pulse: (prev?.pulse ?? 0) + 1 }));
+    const row = rowRefs.current.get(key);
+    if (row) row.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  };
+
+  /** Row classes + remount key so re-selecting restarts the flash. */
+  const rowFlash = (key: string) =>
+    selected?.key === key
+      ? { className: "sim-end-row-flash", key: `${key}:${selected.pulse}` }
+      : { className: "", key };
 
   const rows = [
     { label: "Опасни грешки", per: "10 т.", count: score.opasniCount, points: score.opasniPoints, tone: "var(--danger)" },
@@ -67,6 +224,21 @@ export function SessionEndScreen({
 
   return (
     <div className="flex max-h-full w-full max-w-2xl flex-col gap-4 overflow-y-auto p-1">
+      {/* Row-flash animation (scoped to this screen; motion-reduce = no flash). */}
+      <style>{`
+        @keyframes sim-end-row-flash {
+          0% { background-color: color-mix(in srgb, var(--accent) 28%, transparent); }
+          100% { background-color: transparent; }
+        }
+        .sim-end-row-flash {
+          animation: sim-end-row-flash 1.4s ease-out;
+          border-color: var(--accent) !important;
+        }
+        @media (prefers-reduced-motion: reduce) {
+          .sim-end-row-flash { animation: none; }
+        }
+      `}</style>
+
       {/* Verdict card */}
       <section
         aria-labelledby="sim-result-title"
@@ -160,32 +332,77 @@ export function SessionEndScreen({
         </table>
       </section>
 
+      {/* A15: mistake map — WHERE it happened */}
+      {hasMap ? (
+        <section aria-label="Карта на грешките" className="card flex flex-col gap-2 p-5">
+          <div className="flex flex-wrap items-center gap-3">
+            <h3 className="text-sm font-extrabold">Къде се случи</h3>
+            {commendationMarkers.length > 0 ? (
+              <label className="ml-auto flex cursor-pointer items-center gap-1.5 text-xs font-semibold text-muted">
+                <input
+                  type="checkbox"
+                  checked={showGood}
+                  onChange={(e) => setShowGood(e.target.checked)}
+                />
+                Покажи и похвалите
+              </label>
+            ) : null}
+          </div>
+          <MistakeMap
+            polylines={mapPolylines}
+            markers={markers}
+            selectedId={selected?.key ?? null}
+            onSelect={selectMarker}
+          />
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] font-semibold text-muted">
+            <span><span aria-hidden className="mr-1 inline-block h-2.5 w-2.5 rounded-full" style={{ background: "var(--danger)" }} />опасна</span>
+            <span><span aria-hidden className="mr-1 inline-block h-2.5 w-2.5 rounded-full" style={{ background: "var(--warning)" }} />основна</span>
+            <span><span aria-hidden className="mr-1 inline-block h-2.5 w-2.5 rounded-full" style={{ background: "var(--accent-soft)" }} />второстепенна</span>
+            {nearMissMarkers.length > 0 ? (
+              <span><span aria-hidden className="mr-1 inline-block h-2.5 w-2.5 rounded-full border-2" style={{ borderColor: "var(--warning)" }} />на косъм</span>
+            ) : null}
+            {showGood ? (
+              <span><span aria-hidden className="mr-1 inline-block h-2 w-2 rounded-full" style={{ background: "var(--success)" }} />похвала</span>
+            ) : null}
+          </div>
+        </section>
+      ) : null}
+
       {/* Objectives outcome */}
       {result.objectives.length > 0 ? (
         <section aria-label="Задачи от маршрута" className="card flex flex-col gap-2 p-5">
           <h3 className="text-sm font-extrabold">Задачи от маршрута</h3>
           <ul className="flex flex-col gap-1.5">
-            {result.objectives.map((o) => (
-              <li key={o.id} className="flex items-center gap-2 text-sm">
-                <span
-                  aria-hidden
-                  className="flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-black"
-                  style={
-                    o.done
-                      ? { background: "var(--success)", color: "var(--accent-foreground)" }
-                      : { border: "1px solid var(--border-strong)", color: "var(--muted)" }
-                  }
-                >
-                  {o.done ? "✓" : "–"}
-                </span>
-                <span className={o.done ? "font-semibold" : "font-semibold text-muted"}>
-                  {o.titleBg}
-                </span>
-                {o.done && o.completedAtSec !== null ? (
-                  <span className="ml-auto text-xs tabular-nums text-muted">{clock(o.completedAtSec)}</span>
-                ) : null}
-              </li>
-            ))}
+            {result.objectives.map((o) => {
+              const detailText = objectiveDetailText(o.detail);
+              return (
+                <li key={o.id} className="flex flex-col gap-0.5 text-sm">
+                  <div className="flex items-center gap-2">
+                    <span
+                      aria-hidden
+                      className="flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-black"
+                      style={
+                        o.done
+                          ? { background: "var(--success)", color: "var(--accent-foreground)" }
+                          : { border: "1px solid var(--border-strong)", color: "var(--muted)" }
+                      }
+                    >
+                      {o.done ? "✓" : "–"}
+                    </span>
+                    <span className={o.done ? "font-semibold" : "font-semibold text-muted"}>
+                      {o.titleBg}
+                    </span>
+                    {o.done && o.completedAtSec !== null ? (
+                      <span className="ml-auto text-xs tabular-nums text-muted">{clock(o.completedAtSec)}</span>
+                    ) : null}
+                  </div>
+                  {/* A10 measurement channel — „Реакция: 0.68 с — отличен" */}
+                  {detailText !== null ? (
+                    <p className="pl-7 text-xs font-semibold text-muted">{detailText}</p>
+                  ) : null}
+                </li>
+              );
+            })}
           </ul>
         </section>
       ) : null}
@@ -195,36 +412,85 @@ export function SessionEndScreen({
         <section aria-label="Грешки" className="card flex flex-col gap-2 p-5">
           <h3 className="text-sm font-extrabold">Грешки ({summary.mistakes.length})</h3>
           <ul className="flex flex-col gap-2">
-            {summary.mistakes.map((m, i) => (
-              <li
-                key={`${m.code}-${m.t}-${i}`}
-                className="flex flex-col gap-1 rounded-xl border border-border p-3"
-              >
-                <div className="flex items-baseline justify-between gap-2">
-                  <span className="text-sm font-bold">{m.titleBg}</span>
+            {summary.mistakes.map((m, i) => {
+              const key = `v:${i}`;
+              const flash = rowFlash(key);
+              const corrective = correctiveFor(m.code);
+              return (
+                <li
+                  key={flash.key}
+                  ref={registerRow(key)}
+                  className={`flex flex-col gap-1 rounded-xl border border-border p-3 ${flash.className}`}
+                >
+                  <div className="flex items-baseline justify-between gap-2">
+                    <span className="text-sm font-bold">{m.titleBg}</span>
+                    <span
+                      className="shrink-0 text-xs font-black tabular-nums"
+                      style={{
+                        color:
+                          m.severityClass === "opasna"
+                            ? "var(--danger)"
+                            : m.severityClass === "osnovna"
+                              ? "var(--warning)"
+                              : "var(--accent-soft)",
+                      }}
+                    >
+                      −{m.points} т.
+                    </span>
+                  </div>
+                  <p className="text-xs leading-relaxed text-muted">{m.explanationBg}</p>
+                  {/* A15: the authored corrective — WHAT the right action was. */}
+                  {corrective !== null ? (
+                    <p className="text-xs font-semibold leading-relaxed">
+                      <span className="text-success">✔ Правилното действие:</span>{" "}
+                      {corrective}
+                    </p>
+                  ) : null}
+                  <div className="flex items-center gap-2">
+                    <span className="rounded-full border border-border px-2 py-0.5 text-[10px] font-semibold text-muted">
+                      {m.lawRef}
+                    </span>
+                    <span className="text-[10px] tabular-nums text-muted">в {clock(m.t)}</span>
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        </section>
+      ) : null}
+
+      {/* A15: near misses — nothing graded, honestly surfaced */}
+      {nearMisses.length > 0 ? (
+        <section aria-label="Разминавания на косъм" className="card flex flex-col gap-2 p-5">
+          <h3 className="text-sm font-extrabold text-warning">
+            Разминавания на косъм ({nearMisses.length})
+          </h3>
+          <p className="text-xs leading-relaxed text-muted">
+            Не се броят като грешки — нищо не се удари. Но „мина ми“ не е умение:
+            виж къде беше на косъм и мини оттам по-бавно и по-широко.
+          </p>
+          <ul className="flex flex-col gap-1.5">
+            {nearMisses.map((n, i) => {
+              const key = `n:${i}`;
+              const flash = rowFlash(key);
+              return (
+                <li
+                  key={flash.key}
+                  ref={registerRow(key)}
+                  className={`flex items-center gap-2 rounded-xl border border-border px-3 py-2 text-sm ${flash.className}`}
+                >
                   <span
-                    className="shrink-0 text-xs font-black tabular-nums"
-                    style={{
-                      color:
-                        m.severityClass === "opasna"
-                          ? "var(--danger)"
-                          : m.severityClass === "osnovna"
-                            ? "var(--warning)"
-                            : "var(--accent-soft)",
-                    }}
-                  >
-                    −{m.points} т.
+                    aria-hidden
+                    className="inline-block h-3 w-3 shrink-0 rounded-full border-2"
+                    style={{ borderColor: "var(--warning)" }}
+                  />
+                  <span className="font-semibold">
+                    {NEAR_MISS_KIND_LABELS[n.kind]} — на {n.clearanceM.toFixed(1)} м
                   </span>
-                </div>
-                <p className="text-xs leading-relaxed text-muted">{m.explanationBg}</p>
-                <div className="flex items-center gap-2">
-                  <span className="rounded-full border border-border px-2 py-0.5 text-[10px] font-semibold text-muted">
-                    {m.lawRef}
-                  </span>
-                  <span className="text-[10px] tabular-nums text-muted">в {clock(m.t)}</span>
-                </div>
-              </li>
-            ))}
+                  <span className="ml-auto text-xs tabular-nums text-muted">{clock(n.tSec)}</span>
+                </li>
+              );
+            })}
           </ul>
         </section>
       ) : null}
@@ -234,13 +500,21 @@ export function SessionEndScreen({
         <section aria-label="Похвали" className="card flex flex-col gap-2 p-5">
           <h3 className="text-sm font-extrabold text-success">Похвали</h3>
           <ul className="flex flex-col gap-1">
-            {summary.commendations.map((c, i) => (
-              <li key={`${c.code}-${c.t}-${i}`} className="flex items-center gap-2 text-sm">
-                <span aria-hidden className="text-success">✓</span>
-                <span className="font-semibold">{c.titleBg}</span>
-                <span className="ml-auto text-xs tabular-nums text-muted">{clock(c.t)}</span>
-              </li>
-            ))}
+            {summary.commendations.map((c, i) => {
+              const key = `c:${i}`;
+              const flash = rowFlash(key);
+              return (
+                <li
+                  key={flash.key}
+                  ref={registerRow(key)}
+                  className={`flex items-center gap-2 rounded-lg px-1 text-sm ${flash.className}`}
+                >
+                  <span aria-hidden className="text-success">✓</span>
+                  <span className="font-semibold">{c.titleBg}</span>
+                  <span className="ml-auto text-xs tabular-nums text-muted">{clock(c.t)}</span>
+                </li>
+              );
+            })}
           </ul>
         </section>
       ) : null}
