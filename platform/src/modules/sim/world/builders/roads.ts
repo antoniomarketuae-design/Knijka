@@ -14,6 +14,8 @@
 
 import {
   JUNCTION_Y,
+  PARKING_LANE_END_INSET_M,
+  PARKING_LANE_Y,
   ROAD_Y,
   SIDEWALK_CLASSES,
   SIDEWALK_SKIRT_M,
@@ -41,10 +43,13 @@ export interface RoadBuildResult {
   surface: MeshAccumulator;
   junctions: MeshAccumulator;
   sidewalks: MeshAccumulator;
+  /** Tinted curbside parking bands on arterial edges (doc 68 QW3). */
+  parkingLanes: MeshAccumulator;
   ribbonCount: number;
   skippedRibbonCount: number;
   junctionPatchCount: number;
   sidewalkStripCount: number;
+  parkingLaneStripCount: number;
 }
 
 const planarUV = (p: Vec2): [number, number] => [p[0] * ASPHALT_UV_SCALE, p[1] * ASPHALT_UV_SCALE];
@@ -68,6 +73,41 @@ function buildRibbon(acc: MeshAccumulator, line: Vec2[], halfWidth: number): voi
     if (i > 0) acc.quad(prevL, prevR, ri, li);
     prevL = li;
     prevR = ri;
+  }
+}
+
+/**
+ * One tinted parking band along `line`, spanning lateral offsets
+ * [halfWidth - parkingM, halfWidth] on `side` (+1 right of travel, -1 left).
+ * Sits a hair above the asphalt ribbon (which already covers this width), so
+ * the band reads as a distinct parking strip without any extra cross-section
+ * math. UVs are planar and share the asphalt scale.
+ */
+function buildParkingBand(
+  acc: MeshAccumulator,
+  line: Vec2[],
+  halfWidth: number,
+  parkingM: number,
+  side: 1 | -1,
+): void {
+  const frames = polylineFrames(line);
+  let prevI = -1;
+  let prevO = -1;
+  for (let i = 0; i < line.length; i++) {
+    const p = line[i] as Vec2;
+    const f = frames[i]!;
+    const out = mul(f.right, side * f.miter);
+    const inner = add(p, mul(out, halfWidth - parkingM));
+    const outer = add(p, mul(out, halfWidth));
+    const ii = acc.vertex(toWorld(inner[0], inner[1], PARKING_LANE_Y), UP, planarUV(inner));
+    const oi = acc.vertex(toWorld(outer[0], outer[1], PARKING_LANE_Y), UP, planarUV(outer));
+    if (i > 0) {
+      // CCW seen from above: order depends on which side of travel we're on.
+      if (side === 1) acc.quad(prevI, prevO, oi, ii);
+      else acc.quad(prevO, prevI, ii, oi);
+    }
+    prevI = ii;
+    prevO = oi;
   }
 }
 
@@ -244,10 +284,12 @@ export function buildRoads(network: RoadNetwork): RoadBuildResult {
   const surface = new MeshAccumulator();
   const junctions = new MeshAccumulator();
   const sidewalks = new MeshAccumulator();
+  const parkingLanes = new MeshAccumulator();
   let ribbonCount = 0;
   let skippedRibbonCount = 0;
   let junctionPatchCount = 0;
   let sidewalkStripCount = 0;
+  let parkingLaneStripCount = 0;
 
   for (const eb of network.edges) {
     if (!eb.line) {
@@ -256,6 +298,19 @@ export function buildRoads(network: RoadNetwork): RoadBuildResult {
     }
     buildRibbon(surface, eb.line, eb.halfWidth);
     ribbonCount++;
+
+    if (eb.parkingM > 0) {
+      // Parking bands stop short of the junction mouths (no parking within
+      // 5 m of a junction) — the bare wide mouth reads as approach flare.
+      const lineLen = polylineLength(eb.line);
+      if (lineLen > 2 * PARKING_LANE_END_INSET_M + 4) {
+        const bandLine =
+          trimPolyline(eb.line, PARKING_LANE_END_INSET_M, PARKING_LANE_END_INSET_M, 2) ?? eb.line;
+        buildParkingBand(parkingLanes, bandLine, eb.halfWidth, eb.parkingM, 1);
+        buildParkingBand(parkingLanes, bandLine, eb.halfWidth, eb.parkingM, -1);
+        parkingLaneStripCount += 2;
+      }
+    }
 
     if (SIDEWALK_CLASSES.has(eb.edge.class) && !eb.edge.roundabout) {
       // Pull sidewalk ends back a little so junction corners stay open.
@@ -283,9 +338,11 @@ export function buildRoads(network: RoadNetwork): RoadBuildResult {
     surface,
     junctions,
     sidewalks,
+    parkingLanes,
     ribbonCount,
     skippedRibbonCount,
     junctionPatchCount,
     sidewalkStripCount,
+    parkingLaneStripCount,
   };
 }

@@ -66,7 +66,7 @@ export function DistrictWorld({
 
   return (
     <group name="district-world">
-      <StaticWorld world={world} preset={preset} />
+      <StaticWorld world={world} preset={preset} night={night} />
       <WorldPropsGroup
         world={world}
         preset={preset}

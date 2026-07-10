@@ -133,3 +133,44 @@ describe("stop lines (stop-sign heuristic)", () => {
     }
   });
 });
+
+describe("stop line overrides (QW4 — lesson 2's Б2 at n331942490)", () => {
+  // Curriculum-bricking regression (doc 68 QW4 / audit 04 D10): the l2-stop-
+  // sign objective requires a Б2 line at n331942490, but every incident edge
+  // there is `unclassified`, so the minor×arterial heuristic never fires —
+  // the line MUST come from STOP_LINE_OVERRIDES. If this test fails, lesson 2
+  // cannot be completed and L3–L7 stay locked forever.
+  const district = loadDistrict();
+  const NODE = "n331942490";
+  const APPROACH = "e897608662.0"; // player's northbound oneway approach
+
+  it("hard-places exactly one Б2 stop line at the node, on the player's approach", () => {
+    const rt = createWorldRuntime(district);
+    const lines = rt.debugStopLines().filter((l) => l.junctionNodeId === NODE);
+    expect(lines).toHaveLength(1);
+    const line = lines[0];
+    expect(line.control).toBe("stopSign");
+    expect(district.roads.edges[line.edgeIdx].id).toBe(APPROACH);
+    // Oneway INTO the node: the line guards forward travel, 5 m before it.
+    expect(line.dirSign).toBe(1);
+    const edge = edgeById(district, APPROACH);
+    expect(line.sM).toBeCloseTo(edge.length - 5, 0);
+    // Sane approach bearing: the edge runs almost due north (≈ 358°).
+    const delta = Math.abs(((line.approachBearingDeg - 358 + 540) % 360) - 180);
+    expect(delta).toBeLessThan(10);
+  });
+
+  it("emits stopLineCrossed{stopSign} when driving the lesson-2 approach", () => {
+    const rt = createWorldRuntime(district);
+    const edge = edgeById(district, APPROACH);
+    const { ticks } = drive(rt, edgeDrivePath(edge, 40, edge.length - 0.5, 0.5, 0));
+    const crossed = eventsOf(ticks, "stopLineCrossed");
+    expect(crossed).toHaveLength(1);
+    expect(crossed[0]).toEqual({ kind: "stopLineCrossed", control: "stopSign" });
+  });
+
+  it("removes the node from the uncontrolled (right-hand-rule) junction set", () => {
+    const rt = createWorldRuntime(district);
+    expect(rt.debugUncontrolledJunctions().some((j) => j.id === NODE)).toBe(false);
+  });
+});

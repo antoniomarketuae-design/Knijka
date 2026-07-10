@@ -4,7 +4,8 @@
  *   read at render time from WorldRuntime.signalPhase via a callback; this
  *   layer only decides WHERE lights stand and which node id they belong to).
  * - BG sign poles: Б2 stop / Б1 give-way at unsignalized minor approaches,
- *   Б1 + Д11 at roundabout entries, В26-50 at district entry roads.
+ *   Б1 + Д11 at roundabout entries, В26-50 at district entry roads, plus the
+ *   hand-placed Б2 overrides mirrored from runtime STOP_LINE_OVERRIDES (QW4).
  * - Streetlights along arterials, alternating sides.
  * - Trees: along residential streets + park fill between blocks.
  *
@@ -12,6 +13,7 @@
  * addresses (approaching traffic).
  */
 
+import { STOP_LINE_OVERRIDES } from "../../runtime/stoplines";
 import type {
   District,
   SignKind,
@@ -133,6 +135,22 @@ export function buildProps(
       (kind === "stop" ? stopSignApproaches : giveWayApproaches).add(`${node.id}:${ap.edgeId}`);
     }
   }
+
+  // -- hand-placed Б2 signs (QW4) ----------------------------------------------
+  // Mirrors runtime STOP_LINE_OVERRIDES so every hard-placed graded stop line
+  // has a visible Б2 sign here and a painted line in the markings pass (which
+  // reads stopSignApproaches) — grading must never reference invisible control.
+  for (const ov of STOP_LINE_OVERRIDES) {
+    const key = `${ov.nodeId}:${ov.edgeId}`;
+    if (stopSignApproaches.has(key)) continue;
+    const info = network.nodes.get(ov.nodeId);
+    const ap = info?.approaches.find((a) => a.edgeId === ov.edgeId);
+    if (!ap || !ap.incoming) continue;
+    const { p, yaw } = approachPropPose(ap, 1.4, 0.8);
+    signs.push({ kind: "stop", position: toWorld(p[0], p[1], ROAD_Y), yaw });
+    stopSignApproaches.add(key);
+  }
+
   // -- speed limit 50 at district entries -------------------------------------
   const bounds = district.meta.boundsLocalMeters;
   const margin = 40;

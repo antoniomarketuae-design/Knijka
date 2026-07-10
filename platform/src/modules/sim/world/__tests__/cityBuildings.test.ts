@@ -2,7 +2,11 @@ import { describe, expect, it } from "vitest";
 import {
   buildBuildingInstances,
   CITY_MODELS,
+  DEFAULT_HEIGHT_MAX_M,
+  DEFAULT_HEIGHT_MIN_M,
   orientedBox,
+  resolveBuildingHeightM,
+  TOWER_MIN_HEIGHT_M,
 } from "../builders/cityBuildings";
 import type { DistrictBuilding } from "../types";
 
@@ -36,15 +40,58 @@ describe("orientedBox", () => {
     expect(box.w).toBeCloseTo(10);
     expect(box.d).toBeCloseTo(4);
     // Long axis aligned with the rotation (mod π).
-    const diff = Math.abs(((box.angle - a) % Math.PI + Math.PI) % Math.PI);
+    const diff = Math.abs((((box.angle - a) % Math.PI) + Math.PI) % Math.PI);
     expect(Math.min(diff, Math.PI - diff)).toBeCloseTo(0);
   });
 });
 
-describe("buildBuildingInstances", () => {
-  const block: DistrictBuilding = {
+const square = (
+  id: string,
+  s: number,
+  height: number,
+  heightSource: DistrictBuilding["heightSource"],
+): DistrictBuilding => ({
+  id,
+  height,
+  heightSource,
+  footprint: [
+    [0, 0],
+    [s, 0],
+    [s, s],
+    [0, s],
+  ],
+});
+
+describe("resolveBuildingHeightM (QW3 — heights from the district data)", () => {
+  it("trusts OSM-sourced heights", () => {
+    expect(resolveBuildingHeightM(square("a", 20, 15, "levels"))).toBe(15);
+    expect(resolveBuildingHeightM(square("b", 20, 48, "height"))).toBe(48);
+  });
+
+  it("clamps data glitches", () => {
+    expect(resolveBuildingHeightM(square("c", 20, 0.5, "levels"))).toBe(3);
+    expect(resolveBuildingHeightM(square("d", 20, 400, "levels"))).toBe(75);
+  });
+
+  it("jitters no-data buildings into the 15–25 m mid-rise band, deterministically", () => {
+    const seen = new Set<number>();
+    for (let i = 0; i < 40; i++) {
+      const b = square(`w${i * 7919}`, 20, 6, "default");
+      const h = resolveBuildingHeightM(b);
+      expect(h).toBeGreaterThanOrEqual(DEFAULT_HEIGHT_MIN_M);
+      expect(h).toBeLessThanOrEqual(DEFAULT_HEIGHT_MAX_M);
+      expect(resolveBuildingHeightM(b)).toBe(h); // deterministic per id
+      seen.add(Math.round(h * 10));
+    }
+    expect(seen.size).toBeGreaterThan(10); // actually varied, not one constant
+  });
+});
+
+describe("buildBuildingInstances (QW3 — towers only where the data says tall)", () => {
+  // The modal Студентски град building: a 48 x 10 m panelka at 15 m.
+  const panelka: DistrictBuilding = {
     id: "panelka-1",
-    height: 12,
+    height: 15,
     heightSource: "levels",
     footprint: [
       [0, 0],
@@ -53,78 +100,66 @@ describe("buildBuildingInstances", () => {
       [0, 10],
     ],
   };
+  // A genuine high-rise on a compact plot (the four real ones are 24–35 m).
+  const highRise = square("dorm-tower", 26, 48, "levels");
 
-  it("places exactly one glass tower per footprint, on the ground", () => {
-    const inst = buildBuildingInstances([block]);
-    expect(inst).toHaveLength(1); // towers are monolithic — one per plot
+  it("leaves mid-rise buildings to the facade-prism pass (no tower)", () => {
+    expect(buildBuildingInstances([panelka])).toEqual([]);
+  });
+
+  it("leaves no-data buildings (15–25 m jitter) to the prism pass", () => {
+    expect(buildBuildingInstances([square("nodata", 30, 6, "default")])).toEqual([]);
+  });
+
+  it("places one tower on a tall, compact footprint — at the DATA height", () => {
+    const inst = buildBuildingInstances([highRise]);
+    expect(inst).toHaveLength(1);
     const p = inst[0]!;
+    expect(p.buildingId).toBe("dorm-tower");
     expect(p.position[1]).toBe(0); // base on the ground
-    expect(Number.isFinite(p.position[0])).toBe(true);
-    expect(Number.isFinite(p.position[2])).toBe(true);
-    expect(p.scale[0]).toBeGreaterThan(0);
-    expect(p.scale[2]).toBeGreaterThan(0);
+    expect(p.scale[1]).toBe(48); // rendered height == OSM height, not plot-derived
     expect(p.model).toBeGreaterThanOrEqual(0);
     expect(p.model).toBeLessThan(CITY_MODELS.length);
-    // Tower is centred on the footprint (world z = -y).
-    expect(p.position[0]).toBeCloseTo(24);
-    expect(p.position[2]).toBeCloseTo(-5);
+    // Centred on the footprint (world z = -y).
+    expect(p.position[0]).toBeCloseTo(13);
+    expect(p.position[2]).toBeCloseTo(-13);
   });
 
-  it("derives height from the footprint size, not the OSM height", () => {
-    const inst = buildBuildingInstances([block]);
-    const h = inst[0]!.scale[1];
-    // A tall, believable tower — NOT the 12 m OSM height.
-    expect(h).toBeGreaterThan(40);
-    expect(h).toBeLessThanOrEqual(175);
-    expect(h).not.toBeCloseTo(12);
-  });
-
-  it("keeps plausible tower proportions (no absurd footprint stretch)", () => {
-    const inst = buildBuildingInstances([block]);
-    const p = inst[0]!;
+  it("keeps window proportions bounded under compression (stretch cap)", () => {
+    const p = buildBuildingInstances([highRise])[0]!;
     const m = CITY_MODELS[p.model]!;
     const H = p.scale[1];
-    // Fit width/depth stay within the capped band of the model's natural
-    // footprint (mw·H × md·H) — never a squished box or a wildly fat slab.
     const worldW = p.scale[0] * m.mw;
     const worldD = p.scale[2] * m.md;
+    // Fit stays within STRETCH of the model's natural footprint at the
+    // RENDERED height — bounds window-aspect distortion even when the tower
+    // is vertically compressed to the data height.
     expect(worldW).toBeGreaterThanOrEqual((m.mw * H) / 1.6 - 1e-6);
     expect(worldW).toBeLessThanOrEqual(m.mw * H * 1.6 + 1e-6);
     expect(worldD).toBeGreaterThanOrEqual((m.md * H) / 1.6 - 1e-6);
     expect(worldD).toBeLessThanOrEqual(m.md * H * 1.6 + 1e-6);
   });
 
-  it("puts taller towers on bigger footprints", () => {
-    const square = (id: string, s: number): DistrictBuilding => ({
-      id,
-      height: 20,
-      heightSource: "height",
-      footprint: [
-        [0, 0],
-        [s, 0],
-        [s, s],
-        [0, s],
-      ],
-    });
-    const small = buildBuildingInstances([square("small", 8)])[0]!;
-    const large = buildBuildingInstances([square("large", 40)])[0]!;
-    // Bigger plot → taller authored model AND a taller rendered height.
-    expect(CITY_MODELS[large.model]!.floors).toBeGreaterThan(
-      CITY_MODELS[small.model]!.floors,
-    );
-    expect(large.scale[1]).toBeGreaterThan(small.scale[1]);
+  it("keeps campus-scale plots as prisms even when tall (no invisible-wall shards)", () => {
+    // Real case: w681738480 is 48 m tall on a ~94 x 75 m multi-wing plot.
+    expect(buildBuildingInstances([square("campus", 90, 48, "levels")])).toEqual([]);
+  });
+
+  it(`the tower threshold is ${TOWER_MIN_HEIGHT_M} m`, () => {
+    expect(buildBuildingInstances([square("under", 26, TOWER_MIN_HEIGHT_M - 1, "levels")])).toHaveLength(0);
+    expect(buildBuildingInstances([square("over", 26, TOWER_MIN_HEIGHT_M, "levels")])).toHaveLength(1);
   });
 
   it("is deterministic", () => {
-    const a = buildBuildingInstances([block]);
-    const b = buildBuildingInstances([block]);
+    const a = buildBuildingInstances([highRise, panelka]);
+    const b = buildBuildingInstances([highRise, panelka]);
     expect(a).toEqual(b);
   });
 
   it("skips degenerate footprints", () => {
     expect(
       buildBuildingInstances([
-        { id: "x", height: 9, heightSource: "default", footprint: [[0, 0]] },
+        { id: "x", height: 50, heightSource: "levels", footprint: [[0, 0]] },
       ]),
     ).toEqual([]);
   });

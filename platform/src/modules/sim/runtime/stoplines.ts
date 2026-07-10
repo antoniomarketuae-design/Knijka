@@ -2,7 +2,7 @@
  * sim/runtime — stop-line geometry derivation.
  *
  * OSM (and therefore district-v1.json) has no stop-line or sign data, so stop
- * lines are DERIVED. Two sources:
+ * lines are DERIVED. Three sources:
  *
  * 1. SIGNALIZED APPROACHES. Every edge arriving at a `signalized: true`
  *    intersection node gets a stop line across it, SIGNAL_SETBACK_M (7 m)
@@ -22,6 +22,9 @@
  *      we accept it deliberately: it exercises the full-stop pedagogy and is
  *      replaced per-junction by the hand-polish overlay (wave 2).
  *
+ * 3. HAND-PLACED OVERRIDES (STOP_LINE_OVERRIDES): junctions the curriculum
+ *    depends on that neither source reaches — see the table's comment.
+ *
  * Oneway edges only get a line at their downstream end (no approach exists
  * against the flow). Setbacks clamp to half the edge length on short
  * dual-carriageway link stubs so lines stay on their own edge.
@@ -36,6 +39,31 @@ const SIGNAL_SETBACK_M = 7;
 const STOP_SIGN_SETBACK_M = 5;
 const ARTERIAL_MIN_RANK = 4;
 const MINOR_MAX_RANK = 2;
+
+/**
+ * HAND-PLACED Б2 stop lines — a deterministic override table applied AFTER
+ * the derived sources, for junctions the heuristics can never reach (doc 68
+ * QW4). Each entry pins a stop-sign line on the `edgeId` approach into
+ * `nodeId` (both ends of a two-way edge that touch the node get the line,
+ * same as the heuristic). The world builder mirrors this table for the
+ * visible Б2 sign + painted line (world/builders/props.ts), so grading and
+ * visuals always agree. Entries survive until the hand-polish overlay
+ * (doc 17 §6/§8) replaces per-junction control wholesale.
+ */
+export interface StopLineOverride {
+  nodeId: string;
+  edgeId: string;
+}
+
+export const STOP_LINE_OVERRIDES: readonly StopLineOverride[] = [
+  // Lesson 2's „Спри!" objective (l2-stop-sign, lessons/specs.ts) requires a
+  // Б2 line at n331942490 — but all three incident edges there are
+  // `unclassified` (rank 2), so the minor-meets-arterial heuristic below
+  // never fires and the objective could never complete, locking L3–L7
+  // (audit 04 D10, curriculum-bricking risk). Verified missing 2026-07-10.
+  // The pinned approach is the player's: northbound oneway e897608662.0.
+  { nodeId: "n331942490", edgeId: "e897608662.0" },
+];
 
 export interface StopLine {
   /** Stable debug id: `<edgeId>@<sM>:<control>`. */
@@ -122,6 +150,24 @@ export function buildStopLines(
       if (rt.classRank > MINOR_MAX_RANK) continue;
       if (rt.edge.from === it.id) addApproach(edgeIdx, it.id, true, "stopSign", STOP_SIGN_SETBACK_M);
       if (rt.edge.to === it.id) addApproach(edgeIdx, it.id, false, "stopSign", STOP_SIGN_SETBACK_M);
+    }
+  }
+
+  // Hand-placed overrides (see STOP_LINE_OVERRIDES above). Skipped when the
+  // heuristics already guard that node+edge, so the table is idempotent.
+  for (const ov of STOP_LINE_OVERRIDES) {
+    const edgeIdx = index.edgeIdxById.get(ov.edgeId);
+    if (edgeIdx === undefined) continue;
+    const alreadyGuarded = byEdge[edgeIdx].some(
+      (li) => all[li].junctionNodeId === ov.nodeId,
+    );
+    if (alreadyGuarded) continue;
+    const rt = index.edgeRt(edgeIdx);
+    if (rt.edge.from === ov.nodeId) {
+      addApproach(edgeIdx, ov.nodeId, true, "stopSign", STOP_SIGN_SETBACK_M);
+    }
+    if (rt.edge.to === ov.nodeId) {
+      addApproach(edgeIdx, ov.nodeId, false, "stopSign", STOP_SIGN_SETBACK_M);
     }
   }
 

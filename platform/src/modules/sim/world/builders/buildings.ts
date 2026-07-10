@@ -1,7 +1,13 @@
 /**
  * Buildings: footprint rings extruded to flat-roof prisms.
+ * - Heights come from the district data via resolveBuildingHeightM (QW3,
+ *   doc 68): OSM height/levels where present, deterministic 15–25 m mid-rise
+ *   jitter where the data has none.
  * - Walls merged into one mesh PER facade palette variant (4 variants,
- *   deterministic per building id) — 4 draw calls total.
+ *   deterministic per building id) — 4 draw calls total. Buildings that get a
+ *   glass-tower instance instead (skipFacadesFor) emit NO walls/roof, but
+ *   ALWAYS emit their collider + aabb, so physics and prop placement see
+ *   every building.
  * - Wall UVs: u = perimeter meters, v = height meters, both / FACADE_TILE_M
  *   so the facade texture (4x4 window bays) tiles at true scale.
  * - Ground floor: darker band via vertex colors (extra vertex row at
@@ -11,6 +17,7 @@
  */
 
 import type { DistrictBuilding } from "../types";
+import { resolveBuildingHeightM } from "./cityBuildings";
 import {
   FACADE_TILE_M,
   FACADE_VARIANTS,
@@ -38,13 +45,13 @@ export function facadeVariant(buildingId: string, height: number): number {
 }
 
 function buildOne(
-  wallAcc: MeshAccumulator,
-  roofAcc: MeshAccumulator,
+  wallAcc: MeshAccumulator | null,
+  roofAcc: MeshAccumulator | null,
   colliderAcc: MeshAccumulator,
   b: DistrictBuilding,
 ): [number, number, number, number] {
   const ring = toCCW(b.footprint as Vec2[]);
-  const h = Math.max(3, b.height);
+  const h = resolveBuildingHeightM(b);
   const bandTop = Math.min(GROUND_BAND_M, h - 0.5);
   const dark: [number, number, number] = [GROUND_BAND_TINT, GROUND_BAND_TINT, GROUND_BAND_TINT];
   const light: [number, number, number] = [1, 1, 1];
@@ -76,16 +83,18 @@ function buildOne(
 
     // Wall as two stacked quads: ground band (dark tint) + upper floors.
     // Vertical wall along travel (b0, b1, t1, t0) faces right = outward.
-    const rows: [number, number, [number, number, number]][] = [
-      [0, bandTop, dark],
-      [bandTop, h, light],
-    ];
-    for (const [y0, y1, tint] of rows) {
-      const b0 = wallAcc.vertex(toWorld(p0[0], p0[1], y0), n, [u0, y0 / FACADE_TILE_M], tint);
-      const b1 = wallAcc.vertex(toWorld(p1[0], p1[1], y0), n, [u1, y0 / FACADE_TILE_M], tint);
-      const t1 = wallAcc.vertex(toWorld(p1[0], p1[1], y1), n, [u1, y1 / FACADE_TILE_M], tint);
-      const t0 = wallAcc.vertex(toWorld(p0[0], p0[1], y1), n, [u0, y1 / FACADE_TILE_M], tint);
-      wallAcc.quad(b0, b1, t1, t0);
+    if (wallAcc) {
+      const rows: [number, number, [number, number, number]][] = [
+        [0, bandTop, dark],
+        [bandTop, h, light],
+      ];
+      for (const [y0, y1, tint] of rows) {
+        const b0 = wallAcc.vertex(toWorld(p0[0], p0[1], y0), n, [u0, y0 / FACADE_TILE_M], tint);
+        const b1 = wallAcc.vertex(toWorld(p1[0], p1[1], y0), n, [u1, y0 / FACADE_TILE_M], tint);
+        const t1 = wallAcc.vertex(toWorld(p1[0], p1[1], y1), n, [u1, y1 / FACADE_TILE_M], tint);
+        const t0 = wallAcc.vertex(toWorld(p0[0], p0[1], y1), n, [u0, y1 / FACADE_TILE_M], tint);
+        wallAcc.quad(b0, b1, t1, t0);
+      }
     }
 
     // Collider: single full-height quad.
@@ -97,18 +106,28 @@ function buildOne(
   }
 
   // Roof: ear-clip the ring at height h (CCW input -> up-facing output).
-  const tris = triangulate(ring);
-  const roofIdx = ring.map((p) =>
-    roofAcc.vertex(toWorld(p[0], p[1], h), UP, [p[0] / 9, p[1] / 9]),
-  );
-  for (let i = 0; i < tris.length; i += 3) {
-    roofAcc.tri(roofIdx[tris[i]!]!, roofIdx[tris[i + 1]!]!, roofIdx[tris[i + 2]!]!);
+  if (roofAcc) {
+    const tris = triangulate(ring);
+    const roofIdx = ring.map((p) =>
+      roofAcc.vertex(toWorld(p[0], p[1], h), UP, [p[0] / 9, p[1] / 9]),
+    );
+    for (let i = 0; i < tris.length; i += 3) {
+      roofAcc.tri(roofIdx[tris[i]!]!, roofIdx[tris[i + 1]!]!, roofIdx[tris[i + 2]!]!);
+    }
   }
 
   return [minX, minY, maxX, maxY];
 }
 
-export function buildBuildings(buildings: DistrictBuilding[]): BuildingBuildResult {
+/**
+ * `skipFacadesFor`: building ids that render as instanced glass towers
+ * instead (buildBuildingInstances) — they get collider + aabb but no
+ * wall/roof mesh, so the tower and the prism never z-fight.
+ */
+export function buildBuildings(
+  buildings: DistrictBuilding[],
+  skipFacadesFor?: ReadonlySet<string>,
+): BuildingBuildResult {
   const walls = Array.from({ length: FACADE_VARIANTS }, () => new MeshAccumulator(true));
   const roofs = new MeshAccumulator();
   const collider = new MeshAccumulator();
@@ -116,8 +135,11 @@ export function buildBuildings(buildings: DistrictBuilding[]): BuildingBuildResu
   let count = 0;
   for (const b of buildings) {
     if (!b.footprint || b.footprint.length < 3) continue;
-    const variant = facadeVariant(b.id, b.height);
-    aabbs.push(buildOne(walls[variant]!, roofs, collider, b));
+    const asTower = skipFacadesFor?.has(b.id) ?? false;
+    const variant = facadeVariant(b.id, resolveBuildingHeightM(b));
+    aabbs.push(
+      buildOne(asTower ? null : walls[variant]!, asTower ? null : roofs, collider, b),
+    );
     count++;
   }
   return { walls, roofs, collider, aabbs, count };

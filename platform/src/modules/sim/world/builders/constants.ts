@@ -21,10 +21,48 @@ export const SIDEWALK_WIDTH_M = 2.0;
 /** Outer skirt from sidewalk top back down to terrain. */
 export const SIDEWALK_SKIRT_M = 0.35;
 
-/** Extra open-corner radius added past the widest approach at junctions. */
-export const JUNCTION_CORNER_RADIUS_M = 2.0;
+/**
+ * Extra open-corner (curb fillet) radius added past the widest approach at
+ * junctions, by the junction's dominant road class. Real Sofia curb radii run
+ * 6–12 m; the old flat 2 m read like a model railway and forced implausible
+ * turning lines (doc 68 QW3 / audit 03 B2).
+ */
+export const JUNCTION_CORNER_RADIUS_MINOR_M = 6; // residential/service/unclassified
+export const JUNCTION_CORNER_RADIUS_TERTIARY_M = 8;
+export const JUNCTION_CORNER_RADIUS_ARTERIAL_M = 10; // secondary/primary
+
+/** Corner radius for a junction whose widest incident road has `maxRank`. */
+export function junctionCornerRadiusM(maxRank: number): number {
+  if (maxRank >= 4) return JUNCTION_CORNER_RADIUS_ARTERIAL_M;
+  if (maxRank === 3) return JUNCTION_CORNER_RADIUS_TERTIARY_M;
+  return JUNCTION_CORNER_RADIUS_MINOR_M;
+}
+
 /** Setback used at degree-2 joints (way splits) to stitch tangents. */
 export const JOINT_SETBACK_M = 0.6;
+
+/**
+ * Curbside parking-lane band added to each side of arterial-class streets
+ * (doc 68 QW3 / audit 03 B2): real Студентски град streets read 9–12 m
+ * curb-to-curb because cars park along both curbs — the bare lanes×3.25
+ * cross-section is what made streets read miniature. The band is part of the
+ * carriageway ribbon (asphalt + colliders + sidewalks all shift out with it)
+ * and is tinted separately so it reads as parking, not as an extra lane.
+ * Sized so TrafficLayer's parked-car pass (travelHalf + 1.35 m center offset,
+ * car half-width 0.88 m) sits fully inside the band.
+ */
+export const PARKING_LANE_WIDTH_M = 2.5;
+/** Road classes that carry the parking band (links excluded — short stubs). */
+export const PARKING_LANE_CLASSES: ReadonlySet<string> = new Set([
+  "primary",
+  "secondary",
+  "tertiary",
+]);
+/** Parking band stops this far short of the ribbon ends (no parking within
+ *  5 m of a junction, ЗДвП чл. 98) — the bare mouth reads as approach flare. */
+export const PARKING_LANE_END_INSET_M = 5;
+/** Parking band tint mesh sits between asphalt and paint (z-fight-safe). */
+export const PARKING_LANE_Y = ROAD_Y + 0.006;
 
 /** Marking paint dimensions (М-series, stylized). */
 export const DASH_LENGTH_M = 2.5;

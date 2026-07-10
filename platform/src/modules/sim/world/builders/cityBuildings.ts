@@ -1,22 +1,32 @@
 /**
- * City buildings — places our authored glass-tower models (public/sim/city,
- * `tower_*.glb`) onto the real OSM footprints. This is the VISUAL replacement
- * for the procedural extruded prisms: buildBuildings() still produces the
- * wall/roof mesh data + the collider (physics is unchanged and the renderer
- * keeps the colliders), but the renderer draws these instanced glass towers
- * instead of the flat prisms.
+ * City buildings — places the authored glass-tower models (public/sim/city,
+ * `tower_*.glb`) onto the real OSM footprints, but ONLY where the district
+ * data says a genuine high-rise stands. Everything else renders as the
+ * procedural facade prism (buildings.ts) at its true height.
  *
- * Every footprint becomes ONE glass tower (towers are monolithic point/slab
- * blocks — tiling copies of a tower side-by-side would look wrong). For each
- * footprint we take its minimum-area oriented bounding box, derive a target
- * height from the footprint's plan size (bigger plots → taller towers, min/max
- * clamped) and pick the tower model whose authored floor count matches that
- * height. The footprint fit is proportion-preserving: the tower is scaled to
- * cover the plot but never stretched more than STRETCH× beyond the model's own
- * slender proportions, so a tower never becomes a squished box or a wildly fat
- * slab. Pure + testable: no three.js, no DOM. The CITY_MODELS dimension table
- * is the shared contract with the client loader (cityModels.ts), which
- * normalises every GLB to unit height with its footprint centred on x/z.
+ * QW3 (docs/simulation/68 §Phase 0, audit 03 B1): the previous version
+ * derived tower height from the PLOT size, clamped 42–170 m — every one of
+ * the 248 footprints became a tower, a ~10:1 street canyon that made the
+ * (correct) 3.25 m lanes read miniature. Heights now come from the district
+ * data (`height` + `heightSource` per building, OSM-derived):
+ *  - "height"/"levels": trust the data (clamped only against glitches);
+ *  - "default" (no OSM data): deterministic 15–25 m jitter per building id —
+ *    the Студентски град mid-rise reality.
+ * A building becomes a glass tower only when it is genuinely tall
+ * (>= TOWER_MIN_HEIGHT_M) AND its plot is compact enough for a point tower —
+ * campus-scale multi-wing footprints stay prisms even when tall, because a
+ * slender tower fitted to them would cover a fraction of the plot while its
+ * full-footprint collider stayed (invisible walls).
+ *
+ * Towers render at the REAL data height: the models (24–50 authored floors)
+ * are vertically compressed to match (doc 68: "scale down gracefully"). The
+ * footprint fit stays proportional to the rendered height with a bounded
+ * stretch, which also bounds window-aspect distortion to STRETCH — compression
+ * shrinks windows but never squashes their shape beyond that band.
+ *
+ * Pure + testable: no three.js, no DOM. The CITY_MODELS dimension table is the
+ * shared contract with the client loader (cityModels.ts), which normalises
+ * every GLB to unit height with its footprint centred on x/z.
  */
 
 import type { BuildingInstancePlacement, DistrictBuilding } from "../types";
@@ -38,7 +48,7 @@ export interface CityModel {
  * each GLB's bounding box (x/y and z/y) at unit height and MUST match the
  * loader's unit-height normalisation — they drive the footprint fit. `floors`
  * is the authored storey count (from the file name) and selects which tower
- * lands on a given plot size.
+ * lands on a given building height.
  */
 export const CITY_MODELS: CityModel[] = [
   { file: "tower_res_blue_24", mw: 0.246, md: 0.248, floors: 24 },
@@ -53,18 +63,37 @@ export const CITY_MODELS: CityModel[] = [
   { file: "tower_office_grey_50", mw: 0.125, md: 0.109, floors: 50 },
 ];
 
-/** World metres per authored storey (sets a tower's rendered height band). */
+/** World metres per authored storey (converts data height → target floors). */
 const METERS_PER_FLOOR = 3.4;
-/** Height clamp (m). Floor of the shortest tower / ceiling of the tallest. */
-const H_MIN = 42;
-const H_MAX = CITY_MODELS[CITY_MODELS.length - 1]!.floors * METERS_PER_FLOOR; // 50 floors → 170 m
-/** Plan-size (√area, m) → target height gain. Tuned for a tall varied skyline. */
-const AREA_TO_HEIGHT = 6.5;
-/** Max footprint fit stretch vs the model's natural (proportional) footprint. */
+
+/** Height band (m) for buildings with NO OSM data (heightSource "default"). */
+export const DEFAULT_HEIGHT_MIN_M = 15;
+export const DEFAULT_HEIGHT_MAX_M = 25;
+/** Data-glitch clamps on OSM-sourced heights. */
+const DATA_HEIGHT_MIN_M = 3;
+const DATA_HEIGHT_MAX_M = 75;
+
+/** Data height at/above which a building renders as a glass tower. */
+export const TOWER_MIN_HEIGHT_M = 40;
+/** Plots with a longer OBB axis than this stay prisms even when tall —
+ *  they are multi-wing complexes a single point tower cannot cover. */
+export const TOWER_MAX_PLOT_M = 40;
+
+/** Max footprint fit stretch vs the model's natural (proportional) footprint —
+ *  also the bound on window-aspect distortion. */
 const STRETCH = 1.6;
-/** Keep the rendered height within this band of the model's authored height,
- *  so a tower is never vertically squished/stretched into an implausible shape. */
-const PROPORTION_BAND = 0.15;
+
+/**
+ * Rendered height for a building, from the district data (see module header).
+ * Deterministic: the "default" jitter hashes the building id.
+ */
+export function resolveBuildingHeightM(b: DistrictBuilding): number {
+  if (b.heightSource === "default") {
+    const u = (hashString(b.id) % 1000) / 1000;
+    return DEFAULT_HEIGHT_MIN_M + u * (DEFAULT_HEIGHT_MAX_M - DEFAULT_HEIGHT_MIN_M);
+  }
+  return clamp(b.height, DATA_HEIGHT_MIN_M, DATA_HEIGHT_MAX_M);
+}
 
 interface OBB {
   cx: number;
@@ -131,16 +160,17 @@ function clamp(v: number, lo: number, hi: number): number {
 }
 
 /**
- * Pick the tower model whose authored floor count best matches `targetFloors`,
- * using a per-building hash to break ties (and split the two 40-floor twins) so
- * neighbouring plots of the same size don't all resolve to the same tower.
+ * Pick the tower model whose authored floor count best matches `targetFloors`.
+ * Real district heights (12–22 floors) sit below every authored tower, so a
+ * pure argmin would put the SAME shortest tower on every tall plot; a 0–6
+ * floor deterministic per-building jitter varies neighbouring high-rises
+ * while still bounding the vertical compression to the shorter models.
  */
 function pickModel(targetFloors: number, hash: number): number {
   let best = 0;
   let bestScore = Infinity;
   for (let i = 0; i < CITY_MODELS.length; i++) {
-    // Tiny deterministic jitter breaks exact ties (e.g. twin_a vs twin_b).
-    const jitter = ((hash >>> i) & 1) * 0.25;
+    const jitter = ((hash >>> i) & 3) * 2;
     const score = Math.abs(CITY_MODELS[i]!.floors - targetFloors) + jitter;
     if (score < bestScore) {
       bestScore = score;
@@ -151,11 +181,11 @@ function pickModel(targetFloors: number, hash: number): number {
 }
 
 /**
- * One instanced glass tower per footprint. World space, base at y=0, with a
- * non-uniform (width, height, depth) fit scale on the unit-height model. Height
- * is derived from the footprint's plan size (√area) — not the OSM height — so
- * the skyline is a tall, varied glass metropolis; the fit is capped so a tower
- * keeps plausible slender proportions rather than being stretched or squished.
+ * One instanced glass tower per QUALIFYING footprint (tall + compact — see
+ * module header); every other building is left to the facade-prism pass.
+ * World space, base at y=0, with a non-uniform (width, height, depth) fit
+ * scale on the unit-height model. Height is the resolved DATA height; the
+ * footprint fit is capped so windows keep a plausible aspect.
  */
 export function buildBuildingInstances(
   buildings: DistrictBuilding[],
@@ -163,28 +193,20 @@ export function buildBuildingInstances(
   const out: BuildingInstancePlacement[] = [];
   for (const b of buildings) {
     if (!b.footprint || b.footprint.length < 3) continue;
+    const H = resolveBuildingHeightM(b);
+    if (H < TOWER_MIN_HEIGHT_M) continue; // mid-rise → facade prism
     const ring = toCCW(b.footprint as Vec2[]);
     const box = orientedBox(ring);
     if (box.w < 2 || box.d < 2) continue;
+    if (Math.max(box.w, box.d) > TOWER_MAX_PLOT_M) continue; // multi-wing → prism
 
     const hash = hashString(b.id);
-    // Deterministic ±15% skyline jitter from the id (varies equal-size plots).
-    const jitter = 0.85 + ((hash % 1000) / 1000) * 0.3;
-
-    // Height from plan size (√area is the plot's characteristic dimension), so
-    // bigger plots carry taller towers. Clamped to the tower height band.
-    const planSize = Math.sqrt(box.w * box.d);
-    const targetH = clamp(planSize * AREA_TO_HEIGHT * jitter, H_MIN, H_MAX);
-
-    // Choose the tower whose storey count fits, then render within a tight band
-    // of that tower's authored height so it never looks vertically distorted.
-    const modelIndex = pickModel(targetH / METERS_PER_FLOOR, hash);
+    const modelIndex = pickModel(H / METERS_PER_FLOOR, hash);
     const m = CITY_MODELS[modelIndex]!;
-    const authoredH = m.floors * METERS_PER_FLOOR;
-    const H = clamp(targetH, authoredH * (1 - PROPORTION_BAND), authoredH * (1 + PROPORTION_BAND));
 
     // Fit the footprint but cap the stretch vs the model's natural footprint
-    // (mw·H × md·H) so the glass box is neither absurdly fat nor a thin needle.
+    // at the RENDERED height (mw·H × md·H). This bounds window-aspect
+    // distortion to STRETCH even under vertical compression.
     const natW = m.mw * H;
     const natD = m.md * H;
     const worldW = clamp(box.w, natW / STRETCH, natW * STRETCH);
@@ -194,6 +216,7 @@ export function buildBuildingInstances(
     const sz = worldD / m.md;
 
     out.push({
+      buildingId: b.id,
       model: modelIndex,
       position: [box.cx, 0, -box.cy], // district (x,y) -> world (x, 0, -y)
       yaw: box.angle,

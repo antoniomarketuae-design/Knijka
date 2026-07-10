@@ -28,8 +28,12 @@ export function buildWorldGeometry(
 ): WorldGeometry {
   const network = analyzeNetwork(district, options.junctionRadiusOverrides);
   const roads = buildRoads(network);
-  const buildings = buildBuildings(district.buildings);
+  // Tall, compact buildings become glass-tower instances; every other
+  // footprint keeps its facade prism (walls/roofs), so the split below tells
+  // the prism builder which ids to leave to the instanced pass (doc 68 QW3).
   const buildingInstances = buildBuildingInstances(district.buildings);
+  const towerIds = new Set(buildingInstances.map((p) => p.buildingId));
+  const buildings = buildBuildings(district.buildings, towerIds);
   const props = buildProps(district, network, buildings.aabbs, {
     treeDensity: options.treeDensity ?? 1,
     seed: options.seed ?? DEFAULT_SEED,
@@ -63,6 +67,7 @@ export function buildWorldGeometry(
     roads.surface,
     roads.junctions,
     roads.sidewalks,
+    roads.parkingLanes,
     markings.markings,
     terrain.grass,
     terrain.paved,
@@ -81,6 +86,7 @@ export function buildWorldGeometry(
     markingQuads: markings.markingQuads,
     stopLines: markings.stopLines,
     zebraCrossings: markings.zebraCrossings,
+    parkingLaneStrips: roads.parkingLaneStripCount,
     buildings: buildings.count,
     buildingInstances: buildingInstances.length,
     trafficLights: props.trafficLights.length,
@@ -89,10 +95,11 @@ export function buildWorldGeometry(
     trees: props.trees.length,
     vertices,
     triangles,
-    // roads + junctions + sidewalks + markings + grass + paved + 3 signal
-    // parts + (4 sign faces + 1 pole) + 2 streetlight parts + 4 tree variants
-    // + buildings (chunked & frustum-culled at runtime; count ~model-order).
-    drawCallEstimate: 5 + 3 + 5 + 2 + 1 + 4 + CITY_MODELS.length,
+    // roads + junctions + sidewalks + parking lanes + markings + grass +
+    // paved + 4 facade-wall variants + roofs + 3 signal parts + (4 sign faces
+    // + 1 pole) + 2 streetlight parts + 4 tree variants + towers (chunked &
+    // frustum-culled at runtime; count ~model-order).
+    drawCallEstimate: 6 + 5 + 3 + 5 + 2 + 1 + 4 + CITY_MODELS.length,
   };
 
   return {
@@ -100,6 +107,7 @@ export function buildWorldGeometry(
     junctionSurface: roads.junctions.toMeshData(),
     sidewalks: roads.sidewalks.toMeshData(),
     markings: markings.markings.toMeshData(),
+    parkingLanes: roads.parkingLanes.toMeshData(),
     terrain: terrain.grass.toMeshData(),
     terrainPaved: terrain.paved.toMeshData(),
     buildingWalls: buildings.walls.map((w) => w.toMeshData()),

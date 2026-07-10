@@ -185,11 +185,14 @@ export interface TreePlacement extends StaticTransform {
 }
 
 /**
- * One instanced Kenney building module. Non-uniform scale (unlike
+ * One instanced glass-tower model. Non-uniform scale (unlike
  * StaticTransform's single scale) because footprints fit width/height/depth
  * independently. Base sits at world y=0.
  */
 export interface BuildingInstancePlacement {
+  /** District building id — links the instance to its footprint (the facade
+   *  prism builder skips walls/roofs for these ids). */
+  buildingId: string;
   /** Index into CITY_MODELS / the loaded geometry list. */
   model: number;
   position: Vec3Tuple;
@@ -217,8 +220,10 @@ export interface WorldStats {
   markingQuads: number;
   stopLines: number;
   zebraCrossings: number;
+  /** Curbside parking bands on arterial edges (two per qualifying ribbon). */
+  parkingLaneStrips: number;
   buildings: number;
-  /** Instanced Kenney building modules placed on the footprints. */
+  /** Instanced glass towers placed on tall, compact footprints. */
   buildingInstances: number;
   trafficLights: number;
   signs: Record<SignKind, number>;
@@ -239,17 +244,21 @@ export interface WorldGeometry {
   sidewalks: MeshData;
   /** All white paint: lane separators, edge lines, stop lines, zebras. */
   markings: MeshData;
+  /** Tinted curbside parking bands on arterial edges (inside the ribbon
+   *  width, drawn a hair above the asphalt — doc 68 QW3). */
+  parkingLanes: MeshData;
   /** Open ground (grass): parks, verges, district edges. Subtle off-road relief. */
   terrain: MeshData;
   /** Paved ground (concrete): courtyards/parking in the built-up fabric.
    *  Co-planar with `terrain`, shares its vertex positions so there are no seams. */
   terrainPaved: MeshData;
-  /** Building walls merged per facade palette variant (index = variant).
-   *  Kept as data + collider source; the renderer draws `buildingInstances`. */
+  /** Building walls merged per facade palette variant (index = variant) —
+   *  the mid-rise fabric, extruded at the district-data height (doc 68 QW3).
+   *  Rendered by StaticWorld; excludes buildings drawn as tower instances. */
   buildingWalls: MeshData[];
-  /** All flat roofs merged. Kept as data; not drawn when city models load. */
+  /** Flat roofs of the facade-prism buildings, merged. */
   buildingRoofs: MeshData;
-  /** Kenney building modules placed on the footprints (the drawn buildings). */
+  /** Instanced glass towers on the tall, compact footprints (CityBuildings). */
   buildingInstances: BuildingInstancePlacement[];
   trafficLights: TrafficLightPlacement[];
   signs: SignPlacement[];

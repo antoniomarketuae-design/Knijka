@@ -7,9 +7,12 @@
 
 import type { District, DistrictEdge } from "../types";
 import {
+  CLASS_RANK,
   JOINT_SETBACK_M,
-  JUNCTION_CORNER_RADIUS_M,
+  junctionCornerRadiusM,
   LANE_WIDTH_M,
+  PARKING_LANE_CLASSES,
+  PARKING_LANE_WIDTH_M,
 } from "./constants";
 import {
   add,
@@ -30,6 +33,8 @@ export interface Approach {
   /** Unit direction pointing AWAY from the node along the edge. */
   dir: Vec2;
   halfWidth: number;
+  /** Parking band width inside halfWidth (0 on non-arterial edges). */
+  parkingM: number;
   /** Trim distance from the node along this edge. */
   setback: number;
   /** Cross-section at the cut: point on centerline + left/right extremes. */
@@ -56,6 +61,8 @@ export interface NodeInfo {
 export interface EdgeBuild {
   edge: DistrictEdge;
   halfWidth: number;
+  /** Parking band width inside halfWidth on each side (0 = no band). */
+  parkingM: number;
   /** Junction-trimmed centerline (null when the whole edge is junction area). */
   line: Vec2[] | null;
   trimFrom: number;
@@ -71,12 +78,29 @@ export interface RoadNetwork {
   roundaboutEdgeIds: Set<string>;
 }
 
-export function edgeHalfWidth(edge: DistrictEdge): number {
+/** Parking band width per side of an edge (0 for non-arterial/roundabout). */
+export function edgeParkingWidthM(edge: DistrictEdge): number {
+  if (edge.roundabout) return 0;
+  return PARKING_LANE_CLASSES.has(edge.class) ? PARKING_LANE_WIDTH_M : 0;
+}
+
+/** Travel-lane half width (lanes × 3.25 / 2) — the graded carriageway. */
+export function edgeTravelHalfWidth(edge: DistrictEdge): number {
   const lanes = Math.max(1, edge.lanes);
   let half = (lanes * LANE_WIDTH_M) / 2;
   // Single-lane roundabout rings read too thin — BG ring lanes are wide.
   if (edge.roundabout) half = Math.max(half, 2.4);
   return half;
+}
+
+/**
+ * Full curb-to-curb half width: travel lanes + the curbside parking band on
+ * arterial classes (doc 68 QW3). Everything derived from it — ribbons,
+ * junction patches, sidewalks, colliders, prop lateral offsets — shifts out
+ * consistently; markings use the travel width via EdgeBuild/Approach.parkingM.
+ */
+export function edgeHalfWidth(edge: DistrictEdge): number {
+  return edgeTravelHalfWidth(edge) + edgeParkingWidthM(edge);
 }
 
 /** Direction pointing away from `nodeId` along the edge geometry. */
@@ -121,8 +145,9 @@ export function analyzeNetwork(
     const degree = touched.length;
     if (degree === 1) deadEnds.add(id);
     const maxHalf = Math.max(...touched.map(edgeHalfWidth));
+    const maxRank = Math.max(...touched.map((e) => CLASS_RANK[e.class] ?? 2));
     let radius: number;
-    if (degree >= 3) radius = maxHalf + JUNCTION_CORNER_RADIUS_M;
+    if (degree >= 3) radius = maxHalf + junctionCornerRadiusM(maxRank);
     else if (degree === 2) radius = Math.max(JOINT_SETBACK_M, maxHalf * 0.25);
     else radius = 0;
     const override = junctionRadiusOverrides?.[id];
@@ -159,7 +184,14 @@ export function analyzeNetwork(
       line = null;
     }
 
-    const build: EdgeBuild = { edge, halfWidth: edgeHalfWidth(edge), line, trimFrom: sFrom, trimTo: sTo };
+    const build: EdgeBuild = {
+      edge,
+      halfWidth: edgeHalfWidth(edge),
+      parkingM: edgeParkingWidthM(edge),
+      line,
+      trimFrom: sFrom,
+      trimTo: sTo,
+    };
     edgeBuilds.push(build);
     edgeById.set(edge.id, build);
 
@@ -181,6 +213,7 @@ export function analyzeNetwork(
         edge,
         dir: dirAwayFromNode(edge, nodeId),
         halfWidth: hw,
+        parkingM: build.parkingM,
         setback: atStart ? sFrom : sTo,
         cut: point,
         cutTangentAway: away,

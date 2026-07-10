@@ -115,9 +115,10 @@ function paintStopLine(acc: MeshAccumulator, ap: Approach, dashed: boolean): voi
   const away = ap.cutTangentAway;
   const rightOfAway = perpRight(away);
   // Incoming traffic drives toward the node on ITS right side, which is the
-  // LEFT half relative to the away direction.
+  // LEFT half relative to the away direction. The line spans the TRAVEL lanes
+  // only — never the parking band (ap.parkingM).
   const inner = 0.15;
-  const outer = ap.halfWidth - 0.2;
+  const outer = ap.halfWidth - ap.parkingM - 0.2;
   const lineDir = rightOfAway;
   const base = add(ap.cut, mul(away, 0.6)); // just outside the junction mouth
   const from = ap.edge.oneway ? -outer : inner;
@@ -176,17 +177,24 @@ export function buildMarkings(
     const line = trimPolyline(eb.line, 0.8, 0.8, 2.5);
     if (!line) continue;
     const lanes = Math.max(1, eb.edge.lanes);
+    // Paint geometry works off the TRAVEL width — the parking band (parkingM,
+    // doc 68 QW3) is inside eb.halfWidth but carries no lane lines; the solid
+    // edge line separates the travel lanes from the parking band.
+    const travelHalf = eb.halfWidth - eb.parkingM;
     // Lane boundaries at every internal multiple of LANE_WIDTH from the left
     // edge. For two-way edges the middle boundary is the center line.
     for (let k = 1; k < lanes; k++) {
-      const off = -eb.halfWidth + k * LANE_WIDTH_M;
-      if (Math.abs(off) > eb.halfWidth - 0.4) continue;
+      const off = -travelHalf + k * LANE_WIDTH_M;
+      if (Math.abs(off) > travelHalf - 0.4) continue;
       const offLine = offsetPolyline(line, off);
       markingQuads += paintDashedLine(acc, offLine, DASH_WIDTH_M);
     }
     if (ARTERIAL_CLASSES.has(eb.edge.class)) {
+      // With a parking band the edge line sits ON the travel/parking boundary;
+      // without one it stays inset from the curb so paint never underlaps it.
+      const edgeOff = eb.parkingM > 0 ? travelHalf : travelHalf - EDGE_LINE_INSET_M;
       for (const side of [-1, 1] as const) {
-        const offLine = offsetPolyline(line, side * (eb.halfWidth - EDGE_LINE_INSET_M));
+        const offLine = offsetPolyline(line, side * edgeOff);
         markingQuads += paintSolidLine(acc, offLine, EDGE_LINE_WIDTH_M);
       }
     }

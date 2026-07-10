@@ -9,6 +9,8 @@ import { buildWorldGeometry } from "../builders/buildWorldGeometry";
 import {
   CURB_HEIGHT_M,
   LANE_WIDTH_M,
+  PARKING_LANE_WIDTH_M,
+  PARKING_LANE_Y,
   ROAD_Y,
   SIDEWALK_TOP_Y,
 } from "../builders/constants";
@@ -117,13 +119,24 @@ describe("buildWorldGeometry on a synthetic X-junction", () => {
     expect(world.stats.junctionPatches).toBe(1);
   });
 
-  it("road ribbons have the correct width from lane counts", () => {
-    // First ribbon is eN (4 lanes): first two vertices are the L/R pair of
-    // the first cross-section -> distance = 4 * 3.25 m.
+  it("road ribbons have the correct width from lane counts (+ parking bands)", () => {
+    // First ribbon is eN (secondary, 4 lanes): first two vertices are the L/R
+    // pair of the first cross-section -> travel lanes + a parking band per
+    // side (QW3 arterial cross-section).
     const pos = world.roadSurface.positions;
     const dx = pos[0]! - pos[3]!;
     const dz = pos[2]! - pos[5]!;
-    expect(Math.hypot(dx, dz)).toBeCloseTo(4 * LANE_WIDTH_M, 3);
+    expect(Math.hypot(dx, dz)).toBeCloseTo(4 * LANE_WIDTH_M + 2 * PARKING_LANE_WIDTH_M, 3);
+  });
+
+  it("lays tinted parking bands along arterial edges only", () => {
+    // eN + eS are secondary (2 strips each); eE/eW residential get none.
+    expect(world.stats.parkingLaneStrips).toBe(4);
+    const pos = world.parkingLanes.positions;
+    expect(pos.length).toBeGreaterThan(0);
+    for (let i = 1; i < pos.length; i += 3) {
+      expect(pos[i]!).toBeCloseTo(PARKING_LANE_Y);
+    }
   });
 
   it("all road surface normals point up and sit at ROAD_Y", () => {
@@ -225,7 +238,7 @@ describe("buildWorldGeometry on a synthetic X-junction", () => {
   it("junction radius overrides move the ribbon cut (hand-polish hook)", () => {
     const wide = buildWorldGeometry(syntheticDistrict(), {
       seed: 7,
-      junctionRadiusOverrides: { nC: 20 },
+      junctionRadiusOverrides: { nC: 32 },
     });
     // eN ribbon starts further from the center -> first vertex further out.
     const zDefault = Math.abs(world.roadSurface.positions[2]!);
@@ -273,6 +286,7 @@ describe("buildWorldGeometry on the real district (Студентски град
       world.junctionSurface,
       world.sidewalks,
       world.markings,
+      world.parkingLanes,
       world.terrain,
       world.buildingRoofs,
       ...world.buildingWalls,
@@ -315,6 +329,45 @@ describe("buildWorldGeometry on the real district (Студентски град
     ).length;
     expect(world.stats.zebraCrossings).toBeGreaterThan(paintable * 0.8);
     expect(world.stats.zebraCrossings).toBeLessThanOrEqual(paintable);
+  });
+
+  it("renders a mid-rise district: prisms for the fabric, few towers, data heights (QW3)", () => {
+    // Every footprint is either a facade prism or a tower instance.
+    expect(world.stats.buildings).toBe(district.buildings.length);
+    // Towers only where OSM says genuinely tall AND the plot is compact —
+    // a handful in Студентски град, not all 248 (the old 42–170 m canyon).
+    expect(world.stats.buildingInstances).toBeGreaterThanOrEqual(1);
+    expect(world.stats.buildingInstances).toBeLessThanOrEqual(12);
+    for (const inst of world.buildingInstances) {
+      expect(inst.scale[1]).toBeGreaterThanOrEqual(40);
+      expect(inst.scale[1]).toBeLessThanOrEqual(75);
+    }
+    // The prism fabric exists and tops out at mid-rise/real heights (≤ 75 m),
+    // with the bulk of roof area well under the old 42 m tower floor.
+    let maxRoofY = 0;
+    let under30 = 0;
+    let roofVerts = 0;
+    const roofPos = world.buildingRoofs.positions;
+    for (let i = 1; i < roofPos.length; i += 3) {
+      const y = roofPos[i]!;
+      maxRoofY = Math.max(maxRoofY, y);
+      if (y < 30) under30++;
+      roofVerts++;
+    }
+    expect(roofVerts).toBeGreaterThan(0);
+    expect(maxRoofY).toBeLessThanOrEqual(75);
+    expect(under30 / roofVerts).toBeGreaterThan(0.8);
+  });
+
+  it("paints the hand-placed Б2 line + sign for lesson 2 (QW4)", () => {
+    // The override approach at n331942490 must carry a stop sign near the
+    // junction (383.17, 65.76 → world z = -65.76).
+    const near = world.signs.filter(
+      (s) =>
+        s.kind === "stop" &&
+        Math.hypot(s.position[0] - 383.17, s.position[2] - -65.76) < 18,
+    );
+    expect(near.length).toBe(1);
   });
 
   it("keeps the ODbL attribution visible in the build output", () => {
