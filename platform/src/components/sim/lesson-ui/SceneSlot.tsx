@@ -21,15 +21,19 @@
  *      - const tick = runtime.sample(vehicleSample, tSec, isNight)
  *      - onTick(tick)               // feeds rules + objectives + HUD
  *    `tSec` is seconds since session start, monotonic (SimTick contract).
- * 4. Pre-drive phase (lesson.preDrive) — the interim QW5/QW10 contract:
- *      - Apply `preDriveCabinSteps` to the cabin state idempotently, so a
- *        checklist "belt ✓" really belts the cabin (rule engine + telltales
- *        agree with what the student was told they did).
- *      - While `driveLocked`, zero the drive inputs into the physics (the car
- *        must not move mid-checklist) and report the first throttle attempt
- *        via onBlockedDriveAttempt (the shell rate-limits the explanation).
- *      - Performed cockpit controls (hotspots/keys → onPreDriveStep) are
- *        Phase 1 A2; today the checklist click in the shell is the only path.
+ * 4. Pre-drive phase (lesson.preDrive) — the A2 performed contract:
+ *      - OBSERVE the real vehicle transitions (driveline.subscribe, cabin
+ *        state polls, glances, raw pedals) and resolve them to steps via
+ *        procedures/performedSteps.ts, reporting each via onPreDriveStep —
+ *        performable steps NEVER complete from clicks; only the checklist's
+ *        info steps confirm through the shell.
+ *      - While `driveLocked`, zero the drive inputs into the physics; a
+ *        throttle press while the driveline is genuinely ready to move off
+ *        IS the "move-off" step (it completes the procedure and unlocks the
+ *        gate), an earlier press reports onBlockedDriveAttempt (the shell
+ *        rate-limits the explanation).
+ *      - In instruction mode, pulse the cockpit hotspot(s) named by
+ *        `preDriveHighlightStepId` (doc-69 names, hotspotsForStep map).
  * 5. Feed the minimap a few times per second (NOT per frame):
  *    onMinimapFrame({ polylines, transform }) using the runtime's minimap
  *    builder (hud/Minimap.tsx documents the projection).
@@ -57,13 +61,13 @@ export interface SceneSlotProps {
   /** QW10: true while the lesson is in the pre-drive phase — the scene must
    *  keep the vehicle stationary (zero throttle/brake into the physics). */
   driveLocked: boolean;
-  /** QW5: pre-drive steps completed in the checklist that carry a real cabin
-   *  effect (belt/lights/indicator), in completion order. Append-only within
-   *  a session run; the scene applies them idempotently to CabinControls. */
-  preDriveCabinSteps: readonly PreDriveStepId[];
+  /** A2 instruction mode: the pending procedure step whose cockpit hotspot(s)
+   *  should pulse, or null (practice/assess/driving — no highlights). */
+  preDriveHighlightStepId: PreDriveStepId | null;
   /** Authoritative frame feed → lesson engine (rules + objectives + HUD). */
   onTick: (tick: SimTick) => void;
-  /** Cockpit interactions during the pre-drive phase. */
+  /** A2: a pre-drive step was PERFORMED on a real control — the scene's
+   *  transition observer resolved it (procedures/performedSteps.ts). */
   onPreDriveStep: (stepId: PreDriveStepId, tSec: number) => void;
   /** QW10: throttle pressed while driveLocked — the shell shows the
    *  "завърши подготовката" explanation (rate-limited there). */

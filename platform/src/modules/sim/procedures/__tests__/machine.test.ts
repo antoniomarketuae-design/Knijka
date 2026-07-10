@@ -7,6 +7,7 @@ import type {
   PreDriveStepId,
   ProcedureCompletedEvent,
   StepCompletedEvent,
+  StepOutOfOrderEvent,
 } from "../types";
 
 // -- helpers -----------------------------------------------------------------
@@ -248,6 +249,88 @@ describe("pre-drive machine — wrong order", () => {
     const v = violations(events);
     expect(v).toHaveLength(1);
     expect(v[0]).toMatchObject({ code: "PREDRIVE_WRONG_ORDER", detail: "start-engine" });
+  });
+});
+
+describe("pre-drive machine — modes (A2 Instruction→Practice→Assess)", () => {
+  const OUT_OF_ORDER: PreDriveStepId[] = [
+    "adjust-mirrors", // before the seat — wrong order in every mode
+    "adjust-seat",
+    "check-surroundings",
+    "fasten-seatbelt",
+    "check-dashboard",
+    "start-engine",
+    "press-brake",
+    "select-gear",
+    "release-handbrake",
+    "final-mirror-check",
+    "signal",
+    "move-off",
+  ];
+
+  it("defaults to assess — the documented exam-strict scoring", () => {
+    expect(createPreDriveMachine({ isNight: false }).mode).toBe("assess");
+  });
+
+  it("instruction: wrong order is COACHED (stepOutOfOrder, law-cited), never scored", () => {
+    const { machine, events } = runSteps(
+      createPreDriveMachine({ isNight: false, mode: "instruction" }),
+      OUT_OF_ORDER,
+    );
+    expect(violations(events)).toEqual([]); // zero scored events
+    const coached = events.filter((e): e is StepOutOfOrderEvent => e.kind === "stepOutOfOrder");
+    expect(coached).toHaveLength(1);
+    expect(coached[0]).toMatchObject({ stepId: "adjust-mirrors" });
+    expect(coached[0].explanationBg.length).toBeGreaterThan(10); // the authored WHY
+    expect(machine.penaltyPoints).toBe(0);
+    // ...but the order mistake is still tracked and still costs "perfect".
+    const r = result(events);
+    expect(r.wrongOrderStepIds).toEqual(["adjust-mirrors"]);
+    expect(r.penaltyPoints).toBe(0);
+    expect(r.perfect).toBe(false);
+    expect(events.some((e) => e.kind === "commendation")).toBe(false);
+  });
+
+  it("practice: order-tolerant exactly like instruction", () => {
+    const { events } = runSteps(
+      createPreDriveMachine({ isNight: false, mode: "practice" }),
+      OUT_OF_ORDER,
+    );
+    expect(violations(events)).toEqual([]);
+    expect(events.filter((e) => e.kind === "stepOutOfOrder")).toHaveLength(1);
+    expect(result(events).penaltyPoints).toBe(0);
+  });
+
+  it("assess: the same run is graded PREDRIVE_WRONG_ORDER (второстепенна)", () => {
+    const { events } = runSteps(
+      createPreDriveMachine({ isNight: false, mode: "assess" }),
+      OUT_OF_ORDER,
+    );
+    const v = violations(events);
+    expect(v).toHaveLength(1);
+    expect(v[0]).toMatchObject({ code: "PREDRIVE_WRONG_ORDER", detail: "adjust-mirrors" });
+    expect(events.some((e) => e.kind === "stepOutOfOrder")).toBe(false);
+    expect(result(events).penaltyPoints).toBe(1);
+  });
+
+  it("skips are scored in EVERY mode — omissions are never mode-forgiven", () => {
+    for (const mode of ["instruction", "practice", "assess"] as const) {
+      const withoutBelt = PERFECT_DAY.filter((s) => s !== "fasten-seatbelt");
+      const { events } = runSteps(createPreDriveMachine({ isNight: false, mode }), withoutBelt);
+      const v = violations(events);
+      expect(v.map((x) => x.code)).toEqual(["PREDRIVE_SEATBELT_SKIPPED"]);
+      expect(result(events).penaltyPoints).toBe(3);
+    }
+  });
+
+  it("a clean in-order run is perfect in every mode", () => {
+    for (const mode of ["instruction", "practice", "assess"] as const) {
+      const { events } = runSteps(createPreDriveMachine({ isNight: false, mode }), PERFECT_DAY);
+      expect(result(events).perfect).toBe(true);
+      expect(events.some((e) => e.kind === "commendation" && e.code === "PREDRIVE_PERFECT")).toBe(
+        true,
+      );
+    }
   });
 });
 

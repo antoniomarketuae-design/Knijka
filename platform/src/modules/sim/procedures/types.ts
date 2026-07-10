@@ -10,6 +10,20 @@
 
 import type { CommendationEvent, ViolationEvent } from "../rules/types";
 
+/**
+ * A2 lesson modes (doc 68 §5 — aviation Instruction→Practice→Assess ladder):
+ *  - "instruction": guided — the pending step is prompted and its cockpit
+ *    hotspot highlighted; wrong order is COACHED (stepOutOfOrder event, not
+ *    scored), so the student can explore the sequence safely.
+ *  - "practice":    recall — no highlights, order-tolerant (wrong order is
+ *    tracked but not scored); the shell offers a gentle hint after idling.
+ *  - "assess":      exam-strict — wrong order is graded exactly like the
+ *    official protocol (PREDRIVE_WRONG_ORDER, второстепенна).
+ * Skipping a REQUIRED step before move-off is scored in every mode — an
+ * omission is an omission; only the order tolerance varies.
+ */
+export type PreDriveMode = "instruction" | "practice" | "assess";
+
 export type PreDriveStepId =
   | "adjust-seat"
   | "adjust-mirrors"
@@ -68,6 +82,21 @@ export interface StepCompletedEvent {
   titleBg: string;
 }
 
+/**
+ * A step performed out of order in a NON-assess mode: coached, not scored.
+ * Carries the same authored texts as the PREDRIVE_WRONG_ORDER violation so
+ * the HUD can teach (kind:"lesson" toast) with the law citation — the
+ * teach-first-then-grade pattern applied to the procedure.
+ */
+export interface StepOutOfOrderEvent {
+  kind: "stepOutOfOrder";
+  stepId: PreDriveStepId;
+  t: number;
+  titleBg: string;
+  explanationBg: string;
+  lawRef?: string;
+}
+
 export interface PreDriveResult {
   completedStepIds: PreDriveStepId[];
   skippedStepIds: PreDriveStepId[];
@@ -84,6 +113,7 @@ export interface ProcedureCompletedEvent {
 
 export type PreDriveEvent =
   | StepCompletedEvent
+  | StepOutOfOrderEvent
   | ProcedureCompletedEvent
   | ViolationEvent
   | CommendationEvent;

@@ -2,10 +2,15 @@
  * Pre-drive procedure state machine — a pure reducer over pre-drive actions.
  *
  * Scoring model (documented decisions):
- *  - Performing a step whose prerequisites are missing => PREDRIVE_WRONG_ORDER
- *    (второстепенна) emitted immediately; the step still counts as done.
+ *  - Performing a step whose prerequisites are missing => wrong order. In
+ *    "assess" mode (default) that is PREDRIVE_WRONG_ORDER (второстепенна)
+ *    emitted immediately; in "instruction"/"practice" (A2 modes, doc 68 §5)
+ *    it is COACHED instead — a stepOutOfOrder event with the same authored
+ *    law-cited texts, tracked in wrongOrderStepIds but never scored. Either
+ *    way the step still counts as done.
  *  - A required step never performed before move-off => skip violation at
- *    move-off: второстепенна each, seatbelt => ОСНОВНА (3 т.).
+ *    move-off: второстепенна each, seatbelt => ОСНОВНА (3 т.). Skips are
+ *    scored in EVERY mode — only the order tolerance varies by mode.
  *  - No double counting: a step done late is only a wrong-order mistake (on
  *    the step that jumped ahead of it), never also a skip; move-off itself is
  *    never wrong-order.
@@ -23,12 +28,15 @@ import { makeCommendation, makeViolation } from "../rules/catalog";
 import { createPreDriveState, PRE_DRIVE_STEP_ORDER, PRE_DRIVE_STEPS } from "./steps";
 import type {
   PreDriveEvent,
+  PreDriveMode,
   PreDriveResult,
   PreDriveState,
   PreDriveStepId,
 } from "./types";
 
 export interface PreDriveMachine {
+  /** Order-tolerance mode (doc 68 §5). Default "assess" = the pre-A2 scoring. */
+  mode: PreDriveMode;
   state: PreDriveState;
   completedStepIds: PreDriveStepId[];
   wrongOrderStepIds: PreDriveStepId[];
@@ -37,8 +45,15 @@ export interface PreDriveMachine {
   finished: boolean;
 }
 
-export function createPreDriveMachine(opts: { isNight: boolean }): PreDriveMachine {
+export function createPreDriveMachine(opts: {
+  isNight: boolean;
+  /** Defaults to "assess" — the documented exam-strict scoring — so direct
+   *  callers/tests keep the pre-A2 semantics; the LESSON default is
+   *  "instruction" (lessons/engine.ts reads LessonSpec.preDriveMode). */
+  mode?: PreDriveMode;
+}): PreDriveMachine {
   return {
+    mode: opts.mode ?? "assess",
     state: createPreDriveState(opts),
     completedStepIds: [],
     wrongOrderStepIds: [],
@@ -83,9 +98,22 @@ export function applyPreDriveAction(
       titleBg: `Нарушен ред: ${spec.titleBg.toLowerCase()}`,
       detail: stepId,
     });
-    machine.violationCount += 1;
-    machine.penaltyPoints += v.points;
-    events.push(v);
+    if (prev.mode === "assess") {
+      machine.violationCount += 1;
+      machine.penaltyPoints += v.points;
+      events.push(v);
+    } else {
+      // Instruction/practice: coach the order mistake (teach-first) — same
+      // authored WHY + law citation, zero points.
+      events.push({
+        kind: "stepOutOfOrder",
+        stepId,
+        t,
+        titleBg: v.titleBg,
+        explanationBg: v.explanationBg,
+        lawRef: v.lawRef,
+      });
+    }
   }
 
   if (stepId === "move-off") {
@@ -118,7 +146,9 @@ function finishProcedure(machine: PreDriveMachine, t: number, events: PreDriveEv
     events.push(v);
   }
 
-  const perfect = machine.violationCount === 0;
+  // Perfect = zero violations AND clean order — in non-assess modes wrong
+  // order carries no points, but a coached order mistake is still not perfect.
+  const perfect = machine.violationCount === 0 && machine.wrongOrderStepIds.length === 0;
   if (perfect) events.push(makeCommendation("PREDRIVE_PERFECT", t));
 
   const result: PreDriveResult = {

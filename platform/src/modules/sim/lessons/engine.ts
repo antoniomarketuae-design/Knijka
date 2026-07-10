@@ -69,7 +69,11 @@ export function createLessonSession(
     lesson,
     phase: lesson.preDrive ? "preDrive" : "driving",
     isNight,
-    preDrive: lesson.preDrive ? createPreDriveMachine({ isNight }) : null,
+    // A2: the lesson default is "instruction" (guided first contact); specs
+    // opt into "practice"/"assess" via the additive preDriveMode field.
+    preDrive: lesson.preDrive
+      ? createPreDriveMachine({ isNight, mode: lesson.preDriveMode ?? "instruction" })
+      : null,
     rules: createRuleEngine(opts.ruleConfig),
     objectives,
     evalStates: objectives.map((o) => createEvalState(o.params)),
@@ -111,8 +115,11 @@ function toHudEvents(events: ReadonlyArray<RuleEvent>): HudEvent[] {
 // ---------------------------------------------------------------------------
 
 /**
- * Apply one pre-drive checklist action. No-op outside the preDrive phase.
- * Completing "move-off" finishes the procedure and unlocks the driving phase.
+ * Apply one PERFORMED (or info-confirmed) pre-drive step. No-op outside the
+ * preDrive phase. Since A2 the caller is the 3D scene's transition observer
+ * (procedures/performedSteps.ts) for performed steps and the read-only
+ * checklist's confirm button for info steps — never a click-to-complete
+ * path. Completing "move-off" finishes the procedure and unlocks driving.
  */
 export function applyPreDriveStep(
   prev: LessonSessionState,
@@ -126,6 +133,19 @@ export function applyPreDriveStep(
   const { machine, events } = applyPreDriveAction(prev.preDrive, stepId, tSec);
   const scorable = events.filter(isScorableEvent);
   const hudEvents = toHudEvents(scorable);
+
+  // A2 teach-first: an out-of-order step in instruction/practice mode is
+  // coached (lesson toast with the authored law-cited WHY), never scored.
+  for (const e of events) {
+    if (e.kind === "stepOutOfOrder") {
+      hudEvents.push({
+        kind: "lesson",
+        titleBg: e.titleBg,
+        explanationBg: e.explanationBg,
+        lawRef: e.lawRef,
+      });
+    }
+  }
 
   const finished = events.some((e) => e.kind === "procedureCompleted");
   if (finished) {
@@ -145,10 +165,12 @@ export function applyPreDriveStep(
 }
 
 /**
- * QW10 (doc 68 Phase 0): while the pre-drive procedure is still running the
- * vehicle must not move — the 3D scene zeroes the drive inputs into the
- * physics while this is true and explains why on the first throttle attempt.
- * Interim gate until real ignition/handbrake state lands (Phase 1 A1).
+ * QW10 drive gate: while the pre-drive procedure is still running the 3D
+ * scene zeroes the drive inputs into the physics and explains why on the
+ * first premature throttle attempt. Since A1+A2 the gate is mostly a
+ * backstop — ignition/selector/parking brake are REAL now, so completing the
+ * procedure genuinely readies the car, and the throttle press that performs
+ * "move-off" is the same press that rolls it once this unlocks.
  */
 export function isDriveLocked(state: LessonSessionState): boolean {
   return state.phase === "preDrive";

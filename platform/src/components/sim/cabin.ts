@@ -9,12 +9,11 @@
 //
 // Key handling mirrors the SimInput pattern (engine/input.ts) but lives here
 // because these are cabin/vehicle-operation concerns, not driving-axis inputs.
+//
+// A2: the cockpit hotspots (vitok/hotspots.ts) call the SAME public methods
+// the key handlers use — clicking the starter and pressing I are literally
+// one code path, so the procedure observer cannot tell them apart (doc 69).
 
-import {
-  applyPreDriveStepToCabin,
-  drivelineEffectOf,
-  type PreDriveStepId,
-} from "@/modules/sim/procedures";
 import { DrivelineState, type VehicleStartState } from "@/modules/sim/vehicle";
 
 export type IndicatorSetting = "off" | "left" | "right";
@@ -181,46 +180,45 @@ export class CabinControls {
     return m;
   }
 
-  /**
-   * QW5 (doc 68 Phase 0): a completed pre-drive checklist step must set the
-   * REAL state it claims — cabin electrics (belt / low beams / left
-   * indicator) AND, since A1, driveline state (engine started / forward gear
-   * / parking brake released), so the rule engine, physics gating, HUD
-   * telltales and the sim agree with what the student was just told they did.
-   * Idempotent — safe to re-apply the whole completed list; steps without an
-   * underlying state are no-ops (see procedures/cabinEffects.ts for the map).
-   */
-  applyPreDriveStep(stepId: PreDriveStepId): void {
-    switch (drivelineEffectOf(stepId)) {
-      case "engine-on":
-        this.driveline.forceEngineOn();
-        break;
-      case "select-forward":
-        this.driveline.forceSelectForward();
-        break;
-      case "parking-brake-off":
-        this.driveline.forceParkingBrake(false);
-        break;
-      case null:
-        break;
-    }
-    const next = applyPreDriveStepToCabin(stepId, {
-      seatbeltOn: this.seatbeltOn,
-      headlights: this.headlights,
-      indicator: this.indicator,
-    });
-    if (next.seatbeltOn !== this.seatbeltOn) {
-      this.seatbeltOn = next.seatbeltOn;
-      this.callbacks.onSeatbeltToggle?.(next.seatbeltOn); // audio click
-    }
-    if (next.headlights !== this.headlights) {
-      this.headlights = next.headlights;
-    }
-    if (next.indicator !== this.indicator) {
-      this.indicator = next.indicator;
-      this.indicatorChangedAt = this.clock; // first blink starts "on"
-      this.autocancelArmed = false;
-    }
+  // -- public control actions (A2) ---------------------------------------------
+  // ONE code path per control: the keyboard handlers below and the cockpit
+  // hotspots both call these, so audio callbacks, blink phase and the A2
+  // procedure observer see identical transitions regardless of input device.
+  // (The old QW5 applyPreDriveStep checklist-forcing path is GONE — steps now
+  // complete FROM these transitions, never the other way around.)
+
+  /** Seatbelt buckle (key B / hotspot_belt). */
+  toggleSeatbelt(): void {
+    this.seatbeltOn = !this.seatbeltOn;
+    this.callbacks.onSeatbeltToggle?.(this.seatbeltOn); // audio click
+  }
+
+  /** Headlight rotary: off → low → high → off (key L / hotspot_headlights). */
+  cycleHeadlights(): void {
+    this.headlights =
+      this.headlights === "off" ? "low" : this.headlights === "low" ? "high" : "off";
+  }
+
+  /** Stalk single-click cycle for the hotspot: off → left → right → off.
+   *  (Keys , and . keep their direct toggle-side semantics.) */
+  cycleIndicator(): void {
+    this.indicator =
+      this.indicator === "off" ? "left" : this.indicator === "left" ? "right" : "off";
+    this.indicatorChangedAt = this.clock; // first blink always starts "on"
+    this.autocancelArmed = false;
+  }
+
+  /** Parking brake toggle (key Space / hotspot_parking_brake) — routes the
+   *  audio callback exactly like the key path. */
+  toggleParkingBrake(): void {
+    this.driveline.toggleParkingBrake();
+    this.callbacks.onParkingBrakeToggle?.(this.driveline.parkingBrakeOn);
+  }
+
+  /** Mirror glance (keys Q/E/F / hotspot_mirror_*) — the GRADED path: latches
+   *  the one-frame sample for the rule engine and animates the head turn. */
+  glance(mirror: MirrorGlanceKind): void {
+    this.startGlance(mirror);
   }
 
   private setIndicator(side: Exclude<IndicatorSetting, "off">): void {
@@ -250,12 +248,10 @@ export class CabinControls {
         this.setIndicator("right");
         break;
       case CABIN_KEYS.headlights:
-        this.headlights =
-          this.headlights === "off" ? "low" : this.headlights === "low" ? "high" : "off";
+        this.cycleHeadlights();
         break;
       case CABIN_KEYS.seatbelt:
-        this.seatbeltOn = !this.seatbeltOn;
-        this.callbacks.onSeatbeltToggle?.(this.seatbeltOn);
+        this.toggleSeatbelt();
         break;
       case CABIN_KEYS.glanceLeft:
         this.startGlance("left");
@@ -278,8 +274,7 @@ export class CabinControls {
         this.driveline.toggleEngine();
         break;
       case DRIVELINE_KEYS.parkingBrake:
-        this.driveline.toggleParkingBrake();
-        this.callbacks.onParkingBrakeToggle?.(this.driveline.parkingBrakeOn);
+        this.toggleParkingBrake();
         break;
       case DRIVELINE_KEYS.gearUp:
         this.driveline.gearUp();

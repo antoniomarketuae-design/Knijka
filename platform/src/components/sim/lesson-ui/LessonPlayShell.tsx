@@ -48,7 +48,13 @@ import {
   type QuizTriggerState,
   type TriggeredQuiz,
 } from "@/modules/sim/lessons";
-import { hasPreDriveCabinEffect, type PreDriveStepId } from "@/modules/sim/procedures";
+import {
+  PRE_DRIVE_STEP_ORDER,
+  PRE_DRIVE_STEPS,
+  preDriveStepKind,
+  type PreDriveMode,
+  type PreDriveStepId,
+} from "@/modules/sim/procedures";
 import type { SimTick } from "@/modules/sim/rules";
 import type { DrivelineSnapshot } from "@/modules/sim/vehicle";
 import { finishLessonAction } from "@/app/(dashboard)/simulator/actions";
@@ -70,6 +76,11 @@ const HUD_POLL_MS = 150;
 /** QW10: min seconds between two "завърши подготовката" toasts. */
 const BLOCKED_DRIVE_TOAST_COOLDOWN_S = 10;
 
+/** A2 practice mode: seconds of pre-drive idling before a gentle hint. */
+const PRACTICE_HINT_IDLE_S = 20;
+/** How often the practice-idle watchdog checks (ms). */
+const PRACTICE_HINT_POLL_MS = 2000;
+
 interface HudSnapshot {
   phase: LessonSessionState["phase"];
   /** QW10: pre-drive phase — the scene keeps the vehicle stationary. */
@@ -89,6 +100,8 @@ interface HudSnapshot {
   objectiveProgress: number | null;
   preDriveCompleted: PreDriveStepId[];
   preDriveWrongOrder: PreDriveStepId[];
+  /** Canonical next pending step while in the pre-drive phase, else null. */
+  preDriveNextStepId: PreDriveStepId | null;
   vehicle: { x: number; y: number; headingDeg: number } | null;
 }
 
@@ -101,6 +114,7 @@ function snapshotOf(
     s.currentObjectiveIndex < s.objectives.length
       ? s.objectives[s.currentObjectiveIndex]
       : null;
+  const preDrive = s.preDrive;
   return {
     phase: s.phase,
     driveLocked: isDriveLocked(s),
@@ -118,8 +132,12 @@ function snapshotOf(
       active && (active.params.kind === "driveDistance" || active.params.kind === "completeManeuver")
         ? active.progress
         : null,
-    preDriveCompleted: s.preDrive ? [...s.preDrive.completedStepIds] : [],
-    preDriveWrongOrder: s.preDrive ? [...s.preDrive.wrongOrderStepIds] : [],
+    preDriveCompleted: preDrive ? [...preDrive.completedStepIds] : [],
+    preDriveWrongOrder: preDrive ? [...preDrive.wrongOrderStepIds] : [],
+    preDriveNextStepId:
+      s.phase === "preDrive" && preDrive
+        ? PRE_DRIVE_STEP_ORDER.find((id) => !preDrive.completedStepIds.includes(id)) ?? null
+        : null,
     vehicle: lastTick
       ? {
           x: lastTick.position.x,
@@ -294,11 +312,11 @@ export function LessonPlayShell({
     return () => window.removeEventListener("keydown", onKey);
   }, [toggleFullscreen]);
 
-  // QW5: checklist completions that carry a real cabin effect (belt/lights/
-  // indicator), in completion order. Append-only per session run — the scene
-  // applies them idempotently to CabinControls so the rule engine + telltales
-  // agree with what the student was just told they did.
-  const [preDriveCabinSteps, setPreDriveCabinSteps] = useState<PreDriveStepId[]>([]);
+  // A2: pre-drive mode (Instruction→Practice→Assess). The machine applies the
+  // matching order-scoring; the shell derives the presentation from it.
+  const preDriveMode: PreDriveMode = lesson.preDriveMode ?? "instruction";
+  // Session time of the last completed step — the practice-idle hint reads it.
+  const lastPreDriveStepAtRef = useRef(0);
 
   // -- micro-quiz: the theory↔driving closed loop ------------------------------
   // The pure trigger lives in a ref (frame-rate, zero re-renders); an active
@@ -416,23 +434,17 @@ export function LessonPlayShell({
     [push, finalize, activeQuiz],
   );
 
+  // A2: the ONLY sink for pre-drive completions. Performed steps arrive from
+  // the scene's transition observer (keyboard or cockpit hotspot — same
+  // path); info steps arrive from the read-only checklist's confirm button.
   const handlePreDriveStep = useCallback(
     (stepId: PreDriveStepId, tSec?: number) => {
+      const t = tSec ?? nowSec();
       const prev = sessionRef.current;
-      const { state, hudEvents } = applyPreDriveStep(prev, stepId, tSec ?? nowSec());
+      const { state, hudEvents } = applyPreDriveStep(prev, stepId, t);
       sessionRef.current = state;
+      lastPreDriveStepAtRef.current = Math.max(lastPreDriveStepAtRef.current, t);
 
-      // QW5: a step that newly completed AND has a real cabin state behind it
-      // (belt / low beams / left indicator) is forwarded to the scene, which
-      // sets that state on CabinControls — the checklist must never claim
-      // something the car doesn't reflect.
-      const newlyCompleted =
-        state.preDrive !== null &&
-        state.preDrive.completedStepIds.includes(stepId) &&
-        !(prev.preDrive?.completedStepIds.includes(stepId) ?? false);
-      if (newlyCompleted && hasPreDriveCabinEffect(stepId)) {
-        setPreDriveCabinSteps((steps) => [...steps, stepId]);
-      }
       if (hudEvents.length > 0) {
         push(
           hudEvents.filter(
@@ -450,9 +462,10 @@ export function LessonPlayShell({
   );
 
   // -- QW10: blocked-drive explanation ------------------------------------------
-  // First throttle attempt during the pre-drive phase → one teaching toast
-  // explaining WHY the car stays put; a cooldown keeps repeat presses silent
-  // instead of spamming the queue.
+  // Throttle attempt during the pre-drive phase while the car is NOT yet
+  // genuinely ready (engine off / P / parking brake on) → one teaching toast
+  // explaining WHY it stays put; a cooldown keeps repeat presses silent. Once
+  // the driveline IS ready, the same press performs "move-off" instead.
   const blockedToastAtSecRef = useRef(Number.NEGATIVE_INFINITY);
   const handleBlockedDriveAttempt = useCallback(() => {
     const t = nowSec();
@@ -461,12 +474,35 @@ export function LessonPlayShell({
     push([
       {
         kind: "lesson",
-        titleBg: "Завърши подготовката преди потегляне",
+        titleBg: "Колата още не е готова за потегляне",
         explanationBg:
-          "Колата остава на място, докато проверките не са готови — колан, огледала, двигател. Мини през стъпките в списъка вляво и завърши с „Потегляне“.",
+          "Работи с истинските контроли: запали двигателя (I), включи предавка с ], освободи ръчната спирачка (Space). Списъкът вляво се отмята сам, докато го правиш — потегляш с газта, когато колата наистина може да тръгне.",
       },
     ]);
   }, [nowSec, push]);
+
+  // -- A2 practice mode: gentle hint after ~20 s of pre-drive idling ------------
+  useEffect(() => {
+    if (preDriveMode !== "practice") return;
+    const id = window.setInterval(() => {
+      const s = sessionRef.current;
+      const preDrive = s.preDrive;
+      if (s.phase !== "preDrive" || preDrive === null || finalizedRef.current) return;
+      const now = nowSec();
+      if (now - lastPreDriveStepAtRef.current < PRACTICE_HINT_IDLE_S) return;
+      lastPreDriveStepAtRef.current = now; // re-arm — next hint in another 20 s
+      const nextId = PRE_DRIVE_STEP_ORDER.find((id) => !preDrive.completedStepIds.includes(id));
+      if (!nextId) return;
+      push([
+        {
+          kind: "lesson",
+          titleBg: `Подсказка: ${PRE_DRIVE_STEPS[nextId].titleBg.toLowerCase()}`,
+          explanationBg: PRE_DRIVE_STEPS[nextId].instructionBg,
+        },
+      ]);
+    }, PRACTICE_HINT_POLL_MS);
+    return () => window.clearInterval(id);
+  }, [preDriveMode, nowSec, push]);
 
   // -- HUD poll ------------------------------------------------------------------
   useEffect(() => {
@@ -491,11 +527,11 @@ export function LessonPlayShell({
     setSaveResult(null);
     setFlash(null);
     clear();
-    // Fresh pre-drive: the checklist restarts, so the cabin-effect feed and
-    // the blocked-drive toast cooldown restart with it. (The cabin itself
-    // keeps whatever state the previous run set — the student re-confirms it
-    // step by step, idempotently.)
-    setPreDriveCabinSteps([]);
+    // Fresh pre-drive: the scene's observer re-baselines on the driveLocked
+    // rising edge (a car left running/belted by the previous run never
+    // auto-completes steps — the student re-performs the transitions); the
+    // idle-hint clock and the blocked-drive toast cooldown restart here.
+    lastPreDriveStepAtRef.current = 0;
     blockedToastAtSecRef.current = Number.NEGATIVE_INFINITY;
     // Fresh micro-quiz session: reset the tally + rebuild the trigger from the
     // already-loaded bank.
@@ -583,7 +619,10 @@ export function LessonPlayShell({
             quality={quality}
             paused={ended || activeQuiz !== null}
             driveLocked={snap.driveLocked && !ended}
-            preDriveCabinSteps={preDriveCabinSteps}
+            preDriveHighlightStepId={
+              // Instruction mode only: pulse the pending step's hotspot(s).
+              preDriveMode === "instruction" && !ended ? snap.preDriveNextStepId : null
+            }
             onTick={handleTick}
             onPreDriveStep={handlePreDriveStep}
             onBlockedDriveAttempt={handleBlockedDriveAttempt}
@@ -639,13 +678,18 @@ export function LessonPlayShell({
           </div>
         ) : null}
 
-        {/* Pre-drive checklist — left panel during the preparation phase */}
+        {/* Pre-drive progress — READ-ONLY panel (A2): rows tick as the student
+            performs the steps on real controls; only info steps confirm here. */}
         {snap.phase === "preDrive" && !ended ? (
           <div className="absolute left-3 top-3 max-h-[calc(100%-1.5rem)] overflow-y-auto">
             <PreDriveChecklist
               completedStepIds={snap.preDriveCompleted}
               wrongOrderStepIds={snap.preDriveWrongOrder}
-              onStep={handlePreDriveStep}
+              mode={preDriveMode}
+              onConfirmStep={(stepId) => {
+                // Defense in depth: performable steps NEVER complete by click.
+                if (preDriveStepKind(stepId) === "info") handlePreDriveStep(stepId);
+              }}
             />
           </div>
         ) : null}

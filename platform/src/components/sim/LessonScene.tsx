@@ -40,13 +40,20 @@ import {
   DIFFICULTY_ORDER,
   DIFFICULTY_PRESETS,
   type DifficultyMode,
+  type DrivelineEvent,
   type DrivelineSnapshot,
   type VehicleInput,
   type VehicleSim,
 } from "@/modules/sim/vehicle";
 import type { VehicleSample } from "@/modules/sim/contracts";
 import type { LessonSpec } from "@/modules/sim/lessons";
-import type { PreDriveStepId } from "@/modules/sim/procedures";
+import {
+  createPreDriveSignalTracker,
+  observeControlSignal,
+  readyToMoveOff,
+  type PreDriveSignalTracker,
+  type PreDriveStepId,
+} from "@/modules/sim/procedures";
 import type { SimTick } from "@/modules/sim/rules";
 import type { MinimapFrame } from "@/modules/sim/hud";
 import {
@@ -62,7 +69,8 @@ import {
 } from "@/modules/sim/world";
 import { createWorldRuntime } from "@/modules/sim/runtime";
 import { createTrafficSystem, TrafficLayer, type TrafficDistrict } from "@/modules/sim/traffic";
-import { CabinControls } from "./cabin";
+import { CabinControls, type MirrorGlanceKind } from "./cabin";
+import { CockpitInteractionContext } from "./vitok/hotspots";
 import { SimAudio } from "./simAudio";
 import { CameraRig, type CameraMode } from "./CameraRig";
 import { VehicleRig, type VehicleSpawn } from "./VehicleRig";
@@ -94,10 +102,17 @@ const MINIMAP_PX_PER_M = 0.5;
  */
 class GatedSimInput extends SimInput {
   driveLocked = false;
+  /** Raw (pre-gate) pedal values from the last read — the A2 procedure
+   *  observer edge-detects these: a real brake press performs "press-brake",
+   *  a throttle press on a ready driveline performs "move-off". */
+  rawThrottle = 0;
+  rawBrake = 0;
   private blockedThrottleAttempt = false;
 
   override read(): VehicleInput {
     const out = super.read();
+    this.rawThrottle = out.throttle;
+    this.rawBrake = out.brake;
     if (this.driveLocked) {
       if (out.throttle > 0) this.blockedThrottleAttempt = true;
       out.throttle = 0;
@@ -164,9 +179,10 @@ export interface LessonSceneProps {
   paused: boolean;
   /** QW10: pre-drive phase — zero the drive inputs, the car must not move. */
   driveLocked: boolean;
-  /** QW5: completed checklist steps with a real cabin effect (append-only). */
-  preDriveCabinSteps: readonly PreDriveStepId[];
+  /** A2 instruction mode: pending step whose cockpit hotspot(s) pulse. */
+  preDriveHighlightStepId: PreDriveStepId | null;
   onTick: (tick: SimTick) => void;
+  /** A2: a step was PERFORMED on a real control (observer-resolved). */
   onPreDriveStep: (stepId: PreDriveStepId, tSec: number) => void;
   /** QW10: throttle pressed while driveLocked (shell rate-limits the toast). */
   onBlockedDriveAttempt: () => void;
@@ -291,8 +307,9 @@ function ReadyScene({
   setMenuPaused,
   physicsPaused,
   driveLocked,
-  preDriveCabinSteps,
+  preDriveHighlightStepId,
   onBlockedDriveAttempt,
+  onPreDriveStep,
   onMinimap,
   onTickCb,
   onDriveline,
@@ -333,6 +350,13 @@ function ReadyScene({
   // once) can seed a freshly created input with the current gate state.
   const driveLockedRef = useRef(driveLocked);
 
+  // A2 performed pre-drive: raw transition queues, drained by RuntimeDriver's
+  // frame loop and resolved to procedure steps (performedSteps.ts). Driveline
+  // events arrive via subscribe (below); glances via the cabin callback (both
+  // Q/E/F keys AND mirror-hotspot clicks land there — one graded path).
+  const drivelineEventsRef = useRef<DrivelineEvent[]>([]);
+  const glanceQueueRef = useRef<MirrorGlanceKind[]>([]);
+
   // Input + cabin + audio lifecycle.
   useEffect(() => {
     const input = new GatedSimInput({
@@ -353,6 +377,9 @@ function ReadyScene({
         onSeatbeltToggle: () => audio.click(),
         onToggleMute: () => audio.toggleMute(),
         onParkingBrakeToggle: () => audio.click(),
+        // A2: every glance (keys Q/E/F or a mirror hotspot click) feeds the
+        // procedure observer — the same event the rule engine already grades.
+        onGlance: (mirror) => glanceQueueRef.current.push(mirror),
       },
       // A1 spawn policy: cold start (engine off, P, parking brake on) unless
       // the lesson opts into ready-to-drive (L0). Read once at mount — the
@@ -360,12 +387,18 @@ function ReadyScene({
       lesson.vehicleStart ?? "cold",
     );
     cabinRef.current = cabin;
+    // A2: observe every driveline transition (ignition/selector/parking
+    // brake/…) — RuntimeDriver drains the queue and resolves steps from it.
+    const unsubscribeDriveline = cabin.driveline.subscribe((event) => {
+      drivelineEventsRef.current.push(event);
+    });
     const unlock = () => audio.unlock();
     window.addEventListener("pointerdown", unlock);
     window.addEventListener("keydown", unlock);
     return () => {
       window.removeEventListener("pointerdown", unlock);
       window.removeEventListener("keydown", unlock);
+      unsubscribeDriveline();
       input.dispose();
       inputRef.current = null;
       cabin.dispose();
@@ -384,15 +417,14 @@ function ReadyScene({
     if (inputRef.current) inputRef.current.driveLocked = driveLocked;
   }, [driveLocked]);
 
-  // QW5: completed checklist steps set the REAL cabin state they claim (belt,
-  // low beams, left indicator) so the rule engine + telltales agree with what
-  // the student was just told they did. Idempotent re-application of the full
-  // append-only list also covers steps clicked before the cabin mounted.
-  useEffect(() => {
-    const cabin = cabinRef.current;
-    if (!cabin) return;
-    for (const stepId of preDriveCabinSteps) cabin.applyPreDriveStep(stepId);
-  }, [preDriveCabinSteps]);
+  // A2: cockpit hotspot interaction — pointer-active only in the cockpit
+  // camera view; instruction mode pulses the pending step's hotspot(s).
+  // (The old QW5 "checklist click forces cabin state" effect is gone: state
+  // transitions now COMPLETE steps, never the reverse.)
+  const cockpitInteraction = useMemo(
+    () => ({ enabled: cockpit, highlightStepId: preDriveHighlightStepId }),
+    [cockpit, preDriveHighlightStepId],
+  );
 
   const getSignalPhase = useCallback(
     (id: string) => runtime.signalPhase(id),
@@ -456,19 +488,24 @@ function ReadyScene({
               getSignalPhase={getSignalPhase}
               signSvgBaseUrl={null}
             />
-            <VehicleRig
-              simRef={simRef}
-              chassisGroupRef={chassisGroupRef}
-              inputRef={inputRef}
-              cabinRef={cabinRef}
-              audioRef={audioRef}
-              sampleRef={sampleRef}
-              paused={physicsPaused}
-              spawn={spawn}
-              difficultyRef={difficultyRef}
-              onCollision={handleCollision}
-              night={isNight}
-            />
+            {/* A2: the provider gives VitokCockpit's hotspot layer its
+                enable/highlight state without threading props through
+                VehicleRig (context crosses the R3F tree). */}
+            <CockpitInteractionContext.Provider value={cockpitInteraction}>
+              <VehicleRig
+                simRef={simRef}
+                chassisGroupRef={chassisGroupRef}
+                inputRef={inputRef}
+                cabinRef={cabinRef}
+                audioRef={audioRef}
+                sampleRef={sampleRef}
+                paused={physicsPaused}
+                spawn={spawn}
+                difficultyRef={difficultyRef}
+                onCollision={handleCollision}
+                night={isNight}
+              />
+            </CockpitInteractionContext.Provider>
             <RuntimeDriver
               runtime={runtime}
               traffic={traffic}
@@ -476,6 +513,10 @@ function ReadyScene({
               inputRef={inputRef}
               cabinRef={cabinRef}
               audioRef={audioRef}
+              driveLocked={driveLocked}
+              drivelineEventsRef={drivelineEventsRef}
+              glanceQueueRef={glanceQueueRef}
+              onPreDriveStep={onPreDriveStep}
               onBlockedDriveAttempt={onBlockedDriveAttempt}
               onTick={onTickCb}
               onMinimap={onMinimap}
@@ -562,7 +603,30 @@ function ReadyScene({
   );
 }
 
-/** In-canvas per-frame driver: signals → traffic → sample → onTick + minimap. */
+// A2 pedal-edge thresholds on the RAW (pre-gate) ramped keyboard/gamepad
+// pedals: crossing PRESS upward performs the step; re-arms below RELEASE.
+const BRAKE_PRESS_THRESHOLD = 0.4;
+const BRAKE_REARM_THRESHOLD = 0.1;
+
+/** Poll baseline for the cabin-electrics edge detection (A2 observer). */
+interface CabinPollState {
+  seatbeltOn: boolean;
+  headlights: "off" | "low" | "high";
+  indicator: "off" | "left" | "right";
+  brakeArmed: boolean;
+}
+
+function cabinPollBaseline(cabin: CabinControls | null, rawBrake: number): CabinPollState {
+  return {
+    seatbeltOn: cabin?.seatbeltOn ?? false,
+    headlights: cabin?.headlights ?? "off",
+    indicator: cabin?.indicator ?? "off",
+    brakeArmed: rawBrake > BRAKE_PRESS_THRESHOLD,
+  };
+}
+
+/** In-canvas per-frame driver: signals → traffic → sample → onTick + minimap
+ *  + the A2 pre-drive transition observer. */
 function RuntimeDriver({
   runtime,
   traffic,
@@ -570,6 +634,10 @@ function RuntimeDriver({
   inputRef,
   cabinRef,
   audioRef,
+  driveLocked,
+  drivelineEventsRef,
+  glanceQueueRef,
+  onPreDriveStep,
   onBlockedDriveAttempt,
   onTick,
   onMinimap,
@@ -585,6 +653,11 @@ function RuntimeDriver({
   inputRef: React.RefObject<GatedSimInput | null>;
   cabinRef: React.RefObject<CabinControls | null>;
   audioRef: React.RefObject<SimAudio | null>;
+  /** True while the procedure runs — the observer only listens then. */
+  driveLocked: boolean;
+  drivelineEventsRef: React.RefObject<DrivelineEvent[]>;
+  glanceQueueRef: React.RefObject<MirrorGlanceKind[]>;
+  onPreDriveStep: (stepId: PreDriveStepId, tSec: number) => void;
   onBlockedDriveAttempt: () => void;
   onTick: (t: SimTick) => void;
   onMinimap: (f: MinimapFrame) => void;
@@ -597,12 +670,86 @@ function RuntimeDriver({
   const tRef = useRef(0);
   const lastMinimapRef = useRef(0);
 
+  // A2 observer state: the signal tracker + polled-edge baseline reset on
+  // every RISING edge of driveLocked (lesson start AND retry), re-baselined
+  // to the cabin's CURRENT state so a car left belted/running by a previous
+  // run never auto-completes steps — the student re-performs transitions.
+  const trackerRef = useRef<PreDriveSignalTracker>(createPreDriveSignalTracker());
+  const pollRef = useRef<CabinPollState>(cabinPollBaseline(null, 0));
+  const prevLockedRef = useRef(false);
+
   useFrame((_, delta) => {
     // QW10: consume the throttle-while-locked latch every frame (so attempts
     // during a pause never queue up), surface it only on live frames.
     const blockedAttempt = inputRef.current?.consumeBlockedDriveAttempt() ?? false;
     if (paused) return;
-    if (blockedAttempt) onBlockedDriveAttempt();
+
+    // ---- A2: performed pre-drive — real transitions drive the machine ----
+    const cabin = cabinRef.current;
+    const input = inputRef.current;
+    const drivelineEvents = drivelineEventsRef.current;
+    const glances = glanceQueueRef.current;
+    if (driveLocked && !prevLockedRef.current) {
+      trackerRef.current = createPreDriveSignalTracker();
+      pollRef.current = cabinPollBaseline(cabin, input?.rawBrake ?? 0);
+      drivelineEvents.length = 0;
+      glances.length = 0;
+    }
+    prevLockedRef.current = driveLocked;
+
+    if (driveLocked && cabin) {
+      const tracker = trackerRef.current;
+      const emit = (stepId: PreDriveStepId | null) => {
+        if (stepId) onPreDriveStep(stepId, tRef.current);
+      };
+      // 1. Driveline transitions (ignition / selector / parking brake).
+      for (const event of drivelineEvents) {
+        emit(observeControlSignal(tracker, { kind: "driveline", event }));
+      }
+      // 2. Mirror glances (keys Q/E/F and mirror hotspots — one graded path).
+      for (const mirror of glances) {
+        emit(observeControlSignal(tracker, { kind: "glance", mirror }));
+      }
+      // 3. Cabin electrics — polled edges (belt / lights / indicator).
+      const poll = pollRef.current;
+      if (cabin.seatbeltOn !== poll.seatbeltOn) {
+        poll.seatbeltOn = cabin.seatbeltOn;
+        emit(observeControlSignal(tracker, { kind: "seatbelt", on: cabin.seatbeltOn }));
+      }
+      if (cabin.headlights !== poll.headlights) {
+        poll.headlights = cabin.headlights;
+        emit(observeControlSignal(tracker, { kind: "headlights", setting: cabin.headlights }));
+      }
+      if (cabin.indicator !== poll.indicator) {
+        poll.indicator = cabin.indicator;
+        emit(observeControlSignal(tracker, { kind: "indicator", setting: cabin.indicator }));
+      }
+      // 4. Brake pedal — raw (pre-gate) press edge performs "press-brake".
+      const rawBrake = input?.rawBrake ?? 0;
+      if (!poll.brakeArmed && rawBrake > BRAKE_PRESS_THRESHOLD) {
+        poll.brakeArmed = true;
+        emit(observeControlSignal(tracker, { kind: "brakePressed" }));
+      } else if (poll.brakeArmed && rawBrake < BRAKE_REARM_THRESHOLD) {
+        poll.brakeArmed = false;
+      }
+      // 5. Throttle — on a genuinely ready driveline it IS "move-off"
+      //    (completes the procedure → shell unlocks the QW10 gate → the same
+      //    held pedal rolls the car); earlier it stays the teaching moment.
+      if (blockedAttempt) {
+        if (readyToMoveOff(cabin.driveline.physicsInput)) {
+          emit(observeControlSignal(tracker, { kind: "moveOffAttempt" }));
+        } else {
+          onBlockedDriveAttempt();
+        }
+      }
+    } else if (blockedAttempt) {
+      onBlockedDriveAttempt();
+    }
+    // Drain both queues even outside the pre-drive phase (driveline events
+    // keep flowing while driving — wipers, gears, stalls — and must not pile).
+    drivelineEvents.length = 0;
+    glances.length = 0;
+
     const dt = Math.min(delta, 0.1);
     tRef.current += dt;
     const sample = sampleRef.current;
@@ -664,6 +811,7 @@ function ControlsHelp() {
     ["T", "чистачки"],
     ["H", "клаксон — задръж"],
     ["Q E F", "огледала: ляво / дясно / назад"],
+    ["Клик", "контролите в кабината (изглед кокпит)"],
     ["C", "смяна на изглед"],
     ["X", "цял екран"],
     ["R  ·  Esc", "рестарт · пауза"],

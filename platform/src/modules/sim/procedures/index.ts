@@ -9,15 +9,26 @@
 
 export { createPreDriveState, PRE_DRIVE_STEP_ORDER, PRE_DRIVE_STEPS } from "./steps";
 
+// A2 performed pre-drive: real transitions → steps (+ the doc-69 hotspot
+// naming contract, which is load-bearing between the cockpit and this module).
 export {
-  applyPreDriveStepToCabin,
-  drivelineEffectOf,
-  hasPreDriveCabinEffect,
-  PRE_DRIVE_CABIN_EFFECT_STEPS,
-  PRE_DRIVE_DRIVELINE_EFFECT_STEPS,
-  type PreDriveCabinState,
-  type PreDriveDrivelineEffect,
-} from "./cabinEffects";
+  COCKPIT_HOTSPOT_NAMES,
+  createPreDriveSignalTracker,
+  hotspotsForStep,
+  isCockpitHotspotName,
+  observeControlSignal,
+  PRE_DRIVE_INFO_STEPS,
+  PRE_DRIVE_STEP_CONTROLS,
+  preDriveStepKind,
+  readyToMoveOff,
+  resolveHotspotName,
+  type CockpitHotspotName,
+  type NamedNode,
+  type PreDriveControlSignal,
+  type PreDriveSignalTracker,
+  type PreDriveStepControl,
+  type PreDriveStepKind,
+} from "./performedSteps";
 
 export {
   applyPreDriveAction,
@@ -28,10 +39,12 @@ export {
 
 export type {
   PreDriveEvent,
+  PreDriveMode,
   PreDriveResult,
   PreDriveState,
   PreDriveStepId,
   PreDriveStepSpec,
   ProcedureCompletedEvent,
   StepCompletedEvent,
+  StepOutOfOrderEvent,
 } from "./types";

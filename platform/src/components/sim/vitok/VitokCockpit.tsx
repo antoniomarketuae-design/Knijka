@@ -1,10 +1,26 @@
 "use client";
 
-import { useMemo, useRef, type RefObject } from "react";
-import { useFrame } from "@react-three/fiber";
-import { SRGBColorSpace, type CanvasTexture, type Group, type Object3D } from "three";
+import {
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type RefObject,
+} from "react";
+import { useFrame, type ThreeEvent } from "@react-three/fiber";
+import { Html } from "@react-three/drei";
+import {
+  SRGBColorSpace,
+  type CanvasTexture,
+  type Group,
+  type MeshBasicMaterial,
+  type Object3D,
+} from "three";
 import { COCKPIT_EYE, type VehicleSim } from "@/modules/sim/vehicle";
 import type { SimInput } from "@/modules/sim/engine";
+import { hotspotsForStep, type CockpitHotspotName } from "@/modules/sim/procedures";
 import type { CabinControls } from "../cabin";
 import {
   CLUSTER_H,
@@ -14,6 +30,12 @@ import {
   needleAngleRad,
   type ClusterData,
 } from "./cluster";
+import {
+  COCKPIT_HOTSPOTS,
+  CockpitInteractionContext,
+  CONTROL_BODY_SPECS,
+  type HotspotAction,
+} from "./hotspots";
 import { mergedBoxes, steeringWheelGeometry, type BoxSpec } from "./parts";
 
 // ---------------------------------------------------------------------------
@@ -235,6 +257,210 @@ export function VitokCockpit({
           <meshStandardMaterial color="#5b6b85" roughness={0.15} metalness={0.85} />
         </mesh>
       </group>
+
+      {/* A2: named raycast hotspots + visible control bodies (doc 69). */}
+      <CockpitHotspots cabinRef={cabinRef} />
+    </group>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// A2 cockpit hotspots — the doc-69 interactive layer
+// ---------------------------------------------------------------------------
+
+/** Hover glow / instruction-pulse opacities for the proxy boxes. */
+const HOTSPOT_HOVER_OPACITY = 0.38;
+const HOTSPOT_PULSE_BASE = 0.14;
+const HOTSPOT_PULSE_AMPLITUDE = 0.13;
+const HOTSPOT_PULSE_HZ = 0.7;
+const HOTSPOT_COLOR = "#6db4ff";
+
+/**
+ * Named raycast-target meshes per the doc-69 contract: invisible proxy boxes
+ * (transparent, opacity 0 — R3F only raycasts objects with handlers, so the
+ * rest of the cockpit stays inert) plus one merged mesh of small visible
+ * control bodies (stalks / starter / hazard / buckle / mirror housings).
+ *
+ * Interaction contract (doc 68 A2):
+ *  - hover  → subtle emissive-style glow + Bulgarian tooltip naming the
+ *    control (with its equivalent key — the keys are real, so the hint is
+ *    honest), pointer cursor;
+ *  - click  → the SAME CabinControls/DrivelineState transition as the key
+ *    (gear selector: right-click steps back toward P; horn is momentary on
+ *    pointer down/up; mirrors fire the graded cabin glance);
+ *  - instruction mode → the pending step's hotspot(s) pulse gently
+ *    (highlightStepId via CockpitInteractionContext, provided by LessonScene).
+ *
+ * Enabled only in the cockpit camera view (context.enabled) — a chase-view
+ * click on the car must never operate a control the student cannot see.
+ */
+function CockpitHotspots({ cabinRef }: { cabinRef: RefObject<CabinControls | null> }) {
+  const { enabled, highlightStepId } = useContext(CockpitInteractionContext);
+  const [hovered, setHovered] = useState<CockpitHotspotName | null>(null);
+  // Ref twin of `hovered` for the frame loop (written only in handlers/effects
+  // — render stays pure per the project lint rules).
+  const hoveredRef = useRef<CockpitHotspotName | null>(null);
+  const materialsRef = useRef(new Map<CockpitHotspotName, MeshBasicMaterial>());
+
+  const setHover = useCallback((name: CockpitHotspotName | null) => {
+    hoveredRef.current = name;
+    setHovered(name);
+    document.body.style.cursor = name ? "pointer" : "auto";
+  }, []);
+
+  // Camera left cockpit view (or unmount) mid-hover: clear glow + cursor.
+  useEffect(() => {
+    if (!enabled && hoveredRef.current !== null) setHover(null);
+    return () => {
+      if (hoveredRef.current !== null) {
+        hoveredRef.current = null;
+        document.body.style.cursor = "auto";
+      }
+    };
+  }, [enabled, setHover]);
+
+  const controlBodies = useMemo(() => mergedBoxes(CONTROL_BODY_SPECS), []);
+
+  const highlightNames = useMemo(
+    () => new Set<CockpitHotspotName>(highlightStepId ? hotspotsForStep(highlightStepId) : []),
+    [highlightStepId],
+  );
+
+  // Per-frame glow: hovered = steady, highlighted = slow pulse, else hidden.
+  // Mutates materials only (no React state at frame rate).
+  useFrame((state) => {
+    const pulse =
+      HOTSPOT_PULSE_BASE +
+      HOTSPOT_PULSE_AMPLITUDE *
+        (0.5 + 0.5 * Math.sin(state.clock.elapsedTime * HOTSPOT_PULSE_HZ * 2 * Math.PI));
+    for (const [name, material] of materialsRef.current) {
+      material.opacity =
+        hoveredRef.current === name ? HOTSPOT_HOVER_OPACITY : highlightNames.has(name) ? pulse : 0;
+    }
+  });
+
+  const runAction = useCallback(
+    (action: HotspotAction) => {
+      const cabin = cabinRef.current;
+      if (!cabin) return;
+      switch (action.type) {
+        case "engineToggle":
+          cabin.driveline.toggleEngine();
+          break;
+        case "seatbeltToggle":
+          cabin.toggleSeatbelt();
+          break;
+        case "gearStep":
+          cabin.driveline.gearUp(); // click = one gate step toward D (doc 69)
+          break;
+        case "parkingBrakeToggle":
+          cabin.toggleParkingBrake();
+          break;
+        case "indicatorCycle":
+          cabin.cycleIndicator();
+          break;
+        case "wipersToggle":
+          cabin.driveline.toggleWipers();
+          break;
+        case "headlightsCycle":
+          cabin.cycleHeadlights();
+          break;
+        case "hazardsToggle":
+          cabin.driveline.toggleHazards();
+          break;
+        case "fogToggle":
+          cabin.driveline.toggleFogLights();
+          break;
+        case "glance":
+          cabin.glance(action.mirror); // the graded mirror path (Q/E/F twin)
+          break;
+        case "hornHold":
+          break; // momentary — handled on pointer down/up below
+      }
+    },
+    [cabinRef],
+  );
+
+  const hoveredSpec = hovered ? COCKPIT_HOTSPOTS.find((h) => h.name === hovered) ?? null : null;
+
+  return (
+    <group>
+      {/* Visible control bodies — one merged mesh, one draw call. */}
+      <mesh geometry={controlBodies}>
+        <meshStandardMaterial color="#2b333e" roughness={0.85} />
+      </mesh>
+
+      {enabled
+        ? COCKPIT_HOTSPOTS.map((spec) => (
+            <mesh
+              key={spec.name}
+              name={spec.name}
+              position={spec.pos as [number, number, number]}
+              onPointerOver={(e: ThreeEvent<PointerEvent>) => {
+                e.stopPropagation();
+                setHover(spec.name);
+              }}
+              onPointerOut={() => {
+                if (hoveredRef.current === spec.name) setHover(null);
+                if (spec.action.type === "hornHold") cabinRef.current?.driveline.setHorn(false);
+              }}
+              onPointerDown={(e: ThreeEvent<PointerEvent>) => {
+                if (spec.action.type !== "hornHold" || e.button !== 0) return;
+                e.stopPropagation();
+                cabinRef.current?.driveline.setHorn(true);
+              }}
+              onPointerUp={() => {
+                if (spec.action.type === "hornHold") cabinRef.current?.driveline.setHorn(false);
+              }}
+              onClick={(e: ThreeEvent<MouseEvent>) => {
+                e.stopPropagation();
+                runAction(spec.action);
+              }}
+              onContextMenu={(e: ThreeEvent<MouseEvent>) => {
+                e.stopPropagation();
+                e.nativeEvent.preventDefault();
+                // Right-click steps the selector gate back toward P (doc 69).
+                if (spec.action.type === "gearStep") cabinRef.current?.driveline.gearDown();
+              }}
+            >
+              <boxGeometry args={spec.size as [number, number, number]} />
+              <meshBasicMaterial
+                ref={(m: MeshBasicMaterial | null) => {
+                  if (m) materialsRef.current.set(spec.name, m);
+                  else materialsRef.current.delete(spec.name);
+                }}
+                color={HOTSPOT_COLOR}
+                transparent
+                opacity={0}
+                depthWrite={false}
+                toneMapped={false}
+              />
+            </mesh>
+          ))
+        : null}
+
+      {/* Tooltip: Bulgarian control name + its real key, above the control. */}
+      {enabled && hoveredSpec ? (
+        <Html
+          position={[
+            hoveredSpec.pos[0],
+            hoveredSpec.pos[1] + hoveredSpec.size[1] / 2 + 0.03,
+            hoveredSpec.pos[2],
+          ]}
+          center
+          style={{ pointerEvents: "none", whiteSpace: "nowrap" }}
+          zIndexRange={[30, 10]}
+        >
+          <div className="flex items-center gap-1.5 rounded-lg border border-border bg-background/90 px-2 py-1 backdrop-blur">
+            <span className="text-[11px] font-semibold text-foreground">
+              {hoveredSpec.labelBg}
+            </span>
+            <kbd className="rounded bg-surface px-1 py-0.5 font-mono text-[10px] font-bold text-accent">
+              {hoveredSpec.keyHint}
+            </kbd>
+          </div>
+        </Html>
+      ) : null}
     </group>
   );
 }
