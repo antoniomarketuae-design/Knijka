@@ -49,8 +49,10 @@ export interface QualityPreset {
    */
   bloom: boolean;
   /**
-   * Subtle finishing grade (vignette + a touch of saturation). High only.
-   * Requires `postprocessing`.
+   * Finishing grade (saturation + contrast + vignette) countering tone-map
+   * flattening. Med + high — pmndrs merges consecutive effects into the one
+   * fullscreen pass SMAA/ToneMapping already occupy, so it is ~free even on
+   * Iris Xe (doc 71 §4.3). Requires `postprocessing`.
    */
   colorGrade: boolean;
   /** Recommended Canvas dpr cap — the integrator wires `dpr={[1, maxDpr]}`. */
@@ -80,31 +82,34 @@ export const QUALITY_PRESETS: Record<QualityLevel, QualityPreset> = {
   // The Iris Xe 60 fps target. One 1024² shadow map, GPU rain, and a lean
   // composer: half-res N8AO (the big "flatness" fix) + tight mipmap bloom
   // (the single cheapest "looks expensive" lever — lights/sun/speculars glow)
-  // + SMAA + ACES tone map. No color grade — that's the part that reads
-  // "blobby" on a weak GPU. Half-res AO is ≈1 ms; mipmap bloom ≈0.5 ms;
-  // SMAA ≈0.3 ms.
+  // + grade + SMAA + tone map (grade/SMAA/tone-map merge into one pass, so
+  // med students get the anti-"washed-out" grade too — doc 71 Phase 1).
+  // Half-res AO is ≈1 ms; mipmap bloom ≈0.5 ms; the merged final pass ≈0.3 ms.
+  // shadowRadiusM 55: the 22° golden sun throws ~2.5× longer shadows than the
+  // old noon rig (texel 10.7 cm — still fine with texel snapping).
   med: {
     level: "med",
     shadows: true,
     shadowMapSize: 1024,
-    shadowRadiusM: 45,
+    shadowRadiusM: 55,
     rainParticles: 800,
     postprocessing: true,
     aoEnabled: true,
     aoHalfRes: true,
     aoQuality: "performance",
     bloom: true,
-    colorGrade: false,
+    colorGrade: true,
     maxDpr: 1.25,
   },
-  // Discrete-GPU tier: 2048² shadows, denser rain, and the full composer —
-  // half-res N8AO (more samples than med) + subtle bloom + a light vignette/
-  // saturation grade + SMAA + ACES tone map. Still half-res AO to stay safe.
+  // Discrete-GPU tier: 2048² shadows (75 m radius for the long golden-hour
+  // throws), denser rain, and the full composer — half-res N8AO (more samples
+  // than med) + subtle bloom + grade + SMAA + tone map. Still half-res AO to
+  // stay safe.
   high: {
     level: "high",
     shadows: true,
     shadowMapSize: 2048,
-    shadowRadiusM: 60,
+    shadowRadiusM: 75,
     rainParticles: 1400,
     postprocessing: true,
     aoEnabled: true,

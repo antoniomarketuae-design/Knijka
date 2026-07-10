@@ -153,6 +153,10 @@ export function StaticWorld({
     [wetness],
   );
   const roadTint = useMemo(() => new Color(wet.darken, wet.darken, wet.darken), [wet.darken]);
+  // Asphalt env response (doc 71 §4.4): 1.5 so the wet-gloss state (roughness
+  // 0.35) smears the golden HDRI like damp asphalt — dry roughness ~1.0 keeps
+  // it matte, so this only shows where the surface goes smooth.
+  const ROAD_ENV_INTENSITY = 1.5;
   // Parking bands read a touch lighter/cooler than the travel lanes so the
   // extra width reads as parking, not as another lane (doc 68 QW3).
   const parkingTint = useMemo(
@@ -201,6 +205,7 @@ export function StaticWorld({
             color={roadTint}
             roughness={wet.roughness}
             metalness={0}
+            envMapIntensity={ROAD_ENV_INTENSITY}
           />
         ) : (
           <meshStandardMaterial
@@ -208,6 +213,7 @@ export function StaticWorld({
             color={roadTint}
             roughness={wet.roughness}
             metalness={0}
+            envMapIntensity={ROAD_ENV_INTENSITY}
           />
         )}
       </mesh>
@@ -221,6 +227,7 @@ export function StaticWorld({
             color={roadTint}
             roughness={wet.roughness}
             metalness={0}
+            envMapIntensity={ROAD_ENV_INTENSITY}
           />
         ) : (
           <meshStandardMaterial
@@ -228,6 +235,7 @@ export function StaticWorld({
             color={roadTint}
             roughness={wet.roughness}
             metalness={0}
+            envMapIntensity={ROAD_ENV_INTENSITY}
           />
         )}
       </mesh>
@@ -241,6 +249,7 @@ export function StaticWorld({
             color={parkingTint}
             roughness={wet.roughness}
             metalness={0}
+            envMapIntensity={ROAD_ENV_INTENSITY}
           />
         ) : (
           <meshStandardMaterial
@@ -248,6 +257,7 @@ export function StaticWorld({
             color={parkingTint}
             roughness={wet.roughness}
             metalness={0}
+            envMapIntensity={ROAD_ENV_INTENSITY}
           />
         )}
       </mesh>

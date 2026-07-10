@@ -79,10 +79,24 @@ describe("ENVIRONMENT_PRESETS", () => {
     expect(dusk.elevationDeg).toBeLessThan(15);
     const dir = sunDirection(dusk);
     expect(dir.x).toBeLessThan(0); // west
-    // Day sun sits much higher.
-    expect(ENVIRONMENT_PRESETS.day.light.sun.elevationDeg).toBeGreaterThan(
-      dusk.elevationDeg + 30,
-    );
+    // Day is "late golden" (doc 71 §4.1: 22° — low for shape, but held above
+    // 18° so shadows stay inside the camera-following frustum until CSM);
+    // dusk still sits below it.
+    const day = ENVIRONMENT_PRESETS.day.light.sun;
+    expect(day.elevationDeg).toBeGreaterThan(dusk.elevationDeg);
+    expect(day.elevationDeg).toBeGreaterThanOrEqual(18);
+    expect(day.elevationDeg).toBeLessThanOrEqual(25);
+    expect(sunDirection(day).x).toBeLessThan(0); // west-southwest key
+  });
+
+  it("gives every preset its own tone-mapping exposure, day punchiest", () => {
+    const e = (t: TimeOfDay) => ENVIRONMENT_PRESETS[t].exposure;
+    expect(e("day")).toBeGreaterThan(e("dusk"));
+    expect(e("dusk")).toBeGreaterThan(e("night"));
+    for (const t of TIMES) {
+      expect(e(t)).toBeGreaterThan(0.5);
+      expect(e(t)).toBeLessThan(1.5);
+    }
   });
 
   it("keeps every key light above the horizon (shadow caster stays valid)", () => {

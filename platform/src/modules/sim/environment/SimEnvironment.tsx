@@ -16,22 +16,27 @@
 //    snapped to shadow-texel increments so edges don't shimmer as you drive.
 //  - Quality changes remount the light (key) — a deliberate, rare hitch.
 //
-// Tone mapping: R3F already defaults the renderer to ACES filmic (do NOT
-// pass `flat` on the Canvas); this component re-asserts it defensively while
-// the composer is not in charge. At med + high the EffectComposer takes over
-// the final image and ACES is re-applied as the LAST effect in its chain.
-// Exposure (SIM_EXPOSURE) is a single global knob that works on both paths:
-// three feeds gl.toneMappingExposure into the composer's ACES shader too.
+// Tone mapping: AgX by default (SIM_TONE_MAPPING) — doc 71 §4.3: hue
+// preservation under the warm low sun (no orange→yellow skew) and it matches
+// Blender 4/5's default view transform, so authored materials read the same
+// in-browser. ACES stays one constant away as the A/B fallback. BOTH paths
+// stay in sync: the renderer applies it directly while the composer is not
+// in charge, and the composer re-applies the same operator as the LAST
+// effect in its chain. Exposure is per-preset (presets.ts `exposure`) —
+// three feeds gl.toneMappingExposure into the composer's tone-map shader too.
 //
 // Composer structure by quality level:
-//   low  — none (renderer ACES + canvas MSAA)
-//   med  — N8AO (half-res) → Bloom → SMAA → ACES ToneMapping
-//   high — N8AO (half-res) → Bloom → HueSaturation + Vignette → SMAA → ACES
+//   low  — none (renderer AgX + canvas MSAA)
+//   med  — N8AO (half-res) → Bloom → HueSaturation + BrightnessContrast +
+//          Vignette → SMAA → AgX ToneMapping (grade effects merge into ONE
+//          fullscreen pass with SMAA/ToneMapping — ~free, doc 71 §4.3)
+//   high — same chain, more AO samples
 
 import { useEffect, useMemo, useRef, type JSX } from "react";
 import { useFrame, useThree } from "@react-three/fiber";
 import {
   Bloom,
+  BrightnessContrast,
   EffectComposer,
   HueSaturation,
   N8AO,
@@ -42,6 +47,7 @@ import {
 import { ToneMappingMode } from "postprocessing";
 import {
   ACESFilmicToneMapping,
+  AgXToneMapping,
   Color,
   MathUtils,
   Vector3,
@@ -71,25 +77,40 @@ export interface SimEnvironmentProps {
 }
 
 /**
- * Renderer tone-mapping exposure. Applies on BOTH the composer and non-
- * composer paths (see file header). Kept a hair above 1.0 for a slightly
- * punchier daytime image; deliberately mild because it is a single global
- * value shared with the intentionally-dark night rig — pushing it toward the
- * 1.15 ceiling brightens night too. Tune with human eyes in the 1.0–1.15 band.
+ * The tone-mapping operator, ONE switch for both paths (renderer fallback +
+ * composer ToneMapping effect — the file header documents that contract).
+ * "agx" is the doc 71 §4.3 ruling (A/B winner over ACES: hue preservation +
+ * Blender-parity); flip to "aces" to compare — nothing else needs touching.
  */
-const SIM_EXPOSURE = 1.05;
+const SIM_TONE_MAPPING = "agx" as "agx" | "aces";
+const TONE_MAPPING_THREE =
+  SIM_TONE_MAPPING === "aces" ? ACESFilmicToneMapping : AgXToneMapping;
+const TONE_MAPPING_MODE =
+  SIM_TONE_MAPPING === "aces" ? ToneMappingMode.ACES_FILMIC : ToneMappingMode.AGX;
+
+/**
+ * Color grade riding in the composer's final effect pass (med + high) —
+ * counters the tone mapper's flattening (AgX lifts mid-contrast, ACES
+ * desaturates). Doc 71 §4.3 bands: saturation 0.12–0.2, contrast 0.07–0.1.
+ */
+const GRADE_SATURATION = 0.15;
+const GRADE_CONTRAST = 0.08;
 
 /**
  * N8AO tuning (med + high). World-space radius, so contact darkening stays a
- * fixed physical size regardless of distance. Small radius = grounding under
- * the car / at curb & wall bases rather than dimming open tarmac. These three
- * are the AO "look" knobs most worth a human-eyes pass.
+ * fixed physical size regardless of distance. Library guidance: intensity 2 =
+ * subtle, 5 = heavy — the old 1.5/1.5 sat below the visibility floor on a
+ * bright scene (part of "everything floats"). Radius 2.5 m reaches curb
+ * bases, window recesses and street-canyon corners; half-res cost is
+ * unchanged (samples don't scale with radius). If curb bases read "dirty",
+ * drop intensity toward 1.9 before touching radius (doc 71 §4.3; retune DOWN
+ * once baked AO lands in Phase 4 to avoid double-darkening).
  */
-const AO_RADIUS_M = 1.5;
+const AO_RADIUS_M = 2.5;
 /** How quickly AO fades with world distance between occluder and receiver. */
 const AO_DISTANCE_FALLOFF = 1.0;
-/** AO strength (higher = darker crevices). Conservative so it never reads dirty. */
-const AO_INTENSITY = 1.5;
+/** AO strength (higher = darker crevices). */
+const AO_INTENSITY = 2.2;
 
 /** Damping stiffness for time-of-day crossfades (≈2 s to settle). */
 const FADE_LAMBDA = 2.2;
@@ -167,7 +188,7 @@ export function SimEnvironment({ timeOfDay, rain, quality }: SimEnvironmentProps
     up: new Vector3(0, 1, 0),
   });
 
-  const fogArgs = useMemo<[string, number]>(() => ["#b7cfe6", 0.002], []);
+  const fogArgs = useMemo<[string, number]>(() => ["#e3c49c", 0.0028], []);
 
   useFrame((state, delta) => {
     stepWeather(delta);
@@ -179,19 +200,12 @@ export function SimEnvironment({ timeOfDay, rain, quality }: SimEnvironmentProps
     const sunTarget = targetRef.current;
     if (!hemi || !sun || !fog || !sunTarget) return;
 
-    // Exposure applies on BOTH paths: the renderer's built-in ACES (no
-    // composer) and the composer's ToneMapping effect (three copies
-    // gl.toneMappingExposure into that effect's ACES shader uniform each
-    // frame). Cheap idempotent write.
-    if (state.gl.toneMappingExposure !== SIM_EXPOSURE) {
-      state.gl.toneMappingExposure = SIM_EXPOSURE;
-    }
-
     // While the composer is not in charge of the final image, keep the
-    // renderer on ACES (the composer sets NoToneMapping while mounted and
-    // re-applies ACES as its last effect — never fight it there).
-    if (!qp.postprocessing && state.gl.toneMapping !== ACESFilmicToneMapping) {
-      state.gl.toneMapping = ACESFilmicToneMapping;
+    // renderer on the chosen tone mapper (the composer sets NoToneMapping
+    // while mounted and re-applies the same operator as its last effect —
+    // never fight it there).
+    if (!qp.postprocessing && state.gl.toneMapping !== TONE_MAPPING_THREE) {
+      state.gl.toneMapping = TONE_MAPPING_THREE;
     }
 
     // First frame snaps to the preset (damp with dt→∞ lands exactly);
@@ -199,6 +213,17 @@ export function SimEnvironment({ timeOfDay, rain, quality }: SimEnvironmentProps
     const dt = initialized.current ? Math.min(delta, 0.1) : 1000;
     initialized.current = true;
     const scratch = scratchRef.current;
+
+    // Per-preset exposure, damped like the rest of the rig so time-of-day
+    // switches crossfade. Applies on BOTH paths: the renderer's built-in tone
+    // map (no composer) and the composer's ToneMapping effect (three copies
+    // gl.toneMappingExposure into that effect's shader uniform each frame).
+    state.gl.toneMappingExposure = MathUtils.damp(
+      state.gl.toneMappingExposure,
+      preset.exposure,
+      FADE_LAMBDA,
+      dt,
+    );
 
     // Hemisphere fill.
     dampColor(hemi.color, goal.hemiSky, FADE_LAMBDA, dt);
@@ -285,32 +310,39 @@ export function SimEnvironment({ timeOfDay, rain, quality }: SimEnvironmentProps
       );
     }
     if (qp.bloom) {
-      // Tight HDR bloom on the sun disc / bright speculars / emissive lights
+      // Tight HDR bloom on the sun disc / bright speculars / lit windows
       // (med + high). mipmapBlur with a small radius keeps the glow contained
-      // (not "blobby") and cheap on a weak GPU; the high luminance threshold
-      // means only genuinely bright (HDR > 1) pixels bloom. Its convolution
-      // makes it its own pass, before tone mapping.
+      // (not "blobby") and cheap on a weak GPU. Threshold 0.9 (doc 71 §4.3):
+      // with the low golden sun + exposure 1.15, paint speculars and DAY_GLOW
+      // 2.0 window emissives sit just above it while lit facades stay clean.
+      // Its convolution makes it its own pass, before tone mapping.
       chain.push(
         <Bloom
           key="bloom"
           mipmapBlur
-          radius={0.5}
-          intensity={0.6}
-          luminanceThreshold={1.0}
+          radius={0.6}
+          intensity={0.75}
+          luminanceThreshold={0.9}
           luminanceSmoothing={0.2}
         />,
       );
     }
     if (qp.colorGrade) {
-      // Light finishing grade (high only): a touch of saturation + soft
-      // vignette. Merged with SMAA + ToneMapping into one effect pass.
-      chain.push(<HueSaturation key="grade" hue={0} saturation={0.06} />);
+      // Finishing grade (med + high — doc 71 §4.3: pmndrs merges consecutive
+      // effects into ONE fullscreen pass with SMAA + ToneMapping, ~free):
+      // saturation + contrast counter the tone mapper's flattening, plus a
+      // soft vignette.
+      chain.push(<HueSaturation key="grade" hue={0} saturation={GRADE_SATURATION} />);
+      chain.push(
+        <BrightnessContrast key="contrast" brightness={0} contrast={GRADE_CONTRAST} />,
+      );
       chain.push(<Vignette key="vignette" eskil={false} offset={0.28} darkness={0.45} />);
     }
-    // SMAA (the AA that replaces canvas MSAA) then ACES tone map close every
-    // chain; ToneMapping stays LAST so it maps the fully-composited image.
+    // SMAA (the AA that replaces canvas MSAA) then the tone map close every
+    // chain; ToneMapping stays LAST so it maps the fully-composited image
+    // with the SAME operator as the non-composer renderer path.
     chain.push(<SMAA key="smaa" />);
-    chain.push(<ToneMapping key="tonemap" mode={ToneMappingMode.ACES_FILMIC} />);
+    chain.push(<ToneMapping key="tonemap" mode={TONE_MAPPING_MODE} />);
     return chain;
   }, [qp.aoEnabled, qp.aoHalfRes, qp.aoQuality, qp.bloom, qp.colorGrade]);
 

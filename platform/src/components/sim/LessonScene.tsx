@@ -25,7 +25,7 @@ import Link from "next/link";
 import { Canvas, useFrame } from "@react-three/fiber";
 import { Environment } from "@react-three/drei";
 import { Physics } from "@react-three/rapier";
-import type { Group } from "three";
+import { Euler, type Group } from "three";
 import {
   createTelemetry,
   hasTouchScreen,
@@ -105,6 +105,17 @@ interface SpawnPointLike {
 
 const MINIMAP_MS = 200;
 const MINIMAP_PX_PER_M = 0.5;
+
+/**
+ * Day IBL: Poly Haven `shanghai_riverside` (CC0) — a true-unclipped-sun (25 EV)
+ * golden-hour riverside, so paint/glass/wet-asphalt speculars come free from
+ * the env map (doc 71 §4.2). Its baked sun sits at equirect u=0.600, elevation
+ * ≈20° (measured from the 1k pixels), which lands at in-scene compass azimuth
+ * 126°; the preset sun is at azimuth 245°, so rotate the environment by
+ * 245° − 126° = +119° around Y — otherwise glass towers show a double sun.
+ */
+const DAY_ENV_ROTATION = new Euler(0, (119 * Math.PI) / 180, 0);
+const NIGHT_ENV_ROTATION = new Euler(0, 0, 0);
 
 /** P1: localStorage key marking the one-time touch orientation hint as seen. */
 const TOUCH_HINT_STORAGE_KEY = "sim.touchHintSeen";
@@ -574,17 +585,22 @@ function ReadyScene({
       >
         <SimEnvironment timeOfDay={timeOfDay} rain={rain} quality={level} />
         {/* HDRI image-based lighting — real sky reflections/ambient for PBR
-            materials, glass, mirrors and (later) car paint. background=false
-            keeps SimEnvironment's animated sky dome. Day uses a clear day sky;
-            night uses a dim dusk/urban PMREM so metal/glass/mirrors sample a
-            faint skyline instead of black (a graded mirror feature needs
-            *something* to reflect at night). Intensities stay modest so the
-            IBL complements the sun/hemisphere rig rather than flattening it. */}
+            materials, glass, mirrors and car paint. background=false keeps
+            SimEnvironment's animated sky dome. Day uses the golden-hour
+            shanghai_riverside (rotated so its baked sun matches the preset
+            sun azimuth — see DAY_ENV_ROTATION); night uses a dim dusk/urban
+            PMREM so metal/glass/mirrors sample a faint skyline instead of
+            black (a graded mirror feature needs *something* to reflect at
+            night). Intensities stay modest so the IBL complements the
+            sun/hemisphere rig rather than flattening it. */}
         <Suspense fallback={null}>
           <Environment
-            files={isNight ? "/sim/env/sky_urban_1k.hdr" : "/sim/env/sky_clear_1k.hdr"}
+            files={
+              isNight ? "/sim/env/sky_urban_1k.hdr" : "/sim/env/shanghai_riverside_1k.hdr"
+            }
             background={false}
-            environmentIntensity={isNight ? 0.12 : 0.4}
+            environmentIntensity={isNight ? 0.12 : 0.5}
+            environmentRotation={isNight ? NIGHT_ENV_ROTATION : DAY_ENV_ROTATION}
           />
         </Suspense>
         <Suspense fallback={null}>

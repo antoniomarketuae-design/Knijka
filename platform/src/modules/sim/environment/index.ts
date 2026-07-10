@@ -22,6 +22,8 @@ export {
   RAIN_SUN_DIM,
   RAIN_HEMISPHERE_DIM,
 } from "./presets";
+export { BENCHMARK_CAMERAS } from "./benchmarkCameras";
+export type { BenchmarkCameraPose } from "./benchmarkCameras";
 export type {
   TimeOfDay,
   SunAngles,

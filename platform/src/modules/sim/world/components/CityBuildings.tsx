@@ -39,9 +39,10 @@ preloadCityModels();
 const CHUNK_M = 200;
 
 /** Emissive intensity of the lit-window material (`glass_lit` in the v3 kit)
- *  by time of day. Day matches the kit's authored KHR emissive strength. */
+ *  by time of day. Day 2.0 (doc 71 §4.3): golden-hour interiors must cross
+ *  the composer's 0.9 bloom threshold — 1.35 was authored for noon. */
 const LIT_WINDOW_MATERIAL = "glass_lit";
-const DAY_GLOW = 1.35;
+const DAY_GLOW = 2.0;
 const NIGHT_GLOW = 3.2;
 
 const _pos = new THREE.Vector3();
@@ -49,6 +50,20 @@ const _quat = new THREE.Quaternion();
 const _scale = new THREE.Vector3();
 const _mat = new THREE.Matrix4();
 const _Y = new THREE.Vector3(0, 1, 0);
+const _tint = new THREE.Color();
+
+/** Per-instance facade tint via `instanceColor` (doc 71 Phase 1 / QW-D):
+ *  ±9 % brightness + a subtle warm/cool split so repeated instances of a
+ *  model stop being pixel-identical. Zero extra draw calls; multiplies
+ *  diffuse only (emissive untouched in r185). Keyed on a deterministic hash
+ *  of the instance index — the SAME placements array feeds every material
+ *  group of a model, so all groups of one building tint identically. */
+function tintFor(i: number): THREE.Color {
+  const h = ((i + 1) * 2654435761) >>> 0;
+  const lum = 0.9 + 0.18 * ((h & 0xff) / 255);
+  const warm = 0.985 + 0.03 * (((h >> 8) & 0xff) / 255);
+  return _tint.setRGB(lum * warm, lum, lum * (2.0 - warm));
+}
 
 function makeInstanced(
   geometry: THREE.BufferGeometry,
@@ -57,6 +72,7 @@ function makeInstanced(
   castShadow: boolean,
   receiveShadow: boolean,
   name: string,
+  tint: boolean,
 ): THREE.InstancedMesh {
   const mesh = new THREE.InstancedMesh(geometry, material, placements.length);
   for (let i = 0; i < placements.length; i++) {
@@ -66,8 +82,10 @@ function makeInstanced(
     _scale.set(p.scale[0], p.scale[1], p.scale[2]);
     _mat.compose(_pos, _quat, _scale);
     mesh.setMatrixAt(i, _mat);
+    if (tint) mesh.setColorAt(i, tintFor(i));
   }
   mesh.instanceMatrix.needsUpdate = true;
+  if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
   mesh.castShadow = castShadow;
   mesh.receiveShadow = receiveShadow;
   mesh.matrixAutoUpdate = false;
@@ -131,6 +149,10 @@ export function CityBuildings({
             castShadow,
             preset.receiveShadows,
             `city-buildings-${key}-${grp.name}`,
+            // Tint the matte shells only; glass groups (glass_dark/
+            // glass_bronze/glass_lit) keep physically-consistent reflections
+            // and untinted emissive windows.
+            !grp.name.startsWith("glass"),
           ),
         );
       }

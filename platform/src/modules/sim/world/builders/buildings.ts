@@ -12,6 +12,9 @@
  *   so the facade texture (4x4 window bays) tiles at true scale.
  * - Ground floor: darker band via vertex colors (extra vertex row at
  *   GROUND_BAND_M) — free, no extra material.
+ * - Per-building tint (doc 71 Phase 1 / QW-D): ±9 % brightness + a subtle
+ *   warm/cool split, deterministic per building id, multiplied into the same
+ *   vertex colors — the 238 prisms stop being identical white at zero cost.
  * - Roofs merged into one mesh (flat, ear-clip triangulated).
  * - Collider: wall quads only, merged into a single trimesh.
  */
@@ -44,6 +47,20 @@ export function facadeVariant(buildingId: string, height: number): number {
   return h % FACADE_VARIANTS;
 }
 
+/**
+ * Deterministic per-building facade tint (multiplied into the wall vertex
+ * colors): luminance 0.90–1.08 with a ±1.5 % warm/cool channel split. Subtle
+ * on purpose — it must read as different paint/weathering batches, not as
+ * candy. Uses a different hash lane than facadeVariant so tint and texture
+ * variant don't correlate.
+ */
+export function facadeTint(buildingId: string): [number, number, number] {
+  const h = hashString(`tint:${buildingId}`);
+  const lum = 0.9 + 0.18 * ((h & 0xff) / 255);
+  const warm = 0.985 + 0.03 * (((h >> 8) & 0xff) / 255);
+  return [lum * warm, lum, lum * (2.0 - warm)];
+}
+
 function buildOne(
   wallAcc: MeshAccumulator | null,
   roofAcc: MeshAccumulator | null,
@@ -53,8 +70,13 @@ function buildOne(
   const ring = toCCW(b.footprint as Vec2[]);
   const h = resolveBuildingHeightM(b);
   const bandTop = Math.min(GROUND_BAND_M, h - 0.5);
-  const dark: [number, number, number] = [GROUND_BAND_TINT, GROUND_BAND_TINT, GROUND_BAND_TINT];
-  const light: [number, number, number] = [1, 1, 1];
+  const [tr, tg, tb] = facadeTint(b.id);
+  const dark: [number, number, number] = [
+    GROUND_BAND_TINT * tr,
+    GROUND_BAND_TINT * tg,
+    GROUND_BAND_TINT * tb,
+  ];
+  const light: [number, number, number] = [tr, tg, tb];
 
   let minX = Infinity;
   let minY = Infinity;

@@ -59,8 +59,11 @@ function prepMaterial(src: THREE.MeshStandardMaterial): THREE.MeshStandardMateri
   const m = src.clone();
   // Reflective glass (glass_dark rough 0.06, glass_bronze 0.07) is very
   // smooth; push its environment reflection so towers mirror the sky/scene.
-  // Everything else (concrete/precast/stone/bronze trim) gets a milder bump.
-  m.envMapIntensity = m.roughness <= 0.12 ? 1.8 : 1.2;
+  // Rebalanced for the golden-hour HDRI (doc 71 §4.4): glass up 1.8 → 2.2
+  // (the unclipped sun smears across curtain walls), matte down 1.2 → 1.0
+  // (the warm env over-lights concrete otherwise — shells should be lit by
+  // the sun/hemisphere rig, not mirror-lit).
+  m.envMapIntensity = m.roughness <= 0.12 ? 2.2 : 1.0;
   m.needsUpdate = true;
   return m;
 }
