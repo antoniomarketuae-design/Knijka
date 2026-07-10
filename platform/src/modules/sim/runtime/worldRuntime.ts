@@ -37,20 +37,25 @@ const STOP_LINE_REFIRE_SEC = 5;
 /** Heading opposes the one-way's flow by more than this → wrong way. */
 const WRONG_WAY_ANGLE_DEG = 120;
 
-/** Radius around a junction to look for conflicting priority traffic, meters. */
-const PRIORITY_CONFLICT_RADIUS_M = 16;
-/** Look-ahead for oncoming traffic when turning left, meters. */
-const LEFT_TURN_ONCOMING_RADIUS_M = 26;
-/** Distance to the junction node within which the right-hand-rule check arms, meters. */
-const RHR_CORE_RADIUS_M = 9;
+/** Radius around a junction to look for conflicting priority traffic, meters.
+ * Junction catchments grew with the perceptual road scale (mouths now sit
+ * 17–43 m out) — exported for tests. */
+export const PRIORITY_CONFLICT_RADIUS_M = 26;
+/** Look-ahead for oncoming traffic when turning left, meters (scaled). */
+export const LEFT_TURN_ONCOMING_RADIUS_M = 36;
+/** Distance to the junction node within which the right-hand-rule check arms,
+ * meters (2× — the junction box itself is 2.5× wider). */
+export const RHR_CORE_RADIUS_M = 18;
 /** Above this speed the driver counts as entering (not creeping/yielding), km/h. */
 const RHR_MOVING_KMH = 3;
 /** At/below this speed while a conflict is present, the driver is yielding, km/h. */
 const RHR_YIELD_KMH = 8;
-/** How far beyond a roundabout's ring the entry-yield decision zone reaches, meters. */
-const ROUNDABOUT_ENTRY_MARGIN_M = 9;
-/** Extra reach beyond the ring for the circulating-traffic band, meters. */
-const ROUNDABOUT_BAND_EXTRA_M = 6;
+/** How far beyond a roundabout's ring the entry-yield decision zone reaches,
+ * meters (entry mouths widened with the perceptual road scale). */
+const ROUNDABOUT_ENTRY_MARGIN_M = 12;
+/** Extra reach beyond the ring for the circulating-traffic band, meters —
+ * circulating NPCs now ride lane centers ~4 m off the ring centerline. */
+const ROUNDABOUT_BAND_EXTRA_M = 9;
 /**
  * Minimum inward component of the driver's heading (unit) to count as ENTERING
  * rather than circulating tangentially — guards against flagging a driver who

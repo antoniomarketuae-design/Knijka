@@ -1,14 +1,17 @@
 import { describe, expect, it } from "vitest";
 import { createWorldRuntime } from "..";
+import { LANE_WIDTH_M } from "../spatial";
 import { drive, edgeById, edgeDrivePath, loadDistrict } from "./helpers";
 
 /**
  * Crossing-zone sequencing on a real crossing: n676643323 (marked, not
  * signalized) sits at s ≈ 120.8 of e170139947.0 (ул. Проф. Борис Боровски,
  * two-way, 131.3 m) — a clean straight approach with the zone fully on-edge.
+ * Drives run in the right-lane center (LANE_WIDTH_M / 2 off the centerline).
  */
 const CROSSING = "n676643323";
 const HOST_EDGE = "e170139947.0";
+const LANE_C = LANE_WIDTH_M / 2;
 
 type ZoneEvent = { kind: string; crossingId?: string; pedestrianOnCrossing?: boolean };
 
@@ -30,15 +33,15 @@ function zoneEventsFor(ticks: ReturnType<typeof drive>["ticks"], crossingId: str
 describe("pedestrian crossing zones", () => {
   const district = loadDistrict();
 
-  it("emits crossingZoneEntered (~25 m out) then crossingPassed, exactly once each", () => {
+  it("emits crossingZoneEntered (~35 m out) then crossingPassed, exactly once each", () => {
     const rt = createWorldRuntime(district);
     const edge = edgeById(district, HOST_EDGE);
-    const { ticks } = drive(rt, edgeDrivePath(edge, 80, 131, 1, 1.625));
+    const { ticks } = drive(rt, edgeDrivePath(edge, 80, 131, 1, LANE_C));
     const seq = zoneEventsFor(ticks, CROSSING);
     expect(seq.map((e) => e.kind)).toEqual(["crossingZoneEntered", "crossingPassed"]);
     // No pedestrians exist yet (no traffic module): flag must be false.
     expect(seq.every((e) => e.pedestrianOnCrossing === false)).toBe(true);
-    // Zone arms roughly 25 m before the crossing (s≈120.8 ⇒ enter s≈96):
+    // Zone arms roughly 35 m before the crossing (s≈120.8 ⇒ enter s≈86):
     // with 1 m steps the entered event must come well before the pass.
     const enterIdx = ticks.findIndex((t) => t.events.some((e) => e.kind === "crossingZoneEntered"));
     const passIdx = ticks.findIndex((t) => t.events.some((e) => e.kind === "crossingPassed"));
@@ -51,7 +54,7 @@ describe("pedestrian crossing zones", () => {
     // touch it — and driving nowhere near a zone emits no zone events at all.
     const rt = createWorldRuntime(district);
     const edge = edgeById(district, HOST_EDGE);
-    const { ticks } = drive(rt, edgeDrivePath(edge, 80, 131, 1, 1.625));
+    const { ticks } = drive(rt, edgeDrivePath(edge, 80, 131, 1, LANE_C));
     expect(zoneEventsFor(ticks, "n263750759")).toHaveLength(0);
   });
 
@@ -59,7 +62,7 @@ describe("pedestrian crossing zones", () => {
     const rt = createWorldRuntime(district);
     rt.setPedestrianQuery((id) => id === CROSSING);
     const edge = edgeById(district, HOST_EDGE);
-    const { ticks } = drive(rt, edgeDrivePath(edge, 80, 131, 1, 1.625));
+    const { ticks } = drive(rt, edgeDrivePath(edge, 80, 131, 1, LANE_C));
     const seq = zoneEventsFor(ticks, CROSSING);
     expect(seq.map((e) => e.kind)).toEqual(["crossingZoneEntered", "crossingPassed"]);
     expect(seq.every((e) => e.pedestrianOnCrossing === true)).toBe(true);
@@ -71,9 +74,9 @@ describe("pedestrian crossing zones", () => {
     rt.setPedestrianQuery(() => pedestrian);
     const edge = edgeById(district, HOST_EDGE);
 
-    const r1 = drive(rt, edgeDrivePath(edge, 80, 105, 1, 1.625)); // inside zone, before crossing
+    const r1 = drive(rt, edgeDrivePath(edge, 80, 105, 1, LANE_C)); // inside zone, before crossing
     pedestrian = true; // steps onto the crossing while we approach
-    const r2 = drive(rt, edgeDrivePath(edge, 106, 131, 1, 1.625), { t0Sec: r1.tEnd });
+    const r2 = drive(rt, edgeDrivePath(edge, 106, 131, 1, LANE_C), { t0Sec: r1.tEnd });
 
     const seq = [...zoneEventsFor(r1.ticks, CROSSING), ...zoneEventsFor(r2.ticks, CROSSING)];
     expect(seq.map((e) => [e.kind, e.pedestrianOnCrossing])).toEqual([
@@ -83,15 +86,15 @@ describe("pedestrian crossing zones", () => {
     ]);
   });
 
-  it("re-arms after leaving the zone (exit hysteresis at ~28 m)", () => {
+  it("re-arms after leaving the zone (exit hysteresis at ~38 m)", () => {
     const rt = createWorldRuntime(district);
     const edge = edgeById(district, HOST_EDGE);
-    const forth = edgeDrivePath(edge, 80, 131, 1, 1.625);
-    const back = edgeDrivePath(edge, 131, 80, 1, 1.625); // exits the zone at s≈93
-    const again = edgeDrivePath(edge, 80, 131, 1, 1.625);
+    const forth = edgeDrivePath(edge, 80, 131, 1, LANE_C);
+    const back = edgeDrivePath(edge, 131, 80, 1, LANE_C); // exits the zone at s≈83
+    const again = edgeDrivePath(edge, 80, 131, 1, LANE_C);
     const r1 = drive(rt, forth);
     // Reversing back over the crossing while STILL inside the zone is latched
-    // (one pass per zone visit); the exit at >28 m re-arms everything.
+    // (one pass per zone visit); the exit at >38 m re-arms everything.
     const r2 = drive(rt, back, { t0Sec: r1.tEnd });
     const r3 = drive(rt, again, { t0Sec: r2.tEnd });
     expect(zoneEventsFor(r1.ticks, CROSSING).map((e) => e.kind)).toEqual([

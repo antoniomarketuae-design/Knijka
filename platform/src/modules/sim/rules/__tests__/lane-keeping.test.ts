@@ -1,8 +1,11 @@
 import { describe, expect, it } from "vitest";
+import { DEFAULT_RULE_CONFIG } from "../types";
 import { codes, drive, tick } from "./fixtures";
 
-// laneKeepMaxOffsetM = 1.3, laneKeepSustainSec = 3, movingSpeedKmh = 5.
-const straddle = (t: number) => tick(t, { speedKmh: 30, maxSpeedKmh: 50, laneOffsetM: 1.6 });
+// laneKeepMaxOffsetM scales with the perceptual road width; straddle just
+// past it. laneKeepSustainSec = 3, movingSpeedKmh = 5.
+const OFF = DEFAULT_RULE_CONFIG.laneKeepMaxOffsetM + 0.3;
+const straddle = (t: number) => tick(t, { speedKmh: 30, maxSpeedKmh: 50, laneOffsetM: OFF });
 const centred = (t: number) => tick(t, { speedKmh: 30, maxSpeedKmh: 50, laneOffsetM: 0 });
 
 describe("lane-keeping detector", () => {
@@ -22,7 +25,7 @@ describe("lane-keeping detector", () => {
   });
 
   it("does not fire while stopped", () => {
-    const ticks = [0, 1, 2, 3, 4].map((t) => tick(t, { speedKmh: 0, laneOffsetM: 1.6 }));
+    const ticks = [0, 1, 2, 3, 4].map((t) => tick(t, { speedKmh: 0, laneOffsetM: OFF }));
     expect(codes(drive(ticks).events)).not.toContain("POOR_LANE_KEEPING");
   });
 

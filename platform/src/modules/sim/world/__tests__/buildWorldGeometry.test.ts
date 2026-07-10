@@ -183,10 +183,11 @@ describe("buildWorldGeometry on a synthetic X-junction", () => {
     expect(world.trafficLights.length).toBe(4);
     for (const tl of world.trafficLights) {
       expect(tl.nodeId).toBe("nC");
-      // Poles stand outside the roadway but near the junction.
+      // Poles stand outside the roadway but near the junction mouth (the
+      // scaled open radius reaches ~35 m here, pole ~42 m out).
       const d = Math.hypot(tl.position[0], tl.position[2]);
       expect(d).toBeGreaterThan(LANE_WIDTH_M);
-      expect(d).toBeLessThan(30);
+      expect(d).toBeLessThan(50);
     }
   });
 
@@ -236,9 +237,10 @@ describe("buildWorldGeometry on a synthetic X-junction", () => {
   });
 
   it("junction radius overrides move the ribbon cut (hand-polish hook)", () => {
+    // Default open radius at nC is ~35 m (scaled roads); override past it.
     const wide = buildWorldGeometry(syntheticDistrict(), {
       seed: 7,
-      junctionRadiusOverrides: { nC: 32 },
+      junctionRadiusOverrides: { nC: 50 },
     });
     // eN ribbon starts further from the center -> first vertex further out.
     const zDefault = Math.abs(world.roadSurface.positions[2]!);
@@ -361,11 +363,12 @@ describe("buildWorldGeometry on the real district (Студентски град
 
   it("paints the hand-placed Б2 line + sign for lesson 2 (QW4)", () => {
     // The override approach at n331942490 must carry a stop sign near the
-    // junction (383.17, 65.76 → world z = -65.76).
+    // junction (383.17, 65.76 → world z = -65.76). The sign stands at the
+    // junction mouth — open radius ~17 m + pole offsets ≈ 19 m out.
     const near = world.signs.filter(
       (s) =>
         s.kind === "stop" &&
-        Math.hypot(s.position[0] - 383.17, s.position[2] - -65.76) < 18,
+        Math.hypot(s.position[0] - 383.17, s.position[2] - -65.76) < 28,
     );
     expect(near.length).toBe(1);
   });

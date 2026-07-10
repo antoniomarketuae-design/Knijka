@@ -16,6 +16,7 @@
  */
 
 import type { SignalPhase } from "../contracts";
+import { JUNCTION_TRIM_MAX_FRACTION, STOP_LINE_BEYOND_CUT_M } from "../world/builders/network";
 import { sampleLane, type DirectedLane, type LaneGraph } from "./graph";
 import type { TrafficRoute } from "./routes";
 import type { TrafficConfig, TrafficVehicleState } from "./types";
@@ -66,10 +67,28 @@ export interface VehicleEnv {
   playerDirY: number;
 }
 
-const RESERVE_DIST_M = 20;
+/** Braking headroom kept between the reservation attempt and the stop point. */
+const RESERVE_AHEAD_M = 12;
 const RESERVATION_STALE_SEC = 0.8;
-const HOLD_PAST_M = 8;
+/** Minimum arc past the node before a reservation releases (floor — raised
+ *  to the junction radius so the box is actually clear before release). */
+const HOLD_PAST_MIN_M = 8;
+/** Stop-point floor before an unsignalized junction NODE center, meters. */
+const UNSIGNALIZED_STOP_FLOOR_M = 6.5;
 const IDM_DELTA = 4;
+
+/**
+ * Where this lane's junction stop point sits, measured back from the node:
+ * the drawn junction mouth (graph.junctionRadiusM, clamped per lane exactly
+ * like the world builder's ribbon trim) + the paint inset, floored by the
+ * config offset. Keeps NPC noses OUTSIDE the scaled junction patch, on the
+ * same line the player is graded against.
+ */
+function junctionStopOffsetM(graph: LaneGraph, lk: DirectedLane, floorM: number): number {
+  const radius = graph.junctionRadiusM.get(lk.toNode) ?? 0;
+  const cut = Math.min(radius, lk.length * JUNCTION_TRIM_MAX_FRACTION);
+  return Math.max(floorM, cut + STOP_LINE_BEYOND_CUT_M);
+}
 
 // Scratch for polyline sampling — module-level, update() is single-threaded.
 const samp = { x: 0, y: 0, dirX: 0, dirY: 0, segHint: 0 };
@@ -247,10 +266,14 @@ export function updateVehicle(agent: VehicleAgent, dt: number, env: VehicleEnv):
   // Reservation lifecycle: renew while relevant, release once passed.
   if (agent.heldNode) {
     const r = env.reservations.get(agent.heldNode);
+    const holdPastM = Math.max(
+      HOLD_PAST_MIN_M,
+      (env.graph.junctionRadiusM.get(agent.heldNode) ?? 0) + STOP_LINE_BEYOND_CUT_M,
+    );
     if (curLane.toNode === agent.heldNode) {
       if (r) r.renewedAt = env.timeSec; // still approaching / traversing
-    } else if (curLane.fromNode === agent.heldNode && agent.s <= HOLD_PAST_M) {
-      if (r) r.renewedAt = env.timeSec; // clearing the junction box
+    } else if (curLane.fromNode === agent.heldNode && agent.s <= holdPastM) {
+      if (r) r.renewedAt = env.timeSec; // clearing the (scaled) junction box
     } else {
       if (r && r.holder === agent.state.id) r.holder = -1;
       agent.heldNode = null;
@@ -317,9 +340,12 @@ function stopPointTerm(
 
     const dEnd = acc + lk.length;
 
-    // Signalized lane end.
-    if (lk.endSignalNodeId && dEnd < cfg.lookaheadM + cfg.signalStopOffsetM) {
-      const stopAt = dEnd - cfg.signalStopOffsetM - HALF_LEN;
+    // Signalized lane end — stop at the junction mouth, not the node center.
+    const signalOffsetM = lk.endSignalNodeId
+      ? junctionStopOffsetM(env.graph, lk, cfg.signalStopOffsetM)
+      : 0;
+    if (lk.endSignalNodeId && dEnd < cfg.lookaheadM + signalOffsetM) {
+      const stopAt = dEnd - signalOffsetM - HALF_LEN;
       if (stopAt > 0.3 && agent.committedSignalNode !== lk.endSignalNodeId) {
         const phase = env.signalPhase(lk.endSignalNodeId);
         let mustStop = phase === "red" || phase === "redYellow";
@@ -336,12 +362,16 @@ function stopPointTerm(
       }
     }
 
-    // Unsignalized junction: time-slot reservation.
+    // Unsignalized junction: time-slot reservation. Stop point and reserve
+    // distance both track the drawn junction mouth so agents neither halt
+    // inside the box nor discover a denied slot with no room left to brake.
     if (!blocked && lk.endYieldDegree >= 3 && dEnd < cfg.lookaheadM) {
-      const stopAt = dEnd - 6.5 - HALF_LEN;
+      const stopOffsetM = junctionStopOffsetM(env.graph, lk, UNSIGNALIZED_STOP_FLOOR_M);
+      const stopAt = dEnd - stopOffsetM - HALF_LEN;
+      const reserveDistM = stopOffsetM + HALF_LEN + RESERVE_AHEAD_M;
       if (agent.heldNode === lk.toNode) {
         // already ours — proceed
-      } else if (dEnd < RESERVE_DIST_M && agent.heldNode === null) {
+      } else if (dEnd < reserveDistM && agent.heldNode === null) {
         const r = env.reservations.get(lk.toNode);
         if (r) {
           const stale = env.timeSec - r.renewedAt > RESERVATION_STALE_SEC;
@@ -355,7 +385,7 @@ function stopPointTerm(
             blocked = true;
           }
         }
-      } else if (dEnd < RESERVE_DIST_M && agent.heldNode !== null && stopAt > 0.3) {
+      } else if (dEnd < reserveDistM && agent.heldNode !== null && stopAt > 0.3) {
         // Holding a different node — wait here until it is released.
         const t = idmTerm(cfg, v, stopAt, 0);
         if (t > term) term = t;

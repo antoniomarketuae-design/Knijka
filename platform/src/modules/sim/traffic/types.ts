@@ -11,7 +11,7 @@
  * presentation layer maps (x, y) -> three.js (x, -z), y-up.
  */
 
-import type { SignalPhase } from "../contracts";
+import { PERCEPTUAL_ROAD_SCALE, type SignalPhase } from "../contracts";
 
 // ---------------------------------------------------------------------------
 // District input — structural subset of content/world/district-v1.json.
@@ -155,7 +155,8 @@ export interface TrafficConfig {
   headwaySec: number;
   /** Absolute speed cap regardless of edge maxspeed, m/s. */
   maxSpeedMps: number;
-  /** Stop-line distance before a signalized node center, meters. */
+  /** Stop-line distance before a signalized node center, meters. FLOOR —
+   *  raised per junction to the drawn junction mouth (vehicles.ts). */
   signalStopOffsetM: number;
   /** Stop distance before an occupied pedestrian crossing, meters. */
   crossingStopOffsetM: number;
@@ -179,7 +180,9 @@ export const DEFAULT_TRAFFIC_CONFIG: TrafficConfig = {
   seed: 1,
   vehicleCount: 10,
   pedestrianCount: 8,
-  laneWidthM: 3.25,
+  // MUST match the world/runtime lane width (3.25 m × perceptual road scale)
+  // or NPC lane centers drift off the painted lanes.
+  laneWidthM: 3.25 * PERCEPTUAL_ROAD_SCALE,
   excludedRoadClasses: ["service"],
 
   accelMps2: 1.8,
@@ -188,10 +191,14 @@ export const DEFAULT_TRAFFIC_CONFIG: TrafficConfig = {
   minGapM: 2.0,
   headwaySec: 1.4,
   maxSpeedMps: 50 / 3.6,
-  signalStopOffsetM: 8,
-  crossingStopOffsetM: 4,
+  // Stop-offset FLOORS — vehicles.ts raises both to the junction mouth
+  // (nodeOpenRadiusM) per node so NPCs never halt inside the scaled junction.
+  signalStopOffsetM: 18,
+  crossingStopOffsetM: 8,
   lookaheadM: 60,
-  playerLateralM: 2.3,
+  // Half the scaled lane (~4.1 m) + car half-width: a player anywhere in the
+  // NPC's lane must register, an adjacent-lane car (8.1 m off) must not.
+  playerLateralM: 5.0,
 
   pedSpeedMps: 1.25,
   pedWaitMinSec: 1.0,

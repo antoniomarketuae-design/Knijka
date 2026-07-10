@@ -3,7 +3,7 @@
  *
  * Emits `turnStarted` when the accumulated signed heading change over a
  * sliding 3 s window exceeds 55° while the vehicle is inside a junction area
- * (≤ 30 m from an intersection node — the runtime supplies that flag).
+ * (≤ 40 m from an intersection node — the runtime supplies that flag).
  * Heading is CW-positive, so a positive window sum = right turn.
  *
  * One event per maneuver: after firing, the detector re-arms only once the
@@ -17,8 +17,10 @@ import { signedDeltaDeg } from "./geometry";
 export const TURN_THRESHOLD_DEG = 55;
 export const TURN_WINDOW_SEC = 3;
 export const TURN_REARM_DEG = 15;
-/** "On junction area" radius used by the runtime when calling update(). */
-export const JUNCTION_AREA_RADIUS_M = 30;
+/** "On junction area" radius used by the runtime when calling update().
+ * Covers the scaled junction patches (open radii reach ~36 m on arterials —
+ * perceptual road scale); turns start at the mouth, not at the node. */
+export const JUNCTION_AREA_RADIUS_M = 40;
 
 /** 3 s at ~340 Hz — beyond any realistic frame rate. */
 const CAPACITY = 1024;

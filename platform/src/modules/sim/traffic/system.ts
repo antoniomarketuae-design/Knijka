@@ -42,8 +42,10 @@ import {
 const MAX_DT_SEC = 0.1;
 const VEHICLE_COLOR_VARIANTS = 4;
 const PED_COLOR_VARIANTS = 4;
-/** A vehicle counts as "ahead in my path" within this lateral corridor, meters. */
-const LEAD_CORRIDOR_M = 1.8;
+/** A vehicle counts as "ahead in my path" within this lateral corridor, meters.
+ * ~Half the scaled lane: same-lane leaders register even off-center, while an
+ * adjacent-lane car (one lane ≈ 8.1 m over) never does (perceptual scale). */
+const LEAD_CORRIDOR_M = 4.0;
 /** Approx sum of the two half-lengths, for a bumper-to-bumper gap, meters. */
 const VEHICLE_LENGTH_M = 4.1;
 /** Below this speed a vehicle is stopped/parked and makes no priority claim, m/s. */

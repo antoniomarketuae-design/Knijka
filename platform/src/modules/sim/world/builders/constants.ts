@@ -2,10 +2,17 @@
  * World-builder dimensional constants. Meters. Single source of truth for
  * both the visual meshes and the colliders — keep in sync with the vehicle
  * harness assumptions (12 cm drivable curb, car ~4.2 m).
+ *
+ * Road dimensions are PERCEPTUALLY SCALED (contracts.PERCEPTUAL_ROAD_SCALE,
+ * founder call 2026-07-10): textbook 3.25 m lanes read miniature on screen,
+ * so the whole road cross-section (lanes, sidewalks, parking, paint, corner
+ * fillets) runs 2.5× while the car stays real-size.
  */
 
-/** Bulgarian urban lane width standard. */
-export const LANE_WIDTH_M = 3.25;
+import { PERCEPTUAL_ROAD_SCALE } from "../../contracts";
+
+/** Bulgarian urban lane width standard (3.25 m), perceptually scaled. */
+export const LANE_WIDTH_M = 3.25 * PERCEPTUAL_ROAD_SCALE;
 
 /** Road surface height above the physics ground plane top. */
 export const ROAD_Y = 0.02;
@@ -17,7 +24,8 @@ export const JUNCTION_Y = ROAD_Y - 0.003;
 /** Raised curb height — must stay drivable per the vehicle harness. */
 export const CURB_HEIGHT_M = 0.12;
 export const SIDEWALK_TOP_Y = ROAD_Y + CURB_HEIGHT_M;
-export const SIDEWALK_WIDTH_M = 2.0;
+/** Scaled with the road cross-section (real ~2 m read like a curb strip). */
+export const SIDEWALK_WIDTH_M = 3.5;
 /** Outer skirt from sidewalk top back down to terrain. */
 export const SIDEWALK_SKIRT_M = 0.35;
 
@@ -25,11 +33,12 @@ export const SIDEWALK_SKIRT_M = 0.35;
  * Extra open-corner (curb fillet) radius added past the widest approach at
  * junctions, by the junction's dominant road class. Real Sofia curb radii run
  * 6–12 m; the old flat 2 m read like a model railway and forced implausible
- * turning lines (doc 68 QW3 / audit 03 B2).
+ * turning lines (doc 68 QW3 / audit 03 B2). Scaled ~1.5× with the perceptual
+ * road scale so mouths stay proportionate to the 2.5× lanes.
  */
-export const JUNCTION_CORNER_RADIUS_MINOR_M = 6; // residential/service/unclassified
-export const JUNCTION_CORNER_RADIUS_TERTIARY_M = 8;
-export const JUNCTION_CORNER_RADIUS_ARTERIAL_M = 10; // secondary/primary
+export const JUNCTION_CORNER_RADIUS_MINOR_M = 9; // residential/service/unclassified
+export const JUNCTION_CORNER_RADIUS_TERTIARY_M = 12;
+export const JUNCTION_CORNER_RADIUS_ARTERIAL_M = 15; // secondary/primary
 
 /** Corner radius for a junction whose widest incident road has `maxRank`. */
 export function junctionCornerRadiusM(maxRank: number): number {
@@ -48,10 +57,10 @@ export const JOINT_SETBACK_M = 0.6;
  * cross-section is what made streets read miniature. The band is part of the
  * carriageway ribbon (asphalt + colliders + sidewalks all shift out with it)
  * and is tinted separately so it reads as parking, not as an extra lane.
- * Sized so TrafficLayer's parked-car pass (travelHalf + 1.35 m center offset,
- * car half-width 0.88 m) sits fully inside the band.
+ * Sized so TrafficLayer's parked-car pass (travelHalf + 2.0 m center offset,
+ * car half-width 0.95 m) sits fully inside the band.
  */
-export const PARKING_LANE_WIDTH_M = 2.5;
+export const PARKING_LANE_WIDTH_M = 4.0;
 /** Road classes that carry the parking band (links excluded — short stubs). */
 export const PARKING_LANE_CLASSES: ReadonlySet<string> = new Set([
   "primary",
@@ -64,16 +73,17 @@ export const PARKING_LANE_END_INSET_M = 5;
 /** Parking band tint mesh sits between asphalt and paint (z-fight-safe). */
 export const PARKING_LANE_Y = ROAD_Y + 0.006;
 
-/** Marking paint dimensions (М-series, stylized). */
-export const DASH_LENGTH_M = 2.5;
-export const DASH_GAP_M = 4.0;
-export const DASH_WIDTH_M = 0.12;
-export const EDGE_LINE_WIDTH_M = 0.15;
-export const EDGE_LINE_INSET_M = 0.25;
-export const STOP_LINE_WIDTH_M = 0.4;
-export const ZEBRA_STRIPE_ACROSS_M = 0.5; // stripe width across the road
-export const ZEBRA_GAP_M = 0.4;
-export const ZEBRA_LENGTH_M = 4.0; // extent along the road axis
+/** Marking paint dimensions (М-series, stylized). Scaled with the road —
+ * textbook paint on an 8 m lane reads like thread (perceptual road scale). */
+export const DASH_LENGTH_M = 5.0;
+export const DASH_GAP_M = 8.0;
+export const DASH_WIDTH_M = 0.25;
+export const EDGE_LINE_WIDTH_M = 0.3;
+export const EDGE_LINE_INSET_M = 0.5;
+export const STOP_LINE_WIDTH_M = 0.8;
+export const ZEBRA_STRIPE_ACROSS_M = 0.8; // stripe width across the road
+export const ZEBRA_GAP_M = 0.6;
+export const ZEBRA_LENGTH_M = 6.0; // extent along the road axis
 
 /** Building facade texture bay: one window per 3 m x 3 m. */
 export const FACADE_BAY_M = 3;
@@ -131,11 +141,13 @@ export const CLASS_RANK: Readonly<Record<string, number>> = {
   service: 1,
 };
 
-/** Terrain relief: keep subtle (visual only, collider stays flat). */
+/** Terrain relief: keep subtle (visual only, collider stays flat). Flat band
+ * covers the widest scaled carriageway (max half-width ~28 m) so relief never
+ * pokes through the asphalt. */
 export const TERRAIN_MARGIN_M = 60;
 export const TERRAIN_MAX_RELIEF_M = 0.25;
-export const TERRAIN_FLAT_NEAR_ROAD_M = 14;
-export const TERRAIN_FULL_RELIEF_M = 38;
+export const TERRAIN_FLAT_NEAR_ROAD_M = 30;
+export const TERRAIN_FULL_RELIEF_M = 54;
 
 /**
  * Ground-use zoning: terrain cells whose centre is within this distance of any

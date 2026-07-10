@@ -13,6 +13,19 @@
 
 import type { SimTick } from "./rules/types";
 
+/**
+ * PERCEPTUAL ROAD SCALE — the single dial for how exaggerated the road
+ * network is versus textbook Bulgarian dimensions (founder call 2026-07-10:
+ * perception over textbook; tunable). Driving games run 1.5–2.5× lane
+ * exaggeration because textbook-width lanes read miniature on screen; we run
+ * 2.5×. The CAR stays real-size — only the road world scales. EVERY road
+ * dimension (lane width, paint, setbacks, grading tolerances, traffic-AI
+ * offsets) must derive from this constant so one edit re-tunes the world
+ * coherently — visual geometry, grading geometry, traffic AI and paint have
+ * to agree or detectors misfire.
+ */
+export const PERCEPTUAL_ROAD_SCALE = 2.5;
+
 /** Vehicle state sampled from the physics rig each frame (world space, meters). */
 export interface VehicleSample {
   position: { x: number; y: number }; // ground plane; x=east, y=north (district space)
@@ -64,6 +77,13 @@ export interface LessonSpec {
   spawn: { pointId?: string; position?: { x: number; y: number }; headingDeg?: number };
   /** Whether the 13-step pre-drive procedure runs before driving. */
   preDrive: boolean;
+  /**
+   * Vehicle state at spawn (A1 driveline). Default (absent) = "cold": engine
+   * OFF, selector P, parking brake ON — the pre-drive reality every lesson
+   * should start from. "ready" = engine running in D with the brake released;
+   * reserved for acclimatization free-drive (L0).
+   */
+  vehicleStart?: "cold" | "ready";
   /** Ordered objectives; each completes via a predicate over runtime state. */
   objectives: LessonObjective[];
   /** Optional time-of-day/weather override. */

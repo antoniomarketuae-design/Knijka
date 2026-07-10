@@ -82,11 +82,12 @@ describe("lane graph from the real district", () => {
 describe("lane graph offsets (square fixture)", () => {
   it("offsets the driving lane to the right of travel", () => {
     const { graph } = buildSquareGraph();
-    // eAB is oneway with 2 lanes: rightmost lane center = 1.625 m right of
-    // the centerline. Direction (1, 0) -> right normal (0, -1) -> y = -1.625.
+    // eAB is oneway with 2 lanes: rightmost lane center = laneWidth/2 right
+    // of the centerline. Direction (1, 0) -> right normal (0, -1) -> y < 0.
+    const laneC = DEFAULT_TRAFFIC_CONFIG.laneWidthM / 2;
     const ab = findLane(graph, "A", "B");
-    expect(ab.py[0]).toBeCloseTo(-1.625, 3);
-    expect(ab.py[ab.py.length - 1]).toBeCloseTo(-1.625, 3);
+    expect(ab.py[0]).toBeCloseTo(-laneC, 3);
+    expect(ab.py[ab.py.length - 1]).toBeCloseTo(-laneC, 3);
     expect(ab.length).toBeCloseTo(300, 1);
   });
 

@@ -13,6 +13,10 @@
  * опасни = 10 т.; pass: ≤ 9 total points, of which ≤ 6 from основни).
  */
 
+// Value-only import; ../contracts imports this file as `import type`, so no
+// runtime cycle exists (the type import is erased).
+import { PERCEPTUAL_ROAD_SCALE } from "../contracts";
+
 // ---------------------------------------------------------------------------
 // SimTick — the input frame the 3D engine emits
 // ---------------------------------------------------------------------------
@@ -319,7 +323,10 @@ export const DEFAULT_RULE_CONFIG: RuleEngineConfig = {
   mirrorLookbackSec: 5,
   laneChangeMinSpeedKmh: 10,
 
-  laneKeepMaxOffsetM: 1.3, // ~straddling the lane line (3.25 m lane → 1.6 m half)
+  // ~straddling the lane line, scaled with the perceptual road width (base
+  // 1.3 on a textbook 3.25 m lane → 3.25 on the 8.125 m drawn lane). The car
+  // stays real-size, so the tolerance must track the DRAWN lane, not the law.
+  laneKeepMaxOffsetM: 1.3 * PERCEPTUAL_ROAD_SCALE,
   laneKeepSustainSec: 3, // conservative: only sustained wandering, not a brief drift
 
   conditionSpeedRainFactor: 0.85,

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { SignalPhase } from "../../contracts";
+import { DEFAULT_TRAFFIC_CONFIG } from "../types";
 import { createVehicleAgent, updateVehicle, VEHICLE_LENGTH_M, type VehicleAgent, type VehicleEnv } from "../vehicles";
 import { buildSquareGraph, makeVehicleEnv, squareRoute } from "./fixtures";
 
@@ -26,8 +27,9 @@ function setup(phase: SignalPhase | ((id: string) => SignalPhase)) {
 }
 
 // Lane A->B is route index 0; its stop line for signal B sits at
-// length - signalStopOffset(8) - halfLen(2.15) = ~289.85 m.
-const STOP_LINE_S = 300 - 8 - VEHICLE_LENGTH_M / 2;
+// length - signalStopOffset - halfLen. Node B is degree 2, so its junction
+// mouth (~2.6 m) never exceeds the config floor and the floor applies.
+const STOP_LINE_S = 300 - DEFAULT_TRAFFIC_CONFIG.signalStopOffsetM - VEHICLE_LENGTH_M / 2;
 
 describe("red-light stopping envelope", () => {
   it("stops before the stop line on red and never crosses", () => {
@@ -62,7 +64,7 @@ describe("red-light stopping envelope", () => {
 
   it("commits through on yellow when already too close to stop", () => {
     const { agent, env } = setup("yellow");
-    agent.s = 282; // ~8 m from the stop line
+    agent.s = STOP_LINE_S - 8; // ~8 m from the stop line
     agent.speed = 13; // needs ~15 m at full braking -> cannot stop
     let minSpeedBeforeB = Infinity;
     run(env, 10, () => {
@@ -135,7 +137,7 @@ describe("player blocking the lane", () => {
     const { agent, env } = setup("green");
     env.hasPlayer = true;
     env.playerX = 150;
-    env.playerY = -1.625; // exactly on the A->B lane center
+    env.playerY = -DEFAULT_TRAFFIC_CONFIG.laneWidthM / 2; // exactly on the A->B lane center
     env.playerSpeedMps = 0;
 
     let minDist = Infinity;
@@ -159,7 +161,7 @@ describe("player blocking the lane", () => {
     const { agent, env } = setup("green");
     env.hasPlayer = true;
     env.playerX = 150;
-    env.playerY = -8; // > playerLateralM away from lane center
+    env.playerY = -14; // ~10 m off the lane center: > playerLateralM (5 m)
     env.playerSpeedMps = 0;
     run(env, 60);
     expect(agent.routePos).toBeGreaterThan(0); // passed the parked car
@@ -177,8 +179,8 @@ describe("pedestrian-on-crossing yield", () => {
 
     run(env, 60);
     expect(agent.routePos).toBe(0);
-    // Stopped before the crossing minus the stop offset (4 m) + half length.
-    expect(agent.s).toBeLessThan(150 - 4);
+    // Stopped before the crossing minus the configured stop offset.
+    expect(agent.s).toBeLessThan(150 - DEFAULT_TRAFFIC_CONFIG.crossingStopOffsetM);
     expect(agent.speed).toBeLessThan(0.2);
 
     env.crossingCounts.set("x1", 0);

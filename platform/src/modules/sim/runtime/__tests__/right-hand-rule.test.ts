@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { createWorldRuntime } from "..";
+import { RHR_CORE_RADIUS_M } from "../worldRuntime";
 import { loadDistrict, mkVehicle } from "./helpers";
 import type { SimTickEvent } from "../../rules/types";
 
@@ -55,7 +56,7 @@ describe("right-hand-rule (uncontrolled junction) emission", () => {
       t += 0.1;
       rt.update(0.1);
       const tick = rt.sample(
-        mkVehicle({ x: j.x + 14, y: j.y, headingDeg: 0 }, { speedKmh: 6 }),
+        mkVehicle({ x: j.x + RHR_CORE_RADIUS_M + 4, y: j.y, headingDeg: 0 }, { speedKmh: 6 }),
         t,
         false,
       );

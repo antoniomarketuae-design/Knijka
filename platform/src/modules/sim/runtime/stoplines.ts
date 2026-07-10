@@ -5,16 +5,22 @@
  * lines are DERIVED. Three sources:
  *
  * 1. SIGNALIZED APPROACHES. Every edge arriving at a `signalized: true`
- *    intersection node gets a stop line across it, SIGNAL_SETBACK_M (7 m)
- *    before the node — roughly where the real line sits ahead of the zebra +
- *    lamp post. The line's lightState is adjudicated per approach axis
- *    (N-S / E-W) against the node's signal cluster.
+ *    intersection node gets a stop line across it, at the JUNCTION MOUTH —
+ *    the same open-radius cut the world builder trims ribbons at (shared
+ *    nodeOpenRadiusM math + STOP_LINE_BEYOND_CUT_M), never closer than
+ *    SIGNAL_SETBACK_M. With the perceptual road scale (2.5×) junction
+ *    patches reach 17–43 m from the node, so a fixed setback would sit
+ *    INSIDE the junction; deriving from the same math as the painted line
+ *    keeps grading and paint coincident. The line's lightState is
+ *    adjudicated per approach axis (N-S / E-W) against the node's signal
+ *    cluster.
  *
  * 2. STOP-SIGN HEURISTIC (honest documentation, per doc 17 §6/§8 the real
  *    signs arrive with the hand-polish overlay): at every UNSIGNALIZED
  *    intersection where a minor road (service / residential / unclassified,
  *    class rank ≤ 2) meets an arterial (primary / secondary / secondary_link,
- *    rank ≥ 4), each MINOR approach gets a stop-sign line 5 m before the node.
+ *    rank ≥ 4), each MINOR approach gets a stop-sign line at the junction
+ *    mouth (same derivation as source 1, floor STOP_SIGN_SETBACK_M).
  *    - Tertiary meetings are excluded — those are typically yield (Б1), and
  *      modeling yield as stop would grade students unfairly.
  *    - Roundabout nodes are excluded (priority-inside, yield on entry).
@@ -30,13 +36,29 @@
  * dual-carriageway link stubs so lines stay on their own edge.
  */
 
+import { PERCEPTUAL_ROAD_SCALE } from "../contracts";
+import {
+  JUNCTION_TRIM_MAX_FRACTION,
+  nodeOpenRadiusM,
+  STOP_LINE_BEYOND_CUT_M,
+} from "../world/builders/network";
 import type { District } from "./district";
 import { axisOfBearing, bearingDeg, type Axis } from "./geometry";
 import type { DistrictIndex } from "./spatial";
 import type { SignalController } from "./signals";
 
-const SIGNAL_SETBACK_M = 7;
-const STOP_SIGN_SETBACK_M = 5;
+/**
+ * Fallback setbacks from the junction node (textbook 7 m / 5 m × the
+ * perceptual road scale), used ONLY when a node's open radius cannot be
+ * computed (no incident edges — degenerate data). Everywhere else the
+ * setback is the junction-mouth cut (nodeOpenRadiusM, clamped per edge
+ * exactly like the ribbon trim) + STOP_LINE_BEYOND_CUT_M — the graded line
+ * must COINCIDE with the painted line (never before it, or a driver stopping
+ * at the paint gets flagged; never after it, or grading fires mid-junction).
+ */
+export const SIGNAL_SETBACK_M = 7 * PERCEPTUAL_ROAD_SCALE;
+export const STOP_SIGN_SETBACK_M = 5 * PERCEPTUAL_ROAD_SCALE;
+
 const ARTERIAL_MIN_RANK = 4;
 const MINOR_MAX_RANK = 2;
 
@@ -98,16 +120,32 @@ export function buildStopLines(
   const all: StopLine[] = [];
   const byEdge: number[][] = index.edges.map(() => []);
 
+  /**
+   * Junction-mouth setback for an approach: the world builder's open-radius
+   * cut on this edge (identical math incl. the per-edge trim clamp) plus the
+   * paint inset. Guarantees the graded line sits ON the painted line, just
+   * outside the junction patch. The scaled textbook setback is only a
+   * fallback for nodes with no computable radius.
+   */
+  const mouthSetbackM = (edgeIdx: number, junctionNodeId: string, fallbackM: number): number => {
+    const incident = index.edgesAtNode.get(junctionNodeId) ?? [];
+    const touched = incident.map((i) => index.edgeRt(i).edge);
+    const radius = nodeOpenRadiusM(touched, touched.length);
+    if (radius <= 0) return fallbackM;
+    const rt = index.edgeRt(edgeIdx);
+    return Math.min(radius, rt.totalLen * JUNCTION_TRIM_MAX_FRACTION) + STOP_LINE_BEYOND_CUT_M;
+  };
+
   const addApproach = (
     edgeIdx: number,
     junctionNodeId: string,
     atFromEnd: boolean,
     control: "trafficLight" | "stopSign",
-    setbackM: number,
+    fallbackM: number,
   ): void => {
     const rt = index.edgeRt(edgeIdx);
     if (atFromEnd && rt.edge.oneway) return; // flow leaves the junction here
-    const sb = Math.min(setbackM, rt.totalLen / 2);
+    const sb = Math.min(mouthSetbackM(edgeIdx, junctionNodeId, fallbackM), rt.totalLen / 2);
     const sM = atFromEnd ? sb : rt.totalLen - sb;
     const dirSign: 1 | -1 = atFromEnd ? -1 : 1;
     const [tx, ty] = index.tangentAt(edgeIdx, sM);

@@ -78,14 +78,27 @@ export interface RoadNetwork {
   roundaboutEdgeIds: Set<string>;
 }
 
+/**
+ * Structural subset of an edge that the width/junction math needs. Kept
+ * structural so the runtime (runtime/district) and traffic (traffic/types)
+ * edge types can reuse EXACTLY this math — grading, NPC stop points and the
+ * drawn world must agree on where a junction mouth is (perceptual road
+ * scale: detectors misfire if they disagree).
+ */
+export interface JunctionEdgeLike {
+  class: string;
+  lanes: number;
+  roundabout: boolean;
+}
+
 /** Parking band width per side of an edge (0 for non-arterial/roundabout). */
-export function edgeParkingWidthM(edge: DistrictEdge): number {
+export function edgeParkingWidthM(edge: JunctionEdgeLike): number {
   if (edge.roundabout) return 0;
   return PARKING_LANE_CLASSES.has(edge.class) ? PARKING_LANE_WIDTH_M : 0;
 }
 
-/** Travel-lane half width (lanes × 3.25 / 2) — the graded carriageway. */
-export function edgeTravelHalfWidth(edge: DistrictEdge): number {
+/** Travel-lane half width (lanes × LANE_WIDTH_M / 2) — the graded carriageway. */
+export function edgeTravelHalfWidth(edge: JunctionEdgeLike): number {
   const lanes = Math.max(1, edge.lanes);
   let half = (lanes * LANE_WIDTH_M) / 2;
   // Single-lane roundabout rings read too thin — BG ring lanes are wide.
@@ -99,8 +112,30 @@ export function edgeTravelHalfWidth(edge: DistrictEdge): number {
  * junction patches, sidewalks, colliders, prop lateral offsets — shifts out
  * consistently; markings use the travel width via EdgeBuild/Approach.parkingM.
  */
-export function edgeHalfWidth(edge: DistrictEdge): number {
+export function edgeHalfWidth(edge: JunctionEdgeLike): number {
   return edgeTravelHalfWidth(edge) + edgeParkingWidthM(edge);
+}
+
+/** Junction trim never eats more than this fraction of an edge's length. */
+export const JUNCTION_TRIM_MAX_FRACTION = 0.45;
+/** Stop lines (painted AND graded) sit this far outside the junction cut. */
+export const STOP_LINE_BEYOND_CUT_M = 0.6;
+
+/**
+ * Open-area radius of a node — how far the junction patch reaches along each
+ * incident edge (before the per-edge JUNCTION_TRIM_MAX_FRACTION clamp).
+ * SHARED source of truth: analyzeNetwork (ribbons/patches), runtime
+ * stop-line derivation and the traffic system's junction stop offsets all
+ * call this, so the graded line, the painted line and NPC stop points agree.
+ */
+export function nodeOpenRadiusM(touched: readonly JunctionEdgeLike[], degree: number): number {
+  if (degree <= 1 || touched.length === 0) return 0;
+  const maxHalf = Math.max(...touched.map(edgeHalfWidth));
+  if (degree >= 3) {
+    const maxRank = Math.max(...touched.map((e) => CLASS_RANK[e.class] ?? 2));
+    return maxHalf + junctionCornerRadiusM(maxRank);
+  }
+  return Math.max(JOINT_SETBACK_M, maxHalf * 0.25);
 }
 
 /** Direction pointing away from `nodeId` along the edge geometry. */
@@ -144,12 +179,7 @@ export function analyzeNetwork(
     if (!pos) continue;
     const degree = touched.length;
     if (degree === 1) deadEnds.add(id);
-    const maxHalf = Math.max(...touched.map(edgeHalfWidth));
-    const maxRank = Math.max(...touched.map((e) => CLASS_RANK[e.class] ?? 2));
-    let radius: number;
-    if (degree >= 3) radius = maxHalf + junctionCornerRadiusM(maxRank);
-    else if (degree === 2) radius = Math.max(JOINT_SETBACK_M, maxHalf * 0.25);
-    else radius = 0;
+    let radius = nodeOpenRadiusM(touched, degree);
     const override = junctionRadiusOverrides?.[id];
     if (override !== undefined) radius = override;
     nodeInfos.set(id, {
@@ -172,8 +202,8 @@ export function analyzeNetwork(
     const total = polylineLength(g);
     const fromInfo = nodeInfos.get(edge.from);
     const toInfo = nodeInfos.get(edge.to);
-    let sFrom = Math.min(fromInfo?.radius ?? 0, total * 0.45);
-    let sTo = Math.min(toInfo?.radius ?? 0, total * 0.45);
+    let sFrom = Math.min(fromInfo?.radius ?? 0, total * JUNCTION_TRIM_MAX_FRACTION);
+    let sTo = Math.min(toInfo?.radius ?? 0, total * JUNCTION_TRIM_MAX_FRACTION);
 
     let line = trimPolyline(g, sFrom, sTo, 0.5);
     if (!line) {

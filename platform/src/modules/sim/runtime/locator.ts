@@ -7,7 +7,7 @@
  *   a junction or a parallel road don't flip-flop.
  * - Lane hysteresis: within an edge, the lane id only changes once the vehicle
  *   is LANE_SWITCH_DEADBAND_M past the lane boundary.
- * - > OFF_ROAD_DISTANCE_M (15 m) from every centerline ⇒ edgeId null.
+ * - > OFF_ROAD_DISTANCE_M (30 m) from every centerline ⇒ edgeId null.
  *
  * Lane model (until wave-2 lane topology, doc 17 §7): lanes are procedural
  * bands of LANE_WIDTH_M around the OSM centerline. Oneway edges center the
@@ -20,7 +20,10 @@
 
 import { LANE_WIDTH_M, OFF_ROAD_DISTANCE_M, makeEdgeHit, type DistrictIndex, type EdgeHit } from "./spatial";
 
-const EDGE_SWITCH_MARGIN_M = 2.5;
+/** A rival edge must be closer than the locked one by this much to steal the
+ * fix. ~Half the scaled lane width: lane centers now sit 4–12 m off their
+ * centerline, so junction-area rivals brush much closer than they used to. */
+const EDGE_SWITCH_MARGIN_M = 4.0;
 const LANE_SWITCH_DEADBAND_M = 0.35;
 
 export interface LocateFix {

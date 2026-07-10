@@ -4,21 +4,28 @@
  * Precomputes per-edge runtime geometry (cumulative arclengths, lane banks)
  * and a uniform grid hash over road segments for nearest-edge queries.
  * At district scale (323 edges, ~1.6 × 1.2 km) a grid hash comfortably beats
- * anything fancier: queries touch a 3×3 cell neighborhood (cell 32 m ≥ 2× the
- * 15 m off-road cutoff), a handful of segments each.
+ * anything fancier: queries touch a 3×3 cell neighborhood (cell 32 m ≥ the
+ * 30 m off-road cutoff), a handful of segments each.
  *
  * Allocation discipline: `nearestEdge`/`projectOnEdge` write into caller-owned
  * hit slots; the only per-query allocation is nothing.
  */
 
+import { PERCEPTUAL_ROAD_SCALE } from "../contracts";
 import type { District, DistrictEdge, DistrictIntersection, DistrictNode } from "./district";
 import { projectOnSegment, type SegProjection } from "./geometry";
 
-/** Standard BG urban lane width used for procedural lane banks. */
-export const LANE_WIDTH_M = 3.25;
+/**
+ * Lane width used for procedural lane banks. MUST equal the world builder's
+ * LANE_WIDTH_M exactly (3.25 m BG standard × the perceptual road scale) —
+ * the locator's lane fix is graded against the painted lanes.
+ */
+export const LANE_WIDTH_M = 3.25 * PERCEPTUAL_ROAD_SCALE;
 
-/** Beyond this distance from every edge centerline the vehicle is off-road. */
-export const OFF_ROAD_DISTANCE_M = 15;
+/** Beyond this distance from every edge centerline the vehicle is off-road.
+ * Must exceed the widest scaled carriageway half-width (6 lanes ≈ 24.4 m +
+ * parking) or driving the outer lane of an arterial would read as off-road. */
+export const OFF_ROAD_DISTANCE_M = 30;
 
 /** Rank used by the stop-sign heuristic and signal grouping. Higher = more arterial. */
 export const CLASS_RANK: Record<string, number> = {

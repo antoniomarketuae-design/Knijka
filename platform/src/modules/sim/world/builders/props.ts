@@ -245,7 +245,9 @@ export function buildProps(
     for (let gy = bounds.minY; gy < bounds.maxY; gy += step) {
       if (rng() > 0.55 * options.treeDensity) continue;
       const p: Vec2 = [gx + rng() * step, gy + rng() * step];
-      if (roadGrid.distanceTo(p, 16) < 15) continue;
+      // Gate measures to the CENTERLINE: must exceed the widest scaled
+      // carriageway half-width (~28 m) or park trees sprout on the asphalt.
+      if (roadGrid.distanceTo(p, 31) < 30) continue;
       if (insideBuilding(p, 2.5)) continue;
       pushTree(p);
     }

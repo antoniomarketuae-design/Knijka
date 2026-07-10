@@ -12,6 +12,7 @@
  * random walk can always be closed into a loop.
  */
 
+import { nodeOpenRadiusM } from "../world/builders/network";
 import type { TrafficDistrict, DistrictEdge } from "./types";
 
 export interface LaneCrossing {
@@ -64,6 +65,12 @@ export interface LaneGraph {
   crossingSignalNode: Map<string, string>;
   /** crossingId -> lanes it spans (for pedestrian vehicle-gap checks). */
   crossingLanes: Map<string, CrossingLaneRef[]>;
+  /**
+   * intersection nodeId -> drawn junction open radius, meters (the world
+   * builder's nodeOpenRadiusM — perceptual road scale). Vehicles stop at
+   * this mouth, never inside the junction patch.
+   */
+  junctionRadiusM: Map<string, number>;
 }
 
 export interface LaneGraphOptions {
@@ -173,6 +180,23 @@ export function buildLaneGraph(district: TrafficDistrict, opts: LaneGraphOptions
   const excluded = new Set(opts.excludedRoadClasses);
   const intersectionById = new Map(district.intersections.map((i) => [i.id, i]));
 
+  // Drawn junction open radius per intersection — the SAME math the world
+  // builder trims ribbons with (all touching edges, service roads included),
+  // so NPC stop points land at the visible junction mouth.
+  const touchingByNode = new Map<string, DistrictEdge[]>();
+  for (const edge of district.roads.edges) {
+    for (const id of [edge.from, edge.to]) {
+      let bucket = touchingByNode.get(id);
+      if (!bucket) touchingByNode.set(id, (bucket = []));
+      bucket.push(edge);
+    }
+  }
+  const junctionRadiusM = new Map<string, number>();
+  for (const ix of district.intersections) {
+    const touched = touchingByNode.get(ix.id) ?? [];
+    junctionRadiusM.set(ix.id, nodeOpenRadiusM(touched, touched.length));
+  }
+
   const lanes: DirectedLane[] = [];
   const nodeOut = new Map<string, number[]>();
   const lanesByEdge = new Map<string, number[]>();
@@ -236,7 +260,9 @@ export function buildLaneGraph(district: TrafficDistrict, opts: LaneGraphOptions
       for (const li of laneIdxs) {
         const lane = lanes[li];
         const proj = projectOntoPolyline(lane.px, lane.py, lane.cum, crossing.x, crossing.y);
-        if (proj.dist <= 15) {
+        // Glitch gate only — outer lane centers now sit up to ~20 m off the
+        // crossing point on 6-lane arterials (perceptual road scale).
+        if (proj.dist <= 35) {
           lane.crossings.push({ crossingId: crossing.id, s: proj.s });
           refs.push({ laneIndex: li, s: proj.s });
         }
@@ -265,6 +291,7 @@ export function buildLaneGraph(district: TrafficDistrict, opts: LaneGraphOptions
     loopLanes: largestScc(lanes, nodeOut),
     crossingSignalNode,
     crossingLanes,
+    junctionRadiusM,
   };
 }
 

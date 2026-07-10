@@ -2,15 +2,18 @@
  * sim/runtime — pedestrian-crossing zone tracker.
  *
  * Emits the SimTick zone events (rules/types.ts semantics):
- * - crossingZoneEntered — vehicle enters the ~25 m approach zone of a
+ * - crossingZoneEntered — vehicle enters the ~35 m approach zone of a
  *   crossing. Re-emitted for the same crossing when the pedestrian flag flips
  *   while the vehicle is still inside (contract explicitly allows this).
  * - crossingPassed — the vehicle's position passes the crossing point
  *   (ahead → behind along the vehicle's heading, laterally close).
  *
  * A zone only arms when the vehicle is on the crossing's host edge or an edge
- * sharing a node with it — a parallel street 20 m away must not trigger it.
- * Exit uses a 28 m radius (hysteresis) and re-arms the zone for re-entry.
+ * sharing a node with it — a parallel street must not trigger it (the
+ * edge-adjacency gate, not the radius, carries that guarantee).
+ * Exit uses a 38 m radius (hysteresis) and re-arms the zone for re-entry.
+ * Radii/lateral bounds scaled with the perceptual road scale: the outer lane
+ * of a 6-lane arterial now runs ~20 m from the crossing point.
  *
  * Pedestrians: there is no traffic module yet, so `pedestrianOnCrossing` is
  * false until a query hook is installed (WorldRuntime.setPedestrianQuery) —
@@ -21,10 +24,11 @@ import type { SimTickEvent } from "../rules/types";
 import type { District } from "./district";
 import type { DistrictIndex } from "./spatial";
 
-export const CROSSING_ZONE_RADIUS_M = 25;
-const ZONE_EXIT_RADIUS_M = 28;
-/** Max lateral distance for a legitimate "passed over the crossing". */
-const PASS_LATERAL_MAX_M = 8;
+export const CROSSING_ZONE_RADIUS_M = 35;
+const ZONE_EXIT_RADIUS_M = 38;
+/** Max lateral distance for a legitimate "passed over the crossing" — must
+ * cover the outermost scaled lane center (~20.3 m on 6-lane arterials). */
+const PASS_LATERAL_MAX_M = 22;
 
 export type PedestrianQuery = (crossingId: string) => boolean;
 
