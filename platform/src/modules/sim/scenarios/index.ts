@@ -28,8 +28,11 @@ export {
 export {
   resolveEncounter,
   recordEncounter,
+  policyForViolation,
+  VTOROSTEPENNA_DEFAULT_POLICY,
   type EncounterMode,
   type ScenarioOutcome,
+  type ViolationSeverity,
 } from "./policy";
 
 export { scenarioForCode } from "./mapping";

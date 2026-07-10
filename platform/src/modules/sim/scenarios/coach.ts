@@ -7,14 +7,21 @@
  * collision. Everything else (основна/второстепенна) teaches on the first
  * encounter and grades on repeats (escalating, per policy.ts).
  *
+ * A12 warn-once floor: второстепенна (1-point) codes get ONE warning toast
+ * (teach) before grading begins REGARDLESS of scenario mapping — unmapped
+ * codes via the explicit policy-level default, mapped codes even if their
+ * scenario were ever marked "always-grade" (a 1-point slip is never a safety
+ * floor). See `policyForViolation` in policy.ts. основна/опасна unchanged.
+ *
  * Pure + deterministic: the caller owns the per-session encounter counts.
  */
 
+import { getScenarioEvent } from "./events";
 import { scenarioForCode } from "./mapping";
-import { resolveEncounter } from "./policy";
-import type { EncounterMode } from "./policy";
+import { policyForViolation, resolveEncounter } from "./policy";
+import type { EncounterMode, ViolationSeverity } from "./policy";
 
-type Severity = "opasna" | "osnovna" | "vtorostepenna";
+type Severity = ViolationSeverity;
 
 export interface CoachInput {
   code: string;
@@ -31,6 +38,13 @@ export interface CoachDecision {
   scored: boolean;
   /** Whether to surface the contextual mini-lesson this encounter. */
   showLesson: boolean;
+  /**
+   * Repeat-penalty escalation (policy.ts): 0 for teach/learn; for grade mode
+   * ×1.0 on the first graded pass, ×1.5 then ×2.0 (capped) on repeats. A9
+   * applies it to the training-layer effective points (lessons/escalation.ts);
+   * the official base points stay catalog-fixed.
+   */
+  penaltyMultiplier: number;
 }
 
 /** Decide one violation and return the updated encounter counts. */
@@ -40,9 +54,10 @@ export function coachStep(
 ): { decision: CoachDecision; encounters: Record<string, number> } {
   const scenarioId = scenarioForCode(v.code);
   const key = scenarioId ?? v.code;
-  // Safety floor: dangerous / terminating errors are never taught away.
-  const override =
-    v.severityClass === "opasna" || v.terminateSession ? "always-grade" : undefined;
+  // Severity ladder (policy.ts): опасна/terminating always grade; второстепенна
+  // warns once before grading regardless of mapping; основна follows the map.
+  const mappedPolicy = scenarioId ? getScenarioEvent(scenarioId)?.policyDefault : undefined;
+  const override = policyForViolation(v.severityClass, v.terminateSession === true, mappedPolicy);
   const prior = encounters[key] ?? 0;
   const outcome = resolveEncounter(key, prior, override);
   return {
@@ -52,6 +67,7 @@ export function coachStep(
       mode: outcome.mode,
       scored: outcome.mode === "grade",
       showLesson: outcome.showLesson,
+      penaltyMultiplier: outcome.penaltyMultiplier,
     },
     encounters: { ...encounters, [key]: prior + 1 },
   };

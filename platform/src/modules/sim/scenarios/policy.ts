@@ -37,6 +37,49 @@ const BASE_PENALTY = 1;
 const REPEAT_STEP = 0.5;
 const PENALTY_CAP = 2;
 
+// ---------------------------------------------------------------------------
+// A12 — severity-level policy floor (warn once, then grade)
+// ---------------------------------------------------------------------------
+
+/** The severity classes a coached violation can carry (rules/types.ts). */
+export type ViolationSeverity = "opasna" | "osnovna" | "vtorostepenna";
+
+/**
+ * Policy-level default for второстепенни (1-point) codes: warn once (teach),
+ * then grade. A named policy, not an accident of the unknown-id fallback in
+ * `resolveEncounter` — второстепенни are exactly the codes where a surprise
+ * penalty on the first slip destroys trust fastest (A12 / research R1 §6).
+ */
+export const VTOROSTEPENNA_DEFAULT_POLICY: GradingPolicy = "teach-first-then-grade";
+
+/**
+ * Resolve the policy override for one coached violation (A12).
+ *
+ * The severity ladder, in priority order:
+ *  - опасна / session-terminating → "always-grade" (safety floor: a red light
+ *    or collision is never taught away);
+ *  - второстепенна → ONE warning toast (teach) before grading begins,
+ *    REGARDLESS of scenario mapping: unmapped codes get the explicit
+ *    `VTOROSTEPENNA_DEFAULT_POLICY`, and even a mapping to an "always-grade"
+ *    scenario cannot skip the warning for a 1-point slip. A "learn-only"
+ *    mapping is MORE lenient than warn-once, so it is left in charge.
+ *  - основна → no override; the scenario mapping (or the library default)
+ *    decides, exactly as before.
+ *
+ * Returns the `policyOverride` to pass to `resolveEncounter`, or undefined to
+ * let the scenario mapping decide.
+ */
+export function policyForViolation(
+  severityClass: ViolationSeverity,
+  terminating: boolean,
+  mappedPolicy: GradingPolicy | undefined,
+): GradingPolicy | undefined {
+  if (severityClass === "opasna" || terminating) return "always-grade";
+  if (severityClass !== "vtorostepenna") return undefined;
+  if (mappedPolicy === "learn-only") return undefined;
+  return VTOROSTEPENNA_DEFAULT_POLICY;
+}
+
 function gradeMultiplier(priorGradedCount: number): number {
   return Math.min(PENALTY_CAP, BASE_PENALTY + REPEAT_STEP * Math.max(0, priorGradedCount));
 }

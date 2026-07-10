@@ -29,6 +29,15 @@
  *  - Both pedestrian-crossing violations can fire on one crossing (approach
  *    too fast, then still failing to yield) — they are distinct mistakes and
  *    each deserves immediate feedback. Any опасна already fails the session.
+ *  - A12 tolerance bands: false-positive penalties are the genre's #1
+ *    trust-killer, so every detector carries explicit grace for innocent
+ *    driving at its margins — physics creep on full stops, braking-response
+ *    pause on crossing approach, cut-in recovery + grace ratio on following
+ *    distance, min (not product) composition of condition factors, and a
+ *    reverse-gear gate on the flow/lane detectors (a reverse-parking
+ *    maneuver is not a wrong-way run or a lane change). The regression
+ *    battery in __tests__/false-positives.test.ts is the contract: those
+ *    drives must NEVER produce a violation.
  */
 
 import { makeCommendation, makeViolation } from "./catalog";
@@ -68,6 +77,10 @@ export interface RuleEngineState {
   config: RuleEngineConfig;
   prevT: number | null;
   prevLaneId: number | null;
+  /** Previous frame's speed — lets detectors read braking response (A12). */
+  prevSpeedKmh: number | null;
+  /** Previous frame's lead gap (null = none reported) — cut-in recovery (A12). */
+  prevLeadGapM: number | null;
   lastIndicatorOnAt: Record<TurnDirection, number | null>;
   lastGlanceAt: Record<MirrorKind, number | null>;
   stop: {
@@ -102,6 +115,8 @@ export function createRuleEngine(config?: Partial<RuleEngineConfig>): RuleEngine
     config: { ...DEFAULT_RULE_CONFIG, ...config },
     prevT: null,
     prevLaneId: null,
+    prevSpeedKmh: null,
+    prevLeadGapM: null,
     lastIndicatorOnAt: { left: null, right: null },
     lastGlanceAt: { left: null, right: null, rear: null },
     stop: { stoppedSince: null, lastQualifyingStopAt: null },
@@ -198,6 +213,24 @@ export function reduceTick(prev: RuleEngineState, tick: SimTick): ReduceResult {
   const speed = tick.speedKmh;
   const events: RuleEvent[] = [];
 
+  // Frame-to-frame derivatives (A12 tolerance bands). dt of 0 (duplicate
+  // timestamp) or a first frame yields neutral rates — detectors then judge
+  // on the raw condition alone.
+  const dt = s.prevT !== null ? t - s.prevT : 0;
+  /** Signed acceleration, m/s² (negative = braking). */
+  const accelMps2 =
+    s.prevSpeedKmh !== null && dt > 0 ? (speed - s.prevSpeedKmh) / 3.6 / dt : 0;
+  /** Gap to the lead vehicle, or null when the road ahead is clear/unknown. */
+  const leadGapM =
+    tick.leadGapM !== undefined && Number.isFinite(tick.leadGapM) ? tick.leadGapM : null;
+  /** Rate the gap to the lead vehicle is opening, m/s (negative = closing). */
+  const gapOpeningMps =
+    leadGapM !== null && s.prevLeadGapM !== null && dt > 0
+      ? (leadGapM - s.prevLeadGapM) / dt
+      : 0;
+  /** Reverse-gear maneuvering (parking) — flow/lane detectors do not apply. */
+  const forwardGear = tick.gear >= 0;
+
   // -- 1. observation trackers (indicator history, mirror glances, full stops)
   if (tick.indicator === "left") s.lastIndicatorOnAt.left = t;
   if (tick.indicator === "right") s.lastIndicatorOnAt.right = t;
@@ -221,10 +254,13 @@ export function reduceTick(prev: RuleEngineState, tick: SimTick): ReduceResult {
   }
 
   // -- 3. lane-change detection (after glance/indicator trackers updated)
+  // Reverse gear is exempt (A12): backing across a lane boundary is a parking
+  // maneuver, judged by maneuver objectives — not a lane change.
   if (
     s.prevLaneId !== null &&
     tick.laneId !== s.prevLaneId &&
-    speed >= cfg.laneChangeMinSpeedKmh
+    speed >= cfg.laneChangeMinSpeedKmh &&
+    forwardGear
   ) {
     const dir: TurnDirection = tick.laneId > s.prevLaneId ? "left" : "right";
     const lastOn = s.lastIndicatorOnAt[dir];
@@ -284,18 +320,27 @@ export function reduceTick(prev: RuleEngineState, tick: SimTick): ReduceResult {
     events.push(makeViolation("HEADLIGHTS_OFF_AT_NIGHT", t));
   }
 
-  // Lane-keeping: sustained off-centre / straddling positioning while moving.
+  // Lane-keeping: sustained off-centre / straddling positioning while moving
+  // forward. Reverse maneuvering (bay/parallel parking) is legitimately
+  // off-centre and exempt (A12).
   const offCentre = Math.abs(tick.laneOffsetM) > cfg.laneKeepMaxOffsetM;
-  if (stepEpisode(s.laneKeeping, offCentre && moving, !offCentre, t, cfg.laneKeepSustainSec)) {
+  if (
+    stepEpisode(s.laneKeeping, offCentre && moving && forwardGear, !offCentre, t, cfg.laneKeepSustainSec)
+  ) {
     events.push(makeViolation("POOR_LANE_KEEPING", t));
   }
 
   // Speed for the conditions: within the posted limit, but too fast for rain /
-  // night. (Above the limit is regular speeding, handled above.)
+  // night. (Above the limit is regular speeding, handled above.) Factors
+  // compose by MIN — the single most restrictive condition governs; the
+  // product would double-bill a rainy night (A12). A factor of 1 means the
+  // condition does not reduce the prudent speed at all.
   const raining = tick.rain === true;
-  const conditionsReduced = raining || tick.isNight;
-  const conditionFactor =
-    (raining ? cfg.conditionSpeedRainFactor : 1) * (tick.isNight ? cfg.conditionSpeedNightFactor : 1);
+  const conditionFactor = Math.min(
+    raining ? cfg.conditionSpeedRainFactor : 1,
+    tick.isNight ? cfg.conditionSpeedNightFactor : 1,
+  );
+  const conditionsReduced = conditionFactor < 1;
   const conditionLimit = limit * conditionFactor;
   const tooFastForConditions =
     conditionsReduced && moving && speed > conditionLimit && speed <= gracedLimit;
@@ -319,37 +364,54 @@ export function reduceTick(prev: RuleEngineState, tick: SimTick): ReduceResult {
     events.push(makeViolation("HEADLIGHTS_OFF_IN_RAIN", t));
   }
 
-  // Following distance (2-second rule) — only above stop-and-go speed and when a
-  // lead vehicle is actually in the tick's gap channel.
-  const leadGap = tick.leadGapM;
+  // Following distance (2-second rule) — only above stop-and-go speed, when a
+  // lead vehicle is actually in the tick's gap channel, only below the grace
+  // ratio of the taught 2-second target, and never while the gap is already
+  // opening (cut-in recovery — the driver is fixing it; A12).
   const safeGapM = Math.max(cfg.followMinGapM, (speed / 3.6) * cfg.followSafeSeconds);
   const tailgating =
     moving &&
     speed >= cfg.followMinSpeedKmh &&
-    leadGap !== undefined &&
-    Number.isFinite(leadGap) &&
-    leadGap < safeGapM;
+    leadGapM !== null &&
+    leadGapM < safeGapM * cfg.followFireRatio &&
+    gapOpeningMps < cfg.followRecoveryRateMps;
   if (stepEpisode(s.following, tailgating, !tailgating, t, cfg.followSustainSec)) {
     events.push(makeViolation("FOLLOWING_TOO_CLOSE", t));
   }
 
-  // Wrong way against a one-way street (runtime sets tick.wrongWay).
-  const goingWrongWay = tick.wrongWay === true && moving;
+  // Wrong way against a one-way street (runtime sets tick.wrongWay). Reverse
+  // gear is exempt (A12): reversing into a parking spot moves against the
+  // flow by definition and is judged as a maneuver, not as wrong-way driving.
+  const goingWrongWay = tick.wrongWay === true && moving && forwardGear;
   if (stepEpisode(s.wrongWay, goingWrongWay, !goingWrongWay, t, cfg.wrongWaySustainSec)) {
     events.push(makeViolation("WRONG_WAY", t));
   }
 
   // Keep right: prolonged driving in a non-rightmost lane on a multi-lane road.
-  const inLeftLane = tick.laneId > 0 && (tick.laneCount ?? 1) > 1 && moving;
-  if (stepEpisode(s.keepRight, inLeftLane, !inLeftLane, t, cfg.keepRightSustainSec)) {
+  // Exempt while the LEFT indicator is on — declared left-turn positioning or
+  // an announced overtake is REQUIRED left-lane use (ЗДвП чл. 25), and exempt
+  // in reverse gear (parking maneuvers; A12).
+  const hoggingLeft =
+    tick.laneId > 0 &&
+    (tick.laneCount ?? 1) > 1 &&
+    moving &&
+    forwardGear &&
+    tick.indicator !== "left";
+  if (stepEpisode(s.keepRight, hoggingLeft, !hoggingLeft, t, cfg.keepRightSustainSec)) {
     events.push(makeViolation("NOT_KEEPING_RIGHT", t));
   }
 
-  // -- 5. pedestrian-crossing zone: track approach speed while a pedestrian is present
+  // -- 5. pedestrian-crossing zone: track approach speed while a pedestrian is
+  // present. A firm braking response (>= crossingBrakeResponseMps2) pauses the
+  // too-fast clock: entering the zone at a legal 45-50 km/h and braking hard
+  // takes longer than the sustain to get under the max — punishing the exact
+  // correct reaction would be a 10-point false positive (A12). Holding speed,
+  // or merely lifting off, still fires on the sustain.
   if (s.crossing) {
     const z = s.crossing;
     z.minSpeedKmh = Math.min(z.minSpeedKmh, speed);
-    if (z.pedestrianSeen && speed > cfg.crossingApproachMaxKmh) {
+    const respondingByBraking = accelMps2 <= -cfg.crossingBrakeResponseMps2;
+    if (z.pedestrianSeen && speed > cfg.crossingApproachMaxKmh && !respondingByBraking) {
       if (z.tooFastSince === null) z.tooFastSince = t;
       if (!z.tooFastEmitted && t - z.tooFastSince >= cfg.crossingTooFastSustainSec) {
         z.tooFastEmitted = true;
@@ -389,6 +451,8 @@ export function reduceTick(prev: RuleEngineState, tick: SimTick): ReduceResult {
   }
 
   s.prevT = t;
+  s.prevSpeedKmh = speed;
+  s.prevLeadGapM = leadGapM;
   return { state: s, events };
 }
 

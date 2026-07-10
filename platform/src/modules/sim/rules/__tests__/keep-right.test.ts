@@ -1,10 +1,13 @@
 import { describe, expect, it } from "vitest";
 import { codes, drive, tick } from "./fixtures";
 
-// keepRightSustainSec = 8 → needs a long stint in the left lane, not a brief overtake.
+// keepRightSustainSec = 12 → needs a long stint in the left lane, not an
+// overtake. (A12: was 8 s / a 10-tick stint here — that is the duration of a
+// legitimate pass of a slower vehicle, so the guilty fixture now hogs the
+// lane for a clearly-guilty 17 s instead.)
 describe("keep-right detector", () => {
   it("fires after a prolonged stint in a left lane on a multi-lane road", () => {
-    const ticks = Array.from({ length: 10 }, (_, t) =>
+    const ticks = Array.from({ length: 18 }, (_, t) =>
       tick(t, { speedKmh: 40, laneId: 1, laneCount: 2 }),
     );
     expect(codes(drive(ticks).events)).toContain("NOT_KEEPING_RIGHT");

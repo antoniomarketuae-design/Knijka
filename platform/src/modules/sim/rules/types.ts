@@ -239,7 +239,12 @@ export interface RuleEngineConfig {
   /** Seconds the dangerous-speeding condition must hold before it fires. */
   speedingDangerousSustainSec: number;
 
-  /** Speed at or under which the vehicle counts as fully stopped, km/h. */
+  /**
+   * Speed at or under which the vehicle counts as fully stopped, km/h.
+   * Must absorb physics-solver creep: a car held on the brake reads a small
+   * residual velocity (sub-1 km/h) from the rigid-body solver, and a full
+   * stop that never registers is a 10-point опасна false positive (A12).
+   */
   fullStopMaxSpeedKmh: number;
   /** Seconds the vehicle must remain fully stopped for the stop to qualify. */
   fullStopMinDurationSec: number;
@@ -265,9 +270,23 @@ export interface RuleEngineConfig {
   /** Seconds the off-centre condition must hold before POOR_LANE_KEEPING fires. */
   laneKeepSustainSec: number;
 
-  /** Prudent-speed factor on the posted limit in rain (0.85 = 15% below). */
+  /**
+   * Prudent-speed factor on the posted limit in rain (0.85 = 15% below).
+   * When several conditions apply the engine takes the MOST RESTRICTIVE
+   * single factor (min), never the product — multiplying factors double-bills
+   * a rainy night (0.85 x 0.9 = 0.765 would flag 40 km/h in a 50 zone, which
+   * is textbook-prudent driving; A12 FP case).
+   */
   conditionSpeedRainFactor: number;
-  /** Prudent-speed factor on the posted limit at night. */
+  /**
+   * Prudent-speed factor on the posted limit at night. 1 = night alone does
+   * not reduce the enforced prudent speed: the MVP world is lit urban Sofia,
+   * where driving AT the posted limit with low beams on is exactly what every
+   * competent driver does — any factor < 1 here flags at-the-limit night
+   * cruising, the single most common innocent night behaviour (A12 FP case).
+   * If unlit rural segments arrive, reintroduce a reduction as a per-segment
+   * world signal, not a blanket night factor.
+   */
   conditionSpeedNightFactor: number;
   /** Seconds too-fast-for-conditions must hold before it fires. */
   conditionsSpeedSustainSec: number;
@@ -278,9 +297,28 @@ export interface RuleEngineConfig {
   followSafeSeconds: number;
   /** Never flag below this gap floor (crawl / stop-and-go), meters. */
   followMinGapM: number;
-  /** Only judge following distance above this speed (below = stop-and-go), km/h. */
+  /**
+   * Only judge following distance above this speed (below = stop-and-go), km/h.
+   * Queue traffic legitimately rolls at 15-20 km/h with ~1-second gaps; the
+   * floor must sit above the queue-roll band or dense traffic spams
+   * FOLLOWING_TOO_CLOSE (A12 FP case — the genre's classic trust-killer).
+   */
   followMinSpeedKmh: number;
-  /** Seconds under the safe gap before FOLLOWING_TOO_CLOSE fires. */
+  /**
+   * Grace band on the time-gap target: the violation fires only below this
+   * fraction of the safe gap. The 2-second rule is the TAUGHT ideal; grading
+   * at 100% of it flags 1.7-second urban flow that no examiner would fault.
+   * 0.7 ≈ fires under ~1.26 s of actual gap — genuinely close (A12).
+   */
+  followFireRatio: number;
+  /**
+   * Gap-opening rate (m/s) at or above which tailgating is NOT counted: the
+   * driver is actively recovering. Protects the cut-in case — a car merging
+   * a few metres ahead puts the driver inside the safe gap through no fault
+   * of theirs; while they back off and the gap grows, no violation (A12).
+   */
+  followRecoveryRateMps: number;
+  /** Seconds under the fire threshold before FOLLOWING_TOO_CLOSE fires. */
   followSustainSec: number;
 
   /** Seconds against a one-way's flow before WRONG_WAY fires. */
@@ -290,13 +328,27 @@ export interface RuleEngineConfig {
   cleanDrivingDistanceM: number;
 
   /** Seconds in a non-rightmost lane (multi-lane) before NOT_KEEPING_RIGHT — long
-   *  enough that a normal overtake never trips it. */
+   *  enough that a normal overtake never trips it. A real pass of a slower
+   *  vehicle at a modest speed delta runs 10-15 s in the left lane; the hog
+   *  the rule targets sits there for tens of seconds (A12 tolerance band).
+   *  Left-lane time with the LEFT indicator on (declared overtake / left-turn
+   *  positioning) is exempt entirely — see engine.ts. */
   keepRightSustainSec: number;
 
   /** Max approach speed inside a crossing zone while a pedestrian is on the crossing, km/h. */
   crossingApproachMaxKmh: number;
   /** Seconds above the approach max before the too-fast violation fires. */
   crossingTooFastSustainSec: number;
+  /**
+   * Deceleration (m/s², positive number) at or above which the driver counts
+   * as actively responding to the pedestrian, pausing the too-fast clock.
+   * Entering the ~25-30 m zone at a legal 45-50 km/h and braking normally
+   * (~3 m/s²) takes ~1.5-2 s to get under the approach max — without this
+   * band the 10-point PEDESTRIAN_CROSSING_TOO_FAST fires DURING a correct,
+   * prompt braking response (A12 FP case). Barreling through at constant
+   * speed, or merely lifting off, still fires on the sustain unchanged.
+   */
+  crossingBrakeResponseMps2: number;
   /** To earn the yield commendation the vehicle must have slowed to at most this, km/h. */
   yieldSlowSpeedKmh: number;
 
@@ -310,7 +362,11 @@ export const DEFAULT_RULE_CONFIG: RuleEngineConfig = {
   speedingMinorSustainSec: 2,
   speedingDangerousSustainSec: 1,
 
-  fullStopMaxSpeedKmh: 0.5,
+  // A12: was 0.5 — physics-solver brake creep reads 0.5-1 km/h on a car that
+  // is genuinely stopped, and at 0.5 a real stop could never qualify (FP case:
+  // "physics-jitter full stop"). 1 km/h is still unambiguously a stop; a
+  // rolling stop at 3-4 km/h stays guilty.
+  fullStopMaxSpeedKmh: 1,
   fullStopMinDurationSec: 0.5,
   stopRecencySec: 6,
 
@@ -330,21 +386,38 @@ export const DEFAULT_RULE_CONFIG: RuleEngineConfig = {
   laneKeepSustainSec: 3, // conservative: only sustained wandering, not a brief drift
 
   conditionSpeedRainFactor: 0.85,
-  conditionSpeedNightFactor: 0.9,
+  // A12: was 0.9 — flagged driving AT the posted limit on lit urban streets at
+  // night (FP case: "night cruise at exactly the limit, lows on"). See the
+  // interface comment; factors compose by MIN, not product, so rain governs
+  // a rainy night at 0.85.
+  conditionSpeedNightFactor: 1,
   conditionsSpeedSustainSec: 3,
   rainLightsSustainSec: 3,
 
   followSafeSeconds: 1.8,
   followMinGapM: 4,
-  followMinSpeedKmh: 15,
+  // A12: was 15 — queue traffic rolls at 15-20 km/h with short gaps (FP case:
+  // "queue roll at 18 km/h"); above 20 km/h you are genuinely flowing.
+  followMinSpeedKmh: 20,
+  // A12: new grace band — fire only under 70% of the 2-second target
+  // (FP case: "urban flow at ~1.3 s gap"). Steady sub-1.3 s tailgating fires.
+  followFireRatio: 0.7,
+  // A12: new — a gap opening at >= 0.5 m/s means the driver is recovering
+  // from a cut-in; do not count those frames (FP case: "cut-in recovery").
+  followRecoveryRateMps: 0.5,
   followSustainSec: 2,
 
   wrongWaySustainSec: 1.5,
-  keepRightSustainSec: 8,
+  // A12: was 8 — a real overtake of a slower vehicle runs 10-15 s in the left
+  // lane (FP case: "10-second overtake"); a hog sits there far longer.
+  keepRightSustainSec: 12,
   cleanDrivingDistanceM: 250,
 
   crossingApproachMaxKmh: 30,
   crossingTooFastSustainSec: 1,
+  // A12: new — braking at >= 2 m/s² toward a pedestrian pauses the too-fast
+  // clock (FP case: "prompt firm brake from a legal approach speed").
+  crossingBrakeResponseMps2: 2,
   yieldSlowSpeedKmh: 10,
 
   collisionCooldownSec: 3,
