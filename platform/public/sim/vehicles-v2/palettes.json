@@ -1,0 +1,226 @@
+{
+  "colors": {
+    "silver": [
+      0.3,
+      0.31,
+      0.33
+    ],
+    "grey": [
+      0.15,
+      0.16,
+      0.17
+    ],
+    "white": [
+      0.64,
+      0.65,
+      0.65
+    ],
+    "black": [
+      0.024,
+      0.024,
+      0.028
+    ],
+    "dark_blue": [
+      0.032,
+      0.055,
+      0.13
+    ],
+    "midnight_blue": [
+      0.018,
+      0.03,
+      0.085
+    ],
+    "faded_blue": [
+      0.16,
+      0.21,
+      0.3
+    ],
+    "red": [
+      0.28,
+      0.045,
+      0.035
+    ],
+    "dark_red": [
+      0.13,
+      0.026,
+      0.03
+    ],
+    "dark_green": [
+      0.03,
+      0.085,
+      0.048
+    ],
+    "beige": [
+      0.36,
+      0.31,
+      0.21
+    ],
+    "brown": [
+      0.11,
+      0.066,
+      0.042
+    ],
+    "teal": [
+      0.035,
+      0.14,
+      0.14
+    ],
+    "orange": [
+      0.42,
+      0.14,
+      0.03
+    ],
+    "taxi_yellow": [
+      0.68,
+      0.44,
+      0.045
+    ],
+    "route_yellow": [
+      0.66,
+      0.4,
+      0.04
+    ],
+    "dark_grey": [
+      0.06,
+      0.062,
+      0.068
+    ]
+  },
+  "globalAmbientWeights": {
+    "grey": 18,
+    "white": 18,
+    "silver": 15,
+    "black": 15,
+    "dark_blue": 10,
+    "red": 7,
+    "dark_green": 4,
+    "beige": 4,
+    "brown": 3,
+    "orange": 2,
+    "teal": 2,
+    "faded_blue": 2
+  },
+  "models": {
+    "vela_h3": {
+      "archetype": "compact_hatchback",
+      "movingShare": 0.18,
+      "palette": {
+        "silver": 30,
+        "grey": 20,
+        "dark_blue": 18,
+        "red": 16,
+        "black": 16
+      }
+    },
+    "pino": {
+      "archetype": "city_hatchback",
+      "movingShare": 0.1,
+      "palette": {
+        "white": 30,
+        "red": 25,
+        "teal": 15,
+        "silver": 20,
+        "orange": 10
+      }
+    },
+    "corva_s": {
+      "archetype": "midsize_sedan",
+      "movingShare": 0.14,
+      "palette": {
+        "grey": 28,
+        "black": 22,
+        "dark_blue": 18,
+        "silver": 20,
+        "beige": 12
+      }
+    },
+    "dret_90": {
+      "archetype": "oldgen_sedan",
+      "movingShare": 0.08,
+      "palette": {
+        "dark_red": 25,
+        "dark_green": 20,
+        "beige": 20,
+        "silver": 20,
+        "faded_blue": 15
+      }
+    },
+    "corva_sw": {
+      "archetype": "wagon",
+      "movingShare": 0.12,
+      "palette": {
+        "dark_green": 25,
+        "grey": 22,
+        "dark_blue": 20,
+        "silver": 20,
+        "brown": 13
+      }
+    },
+    "arden_x": {
+      "archetype": "crossover",
+      "movingShare": 0.14,
+      "palette": {
+        "white": 28,
+        "grey": 24,
+        "brown": 16,
+        "dark_red": 16,
+        "black": 16
+      }
+    },
+    "kolos": {
+      "archetype": "boxy_suv",
+      "movingShare": 0.06,
+      "palette": {
+        "black": 50,
+        "dark_grey": 30,
+        "white": 20
+      }
+    },
+    "corva_l": {
+      "archetype": "luxury_sedan",
+      "movingShare": 0.02,
+      "palette": {
+        "black": 45,
+        "dark_grey": 30,
+        "midnight_blue": 25
+      }
+    },
+    "tarpan": {
+      "archetype": "pickup",
+      "movingShare": 0.02,
+      "palette": {
+        "white": 35,
+        "dark_blue": 25,
+        "red": 20,
+        "grey": 20
+      }
+    },
+    "kargo_v": {
+      "archetype": "panel_van",
+      "movingShare": 0.07,
+      "palette": {
+        "white": 70,
+        "grey": 15,
+        "dark_blue": 15
+      }
+    },
+    "kargo_m": {
+      "archetype": "minibus",
+      "movingShare": 0.03,
+      "palette": {
+        "route_yellow": 70,
+        "white": 20,
+        "grey": 10
+      }
+    },
+    "taxi": {
+      "archetype": "taxi",
+      "movingShare": 0.04,
+      "palette": {
+        "taxi_yellow": 90,
+        "dark_green": 10
+      }
+    }
+  },
+  "notes": "Parked-car spawns: shift +10% toward vela_h3/corva_s/dret_90. Wheel hub tint (silver vs dark) may be randomized per instance. Weights from Axalta 2025 EU adjusted for the ~19-yr-old BG parc."
+}
