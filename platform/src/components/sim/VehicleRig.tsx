@@ -205,7 +205,7 @@ export function VehicleRig({
           Hero "Aurelis GT-E" exterior (Draco glTF) + the existing „Виток"
           cockpit for the inside view. */}
       <group ref={chassisGroupRef}>
-        <HeroCarBody />
+        <HeroCarBody simRef={simRef} />
         <VitokCockpit simRef={simRef} inputRef={inputRef} cabinRef={cabinRef} />
 
         {/* Windshield glass — a faint cool-tinted, low-roughness plane raked

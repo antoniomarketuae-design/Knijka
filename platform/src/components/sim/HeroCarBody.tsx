@@ -8,27 +8,42 @@
  * the model's materials and only bump envMapIntensity so the paint/glass reflect
  * the scene HDRI. Exterior shell + separate wheel nodes; no modelled interior,
  * so the cockpit view keeps VitokCockpit (the outward-facing shell backface-culls
- * from inside). Wheels are rigged nodes but drawn static here for v1 — physics /
- * rule-engine grading read game state, not these meshes, so feel is unaffected.
+ * from inside).
+ *
+ * Wheels are rigged: the four `wheel_*` nodes roll about local X from speed and
+ * the front pair steers from `sim.steerRad`. Physics / rule-engine grading read
+ * game state, not these meshes, so feel is unaffected either way.
  *
  * Auto-fits to the physics chassis: uniform scale so the model width matches the
  * collider, and a Y offset so the wheels sit on the ground. `HERO_YAW` flips the
  * facing if it renders backward.
  */
 
-import { useMemo } from "react";
+import { useMemo, useRef, type RefObject } from "react";
+import { useFrame } from "@react-three/fiber";
 import { useGLTF } from "@react-three/drei";
-import { Box3, Mesh, MeshStandardMaterial, Vector3 } from "three";
-import { CHASSIS_HALF_EXTENTS } from "@/modules/sim/vehicle";
+import { Box3, Mesh, MeshStandardMaterial, Object3D, Vector3 } from "three";
+import { CHASSIS_HALF_EXTENTS, type VehicleSim } from "@/modules/sim/vehicle";
 
 const HERO_URL = "/sim/vehicles/hero_car.glb";
 /** Local Draco decoder (CSP-safe, no CDN) — copied to public/draco/. */
 const DRACO_PATH = "/draco/";
 /** 0, or Math.PI if the car renders facing backward, after a look. */
 const HERO_YAW = 0;
+/** Approx tyre radius (m) for the roll rate (car is scaled to ~real size). */
+const WHEEL_RADIUS_M = 0.34;
+/** Visual front-wheel steer as a fraction of the physics steer angle. */
+const STEER_VISUAL = 1.0;
 
-export function HeroCarBody() {
+interface Wheel {
+  node: Object3D;
+  front: boolean;
+}
+
+export function HeroCarBody({ simRef }: { simRef?: RefObject<VehicleSim | null> }) {
   const { scene } = useGLTF(HERO_URL, DRACO_PATH);
+  const wheels = useRef<Wheel[]>([]);
+  const roll = useRef(0);
 
   const { model, scale, offsetY } = useMemo(() => {
     const root = scene.clone(true);
@@ -46,6 +61,17 @@ export function HeroCarBody() {
       }
     });
 
+    // Collect the rigged wheel nodes (steer applied before roll → YXZ order).
+    const found: Wheel[] = [];
+    for (const name of ["wheel_FL", "wheel_FR", "wheel_RL", "wheel_RR"]) {
+      const node = root.getObjectByName(name);
+      if (node) {
+        node.rotation.order = "YXZ";
+        found.push({ node, front: name.startsWith("wheel_F") });
+      }
+    }
+    wheels.current = found;
+
     // Auto-fit to the collider: scale model width → collider width, then drop it
     // so its lowest point (tyre contact) sits at the collider bottom (-h.y).
     const bbox = new Box3().setFromObject(root);
@@ -56,6 +82,18 @@ export function HeroCarBody() {
     const fitOffsetY = -CHASSIS_HALF_EXTENTS.y - bbox.min.y * fitScale;
     return { model: root, scale: fitScale, offsetY: fitOffsetY };
   }, [scene]);
+
+  useFrame((_, delta) => {
+    const sim = simRef?.current;
+    if (!sim || wheels.current.length === 0) return;
+    const speedMps = sim.speedKmh / 3.6;
+    roll.current += (speedMps / WHEEL_RADIUS_M) * delta;
+    const steer = (sim.steerRad ?? 0) * STEER_VISUAL;
+    for (const w of wheels.current) {
+      w.node.rotation.x = roll.current;
+      w.node.rotation.y = w.front ? steer : 0;
+    }
+  });
 
   return (
     <group scale={scale} position={[0, offsetY, 0]} rotation={[0, HERO_YAW, 0]}>
