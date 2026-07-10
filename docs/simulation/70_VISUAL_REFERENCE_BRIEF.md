@@ -114,3 +114,30 @@ wet asphalt — strong reflections (our env-map handles this).
    Blender, better silhouettes than v1 (~1–3k tris each is acceptable).
 4. **The de-badged boxy luxury SUV** (REF 4) at hero quality.
 5. Everything web-budget-disciplined: Draco'd GLBs, instanced rendering, existing pipelines.
+
+---
+
+## REF 5 — CURRENT STATE, chase view (founder screenshot 2026-07-10, post-integration)
+
+What the sim actually looks like now (the gap's "before"): washed-out, low-contrast scene.
+Buildings render as FLAT UNTEXTURED boxes — pale grey/white prisms with dark window
+rectangles, zero facade texture/relief/material variation; one brick-red block visible.
+Ground is uniform pale concrete/asphalt with almost no tonal variation, road/plaza boundary
+barely readable; one saturated flat-green lawn patch (no texture). Sky: flat pale blue,
+no gradient interest. Lighting: flat ambient, weak shadows, no warm sun direction, no
+atmosphere/fog depth. Traffic: recognizable low-poly cars but toy-like — flat paint, no
+material response visible at distance, simple boxes with wheels (one police car with
+lightbar reads well). Palms/trees read OK but saturated flat green. The hero car (player)
+looks good — glossy dark paint with sun highlight + full-width tail light bar. Street
+lamps/bench present. Overall verdict: geometry/layout is there; MATERIALS, TEXTURES,
+LIGHTING/ATMOSPHERE and GROUND VARIETY are missing — that's the gap.
+
+## REF 6 — CURRENT STATE, cockpit view (founder screenshot, post-reframe)
+
+The 40-50% interior contract OVERSHOT: dash + wheel + roof header now dominate so much
+that the windshield is a thin letterbox strip — the student sees "almost nothing" of the
+road (founder's words). Cluster/wheel/console read well; rear-view mirror shows a dark
+smear; left door mirror shows solid green (grass — aim/exposure wrong). The fix direction:
+interior presence YES, but the WINDSHIELD must get ~50-55% of frame with a clear view of
+the road 10-100 m ahead; reduce roof-header intrusion (raise pitch or lower eye), fix
+mirror cam aim/exposure. Balance target = REF 2 (CCD): dash visible but the WORLD readable.
