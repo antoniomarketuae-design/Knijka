@@ -1,53 +1,387 @@
 "use client";
 
 /**
- * Instanced street props:
- * - TrafficLights: housings (1 instanced mesh) + lamps (1 instanced mesh,
- *   per-instance color driven each frame from `getSignalPhase(nodeId)` —
- *   phase LOGIC lives in runtime/WorldRuntime; this only lights lamps).
- * - SignPoles: shared pole instanced mesh + one instanced plate mesh per
- *   sign kind (textured from the SVG catalog with procedural fallback).
- * - Streetlights: housing + emissive head (night glow).
- * - Trees: 4 real Kenney low-poly GLB models, one instanced mesh each,
- *   vertex-colored (baked from glTF base colors); procedural blob fallback
- *   until the GLBs load.
+ * Instanced street props — now dressed with the authored 3D GLB kits
+ * (public/sim/signs + public/sim/streetscape, Draco-compressed) instead of the
+ * old flat SVG plates + primitive poles.
  *
- * Draw calls: 2 (signals) + 5 (signs) + 2 (streetlights) + 4 (trees) = 13.
+ * Every prop family is still INSTANCED (one InstancedMesh per model + material
+ * group) and placed at the exact positions the pure builder emits
+ * (world.signs / trafficLights / streetlights / trees). The GLBs load once
+ * through a reference-counted module cache (mirrors cityModels.ts); each is
+ * baked into a single vertex-coloured geometry per solid-colour body (baseColor
+ * → vertex colour, so a multi-material prop draws in ONE call) plus, for signs,
+ * a separate textured "face" group that keeps the correct baked Bulgarian sign
+ * graphic (fixes the old roundabout wrong-face bug inherently — sign_roundabout
+ * carries г12 "кръгово движение").
+ *
+ * Facing: authored props address the driver on their local -Z; the placement
+ * convention is local +Z → driver (yawFromFacing). We therefore bake a 180°
+ * yaw into the sign + signal geometry, and -90° into the street lamp (its arm
+ * is modelled along +X and must reach over the road on local +Z).
+ *
+ * Metal/glass materials get a modest envMapIntensity bump so they catch the
+ * scene HDRI (scene.environment, set by the scene's <Environment>).
+ *
+ * Draw calls (WorldProps only; CityBuildings is separate + chunked):
+ *   signals 2 (housing + lamps) + signs 8 (4 kinds × body+face)
+ *   + streetlights 2 (housing + glow) + trees 2 (palm + ornamental)
+ *   + furniture 4 (bench + bollard + trash_bin + planter) = 18  (was 13).
+ * All fixed + instanced; low tier decimates trees via preset.treeFraction.
  */
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
+import type { GLTF } from "three/examples/jsm/loaders/GLTFLoader.js";
 import type { SignalPhase } from "../../contracts";
-import type { SignKind, TreePlacement, WorldGeometry } from "../types";
-import { loadSignTextureFromSvg, proceduralSignTexture } from "../textures/signTextures";
+import type { SignKind, StaticTransform, TreePlacement, WorldGeometry } from "../types";
+import { createGltfLoader } from "./gltfLoader";
 import {
   createInstancedMesh,
   createOffsetInstancedMesh,
   disposeAll,
   mergeSafe,
-  paintGeometry,
 } from "./three-helpers";
-import { preloadTreeModels, TREE_MODEL_FILES, useTreeModels } from "./treeModels";
 import { CityBuildings } from "./CityBuildings";
 import type { QualityPreset } from "./quality";
 
-// Start fetching + baking the Kenney tree GLBs as soon as this module loads,
-// before any <Trees/> mounts (no-op on the server).
-preloadTreeModels();
+const SIGN_BASE = "/sim/signs";
+const STREET_BASE = "/sim/streetscape";
 
-const METAL = 0x3c4043;
-const DARK_HOUSING = 0x232527;
+/** sim SignKind → authored 3D sign GLB (correct Bulgarian face baked in). */
+const SIGN_GLB: Record<SignKind, string> = {
+  stop: "sign_stop",
+  giveWay: "sign_give_way",
+  limit50: "sign_speed_limit_50",
+  roundabout: "sign_roundabout",
+};
+const SIGN_KINDS = Object.keys(SIGN_GLB) as SignKind[];
 
 // ---------------------------------------------------------------------------
-// Traffic lights
+// GLB baking
 // ---------------------------------------------------------------------------
 
-// Lamp local offsets on the head (x, y, z-forward): red top, yellow, green.
+/**
+ * Merge the selected mesh primitives of a loaded GLB scene into ONE geometry
+ * whose per-vertex colour is baked from each primitive's glTF baseColorFactor
+ * (linear → linear, copies straight across). Optional Y-rotation is applied
+ * before normalisation so facing + centring land in the final frame.
+ */
+function bakeVertexColored(
+  scene: THREE.Object3D,
+  opts: {
+    include?: (materialName: string) => boolean;
+    rotateY?: number;
+    centerXZ?: boolean;
+  } = {},
+): THREE.BufferGeometry {
+  scene.updateWorldMatrix(true, true);
+  const parts: THREE.BufferGeometry[] = [];
+
+  scene.traverse((obj) => {
+    const mesh = obj as THREE.Mesh;
+    if (!mesh.isMesh) return;
+    const src = mesh.geometry;
+    const pos = src.getAttribute("position");
+    if (!pos) return;
+    const mat = (Array.isArray(mesh.material) ? mesh.material[0] : mesh.material) as
+      | THREE.MeshStandardMaterial
+      | undefined;
+    if (opts.include && !opts.include(mat?.name ?? "")) return;
+
+    const g = new THREE.BufferGeometry();
+    g.setAttribute("position", pos.clone());
+    const nor = src.getAttribute("normal");
+    if (nor) g.setAttribute("normal", nor.clone());
+    if (src.index) g.setIndex(src.index.clone());
+    g.applyMatrix4(mesh.matrixWorld);
+    if (!nor) g.computeVertexNormals();
+
+    const color = mat?.color ?? new THREE.Color(0xffffff);
+    const count = pos.count;
+    const colors = new Float32Array(count * 3);
+    for (let i = 0; i < count; i++) {
+      colors[i * 3] = color.r;
+      colors[i * 3 + 1] = color.g;
+      colors[i * 3 + 2] = color.b;
+    }
+    g.setAttribute("color", new THREE.BufferAttribute(colors, 3));
+    parts.push(g);
+  });
+
+  if (parts.length === 0) throw new Error("bakeVertexColored: no matching geometry");
+  const merged = mergeSafe(parts, false);
+  for (const p of parts) p.dispose();
+  if (opts.rotateY) merged.rotateY(opts.rotateY);
+
+  merged.computeBoundingBox();
+  const bb = merged.boundingBox!;
+  const dx = opts.centerXZ ? (bb.min.x + bb.max.x) / 2 : 0;
+  const dz = opts.centerXZ ? (bb.min.z + bb.max.z) / 2 : 0;
+  const dy = bb.min.y; // base to y=0
+  if (dx || dy || dz) merged.translate(-dx, -dy, -dz);
+  merged.computeBoundingSphere();
+  return merged;
+}
+
+/**
+ * Extract the sign's textured face primitive (material name starts with
+ * "face_") as its own geometry + a cloned material that keeps the baked webp
+ * face (alphaMode MASK → alphaTest 0.5). Same Y-rotation as the body so they
+ * stay aligned.
+ */
+function bakeSignFace(
+  scene: THREE.Object3D,
+  rotateY: number,
+): { geometry: THREE.BufferGeometry; material: THREE.MeshStandardMaterial } {
+  scene.updateWorldMatrix(true, true);
+  let out: { geometry: THREE.BufferGeometry; material: THREE.MeshStandardMaterial } | null = null;
+
+  scene.traverse((obj) => {
+    const mesh = obj as THREE.Mesh;
+    if (!mesh.isMesh || out) return;
+    const mat = (Array.isArray(mesh.material) ? mesh.material[0] : mesh.material) as
+      | THREE.MeshStandardMaterial
+      | undefined;
+    if (!mat || !mat.name.startsWith("face_")) return;
+
+    const src = mesh.geometry;
+    const g = new THREE.BufferGeometry();
+    g.setAttribute("position", src.getAttribute("position").clone());
+    const nor = src.getAttribute("normal");
+    if (nor) g.setAttribute("normal", nor.clone());
+    const uv = src.getAttribute("uv");
+    if (uv) g.setAttribute("uv", uv.clone());
+    if (src.index) g.setIndex(src.index.clone());
+    g.applyMatrix4(mesh.matrixWorld);
+    if (!nor) g.computeVertexNormals();
+    if (rotateY) g.rotateY(rotateY);
+    g.computeBoundingSphere();
+
+    const material = mat.clone();
+    material.envMapIntensity = 1.2; // modest HDRI catch on the retroreflective face
+    material.needsUpdate = true;
+    out = { geometry: g, material };
+  });
+
+  if (!out) throw new Error("bakeSignFace: no face_* primitive found");
+  return out;
+}
+
+// ---------------------------------------------------------------------------
+// Prop asset cache (reference-counted, mirrors cityModels.ts)
+// ---------------------------------------------------------------------------
+
+interface SignAsset {
+  body: THREE.BufferGeometry;
+  faceGeometry: THREE.BufferGeometry;
+  faceMaterial: THREE.MeshStandardMaterial;
+}
+
+interface PropAssets {
+  signs: Record<SignKind, SignAsset>;
+  signalHousing: THREE.BufferGeometry;
+  streetlightHousing: THREE.BufferGeometry;
+  streetlightGlow: THREE.BufferGeometry;
+  palm: THREE.BufferGeometry;
+  ornamental: THREE.BufferGeometry;
+  furniture: {
+    bench: THREE.BufferGeometry;
+    bollard: THREE.BufferGeometry;
+    trashBin: THREE.BufferGeometry;
+    planter: THREE.BufferGeometry;
+  };
+  /** Shared vertex-colour materials (one per prop family). */
+  materials: {
+    signBody: THREE.MeshStandardMaterial;
+    signalHousing: THREE.MeshStandardMaterial;
+    streetSteel: THREE.MeshStandardMaterial;
+    tree: THREE.MeshStandardMaterial;
+    furniture: THREE.MeshStandardMaterial;
+  };
+}
+
+function makeSharedMaterials(): PropAssets["materials"] {
+  const std = (metalness: number, roughness: number, envMapIntensity: number) =>
+    new THREE.MeshStandardMaterial({ vertexColors: true, metalness, roughness, envMapIntensity });
+  return {
+    signBody: std(0.5, 0.5, 1.4), // galvanised poles/brackets catch the sky
+    signalHousing: std(0.3, 0.55, 1.3),
+    streetSteel: std(0.45, 0.5, 1.3),
+    tree: std(0.0, 0.9, 1.0),
+    furniture: std(0.3, 0.6, 1.2),
+  };
+}
+
+async function buildPropAssets(): Promise<PropAssets> {
+  const loader = createGltfLoader();
+  const load = (base: string, file: string): Promise<GLTF> => loader.loadAsync(`${base}/${file}.glb`);
+
+  const [
+    stop,
+    giveWay,
+    limit50,
+    roundabout,
+    signal,
+    lamp,
+    palm,
+    ornamental,
+    bench,
+    bollard,
+    trashBin,
+    planter,
+  ] = await Promise.all([
+    load(SIGN_BASE, SIGN_GLB.stop),
+    load(SIGN_BASE, SIGN_GLB.giveWay),
+    load(SIGN_BASE, SIGN_GLB.limit50),
+    load(SIGN_BASE, SIGN_GLB.roundabout),
+    load(SIGN_BASE, "signal_head_3"),
+    load(STREET_BASE, "street_lamp"),
+    load(STREET_BASE, "palm_tree"),
+    load(STREET_BASE, "ornamental_tree"),
+    load(STREET_BASE, "bench"),
+    load(STREET_BASE, "bollard"),
+    load(STREET_BASE, "trash_bin"),
+    load(STREET_BASE, "planter"),
+  ]);
+
+  const bakeSign = (gltf: GLTF): SignAsset => {
+    const body = bakeVertexColored(gltf.scene, {
+      include: (n) => !n.startsWith("face_"),
+      rotateY: Math.PI,
+    });
+    const face = bakeSignFace(gltf.scene, Math.PI);
+    return { body, faceGeometry: face.geometry, faceMaterial: face.material };
+  };
+
+  const signs: Record<SignKind, SignAsset> = {
+    stop: bakeSign(stop),
+    giveWay: bakeSign(giveWay),
+    limit50: bakeSign(limit50),
+    roundabout: bakeSign(roundabout),
+  };
+
+  const signalHousing = bakeVertexColored(signal.scene, {
+    include: (n) => !n.startsWith("lamp_"),
+    rotateY: Math.PI,
+  });
+
+  const streetlightHousing = bakeVertexColored(lamp.scene, {
+    include: (n) => n !== "lamp_lit",
+    rotateY: -Math.PI / 2,
+  });
+  const streetlightGlow = bakeVertexColored(lamp.scene, {
+    include: (n) => n === "lamp_lit",
+    rotateY: -Math.PI / 2,
+  });
+
+  return {
+    signs,
+    signalHousing,
+    streetlightHousing,
+    streetlightGlow,
+    palm: bakeVertexColored(palm.scene, { centerXZ: true }),
+    ornamental: bakeVertexColored(ornamental.scene, { centerXZ: true }),
+    furniture: {
+      bench: bakeVertexColored(bench.scene, { centerXZ: true }),
+      bollard: bakeVertexColored(bollard.scene, { centerXZ: true }),
+      trashBin: bakeVertexColored(trashBin.scene, { centerXZ: true }),
+      planter: bakeVertexColored(planter.scene, { centerXZ: true }),
+    },
+    materials: makeSharedMaterials(),
+  };
+}
+
+function disposePropAssets(a: PropAssets): void {
+  for (const kind of SIGN_KINDS) {
+    a.signs[kind].body.dispose();
+    a.signs[kind].faceGeometry.dispose();
+    a.signs[kind].faceMaterial.map?.dispose();
+    a.signs[kind].faceMaterial.dispose();
+  }
+  disposeAll([
+    a.signalHousing,
+    a.streetlightHousing,
+    a.streetlightGlow,
+    a.palm,
+    a.ornamental,
+    a.furniture.bench,
+    a.furniture.bollard,
+    a.furniture.trashBin,
+    a.furniture.planter,
+    ...Object.values(a.materials),
+  ]);
+}
+
+interface CacheEntry {
+  assets: PropAssets | null;
+  promise: Promise<PropAssets>;
+  refs: number;
+}
+let entry: CacheEntry | null = null;
+
+function ensureEntry(): CacheEntry {
+  if (!entry) {
+    const promise = buildPropAssets().then((assets) => {
+      if (entry) entry.assets = assets;
+      return assets;
+    });
+    entry = { assets: null, promise, refs: 0 };
+  }
+  return entry;
+}
+function acquire(): Promise<PropAssets> {
+  const e = ensureEntry();
+  e.refs += 1;
+  return e.promise;
+}
+function release(): void {
+  if (!entry) return;
+  entry.refs -= 1;
+  if (entry.refs <= 0) {
+    const e = entry;
+    entry = null;
+    e.promise.then(disposePropAssets).catch(() => {
+      /* load failed — nothing to dispose */
+    });
+  }
+}
+
+/** Warm the cache as soon as this module loads (no-op on the server). */
+function preloadPropModels(): void {
+  if (typeof window === "undefined") return;
+  ensureEntry();
+}
+preloadPropModels();
+
+/** Returns the baked prop assets, or null until they load / on the server. */
+function usePropModels(): PropAssets | null {
+  const [assets, setAssets] = useState<PropAssets | null>(null);
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    let active = true;
+    acquire().then((a) => {
+      if (active) setAssets(a);
+    });
+    return () => {
+      active = false;
+      setAssets(null);
+      release();
+    };
+  }, []);
+  return assets;
+}
+
+// ---------------------------------------------------------------------------
+// Traffic lights (GLB housing + per-frame lens emissives)
+// ---------------------------------------------------------------------------
+
+// Lens local offsets on the housing (rotated frame): red top, yellow, green.
 const LAMP_OFFSETS: [number, number, number][] = [
-  [0, 3.06, 0.13],
-  [0, 2.82, 0.13],
-  [0, 2.58, 0.13],
+  [0, 2.85, 0.15],
+  [0, 2.55, 0.15],
+  [0, 2.25, 0.15],
 ];
 
 const LAMP_ON = {
@@ -74,39 +408,31 @@ function lampColorsFor(phase: SignalPhase): [THREE.Color, THREE.Color, THREE.Col
 
 function TrafficLights({
   world,
+  assets,
   preset,
   getSignalPhase,
 }: {
   world: WorldGeometry;
+  assets: PropAssets;
   preset: QualityPreset;
   getSignalPhase?: (signalNodeId: string) => SignalPhase;
 }) {
   const lights = world.trafficLights;
 
   const housing = useMemo(() => {
-    const pole = new THREE.CylinderGeometry(0.055, 0.07, 3.3, 8).translate(0, 1.65, 0);
-    const head = new THREE.BoxGeometry(0.3, 0.82, 0.22).translate(0, 2.82, 0);
-    const geometry = mergeSafe([pole, head], false);
-    pole.dispose();
-    head.dispose();
-    const material = new THREE.MeshStandardMaterial({
-      color: DARK_HOUSING,
-      roughness: 0.6,
-      metalness: 0.35,
-    });
-    const mesh = createInstancedMesh(geometry, material, lights, {
+    const mesh = createInstancedMesh(assets.signalHousing, assets.materials.signalHousing, lights, {
       castShadow: preset.castShadows === "full",
       name: "traffic-light-housings",
     });
-    return { geometry, material, mesh };
-  }, [lights, preset.castShadows]);
+    return mesh;
+  }, [assets, lights, preset.castShadows]);
+  useEffect(() => () => housing.dispose(), [housing]);
 
   const lamps = useMemo(() => {
-    const geometry = new THREE.SphereGeometry(0.082, 10, 8);
+    const geometry = new THREE.SphereGeometry(0.085, 10, 8);
     const material = new THREE.MeshBasicMaterial({ toneMapped: false });
     const mesh = createOffsetInstancedMesh(geometry, material, lights, LAMP_OFFSETS);
     mesh.name = "traffic-light-lamps";
-    // Initialize instance colors so the attribute exists before frame 1.
     const initial = lampColorsFor("green");
     for (let i = 0; i < lights.length; i++) {
       mesh.setColorAt(i * 3, initial[0]);
@@ -115,14 +441,6 @@ function TrafficLights({
     }
     return { geometry, material, mesh };
   }, [lights]);
-
-  useEffect(
-    () => () => {
-      disposeAll([housing.geometry, housing.material]);
-      housing.mesh.dispose();
-    },
-    [housing],
-  );
   useEffect(
     () => () => {
       disposeAll([lamps.geometry, lamps.material]);
@@ -131,7 +449,6 @@ function TrafficLights({
     [lamps],
   );
 
-  // Per-frame lamp state, mutated through refs (R3F escape hatch).
   const lampsRef = useRef<THREE.InstancedMesh | null>(null);
   const lastPhases = useRef<(SignalPhase | null)[]>([]);
   useEffect(() => {
@@ -157,205 +474,103 @@ function TrafficLights({
 
   return (
     <group name="traffic-lights">
-      <primitive object={housing.mesh} />
+      <primitive object={housing} />
       <primitive object={lamps.mesh} ref={lampsRef} />
     </group>
   );
 }
 
 // ---------------------------------------------------------------------------
-// Sign poles
+// Signs (3D GLB: vertex-coloured body + textured face, per kind)
 // ---------------------------------------------------------------------------
 
-/** Plate mount heights per kind (Д11 rides above Б1 on shared poles). */
-const PLATE_HEIGHT: Record<SignKind, number> = {
-  stop: 2.35,
-  giveWay: 2.05,
-  limit50: 2.35,
-  roundabout: 2.72,
-};
-
-const SIGN_KINDS: SignKind[] = ["stop", "giveWay", "limit50", "roundabout"];
-
-function SignPoles({
+function Signs({
   world,
+  assets,
   preset,
-  signSvgBaseUrl,
 }: {
   world: WorldGeometry;
+  assets: PropAssets;
   preset: QualityPreset;
-  signSvgBaseUrl: string | null;
 }) {
   const signs = world.signs;
 
-  // Procedural sign faces render immediately; the real catalog SVGs replace
-  // them when fetched (plates rebuild — cheap, a few hundred instances).
-  const procedural = useMemo(
-    () => ({
-      stop: proceduralSignTexture("stop", preset.signTextureSize),
-      giveWay: proceduralSignTexture("giveWay", preset.signTextureSize),
-      limit50: proceduralSignTexture("limit50", preset.signTextureSize),
-      roundabout: proceduralSignTexture("roundabout", preset.signTextureSize),
-    }),
-    [preset.signTextureSize],
-  );
-  useEffect(() => () => disposeAll(Object.values(procedural)), [procedural]);
-
-  const [svgTextures, setSvgTextures] = useState<Partial<
-    Record<SignKind, THREE.Texture>
-  > | null>(null);
-  useEffect(() => {
-    if (!signSvgBaseUrl) return;
-    let cancelled = false;
-    const loaded: Partial<Record<SignKind, THREE.Texture>> = {};
-    Promise.all(
-      SIGN_KINDS.map(async (kind) => {
-        const tex = await loadSignTextureFromSvg(kind, signSvgBaseUrl, preset.signTextureSize);
-        if (tex) loaded[kind] = tex;
-      }),
-    ).then(() => {
-      if (cancelled || Object.keys(loaded).length === 0) {
-        disposeAll(Object.values(loaded));
-        return;
-      }
-      setSvgTextures(loaded);
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [signSvgBaseUrl, preset.signTextureSize]);
-  useEffect(
-    () => () => {
-      if (svgTextures) disposeAll(Object.values(svgTextures));
-    },
-    [svgTextures],
-  );
-
-  const poles = useMemo(() => {
-    // One pole per placement EXCEPT roundabout plates (shared pole with Б1).
-    const poleTransforms = signs.filter((s) => s.kind !== "roundabout");
-    const geometry = new THREE.CylinderGeometry(0.035, 0.045, 2.9, 8).translate(0, 1.45, 0);
-    const material = new THREE.MeshStandardMaterial({
-      color: METAL,
-      roughness: 0.55,
-      metalness: 0.5,
-    });
-    const mesh = createInstancedMesh(geometry, material, poleTransforms, {
-      castShadow: preset.castShadows === "full",
-      name: "sign-poles",
-    });
-    return { geometry, material, mesh };
-  }, [signs, preset.castShadows]);
-  useEffect(
-    () => () => {
-      disposeAll([poles.geometry, poles.material]);
-      poles.mesh.dispose();
-    },
-    [poles],
-  );
-
-  const plates = useMemo(() => {
-    const base = new THREE.PlaneGeometry(0.72, 0.72);
-    const list = SIGN_KINDS.map((kind) => {
-      const geometry = base.clone().translate(0, PLATE_HEIGHT[kind], 0.05);
-      const material = new THREE.MeshStandardMaterial({
-        map: svgTextures?.[kind] ?? procedural[kind],
-        alphaTest: 0.35,
-        side: THREE.DoubleSide,
-        roughness: 0.5,
-        metalness: 0.1,
-      });
-      const mesh = createInstancedMesh(
-        geometry,
-        material,
-        signs.filter((s) => s.kind === kind),
-        { name: `signs-${kind}` },
+  const meshes = useMemo(() => {
+    const castShadow = preset.castShadows === "full";
+    const out: THREE.InstancedMesh[] = [];
+    for (const kind of SIGN_KINDS) {
+      const placements = signs.filter((s) => s.kind === kind);
+      if (placements.length === 0) continue;
+      const a = assets.signs[kind];
+      out.push(
+        createInstancedMesh(a.body, assets.materials.signBody, placements, {
+          castShadow,
+          name: `signs-${kind}-body`,
+        }),
       );
-      return { kind, geometry, material, mesh };
-    });
-    base.dispose();
-    return list;
-  }, [signs, procedural, svgTextures]);
-  useEffect(
-    () => () => {
-      for (const p of plates) {
-        p.geometry.dispose();
-        p.material.dispose();
-        p.mesh.dispose();
-      }
-    },
-    [plates],
-  );
+      out.push(
+        createInstancedMesh(a.faceGeometry, a.faceMaterial, placements, {
+          castShadow: false,
+          name: `signs-${kind}-face`,
+        }),
+      );
+    }
+    return out;
+  }, [assets, signs, preset.castShadows]);
+  useEffect(() => () => disposeAll(meshes), [meshes]);
 
   return (
-    <group name="sign-poles">
-      <primitive object={poles.mesh} />
-      {plates.map((p) => (
-        <primitive key={p.kind} object={p.mesh} />
+    <group name="signs">
+      {meshes.map((m, i) => (
+        <primitive key={i} object={m} />
       ))}
     </group>
   );
 }
 
 // ---------------------------------------------------------------------------
-// Streetlights
+// Streetlights (GLB housing + emissive head gated on night)
 // ---------------------------------------------------------------------------
 
 function Streetlights({
   world,
+  assets,
   preset,
   night,
 }: {
   world: WorldGeometry;
+  assets: PropAssets;
   preset: QualityPreset;
   night: boolean;
 }) {
   const lights = world.streetlights;
 
-  const housing = useMemo(() => {
-    const pole = new THREE.CylinderGeometry(0.05, 0.075, 5.6, 8).translate(0, 2.8, 0);
-    const arm = new THREE.CylinderGeometry(0.04, 0.045, 1.5, 6)
-      .rotateX(Math.PI / 2 - 0.35)
-      .translate(0, 5.75, 0.62);
-    const head = new THREE.BoxGeometry(0.24, 0.1, 0.62).translate(0, 6.0, 1.28);
-    const geometry = mergeSafe([pole, arm, head], false);
-    pole.dispose();
-    arm.dispose();
-    head.dispose();
-    const material = new THREE.MeshStandardMaterial({
-      color: METAL,
-      roughness: 0.6,
-      metalness: 0.45,
-    });
-    const mesh = createInstancedMesh(geometry, material, lights, {
-      castShadow: preset.castShadows === "full",
-      name: "streetlight-housings",
-    });
-    return { geometry, material, mesh };
-  }, [lights, preset.castShadows]);
-  useEffect(
-    () => () => {
-      disposeAll([housing.geometry, housing.material]);
-      housing.mesh.dispose();
-    },
-    [housing],
+  const housing = useMemo(
+    () =>
+      createInstancedMesh(assets.streetlightHousing, assets.materials.streetSteel, lights, {
+        castShadow: preset.castShadows === "full",
+        name: "streetlight-housings",
+      }),
+    [assets, lights, preset.castShadows],
   );
+  useEffect(() => () => housing.dispose(), [housing]);
 
-  // Rebuilds on night toggle (rare, cheap) — keeps materials immutable.
+  // Rebuilds on night toggle (rare, cheap) — keeps the material immutable.
   const glow = useMemo(() => {
-    const geometry = new THREE.BoxGeometry(0.2, 0.04, 0.54).translate(0, 5.94, 1.28);
     const material = new THREE.MeshStandardMaterial({
-      color: 0x8f9498,
-      emissive: 0xffd9a0,
-      emissiveIntensity: night ? 2.4 : 0,
+      color: 0x2a2a2a,
+      emissive: 0xffe6c2,
+      emissiveIntensity: night ? 2.6 : 0,
       roughness: 0.4,
     });
-    const mesh = createInstancedMesh(geometry, material, lights, { name: "streetlight-glow" });
-    return { geometry, material, mesh };
-  }, [lights, night]);
+    const mesh = createInstancedMesh(assets.streetlightGlow, material, lights, {
+      name: "streetlight-glow",
+    });
+    return { material, mesh };
+  }, [assets, lights, night]);
   useEffect(
     () => () => {
-      disposeAll([glow.geometry, glow.material]);
+      glow.material.dispose();
       glow.mesh.dispose();
     },
     [glow],
@@ -363,141 +578,133 @@ function Streetlights({
 
   return (
     <group name="streetlights">
-      <primitive object={housing.mesh} />
+      <primitive object={housing} />
       <primitive object={glow.mesh} />
     </group>
   );
 }
 
 // ---------------------------------------------------------------------------
-// Trees
+// Trees (palm + ornamental GLBs, mixed deterministically)
 // ---------------------------------------------------------------------------
 
-const TRUNK = 0x6b5340;
-const FOLIAGE = [0x5d7a4a, 0x6f8c52, 0x4c6b45];
-
-/**
- * Deterministic 4-way bucket: fold the builder's variant with a hash of the
- * (already deterministic) world position so all four GLB models get used while
- * placement stays fully reproducible.
- */
-function modelIndexFor(t: TreePlacement): number {
-  const n = TREE_MODEL_FILES.length;
+/** Deterministic 2-way bucket folded with a hash of the (already deterministic)
+ *  world position, so both models are used and placement stays reproducible. */
+function isPalm(t: TreePlacement): boolean {
   const hx = Math.imul(Math.floor(t.position[0]), 73856093);
   const hz = Math.imul(Math.floor(t.position[2]), 19349663);
-  return (t.variant + (Math.abs(hx ^ hz) % n)) % n;
+  return ((t.variant + (Math.abs(hx ^ hz) % 2)) % 2) === 0;
 }
 
-/** Procedural blob tree — retained as the fallback shown until the GLBs load. */
-function makeTreeGeometry(variant: 0 | 1 | 2): THREE.BufferGeometry {
-  const parts: THREE.BufferGeometry[] = [];
-  if (variant === 2) {
-    // Conifer: trunk + two stacked cones.
-    parts.push(
-      paintGeometry(new THREE.CylinderGeometry(0.09, 0.13, 1.2, 6).translate(0, 0.6, 0), TRUNK),
-    );
-    parts.push(paintGeometry(new THREE.ConeGeometry(1.15, 2.4, 7).translate(0, 2.2, 0), FOLIAGE[2]!));
-    parts.push(paintGeometry(new THREE.ConeGeometry(0.8, 1.8, 7).translate(0, 3.6, 0), FOLIAGE[0]!));
-  } else {
-    const tall = variant === 1;
-    const trunkH = tall ? 2.2 : 1.5;
-    parts.push(
-      paintGeometry(
-        new THREE.CylinderGeometry(0.1, 0.15, trunkH, 6).translate(0, trunkH / 2, 0),
-        TRUNK,
-      ),
-    );
-    const blob = new THREE.IcosahedronGeometry(tall ? 1.5 : 1.8, 0)
-      .scale(1, tall ? 1.3 : 1.05, 1)
-      .translate(0, trunkH + (tall ? 1.5 : 1.4), 0);
-    parts.push(paintGeometry(blob, FOLIAGE[variant]!));
-    if (!tall) {
-      parts.push(
-        paintGeometry(
-          new THREE.IcosahedronGeometry(1.0, 0).translate(0.9, trunkH + 0.9, 0.3),
-          FOLIAGE[1]!,
-        ),
-      );
-    }
-  }
-  const merged = mergeSafe(parts, false);
-  for (const p of parts) p.dispose();
-  return merged;
-}
-
-interface TreeVariantMesh {
-  mesh: THREE.InstancedMesh;
-  /** Set only for the procedural fallback (the GLB geometries are cache-owned). */
-  ownedGeometry: THREE.BufferGeometry | null;
-}
-
-function Trees({ world, preset }: { world: WorldGeometry; preset: QualityPreset }) {
-  const models = useTreeModels();
-
-  // Quality decimation: deterministic slice of the placement list.
+function Trees({
+  world,
+  assets,
+  preset,
+}: {
+  world: WorldGeometry;
+  assets: PropAssets;
+  preset: QualityPreset;
+}) {
+  // Quality decimation: deterministic slice of the placement list (far-prop LOD).
   const kept = useMemo(() => {
-    const keepEvery = preset.treeFraction >= 1 ? 1 : Math.round(1 / (1 - preset.treeFraction));
-    return preset.treeFraction >= 1
-      ? world.trees
-      : world.trees.filter((_, i) => i % keepEvery !== 0);
+    if (preset.treeFraction >= 1) return world.trees;
+    const keepEvery = Math.round(1 / (1 - preset.treeFraction));
+    return world.trees.filter((_, i) => i % keepEvery !== 0);
   }, [world.trees, preset.treeFraction]);
 
-  const assets = useMemo(() => {
+  const meshes = useMemo(() => {
     const castShadow = preset.castShadows === "full";
-    if (models) {
-      // Real Kenney GLB trees: one instanced mesh per model, shared material,
-      // placements bucketed deterministically across the four models.
-      const material = new THREE.MeshStandardMaterial({
-        vertexColors: true,
-        roughness: 0.9,
-        metalness: 0,
-      });
-      const buckets: TreePlacement[][] = models.map(() => []);
-      for (const t of kept) buckets[modelIndexFor(t)]!.push(t);
-      const variants: TreeVariantMesh[] = models.map((geometry, i) => ({
-        mesh: createInstancedMesh(geometry, material, buckets[i]!, {
-          castShadow,
-          name: `trees-glb-${i}`,
-        }),
-        ownedGeometry: null,
-      }));
-      return { material, variants };
-    }
-    // Fallback (GLBs not loaded yet / failed): procedural blob trees.
-    const material = new THREE.MeshStandardMaterial({
-      vertexColors: true,
-      flatShading: true,
-      roughness: 0.95,
-    });
-    const variants: TreeVariantMesh[] = ([0, 1, 2] as const).map((variant) => {
-      const geometry = makeTreeGeometry(variant);
-      const placements = kept.filter((t) => t.variant === variant);
-      return {
-        mesh: createInstancedMesh(geometry, material, placements, {
-          castShadow,
-          name: `trees-${variant}`,
-        }),
-        ownedGeometry: geometry,
-      };
-    });
-    return { material, variants };
-  }, [models, kept, preset.castShadows]);
-
-  useEffect(
-    () => () => {
-      assets.material.dispose();
-      for (const v of assets.variants) {
-        v.ownedGeometry?.dispose();
-        v.mesh.dispose();
-      }
-    },
-    [assets],
-  );
+    const palm: TreePlacement[] = [];
+    const orn: TreePlacement[] = [];
+    for (const t of kept) (isPalm(t) ? palm : orn).push(t);
+    return [
+      createInstancedMesh(assets.palm, assets.materials.tree, palm, { castShadow, name: "trees-palm" }),
+      createInstancedMesh(assets.ornamental, assets.materials.tree, orn, {
+        castShadow,
+        name: "trees-ornamental",
+      }),
+    ];
+  }, [assets, kept, preset.castShadows]);
+  useEffect(() => () => disposeAll(meshes), [meshes]);
 
   return (
     <group name="trees">
-      {assets.variants.map((v, i) => (
-        <primitive key={i} object={v.mesh} />
+      {meshes.map((m, i) => (
+        <primitive key={i} object={m} />
+      ))}
+    </group>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Street furniture (derived from streetlight placements, low density)
+// ---------------------------------------------------------------------------
+
+/**
+ * Derive bench/bin/planter/bollard poses from the streetlight run along the
+ * arterials. Each is offset along the road tangent (streetlight local +X) so it
+ * sits beside the pole on the sidewalk, sharing the light's yaw + height. Modulo
+ * gates keep the counts modest and fully deterministic.
+ */
+function furniturePlacements(streetlights: readonly StaticTransform[]) {
+  const bench: StaticTransform[] = [];
+  const bollard: StaticTransform[] = [];
+  const trashBin: StaticTransform[] = [];
+  const planter: StaticTransform[] = [];
+  for (let i = 0; i < streetlights.length; i++) {
+    const s = streetlights[i]!;
+    const [x, y, z] = s.position;
+    const yaw = s.yaw;
+    // Road tangent = streetlight local +X.
+    const tx = Math.cos(yaw);
+    const tz = -Math.sin(yaw);
+    const at = (along: number): StaticTransform => ({
+      position: [x + tx * along, y, z + tz * along],
+      yaw,
+    });
+    if (i % 9 === 0) bench.push(at(2.6));
+    if (i % 9 === 4) trashBin.push(at(-2.2));
+    if (i % 7 === 3) planter.push(at(1.8));
+    if (i % 5 === 2) bollard.push(at(-1.2));
+  }
+  return { bench, bollard, trashBin, planter };
+}
+
+function Furniture({
+  world,
+  assets,
+  preset,
+}: {
+  world: WorldGeometry;
+  assets: PropAssets;
+  preset: QualityPreset;
+}) {
+  const meshes = useMemo(() => {
+    const castShadow = preset.castShadows === "full";
+    const p = furniturePlacements(world.streetlights);
+    const mat = assets.materials.furniture;
+    return [
+      createInstancedMesh(assets.furniture.bench, mat, p.bench, { castShadow, name: "furniture-bench" }),
+      createInstancedMesh(assets.furniture.planter, mat, p.planter, {
+        castShadow,
+        name: "furniture-planter",
+      }),
+      createInstancedMesh(assets.furniture.trashBin, mat, p.trashBin, {
+        castShadow,
+        name: "furniture-trash-bin",
+      }),
+      createInstancedMesh(assets.furniture.bollard, mat, p.bollard, {
+        castShadow,
+        name: "furniture-bollard",
+      }),
+    ];
+  }, [assets, world.streetlights, preset.castShadows]);
+  useEffect(() => () => disposeAll(meshes), [meshes]);
+
+  return (
+    <group name="furniture">
+      {meshes.map((m, i) => (
+        <primitive key={i} object={m} />
       ))}
     </group>
   );
@@ -510,21 +717,33 @@ export function WorldPropsGroup({
   preset,
   night,
   getSignalPhase,
-  signSvgBaseUrl,
 }: {
   world: WorldGeometry;
   preset: QualityPreset;
   night: boolean;
   getSignalPhase?: (signalNodeId: string) => SignalPhase;
-  signSvgBaseUrl: string | null;
+  /** Retained for the DistrictWorld prop contract; the 3D sign faces are baked
+   *  into the GLBs now, so the SVG catalog is no longer consulted. */
+  signSvgBaseUrl?: string | null;
 }) {
+  const assets = usePropModels();
   return (
     <group name="world-props">
       <CityBuildings world={world} preset={preset} night={night} />
-      <TrafficLights world={world} preset={preset} getSignalPhase={getSignalPhase} />
-      <SignPoles world={world} preset={preset} signSvgBaseUrl={signSvgBaseUrl} />
-      <Streetlights world={world} preset={preset} night={night} />
-      <Trees world={world} preset={preset} />
+      {assets ? (
+        <>
+          <TrafficLights
+            world={world}
+            assets={assets}
+            preset={preset}
+            getSignalPhase={getSignalPhase}
+          />
+          <Signs world={world} assets={assets} preset={preset} />
+          <Streetlights world={world} assets={assets} preset={preset} night={night} />
+          <Trees world={world} assets={assets} preset={preset} />
+          <Furniture world={world} assets={assets} preset={preset} />
+        </>
+      ) : null}
     </group>
   );
 }

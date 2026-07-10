@@ -1,4 +1,12 @@
 /**
+ * DEPRECATED — superseded by the authored 3D sign GLBs (public/sim/signs).
+ * The district renderer (WorldProps.tsx) now instances `sign_*.glb`, whose
+ * Bulgarian faces are baked in correctly, so the flat SVG-plate path below is
+ * no longer wired into the sim. In particular the old `roundabout → d11.svg`
+ * mis-map (Д11 is "settlement name"; the roundabout sign is г12 "кръгово
+ * движение") is moot: sign_roundabout.glb carries the correct face. Kept only
+ * for reference / possible reuse outside the sim.
+ *
  * BG road-sign textures. Primary path: rasterize the real SVGs from
  * content/signs/svg (Б1, Б2, В26, Д11) fetched from `signSvgBaseUrl`.
  * Fallback: procedural canvas replicas (same shapes/colors as the SVG
