@@ -26,6 +26,12 @@ import { getRainIntensity } from "./weather";
 /** Damping stiffness for preset crossfades (≈2 s to settle). */
 const FADE_LAMBDA = 2.2;
 
+/** Scene name of the dome mesh. The A4 mirror rig (MirrorRig.tsx) looks it up
+ *  to temporarily SHRINK the dome inside its short mirror-camera far plane
+ *  during RTT passes — safe because the shader is scale-invariant (vDir is the
+ *  normalized unit-sphere position; nothing samples world distance). */
+export const SKY_DOME_NAME = "sim-sky-dome";
+
 const VERTEX = /* glsl */ `
 varying vec3 vDir;
 void main() {
@@ -198,7 +204,7 @@ export function SkyDome({ timeOfDay, radius = 520 }: { timeOfDay: TimeOfDay; rad
 
   return (
     <group ref={groupRef}>
-      <mesh scale={radius} frustumCulled={false}>
+      <mesh name={SKY_DOME_NAME} scale={radius} frustumCulled={false}>
         <sphereGeometry args={[1, 32, 16]} />
         <shaderMaterial ref={materialRef} args={materialArgs} />
       </mesh>

@@ -15,6 +15,9 @@
 
 export { SimEnvironment, type SimEnvironmentProps } from "./SimEnvironment";
 export { WindshieldDroplets } from "./WindshieldDroplets";
+// The A4 mirror rig shrinks the (scale-invariant) sky dome into its short
+// mirror frustum during RTT passes — name lookup only, no component export.
+export { SKY_DOME_NAME } from "./SkyDome";
 
 export {
   ENVIRONMENT_PRESETS,

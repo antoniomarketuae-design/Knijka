@@ -22,7 +22,7 @@ import {
   useState,
 } from "react";
 import Link from "next/link";
-import { Canvas, useFrame } from "@react-three/fiber";
+import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { Environment } from "@react-three/drei";
 import { Physics } from "@react-three/rapier";
 import { Euler, type Group } from "three";
@@ -119,6 +119,18 @@ const NIGHT_ENV_ROTATION = new Euler(0, 0, 0);
 
 /** P1: localStorage key marking the one-time touch orientation hint as seen. */
 const TOUCH_HINT_STORAGE_KEY = "sim.touchHintSeen";
+
+/** Dev perf readout opt-in (never in production builds): `?simPerf=1` on the
+ *  URL or `localStorage["sim.perfLog"]="1"`. Read once at scene mount. */
+function shouldLogPerf(): boolean {
+  if (process.env.NODE_ENV === "production") return false;
+  try {
+    if (new URLSearchParams(window.location.search).has("simPerf")) return true;
+    return window.localStorage.getItem("sim.perfLog") === "1";
+  } catch {
+    return false;
+  }
+}
 
 /** The hint replaces the old refusal GateCard: touch-only devices get ONE
  *  orientation/expectation card, then drive. Fail-open on storage errors. */
@@ -432,6 +444,8 @@ function ReadyScene({
   // the one-time orientation hint and a collapsed keyboard legend.
   const [touchCapable] = useState(() => hasTouchScreen());
   const [touchOnly] = useState(() => isTouchOnlyDevice());
+  // Dev-only renderer stats logger (draws/tris/fps per frame, all passes).
+  const [perfLog] = useState(() => shouldLogPerf());
   const [touchSource] = useState(() => new TouchInputSource());
   const [showTouchHint, setShowTouchHint] = useState(shouldShowTouchHint);
   const dismissTouchHint = useCallback(() => {
@@ -583,6 +597,7 @@ function ReadyScene({
           stencil: false,
         }}
       >
+        {perfLog ? <PerfProbe /> : null}
         <SimEnvironment timeOfDay={timeOfDay} rain={rain} quality={level} />
         {/* HDRI image-based lighting — real sky reflections/ambient for PBR
             materials, glass, mirrors and car paint. background=false keeps
@@ -808,6 +823,53 @@ function ReadyScene({
       ) : null}
     </div>
   );
+}
+
+/**
+ * Dev-only whole-frame renderer stats (opt-in via shouldLogPerf), logged to
+ * the console once per second: fps, draw calls and triangles PER FRAME —
+ * including the A4 mirror RTT passes and the composer's internal passes.
+ * That's why `gl.info.autoReset` is turned off (three would otherwise zero
+ * the counters after EVERY gl.render, leaving only the last pass visible)
+ * and the counters are read + reset manually at the START of each frame
+ * (useFrame priority -100 — before MirrorRig's pass at 0 and the composer's
+ * render at 1), so each read captures the full previous frame.
+ * Budget lines to compare against: doc quality-gap/13 §1 — ≤150 draws
+ * (laptop iGPU) / ≤75 (phone), ≤750k/300k tris.
+ */
+function PerfProbe() {
+  const gl = useThree((s) => s.gl);
+  useEffect(() => {
+    gl.info.autoReset = false;
+    return () => {
+      gl.info.autoReset = true;
+      gl.info.reset();
+    };
+  }, [gl]);
+  const accRef = useRef({ frames: 0, calls: 0, tris: 0, windowStart: -1 });
+  useFrame((state) => {
+    const acc = accRef.current;
+    acc.frames += 1;
+    acc.calls += gl.info.render.calls;
+    acc.tris += gl.info.render.triangles;
+    gl.info.reset();
+    const now = state.clock.elapsedTime;
+    if (acc.windowStart < 0) acc.windowStart = now;
+    const span = now - acc.windowStart;
+    if (span >= 1) {
+      console.info(
+        `[sim-perf] fps=${(acc.frames / span).toFixed(0)}` +
+          ` draws/frame=${Math.round(acc.calls / acc.frames)}` +
+          ` tris/frame=${Math.round(acc.tris / acc.frames / 1000)}k` +
+          ` programs=${gl.info.programs?.length ?? 0}`,
+      );
+      acc.frames = 0;
+      acc.calls = 0;
+      acc.tris = 0;
+      acc.windowStart = now;
+    }
+  }, -100);
+  return null;
 }
 
 // A2 pedal-edge thresholds on the RAW (pre-gate) ramped keyboard/gamepad
