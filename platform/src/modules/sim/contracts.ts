@@ -345,6 +345,37 @@ export interface StagedEventOutcome {
   approachSpeedKmh?: number;
 }
 
+// ---------------------------------------------------------------------------
+// A11 hittable traffic — near-miss session stat (doc 68 A11; audit C1).
+//
+// A near-miss is the player passing a MOVING NPC with almost no lateral
+// clearance at a real relative speed — nothing touched, so nothing is graded
+// (deliberately NOT a ViolationCode). It is an ADDITIVE measurement channel
+// like StagedEventOutcome: A15's feedback map consumes it to show "you got
+// away with these". Detection lives in traffic/proximity.ts (pure); the
+// NpcColliders physics layer runs it and reports through LessonScene.
+// ---------------------------------------------------------------------------
+
+/** One resolved near-miss encounter (reported when the bodies separate). */
+export interface NearMissEvent {
+  /** Session time at resolution, s. */
+  tSec: number;
+  /** What was nearly hit (staged cyclist proxies report "cyclist"). */
+  kind: "vehicle" | "pedestrian" | "cyclist";
+  /** Published traffic state id (staged actors >= 1000). */
+  npcId: number;
+  /** Tightest body-envelope clearance during the encounter, m (0 = brushed). */
+  clearanceM: number;
+  /** Peak relative speed during the encounter, m/s. */
+  relSpeedMps: number;
+}
+
+/** Running session aggregate — `worst` is the tightest-clearance encounter. */
+export interface NearMissStats {
+  count: number;
+  worst: NearMissEvent | null;
+}
+
 /** Events the HUD listens to (toasts, banners). Emitted by lessons/runtime. */
 export type HudEvent =
   /** A graded mistake. Carries the catalog's authored WHY (explanationBg) +

@@ -37,6 +37,10 @@ import type { SimAudio } from "./simAudio";
 import { updateVehicleSample } from "./vehicleSample";
 import { INTERIOR_LAYER, VitokCockpit } from "./vitok/VitokCockpit";
 import { HeroCarBody } from "./HeroCarBody";
+import { readNpcColliderUserData } from "./NpcColliders";
+
+/** Contact classification (mirrors SimTickEvent collision `withWhat`). */
+export type CollisionWithWhat = "vehicle" | "pedestrian" | "cyclist" | "staticObject";
 
 /**
  * R3F binding for the React-free VehicleSim physics core.
@@ -92,8 +96,10 @@ export function VehicleRig({
   spawn?: VehicleSpawn;
   /** Current driving-assist mode (Beginner/Normal/Advanced). Read each step. */
   difficultyRef?: RefObject<DifficultyMode>;
-  /** Fired on a real (fast-enough) impact so the rule engine can grade it. */
-  onCollision?: (impactKmh: number) => void;
+  /** Fired on a real (fast-enough) impact so the rule engine can grade it.
+   *  A11: `withWhat` classifies the contact from the other body's NPC-shell
+   *  userData tag — untagged bodies (world meshes) are static objects. */
+  onCollision?: (impactKmh: number, withWhat: CollisionWithWhat) => void;
   /** Lesson night flag — raises the interior fill light's floor at dusk. The
    *  cabin's own headlights / night-preview toggle also raise it, so the cabin
    *  never goes near-black even when this is left at its default. */
@@ -210,10 +216,24 @@ export function VehicleRig({
       rotation={[0, spawn.yawRad, 0]}
       angularDamping={CHASSIS_ANGULAR_DAMPING}
       linearDamping={CHASSIS_LINEAR_DAMPING}
-      onCollisionEnter={() => {
-        const speed = Math.abs(simRef.current?.speedKmh ?? 0);
-        audioRef.current?.thump(Math.min(1, speed / 50 + 0.15));
-        if (speed >= COLLISION_MIN_KMH) onCollision?.(speed);
+      onCollisionEnter={(payload) => {
+        // A11: classify the contact — NPC shells carry a userData tag
+        // (NpcColliders); anything untagged (world meshes, props, kerbs)
+        // stays a static object.
+        const tag = readNpcColliderUserData(payload.other.rigidBody?.userData);
+        // Impact severity = RELATIVE speed: a moving NPC striking a stopped
+        // player is still a real crash. Static geometry has zero velocity,
+        // so the pre-A11 own-speed behavior is preserved there.
+        const pv = payload.target.rigidBody?.linvel();
+        const ov = payload.other.rigidBody?.linvel();
+        const impactKmh =
+          pv && ov
+            ? Math.hypot(pv.x - ov.x, pv.y - ov.y, pv.z - ov.z) * 3.6
+            : Math.abs(simRef.current?.speedKmh ?? 0);
+        audioRef.current?.thump(Math.min(1, impactKmh / 50 + 0.15));
+        if (impactKmh >= COLLISION_MIN_KMH) {
+          onCollision?.(impactKmh, tag?.kind ?? "staticObject");
+        }
       }}
     >
       <CuboidCollider

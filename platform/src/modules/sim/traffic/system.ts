@@ -92,6 +92,8 @@ class TrafficSystemImpl implements TrafficSystem {
   private readonly stagedPeds: StagedPedestrianAgent[] = [];
   private readonly stagedById = new Map<string, StagedVehicleAgent | StagedPedestrianAgent>();
   private readonly stagedEnv: StagedEnv;
+  /** A11: state ids of staged cyclist proxies (extraRightOffsetM > 0). */
+  private readonly cyclistStateIds = new Set<number>();
 
   constructor(district: TrafficDistrict, cfg: TrafficConfig) {
     const rng = mulberry32(cfg.seed);
@@ -307,6 +309,9 @@ class TrafficSystemImpl implements TrafficSystem {
       this.stagedVehicles.push(agent);
       this.vehicles.push(agent.state);
       this.stagedById.set(spec.id, agent);
+      // A11: the curb offset is the staged spec's cyclist marker (audit C3 —
+      // v1 "cyclists" are narrow curb-riding vehicle proxies).
+      if ((spec.extraRightOffsetM ?? 0) > 0) this.cyclistStateIds.add(stateId);
       return agent.view;
     }
     const path = buildStagedPedPath(spec.path);
@@ -325,6 +330,10 @@ class TrafficSystemImpl implements TrafficSystem {
 
   staged(id: string): StagedActorView | null {
     return this.stagedById.get(id)?.view ?? null;
+  }
+
+  vehicleCollisionKind(stateId: number): "vehicle" | "cyclist" {
+    return this.cyclistStateIds.has(stateId) ? "cyclist" : "vehicle";
   }
 
   pedestrianOnCrossing(crossingId: string): boolean {

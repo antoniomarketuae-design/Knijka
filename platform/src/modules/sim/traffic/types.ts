@@ -399,6 +399,15 @@ export interface TrafficSystem {
   stagedCommand(id: string, command: StagedCommand): void;
   /** Live view of a staged actor, or null. */
   staged(id: string): StagedActorView | null;
+  /**
+   * A11: how a published VEHICLE state should read in a collision
+   * (`SimTickEvent` collision `withWhat`). Staged curb-riding cyclist proxies
+   * report "cyclist", every other vehicle state "vehicle". The v1 cyclist IS
+   * a narrow staged vehicle-agent riding the curb (audit C3) — its defining
+   * trait in the staged spec is `extraRightOffsetM > 0`, which is what tags
+   * it here. `stateId` is TrafficVehicleState.id (staged ids >= 1000).
+   */
+  vehicleCollisionKind(stateId: number): "vehicle" | "cyclist";
   readonly timeSec: number;
   readonly stats: TrafficSystemStats;
 }

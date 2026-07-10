@@ -21,6 +21,23 @@ export type { Rng } from "./rng";
 export { TrafficLayer } from "./TrafficLayer";
 export type { TrafficLayerProps } from "./TrafficLayer";
 export { DEFAULT_TRAFFIC_CONFIG } from "./types";
+// A11 hittable traffic — pure proximity/near-miss helpers for the physics
+// shell pool (components/sim/NpcColliders binds them to rapier).
+export {
+  assignPool,
+  createNearMissTracker,
+  DEFAULT_NEAR_MISS_CONFIG,
+  resetNearMissTracker,
+  selectNearest,
+  stepNearMiss,
+} from "./proximity";
+export type {
+  AgentPoint,
+  NearMissAgent,
+  NearMissConfig,
+  NearMissPlayer,
+  NearMissTracker,
+} from "./proximity";
 export type {
   DistrictCrossing,
   DistrictEdge,

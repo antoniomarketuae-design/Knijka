@@ -45,7 +45,12 @@ import {
   type VehicleInput,
   type VehicleSim,
 } from "@/modules/sim/vehicle";
-import type { StagedEventOutcome, VehicleSample } from "@/modules/sim/contracts";
+import type {
+  NearMissEvent,
+  NearMissStats,
+  StagedEventOutcome,
+  VehicleSample,
+} from "@/modules/sim/contracts";
 import type { LessonSpec } from "@/modules/sim/lessons";
 import {
   createScenarioDirector,
@@ -78,7 +83,8 @@ import { CabinControls, type MirrorGlanceKind } from "./cabin";
 import { CockpitInteractionContext } from "./vitok/hotspots";
 import { SimAudio } from "./simAudio";
 import { CameraRig, type CameraMode } from "./CameraRig";
-import { VehicleRig, type VehicleSpawn } from "./VehicleRig";
+import { VehicleRig, type CollisionWithWhat, type VehicleSpawn } from "./VehicleRig";
+import { NpcColliders } from "./NpcColliders";
 import { createVehicleSample } from "./vehicleSample";
 import { buildMinimapPolylines } from "./lessonMinimap";
 import { RouteGuidance } from "./RouteGuidance";
@@ -206,6 +212,10 @@ export interface LessonSceneProps {
    *  record (reaction time, stop gap, …). The graded consequences already
    *  arrived through onTick; the shell folds this via applyStagedOutcome. */
   onStagedOutcome?: (outcome: StagedEventOutcome) => void;
+  /** A11 (additive): a near-miss encounter resolved — the player squeezed
+   *  past a moving NPC with almost no clearance. Session STAT only (A15's
+   *  feedback map); nothing is graded. Carries the running aggregate. */
+  onNearMiss?: (event: NearMissEvent, stats: NearMissStats) => void;
 }
 
 export default function LessonScene(props: LessonSceneProps) {
@@ -342,6 +352,7 @@ function ReadyScene({
   onTickCb,
   onDriveline,
   onStagedOutcome,
+  onNearMiss,
 }: LessonSceneProps & {
   built: Built;
   menuPaused: boolean;
@@ -483,11 +494,16 @@ function ReadyScene({
     [runtime],
   );
 
-  // A real impact (VehicleRig gates by speed) → queue a collision for the rule
-  // engine, which grades it опасна and terminates the session.
-  const handleCollision = useCallback(() => {
-    runtime.pushCollision("staticObject");
-  }, [runtime]);
+  // A real impact (VehicleRig gates by relative speed) → queue a collision for
+  // the rule engine, which grades it опасна and terminates the session. A11:
+  // `withWhat` now reflects what was actually hit — NPC shells classify as
+  // vehicle/pedestrian/cyclist; untagged world geometry stays staticObject.
+  const handleCollision = useCallback(
+    (_impactKmh: number, withWhat: CollisionWithWhat) => {
+      runtime.pushCollision(withWhat);
+    },
+    [runtime],
+  );
 
   return (
     <div className="relative h-full w-full">
@@ -580,6 +596,18 @@ function ReadyScene({
               isNight={isNight}
               rain={rain}
               paused={physicsPaused}
+            />
+            {/* A11 hittable traffic: a fixed pool of kinematic collider
+                shells (8 vehicles + 4 pedestrians) follows the NPCs nearest
+                the player, so driving into traffic is a real contact the
+                rule engine grades by kind. Mounted AFTER RuntimeDriver —
+                its frame callback then reads this frame's fresh traffic
+                poses. Also runs the near-miss session stat (no grading). */}
+            <NpcColliders
+              traffic={traffic}
+              sampleRef={sampleRef}
+              paused={physicsPaused}
+              onNearMiss={onNearMiss}
             />
             {/* Ambient life — cars + pedestrians. Render-only: RuntimeDriver
                 already steps traffic.update each frame (so it stays in lockstep
