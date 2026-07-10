@@ -13,10 +13,14 @@
  *  - slerp-smooths each vehicle's yaw so NPCs stop snapping through corners,
  *  - lights emissive head/tail lamps (gated on the optional `night` flag) and
  *    amber blinkers driven from the derived turn direction,
- *  - upgrades the interim box car: a glazed cabin, an 8–10 colour paint
- *    palette, and MeshStandardMaterial so bodies catch the sun/HDRI,
+ *  - replaces the interim box car with the authored low-poly GLB fleet
+ *    (./vehicleFleet): each agent is assigned a model deterministically from its
+ *    id (police rare), same-model agents share an InstancedMesh, and ALL wheels
+ *    are one shared InstancedMesh (spun/steered per frame) — so real cars cost a
+ *    fixed handful of draws, not one per agent,
  *  - and (when the district is supplied) drops a deterministic parked-car pass
- *    along residential/arterial curbs so the streets aren't deserted.
+ *    along residential/arterial curbs so the streets aren't deserted (still the
+ *    interim box car — GLB upgrade deferred to keep those always-on draws cheap).
  *
  * ADR-001: all vehicles are FICTIONAL — no real car-brand names anywhere.
  *
@@ -36,6 +40,7 @@
 
 import { useEffect, useLayoutEffect, useMemo, useRef, type RefObject } from "react";
 import { useFrame } from "@react-three/fiber";
+import { useGLTF } from "@react-three/drei";
 import {
   CanvasTexture,
   Color,
@@ -49,6 +54,12 @@ import {
 } from "three";
 import type { SignalPhase } from "../contracts";
 import type { TrafficDistrict, TrafficSystem, TrafficUpdateContext } from "./types";
+import {
+  buildTrafficFleet,
+  disposeTrafficFleet,
+  DRACO_DECODER_PATH,
+  FLEET_URLS,
+} from "./vehicleFleet";
 
 // Paint palette — expanded to 10 fictional car colours (brick/blue/sand/slate
 // originals + graphite, two silvers, dark green, maroon, muted gold).
@@ -74,20 +85,11 @@ const HEAD_COLOR = "#fff2cf"; // warm headlight glow (night)
 const BLINK_ON = "#ff9a1f";
 const BLINK_OFF = "#2a1c08";
 
-// Local-space part offsets (nose = +Z).
-const CABIN_Y = 1.08;
-const CABIN_Z = -0.35;
-const WHEEL_X = 0.74;
-const WHEEL_Y = 0.3;
-const WHEEL_Z = 1.32;
-const WHEEL_RADIUS = 0.3;
-const BRAKE_Y = 0.72;
-const BRAKE_Z = -2.03;
-const HEAD_Y = 0.5;
-const HEAD_Z = 2.0;
-const BLINK_X = 0.74;
-const BLINK_Y = 0.52;
-const BLINK_Z_REAR = -1.98;
+// Local-space part offsets (nose = +Z). Moving-car body/wheel/lamp offsets now
+// come from each GLB model's rig (./vehicleFleet); only the parked interim box
+// car and the pedestrian primitives keep hard-coded offsets.
+const CABIN_Y = 1.08; // parked box-car cabin
+const CABIN_Z = -0.35; // parked box-car cabin
 const PED_BODY_Y = 0.82;
 const PED_HEAD_Y = 1.52;
 const BLOB_Y = 0.03;
@@ -103,8 +105,7 @@ const BLINK_PERIOD_S = 0.9; // full cycle
 const BLINK_DUTY = 0.55; // fraction "on"
 
 const UP = new Vector3(0, 1, 0);
-const AXIS_Z = new Vector3(0, 0, 1);
-const AXIS_X = new Vector3(1, 0, 0);
+const AXIS_X = new Vector3(1, 0, 0); // wheel spin axis (GLB wheels are X-axial)
 
 /** Shortest-signed angular difference a-b wrapped to (-pi, pi]. */
 function wrapPi(a: number): number {
@@ -266,18 +267,28 @@ export function TrafficLayer({
   // Passed as a prop (not a JSX child), so dispose it ourselves on unmount.
   useEffect(() => () => blobTex.dispose(), [blobTex]);
 
-  // Moving agents.
+  // Moving agents. Bodies + wheels are the authored GLB fleet (built below);
+  // the blob shadow and the emissive lamp overlays stay as code-geometry
+  // InstancedMeshes so blinkers / brake lights / night gating keep per-vehicle
+  // (or global-night) control that baked-in GLB emissive can't give per instance.
   const vehBlobRef = useRef<InstancedMesh>(null);
-  const bodyRef = useRef<InstancedMesh>(null);
-  const cabinRef = useRef<InstancedMesh>(null);
-  const glassRef = useRef<InstancedMesh>(null);
-  const wheelRef = useRef<InstancedMesh>(null);
   const brakeRef = useRef<InstancedMesh>(null);
   const headRef = useRef<InstancedMesh>(null);
   const blinkRef = useRef<InstancedMesh>(null);
   const pedBlobRef = useRef<InstancedMesh>(null);
   const pedBodyRef = useRef<InstancedMesh>(null);
   const pedHeadRef = useRef<InstancedMesh>(null);
+
+  // Authored GLB fleet: load the kit (Draco), then instance it. Rebuilt only on
+  // remount / system swap; disposed (buffers + merged geometry) on teardown.
+  const gltfs = useGLTF(FLEET_URLS, DRACO_DECODER_PATH) as unknown as Array<{
+    scene: AnyObject3D;
+  }>;
+  const fleet = useMemo(
+    () => buildTrafficFleet(gltfs.map((g) => g.scene), system.vehicles),
+    [gltfs, system],
+  );
+  useEffect(() => () => disposeTrafficFleet(fleet), [fleet]);
   // Parked (static).
   const parkBodyRef = useRef<InstancedMesh>(null);
   const parkCabinRef = useRef<InstancedMesh>(null);
@@ -301,8 +312,7 @@ export function TrafficLayer({
     blinkClock: number;
     // Reused rotation scratch.
     qYaw: Quaternion;
-    qTip: Quaternion; // Rz(+90): tips the wheel cylinder axis to lateral
-    qRoll: Quaternion;
+    qRoll: Quaternion; // wheel roll about local X
     qWheel: Quaternion;
     qFlat: Quaternion; // Rx(-90): lays a decal flat on the ground
     qBlob: Quaternion;
@@ -319,7 +329,6 @@ export function TrafficLayer({
   // Instanced-buffer setup + scratch (re)build.
   useLayoutEffect(() => {
     const color = new Color();
-    const qTip = new Quaternion().setFromAxisAngle(AXIS_Z, Math.PI / 2);
     const qFlat = new Quaternion().setFromAxisAngle(AXIS_X, -Math.PI / 2);
     scratchRef.current = {
       dummy: new Object3D(),
@@ -334,19 +343,16 @@ export function TrafficLayer({
       blinkState: new Int8Array(nVeh * 2).fill(-1),
       blinkClock: 0,
       qYaw: new Quaternion(),
-      qTip,
       qRoll: new Quaternion(),
       qWheel: new Quaternion(),
       qFlat,
       qBlob: new Quaternion(),
       ctx: { signalPhase: () => "green", playerPos: null },
     };
+    // Bodies/wheels (the GLB fleet) manage their own draw usage; only the
+    // code-geometry overlays need the dynamic hint here.
     const dynamic = [
       vehBlobRef,
-      bodyRef,
-      cabinRef,
-      glassRef,
-      wheelRef,
       brakeRef,
       headRef,
       blinkRef,
@@ -356,13 +362,6 @@ export function TrafficLayer({
     ];
     for (const ref of dynamic) {
       ref.current?.instanceMatrix.setUsage(DynamicDrawUsage);
-    }
-    const body = bodyRef.current;
-    if (body) {
-      for (let i = 0; i < nVeh; i++) {
-        body.setColorAt(i, color.set(BODY_COLORS[system.vehicles[i].colorIndex % BODY_COLORS.length]));
-      }
-      if (body.instanceColor) body.instanceColor.needsUpdate = true;
     }
     const pedBody = pedBodyRef.current;
     if (pedBody) {
@@ -434,16 +433,13 @@ export function TrafficLayer({
     const yawT = 1 - Math.exp(-YAW_SMOOTH_RATE * dtc);
     const steerT = 1 - Math.exp(-STEER_SMOOTH_RATE * dtc);
 
-    // --- Vehicles.
+    // --- Vehicles (GLB fleet bodies + shared wheels + code-geometry overlays).
     const vehBlob = vehBlobRef.current;
-    const body = bodyRef.current;
-    const cabin = cabinRef.current;
-    const glass = glassRef.current;
-    const wheel = wheelRef.current;
     const brake = brakeRef.current;
     const head = headRef.current;
     const blink = blinkRef.current;
-    if (vehBlob && body && cabin && glass && wheel && brake && head && blink) {
+    const wheel = fleet.wheel;
+    if (vehBlob && brake && head && blink && wheel) {
       let blinkColorDirty = false;
       for (let i = 0; i < nVeh; i++) {
         const v = system.vehicles[i];
@@ -462,6 +458,12 @@ export function TrafficLayer({
         }
         const yaw = scratch.dispYaw[i];
 
+        // Model + its rig (body InstancedMesh, wheel offsets, lamp placement).
+        const model = fleet.models[fleet.assign[i]];
+        const rig = model.rig;
+        const bodyMesh = model.mesh;
+        const s = fleet.slot[i];
+
         const dx = tx - cam.x;
         const dz = tz - cam.z;
         const visible = dx * dx + dz * dz <= maxD2;
@@ -470,10 +472,8 @@ export function TrafficLayer({
           dummy.rotation.set(0, 0, 0);
           dummy.scale.set(0, 0, 0);
           dummy.updateMatrix();
+          bodyMesh?.setMatrixAt(s, dummy.matrix);
           vehBlob.setMatrixAt(i, dummy.matrix);
-          body.setMatrixAt(i, dummy.matrix);
-          cabin.setMatrixAt(i, dummy.matrix);
-          glass.setMatrixAt(i, dummy.matrix);
           brake.setMatrixAt(i, dummy.matrix);
           head.setMatrixAt(i, dummy.matrix);
           blink.setMatrixAt(i * 2, dummy.matrix);
@@ -486,7 +486,8 @@ export function TrafficLayer({
         const cos = Math.cos(yaw);
         const sin = Math.sin(yaw);
 
-        // Cosmetic steer from the smoothed yaw rate; roll from ground speed.
+        // Cosmetic steer from the smoothed yaw rate; roll from ground speed over
+        // this model's wheel radius.
         const yawRate = dtc > 1e-4 ? wrapPi(yaw - scratch.prevYaw[i]) / dtc : 0;
         scratch.prevYaw[i] = yaw;
         const steerTarget = Math.max(
@@ -495,62 +496,62 @@ export function TrafficLayer({
         );
         scratch.steer[i] += (steerTarget - scratch.steer[i]) * steerT;
         const steer = scratch.steer[i];
-        scratch.roll[i] += (v.speedMps * dtc) / WHEEL_RADIUS;
+        scratch.roll[i] += (v.speedMps * dtc) / fleet.wheelRadius[i];
         const roll = scratch.roll[i];
 
-        // Blob shadow (elliptical, laid flat, aligned to the car).
+        // Blob shadow (elliptical, laid flat, sized to the model footprint).
         scratch.qYaw.setFromAxisAngle(UP, yaw);
         scratch.qBlob.copy(scratch.qYaw).multiply(scratch.qFlat);
         dummy.quaternion.copy(scratch.qBlob);
-        dummy.scale.set(1.2, 2.45, 1);
+        dummy.scale.set(rig.halfWidth + 0.34, rig.halfLength + 0.4, 1);
         dummy.position.set(tx, BLOB_Y, tz);
         dummy.updateMatrix();
         vehBlob.setMatrixAt(i, dummy.matrix);
 
-        // Body.
+        // Body (GLB is authored ground-relative — origin on the tarmac at Y = 0).
         dummy.scale.set(1, 1, 1);
         dummy.rotation.set(0, yaw, 0);
-        dummy.position.set(tx, 0.62, tz);
+        dummy.position.set(tx, 0, tz);
         dummy.updateMatrix();
-        body.setMatrixAt(i, dummy.matrix);
-        // Cabin + glazing (local offset rotated by yaw).
-        dummy.position.set(tx + CABIN_Z * sin, CABIN_Y, tz + CABIN_Z * cos);
-        dummy.updateMatrix();
-        cabin.setMatrixAt(i, dummy.matrix);
-        glass.setMatrixAt(i, dummy.matrix);
-        // Tail/brake bar.
-        dummy.position.set(tx + BRAKE_Z * sin, BRAKE_Y, tz + BRAKE_Z * cos);
+        bodyMesh?.setMatrixAt(s, dummy.matrix);
+
+        // Tail/brake bar (rear, per-model Z).
+        dummy.position.set(tx + rig.rearZ * sin, rig.lampY, tz + rig.rearZ * cos);
         dummy.updateMatrix();
         brake.setMatrixAt(i, dummy.matrix);
-        // Headlight bar (front).
-        dummy.position.set(tx + HEAD_Z * sin, HEAD_Y, tz + HEAD_Z * cos);
+        // Headlight bar (front) — only drawn at night, matrix kept fresh anyway.
+        dummy.position.set(tx + rig.frontZ * sin, rig.headY, tz + rig.frontZ * cos);
         dummy.updateMatrix();
         head.setMatrixAt(i, dummy.matrix);
         // Rear blinker lamps (index 2i = left +X, 2i+1 = right -X).
+        const blinkOx = rig.halfWidth * 0.82;
+        const blinkZ = rig.rearZ + 0.05;
         for (let side = 0; side < 2; side++) {
-          const ox = side === 0 ? BLINK_X : -BLINK_X;
+          const ox = side === 0 ? blinkOx : -blinkOx;
           dummy.position.set(
-            tx + ox * cos + BLINK_Z_REAR * sin,
-            BLINK_Y,
-            tz - ox * sin + BLINK_Z_REAR * cos,
+            tx + ox * cos + blinkZ * sin,
+            rig.lampY,
+            tz - ox * sin + blinkZ * cos,
           );
           dummy.updateMatrix();
           blink.setMatrixAt(i * 2 + side, dummy.matrix);
         }
-        // Wheels: qYaw(+steer on fronts) * tip(Z) * roll(Y).
+        // Wheels: shared X-axial geometry, scaled to the model radius —
+        // qYaw(+steer on fronts) * roll about local X. No cylinder tip needed.
+        const wscale = fleet.wheelScale[i];
         for (let w = 0; w < 4; w++) {
           const front = w < 2;
-          const ox = w % 2 === 0 ? WHEEL_X : -WHEEL_X;
-          const oz = front ? WHEEL_Z : -WHEEL_Z;
+          const off = rig.wheelOffsets[w];
           scratch.qYaw.setFromAxisAngle(UP, yaw + (front ? steer : 0));
-          scratch.qRoll.setFromAxisAngle(UP, roll);
-          scratch.qWheel
-            .copy(scratch.qYaw)
-            .multiply(scratch.qTip)
-            .multiply(scratch.qRoll);
+          scratch.qRoll.setFromAxisAngle(AXIS_X, roll);
+          scratch.qWheel.copy(scratch.qYaw).multiply(scratch.qRoll);
           dummy.quaternion.copy(scratch.qWheel);
-          dummy.scale.set(1, 1, 1);
-          dummy.position.set(tx + ox * cos + oz * sin, WHEEL_Y, tz - ox * sin + oz * cos);
+          dummy.scale.set(wscale, wscale, wscale);
+          dummy.position.set(
+            tx + off.x * cos + off.z * sin,
+            off.y,
+            tz - off.x * sin + off.z * cos,
+          );
           dummy.updateMatrix();
           wheel.setMatrixAt(i * 4 + w, dummy.matrix);
         }
@@ -580,11 +581,11 @@ export function TrafficLayer({
           blinkColorDirty = true;
         }
       }
-      vehBlob.instanceMatrix.needsUpdate = true;
-      body.instanceMatrix.needsUpdate = true;
-      cabin.instanceMatrix.needsUpdate = true;
-      glass.instanceMatrix.needsUpdate = true;
+      for (const model of fleet.models) {
+        if (model.mesh) model.mesh.instanceMatrix.needsUpdate = true;
+      }
       wheel.instanceMatrix.needsUpdate = true;
+      vehBlob.instanceMatrix.needsUpdate = true;
       brake.instanceMatrix.needsUpdate = true;
       head.instanceMatrix.needsUpdate = true;
       blink.instanceMatrix.needsUpdate = true;
@@ -652,29 +653,11 @@ export function TrafficLayer({
         />
       </instancedMesh>
 
-      <instancedMesh ref={bodyRef} args={[undefined, undefined, nVeh]} frustumCulled={false} castShadow>
-        <boxGeometry args={[1.76, 0.62, 4.1]} />
-        <meshStandardMaterial color="#ffffff" roughness={0.5} metalness={0.25} />
-      </instancedMesh>
-      <instancedMesh ref={cabinRef} args={[undefined, undefined, nVeh]} frustumCulled={false} castShadow>
-        <boxGeometry args={[1.55, 0.55, 2.05]} />
-        <meshStandardMaterial color={ROOF_COLOR} roughness={0.55} metalness={0.25} />
-      </instancedMesh>
-      {/* Glazed greenhouse — tinted glass sub-material, inset over the cabin. */}
-      <instancedMesh ref={glassRef} args={[undefined, undefined, nVeh]} frustumCulled={false}>
-        <boxGeometry args={[1.4, 0.5, 1.86]} />
-        <meshStandardMaterial
-          color={GLASS_COLOR}
-          roughness={0.08}
-          metalness={0.1}
-          transparent
-          opacity={0.62}
-        />
-      </instancedMesh>
-      <instancedMesh ref={wheelRef} args={[undefined, undefined, nVeh * 4]} frustumCulled={false}>
-        <cylinderGeometry args={[WHEEL_RADIUS, WHEEL_RADIUS, 0.24, 10]} />
-        <meshStandardMaterial color="#181b20" roughness={0.75} metalness={0.15} />
-      </instancedMesh>
+      {/* Authored GLB fleet: per-model body InstancedMeshes + one shared wheel
+          InstancedMesh, built imperatively in `fleet`. dispose={null} keeps the
+          drei-cached geometry/materials alive across remounts — the buffers we
+          own are freed in the disposeTrafficFleet cleanup effect above. */}
+      <primitive object={fleet.group} dispose={null} />
       {/* Tail/brake bar — unlit basic material so per-instance colour reads as
           light (brake red / night tail glow / unlit lens). */}
       <instancedMesh ref={brakeRef} args={[undefined, undefined, nVeh]} frustumCulled={false}>
@@ -747,3 +730,7 @@ export function TrafficLayer({
     </group>
   );
 }
+
+// Warm the drei GLTF cache so the fleet is decoded before the first lesson mounts
+// (Draco decode happens off the render path). Matches HeroCarBody's preload.
+useGLTF.preload(FLEET_URLS, DRACO_DECODER_PATH);
