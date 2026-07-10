@@ -17,7 +17,12 @@
  */
 
 import type { ScorableEvent } from "../rules";
-import type { EventPosition, ObjectiveOutcome, SessionNearMiss } from "./types";
+import type {
+  EventPosition,
+  ExamTermination,
+  ObjectiveOutcome,
+  SessionNearMiss,
+} from "./types";
 
 // ---------------------------------------------------------------------------
 // The versioned Json payload of SimSession.events
@@ -45,6 +50,16 @@ export interface SimSessionEventsJson {
   effectiveScore?: number;
   eventPositions?: EventPosition[];
   nearMisses?: SessionNearMiss[];
+  /**
+   * A13 (additive, optional — absent on training lessons and pre-A13 rows):
+   * the session ran in exam mode. A passed sim exam is the strongest
+   * readiness evidence a stored session carries — persisted so A14's
+   * learner-model/gamification paths can weight it later WITHOUT re-deriving
+   * from lesson ids (no A14 logic changes shipped with A13).
+   */
+  examMode?: boolean;
+  /** A13: why the exam terminated (server-derived, examMode rows only). */
+  examTermination?: ExamTermination;
 }
 
 /**
@@ -85,6 +100,13 @@ export function parseSimSessionEvents(value: unknown): SimSessionEventsJson | nu
   }
   if (Array.isArray(o.nearMisses)) {
     parsed.nearMisses = o.nearMisses as SessionNearMiss[];
+  }
+  // A13 optional fields — same treatment as the A15 additions above.
+  if (o.examMode === true) {
+    parsed.examMode = true;
+  }
+  if (typeof o.examTermination === "object" && o.examTermination !== null) {
+    parsed.examTermination = o.examTermination as ExamTermination;
   }
   return parsed;
 }

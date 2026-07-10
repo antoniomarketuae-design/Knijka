@@ -34,6 +34,7 @@ import {
   isEscalationMultiplier,
   type PenaltyEscalation,
 } from "./escalation";
+import { examTerminationFor } from "./exam";
 import { lessonById } from "./specs";
 import type {
   EventPosition,
@@ -408,6 +409,12 @@ export function gradeFinishWire(input: unknown): GradedFinishWire {
   }
   const { effectiveTotalPoints, escalated } = applyEscalations(summary.mistakes, escalations);
 
+  // A13: for examMode specs the termination record is REDERIVED here from
+  // the rebuilt catalog events — never read from the client (the same pure
+  // fold the live session ran, so both sides always agree on reason + time).
+  const examTermination =
+    lesson.examMode === true ? examTerminationFor(events) : null;
+
   const result: LessonResult = {
     lessonId: lesson.id,
     summary,
@@ -419,6 +426,7 @@ export function gradeFinishWire(input: unknown): GradedFinishWire {
     effectiveScore: effectiveTotalPoints,
     escalations: escalated,
     durationSec: (wire.finishedAtMs - wire.startedAtMs) / 1000,
+    ...(examTermination !== null ? { examTermination } : {}),
   };
 
   return { status: "ok", lesson, wire, events, result };

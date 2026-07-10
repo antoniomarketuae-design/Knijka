@@ -41,4 +41,5 @@ export {
   coachSession,
   type CoachInput,
   type CoachDecision,
+  type CoachOptions,
 } from "./coach";

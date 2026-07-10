@@ -44,6 +44,7 @@ import {
   type ObjectiveContext,
 } from "./objectives";
 import { applyEscalations, type PenaltyEscalation } from "./escalation";
+import { examTerminationFor } from "./exam";
 import type {
   EventPosition,
   LessonPhase,
@@ -200,13 +201,37 @@ export function applyPreDriveStep(
     hudEvents.push({ kind: "objectiveComplete", titleBg: "Подготовка за потегляне" });
   }
 
+  const allEvents = scorable.length > 0 ? [...prev.events, ...scorable] : prev.events;
+
+  // A13: the exam is graded from the first second — the pre-drive procedure
+  // included (assess mode scores wrong order live, skips at move-off). A
+  // candidate who blows past the official limits before even driving is
+  // terminated on the spot, exactly like on the road.
+  let examTermination = prev.examTermination;
+  let phase: LessonPhase = finished ? "driving" : prev.phase;
+  let endedAtSec = prev.endedAtSec;
+  if (
+    prev.lesson.examMode === true &&
+    examTermination === undefined &&
+    scorable.some((e) => e.kind === "violation")
+  ) {
+    const trip = examTerminationFor(allEvents);
+    if (trip !== null) {
+      examTermination = trip;
+      phase = "completed";
+      endedAtSec = tSec;
+    }
+  }
+
   return {
     state: {
       ...prev,
       preDrive: machine,
-      phase: finished ? "driving" : prev.phase,
-      events: scorable.length > 0 ? [...prev.events, ...scorable] : prev.events,
+      phase,
+      endedAtSec,
+      events: allEvents,
       lastT: Math.max(prev.lastT, tSec),
+      ...(examTermination !== undefined ? { examTermination } : {}),
     },
     hudEvents,
   };
@@ -240,6 +265,10 @@ export function applyTick(prev: LessonSessionState, tick: SimTick): LessonStepRe
 
   const { state: rules, events: ruleEvents } = reduceTick(prev.rules, tick);
 
+  // A13: exam sessions bypass the whole teach-first layer — see coach.ts.
+  const examMode = prev.lesson.examMode === true;
+  const coachOpts = examMode ? { examMode: true } : undefined;
+
   // Coach the violations: teach-first-then-grade. A first, teachable mistake
   // PAUSES the sim with a mini-lesson card (A9, doc 65 §5) and does NOT count
   // toward the score; repeats — and any dangerous/terminating error — are
@@ -256,11 +285,15 @@ export function applyTick(prev: LessonSessionState, tick: SimTick): LessonStepRe
       scoredEvents.push(e);
       continue;
     }
-    const step = coachStep(encounters, {
-      code: e.code,
-      severityClass: e.severityClass,
-      terminateSession: e.terminateSession,
-    });
+    const step = coachStep(
+      encounters,
+      {
+        code: e.code,
+        severityClass: e.severityClass,
+        terminateSession: e.terminateSession,
+      },
+      coachOpts,
+    );
     encounters = step.encounters;
     if (step.decision.scored) {
       // Graded — QW7 explaining toast, deliberately NON-blocking. This covers
@@ -386,6 +419,25 @@ export function applyTick(prev: LessonSessionState, tick: SimTick): LessonStepRe
     }
   }
 
+  // A13: exam sessions TERMINATE the moment the official limits are crossed
+  // (any опасна / collision / > 9 total / > 6 from основни) — the fold runs
+  // only on frames that scored a violation, and it wins over a same-frame
+  // route completion (a route finished ON the tripping mistake is still a
+  // terminated exam). Training lessons keep driving (rules/scoring.ts).
+  let examTermination = prev.examTermination;
+  if (
+    examMode &&
+    examTermination === undefined &&
+    scoredEvents.some((e) => e.kind === "violation")
+  ) {
+    const trip = examTerminationFor([...prev.events, ...scoredEvents]);
+    if (trip !== null) {
+      examTermination = trip;
+      phase = "completed";
+      endedAtSec = tick.t;
+    }
+  }
+
   // A15: record WHERE each scored event happened — the tick in hand at
   // emission time is the only moment the position is knowable, and the rule
   // engine deliberately stays position-free (law, not geometry). Paired back
@@ -417,6 +469,7 @@ export function applyTick(prev: LessonSessionState, tick: SimTick): LessonStepRe
       lastTeachMomentAtSec: lastTeachAt,
       lastT: Math.max(prev.lastT, tick.t),
       ...(eventPositions !== undefined ? { eventPositions } : {}),
+      ...(examTermination !== undefined ? { examTermination } : {}),
     },
     hudEvents,
     teachMoments,
@@ -536,5 +589,7 @@ export function buildLessonResult(state: LessonSessionState): LessonResult {
     // A15: the mistake-map channels ride into the result untouched.
     ...(state.eventPositions !== undefined ? { eventPositions: state.eventPositions } : {}),
     ...(state.nearMisses !== undefined ? { nearMisses: state.nearMisses } : {}),
+    // A13: the exam-termination record (examMode sessions only).
+    ...(state.examTermination !== undefined ? { examTermination: state.examTermination } : {}),
   };
 }

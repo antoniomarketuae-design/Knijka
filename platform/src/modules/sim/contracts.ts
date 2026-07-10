@@ -110,6 +110,26 @@ export interface LessonSpec {
    * absent/empty = free ambient traffic only (pre-A8 behavior).
    */
   stagedEvents?: StagedEventSpec[];
+  /**
+   * A13 exam session mode („Пробен практически изпит"). Additive; absent =
+   * training lesson. True flips the session to exam-strict behavior:
+   *  - coach OFF — every violation grades at catalog points from the FIRST
+   *    encounter (no teach moments, no warn-once, no escalation multipliers;
+   *    lessons/engine.ts wires it through scenarios/coach `examMode`);
+   *  - live official termination — any опасна, any collision, > 9 total
+   *    points or > 6 points from основни ends the session immediately
+   *    („Изпитът се прекратява", lessons/exam.ts);
+   *  - the shell suppresses route guidance and micro-quizzes — the student
+   *    navigates by the objective banner's examiner instructions.
+   */
+  examMode?: boolean;
+  /**
+   * A13 unlock gate for out-of-curriculum entries (the exam card on
+   * /simulator): the entry unlocks once THIS lesson id has a passed session
+   * (lessons/progression.ts isExamUnlocked). Linear curriculum progression
+   * ignores it; absent = always unlocked.
+   */
+  unlockAfterLessonId?: string;
 }
 
 export interface LessonObjective {

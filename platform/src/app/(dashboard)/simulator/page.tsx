@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import { requireUser } from "@/modules/auth";
 import {
   computeProgression,
+  EXAM_LESSON,
+  isExamUnlocked,
   LESSONS,
   type LessonAttemptRow,
 } from "@/modules/sim/lessons";
@@ -62,7 +64,22 @@ export default async function SimulatorPage() {
     bestScore: e.bestScore,
   }));
 
-  return <SimulatorClient entries={entries} history={history} />;
+  // A13: the exam entry — gated by the spec's prerequisite (isExamUnlocked;
+  // EXAM_LESSON documents the l2-intersections choice), stats folded from
+  // the same persisted attempts as the lesson cards.
+  const examAttempts = attempts.filter((a) => a.lessonId === EXAM_LESSON.id);
+  const examEntry: LessonEntryView = {
+    lesson: EXAM_LESSON,
+    unlocked: isExamUnlocked(EXAM_LESSON, attempts),
+    passed: examAttempts.some((a) => a.passed),
+    attempts: examAttempts.length,
+    bestScore: examAttempts.reduce<number | null>(
+      (best, a) => (best === null ? a.score : Math.min(best, a.score)),
+      null,
+    ),
+  };
+
+  return <SimulatorClient entries={entries} examEntry={examEntry} history={history} />;
 }
 
 // ---------------------------------------------------------------------------
@@ -84,7 +101,9 @@ const SEVERITY_RANK: Record<SessionHistoryMistake["severityClass"], number> = {
  * re-price or re-title them. Unknown codes are skipped, not trusted.
  */
 function buildHistoryEntries(rows: SimSessionDetailRow[]): SessionHistoryEntry[] {
-  const titleByLessonId = new Map(LESSONS.map((l) => [l.id, l.titleBg]));
+  const titleByLessonId = new Map(
+    [...LESSONS, EXAM_LESSON].map((l) => [l.id, l.titleBg]),
+  );
 
   return rows.map((r) => {
     const ev = r.events;

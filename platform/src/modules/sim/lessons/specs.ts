@@ -26,13 +26,20 @@
  *    night lighting and set isNight on every tick for this lesson.
  */
 
-import type { LessonSpec, ParkingBaySpec } from "../contracts";
+import type {
+  CyclistRightHookSpec,
+  LessonSpec,
+  ParkingBaySpec,
+  PriorityFromRightSpec,
+  RoundaboutEntrySpec,
+} from "../contracts";
 
 /**
  * L7's marked bay — single source for the WORLD paint (LessonSpec.parkingBay
  * → LESSON_PARKING_BAYS → markings builder) and the GRADED rect (l7-park
  * objective params.bay, A10): what the student sees painted is exactly what
- * the evaluator measures against.
+ * the evaluator measures against. The A13 exam route ends in the SAME bay
+ * (same painted rect, same graded rect — one street, one truth).
  */
 const L7_PARKING_BAY: ParkingBaySpec = {
   x: 681.26,
@@ -41,6 +48,103 @@ const L7_PARKING_BAY: ParkingBaySpec = {
   widthM: 3.0,
   lengthM: 6.6,
 };
+
+// ---------------------------------------------------------------------------
+// Shared staged encounters (still DATA — the builders only stamp an id, so
+// the lesson that teaches a hazard and the exam that rehearses it grade the
+// EXACT same pinned geometry; a district fix lands in both at once).
+// ---------------------------------------------------------------------------
+
+/** L2/exam — priority car from the right at the Б2-guarded junction
+ *  n5063751788. See the honest-placement note on the L2 entry. */
+function priorityFromRightAtB2(id: string): PriorityFromRightSpec {
+  return {
+    id,
+    kind: "priorityFromRight",
+    libraryEventId: "ev-junction-priority-sign",
+    junction: { nodeId: "n5063751788", x: 434.54, y: 67.2 },
+    actor: {
+      // Northbound on бул. „Акад. Стефан Младенов" (e672186635.0), across
+      // the junction, north past the lights, exiting east on the
+      // secondary_link — clear of the player's whole remaining route.
+      pathNodes: [
+        "n1113186267",
+        "n5063751788",
+        "n9601848047",
+        "n6294463135",
+        "n1805512602",
+        "n330851787",
+      ],
+      hold: { nodeIndex: 1, offsetM: -75 }, // 75 m south of the junction
+      cruiseSpeedMps: 8.5,
+      colorIndex: 2,
+    },
+    junctionNodeIndex: 1,
+    armDistM: 95,
+    leadSec: 1.1,
+    lineDistM: 8,
+    clearSpeedMps: 12.5,
+  };
+}
+
+/** L3/exam — cyclist right-hook at the uncontrolled T n415949424 (the routes
+ *  share the same southbound straight + right turn west). Audit C3 caveat:
+ *  the "cyclist" is a narrow scripted vehicle-agent riding the curb. */
+function cyclistRightHookAtT(id: string): CyclistRightHookSpec {
+  return {
+    id,
+    kind: "cyclistRightHook",
+    libraryEventId: "ev-cyclist",
+    junction: { nodeId: "n415949424", x: 229.08, y: -401.6 },
+    actor: {
+      // Southbound on the 131 m straight the player also rides, then
+      // straight through the junction and away south (off the route).
+      pathNodes: ["n179974484", "n415949424", "n10829521919"],
+      hold: { nodeIndex: 1, offsetM: -38 }, // waits curb-side, 38 m short
+      cruiseSpeedMps: 4.6,
+      extraRightOffsetM: 2.6, // rides the curb of the scaled lane
+      colorIndex: 1,
+    },
+    junctionNodeIndex: 1,
+    releaseDistM: 70,
+    dangerRadiusM: 9,
+    conflictWindowM: 20,
+  };
+}
+
+/** L3/exam — circulating-car conflict at the rb-1 SE entry mouth (both
+ *  routes approach it westbound along „Баку"). */
+function roundaboutEntryConflict(id: string): RoundaboutEntrySpec {
+  return {
+    id,
+    kind: "roundaboutEntry",
+    libraryEventId: "ev-roundabout",
+    center: { x: -38.03, y: -342.96 },
+    ringRadiusM: 19.83,
+    actor: {
+      // The full rb-1 ring as a closed loop (counter-clockwise).
+      pathNodes: [
+        "n707684255",
+        "n707684256",
+        "n279646956",
+        "n279646958",
+        "n1038574156",
+        "n1038574251",
+        "n707684255",
+      ],
+      hold: { nodeIndex: 0, offsetM: 0 }, // dormant on the far (west) arc
+      cruiseSpeedMps: 6.5,
+      loop: true,
+      colorIndex: 0,
+    },
+    entry: { x: -20.1, y: -351.4 }, // player's SE entry mouth (n279646956)
+    entryNodeIndex: 2,
+    conflictLeadM: 12,
+    armDistM: 110,
+    minSyncSpeedMps: 3,
+    maxSyncSpeedMps: 9,
+  };
+}
 
 export const LESSONS: readonly LessonSpec[] = [
   {
@@ -117,35 +221,7 @@ export const LESSONS: readonly LessonSpec[] = [
     // orchestrator's staging machinery is junction-type agnostic; the
     // conflictFromRight/uncontrolled variant is exercised by the orchestrator
     // integration tests at n348207502.
-    stagedEvents: [
-      {
-        id: "l2-priority-from-right",
-        kind: "priorityFromRight",
-        libraryEventId: "ev-junction-priority-sign",
-        junction: { nodeId: "n5063751788", x: 434.54, y: 67.2 },
-        actor: {
-          // Northbound on бул. „Акад. Стефан Младенов" (e672186635.0), across
-          // the junction, north past the lights, exiting east on the
-          // secondary_link — clear of the player's whole remaining route.
-          pathNodes: [
-            "n1113186267",
-            "n5063751788",
-            "n9601848047",
-            "n6294463135",
-            "n1805512602",
-            "n330851787",
-          ],
-          hold: { nodeIndex: 1, offsetM: -75 }, // 75 m south of the junction
-          cruiseSpeedMps: 8.5,
-          colorIndex: 2,
-        },
-        junctionNodeIndex: 1,
-        armDistM: 95,
-        leadSec: 1.1,
-        lineDistM: 8,
-        clearSpeedMps: 12.5,
-      },
-    ],
+    stagedEvents: [priorityFromRightAtB2("l2-priority-from-right")],
     objectives: [
       {
         id: "l2-stop-sign",
@@ -225,54 +301,8 @@ export const LESSONS: readonly LessonSpec[] = [
     //     reach the yield line; the runtime's circulatingConflict query
     //     grades the entry exactly as it would any ambient car.
     stagedEvents: [
-      {
-        id: "l3-cyclist-right-hook",
-        kind: "cyclistRightHook",
-        libraryEventId: "ev-cyclist",
-        junction: { nodeId: "n415949424", x: 229.08, y: -401.6 },
-        actor: {
-          // Southbound on the 131 m straight the player also rides, then
-          // straight through the junction and away south (off the route).
-          pathNodes: ["n179974484", "n415949424", "n10829521919"],
-          hold: { nodeIndex: 1, offsetM: -38 }, // waits curb-side, 38 m short
-          cruiseSpeedMps: 4.6,
-          extraRightOffsetM: 2.6, // rides the curb of the scaled lane
-          colorIndex: 1,
-        },
-        junctionNodeIndex: 1,
-        releaseDistM: 70,
-        dangerRadiusM: 9,
-        conflictWindowM: 20,
-      },
-      {
-        id: "l3-roundabout-conflict",
-        kind: "roundaboutEntry",
-        libraryEventId: "ev-roundabout",
-        center: { x: -38.03, y: -342.96 },
-        ringRadiusM: 19.83,
-        actor: {
-          // The full rb-1 ring as a closed loop (counter-clockwise).
-          pathNodes: [
-            "n707684255",
-            "n707684256",
-            "n279646956",
-            "n279646958",
-            "n1038574156",
-            "n1038574251",
-            "n707684255",
-          ],
-          hold: { nodeIndex: 0, offsetM: 0 }, // dormant on the far (west) arc
-          cruiseSpeedMps: 6.5,
-          loop: true,
-          colorIndex: 0,
-        },
-        entry: { x: -20.1, y: -351.4 }, // player's SE entry mouth (n279646956)
-        entryNodeIndex: 2,
-        conflictLeadM: 12,
-        armDistM: 110,
-        minSyncSpeedMps: 3,
-        maxSyncSpeedMps: 9,
-      },
+      cyclistRightHookAtT("l3-cyclist-right-hook"),
+      roundaboutEntryConflict("l3-roundabout-conflict"),
     ],
     objectives: [
       {
@@ -520,23 +550,276 @@ export const LESSONS: readonly LessonSpec[] = [
   },
 ];
 
+// ---------------------------------------------------------------------------
+// A13 — „Пробен практически изпит" (exam mode; doc 68 row A13, finding D6)
+// ---------------------------------------------------------------------------
+
+/**
+ * The exam route (~2.5 km, 10–15 min incl. the strict pre-drive) chains the
+ * district's graded set — every leg verified drivable on the road graph
+ * (oneways honored), every coordinate pinned to district-v1.json:
+ *
+ *   spawn-4 (cold start, pre-drive ASSESS)
+ *   → north to the Б2 „Спри!" at n331942490          [braking lead car]
+ *   → right, then left onto the boulevard             [priority from right]
+ *   → north through both lights (n1805512602, n5997970086)
+ *   → block-turnaround via „Проф. Марко Семов" onto the southbound
+ *     carriageway (dual carriageway — the loop IS the legal U-turn)
+ *   → south past n5063751788, right at the signalized n179974491 onto
+ *     „Проф. Георги Брадистилов", left onto „Проф. Борис Боровски"
+ *   → right at the T n415949424, west                 [cyclist right-hook]
+ *   → along the southern street                       [pedestrian dart-out]
+ *   → rb-1 roundabout as the turnaround (enter SE mouth, ~5/6 around,
+ *     exit east with the right indicator)             [circulating conflict]
+ *   → back east, north on „Боровски", east on „Брадистилов", straight
+ *     through the light onto „Трайко Станоев"
+ *   → reverse-park in the SAME painted bay L7 grades (L7_PARKING_BAY).
+ *
+ * All five A8 staged-event kinds run, exam-armed: the three junction hazards
+ * reuse the lesson geometry verbatim (shared builders above); the braking
+ * lead car is re-placed on the opening straight (hold s≈115 ≈ 25 m ahead of
+ * spawn-4 at s≈90; slam at s≈150, ~90 m short of the stop line — recover,
+ * then stop at the Б2) with NO ball visual (triggersHazard false: the brake
+ * lights ARE the stimulus, as on a real exam); the dart-out fires at the
+ * marked mid-block crossing n11364730203 on the long westbound straight.
+ *
+ * Exam decisions (documented):
+ *  - preDriveMode "assess": the procedure is graded in exam-strict order
+ *    from the first action — it IS how the real exam starts.
+ *  - NO requireRedMet on the lights: the exam takes signal phases as they
+ *    come; forcing a met red is a training gate (L2), not exam protocol.
+ *  - objective titles ARE the examiner's instructions (route guidance is off
+ *    in exam mode — the student navigates by instruction, doc 32 style).
+ *  - unlockAfterLessonId "l2-intersections": by L2 the student has proven
+ *    moving off + stop/priority discipline — the minimum to attempt a session
+ *    that terminates on any опасна. Earlier = demoralizing insta-fail;
+ *    later = the product promise gated behind the whole curriculum. Change
+ *    the field to re-gate.
+ */
+export const EXAM_LESSON: LessonSpec = {
+  id: "lex-exam-1",
+  order: 100, // out of the linear curriculum — never unlocks by order
+  titleBg: "Пробен практически изпит",
+  descriptionBg:
+    "Пълна репетиция на изпита: строга подготовка преди потегляне, маршрут от около 2,5 км без подсказки и оценяване по официалната система от първата секунда. Опасна грешка, произшествие или превишен лимит прекратяват изпита незабавно.",
+  conceptIds: [
+    "c-pre-drive-check",
+    "c-priority-concept",
+    "c-give-way-stop-behavior",
+    "c-light-junction",
+    "c-roundabout-rules",
+    "c-crosswalk-yield",
+    "c-braking-distance",
+    "c-speed-adaptation",
+    "c-reversing",
+    "c-maneuver-principles",
+  ],
+  spawn: { pointId: "spawn-4" },
+  preDrive: true,
+  preDriveMode: "assess",
+  // vehicleStart absent = cold (engine off, P, parking brake on — A1 policy).
+  examMode: true,
+  unlockAfterLessonId: "l2-intersections",
+  parkingBay: L7_PARKING_BAY,
+  stagedEvents: [
+    {
+      // Opening-straight emergency: the lead car waits ~25 m ahead of
+      // spawn-4 on the northbound oneway (e226063192.0 → e897608662.0),
+      // matches the candidate's speed, then brake-slams at (386.3, −28) —
+      // s≈150, ~60 m past spawn, ~90 m before the Б2 stop line, ON the
+      // authored path (verified against the edge geometry). After the beat
+      // it drives on and turns WEST at the T n331942490 (e904964433.1),
+      // off the exam route (the candidate turns east).
+      id: "ex-braking-lead",
+      kind: "brakingLeadCar",
+      libraryEventId: "ev-emergency-braking",
+      actor: {
+        pathNodes: ["n415950074", "n331942486", "n331942490", "n2349242518"],
+        hold: { nodeIndex: 0, offsetM: 115 },
+        cruiseSpeedMps: 10,
+        colorIndex: 3,
+      },
+      followGapM: 22,
+      maxMatchSpeedMps: 13.9, // 50 km/h — urban limit of the street
+      slamAt: { x: 386.3, y: -28.0 },
+      slamRadiusM: 7,
+      slamDecelMps2: 7.5,
+      minSlamSpeedKmh: 25,
+      proximityFallbackM: 30,
+      triggersHazard: false, // no ball — brake lights are the exam stimulus
+      resumeAfterSec: 4,
+    },
+    // The three junction hazards — lesson geometry verbatim (builders above).
+    priorityFromRightAtB2("ex-priority-from-right"),
+    cyclistRightHookAtT("ex-cyclist-right-hook"),
+    roundaboutEntryConflict("ex-roundabout-conflict"),
+    {
+      // Mid-block dart-out at the marked crossing n11364730203 on the long
+      // westbound straight (edge e35467616.0, 2 scaled lanes, tangent
+      // ≈ (−0.9913, 0.1314) at the crossing vertex). Same derivation as L4:
+      // curb start = crossing + 9.725 m to the player's RIGHT (north curb,
+      // right = (0.1314, 0.9913)); the dart runs south across the full
+      // carriageway (2·8.125 curb-to-curb inside a 23.5 m walk). Crossing
+      // occupancy feeds the existing PEDESTRIAN_* detectors unchanged.
+      id: "ex-ped-dart-out",
+      kind: "pedestrianDartOut",
+      libraryEventId: "ev-ped-crossing-marked",
+      crossingId: "n11364730203",
+      crossing: { x: 105.28, y: -391.54 },
+      start: { x: 106.56, y: -381.9 },
+      dir: { x: -0.1314, y: -0.9913 },
+      speedMps: 2.9,
+      travelM: 23.5,
+      roadFromM: 1.2,
+      roadToM: 18.25,
+      triggerDistM: 34,
+      minTriggerSpeedKmh: 20,
+    },
+  ],
+  objectives: [
+    {
+      id: "ex-stop-b2",
+      titleBg: "Потегли направо. На знака „Спри!“ спри напълно",
+      kind: "passSignal",
+      params: {
+        nodeId: "n331942490",
+        x: 383.17,
+        y: 65.76,
+        radiusM: 30,
+        control: "stopSign",
+      },
+    },
+    {
+      id: "ex-signal-1",
+      titleBg: "След стопа завий надясно, после наляво по булеварда — премини светофара",
+      kind: "passSignal",
+      params: {
+        nodeId: "n1805512602",
+        x: 430.13,
+        y: 235.3,
+        radiusM: 30,
+        control: "trafficLight",
+      },
+    },
+    {
+      id: "ex-signal-2",
+      titleBg: "Продължи направо през следващия светофар",
+      kind: "passSignal",
+      params: {
+        nodeId: "n5997970086",
+        x: 421.91,
+        y: 275.44,
+        radiusM: 30,
+        control: "trafficLight",
+        // No requireRedMet — see the exam-decisions note above.
+      },
+    },
+    {
+      // Southbound-carriageway checkpoint n6294440269 — reachable only after
+      // the block turnaround (sequential objectives make the northbound pass
+      // 17 m east irrelevant: this activates after the light-2 crossing).
+      id: "ex-turnaround",
+      titleBg: "Веднага след светофара завий наляво по „Проф. Марко Семов“ и се върни по булеварда на юг",
+      kind: "reachZone",
+      params: { x: 427.0, y: 159.0, radiusM: 18 },
+    },
+    {
+      // West of the right turn at the signalized n179974491 — the 4-way
+      // n348207502 confirms the candidate is westbound on „Брадистилов".
+      id: "ex-turn-bradistilov",
+      titleBg: "В края на булеварда завий надясно по „Проф. Георги Брадистилов“",
+      kind: "reachZone",
+      params: { x: 389.21, y: -271.99, radiusM: 20 },
+    },
+    {
+      // Midpoint of the 131 m „Боровски" straight (241,−271)→(229,−402).
+      id: "ex-turn-borovski",
+      titleBg: "На кръстовището завий наляво по „Проф. Борис Боровски“",
+      kind: "reachZone",
+      params: { x: 234.5, y: -336.5, radiusM: 16 },
+    },
+    {
+      // n6805916117 — 61 m west of the T (the cyclist right-hook corner).
+      id: "ex-turn-west",
+      titleBg: "На Т-образното кръстовище завий надясно, на запад",
+      kind: "reachZone",
+      params: { x: 168.43, y: -396.7, radiusM: 16 },
+    },
+    {
+      // rb-1 approach — same zone as L3 (the dart-out fires on this leg).
+      id: "ex-roundabout-approach",
+      titleBg: "Продължи направо до кръговото кръстовище",
+      kind: "reachZone",
+      params: { x: -38.03, y: -342.96, radiusM: 60 },
+    },
+    {
+      // The roundabout is the route's turnaround: enter the SE mouth, ~5/6
+      // around, exit east onto „Баку" — right indicator required in the exit
+      // window (A10 evaluator); an unsignaled exit voids the traversal.
+      id: "ex-roundabout",
+      titleBg: "На кръговото се върни в обратна посока — излез на изток с десен мигач",
+      kind: "completeManeuver",
+      params: {
+        maneuver: "roundabout",
+        x: -38.03,
+        y: -342.96,
+        enterRadiusM: 26,
+        exitRadiusM: 45,
+      },
+    },
+    {
+      // Same mid-„Боровски" zone as ex-turn-borovski, now northbound —
+      // sequential activation (post-roundabout) keeps the passes apart.
+      id: "ex-return-borovski",
+      titleBg: "Върни се на изток и на Т-образното кръстовище завий наляво, на север",
+      kind: "reachZone",
+      params: { x: 234.5, y: -336.5, radiusM: 16 },
+    },
+    {
+      id: "ex-return-bradistilov",
+      titleBg: "Завий надясно по „Проф. Георги Брадистилов“ и карай направо, на изток",
+      kind: "reachZone",
+      params: { x: 389.21, y: -271.99, radiusM: 20 },
+    },
+    {
+      // spawn-1's arc on „Трайко Станоев" — 62 m before the painted bay.
+      id: "ex-street-stanoev",
+      titleBg: "Премини направо през светофара и продължи по „Трайко Станоев“",
+      kind: "reachZone",
+      params: { x: 620.96, y: -215.89, radiusM: 20 },
+    },
+    {
+      id: "ex-park",
+      titleBg: "Паркирай на заден ход в очертаното място вдясно и спри напълно",
+      kind: "completeManeuver",
+      params: { maneuver: "parkInBay", holdSec: 1.5, bay: L7_PARKING_BAY },
+    },
+  ],
+};
+
 /**
  * Every lesson-authored painted parking bay (doc 68 A5). The world builder
  * paints these by default (buildWorldGeometry `options.parkingBays` fallback)
  * — same curriculum-drives-the-world pattern as the L2 Б2 stop-sign placement
  * (runtime/stoplines STOP_LINE_OVERRIDES → world props). DATA ONLY, so the
  * pure world builder can import it without dragging in the lesson engine.
+ * The exam's bay IS L7's object, so the curriculum list already covers it.
  */
 export const LESSON_PARKING_BAYS: readonly ParkingBaySpec[] = LESSONS.flatMap((l) =>
   l.parkingBay ? [l.parkingBay] : [],
 );
 
-/** Lookup by id; undefined for unknown ids (wire input goes through this). */
+/** Every playable spec: curriculum lessons + the A13 exam. */
+const ALL_LESSONS: readonly LessonSpec[] = [...LESSONS, EXAM_LESSON];
+
+/** Lookup by id — including the exam; undefined for unknown ids (wire input
+ *  goes through this, so exam finishes grade server-side like any lesson). */
 export function lessonById(id: string): LessonSpec | undefined {
-  return LESSONS.find((l) => l.id === id);
+  return ALL_LESSONS.find((l) => l.id === id);
 }
 
-/** Lessons sorted by curriculum order (LESSONS is already ordered; be safe). */
+/** Curriculum lessons sorted by order (the exam entry is NOT in here — it
+ *  has its own gated card on /simulator, not a select-grid slot). */
 export function lessonsInOrder(): LessonSpec[] {
   return [...LESSONS].sort((a, b) => a.order - b.order);
 }

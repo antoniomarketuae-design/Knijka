@@ -354,6 +354,31 @@ export interface SessionNearMiss {
 }
 
 // ---------------------------------------------------------------------------
+// A13 — exam termination (examMode sessions only)
+// ---------------------------------------------------------------------------
+
+/**
+ * Why an exam session terminated mid-route (A13). The first three mirror the
+ * official fail rule (rules/summary.ts FailReason — doc 32: no опасна, ≤ 9
+ * total, ≤ 6 from основни); "collision" is the terminateSession catalog flag
+ * (a ПТП ends the real exam on the spot). In examMode these end the session
+ * THE MOMENT they occur — unlike training lessons, which keep driving for
+ * learning value and only fold the verdict at the end.
+ */
+export type ExamTerminationReason =
+  | "collision"
+  | "dangerous-mistake"
+  | "total-points-exceeded"
+  | "osnovni-points-exceeded";
+
+/** The termination record: what ended the exam, and when. */
+export interface ExamTermination {
+  reason: ExamTerminationReason;
+  /** Session time of the violation that tripped the limit, seconds. */
+  tSec: number;
+}
+
+// ---------------------------------------------------------------------------
 // Lesson session state (the pure reducer state)
 // ---------------------------------------------------------------------------
 
@@ -411,6 +436,13 @@ export interface LessonSessionState {
    * Session stat only; never folds into any score.
    */
   nearMisses?: SessionNearMiss[];
+  /**
+   * A13 (additive; examMode sessions only): set the moment the exam
+   * terminated on the official limits (exam.ts examTerminationFor) — the
+   * session phase flips to "completed" on the same step. Absent on training
+   * lessons and on exams that finished the route within limits.
+   */
+  examTermination?: ExamTermination;
 }
 
 // ---------------------------------------------------------------------------
@@ -483,4 +515,11 @@ export interface LessonResult {
   eventPositions?: EventPosition[];
   /** A15 (additive): the session's near-miss encounters ("мина на косъм"). */
   nearMisses?: SessionNearMiss[];
+  /**
+   * A13 (additive; examMode only): why the exam terminated mid-route, for the
+   * examiner-style end framing („Изпитът се прекратява: …"). Derived on the
+   * client from the live session and REDERIVED server-side from the rebuilt
+   * catalog events (wire.ts) — never trusted from the client.
+   */
+  examTermination?: ExamTermination;
 }

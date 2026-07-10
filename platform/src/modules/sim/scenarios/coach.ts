@@ -29,6 +29,18 @@ export interface CoachInput {
   terminateSession?: boolean;
 }
 
+/**
+ * A13 exam mode: teach-first is OFF for the whole session. EVERY violation —
+ * every severity, mapped or not, first encounter or repeat — grades at
+ * catalog points (mode "grade", ×1.0, no lesson card). The A12 warn-once
+ * floor and the repeat-escalation ladder are TRAINING devices; an exam
+ * scores exactly what the official protocol scores, nothing softer and
+ * nothing harder. Encounter counts still accumulate (session bookkeeping).
+ */
+export interface CoachOptions {
+  examMode?: boolean;
+}
+
 export interface CoachDecision {
   code: string;
   /** Scenario event this maps to (null → keyed by its own code). */
@@ -51,14 +63,35 @@ export interface CoachDecision {
 export function coachStep(
   encounters: Readonly<Record<string, number>>,
   v: CoachInput,
+  opts?: CoachOptions,
 ): { decision: CoachDecision; encounters: Record<string, number> } {
   const scenarioId = scenarioForCode(v.code);
   const key = scenarioId ?? v.code;
+  const prior = encounters[key] ?? 0;
+  const nextEncounters = { ...encounters, [key]: prior + 1 };
+
+  // A13 exam mode — unconditional always-grade at official base points. Even
+  // learn-only-mapped codes grade: if the rule engine emitted a violation, an
+  // examiner would log it. No multiplier (repeat escalation is training-only)
+  // and no mini-lesson mid-exam (the debrief teaches AFTER the verdict).
+  if (opts?.examMode === true) {
+    return {
+      decision: {
+        code: v.code,
+        scenarioId,
+        mode: "grade",
+        scored: true,
+        showLesson: false,
+        penaltyMultiplier: 1,
+      },
+      encounters: nextEncounters,
+    };
+  }
+
   // Severity ladder (policy.ts): опасна/terminating always grade; второстепенна
   // warns once before grading regardless of mapping; основна follows the map.
   const mappedPolicy = scenarioId ? getScenarioEvent(scenarioId)?.policyDefault : undefined;
   const override = policyForViolation(v.severityClass, v.terminateSession === true, mappedPolicy);
-  const prior = encounters[key] ?? 0;
   const outcome = resolveEncounter(key, prior, override);
   return {
     decision: {
@@ -69,7 +102,7 @@ export function coachStep(
       showLesson: outcome.showLesson,
       penaltyMultiplier: outcome.penaltyMultiplier,
     },
-    encounters: { ...encounters, [key]: prior + 1 },
+    encounters: nextEncounters,
   };
 }
 

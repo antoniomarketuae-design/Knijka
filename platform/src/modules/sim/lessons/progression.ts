@@ -62,3 +62,19 @@ export function computeProgression(
     };
   });
 }
+
+/**
+ * A13 — the exam entry's unlock gate. Out-of-curriculum specs (the exam card)
+ * unlock once their `unlockAfterLessonId` prerequisite has a PASSED session;
+ * a spec without the field is always open. Pure, mirrors computeProgression's
+ * "previous passed" rule but keyed by an explicit lesson id instead of order
+ * (documented choice on EXAM_LESSON: prerequisite = l2-intersections).
+ */
+export function isExamUnlocked(
+  exam: Pick<LessonSpec, "unlockAfterLessonId">,
+  attempts: ReadonlyArray<LessonAttemptRow>,
+): boolean {
+  const prereq = exam.unlockAfterLessonId;
+  if (prereq === undefined) return true;
+  return attempts.some((a) => a.lessonId === prereq && a.passed);
+}

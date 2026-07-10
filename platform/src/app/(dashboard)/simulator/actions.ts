@@ -113,6 +113,15 @@ export async function finishLessonAction(
       x: n.x ?? null,
       y: n.y ?? null,
     })),
+    // A13: exam-mode marker + server-derived termination record. Both come
+    // from the SPEC and the rebuilt catalog events (gradeFinishWire) — the
+    // client never sends an exam flag, so it cannot claim one. Stored so
+    // A14's paths can weight exam evidence later (no A14 change here; the
+    // gamification event below already carries lessonId).
+    ...(lesson.examMode === true ? { examMode: true } : {}),
+    ...(result.examTermination !== undefined
+      ? { examTermination: result.examTermination }
+      : {}),
   };
 
   let sessionId: string;

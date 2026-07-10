@@ -88,3 +88,40 @@ describe("A12 warn-once floor for второстепенни", () => {
     expect(opasna.decision).toMatchObject({ mode: "grade", scored: true });
   });
 });
+
+describe("A13 exam mode — coach OFF, always-grade", () => {
+  it("EVERY catalog code, EVERY severity grades from the first encounter at ×1.0", () => {
+    // The whole-catalog sweep, exam edition: no teach, no warn-once, no
+    // lesson card, official base points only — if a new detector lands, this
+    // is what guarantees the exam still grades it from tick one.
+    for (const [code, spec] of Object.entries(VIOLATIONS)) {
+      const first = coachStep(
+        {},
+        {
+          code,
+          severityClass: spec.severityClass,
+          terminateSession: spec.terminateSession === true,
+        },
+        { examMode: true },
+      );
+      expect(first.decision.mode, `${code}: exam must grade the first encounter`).toBe("grade");
+      expect(first.decision.scored, `${code}: exam must score`).toBe(true);
+      expect(first.decision.penaltyMultiplier, `${code}: no multiplier on exams`).toBe(1);
+      expect(first.decision.showLesson, `${code}: no mini-lesson mid-exam`).toBe(false);
+
+      // Repeats stay at ×1.0 — the escalation ladder is training-only.
+      const second = coachStep(
+        first.encounters,
+        { code, severityClass: spec.severityClass },
+        { examMode: true },
+      );
+      expect(second.decision.mode, `${code}: repeat grades`).toBe("grade");
+      expect(second.decision.penaltyMultiplier, `${code}: repeat stays ×1.0`).toBe(1);
+    }
+  });
+
+  it("without the flag the coach is untouched (teach-first survives)", () => {
+    const first = coachStep({}, { code: "SPEEDING_OVER_LIMIT", severityClass: "vtorostepenna" });
+    expect(first.decision.mode).toBe("teach");
+  });
+});

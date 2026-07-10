@@ -18,8 +18,11 @@ export type {
   StagedEventSpec,
 } from "../contracts";
 
-// Lesson data (specs pinned to district-v1.json)
-export { LESSONS, lessonById, lessonsInOrder } from "./specs";
+// Lesson data (specs pinned to district-v1.json) + the A13 exam spec
+export { EXAM_LESSON, LESSONS, lessonById, lessonsInOrder } from "./specs";
+
+// A13 exam mode — official-limit termination fold (client + server shared)
+export { EXAM_TERMINATION_TEXT_BG, examTerminationFor } from "./exam";
 
 // Session engine (pure lifecycle reducer)
 export {
@@ -80,9 +83,10 @@ export {
   type TriggeredQuiz,
 } from "./quiz-trigger";
 
-// Progression / unlock logic
+// Progression / unlock logic (+ the A13 exam gate)
 export {
   computeProgression,
+  isExamUnlocked,
   type LessonAttemptRow,
   type LessonProgressEntry,
 } from "./progression";
@@ -112,6 +116,8 @@ export {
 // Shared types
 export type {
   EventPosition,
+  ExamTermination,
+  ExamTerminationReason,
   LessonPhase,
   LessonResult,
   LessonSessionState,

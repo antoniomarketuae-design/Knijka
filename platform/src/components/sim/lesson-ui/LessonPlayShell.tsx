@@ -38,6 +38,7 @@ import {
   buildLessonResult,
   createLessonSession,
   createQuizTriggerState,
+  EXAM_TERMINATION_TEXT_BG,
   finishSession,
   isDriveLocked,
   observeQuizTick,
@@ -61,7 +62,7 @@ import {
   type PreDriveMode,
   type PreDriveStepId,
 } from "@/modules/sim/procedures";
-import type { SimTick } from "@/modules/sim/rules";
+import { accumulateScore, type SimTick } from "@/modules/sim/rules";
 import type { DrivelineSnapshot } from "@/modules/sim/vehicle";
 import { finishLessonAction } from "@/app/(dashboard)/simulator/actions";
 import {
@@ -110,6 +111,8 @@ interface HudSnapshot {
   /** Canonical next pending step while in the pre-drive phase, else null. */
   preDriveNextStepId: PreDriveStepId | null;
   vehicle: { x: number; y: number; headingDeg: number } | null;
+  /** A13: live official tally (exam sessions only, null otherwise). */
+  examTally: { totalPoints: number; osnovniPoints: number; opasniCount: number } | null;
 }
 
 function snapshotOf(
@@ -152,6 +155,19 @@ function snapshotOf(
           headingDeg: lastTick.headingDeg,
         }
       : null,
+    // A13: the live protocol tally — folded from the session's scored events
+    // per the official taxonomy (rules/scoring.ts). Exam sessions only.
+    examTally:
+      s.lesson.examMode === true
+        ? (() => {
+            const score = accumulateScore(s.events);
+            return {
+              totalPoints: score.totalPoints,
+              osnovniPoints: score.osnovniPoints,
+              opasniCount: score.opasniCount,
+            };
+          })()
+        : null,
   };
 }
 
@@ -319,6 +335,11 @@ export function LessonPlayShell({
     return () => window.removeEventListener("keydown", onKey);
   }, [toggleFullscreen]);
 
+  // A13: exam session — teach/quiz/guidance machinery OFF, examiner framing
+  // ON. The always-grade + termination behavior lives in the engine (it reads
+  // lesson.examMode itself); the shell only adapts the presentation.
+  const examMode = lesson.examMode === true;
+
   // A2: pre-drive mode (Instruction→Practice→Assess). The machine applies the
   // matching order-scoring; the shell derives the presentation from it.
   const preDriveMode: PreDriveMode = lesson.preDriveMode ?? "instruction";
@@ -337,7 +358,10 @@ export function LessonPlayShell({
 
   // Load the concept-linked question bank once per lesson (server-sanitized),
   // then build the pure trigger from it. No bank ⇒ no quizzes (graceful).
+  // A13: exam sessions never quiz — the bank is not even fetched, so the
+  // trigger stays null and observeQuizTick is never armed.
   useEffect(() => {
+    if (examMode) return;
     let cancelled = false;
     void loadMicroQuizBank(lesson.id).then(
       (bank) => {
@@ -352,7 +376,7 @@ export function LessonPlayShell({
     return () => {
       cancelled = true;
     };
-  }, [lesson.id]);
+  }, [lesson.id, examMode]);
 
   // Frequency changes apply immediately, keeping the session's counters.
   useEffect(() => {
@@ -504,6 +528,11 @@ export function LessonPlayShell({
       sessionRef.current = state;
       lastPreDriveStepAtRef.current = Math.max(lastPreDriveStepAtRef.current, t);
 
+      // A13: an exam can terminate DURING the pre-drive (assess mode scores
+      // live; crossing the official limits before even moving off ends the
+      // exam on the spot). Training lessons never complete from this path.
+      if (state.phase === "completed") finalize(state);
+
       if (hudEvents.length > 0) {
         push(
           hudEvents.filter(
@@ -517,7 +546,7 @@ export function LessonPlayShell({
       }
       setSnap(snapshotOf(sessionRef.current, lastTickRef.current, drivelineRef.current));
     },
-    [push, nowSec],
+    [push, nowSec, finalize],
   );
 
   // -- QW10: blocked-drive explanation ------------------------------------------
@@ -638,17 +667,26 @@ export function LessonPlayShell({
           ← Всички уроци
         </button>
         <h1 className="text-lg font-extrabold">{lesson.titleBg}</h1>
+        {/* A13: unmistakable exam framing — this is a protocol, not a lesson. */}
+        {examMode ? (
+          <span className="rounded-full bg-danger/15 px-2.5 py-1 text-[10px] font-black uppercase tracking-wider text-danger">
+            Изпит
+          </span>
+        ) : null}
         <div className="ml-auto flex flex-wrap items-center gap-2">
           {!ended ? (
             <>
-              <QuizFrequencySelector value={quizFreq} onChange={setQuizFreq} />
+              {/* A13: no micro-quizzes on an exam — the selector disappears. */}
+              {!examMode ? <QuizFrequencySelector value={quizFreq} onChange={setQuizFreq} /> : null}
               {lesson.objectives.length === 0 ? (
                 <button type="button" className="btn-accent px-4 py-1.5 text-xs" onClick={finishNow}>
                   Завърши сесията
                 </button>
               ) : (
                 <button type="button" className="btn-ghost px-4 py-1.5 text-xs" onClick={abortNow}>
-                  Прекрати урока
+                  {/* A13: no mid-exam restart — leaving = abort, next try is a
+                      fresh attempt from the briefing. */}
+                  {examMode ? "Прекрати изпита" : "Прекрати урока"}
                 </button>
               )}
             </>
@@ -687,7 +725,12 @@ export function LessonPlayShell({
             // A7: snapshotOf stores currentObjectiveIndex + 1 — undo the +1 so
             // the scene's in-world route guidance gets the engine's 0-based
             // index (=== objectives.length once all are done → guidance hides).
-            activeObjectiveIndex={snap.objectiveIndex - 1}
+            // A13: exam sessions pass the all-done index UNCONDITIONALLY — the
+            // ghost route / turn arrows / markers never render; the student
+            // navigates by the objective banner's examiner instructions.
+            activeObjectiveIndex={
+              examMode ? lesson.objectives.length : snap.objectiveIndex - 1
+            }
             onTick={handleTick}
             onPreDriveStep={handlePreDriveStep}
             onBlockedDriveAttempt={handleBlockedDriveAttempt}
@@ -748,6 +791,35 @@ export function LessonPlayShell({
           </div>
         ) : null}
 
+        {/* A13: live protocol tally — the exam's honest scoreboard (official
+            taxonomy: total / основни / опасни against the doc-32 limits). */}
+        {examMode && snap.examTally !== null && snap.phase === "driving" && !ended ? (
+          <div className="absolute left-3 top-3">
+            <div
+              aria-label="Протокол — наказателни точки"
+              className="rounded-xl border border-border bg-surface/90 px-3 py-2 text-xs backdrop-blur"
+            >
+              <p className="text-[10px] font-black uppercase tracking-wider text-muted">
+                Протокол
+              </p>
+              <p className="mt-0.5 flex items-baseline gap-1 font-black tabular-nums">
+                <span
+                  className={
+                    snap.examTally.totalPoints > 9 ? "text-danger" : "text-foreground"
+                  }
+                >
+                  {snap.examTally.totalPoints}
+                </span>
+                <span className="font-semibold text-muted">/ 9 т.</span>
+              </p>
+              <p className="text-[10px] font-semibold tabular-nums text-muted">
+                основни {snap.examTally.osnovniPoints} / 6
+                {snap.examTally.opasniCount > 0 ? " · опасна!" : ""}
+              </p>
+            </div>
+          </div>
+        ) : null}
+
         {/* Pre-drive progress — READ-ONLY panel (A2): rows tick as the student
             performs the steps on real controls; only info steps confirm here. */}
         {snap.phase === "preDrive" && !ended ? (
@@ -785,25 +857,65 @@ export function LessonPlayShell({
           />
         ) : null}
 
-        {/* Session end — overlay */}
+        {/* Session end — overlay. A13: exam sessions get the examiner-protocol
+            framing ABOVE the official verdict card — „Изпитът се прекратява"
+            with the reason when the limits ended it mid-route; the A15
+            mistake map + correctives below stay (learning continues after
+            the verdict). */}
         {ended && result ? (
           <div className="absolute inset-0 z-20 flex items-start justify-center overflow-y-auto bg-background/85 p-4 backdrop-blur-sm sm:p-6">
-            <SessionEndScreen
-              lessonTitleBg={lesson.titleBg}
-              result={result}
-              debriefText={debriefText}
-              concepts={saveResult?.ok ? saveResult.concepts : []}
-              xpEarned={saveResult?.ok ? saveResult.xpEarned : null}
-              onRetry={retry}
-              nextLessonTitleBg={nextLesson?.titleBg ?? null}
-              onNextLesson={
-                nextLesson && result.passed ? () => onStartLesson(nextLesson.id) : null
-              }
-              // A15 mistake map: the last live minimap frame carries the FULL
-              // district polylines (LessonScene builds them once) — a static
-              // fit-to-route view needs nothing else.
-              mapPolylines={minimapFrame?.polylines ?? null}
-            />
+            <div className="flex w-full max-w-2xl flex-col gap-3">
+              {examMode ? (
+                <section
+                  aria-label="Протокол на изпитващия"
+                  className={`card border p-4 ${
+                    result.examTermination !== undefined
+                      ? "border-danger/60"
+                      : result.passed
+                        ? "border-success/60"
+                        : "border-warning/60"
+                  }`}
+                >
+                  <p className="text-[10px] font-black uppercase tracking-wider text-muted">
+                    Пробен практически изпит · протокол
+                  </p>
+                  {result.examTermination !== undefined ? (
+                    <p className="mt-1 text-sm font-bold text-danger">
+                      Изпитът се прекратява:{" "}
+                      {EXAM_TERMINATION_TEXT_BG[result.examTermination.reason]}.
+                    </p>
+                  ) : result.aborted ? (
+                    <p className="mt-1 text-sm font-bold text-warning">
+                      Изпитът беше прекъснат — опитът не се зачита за издържан.
+                    </p>
+                  ) : result.passed ? (
+                    <p className="mt-1 text-sm font-bold text-success">
+                      Маршрутът е завършен в допустимите граници.
+                    </p>
+                  ) : (
+                    <p className="mt-1 text-sm font-bold text-warning">
+                      Маршрутът приключи извън изискванията за издържан изпит.
+                    </p>
+                  )}
+                </section>
+              ) : null}
+              <SessionEndScreen
+                lessonTitleBg={lesson.titleBg}
+                result={result}
+                debriefText={debriefText}
+                concepts={saveResult?.ok ? saveResult.concepts : []}
+                xpEarned={saveResult?.ok ? saveResult.xpEarned : null}
+                onRetry={retry}
+                nextLessonTitleBg={nextLesson?.titleBg ?? null}
+                onNextLesson={
+                  nextLesson && result.passed ? () => onStartLesson(nextLesson.id) : null
+                }
+                // A15 mistake map: the last live minimap frame carries the FULL
+                // district polylines (LessonScene builds them once) — a static
+                // fit-to-route view needs nothing else.
+                mapPolylines={minimapFrame?.polylines ?? null}
+              />
+            </div>
           </div>
         ) : null}
       </div>
