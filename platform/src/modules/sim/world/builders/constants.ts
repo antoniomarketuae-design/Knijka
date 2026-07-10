@@ -161,3 +161,21 @@ export const TERRAIN_PAVE_NEAR_BUILDING_M = 20;
 export const STREETLIGHT_SPACING_M = 28;
 export const STREET_TREE_SPACING_M = 22;
 export const PARK_TREE_GRID_M = 18;
+
+// --- streetscape v2 dressing (doc 70 REF 1 + REF 3) --------------------------
+
+/** Leafy-tree row spacing along arterial streets (REF 3's tree-lined roads). */
+export const ARTERIAL_TREE_SPACING_M = 26;
+/** How many primary-class streets (grouped by name, longest first) get palms
+ *  instead of leafy rows — the premium/waterfront-flavored boulevards. */
+export const PALM_STREET_COUNT = 2;
+/** Minimum distance between roadside billboards (sparse: one per ~150–200 m). */
+export const BILLBOARD_MIN_SPACING_M = 150;
+/** Billboards keep clear of the junction mouth by at least this much. */
+export const BILLBOARD_END_INSET_M = 20;
+/** Bus-stop shelter distance past the junction mouth (>= 25 m required). */
+export const BUS_STOP_FROM_MOUTH_M = 28;
+/** Minimum separation between two placed shelters. */
+export const BUS_STOP_MIN_SEPARATION_M = 150;
+/** Deterministic shelter count cap (target 4–8 district-wide). */
+export const BUS_STOP_MAX_COUNT = 6;

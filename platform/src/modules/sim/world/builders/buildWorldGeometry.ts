@@ -98,13 +98,17 @@ export function buildWorldGeometry(
     signs: signCounts,
     streetlights: props.streetlights.length,
     trees: props.trees.length,
+    billboards: props.billboards.length,
+    busStops: props.busStops.length,
+    parkingKits: props.parkingKits.length,
     vertices,
     triangles,
-    // roads + junctions + sidewalks + parking lanes + markings + grass +
-    // paved + 4 facade-wall variants + roofs + 3 signal parts + (4 sign faces
-    // + 1 pole) + 2 streetlight parts + 4 tree variants + towers (chunked &
-    // frustum-culled at runtime; count ~model-order).
-    drawCallEstimate: 6 + 5 + 3 + 5 + 2 + 1 + 4 + CITY_MODELS.length,
+    // 12 static meshes (roads, junctions, sidewalks, parking lanes, markings,
+    // grass, paved, 4 facade-wall variants, roofs) + 27 fixed WorldProps
+    // instanced draws (2 signals + 8 signs + 2 streetlights + 4 trees +
+    // 4 furniture + 4 billboards + 2 bus stops + 1 parking kit) + towers
+    // (chunked & frustum-culled at runtime; count ~model-order).
+    drawCallEstimate: 12 + 27 + CITY_MODELS.length,
   };
 
   return {
@@ -122,6 +126,9 @@ export function buildWorldGeometry(
     signs: props.signs,
     streetlights: props.streetlights,
     trees: props.trees,
+    billboards: props.billboards,
+    busStops: props.busStops,
+    parkingKits: props.parkingKits,
     colliders: {
       ground: {
         halfExtents: [spanX / 2, groundThickness / 2, spanY / 2],

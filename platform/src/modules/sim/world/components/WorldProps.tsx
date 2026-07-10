@@ -23,10 +23,23 @@
  * Metal/glass materials get a modest envMapIntensity bump so they catch the
  * scene HDRI (scene.environment, set by the scene's <Environment>).
  *
+ * Streetscape v2 (doc 70 REF 1 + REF 3): leafy street trees (2 new models),
+ * roadside billboards, bus-stop shelters and a pre-merged surface-parking
+ * dressing cluster (kiosk + barrier arm + y/b bollards + wheel-stop rows —
+ * merged into ONE geometry at bake time so all sites cost a single draw).
+ * Ad faces (billboards + shelter panel) bake into a separate vertex-coloured
+ * pass whose material gets a soft emissive lift at night, mirroring the
+ * streetlight-glow gating. The v2 kit's signage_strip is NOT placed: it is a
+ * podium-facade band with no free-standing support, so it has no standalone
+ * streetside reading (buildings are outside this component's scope).
+ *
  * Draw calls (WorldProps only; CityBuildings is separate + chunked):
  *   signals 2 (housing + lamps) + signs 8 (4 kinds × body+face)
- *   + streetlights 2 (housing + glow) + trees 2 (palm + ornamental)
- *   + furniture 4 (bench + bollard + trash_bin + planter) = 18  (was 13).
+ *   + streetlights 2 (housing + glow)
+ *   + trees 4 (palm + ornamental + leafy_a + leafy_b)
+ *   + furniture 4 (bench + bollard + trash_bin + planter)
+ *   + billboards 4 (large/small × body+face) + bus stops 2 (body + face)
+ *   + parking kit 1 (merged cluster) = 27  (was 18).
  * All fixed + instanced; low tier decimates trees via preset.treeFraction.
  */
 
@@ -35,7 +48,14 @@ import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
 import type { GLTF } from "three/examples/jsm/loaders/GLTFLoader.js";
 import type { SignalPhase } from "../../contracts";
-import type { SignKind, StaticTransform, TreePlacement, WorldGeometry } from "../types";
+import type {
+  BillboardSize,
+  SignKind,
+  StaticTransform,
+  TreeKind,
+  TreePlacement,
+  WorldGeometry,
+} from "../types";
 import { createGltfLoader } from "./gltfLoader";
 import {
   createInstancedMesh,
@@ -48,6 +68,7 @@ import type { QualityPreset } from "./quality";
 
 const SIGN_BASE = "/sim/signs";
 const STREET_BASE = "/sim/streetscape";
+const STREET_V2_BASE = "/sim/streetscape-v2";
 
 /** sim SignKind → authored 3D sign GLB (correct Bulgarian face baked in). */
 const SIGN_GLB: Record<SignKind, string> = {
@@ -74,6 +95,9 @@ function bakeVertexColored(
     include?: (materialName: string) => boolean;
     rotateY?: number;
     centerXZ?: boolean;
+    /** Skip the base-to-y=0 translation — REQUIRED for partial bakes (e.g. an
+     *  elevated ad face) that must stay aligned with their body geometry. */
+    normalize?: boolean;
   } = {},
 ): THREE.BufferGeometry {
   scene.updateWorldMatrix(true, true);
@@ -117,9 +141,10 @@ function bakeVertexColored(
 
   merged.computeBoundingBox();
   const bb = merged.boundingBox!;
-  const dx = opts.centerXZ ? (bb.min.x + bb.max.x) / 2 : 0;
-  const dz = opts.centerXZ ? (bb.min.z + bb.max.z) / 2 : 0;
-  const dy = bb.min.y; // base to y=0
+  const normalize = opts.normalize ?? true;
+  const dx = normalize && opts.centerXZ ? (bb.min.x + bb.max.x) / 2 : 0;
+  const dz = normalize && opts.centerXZ ? (bb.min.z + bb.max.z) / 2 : 0;
+  const dy = normalize ? bb.min.y : 0; // base to y=0
   if (dx || dy || dz) merged.translate(-dx, -dy, -dz);
   merged.computeBoundingSphere();
   return merged;
@@ -179,19 +204,28 @@ interface SignAsset {
   faceMaterial: THREE.MeshStandardMaterial;
 }
 
+/** Body + separately-baked emissive ad face (aligned, same frame). */
+interface AdPropAsset {
+  body: THREE.BufferGeometry;
+  face: THREE.BufferGeometry;
+}
+
 interface PropAssets {
   signs: Record<SignKind, SignAsset>;
   signalHousing: THREE.BufferGeometry;
   streetlightHousing: THREE.BufferGeometry;
   streetlightGlow: THREE.BufferGeometry;
-  palm: THREE.BufferGeometry;
-  ornamental: THREE.BufferGeometry;
+  trees: Record<TreeKind, THREE.BufferGeometry>;
   furniture: {
     bench: THREE.BufferGeometry;
     bollard: THREE.BufferGeometry;
     trashBin: THREE.BufferGeometry;
     planter: THREE.BufferGeometry;
   };
+  billboards: Record<BillboardSize, AdPropAsset>;
+  busStop: AdPropAsset;
+  /** Whole parking-dressing cluster merged into one geometry (one draw). */
+  parkingKit: THREE.BufferGeometry;
   /** Shared vertex-colour materials (one per prop family). */
   materials: {
     signBody: THREE.MeshStandardMaterial;
@@ -200,6 +234,58 @@ interface PropAssets {
     tree: THREE.MeshStandardMaterial;
     furniture: THREE.MeshStandardMaterial;
   };
+}
+
+const TREE_KINDS: TreeKind[] = ["palm", "ornamental", "leafyA", "leafyB"];
+
+/**
+ * Merge already-baked part geometries at local offsets into one cluster
+ * geometry (parts stay vertex-coloured, so the cluster renders in ONE
+ * instanced draw for all sites). Inputs are NOT disposed.
+ */
+function composeCluster(
+  parts: { geometry: THREE.BufferGeometry; x: number; z: number; yaw?: number }[],
+): THREE.BufferGeometry {
+  const mat = new THREE.Matrix4();
+  const quat = new THREE.Quaternion();
+  const yAxis = new THREE.Vector3(0, 1, 0);
+  const placed = parts.map((part) => {
+    const g = part.geometry.clone();
+    quat.setFromAxisAngle(yAxis, part.yaw ?? 0);
+    mat.compose(new THREE.Vector3(part.x, 0, part.z), quat, new THREE.Vector3(1, 1, 1));
+    g.applyMatrix4(mat);
+    return g;
+  });
+  const merged = mergeSafe(placed, false);
+  for (const g of placed) g.dispose();
+  merged.computeBoundingSphere();
+  return merged;
+}
+
+/**
+ * Local layout of one surface-parking dressing site (doc 70 REF 1 midground):
+ * ticket kiosk + barrier arm + y/b bollards guard the entrance on local +Z
+ * (the builder aims +Z at the nearest road); two wheel-stop rows mark the
+ * stall rows behind (1.8 m stops on a 2.7 m stall pitch). Extents stay inside
+ * the ~9 m clearance radius the hand-picked sites were verified against.
+ */
+function composeParkingKit(pieces: {
+  kiosk: THREE.BufferGeometry;
+  barrier: THREE.BufferGeometry;
+  bollard: THREE.BufferGeometry;
+  wheelStop: THREE.BufferGeometry;
+}): THREE.BufferGeometry {
+  const parts: { geometry: THREE.BufferGeometry; x: number; z: number; yaw?: number }[] = [
+    { geometry: pieces.kiosk, x: -2.5, z: 6.5 },
+    { geometry: pieces.barrier, x: 0.6, z: 6.5 }, // arm spans the entrance lane (+X)
+    { geometry: pieces.bollard, x: -0.7, z: 7.0 },
+    { geometry: pieces.bollard, x: 4.3, z: 7.0 },
+  ];
+  for (let i = 0; i < 5; i++) parts.push({ geometry: pieces.wheelStop, x: (i - 2) * 2.7, z: -3.5 });
+  for (let i = 0; i < 4; i++) {
+    parts.push({ geometry: pieces.wheelStop, x: (i - 1.5) * 2.7, z: -8.5 });
+  }
+  return composeCluster(parts);
 }
 
 function makeSharedMaterials(): PropAssets["materials"] {
@@ -231,6 +317,15 @@ async function buildPropAssets(): Promise<PropAssets> {
     bollard,
     trashBin,
     planter,
+    leafyA,
+    leafyB,
+    billboardLarge,
+    billboardSmall,
+    busStopShelter,
+    ticketKiosk,
+    barrierArm,
+    bollardYb,
+    wheelStop,
   ] = await Promise.all([
     load(SIGN_BASE, SIGN_GLB.stop),
     load(SIGN_BASE, SIGN_GLB.giveWay),
@@ -244,6 +339,15 @@ async function buildPropAssets(): Promise<PropAssets> {
     load(STREET_BASE, "bollard"),
     load(STREET_BASE, "trash_bin"),
     load(STREET_BASE, "planter"),
+    load(STREET_V2_BASE, "leafy_tree_a"),
+    load(STREET_V2_BASE, "leafy_tree_b"),
+    load(STREET_V2_BASE, "billboard_large"),
+    load(STREET_V2_BASE, "billboard_small"),
+    load(STREET_V2_BASE, "bus_stop_shelter"),
+    load(STREET_V2_BASE, "ticket_kiosk"),
+    load(STREET_V2_BASE, "barrier_arm"),
+    load(STREET_V2_BASE, "bollard_yb"),
+    load(STREET_V2_BASE, "wheel_stop"),
   ]);
 
   const bakeSign = (gltf: GLTF): SignAsset => {
@@ -276,19 +380,59 @@ async function buildPropAssets(): Promise<PropAssets> {
     rotateY: -Math.PI / 2,
   });
 
+  // Ad-carrying v2 props: vertex-coloured body + the "ad_face" primitive as a
+  // separately-instanced emissive pass. The face bake must NOT re-normalize
+  // (its bbox differs from the body's), or the panel drops to ground level.
+  // v2 kit follows the v1 facing convention (props address local -Z → bake π).
+  const bakeAdProp = (gltf: GLTF): AdPropAsset => ({
+    body: bakeVertexColored(gltf.scene, {
+      include: (n) => n !== "ad_face",
+      rotateY: Math.PI,
+    }),
+    face: bakeVertexColored(gltf.scene, {
+      include: (n) => n === "ad_face",
+      rotateY: Math.PI,
+      normalize: false,
+    }),
+  });
+
+  // Parking kit: bake each piece, merge the authored site layout into ONE
+  // cluster geometry, drop the per-piece bakes (only the cluster instances).
+  const kioskG = bakeVertexColored(ticketKiosk.scene, { rotateY: Math.PI, centerXZ: true });
+  const barrierG = bakeVertexColored(barrierArm.scene, {});
+  const bollardYbG = bakeVertexColored(bollardYb.scene, { centerXZ: true });
+  const wheelStopG = bakeVertexColored(wheelStop.scene, { centerXZ: true });
+  const parkingKit = composeParkingKit({
+    kiosk: kioskG,
+    barrier: barrierG,
+    bollard: bollardYbG,
+    wheelStop: wheelStopG,
+  });
+  disposeAll([kioskG, barrierG, bollardYbG, wheelStopG]);
+
   return {
     signs,
     signalHousing,
     streetlightHousing,
     streetlightGlow,
-    palm: bakeVertexColored(palm.scene, { centerXZ: true }),
-    ornamental: bakeVertexColored(ornamental.scene, { centerXZ: true }),
+    trees: {
+      palm: bakeVertexColored(palm.scene, { centerXZ: true }),
+      ornamental: bakeVertexColored(ornamental.scene, { centerXZ: true }),
+      leafyA: bakeVertexColored(leafyA.scene, { centerXZ: true }),
+      leafyB: bakeVertexColored(leafyB.scene, { centerXZ: true }),
+    },
     furniture: {
       bench: bakeVertexColored(bench.scene, { centerXZ: true }),
       bollard: bakeVertexColored(bollard.scene, { centerXZ: true }),
       trashBin: bakeVertexColored(trashBin.scene, { centerXZ: true }),
       planter: bakeVertexColored(planter.scene, { centerXZ: true }),
     },
+    billboards: {
+      large: bakeAdProp(billboardLarge),
+      small: bakeAdProp(billboardSmall),
+    },
+    busStop: bakeAdProp(busStopShelter),
+    parkingKit,
     materials: makeSharedMaterials(),
   };
 }
@@ -304,12 +448,18 @@ function disposePropAssets(a: PropAssets): void {
     a.signalHousing,
     a.streetlightHousing,
     a.streetlightGlow,
-    a.palm,
-    a.ornamental,
+    ...Object.values(a.trees),
     a.furniture.bench,
     a.furniture.bollard,
     a.furniture.trashBin,
     a.furniture.planter,
+    a.billboards.large.body,
+    a.billboards.large.face,
+    a.billboards.small.body,
+    a.billboards.small.face,
+    a.busStop.body,
+    a.busStop.face,
+    a.parkingKit,
     ...Object.values(a.materials),
   ]);
 }
@@ -585,16 +735,8 @@ function Streetlights({
 }
 
 // ---------------------------------------------------------------------------
-// Trees (palm + ornamental GLBs, mixed deterministically)
+// Trees (palm + ornamental + leafy_a/b GLBs, bucketed by builder-decided kind)
 // ---------------------------------------------------------------------------
-
-/** Deterministic 2-way bucket folded with a hash of the (already deterministic)
- *  world position, so both models are used and placement stays reproducible. */
-function isPalm(t: TreePlacement): boolean {
-  const hx = Math.imul(Math.floor(t.position[0]), 73856093);
-  const hz = Math.imul(Math.floor(t.position[2]), 19349663);
-  return ((t.variant + (Math.abs(hx ^ hz) % 2)) % 2) === 0;
-}
 
 function Trees({
   world,
@@ -614,16 +756,19 @@ function Trees({
 
   const meshes = useMemo(() => {
     const castShadow = preset.castShadows === "full";
-    const palm: TreePlacement[] = [];
-    const orn: TreePlacement[] = [];
-    for (const t of kept) (isPalm(t) ? palm : orn).push(t);
-    return [
-      createInstancedMesh(assets.palm, assets.materials.tree, palm, { castShadow, name: "trees-palm" }),
-      createInstancedMesh(assets.ornamental, assets.materials.tree, orn, {
+    const buckets: Record<TreeKind, TreePlacement[]> = {
+      palm: [],
+      ornamental: [],
+      leafyA: [],
+      leafyB: [],
+    };
+    for (const t of kept) buckets[t.kind].push(t);
+    return TREE_KINDS.map((kind) =>
+      createInstancedMesh(assets.trees[kind], assets.materials.tree, buckets[kind], {
         castShadow,
-        name: "trees-ornamental",
+        name: `trees-${kind}`,
       }),
-    ];
+    );
   }, [assets, kept, preset.castShadows]);
   useEffect(() => () => disposeAll(meshes), [meshes]);
 
@@ -711,6 +856,109 @@ function Furniture({
 }
 
 // ---------------------------------------------------------------------------
+// Streetscape v2 — billboards, bus stops, parking-lot dressing (doc 70)
+// ---------------------------------------------------------------------------
+
+function StreetscapeV2({
+  world,
+  assets,
+  preset,
+  night,
+}: {
+  world: WorldGeometry;
+  assets: PropAssets;
+  preset: QualityPreset;
+  night: boolean;
+}) {
+  const bySize = useMemo(
+    () => ({
+      large: world.billboards.filter((b) => b.size === "large"),
+      small: world.billboards.filter((b) => b.size === "small"),
+    }),
+    [world.billboards],
+  );
+
+  const bodies = useMemo(() => {
+    const castShadow = preset.castShadows === "full";
+    const out: THREE.InstancedMesh[] = [];
+    for (const size of ["large", "small"] as const) {
+      if (bySize[size].length === 0) continue;
+      out.push(
+        createInstancedMesh(assets.billboards[size].body, assets.materials.streetSteel, bySize[size], {
+          castShadow,
+          name: `billboards-${size}-body`,
+        }),
+      );
+    }
+    if (world.busStops.length > 0) {
+      out.push(
+        createInstancedMesh(assets.busStop.body, assets.materials.streetSteel, world.busStops, {
+          castShadow,
+          name: "bus-stops-body",
+        }),
+      );
+    }
+    if (world.parkingKits.length > 0) {
+      out.push(
+        createInstancedMesh(assets.parkingKit, assets.materials.furniture, world.parkingKits, {
+          castShadow,
+          name: "parking-kits",
+        }),
+      );
+    }
+    return out;
+  }, [assets, bySize, world.busStops, world.parkingKits, preset.castShadows]);
+  useEffect(() => () => disposeAll(bodies), [bodies]);
+
+  // Ad faces: one shared material, softly emissive at night (REF 1 lit-panel
+  // flavor). Rebuilds on night toggle like the streetlight glow — rare, cheap.
+  const adFaces = useMemo(() => {
+    const material = new THREE.MeshStandardMaterial({
+      vertexColors: true,
+      emissive: 0xfff1d4,
+      emissiveIntensity: night ? 1.4 : 0,
+      roughness: 0.4,
+      envMapIntensity: 1.2,
+    });
+    const meshes: THREE.InstancedMesh[] = [];
+    for (const size of ["large", "small"] as const) {
+      if (bySize[size].length === 0) continue;
+      meshes.push(
+        createInstancedMesh(assets.billboards[size].face, material, bySize[size], {
+          name: `billboards-${size}-face`,
+        }),
+      );
+    }
+    if (world.busStops.length > 0) {
+      meshes.push(
+        createInstancedMesh(assets.busStop.face, material, world.busStops, {
+          name: "bus-stops-face",
+        }),
+      );
+    }
+    return { material, meshes };
+  }, [assets, bySize, world.busStops, night]);
+  useEffect(
+    () => () => {
+      adFaces.material.dispose();
+      disposeAll(adFaces.meshes);
+    },
+    [adFaces],
+  );
+
+  return (
+    <group name="streetscape-v2">
+      {bodies.map((m, i) => (
+        <primitive key={`b${i}`} object={m} />
+      ))}
+      {adFaces.meshes.map((m, i) => (
+        <primitive key={`f${i}`} object={m} />
+      ))}
+    </group>
+  );
+}
+
+// ---------------------------------------------------------------------------
 
 export function WorldPropsGroup({
   world,
@@ -742,6 +990,7 @@ export function WorldPropsGroup({
           <Streetlights world={world} assets={assets} preset={preset} night={night} />
           <Trees world={world} assets={assets} preset={preset} />
           <Furniture world={world} assets={assets} preset={preset} />
+          <StreetscapeV2 world={world} assets={assets} preset={preset} night={night} />
         </>
       ) : null}
     </group>

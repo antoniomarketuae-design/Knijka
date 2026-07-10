@@ -196,6 +196,18 @@ describe("buildWorldGeometry on a synthetic X-junction", () => {
     expect(world.stats.signs.limit50).toBeGreaterThanOrEqual(1);
   });
 
+  it("streetscape v2: no palms/billboards without primary streets, no kits off-district", () => {
+    // Palm streets and billboards are primary-class only; this district has
+    // secondary + residential edges.
+    expect(world.trees.every((t) => t.kind !== "palm")).toBe(true);
+    expect(world.stats.billboards).toBe(0);
+    // Hand-anchored parking sites lie outside these bounds -> skipped.
+    expect(world.stats.parkingKits).toBe(0);
+    // Secondary edges near the signalized junction still host a shelter.
+    expect(world.stats.busStops).toBeGreaterThanOrEqual(1);
+    expect(world.stats.busStops).toBeLessThanOrEqual(8);
+  });
+
   it("extrudes the building with 4 wall variants buckets and a roof", () => {
     const total = world.buildingWalls.reduce((s, w) => s + w.positions.length, 0);
     expect(total).toBeGreaterThan(0);
@@ -314,7 +326,15 @@ describe("buildWorldGeometry on the real district (Студентски град
       const p = mesh.positions;
       for (let i = 0; i < p.length; i++) if (!Number.isFinite(p[i])) nonFinite++;
     }
-    for (const list of [world.trafficLights, world.signs, world.streetlights, world.trees]) {
+    for (const list of [
+      world.trafficLights,
+      world.signs,
+      world.streetlights,
+      world.trees,
+      world.billboards,
+      world.busStops,
+      world.parkingKits,
+    ]) {
       for (const t of list) {
         if (!t.position.every(Number.isFinite) || !Number.isFinite(t.yaw)) nonFinite++;
       }
@@ -348,16 +368,24 @@ describe("buildWorldGeometry on the real district (Студентски град
   });
 
   it("renders a mid-rise district: prisms for the fabric, few towers, data heights (QW3)", () => {
-    // Every footprint is either a facade prism or a tower instance.
+    // Every footprint is either a facade prism or a kit-building instance.
     expect(world.stats.buildings).toBe(district.buildings.length);
     // Towers only where OSM says genuinely tall AND the plot is compact —
-    // a handful in Студентски град, not all 248 (the old 42–170 m canyon).
+    // a handful in Студентски град, not all 248 (the old 42–170 m canyon) —
+    // plus a sparse capped set of low retail pavilions (kit v3).
     expect(world.stats.buildingInstances).toBeGreaterThanOrEqual(1);
     expect(world.stats.buildingInstances).toBeLessThanOrEqual(12);
+    let towers = 0;
     for (const inst of world.buildingInstances) {
-      expect(inst.scale[1]).toBeGreaterThanOrEqual(40);
-      expect(inst.scale[1]).toBeLessThanOrEqual(75);
+      if (inst.scale[1] >= 40) {
+        towers++;
+        expect(inst.scale[1]).toBeLessThanOrEqual(75); // data heights, clamped
+      } else {
+        expect(inst.scale[1]).toBeLessThan(8); // retail pavilion, low by rule
+      }
     }
+    expect(towers).toBeGreaterThanOrEqual(1);
+    expect(towers).toBeLessThanOrEqual(8);
     // The prism fabric exists and tops out at mid-rise/real heights (≤ 75 m),
     // with the bulk of roof area well under the old 42 m tower floor.
     let maxRoofY = 0;
@@ -404,6 +432,64 @@ describe("buildWorldGeometry on the real district (Студентски град
   it("keeps the ODbL attribution visible in the build output", () => {
     expect(world.attribution.text).toContain("OpenStreetMap contributors");
     expect(world.attribution.copyrightUrl).toContain("openstreetmap.org/copyright");
+  });
+
+  it("mixes the streetscape-v2 trees: palm streets + leafy rows (doc 70 REF 3)", () => {
+    const kinds = { palm: 0, ornamental: 0, leafyA: 0, leafyB: 0 };
+    for (const t of world.trees) kinds[t.kind]++;
+    // Exactly the palm-street boulevards carry palms; leafy rows dominate.
+    expect(kinds.palm).toBeGreaterThan(20);
+    expect(kinds.leafyA + kinds.leafyB).toBeGreaterThan(kinds.palm);
+    expect(kinds.leafyA + kinds.leafyB).toBeGreaterThan(kinds.ornamental);
+    expect(kinds.palm + kinds.ornamental + kinds.leafyA + kinds.leafyB).toBe(world.trees.length);
+  });
+
+  it("places sparse billboards along the primary street (doc 70 REF 3)", () => {
+    expect(world.stats.billboards).toBeGreaterThanOrEqual(5);
+    expect(world.stats.billboards).toBeLessThanOrEqual(30);
+    // Sparse: pairwise distance >= the min spacing (billboards anchor to the
+    // road centerline; the lateral pole offset can only stretch that).
+    for (let i = 0; i < world.billboards.length; i++) {
+      for (let j = i + 1; j < world.billboards.length; j++) {
+        const a = world.billboards[i]!.position;
+        const b = world.billboards[j]!.position;
+        expect(Math.hypot(a[0] - b[0], a[2] - b[2])).toBeGreaterThan(100);
+      }
+    }
+    const sizes = new Set(world.billboards.map((b) => b.size));
+    expect(sizes.has("large")).toBe(true);
+    expect(sizes.has("small")).toBe(true);
+  });
+
+  it("places 4-8 bus-stop shelters on the sidewalk, apart from each other", () => {
+    expect(world.stats.busStops).toBeGreaterThanOrEqual(4);
+    expect(world.stats.busStops).toBeLessThanOrEqual(8);
+    for (const s of world.busStops) {
+      expect(s.position[1]).toBeCloseTo(SIDEWALK_TOP_Y);
+    }
+    for (let i = 0; i < world.busStops.length; i++) {
+      for (let j = i + 1; j < world.busStops.length; j++) {
+        const a = world.busStops[i]!.position;
+        const b = world.busStops[j]!.position;
+        expect(Math.hypot(a[0] - b[0], a[2] - b[2])).toBeGreaterThanOrEqual(150);
+      }
+    }
+  });
+
+  it("dresses the 3 hand-anchored surface-parking sites (doc 70 REF 1)", () => {
+    expect(world.stats.parkingKits).toBe(3);
+    // Hand-picked district coordinates (props.ts PARKING_KIT_SITES), world z = -y.
+    const sites: [number, number][] = [
+      [-594.8, 184.8],
+      [-558.8, -235.2],
+      [149.2, -307.2],
+    ];
+    for (const [x, z] of sites) {
+      const hit = world.parkingKits.some(
+        (k) => Math.hypot(k.position[0] - x, k.position[2] - z) < 0.5,
+      );
+      expect(hit).toBe(true);
+    }
   });
 
   it("stays inside the performance budget", () => {

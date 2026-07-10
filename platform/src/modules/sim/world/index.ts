@@ -35,6 +35,8 @@ export type { QualityPreset } from "./components/quality";
 
 export { assertDistrict } from "./types";
 export type {
+  BillboardPlacement,
+  BillboardSize,
   BuildWorldOptions,
   ColliderMesh,
   District,
@@ -50,6 +52,7 @@ export type {
   SignPlacement,
   StaticTransform,
   TrafficLightPlacement,
+  TreeKind,
   TreePlacement,
   WorldColliderSet,
   WorldGeometry,

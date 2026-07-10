@@ -182,8 +182,19 @@ export interface SignPlacement extends StaticTransform {
   kind: SignKind;
 }
 
+/** Which authored tree model renders a placement (streetscape v2 mix). */
+export type TreeKind = "palm" | "ornamental" | "leafyA" | "leafyB";
+
 export interface TreePlacement extends StaticTransform {
   variant: 0 | 1 | 2;
+  kind: TreeKind;
+}
+
+export type BillboardSize = "large" | "small";
+
+/** Roadside advertising billboard on a pole (streetscape v2, REF 3). */
+export interface BillboardPlacement extends StaticTransform {
+  size: BillboardSize;
 }
 
 /**
@@ -233,6 +244,12 @@ export interface WorldStats {
   signs: Record<SignKind, number>;
   streetlights: number;
   trees: number;
+  /** Roadside billboards on primary streets (streetscape v2). */
+  billboards: number;
+  /** Bus-stop shelters on primary/secondary sidewalks (streetscape v2). */
+  busStops: number;
+  /** Surface-parking dressing clusters (kiosk + barrier + wheel stops). */
+  parkingKits: number;
   vertices: number;
   triangles: number;
   /** Rough render draw-call estimate for DistrictWorld (no shadows). */
@@ -268,6 +285,12 @@ export interface WorldGeometry {
   signs: SignPlacement[];
   streetlights: StaticTransform[];
   trees: TreePlacement[];
+  /** Roadside billboards along primary streets (streetscape v2, REF 3). */
+  billboards: BillboardPlacement[];
+  /** Bus-stop shelters on primary/secondary sidewalks near junction mouths. */
+  busStops: StaticTransform[];
+  /** Surface-parking dressing clusters (one transform per pre-merged kit). */
+  parkingKits: StaticTransform[];
   colliders: WorldColliderSet;
   /** ODbL attribution text from meta — must stay user-visible. */
   attribution: { text: string; copyrightUrl: string };
