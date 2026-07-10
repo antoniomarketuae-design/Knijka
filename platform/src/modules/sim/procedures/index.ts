@@ -11,9 +11,12 @@ export { createPreDriveState, PRE_DRIVE_STEP_ORDER, PRE_DRIVE_STEPS } from "./st
 
 export {
   applyPreDriveStepToCabin,
+  drivelineEffectOf,
   hasPreDriveCabinEffect,
   PRE_DRIVE_CABIN_EFFECT_STEPS,
+  PRE_DRIVE_DRIVELINE_EFFECT_STEPS,
   type PreDriveCabinState,
+  type PreDriveDrivelineEffect,
 } from "./cabinEffects";
 
 export {

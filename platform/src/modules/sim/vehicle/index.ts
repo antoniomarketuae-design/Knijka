@@ -17,6 +17,31 @@ export type { VehicleInput, VehicleDebugState, RapierModule } from "./VehicleSim
 export * from "./tuning";
 
 export {
+  DrivelineState,
+  READY_DRIVELINE,
+  transmissionModeFor,
+  hasDriveTraction,
+  forwardForceScale,
+  gearForSpeedKmh,
+  MANUAL_GEAR_COUNT,
+  MANUAL_GEAR_MAX_KMH,
+  PARKING_BRAKE_FORCE_N,
+  SELECTOR_ENGAGE_MAX_KMH,
+  STALL_BELOW_KMH,
+  STALL_GRACE_S,
+  STALL_MIN_THROTTLE,
+} from "./driveline";
+export type {
+  DrivelineEvent,
+  DrivelineListener,
+  DrivelinePhysicsInput,
+  DrivelineSnapshot,
+  SelectorPosition,
+  TransmissionMode,
+  VehicleStartState,
+} from "./driveline";
+
+export {
   applyDifficulty,
   createDriveAssistState,
   DIFFICULTY_PRESETS,

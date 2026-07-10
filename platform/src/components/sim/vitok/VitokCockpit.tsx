@@ -153,12 +153,16 @@ export function VitokCockpit({
       rt.cooldown = 0.1;
       const input = inputRef.current?.read() ?? null;
       const blink = cabin?.blinkOn ?? false;
+      const hazardBlink = cabin?.hazardBlinkOn ?? false;
       const d = rt.data;
-      d.gear = sim.gear;
-      d.indicatorLeftLit = blink && cabin?.indicator === "left";
-      d.indicatorRightLit = blink && cabin?.indicator === "right";
+      // A1: the cluster reads the REAL driveline — selector letter (P R N D /
+      // M2), stateful parking-brake lamp, hazard flashers on both arrows.
+      d.gear = cabin ? cabin.driveline.gearLabel : sim.gear;
+      d.indicatorLeftLit = (blink && cabin?.indicator === "left") || hazardBlink;
+      d.indicatorRightLit = (blink && cabin?.indicator === "right") || hazardBlink;
       d.seatbeltOn = cabin?.seatbeltOn ?? false;
-      d.handbrakeOn = input?.handbrake ?? false;
+      d.handbrakeOn =
+        (cabin?.driveline.parkingBrakeOn ?? false) || (input?.handbrake ?? false);
       d.headlights = cabin?.headlights ?? "off";
       const hash = clusterHash(d);
       if (hash !== rt.lastHash) {

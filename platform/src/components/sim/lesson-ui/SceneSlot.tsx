@@ -47,6 +47,7 @@ import type { LessonSpec } from "@/modules/sim/lessons";
 import type { MinimapFrame } from "@/modules/sim/hud";
 import type { PreDriveStepId } from "@/modules/sim/procedures";
 import type { SimTick } from "@/modules/sim/rules";
+import type { DrivelineSnapshot } from "@/modules/sim/vehicle";
 import type { QualityPreset } from "./types";
 
 export interface SceneSlotProps {
@@ -69,6 +70,9 @@ export interface SceneSlotProps {
   onBlockedDriveAttempt: () => void;
   /** Low-frequency minimap data → HUD minimap. */
   onMinimapFrame: (frame: MinimapFrame) => void;
+  /** A1: low-frequency driveline state (ignition/selector/parking brake/
+   *  hazards/…) → HUD telltales (GearIndicatorCard). */
+  onDriveline?: (snap: DrivelineSnapshot) => void;
 }
 
 // The heavy Three.js/rapier bundle loads client-side only (rapier wasm must

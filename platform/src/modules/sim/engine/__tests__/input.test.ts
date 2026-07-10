@@ -168,4 +168,11 @@ describe("SimInput keyboard pedal ramps", () => {
     expect(h.advance(THROTTLE_RELEASE_S * 1100).throttle).toBe(0);
     h.input.dispose();
   });
+
+  it("Space is NOT the momentary handbrake anymore (A1: parking-brake toggle lives in cabin.ts)", () => {
+    const h = harness();
+    h.press("Space");
+    expect(h.advance(100).handbrake).toBe(false);
+    h.input.dispose();
+  });
 });

@@ -139,7 +139,11 @@ export class SimInput {
     out.throttle = this.throttlePedal;
     out.brake = this.brakePedal;
     out.steer = (left ? 1 : 0) - (right ? 1 : 0);
-    out.handbrake = on("Space");
+    // A1: keyboard Space is now the stateful parking-brake TOGGLE, handled by
+    // CabinControls → DrivelineState (components/sim/cabin.ts). The momentary
+    // sport handbrake stays reachable on gamepad A only; Space remains in
+    // HANDLED_CODES so it never scrolls the page.
+    out.handbrake = false;
 
     this.mergeGamepad(out);
     return out;

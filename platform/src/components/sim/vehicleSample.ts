@@ -35,6 +35,29 @@ function gearToNumber(gear: string): number {
 }
 
 /**
+ * Contract gear (-1 = reverse, 0 = neutral, 1.. = forward) from the REAL
+ * selector state (A1). R is now what the student deliberately engaged — the
+ * rule engine's reverse-related logic (e.g. L7 parkInBay's usedReverse) stops
+ * inferring intent from rolling direction. In D the forward number stays the
+ * speed-derived cosmetic gear (min 1 — an automatic in D is never "in
+ * neutral"); in M it is the student's own gear.
+ */
+function contractGear(cabin: CabinControls, sim: VehicleSim): number {
+  const d = cabin.driveline;
+  switch (d.selector) {
+    case "R":
+      return -1;
+    case "P":
+    case "N":
+      return 0;
+    case "M":
+      return d.manualGear;
+    case "D":
+      return Math.max(1, gearToNumber(sim.gear));
+  }
+}
+
+/**
  * Write the current frame into `out` (zero allocation).
  *
  * District-space mapping (matches DistrictWorld, which places district (x,y)
@@ -65,7 +88,10 @@ export function updateVehicleSample(
   out.indicator = cabin.indicator;
   out.headlights = cabin.headlights;
   out.seatbeltOn = cabin.seatbeltOn;
-  out.handbrakeOn = input?.handbrake ?? false;
-  out.gear = gearToNumber(sim.gear);
+  // A1: the stateful parking brake is the real handbrake signal — the rule
+  // engine's HANDBRAKE_LEFT_ON detector now grades truth, not a held Space
+  // key. The momentary gamepad handbrake still counts while held.
+  out.handbrakeOn = cabin.driveline.parkingBrakeOn || (input?.handbrake ?? false);
+  out.gear = contractGear(cabin, sim);
   out.mirrorGlance = cabin.consumeGlanceSample();
 }

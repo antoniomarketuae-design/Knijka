@@ -11,25 +11,26 @@
  * Full 13-step map (steps without a line here have NO underlying vehicle
  * state yet — they stay informational, scored by the procedure machine only):
  *
- *  | Step                | Cabin effect                       | Why not more |
+ *  | Step                | Effect (cabin / driveline)         | Why not more |
  *  |---------------------|------------------------------------|--------------|
- *  | adjust-seat         | — (no seat state)                  | Phase 1 A1   |
+ *  | adjust-seat         | — (no seat state)                  | Phase 1 A3   |
  *  | adjust-mirrors      | — (no mirror-adjust state)         | Phase 1 A4   |
  *  | check-surroundings  | — (purely observational)           | —            |
  *  | fasten-seatbelt     | seatbeltOn := true                 |              |
  *  | check-dashboard     | — (purely observational)           | —            |
  *  | headlights-on       | headlights := "low" (only if off)  | never downgrades an already-on setting |
- *  | start-engine        | — (no engine state yet)            | Phase 1 A1   |
- *  | press-brake         | — (momentary pedal, no state)      | Phase 1 A1   |
- *  | select-gear         | — (gearbox is cosmetic)            | Phase 1 A1   |
- *  | release-handbrake   | — (no parking-brake state)         | Phase 1 A1   |
+ *  | start-engine        | driveline: engineOn := true (A1)   |              |
+ *  | press-brake         | — (momentary pedal, no state)      | —            |
+ *  | select-gear         | driveline: selector := D / M (A1)  |              |
+ *  | release-handbrake   | driveline: parkingBrakeOn := false (A1) |         |
  *  | final-mirror-check  | — (a glance is a one-frame event, not state; faking one would lie to the mirror detector) | Phase 1 A4 |
  *  | signal              | indicator := "left" (step text: „Подай ляв мигач") |  |
  *  | move-off            | — (phase transition, lessons/)     | —            |
  *
  * Pure and framework-free so it is testable here; CabinControls
- * (src/components/sim/cabin.ts) is the single consumer and applies the result
- * to the live cabin.
+ * (src/components/sim/cabin.ts) is the single consumer: it applies the cabin
+ * slice via `applyPreDriveStepToCabin` and the driveline slice (A1 vehicle
+ * state machine) via `drivelineEffectOf` → DrivelineState force-setters.
  */
 
 import type { PreDriveStepId } from "./types";
@@ -42,15 +43,54 @@ export interface PreDriveCabinState {
   indicator: "off" | "left" | "right";
 }
 
-/** Steps that set real cabin state when completed in the checklist. */
+/** Steps that set real cabin "electrics" state when completed. */
 export const PRE_DRIVE_CABIN_EFFECT_STEPS: readonly PreDriveStepId[] = [
   "fasten-seatbelt",
   "headlights-on",
   "signal",
 ];
 
+/**
+ * Driveline effects (A1 vehicle state machine): what a completed checklist
+ * step must force on the DrivelineState so the machine agrees with what the
+ * student was told they did — without these, "start-engine ✓" would leave the
+ * car dead after move-off (the A6 contradiction class, in reverse).
+ */
+export type PreDriveDrivelineEffect =
+  | "engine-on"
+  | "select-forward"
+  | "parking-brake-off";
+
+/** Steps that set real driveline state when completed in the checklist. */
+export const PRE_DRIVE_DRIVELINE_EFFECT_STEPS: readonly PreDriveStepId[] = [
+  "start-engine",
+  "select-gear",
+  "release-handbrake",
+];
+
+/** The driveline effect a completed step carries, or null (pure map). */
+export function drivelineEffectOf(
+  stepId: PreDriveStepId,
+): PreDriveDrivelineEffect | null {
+  switch (stepId) {
+    case "start-engine":
+      return "engine-on";
+    case "select-gear":
+      return "select-forward";
+    case "release-handbrake":
+      return "parking-brake-off";
+    default:
+      return null;
+  }
+}
+
+/** True when the step carries ANY real vehicle-state effect (cabin electrics
+ *  or driveline) — the shell forwards exactly these to the 3D scene. */
 export function hasPreDriveCabinEffect(stepId: PreDriveStepId): boolean {
-  return PRE_DRIVE_CABIN_EFFECT_STEPS.includes(stepId);
+  return (
+    PRE_DRIVE_CABIN_EFFECT_STEPS.includes(stepId) ||
+    PRE_DRIVE_DRIVELINE_EFFECT_STEPS.includes(stepId)
+  );
 }
 
 /**

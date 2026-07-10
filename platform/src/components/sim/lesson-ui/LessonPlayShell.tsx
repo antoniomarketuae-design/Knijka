@@ -50,6 +50,7 @@ import {
 } from "@/modules/sim/lessons";
 import { hasPreDriveCabinEffect, type PreDriveStepId } from "@/modules/sim/procedures";
 import type { SimTick } from "@/modules/sim/rules";
+import type { DrivelineSnapshot } from "@/modules/sim/vehicle";
 import { finishLessonAction } from "@/app/(dashboard)/simulator/actions";
 import {
   loadMicroQuizBank,
@@ -79,6 +80,9 @@ interface HudSnapshot {
   indicator: SimTick["indicator"];
   headlights: SimTick["headlights"];
   seatbeltOn: boolean;
+  /** A1: driveline telltales (ignition/selector/parking brake/hazards/fog/
+   *  stall) — null until the scene emits the first snapshot. */
+  driveline: DrivelineSnapshot | null;
   objectiveTitle: string | null;
   objectiveIndex: number;
   objectiveTotal: number;
@@ -88,7 +92,11 @@ interface HudSnapshot {
   vehicle: { x: number; y: number; headingDeg: number } | null;
 }
 
-function snapshotOf(s: LessonSessionState, lastTick: SimTick | null): HudSnapshot {
+function snapshotOf(
+  s: LessonSessionState,
+  lastTick: SimTick | null,
+  driveline: DrivelineSnapshot | null = null,
+): HudSnapshot {
   const active =
     s.currentObjectiveIndex < s.objectives.length
       ? s.objectives[s.currentObjectiveIndex]
@@ -102,6 +110,7 @@ function snapshotOf(s: LessonSessionState, lastTick: SimTick | null): HudSnapsho
     indicator: lastTick?.indicator ?? "off",
     headlights: lastTick?.headlights ?? "off",
     seatbeltOn: lastTick?.seatbeltOn ?? false,
+    driveline,
     objectiveTitle: s.phase === "driving" && active ? active.spec.titleBg : null,
     objectiveIndex: s.currentObjectiveIndex + 1,
     objectiveTotal: s.objectives.length,
@@ -213,6 +222,12 @@ export function LessonPlayShell({
   const sessionRef = useRef<LessonSessionState>(initialSession);
   const finalizedRef = useRef(false);
   const lastTickRef = useRef<SimTick | null>(null);
+  // A1: latest driveline snapshot from the scene (a few Hz) — ref-resident,
+  // folded into the HUD snapshot by the regular poll below.
+  const drivelineRef = useRef<DrivelineSnapshot | null>(null);
+  const handleDriveline = useCallback((snap: DrivelineSnapshot) => {
+    drivelineRef.current = snap;
+  }, []);
   // Clocks are set in a mount effect (render must stay pure per lint rules).
   const startedAtMsRef = useRef<number | null>(null);
   const mountedAtRef = useRef<number | null>(null);
@@ -429,7 +444,7 @@ export function LessonPlayShell({
           setFlash({ titleBg: completed.titleBg, key: ++flashKey.current });
         }
       }
-      setSnap(snapshotOf(sessionRef.current, lastTickRef.current));
+      setSnap(snapshotOf(sessionRef.current, lastTickRef.current, drivelineRef.current));
     },
     [push, nowSec],
   );
@@ -456,7 +471,7 @@ export function LessonPlayShell({
   // -- HUD poll ------------------------------------------------------------------
   useEffect(() => {
     const id = window.setInterval(() => {
-      setSnap(snapshotOf(sessionRef.current, lastTickRef.current));
+      setSnap(snapshotOf(sessionRef.current, lastTickRef.current, drivelineRef.current));
     }, HUD_POLL_MS);
     return () => window.clearInterval(id);
   }, []);
@@ -490,7 +505,9 @@ export function LessonPlayShell({
       quizBankRef.current.length > 0
         ? createQuizTriggerState(quizFreqRef.current, quizBankRef.current)
         : null;
-    setSnap(snapshotOf(sessionRef.current, null));
+    // The cabin/driveline keeps its physical state across a retry (the car
+    // does not teleport or reset) — keep showing the live telltales.
+    setSnap(snapshotOf(sessionRef.current, null, drivelineRef.current));
   };
 
   // Debrief: the template is deterministic — render it instantly client-side;
@@ -571,6 +588,7 @@ export function LessonPlayShell({
             onPreDriveStep={handlePreDriveStep}
             onBlockedDriveAttempt={handleBlockedDriveAttempt}
             onMinimapFrame={setMinimapFrame}
+            onDriveline={handleDriveline}
           />
         </div>
 
@@ -599,6 +617,7 @@ export function LessonPlayShell({
               indicator={snap.indicator}
               headlights={snap.headlights}
               seatbeltOn={snap.seatbeltOn}
+              driveline={snap.driveline}
             />
           </div>
         ) : null}

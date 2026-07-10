@@ -40,6 +40,7 @@ import {
   DIFFICULTY_ORDER,
   DIFFICULTY_PRESETS,
   type DifficultyMode,
+  type DrivelineSnapshot,
   type VehicleInput,
   type VehicleSim,
 } from "@/modules/sim/vehicle";
@@ -170,6 +171,9 @@ export interface LessonSceneProps {
   /** QW10: throttle pressed while driveLocked (shell rate-limits the toast). */
   onBlockedDriveAttempt: () => void;
   onMinimapFrame: (frame: MinimapFrame) => void;
+  /** A1: low-frequency driveline state (selector/ignition/parking brake/…)
+   *  → HUD telltales. Emitted on the minimap cadence, not per frame. */
+  onDriveline?: (snap: DrivelineSnapshot) => void;
 }
 
 export default function LessonScene(props: LessonSceneProps) {
@@ -291,6 +295,7 @@ function ReadyScene({
   onBlockedDriveAttempt,
   onMinimap,
   onTickCb,
+  onDriveline,
 }: LessonSceneProps & {
   built: Built;
   menuPaused: boolean;
@@ -343,10 +348,17 @@ function ReadyScene({
     inputRef.current = input;
     const audio = new SimAudio();
     audioRef.current = audio;
-    const cabin = new CabinControls({
-      onSeatbeltToggle: () => audio.click(),
-      onToggleMute: () => audio.toggleMute(),
-    });
+    const cabin = new CabinControls(
+      {
+        onSeatbeltToggle: () => audio.click(),
+        onToggleMute: () => audio.toggleMute(),
+        onParkingBrakeToggle: () => audio.click(),
+      },
+      // A1 spawn policy: cold start (engine off, P, parking brake on) unless
+      // the lesson opts into ready-to-drive (L0). Read once at mount — the
+      // lesson identity is fixed for the life of this scene.
+      lesson.vehicleStart ?? "cold",
+    );
     cabinRef.current = cabin;
     const unlock = () => audio.unlock();
     window.addEventListener("pointerdown", unlock);
@@ -462,9 +474,12 @@ function ReadyScene({
               traffic={traffic}
               sampleRef={sampleRef}
               inputRef={inputRef}
+              cabinRef={cabinRef}
+              audioRef={audioRef}
               onBlockedDriveAttempt={onBlockedDriveAttempt}
               onTick={onTickCb}
               onMinimap={onMinimap}
+              onDriveline={onDriveline}
               minimapPolylines={minimapPolylines}
               isNight={isNight}
               rain={rain}
@@ -553,9 +568,12 @@ function RuntimeDriver({
   traffic,
   sampleRef,
   inputRef,
+  cabinRef,
+  audioRef,
   onBlockedDriveAttempt,
   onTick,
   onMinimap,
+  onDriveline,
   minimapPolylines,
   isNight,
   rain,
@@ -565,9 +583,12 @@ function RuntimeDriver({
   traffic: ReturnType<typeof createTrafficSystem>;
   sampleRef: React.RefObject<VehicleSample>;
   inputRef: React.RefObject<GatedSimInput | null>;
+  cabinRef: React.RefObject<CabinControls | null>;
+  audioRef: React.RefObject<SimAudio | null>;
   onBlockedDriveAttempt: () => void;
   onTick: (t: SimTick) => void;
   onMinimap: (f: MinimapFrame) => void;
+  onDriveline?: (snap: DrivelineSnapshot) => void;
   minimapPolylines: MinimapFrame["polylines"];
   isNight: boolean;
   rain: boolean;
@@ -598,6 +619,9 @@ function RuntimeDriver({
       sample.position.y,
       sample.headingDeg,
     );
+    // A6 audio pass: sticky scene state for the audio layer (rain patter +
+    // NPC proximity hum) — consumed by VehicleRig's per-frame audio update.
+    audioRef.current?.setEnvironment({ rain, nearestNpcM: leadGap });
     const tick = runtime.sample(sample, tRef.current, isNight, rain, leadGap);
     onTick(tick);
 
@@ -612,6 +636,10 @@ function RuntimeDriver({
           pxPerMeter: MINIMAP_PX_PER_M,
         },
       });
+      // A1: driveline telltales share the low-frequency cadence — the shell
+      // stores the snapshot in a ref and folds it into its own HUD poll.
+      const cabin = cabinRef.current;
+      if (cabin) onDriveline?.(cabin.driveline.snapshot());
     }
   });
 
@@ -624,9 +652,17 @@ function ControlsHelp() {
   const [open, setOpen] = useState(true);
   const rows: Array<[string, string]> = [
     ["W A S D", "кормуване (или стрелки)"],
+    ["I", "двигател: старт / стоп"],
+    ["[ ]", "скорости: към P / към D"],
+    ["Space", "ръчна спирачка"],
+    ["Z", "съединител — задръж („Напреднал“)"],
+    ["B", "предпазен колан"],
     [", .", "мигач ляво / дясно"],
     ["L", "светлини"],
-    ["B", "предпазен колан"],
+    ["V", "фарове за мъгла"],
+    ["J", "аварийни светлини"],
+    ["T", "чистачки"],
+    ["H", "клаксон — задръж"],
     ["Q E F", "огледала: ляво / дясно / назад"],
     ["C", "смяна на изглед"],
     ["X", "цял екран"],

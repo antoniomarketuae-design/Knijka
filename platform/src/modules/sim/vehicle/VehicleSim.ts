@@ -29,6 +29,13 @@ import type {
 } from "@dimforge/rapier3d-compat";
 import type RAPIER_API from "@dimforge/rapier3d-compat";
 import * as T from "./tuning";
+import {
+  forwardForceScale,
+  hasDriveTraction,
+  PARKING_BRAKE_FORCE_N,
+  READY_DRIVELINE,
+  type DrivelinePhysicsInput,
+} from "./driveline";
 import { approach, clamp, dot, lerp, rotateInto, yawQuat, type Quat, type Vec3 } from "./math";
 
 /** The rapier module object (default export of @dimforge/rapier3d-compat). */
@@ -196,8 +203,19 @@ export class VehicleSim {
    * Per-physics-step update. Call BEFORE world.step() — in R3F wire it into
    * `useBeforePhysicsStep` (fires once per fixed substep), in Node call it
    * right before `world.step()`. Always pass the fixed timestep.
+   *
+   * `driveline` (A1) gates the drivetrain: engine off / P / N transmit no
+   * force, R drives backward (proper reverse), a clutch-down manual box
+   * freewheels, and the stateful parking brake drags the rear axle. It
+   * DEFAULTS to READY_DRIVELINE (engine on, D, brake released) so callers
+   * that predate A1 — the CI harness above all — keep today's behavior
+   * bit-for-bit, including the brake-at-standstill reverse overload in D.
    */
-  update(input: VehicleInput, dt: number): void {
+  update(
+    input: VehicleInput,
+    dt: number,
+    driveline: DrivelinePhysicsInput = READY_DRIVELINE,
+  ): void {
     if (this.disposed) return;
     const c = this.controller;
     // Forward speed from the body velocity (controller.currentVehicleSpeed()
@@ -218,19 +236,44 @@ export class VehicleSim {
     for (const i of T.STEERED_WHEELS) c.setWheelSteering(i, this.steer);
 
     // --- Throttle / brake / reverse state machine ---------------------------
+    // Driveline gating (A1): force flows only when the engine runs AND a
+    // drive position is engaged (D / M with clutch up / R). The default
+    // READY_DRIVELINE keeps the pre-A1 machine (harness-gated) unchanged.
+    const traction = hasDriveTraction(driveline);
     let engineTotal = 0; // N, split across driven wheels
     let brakePedal = 0; // 0..1
-    if (input.throttle > 0) {
+    if (driveline.selector === "R") {
+      // Proper reverse: THROTTLE drives backward (capped), brake brakes.
+      if (input.throttle > 0) {
+        if (speedMs > 0.5) {
+          brakePedal = input.throttle; // still rolling forwards: stop first
+        } else if (traction && speedKmh > -T.REVERSE_MAX_KMH) {
+          engineTotal = -T.REVERSE_FORCE_N * input.throttle;
+        }
+      } else if (input.brake > 0) {
+        brakePedal = input.brake;
+      }
+    } else if (input.throttle > 0) {
       if (speedMs < -0.5) {
         brakePedal = input.throttle; // rolling backwards: throttle stops first
-      } else {
-        engineTotal = T.engineForceAt(absKmh) * input.throttle;
+      } else if (traction) {
+        engineTotal =
+          forwardForceScale(driveline, absKmh) * T.engineForceAt(absKmh) * input.throttle;
       }
     } else if (input.brake > 0) {
       if (speedMs > 0.5) {
         brakePedal = input.brake; // moving forwards: brake pedal brakes
-      } else if (speedKmh > -T.REVERSE_MAX_KMH) {
-        engineTotal = -T.REVERSE_FORCE_N * input.brake; // stopped: reverse
+      } else if (
+        traction &&
+        driveline.selector === "D" &&
+        speedKmh > -T.REVERSE_MAX_KMH
+      ) {
+        // Legacy arcade overload, kept ONLY in D for back-compat (the
+        // harness envelope asserts it): brake at standstill = reverse.
+        // Deliberate reverse is the R position above.
+        engineTotal = -T.REVERSE_FORCE_N * input.brake;
+      } else {
+        brakePedal = input.brake; // no drive available: the pedal just brakes
       }
     }
 
@@ -251,6 +294,12 @@ export class VehicleSim {
     if (input.handbrake) {
       rearBrakeN = Math.max(rearBrakeN, T.HANDBRAKE_FORCE_N / 2);
       rearGrip = T.HANDBRAKE_REAR_GRIP; // rear breaks loose → handbrake slide
+    }
+    if (driveline.parkingBrakeOn) {
+      // Stateful parking brake (A1): a locked rear axle the engine cannot
+      // out-pull — WITHOUT the momentary handbrake's grip loss (this is a
+      // parking pawl feel, not a drift assist).
+      rearBrakeN = Math.max(rearBrakeN, PARKING_BRAKE_FORCE_N / 2);
     }
     c.setWheelBrake(FL, frontBrakeN * dt);
     c.setWheelBrake(FR, frontBrakeN * dt);

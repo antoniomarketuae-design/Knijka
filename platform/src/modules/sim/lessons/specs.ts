@@ -34,6 +34,10 @@ export const LESSONS: readonly LessonSpec[] = [
     conceptIds: ["c-driver-obligations", "c-speed-adaptation", "c-safety-space"],
     spawn: { pointId: "spawn-6" }, // Проф. Константин Чилов
     preDrive: false,
+    // Acclimatization sandbox: the ONLY lesson that spawns ready-to-drive
+    // (engine on, D, brake released). Every other lesson keeps the default
+    // cold start — engine off, P, parking brake on (A1 spawn policy).
+    vehicleStart: "ready",
     objectives: [],
   },
   {

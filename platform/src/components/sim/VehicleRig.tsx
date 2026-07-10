@@ -27,6 +27,7 @@ import {
   applyDifficulty,
   createDriveAssistState,
   DEFAULT_DIFFICULTY,
+  transmissionModeFor,
   type DifficultyMode,
 } from "@/modules/sim/vehicle";
 import type { SimInput } from "@/modules/sim/engine";
@@ -138,7 +139,11 @@ export function VehicleRig({
     // Shape input for the learner mode (throttle/governor/steer smoothing) —
     // physics constants untouched, so the CI harness stays valid.
     const shaped = applyDifficulty(raw, mode, sim.speedKmh, FIXED_DT, assistRef.current);
-    sim.update(shaped, FIXED_DT);
+    // A1: the driveline gates traction (ignition/selector/clutch/parking
+    // brake). Without a cabin (headless/legacy) the default keeps the car
+    // permanently ready-to-drive — exactly the pre-A1 behavior.
+    const driveline = cabinRef.current?.driveline.physicsInput;
+    sim.update(shaped, FIXED_DT, driveline);
   });
 
   // Render-rate glue: kill-plane rescue, cabin clocks (blink/glance),
@@ -153,6 +158,13 @@ export function VehicleRig({
     const input = inputRef.current?.read() ?? null;
     if (cabin) {
       cabin.update(delta, sim.steerRad);
+      // A1: advance the driveline (stall grace timer + difficulty-driven
+      // transmission mode). Render rate is plenty for a 0.7 s stall window.
+      cabin.driveline.update(delta, {
+        speedKmh: sim.speedKmh,
+        throttle: input?.throttle ?? 0,
+        transmission: transmissionModeFor(difficultyRef?.current ?? DEFAULT_DIFFICULTY),
+      });
       const chassis = chassisGroupRef.current;
       if (chassis) updateVehicleSample(sampleRef.current, sim, chassis, cabin, input);
     }
@@ -170,9 +182,18 @@ export function VehicleRig({
     audioRef.current?.update({
       speedKmh: sim.speedKmh,
       throttle: input?.throttle ?? 0,
-      indicatorActive: (cabin?.indicator ?? "off") !== "off",
-      blinkOn: cabin?.blinkOn ?? false,
+      brake: input?.brake ?? 0,
+      indicatorActive:
+        (cabin?.indicator ?? "off") !== "off" || (cabin?.driveline.hazardsOn ?? false),
+      blinkOn: (cabin?.blinkOn ?? false) || (cabin?.hazardBlinkOn ?? false),
+      // A1 driveline truth: the engine voice dies with the ignition/stall,
+      // wipers swish from real state, the horn sounds while held.
+      engineOn: cabin?.driveline.engineOn ?? true,
+      wipersOn: cabin?.driveline.wipersOn ?? false,
+      hornOn: cabin?.driveline.hornOn ?? false,
       paused,
+      // rain + nearestNpcM arrive via audio.setEnvironment (LessonScene's
+      // frame loop).
     });
   });
 

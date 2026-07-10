@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
   applyPreDriveStepToCabin,
+  drivelineEffectOf,
   hasPreDriveCabinEffect,
   PRE_DRIVE_CABIN_EFFECT_STEPS,
+  PRE_DRIVE_DRIVELINE_EFFECT_STEPS,
   type PreDriveCabinState,
 } from "../cabinEffects";
 import { PRE_DRIVE_STEP_ORDER } from "../steps";
@@ -16,26 +18,46 @@ const cabin = (over: Partial<PreDriveCabinState> = {}): PreDriveCabinState => ({
 });
 
 describe("pre-drive cabin effects — the QW5 honesty map", () => {
-  it("exactly three steps carry a real cabin effect (belt, lights, signal)", () => {
+  it("exactly three steps carry a cabin-electrics effect (belt, lights, signal)", () => {
     expect(PRE_DRIVE_CABIN_EFFECT_STEPS).toEqual([
       "fasten-seatbelt",
       "headlights-on",
       "signal",
     ]);
+  });
+
+  it("exactly three steps carry a driveline effect (A1: engine, gear, parking brake)", () => {
+    expect(PRE_DRIVE_DRIVELINE_EFFECT_STEPS).toEqual([
+      "start-engine",
+      "select-gear",
+      "release-handbrake",
+    ]);
+    expect(drivelineEffectOf("start-engine")).toBe("engine-on");
+    expect(drivelineEffectOf("select-gear")).toBe("select-forward");
+    expect(drivelineEffectOf("release-handbrake")).toBe("parking-brake-off");
+    for (const stepId of PRE_DRIVE_STEP_ORDER) {
+      if (!PRE_DRIVE_DRIVELINE_EFFECT_STEPS.includes(stepId)) {
+        expect(drivelineEffectOf(stepId)).toBeNull();
+      }
+    }
+  });
+
+  it("hasPreDriveCabinEffect = cabin ∪ driveline effects (the shell's forward filter)", () => {
     for (const stepId of PRE_DRIVE_STEP_ORDER) {
       expect(hasPreDriveCabinEffect(stepId)).toBe(
-        PRE_DRIVE_CABIN_EFFECT_STEPS.includes(stepId),
+        PRE_DRIVE_CABIN_EFFECT_STEPS.includes(stepId) ||
+          PRE_DRIVE_DRIVELINE_EFFECT_STEPS.includes(stepId),
       );
     }
   });
 
-  it("informational steps change nothing (identity — cheap no-op detection)", () => {
-    const informational = PRE_DRIVE_STEP_ORDER.filter(
-      (id) => !hasPreDriveCabinEffect(id),
+  it("steps without a cabin-electrics effect leave the cabin unchanged (identity)", () => {
+    const nonCabin = PRE_DRIVE_STEP_ORDER.filter(
+      (id) => !PRE_DRIVE_CABIN_EFFECT_STEPS.includes(id),
     );
-    expect(informational).toHaveLength(PRE_DRIVE_STEP_ORDER.length - 3);
+    expect(nonCabin).toHaveLength(PRE_DRIVE_STEP_ORDER.length - 3);
     const s = cabin();
-    for (const stepId of informational) {
+    for (const stepId of nonCabin) {
       expect(applyPreDriveStepToCabin(stepId, s)).toBe(s);
     }
   });

@@ -1,16 +1,21 @@
 // Cabin controls — the vehicle "electrics" the physics core deliberately does
 // not know about: indicators, headlights, seatbelt, mirror-glance requests and
-// the night-preview toggle. Plain TS (no React): the R3F visual layer reads
-// this state per frame, the HUD polls it, and the VehicleSample builder
-// serializes it for the rule engine (contracts.ts).
+// the night-preview toggle — PLUS ownership of the A1 driveline state machine
+// (ignition, selector, clutch, parking brake, hazards, wipers, fog, horn):
+// CabinControls binds the keys, DrivelineState (modules/sim/vehicle) holds the
+// truth. The R3F visual layer reads this state per frame, the HUD polls it,
+// and the VehicleSample builder serializes it for the rule engine
+// (contracts.ts); VehicleRig feeds `driveline.physicsInput` into VehicleSim.
 //
 // Key handling mirrors the SimInput pattern (engine/input.ts) but lives here
-// because these are cabin/visual concerns, not driving physics inputs.
+// because these are cabin/vehicle-operation concerns, not driving-axis inputs.
 
 import {
   applyPreDriveStepToCabin,
+  drivelineEffectOf,
   type PreDriveStepId,
 } from "@/modules/sim/procedures";
+import { DrivelineState, type VehicleStartState } from "@/modules/sim/vehicle";
 
 export type IndicatorSetting = "off" | "left" | "right";
 export type HeadlightSetting = "off" | "low" | "high";
@@ -38,6 +43,33 @@ export const CABIN_KEYS = {
   muteAudio: "KeyM",
 } as const;
 
+/**
+ * A1 driveline key bindings — chosen against the FULL existing map (WASD/
+ * arrows drive, Space, C camera, R reset, Esc pause, X fullscreen, ,/. L B
+ * Q/E/F N M cabin) so nothing collides:
+ *
+ *  - I  = ignition (E is the right-mirror glance; W/S are pedals),
+ *  - Space = stateful parking-brake TOGGLE — it replaces the old momentary
+ *    drift handbrake on the keyboard (that stays on gamepad A only),
+ *  - [ / ] = selector gate one step toward P / toward D (and manual gear
+ *    down/up). Shift/Ctrl were rejected: Ctrl+W closes the browser tab and
+ *    five discrete Shift presses trip Windows Sticky Keys mid-lesson,
+ *  - Z (HOLD) = clutch — left pinky, held while W throttles (manual mode),
+ *  - J = hazards, T = wipers, V = fog lights (W and F are taken),
+ *  - H (HOLD) = horn (the genre convention; B is the seatbelt).
+ */
+export const DRIVELINE_KEYS = {
+  engine: "KeyI",
+  parkingBrake: "Space",
+  gearUp: "BracketRight",
+  gearDown: "BracketLeft",
+  clutch: "KeyZ",
+  hazards: "KeyJ",
+  wipers: "KeyT",
+  fogLights: "KeyV",
+  horn: "KeyH",
+} as const;
+
 export interface CabinCallbacks {
   /** B — seatbelt buckled/unbuckled (audio plays the click). */
   onSeatbeltToggle?: (on: boolean) => void;
@@ -45,6 +77,8 @@ export interface CabinCallbacks {
   onGlance?: (mirror: MirrorGlanceKind) => void;
   /** M — mute toggle request (audio layer owns the actual state). */
   onToggleMute?: () => void;
+  /** Space — parking brake engaged/released (audio plays the lever click). */
+  onParkingBrakeToggle?: (on: boolean) => void;
 }
 
 /** Steer angle (rad) that arms the indicator auto-cancel... */
@@ -58,6 +92,11 @@ export class CabinControls {
   seatbeltOn = false;
   nightPreview = false;
 
+  /** A1 vehicle state machine — ignition/selector/clutch/parking brake/
+   *  hazards/wipers/fog/horn. ONE source: physics, HUD, cluster, sample
+   *  builder and (A2) the procedure machine all read from here. */
+  readonly driveline: DrivelineState;
+
   /** Mirror currently being glanced at (for camera + HUD), or null. */
   glanceMirror: MirrorGlanceKind | null = null;
 
@@ -69,13 +108,23 @@ export class CabinControls {
   private autocancelArmed = false;
   private disposed = false;
 
-  constructor(private readonly callbacks: CabinCallbacks = {}) {
+  constructor(
+    private readonly callbacks: CabinCallbacks = {},
+    /** Lesson spawn policy (LessonSpec.vehicleStart) — default cold start:
+     *  engine OFF, selector P, parking brake ON (the pre-drive reality). */
+    vehicleStart: VehicleStartState = "cold",
+  ) {
+    this.driveline = new DrivelineState(vehicleStart);
     window.addEventListener("keydown", this.onKeyDown);
+    window.addEventListener("keyup", this.onKeyUp);
+    window.addEventListener("blur", this.onBlur);
   }
 
   dispose(): void {
     this.disposed = true;
     window.removeEventListener("keydown", this.onKeyDown);
+    window.removeEventListener("keyup", this.onKeyUp);
+    window.removeEventListener("blur", this.onBlur);
   }
 
   /**
@@ -108,6 +157,13 @@ export class CabinControls {
     return ((this.clock - this.indicatorChangedAt) % BLINK_PERIOD_S) < BLINK_PERIOD_S / 2;
   }
 
+  /** Hazard-lamp blink (A1): free-running on the same 600 ms relay period —
+   *  lights BOTH indicator lamps in the cluster/exterior while hazards are on. */
+  get hazardBlinkOn(): boolean {
+    if (!this.driveline.hazardsOn) return false;
+    return (this.clock % BLINK_PERIOD_S) < BLINK_PERIOD_S / 2;
+  }
+
   /** Glance progress 0..1 while a glance is active, else -1. */
   glanceProgress(): number {
     if (!this.glanceMirror) return -1;
@@ -127,13 +183,27 @@ export class CabinControls {
 
   /**
    * QW5 (doc 68 Phase 0): a completed pre-drive checklist step must set the
-   * REAL cabin state it claims (belt / low beams / left indicator), so the
-   * rule engine, HUD telltales and the sim agree with what the student was
-   * just told they did. Idempotent — safe to re-apply the whole completed
-   * list; steps without an underlying state are no-ops (see
-   * procedures/cabinEffects.ts for the full 13-step map).
+   * REAL state it claims — cabin electrics (belt / low beams / left
+   * indicator) AND, since A1, driveline state (engine started / forward gear
+   * / parking brake released), so the rule engine, physics gating, HUD
+   * telltales and the sim agree with what the student was just told they did.
+   * Idempotent — safe to re-apply the whole completed list; steps without an
+   * underlying state are no-ops (see procedures/cabinEffects.ts for the map).
    */
   applyPreDriveStep(stepId: PreDriveStepId): void {
+    switch (drivelineEffectOf(stepId)) {
+      case "engine-on":
+        this.driveline.forceEngineOn();
+        break;
+      case "select-forward":
+        this.driveline.forceSelectForward();
+        break;
+      case "parking-brake-off":
+        this.driveline.forceParkingBrake(false);
+        break;
+      case null:
+        break;
+    }
     const next = applyPreDriveStepToCabin(stepId, {
       seatbeltOn: this.seatbeltOn,
       headlights: this.headlights,
@@ -202,6 +272,49 @@ export class CabinControls {
       case CABIN_KEYS.muteAudio:
         this.callbacks.onToggleMute?.();
         break;
+
+      // --- A1 driveline controls (state lives in DrivelineState) ------------
+      case DRIVELINE_KEYS.engine:
+        this.driveline.toggleEngine();
+        break;
+      case DRIVELINE_KEYS.parkingBrake:
+        this.driveline.toggleParkingBrake();
+        this.callbacks.onParkingBrakeToggle?.(this.driveline.parkingBrakeOn);
+        break;
+      case DRIVELINE_KEYS.gearUp:
+        this.driveline.gearUp();
+        break;
+      case DRIVELINE_KEYS.gearDown:
+        this.driveline.gearDown();
+        break;
+      case DRIVELINE_KEYS.clutch:
+        this.driveline.setClutch(true);
+        break;
+      case DRIVELINE_KEYS.hazards:
+        this.driveline.toggleHazards();
+        break;
+      case DRIVELINE_KEYS.wipers:
+        this.driveline.toggleWipers();
+        break;
+      case DRIVELINE_KEYS.fogLights:
+        this.driveline.toggleFogLights();
+        break;
+      case DRIVELINE_KEYS.horn:
+        this.driveline.setHorn(true);
+        break;
     }
+  };
+
+  /** Held controls (clutch, horn) release on keyup. */
+  private readonly onKeyUp = (e: KeyboardEvent): void => {
+    if (this.disposed) return;
+    if (e.code === DRIVELINE_KEYS.clutch) this.driveline.setClutch(false);
+    if (e.code === DRIVELINE_KEYS.horn) this.driveline.setHorn(false);
+  };
+
+  /** Focus loss must never leave a held control stuck down. */
+  private readonly onBlur = (): void => {
+    this.driveline.setClutch(false);
+    this.driveline.setHorn(false);
   };
 }
