@@ -13,16 +13,21 @@
  *  - slerp-smooths each vehicle's yaw so NPCs stop snapping through corners,
  *  - lights emissive head/tail lamps (gated on the optional `night` flag) and
  *    amber blinkers driven from the derived turn direction,
- *  - replaces the interim box car with the authored low-poly GLB fleet
- *    (./vehicleFleet): each agent is assigned a model deterministically from its
- *    id (police rare), same-model agents share an InstancedMesh, and ALL wheels
- *    are one shared InstancedMesh (spun/steered per frame) — so real cars cost a
- *    fixed handful of draws, not one per agent,
+ *  - renders the authored GLB fleet (./vehicleFleet — fleet v2, doc 70 REF 3:
+ *    12 v2 models + v1 police + the REF-4 hero boxy luxury SUV): each agent is
+ *    assigned a model deterministically from its id (police ~1-in-15, research-
+ *    weighted mix, taxi ~1-in-10, hero SUV ~1-in-20 capped), same-model agents
+ *    share an InstancedMesh, palette-listed models carry a per-instance paint
+ *    tint on a split paint shell, and ALL standard wheels are one shared
+ *    InstancedMesh (spun/steered per frame; the hero SUV spins its own
+ *    side-mirrored custom wheel meshes) — so real cars cost a fixed handful
+ *    of draws, not one per agent,
  *  - and (when the district is supplied) drops a deterministic parked-car pass
  *    along residential/arterial curbs so the streets aren't deserted.
  *
- * A5 visual-floor pass (doc 68): the parked cars are now the same GLB kit as
- * the moving fleet — static per-model InstancedMeshes (civilian models only)
+ * A5 visual-floor pass (doc 68): the parked cars are the same GLB kit as
+ * the moving fleet — static per-model InstancedMeshes (parked pool only:
+ * no police/minibus/hero SUV, curb taxis allowed — see vehicleFleet)
  * + a static shared wheel mesh + blob shadows, placed once. Pedestrians are
  * articulated: six instanced parts (torso, head, 2 arms, 2 legs) with a
  * counter-phase leg/arm swing driven by each agent's walkPhase/speed, and
@@ -161,8 +166,10 @@ interface ParkedCar {
   x: number;
   y: number;
   yaw: number;
-  /** Fleet model index (civilian pool only — no parked police cruisers). */
+  /** Fleet model index (parked pool only — no police/minibus/hero SUV). */
   model: number;
+  /** Stable placement hash — picks the paint palette color. */
+  seed: number;
 }
 
 function computeParkedCars(
@@ -211,6 +218,7 @@ function computeParkedCars(
             y: ay + dy * t + ny * offset,
             yaw: Math.atan2(dx, -dy),
             model: assignCivilianModel(h),
+            seed: h,
           });
           if (out.length >= PARK_CAP) return out;
         }
@@ -341,7 +349,7 @@ export function TrafficLayer({
       buildTrafficFleet(
         gltfs.map((g) => g.scene),
         system.vehicles,
-        parked.map((p) => p.model),
+        parked.map((p) => ({ model: p.model, seed: p.seed })),
       ),
     [gltfs, system, parked],
   );
@@ -497,12 +505,14 @@ export function TrafficLayer({
       const tz = -c.y;
       const cos = Math.cos(c.yaw);
       const sin = Math.sin(c.yaw);
-      // Body (GLB authored ground-relative — origin on the tarmac).
+      // Body + palette-tinted paint shell (GLB authored ground-relative —
+      // origin on the tarmac; both meshes share the slot space).
       dummy.scale.set(1, 1, 1);
       dummy.rotation.set(0, c.yaw, 0);
       dummy.position.set(tx, 0, tz);
       dummy.updateMatrix();
       mesh?.setMatrixAt(s, dummy.matrix);
+      fleet.parkedPaintMeshes[m]?.setMatrixAt(s, dummy.matrix);
       // Wheels: static but rendered — yaw · fixed roll phase, model-scaled.
       const ws = fleet.parkedWheelScale[i];
       qYaw.setFromAxisAngle(UP, c.yaw);
@@ -529,6 +539,9 @@ export function TrafficLayer({
       }
     }
     for (const mesh of fleet.parkedMeshes) {
+      if (mesh) mesh.instanceMatrix.needsUpdate = true;
+    }
+    for (const mesh of fleet.parkedPaintMeshes) {
       if (mesh) mesh.instanceMatrix.needsUpdate = true;
     }
     if (wheel) wheel.instanceMatrix.needsUpdate = true;
@@ -590,10 +603,16 @@ export function TrafficLayer({
         }
         const yaw = scratch.dispYaw[i];
 
-        // Model + its rig (body InstancedMesh, wheel offsets, lamp placement).
-        const model = fleet.models[fleet.assign[i]];
+        // Model + its rig (body InstancedMesh, paint shell, wheel meshes).
+        const mIdx = fleet.assign[i];
+        const model = fleet.models[mIdx];
         const rig = model.rig;
         const bodyMesh = model.mesh;
+        const paintMesh = fleet.paintMeshes[mIdx];
+        // Custom-wheel models (hero SUV) spin their own side-mirrored meshes;
+        // their shared-wheel slots stay at the zero matrix forever.
+        const cwL = fleet.customWheelL[mIdx];
+        const cwR = fleet.customWheelR[mIdx];
         const s = fleet.slot[i];
 
         const dx = tx - cam.x;
@@ -605,12 +624,20 @@ export function TrafficLayer({
           dummy.scale.set(0, 0, 0);
           dummy.updateMatrix();
           bodyMesh?.setMatrixAt(s, dummy.matrix);
+          paintMesh?.setMatrixAt(s, dummy.matrix);
           vehBlob.setMatrixAt(i, dummy.matrix);
           brake.setMatrixAt(i, dummy.matrix);
           head.setMatrixAt(i, dummy.matrix);
           blink.setMatrixAt(i * 2, dummy.matrix);
           blink.setMatrixAt(i * 2 + 1, dummy.matrix);
-          for (let w = 0; w < 4; w++) wheel.setMatrixAt(i * 4 + w, dummy.matrix);
+          if (cwL && cwR) {
+            for (let w = 0; w < 2; w++) {
+              cwL.setMatrixAt(s * 2 + w, dummy.matrix);
+              cwR.setMatrixAt(s * 2 + w, dummy.matrix);
+            }
+          } else {
+            for (let w = 0; w < 4; w++) wheel.setMatrixAt(i * 4 + w, dummy.matrix);
+          }
           scratch.prevYaw[i] = yaw;
           continue;
         }
@@ -640,22 +667,28 @@ export function TrafficLayer({
         dummy.updateMatrix();
         vehBlob.setMatrixAt(i, dummy.matrix);
 
-        // Body (GLB is authored ground-relative — origin on the tarmac at Y = 0).
+        // Body + paint shell (GLB is authored ground-relative — origin on the
+        // tarmac at Y = 0; the paint shell shares the body's slot space).
         dummy.scale.set(1, 1, 1);
         dummy.rotation.set(0, yaw, 0);
         dummy.position.set(tx, 0, tz);
         dummy.updateMatrix();
         bodyMesh?.setMatrixAt(s, dummy.matrix);
+        paintMesh?.setMatrixAt(s, dummy.matrix);
 
-        // Tail/brake bar (rear, per-model Z).
+        // Tail/brake bar (rear, per-model Z) — X-scaled to the model width
+        // (the v2 fleet spans 1.54 m city cars to 2.04 m minibuses).
+        dummy.scale.set(rig.halfWidth * 1.64 / 1.5, 1, 1); // bar geo is 1.5 wide
         dummy.position.set(tx + rig.rearZ * sin, rig.lampY, tz + rig.rearZ * cos);
         dummy.updateMatrix();
         brake.setMatrixAt(i, dummy.matrix);
         // Headlight bar (front) — only drawn at night, matrix kept fresh anyway.
+        dummy.scale.set(rig.halfWidth * 1.44 / 1.3, 1, 1); // bar geo is 1.3 wide
         dummy.position.set(tx + rig.frontZ * sin, rig.headY, tz + rig.frontZ * cos);
         dummy.updateMatrix();
         head.setMatrixAt(i, dummy.matrix);
         // Rear blinker lamps (index 2i = left +X, 2i+1 = right -X).
+        dummy.scale.set(1, 1, 1);
         const blinkOx = rig.halfWidth * 0.82;
         const blinkZ = rig.rearZ + 0.05;
         for (let side = 0; side < 2; side++) {
@@ -668,8 +701,10 @@ export function TrafficLayer({
           dummy.updateMatrix();
           blink.setMatrixAt(i * 2 + side, dummy.matrix);
         }
-        // Wheels: shared X-axial geometry, scaled to the model radius —
-        // qYaw(+steer on fronts) * roll about local X. No cylinder tip needed.
+        // Wheels — qYaw(+steer on fronts) * roll about local X. Standard
+        // models: the shared X-axial geometry scaled to the model radius.
+        // Custom-wheel models (hero SUV): the model's own left/right meshes
+        // at scale 1 (FL/RL -> left mesh slots s*2/s*2+1, FR/RR -> right).
         const wscale = fleet.wheelScale[i];
         for (let w = 0; w < 4; w++) {
           const front = w < 2;
@@ -685,7 +720,11 @@ export function TrafficLayer({
             tz - off.x * sin + off.z * cos,
           );
           dummy.updateMatrix();
-          wheel.setMatrixAt(i * 4 + w, dummy.matrix);
+          if (cwL && cwR) {
+            (w % 2 === 0 ? cwL : cwR).setMatrixAt(s * 2 + (w >> 1), dummy.matrix);
+          } else {
+            wheel.setMatrixAt(i * 4 + w, dummy.matrix);
+          }
         }
 
         // Tail-lamp colour: braking > night-tail > unlit. Cache the state key
@@ -715,6 +754,15 @@ export function TrafficLayer({
       }
       for (const model of fleet.models) {
         if (model.mesh) model.mesh.instanceMatrix.needsUpdate = true;
+      }
+      for (const pm of fleet.paintMeshes) {
+        if (pm) pm.instanceMatrix.needsUpdate = true;
+      }
+      for (let m = 0; m < fleet.customWheelL.length; m++) {
+        const l = fleet.customWheelL[m];
+        const r = fleet.customWheelR[m];
+        if (l) l.instanceMatrix.needsUpdate = true;
+        if (r) r.instanceMatrix.needsUpdate = true;
       }
       wheel.instanceMatrix.needsUpdate = true;
       vehBlob.instanceMatrix.needsUpdate = true;
