@@ -45,8 +45,13 @@ import {
   type VehicleInput,
   type VehicleSim,
 } from "@/modules/sim/vehicle";
-import type { VehicleSample } from "@/modules/sim/contracts";
+import type { StagedEventOutcome, VehicleSample } from "@/modules/sim/contracts";
 import type { LessonSpec } from "@/modules/sim/lessons";
+import {
+  createScenarioDirector,
+  lessonSeed,
+  type ScenarioDirector,
+} from "@/modules/sim/orchestrator";
 import {
   createPreDriveSignalTracker,
   observeControlSignal,
@@ -170,6 +175,8 @@ interface Built {
   geometry: WorldGeometry;
   district: ReturnType<typeof assertDistrict>;
   traffic: ReturnType<typeof createTrafficSystem>;
+  /** A8 scenario director — null when the lesson stages no events. */
+  director: ScenarioDirector | null;
   minimapPolylines: MinimapFrame["polylines"];
   spawnPoints: SpawnPointLike[];
 }
@@ -195,6 +202,10 @@ export interface LessonSceneProps {
   /** A1: low-frequency driveline state (selector/ignition/parking brake/…)
    *  → HUD telltales. Emitted on the minimap cadence, not per frame. */
   onDriveline?: (snap: DrivelineSnapshot) => void;
+  /** A8 (additive): a staged encounter resolved — carries the measurement
+   *  record (reaction time, stop gap, …). The graded consequences already
+   *  arrived through onTick; the shell folds this via applyStagedOutcome. */
+  onStagedOutcome?: (outcome: StagedEventOutcome) => void;
 }
 
 export default function LessonScene(props: LessonSceneProps) {
@@ -242,12 +253,23 @@ export default function LessonScene(props: LessonSceneProps) {
         runtime.setCirculatingQuery((cx, cy, px, py, h, r) =>
           traffic.circulatingConflict(cx, cy, px, py, h, r),
         );
+        // A8: stage the lesson's scripted encounters NOW — before TrafficLayer
+        // mounts — so staged actors land inside the instanced buffers. The
+        // director is deterministic per (lesson seed, attempt).
+        const stagedEvents = props.lesson.stagedEvents ?? [];
+        const director =
+          stagedEvents.length > 0
+            ? createScenarioDirector(stagedEvents, traffic, {
+                seed: lessonSeed(props.lesson.id),
+              })
+            : null;
         if (alive) {
           setBuilt({
             runtime,
             geometry,
             district,
             traffic,
+            director,
             minimapPolylines: buildMinimapPolylines(district),
             spawnPoints,
           });
@@ -319,6 +341,7 @@ function ReadyScene({
   onMinimap,
   onTickCb,
   onDriveline,
+  onStagedOutcome,
 }: LessonSceneProps & {
   built: Built;
   menuPaused: boolean;
@@ -327,7 +350,7 @@ function ReadyScene({
   onMinimap: (f: MinimapFrame) => void;
   onTickCb: (t: SimTick) => void;
 }) {
-  const { runtime, geometry, district, traffic, minimapPolylines, spawnPoints } =
+  const { runtime, geometry, district, traffic, director, minimapPolylines, spawnPoints } =
     built;
 
   const timeOfDay = lesson.environment?.timeOfDay ?? "day";
@@ -366,6 +389,15 @@ function ReadyScene({
   // once) can seed a freshly created input with the current gate state.
   const driveLockedRef = useRef(driveLocked);
 
+  // A8: the scenario director rides in a ref (created in the load path, used
+  // by the frame loop + the R-key reset) and drives the L5 hazard visual via
+  // this render-free flag ref (TrafficLayer reads it per frame).
+  const directorRef = useRef<ScenarioDirector | null>(director);
+  useEffect(() => {
+    directorRef.current = director;
+  }, [director]);
+  const hazardActiveRef = useRef(false);
+
   // A2 performed pre-drive: raw transition queues, drained by RuntimeDriver's
   // frame loop and resolved to procedure steps (performedSteps.ts). Driveline
   // events arrive via subscribe (below); glances via the cabin callback (both
@@ -381,7 +413,11 @@ function ReadyScene({
           cameraModeRef.current === "chase" ? "cockpit" : "chase";
         setCockpit(cameraModeRef.current === "cockpit");
       },
-      onReset: () => simRef.current?.reset(),
+      onReset: () => {
+        simRef.current?.reset();
+        // A8: retry re-stages every staged encounter (fresh attempt seed).
+        directorRef.current?.reset();
+      },
       onTogglePause: () => setMenuPaused(!menuPaused),
     });
     input.driveLocked = driveLockedRef.current;
@@ -525,6 +561,8 @@ function ReadyScene({
             <RuntimeDriver
               runtime={runtime}
               traffic={traffic}
+              director={director}
+              hazardActiveRef={hazardActiveRef}
               sampleRef={sampleRef}
               inputRef={inputRef}
               cabinRef={cabinRef}
@@ -537,6 +575,7 @@ function ReadyScene({
               onTick={onTickCb}
               onMinimap={onMinimap}
               onDriveline={onDriveline}
+              onStagedOutcome={onStagedOutcome}
               minimapPolylines={minimapPolylines}
               isNight={isNight}
               rain={rain}
@@ -545,7 +584,9 @@ function ReadyScene({
             {/* Ambient life — cars + pedestrians. Render-only: RuntimeDriver
                 already steps traffic.update each frame (so it stays in lockstep
                 with the rule engine), so we do NOT pass `runtime` here. Draw
-                distance covers the anchored cluster (fog fades the far edge). */}
+                distance covers the anchored cluster (fog fades the far edge).
+                A8: the lesson hazard (L5 ball dart-out) renders here too — the
+                scenario director owns hazardActiveRef (A5's prepared seam). */}
             <TrafficLayer
               system={traffic}
               maxDrawDistanceM={420}
@@ -553,6 +594,8 @@ function ReadyScene({
               // world `District` ⊇ `TrafficDistrict` (only differs on a field
               // TrafficLayer doesn't read — crossings.edgeId nullability).
               district={district as TrafficDistrict}
+              hazard={lesson.hazard ?? null}
+              hazardActiveRef={hazardActiveRef}
             />
           </Physics>
         </Suspense>
@@ -658,6 +701,8 @@ function cabinPollBaseline(cabin: CabinControls | null, rawBrake: number): Cabin
 function RuntimeDriver({
   runtime,
   traffic,
+  director,
+  hazardActiveRef,
   sampleRef,
   inputRef,
   cabinRef,
@@ -670,6 +715,7 @@ function RuntimeDriver({
   onTick,
   onMinimap,
   onDriveline,
+  onStagedOutcome,
   minimapPolylines,
   isNight,
   rain,
@@ -677,6 +723,10 @@ function RuntimeDriver({
 }: {
   runtime: ReturnType<typeof createWorldRuntime>;
   traffic: ReturnType<typeof createTrafficSystem>;
+  /** A8 scenario director (null = lesson stages nothing). */
+  director: ScenarioDirector | null;
+  /** A8 → TrafficLayer: animate the lesson hazard visual while true. */
+  hazardActiveRef: React.RefObject<boolean>;
   sampleRef: React.RefObject<VehicleSample>;
   inputRef: React.RefObject<GatedSimInput | null>;
   cabinRef: React.RefObject<CabinControls | null>;
@@ -690,6 +740,7 @@ function RuntimeDriver({
   onTick: (t: SimTick) => void;
   onMinimap: (f: MinimapFrame) => void;
   onDriveline?: (snap: DrivelineSnapshot) => void;
+  onStagedOutcome?: (outcome: StagedEventOutcome) => void;
   minimapPolylines: MinimapFrame["polylines"];
   isNight: boolean;
   rain: boolean;
@@ -798,6 +849,28 @@ function RuntimeDriver({
     // NPC proximity hum) — consumed by VehicleRig's per-frame audio update.
     audioRef.current?.setEnvironment({ rain, nearestNpcM: leadGap });
     const tick = runtime.sample(sample, tRef.current, isNight, rain, leadGap);
+
+    // A8: the scenario director steps AFTER traffic.update + runtime.sample —
+    // it watches the player, commands staged actors (effective next frame)
+    // and appends its outcome events into the SAME tick the rule engine
+    // grades. The hazard flag drives TrafficLayer's L5 ball animation.
+    if (director) {
+      const staged = director.step({
+        tSec: tRef.current,
+        dtSec: dt,
+        x: sample.position.x,
+        y: sample.position.y,
+        speedKmh: sample.speedKmh,
+        headingDeg: sample.headingDeg,
+        brakePedal: inputRef.current?.rawBrake ?? 0,
+        tickEvents: tick.events,
+      });
+      for (const e of staged.events) tick.events.push(e);
+      hazardActiveRef.current = director.hazardActive;
+      if (onStagedOutcome) {
+        for (const o of staged.outcomes) onStagedOutcome(o);
+      }
+    }
     onTick(tick);
 
     const nowMs = tRef.current * 1000;

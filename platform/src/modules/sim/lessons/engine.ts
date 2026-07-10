@@ -15,7 +15,7 @@
  * The React shell keeps the state in a ref and re-renders from snapshots.
  */
 
-import type { HudEvent, LessonSpec } from "../contracts";
+import type { HudEvent, LessonSpec, StagedEventOutcome } from "../contracts";
 import {
   buildSessionSummary,
   createRuleEngine,
@@ -367,6 +367,24 @@ export function applyTick(prev: LessonSessionState, tick: SimTick): LessonStepRe
     hudEvents,
     teachMoments,
   };
+}
+
+// ---------------------------------------------------------------------------
+// Staged-encounter outcomes (A8 — additive)
+// ---------------------------------------------------------------------------
+
+/**
+ * Record one resolved staged encounter on the session (A8). Pure/additive:
+ * the GRADED consequences of the encounter arrived through applyTick already
+ * (the orchestrator emits only existing SimTick vocabulary) — this only
+ * accumulates the measurement record (reaction time, stop gap, …) that A10
+ * locks objectives to and the debrief will cite.
+ */
+export function applyStagedOutcome(
+  prev: LessonSessionState,
+  outcome: StagedEventOutcome,
+): LessonSessionState {
+  return { ...prev, stagedOutcomes: [...(prev.stagedOutcomes ?? []), outcome] };
 }
 
 // ---------------------------------------------------------------------------

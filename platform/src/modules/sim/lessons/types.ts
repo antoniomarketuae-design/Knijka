@@ -9,7 +9,7 @@
  * is the only impure seam and is injectable, like every other module store.
  */
 
-import type { LessonObjective, LessonSpec } from "../contracts";
+import type { LessonObjective, LessonSpec, StagedEventOutcome } from "../contracts";
 import type {
   RuleEngineState,
   ScorableEvent,
@@ -233,6 +233,16 @@ export interface LessonSessionState {
   /** Session time of the last processed tick, seconds. */
   lastT: number;
   endedAtSec: number | null;
+  /**
+   * A8 (additive): resolved staged-encounter outcomes, in resolution order.
+   * The GRADED consequences already live in `events` (the orchestrator emits
+   * only existing SimTick vocabulary); this is the measurement channel —
+   * `reactionTimeSec` on the l5-braking-lead-car outcome is the
+   * stimulus→brake-onset delta A10 locks the L5 objective to. Populated via
+   * `applyStagedOutcome` (engine.ts) from LessonScene's onStagedOutcome
+   * callback; absent on sessions predating A8.
+   */
+  stagedOutcomes?: StagedEventOutcome[];
 }
 
 // ---------------------------------------------------------------------------

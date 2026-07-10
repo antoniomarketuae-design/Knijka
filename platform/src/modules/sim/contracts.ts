@@ -103,6 +103,13 @@ export interface LessonSpec {
   /** Sudden-obstacle stimulus for emergency-stop lessons (L5). Render-side
    * lives in TrafficLayer; the trigger is A8's job. */
   hazard?: HazardStimulusSpec;
+  /**
+   * A8 staged encounters — deterministic scripted events the scenario
+   * orchestrator (modules/sim/orchestrator) directs during this lesson.
+   * DATA ONLY, pinned to district-v1.json like every other spec field;
+   * absent/empty = free ambient traffic only (pre-A8 behavior).
+   */
+  stagedEvents?: StagedEventSpec[];
 }
 
 export interface LessonObjective {
@@ -146,6 +153,196 @@ export interface HazardStimulusSpec {
   dirY: number;
   speedMps: number;
   travelM: number;
+}
+
+// ---------------------------------------------------------------------------
+// A8 staged scenario events (doc 68 A8; event library: docs/simulation/65).
+//
+// Each spec is authored DATA describing one deterministic encounter: the
+// actor's scripted path (district node ids resolved against the same lane
+// graph ambient traffic drives), its dormant hold pose, and the arm/trigger
+// geometry the orchestrator evaluates against the player each frame.
+// Outcomes are reported as SimTick events the EXISTING rule engine already
+// grades (prioritySituation / crossing events / collision) — staged events
+// add no new ViolationCodes.
+// ---------------------------------------------------------------------------
+
+/** Scripted vehicle path + dormant pose (resolved by traffic.stage()). */
+export interface StagedActorPathSpec {
+  /** District node ids; consecutive pairs must be lane-graph-connected. */
+  pathNodes: string[];
+  /** Dormant hold: arc of pathNodes[nodeIndex] + offsetM (negative = before). */
+  hold: { nodeIndex: number; offsetM: number };
+  /** Default cruise speed, m/s. */
+  cruiseSpeedMps: number;
+  /** Curb-side extra offset, m (cyclist proxy rides right of lane center). */
+  extraRightOffsetM?: number;
+  /** Closed loop path (roundabout circulation). */
+  loop?: boolean;
+  /** Presentation palette index. */
+  colorIndex?: number;
+}
+
+export type StagedEventKind =
+  | "pedestrianDartOut"
+  | "priorityFromRight"
+  | "brakingLeadCar"
+  | "cyclistRightHook"
+  | "roundaboutEntry";
+
+interface StagedEventBase {
+  /** Unique per lesson, e.g. "l4-dart-out". */
+  id: string;
+  kind: StagedEventKind;
+  /** 45-event library id (docs/simulation/65) for traceability. */
+  libraryEventId?: string;
+}
+
+/** A pedestrian steps onto a specific crossing as the player approaches at
+ * speed — crossing occupancy drives the existing PEDESTRIAN_* grading. */
+export interface PedestrianDartOutSpec extends StagedEventBase {
+  kind: "pedestrianDartOut";
+  /** Crossing id from district-v1.json (occupancy + zone grading key). */
+  crossingId: string;
+  crossing: { x: number; y: number };
+  /** Curb start point + unit dart direction (across the road). */
+  start: { x: number; y: number };
+  dir: { x: number; y: number };
+  speedMps: number;
+  /** Total walk length (across + a few metres of walk-out), m. */
+  travelM: number;
+  /** Roadway span along the dart path (crossing-occupancy window), m. */
+  roadFromM: number;
+  roadToM: number;
+  /** Trigger: player nearer than this to the crossing (± seeded jitter)… */
+  triggerDistM: number;
+  /** …approaching it, at or above this speed. */
+  minTriggerSpeedKmh: number;
+}
+
+/** A scripted car crosses the player's guarded junction from the right,
+ * timed to arrive just before the player's projected line-crossing. Grading:
+ * the runtime's existing junction adjudication (give-way conflict at the
+ * stop line via conflictNear, right-hand rule via conflictFromRight at
+ * uncontrolled nodes) fires on the staged car like on any other vehicle. */
+export interface PriorityFromRightSpec extends StagedEventBase {
+  kind: "priorityFromRight";
+  junction: { nodeId: string; x: number; y: number };
+  /**
+   * Which runtime detector guards the junction (default "stopLine"): the
+   * stop-line give-way check needs the orchestrator to emit the yielded
+   * commendation itself; the uncontrolled right-hand-rule tracker emits its
+   * own on leaving the junction.
+   */
+  junctionControl?: "stopLine" | "uncontrolled";
+  actor: StagedActorPathSpec;
+  /** Index of the junction node within actor.pathNodes (timing reference). */
+  junctionNodeIndex: number;
+  /** Player distance to the junction that starts the arrival sync, m. */
+  armDistM: number;
+  /** Car passes the node this long before the player's projected crossing, s. */
+  leadSec: number;
+  /** Approximate player stop-line distance from the junction node, m. */
+  lineDistM: number;
+  /** Speed after clearing the junction (leave the conflict radius fast), m/s. */
+  clearSpeedMps: number;
+}
+
+/** A lead car matches the player's speed at a fixed gap, then brake-slams at
+ * a staged point (with the lesson's ballDartOut visual as the WHY). The
+ * orchestrator measures stimulus→brake-onset reaction time. */
+export interface BrakingLeadCarSpec extends StagedEventBase {
+  kind: "brakingLeadCar";
+  actor: StagedActorPathSpec;
+  /** Gap held ahead of the player while matching, m. */
+  followGapM: number;
+  maxMatchSpeedMps: number;
+  /** The staged slam point on the lead car's path (district space). */
+  slamAt: { x: number; y: number };
+  slamRadiusM: number;
+  slamDecelMps2: number;
+  /** Player must be at least this fast for the slam (else it defers until the
+   *  player closes within proximityFallbackM of the held car). */
+  minSlamSpeedKmh: number;
+  proximityFallbackM: number;
+  /** Flip the lesson's HazardStimulusSpec visual (ball dart) at the slam. */
+  triggersHazard: boolean;
+  /** Seconds after resolution before the lead car drives on. */
+  resumeAfterSec: number;
+}
+
+/** A slow "cyclist" (narrow scripted vehicle-agent — honest v1 actor-model
+ * limitation, audit C3) rides curb-side toward a junction the player turns
+ * right at; turning across it is the classic right hook. Graded via existing
+ * vocabulary: prioritySituation (FAILED_TO_YIELD / YIELDED_TO_PRIORITY) and
+ * collision(cyclist) on contact. */
+export interface CyclistRightHookSpec extends StagedEventBase {
+  kind: "cyclistRightHook";
+  junction: { nodeId: string; x: number; y: number };
+  actor: StagedActorPathSpec;
+  junctionNodeIndex: number;
+  /** Player distance to the junction that releases the cyclist, m. */
+  releaseDistM: number;
+  /** Right turn started with the cyclist within this of the player = hook, m. */
+  dangerRadiusM: number;
+  /** Cyclist within this of the player near the junction = a real conflict
+   *  existed (gates the yielded commendation), m. */
+  conflictWindowM: number;
+}
+
+/** A scripted car circulates the roundabout timed to the player's approach —
+ * the runtime's existing circulatingConflict query grades the entry. */
+export interface RoundaboutEntrySpec extends StagedEventBase {
+  kind: "roundaboutEntry";
+  center: { x: number; y: number };
+  ringRadiusM: number;
+  /** Closed ring loop (loop: true). */
+  actor: StagedActorPathSpec;
+  /** Player's entry mouth (district space) + its ring node index. */
+  entry: { x: number; y: number };
+  entryNodeIndex: number;
+  /** Desired car arc upstream of the entry when the player arrives, m. */
+  conflictLeadM: number;
+  /** Player distance to the ring center that starts the sync, m. */
+  armDistM: number;
+  minSyncSpeedMps: number;
+  maxSyncSpeedMps: number;
+}
+
+export type StagedEventSpec =
+  | PedestrianDartOutSpec
+  | PriorityFromRightSpec
+  | BrakingLeadCarSpec
+  | CyclistRightHookSpec
+  | RoundaboutEntrySpec;
+
+/**
+ * Resolution record of one staged encounter (A8). The GRADING already
+ * happened through the rule engine (the orchestrator emits only existing
+ * SimTick vocabulary); this record is the additive measurement channel —
+ * A10 locks lesson objectives to it (e.g. L5 reaction time).
+ */
+export interface StagedEventOutcome {
+  eventId: string;
+  kind: StagedEventKind;
+  /** True = the student resolved the encounter correctly. */
+  success: boolean;
+  detail:
+    | "yielded" // conflict existed, player gave way
+    | "clear" // encounter resolved without a live conflict
+    | "violation" // graded FAILED_TO_YIELD / PEDESTRIAN_* path
+    | "collision" // physical contact with the staged actor
+    | "stoppedInTime" // brakingLeadCar: full stop with gap left
+    | "hitLeadCar" // brakingLeadCar: rear-ended the lead
+    | "passedWithoutStopping"; // brakingLeadCar: swerved past the stimulus
+  /** Session time of resolution, s. */
+  tSec: number;
+  /** Stimulus onset → first brake application, s (dart-out + lead car). */
+  reactionTimeSec?: number;
+  /** Remaining bumper gap at full stop, m (brakingLeadCar). */
+  stopGapM?: number;
+  /** Player speed at the moment the stimulus fired, km/h. */
+  approachSpeedKmh?: number;
 }
 
 /** Events the HUD listens to (toasts, banners). Emitted by lessons/runtime. */

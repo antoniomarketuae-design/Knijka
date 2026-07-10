@@ -208,6 +208,115 @@ export const DEFAULT_TRAFFIC_CONFIG: TrafficConfig = {
 };
 
 // ---------------------------------------------------------------------------
+// Staged actors (A8 scenario orchestrator) — the NARROW imperative seam.
+//
+// A staged actor is a scripted agent the orchestrator deploys for ONE
+// deterministic encounter: it follows a fixed path (resolved from the lane
+// graph for vehicles, an explicit polyline for pedestrians), holds a dormant
+// pose until commanded, and executes exactly one behavior command at a time.
+// Staged actors publish into the same `vehicles` / `pedestrians` state arrays
+// (and crossing occupancy) as ambient agents, so the presentation layer and
+// every existing rule-engine query (leadGapMeters, conflictFromRight,
+// circulatingConflict, pedestrianOnCrossing, …) see them with zero new
+// grading plumbing.
+//
+// Honest v1 limitations (doc 68 A8):
+//  - Staged actors are INVISIBLE to ambient agents (ambient car-following
+//    only scans route lanes), so an ambient car may overlap a staged one.
+//  - There is no cyclist actor type (audit C3): a "cyclist" is a narrow
+//    scripted vehicle-agent rendered with the car fleet.
+//  - Scripted actors obey only their script — signals/reservations are the
+//    orchestrator's responsibility via timing, not simulated compliance.
+// ---------------------------------------------------------------------------
+
+export interface StagedVehicleSpec {
+  kind: "vehicle";
+  /** Orchestrator handle — unique per session. */
+  id: string;
+  /**
+   * District node ids the actor drives through, in order. Every consecutive
+   * pair must be connected by a directed lane in the road graph (same lanes
+   * ambient traffic drives), or stage() returns null.
+   */
+  pathNodes: string[];
+  /** Dormant hold pose: arc of pathNodes[nodeIndex] + offsetM (may be
+   *  negative = before the node) along the resolved path. */
+  hold: { nodeIndex: number; offsetM: number };
+  /** Default target speed for `cruise` commands, m/s. */
+  cruiseSpeedMps: number;
+  /** Acceleration toward a higher target, m/s² (default 2.6). */
+  accelMps2?: number;
+  /** Deceleration toward a lower target, m/s² (default 4.5). */
+  decelMps2?: number;
+  /** Extra rightward offset from the lane center, m — cyclists ride the curb. */
+  extraRightOffsetM?: number;
+  /** Loop the path (roundabout circulation) instead of finishing at its end. */
+  loop?: boolean;
+  /** Presentation palette index. */
+  colorIndex?: number;
+  /**
+   * Emergency-brake when the player is directly ahead in the path corridor
+   * (default true) — a staged actor must never ram the player from behind;
+   * the PLAYER driving into a staged actor stays possible (that consequence
+   * is the point). An active `brake` command overrides the guard.
+   */
+  playerGuard?: boolean;
+}
+
+export interface StagedPedestrianSpec {
+  kind: "pedestrian";
+  id: string;
+  /** Explicit district-space polyline (e.g. curb -> across the road -> out). */
+  path: ReadonlyArray<{ x: number; y: number }>;
+  /** Walk speed once released, m/s (a dart-out runs at ~2.9). */
+  speedMps: number;
+  /** Crossing whose occupancy this actor drives while on the roadway span. */
+  crossingId?: string;
+  /** Roadway span along the path (arc range counting as on-crossing), m. */
+  roadFromM?: number;
+  roadToM?: number;
+  colorIndex?: number;
+}
+
+export type StagedActorSpec = StagedVehicleSpec | StagedPedestrianSpec;
+
+/** One behavior at a time — the orchestrator re-commands as the scene evolves. */
+export type StagedCommand =
+  /** Freeze (brake to 0, stand still). Pedestrians stop walking. */
+  | { type: "hold" }
+  /** Follow the path at `speedMps` (default: spec cruise speed). Releases a
+   *  dormant pedestrian into its walk. */
+  | { type: "cruise"; speedMps?: number }
+  /** Vehicles only: regulate speed to hold `gapM` meters ahead of the player
+   *  (projected onto the actor's path). */
+  | { type: "matchPlayer"; gapM: number; maxSpeedMps: number }
+  /** Vehicles only: brake-slam at `decelMps2` (default 7.5) to a stop; holds
+   *  the stop and suppresses the player guard (already braking). */
+  | { type: "brake"; decelMps2?: number }
+  /** Teleport back to the dormant hold pose (re-stage on retry). */
+  | { type: "reset" };
+
+/** Live read-only view of a staged actor (object identity stable per actor). */
+export interface StagedActorView {
+  readonly id: string;
+  readonly kind: "vehicle" | "pedestrian";
+  /** District-space pose — mirrors the published agent state. */
+  readonly x: number;
+  readonly y: number;
+  readonly dirX: number;
+  readonly dirY: number;
+  readonly speedMps: number;
+  /** Arc position along the resolved path, m. */
+  readonly s: number;
+  readonly pathLengthM: number;
+  /** Arc position of each spec pathNode along the resolved path (vehicles;
+   *  empty for pedestrians) — the orchestrator's timing reference. */
+  readonly nodeS: readonly number[];
+  /** True once a non-loop path is fully traversed (actor parked at its end). */
+  readonly finished: boolean;
+}
+
+// ---------------------------------------------------------------------------
 // System handle
 // ---------------------------------------------------------------------------
 
@@ -278,6 +387,18 @@ export interface TrafficSystem {
     headingDeg: number,
     bandRadiusM: number,
   ): boolean;
+  /**
+   * Deploy a scripted actor, dormant at its hold pose (A8). MUST be called
+   * before the presentation layer mounts — TrafficLayer sizes its instanced
+   * buffers from the agent arrays at mount. Returns null when the spec cannot
+   * resolve (unknown/unconnected path nodes, duplicate id, degenerate path).
+   */
+  stage(spec: StagedActorSpec): StagedActorView | null;
+  /** Command a staged actor (no-op for unknown ids). Takes effect on the next
+   *  update() — one frame of latency, invisible at 60 Hz. */
+  stagedCommand(id: string, command: StagedCommand): void;
+  /** Live view of a staged actor, or null. */
+  staged(id: string): StagedActorView | null;
   readonly timeSec: number;
   readonly stats: TrafficSystemStats;
 }

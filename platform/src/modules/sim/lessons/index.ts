@@ -8,7 +8,13 @@
  */
 
 // Contract types lesson consumers need (owned by ../contracts.ts)
-export type { HudEvent, LessonObjective, LessonSpec } from "../contracts";
+export type {
+  HudEvent,
+  LessonObjective,
+  LessonSpec,
+  StagedEventOutcome,
+  StagedEventSpec,
+} from "../contracts";
 
 // Lesson data (specs pinned to district-v1.json)
 export { LESSONS, lessonById, lessonsInOrder } from "./specs";
@@ -17,6 +23,7 @@ export { LESSONS, lessonById, lessonsInOrder } from "./specs";
 export {
   abortSession,
   applyPreDriveStep,
+  applyStagedOutcome,
   applyTick,
   buildLessonResult,
   createLessonSession,

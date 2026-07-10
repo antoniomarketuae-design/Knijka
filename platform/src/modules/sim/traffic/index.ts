@@ -16,6 +16,8 @@
  */
 
 export { createTrafficSystem } from "./system";
+export { mulberry32 } from "./rng";
+export type { Rng } from "./rng";
 export { TrafficLayer } from "./TrafficLayer";
 export type { TrafficLayerProps } from "./TrafficLayer";
 export { DEFAULT_TRAFFIC_CONFIG } from "./types";
@@ -25,6 +27,11 @@ export type {
   DistrictIntersection,
   DistrictNode,
   SignalPhaseFn,
+  StagedActorSpec,
+  StagedActorView,
+  StagedCommand,
+  StagedPedestrianSpec,
+  StagedVehicleSpec,
   TrafficConfig,
   TrafficDistrict,
   TrafficPedestrianState,

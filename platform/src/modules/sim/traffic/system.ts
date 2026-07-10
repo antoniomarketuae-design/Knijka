@@ -22,6 +22,19 @@ import {
 import { mulberry32, rngRange } from "./rng";
 import { buildRoutes, DEFAULT_ROUTE_OPTIONS, type TrafficRoute } from "./routes";
 import {
+  applyStagedCommand,
+  buildStagedPedPath,
+  createStagedPedestrian,
+  createStagedVehicle,
+  resolveStagedVehiclePath,
+  STAGED_STATE_ID_BASE,
+  updateStagedPedestrian,
+  updateStagedVehicle,
+  type StagedEnv,
+  type StagedPedestrianAgent,
+  type StagedVehicleAgent,
+} from "./staged";
+import {
   createVehicleAgent,
   updateVehicle,
   type NodeReservation,
@@ -30,6 +43,9 @@ import {
 } from "./vehicles";
 import {
   DEFAULT_TRAFFIC_CONFIG,
+  type StagedActorSpec,
+  type StagedActorView,
+  type StagedCommand,
   type TrafficConfig,
   type TrafficDistrict,
   type TrafficPedestrianState,
@@ -71,6 +87,11 @@ class TrafficSystemImpl implements TrafficSystem {
   private readonly reservations = new Map<string, NodeReservation>();
   private readonly vehicleEnv: VehicleEnv;
   private readonly pedestrianEnv: PedestrianEnv;
+  // A8 staged actors — scripted, orchestrator-commanded (staged.ts).
+  private readonly stagedVehicles: StagedVehicleAgent[] = [];
+  private readonly stagedPeds: StagedPedestrianAgent[] = [];
+  private readonly stagedById = new Map<string, StagedVehicleAgent | StagedPedestrianAgent>();
+  private readonly stagedEnv: StagedEnv;
 
   constructor(district: TrafficDistrict, cfg: TrafficConfig) {
     const rng = mulberry32(cfg.seed);
@@ -200,6 +221,14 @@ class TrafficSystemImpl implements TrafficSystem {
       playerSpeedKmh: 0,
     };
 
+    this.stagedEnv = {
+      hasPlayer: false,
+      playerX: 0,
+      playerY: 0,
+      playerSpeedMps: 0,
+      crossingCounts: this.crossingCounts,
+    };
+
     // Publish initial poses (dt = 0 moves nothing, only samples polylines).
     for (const agent of this.pedestrianAgents) updatePedestrian(agent, 0, this.pedestrianEnv);
     for (const agent of this.vehicleAgents) updateVehicle(agent, 0, this.vehicleEnv);
@@ -251,6 +280,51 @@ class TrafficSystemImpl implements TrafficSystem {
     for (let i = 0; i < this.vehicleAgents.length; i++) {
       updateVehicle(this.vehicleAgents[i], dt, vEnv);
     }
+
+    // Staged actors last: they read the freshest player pose and publish into
+    // the same state arrays; ambient agents never read them (documented v1
+    // limitation — see staged.ts header).
+    const sEnv = this.stagedEnv;
+    sEnv.hasPlayer = vEnv.hasPlayer;
+    sEnv.playerX = vEnv.playerX;
+    sEnv.playerY = vEnv.playerY;
+    sEnv.playerSpeedMps = vEnv.playerSpeedMps;
+    for (let i = 0; i < this.stagedVehicles.length; i++) {
+      updateStagedVehicle(this.stagedVehicles[i], dt, sEnv);
+    }
+    for (let i = 0; i < this.stagedPeds.length; i++) {
+      updateStagedPedestrian(this.stagedPeds[i], dt, sEnv);
+    }
+  }
+
+  stage(spec: StagedActorSpec): StagedActorView | null {
+    if (this.stagedById.has(spec.id)) return null;
+    const stateId = STAGED_STATE_ID_BASE + this.stagedById.size;
+    if (spec.kind === "vehicle") {
+      const path = resolveStagedVehiclePath(this.graph, spec.pathNodes, spec.extraRightOffsetM ?? 0);
+      if (!path) return null;
+      const agent = createStagedVehicle(spec, path, stateId);
+      this.stagedVehicles.push(agent);
+      this.vehicles.push(agent.state);
+      this.stagedById.set(spec.id, agent);
+      return agent.view;
+    }
+    const path = buildStagedPedPath(spec.path);
+    if (!path) return null;
+    const agent = createStagedPedestrian(spec, path, stateId);
+    this.stagedPeds.push(agent);
+    this.pedestrians.push(agent.state);
+    this.stagedById.set(spec.id, agent);
+    return agent.view;
+  }
+
+  stagedCommand(id: string, command: StagedCommand): void {
+    const agent = this.stagedById.get(id);
+    if (agent) applyStagedCommand(agent, command, this.stagedEnv);
+  }
+
+  staged(id: string): StagedActorView | null {
+    return this.stagedById.get(id)?.view ?? null;
   }
 
   pedestrianOnCrossing(crossingId: string): boolean {

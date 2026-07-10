@@ -92,6 +92,45 @@ export const LESSONS: readonly LessonSpec[] = [
     ],
     spawn: { pointId: "spawn-4" }, // одностранна улица на север
     preDrive: false,
+    // A8 staged encounter — priority from the right. HONEST PLACEMENT NOTE:
+    // the L2 route has NO uncontrolled (right-hand-rule) junction — every
+    // junction on it is signalized or stop-guarded — so the scripted car
+    // crosses the player's Б2-guarded junction n5063751788 (the minor-meets-
+    // arterial stop east of the first objective, where the route turns north
+    // onto the secondary). Grading path: the runtime's stop-line give-way
+    // adjudication (conflictNear at line crossing → FAILED_TO_YIELD). The
+    // orchestrator's staging machinery is junction-type agnostic; the
+    // conflictFromRight/uncontrolled variant is exercised by the orchestrator
+    // integration tests at n348207502.
+    stagedEvents: [
+      {
+        id: "l2-priority-from-right",
+        kind: "priorityFromRight",
+        libraryEventId: "ev-junction-priority-sign",
+        junction: { nodeId: "n5063751788", x: 434.54, y: 67.2 },
+        actor: {
+          // Northbound on бул. „Акад. Стефан Младенов" (e672186635.0), across
+          // the junction, north past the lights, exiting east on the
+          // secondary_link — clear of the player's whole remaining route.
+          pathNodes: [
+            "n1113186267",
+            "n5063751788",
+            "n9601848047",
+            "n6294463135",
+            "n1805512602",
+            "n330851787",
+          ],
+          hold: { nodeIndex: 1, offsetM: -75 }, // 75 m south of the junction
+          cruiseSpeedMps: 8.5,
+          colorIndex: 2,
+        },
+        junctionNodeIndex: 1,
+        armDistM: 95,
+        leadSec: 1.1,
+        lineDistM: 8,
+        clearSpeedMps: 12.5,
+      },
+    ],
     objectives: [
       {
         id: "l2-stop-sign",
@@ -145,6 +184,67 @@ export const LESSONS: readonly LessonSpec[] = [
     ],
     spawn: { pointId: "spawn-3" }, // южна права, на север към кръговото
     preDrive: false,
+    // A8 staged encounters, in route order:
+    //  1. Cyclist right-hook at the uncontrolled T n415949424 — the route's
+    //     only genuine RIGHT turn (south → west toward the roundabout). The
+    //     "cyclist" is a narrow scripted vehicle-agent riding the curb
+    //     (extraRightOffsetM) — v1 actor-model limitation (audit C3): no
+    //     cyclist mesh/type exists yet, it renders as a small fleet car.
+    //     It continues STRAIGHT south while the player turns right across it.
+    //  2. Roundabout entry conflict at rb-1 — a scripted car circulates the
+    //     ring timed to be just left of the player's entry mouth when they
+    //     reach the yield line; the runtime's circulatingConflict query
+    //     grades the entry exactly as it would any ambient car.
+    stagedEvents: [
+      {
+        id: "l3-cyclist-right-hook",
+        kind: "cyclistRightHook",
+        libraryEventId: "ev-cyclist",
+        junction: { nodeId: "n415949424", x: 229.08, y: -401.6 },
+        actor: {
+          // Southbound on the 131 m straight the player also rides, then
+          // straight through the junction and away south (off the route).
+          pathNodes: ["n179974484", "n415949424", "n10829521919"],
+          hold: { nodeIndex: 1, offsetM: -38 }, // waits curb-side, 38 m short
+          cruiseSpeedMps: 4.6,
+          extraRightOffsetM: 2.6, // rides the curb of the scaled lane
+          colorIndex: 1,
+        },
+        junctionNodeIndex: 1,
+        releaseDistM: 70,
+        dangerRadiusM: 9,
+        conflictWindowM: 20,
+      },
+      {
+        id: "l3-roundabout-conflict",
+        kind: "roundaboutEntry",
+        libraryEventId: "ev-roundabout",
+        center: { x: -38.03, y: -342.96 },
+        ringRadiusM: 19.83,
+        actor: {
+          // The full rb-1 ring as a closed loop (counter-clockwise).
+          pathNodes: [
+            "n707684255",
+            "n707684256",
+            "n279646956",
+            "n279646958",
+            "n1038574156",
+            "n1038574251",
+            "n707684255",
+          ],
+          hold: { nodeIndex: 0, offsetM: 0 }, // dormant on the far (west) arc
+          cruiseSpeedMps: 6.5,
+          loop: true,
+          colorIndex: 0,
+        },
+        entry: { x: -20.1, y: -351.4 }, // player's SE entry mouth (n279646956)
+        entryNodeIndex: 2,
+        conflictLeadM: 12,
+        armDistM: 110,
+        minSyncSpeedMps: 3,
+        maxSyncSpeedMps: 9,
+      },
+    ],
     objectives: [
       {
         id: "l3-approach",
@@ -183,6 +283,31 @@ export const LESSONS: readonly LessonSpec[] = [
     ],
     spawn: { pointId: "spawn-5" }, // ул. Крум Кюлявков, на югозапад
     preDrive: false,
+    // A8 staged encounter — pedestrian dart-out at the FIRST crossing of the
+    // route (n12324499587, which the player provably drives over). The
+    // pedestrian stands at the player's RIGHT curb; when the player closes in
+    // at speed it steps out and runs across. Geometry derived from
+    // e28780082.0 at the crossing (tangent ≈ (-0.874, -0.487), 2 scaled
+    // lanes): curb offset = 2·8.125/2 + 0.4 + 1.2 = 9.725 m each side.
+    // Crossing occupancy feeds the existing zone events → the PEDESTRIAN_*
+    // detectors grade the approach with zero new plumbing.
+    stagedEvents: [
+      {
+        id: "l4-ped-dart-out",
+        kind: "pedestrianDartOut",
+        libraryEventId: "ev-ped-crossing-marked",
+        crossingId: "n12324499587",
+        crossing: { x: -531.98, y: 123.75 },
+        start: { x: -536.71, y: 132.25 },
+        dir: { x: 0.4866, y: -0.8736 },
+        speedMps: 2.9,
+        travelM: 23.5, // across the 19.45 m curb-to-curb + 4 m walk-out
+        roadFromM: 1.2,
+        roadToM: 18.25,
+        triggerDistM: 34,
+        minTriggerSpeedKmh: 20,
+      },
+    ],
     objectives: [
       {
         id: "l4-crossing-1",
@@ -235,6 +360,35 @@ export const LESSONS: readonly LessonSpec[] = [
       speedMps: 3.5,
       travelM: 11.5,
     },
+    // A8 staged encounter — braking lead car with measured reaction time.
+    // A lead car waits 28 m ahead of spawn-2, pulls away matching the
+    // player's speed at a safe ~26 m gap, then brake-slams at the staged
+    // point ~14 m short of the ball's crossing line — the same moment the
+    // orchestrator flips the ballDartOut visual (the WHY of the slam). The
+    // orchestrator measures stimulus → brake-onset reaction time and surfaces
+    // it on the StagedEventOutcome (A10 locks l5-emergency-stop to it).
+    stagedEvents: [
+      {
+        id: "l5-braking-lead-car",
+        kind: "brakingLeadCar",
+        libraryEventId: "ev-emergency-braking",
+        actor: {
+          pathNodes: ["n2282379696", "n10572786457"], // ул. Васил Калчев
+          hold: { nodeIndex: 0, offsetM: 133 }, // spawn-2 sits at s≈105
+          cruiseSpeedMps: 11,
+          colorIndex: 3,
+        },
+        followGapM: 26,
+        maxMatchSpeedMps: 16.7,
+        slamAt: { x: -167.0, y: 566.6 }, // lane center, 14 m before the ball line
+        slamRadiusM: 7,
+        slamDecelMps2: 7.5,
+        minSlamSpeedKmh: 25,
+        proximityFallbackM: 30,
+        triggersHazard: true,
+        resumeAfterSec: 5,
+      },
+    ],
     objectives: [
       {
         id: "l5-build-speed",
