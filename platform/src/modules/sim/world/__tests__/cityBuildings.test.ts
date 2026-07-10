@@ -4,9 +4,13 @@ import {
   CITY_MODELS,
   DEFAULT_HEIGHT_MAX_M,
   DEFAULT_HEIGHT_MIN_M,
+  MAX_PAVILIONS,
   orientedBox,
+  PAVILION_MAX_HEIGHT_M,
   resolveBuildingHeightM,
   TOWER_MIN_HEIGHT_M,
+  TWIN_MAX_GAP_M,
+  type FacadeSystem,
 } from "../builders/cityBuildings";
 import type { DistrictBuilding } from "../types";
 
@@ -50,16 +54,48 @@ const square = (
   s: number,
   height: number,
   heightSource: DistrictBuilding["heightSource"],
+  at: [number, number] = [0, 0],
 ): DistrictBuilding => ({
   id,
   height,
   heightSource,
   footprint: [
-    [0, 0],
-    [s, 0],
-    [s, s],
-    [0, s],
+    [at[0], at[1]],
+    [at[0] + s, at[1]],
+    [at[0] + s, at[1] + s],
+    [at[0], at[1] + s],
   ],
+});
+
+describe("CITY_MODELS (district kit v3 contract)", () => {
+  it("ships the 16 v3 models with floors parsed from the filename", () => {
+    expect(CITY_MODELS).toHaveLength(16);
+    for (const m of CITY_MODELS) {
+      // t_*_NN or pav_*_NNf — the numeric suffix is the authored storey count.
+      const match = m.file.match(/_(\d+)f?$/);
+      expect(match, m.file).not.toBeNull();
+      expect(m.floors).toBe(Number(match![1]));
+      expect(m.mw).toBeGreaterThan(0);
+      expect(m.md).toBeGreaterThan(0);
+    }
+  });
+
+  it("covers every facade system of doc 70 REF 1", () => {
+    const systems = new Set<FacadeSystem>(CITY_MODELS.map((m) => m.system));
+    expect(systems).toEqual(
+      new Set(["grid", "strip", "curtain", "band", "slab", "pavilion"]),
+    );
+  });
+
+  it("carries exactly one twin pair and two pavilions", () => {
+    expect(CITY_MODELS.filter((m) => m.twin === "a")).toHaveLength(1);
+    expect(CITY_MODELS.filter((m) => m.twin === "b")).toHaveLength(1);
+    expect(CITY_MODELS.filter((m) => m.system === "pavilion")).toHaveLength(2);
+    // Twins are curtain-system towers, not pavilions.
+    for (const m of CITY_MODELS) {
+      if (m.twin) expect(m.system).toBe("curtain");
+    }
+  });
 });
 
 describe("resolveBuildingHeightM (QW3 — heights from the district data)", () => {
@@ -120,6 +156,9 @@ describe("buildBuildingInstances (QW3 — towers only where the data says tall)"
     expect(p.scale[1]).toBe(48); // rendered height == OSM height, not plot-derived
     expect(p.model).toBeGreaterThanOrEqual(0);
     expect(p.model).toBeLessThan(CITY_MODELS.length);
+    const m = CITY_MODELS[p.model]!;
+    expect(m.system).not.toBe("pavilion");
+    expect(m.twin).toBeUndefined(); // a lone tall plot never gets a twin
     // Centred on the footprint (world z = -y).
     expect(p.position[0]).toBeCloseTo(13);
     expect(p.position[2]).toBeCloseTo(-13);
@@ -162,5 +201,113 @@ describe("buildBuildingInstances (QW3 — towers only where the data says tall)"
         { id: "x", height: 50, heightSource: "levels", footprint: [[0, 0]] },
       ]),
     ).toEqual([]);
+  });
+});
+
+describe("buildBuildingInstances (v3 — twin pair placement)", () => {
+  it("hosts the curtain twins on two adjacent tower plots of equal height", () => {
+    // The real pair: w50009548 / w50010502 — both 51 m, centres ~69 m apart.
+    const a = square("twin-west", 25, 51, "levels", [0, 0]);
+    const b = square("twin-east", 25, 51, "levels", [69, 0]);
+    const inst = buildBuildingInstances([a, b]);
+    expect(inst).toHaveLength(2);
+    const models = inst.map((p) => CITY_MODELS[p.model]!);
+    expect(new Set(models.map((m) => m.twin))).toEqual(new Set(["a", "b"]));
+    // Both render at their (equal) data height — the identical pair.
+    expect(inst[0]!.scale[1]).toBe(51);
+    expect(inst[1]!.scale[1]).toBe(51);
+  });
+
+  it("does not pair plots further apart than the twin gap", () => {
+    const a = square("far-1", 25, 51, "levels", [0, 0]);
+    const b = square("far-2", 25, 51, "levels", [TWIN_MAX_GAP_M + 60, 0]);
+    const inst = buildBuildingInstances([a, b]);
+    expect(inst).toHaveLength(2);
+    for (const p of inst) expect(CITY_MODELS[p.model]!.twin).toBeUndefined();
+  });
+
+  it("does not pair plots with very different heights", () => {
+    const a = square("short-neighbour", 25, 42, "levels", [0, 0]);
+    const b = square("tall-neighbour", 25, 70, "levels", [60, 0]);
+    const inst = buildBuildingInstances([a, b]);
+    expect(inst).toHaveLength(2);
+    for (const p of inst) expect(CITY_MODELS[p.model]!.twin).toBeUndefined();
+  });
+});
+
+describe("buildBuildingInstances (v3 — facade-system spread)", () => {
+  it("spreads distinct facade systems across separated tower plots", () => {
+    // Five tall compact plots, pairwise > TWIN_MAX_GAP_M apart and with
+    // height gaps that forbid twin pairing → round-robin over all 5 systems.
+    const plots = [42, 52, 62, 72, 44].map((h, i) =>
+      square(`spread-${i}`, 25, h, "levels", [i * 400, (i % 2) * 400]),
+    );
+    const inst = buildBuildingInstances(plots);
+    expect(inst).toHaveLength(5);
+    const systems = new Set(inst.map((p) => CITY_MODELS[p.model]!.system));
+    expect(systems).toEqual(new Set(["grid", "strip", "curtain", "band", "slab"]));
+    for (const p of inst) expect(CITY_MODELS[p.model]!.twin).toBeUndefined();
+  });
+
+  it("keeps the spread deterministic", () => {
+    const plots = [42, 52, 62, 72, 44].map((h, i) =>
+      square(`spread-${i}`, 25, h, "levels", [i * 400, (i % 2) * 400]),
+    );
+    expect(buildBuildingInstances(plots)).toEqual(buildBuildingInstances(plots));
+  });
+});
+
+describe("buildBuildingInstances (v3 — retail pavilions)", () => {
+  // A qualifying plot: 16 x 12 m (192 m²) at 3 m — a low retail box.
+  const pavPlot = (id: string, at: [number, number] = [0, 0]): DistrictBuilding => ({
+    id,
+    height: 3,
+    heightSource: "levels",
+    footprint: [
+      [at[0], at[1]],
+      [at[0] + 16, at[1]],
+      [at[0] + 16, at[1] + 12],
+      [at[0], at[1] + 12],
+    ],
+  });
+
+  it("places a bronze pavilion on a small, low, data-known plot — exact plot fit", () => {
+    const inst = buildBuildingInstances([pavPlot("kiosk-row")]);
+    expect(inst).toHaveLength(1);
+    const p = inst[0]!;
+    const m = CITY_MODELS[p.model]!;
+    expect(m.system).toBe("pavilion");
+    expect(p.scale[1]).toBe(3); // data height
+    // Exact OBB fit — a pavilion must not overhang its collider footprint.
+    expect(p.scale[0] * m.mw).toBeCloseTo(16);
+    expect(p.scale[2] * m.md).toBeCloseTo(12);
+    expect(p.position[0]).toBeCloseTo(8);
+    expect(p.position[2]).toBeCloseTo(-6);
+  });
+
+  it(`uses the 2-floor pavilion for taller plots (< ${PAVILION_MAX_HEIGHT_M} m)`, () => {
+    const tall = { ...pavPlot("mezzanine"), height: 6 };
+    const p = buildBuildingInstances([tall])[0]!;
+    const m = CITY_MODELS[p.model]!;
+    expect(m.system).toBe("pavilion");
+    expect(m.floors).toBe(2);
+    expect(p.scale[1]).toBe(6);
+  });
+
+  it("skips kiosk-scale and default-height plots", () => {
+    // Too small for the pavilion silhouette.
+    expect(buildBuildingInstances([square("tiny", 4, 3, "levels")])).toEqual([]);
+    // No OSM data → 15–25 m jitter → not low → prism.
+    expect(buildBuildingInstances([square("guess", 14, 3, "default")])).toEqual([]);
+  });
+
+  it(`caps pavilions at ${MAX_PAVILIONS} and keeps the pick deterministic`, () => {
+    const many = Array.from({ length: 14 }, (_, i) =>
+      pavPlot(`pav-${i}`, [i * 40, 0]),
+    );
+    const inst = buildBuildingInstances(many);
+    expect(inst).toHaveLength(MAX_PAVILIONS);
+    for (const p of inst) expect(CITY_MODELS[p.model]!.system).toBe("pavilion");
+    expect(buildBuildingInstances(many)).toEqual(inst);
   });
 });

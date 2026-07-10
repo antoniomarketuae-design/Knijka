@@ -5,7 +5,7 @@
  *   jitter where the data has none.
  * - Walls merged into one mesh PER facade palette variant (4 variants,
  *   deterministic per building id) — 4 draw calls total. Buildings that get a
- *   glass-tower instance instead (skipFacadesFor) emit NO walls/roof, but
+ *   kit-building instance instead (skipFacadesFor) emit NO walls/roof, but
  *   ALWAYS emit their collider + aabb, so physics and prop placement see
  *   every building.
  * - Wall UVs: u = perimeter meters, v = height meters, both / FACADE_TILE_M
@@ -120,9 +120,9 @@ function buildOne(
 }
 
 /**
- * `skipFacadesFor`: building ids that render as instanced glass towers
- * instead (buildBuildingInstances) — they get collider + aabb but no
- * wall/roof mesh, so the tower and the prism never z-fight.
+ * `skipFacadesFor`: building ids that render as instanced kit buildings
+ * (towers or retail pavilions, buildBuildingInstances) — they get collider +
+ * aabb but no wall/roof mesh, so the instance and the prism never z-fight.
  */
 export function buildBuildings(
   buildings: DistrictBuilding[],

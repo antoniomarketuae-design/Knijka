@@ -1,14 +1,14 @@
 "use client";
 
 /**
- * CityBuildings — instanced authored glass towers placed on the OSM footprints
- * (world.buildingInstances). Each tower carries multiple PBR materials, so it is
- * drawn as one InstancedMesh PER material group (glass / mullion / spandrel /
- * lit windows / …), all sharing the SAME per-instance matrices. The glass
+ * CityBuildings — instanced authored district-kit-v3 buildings (towers +
+ * retail pavilions) placed on the OSM footprints (world.buildingInstances).
+ * Each model carries multiple PBR materials, so it is drawn as one
+ * InstancedMesh PER material group (glass / concrete shell / podium / lit
+ * windows / …), all sharing the SAME per-instance matrices. The glass
  * materials reflect the scene HDRI (scene.environment, set by the scene's
- * <Environment>) automatically via MeshStandardMaterial's envMap sampling — the
- * signature glass-tower look — and the emissive `glass_lit` windows glow,
- * brighter at night.
+ * <Environment>) automatically via MeshStandardMaterial's envMap sampling,
+ * and the emissive `glass_lit` windows glow, brighter at night.
  *
  * Instances are chunked into a 128 m spatial grid: one InstancedMesh per
  * (model, material group, chunk). Each chunk mesh gets an instance-aware
@@ -38,8 +38,10 @@ preloadCityModels();
  *  so the chunk count multiplies the draw budget — keep it moderate. */
 const CHUNK_M = 200;
 
-/** Emissive intensity of the lit-window material by time of day. */
-const DAY_GLOW = 1.0;
+/** Emissive intensity of the lit-window material (`glass_lit` in the v3 kit)
+ *  by time of day. Day matches the kit's authored KHR emissive strength. */
+const LIT_WINDOW_MATERIAL = "glass_lit";
+const DAY_GLOW = 1.35;
 const NIGHT_GLOW = 3.2;
 
 const _pos = new THREE.Vector3();
@@ -143,7 +145,7 @@ export function CityBuildings({
     const want = night ? NIGHT_GLOW : DAY_GLOW;
     for (const groups of models.models) {
       for (const g of groups) {
-        if (g.name === "glass_lit" && g.material.emissiveIntensity !== want) {
+        if (g.name === LIT_WINDOW_MATERIAL && g.material.emissiveIntensity !== want) {
           g.material.emissiveIntensity = want;
           g.material.needsUpdate = true;
         }

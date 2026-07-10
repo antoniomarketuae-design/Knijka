@@ -1,16 +1,19 @@
 /**
- * Glass-tower geometry loader — CLIENT ONLY (GLTFLoader needs the DOM).
+ * District-kit geometry loader — CLIENT ONLY (GLTFLoader needs the DOM).
  *
- * Loads every model in CITY_MODELS (the authored `tower_*.glb` glass towers,
+ * Loads every model in CITY_MODELS (the authored district kit v3 under
+ * public/sim/city-v3: `t_*.glb` towers + `pav_*.glb` retail pavilions,
  * Draco-compressed by the asset pipeline — hence createGltfLoader(), NOT a bare
- * GLTFLoader which throws "no DRACOLoader instance provided"). Unlike the old
- * Kenney kit (one merged geometry + a shared colormap atlas), each tower carries
- * its OWN PBR materials — `glass_*` (dark, metal 0, rough 0.05: reflects the
- * scene HDRI), `mullion` (metallic), `spandrel_*`/`stone`/`crown`, `retail_glass`
- * and `glass_lit` (emissive warm windows). We keep those materials: this loader
- * bakes each GLB into one `{ geometry, material }` group PER material so the
- * renderer can instance them separately and the glass reflects `scene.environment`
- * (set by the scene's <Environment>) via MeshStandardMaterial's envMap sampling.
+ * GLTFLoader which throws "no DRACOLoader instance provided"). Each building
+ * carries its OWN PBR materials — `glass_dark`/`glass_bronze` (rough ≤ 0.07,
+ * clearcoated: reflects the scene HDRI), matte facade shells (`conc_beige`/
+ * `conc_grey`/`precast_cream`/`band_white`/`stone_podium`/`stone_dark`/
+ * `roof_dark`), `bronze_metal` (metallic trim), `glass_lit` (emissive warm
+ * lit windows — the night-glow hook) and `sign_red` (emissive retail signage
+ * strips). We keep those materials: this loader bakes each GLB into one
+ * `{ geometry, material }` group PER material so the renderer can instance
+ * them separately and the glass reflects `scene.environment` (set by the
+ * scene's <Environment>) via MeshStandardMaterial's envMap sampling.
  *
  * Every group of a model shares one normalisation (computed over the WHOLE
  * model's bbox): base y=0, footprint centred on x/z, height = 1 — the exact
@@ -29,13 +32,13 @@ import { CITY_MODELS } from "../builders/cityBuildings";
 import { createGltfLoader } from "./gltfLoader";
 import { mergeSafe } from "./three-helpers";
 
-const BASE_URL = "/sim/city";
+const BASE_URL = "/sim/city-v3";
 
 /** One bake result per glTF material: geometry + its own PBR material. */
 export interface CityMaterialGroup {
   geometry: THREE.BufferGeometry;
   material: THREE.MeshStandardMaterial;
-  /** glTF material name (e.g. "glass_grey", "mullion", "glass_lit"). */
+  /** glTF material name (e.g. "glass_dark", "conc_beige", "glass_lit"). */
   name: string;
 }
 
@@ -48,13 +51,15 @@ export interface CityAssets {
  * Clone a glTF-loaded material (so we own + can tweak/dispose it) and give the
  * glossy glass extra envMap punch so the HDRI reflection reads as real glass.
  * three already builds correct metalness/roughness/emissive from the glTF (incl.
- * KHR_materials_emissive_strength → emissiveIntensity on `glass_lit`).
+ * KHR_materials_emissive_strength → emissiveIntensity on `glass_lit`/`sign_red`,
+ * and KHR_materials_clearcoat on the glass → MeshPhysicalMaterial, a
+ * MeshStandardMaterial subclass — clone() keeps it).
  */
 function prepMaterial(src: THREE.MeshStandardMaterial): THREE.MeshStandardMaterial {
   const m = src.clone();
-  // Reflective glass (glass_*, retail_glass) is very smooth; push its
-  // environment reflection so towers mirror the sky/scene. Metals (mullion,
-  // spandrel, crown) get a milder bump.
+  // Reflective glass (glass_dark rough 0.06, glass_bronze 0.07) is very
+  // smooth; push its environment reflection so towers mirror the sky/scene.
+  // Everything else (concrete/precast/stone/bronze trim) gets a milder bump.
   m.envMapIntensity = m.roughness <= 0.12 ? 1.8 : 1.2;
   m.needsUpdate = true;
   return m;
