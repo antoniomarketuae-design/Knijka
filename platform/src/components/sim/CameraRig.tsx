@@ -16,6 +16,7 @@ import {
   COCKPIT_LEAN_LATERAL,
   COCKPIT_LEAN_LONGITUDINAL,
   COCKPIT_ROLL_GAIN,
+  COCKPIT_PITCH_BASE,
   COCKPIT_PITCH_GAIN,
   COCKPIT_LOOK_INTO_TURN,
   COCKPIT_LEAN_DAMPING,
@@ -47,14 +48,19 @@ const FOV_WIDEN_COCKPIT = 5;
 const FOV_DAMPING = 3;
 
 /**
- * Mirror-glance head turns (rad), derived from the cockpit geometry:
- * eye (0.34, 0.62, 0.15) vs door mirrors (±0.90, 0.28, 0.55) and the
- * interior mirror (0, 0.68, 0.55). Positive yaw looks toward car-left.
+ * Mirror-glance head turns (rad), derived from the RETUNED cockpit geometry
+ * (doc 70): eye COCKPIT_EYE (0.34, 0.74, −0.18) with the base view pitched
+ * COCKPIT_PITCH_BASE (−14°) vs the door mirrors (±0.905, 0.455, 0.592) and
+ * the interior mirror (0, 0.687, 0.575). yaw = atan2(Δx, Δz) (positive looks
+ * toward car-left); pitch is measured relative to the PITCHED view axis
+ * (glance rotation composes after the base pitch), i.e.
+ * atan2(Δy, dist) − COCKPIT_PITCH_BASE. The mirrors are already in frame at
+ * rest, so the turn centres the glass rather than the old exaggerated whip.
  */
 const GLANCE_OFFSETS: Record<MirrorGlanceKind, { yaw: number; pitch: number }> = {
-  left: { yaw: 0.95, pitch: -0.32 },
-  right: { yaw: -1.26, pitch: -0.22 },
-  rear: { yaw: -0.62, pitch: 0.14 },
+  left: { yaw: 0.66, pitch: -0.05 },
+  right: { yaw: -1.02, pitch: 0.05 },
+  rear: { yaw: -0.42, pitch: 0.18 },
 };
 
 /**
@@ -66,8 +72,8 @@ const GLANCE_OFFSETS: Record<MirrorGlanceKind, { yaw: number; pitch: number }> =
  * Cockpit eye position AND orientation are exponentially damped (FEEL-NOTES:
  * rigid cockpit cams transmit every suspension tick into the viewer's neck);
  * both cameras get a subtle speed-based FOV widen, and the cockpit performs
- * the 350 ms mirror-glance look (Q/E/F) that feeds the rule engine's
- * mirror-check detector.
+ * the HOLD-to-glance mirror look (Q/E/F held / hotspot pressed) that feeds
+ * the rule engine's mirror-check detector once per hold.
  */
 export function CameraRig({
   chassisGroupRef,
@@ -201,9 +207,12 @@ export function CameraRig({
 
       // Head roll INTO the corner, nose-dive pitch on braking, look-into-turn
       // yaw — small camera-local rotation (YXZ), applied after base orientation.
+      // COCKPIT_PITCH_BASE rides the same X axis: the constant downward tilt
+      // that puts the dash-top at ~46% of frame height (doc 70 contract; the
+      // full visibility math lives on the constant in tuning.ts).
       const steerNorm = clampAbs(steer / STEER_MAX_ANGLE, 1);
       leanEuler.set(
-        lean.longG * COCKPIT_PITCH_GAIN,
+        COCKPIT_PITCH_BASE + lean.longG * COCKPIT_PITCH_GAIN,
         steerNorm * COCKPIT_LOOK_INTO_TURN,
         lean.latG * COCKPIT_ROLL_GAIN,
         "YXZ",
@@ -211,12 +220,14 @@ export function CameraRig({
       leanQuat.setFromEuler(leanEuler);
       cam.quaternion.multiply(leanQuat);
 
-      // Mirror glance: 350 ms ease-out-and-back head turn toward the mirror.
+      // Mirror glance: head turns toward the mirror while the key/hotspot is
+      // HELD (founder contract) — GlanceHold's 0..1 envelope, smoothstepped
+      // here so the turn eases in, holds steady, and eases back on release.
       const cabin = cabinRef.current;
-      const progress = cabin?.glanceProgress() ?? -1;
+      const s = cabin?.glanceStrength() ?? 0;
       const mirror = cabin?.glanceMirror;
-      if (progress >= 0 && mirror) {
-        const env = Math.sin(Math.PI * progress) ** 0.8;
+      if (s > 0 && mirror) {
+        const env = s * s * (3 - 2 * s);
         const o = GLANCE_OFFSETS[mirror];
         glanceEuler.set(o.pitch * env, o.yaw * env, 0, "YXZ");
         glanceQuat.setFromEuler(glanceEuler);

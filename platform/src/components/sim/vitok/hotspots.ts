@@ -47,6 +47,8 @@ export type HotspotAction =
   | { type: "fogToggle" }
   /** Momentary: pointer down = horn on, pointer up/leave = off. */
   | { type: "hornHold" }
+  /** Held: pointer down = glance view in (graded once), pointer up/leave =
+   *  eyes back on the road — same hold semantics as the Q/E/F keys. */
   | { type: "glance"; mirror: MirrorGlanceKind };
 
 export interface CockpitHotspotSpec {
@@ -140,7 +142,7 @@ export const COCKPIT_HOTSPOTS: readonly CockpitHotspotSpec[] = [
   },
   {
     name: "hotspot_mirror_left",
-    labelBg: "Ляво огледало — поглед",
+    labelBg: "Ляво огледало — задръж за поглед",
     keyHint: "Q",
     pos: [0.905, 0.455, 0.592],
     size: [0.18, 0.14, 0.1],
@@ -148,7 +150,7 @@ export const COCKPIT_HOTSPOTS: readonly CockpitHotspotSpec[] = [
   },
   {
     name: "hotspot_mirror_right",
-    labelBg: "Дясно огледало — поглед",
+    labelBg: "Дясно огледало — задръж за поглед",
     keyHint: "E",
     pos: [-0.905, 0.455, 0.592],
     size: [0.18, 0.14, 0.1],
@@ -156,7 +158,7 @@ export const COCKPIT_HOTSPOTS: readonly CockpitHotspotSpec[] = [
   },
   {
     name: "hotspot_mirror_rear",
-    labelBg: "Вътрешно огледало — поглед",
+    labelBg: "Вътрешно огледало — задръж за поглед",
     keyHint: "F",
     pos: [0, 0.687, 0.575],
     size: [0.3, 0.13, 0.09],

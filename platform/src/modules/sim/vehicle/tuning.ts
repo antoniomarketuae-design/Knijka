@@ -293,20 +293,53 @@ export const CALIBRATED_GFOV_DEG = Math.round(
  *  horizontal FOV (Hor+) and the calibration is aspect-independent. */
 export const CHASE_FOV = 44;
 
-/** Driver eye point, chassis-local (LHD: +X is the left/driver side).
- *  y ≈ 0.66 above the COM puts the eye ~1.15 m above the road (real sedan
- *  driver eye height, SAE eyellipse — docs/simulation/63). */
-export const COCKPIT_EYE = { x: 0.34, y: 0.66, z: 0.12 } as const;
-/** Cockpit vertical FOV. Was 55 (doc 63's "natural cockpit" pick, made to
- *  kill a 68° fishbowl before the GFOV research landed). 40 sits just above
- *  the calibrated 30–34° band (CALIBRATED_GFOV_DEG): the last ~8° are kept
- *  deliberately so the windshield frame/A-pillars stay in view — pure
- *  calibration reads as looking through binoculars and amputates the cabin
- *  (re-triggering doc 63's "floating" complaint). Net effect vs 55: the
- *  scene renders ~1.4× larger — roads read wider, speed reads faster.
- *  Founder tune range: down toward CALIBRATED_GFOV_DEG if roads still read
- *  narrow, up toward the legacy 55 if the cabin feels cropped. */
-export const COCKPIT_FOV = 40;
+/**
+ * Driver eye point, chassis-local (LHD: +X is the left/driver side).
+ *
+ * RETUNED 2026-07-10 to the founder's cockpit-view contract (doc 70 REF 2/3):
+ * the interior must fill ~40–50% of the frame bottom — full dash, whole
+ * steering wheel, binnacle, left A-pillar base, side-mirror glass, interior
+ * rear-view mirror in frame top-right; windshield = upper ~55%.
+ *
+ * The authored-eye reference of the interior GLB is (0.34, 0.66, 0.12) — the
+ * GLB mount in VitokCockpit is calibrated to it and MUST NOT move (hotspot
+ * proxies are placed in chassis space against that mount). The CAMERA now
+ * sits higher and further back than the authored eye — a seating position,
+ * not a hood cam. Key cabin geometry (chassis-local, from the GLB/hotspots):
+ *   dash top (cowl)  y ≈ 0.48, z ≈ 0.70
+ *   wheel centre     (0.34, 0.30, 0.52), rim radius ≈ 0.19
+ *   interior mirror  (0.00, 0.69, 0.58) · left door mirror (0.91, 0.46, 0.59)
+ * From the OLD eye (0.66, z 0.12, level view, FOV 40) the dash top sat only
+ * ~7% up the frame and the wheel was entirely below the frustum — the exact
+ * "hood cam" the founder rejected. See COCKPIT_PITCH_BASE for the full
+ * frame-fraction math at the new pose. y 0.74 ≈ 1.23 m above road — upright
+ * SUV-ish seating per REF 2; z −0.18 puts the eye ~0.70 m behind the wheel
+ * centre (real torso-to-wheel distance, not floating over the dash). */
+export const COCKPIT_EYE = { x: 0.34, y: 0.74, z: -0.18 } as const;
+/** Cockpit vertical FOV. History: 55 (doc 63) → 40 (QW2 GFOV calibration) →
+ *  57 (founder contract, doc 70): at 40 the cabin was amputated — no wheel,
+ *  no mirrors, no A-pillars, ~7% dash. 57 trades ~1.3× GFOV minification for
+ *  the REF 2/3 framing; the founder explicitly chose the cabin-visible look
+ *  over pure calibration. At 16:9 the half-hFOV is atan(tan(28.5°)·16/9) ≈
+ *  44° — both door-mirror lines of sight fit; only the far ~9° of the
+ *  passenger-side dash end falls outside (full dash left-to-right would need
+ *  hFOV ≈ 106° = fishbowl; every other contract item holds at 57). */
+export const COCKPIT_FOV = 57;
+/**
+ * Constant downward camera pitch (rad, negative = look down) applied to the
+ * cockpit view. The contract needs the dash-top/cowl line at ~45% of frame
+ * height — impossible with a level camera without a huge FOV. With eye
+ * (0.34, 0.74, −0.18), pitch −14° and vFOV 57° the frame spans −42.5°…+14.5°
+ * about the horizon; angles below the horizon per landmark (atan Δy/Δz from
+ * the eye) → fraction of frame height from the bottom edge:
+ *   wheel bottom (y 0.11, z 0.52): −42.0° →  ~1%  (whole wheel just in frame)
+ *   wheel top    (y 0.49, z 0.52): −19.7° → ~40%
+ *   dash top     (y 0.48, z 0.70): −16.5° → ~46%  → windshield = upper ~54% ✓
+ *   int. mirror  (y 0.69, z 0.58):  −4.0° → ~68% high, ~77% from left (top-right) ✓
+ *   door mirror  (0.91, 0.46, 0.59): −20.3° → ~39% high, ~9% from left ✓
+ *   sun visor    (y ≈ 0.93, z 0.55): +14.6° → grazes the top edge ✓
+ * Net: interior fills the bottom ~46% of the frame — the doc-70 40–50% band. */
+export const COCKPIT_PITCH_BASE = -0.245; // ≈ −14°
 /** Cockpit eye-position smoothing rate (1/s) — damps suspension tick. */
 export const COCKPIT_DAMPING = 25;
 

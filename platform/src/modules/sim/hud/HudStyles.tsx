@@ -26,13 +26,20 @@ export function HudStyles() {
         0%, 49% { opacity: 1; }
         50%, 100% { opacity: 0.15; }
       }
+      @keyframes hud-gear-reject {
+        0%, 100% { opacity: 1; }
+        15%, 45%, 75% { color: var(--danger); opacity: 1; }
+        30%, 60% { color: var(--danger); opacity: 0.25; }
+      }
       .hud-toast-in { animation: hud-toast-in 0.22s ease-out both; }
       .hud-pop { animation: hud-pop 0.35s cubic-bezier(0.34, 1.56, 0.64, 1) both; }
       .hud-banner-in { animation: hud-banner-in 0.25s ease-out both; }
       .hud-blink { animation: hud-blink 0.8s step-start infinite; }
+      .hud-gear-reject { animation: hud-gear-reject 0.7s ease-in-out 1; }
       @media (prefers-reduced-motion: reduce) {
         .hud-toast-in, .hud-pop, .hud-banner-in { animation: none; }
         .hud-blink { animation: none; opacity: 1; }
+        .hud-gear-reject { animation: none; }
       }
     `}</style>
   );

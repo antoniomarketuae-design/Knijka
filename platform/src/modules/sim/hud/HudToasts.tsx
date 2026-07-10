@@ -35,7 +35,9 @@ function ttlFor(event: HudEvent): number {
 
 export function useHudToastQueue(): {
   toasts: HudToast[];
-  push: (events: ReadonlyArray<HudEvent>) => void;
+  /** `ttlMs` overrides the kind-derived TTL — short control hints (e.g. the
+   *  driveline-rejection feedback) live 3–4 s, not the 8 s teaching TTL. */
+  push: (events: ReadonlyArray<HudEvent>, ttlMs?: number) => void;
   clear: () => void;
 } {
   const [toasts, setToasts] = useState<HudToast[]>([]);
@@ -47,14 +49,14 @@ export function useHudToastQueue(): {
     return () => pending.forEach((t) => window.clearTimeout(t));
   }, []);
 
-  const push = useCallback((events: ReadonlyArray<HudEvent>) => {
+  const push = useCallback((events: ReadonlyArray<HudEvent>, ttlMs?: number) => {
     if (events.length === 0) return;
     const added: HudToast[] = events.map((event) => ({ id: nextId.current++, event }));
     setToasts((prev) => [...added.reverse(), ...prev].slice(0, MAX_VISIBLE));
     for (const toast of added) {
       const timer = window.setTimeout(() => {
         setToasts((prev) => prev.filter((t) => t.id !== toast.id));
-      }, ttlFor(toast.event));
+      }, ttlMs ?? ttlFor(toast.event));
       timers.current.push(timer);
     }
   }, []);

@@ -43,6 +43,7 @@ import {
   DIFFICULTY_PRESETS,
   type DifficultyMode,
   type DrivelineEvent,
+  type DrivelineRejection,
   type DrivelineSnapshot,
   type VehicleInput,
   type VehicleSim,
@@ -225,6 +226,11 @@ export interface LessonSceneProps {
   /** A1: low-frequency driveline state (selector/ignition/parking brake/…)
    *  → HUD telltales. Emitted on the minimap cadence, not per frame. */
   onDriveline?: (snap: DrivelineSnapshot) => void;
+  /** A rejected driveline action (start interlock / selector gate) — the
+   *  shell turns it into a visible HUD hint + gear-telltale flash. Carries a
+   *  fresh snapshot so the message can name the blocking state (founder bug
+   *  2026-07-10: refusals must never be silent). */
+  onDrivelineRejection?: (rejection: DrivelineRejection, snap: DrivelineSnapshot) => void;
   /** A8 (additive): a staged encounter resolved — carries the measurement
    *  record (reaction time, stop gap, …). The graded consequences already
    *  arrived through onTick; the shell folds this via applyStagedOutcome. */
@@ -362,6 +368,7 @@ function ReadyScene({
   onMinimap,
   onTickCb,
   onDriveline,
+  onDrivelineRejection,
   onStagedOutcome,
   onNearMiss,
   onToggleFullscreen,
@@ -631,6 +638,7 @@ function ReadyScene({
               onTick={onTickCb}
               onMinimap={onMinimap}
               onDriveline={onDriveline}
+              onDrivelineRejection={onDrivelineRejection}
               onStagedOutcome={onStagedOutcome}
               minimapPolylines={minimapPolylines}
               isNight={isNight}
@@ -827,6 +835,7 @@ function RuntimeDriver({
   onTick,
   onMinimap,
   onDriveline,
+  onDrivelineRejection,
   onStagedOutcome,
   minimapPolylines,
   isNight,
@@ -852,6 +861,7 @@ function RuntimeDriver({
   onTick: (t: SimTick) => void;
   onMinimap: (f: MinimapFrame) => void;
   onDriveline?: (snap: DrivelineSnapshot) => void;
+  onDrivelineRejection?: (rejection: DrivelineRejection, snap: DrivelineSnapshot) => void;
   onStagedOutcome?: (outcome: StagedEventOutcome) => void;
   minimapPolylines: MinimapFrame["polylines"];
   isNight: boolean;
@@ -935,6 +945,17 @@ function RuntimeDriver({
       }
     } else if (blockedAttempt) {
       onBlockedDriveAttempt();
+    }
+    // Rejected driveline actions must be VISIBLE (founder bug 2026-07-10:
+    // start interlock + selector gate refused silently). Forward them with a
+    // fresh snapshot — the selector cannot have changed by the rejection
+    // itself, so the snapshot names the state that blocked the action.
+    if (onDrivelineRejection && cabin) {
+      for (const event of drivelineEvents) {
+        if (event.kind === "startRejected" || event.kind === "shiftRejected") {
+          onDrivelineRejection(event, cabin.driveline.snapshot());
+        }
+      }
     }
     // Drain both queues even outside the pre-drive phase (driveline events
     // keep flowing while driving — wipers, gears, stalls — and must not pile).
@@ -1024,7 +1045,7 @@ function ControlsHelp({ defaultOpen = true }: { defaultOpen?: boolean }) {
     ["J", "аварийни светлини"],
     ["T", "чистачки"],
     ["H", "клаксон — задръж"],
-    ["Q E F", "огледала: ляво / дясно / назад"],
+    ["Q E F", "огледала — задръж (ляво / дясно / назад)"],
     ["Клик", "контролите в кабината (изглед кокпит)"],
     ["C", "смяна на изглед"],
     ["X", "цял екран"],

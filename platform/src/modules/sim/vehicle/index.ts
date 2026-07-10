@@ -35,6 +35,7 @@ export type {
   DrivelineEvent,
   DrivelineListener,
   DrivelinePhysicsInput,
+  DrivelineRejection,
   DrivelineSnapshot,
   SelectorPosition,
   TransmissionMode,

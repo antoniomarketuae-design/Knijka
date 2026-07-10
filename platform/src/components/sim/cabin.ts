@@ -22,8 +22,78 @@ export type MirrorGlanceKind = "left" | "right" | "rear";
 
 /** Indicator blink period (s): 600 ms full cycle => 300 ms on / 300 ms off. */
 export const BLINK_PERIOD_S = 0.6;
-/** Mirror-glance camera excursion duration (s). */
-export const GLANCE_DURATION_S = 0.35;
+/** Mirror-glance head-turn ease time (s): key-down ramps the view IN over
+ *  this, key-up ramps it back OUT. Founder contract (2026-07-10): a glance
+ *  HOLDS at full deflection while the key/pointer is held — it is no longer
+ *  a momentary out-and-back flash. */
+export const GLANCE_EASE_S = 0.18;
+/** Tap fallback: sources without a release edge (the touch overlay's round
+ *  buttons call glance() once) hold the view this long, then auto-release. */
+export const GLANCE_TAP_HOLD_S = 0.9;
+
+/**
+ * Pure hold-to-glance state machine (extracted so it is unit-testable in
+ * Node — CabinControls binds window listeners and cannot be constructed
+ * headless). Semantics:
+ *   - start(mirror)  → head turns toward the mirror over GLANCE_EASE_S and
+ *     HOLDS there until end()/release(); returns true only when the press
+ *     begins a NEW glance (the grading latch — once per hold, on press).
+ *   - end(mirror)    → releases only when it matches the held mirror, so
+ *     releasing Q never cancels an E-hold that replaced it mid-press.
+ *   - start(mirror, tap=true) → same, but auto-releases after
+ *     GLANCE_TAP_HOLD_S (touch buttons have no keyup).
+ *   - update(dt)     → advances the 0..1 envelope; `mirror` clears only after
+ *     the head has eased fully back (the camera reads mirror+strength).
+ */
+export class GlanceHold {
+  /** Mirror the head is turned toward (stays set through the ease-out). */
+  mirror: MirrorGlanceKind | null = null;
+  private held = false;
+  private env = 0;
+  private tapRemainingS = -1;
+
+  /** Head-turn envelope 0..1 (0 = forward, 1 = full mirror deflection). */
+  get strength(): number {
+    return this.mirror ? this.env : 0;
+  }
+
+  start(mirror: MirrorGlanceKind, tap = false): boolean {
+    // Already actively holding this mirror (e.g. key held + hotspot press):
+    // one hold = one graded glance, so the second source does not re-latch.
+    const isNewGlance = !(this.held && this.mirror === mirror);
+    this.mirror = mirror;
+    this.held = true;
+    this.tapRemainingS = tap ? GLANCE_TAP_HOLD_S : -1;
+    return isNewGlance;
+  }
+
+  end(mirror: MirrorGlanceKind): void {
+    if (this.mirror !== mirror) return;
+    this.held = false;
+    this.tapRemainingS = -1;
+  }
+
+  /** Focus loss / dispose: nothing may stay held down. */
+  release(): void {
+    this.held = false;
+    this.tapRemainingS = -1;
+  }
+
+  update(dtSec: number): void {
+    if (!this.mirror) return;
+    if (this.held && this.tapRemainingS >= 0) {
+      this.tapRemainingS -= dtSec;
+      if (this.tapRemainingS <= 0) this.release();
+    }
+    const step = dtSec / GLANCE_EASE_S;
+    if (this.held) {
+      this.env = Math.min(1, this.env + step);
+    } else {
+      this.env = Math.max(0, this.env - step);
+      if (this.env <= 0) this.mirror = null;
+    }
+  }
+}
 
 /**
  * Single place that defines the cabin key bindings (KeyboardEvent.code, so
@@ -96,12 +166,11 @@ export class CabinControls {
    *  builder and (A2) the procedure machine all read from here. */
   readonly driveline: DrivelineState;
 
-  /** Mirror currently being glanced at (for camera + HUD), or null. */
-  glanceMirror: MirrorGlanceKind | null = null;
+  /** Hold-to-glance state (keys Q/E/F down/up, hotspot pointer down/up). */
+  private readonly glances = new GlanceHold();
 
   private clock = 0;
   private indicatorChangedAt = 0;
-  private glanceStartedAt = -1;
   /** One-frame latch consumed by the VehicleSample builder. */
   private pendingGlanceSample: MirrorGlanceKind | null = null;
   private autocancelArmed = false;
@@ -134,11 +203,7 @@ export class CabinControls {
    */
   update(dtSec: number, steerRad: number): void {
     this.clock += dtSec;
-
-    if (this.glanceMirror && this.clock - this.glanceStartedAt >= GLANCE_DURATION_S) {
-      this.glanceMirror = null;
-      this.glanceStartedAt = -1;
-    }
+    this.glances.update(dtSec);
 
     if (this.indicator !== "off") {
       const toward = this.indicator === "left" ? steerRad : -steerRad;
@@ -163,11 +228,15 @@ export class CabinControls {
     return (this.clock % BLINK_PERIOD_S) < BLINK_PERIOD_S / 2;
   }
 
-  /** Glance progress 0..1 while a glance is active, else -1. */
-  glanceProgress(): number {
-    if (!this.glanceMirror) return -1;
-    const p = (this.clock - this.glanceStartedAt) / GLANCE_DURATION_S;
-    return p >= 0 && p <= 1 ? p : -1;
+  /** Mirror currently glanced at (camera + HUD read), or null. Stays set
+   *  through the ease-out so the head turns BACK smoothly after release. */
+  get glanceMirror(): MirrorGlanceKind | null {
+    return this.glances.mirror;
+  }
+
+  /** Head-turn envelope 0..1 (0 = eyes forward, 1 = holding on the mirror). */
+  glanceStrength(): number {
+    return this.glances.strength;
   }
 
   /**
@@ -226,10 +295,23 @@ export class CabinControls {
     this.callbacks.onParkingBrakeToggle?.(this.driveline.parkingBrakeOn);
   }
 
-  /** Mirror glance (keys Q/E/F / hotspot_mirror_*) — the GRADED path: latches
-   *  the one-frame sample for the rule engine and animates the head turn. */
+  /** Mirror glance HOLD begin (key down Q/E/F / hotspot pointer down) — the
+   *  GRADED path: latches the one-frame sample for the rule engine ONCE per
+   *  hold (on press) and turns the head toward the mirror until the matching
+   *  glanceEnd(). */
+  glanceStart(mirror: MirrorGlanceKind): void {
+    if (this.glances.start(mirror)) this.latchGlance(mirror);
+  }
+
+  /** Mirror glance HOLD end (key up / hotspot pointer up or leave). */
+  glanceEnd(mirror: MirrorGlanceKind): void {
+    this.glances.end(mirror);
+  }
+
+  /** Tap glance (touch overlay buttons — no release edge): same graded path,
+   *  holds the view for GLANCE_TAP_HOLD_S and then eases back on its own. */
   glance(mirror: MirrorGlanceKind): void {
-    this.startGlance(mirror);
+    if (this.glances.start(mirror, true)) this.latchGlance(mirror);
   }
 
   private setIndicator(side: Exclude<IndicatorSetting, "off">): void {
@@ -238,9 +320,8 @@ export class CabinControls {
     this.autocancelArmed = false;
   }
 
-  private startGlance(mirror: MirrorGlanceKind): void {
-    this.glanceMirror = mirror;
-    this.glanceStartedAt = this.clock;
+  /** The graded once-per-hold press: rule-engine sample + observer callback. */
+  private latchGlance(mirror: MirrorGlanceKind): void {
     this.pendingGlanceSample = mirror;
     this.callbacks.onGlance?.(mirror);
   }
@@ -265,13 +346,13 @@ export class CabinControls {
         this.toggleSeatbelt();
         break;
       case CABIN_KEYS.glanceLeft:
-        this.startGlance("left");
+        this.glanceStart("left");
         break;
       case CABIN_KEYS.glanceRight:
-        this.startGlance("right");
+        this.glanceStart("right");
         break;
       case CABIN_KEYS.glanceRear:
-        this.startGlance("rear");
+        this.glanceStart("rear");
         break;
       case CABIN_KEYS.nightPreview:
         this.nightPreview = !this.nightPreview;
@@ -311,16 +392,20 @@ export class CabinControls {
     }
   };
 
-  /** Held controls (clutch, horn) release on keyup. */
+  /** Held controls (clutch, horn, mirror glances) release on keyup. */
   private readonly onKeyUp = (e: KeyboardEvent): void => {
     if (this.disposed) return;
     if (e.code === DRIVELINE_KEYS.clutch) this.driveline.setClutch(false);
     if (e.code === DRIVELINE_KEYS.horn) this.driveline.setHorn(false);
+    if (e.code === CABIN_KEYS.glanceLeft) this.glanceEnd("left");
+    if (e.code === CABIN_KEYS.glanceRight) this.glanceEnd("right");
+    if (e.code === CABIN_KEYS.glanceRear) this.glanceEnd("rear");
   };
 
   /** Focus loss must never leave a held control stuck down. */
   private readonly onBlur = (): void => {
     this.driveline.setClutch(false);
     this.driveline.setHorn(false);
+    this.glances.release();
   };
 }

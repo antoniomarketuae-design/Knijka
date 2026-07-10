@@ -358,7 +358,8 @@ const HOTSPOT_COLOR = "#6db4ff";
  *    honest), pointer cursor;
  *  - click  → the SAME CabinControls/DrivelineState transition as the key
  *    (gear selector: right-click steps back toward P; horn is momentary on
- *    pointer down/up; mirrors fire the graded cabin glance);
+ *    pointer down/up; mirror glances HOLD while pressed — pointer down/up
+ *    twins the Q/E/F key down/up, graded once per hold);
  *  - instruction mode → the pending step's hotspot(s) pulse gently
  *    (highlightStepId via CockpitInteractionContext, provided by LessonScene).
  *
@@ -441,8 +442,7 @@ function CockpitHotspots({ cabinRef }: { cabinRef: RefObject<CabinControls | nul
           cabin.driveline.toggleFogLights();
           break;
         case "glance":
-          cabin.glance(action.mirror); // the graded mirror path (Q/E/F twin)
-          break;
+          break; // held — handled on pointer down/up below (Q/E/F twin)
         case "hornHold":
           break; // momentary — handled on pointer down/up below
       }
@@ -467,15 +467,25 @@ function CockpitHotspots({ cabinRef }: { cabinRef: RefObject<CabinControls | nul
               }}
               onPointerOut={() => {
                 if (hoveredRef.current === spec.name) setHover(null);
+                // Dragging off a held control releases it (like lifting off).
                 if (spec.action.type === "hornHold") cabinRef.current?.driveline.setHorn(false);
+                if (spec.action.type === "glance") cabinRef.current?.glanceEnd(spec.action.mirror);
               }}
               onPointerDown={(e: ThreeEvent<PointerEvent>) => {
-                if (spec.action.type !== "hornHold" || e.button !== 0) return;
-                e.stopPropagation();
-                cabinRef.current?.driveline.setHorn(true);
+                if (e.button !== 0) return;
+                if (spec.action.type === "hornHold") {
+                  e.stopPropagation();
+                  cabinRef.current?.driveline.setHorn(true);
+                } else if (spec.action.type === "glance") {
+                  // Founder contract: the glance view HOLDS while pressed —
+                  // pointer down/up mirrors the Q/E/F key down/up exactly.
+                  e.stopPropagation();
+                  cabinRef.current?.glanceStart(spec.action.mirror);
+                }
               }}
               onPointerUp={() => {
                 if (spec.action.type === "hornHold") cabinRef.current?.driveline.setHorn(false);
+                if (spec.action.type === "glance") cabinRef.current?.glanceEnd(spec.action.mirror);
               }}
               onClick={(e: ThreeEvent<MouseEvent>) => {
                 e.stopPropagation();

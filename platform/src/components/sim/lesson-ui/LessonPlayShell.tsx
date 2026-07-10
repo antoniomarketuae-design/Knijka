@@ -63,7 +63,7 @@ import {
   type PreDriveStepId,
 } from "@/modules/sim/procedures";
 import { accumulateScore, type SimTick } from "@/modules/sim/rules";
-import type { DrivelineSnapshot } from "@/modules/sim/vehicle";
+import type { DrivelineRejection, DrivelineSnapshot } from "@/modules/sim/vehicle";
 import { finishLessonAction } from "@/app/(dashboard)/simulator/actions";
 import {
   loadMicroQuizBank,
@@ -83,6 +83,75 @@ const HUD_POLL_MS = 150;
 
 /** QW10: min seconds between two "завърши подготовката" toasts. */
 const BLOCKED_DRIVE_TOAST_COOLDOWN_S = 10;
+
+/** Driveline-rejection hints: short control feedback, not an 8 s lesson. */
+const REJECTION_TOAST_TTL_MS = 3500;
+/** Min seconds between two hints for the SAME rejection (mashing [ or I
+ *  keeps one toast on screen instead of stacking four). */
+const REJECTION_TOAST_COOLDOWN_S = 3;
+
+/**
+ * Why the car refused a control action, in HUD grammar (founder bug
+ * 2026-07-10: the start interlock and selector gate rejected SILENTLY — „I
+ * doesn't start", „] doesn't go up"). The snapshot names the blocking state;
+ * endOfGate needs it to tell "already in D" (the founder expecting numbered
+ * gears on the automatic) from "already in P" / "top manual gear". No lawRef
+ * — this is vehicle operation, not a graded rule.
+ */
+function rejectionHint(
+  rejection: DrivelineRejection,
+  snap: DrivelineSnapshot,
+): { key: string; titleBg: string; explanationBg: string } {
+  if (rejection.kind === "startRejected") {
+    return rejection.reason === "clutch"
+      ? {
+          key: "start-clutch",
+          titleBg: "Двигателят не запали",
+          explanationBg:
+            "Натисни и задръж съединителя (Z) — или премести лоста в P или N — и опитай пак с I.",
+        }
+      : {
+          key: "start-selector",
+          titleBg: "Двигателят не запали",
+          explanationBg: "Постави скоростния лост в P или N (клавиш [), за да запалиш с I.",
+        };
+  }
+  switch (rejection.reason) {
+    case "speed":
+      return {
+        key: "shift-speed",
+        titleBg: "Скоростта е твърде висока",
+        explanationBg: "Спри напълно, за да включиш R или P.",
+      };
+    case "clutch":
+      return {
+        key: "shift-clutch",
+        titleBg: "Предавката не влезе",
+        explanationBg: "Натисни и задръж съединителя (Z), докато местиш лоста.",
+      };
+    case "endOfGate":
+      if (snap.selector === "D") {
+        return {
+          key: "gate-d",
+          titleBg: "Лостът вече е в D",
+          explanationBg:
+            "Автоматичната кутия сменя предавките сама — напред няма ръчни степени. С [ връщаш към N.",
+        };
+      }
+      if (snap.selector === "M") {
+        return {
+          key: "gate-m",
+          titleBg: `Това е последната предавка (M${snap.manualGear})`,
+          explanationBg: "Нагоре няма повече предавки.",
+        };
+      }
+      return {
+        key: "gate-p",
+        titleBg: "Лостът вече е в P",
+        explanationBg: "Назад няма повече позиции — с ] тръгваш към R, N и D.",
+      };
+  }
+}
 
 /** A2 practice mode: seconds of pre-drive idling before a gentle hint. */
 const PRACTICE_HINT_IDLE_S = 20;
@@ -269,6 +338,11 @@ export function LessonPlayShell({
   const handleDriveline = useCallback((snap: DrivelineSnapshot) => {
     drivelineRef.current = snap;
   }, []);
+  // Rejected driveline actions (start interlock / selector gate) → visible
+  // feedback: gear-telltale flash + a short hint toast (handler below, after
+  // nowSec/push exist). The counter keys the one-shot CSS flash.
+  const [gearRejectFlash, setGearRejectFlash] = useState(0);
+  const rejectionToastAtRef = useRef<Record<string, number>>({});
   // Clocks are set in a mount effect (render must stay pure per lint rules).
   const startedAtMsRef = useRef<number | null>(null);
   const mountedAtRef = useRef<number | null>(null);
@@ -412,6 +486,27 @@ export function LessonPlayShell({
     const mountedAt = mountedAtRef.current ?? performance.now();
     return Math.max(t, (performance.now() - mountedAt) / 1000);
   }, []);
+
+  // A rejected driveline action must never be silent (founder bug
+  // 2026-07-10): flash the gear telltale on every refused shift and show the
+  // WHY as a short hint toast (kind "lesson" body, 3.5 s TTL, no law-ref),
+  // rate-limited per reason so key-mashing keeps one toast, not four.
+  const handleDrivelineRejection = useCallback(
+    (rejection: DrivelineRejection, snap: DrivelineSnapshot) => {
+      if (finalizedRef.current) return;
+      if (rejection.kind === "shiftRejected") setGearRejectFlash((k) => k + 1);
+      const hint = rejectionHint(rejection, snap);
+      const t = nowSec();
+      const last = rejectionToastAtRef.current[hint.key] ?? Number.NEGATIVE_INFINITY;
+      if (t - last < REJECTION_TOAST_COOLDOWN_S) return;
+      rejectionToastAtRef.current[hint.key] = t;
+      push(
+        [{ kind: "lesson", titleBg: hint.titleBg, explanationBg: hint.explanationBg }],
+        REJECTION_TOAST_TTL_MS,
+      );
+    },
+    [nowSec, push],
+  );
 
   // -- finalize: fold + persist ------------------------------------------------
   const finalize = useCallback(
@@ -621,6 +716,9 @@ export function LessonPlayShell({
     // idle-hint clock and the blocked-drive toast cooldown restart here.
     lastPreDriveStepAtRef.current = 0;
     blockedToastAtSecRef.current = Number.NEGATIVE_INFINITY;
+    // Rejection-hint cooldowns are keyed by the session clock, which resets
+    // with the retry — clear them so the first refusal explains again.
+    rejectionToastAtRef.current = {};
     // Fresh micro-quiz session: reset the tally + rebuild the trigger from the
     // already-loaded bank. Teach-moment queue starts empty too (the fresh
     // engine state re-teaches first encounters from scratch).
@@ -736,6 +834,7 @@ export function LessonPlayShell({
             onBlockedDriveAttempt={handleBlockedDriveAttempt}
             onMinimapFrame={setMinimapFrame}
             onDriveline={handleDriveline}
+            onDrivelineRejection={handleDrivelineRejection}
             // P1: the touch overlay's ⛶ button — same QW1 toggle as key X.
             onToggleFullscreen={toggleFullscreen}
             // A8/A15: measurement channels (staged outcomes + near-misses).
@@ -770,6 +869,7 @@ export function LessonPlayShell({
               headlights={snap.headlights}
               seatbeltOn={snap.seatbeltOn}
               driveline={snap.driveline}
+              rejectFlashKey={gearRejectFlash}
             />
           </div>
         ) : null}

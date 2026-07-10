@@ -94,6 +94,16 @@ export type DrivelineEvent =
 
 export type DrivelineListener = (event: DrivelineEvent) => void;
 
+/** The rejection subset of DrivelineEvent. A refused control action must
+ *  never fail silently (founder bug 2026-07-10: "pressed I again — doesn't
+ *  start" / "] doesn't go up") — the scene forwards these to the HUD, which
+ *  explains WHY the car refused. Additive alias; the event stream is
+ *  unchanged. */
+export type DrivelineRejection = Extract<
+  DrivelineEvent,
+  { kind: "startRejected" | "shiftRejected" }
+>;
+
 /** HUD/cluster read model — allocated on demand (poll cadence, not per frame). */
 export interface DrivelineSnapshot {
   transmission: TransmissionMode;

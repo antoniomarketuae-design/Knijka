@@ -56,7 +56,7 @@ import type {
 import type { MinimapFrame } from "@/modules/sim/hud";
 import type { PreDriveStepId } from "@/modules/sim/procedures";
 import type { SimTick } from "@/modules/sim/rules";
-import type { DrivelineSnapshot } from "@/modules/sim/vehicle";
+import type { DrivelineRejection, DrivelineSnapshot } from "@/modules/sim/vehicle";
 import type { QualityPreset } from "./types";
 
 export interface SceneSlotProps {
@@ -86,6 +86,10 @@ export interface SceneSlotProps {
   /** A1: low-frequency driveline state (ignition/selector/parking brake/
    *  hazards/…) → HUD telltales (GearIndicatorCard). */
   onDriveline?: (snap: DrivelineSnapshot) => void;
+  /** A rejected driveline action (start interlock / selector gate) + a fresh
+   *  snapshot — the shell explains WHY via a HUD hint and flashes the gear
+   *  telltale (refusals must never be silent — founder bug 2026-07-10). */
+  onDrivelineRejection?: (rejection: DrivelineRejection, snap: DrivelineSnapshot) => void;
   /** P1: shell-owned fullscreen toggle (QW1 — the shell root is the
    *  fullscreen element) so the scene's touch overlay can offer ⛶. */
   onToggleFullscreen?: () => void;

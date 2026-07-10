@@ -64,6 +64,7 @@ export function GearIndicatorCard({
   headlights,
   seatbeltOn,
   driveline = null,
+  rejectFlashKey = 0,
 }: {
   gear: number;
   indicator: IndicatorState;
@@ -71,6 +72,10 @@ export function GearIndicatorCard({
   seatbeltOn: boolean;
   /** A1 driveline telltales; null → legacy card (no driveline in the scene). */
   driveline?: DrivelineSnapshot | null;
+  /** Increments on every REJECTED shift (selector gate refused) — the gear
+   *  telltale flashes red once so the refusal is visible even mid-drive
+   *  (founder bug 2026-07-10: silent gate rejections). 0 = never flashed. */
+  rejectFlashKey?: number;
 }) {
   const d = driveline;
   // Selector letter is the truth when the driveline exists (P R N D / M2);
@@ -84,8 +89,10 @@ export function GearIndicatorCard({
         <span className="text-[9px] font-bold uppercase tracking-wider text-muted">
           Предавка
         </span>
+        {/* key remount retriggers the one-shot flash on every new rejection */}
         <span
-          className="text-2xl font-black leading-none"
+          key={`reject-${rejectFlashKey}`}
+          className={`text-2xl font-black leading-none ${rejectFlashKey > 0 ? "hud-gear-reject" : ""}`}
           style={{ color: d && !d.engineOn ? "var(--border-strong)" : "var(--accent)" }}
         >
           {gearText}

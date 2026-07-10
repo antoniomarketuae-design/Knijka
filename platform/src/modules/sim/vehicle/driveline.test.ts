@@ -298,6 +298,71 @@ describe("stall model", () => {
   });
 });
 
+describe("founder-reported sequences (test drive 2026-07-10)", () => {
+  it("'pressed I, engine stopped; pressed I again — doesn't start': stop in D, restart is rejected WITH an event, P/N recovers", () => {
+    const { d, events } = rig("ready"); // engine on, D — mid-drive
+    expect(d.toggleEngine()).toBe(true); // I: stopping is always allowed
+    expect(d.engineOn).toBe(false);
+    expect(events.at(-1)).toEqual({ kind: "engineStopped" });
+
+    expect(d.toggleEngine()).toBe(false); // I again: interlocked (still in D)
+    expect(d.engineOn).toBe(false);
+    // NOT a silent failure: the rejection is observable (the HUD subscribes).
+    expect(events.at(-1)).toEqual({ kind: "startRejected", reason: "selector" });
+
+    expect(d.gearDown()).toBe(true); // [ : D → N
+    expect(d.toggleEngine()).toBe(true); // I: starts from N
+    expect(d.engineOn).toBe(true);
+    expect(events.at(-1)).toEqual({ kind: "engineStarted" });
+  });
+
+  it("automatic: '[ down to N, then ]' returns to D — there ARE no numbered gears, and ] in D rejects with an event", () => {
+    const { d, events } = rig("ready");
+    d.update(1 / 60, { speedKmh: 40, throttle: 0.3 }); // rolling
+    expect(d.gearDown()).toBe(true); // [ : D → N
+    expect(d.selector).toBe("N");
+    expect(d.gearUp()).toBe(true); // ] : N → D (never M1/M2/M3 on the automatic)
+    expect(d.selector).toBe("D");
+    expect(d.gearLabel).toBe("D");
+
+    // What the founder likely saw next: ] again, expecting an upshift.
+    expect(d.gearUp()).toBe(false);
+    expect(d.selector).toBe("D");
+    expect(events.at(-1)).toEqual({ kind: "shiftRejected", reason: "endOfGate" });
+  });
+
+  it("automatic: [ from N while rolling is rejected (R needs standstill) with an event", () => {
+    const { d, events } = rig("ready");
+    d.update(1 / 60, { speedKmh: 40, throttle: 0 });
+    expect(d.gearDown()).toBe(true); // D → N
+    expect(d.gearDown()).toBe(false); // N → R at 40 km/h: rejected
+    expect(d.selector).toBe("N");
+    expect(events.at(-1)).toEqual({ kind: "shiftRejected", reason: "speed" });
+  });
+
+  it("manual: '[ down to N, then ]' without the clutch is rejected WITH an event; with the clutch it enters the speed-matched gear", () => {
+    const { d, events } = rig("ready");
+    d.update(1 / 60, { speedKmh: 40, throttle: 0.3, transmission: "manual" });
+    expect(d.selector).toBe("M"); // D converted to speed-matched M gear
+
+    // Slip out to N — always free, like a real unloaded box.
+    d.setClutch(true);
+    while (d.manualGear > 1) d.gearDown();
+    d.setClutch(false);
+    expect(d.gearDown()).toBe(true); // M1 → N, clutch up — fine
+    expect(d.selector).toBe("N");
+
+    expect(d.gearUp()).toBe(false); // ] without clutch: silent no more
+    expect(d.selector).toBe("N");
+    expect(events.at(-1)).toEqual({ kind: "shiftRejected", reason: "clutch" });
+
+    d.setClutch(true);
+    expect(d.gearUp()).toBe(true); // ] with clutch: N → M @ speed-matched gear
+    expect(d.selector).toBe("M");
+    expect(d.manualGear).toBe(gearForSpeedKmh(40));
+  });
+});
+
 describe("auxiliary controls + events", () => {
   it("parking brake / hazards / wipers / fog / horn toggle with events", () => {
     const { d, events } = rig("cold");
