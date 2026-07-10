@@ -2,7 +2,7 @@
  * Shared types of the gamification module.
  */
 
-/** Activity events reported by call sites (practice + exam flows). */
+/** Activity events reported by call sites (practice + exam + sim flows). */
 export type GamificationEvent =
   | {
       type: "practice_answer";
@@ -15,6 +15,25 @@ export type GamificationEvent =
       passed: boolean;
       /** Final exam score, 0..97. */
       score: number;
+    }
+  | {
+      /**
+       * A finished (non-aborted) sim lesson — fired by the simulator's
+       * finishLessonAction AFTER the SimSession row persisted, mirroring the
+       * exam flow. The extra fields are optional so the shape documented by
+       * the sim module (SimLessonGamificationEvent, @/modules/sim/lessons)
+       * stays assignable; absent = no bonus.
+       */
+      type: "sim_lesson";
+      passed: boolean;
+      /** Official penalty points, 0 = perfect (LOWER is better; NOT 0..97). */
+      score: number;
+      /** Lesson id (e.g. "l1"), reserved for per-lesson analytics. */
+      lessonId?: string;
+      /** True only on the FIRST ever pass of this lesson (server-derived). */
+      firstPass?: boolean;
+      /** CLEAN_DRIVING commendations this session (server-rebuilt events). */
+      cleanDrives?: number;
     };
 
 /** One entry of the GamificationState.achievements Json array. */

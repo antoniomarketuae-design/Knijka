@@ -19,10 +19,21 @@ export type { AnswerContext, SubmitAnswerResult } from "./submit";
 export { applyGradedAnswers } from "./examFeed";
 export type { GradedAnswer } from "./examFeed";
 
-export { getReadiness, getSectionOverview, getTopicOverview } from "./readiness";
+export { recordSimObservations } from "./simFeed";
+export type { SimObservation } from "./simFeed";
+export type { SimSeverity } from "./store";
+
+export {
+  getReadiness,
+  getSectionOverview,
+  getSimWeakSpots,
+  getTopicOverview,
+} from "./readiness";
 export type {
   ConceptReadiness,
   Readiness,
   SectionOverview,
+  SimWeakSpot,
+  SimWeakSpotsResult,
   TopicOverview,
 } from "./readiness";

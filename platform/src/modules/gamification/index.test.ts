@@ -150,6 +150,19 @@ describe("recordActivity — achievements", () => {
     expect(ids(r.newAchievements)).toEqual(["first-exam"]);
   });
 
+  it("a sim lesson never awards the exam achievement family (A14)", async () => {
+    const r = await recordActivity(
+      USER,
+      // score here is PENALTY points — a 95 would be a catastrophic drive,
+      // and must never read as an excellent exam.
+      { type: "sim_lesson", passed: true, score: 95 },
+      NOW,
+    );
+    expect(ids(r.newAchievements)).not.toContain("first-exam");
+    expect(ids(r.newAchievements)).not.toContain("first-passed-exam");
+    expect(ids(r.newAchievements)).not.toContain("exam-90-plus");
+  });
+
   it("awards streak achievements when the chain crosses a threshold", async () => {
     // 23:59 Sofia Jul 6 → 00:30 Sofia Jul 7: consecutive Sofia days.
     const lateYesterday = new Date("2026-07-06T20:59:00.000Z");
@@ -223,6 +236,38 @@ describe("recordActivity — achievements", () => {
       NOW,
     );
     expect(ids(r.newAchievements)).not.toContain("topic-mastered");
+  });
+});
+
+describe("recordActivity — sim lessons (A14)", () => {
+  it("awards sim XP, persists it and advances the streak like any activity", async () => {
+    const r = await recordActivity(
+      USER,
+      {
+        type: "sim_lesson",
+        passed: true,
+        score: 2,
+        lessonId: "l1",
+        firstPass: true,
+        cleanDrives: 1,
+      },
+      NOW,
+    );
+    // 40 base + 60 passed + 50 first pass + 1×10 clean drive (xp.ts).
+    expect(r.xpAwarded).toBe(160);
+    expect(r.streak).toBe(1);
+    const saved = store.getStateSync(USER)!;
+    expect(saved.xp).toBe(160);
+    expect(saved.lastActiveDay).toEqual(NOW);
+  });
+
+  it("a failed drive still pays the base — effort counts", async () => {
+    const r = await recordActivity(
+      USER,
+      { type: "sim_lesson", passed: false, score: 23 },
+      NOW,
+    );
+    expect(r.xpAwarded).toBe(40);
   });
 });
 

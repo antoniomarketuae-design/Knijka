@@ -24,6 +24,7 @@ import type {
   LearningStore,
   ProgressRow,
   ProgressUpdate,
+  SimEvidenceRow,
 } from "./store";
 
 // ---------------------------------------------------------------------------
@@ -176,8 +177,15 @@ export interface RecordAnswerCall {
 export class FakeLearningStore implements LearningStore {
   private progress = new Map<string, Map<string, ProgressRow>>();
   private attempts: (AttemptRecord & { userId: string })[] = [];
+  private simEvidence = new Map<string, SimEvidenceRow[]>();
   /** Every recordAnswer call — one entry per (atomic) transaction. */
   readonly recordAnswerCalls: RecordAnswerCall[] = [];
+
+  seedSimEvidence(userId: string, rows: SimEvidenceRow[]): void {
+    const list = this.simEvidence.get(userId) ?? [];
+    list.push(...rows);
+    this.simEvidence.set(userId, list);
+  }
 
   seedProgress(
     userId: string,
@@ -254,5 +262,14 @@ export class FakeLearningStore implements LearningStore {
     for (const u of updates) {
       this.seedProgress(userId, { ...u, updatedAt: new Date() });
     }
+  }
+
+  async getSimEvidenceSince(
+    userId: string,
+    since: Date,
+  ): Promise<SimEvidenceRow[]> {
+    return (this.simEvidence.get(userId) ?? [])
+      .filter((r) => r.finishedAt.getTime() >= since.getTime())
+      .map((r) => ({ ...r }));
   }
 }

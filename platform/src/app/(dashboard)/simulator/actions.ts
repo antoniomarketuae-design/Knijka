@@ -10,11 +10,23 @@
  * SimSession row via the injectable store. Business logic stays in
  * @/modules/sim/lessons — this file only adapts it to the wire, exactly like
  * the exams/theory actions do.
+ *
+ * A14 learner-model integration: AFTER the session persisted, this action —
+ * the server path, so concept ids/severities always come from the rebuilt
+ * catalog events, never from client claims —
+ *  1. feeds concept-linked violations/commendations into the learning module
+ *    (recordSimObservations: mastery dip + SM-2 review scheduling), and
+ *  2. reports a sim_lesson event to gamification for XP (recordActivity,
+ *     not trackActivity, because the awarded XP must reach the session-end
+ *     screen's XP chip).
+ * Both are swallow-on-failure: a learner-model bug never breaks the save.
  */
 
 import "@/lib/content/loader";
 import { getContentRepo } from "@/lib/content/repo";
 import { requireUser } from "@/modules/auth";
+import { recordActivity } from "@/modules/gamification";
+import { recordSimObservations, type SimObservation } from "@/modules/learning";
 import { buildDebrief, gradeFinishWire } from "@/modules/sim/lessons";
 import {
   getSimSessionStore,
@@ -36,18 +48,24 @@ export async function finishLessonAction(
   // Debrief context (server-only facts the pure engine doesn't own):
   //  - priorBestScore: the driver's fewest penalty points on THIS lesson so
   //    far. listSessions runs BEFORE saveSession below, so it excludes this
-  //    attempt → the debrief can coach improvement vs the driver's own best.
+  //    attempt → the debrief can coach improvement vs the driver's own best,
+  //    and a pass now is a FIRST pass iff no prior attempt passed.
   //  - conceptTitles: names the "practice this next" focus concept.
   //  - microQuiz: the contextual-quiz tally the client tracked (validated wire).
   let priorBestScore: number | null = null;
+  let previouslyPassed = false;
   try {
     const rows = await getSimSessionStore().listSessions(user.id);
-    const scores = rows
-      .filter((r) => r.lessonId === lesson.id && r.score !== null)
+    const mine = rows.filter((r) => r.lessonId === lesson.id);
+    const scores = mine
+      .filter((r) => r.score !== null)
       .map((r) => r.score as number);
     if (scores.length > 0) priorBestScore = Math.min(...scores);
+    previouslyPassed = mine.some((r) => r.passed);
   } catch {
-    // No history available — improvement coaching is simply skipped.
+    // No history available — improvement coaching is simply skipped (and the
+    // first-pass XP bonus errs toward awarding; the achievement-style loss of
+    // a one-time bonus is worse than a rare double award).
   }
 
   const conceptTitles: Record<string, string> = {};
@@ -94,21 +112,63 @@ export async function finishLessonAction(
   }
 
   // -------------------------------------------------------------------------
-  // INTEGRATION ASK (gamification): once GamificationEvent accepts
-  //   { type: "sim_lesson", passed: boolean, score: number }
-  // (see SimLessonGamificationEvent in @/modules/sim/lessons), award XP here:
-  //   await trackActivity(user.id, { type: "sim_lesson", passed: result.passed, score: result.score });
-  // and return the awarded XP as `xpEarned`. The union is currently CLOSED
-  // (practice_answer | exam_completed), so sim lessons award no XP yet and
-  // the session-end screen hides its XP chip.
+  // A14 §2 — sim events feed the learner model. Only server-rebuilt catalog
+  // events are used (conceptId + severityClass always come from the catalog),
+  // in chronological order so same-concept evidence compounds honestly.
+  // Aborted sessions still count: the mistakes made before quitting are real
+  // evidence. Failure is logged and swallowed — the session is already saved.
   // -------------------------------------------------------------------------
+  try {
+    const chronological = [
+      ...result.summary.mistakes,
+      ...result.summary.commendations,
+    ].sort((a, b) => a.t - b.t);
+    const observations: SimObservation[] = [];
+    for (const e of chronological) {
+      if (e.conceptId === undefined) continue;
+      observations.push(
+        e.kind === "violation"
+          ? { conceptId: e.conceptId, kind: "violation", severity: e.severityClass }
+          : { conceptId: e.conceptId, kind: "commendation" },
+      );
+    }
+    await recordSimObservations(user.id, observations);
+  } catch (err) {
+    console.warn("simulator: recordSimObservations failed (session saved)", err);
+  }
+
+  // -------------------------------------------------------------------------
+  // A14 §1 — XP for the drive. No XP for aborted sessions (quitting is not a
+  // completed learning activity, and instant-abort must not farm the base
+  // award). recordActivity instead of trackActivity so the awarded XP reaches
+  // the session-end screen; failures degrade to the pre-A14 null chip.
+  // -------------------------------------------------------------------------
+  let xpEarned: number | null = null;
+  if (!result.aborted) {
+    try {
+      const cleanDrives = events.filter(
+        (e) => e.kind === "commendation" && e.code === "CLEAN_DRIVING",
+      ).length;
+      const awarded = await recordActivity(user.id, {
+        type: "sim_lesson",
+        passed: result.passed,
+        score: result.score,
+        lessonId: lesson.id,
+        firstPass: result.passed && !previouslyPassed,
+        cleanDrives,
+      });
+      xpEarned = awarded.xpAwarded;
+    } catch (err) {
+      console.warn("simulator: gamification failed (session saved)", err);
+    }
+  }
 
   return {
     ok: true,
     sessionId,
     debriefText: debrief.text,
     concepts: enrichConcepts(debrief.conceptIds),
-    xpEarned: null,
+    xpEarned,
   };
 }
 

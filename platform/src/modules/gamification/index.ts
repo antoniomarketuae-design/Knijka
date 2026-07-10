@@ -11,9 +11,12 @@
  *
  * Flow: call sites report activity AFTER the owning module persisted it —
  *   practice: theory practice action, after learning's submitAnswer;
- *   exams:    exams action, after the exam module's submitExam.
- * Both go through trackActivity(), which never throws: a gamification bug
- * must never break answering questions or grading an exam.
+ *   exams:    exams action, after the exam module's submitExam;
+ *   sim:      simulator finish action, after the SimSession row saved (A14 —
+ *             uses recordActivity directly so the awarded XP reaches the
+ *             session-end screen, with the same swallow-on-failure contract).
+ * The first two go through trackActivity(), which never throws: a
+ * gamification bug must never break answering questions or grading an exam.
  *
  * Idempotency: recordActivity is called exactly once per user action (no
  * retries at call sites), so per-event dedup is intentionally not implemented.
@@ -150,11 +153,14 @@ export async function recordActivity(
       );
       if (mastered) award("topic-mastered");
     }
-  } else {
+  } else if (event.type === "exam_completed") {
     award("first-exam");
     if (event.passed) award("first-passed-exam");
     if (event.score >= EXAM_EXCELLENT_SCORE) award("exam-90-plus");
   }
+  // sim_lesson (A14): no dedicated achievements in v1 — a finished drive earns
+  // XP (xp.ts) and advances the streak like any learning activity; the exam
+  // achievement family above must never fire for sim events.
 
   // ---- daily mission (double-award guarded by the "dm-<date>" marker) --------
   let missionCompleted = false;

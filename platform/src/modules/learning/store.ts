@@ -40,6 +40,25 @@ export interface AttemptRecord {
   answeredAt: Date;
 }
 
+/** Official sim severity classes (docs/education/32; mirrors sim/rules). */
+export type SimSeverity = "opasna" | "osnovna" | "vtorostepenna";
+
+/**
+ * One concept-linked rule event from a recent sim session — the raw sim
+ * evidence the readiness blend and weak-spots ranking consume. Derived
+ * READ-ONLY from SimSession rows (owned by the sim module) exactly like the
+ * gamification store derives from QuestionAttempt/ExamAttempt: no writes, no
+ * schema coupling beyond the versioned events Json we parse defensively.
+ */
+export interface SimEvidenceRow {
+  conceptId: string;
+  kind: "violation" | "commendation";
+  /** Set for violations; null for commendations. */
+  severity: SimSeverity | null;
+  /** When the session finished (recency of the evidence). */
+  finishedAt: Date;
+}
+
 export interface LearningStore {
   /** All Progress rows for a user. */
   getProgress(userId: string): Promise<ProgressRow[]>;
@@ -59,6 +78,47 @@ export interface LearningStore {
    * feed, where the exam module already owns the attempt rows.
    */
   upsertProgress(userId: string, updates: ProgressUpdate[]): Promise<void>;
+  /**
+   * Concept-linked rule events from sim sessions finished at/after `since`
+   * (read-only; see SimEvidenceRow). Unreadable/foreign event payloads are
+   * skipped silently — never fail readiness over one corrupt row.
+   */
+  getSimEvidenceSince(userId: string, since: Date): Promise<SimEvidenceRow[]>;
+}
+
+/**
+ * Defensive extraction of concept-linked rule events from a SimSession
+ * events Json column. Exported for the Prisma store + tests; accepts the
+ * versioned payload written by sim/lessons/store.ts but trusts nothing.
+ */
+export function extractSimEvidence(
+  events: unknown,
+  finishedAt: Date,
+): SimEvidenceRow[] {
+  if (typeof events !== "object" || events === null) return [];
+  const o = events as Record<string, unknown>;
+  if (o.version !== 1 || !Array.isArray(o.ruleEvents)) return [];
+
+  const out: SimEvidenceRow[] = [];
+  for (const item of o.ruleEvents) {
+    if (typeof item !== "object" || item === null) continue;
+    const e = item as Record<string, unknown>;
+    if (typeof e.conceptId !== "string" || e.conceptId.length === 0) continue;
+    if (e.kind === "violation") {
+      const severity = e.severityClass;
+      if (
+        severity !== "opasna" &&
+        severity !== "osnovna" &&
+        severity !== "vtorostepenna"
+      ) {
+        continue;
+      }
+      out.push({ conceptId: e.conceptId, kind: "violation", severity, finishedAt });
+    } else if (e.kind === "commendation") {
+      out.push({ conceptId: e.conceptId, kind: "commendation", severity: null, finishedAt });
+    }
+  }
+  return out;
 }
 
 function createPrismaStore(): LearningStore {
@@ -111,6 +171,20 @@ function createPrismaStore(): LearningStore {
           }),
         ),
       );
+    },
+
+    async getSimEvidenceSince(userId, since) {
+      const db = await getDb();
+      const rows = await db.simSession.findMany({
+        where: { userId, finishedAt: { gte: since } },
+        select: { events: true, finishedAt: true },
+      });
+      const out: SimEvidenceRow[] = [];
+      for (const r of rows) {
+        if (r.finishedAt === null) continue;
+        out.push(...extractSimEvidence(r.events, r.finishedAt));
+      }
+      return out;
     },
 
     async recordAnswer(userId, attempt, updates) {

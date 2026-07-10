@@ -1,10 +1,15 @@
 /**
- * Exam-readiness estimate v1 + per-topic dashboard overview.
+ * Exam-readiness estimate v2 (theory + sim blend) + per-topic dashboard
+ * overview.
  *
- * computeReadiness is a PURE function over (Progress rows, ContentRepo, now):
+ * computeReadiness is a PURE function over (Progress rows, ContentRepo, now,
+ * sim evidence):
  *
- *   effectiveMastery(c) = mastery(c) * recencyFactor(days since last update)
- *   score = 100 * Σ(difficulty_c * effectiveMastery_c) / Σ(difficulty_c)
+ *   theory(c)  = mastery(c) * recencyFactor(days since last update)
+ *   blended(c) = has sim evidence for c
+ *                  ? theory(c) * (1 - w) + simSignal(c) * w    (w = 0.25)
+ *                  : theory(c)
+ *   score      = 100 * Σ(difficulty_c * blended_c) / Σ(difficulty_c)
  *
  * summed over ALL concepts in the content repo:
  *  - weight     = concept difficulty (1..3) — harder concepts matter more;
@@ -13,13 +18,33 @@
  *  - recency    = full credit for 7 days after the last review, then linear
  *    decay to a 0.5 floor at 30 days — stale knowledge counts half.
  *
+ * Sim blend (A14, de Winter: sim telemetry predicts the road test): each
+ * concept-linked rule event from sessions in the last 14 days is evidence.
+ * simSignal(c) = positive / (positive + negative) in [0,1], where each
+ * commendation adds 1 positive unit and each violation adds severity-weighted
+ * negative units (опасна 3, основна 2, второстепенна 1 — the official
+ * hierarchy). Violation-free driving on a concept therefore RAISES its
+ * effective mastery (up to +w) and repeated violations LOWER it (down to
+ * theory×(1-w)). The blend is deliberately conservative: it only touches
+ * concepts with recent sim evidence, so theory stays dominant until sim
+ * coverage is broad; blending at CONCEPT level makes per-topic and overall
+ * scores plus weakest-concepts all honest through one formula. Note the
+ * long-term memory of sim mistakes already lives in Progress via
+ * recordSimObservations (simFeed.ts); this blend is the bounded RECENT-
+ * behaviour overlay on top (also the only place commendation-density counts).
+ *
  * No data → score 0. Score maps directly to the ≥87/97 (~90%) exam bar:
  * a user should not sit the mock exam confident below ~85–90.
  */
 
 import { getContentRepo, type ContentRepo } from "@/lib/content/repo";
 import { DAY_MS, isDue } from "./scheduler";
-import { getLearningStore, type ProgressRow } from "./store";
+import {
+  getLearningStore,
+  type ProgressRow,
+  type SimEvidenceRow,
+  type SimSeverity,
+} from "./store";
 
 /** Full recency credit within this many days of the last review. */
 export const RECENCY_FULL_DAYS = 7;
@@ -29,6 +54,72 @@ export const RECENCY_FLOOR = 0.5;
 export const RECENCY_FLOOR_DAYS = 30;
 
 export const WEAKEST_CONCEPTS_COUNT = 5;
+
+// ---- sim blend (A14) --------------------------------------------------------
+
+/** Sim evidence older than this many days no longer influences readiness. */
+export const SIM_EVIDENCE_WINDOW_DAYS = 14;
+/** Blend weight of the sim signal on a concept WITH recent evidence. */
+export const SIM_BLEND_WEIGHT = 0.25;
+/** Negative evidence units per violation, by official severity class. */
+export const SIM_SEVERITY_UNITS: Record<SimSeverity, number> = {
+  opasna: 3,
+  osnovna: 2,
+  vtorostepenna: 1,
+};
+
+/** Aggregated recent sim evidence for one concept. */
+export interface SimConceptSignal {
+  conceptId: string;
+  violationCount: number;
+  commendationCount: number;
+  /** Worst severity observed, null when violation-free. */
+  worstSeverity: SimSeverity | null;
+  /** positive/(positive+negative) in [0,1]; 1 = violation-free driving. */
+  signal: number;
+}
+
+/** Fold raw evidence rows into per-concept signals — pure. */
+export function aggregateSimSignals(
+  evidence: ReadonlyArray<SimEvidenceRow>,
+): Map<string, SimConceptSignal> {
+  const acc = new Map<
+    string,
+    { pos: number; neg: number; v: number; c: number; worst: SimSeverity | null }
+  >();
+  for (const row of evidence) {
+    const cur =
+      acc.get(row.conceptId) ?? { pos: 0, neg: 0, v: 0, c: 0, worst: null };
+    if (row.kind === "violation" && row.severity !== null) {
+      cur.neg += SIM_SEVERITY_UNITS[row.severity];
+      cur.v += 1;
+      if (
+        cur.worst === null ||
+        SIM_SEVERITY_UNITS[row.severity] > SIM_SEVERITY_UNITS[cur.worst]
+      ) {
+        cur.worst = row.severity;
+      }
+    } else if (row.kind === "commendation") {
+      cur.pos += 1;
+      cur.c += 1;
+    }
+    acc.set(row.conceptId, cur);
+  }
+
+  const out = new Map<string, SimConceptSignal>();
+  for (const [conceptId, a] of acc) {
+    const total = a.pos + a.neg;
+    if (total === 0) continue;
+    out.set(conceptId, {
+      conceptId,
+      violationCount: a.v,
+      commendationCount: a.c,
+      worstSeverity: a.worst,
+      signal: a.pos / total,
+    });
+  }
+  return out;
+}
 
 export interface ConceptReadiness {
   conceptId: string;
@@ -60,14 +151,24 @@ export function computeReadiness(
   progress: ProgressRow[],
   repo: ContentRepo,
   now: Date,
+  simEvidence: ReadonlyArray<SimEvidenceRow> = [],
 ): Readiness {
   const byConcept = new Map(progress.map((p) => [p.conceptId, p]));
+  const simSignals = aggregateSimSignals(simEvidence);
 
   const effectiveMastery = (conceptId: string): number => {
     const row = byConcept.get(conceptId);
-    if (!row) return 0;
-    const days = (now.getTime() - row.updatedAt.getTime()) / DAY_MS;
-    return row.mastery * recencyFactor(days);
+    const days = row
+      ? (now.getTime() - row.updatedAt.getTime()) / DAY_MS
+      : Infinity;
+    const theory = row ? row.mastery * recencyFactor(days) : 0;
+    // Sim blend (see file header): only concepts with recent sim evidence
+    // move, bounded by SIM_BLEND_WEIGHT — theory stays dominant.
+    const sim = simSignals.get(conceptId);
+    if (!sim) return theory;
+    return clamp01(
+      theory * (1 - SIM_BLEND_WEIGHT) + sim.signal * SIM_BLEND_WEIGHT,
+    );
   };
 
   const topics = [...repo.topics()].sort((a, b) => a.order - b.order);
@@ -112,8 +213,93 @@ export async function getReadiness(
   userId: string,
   now: Date = new Date(),
 ): Promise<Readiness> {
-  const progress = await getLearningStore().getProgress(userId);
-  return computeReadiness(progress, getContentRepo(), now);
+  const store = getLearningStore();
+  const since = new Date(now.getTime() - SIM_EVIDENCE_WINDOW_DAYS * DAY_MS);
+  const [progress, simEvidence] = await Promise.all([
+    store.getProgress(userId),
+    // A degraded sim read must never take the readiness ring down with it.
+    store.getSimEvidenceSince(userId, since).catch(() => []),
+  ]);
+  return computeReadiness(progress, getContentRepo(), now, simEvidence);
+}
+
+function clamp01(x: number): number {
+  return Math.min(1, Math.max(0, x));
+}
+
+// ---------------------------------------------------------------------------
+// Sim weak spots (A14) — dashboard card input
+// ---------------------------------------------------------------------------
+
+export interface SimWeakSpot {
+  conceptId: string;
+  titleBg: string;
+  topicId: string;
+  /** For the „practice this" link (/theory/practice?topic=<slug>). */
+  topicSlug: string | null;
+  violationCount: number;
+  worstSeverity: SimSeverity;
+}
+
+export interface SimWeakSpotsResult {
+  /** Any sim evidence in the window at all — drives card visibility. */
+  hasRecentEvidence: boolean;
+  /** Up to `limit` concepts with the worst recent sim evidence, worst first. */
+  spots: SimWeakSpot[];
+}
+
+/** Rank concepts by recent sim evidence — pure (worst first). */
+export function computeSimWeakSpots(
+  evidence: ReadonlyArray<SimEvidenceRow>,
+  repo: ContentRepo,
+  limit: number,
+): SimWeakSpotsResult {
+  const signals = [...aggregateSimSignals(evidence).values()];
+  const topicSlugById = new Map(repo.topics().map((t) => [t.id, t.slug]));
+
+  const spots = signals
+    .filter(
+      (s): s is SimConceptSignal & { worstSeverity: SimSeverity } =>
+        s.violationCount > 0 && s.worstSeverity !== null,
+    )
+    // Worst first: lowest signal (violation-dominated), then most violations,
+    // then worst severity as the tie-break.
+    .sort(
+      (a, b) =>
+        a.signal - b.signal ||
+        b.violationCount - a.violationCount ||
+        SIM_SEVERITY_UNITS[b.worstSeverity] - SIM_SEVERITY_UNITS[a.worstSeverity],
+    )
+    .slice(0, Math.max(0, limit))
+    .flatMap((s) => {
+      const concept = repo.conceptById(s.conceptId);
+      if (!concept) return []; // stale id — content moved on, skip
+      return [
+        {
+          conceptId: s.conceptId,
+          titleBg: concept.titleBg,
+          topicId: concept.topicId,
+          topicSlug: topicSlugById.get(concept.topicId) ?? null,
+          violationCount: s.violationCount,
+          worstSeverity: s.worstSeverity,
+        },
+      ];
+    });
+
+  return { hasRecentEvidence: evidence.length > 0, spots };
+}
+
+/** The `limit` concepts with the worst recent sim evidence (dashboard card). */
+export async function getSimWeakSpots(
+  userId: string,
+  limit = 3,
+  now: Date = new Date(),
+): Promise<SimWeakSpotsResult> {
+  const since = new Date(now.getTime() - SIM_EVIDENCE_WINDOW_DAYS * DAY_MS);
+  const evidence = await getLearningStore()
+    .getSimEvidenceSince(userId, since)
+    .catch(() => [] as SimEvidenceRow[]);
+  return computeSimWeakSpots(evidence, getContentRepo(), limit);
 }
 
 // ---------------------------------------------------------------------------

@@ -4,6 +4,7 @@ import { ContinueLessonCard } from "@/components/dashboard/ContinueLessonCard";
 import { DailyMissionCard } from "@/components/dashboard/DailyMissionCard";
 import { ModuleGrid } from "@/components/dashboard/ModuleGrid";
 import { ReadinessRing } from "@/components/dashboard/ReadinessRing";
+import { SimWeakSpotsCard } from "@/components/dashboard/SimWeakSpotsCard";
 import { StreakBadge } from "@/components/dashboard/StreakBadge";
 import { TopicMasteryGrid } from "@/components/dashboard/TopicMasteryGrid";
 import { XpBar } from "@/components/dashboard/XpBar";
@@ -13,6 +14,7 @@ import {
   getGamification,
   getReadiness,
   getRecentAchievements,
+  getSimWeakSpots,
   getStudentProfile,
 } from "@/components/dashboard/data";
 
@@ -23,15 +25,23 @@ export const metadata: Metadata = {
 
 /** The hub. Server component: awaits the (mock) module APIs, streams via loading.tsx. */
 export default async function DashboardPage() {
-  const [profile, readiness, gamification, mission, achievements, lesson] =
-    await Promise.all([
-      getStudentProfile(),
-      getReadiness(),
-      getGamification(),
-      getDailyMission(),
-      getRecentAchievements(),
-      getContinueLesson(),
-    ]);
+  const [
+    profile,
+    readiness,
+    gamification,
+    mission,
+    achievements,
+    lesson,
+    simWeakSpots,
+  ] = await Promise.all([
+    getStudentProfile(),
+    getReadiness(),
+    getGamification(),
+    getDailyMission(),
+    getRecentAchievements(),
+    getContinueLesson(),
+    getSimWeakSpots(),
+  ]);
 
   return (
     <div className="relative flex flex-col gap-6">
@@ -84,7 +94,8 @@ export default async function DashboardPage() {
           </div>
           <ReadinessRing readiness={readiness} />
           <p className="text-center text-xs leading-relaxed text-muted">
-            Прогноза на база твоите отговори. Официалният изпит изисква{" "}
+            Прогноза на база твоите отговори и карането ти в симулатора.
+            Официалният изпит изисква{" "}
             <span className="font-mono font-bold tabular-nums text-foreground">
               ≥87
             </span>{" "}
@@ -98,6 +109,9 @@ export default async function DashboardPage() {
 
       {/* Per-topic mastery (16 topics) */}
       <TopicMasteryGrid readiness={readiness} />
+
+      {/* Sim weak spots (A14) — hidden until the user has driven recently */}
+      <SimWeakSpotsCard snapshot={simWeakSpots} />
 
       {/* Achievements */}
       <AchievementsRow achievements={achievements} />

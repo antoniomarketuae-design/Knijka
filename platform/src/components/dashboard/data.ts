@@ -1,6 +1,7 @@
 import "@/lib/content/loader";
 import {
   getReadiness as learningGetReadiness,
+  getSimWeakSpots as learningGetSimWeakSpots,
   getTopicOverview as learningGetTopicOverview,
 } from "@/modules/learning";
 import { requireUser } from "@/modules/auth";
@@ -98,6 +99,23 @@ export interface StudentProfile {
   firstName: string;
 }
 
+/** One „sim weak spot" — a concept the driver keeps violating on the road. */
+export interface SimWeakSpotView {
+  conceptId: string;
+  titleBg: string;
+  violationCount: number;
+  worstSeverity: "opasna" | "osnovna" | "vtorostepenna";
+  /** Targeted theory practice for the concept's topic. */
+  href: string;
+}
+
+export interface SimWeakSpotsSnapshot {
+  /** False until the user has driven recently — the card hides itself. */
+  hasRecentEvidence: boolean;
+  /** Worst first, at most 3. Empty + hasRecentEvidence = clean driving. */
+  spots: SimWeakSpotView[];
+}
+
 /* ------------------------------------------------------------- real API */
 
 export async function getStudentProfile(): Promise<StudentProfile> {
@@ -184,6 +202,24 @@ export async function getGamification(): Promise<GamificationSummary> {
 export async function getDailyMission(): Promise<DailyMission | null> {
   const user = await requireUser();
   return gamificationGetDailyMission(user.id);
+}
+
+/** Concepts with the worst recent sim evidence (learning module, A14). */
+export async function getSimWeakSpots(): Promise<SimWeakSpotsSnapshot> {
+  const user = await requireUser();
+  const result = await learningGetSimWeakSpots(user.id, 3);
+  return {
+    hasRecentEvidence: result.hasRecentEvidence,
+    spots: result.spots.map((s) => ({
+      conceptId: s.conceptId,
+      titleBg: s.titleBg,
+      violationCount: s.violationCount,
+      worstSeverity: s.worstSeverity,
+      // Same routing rule as the simulator debrief links: topic-scoped
+      // practice when the slug resolves, the theory hub otherwise.
+      href: s.topicSlug ? `/theory/practice?topic=${s.topicSlug}` : "/theory",
+    })),
+  };
 }
 
 /** Newest 4 earned achievements (daily-mission markers filtered out). */
