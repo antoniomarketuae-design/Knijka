@@ -1,0 +1,23 @@
+{
+  "version": 1,
+  "format": "ktx2",
+  "sets": {
+    "road": {
+      "color": "road/color.ktx2",
+      "normal": "road/normal.ktx2",
+      "roughness": "road/roughness.ktx2",
+      "ao": "road/ao.ktx2"
+    },
+    "sidewalk": {
+      "color": "sidewalk/color.ktx2",
+      "normal": "sidewalk/normal.ktx2",
+      "roughness": "sidewalk/roughness.ktx2"
+    },
+    "ground": {
+      "color": "ground/color.ktx2",
+      "normal": "ground/normal.ktx2",
+      "roughness": "ground/roughness.ktx2",
+      "ao": "ground/ao.ktx2"
+    }
+  }
+}

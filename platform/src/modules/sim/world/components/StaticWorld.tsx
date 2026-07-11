@@ -196,9 +196,9 @@ export function StaticWorld({
 
   // Real CC0 PBR sets — shared, cached, loaded once. Until they resolve (or on
   // the server) each mesh falls back to its procedural canvas texture below.
-  const asphalt = usePbrSet("road", preset.anisotropy);
-  const concrete = usePbrSet("sidewalk", preset.anisotropy);
-  const grass = usePbrSet("ground", preset.anisotropy);
+  const asphalt = usePbrSet("road", preset.anisotropy, gl);
+  const concrete = usePbrSet("sidewalk", preset.anisotropy, gl);
+  const grass = usePbrSet("ground", preset.anisotropy, gl);
   // Baked facade bay sets (facade_atlas.py) — shared with the instanced kit
   // towers (CityBuildings wires the same cache onto the GLB materials).
   const facadeSets = useFacadeTextures(gl, preset.anisotropy);

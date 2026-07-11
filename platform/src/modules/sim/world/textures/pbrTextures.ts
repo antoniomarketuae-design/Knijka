@@ -1,8 +1,25 @@
 /**
  * Real CC0 PBR texture sets (asphalt / concrete / grass) — CLIENT ONLY
- * (THREE.TextureLoader needs the DOM Image API). Files live under
- * public/sim/textures/{road,sidewalk,ground} and are the "free foundation"
- * upgrade from the procedural canvas textures.
+ * (THREE.TextureLoader / KTX2Loader need the DOM / a WebGL context). Files live
+ * under public/sim/textures/{road,sidewalk,ground} and are the "free
+ * foundation" upgrade from the procedural canvas textures.
+ *
+ * Format (doc 71 §2.1/§13 — the VRAM budget enabler): KTX2 when
+ * textures/manifest.json declares `format:"ktx2"` (ETC1S albedo/roughness/ao,
+ * UASTC normals; transcoded to a GPU-compressed format at load so the maps stay
+ * compressed in VRAM — ~6× less than the RGBA8 the PNGs decode to). The source
+ * PNGs stay on disk as the FALLBACK: a map with no KTX2 in the manifest, or a
+ * KTX2 that fails to load at runtime, transparently loads its .png. No manifest
+ * (or a non-ktx2 one) → the whole set loads PNGs exactly as before. Mirrors the
+ * facade loader (facadeTextures.ts) — KTX2Loader + the wasm transcoder in
+ * public/basis/.
+ *
+ * COLORSPACE + WRAP are set explicitly here and are AUTHORITATIVE regardless of
+ * format (a lost sRGB flag washes/darkens the ground; a lost RepeatWrapping
+ * shreds the tiling): albedo sRGB, normal/roughness/ao linear; wrapS/wrapT
+ * RepeatWrapping with the COMPUTED `repeat` (see below). The KTX2 files carry
+ * their own mip chain (toktx --genmipmap) — WebGL can't regenerate mips for a
+ * compressed format, so `generateMipmaps` is left off for KTX2 and on for PNG.
  *
  * Loading model: a module-level, reference-counted cache. Each set is loaded
  * exactly once and SHARED across every mesh that uses it (road + junction
@@ -31,6 +48,7 @@
 
 import { useEffect, useState } from "react";
 import * as THREE from "three";
+import { KTX2Loader } from "three/examples/jsm/loaders/KTX2Loader.js";
 
 export type PbrGroup = "road" | "sidewalk" | "ground";
 
@@ -100,25 +118,45 @@ function repeatOf(cfg: GroupConfig): [number, number] {
 }
 
 const BASE_URL = "/sim/textures";
+/** basis_transcoder.{js,wasm} copied from three/examples/jsm/libs/basis. */
+const BASIS_TRANSCODER_PATH = "/basis/";
 
+type MapName = "color" | "normal" | "roughness" | "ao";
+
+interface Manifest {
+  version: number;
+  format: "ktx2" | "png";
+  /** group -> { map -> file path relative to BASE_URL }. */
+  sets: Record<string, Partial<Record<MapName, string>>>;
+}
+
+/**
+ * colorSpace + wrap are AUTHORITATIVE here (doc 71 §3 CRITICAL): albedo sRGB,
+ * everything else linear; RepeatWrapping + the computed tiling repeat. Applied
+ * identically to KTX2 and PNG textures so the swap is invisible. `compressed`
+ * (KTX2) textures carry a baked mip chain — WebGL can't regenerate mips for a
+ * compressed format, so leave generateMipmaps off and trust KTX2Loader's
+ * mip-aware minFilter; PNG textures generate mips at upload as before.
+ */
 function configureTexture(
   tex: THREE.Texture,
   srgb: boolean,
   repeat: [number, number],
+  compressed: boolean,
 ): THREE.Texture {
   tex.colorSpace = srgb ? THREE.SRGBColorSpace : THREE.NoColorSpace;
   tex.wrapS = THREE.RepeatWrapping;
   tex.wrapT = THREE.RepeatWrapping;
   tex.repeat.set(repeat[0], repeat[1]);
-  tex.generateMipmaps = true;
-  tex.minFilter = THREE.LinearMipmapLinearFilter;
   tex.magFilter = THREE.LinearFilter;
+  tex.minFilter = THREE.LinearMipmapLinearFilter; // trilinear over the mip chain
+  if (!compressed) tex.generateMipmaps = true; // KTX2 ships its own mips
   tex.anisotropy = 4; // sensible default; usePbrSet() raises it per quality
   tex.needsUpdate = true;
   return tex;
 }
 
-function loadOne(
+function loadPng(
   loader: THREE.TextureLoader,
   url: string,
   srgb: boolean,
@@ -127,31 +165,77 @@ function loadOne(
   return new Promise((resolve, reject) => {
     loader.load(
       url,
-      (tex) => resolve(configureTexture(tex, srgb, repeat)),
+      (tex) => resolve(configureTexture(tex, srgb, repeat, false)),
       undefined,
       (err) => reject(err instanceof Error ? err : new Error(`load failed: ${url}`)),
     );
   });
 }
 
-function buildSet(group: PbrGroup): Promise<PbrTextureSet> {
+/** Load a KTX2 map; on any load/transcode error fall back to the source PNG. */
+function loadKtx2(
+  ktx2: KTX2Loader,
+  pngLoader: THREE.TextureLoader,
+  ktx2Url: string,
+  pngUrl: string,
+  srgb: boolean,
+  repeat: [number, number],
+): Promise<THREE.Texture> {
+  return new Promise((resolve, reject) => {
+    ktx2.load(
+      ktx2Url,
+      (tex) => resolve(configureTexture(tex, srgb, repeat, true)),
+      undefined,
+      () => {
+        // KTX2 missing / corrupt / untranscodable — fall back to the PNG.
+        loadPng(pngLoader, pngUrl, srgb, repeat).then(resolve, reject);
+      },
+    );
+  });
+}
+
+// Manifest is shared across all three groups — fetch it once.
+let manifestPromise: Promise<Manifest | null> | null = null;
+function loadManifest(): Promise<Manifest | null> {
+  if (!manifestPromise) {
+    manifestPromise = fetch(`${BASE_URL}/manifest.json`)
+      .then((res) => (res.ok ? (res.json() as Promise<Manifest>) : null))
+      .then((m) => (m && m.format === "ktx2" ? m : null))
+      .catch(() => null); // no manifest / not ktx2 -> PNG path
+  }
+  return manifestPromise;
+}
+
+function buildSet(group: PbrGroup, gl: THREE.WebGLRenderer): Promise<PbrTextureSet> {
   const cfg = GROUPS[group];
   const base = `${BASE_URL}/${cfg.dir}`;
   const repeat = repeatOf(cfg);
-  const loader = new THREE.TextureLoader();
-  return Promise.all([
-    loadOne(loader, `${base}/color.png`, true, repeat),
-    loadOne(loader, `${base}/normal.png`, false, repeat),
-    loadOne(loader, `${base}/roughness.png`, false, repeat),
-    cfg.hasAo
-      ? loadOne(loader, `${base}/ao.png`, false, repeat)
-      : Promise.resolve<THREE.Texture | null>(null),
-  ]).then(([map, normalMap, roughnessMap, aoMap]) => ({
-    map,
-    normalMap,
-    roughnessMap,
-    aoMap,
-  }));
+  const pngLoader = new THREE.TextureLoader();
+
+  return loadManifest().then((manifest) => {
+    const entry = manifest?.sets?.[group];
+    const ktx2 = entry
+      ? new KTX2Loader().setTranscoderPath(BASIS_TRANSCODER_PATH).detectSupport(gl)
+      : null;
+
+    const loadMap = (map: MapName, srgb: boolean): Promise<THREE.Texture> => {
+      const pngUrl = `${base}/${map}.png`;
+      const ktx2File = entry?.[map];
+      return ktx2 && ktx2File
+        ? loadKtx2(ktx2, pngLoader, `${BASE_URL}/${ktx2File}`, pngUrl, srgb, repeat)
+        : loadPng(pngLoader, pngUrl, srgb, repeat);
+    };
+
+    return Promise.all([
+      loadMap("color", true), // sRGB albedo
+      loadMap("normal", false), // linear
+      loadMap("roughness", false), // linear
+      cfg.hasAo ? loadMap("ao", false) : Promise.resolve<THREE.Texture | null>(null),
+    ]).then(([map, normalMap, roughnessMap, aoMap]) => {
+      ktx2?.dispose();
+      return { map, normalMap, roughnessMap, aoMap };
+    });
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -172,10 +256,10 @@ function texturesOf(set: PbrTextureSet): THREE.Texture[] {
   return list;
 }
 
-function acquire(group: PbrGroup): Promise<PbrTextureSet> {
+function acquire(group: PbrGroup, gl: THREE.WebGLRenderer): Promise<PbrTextureSet> {
   let entry = cache.get(group);
   if (!entry) {
-    const promise = buildSet(group).then((set) => {
+    const promise = buildSet(group, gl).then((set) => {
       const e = cache.get(group);
       if (e) e.set = set;
       return set;
@@ -212,15 +296,20 @@ function release(group: PbrGroup): void {
  * Loads (once, cached) the PBR set for `group` and returns it, or null until
  * it resolves / on the server. Callers should fall back to their procedural
  * texture while null. `anisotropy` (from the quality preset) is applied to the
- * shared textures; the CC0 sets look best at 4-8.
+ * shared textures; the CC0 sets look best at 4-8. `gl` (from `useThree`) is
+ * needed to detect the GPU's transcode-target formats for the KTX2 path.
  */
-export function usePbrSet(group: PbrGroup, anisotropy: number): PbrTextureSet | null {
+export function usePbrSet(
+  group: PbrGroup,
+  anisotropy: number,
+  gl: THREE.WebGLRenderer,
+): PbrTextureSet | null {
   const [set, setSet] = useState<PbrTextureSet | null>(null);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
     let active = true;
-    acquire(group).then((s) => {
+    acquire(group, gl).then((s) => {
       if (active) setSet(s);
     });
     return () => {
@@ -228,7 +317,7 @@ export function usePbrSet(group: PbrGroup, anisotropy: number): PbrTextureSet | 
       setSet(null);
       release(group);
     };
-  }, [group]);
+  }, [group, gl]);
 
   useEffect(() => {
     if (!set) return;
