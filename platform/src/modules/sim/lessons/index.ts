@@ -18,8 +18,19 @@ export type {
   StagedEventSpec,
 } from "../contracts";
 
-// Lesson data (specs pinned to district-v1.json) + the A13 exam spec
-export { EXAM_LESSON, LESSONS, lessonById, lessonsInOrder } from "./specs";
+// Multi-map seam helpers (doc 74 §5.1 — contracts own the district default)
+export { DEFAULT_DISTRICT_ID, DEFAULT_LESSON_TRAFFIC, lessonDistrictId } from "../contracts";
+
+// Lesson data (curriculum specs pinned to district-v1.json, полигон specs
+// pinned to poligon-v1.json) + the A13 exam spec + per-district bay paint
+export {
+  EXAM_LESSON,
+  LESSONS,
+  POLIGON_LESSONS,
+  lessonById,
+  lessonParkingBaysFor,
+  lessonsInOrder,
+} from "./specs";
 
 // A13 exam mode — official-limit termination fold (client + server shared)
 export { EXAM_TERMINATION_TEXT_BG, examTerminationFor } from "./exam";

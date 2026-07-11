@@ -17,10 +17,14 @@ export function LessonCard({
 }) {
   const { lesson, unlocked, passed, attempts, bestScore } = entry;
   const isFreeDrive = lesson.objectives.length === 0;
+  // Полигон entries sit OUTSIDE the numbered curriculum chain (their order is
+  // only a grid-sort key) — badge them as the training ground, not „Урок N".
+  const onPoligon = lesson.world?.districtId === "poligon-v1";
+  const badge = isFreeDrive ? "Без задачи" : onPoligon ? "Площадка" : `Урок ${lesson.order}`;
 
   return (
     <article
-      aria-label={`Урок ${lesson.order}: ${lesson.titleBg}`}
+      aria-label={`${badge}: ${lesson.titleBg}`}
       className={`card relative flex flex-col gap-3 p-5 transition motion-reduce:transition-none ${
         unlocked ? "hover:border-border-strong hover:shadow-glow-sm" : "opacity-70"
       }`}
@@ -28,7 +32,7 @@ export function LessonCard({
       <header className="flex items-start justify-between gap-3">
         <div>
           <span className="text-[10px] font-black uppercase tracking-wider text-muted">
-            {isFreeDrive ? "Без задачи" : `Урок ${lesson.order}`}
+            {badge}
           </span>
           <h3 className="mt-0.5 text-lg font-extrabold leading-tight">{lesson.titleBg}</h3>
         </div>

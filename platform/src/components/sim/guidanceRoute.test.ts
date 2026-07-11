@@ -298,3 +298,48 @@ describe("derivation on the real district", () => {
     }
   });
 });
+
+// ---------------------------------------------------------------------------
+// Полигон (B3 multi-map): guidance derives on poligon-v1 exactly like on the
+// city — the graph builder takes whatever district the scene loaded.
+// ---------------------------------------------------------------------------
+
+describe("derivation on the полигон (poligon-v1)", () => {
+  const file = path.resolve(__dirname, "../../../public/world/poligon-v1.json");
+  const district = JSON.parse(fs.readFileSync(file, "utf8")) as RouteDistrictLike & {
+    spawnPoints: { id: string; x: number; y: number; heading: number }[];
+  };
+  const graph = buildRouteGraph(district);
+  const l8 = lessonById("l8-poligon")!;
+  const spawn = (() => {
+    const p = district.spawnPoints.find((s) => s.id === l8.spawn.pointId);
+    if (!p) throw new Error(`missing полигон spawn ${l8.spawn.pointId}`);
+    return { x: p.x, y: p.y, headingDeg: p.heading };
+  })();
+
+  it("derives a route for every l8 objective that wants one", () => {
+    for (let i = 0; i < l8.objectives.length; i++) {
+      const goal = guidanceGoalFor(l8, i);
+      if (goal === null) continue; // smoothStop — by design
+      const route = deriveGuidanceRoute(graph, spawn, goal);
+      expect(route, `l8 objective ${i}`).not.toBeNull();
+      expect(route!.totalLen).toBeGreaterThan(6);
+      if (goal.kind === "point") {
+        const snapped = snapToRoad(graph, goal.x, goal.y)!;
+        const end = endPoint(route!);
+        const gap = Math.hypot(end.x - goal.x, end.y - goal.y);
+        expect(gap, `l8 objective ${i} end gap`).toBeLessThan(snapped.distM + 6);
+      }
+    }
+  });
+
+  it("the circuit drive walks ahead along the perimeter, the park targets the apron bay", () => {
+    const ahead = guidanceGoalFor(l8, 0);
+    expect(ahead?.kind).toBe("ahead");
+    const park = guidanceGoalFor(l8, 1);
+    expect(park).toEqual({ kind: "point", x: 98.5, y: -70, marker: true });
+    // The bay snaps onto the parking apron, well inside the полигон bounds.
+    const snapped = snapToRoad(graph, 98.5, -70)!;
+    expect(snapped.distM).toBeLessThan(8);
+  });
+});

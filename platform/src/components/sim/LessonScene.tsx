@@ -48,13 +48,15 @@ import {
   type VehicleInput,
   type VehicleSim,
 } from "@/modules/sim/vehicle";
-import type {
-  NearMissEvent,
-  NearMissStats,
-  StagedEventOutcome,
-  VehicleSample,
+import {
+  DEFAULT_LESSON_TRAFFIC,
+  lessonDistrictId,
+  type NearMissEvent,
+  type NearMissStats,
+  type StagedEventOutcome,
+  type VehicleSample,
 } from "@/modules/sim/contracts";
-import type { LessonSpec } from "@/modules/sim/lessons";
+import { lessonParkingBaysFor, type LessonSpec } from "@/modules/sim/lessons";
 import {
   createScenarioDirector,
   lessonSeed,
@@ -106,6 +108,13 @@ interface SpawnPointLike {
 
 const MINIMAP_MS = 200;
 const MINIMAP_PX_PER_M = 0.5;
+
+/** BG display names of the shipped worlds (loading/error copy). Unknown
+ *  district ids fall back to a generic „света". */
+const WORLD_NAME_BG: Record<string, string> = {
+  "district-v1": "Студентски град",
+  "poligon-v1": "учебния полигон",
+};
 
 /**
  * Day IBL: Poly Haven `shanghai_riverside` (CC0) — a true-unclipped-sun (25 EV)
@@ -280,26 +289,38 @@ export default function LessonScene(props: LessonSceneProps) {
     let alive = true;
     (async () => {
       try {
-        const res = await fetch("/world/district-v1.json");
-        if (!res.ok) throw new Error(`district ${res.status}`);
+        // THE multi-map seam (doc 74 §5.2): the lesson spec names its world;
+        // everything below is parameterized by the parsed document.
+        const districtId = lessonDistrictId(props.lesson);
+        const res = await fetch(`/world/${districtId}.json`);
+        if (!res.ok) throw new Error(`district ${districtId} ${res.status}`);
         const raw: unknown = await res.json();
         const runtime = createWorldRuntime(raw);
         const district = assertDistrict(raw);
-        const geometry = buildWorldGeometry(district);
+        // Bay paint is CURRICULUM data, per district (doc 74 §5.4): pass the
+        // loaded map's bays explicitly so city bays never paint onto the
+        // полигон (and vice versa) — the builder's default is district-v1's.
+        const geometry = buildWorldGeometry(district, {
+          parkingBays: lessonParkingBaysFor(districtId),
+        });
         const spawnPoints = (
           (raw as { spawnPoints?: SpawnPointLike[] }).spawnPoints ?? []
         );
         // Anchor traffic at the lesson spawn so cars + pedestrians are where the
         // driver actually is — routes otherwise scatter across the ~1.6 km map
         // and every agent gets distance-culled (nearest car was ~340 m away).
+        // Counts are per-lesson data since the полигон (doc 74 §5.5); the
+        // defaults are the pre-seam city values.
         const anchorPose = spawnPose(props.lesson, spawnPoints);
+        const trafficSpec = props.lesson.traffic;
         const traffic = createTrafficSystem(
           raw as Parameters<typeof createTrafficSystem>[0],
           {
             anchor: { x: anchorPose.x, y: -anchorPose.z },
-            anchorRadiusM: 280,
-            vehicleCount: 26,
-            pedestrianCount: 20,
+            anchorRadiusM: trafficSpec?.anchorRadiusM ?? DEFAULT_LESSON_TRAFFIC.anchorRadiusM,
+            vehicleCount: trafficSpec?.vehicleCount ?? DEFAULT_LESSON_TRAFFIC.vehicleCount,
+            pedestrianCount:
+              trafficSpec?.pedestrianCount ?? DEFAULT_LESSON_TRAFFIC.pedestrianCount,
           },
         );
         runtime.setPedestrianQuery((id) => traffic.pedestrianOnCrossing(id));
@@ -344,12 +365,13 @@ export default function LessonScene(props: LessonSceneProps) {
 
   // P1: the old touch refusal GateCard is GONE — touch-only devices now get
   // the TouchControls overlay (ReadyScene) and a one-time orientation hint.
+  const worldName = WORLD_NAME_BG[lessonDistrictId(props.lesson)] ?? "света";
   if (loadError) {
     return (
       <GateCard
         icon="⚠️"
         title="Светът не се зареди"
-        body="Данните за Студентски град не успяха да се заредят. Провери връзката и опитай пак."
+        body={`Данните за ${worldName} не успяха да се заредят. Провери връзката и опитай пак.`}
       />
     );
   }
@@ -358,7 +380,7 @@ export default function LessonScene(props: LessonSceneProps) {
       <div className="flex h-full w-full items-center justify-center bg-surface">
         <div className="flex flex-col items-center gap-3 text-muted">
           <div className="h-8 w-8 animate-spin rounded-full border-2 border-border border-t-accent" />
-          <p className="text-sm">Зареждане на Студентски град…</p>
+          <p className="text-sm">Зареждане на {worldName}…</p>
         </div>
       </div>
     );

@@ -24,6 +24,7 @@ import path from "node:path";
 import { beforeAll, describe, expect, it } from "vitest";
 import type { ParkingBaySpec, VehicleSample } from "../../contracts";
 import { createWorldRuntime, type DistrictWorldRuntime } from "../../runtime";
+import { STOP_LINE_OVERRIDES } from "../../runtime/stoplines";
 import { buildLaneGraph } from "../../traffic/graph";
 import { createTrafficSystem } from "../../traffic/system";
 import { DEFAULT_TRAFFIC_CONFIG, type TrafficDistrict } from "../../traffic/types";
@@ -208,6 +209,23 @@ describe("poligon-v1 through the world runtime", () => {
     expect(runtime.locate({ x: 20, y: -130 }).edgeId).toBe("pg-e-s3");
     expect(runtime.locate({ x: -95, y: -105 }).edgeId).toBe("pg-e-apron-slalom");
     expect(runtime.locate({ x: 95, y: -105 }).edgeId).toBe("pg-e-apron-bays");
+  });
+
+  it("STOP_LINE_OVERRIDES is skip-safe on a foreign map (doc 74 §5.6 regression)", () => {
+    // The hand-placed Б2 table is pinned to district-v1 edge ids. On any
+    // other district those ids must simply not resolve (unknown edgeId →
+    // continue) — never throw, never conjure a phantom stop line. Guard the
+    // precondition first so a future полигон edge can't silently collide
+    // with an override id and turn this test vacuous.
+    expect(STOP_LINE_OVERRIDES.length).toBeGreaterThan(0);
+    const raw = loadPoligonRaw() as { roads: { edges: Array<{ id: string }> } };
+    const edgeIds = new Set(raw.roads.edges.map((e) => e.id));
+    for (const ov of STOP_LINE_OVERRIDES) {
+      expect(edgeIds.has(ov.edgeId), ov.edgeId).toBe(false);
+    }
+    // createWorldRuntime already ran the override loop in beforeAll without
+    // throwing; the полигон still derives ZERO stop lines.
+    expect(runtime.debugStopLines()).toEqual([]);
   });
 
   it("samples a clean eastbound run down the start straight (no phantom events)", () => {

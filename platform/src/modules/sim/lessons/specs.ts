@@ -26,12 +26,14 @@
  *    night lighting and set isNight on every tick for this lesson.
  */
 
-import type {
-  CyclistRightHookSpec,
-  LessonSpec,
-  ParkingBaySpec,
-  PriorityFromRightSpec,
-  RoundaboutEntrySpec,
+import {
+  DEFAULT_DISTRICT_ID,
+  lessonDistrictId,
+  type CyclistRightHookSpec,
+  type LessonSpec,
+  type ParkingBaySpec,
+  type PriorityFromRightSpec,
+  type RoundaboutEntrySpec,
 } from "../contracts";
 
 /**
@@ -797,20 +799,143 @@ export const EXAM_LESSON: LessonSpec = {
   ],
 };
 
-/**
- * Every lesson-authored painted parking bay (doc 68 A5). The world builder
- * paints these by default (buildWorldGeometry `options.parkingBays` fallback)
- * — same curriculum-drives-the-world pattern as the L2 Б2 stop-sign placement
- * (runtime/stoplines STOP_LINE_OVERRIDES → world props). DATA ONLY, so the
- * pure world builder can import it without dragging in the lesson engine.
- * The exam's bay IS L7's object, so the curriculum list already covers it.
- */
-export const LESSON_PARKING_BAYS: readonly ParkingBaySpec[] = LESSONS.flatMap((l) =>
-  l.parkingBay ? [l.parkingBay] : [],
-);
+// ---------------------------------------------------------------------------
+// ПОЛИГОН — „Учебна площадка" entries (map program doc 74, wave 1)
+// ---------------------------------------------------------------------------
 
-/** Every playable spec: curriculum lessons + the A13 exam. */
-const ALL_LESSONS: readonly LessonSpec[] = [...LESSONS, EXAM_LESSON];
+/**
+ * The полигон's graded bay: PERPENDICULAR bay on the „Коридор за паркиране"
+ * apron (edge pg-e-apron-bays — centerline x = 95, 2 service lanes → scaled
+ * half-width 8.125 m). Center 3.5 m east of the centerline, axis EAST
+ * (headingDeg 90) across the north-south corridor — the classic полигон
+ * reverse-bay drill. Far edge 98.5 + 3.3 = 101.8 m < curb at 103.1 m, so the
+ * paint stays on the carriageway. Same rect the prototype test paints —
+ * single source for the world paint AND the graded rect (the L7 pattern).
+ */
+const L8_POLIGON_BAY: ParkingBaySpec = {
+  x: 98.5,
+  y: -70,
+  headingDeg: 90,
+  widthM: 3.0,
+  lengthM: 6.6,
+};
+
+/** Полигон ambient traffic: an учебна площадка, not a boulevard — a couple
+ *  of instructor cars and walkers. anchorRadiusM covers the whole 380 × 260 m
+ *  ground (the city's 280 m default is anchored for a 1.6 km map). */
+const POLIGON_TRAFFIC = { vehicleCount: 2, pedestrianCount: 2, anchorRadiusM: 400 } as const;
+
+/**
+ * Out-of-curriculum полигон entries — the A13 exam-card PATTERN, not new
+ * machinery: they live outside LESSONS (the linear order-chain progression
+ * never sees them, so every existing unlock/pinning invariant is untouched),
+ * unlock via the same `unlockAfterLessonId` + isExamUnlocked gate the exam
+ * card uses (absent field = always open), and resolve through lessonById for
+ * the wire/grading path like any lesson. `order` here is ONLY a select-grid
+ * sort key (0.5 / 1.5 slot the cards after L0 / L1); it deliberately stays
+ * out of the contiguous 0..n curriculum chain.
+ */
+export const POLIGON_LESSONS: readonly LessonSpec[] = [
+  {
+    id: "l0p-poligon-free",
+    order: 0.5, // grid slot right after L0 — free-drive cards lead the grid
+    titleBg: "Полигон — свободно каране",
+    descriptionBg:
+      "Учебната площадка е само твоя: широки алеи, плавни завои и почти никакъв трафик. Свикни с колата на спокойствие, преди да излезеш в квартала — правилата важат и тук.",
+    conceptIds: ["c-driver-obligations", "c-speed-adaptation", "c-maneuver-principles"],
+    world: { districtId: "poligon-v1" },
+    spawn: { pointId: "pg-spawn-1" }, // старт-стоп права
+    preDrive: false,
+    // Same acclimatization policy as L0: ready to roll (engine on, D).
+    vehicleStart: "ready",
+    traffic: POLIGON_TRAFFIC,
+    objectives: [],
+  },
+  {
+    id: "l8-poligon",
+    order: 1.5, // grid slot right after L1 — площадката преди трафика
+    titleBg: "Полигон — начални маневри",
+    descriptionBg:
+      "Първите маневри се учат на площадката, не в трафика: обиколи периметъра с плавни завои, паркирай на заден ход в очертаното място и спри меко на коридора.",
+    conceptIds: [
+      "c-pre-drive-check",
+      "c-maneuver-principles",
+      "c-reversing",
+      "c-braking-distance",
+      "c-mirrors-blind-spots",
+    ],
+    world: { districtId: "poligon-v1" },
+    spawn: { pointId: "pg-spawn-1" }, // старт-стоп права, на изток
+    preDrive: true,
+    // Second rung of the Instruction→Practice→Assess ladder (doc 68 §5): the
+    // student saw the guided procedure in L1; here it runs order-tolerant
+    // with idle hints, not exam-strict ("assess" stays optional drill-up).
+    preDriveMode: "practice",
+    // vehicleStart absent = cold (A1 policy) — the полигон teaches the real
+    // start ritual from the first hour.
+    unlockAfterLessonId: "l1-preparation",
+    parkingBay: L8_POLIGON_BAY,
+    traffic: POLIGON_TRAFFIC,
+    objectives: [
+      {
+        id: "l8-circuit",
+        titleBg: "Обиколи полигона — измини 400 метра",
+        kind: "driveDistance",
+        params: { meters: 400 },
+      },
+      {
+        id: "l8-park",
+        titleBg: "Паркирай на заден ход в очертаното място",
+        kind: "completeManeuver",
+        // Bay-locked like L7: at rest inside the SAME painted rect, aligned,
+        // via reverse (A10 evaluator defaults).
+        params: { maneuver: "parkInBay", holdSec: 1.5, bay: L8_POLIGON_BAY },
+      },
+      {
+        id: "l8-smooth-stop",
+        titleBg: "Спри плавно на коридора за паркиране",
+        kind: "completeManeuver",
+        // The apron is a 20 km/h zone — arm the attempt from 15 km/h so the
+        // drill is drivable without breaking the полигон limit.
+        params: { maneuver: "smoothStop", minApproachKmh: 15, maxDecelMs2: 3.5 },
+      },
+    ],
+  },
+];
+
+/**
+ * Every lesson-authored painted parking bay (doc 68 A5) ON THE DEFAULT CITY
+ * DISTRICT. The world builder paints these by default (buildWorldGeometry
+ * `options.parkingBays` fallback) — same curriculum-drives-the-world pattern
+ * as the L2 Б2 stop-sign placement (runtime/stoplines STOP_LINE_OVERRIDES →
+ * world props). DATA ONLY, so the pure world builder can import it without
+ * dragging in the lesson engine. The exam's bay IS L7's object, so the
+ * curriculum list already covers it.
+ *
+ * Multi-map (doc 74 §5.4): the default MUST stay district-v1-only — полигон
+ * bays must never paint onto the city and vice versa. Per-district paint sets
+ * come from lessonParkingBaysFor(); LessonScene passes them explicitly.
+ */
+export const LESSON_PARKING_BAYS: readonly ParkingBaySpec[] = LESSONS.filter(
+  (l) => lessonDistrictId(l) === DEFAULT_DISTRICT_ID,
+).flatMap((l) => (l.parkingBay ? [l.parkingBay] : []));
+
+/** Every playable spec: curriculum lessons + полигон entries + the A13 exam. */
+const ALL_LESSONS: readonly LessonSpec[] = [...LESSONS, ...POLIGON_LESSONS, EXAM_LESSON];
+
+/**
+ * Lesson-authored bay paint for ONE district (doc 74 §5.4) — what the scene
+ * hands buildWorldGeometry for the map it actually loaded. Union across every
+ * curriculum + полигон spec on that district, so free drive on the полигон
+ * still shows the drill bay, exactly like the city always shows L7's. The
+ * exam is deliberately excluded: its bay IS L7's object (same rect, single
+ * truth) and including it would paint the rect twice.
+ */
+export function lessonParkingBaysFor(districtId: string): readonly ParkingBaySpec[] {
+  return [...LESSONS, ...POLIGON_LESSONS]
+    .filter((l) => lessonDistrictId(l) === districtId)
+    .flatMap((l) => (l.parkingBay ? [l.parkingBay] : []));
+}
 
 /** Lookup by id — including the exam; undefined for unknown ids (wire input
  *  goes through this, so exam finishes grade server-side like any lesson). */

@@ -5,7 +5,9 @@ import {
   EXAM_LESSON,
   isExamUnlocked,
   LESSONS,
+  POLIGON_LESSONS,
   type LessonAttemptRow,
+  type LessonSpec,
 } from "@/modules/sim/lessons";
 import {
   getSimSessionStore,
@@ -56,28 +58,39 @@ export default async function SimulatorPage() {
     console.warn("simulator: listSessions failed, using empty progression", err);
   }
 
-  const entries: LessonEntryView[] = computeProgression(LESSONS, attempts).map((e) => ({
-    lesson: e.lesson,
-    unlocked: e.unlocked,
-    passed: e.passed,
-    attempts: e.attempts,
-    bestScore: e.bestScore,
-  }));
-
-  // A13: the exam entry — gated by the spec's prerequisite (isExamUnlocked;
-  // EXAM_LESSON documents the l2-intersections choice), stats folded from
-  // the same persisted attempts as the lesson cards.
-  const examAttempts = attempts.filter((a) => a.lessonId === EXAM_LESSON.id);
-  const examEntry: LessonEntryView = {
-    lesson: EXAM_LESSON,
-    unlocked: isExamUnlocked(EXAM_LESSON, attempts),
-    passed: examAttempts.some((a) => a.passed),
-    attempts: examAttempts.length,
-    bestScore: examAttempts.reduce<number | null>(
-      (best, a) => (best === null ? a.score : Math.min(best, a.score)),
-      null,
-    ),
+  // Out-of-curriculum entries (exam + полигон) share one fold: gated by the
+  // spec's own unlockAfterLessonId (isExamUnlocked — absent field = always
+  // open), stats from the same persisted attempts as the lesson cards.
+  const entryFor = (spec: LessonSpec): LessonEntryView => {
+    const specAttempts = attempts.filter((a) => a.lessonId === spec.id);
+    return {
+      lesson: spec,
+      unlocked: isExamUnlocked(spec, attempts),
+      passed: specAttempts.some((a) => a.passed),
+      attempts: specAttempts.length,
+      bestScore: specAttempts.reduce<number | null>(
+        (best, a) => (best === null ? a.score : Math.min(best, a.score)),
+        null,
+      ),
+    };
   };
+
+  // Curriculum progression + the полигон cards, merged into ONE grid sorted
+  // by order (полигон orders 0.5 / 1.5 slot the cards after L0 / L1 — the
+  // площадка comes before city traffic, as in a real driving school).
+  const entries: LessonEntryView[] = [
+    ...computeProgression(LESSONS, attempts).map((e) => ({
+      lesson: e.lesson,
+      unlocked: e.unlocked,
+      passed: e.passed,
+      attempts: e.attempts,
+      bestScore: e.bestScore,
+    })),
+    ...POLIGON_LESSONS.map(entryFor),
+  ].sort((a, b) => a.lesson.order - b.lesson.order);
+
+  // A13: the exam entry — its own gated card below the grid.
+  const examEntry: LessonEntryView = entryFor(EXAM_LESSON);
 
   return <SimulatorClient entries={entries} examEntry={examEntry} history={history} />;
 }
@@ -102,7 +115,7 @@ const SEVERITY_RANK: Record<SessionHistoryMistake["severityClass"], number> = {
  */
 function buildHistoryEntries(rows: SimSessionDetailRow[]): SessionHistoryEntry[] {
   const titleByLessonId = new Map(
-    [...LESSONS, EXAM_LESSON].map((l) => [l.id, l.titleBg]),
+    [...LESSONS, ...POLIGON_LESSONS, EXAM_LESSON].map((l) => [l.id, l.titleBg]),
   );
 
   return rows.map((r) => {
