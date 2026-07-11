@@ -86,17 +86,22 @@ export const COCKPIT_HOTSPOTS: readonly CockpitHotspotSpec[] = [
   },
   {
     name: "hotspot_gear_selector",
+    // v3 console bridge (doc 73 §4 P2-1): the selector rides the RAISED
+    // floating deck (top y 0.31) so the control is visible instead of below
+    // the frame bottom in every pose — was [0, 0.178, 0.43]. Kept in the
+    // same commit as the hero_interior.glb v3 swap (node moved identically).
     labelBg: "Скоростен лост (десен бутон: назад към P)",
     keyHint: "[ ]",
-    pos: [0, 0.178, 0.43],
+    pos: [0, 0.32, 0.43],
     size: [0.13, 0.14, 0.16],
     action: { type: "gearStep" },
   },
   {
     name: "hotspot_parking_brake",
+    // v3 console bridge (doc 73 §4 P2-1) — was [0.093, 0.144, 0.35].
     labelBg: "Ръчна спирачка",
     keyHint: "Space",
-    pos: [0.093, 0.144, 0.35],
+    pos: [0.093, 0.315, 0.35],
     size: [0.1, 0.08, 0.12],
     action: { type: "parkingBrakeToggle" },
   },
