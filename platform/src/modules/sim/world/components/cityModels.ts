@@ -1,16 +1,16 @@
 /**
  * District-kit geometry loader — CLIENT ONLY (GLTFLoader needs the DOM).
  *
- * Loads every model in CITY_MODELS (the authored district kit v3 under
+ * Loads every model in CITY_MODELS (the authored district kit under
  * public/sim/city-v3: `t_*.glb` towers + `pav_*.glb` retail pavilions,
  * Draco-compressed by the asset pipeline — hence createGltfLoader(), NOT a bare
- * GLTFLoader which throws "no DRACOLoader instance provided"). Each building
- * carries its OWN PBR materials — `glass_dark`/`glass_bronze` (rough ≤ 0.07,
- * clearcoated: reflects the scene HDRI), matte facade shells (`conc_beige`/
- * `conc_grey`/`precast_cream`/`band_white`/`stone_podium`/`stone_dark`/
- * `roof_dark`), `bronze_metal` (metallic trim), `glass_lit` (emissive warm
- * lit windows — the night-glow hook) and `sign_red` (emissive retail signage
- * strips). We keep those materials: this loader bakes each GLB into one
+ * GLTFLoader which throws "no DRACOLoader instance provided"). The v4 kit
+ * ships IMAGE-FREE named materials: `bay_grid`/`bay_strip`/`bay_curtain`/
+ * `bay_band` (tower shafts) + `trim` (podium/retail/parapet/signage) receive
+ * the shared baked facade textures at runtime (CityBuildings wires them from
+ * useFacadeTextures BY NAME — one GPU copy district-wide), plus flat
+ * `glass_dark` (lobbies), `glass_bronze`/`bronze_metal`/`stone_dark`
+ * (pavilions) and `roof_dark`. This loader bakes each GLB into one
  * `{ geometry, material }` group PER material so the renderer can instance
  * them separately and the glass reflects `scene.environment` (set by the
  * scene's <Environment>) via MeshStandardMaterial's envMap sampling.
@@ -98,6 +98,11 @@ function bakeTowerGroups(scene: THREE.Object3D): CityMaterialGroup[] {
     if (nor) g.setAttribute("normal", nor.clone());
     const uv = src.getAttribute("uv");
     if (uv) g.setAttribute("uv", uv.clone());
+    // COLOR_0: per-face facade tints (beige/grey concrete, cream/white
+    // parapets) multiplied over the NEUTRAL baked textures — the v4 kit's
+    // per-system variety channel. Dropping it would grey out the district.
+    const col = src.getAttribute("color");
+    if (col) g.setAttribute("color", col.clone());
     // Bake the node's world transform into the positions/normals.
     g.applyMatrix4(mesh.matrixWorld);
     if (!nor) g.computeVertexNormals();

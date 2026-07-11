@@ -89,6 +89,10 @@ function useWorldTextures(preset: QualityPreset): WorldTextures {
         const pair = makeFacadeTextures(v, Math.min(512, preset.textureSize));
         withAniso(pair.map);
         withAniso(pair.emissiveMap);
+        // The wall UVs are authored for the baked sets (glTF convention,
+        // negated V — buildings.ts); match the fallback's orientation.
+        pair.map.flipY = false;
+        pair.emissiveMap.flipY = false;
         return pair;
       }),
     };
@@ -170,12 +174,16 @@ export function StaticWorld({
 }) {
   const textures = useWorldTextures(preset);
   const geometries = useWorldGeometries(world);
+  const gl = useThree((s) => s.gl);
 
   // Real CC0 PBR sets — shared, cached, loaded once. Until they resolve (or on
   // the server) each mesh falls back to its procedural canvas texture below.
   const asphalt = usePbrSet("road", preset.anisotropy);
   const concrete = usePbrSet("sidewalk", preset.anisotropy);
   const grass = usePbrSet("ground", preset.anisotropy);
+  // Baked facade bay sets (facade_atlas.py) — shared with the instanced kit
+  // towers (CityBuildings wires the same cache onto the GLB materials).
+  const facadeSets = useFacadeTextures(gl, preset.anisotropy);
 
   const receive = preset.receiveShadows;
   const buildingsCast = preset.castShadows !== "none";
@@ -380,27 +388,54 @@ export function StaticWorld({
         <meshStandardMaterial color={0xe9e7df} roughness={0.85} metalness={0} />
       </mesh>
       {/* Mid-rise facade prisms: real OSM footprints at district-data heights
-          (glass towers are a separate instanced pass — CityBuildings). */}
-      {geometries.walls.map((wall, variant) =>
-        wall.getAttribute("position") && wall.getAttribute("position").count > 0 ? (
+          (glass towers are a separate instanced pass — CityBuildings). Baked
+          bay sets (real recess normals/AO + lit-window emissive, doc 71 §4.5)
+          replace the procedural canvas pair once loaded; the facadeTint
+          vertex colors keep multiplying over either. ORM fills three slots
+          from ONE texture (R=AO, G=rough, B=metal — three's channel layout),
+          so factors stay 1 and the map rules. */}
+      {geometries.walls.map((wall, variant) => {
+        if (!(wall.getAttribute("position") && wall.getAttribute("position").count > 0)) {
+          return null;
+        }
+        const baked = facadeSets?.[FACADE_SETS[variant % FACADE_VARIANT_COUNT]!];
+        return (
           <mesh
             key={variant}
             geometry={wall}
             castShadow={buildingsCast}
             receiveShadow={receive}
           >
-            <meshStandardMaterial
-              map={textures.facades[variant % FACADE_VARIANT_COUNT]!.map}
-              emissiveMap={textures.facades[variant % FACADE_VARIANT_COUNT]!.emissiveMap}
-              emissive={0xffffff}
-              emissiveIntensity={night ? 1.1 : 0}
-              vertexColors
-              roughness={0.9}
-              metalness={0}
-            />
+            {baked ? (
+              <meshStandardMaterial
+                map={baked.color}
+                normalMap={baked.normal}
+                aoMap={baked.orm}
+                aoMapIntensity={1.2}
+                roughnessMap={baked.orm}
+                metalnessMap={baked.orm}
+                emissiveMap={baked.emissive}
+                emissive={0xffffff}
+                emissiveIntensity={night ? FACADE_NIGHT_GLOW : FACADE_DAY_GLOW}
+                vertexColors
+                roughness={1}
+                metalness={1}
+                envMapIntensity={1.5}
+              />
+            ) : (
+              <meshStandardMaterial
+                map={textures.facades[variant % FACADE_VARIANT_COUNT]!.map}
+                emissiveMap={textures.facades[variant % FACADE_VARIANT_COUNT]!.emissiveMap}
+                emissive={0xffffff}
+                emissiveIntensity={night ? 1.1 : 0}
+                vertexColors
+                roughness={0.9}
+                metalness={0}
+              />
+            )}
           </mesh>
-        ) : null,
-      )}
+        );
+      })}
       <mesh geometry={geometries.roofs} castShadow={buildingsCast} receiveShadow={receive}>
         <meshStandardMaterial map={textures.roof} roughness={0.95} metalness={0} />
       </mesh>

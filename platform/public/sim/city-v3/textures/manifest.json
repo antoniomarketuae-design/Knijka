@@ -1,0 +1,86 @@
+{
+  "version": 1,
+  "format": "ktx2",
+  "sets": {
+    "bay_grid": {
+      "color": "bay_grid_color.ktx2",
+      "normal": "bay_grid_normal.ktx2",
+      "orm": "bay_grid_orm.ktx2",
+      "emissive": "bay_grid_emissive.ktx2"
+    },
+    "bay_strip": {
+      "color": "bay_strip_color.ktx2",
+      "normal": "bay_strip_normal.ktx2",
+      "orm": "bay_strip_orm.ktx2",
+      "emissive": "bay_strip_emissive.ktx2"
+    },
+    "bay_curtain": {
+      "color": "bay_curtain_color.ktx2",
+      "normal": "bay_curtain_normal.ktx2",
+      "orm": "bay_curtain_orm.ktx2",
+      "emissive": "bay_curtain_emissive.ktx2"
+    },
+    "bay_band": {
+      "color": "bay_band_color.ktx2",
+      "normal": "bay_band_normal.ktx2",
+      "orm": "bay_band_orm.ktx2",
+      "emissive": "bay_band_emissive.ktx2"
+    },
+    "trim": {
+      "color": "trim_color.ktx2",
+      "normal": "trim_normal.ktx2",
+      "orm": "trim_orm.ktx2",
+      "emissive": "trim_emissive.ktx2"
+    }
+  },
+  "layout": {
+    "bay": {
+      "tile_u_m": 12,
+      "tile_v_m": 11.399999999999999,
+      "module_m": {
+        "grid": 3,
+        "strip": 2.4,
+        "curtain": 1.5,
+        "band": 3
+      },
+      "lit_pct": {
+        "grid": 0.3,
+        "strip": 0.22,
+        "curtain": 0.35,
+        "band": 0.2
+      }
+    },
+    "trim": {
+      "tile_u_m": 12,
+      "total_v_m": 13.7,
+      "strips_m": {
+        "podium": [
+          0,
+          4.5
+        ],
+        "retail": [
+          4.8,
+          8.7
+        ],
+        "parapet": [
+          9,
+          11.2
+        ],
+        "sign": [
+          11.5,
+          12.4
+        ],
+        "louver": [
+          12.7,
+          13.7
+        ]
+      }
+    },
+    "maps": [
+      "color",
+      "normal",
+      "orm",
+      "emissive"
+    ]
+  }
+}

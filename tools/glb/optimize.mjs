@@ -37,6 +37,7 @@ import { resolve as resolvePath, join as joinPath } from "node:path";
 import { createRequire } from "node:module";
 import { pathToFileURL, fileURLToPath } from "node:url";
 import process from "node:process";
+import { findToktx, envWithToktx } from "./ktx.mjs";
 
 // This script lives outside the `platform/` package, but its heavy deps
 // (@gltf-transform/*, draco3dgltf, sharp) are installed in platform/node_modules.
@@ -87,15 +88,9 @@ function fmtBytes(n) {
   return `${(n / (1024 * 1024)).toFixed(2)} MB`;
 }
 
-/** True if a working `toktx` (KTX-Software) binary is on PATH. */
-function detectToktx() {
-  try {
-    execFileSync("toktx", ["--version"], { stdio: "ignore" });
-    return true;
-  } catch {
-    return false;
-  }
-}
+// toktx detection lives in ./ktx.mjs (probes PATH, the KTX-Software installer
+// dir and E:\ktx*) — shared with pack_textures.mjs so both pipelines upgrade
+// to KTX2 automatically the moment the founder's KTX-Software install lands.
 
 // ---- main ------------------------------------------------------------------
 
@@ -125,15 +120,26 @@ async function main() {
   const document = await io.read(inputPath);
   const textureCount = document.getRoot().listTextures().length;
 
+  // Blender's glTF exporter (5.x, "all vertex colors") duplicates the active
+  // color attribute into COLOR_1+ — dead weight no runtime reads. Drop the
+  // extras up front; dedup/prune below clean the orphaned accessors.
+  for (const mesh of document.getRoot().listMeshes()) {
+    for (const prim of mesh.listPrimitives()) {
+      for (const semantic of prim.listSemantics()) {
+        if (/^COLOR_(?:[1-9]\d*)$/.test(semantic)) prim.setAttribute(semantic, null);
+      }
+    }
+  }
+
   // Decide the texture strategy up front so we can log one clear line.
   const wantKtx2 = ktx2;
-  const toktxAvailable = wantKtx2 ? detectToktx() : false;
-  const useKtx2 = wantKtx2 && toktxAvailable;
+  const toktx = wantKtx2 ? findToktx() : null;
+  const useKtx2 = wantKtx2 && toktx !== null;
 
   if (!wantKtx2) {
     console.log("  textures:    KTX2 disabled (--no-ktx2) — using webp + resize fallback");
   } else if (useKtx2) {
-    console.log("  textures:    KTX2/BasisU via toktx (KTX-Software found on PATH)");
+    console.log(`  textures:    KTX2/BasisU via toktx (${toktx.bin})`);
   } else {
     console.log(
       "  textures:    KTX2 SKIPPED — no `toktx`/`basisu` (KTX-Software) binary on PATH;\n" +
@@ -146,7 +152,23 @@ async function main() {
   }
 
   // ---- geometry + housekeeping transforms (always) ----
-  const transforms = [dedup(), weld(), prune(), resample()];
+  // prune keepAttributes: the district-kit GLBs ship IMAGE-FREE materials
+  // (shared textures are wired at runtime by material name), so their
+  // TEXCOORD_0/COLOR_0 look "unused" to prune's material analysis — default
+  // v4 behaviour (keepAttributes false) silently strips the facade UVs.
+  // keepUniqueNames: the district-kit GLBs carry IMAGE-FREE facade materials
+  // (bay_grid/bay_strip/bay_curtain/bay_band/trim) that the runtime wires the
+  // shared textures onto BY NAME (facadeTextures.ts / CityBuildings). With the
+  // images stripped at export they are byte-identical glTF materials, so a
+  // value-based dedup collapses all five into one (keeping whichever name comes
+  // first — `trim`), silently destroying the bay-system distinction the sim
+  // depends on. Preserving uniquely-named properties keeps the wiring intact.
+  const transforms = [
+    dedup({ keepUniqueNames: true }),
+    weld(),
+    prune({ keepAttributes: true }),
+    resample(),
+  ];
 
   // ---- texture transform: webp+resize unless KTX2 will run as a post-pass ----
   if (!useKtx2 && textureCount > 0) {
@@ -160,7 +182,10 @@ async function main() {
   }
 
   // ---- Draco geometry compression (always) ----
-  transforms.push(draco());
+  // quantizeTexcoord 14 (default 12): tiling facade UVs run past 0–1; 12 bits
+  // over the UV range = ~15 px swim at 2K on long facades (doc 71 §4.5). The
+  // generators also floor-subtract per-face UVs to keep magnitudes small.
+  transforms.push(draco({ quantizeTexcoord: 14 }));
 
   await document.transform(...transforms);
   await io.write(outputPath, document);
@@ -173,8 +198,25 @@ async function main() {
       const bin = process.platform === "win32" ? "gltf-transform.cmd" : "gltf-transform";
       const binPath = joinPath(platformDir, "node_modules", ".bin", bin);
       const cli = existsSync(binPath) ? binPath : bin;
-      execFileSync(cli, ["etc1s", outputPath, outputPath], { stdio: "inherit" });
-      console.log("  textures:    KTX2/BasisU (etc1s) applied");
+      const env = envWithToktx(toktx);
+      // Per-slot codec policy (doc 71 §4.7): ETC1S for color-ish maps (4 bpp),
+      // UASTC for normal maps (ETC1S bands normal vectors). Run ETC1S first on
+      // the explicit non-normal slots, then UASTC on normals only.
+      execFileSync(
+        cli,
+        [
+          "etc1s", outputPath, outputPath,
+          "--slots", "{baseColorTexture,emissiveTexture,occlusionTexture,metallicRoughnessTexture}",
+          "--quality", "160",
+        ],
+        { stdio: "inherit", env },
+      );
+      execFileSync(
+        cli,
+        ["uastc", outputPath, outputPath, "--slots", "{normalTexture}", "--level", "2", "--rdo", "--zstd", "18"],
+        { stdio: "inherit", env },
+      );
+      console.log("  textures:    KTX2/BasisU applied (etc1s color + uastc normals)");
     } catch (err) {
       console.warn(
         `  textures:    KTX2 pass failed (${err.message}) — output has Draco + un-KTX2 textures`,

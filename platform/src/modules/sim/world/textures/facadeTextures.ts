@@ -4,8 +4,9 @@
  * (bay_grid / bay_strip / bay_curtain / bay_band towers + the trim atlas)
  * are the single GPU copy, wired onto materials BY NAME in CityBuildings and
  * onto the 238 facade prisms in StaticWorld. Authored by
- * tools/blender/facade_atlas.py (strip-board Cycles bakes: real recess
- * normals + AO + lit-window emissive), packed by tools/glb/pack_textures.mjs.
+ * tools/blender/facade_gen.mjs (procedural Node/sharp raster: window grid +
+ * real recess normals + AO + lit-window emissive), packed by
+ * tools/glb/pack_textures.mjs.
  *
  * Format follows textures/manifest.json: "webp" today, "ktx2" automatically
  * once KTX-Software lands and the packer re-runs (ETC1S color / UASTC

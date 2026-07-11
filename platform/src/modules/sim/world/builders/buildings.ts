@@ -8,8 +8,13 @@
  *   kit-building instance instead (skipFacadesFor) emit NO walls/roof, but
  *   ALWAYS emit their collider + aabb, so physics and prop placement see
  *   every building.
- * - Wall UVs: u = perimeter meters, v = height meters, both / FACADE_TILE_M
- *   so the facade texture (4x4 window bays) tiles at true scale.
+ * - Wall UVs: u = perimeter meters / FACADE_TILE_U_M, v = -(height meters) /
+ *   FACADE_TILE_V_M — the baked bay textures (facade_atlas.py) tile at true
+ *   world scale. V is NEGATED because the shared textures are uploaded in
+ *   glTF convention (flipY=false, v=0 at image top) to serve the kit towers
+ *   too; with RepeatWrapping the negation reads the image bottom-up.
+ * - Per-building whole-bay U / whole-floor V offset (hash lane "bay:") shifts
+ *   the baked lit-window pattern so neighbouring prisms never repeat it.
  * - Ground floor: darker band via vertex colors (extra vertex row at
  *   GROUND_BAND_M) — free, no extra material.
  * - Per-building tint (doc 71 Phase 1 / QW-D): ±9 % brightness + a subtle
@@ -22,7 +27,10 @@
 import type { DistrictBuilding } from "../types";
 import { resolveBuildingHeightM } from "./cityBuildings";
 import {
-  FACADE_TILE_M,
+  FACADE_BAY_M,
+  FACADE_FLOOR_M,
+  FACADE_TILE_U_M,
+  FACADE_TILE_V_M,
   FACADE_VARIANTS,
   GROUND_BAND_M,
   GROUND_BAND_TINT,
@@ -70,6 +78,12 @@ function buildOne(
   const ring = toCCW(b.footprint as Vec2[]);
   const h = resolveBuildingHeightM(b);
   const bandTop = Math.min(GROUND_BAND_M, h - 0.5);
+  // Whole-bay U / whole-floor V shift of the baked bay texture per building —
+  // de-correlates the lit-window pattern across the 238 prisms for free.
+  const bayHash = hashString(`bay:${b.id}`);
+  const uOff = (bayHash % 4) * (FACADE_BAY_M / FACADE_TILE_U_M);
+  const vOff = ((bayHash >> 2) % 3) * (FACADE_FLOOR_M / FACADE_TILE_V_M);
+  const vAt = (y: number): number => vOff - y / FACADE_TILE_V_M;
   const [tr, tg, tb] = facadeTint(b.id);
   const dark: [number, number, number] = [
     GROUND_BAND_TINT * tr,
@@ -99,8 +113,8 @@ function buildOne(
     const nx = dy / segLen;
     const ny = -dx / segLen;
     const n: [number, number, number] = [nx, 0, -ny];
-    const u0 = perim / FACADE_TILE_M;
-    const u1 = (perim + segLen) / FACADE_TILE_M;
+    const u0 = uOff + perim / FACADE_TILE_U_M;
+    const u1 = uOff + (perim + segLen) / FACADE_TILE_U_M;
     perim += segLen;
 
     // Wall as two stacked quads: ground band (dark tint) + upper floors.
@@ -111,10 +125,10 @@ function buildOne(
         [bandTop, h, light],
       ];
       for (const [y0, y1, tint] of rows) {
-        const b0 = wallAcc.vertex(toWorld(p0[0], p0[1], y0), n, [u0, y0 / FACADE_TILE_M], tint);
-        const b1 = wallAcc.vertex(toWorld(p1[0], p1[1], y0), n, [u1, y0 / FACADE_TILE_M], tint);
-        const t1 = wallAcc.vertex(toWorld(p1[0], p1[1], y1), n, [u1, y1 / FACADE_TILE_M], tint);
-        const t0 = wallAcc.vertex(toWorld(p0[0], p0[1], y1), n, [u0, y1 / FACADE_TILE_M], tint);
+        const b0 = wallAcc.vertex(toWorld(p0[0], p0[1], y0), n, [u0, vAt(y0)], tint);
+        const b1 = wallAcc.vertex(toWorld(p1[0], p1[1], y0), n, [u1, vAt(y0)], tint);
+        const t1 = wallAcc.vertex(toWorld(p1[0], p1[1], y1), n, [u1, vAt(y1)], tint);
+        const t0 = wallAcc.vertex(toWorld(p0[0], p0[1], y1), n, [u0, vAt(y1)], tint);
         wallAcc.quad(b0, b1, t1, t0);
       }
     }

@@ -23,8 +23,10 @@
  */
 
 import { useEffect, useMemo } from "react";
+import { useThree } from "@react-three/fiber";
 import * as THREE from "three";
 import type { BuildingInstancePlacement, WorldGeometry } from "../types";
+import { useFacadeTextures, type FacadeSetName } from "../textures/facadeTextures";
 import { preloadCityModels, useCityModels } from "./cityModels";
 import type { QualityPreset } from "./quality";
 
@@ -38,12 +40,26 @@ preloadCityModels();
  *  so the chunk count multiplies the draw budget — keep it moderate. */
 const CHUNK_M = 200;
 
-/** Emissive intensity of the lit-window material (`glass_lit` in the v3 kit)
- *  by time of day. Day 2.0 (doc 71 §4.3): golden-hour interiors must cross
- *  the composer's 0.9 bloom threshold — 1.35 was authored for noon. */
-const LIT_WINDOW_MATERIAL = "glass_lit";
+/** Emissive intensity of the lit-window materials by time of day. Day 2.0
+ *  (doc 71 §4.3): golden-hour interiors must cross the composer's 0.9 bloom
+ *  threshold. The v4 kit bakes lit windows into the bay/trim emissive maps
+ *  (materials `bay_*` + `trim`); `glass_lit` is kept for older kit GLBs. */
 const DAY_GLOW = 2.0;
 const NIGHT_GLOW = 3.2;
+
+/** Materials whose emissive map carries baked lit windows / signage. */
+function isLitWindowMaterial(name: string): boolean {
+  return name === "glass_lit" || name === "trim" || name.startsWith("bay_");
+}
+
+/** Baked facade set for a kit material name, if it is texture-driven. */
+function facadeSetFor(name: string): FacadeSetName | null {
+  if (name === "trim") return "trim";
+  if (name === "bay_grid" || name === "bay_strip" || name === "bay_curtain" || name === "bay_band") {
+    return name;
+  }
+  return null;
+}
 
 const _pos = new THREE.Vector3();
 const _quat = new THREE.Quaternion();
@@ -109,6 +125,43 @@ export function CityBuildings({
   night?: boolean;
 }) {
   const models = useCityModels();
+  const gl = useThree((s) => s.gl);
+  // Shared baked facade sets (one GPU copy district-wide — same cache the
+  // facade prisms in StaticWorld consume). The kit GLBs ship image-free.
+  const facadeSets = useFacadeTextures(gl, 8);
+
+  // Wire the shared textures onto the named kit materials (bay_* / trim).
+  // Everything is set explicitly — the image-free GLB factors are noise:
+  // color/roughness/metalness 1 so the maps rule; emissive white so the
+  // day/night glow effect below owns intensity; ORM fills aoMap +
+  // roughnessMap + metalnessMap from ONE texture (R=AO, G=rough, B=metal).
+  useEffect(() => {
+    if (!models || !facadeSets) return;
+    for (const groups of models.models) {
+      for (const g of groups) {
+        const setName = facadeSetFor(g.name);
+        if (!setName) continue;
+        const set = facadeSets[setName];
+        const m = g.material;
+        if (m.map === set.color) continue; // already wired
+        m.map = set.color;
+        m.normalMap = set.normal;
+        m.aoMap = set.orm;
+        m.aoMapIntensity = 1.2;
+        m.roughnessMap = set.orm;
+        m.metalnessMap = set.orm;
+        m.emissiveMap = set.emissive;
+        m.emissive.setRGB(1, 1, 1);
+        m.color.setRGB(1, 1, 1);
+        m.roughness = 1;
+        m.metalness = 1;
+        // Bays mix concrete + glass panes in one map (metal/rough channels
+        // pick the response); middle-ground env punch. Trim is mostly stone.
+        m.envMapIntensity = setName === "trim" ? 1.0 : 1.5;
+        m.needsUpdate = true;
+      }
+    }
+  }, [models, facadeSets]);
 
   const assets = useMemo(() => {
     if (!models) return null;
@@ -160,14 +213,15 @@ export function CityBuildings({
     return { meshes };
   }, [models, world.buildingInstances, preset.castShadows, preset.receiveShadows]);
 
-  // Night glow — tweak the shared emissive window material in place (cheap; no
-  // mesh rebuild). Materials are cache-owned, like the previous atlas texture.
+  // Night glow — tweak the shared emissive window materials in place (cheap;
+  // no mesh rebuild). Materials are cache-owned, like the previous atlas
+  // texture. Covers the baked bay/trim emissive maps (v4 kit) and glass_lit.
   useEffect(() => {
     if (!models) return;
     const want = night ? NIGHT_GLOW : DAY_GLOW;
     for (const groups of models.models) {
       for (const g of groups) {
-        if (g.name === LIT_WINDOW_MATERIAL && g.material.emissiveIntensity !== want) {
+        if (isLitWindowMaterial(g.name) && g.material.emissiveIntensity !== want) {
           g.material.emissiveIntensity = want;
           g.material.needsUpdate = true;
         }
