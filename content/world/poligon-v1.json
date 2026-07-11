@@ -1,0 +1,854 @@
+{
+ "format": "district-v1",
+ "meta": {
+  "district": "poligon",
+  "label": "Учебен полигон (закрита площадка за начално обучение)",
+  "mapKind": "training-ground",
+  "generator": "tools/maps/gen_poligon.mjs",
+  "boundsLocalMeters": {
+   "minX": -190,
+   "minY": -130,
+   "maxX": 190,
+   "maxY": 130
+  },
+  "attribution": {
+   "text": "Учебен полигон — оригинален авторски дизайн (без данни от OpenStreetMap)",
+   "license": "All rights reserved",
+   "licenseUrl": "/",
+   "copyrightUrl": "/",
+   "obligation": "none — original work, no ODbL attribution required for this map"
+  },
+  "defaults": {
+   "maxspeedUrbanKmh": 30,
+   "note": "Полигон: 30 km/h е защитната граница навсякъде на площадката; сервизните коридори са маркирани 20 km/h."
+  },
+  "stats": {
+   "roadKm": 2.07,
+   "nodes": 17,
+   "edges": 20,
+   "intersections": 7,
+   "crossings": 1,
+   "buildings": 2,
+   "spawnPoints": 3
+  }
+ },
+ "roads": {
+  "nodes": [
+   {
+    "id": "pg-n-c",
+    "x": 0,
+    "y": 0
+   },
+   {
+    "id": "pg-n-e0",
+    "x": 190,
+    "y": 0
+   },
+   {
+    "id": "pg-n-g1",
+    "x": -95,
+    "y": -40
+   },
+   {
+    "id": "pg-n-g2",
+    "x": -95,
+    "y": -130
+   },
+   {
+    "id": "pg-n-h1",
+    "x": 95,
+    "y": -40
+   },
+   {
+    "id": "pg-n-n0",
+    "x": 0,
+    "y": 130
+   },
+   {
+    "id": "pg-n-ne-a",
+    "x": 190,
+    "y": 110
+   },
+   {
+    "id": "pg-n-ne-b",
+    "x": 170,
+    "y": 130
+   },
+   {
+    "id": "pg-n-nw-a",
+    "x": -170,
+    "y": 130
+   },
+   {
+    "id": "pg-n-nw-b",
+    "x": -190,
+    "y": 110
+   },
+   {
+    "id": "pg-n-p1",
+    "x": 95,
+    "y": -130
+   },
+   {
+    "id": "pg-n-s0",
+    "x": 0,
+    "y": -130
+   },
+   {
+    "id": "pg-n-se-a",
+    "x": 170,
+    "y": -130
+   },
+   {
+    "id": "pg-n-se-b",
+    "x": 190,
+    "y": -110
+   },
+   {
+    "id": "pg-n-sw-a",
+    "x": -170,
+    "y": -130
+   },
+   {
+    "id": "pg-n-sw-b",
+    "x": -190,
+    "y": -110
+   },
+   {
+    "id": "pg-n-w0",
+    "x": -190,
+    "y": 0
+   }
+  ],
+  "edges": [
+   {
+    "id": "pg-e-s1",
+    "from": "pg-n-sw-a",
+    "to": "pg-n-g2",
+    "class": "unclassified",
+    "name": "Старт-стоп права",
+    "oneway": false,
+    "roundabout": false,
+    "lanes": 2,
+    "lanesSource": "tag",
+    "maxspeed": 30,
+    "maxspeedSource": "tag",
+    "length": 75,
+    "geometry": [
+     [
+      -170,
+      -130
+     ],
+     [
+      -95,
+      -130
+     ]
+    ]
+   },
+   {
+    "id": "pg-e-s2",
+    "from": "pg-n-g2",
+    "to": "pg-n-s0",
+    "class": "unclassified",
+    "name": "Старт-стоп права",
+    "oneway": false,
+    "roundabout": false,
+    "lanes": 2,
+    "lanesSource": "tag",
+    "maxspeed": 30,
+    "maxspeedSource": "tag",
+    "length": 95,
+    "geometry": [
+     [
+      -95,
+      -130
+     ],
+     [
+      0,
+      -130
+     ]
+    ]
+   },
+   {
+    "id": "pg-e-s3",
+    "from": "pg-n-s0",
+    "to": "pg-n-p1",
+    "class": "unclassified",
+    "name": "Старт-стоп права",
+    "oneway": false,
+    "roundabout": false,
+    "lanes": 2,
+    "lanesSource": "tag",
+    "maxspeed": 30,
+    "maxspeedSource": "tag",
+    "length": 95,
+    "geometry": [
+     [
+      0,
+      -130
+     ],
+     [
+      95,
+      -130
+     ]
+    ]
+   },
+   {
+    "id": "pg-e-s4",
+    "from": "pg-n-p1",
+    "to": "pg-n-se-a",
+    "class": "unclassified",
+    "name": "Старт-стоп права",
+    "oneway": false,
+    "roundabout": false,
+    "lanes": 2,
+    "lanesSource": "tag",
+    "maxspeed": 30,
+    "maxspeedSource": "tag",
+    "length": 75,
+    "geometry": [
+     [
+      95,
+      -130
+     ],
+     [
+      170,
+      -130
+     ]
+    ]
+   },
+   {
+    "id": "pg-e-e1",
+    "from": "pg-n-se-b",
+    "to": "pg-n-e0",
+    "class": "unclassified",
+    "name": "Източна права",
+    "oneway": false,
+    "roundabout": false,
+    "lanes": 2,
+    "lanesSource": "tag",
+    "maxspeed": 30,
+    "maxspeedSource": "tag",
+    "length": 110,
+    "geometry": [
+     [
+      190,
+      -110
+     ],
+     [
+      190,
+      0
+     ]
+    ]
+   },
+   {
+    "id": "pg-e-e2",
+    "from": "pg-n-e0",
+    "to": "pg-n-ne-a",
+    "class": "unclassified",
+    "name": "Източна права",
+    "oneway": false,
+    "roundabout": false,
+    "lanes": 2,
+    "lanesSource": "tag",
+    "maxspeed": 30,
+    "maxspeedSource": "tag",
+    "length": 110,
+    "geometry": [
+     [
+      190,
+      0
+     ],
+     [
+      190,
+      110
+     ]
+    ]
+   },
+   {
+    "id": "pg-e-n1",
+    "from": "pg-n-ne-b",
+    "to": "pg-n-n0",
+    "class": "unclassified",
+    "name": "Северна права",
+    "oneway": false,
+    "roundabout": false,
+    "lanes": 2,
+    "lanesSource": "tag",
+    "maxspeed": 30,
+    "maxspeedSource": "tag",
+    "length": 170,
+    "geometry": [
+     [
+      170,
+      130
+     ],
+     [
+      0,
+      130
+     ]
+    ]
+   },
+   {
+    "id": "pg-e-n2",
+    "from": "pg-n-n0",
+    "to": "pg-n-nw-a",
+    "class": "unclassified",
+    "name": "Северна права",
+    "oneway": false,
+    "roundabout": false,
+    "lanes": 2,
+    "lanesSource": "tag",
+    "maxspeed": 30,
+    "maxspeedSource": "tag",
+    "length": 170,
+    "geometry": [
+     [
+      0,
+      130
+     ],
+     [
+      -170,
+      130
+     ]
+    ]
+   },
+   {
+    "id": "pg-e-w1",
+    "from": "pg-n-nw-b",
+    "to": "pg-n-w0",
+    "class": "unclassified",
+    "name": "Западна права",
+    "oneway": false,
+    "roundabout": false,
+    "lanes": 2,
+    "lanesSource": "tag",
+    "maxspeed": 30,
+    "maxspeedSource": "tag",
+    "length": 110,
+    "geometry": [
+     [
+      -190,
+      110
+     ],
+     [
+      -190,
+      0
+     ]
+    ]
+   },
+   {
+    "id": "pg-e-w2",
+    "from": "pg-n-w0",
+    "to": "pg-n-sw-b",
+    "class": "unclassified",
+    "name": "Западна права",
+    "oneway": false,
+    "roundabout": false,
+    "lanes": 2,
+    "lanesSource": "tag",
+    "maxspeed": 30,
+    "maxspeedSource": "tag",
+    "length": 110,
+    "geometry": [
+     [
+      -190,
+      0
+     ],
+     [
+      -190,
+      -110
+     ]
+    ]
+   },
+   {
+    "id": "pg-e-c-sw",
+    "from": "pg-n-sw-a",
+    "to": "pg-n-sw-b",
+    "class": "unclassified",
+    "name": "Югозападен завой",
+    "oneway": false,
+    "roundabout": false,
+    "lanes": 2,
+    "lanesSource": "tag",
+    "maxspeed": 30,
+    "maxspeedSource": "tag",
+    "length": 31.37,
+    "geometry": [
+     [
+      -170,
+      -130
+     ],
+     [
+      -173.9,
+      -129.62
+     ],
+     [
+      -177.65,
+      -128.48
+     ],
+     [
+      -181.11,
+      -126.63
+     ],
+     [
+      -184.14,
+      -124.14
+     ],
+     [
+      -186.63,
+      -121.11
+     ],
+     [
+      -188.48,
+      -117.65
+     ],
+     [
+      -189.62,
+      -113.9
+     ],
+     [
+      -190,
+      -110
+     ]
+    ]
+   },
+   {
+    "id": "pg-e-c-se",
+    "from": "pg-n-se-a",
+    "to": "pg-n-se-b",
+    "class": "unclassified",
+    "name": "Югоизточен завой",
+    "oneway": false,
+    "roundabout": false,
+    "lanes": 2,
+    "lanesSource": "tag",
+    "maxspeed": 30,
+    "maxspeedSource": "tag",
+    "length": 31.37,
+    "geometry": [
+     [
+      170,
+      -130
+     ],
+     [
+      173.9,
+      -129.62
+     ],
+     [
+      177.65,
+      -128.48
+     ],
+     [
+      181.11,
+      -126.63
+     ],
+     [
+      184.14,
+      -124.14
+     ],
+     [
+      186.63,
+      -121.11
+     ],
+     [
+      188.48,
+      -117.65
+     ],
+     [
+      189.62,
+      -113.9
+     ],
+     [
+      190,
+      -110
+     ]
+    ]
+   },
+   {
+    "id": "pg-e-c-ne",
+    "from": "pg-n-ne-a",
+    "to": "pg-n-ne-b",
+    "class": "unclassified",
+    "name": "Североизточен завой",
+    "oneway": false,
+    "roundabout": false,
+    "lanes": 2,
+    "lanesSource": "tag",
+    "maxspeed": 30,
+    "maxspeedSource": "tag",
+    "length": 31.37,
+    "geometry": [
+     [
+      190,
+      110
+     ],
+     [
+      189.62,
+      113.9
+     ],
+     [
+      188.48,
+      117.65
+     ],
+     [
+      186.63,
+      121.11
+     ],
+     [
+      184.14,
+      124.14
+     ],
+     [
+      181.11,
+      126.63
+     ],
+     [
+      177.65,
+      128.48
+     ],
+     [
+      173.9,
+      129.62
+     ],
+     [
+      170,
+      130
+     ]
+    ]
+   },
+   {
+    "id": "pg-e-c-nw",
+    "from": "pg-n-nw-a",
+    "to": "pg-n-nw-b",
+    "class": "unclassified",
+    "name": "Северозападен завой",
+    "oneway": false,
+    "roundabout": false,
+    "lanes": 2,
+    "lanesSource": "tag",
+    "maxspeed": 30,
+    "maxspeedSource": "tag",
+    "length": 31.37,
+    "geometry": [
+     [
+      -170,
+      130
+     ],
+     [
+      -173.9,
+      129.62
+     ],
+     [
+      -177.65,
+      128.48
+     ],
+     [
+      -181.11,
+      126.63
+     ],
+     [
+      -184.14,
+      124.14
+     ],
+     [
+      -186.63,
+      121.11
+     ],
+     [
+      -188.48,
+      117.65
+     ],
+     [
+      -189.62,
+      113.9
+     ],
+     [
+      -190,
+      110
+     ]
+    ]
+   },
+   {
+    "id": "pg-e-spine-s",
+    "from": "pg-n-s0",
+    "to": "pg-n-c",
+    "class": "tertiary",
+    "name": "Централна алея",
+    "oneway": false,
+    "roundabout": false,
+    "lanes": 2,
+    "lanesSource": "tag",
+    "maxspeed": 30,
+    "maxspeedSource": "tag",
+    "length": 130,
+    "geometry": [
+     [
+      0,
+      -130
+     ],
+     [
+      0,
+      0
+     ]
+    ]
+   },
+   {
+    "id": "pg-e-spine-n",
+    "from": "pg-n-c",
+    "to": "pg-n-n0",
+    "class": "tertiary",
+    "name": "Централна алея",
+    "oneway": false,
+    "roundabout": false,
+    "lanes": 2,
+    "lanesSource": "tag",
+    "maxspeed": 30,
+    "maxspeedSource": "tag",
+    "length": 130,
+    "geometry": [
+     [
+      0,
+      0
+     ],
+     [
+      0,
+      130
+     ]
+    ]
+   },
+   {
+    "id": "pg-e-cross-w",
+    "from": "pg-n-w0",
+    "to": "pg-n-c",
+    "class": "tertiary",
+    "name": "Напречна алея",
+    "oneway": false,
+    "roundabout": false,
+    "lanes": 2,
+    "lanesSource": "tag",
+    "maxspeed": 30,
+    "maxspeedSource": "tag",
+    "length": 190,
+    "geometry": [
+     [
+      -190,
+      0
+     ],
+     [
+      0,
+      0
+     ]
+    ]
+   },
+   {
+    "id": "pg-e-cross-e",
+    "from": "pg-n-c",
+    "to": "pg-n-e0",
+    "class": "tertiary",
+    "name": "Напречна алея",
+    "oneway": false,
+    "roundabout": false,
+    "lanes": 2,
+    "lanesSource": "tag",
+    "maxspeed": 30,
+    "maxspeedSource": "tag",
+    "length": 190,
+    "geometry": [
+     [
+      0,
+      0
+     ],
+     [
+      190,
+      0
+     ]
+    ]
+   },
+   {
+    "id": "pg-e-apron-slalom",
+    "from": "pg-n-g2",
+    "to": "pg-n-g1",
+    "class": "service",
+    "name": "Слаломен коридор",
+    "oneway": false,
+    "roundabout": false,
+    "lanes": 1,
+    "lanesSource": "tag",
+    "maxspeed": 20,
+    "maxspeedSource": "tag",
+    "length": 90,
+    "geometry": [
+     [
+      -95,
+      -130
+     ],
+     [
+      -95,
+      -40
+     ]
+    ]
+   },
+   {
+    "id": "pg-e-apron-bays",
+    "from": "pg-n-p1",
+    "to": "pg-n-h1",
+    "class": "service",
+    "name": "Коридор за паркиране",
+    "oneway": false,
+    "roundabout": false,
+    "lanes": 2,
+    "lanesSource": "tag",
+    "maxspeed": 20,
+    "maxspeedSource": "tag",
+    "length": 90,
+    "geometry": [
+     [
+      95,
+      -130
+     ],
+     [
+      95,
+      -40
+     ]
+    ]
+   }
+  ]
+ },
+ "intersections": [
+  {
+   "id": "pg-n-c",
+   "x": 0,
+   "y": 0,
+   "degree": 4,
+   "signalized": false
+  },
+  {
+   "id": "pg-n-e0",
+   "x": 190,
+   "y": 0,
+   "degree": 3,
+   "signalized": false
+  },
+  {
+   "id": "pg-n-g2",
+   "x": -95,
+   "y": -130,
+   "degree": 3,
+   "signalized": false
+  },
+  {
+   "id": "pg-n-n0",
+   "x": 0,
+   "y": 130,
+   "degree": 3,
+   "signalized": false
+  },
+  {
+   "id": "pg-n-p1",
+   "x": 95,
+   "y": -130,
+   "degree": 3,
+   "signalized": false
+  },
+  {
+   "id": "pg-n-s0",
+   "x": 0,
+   "y": -130,
+   "degree": 3,
+   "signalized": false
+  },
+  {
+   "id": "pg-n-w0",
+   "x": -190,
+   "y": 0,
+   "degree": 3,
+   "signalized": false
+  }
+ ],
+ "crossings": [
+  {
+   "id": "pg-x-1",
+   "x": 0,
+   "y": 65,
+   "kind": "marked",
+   "signalized": false,
+   "edgeId": "pg-e-spine-n"
+  }
+ ],
+ "roundabouts": [],
+ "buildings": [
+  {
+   "id": "pg-b-office",
+   "height": 6,
+   "heightSource": "default",
+   "footprint": [
+    [
+     -160,
+     -95
+    ],
+    [
+     -130,
+     -95
+    ],
+    [
+     -130,
+     -75
+    ],
+    [
+     -160,
+     -75
+    ]
+   ]
+  },
+  {
+   "id": "pg-b-garage",
+   "height": 4.5,
+   "heightSource": "default",
+   "footprint": [
+    [
+     130,
+     -95
+    ],
+    [
+     160,
+     -95
+    ],
+    [
+     160,
+     -78
+    ],
+    [
+     130,
+     -78
+    ]
+   ]
+  }
+ ],
+ "spawnPoints": [
+  {
+   "id": "pg-spawn-1",
+   "x": 20,
+   "y": -130,
+   "heading": 90,
+   "edgeId": "pg-e-s3",
+   "name": "Старт-стоп права"
+  },
+  {
+   "id": "pg-spawn-2",
+   "x": -95,
+   "y": -105,
+   "heading": 0,
+   "edgeId": "pg-e-apron-slalom",
+   "name": "Слаломен коридор"
+  },
+  {
+   "id": "pg-spawn-3",
+   "x": 95,
+   "y": -105,
+   "heading": 0,
+   "edgeId": "pg-e-apron-bays",
+   "name": "Коридор за паркиране"
+  }
+ ]
+}
