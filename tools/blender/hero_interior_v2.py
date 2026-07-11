@@ -14,9 +14,10 @@ are untouched):
   DELETE  every shell island with bz_min >= 1.24: old header box
           (by 0.34..0.46, bz 1.31..1.40), old roof panel (bz 1.32..1.35),
           both sun visors (bz 1.26..1.34), the old mirror stem (floats after
-          the header goes). The rear-view mirror HOUSING + glass quad
-          (hotspot_mirror_rear) are bz_min 1.19 -> kept, positions unchanged
-          (GLANCE targets / MirrorRig / hotspot layer stay valid).
+          the header goes), AND the old mirror HOUSING (bz_min 1.19, the chunky
+          central block that dropped into the sightline under the v2 camera —
+          the founder's black mass). The glass quad (hotspot_mirror_rear) is
+          KEPT as a node but raised + shrunk onto a new small high housing.
   DELETE  both A-pillar sails (bz spans 0.96..1.38, by_max > 0.9) — rebuilt
           longer + slimmer for the taller opening.
   CLAMP   cowl/scuttle lip: dash-forward verts (by>=0.95) onto the plane
@@ -37,8 +38,12 @@ are untouched):
           off-frame, window >=65%.
   NEW     slim A-pillars (6.5x7.5 cm) cowl corners -> header ends; sun visors
           tucked flat against the new headliner (over the driver's head, out
-          of frame); swan-neck mirror arm header -> unchanged mirror housing;
-          B-pillars extended up to meet the new ceiling.
+          of frame); a SMALL rear-view mirror housing high under the header
+          (chassis y 0.79..0.85) on a thin discreet stalk, glass raised/shrunk
+          onto it (upper-right of frame, out of the road band); B-pillars
+          extended up to meet the new ceiling.
+  ALSO    centre-stack bezel + centre screen dropped below the cowl line so the
+          dark screen no longer pokes into the road view as a black slab.
 
 MUST NOT BREAK (verified at the end): 13 hotspot_* nodes, screen_cluster /
 screen_center, steering_wheel hierarchy, interior_shell/interior_seats
@@ -113,6 +118,16 @@ for isl in islands:
         doomed |= isl
         log.append(f"deleted A-pillar island x[{min(xs):+.2f},{max(xs):+.2f}] "
                    f"({len(isl)} verts)")
+    # OLD rear-view mirror housing (isl#82): the chunky central block that hung
+    # at chassis y 0.64-0.73 (eye level) — with the v2 camera raised +0.05 and
+    # pitch relaxed to -5, it dropped into the sightline as the founder's black
+    # mass. Deleted here; a SMALL housing + thin stalk + raised/shrunk glass are
+    # rebuilt high under the header (see the new-geometry block below).
+    elif (1.15 <= bz_min <= 1.22 and bz_max <= 1.30 and by_max <= 0.66
+          and max(abs(vx) for vx in xs) <= 0.16):
+        doomed |= isl
+        log.append(f"deleted OLD mirror housing bz[{bz_min:.2f},{bz_max:.2f}] "
+                   f"by[{min(ys):.2f},{max(ys):.2f}] ({len(isl)} verts)")
 
 bmesh.ops.delete(bm, geom=[bm.verts[i] for i in doomed], context="VERTS")
 bm.verts.ensure_lookup_table()
@@ -133,9 +148,11 @@ for v in bm.verts:
         if z > cap:
             v.co.z = cap
             n_hood += 1
-    # centre-stack bezel shave (screen_center object drops 3 cm below)
-    elif -0.23 <= x <= 0.20 and 0.62 <= y <= 0.80 and z > 1.062:
-        v.co.z = 1.062
+    # centre-stack bezel shave: dropped to bz 1.000 (chassis y 0.45, ~3 cm
+    # BELOW the cowl line 0.48) so the dark centre screen tucks under the dash
+    # silhouette instead of poking into the road band as a black slab.
+    elif -0.23 <= x <= 0.20 and 0.62 <= y <= 0.80 and z > 1.000:
+        v.co.z = 1.000
         n_bezel += 1
     # B-pillar extension up to the new ceiling
     elif -0.60 <= y <= -0.44 and abs(x) >= 0.68 and z >= 1.32:
@@ -189,8 +206,13 @@ add_box((0.20, -0.10, 1.393), (0.53, 0.06, 1.406))
 # slim A-pillars: cowl corners -> header ends
 add_beam((-0.76, 1.00, 0.945), (-0.72, 0.11, 1.410), 0.065, 0.075)
 add_beam((0.76, 1.00, 0.945), (0.72, 0.11, 1.410), 0.065, 0.075)
-# swan-neck mirror arm: header -> unchanged mirror housing top
-add_beam((0.0, 0.11, 1.405), (0.0, 0.60, 1.272), 0.022, 0.022)
+# rear-view mirror REBUILT high/right/small (founder directive 2026-07-11):
+# a compact housing tucked just under the header (chassis y 0.79..0.85,
+# z 0.475..0.560 — above the eye line, so it frames in the UPPER-RIGHT, clear
+# of the graded road band) fed by a thin discreet stalk from the header. The
+# glass quad (hotspot_mirror_rear) is raised + shrunk onto it in section 2.
+add_box((-0.085, 0.475, 1.340), (0.085, 0.560, 1.400))  # small mirror housing
+add_beam((0.0, 0.15, 1.415), (0.0, 0.47, 1.372), 0.020, 0.020)  # thin stalk
 
 bm.normal_update()
 bm.to_mesh(shell.data)
@@ -201,7 +223,17 @@ shell.data.update()
 # 2. Screens: drop so they tuck under the shaved hood / bezel
 # --------------------------------------------------------------------------
 D.objects["screen_cluster"].location.z -= 0.025
-D.objects["screen_center"].location.z -= 0.030
+# centre screen dropped 9.5 cm (was 3): its top now sits at chassis y ~0.44,
+# below the cowl (0.48) and the shaved bezel (0.45) — no longer a black slab.
+D.objects["screen_center"].location.z -= 0.095
+# raise + shrink the rear-view mirror glass onto the new high housing: chassis
+# (0, 0.80, 0.50), ~y+0.11 vs the old (0, 0.687, 0.575). It now projects to the
+# UPPER-RIGHT (fy ~0.74) — high/right/small per the founder directive — while
+# MirrorRig's rear RTT vantage [0,0.687,0.575] is intentionally left untouched
+# (it is the rear-view sample point, not the glass surface).
+mr = D.objects["hotspot_mirror_rear"]
+mr.location = (0.0, 0.50, 1.353)
+mr.scale = (0.84, 0.84, 0.84)
 bpy.context.view_layer.update()
 
 # --------------------------------------------------------------------------

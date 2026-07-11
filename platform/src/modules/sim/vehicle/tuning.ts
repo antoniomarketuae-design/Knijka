@@ -401,10 +401,11 @@ export function cockpitVFovForAspect(aspect: number): number {
  *      the shaved cowl still slopes away along the sightline)
  *   10 m road pt   (y −0.49, z 10):      fy 0.466       (10–100 m band clear) ✓
  *   horizon:                             fy 0.60 ✓
- *   int. mirror    (0.00, 0.687, 0.575): fx 0.69 fy 0.57 (right of the driven
- *      lane, above the 10 m road row; the GLB authors the glass at the car
- *      centreline near eye height, UNMOVED in v2 — the raised camera now
- *      looks marginally down at it, so it sits just under the horizon line)
+ *   int. mirror    (0.00, 0.803, 0.50): fx 0.71 fy 0.745 (upper-right, ABOVE
+ *      the horizon and clear of the graded road band — RAISED from the old
+ *      eye-level (0, 0.687, 0.575) in the 2026-07-11 black-mass fix: that
+ *      block dropped into the sightline under the v2 camera, so the mirror
+ *      was rebuilt small on a header-mounted stalk, hero_interior_v2.py)
  *   door mirror L  (0.905, 0.455, 0.592): fx 0.003 fy 0.26 (glass at the left
  *      frame edge — lane 12: "~37° left from the aft camera") ✓
  *   glass top/header (y 0.850, z 0.16):  fy 1.003 → header OUT of frame at

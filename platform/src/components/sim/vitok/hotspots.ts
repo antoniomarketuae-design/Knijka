@@ -158,9 +158,12 @@ export const COCKPIT_HOTSPOTS: readonly CockpitHotspotSpec[] = [
   },
   {
     name: "hotspot_mirror_rear",
+    // Raised to the header-mounted housing in the 2026-07-11 black-mass fix
+    // (was [0, 0.687, 0.575]) so the glance click-target tracks the relocated
+    // glass (GLB hotspot_mirror_rear now at chassis (0, 0.803, 0.50)).
     labelBg: "Вътрешно огледало — задръж за поглед",
     keyHint: "F",
-    pos: [0, 0.687, 0.575],
+    pos: [0, 0.803, 0.5],
     size: [0.3, 0.13, 0.09],
     action: { type: "glance", mirror: "rear" },
   },

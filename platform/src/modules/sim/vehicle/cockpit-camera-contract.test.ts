@@ -67,8 +67,12 @@ const LANDMARKS = {
   wheelTop: { x: 0.34, y: 0.484, z: 0.431 },
   /** Instrument-cluster screen centre (GLB screen_cluster, v2: −2.5 cm). */
   cluster: { x: 0.34, y: 0.399, z: 0.7106 },
-  /** Interior rear-view mirror glass centre (GLB hotspot_mirror_rear). */
-  interiorMirror: { x: 0.0, y: 0.687, z: 0.575 },
+  /** Interior rear-view mirror glass centre (GLB hotspot_mirror_rear) — RAISED
+   *  to a small header-mounted housing in the 2026-07-11 black-mass fix (was
+   *  (0, 0.687, 0.575), the eye-level block that the v2 camera dropped into the
+   *  sightline). Now (0, 0.803, 0.50): projects to the upper-right, out of the
+   *  road band. */
+  interiorMirror: { x: 0.0, y: 0.803, z: 0.5 },
   /** Left door-mirror glass centre (GLB hotspot_mirror_left). */
   doorMirrorLeft: { x: 0.905, y: 0.455, z: 0.592 },
   /** Road surface point ~10 m ahead of the driver. */
@@ -181,19 +185,20 @@ describe("frame composition bands at 16:9 (founder contract: world ≥65%)", () 
     expect(f.header.y).toBeGreaterThanOrEqual(0.97);
   });
 
-  it("interior mirror sits right of the driven lane, clear of the graded road band", () => {
-    // CONSCIOUS BAND CHANGE vs lane 12 (upper-right corner) AND vs the
-    // pre-v2 test (above the horizon line): the GLB authors the mirror
-    // glass at the car centreline near eye height (0, 0.687, 0.575) and the
-    // v2 rebuild deliberately does NOT move it (hotspot proxies, MirrorRig
-    // RTT and glance grading all key off it). The raised +0.05 eye now
-    // looks marginally DOWN at the glass, so it projects just under the
-    // horizon (fy ≈ 0.57). Contract INTENT preserved as: right of the
-    // driver-ahead column (clear of the driven lane), above the 10 m road
-    // row (clear of the graded 10–100 m band dead ahead), fully in frame.
+  it("interior mirror sits high-right, clear of the graded road band", () => {
+    // 2026-07-11 BLACK-MASS FIX: the mirror glass was RAISED from eye level
+    // (0, 0.687, 0.575) — where the v2 camera dropped it into the sightline as
+    // a central black mass — to a small header-mounted housing (0, 0.803, 0.50).
+    // It now projects to the UPPER-RIGHT (fx ≈ 0.71, fy ≈ 0.75), above the
+    // horizon (0.60) and well clear of the graded 10–100 m road band, which is
+    // exactly the founder directive "high-center/top-right and small". The
+    // bands below are UNCHANGED (the raised position still satisfies them) —
+    // the window-size assertions above are untouched. MirrorRig's rear-view
+    // RTT vantage stays at (0,0.687,0.575) by design (sample point ≠ glass).
     expect(f.interiorMirror.x).toBeGreaterThanOrEqual(0.6);
     expect(f.interiorMirror.x).toBeLessThanOrEqual(0.95);
     expect(f.interiorMirror.y).toBeGreaterThan(f.road10m.y);
+    expect(f.interiorMirror.y).toBeGreaterThan(f.horizon.y); // now ABOVE horizon
     expect(f.interiorMirror.y).toBeLessThanOrEqual(0.97);
   });
 
