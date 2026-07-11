@@ -290,6 +290,10 @@ export interface TrafficLayerProps {
    * from the spec's origin along its dart direction while true.
    */
   hazardActiveRef?: RefObject<boolean>;
+  /** Whether the premium boxy-SUV spawn gets the expensive MeshPhysical
+   *  clearcoat paint (doc 71 perf tiering — high only). Default true keeps the
+   *  full look; LessonScene passes `level === "high"`. */
+  clearcoat?: boolean;
 }
 
 export function TrafficLayer({
@@ -304,6 +308,7 @@ export function TrafficLayer({
   laneWidthM = 3.25 * PERCEPTUAL_ROAD_SCALE,
   hazard = null,
   hazardActiveRef,
+  clearcoat = true,
 }: TrafficLayerProps) {
   const nVeh = system.vehicles.length;
   const nPed = system.pedestrians.length;
@@ -350,8 +355,9 @@ export function TrafficLayer({
         gltfs.map((g) => g.scene),
         system.vehicles,
         parked.map((p) => ({ model: p.model, seed: p.seed })),
+        { clearcoat },
       ),
-    [gltfs, system, parked],
+    [gltfs, system, parked, clearcoat],
   );
   useEffect(() => () => disposeTrafficFleet(fleet), [fleet]);
   // Parked-car blob shadows (static, placed with the parked pass).

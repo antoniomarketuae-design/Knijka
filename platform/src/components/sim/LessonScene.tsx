@@ -73,6 +73,7 @@ import {
   SimEnvironment,
   WindshieldDroplets,
   QUALITY_PRESETS,
+  type QualityLevel,
 } from "@/modules/sim/environment";
 import {
   DistrictWorld,
@@ -597,7 +598,7 @@ function ReadyScene({
           stencil: false,
         }}
       >
-        {perfLog ? <PerfProbe /> : null}
+        {perfLog ? <PerfProbe level={level} /> : null}
         <SimEnvironment timeOfDay={timeOfDay} rain={rain} quality={level} />
         {/* HDRI image-based lighting — real sky reflections/ambient for PBR
             materials, glass, mirrors and car paint. background=false keeps
@@ -703,6 +704,8 @@ function ReadyScene({
               district={district as TrafficDistrict}
               hazard={lesson.hazard ?? null}
               hazardActiveRef={hazardActiveRef}
+              // Perf tier (doc 71): SUV clearcoat on the high tier only.
+              clearcoat={level === "high"}
             />
           </Physics>
         </Suspense>
@@ -837,7 +840,7 @@ function ReadyScene({
  * Budget lines to compare against: doc quality-gap/13 §1 — ≤150 draws
  * (laptop iGPU) / ≤75 (phone), ≤750k/300k tris.
  */
-function PerfProbe() {
+function PerfProbe({ level }: { level: QualityLevel }) {
   const gl = useThree((s) => s.gl);
   useEffect(() => {
     gl.info.autoReset = false;
@@ -846,6 +849,14 @@ function PerfProbe() {
       gl.info.reset();
     };
   }, [gl]);
+  // One-line readout of the active tier + the feature gates it selected, so the
+  // founder's probe shows which facade/clearcoat path this run is on.
+  useEffect(() => {
+    const p = QUALITY_PRESETS[level];
+    console.info(
+      `[sim-perf] tier=${level} facadeMaps=${p.facadeMaps} clearcoat=${p.clearcoat}`,
+    );
+  }, [level]);
   const accRef = useRef({ frames: 0, calls: 0, tris: 0, windowStart: -1 });
   useFrame((state) => {
     const acc = accRef.current;

@@ -64,6 +64,7 @@ import {
   type Material,
   Mesh,
   MeshPhysicalMaterial,
+  MeshStandardMaterial,
   type Object3D,
   Vector3,
 } from "three";
@@ -283,6 +284,23 @@ export function carPaintMaterial(opts: CarPaintOptions = {}): MeshPhysicalMateri
   });
 }
 
+/**
+ * The med/low fallback for the hero paint (docs/simulation/71 §4.8 tier
+ * ruling): a glossy MeshStandard — NO clearcoat lobe, so ~half the fragment
+ * cost of `carPaintMaterial`, but a high metalness + low roughness + strong env
+ * reflection keep the "wet gloss" read. Same signature as carPaintMaterial so
+ * the call sites (HeroCarBody + the fleet's boxy SUV) swap one for the other by
+ * tier. The caller OWNS the returned material and must dispose it.
+ */
+export function carPaintStandardMaterial(opts: CarPaintOptions = {}): MeshStandardMaterial {
+  return new MeshStandardMaterial({
+    color: opts.color ?? 0x0a0a0a,
+    metalness: 0.7,
+    roughness: 0.35,
+    envMapIntensity: opts.envMapIntensity ?? 1.4,
+  });
+}
+
 // ---------------------------------------------------------------------------
 // Extraction
 // ---------------------------------------------------------------------------
@@ -417,7 +435,7 @@ function mergePrims(prims: RawPrim[]): GeoSet | null {
   return { geometry: merged, materials };
 }
 
-function extractModelRig(scene: Object3D, modelIndex: number): ModelRig {
+function extractModelRig(scene: Object3D, modelIndex: number, clearcoat: boolean): ModelRig {
   scene.updateMatrixWorld(true);
   const offsets: Record<string, Vector3> = {};
   const bodyPrims: RawPrim[] = [];
@@ -468,19 +486,24 @@ function extractModelRig(scene: Object3D, modelIndex: number): ModelRig {
     if (host) p.mat = host;
   }
 
-  // Hero-only clearcoat: swap the SUV's gloss-black paint (stays inside the
-  // body merge — it has no palette split) for a real MeshPhysicalMaterial.
-  // Fleet models keep MeshStandard (perf; see CLEARCOAT_PAINT_MODELS). We own
-  // the new material (never mutate the drei-cached one) — disposed on teardown.
+  // Hero-only paint upgrade: swap the SUV's gloss-black paint (stays inside the
+  // body merge — it has no palette split) for a dedicated hero material. On the
+  // high tier (clearcoat=true) that is a real MeshPhysicalMaterial (clearcoat);
+  // on med/low it is the glossy MeshStandard fallback (~½ the fragment cost).
+  // Either way fleet models keep their authored MeshStandard (see
+  // CLEARCOAT_PAINT_MODELS). We own the new material (never mutate the
+  // drei-cached one) — disposed on teardown.
   const ownedMaterials: Material[] = [];
   if (CLEARCOAT_PAINT_MODELS.has(modelIndex)) {
     const paintPrims = bodyPrims.filter((p) => p.matName.startsWith("paint"));
     if (paintPrims.length > 0) {
       const src = paintPrims[0].mat as Material & { color?: Color; name?: string };
-      const clearcoat = carPaintMaterial({ color: src.color?.clone() });
-      clearcoat.name = src.name ?? "paint_clearcoat";
-      ownedMaterials.push(clearcoat);
-      for (const p of paintPrims) p.mat = clearcoat; // one shared group
+      const heroPaint = clearcoat
+        ? carPaintMaterial({ color: src.color?.clone() })
+        : carPaintStandardMaterial({ color: src.color?.clone() });
+      heroPaint.name = src.name ?? (clearcoat ? "paint_clearcoat" : "paint_gloss");
+      ownedMaterials.push(heroPaint);
+      for (const p of paintPrims) p.mat = heroPaint; // one shared group
     }
   }
 
@@ -622,6 +645,18 @@ export interface ParkedPlacement {
   seed: number;
 }
 
+/** Build-time quality gates for the fleet. */
+export interface BuildTrafficFleetOptions {
+  /**
+   * Real automotive clearcoat (MeshPhysicalMaterial) on the hero boxy SUV
+   * paint. Default true (the high look). Pass false on med/low to render the
+   * SUV paint as glossy MeshStandard — ~½ the fragment cost (mirrors the
+   * player car's HeroCarBody gate). Only the ≤2 capped SUV instances are
+   * affected; the rest of the fleet is MeshStandard regardless.
+   */
+  clearcoat?: boolean;
+}
+
 export interface TrafficFleet {
   /** One Object3D holding every fleet InstancedMesh; mount with <primitive>. */
   group: Group;
@@ -679,8 +714,14 @@ export function buildTrafficFleet(
   scenes: Object3D[],
   vehicles: readonly TrafficVehicleState[],
   parked: readonly ParkedPlacement[] = [],
+  opts: BuildTrafficFleetOptions = {},
 ): TrafficFleet {
-  const rigs = scenes.map((s, m) => extractModelRig(s, m));
+  // Tier gate for the hero boxy SUV paint (docs/simulation/71 §4.8): real
+  // clearcoat at high, glossy MeshStandard on med/low. Defaults to true so the
+  // full look (and the existing headless tests) are preserved when a caller
+  // does not opt in.
+  const clearcoat = opts.clearcoat ?? true;
+  const rigs = scenes.map((s, m) => extractModelRig(s, m, clearcoat));
   const sharedWheel = extractSharedWheel(scenes[0]);
   const nVeh = vehicles.length;
   const color = new Color();

@@ -43,7 +43,7 @@ export {
   medianFpsFromDeltas,
   MIN_PROBE_SAMPLES,
 } from "./quality";
-export type { QualityLevel, QualitySetting, QualityPreset } from "./quality";
+export type { QualityLevel, QualitySetting, QualityPreset, FacadeMapsMode } from "./quality";
 
 export {
   effectiveQuality,

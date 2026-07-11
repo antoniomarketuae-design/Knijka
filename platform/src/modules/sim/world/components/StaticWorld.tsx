@@ -32,9 +32,27 @@ import { useFacadeTextures, type FacadeSetName } from "../textures/facadeTexture
 import { macroOnBeforeCompile, macroProgramCacheKey } from "../textures/macroVariation";
 import { usePbrSet } from "../textures/pbrTextures";
 import { disposeAll, meshDataToGeometry } from "./three-helpers";
+import { QUALITY_PRESETS, type FacadeMapsMode } from "@/modules/sim/environment";
 import type { QualityPreset } from "./quality";
 
 const FACADE_VARIANT_COUNT = 4;
+
+/** Constant PBR response when the ORM map is dropped (med/low) — matches the
+ *  instanced towers (CityBuildings): matte dielectric, no per-pixel fetch. */
+const FACADE_FALLBACK_ROUGHNESS = 0.7;
+const FACADE_FALLBACK_METALNESS = 0.0;
+
+/**
+ * Per-fragment facade-map budget for this tier (shared ruling with the
+ * instanced towers). The world preset carries no explicit level, so map its
+ * tier-monotonic textureSize back to the shared quality level and read the
+ * environment presets (single source of truth). high = full, med = colorNormal,
+ * low = colorOnly.
+ */
+function facadeMapsFor(preset: QualityPreset): FacadeMapsMode {
+  const level = preset.textureSize >= 1024 ? "high" : preset.textureSize >= 512 ? "med" : "low";
+  return QUALITY_PRESETS[level].facadeMaps;
+}
 
 /**
  * Facade-prism variant -> baked bay system (doc 71 §4.5). Variant 0 is the
@@ -187,6 +205,7 @@ export function StaticWorld({
 
   const receive = preset.receiveShadows;
   const buildingsCast = preset.castShadows !== "none";
+  const facadeMaps = facadeMapsFor(preset);
 
   // Wet-road response: as the shared rain channel soaks the asphalt, drop its
   // roughness (dry matte 1.0 → wet gloss 0.35 so the sky/streetlights smear
@@ -407,19 +426,22 @@ export function StaticWorld({
             receiveShadow={receive}
           >
             {baked ? (
+              // Tier-gated maps (shared ruling with CityBuildings): color +
+              // emissive always; normal on full+colorNormal; the ORM (ao/rough/
+              // metal) only on full — dropped to a matte constant otherwise.
               <meshStandardMaterial
                 map={baked.color}
-                normalMap={baked.normal}
-                aoMap={baked.orm}
+                normalMap={facadeMaps === "colorOnly" ? undefined : baked.normal}
+                aoMap={facadeMaps === "full" ? baked.orm : undefined}
                 aoMapIntensity={1.2}
-                roughnessMap={baked.orm}
-                metalnessMap={baked.orm}
+                roughnessMap={facadeMaps === "full" ? baked.orm : undefined}
+                metalnessMap={facadeMaps === "full" ? baked.orm : undefined}
                 emissiveMap={baked.emissive}
                 emissive={0xffffff}
                 emissiveIntensity={night ? FACADE_NIGHT_GLOW : FACADE_DAY_GLOW}
                 vertexColors
-                roughness={1}
-                metalness={1}
+                roughness={facadeMaps === "full" ? 1 : FACADE_FALLBACK_ROUGHNESS}
+                metalness={facadeMaps === "full" ? 1 : FACADE_FALLBACK_METALNESS}
                 envMapIntensity={1.5}
               />
             ) : (

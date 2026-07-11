@@ -12,6 +12,22 @@ export type QualitySetting = QualityLevel | "auto";
  *  performance = 8 AO / 4 denoise samples; low = 16 / 4; medium = 16 / 8. */
 export type AoQuality = "performance" | "low" | "medium";
 
+/**
+ * How many facade texture maps each fragment samples on the 16 kit towers +
+ * 238 mid-rise prisms — the dominant post-facade fragment cost (commit e3f81b7
+ * bound color+normal+ORM(ao/rough/metal)+emissive on every building material).
+ * The three levels are a per-fragment-fetch budget, wired at the material sites
+ * (CityBuildings / StaticWorld):
+ *   full        — color + normal + ORM(ao/rough/metal) + emissive (5 textures,
+ *                 6 fetches: ORM feeds 3 slots). The high look, unchanged.
+ *   colorNormal — color + normal + emissive; DROP the ORM (constant
+ *                 roughness/metalness). 3 fetches — halves the facade fragment
+ *                 cost while keeping surface relief.
+ *   colorOnly   — color + emissive only; no normal, no ORM. 2 fetches — the
+ *                 cheapest facade path for phone-class GPUs.
+ */
+export type FacadeMapsMode = "full" | "colorNormal" | "colorOnly";
+
 export interface QualityPreset {
   level: QualityLevel;
   /** Whether the directional light casts a shadow map at all. */
@@ -57,6 +73,19 @@ export interface QualityPreset {
   colorGrade: boolean;
   /** Recommended Canvas dpr cap — the integrator wires `dpr={[1, maxDpr]}`. */
   maxDpr: number;
+  /**
+   * Per-fragment facade texture budget for the towers + prisms (see
+   * FacadeMapsMode). high = "full" (identical to the pre-tier look); med =
+   * "colorNormal" (drops the ORM); low = "colorOnly" (drops normal + ORM).
+   */
+  facadeMaps: FacadeMapsMode;
+  /**
+   * Real automotive clearcoat (MeshPhysicalMaterial) on the HERO paint — the
+   * player car (HeroCarBody) + the rare premium boxy SUV (vehicleFleet). false
+   * → glossy MeshStandard (metalness ~0.7 + high envMapIntensity), ~½ the
+   * fragment cost of the extra clearcoat lobe. On (true) only at high.
+   */
+  clearcoat: boolean;
 }
 
 export const QUALITY_PRESETS: Record<QualityLevel, QualityPreset> = {
@@ -78,6 +107,11 @@ export const QUALITY_PRESETS: Record<QualityLevel, QualityPreset> = {
     bloom: false,
     colorGrade: false,
     maxDpr: 1.0,
+    // Cheapest facade path: albedo + lit-window emissive only (2 fetches). No
+    // normal (relief goes flat) and no ORM (constant matte roughness) — the
+    // phone-class fragment budget. Hero clearcoat off (glossy MeshStandard).
+    facadeMaps: "colorOnly",
+    clearcoat: false,
   },
   // The Iris Xe 60 fps target. One 1024² shadow map, GPU rain, and a lean
   // composer: half-res N8AO (the big "flatness" fix) + tight mipmap bloom
@@ -100,6 +134,12 @@ export const QUALITY_PRESETS: Record<QualityLevel, QualityPreset> = {
     bloom: true,
     colorGrade: true,
     maxDpr: 1.25,
+    // Keep the recess normals (relief is the "reads as a building" cue) but
+    // drop the ORM (ao/rough/metal) → constant roughness/metalness. 3 fetches
+    // vs high's 6 — halves the facade fragment cost, the Iris-Xe FPS fix. Hero
+    // clearcoat off: the player/SUV paint runs glossy MeshStandard here.
+    facadeMaps: "colorNormal",
+    clearcoat: false,
   },
   // Discrete-GPU tier: 2048² shadows (75 m radius for the long golden-hour
   // throws), denser rain, and the full composer — half-res N8AO (more samples
@@ -118,6 +158,11 @@ export const QUALITY_PRESETS: Record<QualityLevel, QualityPreset> = {
     bloom: true,
     colorGrade: true,
     maxDpr: 1.5,
+    // The full authored look — every facade map sampled, real automotive
+    // clearcoat on the hero paint. Identical to the pre-tier (regression)
+    // build; the discrete-GPU tier pays for it.
+    facadeMaps: "full",
+    clearcoat: true,
   },
 };
 

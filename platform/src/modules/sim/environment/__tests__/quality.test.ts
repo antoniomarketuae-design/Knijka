@@ -74,6 +74,20 @@ describe("QUALITY_PRESETS", () => {
       expect(QUALITY_PRESETS[level].level).toBe(level);
     }
   });
+
+  it("gates the facade texture budget by tier (the dominant post-facade cost)", () => {
+    // high keeps the full authored look; med drops the ORM but keeps relief;
+    // low is albedo + emissive only.
+    expect(QUALITY_PRESETS.high.facadeMaps).toBe("full");
+    expect(QUALITY_PRESETS.med.facadeMaps).toBe("colorNormal");
+    expect(QUALITY_PRESETS.low.facadeMaps).toBe("colorOnly");
+  });
+
+  it("enables real clearcoat only at high (med/low fall back to glossy standard)", () => {
+    expect(QUALITY_PRESETS.high.clearcoat).toBe(true);
+    expect(QUALITY_PRESETS.med.clearcoat).toBe(false);
+    expect(QUALITY_PRESETS.low.clearcoat).toBe(false);
+  });
 });
 
 describe("medianFpsFromDeltas", () => {

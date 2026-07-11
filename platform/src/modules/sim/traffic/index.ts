@@ -16,9 +16,10 @@
  */
 
 export { createTrafficSystem } from "./system";
-// Shared HERO clearcoat car-paint recipe (player car + premium boxy SUV).
-export { carPaintMaterial } from "./vehicleFleet";
-export type { CarPaintOptions } from "./vehicleFleet";
+// Shared HERO car-paint recipes (player car + premium boxy SUV): clearcoat at
+// high, glossy MeshStandard fallback on med/low (docs/simulation/71 §4.8).
+export { carPaintMaterial, carPaintStandardMaterial } from "./vehicleFleet";
+export type { CarPaintOptions, BuildTrafficFleetOptions } from "./vehicleFleet";
 export { mulberry32 } from "./rng";
 export type { Rng } from "./rng";
 export { TrafficLayer } from "./TrafficLayer";

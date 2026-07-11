@@ -31,9 +31,11 @@
 import { useContext, useEffect, useMemo, useRef, type RefObject } from "react";
 import { useFrame } from "@react-three/fiber";
 import { useGLTF } from "@react-three/drei";
-import { Box3, Mesh, MeshPhysicalMaterial, MeshStandardMaterial, Object3D, Vector3 } from "three";
+import { Box3, Mesh, MeshStandardMaterial, Object3D, Vector3 } from "three";
 import { CHASSIS_HALF_EXTENTS, type VehicleSim } from "@/modules/sim/vehicle";
-import { carPaintMaterial } from "@/modules/sim/traffic";
+import { carPaintMaterial, carPaintStandardMaterial } from "@/modules/sim/traffic";
+import { QUALITY_PRESETS, type QualityLevel } from "@/modules/sim/environment";
+import { loadQualityPreset } from "./lesson-ui/QualityPresetSelector";
 import { CockpitInteractionContext } from "./vitok/hotspots";
 
 const HERO_URL = "/sim/vehicles/hero_car.glb";
@@ -58,11 +60,24 @@ export function HeroCarBody({ simRef }: { simRef?: RefObject<VehicleSim | null> 
   const wheels = useRef<Wheel[]>([]);
   const roll = useRef(0);
 
+  // Tier gate for the body paint (docs/simulation/71 §4.8): real clearcoat only
+  // at high, glossy MeshStandard on med/low (~½ the fragment cost). The rendered
+  // tier is the lesson-ui preset (LessonScene's `quality` prop origin — the sim
+  // canvas is client-only, so the localStorage read is safe); the clearcoat
+  // ruling itself lives in the environment presets. Fixed per session, so a
+  // one-time read is enough.
+  const useClearcoat = useMemo(() => {
+    const q = loadQualityPreset(); // "low" | "medium" | "high"
+    const level: QualityLevel = q === "medium" ? "med" : q;
+    return QUALITY_PRESETS[level].clearcoat;
+  }, []);
+
   const { model, scale, offsetY, paintMaterial } = useMemo(() => {
     const root = scene.clone(true);
-    // One shared clearcoat material for every paint panel (single shader
-    // program), built lazily from the model's authored pigment colour.
-    let paintMaterial: MeshPhysicalMaterial | null = null;
+    // One shared paint material for every panel (single shader program), built
+    // lazily from the model's authored pigment colour — clearcoat or glossy
+    // standard by tier.
+    let paintMaterial: MeshStandardMaterial | null = null;
     root.traverse((o) => {
       const mesh = o as Mesh;
       if (!mesh.isMesh) return;
@@ -71,17 +86,20 @@ export function HeroCarBody({ simRef }: { simRef?: RefObject<VehicleSim | null> 
       const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
       const next = mats.map((m) => {
         const sm = m as MeshStandardMaterial;
-        // Body paint -> real automotive clearcoat (recipe: docs/simulation/71
-        // §4.8), keeping the authored pigment colour + double-sidedness. The
-        // cloned mesh gets OUR material; the drei-cached one is never mutated.
+        // Body paint -> hero paint (recipe: docs/simulation/71 §4.8): real
+        // automotive clearcoat at high, glossy MeshStandard on med/low. Keeps
+        // the authored pigment colour + double-sidedness. The cloned mesh gets
+        // OUR material; the drei-cached one is never mutated.
         if (sm && /paint/i.test(sm.name ?? "")) {
           if (!paintMaterial) {
-            const p = carPaintMaterial({ color: sm.color?.clone() });
+            const p = useClearcoat
+              ? carPaintMaterial({ color: sm.color?.clone() })
+              : carPaintStandardMaterial({ color: sm.color?.clone() });
             p.name = sm.name ?? "car_paint";
             p.side = sm.side; // preserve the GLB's double-sided shell
             paintMaterial = p;
           }
-          return paintMaterial as MeshPhysicalMaterial;
+          return paintMaterial as MeshStandardMaterial;
         }
         // Glass, chrome, tyre and lights stay as authored; just let them catch
         // the scene HDRI (glossy reflective car look).
@@ -116,12 +134,12 @@ export function HeroCarBody({ simRef }: { simRef?: RefObject<VehicleSim | null> 
       model: root,
       scale: fitScale,
       offsetY: fitOffsetY,
-      paintMaterial: paintMaterial as MeshPhysicalMaterial | null,
+      paintMaterial: paintMaterial as MeshStandardMaterial | null,
     };
-  }, [scene]);
+  }, [scene, useClearcoat]);
 
-  // Dispose the clearcoat we created when the model re-clones or unmounts (the
-  // GLB's own cached materials belong to the drei cache and are left alone).
+  // Dispose the paint material we created when the model re-clones or unmounts
+  // (the GLB's own cached materials belong to the drei cache and are left alone).
   useEffect(() => () => paintMaterial?.dispose(), [paintMaterial]);
 
   useFrame((_, delta) => {

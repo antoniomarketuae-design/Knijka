@@ -22,6 +22,7 @@ import {
   BOXY_MAX_INSTANCES,
   buildTrafficFleet,
   carPaintMaterial,
+  carPaintStandardMaterial,
   disposeTrafficFleet,
   FLEET,
   paintColorFor,
@@ -281,6 +282,16 @@ describe("hero clearcoat paint", () => {
     mat.dispose();
   });
 
+  it("carPaintStandardMaterial is the glossy MeshStandard fallback (no clearcoat lobe)", () => {
+    const mat = carPaintStandardMaterial({ color: 0x0a0a0a });
+    expect(mat).toBeInstanceOf(MeshStandardMaterial);
+    expect(mat).not.toBeInstanceOf(MeshPhysicalMaterial);
+    expect(mat.metalness).toBeCloseTo(0.7);
+    expect(mat.roughness).toBeCloseTo(0.35);
+    expect(mat.envMapIntensity).toBeCloseTo(1.4);
+    mat.dispose();
+  });
+
   it("upgrades the hero SUV paint to clearcoat but keeps the fleet on MeshStandard", () => {
     // Rigs are extracted for every model regardless of instance count.
     const fleet = buildTrafficFleet(makeScenes(), [vehicle(1)]);
@@ -300,6 +311,31 @@ describe("hero clearcoat paint", () => {
     expect(kolos.bodyMaterials.some((m) => m instanceof MeshPhysicalMaterial)).toBe(false);
     expect(kolos.ownedMaterials.length).toBe(0);
 
+    expect(() => disposeTrafficFleet(fleet)).not.toThrow();
+  });
+
+  it("drops the hero SUV to glossy MeshStandard on the med/low tier (clearcoat=false)", () => {
+    const fleet = buildTrafficFleet(makeScenes(), [vehicle(1)], [], { clearcoat: false });
+
+    // The SUV paint is now a plain MeshStandard (still OWNED + disposed), NOT a
+    // MeshPhysicalMaterial — no clearcoat lobe on the cheaper tiers.
+    const suv = fleet.models[BOXY_INDEX].rig;
+    const physical = suv.bodyMaterials.filter((m) => m instanceof MeshPhysicalMaterial);
+    expect(physical.length).toBe(0);
+    const owned = suv.ownedMaterials;
+    expect(owned.length).toBe(1);
+    expect(owned[0]).toBeInstanceOf(MeshStandardMaterial);
+    expect((owned[0] as MeshStandardMaterial).metalness).toBeCloseTo(0.7);
+    // The owned paint material is actually wired onto the merged body.
+    expect(suv.bodyMaterials).toContain(owned[0]);
+
+    expect(() => disposeTrafficFleet(fleet)).not.toThrow();
+  });
+
+  it("defaults to clearcoat when no options are passed (the full look)", () => {
+    const fleet = buildTrafficFleet(makeScenes(), [vehicle(1)], []);
+    const suv = fleet.models[BOXY_INDEX].rig;
+    expect(suv.bodyMaterials.some((m) => m instanceof MeshPhysicalMaterial)).toBe(true);
     expect(() => disposeTrafficFleet(fleet)).not.toThrow();
   });
 });

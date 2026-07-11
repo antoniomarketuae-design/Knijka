@@ -27,6 +27,7 @@ import { useThree } from "@react-three/fiber";
 import * as THREE from "three";
 import type { BuildingInstancePlacement, WorldGeometry } from "../types";
 import { useFacadeTextures, type FacadeSetName } from "../textures/facadeTextures";
+import { QUALITY_PRESETS, type FacadeMapsMode } from "@/modules/sim/environment";
 import { preloadCityModels, useCityModels } from "./cityModels";
 import type { QualityPreset } from "./quality";
 
@@ -59,6 +60,23 @@ function facadeSetFor(name: string): FacadeSetName | null {
     return name;
   }
   return null;
+}
+
+/** Constant PBR response when the ORM map is dropped (med/low): a matte
+ *  dielectric facade — glass-pane gloss is a high-tier-only detail. */
+const FACADE_FALLBACK_ROUGHNESS = 0.7;
+const FACADE_FALLBACK_METALNESS = 0.0;
+
+/**
+ * Per-fragment facade-map budget for this tier (doc 71 §4.5 / quality-gap/13).
+ * The world preset carries no explicit level, so map its tier-monotonic
+ * textureSize (256/512/1024) back to the shared quality level and read the
+ * budget from the environment presets — the single source of truth (high =
+ * full, med = colorNormal, low = colorOnly). Keeps the high look byte-identical.
+ */
+function facadeMapsFor(preset: QualityPreset): FacadeMapsMode {
+  const level = preset.textureSize >= 1024 ? "high" : preset.textureSize >= 512 ? "med" : "low";
+  return QUALITY_PRESETS[level].facadeMaps;
 }
 
 const _pos = new THREE.Vector3();
@@ -130,11 +148,15 @@ export function CityBuildings({
   // facade prisms in StaticWorld consume). The kit GLBs ship image-free.
   const facadeSets = useFacadeTextures(gl, 8);
 
-  // Wire the shared textures onto the named kit materials (bay_* / trim).
-  // Everything is set explicitly — the image-free GLB factors are noise:
-  // color/roughness/metalness 1 so the maps rule; emissive white so the
-  // day/night glow effect below owns intensity; ORM fills aoMap +
-  // roughnessMap + metalnessMap from ONE texture (R=AO, G=rough, B=metal).
+  const facadeMaps = facadeMapsFor(preset);
+
+  // Wire the shared textures onto the named kit materials (bay_* / trim),
+  // TIER-GATED (doc 71 §4.5). color + emissive are always bound (albedo + the
+  // lit-window glow the day/night effect drives). The recess normal and the
+  // ORM (aoMap+roughnessMap+metalnessMap from ONE texture, R=AO G=rough
+  // B=metal) are dropped by tier so med/low sample fewer textures per fragment;
+  // when the ORM is dropped, roughness/metalness fall back to a matte constant.
+  // full = 6 fetches (the high look), colorNormal = 3, colorOnly = 2.
   useEffect(() => {
     if (!models || !facadeSets) return;
     for (const groups of models.models) {
@@ -143,25 +165,36 @@ export function CityBuildings({
         if (!setName) continue;
         const set = facadeSets[setName];
         const m = g.material;
-        if (m.map === set.color) continue; // already wired
         m.map = set.color;
-        m.normalMap = set.normal;
-        m.aoMap = set.orm;
-        m.aoMapIntensity = 1.2;
-        m.roughnessMap = set.orm;
-        m.metalnessMap = set.orm;
         m.emissiveMap = set.emissive;
         m.emissive.setRGB(1, 1, 1);
         m.color.setRGB(1, 1, 1);
-        m.roughness = 1;
-        m.metalness = 1;
-        // Bays mix concrete + glass panes in one map (metal/rough channels
-        // pick the response); middle-ground env punch. Trim is mostly stone.
+        if (facadeMaps === "full") {
+          m.normalMap = set.normal;
+          m.aoMap = set.orm;
+          m.aoMapIntensity = 1.2;
+          m.roughnessMap = set.orm;
+          m.metalnessMap = set.orm;
+          // Bays mix concrete + glass panes in one map (metal/rough channels
+          // pick the response); factors 1 so the maps rule.
+          m.roughness = 1;
+          m.metalness = 1;
+        } else {
+          // Drop the ORM (both med + low): constant matte response, no per-pixel
+          // ao/rough/metal fetch. colorOnly additionally drops the normal map.
+          m.normalMap = facadeMaps === "colorNormal" ? set.normal : null;
+          m.aoMap = null;
+          m.roughnessMap = null;
+          m.metalnessMap = null;
+          m.roughness = FACADE_FALLBACK_ROUGHNESS;
+          m.metalness = FACADE_FALLBACK_METALNESS;
+        }
+        // Trim is mostly stone; bays get the middle-ground env punch.
         m.envMapIntensity = setName === "trim" ? 1.0 : 1.5;
         m.needsUpdate = true;
       }
     }
-  }, [models, facadeSets]);
+  }, [models, facadeSets, facadeMaps]);
 
   const assets = useMemo(() => {
     if (!models) return null;
