@@ -17,8 +17,10 @@ import {
   CanvasTexture,
   Mesh,
   MeshBasicMaterial,
+  MeshStandardMaterial,
   SRGBColorSpace,
   type BufferGeometry,
+  type Material,
   type Object3D,
 } from "three";
 import type { VehicleSim } from "@/modules/sim/vehicle";
@@ -45,6 +47,10 @@ import { MirrorRig, type MirrorMeshes } from "./MirrorRig";
 // 6 materials, 2 merged draw groups interior_shell + interior_seats, all 13
 // doc-69 hotspot_* nodes kept separate + screen_cluster / screen_center +
 // the steering_wheel empty parenting steering_wheel_mesh & hotspot_horn).
+// The shell/seats/console/wheel carry a baked 1024² Cycles AO map (glTF
+// occlusionTexture on a dedicated uv2 → aoMap; intensity set below); the
+// screens/mirrors/hotspots are scoped out of it so their material swaps and
+// synthesized quad UVs are untouched.
 //
 // MOUNTING MATH (verified against the GLB node transforms): the file is
 // authored Y-up with the car facing -Z — the same convention as the exterior
@@ -61,6 +67,16 @@ const DRACO_PATH = "/draco/";
 const INTERIOR_YAW = Math.PI;
 /** Authored floor→eye calibration: chassis-local y = authored y - 0.55. */
 const INTERIOR_Y_OFFSET = -0.55;
+/**
+ * Baked-AO strength for the interior. The GLB ships a 1024² Cycles AO bake
+ * (contact shadows in the dash cavities, under the cowl, seat bolsters,
+ * footwells, door-card recesses) as glTF `occlusionTexture` on texCoord 1 →
+ * GLTFLoader assigns it to `material.aoMap` on the `uv1` set automatically.
+ * aoMap darkens INDIRECT light only (the sim's IBL/fill), so we push the
+ * intensity into the archviz "grounded" band (doc 71 §4.6: 1.2–1.4) — the
+ * interior is ~half the cockpit frame and this is what stops it reading flat.
+ */
+const INTERIOR_AO_INTENSITY = 1.3;
 
 /**
  * Render layer for everything cabin-local (interior GLB, hotspot proxies,
@@ -196,9 +212,22 @@ export function VitokCockpit({
       const mesh = o as Mesh;
       if (mesh.isMesh) {
         // No shadow casting: 22.5k tris the shadow pass doesn't need — the
-        // cabin is lit by the fill light + IBL, grounded by the world's AO.
+        // cabin is lit by the fill light + IBL, grounded by baked AO below.
         mesh.castShadow = false;
         mesh.receiveShadow = true;
+        // Baked interior AO: GLTFLoader already wired the GLB occlusionTexture
+        // (texCoord 1) to aoMap on uv1 for the shell/seats/console/wheel
+        // materials — push its intensity to the grounded band. Screens/mirrors
+        // and hotspot controls carry no aoMap (scoped out in the GLB), so this
+        // no-ops on them; the runtime cluster/mirror material swaps are intact.
+        const mats: (Material | undefined)[] = Array.isArray(mesh.material)
+          ? mesh.material
+          : [mesh.material];
+        for (const m of mats) {
+          if (m instanceof MeshStandardMaterial && m.aoMap) {
+            m.aoMapIntensity = INTERIOR_AO_INTENSITY;
+          }
+        }
       }
     });
 

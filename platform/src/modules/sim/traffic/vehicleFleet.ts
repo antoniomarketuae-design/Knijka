@@ -57,11 +57,13 @@ import {
   Box3,
   type BufferGeometry,
   Color,
+  type ColorRepresentation,
   DynamicDrawUsage,
   Group,
   InstancedMesh,
   type Material,
   Mesh,
+  MeshPhysicalMaterial,
   type Object3D,
   Vector3,
 } from "three";
@@ -103,6 +105,17 @@ export const BOXY_INDEX = FLEET.length - 2;
  *  draws). Overflow reassigns to the kolos (same boxy-SUV archetype). */
 export const BOXY_MAX_INSTANCES = 2;
 const BOXY_FALLBACK_INDEX = FLEET.indexOf("kolos");
+
+/**
+ * Models whose gloss paint is upgraded to REAL automotive clearcoat
+ * (MeshPhysicalMaterial). HERO-ONLY by ruling (docs/simulation/71 §4.8 +
+ * quality-gap/06 §3): clearcoat is the most expensive built-in material, so
+ * only the rare premium boxy SUV gets it — REF-4 gloss black IS its identity,
+ * and it spawns ~1-in-21 capped at BOXY_MAX_INSTANCES (2). Every other fleet
+ * model keeps MeshStandard. Combined with the player car (HeroCarBody, +1),
+ * this bounds physical-material vehicles to ≤3 instances on screen.
+ */
+const CLEARCOAT_PAINT_MODELS = new Set<number>([BOXY_INDEX]);
 
 /** Local Draco decoder (CSP-safe, served from public/draco/ — no CDN). */
 export const DRACO_DECODER_PATH = "/draco/";
@@ -234,6 +247,43 @@ export function paintColorFor(modelIndex: number, seed: number, out: Color): boo
 }
 
 // ---------------------------------------------------------------------------
+// Car paint — shared HERO clearcoat recipe (player car + premium boxy SUV)
+// ---------------------------------------------------------------------------
+
+export interface CarPaintOptions {
+  /** Pigment colour (linear space). Default: REF-4 gloss black (#0a0a0a). */
+  color?: ColorRepresentation;
+  /** Env reflection strength vs the scene HDRI. Plan §4.8 range 1.0–1.5;
+   *  default 1.4, tuned to the dimmed day golden-hour env (shanghai_riverside_1k
+   *  @ environmentIntensity 0.5) so black paint catches a deep gloss highlight. */
+  envMapIntensity?: number;
+}
+
+/**
+ * Real automotive CLEARCOAT paint — the canonical three.js `webgl_materials_car`
+ * recipe (quality-gap/06 §3a): a rough metallic pigment/flake base UNDER a
+ * near-mirror clearcoat. The rough metal base carries the pigment; the clearcoat
+ * (roughness ~0.03) supplies the crisp sky/environment reflection that sweeps
+ * across the body while driving — the "deep gloss" REF-4 look.
+ *
+ * MeshPhysicalMaterial is the most expensive built-in material, so this is
+ * HERO-ONLY (docs/simulation/71 §4.8 ruling: clearcoat = player car + the rare
+ * premium boxy SUV; the 12-model traffic fleet stays MeshStandard for perf).
+ * No `transmission`/`sheen` (banned on gameplay vehicles). The caller OWNS the
+ * returned material and must dispose it.
+ */
+export function carPaintMaterial(opts: CarPaintOptions = {}): MeshPhysicalMaterial {
+  return new MeshPhysicalMaterial({
+    color: opts.color ?? 0x0a0a0a,
+    metalness: 0.9,
+    roughness: 0.5,
+    clearcoat: 1.0,
+    clearcoatRoughness: 0.03,
+    envMapIntensity: opts.envMapIntensity ?? 1.4,
+  });
+}
+
+// ---------------------------------------------------------------------------
 // Extraction
 // ---------------------------------------------------------------------------
 
@@ -281,6 +331,9 @@ export interface ModelRig {
   bodyGeometry: BufferGeometry;
   /** Materials aligned to the merged geometry's groups. */
   bodyMaterials: Material[];
+  /** Materials WE created (not from the drei cache) — disposed by
+   *  disposeTrafficFleet. Today: the hero SUV's clearcoat paint clone. */
+  ownedMaterials: Material[];
   /** Split paint shell for per-instance palette tint (null: paint stays in
    *  the body merge — police livery / hero SUV). Material is OUR white clone. */
   paint: GeoSet | null;
@@ -415,6 +468,22 @@ function extractModelRig(scene: Object3D, modelIndex: number): ModelRig {
     if (host) p.mat = host;
   }
 
+  // Hero-only clearcoat: swap the SUV's gloss-black paint (stays inside the
+  // body merge — it has no palette split) for a real MeshPhysicalMaterial.
+  // Fleet models keep MeshStandard (perf; see CLEARCOAT_PAINT_MODELS). We own
+  // the new material (never mutate the drei-cached one) — disposed on teardown.
+  const ownedMaterials: Material[] = [];
+  if (CLEARCOAT_PAINT_MODELS.has(modelIndex)) {
+    const paintPrims = bodyPrims.filter((p) => p.matName.startsWith("paint"));
+    if (paintPrims.length > 0) {
+      const src = paintPrims[0].mat as Material & { color?: Color; name?: string };
+      const clearcoat = carPaintMaterial({ color: src.color?.clone() });
+      clearcoat.name = src.name ?? "paint_clearcoat";
+      ownedMaterials.push(clearcoat);
+      for (const p of paintPrims) p.mat = clearcoat; // one shared group
+    }
+  }
+
   // Split paint out for per-instance palette tint (palette-listed models).
   let paint: GeoSet | null = null;
   let mergedBody: GeoSet | null;
@@ -478,6 +547,7 @@ function extractModelRig(scene: Object3D, modelIndex: number): ModelRig {
   return {
     bodyGeometry,
     bodyMaterials: mergedBody.materials,
+    ownedMaterials,
     paint,
     customWheel,
     wheelOffsets,
@@ -811,6 +881,9 @@ export function disposeTrafficFleet(fleet: TrafficFleet): void {
     fleet.customWheelL[m]?.dispose();
     fleet.customWheelR[m]?.dispose();
     const rig = fleet.models[m].rig;
+    // Materials we created (hero SUV clearcoat clone) — cached materials are
+    // the drei GLTF cache's and are deliberately NOT disposed here.
+    for (const mat of rig.ownedMaterials) mat.dispose();
     // Merged geometries are ours regardless of whether any mesh used them.
     rig.bodyGeometry.dispose();
     if (rig.paint) {

@@ -16,6 +16,9 @@
  */
 
 export { createTrafficSystem } from "./system";
+// Shared HERO clearcoat car-paint recipe (player car + premium boxy SUV).
+export { carPaintMaterial } from "./vehicleFleet";
+export type { CarPaintOptions } from "./vehicleFleet";
 export { mulberry32 } from "./rng";
 export type { Rng } from "./rng";
 export { TrafficLayer } from "./TrafficLayer";

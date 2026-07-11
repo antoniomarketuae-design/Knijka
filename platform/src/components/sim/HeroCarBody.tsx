@@ -3,10 +3,12 @@
 /**
  * Hero player-car exterior — the fictional "Aurelis GT-E" (ADR-001, unbadged),
  * built via Rodin → voxel-rebuild (see tools/blender/HERO_CAR_RODIN_BRIEF.md).
- * Draco-compressed GLB with its OWN PBR materials (deep-gloss paint, tinted
- * glass, chrome, alloys, LED bars), so — unlike the old RoadsterBody — we keep
- * the model's materials and only bump envMapIntensity so the paint/glass reflect
- * the scene HDRI.
+ * Draco-compressed GLB with its OWN PBR materials (tinted glass, chrome, alloys,
+ * LED bars). The BODY PAINT is upgraded to a real automotive clearcoat
+ * (MeshPhysicalMaterial, shared carPaintMaterial recipe — docs/simulation/71
+ * §4.8: hero-only, so the traffic fleet stays cheap), keeping the model's
+ * authored pigment colour; every other material is left as authored with only a
+ * bumped envMapIntensity so glass/chrome reflect the scene HDRI.
  *
  * COCKPIT VIEW HIDES THE EXTERIOR (A3): every material in the GLB is
  * double-sided and the tinted-glass canopy is OPAQUE near-black, spanning
@@ -26,11 +28,12 @@
  * facing if it renders backward.
  */
 
-import { useContext, useMemo, useRef, type RefObject } from "react";
+import { useContext, useEffect, useMemo, useRef, type RefObject } from "react";
 import { useFrame } from "@react-three/fiber";
 import { useGLTF } from "@react-three/drei";
-import { Box3, Mesh, MeshStandardMaterial, Object3D, Vector3 } from "three";
+import { Box3, Mesh, MeshPhysicalMaterial, MeshStandardMaterial, Object3D, Vector3 } from "three";
 import { CHASSIS_HALF_EXTENTS, type VehicleSim } from "@/modules/sim/vehicle";
+import { carPaintMaterial } from "@/modules/sim/traffic";
 import { CockpitInteractionContext } from "./vitok/hotspots";
 
 const HERO_URL = "/sim/vehicles/hero_car.glb";
@@ -55,20 +58,37 @@ export function HeroCarBody({ simRef }: { simRef?: RefObject<VehicleSim | null> 
   const wheels = useRef<Wheel[]>([]);
   const roll = useRef(0);
 
-  const { model, scale, offsetY } = useMemo(() => {
+  const { model, scale, offsetY, paintMaterial } = useMemo(() => {
     const root = scene.clone(true);
+    // One shared clearcoat material for every paint panel (single shader
+    // program), built lazily from the model's authored pigment colour.
+    let paintMaterial: MeshPhysicalMaterial | null = null;
     root.traverse((o) => {
       const mesh = o as Mesh;
       if (!mesh.isMesh) return;
       mesh.castShadow = true;
       mesh.receiveShadow = true;
       const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
-      for (const m of mats) {
+      const next = mats.map((m) => {
         const sm = m as MeshStandardMaterial;
-        // Keep the model's own colours/metalness/roughness; just let the paint,
-        // glass and chrome catch the scene HDRI (glossy reflective car look).
+        // Body paint -> real automotive clearcoat (recipe: docs/simulation/71
+        // §4.8), keeping the authored pigment colour + double-sidedness. The
+        // cloned mesh gets OUR material; the drei-cached one is never mutated.
+        if (sm && /paint/i.test(sm.name ?? "")) {
+          if (!paintMaterial) {
+            const p = carPaintMaterial({ color: sm.color?.clone() });
+            p.name = sm.name ?? "car_paint";
+            p.side = sm.side; // preserve the GLB's double-sided shell
+            paintMaterial = p;
+          }
+          return paintMaterial as MeshPhysicalMaterial;
+        }
+        // Glass, chrome, tyre and lights stay as authored; just let them catch
+        // the scene HDRI (glossy reflective car look).
         if (sm && "envMapIntensity" in sm) sm.envMapIntensity = 1.3;
-      }
+        return m;
+      });
+      mesh.material = Array.isArray(mesh.material) ? next : next[0];
     });
 
     // Collect the rigged wheel nodes (steer applied before roll → YXZ order).
@@ -90,8 +110,19 @@ export function HeroCarBody({ simRef }: { simRef?: RefObject<VehicleSim | null> 
     const targetWidth = CHASSIS_HALF_EXTENTS.x * 2;
     const fitScale = size.x > 1e-3 ? targetWidth / size.x : 1;
     const fitOffsetY = -CHASSIS_HALF_EXTENTS.y - bbox.min.y * fitScale;
-    return { model: root, scale: fitScale, offsetY: fitOffsetY };
+    // `paintMaterial` is assigned synchronously inside the traverse above, but
+    // TS can't see through the closure — assert its declared type back.
+    return {
+      model: root,
+      scale: fitScale,
+      offsetY: fitOffsetY,
+      paintMaterial: paintMaterial as MeshPhysicalMaterial | null,
+    };
   }, [scene]);
+
+  // Dispose the clearcoat we created when the model re-clones or unmounts (the
+  // GLB's own cached materials belong to the drei cache and are left alone).
+  useEffect(() => () => paintMaterial?.dispose(), [paintMaterial]);
 
   useFrame((_, delta) => {
     const sim = simRef?.current;

@@ -10,6 +10,7 @@ import {
   Color,
   Group,
   Mesh,
+  MeshPhysicalMaterial,
   MeshStandardMaterial,
   type Object3D,
 } from "three";
@@ -20,6 +21,7 @@ import {
   BOXY_INDEX,
   BOXY_MAX_INSTANCES,
   buildTrafficFleet,
+  carPaintMaterial,
   disposeTrafficFleet,
   FLEET,
   paintColorFor,
@@ -263,6 +265,41 @@ describe("buildTrafficFleet parked pass", () => {
     expect(fleet.parkedWheel).toBeNull();
     expect(fleet.parkedMeshes.every((m) => m === null)).toBe(true);
     expect(fleet.parkedPaintMeshes.every((m) => m === null)).toBe(true);
+    expect(() => disposeTrafficFleet(fleet)).not.toThrow();
+  });
+});
+
+describe("hero clearcoat paint", () => {
+  it("carPaintMaterial is a MeshPhysicalMaterial with the clearcoat recipe", () => {
+    const mat = carPaintMaterial({ color: 0x0a0a0a });
+    expect(mat).toBeInstanceOf(MeshPhysicalMaterial);
+    expect(mat.clearcoat).toBe(1);
+    expect(mat.clearcoatRoughness).toBeCloseTo(0.03);
+    expect(mat.metalness).toBeCloseTo(0.9);
+    expect(mat.roughness).toBeCloseTo(0.5);
+    expect(mat.transmission).toBe(0); // banned on gameplay vehicles
+    mat.dispose();
+  });
+
+  it("upgrades the hero SUV paint to clearcoat but keeps the fleet on MeshStandard", () => {
+    // Rigs are extracted for every model regardless of instance count.
+    const fleet = buildTrafficFleet(makeScenes(), [vehicle(1)]);
+
+    // Hero SUV body carries exactly one physical (clearcoat) paint material,
+    // and it is OWNED (disposed on teardown).
+    const suv = fleet.models[BOXY_INDEX].rig;
+    const physical = suv.bodyMaterials.filter((m) => m instanceof MeshPhysicalMaterial);
+    expect(physical.length).toBe(1);
+    expect((physical[0] as MeshPhysicalMaterial).clearcoat).toBe(1);
+    expect(suv.ownedMaterials).toContain(physical[0]);
+
+    // A fleet model (kolos, the ambient boxy SUV) stays MeshStandard — the
+    // clearcoat is hero-only. (MeshPhysicalMaterial extends MeshStandard, so
+    // an explicit instanceof check is what distinguishes them.)
+    const kolos = fleet.models[KOLOS_INDEX].rig;
+    expect(kolos.bodyMaterials.some((m) => m instanceof MeshPhysicalMaterial)).toBe(false);
+    expect(kolos.ownedMaterials.length).toBe(0);
+
     expect(() => disposeTrafficFleet(fleet)).not.toThrow();
   });
 });

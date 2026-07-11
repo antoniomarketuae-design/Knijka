@@ -1,9 +1,23 @@
 """
 Hero traffic/showcase vehicle: FICTIONAL boxy luxury SUV ("Kastel Baron" working
 name) — de-badged G63-type per docs/simulation/70_VISUAL_REFERENCE_BRIEF.md REF 4
-and the dimensioned research digest. Headless Blender, house style of
-tools/blender/vehicles.py (bmesh Builder in glTF space, cached mat(), separate
-hub-centred wheel nodes wheel_FL/FR/RL/RR spinning on local X, nose +Z).
+and the dimensioned research digest.
+
+v2 — MID-POLY rebuild (docs/simulation/71 §4.8, quality-gap/06_vehicle_detail.md §2):
+the v1 slab body read "toy" because every edge was a razor 90° that catches no
+highlight, and the headlamps read as archery-target bullseyes. The fix is the
+industry mid-poly workflow, NO bake: model once at final resolution, put a real
+1-segment bevel (~4.5 mm) on every visible edge, then let the Weighted Normal
+modifier make the big flat faces dominate the shading so the low-poly slab reads
+high-poly. Target ~15-30k tris. Headlamps rebuilt as round LED-ring DRLs (thin
+bright ring over a DARK lens + chrome projector bowl — never a bright centre dot).
+
+House style of tools/blender/vehicles.py (bmesh Builder in glTF space, cached
+mat(), separate hub-centred wheel nodes wheel_FL/FR/RL/RR spinning on local X,
+nose +Z). Material NAMES are a load-bearing contract with the fleet loader
+(platform/src/modules/sim/traffic/vehicleFleet.ts): paint_* stays in the body
+merge, mesh_dark->matte_black / brake_steel->silver_satin fold, and the wheels
+count as CUSTOM because they carry rim_gloss_black/red_accent — do not rename.
 
 ADR-001 (HARD RULE): fully fictional. NO three-pointed star, NO Panamericana
 15-slat pattern (we use 13 slats, different pitch), NO wordmarks, plain wheel
@@ -36,7 +50,12 @@ if not out_dir:
     out_dir = os.path.join(os.path.expanduser("~"), "boxy-suv-out")
 os.makedirs(out_dir, exist_ok=True)
 
-HDRI = "E:/AI driver/platform/public/sim/env/sky_urban_1k.hdr"
+# Golden-hour HDRI is the sim's Phase-1 primary env (doc 71 §4.2) — a real
+# unclipped sun in the map is what makes gloss-black paint + chrome read as a
+# "product shot" rather than the flat overcast v1 previews. Fall back to the
+# older urban sky if the golden HDRI is missing.
+HDRI = "E:/AI driver/platform/public/sim/env/shanghai_riverside_1k.hdr"
+HDRI_FALLBACK = "E:/AI driver/platform/public/sim/env/sky_urban_1k.hdr"
 PREVIEW_DIR = "E:/AI driver/tools/blender/previews"
 os.makedirs(PREVIEW_DIR, exist_ok=True)
 
@@ -83,29 +102,32 @@ def mat(name, rgb, rough=0.5, metal=0.0, emit=None, emit_strength=0.0, coat=0.0,
     return m
 
 
-# Deep gloss-black clearcoat body (REF 4 wet-asphalt hero look).
-PAINT = mat("paint_gloss_black", (0.013, 0.013, 0.015), rough=0.22, metal=0.35, coat=1.0)
-MATTE = mat("matte_black", (0.022, 0.022, 0.024), rough=0.88, metal=0.0)      # arches/cladding
-TRIM = mat("gloss_trim", (0.014, 0.014, 0.016), rough=0.30, metal=0.2, coat=0.4)  # handles/pillars/frames
-CHROME = mat("chrome", (0.82, 0.83, 0.85), rough=0.07, metal=1.0)             # grille slats + exhaust
-SILVER = mat("silver_satin", (0.52, 0.53, 0.55), rough=0.34, metal=0.9)       # boards + skid lip
-RED_ACC = mat("red_accent", (0.45, 0.015, 0.02), rough=0.28, metal=0.1, coat=0.6)  # calipers + pinstripe
-GLASS = mat("glass_tint", (0.014, 0.018, 0.026), rough=0.06, metal=0.65, coat=0.7)
-MESH_DK = mat("mesh_dark", (0.016, 0.016, 0.018), rough=0.92, metal=0.0)      # intakes/grille backing
-TIRE = mat("tire", (0.016, 0.016, 0.02), rough=0.85, metal=0.0)
-RIM = mat("rim_gloss_black", (0.015, 0.015, 0.017), rough=0.16, metal=0.55, coat=0.6)
-STEEL = mat("brake_steel", (0.26, 0.26, 0.28), rough=0.45, metal=0.85)
+# Two blacks are THE G-Class cue (doc 06 §4): deep gloss clearcoat paint vs matte
+# cladding, obviously different gloss. Paint recipe follows the official three.js
+# car shader — a rough metallic base UNDER a near-mirror clearcoat.
+PAINT = mat("paint_gloss_black", (0.010, 0.010, 0.012), rough=0.42, metal=0.9,
+            coat=1.0, coat_rough=0.035)
+MATTE = mat("matte_black", (0.017, 0.017, 0.019), rough=0.80, metal=0.0)     # arches/cladding
+TRIM = mat("gloss_trim", (0.012, 0.012, 0.014), rough=0.28, metal=0.25, coat=0.5)  # handles/pillars/frames
+CHROME = mat("chrome", (0.86, 0.87, 0.89), rough=0.075, metal=1.0)           # grille slats + exhaust + lamp bezels
+SILVER = mat("silver_satin", (0.55, 0.56, 0.58), rough=0.30, metal=0.92)     # boards + skid lip
+RED_ACC = mat("red_accent", (0.50, 0.02, 0.02), rough=0.30, metal=0.1, coat=0.6)  # calipers + pinstripe
+GLASS = mat("glass_tint", (0.010, 0.013, 0.020), rough=0.05, metal=0.85, coat=0.6)
+MESH_DK = mat("mesh_dark", (0.013, 0.013, 0.015), rough=0.92, metal=0.0)     # intakes/grille backing/lens cup
+TIRE = mat("tire", (0.017, 0.017, 0.021), rough=0.90, metal=0.0)
+RIM = mat("rim_gloss_black", (0.013, 0.013, 0.016), rough=0.15, metal=0.55, coat=0.7)
+STEEL = mat("brake_steel", (0.27, 0.27, 0.29), rough=0.42, metal=0.85)
 PLATE = mat("plate_blank", (0.74, 0.75, 0.76), rough=0.4, metal=0.0)
-DRL = mat("drl_ring", (0.88, 0.90, 0.95), rough=0.15, emit=(1.0, 1.0, 1.0),
-          emit_strength=4.0)
-PROJ = mat("projector", (0.80, 0.80, 0.78), rough=0.15, emit=(1.0, 0.95, 0.85),
-           emit_strength=2.2)
+# The ONLY lit part of the headlamp — a thin bright LED DRL ring. Everything
+# inboard of it stays dark so it never reads as a bullseye.
+DRL = mat("drl_ring", (0.90, 0.93, 0.98), rough=0.12, emit=(0.95, 0.97, 1.0),
+          emit_strength=2.6)
 AMBER = mat("amber_lens", (0.55, 0.22, 0.02), rough=0.2, emit=(1.0, 0.45, 0.05),
-            emit_strength=1.5)
+            emit_strength=1.4)
 TAIL = mat("tail_red", (0.22, 0.012, 0.012), rough=0.2, emit=(1.0, 0.05, 0.03),
-           emit_strength=0.9)
+           emit_strength=0.85)
 REVERSE = mat("reverse_lens", (0.45, 0.45, 0.45), rough=0.2, emit=(0.9, 0.9, 0.85),
-              emit_strength=0.25)
+              emit_strength=0.22)
 
 # ---------------------------------------------------------------------------
 # Builder — authors in glTF space (X right/left+, Y up, Z nose+); stores Blender
@@ -232,6 +254,42 @@ class Builder:
 
 
 # ---------------------------------------------------------------------------
+# Mid-poly finisher: bevel every visible edge + Weighted Normal so the flat slab
+# reads high-poly (docs/simulation/quality-gap/06 §2a). NO bake. Applied per
+# object so render, tri-count and export all agree on the final geometry.
+# ---------------------------------------------------------------------------
+def hard_surface_pass(obj, width=0.0045, segments=1, angle_deg=32):
+    bpy.ops.object.select_all(action="DESELECT")
+    obj.select_set(True)
+    bpy.context.view_layer.objects.active = obj
+    # Smooth shading first so custom normals (set by Weighted Normal) actually
+    # drive the interpolation; the big planar faces stay flat either way.
+    try:
+        bpy.ops.object.shade_smooth()
+    except Exception:
+        pass
+    bev = obj.modifiers.new("Bevel", "BEVEL")
+    bev.width = width
+    bev.segments = segments
+    bev.limit_method = "ANGLE"
+    bev.angle_limit = math.radians(angle_deg)
+    bev.use_clamp_overlap = True          # protects thin details (seams/slats)
+    bev.harden_normals = False            # soft rounded edge highlight (not hard)
+    bev.miter_outer = "MITER_ARC"
+    bev.loop_slide = True
+    wn = obj.modifiers.new("WeightedNormal", "WEIGHTED_NORMAL")
+    wn.keep_sharp = True
+    wn.mode = "FACE_AREA"                 # big faces dominate -> flat reads flat
+    wn.weight = 50
+    wn.thresh = 0.01
+    for m in (bev.name, wn.name):
+        try:
+            bpy.ops.object.modifier_apply(modifier=m)
+        except Exception as e:
+            print("  modifier apply failed:", m, e)
+
+
+# ---------------------------------------------------------------------------
 # Dimensions (glTF space, m)
 # ---------------------------------------------------------------------------
 NOSE, Z_TAIL = 2.245, -2.415        # body 4.66; spare adds ~0.24 behind
@@ -243,6 +301,27 @@ WHEEL_R, TIRE_W, HUB_X = 0.3975, 0.295, 0.83
 WS_BASE_Z, WS_TOP_Z = 0.95, 0.58     # windshield rake ~27 deg from vertical
 CAB_HW = 0.86
 FLARE_RO, FLARE_RI, FLARE_OUT = 0.575, 0.465, 0.965
+
+
+def build_lamp(b, sx):
+    """Round LED-ring headlamp. The single rule that separates a modern LED lamp
+    from a bullseye TARGET: a thin bright DRL ring is the ONLY lit thing, sitting
+    over an otherwise DARK lens with a DARK recessed projector — no chrome inside
+    (chrome mirrors the bright sky into a white centre dot = instant target)."""
+    cy = 0.96
+    # squared matte housing set into the fascia
+    b.box_g(sx, cy, 2.260, 0.31, 0.31, 0.055, MATTE)
+    # dark reflector lens cup — the whole face reads dark
+    b.cyl_g(sx, cy, "z", 0.142, 2.268, 2.300, MESH_DK, seg=34)
+    # dark GLOSS bezel rim (not chrome, so no bright band competes with the ring)
+    b.ring_g(sx, cy, "z", 0.138, 0.156, 2.292, 2.314, TRIM, seg=34)
+    # THIN bright LED DRL ring near the outer edge (the ONLY lit element)
+    b.ring_g(sx, cy, "z", 0.116, 0.128, 2.301, 2.307, DRL, seg=40)
+    # dark recessed projector: dark bowl + dark bezel + a dark, only-slightly
+    # glossy lens set BEHIND the ring plane so it stays a shadowed dark eye
+    b.cyl_g(sx, cy, "z", 0.072, 2.284, 2.298, MESH_DK, seg=24)
+    b.ring_g(sx, cy, "z", 0.058, 0.072, 2.294, 2.302, TRIM, seg=24)
+    b.cyl_g(sx, cy, "z", 0.054, 2.290, 2.297, TRIM, seg=24)
 
 
 def build_body():
@@ -261,6 +340,8 @@ def build_body():
     b.box_g(0, (GLASS_TOP + ROOF) / 2, -0.875, 1.75, ROOF - GLASS_TOP, 2.95, PAINT)
     for sx in (1, -1):
         b.box_g(sx * 0.872, 1.862, -0.875, 0.032, 0.028, 2.90, TRIM)
+    # low roof-edge trim rail across the front (REF-4 roof trim cue)
+    b.box_g(0, 1.878, 0.62, 1.70, 0.02, 0.05, TRIM)
 
     # pillars (gloss black frames): A raked, B/C vertical, D rear corner
     for sx in (1, -1):
@@ -272,29 +353,30 @@ def build_body():
                     0.03, GLASS_TOP - BELT, pw, TRIM)
 
     # ---- hood: raised perimeter step + washer nozzles + cowl ----
-    b.box_g(0, BELT + 0.009, 1.60, 1.42, 0.022, 1.16, PAINT)
+    b.box_g(0, BELT + 0.010, 1.60, 1.44, 0.024, 1.18, PAINT)
+    b.box_g(0, BELT + 0.020, 1.60, 1.30, 0.020, 1.02, PAINT)   # centre power dome
     for sx in (1, -1):
-        b.box_g(sx * 0.14, BELT + 0.027, 1.14, 0.028, 0.014, 0.05, MATTE)
+        b.box_g(sx * 0.14, BELT + 0.030, 1.14, 0.028, 0.014, 0.05, MATTE)  # washer nozzle
     b.box_g(0, BELT - 0.003, 0.985, 1.60, 0.015, 0.06, MATTE)  # wiper bay
 
     # ---- fender-top indicator pods (the icon) ----
     for sx in (1, -1):
-        b.box_g(sx * 0.795, BELT + 0.0275, 2.02, 0.07, 0.055, 0.15, TRIM)
-        b.box_g(sx * 0.795, BELT + 0.033, 2.096, 0.05, 0.03, 0.012, AMBER)
+        b.box_g(sx * 0.795, BELT + 0.028, 2.02, 0.072, 0.058, 0.15, TRIM)
+        b.box_g(sx * 0.795, BELT + 0.034, 2.096, 0.05, 0.03, 0.012, AMBER)
 
-    # ---- front fascia: round lamps in squared bezels + 13-slat grille ----
+    # ---- front fascia: round LED lamps + 13-slat grille (NO badge) ----
     for sx in (0.66, -0.66):
-        b.box_g(sx, 0.96, 2.263, 0.30, 0.30, 0.055, MATTE)          # bezel
-        b.cyl_g(sx, 0.96, "z", 0.128, 2.263, 2.298, GLASS, seg=24)  # lens
-        b.ring_g(sx, 0.96, "z", 0.100, 0.122, 2.298, 2.305, DRL, seg=24)
-        b.cyl_g(sx, 0.96, "z", 0.048, 2.296, 2.302, PROJ, seg=16)   # projector
-    b.box_g(0, 0.93, 2.258, 1.00, 0.40, 0.026, TRIM)                # grille frame
-    b.box_g(0, 0.93, 2.262, 0.94, 0.34, 0.026, MESH_DK)             # backing
+        build_lamp(b, sx)
+    b.box_g(0, 0.93, 2.256, 1.02, 0.42, 0.028, TRIM)                # grille frame
+    b.box_g(0, 0.93, 2.262, 0.94, 0.34, 0.026, MESH_DK)            # backing
     n_slats = 13                                                    # NOT 15 (ADR-001)
     pitch = 0.94 / n_slats
     for k in range(n_slats):
         xk = -0.47 + (k + 0.5) * pitch
-        b.box_g(xk, 0.93, 2.276, 0.02, 0.33, 0.030, CHROME)
+        b.box_g(xk, 0.93, 2.278, 0.021, 0.33, 0.032, CHROME)
+    # two chrome cross-rails tying the slats (generic, not the Panamericana pitch)
+    for gy in (1.055, 0.805):
+        b.box_g(0, gy, 2.280, 0.93, 0.022, 0.030, CHROME)
     # NO central badge, NO star — clean slats only.
 
     # ---- front bumper: 3 mesh intakes + silver skid lip + tow eyes ----
@@ -302,7 +384,7 @@ def build_body():
     b.box_g(0, 0.545, 2.333, 0.78, 0.21, 0.012, MESH_DK)
     for sx in (1, -1):
         b.box_g(sx * 0.60, 0.545, 2.333, 0.30, 0.21, 0.012, MESH_DK)
-        b.cyl_g(sx * 0.34, 0.44, "z", 0.020, 2.33, 2.36, SILVER, seg=10)
+        b.cyl_g(sx * 0.34, 0.44, "z", 0.020, 2.33, 2.36, SILVER, seg=12)
     b.box_g(0, 0.395, 2.29, 0.90, 0.06, 0.13, SILVER)               # skid lip
     # lower-body corner wraps bridging bumper ears into the arch flares
     for sx in (1, -1):
@@ -311,46 +393,46 @@ def build_body():
 
     # ---- sides: cladding, seams, hinges, handles, boards, exhausts, mirrors ----
     for sx in (1, -1):
-        # mid-height protective cladding strip
-        b.box_g(sx * 0.886, 0.88, -0.085, 0.02, 0.09, 4.30, MATTE)
+        # mid-height protective cladding strip (matte — the two-blacks contrast)
+        b.box_g(sx * 0.888, 0.88, -0.085, 0.024, 0.10, 4.30, MATTE)
         # door cut seams (dark, hairline-proud)
         for sz in (0.95, -0.28, -1.30):
             b.box_g(sx * 0.882, 0.80, sz, 0.006, 0.70, 0.014, MESH_DK)
         # external barrel hinges — 2 per door on leading edges
         for hz in (0.90, -0.31):
             for hy in (0.68, 1.02):
-                b.cyl_g(sx * 0.888, hz, "y", 0.016, hy, hy + 0.09, PAINT, seg=10)
+                b.cyl_g(sx * 0.888, hz, "y", 0.017, hy, hy + 0.10, PAINT, seg=12)
         # exposed gloss-black door handles
         for hz in (0.42, -0.80):
-            b.box_g(sx * 0.890, 1.03, hz, 0.025, 0.04, 0.16, TRIM)
+            b.box_g(sx * 0.890, 1.03, hz, 0.025, 0.045, 0.16, TRIM)
         # silver running board + rubber treads
         b.box_g(sx * 0.945, 0.452, 0.0, 0.15, 0.05, 1.58, SILVER)
         for tz in (-0.55, -0.18, 0.18, 0.55):
             b.box_g(sx * 0.952, 0.480, tz, 0.11, 0.010, 0.22, MATTE)
         # side-exit dual exhaust tips behind front wheel, under the board
         for ez in (0.66, 0.52):
-            b.cyl_g(0.385, ez, "x", 0.038, sx * 0.90, sx * 1.005, CHROME, seg=14)
+            b.cyl_g(0.385, ez, "x", 0.040, sx * 0.90, sx * 1.010, CHROME, seg=16)
         # mirror: stalk + head + amber strip + glass
         b.box_g(sx * 0.955, 1.40, 0.82, 0.13, 0.03, 0.05, MATTE)
         b.box_g(sx * 1.045, 1.45, 0.80, 0.12, 0.15, 0.075, MATTE)
         b.box_g(sx * 1.108, 1.45, 0.80, 0.012, 0.02, 0.05, AMBER)
         b.box_g(sx * 1.045, 1.45, 0.760, 0.10, 0.13, 0.008, GLASS)
 
-    # ---- squared-off octagonal arch flares + dark liners + brakes ----
+    # ---- squared-off arch flares + dark liners + brakes ----
     for wz in (WZ_F, WZ_R):
         for sx in (1, -1):
             x_in, x_out = sx * (HW - 0.005), sx * FLARE_OUT
             b.ring_g(WHEEL_R, wz, "x", FLARE_RI, FLARE_RO,
                      min(x_in, x_out), max(x_in, x_out), MATTE,
-                     seg=5, a0=0.05, a1=math.pi - 0.05)
+                     seg=11, a0=0.04, a1=math.pi - 0.04)
             # dark arch liner ring flush on the body side
             b.ring_g(WHEEL_R, wz, "x", 0.28, FLARE_RI + 0.005,
                      sx * 0.879, sx * 0.883 if sx > 0 else sx * 0.879 - 0.004,
-                     MESH_DK, seg=8, a0=-0.1, a1=math.pi + 0.1)
+                     MESH_DK, seg=12, a0=-0.1, a1=math.pi + 0.1)
             # brake disc + RED caliper (static, visible through spokes)
             xd0, xd1 = sx * 0.79, sx * 0.828
             b.cyl_g(WHEEL_R, wz, "x", 0.185, min(xd0, xd1), max(xd0, xd1),
-                    STEEL, seg=18)
+                    STEEL, seg=22)
             cz = wz + (0.11 if wz > 0 else -0.11)
             b.box_g(sx * 0.807, 0.52, cz, 0.05, 0.15, 0.11, RED_ACC)
 
@@ -367,15 +449,18 @@ def build_body():
     b.box_g(0, 0.57, -2.508, 0.46, 0.10, 0.008, PLATE)              # blank plate
     # tailgate hinges (right side = -X) + handle (left)
     for hy in (0.90, 1.28):
-        b.cyl_g(-0.84, -2.432, "y", 0.017, hy, hy + 0.09, PAINT, seg=10)
+        b.cyl_g(-0.84, -2.432, "y", 0.018, hy, hy + 0.10, PAINT, seg=12)
     b.box_g(0.68, 1.00, -2.428, 0.12, 0.035, 0.03, TRIM)
-    # full-size spare in a plain hard cover (smooth face + simple ring rib ONLY)
-    b.ring_g(0, 1.05, "z", 0.29, 0.40, -2.43, -2.62, TIRE, seg=24)  # tire band
-    b.cyl_g(0, 1.05, "z", 0.405, -2.60, -2.645, PAINT, seg=24)      # cover
-    b.ring_g(0, 1.05, "z", 0.21, 0.27, -2.645, -2.660, PAINT, seg=20)  # rib
+    # full-size spare in a plain hard cover (smooth face + simple ring rib ONLY).
+    # `tire`-material band stays in the BODY mesh (fleet loader keeps it here).
+    b.ring_g(0, 1.05, "z", 0.29, 0.40, -2.43, -2.62, TIRE, seg=28)  # tire band
+    b.cyl_g(0, 1.05, "z", 0.405, -2.60, -2.645, PAINT, seg=28)      # cover
+    b.ring_g(0, 1.05, "z", 0.21, 0.27, -2.645, -2.660, PAINT, seg=24)  # rib
     b.box_g(0, 1.475, -2.60, 0.18, 0.04, 0.05, TAIL)                # 3rd brake pod
 
-    return b.finalize("suv_boxy_lux")
+    obj = b.finalize("suv_boxy_lux")
+    hard_surface_pass(obj, width=0.0045, segments=1, angle_deg=32)
+    return obj
 
 
 # ---------------------------------------------------------------------------
@@ -389,24 +474,28 @@ def build_wheel(name, side):
     ht = TIRE_W / 2
     RIM_R = 0.2794                       # 22" rim radius
     # tire as a solid annulus (visible sidewalls, closed)
-    b.ring_g(0, 0, "x", RIM_R + 0.006, WHEEL_R, -ht, ht, TIRE, seg=28)
+    b.ring_g(0, 0, "x", RIM_R + 0.006, WHEEL_R, -ht, ht, TIRE, seg=32)
     # rim outer lip + red pinstripe on the outer edge
     lo, hi = sorted((s * 0.096, s * ht))
-    b.ring_g(0, 0, "x", 0.242, RIM_R + 0.008, lo, hi, RIM, seg=24)
+    b.ring_g(0, 0, "x", 0.242, RIM_R + 0.008, lo, hi, RIM, seg=28)
     lo, hi = sorted((s * ht, s * (ht + 0.0045)))
-    b.ring_g(0, 0, "x", 0.262, RIM_R + 0.008, lo, hi, RED_ACC, seg=24)
+    b.ring_g(0, 0, "x", 0.262, RIM_R + 0.008, lo, hi, RED_ACC, seg=28)
     # 7 twin-Y spoke pairs (14 thin spokes) — deep dish near outboard face
     for k in range(7):
         base = TAU * k / 7
         for da in (-0.13, 0.13):
-            b.spoke_g(s * 0.092, s * 0.138, 0.068, 0.246,
-                      base + da, 0.010, RIM)
+            b.spoke_g(s * 0.092, s * 0.140, 0.066, 0.246,
+                      base + da, 0.011, RIM)
     # hub + plain center cap (NO logo)
-    lo, hi = sorted((s * 0.088, s * 0.146))
-    b.cyl_g(0, 0, "x", 0.082, lo, hi, RIM, seg=16)
-    lo, hi = sorted((s * 0.146, s * 0.153))
-    b.cyl_g(0, 0, "x", 0.052, lo, hi, RIM, seg=16)
-    return b.finalize(name)
+    lo, hi = sorted((s * 0.088, s * 0.148))
+    b.cyl_g(0, 0, "x", 0.082, lo, hi, RIM, seg=18)
+    lo, hi = sorted((s * 0.148, s * 0.156))
+    b.cyl_g(0, 0, "x", 0.052, lo, hi, RIM, seg=18)
+    obj = b.finalize(name)
+    # Lighter bevel on the wheel — rounds the tire shoulder + spoke edges without
+    # eating the thin spokes (clamp_overlap protects them).
+    hard_surface_pass(obj, width=0.0028, segments=1, angle_deg=30)
+    return obj
 
 
 # ---------------------------------------------------------------------------
@@ -423,20 +512,6 @@ for (wn, gx, gz, side) in (("wheel_FL", HUB_X, WZ_F, 1),
     w.parent = body
     w.matrix_parent_inverse = body.matrix_world.inverted()
     wheels.append(w)
-
-# smooth the cylindrical surfaces, keep the slab edges hard
-bpy.ops.object.select_all(action="DESELECT")
-body.select_set(True)
-for w in wheels:
-    w.select_set(True)
-bpy.context.view_layer.objects.active = body
-try:
-    bpy.ops.object.shade_auto_smooth(angle=math.radians(38))
-except Exception:
-    try:
-        bpy.ops.object.shade_smooth_by_angle(angle=math.radians(38))
-    except Exception:
-        pass
 
 # ---------------------------------------------------------------------------
 # export GLB (raw; Draco happens in tools/glb/optimize.mjs afterwards)
@@ -457,12 +532,12 @@ for o in [body] + wheels:
     tris += sum(len(p.vertices) - 2 for p in o.data.polygons)
 
 # ---------------------------------------------------------------------------
-# contact-sheet renders vs the sim HDRI (front-3/4, rear-3/4, side)
+# contact-sheet renders vs the sim golden-hour HDRI (front-3/4, rear-3/4, side)
 # ---------------------------------------------------------------------------
 bpy.ops.mesh.primitive_plane_add(size=90, location=(0, 0, 0))
 ground = bpy.context.active_object
 ground.data.materials.append(
-    mat("wet_asphalt", (0.030, 0.032, 0.036), rough=0.16, metal=0.0, coat=0.4))
+    mat("wet_asphalt", (0.026, 0.028, 0.032), rough=0.14, metal=0.0, coat=0.4))
 
 world = bpy.data.worlds.new("sky")
 world.use_nodes = True
@@ -472,21 +547,29 @@ for n in list(nt.nodes):
     nt.nodes.remove(n)
 w_out = nt.nodes.new("ShaderNodeOutputWorld")
 bg = nt.nodes.new("ShaderNodeBackground")
+hdri_path = HDRI if os.path.exists(HDRI) else HDRI_FALLBACK
 try:
     env = nt.nodes.new("ShaderNodeTexEnvironment")
-    env.image = bpy.data.images.load(HDRI)
+    env.image = bpy.data.images.load(hdri_path)
+    # rotate the HDRI so its baked sun sits front-left of the hero for the 3/4s
+    texco = nt.nodes.new("ShaderNodeTexCoord")
+    mapping = nt.nodes.new("ShaderNodeMapping")
+    mapping.inputs["Rotation"].default_value = (0.0, 0.0, math.radians(-55))
+    nt.links.new(texco.outputs["Generated"], mapping.inputs["Vector"])
+    nt.links.new(mapping.outputs["Vector"], env.inputs["Vector"])
     nt.links.new(env.outputs[0], bg.inputs[0])
-    bg.inputs[1].default_value = 1.1
+    bg.inputs[1].default_value = 1.0
 except Exception:
     bg.inputs[0].default_value = (0.85, 0.88, 0.95, 1.0)
 nt.links.new(bg.outputs[0], w_out.inputs[0])
 
 sun_data = bpy.data.lights.new("sun", type="SUN")
-sun_data.energy = 3.2
-sun_data.color = (1.0, 0.95, 0.85)
+sun_data.energy = 2.6
+sun_data.color = (1.0, 0.93, 0.80)
+sun_data.angle = math.radians(1.5)
 sun = bpy.data.objects.new("sun", sun_data)
 bpy.context.collection.objects.link(sun)
-sun.rotation_euler = (math.radians(58), math.radians(12), math.radians(-50))
+sun.rotation_euler = (math.radians(56), math.radians(10), math.radians(-52))
 
 tgt = bpy.data.objects.new("target", None)
 tgt.location = (0, 0, 0.95)
@@ -508,7 +591,7 @@ for eng in ("BLENDER_EEVEE_NEXT", "BLENDER_EEVEE"):
     except Exception:
         continue
 try:
-    sc.eevee.taa_render_samples = 96
+    sc.eevee.taa_render_samples = 128
     sc.eevee.use_raytracing = True
 except Exception:
     pass
@@ -518,13 +601,18 @@ try:
     sc.view_settings.view_transform = "AgX"
 except Exception:
     sc.view_settings.view_transform = "Filmic"
+try:
+    sc.view_settings.exposure = 0.35
+except Exception:
+    pass
 sc.render.image_settings.file_format = "PNG"
 
 # Blender space: nose points toward -Y.
 VIEWS = [
-    ("boxy_suv_front34", (4.6, -6.0, 2.2), 40),
-    ("boxy_suv_rear34", (4.6, 6.0, 2.2), 40),
-    ("boxy_suv_side", (9.0, 0.2, 1.30), 50),
+    ("boxy_suv_v2_front34", (4.5, -5.9, 2.0), 42),
+    ("boxy_suv_v2_rear34", (4.6, 6.0, 2.1), 42),
+    ("boxy_suv_v2_side", (9.0, 0.2, 1.28), 50),
+    ("boxy_suv_v2_front", (0.9, -6.8, 1.35), 55),   # near head-on: verify lamps
 ]
 for (vname, loc, lens) in VIEWS:
     cam_data.lens = lens
