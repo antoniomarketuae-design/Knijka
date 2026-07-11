@@ -22,6 +22,14 @@ export type RoadClass =
   | "residential"
   | "service";
 
+/**
+ * Per-edge legality-zone tag (doc 72 N3, B1a). "thirty" marks a signed
+ * «Зона 30» section (OSM-verified maxspeed=30 tags in district-v1);
+ * "school"/"residential" are reserved for the hand-polish overlay / future
+ * districts (Д15/Д16 semantics). Additive — absent = untagged.
+ */
+export type EdgeZone = "school" | "residential" | "thirty";
+
 export interface DistrictEdge {
   id: string;
   from: string;
@@ -38,6 +46,14 @@ export interface DistrictEdge {
   length: number;
   /** Polyline [x, y][] in local meters; endpoints coincide with from/to nodes. */
   geometry: [number, number][];
+  // -- B1a additive legality tags (doc 72 N3). The parser is tolerant: all
+  // three are optional and pass through untouched when absent.
+  /** Legality-zone tag; the reduced speed (if any) lives in `maxspeed`. */
+  zone?: EdgeZone;
+  /** Overtaking banned on this edge (В24-class zone) — surface-only context. */
+  noOvertake?: boolean;
+  /** U-turn banned on this edge — surface-only context (doc 72 OV-17). */
+  noUTurn?: boolean;
 }
 
 export interface DistrictIntersection {

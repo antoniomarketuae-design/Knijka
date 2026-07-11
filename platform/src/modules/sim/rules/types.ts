@@ -39,12 +39,19 @@ export type TurnDirection = "left" | "right";
 export type SimTickEvent =
   /**
    * Vehicle front axle crossed a stop line. For traffic lights the engine
-   * reports the light state AT THE MOMENT of crossing.
+   * reports the light state AT THE MOMENT of crossing. B1a additions
+   * (doc 72 JU-06/JU-08): "redYellow" is its own state (red+yellow creep is
+   * the официална основна, not the 10-point red entry), and for yellow
+   * crossings the runtime MAY attach `stoppable` — its amber adjudication of
+   * whether a comfortable stop was possible at the green→yellow flip
+   * (distance/speed snapshot vs reaction + comfortable-decel physics).
+   * Absent = unknown → the reducer stays silent (conservative, A12).
    */
   | {
       kind: "stopLineCrossed";
       control: "stopSign" | "trafficLight";
-      lightState?: "red" | "yellow" | "green";
+      lightState?: "red" | "redYellow" | "yellow" | "green";
+      stoppable?: boolean;
     }
   /**
    * Vehicle entered the approach zone of a pedestrian crossing (engine should
@@ -121,9 +128,46 @@ export interface SimTick {
   leadGapM?: number;
   /** True when driving against the flow of a one-way street (runtime-computed). */
   wrongWay?: boolean;
+  // -- B1a Wave-1 world context (doc 72 capabilities 1 + N3). ALL optional and
+  // additive: absent = unknown, and every detector that reads them treats
+  // unknown as innocent (A12 — conservative by construction).
+  /**
+   * The driveline's latched stall flag (VehicleSample.stalled passthrough).
+   * Rising edge = the официална второстепенна „загасване" (doc 72 VP-04).
+   */
+  stalled?: boolean;
+  /** True/false when the runtime knows the current edge's directionality;
+   * absent = unknown (center-line grading stays silent). */
+  oneway?: boolean;
+  /** Legality-zone tag of the current edge (doc 72 N3; district data). */
+  zone?: EdgeZoneTag;
+  /** Overtaking banned on the current edge (В24-class zone; surface-only
+   * context for the future overtake-corridor adjudicator — doc 72 OV-06). */
+  noOvertake?: boolean;
+  /** U-turn banned on the current edge (surface-only context until the
+   * U-turn maneuver evaluator lands — doc 72 OV-17 maps no cheap code). */
+  noUTurn?: boolean;
+  /** Distance to the next stop line ahead on the current edge (travel
+   * direction), m, within the runtime's watch window; absent = none/unknown. */
+  nextStopLineM?: number;
+  /** Control of that line. */
+  nextStopLineControl?: "stopSign" | "trafficLight";
+  /** Live lamp state of that line's approach (trafficLight lines only). */
+  nextStopLineState?: "red" | "redYellow" | "yellow" | "green";
+  /** Distance to the nearest intersection node, m (within ~80 m); absent =
+   * none near. Context gate for the causeless-harsh-brake detector. */
+  nextJunctionM?: number;
   /** Discrete events since the previous tick. */
   events: SimTickEvent[];
 }
+
+/**
+ * Per-edge legality-zone tag (doc 72 N3). "thirty" = a signed «Зона 30»
+ * section (the edge's maxspeed already carries the reduced limit — SPEEDING_*
+ * grades it with zero new code); "school"/"residential" reserved for
+ * hand-polish/future districts (Д15/Д16 semantics per чл. 62–63).
+ */
+export type EdgeZoneTag = "school" | "residential" | "thirty";
 
 // ---------------------------------------------------------------------------
 // Output events — violations & commendations
@@ -166,6 +210,15 @@ export type ViolationCode =
   | "PEDESTRIAN_CROSSING_TOO_FAST" // опасна: accident precondition (official list)
   | "PEDESTRIAN_NOT_YIELDED" // опасна
   | "COLLISION" // опасна + session terminate flag (official: exam terminated)
+  // B1a Wave-1 detector pack (doc 72 capability 1 + N2)
+  | "ENGINE_STALLED" // второстепенна: „загасване" (VP-04)
+  | "MOVE_OFF_WITHOUT_OBSERVATION" // основна: no mirror check before first move-off (PK-05; config-gated, see moveOffObservationEnabled)
+  | "STOP_LINE_OVERSHOOT" // второстепенна: halted past the line at red (JU-15)
+  | "CENTER_LINE_TOUCHED" // второстепенна: „настъпване на осева линия" (SN-03/OV-04)
+  | "HARSH_BRAKING_NO_CAUSE" // основна: „рязко спиране" with no hazard context (VP-09/SP-11)
+  | "HESITATION_AT_GREEN" // второстепенна: „закъснели действия" — green + clear + stationary (JU-09)
+  | "YELLOW_LIGHT_NOT_STOPPED" // основна: amber entered although a comfortable stop existed (JU-06)
+  | "RED_YELLOW_CROSSED" // основна: entered on the red+yellow combination (JU-08)
   // pre-drive procedure (procedures/machine.ts)
   | "PREDRIVE_STEP_SKIPPED" // второстепенна per skipped step
   | "PREDRIVE_SEATBELT_SKIPPED" // основна (skipping the belt is not a detail)
@@ -354,6 +407,61 @@ export interface RuleEngineConfig {
 
   /** Minimum seconds between two collision violations (physics multi-contact debounce). */
   collisionCooldownSec: number;
+
+  // -- B1a Wave-1 detector pack (doc 72 capability 1) ------------------------
+
+  /**
+   * Move-off observation (PK-05 / DVSA top-5). SHIPPED FLAGGED OFF: with the
+   * current telemetry a curb move-off is indistinguishable from a queue/
+   * light move-off, and the A12 innocent-drive contract (the FP battery's
+   * spawn pull-aways, incl. the whole-commute case) treats an unglanced
+   * pull-away as innocent — enabling it by default would flag the contract's
+   * own drives. Lessons that DRILL the move-off ritual (потегляне от място)
+   * opt in per-lesson via config override.
+   */
+  moveOffObservationEnabled: boolean;
+  /** Mirror glance (left or rear) must fall within this window before the
+   * session's FIRST move-off from rest. */
+  moveOffLookbackSec: number;
+
+  /** Vehicle-center distance to a red-controlled stop line at rest at/under
+   * which the nose (≈2.15 m overhang) is clearly past the line/on the zebra.
+   * Deliberately under the geometric touch point — flags a real overshoot,
+   * never a bumper kissing the paint (A12). */
+  stopOvershootCenterM: number;
+  /** Seconds at rest past the line before STOP_LINE_OVERSHOOT fires. */
+  stopOvershootRestSec: number;
+
+  /** Seconds of riding the center line (two-way road, leftmost lane, offset
+   * beyond laneKeepMaxOffsetM toward oncoming, indicator off) before
+   * CENTER_LINE_TOUCHED fires. Shorter than the generic lane-keep sustain —
+   * the specific code wins and suppresses the generic one (no double-bill). */
+  centerLineSustainSec: number;
+
+  /** Deceleration (m/s², positive) at/above which braking counts as harsh. */
+  harshBrakeDecelMps2: number;
+  /** Speed at brake onset must be at least this for a causeless-harsh-brake
+   * episode, km/h (low-speed stabs are clumsy, not dangerous). */
+  harshBrakeMinSpeedKmh: number;
+  /** Seconds the harsh deceleration must sustain before it fires. */
+  harshBrakeSustainSec: number;
+  /** A lead vehicle within this gap is a plausible cause — never fire, m. */
+  harshBrakeClearLeadGapM: number;
+  /** A stop line ahead within this distance is a plausible cause, m. */
+  harshBrakeStopLineClearM: number;
+  /** A junction within this distance is a plausible cause, m. */
+  harshBrakeJunctionClearM: number;
+  /** Any hazard-shaped tick event (crossing zone, priority situation,
+   * collision) within this many seconds exempts hard braking, s. */
+  harshBrakeHazardCooldownSec: number;
+
+  /** Stationary at a GREEN light with a clear box for this long =
+   * второстепенна „закъснели действия" (JU-09). Generous by design. */
+  hesitationSustainSec: number;
+  /** Only judged while at rest within this distance of the line, m. */
+  hesitationMaxLineDistM: number;
+  /** Lead gap at/under this means someone blocks the box — never fire, m. */
+  hesitationClearGapM: number;
 }
 
 export const DEFAULT_RULE_CONFIG: RuleEngineConfig = {
@@ -421,4 +529,21 @@ export const DEFAULT_RULE_CONFIG: RuleEngineConfig = {
   yieldSlowSpeedKmh: 10,
 
   collisionCooldownSec: 3,
+
+  // B1a Wave-1 (doc 72 capability 1). Every threshold errs innocent (A12).
+  moveOffObservationEnabled: false, // see the interface comment — lessons opt in
+  moveOffLookbackSec: 7,
+  stopOvershootCenterM: 1.2, // nose ≥ ~1 m over the paint before it counts
+  stopOvershootRestSec: 0.7,
+  centerLineSustainSec: 2,
+  harshBrakeDecelMps2: 7, // emergency-grade only; a firm 4–5 m/s² stop never fires
+  harshBrakeMinSpeedKmh: 35,
+  harshBrakeSustainSec: 0.4,
+  harshBrakeClearLeadGapM: 45,
+  harshBrakeStopLineClearM: 60,
+  harshBrakeJunctionClearM: 35,
+  harshBrakeHazardCooldownSec: 6,
+  hesitationSustainSec: 5, // DVSA marks ~3 s; we grade only a clear freeze
+  hesitationMaxLineDistM: 12,
+  hesitationClearGapM: 12,
 };

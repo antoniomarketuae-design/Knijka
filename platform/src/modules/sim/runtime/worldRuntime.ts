@@ -34,6 +34,28 @@ import { JUNCTION_AREA_RADIUS_M, TurnDetector } from "./turns";
  * spam RED_LIGHT_CROSSED; a genuine re-approach takes longer anyway). */
 const STOP_LINE_REFIRE_SEC = 5;
 
+/** How far ahead on the current edge the next-stop-line context reaches, m. */
+const NEXT_LINE_WATCH_M = 120;
+/** Junction-proximity context radius (harsh-brake cause gate), m. */
+const JUNCTION_CONTEXT_RADIUS_M = 80;
+/**
+ * Amber adjudication (B1a, doc 72 JU-06): at the green→yellow flip the
+ * runtime freezes the last green-frame snapshot (distance to line + speed);
+ * a comfortable stop was possible iff the frozen distance exceeds
+ * reaction distance + comfortable-brake distance, with a safety margin so
+ * only clear gambles grade — the true dilemma zone stays innocent (A12).
+ */
+export const AMBER_REACTION_SEC = 1.0;
+export const AMBER_COMFORT_DECEL_MPS2 = 3.0;
+export const AMBER_STOP_MARGIN = 1.15;
+
+/** Could the driver have stopped comfortably before the line? (exported for tests) */
+export function comfortableStopPossible(distToLineM: number, speedKmh: number): boolean {
+  const v = speedKmh / 3.6;
+  const needed = (v * AMBER_REACTION_SEC + (v * v) / (2 * AMBER_COMFORT_DECEL_MPS2)) * AMBER_STOP_MARGIN;
+  return distToLineM > needed;
+}
+
 /** Heading opposes the one-way's flow by more than this → wrong way. */
 const WRONG_WAY_ANGLE_DEG = 120;
 
@@ -117,7 +139,29 @@ export type CirculatingQuery = (
   bandRadiusM: number,
 ) => boolean;
 
+/** Phase + seconds-to-change read model (B1a N2 director API). */
+export interface SignalPhaseInfo {
+  phase: SignalPhase;
+  timeToChangeSec: number;
+}
+
 export interface DistrictWorldRuntime extends WorldRuntime {
+  /**
+   * B1a N2 — signal-phase director API. `signalPhaseInfo` reads phase +
+   * time-to-change for the lamps facing `approachBearingDeg` (omit for the
+   * node's own axis-group); `setSignalClusterOffset` pins a cluster's phase
+   * offset (staged exams at session start, the amber runner on approach);
+   * `signalOffsetForPhaseStart` computes the offset that makes `phase` start
+   * in `inSec` seconds for that approach.
+   */
+  signalPhaseInfo(signalNodeId: string, approachBearingDeg?: number): SignalPhaseInfo;
+  setSignalClusterOffset(signalNodeId: string, offsetSec: number): void;
+  signalOffsetForPhaseStart(
+    signalNodeId: string,
+    approachBearingDeg: number,
+    phase: SignalPhase,
+    inSec: number,
+  ): number;
   /** Install the traffic module's pedestrian lookup (default: nobody anywhere). */
   setPedestrianQuery(fn: PedestrianQuery | null): void;
   /** Install the traffic module's junction-conflict lookup (default: none). */
@@ -187,19 +231,39 @@ export function createWorldRuntime(districtJson: District | unknown): DistrictWo
   let prevS = 0;
   let lastMoveSign: 1 | -1 | 0 = 0;
 
+  // Amber decision watch (B1a JU-06): while the next signalized line ahead
+  // shows green, keep a fresh {distance, speed} snapshot; the green→yellow
+  // flip freezes it — that frozen snapshot IS the state "at the flip", and
+  // adjudicates `stoppable` when the line later fires on yellow. One watched
+  // line at a time (the vehicle is on one approach); anything unknown leaves
+  // `stoppable` unset and the reducer silent (A12).
+  let amberLineIdx = -1;
+  let amberGreenDistM = -1;
+  let amberGreenSpeedKmh = 0;
+  let amberFrozen = false;
+
   const speedLimitHit = makeEdgeHit();
 
-  function lightStateOf(line: StopLine): "red" | "yellow" | "green" {
-    const phase = signals.phaseForClusterGroup(line.clusterIdx, line.group ?? "ns");
-    // red+yellow legally still forbids entry — graded as red.
-    return phase === "redYellow" ? "red" : phase;
+  /** Lamp state of a signalized line's approach group — redYellow is its own
+   * state now (JU-08 grades the creep as основна, not as the 10-point red). */
+  function lightStateOf(line: StopLine): SignalPhase {
+    return signals.phaseForClusterGroup(line.clusterIdx, line.group ?? "ns");
   }
 
   function fireLine(line: StopLine, lineIdx: number, tSec: number, events: SimTickEvent[]): void {
     if (tSec - lineLastFired[lineIdx] < STOP_LINE_REFIRE_SEC) return;
     lineLastFired[lineIdx] = tSec;
     if (line.control === "trafficLight") {
-      events.push({ kind: "stopLineCrossed", control: "trafficLight", lightState: lightStateOf(line) });
+      const state = lightStateOf(line);
+      const ev: Extract<SimTickEvent, { kind: "stopLineCrossed" }> = {
+        kind: "stopLineCrossed",
+        control: "trafficLight",
+        lightState: state,
+      };
+      if (state === "yellow" && amberFrozen && amberLineIdx === lineIdx && amberGreenDistM >= 0) {
+        ev.stoppable = comfortableStopPossible(amberGreenDistM, amberGreenSpeedKmh);
+      }
+      events.push(ev);
     } else {
       events.push({ kind: "stopLineCrossed", control: "stopSign" });
       // Give-way/stop: crossing into the junction while conflicting traffic is
@@ -290,6 +354,69 @@ export function createWorldRuntime(districtJson: District | unknown): DistrictWo
       detectStopLines(fix.edgeIdx, fix.sM, tSec, events);
       prevEdgeIdx = fix.edgeIdx;
       prevS = fix.sM;
+
+      // 3b. Next-stop-line context (B1a): the nearest line AHEAD on the
+      // current edge in the travel direction, within the watch window. Runs
+      // AFTER detectStopLines so a yellow crossing this frame reads the
+      // PREVIOUS frames' amber snapshot (state at the flip), then updates.
+      let nextLineIdx = -1;
+      let nextLineDistM = Infinity;
+      if (fix.edgeIdx >= 0) {
+        const [tx, ty] = index.tangentAt(fix.edgeIdx, fix.sM);
+        const travelSign: 1 | -1 =
+          Math.abs(signedDeltaDeg(v.headingDeg, bearingDeg(tx, ty))) <= 90 ? 1 : -1;
+        const lineIdxs = stopLines.byEdge[fix.edgeIdx];
+        for (let i = 0; i < lineIdxs.length; i++) {
+          const line = stopLines.all[lineIdxs[i]];
+          if (line.dirSign !== travelSign) continue;
+          const d = (line.sM - fix.sM) * travelSign;
+          if (d >= 0 && d < nextLineDistM) {
+            nextLineDistM = d;
+            nextLineIdx = lineIdxs[i];
+          }
+        }
+        if (nextLineDistM > NEXT_LINE_WATCH_M) nextLineIdx = -1;
+      }
+      let nextStopLineM: number | undefined;
+      let nextStopLineControl: "stopSign" | "trafficLight" | undefined;
+      let nextStopLineState: SignalPhase | undefined;
+      if (nextLineIdx >= 0) {
+        const line = stopLines.all[nextLineIdx];
+        nextStopLineM = nextLineDistM;
+        nextStopLineControl = line.control;
+        if (line.control === "trafficLight") nextStopLineState = lightStateOf(line);
+      }
+
+      // Amber decision watch update (green snapshot / flip freeze).
+      if (nextLineIdx !== amberLineIdx) {
+        amberLineIdx = nextLineIdx;
+        amberGreenDistM = -1;
+        amberGreenSpeedKmh = 0;
+        amberFrozen = false;
+      }
+      if (nextLineIdx >= 0 && nextStopLineState !== undefined) {
+        if (nextStopLineState === "green") {
+          amberGreenDistM = nextLineDistM;
+          amberGreenSpeedKmh = v.speedKmh;
+          amberFrozen = false;
+        } else if (nextStopLineState === "yellow") {
+          amberFrozen = amberGreenDistM >= 0;
+        } else {
+          amberGreenDistM = -1;
+          amberFrozen = false;
+        }
+      }
+
+      // 3c. Junction-proximity context (harsh-brake cause gate).
+      const nearJunction = index.nearestIntersection(
+        v.position.x,
+        v.position.y,
+        JUNCTION_CONTEXT_RADIUS_M,
+      );
+      const nextJunctionM =
+        nearJunction !== null
+          ? Math.hypot(nearJunction.x - v.position.x, nearJunction.y - v.position.y)
+          : undefined;
 
       // 4. Turns (only inside junction areas).
       const nearestIx = index.nearestIntersection(
@@ -438,7 +565,7 @@ export function createWorldRuntime(districtJson: District | unknown): DistrictWo
           ? isWrongWay(true, index.tangentAt(fix.edgeIdx, fix.sM), v.headingDeg)
           : false;
 
-      return {
+      const tick: SimTick = {
         t: tSec,
         speedKmh: v.speedKmh,
         maxSpeedKmh,
@@ -458,6 +585,22 @@ export function createWorldRuntime(districtJson: District | unknown): DistrictWo
         wrongWay,
         events,
       };
+      // B1a additive world context (doc 72 capabilities 1 + N3): flows onto
+      // the tick exactly the way maxSpeedKmh does — from the resolved edge.
+      if (v.stalled !== undefined) tick.stalled = v.stalled;
+      if (edgeRt !== null) {
+        tick.oneway = edgeRt.edge.oneway;
+        if (edgeRt.edge.zone !== undefined) tick.zone = edgeRt.edge.zone;
+        if (edgeRt.edge.noOvertake !== undefined) tick.noOvertake = edgeRt.edge.noOvertake;
+        if (edgeRt.edge.noUTurn !== undefined) tick.noUTurn = edgeRt.edge.noUTurn;
+      }
+      if (nextStopLineM !== undefined) {
+        tick.nextStopLineM = nextStopLineM;
+        tick.nextStopLineControl = nextStopLineControl;
+        if (nextStopLineState !== undefined) tick.nextStopLineState = nextStopLineState;
+      }
+      if (nextJunctionM !== undefined) tick.nextJunctionM = nextJunctionM;
+      return tick;
     },
 
     signalPhase(signalNodeId: string): SignalPhase {
@@ -466,6 +609,23 @@ export function createWorldRuntime(districtJson: District | unknown): DistrictWo
 
     signalPhaseForApproach(signalNodeId: string, bearingDeg: number): SignalPhase {
       return signals.phaseForApproach(signalNodeId, bearingDeg);
+    },
+
+    signalPhaseInfo(signalNodeId: string, approachBearingDeg?: number): SignalPhaseInfo {
+      return signals.phaseInfo(signalNodeId, approachBearingDeg);
+    },
+
+    setSignalClusterOffset(signalNodeId: string, offsetSec: number): void {
+      signals.setClusterOffset(signalNodeId, offsetSec);
+    },
+
+    signalOffsetForPhaseStart(
+      signalNodeId: string,
+      approachBearingDeg: number,
+      phase: SignalPhase,
+      inSec: number,
+    ): number {
+      return signals.offsetForPhaseStart(signalNodeId, approachBearingDeg, phase, inSec);
     },
 
     speedLimitAt(pos: { x: number; y: number }): number {

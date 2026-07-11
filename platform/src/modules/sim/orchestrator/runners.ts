@@ -18,6 +18,7 @@
  */
 
 import type {
+  AmberDilemmaSpec,
   BrakingLeadCarSpec,
   CyclistRightHookSpec,
   PedestrianDartOutSpec,
@@ -28,7 +29,12 @@ import type {
 } from "../contracts";
 import type { SimTickEvent } from "../rules";
 import type { Rng } from "../traffic/rng";
-import type { DirectorInput, StagedEventPhase, StagedTrafficPort } from "./types";
+import type {
+  DirectorInput,
+  SignalDirectorPort,
+  StagedEventPhase,
+  StagedTrafficPort,
+} from "./types";
 
 /** Raw brake pedal at/above this = the student is braking (reaction onset). */
 export const BRAKE_ONSET_THRESHOLD = 0.35;
@@ -735,8 +741,131 @@ export class RoundaboutEntryRunner implements EventRunner {
 }
 
 // ---------------------------------------------------------------------------
+// 6. Amber dilemma (B1a — doc 72 JU-06, capability N2). No actor: the runner
+//    pins the junction's signal-cluster offset when the player arms the
+//    approach, so the green→yellow flip lands `flipEtaSec` (± seeded jitter)
+//    of travel time before the stop line. Grading is 100% the existing
+//    pipeline — the runtime's stopLineCrossed (yellow + `stoppable`
+//    adjudication / redYellow / red) through the rule engine; the runner
+//    only watches those same events to record the outcome.
+// ---------------------------------------------------------------------------
 
-export function createRunner(spec: StagedEventSpec): EventRunner {
+/** Player counts as stopped for the dilemma resolution at/under this, km/h. */
+const AMBER_STOPPED_KMH = 1.5;
+/** Minimum assumed approach speed for the ETA projection, m/s. */
+const AMBER_MIN_ETA_MPS = 3;
+
+export class AmberDilemmaRunner implements EventRunner {
+  phase: StagedEventPhase = "idle";
+  outcome: StagedEventOutcome | null = null;
+  hazardActive = false;
+
+  private flipEtaSec = 0;
+  private approachSpeedKmh = 0;
+  private approachBearingDeg = 0;
+
+  constructor(
+    readonly spec: AmberDilemmaSpec,
+    private readonly signals: SignalDirectorPort | null,
+  ) {}
+
+  stage(_traffic: StagedTrafficPort, rng: Rng, _firstTime: boolean): void {
+    // No actor to stage — only the per-attempt jitter draw (determinism:
+    // same seed + attempt = same flip timing).
+    this.flipEtaSec = this.spec.flipEtaSec + (rng() * 2 - 1) * 0.15;
+    this.phase = "armed";
+    this.outcome = null;
+    this.approachSpeedKmh = 0;
+    this.approachBearingDeg = 0;
+  }
+
+  step(_traffic: StagedTrafficPort, input: DirectorInput, _out: SimTickEvent[]): StagedEventOutcome | null {
+    const s = this.spec;
+    if (this.phase === "resolved") return null;
+    const d = dist(input.x, input.y, s.junction.x, s.junction.y);
+
+    if (this.phase === "armed") {
+      if (
+        d <= s.armDistM &&
+        input.speedKmh >= s.minTriggerSpeedKmh &&
+        approaching(input, s.junction.x, s.junction.y)
+      ) {
+        // Pin the flip: yellow starts when the player is `flipEtaSec` of
+        // travel time from THEIR stop line, projected at the current speed.
+        const lineDistM = Math.max(0, d - s.lineDistM);
+        const etaSec = lineDistM / Math.max(input.speedKmh * KMH_TO_MPS, AMBER_MIN_ETA_MPS);
+        const flipInSec = Math.max(0, etaSec - this.flipEtaSec);
+        this.approachBearingDeg = input.headingDeg;
+        if (this.signals !== null) {
+          const offset = this.signals.signalOffsetForPhaseStart(
+            s.signalNodeId,
+            this.approachBearingDeg,
+            "yellow",
+            flipInSec,
+          );
+          this.signals.setSignalClusterOffset(s.signalNodeId, offset);
+        }
+        this.approachSpeedKmh = input.speedKmh;
+        this.phase = "triggered";
+      }
+      return null;
+    }
+
+    // triggered — the flip is scheduled; the production pipeline grades.
+    for (const e of input.tickEvents) {
+      if (e.kind !== "stopLineCrossed" || e.control !== "trafficLight") continue;
+      if (d > s.lineDistM + 60) continue; // some other junction's line
+      if (e.lightState === "green") return this.resolve(input, true, "clear");
+      if (e.lightState === "yellow") {
+        // The runtime's amber adjudication decided: stoppable = the gamble
+        // (graded YELLOW_LIGHT_NOT_STOPPED by the reducer); not stoppable /
+        // unknown = the legal dilemma-zone clearance.
+        return e.stoppable === true
+          ? this.resolve(input, false, "violation")
+          : this.resolve(input, true, "clear");
+      }
+      // red / redYellow — RED_LIGHT_CROSSED / RED_YELLOW_CROSSED graded.
+      return this.resolve(input, false, "violation");
+    }
+    // Stopped before the line while the signal forbids entry = the correct
+    // stop decision.
+    if (
+      input.speedKmh <= AMBER_STOPPED_KMH &&
+      d >= s.lineDistM - 3 &&
+      d <= s.armDistM &&
+      this.signals !== null
+    ) {
+      const phase = this.signals.signalPhaseInfo(s.signalNodeId, this.approachBearingDeg).phase;
+      if (phase === "yellow" || phase === "red") {
+        return this.resolve(input, true, "yielded");
+      }
+    }
+    // Defensive: drove past the junction without a line event.
+    if (aheadOfPlayerM(input, s.junction.x, s.junction.y) < -20) {
+      return this.resolve(input, true, "clear");
+    }
+    return null;
+  }
+
+  private resolve(
+    input: DirectorInput,
+    success: boolean,
+    detail: StagedEventOutcome["detail"],
+  ): StagedEventOutcome {
+    this.phase = "resolved";
+    this.outcome = outcomeOf(this.spec, input, success, detail, {
+      approachSpeedKmh: this.approachSpeedKmh,
+    });
+    return this.outcome;
+  }
+}
+
+// ---------------------------------------------------------------------------
+
+export function createRunner(
+  spec: StagedEventSpec,
+  signals: SignalDirectorPort | null = null,
+): EventRunner {
   switch (spec.kind) {
     case "pedestrianDartOut":
       return new PedestrianDartOutRunner(spec);
@@ -748,5 +877,7 @@ export function createRunner(spec: StagedEventSpec): EventRunner {
       return new CyclistRightHookRunner(spec);
     case "roundaboutEntry":
       return new RoundaboutEntryRunner(spec);
+    case "amberDilemma":
+      return new AmberDilemmaRunner(spec, signals);
   }
 }

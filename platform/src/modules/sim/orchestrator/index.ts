@@ -25,6 +25,7 @@ export type {
   DirectorStepResult,
   ScenarioDirector,
   ScenarioDirectorOptions,
+  SignalDirectorPort,
   StagedEventPhase,
   StagedEventStatus,
   StagedTrafficPort,
@@ -32,6 +33,7 @@ export type {
 
 // Contract types consumers need alongside the director (owned by ../contracts).
 export type {
+  AmberDilemmaSpec,
   StagedEventKind,
   StagedEventOutcome,
   StagedEventSpec,

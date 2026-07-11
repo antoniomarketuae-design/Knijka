@@ -106,6 +106,21 @@ export interface RuleEngineState {
   terminated: boolean;
   /** Metres driven since the last violation — earns CLEAN_DRIVING commendations. */
   cleanDistanceM: number;
+  // -- B1a Wave-1 detector pack (doc 72 capability 1) ------------------------
+  /** Rising-edge episode over tick.stalled (второстепенна „загасване"). */
+  stall: EpisodeState;
+  /** Halted with the nose past a red-controlled stop line (JU-15). */
+  stopOvershoot: EpisodeState;
+  /** Sustained ride on the осева линия toward oncoming (SN-03). */
+  centerLine: EpisodeState;
+  /** Stationary at a green light with a clear box (JU-09). */
+  hesitation: EpisodeState;
+  /** Causeless harsh braking — episode with onset-speed memory (SP-11). */
+  harshBrake: { activeSince: number | null; emitted: boolean; onsetKmh: number };
+  /** First-move-off observation check (PK-05; config-gated). */
+  moveOff: { restSeen: boolean; done: boolean };
+  /** Last time a hazard-shaped tick event was seen (harsh-brake exemption). */
+  lastHazardEventAt: number | null;
 }
 
 const IDLE_EPISODE: EpisodeState = { activeSince: null, emitted: false };
@@ -135,6 +150,13 @@ export function createRuleEngine(config?: Partial<RuleEngineConfig>): RuleEngine
     collisionCooldownUntil: null,
     terminated: false,
     cleanDistanceM: 0,
+    stall: { ...IDLE_EPISODE },
+    stopOvershoot: { ...IDLE_EPISODE },
+    centerLine: { ...IDLE_EPISODE },
+    hesitation: { ...IDLE_EPISODE },
+    harshBrake: { activeSince: null, emitted: false, onsetKmh: 0 },
+    moveOff: { restSeen: false, done: false },
+    lastHazardEventAt: null,
   };
 }
 
@@ -156,6 +178,12 @@ function cloneState(s: RuleEngineState): RuleEngineState {
     wrongWay: { ...s.wrongWay },
     keepRight: { ...s.keepRight },
     crossing: s.crossing ? { ...s.crossing } : null,
+    stall: { ...s.stall },
+    stopOvershoot: { ...s.stopOvershoot },
+    centerLine: { ...s.centerLine },
+    hesitation: { ...s.hesitation },
+    harshBrake: { ...s.harshBrake },
+    moveOff: { ...s.moveOff },
   };
 }
 
@@ -237,6 +265,16 @@ export function reduceTick(prev: RuleEngineState, tick: SimTick): ReduceResult {
 
   for (const e of tick.events) {
     if (e.kind === "mirrorGlance") s.lastGlanceAt[e.mirror] = t;
+    // Hazard ledger (A12): anything hazard-shaped in the recent past makes a
+    // hard brake explainable — the causeless-harsh-brake detector stands down.
+    if (
+      e.kind === "crossingZoneEntered" ||
+      e.kind === "crossingPassed" ||
+      e.kind === "prioritySituation" ||
+      e.kind === "collision"
+    ) {
+      s.lastHazardEventAt = t;
+    }
   }
 
   if (speed <= cfg.fullStopMaxSpeedKmh) {
@@ -246,6 +284,36 @@ export function reduceTick(prev: RuleEngineState, tick: SimTick): ReduceResult {
     }
   } else {
     s.stop.stoppedSince = null;
+  }
+
+  // -- 1b. move-off observation (PK-05, DVSA top-5) — the session's FIRST
+  // move-off from an observed rest must carry a fresh mirror glance (left or
+  // rear) within the lookback. Config-gated OFF by default (see types.ts:
+  // curb exits are indistinguishable from queue move-offs with current
+  // telemetry, and the A12 innocent-drive contract pulls away unglanced).
+  // A session that starts already in motion, or whose first motion is a
+  // reverse maneuver, is never graded (conservative).
+  if (!s.moveOff.done) {
+    if (speed <= cfg.fullStopMaxSpeedKmh) {
+      s.moveOff.restSeen = true;
+    } else if (speed > cfg.movingSpeedKmh) {
+      s.moveOff.done = true;
+      if (cfg.moveOffObservationEnabled && s.moveOff.restSeen && forwardGear) {
+        const left = s.lastGlanceAt.left;
+        const rear = s.lastGlanceAt.rear;
+        const observed =
+          (left !== null && t - left <= cfg.moveOffLookbackSec) ||
+          (rear !== null && t - rear <= cfg.moveOffLookbackSec);
+        if (!observed) events.push(makeViolation("MOVE_OFF_WITHOUT_OBSERVATION", t));
+      }
+    }
+  }
+
+  // -- 1c. stall grading (VP-04): the driveline latches `stalled` until the
+  // next successful restart — the rising edge is one официална второстепенна
+  // „загасване"; the restart re-arms the episode for the next one.
+  if (stepEpisode(s.stall, tick.stalled === true, tick.stalled !== true, t, 0)) {
+    events.push(makeViolation("ENGINE_STALLED", t));
   }
 
   // -- 2. discrete zone / contact events
@@ -320,12 +388,45 @@ export function reduceTick(prev: RuleEngineState, tick: SimTick): ReduceResult {
     events.push(makeViolation("HEADLIGHTS_OFF_AT_NIGHT", t));
   }
 
+  // Center-line touch (SN-03/OV-04 — „настъпване на осева линия"): sustained
+  // ride on/over the center line toward ONCOMING traffic. Armed only on
+  // POSITIVE evidence: the runtime says the edge is two-way (oneway === false)
+  // and the vehicle is in the leftmost lane of its direction with the offset
+  // toward the center. A declared maneuver (any indicator — announced
+  // overtake/dodge or return) is exempt, as is reverse maneuvering (A12).
+  // When this specific condition is armed the GENERIC lane-keeping episode is
+  // suppressed — one act, one code, no double-billing.
+  const centerLineCond =
+    tick.oneway === false &&
+    tick.laneId === (tick.laneCount ?? 1) - 1 &&
+    tick.laneOffsetM > cfg.laneKeepMaxOffsetM &&
+    tick.indicator === "off" &&
+    moving &&
+    forwardGear;
+  if (
+    stepEpisode(
+      s.centerLine,
+      centerLineCond,
+      tick.laneOffsetM <= cfg.laneKeepMaxOffsetM,
+      t,
+      cfg.centerLineSustainSec,
+    )
+  ) {
+    events.push(makeViolation("CENTER_LINE_TOUCHED", t));
+  }
+
   // Lane-keeping: sustained off-centre / straddling positioning while moving
   // forward. Reverse maneuvering (bay/parallel parking) is legitimately
   // off-centre and exempt (A12).
   const offCentre = Math.abs(tick.laneOffsetM) > cfg.laneKeepMaxOffsetM;
   if (
-    stepEpisode(s.laneKeeping, offCentre && moving && forwardGear, !offCentre, t, cfg.laneKeepSustainSec)
+    stepEpisode(
+      s.laneKeeping,
+      offCentre && moving && forwardGear && !centerLineCond,
+      !offCentre,
+      t,
+      cfg.laneKeepSustainSec,
+    )
   ) {
     events.push(makeViolation("POOR_LANE_KEEPING", t));
   }
@@ -401,6 +502,85 @@ export function reduceTick(prev: RuleEngineState, tick: SimTick): ReduceResult {
     events.push(makeViolation("NOT_KEEPING_RIGHT", t));
   }
 
+  // -- 4b. B1a Wave-1 world-context detectors (doc 72 capability 1). All of
+  // them read the OPTIONAL tick context fields; absent context = silent.
+
+  // Stop position at red (JU-15): halted with the nose past the line/on the
+  // zebra while the light forbids entry. The center never crossed (that would
+  // be RED_LIGHT_CROSSED via the sweep) — this is the invisible-today overshoot.
+  const overLineAtRed =
+    tick.nextStopLineControl === "trafficLight" &&
+    (tick.nextStopLineState === "red" || tick.nextStopLineState === "redYellow") &&
+    tick.nextStopLineM !== undefined &&
+    tick.nextStopLineM <= cfg.stopOvershootCenterM &&
+    speed <= cfg.fullStopMaxSpeedKmh &&
+    forwardGear;
+  const overshootDeparted =
+    tick.nextStopLineM === undefined ||
+    tick.nextStopLineM > cfg.stopOvershootCenterM + 2 ||
+    tick.nextStopLineState === "green";
+  if (stepEpisode(s.stopOvershoot, overLineAtRed, overshootDeparted, t, cfg.stopOvershootRestSec)) {
+    events.push(makeViolation("STOP_LINE_OVERSHOOT", t));
+  }
+
+  // Hesitation at green (JU-09 — „закъснели действия"): stationary at the
+  // light, green for the whole sustain, box clear (no lead vehicle near), no
+  // declared turn (an indicator = lawfully waiting for a gap/pedestrians),
+  // and no armed crossing zone (stragglers finishing their crossing).
+  const hesitating =
+    tick.nextStopLineControl === "trafficLight" &&
+    tick.nextStopLineState === "green" &&
+    tick.nextStopLineM !== undefined &&
+    tick.nextStopLineM <= cfg.hesitationMaxLineDistM &&
+    speed <= cfg.fullStopMaxSpeedKmh &&
+    tick.indicator === "off" &&
+    (leadGapM === null || leadGapM > cfg.hesitationClearGapM) &&
+    s.crossing === null &&
+    forwardGear;
+  if (stepEpisode(s.hesitation, hesitating, !hesitating, t, cfg.hesitationSustainSec)) {
+    events.push(makeViolation("HESITATION_AT_GREEN", t));
+  }
+
+  // Causeless harsh braking (VP-09/SP-11 — „рязко спиране, което създава
+  // предпоставка за ПТП"). HIGH FP RISK by nature, so it fires only when
+  // EVERY plausible cause is positively absent (A12 discipline, hard):
+  //  - no lead vehicle anywhere near, no armed crossing zone,
+  //  - no stop line / junction ahead within the clear windows,
+  //  - no hazard-shaped tick event in the recent past (ledger above),
+  //  - on the normal driving line (not recovering from a excursion),
+  //  - onset from real speed, emergency-grade decel, sustained.
+  const noBrakeCause =
+    (leadGapM === null || leadGapM > cfg.harshBrakeClearLeadGapM) &&
+    s.crossing === null &&
+    (tick.nextStopLineM === undefined || tick.nextStopLineM > cfg.harshBrakeStopLineClearM) &&
+    (tick.nextJunctionM === undefined || tick.nextJunctionM > cfg.harshBrakeJunctionClearM) &&
+    (s.lastHazardEventAt === null || t - s.lastHazardEventAt > cfg.harshBrakeHazardCooldownSec) &&
+    Math.abs(tick.laneOffsetM) <= cfg.laneKeepMaxOffsetM &&
+    tick.wrongWay !== true &&
+    forwardGear;
+  const harshDecel = dt > 0 && accelMps2 <= -cfg.harshBrakeDecelMps2;
+  if (harshDecel && noBrakeCause) {
+    if (s.harshBrake.activeSince === null) {
+      s.harshBrake.activeSince = t;
+      s.harshBrake.onsetKmh = s.prevSpeedKmh ?? speed;
+    }
+    if (
+      !s.harshBrake.emitted &&
+      s.harshBrake.onsetKmh >= cfg.harshBrakeMinSpeedKmh &&
+      t - s.harshBrake.activeSince >= cfg.harshBrakeSustainSec
+    ) {
+      s.harshBrake.emitted = true;
+      events.push(makeViolation("HARSH_BRAKING_NO_CAUSE", t));
+    }
+  } else if (accelMps2 > -2) {
+    // Pedal released (or a cause appeared and braking eased) — re-arm.
+    s.harshBrake.activeSince = null;
+    s.harshBrake.emitted = false;
+  } else {
+    // Still braking but a plausible cause exists now — never fire this episode.
+    s.harshBrake.activeSince = null;
+  }
+
   // -- 5. pedestrian-crossing zone: track approach speed while a pedestrian is
   // present. A firm braking response (>= crossingBrakeResponseMps2) pauses the
   // too-fast clock: entering the zone at a legal 45-50 km/h and braking hard
@@ -438,6 +618,11 @@ export function reduceTick(prev: RuleEngineState, tick: SimTick): ReduceResult {
     s.following,
     s.wrongWay,
     s.keepRight,
+    s.stall,
+    s.stopOvershoot,
+    s.centerLine,
+    s.hesitation,
+    s.harshBrake,
   ].some((ep) => ep.emitted && ep.activeSince !== null);
   if (events.some((e) => e.kind === "violation")) {
     s.cleanDistanceM = 0; // any fresh mistake resets the streak
@@ -473,7 +658,16 @@ function handleTickEvent(
     case "stopLineCrossed": {
       if (e.control === "trafficLight") {
         if (e.lightState === "red") out.push(makeViolation("RED_LIGHT_CROSSED", t));
-        // yellow: not penalized in v1 (open question — see module report)
+        // Red+yellow creep (JU-08): entering on the combination is the
+        // официална основна — deliberately NOT the 10-point red entry.
+        else if (e.lightState === "redYellow") out.push(makeViolation("RED_YELLOW_CROSSED", t));
+        // Amber adjudication (JU-06): crossing on yellow is graded ONLY when
+        // the runtime affirmatively computed that a comfortable stop was
+        // possible at the flip (`stoppable: true`). Unknown/false = the
+        // dilemma-zone entry the yellow legally exists for — innocent (A12).
+        else if (e.lightState === "yellow" && e.stoppable === true) {
+          out.push(makeViolation("YELLOW_LIGHT_NOT_STOPPED", t));
+        }
         break;
       }
       // Б2 stop sign: a qualifying full stop must have ended recently.

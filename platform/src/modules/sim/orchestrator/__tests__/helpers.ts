@@ -47,8 +47,15 @@ export interface Stack {
   t: number;
 }
 
-/** Production wiring: runtime queries onto the traffic system + director. */
-export function makeStack(events: StagedEventSpec[], seed = 7): Stack {
+/** Production wiring: runtime queries onto the traffic system + director.
+ * B1a N2: the runtime doubles as the director's SignalDirectorPort (phase
+ * pinning), exactly as LessonScene wires it; `signalOffsets` mirrors the
+ * staged-exam session-start pinning option. */
+export function makeStack(
+  events: StagedEventSpec[],
+  seed = 7,
+  opts: { signalOffsets?: Readonly<Record<string, number>> } = {},
+): Stack {
   const raw = loadRawDistrict();
   const runtime = createWorldRuntime(raw);
   const traffic = createTrafficSystem(raw, {
@@ -65,7 +72,11 @@ export function makeStack(events: StagedEventSpec[], seed = 7): Stack {
   runtime.setCirculatingQuery((cx, cy, px, py, h, r) =>
     traffic.circulatingConflict(cx, cy, px, py, h, r),
   );
-  const director = createScenarioDirector(events, traffic, { seed });
+  const director = createScenarioDirector(events, traffic, {
+    seed,
+    signals: runtime,
+    ...(opts.signalOffsets !== undefined ? { signalOffsets: opts.signalOffsets } : {}),
+  });
   return {
     runtime,
     traffic,

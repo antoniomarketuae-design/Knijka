@@ -568,6 +568,362 @@ describe("FP battery — pedestrian crossings & priority", () => {
 });
 
 // ---------------------------------------------------------------------------
+// B1a Wave-1 detector pack (doc 72 capability 1 + N2) — every new code ships
+// with its innocent-driving cases HERE, before anything else (the mission's
+// own law). Context fields (nextStopLine*, oneway, stalled…) are OPTIONAL:
+// their absence must always read as innocent, and their presence must only
+// convict the specific guilty pattern.
+// ---------------------------------------------------------------------------
+
+describe("FP battery — stall grading (ENGINE_STALLED)", () => {
+  it("legacy rig without a stall channel drives a whole route", () => {
+    // Innocent: `stalled` absent (automatic fleet / older callers) must never
+    // read as a stall.
+    const { events } = drive(cruise(0, 60, { speedKmh: 45 }));
+    expectInnocent(events);
+  });
+
+  it("clean manual drive with the stall channel present and false throughout", () => {
+    // Innocent: the channel exists and stays false — including during slow
+    // maneuvering where a stall would be most likely.
+    const { events } = drive([
+      tick(0, { speedKmh: 0, stalled: false }),
+      tick(1, { speedKmh: 4, stalled: false }),
+      tick(2, { speedKmh: 15, stalled: false }),
+      ...cruise(3, 30, { speedKmh: 40, stalled: false }),
+    ]);
+    expectInnocent(events);
+  });
+
+  it("engine deliberately switched off at the destination", () => {
+    // Innocent: a normal ignition-off at rest does NOT latch `stalled` (the
+    // driveline only sets it on a stall) — parking must stay penalty-free.
+    const { events } = drive([
+      tick(0, { speedKmh: 12, stalled: false }),
+      tick(1, { speedKmh: 3, stalled: false }),
+      tick(2, { speedKmh: 0, stalled: false }),
+      ...cruise(3, 10, { speedKmh: 0, stalled: false, gear: 0, handbrakeOn: true }),
+    ]);
+    expectInnocent(events);
+  });
+});
+
+describe("FP battery — move-off observation (enabled per-lesson)", () => {
+  // The detector ships config-OFF (see types.ts); these cases prove the
+  // ENABLED mode safe for every innocent move-off shape.
+  const enabled = { moveOffObservationEnabled: true } as const;
+
+  it("mirror checked two seconds before pulling away", () => {
+    // Innocent: the taught ritual — glance left, then go.
+    const { events } = drive(
+      [
+        tick(0, { speedKmh: 0 }),
+        tick(1, { speedKmh: 0, events: [glance("left")] }),
+        tick(3, { speedKmh: 8 }),
+        tick(4, { speedKmh: 20 }),
+      ],
+      enabled,
+    );
+    expectInnocent(events);
+  });
+
+  it("interior (rear) mirror check before moving off", () => {
+    // Innocent: checking behind through the rear-view counts as observation.
+    const { events } = drive(
+      [
+        tick(0, { speedKmh: 0 }),
+        tick(2, { speedKmh: 0, events: [glance("rear")] }),
+        tick(3, { speedKmh: 10 }),
+      ],
+      enabled,
+    );
+    expectInnocent(events);
+  });
+
+  it("first motion is a reverse bay exit (maneuver domain, not a move-off)", () => {
+    // Innocent: reversing out of a bay is judged by maneuver objectives; the
+    // forward-move-off rule must not claim it.
+    const { events } = drive(
+      [
+        tick(0, { speedKmh: 0, gear: -1 }),
+        tick(1, { speedKmh: 7, gear: -1 }),
+        tick(2, { speedKmh: 7, gear: -1 }),
+        tick(3, { speedKmh: 0, gear: 1 }),
+        tick(4, { speedKmh: 12 }),
+      ],
+      enabled,
+    );
+    expectInnocent(events);
+  });
+
+  it("session that begins already in motion is never graded", () => {
+    // Innocent: no observed rest = no move-off to judge (mid-drive handoff).
+    const { events } = drive(
+      [tick(0, { speedKmh: 40 }), tick(1, { speedKmh: 40 }), tick(2, { speedKmh: 40 })],
+      enabled,
+    );
+    expectInnocent(events);
+  });
+});
+
+describe("FP battery — stop position at red (STOP_LINE_OVERSHOOT)", () => {
+  const atLine = (over: Partial<SimTick>): Partial<SimTick> => ({
+    speedKmh: 0.5,
+    nextStopLineControl: "trafficLight" as const,
+    ...over,
+  });
+
+  it("textbook stop 2.5 m before the line at red", () => {
+    // Innocent: stopping short of the paint is the correct position — only a
+    // nose clearly OVER the line may grade.
+    const { events } = drive([
+      tick(0, { speedKmh: 20, nextStopLineM: 30, nextStopLineControl: "trafficLight", nextStopLineState: "red" }),
+      ...cruise(1, 20, atLine({ nextStopLineM: 2.5, nextStopLineState: "red" })),
+    ]);
+    expectInnocent(events);
+  });
+
+  it("queue creep close to the line while the light is green", () => {
+    // Innocent: rolling up tight to the line on green behind the queue is
+    // normal — only red/red+yellow arms the overshoot rule (and the car
+    // ahead exempts the hesitation rule).
+    const { events } = drive([
+      ...cruise(0, 10, atLine({ nextStopLineM: 0.8, nextStopLineState: "green", leadGapM: 6 })),
+    ]);
+    expectInnocent(events);
+  });
+
+  it("Б2 creep-and-peek: stop sign, nose at the paint for sightline", () => {
+    // Innocent: the two-stage stop-sign technique (full stop, then creep to
+    // see past parked cars) must stay protected — the rule is red-light only.
+    const { events } = drive([
+      tick(0, { speedKmh: 15 }),
+      tick(1, { speedKmh: 0.4, nextStopLineM: 3, nextStopLineControl: "stopSign" }),
+      ...cruise(2, 8, { speedKmh: 0.5, nextStopLineM: 0.5, nextStopLineControl: "stopSign" }),
+    ]);
+    expectInnocent(events);
+  });
+
+  it("cruising with a red light still far ahead", () => {
+    // Innocent: distance context alone (moving, line 40 m out) is not a stop.
+    const { events } = drive(
+      cruise(0, 10, {
+        speedKmh: 30,
+        nextStopLineM: 40,
+        nextStopLineControl: "trafficLight",
+        nextStopLineState: "red",
+      }),
+    );
+    expectInnocent(events);
+  });
+});
+
+describe("FP battery — center line (CENTER_LINE_TOUCHED)", () => {
+  it("signalled pass around a double-parked van on a two-way street", () => {
+    // Innocent: a DECLARED excursion over the center (indicator on) is a
+    // maneuver, not line-riding — чл. 25 discipline, exempt by design.
+    const { events } = drive([
+      tick(0, { speedKmh: 35, oneway: false, laneCount: 1, laneId: 0, indicator: "left", laneOffsetM: 0.4 }),
+      tick(1, { speedKmh: 33, oneway: false, laneCount: 1, laneId: 0, indicator: "left", laneOffsetM: 3.6 }),
+      tick(2, { speedKmh: 33, oneway: false, laneCount: 1, laneId: 0, indicator: "left", laneOffsetM: 3.6 }),
+      tick(3, { speedKmh: 33, oneway: false, laneCount: 1, laneId: 0, indicator: "right", laneOffsetM: 3.5 }),
+      tick(4, { speedKmh: 35, oneway: false, laneCount: 1, laneId: 0, laneOffsetM: 0.3 }),
+    ]);
+    expectInnocent(events);
+  });
+
+  it("brief unsignalled clip of the line through a bend, corrected", () => {
+    // Innocent: a 1.5 s brush against the line that the driver fixes is lane
+    // keeping noise, not sustained line-riding (sustain window).
+    const { events } = drive([
+      tick(0, { speedKmh: 40, oneway: false, laneCount: 1, laneId: 0, laneOffsetM: 3.4 }),
+      tick(1.5, { speedKmh: 40, oneway: false, laneCount: 1, laneId: 0, laneOffsetM: 0.4 }),
+      tick(3, { speedKmh: 40, oneway: false, laneCount: 1, laneId: 0, laneOffsetM: 0.2 }),
+    ]);
+    expectInnocent(events);
+  });
+
+  it("left-edge drift on a ONE-WAY street is not a center-line touch", () => {
+    // Innocent (of this code): a one-way's left edge borders no oncoming
+    // traffic — the specific осева-линия charge must never apply there.
+    const { events } = drive([
+      tick(0, { speedKmh: 40, oneway: true, laneCount: 2, laneId: 1, laneOffsetM: 3.5 }),
+      tick(1, { speedKmh: 40, oneway: true, laneCount: 2, laneId: 1, laneOffsetM: 3.5 }),
+      tick(2.5, { speedKmh: 40, oneway: true, laneCount: 2, laneId: 1, laneOffsetM: 0.3 }),
+    ]);
+    expectInnocent(events);
+  });
+
+  it("reverse parallel park sweeping across the center of a two-way", () => {
+    // Innocent: reverse maneuvering legitimately crosses lane geometry.
+    const { events } = drive(
+      Array.from({ length: 6 }, (_, t) =>
+        tick(t, { speedKmh: 6, gear: -1, oneway: false, laneCount: 1, laneId: 0, laneOffsetM: 4.2 }),
+      ),
+    );
+    expectInnocent(events);
+  });
+});
+
+describe("FP battery — causeless harsh brake (HARSH_BRAKING_NO_CAUSE)", () => {
+  it("emergency stop for a pedestrian dart-out at a crossing", () => {
+    // Innocent: THE correct emergency response — the armed crossing zone is
+    // the cause; grading it would punish exactly the trained reflex.
+    const { events } = drive([
+      tick(0, { speedKmh: 45 }),
+      tick(0.5, { speedKmh: 45, events: [zoneEntered(true)] }),
+      tick(1, { speedKmh: 31 }),
+      tick(1.5, { speedKmh: 17 }),
+      tick(2, { speedKmh: 4 }),
+      tick(3, { speedKmh: 0.5 }),
+    ]);
+    expectInnocent(events);
+  });
+
+  it("hard stop behind a brake-slamming lead car", () => {
+    // Innocent: the lead vehicle IS the cause (leadGapM present and shrinking,
+    // then reopening as the driver stops harder).
+    const { events } = drive([
+      tick(0, { speedKmh: 55, leadGapM: 30 }),
+      tick(1, { speedKmh: 36, leadGapM: 14 }),
+      tick(1.5, { speedKmh: 22, leadGapM: 15.5 }),
+      tick(2, { speedKmh: 8, leadGapM: 18 }),
+      tick(3, { speedKmh: 0.5, leadGapM: 19 }),
+    ]);
+    expectInnocent(events);
+  });
+
+  it("late-but-legal hard stop for a red light ahead", () => {
+    // Innocent: a red light within the clear window is a cause — the amber
+    // dilemma's stop branch must never grade as phantom braking.
+    const { events } = drive([
+      tick(0, { speedKmh: 50, nextStopLineM: 45, nextStopLineControl: "trafficLight", nextStopLineState: "yellow" }),
+      tick(0.5, { speedKmh: 36, nextStopLineM: 39, nextStopLineControl: "trafficLight", nextStopLineState: "red" }),
+      tick(1, { speedKmh: 22, nextStopLineM: 35, nextStopLineControl: "trafficLight", nextStopLineState: "red" }),
+      tick(1.5, { speedKmh: 8, nextStopLineM: 33, nextStopLineControl: "trafficLight", nextStopLineState: "red" }),
+      tick(2.5, { speedKmh: 0.5, nextStopLineM: 32, nextStopLineControl: "trafficLight", nextStopLineState: "red" }),
+    ]);
+    expectInnocent(events);
+  });
+
+  it("firm planned stop at ~4.5 m/s² on a clear road", () => {
+    // Innocent: decisive braking is good driving; only emergency-grade decel
+    // with zero context may grade.
+    const { events } = drive([
+      tick(0, { speedKmh: 50 }),
+      tick(1, { speedKmh: 34 }),
+      tick(2, { speedKmh: 18 }),
+      tick(3, { speedKmh: 4 }),
+      tick(4, { speedKmh: 0.5 }),
+    ]);
+    expectInnocent(events);
+  });
+
+  it("hard brake on a junction approach (car noses out and retreats)", () => {
+    // Innocent: junction proximity is a plausible cause by definition —
+    // ERSO says 40–60% of crashes happen there; the gate stays wide.
+    const { events } = drive([
+      tick(0, { speedKmh: 48, nextJunctionM: 34 }),
+      tick(0.5, { speedKmh: 34, nextJunctionM: 30 }),
+      tick(1, { speedKmh: 20, nextJunctionM: 27 }),
+      tick(2, { speedKmh: 30, nextJunctionM: 15 }),
+    ]);
+    expectInnocent(events);
+  });
+});
+
+describe("FP battery — hesitation at green (HESITATION_AT_GREEN)", () => {
+  const light = (over: Partial<SimTick>): Partial<SimTick> => ({
+    speedKmh: 0.4,
+    nextStopLineM: 6,
+    nextStopLineControl: "trafficLight" as const,
+    ...over,
+  });
+
+  it("long wait at RED is patience, not hesitation", () => {
+    const { events } = drive(cruise(0, 35, light({ nextStopLineState: "red" })));
+    expectInnocent(events);
+  });
+
+  it("green with a queue still blocking the box", () => {
+    // Innocent: green means go-if-clear; a car 5 m ahead is not clear.
+    const { events } = drive(cruise(0, 20, light({ nextStopLineState: "green", leadGapM: 5 })));
+    expectInnocent(events);
+  });
+
+  it("green while waiting for an oncoming gap with the left indicator on", () => {
+    // Innocent: a declared left turn lawfully waits at green (чл. 25/чл. 37).
+    const { events } = drive(
+      cruise(0, 25, light({ nextStopLineState: "green", indicator: "left" })),
+    );
+    expectInnocent(events);
+  });
+
+  it("prompt move-off within three seconds of green", () => {
+    const { events } = drive([
+      ...cruise(0, 10, light({ nextStopLineState: "red" })),
+      tick(11, light({ nextStopLineState: "green" })),
+      tick(12, light({ nextStopLineState: "green" })),
+      tick(13, { speedKmh: 9, nextStopLineM: 2, nextStopLineControl: "trafficLight", nextStopLineState: "green" }),
+      tick(14, { speedKmh: 20 }),
+    ]);
+    expectInnocent(events);
+  });
+});
+
+describe("FP battery — amber & red+yellow signal semantics", () => {
+  it("yellow crossing inside the dilemma zone (stop was NOT comfortably possible)", () => {
+    // Innocent: this is exactly what the yellow phase legally exists for.
+    const { events } = drive([
+      tick(0, { speedKmh: 48 }),
+      tick(1, {
+        speedKmh: 48,
+        events: [{ kind: "stopLineCrossed", control: "trafficLight", lightState: "yellow", stoppable: false }],
+      }),
+      tick(2, { speedKmh: 45 }),
+    ]);
+    expectInnocent(events);
+  });
+
+  it("yellow crossing with no amber adjudication attached (legacy engine)", () => {
+    // Innocent: unknown = innocent — a runtime that cannot compute the flip
+    // snapshot must never convict on yellow (A12).
+    const { events } = drive([
+      tick(0, { speedKmh: 40 }),
+      tick(1, {
+        speedKmh: 40,
+        events: [{ kind: "stopLineCrossed", control: "trafficLight", lightState: "yellow" }],
+      }),
+    ]);
+    expectInnocent(events);
+  });
+
+  it("waiting through red+yellow and crossing on clean green", () => {
+    // Innocent: the textbook red → red+yellow → green launch.
+    const { events } = drive([
+      ...cruise(0, 8, { speedKmh: 0.4, nextStopLineM: 4, nextStopLineControl: "trafficLight", nextStopLineState: "red" }),
+      tick(9, { speedKmh: 0.4, nextStopLineM: 4, nextStopLineControl: "trafficLight", nextStopLineState: "redYellow" }),
+      tick(10, { speedKmh: 6, events: [greenLight] }),
+      tick(11, { speedKmh: 18 }),
+    ]);
+    expectInnocent(events);
+  });
+
+  it("red+yellow visible ahead while still rolling up (no crossing)", () => {
+    // Innocent: seeing the combination is not entering on it.
+    const { events } = drive(
+      cruise(0, 5, {
+        speedKmh: 12,
+        nextStopLineM: 20,
+        nextStopLineControl: "trafficLight",
+        nextStopLineState: "redYellow",
+      }),
+    );
+    expectInnocent(events);
+  });
+});
+
+// ---------------------------------------------------------------------------
 // Whole-drive integration
 // ---------------------------------------------------------------------------
 

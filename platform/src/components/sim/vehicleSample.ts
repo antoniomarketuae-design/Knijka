@@ -23,6 +23,7 @@ export function createVehicleSample(): VehicleSample {
     handbrakeOn: false,
     gear: 0,
     mirrorGlance: null,
+    stalled: false,
   };
 }
 
@@ -94,4 +95,7 @@ export function updateVehicleSample(
   out.handbrakeOn = cabin.driveline.parkingBrakeOn || (input?.handbrake ?? false);
   out.gear = contractGear(cabin, sim);
   out.mirrorGlance = cabin.consumeGlanceSample();
+  // B1a (doc 72 VP-04): the driveline's latched stall flag — the rule engine
+  // grades its rising edge as the официална второстепенна „загасване".
+  out.stalled = cabin.driveline.stalled;
 }

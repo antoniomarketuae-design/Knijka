@@ -52,6 +52,14 @@ export interface DistrictEdge {
   length: number;
   /** Polyline in district meters, [[x, y], ...], >= 2 points. */
   geometry: [number, number][];
+  // -- B1a additive legality tags (doc 72 N3; runtime/district.ts mirrors).
+  /** Legality-zone tag ("thirty" = signed «Зона 30»; school/residential
+   *  reserved). The reduced limit itself lives in `maxspeed`. */
+  zone?: "school" | "residential" | "thirty";
+  /** Overtaking banned on this edge — surface-only context. */
+  noOvertake?: boolean;
+  /** U-turn banned on this edge — surface-only context. */
+  noUTurn?: boolean;
 }
 
 export interface DistrictIntersection {

@@ -65,6 +65,43 @@ interface SignalNode {
   group: Axis;
 }
 
+/** Phase + time-to-next-change of an axis-group at local cycle time (B1a N2).
+ * The ns timeline: green [0,20) → yellow [20,23) → red [23,49) → redYellow
+ * [49,50); the ew timeline is the same shifted by a half-cycle. Consistent
+ * with phaseInCycle by construction (asserted in signals.test.ts). */
+export function phaseTimingInCycle(
+  localSec: number,
+  group: Axis,
+): { phase: SignalPhase; timeToChangeSec: number } {
+  const cycle = SIGNAL_TIMING.cycleSec;
+  const t = ((localSec % cycle) + cycle) % cycle;
+  const u = group === "ns" ? t : (t - HALF + cycle) % cycle;
+  const { greenSec, yellowSec, redYellowSec } = SIGNAL_TIMING;
+  if (u < greenSec) return { phase: "green", timeToChangeSec: greenSec - u };
+  if (u < greenSec + yellowSec) {
+    return { phase: "yellow", timeToChangeSec: greenSec + yellowSec - u };
+  }
+  if (u < cycle - redYellowSec) {
+    return { phase: "red", timeToChangeSec: cycle - redYellowSec - u };
+  }
+  return { phase: "redYellow", timeToChangeSec: cycle - u };
+}
+
+/** Cycle-local time at which `phase` STARTS for the given axis-group. */
+export function phaseStartLocalSec(phase: SignalPhase, group: Axis): number {
+  const cycle = SIGNAL_TIMING.cycleSec;
+  const { greenSec, yellowSec, redYellowSec } = SIGNAL_TIMING;
+  const nsStart =
+    phase === "green"
+      ? 0
+      : phase === "yellow"
+        ? greenSec
+        : phase === "red"
+          ? greenSec + yellowSec
+          : cycle - redYellowSec; // redYellow
+  return group === "ns" ? nsStart : (nsStart + HALF) % cycle;
+}
+
 /** Phase of the given axis-group at local cycle time (phase A = N-S first). */
 export function phaseInCycle(localSec: number, group: Axis): SignalPhase {
   const t = ((localSec % SIGNAL_TIMING.cycleSec) + SIGNAL_TIMING.cycleSec) % SIGNAL_TIMING.cycleSec;
@@ -231,6 +268,58 @@ export class SignalController {
   /** Cluster index for a signal node id, -1 if unknown. */
   clusterIdxForNode(signalNodeId: string): number {
     return this.nodes.get(signalNodeId)?.clusterIdx ?? -1;
+  }
+
+  // -- B1a N2: signal-phase director API (doc 72 JU-06..09/20) ---------------
+
+  /**
+   * Phase + seconds until it changes, for the lamps a driver arriving on
+   * `approachBearingDeg` sees at this node's junction. Omit the bearing to
+   * read the node's own assigned axis-group. Unknown ids fail safe (red, ∞).
+   */
+  phaseInfo(
+    signalNodeId: string,
+    approachBearingDeg?: number,
+  ): { phase: SignalPhase; timeToChangeSec: number } {
+    const node = this.nodes.get(signalNodeId);
+    if (!node) return { phase: "red", timeToChangeSec: Infinity };
+    const group =
+      approachBearingDeg === undefined ? node.group : axisOfBearing(approachBearingDeg);
+    return phaseTimingInCycle(this.tSec + this.offsets[node.clusterIdx], group);
+  }
+
+  /**
+   * Pin a cluster's phase offset (by any member node id). The director's
+   * staging dial (doc 72 N2): staged exams pin junction phases at session
+   * start, and the amber-dilemma runner pins the flip on approach.
+   * Determinism is preserved — callers derive the offset from their seed /
+   * deterministic player state. No-op for unknown ids.
+   */
+  setClusterOffset(signalNodeId: string, offsetSec: number): void {
+    const node = this.nodes.get(signalNodeId);
+    if (!node) return;
+    const cycle = SIGNAL_TIMING.cycleSec;
+    const norm = ((offsetSec % cycle) + cycle) % cycle;
+    this.offsets[node.clusterIdx] = norm;
+    this.clustersInfo[node.clusterIdx].offsetSec = norm;
+  }
+
+  /**
+   * The cluster offset that makes `phase` START in exactly `inSec` seconds
+   * for the approach group of `approachBearingDeg` at this node. Feed the
+   * result to setClusterOffset. Unknown ids return the current-time-neutral 0.
+   */
+  offsetForPhaseStart(
+    signalNodeId: string,
+    approachBearingDeg: number,
+    phase: SignalPhase,
+    inSec: number,
+  ): number {
+    const node = this.nodes.get(signalNodeId);
+    if (!node) return 0;
+    const cycle = SIGNAL_TIMING.cycleSec;
+    const startLocal = phaseStartLocalSec(phase, axisOfBearing(approachBearingDeg));
+    return (((startLocal - inSec - this.tSec) % cycle) + cycle) % cycle;
   }
 
   /** Assigned axis-group of a signal node ("ns" fallback for unknown ids). */

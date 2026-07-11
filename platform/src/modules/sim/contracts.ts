@@ -38,6 +38,14 @@ export interface VehicleSample {
   handbrakeOn: boolean;
   gear: number;
   mirrorGlance: "left" | "right" | "rear" | null; // set on the frame a glance key is pressed
+  /**
+   * B1a (doc 72 VP-04): the driveline's latched stall flag (DrivelineState
+   * .stalled — set by a stall, cleared by the next successful restart).
+   * Additive; absent = the rig has no stall channel (automatic fleet / older
+   * callers). The rule engine grades the RISING EDGE as the official
+   * второстепенна „загасване".
+   */
+  stalled?: boolean;
 }
 
 /** Traffic-signal runtime state, per signal node id from district-v1.json. */
@@ -66,6 +74,29 @@ export interface WorldRuntime {
   };
 }
 
+/**
+ * Multi-map seam (doc 74 §5.1): the district a lesson without `world` plays
+ * on — the original Студентски град map. Every existing spec omits the field,
+ * so the default keeps them byte-identical in behavior.
+ */
+export const DEFAULT_DISTRICT_ID = "district-v1";
+
+/** Resolved district id of a lesson (absent `world` = the city default). */
+export function lessonDistrictId(lesson: Pick<LessonSpec, "world">): string {
+  return lesson.world?.districtId ?? DEFAULT_DISTRICT_ID;
+}
+
+/**
+ * Ambient-traffic sizing the scene used to hardcode (doc 74 §5.5) — now the
+ * per-lesson `traffic` field's fallback. These ARE the pre-seam city values;
+ * changing them re-tunes every lesson that doesn't override.
+ */
+export const DEFAULT_LESSON_TRAFFIC = {
+  vehicleCount: 26,
+  pedestrianCount: 20,
+  anchorRadiusM: 280,
+} as const;
+
 /** A scored driving lesson. Specs are data; orchestration lives in lessons/. */
 export interface LessonSpec {
   id: string; // "l-first-drive"
@@ -74,7 +105,22 @@ export interface LessonSpec {
   descriptionBg: string;
   /** Concept ids this lesson exercises (links sim ↔ knowledge graph). */
   conceptIds: string[];
-  /** Spawn point id from district-v1.json, or explicit pose. */
+  /**
+   * B-multi-map (doc 74 §5.1): which world file this lesson plays on —
+   * LessonScene fetches `/world/${districtId}.json`. Absent =
+   * DEFAULT_DISTRICT_ID (district-v1, Студентски град). Everything downstream
+   * of the fetch (runtime, builder, traffic, minimap, spawns, guidance) is
+   * parameterized by the parsed document — proven map-agnostic by the
+   * poligon-district test suite.
+   */
+  world?: { districtId: string };
+  /**
+   * B-multi-map (doc 74 §5.5): per-lesson ambient traffic sizing. Absent
+   * fields fall back to DEFAULT_LESSON_TRAFFIC (the city values). The полигон
+   * runs ~2 vehicles / 2 pedestrians — an учебна площадка is not a highway.
+   */
+  traffic?: { vehicleCount?: number; pedestrianCount?: number; anchorRadiusM?: number };
+  /** Spawn point id from the lesson's district JSON, or explicit pose. */
   spawn: { pointId?: string; position?: { x: number; y: number }; headingDeg?: number };
   /** Whether the 13-step pre-drive procedure runs before driving. */
   preDrive: boolean;
@@ -208,7 +254,8 @@ export type StagedEventKind =
   | "priorityFromRight"
   | "brakingLeadCar"
   | "cyclistRightHook"
-  | "roundaboutEntry";
+  | "roundaboutEntry"
+  | "amberDilemma";
 
 interface StagedEventBase {
   /** Unique per lesson, e.g. "l4-dart-out". */
@@ -329,12 +376,44 @@ export interface RoundaboutEntrySpec extends StagedEventBase {
   maxSyncSpeedMps: number;
 }
 
+/**
+ * B1a — the first phase-driven staged event (doc 72 JU-06, capability N2).
+ * No actor: the director pins the junction's signal-cluster phase offset when
+ * the player ARMS the approach, so the green→yellow flip lands exactly
+ * `flipEtaSec` of travel time before the player's stop line — the dilemma
+ * window, guaranteed per seed. Grading stays in the EXISTING pipeline: the
+ * runtime's stopLineCrossed reports yellow/redYellow/red at crossing (plus
+ * the amber `stoppable` adjudication) and the rule engine grades it; the
+ * runner only records the outcome.
+ */
+export interface AmberDilemmaSpec extends StagedEventBase {
+  kind: "amberDilemma";
+  /** Signal node id (member of the junction's controller cluster). */
+  signalNodeId: string;
+  /** Junction node position, district space. */
+  junction: { x: number; y: number };
+  /** Player distance to the junction that pins the phase, m. */
+  armDistM: number;
+  /** Player must be at least this fast at arm, km/h. */
+  minTriggerSpeedKmh: number;
+  /** Stop-line setback from the junction node on the player's approach, m. */
+  lineDistM: number;
+  /**
+   * Player's time-to-line at the green→yellow flip, s (± seeded jitter).
+   * The dilemma dial: ≥ ~4 s = a comfortable stop exists (stopping is the
+   * graded correct answer — carrying on lands on red); ≤ ~2 s = committed
+   * (proceeding through the yellow is correct).
+   */
+  flipEtaSec: number;
+}
+
 export type StagedEventSpec =
   | PedestrianDartOutSpec
   | PriorityFromRightSpec
   | BrakingLeadCarSpec
   | CyclistRightHookSpec
-  | RoundaboutEntrySpec;
+  | RoundaboutEntrySpec
+  | AmberDilemmaSpec;
 
 /**
  * Resolution record of one staged encounter (A8). The GRADING already

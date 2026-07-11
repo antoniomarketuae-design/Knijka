@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { SignalPhase } from "../../contracts";
-import { createWorldRuntime, SIGNAL_TIMING } from "..";
+import { createWorldRuntime, phaseTimingInCycle, SIGNAL_TIMING } from "..";
+import { phaseInCycle } from "../signals";
 import { loadDistrict } from "./helpers";
 
 /**
@@ -125,5 +126,86 @@ describe("signal controller", () => {
     const rt = createWorldRuntime(district);
     rt.update(10);
     expect(rt.signalPhase("n-does-not-exist")).toBe("red");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// B1a N2 — the signal-phase director API (doc 72 JU-06..09/20)
+// ---------------------------------------------------------------------------
+
+describe("signal-phase director API (B1a N2)", () => {
+  const district = loadDistrict();
+
+  it("phaseTimingInCycle agrees with phaseInCycle and its countdown lands on boundaries", () => {
+    for (const group of ["ns", "ew"] as const) {
+      for (let t = 0; t < SIGNAL_TIMING.cycleSec; t += 0.25) {
+        const info = phaseTimingInCycle(t, group);
+        expect(info.phase, `${group}@${t}`).toBe(phaseInCycle(t, group));
+        expect(info.timeToChangeSec).toBeGreaterThan(0);
+        // Just after the predicted change moment the phase HAS changed…
+        const after = phaseTimingInCycle(t + info.timeToChangeSec + 1e-9, group);
+        expect(after.phase, `${group}@${t}+${info.timeToChangeSec}`).not.toBe(info.phase);
+        // …and just before it, it has not.
+        const before = phaseTimingInCycle(t + info.timeToChangeSec - 1e-6, group);
+        expect(before.phase).toBe(info.phase);
+      }
+    }
+  });
+
+  it("signalPhaseInfo matches the lamps a driver on that approach sees", () => {
+    const rt = createWorldRuntime(district);
+    for (const dt of [0.3, 4.1, 9.7, 13.2]) {
+      rt.update(dt);
+      for (const bearing of [74, 178, 254, 358]) {
+        expect(rt.signalPhaseInfo(JUNCTION, bearing).phase).toBe(
+          rt.signalPhaseForApproach(JUNCTION, bearing),
+        );
+      }
+    }
+  });
+
+  it("setSignalClusterOffset + signalOffsetForPhaseStart pin the flip to the second", () => {
+    const rt = createWorldRuntime(district);
+    rt.update(13.7); // arbitrary session time — the API must account for it
+    const bearing = 254; // Трайко Станоев approach toward the junction
+    const offset = rt.signalOffsetForPhaseStart(JUNCTION, bearing, "yellow", 5);
+    rt.setSignalClusterOffset(JUNCTION, offset);
+    // Green now (yellow only starts in 5 s), with the countdown agreeing.
+    const info = rt.signalPhaseInfo(JUNCTION, bearing);
+    expect(info.phase).toBe("green");
+    expect(info.timeToChangeSec).toBeCloseTo(5, 5);
+    rt.update(4.9);
+    expect(rt.signalPhaseInfo(JUNCTION, bearing).phase).toBe("green");
+    rt.update(0.2);
+    expect(rt.signalPhaseInfo(JUNCTION, bearing).phase).toBe("yellow");
+    rt.update(SIGNAL_TIMING.yellowSec);
+    expect(rt.signalPhaseInfo(JUNCTION, bearing).phase).toBe("red");
+  });
+
+  it("pinning is deterministic: two runtimes given the same offset agree everywhere", () => {
+    const a = createWorldRuntime(district);
+    const b = createWorldRuntime(district);
+    a.update(2.2);
+    b.update(2.2);
+    a.setSignalClusterOffset(JUNCTION, 17);
+    b.setSignalClusterOffset(JUNCTION, 17);
+    for (const dt of [0.4, 3.3, 7.9, 0.05]) {
+      a.update(dt);
+      b.update(dt);
+      for (const bearing of [74, 254]) {
+        expect(a.signalPhaseInfo(JUNCTION, bearing).phase).toBe(
+          b.signalPhaseInfo(JUNCTION, bearing).phase,
+        );
+      }
+    }
+  });
+
+  it("fails safe on unknown node ids (red, no change ever, neutral offset)", () => {
+    const rt = createWorldRuntime(district);
+    const info = rt.signalPhaseInfo("n-nope");
+    expect(info.phase).toBe("red");
+    expect(info.timeToChangeSec).toBe(Infinity);
+    expect(() => rt.setSignalClusterOffset("n-nope", 10)).not.toThrow();
+    expect(rt.signalOffsetForPhaseStart("n-nope", 74, "green", 3)).toBe(0);
   });
 });

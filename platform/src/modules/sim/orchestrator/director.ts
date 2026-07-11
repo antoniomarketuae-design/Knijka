@@ -23,6 +23,7 @@ import type {
   DirectorStepResult,
   ScenarioDirector,
   ScenarioDirectorOptions,
+  SignalDirectorPort,
   StagedEventStatus,
   StagedTrafficPort,
 } from "./types";
@@ -47,6 +48,8 @@ class ScenarioDirectorImpl implements ScenarioDirector {
   private readonly runners: EventRunner[];
   private readonly allOutcomes: StagedEventOutcome[] = [];
   private readonly seed: number;
+  private readonly signals: SignalDirectorPort | null;
+  private readonly signalOffsets: ReadonlyArray<readonly [string, number]>;
 
   constructor(
     events: readonly StagedEventSpec[],
@@ -54,9 +57,23 @@ class ScenarioDirectorImpl implements ScenarioDirector {
     opts: ScenarioDirectorOptions,
   ) {
     this.seed = opts.seed >>> 0;
-    this.runners = events.map((spec) => createRunner(spec));
+    this.signals = opts.signals ?? null;
+    // Sorted for deterministic application order regardless of object shape.
+    this.signalOffsets = Object.entries(opts.signalOffsets ?? {}).sort((a, b) =>
+      a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0,
+    );
+    this.applySignalOffsets();
+    this.runners = events.map((spec) => createRunner(spec, this.signals));
     for (const runner of this.runners) {
       runner.stage(this.traffic, this.eventRng(runner.spec.id), true);
+    }
+  }
+
+  /** Session-start phase pinning (B1a N2) — re-applied on every reset(). */
+  private applySignalOffsets(): void {
+    if (this.signals === null) return;
+    for (const [nodeId, offsetSec] of this.signalOffsets) {
+      this.signals.setSignalClusterOffset(nodeId, offsetSec);
     }
   }
 
@@ -91,6 +108,7 @@ class ScenarioDirectorImpl implements ScenarioDirector {
   reset(): void {
     this.attempt += 1;
     this.allOutcomes.length = 0;
+    this.applySignalOffsets();
     for (const runner of this.runners) {
       runner.stage(this.traffic, this.eventRng(runner.spec.id), false);
     }

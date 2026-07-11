@@ -11,7 +11,7 @@
  * ViolationCodes, no second grader.
  */
 
-import type { StagedEventKind, StagedEventOutcome } from "../contracts";
+import type { SignalPhase, StagedEventKind, StagedEventOutcome } from "../contracts";
 import type { SimTickEvent } from "../rules";
 import type { StagedActorSpec, StagedActorView, StagedCommand } from "../traffic";
 
@@ -24,6 +24,28 @@ export interface StagedTrafficPort {
   stage(spec: StagedActorSpec): StagedActorView | null;
   stagedCommand(id: string, command: StagedCommand): void;
   staged(id: string): StagedActorView | null;
+}
+
+/**
+ * B1a N2 — the narrow signal seam the director drives, structurally satisfied
+ * by DistrictWorldRuntime (runtime/worldRuntime.ts). Lets staged exams pin
+ * junction phases at session start (`ScenarioDirectorOptions.signalOffsets`)
+ * and lets the amber-dilemma runner pin the green→yellow flip on approach.
+ * Determinism: offsets derive from the seed / the deterministic player state,
+ * never from wall time or RNG at step time.
+ */
+export interface SignalDirectorPort {
+  signalPhaseInfo(
+    signalNodeId: string,
+    approachBearingDeg?: number,
+  ): { phase: SignalPhase; timeToChangeSec: number };
+  setSignalClusterOffset(signalNodeId: string, offsetSec: number): void;
+  signalOffsetForPhaseStart(
+    signalNodeId: string,
+    approachBearingDeg: number,
+    phase: SignalPhase,
+    inSec: number,
+  ): number;
 }
 
 /** Player state + frame context the director consumes each frame. */
@@ -65,6 +87,18 @@ export interface StagedEventStatus {
 export interface ScenarioDirectorOptions {
   /** Master seed — same seed + same attempt + same driving = same staging. */
   seed: number;
+  /**
+   * B1a N2: the signal seam (usually the DistrictWorldRuntime itself).
+   * Absent = phase-driven events stage but never touch the lights (the
+   * amber runner degrades to a passive observer of ambient phases).
+   */
+  signals?: SignalDirectorPort;
+  /**
+   * Per-node phase offsets applied at session start AND on every reset() —
+   * staged exams pin junction phases here (part of the exam's authored data /
+   * seed derivation, so determinism holds across attempts).
+   */
+  signalOffsets?: Readonly<Record<string, number>>;
 }
 
 export interface ScenarioDirector {
