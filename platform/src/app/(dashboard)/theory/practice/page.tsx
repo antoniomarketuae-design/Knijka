@@ -9,6 +9,7 @@ import type { PracticeQuestionDto } from "@/components/theory/types";
 import { getContentRepo } from "@/lib/content/repo";
 import { requireUser } from "@/modules/auth";
 import { buildPracticeSession } from "@/modules/learning";
+import { checkPracticeQuota } from "@/modules/payments";
 
 export const metadata: Metadata = {
   title: "Тренировка · Книжка.AI",
@@ -30,6 +31,15 @@ interface PracticePageProps {
  */
 export default async function PracticePage({ searchParams }: PracticePageProps) {
   const user = await requireUser();
+
+  // Free tier is visible BEFORE it bites: the counter renders over the
+  // session, and a spent quota shows an inline paywall card here instead of
+  // the mid-session hard redirect from the submit action.
+  const quota = await checkPracticeQuota(user.id);
+  if (!quota.unlimited && quota.remainingToday === 0) {
+    return <QuotaExhausted limit={quota.limit} />;
+  }
+
   const params = await searchParams;
   const sectionParam =
     typeof params.section === "string" ? params.section : undefined;
@@ -97,9 +107,55 @@ export default async function PracticePage({ searchParams }: PracticePageProps) 
       ) : (
         /* Fresh key per server render: router.refresh() ("Нова тренировка")
            builds a new session and remounts the client flow from scratch. */
-        <PracticeSession key={crypto.randomUUID()} questions={questions} />
+        <PracticeSession
+          key={crypto.randomUUID()}
+          questions={questions}
+          quota={
+            quota.unlimited
+              ? null
+              : {
+                  usedToday: quota.limit - quota.remainingToday,
+                  limit: quota.limit,
+                }
+          }
+        />
       )}
     </div>
+  );
+}
+
+/** Spent daily quota: an honest inline invitation instead of a hard redirect. */
+function QuotaExhausted({ limit }: { limit: number }) {
+  return (
+    <section
+      aria-labelledby="quota-exhausted-title"
+      className="card mx-auto mt-8 flex w-full max-w-xl flex-col items-center gap-4 p-8 text-center sm:p-12"
+    >
+      <span
+        aria-hidden
+        className="flex h-14 w-14 items-center justify-center rounded-2xl border border-accent/40 bg-accent/10 text-accent"
+      >
+        <IconLock className="h-7 w-7" />
+      </span>
+      <div>
+        <h2 id="quota-exhausted-title" className="font-display text-lg font-extrabold">
+          Дневната безплатна порция свърши
+        </h2>
+        <p className="mx-auto mt-2 max-w-md text-sm leading-relaxed text-muted">
+          Мина през всичките {limit} безплатни въпроса за днес — добра работа!
+          Утре порцията се подновява. Ако искаш да продължиш още сега, пакетите
+          махат лимита.
+        </p>
+      </div>
+      <div className="flex flex-wrap justify-center gap-3">
+        <Link href="/pricing?status=quota" className="btn-accent">
+          Виж пакетите
+        </Link>
+        <Link href="/theory" className="btn-ghost">
+          Към темите
+        </Link>
+      </div>
+    </section>
   );
 }
 

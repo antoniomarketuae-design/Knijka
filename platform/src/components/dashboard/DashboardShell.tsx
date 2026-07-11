@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { signOut } from "next-auth/react";
 import { useEffect, useRef, useState, type ComponentType, type SVGProps } from "react";
 import {
   IconBook,
@@ -9,6 +10,7 @@ import {
   IconClipboardCheck,
   IconGear,
   IconHome,
+  IconLogout,
   IconMenu,
   IconStar,
   IconTrophy,
@@ -120,6 +122,25 @@ function NavLinks({ onNavigate }: { onNavigate?: () => void }) {
 }
 
 /**
+ * „Изход" — the target users are teenagers on shared/family/school computers,
+ * so signing out must be one visible click from every authed screen.
+ * signOut() clears the session cookie server-side and lands on the landing
+ * page (redirectTo — next-auth v5 name for callbackUrl).
+ */
+function SignOutButton() {
+  return (
+    <button
+      type="button"
+      onClick={() => signOut({ redirectTo: "/" })}
+      className="group flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold text-muted transition duration-200 hover:bg-surface-2 hover:text-foreground motion-reduce:transition-none"
+    >
+      <IconLogout className="h-5 w-5 shrink-0" />
+      <span className="flex-1 text-left">Изход</span>
+    </button>
+  );
+}
+
+/**
  * Dashboard chrome: fixed sidebar on desktop, topbar + slide-over drawer on
  * mobile. Client component only because of the drawer state and active-link
  * highlighting — all data stays in server components.
@@ -159,6 +180,9 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
             Категория <strong className="font-mono font-bold text-foreground">B</strong>{" "}
             · България
           </p>
+        </div>
+        <div className="border-t border-hair pt-2">
+          <SignOutButton />
         </div>
       </aside>
 
@@ -210,6 +234,9 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
             <nav aria-label="Основна навигация">
               <NavLinks onNavigate={() => setOpen(false)} />
             </nav>
+            <div className="mt-auto border-t border-hair pt-2">
+              <SignOutButton />
+            </div>
           </div>
         </div>
       ) : null}

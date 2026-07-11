@@ -11,7 +11,11 @@ type FieldErrors = Partial<
   Record<"email" | "password" | "name" | "birthYear" | "consent", string>
 >;
 
-const CURRENT_MAX_YEAR = 2012;
+// Youngest allowed account: MIN_AGE years old *this* calendar year — computed,
+// so the ceiling never drifts (a hardcoded year silently raised the minimum
+// age every January). Keep MIN_AGE in sync with modules/auth/schemas.ts.
+const MIN_AGE = 14;
+const CURRENT_MAX_YEAR = new Date().getFullYear() - MIN_AGE;
 const MIN_YEAR = 1950;
 
 export function RegisterForm() {
@@ -210,11 +214,28 @@ export function RegisterForm() {
             className="mt-0.5 h-4 w-4 shrink-0 accent-accent"
           />
           <span>
-            {/* GDPR consent stub — final wording pending legal review */}
+            {/* GDPR consent — final wording pending legal review */}
             Съгласявам се Книжка.AI да обработва личните ми данни
             (имейл, име, година на раждане) за целите на създаване на акаунт и
-            проследяване на учебния ми напредък, в съответствие с GDPR. Мога да
-            оттегля съгласието си по всяко време.
+            проследяване на учебния ми напредък, съгласно{" "}
+            <a
+              href="/privacy"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="font-semibold text-accent underline-offset-4 hover:underline"
+            >
+              Политиката за поверителност
+            </a>{" "}
+            и{" "}
+            <a
+              href="/terms"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="font-semibold text-accent underline-offset-4 hover:underline"
+            >
+              Условията за ползване
+            </a>
+            . Мога да оттегля съгласието си по всяко време.
           </span>
         </label>
         {fieldErrors.consent && (

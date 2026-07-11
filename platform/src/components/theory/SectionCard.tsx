@@ -2,11 +2,13 @@ import Link from "next/link";
 import { IconArrowRight } from "@/components/icons";
 import type { SectionOverview } from "@/modules/learning";
 
-/** Same mastery thresholds as TopicCard / the dashboard — keep them in sync. */
+/** Same mastery thresholds as TopicCard / the dashboard — keep them in sync.
+ *  Started-but-low reads neutral accent („тепърва загрява"), never danger-red —
+ *  red is for genuine answer-level errors, not an early learner's progress bar. */
 function masteryColor(mastery: number): string {
   if (mastery >= 0.75) return "var(--success)";
   if (mastery >= 0.45) return "var(--warning)";
-  if (mastery > 0) return "var(--danger)";
+  if (mastery > 0) return "var(--accent)";
   return "var(--border-strong)";
 }
 

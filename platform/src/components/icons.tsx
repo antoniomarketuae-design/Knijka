@@ -144,6 +144,16 @@ export function IconCheck(props: IconProps) {
   );
 }
 
+export function IconLogout(props: IconProps) {
+  return (
+    <svg {...base(props)}>
+      <path d="M14 4H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h7" />
+      <path d="m16 8 4 4-4 4" />
+      <path d="M20 12H9" />
+    </svg>
+  );
+}
+
 export function IconMenu(props: IconProps) {
   return (
     <svg {...base(props)}>

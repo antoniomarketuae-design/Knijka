@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { AchievementsRow } from "@/components/dashboard/AchievementsRow";
 import { ContinueLessonCard } from "@/components/dashboard/ContinueLessonCard";
 import { DailyMissionCard } from "@/components/dashboard/DailyMissionCard";
+import { ExamCountdown } from "@/components/dashboard/ExamCountdown";
 import { ModuleGrid } from "@/components/dashboard/ModuleGrid";
 import { ReadinessRing } from "@/components/dashboard/ReadinessRing";
 import { SimWeakSpotsCard } from "@/components/dashboard/SimWeakSpotsCard";
@@ -65,6 +66,8 @@ export default async function DashboardPage() {
           <p className="mt-1 text-sm text-muted">
             Днес е добър ден да станеш по-добър шофьор.
           </p>
+          {/* Onboarding answers, finally surfaced (exam date + daily goal). */}
+          <ExamCountdown />
         </div>
         <div className="flex flex-col gap-3 sm:flex-row sm:items-stretch">
           <StreakBadge gamification={gamification} />

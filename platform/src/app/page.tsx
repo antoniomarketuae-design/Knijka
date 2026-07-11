@@ -35,8 +35,7 @@ function buildFeatures(questionsLabel: string) {
       icon: IconWheel,
       titleBg: "Симулатор",
       textBg:
-        "Кокпит шофиране в браузъра по улици с българска пътна обстановка — в разработка, идва след теорията.",
-      soon: true,
+        "Кокпит шофиране в браузъра по реалната улична мрежа на Студентски град — уроци, изпитен режим и оценяване по официалната система.",
     },
   ] as const;
 }
@@ -287,7 +286,7 @@ export default function LandingPage() {
           </h2>
 
           <ul className="mt-10 grid grid-cols-1 gap-4 md:grid-cols-3">
-            {features.map(({ icon: Icon, titleBg, textBg, ...f }, i) => (
+            {features.map(({ icon: Icon, titleBg, textBg }, i) => (
               <li
                 key={titleBg}
                 className="hud-panel group relative flex flex-col gap-4 p-6 transition hover:-translate-y-1 hover:shadow-glow motion-reduce:transition-none motion-reduce:hover:translate-y-0"
@@ -296,16 +295,9 @@ export default function LandingPage() {
                   <span className="flex h-12 w-12 items-center justify-center rounded-xl border border-hair bg-accent/15 text-accent shadow-glow-sm">
                     <Icon className="h-6 w-6" />
                   </span>
-                  <div className="flex items-center gap-2">
-                    {"soon" in f && f.soon ? (
-                      <span className="rounded-full border border-accent-2/40 bg-accent-2/10 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-accent-2">
-                        Скоро
-                      </span>
-                    ) : null}
-                    <span className="hud-label tabular-nums">
-                      {String(i + 1).padStart(2, "0")}
-                    </span>
-                  </div>
+                  <span className="hud-label tabular-nums">
+                    {String(i + 1).padStart(2, "0")}
+                  </span>
                 </div>
                 <h3 className="font-display text-lg font-extrabold">{titleBg}</h3>
                 <p className="text-sm leading-relaxed text-muted">{textBg}</p>

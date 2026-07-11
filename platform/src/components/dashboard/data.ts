@@ -1,4 +1,5 @@
 import "@/lib/content/loader";
+import { getContentRepo } from "@/lib/content/repo";
 import {
   getReadiness as learningGetReadiness,
   getSimWeakSpots as learningGetSimWeakSpots,
@@ -42,6 +43,8 @@ export interface WeakConcept {
   topicId: string;
   /** 0..1 */
   mastery: number;
+  /** Topic-scoped practice when the slug resolves, the theory hub otherwise. */
+  href: string;
 }
 
 export interface ReadinessSnapshot {
@@ -131,6 +134,13 @@ export async function getReadiness(): Promise<ReadinessSnapshot> {
     learningGetTopicOverview(user.id),
   ]);
   const byTopic = new Map(overview.map((t) => [t.topicId, t]));
+  // Same routing rule as getSimWeakSpots: resolve the concept's topic slug so
+  // the „Препоръчано за упражнение" chips start topic-scoped practice.
+  const slugByTopicId = new Map(
+    getContentRepo()
+      .topics()
+      .map((t) => [t.id, t.slug]),
+  );
 
   return {
     score: readiness.score,
@@ -146,12 +156,16 @@ export async function getReadiness(): Promise<ReadinessSnapshot> {
         questionsSeen: t?.seenConceptCount ?? 0,
       };
     }),
-    weakestConcepts: readiness.weakestConcepts.map((c) => ({
-      conceptId: c.conceptId,
-      titleBg: c.titleBg,
-      topicId: c.topicId,
-      mastery: c.effectiveMastery,
-    })),
+    weakestConcepts: readiness.weakestConcepts.map((c) => {
+      const slug = slugByTopicId.get(c.topicId);
+      return {
+        conceptId: c.conceptId,
+        titleBg: c.titleBg,
+        topicId: c.topicId,
+        mastery: c.effectiveMastery,
+        href: slug ? `/theory/practice?topic=${slug}` : "/theory",
+      };
+    }),
   };
 }
 
@@ -187,7 +201,9 @@ export async function getContinueLesson(): Promise<ContinueLesson | null> {
     topic: { id: weakest.topicId, order: weakest.order, titleBg: weakest.titleBg },
     conceptTitleBg: weakConcept?.titleBg ?? weakest.titleBg,
     progressPct: Math.round(weakest.coverage * 100),
-    href: "/theory",
+    // Straight into a session scoped to the weakest started topic — the hero
+    // CTA drops the student into the right practice, not the generic hub.
+    href: `/theory/practice?topic=${weakest.slug}`,
   };
 }
 

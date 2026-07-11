@@ -14,15 +14,14 @@ export const ROUTE_STATUS: Record<string, RouteStatus> = {
   "/dashboard": "live",
   "/theory": "live",
   "/exams": "live",
-  // Shipped and actively developed — navigable, but badged "в разработка" so
-  // expectations are set (it is not launch-polished yet). NOT "soon": making it
-  // inert would lock the team out of the page they are building.
-  "/simulator": "dev",
+  // Shipped: lesson ladder + exam mode on the real Студентски град street
+  // topology. Flipped from "dev" once the sim left the in-progress phase.
+  "/simulator": "live",
   "/tutor": "live",
   // No page yet — must stay non-navigating so nav never 404s.
   "/leaderboard": "soon",
   "/pricing": "live",
-  "/settings": "soon",
+  "/settings": "live",
 };
 
 /** True when a route has no real destination yet → render non-navigating. */

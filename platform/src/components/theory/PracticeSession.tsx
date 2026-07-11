@@ -53,8 +53,11 @@ interface AnswerRecord {
 
 export function PracticeSession({
   questions,
+  quota = null,
 }: {
   questions: PracticeQuestionDto[];
+  /** Free-tier counter („Днес: X от Y безплатни въпроса"); null = unlimited. */
+  quota?: { usedToday: number; limit: number } | null;
 }) {
   const [index, setIndex] = useState(0);
   const [selected, setSelected] = useState<string[]>([]);
@@ -161,6 +164,16 @@ export function PracticeSession({
     >
       {/* Progress */}
       <div className="flex flex-col gap-2.5">
+        {quota !== null ? (
+          // Live free-tier meter: answers in this session count toward today.
+          <p className="font-mono text-[11px] font-bold tabular-nums text-muted">
+            Днес:{" "}
+            <span className="text-accent">
+              {Math.min(quota.limit, quota.usedToday + answeredCount)}
+            </span>{" "}
+            от {quota.limit} безплатни въпроса
+          </p>
+        ) : null}
         <div className="flex flex-wrap items-center justify-between gap-2">
           <p className="text-sm font-semibold tabular-nums text-muted">
             Въпрос <span className="font-bold text-foreground">{index + 1}</span> от{" "}

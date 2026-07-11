@@ -26,7 +26,19 @@ export default async function LoginPage({ searchParams }: Props) {
         Влез в акаунта си, за да продължиш обучението.
       </p>
       <LoginForm callbackUrl={callbackUrl} />
-      <p className="mt-6 text-center text-sm text-muted">
+      {/* Support path until automated reset ships (audit B2): access is
+          restored manually via the contact channel — never a dead end. */}
+      <p className="mt-4 text-center text-xs text-muted">
+        Забравена парола?{" "}
+        <Link
+          href="/contact"
+          className="font-semibold text-accent underline-offset-4 hover:underline"
+        >
+          Пиши ни
+        </Link>{" "}
+        от имейла на акаунта — възстановяваме достъпа ръчно.
+      </p>
+      <p className="mt-4 text-center text-sm text-muted">
         Нямаш акаунт?{" "}
         <Link
           href="/register"

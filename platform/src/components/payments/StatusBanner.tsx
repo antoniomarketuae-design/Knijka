@@ -1,15 +1,28 @@
 /**
- * Post-checkout status banner for /pricing (?status=...).
- * Server component; same visual language as the /exams message card.
+ * Status banner for /pricing (?status=...).
+ * Covers both post-checkout returns (success/cancelled/error/unavailable) and
+ * free-tier cap landings (quota/exam-limit) — every way a user can be *sent*
+ * here must explain itself. Server component; same visual language as the
+ * /exams message card.
  */
 
-export type PricingStatus = "success" | "cancelled" | "unavailable" | "error";
+import { FREE_DAILY_PRACTICE_LIMIT } from "@/modules/payments";
+
+export type PricingStatus =
+  | "success"
+  | "cancelled"
+  | "unavailable"
+  | "error"
+  | "quota"
+  | "exam-limit";
 
 export function parsePricingStatus(value: unknown): PricingStatus | null {
   return value === "success" ||
     value === "cancelled" ||
     value === "unavailable" ||
-    value === "error"
+    value === "error" ||
+    value === "quota" ||
+    value === "exam-limit"
     ? value
     : null;
 }
@@ -19,6 +32,9 @@ const STYLES: Record<PricingStatus, string> = {
   cancelled: "border-warning/50 text-warning",
   unavailable: "border-warning/50 text-warning",
   error: "border-danger/50 text-danger",
+  // Cap landings are an invitation, not an error — accent, never red.
+  quota: "border-accent/50 text-accent",
+  "exam-limit": "border-accent/50 text-accent",
 };
 
 export function StatusBanner({
@@ -38,7 +54,11 @@ export function StatusBanner({
         ? "Плащането беше прекъснато. Нищо не е таксувано — можеш да опиташ отново, когато решиш."
         : status === "unavailable"
           ? "Онлайн плащанията още не са активни. Пакетите ще бъдат достъпни съвсем скоро."
-          : "Нещо се обърка при започването на плащането. Опитай отново — нищо не е таксувано.";
+          : status === "quota"
+            ? `Дневната безплатна порция от ${FREE_DAILY_PRACTICE_LIMIT} въпроса свърши. Утре има нова — или продължи без лимит с пакет.`
+            : status === "exam-limit"
+              ? "Безплатният пробен изпит е използван. Пакетите дават неограничени изпити в официалния формат."
+              : "Нещо се обърка при започването на плащането. Опитай отново — нищо не е таксувано.";
 
   return (
     <p

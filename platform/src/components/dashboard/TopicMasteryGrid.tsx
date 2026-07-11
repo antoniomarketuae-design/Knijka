@@ -98,7 +98,7 @@ export function TopicMasteryGrid({ readiness }: { readiness: ReadinessSnapshot }
             {weakestConcepts.map((c) => (
               <li key={c.conceptId}>
                 <Link
-                  href="/theory"
+                  href={c.href}
                   className="inline-flex items-center gap-1.5 rounded-full border border-hair bg-surface-2 px-3 py-1.5 text-xs font-semibold transition duration-200 hover:border-border-strong hover:text-accent motion-reduce:transition-none"
                 >
                   <span

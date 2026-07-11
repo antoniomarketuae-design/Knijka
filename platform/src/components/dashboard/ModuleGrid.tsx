@@ -33,7 +33,8 @@ const MODULES: ModuleCard[] = [
   {
     href: "/simulator",
     titleBg: "Симулатор",
-    descriptionBg: "Кокпит шофиране в браузъра — в разработка.",
+    descriptionBg:
+      "Кокпит шофиране по улиците на Студентски град — с инструктор в реално време.",
     icon: IconWheel,
   },
   {

@@ -1,5 +1,14 @@
 import { z } from "zod";
 
+/** Youngest allowed account: MIN_AGE years old this calendar year. Computed,
+ *  never hardcoded — a fixed year silently raises the minimum age every
+ *  January. Keep in sync with the register form's MIN_AGE. */
+const MIN_AGE = 14;
+const MIN_BIRTH_YEAR = 1950;
+function maxBirthYear(): number {
+  return new Date().getFullYear() - MIN_AGE;
+}
+
 /** Normalized e-mail: trimmed + lowercased before the format check, so
  *  "Ivan@Mail.BG " and "ivan@mail.bg" are the same account. */
 const emailSchema = z
@@ -22,8 +31,14 @@ export const registerInputSchema = z.object({
   birthYear: z.coerce
     .number({ error: "Невалидна година на раждане." })
     .int({ error: "Невалидна година на раждане." })
-    .min(1950, { error: "Годината на раждане трябва да е между 1950 и 2012." })
-    .max(2012, { error: "Годината на раждане трябва да е между 1950 и 2012." }),
+    .min(MIN_BIRTH_YEAR, {
+      error: `Годината на раждане трябва да е между ${MIN_BIRTH_YEAR} и ${maxBirthYear()}.`,
+    })
+    // Refinement (not .max) so a long-lived server process stays correct
+    // across a New Year — the bound is evaluated per parse, not at import.
+    .refine((year) => year <= maxBirthYear(), {
+      error: `Годината на раждане трябва да е между ${MIN_BIRTH_YEAR} и ${maxBirthYear()}.`,
+    }),
   // GDPR: explicit consent is a hard gate — the account cannot exist without it.
   consent: z.literal(true, {
     error: "Трябва да се съгласиш с обработката на личните ти данни.",

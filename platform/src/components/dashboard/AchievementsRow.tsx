@@ -1,4 +1,3 @@
-import Link from "next/link";
 import type { ComponentType, SVGProps } from "react";
 import type { Achievement } from "@/components/dashboard/data";
 import { EmptyState } from "@/components/dashboard/EmptyState";
@@ -33,12 +32,8 @@ export function AchievementsRow({ achievements }: { achievements: Achievement[] 
         <h2 id="achievements-title" className="font-display text-base font-extrabold">
           Последни постижения
         </h2>
-        <Link
-          href="/leaderboard"
-          className="text-xs font-bold text-accent hover:underline"
-        >
-          Виж всички
-        </Link>
+        {/* „Виж всички" се връща, когато /leaderboard получи страница
+            (availability.ts все още я държи „Скоро"). */}
       </div>
 
       {achievements.length === 0 ? (

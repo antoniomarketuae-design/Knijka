@@ -33,5 +33,16 @@ export async function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/dashboard/:path*"],
+  // Every authed area, so a logged-out deep link (e.g. /theory/practice)
+  // round-trips through /login WITH callbackUrl and lands where it was headed.
+  // requireUser() remains the secure per-request check on each page.
+  matcher: [
+    "/dashboard/:path*",
+    "/theory/:path*",
+    "/exams/:path*",
+    "/simulator/:path*",
+    "/tutor/:path*",
+    "/pricing/:path*",
+    "/settings/:path*",
+  ],
 };
