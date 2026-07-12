@@ -145,4 +145,32 @@ describe("roundabout yield tolerance bands (C1)", () => {
     const violated = events.filter((e) => e.kind === "prioritySituation" && e.violated);
     expect(violated).toHaveLength(0);
   });
+
+  it("D1 guard-rail: a SUSTAINED-braking barger entering the ring still grades", () => {
+    // Guilty: drives at the entry mouth pointed into the ring at 40 km/h and
+    // rides the brake at a steady ~3 m/s² without ever stopping or yielding
+    // while traffic circulates. The braking-response band is a reaction
+    // window, not a transit pass — immunity must expire once the response
+    // horizon has elapsed with the driver still pushing into the ring.
+    const rt = createWorldRuntime(loadDistrict());
+    const rb = rt.district.roundabouts[0];
+    rt.setCirculatingQuery(() => true);
+    const events: SimTickEvent[] = [];
+    let t = 0;
+    // 36 frames = 3.6 s; 1.08 km/h per 0.1 s frame = 3.0 m/s² throughout.
+    // Fixed pose at the south mouth, heading north (inward = 1): azimuth
+    // never sweeps, so the circulating latch stays off — this is an ENTRY.
+    for (let i = 0; i < 36; i++) {
+      t += 0.1;
+      rt.update(0.1);
+      const tick = rt.sample(
+        mkVehicle({ x: rb.x, y: rb.y - (rb.radius + 4), headingDeg: 0 }, { speedKmh: 40 - 1.08 * i }),
+        t,
+        false,
+      );
+      events.push(...tick.events);
+    }
+    const violated = events.filter((e) => e.kind === "prioritySituation" && e.violated);
+    expect(violated.length).toBeGreaterThan(0);
+  });
 });

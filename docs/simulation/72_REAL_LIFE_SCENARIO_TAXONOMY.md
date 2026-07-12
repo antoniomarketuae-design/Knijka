@@ -3,7 +3,7 @@
 **Status:** v1.0 — research synthesis complete
 **Date:** 2026-07-12
 **Owner:** A1 (scenario-taxonomy lane of the exam-generation program)
-**Upstream:** docs/education/32 (official Наредба № 38 scoring — LAW for this doc) · docs/simulation/65 (45-event canonical library) · `platform/src/modules/sim/rules/types.ts` (22 ViolationCodes) · `platform/src/modules/sim/orchestrator/` (5 staged-event kinds)
+**Upstream:** docs/education/32 (official Наредба № 38 scoring — LAW for this doc) · docs/simulation/65 (45-event canonical library) · `platform/src/modules/sim/rules/types.ts` (22 ViolationCodes) · `platform/src/modules/sim/orchestrator/` (5 staged-event kinds at writing; 6 since B1a — `amberDilemma` joined the union)
 **Rule:** every archetype below is grounded in (a) what real drivers actually do wrong on real roads, per recorded evidence, and (b) what the real Bulgarian practical exam actually grades. Nothing is invented for gameplay.
 
 ---

@@ -75,6 +75,16 @@ const RHR_YIELD_KMH = 8;
 /** Deceleration (m/s²) at/above which the driver counts as actively yielding
  * to a priority conflict — no violation fires mid-braking-response (C1). */
 const YIELD_BRAKE_RESPONSE_MPS2 = 2.5;
+/** D1 revision — the braking-response immunity is a REACTION window, not a
+ * transit pass: it only suppresses conviction within this many seconds of
+ * the conflict becoming visible. Any lawful urban speed (≤ 52 km/h) brakes
+ * to a stop inside 3 s at the band's own threshold response (≥ 4.8 m/s² is
+ * an ordinary firm stop; the C1 innocent shells brake harder still), so a
+ * driver STILL moving through the conflict zone this long after seeing the
+ * conflict is crossing it, not yielding — the D1 probe convicted a barger
+ * riding a steady 3 m/s² brake clean across the core under C1's unbounded
+ * band (right-hand-rule.test.ts / roundabout.test.ts D1 guard-rails). */
+const YIELD_BRAKE_RESPONSE_MAX_SEC = 3.0;
 /** Seconds a barge condition must hold before it convicts — staged "late"/
  * "tight" conflicts can be BORN with the driver already in the zone at
  * speed; a human needs reaction time before the brake shows (C1). A real
@@ -512,7 +522,10 @@ export function createWorldRuntime(districtJson: District | unknown): DistrictWo
         // C1: convict only when the conflict has been VISIBLE for at least
         // the reaction window (measured from the conflict's onset — staged
         // "late" arrivals can be born with the driver already at the core)
-        // and the driver is not actively braking for it.
+        // and the driver is not actively braking for it. D1: the braking
+        // immunity expires after YIELD_BRAKE_RESPONSE_MAX_SEC — a driver
+        // still moving through the core that long after the conflict
+        // appeared is crossing, not stopping.
         if (
           !rhrFired &&
           inCore &&
@@ -520,7 +533,7 @@ export function createWorldRuntime(districtJson: District | unknown): DistrictWo
           rightConflict &&
           rhrCondSince !== null &&
           tSec - rhrCondSince >= YIELD_CONVICT_SUSTAIN_SEC &&
-          !brakingResponse
+          !(brakingResponse && tSec - rhrCondSince <= YIELD_BRAKE_RESPONSE_MAX_SEC)
         ) {
           events.push({ kind: "prioritySituation", situation: "right-hand-rule", violated: true });
           rhrFired = true;
@@ -600,7 +613,8 @@ export function createWorldRuntime(districtJson: District | unknown): DistrictWo
         const rad = (v.headingDeg * Math.PI) / 180;
         const inward = dist > 0 ? (cdx * Math.sin(rad) + cdy * Math.cos(rad)) / dist : 0;
         // C1: reaction window from the conflict's onset + braking-response
-        // band + ring-transit latch — as in the RHR tracker above.
+        // band + ring-transit latch — as in the RHR tracker above. D1: the
+        // braking immunity expires after YIELD_BRAKE_RESPONSE_MAX_SEC.
         if (
           !rbFired &&
           circulating &&
@@ -609,7 +623,7 @@ export function createWorldRuntime(districtJson: District | unknown): DistrictWo
           !onRing &&
           rbCondSince !== null &&
           tSec - rbCondSince >= YIELD_CONVICT_SUSTAIN_SEC &&
-          !brakingResponse
+          !(brakingResponse && tSec - rbCondSince <= YIELD_BRAKE_RESPONSE_MAX_SEC)
         ) {
           events.push({ kind: "prioritySituation", situation: "roundabout", violated: true });
           rbFired = true;

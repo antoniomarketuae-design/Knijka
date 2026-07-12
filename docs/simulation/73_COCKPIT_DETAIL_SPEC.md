@@ -34,7 +34,7 @@ v2 datum surfaces (from `tools/blender/hero_interior_v2.py`):
 | Centre screen | screen_center top edge ≈ y 0.44 (dropped 9.5 cm in v2) |
 | Interior mirror | glass (0, 0.803, 0.50); housing (±0.085, 0.79–0.85, 0.475–0.560); stalk from header |
 | Door mirror glass (L) | (0.905, 0.455, 0.592); sail panels |x| > 0.86 kept intact by the cowl clamp |
-| Hotspot controls | per `platform/src/components/sim/vitok/hotspots.ts` (engine start (0.095, 0.34, 0.757); hazard (0, 0.338, 0.752); headlights (0.655, 0.342, 0.71); fog (0.585, 0.328, 0.723); stalks (0.48 / 0.20, 0.327, 0.587); horn (0.34, 0.281, 0.50); selector (0, 0.178, 0.43); park brake (0.093, 0.144, 0.35); belt (0.135, 0.05, −0.22)) |
+| Hotspot controls | per `platform/src/components/sim/vitok/hotspots.ts` (engine start (0.095, 0.34, 0.757); hazard (0, 0.338, 0.752); headlights (0.655, 0.342, 0.71); fog (0.585, 0.328, 0.723); stalks (0.48 / 0.20, 0.327, 0.587); horn (0.34, 0.281, 0.50); selector (0, 0.178, 0.43); park brake (0.093, 0.144, 0.35); belt (0.135, 0.05, −0.22)) — *pre-v3 snapshot; as SHIPPED (v3 + C2, D1-verified proxy=GLB-node exact): start (0.095, 0.316, 0.725); hazard (0, 0.316, 0.725); selector (0, 0.32, 0.43); park brake (0.093, 0.315, 0.50); others unchanged* |
 
 Existing materials: `int_dark, int_leather, int_alu, int_accent, int_gloss, int_seat` (solid-colour PBR + baked 1024² AO atlas on uv1 via `hero_interior_ao_bake.py`; no albedo textures — **detail must be geometry + AO, not texture**).
 
@@ -187,6 +187,7 @@ Placement: recessed 6 mm INTO the cowl slope at (±0.35, on-surface, z 0.86).
 **P2-1 · Floating console bridge + selector + EPB.** Ref: Golf 8 DSG stubby shift-by-wire rocker (~50 mm) + EPB switch 20×40 mm + AutoHold; "floating bridge" deck per doc 67 §10.6.
 Placement: deck x −0.15…0.15, z 0.18–0.55, **top y 0.31** (raised from the current implied ~0.14 so controls enter the right-glance frame — see §2 finding); selector knob top (0, 0.345, 0.43); EPB (0.093, 0.325, 0.35); wireless-pad slant + 2 USB-C dots in the front recess z 0.52–0.55; open shelf beneath.
 ~2,100 tris · int_dark deck, int_gloss top plate, int_alu selector collar, int_emissive P-glyph · nodes `hotspot_gear_selector` + `hotspot_parking_brake` get the visible meshes · **Requires same-commit A2 change:** `hotspots.ts` proxy positions → gear (0, 0.32, 0.43), park brake (0.093, 0.315, 0.35). · Safety: top y 0.31 at z 0.43 is 0.235 below the cowl ray AND below the rest frame bottom (needs 0.338 to appear) — invisible at rest, revealed only by the right glance. Cannot touch world.
+> **C2 revision (2026-07-12, shipped):** projection through the shipped CameraRig quats proved right-glance visibility is IMPOSSIBLE at this x (horizontal-in needs z ≤ 0.27, vertical-in needs z ≥ 0.49), so the EPB moved FORWARD to **(0.093, 0.315, 0.50)** — the switch crest (y 0.334) now breaks the REST frame bottom instead (D1 render re-verified: crest at frame fy 0.048 from the shipped GLB). `hotspots.ts` + GLB node moved identically; the selector stayed at (0, 0.32, 0.43).
 
 **P2-2 · Right door card, forward section.** Mirror of P1-15 at 60% detail (no switch pod internals — right-glance only, 91° frame edge).
 Placement: x ≈ −0.80, z 0.30–0.62. ~1,200 tris · same materials · static · Safety: outside the rest frustum entirely (x < −0.50 at dash depth); below cowl during glances.

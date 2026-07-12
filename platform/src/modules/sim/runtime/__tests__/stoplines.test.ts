@@ -250,4 +250,34 @@ describe("cluster-interior edges carry no stop lines (C1)", () => {
     // n1805512602 signalized) keeps its line — entry is still graded.
     expect(onEdge("e672169336.0").length).toBeGreaterThan(0);
   });
+
+  it("D1 guard-rail: the cull never leaves a JUNCTION signal cluster with ZERO outer lines", () => {
+    // The C1 cull removes trafficLight lines on cluster-INTERIOR stubs. If a
+    // whole cluster ever lost every line (say, an over-eager cluster radius
+    // merging two separate intersections until all their approaches became
+    // "interior"), red-light running there would silently stop being graded.
+    // Every cluster containing a signalized INTERSECTION must keep at least
+    // one trafficLight stop line on an outer approach. (Clusters made only of
+    // standalone signalized pedestrian crossings never had stop lines — they
+    // are graded by the crossing-zone tracker, not by lines.)
+    const rt = createWorldRuntime(district);
+    const signalizedIx = new Set(
+      district.intersections.filter((i) => i.signalized).map((i) => i.id),
+    );
+    const clusters = rt.debugSignalClusters();
+    const guarded = new Set<number>();
+    for (const line of rt.debugStopLines()) {
+      if (line.control === "trafficLight" && line.clusterIdx >= 0) guarded.add(line.clusterIdx);
+    }
+    let junctionClusters = 0;
+    for (let ci = 0; ci < clusters.length; ci++) {
+      if (!clusters[ci].memberNodeIds.some((id) => signalizedIx.has(id))) continue;
+      junctionClusters++;
+      expect(
+        guarded.has(ci),
+        `signal cluster ${clusters[ci].id} (${clusters[ci].memberNodeIds.length} nodes) has no stop line left`,
+      ).toBe(true);
+    }
+    expect(junctionClusters).toBeGreaterThan(0); // the invariant actually bites
+  });
 });

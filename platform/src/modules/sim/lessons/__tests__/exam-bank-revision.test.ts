@@ -60,7 +60,10 @@ import { EXAM_CONDITIONS, EXAM_SHELLS, TASHEV_BAY, type ExamRouteShell } from ".
 import { L7_PARKING_BAY } from "../specs";
 import { gradeFinishWire } from "../wire";
 
-const FULL = process.env.EXAM_BANK_REVISION_FULL === "1";
+// NOTE (D1): the EXAM_BANK_REVISION_FULL=1 large-sample innocent sweep named
+// in the header lives in the sibling exam-bank-bot.test.ts (describe.runIf) —
+// run both files together, as the revision command does. This file's own
+// tests are unconditional.
 
 // ---------------------------------------------------------------------------
 // Fresh district fixtures (own parsing, own edge map)

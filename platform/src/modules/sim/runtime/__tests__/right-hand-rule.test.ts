@@ -141,4 +141,33 @@ describe("RHR braking-response band (C1)", () => {
     );
     expect(violated.length).toBeGreaterThan(0);
   });
+
+  it("D1 guard-rail: a SUSTAINED-braking barger who transits the core still grades", () => {
+    // Guilty: enters the core at 52 km/h and rides the brake at a steady
+    // ~3 m/s² the whole way across — never stopping, never yielding, crossing
+    // in front of the right-side car. The braking-response band is a REACTION
+    // window, not a transit pass: immunity must expire once the response
+    // horizon (long enough to brake any lawful urban speed to a stop) has
+    // elapsed with the driver still moving through the core.
+    const rt = createWorldRuntime(loadDistrict());
+    const j = rt.debugUncontrolledJunctions()[0];
+    rt.setRightConflictQuery(() => true);
+    const events: SimTickEvent[] = [];
+    let t = 0;
+    // 40 frames = 4.0 s; 1.08 km/h per 0.1 s frame = 3.0 m/s² throughout.
+    for (let i = 0; i < 40; i++) {
+      t += 0.1;
+      rt.update(0.1);
+      const tick = rt.sample(
+        mkVehicle({ x: j.x, y: j.y, headingDeg: 270 }, { speedKmh: 52 - 1.08 * i }),
+        t,
+        false,
+      );
+      events.push(...tick.events);
+    }
+    const violated = events.filter(
+      (e) => e.kind === "prioritySituation" && e.violated,
+    );
+    expect(violated.length).toBeGreaterThan(0);
+  });
 });
