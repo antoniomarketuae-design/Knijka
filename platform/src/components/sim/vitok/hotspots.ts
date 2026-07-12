@@ -70,9 +70,14 @@ export interface CockpitHotspotSpec {
 export const COCKPIT_HOTSPOTS: readonly CockpitHotspotSpec[] = [
   {
     name: "hotspot_engine_start",
+    // C2 glass fix (2026-07-12): the v2-dropped centre screen fully occluded
+    // the button; the glass bottom was raised to y 0.36 and the button moved
+    // into the opened band, base flush on the raycast stack wall — was
+    // [0.095, 0.34, 0.757]. Kept in the same commit as the hero_interior.glb
+    // swap (node moved identically in tools/blender/hero_interior_v3.py).
     labelBg: "Стартер — двигател",
     keyHint: "I",
-    pos: [0.095, 0.34, 0.757],
+    pos: [0.095, 0.316, 0.725],
     size: [0.08, 0.08, 0.07],
     action: { type: "engineToggle" },
   },
@@ -98,10 +103,16 @@ export const COCKPIT_HOTSPOTS: readonly CockpitHotspotSpec[] = [
   },
   {
     name: "hotspot_parking_brake",
-    // v3 console bridge (doc 73 §4 P2-1) — was [0.093, 0.144, 0.35].
+    // v3 console bridge (doc 73 §4 P2-1) — was [0.093, 0.144, 0.35]. C2 fix
+    // (2026-07-12): moved FORWARD to z 0.50 — projection through the shipped
+    // CameraRig quats proved right-glance visibility is impossible at this x
+    // (horizontal-in needs z ≤ 0.27, vertical-in needs z ≥ 0.49), so the
+    // switch crest (y 0.334) now breaks the REST frame bottom instead, the
+    // pose the pre-drive handbrake step is graded in. Same commit as the
+    // GLB swap (node moved identically).
     labelBg: "Ръчна спирачка",
     keyHint: "Space",
-    pos: [0.093, 0.315, 0.35],
+    pos: [0.093, 0.315, 0.5],
     size: [0.1, 0.08, 0.12],
     action: { type: "parkingBrakeToggle" },
   },
@@ -131,9 +142,12 @@ export const COCKPIT_HOTSPOTS: readonly CockpitHotspotSpec[] = [
   },
   {
     name: "hotspot_hazard",
+    // C2 glass fix (2026-07-12): moved with the start button so the
+    // red-triangle cap clears the reshaped centre glass, base flush on the
+    // raycast stack wall — was [0, 0.338, 0.752]. Same commit as the GLB swap.
     labelBg: "Аварийни светлини",
     keyHint: "J",
-    pos: [0, 0.338, 0.752],
+    pos: [0, 0.316, 0.725],
     size: [0.08, 0.06, 0.07],
     action: { type: "hazardsToggle" },
   },

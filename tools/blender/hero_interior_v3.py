@@ -20,8 +20,9 @@ bx=-cx, by=cz, bz=cy+0.55; mount yaw-pi / y-0.55 untouched):
       (sill/roll/flipper/window pod/armrest/tweeter), interior-mirror bezel +
       day/night tab, demister slots.
   P2: floating console bridge with RAISED selector/EPB (hotspot nodes MOVED to
-      chassis (0,0.32,0.43) / (0.093,0.315,0.35) - requires the same-commit
-      hotspots.ts sync, doc 73 SS4 P2-1), right door card @60%, glovebox seam +
+      chassis (0,0.32,0.43) / (0.093,0.315,0.50) - requires the same-commit
+      hotspots.ts sync, doc 73 SS4 P2-1 + the C2 forward revision below),
+      right door card @60%, glovebox seam +
       inlay, speaker grilles, passenger-seat pass, grab handles, overhead
       console, door pocket lips, A-pillar base pods.
   P3: pedal set, belt buckle+stalk (hotspot_belt), column adjust lever, visor
@@ -50,11 +51,33 @@ raycast against the v2 shell at build time):
     top face capped under the eye->cluster-bottom grazing ray).
   - Speaker dash rings at x +/-0.66 (spec +/-0.88 has NO surface - measured
     dash top ends ~+/-0.84).
-  - FLAGGED, NOT FIXED (outside the sanctioned edits): the v2 screen drop put
-    the centre glass IN FRONT of hotspot_engine_start / hotspot_hazard - both
-    controls are already invisible from every pose today (clicks still work:
-    raycast proxies ignore occlusion). Their P1-13/14 dressing is built
-    anyway so a future screen fix reveals it. See the B2 report.
+
+C2 SANCTIONED REVISIONS (the two defects the a5ffe65 build flagged):
+  FIX 1 - centre-screen glass vs start/hazard: the v2 drop slid the glass
+    (measured y 0.2535..0.4405, z 0.665..0.735) down OVER the contract
+    start/hazard buttons (band y 0.32..0.36 at z 0.74..0.77, BEHIND the
+    glass) - both invisible from every pose. Fix: freeze the glass TOP edge
+    (y 0.4405, proven legal under the cowl ray) and raise the BOTTOM edge to
+    y 0.360 (scale about the top edge along the quad's in-plane up axis - the
+    bezel/back-body derive from SCREEN.matrix_world and follow), then move
+    the start/hazard nodes to row y 0.316 mounted FLUSH-PROUD of the
+    RAYCAST stack wall (the v1 wall face z~0.71 sits in front of the old
+    z~0.75 button coordinates - first C2 iteration showed the wall panel
+    swallowing them; button base now touches the measured face, the P1-13
+    halo ring lands ~2 mm in front of it). Rest-pose reads: prow cut fy
+    ~0.10 < controls < glass edge fy ~0.20 - halo + P1-14 triangle in the
+    open band. No windshield change: the glass silhouette only SHRINKS.
+  FIX 2 - EPB glance visibility: the spec coordinate (0.093,0.315,0.35) sits
+    outside the right-glance frame. The proposed z 0.35->0.25 move fixes only
+    the HORIZONTAL exit (fx -0.019 -> +0.027) and drops the switch further
+    below the frame BOTTOM (fy -0.122 -> -0.235: still invisible). Projection
+    truth (three.js, CameraRig quats): at x 0.093 horizontal-in needs
+    z <= 0.27, vertical-in needs z >= 0.49 - right-glance visibility is
+    geometrically impossible on the deck. Revision: move the EPB FORWARD to
+    (0.093,0.315,0.50) beside the wireless pad with a taller VW pull-tab
+    (crest y 0.334) - the switch crest enters the REST frame (fy ~0.03-0.05,
+    bottom-centre-right), the pose the pre-drive handbrake step is actually
+    graded in. Same-commit hotspots.ts sync for all three nodes.
 
 MUST NOT BREAK (asserted): 13 hotspot_* nodes, screen_cluster/screen_center,
 steering_wheel hierarchy, interior_shell/interior_seats grouping, <=8 interior
@@ -523,13 +546,32 @@ build_blade_band()
 # ---- P1-8 HVAC bar as the stack PROW + P1-9 screen bezel/back (see header) --
 SCREEN = D.objects["screen_center"]
 
+# C2 FIX 1a: reshape the centre glass BEFORE build_stack reads its matrix.
+# Freeze the top edge (y 0.4405 - proven legal), raise the bottom edge
+# 0.2535 -> 0.360 by scaling the quad about its top edge along the local
+# in-plane up axis (local +Z; the object origin is the quad centre, no
+# parent). The P1-9 bezel lips + back-body are built from SCREEN.matrix_world
+# below, so they follow the reshape automatically. This opens the rest-pose
+# stack band fy ~0.10..0.20 for the start/hazard row (section 5).
+_scr_m = SCREEN.matrix_world.copy()
+_scr_up = (_scr_m.to_3x3() @ Vector((0.0, 0.0, 1.0))).normalized()
+_scr_top = _scr_m @ Vector((0.0, 0.0, 0.094))        # top-edge centre (world)
+_scr_half = (_scr_top.z - (0.360 + 0.55)) / _scr_up.z / 2.0
+assert 0.030 < _scr_half < 0.050, f"glass reshape out of band: {_scr_half:.4f}"
+SCREEN.scale.z *= _scr_half / 0.094
+SCREEN.location = _scr_top - _scr_up * _scr_half
+bpy.context.view_layer.update()
+print(f"C2 fix1a: screen_center bottom 0.2535 -> 0.360 "
+      f"(half {_scr_half:.4f}, scale.z {SCREEN.scale.z:.4f})")
+
 
 def build_stack():
     zf = 0.664                                    # prow face, in front of glass
     y0, y1 = 0.245, 0.295
     zback = dash_z(0, 0.22, 0.75)
-    # gloss prow body: face panel + return to the stack face (return top capped
-    # at y 0.253 so it never pokes through the glass plane; glass bottom 0.2535)
+    # gloss prow body: face panel + return to the stack face (return top kept
+    # at y 0.253: below the rest-pose prow cut, so the shelf stays invisible
+    # now that the C2 glass reshape lifted the glass bottom to 0.355)
     box(SH, (-0.20, y0, zf), (0.20, y1, zf + 0.012), MGLS)
     box(SH, (-0.20, y0, zf + 0.012), (0.20, 0.253, zback + 0.01), MGLS)
     # gloss ledge under the glass, ending BEFORE the canted glass plane (0.675+)
@@ -738,8 +780,9 @@ def build_console():
     annulus(SH, (0.0, 0.3105, 0.43), (0, 1, 0), 0.033, 0.026, 0.0015, 12, MALU)
     cyl(SH, (0.0, 0.310, 0.43), (0.0, 0.328, 0.43), 0.0255, 0.013, 12, MDARK,
         cap0=False, cap1=False)
-    # EPB bezel plate (switch itself = hotspot_parking_brake)
-    box(SH, (0.071, 0.3105, 0.328), (0.115, 0.3135, 0.372), MALU)
+    # EPB bezel plate (switch itself = hotspot_parking_brake) — C2 fix 2:
+    # moved forward with the switch, z 0.35 -> 0.50 (rest-frame visibility)
+    box(SH, (0.071, 0.3105, 0.478), (0.115, 0.3135, 0.522), MALU)
     # wireless-pad slant in the front recess (z 0.52-0.55)
     obox(SH, (0.0, 0.3155, 0.524), (1, 0, 0), (0, 0.966, -0.259),
          (0.055, 0.0035, 0.026), MDARK)
@@ -943,16 +986,35 @@ build_wheel_dress()
 # 5. Hotspot control meshes (doc 69: separate named nodes, kept out of the
 #    dash bake) — rebuilds + the P2-1 node raises
 # ============================================================================
-# P2-1: RAISE the selector/EPB nodes onto the new bridge deck. The SAME COMMIT
-# must sync platform/src/components/sim/vitok/hotspots.ts: gear (0,0.32,0.43),
-# park brake (0.093,0.315,0.35) — doc 73 §4 P2-1.
+# P2-1: RAISE the selector/EPB nodes onto the new bridge deck; C2 fix 2 moves
+# the EPB FORWARD (z 0.35 -> 0.50, see header: right-glance-in is impossible,
+# rest-frame-in is the honest fix). C2 fix 1b moves start/hazard down to row
+# y 0.316 and mounts each button base FLUSH on the RAYCAST stack wall
+# (rotations kept — the v1 button meshes are authored in the raked local
+# frame; base = node + 0.0066 along the rake normal, halo lands ~2 mm proud
+# of the wall). The SAME COMMIT must sync
+# platform/src/components/sim/vitok/hotspots.ts: gear (0,0.32,0.43), park
+# brake (0.093,0.315,0.50), engine start / hazard at the printed positions.
 sel_ob = D.objects["hotspot_gear_selector"]
 sel_ob.location = B((0.0, 0.32, 0.43))
 sel_ob.rotation_euler = (0.0, 0.0, 0.0)
 epb_ob = D.objects["hotspot_parking_brake"]
-epb_ob.location = B((0.093, 0.315, 0.35))
+epb_ob.location = B((0.093, 0.315, 0.50))
 epb_ob.rotation_euler = (0.0, 0.0, 0.0)
+_sta_wall = dash_z(0.095, 0.316, 0.7118)
+_haz_wall = dash_z(0.0, 0.316, 0.7118)
+STA_POS = (0.095, 0.316, max(_sta_wall - 0.0066, 0.700))
+HAZ_POS = (0.0, 0.316, max(_haz_wall - 0.0066, 0.700))
+assert 0.69 <= STA_POS[2] <= 0.745 and 0.69 <= HAZ_POS[2] <= 0.745, \
+    f"start/hazard wall probe out of band: {_sta_wall:.4f}/{_haz_wall:.4f}"
+sta_ob = D.objects["hotspot_engine_start"]
+sta_ob.location = B(STA_POS)
+haz_ob = D.objects["hotspot_hazard"]
+haz_ob.location = B(HAZ_POS)
 bpy.context.view_layer.update()
+print(f"C2 fix1b: start ({STA_POS[0]:.4f},{STA_POS[1]:.4f},{STA_POS[2]:.4f}) "
+      f"hazard ({HAZ_POS[0]:.4f},{HAZ_POS[1]:.4f},{HAZ_POS[2]:.4f}) "
+      f"walls {_sta_wall:.4f}/{_haz_wall:.4f}")
 
 SEL = Acc("hotspot_gear_selector")      # DSG stubby: shaft + knob, top y 0.345
 cyl(SEL, (0.0, 0.314, 0.43), (0.0, 0.331, 0.43), 0.0105, 0.0125, 10, MDARK)
@@ -962,11 +1024,13 @@ obox(SEL, (0.0, 0.3335, 0.43), (1, 0, 0), (0, 1, 0), (0.0215, 0.0016, 0.0275), M
 box(SEL, (-0.004, 0.3355, 0.4015), (0.004, 0.3415, 0.4035), MEM)   # P glyph dot
 SEL.mark("P2-1 selector knob")
 
-EPB = Acc("hotspot_parking_brake")      # 20x40 rocker, top y 0.325, P glyph
-box(EPB, (0.083, 0.3145, 0.332), (0.103, 0.3225, 0.368), MDARK)
-obox(EPB, (0.093, 0.3235, 0.339), (0, 0, 1), (0, 1, 0.35), (0.0095, 0.0022, 0.0075), MDARK)
-box(EPB, (0.0895, 0.3226, 0.3505), (0.0965, 0.3242, 0.3575), MEM)  # P glyph
-EPB.mark("P2-1 EPB switch")
+EPB = Acc("hotspot_parking_brake")      # C2 fix 2: 20x36 base at z 0.50 with a
+# taller VW pull-tab (crest y 0.334) so the crest breaks the rest frame bottom
+# (fy ~0.03-0.05 at z 0.50); P glyph rides the crest top face
+box(EPB, (0.083, 0.3145, 0.482), (0.103, 0.3225, 0.518), MDARK)
+obox(EPB, (0.093, 0.328, 0.489), (0, 0, 1), (0, 1, 0.35), (0.0095, 0.006, 0.0075), MDARK)
+box(EPB, (0.0895, 0.3338, 0.4855), (0.0965, 0.3352, 0.4925), MEM)  # P glyph
+EPB.mark("P2-1 EPB switch (C2 fwd)")
 
 BLT = Acc("hotspot_belt")               # P3-2: buckle head + 200 mm stalk
 obox(BLT, (0.140, -0.02, -0.207), (0.05, 1, 0.15), (1, -0.05, 0), (0.0125, 0.075, 0.007), MDARK)
@@ -975,9 +1039,9 @@ box(BLT, (0.124, 0.102, -0.230), (0.146, 0.1085, -0.206), MACC)    # red button
 box(BLT, (0.126, 0.070, -0.240), (0.144, 0.084, -0.236), MDARK)    # tongue slot
 BLT.mark("P3-2 belt buckle")
 
-# P1-12/13/14 dressing appended to the EXISTING control meshes (see header
-# note: start/hazard are occluded by the v2-dropped centre screen; built
-# anyway so a future screen fix reveals them at zero geometry cost)
+# P1-12/13/14 dressing appended to the EXISTING control meshes at the C2
+# fix-1 positions (nodes moved in section 5; the glass reshape opened the
+# rest-pose band fy 0.10..0.19 that the halo + triangle now land in)
 _STACK_N = Vector((0, 0.334, -0.943)).normalized()   # measured stack rake
 
 FOG = Acc("hotspot_fog")                # icon dot on the switch top face
@@ -987,14 +1051,14 @@ obox(FOG, tuple(_fc), (1, 0, 0), tuple(_fog_n), (0.008, 0.0012, 0.002), MEM)
 FOG.mark("P1-12 fog icon dot")
 
 STA = Acc("hotspot_engine_start")       # halo ring at the start-button root
-_sc = Vector((0.095, 0.34, 0.757)) - _STACK_N * 0.005
+_sc = Vector(STA_POS) - _STACK_N * 0.005
 annulus(STA, tuple(_sc), tuple(-_STACK_N), 0.0265, 0.0235, 0.003, 14, MEM)
 STA.mark("P1-13 start halo")
 
 HAZ = Acc("hotspot_hazard")             # red triangle ridge on the cap
 _u = Vector((1, 0, 0))
 _v = _u.cross(_STACK_N).normalized()                 # up-ish in the cap plane
-_hc = Vector((0, 0.338, 0.752)) + _STACK_N * 0.011
+_hc = Vector(HAZ_POS) + _STACK_N * 0.011
 _tri = [_hc + _u * -0.0075 + _v * -0.0045,
         _hc + _u * 0.0075 + _v * -0.0045,
         _hc + _v * 0.0085]
