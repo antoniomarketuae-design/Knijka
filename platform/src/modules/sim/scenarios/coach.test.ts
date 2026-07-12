@@ -57,6 +57,33 @@ describe("teach-first-then-grade coach", () => {
     });
     expect(second.decision.mode).toBe("grade");
   });
+
+  it("C3: a Wave-1 code walks the full ladder — teach, ×1.0, ×1.5, ×2.0 (capped)", () => {
+    // ENGINE_STALLED is unmapped (keyed by its own code) and второстепенна:
+    // the first stall is a free warning; repeats grade and escalate on the
+    // training layer while official points stay catalog-fixed.
+    const seq = coachSession([
+      { code: "ENGINE_STALLED", severityClass: "vtorostepenna" },
+      { code: "ENGINE_STALLED", severityClass: "vtorostepenna" },
+      { code: "ENGINE_STALLED", severityClass: "vtorostepenna" },
+      { code: "ENGINE_STALLED", severityClass: "vtorostepenna" },
+      { code: "ENGINE_STALLED", severityClass: "vtorostepenna" },
+    ]);
+    expect(seq[0]).toMatchObject({ scenarioId: null, mode: "teach", penaltyMultiplier: 0 });
+    expect(seq[1]).toMatchObject({ mode: "grade", penaltyMultiplier: 1 });
+    expect(seq[2]).toMatchObject({ mode: "grade", penaltyMultiplier: 1.5 });
+    expect(seq[3]).toMatchObject({ mode: "grade", penaltyMultiplier: 2 });
+    expect(seq[4]).toMatchObject({ mode: "grade", penaltyMultiplier: 2 }); // capped
+  });
+
+  it("C3: an unmapped Wave-1 основна teaches first, then grades (library default)", () => {
+    const seq = coachSession([
+      { code: "HARSH_BRAKING_NO_CAUSE", severityClass: "osnovna" },
+      { code: "HARSH_BRAKING_NO_CAUSE", severityClass: "osnovna" },
+    ]);
+    expect(seq[0]).toMatchObject({ scenarioId: null, mode: "teach", scored: false });
+    expect(seq[1]).toMatchObject({ mode: "grade", scored: true, penaltyMultiplier: 1 });
+  });
 });
 
 describe("A12 warn-once floor for второстепенни", () => {

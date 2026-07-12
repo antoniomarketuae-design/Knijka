@@ -111,12 +111,31 @@ export interface RuleEngineState {
   stall: EpisodeState;
   /** Halted with the nose past a red-controlled stop line (JU-15). */
   stopOvershoot: EpisodeState;
+  /**
+   * C3 lawful-presence latch: the vehicle was at/near this stop line while
+   * the light was GREEN (queue creep, or crossing legally when the phase
+   * flipped). While latched, a later red must not convict the stranded car —
+   * it arrived lawfully (FP case: "green-queue creep caught by the flip").
+   * Cleared only on physical departure from the line window.
+   */
+  stopOvershootGreenSeen: boolean;
   /** Sustained ride on the осева линия toward oncoming (SN-03). */
   centerLine: EpisodeState;
   /** Stationary at a green light with a clear box (JU-09). */
   hesitation: EpisodeState;
-  /** Causeless harsh braking — episode with onset-speed memory (SP-11). */
-  harshBrake: { activeSince: number | null; emitted: boolean; onsetKmh: number };
+  /**
+   * Causeless harsh braking — episode with onset-speed memory (SP-11).
+   * `causeSeen` (C3): a plausible cause observed at ANY point of the current
+   * continuous braking episode exempts the WHOLE episode — a cause that
+   * evaporates mid-stop (lead brake-checks then floors it) must not convert
+   * the tail of a justified stop into a phantom (sticky-cause ledger).
+   */
+  harshBrake: {
+    activeSince: number | null;
+    emitted: boolean;
+    onsetKmh: number;
+    causeSeen: boolean;
+  };
   /** First-move-off observation check (PK-05; config-gated). */
   moveOff: { restSeen: boolean; done: boolean };
   /** Last time a hazard-shaped tick event was seen (harsh-brake exemption). */
@@ -152,9 +171,10 @@ export function createRuleEngine(config?: Partial<RuleEngineConfig>): RuleEngine
     cleanDistanceM: 0,
     stall: { ...IDLE_EPISODE },
     stopOvershoot: { ...IDLE_EPISODE },
+    stopOvershootGreenSeen: false,
     centerLine: { ...IDLE_EPISODE },
     hesitation: { ...IDLE_EPISODE },
-    harshBrake: { activeSince: null, emitted: false, onsetKmh: 0 },
+    harshBrake: { activeSince: null, emitted: false, onsetKmh: 0, causeSeen: false },
     moveOff: { restSeen: false, done: false },
     lastHazardEventAt: null,
   };
@@ -508,25 +528,51 @@ export function reduceTick(prev: RuleEngineState, tick: SimTick): ReduceResult {
   // Stop position at red (JU-15): halted with the nose past the line/on the
   // zebra while the light forbids entry. The center never crossed (that would
   // be RED_LIGHT_CROSSED via the sweep) — this is the invisible-today overshoot.
+  //
+  // C3 lawful-presence latch: being at/near the line window while the light is
+  // GREEN (queue creep on green, or the phase flipping over a stranded queue)
+  // marks the presence as lawful — the code charges HOW YOU ARRIVED, not where
+  // a red caught you. The latch clears only on physical departure, which also
+  // kills the refire loop (one stranding, two red cycles = one violation, and
+  // only when the arrival itself was under a forbidding light).
+  const inOvershootWindow =
+    tick.nextStopLineControl === "trafficLight" &&
+    tick.nextStopLineM !== undefined &&
+    tick.nextStopLineM <= cfg.stopOvershootCenterM + 2;
+  const overshootDeparted =
+    tick.nextStopLineM === undefined || tick.nextStopLineM > cfg.stopOvershootCenterM + 2;
+  if (inOvershootWindow && tick.nextStopLineState === "green") {
+    s.stopOvershootGreenSeen = true;
+  } else if (overshootDeparted) {
+    s.stopOvershootGreenSeen = false;
+  }
   const overLineAtRed =
     tick.nextStopLineControl === "trafficLight" &&
     (tick.nextStopLineState === "red" || tick.nextStopLineState === "redYellow") &&
     tick.nextStopLineM !== undefined &&
     tick.nextStopLineM <= cfg.stopOvershootCenterM &&
     speed <= cfg.fullStopMaxSpeedKmh &&
+    !s.stopOvershootGreenSeen &&
     forwardGear;
-  const overshootDeparted =
-    tick.nextStopLineM === undefined ||
-    tick.nextStopLineM > cfg.stopOvershootCenterM + 2 ||
-    tick.nextStopLineState === "green";
-  if (stepEpisode(s.stopOvershoot, overLineAtRed, overshootDeparted, t, cfg.stopOvershootRestSec)) {
+  if (
+    stepEpisode(
+      s.stopOvershoot,
+      overLineAtRed,
+      overshootDeparted || tick.nextStopLineState === "green",
+      t,
+      cfg.stopOvershootRestSec,
+    )
+  ) {
     events.push(makeViolation("STOP_LINE_OVERSHOOT", t));
   }
 
   // Hesitation at green (JU-09 — „закъснели действия"): stationary at the
   // light, green for the whole sustain, box clear (no lead vehicle near), no
   // declared turn (an indicator = lawfully waiting for a gap/pedestrians),
-  // and no armed crossing zone (stragglers finishing their crossing).
+  // no armed crossing zone (stragglers finishing their crossing), and the
+  // engine RUNNING — a stall at the green is already billed as
+  // ENGINE_STALLED; charging the restart seconds again as hesitation would
+  // double-bill one act (C3 FP case: "stalled at the green").
   const hesitating =
     tick.nextStopLineControl === "trafficLight" &&
     tick.nextStopLineState === "green" &&
@@ -536,6 +582,7 @@ export function reduceTick(prev: RuleEngineState, tick: SimTick): ReduceResult {
     tick.indicator === "off" &&
     (leadGapM === null || leadGapM > cfg.hesitationClearGapM) &&
     s.crossing === null &&
+    tick.stalled !== true &&
     forwardGear;
   if (stepEpisode(s.hesitation, hesitating, !hesitating, t, cfg.hesitationSustainSec)) {
     events.push(makeViolation("HESITATION_AT_GREEN", t));
@@ -549,8 +596,24 @@ export function reduceTick(prev: RuleEngineState, tick: SimTick): ReduceResult {
   //  - no hazard-shaped tick event in the recent past (ledger above),
   //  - on the normal driving line (not recovering from a excursion),
   //  - onset from real speed, emergency-grade decel, sustained.
+  // C3 additions to the cause ledger:
+  //  - a FORBIDDING (non-green) light visible ahead is a cause at any
+  //    distance the runtime watches — braking for a fresh amber flip 70 m out
+  //    is a response, not a phantom;
+  //  - a lead gap CLOSING fast is a cause at any distance — a lead braking
+  //    hard 50 m ahead is exactly what must be responded to.
+  const signalAheadForbids =
+    tick.nextStopLineControl === "trafficLight" &&
+    tick.nextStopLineState !== undefined &&
+    tick.nextStopLineState !== "green" &&
+    tick.nextStopLineM !== undefined &&
+    tick.nextStopLineM <= cfg.harshBrakeSignalCauseM;
+  const leadClosingFast =
+    leadGapM !== null && gapOpeningMps <= -cfg.harshBrakeClosingLeadMps;
   const noBrakeCause =
     (leadGapM === null || leadGapM > cfg.harshBrakeClearLeadGapM) &&
+    !leadClosingFast &&
+    !signalAheadForbids &&
     s.crossing === null &&
     (tick.nextStopLineM === undefined || tick.nextStopLineM > cfg.harshBrakeStopLineClearM) &&
     (tick.nextJunctionM === undefined || tick.nextJunctionM > cfg.harshBrakeJunctionClearM) &&
@@ -559,7 +622,14 @@ export function reduceTick(prev: RuleEngineState, tick: SimTick): ReduceResult {
     tick.wrongWay !== true &&
     forwardGear;
   const harshDecel = dt > 0 && accelMps2 <= -cfg.harshBrakeDecelMps2;
-  if (harshDecel && noBrakeCause) {
+  // Sticky-cause ledger (C3): a cause observed at any point of ONE continuous
+  // braking episode (pedal never released) exempts the whole episode — a lead
+  // that brake-checks and then floors it must not convert the tail of the
+  // justified stop into a phantom. Resets on pedal release.
+  if (accelMps2 <= -2 && !noBrakeCause) {
+    s.harshBrake.causeSeen = true;
+  }
+  if (harshDecel && noBrakeCause && !s.harshBrake.causeSeen) {
     if (s.harshBrake.activeSince === null) {
       s.harshBrake.activeSince = t;
       s.harshBrake.onsetKmh = s.prevSpeedKmh ?? speed;
@@ -576,6 +646,7 @@ export function reduceTick(prev: RuleEngineState, tick: SimTick): ReduceResult {
     // Pedal released (or a cause appeared and braking eased) — re-arm.
     s.harshBrake.activeSince = null;
     s.harshBrake.emitted = false;
+    s.harshBrake.causeSeen = false;
   } else {
     // Still braking but a plausible cause exists now — never fire this episode.
     s.harshBrake.activeSince = null;

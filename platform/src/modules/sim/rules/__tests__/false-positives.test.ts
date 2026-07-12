@@ -716,6 +716,21 @@ describe("FP battery — stop position at red (STOP_LINE_OVERSHOOT)", () => {
     );
     expectInnocent(events);
   });
+
+  it("regression: green-queue creep to the line, light flips red while standing", () => {
+    // Innocent: rolled up tight to the line ON GREEN behind a queue (lawful
+    // entry), then the phase cycles to red over the stranded car. The code
+    // charges HOW YOU ARRIVED, not where a red caught you. Locked in the C3
+    // lawful-presence latch (stopOvershootGreenSeen).
+    const { events } = drive([
+      tick(0, { speedKmh: 12, nextStopLineM: 12, nextStopLineControl: "trafficLight", nextStopLineState: "green", leadGapM: 8 }),
+      tick(1, { speedKmh: 6, nextStopLineM: 6, nextStopLineControl: "trafficLight", nextStopLineState: "green", leadGapM: 6 }),
+      tick(2, { speedKmh: 3, nextStopLineM: 2, nextStopLineControl: "trafficLight", nextStopLineState: "green", leadGapM: 5 }),
+      tick(3, { speedKmh: 0.5, nextStopLineM: 0.8, nextStopLineControl: "trafficLight", nextStopLineState: "green", leadGapM: 5 }),
+      ...cruise(4, 10, { speedKmh: 0.4, nextStopLineM: 0.8, nextStopLineControl: "trafficLight", nextStopLineState: "red", leadGapM: 5 }),
+    ]);
+    expectInnocent(events);
+  });
 });
 
 describe("FP battery — center line (CENTER_LINE_TOUCHED)", () => {
@@ -761,6 +776,26 @@ describe("FP battery — center line (CENTER_LINE_TOUCHED)", () => {
         tick(t, { speedKmh: 6, gear: -1, oneway: false, laneCount: 1, laneId: 0, laneOffsetM: 4.2 }),
       ),
     );
+    expectInnocent(events);
+  });
+
+  it("regression: unsignalled ~3 s pass around a parked car blocking the lane", () => {
+    // Innocent: a delivery van blocks the lane; the driver eases over the
+    // center and back in one ~3 s arc. On streets lined with parked cars the
+    // usable corridor IS at/over the nominal center — a single avoidance arc
+    // is not line-riding. Locked in centerLineSustainSec = 3.5 (was 2, which
+    // fired mid-avoidance). The lazy block-long straddle still fires (see
+    // wave1-detectors.test.ts). C3 ruling: a LONG unsignalled occupation
+    // stays guilty — чл. 25 wants заобикаляне signalled; the sustain window
+    // only shields the brief arc.
+    const { events } = drive([
+      tick(0, { speedKmh: 30, oneway: false, laneCount: 1, laneId: 0, laneOffsetM: 0.3 }),
+      tick(1, { speedKmh: 28, oneway: false, laneCount: 1, laneId: 0, laneOffsetM: 3.5 }),
+      tick(2, { speedKmh: 28, oneway: false, laneCount: 1, laneId: 0, laneOffsetM: 3.6 }),
+      tick(3, { speedKmh: 28, oneway: false, laneCount: 1, laneId: 0, laneOffsetM: 3.5 }),
+      tick(4, { speedKmh: 30, oneway: false, laneCount: 1, laneId: 0, laneOffsetM: 0.4 }),
+      tick(5, { speedKmh: 32, oneway: false, laneCount: 1, laneId: 0, laneOffsetM: 0.2 }),
+    ]);
     expectInnocent(events);
   });
 });
@@ -827,6 +862,41 @@ describe("FP battery — causeless harsh brake (HARSH_BRAKING_NO_CAUSE)", () => 
       tick(0.5, { speedKmh: 34, nextJunctionM: 30 }),
       tick(1, { speedKmh: 20, nextJunctionM: 27 }),
       tick(2, { speedKmh: 30, nextJunctionM: 15 }),
+    ]);
+    expectInnocent(events);
+  });
+
+  it("regression: amber flip at 70 m + lead braking 50 m ahead — causes just outside the old gates", () => {
+    // Innocent: the light flips to yellow 70 m out (beyond the 60 m stop-line
+    // gate) AND the lead brakes from 50 m (beyond the 45 m lead gate); the
+    // student responds to both with an emergency-grade stop. Two near-causes,
+    // each a hair outside its window, are still an obvious cause. Locked in
+    // harshBrakeSignalCauseM (any visible non-green light is a cause) and
+    // harshBrakeClosingLeadMps (a fast-closing lead is a cause at any range).
+    const { events } = drive([
+      tick(0, { speedKmh: 55, leadGapM: 52, nextStopLineM: 74, nextStopLineControl: "trafficLight", nextStopLineState: "green" }),
+      tick(0.5, { speedKmh: 55, leadGapM: 50, nextStopLineM: 70, nextStopLineControl: "trafficLight", nextStopLineState: "yellow" }),
+      tick(1, { speedKmh: 41, leadGapM: 49, nextStopLineM: 66, nextStopLineControl: "trafficLight", nextStopLineState: "yellow" }),
+      tick(1.5, { speedKmh: 27, leadGapM: 49.5, nextStopLineM: 62, nextStopLineControl: "trafficLight", nextStopLineState: "yellow" }),
+      tick(2, { speedKmh: 14, leadGapM: 51, nextStopLineM: 60, nextStopLineControl: "trafficLight", nextStopLineState: "red" }),
+      tick(3, { speedKmh: 0.5, leadGapM: 53, nextStopLineM: 59, nextStopLineControl: "trafficLight", nextStopLineState: "red" }),
+    ]);
+    expectInnocent(events);
+  });
+
+  it("regression: lead brake-checks then accelerates away mid-stop (sticky cause)", () => {
+    // Innocent: the lead slams (gap collapses 30→14 — a plain cause), the
+    // student commits to a hard stop, the lead floors it and the gap balloons
+    // past the clear gate WHILE the stop is still finishing. A cause observed
+    // during one continuous braking episode exempts the whole episode.
+    // Locked in the harshBrake.causeSeen sticky-cause ledger.
+    const { events } = drive([
+      tick(0, { speedKmh: 55, leadGapM: 30 }),
+      tick(0.5, { speedKmh: 48, leadGapM: 20 }),
+      tick(1, { speedKmh: 36, leadGapM: 14 }),
+      tick(1.5, { speedKmh: 22, leadGapM: 30 }),
+      tick(2, { speedKmh: 9, leadGapM: 48 }),
+      tick(2.5, { speedKmh: 0.5, leadGapM: 60 }),
     ]);
     expectInnocent(events);
   });

@@ -46,6 +46,14 @@ export type SimTickEvent =
    * whether a comfortable stop was possible at the green→yellow flip
    * (distance/speed snapshot vs reaction + comfortable-decel physics).
    * Absent = unknown → the reducer stays silent (conservative, A12).
+   *
+   * CONTRACT (C3 ruling — the tailgater defence): `stoppable: true` must mean
+   * a COMFORTABLE stop was possible (гентle decel + full reaction time + a
+   * safety margin — worldRuntime uses 3 m/s², 1 s, ×1.15), never merely a
+   * physically possible one. A stop any FOLLOWER could also match is the bar:
+   * that comfort margin is exactly what makes "I had a tailgater" a non-
+   * defence — a follower at any legal-ish gap can match a 3 m/s² stop. An
+   * adjudicator that cannot guarantee this must omit the field (= innocent).
    */
   | {
       kind: "stopLineCrossed";
@@ -434,8 +442,12 @@ export interface RuleEngineConfig {
 
   /** Seconds of riding the center line (two-way road, leftmost lane, offset
    * beyond laneKeepMaxOffsetM toward oncoming, indicator off) before
-   * CENTER_LINE_TOUCHED fires. Shorter than the generic lane-keep sustain —
-   * the specific code wins and suppresses the generic one (no double-bill). */
+   * CENTER_LINE_TOUCHED fires. C3: was 2 — an unsignalled single-obstacle
+   * avoidance (easing around a parked van, ~3 s over the line) fired as
+   * line-riding (FP case: "unsignalled pass around a parked car"). 3.5 s
+   * tolerates one avoidance arc; the lazy block-long straddle the code
+   * targets still fires. The specific code keeps suppressing the generic
+   * lane-keeping episode while armed (no double-bill). */
   centerLineSustainSec: number;
 
   /** Deceleration (m/s², positive) at/above which braking counts as harsh. */
@@ -451,6 +463,16 @@ export interface RuleEngineConfig {
   harshBrakeStopLineClearM: number;
   /** A junction within this distance is a plausible cause, m. */
   harshBrakeJunctionClearM: number;
+  /** C3: a FORBIDDING (non-green) traffic light ahead within this distance is
+   * a plausible cause at any speed — braking for a visible yellow/red is a
+   * response, not a phantom (FP case: "amber flip at 70 m", just outside the
+   * 60 m stop-line gate). Matches the runtime's line watch window. */
+  harshBrakeSignalCauseM: number;
+  /** C3: a lead gap CLOSING at/above this rate (m/s) is a plausible cause at
+   * any distance — a lead braking hard 50 m ahead at speed closes fast and
+   * is exactly what the driver must respond to (FP case: "amber flip + lead
+   * brake coincide, each just outside its gate"). */
+  harshBrakeClosingLeadMps: number;
   /** Any hazard-shaped tick event (crossing zone, priority situation,
    * collision) within this many seconds exempts hard braking, s. */
   harshBrakeHazardCooldownSec: number;
@@ -535,13 +557,16 @@ export const DEFAULT_RULE_CONFIG: RuleEngineConfig = {
   moveOffLookbackSec: 7,
   stopOvershootCenterM: 1.2, // nose ≥ ~1 m over the paint before it counts
   stopOvershootRestSec: 0.7,
-  centerLineSustainSec: 2,
+  // C3: was 2 — fired on an unsignalled ~3 s obstacle avoidance (see interface).
+  centerLineSustainSec: 3.5,
   harshBrakeDecelMps2: 7, // emergency-grade only; a firm 4–5 m/s² stop never fires
   harshBrakeMinSpeedKmh: 35,
   harshBrakeSustainSec: 0.4,
   harshBrakeClearLeadGapM: 45,
   harshBrakeStopLineClearM: 60,
   harshBrakeJunctionClearM: 35,
+  harshBrakeSignalCauseM: 120, // C3: any visible yellow/red ahead is a cause
+  harshBrakeClosingLeadMps: 3, // C3: fast-closing lead = cause at any distance
   harshBrakeHazardCooldownSec: 6,
   hesitationSustainSec: 5, // DVSA marks ~3 s; we grade only a clear freeze
   hesitationMaxLineDistM: 12,

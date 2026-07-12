@@ -27,6 +27,26 @@ describe("violation catalog integrity", () => {
     expect(terminating).toEqual(["COLLISION"]);
   });
 
+  it("C3/A14: every Wave-1 code links a knowledge-graph concept", () => {
+    // The sim→theory recommendation loop needs the link; a Wave-1 code
+    // without a conceptId ships a dead end (CENTER_LINE_TOUCHED was one —
+    // wired to c-longitudinal-markings, осевата линия being a надлъжна
+    // маркировка).
+    const wave1 = [
+      "ENGINE_STALLED",
+      "MOVE_OFF_WITHOUT_OBSERVATION",
+      "STOP_LINE_OVERSHOOT",
+      "CENTER_LINE_TOUCHED",
+      "HARSH_BRAKING_NO_CAUSE",
+      "HESITATION_AT_GREEN",
+      "YELLOW_LIGHT_NOT_STOPPED",
+      "RED_YELLOW_CROSSED",
+    ] as const;
+    for (const code of wave1) {
+      expect(VIOLATIONS[code].conceptId, code).toBeDefined();
+    }
+  });
+
   it("every linked conceptId exists in the knowledge graph (content/concepts.json)", () => {
     const conceptsPath = path.resolve(
       path.dirname(fileURLToPath(import.meta.url)),

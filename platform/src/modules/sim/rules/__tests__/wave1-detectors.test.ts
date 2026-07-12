@@ -43,6 +43,21 @@ describe("ENGINE_STALLED (VP-04 — загасване)", () => {
     ]);
     expect(violationsOf(events, "ENGINE_STALLED")).toHaveLength(2);
   });
+
+  it("C3 ruling: three stalls in a move-off practice drill are three второстепенни", () => {
+    // Deliberate restart practice still bills each stall — Наредба № 38
+    // counts every загасване. The trust story lives one layer up: the code
+    // is второстепенна, so the A12 warn-once floor teaches the FIRST stall
+    // free (coach.test.ts sweeps that for every 1-point code).
+    const { events } = drive([
+      tick(0, { speedKmh: 2, stalled: true }),
+      tick(2, { speedKmh: 0, stalled: false }),
+      tick(4, { speedKmh: 3, stalled: true }),
+      tick(6, { speedKmh: 0, stalled: false }),
+      tick(8, { speedKmh: 2, stalled: true }),
+    ]);
+    expect(violationsOf(events, "ENGINE_STALLED")).toHaveLength(3);
+  });
 });
 
 describe("MOVE_OFF_WITHOUT_OBSERVATION (PK-05 — потегляне без оглеждане)", () => {
@@ -98,6 +113,32 @@ describe("STOP_LINE_OVERSHOOT (JU-15 — спиране след линията)
   it("also fires on the red+yellow combination (entry still forbidden)", () => {
     const { events } = drive([
       ...cruise(0, 3, { ...overLine, nextStopLineState: "redYellow" }),
+    ]);
+    expect(violationsOf(events, "STOP_LINE_OVERSHOOT")).toHaveLength(1);
+  });
+
+  it("C3: one stranding across two red cycles bills exactly once", () => {
+    // Guilty arrival at red fires once; the green cycle passing over the
+    // still-stranded car must not re-arm a second bill on the next red (and
+    // the green presence marks it lawfully-arrived from then on).
+    const { events } = drive([
+      tick(0, { speedKmh: 20, nextStopLineM: 15, nextStopLineControl: "trafficLight", nextStopLineState: "red" }),
+      ...cruise(1, 6, { speedKmh: 0.5, nextStopLineM: 0.8, nextStopLineControl: "trafficLight", nextStopLineState: "red" }),
+      ...cruise(7, 12, { speedKmh: 0.5, nextStopLineM: 0.8, nextStopLineControl: "trafficLight", nextStopLineState: "green", leadGapM: 4 }),
+      ...cruise(13, 20, { speedKmh: 0.5, nextStopLineM: 0.8, nextStopLineControl: "trafficLight", nextStopLineState: "red", leadGapM: 4 }),
+    ]);
+    expect(violationsOf(events, "STOP_LINE_OVERSHOOT")).toHaveLength(1);
+  });
+
+  it("C3 ruling: creeping past the line AT RED after a proper stop is still guilty", () => {
+    // Stopping correctly and then creeping the nose over the paint while the
+    // light is still red is exactly what examiners mark — the lawful-presence
+    // latch only protects arrivals under green.
+    const { events } = drive([
+      tick(0, { speedKmh: 15, nextStopLineM: 10, nextStopLineControl: "trafficLight", nextStopLineState: "red" }),
+      ...cruise(1, 3, { speedKmh: 0.5, nextStopLineM: 2.5, nextStopLineControl: "trafficLight", nextStopLineState: "red" }),
+      tick(4, { speedKmh: 3, nextStopLineM: 1.5, nextStopLineControl: "trafficLight", nextStopLineState: "red" }),
+      ...cruise(5, 8, { speedKmh: 0.5, nextStopLineM: 0.9, nextStopLineControl: "trafficLight", nextStopLineState: "red" }),
     ]);
     expect(violationsOf(events, "STOP_LINE_OVERSHOOT")).toHaveLength(1);
   });
@@ -190,6 +231,23 @@ describe("HESITATION_AT_GREEN (JU-09 — закъснели действия)", 
     ]);
     expect(violationsOf(events, "HESITATION_AT_GREEN")).toHaveLength(2);
   });
+
+  it("C3: a stall at the green bills as the stall — not ALSO as hesitation", () => {
+    // One act, one code: the ~8 s freeze is caused by the stall (already a
+    // второстепенна); charging the restart seconds again as закъснели
+    // действия would double-bill. After the restart the hesitation clock
+    // starts fresh.
+    const { events } = drive([
+      ...cruise(0, 4, { ...waiting, nextStopLineState: "red" }),
+      tick(5, { ...waiting, speedKmh: 0.5, stalled: true }),
+      ...cruise(6, 12, { ...waiting, speedKmh: 0.4, stalled: true }),
+      tick(13, { ...waiting, speedKmh: 0.4, stalled: false }),
+      tick(14, { speedKmh: 6, nextStopLineM: 3, nextStopLineControl: "trafficLight", nextStopLineState: "green" }),
+      tick(15, { speedKmh: 15 }),
+    ]);
+    expect(violationsOf(events, "ENGINE_STALLED")).toHaveLength(1);
+    expect(violationsOf(events, "HESITATION_AT_GREEN")).toHaveLength(0);
+  });
 });
 
 describe("YELLOW_LIGHT_NOT_STOPPED / RED_YELLOW_CROSSED (JU-06 / JU-08)", () => {
@@ -230,5 +288,36 @@ describe("YELLOW_LIGHT_NOT_STOPPED / RED_YELLOW_CROSSED (JU-06 / JU-08)", () => 
       }),
     ]);
     expect(codes(events)).toContain("RED_LIGHT_CROSSED");
+  });
+
+  it("C3 ruling: a creeping-queue entry on red+yellow is still the основна", () => {
+    // Following the queue across the line while the combination shows is
+    // потегляне на червено и жълто — examiners mark it; teach-first softens
+    // the first encounter, the code stays guilty.
+    const { events } = drive([
+      tick(0, { speedKmh: 4, leadGapM: 6 }),
+      tick(1, {
+        speedKmh: 6,
+        leadGapM: 7,
+        events: [{ kind: "stopLineCrossed", control: "trafficLight", lightState: "redYellow" }],
+      }),
+    ]);
+    expect(violationsOf(events, "RED_YELLOW_CROSSED")).toHaveLength(1);
+    expect(codes(events)).not.toContain("RED_LIGHT_CROSSED");
+  });
+
+  it("C3 ruling: yellow with stoppable=true stays guilty — the tailgater defence is priced into the adjudicator", () => {
+    // `stoppable: true` is only ever computed from COMFORTABLE-stop physics
+    // (3 m/s² + 1 s reaction + 15% margin, worldRuntime) — a stop any
+    // follower could match. A dilemma-zone entry where braking would be
+    // harsh computes stoppable=false and stays innocent (see the FP battery).
+    const { events } = drive([
+      tick(0, { speedKmh: 30 }),
+      tick(1, {
+        speedKmh: 30,
+        events: [{ kind: "stopLineCrossed", control: "trafficLight", lightState: "yellow", stoppable: true }],
+      }),
+    ]);
+    expect(violationsOf(events, "YELLOW_LIGHT_NOT_STOPPED")).toHaveLength(1);
   });
 });

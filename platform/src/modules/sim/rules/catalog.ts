@@ -312,6 +312,9 @@ export const VIOLATIONS: Record<ViolationCode, ViolationSpec> = {
     correctiveBg:
       "Дръж колата в средата на своята лента и гледай далеч напред. Ако се налага да пресечеш осевата линия (заобикаляне, изпреварване) — първо огледало и мигач, после маневра.",
     lawRef: "Наредба № 38 (второстепенни грешки — настъпване на осева линия)",
+    // C3/A14: осевата линия е надлъжна маркировка — link the mistake to the
+    // knowledge graph so sim slips drive theory recommendations.
+    conceptId: "c-longitudinal-markings",
   },
   HARSH_BRAKING_NO_CAUSE: {
     severityClass: "osnovna",

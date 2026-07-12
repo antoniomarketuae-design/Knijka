@@ -152,6 +152,37 @@ describe("examTerminationFor — the official limits", () => {
       tSec: 4,
     });
   });
+
+  it("C3: the Wave-1 основни count toward the > 6 fold like any other основна", () => {
+    // Three of the NEW основни (3 т. each): 9 total (≤ 9) but 9 from основни
+    // (> 6) → the third one trips the основни cap.
+    const events = [
+      makeViolation("YELLOW_LIGHT_NOT_STOPPED", 10),
+      makeViolation("RED_YELLOW_CROSSED", 20),
+      makeViolation("HARSH_BRAKING_NO_CAUSE", 30),
+    ];
+    expect(examTerminationFor(events)).toEqual({
+      reason: "osnovni-points-exceeded",
+      tSec: 30,
+    });
+  });
+
+  it("C3: the Wave-1 второстепенни count toward the > 9 total fold", () => {
+    // 2 new основни (6) + 3 new второстепенни (3) = 9 → legal; a 4th
+    // второстепенна (10 total) trips the total cap.
+    const events = [
+      makeViolation("YELLOW_LIGHT_NOT_STOPPED", 1),
+      makeViolation("RED_YELLOW_CROSSED", 2),
+      makeViolation("ENGINE_STALLED", 3),
+      makeViolation("STOP_LINE_OVERSHOOT", 4),
+      makeViolation("HESITATION_AT_GREEN", 5),
+    ];
+    expect(examTerminationFor(events)).toBeNull();
+    expect(examTerminationFor([...events, makeViolation("CENTER_LINE_TOUCHED", 6)])).toEqual({
+      reason: "total-points-exceeded",
+      tSec: 6,
+    });
+  });
 });
 
 // ---------------------------------------------------------------------------
