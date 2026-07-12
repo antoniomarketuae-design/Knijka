@@ -120,6 +120,16 @@ export interface SimTick {
   laneId: number;
   /** Lanes in the current travel direction (optional; absent = unknown/1). */
   laneCount?: number;
+  /**
+   * Stable id of the road segment `laneId` is numbered against (C1 revision).
+   * Lane ids are only comparable WITHIN one segment — crossing to a segment
+   * with a different lane count renumbers the same physical lane (see the
+   * laneId convention note above). When present, the lane-change detector
+   * only grades laneId deltas between frames on the SAME segment; absent =
+   * legacy engines with globally stable ids keep the old behaviour. `null`
+   * means off-road/unknown.
+   */
+  edgeId?: string | null;
   indicator: IndicatorState;
   headlights: HeadlightState;
   seatbeltOn: boolean;
@@ -325,6 +335,17 @@ export interface RuleEngineConfig {
   mirrorLookbackSec: number;
   /** Lane-id changes below this speed are ignored (parking shuffles, not lane changes). */
   laneChangeMinSpeedKmh: number;
+  /**
+   * C1 revision — lane-id deltas within this many seconds of a SEGMENT
+   * (edgeId) transition are lane-numbering artifacts, not maneuvers, and are
+   * never graded; deltas farther from a joint are held this long and only
+   * emitted if no transition follows. Near a joint the locator's projection
+   * sweeps the bank while the car corners (renumbering the same physical
+   * lane just before/after the lock switches edges) — the C1 exam-bank bot
+   * collected 2–4 phantom основни per drive at multi-lane joints. Only
+   * applies when the tick reports edgeId; legacy sources grade immediately.
+   */
+  laneChangeJointGraceSec: number;
 
   /** |laneOffsetM| beyond this (while moving) counts as straddling / off-centre. */
   laneKeepMaxOffsetM: number;
@@ -508,6 +529,8 @@ export const DEFAULT_RULE_CONFIG: RuleEngineConfig = {
   indicatorLookbackSec: 3,
   mirrorLookbackSec: 5,
   laneChangeMinSpeedKmh: 10,
+  laneChangeJointGraceSec: 1.5, // C1 — see the interface comment
+
 
   // ~straddling the lane line, scaled with the perceptual road width (base
   // 1.3 on a textbook 3.25 m lane → 3.25 on the 8.125 m drawn lane). The car

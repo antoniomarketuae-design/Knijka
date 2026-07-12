@@ -31,7 +31,7 @@ export {
 export { LANE_WIDTH_M, OFF_ROAD_DISTANCE_M } from "./spatial";
 export { SIGNAL_TIMING, phaseTimingInCycle, type SignalClusterInfo } from "./signals";
 export { CROSSING_ZONE_RADIUS_M, type PedestrianQuery } from "./zones";
-export { JUNCTION_AREA_RADIUS_M, TURN_THRESHOLD_DEG, TURN_WINDOW_SEC } from "./turns";
+export { JUNCTION_AREA_RADIUS_M, TURN_THRESHOLD_DEG, TURN_WINDOW_SEC, TurnDetector } from "./turns";
 export type { StopLine } from "./stoplines";
 export {
   buildMinimap,

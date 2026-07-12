@@ -72,6 +72,17 @@ export const RHR_CORE_RADIUS_M = 18;
 const RHR_MOVING_KMH = 3;
 /** At/below this speed while a conflict is present, the driver is yielding, km/h. */
 const RHR_YIELD_KMH = 8;
+/** Deceleration (m/s²) at/above which the driver counts as actively yielding
+ * to a priority conflict — no violation fires mid-braking-response (C1). */
+const YIELD_BRAKE_RESPONSE_MPS2 = 2.5;
+/** Seconds a barge condition must hold before it convicts — staged "late"/
+ * "tight" conflicts can be BORN with the driver already in the zone at
+ * speed; a human needs reaction time before the brake shows (C1). A real
+ * barger holds the condition far longer than this while crossing. */
+const YIELD_CONVICT_SUSTAIN_SEC = 0.9;
+/** Azimuth sweep around the roundabout centre that marks the vehicle as
+ * circulating (ring priority) — entry grading stands down after this (C1). */
+const RB_ON_RING_DEG = 35;
 /** How far beyond a roundabout's ring the entry-yield decision zone reaches,
  * meters (entry mouths widened with the perceptual road scale). */
 const ROUNDABOUT_ENTRY_MARGIN_M = 12;
@@ -225,6 +236,23 @@ export function createWorldRuntime(districtJson: District | unknown): DistrictWo
   let rbFired = false;
   let rbConflictSeen = false; // circulating traffic observed this approach
   let rbSlowed = false; // driver slowed to yield speed while it was circulating
+  // C1 revision — yield-adjudication tolerance bands (A12 discipline):
+  //  - Braking response: a driver DECELERATING hard toward the conflict is
+  //    yielding, not barging — staged conflicts can materialise inside the
+  //    physical braking distance ("late"/"tight" tiers), and convicting the
+  //    correct reaction mid-brake was a 10-point FP (C1 exam-bank bot,
+  //    shells F/G). Mirrors the crossingBrakeResponseMps2 band.
+  //  - Ring-transit latch: the ring polyline is polygonal, so a vehicle
+  //    ALREADY CIRCULATING points "inward" ≥ the entry threshold at every
+  //    corner; once the azimuth around the centre has swept ≥ RB_ON_RING_DEG
+  //    this visit, the vehicle holds ring priority and entry grading stands
+  //    down (C1 FP: graded as a barging entry 70 m PAST a lawful entry).
+  let prevYieldSpeedKmh: number | null = null;
+  let prevYieldT = 0;
+  let rbAzPrevDeg: number | null = null;
+  let rbAzAccumDeg = 0;
+  let rhrCondSince: number | null = null; // conflict-visible onset (reaction window)
+  let rbCondSince: number | null = null;
 
   // Previous-frame tracking for line-crossing detection.
   let prevEdgeIdx = -1;
@@ -349,8 +377,9 @@ export function createWorldRuntime(districtJson: District | unknown): DistrictWo
         events.push({ kind: "mirrorGlance", mirror: v.mirrorGlance });
       }
 
-      // 3. Lane fix (committed hysteresis) + stop-line crossings.
-      const fix = locator.track(v.position.x, v.position.y);
+      // 3. Lane fix (committed hysteresis, heading-gated lock stealing) +
+      // stop-line crossings.
+      const fix = locator.track(v.position.x, v.position.y, v.headingDeg);
       detectStopLines(fix.edgeIdx, fix.sM, tSec, events);
       prevEdgeIdx = fix.edgeIdx;
       prevS = fix.sM;
@@ -439,6 +468,17 @@ export function createWorldRuntime(districtJson: District | unknown): DistrictWo
         }
       }
 
+      // 4b'. Yield braking-response band (C1): decelerating hard toward the
+      // conflict = actively yielding; the trackers below never convict
+      // mid-response. A barger who releases the brake still grades.
+      const yieldDecelMps2 =
+        prevYieldSpeedKmh !== null && tSec > prevYieldT
+          ? (prevYieldSpeedKmh - v.speedKmh) / 3.6 / (tSec - prevYieldT)
+          : 0;
+      const brakingResponse = yieldDecelMps2 >= YIELD_BRAKE_RESPONSE_MPS2;
+      prevYieldSpeedKmh = v.speedKmh;
+      prevYieldT = tSec;
+
       // 4b. Right-hand rule: entering an uncontrolled junction's core while a
       // vehicle approaches from the right = failing to give way (once per
       // visit). Slowing for that same conflict and NOT barging in earns a
@@ -449,6 +489,7 @@ export function createWorldRuntime(districtJson: District | unknown): DistrictWo
           rhrFired = false;
           rhrConflictSeen = false;
           rhrSlowed = false;
+          rhrCondSince = null;
         }
         const rightConflict = rightConflictQuery(
           nearestIx.x,
@@ -460,12 +501,27 @@ export function createWorldRuntime(districtJson: District | unknown): DistrictWo
         );
         if (rightConflict) {
           rhrConflictSeen = true;
+          if (rhrCondSince === null) rhrCondSince = tSec; // conflict became visible
           if (v.speedKmh <= RHR_YIELD_KMH) rhrSlowed = true;
+        } else {
+          rhrCondSince = null;
         }
         const dx = nearestIx.x - v.position.x;
         const dy = nearestIx.y - v.position.y;
         const inCore = dx * dx + dy * dy <= RHR_CORE_RADIUS_M * RHR_CORE_RADIUS_M;
-        if (!rhrFired && inCore && v.speedKmh > RHR_MOVING_KMH && rightConflict) {
+        // C1: convict only when the conflict has been VISIBLE for at least
+        // the reaction window (measured from the conflict's onset — staged
+        // "late" arrivals can be born with the driver already at the core)
+        // and the driver is not actively braking for it.
+        if (
+          !rhrFired &&
+          inCore &&
+          v.speedKmh > RHR_MOVING_KMH &&
+          rightConflict &&
+          rhrCondSince !== null &&
+          tSec - rhrCondSince >= YIELD_CONVICT_SUSTAIN_SEC &&
+          !brakingResponse
+        ) {
           events.push({ kind: "prioritySituation", situation: "right-hand-rule", violated: true });
           rhrFired = true;
         }
@@ -484,6 +540,7 @@ export function createWorldRuntime(districtJson: District | unknown): DistrictWo
         rhrFired = false;
         rhrConflictSeen = false;
         rhrSlowed = false;
+        rhrCondSince = null;
       }
 
       // 4c. Roundabout entry: entering the ring (heading inward, at speed) while
@@ -509,7 +566,16 @@ export function createWorldRuntime(districtJson: District | unknown): DistrictWo
           rbFired = false;
           rbConflictSeen = false;
           rbSlowed = false;
+          rbAzPrevDeg = null;
+          rbAzAccumDeg = 0;
+          rbCondSince = null;
         }
+        // Azimuth sweep this visit — ≥ RB_ON_RING_DEG means the vehicle is
+        // CIRCULATING (holds ring priority); see the C1 note above.
+        const azDeg = bearingDeg(v.position.x - nearRb.x, v.position.y - nearRb.y);
+        if (rbAzPrevDeg !== null) rbAzAccumDeg += signedDeltaDeg(rbAzPrevDeg, azDeg);
+        rbAzPrevDeg = azDeg;
+        const onRing = Math.abs(rbAzAccumDeg) >= RB_ON_RING_DEG;
         const band = nearRb.radius + ROUNDABOUT_BAND_EXTRA_M;
         const circulating = circulatingQuery(
           nearRb.x,
@@ -521,7 +587,10 @@ export function createWorldRuntime(districtJson: District | unknown): DistrictWo
         );
         if (circulating) {
           rbConflictSeen = true;
+          if (rbCondSince === null) rbCondSince = tSec; // conflict became visible
           if (v.speedKmh <= RHR_YIELD_KMH) rbSlowed = true;
+        } else {
+          rbCondSince = null;
         }
         // Inward component of the heading: >0 means driving into the ring (entering),
         // ~0 means going around it (already has priority) → don't flag.
@@ -530,11 +599,17 @@ export function createWorldRuntime(districtJson: District | unknown): DistrictWo
         const dist = Math.sqrt(nearRbDist2);
         const rad = (v.headingDeg * Math.PI) / 180;
         const inward = dist > 0 ? (cdx * Math.sin(rad) + cdy * Math.cos(rad)) / dist : 0;
+        // C1: reaction window from the conflict's onset + braking-response
+        // band + ring-transit latch — as in the RHR tracker above.
         if (
           !rbFired &&
           circulating &&
           inward >= ROUNDABOUT_INWARD_MIN &&
-          v.speedKmh > RHR_MOVING_KMH
+          v.speedKmh > RHR_MOVING_KMH &&
+          !onRing &&
+          rbCondSince !== null &&
+          tSec - rbCondSince >= YIELD_CONVICT_SUSTAIN_SEC &&
+          !brakingResponse
         ) {
           events.push({ kind: "prioritySituation", situation: "roundabout", violated: true });
           rbFired = true;
@@ -553,6 +628,9 @@ export function createWorldRuntime(districtJson: District | unknown): DistrictWo
         rbFired = false;
         rbConflictSeen = false;
         rbSlowed = false;
+        rbAzPrevDeg = null;
+        rbAzAccumDeg = 0;
+        rbCondSince = null;
       }
 
       // 5. Pedestrian-crossing zones.
@@ -574,6 +652,9 @@ export function createWorldRuntime(districtJson: District | unknown): DistrictWo
         laneOffsetM: fix.laneOffsetM,
         laneId: fix.laneId,
         laneCount: edgeRt ? edgeRt.lanesPerDir : 1,
+        // C1: the segment laneId is numbered against — the reducer only
+        // grades laneId deltas within one segment (renumbering ≠ maneuver).
+        edgeId: fix.edgeId,
         indicator: v.indicator,
         headlights: v.headlights,
         seatbeltOn: v.seatbeltOn,

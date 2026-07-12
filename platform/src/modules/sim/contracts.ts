@@ -332,6 +332,11 @@ export interface BrakingLeadCarSpec extends StagedEventBase {
    *  player closes within proximityFallbackM of the held car). */
   minSlamSpeedKmh: number;
   proximityFallbackM: number;
+  /** C1: player-to-lead distance that arms the encounter, m. Absent = legacy
+   * spawn-corridor behaviour (arms on the first player movement); set it for
+   * MID-ROUTE corridors so the held lead waits for the player instead of
+   * driving its corridor alone at session start. */
+  armDistM?: number;
   /** Flip the lesson's HazardStimulusSpec visual (ball dart) at the slam. */
   triggersHazard: boolean;
   /** Seconds after resolution before the lead car drives on. */

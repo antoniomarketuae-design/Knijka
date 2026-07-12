@@ -160,3 +160,38 @@ describe("locate() on district-v1", () => {
     }
   });
 });
+
+// ---------------------------------------------------------------------------
+// C1 revision — heading gate on edge-lock stealing
+// ---------------------------------------------------------------------------
+
+describe("edge-lock stealing is heading-gated in sample() tracking (C1)", () => {
+  const district = loadDistrict();
+
+  it("crossing a service-road mouth on the boulevard never bills the stub's limit", () => {
+    // e672169337.0/e672169337.1 run north (3-lane oneway, 50 km/h); the
+    // 30 km/h service stub e1043264868.0 tees in from the east exactly at
+    // their joint (n9601848047). A driver riding the right lane crosses the
+    // stub's centerline extension within centimeters — distance alone stole
+    // the committed lock for ~1 s and SPEEDING_DANGEROUS was billed against
+    // the stub's 30 km/h limit at a lawful 45 (found by the C1 exam-bank
+    // bot; the predecessor's 1.5 m lane inset only shrank the window).
+    // The stub is near-perpendicular to the travel heading, so the heading
+    // gate must keep the lock on the aligned boulevard edges.
+    const rt = createWorldRuntime(district);
+    const a = edgeById(district, "e672169337.0");
+    const b = edgeById(district, "e672169337.1");
+    // Rightmost-lane center of a 3-lane oneway = (lanes-1)/2 × W = one lane
+    // width right of the centerline; 1.5 m inset like the C1 bot rides.
+    const laneCenter = LANE_WIDTH_M - 1.5;
+    const poses = [
+      ...edgeDrivePath(a, 20, a.length, 0.5, laneCenter),
+      ...edgeDrivePath(b, 0, b.length - 2, 0.5, laneCenter),
+    ];
+    const { ticks } = drive(rt, poses, { speedKmh: 45 });
+    for (const t of ticks) {
+      expect(t.maxSpeedKmh, `locked to ${t.edgeId} at (${t.position.x.toFixed(1)}, ${t.position.y.toFixed(1)})`).toBe(50);
+      expect(t.wrongWay ?? false).toBe(false);
+    }
+  });
+});

@@ -206,3 +206,48 @@ describe("stop line overrides (QW4 — lesson 2's Б2 at n331942490)", () => {
     expect(rt.debugUncontrolledJunctions().some((j) => j.id === NODE)).toBe(false);
   });
 });
+
+// ---------------------------------------------------------------------------
+// C1 revision — no stop lines INSIDE a signal cluster
+// ---------------------------------------------------------------------------
+
+describe("cluster-interior edges carry no stop lines (C1)", () => {
+  const district = loadDistrict();
+
+  it("invariant: no trafficLight line on an edge whose both ends share one cluster", () => {
+    // OSM models one physical signalized complex (the „Семов" block, the NW
+    // „Габровски" cluster) as several micro-nodes linked by 4–25 m stubs.
+    // A stub BETWEEN two members of the same cluster is junction interior:
+    // a driver who entered the complex on green would face the perpendicular
+    // axis-group's red there, making the официален обратен завой around the
+    // block ungradable (10-point RED_LIGHT_CROSSED for a lawful transit —
+    // found by the C1 exam-bank driver bot on shells A/B/D/E/G).
+    const rt = createWorldRuntime(district);
+    const clusterOf = new Map<string, string>();
+    for (const c of rt.debugSignalClusters()) {
+      for (const m of c.memberNodeIds) clusterOf.set(m, c.id);
+    }
+    for (const line of rt.debugStopLines()) {
+      if (line.control !== "trafficLight") continue;
+      const edge = district.roads.edges[line.edgeIdx];
+      const fromCluster = clusterOf.get(edge.from);
+      const toCluster = clusterOf.get(edge.to);
+      expect(
+        fromCluster !== undefined && fromCluster === toCluster,
+        `${line.id} lies interior to signal cluster ${fromCluster}`,
+      ).toBe(false);
+    }
+  });
+
+  it("pins the Семов-block stub e672166612.0 clean and the outer approach guarded", () => {
+    const rt = createWorldRuntime(district);
+    const lines = rt.debugStopLines();
+    const onEdge = (id: string) =>
+      lines.filter((l) => district.roads.edges[l.edgeIdx].id === id);
+    // Interior stub n1805512645 → n6294440266 (7 m, both cluster members).
+    expect(onEdge("e672166612.0")).toHaveLength(0);
+    // Outer boulevard approach into the complex (n6294463135 is unsignalized,
+    // n1805512602 signalized) keeps its line — entry is still graded.
+    expect(onEdge("e672169336.0").length).toBeGreaterThan(0);
+  });
+});

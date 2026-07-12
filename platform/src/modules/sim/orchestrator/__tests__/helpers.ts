@@ -99,8 +99,22 @@ export interface PlayerFrame {
   brakePedal: number;
 }
 
+/** Optional per-frame vehicle/environment state for stepFrame (C1 revision:
+ * the innocent-bot harness needs indicators, lights, night/rain and the
+ * production leadGap wiring; defaults preserve the original behaviour). */
+export interface FrameOpts {
+  indicator?: "off" | "left" | "right";
+  headlights?: "off" | "low" | "high";
+  gear?: number;
+  mirrorGlance?: "left" | "right" | "rear" | null;
+  isNight?: boolean;
+  rain?: boolean;
+  /** Pass the production wiring: traffic.leadGapMeters(...) each frame. */
+  leadGapM?: number;
+}
+
 /** One production-ordered frame: runtime → traffic → sample → director → rules. */
-export function stepFrame(stack: Stack, p: PlayerFrame): SimTick {
+export function stepFrame(stack: Stack, p: PlayerFrame, opts: FrameOpts = {}): SimTick {
   stack.t += DT;
   stack.runtime.update(DT);
   stack.traffic.update(DT, {
@@ -114,15 +128,17 @@ export function stepFrame(stack: Stack, p: PlayerFrame): SimTick {
       position: { x: p.x, y: p.y },
       headingDeg: p.headingDeg,
       speedKmh: p.speedKmh,
-      indicator: "off",
-      headlights: "off",
+      indicator: opts.indicator ?? "off",
+      headlights: opts.headlights ?? "off",
       seatbeltOn: true,
       handbrakeOn: false,
-      gear: 1,
-      mirrorGlance: null,
+      gear: opts.gear ?? 1,
+      mirrorGlance: opts.mirrorGlance ?? null,
     },
     stack.t,
-    false,
+    opts.isNight ?? false,
+    opts.rain ?? false,
+    opts.leadGapM ?? Infinity,
   );
   const staged = stack.director.step({
     tSec: stack.t,

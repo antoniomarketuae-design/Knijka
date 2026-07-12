@@ -17,7 +17,7 @@
 
 import { describe, expect, it } from "vitest";
 import type { RuleEvent, SimTick, SimTickEvent } from "../types";
-import { cruise, drive, tick } from "./fixtures";
+import { codes, cruise, drive, tick } from "./fixtures";
 
 /** Assert the drive produced zero violations (commendations are fine). */
 function expectInnocent(events: RuleEvent[]): void {
@@ -218,6 +218,52 @@ describe("FP battery — indicators & lane changes", () => {
       tick(2, { speedKmh: 3, laneId: 0 }),
     ]);
     expectInnocent(events);
+  });
+
+  it("regression: straight across an edge boundary that renumbers the lane (C1)", () => {
+    // Innocent: driving straight from a 3-lane oneway (rightmost = laneId 0)
+    // onto a narrower link renumbers the SAME physical lane — the SimTick
+    // contract says lane ids are only stable along one segment. Found by the
+    // C1 exam-bank bot: every boulevard→link joint billed a phantom
+    // unsignalled + unmirrored lane change (2 × основна per joint). With the
+    // tick's edgeId present, cross-segment deltas must never grade.
+    const { events } = drive([
+      tick(0, { speedKmh: 45, laneId: 1, laneCount: 3, edgeId: "e-blvd" }),
+      tick(1, { speedKmh: 45, laneId: 1, laneCount: 3, edgeId: "e-blvd" }),
+      tick(2, { speedKmh: 45, laneId: 0, laneCount: 1, edgeId: "e-link" }),
+      tick(3, { speedKmh: 45, laneId: 0, laneCount: 1, edgeId: "e-link" }),
+      // …and the renumbering back up onto the next multi-lane bank.
+      tick(4, { speedKmh: 45, laneId: 2, laneCount: 3, edgeId: "e-blvd-2" }),
+    ]);
+    expectInnocent(events);
+  });
+
+  it("regression: cornering renumber just BEFORE the lock switches edges (C1)", () => {
+    // Innocent: at a multi-lane joint the locator's projection sweeps the
+    // outgoing bank while the car corners — the laneId flips a beat before
+    // the edge lock switches. The joint grace must swallow the delta.
+    const { events } = drive([
+      ...cruise(0, 8, { speedKmh: 40, laneId: 0, laneCount: 3, edgeId: "e-blvd" }),
+      tick(9, { speedKmh: 40, laneId: 1, laneCount: 3, edgeId: "e-blvd" }), // sweep artifact
+      tick(10, { speedKmh: 40, laneId: 0, laneCount: 2, edgeId: "e-next" }), // lock switch
+      ...cruise(11, 15, { speedKmh: 40, laneId: 0, laneCount: 2, edgeId: "e-next" }),
+    ]);
+    expectInnocent(events);
+  });
+
+  it("C1 guard-rail: a real lane change WITHIN one edge still grades", () => {
+    // Guilty control for the joint cases: the same laneId delta inside one
+    // segment, away from any joint, remains an unsignalled, unmirrored lane
+    // change once the joint grace elapses — with the DELTA's own timestamp.
+    const { events } = drive([
+      ...cruise(0, 4, { speedKmh: 45, laneId: 0, laneCount: 3, edgeId: "e-blvd" }),
+      tick(5, { speedKmh: 45, laneId: 1, laneCount: 3, edgeId: "e-blvd" }),
+      ...cruise(6, 10, { speedKmh: 45, laneId: 1, laneCount: 3, edgeId: "e-blvd" }),
+    ]);
+    expect(codes(events)).toContain("LANE_CHANGE_WITHOUT_INDICATOR");
+    expect(codes(events)).toContain("LANE_CHANGE_WITHOUT_MIRROR_CHECK");
+    const v = events.find((e) => e.code === "LANE_CHANGE_WITHOUT_INDICATOR");
+    expect(v?.t).toBe(5);
   });
 
   it("regression: brisk reverse across a lane boundary during a reverse park", () => {

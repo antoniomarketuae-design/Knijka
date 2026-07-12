@@ -177,7 +177,11 @@ export class PedestrianDartOutRunner implements EventRunner {
     if (this.phase === "armed") {
       // Player drove past the crossing without ever building trigger speed —
       // the encounter quietly never happens (no outcome, nothing to grade).
-      if (d > 8 && aheadOfPlayerM(input, s.crossing.x, s.crossing.y) < -5) {
+      // C1 revision: LOCAL passes only (d < 60) — without the distance cap,
+      // any moment the route pointed away from a far-off site cancelled the
+      // encounter (the exam bank's C9w/C10e darts died 500 m across town,
+      // minutes before the player's actual approach leg).
+      if (d > 8 && d < 60 && aheadOfPlayerM(input, s.crossing.x, s.crossing.y) < -5) {
         this.phase = "resolved";
         return null;
       }
@@ -454,7 +458,16 @@ export class BrakingLeadCarRunner implements EventRunner {
     }
 
     if (this.phase === "armed") {
-      if (input.speedKmh > 4) {
+      // C1 revision: mid-route corridors (armDistM present) arm only when
+      // the player is actually NEAR the held lead. Without the gate, the
+      // lead started rolling at the first player movement anywhere in the
+      // city, drove its corridor alone, and later graded a phantom
+      // "passedWithoutStopping" against a player minutes behind (exam-bank
+      // B4/B6 sites). Spawn corridors (no armDistM) keep the legacy
+      // speed-only arming — the player starts right behind the lead there.
+      const nearLead =
+        s.armDistM === undefined || dist(input.x, input.y, actor.x, actor.y) <= s.armDistM;
+      if (nearLead && input.speedKmh > 4) {
         traffic.stagedCommand(s.id, {
           type: "matchPlayer",
           gapM: this.followGapM,

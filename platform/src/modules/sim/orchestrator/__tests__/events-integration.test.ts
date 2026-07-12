@@ -207,7 +207,9 @@ describe("L2 priority-from-right (integration)", () => {
     const stack = makeStack([rhr]);
     // Northbound approach: e31297253.0 then e1164416887.0 (single oneways).
     const driver = new PolyDriver(
-      concat(edgeGeometry("e31297253.0"), edgeGeometry("e1164416887.0"), [[389.5, -262]]),
+      // C1: continue past the box — conviction now needs the barge condition
+      // to SUSTAIN ~1 s (reaction window), so the drive must span the core.
+      concat(edgeGeometry("e31297253.0"), edgeGeometry("e1164416887.0"), [[389.5, -262], [389.8, -244]]),
       140,
     );
     for (let i = 0; i < 90 * 30 && stack.outcomes.length === 0; i++) {

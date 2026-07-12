@@ -169,10 +169,17 @@ const PRIORITY_RHR_TIERS = [
 ] as const;
 
 /** JU-06 amber classes: committed (proceed correct) / dilemma / comfortable
- *  stop existed (carrying on lands on red). */
+ *  stop existed (carrying on lands on red).
+ *  C1 revision: dilemma was flipEtaSec 3.0 — EQUAL to the controller's 3 s
+ *  yellow, so a driver who correctly committed at constant speed reached the
+ *  line exactly at the red edge (RED_LIGHT_CROSSED on an innocent commit,
+ *  every A1-dilemma variant; the runner's ±0.15 s jitter decided the coin).
+ *  2.55 keeps the true dilemma (a comfortable stop still does not exist —
+ *  the adjudicator needs ≈44 m at 45 km/h, this flips at ≈32 m) while a
+ *  committed entry clears on yellow with margin even at the jitter's edge. */
 const AMBER_TIERS = [
   { key: "committed", flipEtaSec: 1.6, terminal: false, weight: 3 },
-  { key: "dilemma", flipEtaSec: 3.0, terminal: true, weight: 4 },
+  { key: "dilemma", flipEtaSec: 2.55, terminal: true, weight: 4 },
   { key: "stoppable", flipEtaSec: 4.5, terminal: true, weight: 4 },
 ] as const;
 
@@ -474,11 +481,28 @@ const P1_SITE = {
 };
 
 /** P2 — right-hand-rule at the uncontrolled 4-way n348207502, player
- *  northbound [shipped: the orchestrator integration-suite geometry]. */
+ *  northbound [shipped: the orchestrator integration-suite geometry].
+ *  C1 revision: the original path ended at n332113263 — ON the host routes
+ *  (B and G both drive n348207502 → n332113263 on their return legs), and a
+ *  finished staged vehicle PARKS at its path end (traffic/staged.ts), so the
+ *  variant dead-ended behind a mid-lane roadblock (both C1 bots stuck at
+ *  (318.9, −269.0), 11 m behind the node). The car now exits NORTH through
+ *  the Б2 corridor and parks west of n331942490 at n2349242518 — B1's
+ *  shipped, lane-graph-proven off-route terminus (off B and G entirely; the
+ *  approach arm, hold and junction crossing are unchanged, so the RHR
+ *  encounter geometry is identical). */
 const P2_SITE = {
   junction: { nodeId: "n348207502", x: 389.21, y: -271.99 },
   actor: {
-    pathNodes: ["n179974491", "n348207502", "n332113263"],
+    pathNodes: [
+      "n179974491",
+      "n348207502",
+      "n8585786884",
+      "n415950074",
+      "n331942486",
+      "n331942490",
+      "n2349242518",
+    ],
     hold: { nodeIndex: 1, offsetM: -60 },
     cruiseSpeedMps: 8.5,
     colorIndex: 2,
@@ -619,10 +643,15 @@ const B1_SITE = {
 
 /** B3 — braking lead car on spawn-3's northbound straight (e31297253.0;
  *  spawn sits at s≈103, hold 25 m ahead, slam ~60 m later, then the car
- *  turns west at n348207502, off both host routes). */
+ *  turns EAST at n348207502 and parks down the south „Станоев" arm.
+ *  C1 revision: the authored west exit claimed to be "off both host routes"
+ *  but shell B's return leg drives n348207502 → n332113263 — the parked car
+ *  was a mid-lane roadblock at arc ≈1606 (C1 bot stuck against it, stacked
+ *  with P2's). n2644522840 (452, −333) via the two-way e724866098.0 south
+ *  arm is on no shell's routeNodes. */
 const B3_SITE = {
   actor: {
-    pathNodes: ["n1812874946", "n9959660040", "n348207502", "n332113263"],
+    pathNodes: ["n1812874946", "n9959660040", "n348207502", "n179974491", "n2644522840"],
     hold: { nodeIndex: 0, offsetM: 128 },
     cruiseSpeedMps: 10,
     colorIndex: 3,
@@ -638,7 +667,11 @@ const B3_SITE = {
 
 /** B4 — braking lead car on „Боян Каменов" eastbound (waits just past the
  *  Габровски junction the player turns in from; slam mid-straight, then the
- *  car carries on east ahead of the player). */
+ *  car turns right at the 4-way and parks down the SE „Брадистилов" arm.
+ *  C1 revision: the authored terminal n8585789857 is ON host shell D's route
+ *  (D drives n316786266 → n8585789857 right behind the car) — a finished
+ *  staged vehicle parks at its path end, so every D variant with B4 staged
+ *  dead-ended behind it. n10579367462 is the P3-actors' own off-route arm. */
 const B4_SITE = {
   actor: {
     pathNodes: [
@@ -647,12 +680,16 @@ const B4_SITE = {
       "n639932179",
       "n10581457590",
       "n316786266",
-      "n8585789857",
+      "n10579367462",
     ],
     hold: { nodeIndex: 0, offsetM: 2 },
     cruiseSpeedMps: 10,
     colorIndex: 3,
   },
+  // C1: mid-route corridor — the lead waits until the player is near
+  // (armDistM), else it drove off at session start and graded a phantom
+  // passedWithoutStopping against a player minutes behind.
+  armDistM: 60,
   maxMatchSpeedMps: 13.9,
   slamAt: { x: -325.2, y: -53.1 },
   slamRadiusM: 7,
@@ -698,6 +735,8 @@ const B6_SITE = {
     cruiseSpeedMps: 11,
     colorIndex: 3,
   },
+  // C1: mid-route corridor — see B4's armDistM note.
+  armDistM: 60,
   maxMatchSpeedMps: 13.9,
   slamAt: { x: -306.3, y: 109.0 },
   slamRadiusM: 7,
@@ -708,11 +747,19 @@ const B6_SITE = {
 };
 
 /** A1 — amber dilemma at n1805512602, northbound on the boulevard
- *  (lineDistM = the runtime's derived setback on e672169336.0). */
+ *  (lineDistM = the runtime's derived setback on e672169336.0).
+ *  C1 revision: armDistM was 70 — only ~38 m arm-to-line, so the "stoppable"
+ *  flip (4.5 s ETA) always clamped to "flip now" at ≈3.0 s ETA — exactly the
+ *  yellow duration. A comfortable stop never existed and a committed driver
+ *  reached the line ≈0.05 s into red — every dry A1-stoppable variant failed
+ *  a 10-point red through no fault (rain variants survived only because the
+ *  slower approach tipped the stop/commit decision 0.1 m the other way).
+ *  110 m arms ≈78 m before the line: the 4.5 s flip fires at ~56 m — a real
+ *  comfortable stop — while dilemma/committed keep their entry character. */
 const A1_SITE = {
   signalNodeId: "n1805512602",
   junction: { x: 430.13, y: 235.3 },
-  armDistM: 70,
+  armDistM: 110,
   minTriggerSpeedKmh: 15,
   lineDistM: 31.8,
 };
@@ -886,7 +933,13 @@ export const EXAM_SHELLS: readonly ExamRouteShell[] = [
     nameBg: "Западният пръстен",
     descriptionBg:
       "Светофарът на „Трайко Станоев“, южният пръстен с кръговото като обратен завой и центърът по „Росарио“ и „Брадистилов“.",
-    spawn: { pointId: "spawn-1" },
+    // C1 revision: spawn-1 (620.96, -215.89, heading 71.2°) faces EAST — the
+    // opposite of this route's westbound opening leg (bearing 251.2°), so the
+    // variant was undrivable as authored (the builders' suite checked spawn
+    // POSITION only, never heading). Explicit westbound pose at the scaled
+    // right-lane center of e519275131.0 at spawn-1's chainage — the shell E
+    // convention.
+    spawn: { position: { x: 619.65, y: -212.05 }, headingDeg: 251.2 },
     routeNodes: [
       "n417233856", "n179974491", "n348207502", "n332113263", "n415950003", "n179974484",
       "n415949424", "n6805916117", "n685714833", "n685714834", "n279646951", "n279646953",

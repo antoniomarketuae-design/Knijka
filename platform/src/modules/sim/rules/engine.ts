@@ -77,6 +77,18 @@ export interface RuleEngineState {
   config: RuleEngineConfig;
   prevT: number | null;
   prevLaneId: number | null;
+  /** Segment the previous frame's laneId was numbered against (C1 revision):
+   * laneId deltas are only lane CHANGES within one segment — an edge
+   * transition renumbers lanes (SimTick contract note on laneId stability).
+   * `undefined` = the tick source does not report segments (legacy grading). */
+  prevEdgeId: string | null | undefined;
+  /** C1 joint-grace ledger (only used when the tick reports edgeId): lane-id
+   * deltas are held laneChangeJointGraceSec and dropped when a segment
+   * transition lands inside the window — see the config comment. */
+  laneChange: {
+    pending: Array<{ t: number; dir: TurnDirection; indicatorOk: boolean; mirrorOk: boolean }>;
+    lastBasisChangeAt: number | null;
+  };
   /** Previous frame's speed — lets detectors read braking response (A12). */
   prevSpeedKmh: number | null;
   /** Previous frame's lead gap (null = none reported) — cut-in recovery (A12). */
@@ -149,6 +161,8 @@ export function createRuleEngine(config?: Partial<RuleEngineConfig>): RuleEngine
     config: { ...DEFAULT_RULE_CONFIG, ...config },
     prevT: null,
     prevLaneId: null,
+    prevEdgeId: undefined,
+    laneChange: { pending: [], lastBasisChangeAt: null },
     prevSpeedKmh: null,
     prevLeadGapM: null,
     lastIndicatorOnAt: { left: null, right: null },
@@ -198,6 +212,7 @@ function cloneState(s: RuleEngineState): RuleEngineState {
     wrongWay: { ...s.wrongWay },
     keepRight: { ...s.keepRight },
     crossing: s.crossing ? { ...s.crossing } : null,
+    laneChange: { pending: s.laneChange.pending.map((p) => ({ ...p })), lastBasisChangeAt: s.laneChange.lastBasisChangeAt },
     stall: { ...s.stall },
     stopOvershoot: { ...s.stopOvershoot },
     centerLine: { ...s.centerLine },
@@ -344,6 +359,35 @@ export function reduceTick(prev: RuleEngineState, tick: SimTick): ReduceResult {
   // -- 3. lane-change detection (after glance/indicator trackers updated)
   // Reverse gear is exempt (A12): backing across a lane boundary is a parking
   // maneuver, judged by maneuver objectives — not a lane change.
+  // C1 revision: lane ids are only comparable WITHIN one segment (the SimTick
+  // contract note on laneId stability), and near a segment joint the
+  // locator's projection sweeps the bank while the car corners. So when the
+  // tick reports edgeId: (a) deltas ACROSS segments never grade
+  // (renumbering); (b) deltas within laneChangeJointGraceSec after a
+  // transition never grade (joint artifact); (c) all other deltas are held
+  // for the grace and dropped if a transition lands inside the window —
+  // otherwise they emit with the delta's own timestamp. Legacy tick sources
+  // (no edgeId) grade immediately, exactly as before. FP cases: "straight
+  // across a lane-count change" + the joint cases in false-positives.test.ts.
+  const basisKnown = tick.edgeId !== undefined && s.prevEdgeId !== undefined;
+  const basisChanged = basisKnown && tick.edgeId !== s.prevEdgeId;
+  if (basisChanged) {
+    s.laneChange.pending = [];
+    s.laneChange.lastBasisChangeAt = t;
+  }
+  if (s.laneChange.pending.length > 0) {
+    const still: typeof s.laneChange.pending = [];
+    for (const p of s.laneChange.pending) {
+      if (t - p.t < cfg.laneChangeJointGraceSec) {
+        still.push(p);
+        continue;
+      }
+      if (!p.indicatorOk) events.push(makeViolation("LANE_CHANGE_WITHOUT_INDICATOR", p.t));
+      if (!p.mirrorOk) events.push(makeViolation("LANE_CHANGE_WITHOUT_MIRROR_CHECK", p.t));
+      if (p.indicatorOk && p.mirrorOk) events.push(makeCommendation("SAFE_LANE_CHANGE", p.t));
+    }
+    s.laneChange.pending = still;
+  }
   if (
     s.prevLaneId !== null &&
     tick.laneId !== s.prevLaneId &&
@@ -355,11 +399,22 @@ export function reduceTick(prev: RuleEngineState, tick: SimTick): ReduceResult {
     const indicatorOk = lastOn !== null && t - lastOn <= cfg.indicatorLookbackSec;
     const lastGlance = s.lastGlanceAt[dir];
     const mirrorOk = lastGlance !== null && t - lastGlance <= cfg.mirrorLookbackSec;
-    if (!indicatorOk) events.push(makeViolation("LANE_CHANGE_WITHOUT_INDICATOR", t));
-    if (!mirrorOk) events.push(makeViolation("LANE_CHANGE_WITHOUT_MIRROR_CHECK", t));
-    if (indicatorOk && mirrorOk) events.push(makeCommendation("SAFE_LANE_CHANGE", t));
+    if (tick.edgeId === undefined || s.prevEdgeId === undefined) {
+      // Legacy source without segment ids — immediate grading.
+      if (!indicatorOk) events.push(makeViolation("LANE_CHANGE_WITHOUT_INDICATOR", t));
+      if (!mirrorOk) events.push(makeViolation("LANE_CHANGE_WITHOUT_MIRROR_CHECK", t));
+      if (indicatorOk && mirrorOk) events.push(makeCommendation("SAFE_LANE_CHANGE", t));
+    } else if (
+      !basisChanged &&
+      (s.laneChange.lastBasisChangeAt === null ||
+        t - s.laneChange.lastBasisChangeAt >= cfg.laneChangeJointGraceSec)
+    ) {
+      s.laneChange.pending.push({ t, dir, indicatorOk, mirrorOk });
+    }
+    // else: renumbering at/near a segment joint — locator artifact, no grade.
   }
   s.prevLaneId = tick.laneId;
+  s.prevEdgeId = tick.edgeId;
 
   // -- 4. continuous detectors (sustain + hysteresis)
   const limit = tick.maxSpeedKmh;

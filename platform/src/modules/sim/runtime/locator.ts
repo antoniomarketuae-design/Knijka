@@ -19,12 +19,31 @@
  */
 
 import { LANE_WIDTH_M, OFF_ROAD_DISTANCE_M, makeEdgeHit, type DistrictIndex, type EdgeHit } from "./spatial";
+import { bearingDeg, signedDeltaDeg } from "./geometry";
 
 /** A rival edge must be closer than the locked one by this much to steal the
  * fix. ~Half the scaled lane width: lane centers now sit 4–12 m off their
  * centerline, so junction-area rivals brush much closer than they used to. */
 const EDGE_SWITCH_MARGIN_M = 4.0;
 const LANE_SWITCH_DEADBAND_M = 0.35;
+
+/**
+ * C1 revision — heading gate on lock STEALING. A vehicle crossing a side-
+ * street mouth passes within centimeters of that stub's centerline; distance
+ * alone then flips the committed lock onto the stub for ~1 s, and the sweep
+ * bills the stub's limit (SPEEDING_DANGEROUS vs a 30 km/h service mouth on
+ * the boulevard) or its direction (WRONG_WAY on an opposing oneway link at a
+ * junction corner) against a driver riding their own lane. While the LOCKED
+ * edge is still heading-plausible, a rival may steal the fix only if the
+ * vehicle's heading is plausible for the rival too:
+ *  - two-way rival: within HEADING_GATE_DEG of EITHER geometry direction;
+ *  - oneway rival: within HEADING_GATE_DEG of its legal flow — locking onto
+ *    an opposing oneway the driver merely brushes IS the wrong-way FP.
+ * Acquisition (no lock / lock off-road) stays distance-only, so a genuine
+ * wrong-way run — where the old edge falls away — still locks and grades
+ * (wrong-way.test.ts holds).
+ */
+const HEADING_GATE_DEG = 60;
 
 export interface LocateFix {
   /** Index into DistrictIndex.edges, or -1 when off-road. */
@@ -61,6 +80,9 @@ export class Locator {
   private lockedEdgeIdx = -1;
   private lockedLaneId = -1;
   private lockedTravelDir: 1 | -1 = 1;
+  /** Heading of the last track() call — part of the committed lock state, so
+   * peek() applies the SAME steal gate and never disagrees with tracking. */
+  private lockedHeadingDeg: number | undefined = undefined;
 
   // Scratch — zero per-call allocation on the tracking path.
   private readonly bestHit = makeEdgeHit();
@@ -75,34 +97,56 @@ export class Locator {
   /**
    * Track the vehicle: applies + commits hysteresis state. Returns an
    * internally reused fix — copy fields out, do not hold the reference.
+   * `headingDeg` (when the caller knows it) arms the heading gate on lock
+   * stealing — see HEADING_GATE_DEG.
    */
-  track(x: number, y: number): LocateFix {
-    const chosen = this.chooseEdge(x, y);
+  track(x: number, y: number, headingDeg?: number): LocateFix {
+    const chosen = this.chooseEdge(x, y, headingDeg);
+    this.lockedHeadingDeg = headingDeg;
     this.applyFix(chosen, /* commit */ true);
     return this.fix;
   }
 
   /**
    * Pure lookup for HUD/minimap (`WorldRuntime.locate`): benefits from the
-   * committed lock (stable answers for the same vehicle) but never mutates it,
-   * so out-of-band calls cannot corrupt the sample() tracking.
+   * committed lock (stable answers for the same vehicle — including its
+   * heading gate, so peek never flip-flops against tracking) but never
+   * mutates it, so out-of-band calls cannot corrupt the sample() tracking.
    */
   peek(x: number, y: number): LocateFix {
-    const chosen = this.chooseEdge(x, y);
+    const chosen = this.chooseEdge(x, y, this.lockedHeadingDeg);
     this.applyFix(chosen, /* commit */ false);
     return this.fix;
   }
 
-  private chooseEdge(x: number, y: number): EdgeHit | null {
+  /** Heading plausibility of a hit (see HEADING_GATE_DEG). */
+  private headingPlausible(hit: EdgeHit, headingDeg: number): boolean {
+    const fwd = bearingDeg(hit.tanX, hit.tanY);
+    const dFwd = Math.abs(signedDeltaDeg(headingDeg, fwd));
+    if (dFwd <= HEADING_GATE_DEG) return true;
+    const rt = this.index.edgeRt(hit.edgeIdx);
+    if (rt.edge.oneway) return false; // opposing a oneway's flow = implausible
+    return 180 - dFwd <= HEADING_GATE_DEG;
+  }
+
+  private chooseEdge(x: number, y: number, headingDeg?: number): EdgeHit | null {
     const best = this.bestHit;
     const hasBest = this.index.nearestEdge(x, y, OFF_ROAD_DISTANCE_M, best);
 
     if (this.lockedEdgeIdx >= 0) {
       const cur = this.index.projectOnEdge(this.lockedEdgeIdx, x, y, this.currentHit);
       if (cur.distM <= OFF_ROAD_DISTANCE_M) {
-        // Locked edge still plausible — switch only on a clear win.
+        // Locked edge still plausible — switch only on a clear win, and (with
+        // a known heading) only onto a rival the heading is plausible for,
+        // unless the locked edge itself has become heading-implausible.
         if (hasBest && best.edgeIdx !== this.lockedEdgeIdx && best.distM + EDGE_SWITCH_MARGIN_M < cur.distM) {
-          return best;
+          if (
+            headingDeg === undefined ||
+            this.headingPlausible(best, headingDeg) ||
+            !this.headingPlausible(cur, headingDeg)
+          ) {
+            return best;
+          }
         }
         return cur;
       }

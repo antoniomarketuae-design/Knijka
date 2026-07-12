@@ -145,6 +145,20 @@ export function buildStopLines(
   ): void => {
     const rt = index.edgeRt(edgeIdx);
     if (atFromEnd && rt.edge.oneway) return; // flow leaves the junction here
+    // C1 revision — no lines INSIDE a signal cluster. OSM models one physical
+    // signalized complex as several micro-nodes (the „Семов" block, the NW
+    // „Габровски" cluster) whose 4–25 m link stubs run between SAME-cluster
+    // members. A driver who entered the complex on green then faces the
+    // perpendicular axis-group's red on an interior stub — the официален
+    // обратен завой around the block becomes ungradable (10-point
+    // RED_LIGHT_CROSSED for a lawful transit — the C1 FP case in
+    // stoplines.test.ts). Real complexes paint stop lines only on their
+    // OUTER approaches; interior edges get none.
+    if (control === "trafficLight") {
+      const otherEnd = rt.edge.from === junctionNodeId ? rt.edge.to : rt.edge.from;
+      const cluster = signals.clusterIdxForNode(junctionNodeId);
+      if (cluster >= 0 && signals.clusterIdxForNode(otherEnd) === cluster) return;
+    }
     const sb = Math.min(mouthSetbackM(edgeIdx, junctionNodeId, fallbackM), rt.totalLen / 2);
     const sM = atFromEnd ? sb : rt.totalLen - sb;
     const dirSign: 1 | -1 = atFromEnd ? -1 : 1;
