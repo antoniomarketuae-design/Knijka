@@ -10,9 +10,12 @@ import type { LessonEntryView } from "./types";
 
 export function LessonCard({
   entry,
+  prerequisiteTitleBg = null,
   onStart,
 }: {
   entry: LessonEntryView;
+  /** Title of the lesson that unlocks this one — shown on locked cards. */
+  prerequisiteTitleBg?: string | null;
   onStart: (lessonId: string) => void;
 }) {
   const { lesson, unlocked, passed, attempts, bestScore } = entry;
@@ -88,7 +91,9 @@ export function LessonCard({
         </button>
       ) : (
         <p className="rounded-xl bg-surface-2 px-3 py-2.5 text-center text-xs font-semibold text-muted">
-          Издържи предишния урок, за да се отключи.
+          {prerequisiteTitleBg !== null
+            ? `Издържи „${prerequisiteTitleBg}“, за да се отключи.`
+            : "Издържи предишния урок, за да се отключи."}
         </p>
       )}
     </article>

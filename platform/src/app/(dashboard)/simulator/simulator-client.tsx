@@ -153,10 +153,28 @@ export function SimulatorClient({
 
   // The exam has no "next lesson" — it is the end of the ladder; training
   // lessons keep the linear „Следващ урок" affordance.
-  const next =
+  const nextEntry =
     active.lesson.examMode === true
       ? null
-      : entries.find((e) => e.lesson.order === active.lesson.order + 1)?.lesson ?? null;
+      : entries.find((e) => e.lesson.order === active.lesson.order + 1) ?? null;
+  // „Следващ урок" must never start a LOCKED lesson. Our `entries` snapshot is
+  // stale after a pass, so allow the CTA when the snapshot already says
+  // unlocked OR when the just-passed lesson IS the next one's prerequisite
+  // (explicit unlockAfterLessonId for полигон-style cards, previous order in
+  // the curriculum chain). Example this guards: passing „Полигон — свободно
+  // каране“ (0.5) must NOT offer „Полигон — начални маневри“ (1.5), which
+  // unlocks only after „Подготовка и потегляне“ (1).
+  const nextPrereqId =
+    nextEntry === null
+      ? undefined
+      : nextEntry.lesson.unlockAfterLessonId ??
+        entries.find((e) => e.lesson.order === nextEntry.lesson.order - 1)
+          ?.lesson.id;
+  const next =
+    nextEntry !== null &&
+    (nextEntry.unlocked || nextPrereqId === active.lesson.id)
+      ? nextEntry.lesson
+      : null;
 
   return (
     <LessonPlayShell

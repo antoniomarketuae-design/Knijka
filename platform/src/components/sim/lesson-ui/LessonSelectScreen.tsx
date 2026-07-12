@@ -21,6 +21,17 @@ export function LessonSelectScreen({
   onQualityChange: (q: QualityPreset) => void;
   onStart: (lessonId: string) => void;
 }) {
+  // Name the prerequisite on locked cards ("Издържи „Свободно каране“…"):
+  // полигон/exam-style specs carry an explicit unlockAfterLessonId; curriculum
+  // lessons unlock after the previous integer order (computeProgression).
+  const titleById = new Map(entries.map((e) => [e.lesson.id, e.lesson.titleBg]));
+  const prerequisiteTitleFor = (entry: LessonEntryView): string | null => {
+    const explicit = entry.lesson.unlockAfterLessonId;
+    if (explicit !== undefined) return titleById.get(explicit) ?? null;
+    const prev = entries.find((e) => e.lesson.order === entry.lesson.order - 1);
+    return prev?.lesson.titleBg ?? null;
+  };
+
   return (
     <div className="flex flex-col gap-5">
       <header className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -36,7 +47,14 @@ export function LessonSelectScreen({
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
         {entries.map((entry) => (
-          <LessonCard key={entry.lesson.id} entry={entry} onStart={onStart} />
+          <LessonCard
+            key={entry.lesson.id}
+            entry={entry}
+            prerequisiteTitleBg={
+              entry.unlocked ? null : prerequisiteTitleFor(entry)
+            }
+            onStart={onStart}
+          />
         ))}
       </div>
 

@@ -603,7 +603,11 @@ function ReadyScene({
   return (
     <div className="relative h-full w-full">
       <Canvas
-        shadows
+        // "percentage" = PCFShadowMap. Bare `shadows` requests PCFSoftShadowMap,
+        // which three r185 deprecated — it falls back to PCFShadowMap anyway but
+        // logs a deprecation warning on every shadow render (hundreds/session).
+        // Explicit type: identical output, silent console.
+        shadows="percentage"
         dpr={[1, QUALITY_PRESETS[level].maxDpr]}
         camera={{
           fov: CHASE_FOV,
