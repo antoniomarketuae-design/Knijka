@@ -35,6 +35,7 @@ import {
   type PenaltyEscalation,
 } from "./escalation";
 import { examTerminationFor } from "./exam";
+import { examVariantById } from "./examBank";
 import { lessonById } from "./specs";
 import type {
   EventPosition,
@@ -387,7 +388,12 @@ export function gradeFinishWire(input: unknown): GradedFinishWire {
   const wire = parseFinishLessonWire(input);
   if (wire === null) return { status: "invalid" };
 
-  const lesson = lessonById(wire.lessonId);
+  // B1b: exam-bank ids resolve by REGENERATION — the server rebuilds the
+  // exact LessonSpec from the variant id (same pure generator the client
+  // played), so grading integrity never depends on client-supplied spec data
+  // and the SimSession row needs nothing beyond the lessonId it already
+  // stores (the variant id IS the lessonId).
+  const lesson = lessonById(wire.lessonId) ?? examVariantById(wire.lessonId);
   if (lesson === undefined) return { status: "unknown-lesson" };
 
   const events = rebuildRuleEvents(wire.ruleEvents);

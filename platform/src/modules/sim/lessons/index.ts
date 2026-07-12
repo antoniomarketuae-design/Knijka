@@ -35,6 +35,24 @@ export {
 // A13 exam mode — official-limit termination fold (client + server shared)
 export { EXAM_TERMINATION_TEXT_BG, examTerminationFor } from "./exam";
 
+// B1b — THE EXAM BANK: 1000+ distinct, replayable exam variants. Pure and
+// deterministic; ids are the recipes (EX-<shell>-<cond>-<NNNN>).
+export {
+  EXAM_BANK_SIZE,
+  EXAM_MAX_TERMINAL_ENCOUNTERS,
+  EXAM_MIN_TERMINAL_ENCOUNTERS,
+  allExamVariantIds,
+  drawExamVariantId,
+  examShellAssignmentCount,
+  examVariantById,
+  examVariantDistinctnessKey,
+  generateExamVariant,
+  isExamVariantId,
+  parseExamVariantId,
+  type ParsedExamVariantId,
+} from "./examBank";
+export { EXAM_CONDITIONS, EXAM_SHELLS } from "./examBankData";
+
 // Session engine (pure lifecycle reducer)
 export {
   abortSession,

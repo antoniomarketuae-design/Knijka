@@ -4,6 +4,7 @@ import {
   computeProgression,
   EXAM_LESSON,
   isExamUnlocked,
+  isExamVariantId,
   LESSONS,
   POLIGON_LESSONS,
   type LessonAttemptRow,
@@ -89,8 +90,22 @@ export default async function SimulatorPage() {
     ...POLIGON_LESSONS.map(entryFor),
   ].sort((a, b) => a.lesson.order - b.lesson.order);
 
-  // A13: the exam entry — its own gated card below the grid.
-  const examEntry: LessonEntryView = entryFor(EXAM_LESSON);
+  // A13: the exam entry — its own gated card below the grid. B1b: exam-bank
+  // variant sessions persist under their variant ids (EX-…), so the card's
+  // attempt/pass/best stats aggregate the fixed route AND every variant.
+  const examAttempts = attempts.filter(
+    (a) => a.lessonId === EXAM_LESSON.id || isExamVariantId(a.lessonId),
+  );
+  const examEntry: LessonEntryView = {
+    lesson: EXAM_LESSON,
+    unlocked: isExamUnlocked(EXAM_LESSON, attempts),
+    passed: examAttempts.some((a) => a.passed),
+    attempts: examAttempts.length,
+    bestScore: examAttempts.reduce<number | null>(
+      (best, a) => (best === null ? a.score : Math.min(best, a.score)),
+      null,
+    ),
+  };
 
   return <SimulatorClient entries={entries} examEntry={examEntry} history={history} />;
 }
@@ -151,7 +166,11 @@ function buildHistoryEntries(rows: SimSessionDetailRow[]): SessionHistoryEntry[]
 
     return {
       id: r.id,
-      lessonTitleBg: titleByLessonId.get(r.lessonId) ?? r.lessonId,
+      // B1b: exam-bank sessions carry their variant code as the lessonId —
+      // title them like the play shell does (the code IS the replay handle).
+      lessonTitleBg:
+        titleByLessonId.get(r.lessonId) ??
+        (isExamVariantId(r.lessonId) ? `Изпитен вариант ${r.lessonId}` : r.lessonId),
       finishedAtIso: r.finishedAt !== null ? r.finishedAt.toISOString() : null,
       passed: ev?.passed ?? false,
       aborted: ev?.aborted ?? false,

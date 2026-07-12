@@ -35,15 +35,18 @@ import {
   type PriorityFromRightSpec,
   type RoundaboutEntrySpec,
 } from "../contracts";
+import { EXAM_BANK_PARKING_BAYS } from "./examBankData";
 
 /**
  * L7's marked bay — single source for the WORLD paint (LessonSpec.parkingBay
  * → LESSON_PARKING_BAYS → markings builder) and the GRADED rect (l7-park
  * objective params.bay, A10): what the student sees painted is exactly what
  * the evaluator measures against. The A13 exam route ends in the SAME bay
- * (same painted rect, same graded rect — one street, one truth).
+ * (same painted rect, same graded rect — one street, one truth). Exported
+ * since B1b: exam-bank shells that finish on „Трайко Станоев" park in THIS
+ * object (examBank.ts) — the single-truth rect survives the bank.
  */
-const L7_PARKING_BAY: ParkingBaySpec = {
+export const L7_PARKING_BAY: ParkingBaySpec = {
   x: 681.26,
   y: -199.54,
   headingDeg: 67.3,
@@ -932,9 +935,15 @@ const ALL_LESSONS: readonly LessonSpec[] = [...LESSONS, ...POLIGON_LESSONS, EXAM
  * truth) and including it would paint the rect twice.
  */
 export function lessonParkingBaysFor(districtId: string): readonly ParkingBaySpec[] {
-  return [...LESSONS, ...POLIGON_LESSONS]
-    .filter((l) => lessonDistrictId(l) === districtId)
-    .flatMap((l) => (l.parkingBay ? [l.parkingBay] : []));
+  return [
+    ...[...LESSONS, ...POLIGON_LESSONS]
+      .filter((l) => lessonDistrictId(l) === districtId)
+      .flatMap((l) => (l.parkingBay ? [l.parkingBay] : [])),
+    // B1b: exam-bank bays live on the city district only. Painted always
+    // (like L7's) so a drawn variant's bay is never an invisible rect;
+    // examBankData is pure data (contracts-only imports), so no cycle.
+    ...(districtId === DEFAULT_DISTRICT_ID ? EXAM_BANK_PARKING_BAYS : []),
+  ];
 }
 
 /** Lookup by id — including the exam; undefined for unknown ids (wire input

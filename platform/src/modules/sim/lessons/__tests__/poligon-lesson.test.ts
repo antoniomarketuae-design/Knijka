@@ -34,6 +34,7 @@ import {
   buildLessonResult,
   createLessonSession,
 } from "../engine";
+import { EXAM_BANK_PARKING_BAYS } from "../examBankData";
 import { parseObjectiveParams } from "../objectives";
 import { isExamUnlocked } from "../progression";
 import {
@@ -153,7 +154,13 @@ describe("per-map bay paint isolation (doc 74 §5.4)", () => {
 
   it("per-district paint sets are disjoint and complete", () => {
     const l7 = lessonById("l7-parking")!;
-    expect(lessonParkingBaysFor(DEFAULT_DISTRICT_ID)).toEqual([l7.parkingBay]);
+    // B1b: the city set = curriculum bays + the exam bank's authored bays
+    // (painted always, like L7's, so a drawn variant never grades against an
+    // invisible rect). The полигон must see NEITHER.
+    expect(lessonParkingBaysFor(DEFAULT_DISTRICT_ID)).toEqual([
+      l7.parkingBay,
+      ...EXAM_BANK_PARKING_BAYS,
+    ]);
     expect(lessonParkingBaysFor("poligon-v1")).toEqual([l8.parkingBay]);
     expect(lessonParkingBaysFor("no-such-district")).toEqual([]);
   });
