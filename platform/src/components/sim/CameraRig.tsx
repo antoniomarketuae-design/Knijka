@@ -113,7 +113,12 @@ export function CameraRig({
     sway: new Vector3(),
     leanQuat: new Quaternion(),
     leanEuler: new Euler(),
+    // Chassis position last frame — the cockpit smoother compensates the
+    // car's own displacement so smoothing happens in the CAR frame (see the
+    // back-seat-POV fix below).
+    prevPos: new Vector3(),
   });
+  const prevPosValid = useRef(false);
 
   useFrame((state, delta) => {
     const telemetry = telemetryRef.current;
@@ -136,7 +141,7 @@ export function CameraRig({
       cam.updateProjectionMatrix();
     }
 
-    const { pos, quat, fwd, fwdFlat, desired, look, lookSmooth, eye, rotSmooth, glanceQuat, glanceEuler, sway, leanQuat, leanEuler } =
+    const { pos, quat, fwd, fwdFlat, desired, look, lookSmooth, eye, rotSmooth, glanceQuat, glanceEuler, sway, leanQuat, leanEuler, prevPos } =
       scratchRef.current;
     chassis.getWorldPosition(pos);
     chassis.getWorldQuaternion(quat);
@@ -212,6 +217,18 @@ export function CameraRig({
         )
         .applyQuaternion(quat)
         .add(pos);
+      // BACK-SEAT-POV FIX (founder-reported): a plain world-space lerp toward
+      // a target that moves with the car has a steady-state tracking error of
+      // v/rate — at 76 km/h with COCKPIT_DAMPING 25 that is ~0.84 m REARWARD,
+      // which put the camera behind the seat headrest under acceleration.
+      // Carry the camera along with the chassis's own frame displacement
+      // FIRST, so the lerp only smooths car-local jitter (suspension tick),
+      // never the car's travel: zero lag at any speed.
+      if (prevPosValid.current && !switched) {
+        cam.position.add(pos).sub(prevPos);
+      }
+      prevPos.copy(pos);
+      prevPosValid.current = true;
       const k = switched ? 1 : 1 - Math.exp(-COCKPIT_DAMPING * delta);
       cam.position.lerp(eye, k);
 
