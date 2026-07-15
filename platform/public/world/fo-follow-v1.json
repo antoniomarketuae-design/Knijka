@@ -1,0 +1,130 @@
+{
+ "format": "district-v1",
+ "meta": {
+  "district": "fo-follow",
+  "label": "Учебна улица — дистанция на следване (сценарий FO-01)",
+  "mapKind": "scenario-street",
+  "generator": "tools/maps/gen_fo_follow.mjs",
+  "boundsLocalMeters": {
+   "minX": -28.12,
+   "minY": 0,
+   "maxX": 14.125,
+   "maxY": 360
+  },
+  "attribution": {
+   "text": "Учебна права улица за движение в колона — оригинален параметричен дизайн (без данни от OpenStreetMap)",
+   "license": "All rights reserved",
+   "licenseUrl": "/",
+   "copyrightUrl": "/",
+   "obligation": "none — original work, no ODbL attribution required for this map"
+  },
+  "defaults": {
+   "maxspeedUrbanKmh": 50,
+   "note": "Права улица: дистанцията до предния се държи в секунди (2 при сухо), а не в метри на око."
+  },
+  "stats": {
+   "roadKm": 0.36,
+   "nodes": 2,
+   "edges": 1,
+   "intersections": 0,
+   "crossings": 0,
+   "buildings": 1,
+   "spawnPoints": 2
+  },
+  "scenario": {
+   "archetype": "straight-street",
+   "params": {
+    "lengthM": 360,
+    "maxspeedKmh": 50
+   },
+   "lanesPerDirection": 1,
+   "laneCenterRightM": 4.06
+  }
+ },
+ "roads": {
+  "nodes": [
+   {
+    "id": "fo-n-end",
+    "x": 0,
+    "y": 360
+   },
+   {
+    "id": "fo-n-start",
+    "x": 0,
+    "y": 0
+   }
+  ],
+  "edges": [
+   {
+    "id": "fo-e-street",
+    "from": "fo-n-start",
+    "to": "fo-n-end",
+    "class": "residential",
+    "name": "Права улица с движение в колона",
+    "oneway": false,
+    "roundabout": false,
+    "lanes": 2,
+    "lanesSource": "tag",
+    "maxspeed": 50,
+    "maxspeedSource": "tag",
+    "length": 360,
+    "geometry": [
+     [
+      0,
+      0
+     ],
+     [
+      0,
+      360
+     ]
+    ]
+   }
+  ]
+ },
+ "intersections": [],
+ "crossings": [],
+ "roundabouts": [],
+ "buildings": [
+  {
+   "id": "fo-b-block",
+   "height": 7,
+   "heightSource": "default",
+   "footprint": [
+    [
+     -28.12,
+     150
+    ],
+    [
+     -16.12,
+     150
+    ],
+    [
+     -16.12,
+     168
+    ],
+    [
+     -28.12,
+     168
+    ]
+   ]
+  }
+ ],
+ "spawnPoints": [
+  {
+   "id": "fo-spawn-approach",
+   "x": 4.06,
+   "y": 15,
+   "heading": 0,
+   "edgeId": "fo-e-street",
+   "name": "Начало на отсечката"
+  },
+  {
+   "id": "fo-spawn-finish",
+   "x": 4.06,
+   "y": 345,
+   "heading": 0,
+   "edgeId": "fo-e-street",
+   "name": "Контролна точка — край на отсечката"
+  }
+ ]
+}

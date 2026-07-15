@@ -28,6 +28,7 @@ export type ScenarioFamily =
   | "merging"
   | "hazards"
   | "speed"
+  | "following"
   | "conditions"
   | "vru"
   | "exam-drills";
@@ -42,6 +43,7 @@ export const SCENARIO_FAMILIES: readonly ScenarioFamily[] = [
   "merging",
   "hazards",
   "speed",
+  "following",
   "conditions",
   "vru",
   "exam-drills",

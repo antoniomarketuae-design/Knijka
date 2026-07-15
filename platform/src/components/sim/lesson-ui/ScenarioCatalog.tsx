@@ -29,6 +29,7 @@ const FAMILY_ICONS: Record<string, string> = {
   merging: "🔀",
   hazards: "⚠️",
   speed: "🚗",
+  following: "🚙",
   conditions: "🌧️",
   vru: "🚲",
   "exam-drills": "🎓",

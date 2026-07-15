@@ -153,3 +153,17 @@ export {
   recordScSpeedRainDrive,
   type ScSpeedRainTraceName,
 } from "./scSpeedRain";
+
+// S3-C — the following/gap-management authored drives (sc-follow-distance /
+// sc-follow-brake); committed traces are recordings of exactly these scripts
+// (gates: traces/__tests__/fo-follow-distance- / fo-follow-brake-traces).
+export {
+  SC_FOLLOW_DISTANCE_ID,
+  recordScFollowDistanceDrive,
+  type ScFollowDistanceTraceName,
+} from "./scFollowDistance";
+export {
+  SC_FOLLOW_BRAKE_ID,
+  recordScFollowBrakeDrive,
+  type ScFollowBrakeTraceName,
+} from "./scFollowBrake";
