@@ -167,3 +167,16 @@ export {
   recordScFollowBrakeDrive,
   type ScFollowBrakeTraceName,
 } from "./scFollowBrake";
+
+// S3-D — the second junction/priority authored drives (sc-junction-gap /
+// sc-junction-blind); committed traces are recordings of exactly these scripts
+// (gate: traces/__tests__/sc-ju2-traces).
+export {
+  recordScJunction2Drive,
+  scJunction2TraceNames,
+  SC_JUNCTION2_RECORDINGS,
+  SC_JUNCTION_GAP_ID,
+  SC_JUNCTION_BLIND_ID,
+  type ScJunction2TemplateId,
+  type ScJunction2TraceName,
+} from "./scJunctions2";

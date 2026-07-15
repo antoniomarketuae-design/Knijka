@@ -13,6 +13,7 @@
 import type { ScenarioSpec } from "./types";
 import type { ParkingBaySpec } from "../../contracts";
 import { SCENARIO_TEMPLATES_JUNCTIONS } from "./templates-junctions";
+import { SCENARIO_TEMPLATES_JUNCTIONS2 } from "./templates-junctions2";
 import { PARKING_TEMPLATES } from "./templates-parking";
 import { SCENARIO_TEMPLATES_FLOW } from "./templates-flow";
 import { SCENARIO_TEMPLATES_PE } from "./templates-pe";
@@ -207,6 +208,7 @@ export const SCENARIO_TEMPLATES: readonly ScenarioSpec[] = [
   ...PARKING_TEMPLATES,
   ...SCENARIO_TEMPLATES_FLOW,
   ...SCENARIO_TEMPLATES_JUNCTIONS,
+  ...SCENARIO_TEMPLATES_JUNCTIONS2,
   ...SCENARIO_TEMPLATES_PE,
   ...SCENARIO_TEMPLATES_SP,
   ...SCENARIO_TEMPLATES_FOLLOWING,
