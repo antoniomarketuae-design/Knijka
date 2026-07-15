@@ -1,6 +1,7 @@
 import "@/lib/content/loader";
 import type { Metadata } from "next";
 import Link from "next/link";
+import { getContentRepo } from "@/lib/content/repo";
 import { requireUser } from "@/modules/auth";
 import {
   EXAM_DURATION_SEC,
@@ -16,7 +17,7 @@ import { startExamAction } from "./actions";
 export const metadata: Metadata = {
   title: "Пробни изпити · Книжка.AI",
   description:
-    "Пробен изпит 1:1 с официалния формат: 45 въпроса, 97 точки, праг 87, 40 минути.",
+    "Пробен изпит 1:1 с официалния формат: 45 въпроса на опит от банка с над 1000 оригинални, 97 точки, праг 87, 40 минути.",
 };
 
 const MESSAGES: Record<string, string> = {
@@ -44,6 +45,12 @@ export default async function ExamsPage({
     getExamHistory(user.id),
   ]);
   const message = typeof msg === "string" ? MESSAGES[msg] : undefined;
+
+  // Live bank size (landing-page honesty rule: floor to the nearest 100,
+  // derived from the content repo so the claim grows with the bank).
+  const questionCount = getContentRepo().questions().length;
+  const bankRounded = Math.floor(questionCount / 100) * 100;
+  const bankLabel = bankRounded >= 100 ? `над ${bankRounded}` : `${questionCount}`;
 
   return (
     <div className="flex flex-col gap-6">
@@ -83,17 +90,20 @@ export default async function ExamsPage({
           </span>
         </div>
 
-        <dl className="relative mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
-          <RuleStat value={String(EXAM_QUESTION_COUNT)} label="въпроса" />
+        <dl className="relative mt-4 grid grid-cols-2 gap-3 sm:grid-cols-5">
+          <RuleStat value={String(EXAM_QUESTION_COUNT)} label="въпроса на изпит" />
           <RuleStat value={String(EXAM_MAX_POINTS)} label="точки максимум" />
           <RuleStat value={`≥ ${EXAM_PASS_POINTS}`} label="точки за успех" accent />
           <RuleStat value={formatClock(EXAM_DURATION_SEC)} label="минути време" />
+          <RuleStat value={bankLabel} label="въпроса в банката" />
         </dl>
 
         <p className="mt-4 text-sm leading-relaxed text-muted">
           Пробният изпит повтаря официалния теоретичен изпит на ИААА (Наредба
           № 38): въпроси с тежест 1, 2 и 3 точки, включително въпроси с повече
-          от един верен отговор. По време на изпита няма подсказки и обратна
+          от един верен отговор. Всеки опит тегли нови {EXAM_QUESTION_COUNT}{" "}
+          въпроса от банка с {bankLabel} оригинални — два еднакви изпита
+          практически няма. По време на изпита няма подсказки и обратна
           връзка — пълният преглед с обяснения идва след предаването.
         </p>
 
