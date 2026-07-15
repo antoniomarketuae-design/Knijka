@@ -56,8 +56,10 @@ export function LessonCard({
       <p className="text-sm leading-relaxed text-muted">{lesson.descriptionBg}</p>
 
       <dl className="mt-auto flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted">
+        {/* conceptIds are entries from the 152-concept learning graph — the
+            old label „Теми" read as the (16) theory topics and undersold. */}
         <div className="flex items-baseline gap-1">
-          <dt className="font-semibold">Теми:</dt>
+          <dt className="font-semibold">Понятия:</dt>
           <dd className="font-black tabular-nums text-foreground">{lesson.conceptIds.length}</dd>
         </div>
         {!isFreeDrive ? (
