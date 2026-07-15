@@ -16,7 +16,7 @@ const HERE = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(HERE, "../../../../../../..");
 
 describe("S2 catalog integrity", () => {
-  it("registers the full S1+S2+S3 wave (14 templates across the families)", () => {
+  it("registers the full S1+S2+S3 wave (17 templates across the families)", () => {
     const ids = SCENARIO_TEMPLATES.map((s) => s.id).sort();
     expect(ids).toEqual(
       [
@@ -34,6 +34,9 @@ describe("S2 catalog integrity", () => {
         "sc-crossing-let-pass",
         "sc-crossing-slow-crosser",
         "sc-crossing-rain-sprint",
+        "sc-speed-creep",
+        "sc-speed-dangerous",
+        "sc-speed-rain",
       ].sort(),
     );
   });

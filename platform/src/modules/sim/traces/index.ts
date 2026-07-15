@@ -134,3 +134,22 @@ export {
   recordScCrossingRainSprintDrive,
   type ScCrossingRainSprintTraceName,
 } from "./scCrossingRainSprint";
+
+// S3-B — the speed-management authored drives (sc-speed-creep / sc-speed-
+// dangerous / sc-speed-rain); committed traces are recordings of exactly these
+// scripts (gates: traces/__tests__/sp-speed-*).
+export {
+  SC_SPEED_CREEP_ID,
+  recordScSpeedCreepDrive,
+  type ScSpeedCreepTraceName,
+} from "./scSpeedCreep";
+export {
+  SC_SPEED_DANGEROUS_ID,
+  recordScSpeedDangerousDrive,
+  type ScSpeedDangerousTraceName,
+} from "./scSpeedDanger";
+export {
+  SC_SPEED_RAIN_ID,
+  recordScSpeedRainDrive,
+  type ScSpeedRainTraceName,
+} from "./scSpeedRain";

@@ -16,6 +16,7 @@ import { SCENARIO_TEMPLATES_JUNCTIONS } from "./templates-junctions";
 import { PARKING_TEMPLATES } from "./templates-parking";
 import { SCENARIO_TEMPLATES_FLOW } from "./templates-flow";
 import { SCENARIO_TEMPLATES_PE } from "./templates-pe";
+import { SCENARIO_TEMPLATES_SP } from "./templates-sp";
 
 /**
  * The TARGET bay of content/world/lot-perp-v1.json — meta.scenario bay
@@ -206,6 +207,7 @@ export const SCENARIO_TEMPLATES: readonly ScenarioSpec[] = [
   ...SCENARIO_TEMPLATES_FLOW,
   ...SCENARIO_TEMPLATES_JUNCTIONS,
   ...SCENARIO_TEMPLATES_PE,
+  ...SCENARIO_TEMPLATES_SP,
 ];
 
 /** Lookup by template id; undefined for unknown ids. */
