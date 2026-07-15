@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, type RefObject } from "react";
+import { useEffect, useRef, type RefObject } from "react";
 import { useFrame } from "@react-three/fiber";
 import { Euler, Quaternion, Vector3, type Group, type PerspectiveCamera } from "three";
 import {
@@ -28,7 +28,33 @@ import {
 import { FpsMeter, type SimTelemetry } from "@/modules/sim/engine";
 import type { CabinControls, MirrorGlanceKind } from "./cabin";
 
-export type CameraMode = "chase" | "cockpit";
+export type CameraMode = "chase" | "cockpit" | "topdown";
+
+/**
+ * S0-View top-down mode (doc 76 §4 — "one world, N cameras", founder-
+ * confirmed first-class POV). INTEGRATION CHOICE: a PERSPECTIVE camera from
+ * high altitude with a NARROW FOV (15° ≈ near-orthographic foreshortening),
+ * not a true OrthographicCamera. Rationale: the R3F Canvas owns ONE default
+ * camera shared by all modes (chase/cockpit mutate its fov/pose every
+ * frame); swapping camera TYPE per mode would churn `state.camera` for
+ * every consumer (composer passes, mirror RTT, drei helpers) and double the
+ * resize handling. The camera flies at a CONSTANT altitude and zooms by
+ * deriving the vFOV from the preset width at the live aspect (one atan per
+ * frame — the cockpit's own hFOV-hold pattern): constant height keeps the
+ * scene fog/lighting identical across presets (at 300 m the world was fog-
+ * washed), and at the preset widths the FOV lands at ~7–30° — visually flat,
+ * exactly the doc's "perspective from high with narrow FOV" alternative.
+ * View-only: grading never reads the camera.
+ */
+const TOPDOWN_HEIGHT_M = 110;
+/** Zoom presets: visible ground WIDTH at the car's plane, m (doc 76 §4). */
+const TOPDOWN_WIDTHS_M = [20, 40, 80] as const;
+const TOPDOWN_DEFAULT_ZOOM = 1; // 40 m
+/** Fallback fov on mode entry (the per-frame derivation replaces it). */
+const TOPDOWN_FOV_FALLBACK = 15;
+/** Position follow stiffness (1/s) + screen-up orientation damping (1/s). */
+const TOPDOWN_STIFFNESS = 5;
+const TOPDOWN_UP_DAMPING = 4;
 
 /** Clamp to [-limit, +limit]. */
 function clampAbs(v: number, limit: number): number {
@@ -96,6 +122,25 @@ export function CameraRig({
   const lastMode = useRef<CameraMode | null>(null);
   // Smoothed G-force lean state (cockpit head motion).
   const leanRef = useRef({ latG: 0, longG: 0, prevSpeedMps: 0 });
+  // Top-down state (refs — render-free): zoom preset index + orientation.
+  const topdownZoomRef = useRef(TOPDOWN_DEFAULT_ZOOM);
+  const topdownHeadingUpRef = useRef(false); // false = north-up
+
+  // Top-down hotkeys (legend rows in LessonScene): G cycles the zoom preset,
+  // N toggles north-up / heading-up. Active only while the mode is on — the
+  // keys stay free for future bindings in the other views.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.repeat || cameraModeRef.current !== "topdown") return;
+      if (e.code === "KeyG") {
+        topdownZoomRef.current = (topdownZoomRef.current + 1) % TOPDOWN_WIDTHS_M.length;
+      } else if (e.code === "KeyN") {
+        topdownHeadingUpRef.current = !topdownHeadingUpRef.current;
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [cameraModeRef]);
 
   // Scratch objects — never allocate in useFrame.
   const scratchRef = useRef({
@@ -117,6 +162,8 @@ export function CameraRig({
     // car's own displacement so smoothing happens in the CAR frame (see the
     // back-seat-POV fix below).
     prevPos: new Vector3(),
+    // Top-down screen-up vector, damped (north-up ↔ heading-up transitions).
+    upSmooth: new Vector3(0, 0, -1),
   });
   const prevPosValid = useRef(false);
 
@@ -137,38 +184,75 @@ export function CameraRig({
     const switched = mode !== lastMode.current;
     if (switched) {
       lastMode.current = mode;
-      cam.fov = mode === "chase" ? CHASE_FOV : cockpitVFovForAspect(cam.aspect);
+      cam.fov =
+        mode === "chase"
+          ? CHASE_FOV
+          : mode === "topdown"
+            ? TOPDOWN_FOV_FALLBACK
+            : cockpitVFovForAspect(cam.aspect);
       cam.updateProjectionMatrix();
     }
 
-    const { pos, quat, fwd, fwdFlat, desired, look, lookSmooth, eye, rotSmooth, glanceQuat, glanceEuler, sway, leanQuat, leanEuler, prevPos } =
+    const { pos, quat, fwd, fwdFlat, desired, look, lookSmooth, eye, rotSmooth, glanceQuat, glanceEuler, sway, leanQuat, leanEuler, prevPos, upSmooth } =
       scratchRef.current;
     chassis.getWorldPosition(pos);
     chassis.getWorldQuaternion(quat);
     fwd.set(0, 0, 1).applyQuaternion(quat);
 
-    // Base FOV. Chase keeps three's default Hor+ resize (vFOV fixed). The
-    // cockpit instead HOLDS ITS ~75.4° hFOV constant across window shapes
-    // (doc 71 §4.9): vFOV is derived from the live aspect every frame (one
-    // atan — R3F keeps cam.aspect current on resize), so ultrawide/portrait
-    // windows keep the exact horizontal composition the camera contract is
-    // authored for instead of gaining/losing world at the sides.
-    const baseFov = mode === "chase" ? CHASE_FOV : cockpitVFovForAspect(cam.aspect);
-    // Subtle speed-based FOV widen (both cameras). In the cockpit the result
-    // is capped at COCKPIT_FOV_MAX — the lane-12 hard rule (vFOV > ~56 breaks
-    // the graded 10–30 m distance judgments) outranks the widen effect.
-    const speedNorm = Math.min(Math.abs(sim?.speedKmh ?? 0) / 130, 1) ** 1.4;
-    const widen = mode === "chase" ? FOV_WIDEN_CHASE : FOV_WIDEN_COCKPIT;
-    const targetFov =
-      mode === "chase"
-        ? baseFov + widen * speedNorm
-        : Math.min(baseFov + widen * speedNorm, COCKPIT_FOV_MAX);
-    if (Math.abs(cam.fov - targetFov) > 0.02) {
-      cam.fov += (targetFov - cam.fov) * (1 - Math.exp(-FOV_DAMPING * delta));
-      cam.updateProjectionMatrix();
+    if (mode !== "topdown") {
+      // Base FOV. Chase keeps three's default Hor+ resize (vFOV fixed). The
+      // cockpit instead HOLDS ITS ~75.4° hFOV constant across window shapes
+      // (doc 71 §4.9): vFOV is derived from the live aspect every frame (one
+      // atan — R3F keeps cam.aspect current on resize), so ultrawide/portrait
+      // windows keep the exact horizontal composition the camera contract is
+      // authored for instead of gaining/losing world at the sides.
+      const baseFov = mode === "chase" ? CHASE_FOV : cockpitVFovForAspect(cam.aspect);
+      // Subtle speed-based FOV widen (both cameras). In the cockpit the result
+      // is capped at COCKPIT_FOV_MAX — the lane-12 hard rule (vFOV > ~56 breaks
+      // the graded 10–30 m distance judgments) outranks the widen effect.
+      // Top-down holds TOPDOWN_FOV constant — zoom is the height, never fov.
+      const speedNorm = Math.min(Math.abs(sim?.speedKmh ?? 0) / 130, 1) ** 1.4;
+      const widen = mode === "chase" ? FOV_WIDEN_CHASE : FOV_WIDEN_COCKPIT;
+      const targetFov =
+        mode === "chase"
+          ? baseFov + widen * speedNorm
+          : Math.min(baseFov + widen * speedNorm, COCKPIT_FOV_MAX);
+      if (Math.abs(cam.fov - targetFov) > 0.02) {
+        cam.fov += (targetFov - cam.fov) * (1 - Math.exp(-FOV_DAMPING * delta));
+        cam.updateProjectionMatrix();
+      }
     }
 
-    if (mode === "chase") {
+    if (mode === "topdown") {
+      // Centered-on-car bird view at CONSTANT altitude; the zoom preset's
+      // visible ground WIDTH derives the vFOV at the live aspect per frame,
+      // so resize/rotation keep the promised meters across the screen while
+      // the fog/lighting stay identical across presets.
+      fwdFlat.set(fwd.x, 0, fwd.z);
+      if (fwdFlat.lengthSq() < 1e-6) fwdFlat.set(0, 0, 1);
+      fwdFlat.normalize();
+      const widthM = TOPDOWN_WIDTHS_M[topdownZoomRef.current];
+      const aspect = Math.max(cam.aspect, 0.2);
+      const targetFov =
+        (Math.atan(widthM / (2 * TOPDOWN_HEIGHT_M * aspect)) * 360) / Math.PI;
+      if (Math.abs(cam.fov - targetFov) > 0.05) {
+        cam.fov += (targetFov - cam.fov) * (switched ? 1 : 1 - Math.exp(-8 * delta));
+        cam.updateProjectionMatrix();
+      }
+      desired.set(pos.x, pos.y + TOPDOWN_HEIGHT_M, pos.z);
+      const k = switched ? 1 : 1 - Math.exp(-TOPDOWN_STIFFNESS * delta);
+      cam.position.lerp(desired, k);
+      // Screen-up: world north (three −Z) or the car's heading — damped so
+      // heading-up rotates the frame smoothly instead of snapping per tick.
+      look.set(0, 0, -1); // scratch reuse: the up TARGET this frame
+      const upTarget = topdownHeadingUpRef.current ? fwdFlat : look;
+      const ku = switched ? 1 : 1 - Math.exp(-TOPDOWN_UP_DAMPING * delta);
+      upSmooth.lerp(upTarget, ku);
+      if (upSmooth.lengthSq() < 1e-4) upSmooth.copy(upTarget);
+      upSmooth.normalize();
+      cam.up.copy(upSmooth);
+      cam.lookAt(pos.x, pos.y, pos.z);
+    } else if (mode === "chase") {
       fwdFlat.set(fwd.x, 0, fwd.z);
       if (fwdFlat.lengthSq() < 1e-6) fwdFlat.set(0, 0, 1);
       fwdFlat.normalize();

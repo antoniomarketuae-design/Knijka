@@ -85,6 +85,13 @@ import {
 } from "@/modules/sim/world";
 import { createWorldRuntime } from "@/modules/sim/runtime";
 import { createTrafficSystem, TrafficLayer, type TrafficDistrict } from "@/modules/sim/traffic";
+import {
+  buildPoligonGhostDemo,
+  createTraceClock,
+  type LiveTraceRecorder,
+  type RecordedDrive,
+  type TraceClock,
+} from "@/modules/sim/traces";
 import { CabinControls, type MirrorGlanceKind } from "./cabin";
 import { TouchControls } from "./TouchControls";
 import { CockpitInteractionContext } from "./vitok/hotspots";
@@ -95,6 +102,8 @@ import { NpcColliders } from "./NpcColliders";
 import { createVehicleSample } from "./vehicleSample";
 import { buildMinimapPolylines } from "./lessonMinimap";
 import { RouteGuidance } from "./RouteGuidance";
+import { ShadowCar } from "./ShadowCar";
+import { TraceTimeline } from "./lesson-ui/TraceTimeline";
 import type { QualityPreset } from "./lesson-ui/types";
 
 // Minimal structural mirrors of the district shapes we read here — the runtime
@@ -137,6 +146,22 @@ function shouldLogPerf(): boolean {
   try {
     if (new URLSearchParams(window.location.search).has("simPerf")) return true;
     return window.localStorage.getItem("sim.perfLog") === "1";
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * S0-View demo flag (doc 76 §10 P0 proof-of-form; never in production
+ * builds): `?ghost=demo` on полигон FREE DRIVE mounts the Shadow Car demo —
+ * a scripted correct drive recorded at load through the production stack
+ * (traces/demo.ts), played back as the translucent ghost + path ribbon +
+ * scrub timeline, for the founder to judge the form factor.
+ */
+function isGhostDemoEnabled(): boolean {
+  if (process.env.NODE_ENV === "production") return false;
+  try {
+    return new URLSearchParams(window.location.search).get("ghost") === "demo";
   } catch {
     return false;
   }
@@ -236,6 +261,9 @@ interface Built {
   director: ScenarioDirector | null;
   minimapPolylines: MinimapFrame["polylines"];
   spawnPoints: SpawnPointLike[];
+  /** S0-View: raw district doc for the ?ghost=demo recorder — null unless
+   *  the dev flag is on AND this is полигон free drive. */
+  ghostDemoRaw: unknown | null;
 }
 
 export interface LessonSceneProps {
@@ -275,6 +303,14 @@ export interface LessonSceneProps {
   /** P1: shell-owned fullscreen toggle (QW1 — the shell root is the
    *  fullscreen element) so the touch overlay can offer the ⛶ button. */
   onToggleFullscreen?: () => void;
+  /**
+   * S0-View (additive, doc 76 §5 attempt recording): a live trace recorder
+   * created via traces.createTraceRecorder — when provided, the frame loop
+   * streams the STUDENT's drive into it (20 Hz kinematics + glance/signal/
+   * driveline events). OFF by default (prop absent); the owner calls
+   * finish() at session end for compare-vs-shadow / replay.
+   */
+  attemptRecorderRef?: React.RefObject<LiveTraceRecorder | null>;
 }
 
 export default function LessonScene(props: LessonSceneProps) {
@@ -342,6 +378,13 @@ export default function LessonScene(props: LessonSceneProps) {
                 seed: lessonSeed(props.lesson.id),
               })
             : null;
+        // S0-View: the ghost demo needs the raw doc for its headless recorder.
+        const ghostDemoRaw =
+          isGhostDemoEnabled() &&
+          districtId === "poligon-v1" &&
+          props.lesson.objectives.length === 0
+            ? raw
+            : null;
         if (alive) {
           setBuilt({
             runtime,
@@ -351,6 +394,7 @@ export default function LessonScene(props: LessonSceneProps) {
             director,
             minimapPolylines: buildMinimapPolylines(district),
             spawnPoints,
+            ghostDemoRaw,
           });
         }
       } catch (err) {
@@ -418,6 +462,7 @@ function ReadyScene({
   onStagedOutcome,
   onNearMiss,
   onToggleFullscreen,
+  attemptRecorderRef,
 }: LessonSceneProps & {
   built: Built;
   menuPaused: boolean;
@@ -428,6 +473,20 @@ function ReadyScene({
 }) {
   const { runtime, geometry, district, traffic, director, minimapPolylines, spawnPoints } =
     built;
+
+  // S0-View ?ghost=demo: record the scripted shadow drive ONCE per scene
+  // (deterministic, <100 ms — the same recorder the vitest suite gates) and
+  // play it through ShadowCar + TraceTimeline via a shared clock ref.
+  const ghostDemo = useMemo<RecordedDrive | null>(() => {
+    if (!built.ghostDemoRaw) return null;
+    try {
+      return buildPoligonGhostDemo(built.ghostDemoRaw);
+    } catch (err) {
+      console.warn("LessonScene: ghost demo recording failed", err);
+      return null;
+    }
+  }, [built.ghostDemoRaw]);
+  const ghostClockRef = useRef<TraceClock>(createTraceClock());
 
   const timeOfDay = lesson.environment?.timeOfDay ?? "day";
   const rain = lesson.environment?.rain ?? false;
@@ -481,11 +540,14 @@ function ReadyScene({
   }, []);
 
   // Camera toggle + car reset, shared by the key callbacks (C/R) and the
-  // touch overlay buttons — one code path per action.
+  // touch overlay buttons — one code path per action. S0-View: C now CYCLES
+  // three views — cockpit → chase → top-down (doc 76 §4, view-only concern:
+  // grading never reads the camera).
   const toggleCamera = useCallback(() => {
-    cameraModeRef.current =
-      cameraModeRef.current === "chase" ? "cockpit" : "chase";
-    setCockpit(cameraModeRef.current === "cockpit");
+    const order: CameraMode[] = ["cockpit", "chase", "topdown"];
+    const next = order[(order.indexOf(cameraModeRef.current) + 1) % order.length];
+    cameraModeRef.current = next;
+    setCockpit(next === "cockpit");
   }, []);
 
   // Mirror of the driveLocked prop so the input lifecycle effect (which runs
@@ -685,9 +747,11 @@ function ReadyScene({
               director={director}
               hazardActiveRef={hazardActiveRef}
               sampleRef={sampleRef}
+              simRef={simRef}
               inputRef={inputRef}
               cabinRef={cabinRef}
               audioRef={audioRef}
+              attemptRecorderRef={attemptRecorderRef}
               driveLocked={driveLocked}
               drivelineEventsRef={drivelineEventsRef}
               glanceQueueRef={glanceQueueRef}
@@ -747,6 +811,13 @@ function ReadyScene({
             spawnStart={guidanceSpawnStart}
           />
         ) : null}
+        {/* S0-View ?ghost=demo: the Shadow Car (translucent ghost + blue path
+            ribbon) plays the recorded trace kinematically — no physics. */}
+        {ghostDemo ? (
+          <Suspense fallback={null}>
+            <ShadowCar trace={ghostDemo.trace} clockRef={ghostClockRef} />
+          </Suspense>
+        ) : null}
         <CameraRig
           chassisGroupRef={chassisGroupRef}
           simRef={simRef}
@@ -761,6 +832,14 @@ function ReadyScene({
           bottom cards + minimap). Collapsed by default on touch-only devices
           (the keys are real but secondary there). */}
       <ControlsHelp defaultOpen={!touchOnly} />
+
+      {/* S0-View ?ghost=demo: playback deck for the Shadow Car — scrub bar,
+          speeds, annotation ticks, step-by-step, loop-section. */}
+      {ghostDemo ? (
+        <div className="absolute bottom-3 left-1/2 z-10 w-[min(92%,36rem)] -translate-x-1/2">
+          <TraceTimeline trace={ghostDemo.trace} clockRef={ghostClockRef} />
+        </div>
+      ) : null}
 
       {/* P1: touch input overlay — mounts on any touch-capable device, hides
           itself during keyboard use and while paused/quiz/teach/end overlays
@@ -939,9 +1018,11 @@ function RuntimeDriver({
   director,
   hazardActiveRef,
   sampleRef,
+  simRef,
   inputRef,
   cabinRef,
   audioRef,
+  attemptRecorderRef,
   driveLocked,
   drivelineEventsRef,
   glanceQueueRef,
@@ -964,9 +1045,13 @@ function RuntimeDriver({
   /** A8 → TrafficLayer: animate the lesson hazard visual while true. */
   hazardActiveRef: React.RefObject<boolean>;
   sampleRef: React.RefObject<VehicleSample>;
+  /** S0-View: live steer angle for the attempt recorder (visual channel). */
+  simRef: React.RefObject<VehicleSim | null>;
   inputRef: React.RefObject<GatedSimInput | null>;
   cabinRef: React.RefObject<CabinControls | null>;
   audioRef: React.RefObject<SimAudio | null>;
+  /** S0-View attempt recording — absent/null = off (default). */
+  attemptRecorderRef?: React.RefObject<LiveTraceRecorder | null>;
   /** True while the procedure runs — the observer only listens then. */
   driveLocked: boolean;
   drivelineEventsRef: React.RefObject<DrivelineEvent[]>;
@@ -993,6 +1078,8 @@ function RuntimeDriver({
   const trackerRef = useRef<PreDriveSignalTracker>(createPreDriveSignalTracker());
   const pollRef = useRef<CabinPollState>(cabinPollBaseline(null, 0));
   const prevLockedRef = useRef(false);
+  // S0-View attempt recorder: last indicator setting → signal-on/off edges.
+  const recIndicatorRef = useRef<"off" | "left" | "right">("off");
 
   useFrame((_, delta) => {
     // QW10: consume the throttle-while-locked latch every frame (so attempts
@@ -1072,6 +1159,14 @@ function RuntimeDriver({
         }
       }
     }
+    // S0-View: stream driveline transitions into the attempt trace before
+    // the queues drain (sparse events — allocation is allowed there).
+    const recorder = attemptRecorderRef?.current;
+    if (recorder) {
+      for (const event of drivelineEvents) {
+        recorder.addEvent("driveline", tRef.current, undefined, event.kind);
+      }
+    }
     // Drain both queues even outside the pre-drive phase (driveline events
     // keep flowing while driving — wipers, gears, stalls — and must not pile).
     drivelineEvents.length = 0;
@@ -1121,6 +1216,34 @@ function RuntimeDriver({
     }
     onTick(tick);
 
+    // S0-View attempt recording (doc 76 §5): the ring recorder decimates the
+    // frame feed to ~20 Hz itself — push() is zero-alloc, so this stays free
+    // when the prop is absent and cheap when it isn't.
+    if (recorder) {
+      recorder.push({
+        tSec: tRef.current,
+        x: sample.position.x,
+        y: sample.position.y,
+        headingDeg: sample.headingDeg,
+        steerRad: simRef.current?.steerRad ?? 0,
+        speedKmh: sample.speedKmh,
+        gear: sample.gear,
+        indicator: sample.indicator,
+        brakeOn: (inputRef.current?.rawBrake ?? 0) > 0.15,
+        throttleOn: (inputRef.current?.rawThrottle ?? 0) > 0.15,
+      });
+      // Sparse events: glances arrive as one-frame sample values; indicator
+      // edges become signal-on/off.
+      if (sample.mirrorGlance) {
+        recorder.addEvent(`glance-${sample.mirrorGlance}`, tRef.current);
+      }
+      if (sample.indicator !== recIndicatorRef.current) {
+        recIndicatorRef.current = sample.indicator;
+        if (sample.indicator === "off") recorder.addEvent("signal-off", tRef.current);
+        else recorder.addEvent("signal-on", tRef.current, undefined, sample.indicator);
+      }
+    }
+
     const nowMs = tRef.current * 1000;
     if (nowMs - lastMinimapRef.current >= MINIMAP_MS) {
       lastMinimapRef.current = nowMs;
@@ -1162,7 +1285,9 @@ function ControlsHelp({ defaultOpen = true }: { defaultOpen?: boolean }) {
     ["H", "клаксон — задръж"],
     ["Q E F", "огледала — задръж (ляво / дясно / назад)"],
     ["Клик", "контролите в кабината (изглед кокпит)"],
-    ["C", "смяна на изглед"],
+    ["C", "изглед: кокпит / отвън / отгоре"],
+    ["G", "мащаб отгоре: 20 / 40 / 80 м"],
+    ["N", "отгоре: север горе / посока горе"],
     ["X", "цял екран"],
     ["R  ·  Esc", "рестарт · пауза"],
   ];

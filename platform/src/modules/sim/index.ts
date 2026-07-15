@@ -9,3 +9,4 @@
 export * as rules from "./rules";
 export * as procedures from "./procedures";
 export * as lessons from "./lessons";
+export * as traces from "./traces";

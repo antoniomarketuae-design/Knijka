@@ -43,6 +43,7 @@ import {
   type GuidanceGoal,
   type RouteDistrictLike,
 } from "./guidanceRoute";
+import { createRibbonBuffers, writeRibbonStrip } from "./ribbonStrip";
 
 // World constants (world/builders/constants.ts): ROAD_Y = 0.02, MARKING_Y =
 // 0.032. The ribbon hovers ~2.5 cm over the asphalt — above the paint, no
@@ -154,43 +155,11 @@ export interface RouteGuidanceProps {
   spawnStart: { x: number; y: number; headingDeg: number };
 }
 
-/** Write the derived route into the ribbon's preallocated attribute buffers. */
+/** Write the derived route into the ribbon's preallocated attribute buffers.
+ *  The mesh math lives in the SHARED builder (ribbonStrip.ts) — extracted for
+ *  the Scenario Studio trace ribbons; A7 behavior is byte-identical. */
 function fillRibbon(geo: THREE.BufferGeometry, route: DerivedRoute): void {
-  const posAttr = geo.getAttribute("position") as THREE.BufferAttribute;
-  const sAttr = geo.getAttribute("aS") as THREE.BufferAttribute;
-  const positions = posAttr.array as Float32Array;
-  const arcAttr = sAttr.array as Float32Array;
-  const { pts, arc, count } = route;
-  for (let i = 0; i < count; i++) {
-    const x = pts[i * 2];
-    const y = pts[i * 2 + 1];
-    // Tangent from neighbors (clamped at the ends), left normal = (-ty, tx).
-    const i0 = i > 0 ? i - 1 : i;
-    const i1 = i < count - 1 ? i + 1 : i;
-    let tx = pts[i1 * 2] - pts[i0 * 2];
-    let ty = pts[i1 * 2 + 1] - pts[i0 * 2 + 1];
-    const len = Math.hypot(tx, ty) || 1;
-    tx /= len;
-    ty /= len;
-    const nx = -ty * RIBBON_HALF_W;
-    const ny = tx * RIBBON_HALF_W;
-    // district (x, y) → three (x, RIBBON_Y, −y)
-    const v = i * 2;
-    positions[v * 3] = x + nx;
-    positions[v * 3 + 1] = RIBBON_Y;
-    positions[v * 3 + 2] = -(y + ny);
-    positions[v * 3 + 3] = x - nx;
-    positions[v * 3 + 4] = RIBBON_Y;
-    positions[v * 3 + 5] = -(y - ny);
-    arcAttr[v] = arc[i];
-    arcAttr[v + 1] = arc[i];
-  }
-  geo.setDrawRange(0, (count - 1) * 6);
-  posAttr.needsUpdate = true;
-  sAttr.needsUpdate = true;
-  // Never frustum-culled (the route spans the district); a huge static bound
-  // keeps three from ever recomputing one.
-  if (!geo.boundingSphere) geo.boundingSphere = new THREE.Sphere(new THREE.Vector3(), 1e6);
+  writeRibbonStrip(geo, route, RIBBON_Y, RIBBON_HALF_W);
 }
 
 export function RouteGuidance({
@@ -204,28 +173,9 @@ export function RouteGuidance({
   const reducedMotion = useMemo(() => prefersReducedMotion(), []);
   const accent = useMemo(() => readAccentCyan(), []);
 
-  // --- Ribbon: preallocated triangle strip (2 verts per route sample). ---
-  const ribbonBuffers = useMemo(() => {
-    const positions = new Float32Array(ROUTE_MAX_SAMPLES * 2 * 3);
-    const aS = new Float32Array(ROUTE_MAX_SAMPLES * 2);
-    const aSide = new Float32Array(ROUTE_MAX_SAMPLES * 2);
-    for (let i = 0; i < ROUTE_MAX_SAMPLES; i++) {
-      aSide[i * 2] = -1;
-      aSide[i * 2 + 1] = 1;
-    }
-    const index = new Uint16Array((ROUTE_MAX_SAMPLES - 1) * 6);
-    for (let i = 0; i < ROUTE_MAX_SAMPLES - 1; i++) {
-      const v = i * 2;
-      const o = i * 6;
-      index[o] = v;
-      index[o + 1] = v + 1;
-      index[o + 2] = v + 2;
-      index[o + 3] = v + 1;
-      index[o + 4] = v + 3;
-      index[o + 5] = v + 2;
-    }
-    return { positions, aS, aSide, index };
-  }, []);
+  // --- Ribbon: preallocated triangle strip (2 verts per route sample),
+  // built by the shared ribbonStrip helper (identical layout as always). ---
+  const ribbonBuffers = useMemo(() => createRibbonBuffers(ROUTE_MAX_SAMPLES), []);
 
   const ribbonMatArgs = useMemo<[THREE.ShaderMaterialParameters]>(
     () => [

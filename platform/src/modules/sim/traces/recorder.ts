@@ -1,0 +1,574 @@
+/**
+ * Trace recorders (doc 76 §5) — the two ways a ScenarioTrace is born:
+ *
+ * 1. `recordScriptedDrive` — HEADLESS: drives an authored script through the
+ *    PRODUCTION stack (createWorldRuntime + createTrafficSystem + scenario
+ *    director + rule engine — the same wiring LessonScene and the C1
+ *    driver-bot harness use) and returns the trace PLUS the rule-engine
+ *    event log, so every shadow demo can be gated on "replays with zero
+ *    violations" (doc 76 §5 validation rule). Kinematic, deterministic,
+ *    node-safe: usable from vitest, tools/ pipelines and the browser.
+ *
+ * 2. `createTraceRecorder` — LIVE: a ring recorder the scene's frame loop
+ *    pushes into (student attempts). Columnar typed-array storage, scheduled
+ *    ~20 Hz decimation, ZERO allocation per push — the LessonScene frame-loop
+ *    law. Events (glances/signals/driveline) are sparse and may allocate.
+ */
+
+import type { StagedEventOutcome, StagedEventSpec, VehicleSample } from "../contracts";
+import { createScenarioDirector } from "../orchestrator";
+import { createRuleEngine, reduceTick, type RuleEvent } from "../rules";
+import { createWorldRuntime } from "../runtime";
+import { createTrafficSystem } from "../traffic/system";
+import type { TrafficDistrict } from "../traffic/types";
+import { ESTIMATE_WHEELBASE } from "../vehicle";
+import {
+  TRACE_SAMPLE_HZ,
+  TRACE_VERSION,
+  type ScenarioTrace,
+  type TraceEvent,
+  type TraceEventKind,
+  type TraceIndicator,
+  type TraceKind,
+  type TraceSample,
+} from "./types";
+
+// ---------------------------------------------------------------------------
+// Live ring recorder (student attempts — LessonScene frame hook)
+// ---------------------------------------------------------------------------
+
+export interface LiveTraceSampleInput {
+  tSec: number;
+  x: number;
+  y: number;
+  headingDeg: number;
+  steerRad: number;
+  speedKmh: number;
+  gear: number;
+  indicator: TraceIndicator;
+  brakeOn: boolean;
+  throttleOn: boolean;
+}
+
+export interface LiveRecorderOptions {
+  scenarioId: string;
+  kind: TraceKind;
+  /** Sampling cadence, Hz (default TRACE_SAMPLE_HZ = 20). */
+  hz?: number;
+  /** Ring capacity in seconds — older samples are overwritten (default 300 s). */
+  maxDurationSec?: number;
+  /** Sparse-event cap; further events are dropped (default 512). */
+  maxEvents?: number;
+}
+
+export interface LiveTraceRecorder {
+  /** Feed the CURRENT frame; the recorder decimates to its cadence. Zero-alloc. */
+  push(s: LiveTraceSampleInput): void;
+  /** Record a sparse event at `tSec` (glance/signal/driveline/annotation). */
+  addEvent(kind: TraceEventKind, tSec: number, textBg?: string, detail?: string): void;
+  /** Drop everything and start over (retry). */
+  reset(): void;
+  /** Assemble the trace (rebased so the first retained sample is t = 0);
+   *  null while fewer than two samples exist. Allocates — end-of-run only. */
+  finish(): ScenarioTrace | null;
+  readonly sampleCount: number;
+}
+
+const IND_TO_CODE: Record<TraceIndicator, number> = { off: 0, left: 1, right: 2 };
+const CODE_TO_IND: readonly TraceIndicator[] = ["off", "left", "right"];
+
+export function createTraceRecorder(options: LiveRecorderOptions): LiveTraceRecorder {
+  const hz = options.hz ?? TRACE_SAMPLE_HZ;
+  const period = 1 / hz;
+  const capacity = Math.max(16, Math.ceil((options.maxDurationSec ?? 300) * hz));
+  const maxEvents = options.maxEvents ?? 512;
+
+  // Columnar ring storage — one typed array per channel, mutated in place.
+  const colT = new Float64Array(capacity);
+  const colX = new Float64Array(capacity);
+  const colY = new Float64Array(capacity);
+  const colH = new Float64Array(capacity);
+  const colSteer = new Float64Array(capacity);
+  const colSpeed = new Float64Array(capacity);
+  const colGear = new Int8Array(capacity);
+  const colInd = new Uint8Array(capacity);
+  const colFlags = new Uint8Array(capacity); // bit0 = brake, bit1 = throttle
+
+  let head = 0; // next write slot
+  let count = 0;
+  let nextT = -Infinity; // first push is always accepted
+  let events: TraceEvent[] = [];
+
+  return {
+    get sampleCount() {
+      return count;
+    },
+
+    push(s: LiveTraceSampleInput): void {
+      if (s.tSec + 1e-6 < nextT) return;
+      // Scheduled cadence: march the grid forward; re-anchor after stalls
+      // (pause menus) so the next sample lands promptly, not in the past.
+      nextT = nextT === -Infinity || s.tSec > nextT + period ? s.tSec + period : nextT + period;
+      colT[head] = s.tSec;
+      colX[head] = s.x;
+      colY[head] = s.y;
+      colH[head] = s.headingDeg;
+      colSteer[head] = s.steerRad;
+      colSpeed[head] = s.speedKmh;
+      colGear[head] = s.gear;
+      colInd[head] = IND_TO_CODE[s.indicator] ?? 0;
+      colFlags[head] = (s.brakeOn ? 1 : 0) | (s.throttleOn ? 2 : 0);
+      head = (head + 1) % capacity;
+      if (count < capacity) count++;
+    },
+
+    addEvent(kind, tSec, textBg, detail) {
+      if (events.length >= maxEvents) return;
+      const e: TraceEvent = { tSec, kind };
+      if (textBg !== undefined) e.textBg = textBg;
+      if (detail !== undefined) e.detail = detail;
+      events.push(e);
+    },
+
+    reset() {
+      head = 0;
+      count = 0;
+      nextT = -Infinity;
+      events = [];
+    },
+
+    finish(): ScenarioTrace | null {
+      if (count < 2) return null;
+      const start = (head - count + capacity) % capacity;
+      const t0 = colT[start];
+      const samples: TraceSample[] = new Array(count);
+      for (let i = 0; i < count; i++) {
+        const j = (start + i) % capacity;
+        samples[i] = {
+          tSec: colT[j] - t0,
+          x: colX[j],
+          y: colY[j],
+          headingDeg: colH[j],
+          steerRad: colSteer[j],
+          speedKmh: colSpeed[j],
+          gear: colGear[j],
+          indicator: CODE_TO_IND[colInd[j]] ?? "off",
+          brakeOn: (colFlags[j] & 1) !== 0,
+          throttleOn: (colFlags[j] & 2) !== 0,
+        };
+      }
+      const durationSec = samples[count - 1].tSec;
+      const outEvents = events
+        .filter((e) => e.tSec >= t0)
+        .map((e) => ({ ...e, tSec: e.tSec - t0 }))
+        .sort((a, b) => a.tSec - b.tSec);
+      return {
+        meta: {
+          scenarioId: options.scenarioId,
+          kind: options.kind,
+          version: TRACE_VERSION,
+          durationSec,
+        },
+        samples,
+        events: outEvents,
+      };
+    },
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Scripted headless recorder (shadow / mistake demos — the C1 bot's mold)
+// ---------------------------------------------------------------------------
+
+/** One authored instruction of a drive script. `drive`/`pause` consume time;
+ *  the rest are instantaneous markers applied at the current clock. */
+export type DriveStep =
+  | {
+      kind: "drive";
+      /** District-space polyline the car follows (lane-positioned by the
+       *  author — the recorder does NOT lane-offset). */
+      points: ReadonlyArray<readonly [number, number]>;
+      targetKmh: number;
+      /** Reverse gear: travel along the polyline facing AWAY from travel. */
+      reverse?: boolean;
+      /** Come to rest at the polyline end (default: stop only when the next
+       *  timed step is not a same-direction drive). */
+      stopAtEnd?: boolean;
+    }
+  | { kind: "pause"; sec: number; brake?: boolean }
+  | { kind: "indicator"; setting: TraceIndicator }
+  | { kind: "glance"; mirror: "left" | "right" | "rear" }
+  | { kind: "annotation"; textBg: string };
+
+export interface DriveScript {
+  steps: DriveStep[];
+}
+
+export interface RecordScriptedDriveOptions {
+  scenarioId: string;
+  kind: TraceKind;
+  /** Deterministic seed for traffic + director (default 7). */
+  seed?: number;
+  stagedEvents?: StagedEventSpec[];
+  /** Ambient traffic (default 0/0 — staged actors only, the harness law). */
+  vehicleCount?: number;
+  pedestrianCount?: number;
+  isNight?: boolean;
+  rain?: boolean;
+  /** Hard cap on scripted-drive length (default 900 s). */
+  maxDurationSec?: number;
+}
+
+export interface RecordedDrive {
+  trace: ScenarioTrace;
+  /** Full chronological rule-engine log of the drive — the zero-violation
+   *  CI gate for shadow demos reads this. */
+  ruleEvents: RuleEvent[];
+  /** Staged-encounter resolutions (empty without stagedEvents). */
+  outcomes: StagedEventOutcome[];
+}
+
+/** Simulation rate of the scripted recorder; 3:1 against TRACE_SAMPLE_HZ so
+ *  decimation lands exactly on the 20 Hz grid. */
+const SCRIPT_DT = 1 / 60;
+const SCRIPT_ACCEL = 2.2; // m/s² — the C1 bot's comfortable rates
+const SCRIPT_DECEL = 4.6;
+
+function wrap180(d: number): number {
+  while (d > 180) d -= 360;
+  while (d < -180) d += 360;
+  return d;
+}
+
+/** Internal arclength walker over one drive step's polyline. */
+class StepPath {
+  readonly px: number[] = [];
+  readonly py: number[] = [];
+  readonly cum: number[] = [0];
+  readonly length: number;
+  /** 2 m-sampled headings for the curve-speed cap. */
+  private readonly hArc: number[] = [];
+  private readonly hDeg: number[] = [];
+
+  constructor(points: ReadonlyArray<readonly [number, number]>) {
+    for (const [x, y] of points) {
+      const n = this.px.length;
+      if (n > 0 && Math.hypot(x - this.px[n - 1], y - this.py[n - 1]) < 1e-6) continue;
+      this.px.push(x);
+      this.py.push(y);
+      if (this.px.length > 1) {
+        const i = this.px.length - 1;
+        this.cum.push(
+          this.cum[i - 1] + Math.hypot(this.px[i] - this.px[i - 1], this.py[i] - this.py[i - 1]),
+        );
+      }
+    }
+    this.length = this.cum[this.cum.length - 1] ?? 0;
+    let acc = 0;
+    for (let i = 0; i < this.px.length - 1; i++) {
+      const dx = this.px[i + 1] - this.px[i];
+      const dy = this.py[i + 1] - this.py[i];
+      const segLen = Math.hypot(dx, dy);
+      const h = ((Math.atan2(dx, dy) * 180) / Math.PI + 360) % 360;
+      for (let q = 0; q < segLen; q += 2) {
+        this.hArc.push(acc + q);
+        this.hDeg.push(h);
+      }
+      acc += segLen;
+    }
+  }
+
+  poseAt(s: number): { x: number; y: number; headingDeg: number } {
+    const ss = Math.max(0, Math.min(this.length, s));
+    let i = 0;
+    while (i < this.cum.length - 2 && this.cum[i + 1] < ss) i++;
+    const segLen = this.cum[i + 1] - this.cum[i];
+    const t = segLen > 0 ? (ss - this.cum[i]) / segLen : 0;
+    const dx = this.px[i + 1] - this.px[i];
+    const dy = this.py[i + 1] - this.py[i];
+    return {
+      x: this.px[i] + dx * t,
+      y: this.py[i] + dy * t,
+      headingDeg: ((Math.atan2(dx, dy) * 180) / Math.PI + 360) % 360,
+    };
+  }
+
+  /** |Σ heading deltas| over (s, s+aheadM] — the C1 curve-speed input. */
+  curvatureAhead(s: number, aheadM: number): number {
+    const { hArc, hDeg } = this;
+    let lo = 0;
+    let hi = hArc.length - 1;
+    if (hi < 1) return 0;
+    while (lo < hi) {
+      const mid = (lo + hi) >> 1;
+      if (hArc[mid] < s) lo = mid + 1;
+      else hi = mid;
+    }
+    let sum = 0;
+    for (let i = lo; i + 1 < hArc.length && hArc[i + 1] <= s + aheadM; i++) {
+      sum += wrap180(hDeg[i + 1] - hDeg[i]);
+    }
+    return Math.abs(sum);
+  }
+}
+
+/**
+ * Drive an authored script through the production stack and record it.
+ *
+ * The movement model is the C1 driver-bot's kinematic core (accel/decel
+ * limits + curve-speed caps over the authored polyline) — NOT physics, by
+ * design (doc 76 trap 3). The production runtime + rule engine grade every
+ * frame exactly as LessonScene would, so the returned `ruleEvents` log is
+ * the authoritative innocence check for shadow demos.
+ */
+export function recordScriptedDrive(
+  districtRaw: unknown,
+  script: DriveScript,
+  options: RecordScriptedDriveOptions,
+): RecordedDrive {
+  // --- production stack (the orchestrator-harness wiring, LessonScene's) ---
+  const runtime = createWorldRuntime(districtRaw);
+  const traffic = createTrafficSystem(districtRaw as TrafficDistrict, {
+    seed: options.seed ?? 7,
+    vehicleCount: options.vehicleCount ?? 0,
+    pedestrianCount: options.pedestrianCount ?? 0,
+  });
+  runtime.setPedestrianQuery((id) => traffic.pedestrianOnCrossing(id));
+  runtime.setJunctionConflictQuery((x, y, r, b) => traffic.conflictNear(x, y, r, b));
+  runtime.setOncomingQuery((px, py, h, r) => traffic.oncomingNear(px, py, h, r));
+  runtime.setRightConflictQuery((jx, jy, px, py, h, r) =>
+    traffic.conflictFromRight(jx, jy, px, py, h, r),
+  );
+  runtime.setCirculatingQuery((cx, cy, px, py, h, r) =>
+    traffic.circulatingConflict(cx, cy, px, py, h, r),
+  );
+  const staged = options.stagedEvents ?? [];
+  const director =
+    staged.length > 0
+      ? createScenarioDirector(staged, traffic, { seed: options.seed ?? 7, signals: runtime })
+      : null;
+  let rules = createRuleEngine();
+  const ruleEvents: RuleEvent[] = [];
+  const outcomes: StagedEventOutcome[] = [];
+
+  // --- recording state -----------------------------------------------------
+  const samples: TraceSample[] = [];
+  const events: TraceEvent[] = [];
+  let t = 0;
+  let frame = 0;
+  let indicator: TraceIndicator = "off";
+  let pendingGlance: "left" | "right" | "rear" | null = null;
+  let pose = { x: 0, y: 0, headingDeg: 0 };
+  let prevHeading: number | null = null;
+  let speedMps = 0;
+
+  const isNight = options.isNight ?? false;
+  const rain = options.rain ?? false;
+  const maxFrames = Math.ceil((options.maxDurationSec ?? 900) / SCRIPT_DT);
+
+  const emitEvent = (kind: TraceEventKind, textBg?: string, detail?: string) => {
+    const e: TraceEvent = { tSec: t, kind };
+    if (textBg !== undefined) e.textBg = textBg;
+    if (detail !== undefined) e.detail = detail;
+    events.push(e);
+  };
+
+  // Last-known discrete state — the closing sample repeats it verbatim.
+  let lastGear = 1;
+  let lastBrake = false;
+  let lastThrottle = false;
+  let lastReverse = false;
+
+  const record = (gear: number, brakeOn: boolean, throttleOn: boolean, reverse: boolean) => {
+    lastGear = gear;
+    lastBrake = brakeOn;
+    lastThrottle = throttleOn;
+    lastReverse = reverse;
+    // Front-wheel steer estimate (bicycle model) for the ghost's wheel visual.
+    let steerRad = 0;
+    if (prevHeading !== null && Math.abs(speedMps) > 0.4) {
+      const yawRate = (wrap180(pose.headingDeg - prevHeading) * Math.PI) / 180 / SCRIPT_DT;
+      // headingDeg is cw-positive; steer is POSITIVE-LEFT (ccw) → negate.
+      steerRad = Math.atan((ESTIMATE_WHEELBASE * -yawRate) / Math.max(Math.abs(speedMps), 0.4));
+      if (reverse) steerRad = -steerRad;
+      steerRad = Math.max(-0.6, Math.min(0.6, steerRad));
+    }
+    if (frame % 3 === 0) {
+      const speedKmh = (reverse ? -1 : 1) * speedMps * 3.6;
+      samples.push({
+        tSec: t,
+        x: pose.x,
+        y: pose.y,
+        headingDeg: pose.headingDeg,
+        // Normalize -0 (atan/product artifacts) — JSON drops the sign and the
+        // determinism law compares serialized forms.
+        steerRad: steerRad === 0 ? 0 : steerRad,
+        speedKmh: speedKmh === 0 ? 0 : speedKmh,
+        gear,
+        indicator,
+        brakeOn,
+        throttleOn,
+      });
+    }
+  };
+
+  /** One production-ordered frame: runtime → traffic → sample → director → rules. */
+  const stepStack = () => {
+    runtime.update(SCRIPT_DT);
+    traffic.update(SCRIPT_DT, {
+      signalPhase: (id) => runtime.signalPhase(id),
+      playerPos: { x: pose.x, y: pose.y },
+      playerSpeedKmh: Math.abs(speedMps) * 3.6,
+      playerHeadingDeg: pose.headingDeg,
+    });
+    const leadGap = traffic.leadGapMeters(pose.x, pose.y, pose.headingDeg);
+    const vehicleSample: VehicleSample = {
+      position: { x: pose.x, y: pose.y },
+      headingDeg: pose.headingDeg,
+      speedKmh: speedMps * 3.6,
+      indicator,
+      headlights: isNight ? "low" : "off",
+      seatbeltOn: true,
+      handbrakeOn: false,
+      gear: 1,
+      mirrorGlance: pendingGlance,
+      stalled: false,
+    };
+    pendingGlance = null;
+    const tick = runtime.sample(vehicleSample, t, isNight, rain, leadGap);
+    if (director) {
+      const res = director.step({
+        tSec: t,
+        dtSec: SCRIPT_DT,
+        x: pose.x,
+        y: pose.y,
+        speedKmh: speedMps * 3.6,
+        headingDeg: pose.headingDeg,
+        brakePedal: 0,
+        tickEvents: tick.events,
+      });
+      for (const e of res.events) tick.events.push(e);
+      outcomes.push(...res.outcomes);
+    }
+    const reduced = reduceTick(rules, tick);
+    rules = reduced.state;
+    ruleEvents.push(...reduced.events);
+  };
+
+  const advanceFrame = () => {
+    stepStack();
+    t += SCRIPT_DT;
+    frame++;
+  };
+
+  // Seed the pose from the first drive step so the t=0 sample is placed.
+  const firstDrive = script.steps.find((s) => s.kind === "drive");
+  if (firstDrive && firstDrive.kind === "drive" && firstDrive.points.length >= 2) {
+    const path = new StepPath(firstDrive.points);
+    const p = path.poseAt(0);
+    pose = firstDrive.reverse
+      ? { x: p.x, y: p.y, headingDeg: (p.headingDeg + 180) % 360 }
+      : p;
+  }
+
+  const steps = script.steps;
+  for (let si = 0; si < steps.length && frame < maxFrames; si++) {
+    const step = steps[si];
+    if (step.kind === "indicator") {
+      if (step.setting !== indicator) {
+        indicator = step.setting;
+        if (indicator === "off") emitEvent("signal-off");
+        else emitEvent("signal-on", undefined, indicator);
+      }
+      continue;
+    }
+    if (step.kind === "glance") {
+      pendingGlance = step.mirror;
+      emitEvent(`glance-${step.mirror}` as TraceEventKind);
+      continue;
+    }
+    if (step.kind === "annotation") {
+      emitEvent("annotation", step.textBg);
+      continue;
+    }
+    if (step.kind === "pause") {
+      const until = t + step.sec;
+      speedMps = 0;
+      while (t < until && frame < maxFrames) {
+        record(lastGear, step.brake ?? false, false, false);
+        advanceFrame();
+      }
+      continue;
+    }
+
+    // --- drive step ---------------------------------------------------------
+    if (step.points.length < 2) continue;
+    const path = new StepPath(step.points);
+    const reverse = step.reverse ?? false;
+    // Stop at the end unless the NEXT timed step is a same-direction drive.
+    let stopAtEnd = step.stopAtEnd ?? true;
+    if (step.stopAtEnd === undefined) {
+      for (let sj = si + 1; sj < steps.length; sj++) {
+        const nxt = steps[sj];
+        if (nxt.kind === "drive") {
+          stopAtEnd = (nxt.reverse ?? false) !== reverse;
+          break;
+        }
+        if (nxt.kind === "pause") break; // a pause means: arrive at rest
+      }
+    }
+    let s = 0;
+    const targetBase = step.targetKmh / 3.6;
+    while (s < path.length - 0.05 && frame < maxFrames) {
+      let target = targetBase;
+      // Curve-speed cap (the C1 windows) so heading changes stay drivable.
+      for (const aheadM of [10, 18, 30]) {
+        const dh = path.curvatureAhead(s, aheadM);
+        if (dh > 8) {
+          const radius = aheadM / ((dh * Math.PI) / 180);
+          target = Math.min(target, Math.max(1.6, Math.sqrt(2.4 * radius)));
+        }
+      }
+      if (stopAtEnd) {
+        const dEnd = path.length - s;
+        target = Math.min(target, Math.sqrt(2 * (SCRIPT_DECEL * 0.7) * Math.max(0, dEnd)));
+      }
+      const braking = target < speedMps - 0.05;
+      const accelerating = target > speedMps + 0.05;
+      if (accelerating) speedMps = Math.min(target, speedMps + SCRIPT_ACCEL * SCRIPT_DT);
+      else if (braking) speedMps = Math.max(target, speedMps - SCRIPT_DECEL * SCRIPT_DT);
+      s = Math.min(path.length, s + speedMps * SCRIPT_DT);
+      prevHeading = pose.headingDeg;
+      const p = path.poseAt(s);
+      pose = reverse ? { x: p.x, y: p.y, headingDeg: (p.headingDeg + 180) % 360 } : p;
+      record(reverse ? -1 : 1, braking, accelerating, reverse);
+      advanceFrame();
+    }
+    if (stopAtEnd) speedMps = 0;
+    prevHeading = pose.headingDeg;
+  }
+
+  // Closing sample so the last pose is always captured exactly — with the
+  // last-known discrete state (a brake-hold pause ends still on the brake).
+  const lastT = samples.length > 0 ? samples[samples.length - 1].tSec : -1;
+  if (t > lastT + 1e-6) {
+    frame = 0; // force-record
+    record(lastGear, lastBrake, lastThrottle, lastReverse);
+  }
+
+  const durationSec = samples.length > 0 ? samples[samples.length - 1].tSec : 0;
+  return {
+    trace: {
+      meta: {
+        scenarioId: options.scenarioId,
+        kind: options.kind,
+        version: TRACE_VERSION,
+        durationSec,
+      },
+      samples,
+      events,
+    },
+    ruleEvents,
+    outcomes,
+  };
+}
