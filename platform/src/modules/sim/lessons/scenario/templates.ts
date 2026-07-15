@@ -12,6 +12,9 @@
 
 import type { ScenarioSpec } from "./types";
 import type { ParkingBaySpec } from "../../contracts";
+import { SCENARIO_TEMPLATES_JUNCTIONS } from "./templates-junctions";
+import { PARKING_TEMPLATES } from "./templates-parking";
+import { SCENARIO_TEMPLATES_FLOW } from "./templates-flow";
 
 /**
  * The TARGET bay of content/world/lot-perp-v1.json — meta.scenario bay
@@ -194,8 +197,14 @@ export const SC_PARK_PERP_REV: ScenarioSpec = {
   localeBg: "bg-BG",
 };
 
-/** Every authored template, id-unique (the assembly line appends here). */
-export const SCENARIO_TEMPLATES: readonly ScenarioSpec[] = [SC_PARK_PERP_REV];
+/** Every authored template, id-unique (the assembly line appends here —
+ *  one line per family file, each owned by its wave). */
+export const SCENARIO_TEMPLATES: readonly ScenarioSpec[] = [
+  SC_PARK_PERP_REV,
+  ...PARKING_TEMPLATES,
+  ...SCENARIO_TEMPLATES_FLOW,
+  ...SCENARIO_TEMPLATES_JUNCTIONS,
+];
 
 /** Lookup by template id; undefined for unknown ids. */
 export function scenarioById(id: string): ScenarioSpec | undefined {

@@ -422,38 +422,95 @@ export function buildParkingLotDistrict(params) {
 }
 
 // ---------------------------------------------------------------------------
-// P0 instance — the founder's reference image (doc 76 §10/§12): perpendicular
-// bay, 2.7 m wide, 4 occupied neighbors around ONE free bay, approach south.
+// Committed instances.
+//
+// P0 — the founder's reference image (doc 76 §10/§12): perpendicular bay,
+// 2.7 m wide, 4 occupied neighbors around ONE free bay, approach south.
+//
+// S2-A parking wave (doc-72 PK-01/PK-02 variants — same generator, new
+// params; no new archetype):
+//   lot-par-v1    — angle "parallel": street-side parallel slot between two
+//                   parked cars (THE Наредба-38 exam maneuver, PK-01);
+//   lot-45-v1     — angle "45": echelon bays, forward entry;
+//   lot-narrow-v1 — angle "90" at bayWidth 2.5 (the tight-pocket hard
+//                   variant of P0 — both neighbors occupied, tighter rubric).
 // ---------------------------------------------------------------------------
 
-const P0_PARAMS = {
-  districtId: "lot-perp-v1",
-  label: "Учебен паркинг — перпендикулярно място на заден ход (сценарий P0)",
-  bays: 5,
-  bayWidthM: 2.7,
-  bayDepthM: 5.0,
-  angle: "90",
-  aisleWidthM: 7,
-  occupancy: "XX_XX",
-  approachM: 90,
-  entry: "south",
-};
-
-const district = buildParkingLotDistrict(P0_PARAMS);
-const out = JSON.stringify(district, null, 1) + "\n";
-JSON.parse(out); // JSON validity self-check
-
-const OUT_FILE = path.join(REPO_ROOT, "content", "world", `${P0_PARAMS.districtId}.json`);
-mkdirSync(path.dirname(OUT_FILE), { recursive: true });
-writeFileSync(OUT_FILE, out);
+const INSTANCES = [
+  {
+    districtId: "lot-perp-v1",
+    label: "Учебен паркинг — перпендикулярно място на заден ход (сценарий P0)",
+    bays: 5,
+    bayWidthM: 2.7,
+    bayDepthM: 5.0,
+    angle: "90",
+    aisleWidthM: 7,
+    occupancy: "XX_XX",
+    approachM: 90,
+    entry: "south",
+  },
+  {
+    districtId: "lot-par-v1",
+    label: "Учебен паркинг — успоредно място между две коли (сценарий S2)",
+    bays: 5,
+    bayWidthM: 2.5,
+    bayDepthM: 5.5,
+    angle: "parallel",
+    aisleWidthM: 7,
+    occupancy: "XX_XX",
+    approachM: 90,
+    entry: "south",
+  },
+  {
+    districtId: "lot-45-v1",
+    label: "Учебен паркинг — косо място на 45° с преден вход (сценарий S2)",
+    bays: 5,
+    bayWidthM: 2.7,
+    bayDepthM: 5.0,
+    angle: "45",
+    aisleWidthM: 7,
+    occupancy: "XX_XX",
+    approachM: 90,
+    entry: "south",
+  },
+  {
+    districtId: "lot-narrow-v1",
+    label: "Учебен паркинг — тясно гнездо 2,5 м на заден ход (сценарий S2)",
+    bays: 5,
+    bayWidthM: 2.5,
+    bayDepthM: 5.0,
+    angle: "90",
+    aisleWidthM: 7,
+    occupancy: "XX_XX",
+    approachM: 90,
+    entry: "south",
+  },
+];
 
 const line = (k, v) => console.log(`  ${String(k).padEnd(28)} ${v}`);
-console.log(`=== parking-lot build: ${P0_PARAMS.districtId} ===`);
-line("bays / width / angle", `${P0_PARAMS.bays} / ${P0_PARAMS.bayWidthM} m / ${P0_PARAMS.angle}`);
-line("occupancy (X=car, _=free)", P0_PARAMS.occupancy);
-line("target bay", `${district.meta.scenario.targetBayId} @ (${district.meta.scenario.bays.find((b) => !b.occupied).x}, ${district.meta.scenario.bays.find((b) => !b.occupied).y})`);
-line("nodes / edges", `${district.meta.stats.nodes} / ${district.meta.stats.edges}`);
-line("spawns", district.spawnPoints.map((s) => s.id).join(", "));
-line("bounds", `${r2(district.meta.boundsLocalMeters.maxX - district.meta.boundsLocalMeters.minX)} x ${r2(district.meta.boundsLocalMeters.maxY - district.meta.boundsLocalMeters.minY)} m`);
-line("output", OUT_FILE);
-console.log("Validation OK.");
+
+for (const params of INSTANCES) {
+  const district = buildParkingLotDistrict(params);
+  const out = JSON.stringify(district, null, 1) + "\n";
+  JSON.parse(out); // JSON validity self-check
+
+  // content/world is the source of truth; platform/public/world is the
+  // byte-identical published copy the browser fetches (the world-JSON law —
+  // the contract batteries assert equality).
+  const CONTENT_FILE = path.join(REPO_ROOT, "content", "world", `${params.districtId}.json`);
+  const PUBLIC_FILE = path.join(REPO_ROOT, "platform", "public", "world", `${params.districtId}.json`);
+  for (const file of [CONTENT_FILE, PUBLIC_FILE]) {
+    mkdirSync(path.dirname(file), { recursive: true });
+    writeFileSync(file, out);
+  }
+
+  console.log(`=== parking-lot build: ${params.districtId} ===`);
+  line("bays / width / angle", `${params.bays} / ${params.bayWidthM} m / ${params.angle}`);
+  line("occupancy (X=car, _=free)", params.occupancy);
+  line("target bay", `${district.meta.scenario.targetBayId} @ (${district.meta.scenario.bays.find((b) => !b.occupied).x}, ${district.meta.scenario.bays.find((b) => !b.occupied).y})`);
+  line("nodes / edges", `${district.meta.stats.nodes} / ${district.meta.stats.edges}`);
+  line("spawns", district.spawnPoints.map((s) => s.id).join(", "));
+  line("bounds", `${r2(district.meta.boundsLocalMeters.maxX - district.meta.boundsLocalMeters.minX)} x ${r2(district.meta.boundsLocalMeters.maxY - district.meta.boundsLocalMeters.minY)} m`);
+  line("output", `${CONTENT_FILE} (+ public copy)`);
+  console.log("Validation OK.");
+}

@@ -172,6 +172,16 @@ export function parseObjectiveParams(objective: LessonObjective): ObjectiveParam
           headingTolDeg:
             num(p.headingTolDeg) && p.headingTolDeg > 0 ? p.headingTolDeg : PARK_HEADING_TOL_DEG,
         };
+        // S2 (additive): the entry-gear gate — absent = the reverse default.
+        if (p.entry !== undefined) {
+          if (p.entry !== "reverse" && p.entry !== "forward") {
+            throw new ObjectiveSpecError(
+              objective.id,
+              'parkInBay entry must be "reverse" | "forward" when present',
+            );
+          }
+          params.entry = p.entry;
+        }
         return params;
       }
       if (p.maneuver === "roundabout") {
@@ -230,6 +240,7 @@ export function createEvalState(params: ObjectiveParams): ObjectiveEvalState {
           return {
             type: "parkInBay",
             usedReverse: false,
+            enteredForward: false,
             stoppedSinceT: null,
             inBay: false,
             attempts: 0,
@@ -564,6 +575,10 @@ function stepEmergencyStop(
  * NEW attempt (counted, and reverse must be used again). A stop that is
  * inside the bay but outside tolerance surfaces as alignment "sloppy" and
  * does not complete.
+ *
+ * S2: `entry: "forward"` swaps the gate — the current attempt's bay ENTRY
+ * itself must happen in a forward gear (echelon/45° drills); everything else
+ * (bay lock, alignment, hold, attempts) is identical.
  */
 function stepParkInBay(
   params: ParkInBayParams,
@@ -594,6 +609,14 @@ function stepParkInBay(
   const exitedBay = prev.inBay && !inBay;
   const nearBay = Math.hypot(relX, relY) <= PARK_MANEUVER_ZONE_M;
   const usedReverse = (exitedBay ? false : prev.usedReverse) || (tick.gear < 0 && nearBay);
+  // S2 forward-entry gate: latched on the outside → inside transition (the
+  // gear that CARRIED the entry), cleared on exit — a reverse nose-out
+  // followed by a forward re-entry re-earns it, symmetric with usedReverse.
+  const enteredForward = inBay
+    ? prev.inBay
+      ? prev.enteredForward
+      : tick.gear > 0
+    : false;
 
   const stopped = tick.speedKmh <= STOPPED_SPEED_KMH;
   // The hold clock only runs at rest INSIDE the bay.
@@ -604,7 +627,11 @@ function stepParkInBay(
   const headingOffsetDeg = axisAngleDiffDeg(tick.headingDeg, bay.headingDeg);
   const aligned = centerOffsetM <= centerTolM && headingOffsetDeg <= headingTolDeg;
 
-  const done = inBay && stopped && usedReverse && aligned && heldFor >= holdSec;
+  // The entry-gear gate: reverse credit (the A10 default) or the S2 forward
+  // entry, per the authored param.
+  const entryOk = params.entry === "forward" ? enteredForward : usedReverse;
+
+  const done = inBay && stopped && entryOk && aligned && heldFor >= holdSec;
 
   let alignment: ParkAlignment | null = null;
   if (inBay && stopped) {
@@ -619,18 +646,18 @@ function stepParkInBay(
     ? 1
     : inBay
       ? stopped
-        ? aligned && usedReverse
+        ? aligned && entryOk
           ? 0.9 // holding for holdSec
-          : 0.7 // stopped in bay, but sloppy or without reverse
+          : 0.7 // stopped in bay, but sloppy or with the wrong entry gear
         : 0.5 // maneuvering inside the bay
-      : usedReverse
+      : entryOk
         ? 0.3
         : 0.1;
 
   return {
     done,
     progress,
-    evalState: { type: "parkInBay", usedReverse, stoppedSinceT, inBay, attempts },
+    evalState: { type: "parkInBay", usedReverse, enteredForward, stoppedSinceT, inBay, attempts },
     detail: {
       kind: "parkInBay",
       attempts,

@@ -78,3 +78,14 @@ export {
   SC_PARK_PERP_REV,
   scenarioById,
 } from "./templates";
+
+// S2-A parking wave (sc-park-parallel / sc-park-45 / sc-park-narrow)
+export {
+  LOT_45_TARGET_BAY,
+  LOT_NARROW_TARGET_BAY,
+  LOT_PAR_TARGET_BAY,
+  PARKING_TEMPLATES,
+  SC_PARK_45,
+  SC_PARK_NARROW,
+  SC_PARK_PARALLEL,
+} from "./templates-parking";

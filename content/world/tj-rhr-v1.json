@@ -1,0 +1,208 @@
+{
+ "format": "district-v1",
+ "meta": {
+  "district": "tj-rhr",
+  "label": "Учебно равнозначно Т-кръстовище — предимство отдясно (сценарий JU-01)",
+  "mapKind": "scenario-junction",
+  "generator": "tools/maps/gen_t_junction.mjs",
+  "boundsLocalMeters": {
+   "minX": -150,
+   "minY": -120,
+   "maxX": 150,
+   "maxY": 0
+  },
+  "attribution": {
+   "text": "Учебно Т-образно кръстовище — оригинален параметричен дизайн (без данни от OpenStreetMap)",
+   "license": "All rights reserved",
+   "licenseUrl": "/",
+   "copyrightUrl": "/",
+   "obligation": "none — original work, no ODbL attribution required for this map"
+  },
+  "defaults": {
+   "maxspeedUrbanKmh": 40,
+   "note": "Учебно кръстовище: ограниченията идват от таговете на улиците."
+  },
+  "stats": {
+   "roadKm": 0.42,
+   "nodes": 4,
+   "edges": 3,
+   "intersections": 1,
+   "crossings": 0,
+   "buildings": 1,
+   "spawnPoints": 3
+  },
+  "scenario": {
+   "archetype": "t-junction",
+   "params": {
+    "control": "none",
+    "priorityArmM": 150,
+    "minorArmM": 120,
+    "lanes": 2,
+    "priorityMaxKmh": 40,
+    "minorMaxKmh": 40
+   },
+   "junctionNodeId": "tj-n-c",
+   "expectedControl": "rightHandRule"
+  }
+ },
+ "roads": {
+  "nodes": [
+   {
+    "id": "tj-n-c",
+    "x": 0,
+    "y": 0
+   },
+   {
+    "id": "tj-n-e",
+    "x": 150,
+    "y": 0
+   },
+   {
+    "id": "tj-n-s",
+    "x": 0,
+    "y": -120
+   },
+   {
+    "id": "tj-n-w",
+    "x": -150,
+    "y": 0
+   }
+  ],
+  "edges": [
+   {
+    "id": "tj-e-w",
+    "from": "tj-n-w",
+    "to": "tj-n-c",
+    "class": "residential",
+    "name": "Главна улица — запад",
+    "oneway": false,
+    "roundabout": false,
+    "lanes": 2,
+    "lanesSource": "tag",
+    "maxspeed": 40,
+    "maxspeedSource": "tag",
+    "length": 150,
+    "geometry": [
+     [
+      -150,
+      0
+     ],
+     [
+      0,
+      0
+     ]
+    ]
+   },
+   {
+    "id": "tj-e-e",
+    "from": "tj-n-c",
+    "to": "tj-n-e",
+    "class": "residential",
+    "name": "Главна улица — изток",
+    "oneway": false,
+    "roundabout": false,
+    "lanes": 2,
+    "lanesSource": "tag",
+    "maxspeed": 40,
+    "maxspeedSource": "tag",
+    "length": 150,
+    "geometry": [
+     [
+      0,
+      0
+     ],
+     [
+      150,
+      0
+     ]
+    ]
+   },
+   {
+    "id": "tj-e-s",
+    "from": "tj-n-s",
+    "to": "tj-n-c",
+    "class": "residential",
+    "name": "Странична улица",
+    "oneway": false,
+    "roundabout": false,
+    "lanes": 2,
+    "lanesSource": "tag",
+    "maxspeed": 40,
+    "maxspeedSource": "tag",
+    "length": 120,
+    "geometry": [
+     [
+      0,
+      -120
+     ],
+     [
+      0,
+      0
+     ]
+    ]
+   }
+  ]
+ },
+ "intersections": [
+  {
+   "id": "tj-n-c",
+   "x": 0,
+   "y": 0,
+   "degree": 3,
+   "signalized": false
+  }
+ ],
+ "crossings": [],
+ "roundabouts": [],
+ "buildings": [
+  {
+   "id": "tj-b-corner",
+   "height": 5,
+   "heightSource": "default",
+   "footprint": [
+    [
+     -40,
+     -40
+    ],
+    [
+     -26,
+     -40
+    ],
+    [
+     -26,
+     -26
+    ],
+    [
+     -40,
+     -26
+    ]
+   ]
+  }
+ ],
+ "spawnPoints": [
+  {
+   "id": "tj-spawn-south",
+   "x": 0,
+   "y": -105,
+   "heading": 0,
+   "edgeId": "tj-e-s",
+   "name": "Странична улица — подход към кръстовището"
+  },
+  {
+   "id": "tj-spawn-east",
+   "x": 135,
+   "y": 0,
+   "heading": 270,
+   "edgeId": "tj-e-e",
+   "name": "Главна улица — подход от изток"
+  },
+  {
+   "id": "tj-spawn-west",
+   "x": -135,
+   "y": 0,
+   "heading": 90,
+   "edgeId": "tj-e-w",
+   "name": "Главна улица — подход от запад"
+  }
+ ]
+}

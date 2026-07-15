@@ -130,6 +130,14 @@ export interface ParkInBayParams {
   centerTolM: number;
   /** Max |heading − bay axis| at rest, degrees (folded to the 180° axis). */
   headingTolDeg: number;
+  /**
+   * Which gear must carry the bay entry (S2, additive — absent = "reverse",
+   * the A10/D4-hardened default every existing lesson keeps byte-identical).
+   * "forward": echelon/45° forward-entry drills (doc-72 PK-02 echelon
+   * variant) — the CURRENT attempt's bay entry itself must happen in a
+   * forward gear; the reverse-credit machinery is not consulted.
+   */
+  entry?: "reverse" | "forward";
 }
 
 /**
@@ -212,6 +220,12 @@ export type ObjectiveEvalState =
        * leaves the bay — a new attempt must reverse again).
        */
       usedReverse: boolean;
+      /**
+       * The CURRENT bay entry happened in a forward gear (set on the
+       * outside → inside transition, cleared on exit) — the gate the
+       * `entry: "forward"` variant checks instead of usedReverse (S2).
+       */
+      enteredForward: boolean;
       /** Session time the current continuous in-bay stop began; null while moving. */
       stoppedSinceT: number | null;
       /** Car centre currently inside the bay rect. */

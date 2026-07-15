@@ -165,6 +165,17 @@ export {
   type ValidateScenarioOptions,
 } from "./scenario";
 
+// S2-A parking wave templates (own line-block per wave — merge-safe)
+export {
+  LOT_45_TARGET_BAY,
+  LOT_NARROW_TARGET_BAY,
+  LOT_PAR_TARGET_BAY,
+  PARKING_TEMPLATES,
+  SC_PARK_45,
+  SC_PARK_NARROW,
+  SC_PARK_PARALLEL,
+} from "./scenario";
+
 // Progression / unlock logic (+ the A13 exam gate)
 export {
   computeProgression,

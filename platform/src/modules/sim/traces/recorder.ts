@@ -309,6 +309,16 @@ export interface RecordScriptedDriveOptions {
    */
   collisionMinKmh?: number;
   /**
+   * S2 (junction/signal family): deterministic session-start signal pinning —
+   * the same doc 72 N2 dial the director exposes as
+   * ScenarioDirectorOptions.signalOffsets, applied through the runtime's
+   * PUBLIC setSignalClusterOffset before the first frame (sorted-key order,
+   * the director's own convention). Authored demos on signalized micro-maps
+   * pin the phase their story needs („arrive on red") instead of leaning on
+   * the map's natural FNV-1a offset. Absent = natural offsets.
+   */
+  signalOffsets?: Readonly<Record<string, number>>;
+  /**
    * S1 full-pipeline hook: every production tick of the drive, AFTER the
    * scenario director appended its events — the SAME object the internal
    * rule engine reduces. The bot-completion proof feeds these into a REAL
@@ -427,6 +437,13 @@ export function recordScriptedDrive(
 ): RecordedDrive {
   // --- production stack (the orchestrator-harness wiring, LessonScene's) ---
   const runtime = createWorldRuntime(districtRaw);
+  // Session-start phase pinning (S2) — sorted for deterministic application
+  // order regardless of object shape (the director's applySignalOffsets law).
+  for (const [nodeId, offsetSec] of Object.entries(options.signalOffsets ?? {}).sort((a, b) =>
+    a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0,
+  )) {
+    runtime.setSignalClusterOffset(nodeId, offsetSec);
+  }
   const traffic = createTrafficSystem(districtRaw as TrafficDistrict, {
     seed: options.seed ?? 7,
     vehicleCount: options.vehicleCount ?? 0,

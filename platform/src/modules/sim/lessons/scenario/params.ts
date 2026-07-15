@@ -78,6 +78,9 @@ export function serializeObjectiveParams(
               bay: { ...p.bay },
               centerTolM: r2((p.centerTolM ?? PARK_CENTER_TOL_M) * toleranceScale),
               headingTolDeg: r2((p.headingTolDeg ?? PARK_HEADING_TOL_DEG) * toleranceScale),
+              // S2: only the non-default entry gate rides the wire — absent
+              // stays byte-identical for every reverse-entry lesson.
+              ...(p.entry === "forward" ? { entry: "forward" } : {}),
             },
           };
       }

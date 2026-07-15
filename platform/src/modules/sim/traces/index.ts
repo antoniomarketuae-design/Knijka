@@ -69,3 +69,49 @@ export {
   scParkPerpRevShadowScript,
   type ScParkPerpRevTraceName,
 } from "./scParkPerpRev";
+
+// S2-A — the parking-wave authored drives (sc-park-parallel / sc-park-45 /
+// sc-park-narrow); committed traces under content/traces/<template>/ are
+// recordings of exactly these scripts (gates: traces/__tests__/sc-park-*).
+export {
+  SC_PARK_PARALLEL_ID,
+  recordScParkParallelDrive,
+  type ScParkParallelTraceName,
+} from "./scParkParallel";
+export { SC_PARK_45_ID, recordScPark45Drive, type ScPark45TraceName } from "./scPark45";
+export {
+  SC_PARK_NARROW_ID,
+  recordScParkNarrowDrive,
+  type ScParkNarrowTraceName,
+} from "./scParkNarrow";
+
+// S2-B — the junction/signal authored drives (sc-junction-rhr / -stop /
+// sc-signal-response / sc-turn-left-oncoming); committed traces are recordings
+// of exactly these scripts (gates: traces/__tests__/sc-tj- / sc-sx-traces).
+export {
+  recordScJunctionDrive,
+  scJunctionTraceNames,
+  SC_JUNCTION_RECORDINGS,
+  type ScJunctionTemplateId,
+  type ScJunctionTraceName,
+} from "./scJunctions";
+
+// S2-C — the flow authored drives (sc-zebra-approach / sc-roundabout-entry /
+// sc-lane-change); committed traces are recordings of exactly these scripts
+// (gates: traces/__tests__/sc-zebra-approach- / sc-roundabout-entry- /
+// sc-lane-change-traces).
+export {
+  SC_ZEBRA_APPROACH_ID,
+  recordScZebraApproachDrive,
+  type ScZebraApproachTraceName,
+} from "./scZebraApproach";
+export {
+  SC_ROUNDABOUT_ENTRY_ID,
+  recordScRoundaboutEntryDrive,
+  type ScRoundaboutEntryTraceName,
+} from "./scRoundaboutEntry";
+export {
+  SC_LANE_CHANGE_ID,
+  recordScLaneChangeDrive,
+  type ScLaneChangeTraceName,
+} from "./scLaneChange";
