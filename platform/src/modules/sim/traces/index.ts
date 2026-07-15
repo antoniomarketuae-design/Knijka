@@ -215,3 +215,24 @@ export {
   recordScPkSmoothStopDrive,
   type ScPkSmoothStopTraceName,
 } from "./scPkSmoothStop";
+
+// S4 (cockpit channels — AC/VP unlock) — the cockpit-procedure + adverse-
+// conditions authored drives (sc-vp-readiness / sc-ac-night-lights /
+// sc-ac-rain-lights); committed traces are recordings of exactly these scripts
+// (gates: traces/__tests__/vp-readiness- / ac-night-lights- /
+// ac-rain-lights-traces).
+export {
+  SC_VP_READINESS_ID,
+  recordScVpReadinessDrive,
+  type ScVpReadinessTraceName,
+} from "./scVpReadiness";
+export {
+  SC_AC_NIGHT_LIGHTS_ID,
+  recordScAcNightLightsDrive,
+  type ScAcNightLightsTraceName,
+} from "./scAcNightLights";
+export {
+  SC_AC_RAIN_LIGHTS_ID,
+  recordScAcRainLightsDrive,
+  type ScAcRainLightsTraceName,
+} from "./scAcRainLights";

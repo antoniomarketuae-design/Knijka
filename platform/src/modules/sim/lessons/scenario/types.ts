@@ -30,6 +30,7 @@ export type ScenarioFamily =
   | "speed"
   | "following"
   | "conditions"
+  | "cockpit"
   | "vru"
   | "exam-drills";
 
@@ -45,6 +46,7 @@ export const SCENARIO_FAMILIES: readonly ScenarioFamily[] = [
   "speed",
   "following",
   "conditions",
+  "cockpit",
   "vru",
   "exam-drills",
 ];

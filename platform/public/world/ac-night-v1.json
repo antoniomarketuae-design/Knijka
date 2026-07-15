@@ -1,0 +1,130 @@
+{
+ "format": "district-v1",
+ "meta": {
+  "district": "ac-night",
+  "label": "Учебна улица — нощно каране без светлини (сценарий AC-01)",
+  "mapKind": "scenario-street",
+  "generator": "tools/maps/gen_ac_vp_streets.mjs",
+  "boundsLocalMeters": {
+   "minX": -28.12,
+   "minY": 0,
+   "maxX": 14.125,
+   "maxY": 360
+  },
+  "attribution": {
+   "text": "Учебна права улица за кокпит дисциплина — оригинален параметричен дизайн (без данни от OpenStreetMap)",
+   "license": "All rights reserved",
+   "licenseUrl": "/",
+   "copyrightUrl": "/",
+   "obligation": "none — original work, no ODbL attribution required for this map"
+  },
+  "defaults": {
+   "maxspeedUrbanKmh": 50,
+   "note": "Права улица: ограничението важи по цялата дължина; фокусът е върху състоянието на кокпита, не върху скоростта."
+  },
+  "stats": {
+   "roadKm": 0.36,
+   "nodes": 2,
+   "edges": 1,
+   "intersections": 0,
+   "crossings": 0,
+   "buildings": 1,
+   "spawnPoints": 2
+  },
+  "scenario": {
+   "archetype": "straight-street",
+   "params": {
+    "lengthM": 360,
+    "maxspeedKmh": 50
+   },
+   "lanesPerDirection": 1,
+   "laneCenterRightM": 4.06
+  }
+ },
+ "roads": {
+  "nodes": [
+   {
+    "id": "ac-night-n-end",
+    "x": 0,
+    "y": 360
+   },
+   {
+    "id": "ac-night-n-start",
+    "x": 0,
+    "y": 0
+   }
+  ],
+  "edges": [
+   {
+    "id": "ac-night-e-street",
+    "from": "ac-night-n-start",
+    "to": "ac-night-n-end",
+    "class": "residential",
+    "name": "Права улица за упражнение на кокпит дисциплина",
+    "oneway": false,
+    "roundabout": false,
+    "lanes": 2,
+    "lanesSource": "tag",
+    "maxspeed": 50,
+    "maxspeedSource": "tag",
+    "length": 360,
+    "geometry": [
+     [
+      0,
+      0
+     ],
+     [
+      0,
+      360
+     ]
+    ]
+   }
+  ]
+ },
+ "intersections": [],
+ "crossings": [],
+ "roundabouts": [],
+ "buildings": [
+  {
+   "id": "ac-night-b-block",
+   "height": 7,
+   "heightSource": "default",
+   "footprint": [
+    [
+     -28.12,
+     150
+    ],
+    [
+     -16.12,
+     150
+    ],
+    [
+     -16.12,
+     168
+    ],
+    [
+     -28.12,
+     168
+    ]
+   ]
+  }
+ ],
+ "spawnPoints": [
+  {
+   "id": "ac-night-spawn-approach",
+   "x": 4.06,
+   "y": 15,
+   "heading": 0,
+   "edgeId": "ac-night-e-street",
+   "name": "Начало на отсечката"
+  },
+  {
+   "id": "ac-night-spawn-finish",
+   "x": 4.06,
+   "y": 345,
+   "heading": 0,
+   "edgeId": "ac-night-e-street",
+   "name": "Контролна точка — край на отсечката"
+  }
+ ]
+}

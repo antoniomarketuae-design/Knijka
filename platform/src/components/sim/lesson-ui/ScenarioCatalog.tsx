@@ -31,6 +31,7 @@ const FAMILY_ICONS: Record<string, string> = {
   speed: "🚗",
   following: "🚙",
   conditions: "🌧️",
+  cockpit: "🧰",
   vru: "🚲",
   "exam-drills": "🎓",
 };
