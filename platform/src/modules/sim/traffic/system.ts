@@ -43,6 +43,7 @@ import {
 } from "./vehicles";
 import {
   DEFAULT_TRAFFIC_CONFIG,
+  type OncomingApproach,
   type StagedActorSpec,
   type StagedActorView,
   type StagedCommand,
@@ -348,8 +349,8 @@ class TrafficSystemImpl implements TrafficSystem {
     return conflictNearFor(this.vehicles, x, y, radiusM, approachBearingDeg);
   }
 
-  oncomingNear(px: number, py: number, headingDeg: number, radiusM: number): boolean {
-    return oncomingNearFor(this.vehicles, px, py, headingDeg, radiusM);
+  oncomingNear(px: number, py: number, headingDeg: number, radiusM: number): OncomingApproach | null {
+    return oncomingApproachFor(this.vehicles, px, py, headingDeg, radiusM);
   }
 
   conflictFromRight(
@@ -436,7 +437,50 @@ export function conflictFromRightFor(
   return false;
 }
 
-/** Pure "oncoming vehicle ahead" test (district space; see interface). */
+/**
+ * Pure "most urgent oncoming vehicle ahead" query (district space; see the
+ * TrafficSystem.oncomingNear doc). N1: among all moving oncoming vehicles
+ * ahead within the radius, returns the one with the SMALLEST time-to-arrival
+ * (distM / closingMps) — that is the gap the left-turn adjudicator must
+ * grade. Null when the way is clear.
+ */
+export function oncomingApproachFor(
+  vehicles: readonly { x: number; y: number; dirX: number; dirY: number; speedMps: number }[],
+  px: number,
+  py: number,
+  headingDeg: number,
+  radiusM: number,
+): OncomingApproach | null {
+  const rad = (headingDeg * Math.PI) / 180;
+  const fx = Math.sin(rad); // forward x (0° = north = +y)
+  const fy = Math.cos(rad);
+  const r2 = radiusM * radiusM;
+  let best: OncomingApproach | null = null;
+  let bestTta = Infinity;
+  for (const v of vehicles) {
+    const dx = v.x - px;
+    const dy = v.y - py;
+    const d2 = dx * dx + dy * dy;
+    if (d2 > r2) continue;
+    if (dx * fx + dy * fy <= 0) continue; // must be ahead of the player
+    if (v.speedMps < CONFLICT_MIN_SPEED_MPS) continue;
+    const vBearing = (Math.atan2(v.dirX, v.dirY) * 180) / Math.PI;
+    const delta = Math.abs((((vBearing - headingDeg) % 360) + 540) % 360 - 180);
+    if (delta <= ONCOMING_MIN_DEG) continue; // not heading roughly opposite
+    const distM = Math.sqrt(d2);
+    // Closing speed: the vehicle's velocity component toward the query point
+    // (unit vector vehicle → player is (-dx, -dy) / distM).
+    const closingMps = distM > 0 ? (v.dirX * -dx + v.dirY * -dy) * (v.speedMps / distM) : v.speedMps;
+    const tta = closingMps > 0.1 ? distM / closingMps : Infinity;
+    if (tta < bestTta || (best === null && tta === Infinity)) {
+      bestTta = tta;
+      best = { distM, closingMps, speedMps: v.speedMps };
+    }
+  }
+  return best;
+}
+
+/** Boolean form of oncomingApproachFor (legacy tests / presence checks). */
 export function oncomingNearFor(
   vehicles: readonly { x: number; y: number; dirX: number; dirY: number; speedMps: number }[],
   px: number,
@@ -444,21 +488,7 @@ export function oncomingNearFor(
   headingDeg: number,
   radiusM: number,
 ): boolean {
-  const rad = (headingDeg * Math.PI) / 180;
-  const fx = Math.sin(rad); // forward x (0° = north = +y)
-  const fy = Math.cos(rad);
-  const r2 = radiusM * radiusM;
-  for (const v of vehicles) {
-    const dx = v.x - px;
-    const dy = v.y - py;
-    if (dx * dx + dy * dy > r2) continue;
-    if (dx * fx + dy * fy <= 0) continue; // must be ahead of the player
-    if (v.speedMps < CONFLICT_MIN_SPEED_MPS) continue;
-    const vBearing = (Math.atan2(v.dirX, v.dirY) * 180) / Math.PI;
-    const delta = Math.abs((((vBearing - headingDeg) % 360) + 540) % 360 - 180);
-    if (delta > ONCOMING_MIN_DEG) return true; // heading roughly opposite → oncoming
-  }
-  return false;
+  return oncomingApproachFor(vehicles, px, py, headingDeg, radiusM) !== null;
 }
 
 /** Pure "conflicting vehicle near a point" test (district space; see interface). */

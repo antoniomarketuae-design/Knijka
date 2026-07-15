@@ -11,7 +11,15 @@ export {
   AMBER_REACTION_SEC,
   AMBER_COMFORT_DECEL_MPS2,
   AMBER_STOP_MARGIN,
+  LEFT_TURN_ONCOMING_RADIUS_M,
+  LEFT_TURN_CONVICT_GAP_SEC,
+  LEFT_TURN_GAP_ADVISORY_SEC,
+  LEFT_TURN_GAP_SAFE_SEC,
+  LEFT_TURN_CONVICT_RADIUS_M,
+  LEFT_TURN_GAP_MEMORY_SEC,
   type DistrictWorldRuntime,
+  type OncomingConflict,
+  type OncomingQuery,
   type SignalPhaseInfo,
 } from "./worldRuntime";
 export {

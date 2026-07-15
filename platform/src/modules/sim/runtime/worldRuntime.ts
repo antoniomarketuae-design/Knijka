@@ -65,6 +65,44 @@ const WRONG_WAY_ANGLE_DEG = 120;
 export const PRIORITY_CONFLICT_RADIUS_M = 26;
 /** Look-ahead for oncoming traffic when turning left, meters (scaled). */
 export const LEFT_TURN_ONCOMING_RADIUS_M = 36;
+/**
+ * N1 left-turn-across-path adjudication (doc 72 JU-10 — „ляв завой срещу
+ * насрещните", the top-ranked missing capability). The graded quantity is the
+ * ACCEPTED GAP: seconds until the oncoming vehicle arrives, measured at the
+ * player's turn commit. JU-10's evidence bar: turning across an oncoming
+ * vehicle < 4 s away is THE taught mistake, and the fatal misjudgement is
+ * "arrival by 1–2 s". Bands (A12 — err innocent):
+ *  - gap ≤ CONVICT (2.0 s): the oncoming physically cannot avoid braking for
+ *    the turner → FAILED_TO_YIELD („опасна", Н38 W:5). A left turn across
+ *    takes ~2–3 s of the oncoming's lane, so a sub-2 s gap is a forced
+ *    conflict, not a judgment call.
+ *  - gap < ADVISORY (3.0 s): unsafe-but-legal — surfaced through the gapSec
+ *    measurement channel for scenario rubrics, NEVER graded (founder ruling
+ *    in the N1 build order).
+ *  - gap ≥ SAFE (4.0 s): the JU-10 textbook norm — clean.
+ */
+export const LEFT_TURN_CONVICT_GAP_SEC = 2.0;
+export const LEFT_TURN_GAP_ADVISORY_SEC = 3.0;
+export const LEFT_TURN_GAP_SAFE_SEC = 4.0;
+/**
+ * Legacy-wiring fallback: when the installed OncomingQuery returns only a
+ * boolean (no gap telemetry), conviction requires presence within this tight
+ * radius instead — ≈ the sub-2 s band at archetypal urban closing speeds
+ * (20 m at 36–50 km/h ≈ 1.4–2.0 s). Gap-aware wiring supersedes it.
+ */
+export const LEFT_TURN_CONVICT_RADIUS_M = 20;
+/**
+ * A convict-tight gap observed while the player was MOVING convicts a commit
+ * within this many seconds (the oncoming may have emergency-braked or been
+ * guard-stopped by the moment the 55° heading sweep registers the turn — the
+ * examiner grades the cut, not the victim's rescue). Short enough that a
+ * WAITING driver whose conflict passes nose-to-nose stays innocent: from
+ * rest, building a 55° sweep takes well over 1.5 s.
+ */
+export const LEFT_TURN_GAP_MEMORY_SEC = 1.5;
+/** Below this closing speed an "oncoming" makes no arrival claim (stopped at
+ * ITS red / queue creep / turning away — all A12-innocent), m/s. */
+const LEFT_TURN_MIN_CLOSING_MPS = 1.0;
 /** Distance to the junction node within which the right-hand-rule check arms,
  * meters (2× — the junction box itself is 2.5× wider). */
 export const RHR_CORE_RADIUS_M = 18;
@@ -132,13 +170,34 @@ export type JunctionConflictQuery = (
   approachBearingDeg: number,
 ) => boolean;
 
-/** Is there an oncoming vehicle ahead of the player (for turning left across it)? */
+/**
+ * N1 (doc 72 JU-10): approach telemetry of the most urgent oncoming vehicle —
+ * distance + closing speed, so the left-turn adjudicator grades the accepted
+ * gap in SECONDS. Structurally satisfied by the traffic module's
+ * OncomingApproach without a cross-module type import.
+ */
+export interface OncomingConflict {
+  distM: number;
+  closingMps: number;
+}
+
+/**
+ * Is there an oncoming vehicle ahead (for turning left across it)? The N1
+ * tracker probes in the CONFLICT FRAME: (px, py) is the junction node and
+ * headingDeg the player's approach heading frozen at visit start, so the
+ * returned distance/closing measure the oncoming's arrival at the conflict
+ * point regardless of how far the player's nose has swept into the turn.
+ * Rich return (`OncomingConflict` / null) enables gap-in-seconds
+ * adjudication; the legacy boolean form stays accepted — presence-only, with
+ * conviction falling back to the tight-radius probe (see
+ * LEFT_TURN_CONVICT_RADIUS_M).
+ */
 export type OncomingQuery = (
   px: number,
   py: number,
   headingDeg: number,
   radiusM: number,
-) => boolean;
+) => boolean | OncomingConflict | null;
 
 /** Is there a vehicle approaching from the player's right near a junction? */
 export type RightConflictQuery = (
@@ -263,6 +322,29 @@ export function createWorldRuntime(districtJson: District | unknown): DistrictWo
   let rbAzAccumDeg = 0;
   let rhrCondSince: number | null = null; // conflict-visible onset (reaction window)
   let rbCondSince: number | null = null;
+
+  // N1 left-turn-across-path tracker (doc 72 JU-10) — one adjudication per
+  // junction visit, same visit/latch shape as the RHR tracker above. All the
+  // house disciplines apply: conflict-visible minimum (YIELD_CONVICT_SUSTAIN),
+  // braking-response stand-down bounded by the D1 reaction window, and the
+  // gap-memory latch (LEFT_TURN_GAP_MEMORY_SEC) so a guard-stopped/emergency-
+  // braking victim still convicts the cutter while a waiting yielder whose
+  // conflict passed stays innocent.
+  // The probe runs in the CONFLICT FRAME: centred on the junction node with
+  // the player's approach heading FROZEN at visit start — the accepted gap is
+  // the oncoming's time to the conflict point (the node), and it must not
+  // dissolve just because the player's nose has already swept 55° into the
+  // turn (the bearing-opposition filter would drop a still-arriving car).
+  let ltNode: string | null = null; // junction currently visited (any control)
+  let ltApproachHeading = 0; // player heading frozen at visit start
+  let ltAdjudicated = false; // one grade per visit
+  let ltConflictSeen = false; // a REAL closing conflict (gap ≤ safe band) seen
+  let ltSlowed = false; // player held yield speed while that conflict existed
+  let ltCondSince: number | null = null; // current visibility episode onset
+  let ltOnsetT = -Infinity; // onset of the most recent episode (stand-down base)
+  let ltSustainedRecentT = -Infinity; // last frame with ≥ sustain visibility
+  let ltLastTightT = -Infinity; // last convict-tight observation while moving
+  let ltTightGapSec: number | undefined; // gap recorded at that observation
 
   // Previous-frame tracking for line-crossing detection.
   let prevEdgeIdx = -1;
@@ -465,15 +547,13 @@ export function createWorldRuntime(districtJson: District | unknown): DistrictWo
       );
       const beforeTurns = events.length;
       turns.update(tSec, v.headingDeg, nearestIx !== null, events);
-      // Turning left while oncoming traffic is approaching = failure to yield.
+      // Left-turn commit this frame? Adjudicated by the N1 tracker below
+      // (after the braking-response band is known — see 4a').
+      let leftTurnCommitted = false;
       for (let i = beforeTurns; i < events.length; i++) {
         const te = events[i];
-        if (
-          te.kind === "turnStarted" &&
-          te.direction === "left" &&
-          oncomingQuery(v.position.x, v.position.y, v.headingDeg, LEFT_TURN_ONCOMING_RADIUS_M)
-        ) {
-          events.push({ kind: "prioritySituation", situation: "left-turn", violated: true });
+        if (te.kind === "turnStarted" && te.direction === "left") {
+          leftTurnCommitted = true;
           break;
         }
       }
@@ -488,6 +568,113 @@ export function createWorldRuntime(districtJson: District | unknown): DistrictWo
       const brakingResponse = yieldDecelMps2 >= YIELD_BRAKE_RESPONSE_MPS2;
       prevYieldSpeedKmh = v.speedKmh;
       prevYieldT = tSec;
+
+      // 4a'. N1 left-turn-across-path tracker (doc 72 JU-10). Runs at EVERY
+      // junction (signalized or not — the чл. 37 oncoming duty is universal);
+      // constants & bands documented at LEFT_TURN_CONVICT_GAP_SEC.
+      if (nearestIx !== null) {
+        if (ltNode !== nearestIx.id) {
+          ltNode = nearestIx.id;
+          ltApproachHeading = v.headingDeg;
+          ltAdjudicated = false;
+          ltConflictSeen = false;
+          ltSlowed = false;
+          ltCondSince = null;
+          ltOnsetT = -Infinity;
+          ltSustainedRecentT = -Infinity;
+          ltLastTightT = -Infinity;
+          ltTightGapSec = undefined;
+        }
+        const probe = oncomingQuery(
+          nearestIx.x,
+          nearestIx.y,
+          ltApproachHeading,
+          LEFT_TURN_ONCOMING_RADIUS_M,
+        );
+        // Normalize the probe: rich telemetry → gap in seconds; legacy
+        // boolean → presence with unknown gap (conviction via tight radius).
+        let present = false;
+        let gapSec: number | undefined;
+        if (typeof probe === "object" && probe !== null) {
+          if (probe.closingMps >= LEFT_TURN_MIN_CLOSING_MPS) {
+            present = true;
+            gapSec = probe.distM / probe.closingMps;
+          }
+        } else if (probe === true) {
+          present = true;
+        }
+        if (present) {
+          if (ltCondSince === null) {
+            ltCondSince = tSec;
+            ltOnsetT = tSec;
+          }
+          if (tSec - ltCondSince >= YIELD_CONVICT_SUSTAIN_SEC) ltSustainedRecentT = tSec;
+          // A REAL conflict (within the graded band, or unknown-gap presence):
+          // arms the yielded-commendation eligibility.
+          if (gapSec === undefined || gapSec <= LEFT_TURN_GAP_SAFE_SEC) {
+            ltConflictSeen = true;
+            if (v.speedKmh <= RHR_YIELD_KMH) ltSlowed = true;
+          }
+          // Convict-tight observation — only while the player is MOVING into
+          // it (a stopped/creeping waiter reads tight gaps as every oncoming
+          // passes nose-to-nose; those are innocent by definition).
+          if (v.speedKmh > RHR_YIELD_KMH) {
+            const tight =
+              gapSec !== undefined
+                ? gapSec <= LEFT_TURN_CONVICT_GAP_SEC
+                : !!oncomingQuery(
+                    nearestIx.x,
+                    nearestIx.y,
+                    ltApproachHeading,
+                    LEFT_TURN_CONVICT_RADIUS_M,
+                  );
+            if (tight) {
+              ltLastTightT = tSec;
+              ltTightGapSec = gapSec;
+            }
+          }
+        } else {
+          ltCondSince = null;
+        }
+        if (leftTurnCommitted && !ltAdjudicated) {
+          const commitGap = gapSec ?? ltTightGapSec;
+          const tightRecent = tSec - ltLastTightT <= LEFT_TURN_GAP_MEMORY_SEC;
+          const visibleLongEnough = tSec - ltSustainedRecentT <= LEFT_TURN_GAP_MEMORY_SEC;
+          const standDown =
+            brakingResponse && tSec - ltOnsetT <= YIELD_BRAKE_RESPONSE_MAX_SEC;
+          if (tightRecent && visibleLongEnough && !standDown) {
+            const ev: Extract<SimTickEvent, { kind: "prioritySituation" }> = {
+              kind: "prioritySituation",
+              situation: "left-turn-oncoming",
+              violated: true,
+            };
+            if (commitGap !== undefined) ev.gapSec = commitGap;
+            events.push(ev);
+            ltAdjudicated = true;
+          } else if (ltConflictSeen && ltSlowed) {
+            // Waited for the gap, then turned — the JU-10 correct resolution.
+            const ev: Extract<SimTickEvent, { kind: "prioritySituation" }> = {
+              kind: "prioritySituation",
+              situation: "left-turn-oncoming",
+              violated: false,
+              yielded: true,
+            };
+            if (gapSec !== undefined) ev.gapSec = gapSec;
+            events.push(ev);
+            ltAdjudicated = true;
+          }
+        }
+      } else if (ltNode !== null) {
+        ltNode = null;
+        ltAdjudicated = false;
+        ltConflictSeen = false;
+        ltSlowed = false;
+        ltCondSince = null;
+        ltOnsetT = -Infinity;
+        ltSustainedRecentT = -Infinity;
+        ltLastTightT = -Infinity;
+        ltTightGapSec = undefined;
+      }
 
       // 4b. Right-hand rule: entering an uncontrolled junction's core while a
       // vehicle approaches from the right = failing to give way (once per
@@ -688,6 +875,9 @@ export function createWorldRuntime(districtJson: District | unknown): DistrictWo
         if (edgeRt.edge.zone !== undefined) tick.zone = edgeRt.edge.zone;
         if (edgeRt.edge.noOvertake !== undefined) tick.noOvertake = edgeRt.edge.noOvertake;
         if (edgeRt.edge.noUTurn !== undefined) tick.noUTurn = edgeRt.edge.noUTurn;
+        // N1 (doc 72 OV-14): one marked lane TOTAL on a two-way road = the
+        // narrow-street-meeting context. Surface-only (see SimTick doc).
+        if (!edgeRt.edge.oneway && edgeRt.edge.lanes <= 1) tick.narrowTwoWay = true;
       }
       if (nextStopLineM !== undefined) {
         tick.nextStopLineM = nextStopLineM;

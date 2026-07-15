@@ -81,12 +81,19 @@ export type SimTickEvent =
    * priority situation (right-hand rule, left turn vs oncoming, roundabout
    * entry, emergency vehicle...). `violated` grades FAILED_TO_YIELD; `yielded`
    * (resolved a real conflict correctly) earns a positive commendation.
+   *
+   * N1 (doc 72 JU-10) additive: `gapSec` MAY carry the adjudicator's measured
+   * time-gap to the conflicting vehicle at the commit moment (the ACCEPTED
+   * GAP of a left turn across oncoming). Measurement channel only — the
+   * reducer grades exclusively off `violated`/`yielded`; scenarios rubric the
+   * gap (< ~3 s = unsafe-but-legal advisory). Absent = unknown.
    */
   | {
       kind: "prioritySituation";
       situation: string;
       violated: boolean;
       yielded?: boolean;
+      gapSec?: number;
     };
 
 /**
@@ -165,6 +172,13 @@ export interface SimTick {
   /** U-turn banned on the current edge (surface-only context until the
    * U-turn maneuver evaluator lands — doc 72 OV-17 maps no cheap code). */
   noUTurn?: boolean;
+  /** N1 (doc 72 OV-14): the current edge is a NARROW two-way road (one marked
+   * lane total — meeting traffic must negotiate the passage). Surface-only
+   * world context for narrow-meeting scenarios/rubrics; no detector grades
+   * it (the who-yields adjudication needs obstruction-side data, which lives
+   * in the staged narrowMeeting spec). district-v1 has no such edge today —
+   * the poligon apron and future districts do. */
+  narrowTwoWay?: boolean;
   /** Distance to the next stop line ahead on the current edge (travel
    * direction), m, within the runtime's watch window; absent = none/unknown. */
   nextStopLineM?: number;

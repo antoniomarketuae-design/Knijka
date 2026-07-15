@@ -21,6 +21,8 @@ import type {
   AmberDilemmaSpec,
   BrakingLeadCarSpec,
   CyclistRightHookSpec,
+  NarrowMeetingSpec,
+  OncomingLeftTurnSpec,
   PedestrianDartOutSpec,
   PriorityFromRightSpec,
   RoundaboutEntrySpec,
@@ -874,6 +876,424 @@ export class AmberDilemmaRunner implements EventRunner {
 }
 
 // ---------------------------------------------------------------------------
+// 7. Oncoming left turn (N1 — doc 72 JU-10, the left-turn-across-path
+//    archetype). The runner is choreography + measurement only: it times an
+//    oncoming actor STRAIGHT through the junction so it sits `gapSec` short
+//    of the node at the player's projected node arrival, then lets the
+//    runtime's own N1 tracker adjudicate ("left-turn-oncoming" →
+//    FAILED_TO_YIELD / YIELDED_TO_PRIORITY). The ACCEPTED GAP (seconds to
+//    the oncoming at the player's commit) is recorded on the outcome —
+//    scenarios rubric < 3 s as the unsafe-but-legal advisory (doc 72 JU-10:
+//    "< 4 s away" is the taught mistake; conviction lives at ≤ 2 s).
+// ---------------------------------------------------------------------------
+
+/** Sync cap: the oncoming's plausible urban speed band, m/s. */
+const LTAP_SYNC_MAX_MPS = 11.5;
+/** Position-feedback gain: m/s of speed correction per meter of lead error.
+ * The sync holds the actor at (playerNodeEta + gapSec) × cruise metres from
+ * the node, so it crosses AT CRUISE SPEED with the authored gap — a crawling
+ * "oncoming" would be a soft target and a soft lesson. */
+const LTAP_SYNC_GAIN = 0.35;
+/** Player yielding at/under this speed commits the actor through, km/h. */
+const LTAP_YIELD_KMH = 8;
+/** The encounter is over this far past the node, m (beyond the runtime's
+ * 36 m oncoming radius so a waiting player can never meet a stale conflict). */
+const LTAP_CLEAR_ARC_M = 40;
+/** turnStarted farther than this from the junction is some other corner, m. */
+const LTAP_COMMIT_NEAR_M = 45;
+
+export class OncomingLeftTurnRunner implements EventRunner {
+  phase: StagedEventPhase = "idle";
+  outcome: StagedEventOutcome | null = null;
+  hazardActive = false;
+
+  private gapSec = 0;
+  private committed = false;
+  private sawYield = false;
+  private acceptedGapSec: number | undefined;
+
+  constructor(readonly spec: OncomingLeftTurnSpec) {}
+
+  stage(traffic: StagedTrafficPort, rng: Rng, firstTime: boolean): void {
+    const s = this.spec;
+    if (firstTime) {
+      const view = traffic.stage({
+        kind: "vehicle",
+        id: s.id,
+        pathNodes: s.actor.pathNodes,
+        hold: s.actor.hold,
+        cruiseSpeedMps: s.actor.cruiseSpeedMps,
+        loop: s.actor.loop,
+        colorIndex: s.actor.colorIndex,
+        playerGuard: true, // never ram the player — the guard-stopped victim
+        // still convicts via the runtime's gap-memory latch
+      });
+      if (!view) throw new Error(`staged event ${s.id}: oncoming path failed to stage`);
+    } else {
+      traffic.stagedCommand(s.id, { type: "reset" });
+    }
+    this.gapSec = s.gapSec + (rng() * 2 - 1) * 0.15;
+    this.phase = "armed";
+    this.outcome = null;
+    this.committed = false;
+    this.sawYield = false;
+    this.acceptedGapSec = undefined;
+  }
+
+  step(traffic: StagedTrafficPort, input: DirectorInput, out: SimTickEvent[]): StagedEventOutcome | null {
+    const s = this.spec;
+    if (this.phase === "resolved") return null;
+    const actor = traffic.staged(s.id);
+    if (!actor) return null;
+    const d = dist(input.x, input.y, s.junction.x, s.junction.y);
+    const carArc = actor.s - actor.nodeS[s.junctionNodeIndex]; // <0 before node
+
+    // Adjudication watch — live in every phase (the runtime may fire early).
+    // Event order within a tick: turnStarted (runtime step 4) precedes the
+    // tracker's prioritySituation (step 4a'), so the gap measurement lands
+    // before the resolution scan reads the grade.
+    for (const e of input.tickEvents) {
+      if (
+        e.kind === "turnStarted" &&
+        e.direction === "left" &&
+        d <= LTAP_COMMIT_NEAR_M &&
+        !this.committed
+      ) {
+        this.committed = true;
+        if (carArc < -0.5 && actor.speedMps >= 1) {
+          // Seconds until the oncoming reaches the junction — the accepted gap.
+          this.acceptedGapSec = -carArc / actor.speedMps;
+        }
+      }
+      if (e.kind === "prioritySituation" && e.situation === "left-turn-oncoming") {
+        if (this.acceptedGapSec === undefined && e.gapSec !== undefined) {
+          this.acceptedGapSec = e.gapSec;
+        }
+        if (e.violated) return this.resolve(input, false, "violation");
+        if (e.yielded) return this.resolve(input, true, "yielded");
+      }
+    }
+
+    // Contact in the box (frontal — the player crossed into the oncoming).
+    if (
+      dist(input.x, input.y, actor.x, actor.y) < VEHICLE_CONTACT_M &&
+      input.speedKmh + actor.speedMps * 3.6 > 5
+    ) {
+      out.push({ kind: "collision", withWhat: "vehicle" });
+      return this.resolve(input, false, "collision");
+    }
+
+    if (this.phase === "armed") {
+      if (d > s.armDistM) return null;
+      const carDist = -carArc;
+      if (carDist <= 2) {
+        // Through the node — sprint clear of the 36 m oncoming radius.
+        traffic.stagedCommand(s.id, { type: "cruise", speedMps: s.clearSpeedMps });
+        this.phase = "triggered";
+        return null;
+      }
+      if (this.committed || input.speedKmh <= LTAP_YIELD_KMH) {
+        // The player decided (turned, or is yielding at the mouth): the
+        // actor takes its priority at full cruise and the dilemma plays out.
+        traffic.stagedCommand(s.id, { type: "cruise" });
+        this.phase = "triggered";
+        return null;
+      }
+      if (d <= 10) {
+        // At the node — freeze the staging (last synced speed ≈ cruise) so
+        // the delivered gap stays the authored tier; syncing against the
+        // flattening corner distance would distort it.
+        this.phase = "triggered";
+        return null;
+      }
+      // Arrival sync (position feedback): hold the actor at
+      // (playerNodeEta + gapSec) × cruise metres from the node, so at the
+      // player's projected node arrival it is `gapSec` short — AT CRUISE.
+      const playerNodeEta = d / Math.max(input.speedKmh * KMH_TO_MPS, 3);
+      const desiredCarDist = (playerNodeEta + this.gapSec) * s.actor.cruiseSpeedMps;
+      const target = Math.min(
+        LTAP_SYNC_MAX_MPS,
+        Math.max(0, s.actor.cruiseSpeedMps + LTAP_SYNC_GAIN * (carDist - desiredCarDist)),
+      );
+      traffic.stagedCommand(s.id, { type: "cruise", speedMps: target });
+      return null;
+    }
+
+    // triggered — the runtime tracker adjudicates; we only watch for the end.
+    if (input.speedKmh <= LTAP_YIELD_KMH && Math.abs(carArc) <= 36 && d <= s.armDistM) {
+      this.sawYield = true; // waited while the oncoming held the junction
+    }
+    if (carArc > 6) {
+      traffic.stagedCommand(s.id, { type: "cruise", speedMps: s.clearSpeedMps });
+    }
+    if (carArc > LTAP_CLEAR_ARC_M || actor.finished) {
+      // A yielding player's commendation lands at their LATER commit — hold
+      // the resolution open while they are still at the junction about to
+      // take the (now clear) turn.
+      if (this.sawYield && !this.committed && d <= 60) return null;
+      // Otherwise: a clean-gap turn (accepted gap recorded for the rubric),
+      // or the encounter dissolved without a commitment.
+      return this.resolve(input, true, "clear");
+    }
+    return null;
+  }
+
+  private resolve(
+    input: DirectorInput,
+    success: boolean,
+    detail: StagedEventOutcome["detail"],
+  ): StagedEventOutcome {
+    this.phase = "resolved";
+    this.outcome = outcomeOf(this.spec, input, success, detail, {
+      ...(this.acceptedGapSec !== undefined ? { acceptedGapSec: this.acceptedGapSec } : {}),
+    });
+    return this.outcome;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// 8. Narrow-street meeting (N1 — doc 72 OV-14). A parked row leaves one
+//    usable lane; an oncoming actor transits as the player arrives. ЗДвП
+//    narrow-passage priority: the side WITH the obstruction yields. The
+//    authored obstruction side lives only in the spec, so the ADJUDICATION
+//    lives here (cyclist-right-hook precedent) — emitting ONLY the reserved
+//    prioritySituation vocabulary ("narrow-meeting").
+// ---------------------------------------------------------------------------
+
+/** House disciplines (mirroring the runtime's yield adjudication): */
+const NM_SUSTAIN_SEC = 0.9; // reaction window before any conviction
+const NM_STANDDOWN_MAX_SEC = 3.0; // D1-bounded braking-response immunity
+/** Forcing the oncoming to a guard standstill this long = the barge stands
+ * even though the player stopped too (nose-to-nose stalemate they caused). */
+const NM_BLOCK_CONVICT_SEC = 4.0;
+/** Player over the centerline by more than this = in the oncoming lane, m. */
+const NM_LANE_OVER_M = 1.2;
+/** Moving faster than this while in conflict = barging, km/h. */
+const NM_BARGE_MIN_KMH = 6;
+/** The oncoming within this beyond its entrance counts as arriving, m. */
+const NM_ONCOMING_NEAR_M = 25;
+/** Yield credit is observable this far before the section start, m. */
+const NM_WAIT_ZONE_M = 45;
+/** Actor sync clamp, m/s. */
+const NM_SYNC_MIN_MPS = 1.5;
+
+export class NarrowMeetingRunner implements EventRunner {
+  phase: StagedEventPhase = "idle";
+  outcome: StagedEventOutcome | null = null;
+  hazardActive = false;
+
+  // Section frame (unit start→end + left normal), built once.
+  private readonly ux: number;
+  private readonly uy: number;
+  private readonly lx: number;
+  private readonly ly: number;
+  private readonly lenM: number;
+
+  private transitSpeedMps = 0;
+  private condSince: number | null = null; // conflict-visible onset
+  private convictSince: number | null = null; // live barge condition onset
+  private blockSince: number | null = null; // oncoming guard-stopped onset
+  private sawConflict = false;
+  private sawWait = false;
+  private holding = false; // obstructionSide "oncoming": actor holds at entry
+
+  constructor(readonly spec: NarrowMeetingSpec) {
+    const dx = spec.sectionEnd.x - spec.sectionStart.x;
+    const dy = spec.sectionEnd.y - spec.sectionStart.y;
+    this.lenM = Math.max(1, Math.hypot(dx, dy));
+    this.ux = dx / this.lenM;
+    this.uy = dy / this.lenM;
+    // Left of travel (x east, y north): rotate (ux, uy) 90° CCW.
+    this.lx = -this.uy;
+    this.ly = this.ux;
+  }
+
+  private along(x: number, y: number): number {
+    return (x - this.spec.sectionStart.x) * this.ux + (y - this.spec.sectionStart.y) * this.uy;
+  }
+
+  private lat(x: number, y: number): number {
+    return (x - this.spec.sectionStart.x) * this.lx + (y - this.spec.sectionStart.y) * this.ly;
+  }
+
+  stage(traffic: StagedTrafficPort, rng: Rng, firstTime: boolean): void {
+    const s = this.spec;
+    if (firstTime) {
+      const view = traffic.stage({
+        kind: "vehicle",
+        id: s.id,
+        pathNodes: s.actor.pathNodes,
+        hold: s.actor.hold,
+        cruiseSpeedMps: s.actor.cruiseSpeedMps,
+        colorIndex: s.actor.colorIndex,
+        playerGuard: true, // never rams a player blocking its lane — the
+        // guard standstill IS the barge evidence
+      });
+      if (!view) throw new Error(`staged event ${s.id}: oncoming path failed to stage`);
+      for (let i = 0; i < (s.props?.length ?? 0); i++) {
+        const p = s.props![i];
+        const propView = traffic.stage({
+          kind: "vehicle",
+          id: `${s.id}-prop-${i}`,
+          pathNodes: p.pathNodes,
+          hold: p.hold,
+          cruiseSpeedMps: 0, // parked row — never commanded
+          // NOTE: keep prop offsets at 0/negative — a positive curb offset
+          // tags the state as a cyclist proxy (A11 vehicleCollisionKind).
+          extraRightOffsetM: p.extraRightOffsetM,
+          colorIndex: p.colorIndex,
+        });
+        if (!propView) throw new Error(`staged event ${s.id}: prop ${i} failed to stage`);
+      }
+    } else {
+      traffic.stagedCommand(s.id, { type: "reset" });
+      for (let i = 0; i < (s.props?.length ?? 0); i++) {
+        traffic.stagedCommand(`${s.id}-prop-${i}`, { type: "reset" });
+      }
+    }
+    this.transitSpeedMps = (s.transitSpeedMps ?? s.actor.cruiseSpeedMps) + (rng() * 2 - 1) * 0.3;
+    this.phase = "armed";
+    this.outcome = null;
+    this.condSince = null;
+    this.convictSince = null;
+    this.blockSince = null;
+    this.sawConflict = false;
+    this.sawWait = false;
+    this.holding = false;
+  }
+
+  step(traffic: StagedTrafficPort, input: DirectorInput, out: SimTickEvent[]): StagedEventOutcome | null {
+    const s = this.spec;
+    if (this.phase === "resolved") return null;
+    const actor = traffic.staged(s.id);
+    if (!actor) return null;
+    const entryArc = actor.nodeS[s.actorEntry.nodeIndex] + s.actorEntry.offsetM;
+    const playerAlong = this.along(input.x, input.y);
+    const playerLat = this.lat(input.x, input.y);
+    const actorAlong = this.along(actor.x, actor.y);
+    const dStart = dist(input.x, input.y, s.sectionStart.x, s.sectionStart.y);
+
+    // Contact — the player squeezed into the oncoming.
+    if (
+      dist(input.x, input.y, actor.x, actor.y) < VEHICLE_CONTACT_M &&
+      input.speedKmh + actor.speedMps * 3.6 > 4
+    ) {
+      out.push({ kind: "collision", withWhat: "vehicle" });
+      return this.resolve(input, false, "collision");
+    }
+
+    if (s.obstructionSide === "oncoming") {
+      // The ONCOMING carries the obstruction: it yields at ITS entrance while
+      // the player transits with priority. Nothing about the player grades —
+      // proceeding on your priority is simply correct (RHR precedent: no
+      // commendation for taking priority, no violation either).
+      if (this.phase === "armed") {
+        if (dStart <= s.armDistM && approaching(input, s.sectionStart.x, s.sectionStart.y)) {
+          traffic.stagedCommand(s.id, { type: "cruise" });
+          this.phase = "triggered";
+        }
+        return null;
+      }
+      if (!this.holding && actor.s >= entryArc - 3) {
+        traffic.stagedCommand(s.id, { type: "cruise", speedMps: 0 }); // yields
+        this.holding = true;
+      }
+      if (playerAlong > this.lenM + 3) {
+        traffic.stagedCommand(s.id, { type: "cruise", speedMps: this.transitSpeedMps });
+        return this.resolve(input, true, "clear");
+      }
+      return null;
+    }
+
+    // Obstruction on the PLAYER's side — the player must yield.
+    if (this.phase === "armed") {
+      if (dStart > s.armDistM && playerAlong < -8) return null;
+      const carDistToEntry = entryArc - actor.s;
+      if (carDistToEntry <= 4 || playerAlong > -8) {
+        traffic.stagedCommand(s.id, { type: "cruise", speedMps: this.transitSpeedMps });
+        this.phase = "triggered";
+        return null;
+      }
+      // Sync the actor to reach its entrance about when the player reaches
+      // theirs — the meeting is guaranteed mid-block.
+      const playerEta = Math.max(0.6, (playerAlong < 0 ? -playerAlong : 0) / Math.max(input.speedKmh * KMH_TO_MPS, 2));
+      const target = Math.min(
+        this.transitSpeedMps,
+        Math.max(NM_SYNC_MIN_MPS, carDistToEntry / playerEta),
+      );
+      traffic.stagedCommand(s.id, { type: "cruise", speedMps: target });
+      return null;
+    }
+
+    // triggered — adjudicate.
+    const actorCleared = actorAlong < playerAlong - 4 || actorAlong < -4 || actor.finished;
+    const conflictLive = !actorCleared && actorAlong <= this.lenM + NM_ONCOMING_NEAR_M;
+    if (conflictLive && this.condSince === null) this.condSince = input.tSec;
+    if (conflictLive && dStart <= NM_WAIT_ZONE_M + this.lenM) this.sawConflict = true;
+    if (
+      this.sawConflict &&
+      !actorCleared &&
+      input.speedKmh <= LTAP_YIELD_KMH &&
+      playerAlong < 4 &&
+      playerLat <= NM_LANE_OVER_M
+    ) {
+      this.sawWait = true; // waiting at the widening, own side
+    }
+
+    const playerInSection = playerAlong >= -2 && playerAlong <= this.lenM + 2;
+    const barging = conflictLive && playerInSection && playerLat > NM_LANE_OVER_M;
+    if (barging && input.speedKmh > NM_BARGE_MIN_KMH) {
+      if (this.convictSince === null) this.convictSince = input.tSec;
+    } else {
+      this.convictSince = null;
+    }
+    if (barging && actor.speedMps < 0.5) {
+      if (this.blockSince === null) this.blockSince = input.tSec;
+    } else {
+      this.blockSince = null;
+    }
+
+    const standDown =
+      input.brakePedal >= BRAKE_ONSET_THRESHOLD &&
+      this.condSince !== null &&
+      input.tSec - this.condSince <= NM_STANDDOWN_MAX_SEC;
+    const visibleLongEnough =
+      this.condSince !== null && input.tSec - this.condSince >= NM_SUSTAIN_SEC;
+    const bargeSustained =
+      this.convictSince !== null && input.tSec - this.convictSince >= NM_SUSTAIN_SEC;
+    const blockedOut = this.blockSince !== null && input.tSec - this.blockSince >= NM_BLOCK_CONVICT_SEC;
+    if (visibleLongEnough && ((bargeSustained && !standDown) || blockedOut)) {
+      out.push({ kind: "prioritySituation", situation: "narrow-meeting", violated: true });
+      return this.resolve(input, false, "violation");
+    }
+
+    if (actorCleared) {
+      if (this.sawWait) {
+        out.push({
+          kind: "prioritySituation",
+          situation: "narrow-meeting",
+          violated: false,
+          yielded: true,
+        });
+        return this.resolve(input, true, "yielded");
+      }
+      return this.resolve(input, true, "clear");
+    }
+    return null;
+  }
+
+  private resolve(
+    input: DirectorInput,
+    success: boolean,
+    detail: StagedEventOutcome["detail"],
+  ): StagedEventOutcome {
+    this.phase = "resolved";
+    this.outcome = outcomeOf(this.spec, input, success, detail);
+    return this.outcome;
+  }
+}
+
+// ---------------------------------------------------------------------------
 
 export function createRunner(
   spec: StagedEventSpec,
@@ -892,5 +1312,9 @@ export function createRunner(
       return new RoundaboutEntryRunner(spec);
     case "amberDilemma":
       return new AmberDilemmaRunner(spec, signals);
+    case "oncomingLeftTurn":
+      return new OncomingLeftTurnRunner(spec);
+    case "narrowMeeting":
+      return new NarrowMeetingRunner(spec);
   }
 }

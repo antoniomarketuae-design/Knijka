@@ -176,6 +176,43 @@ export interface LessonSpec {
    * ignores it; absent = always unlocked.
    */
   unlockAfterLessonId?: string;
+  /**
+   * S0 Scenario Studio (doc 76 §7) — per-level learning aids of a compiled
+   * scenario micro-lesson. ADDITIVE + DATA ONLY: absent (every existing
+   * lesson) = no aids, byte-identical behavior. The scenario compiler
+   * (lessons/scenario) writes it per difficulty level; LessonScene/the shell
+   * consume it when the S0-View workstream lands the ghost/top-down/timeline
+   * renderers — until then the field is inert data riding the existing
+   * LessonSpec prop path.
+   */
+  aids?: LessonAidsSpec;
+}
+
+/**
+ * The Scenario Studio aid ladder contract (doc 76 §7, one flag per aid the
+ * table names). Every flag is optional; absent = off. Consumers:
+ *  - shadowCar / followHints — S0-View's ghost playback + deviation hints;
+ *  - pathRibbon — the A7 guidance ribbon restyled as the correct-path overlay;
+ *  - pauseOnError — the shell freezes physics on the first graded mistake
+ *    (beyond the A9 teach-moment machinery, which stays coach-policy-driven);
+ *  - topdownAllowed — the orthographic top-down POV may be used WHILE DRIVING
+ *    (L1); demo/replay views are always free to use it. L4 locks to cockpit
+ *    like the real exam (doc 76 §4) — flag absent;
+ *  - hintsAfterIdleSec — idle seconds before a contextual hint (L2 pattern).
+ */
+export interface LessonAidsSpec {
+  /** Translucent ghost car replaying the correct recorded trace. */
+  shadowCar?: boolean;
+  /** Correct-path ground ribbon (the reference image's colored line). */
+  pathRibbon?: boolean;
+  /** Live follow-the-ghost deviation hints („0,8 м встрани от линията"). */
+  followHints?: boolean;
+  /** Freeze + card on the first graded mistake. */
+  pauseOnError?: boolean;
+  /** Top-down ortho camera allowed while driving (grading stays cockpit/chase-only elsewhere). */
+  topdownAllowed?: boolean;
+  /** Seconds of idling before a contextual hint appears; absent = no idle hints. */
+  hintsAfterIdleSec?: number;
 }
 
 export interface LessonObjective {
@@ -255,7 +292,9 @@ export type StagedEventKind =
   | "brakingLeadCar"
   | "cyclistRightHook"
   | "roundaboutEntry"
-  | "amberDilemma";
+  | "amberDilemma"
+  | "oncomingLeftTurn"
+  | "narrowMeeting";
 
 interface StagedEventBase {
   /** Unique per lesson, e.g. "l4-dart-out". */
@@ -412,13 +451,85 @@ export interface AmberDilemmaSpec extends StagedEventBase {
   flipEtaSec: number;
 }
 
+/**
+ * N1 (doc 72 JU-10 — the #1 ranked capability gap): an oncoming car drives
+ * STRAIGHT through the junction the player turns LEFT at, timed so it is
+ * `gapSec` short of the junction node when the player's projected arrival at
+ * the node lands — the left-turn-across-path dilemma, guaranteed per seed.
+ * Grading is the runtime's own N1 tracker (prioritySituation
+ * "left-turn-oncoming" → FAILED_TO_YIELD / YIELDED_TO_PRIORITY); the runner
+ * records the outcome + the ACCEPTED GAP measurement (acceptedGapSec).
+ *
+ * `gapSec` is the tier dial (exam-bank style):
+ *  - ≤ ~1.6 s "tight"  — turning grades the 10-point опасна; waiting is the
+ *    only correct resolution;
+ *  - ~2.6–3.0 s "advisory" — legal but unsafe: no violation, the outcome's
+ *    acceptedGapSec < 3 s lets the scenario rubric coach it;
+ *  - ≥ ~5 s "safe" — a clean gap; turning immediately is correct.
+ */
+export interface OncomingLeftTurnSpec extends StagedEventBase {
+  kind: "oncomingLeftTurn";
+  junction: { nodeId: string; x: number; y: number };
+  /** Opposing-approach path straight through the junction. */
+  actor: StagedActorPathSpec;
+  /** Index of the junction node within actor.pathNodes (timing reference). */
+  junctionNodeIndex: number;
+  /** Player distance to the junction that starts the arrival sync, m. */
+  armDistM: number;
+  /** Oncoming's time-to-node at the player's projected node arrival, s
+   * (± seeded jitter) — the gap-class tier dial, see above. The sync holds
+   * the actor at (playerEta + gapSec) × cruise metres from the node, so it
+   * arrives AT CRUISE SPEED with the authored gap. */
+  gapSec: number;
+  /** Speed after clearing the junction (leave the conflict radius fast), m/s. */
+  clearSpeedMps: number;
+}
+
+/**
+ * N1 (doc 72 OV-14 — „разминаване в тясна улица"): a parked row narrows the
+ * road to ONE usable lane; an oncoming actor is timed to transit the section
+ * as the player arrives. ЗДвП narrow-passage priority: the side WITH the
+ * obstruction yields. The runner adjudicates (no runtime detector can see
+ * authored obstruction sides) and emits ONLY the reserved vocabulary:
+ * prioritySituation "narrow-meeting" → FAILED_TO_YIELD (barging into the
+ * oncoming's priority) / YIELDED_TO_PRIORITY (waiting at the widening).
+ */
+export interface NarrowMeetingSpec extends StagedEventBase {
+  kind: "narrowMeeting";
+  /** Narrow-section span on the ROAD CENTERLINE, district space:
+   * `sectionStart` = the player-side entrance, `sectionEnd` = the far end. */
+  sectionStart: { x: number; y: number };
+  sectionEnd: { x: number; y: number };
+  /** Which side carries the obstruction — and therefore must yield. */
+  obstructionSide: "player" | "oncoming";
+  /** Oncoming actor scripted through the section toward the player. */
+  actor: StagedActorPathSpec;
+  /** The actor-path arc of ITS section entrance (the sectionEnd side):
+   * nodeS[nodeIndex] + offsetM — the runner's timing reference. */
+  actorEntry: { nodeIndex: number; offsetM: number };
+  /** Player distance to sectionStart that begins the arrival sync, m. */
+  armDistM: number;
+  /** Actor speed while transiting the section, m/s (default: cruise). */
+  transitSpeedMps?: number;
+  /** Stationary prop vehicles forming the parked row (staged held actors —
+   * doc 72 OV-18's "stage() with a hold pose" pattern; never commanded). */
+  props?: Array<{
+    pathNodes: string[];
+    hold: { nodeIndex: number; offsetM: number };
+    extraRightOffsetM?: number;
+    colorIndex?: number;
+  }>;
+}
+
 export type StagedEventSpec =
   | PedestrianDartOutSpec
   | PriorityFromRightSpec
   | BrakingLeadCarSpec
   | CyclistRightHookSpec
   | RoundaboutEntrySpec
-  | AmberDilemmaSpec;
+  | AmberDilemmaSpec
+  | OncomingLeftTurnSpec
+  | NarrowMeetingSpec;
 
 /**
  * Resolution record of one staged encounter (A8). The GRADING already
@@ -447,6 +558,15 @@ export interface StagedEventOutcome {
   stopGapM?: number;
   /** Player speed at the moment the stimulus fired, km/h. */
   approachSpeedKmh?: number;
+  /**
+   * N1 gap-acceptance measurement (oncomingLeftTurn): seconds until the
+   * oncoming vehicle would reach the junction, measured at the player's turn
+   * commit. Rubric thresholds (doc 72 JU-10 evidence): < 3 s = unsafe-but-
+   * legal advisory (NOT a violation — the 10-point conviction band lives in
+   * the runtime at ≤ 2 s), ≥ 4 s = the taught norm. Absent = no oncoming was
+   * inbound at commit (waited it out / clear road).
+   */
+  acceptedGapSec?: number;
 }
 
 // ---------------------------------------------------------------------------

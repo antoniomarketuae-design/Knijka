@@ -99,6 +99,24 @@ export interface TrafficPedestrianState {
   colorIndex: number;
 }
 
+/**
+ * N1 (doc 72 JU-10) — one oncoming vehicle's approach telemetry, as returned
+ * by TrafficSystem.oncomingNear. `closingMps` is the vehicle's speed component
+ * toward the query point (its own motion only — the gap a WAITING driver
+ * reads); time-to-arrival ≈ distM / closingMps. Structurally satisfies the
+ * runtime's OncomingConflict (the query seam stays runtime-typed).
+ */
+export interface OncomingApproach {
+  /** Center-to-center distance to the query point, m. */
+  distM: number;
+  /** Speed component toward the query point, m/s — can be ~0 for a mover
+   * sliding past obliquely (the runtime's closing floor treats those as
+   * making no arrival claim). */
+  closingMps: number;
+  /** The vehicle's own speed, m/s (>= the moving-conflict floor). */
+  speedMps: number;
+}
+
 // ---------------------------------------------------------------------------
 // Update context — what the integrator feeds the system each frame.
 // ---------------------------------------------------------------------------
@@ -356,11 +374,17 @@ export interface TrafficSystem {
    */
   conflictNear(x: number, y: number, radiusM: number, approachBearingDeg: number): boolean;
   /**
-   * True when a moving vehicle is AHEAD of the player within `radiusM` and
-   * heading roughly toward them (oncoming) — used to grade turning left across
-   * oncoming traffic. District space; headingDeg 0 = north, clockwise.
+   * The most urgent MOVING oncoming vehicle ahead of the player within
+   * `radiusM` (heading roughly toward them), or null when the way is clear —
+   * used to grade turning left across oncoming traffic. N1 (doc 72 JU-10):
+   * the return carries distance + closing speed so the runtime adjudicates
+   * the ACCEPTED GAP in seconds instead of mere presence (a 36 m queue-creep
+   * at 1 m/s is a 30+ second gap, not a conflict). Falsy-compatible: callers
+   * that used the old boolean form (`if (oncomingNear(...))`) behave
+   * identically, and the runtime's OncomingQuery accepts both shapes.
+   * District space; headingDeg 0 = north, clockwise.
    */
-  oncomingNear(px: number, py: number, headingDeg: number, radiusM: number): boolean;
+  oncomingNear(px: number, py: number, headingDeg: number, radiusM: number): OncomingApproach | null;
   /**
    * True when a moving vehicle near the junction (jx,jy) is on the player's
    * RIGHT and not travelling the player's own direction — used to grade the
