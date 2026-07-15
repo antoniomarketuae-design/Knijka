@@ -244,3 +244,14 @@ rule for any detector touch, determinism law (no Date.now/random).
 4. Scenario access: free tier gets L1 of every template (recommended — the library
    IS the acquisition hook) vs gated behind premium_sim.
 5. N1 (oncoming) scheduling: P2 as proposed, or earlier at the cost of P1 breadth.
+
+---
+
+## 12. FOUNDER RULINGS (2026-07-15) — the proposal is APPROVED with amendments
+1. Scale model approved, amended: **150 hand-authored templates** (× parametric
+   variants ⇒ well beyond 400 tasks). 2. Prototype = reverse perpendicular parking ✓.
+3. Ghost = translucent car ✓. 4. Free tier gets L1 of every template ✓.
+5. **N1 oncoming machinery: build NOW** (not P2). Additional immediate order:
+**low-speed/reverse feel + precise colliders NOW**. Top-down mode confirmed as a
+first-class POV option. Wrong-way content: demonstrated only, never practiced ✓.
+Execution: ALL phases, autonomous, as many agents as required.
