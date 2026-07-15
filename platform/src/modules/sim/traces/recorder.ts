@@ -17,7 +17,7 @@
 
 import type { StagedEventOutcome, StagedEventSpec, VehicleSample } from "../contracts";
 import { createScenarioDirector } from "../orchestrator";
-import { createRuleEngine, reduceTick, type RuleEvent, type SimTick } from "../rules";
+import { createRuleEngine, reduceTick, type HeadlightState, type RuleEvent, type SimTick } from "../rules";
 import { createWorldRuntime } from "../runtime";
 import { createTrafficSystem } from "../traffic/system";
 import type { TrafficDistrict } from "../traffic/types";
@@ -210,7 +210,20 @@ export type DriveStep =
    * like a physics contact would; it is a scripted narrative beat, never a
    * geometric check (those are `obstacles` below).
    */
-  | { kind: "collision"; withWhat: TraceCollisionWith };
+  | { kind: "collision"; withWhat: TraceCollisionWith }
+  /**
+   * Cockpit-state channels (capability phase — the AC/VP unlock). Each sets a
+   * discrete telemetry channel the rule engine reads, at the current clock,
+   * held until the next same-kind step. DEFAULTS match the recorder's former
+   * hardcodes exactly (headlights = isNight ? "low" : "off"; seatbelt on;
+   * handbrake off), so a script that never emits these records BYTE-IDENTICAL
+   * to before — every shipped trace is unaffected. A mistake demo flips one
+   * (lights off at night, belt off while moving, handbrake left on) to grade
+   * the matching code; a shadow sets the correct state.
+   */
+  | { kind: "headlights"; setting: HeadlightState }
+  | { kind: "seatbelt"; on: boolean }
+  | { kind: "handbrake"; on: boolean };
 
 /**
  * One flat obstacle rect in district space (S1) — the headless twin of the
@@ -482,6 +495,13 @@ export function recordScriptedDrive(
   const rain = options.rain ?? false;
   const maxFrames = Math.ceil((options.maxDurationSec ?? 900) / SCRIPT_DT);
 
+  // Cockpit-state channels (see the DriveStep doc): initial values are the
+  // recorder's former hardcodes, so scripts that never touch them are
+  // byte-identical to before.
+  let headlights: HeadlightState = isNight ? "low" : "off";
+  let seatbeltOn = true;
+  let handbrakeOn = false;
+
   const emitEvent = (kind: TraceEventKind, textBg?: string, detail?: string) => {
     const e: TraceEvent = { tSec: t, kind };
     if (textBg !== undefined) e.textBg = textBg;
@@ -575,9 +595,9 @@ export function recordScriptedDrive(
       // and the A12 reverse exemptions read exactly these channels.
       speedKmh: (lastReverse ? -1 : 1) * Math.abs(speedMps) * 3.6,
       indicator,
-      headlights: isNight ? "low" : "off",
-      seatbeltOn: true,
-      handbrakeOn: false,
+      headlights,
+      seatbeltOn,
+      handbrakeOn,
       gear: lastGear,
       mirrorGlance: pendingGlance,
       stalled: false,
@@ -644,6 +664,18 @@ export function recordScriptedDrive(
       // Authored consequence — drains into the NEXT frame's tick (a pause or
       // drive step must follow so a frame exists to grade it).
       runtime.pushCollision(step.withWhat);
+      continue;
+    }
+    if (step.kind === "headlights") {
+      headlights = step.setting;
+      continue;
+    }
+    if (step.kind === "seatbelt") {
+      seatbeltOn = step.on;
+      continue;
+    }
+    if (step.kind === "handbrake") {
+      handbrakeOn = step.on;
       continue;
     }
     if (step.kind === "pause") {
