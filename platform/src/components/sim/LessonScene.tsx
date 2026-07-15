@@ -655,6 +655,16 @@ function ReadyScene({
     setCockpit(next === "cockpit");
   }, [topdownInCycle]);
 
+  // Enter top-down directly (used by the G/N top-down hotkeys so they work
+  // from any view instead of silently no-op'ing outside top-down). Guarded by
+  // topdownInCycle at the call site — exam rungs, where top-down is disallowed,
+  // never enter it.
+  const enterTopdown = useCallback(() => {
+    if (cameraModeRef.current === "topdown") return;
+    cameraModeRef.current = "topdown";
+    setCockpit(false);
+  }, []);
+
   // Mirror of the driveLocked prop so the input lifecycle effect (which runs
   // once) can seed a freshly created input with the current gate state.
   const driveLockedRef = useRef(driveLocked);
@@ -964,6 +974,8 @@ function ReadyScene({
           cameraModeRef={cameraModeRef}
           cabinRef={cabinRef}
           telemetryRef={telemetryRef}
+          topdownAllowed={topdownInCycle}
+          enterTopdown={enterTopdown}
         />
         {cockpit && rain ? <WindshieldDroplets /> : null}
       </Canvas>
@@ -971,7 +983,7 @@ function ReadyScene({
       {/* Controls legend — collapsible, top-left of the canvas (clear of the
           bottom cards + minimap). Collapsed by default on touch-only devices
           (the keys are real but secondary there). */}
-      <ControlsHelp defaultOpen={!touchOnly} />
+      <ControlsHelp defaultOpen={!touchOnly} topdownAllowed={topdownInCycle} />
 
       {/* S0-View ?ghost=demo: playback deck for the Shadow Car — scrub bar,
           speeds, annotation ticks, step-by-step, loop-section. */}
@@ -1477,7 +1489,15 @@ function RuntimeDriver({
 /** Collapsible key legend, top-left of the canvas — clear of the bottom HUD
  *  cards and the minimap. Default open so the keys are visible (collapsed on
  *  touch-only devices, where the touch overlay is the primary input). */
-function ControlsHelp({ defaultOpen = true }: { defaultOpen?: boolean }) {
+function ControlsHelp({
+  defaultOpen = true,
+  topdownAllowed = true,
+}: {
+  defaultOpen?: boolean;
+  /** Only advertise the top-down view + its G/N controls when it's reachable
+   *  (curriculum lessons + scenario L1; exam rungs lock it out). */
+  topdownAllowed?: boolean;
+}) {
   const [open, setOpen] = useState(defaultOpen);
   const rows: Array<[string, string]> = [
     ["W A S D", "кормуване (или стрелки)"],
@@ -1494,9 +1514,13 @@ function ControlsHelp({ defaultOpen = true }: { defaultOpen?: boolean }) {
     ["H", "клаксон — задръж"],
     ["Q E F", "огледала — задръж (ляво / дясно / назад)"],
     ["Клик", "контролите в кабината (изглед кокпит)"],
-    ["C", "изглед: кокпит / отвън / отгоре"],
-    ["G", "мащаб отгоре: 20 / 40 / 80 м"],
-    ["N", "отгоре: север горе / посока горе"],
+    ["C", topdownAllowed ? "изглед: кокпит / отвън / отгоре" : "изглед: кокпит / отвън"],
+    ...(topdownAllowed
+      ? ([
+          ["G", "мащаб отгоре: 20 / 40 / 80 м (влиза в изглед отгоре)"],
+          ["N", "отгоре: север горе / посока горе"],
+        ] as Array<[string, string]>)
+      : []),
     ["X", "цял екран"],
     ["R  ·  Esc", "рестарт · пауза"],
   ];

@@ -111,12 +111,18 @@ export function CameraRig({
   cameraModeRef,
   cabinRef,
   telemetryRef,
+  topdownAllowed = true,
+  enterTopdown,
 }: {
   chassisGroupRef: RefObject<Group | null>;
   simRef: RefObject<VehicleSim | null>;
   cameraModeRef: RefObject<CameraMode>;
   cabinRef: RefObject<CabinControls | null>;
   telemetryRef: RefObject<SimTelemetry>;
+  /** Whether top-down is reachable this lesson (false on exam rungs). */
+  topdownAllowed?: boolean;
+  /** Switch the shared view state into top-down (parent owns cockpit state). */
+  enterTopdown?: () => void;
 }) {
   const fpsMeterRef = useRef(new FpsMeter());
   const lastMode = useRef<CameraMode | null>(null);
@@ -127,20 +133,28 @@ export function CameraRig({
   const topdownHeadingUpRef = useRef(false); // false = north-up
 
   // Top-down hotkeys (legend rows in LessonScene): G cycles the zoom preset,
-  // N toggles north-up / heading-up. Active only while the mode is on — the
-  // keys stay free for future bindings in the other views.
+  // N toggles north-up / heading-up. From ANOTHER view they first SWITCH into
+  // top-down (when the lesson allows it), so the keys always do something
+  // instead of silently no-op'ing — the founder-reported "G/N don't work".
+  // On exam rungs (topdownAllowed=false) they stay inert, and the legend
+  // doesn't advertise them.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.repeat || cameraModeRef.current !== "topdown") return;
+      if (e.repeat) return;
+      if (e.code !== "KeyG" && e.code !== "KeyN") return;
+      if (cameraModeRef.current !== "topdown") {
+        if (!topdownAllowed) return;
+        enterTopdown?.();
+      }
       if (e.code === "KeyG") {
         topdownZoomRef.current = (topdownZoomRef.current + 1) % TOPDOWN_WIDTHS_M.length;
-      } else if (e.code === "KeyN") {
+      } else {
         topdownHeadingUpRef.current = !topdownHeadingUpRef.current;
       }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [cameraModeRef]);
+  }, [cameraModeRef, topdownAllowed, enterTopdown]);
 
   // Scratch objects — never allocate in useFrame.
   const scratchRef = useRef({
