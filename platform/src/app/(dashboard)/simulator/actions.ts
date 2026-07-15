@@ -27,10 +27,19 @@ import { getContentRepo } from "@/lib/content/repo";
 import { requireUser } from "@/modules/auth";
 import { recordActivity } from "@/modules/gamification";
 import { recordSimObservations, type SimObservation } from "@/modules/learning";
-import { buildDebrief, gradeFinishWire } from "@/modules/sim/lessons";
+import {
+  buildDebrief,
+  gradeFinishWire,
+  isScenarioLevelUnlocked,
+  parseScenarioLessonId,
+  scenarioById,
+  scoreRubric,
+  type RubricScore,
+} from "@/modules/sim/lessons";
 import {
   getSimSessionStore,
   type SimSessionEventsJson,
+  type SimSessionListRow,
 } from "@/modules/sim/lessons/store";
 import type { FinishLessonActionResult } from "@/components/sim/lesson-ui/types";
 
@@ -54,9 +63,10 @@ export async function finishLessonAction(
   //  - microQuiz: the contextual-quiz tally the client tracked (validated wire).
   let priorBestScore: number | null = null;
   let previouslyPassed = false;
+  let historyRows: SimSessionListRow[] = [];
   try {
-    const rows = await getSimSessionStore().listSessions(user.id);
-    const mine = rows.filter((r) => r.lessonId === lesson.id);
+    historyRows = await getSimSessionStore().listSessions(user.id);
+    const mine = historyRows.filter((r) => r.lessonId === lesson.id);
     const scores = mine
       .filter((r) => r.score !== null)
       .map((r) => r.score as number);
@@ -66,6 +76,40 @@ export async function finishLessonAction(
     // No history available — improvement coaching is simply skipped (and the
     // first-pass XP bonus errs toward awarding; the achievement-style loss of
     // a one-time bonus is worse than a rare double award).
+  }
+
+  // ---------------------------------------------------------------------------
+  // S1 scenario sessions (<templateId>@L<n>) — two server-side extras:
+  //  1. the SOFT LEVEL GATE (doc 76 §8): L2+ persists only when the previous
+  //     level already has a ≥2★ session in THIS user's history (the same pure
+  //     fold the /simulator level picker runs — client and server agree);
+  //  2. the RUBRIC (doc 76 §6): stars recomputed here from the server-graded
+  //     result + validated wire measurement channels, persisted as
+  //     events.rubricStars (drives the catalog best + future unlocks). The
+  //     official score/verdict above never read any of this.
+  // ---------------------------------------------------------------------------
+  const scenarioRef = parseScenarioLessonId(lesson.id);
+  const scenarioSpec = scenarioRef !== null ? scenarioById(scenarioRef.templateId) : undefined;
+  let scenarioRubric: RubricScore | null = null;
+  if (scenarioRef !== null && scenarioSpec !== undefined) {
+    if (
+      !isScenarioLevelUnlocked(
+        scenarioSpec,
+        scenarioRef.level,
+        historyRows.map((r) => ({ lessonId: r.lessonId, rubricStars: r.rubricStars })),
+      )
+    ) {
+      return { ok: false, code: "LEVEL_LOCKED" };
+    }
+    if (scenarioSpec.rubric !== undefined) {
+      scenarioRubric = scoreRubric(
+        result,
+        scenarioSpec.rubric,
+        wire.observedMomentIds !== undefined
+          ? { observedMomentIds: wire.observedMomentIds }
+          : undefined,
+      );
+    }
   }
 
   const conceptTitles: Record<string, string> = {};
@@ -122,6 +166,8 @@ export async function finishLessonAction(
     ...(result.examTermination !== undefined
       ? { examTermination: result.examTermination }
       : {}),
+    // S1: scenario rubric stars (server-computed above; display + unlock).
+    ...(scenarioRubric !== null ? { rubricStars: scenarioRubric.stars } : {}),
   };
 
   let sessionId: string;

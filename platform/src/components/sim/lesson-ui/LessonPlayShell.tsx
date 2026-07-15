@@ -14,7 +14,7 @@
  * actually fire.
  */
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   GearIndicatorCard,
   HudStyles,
@@ -42,6 +42,10 @@ import {
   finishSession,
   isDriveLocked,
   observeQuizTick,
+  parkingObservationFromTrace,
+  parseScenarioLessonId,
+  scenarioById,
+  scoreRubric,
   serializeNearMisses,
   serializeRuleEvents,
   type LessonResult,
@@ -51,10 +55,14 @@ import {
   type NearMissEvent,
   type QuizFrequency,
   type QuizTriggerState,
+  type RubricObservationInput,
+  type RubricScore,
+  type ScenarioSpec,
   type StagedEventOutcome,
   type TeachMoment,
   type TriggeredQuiz,
 } from "@/modules/sim/lessons";
+import { createTraceRecorder, type LiveTraceRecorder } from "@/modules/sim/traces";
 import {
   PRE_DRIVE_STEP_ORDER,
   PRE_DRIVE_STEPS,
@@ -359,6 +367,22 @@ export function LessonPlayShell({
   const [saveResult, setSaveResult] = useState<FinishLessonActionResult | null>(null);
   const { toasts, push, clear } = useHudToastQueue();
 
+  // -- S1: scenario sessions (<templateId>@L<n>) --------------------------------
+  // The template (rubric + teach copy), a live ATTEMPT recorder the scene
+  // streams into (glances feed the observation stars), and the rubric result
+  // for the end screen. All null/inert on curriculum lessons.
+  const scenarioSpec: ScenarioSpec | null = useMemo(() => {
+    const parsed = parseScenarioLessonId(lesson.id);
+    return (parsed ? scenarioById(parsed.templateId) : undefined) ?? null;
+  }, [lesson.id]);
+  const [attemptRecorder] = useState<LiveTraceRecorder | null>(() =>
+    parseScenarioLessonId(lesson.id) !== null
+      ? createTraceRecorder({ scenarioId: lesson.id, kind: "attempt" })
+      : null,
+  );
+  const attemptRecorderRef = useRef<LiveTraceRecorder | null>(attemptRecorder);
+  const [rubric, setRubric] = useState<RubricScore | null>(null);
+
   // -- QW1: fullscreen (immersive) mode ----------------------------------------
   // The fullscreen ELEMENT is the shell root (not just the canvas): the
   // browser then hides all surrounding dashboard chrome for free, while the
@@ -517,6 +541,25 @@ export function LessonPlayShell({
       const r = buildLessonResult(state);
       setResult(r);
 
+      // S1 scenario rubric (doc 76 §6): observation from the recorded
+      // attempt's glance events (honest measured:false when no trace), the
+      // stars from the pure scorer. Display here; the SERVER recomputes the
+      // persisted stars from the same validated wire channels.
+      let observedMomentIds: string[] | undefined;
+      if (scenarioSpec?.rubric !== undefined) {
+        const trace = attemptRecorderRef.current?.finish() ?? null;
+        let observation: RubricObservationInput | undefined;
+        const moments = scenarioSpec.rubric.observation?.moments;
+        if (trace !== null && moments !== undefined && moments.length > 0) {
+          const mapped = parkingObservationFromTrace(trace, moments);
+          if (mapped !== null) {
+            observation = mapped;
+            observedMomentIds = [...mapped.observedMomentIds];
+          }
+        }
+        setRubric(scoreRubric(r, scenarioSpec.rubric, observation));
+      }
+
       void finishLessonAction({
         lessonId: lesson.id,
         startedAtMs: startedAtMsRef.current ?? Date.now(),
@@ -532,16 +575,20 @@ export function LessonPlayShell({
           state.penaltyEscalations,
           state.eventPositions ?? [],
         ),
+        // S1: the A10 measurement detail rides along (validated server-side;
+        // rubric/display metadata — never the official score).
         objectives: r.objectives.map((o) => ({
           id: o.id,
           done: o.done,
           completedAtSec: o.completedAtSec,
+          ...(o.detail !== undefined ? { detail: o.detail } : {}),
         })),
         microQuiz: { ...quizStatsRef.current },
         nearMisses: serializeNearMisses(state.nearMisses ?? []),
+        ...(observedMomentIds !== undefined ? { observedMomentIds } : {}),
       }).then(setSaveResult, () => setSaveResult({ ok: false, code: "SAVE_FAILED" }));
     },
-    [lesson.id],
+    [lesson.id, scenarioSpec],
   );
 
   // -- SceneSlot callbacks -------------------------------------------------------
@@ -710,6 +757,9 @@ export function LessonPlayShell({
     setSaveResult(null);
     setFlash(null);
     clear();
+    // S1: a fresh attempt records a fresh trace + rubric.
+    attemptRecorderRef.current?.reset();
+    setRubric(null);
     // Fresh pre-drive: the scene's observer re-baselines on the driveLocked
     // rising edge (a car left running/belted by the previous run never
     // auto-completes steps — the student re-performs the transitions); the
@@ -840,6 +890,9 @@ export function LessonPlayShell({
             // A8/A15: measurement channels (staged outcomes + near-misses).
             onStagedOutcome={handleStagedOutcome}
             onNearMiss={handleNearMiss}
+            // S1: scenario sessions record the student's attempt (glances →
+            // observation stars; the future compare-vs-shadow view).
+            attemptRecorderRef={attemptRecorderRef}
           />
         </div>
 
@@ -1002,6 +1055,9 @@ export function LessonPlayShell({
               <SessionEndScreen
                 lessonTitleBg={lesson.titleBg}
                 result={result}
+                // S1: scenario rubric stars + breakdown (additive section;
+                // official points stay the primary verdict).
+                rubric={rubric}
                 debriefText={debriefText}
                 concepts={saveResult?.ok ? saveResult.concepts : []}
                 xpEarned={saveResult?.ok ? saveResult.xpEarned : null}

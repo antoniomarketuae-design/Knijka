@@ -134,14 +134,16 @@ export const SC_PARK_PERP_REV: ScenarioSpec = {
     },
     parTimeSec: 90,
   },
-  // Recorded by the S1 trace recorder (S0-View): pending, typed, validated.
-  // §5 CI gate (replay with ZERO violations) arms when the file lands.
-  shadow: { path: "content/traces/sc-park-perp-rev/shadow-correct.trace.json", pending: true },
+  // RECORDED (S1): the committed files are deterministic recordings of the
+  // authored scripts in traces/scParkPerpRev.ts; the §5 gate (replays with
+  // ZERO violations + completes parkInBay) and the §9 stage-5 code asserts
+  // run in traces/__tests__/sc-park-perp-rev-traces.test.ts. Re-record with
+  // RECORD_TRACES=1 (see that file's header) after any engine/script change.
+  shadow: { path: "content/traces/sc-park-perp-rev/shadow-correct.trace.json" },
   mistakes: [
     {
       traceRef: {
         path: "content/traces/sc-park-perp-rev/mistake-wide-approach.trace.json",
-        pending: true,
       },
       titleBg: "Твърде широк подход",
       whatWentWrongBg:
@@ -151,7 +153,6 @@ export const SC_PARK_PERP_REV: ScenarioSpec = {
     {
       traceRef: {
         path: "content/traces/sc-park-perp-rev/mistake-no-observation.trace.json",
-        pending: true,
       },
       titleBg: "Заден ход без наблюдение",
       whatWentWrongBg:

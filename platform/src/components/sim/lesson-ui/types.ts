@@ -56,6 +56,26 @@ export interface LessonEntryView {
   bestScore: number | null;
 }
 
+/**
+ * S1 — one „Сценарии" catalog card (doc 76 §8), serializable server → client:
+ * the template's card copy + the student's per-level progression (computed
+ * server-side in page.tsx via scenarioLevelProgress from persisted sessions;
+ * the same pure fold the save action's soft gate runs).
+ */
+export interface ScenarioCatalogEntry {
+  templateId: string;
+  titleBg: string;
+  objectiveBg: string;
+  family: string;
+  tagsBg: string[];
+  levels: Array<{
+    level: 1 | 2 | 3 | 4 | 5;
+    unlocked: boolean;
+    attempts: number;
+    bestStars: 1 | 2 | 3 | null;
+  }>;
+}
+
 /** Result of the finish-lesson server action (actions.ts). */
 export type FinishLessonActionResult =
   | {
@@ -66,4 +86,9 @@ export type FinishLessonActionResult =
       /** Always null until gamification accepts sim_lesson events. */
       xpEarned: number | null;
     }
-  | { ok: false; code: "INVALID_INPUT" | "UNKNOWN_LESSON" | "SAVE_FAILED" };
+  | {
+      ok: false;
+      /** LEVEL_LOCKED (S1): a scenario level whose previous rung has no ≥2★
+       *  session yet — the server refuses to persist (soft gate, doc 76 §8). */
+      code: "INVALID_INPUT" | "UNKNOWN_LESSON" | "SAVE_FAILED" | "LEVEL_LOCKED";
+    };

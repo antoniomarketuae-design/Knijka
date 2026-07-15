@@ -7,15 +7,22 @@ import {
   isExamVariantId,
   LESSONS,
   POLIGON_LESSONS,
+  SCENARIO_LEVEL_NAMES_BG,
+  SCENARIO_TEMPLATES,
+  scenarioLevelProgress,
   type LessonAttemptRow,
   type LessonSpec,
 } from "@/modules/sim/lessons";
 import {
   getSimSessionStore,
   type SimSessionDetailRow,
+  type SimSessionListRow,
 } from "@/modules/sim/lessons/store";
 import { VIOLATIONS, type ViolationCode } from "@/modules/sim/rules";
-import type { LessonEntryView } from "@/components/sim/lesson-ui/types";
+import type {
+  LessonEntryView,
+  ScenarioCatalogEntry,
+} from "@/components/sim/lesson-ui/types";
 import { SimulatorClient } from "./simulator-client";
 import type {
   SessionHistoryEntry,
@@ -46,10 +53,11 @@ export default async function SimulatorPage() {
 
   let attempts: LessonAttemptRow[] = [];
   let history: SessionHistoryEntry[] = [];
+  let sessionRows: SimSessionListRow[] = [];
   try {
     const store = getSimSessionStore();
-    const rows = await store.listSessions(user.id);
-    attempts = rows
+    sessionRows = await store.listSessions(user.id);
+    attempts = sessionRows
       .filter((r) => r.score !== null)
       .map((r) => ({ lessonId: r.lessonId, passed: r.passed, score: r.score as number }));
     history = buildHistoryEntries(await store.listRecentSessions(user.id, HISTORY_LIMIT));
@@ -58,6 +66,27 @@ export default async function SimulatorPage() {
     // with default progression — only L0 open, nothing persisted, no history.
     console.warn("simulator: listSessions failed, using empty progression", err);
   }
+
+  // S1 „Сценарии" catalog (doc 76 §8): per-template level progression from
+  // the SAME persisted rows — the pure fold the save action's soft gate runs,
+  // so the picker and the server always agree on what is open.
+  const scenarioRows = sessionRows.map((r) => ({
+    lessonId: r.lessonId,
+    rubricStars: r.rubricStars,
+  }));
+  const scenarios: ScenarioCatalogEntry[] = SCENARIO_TEMPLATES.map((spec) => ({
+    templateId: spec.id,
+    titleBg: spec.titleBg,
+    objectiveBg: spec.objectiveBg,
+    family: spec.family,
+    tagsBg: [...spec.tagsBg],
+    levels: scenarioLevelProgress(spec, scenarioRows).map((l) => ({
+      level: l.level,
+      unlocked: l.unlocked,
+      attempts: l.attempts,
+      bestStars: l.bestStars,
+    })),
+  }));
 
   // Out-of-curriculum entries (exam + полигон) share one fold: gated by the
   // spec's own unlockAfterLessonId (isExamUnlocked — absent field = always
@@ -107,7 +136,14 @@ export default async function SimulatorPage() {
     ),
   };
 
-  return <SimulatorClient entries={entries} examEntry={examEntry} history={history} />;
+  return (
+    <SimulatorClient
+      entries={entries}
+      examEntry={examEntry}
+      history={history}
+      scenarios={scenarios}
+    />
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -132,6 +168,16 @@ function buildHistoryEntries(rows: SimSessionDetailRow[]): SessionHistoryEntry[]
   const titleByLessonId = new Map(
     [...LESSONS, ...POLIGON_LESSONS, EXAM_LESSON].map((l) => [l.id, l.titleBg]),
   );
+  // S1: scenario sessions persist under <templateId>@L<n> — title them like
+  // the compiled lesson does (compile.ts), per authored level.
+  for (const spec of SCENARIO_TEMPLATES) {
+    for (const rung of spec.levels) {
+      titleByLessonId.set(
+        `${spec.id}@L${rung.level}`,
+        `${spec.titleBg} · Ниво ${rung.level} — ${SCENARIO_LEVEL_NAMES_BG[rung.level]}`,
+      );
+    }
+  }
 
   return rows.map((r) => {
     const ev = r.events;

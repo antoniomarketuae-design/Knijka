@@ -116,6 +116,7 @@ export function createFakeSimSessionStore(): FakeSimSessionStore {
           finishedAt: r.input.finishedAt,
           score: r.input.score,
           passed: r.input.events.passed,
+          rubricStars: r.input.events.rubricStars ?? null,
         }))
         .reverse();
     },

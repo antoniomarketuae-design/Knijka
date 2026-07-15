@@ -36,10 +36,12 @@ import {
 } from "./escalation";
 import { examTerminationFor } from "./exam";
 import { examVariantById } from "./examBank";
+import { scenarioLessonById } from "./scenario/resolve";
 import { lessonById } from "./specs";
 import type {
   EventPosition,
   LessonResult,
+  ObjectiveDetail,
   ObjectiveOutcome,
   SessionNearMiss,
 } from "./types";
@@ -83,6 +85,15 @@ export interface WireObjectiveOutcome {
   id: string;
   done: boolean;
   completedAtSec: number | null;
+  /**
+   * S1 (additive): the A10 measurement detail of this objective (park
+   * attempts/alignment, reaction band, …). MEASUREMENT/RUBRIC METADATA ONLY
+   * — validated shape-by-shape server-side and used for the scenario rubric
+   * stars + history display; the official score/verdict NEVER derives from
+   * it (a tampered detail moves a star, never a penalty point). Malformed
+   * details drop silently, like A15 positions.
+   */
+  detail?: ObjectiveDetail;
 }
 
 /** Contextual micro-quizzes answered during the drive (feeds the debrief). */
@@ -102,6 +113,13 @@ export interface FinishLessonWire {
   microQuiz?: WireMicroQuiz;
   /** A15: near-miss encounters (validated stat; absent on older clients). */
   nearMisses?: WireNearMiss[];
+  /**
+   * S1 (scenario sessions): ids of the template's rubric observation moments
+   * the student's recorded glances covered (lessons/scenario/observation.ts
+   * maps the attempt trace client-side). RUBRIC METADATA ONLY — bounded and
+   * validated; drives the observation stars line, never the official score.
+   */
+  observedMomentIds?: string[];
 }
 
 /** Hard caps — a session cannot legitimately exceed these. */
@@ -113,6 +131,9 @@ const MAX_MICRO_QUIZZES = 20;
 /** A15 caps: near-miss list size + sane world-coordinate bound, meters. */
 const MAX_NEAR_MISSES = 100;
 const MAX_ABS_COORD_M = 100_000;
+/** S1 caps: observation-moment id list (templates author ≤ a handful). */
+const MAX_OBSERVED_MOMENTS = 32;
+const MAX_MOMENT_ID_LEN = 64;
 
 // ---------------------------------------------------------------------------
 // Client side: serialize
@@ -227,7 +248,12 @@ export function parseFinishLessonWire(value: unknown): FinishLessonWire | null {
     const ob = item as Record<string, unknown>;
     if (typeof ob.id !== "string" || typeof ob.done !== "boolean") return null;
     const completedAtSec = isFiniteNum(ob.completedAtSec) ? ob.completedAtSec : null;
-    objectives.push({ id: ob.id, done: ob.done, completedAtSec });
+    const outcome: WireObjectiveOutcome = { id: ob.id, done: ob.done, completedAtSec };
+    // S1: measurement detail — malformed shapes drop silently (metadata,
+    // not worth a reject; the A15 position treatment).
+    const detail = parseWireObjectiveDetail(ob.detail);
+    if (detail !== null) outcome.detail = detail;
+    objectives.push(outcome);
   }
 
   const microQuiz = parseMicroQuiz(o.microQuiz);
@@ -235,6 +261,9 @@ export function parseFinishLessonWire(value: unknown): FinishLessonWire | null {
 
   const nearMisses = parseNearMisses(o.nearMisses);
   if (nearMisses === "invalid") return null;
+
+  const observedMomentIds = parseObservedMomentIds(o.observedMomentIds);
+  if (observedMomentIds === "invalid") return null;
 
   const wire: FinishLessonWire = {
     lessonId: o.lessonId,
@@ -246,7 +275,81 @@ export function parseFinishLessonWire(value: unknown): FinishLessonWire | null {
   };
   if (microQuiz !== null) wire.microQuiz = microQuiz;
   if (nearMisses !== null) wire.nearMisses = nearMisses;
+  if (observedMomentIds !== null) wire.observedMomentIds = observedMomentIds;
   return wire;
+}
+
+/** S1: parse the optional observed-moment list — null (absent), the deduped
+ *  validated list, or "invalid" (present but not our payload shape). */
+function parseObservedMomentIds(value: unknown): string[] | null | "invalid" {
+  if (value === undefined || value === null) return null;
+  if (!Array.isArray(value) || value.length > MAX_OBSERVED_MOMENTS) return "invalid";
+  const out: string[] = [];
+  for (const item of value) {
+    if (typeof item !== "string" || item.length === 0 || item.length > MAX_MOMENT_ID_LEN) {
+      return "invalid";
+    }
+    if (!out.includes(item)) out.push(item);
+  }
+  return out;
+}
+
+/**
+ * S1: shape-validate one A10 objective detail from the wire. Returns the
+ * REBUILT clean object (unknown fields dropped) or null — malformed details
+ * are display/rubric metadata and drop silently.
+ */
+function parseWireObjectiveDetail(value: unknown): ObjectiveDetail | null {
+  if (typeof value !== "object" || value === null) return null;
+  const d = value as Record<string, unknown>;
+  const numOrNull = (v: unknown, min: number, max: number): number | null | "bad" =>
+    v === null ? null : isFiniteNum(v) && v >= min && v <= max ? v : "bad";
+  switch (d.kind) {
+    case "parkInBay": {
+      if (!Number.isInteger(d.attempts) || (d.attempts as number) < 0 || (d.attempts as number) > 1000) return null;
+      if (typeof d.inBay !== "boolean") return null;
+      const centerOffsetM = numOrNull(d.centerOffsetM, 0, 1000);
+      const headingOffsetDeg = numOrNull(d.headingOffsetDeg, 0, 180);
+      if (centerOffsetM === "bad" || headingOffsetDeg === "bad") return null;
+      const alignment = d.alignment;
+      if (alignment !== null && alignment !== "centered" && alignment !== "acceptable" && alignment !== "sloppy") return null;
+      return {
+        kind: "parkInBay",
+        attempts: d.attempts as number,
+        inBay: d.inBay,
+        centerOffsetM,
+        headingOffsetDeg,
+        alignment,
+      };
+    }
+    case "emergencyStop": {
+      const outcomes = ["pending", "stoppedInTime", "hitLeadCar", "passedWithoutStopping", "collision"];
+      if (typeof d.outcome !== "string" || !outcomes.includes(d.outcome)) return null;
+      const reactionTimeSec = numOrNull(d.reactionTimeSec, 0, 3600);
+      const stopGapM = numOrNull(d.stopGapM, -100, 1000);
+      if (reactionTimeSec === "bad" || stopGapM === "bad") return null;
+      const band = d.band;
+      if (band !== null && band !== "otlichen" && band !== "dobur" && band !== "baven") return null;
+      return {
+        kind: "emergencyStop",
+        outcome: d.outcome as "pending",
+        reactionTimeSec,
+        band,
+        stopGapM,
+      };
+    }
+    case "passSignal": {
+      if (!Number.isInteger(d.redsMetInRun) || (d.redsMetInRun as number) < 0 || (d.redsMetInRun as number) > 1000) return null;
+      if (typeof d.redMetHere !== "boolean") return null;
+      return { kind: "passSignal", redsMetInRun: d.redsMetInRun as number, redMetHere: d.redMetHere };
+    }
+    case "roundabout": {
+      if (typeof d.entered !== "boolean" || typeof d.exitSignaled !== "boolean") return null;
+      return { kind: "roundabout", entered: d.entered, exitSignaled: d.exitSignaled };
+    }
+    default:
+      return null;
+  }
 }
 
 /** A15: finite number inside the sane world-coordinate bound. */
@@ -359,6 +462,9 @@ export function reconcileObjectiveOutcomes(
       titleBg: spec.titleBg,
       done: w?.done ?? false,
       completedAtSec: w?.done ? (w.completedAtSec ?? null) : null,
+      // S1: the validated measurement detail rides through for the rubric +
+      // history display (never into the official score — see the field doc).
+      ...(w?.detail !== undefined ? { detail: w.detail } : {}),
     };
   });
 }
@@ -392,8 +498,13 @@ export function gradeFinishWire(input: unknown): GradedFinishWire {
   // exact LessonSpec from the variant id (same pure generator the client
   // played), so grading integrity never depends on client-supplied spec data
   // and the SimSession row needs nothing beyond the lessonId it already
-  // stores (the variant id IS the lessonId).
-  const lesson = lessonById(wire.lessonId) ?? examVariantById(wire.lessonId);
+  // stores (the variant id IS the lessonId). S1: scenario ids
+  // (<templateId>@L<n>) resolve the same way — the server RECOMPILES the
+  // micro-lesson from the pure template, so it regrades identically.
+  const lesson =
+    lessonById(wire.lessonId) ??
+    examVariantById(wire.lessonId) ??
+    scenarioLessonById(wire.lessonId);
   if (lesson === undefined) return { status: "unknown-lesson" };
 
   const events = rebuildRuleEvents(wire.ruleEvents);

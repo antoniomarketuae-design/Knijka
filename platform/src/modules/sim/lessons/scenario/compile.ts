@@ -163,7 +163,10 @@ export function compileScenario(spec: ScenarioSpec, level: ScenarioLevel): Lesso
   };
 
   const lesson: LessonSpec = {
-    // Variant naming (doc 76 §2): template id + level rung.
+    // Variant naming (doc 76 §2): template id + level rung — the wire
+    // resolver (resolve.ts scenarioLessonById) parses exactly this shape so
+    // the server regrades by recompiling the same pure spec (the B1b exam-
+    // bank pattern).
     id: `${spec.id}@L${level}`,
     order: SCENARIO_LESSON_ORDER,
     titleBg: `${spec.titleBg} · Ниво ${level} — ${SCENARIO_LEVEL_NAMES_BG[level]}`,
@@ -181,6 +184,11 @@ export function compileScenario(spec: ScenarioSpec, level: ScenarioLevel): Lesso
     preDrive: false,
     vehicleStart: rung.vehicleStart ?? spec.start.vehicleStart ?? "ready",
     objectives,
+    // S1 (doc 76 §0 low-speed fidelity): scenario micro-lessons grade ANY
+    // contact — a 2 km/h bumper touch on a parked car IS the mistake being
+    // taught. Street lessons keep VehicleRig's 10 km/h nudge tolerance by
+    // omitting the field.
+    collisionMinKmh: 0,
     ...(environment ? { environment } : {}),
     ...(parkingBay ? { parkingBay } : {}),
     ...(staged.length > 0 ? { stagedEvents: staged } : {}),

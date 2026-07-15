@@ -51,12 +51,20 @@ import {
 import {
   DEFAULT_LESSON_TRAFFIC,
   lessonDistrictId,
+  scenarioBaysOf,
   type NearMissEvent,
   type NearMissStats,
+  type ParkingBaySpec,
   type StagedEventOutcome,
   type VehicleSample,
 } from "@/modules/sim/contracts";
-import { lessonParkingBaysFor, type LessonSpec } from "@/modules/sim/lessons";
+import {
+  isScenarioLessonId,
+  lessonParkingBaysFor,
+  parseScenarioLessonId,
+  scenarioById,
+  type LessonSpec,
+} from "@/modules/sim/lessons";
 import {
   createScenarioDirector,
   lessonSeed,
@@ -88,8 +96,11 @@ import { createTrafficSystem, TrafficLayer, type TrafficDistrict } from "@/modul
 import {
   buildPoligonGhostDemo,
   createTraceClock,
+  parseScenarioTrace,
+  tracePathForRibbon,
   type LiveTraceRecorder,
   type RecordedDrive,
+  type ScenarioTrace,
   type TraceClock,
 } from "@/modules/sim/traces";
 import { CabinControls, type MirrorGlanceKind } from "./cabin";
@@ -102,6 +113,7 @@ import { NpcColliders } from "./NpcColliders";
 import { createVehicleSample } from "./vehicleSample";
 import { buildMinimapPolylines } from "./lessonMinimap";
 import { RouteGuidance } from "./RouteGuidance";
+import { ScenarioObstacles, type ScenarioObstacleSpec } from "./ScenarioObstacles";
 import { ShadowCar } from "./ShadowCar";
 import { TraceTimeline } from "./lesson-ui/TraceTimeline";
 import type { QualityPreset } from "./lesson-ui/types";
@@ -123,7 +135,21 @@ const MINIMAP_PX_PER_M = 0.5;
 const WORLD_NAME_BG: Record<string, string> = {
   "district-v1": "Студентски град",
   "poligon-v1": "учебния полигон",
+  "lot-perp-v1": "учебния паркинг",
 };
+
+/**
+ * S1: public URL of a committed trace (content/traces/… is published to
+ * platform/public/traces/… byte-identically — the world-JSON pattern).
+ */
+function traceUrlFor(repoPath: string): string {
+  return `/${repoPath.replace(/^content\//, "")}`;
+}
+
+/** S1 followHints tuning: sustained lateral deviation → „Следвай синята линия". */
+const FOLLOW_HINT_DEVIATION_M = 1.2;
+const FOLLOW_HINT_SUSTAIN_S = 2;
+const FOLLOW_HINT_POLL_S = 0.25;
 
 /**
  * Day IBL: Poly Haven `shanghai_riverside` (CC0) — a true-unclipped-sun (25 EV)
@@ -264,6 +290,12 @@ interface Built {
   /** S0-View: raw district doc for the ?ghost=demo recorder — null unless
    *  the dev flag is on AND this is полигон free drive. */
   ghostDemoRaw: unknown | null;
+  /** S1: precise hittable parked cars from the district's meta.scenario
+   *  occupancy (scenario lessons only; [] everywhere else). */
+  scenarioObstacles: ScenarioObstacleSpec[];
+  /** S1: the template's recorded shadow trace — fetched only when the
+   *  lesson's aids ask for the ghost or the ribbon; null otherwise. */
+  shadowTrace: ScenarioTrace | null;
 }
 
 export interface LessonSceneProps {
@@ -336,9 +368,64 @@ export default function LessonScene(props: LessonSceneProps) {
         // Bay paint is CURRICULUM data, per district (doc 74 §5.4): pass the
         // loaded map's bays explicitly so city bays never paint onto the
         // полигон (and vice versa) — the builder's default is district-v1's.
+        // S1: scenario-lot districts ADD their meta.scenario bay rects (the
+        // generator's single geometric truth — the compiled lesson's
+        // parkingBay IS one of them by the templates contract test), plus
+        // the lesson's own graded rect defensively deduped — the L7
+        // painted-rect-equals-graded-rect law survives the generated maps.
+        const scenarioBays = scenarioBaysOf(raw);
+        const paintBays: ParkingBaySpec[] = [
+          ...lessonParkingBaysFor(districtId),
+          ...scenarioBays.map((b) => ({
+            x: b.x,
+            y: b.y,
+            headingDeg: b.headingDeg,
+            widthM: b.widthM,
+            lengthM: b.lengthM,
+          })),
+        ];
+        if (
+          props.lesson.parkingBay &&
+          !paintBays.some(
+            (b) => b.x === props.lesson.parkingBay!.x && b.y === props.lesson.parkingBay!.y,
+          )
+        ) {
+          paintBays.push({ ...props.lesson.parkingBay });
+        }
         const geometry = buildWorldGeometry(district, {
-          parkingBays: lessonParkingBaysFor(districtId),
+          parkingBays: paintBays,
         });
+        // S1: occupied bays become PRECISE hittable parked cars (doc 76 §0)
+        // — scenario lessons only; curriculum districts carry no scenario
+        // meta, so this stays [] and nothing mounts.
+        const scenarioObstacles: ScenarioObstacleSpec[] = isScenarioLessonId(props.lesson.id)
+          ? scenarioBays
+              .filter((b) => b.occupied)
+              .map((b, i) => ({
+                kind: "vehicle" as const,
+                x: b.x,
+                y: b.y,
+                headingDeg: b.headingDeg,
+                seed: i,
+              }))
+          : [];
+        // S1: the shadow/ribbon aids need the template's recorded trace.
+        let shadowTrace: ScenarioTrace | null = null;
+        if (props.lesson.aids?.shadowCar || props.lesson.aids?.pathRibbon) {
+          const parsedId = parseScenarioLessonId(props.lesson.id);
+          const template = parsedId ? scenarioById(parsedId.templateId) : undefined;
+          if (template && template.shadow.pending !== true) {
+            try {
+              const traceRes = await fetch(traceUrlFor(template.shadow.path));
+              if (traceRes.ok) {
+                shadowTrace = parseScenarioTrace(await traceRes.json());
+              }
+            } catch {
+              // Trace unavailable — the drill still plays, just without the
+              // ghost/ribbon (never block the lesson on an aid).
+            }
+          }
+        }
         const spawnPoints = (
           (raw as { spawnPoints?: SpawnPointLike[] }).spawnPoints ?? []
         );
@@ -395,6 +482,8 @@ export default function LessonScene(props: LessonSceneProps) {
             minimapPolylines: buildMinimapPolylines(district),
             spawnPoints,
             ghostDemoRaw,
+            scenarioObstacles,
+            shadowTrace,
           });
         }
       } catch (err) {
@@ -488,6 +577,15 @@ function ReadyScene({
   }, [built.ghostDemoRaw]);
   const ghostClockRef = useRef<TraceClock>(createTraceClock());
 
+  // S1 scenario aids (doc 76 §7): the compiled lesson's aids drive the
+  // consumers below. Absent aids (every curriculum lesson) = everything
+  // inert, byte-identical behavior.
+  const aids = lesson.aids;
+  const shadowTrace = built.shadowTrace;
+  const aidClockRef = useRef<TraceClock>(createTraceClock());
+  // followHints: sustained deviation from the shadow path → one hint chip.
+  const [followHintOn, setFollowHintOn] = useState(false);
+
   const timeOfDay = lesson.environment?.timeOfDay ?? "day";
   const rain = lesson.environment?.rain ?? false;
   const isNight = timeOfDay === "night";
@@ -542,13 +640,20 @@ function ReadyScene({
   // Camera toggle + car reset, shared by the key callbacks (C/R) and the
   // touch overlay buttons — one code path per action. S0-View: C now CYCLES
   // three views — cockpit → chase → top-down (doc 76 §4, view-only concern:
-  // grading never reads the camera).
+  // grading never reads the camera). S1: on SCENARIO lessons top-down joins
+  // the driving cycle only when the level's aids allow it (L1 „Воден опит");
+  // L2–L4 lock to cockpit/chase like the doc 76 §4 ladder. Curriculum
+  // lessons keep the full three-view cycle unchanged.
+  const topdownInCycle = !isScenarioLessonId(lesson.id) || aids?.topdownAllowed === true;
   const toggleCamera = useCallback(() => {
-    const order: CameraMode[] = ["cockpit", "chase", "topdown"];
-    const next = order[(order.indexOf(cameraModeRef.current) + 1) % order.length];
+    const order: CameraMode[] = topdownInCycle
+      ? ["cockpit", "chase", "topdown"]
+      : ["cockpit", "chase"];
+    const idx = order.indexOf(cameraModeRef.current);
+    const next = order[(idx + 1) % order.length]; // idx −1 (stale topdown) → cockpit
     cameraModeRef.current = next;
     setCockpit(next === "cockpit");
-  }, []);
+  }, [topdownInCycle]);
 
   // Mirror of the driveLocked prop so the input lifecycle effect (which runs
   // once) can seed a freshly created input with the current gate state.
@@ -738,9 +843,23 @@ function ReadyScene({
                 spawn={spawn}
                 difficultyRef={difficultyRef}
                 onCollision={handleCollision}
+                // S1: scenario drills grade ANY contact (compile writes 0);
+                // absent = the street nudge tolerance (default 10).
+                collisionMinKmh={lesson.collisionMinKmh}
                 night={isNight}
               />
             </CockpitInteractionContext.Provider>
+            {/* S1: precise hittable parked cars from the lot's occupancy —
+                fixed tight cuboids tagged "vehicle" (doc 76 §0). Mounted
+                only on scenario lessons (empty list everywhere else). */}
+            {built.scenarioObstacles.length > 0 ? (
+              <Suspense fallback={null}>
+                <ScenarioObstacles
+                  obstacles={built.scenarioObstacles}
+                  clearcoat={level === "high"}
+                />
+              </Suspense>
+            ) : null}
             <RuntimeDriver
               runtime={runtime}
               traffic={traffic}
@@ -818,6 +937,27 @@ function ReadyScene({
             <ShadowCar trace={ghostDemo.trace} clockRef={ghostClockRef} />
           </Suspense>
         ) : null}
+        {/* S1 aids (doc 76 §7): L1 shadowCar = ghost + ribbon + timeline;
+            L2 pathRibbon = the correct-path ribbon ALONE. */}
+        {shadowTrace && (aids?.shadowCar || aids?.pathRibbon) ? (
+          <Suspense fallback={null}>
+            <ShadowCar
+              trace={shadowTrace}
+              clockRef={aidClockRef}
+              showGhost={aids?.shadowCar === true}
+            />
+          </Suspense>
+        ) : null}
+        {/* S1 followHints: sustained lateral deviation from the shadow path
+            flips the hint chip below (probe runs in-canvas, ~4 Hz). */}
+        {shadowTrace && aids?.followHints ? (
+          <FollowHintProbe
+            trace={shadowTrace}
+            sampleRef={sampleRef}
+            paused={physicsPaused}
+            onChange={setFollowHintOn}
+          />
+        ) : null}
         <CameraRig
           chassisGroupRef={chassisGroupRef}
           simRef={simRef}
@@ -838,6 +978,22 @@ function ReadyScene({
       {ghostDemo ? (
         <div className="absolute bottom-3 left-1/2 z-10 w-[min(92%,36rem)] -translate-x-1/2">
           <TraceTimeline trace={ghostDemo.trace} clockRef={ghostClockRef} />
+        </div>
+      ) : null}
+
+      {/* S1 L1 aid: the same playback deck for the scenario's shadow demo. */}
+      {shadowTrace && aids?.shadowCar ? (
+        <div className="absolute bottom-3 left-1/2 z-10 w-[min(92%,36rem)] -translate-x-1/2">
+          <TraceTimeline trace={shadowTrace} clockRef={aidClockRef} />
+        </div>
+      ) : null}
+
+      {/* S1 followHints chip — „you are off the demonstrated line". */}
+      {followHintOn && aids?.followHints ? (
+        <div className="pointer-events-none absolute left-1/2 top-16 z-10 -translate-x-1/2">
+          <div className="rounded-full border border-accent/60 bg-background/85 px-3.5 py-1.5 text-xs font-bold text-accent shadow-glow-sm backdrop-blur">
+            Следвай синята линия
+          </div>
         </div>
       ) : null}
 
@@ -985,6 +1141,59 @@ function PerfProbe({ level }: { level: QualityLevel }) {
       acc.windowStart = now;
     }
   }, -100);
+  return null;
+}
+
+/**
+ * S1 followHints probe (doc 76 §7 L1): watches the student's lateral
+ * deviation from the shadow trace's ground path and flips `onChange(true)`
+ * after FOLLOW_HINT_DEVIATION_M is exceeded for FOLLOW_HINT_SUSTAIN_S
+ * continuous seconds (back within → immediately off). In-canvas because it
+ * needs the frame clock; work is a ~4 Hz nearest-point scan over the
+ * decimated path (≤ 2048 points — trivial), state changes only on edges.
+ */
+function FollowHintProbe({
+  trace,
+  sampleRef,
+  paused,
+  onChange,
+}: {
+  trace: ScenarioTrace;
+  sampleRef: React.RefObject<VehicleSample>;
+  paused: boolean;
+  onChange: (on: boolean) => void;
+}) {
+  const path = useMemo(() => tracePathForRibbon(trace, 1.0, 2048), [trace]);
+  const stateRef = useRef({ nextPollT: 0, offSince: null as number | null, on: false });
+  useFrame((state) => {
+    if (paused) return;
+    const s = stateRef.current;
+    const now = state.clock.elapsedTime;
+    if (now < s.nextPollT) return;
+    s.nextPollT = now + FOLLOW_HINT_POLL_S;
+    const pos = sampleRef.current.position;
+    let best = Infinity;
+    for (let i = 0; i < path.count; i++) {
+      const dx = pos.x - path.pts[i * 2];
+      const dy = pos.y - path.pts[i * 2 + 1];
+      const d2 = dx * dx + dy * dy;
+      if (d2 < best) best = d2;
+    }
+    const deviated = Math.sqrt(best) > FOLLOW_HINT_DEVIATION_M;
+    if (!deviated) {
+      s.offSince = null;
+      if (s.on) {
+        s.on = false;
+        onChange(false);
+      }
+      return;
+    }
+    if (s.offSince === null) s.offSince = now;
+    if (!s.on && now - s.offSince >= FOLLOW_HINT_SUSTAIN_S) {
+      s.on = true;
+      onChange(true);
+    }
+  });
   return null;
 }
 

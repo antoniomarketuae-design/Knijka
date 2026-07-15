@@ -186,6 +186,66 @@ export interface LessonSpec {
    * LessonSpec prop path.
    */
   aids?: LessonAidsSpec;
+  /**
+   * S1 (doc 76 §0 low-speed fidelity): minimum impact speed, km/h, that
+   * grades a contact as COLLISION in this lesson. Absent = the street
+   * nudge-tolerance default (VehicleRig COLLISION_MIN_KMH = 10). The scenario
+   * compiler writes 0 for maneuver drills — in a parking task a 2 km/h
+   * bumper touch on a parked car IS the graded mistake. Additive: every
+   * existing lesson omits it and keeps street behavior byte-identical.
+   */
+  collisionMinKmh?: number;
+}
+
+/**
+ * S1 — one bay of a scenario district's meta.scenario payload (the parking-lot
+ * generator's single geometric truth): a ParkingBaySpec rect + occupancy.
+ * Occupied bays receive precise hittable parked cars (ScenarioObstacles in the
+ * scene; ObstacleRect2D in the headless trace recorder), free bays are
+ * maneuver targets. Parsed defensively — a district without the payload
+ * (city, полигон) simply yields [].
+ */
+export interface ScenarioBayMeta extends ParkingBaySpec {
+  id: string;
+  occupied: boolean;
+}
+
+/** Defensive read of `meta.scenario.bays` from a raw district document. */
+export function scenarioBaysOf(districtRaw: unknown): ScenarioBayMeta[] {
+  if (typeof districtRaw !== "object" || districtRaw === null) return [];
+  const meta = (districtRaw as { meta?: unknown }).meta;
+  if (typeof meta !== "object" || meta === null) return [];
+  const scenario = (meta as { scenario?: unknown }).scenario;
+  if (typeof scenario !== "object" || scenario === null) return [];
+  const bays = (scenario as { bays?: unknown }).bays;
+  if (!Array.isArray(bays)) return [];
+  const out: ScenarioBayMeta[] = [];
+  for (const raw of bays) {
+    if (typeof raw !== "object" || raw === null) continue;
+    const b = raw as Record<string, unknown>;
+    if (
+      typeof b.id !== "string" ||
+      typeof b.x !== "number" ||
+      typeof b.y !== "number" ||
+      typeof b.headingDeg !== "number" ||
+      typeof b.widthM !== "number" ||
+      typeof b.lengthM !== "number" ||
+      typeof b.occupied !== "boolean" ||
+      ![b.x, b.y, b.headingDeg, b.widthM, b.lengthM].every(Number.isFinite)
+    ) {
+      continue;
+    }
+    out.push({
+      id: b.id,
+      x: b.x,
+      y: b.y,
+      headingDeg: b.headingDeg,
+      widthM: b.widthM,
+      lengthM: b.lengthM,
+      occupied: b.occupied,
+    });
+  }
+  return out;
 }
 
 /**

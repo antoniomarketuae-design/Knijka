@@ -32,16 +32,23 @@
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 import {
+  compileScenario,
   drawExamVariantId,
   generateExamVariant,
   isExamVariantId,
+  scenarioById,
+  type ScenarioLevel,
 } from "@/modules/sim/lessons";
 import { ExamBriefingCard } from "@/components/sim/lesson-ui/ExamBriefingCard";
 import { ExamModeCard } from "@/components/sim/lesson-ui/ExamModeCard";
 import { LessonPlayShell } from "@/components/sim/lesson-ui/LessonPlayShell";
 import { LessonSelectScreen } from "@/components/sim/lesson-ui/LessonSelectScreen";
 import { useQualityPreset } from "@/components/sim/lesson-ui/QualityPresetSelector";
-import type { LessonEntryView } from "@/components/sim/lesson-ui/types";
+import { ScenarioCatalogSection } from "@/components/sim/lesson-ui/ScenarioCatalog";
+import type {
+  LessonEntryView,
+  ScenarioCatalogEntry,
+} from "@/components/sim/lesson-ui/types";
 import {
   SessionHistorySection,
   type SessionHistoryEntry,
@@ -59,12 +66,15 @@ export function SimulatorClient({
   entries,
   examEntry = null,
   history = [],
+  scenarios = [],
 }: {
   entries: LessonEntryView[];
   /** A13: the exam card's view (server-gated unlock); null hides the card. */
   examEntry?: LessonEntryView | null;
   /** A15: recent-session rows for „История на сесиите" (server-built). */
   history?: SessionHistoryEntry[];
+  /** S1: the „Сценарии" catalog cards (server-computed level progression). */
+  scenarios?: ScenarioCatalogEntry[];
 }) {
   const router = useRouter();
   const [quality, setQuality] = useQualityPreset();
@@ -73,12 +83,29 @@ export function SimulatorClient({
   const [briefingOpen, setBriefingOpen] = useState(false);
   // B1b: the drawn/pasted exam-bank variant shown on the briefing.
   const [examVariantId, setExamVariantId] = useState<string | null>(null);
+  // S1: the picked scenario rung — compiling is pure/cheap (the exam-variant
+  // pattern: the id IS the recipe; the server recompiles it to regrade).
+  const [scenarioPick, setScenarioPick] = useState<{
+    templateId: string;
+    level: ScenarioLevel;
+  } | null>(null);
 
   // Regenerating from the id is pure and cheap — the id IS the spec recipe.
   const examVariant = useMemo(
     () => (examVariantId !== null ? generateExamVariant(examVariantId) : null),
     [examVariantId],
   );
+
+  const scenarioLesson = useMemo(() => {
+    if (scenarioPick === null) return null;
+    const spec = scenarioById(scenarioPick.templateId);
+    if (spec === undefined) return null;
+    try {
+      return compileScenario(spec, scenarioPick.level);
+    } catch {
+      return null; // unauthored level — nothing mounts
+    }
+  }, [scenarioPick]);
 
   const variantEntry: LessonEntryView | null =
     examVariant !== null && examEntry !== null
@@ -97,6 +124,29 @@ export function SimulatorClient({
     ...(variantEntry !== null ? [variantEntry] : []),
   ];
   const active = allEntries.find((e) => e.lesson.id === activeLessonId) ?? null;
+
+  // S1: a picked scenario rung mounts the SAME play shell with the compiled
+  // micro-lesson (no "next lesson" — a practice shelf, not the curriculum
+  // chain; exiting returns to the select screen with fresh progression).
+  if (scenarioLesson !== null) {
+    return (
+      <LessonPlayShell
+        key={scenarioLesson.id}
+        lesson={scenarioLesson}
+        quality={quality}
+        nextLesson={null}
+        onExitToSelect={() => {
+          setScenarioPick(null);
+          router.refresh(); // fresh stars/unlocks after new attempts
+        }}
+        onStartLesson={(id) => {
+          // Only same-catalog navigation exists from a scenario session.
+          setScenarioPick(null);
+          setActiveLessonId(id);
+        }}
+      />
+    );
+  }
 
   if (active === null) {
     if (briefingOpen && examEntry !== null) {
@@ -145,6 +195,11 @@ export function SimulatorClient({
             }}
           />
         ) : null}
+        {/* S1: the „Сценарии" zone — the scenario practice library. */}
+        <ScenarioCatalogSection
+          scenarios={scenarios}
+          onStart={(templateId, level) => setScenarioPick({ templateId, level })}
+        />
         {/* A15: past sessions — result + stored debrief on expand. */}
         <SessionHistorySection entries={history} />
       </div>

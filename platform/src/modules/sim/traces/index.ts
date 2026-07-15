@@ -39,15 +39,33 @@ export {
 // Recorders: live ring (student attempts) + scripted headless (demos/QA)
 export {
   createTraceRecorder,
+  obstacleRectsOverlap,
   recordScriptedDrive,
   type DriveScript,
   type DriveStep,
   type LiveRecorderOptions,
   type LiveTraceRecorder,
   type LiveTraceSampleInput,
+  type ObstacleRect2D,
   type RecordScriptedDriveOptions,
   type RecordedDrive,
+  type TraceCollisionWith,
 } from "./recorder";
 
 // The полигон ghost demo (S0-View P0 proof — LessonScene's ?ghost=demo)
 export { buildPoligonGhostDemo, poligonGhostDemoScript } from "./demo";
+
+// S1 — the sc-park-perp-rev authored drives (shadow + 2 mistake demos); the
+// committed traces under content/traces/sc-park-perp-rev/ are recordings of
+// exactly these scripts (gate: traces/__tests__/sc-park-perp-rev-traces).
+export {
+  PARKED_CAR_HALF_LENGTH_M,
+  PARKED_CAR_HALF_WIDTH_M,
+  SC_PARK_PERP_REV_ID,
+  lotObstacleRects,
+  recordScParkPerpRevDrive,
+  scParkPerpRevMistakeNoObservationScript,
+  scParkPerpRevMistakeWideScript,
+  scParkPerpRevShadowScript,
+  type ScParkPerpRevTraceName,
+} from "./scParkPerpRev";

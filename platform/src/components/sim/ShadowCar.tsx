@@ -134,9 +134,16 @@ export interface ShadowCarProps {
   clockRef: React.RefObject<TraceClock>;
   /** Draw the full-path ground ribbon (default true). */
   showRibbon?: boolean;
+  /**
+   * Render the ghost car itself (default true). False = the L2 „Частична
+   * помощ" aid: the correct-path ribbon ALONE, no ghost, no lamp chrome —
+   * the trace still drives the (invisible) pose group so a later toggle
+   * would resume in sync.
+   */
+  showGhost?: boolean;
 }
 
-export function ShadowCar({ trace, clockRef, showRibbon = true }: ShadowCarProps) {
+export function ShadowCar({ trace, clockRef, showRibbon = true, showGhost = true }: ShadowCarProps) {
   const { scene } = useGLTF(HERO_URL, DRACO_PATH);
   const kind = trace.meta.kind;
   const tint = useMemo(() => new THREE.Color(KIND_TINT[kind]), [kind]);
@@ -325,8 +332,10 @@ export function ShadowCar({ trace, clockRef, showRibbon = true }: ShadowCarProps
 
   return (
     <group>
-      {/* Ghost car (pose group; inner group carries the GLB fit transform). */}
-      <group ref={groupRef}>
+      {/* Ghost car (pose group; inner group carries the GLB fit transform).
+          visible=false (L2 ribbon-only) keeps the playback clock advancing —
+          this group stays the single time driver either way. */}
+      <group ref={groupRef} visible={showGhost}>
         <group scale={scale} position={[0, offsetY, 0]} rotation={[0, HERO_YAW, 0]}>
           <primitive object={model} />
         </group>

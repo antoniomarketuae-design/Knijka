@@ -56,6 +56,7 @@ import type {
 import type { MinimapFrame } from "@/modules/sim/hud";
 import type { PreDriveStepId } from "@/modules/sim/procedures";
 import type { SimTick } from "@/modules/sim/rules";
+import type { LiveTraceRecorder } from "@/modules/sim/traces";
 import type { DrivelineRejection, DrivelineSnapshot } from "@/modules/sim/vehicle";
 import type { QualityPreset } from "./types";
 
@@ -100,6 +101,10 @@ export interface SceneSlotProps {
   /** A11→A15 (additive): a near-miss encounter resolved — session stat only,
    *  never graded; the shell records it for the end-screen mistake map. */
   onNearMiss?: (event: NearMissEvent, stats: NearMissStats) => void;
+  /** S1 (additive): the shell's live attempt recorder (scenario sessions) —
+   *  the scene streams the student's 20 Hz kinematics + glance/signal/
+   *  driveline events into it; absent = recording off (default). */
+  attemptRecorderRef?: React.RefObject<LiveTraceRecorder | null>;
 }
 
 // The heavy Three.js/rapier bundle loads client-side only (rapier wasm must

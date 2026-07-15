@@ -32,6 +32,7 @@ import {
   type LessonResult,
   type ObjectiveDetail,
   type ParkAlignment,
+  type RubricScore,
 } from "../lessons";
 import {
   MistakeMap,
@@ -158,6 +159,7 @@ export function SessionEndScreen({
   nextLessonTitleBg,
   onNextLesson,
   mapPolylines = null,
+  rubric = null,
 }: {
   lessonTitleBg: string;
   result: LessonResult;
@@ -176,6 +178,12 @@ export function SessionEndScreen({
    * district, so no live vehicle is needed). null → no map panel.
    */
   mapPolylines?: MinimapPolyline[] | null;
+  /**
+   * S1 (doc 76 §6): the scenario rubric — stars + breakdown, rendered as an
+   * ADDITIVE quality section right under the verdict (official points stay
+   * the primary result). null (every curriculum lesson) = no section.
+   */
+  rubric?: RubricScore | null;
 }) {
   const { summary } = result;
   const score = summary.score;
@@ -331,6 +339,43 @@ export function SessionEndScreen({
           </tbody>
         </table>
       </section>
+
+      {/* S1: scenario rubric — the maneuver-quality layer (doc 76 §6).
+          Official points above remain the verdict; stars grade HOW WELL. */}
+      {rubric !== null ? (
+        <section aria-label="Оценка на маневрата" className="card flex flex-col gap-2 p-5">
+          <div className="flex items-center gap-3">
+            <h3 className="text-sm font-extrabold">Оценка на маневрата</h3>
+            <span
+              aria-label={`${rubric.stars} от 3 звезди`}
+              className="ml-auto text-lg tracking-wide"
+            >
+              {[1, 2, 3].map((s) => (
+                <span
+                  key={s}
+                  aria-hidden
+                  style={{ color: s <= rubric.stars ? "var(--warning)" : "var(--border-strong)" }}
+                >
+                  ★
+                </span>
+              ))}
+            </span>
+          </div>
+          <ul className="flex flex-col gap-1.5">
+            {rubric.breakdownBg.map((line) => (
+              <li key={line.id} className="flex flex-col gap-0.5 text-sm">
+                <div className="flex items-baseline gap-2">
+                  <span className="font-semibold">{line.labelBg}</span>
+                  <span className="ml-auto shrink-0 text-xs font-black tabular-nums text-muted">
+                    {line.points !== null ? `${line.points} / 2 т.` : line.measured ? "—" : "не се измерва"}
+                  </span>
+                </div>
+                <p className="text-xs leading-relaxed text-muted">{line.detailBg}</p>
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
 
       {/* A15: mistake map — WHERE it happened */}
       {hasMap ? (

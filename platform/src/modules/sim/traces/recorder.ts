@@ -17,11 +17,11 @@
 
 import type { StagedEventOutcome, StagedEventSpec, VehicleSample } from "../contracts";
 import { createScenarioDirector } from "../orchestrator";
-import { createRuleEngine, reduceTick, type RuleEvent } from "../rules";
+import { createRuleEngine, reduceTick, type RuleEvent, type SimTick } from "../rules";
 import { createWorldRuntime } from "../runtime";
 import { createTrafficSystem } from "../traffic/system";
 import type { TrafficDistrict } from "../traffic/types";
-import { ESTIMATE_WHEELBASE } from "../vehicle";
+import { CHASSIS_HALF_EXTENTS, ESTIMATE_WHEELBASE } from "../vehicle";
 import {
   TRACE_SAMPLE_HZ,
   TRACE_VERSION,
@@ -180,6 +180,10 @@ export function createTraceRecorder(options: LiveRecorderOptions): LiveTraceReco
 // Scripted headless recorder (shadow / mistake demos — the C1 bot's mold)
 // ---------------------------------------------------------------------------
 
+/** What a synthesized contact hit — mirrors the runtime's CollisionWith
+ *  vocabulary (worldRuntime.pushCollision → COLLISION detail). */
+export type TraceCollisionWith = "vehicle" | "pedestrian" | "cyclist" | "staticObject";
+
 /** One authored instruction of a drive script. `drive`/`pause` consume time;
  *  the rest are instantaneous markers applied at the current clock. */
 export type DriveStep =
@@ -198,7 +202,81 @@ export type DriveStep =
   | { kind: "pause"; sec: number; brake?: boolean }
   | { kind: "indicator"; setting: TraceIndicator }
   | { kind: "glance"; mirror: "left" | "right" | "rear" }
-  | { kind: "annotation"; textBg: string };
+  | { kind: "annotation"; textBg: string }
+  /**
+   * S1 mistake-demo seam: an AUTHORED consequence at the current clock — the
+   * scripted „пешеходец зад колата" of a no-observation demo. Pushed into the
+   * production runtime (pushCollision), so the rule engine grades it exactly
+   * like a physics contact would; it is a scripted narrative beat, never a
+   * geometric check (those are `obstacles` below).
+   */
+  | { kind: "collision"; withWhat: TraceCollisionWith };
+
+/**
+ * One flat obstacle rect in district space (S1) — the headless twin of the
+ * scene's ScenarioObstacles colliders: while a drive script runs, the hero
+ * footprint (CHASSIS_HALF_EXTENTS) is SAT-tested against these every frame,
+ * and an overlap at/above `collisionMinKmh` pushes a runtime collision the
+ * rules engine grades (COLLISION, detail = withWhat). This is what arms the
+ * doc 76 §5/§9 gates: a shadow demo proves it NEVER touches the parked cars;
+ * a clipping mistake demo proves it grades COLLISION at walking speed.
+ */
+export interface ObstacleRect2D {
+  x: number;
+  y: number;
+  /** District heading of the rect's LENGTH axis (0 = north, cw). */
+  headingDeg: number;
+  halfWidthM: number;
+  halfLengthM: number;
+  withWhat: TraceCollisionWith;
+}
+
+/**
+ * 2D OBB overlap (separating-axis test over both rects' axes). Pure —
+ * exported for the trace-gate tests. Headings: 0 = north, cw-positive
+ * (district convention); length runs along the heading.
+ */
+export function obstacleRectsOverlap(
+  a: { x: number; y: number; headingDeg: number; halfWidthM: number; halfLengthM: number },
+  b: { x: number; y: number; headingDeg: number; halfWidthM: number; halfLengthM: number },
+): boolean {
+  const rects = [a, b];
+  for (let r = 0; r < 2; r++) {
+    const h = (rects[r].headingDeg * Math.PI) / 180;
+    // Axis along the length (sin h, cos h) and across it (cos h, −sin h).
+    const axes: Array<readonly [number, number]> = [
+      [Math.sin(h), Math.cos(h)],
+      [Math.cos(h), -Math.sin(h)],
+    ];
+    for (const [ux, uy] of axes) {
+      let min0 = Infinity;
+      let max0 = -Infinity;
+      let min1 = Infinity;
+      let max1 = -Infinity;
+      for (let i = 0; i < 2; i++) {
+        const rect = rects[i];
+        const hh = (rect.headingDeg * Math.PI) / 180;
+        const axX = Math.sin(hh);
+        const axY = Math.cos(hh);
+        const latX = Math.cos(hh);
+        const latY = -Math.sin(hh);
+        const c = rect.x * ux + rect.y * uy;
+        const ext =
+          rect.halfLengthM * Math.abs(axX * ux + axY * uy) +
+          rect.halfWidthM * Math.abs(latX * ux + latY * uy);
+        if (i === 0) {
+          min0 = c - ext;
+          max0 = c + ext;
+        } else {
+          min1 = c - ext;
+          max1 = c + ext;
+        }
+      }
+      if (max0 < min1 || max1 < min0) return false; // separating axis found
+    }
+  }
+  return true;
+}
 
 export interface DriveScript {
   steps: DriveStep[];
@@ -217,6 +295,27 @@ export interface RecordScriptedDriveOptions {
   rain?: boolean;
   /** Hard cap on scripted-drive length (default 900 s). */
   maxDurationSec?: number;
+  /**
+   * S1: precise scenario obstacles (parked cars from the district's
+   * meta.scenario.bays, cones, …) — SAT-tested against the hero footprint
+   * every frame; an overlap pushes a runtime collision (rising edge per
+   * obstacle). Absent = no geometric contacts (the S0 behavior).
+   */
+  obstacles?: readonly ObstacleRect2D[];
+  /**
+   * Contact-grading threshold, km/h, for `obstacles` (the VehicleRig seam):
+   * default 10 = the street nudge tolerance; parking scenarios pass 0 so a
+   * 2 km/h bumper touch IS the graded mistake (doc 76 §0).
+   */
+  collisionMinKmh?: number;
+  /**
+   * S1 full-pipeline hook: every production tick of the drive, AFTER the
+   * scenario director appended its events — the SAME object the internal
+   * rule engine reduces. The bot-completion proof feeds these into a REAL
+   * lesson session (createLessonSession + applyTick), so a scripted attempt
+   * exercises objectives/coach/wire exactly like a live drive.
+   */
+  onTick?: (tick: SimTick) => void;
 }
 
 export interface RecordedDrive {
@@ -412,8 +511,37 @@ export function recordScriptedDrive(
     }
   };
 
+  // S1 obstacle contacts: rising-edge SAT overlap of the hero footprint vs
+  // each authored rect (the ScenarioObstacles twin). Latched per obstacle so
+  // a continuing contact pushes once; separating re-arms it.
+  const obstacles = options.obstacles ?? [];
+  const obstacleContact = new Array<boolean>(obstacles.length).fill(false);
+  const collisionMinKmh = options.collisionMinKmh ?? 10;
+  const heroRect = {
+    x: 0,
+    y: 0,
+    headingDeg: 0,
+    halfWidthM: CHASSIS_HALF_EXTENTS.x,
+    halfLengthM: CHASSIS_HALF_EXTENTS.z,
+  };
+
   /** One production-ordered frame: runtime → traffic → sample → director → rules. */
   const stepStack = () => {
+    // Obstacle contacts push BEFORE sample() — the pushCollision contract
+    // (events drain into the next tick, exactly like a physics handler).
+    if (obstacles.length > 0) {
+      heroRect.x = pose.x;
+      heroRect.y = pose.y;
+      heroRect.headingDeg = pose.headingDeg;
+      const speedKmh = Math.abs(speedMps) * 3.6;
+      for (let i = 0; i < obstacles.length; i++) {
+        const hit = obstacleRectsOverlap(heroRect, obstacles[i]);
+        if (hit && !obstacleContact[i] && speedKmh >= collisionMinKmh) {
+          runtime.pushCollision(obstacles[i].withWhat);
+        }
+        obstacleContact[i] = hit;
+      }
+    }
     runtime.update(SCRIPT_DT);
     traffic.update(SCRIPT_DT, {
       signalPhase: (id) => runtime.signalPhase(id),
@@ -425,12 +553,15 @@ export function recordScriptedDrive(
     const vehicleSample: VehicleSample = {
       position: { x: pose.x, y: pose.y },
       headingDeg: pose.headingDeg,
-      speedKmh: speedMps * 3.6,
+      // Live parity (vehicleSample.ts): SIGNED speed (negative in reverse)
+      // and the CONTRACT gear (−1 = R) — the parkInBay usedReverse credit
+      // and the A12 reverse exemptions read exactly these channels.
+      speedKmh: (lastReverse ? -1 : 1) * Math.abs(speedMps) * 3.6,
       indicator,
       headlights: isNight ? "low" : "off",
       seatbeltOn: true,
       handbrakeOn: false,
-      gear: 1,
+      gear: lastGear,
       mirrorGlance: pendingGlance,
       stalled: false,
     };
@@ -450,6 +581,7 @@ export function recordScriptedDrive(
       for (const e of res.events) tick.events.push(e);
       outcomes.push(...res.outcomes);
     }
+    options.onTick?.(tick);
     const reduced = reduceTick(rules, tick);
     rules = reduced.state;
     ruleEvents.push(...reduced.events);
@@ -489,6 +621,12 @@ export function recordScriptedDrive(
     }
     if (step.kind === "annotation") {
       emitEvent("annotation", step.textBg);
+      continue;
+    }
+    if (step.kind === "collision") {
+      // Authored consequence — drains into the NEXT frame's tick (a pause or
+      // drive step must follow so a frame exists to grade it).
+      runtime.pushCollision(step.withWhat);
       continue;
     }
     if (step.kind === "pause") {

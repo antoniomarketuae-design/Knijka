@@ -60,6 +60,14 @@ export interface SimSessionEventsJson {
   examMode?: boolean;
   /** A13: why the exam terminated (server-derived, examMode rows only). */
   examTermination?: ExamTermination;
+  /**
+   * S1 (additive; scenario sessions only): rubric stars the SERVER computed
+   * from the graded result + validated wire measurement channels
+   * (finishLessonAction → scoreRubric). Drives the catalog's personal-best
+   * display and the soft level unlock (scenario/progress.ts) — never any
+   * official score.
+   */
+  rubricStars?: 1 | 2 | 3;
 }
 
 /**
@@ -108,6 +116,10 @@ export function parseSimSessionEvents(value: unknown): SimSessionEventsJson | nu
   if (typeof o.examTermination === "object" && o.examTermination !== null) {
     parsed.examTermination = o.examTermination as ExamTermination;
   }
+  // S1: rubric stars — strict members only (1 | 2 | 3).
+  if (o.rubricStars === 1 || o.rubricStars === 2 || o.rubricStars === 3) {
+    parsed.rubricStars = o.rubricStars;
+  }
   return parsed;
 }
 
@@ -132,6 +144,9 @@ export interface SimSessionListRow {
   score: number | null;
   /** Parsed from the events payload; false when the payload is unreadable. */
   passed: boolean;
+  /** S1: rubric stars from the events payload (scenario sessions); null on
+   *  non-scenario rows / unreadable payloads / pre-S1 rows. */
+  rubricStars: number | null;
 }
 
 /**
@@ -198,13 +213,17 @@ function createPrismaStore(): SimSessionStore {
           events: true,
         },
       });
-      return rows.map((r) => ({
-        id: r.id,
-        lessonId: r.lessonId,
-        finishedAt: r.finishedAt,
-        score: r.score,
-        passed: parseSimSessionEvents(r.events)?.passed ?? false,
-      }));
+      return rows.map((r) => {
+        const parsed = parseSimSessionEvents(r.events);
+        return {
+          id: r.id,
+          lessonId: r.lessonId,
+          finishedAt: r.finishedAt,
+          score: r.score,
+          passed: parsed?.passed ?? false,
+          rubricStars: parsed?.rubricStars ?? null,
+        };
+      });
     },
 
     async listRecentSessions(userId, limit) {

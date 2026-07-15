@@ -53,6 +53,24 @@ export {
 // Rubric scorer (pure; S1 wires the end screen)
 export { scoreRubric } from "./rubric";
 
+// S1 — id resolution (<templateId>@L<n> → compiled LessonSpec; the wire's
+// third resolver), soft level progression (unlock by stars) and the
+// attempt-trace observation mapper.
+export {
+  isScenarioLessonId,
+  parseScenarioLessonId,
+  scenarioLessonById,
+  type ParsedScenarioLessonId,
+} from "./resolve";
+export {
+  SCENARIO_UNLOCK_MIN_STARS,
+  isScenarioLevelUnlocked,
+  scenarioLevelProgress,
+  type ScenarioAttemptRow,
+  type ScenarioLevelProgress,
+} from "./progress";
+export { parkingObservationFromTrace } from "./observation";
+
 // Authored templates (P0: sc-park-perp-rev)
 export {
   LOT_PERP_TARGET_BAY,

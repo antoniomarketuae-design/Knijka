@@ -124,8 +124,21 @@ describe("sc-park-perp-rev ↔ lot-perp-v1.json (the committed generated map)", 
     expect(readFileSync(pub).equals(src)).toBe(true);
   });
 
-  it("pending traces are explicit and typed (S1 fills them)", () => {
-    expect(SC_PARK_PERP_REV.shadow.pending).toBe(true);
-    for (const m of SC_PARK_PERP_REV.mistakes) expect(m.traceRef.pending).toBe(true);
+  it("traces are RECORDED (S1): files exist at the refs + public copies match", () => {
+    const refs = [SC_PARK_PERP_REV.shadow, ...SC_PARK_PERP_REV.mistakes.map((m) => m.traceRef)];
+    for (const ref of refs) {
+      expect(ref.pending, ref.path).not.toBe(true);
+      const src = path.join(REPO_ROOT, ref.path);
+      expect(existsSync(src), src).toBe(true);
+      // Public copy: content/traces/<template>/<file> → platform/public/traces/…
+      const pub = path.join(
+        REPO_ROOT,
+        "platform",
+        "public",
+        ref.path.replace(/^content\//, ""),
+      );
+      expect(existsSync(pub), pub).toBe(true);
+      expect(readFileSync(pub).equals(readFileSync(src))).toBe(true);
+    }
   });
 });

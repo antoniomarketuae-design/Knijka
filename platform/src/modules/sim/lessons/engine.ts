@@ -268,6 +268,14 @@ export function applyTick(prev: LessonSessionState, tick: SimTick): LessonStepRe
   // A13: exam sessions bypass the whole teach-first layer — see coach.ts.
   const examMode = prev.lesson.examMode === true;
   const coachOpts = examMode ? { examMode: true } : undefined;
+  // S1 pauseOnError (doc 76 §7 L1 „Воден опит"): in a guided scenario drill
+  // EVERY graded violation ALSO freezes into a teach card — including codes
+  // the coach normally only toasts (опасна/terminating like COLLISION: at
+  // walking speed in a parking lot the freeze IS the lesson, unlike street
+  // incidents where a modal would interrupt evasive handling). Scoring is
+  // UNCHANGED — the aid adds the pause, never touches points. Inert when the
+  // flag is absent (every curriculum lesson).
+  const pauseOnError = prev.lesson.aids?.pauseOnError === true;
 
   // Coach the violations: teach-first-then-grade. A first, teachable mistake
   // PAUSES the sim with a mini-lesson card (A9, doc 65 §5) and does NOT count
@@ -311,6 +319,27 @@ export function applyTick(prev: LessonSessionState, tick: SimTick): LessonStepRe
         lawRef: e.lawRef,
       });
       scoredEvents.push(e);
+      // S1 pauseOnError: the scored violation ADDITIONALLY pauses with the
+      // teach card (rate-limited like every pause; same-tick moments merge).
+      if (pauseOnError) {
+        const canPause =
+          lastTeachAt === null ||
+          lastTeachAt === tick.t ||
+          tick.t - lastTeachAt >= TEACH_PAUSE_MIN_GAP_S;
+        if (canPause) {
+          teachMoments.push({
+            code: e.code,
+            scenarioId: null,
+            titleBg: e.titleBg,
+            explanationBg: e.explanationBg,
+            lawRef: e.lawRef,
+            severity: e.severityClass,
+            points: e.points,
+            t: e.t,
+          });
+          lastTeachAt = tick.t;
+        }
+      }
       if (step.decision.penaltyMultiplier > 1) {
         // Repeat mistake — record the escalation; buildLessonResult folds it
         // into the effective (training) score. Official points stay as-is.
