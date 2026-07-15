@@ -200,3 +200,18 @@ export {
   recordScOvOneWayDrive,
   type ScOvOneWayTraceName,
 } from "./scOvOneWay";
+
+// S3-F — the VRU-family authored drives (sc-vu-cyclist-hook); committed traces
+// are recordings of exactly these scripts (gate: traces/__tests__/
+// sc-vu-cyclist-hook-traces).
+export {
+  SC_VU_CYCLIST_HOOK_ID,
+  recordScVuCyclistDrive,
+  type ScVuCyclistTraceName,
+} from "./scVuCyclist";
+export {
+  SC_PK_SMOOTH_STOP_ID,
+  pkVanObstacle,
+  recordScPkSmoothStopDrive,
+  type ScPkSmoothStopTraceName,
+} from "./scPkSmoothStop";

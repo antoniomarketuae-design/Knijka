@@ -1,0 +1,130 @@
+{
+ "format": "district-v1",
+ "meta": {
+  "district": "pk-stop",
+  "label": "Учебна улица — плавно спиране на позиция (сценарий PK-14)",
+  "mapKind": "scenario-street",
+  "generator": "tools/maps/gen_pk_smoothstop.mjs",
+  "boundsLocalMeters": {
+   "minX": -28.12,
+   "minY": 0,
+   "maxX": 14.125,
+   "maxY": 200
+  },
+  "attribution": {
+   "text": "Учебна права улица за плавно спиране на позиция — оригинален параметричен дизайн (без данни от OpenStreetMap)",
+   "license": "All rights reserved",
+   "licenseUrl": "/",
+   "copyrightUrl": "/",
+   "obligation": "none — original work, no ODbL attribution required for this map"
+  },
+  "defaults": {
+   "maxspeedUrbanKmh": 50,
+   "note": "Права улица: спирането е плавно и предвидимо — газта се вдига рано, спирачката е мека."
+  },
+  "stats": {
+   "roadKm": 0.2,
+   "nodes": 2,
+   "edges": 1,
+   "intersections": 0,
+   "crossings": 0,
+   "buildings": 1,
+   "spawnPoints": 2
+  },
+  "scenario": {
+   "archetype": "straight-street",
+   "params": {
+    "lengthM": 200,
+    "maxspeedKmh": 50
+   },
+   "lanesPerDirection": 1,
+   "laneCenterRightM": 4.06
+  }
+ },
+ "roads": {
+  "nodes": [
+   {
+    "id": "pk-n-end",
+    "x": 0,
+    "y": 200
+   },
+   {
+    "id": "pk-n-start",
+    "x": 0,
+    "y": 0
+   }
+  ],
+  "edges": [
+   {
+    "id": "pk-e-street",
+    "from": "pk-n-start",
+    "to": "pk-n-end",
+    "class": "residential",
+    "name": "Права улица — плавно спиране на позиция",
+    "oneway": false,
+    "roundabout": false,
+    "lanes": 2,
+    "lanesSource": "tag",
+    "maxspeed": 50,
+    "maxspeedSource": "tag",
+    "length": 200,
+    "geometry": [
+     [
+      0,
+      0
+     ],
+     [
+      0,
+      200
+     ]
+    ]
+   }
+  ]
+ },
+ "intersections": [],
+ "crossings": [],
+ "roundabouts": [],
+ "buildings": [
+  {
+   "id": "pk-b-block",
+   "height": 7,
+   "heightSource": "default",
+   "footprint": [
+    [
+     -28.12,
+     80
+    ],
+    [
+     -16.12,
+     80
+    ],
+    [
+     -16.12,
+     98
+    ],
+    [
+     -28.12,
+     98
+    ]
+   ]
+  }
+ ],
+ "spawnPoints": [
+  {
+   "id": "pk-spawn-approach",
+   "x": 4.06,
+   "y": 15,
+   "heading": 0,
+   "edgeId": "pk-e-street",
+   "name": "Начало на отсечката"
+  },
+  {
+   "id": "pk-spawn-finish",
+   "x": 4.06,
+   "y": 185,
+   "heading": 0,
+   "edgeId": "pk-e-street",
+   "name": "Контролна точка — край на отсечката"
+  }
+ ]
+}

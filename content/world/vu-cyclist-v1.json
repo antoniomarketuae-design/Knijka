@@ -1,0 +1,207 @@
+{
+ "format": "district-v1",
+ "meta": {
+  "district": "vu-cyclist",
+  "label": "Учебно Т-кръстовище с велосипедист покрай бордюра (сценарий VU-01)",
+  "mapKind": "scenario-vru",
+  "generator": "tools/maps/gen_vu_cyclist.mjs",
+  "boundsLocalMeters": {
+   "minX": -130,
+   "minY": -90,
+   "maxX": 130,
+   "maxY": 0
+  },
+  "attribution": {
+   "text": "Учебно кръстовище за велосипедист — оригинален параметричен дизайн (без данни от OpenStreetMap)",
+   "license": "All rights reserved",
+   "licenseUrl": "/",
+   "copyrightUrl": "/",
+   "obligation": "none — original work, no ODbL attribution required for this map"
+  },
+  "defaults": {
+   "maxspeedUrbanKmh": 50,
+   "note": "Учебно кръстовище: ограниченията идват от таговете на улиците."
+  },
+  "stats": {
+   "roadKm": 0.35,
+   "nodes": 4,
+   "edges": 3,
+   "intersections": 1,
+   "crossings": 0,
+   "buildings": 1,
+   "spawnPoints": 3
+  },
+  "scenario": {
+   "archetype": "t-junction",
+   "params": {
+    "control": "none",
+    "throughArmM": 130,
+    "stemArmM": 90,
+    "throughMaxKmh": 50,
+    "stemMaxKmh": 50
+   },
+   "junctionNodeId": "vu-n-c",
+   "expectedControl": "rightHandRule"
+  }
+ },
+ "roads": {
+  "nodes": [
+   {
+    "id": "vu-n-c",
+    "x": 0,
+    "y": 0
+   },
+   {
+    "id": "vu-n-e",
+    "x": 130,
+    "y": 0
+   },
+   {
+    "id": "vu-n-s",
+    "x": 0,
+    "y": -90
+   },
+   {
+    "id": "vu-n-w",
+    "x": -130,
+    "y": 0
+   }
+  ],
+  "edges": [
+   {
+    "id": "vu-e-w",
+    "from": "vu-n-w",
+    "to": "vu-n-c",
+    "class": "residential",
+    "name": "Права улица — запад",
+    "oneway": false,
+    "roundabout": false,
+    "lanes": 2,
+    "lanesSource": "tag",
+    "maxspeed": 50,
+    "maxspeedSource": "tag",
+    "length": 130,
+    "geometry": [
+     [
+      -130,
+      0
+     ],
+     [
+      0,
+      0
+     ]
+    ]
+   },
+   {
+    "id": "vu-e-e",
+    "from": "vu-n-c",
+    "to": "vu-n-e",
+    "class": "residential",
+    "name": "Права улица — изток",
+    "oneway": false,
+    "roundabout": false,
+    "lanes": 2,
+    "lanesSource": "tag",
+    "maxspeed": 50,
+    "maxspeedSource": "tag",
+    "length": 130,
+    "geometry": [
+     [
+      0,
+      0
+     ],
+     [
+      130,
+      0
+     ]
+    ]
+   },
+   {
+    "id": "vu-e-s",
+    "from": "vu-n-s",
+    "to": "vu-n-c",
+    "class": "residential",
+    "name": "Странична улица",
+    "oneway": false,
+    "roundabout": false,
+    "lanes": 2,
+    "lanesSource": "tag",
+    "maxspeed": 50,
+    "maxspeedSource": "tag",
+    "length": 90,
+    "geometry": [
+     [
+      0,
+      -90
+     ],
+     [
+      0,
+      0
+     ]
+    ]
+   }
+  ]
+ },
+ "intersections": [
+  {
+   "id": "vu-n-c",
+   "x": 0,
+   "y": 0,
+   "degree": 3,
+   "signalized": false
+  }
+ ],
+ "crossings": [],
+ "roundabouts": [],
+ "buildings": [
+  {
+   "id": "vu-b-corner",
+   "height": 5,
+   "heightSource": "default",
+   "footprint": [
+    [
+     -40,
+     -40
+    ],
+    [
+     -26,
+     -40
+    ],
+    [
+     -26,
+     -26
+    ],
+    [
+     -40,
+     -26
+    ]
+   ]
+  }
+ ],
+ "spawnPoints": [
+  {
+   "id": "vu-spawn-west",
+   "x": -115,
+   "y": 0,
+   "heading": 90,
+   "edgeId": "vu-e-w",
+   "name": "Права улица — подход от запад"
+  },
+  {
+   "id": "vu-spawn-east",
+   "x": 115,
+   "y": 0,
+   "heading": 270,
+   "edgeId": "vu-e-e",
+   "name": "Права улица — подход от изток"
+  },
+  {
+   "id": "vu-spawn-south",
+   "x": 0,
+   "y": -75,
+   "heading": 0,
+   "edgeId": "vu-e-s",
+   "name": "Странична улица — подход към кръстовището"
+  }
+ ]
+}

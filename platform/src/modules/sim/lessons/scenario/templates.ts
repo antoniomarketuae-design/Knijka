@@ -20,6 +20,8 @@ import { SCENARIO_TEMPLATES_PE } from "./templates-pe";
 import { SCENARIO_TEMPLATES_SP } from "./templates-sp";
 import { SCENARIO_TEMPLATES_FOLLOWING } from "./templates-following";
 import { SCENARIO_TEMPLATES_LANES } from "./templates-lanes";
+import { SCENARIO_TEMPLATES_VRU } from "./templates-vru";
+import { SCENARIO_TEMPLATES_PK } from "./templates-pk";
 
 /**
  * The TARGET bay of content/world/lot-perp-v1.json — meta.scenario bay
@@ -214,6 +216,8 @@ export const SCENARIO_TEMPLATES: readonly ScenarioSpec[] = [
   ...SCENARIO_TEMPLATES_SP,
   ...SCENARIO_TEMPLATES_FOLLOWING,
   ...SCENARIO_TEMPLATES_LANES,
+  ...SCENARIO_TEMPLATES_VRU,
+  ...SCENARIO_TEMPLATES_PK,
 ];
 
 /** Lookup by template id; undefined for unknown ids. */
