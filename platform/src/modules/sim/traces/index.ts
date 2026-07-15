@@ -115,3 +115,22 @@ export {
   recordScLaneChangeDrive,
   type ScLaneChangeTraceName,
 } from "./scLaneChange";
+
+// S3-A — the pedestrian-family authored drives (sc-crossing-let-pass /
+// sc-crossing-slow-crosser / sc-crossing-rain-sprint); committed traces are
+// recordings of exactly these scripts (gates: traces/__tests__/sc-crossing-*).
+export {
+  SC_CROSSING_LET_PASS_ID,
+  recordScCrossingLetPassDrive,
+  type ScCrossingLetPassTraceName,
+} from "./scCrossingLetPass";
+export {
+  SC_CROSSING_SLOW_CROSSER_ID,
+  recordScCrossingSlowCrosserDrive,
+  type ScCrossingSlowCrosserTraceName,
+} from "./scCrossingSlowCrosser";
+export {
+  SC_CROSSING_RAIN_SPRINT_ID,
+  recordScCrossingRainSprintDrive,
+  type ScCrossingRainSprintTraceName,
+} from "./scCrossingRainSprint";
