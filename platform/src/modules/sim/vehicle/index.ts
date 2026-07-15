@@ -48,6 +48,14 @@ export {
   DIFFICULTY_PRESETS,
   DIFFICULTY_ORDER,
   DEFAULT_DIFFICULTY,
+  // S0 low-speed maneuvering bands (parking envelope, doc 76 §0/§12).
+  CREEP_CAP_FULL_KMH,
+  CREEP_CAP_END_KMH,
+  CRAWL_BRAKE_FULL_KMH,
+  CRAWL_BRAKE_END_KMH,
+  FULL_LOCK_BELOW_KMH,
+  FULL_LOCK_FADE_END_KMH,
+  PARKING_STEER_TAU_S,
 } from "./difficulty";
 export type {
   DifficultyMode,

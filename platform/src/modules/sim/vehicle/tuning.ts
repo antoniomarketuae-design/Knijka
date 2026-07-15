@@ -158,6 +158,16 @@ export const ENGINE_FORCE_CURVE: ReadonlyArray<readonly [number, number]> = [
 export const REVERSE_FORCE_N = 3000;
 /** Reverse speed cap (km/h). */
 export const REVERSE_MAX_KMH = 25;
+/**
+ * S0 parking envelope: brake-pedal fraction used when the driver holds the
+ * throttle in the WRONG direction for the current motion (gas in R while
+ * still rolling forward, gas in D while rolling backward) and the sim must
+ * stop the car before driving the other way. 1.0 was a full 0.9 g slam at
+ * the 0-crossing — a torque converter fighting the roll is firm, not violent.
+ * Applies ONLY on the explicit-driveline path (cabin sessions); legacy
+ * callers (the CI harness) keep the original full-brake behavior bit-for-bit.
+ */
+export const STOP_FIRST_BRAKE = 0.55;
 /** Coast-down rolling resistance, total (N), applied as wheel brake impulses. */
 export const ROLLING_RESISTANCE_N = 280;
 

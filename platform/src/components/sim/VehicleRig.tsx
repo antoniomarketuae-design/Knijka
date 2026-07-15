@@ -70,8 +70,12 @@ export interface VehicleSpawn {
 
 /** A contact below this impact speed (km/h) is treated as a gentle nudge /
  *  curb touch — audible thump only, NOT graded as a collision (which would
- *  terminate the session). Real crashes into walls/vehicles are above it. */
-const COLLISION_MIN_KMH = 10;
+ *  terminate the session). Real crashes into walls/vehicles are above it.
+ *  This is the DEFAULT for street driving; scenario lessons can lower it via
+ *  the `collisionMinKmh` prop (S0, doc 76 §0): a 2 km/h bumper touch on a
+ *  parked car or cone IS the graded mistake in a parking task, while the
+ *  street nudge-tolerance stays 10 everywhere else. */
+export const COLLISION_MIN_KMH = 10;
 
 export function VehicleRig({
   simRef,
@@ -84,6 +88,7 @@ export function VehicleRig({
   spawn = SPAWN,
   difficultyRef,
   onCollision,
+  collisionMinKmh = COLLISION_MIN_KMH,
   night = false,
 }: {
   simRef: RefObject<VehicleSim | null>;
@@ -100,6 +105,12 @@ export function VehicleRig({
    *  A11: `withWhat` classifies the contact from the other body's NPC-shell
    *  userData tag — untagged bodies (world meshes) are static objects. */
   onCollision?: (impactKmh: number, withWhat: CollisionWithWhat) => void;
+  /** Minimum impact speed (km/h) that grades as a collision. Defaults to the
+   *  street nudge-tolerance COLLISION_MIN_KMH (10). Parking scenarios pass a
+   *  low/zero threshold (S0 seam — see ScenarioObstacles) so ANY bumper
+   *  contact registers as the mistake it is. The sub-threshold thump audio
+   *  is unaffected. */
+  collisionMinKmh?: number;
   /** Lesson night flag — raises the interior fill light's floor at dusk. The
    *  cabin's own headlights / night-preview toggle also raise it, so the cabin
    *  never goes near-black even when this is left at its default. */
@@ -231,7 +242,7 @@ export function VehicleRig({
             ? Math.hypot(pv.x - ov.x, pv.y - ov.y, pv.z - ov.z) * 3.6
             : Math.abs(simRef.current?.speedKmh ?? 0);
         audioRef.current?.thump(Math.min(1, impactKmh / 50 + 0.15));
-        if (impactKmh >= COLLISION_MIN_KMH) {
+        if (impactKmh >= collisionMinKmh) {
           onCollision?.(impactKmh, tag?.kind ?? "staticObject");
         }
       }}

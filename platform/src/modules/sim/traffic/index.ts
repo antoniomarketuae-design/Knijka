@@ -20,6 +20,19 @@ export { createTrafficSystem } from "./system";
 // high, glossy MeshStandard fallback on med/low (docs/simulation/71 §4.8).
 export { carPaintMaterial, carPaintStandardMaterial } from "./vehicleFleet";
 export type { CarPaintOptions, BuildTrafficFleetOptions } from "./vehicleFleet";
+// S0 scenario obstacles (doc 76 §0): the instanced-fleet machinery + measured
+// per-model rigs, additively exposed so components/sim/ScenarioObstacles can
+// render PRECISE hittable parked cars over the same GLB kit (its colliders
+// are cuboids matched to each rig's measured bbox — never a generic shell).
+export {
+  assignCivilianModel,
+  buildTrafficFleet,
+  disposeTrafficFleet,
+  DRACO_DECODER_PATH,
+  FLEET,
+  FLEET_URLS,
+} from "./vehicleFleet";
+export type { ModelRig, ParkedPlacement, TrafficFleet } from "./vehicleFleet";
 export { mulberry32 } from "./rng";
 export type { Rng } from "./rng";
 export { TrafficLayer } from "./TrafficLayer";
@@ -47,6 +60,7 @@ export type {
   DistrictEdge,
   DistrictIntersection,
   DistrictNode,
+  OncomingApproach,
   SignalPhaseFn,
   StagedActorSpec,
   StagedActorView,

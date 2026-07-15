@@ -206,17 +206,30 @@ export class VehicleSim {
    *
    * `driveline` (A1) gates the drivetrain: engine off / P / N transmit no
    * force, R drives backward (proper reverse), a clutch-down manual box
-   * freewheels, and the stateful parking brake drags the rear axle. It
-   * DEFAULTS to READY_DRIVELINE (engine on, D, brake released) so callers
-   * that predate A1 — the CI harness above all — keep today's behavior
-   * bit-for-bit, including the brake-at-standstill reverse overload in D.
+   * freewheels, and the stateful parking brake drags the rear axle. When it
+   * is OMITTED the sim runs the LEGACY pre-A1 machine (READY_DRIVELINE +
+   * the arcade brake-at-standstill-reverses overload in D + full-force
+   * stop-first braking) so callers that predate A1 — the CI harness above
+   * all — keep today's behavior bit-for-bit.
+   *
+   * S0 parking honesty: callers that DO pass a driveline (every cabin
+   * session) get the honest low-speed machine instead —
+   *  - brake in D at a standstill HOLDS the car (no silent backward creep at
+   *    the 0-crossing; deliberate reverse is the R position),
+   *  - wrong-direction throttle stops the car at STOP_FIRST_BRAKE (~0.5 g)
+   *    rather than a full 0.9 g slam before the direction change.
    */
   update(
     input: VehicleInput,
     dt: number,
-    driveline: DrivelinePhysicsInput = READY_DRIVELINE,
+    driveline?: DrivelinePhysicsInput,
   ): void {
     if (this.disposed) return;
+    // Legacy machine = the pre-A1 arcade contract, selected by OMITTING the
+    // argument (the CI harness / spike-era callers). An explicitly passed
+    // driveline — even one equal to READY_DRIVELINE — is the honest machine.
+    const legacyArcade = driveline === undefined;
+    const dl: DrivelinePhysicsInput = driveline ?? READY_DRIVELINE;
     const c = this.controller;
     // Forward speed from the body velocity (controller.currentVehicleSpeed()
     // uses |linvel| and spikes on suspension jolts — measured +250 km/h
@@ -237,16 +250,20 @@ export class VehicleSim {
 
     // --- Throttle / brake / reverse state machine ---------------------------
     // Driveline gating (A1): force flows only when the engine runs AND a
-    // drive position is engaged (D / M with clutch up / R). The default
-    // READY_DRIVELINE keeps the pre-A1 machine (harness-gated) unchanged.
-    const traction = hasDriveTraction(driveline);
+    // drive position is engaged (D / M with clutch up / R). The legacy
+    // machine (no driveline argument) keeps the pre-A1 behavior bit-for-bit.
+    const traction = hasDriveTraction(dl);
+    // S0: wrong-direction throttle stops the car before the direction change.
+    // Honest machine: a firm ~0.5 g (torque-converter fight), not the legacy
+    // full-brake slam — the 0-crossing must not snap heads in a parking bay.
+    const stopFirst = legacyArcade ? 1 : T.STOP_FIRST_BRAKE;
     let engineTotal = 0; // N, split across driven wheels
     let brakePedal = 0; // 0..1
-    if (driveline.selector === "R") {
+    if (dl.selector === "R") {
       // Proper reverse: THROTTLE drives backward (capped), brake brakes.
       if (input.throttle > 0) {
         if (speedMs > 0.5) {
-          brakePedal = input.throttle; // still rolling forwards: stop first
+          brakePedal = input.throttle * stopFirst; // rolling forwards: stop first
         } else if (traction && speedKmh > -T.REVERSE_MAX_KMH) {
           engineTotal = -T.REVERSE_FORCE_N * input.throttle;
         }
@@ -255,25 +272,28 @@ export class VehicleSim {
       }
     } else if (input.throttle > 0) {
       if (speedMs < -0.5) {
-        brakePedal = input.throttle; // rolling backwards: throttle stops first
+        brakePedal = input.throttle * stopFirst; // rolling backwards: stop first
       } else if (traction) {
         engineTotal =
-          forwardForceScale(driveline, absKmh) * T.engineForceAt(absKmh) * input.throttle;
+          forwardForceScale(dl, absKmh) * T.engineForceAt(absKmh) * input.throttle;
       }
     } else if (input.brake > 0) {
       if (speedMs > 0.5) {
         brakePedal = input.brake; // moving forwards: brake pedal brakes
       } else if (
+        legacyArcade &&
         traction &&
-        driveline.selector === "D" &&
+        dl.selector === "D" &&
         speedKmh > -T.REVERSE_MAX_KMH
       ) {
-        // Legacy arcade overload, kept ONLY in D for back-compat (the
-        // harness envelope asserts it): brake at standstill = reverse.
-        // Deliberate reverse is the R position above.
+        // Legacy arcade overload, ONLY on the legacy machine (the harness
+        // envelope asserts it): brake at standstill = reverse. On the honest
+        // machine the brake pedal HOLDS a stopped car (S0 parking fix —
+        // students braking to a precise stop in D must not glide backward);
+        // deliberate reverse is the R position above.
         engineTotal = -T.REVERSE_FORCE_N * input.brake;
       } else {
-        brakePedal = input.brake; // no drive available: the pedal just brakes
+        brakePedal = input.brake; // brake pedal brakes — at rest it holds
       }
     }
 
@@ -295,7 +315,7 @@ export class VehicleSim {
       rearBrakeN = Math.max(rearBrakeN, T.HANDBRAKE_FORCE_N / 2);
       rearGrip = T.HANDBRAKE_REAR_GRIP; // rear breaks loose → handbrake slide
     }
-    if (driveline.parkingBrakeOn) {
+    if (dl.parkingBrakeOn) {
       // Stateful parking brake (A1): a locked rear axle the engine cannot
       // out-pull — WITHOUT the momentary handbrake's grip loss (this is a
       // parking pawl feel, not a drift assist).
