@@ -1,0 +1,273 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`compileScenario — sc-park-perp-rev > golden compile snapshot per level (the compiled contract — review on change) > L1 1`] = `
+{
+  "aids": {
+    "followHints": true,
+    "pathRibbon": true,
+    "pauseOnError": true,
+    "shadowCar": true,
+    "topdownAllowed": true,
+  },
+  "conceptIds": [
+    "c-reversing",
+    "c-maneuver-principles",
+    "c-mirrors-blind-spots",
+  ],
+  "descriptionBg": "Паркирай на заден ход в свободното перпендикулярно място между паркирани коли — с оглеждане преди и по време на маневрата, точно в очертанията и с възможно най-малко корекции.",
+  "id": "sc-park-perp-rev@L1",
+  "objectives": [
+    {
+      "id": "sc-ppr-position",
+      "kind": "reachZone",
+      "params": {
+        "maxSpeedKmh": 15,
+        "radiusM": 7,
+        "x": 0,
+        "y": 6,
+      },
+      "titleBg": "Заеми изходна позиция покрай свободното място",
+    },
+    {
+      "id": "sc-ppr-park",
+      "kind": "completeManeuver",
+      "params": {
+        "bay": {
+          "headingDeg": 90,
+          "lengthM": 5,
+          "widthM": 2.7,
+          "x": 5.03,
+          "y": 0,
+        },
+        "centerTolM": 0.75,
+        "headingTolDeg": 15,
+        "holdSec": 1.5,
+        "maneuver": "parkInBay",
+      },
+      "titleBg": "Паркирай на заден ход в очертаното място и спри напълно",
+    },
+  ],
+  "order": 1000,
+  "parkingBay": {
+    "headingDeg": 90,
+    "lengthM": 5,
+    "widthM": 2.7,
+    "x": 5.03,
+    "y": 0,
+  },
+  "preDrive": false,
+  "spawn": {
+    "pointId": "lot-spawn-approach",
+  },
+  "titleBg": "Перпендикулярно паркиране на заден ход · Ниво 1 — Воден опит",
+  "traffic": {
+    "anchorRadiusM": 400,
+    "pedestrianCount": 0,
+    "vehicleCount": 0,
+  },
+  "vehicleStart": "ready",
+  "world": {
+    "districtId": "lot-perp-v1",
+  },
+}
+`;
+
+exports[`compileScenario — sc-park-perp-rev > golden compile snapshot per level (the compiled contract — review on change) > L2 1`] = `
+{
+  "aids": {
+    "hintsAfterIdleSec": 20,
+    "pathRibbon": true,
+  },
+  "conceptIds": [
+    "c-reversing",
+    "c-maneuver-principles",
+    "c-mirrors-blind-spots",
+  ],
+  "descriptionBg": "Паркирай на заден ход в свободното перпендикулярно място между паркирани коли — с оглеждане преди и по време на маневрата, точно в очертанията и с възможно най-малко корекции.",
+  "id": "sc-park-perp-rev@L2",
+  "objectives": [
+    {
+      "id": "sc-ppr-position",
+      "kind": "reachZone",
+      "params": {
+        "maxSpeedKmh": 15,
+        "radiusM": 7,
+        "x": 0,
+        "y": 6,
+      },
+      "titleBg": "Заеми изходна позиция покрай свободното място",
+    },
+    {
+      "id": "sc-ppr-park",
+      "kind": "completeManeuver",
+      "params": {
+        "bay": {
+          "headingDeg": 90,
+          "lengthM": 5,
+          "widthM": 2.7,
+          "x": 5.03,
+          "y": 0,
+        },
+        "centerTolM": 0.63,
+        "headingTolDeg": 12.5,
+        "holdSec": 1.5,
+        "maneuver": "parkInBay",
+      },
+      "titleBg": "Паркирай на заден ход в очертаното място и спри напълно",
+    },
+  ],
+  "order": 1000,
+  "parkingBay": {
+    "headingDeg": 90,
+    "lengthM": 5,
+    "widthM": 2.7,
+    "x": 5.03,
+    "y": 0,
+  },
+  "preDrive": false,
+  "spawn": {
+    "pointId": "lot-spawn-approach",
+  },
+  "titleBg": "Перпендикулярно паркиране на заден ход · Ниво 2 — Частична помощ",
+  "traffic": {
+    "anchorRadiusM": 400,
+    "pedestrianCount": 0,
+    "vehicleCount": 0,
+  },
+  "vehicleStart": "ready",
+  "world": {
+    "districtId": "lot-perp-v1",
+  },
+}
+`;
+
+exports[`compileScenario — sc-park-perp-rev > golden compile snapshot per level (the compiled contract — review on change) > L3 1`] = `
+{
+  "conceptIds": [
+    "c-reversing",
+    "c-maneuver-principles",
+    "c-mirrors-blind-spots",
+  ],
+  "descriptionBg": "Паркирай на заден ход в свободното перпендикулярно място между паркирани коли — с оглеждане преди и по време на маневрата, точно в очертанията и с възможно най-малко корекции.",
+  "id": "sc-park-perp-rev@L3",
+  "objectives": [
+    {
+      "id": "sc-ppr-position",
+      "kind": "reachZone",
+      "params": {
+        "maxSpeedKmh": 15,
+        "radiusM": 7,
+        "x": 0,
+        "y": 6,
+      },
+      "titleBg": "Заеми изходна позиция покрай свободното място",
+    },
+    {
+      "id": "sc-ppr-park",
+      "kind": "completeManeuver",
+      "params": {
+        "bay": {
+          "headingDeg": 90,
+          "lengthM": 5,
+          "widthM": 2.7,
+          "x": 5.03,
+          "y": 0,
+        },
+        "centerTolM": 0.5,
+        "headingTolDeg": 10,
+        "holdSec": 1.5,
+        "maneuver": "parkInBay",
+      },
+      "titleBg": "Паркирай на заден ход в очертаното място и спри напълно",
+    },
+  ],
+  "order": 1000,
+  "parkingBay": {
+    "headingDeg": 90,
+    "lengthM": 5,
+    "widthM": 2.7,
+    "x": 5.03,
+    "y": 0,
+  },
+  "preDrive": false,
+  "spawn": {
+    "pointId": "lot-spawn-approach",
+  },
+  "titleBg": "Перпендикулярно паркиране на заден ход · Ниво 3 — Самостоятелно",
+  "traffic": {
+    "anchorRadiusM": 400,
+    "pedestrianCount": 0,
+    "vehicleCount": 0,
+  },
+  "vehicleStart": "ready",
+  "world": {
+    "districtId": "lot-perp-v1",
+  },
+}
+`;
+
+exports[`compileScenario — sc-park-perp-rev > golden compile snapshot per level (the compiled contract — review on change) > L4 1`] = `
+{
+  "conceptIds": [
+    "c-reversing",
+    "c-maneuver-principles",
+    "c-mirrors-blind-spots",
+  ],
+  "descriptionBg": "Паркирай на заден ход в свободното перпендикулярно място между паркирани коли — с оглеждане преди и по време на маневрата, точно в очертанията и с възможно най-малко корекции.",
+  "examMode": true,
+  "id": "sc-park-perp-rev@L4",
+  "objectives": [
+    {
+      "id": "sc-ppr-position",
+      "kind": "reachZone",
+      "params": {
+        "maxSpeedKmh": 15,
+        "radiusM": 7,
+        "x": 0,
+        "y": 6,
+      },
+      "titleBg": "Заеми изходна позиция покрай свободното място",
+    },
+    {
+      "id": "sc-ppr-park",
+      "kind": "completeManeuver",
+      "params": {
+        "bay": {
+          "headingDeg": 90,
+          "lengthM": 5,
+          "widthM": 2.7,
+          "x": 5.03,
+          "y": 0,
+        },
+        "centerTolM": 0.5,
+        "headingTolDeg": 10,
+        "holdSec": 1.5,
+        "maneuver": "parkInBay",
+      },
+      "titleBg": "Паркирай на заден ход в очертаното място и спри напълно",
+    },
+  ],
+  "order": 1000,
+  "parkingBay": {
+    "headingDeg": 90,
+    "lengthM": 5,
+    "widthM": 2.7,
+    "x": 5.03,
+    "y": 0,
+  },
+  "preDrive": false,
+  "spawn": {
+    "pointId": "lot-spawn-approach",
+  },
+  "titleBg": "Перпендикулярно паркиране на заден ход · Ниво 4 — Изпитни условия",
+  "traffic": {
+    "anchorRadiusM": 400,
+    "pedestrianCount": 0,
+    "vehicleCount": 0,
+  },
+  "vehicleStart": "cold",
+  "world": {
+    "districtId": "lot-perp-v1",
+  },
+}
+`;

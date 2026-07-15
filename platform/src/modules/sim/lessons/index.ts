@@ -10,6 +10,7 @@
 // Contract types lesson consumers need (owned by ../contracts.ts)
 export type {
   HudEvent,
+  LessonAidsSpec,
   LessonObjective,
   LessonSpec,
   NearMissEvent,
@@ -111,6 +112,48 @@ export {
   type QuizTuning,
   type TriggeredQuiz,
 } from "./quiz-trigger";
+
+// S0 Scenario Studio (doc 76) — ScenarioSpec v1 + compiler + rubric. A
+// scenario compiles INTO a LessonSpec; nothing else in this barrel changes.
+export {
+  DEFAULT_LEVEL_AIDS,
+  DOC72_ARCHETYPE_IDS,
+  LOT_PERP_TARGET_BAY,
+  MAP_ARCHETYPES,
+  SCENARIO_DEFAULT_TRAFFIC,
+  SCENARIO_FAMILIES,
+  SCENARIO_LESSON_ORDER,
+  SCENARIO_LEVEL_NAMES_BG,
+  SCENARIO_TEMPLATES,
+  SC_PARK_PERP_REV,
+  ScenarioCompileError,
+  ScenarioSpecError,
+  assertScenarioSpec,
+  compileScenario,
+  isDoc72ArchetypeId,
+  scenarioById,
+  scoreRubric,
+  serializeObjectiveParams,
+  validateScenarioSpec,
+  type ConditionAxis,
+  type LevelSpec,
+  type MapArchetype,
+  type MistakeDemo,
+  type RubricBreakdownLine,
+  type RubricObservationInput,
+  type RubricScore,
+  type RubricSpec,
+  type ScenarioFamily,
+  type ScenarioLevel,
+  type ScenarioObjectiveSpec,
+  type ScenarioSpec,
+  type ScenarioStart,
+  type ScenarioTeach,
+  type ScenarioTraffic,
+  type StepText,
+  type TraceRef,
+  type ValidateScenarioOptions,
+} from "./scenario";
 
 // Progression / unlock logic (+ the A13 exam gate)
 export {
