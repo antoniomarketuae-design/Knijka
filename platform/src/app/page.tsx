@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import "@/lib/content/loader";
 import { getContentRepo } from "@/lib/content/repo";
+import { EXAM_BANK_SIZE } from "@/modules/sim/lessons";
 import { Gauge } from "@/components/hud/Gauge";
 import {
   IconArrowRight,
@@ -15,10 +16,10 @@ import {
 export const metadata: Metadata = {
   title: "Книжка.AI — вземи книжка с AI учител до теб",
   description:
-    "AI академия за шофьорски изпит в България: адаптивна теория, пробни изпити 1:1 с официалния формат и AI учител, който отговаря с цитат от закона.",
+    "AI академия за шофьорски изпит в България: адаптивна теория, пробни изпити 1:1 с официалния формат, шофьорски симулатор с хиляди изпитни варианта и AI учител, който отговаря с цитат от закона.",
 };
 
-function buildFeatures(questionsLabel: string) {
+function buildFeatures(questionsLabel: string, examVariantsLabel: string) {
   return [
     {
       icon: IconBot,
@@ -34,8 +35,7 @@ function buildFeatures(questionsLabel: string) {
     {
       icon: IconWheel,
       titleBg: "Симулатор",
-      textBg:
-        "Кокпит шофиране в браузъра по реалната улична мрежа на Студентски град — уроци, изпитен режим и оценяване по официалната система.",
+      textBg: `Кокпит шофиране в браузъра: уроци + учебен полигон по реална улична мрежа и ${examVariantsLabel} изпитни варианта от реални пътни ситуации, оценявани по официалната система.`,
     },
   ] as const;
 }
@@ -80,7 +80,10 @@ export default function LandingPage() {
   const questionsRounded = Math.floor(questionCount / 100) * 100;
   const questionsLabel =
     questionsRounded >= 100 ? `над ${questionsRounded}` : `${questionCount}`;
-  const features = buildFeatures(questionsLabel);
+  // Same honesty rule for the sim exam bank (14 940 today, grows with data).
+  const examVariantsRounded = Math.floor(EXAM_BANK_SIZE / 100) * 100;
+  const examVariantsLabel = `над ${examVariantsRounded.toLocaleString("bg-BG")}`;
+  const features = buildFeatures(questionsLabel, examVariantsLabel);
 
   const telemetry = [
     {
@@ -94,6 +97,12 @@ export default function LandingPage() {
       label: "Банка",
       value: questionsLabel,
       sub: `въпроса · ${topicCount} теми`,
+    },
+    {
+      icon: IconWheel,
+      label: "Симулатор",
+      value: examVariantsLabel,
+      sub: "изпитни варианта · 2 карти",
     },
     {
       icon: IconShield,
@@ -190,9 +199,10 @@ export default function LandingPage() {
               </h1>
 
               <p className="mx-auto mt-6 max-w-xl text-base leading-relaxed text-muted sm:text-lg lg:mx-0">
-                Учи теорията като игра: адаптивни упражнения, серии и нива,
-                пробни изпити в официалния формат и учител, който обяснява всяка
-                грешка с цитат от закона.
+                Учи теорията като игра и карай в симулатора още преди първия
+                си час зад волана: адаптивни упражнения, пробни изпити в
+                официалния формат, хиляди изпитни шофьорски сценария и учител,
+                който обяснява всяка грешка с цитат от закона.
               </p>
 
               <div className="mt-8 flex flex-col items-center gap-3 sm:flex-row sm:justify-center lg:justify-start">
@@ -206,7 +216,7 @@ export default function LandingPage() {
               </div>
 
               {/* Trust row — telemetry readouts */}
-              <dl className="mt-10 grid grid-cols-1 gap-3 sm:grid-cols-3">
+              <dl className="mt-10 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
                 {telemetry.map(({ icon: Icon, label, value, sub }) => (
                   <div
                     key={label}
