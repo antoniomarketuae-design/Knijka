@@ -180,3 +180,23 @@ export {
   type ScJunction2TemplateId,
   type ScJunction2TraceName,
 } from "./scJunctions2";
+
+// S3-E — the lane-discipline authored drives (sc-ov-keep-right / sc-ov-lane-
+// keeping / sc-ov-oneway); committed traces are recordings of exactly these
+// scripts (gates: traces/__tests__/sc-ov-keep-right- / sc-ov-lane-keeping- /
+// sc-ov-oneway-traces).
+export {
+  SC_OV_KEEP_RIGHT_ID,
+  recordScOvKeepRightDrive,
+  type ScOvKeepRightTraceName,
+} from "./scOvKeepRight";
+export {
+  SC_OV_LANE_KEEPING_ID,
+  recordScOvLaneKeepingDrive,
+  type ScOvLaneKeepingTraceName,
+} from "./scOvLaneKeeping";
+export {
+  SC_OV_ONEWAY_ID,
+  recordScOvOneWayDrive,
+  type ScOvOneWayTraceName,
+} from "./scOvOneWay";

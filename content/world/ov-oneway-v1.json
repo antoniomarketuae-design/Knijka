@@ -1,0 +1,131 @@
+{
+ "format": "district-v1",
+ "meta": {
+  "district": "ov-oneway",
+  "label": "Учебна еднопосочна улица (сценарий OV-13)",
+  "mapKind": "scenario-street",
+  "generator": "tools/maps/gen_ov_oneway.mjs",
+  "boundsLocalMeters": {
+   "minX": -24.06,
+   "minY": 0,
+   "maxX": 10.0625,
+   "maxY": 300
+  },
+  "attribution": {
+   "text": "Учебна еднопосочна улица — оригинален параметричен дизайн (без данни от OpenStreetMap)",
+   "license": "All rights reserved",
+   "licenseUrl": "/",
+   "copyrightUrl": "/",
+   "obligation": "none — original work, no ODbL attribution required for this map"
+  },
+  "defaults": {
+   "maxspeedUrbanKmh": 50,
+   "note": "Еднопосочна улица: влизаш само по посока на движението; знакът В2 „Влизането забранено“ значи не влизаш."
+  },
+  "stats": {
+   "roadKm": 0.3,
+   "nodes": 2,
+   "edges": 1,
+   "intersections": 0,
+   "crossings": 0,
+   "buildings": 1,
+   "spawnPoints": 2
+  },
+  "scenario": {
+   "archetype": "straight-street",
+   "params": {
+    "lengthM": 300,
+    "maxspeedKmh": 50
+   },
+   "oneway": true,
+   "lanesPerDirection": 1,
+   "laneCenterM": 0
+  }
+ },
+ "roads": {
+  "nodes": [
+   {
+    "id": "ov-ow-n-end",
+    "x": 0,
+    "y": 300
+   },
+   {
+    "id": "ov-ow-n-start",
+    "x": 0,
+    "y": 0
+   }
+  ],
+  "edges": [
+   {
+    "id": "ov-ow-street",
+    "from": "ov-ow-n-start",
+    "to": "ov-ow-n-end",
+    "class": "residential",
+    "name": "Еднопосочна улица",
+    "oneway": true,
+    "roundabout": false,
+    "lanes": 1,
+    "lanesSource": "tag",
+    "maxspeed": 50,
+    "maxspeedSource": "tag",
+    "length": 300,
+    "geometry": [
+     [
+      0,
+      0
+     ],
+     [
+      0,
+      300
+     ]
+    ]
+   }
+  ]
+ },
+ "intersections": [],
+ "crossings": [],
+ "roundabouts": [],
+ "buildings": [
+  {
+   "id": "ov-ow-b-block",
+   "height": 7,
+   "heightSource": "default",
+   "footprint": [
+    [
+     -24.06,
+     150
+    ],
+    [
+     -12.06,
+     150
+    ],
+    [
+     -12.06,
+     168
+    ],
+    [
+     -24.06,
+     168
+    ]
+   ]
+  }
+ ],
+ "spawnPoints": [
+  {
+   "id": "ov-ow-spawn-entry",
+   "x": 0,
+   "y": 15,
+   "heading": 0,
+   "edgeId": "ov-ow-street",
+   "name": "Вход по посока на движението"
+  },
+  {
+   "id": "ov-ow-spawn-finish",
+   "x": 0,
+   "y": 285,
+   "heading": 0,
+   "edgeId": "ov-ow-street",
+   "name": "Контролна точка — край на улицата"
+  }
+ ]
+}
