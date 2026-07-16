@@ -31,6 +31,9 @@ const DEFAULT_ACCEL_MPS2 = 2.6;
 const DEFAULT_DECEL_MPS2 = 4.5;
 const DEFAULT_SLAM_DECEL_MPS2 = 7.5;
 const HOLD_DECEL_MPS2 = 8;
+/** Default laneShift glide duration, s (the FO-03 cut-in reads as one calm
+ *  lane change at urban speed — ~8 m of lateral travel over 1.5 s). */
+const DEFAULT_LANE_SHIFT_RAMP_SEC = 1.5;
 /** Player-guard corridor: brake for a player within this far ahead, m. */
 const GUARD_AHEAD_M = 16;
 /** Player-guard lateral half-width, m (~car width + margin). */
@@ -182,6 +185,14 @@ export interface StagedVehicleAgent {
   segHint: number;
   playerSegHint: number;
   finished: boolean;
+  /** Lateral channel (laneShift): current published offset right of the
+   *  resolved path, m. 0 for every actor never commanded — byte-identical
+   *  pre-laneShift publishing. */
+  lat: number;
+  /** laneShift target offset, m (== lat when no glide is running). */
+  latTarget: number;
+  /** Signed glide rate toward latTarget, m/s (0 = idle channel). */
+  latRate: number;
 }
 
 export interface StagedPedestrianAgent {
@@ -255,6 +266,9 @@ export function createStagedVehicle(
     segHint: 0,
     playerSegHint: 0,
     finished: false,
+    lat: 0,
+    latTarget: 0,
+    latRate: 0,
   };
   publishVehicle(agent);
   return agent;
@@ -329,12 +343,23 @@ export function applyStagedCommand(
         v.command.type = "brake";
         v.command.decelMps2 = command.decelMps2 ?? DEFAULT_SLAM_DECEL_MPS2;
         break;
+      case "laneShift": {
+        // Lateral channel only — the longitudinal command keeps driving speed.
+        const ramp = command.rampSec ?? DEFAULT_LANE_SHIFT_RAMP_SEC;
+        v.latTarget = command.toOffsetM;
+        v.latRate = ramp > 0 ? (v.latTarget - v.lat) / ramp : 0;
+        if (ramp <= 0) v.lat = v.latTarget; // degenerate ramp = instant
+        break;
+      }
       case "reset":
         v.command.type = "hold";
         v.s = v.holdS;
         v.speed = 0;
         v.segHint = 0;
         v.finished = false;
+        v.lat = 0;
+        v.latTarget = 0;
+        v.latRate = 0;
         publishVehicle(v);
         break;
     }
@@ -357,7 +382,7 @@ export function applyStagedCommand(
       publishPedestrian(p, 0);
       break;
     default:
-      break; // matchPlayer / brake are vehicle-only — ignore
+      break; // matchPlayer / brake / laneShift are vehicle-only — ignore
   }
 }
 
@@ -446,6 +471,18 @@ export function updateStagedVehicle(agent: StagedVehicleAgent, dt: number, env: 
     agent.finished = true;
   }
 
+  // 4b) Lateral glide (laneShift): pure dt integration toward the target,
+  // clamped so the channel parks exactly on it (idle channel = zero work).
+  if (agent.lat !== agent.latTarget && agent.latRate !== 0) {
+    const next = agent.lat + agent.latRate * dt;
+    agent.lat =
+      (agent.latRate > 0 && next >= agent.latTarget) ||
+      (agent.latRate < 0 && next <= agent.latTarget)
+        ? agent.latTarget
+        : next;
+    if (agent.lat === agent.latTarget) agent.latRate = 0;
+  }
+
   // Brake lights: an active slam, or actively slowing toward a lower target.
   agent.state.braking = cmd.type === "brake" || agent.speed > target + 0.3;
 
@@ -455,11 +492,24 @@ export function updateStagedVehicle(agent: StagedVehicleAgent, dt: number, env: 
 function publishVehicle(agent: StagedVehicleAgent): void {
   sampleLane(agent.path, agent.s, agent.segHint, samp);
   agent.segHint = samp.segHint;
-  agent.state.x = samp.x;
-  agent.state.y = samp.y;
+  // Lateral channel: offset the published pose to the RIGHT of travel
+  // (right normal of (dx, dy) is (dy, -dx) — the offsetPolyline convention).
+  // lat = 0 for every actor never laneShift-ed → byte-identical publishing.
+  agent.state.x = samp.x + samp.dirY * agent.lat;
+  agent.state.y = samp.y - samp.dirX * agent.lat;
   if (samp.dirX !== 0 || samp.dirY !== 0) {
-    agent.state.dirX = samp.dirX;
-    agent.state.dirY = samp.dirY;
+    if (agent.latRate !== 0 && agent.lat !== agent.latTarget && agent.speed > 0.1) {
+      // Mid-glide: publish the true velocity direction (path motion + the
+      // sideways glide) so the rig visually noses into the lane change.
+      const vx = samp.dirX * agent.speed + samp.dirY * agent.latRate;
+      const vy = samp.dirY * agent.speed - samp.dirX * agent.latRate;
+      const inv = 1 / Math.hypot(vx, vy);
+      agent.state.dirX = vx * inv;
+      agent.state.dirY = vy * inv;
+    } else {
+      agent.state.dirX = samp.dirX;
+      agent.state.dirY = samp.dirY;
+    }
   }
   agent.state.speedMps = agent.speed;
   const view = agent.view;

@@ -20,6 +20,7 @@
 import type {
   AmberDilemmaSpec,
   BrakingLeadCarSpec,
+  CutInLeadCarSpec,
   CyclistRightHookSpec,
   EmergencyApproachSpec,
   NarrowMeetingSpec,
@@ -27,6 +28,7 @@ import type {
   PedestrianDartOutSpec,
   PoliceStopSpec,
   PriorityFromRightSpec,
+  RearTailgaterSpec,
   RoundaboutEntrySpec,
   StagedEventOutcome,
   StagedEventSpec,
@@ -1763,6 +1765,317 @@ export class TrafficControllerRunner implements EventRunner {
 }
 
 // ---------------------------------------------------------------------------
+// 12. Cut-in lead car (doc 72 §9 FO-03 „Вклиняване" — the FOLLOWING family's
+//     cut-in actor). Choreography + measurement only: the actor paces the
+//     player from the ADJACENT lane (matchPlayer — slaved to the player's own
+//     progress, deterministic), then at the staged cut point locks a plain
+//     cruise and executes the traffic port's laneShift glide into the
+//     player's lane, landing ~paceAheadM of centers ahead — the stolen
+//     2-second cushion. GRADING IS 100% THE SHIPPED PIPELINE (doc 72: "the
+//     grading is fully ready"): FOLLOWING_TOO_CLOSE and its
+//     followRecoveryRateMps guard — the innocent stolen-gap phase (gap being
+//     re-opened) never bills, HOLDING the stolen gap bills exactly once, and
+//     a panic-slam is exempt because the cut-in itself is a forward cause in
+//     the harsh-brake ledger (the honest A12 read). The runner emits ONLY a
+//     collision on physical contact (rear-ending the cutter — the
+//     brakingLeadCar precedent); everything else is outcome measurement.
+// ---------------------------------------------------------------------------
+
+/** Bumper-gap threshold ratio + seconds mirrored from the rule engine's
+ * followFireRatio × followSafeSeconds — measurement only (the runner never
+ * emits off these; the reducer's own detector is the grade). */
+const CUTIN_SAFE_SECONDS = 1.8;
+const CUTIN_FIRE_RATIO = 0.7;
+const CUTIN_MIN_GAP_M = 4;
+/** Sustained sub-threshold hold that marks the outcome "violation", s —
+ * looser than the engine's 2 s sustain (measurement, biased innocent). */
+const CUTIN_HELD_SEC = 3;
+/** Gap opening at/above this = the driver is rebuilding, m/s (engine's
+ * followRecoveryRateMps). */
+const CUTIN_RECOVERY_MPS = 0.5;
+/** Player under this speed is not "holding at speed" (engine's follow floor), km/h. */
+const CUTIN_MIN_SPEED_KMH = 20;
+
+export class CutInLeadCarRunner implements EventRunner {
+  phase: StagedEventPhase = "idle";
+  outcome: StagedEventOutcome | null = null;
+  hazardActive = false;
+
+  private paceAheadM = 0;
+  private cutAtSec: number | null = null;
+  private approachSpeedKmh = 0;
+  private prevGapM: number | null = null;
+  private prevTSec: number | null = null;
+  private heldSince: number | null = null;
+  private sawHold = false;
+  private sawRecovery = false;
+
+  constructor(readonly spec: CutInLeadCarSpec) {}
+
+  stage(traffic: StagedTrafficPort, rng: Rng, firstTime: boolean): void {
+    const s = this.spec;
+    if (firstTime) {
+      const view = traffic.stage({
+        kind: "vehicle",
+        id: s.id,
+        pathNodes: s.actor.pathNodes,
+        hold: s.actor.hold,
+        cruiseSpeedMps: s.actor.cruiseSpeedMps,
+        // The ADJACENT lane (≤ 0 — a positive curb offset would tag the actor
+        // as a cyclist proxy, A11 vehicleCollisionKind).
+        extraRightOffsetM: s.actor.extraRightOffsetM,
+        colorIndex: s.actor.colorIndex,
+        profile: s.actor.profile,
+        playerGuard: true, // the player stays BEHIND the cutter — inert here,
+        // kept on as the house safety default
+      });
+      if (!view) throw new Error(`staged event ${s.id}: cut-in path failed to stage`);
+    } else {
+      traffic.stagedCommand(s.id, { type: "reset" });
+    }
+    this.paceAheadM = s.paceAheadM + (rng() * 2 - 1) * 1.0;
+    this.phase = "armed";
+    this.outcome = null;
+    this.cutAtSec = null;
+    this.approachSpeedKmh = 0;
+    this.prevGapM = null;
+    this.prevTSec = null;
+    this.heldSince = null;
+    this.sawHold = false;
+    this.sawRecovery = false;
+  }
+
+  step(traffic: StagedTrafficPort, input: DirectorInput, out: SimTickEvent[]): StagedEventOutcome | null {
+    const s = this.spec;
+    if (this.phase === "resolved") return null;
+    const actor = traffic.staged(s.id);
+    if (!actor) return null;
+
+    if (this.phase === "armed") {
+      // First player movement starts the adjacent-lane pacing (the
+      // brakingLeadCar spawn-corridor arming — the spawn IS the corridor).
+      if (input.speedKmh > 4) {
+        traffic.stagedCommand(s.id, {
+          type: "matchPlayer",
+          gapM: this.paceAheadM,
+          maxSpeedMps: s.maxMatchSpeedMps,
+        });
+        this.phase = "triggered";
+      }
+      return null;
+    }
+
+    // triggered — pacing alongside until the staged cut, then adjudicating.
+    if (this.cutAtSec === null) {
+      const atCutPoint = dist(actor.x, actor.y, s.cutAt.x, s.cutAt.y) <= s.cutRadiusM;
+      if (atCutPoint && input.speedKmh >= s.minCutSpeedKmh) {
+        // The cut: lock a PLAIN cruise (the player's lift must genuinely
+        // re-open the gap — matchPlayer would keep stealing it) and glide
+        // into the player's lane over the authored ramp.
+        traffic.stagedCommand(s.id, { type: "cruise", speedMps: s.cutSpeedMps });
+        traffic.stagedCommand(s.id, {
+          type: "laneShift",
+          toOffsetM: s.cutShiftM,
+          rampSec: s.cutRampSec,
+        });
+        this.cutAtSec = input.tSec;
+        this.approachSpeedKmh = input.speedKmh;
+      }
+      return null;
+    }
+
+    // Cut executed — the production FOLLOWING_TOO_CLOSE pipeline grades; the
+    // runner only measures and covers physical contact.
+    const centerGap = dist(input.x, input.y, actor.x, actor.y);
+    if (centerGap < VEHICLE_CONTACT_M && input.speedKmh + actor.speedMps * 3.6 > 5) {
+      out.push({ kind: "collision", withWhat: "vehicle" });
+      return this.resolve(input, false, "collision");
+    }
+    const bumperGap = Math.max(0, centerGap - LEAD_CAR_LENGTH_M);
+    const speedMps = input.speedKmh * KMH_TO_MPS;
+    const safeGapM = Math.max(CUTIN_MIN_GAP_M, speedMps * CUTIN_SAFE_SECONDS);
+    const dt = this.prevTSec !== null ? input.tSec - this.prevTSec : 0;
+    const opening =
+      this.prevGapM !== null && dt > 0 ? (bumperGap - this.prevGapM) / dt : 0;
+    this.prevGapM = bumperGap;
+    this.prevTSec = input.tSec;
+
+    const holding =
+      input.speedKmh >= CUTIN_MIN_SPEED_KMH &&
+      bumperGap < safeGapM * CUTIN_FIRE_RATIO &&
+      opening < CUTIN_RECOVERY_MPS;
+    if (holding) {
+      if (this.heldSince === null) this.heldSince = input.tSec;
+      if (input.tSec - this.heldSince >= CUTIN_HELD_SEC) this.sawHold = true;
+    } else {
+      this.heldSince = null;
+    }
+    if (bumperGap >= safeGapM * CUTIN_FIRE_RATIO && actor.speedMps > 1) {
+      this.sawRecovery = true; // the cushion is rebuilt (or never lost)
+    }
+
+    const actorAheadM = aheadOfPlayerM(input, actor.x, actor.y);
+    if (actorAheadM >= s.clearAheadM || actor.finished) {
+      return this.resolve(
+        input,
+        !this.sawHold,
+        this.sawHold ? "violation" : this.sawRecovery ? "yielded" : "clear",
+      );
+    }
+    return null;
+  }
+
+  private resolve(
+    input: DirectorInput,
+    success: boolean,
+    detail: StagedEventOutcome["detail"],
+  ): StagedEventOutcome {
+    this.phase = "resolved";
+    this.outcome = outcomeOf(this.spec, input, success, detail, {
+      ...(this.approachSpeedKmh > 0 ? { approachSpeedKmh: this.approachSpeedKmh } : {}),
+    });
+    return this.outcome;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// 13. Rear tailgater (doc 72 §9 FO-07 „Лепка отзад" — the FOLLOWING family's
+//     rear actor). PRESSURE SCENERY under the learn-only policy: the runner
+//     emits ZERO SimTick events, ever — no violation OR collision can grade
+//     from it (the policeStop discipline; an unmodelled duty must not
+//     convict, A12). The actor matchPlayer-paces a NEGATIVE gap (the
+//     emergencyApproach rear-sync precedent, in the player's OWN lane), holds
+//     the glued pose for pressureSec, then laneShift-passes on the left and
+//     drives off. The taught mistake (brake-check) grades through the
+//     SHIPPED HARSH_BRAKING_NO_CAUSE — a rear car is not a forward cause
+//     (the ledger reads only the forward leadGap channel); the taught
+//     response (ease off / grow the front gap) reads on the outcome only.
+//
+//     playerGuard OFF by design: the guard's stop-6-m-short corridor forbids
+//     the sub-6 m лепка pose. Safety is structural — the matchPlayer
+//     proportional law backs off as the gap error flips, and the authored
+//     decel cap (12 m/s²) out-brakes any player slam, so the actor stops
+//     inside its own cushion even against a 12 m/s² brake-check.
+// ---------------------------------------------------------------------------
+
+/** The tailgater's driveline caps — authored constants (not spec surface):
+ * decel must be ≥ the hero's max brake so a brake-check never produces a
+ * staged rear-end; accel keeps it glued through player speed changes. */
+const TAILGATER_DECEL_MPS2 = 12;
+const TAILGATER_ACCEL_MPS2 = 3.5;
+/** Latch window: glued once within followBehindM + this many meters, m. */
+const TAILGATER_LATCH_SLACK_M = 4;
+
+export class RearTailgaterRunner implements EventRunner {
+  phase: StagedEventPhase = "idle";
+  outcome: StagedEventOutcome | null = null;
+  hazardActive = false;
+
+  private releaseGapM = 0;
+  private followBehindM = 0;
+  private pressureSec = 0;
+  private latchedAt: number | null = null;
+  private latchSpeedKmh = 0;
+  private passCommanded = false;
+  private sawYield = false;
+
+  constructor(readonly spec: RearTailgaterSpec) {}
+
+  stage(traffic: StagedTrafficPort, rng: Rng, firstTime: boolean): void {
+    const s = this.spec;
+    if (firstTime) {
+      const view = traffic.stage({
+        kind: "vehicle",
+        id: s.id,
+        pathNodes: s.actor.pathNodes,
+        hold: s.actor.hold,
+        cruiseSpeedMps: s.actor.cruiseSpeedMps,
+        extraRightOffsetM: s.actor.extraRightOffsetM,
+        colorIndex: s.actor.colorIndex,
+        profile: s.actor.profile,
+        accelMps2: TAILGATER_ACCEL_MPS2,
+        decelMps2: TAILGATER_DECEL_MPS2,
+        playerGuard: false, // see the class doc — the лепка pose IS sub-guard
+      });
+      if (!view) throw new Error(`staged event ${s.id}: tailgater path failed to stage`);
+    } else {
+      traffic.stagedCommand(s.id, { type: "reset" });
+    }
+    this.releaseGapM = s.releaseGapM + (rng() * 2 - 1) * 2;
+    this.followBehindM = s.followBehindM + (rng() * 2 - 1) * 0.5;
+    this.pressureSec = s.pressureSec + (rng() * 2 - 1) * 0.5;
+    this.phase = "armed";
+    this.outcome = null;
+    this.latchedAt = null;
+    this.latchSpeedKmh = 0;
+    this.passCommanded = false;
+    this.sawYield = false;
+  }
+
+  step(traffic: StagedTrafficPort, input: DirectorInput, _out: SimTickEvent[]): StagedEventOutcome | null {
+    const s = this.spec;
+    if (this.phase === "resolved") return null;
+    const actor = traffic.staged(s.id);
+    if (!actor) return null;
+    const actorAheadM = aheadOfPlayerM(input, actor.x, actor.y);
+    const behindM = -actorAheadM;
+
+    if (this.phase === "armed") {
+      // Release once the player is genuinely ahead along the road and
+      // travelling the actor's direction (the emergencyApproach discipline).
+      const actorBearing = (Math.atan2(actor.dirX, actor.dirY) * 180) / Math.PI;
+      const delta = Math.abs((((actorBearing - input.headingDeg) % 360) + 540) % 360 - 180);
+      if (behindM >= this.releaseGapM && delta <= APPROACH_MAX_DEG) {
+        traffic.stagedCommand(s.id, {
+          type: "matchPlayer",
+          gapM: -this.followBehindM,
+          maxSpeedMps: s.maxMatchSpeedMps,
+        });
+        this.phase = "triggered";
+      }
+      return null;
+    }
+
+    // triggered — glued pressure, then the pass, then the resolution.
+    // NO adjudication and NO events: pressure scenery (learn-only, A12).
+    if (this.latchedAt === null) {
+      if (
+        !this.passCommanded &&
+        behindM > 0 &&
+        behindM <= this.followBehindM + TAILGATER_LATCH_SLACK_M
+      ) {
+        this.latchedAt = input.tSec;
+        this.latchSpeedKmh = input.speedKmh;
+      }
+    } else {
+      // Outcome measurement only: the taught ease-off (grow the front gap /
+      // shed guilt-free speed) latches "yielded" — nothing grades off it.
+      // Only the PRESSURE phase counts (easing after the pass began is just
+      // the drive winding down, not a response to the tailgater).
+      if (!this.passCommanded && input.speedKmh <= this.latchSpeedKmh - s.easeKmh) {
+        this.sawYield = true;
+      }
+      if (!this.passCommanded && input.tSec - this.latchedAt >= this.pressureSec) {
+        traffic.stagedCommand(s.id, { type: "cruise", speedMps: s.passSpeedMps });
+        traffic.stagedCommand(s.id, {
+          type: "laneShift",
+          toOffsetM: s.passShiftM,
+          rampSec: 1.5,
+        });
+        this.passCommanded = true;
+      }
+    }
+
+    if ((this.passCommanded && actorAheadM >= s.passAheadM) || actor.finished) {
+      this.phase = "resolved";
+      this.outcome = outcomeOf(this.spec, input, true, this.sawYield ? "yielded" : "clear");
+      return this.outcome;
+    }
+    return null;
+  }
+}
+
+// ---------------------------------------------------------------------------
 
 export function createRunner(
   spec: StagedEventSpec,
@@ -1791,5 +2104,9 @@ export function createRunner(
       return new PoliceStopRunner(spec);
     case "trafficController":
       return new TrafficControllerRunner(spec, signals);
+    case "cutInLeadCar":
+      return new CutInLeadCarRunner(spec);
+    case "rearTailgater":
+      return new RearTailgaterRunner(spec);
   }
 }

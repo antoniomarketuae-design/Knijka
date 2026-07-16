@@ -367,6 +367,27 @@ export {
   type ScFollowTruckTraceName,
 } from "./scFollowTruck";
 
+// Capability — the FO actor pair on ln-v1 (doc 72 FO-03 cut-in / FO-07
+// tailgater): sc-follow-cutin rides the NEW cutInLeadCar staged kind + the
+// traffic port's laneShift command (grading fully shipped —
+// FOLLOWING_TOO_CLOSE with the recovery-rate innocence guard);
+// sc-follow-tailgater rides the NEW rearTailgater pressure actor (learn-only,
+// zero emissions — the mistakes grade HARSH_BRAKING_NO_CAUSE /
+// SPEEDING_OVER_LIMIT off the player's own choices). Committed traces under
+// content/traces/<template>/ are recordings of exactly these scripts (gates:
+// traces/__tests__/sc-follow-cutin-traces, sc-follow-tailgater-traces).
+export {
+  SC_FOLLOW_CUTIN_ID,
+  recordScFollowCutinDrive,
+  recordScFollowCutinPanicSlamProbe,
+  type ScFollowCutinTraceName,
+} from "./scFollowCutin";
+export {
+  SC_FOLLOW_TAILGATER_ID,
+  recordScFollowTailgaterDrive,
+  type ScFollowTailgaterTraceName,
+} from "./scFollowTailgater";
+
 // Signals family — the dead/flashing-signal capability drives (sc-signal-dead /
 // sc-signal-flashing); the signal cluster is dialed DARK / flashing amber and
 // the junction falls back to the right-hand rule (doc 72 JU-20). Committed

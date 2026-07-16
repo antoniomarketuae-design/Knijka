@@ -392,7 +392,9 @@ export type StagedEventKind =
   | "narrowMeeting"
   | "emergencyApproach"
   | "policeStop"
-  | "trafficController";
+  | "trafficController"
+  | "cutInLeadCar"
+  | "rearTailgater";
 
 interface StagedEventBase {
   /** Unique per lesson, e.g. "l4-dart-out". */
@@ -764,6 +766,90 @@ export interface TrafficControllerSpec extends StagedEventBase {
   lineDistM: number;
 }
 
+/**
+ * Doc 72 FO-03 „Вклиняване" — the cut-in actor recipe: a car paces the player
+ * from the ADJACENT lane (author the actor path with extraRightOffsetM ≈ −one
+ * lane width; matchPlayer keeps it `paceAheadM` ahead so the encounter is
+ * slaved to the player's own progress), then at the staged cut point executes
+ * the traffic port's `laneShift` glide into the player's lane while locking a
+ * plain cruise — the 2-second cushion is STOLEN through no fault of the
+ * player's. GRADING IS FULLY SHIPPED (doc 72): the rule engine's
+ * FOLLOWING_TOO_CLOSE with its followRecoveryRateMps guard — the innocent
+ * stolen-gap phase never bills while the driver is re-opening the gap;
+ * HOLDING the stolen gap at speed bills exactly once. The runner emits ONLY
+ * a collision on physical contact (rear-ending the cutter — the
+ * brakingLeadCar precedent); its outcome is the additive measurement channel.
+ */
+export interface CutInLeadCarSpec extends StagedEventBase {
+  kind: "cutInLeadCar";
+  /** Adjacent-lane path (extraRightOffsetM ≈ −one lane width = the lane to
+   *  the player's LEFT; keep it ≤ 0 — a positive curb offset tags the actor
+   *  as a cyclist proxy, A11). */
+  actor: StagedActorPathSpec;
+  /** Center-to-center arc gap held AHEAD of the player while pacing in the
+   *  adjacent lane, m (± seeded jitter). */
+  paceAheadM: number;
+  maxMatchSpeedMps: number;
+  /** The staged cut point on the ACTOR's path (district space). */
+  cutAt: { x: number; y: number };
+  /** Actor within this of cutAt (with the player at speed) fires the cut, m. */
+  cutRadiusM: number;
+  /** Player must be at least this fast for the cut to trigger, km/h. */
+  minCutSpeedKmh: number;
+  /** Lateral laneShift executed at the cut, m rightward (≈ +one lane width —
+   *  into the player's lane, landing ~paceAheadM ahead of their bumper). */
+  cutShiftM: number;
+  /** laneShift glide duration, s. */
+  cutRampSec: number;
+  /** Cruise speed locked at the cut, m/s — a PLAIN cruise (not matchPlayer),
+   *  so the player's lift genuinely re-opens the gap (the graded recovery). */
+  cutSpeedMps: number;
+  /** Actor this far ahead of the player (player frame) = encounter over, m. */
+  clearAheadM: number;
+}
+
+/**
+ * Doc 72 FO-07 „Лепка отзад" — the rear-tailgater actor: matchPlayer with a
+ * NEGATIVE gap paces the actor 3–6 m of bumper behind the player in their OWN
+ * lane (the emergencyApproach rear-sync precedent, without the offset path).
+ * PRESSURE SCENERY under the learn-only policy (doc 72): the runner emits
+ * ZERO SimTick events — no violation can ever grade from it (the policeStop
+ * discipline). The taught response (ease off, grow the FRONT gap, let them
+ * pass) and the taught mistake (brake-check) grade through EXISTING channels:
+ * the front leadGap telemetry and HARSH_BRAKING_NO_CAUSE (a rear car is not a
+ * forward cause — the cause ledger only reads the forward gap channel).
+ * After `pressureSec` of glued pressure the actor laneShift-passes on the
+ * left and drives off — the situation resolves like the real one does.
+ *
+ * playerGuard is intentionally OFF for this actor (the guard's stop-6-m-short
+ * corridor would forbid the sub-6 m лепка pose); safety is the matchPlayer
+ * proportional controller itself (it backs off as the gap error flips) plus
+ * an authored decel cap that out-brakes any player slam.
+ */
+export interface RearTailgaterSpec extends StagedEventBase {
+  kind: "rearTailgater";
+  /** The player's own lane (extraRightOffsetM 0), path from behind the spawn. */
+  actor: StagedActorPathSpec;
+  /** Player this far ahead of the held actor (along its path) releases the
+   *  run, m (± seeded jitter). */
+  releaseGapM: number;
+  /** Center-to-center arc gap held BEHIND the player, m (positive; ± jitter).
+   *  ~9 m of centers ≈ 5 m of bumpers — the лепка. */
+  followBehindM: number;
+  maxMatchSpeedMps: number;
+  /** Glued pressure duration from the latch to the pass command, s (± jitter). */
+  pressureSec: number;
+  /** laneShift used for the pass, m (negative = the lane to the LEFT). */
+  passShiftM: number;
+  /** Cruise speed locked for the pass, m/s. */
+  passSpeedMps: number;
+  /** Actor this far ahead of the player = passed → resolve, m. */
+  passAheadM: number;
+  /** Outcome measurement only: easing ≥ this below the latch speed marks the
+   *  taught response ("yielded"), km/h. Nothing grades off it (learn-only). */
+  easeKmh: number;
+}
+
 export type StagedEventSpec =
   | PedestrianDartOutSpec
   | PriorityFromRightSpec
@@ -775,7 +861,9 @@ export type StagedEventSpec =
   | NarrowMeetingSpec
   | EmergencyApproachSpec
   | PoliceStopSpec
-  | TrafficControllerSpec;
+  | TrafficControllerSpec
+  | CutInLeadCarSpec
+  | RearTailgaterSpec;
 
 /**
  * Resolution record of one staged encounter (A8). The GRADING already

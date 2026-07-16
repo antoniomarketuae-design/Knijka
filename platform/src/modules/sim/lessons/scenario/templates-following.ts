@@ -34,15 +34,20 @@
  *
  * Doc-72 provenance: FO-01 and FO-02 are the two "Engine: ✅ FULL" archetypes
  * with a CLEANLY GRADABLE following fault. FO-05 (queue harmonics) is ✅ FULL
- * but LEARN-ONLY (penalty-free — no shadow+2-graded-mistakes mold); FO-03/07
- * (cut-in actor, tailgater actor) stay 🟡/🔴 for later waves. Since shipped
- * here beyond the original batch: FO-08 (standstill-gap rule), FO-04
- * (rain-follow config drill) and FO-06 (sc-follow-truck — the large-vehicle
+ * but LEARN-ONLY (penalty-free — no shadow+2-graded-mistakes mold). Since
+ * shipped here beyond the original batch: FO-08 (standstill-gap rule), FO-04
+ * (rain-follow config drill), FO-06 (sc-follow-truck — the large-vehicle
  * actor PROFILE: the same brakingLeadCar staged kind with `profile: "truck"`,
- * rendered as the procedural box-truck rig; leadGap detector unchanged).
+ * rendered as the procedural box-truck rig; leadGap detector unchanged), and
+ * the FO ACTOR PAIR on ln-v1 (needs the adjacent lane): FO-03 sc-follow-cutin
+ * (the cutInLeadCar staged kind + the traffic port's laneShift command —
+ * grading fully shipped: FOLLOWING_TOO_CLOSE with the recovery-rate innocence
+ * guard) and FO-07 sc-follow-tailgater (the rearTailgater pressure actor,
+ * learn-only — the mistakes grade the SHIPPED HARSH_BRAKING_NO_CAUSE /
+ * SPEEDING_OVER_LIMIT off the player's own choices).
  */
 
-import type { BrakingLeadCarSpec } from "../../contracts";
+import type { BrakingLeadCarSpec, CutInLeadCarSpec, RearTailgaterSpec } from "../../contracts";
 import type { ScenarioSpec } from "./types";
 
 // ---------------------------------------------------------------------------
@@ -647,6 +652,290 @@ export const SC_FOLLOW_TRUCK: ScenarioSpec = {
   localeBg: "bg-BG",
 };
 
+// ---------------------------------------------------------------------------
+// 6. sc-follow-cutin — „Вклиняване" (FO-03) on ln-v1 (the 400 m 2+2 boulevard,
+//    limit 50 — reused: the cut-in needs an adjacent lane to cut FROM). The
+//    FOLLOWING family's actor pair, part 1: the cut-in actor recipe.
+// ---------------------------------------------------------------------------
+
+/** ln-v1 northbound lane centers (meta.scenario; pinned by value — L7). */
+const CUT_RIGHT = 12.19;
+/** One drawn lane width on ln-v1 (3.25 m × perceptual scale 2.5), m — the
+ *  laneShift distance between the two northbound lane centers. */
+const CUT_LANE_SHIFT = 8.125;
+
+/**
+ * The staged CUT-IN CAR on ln-v1: paces the player from the LEFT lane
+ * (extraRightOffsetM −8.125 → x ≈ 4.06) pinned ~12 m of centers ahead
+ * (matchPlayer — slaved to the player's own progress), then at y = 150 locks
+ * a plain 11 m/s cruise and laneShift-glides one lane RIGHT over 1.5 s,
+ * landing in the player's lane ~8 m of bumpers ahead at ~40 km/h — the stolen
+ * cushion (~0.7 s where 2 s belong). GRADING IS FULLY SHIPPED (doc 72 FO-03):
+ * the recovery-rate guard keeps the stolen-gap phase innocent while the
+ * driver lifts and re-opens it; HOLDING it grades exactly FOLLOWING_TOO_CLOSE.
+ * The post-cut cruise is deliberately NOT matchPlayer — the player's lift
+ * must genuinely rebuild the gap, and a panic-slam stays unbilled because the
+ * cut-in itself is a forward cause in the harsh-brake ledger (A12, honest).
+ */
+const FC_CUTTER: CutInLeadCarSpec = {
+  id: "sc-fc-cutter",
+  kind: "cutInLeadCar",
+  actor: {
+    pathNodes: ["ln-n-start", "ln-n-end"],
+    hold: { nodeIndex: 0, offsetM: 30 }, // dormant ~15 m ahead-left of the spawn
+    cruiseSpeedMps: 11,
+    extraRightOffsetM: -CUT_LANE_SHIFT, // the LEFT lane (x ≈ 4.06)
+    colorIndex: 1,
+  },
+  paceAheadM: 12, // ~12 m of centers ahead in the adjacent lane (± jitter)
+  maxMatchSpeedMps: 15,
+  cutAt: { x: 4.0625, y: 150 }, // on the ACTOR's (left-lane) path, mid-street
+  cutRadiusM: 4,
+  minCutSpeedKmh: 25, // the ~40 km/h approach clears it — the cut fires
+  cutShiftM: CUT_LANE_SHIFT, // one lane RIGHT — into the player's lane
+  cutRampSec: 1.5,
+  cutSpeedMps: 11, // ~40 km/h locked cruise — the player's lift re-opens the gap
+  clearAheadM: 45,
+};
+
+/** FO-03 — вклиняване и възстановяване на дистанцията (ЗДвП чл. 23: дистанцията
+ *  се възстановява спокойно — открадната възглавница не се задържа). */
+export const SC_FOLLOW_CUTIN: ScenarioSpec = {
+  id: "sc-follow-cutin",
+  family: "following",
+  tagsBg: ["вклиняване", "дистанция", "възстановяване", "спокойна реакция"],
+  titleBg: "Вклиняване",
+  objectiveBg:
+    "Кола от съседната лента се вклинява на метри пред теб и открадва 2-секундната ти дистанция — без ти да си виновен. Умението, което се оценява: възстанови възглавницата спокойно — вдигни газта и изостани, без да задържаш открадната дистанция и без наказваща спирачка.",
+  archetypeIds: ["FO-03"],
+  conceptIds: ["c-following-distance", "c-safety-space", "c-reaction-time"],
+  map: {
+    archetype: "straight-street",
+    // Reuses the committed ln-v1 map — its meta.scenario.params, here for provenance.
+    params: { lengthM: 400, maxspeedKmh: 50 },
+    districtId: "ln-v1",
+  },
+  start: {
+    spawnPointId: "ln-spawn-start",
+    vehicleStart: "ready",
+  },
+  instructionsBg: [
+    { n: 1, textBg: "Потегли по булеварда в дясната лента — кола отляво се движи почти редом с теб." },
+    { n: 2, textBg: "Колата отляво се вклинява на метри пред теб. Това се случва всеки ден — не е по твоя вина." },
+    { n: 3, textBg: "Реагирай с газта, не със спирачката: вдигни крака и остави дистанцията да се отвори сама." },
+    { n: 4, textBg: "Не задържай открадната дистанция „по инерция“ и не я затваряй „за наказание“ — и двете са лепене." },
+    { n: 5, textBg: "Щом възглавницата от 2 секунди е възстановена, продължи спокойно до края на отсечката." },
+  ],
+  success: [
+    {
+      id: "sc-fc-approach",
+      titleBg: "Установи се спокойно преди вклиняването",
+      params: { kind: "reachZone", x: CUT_RIGHT, y: 110, radiusM: 10 },
+    },
+    {
+      id: "sc-fc-rebuild",
+      titleBg: "Възстанови дистанцията след вклиняването",
+      // The shadow passes here mid-rebuild at ~28 km/h — the lifted-throttle
+      // posture; the gap grading itself is the rule engine's job
+      // (FOLLOWING_TOO_CLOSE + the recovery-rate innocence guard).
+      params: { kind: "reachZone", x: CUT_RIGHT, y: 235, radiusM: 10, maxSpeedKmh: 34 },
+    },
+    {
+      id: "sc-fc-finish",
+      titleBg: "Стигни края на отсечката",
+      params: { kind: "reachZone", x: CUT_RIGHT, y: 340, radiusM: 12 },
+    },
+  ],
+  rubric: { parTimeSec: 80 },
+  shadow: { path: "content/traces/sc-follow-cutin/shadow-correct.trace.json" },
+  mistakes: [
+    {
+      traceRef: { path: "content/traces/sc-follow-cutin/mistake-hold-gap.trace.json" },
+      titleBg: "Лепене по инерция",
+      whatWentWrongBg:
+        "Колата се вклини на метри отпред, а водачът просто продължи с непроменена скорост — под секунда дистанция на 40 км/ч, километър след километър. Вклиняването не е по твоя вина, но задържането на открадната дистанция вече е: това е лепене като всяко друго. Вдигни газта и остави възглавницата да се възстанови.",
+      codeRefs: ["FOLLOWING_TOO_CLOSE"],
+    },
+    {
+      traceRef: { path: "content/traces/sc-follow-cutin/mistake-squeeze.trace.json" },
+      titleBg: "Затваряне „за наказание“",
+      whatWentWrongBg:
+        "Вместо да отстъпи, водачът ускори след вклинилия се и затвори дистанцията още повече — броени метри броня в броня на 45 км/ч. „Наказателното“ лепене не връща нищо: то само залепя два автомобила без никакво време за реакция. Дистанцията се възстановява назад, не напред.",
+      codeRefs: ["FOLLOWING_TOO_CLOSE"],
+    },
+  ],
+  teach: {
+    whenBg:
+      "На всеки булевард с две и повече ленти в посока: пред отбивки, преди завои, на всяко пренареждане. Вклиняването е ежедневие — въпросът не е дали ще ти се случи, а какво правиш в първите две секунди след него.",
+    whyBg:
+      "Открадната дистанция е най-честият невинен път към удар отзад: ти не си сгрешил, но караш с 0,7 секунди възглавница. Инстинктите предлагат две грешки — да не отстъпиш (лепене) или да набиеш спирачка (капан за движещия се зад теб). Правилният рефлекс е третият: вдигната газ и търпение — дистанцията се връща за секунди без нито едно рязко движение.",
+    lawRef: "ЗДвП чл. 23",
+    examinerBg:
+      "Изпитващият гледа реакцията, не вклиняването: плавно вдигане на газта и възстановена дистанция е точното поведение; задържането на къса дистанция след вклиняване се отчита като несъобразена дистанция, а рязката спирачка без причина — като създаване на предпоставка за удар.",
+  },
+  levels: [
+    { level: 1 },
+    { level: 2 },
+    { level: 3 },
+    { level: 4, vehicleStart: "cold" },
+  ],
+  staged: [FC_CUTTER],
+  conditions: { weather: "dry" },
+  localeBg: "bg-BG",
+};
+
+// ---------------------------------------------------------------------------
+// 7. sc-follow-tailgater — „Лепка отзад" (FO-07) on ln-v1 (reused 400 m 2+2
+//    boulevard) — the FOLLOWING family's actor pair, part 2: the rear actor.
+// ---------------------------------------------------------------------------
+
+/**
+ * The FRONT LEAD for sc-follow-tailgater: a constant-speed cruiser far ahead —
+ * the shipped brakingLeadCar kind with the followGapM-ABOVE-ACTUAL trick
+ * (followGapM 150 against an ~80 m real gap keeps the matchPlayer target
+ * permanently above the cap, so the lead cruises at a CONSTANT 11.5 m/s and
+ * never tracks the player). That constancy is the point: when the player
+ * eases off, the FRONT gap genuinely grows — the taught FO-07 response made
+ * visible on the leadGap telemetry — and at the mistake's brake-check moment
+ * the lead sits ~90 m of bumpers ahead, far outside the harsh-brake ledger's
+ * 45 m cause window (the slam has NO forward cause, honestly). The slam tier
+ * is authored out of reach (slamAt past the road end, minSlamSpeedKmh 250).
+ */
+const FTG_LEAD: BrakingLeadCarSpec = {
+  id: "sc-ftg-lead",
+  kind: "brakingLeadCar",
+  actor: {
+    pathNodes: ["ln-n-start", "ln-n-end"],
+    hold: { nodeIndex: 0, offsetM: 110 }, // dormant ~95 m ahead of the spawn
+    cruiseSpeedMps: 11,
+    extraRightOffsetM: 0, // the player's OWN lane (northbound right, x ≈ 12.19)
+    colorIndex: 2,
+  },
+  followGapM: 150, // ABOVE the real ~95 m gap → target always over the cap…
+  maxMatchSpeedMps: 11.5, // …so the lead cruises at a constant 11.5 m/s (~41 km/h)
+  slamAt: { x: 12.19, y: 520 }, // far past the 400 m road — never reached
+  slamRadiusM: 2,
+  slamDecelMps2: 6,
+  minSlamSpeedKmh: 250, // the slam tier is authored out of reach…
+  proximityFallbackM: 0.3, // …and the proximity fallback cannot occur (gap ≥ ~50 m)
+  triggersHazard: false,
+  resumeAfterSec: 3,
+};
+
+/**
+ * The staged TAILGATER on ln-v1: released once the player pulls ~20 m ahead,
+ * it matchPlayer-paces a NEGATIVE gap — ~9 m of centers (≈ 5 m of bumpers)
+ * BEHIND the player in their OWN lane, the „лепка" pose (the emergencyApproach
+ * rear-sync precedent without the offset path; playerGuard off — see the
+ * RearTailgaterSpec doc, safety is the proportional law + a 12 m/s² decel cap
+ * that out-brakes any player slam). PRESSURE SCENERY: the runner emits ZERO
+ * events (learn-only policy, doc 72 FO-07) — the graded surfaces are the
+ * player's own choices: the brake-check grades the SHIPPED
+ * HARSH_BRAKING_NO_CAUSE (a rear car is not a forward cause), guilty speeding
+ * grades SPEEDING_OVER_LIMIT, and the taught ease-off shows up as the growing
+ * front gap. After ~12 s of pressure it laneShift-passes on the left.
+ */
+const FTG_TAILGATER: RearTailgaterSpec = {
+  id: "sc-ftg-tail",
+  kind: "rearTailgater",
+  actor: {
+    pathNodes: ["ln-n-start", "ln-n-end"],
+    hold: { nodeIndex: 0, offsetM: 2 }, // dormant ~13 m behind the spawn
+    cruiseSpeedMps: 14,
+    extraRightOffsetM: 0, // the player's OWN lane
+    colorIndex: 3,
+  },
+  releaseGapM: 20,
+  followBehindM: 9, // ~9 m of centers ≈ 5 m of bumpers — glued (± jitter)
+  maxMatchSpeedMps: 18, // 65 km/h — the pressure keeps up even with a speeder
+  pressureSec: 12,
+  passShiftM: -CUT_LANE_SHIFT, // the pass runs one lane LEFT
+  passSpeedMps: 17,
+  passAheadM: 25,
+  easeKmh: 8,
+};
+
+/** FO-07 — лепка отзад (ЗДвП чл. 23 — дистанцията НАПРЕД се увеличава, за да
+ *  поеме и грешката на движещия се отзад; чл. 20, ал. 1 — водачът е длъжен да
+ *  контролира превозното средство, а не да „възпитава“ със спирачката). */
+export const SC_FOLLOW_TAILGATER: ScenarioSpec = {
+  id: "sc-follow-tailgater",
+  family: "following",
+  tagsBg: ["лепка отзад", "дистанция", "спокойна реакция", "пропускане"],
+  titleBg: "Лепка отзад",
+  objectiveBg:
+    "Агресивна кола се лепи на метри зад теб. Правилният отговор няма нищо общо с нея: вдигни газта, увеличи дистанцията НАПРЕД и я остави да те изпревари. Спирачният удар „за урок“ е точно обратното — предпоставка за удар отзад, в който пострадалият си ти.",
+  archetypeIds: ["FO-07"],
+  conceptIds: ["c-following-distance", "c-safety-space", "c-general-care-duty"],
+  map: {
+    archetype: "straight-street",
+    // Reuses the committed ln-v1 map — its meta.scenario.params, here for provenance.
+    params: { lengthM: 400, maxspeedKmh: 50 },
+    districtId: "ln-v1",
+  },
+  start: {
+    spawnPointId: "ln-spawn-start",
+    vehicleStart: "ready",
+  },
+  instructionsBg: [
+    { n: 1, textBg: "Потегли по булеварда в дясната лента и се установи на спокойна скорост." },
+    { n: 2, textBg: "В огледалото се появява кола, залепена на метри зад теб. Не е приятно — и не е твой проблем за решаване със спирачка." },
+    { n: 3, textBg: "Вдигни газта плавно и увеличи дистанцията НАПРЕД: тя поема и твоето спиране, и грешката на лепката." },
+    { n: 4, textBg: "Не ускорявай гузно и не натискай спирачката „за урок“ — и двете само влошават положението." },
+    { n: 5, textBg: "Дръж десния край на лентата и я остави да те изпревари — после продължи спокойно до края." },
+  ],
+  success: [
+    {
+      id: "sc-ftg-ease",
+      titleBg: "Успокой темпото и увеличи дистанцията напред",
+      // The shadow passes here mid-ease (~28 km/h) with the front gap visibly
+      // growing — the taught response as a completion posture.
+      params: { kind: "reachZone", x: CUT_RIGHT, y: 200, radiusM: 10, maxSpeedKmh: 36 },
+    },
+    {
+      id: "sc-ftg-finish",
+      titleBg: "Стигни края на отсечката",
+      params: { kind: "reachZone", x: CUT_RIGHT, y: 340, radiusM: 12 },
+    },
+  ],
+  rubric: { parTimeSec: 85 },
+  shadow: { path: "content/traces/sc-follow-tailgater/shadow-correct.trace.json" },
+  mistakes: [
+    {
+      traceRef: { path: "content/traces/sc-follow-tailgater/mistake-brake-check.trace.json" },
+      titleBg: "Спирачен удар „за урок“",
+      whatWentWrongBg:
+        "С лепка на метри отзад водачът наби спирачките до дупка на празна улица — „да се научи“. Пред колата няма абсолютно нищо: това е рязко спиране без причина, което сам подготвя удара отзад и по закон е точно създаване на предпоставка за ПТП. Спирачката не е възпитателно средство — дистанцията напред е.",
+      codeRefs: ["HARSH_BRAKING_NO_CAUSE"],
+    },
+    {
+      traceRef: { path: "content/traces/sc-follow-tailgater/mistake-speed-up.trace.json" },
+      titleBg: "Гузно ускоряване",
+      whatWentWrongBg:
+        "Заради натиска отзад водачът вдигна над 55 км/ч в ограничение 50 — „да не пречи“. Лепката просто дойде със скоростта, а нарушението остана за теб: ограничението не се предоговаря от огледалото. Скоростта не решава лепката — решава я увеличената дистанция напред и пропускането.",
+      codeRefs: ["SPEEDING_OVER_LIMIT"],
+    },
+  ],
+  teach: {
+    whenBg:
+      "Всеки път, когато някой се залепи отзад — на булевард, по тъмно, в колона. Колкото по-агресивен е отзад, толкова по-спокоен трябва да си ти отпред: цялата ти защита е пространството ПРЕД теб.",
+    whyBg:
+      "При удар отзад тялото на предния поема камшичния удар — лепката е опасност преди всичко за теб. Спирачният удар „за урок“ е най-лошият възможен ход: превръща потенциален удар в почти сигурен и прехвърля вината върху теб. Увеличената предна дистанция ти дава мек спирачен профил — можеш да спреш плавно и лепката има време да реагира; пропускането решава проблема окончателно.",
+    lawRef: "ЗДвП чл. 23",
+    examinerBg:
+      "Изпитващият не оценява чуждото лепене — оценява твоя отговор: запазено спокойствие, плавно увеличаване на дистанцията напред, десен край на лентата и пропускане. Рязко спиране без причина пред следващ те автомобил е опасно поведение; гузното превишаване е просто превишаване.",
+  },
+  levels: [
+    { level: 1 },
+    { level: 2 },
+    { level: 3 },
+    { level: 4, vehicleStart: "cold" },
+  ],
+  staged: [FTG_LEAD, FTG_TAILGATER],
+  conditions: { weather: "dry" },
+  localeBg: "bg-BG",
+};
+
 /** The following-family templates, in catalog order (registered in
  *  templates.ts). */
 export const SCENARIO_TEMPLATES_FOLLOWING: readonly ScenarioSpec[] = [
@@ -655,4 +944,6 @@ export const SCENARIO_TEMPLATES_FOLLOWING: readonly ScenarioSpec[] = [
   SC_FOLLOW_STANDSTILL,
   SC_FOLLOW_RAIN_GAP,
   SC_FOLLOW_TRUCK,
+  SC_FOLLOW_CUTIN,
+  SC_FOLLOW_TAILGATER,
 ];

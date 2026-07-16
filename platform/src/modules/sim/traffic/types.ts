@@ -349,11 +349,24 @@ export type StagedCommand =
    *  dormant pedestrian into its walk. */
   | { type: "cruise"; speedMps?: number }
   /** Vehicles only: regulate speed to hold `gapM` meters ahead of the player
-   *  (projected onto the actor's path). */
+   *  (projected onto the actor's path). NEGATIVE gapM paces BEHIND the player
+   *  (doc 72 FO-07 — the rear-tailgater recipe; same proportional law). */
   | { type: "matchPlayer"; gapM: number; maxSpeedMps: number }
   /** Vehicles only: brake-slam at `decelMps2` (default 7.5) to a stop; holds
    *  the stop and suppresses the player guard (already braking). */
   | { type: "brake"; decelMps2?: number }
+  /**
+   * Vehicles only: the staged LANE-CHANGE mechanic (doc 72 FO-03 cut-in /
+   * FO-07 tailgater pass — the "small traffic-port addition"). Ramps the
+   * actor's PUBLISHED lateral offset (m, positive = right of its resolved
+   * path) linearly to `toOffsetM` over `rampSec` (default 1.5 s). This is a
+   * separate LATERAL channel: the active longitudinal command (cruise /
+   * matchPlayer / brake) keeps governing speed while the glide runs, so
+   * "cruise + laneShift" IS the cut-in. Deterministic (pure dt integration,
+   * no RNG); `reset` clears it with the rest of the pose. Pedestrians ignore
+   * it (like matchPlayer/brake).
+   */
+  | { type: "laneShift"; toOffsetM: number; rampSec?: number }
   /** Teleport back to the dormant hold pose (re-stage on retry). */
   | { type: "reset" };
 
