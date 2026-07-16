@@ -39,6 +39,13 @@
  * archetypes gradable from the shipped headlight detectors. AC-03..AC-13 need an
  * oncoming actor, a fog/friction condition or a dazzle channel and are 🟡
  * PARTIAL or 🔴 NEW — left for later waves.
+ *
+ * ADR-006 stage 4a adds sc-ac-wet-braking — the FIRST template on the opt-in
+ * wet-grip physics slice (LessonSpec.physics.wetGrip ← ScenarioSpec.physics):
+ * the friction-model slice of the doc-72 AC-07 subsystem (wet braking distance
+ * ~1.4×; the standing-water aquaplane FLOAT itself, and AC-08/12 ice/crosswind,
+ * remain Phase-4 work). See that template's header for the dual-channel
+ * honesty note (live physics vs authored kinematic demos).
  */
 
 import type { BrakingLeadCarSpec } from "../../contracts";
@@ -349,10 +356,145 @@ export const SC_AC_HIGHBEAM_LEAD: ScenarioSpec = {
   localeBg: "bg-BG",
 };
 
+// ---------------------------------------------------------------------------
+// 4. sc-ac-wet-braking — „Спирачен път на мокро" (AC-07 friction slice) on
+//    ac-rain-v1 (360 m straight street, limit 50, DAY rain, WET-GRIP PHYSICS)
+// ---------------------------------------------------------------------------
+
+/** The stop mark of sc-ac-wet-braking: the shadow eases to a full stop here,
+ *  ~5.7 m short of the stopped van at y = 310 (nose 302.02 vs the van's rear
+ *  face at 307.75). Denormalized from ac-rain-v1 (lane x = 4.06). */
+const WET_STOP_MARK_Y = 300;
+
+/**
+ * AC-07 (friction slice) — спирачен път на мокър път (ЗДвП чл. 20 ал. 2:
+ * скоростта се съобразява с атмосферните условия и състоянието на пътя, така
+ * че водачът да може да спре пред всяко предвидимо препятствие; чл. 23 —
+ * дистанция, която позволява да избегне удар).
+ *
+ * THE PHYSICS IS THE LESSON (the first opt-in wet-grip template):
+ *  - `physics.wetGrip` compiles to LessonSpec.physics.wetGrip → the LIVE
+ *    student car runs at tuning.WET_GRIP_FACTOR (0.7): tyre μ and brake force
+ *    scale down, measured braking distance × ~1.42 from 50 km/h
+ *    (vehicle/wet-grip.test.ts). Braking „where the dry habit says" no longer
+ *    stops the car in time — exactly the mistake the demos show.
+ *  - DUAL-CHANNEL HONESTY: the recorded demos are KINEMATIC (authored decel
+ *    envelopes — the recorder never runs VehicleSim), so the wet truth is
+ *    AUTHORED into them: every stop ramp uses SCRIPT_DECEL × WET_GRIP_FACTOR
+ *    (traces/scAcWetBraking.ts), the same ~0.7 scaling the live car obeys.
+ *    Ghost and student therefore brake to the same envelope, by construction
+ *    on one side and by physics on the other.
+ *  - DELIBERATELY NOT coupled to weather="rain" alone: sc-ac-rain-lights and
+ *    every other shipped rain lesson stay on dry physics (their tuning and
+ *    recordings predate the slice); only this template AUTHORS the flag.
+ *
+ * Like the sc-pk-smooth-stop mold, the stopped van is a RECORDER obstacle
+ * rect (trace channel), not a live prop — the live student's graded skill is
+ * the low-speed stop-mark zone; the collision consequence is demonstrated by
+ * the red ghosts.
+ */
+export const SC_AC_WET_BRAKING: ScenarioSpec = {
+  id: "sc-ac-wet-braking",
+  family: "conditions",
+  tagsBg: ["условия", "дъжд", "спирачен път", "мокър път", "съобразена скорост"],
+  titleBg: "Спирачен път на мокро",
+  objectiveBg:
+    "Спри плавно на маркираната позиция зад спрелия автомобил в дъжда — на мокър път спирачният път е около 1,4 пъти по-дълъг, затова вдигаш газта по-рано и спираш по-меко, отколкото на сухо.",
+  archetypeIds: ["AC-07"],
+  conceptIds: ["c-braking-distance", "c-stopping-distance-total", "c-rain-aquaplaning"],
+  map: {
+    archetype: "straight-street",
+    // Reuses the committed ac-rain-v1 map (a plain 1+1 straight street) — its
+    // meta.scenario.params, mirrored here for provenance.
+    params: { lengthM: 360, maxspeedKmh: 50 },
+    districtId: "ac-rain-v1",
+  },
+  start: {
+    spawnPointId: "ac-rain-spawn-approach",
+    vehicleStart: "ready",
+  },
+  instructionsBg: [
+    { n: 1, textBg: "Вали: включи късите светлини и потегли със съобразена за дъжда скорост — около 38 км/ч." },
+    {
+      n: 2,
+      textBg:
+        "Напред в лентата е спрял автомобил. Ще спреш плавно на маркираната позиция на няколко метра зад него.",
+    },
+    {
+      n: 3,
+      textBg:
+        "На мокър път гумите държат по-слабо: спирачният път е около 1,4 пъти по-дълъг, отколкото на сухо.",
+    },
+    {
+      n: 4,
+      textBg:
+        "Затова вдигни газта много по-рано, отколкото ти казва сухият навик, и натисни спирачката меко и постепенно.",
+    },
+    { n: 5, textBg: "Спри напълно на позицията, с дистанция до спрелия отпред, и задръж колата." },
+  ],
+  success: [
+    {
+      id: "sc-acw-approach",
+      titleBg: "Приближи със съобразена за дъжда скорост",
+      // Under the 0.85 × 50 = 42.5 km/h rain envelope — the adapted approach.
+      params: { kind: "reachZone", x: LANE_X, y: 150, radiusM: 12, maxSpeedKmh: 42 },
+    },
+    {
+      id: "sc-acw-mark",
+      titleBg: "Спри точно на маркираната позиция",
+      // Completable ONLY at near-stop speed at the mark (the pk-smooth-stop
+      // discipline): a car that brakes at the dry-habit point blows through
+      // this zone at speed — on wet physics it simply cannot rest here.
+      params: { kind: "reachZone", x: LANE_X, y: WET_STOP_MARK_Y, radiusM: 4, maxSpeedKmh: 6 },
+    },
+  ],
+  rubric: { parTimeSec: 70 },
+  // RECORDED: committed deterministic recordings of the authored scripts in
+  // traces/scAcWetBraking.ts; gates in traces/__tests__/
+  // sc-ac-wet-braking-traces.test.ts (re-record with RECORD_TRACES=1).
+  shadow: { path: "content/traces/sc-ac-wet-braking/shadow-correct.trace.json" },
+  mistakes: [
+    {
+      traceRef: { path: "content/traces/sc-ac-wet-braking/mistake-dry-point.trace.json" },
+      titleBg: "Спирачка „като на сухо“",
+      whatWentWrongBg:
+        "Водачът кара със съобразена скорост, но натисна спирачката там, където сухият навик казва, че стига — на мокрия път същата спирачка спира колата около 1,4 пъти по-дълго и тя се претърколи в спрелия отпред автомобил. На мокро вдигаш газта и спираш по-рано (чл. 20, ал. 2).",
+      codeRefs: ["COLLISION"],
+    },
+    {
+      traceRef: { path: "content/traces/sc-ac-wet-braking/mistake-dry-speed.trace.json" },
+      titleBg: "Кара като на сухо — 50 в дъжда",
+      whatWentWrongBg:
+        "Колата носеше 50 км/ч в дъжда — „нали е в ограничението“ — а несъобразената с мокрия път скорост удължи спирачния път двойно спрямо очакваното: ударът в спрелия отпред стана неизбежен. Ограничението е таван за сухо; в дъжд скоростта се съобразява надолу (чл. 20, ал. 2).",
+      codeRefs: ["COLLISION", "SPEED_TOO_FAST_FOR_CONDITIONS"],
+    },
+  ],
+  teach: {
+    whenBg:
+      "При всяко спиране на мокър път — зад спрял автомобил, на светофар, пред пътека. Правилото: щом пътят е мокър, вдигаш газта по-рано и започваш да спираш там, където на сухо още не би — мократа настилка държи около 70% от сухото сцепление.",
+    whyBg:
+      "Спирачният път расте обратно на сцеплението: на мокро същата спирачка спира колата около 1,4 пъти по-дълго, а сухият навик „знае“ точката за спиране грешно. Повечето удари отзад в дъжда са точно това — спирачка, натисната на сухата точка. Който брои мокрия път в главата си, спира преди препятствието, не в него.",
+    lawRef: "ЗДвП чл. 20, ал. 2",
+    examinerBg:
+      "Изпитващият следи дали „четеш“ настилката: в дъжд очаква по-ниска скорост, по-ранно вдигане на газта и по-дълга дистанция за спиране. Несъобразената с мокрия път скорост е грешка, а спирането в препятствие прекратява изпита.",
+  },
+  levels: [
+    { level: 1 },
+    { level: 2 },
+    { level: 3 },
+    { level: 4, vehicleStart: "cold" },
+  ],
+  conditions: { weather: "rain" },
+  // THE SLICE: the live student car runs wet-grip physics (opt-in, authored).
+  physics: { wetGrip: true },
+  localeBg: "bg-BG",
+};
+
 /** The adverse-conditions-family templates, in catalog order (registered in
  *  templates.ts). */
 export const SCENARIO_TEMPLATES_CONDITIONS: readonly ScenarioSpec[] = [
   SC_AC_NIGHT_LIGHTS,
   SC_AC_RAIN_LIGHTS,
   SC_AC_HIGHBEAM_LEAD,
+  SC_AC_WET_BRAKING,
 ];

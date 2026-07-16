@@ -264,6 +264,15 @@ export function validateScenarioSpec(
     }
   }
 
+  // -- Physics opt-in (ADR-006 stage 4a): boolean when present.
+  if (spec.physics !== undefined) {
+    if (typeof spec.physics !== "object" || spec.physics === null) {
+      errors.push(`physics must be an object ({ wetGrip?: boolean }) when present`);
+    } else if (spec.physics.wetGrip !== undefined && typeof spec.physics.wetGrip !== "boolean") {
+      errors.push(`physics.wetGrip must be boolean when present`);
+    }
+  }
+
   return errors;
 }
 

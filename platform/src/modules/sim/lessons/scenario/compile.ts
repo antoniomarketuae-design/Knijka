@@ -196,6 +196,9 @@ export function compileScenario(spec: ScenarioSpec, level: ScenarioLevel): Lesso
     // Config-gated drills: carry the detector opt-in to the LIVE session so
     // the student's own attempt grades the taught fault (not only the shadow).
     ...(spec.ruleConfig ? { ruleConfig: spec.ruleConfig } : {}),
+    // 4a physics opt-in (the ruleConfig pattern): only a template that AUTHORS
+    // physics.wetGrip flips the live car to wet grip — rain alone never does.
+    ...(spec.physics?.wetGrip ? { physics: { wetGrip: true } } : {}),
   };
 
   const aids = mergeAids(level, rung.aids);

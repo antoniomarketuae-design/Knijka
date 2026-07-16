@@ -400,7 +400,15 @@ export interface RecordedDrive {
  *  decimation lands exactly on the 20 Hz grid. */
 const SCRIPT_DT = 1 / 60;
 const SCRIPT_ACCEL = 2.2; // m/s² — the C1 bot's comfortable rates
-const SCRIPT_DECEL = 4.6;
+/**
+ * Default comfortable braking rate of the kinematic recorder, m/s² (the C1
+ * bot's dry rate; per-step override via DriveStep.maxDecelMps2). EXPORTED
+ * (4a) so wet-surface trace scripts can author their demo envelope from the
+ * same constant the dry demos implicitly use (e.g. SCRIPT_DECEL ×
+ * WET_GRIP_FACTOR) — the recorder itself is kinematic and NEVER reads the
+ * live physics gripFactor; the ghost's honesty is authored.
+ */
+export const SCRIPT_DECEL = 4.6;
 
 function wrap180(d: number): number {
   while (d > 180) d -= 360;

@@ -41,6 +41,7 @@ import {
   DEFAULT_DIFFICULTY,
   DIFFICULTY_ORDER,
   DIFFICULTY_PRESETS,
+  WET_GRIP_FACTOR,
   type DifficultyMode,
   type DrivelineEvent,
   type DrivelineRejection,
@@ -862,6 +863,10 @@ function ReadyScene({
                 // absent = the street nudge tolerance (default 10).
                 collisionMinKmh={lesson.collisionMinKmh}
                 night={isNight}
+                // 4a: the OPT-IN wet-grip physics. Read from the AUTHORED
+                // physics field only — never derived from environment.rain
+                // (shipped rain lessons were tuned against dry physics).
+                gripFactor={lesson.physics?.wetGrip ? WET_GRIP_FACTOR : 1}
               />
             </CockpitInteractionContext.Provider>
             {/* S1: precise hittable parked cars from the lot's occupancy —

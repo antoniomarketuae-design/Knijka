@@ -12,7 +12,12 @@ export {
   chassisMassProperties,
   IDLE_INPUT,
 } from "./VehicleSim";
-export type { VehicleInput, VehicleDebugState, RapierModule } from "./VehicleSim";
+export type {
+  VehicleInput,
+  VehicleDebugState,
+  VehicleSimOptions,
+  RapierModule,
+} from "./VehicleSim";
 
 export * from "./tuning";
 

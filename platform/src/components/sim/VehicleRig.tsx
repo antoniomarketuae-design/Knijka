@@ -90,6 +90,7 @@ export function VehicleRig({
   onCollision,
   collisionMinKmh = COLLISION_MIN_KMH,
   night = false,
+  gripFactor = 1,
 }: {
   simRef: RefObject<VehicleSim | null>;
   chassisGroupRef: RefObject<Group | null>;
@@ -115,6 +116,13 @@ export function VehicleRig({
    *  cabin's own headlights / night-preview toggle also raise it, so the cabin
    *  never goes near-black even when this is left at its default. */
   night?: boolean;
+  /** ADR-006 stage 4a — OPT-IN surface grip for the live physics car. 1
+   *  (default, every existing lesson) = today's dry dynamics bit-identical;
+   *  wet-grip lessons pass tuning.WET_GRIP_FACTOR (0.7) via
+   *  LessonSpec.physics.wetGrip → ~1.4× braking distance, reduced lateral
+   *  grip. Never derived from environment.rain (shipped rain lessons were
+   *  tuned dry — the flag is authored per scenario). */
+  gripFactor?: number;
 }) {
   const { world } = useRapier();
   const bodyRef = useRef<RapierRigidBody>(null);
@@ -138,13 +146,16 @@ export function VehicleRig({
       world as unknown as RapierWorld,
       body as unknown as RapierBody,
       spawn,
+      // 4a: per-lesson surface grip. The default (1) constructs EXACTLY the
+      // pre-4a car — the options object with gripFactor 1 is the identity.
+      { gripFactor },
     );
     simRef.current = sim;
     return () => {
       if (simRef.current === sim) simRef.current = null;
       sim.dispose();
     };
-  }, [world, simRef, spawn]);
+  }, [world, simRef, spawn, gripFactor]);
 
   // Runs once per fixed 60 Hz substep, right before world.step() — exactly
   // the contract VehicleSim.update() requires. Always the fixed dt.

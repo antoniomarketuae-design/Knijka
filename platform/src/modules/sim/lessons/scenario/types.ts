@@ -319,6 +319,15 @@ export interface ScenarioSpec {
    * this makes the student's own attempt grade too.
    */
   ruleConfig?: Partial<RuleEngineConfig>;
+  /**
+   * ADR-006 stage 4a — OPT-IN live-physics overrides, propagated by
+   * compileScenario to LessonSpec.physics (the ruleConfig pattern).
+   * `wetGrip: true` runs the STUDENT's car at the wet grip factor (~1.4×
+   * braking distance, reduced cornering grip). Deliberately NOT implied by
+   * conditions.weather === "rain": shipped rain lessons were tuned against
+   * dry physics — only a template that AUTHORS this field gets wet dynamics.
+   */
+  physics?: { wetGrip?: boolean };
   /** Bulgaria is the product (doc 76 §0 — locale from day one, no country packs). */
   localeBg: "bg-BG";
 }

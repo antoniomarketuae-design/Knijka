@@ -143,6 +143,19 @@ export interface LessonSpec {
   /** Optional time-of-day/weather override. */
   environment?: { timeOfDay?: "day" | "dusk" | "night"; rain?: boolean };
   /**
+   * ADR-006 stage 4a — OPT-IN physics overrides for the LIVE VehicleSim.
+   * `wetGrip: true` runs the hero car at tuning.WET_GRIP_FACTOR (0.7): tyre μ
+   * and service-brake force scale down → ~1.4× braking distance, reduced
+   * cornering grip. DELIBERATELY DECOUPLED from environment.rain: today's
+   * rain lessons were authored and recorded against dry physics, and flipping
+   * them would silently change shipped feel — only a scenario that AUTHORS
+   * physics.wetGrip (compileScenario ← ScenarioSpec.physics) gets wet
+   * dynamics. Absent = gripFactor 1.0 = bit-identical dry physics (the CI
+   * harness baselines are the proof). Recorded traces are kinematic and never
+   * read this field — their wet honesty is authored in the trace scripts.
+   */
+  physics?: { wetGrip?: boolean };
+  /**
    * Per-lesson rule-engine config override (merged over DEFAULT_RULE_CONFIG;
    * createLessonSession opts win over this). Scenario drills for config-gated
    * detectors (e.g. JUNCTION_SCAN_INCOMPLETE, FOLLOWING_TOO_CLOSE_FOR_RAIN,

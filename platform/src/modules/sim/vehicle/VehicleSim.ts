@@ -67,6 +67,25 @@ export interface VehicleDebugState {
   steerRad: number;
 }
 
+/**
+ * Optional per-session physics configuration (ADR-006 stage 4a). STRICTLY
+ * ADDITIVE AND OPT-IN: omitting the object (or every field) is the dry
+ * default and produces bit-identical dynamics — the CI harness baselines and
+ * the wet-grip identity test are the proof.
+ */
+export interface VehicleSimOptions {
+  /**
+   * Surface grip factor: 1 = dry (today's tuning, byte-identical). Values
+   * < 1 scale tyre μ (FRICTION_SLIP_FRONT/REAR — the lateral/side-impulse
+   * clamp) AND the achievable service-brake + handbrake force, so braking
+   * distance grows by ~1/gripFactor and cornering grip drops accordingly.
+   * Wet lessons pass tuning.WET_GRIP_FACTOR (0.7 → ~1.4× braking distance).
+   * The parking brake (a locked pawl at rest) and rolling resistance are
+   * NOT grip-limited and stay unscaled.
+   */
+  gripFactor?: number;
+}
+
 const FL = 0;
 const FR = 1;
 const RL = 2;
@@ -140,6 +159,8 @@ export class VehicleSim {
   private readonly controller: DynamicRayCastVehicleController;
 
   private steer = 0;
+  /** Surface grip factor (1 = dry; see VehicleSimOptions.gripFactor). */
+  private readonly gripFactor: number;
   /** Low-passed lateral acceleration (m/s², car-local, + = left). */
   private aLatSmooth = 0;
   private readonly prevVel: Vec3 = { x: 0, y: 0, z: 0 };
@@ -160,9 +181,14 @@ export class VehicleSim {
     world: World,
     body: RigidBody,
     spawn: { x: number; y: number; z: number; yawRad: number } = T.SPAWN,
+    options?: VehicleSimOptions,
   ) {
     this.world = world;
     this.body = body;
+    // Grip is clamped to a sane band; 1 (the default) is EXACTLY the pre-4a
+    // dry car: every use below multiplies by 1.0, which is the IEEE-754
+    // identity, so the dry path stays bit-identical (harness-proven).
+    this.gripFactor = clamp(options?.gripFactor ?? 1, 0.3, 1);
     this.spawnRotation = yawQuat(spawn.yawRad);
     this.spawnTranslation = { x: spawn.x, y: spawn.y, z: spawn.z };
     this.chassisColliderHandle = body.collider(0).handle;
@@ -194,7 +220,13 @@ export class VehicleSim {
       c.setWheelSuspensionRelaxation(i, T.SUSPENSION_DAMPING_RELAXATION);
       c.setWheelMaxSuspensionTravel(i, T.SUSPENSION_MAX_TRAVEL);
       c.setWheelMaxSuspensionForce(i, T.SUSPENSION_MAX_FORCE);
-      c.setWheelFrictionSlip(i, isFront ? T.FRICTION_SLIP_FRONT : T.FRICTION_SLIP_REAR);
+      // Tyre μ × surface grip (4a): frictionSlip clamps the side impulse
+      // (cheat-sheet point 5), so scaling it IS the lateral wet-grip loss.
+      // gripFactor 1 multiplies by 1.0 — exact identity, dry unchanged.
+      c.setWheelFrictionSlip(
+        i,
+        (isFront ? T.FRICTION_SLIP_FRONT : T.FRICTION_SLIP_REAR) * this.gripFactor,
+      );
       c.setWheelSideFrictionStiffness(i, T.SIDE_FRICTION_STIFFNESS);
     }
   }
@@ -303,8 +335,13 @@ export class VehicleSim {
     }
 
     // --- Brakes: rapier wants IMPULSE per step, so convert N → N·s ----------
-    let frontBrakeN = (brakePedal * T.BRAKE_FORCE_N * T.BRAKE_BIAS_FRONT) / 2;
-    let rearBrakeN = (brakePedal * T.BRAKE_FORCE_N * (1 - T.BRAKE_BIAS_FRONT)) / 2;
+    // Surface grip (4a): the service brake and handbrake are TYRE-limited, so
+    // they scale with gripFactor (0.7 wet ⇒ ~0.64 g peak ⇒ ~1.4× distance).
+    // Rolling resistance and the parking pawl are not grip-limited. With the
+    // default gripFactor 1 every product below is the exact dry value.
+    const brakeForceN = T.BRAKE_FORCE_N * this.gripFactor;
+    let frontBrakeN = (brakePedal * brakeForceN * T.BRAKE_BIAS_FRONT) / 2;
+    let rearBrakeN = (brakePedal * brakeForceN * (1 - T.BRAKE_BIAS_FRONT)) / 2;
     if (engineTotal === 0 && brakePedal === 0) {
       // Coast-down rolling resistance.
       frontBrakeN = Math.max(frontBrakeN, T.ROLLING_RESISTANCE_N / 4);
@@ -312,7 +349,7 @@ export class VehicleSim {
     }
     let rearGrip = T.SIDE_FRICTION_STIFFNESS;
     if (input.handbrake) {
-      rearBrakeN = Math.max(rearBrakeN, T.HANDBRAKE_FORCE_N / 2);
+      rearBrakeN = Math.max(rearBrakeN, (T.HANDBRAKE_FORCE_N * this.gripFactor) / 2);
       rearGrip = T.HANDBRAKE_REAR_GRIP; // rear breaks loose → handbrake slide
     }
     if (dl.parkingBrakeOn) {

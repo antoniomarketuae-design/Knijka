@@ -136,6 +136,21 @@ export const FRICTION_SLIP_FRONT = 1.4;
 export const FRICTION_SLIP_REAR = 1.5;
 /** Lateral stiffness multiplier at normal driving (rapier default 1.0). */
 export const SIDE_FRICTION_STIFFNESS = 1.0;
+/**
+ * WET surface grip factor (ADR-006 stage 4a — the opt-in wet-grip slice;
+ * doc 72 wet-road evidence, doc 65 Phase 4). Scales tyre μ (FRICTION_SLIP_*)
+ * and the achievable service-brake force in VehicleSim when a lesson OPTS IN
+ * via LessonSpec.physics.wetGrip — the default gripFactor is 1.0 and the dry
+ * path stays bit-identical (the CI harness is the proof).
+ *
+ * Value: wet asphalt holds ~65–75% of dry grip (tyre literature; doc 72
+ * FO-04: „braking distance ~1.5× wet"). 0.7 ⇒ braking distance × 1/0.7 ≈
+ * 1.43 from any speed (measured 1.42 from 50 km/h in wet-grip.test.ts) and
+ * lateral grip capped at ~0.7× — the honest, teachable middle of the band.
+ * Aquaplane float / ice (doc 72 AC-08/12) are NOT this constant — they need
+ * the full Phase-4 friction model and stay out of the slice.
+ */
+export const WET_GRIP_FACTOR = 0.7;
 
 // ---------------------------------------------------------------------------
 // Drivetrain
