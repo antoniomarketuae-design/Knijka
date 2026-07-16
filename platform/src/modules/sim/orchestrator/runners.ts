@@ -423,6 +423,9 @@ export class BrakingLeadCarRunner implements EventRunner {
         hold: s.actor.hold,
         cruiseSpeedMps: s.actor.cruiseSpeedMps,
         colorIndex: s.actor.colorIndex,
+        // FO-06: a "truck"/"van" lead publishes its size profile so the fleet
+        // renders the large-vehicle rig (absent = car, byte-identical).
+        profile: s.actor.profile,
         playerGuard: true,
       });
       if (!view) throw new Error(`staged event ${s.id}: vehicle path failed to stage`);

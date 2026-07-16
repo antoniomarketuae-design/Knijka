@@ -69,6 +69,18 @@ export interface TrafficDistrict {
 // allocations in the update path).
 // ---------------------------------------------------------------------------
 
+/**
+ * Vehicle size/type profile (doc 72 §9 FO-06 — the large-vehicle actor
+ * unlock). Data + presentation only: "van" renders the panel-van rig,
+ * "truck" the box-truck rig (longer / wider / taller than any car — the
+ * vision-blocking lead of „Зад камион"). Absent = "car" = the pre-profile
+ * deterministic fleet pick, byte-identical. HONEST LIMIT: every rule-engine
+ * proximity query (leadGapMeters, conflictNear, …) stays POINT-BASED around
+ * the vehicle center with one fixed car-length constant, and the A11 physics
+ * shells stay car-sized — the profile changes NO grading/collision geometry.
+ */
+export type VehicleProfile = "car" | "van" | "truck";
+
 export interface TrafficVehicleState {
   id: number;
   /** Rear-to-front center of the car, district space. */
@@ -82,6 +94,8 @@ export interface TrafficVehicleState {
   braking: boolean;
   /** Body color variant index (presentation palette). */
   colorIndex: number;
+  /** Size/type profile (staged actors only today). Absent = "car". */
+  profile?: VehicleProfile;
 }
 
 export interface TrafficPedestrianState {
@@ -272,6 +286,12 @@ export interface StagedVehicleSpec {
   loop?: boolean;
   /** Presentation palette index. */
   colorIndex?: number;
+  /**
+   * Size/type profile published on the actor's TrafficVehicleState (doc 72
+   * FO-06): "truck"/"van" renders the large-vehicle rig. Default "car".
+   * Visual + data only — see VehicleProfile for the point-geometry caveat.
+   */
+  profile?: VehicleProfile;
   /**
    * Emergency-brake when the player is directly ahead in the path corridor
    * (default true) — a staged actor must never ram the player from behind;

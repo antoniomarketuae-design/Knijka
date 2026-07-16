@@ -353,6 +353,13 @@ export interface StagedActorPathSpec {
   loop?: boolean;
   /** Presentation palette index. */
   colorIndex?: number;
+  /**
+   * Vehicle size/type profile (doc 72 §9 FO-06 „Зад камион"): "truck" renders
+   * the box-truck rig, "van" the panel van; absent = "car" (the deterministic
+   * fleet pick — byte-identical pre-profile behavior). Visual + data only:
+   * the leadGap/conflict queries stay point-based (ADR-001: rigs fictional).
+   */
+  profile?: "car" | "van" | "truck";
 }
 
 export type StagedEventKind =

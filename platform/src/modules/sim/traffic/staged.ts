@@ -231,6 +231,9 @@ export function createStagedVehicle(
       speedMps: 0,
       braking: false,
       colorIndex: spec.colorIndex ?? 0,
+      // FO-06 size/type profile — only present when the spec authors one, so
+      // profile-less staged actors publish the exact pre-profile state shape.
+      ...(spec.profile !== undefined ? { profile: spec.profile } : {}),
     },
     view: {
       id: spec.id,

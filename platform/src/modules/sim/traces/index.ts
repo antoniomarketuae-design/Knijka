@@ -330,6 +330,17 @@ export {
   type ScSpHarshBrakeTraceName,
 } from "./scSpHarshBrake";
 
+// Capability — the FO-06 large-vehicle actor profile (sc-follow-truck: the
+// brakingLeadCar staged kind with profile "truck", rendered as the box-truck
+// rig; leadGap detector unchanged). Committed traces under
+// content/traces/sc-follow-truck/ are recordings of exactly these scripts
+// (gate: traces/__tests__/sc-follow-truck-traces).
+export {
+  SC_FOLLOW_TRUCK_ID,
+  recordScFollowTruckDrive,
+  type ScFollowTruckTraceName,
+} from "./scFollowTruck";
+
 // Signals family — the dead/flashing-signal capability drives (sc-signal-dead /
 // sc-signal-flashing); the signal cluster is dialed DARK / flashing amber and
 // the junction falls back to the right-hand rule (doc 72 JU-20). Committed

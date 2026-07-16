@@ -55,6 +55,7 @@
 
 import {
   Box3,
+  BoxGeometry,
   type BufferGeometry,
   Color,
   type ColorRepresentation,
@@ -106,6 +107,112 @@ export const BOXY_INDEX = FLEET.length - 2;
  *  draws). Overflow reassigns to the kolos (same boxy-SUV archetype). */
 export const BOXY_MAX_INSTANCES = 2;
 const BOXY_FALLBACK_INDEX = FLEET.indexOf("kolos");
+
+// ---------------------------------------------------------------------------
+// Size/type profiles (doc 72 §9 FO-06 — the large-vehicle actor unlock).
+// A staged actor's TrafficVehicleState.profile OVERRIDES the deterministic
+// fleet pick: "van" reuses the kargo_v panel-van GLB; "truck" renders the
+// PROCEDURAL box-truck rig appended AFTER the GLB models (a code-built cab +
+// cargo box — honest polish gap: swap for an authored GLB when the kit grows
+// one; entirely fictional per ADR-001). Ambient vehicles never carry a
+// profile, so the moving/parked mixes are byte-identical to pre-profile.
+// ---------------------------------------------------------------------------
+
+/** Model slot of the procedural box truck — one PAST the GLB fleet. */
+export const TRUCK_MODEL_INDEX = FLEET.length;
+const VAN_MODEL_INDEX = FLEET.indexOf("kargo_v");
+
+/** Box-truck body plan, meters (fictional): ~7.5 × 2.4 × 3.1 — longer, wider
+ *  and taller than every fleet car (~4.4 × 1.8) and the van (~5.4 × 2.0), so
+ *  it genuinely blocks the forward view (FO-06's whole point). */
+export const TRUCK_DIMENSIONS = {
+  lengthM: 7.5,
+  widthM: 2.4,
+  cabHeightM: 2.6,
+  boxHeightM: 3.1,
+  wheelRadiusM: 0.45,
+} as const;
+
+/**
+ * Model index for one vehicle state: an explicit size/type profile (staged
+ * actors only today) overrides the deterministic pick; ambient vehicles have
+ * no profile and keep assignModel unchanged. NOTE: same population-wide
+ * hero-SUV cap caveat as assignModel (applied in buildTrafficFleet).
+ */
+export function modelForVehicle(v: Pick<TrafficVehicleState, "id" | "profile">): number {
+  if (v.profile === "truck") return TRUCK_MODEL_INDEX;
+  if (v.profile === "van") return VAN_MODEL_INDEX;
+  return assignModel(v.id);
+}
+
+/** Mesh-name base for a model slot (the truck slot is past FLEET). */
+function modelName(m: number): string {
+  return FLEET[m] ?? "box_truck";
+}
+
+/**
+ * The procedural box-truck ModelRig: a paint-colored cab + a tall pale cargo
+ * box (two merged BoxGeometries, one draw call per material), shared fleet
+ * wheels scaled to the truck's 0.45 m hubs. Ground-relative like the GLB kit
+ * (Y = 0 = tarmac, nose +Z), so TrafficLayer places/lights/shadows it through
+ * the exact same instancing path as every GLB model. All geometry + materials
+ * are OWNED (disposed by disposeTrafficFleet via ownedMaterials/bodyGeometry).
+ */
+function buildBoxTruckRig(): ModelRig {
+  const { lengthM, widthM, cabHeightM, boxHeightM, wheelRadiusM } = TRUCK_DIMENSIONS;
+  const halfLength = lengthM / 2;
+  const cabPaint = new MeshStandardMaterial({
+    color: 0x27506b, // muted fleet blue (fictional livery, ADR-001)
+    metalness: 0.25,
+    roughness: 0.45,
+    envMapIntensity: 1.35,
+  });
+  cabPaint.name = "truck_cab_paint";
+  const boxMat = new MeshStandardMaterial({
+    color: 0xd7d5cf, // weathered off-white cargo box
+    metalness: 0.05,
+    roughness: 0.8,
+  });
+  boxMat.name = "truck_box";
+  // Cab: slightly narrower than the box, over the front axle.
+  const cabLen = 1.95;
+  const cab = new BoxGeometry(widthM - 0.14, cabHeightM - 0.5, cabLen);
+  cab.translate(0, 0.5 + (cabHeightM - 0.5) / 2, halfLength - cabLen / 2);
+  // Cargo box: full width/height, a visible gap behind the cab.
+  const boxLen = lengthM - cabLen - 0.25;
+  const box = new BoxGeometry(widthM, boxHeightM - 0.62, boxLen);
+  box.translate(0, 0.62 + (boxHeightM - 0.62) / 2, -halfLength + boxLen / 2);
+  // Two BoxGeometries share attribute layouts — this merge cannot fail; the
+  // ?? branch only guards the type.
+  const bodyGeometry = mergeGeometries([cab, box], true) ?? cab;
+  if (bodyGeometry !== cab) {
+    cab.dispose();
+    box.dispose();
+  }
+  const track = widthM / 2 - 0.22;
+  const frontAxleZ = halfLength - 1.15;
+  const rearAxleZ = -halfLength + 1.55;
+  return {
+    bodyGeometry,
+    bodyMaterials: bodyGeometry.groups.length === 2 ? [cabPaint, boxMat] : [cabPaint],
+    ownedMaterials: [cabPaint, boxMat],
+    paint: null, // no palette tint — the livery IS the profile's identity
+    customWheel: null, // shared fleet wheel, scaled to the 0.45 m hubs
+    wheelOffsets: [
+      new Vector3(track, wheelRadiusM, frontAxleZ), // FL (+X = left)
+      new Vector3(-track, wheelRadiusM, frontAxleZ), // FR
+      new Vector3(track, wheelRadiusM, rearAxleZ), // RL
+      new Vector3(-track, wheelRadiusM, rearAxleZ), // RR
+    ],
+    wheelRadius: wheelRadiusM,
+    rearZ: -halfLength,
+    frontZ: halfLength,
+    halfWidth: widthM / 2,
+    halfLength,
+    lampY: 0.95,
+    headY: 0.85,
+  };
+}
 
 /**
  * Models whose gloss paint is upgraded to REAL automotive clearcoat
@@ -722,6 +829,10 @@ export function buildTrafficFleet(
   // does not opt in.
   const clearcoat = opts.clearcoat ?? true;
   const rigs = scenes.map((s, m) => extractModelRig(s, m, clearcoat));
+  // FO-06 profile slot: the procedural box truck rides AFTER the GLB models
+  // (TRUCK_MODEL_INDEX). Costs nothing unless a truck-profile vehicle exists
+  // (count 0 => no InstancedMesh), beyond building the two-box rig itself.
+  rigs.push(buildBoxTruckRig());
   const sharedWheel = extractSharedWheel(scenes[0]);
   const nVeh = vehicles.length;
   const color = new Color();
@@ -730,10 +841,11 @@ export function buildTrafficFleet(
   const slot = new Int32Array(nVeh);
   const wheelScale = new Float32Array(nVeh);
   const wheelRadius = new Float32Array(nVeh);
-  const counts = new Array(FLEET.length).fill(0);
+  const counts = new Array(rigs.length).fill(0);
 
   for (let i = 0; i < nVeh; i++) {
-    let m = assignModel(vehicles[i].id);
+    // Profile override (staged large vehicles) → deterministic fleet pick.
+    let m = modelForVehicle(vehicles[i]);
     // Hero-SUV cap: it costs ~4× a fleet car; overflow becomes a kolos.
     if (m === BOXY_INDEX && counts[m] >= BOXY_MAX_INSTANCES) m = BOXY_FALLBACK_INDEX;
     assign[i] = m;
@@ -750,7 +862,7 @@ export function buildTrafficFleet(
     mesh.instanceMatrix.setUsage(DynamicDrawUsage);
     mesh.frustumCulled = false;
     mesh.castShadow = true;
-    mesh.name = `traffic-body-${FLEET[m]}`;
+    mesh.name = `traffic-body-${modelName(m)}`;
     hideAll(mesh);
     group.add(mesh);
     return { mesh, rig, count };
@@ -828,7 +940,7 @@ export function buildTrafficFleet(
   const parkedAssign = new Int32Array(nPark);
   const parkedSlot = new Int32Array(nPark);
   const parkedWheelScale = new Float32Array(nPark);
-  const parkedCounts = new Array(FLEET.length).fill(0);
+  const parkedCounts = new Array(rigs.length).fill(0);
   for (let i = 0; i < nPark; i++) {
     const m = parked[i].model;
     parkedAssign[i] = m;

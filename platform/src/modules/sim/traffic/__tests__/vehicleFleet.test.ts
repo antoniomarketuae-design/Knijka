@@ -25,7 +25,10 @@ import {
   carPaintStandardMaterial,
   disposeTrafficFleet,
   FLEET,
+  modelForVehicle,
   paintColorFor,
+  TRUCK_DIMENSIONS,
+  TRUCK_MODEL_INDEX,
 } from "../vehicleFleet";
 
 const POLICE_INDEX = FLEET.length - 1;
@@ -266,6 +269,53 @@ describe("buildTrafficFleet parked pass", () => {
     expect(fleet.parkedWheel).toBeNull();
     expect(fleet.parkedMeshes.every((m) => m === null)).toBe(true);
     expect(fleet.parkedPaintMeshes.every((m) => m === null)).toBe(true);
+    expect(() => disposeTrafficFleet(fleet)).not.toThrow();
+  });
+});
+
+describe("large-vehicle profile (doc 72 FO-06)", () => {
+  const KARGO_V_INDEX = FLEET.indexOf("kargo_v");
+
+  it("modelForVehicle: profile overrides the pick; ambient (no profile) stays assignModel", () => {
+    expect(modelForVehicle({ id: 7, profile: "truck" })).toBe(TRUCK_MODEL_INDEX);
+    expect(modelForVehicle({ id: 7, profile: "van" })).toBe(KARGO_V_INDEX);
+    // The default MUST be byte-identical to the pre-profile fleet pick.
+    for (let id = 0; id < 200; id++) {
+      expect(modelForVehicle({ id })).toBe(assignModel(id));
+      expect(modelForVehicle({ id, profile: "car" })).toBe(assignModel(id));
+    }
+  });
+
+  it("builds the procedural box-truck rig for a truck-profile vehicle", () => {
+    const truck: TrafficVehicleState = { ...vehicle(1), profile: "truck" };
+    const fleet = buildTrafficFleet(makeScenes(), [truck, vehicle(2)]);
+    expect(fleet.assign[0]).toBe(TRUCK_MODEL_INDEX);
+    expect(fleet.assign[1]).toBe(assignModel(2)); // ambient neighbor untouched
+    const model = fleet.models[TRUCK_MODEL_INDEX];
+    expect(model.count).toBe(1);
+    expect(model.mesh).not.toBeNull();
+    expect(model.mesh?.name).toBe("traffic-body-box_truck");
+    // The rig is genuinely LARGER than every car (the vision-blocking point):
+    // footprint 7.5 × 2.4 vs the fixture cars' ~4.35 × 1.8.
+    const rig = model.rig;
+    expect(rig.halfLength).toBeCloseTo(TRUCK_DIMENSIONS.lengthM / 2);
+    expect(rig.halfWidth).toBeCloseTo(TRUCK_DIMENSIONS.widthM / 2);
+    expect(rig.paint).toBeNull(); // no palette tint
+    expect(rig.customWheel).toBeNull(); // shared wheel, scaled up
+    expect(fleet.wheelScale[0]).toBeCloseTo(TRUCK_DIMENSIONS.wheelRadiusM / 0.32);
+    expect(fleet.wheelRadius[0]).toBeCloseTo(TRUCK_DIMENSIONS.wheelRadiusM);
+    // Truck materials are OWNED (disposed on teardown), never drei-cached.
+    expect(rig.ownedMaterials.length).toBe(2);
+    expect(() => disposeTrafficFleet(fleet)).not.toThrow();
+  });
+
+  it("a van-profile vehicle reuses the kargo_v panel-van rig", () => {
+    const van: TrafficVehicleState = { ...vehicle(3), profile: "van" };
+    const fleet = buildTrafficFleet(makeScenes(), [van]);
+    expect(fleet.assign[0]).toBe(KARGO_V_INDEX);
+    expect(fleet.models[KARGO_V_INDEX].count).toBe(1);
+    expect(fleet.models[TRUCK_MODEL_INDEX].count).toBe(0);
+    expect(fleet.models[TRUCK_MODEL_INDEX].mesh).toBeNull(); // costs nothing unused
     expect(() => disposeTrafficFleet(fleet)).not.toThrow();
   });
 });

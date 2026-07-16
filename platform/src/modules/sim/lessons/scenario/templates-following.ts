@@ -34,9 +34,12 @@
  *
  * Doc-72 provenance: FO-01 and FO-02 are the two "Engine: ✅ FULL" archetypes
  * with a CLEANLY GRADABLE following fault. FO-05 (queue harmonics) is ✅ FULL
- * but LEARN-ONLY (penalty-free — no shadow+2-graded-mistakes mold); FO-03/04/
- * 06/07/08 are 🟡 PARTIAL or 🔴 NEW (cut-in actor, rain-follow config, truck
- * profile, tailgater actor, standstill-gap rule) and skipped for later waves.
+ * but LEARN-ONLY (penalty-free — no shadow+2-graded-mistakes mold); FO-03/07
+ * (cut-in actor, tailgater actor) stay 🟡/🔴 for later waves. Since shipped
+ * here beyond the original batch: FO-08 (standstill-gap rule), FO-04
+ * (rain-follow config drill) and FO-06 (sc-follow-truck — the large-vehicle
+ * actor PROFILE: the same brakingLeadCar staged kind with `profile: "truck"`,
+ * rendered as the procedural box-truck rig; leadGap detector unchanged).
  */
 
 import type { BrakingLeadCarSpec } from "../../contracts";
@@ -520,6 +523,130 @@ export const SC_FOLLOW_RAIN_GAP: ScenarioSpec = {
   localeBg: "bg-BG",
 };
 
+// ---------------------------------------------------------------------------
+// 5. sc-follow-truck — „Зад камион" (FO-06) on fo-follow-v1 (reuses the 360 m
+//    straight street, limit 50) — the large-vehicle actor-profile scenario.
+// ---------------------------------------------------------------------------
+
+/**
+ * The staged LEAD TRUCK for sc-follow-truck: the SAME brakingLeadCar staged
+ * kind as FO-01, with `profile: "truck"` — the doc 72 FO-06 unlock ("box
+ * truck visual on the vehicle actor; leadGap detector unchanged"). It paces
+ * the player's own lane at a fixed ~17 m (matchPlayer), so the ONLY variable
+ * is the player's SPEED — but unlike FO-01 the lead is a 7.5 × 2.4 × 3.1 m
+ * box truck that blocks ALL forward vision: the gap must buy the sight line
+ * you lost. 17 m is ~3 seconds at the shadow's calm 20 km/h and a sub-second
+ * ~1.0 s at the mistakes' 48 km/h, where FOLLOWING_TOO_CLOSE grades. The slam
+ * tier is authored out of reach (slamAt past the road end, minSlamSpeedKmh
+ * 250) — deterministic moving traffic, not a braking drill. HONEST LIMIT:
+ * the leadGap query stays point-based around the truck's CENTER with the
+ * fixed car-length constant, so the graded gap ignores the longer tail — the
+ * scenario numbers are tuned to the detector, and the profile changes zero
+ * grading geometry (exactly the FO-06 promise).
+ */
+const FT_LEAD_TRUCK: BrakingLeadCarSpec = {
+  id: "sc-ft-lead",
+  kind: "brakingLeadCar",
+  actor: {
+    pathNodes: ["fo-n-start", "fo-n-end"],
+    hold: { nodeIndex: 0, offsetM: 35 }, // dormant ~20 m ahead of the spawn
+    cruiseSpeedMps: 8,
+    extraRightOffsetM: 0, // the player's OWN lane (northbound, x = 4.06)
+    colorIndex: 2,
+    profile: "truck", // FO-06: the box-truck rig — vision blocked
+  },
+  followGapM: 17, // pace ~17 m AHEAD — ~3 s at 20 km/h, ~1 s at 48 km/h
+  maxMatchSpeedMps: 15, // 54 km/h — holds 17 m at any legal player speed
+  slamAt: { x: 4.06, y: 520 }, // far past the 360 m road — never reached
+  slamRadiusM: 2,
+  slamDecelMps2: 6,
+  minSlamSpeedKmh: 250, // the slam tier is authored out of reach…
+  proximityFallbackM: 0.3, // …and the proximity fallback cannot occur (gap pinned at 17 m)
+  triggersHazard: false,
+  resumeAfterSec: 3,
+};
+
+/** FO-06 — следване зад камион със закрит обзор (ЗДвП чл. 23: дистанцията се
+ *  съобразява и с видимостта — зад висок камион тя е нулева напред, затова
+ *  дистанцията е по-голяма, не по-малка). */
+export const SC_FOLLOW_TRUCK: ScenarioSpec = {
+  id: "sc-follow-truck",
+  family: "following",
+  tagsBg: ["дистанция", "камион", "закрит обзор", "следване"],
+  titleBg: "Зад камион",
+  objectiveBg:
+    "Следвай камиона пред теб на УВЕЛИЧЕНА дистанция — той закрива целия ти обзор напред и единственото, което виждаш, е неговата задна врата. Дистанцията купува видимостта, която камионът ти отне: дръж поне 3 секунди.",
+  archetypeIds: ["FO-06"],
+  conceptIds: ["c-following-distance", "c-safety-space", "c-stopping-distance-total"],
+  map: {
+    archetype: "straight-street",
+    // Reuses the committed fo-follow-v1 map — its meta.scenario.params, here for provenance.
+    params: { lengthM: 360, maxspeedKmh: 50 },
+    districtId: "fo-follow-v1",
+  },
+  start: {
+    spawnPointId: "fo-spawn-approach",
+    vehicleStart: "ready",
+  },
+  instructionsBg: [
+    { n: 1, textBg: "Пред теб в твоята лента се движи камион — потегли спокойно след него." },
+    { n: 2, textBg: "Зад камион не виждаш нищо от пътя напред: нито пешеходци, нито спрели коли, нито какво го кара да натисне спирачката." },
+    { n: 3, textBg: "Затова дистанцията расте: дръж поне 3 секунди до камиона — брой „едно-и-две-и-три“, докато той подмине ориентир." },
+    { n: 4, textBg: "Не се доближавай, „за да виждаш“ — колкото по-близо си, толкова ПО-МАЛКО виждаш и толкова по-малко време имаш." },
+    { n: 5, textBg: "Задръж увеличената дистанция до края на отсечката." },
+  ],
+  success: [
+    {
+      id: "sc-ft-follow",
+      titleBg: "Следвай камиона с увеличена дистанция",
+      // Cap 30 km/h keeps the calm blocked-vision approach; the gap grading
+      // itself is the rule engine's job (FOLLOWING_TOO_CLOSE).
+      params: { kind: "reachZone", x: LANE_X, y: 175, radiusM: 10, maxSpeedKmh: 30 },
+    },
+    {
+      id: "sc-ft-finish",
+      titleBg: "Стигни края на отсечката",
+      params: { kind: "reachZone", x: LANE_X, y: 330, radiusM: 12 },
+    },
+  ],
+  rubric: { parTimeSec: 95 },
+  shadow: { path: "content/traces/sc-follow-truck/shadow-correct.trace.json" },
+  mistakes: [
+    {
+      traceRef: { path: "content/traces/sc-follow-truck/mistake-tailgate.trace.json" },
+      titleBg: "Залепен зад камиона",
+      whatWentWrongBg:
+        "Колата се движеше на 48 км/ч на около една секунда зад камиона — при нулева видимост напред. Ако камионът спре рязко заради нещо, което ти не можеш да видиш, нямаш нито време, нито място: при закрит обзор дистанцията се увеличава, не се топи. Несъобразената дистанция е основна грешка.",
+      codeRefs: ["FOLLOWING_TOO_CLOSE"],
+    },
+    {
+      traceRef: { path: "content/traces/sc-follow-truck/mistake-peek.trace.json" },
+      titleBg: "Доближаване „за да виждаш“",
+      whatWentWrongBg:
+        "Дистанцията беше добра, но колата ускори и се залепи зад камиона — уж за да „надникне“ напред. Точно обратното се случи: колкото по-близо до високата задна врата, толкова по-малко път се вижда и толкова по-малко време остава за реакция. Изостани — видимостта зад камион се купува само с дистанция.",
+      codeRefs: ["FOLLOWING_TOO_CLOSE"],
+    },
+  ],
+  teach: {
+    whenBg:
+      "Всеки път, когато пред теб се движи камион, автобус или бус — в града, на булевард, на изхода от кръстовище. Високото превозно средство закрива всичко: пешеходци, светофари, спирачни светлини на колоните напред.",
+    whyBg:
+      "Зад камион губиш най-ценния си инструмент — погледа далеч напред. Не виждаш ЗАЩО камионът ще спре, затова научаваш за спирането едва от неговите стопове — със закъснение. Единственото, което връща това време, е по-голямата дистанция: тя е видимостта, която камионът ти отне.",
+    lawRef: "ЗДвП чл. 23",
+    examinerBg:
+      "Изпитващият следи дистанцията особено внимателно зад високи превозни средства: близка дистанция при закрит обзор се третира като несъобразена. Дръж поне 3 секунди зад камион и не се доближавай, за да „виждаш по-добре“.",
+  },
+  levels: [
+    { level: 1 },
+    { level: 2 },
+    { level: 3 },
+    { level: 4, vehicleStart: "cold" },
+  ],
+  staged: [FT_LEAD_TRUCK],
+  conditions: { weather: "dry" },
+  localeBg: "bg-BG",
+};
+
 /** The following-family templates, in catalog order (registered in
  *  templates.ts). */
 export const SCENARIO_TEMPLATES_FOLLOWING: readonly ScenarioSpec[] = [
@@ -527,4 +654,5 @@ export const SCENARIO_TEMPLATES_FOLLOWING: readonly ScenarioSpec[] = [
   SC_FOLLOW_BRAKE,
   SC_FOLLOW_STANDSTILL,
   SC_FOLLOW_RAIN_GAP,
+  SC_FOLLOW_TRUCK,
 ];
