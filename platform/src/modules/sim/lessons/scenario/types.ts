@@ -175,9 +175,9 @@ export interface ScenarioObjectiveSpec {
   params: ObjectiveParams;
 }
 
-/** Environment axis (doc 76 §2). fog/snow are TAGGABLE but compile-gated
- *  ("soon" — doc 76 §0 weather gaps): the catalog can list the template
- *  before the engine ships the condition. */
+/** Environment axis (doc 76 §2). Every weather now COMPILES (the doc 76 §0
+ *  weather gaps are closed: fog via the AC-03 unlock, snow via the AC-08
+ *  winter-grip unlock — dry/rain/fog/snow, each composable with night). */
 export interface ConditionAxis {
   weather?: "dry" | "rain" | "fog" | "snow";
   night?: boolean;
@@ -323,11 +323,16 @@ export interface ScenarioSpec {
    * ADR-006 stage 4a — OPT-IN live-physics overrides, propagated by
    * compileScenario to LessonSpec.physics (the ruleConfig pattern).
    * `wetGrip: true` runs the STUDENT's car at the wet grip factor (~1.4×
-   * braking distance, reduced cornering grip). Deliberately NOT implied by
-   * conditions.weather === "rain": shipped rain lessons were tuned against
-   * dry physics — only a template that AUTHORS this field gets wet dynamics.
+   * braking distance, reduced cornering grip); `snowGrip: true` at the snow
+   * grip factor (packed snow ≈ 0.4 — ~2.5× braking distance; the SNOW
+   * unlock, doc 72 AC-08). Deliberately NOT implied by conditions.weather
+   * ("rain"/"snow" render without touching physics): shipped weather lessons
+   * were tuned against dry physics — only a template that AUTHORS this field
+   * gets reduced-grip dynamics. Semantic booleans, not raw numbers, so the
+   * factor constants (vehicle/tuning.ts) stay the single source of truth the
+   * authored ghost envelopes are pinned against.
    */
-  physics?: { wetGrip?: boolean };
+  physics?: { wetGrip?: boolean; snowGrip?: boolean };
   /** Bulgaria is the product (doc 76 §0 — locale from day one, no country packs). */
   localeBg: "bg-BG";
 }

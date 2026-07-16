@@ -346,6 +346,11 @@ export interface RecordScriptedDriveOptions {
   /** FOG condition flag (doc 72 AC-03) — reaches every tick through
    *  runtime.sample exactly like `rain`. Default false = today. */
   fog?: boolean;
+  /** SNOW condition flag (doc 72 AC-08 winter grip) — the same seam again
+   *  (tick.snow). Default false = today, byte-identical. The recorder stays
+   *  KINEMATIC: snow-grip ghost envelopes are AUTHORED per script
+   *  (SCRIPT_DECEL × SNOW_GRIP_FACTOR — the wet dual-channel honesty). */
+  snow?: boolean;
   /** Hard cap on scripted-drive length (default 900 s). */
   maxDurationSec?: number;
   /**
@@ -567,6 +572,7 @@ export function recordScriptedDrive(
   const isNight = options.isNight ?? false;
   const rain = options.rain ?? false;
   const fog = options.fog ?? false;
+  const snow = options.snow ?? false;
   const maxFrames = Math.ceil((options.maxDurationSec ?? 900) / SCRIPT_DT);
 
   // Cockpit-state channels (see the DriveStep doc): initial values are the
@@ -680,7 +686,7 @@ export function recordScriptedDrive(
       fogLightsOn,
     };
     pendingGlance = null;
-    const tick = runtime.sample(vehicleSample, t, isNight, rain, leadGap, fog);
+    const tick = runtime.sample(vehicleSample, t, isNight, rain, leadGap, fog, snow);
     if (director) {
       const res = director.step({
         tSec: t,

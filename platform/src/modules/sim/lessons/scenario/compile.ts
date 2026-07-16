@@ -24,9 +24,11 @@
  *    (S0-View: merge lesson.parkingBay into the buildWorldGeometry bays).
  *  - Traffic defaults to ZERO (a focused micro-map is not a boulevard);
  *    templates/levels opt back in per rung.
- *  - weather: dry/rain/FOG compile (fog ungated — FogExp2 render + tick.fog
- *    conditions envelope + fog-lamp duty, doc 72 AC-03); snow stays TAGGABLE
- *    but not compilable (doc 76 §0 weather gaps) — such a rung throws.
+ *  - weather: EVERY condition compiles — dry/rain/fog/snow (the doc 76 §0
+ *    weather gaps are closed: fog via the AC-03 unlock, snow via the AC-08
+ *    winter-grip unlock: snow haze render + tick.snow conditions envelope;
+ *    the snow-grip PHYSICS stays the scenario's explicit physics.snowGrip
+ *    opt-in — the wet precedent, never implied by the weather tag).
  */
 
 import type { LessonAidsSpec, LessonObjective, LessonSpec, ParkingBaySpec } from "../../contracts";
@@ -122,23 +124,22 @@ export function compileScenario(spec: ScenarioSpec, level: ScenarioLevel): Lesso
     );
   }
 
-  // Conditions: rung overrides template. FOG is compilable (doc 76 §0 weather
-  // gap closed: FogExp2 render + tick.fog conditions envelope + fog-lamp duty);
-  // SNOW stays a catalog tag until its render/friction slice ships.
+  // Conditions: rung overrides template. EVERY weather compiles — fog closed
+  // the render/grading gap first (AC-03), snow composes the same render seam
+  // with the AC-08 winter story (snow haze + tick.snow conditions envelope).
+  // The reduced-grip PHYSICS is deliberately NOT implied by the weather tag:
+  // it stays the template's explicit physics opt-in (the wet precedent).
   const conditions = { ...(spec.conditions ?? {}), ...(rung.conditions ?? {}) };
-  if (conditions.weather === "snow") {
-    throw new ScenarioCompileError(
-      spec.id,
-      level,
-      `condition "${conditions.weather}" is tag-only for now (doc 76 §0 weather gaps) — the engine ships dry/rain/fog (+night)`,
-    );
-  }
   const environment: LessonSpec["environment"] | undefined =
-    conditions.night || conditions.weather === "rain" || conditions.weather === "fog"
+    conditions.night ||
+    conditions.weather === "rain" ||
+    conditions.weather === "fog" ||
+    conditions.weather === "snow"
       ? {
           ...(conditions.night ? { timeOfDay: "night" as const } : {}),
           ...(conditions.weather === "rain" ? { rain: true } : {}),
           ...(conditions.weather === "fog" ? { fog: true } : {}),
+          ...(conditions.weather === "snow" ? { snow: true } : {}),
         }
       : undefined;
 
@@ -200,8 +201,16 @@ export function compileScenario(spec: ScenarioSpec, level: ScenarioLevel): Lesso
     // the student's own attempt grades the taught fault (not only the shadow).
     ...(spec.ruleConfig ? { ruleConfig: spec.ruleConfig } : {}),
     // 4a physics opt-in (the ruleConfig pattern): only a template that AUTHORS
-    // physics.wetGrip flips the live car to wet grip — rain alone never does.
-    ...(spec.physics?.wetGrip ? { physics: { wetGrip: true } } : {}),
+    // physics.wetGrip / physics.snowGrip flips the live car to reduced grip —
+    // rain/snow weather alone never does.
+    ...(spec.physics?.wetGrip || spec.physics?.snowGrip
+      ? {
+          physics: {
+            ...(spec.physics.wetGrip ? { wetGrip: true } : {}),
+            ...(spec.physics.snowGrip ? { snowGrip: true } : {}),
+          },
+        }
+      : {}),
   };
 
   const aids = mergeAids(level, rung.aids);

@@ -2,10 +2,12 @@ import { beforeEach, describe, expect, it } from "vitest";
 import {
   FOG_IN_PER_SEC,
   RAIN_IN_PER_SEC,
+  SNOW_IN_PER_SEC,
   WETNESS_IN_PER_SEC,
   WETNESS_OUT_PER_SEC,
   getFogIntensity,
   getRainIntensity,
+  getSnowIntensity,
   getWetness,
   resetWeather,
   setWeatherTarget,
@@ -91,6 +93,31 @@ describe("weather channel", () => {
     expect(getRainIntensity()).toBe(1);
     resetWeather();
     expect(getFogIntensity()).toBe(0);
+  });
+
+  it("SNOW channel: ramps at the documented rate, independent of rain/fog/wetness", () => {
+    setWeatherTarget(false, false, true);
+    run(1);
+    expect(getSnowIntensity()).toBeCloseTo(SNOW_IN_PER_SEC, 2);
+    // Snow does NOT wet the road (the honest scope cut) and brings no rain/fog.
+    expect(getWetness()).toBe(0);
+    expect(getRainIntensity()).toBe(0);
+    expect(getFogIntensity()).toBe(0);
+    run(1 / SNOW_IN_PER_SEC); // more than enough to saturate
+    expect(getSnowIntensity()).toBe(1);
+    // The default (rain-only signature) clears the snow target — additive API.
+    setWeatherTarget(false);
+    stepWeather(999);
+    expect(getSnowIntensity()).toBe(0);
+  });
+
+  it("SNOW channel: clamps and resets like the other channels", () => {
+    setWeatherTarget(true, false, true);
+    stepWeather(999);
+    expect(getSnowIntensity()).toBe(1);
+    expect(getRainIntensity()).toBe(1);
+    resetWeather();
+    expect(getSnowIntensity()).toBe(0);
   });
 });
 

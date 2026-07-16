@@ -21,12 +21,18 @@ import {
   type ShaderMaterialParameters,
 } from "three";
 import { ENVIRONMENT_PRESETS, sunDirection, type TimeOfDay } from "./presets";
-import { getFogIntensity, getRainIntensity } from "./weather";
+import { getFogIntensity, getRainIntensity, getSnowIntensity } from "./weather";
 
 /** How far the FOG weather pulls the whole sky gradient toward the fog color
  *  at full intensity — near-total: in dense fog there IS no sky, only the
  *  bank (0.85 keeps a hint of gradient so the dome never reads flat-painted). */
 const FOG_SKY_WASH = 0.85;
+
+/** How far SNOW weather pulls the sky toward its cold snow-haze color —
+ *  lighter than the fog wash: a snow overcast is a bright white sheet with a
+ *  little gradient left, not a bank you cannot see through. Applied BEFORE
+ *  the fog wash so fog wins a foggy snow. */
+const SNOW_SKY_WASH = 0.75;
 
 /** Damping stiffness for preset crossfades (≈2 s to settle). */
 const FADE_LAMBDA = 2.2;
@@ -143,6 +149,7 @@ export function SkyDome({ timeOfDay, radius = 520 }: { timeOfDay: TimeOfDay; rad
     sunDir: new Vector3(0, 1, 0),
     gray: new Color(),
     fogWash: new Color(),
+    snowWash: new Color(),
   });
 
   // Goal values re-derived only when the preset changes.
@@ -154,6 +161,7 @@ export function SkyDome({ timeOfDay, radius = 520 }: { timeOfDay: TimeOfDay; rad
       horizon: new Color(p.sky.horizon),
       sun: new Color(p.sky.sunTint),
       fogWeather: new Color(p.fogWeather.color),
+      snowWeather: new Color(p.snowWeather.color),
       sunDir: new Vector3(s.x, s.y, s.z),
       horizonCurve: p.sky.horizonCurve,
       discCos: Math.cos((p.sky.sunDiscDeg * Math.PI) / 180),
@@ -177,6 +185,7 @@ export function SkyDome({ timeOfDay, radius = 520 }: { timeOfDay: TimeOfDay; rad
     const base = scratchRef.current;
     const rain = getRainIntensity();
     const fog = getFogIntensity();
+    const snow = getSnowIntensity();
 
     dampColor(base.zenith, goal.zenith, FADE_LAMBDA, dt);
     dampColor(base.horizon, goal.horizon, FADE_LAMBDA, dt);
@@ -186,12 +195,14 @@ export function SkyDome({ timeOfDay, radius = 520 }: { timeOfDay: TimeOfDay; rad
     base.sunDir.z = MathUtils.damp(base.sunDir.z, goal.sunDir.z, FADE_LAMBDA, dt);
 
     // Rain: pull the gradient toward its own luminance (overcast gray),
-    // soften the sun, hide the stars. FOG weather then washes the whole
-    // gradient toward the preset's fog color (in a dense bank there is no
-    // sky) — applied after the rain gray-out so fog wins a foggy rain.
+    // soften the sun, hide the stars. SNOW weather then washes the gradient
+    // toward its cold snow-haze color (a bright winter sheet), and FOG
+    // weather washes over BOTH toward the preset's fog color (in a dense
+    // bank there is no sky) — applied last so fog wins a foggy rain/snow.
     const grayOut = (target: Color, from: Color, amount: number) => {
       const l = 0.299 * from.r + 0.587 * from.g + 0.114 * from.b;
       target.copy(from).lerp(base.gray.setScalar(l * 0.85), rain * amount);
+      target.lerp(base.snowWash.copy(goal.snowWeather), snow * SNOW_SKY_WASH);
       target.lerp(base.fogWash.copy(goal.fogWeather), fog * FOG_SKY_WASH);
     };
     grayOut(u.uZenith.value as Color, base.zenith, 0.55);
@@ -203,18 +214,23 @@ export function SkyDome({ timeOfDay, radius = 520 }: { timeOfDay: TimeOfDay; rad
     u.uSunDiscCos.value = MathUtils.damp(u.uSunDiscCos.value as number, goal.discCos, FADE_LAMBDA, dt);
     u.uSunDiscIntensity.value = MathUtils.damp(
       u.uSunDiscIntensity.value as number,
-      goal.discIntensity * (1 - 0.85 * rain) * (1 - fog),
+      goal.discIntensity * (1 - 0.85 * rain) * (1 - fog) * (1 - 0.9 * snow),
       FADE_LAMBDA,
       dt,
     );
     u.uGlow.value = MathUtils.damp(
       u.uGlow.value as number,
-      goal.glow * (1 - 0.7 * rain) * (1 - fog),
+      goal.glow * (1 - 0.7 * rain) * (1 - fog) * (1 - 0.8 * snow),
       FADE_LAMBDA,
       dt,
     );
     u.uGlowPower.value = MathUtils.damp(u.uGlowPower.value as number, goal.glowPower, FADE_LAMBDA, dt);
-    u.uStars.value = MathUtils.damp(u.uStars.value as number, goal.stars * (1 - rain) * (1 - fog), FADE_LAMBDA, dt);
+    u.uStars.value = MathUtils.damp(
+      u.uStars.value as number,
+      goal.stars * (1 - rain) * (1 - fog) * (1 - snow),
+      FADE_LAMBDA,
+      dt,
+    );
     u.uTime.value = state.clock.elapsedTime;
   });
 

@@ -47,9 +47,16 @@
  * ADR-006 stage 4a adds sc-ac-wet-braking — the FIRST template on the opt-in
  * wet-grip physics slice (LessonSpec.physics.wetGrip ← ScenarioSpec.physics):
  * the friction-model slice of the doc-72 AC-07 subsystem (wet braking distance
- * ~1.4×; the standing-water aquaplane FLOAT itself, and AC-08/12 ice/crosswind,
+ * ~1.4×; the standing-water aquaplane FLOAT itself, and AC-12 crosswind,
  * remain Phase-4 work). See that template's header for the dual-channel
  * honesty note (live physics vs authored kinematic demos).
+ *
+ * The SNOW unlock adds sc-ac-snow (AC-08's packed-snow slice) — the LAST
+ * weather ungated, by COMPOSING the two shipped seams: fog's render path
+ * (weather="snow" → environment.snow → the lighter cold haze + tick.snow at
+ * conditionSpeedSnowFactor 0.5) and the wet-grip physics opt-in
+ * (physics.snowGrip → SNOW_GRIP_FACTOR 0.4 → ~2.5× braking distance). Black
+ * ice (~0.1–0.2 grip, the AC-08 invisible-hazard CUE) stays Phase-4.
  */
 
 import type { BrakingLeadCarSpec } from "../../contracts";
@@ -615,6 +622,147 @@ export const SC_AC_FOG: ScenarioSpec = {
   localeBg: "bg-BG",
 };
 
+// ---------------------------------------------------------------------------
+// 6. sc-ac-snow — „Сняг" (AC-08 packed-snow slice) on ac-rain-v1 (360 m
+//    straight street, limit 50, DAY SNOW, SNOW-GRIP PHYSICS — the last
+//    weather unlock: fog's render seam × the wet-grip physics seam)
+// ---------------------------------------------------------------------------
+
+/** The stop mark of sc-ac-snow: the shadow eases to a full stop here, ~5.7 m
+ *  short of the stopped van at y = 310 (the sc-ac-wet-braking geometry,
+ *  reused verbatim — nose 302.02 vs the van's rear face at 307.75). */
+const SNOW_STOP_MARK_Y = 300;
+
+/**
+ * AC-08 (packed-snow slice) — зимно каране по заснежен път (ЗДвП чл. 20
+ * ал. 2: скоростта се съобразява със състоянието на пътя и атмосферните
+ * условия, така че водачът да може да спре пред всяко предвидимо препятствие).
+ *
+ * THE COMPOSITION IS THE LESSON (the two shipped seams, together):
+ *  - conditions.weather "snow" compiles to LessonSpec.environment.snow → the
+ *    scene renders the cold snow haze (lighter than fog — you SEE the road,
+ *    you cannot STOP on it) and the runtime feeds tick.snow every frame; the
+ *    conditions envelope hardens to conditionSpeedSnowFactor 0.5 × 50 =
+ *    25 km/h — the „зимна скорост" band. Driving the dry habit (~40 km/h,
+ *    legal in rain) grades SPEED_TOO_FAST_FOR_CONDITIONS;
+ *  - `physics.snowGrip` compiles to LessonSpec.physics.snowGrip → the LIVE
+ *    student car runs at tuning.SNOW_GRIP_FACTOR (0.4): packed snow holds
+ *    ~0.35–0.45 of dry grip, braking distance ~2.5× — braking „където сухият
+ *    навик казва" physically cannot stop the car (the wet-braking precedent,
+ *    one grip band deeper).
+ *  - DUAL-CHANNEL HONESTY (the 4a law): the recorded demos are KINEMATIC, so
+ *    every stop ramp is authored at SCRIPT_DECEL × SNOW_GRIP_FACTOR
+ *    (traces/scAcSnow.ts SNOW_DECEL ≈ 1.84 m/s²) — the same scaling the live
+ *    car obeys, pinned by the trace gate.
+ *
+ * HONEST VISUAL SCOPE (documented, not hidden): no snowfall particles and no
+ * white ground cover ship in this slice (asset work — doc 76 §0); the cold
+ * desaturated haze, the copy and the snow-grip physics carry the winter
+ * story. Like the wet template, the stopped van is a RECORDER obstacle rect
+ * (trace channel), not a live prop — the live student's graded skill is the
+ * low-speed stop-mark zone; the collision consequence is demonstrated by the
+ * red ghosts.
+ */
+export const SC_AC_SNOW: ScenarioSpec = {
+  id: "sc-ac-snow",
+  family: "conditions",
+  tagsBg: ["условия", "сняг", "зимни условия", "спирачен път", "съобразена скорост"],
+  titleBg: "Сняг",
+  objectiveBg:
+    "Измини заснежената улица със зимна скорост и спри плавно на маркираната позиция зад спрелия автомобил — на утъпкан сняг гумите държат под половината от сухото сцепление и спирачният път е около 2,5 пъти по-дълъг.",
+  archetypeIds: ["AC-08"],
+  conceptIds: ["c-winter-ice", "c-braking-distance", "c-stopping-distance-total"],
+  map: {
+    archetype: "straight-street",
+    // Reuses the committed ac-rain-v1 map (a plain 1+1 straight street) — its
+    // meta.scenario.params, mirrored here for provenance.
+    params: { lengthM: 360, maxspeedKmh: 50 },
+    districtId: "ac-rain-v1",
+  },
+  start: {
+    spawnPointId: "ac-rain-spawn-approach",
+    vehicleStart: "ready",
+  },
+  instructionsBg: [
+    { n: 1, textBg: "Пътят е заснежен: включи късите светлини и потегли меко, без резки движения." },
+    {
+      n: 2,
+      textBg:
+        "Стабилизирай се около 22 км/ч — на сняг зимната скорост е наполовина под знака, не „малко по-бавно“.",
+    },
+    {
+      n: 3,
+      textBg:
+        "Утъпканият сняг държи около 40% от сухото сцепление: същата спирачка спира колата около 2,5 пъти по-дълго.",
+    },
+    {
+      n: 4,
+      textBg:
+        "Напред в лентата е спрял автомобил. Вдигни газта многократно по-рано, отколкото ти казва сухият навик, и спирай меко и постепенно.",
+    },
+    { n: 5, textBg: "Спри напълно на маркираната позиция, с дистанция до спрелия отпред, и задръж колата." },
+  ],
+  success: [
+    {
+      id: "sc-acs-approach",
+      titleBg: "Приближи със зимна скорост",
+      // Cap 25 km/h IS the snow conditions envelope (0.5 × 50): the adapted
+      // ~22 km/h drive satisfies it; the dry-habit 40 km/h cannot pass here
+      // without slowing into the winter band.
+      params: { kind: "reachZone", x: LANE_X, y: 150, radiusM: 12, maxSpeedKmh: 25 },
+    },
+    {
+      id: "sc-acs-mark",
+      titleBg: "Спри точно на маркираната позиция",
+      // Completable ONLY at near-stop speed at the mark (the pk-smooth-stop
+      // discipline): a car that brakes at the dry-habit point slides through
+      // this zone — on the 0.4 snow grip it simply cannot rest here.
+      params: { kind: "reachZone", x: LANE_X, y: SNOW_STOP_MARK_Y, radiusM: 4, maxSpeedKmh: 6 },
+    },
+  ],
+  rubric: { parTimeSec: 90 },
+  // RECORDED: committed deterministic recordings of the authored scripts in
+  // traces/scAcSnow.ts; gates in traces/__tests__/sc-ac-snow-traces.test.ts
+  // (re-record with RECORD_TRACES=1).
+  shadow: { path: "content/traces/sc-ac-snow/shadow-correct.trace.json" },
+  mistakes: [
+    {
+      traceRef: { path: "content/traces/sc-ac-snow/mistake-dry-speed.trace.json" },
+      titleBg: "Кара „като на сухо“ — 40 в снега",
+      whatWentWrongBg:
+        "Колата носеше 40 км/ч по заснежения път — „нали е под ограничението“. Но ограничението е таван за суха настилка: на сняг несъобразената скорост изяжда цялата дистанция, а спирачният път се брои по зимното сцепление. Зимната скорост тук е под 25 км/ч (чл. 20, ал. 2).",
+      codeRefs: ["SPEED_TOO_FAST_FOR_CONDITIONS"],
+    },
+    {
+      traceRef: { path: "content/traces/sc-ac-snow/mistake-late-brake.trace.json" },
+      titleBg: "Спирачка на „сухата” точка",
+      whatWentWrongBg:
+        "Водачът кара със зимна скорост, но натисна спирачката там, където сухият навик казва, че стига — на утъпкания сняг същата спирачка спира колата около 2,5 пъти по-дълго и тя се плъзна в спрелия отпред автомобил. На сняг вдигаш газта многократно по-рано и спираш меко (чл. 20, ал. 2).",
+      codeRefs: ["COLLISION"],
+    },
+  ],
+  teach: {
+    whenBg:
+      "При всяко каране по заснежен или заледен път — първият сняг, утъпканите странични улици, сенчестите участъци, които не се топят. Двете правила идват заедно: зимна скорост (около наполовина под знака) и многократно по-ранно, по-меко спиране — сухият навик за „точката на спирачката“ на сняг е капан.",
+    whyBg:
+      "Утъпканият сняг държи около 40% от сухото сцепление — спирачният път расте обратно на сцеплението и от 25 км/ч става колкото сухият от 40. Повечето зимни удари са точно това: скорост „по знака“ и спирачка на сухата точка. Който брои снежния път в главата си, спира пред препятствието, не в него — а резките движения на волана и спирачката на сняг отключват поднасяне.",
+    lawRef: "ЗДвП чл. 20, ал. 2",
+    examinerBg:
+      "Изпитващият следи дали „четеш“ настилката: на сняг очаква скорост далеч под ограничението, меки команди и многократно по-ранно вдигане на газта. Несъобразената със зимния път скорост е грешка, а спирането в препятствие прекратява изпита.",
+  },
+  levels: [
+    { level: 1 },
+    { level: 2 },
+    { level: 3 },
+    { level: 4, vehicleStart: "cold" },
+  ],
+  conditions: { weather: "snow" },
+  // THE COMPOSITION: the live student car runs snow-grip physics (opt-in,
+  // authored — the weather tag alone never flips physics, the wet precedent).
+  physics: { snowGrip: true },
+  localeBg: "bg-BG",
+};
+
 /** The adverse-conditions-family templates, in catalog order (registered in
  *  templates.ts). */
 export const SCENARIO_TEMPLATES_CONDITIONS: readonly ScenarioSpec[] = [
@@ -623,4 +771,5 @@ export const SCENARIO_TEMPLATES_CONDITIONS: readonly ScenarioSpec[] = [
   SC_AC_HIGHBEAM_LEAD,
   SC_AC_WET_BRAKING,
   SC_AC_FOG,
+  SC_AC_SNOW,
 ];

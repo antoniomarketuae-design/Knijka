@@ -41,6 +41,7 @@ import {
   DEFAULT_DIFFICULTY,
   DIFFICULTY_ORDER,
   DIFFICULTY_PRESETS,
+  SNOW_GRIP_FACTOR,
   WET_GRIP_FACTOR,
   type DifficultyMode,
   type DrivelineEvent,
@@ -597,6 +598,9 @@ function ReadyScene({
   // FOG weather (doc 72 AC-03): dense FogExp2 + dimmed rig in SimEnvironment,
   // and tick.fog through RuntimeDriver → runtime.sample (the rain seam).
   const fogWeather = lesson.environment?.fog ?? false;
+  // SNOW weather (doc 72 AC-08): the lighter cold haze + tick.snow — the
+  // same seam as fog; the snow-grip PHYSICS rides lesson.physics, never this.
+  const snowWeather = lesson.environment?.snow ?? false;
   const isNight = timeOfDay === "night";
   const level = toLevel(quality);
   const spawn = useMemo(() => spawnPose(lesson, spawnPoints), [lesson, spawnPoints]);
@@ -817,7 +821,7 @@ function ReadyScene({
         }}
       >
         {perfLog ? <PerfProbe level={level} /> : null}
-        <SimEnvironment timeOfDay={timeOfDay} rain={rain} fog={fogWeather} quality={level} />
+        <SimEnvironment timeOfDay={timeOfDay} rain={rain} fog={fogWeather} snow={snowWeather} quality={level} />
         {/* HDRI image-based lighting — real sky reflections/ambient for PBR
             materials, glass, mirrors and car paint. background=false keeps
             SimEnvironment's animated sky dome. Day uses the golden-hour
@@ -872,10 +876,15 @@ function ReadyScene({
                 // absent = the street nudge tolerance (default 10).
                 collisionMinKmh={lesson.collisionMinKmh}
                 night={isNight}
-                // 4a: the OPT-IN wet-grip physics. Read from the AUTHORED
-                // physics field only — never derived from environment.rain
-                // (shipped rain lessons were tuned against dry physics).
-                gripFactor={lesson.physics?.wetGrip ? WET_GRIP_FACTOR : 1}
+                // 4a + snow: the OPT-IN reduced-grip physics. Read from the
+                // AUTHORED physics field only — never derived from
+                // environment.rain/snow (shipped weather lessons were tuned
+                // against dry physics). Both authored = the MOST RESTRICTIVE
+                // factor wins (min — the condition-factor discipline).
+                gripFactor={Math.min(
+                  lesson.physics?.wetGrip ? WET_GRIP_FACTOR : 1,
+                  lesson.physics?.snowGrip ? SNOW_GRIP_FACTOR : 1,
+                )}
                 // N11 (VP-06): director→cluster warning-lamp channel.
                 telltaleLitRef={telltaleLitRef}
               />
@@ -918,6 +927,7 @@ function ReadyScene({
               isNight={isNight}
               rain={rain}
               fog={fogWeather}
+              snow={snowWeather}
               paused={physicsPaused}
             />
             {/* A11 hittable traffic: a fixed pool of kinematic collider
@@ -1295,6 +1305,7 @@ function RuntimeDriver({
   isNight,
   rain,
   fog,
+  snow,
   paused,
 }: {
   runtime: ReturnType<typeof createWorldRuntime>;
@@ -1332,6 +1343,8 @@ function RuntimeDriver({
   rain: boolean;
   /** FOG weather flag — reaches every tick via runtime.sample (the rain seam). */
   fog: boolean;
+  /** SNOW weather flag — the same seam (tick.snow, doc 72 AC-08). */
+  snow: boolean;
   paused: boolean;
 }) {
   const tRef = useRef(0);
@@ -1457,7 +1470,7 @@ function RuntimeDriver({
     // A6 audio pass: sticky scene state for the audio layer (rain patter +
     // NPC proximity hum) — consumed by VehicleRig's per-frame audio update.
     audioRef.current?.setEnvironment({ rain, nearestNpcM: leadGap });
-    const tick = runtime.sample(sample, tRef.current, isNight, rain, leadGap, fog);
+    const tick = runtime.sample(sample, tRef.current, isNight, rain, leadGap, fog, snow);
 
     // A8: the scenario director steps AFTER traffic.update + runtime.sample —
     // it watches the player, commands staged actors (effective next frame)

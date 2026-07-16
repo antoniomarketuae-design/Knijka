@@ -19,6 +19,13 @@
 //                   the SkyDome gray-out. Slower in/out than rain — fog banks
 //                   roll in, they don't switch. Fog does NOT wet the road
 //                   (wetness stays a rain channel).
+//   snowIntensity — how heavy the SNOW weather is *right now* (doc 72 AC-08
+//                   winter grip). Drives a LIGHTER, colder fog-like haze than
+//                   the fog bank (snowfall veils the distance, it does not
+//                   blind), a milder rig dim and a cold SkyDome wash. Like
+//                   fog, snow does NOT wet the road (an honest scope cut —
+//                   white ground cover is asset work; the winter story is
+//                   carried by the haze, the copy and the snow-grip physics).
 
 import { useSyncExternalStore } from "react";
 
@@ -34,6 +41,11 @@ export const RAIN_OUT_PER_SEC = 1 / 3;
 export const FOG_IN_PER_SEC = 1 / 5;
 /** Fog intensity decay rate (1/s → lifts in ~6 s). */
 export const FOG_OUT_PER_SEC = 1 / 6;
+/** Snow intensity rise rate (1/s → full snowfall in ~6 s — weather fronts
+ *  arrive, they don't switch; slowest of the three channels). */
+export const SNOW_IN_PER_SEC = 1 / 6;
+/** Snow intensity decay rate (1/s → clears in ~8 s). */
+export const SNOW_OUT_PER_SEC = 1 / 8;
 
 let wetness = 0;
 let wetnessTarget = 0;
@@ -41,6 +53,8 @@ let rainIntensity = 0;
 let rainTarget = 0;
 let fogIntensity = 0;
 let fogTarget = 0;
+let snowIntensity = 0;
+let snowTarget = 0;
 
 const listeners = new Set<() => void>();
 
@@ -58,12 +72,14 @@ function approach(current: number, target: number, ratePerSec: number, dtSec: nu
   return Math.max(current - maxDelta, target);
 }
 
-/** Set the targets from the lesson's rain/fog flags. Called by SimEnvironment.
- *  `fog` is additive (default false = today's rain-only behavior). */
-export function setWeatherTarget(rain: boolean, fog = false): void {
+/** Set the targets from the lesson's rain/fog/snow flags. Called by
+ *  SimEnvironment. `fog` and `snow` are additive (defaults false = the
+ *  pre-existing rain-only behavior, byte-identical). */
+export function setWeatherTarget(rain: boolean, fog = false, snow = false): void {
   wetnessTarget = rain ? 1 : 0;
   rainTarget = rain ? 1 : 0;
   fogTarget = fog ? 1 : 0;
+  snowTarget = snow ? 1 : 0;
 }
 
 /**
@@ -75,6 +91,7 @@ export function stepWeather(dtSec: number): void {
   const prevW = quantize(wetness);
   const prevR = quantize(rainIntensity);
   const prevF = quantize(fogIntensity);
+  const prevS = quantize(snowIntensity);
   wetness = clamp01(
     approach(wetness, wetnessTarget, wetness < wetnessTarget ? WETNESS_IN_PER_SEC : WETNESS_OUT_PER_SEC, dtSec),
   );
@@ -84,7 +101,15 @@ export function stepWeather(dtSec: number): void {
   fogIntensity = clamp01(
     approach(fogIntensity, fogTarget, fogIntensity < fogTarget ? FOG_IN_PER_SEC : FOG_OUT_PER_SEC, dtSec),
   );
-  if (quantize(wetness) !== prevW || quantize(rainIntensity) !== prevR || quantize(fogIntensity) !== prevF) {
+  snowIntensity = clamp01(
+    approach(snowIntensity, snowTarget, snowIntensity < snowTarget ? SNOW_IN_PER_SEC : SNOW_OUT_PER_SEC, dtSec),
+  );
+  if (
+    quantize(wetness) !== prevW ||
+    quantize(rainIntensity) !== prevR ||
+    quantize(fogIntensity) !== prevF ||
+    quantize(snowIntensity) !== prevS
+  ) {
     for (const fn of listeners) fn();
   }
 }
@@ -104,6 +129,11 @@ export function getFogIntensity(): number {
   return fogIntensity;
 }
 
+/** Imperative read of current SNOW intensity 0..1 (per-frame consumers). */
+export function getSnowIntensity(): number {
+  return snowIntensity;
+}
+
 /** Reset to bone-dry and clear. For tests and full sim teardown. */
 export function resetWeather(): void {
   wetness = 0;
@@ -112,6 +142,8 @@ export function resetWeather(): void {
   rainTarget = 0;
   fogIntensity = 0;
   fogTarget = 0;
+  snowIntensity = 0;
+  snowTarget = 0;
   for (const fn of listeners) fn();
 }
 
@@ -146,6 +178,15 @@ export function useFogIntensity(): number {
   return useSyncExternalStore(
     subscribe,
     () => quantize(fogIntensity),
+    () => 0,
+  );
+}
+
+/** Snow intensity 0..1, quantized to 0.01 (occasional React consumers). */
+export function useSnowIntensity(): number {
+  return useSyncExternalStore(
+    subscribe,
+    () => quantize(snowIntensity),
     () => 0,
   );
 }

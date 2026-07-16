@@ -27,6 +27,8 @@ export {
   FOG_SUN_DIM,
   FOG_HEMISPHERE_DIM,
   FOG_TOPDOWN_MAX_OPTICAL,
+  SNOW_SUN_DIM,
+  SNOW_HEMISPHERE_DIM,
 } from "./presets";
 export { BENCHMARK_CAMERAS } from "./benchmarkCameras";
 export type { BenchmarkCameraPose } from "./benchmarkCameras";
@@ -63,9 +65,11 @@ export {
   useWetness,
   useRainIntensity,
   useFogIntensity,
+  useSnowIntensity,
   getWetness,
   getRainIntensity,
   getFogIntensity,
+  getSnowIntensity,
   wetnessToRoadParams,
   resetWeather,
 } from "./weather";

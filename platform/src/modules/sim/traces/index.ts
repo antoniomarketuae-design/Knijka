@@ -315,6 +315,16 @@ export {
   recordScAcFogDrive,
   type ScAcFogTraceName,
 } from "./scAcFog";
+// SNOW unlock (doc 72 AC-08 packed-snow slice — the LAST weather ungated) —
+// the day-snow authored drives (sc-ac-snow: snow conditions envelope 0.5 +
+// SNOW_DECEL ghost envelopes authored at SCRIPT_DECEL × SNOW_GRIP_FACTOR);
+// committed traces under content/traces/sc-ac-snow/ are recordings of exactly
+// these scripts (gate: traces/__tests__/sc-ac-snow-traces).
+export {
+  SC_AC_SNOW_ID,
+  recordScAcSnowDrive,
+  type ScAcSnowTraceName,
+} from "./scAcSnow";
 
 // Detector pack unit 2 — Part A (shipped detectors: FO-08 standstill gap,
 // OV-07 crossing overtake) + Part B (config-gated drills: JU-23 junction scan,

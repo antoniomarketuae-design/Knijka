@@ -96,11 +96,19 @@ describe("compileScenario — sc-park-perp-rev", () => {
     expect(() => compileScenario(SC_PARK_PERP_REV, 5)).toThrow(/does not author L5.*L1, L2, L3, L4/);
   });
 
-  it("refuses to compile gated conditions (snow stays tag-only, doc 76 §0)", () => {
+  it("compiles SNOW rungs into the lesson environment (the AC-08 unlock — the last weather ungated)", () => {
     const s = clone();
     s.levels[2].conditions = { weather: "snow" };
-    expect(() => compileScenario(s, 3)).toThrow(ScenarioCompileError);
-    expect(() => compileScenario(s, 3)).toThrow(/tag-only for now/);
+    // The doc 76 §0 gate is GONE: a snow rung no longer throws…
+    expect(() => compileScenario(s, 3)).not.toThrow();
+    // …and compiles the render/grading flag. Physics stays the template's
+    // explicit opt-in (the wet precedent): weather alone never flips grip.
+    const lesson = compileScenario(s, 3);
+    expect(lesson.environment).toEqual({ snow: true });
+    expect(lesson.physics).toBeUndefined();
+    // Snowy night composes both flags.
+    s.levels[2].conditions = { weather: "snow", night: true };
+    expect(compileScenario(s, 3).environment).toEqual({ timeOfDay: "night", snow: true });
   });
 
   it("compiles FOG rungs into the lesson environment (the AC-03 unlock — fog is no longer gated)", () => {

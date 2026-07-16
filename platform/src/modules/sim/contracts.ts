@@ -63,7 +63,8 @@ export interface WorldRuntime {
   update(dtSec: number): void;
   /** Produce the authoritative SimTick for the rule engine from a vehicle sample.
    *  `fog` (additive, default false) is the FOG condition flag — it reaches the
-   *  tick exactly like `rain` does (the doc 72 AC-03 seam). */
+   *  tick exactly like `rain` does (the doc 72 AC-03 seam); `snow` (additive,
+   *  default false) is the SNOW condition flag, the same seam again (AC-08). */
   sample(
     v: VehicleSample,
     tSec: number,
@@ -71,6 +72,7 @@ export interface WorldRuntime {
     rain?: boolean,
     leadGapM?: number,
     fog?: boolean,
+    snow?: boolean,
   ): SimTick;
   /** Current phase for a signal node (world renderer reads this to light the lamps). */
   signalPhase(signalNodeId: string): SignalPhase;
@@ -152,22 +154,28 @@ export interface LessonSpec {
   objectives: LessonObjective[];
   /** Optional time-of-day/weather override. `fog` = dense FOG (doc 72 AC-03):
    *  the scene renders the thick FogExp2 + dimmed rig, and the runtime feeds
-   *  tick.fog so the fog conditions envelope + fog-lamp duty arm. Additive —
-   *  absent = today's clear/rain behavior, byte-identical. */
-  environment?: { timeOfDay?: "day" | "dusk" | "night"; rain?: boolean; fog?: boolean };
+   *  tick.fog so the fog conditions envelope + fog-lamp duty arm. `snow` =
+   *  SNOW weather (doc 72 AC-08 winter grip): a LIGHTER cold haze + milder
+   *  dim (SimEnvironment snowWeather specs), and the runtime feeds tick.snow
+   *  so the snow conditions envelope arms (no lamp duty). Additive — absent =
+   *  today's clear/rain behavior, byte-identical. */
+  environment?: { timeOfDay?: "day" | "dusk" | "night"; rain?: boolean; fog?: boolean; snow?: boolean };
   /**
    * ADR-006 stage 4a — OPT-IN physics overrides for the LIVE VehicleSim.
    * `wetGrip: true` runs the hero car at tuning.WET_GRIP_FACTOR (0.7): tyre μ
    * and service-brake force scale down → ~1.4× braking distance, reduced
-   * cornering grip. DELIBERATELY DECOUPLED from environment.rain: today's
-   * rain lessons were authored and recorded against dry physics, and flipping
-   * them would silently change shipped feel — only a scenario that AUTHORS
-   * physics.wetGrip (compileScenario ← ScenarioSpec.physics) gets wet
+   * cornering grip. `snowGrip: true` runs it at tuning.SNOW_GRIP_FACTOR
+   * (0.4, packed snow → ~2.5× braking distance); when both are authored the
+   * MOST RESTRICTIVE factor wins (min — the condition-factor discipline).
+   * DELIBERATELY DECOUPLED from environment.rain/snow: today's rain lessons
+   * were authored and recorded against dry physics, and flipping them would
+   * silently change shipped feel — only a scenario that AUTHORS the physics
+   * field (compileScenario ← ScenarioSpec.physics) gets reduced-grip
    * dynamics. Absent = gripFactor 1.0 = bit-identical dry physics (the CI
    * harness baselines are the proof). Recorded traces are kinematic and never
-   * read this field — their wet honesty is authored in the trace scripts.
+   * read this field — their wet/snow honesty is authored in the trace scripts.
    */
-  physics?: { wetGrip?: boolean };
+  physics?: { wetGrip?: boolean; snowGrip?: boolean };
   /**
    * Per-lesson rule-engine config override (merged over DEFAULT_RULE_CONFIG;
    * createLessonSession opts win over this). Scenario drills for config-gated

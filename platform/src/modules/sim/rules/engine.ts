@@ -661,15 +661,19 @@ export function reduceTick(prev: RuleEngineState, tick: SimTick): ReduceResult {
   }
 
   // Speed for the conditions: within the posted limit, but too fast for rain /
-  // fog / night. (Above the limit is regular speeding, handled above.) Factors
-  // compose by MIN — the single most restrictive condition governs; the
-  // product would double-bill a rainy night (A12). A factor of 1 means the
-  // condition does not reduce the prudent speed at all.
+  // fog / snow / night. (Above the limit is regular speeding, handled above.)
+  // Factors compose by MIN — the single most restrictive condition governs;
+  // the product would double-bill a rainy night (A12). A factor of 1 means
+  // the condition does not reduce the prudent speed at all. Shipped default
+  // ordering: snow 0.5 < fog 0.6 < rain 0.85 ≤ night 1 — a snowy fog grades
+  // once at the snow envelope, exactly like a foggy rain grades at fog's.
   const raining = tick.rain === true;
   const foggy = tick.fog === true;
+  const snowy = tick.snow === true;
   const conditionFactor = Math.min(
     raining ? cfg.conditionSpeedRainFactor : 1,
     foggy ? cfg.conditionSpeedFogFactor : 1,
+    snowy ? cfg.conditionSpeedSnowFactor : 1,
     tick.isNight ? cfg.conditionSpeedNightFactor : 1,
   );
   const conditionsReduced = conditionFactor < 1;

@@ -257,19 +257,24 @@ export function validateScenarioSpec(
     }
   }
 
-  // -- Conditions (fog/snow taggable, compile-gated — no error here).
+  // -- Conditions (every weather compiles — dry/rain/fog/snow).
   for (const c of [spec.conditions, ...(spec.levels ?? []).map((l) => l.conditions)]) {
     if (c?.weather !== undefined && !["dry", "rain", "fog", "snow"].includes(c.weather)) {
       errors.push(`conditions.weather "${c.weather}" must be dry|rain|fog|snow`);
     }
   }
 
-  // -- Physics opt-in (ADR-006 stage 4a): boolean when present.
+  // -- Physics opt-in (ADR-006 stage 4a + the snow unlock): booleans when present.
   if (spec.physics !== undefined) {
     if (typeof spec.physics !== "object" || spec.physics === null) {
-      errors.push(`physics must be an object ({ wetGrip?: boolean }) when present`);
-    } else if (spec.physics.wetGrip !== undefined && typeof spec.physics.wetGrip !== "boolean") {
-      errors.push(`physics.wetGrip must be boolean when present`);
+      errors.push(`physics must be an object ({ wetGrip?: boolean; snowGrip?: boolean }) when present`);
+    } else {
+      if (spec.physics.wetGrip !== undefined && typeof spec.physics.wetGrip !== "boolean") {
+        errors.push(`physics.wetGrip must be boolean when present`);
+      }
+      if (spec.physics.snowGrip !== undefined && typeof spec.physics.snowGrip !== "boolean") {
+        errors.push(`physics.snowGrip must be boolean when present`);
+      }
     }
   }
 

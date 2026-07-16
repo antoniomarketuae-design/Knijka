@@ -171,6 +171,22 @@ describe("wet grip (4a) — braking distance", () => {
     },
     TEST_TIMEOUT,
   );
+
+  it(
+    "SNOW band (the AC-08 slice): same full-brake input from 50 km/h stops ~2.5× longer",
+    () => {
+      // The packed-snow law: SNOW_GRIP_FACTOR 0.4 ⇒ distance × ~1/0.4. Same
+      // opt-in seam, one grip band deeper — and 0.4 sits above the VehicleSim
+      // clamp floor (0.3), so the constant reaches the tyres unclipped.
+      const dry = brakeDistanceFrom(50);
+      const snow = brakeDistanceFrom(50, { gripFactor: T.SNOW_GRIP_FACTOR });
+      const ratio = snow / dry;
+      expect(snow).toBeGreaterThan(dry);
+      expect(ratio).toBeGreaterThanOrEqual(2.1);
+      expect(ratio).toBeLessThanOrEqual(2.9);
+    },
+    TEST_TIMEOUT,
+  );
 });
 
 // ---------------------------------------------------------------------------

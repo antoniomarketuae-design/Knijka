@@ -151,6 +151,22 @@ export const SIDE_FRICTION_STIFFNESS = 1.0;
  * the full Phase-4 friction model and stay out of the slice.
  */
 export const WET_GRIP_FACTOR = 0.7;
+/**
+ * SNOW surface grip factor (the SNOW unlock — doc 72 AC-08 winter grip;
+ * composes the wet-grip seam above with the fog render seam). Same opt-in
+ * contract as WET_GRIP_FACTOR: scales tyre μ and service-brake force in
+ * VehicleSim ONLY when a lesson AUTHORS LessonSpec.physics.snowGrip — the
+ * default gripFactor stays 1.0 and the dry path bit-identical.
+ *
+ * Value: PACKED SNOW holds ~0.35–0.45 of dry grip (tyre/winter-driving
+ * literature; the content bank's c-winter-ice: „на сняг и лед спирачният път
+ * се удължава многократно"). 0.4 ⇒ braking distance × 1/0.4 = ~2.5× dry from
+ * any speed and lateral grip capped at ~0.4× — the honest, teachable middle
+ * of the packed-snow band, and safely above VehicleSim's 0.3 clamp floor.
+ * Black ice (~0.1–0.2) is NOT this constant — it needs the Phase-4 friction
+ * model (doc 72 AC-08's invisible-hazard cue structure) and stays out.
+ */
+export const SNOW_GRIP_FACTOR = 0.4;
 
 // ---------------------------------------------------------------------------
 // Drivetrain

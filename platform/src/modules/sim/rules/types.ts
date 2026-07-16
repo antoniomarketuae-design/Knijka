@@ -165,6 +165,12 @@ export interface SimTick {
    * factor (harsher — чл. 20 ал. 2: stop within the VISIBLE distance) and the
    * fog-lamp duty (чл. 74), never the rain-lights detector. */
   fog?: boolean;
+  /** True in SNOW — winter grip conditions (doc 72 AC-08; optional; absent =
+   * clear). Arms ONLY the snow prudent-speed factor (the harshest of the
+   * condition factors — packed snow holds ~0.35–0.45 of dry grip, so чл. 20
+   * ал. 2 demands the deepest speed cut); no lamp duty arms on snow, and the
+   * rain/fog detectors never read it — every existing drive is byte-identical. */
+  snow?: boolean;
   /** Front fog lamps on (the cockpit V key / driveline fogLightsOn channel).
    * Optional and additive: absent = unknown = treated as OFF, but the only
    * detector reading it (FOG_LIGHTS_OFF_IN_FOG) arms exclusively when
@@ -539,6 +545,18 @@ export interface RuleEngineConfig {
    * true, so no existing drive can reach it.
    */
   conditionSpeedFogFactor: number;
+  /**
+   * Prudent-speed factor on the posted limit in SNOW (doc 72 AC-08 winter
+   * grip). The HARSHEST condition factor: packed snow holds ~0.35–0.45 of
+   * dry grip (SNOW_GRIP_FACTOR 0.4 — braking distance ~2.5× dry), so the
+   * чл. 20 ал. 2 stop-before-the-foreseeable-obstacle envelope demands a
+   * deeper cut than fog's visibility-driven 0.6 — 0.5 (a 50-zone envelope
+   * of 25 km/h) is the „зимна скорост" band the winter archetype teaches.
+   * Composes with rain/fog/night by MIN like every condition factor (never
+   * the product — see conditionSpeedRainFactor); armed ONLY when tick.snow
+   * is true, so no existing drive can reach it.
+   */
+  conditionSpeedSnowFactor: number;
   /** Seconds too-fast-for-conditions must hold before it fires. */
   conditionsSpeedSustainSec: number;
   /** Seconds of driving in rain without low beam before HEADLIGHTS_OFF_IN_RAIN. */
@@ -951,6 +969,11 @@ export const DEFAULT_RULE_CONFIG: RuleEngineConfig = {
   // rain's 0.85 (fog composes by MIN and governs a foggy rain). Armed only
   // by tick.fog — dry/rain/night drives never touch it.
   conditionSpeedFogFactor: 0.6,
+  // AC-08 winter grip: 0.5 × 50 = 25 km/h — the harshest factor (packed snow
+  // grip ~0.4 of dry ⇒ braking distance ~2.5×; чл. 20 ал. 2). Composes by
+  // MIN (a snowy fog grades at the snow envelope once, never the product).
+  // Armed only by tick.snow — dry/rain/fog/night drives never touch it.
+  conditionSpeedSnowFactor: 0.5,
   conditionsSpeedSustainSec: 3,
   rainLightsSustainSec: 3,
   fogLightsSustainSec: 3,

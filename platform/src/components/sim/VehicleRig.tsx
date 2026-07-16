@@ -120,9 +120,11 @@ export function VehicleRig({
   /** ADR-006 stage 4a — OPT-IN surface grip for the live physics car. 1
    *  (default, every existing lesson) = today's dry dynamics bit-identical;
    *  wet-grip lessons pass tuning.WET_GRIP_FACTOR (0.7) via
-   *  LessonSpec.physics.wetGrip → ~1.4× braking distance, reduced lateral
-   *  grip. Never derived from environment.rain (shipped rain lessons were
-   *  tuned dry — the flag is authored per scenario). */
+   *  LessonSpec.physics.wetGrip → ~1.4× braking distance; snow-grip lessons
+   *  pass tuning.SNOW_GRIP_FACTOR (0.4, packed snow) via physics.snowGrip →
+   *  ~2.5× braking distance, reduced lateral grip. Never derived from
+   *  environment.rain/snow (shipped weather lessons were tuned dry — the
+   *  flag is authored per scenario). */
   gripFactor?: number;
   /** N11 (VP-06): director→cluster warning-lamp channel, threaded to
    *  VitokCockpit (the hazardActiveRef pattern — render-free ref, read per

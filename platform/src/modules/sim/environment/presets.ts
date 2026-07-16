@@ -87,6 +87,18 @@ export interface EnvironmentPreset {
    */
   fogWeather: FogSpec;
   /**
+   * Fog target in SNOW WEATHER (doc 72 AC-08 winter grip — the snowfall
+   * veil); blended in by snow intensity. DELIBERATELY LIGHTER than the fog
+   * bank: heavy snowfall shortens usable sight to ~80–120 m (at 0.012,
+   * FogExp2 transmittance is ~40 % at 80 m and ~9 % at 130 m) — you see the
+   * road, you just cannot STOP on it (the grip physics carries the lesson).
+   * Cold desaturated white, never the warm haze. HONEST SCOPE (doc 76 §0):
+   * no snowfall particles and no white ground cover ship in this slice —
+   * asset work; the haze + copy + snow-grip physics carry the winter story.
+   * FOG weather wins over snow when both are on (fog is the denser veil).
+   */
+  snowWeather: FogSpec;
+  /**
    * Renderer tone-mapping exposure target (gl.toneMappingExposure). Per-preset
    * so day can run punchy without brightening the intentionally-dark night rig
    * (doc 71 §4.1 — "stop sharing one knob"). SimEnvironment damps toward it on
@@ -106,6 +118,13 @@ export const FOG_SUN_DIM = 0.8;
 /** How much FOG dims the hemisphere fill (mild — fog scatters light around). */
 export const FOG_HEMISPHERE_DIM = 0.2;
 
+/** How much SNOW dims the key light at full snowfall — a snow overcast sits
+ *  between rain (0.55) and fog (0.8): the sun is a diffuse smudge, not gone. */
+export const SNOW_SUN_DIM = 0.6;
+/** How much SNOW dims the hemisphere fill — LIGHTEST of the three: snowfall
+ *  scatters light everywhere and a winter sky stays bright (high albedo). */
+export const SNOW_HEMISPHERE_DIM = 0.1;
+
 /**
  * Top-down fog cap (doc 76 §4 note: the topdown camera flies at a constant
  * ~110 m — at fog-weather densities the ground would be a solid white sheet).
@@ -114,7 +133,9 @@ export const FOG_HEMISPHERE_DIM = 0.2;
  * through a clearly-foggy ~43 % wash instead of disappearing. Driving views
  * (cockpit ~1.2 m, chase ~5 m) sit far below the cap and render full density —
  * the cap is an honest VIEW-AID concession (topdown is an L1 aid view; the
- * graded envelope always follows tick.fog, never the camera).
+ * graded envelope always follows tick.fog, never the camera). The SNOW haze
+ * rides the SAME cap (0.012 × 110 m ≈ 1.32 optical would white the map out
+ * too) — one view-aid law for every weather veil.
  */
 export const FOG_TOPDOWN_MAX_OPTICAL = 0.75;
 
@@ -155,6 +176,9 @@ export const ENVIRONMENT_PRESETS: Record<TimeOfDay, EnvironmentPreset> = {
     rainFog: { color: "#9aabbd", density: 0.0034 },
     // Day fog: bright desaturated grey (fog scatters daylight) — ~50 m sight.
     fogWeather: { color: "#c9cdd2", density: 0.02 },
+    // Day snow: bright COLD white haze, lighter than fog (~80–120 m usable
+    // sight) — the snowfall veil, not a blinding bank.
+    snowWeather: { color: "#e8ebef", density: 0.012 },
     exposure: 1.15,
   },
 
@@ -182,6 +206,9 @@ export const ENVIRONMENT_PRESETS: Record<TimeOfDay, EnvironmentPreset> = {
     rainFog: { color: "#958b91", density: 0.0042 },
     // Dusk fog: the low warm light barely tints the bank.
     fogWeather: { color: "#aca7a3", density: 0.022 },
+    // Dusk snow: cold grey-blue veil — the day < dusk < night ordering of the
+    // fog specs, mirrored.
+    snowWeather: { color: "#c3c6cc", density: 0.013 },
     exposure: 1.1,
   },
 
@@ -210,6 +237,9 @@ export const ENVIRONMENT_PRESETS: Record<TimeOfDay, EnvironmentPreset> = {
     // Night fog: a faintly-lit dark grey (streetlights glow into the bank),
     // denser than day — night fog is the blindest condition we render.
     fogWeather: { color: "#1a2028", density: 0.024 },
+    // Night snow: a faintly-lit cold grey veil (headlights glitter into the
+    // flakes), densest of the three snow specs.
+    snowWeather: { color: "#252b34", density: 0.015 },
     exposure: 0.95,
   },
 };

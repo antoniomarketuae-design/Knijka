@@ -61,6 +61,57 @@ describe("speed-for-conditions detector — FOG", () => {
   });
 });
 
+// limit 50 · snow factor 0.5 → conditionLimit 25 · sustain 3 s (doc 72 AC-08).
+describe("speed-for-conditions detector — SNOW", () => {
+  it("fires at a fog-legal speed when the snow is on (snow is the harshest factor)", () => {
+    // 28 km/h: under fog's 30 envelope, over snow's 25 — the dry-habit band
+    // the winter archetype demos.
+    const ticks = [0, 1, 2, 3, 4].map((t) =>
+      tick(t, { speedKmh: 28, maxSpeedKmh: 50, snow: true, headlights: "low" }),
+    );
+    expect(codes(drive(ticks).events)).toContain("SPEED_TOO_FAST_FOR_CONDITIONS");
+  });
+
+  it("does not fire at the snow-adapted speed (the FP case: 22 in a 50 zone is the taught winter drive)", () => {
+    const ticks = [0, 1, 2, 3, 4].map((t) =>
+      tick(t, { speedKmh: 22, maxSpeedKmh: 50, snow: true, headlights: "low" }),
+    );
+    expect(codes(drive(ticks).events)).not.toContain("SPEED_TOO_FAST_FOR_CONDITIONS");
+  });
+
+  it("does not fire at the same speed without snow (the factor only arms when snow is on)", () => {
+    const ticks = [0, 1, 2, 3, 4].map((t) => tick(t, { speedKmh: 28, maxSpeedKmh: 50 }));
+    expect(codes(drive(ticks).events)).not.toContain("SPEED_TOO_FAST_FOR_CONDITIONS");
+  });
+
+  it("composes with rain/fog by MIN, not product: a snowy foggy rain grades at the snow envelope once", () => {
+    // 23 km/h: under snow's 25 AND under fog's 30 AND rain's 42.5 — a product
+    // (0.5 × 0.6 × 0.85 = 0.255 → 12.75) would flag this textbook-prudent
+    // winter drive (A12).
+    const ticks = [0, 1, 2, 3, 4].map((t) =>
+      tick(t, {
+        speedKmh: 23,
+        maxSpeedKmh: 50,
+        snow: true,
+        fog: true,
+        rain: true,
+        fogLightsOn: true,
+        headlights: "low",
+      }),
+    );
+    expect(codes(drive(ticks).events)).not.toContain("SPEED_TOO_FAST_FOR_CONDITIONS");
+  });
+
+  it("snow does NOT arm the fog-lamp or rain-lights duties (no lamp duty on snow)", () => {
+    const ticks = [0, 1, 2, 3, 4].map((t) =>
+      tick(t, { speedKmh: 22, maxSpeedKmh: 50, snow: true, headlights: "off", fogLightsOn: false }),
+    );
+    const got = codes(drive(ticks).events);
+    expect(got).not.toContain("FOG_LIGHTS_OFF_IN_FOG");
+    expect(got).not.toContain("HEADLIGHTS_OFF_IN_RAIN");
+  });
+});
+
 // fog + no front fog lamps · sustain 3 s (doc 72 AC-03, чл. 74).
 describe("fog-lamps-in-fog detector", () => {
   it("fires when driving in fog without the front fog lamps", () => {
