@@ -390,6 +390,17 @@ class TrafficSystemImpl implements TrafficSystem {
       radiusM,
     );
   }
+
+  overtakenNear(px: number, py: number, headingDeg: number, radiusM: number): CyclistApproach | null {
+    return sameDirVehicleNearFor(
+      this.vehicles,
+      (stateId) => this.cyclistStateIds.has(stateId),
+      px,
+      py,
+      headingDeg,
+      radiusM,
+    );
+  }
 }
 
 /**
@@ -431,6 +442,52 @@ export function cyclistNearFor(
     // Folded angular difference, 0 = same direction … 180 = head-on oncoming.
     const delta = Math.abs((((vBearing - headingDeg) % 360) + 540) % 360 - 180);
     if (delta > CYCLIST_SAME_DIR_DEG) continue; // oncoming/crossing → a meeting, not a pass
+    bestD2 = d2;
+    best = { x: v.x, y: v.y, dirX: v.dirX, dirY: v.dirY, speedMps: v.speedMps };
+  }
+  return best;
+}
+
+/**
+ * Pure "nearest same-direction VEHICLE near the player" query (OV-09 — the
+ * overtake-return duty's telemetry seam; the cyclistNearFor mold with the
+ * cyclist filter INVERTED). Any published vehicle state qualifies EXCEPT
+ * cyclist proxies (their pass duty is VU-02's lateral-clearance act — one
+ * act, one code); a vehicle heading more than the same-direction cone off
+ * the player's own heading is oncoming/crossing traffic — a different duty,
+ * never returned. Deliberately NO ahead/behind or speed filter: the runtime's
+ * return tracker reads the mate through the whole pass (ahead → alongside →
+ * behind), and a guard-stopped victim must still be returned at the landing
+ * (the reference-speed latch owns the rescue honesty). Nearest wins.
+ */
+export function sameDirVehicleNearFor(
+  vehicles: readonly {
+    id: number;
+    x: number;
+    y: number;
+    dirX: number;
+    dirY: number;
+    speedMps: number;
+  }[],
+  isCyclist: (stateId: number) => boolean,
+  px: number,
+  py: number,
+  headingDeg: number,
+  radiusM: number,
+): CyclistApproach | null {
+  const r2 = radiusM * radiusM;
+  let best: CyclistApproach | null = null;
+  let bestD2 = Infinity;
+  for (const v of vehicles) {
+    if (isCyclist(v.id)) continue; // the cyclist pass is VU-02's act
+    const dx = v.x - px;
+    const dy = v.y - py;
+    const d2 = dx * dx + dy * dy;
+    if (d2 > r2 || d2 >= bestD2) continue;
+    const vBearing = (Math.atan2(v.dirX, v.dirY) * 180) / Math.PI;
+    // Folded angular difference, 0 = same direction … 180 = head-on oncoming.
+    const delta = Math.abs((((vBearing - headingDeg) % 360) + 540) % 360 - 180);
+    if (delta > CYCLIST_SAME_DIR_DEG) continue; // oncoming/crossing → a meeting
     bestD2 = d2;
     best = { x: v.x, y: v.y, dirX: v.dirX, dirY: v.dirY, speedMps: v.speedMps };
   }

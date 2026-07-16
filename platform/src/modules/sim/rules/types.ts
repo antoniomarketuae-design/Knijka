@@ -401,6 +401,7 @@ export type ViolationCode =
   | "EMERGENCY_LANE_DRIVING" // опасна: sustained DRIVING in the лента за принудително спиране (чл. 58, т. 3; breakdown pull-off braking innocent, stopping descoped)
   // OVERTAKE-CORRIDOR adjudication (doc 72 OV-05/OV-08 — the head-on family)
   | "OVERTAKE_INSUFFICIENT_GAP" // опасна: committed on the opposing bank against an oncoming inside the convict gap (OV-05; the abort — braking + returning — NEVER convicts, OV-08)
+  | "OVERTAKE_RETURN_TOO_EARLY" // основна: returned to the own bank under ~1 s in front of the overtaken vehicle — the brake-forcing cut back (OV-09; чл. 42 — връщане вдясно без засичане; runtime overtake-return tracker)
   // VRU-INTERACTION pack slice 1 (doc 72 VU-02 — the lateral-clearance duty)
   | "VULNERABLE_PASS_TOO_CLOSE" // основна: passed a same-direction cyclist with under ~1.2 m of air (чл. 42 достатъчна странична дистанция; the 1.2–1.5 m band stays a taught grace — runtime vulnerable-pass tracker)
   // pre-drive procedure (procedures/machine.ts)

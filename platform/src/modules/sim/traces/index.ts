@@ -555,3 +555,16 @@ export {
   recordScOvAbortDrive,
   type ScOvAbortTraceName,
 } from "./scOvAbort";
+
+// OVERTAKE-RETURN adjudication (doc 72 OV-09 — the overtake's third act):
+// sc-ov-return-gap rides the runtime's overtake-return tracker
+// (OVERTAKE_RETURN_TOO_EARLY off the measured landing gap in front of the
+// overtaken vehicle at the committed return — the reference-speed latch keeps
+// a guard-rescued victim from acquitting the cut). Committed traces under
+// content/traces/sc-ov-return-gap/ are recordings of exactly these scripts
+// (gate: traces/__tests__/sc-ov-return-gap-traces).
+export {
+  SC_OV_RETURN_GAP_ID,
+  recordScOvReturnGapDrive,
+  type ScOvReturnGapTraceName,
+} from "./scOvReturnGap";

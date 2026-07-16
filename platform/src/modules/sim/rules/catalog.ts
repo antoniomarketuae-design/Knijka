@@ -614,6 +614,31 @@ export const VIOLATIONS: Record<ViolationCode, ViolationSpec> = {
     lawRef: "ЗДвП чл. 42, ал. 1",
     conceptId: "c-overtaking-procedure",
   },
+  OVERTAKE_RETURN_TOO_EARLY: {
+    // Doc 72 OV-09 „Ранно прибиране пред изпреварения": основна — the FO-03
+    // cut-in committed BY the student; forcing the overtaken driver's brake
+    // is the graded harm, the mirror image of the head-on gamble above.
+    // LAW VERIFICATION: ЗДвП чл. 42 — the bank grounds the return duty
+    // directly (manevri-i-izprevarvane: „връщаш се вдясно, БЕЗ ДА ЗАСИЧАШ
+    // изпреварения — виждаш го целия в огледалото за обратно виждане") and
+    // the mirror duty on the overtaken side (magistrali-i-izvangradsko:
+    // „изпреварваният не ускорява и не пречи"). ал. 2 exists in the statute
+    // but is NOT bank-confirmable (only a flagged „чл. 42, ал. 3?" exists),
+    // so the honest cite is чл. 42 bare — the ADR-002 retrieval discipline.
+    // The victim's rescue never acquits: the runtime tracker freezes the
+    // overtaken car's reference speed the moment the cut starts forcing it
+    // (runtime OVERTAKE_RETURN_* constants), while a car slowing on its OWN
+    // keeps lowering the reference — that named FP is structurally innocent.
+    severityClass: "osnovna",
+    points: SEVERITY_POINTS.osnovna,
+    titleBg: "Ранно прибиране пред изпреварения",
+    explanationBg:
+      "Прибра се в дясната лента непосредствено пред автомобила, който изпревари, и го принуди да намали. Изпреварването завършва едва с безопасното връщане вдясно — да засечеш изпреварения на метри пред носа му е същото вклиняване, от което ти самият се пазиш на пътя.",
+    correctiveBg:
+      "Прибирай се чак когато видиш ЦЕЛИЯ изпреваран автомобил в огледалото за обратно виждане — тогава разстоянието стига. Мигач надясно и плавна дъга обратно в лентата; секунда по-късно прибиране струва нищо, ранното струва спирачка на другия.",
+    lawRef: "ЗДвП чл. 42",
+    conceptId: "c-overtaking-procedure",
+  },
   VULNERABLE_PASS_TOO_CLOSE: {
     // Doc 72 VU-02 „Тясно изпреварване на колело": Н38 основна (опасна only
     // when the cyclist wobbles/reacts — which the sim adjudicates as the

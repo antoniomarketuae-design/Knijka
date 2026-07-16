@@ -461,6 +461,10 @@ export default function LessonScene(props: LessonSceneProps) {
         // runtime's lateral-clearance tracker reads — staged cyclist proxies
         // only, so every cyclist-less lesson stays structurally silent.
         runtime.setCyclistQuery((px, py, h, r) => traffic.cyclistNear(px, py, h, r));
+        // OV-09 (overtake return): the same-direction VEHICLE telemetry the
+        // runtime's return-gap tracker reads (cyclist proxies excluded at the
+        // source — their pass duty is VU-02's act).
+        runtime.setOvertakenQuery((px, py, h, r) => traffic.overtakenNear(px, py, h, r));
         // A8: stage the lesson's scripted encounters NOW — before TrafficLayer
         // mounts — so staged actors land inside the instanced buffers. The
         // director is deterministic per (lesson seed, attempt).

@@ -499,6 +499,19 @@ export interface TrafficSystem {
    */
   cyclistNear(px: number, py: number, headingDeg: number, radiusM: number): CyclistApproach | null;
   /**
+   * The nearest SAME-DIRECTION vehicle within `radiusM` of the player, or
+   * null (OV-09 — the overtake-return duty; doc 72 §10). The cyclistNear
+   * shape with the proxy filter INVERTED: cyclist proxies never qualify
+   * (their pass duty is VU-02's act — one act, one code), oncoming/crossing
+   * traffic is heading-filtered out, and there is deliberately NO
+   * ahead/behind or speed filter — the runtime's return tracker reads the
+   * overtaken mate through the whole pass (ahead → alongside → behind) and
+   * past a guard rescue. Wire into the runtime:
+   * `runtime.setOvertakenQuery((px, py, h, r) => traffic.overtakenNear(px,
+   * py, h, r))`. District space; headingDeg 0 = north, clockwise.
+   */
+  overtakenNear(px: number, py: number, headingDeg: number, radiusM: number): CyclistApproach | null;
+  /**
    * Deploy a scripted actor, dormant at its hold pose (A8). MUST be called
    * before the presentation layer mounts — TrafficLayer sizes its instanced
    * buffers from the agent arrays at mount. Returns null when the spec cannot

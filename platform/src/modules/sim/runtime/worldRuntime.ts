@@ -168,6 +168,77 @@ export const OVERTAKE_COMMIT_MIN_KMH = 20;
  */
 export const OVERTAKE_GAP_MEMORY_SEC = 1.5;
 /**
+ * OVERTAKE-RETURN adjudication (doc 72 §10 OV-09 — „ранно прибиране пред
+ * изпреварения", the brake-forcing cut back: FO-03's cut-in, committed BY the
+ * student). The graded act: the player completes a genuine PASS of a
+ * same-direction vehicle during an opposing-bank excursion (saw the mate
+ * genuinely AHEAD, then genuinely BEHIND — the VU-02 episode shape) and then
+ * RETURNS to the own bank landing so close in front of it that the return
+ * forces the mate's brake. The graded quantity is the LANDING GAP in seconds:
+ * bumper distance behind the player / the mate's REFERENCE speed — the time
+ * the overtaken driver has before reaching the returning car's position.
+ * ЗДвП чл. 42 (bank-verified, manevri-i-izprevarvane: „връщаш се вдясно, БЕЗ
+ * ДА ЗАСИЧАШ изпреварения — виждаш го целия в огледалото"; ал. 2 exists in
+ * the law but is NOT bank-confirmable, so the honest cite stays чл. 42).
+ * Bands (A12 — err innocent):
+ *  - gap < CONVICT (1.0 s) at the return commit → OVERTAKE_RETURN_TOO_EARLY
+ *    (основна): landing under a second in front of the overtaken vehicle IS
+ *    the brake-forcing cut, not a judgment call;
+ *  - 1.0–2.0 s: the honest TEACH band — under the taught mirror norm but
+ *    graded silent (the VU-02 teach-band ruling: the grace is real, the copy
+ *    teaches the norm);
+ *  - gap ≥ SAFE (2.0 s): the textbook return — clean by silence.
+ * THE REFERENCE-SPEED LATCH (the JU-10 "grade the gamble, never the victim's
+ * rescue" discipline, pointed backwards): the mate's speed is LIVE-TRACKED
+ * until the player's cut first enters the FORCING WINDOW (ahead of the mate
+ * within FORCE_AHEAD, laterally inside FORCE_LATERAL — the staged
+ * playerGuard's own geometry, widened so the latch always precedes the
+ * guard's brake), then FROZEN:
+ *  - a mate braking BECAUSE of the cut cannot acquit the cutter (the live
+ *    dist/speed measure balloons mid-rescue; the frozen reference keeps the
+ *    conviction honest);
+ *  - a mate that slowed ON ITS OWN before any convergence keeps LOWERING the
+ *    reference, which WIDENS the measured gap — the doc's named FP („the
+ *    overtaken car slowing on its own must not convict") is structurally
+ *    innocent.
+ * Structural innocence:
+ *  - no pass, no bill: an abort (never got ahead) produces no return event
+ *    at all — the OV-08 sacred-abort shape, inherited;
+ *  - the excursion dissolving for ANY reason other than a committed return
+ *    to the own bank (junction area, edge loss, solid-span handoff, reverse)
+ *    discards the episode silently;
+ *  - a creeping return (at/under the corridor commit bar) never grades;
+ *  - a mate under the arrival-claim floor makes no claim (parked/crawling —
+ *    the LEFT_TURN_MIN_CLOSING discipline);
+ *  - cyclist proxies never qualify (excluded at the traffic query — the
+ *    cyclist pass duty is VU-02's lateral-clearance act; one act, one code);
+ *  - ONE ACT, ONE CODE (the CROSSED_SOLID_LINE ruling): an excursion the
+ *    corridor has ALREADY billed (OVERTAKE_INSUFFICIENT_GAP emitted) never
+ *    re-bills at the return — the tight slot-back after a convicted gamble
+ *    is the same act's tail (the sc-ov-abort demos' „metres to spare"), and
+ *    the Н38 examiner marks the неправилно изпреварване once.
+ * One bill per overtake: the adjudication is the episode's single terminal
+ * event; a fresh excursion + pass + return is a fresh act and bills again.
+ */
+export const OVERTAKE_RETURN_CONVICT_GAP_SEC = 1.0;
+export const OVERTAKE_RETURN_SAFE_GAP_SEC = 2.0;
+/** Probe reach for the overtaken-mate query, m — covers the safe band at
+ * rural speeds (2 s × 25 m/s = 50 m) with slack. */
+export const OVERTAKE_RETURN_PROBE_RADIUS_M = 60;
+/** Center-to-center body allowance converting to a bumper gap, m (hero half
+ * length 2.02 + mate half ≈ 2.05 — the VU-02 point-geometry honesty). */
+export const OVERTAKE_RETURN_BODY_M = 4.1;
+/** Forcing window, mate frame: the player AHEAD of the mate within this… */
+export const OVERTAKE_RETURN_FORCE_AHEAD_M = 20;
+/** …and laterally inside this = any braking now answers the cut. Strictly
+ * wider than the staged guard corridor (16 m / 3.0 m), so the latch always
+ * fires before a guard rescue can taint the reference. */
+export const OVERTAKE_RETURN_FORCE_LATERAL_M = 4.0;
+/** Seen ahead/behind by at least this much (centers) = a genuine phase, m. */
+const OVERTAKE_RETURN_PASS_MARGIN_M = 2;
+/** Below this reference speed the mate makes no arrival claim, m/s. */
+const OVERTAKE_RETURN_MIN_REF_MPS = 1.0;
+/**
  * VULNERABLE-PASS tracker (doc 72 §7 VU-02 „Тясно изпреварване на колело" —
  * ЗДвП чл. 42: изпреварване на велосипедист само с ДОСТАТЪЧНА СТРАНИЧНА
  * ДИСТАНЦИЯ; the BG/EU taught norm ≈ 1.5 m of open air between bodies). The
@@ -422,6 +493,11 @@ export interface DistrictWorldRuntime extends WorldRuntime {
   /** Install the traffic module's same-direction cyclist lookup (default: none —
    *  the vulnerable-pass tracker stays structurally silent). */
   setCyclistQuery(fn: CyclistQuery | null): void;
+  /** Install the traffic module's same-direction VEHICLE lookup for the
+   *  overtake-return tracker (doc 72 OV-09; the CyclistQuery shape, reused —
+   *  cyclist proxies excluded at the source). Default: none — the tracker
+   *  stays structurally silent. */
+  setOvertakenQuery(fn: CyclistQuery | null): void;
   /** Physics layer reports a contact; drained into the next sample(). */
   pushCollision(withWhat: CollisionWith): void;
   /** Phase a driver approaching `signalNodeId` on `bearingDeg` sees (renderer helper). */
@@ -452,6 +528,7 @@ export function createWorldRuntime(districtJson: District | unknown): DistrictWo
   let rightConflictQuery: RightConflictQuery = () => false;
   let circulatingQuery: CirculatingQuery = () => false;
   let cyclistQuery: CyclistQuery = () => null;
+  let overtakenQuery: CyclistQuery = () => null;
 
   // Junction node positions (district space) for priority conflict lookups.
   const nodePos = new Map<string, { x: number; y: number }>();
@@ -627,6 +704,26 @@ export function createWorldRuntime(districtJson: District | unknown): DistrictWo
   let ocTightOnsetT = -Infinity; // stand-down window base (episode onset)
   let ocLastTightT = -Infinity; // last tight observation (memory latch)
   let ocTightGapSec: number | undefined; // gap recorded at that observation
+
+  // OVERTAKE-RETURN tracker (doc 72 OV-09) — one adjudication per completed
+  // overtake (excursion + pass + committed return); bands, the reference-
+  // speed latch and the structural-innocence list documented at
+  // OVERTAKE_RETURN_CONVICT_GAP_SEC.
+  let orExcursion = false; // mirrors the corridor's armed context
+  let orSawAhead = false; // the mate was seen genuinely AHEAD this excursion
+  let orPassed = false; // …and then genuinely BEHIND — the pass completed
+  let orForced = false; // the cut has entered the forcing window
+  let orRefSpeedMps = 0; // live-tracked until forced, then frozen
+  let orCorridorBilled = false; // corridor billed THIS excursion → stand down
+
+  const orReset = () => {
+    orExcursion = false;
+    orSawAhead = false;
+    orPassed = false;
+    orForced = false;
+    orRefSpeedMps = 0;
+    orCorridorBilled = false;
+  };
 
   // VULNERABLE-PASS tracker (doc 72 VU-02) — one adjudication per completed
   // pass of a same-direction cyclist proxy; constants + bands + stand-downs
@@ -1390,6 +1487,121 @@ export function createWorldRuntime(districtJson: District | unknown): DistrictWo
         ocLastTightT = -Infinity;
         ocTightGapSec = undefined;
       }
+      // 6a'. OVERTAKE-RETURN tracker (doc 72 OV-09) — rides the corridor's
+      // OWN armed context (ocArmed above): the pass phases are watched during
+      // the opposing-bank excursion, the single adjudication happens on the
+      // frame the excursion ends as a COMMITTED RETURN to the own bank.
+      // Bands + the reference-speed latch documented at
+      // OVERTAKE_RETURN_CONVICT_GAP_SEC.
+      if (ocArmed) {
+        orExcursion = true;
+        // One act, one code: the corridor billing this same excursion stands
+        // the return adjudication down (read while still armed — the oc
+        // else-branch clears ocEmitted before the return frame runs).
+        if (ocEmitted) orCorridorBilled = true;
+        const mate = overtakenQuery(
+          v.position.x,
+          v.position.y,
+          v.headingDeg,
+          OVERTAKE_RETURN_PROBE_RADIUS_M,
+        );
+        if (mate !== null) {
+          const orRad = (v.headingDeg * Math.PI) / 180;
+          const orFx = Math.sin(orRad);
+          const orFy = Math.cos(orRad);
+          const along =
+            (mate.x - v.position.x) * orFx + (mate.y - v.position.y) * orFy;
+          if (along > OVERTAKE_RETURN_PASS_MARGIN_M) orSawAhead = true;
+          else if (orSawAhead && along < -OVERTAKE_RETURN_PASS_MARGIN_M) orPassed = true;
+          // Forcing window, MATE frame (the staged playerGuard's geometry,
+          // widened): once the player's cut is what any braking answers, the
+          // reference speed freezes — the rescue can no longer acquit.
+          const mLen = Math.hypot(mate.dirX, mate.dirY);
+          const mDx = mLen > 0 ? mate.dirX / mLen : orFx;
+          const mDy = mLen > 0 ? mate.dirY / mLen : orFy;
+          const relAlong =
+            (v.position.x - mate.x) * mDx + (v.position.y - mate.y) * mDy;
+          const relLat = Math.abs(
+            (v.position.x - mate.x) * mDy - (v.position.y - mate.y) * mDx,
+          );
+          if (
+            relAlong > 0 &&
+            relAlong < OVERTAKE_RETURN_FORCE_AHEAD_M &&
+            relLat < OVERTAKE_RETURN_FORCE_LATERAL_M
+          ) {
+            orForced = true;
+          }
+          if (!orForced) orRefSpeedMps = mate.speedMps;
+        }
+      } else if (orExcursion) {
+        // The excursion ended THIS frame. A COMMITTED RETURN is the one exit
+        // where every other corridor condition still holds and only the bank
+        // flipped home — anything else (junction area, solid span, edge loss,
+        // reverse, narrow road) discards the episode silently (A12).
+        const returned =
+          tick.opposingBank !== true &&
+          tick.solidCenterLine !== true &&
+          edgeRt !== null &&
+          !edgeRt.edge.oneway &&
+          edgeRt.edge.lanes >= 2 &&
+          nearestIx === null &&
+          v.gear >= 0 &&
+          v.speedKmh > OVERTAKE_COMMIT_MIN_KMH;
+        if (returned && orPassed && !orCorridorBilled) {
+          const mate = overtakenQuery(
+            v.position.x,
+            v.position.y,
+            v.headingDeg,
+            OVERTAKE_RETURN_PROBE_RADIUS_M,
+          );
+          if (mate !== null) {
+            const orRad = (v.headingDeg * Math.PI) / 180;
+            const orFx = Math.sin(orRad);
+            const orFy = Math.cos(orRad);
+            const along =
+              (mate.x - v.position.x) * orFx + (mate.y - v.position.y) * orFy;
+            // The landing frame is itself forcing geometry when the player
+            // has arrived inside the mate's window — latch BEFORE any
+            // reference update, so a rescue landing on the very frame of the
+            // bank flip still cannot acquit the cut (the sharpest case; in
+            // continuous motion the excursion frames latch earlier).
+            const mLen = Math.hypot(mate.dirX, mate.dirY);
+            const mDx = mLen > 0 ? mate.dirX / mLen : orFx;
+            const mDy = mLen > 0 ? mate.dirY / mLen : orFy;
+            const relAlong =
+              (v.position.x - mate.x) * mDx + (v.position.y - mate.y) * mDy;
+            const relLat = Math.abs(
+              (v.position.x - mate.x) * mDy - (v.position.y - mate.y) * mDx,
+            );
+            if (
+              relAlong > 0 &&
+              relAlong < OVERTAKE_RETURN_FORCE_AHEAD_M &&
+              relLat < OVERTAKE_RETURN_FORCE_LATERAL_M
+            ) {
+              orForced = true;
+            }
+            // A final un-forced frame keeps the reference honest (a mate that
+            // slowed on its own keeps lowering it right up to the landing).
+            if (!orForced) orRefSpeedMps = mate.speedMps;
+            if (along < -OVERTAKE_RETURN_PASS_MARGIN_M) {
+              const bumperM = Math.max(0, -along - OVERTAKE_RETURN_BODY_M);
+              if (orRefSpeedMps >= OVERTAKE_RETURN_MIN_REF_MPS) {
+                const gapSec = bumperM / orRefSpeedMps;
+                if (gapSec < OVERTAKE_RETURN_CONVICT_GAP_SEC) {
+                  events.push({
+                    kind: "prioritySituation",
+                    situation: "overtake-return",
+                    violated: true,
+                    gapSec,
+                  });
+                }
+                // 1.0–2.0 s: the teach band — silent; ≥ 2 s: clean by silence.
+              }
+            }
+          }
+        }
+        orReset();
+      }
       // 6b. VULNERABLE-PASS tracker (doc 72 VU-02 — bands/stand-downs at
       // VULNERABLE_PASS_PROBE_RADIUS_M). Mid-block only: a junction area
       // DISCARDS the episode wholesale — the right-hook family there is the
@@ -1561,6 +1773,10 @@ export function createWorldRuntime(districtJson: District | unknown): DistrictWo
 
     setCyclistQuery(fn: CyclistQuery | null): void {
       cyclistQuery = fn ?? (() => null);
+    },
+
+    setOvertakenQuery(fn: CyclistQuery | null): void {
+      overtakenQuery = fn ?? (() => null);
     },
 
     debugUncontrolledJunctions() {

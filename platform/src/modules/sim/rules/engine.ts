@@ -1408,7 +1408,10 @@ function handleTickEvent(
       // and a distinct lesson from a junction priority slip. VU-02: the
       // runtime's vulnerable-pass adjudicator ("vulnerable-pass") is the same
       // discipline again — squeezing a cyclist is the чл. 42 lateral-clearance
-      // duty, not a junction priority, so it bills its own основна.
+      // duty, not a junction priority, so it bills its own основна. OV-09:
+      // the runtime's overtake-return adjudicator ("overtake-return") closes
+      // the overtake's third act — the brake-forcing cut back in front of the
+      // overtaken vehicle is the чл. 42 return duty, its own основна.
       if (e.violated) {
         out.push(
           makeViolation(
@@ -1416,9 +1419,11 @@ function handleTickEvent(
               ? "EMERGENCY_NOT_YIELDED"
               : e.situation === "overtake-oncoming"
                 ? "OVERTAKE_INSUFFICIENT_GAP"
-                : e.situation === "vulnerable-pass"
-                  ? "VULNERABLE_PASS_TOO_CLOSE"
-                  : "FAILED_TO_YIELD",
+                : e.situation === "overtake-return"
+                  ? "OVERTAKE_RETURN_TOO_EARLY"
+                  : e.situation === "vulnerable-pass"
+                    ? "VULNERABLE_PASS_TOO_CLOSE"
+                    : "FAILED_TO_YIELD",
             t,
             { detail: e.situation },
           ),

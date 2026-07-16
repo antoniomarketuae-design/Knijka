@@ -1280,6 +1280,100 @@ export const SC_OV_ABORT: ScenarioSpec = {
   localeBg: "bg-BG",
 };
 
+// ---------------------------------------------------------------------------
+// 12. sc-ov-return-gap — „Прибиране след изпреварване" (OV-09, the overtake's
+//     THIRD act) on ov-oncoming-v1 (map REUSED — the sc-ov-abort shared-
+//     district precedent). The oncoming lane is deliberately EMPTY: the graded
+//     act is the RETURN — cutting back in front of the overtaken vehicle too
+//     early (the brake-forcing cut, FO-03's mirror image) — and an oncoming
+//     conviction would mask it (the runtime's one-act-one-code stand-down).
+// ---------------------------------------------------------------------------
+
+/** OV-09 — връщане вдясно без засичане на изпреварения (ЗДвП чл. 42:
+ *  прибираш се едва когато видиш целия изпреваран в огледалото). */
+export const SC_OV_RETURN_GAP: ScenarioSpec = {
+  id: "sc-ov-return-gap",
+  family: "lanes",
+  tagsBg: ["изпреварване", "прибиране вдясно", "дистанция", "извънградски път"],
+  titleBg: "Прибиране след изпреварване",
+  objectiveBg:
+    "Изпревари бавната кола на празен насрещен път и се прибери вдясно БЕЗ да я засичаш: връщането е част от маневрата — прибираш се едва когато видиш целия изпреваран автомобил в огледалото за обратно виждане.",
+  archetypeIds: ["OV-09"],
+  conceptIds: ["c-overtaking-procedure", "c-following-distance", "c-general-care-duty"],
+  map: {
+    archetype: "straight-street",
+    // The generator recipe — mirrored in ov-oncoming-v1.json meta.scenario
+    // (tools/maps/gen_ov_oncoming.mjs; shared with sc-ov-oncoming-gap and
+    // sc-ov-abort — the mw-v1 shared-district precedent).
+    params: { lengthM: OVG_LENGTH, maxspeedKmh: 90 },
+    districtId: "ov-oncoming-v1",
+  },
+  start: {
+    spawnPointId: "ovg-spawn-start",
+    vehicleStart: "ready",
+  },
+  instructionsBg: [
+    { n: 1, textBg: "Потегли и се установи зад бавната кола — насрещната лента е свободна, изпреварването е разрешено." },
+    { n: 2, textBg: "Огледало, мигач наляво и излез решително — подмини бавната кола без бавене." },
+    { n: 3, textBg: "НЕ бързай да се прибираш: изпреварването не свършва при подминаването, а при безопасното връщане вдясно." },
+    { n: 4, textBg: "Прибери се с десен мигач едва когато видиш ЦЕЛИЯ изпреваран автомобил в огледалото за обратно виждане." },
+    { n: 5, textBg: "Плавна дъга обратно в своята лента — без рязък завой пред носа на изпреварения — и продължи до края." },
+  ],
+  success: [
+    {
+      id: "sc-ovr-pass",
+      titleBg: "Изпревари бавната кола в насрещната лента",
+      // Radius 5 on the committed-pass line (x = −2.5): satisfiable only by a
+      // genuine pass through the oncoming lane — the overtake IS the setup.
+      params: { kind: "reachZone", x: -2.5, y: 250, radiusM: 5 },
+    },
+    {
+      id: "sc-ovr-finish",
+      titleBg: "Прибери се вдясно с дистанция и завърши",
+      params: { kind: "reachZone", x: OVG_OWN, y: 540, radiusM: 5 },
+    },
+  ],
+  rubric: { parTimeSec: 70 },
+  // RECORDED: committed deterministic recordings of the authored scripts in
+  // traces/scOvReturnGap.ts; gates in traces/__tests__/
+  // sc-ov-return-gap-traces.test.ts (re-record with RECORD_TRACES=1).
+  shadow: { path: "content/traces/sc-ov-return-gap/shadow-correct.trace.json" },
+  mistakes: [
+    {
+      traceRef: { path: "content/traces/sc-ov-return-gap/mistake-early-cut.trace.json" },
+      titleBg: "Ранно прибиране пред изпреварения",
+      whatWentWrongBg:
+        "Колата подмина бавния автомобил и веднага се прибра — на метри пред носа му, под секунда дистанция. Така принуждаваш изпреварения да спира заради твоята маневра: същото вклиняване, от което всеки водач се пази. Прибираш се едва когато го видиш целия в огледалото (чл. 42).",
+      codeRefs: ["OVERTAKE_RETURN_TOO_EARLY"],
+    },
+    {
+      traceRef: { path: "content/traces/sc-ov-return-gap/mistake-fast-cut.trace.json" },
+      titleBg: "Засичане при бързо изпреварване",
+      whatWentWrongBg:
+        "„Минах бързо, значи мога и бързо да се прибера“ — но скоростта на изпреварването не променя дистанцията на връщането: колата се вряза пред изпреварения със същата половин секунда запас. Колкото по-бързо минаваш, толкова по-лесно е да изчакаш още миг и да се прибереш широко.",
+      codeRefs: ["OVERTAKE_RETURN_TOO_EARLY"],
+    },
+  ],
+  teach: {
+    whenBg:
+      "При всяко изпреварване — връщането вдясно е третото действие на маневрата, след преценката и подминаването. Сигурен ориентир: виждаш ли ЦЕЛИЯ изпреваран автомобил в огледалото за обратно виждане, разстоянието стига.",
+    whyBg:
+      "Ранното прибиране принуждава изпреварения да спира — а спирачка на 90 км/ч заради чуждо вклиняване е готов сценарий за верижна катастрофа. Изпреварването не е състезание до пролуката: секунда по-късно прибиране не струва нищо, секунда по-рано струва нечия спирачка (чл. 42).",
+    lawRef: "ЗДвП чл. 42",
+    examinerBg:
+      "Изпитващият гледа завършека на маневрата: навременен десен мигач, връщане с плавна дъга и ДИСТАНЦИЯ пред изпреварения — без да го засичаш. Прибиране непосредствено пред носа на изпреварения е основна грешка и разваля иначе чисто изпреварване.",
+  },
+  levels: [
+    { level: 1 },
+    { level: 2 },
+    { level: 3 },
+    { level: 4, vehicleStart: "cold" },
+  ],
+  staged: [ovgLeadCar("sc-ovr-lead")],
+  conditions: { weather: "dry" },
+  localeBg: "bg-BG",
+};
+
 export const SCENARIO_TEMPLATES_LANES: readonly ScenarioSpec[] = [
   SC_OV_KEEP_RIGHT,
   SC_OV_LANE_KEEPING,
@@ -1292,4 +1386,5 @@ export const SCENARIO_TEMPLATES_LANES: readonly ScenarioSpec[] = [
   SC_MW_EMERGENCY_LANE,
   SC_OV_ONCOMING_GAP,
   SC_OV_ABORT,
+  SC_OV_RETURN_GAP,
 ];

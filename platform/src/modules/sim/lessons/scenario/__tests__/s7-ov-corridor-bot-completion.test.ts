@@ -1,19 +1,21 @@
 /**
- * OVERTAKE-CORRIDOR bot-completion proofs (doc 72 OV-05/OV-08; the
- * s5-line-bot-completion mold) — the two corridor templates
- * (sc-ov-oncoming-gap / sc-ov-abort), each shadow driven through the FULL
- * production pipeline:
+ * OVERTAKE-CORRIDOR bot-completion proofs (doc 72 OV-05/OV-08/OV-09; the
+ * s5-line-bot-completion mold) — the three overtake templates
+ * (sc-ov-oncoming-gap / sc-ov-abort / sc-ov-return-gap), each shadow driven
+ * through the FULL production pipeline:
  *
  *   compileScenario(L3) → createLessonSession → recordSc*Drive's onTick feeds
  *   applyTick every production frame → session completes → wire serialization
  *   → gradeFinishWire RECOMPILES from the id and regrades → scoreRubric = 3★.
  *
  * Counter-proofs ride the same live pipeline: OVERTAKE_INSUFFICIENT_GAP
- * surfaces through the live rules for every mistake demo, the head-on demo
- * additionally grades COLLISION, and the shadows' positives stay absent from
- * the guilty runs. The ABORT shadow completing with ZERO violations is the
- * discipline's own proof living in the pipeline: an aborted overtake never
- * convicts.
+ * surfaces through the live rules for every corridor mistake demo, the
+ * head-on demo additionally grades COLLISION, the return-gap demos grade
+ * OVERTAKE_RETURN_TOO_EARLY (the overtake's third act), and the shadows'
+ * positives stay absent from the guilty runs. The ABORT shadow completing
+ * with ZERO violations is the discipline's own proof living in the pipeline:
+ * an aborted overtake never convicts — and the WIDE return's silence is the
+ * return tracker's mirror proof.
  */
 
 import { readFileSync } from "node:fs";
@@ -23,13 +25,14 @@ import { describe, expect, it } from "vitest";
 import type { RecordedDrive } from "../../../traces/recorder";
 import { recordScOvAbortDrive } from "../../../traces/scOvAbort";
 import { recordScOvOncomingGapDrive } from "../../../traces/scOvOncomingGap";
+import { recordScOvReturnGapDrive } from "../../../traces/scOvReturnGap";
 import { applyTick, buildLessonResult, createLessonSession } from "../../engine";
 import { gradeFinishWire, serializeRuleEvents } from "../../wire";
 import type { LessonResult, LessonSessionState } from "../../types";
 import { compileScenario } from "../compile";
 import { scenarioLessonById } from "../resolve";
 import { scoreRubric } from "../rubric";
-import { SC_OV_ABORT, SC_OV_ONCOMING_GAP } from "../templates-lanes";
+import { SC_OV_ABORT, SC_OV_ONCOMING_GAP, SC_OV_RETURN_GAP } from "../templates-lanes";
 import type { ScenarioSpec } from "../types";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -98,6 +101,10 @@ const CORRECT: Array<{ spec: ScenarioSpec; record: (d: unknown, onTick: OnTick) 
     spec: SC_OV_ABORT,
     record: (d, onTick) => recordScOvAbortDrive(d, "shadow-correct", { onTick }),
   },
+  {
+    spec: SC_OV_RETURN_GAP,
+    record: (d, onTick) => recordScOvReturnGapDrive(d, "shadow-correct", { onTick }),
+  },
 ];
 
 for (const { spec, record } of CORRECT) {
@@ -126,9 +133,16 @@ for (const { spec, record } of CORRECT) {
     });
 
     it("the staged oncoming resolved as a clean encounter (the choreography completed)", () => {
-      expect(
-        outcome.drive.outcomes.some((o) => o.kind === "oncomingStream" && o.detail === "clear"),
-      ).toBe(true);
+      // sc-ov-return-gap stages NO oncoming by design (an empty oncoming lane
+      // — the graded act is the return); the corridor templates' streams must
+      // still resolve clean.
+      if ((spec.staged ?? []).some((s) => s.kind === "oncomingStream")) {
+        expect(
+          outcome.drive.outcomes.some((o) => o.kind === "oncomingStream" && o.detail === "clear"),
+        ).toBe(true);
+      } else {
+        expect(outcome.drive.outcomes).toEqual([]);
+      }
     });
   });
 }
@@ -166,5 +180,23 @@ describe("OV-corridor counter-proofs — the mistakes grade through the live pip
     expect(driveViolationCodes(outcome)).toContain("OVERTAKE_INSUFFICIENT_GAP");
     expect(driveViolationCodes(outcome)).toContain("COLLISION");
     expect(outcome.result.passed).toBe(false);
+  });
+
+  it("the early cut back: OVERTAKE_RETURN_TOO_EARLY surfaces (the return's guilty twin)", () => {
+    const outcome = driveThroughSession(SC_OV_RETURN_GAP, (d, onTick) =>
+      recordScOvReturnGapDrive(d, "mistake-early-cut", { onTick }),
+    );
+    expect(driveViolationCodes(outcome)).toContain("OVERTAKE_RETURN_TOO_EARLY");
+    expect(driveCommendationCodes(outcome)).not.toContain("CLEAN_DRIVING");
+    // The cut is the return duty's fault, never the corridor's (empty oncoming).
+    expect(driveViolationCodes(outcome)).not.toContain("OVERTAKE_INSUFFICIENT_GAP");
+  });
+
+  it("the fast cut back: OVERTAKE_RETURN_TOO_EARLY again — speed does not change the return duty", () => {
+    const outcome = driveThroughSession(SC_OV_RETURN_GAP, (d, onTick) =>
+      recordScOvReturnGapDrive(d, "mistake-fast-cut", { onTick }),
+    );
+    expect(driveViolationCodes(outcome)).toContain("OVERTAKE_RETURN_TOO_EARLY");
+    expect(driveViolationCodes(outcome)).not.toContain("COLLISION");
   });
 });

@@ -560,6 +560,7 @@ export function recordScriptedDrive(
     traffic.circulatingConflict(cx, cy, px, py, h, r),
   );
   runtime.setCyclistQuery((px, py, h, r) => traffic.cyclistNear(px, py, h, r));
+  runtime.setOvertakenQuery((px, py, h, r) => traffic.overtakenNear(px, py, h, r));
   const staged = options.stagedEvents ?? [];
   const director =
     staged.length > 0
