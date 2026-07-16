@@ -60,6 +60,17 @@ export type SimTickEvent =
       control: "stopSign" | "trafficLight";
       lightState?: "red" | "redYellow" | "yellow" | "green";
       stoppable?: boolean;
+      /**
+       * JU-18 (регулировчик): the traffic CONTROLLER's resolved permission
+       * for this approach at the crossing moment. When present it is the
+       * EFFECTIVE signal and overrides `lightState` entirely (ЗДвП чл. 7 —
+       * сигналите на регулировчика са над светофара): "halt" grades the
+       * dedicated опасна CONTROLLER_SIGNAL_VIOLATED even on green lamps;
+       * "proceed" is innocent even on red. `lightState` still carries the
+       * LAMP truth for debriefs/asserts. Absent = no controller (every
+       * pre-JU-18 engine) → the lightState grading below, byte-identical.
+       */
+      controller?: "halt" | "proceed";
     }
   /**
    * Vehicle entered the approach zone of a pedestrian crossing (engine should
@@ -252,6 +263,7 @@ export type ViolationCode =
   | "HESITATION_AT_GREEN" // второстепенна: „закъснели действия" — green + clear + stationary (JU-09)
   | "YELLOW_LIGHT_NOT_STOPPED" // основна: amber entered although a comfortable stop existed (JU-06)
   | "RED_YELLOW_CROSSED" // основна: entered on the red+yellow combination (JU-08)
+  | "CONTROLLER_SIGNAL_VIOLATED" // опасна: entered against the traffic controller's halt (JU-18; Н38 termination item)
   // B1a Wave-2 detector pack (doc 72 capability 1 — small-rule detectors on EXISTING telemetry)
   | "STANDSTILL_GAP_TOO_CLOSE" // второстепенна: bumper-kissing behind a stopped lead at a standstill (FO-08)
   | "HIGH_BEAM_NOT_DIPPED" // второстепенна: long beam left on behind a lead vehicle at night (AC-04)

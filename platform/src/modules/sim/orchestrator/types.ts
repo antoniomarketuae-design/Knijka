@@ -46,6 +46,18 @@ export interface SignalDirectorPort {
     phase: SignalPhase,
     inSec: number,
   ): number;
+  /**
+   * JU-18 (ADR-006 stage 1d) — post/recall a traffic CONTROLLER at a signal
+   * cluster (structural twin of the runtime's setSignalClusterController;
+   * schedule shape mirrors SignalControllerSchedule without a runtime type
+   * import — the OncomingConflict precedent). OPTIONAL so pre-JU-18 fake
+   * ports stay valid; the trafficController runner degrades to a passive
+   * scenery figure when the port lacks it (fail-innocent: the lamps grade).
+   */
+  setSignalClusterController?(
+    signalNodeId: string,
+    schedule: { haltedGroup: "ns" | "ew"; flipAtSec?: number } | null,
+  ): void;
 }
 
 /** Player state + frame context the director consumes each frame. */

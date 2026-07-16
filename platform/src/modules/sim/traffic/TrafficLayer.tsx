@@ -85,8 +85,9 @@ import {
 // Pedestrian palettes: tops (existing 4 variants) + trousers per variant.
 const PED_COLORS = ["#b8895a", "#6d8a67", "#7a6f9b", "#a0524d"];
 const PED_LEG_COLORS = ["#3a4150", "#4d4439", "#565a5f", "#2f3a4a"];
-// VP-11 "stopSignal" pose (doc 72 — the roadside officer figure): generic
-// hi-vis vest over dark trousers, NO real insignia (ADR-001 fictional).
+// VP-11 "stopSignal" / JU-18 "directTraffic" poses (doc 72 — the officer
+// figures): generic hi-vis vest over dark trousers, NO real insignia
+// (ADR-001 fictional).
 const PED_POSE_HIVIS = "#cadd2e";
 const PED_POSE_LEGS = "#22304a";
 const BRAKE_ON = "#ff2a1a"; // brake pressed
@@ -115,6 +116,9 @@ const PED_SWING_FULL_SPEED_MPS = 1.1;
 /** "stopSignal" pose: the RIGHT arm held rotated ~166° about the shoulder —
  *  raised nearly straight up, the стоп-сигнал gesture (VP-11 officer). */
 const PED_POSE_ARM_RAISE_RAD = 2.9;
+/** "directTraffic" pose (JU-18 регулировчик): the RIGHT arm held rotated 90°
+ *  about the shoulder — extended horizontally along the facing direction. */
+const PED_POSE_ARM_EXTEND_RAD = Math.PI / 2;
 
 // L5 hazard ball (doc 68 A5): bright, big enough to read at speed.
 const HAZARD_BALL_RADIUS_M = 0.36;
@@ -483,15 +487,16 @@ export function TrafficLayer({
       const h = hash32(p.id);
       scratch.pedHeight[i] = 0.9 + ((h & 0xff) / 255) * 0.22;
       scratch.pedBuild[i] = 0.88 + (((h >>> 8) & 0xff) / 255) * 0.26;
-      // VP-11 officer figure: hi-vis vest + dark trousers (ADR-001 fictional).
+      // VP-11 / JU-18 officer figures: hi-vis vest + dark trousers (ADR-001
+      // fictional) — any authored pose wears the uniform.
       const top =
-        p.pose === "stopSignal" ? PED_POSE_HIVIS : PED_COLORS[p.colorIndex % PED_COLORS.length];
+        p.pose !== undefined ? PED_POSE_HIVIS : PED_COLORS[p.colorIndex % PED_COLORS.length];
       torso?.setColorAt(i, color.set(top));
       color.set(top).multiplyScalar(0.92); // sleeves a touch darker
       arm?.setColorAt(i * 2, color);
       arm?.setColorAt(i * 2 + 1, color);
       color.set(
-        p.pose === "stopSignal" ? PED_POSE_LEGS : PED_LEG_COLORS[p.colorIndex % PED_LEG_COLORS.length],
+        p.pose !== undefined ? PED_POSE_LEGS : PED_LEG_COLORS[p.colorIndex % PED_LEG_COLORS.length],
       );
       leg?.setColorAt(i * 2, color);
       leg?.setColorAt(i * 2 + 1, color);
@@ -853,11 +858,14 @@ export function TrafficLayer({
           const armX = sign * PED_SHOULDER_HALF * bld;
           const legX = sign * PED_HIP_HALF * bld;
           // Arm — the VP-11 "stopSignal" pose holds side 1 raised (the
-          // стоп-сигнал gesture); everything else swings with the walk.
+          // стоп-сигнал gesture), the JU-18 "directTraffic" pose holds it
+          // extended horizontally; everything else swings with the walk.
           const armRad =
             p.pose === "stopSignal" && side === 1
               ? PED_POSE_ARM_RAISE_RAD
-              : -sign * swing * PED_ARM_SWING_RAD;
+              : p.pose === "directTraffic" && side === 1
+                ? PED_POSE_ARM_EXTEND_RAD
+                : -sign * swing * PED_ARM_SWING_RAD;
           scratch.qRoll.setFromAxisAngle(AXIS_X, armRad);
           scratch.qWheel.copy(scratch.qYaw).multiply(scratch.qRoll);
           dummy.quaternion.copy(scratch.qWheel);

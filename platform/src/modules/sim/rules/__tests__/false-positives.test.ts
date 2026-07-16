@@ -171,6 +171,40 @@ describe("FP battery — stop lines", () => {
     ]);
     expectInnocent(events);
   });
+
+  it("JU-18: crossing on a RED lamp under the traffic controller's permission", () => {
+    // Innocent: the регулировчик waves the direction through while the lamps
+    // still show red — his signals outrank the lights (ЗДвП чл. 7). Crossing
+    // must never grade RED_LIGHT_CROSSED (or anything else).
+    const proceedOnRed: SimTickEvent = {
+      kind: "stopLineCrossed",
+      control: "trafficLight",
+      lightState: "red",
+      controller: "proceed",
+    };
+    const { events } = drive([
+      tick(0, { speedKmh: 12 }),
+      tick(1, { speedKmh: 15, events: [proceedOnRed] }),
+      tick(2, { speedKmh: 22 }),
+    ]);
+    expectInnocent(events);
+  });
+
+  it("JU-18: waved through by the controller while the lamps agree (green)", () => {
+    // Innocent: permission + green — the everyday controller pass-through.
+    const proceedOnGreen: SimTickEvent = {
+      kind: "stopLineCrossed",
+      control: "trafficLight",
+      lightState: "green",
+      controller: "proceed",
+    };
+    const { events } = drive([
+      tick(0, { speedKmh: 30 }),
+      tick(1, { speedKmh: 30, events: [proceedOnGreen] }),
+      tick(2, { speedKmh: 30 }),
+    ]);
+    expectInnocent(events);
+  });
 });
 
 // ---------------------------------------------------------------------------

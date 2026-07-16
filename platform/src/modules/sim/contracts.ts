@@ -374,7 +374,8 @@ export type StagedEventKind =
   | "oncomingLeftTurn"
   | "narrowMeeting"
   | "emergencyApproach"
-  | "policeStop";
+  | "policeStop"
+  | "trafficController";
 
 interface StagedEventBase {
   /** Unique per lesson, e.g. "l4-dart-out". */
@@ -681,6 +682,54 @@ export interface PoliceStopSpec extends StagedEventBase {
   passBeyondM: number;
 }
 
+/**
+ * ADR-006 stage 1d (doc 72 §3 JU-18 — „Регулировчик на кръстовището", ЗДвП
+ * чл. 7 / Наредба-38 termination item): a traffic CONTROLLER stands at a
+ * SIGNALIZED junction whose lamps keep cycling, and the controller's hand
+ * signals — not the lamps — govern every approach. THE HIERARCHY LESSON:
+ * green lamps do not acquit a crossing the controller halted.
+ *
+ * The runner arms the whole mechanic at session start (the signalOffsets /
+ * signalModes discipline, deterministic authored constants):
+ *  - dials the cluster to mode "controlled" with the authored permission
+ *    timetable (`haltedGroup` + optional single `flipAtSec` flip) through the
+ *    SignalDirectorPort → runtime setSignalClusterController;
+ *  - optionally pins the cluster's lamp offset (`signalOffsetSec`) so the
+ *    lamps show the authored misleading phase (green for the halted player);
+ *  - stages the officer FIGURE (a staged pedestrian that never walks — pose
+ *    "directTraffic": one arm extended horizontally + hi-vis, ADR-001
+ *    fictional). Purely visual.
+ *
+ * GRADING IS 100% THE EXISTING PIPELINE: the runtime's stopLineCrossed
+ * carries the controller permission and the reducer grades it (halt →
+ * CONTROLLER_SIGNAL_VIOLATED, proceed → innocent even on red lamps). The
+ * runner emits ZERO SimTick events — it only watches those same events to
+ * record the outcome (the amberDilemma precedent).
+ */
+export interface TrafficControllerSpec extends StagedEventBase {
+  kind: "trafficController";
+  /** Signal node id (member of the junction's controller cluster). */
+  signalNodeId: string;
+  /** Junction node position, district space (line-event ownership window). */
+  junction: { x: number; y: number };
+  /** Officer FIGURE standing point (the junction-center post), district space. */
+  officer: { x: number; y: number };
+  /** Unit facing direction of the figure (toward the halted approach). */
+  facing: { x: number; y: number };
+  /** Axis-group the controller HALTS from session start ("ns" | "ew"). */
+  haltedGroup: "ns" | "ew";
+  /** Controller time (session s) at which the halt flips to the other axis;
+   *  absent = static halt for the whole session. */
+  flipAtSec?: number;
+  /** Cluster lamp-phase offset pinned at stage time (the misleading-but-
+   *  visible lamp staging — e.g. green for the halted player); absent = the
+   *  map's natural FNV-1a offset. */
+  signalOffsetSec?: number;
+  /** Approximate player stop-line setback from the junction node, m (scopes
+   *  which stopLineCrossed events belong to this junction). */
+  lineDistM: number;
+}
+
 export type StagedEventSpec =
   | PedestrianDartOutSpec
   | PriorityFromRightSpec
@@ -691,7 +740,8 @@ export type StagedEventSpec =
   | OncomingLeftTurnSpec
   | NarrowMeetingSpec
   | EmergencyApproachSpec
-  | PoliceStopSpec;
+  | PoliceStopSpec
+  | TrafficControllerSpec;
 
 /**
  * Resolution record of one staged encounter (A8). The GRADING already

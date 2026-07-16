@@ -103,11 +103,12 @@ export interface TrafficVehicleState {
 
 /**
  * Presentation pose override for a STANDING pedestrian figure (staged actors
- * only today — doc 72 VP-11): "stopSignal" renders one arm raised + hi-vis
- * clothing (the fictional roadside officer, ADR-001 — no real insignia).
- * Visual only: no query or detector reads it.
+ * only today — doc 72 VP-11/JU-18): "stopSignal" renders one arm raised,
+ * "directTraffic" one arm extended horizontally (the регулировчик gesture) —
+ * both with hi-vis clothing (fictional officer figures, ADR-001 — no real
+ * insignia). Visual only: no query or detector reads it.
  */
-export type PedestrianPose = "stopSignal";
+export type PedestrianPose = "stopSignal" | "directTraffic";
 
 export interface TrafficPedestrianState {
   id: number;

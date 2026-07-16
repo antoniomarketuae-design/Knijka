@@ -25,7 +25,12 @@ import { BG_URBAN_DEFAULT_KMH, parseDistrict, type District } from "./district";
 import { Locator } from "./locator";
 import { DistrictIndex, makeEdgeHit, OFF_ROAD_DISTANCE_M } from "./spatial";
 import { bearingDeg, signedDeltaDeg } from "./geometry";
-import { SignalController, type SignalClusterInfo, type SignalClusterMode } from "./signals";
+import {
+  SignalController,
+  type SignalClusterInfo,
+  type SignalClusterMode,
+  type SignalControllerSchedule,
+} from "./signals";
 import { buildStopLines, type StopLine, type StopLineSet } from "./stoplines";
 import { CrossingZoneTracker, type PedestrianQuery } from "./zones";
 import { JUNCTION_AREA_RADIUS_M, TurnDetector } from "./turns";
@@ -250,6 +255,18 @@ export interface DistrictWorldRuntime extends WorldRuntime {
    * = the shipped signalized behavior exactly.
    */
   setSignalClusterMode(signalNodeId: string, mode: SignalClusterMode): void;
+  /**
+   * Post / recall a traffic CONTROLLER at a signal cluster (doc 72 JU-18 —
+   * регулировчик). A schedule dials the cluster to mode "controlled": the
+   * lamps keep cycling (misleading-but-visible), but every stop line of the
+   * cluster adjudicates against the controller's per-approach permission —
+   * crossing while your approach is HALTED grades the dedicated
+   * CONTROLLER_SIGNAL_VIOLATED; crossing while PERMITTED is innocent even on a
+   * red lamp (сигналите на регулировчика са над светофара, ЗДвП чл. 7).
+   * Deterministic session-start dial like setSignalClusterMode; null recalls
+   * the controller (back to "live"). Default absent = today's behavior.
+   */
+  setSignalClusterController(signalNodeId: string, schedule: SignalControllerSchedule | null): void;
   /** Install the traffic module's pedestrian lookup (default: nobody anywhere). */
   setPedestrianQuery(fn: PedestrianQuery | null): void;
   /** Install the traffic module's junction-conflict lookup (default: none). */
@@ -403,6 +420,20 @@ export function createWorldRuntime(districtJson: District | unknown): DistrictWo
       // is not a controlled stop line — no signal code fires (the junction is
       // uncontrolled; the right-hand-rule tracker adjudicates). doc 72 JU-09/20.
       if (signals.isClusterUncontrolled(line.clusterIdx)) return;
+      // Traffic controller posted (JU-18): the CONTROLLER's permission for
+      // this approach is the effective signal — the event carries BOTH the
+      // lamp truth (lightState — the hierarchy proof: green lamps do not
+      // acquit) and the permission; the reducer grades ONLY the permission.
+      const controllerPerm = signals.controllerPermission(line.clusterIdx, line.group ?? "ns");
+      if (controllerPerm !== null) {
+        events.push({
+          kind: "stopLineCrossed",
+          control: "trafficLight",
+          lightState: lightStateOf(line),
+          controller: controllerPerm,
+        });
+        return;
+      }
       const state = lightStateOf(line);
       const ev: Extract<SimTickEvent, { kind: "stopLineCrossed" }> = {
         kind: "stopLineCrossed",
@@ -540,7 +571,15 @@ export function createWorldRuntime(districtJson: District | unknown): DistrictWo
         if (!darkLine) {
           nextStopLineM = nextLineDistM;
           nextStopLineControl = line.control;
-          if (line.control === "trafficLight") nextStopLineState = lightStateOf(line);
+          if (line.control === "trafficLight") {
+            // JU-18: with a controller posted, the surfaced state is the
+            // EFFECTIVE signal, not the lamp — a HALTED approach reads "red"
+            // (so waiting at green lamps is never HESITATION_AT_GREEN and
+            // braking for the halt always has a cause); a PERMITTED approach
+            // reads the live lamp state.
+            const perm = signals.controllerPermission(line.clusterIdx, line.group ?? "ns");
+            nextStopLineState = perm === "halt" ? "red" : lightStateOf(line);
+          }
         }
       }
 
@@ -942,6 +981,13 @@ export function createWorldRuntime(districtJson: District | unknown): DistrictWo
 
     setSignalClusterMode(signalNodeId: string, mode: SignalClusterMode): void {
       signals.setClusterMode(signalNodeId, mode);
+    },
+
+    setSignalClusterController(
+      signalNodeId: string,
+      schedule: SignalControllerSchedule | null,
+    ): void {
+      signals.setClusterController(signalNodeId, schedule);
     },
 
     signalOffsetForPhaseStart(

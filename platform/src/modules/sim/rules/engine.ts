@@ -904,6 +904,15 @@ function handleTickEvent(
   switch (e.kind) {
     case "stopLineCrossed": {
       if (e.control === "trafficLight") {
+        // JU-18: a resolved CONTROLLER permission is the effective signal and
+        // overrides the lamps entirely (ЗДвП чл. 7 — сигналите на
+        // регулировчика са над светофара): "halt" is the dedicated 10-point
+        // опасна even on green lamps; "proceed" is innocent even on red.
+        // Absent (every pre-JU-18 runtime) = the lamp grading, byte-identical.
+        if (e.controller !== undefined) {
+          if (e.controller === "halt") out.push(makeViolation("CONTROLLER_SIGNAL_VIOLATED", t));
+          break;
+        }
         if (e.lightState === "red") out.push(makeViolation("RED_LIGHT_CROSSED", t));
         // Red+yellow creep (JU-08): entering on the combination is the
         // официална основна — deliberately NOT the 10-point red entry.

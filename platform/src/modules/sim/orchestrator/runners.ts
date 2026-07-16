@@ -30,6 +30,7 @@ import type {
   RoundaboutEntrySpec,
   StagedEventOutcome,
   StagedEventSpec,
+  TrafficControllerSpec,
 } from "../contracts";
 import type { SimTickEvent } from "../rules";
 import type { Rng } from "../traffic/rng";
@@ -1610,6 +1611,131 @@ export class PoliceStopRunner implements EventRunner {
 }
 
 // ---------------------------------------------------------------------------
+// 11. Traffic controller (ADR-006 stage 1d — doc 72 §3 JU-18 „Регулировчик",
+//     ЗДвП чл. 7: сигналите на регулировчика са над светофара; Н38
+//     termination item). The runner ARMS the whole mechanic at session start
+//     (the signalOffsets/signalModes discipline — authored constants, no
+//     step-time RNG): the cluster's controller schedule + optional lamp-phase
+//     pin through the SignalDirectorPort, and the posed officer FIGURE (a
+//     staged pedestrian that never walks — pose "directTraffic", ADR-001).
+//     GRADING IS 100% THE PRODUCTION PIPELINE: the runtime's stopLineCrossed
+//     carries the controller permission and the reducer grades it (halt →
+//     CONTROLLER_SIGNAL_VIOLATED even on green lamps; proceed → innocent even
+//     on red). The runner emits ZERO SimTick events — it only watches those
+//     same events to record the outcome (the amberDilemma precedent), so it
+//     can never convict on its own (A12).
+// ---------------------------------------------------------------------------
+
+/** Short standing path for the controller figure (buildStagedPedPath needs a
+ *  polyline > 0.2 m; the figure holds at its start forever), m. */
+const CONTROLLER_FACING_PATH_M = 1.5;
+/** Player counts as holding at the line at/under this, km/h. */
+const CONTROLLER_HOLD_KMH = 4;
+/** Holding is observable within this far beyond the stop-line setback, m. */
+const CONTROLLER_HOLD_ZONE_M = 12;
+/** A line event farther than lineDistM + this from the junction is some
+ *  other junction's line, m (the amberDilemma ownership window). */
+const CONTROLLER_LINE_OWN_M = 60;
+
+export class TrafficControllerRunner implements EventRunner {
+  phase: StagedEventPhase = "idle";
+  outcome: StagedEventOutcome | null = null;
+  hazardActive = false;
+
+  private sawHold = false;
+
+  constructor(
+    readonly spec: TrafficControllerSpec,
+    private readonly signals: SignalDirectorPort | null,
+  ) {}
+
+  stage(traffic: StagedTrafficPort, _rng: Rng, firstTime: boolean): void {
+    const s = this.spec;
+    if (firstTime) {
+      const view = traffic.stage({
+        kind: "pedestrian",
+        id: s.id,
+        // Standing at the junction post, facing the halted approach. The walk
+        // is NEVER commanded — the figure stands for the session.
+        path: [
+          { x: s.officer.x, y: s.officer.y },
+          {
+            x: s.officer.x + s.facing.x * CONTROLLER_FACING_PATH_M,
+            y: s.officer.y + s.facing.y * CONTROLLER_FACING_PATH_M,
+          },
+        ],
+        speedMps: 0,
+        colorIndex: 0,
+        pose: "directTraffic",
+      });
+      if (!view) throw new Error(`staged event ${s.id}: controller figure failed to stage`);
+    } else {
+      traffic.stagedCommand(s.id, { type: "reset" });
+    }
+    // Arm the signal mechanics — session-start dials, re-applied per attempt
+    // exactly like the director's signalOffsets. No jitter draw: everything
+    // about the controller is authored (deterministic per (seed, offsets)).
+    if (this.signals !== null) {
+      if (s.signalOffsetSec !== undefined) {
+        this.signals.setSignalClusterOffset(s.signalNodeId, s.signalOffsetSec);
+      }
+      this.signals.setSignalClusterController?.(s.signalNodeId, {
+        haltedGroup: s.haltedGroup,
+        ...(s.flipAtSec !== undefined ? { flipAtSec: s.flipAtSec } : {}),
+      });
+    }
+    this.phase = "armed";
+    this.outcome = null;
+    this.sawHold = false;
+  }
+
+  step(_traffic: StagedTrafficPort, input: DirectorInput, _out: SimTickEvent[]): StagedEventOutcome | null {
+    const s = this.spec;
+    if (this.phase === "resolved") return null;
+    const d = dist(input.x, input.y, s.junction.x, s.junction.y);
+
+    // Holding at the line while the player's approach is HALTED (authored
+    // schedule — a pure function of session time, same truth the runtime
+    // reads): latches the "waited for the controller" credit.
+    const halted = s.flipAtSec === undefined || input.tSec < s.flipAtSec;
+    if (
+      halted &&
+      input.speedKmh <= CONTROLLER_HOLD_KMH &&
+      d <= s.lineDistM + CONTROLLER_HOLD_ZONE_M
+    ) {
+      this.sawHold = true;
+      this.phase = "triggered";
+    }
+
+    // The production adjudication: OUR junction's stop line crossed — the
+    // runtime attached the controller permission, the reducer already graded.
+    for (const e of input.tickEvents) {
+      if (e.kind !== "stopLineCrossed" || e.control !== "trafficLight") continue;
+      if (e.controller === undefined) continue; // some live junction's line
+      if (d > s.lineDistM + CONTROLLER_LINE_OWN_M) continue;
+      if (e.controller === "halt") return this.resolve(input, false, "violation");
+      return this.resolve(input, true, this.sawHold ? "yielded" : "clear");
+    }
+
+    // Defensive: drove past the junction without a line event.
+    if (aheadOfPlayerM(input, s.junction.x, s.junction.y) < -CONTROLLER_LINE_OWN_M) {
+      return this.resolve(input, true, "clear");
+    }
+    return null;
+  }
+
+  private resolve(
+    input: DirectorInput,
+    success: boolean,
+    detail: StagedEventOutcome["detail"],
+  ): StagedEventOutcome {
+    this.phase = "resolved";
+    this.outcome = outcomeOf(this.spec, input, success, detail);
+    return this.outcome;
+  }
+}
+
+// ---------------------------------------------------------------------------
 
 export function createRunner(
   spec: StagedEventSpec,
@@ -1636,5 +1762,7 @@ export function createRunner(
       return new EmergencyApproachRunner(spec);
     case "policeStop":
       return new PoliceStopRunner(spec);
+    case "trafficController":
+      return new TrafficControllerRunner(spec, signals);
   }
 }

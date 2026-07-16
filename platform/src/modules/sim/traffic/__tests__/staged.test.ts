@@ -232,6 +232,26 @@ describe("staged pedestrian", () => {
     const plain = system.pedestrians.find((p) => p !== officer && p.id >= 1000)!;
     expect("pose" in plain).toBe(false);
   });
+
+  it("publishes the directTraffic pose for the JU-18 controller figure", () => {
+    const system = squareSystem();
+    system.stage({
+      kind: "pedestrian",
+      id: "controller",
+      path: [
+        { x: 150, y: 9.7 },
+        { x: 148.5, y: 9.7 },
+      ],
+      speedMps: 0,
+      pose: "directTraffic",
+    });
+    const controller = system.pedestrians.find((p) => p.pose === "directTraffic")!;
+    expect(controller).toBeDefined();
+    expect(controller.x).toBeCloseTo(150, 3); // stands at the post…
+    run(system, 3, ctx());
+    expect(controller.x).toBeCloseTo(150, 3); // …and never walks uncommanded
+    expect(controller.speedMps).toBe(0);
+  });
 });
 
 describe("staged determinism", () => {

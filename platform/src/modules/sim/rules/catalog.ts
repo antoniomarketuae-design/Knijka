@@ -360,6 +360,17 @@ export const VIOLATIONS: Record<ViolationCode, ViolationSpec> = {
     lawRef: "ППЗДвП чл. 31",
     conceptId: "c-traffic-light-signals",
   },
+  CONTROLLER_SIGNAL_VIOLATED: {
+    severityClass: "opasna",
+    points: SEVERITY_POINTS.opasna,
+    titleBg: "Неизпълнение на сигнала на регулировчика",
+    explanationBg:
+      "Премина стоп-линията, докато регулировчикът спираше твоето направление. Сигналите на регулировчика са на върха на йерархията — над светофара и знаците. Зеленият светофар не разрешава нищо, когато регулировчикът те спира: на изпита това е опасна грешка и изпитът се прекратява.",
+    correctiveBg:
+      "Има ли регулировчик на кръстовището — гледай неговите ръце, не светофара: спри преди линията, докато твоето направление е спряно, и потегли едва когато той разреши твоята посока.",
+    lawRef: "ЗДвП чл. 7",
+    conceptId: "c-signal-hierarchy",
+  },
   RED_YELLOW_CROSSED: {
     severityClass: "osnovna",
     points: SEVERITY_POINTS.osnovna,

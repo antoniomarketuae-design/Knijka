@@ -463,6 +463,11 @@ export default function LessonScene(props: LessonSceneProps) {
           stagedEvents.length > 0
             ? createScenarioDirector(stagedEvents, traffic, {
                 seed: lessonSeed(props.lesson.id),
+                // B1a N2 / JU-18: the runtime IS the SignalDirectorPort — the
+                // same production wiring the recorder and the orchestrator
+                // harness use, so phase-driven runners (amberDilemma pins,
+                // trafficController mode + timetable) work in LIVE play too.
+                signals: runtime,
               })
             : null;
         // S0-View: the ghost demo needs the raw doc for its headless recorder.

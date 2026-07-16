@@ -381,3 +381,16 @@ export {
   type ScSignalTemplateId,
   type ScSignalTraceName,
 } from "./scSignals";
+
+// ADR-006 stage 1d — the JU-18 регулировчик authored drives
+// (sc-signal-controller: the trafficController staged kind arms cluster mode
+// "controlled" + the authored permission timetable while the lamps keep
+// cycling — the signal-hierarchy lesson). Committed traces under
+// content/traces/sc-signal-controller/ are recordings of exactly these
+// scripts (gate: traces/__tests__/sc-signal-controller-traces).
+export {
+  SC_SIGNAL_CONTROLLER_ID,
+  recordScSignalControllerDrive,
+  scSignalControllerTraceNames,
+  type ScSignalControllerTraceName,
+} from "./scSignalController";

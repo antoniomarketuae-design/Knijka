@@ -35,7 +35,7 @@
  */
 
 import type { ScenarioSpec } from "./types";
-import type { PriorityFromRightSpec } from "../../contracts";
+import type { PriorityFromRightSpec, TrafficControllerSpec } from "../../contracts";
 
 /** Drawn lane-center offset from the road centerline on sx-v1, m. */
 export const SIGNAL_LANE_CENTER_M = 4.0625;
@@ -401,9 +401,158 @@ export const SC_SIGNAL_HESITATION: ScenarioSpec = {
   localeBg: "bg-BG",
 };
 
+// ---------------------------------------------------------------------------
+// sc-signal-controller — „Регулировчик на кръстовището" (doc 72 JU-18, ADR-006
+// stage 1d) on sx-v1 (map REUSED; the lamps stay LIVE and misleading — the
+// controller's signals override them: the signal-hierarchy lesson)
+// ---------------------------------------------------------------------------
+
+/**
+ * The staged authority: a CONTROLLER posted at sx-n-c. Session-start dials
+ * (the signalOffsets/signalModes discipline, all authored constants):
+ *  - signalOffsetSec 45 pins the ns lamps GREEN for session time t ∈ [5, 25)
+ *    of each 50 s cycle — the player approaches a GREEN light (the misleading
+ *    lamp; every drive below crosses/arrives inside that window);
+ *  - haltedGroup "ns" halts the player's south-stem approach from t = 0;
+ *  - flipAtSec 30 is the single authored permission flip: from t = 30 the ns
+ *    axis is PERMITTED (by then the lamps have cycled to red — so the shadow
+ *    proceeds on a RED lamp under the controller's permission: the hierarchy
+ *    proven in BOTH directions).
+ * Grading is 100% the production pipeline: stopLineCrossed carries the
+ * controller permission; the reducer grades halt → CONTROLLER_SIGNAL_VIOLATED
+ * (опасна, ЗДвП чл. 7), proceed → innocent. The figure (pose "directTraffic",
+ * one arm extended horizontally + hi-vis, ADR-001 fictional) is purely visual.
+ */
+export const SC_SIGNAL_CONTROLLER_EVENT: TrafficControllerSpec = {
+  id: "sc-sctrl-controller",
+  kind: "trafficController",
+  libraryEventId: "JU-18",
+  signalNodeId: "sx-n-c",
+  junction: { x: 0, y: 0 },
+  // The junction-center post: 4 m left of the player's northbound lane center
+  // (drawn lane at x = 4.0625), facing the halted south approach.
+  officer: { x: 0, y: 0 },
+  facing: { x: 0, y: -1 },
+  haltedGroup: "ns",
+  flipAtSec: 30,
+  signalOffsetSec: 45,
+  // sx-v1 south-approach stop line sits 27.7 m south of the node (the scaled
+  // junction mouth — sx-e-s@92.3, battery sx-district.test.ts).
+  lineDistM: 27.7,
+};
+
+export const SC_SIGNAL_CONTROLLER: ScenarioSpec = {
+  id: "sc-signal-controller",
+  family: "signals",
+  tagsBg: ["регулировчик", "светофар", "йерархия на сигналите", "предимство"],
+  titleBg: "Регулировчик на кръстовището",
+  objectiveBg:
+    "На кръстовището има регулировчик и неговите сигнали са над светофара: спри преди линията, докато той спира твоето направление — дори светофарът да свети зелено — и премини едва когато той разреши посоката ти.",
+  archetypeIds: ["JU-18"],
+  conceptIds: ["c-signal-hierarchy", "c-traffic-light-signals", "c-junction-approach"],
+  map: {
+    archetype: "x-junction",
+    // Map REUSED from the signals family — mirrored in sx-v1.json params. The
+    // controller (mode + timetable + lamp pin) is a runtime session-start
+    // dial armed by the staged event, not a map property.
+    params: {
+      armNorthM: 90,
+      armSouthM: 120,
+      armEastM: 120,
+      armWestM: 170,
+      nsClass: "secondary",
+      ewClass: "residential",
+      nsMaxKmh: 50,
+      ewMaxKmh: 40,
+    },
+    districtId: "sx-v1",
+  },
+  start: {
+    spawnPointId: "sx-spawn-south",
+    vehicleStart: "ready",
+  },
+  instructionsBg: [
+    {
+      n: 1,
+      textBg:
+        "Тръгни по булеварда на север — на кръстовището напред стои РЕГУЛИРОВЧИК, а светофарът продължава да работи.",
+    },
+    {
+      n: 2,
+      textBg:
+        "Запомни йерархията: сигналите на регулировчика са над светофара и над знаците. Каквото показва той, това важи.",
+    },
+    {
+      n: 3,
+      textBg:
+        "Светофарът за теб свети ЗЕЛЕНО, но регулировчикът спира твоето направление — зеленото НЕ разрешава. Спри преди стоп-линията.",
+    },
+    {
+      n: 4,
+      textBg: "Изчакай спокойно пред линията, докато регулировчикът държи посоката ти спряна.",
+    },
+    {
+      n: 5,
+      textBg:
+        "Щом регулировчикът разреши твоята посока, премини правó напред — дори светофарът междувременно да е станал червен: неговият сигнал е по-силен.",
+    },
+  ],
+  success: [
+    {
+      id: "sc-sctrl-approach",
+      titleBg: "Приближи кръстовището с регулировчика с готовност за спиране",
+      // Stem lane center, before the 27.7 m stop line.
+      params: { kind: "reachZone", x: 4.06, y: -42, radiusM: 8, maxSpeedKmh: 30 },
+    },
+    {
+      id: "sc-sctrl-cross",
+      titleBg: "Премини кръстовището след разрешение от регулировчика",
+      // North-arm northbound lane center, past the 40 m junction area.
+      params: { kind: "reachZone", x: 4.06, y: 45, radiusM: 9 },
+    },
+  ],
+  rubric: { parTimeSec: 70 },
+  shadow: { path: "content/traces/sc-signal-controller/shadow-correct.trace.json" },
+  mistakes: [
+    {
+      traceRef: { path: "content/traces/sc-signal-controller/mistake-run.trace.json" },
+      titleBg: "Зеленото „печели“ срещу регулировчика",
+      whatWentWrongBg:
+        "Колата гледаше само светофара: зелено — газ, и премина линията, докато регулировчикът спираше нейното направление. Йерархията е обратна: регулировчикът е над светофара, а преминаването срещу неговия сигнал е опасна грешка, с която изпитът се прекратява.",
+      codeRefs: ["CONTROLLER_SIGNAL_VIOLATED"],
+    },
+    {
+      traceRef: { path: "content/traces/sc-signal-controller/mistake-creep.trace.json" },
+      titleBg: "Припълзяване през линията",
+      whatWentWrongBg:
+        "Колата уж намали, но продължи бавно и „припълзя“ през стоп-линията, докато регулировчикът още спираше посоката ѝ. Спрян си, когато стоиш ПРЕДИ линията — бавното преминаване е също преминаване срещу сигнала на регулировчика.",
+      codeRefs: ["CONTROLLER_SIGNAL_VIOLATED"],
+    },
+  ],
+  teach: {
+    whenBg:
+      "Когато на кръстовището има регулировчик — при неработещ или объркан светофар, протоколни събития, ПТП или задръстване. Неговите сигнали заменят всичко останало: светофар, знаци, маркировка.",
+    whyBg:
+      "Най-честата грешка е да гледаш лампите вместо човека: зелено „за теб“ и потегляш право срещу ръката на регулировчика. Точно това е официална опасна грешка, с която изпитът се прекратява — и реален страничен сблъсък в живота, защото напречното направление вече е пуснато от него.",
+    lawRef: "ЗДвП чл. 7",
+    examinerBg:
+      "Изпитващият гледа едно: подчиняваш ли се на регулировчика, а не на светофара. Спиране преди линията при спряно направление — независимо от зеленото — и решително преминаване чак след неговото разрешение. Преминаване срещу сигнала му прекратява изпита.",
+  },
+  levels: [
+    { level: 1 },
+    { level: 2 },
+    { level: 3 },
+    { level: 4, vehicleStart: "cold" },
+  ],
+  staged: [SC_SIGNAL_CONTROLLER_EVENT],
+  conditions: { weather: "dry" },
+  localeBg: "bg-BG",
+};
+
 /** The SIGNALS-family dead/flashing-signal templates (registered in templates.ts). */
 export const SCENARIO_TEMPLATES_SIGNALS: readonly ScenarioSpec[] = [
   SC_SIGNAL_DEAD,
   SC_SIGNAL_FLASHING,
   SC_SIGNAL_HESITATION,
+  SC_SIGNAL_CONTROLLER,
 ];

@@ -55,15 +55,33 @@ export interface SignalClusterInfo {
 }
 
 /**
- * Runtime control mode of a signal cluster (doc 72 JU-09/JU-20). "live" — the
- * shipped two-phase machine drives the lamps. "dark" (загаснал светофар) /
- * "flashingAmber" (мигащо жълто) — the lamps carry NO phase, so the junction
- * is treated as UNCONTROLLED and the right-hand rule governs it (ЗДвП чл. 50).
- * Both non-live modes behave identically to the grader; the distinct names let
+ * Runtime control mode of a signal cluster (doc 72 JU-09/JU-20/JU-18). "live"
+ * — the shipped two-phase machine drives the lamps. "dark" (загаснал
+ * светофар) / "flashingAmber" (мигащо жълто) — the lamps carry NO phase, so
+ * the junction is treated as UNCONTROLLED and the right-hand rule governs it
+ * (ЗДвП чл. 50). Both behave identically to the grader; the distinct names let
  * the world layer render the right lamp state and the copy cite the right sign.
+ * "controlled" (JU-18 — регулировчик): the lamps KEEP running the live phase
+ * machine (misleading-but-visible), but stop-line adjudication reads the
+ * CONTROLLER's per-approach permission (setClusterController) instead of the
+ * lamps — сигналите на регулировчика са над светофара (ЗДвП чл. 7). The
+ * junction stays CONTROLLED (never right-hand-rule).
  * Default "live" everywhere → absent = today's behavior, byte-for-byte.
  */
-export type SignalClusterMode = "live" | "dark" | "flashingAmber";
+export type SignalClusterMode = "live" | "dark" | "flashingAmber" | "controlled";
+
+/**
+ * JU-18 — the traffic-controller's authored permission timetable for one
+ * cluster: `haltedGroup` is the axis-group the controller HALTS from arming;
+ * at controller time `flipAtSec` (absent = never) the halt flips to the other
+ * axis — a single authored flip, the simplest honest schedule (the
+ * signalOffsets discipline: authored constants, no RNG, so the same dt
+ * sequence reproduces the same permissions bit-for-bit).
+ */
+export interface SignalControllerSchedule {
+  haltedGroup: Axis;
+  flipAtSec?: number;
+}
 
 interface SignalNode {
   id: string;
@@ -136,6 +154,8 @@ export class SignalController {
   private readonly offsets: number[] = [];
   /** Per-cluster control mode (index-aligned with offsets); default "live". */
   private readonly modes: SignalClusterMode[] = [];
+  /** Per-cluster controller timetable (JU-18); null = no controller posted. */
+  private readonly controllers: Array<SignalControllerSchedule | null> = [];
   private tSec = 0;
 
   constructor(district: District, index: DistrictIndex) {
@@ -199,6 +219,7 @@ export class SignalController {
       this.clustersInfo.push({ id: clusterId, x: cx, y: cy, offsetSec, memberNodeIds: ids });
       this.offsets.push(offsetSec);
       this.modes.push("live");
+      this.controllers.push(null);
       for (const i of members[ci]) {
         const r = raw[i];
         this.nodes.set(r.id, {
@@ -327,22 +348,64 @@ export class SignalController {
   /**
    * True when a cluster's lamps carry no phase (dark / flashing amber) — the
    * junction is UNCONTROLLED and the right-hand rule governs it (doc 72
-   * JU-09/JU-20). Out-of-range indices are live (controlled).
+   * JU-09/JU-20). Out-of-range indices are live (controlled). A "controlled"
+   * cluster (JU-18 регулировчик) is NOT uncontrolled — the controller's
+   * signals govern it, never the right-hand rule.
    */
   isClusterUncontrolled(clusterIdx: number): boolean {
-    return this.clusterMode(clusterIdx) !== "live";
+    const mode = this.clusterMode(clusterIdx);
+    return mode === "dark" || mode === "flashingAmber";
   }
 
   /**
    * Set a cluster's control mode (by any member node id). The sibling of
    * setClusterOffset: a deterministic session-start dial (staged exams pin a
    * junction DARK / on FLASHING AMBER to drill the uncontrolled-junction rule,
-   * doc 72 JU-09/JU-20). No-op for unknown ids.
+   * doc 72 JU-09/JU-20). No-op for unknown ids. NOTE: "controlled" without a
+   * posted schedule (setClusterController) adjudicates as live — fail-innocent.
    */
   setClusterMode(signalNodeId: string, mode: SignalClusterMode): void {
     const node = this.nodes.get(signalNodeId);
     if (!node) return;
     this.modes[node.clusterIdx] = mode;
+  }
+
+  /**
+   * Post / recall a traffic CONTROLLER at a cluster (doc 72 JU-18 — the one
+   * dial the staged `trafficController` kind arms at session start). A
+   * schedule sets mode "controlled" and installs the permission timetable;
+   * null recalls the controller and returns the cluster to "live". The lamps
+   * keep cycling (misleading-but-visible) — only stop-line adjudication and
+   * the surfaced next-line context read the controller. Deterministic: the
+   * schedule is authored data, permissions are a pure function of controller
+   * time. No-op for unknown ids.
+   */
+  setClusterController(signalNodeId: string, schedule: SignalControllerSchedule | null): void {
+    const node = this.nodes.get(signalNodeId);
+    if (!node) return;
+    this.controllers[node.clusterIdx] = schedule;
+    this.modes[node.clusterIdx] = schedule !== null ? "controlled" : "live";
+  }
+
+  /**
+   * The controller's permission for an axis-group at the CURRENT controller
+   * time: "halt" while the group is the (possibly flipped) halted axis,
+   * "proceed" for the other one — null when no controller governs the cluster
+   * (mode not "controlled", or no schedule posted: fail-innocent, the lamps
+   * grade). This is the JU-18 hierarchy seam — a non-null permission
+   * OVERRIDES whatever the lamps show (ЗДвП чл. 7).
+   */
+  controllerPermission(clusterIdx: number, group: Axis): "halt" | "proceed" | null {
+    if (this.clusterMode(clusterIdx) !== "controlled") return null;
+    const schedule = this.controllers[clusterIdx];
+    if (schedule === null || schedule === undefined) return null;
+    const flipped = schedule.flipAtSec !== undefined && this.tSec >= schedule.flipAtSec;
+    const halted: Axis = flipped
+      ? schedule.haltedGroup === "ns"
+        ? "ew"
+        : "ns"
+      : schedule.haltedGroup;
+    return group === halted ? "halt" : "proceed";
   }
 
   /**
