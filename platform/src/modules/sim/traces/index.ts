@@ -412,3 +412,20 @@ export {
   recordScPkBanStopDrive,
   type ScPkBanStopTraceName,
 } from "./scPkBanStop";
+
+// ADR-006 stage 2b — the LINE TYPES + BUS LANES authored drives
+// (sc-ov-solid-line / sc-ov-bus-lane: the first templates on the 2b `zones`
+// vocabulary — М1 solid-осева + BUS-lane spans consumed by the runtime and
+// the CROSSED_SOLID_LINE / DRIVING_IN_BUS_LANE detectors). Committed traces
+// under content/traces/<template>/ are recordings of exactly these scripts
+// (gates: traces/__tests__/sc-ov-solid-line-traces + sc-ov-bus-lane-traces).
+export {
+  SC_OV_SOLID_LINE_ID,
+  recordScOvSolidLineDrive,
+  type ScOvSolidLineTraceName,
+} from "./scOvSolidLine";
+export {
+  SC_OV_BUS_LANE_ID,
+  recordScOvBusLaneDrive,
+  type ScOvBusLaneTraceName,
+} from "./scOvBusLane";

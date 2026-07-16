@@ -1409,6 +1409,74 @@ describe("FP battery — ban zones (ILLEGAL_STOP_IN_BAN_ZONE / OVERTAKING_IN_BAN
   });
 });
 
+describe("FP battery — line types & bus lanes (CROSSED_SOLID_LINE / DRIVING_IN_BUS_LANE)", () => {
+  // ADR-006 stage 2b. The structural contracts: a DASHED осева keeps the
+  // whole legal-overtake world innocent (the crossing only grades inside
+  // authored М1 spans), a bus lane is legally CROSSED for the right turn /
+  // the curb, and correctly avoiding the bus lane is never lane-hogging.
+
+  it("a legal overtake across a DASHED осева (opposing bank, no М1 span) is innocent", () => {
+    // Innocent: the textbook 1+1 overtake — signalled, out into the oncoming
+    // lane, past, back. No solid span anywhere near.
+    const { events } = drive([
+      tick(0, { speedKmh: 40, oneway: false, indicator: "left", events: [glance("left")] }),
+      ...cruise(1, 8, { speedKmh: 45, oneway: false, opposingBank: true, indicator: "left" }),
+      tick(9, { speedKmh: 45, oneway: false, indicator: "right", events: [glance("right")] }),
+      ...cruise(10, 14, { speedKmh: 40, oneway: false }),
+    ]);
+    expectInnocent(events);
+  });
+
+  it("center-of-the-line jitter inside an М1 span (flag flickering) is innocent", () => {
+    // Innocent: the car's center dances ON the paint — the opposing-bank flag
+    // flips every other frame and must never hold the crossing sustain.
+    const ticks: SimTick[] = [];
+    for (let i = 0; i <= 16; i++) {
+      ticks.push(
+        tick(i * 0.25, {
+          speedKmh: 25,
+          oneway: false,
+          solidCenterLine: true,
+          ...(i % 2 === 0 ? { opposingBank: true } : {}),
+        }),
+      );
+    }
+    expectInnocent(drive(ticks).events);
+  });
+
+  it("a clean in-lane drive through an М1 span is innocent", () => {
+    const { events } = drive(cruise(0, 20, { speedKmh: 45, oneway: false, solidCenterLine: true }));
+    expectInnocent(events);
+  });
+
+  it("cruising the GENERAL lane through a bus-lane span (16 s) is innocent — no NOT_KEEPING_RIGHT", () => {
+    // Innocent: the ONLY correct way to ride a bus-lane boulevard is the
+    // left (general) lane — the keep-right rule must not demand the bus lane.
+    const { events } = drive(
+      cruise(0, 16, { speedKmh: 40, laneId: 1, laneCount: 2, busLaneRight: true }),
+    );
+    expectInnocent(events);
+  });
+
+  it("a ≤3 s bus-lane transit to turn right (signalled) is innocent", () => {
+    // Innocent: crossing the bus lane immediately before the right turn is
+    // exactly what the law prescribes.
+    const { events } = drive([
+      ...cruise(0, 3, { speedKmh: 30, laneId: 1, laneCount: 2, busLaneRight: true }),
+      tick(4, {
+        speedKmh: 25,
+        laneId: 1,
+        laneCount: 2,
+        busLaneRight: true,
+        indicator: "right",
+        events: [glance("right")],
+      }),
+      ...cruise(5, 7, { speedKmh: 20, laneId: 0, laneCount: 2, busLaneRight: true, indicator: "right" }),
+    ]);
+    expectInnocent(events);
+  });
+});
+
 // ---------------------------------------------------------------------------
 // Whole-drive integration
 // ---------------------------------------------------------------------------

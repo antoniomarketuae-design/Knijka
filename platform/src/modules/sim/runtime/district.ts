@@ -111,9 +111,24 @@ export interface DistrictBounds {
  *                     телеметрия — the same A12 structural-innocence bar as
  *                     the deferred illegal-stop finding);
  *  - "noOvertaking" — В24 „Забранено е изпреварването" span.
+ * Stage 2b (LINE TYPES + BUS LANES — same shape, new vocabulary, so
+ * meta.zonesVersion stays 1; doc 72 OV-04/SN-03/SN-05):
+ *  - "solidCenterLine" — the осева along this span is a SOLID М1 line
+ *                        (единична непрекъсната): fully crossing it grades
+ *                        the опасна CROSSED_SOLID_LINE; a mere touch keeps
+ *                        grading the second-degree CENTER_LINE_TOUCHED;
+ *  - "busLane"         — the CURB lane (laneId 0 of the vehicle's bank) of
+ *                        this span is a bus lane (BUS маркировка): sustained
+ *                        car travel in it grades DRIVING_IN_BUS_LANE, and the
+ *                        keep-right detector stops requiring that lane.
  * Consumers MUST ignore zones with unknown kinds/edge ids (forward compat).
  */
-export type DistrictZoneKind = "noStopping" | "noParking" | "noOvertaking";
+export type DistrictZoneKind =
+  | "noStopping"
+  | "noParking"
+  | "noOvertaking"
+  | "solidCenterLine"
+  | "busLane";
 
 /**
  * One authored ban zone: a span [fromM, toM] of arclength along the host
@@ -129,8 +144,9 @@ export interface DistrictZone {
   /** Span along the edge polyline, meters; requires 0 <= fromM < toM. */
   fromM: number;
   toM: number;
-  /** The posting sign of the ban ("В24" / "В27" / "В28") — provenance +
-   *  (future) sign-post rendering; the runtime grades off `kind` alone. */
+  /** The posting sign/marking of the span ("В24" / "В27" / "В28"; stage 2b:
+   *  "М1" for solidCenterLine, "BUS" for busLane — Наредба № 2 markings) —
+   *  provenance + (future) rendering; the runtime grades off `kind` alone. */
   signRef: string;
 }
 

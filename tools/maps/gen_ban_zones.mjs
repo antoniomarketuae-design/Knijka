@@ -6,21 +6,35 @@
  * sign), never a heuristic, which is what makes the deferred-illegal-stop
  * false-positive finding structural.
  *
- *   - ov-ban-v1  „Изпреварване при забрана"   (OV-06): a 2+2 boulevard with a
+ *   - ov-ban-v1   „Изпреварване при забрана"   (OV-06): a 2+2 boulevard with a
  *     В24 no-overtaking span mid-route — a slow lead is staged by the LESSON;
  *     the legal overtake happens after the zone ends.
- *   - pk-ban-v1  „Спиране в забранена зона"   (PK-06): a 1+1 street with a
+ *   - pk-ban-v1   „Спиране в забранена зона"   (PK-06): a 1+1 street with a
  *     В27 no-stopping span — the legal stop happens after the zone ends.
+ *
+ * Stage 2b (LINE TYPES + BUS LANES — same shape, new kind vocabulary, so
+ * meta.zonesVersion stays 1; doc 72 OV-04/SN-03/SN-05):
+ *
+ *   - ov-solid-v1 „Непрекъсната осева линия"   (OV-04): a 1+1 street whose
+ *     осева is a SOLID М1 line along the span — fully crossing it grades the
+ *     опасна CROSSED_SOLID_LINE; a mere touch stays CENTER_LINE_TOUCHED.
+ *   - ov-bus-v1   „Бус лента"                  (SN-05): a 2+2 boulevard whose
+ *     CURB lane is a bus lane along the span — sustained car travel grades
+ *     DRIVING_IN_BUS_LANE, and the keep-right rule stops requiring that lane.
  *
  * Version contract (runtime/district.ts): format stays "district-v1"; the
  * `zones` array is optional and additive; files that carry it set
- * meta.zonesVersion = 1. NO shipped v1 file is regenerated.
+ * meta.zonesVersion = 1. NO shipped v1 file is regenerated, and the stage-2a
+ * instances above regenerate byte-identically (the 2b support is additive).
  *
  * KNOWN VISUAL GAP (honest): the district renderer instances authored GLB
  * sign models keyed by SignKind (stop/giveWay/limit50/roundabout —
  * WorldProps.tsx + platform/public/sim/signs). No В24/В27 sign assets exist
  * yet, so these zones GRADE correctly but render no sign post; the scenario
  * copy carries the sign teaching until a sign-asset drop extends SignKind.
+ * Likewise the markings builder does not yet paint a SOLID осева / the BUS
+ * inscription along a span — the scenario copy carries that teaching; the
+ * grading is exact regardless (authored spans, not paint reads).
  *
  * Deterministic: same params → byte-identical JSON. No randomness, no OSM.
  * Run:  node tools/maps/gen_ban_zones.mjs
@@ -45,8 +59,16 @@ function polylineLength(pts) {
   return r2(len);
 }
 
-/** signRef ↔ kind pairing law of the first slice (self-validation). */
-const KIND_TO_SIGN = { noOvertaking: "В24", noStopping: "В27", noParking: "В28" };
+/** signRef ↔ kind pairing law (self-validation). Stage 2b adds the MARKING
+ *  kinds: М1 = единична непрекъсната осева (Наредба № 2 надлъжна маркировка),
+ *  BUS = надписът на бус лентата (Наредба № 2 други маркировки). */
+const KIND_TO_SIGN = {
+  noOvertaking: "В24",
+  noStopping: "В27",
+  noParking: "В28",
+  solidCenterLine: "М1",
+  busLane: "BUS",
+};
 
 /**
  * @param {{
@@ -73,6 +95,12 @@ export function buildBanZoneStreet(params) {
   if (!zone || !(zone.fromM >= 40 && zone.toM <= lengthM - 60 && zone.fromM < zone.toM)) {
     errors.push(`zone span must satisfy 40 <= fromM < toM <= ${lengthM - 60} (approach + legal run-out), got [${zone?.fromM}, ${zone?.toM}]`);
   }
+  // Stage 2b kind-shape laws: a bus lane needs a GENERAL lane beside it (2+2
+  // only — a 1+1 „bus lane" would leave the car no legal lane at all), and a
+  // solid осева drill wants the 1+1 street where the осева is at wheel's
+  // reach (the OV-04 real-life geometry).
+  if (zone && zone.kind === "busLane" && lanes !== 4) errors.push(`busLane span requires a 2+2 boulevard (lanes 4), got ${lanes}`);
+  if (zone && zone.kind === "solidCenterLine" && lanes !== 2) errors.push(`solidCenterLine span requires a 1+1 street (lanes 2), got ${lanes}`);
   if (errors.length > 0) throw new Error(`gen_ban_zones params invalid:\n  - ${errors.join("\n  - ")}`);
 
   // Lane bank math (runtime/spatial.ts): lanesPerDir = lanes/2; northbound
@@ -290,6 +318,32 @@ const INSTANCES = [
     maxspeedKmh: 50,
     zone: { kind: "noStopping", fromM: 70, toM: 190 },
     noteBg: "В27 забранява престоя и паркирането в отсечката 70–190 м: спри чак след края на зоната, плътно вдясно.",
+  },
+  // -- Stage 2b (LINE TYPES + BUS LANES) -------------------------------------
+  {
+    // OV-04 host: 1+1 street so the осева is at wheel's reach; the М1 span
+    // covers the mid-route with a clean approach and run-out.
+    districtId: "ov-solid-v1",
+    label: "Учебна улица — непрекъсната осева линия М1 (сценарий OV-04)",
+    idPrefix: "ovs",
+    lengthM: 340,
+    lanes: 2,
+    maxspeedKmh: 50,
+    zone: { kind: "solidCenterLine", fromM: 90, toM: 230 },
+    noteBg: "Осевата линия е непрекъсната (М1) в отсечката 90–230 м: не я застъпвай и не я пресичай — дръж средата на своята лента.",
+  },
+  {
+    // SN-05 host: 2+2 boulevard whose CURB lane is a bus lane through the
+    // span — long enough (240 m) that the keep-right interplay proof rides a
+    // full 12 s+ left-lane cruise INSIDE the span.
+    districtId: "ov-bus-v1",
+    label: "Учебен булевард — бус лента (сценарий SN-05)",
+    idPrefix: "ovbus",
+    lengthM: 500,
+    lanes: 4,
+    maxspeedKmh: 50,
+    zone: { kind: "busLane", fromM: 90, toM: 330 },
+    noteBg: "Дясната лента е бус лента в отсечката 90–330 м: пътувай в лявата (обща) лента и пресичай бус лентата само за завой надясно или спиране до бордюра.",
   },
 ];
 

@@ -1,0 +1,152 @@
+{
+ "format": "district-v1",
+ "meta": {
+  "district": "ov-solid",
+  "label": "Учебна улица — непрекъсната осева линия М1 (сценарий OV-04)",
+  "mapKind": "scenario-street",
+  "generator": "tools/maps/gen_ban_zones.mjs",
+  "zonesVersion": 1,
+  "boundsLocalMeters": {
+   "minX": -34.12,
+   "minY": -6,
+   "maxX": 14.13,
+   "maxY": 346
+  },
+  "attribution": {
+   "text": "Учебна улица със забранителна зона — оригинален параметричен дизайн (без данни от OpenStreetMap)",
+   "license": "All rights reserved",
+   "licenseUrl": "/",
+   "copyrightUrl": "/",
+   "obligation": "none — original work, no ODbL attribution required for this map"
+  },
+  "defaults": {
+   "maxspeedUrbanKmh": 50,
+   "note": "Осевата линия е непрекъсната (М1) в отсечката 90–230 м: не я застъпвай и не я пресичай — дръж средата на своята лента."
+  },
+  "stats": {
+   "roadKm": 0.34,
+   "nodes": 2,
+   "edges": 1,
+   "intersections": 0,
+   "crossings": 0,
+   "buildings": 1,
+   "spawnPoints": 2,
+   "zones": 1
+  },
+  "scenario": {
+   "archetype": "straight-street",
+   "params": {
+    "lengthM": 340,
+    "maxspeedKmh": 50,
+    "banKind": "solidCenterLine",
+    "banFromM": 90,
+    "banToM": 230
+   },
+   "lanesPerDirection": 1,
+   "laneCenterRightM": 4.06,
+   "banZone": {
+    "id": "ovs-z-solidcenterline",
+    "kind": "solidCenterLine",
+    "signRef": "М1",
+    "fromM": 90,
+    "toM": 230
+   }
+  }
+ },
+ "roads": {
+  "nodes": [
+   {
+    "id": "ovs-n-end",
+    "x": 0,
+    "y": 340
+   },
+   {
+    "id": "ovs-n-start",
+    "x": 0,
+    "y": 0
+   }
+  ],
+  "edges": [
+   {
+    "id": "ovs-e-street",
+    "from": "ovs-n-start",
+    "to": "ovs-n-end",
+    "class": "residential",
+    "name": "Учебна улица — непрекъсната осева линия М1 (сценарий OV-04)",
+    "oneway": false,
+    "roundabout": false,
+    "lanes": 2,
+    "lanesSource": "tag",
+    "maxspeed": 50,
+    "maxspeedSource": "tag",
+    "length": 340,
+    "geometry": [
+     [
+      0,
+      0
+     ],
+     [
+      0,
+      340
+     ]
+    ]
+   }
+  ]
+ },
+ "intersections": [],
+ "crossings": [],
+ "roundabouts": [],
+ "buildings": [
+  {
+   "id": "ovs-b-block",
+   "height": 6,
+   "heightSource": "default",
+   "footprint": [
+    [
+     -28.12,
+     60
+    ],
+    [
+     -16.12,
+     60
+    ],
+    [
+     -16.12,
+     76
+    ],
+    [
+     -28.12,
+     76
+    ]
+   ]
+  }
+ ],
+ "spawnPoints": [
+  {
+   "id": "ovs-spawn-start",
+   "x": 4.06,
+   "y": 15,
+   "heading": 0,
+   "edgeId": "ovs-e-street",
+   "name": "Начало — дясна лента"
+  },
+  {
+   "id": "ovs-spawn-finish",
+   "x": 4.06,
+   "y": 325,
+   "heading": 0,
+   "edgeId": "ovs-e-street",
+   "name": "Контролна точка — след зоната"
+  }
+ ],
+ "zones": [
+  {
+   "id": "ovs-z-solidcenterline",
+   "kind": "solidCenterLine",
+   "edgeId": "ovs-e-street",
+   "fromM": 90,
+   "toM": 230,
+   "signRef": "М1"
+  }
+ ]
+}

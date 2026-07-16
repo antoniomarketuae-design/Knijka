@@ -163,6 +163,17 @@ export interface RuleEngineState {
   // -- ZONE-BAN data layer (ADR-006 stage 2a) --------------------------------
   /** Casual rest inside an authored В27 no-stopping zone (PK-06). */
   banZoneStop: EpisodeState;
+  // -- LINE TYPES + BUS LANES (ADR-006 stage 2b) -----------------------------
+  /**
+   * Fully across the solid осева inside an authored М1 span (OV-04/SN-03
+   * escalation). One bill per EXCURSION: `emitted` stays latched until the
+   * vehicle is genuinely back in its own lane (own bank, clear of the line
+   * band) — the same latch also suppresses the touch/lane-keep codes for the
+   * rest of the excursion (one act, one code).
+   */
+  solidCross: EpisodeState;
+  /** Sustained car travel in an authored bus lane (SN-05). */
+  busLane: EpisodeState;
 }
 
 const IDLE_EPISODE: EpisodeState = { activeSince: null, emitted: false };
@@ -206,6 +217,8 @@ export function createRuleEngine(config?: Partial<RuleEngineConfig>): RuleEngine
     highBeamDip: { ...IDLE_EPISODE },
     followingRain: { ...IDLE_EPISODE },
     banZoneStop: { ...IDLE_EPISODE },
+    solidCross: { ...IDLE_EPISODE },
+    busLane: { ...IDLE_EPISODE },
   };
 }
 
@@ -238,6 +251,8 @@ function cloneState(s: RuleEngineState): RuleEngineState {
     highBeamDip: { ...s.highBeamDip },
     followingRain: { ...s.followingRain },
     banZoneStop: { ...s.banZoneStop },
+    solidCross: { ...s.solidCross },
+    busLane: { ...s.busLane },
   };
 }
 
@@ -517,6 +532,41 @@ export function reduceTick(prev: RuleEngineState, tick: SimTick): ReduceResult {
     events.push(makeViolation("HEADLIGHTS_OFF_AT_NIGHT", t));
   }
 
+  // Crossed the solid осева (OV-04/SN-03 escalation — ADR-006 stage 2b): the
+  // vehicle FULLY across the center line (its committed lane fix on the bank
+  // opposing its travel — tick.opposingBank, the locator's own denoised bank
+  // signal) inside an authored М1 span (tick.solidCenterLine — data, never a
+  // heuristic). An indicator does NOT exempt: a signalled overtake across a
+  // solid line is exactly the OV-04 mistake. Reverse maneuvering is exempt
+  // (A12 — a parallel park backs across the road's markings by design).
+  // The episode is the EXCURSION: reset only once genuinely back in the own
+  // lane (own bank AND clear of the line band), so one crossing bills once
+  // even if the flag flickers at the paint on the way back.
+  const solidCrossCond =
+    tick.solidCenterLine === true &&
+    tick.oneway === false &&
+    tick.opposingBank === true &&
+    moving &&
+    forwardGear;
+  if (
+    stepEpisode(
+      s.solidCross,
+      solidCrossCond,
+      tick.opposingBank !== true && tick.laneOffsetM <= cfg.laneKeepMaxOffsetM,
+      t,
+      cfg.solidLineCrossSustainSec,
+    )
+  ) {
+    events.push(makeViolation("CROSSED_SOLID_LINE", t));
+  }
+  // One act, one code (the stage-2b ruling): while the crossing condition is
+  // armed — or has already billed within this same excursion — the touch and
+  // generic lane-keep clocks stand down. A MERE touch (own bank, riding the
+  // line band, never fully across) still grades CENTER_LINE_TOUCHED exactly
+  // as shipped.
+  const solidCrossExcursion =
+    tick.solidCenterLine === true && (solidCrossCond || s.solidCross.emitted);
+
   // Center-line touch (SN-03/OV-04 — „настъпване на осева линия"): sustained
   // ride on/over the center line toward ONCOMING traffic. Armed only on
   // POSITIVE evidence: the runtime says the edge is two-way (oneway === false)
@@ -531,7 +581,8 @@ export function reduceTick(prev: RuleEngineState, tick: SimTick): ReduceResult {
     tick.laneOffsetM > cfg.laneKeepMaxOffsetM &&
     tick.indicator === "off" &&
     moving &&
-    forwardGear;
+    forwardGear &&
+    !solidCrossExcursion;
   if (
     stepEpisode(
       s.centerLine,
@@ -551,7 +602,7 @@ export function reduceTick(prev: RuleEngineState, tick: SimTick): ReduceResult {
   if (
     stepEpisode(
       s.laneKeeping,
-      offCentre && moving && forwardGear && !centerLineCond,
+      offCentre && moving && forwardGear && !centerLineCond && !solidCrossExcursion,
       !offCentre,
       t,
       cfg.laneKeepSustainSec,
@@ -646,9 +697,13 @@ export function reduceTick(prev: RuleEngineState, tick: SimTick): ReduceResult {
   // Keep right: prolonged driving in a non-rightmost lane on a multi-lane road.
   // Exempt while the LEFT indicator is on — declared left-turn positioning or
   // an announced overtake is REQUIRED left-lane use (ЗДвП чл. 25), and exempt
-  // in reverse gear (parking maneuvers; A12).
+  // in reverse gear (parking maneuvers; A12). Stage 2b: inside an authored
+  // bus-lane span the CURB lane is not a legal travel lane for the car, so
+  // the rightmost REQUIRED lane is laneId 1 — correctly avoiding the bus lane
+  // must never grade NOT_KEEPING_RIGHT (the SN-05 interplay; FP-battery case).
+  const rightmostRequiredLane = tick.busLaneRight === true ? 1 : 0;
   const hoggingLeft =
-    tick.laneId > 0 &&
+    tick.laneId > rightmostRequiredLane &&
     (tick.laneCount ?? 1) > 1 &&
     moving &&
     forwardGear &&
@@ -749,6 +804,37 @@ export function reduceTick(prev: RuleEngineState, tick: SimTick): ReduceResult {
     )
   ) {
     events.push(makeViolation("ILLEGAL_STOP_IN_BAN_ZONE", t));
+  }
+
+  // Driving in a bus lane (SN-05 „бус лента" — ADR-006 stage 2b): sustained
+  // car travel in the CURB lane of an authored BUS span (tick.busLaneRight —
+  // data, never a heuristic). The legal sides are structural (A12):
+  //  - the 4 s sustain excludes the right-turn/curb-access transit (crossing
+  //    the bus lane is LEGAL and takes ~2-3 s — a ≤ 3 s transit never bills);
+  //  - a declared RIGHT indicator exempts entirely (announced turn/parking
+  //    entry — the keep-right left-indicator discipline, mirrored);
+  //  - a degenerate span on a single-lane road never convicts (laneCount > 1
+  //    required: with no general lane to use there is nothing to teach);
+  //  - reverse maneuvering is exempt (parking against the curb).
+  // Reset on leaving the lane or the span — one bill per cruise, re-arming
+  // for a repeat offence.
+  const busLaneCruise =
+    tick.busLaneRight === true &&
+    tick.laneId === 0 &&
+    (tick.laneCount ?? 1) > 1 &&
+    moving &&
+    forwardGear &&
+    tick.indicator !== "right";
+  if (
+    stepEpisode(
+      s.busLane,
+      busLaneCruise,
+      tick.busLaneRight !== true || tick.laneId !== 0,
+      t,
+      cfg.busLaneSustainSec,
+    )
+  ) {
+    events.push(makeViolation("DRIVING_IN_BUS_LANE", t));
   }
 
   // NOTE: SP-06 „обструктивно бавно каране" (obstructively slow) was
@@ -935,6 +1021,8 @@ export function reduceTick(prev: RuleEngineState, tick: SimTick): ReduceResult {
     s.highBeamDip,
     s.followingRain,
     s.banZoneStop,
+    s.solidCross,
+    s.busLane,
   ].some((ep) => ep.emitted && ep.activeSince !== null);
   if (events.some((e) => e.kind === "violation")) {
     s.cleanDistanceM = 0; // any fresh mistake resets the streak

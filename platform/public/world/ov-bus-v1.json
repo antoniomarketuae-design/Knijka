@@ -1,0 +1,153 @@
+{
+ "format": "district-v1",
+ "meta": {
+  "district": "ov-bus",
+  "label": "Учебен булевард — бус лента (сценарий SN-05)",
+  "mapKind": "scenario-street",
+  "generator": "tools/maps/gen_ban_zones.mjs",
+  "zonesVersion": 1,
+  "boundsLocalMeters": {
+   "minX": -42.25,
+   "minY": -6,
+   "maxX": 22.25,
+   "maxY": 506
+  },
+  "attribution": {
+   "text": "Учебна улица със забранителна зона — оригинален параметричен дизайн (без данни от OpenStreetMap)",
+   "license": "All rights reserved",
+   "licenseUrl": "/",
+   "copyrightUrl": "/",
+   "obligation": "none — original work, no ODbL attribution required for this map"
+  },
+  "defaults": {
+   "maxspeedUrbanKmh": 50,
+   "note": "Дясната лента е бус лента в отсечката 90–330 м: пътувай в лявата (обща) лента и пресичай бус лентата само за завой надясно или спиране до бордюра."
+  },
+  "stats": {
+   "roadKm": 0.5,
+   "nodes": 2,
+   "edges": 1,
+   "intersections": 0,
+   "crossings": 0,
+   "buildings": 1,
+   "spawnPoints": 2,
+   "zones": 1
+  },
+  "scenario": {
+   "archetype": "straight-street",
+   "params": {
+    "lengthM": 500,
+    "maxspeedKmh": 50,
+    "banKind": "busLane",
+    "banFromM": 90,
+    "banToM": 330
+   },
+   "lanesPerDirection": 2,
+   "laneCenterRightM": 12.19,
+   "banZone": {
+    "id": "ovbus-z-buslane",
+    "kind": "busLane",
+    "signRef": "BUS",
+    "fromM": 90,
+    "toM": 330
+   },
+   "laneCenterLeftM": 4.06
+  }
+ },
+ "roads": {
+  "nodes": [
+   {
+    "id": "ovbus-n-end",
+    "x": 0,
+    "y": 500
+   },
+   {
+    "id": "ovbus-n-start",
+    "x": 0,
+    "y": 0
+   }
+  ],
+  "edges": [
+   {
+    "id": "ovbus-e-street",
+    "from": "ovbus-n-start",
+    "to": "ovbus-n-end",
+    "class": "tertiary",
+    "name": "Учебен булевард — бус лента (сценарий SN-05)",
+    "oneway": false,
+    "roundabout": false,
+    "lanes": 4,
+    "lanesSource": "tag",
+    "maxspeed": 50,
+    "maxspeedSource": "tag",
+    "length": 500,
+    "geometry": [
+     [
+      0,
+      0
+     ],
+     [
+      0,
+      500
+     ]
+    ]
+   }
+  ]
+ },
+ "intersections": [],
+ "crossings": [],
+ "roundabouts": [],
+ "buildings": [
+  {
+   "id": "ovbus-b-block",
+   "height": 6,
+   "heightSource": "default",
+   "footprint": [
+    [
+     -36.25,
+     60
+    ],
+    [
+     -24.25,
+     60
+    ],
+    [
+     -24.25,
+     76
+    ],
+    [
+     -36.25,
+     76
+    ]
+   ]
+  }
+ ],
+ "spawnPoints": [
+  {
+   "id": "ovbus-spawn-start",
+   "x": 12.19,
+   "y": 15,
+   "heading": 0,
+   "edgeId": "ovbus-e-street",
+   "name": "Начало — дясна лента"
+  },
+  {
+   "id": "ovbus-spawn-finish",
+   "x": 12.19,
+   "y": 485,
+   "heading": 0,
+   "edgeId": "ovbus-e-street",
+   "name": "Контролна точка — след зоната"
+  }
+ ],
+ "zones": [
+  {
+   "id": "ovbus-z-buslane",
+   "kind": "busLane",
+   "edgeId": "ovbus-e-street",
+   "fromM": 90,
+   "toM": 330,
+   "signRef": "BUS"
+  }
+ ]
+}

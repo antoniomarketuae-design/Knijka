@@ -208,6 +208,27 @@ export interface SimTick {
    * possibly present in shipped data) — only the bounded, sign-posted zone
    * span convicts. */
   noOvertakeZone?: boolean;
+  // -- LINE TYPES + BUS LANES (ADR-006 stage 2b; doc 72 OV-04/SN-03/SN-05).
+  // Same contract as the stage-2a flags: authored district `zones` spans
+  // only, never heuristics — absent = no span = innocent.
+  /** Inside an authored М1 solid-осева span (единична непрекъсната линия).
+   * Read by the CROSSED_SOLID_LINE detector; a mere touch keeps grading
+   * CENTER_LINE_TOUCHED exactly as before. */
+  solidCenterLine?: boolean;
+  /** Inside an authored BUS-lane span: the CURB lane (laneId 0 of the
+   * vehicle's bank) is a bus lane. Read by DRIVING_IN_BUS_LANE, and the
+   * keep-right detector stops requiring that lane (correctly avoiding the
+   * bus lane must never grade NOT_KEEPING_RIGHT). */
+  busLaneRight?: boolean;
+  /**
+   * The vehicle occupies the bank OPPOSING its own travel direction on a
+   * TWO-WAY road — its center is fully past the осева, on the oncoming half
+   * (runtime-computed from the committed lane fix: the occupied bank's
+   * nominal direction vs the vehicle heading — the same channel `wrongWay`
+   * rides for one-ways). Kinematic world context, set only when true; legal
+   * where the line is dashed — ONLY the solidCenterLine composite grades it.
+   */
+  opposingBank?: boolean;
   /** Distance to the next stop line ahead on the current edge (travel
    * direction), m, within the runtime's watch window; absent = none/unknown. */
   nextStopLineM?: number;
@@ -292,6 +313,9 @@ export type ViolationCode =
   // ZONE-BAN data layer (ADR-006 stage 2a — authored В24/В27 district zones)
   | "ILLEGAL_STOP_IN_BAN_ZONE" // основна: casual rest inside a В27 no-stopping zone (PK-06; queue/signal stops structurally innocent)
   | "OVERTAKING_IN_BAN_ZONE" // основна: lane change past a lead inside a В24 no-overtaking zone (OV-06; the OV-07 corridor discipline)
+  // LINE TYPES + BUS LANES (ADR-006 stage 2b — authored М1/BUS district zones)
+  | "CROSSED_SOLID_LINE" // опасна: fully crossed the solid осева inside an authored М1 span (OV-04/SN-03 escalation; a touch stays CENTER_LINE_TOUCHED)
+  | "DRIVING_IN_BUS_LANE" // основна: sustained car travel in an authored bus lane (SN-05; brief transits to turn/park structurally innocent)
   // pre-drive procedure (procedures/machine.ts)
   | "PREDRIVE_STEP_SKIPPED" // второстепенна per skipped step
   | "PREDRIVE_SEATBELT_SKIPPED" // основна (skipping the belt is not a detail)
@@ -676,6 +700,31 @@ export interface RuleEngineConfig {
    * reposition, never an overtake.
    */
   banOvertakeLeadGapM: number;
+
+  // -- LINE TYPES + BUS LANES (ADR-006 stage 2b; doc 72 OV-04/SN-03/SN-05) ----
+
+  /**
+   * OV-04/SN-03 escalation — seconds the vehicle must CONTINUOUSLY occupy the
+   * opposing bank inside an authored М1 solid-осева span before
+   * CROSSED_SOLID_LINE fires. The bank flip is the locator's committed lane
+   * fix (the same denoised signal the lane-change family rides), so the only
+   * noise left is centre-of-the-line jitter — a car whose center dances ON
+   * the paint flips the flag every few frames and can never hold it this
+   * long, while a genuine crossing (pull-out or drift-across) holds it for
+   * seconds (A12 — the jitter case lives in the FP battery).
+   */
+  solidLineCrossSustainSec: number;
+
+  /**
+   * SN-05 „бус лента" — seconds of sustained travel in an authored bus lane
+   * before DRIVING_IN_BUS_LANE fires. The taught norm: crossing the bus lane
+   * is LEGAL for the right turn / curb access, so a brief transit (≤ ~3 s)
+   * must never convict — 4 s excludes every crossing transit while the
+   * „skip-the-queue" cruise holds far longer. A RIGHT indicator exempts
+   * entirely (declared turn/parking entry — the keep-right left-indicator
+   * discipline, mirrored).
+   */
+  busLaneSustainSec: number;
 }
 
 export const DEFAULT_RULE_CONFIG: RuleEngineConfig = {
@@ -798,4 +847,13 @@ export const DEFAULT_RULE_CONFIG: RuleEngineConfig = {
   banZoneStopLineClearM: 25,
   // OV-06: same 45 m lead corridor as the crossing overtake (one discipline).
   banOvertakeLeadGapM: 45,
+
+  // LINE TYPES + BUS LANES (ADR-006 stage 2b). Structurally data-armed like
+  // the stage-2a flags: no shipped map carries the spans, and every threshold
+  // errs innocent (A12).
+  // 0.6 s: paint-jitter flips can't hold it; the shortest real pull-out can.
+  solidLineCrossSustainSec: 0.6,
+  // 4 s: a right-turn/curb transit crosses the bus lane in ~2-3 s; the cruise
+  // the law targets holds it for blocks.
+  busLaneSustainSec: 4,
 };

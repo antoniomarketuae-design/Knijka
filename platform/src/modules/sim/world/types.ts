@@ -107,11 +107,18 @@ export interface DistrictSpawnPoint {
   name: string | null;
 }
 
-/** ZONE-BAN data layer (ADR-006 stage 2a; runtime/district.ts is the
- *  documented contract — this mirror keeps world-side loads typed). */
-export type DistrictZoneKind = "noStopping" | "noParking" | "noOvertaking";
+/** ZONE-BAN data layer (ADR-006 stage 2a; stage 2b adds the line-type + bus
+ *  vocabulary — runtime/district.ts is the documented contract; this mirror
+ *  keeps world-side loads typed). */
+export type DistrictZoneKind =
+  | "noStopping"
+  | "noParking"
+  | "noOvertaking"
+  | "solidCenterLine"
+  | "busLane";
 
-/** One authored ban span along an edge's polyline arclength (В24/В27/В28). */
+/** One authored span along an edge's polyline arclength (В24/В27/В28 bans;
+ *  stage 2b: М1 solid осева / BUS lane markings). */
 export interface DistrictZone {
   id: string;
   kind: DistrictZoneKind;

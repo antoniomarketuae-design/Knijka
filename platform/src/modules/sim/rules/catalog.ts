@@ -455,9 +455,13 @@ export const VIOLATIONS: Record<ViolationCode, ViolationSpec> = {
   },
   OVERTAKING_IN_BAN_ZONE: {
     // Doc 72 OV-06: Н38 „основна → опасна" — the base sign-zone tier grades
-    // основна; the опасна escalation needs the solid-line / oncoming-crossing
-    // evidence of a LATER slice (line types), so this slice deliberately
-    // grades the lower tier (A12 — err innocent on unmeasured escalation).
+    // основна. Stage 2b REVISITED the опасна escalation (В24 + solid осева)
+    // and deliberately kept this tier: severity is a per-code catalog
+    // invariant (makeViolation copies it from this spec — no conditional
+    // channel exists), and the physical acts diverge anyway: a same-direction
+    // lane change inside В24 (this code, no осева crossed) vs fully crossing
+    // the solid line (its own опасна, CROSSED_SOLID_LINE below). Where both
+    // acts happen, both codes grade — two laws, two lessons, no force-fit.
     severityClass: "osnovna",
     points: SEVERITY_POINTS.osnovna,
     titleBg: "Изпреварване в зона със забрана",
@@ -467,6 +471,36 @@ export const VIOLATIONS: Record<ViolationCode, ViolationSpec> = {
       "Видиш ли В24 — прибери се зад предния и изчакай търпеливо края на забраната. Изпреварвай чак след зоната: огледало, мигач, чиста съседна лента и обратно вдясно, щом видиш изпреварания в огледалото.",
     lawRef: "ЗДвП чл. 42–43",
     conceptId: "c-overtaking-prohibitions",
+  },
+  // -- LINE TYPES + BUS LANES (ADR-006 stage 2b; doc 72 OV-04/SN-03/SN-05) ----
+  CROSSED_SOLID_LINE: {
+    // Doc 72 OV-04/SN-03 escalation tier: the touch is the второстепенна
+    // CENTER_LINE_TOUCHED; FULLY crossing the solid осева puts the whole car
+    // in the oncoming half where the marking exists to forbid exactly that —
+    // the опасна tier („основна/опасна — full crossing against oncoming").
+    severityClass: "opasna",
+    points: SEVERITY_POINTS.opasna,
+    titleBg: "Пресичане на непрекъсната осева линия",
+    explanationBg:
+      "Пресече изцяло непрекъснатата осева линия и навлезе в насрещната половина на платното. Единичната непрекъсната линия (М1) не се застъпва и не се пресича — тя стои точно там, където насрещното движение или видимостта правят навлизането отсреща опасно.",
+    correctiveBg:
+      "Плътна линия = стена: остани в своята лента, дори предният да пълзи. Изпреварвай или заобикаляй чак където линията стане прекъсната — а дотогава дръж средата на лентата и дистанция за спокойно следване.",
+    lawRef: "ППЗДвП чл. 63 (М1 — единична непрекъсната линия)",
+    conceptId: "c-longitudinal-markings",
+  },
+  DRIVING_IN_BUS_LANE: {
+    // Doc 72 SN-05: Н38 основна (3) — „движение в бус лента". The innocent
+    // side is structural: the sustain excludes the legal right-turn/curb
+    // transit, and a declared RIGHT indicator exempts entirely.
+    severityClass: "osnovna",
+    points: SEVERITY_POINTS.osnovna,
+    titleBg: "Движение в бус лента",
+    explanationBg:
+      "Движеше се трайно в лентата, обозначена за превозни средства от редовните линии (маркировка BUS). Бус лентата не е „бърза лента“ за колите — тя пази разписанието на градския транспорт, а движението на автомобили в нея е забранено.",
+    correctiveBg:
+      "Пътувай в съседната обща лента и използвай бус лентата само за да я пресечеш — при завой надясно или спиране до бордюра, с мигач и непосредствено преди маневрата, без да се движиш по нея.",
+    lawRef: "ЗДвП чл. 15",
+    conceptId: "c-other-markings",
   },
   PREDRIVE_STEP_SKIPPED: {
     severityClass: "vtorostepenna",

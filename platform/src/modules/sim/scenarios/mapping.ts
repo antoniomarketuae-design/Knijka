@@ -37,6 +37,9 @@ const CODE_TO_SCENARIO: Record<string, string> = {
   // ZONE-BAN data layer (ADR-006 stage 2a)
   ILLEGAL_STOP_IN_BAN_ZONE: "ev-illegal-stop-zone",
   OVERTAKING_IN_BAN_ZONE: "ev-overtake",
+  // LINE TYPES + BUS LANES (ADR-006 stage 2b)
+  CROSSED_SOLID_LINE: "ev-markings-response",
+  DRIVING_IN_BUS_LANE: "ev-lane-discipline",
 };
 
 /** Scenario event id for a catalog code, or null when it maps to no scenario. */

@@ -699,6 +699,201 @@ export const SC_OV_BAN_OVERTAKE: ScenarioSpec = {
   localeBg: "bg-BG",
 };
 
+// ---------------------------------------------------------------------------
+// 7. sc-ov-solid-line — „Непрекъсната осева линия" (OV-04 escalation + SN-03)
+//    on ov-solid-v1 (340 m 1+1 street, limit 50, М1 solidCenterLine span
+//    @ y ∈ [90, 230] — ADR-006 stage 2b LINE TYPES)
+// ---------------------------------------------------------------------------
+
+/** ov-solid-v1 (1+1): the single lane center of the northbound bank. */
+const OVS_LANE = 4.06;
+/** ov-solid-v1: the М1 solid-осева span along the street (meta.scenario). */
+const OVS_SOLID_FROM = 90;
+const OVS_SOLID_TO = 230;
+
+/** OV-04/SN-03 — единичната непрекъсната осева линия М1 не се застъпва и не
+ *  се пресича (ППЗДвП чл. 63); настъпването е второстепенна, пълното
+ *  пресичане — опасна. Pure line-discipline drive: NO staged actor, ambient
+ *  zero — the only gradable act is the driver's own position vs the осева. */
+export const SC_OV_SOLID_LINE: ScenarioSpec = {
+  id: "sc-ov-solid-line",
+  family: "lanes",
+  tagsBg: ["ленти", "осева линия", "непрекъсната линия", "маркировка"],
+  titleBg: "Непрекъсната осева линия",
+  objectiveBg:
+    "Измини улицата, без да застъпваш и без да пресичаш непрекъснатата осева линия — плътната линия е стена: колкото и бавен да е участъкът, оставаш изцяло в своята лента.",
+  archetypeIds: ["OV-04", "SN-03"],
+  conceptIds: ["c-longitudinal-markings", "c-overtaking-prohibitions", "c-general-care-duty"],
+  map: {
+    archetype: "straight-street",
+    // The generator recipe — mirrored in ov-solid-v1.json meta.scenario.params
+    // (tools/maps/gen_ban_zones.mjs).
+    params: { lengthM: 340, maxspeedKmh: 50, banKind: "solidCenterLine", banFromM: OVS_SOLID_FROM, banToM: OVS_SOLID_TO },
+    districtId: "ov-solid-v1",
+  },
+  start: {
+    spawnPointId: "ovs-spawn-start",
+    vehicleStart: "ready",
+  },
+  instructionsBg: [
+    { n: 1, textBg: "Потегли по улицата и се установи в средата на своята лента." },
+    { n: 2, textBg: "Напред осевата линия става непрекъсната (М1) — оттам нататък тя не се застъпва и не се пресича." },
+    { n: 3, textBg: "Дръж средата на лентата: настъпването на осевата линия е грешка, а пълното ѝ пресичане те вкарва в насрещното на най-опасното място." },
+    { n: 4, textBg: "Не започвай изпреварване и заобикаляне през плътната линия — изчакай прекъсната маркировка." },
+    { n: 5, textBg: "Продължи в своята лента до края на отсечката." },
+  ],
+  success: [
+    {
+      id: "sc-ovsl-hold",
+      titleBg: "Дръж своята лента през плътната линия",
+      // Radius 4 < the 8.125 m lane pitch: satisfiable ONLY from the own-lane
+      // center, deep inside the М1 span — holding the lane IS the drill.
+      params: { kind: "reachZone", x: OVS_LANE, y: 160, radiusM: 4, maxSpeedKmh: 55 },
+    },
+    {
+      id: "sc-ovsl-finish",
+      titleBg: "Стигни края на отсечката в своята лента",
+      params: { kind: "reachZone", x: OVS_LANE, y: 310, radiusM: 5 },
+    },
+  ],
+  rubric: { parTimeSec: 55 },
+  // RECORDED: committed deterministic recordings of the authored scripts in
+  // traces/scOvSolidLine.ts; gates in traces/__tests__/
+  // sc-ov-solid-line-traces.test.ts (re-record with RECORD_TRACES=1).
+  shadow: { path: "content/traces/sc-ov-solid-line/shadow-correct.trace.json" },
+  mistakes: [
+    {
+      traceRef: { path: "content/traces/sc-ov-solid-line/mistake-pullout.trace.json" },
+      titleBg: "Изпреварващо излизане през плътната линия",
+      whatWentWrongBg:
+        "Колата излезе в насрещната лента през непрекъснатата осева линия — с мигач, но мигачът не отменя маркировката. Единичната непрекъсната линия (М1) не се пресича изобщо: тя стои там, където насрещното движение или видимостта правят навлизането отсреща опасно. Това е опасна грешка.",
+      codeRefs: ["CROSSED_SOLID_LINE"],
+    },
+    {
+      traceRef: { path: "content/traces/sc-ov-solid-line/mistake-drift.trace.json" },
+      titleBg: "Отнасяне през осевата линия",
+      whatWentWrongBg:
+        "Водачът се отнесе и колата премина изцяло отвъд непрекъснатата осева линия, в насрещната половина на платното. Погледът далеч напред по средата на лентата държи колата в нея — отнасянето през плътната линия е опасна грешка, дори „само за момент“.",
+      codeRefs: ["CROSSED_SOLID_LINE"],
+    },
+  ],
+  teach: {
+    whenBg:
+      "Навсякъде, където осевата линия е непрекъсната — завои без видимост, върхове на изкачване, стеснени участъци. Прекъсната линия се пресича при изпреварване и завой; непрекъснатата — никога, в нито една посока.",
+    whyBg:
+      "Плътната осева линия е нарисувана точно там, където навлизането в насрещното убива: няма видимост или няма резерв за разминаване. Настъпването ѝ е класическа изпитна грешка, а пълното пресичане те поставя срещу насрещните на сляпо — затова изпитващите го третират като опасна грешка.",
+    lawRef: "ППЗДвП чл. 63",
+    examinerBg:
+      "Изпитващият следи позицията ти спрямо маркировката: устойчиво движение в средата на лентата, без настъпване на осевата линия (второстепенна грешка) и без пресичане на непрекъснатата линия (опасна грешка, проваля изпита).",
+  },
+  levels: [
+    { level: 1 },
+    { level: 2 },
+    { level: 3 },
+    { level: 4, vehicleStart: "cold" },
+  ],
+  conditions: { weather: "dry" },
+  localeBg: "bg-BG",
+};
+
+// ---------------------------------------------------------------------------
+// 8. sc-ov-bus-lane — „Бус лента" (SN-05) on ov-bus-v1 (500 m 2+2 boulevard,
+//    limit 50, BUS busLane span @ y ∈ [90, 330] — ADR-006 stage 2b BUS LANES)
+// ---------------------------------------------------------------------------
+
+/** ov-bus-v1 (2+2): right (bus) / left (general) lane centers, northbound. */
+const OVBUS_RIGHT = 12.19;
+const OVBUS_LEFT = 4.06;
+/** ov-bus-v1: the BUS-lane span along the boulevard (meta.scenario). */
+const OVBUS_FROM = 90;
+const OVBUS_TO = 330;
+
+/** SN-05 — движение в бус лента (ЗДвП чл. 15: лентата за превозни средства от
+ *  редовните линии не е за автомобили; пресича се само за завой надясно /
+ *  спиране до бордюра). Pure lane-choice drive: NO staged actor, ambient
+ *  zero — the only gradable act is which lane the driver travels. */
+export const SC_OV_BUS_LANE: ScenarioSpec = {
+  id: "sc-ov-bus-lane",
+  family: "lanes",
+  tagsBg: ["ленти", "бус лента", "лентова дисциплина", "булевард"],
+  titleBg: "Бус лента",
+  objectiveBg:
+    "Измини булеварда, като пътуваш в общата (лявата) лента през участъка с бус лента и се прибереш вдясно чак след края ѝ — бус лентата не е „бърза лента“ за колите.",
+  archetypeIds: ["SN-05"],
+  conceptIds: ["c-other-markings", "c-lane-choice", "c-right-side-rule"],
+  map: {
+    archetype: "straight-street",
+    // The generator recipe — mirrored in ov-bus-v1.json meta.scenario.params
+    // (tools/maps/gen_ban_zones.mjs).
+    params: { lengthM: 500, maxspeedKmh: 50, banKind: "busLane", banFromM: OVBUS_FROM, banToM: OVBUS_TO },
+    districtId: "ov-bus-v1",
+  },
+  start: {
+    spawnPointId: "ovbus-spawn-start",
+    vehicleStart: "ready",
+  },
+  instructionsBg: [
+    { n: 1, textBg: "Потегли по булеварда в дясната лента — напред тя става бус лента (маркировка BUS)." },
+    { n: 2, textBg: "Преди началото на бус лентата: огледало, мигач наляво и се престрой в общата лента." },
+    { n: 3, textBg: "Пътувай в общата лента през целия участък — движението на автомобили в бус лентата е забранено, дори тя да е празна." },
+    { n: 4, textBg: "Бус лентата се пресича само за завой надясно или спиране до бордюра — с мигач и непосредствено преди маневрата." },
+    { n: 5, textBg: "След края на бус лентата: огледало, мигач надясно и се прибери в дясната лента до края." },
+  ],
+  success: [
+    {
+      id: "sc-ovbus-general",
+      titleBg: "Пътувай в общата лента през участъка",
+      // Radius 4 < the 8.125 m lane pitch: satisfiable ONLY from the LEFT
+      // (general) lane center, deep inside the BUS span — the lane choice IS
+      // the drill.
+      params: { kind: "reachZone", x: OVBUS_LEFT, y: 210, radiusM: 4, maxSpeedKmh: 55 },
+    },
+    {
+      id: "sc-ovbus-finish",
+      titleBg: "Прибери се вдясно след края на бус лентата",
+      params: { kind: "reachZone", x: OVBUS_RIGHT, y: 470, radiusM: 5 },
+    },
+  ],
+  rubric: { parTimeSec: 75 },
+  // RECORDED: committed deterministic recordings of the authored scripts in
+  // traces/scOvBusLane.ts; gates in traces/__tests__/
+  // sc-ov-bus-lane-traces.test.ts (re-record with RECORD_TRACES=1).
+  shadow: { path: "content/traces/sc-ov-bus-lane/shadow-correct.trace.json" },
+  mistakes: [
+    {
+      traceRef: { path: "content/traces/sc-ov-bus-lane/mistake-cruise.trace.json" },
+      titleBg: "Пътуване по бус лентата",
+      whatWentWrongBg:
+        "Колата остана в бус лентата и пътува по нея през целия участък. Лентата с маркировка BUS е само за превозните средства от редовните линии — за колите движението по нея е забранено, дори да е съвсем празна: тя пази разписанието на градския транспорт.",
+      codeRefs: ["DRIVING_IN_BUS_LANE"],
+    },
+    {
+      traceRef: { path: "content/traces/sc-ov-bus-lane/mistake-dip-in.trace.json" },
+      titleBg: "„Само да задмина колоната“ по бус лентата",
+      whatWentWrongBg:
+        "Водачът се престрои правилно в общата лента, но по средата на участъка се върна в бус лентата, „колкото да мине по-бързо“, и пътува по нея. Пресичането на бус лентата е позволено само непосредствено за завой надясно или спиране до бордюра — пътуването по нея е нарушение, колкото и кратко да изглежда.",
+      codeRefs: ["DRIVING_IN_BUS_LANE"],
+    },
+  ],
+  teach: {
+    whenBg:
+      "По всеки булевард с обособена бус лента — в София те са навсякъде и се снимат с камери. Правилото: пътуваш в съседната обща лента, а бус лентата пресичаш само за завой надясно или спиране до бордюра, с мигач, непосредствено преди маневрата.",
+    whyBg:
+      "Бус лентата прави градския транспорт предвидим — една кола „само за минутка“ в нея бави автобуса с всичките му пътници. Двойният капан на изпита: движението по бус лентата е грешка, но и отказът да я пресечеш за десен завой е грешка — тя се ползва точно и само за маневрата.",
+    lawRef: "ЗДвП чл. 15",
+    examinerBg:
+      "Изпитващият следи избора на лента: движение в общата лента покрай бус лентата, без пътуване по нея, и правилно пресичане с мигач при завой надясно. Продължителното движение в бус лентата е основна грешка.",
+  },
+  levels: [
+    { level: 1 },
+    { level: 2 },
+    { level: 3 },
+    { level: 4, vehicleStart: "cold" },
+  ],
+  conditions: { weather: "dry" },
+  localeBg: "bg-BG",
+};
+
 export const SCENARIO_TEMPLATES_LANES: readonly ScenarioSpec[] = [
   SC_OV_KEEP_RIGHT,
   SC_OV_LANE_KEEPING,
@@ -706,4 +901,6 @@ export const SCENARIO_TEMPLATES_LANES: readonly ScenarioSpec[] = [
   SC_OV_CROSSING_OVERTAKE,
   SC_OV_NARROW,
   SC_OV_BAN_OVERTAKE,
+  SC_OV_SOLID_LINE,
+  SC_OV_BUS_LANE,
 ];

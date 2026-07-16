@@ -311,24 +311,39 @@ export function createWorldRuntime(districtJson: District | unknown): DistrictWo
   const nodePos = new Map<string, { x: number; y: number }>();
   for (const n of district.roads.nodes) nodePos.set(n.id, { x: n.x, y: n.y });
 
-  // ZONE-BAN data layer (ADR-006 stage 2a — doc 72 PK-06/OV-06): authored
-  // В24/В27/В28 spans, resolved per frame from the SAME committed lane fix
-  // maxspeed uses (edge + sM membership — no radius geometry, no tracker).
-  // Tolerant by construction: unknown edge ids, unknown kinds and degenerate
-  // spans are inert; a v1 file without `zones` builds an empty map and the
-  // sample() below adds NOTHING to the tick (byte-identical v1 behavior).
+  // ZONE-BAN data layer (ADR-006 stage 2a — doc 72 PK-06/OV-06; stage 2b adds
+  // the LINE TYPES + BUS LANES vocabulary — doc 72 OV-04/SN-03/SN-05):
+  // authored В24/В27/В28/М1/BUS spans, resolved per frame from the SAME
+  // committed lane fix maxspeed uses (edge + sM membership — no radius
+  // geometry, no tracker). Tolerant by construction: unknown edge ids,
+  // unknown kinds and degenerate spans are inert; a v1 file without `zones`
+  // builds an empty map and the sample() below adds NOTHING to the tick
+  // (byte-identical v1 behavior).
+  type KnownZoneKind =
+    | "noStopping"
+    | "noParking"
+    | "noOvertaking"
+    | "solidCenterLine"
+    | "busLane";
+  const KNOWN_ZONE_KINDS = new Set<string>([
+    "noStopping",
+    "noParking",
+    "noOvertaking",
+    "solidCenterLine",
+    "busLane",
+  ]);
   const banZonesByEdge = new Map<
     number,
-    Array<{ kind: "noStopping" | "noParking" | "noOvertaking"; fromM: number; toM: number }>
+    Array<{ kind: KnownZoneKind; fromM: number; toM: number }>
   >();
   for (const z of district.zones ?? []) {
-    if (z.kind !== "noStopping" && z.kind !== "noParking" && z.kind !== "noOvertaking") continue;
+    if (!KNOWN_ZONE_KINDS.has(z.kind)) continue;
     if (!(Number.isFinite(z.fromM) && Number.isFinite(z.toM) && z.fromM < z.toM)) continue;
     const host = index.edgeRtById(z.edgeId);
     if (host === null) continue;
     let list = banZonesByEdge.get(host.idx);
     if (!list) banZonesByEdge.set(host.idx, (list = []));
-    list.push({ kind: z.kind, fromM: z.fromM, toM: z.toM });
+    list.push({ kind: z.kind as KnownZoneKind, fromM: z.fromM, toM: z.toM });
   }
 
   // Uncontrolled (right-hand-rule) junctions: real junctions (degree >= 3) that
@@ -973,10 +988,25 @@ export function createWorldRuntime(districtJson: District | unknown): DistrictWo
         // N1 (doc 72 OV-14): one marked lane TOTAL on a two-way road = the
         // narrow-street-meeting context. Surface-only (see SimTick doc).
         if (!edgeRt.edge.oneway && edgeRt.edge.lanes <= 1) tick.narrowTwoWay = true;
+        // Stage 2b — opposing-bank world context (the CROSSED_SOLID_LINE
+        // channel): on a TWO-WAY edge, the committed lane fix's bank has a
+        // nominal travel direction (fix.travelDir); a vehicle whose heading
+        // opposes its occupied bank sits fully past the осева, on the
+        // oncoming half. Set only when true (legal over a dashed line — the
+        // reducer grades it exclusively inside authored М1 spans). The same
+        // adjudication channel wrongWay rides for one-ways, off the SAME
+        // committed fix — no extra geometry, no heuristics.
+        if (!edgeRt.edge.oneway) {
+          const [otx, oty] = index.tangentAt(fix.edgeIdx, fix.sM);
+          const headingSign: 1 | -1 =
+            Math.abs(signedDeltaDeg(v.headingDeg, bearingDeg(otx, oty))) <= 90 ? 1 : -1;
+          if (headingSign !== fix.travelDir) tick.opposingBank = true;
+        }
       }
-      // ZONE-BAN membership (ADR-006 stage 2a): flags flow onto the tick
-      // exactly the way maxSpeedKmh does — from the resolved edge + the lane
-      // fix's arclength. Absent zones (every shipped v1 file) sets nothing.
+      // ZONE-BAN membership (ADR-006 stage 2a; stage 2b vocabulary): flags
+      // flow onto the tick exactly the way maxSpeedKmh does — from the
+      // resolved edge + the lane fix's arclength. Absent zones (every shipped
+      // v1 file) sets nothing.
       if (fix.edgeIdx >= 0) {
         const spans = banZonesByEdge.get(fix.edgeIdx);
         if (spans !== undefined) {
@@ -985,7 +1015,9 @@ export function createWorldRuntime(districtJson: District | unknown): DistrictWo
             if (fix.sM >= z.fromM && fix.sM <= z.toM) {
               if (z.kind === "noStopping") tick.noStopZone = true;
               else if (z.kind === "noParking") tick.noParkZone = true;
-              else tick.noOvertakeZone = true;
+              else if (z.kind === "noOvertaking") tick.noOvertakeZone = true;
+              else if (z.kind === "solidCenterLine") tick.solidCenterLine = true;
+              else tick.busLaneRight = true;
             }
           }
         }
