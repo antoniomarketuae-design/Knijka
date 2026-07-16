@@ -1,8 +1,10 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import {
+  FOG_IN_PER_SEC,
   RAIN_IN_PER_SEC,
   WETNESS_IN_PER_SEC,
   WETNESS_OUT_PER_SEC,
+  getFogIntensity,
   getRainIntensity,
   getWetness,
   resetWeather,
@@ -65,6 +67,30 @@ describe("weather channel", () => {
     stepWeather(0);
     stepWeather(-1);
     expect(getWetness()).toBe(0);
+  });
+
+  it("FOG channel: ramps at the documented rate, independent of rain/wetness", () => {
+    setWeatherTarget(false, true);
+    run(1);
+    expect(getFogIntensity()).toBeCloseTo(FOG_IN_PER_SEC, 2);
+    // Fog does NOT wet the road and brings no rain.
+    expect(getWetness()).toBe(0);
+    expect(getRainIntensity()).toBe(0);
+    run(1 / FOG_IN_PER_SEC); // more than enough to saturate
+    expect(getFogIntensity()).toBe(1);
+    // The default (rain-only signature) clears the fog target — additive API.
+    setWeatherTarget(false);
+    stepWeather(999);
+    expect(getFogIntensity()).toBe(0);
+  });
+
+  it("FOG channel: clamps and resets like the rain channels", () => {
+    setWeatherTarget(true, true);
+    stepWeather(999);
+    expect(getFogIntensity()).toBe(1);
+    expect(getRainIntensity()).toBe(1);
+    resetWeather();
+    expect(getFogIntensity()).toBe(0);
   });
 });
 

@@ -64,6 +64,7 @@ const CATEGORY_ICONS: Record<string, typeof IconBook> = {
   HANDBRAKE_LEFT_ON: IconGear,
   HEADLIGHTS_OFF_AT_NIGHT: IconGear,
   HEADLIGHTS_OFF_IN_RAIN: IconGear,
+  FOG_LIGHTS_OFF_IN_FOG: IconGear,
 };
 
 export function TeachMomentOverlay({

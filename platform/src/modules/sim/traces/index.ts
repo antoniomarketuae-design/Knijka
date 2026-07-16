@@ -288,6 +288,16 @@ export {
   recordScAcHighbeamLeadDrive,
   type ScAcHighbeamLeadTraceName,
 } from "./scAcHighbeamLead";
+// FOG unlock (doc 72 AC-03 — the compilable weather="fog" condition) — the
+// dense-fog authored drives (sc-ac-fog: fog conditions envelope + the
+// recorder's fogLights channel); committed traces under
+// content/traces/sc-ac-fog/ are recordings of exactly these scripts (gate:
+// traces/__tests__/sc-ac-fog-traces).
+export {
+  SC_AC_FOG_ID,
+  recordScAcFogDrive,
+  type ScAcFogTraceName,
+} from "./scAcFog";
 
 // Detector pack unit 2 — Part A (shipped detectors: FO-08 standstill gap,
 // OV-07 crossing overtake) + Part B (config-gated drills: JU-23 junction scan,

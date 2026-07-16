@@ -242,6 +242,15 @@ export type DriveStep =
   | { kind: "seatbelt"; on: boolean }
   | { kind: "handbrake"; on: boolean }
   /**
+   * Front fog lamps (the FOG unlock — doc 72 AC-03; the cockpit V key /
+   * driveline fogLightsOn channel). Same cockpit-channel discipline as
+   * headlights above: DEFAULT OFF = the recorder's former hardcode (no
+   * channel), so every script that never emits this records BYTE-IDENTICAL
+   * to before. A fog shadow sets {on:true}; the fog-lamp mistake demo leaves
+   * it off and grades FOG_LIGHTS_OFF_IN_FOG.
+   */
+  | { kind: "fogLights"; on: boolean }
+  /**
    * Stall channel (capability phase — the VP-04 unlock). Mirrors the
    * driveline's LATCHED stall flag (VehicleSample.stalled: set by a stall,
    * cleared by the next successful restart), held until the next stall step —
@@ -334,6 +343,9 @@ export interface RecordScriptedDriveOptions {
   pedestrianCount?: number;
   isNight?: boolean;
   rain?: boolean;
+  /** FOG condition flag (doc 72 AC-03) — reaches every tick through
+   *  runtime.sample exactly like `rain`. Default false = today. */
+  fog?: boolean;
   /** Hard cap on scripted-drive length (default 900 s). */
   maxDurationSec?: number;
   /**
@@ -554,6 +566,7 @@ export function recordScriptedDrive(
 
   const isNight = options.isNight ?? false;
   const rain = options.rain ?? false;
+  const fog = options.fog ?? false;
   const maxFrames = Math.ceil((options.maxDurationSec ?? 900) / SCRIPT_DT);
 
   // Cockpit-state channels (see the DriveStep doc): initial values are the
@@ -563,6 +576,7 @@ export function recordScriptedDrive(
   let seatbeltOn = true;
   let handbrakeOn = false;
   let stalledOn = false;
+  let fogLightsOn = false;
 
   const emitEvent = (kind: TraceEventKind, textBg?: string, detail?: string) => {
     const e: TraceEvent = { tSec: t, kind };
@@ -663,9 +677,10 @@ export function recordScriptedDrive(
       gear: lastGear,
       mirrorGlance: pendingGlance,
       stalled: stalledOn,
+      fogLightsOn,
     };
     pendingGlance = null;
-    const tick = runtime.sample(vehicleSample, t, isNight, rain, leadGap);
+    const tick = runtime.sample(vehicleSample, t, isNight, rain, leadGap, fog);
     if (director) {
       const res = director.step({
         tSec: t,
@@ -742,6 +757,10 @@ export function recordScriptedDrive(
     }
     if (step.kind === "stall") {
       stalledOn = step.on;
+      continue;
+    }
+    if (step.kind === "fogLights") {
+      fogLightsOn = step.on;
       continue;
     }
     if (step.kind === "pause") {

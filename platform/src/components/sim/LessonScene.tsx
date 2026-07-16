@@ -594,6 +594,9 @@ function ReadyScene({
 
   const timeOfDay = lesson.environment?.timeOfDay ?? "day";
   const rain = lesson.environment?.rain ?? false;
+  // FOG weather (doc 72 AC-03): dense FogExp2 + dimmed rig in SimEnvironment,
+  // and tick.fog through RuntimeDriver → runtime.sample (the rain seam).
+  const fogWeather = lesson.environment?.fog ?? false;
   const isNight = timeOfDay === "night";
   const level = toLevel(quality);
   const spawn = useMemo(() => spawnPose(lesson, spawnPoints), [lesson, spawnPoints]);
@@ -808,7 +811,7 @@ function ReadyScene({
         }}
       >
         {perfLog ? <PerfProbe level={level} /> : null}
-        <SimEnvironment timeOfDay={timeOfDay} rain={rain} quality={level} />
+        <SimEnvironment timeOfDay={timeOfDay} rain={rain} fog={fogWeather} quality={level} />
         {/* HDRI image-based lighting — real sky reflections/ambient for PBR
             materials, glass, mirrors and car paint. background=false keeps
             SimEnvironment's animated sky dome. Day uses the golden-hour
@@ -904,6 +907,7 @@ function ReadyScene({
               minimapPolylines={minimapPolylines}
               isNight={isNight}
               rain={rain}
+              fog={fogWeather}
               paused={physicsPaused}
             />
             {/* A11 hittable traffic: a fixed pool of kinematic collider
@@ -1267,6 +1271,7 @@ function RuntimeDriver({
   minimapPolylines,
   isNight,
   rain,
+  fog,
   paused,
 }: {
   runtime: ReturnType<typeof createWorldRuntime>;
@@ -1297,6 +1302,8 @@ function RuntimeDriver({
   minimapPolylines: MinimapFrame["polylines"];
   isNight: boolean;
   rain: boolean;
+  /** FOG weather flag — reaches every tick via runtime.sample (the rain seam). */
+  fog: boolean;
   paused: boolean;
 }) {
   const tRef = useRef(0);
@@ -1422,7 +1429,7 @@ function RuntimeDriver({
     // A6 audio pass: sticky scene state for the audio layer (rain patter +
     // NPC proximity hum) — consumed by VehicleRig's per-frame audio update.
     audioRef.current?.setEnvironment({ rain, nearestNpcM: leadGap });
-    const tick = runtime.sample(sample, tRef.current, isNight, rain, leadGap);
+    const tick = runtime.sample(sample, tRef.current, isNight, rain, leadGap, fog);
 
     // A8: the scenario director steps AFTER traffic.update + runtime.sample —
     // it watches the player, commands staged actors (effective next frame)

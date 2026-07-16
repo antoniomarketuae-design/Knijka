@@ -44,7 +44,10 @@ export type CameraMode = "chase" | "cockpit" | "topdown";
  * scene fog/lighting identical across presets (at 300 m the world was fog-
  * washed), and at the preset widths the FOV lands at ~7–30° — visually flat,
  * exactly the doc's "perspective from high with narrow FOV" alternative.
- * View-only: grading never reads the camera.
+ * View-only: grading never reads the camera. FOG WEATHER (doc 72 AC-03) is
+ * the one condition dense enough to wash even this altitude — SimEnvironment
+ * caps the fog-weather density by camera height (FOG_TOPDOWN_MAX_OPTICAL) so
+ * the topdown aid view reads a fog wash, never a solid sheet.
  */
 const TOPDOWN_HEIGHT_M = 110;
 /** Zoom presets: visible ground WIDTH at the car's plane, m (doc 76 §4). */

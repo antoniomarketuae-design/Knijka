@@ -78,6 +78,15 @@ export interface EnvironmentPreset {
   /** Fog target while raining (denser, desaturated); blended in by rain intensity. */
   rainFog: FogSpec;
   /**
+   * Fog target in FOG WEATHER (doc 72 AC-03 „Мъгла" — drastically reduced
+   * visibility); blended in by fog intensity, and it WINS over the rain blend
+   * (a foggy scene is fog first). Densities put usable sight at ~50–70 m:
+   * at 0.02, FogExp2 transmittance e^−(d·s)² is ~37 % at 50 m and ~2 % at
+   * 100 m — the „спри в рамките на видимостта" envelope the fog conditions
+   * factor (rules cfg conditionSpeedFogFactor 0.6) grades against.
+   */
+  fogWeather: FogSpec;
+  /**
    * Renderer tone-mapping exposure target (gl.toneMappingExposure). Per-preset
    * so day can run punchy without brightening the intentionally-dark night rig
    * (doc 71 §4.1 — "stop sharing one knob"). SimEnvironment damps toward it on
@@ -90,6 +99,24 @@ export interface EnvironmentPreset {
 export const RAIN_SUN_DIM = 0.55;
 /** How much rain dims the hemisphere fill. */
 export const RAIN_HEMISPHERE_DIM = 0.3;
+
+/** How much FOG dims the key light at full fog intensity — heavier than rain:
+ *  a fog bank diffuses the sun into the ambient, killing directionality. */
+export const FOG_SUN_DIM = 0.8;
+/** How much FOG dims the hemisphere fill (mild — fog scatters light around). */
+export const FOG_HEMISPHERE_DIM = 0.2;
+
+/**
+ * Top-down fog cap (doc 76 §4 note: the topdown camera flies at a constant
+ * ~110 m — at fog-weather densities the ground would be a solid white sheet).
+ * The WEATHER fog density is capped so the optical depth from the camera to
+ * the ground directly below never exceeds this value: at 0.75 the map reads
+ * through a clearly-foggy ~43 % wash instead of disappearing. Driving views
+ * (cockpit ~1.2 m, chase ~5 m) sit far below the cap and render full density —
+ * the cap is an honest VIEW-AID concession (topdown is an L1 aid view; the
+ * graded envelope always follows tick.fog, never the camera).
+ */
+export const FOG_TOPDOWN_MAX_OPTICAL = 0.75;
 
 /**
  * The three lighting moods. Rigs stay structurally constant across presets
@@ -126,6 +153,8 @@ export const ENVIRONMENT_PRESETS: Record<TimeOfDay, EnvironmentPreset> = {
     // stay legible.
     fog: { color: "#e3c49c", density: 0.0028 },
     rainFog: { color: "#9aabbd", density: 0.0034 },
+    // Day fog: bright desaturated grey (fog scatters daylight) — ~50 m sight.
+    fogWeather: { color: "#c9cdd2", density: 0.02 },
     exposure: 1.15,
   },
 
@@ -151,6 +180,8 @@ export const ENVIRONMENT_PRESETS: Record<TimeOfDay, EnvironmentPreset> = {
     // day < dusk < night fog ordering is a tested invariant.
     fog: { color: "#d9a06b", density: 0.0032 },
     rainFog: { color: "#958b91", density: 0.0042 },
+    // Dusk fog: the low warm light barely tints the bank.
+    fogWeather: { color: "#aca7a3", density: 0.022 },
     exposure: 1.1,
   },
 
@@ -176,6 +207,9 @@ export const ENVIRONMENT_PRESETS: Record<TimeOfDay, EnvironmentPreset> = {
     },
     fog: { color: "#121c2e", density: 0.004 },
     rainFog: { color: "#0e141f", density: 0.0058 },
+    // Night fog: a faintly-lit dark grey (streetlights glow into the bank),
+    // denser than day — night fog is the blindest condition we render.
+    fogWeather: { color: "#1a2028", density: 0.024 },
     exposure: 0.95,
   },
 };

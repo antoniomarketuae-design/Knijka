@@ -17,6 +17,7 @@ const CODE_TO_SCENARIO: Record<string, string> = {
   SEATBELT_OFF_WHILE_MOVING: "ev-seatbelt",
   HEADLIGHTS_OFF_AT_NIGHT: "ev-lights-usage",
   HEADLIGHTS_OFF_IN_RAIN: "ev-adverse-weather",
+  FOG_LIGHTS_OFF_IN_FOG: "ev-lights-usage",
   SPEED_TOO_FAST_FOR_CONDITIONS: "ev-speed-for-conditions",
   FOLLOWING_TOO_CLOSE: "ev-following-distance",
   WRONG_WAY: "ev-sign-prohibitory",

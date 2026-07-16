@@ -96,10 +96,21 @@ describe("compileScenario — sc-park-perp-rev", () => {
     expect(() => compileScenario(SC_PARK_PERP_REV, 5)).toThrow(/does not author L5.*L1, L2, L3, L4/);
   });
 
-  it("refuses to compile gated conditions (fog/snow are tag-only, doc 76 §0)", () => {
+  it("refuses to compile gated conditions (snow stays tag-only, doc 76 §0)", () => {
+    const s = clone();
+    s.levels[2].conditions = { weather: "snow" };
+    expect(() => compileScenario(s, 3)).toThrow(ScenarioCompileError);
+    expect(() => compileScenario(s, 3)).toThrow(/tag-only for now/);
+  });
+
+  it("compiles FOG rungs into the lesson environment (the AC-03 unlock — fog is no longer gated)", () => {
     const s = clone();
     s.levels[2].conditions = { weather: "fog" };
-    expect(() => compileScenario(s, 3)).toThrow(/tag-only for now/);
+    const lesson = compileScenario(s, 3);
+    expect(lesson.environment).toEqual({ fog: true });
+    // Foggy night composes both flags.
+    s.levels[2].conditions = { weather: "fog", night: true };
+    expect(compileScenario(s, 3).environment).toEqual({ timeOfDay: "night", fog: true });
   });
 
   it("compiles rain/night rungs into the lesson environment", () => {

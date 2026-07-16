@@ -24,8 +24,9 @@
  *    (S0-View: merge lesson.parkingBay into the buildWorldGeometry bays).
  *  - Traffic defaults to ZERO (a focused micro-map is not a boulevard);
  *    templates/levels opt back in per rung.
- *  - fog/snow conditions are TAGGABLE but not compilable yet (doc 76 §0
- *    weather gaps) — compiling such a rung throws, listing the gate.
+ *  - weather: dry/rain/FOG compile (fog ungated — FogExp2 render + tick.fog
+ *    conditions envelope + fog-lamp duty, doc 72 AC-03); snow stays TAGGABLE
+ *    but not compilable (doc 76 §0 weather gaps) — such a rung throws.
  */
 
 import type { LessonAidsSpec, LessonObjective, LessonSpec, ParkingBaySpec } from "../../contracts";
@@ -121,21 +122,23 @@ export function compileScenario(spec: ScenarioSpec, level: ScenarioLevel): Lesso
     );
   }
 
-  // Conditions: rung overrides template; fog/snow are catalog tags, not yet
-  // compilable (doc 76 §0 — fog/snow gated "soon").
+  // Conditions: rung overrides template. FOG is compilable (doc 76 §0 weather
+  // gap closed: FogExp2 render + tick.fog conditions envelope + fog-lamp duty);
+  // SNOW stays a catalog tag until its render/friction slice ships.
   const conditions = { ...(spec.conditions ?? {}), ...(rung.conditions ?? {}) };
-  if (conditions.weather === "fog" || conditions.weather === "snow") {
+  if (conditions.weather === "snow") {
     throw new ScenarioCompileError(
       spec.id,
       level,
-      `condition "${conditions.weather}" is tag-only for now (doc 76 §0 weather gaps) — the engine ships dry/rain (+night)`,
+      `condition "${conditions.weather}" is tag-only for now (doc 76 §0 weather gaps) — the engine ships dry/rain/fog (+night)`,
     );
   }
   const environment: LessonSpec["environment"] | undefined =
-    conditions.night || conditions.weather === "rain"
+    conditions.night || conditions.weather === "rain" || conditions.weather === "fog"
       ? {
           ...(conditions.night ? { timeOfDay: "night" as const } : {}),
           ...(conditions.weather === "rain" ? { rain: true } : {}),
+          ...(conditions.weather === "fog" ? { fog: true } : {}),
         }
       : undefined;
 

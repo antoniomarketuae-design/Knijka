@@ -36,9 +36,13 @@
  * Family: "conditions" — the existing catalog chip (doc 76 §2).
  *
  * Doc-72 provenance: AC-01 and AC-02 are the "Engine: ✅ FULL" adverse-condition
- * archetypes gradable from the shipped headlight detectors. AC-03..AC-13 need an
- * oncoming actor, a fog/friction condition or a dazzle channel and are 🟡
- * PARTIAL or 🔴 NEW — left for later waves.
+ * archetypes gradable from the shipped headlight detectors. AC-04 (dazzle
+ * channel) and AC-07's friction slice shipped next; the FOG unlock adds AC-03
+ * (sc-ac-fog — the compilable weather="fog" condition: dense FogExp2 render,
+ * tick.fog conditions envelope at conditionSpeedFogFactor 0.6, and the
+ * FOG_LIGHTS_OFF_IN_FOG fog-lamp duty on the recorder's fogLights channel).
+ * The remaining AC archetypes need an oncoming actor or a snow/ice condition
+ * and stay 🟡 PARTIAL or 🔴 NEW — left for later waves.
  *
  * ADR-006 stage 4a adds sc-ac-wet-braking — the FIRST template on the opt-in
  * wet-grip physics slice (LessonSpec.physics.wetGrip ← ScenarioSpec.physics):
@@ -490,6 +494,127 @@ export const SC_AC_WET_BRAKING: ScenarioSpec = {
   localeBg: "bg-BG",
 };
 
+// ---------------------------------------------------------------------------
+// 5. sc-ac-fog — „Мъгла" (AC-03) on ac-rain-v1 (360 m straight street,
+//    limit 50, DAY dense fog — the FOG weather unlock)
+// ---------------------------------------------------------------------------
+
+/**
+ * AC-03 — движение в гъста мъгла (ЗДвП чл. 20, ал. 2: скоростта се съобразява
+ * с видимостта, така че водачът да може да спре в рамките на ВИДИМОТО платно;
+ * чл. 74: при значително намалена видимост се включват предните фарове за
+ * мъгла, заедно с късите светлини).
+ *
+ * THE FOG IS THE LESSON (the first compilable weather="fog" template):
+ *  - conditions.weather "fog" compiles to LessonSpec.environment.fog → the
+ *    scene renders the dense FogExp2 bank (~50 m usable sight, dimmed rig,
+ *    washed sky) and the runtime feeds tick.fog every frame;
+ *  - the conditions envelope hardens: conditionSpeedFogFactor 0.6 × 50 =
+ *    30 km/h — the „спри в рамките на видимостта" band. Driving the dry
+ *    habit (~38 km/h, legal in rain) grades SPEED_TOO_FAST_FOR_CONDITIONS;
+ *  - the fog-lamp duty arms: FOG_LIGHTS_OFF_IN_FOG (второстепенна, чл. 74)
+ *    grades a drive without the front fog lamps (cockpit V key — the
+ *    recorder's fogLights channel authors the demos).
+ *
+ * Reuses the committed ac-rain-v1 straight street (the sc-ac-wet-braking
+ * precedent): no crossing/junction/signal/sign, ambient traffic ZERO (seed 7),
+ * so nothing but the fog channels is gradable. The shadow drives fog lamps +
+ * low beams on at ~25 km/h and earns CLEAN_DRIVING.
+ */
+export const SC_AC_FOG: ScenarioSpec = {
+  id: "sc-ac-fog",
+  family: "conditions",
+  tagsBg: ["условия", "мъгла", "видимост", "фарове за мъгла", "съобразена скорост"],
+  titleBg: "Мъгла",
+  objectiveBg:
+    "Измини правата улица в гъста мъгла с включени фарове за мъгла и скорост, при която можеш да спреш в рамките на видимия участък — в мъглата виждаш 50 метра напред, а правото да караш 50 км/ч не значи, че е безопасно.",
+  archetypeIds: ["AC-03"],
+  conceptIds: ["c-fog-driving", "c-stopping-distance-total", "c-general-care-duty"],
+  map: {
+    archetype: "straight-street",
+    // Reuses the committed ac-rain-v1 map (a plain 1+1 straight street) — its
+    // meta.scenario.params, mirrored here for provenance.
+    params: { lengthM: 360, maxspeedKmh: 50 },
+    districtId: "ac-rain-v1",
+  },
+  start: {
+    spawnPointId: "ac-rain-spawn-approach",
+    vehicleStart: "ready",
+  },
+  instructionsBg: [
+    { n: 1, textBg: "Гъста мъгла: включи късите светлини и фаровете за мъгла (клавиш V) още преди да потеглиш." },
+    {
+      n: 2,
+      textBg:
+        "Потегли бавно и се стабилизирай около 25 км/ч — в мъглата караш толкова бързо, колкото виждаш, не колкото позволява знакът.",
+    },
+    {
+      n: 3,
+      textBg:
+        "Правилото е желязно: трябва да можеш да спреш В РАМКИТЕ на видимия участък. Виждаш 50 метра — значи скорост, която спира за по-малко от 50 метра, с целия ти рефлекс вътре.",
+    },
+    {
+      n: 4,
+      textBg:
+        "Не се залепяй за маркировката в последния момент — гледай докъдето стига видимостта и очаквай спрял автомобил или пешеходец да „изплува“ от пелената.",
+    },
+    { n: 5, textBg: "Продължи така до края на отсечката — фаровете за мъгла светят, докато трае мъглата." },
+  ],
+  success: [
+    {
+      id: "sc-acf-adapted",
+      titleBg: "Мини контролната зона със съобразена за мъглата скорост",
+      // Cap 30 km/h IS the fog conditions envelope (0.6 × 50): the adapted
+      // ~25 km/h drive satisfies it; a dry-habit 38 km/h simply cannot
+      // complete the objective without slowing into the envelope.
+      params: { kind: "reachZone", x: LANE_X, y: 180, radiusM: 10, maxSpeedKmh: 30 },
+    },
+    {
+      id: "sc-acf-finish",
+      titleBg: "Стигни края на отсечката",
+      params: { kind: "reachZone", x: LANE_X, y: 330, radiusM: 12 },
+    },
+  ],
+  rubric: { parTimeSec: 90 },
+  // RECORDED: committed deterministic recordings of the authored scripts in
+  // traces/scAcFog.ts; gates in traces/__tests__/sc-ac-fog-traces.test.ts
+  // (re-record with RECORD_TRACES=1).
+  shadow: { path: "content/traces/sc-ac-fog/shadow-correct.trace.json" },
+  mistakes: [
+    {
+      traceRef: { path: "content/traces/sc-ac-fog/mistake-dry-speed.trace.json" },
+      titleBg: "Кара „като на сухо“ в мъглата",
+      whatWentWrongBg:
+        "Колата носеше близо 40 км/ч в гъстата мъгла — „нали е под ограничението“. Но ограничението е таван за ясно време: при 50 метра видимост препятствието „изплува“ твърде късно и спирачният път не се събира във видимото. В мъгла скоростта се смъква драстично — тук под 30 км/ч (чл. 20, ал. 2).",
+      codeRefs: ["SPEED_TOO_FAST_FOR_CONDITIONS"],
+    },
+    {
+      traceRef: { path: "content/traces/sc-ac-fog/mistake-no-fog-lights.trace.json" },
+      titleBg: "Без фарове за мъгла",
+      whatWentWrongBg:
+        "Водачът кара със съобразена скорост, но без включени фарове за мъгла — късите светлини се отразяват в пелената, а колата остава смътно петно за другите. При значително намалена видимост предните фарове за мъгла светят заедно с късите (чл. 74) — те осветяват ниско, под мъглата, и те правят видим.",
+      codeRefs: ["FOG_LIGHTS_OFF_IN_FOG"],
+    },
+  ],
+  teach: {
+    whenBg:
+      "При всяка гъста мъгла — есенните утрини, котловините, крайречните булеварди. Двете действия идват заедно още преди потеглянето: фарове за мъгла + къси светлини, и скорост, смъкната до това, което реално виждаш — не до това, което пише на знака.",
+    whyBg:
+      "Мъглата е най-коварното условие: тя не прави пътя хлъзгав, а те ослепява — препятствието се появява на 50 метра, а на 50 км/ч само спирачният път е около 30 метра плюс реакцията. Който кара „по знака“, спира В препятствието; който кара по видимостта, спира ПРЕД него. Затова законът връзва скоростта с видимото платно, а фаровете за мъгла те правят видим за другите.",
+    lawRef: "ЗДвП чл. 20, ал. 2; чл. 74",
+    examinerBg:
+      "Изпитващият очаква при намалена видимост да реагираш без подкана: фарове за мъгла и къси светлини преди потеглянето, скорост далеч под ограничението и по-голяма дистанция. Несъобразената с видимостта скорост е грешка — карай толкова бързо, колкото виждаш.",
+  },
+  levels: [
+    { level: 1 },
+    { level: 2 },
+    { level: 3 },
+    { level: 4, vehicleStart: "cold" },
+  ],
+  conditions: { weather: "fog" },
+  localeBg: "bg-BG",
+};
+
 /** The adverse-conditions-family templates, in catalog order (registered in
  *  templates.ts). */
 export const SCENARIO_TEMPLATES_CONDITIONS: readonly ScenarioSpec[] = [
@@ -497,4 +622,5 @@ export const SCENARIO_TEMPLATES_CONDITIONS: readonly ScenarioSpec[] = [
   SC_AC_RAIN_LIGHTS,
   SC_AC_HIGHBEAM_LEAD,
   SC_AC_WET_BRAKING,
+  SC_AC_FOG,
 ];

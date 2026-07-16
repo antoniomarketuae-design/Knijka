@@ -46,6 +46,13 @@ export interface VehicleSample {
    * второстепенна „загасване".
    */
   stalled?: boolean;
+  /**
+   * Front fog lamps on (the driveline's fogLightsOn channel — cockpit V key).
+   * Additive; absent = the rig has no fog-lamp channel = treated as off. Only
+   * graded when the world is in FOG (FOG_LIGHTS_OFF_IN_FOG), so existing
+   * callers stay byte-identically innocent.
+   */
+  fogLightsOn?: boolean;
 }
 
 /** Traffic-signal runtime state, per signal node id from district-v1.json. */
@@ -54,13 +61,16 @@ export type SignalPhase = "red" | "redYellow" | "green" | "yellow";
 export interface WorldRuntime {
   /** Advance signal phases etc.; call once per render frame. */
   update(dtSec: number): void;
-  /** Produce the authoritative SimTick for the rule engine from a vehicle sample. */
+  /** Produce the authoritative SimTick for the rule engine from a vehicle sample.
+   *  `fog` (additive, default false) is the FOG condition flag — it reaches the
+   *  tick exactly like `rain` does (the doc 72 AC-03 seam). */
   sample(
     v: VehicleSample,
     tSec: number,
     isNight: boolean,
     rain?: boolean,
     leadGapM?: number,
+    fog?: boolean,
   ): SimTick;
   /** Current phase for a signal node (world renderer reads this to light the lamps). */
   signalPhase(signalNodeId: string): SignalPhase;
@@ -140,8 +150,11 @@ export interface LessonSpec {
   vehicleStart?: "cold" | "ready";
   /** Ordered objectives; each completes via a predicate over runtime state. */
   objectives: LessonObjective[];
-  /** Optional time-of-day/weather override. */
-  environment?: { timeOfDay?: "day" | "dusk" | "night"; rain?: boolean };
+  /** Optional time-of-day/weather override. `fog` = dense FOG (doc 72 AC-03):
+   *  the scene renders the thick FogExp2 + dimmed rig, and the runtime feeds
+   *  tick.fog so the fog conditions envelope + fog-lamp duty arm. Additive —
+   *  absent = today's clear/rain behavior, byte-identical. */
+  environment?: { timeOfDay?: "day" | "dusk" | "night"; rain?: boolean; fog?: boolean };
   /**
    * ADR-006 stage 4a — OPT-IN physics overrides for the LIVE VehicleSim.
    * `wetGrip: true` runs the hero car at tuning.WET_GRIP_FACTOR (0.7): tyre μ

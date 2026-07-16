@@ -109,6 +109,8 @@ export interface RuleEngineState {
   laneKeeping: EpisodeState;
   conditionsSpeed: EpisodeState;
   rainLights: EpisodeState;
+  /** Driving in FOG without front fog lamps (AC-03, чл. 74). */
+  fogLights: EpisodeState;
   following: EpisodeState;
   wrongWay: EpisodeState;
   keepRight: EpisodeState;
@@ -211,6 +213,7 @@ export function createRuleEngine(config?: Partial<RuleEngineConfig>): RuleEngine
     laneKeeping: { ...IDLE_EPISODE },
     conditionsSpeed: { ...IDLE_EPISODE },
     rainLights: { ...IDLE_EPISODE },
+    fogLights: { ...IDLE_EPISODE },
     following: { ...IDLE_EPISODE },
     wrongWay: { ...IDLE_EPISODE },
     keepRight: { ...IDLE_EPISODE },
@@ -251,6 +254,7 @@ function cloneState(s: RuleEngineState): RuleEngineState {
     laneKeeping: { ...s.laneKeeping },
     conditionsSpeed: { ...s.conditionsSpeed },
     rainLights: { ...s.rainLights },
+    fogLights: { ...s.fogLights },
     following: { ...s.following },
     wrongWay: { ...s.wrongWay },
     keepRight: { ...s.keepRight },
@@ -629,13 +633,15 @@ export function reduceTick(prev: RuleEngineState, tick: SimTick): ReduceResult {
   }
 
   // Speed for the conditions: within the posted limit, but too fast for rain /
-  // night. (Above the limit is regular speeding, handled above.) Factors
+  // fog / night. (Above the limit is regular speeding, handled above.) Factors
   // compose by MIN — the single most restrictive condition governs; the
   // product would double-bill a rainy night (A12). A factor of 1 means the
   // condition does not reduce the prudent speed at all.
   const raining = tick.rain === true;
+  const foggy = tick.fog === true;
   const conditionFactor = Math.min(
     raining ? cfg.conditionSpeedRainFactor : 1,
+    foggy ? cfg.conditionSpeedFogFactor : 1,
     tick.isNight ? cfg.conditionSpeedNightFactor : 1,
   );
   const conditionsReduced = conditionFactor < 1;
@@ -660,6 +666,20 @@ export function reduceTick(prev: RuleEngineState, tick: SimTick): ReduceResult {
     stepEpisode(s.rainLights, rainNoLights, !raining || tick.headlights !== "off", t, cfg.rainLightsSustainSec)
   ) {
     events.push(makeViolation("HEADLIGHTS_OFF_IN_RAIN", t));
+  }
+
+  // Fog lamps in fog (AC-03, чл. 74 — при значително намалена видимост
+  // предните фарове за мъгла светят, заедно с късите). Armed EXCLUSIVELY by
+  // tick.fog — dry/rain/night drives (fog absent) can never reach it, and a
+  // clear-road drive with the fog lamps left on stays ungraded here (the
+  // чл. 75 dazzle duty is a separate, unshipped code). The sustain gives the
+  // same grace as the rain-lights detector for the moment between moving off
+  // and reaching the V toggle.
+  const fogNoFogLights = foggy && tick.fogLightsOn !== true && moving;
+  if (
+    stepEpisode(s.fogLights, fogNoFogLights, !foggy || tick.fogLightsOn === true, t, cfg.fogLightsSustainSec)
+  ) {
+    events.push(makeViolation("FOG_LIGHTS_OFF_IN_FOG", t));
   }
 
   // Following distance (2-second rule) — only above stop-and-go speed, when a
@@ -1080,6 +1100,7 @@ export function reduceTick(prev: RuleEngineState, tick: SimTick): ReduceResult {
     s.laneKeeping,
     s.conditionsSpeed,
     s.rainLights,
+    s.fogLights,
     s.following,
     s.wrongWay,
     s.keepRight,

@@ -590,6 +590,7 @@ export function createWorldRuntime(districtJson: District | unknown): DistrictWo
       isNight: boolean,
       rain = false,
       leadGapM = Infinity,
+      fog = false,
     ): SimTick {
       const events: SimTickEvent[] = [];
 
@@ -1016,6 +1017,11 @@ export function createWorldRuntime(districtJson: District | unknown): DistrictWo
         wrongWay,
         events,
       };
+      // FOG condition (doc 72 AC-03) — flows onto the tick exactly like rain,
+      // but stays ADDITIVE (set only when on) so pre-fog tick shapes are
+      // untouched; the fog-lamp channel rides along the same way.
+      if (fog) tick.fog = true;
+      if (v.fogLightsOn !== undefined) tick.fogLightsOn = v.fogLightsOn;
       // B1a additive world context (doc 72 capabilities 1 + N3): flows onto
       // the tick exactly the way maxSpeedKmh does — from the resolved edge.
       if (v.stalled !== undefined) tick.stalled = v.stalled;

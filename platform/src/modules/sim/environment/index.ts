@@ -24,6 +24,9 @@ export {
   sunDirection,
   RAIN_SUN_DIM,
   RAIN_HEMISPHERE_DIM,
+  FOG_SUN_DIM,
+  FOG_HEMISPHERE_DIM,
+  FOG_TOPDOWN_MAX_OPTICAL,
 } from "./presets";
 export { BENCHMARK_CAMERAS } from "./benchmarkCameras";
 export type { BenchmarkCameraPose } from "./benchmarkCameras";
@@ -59,8 +62,10 @@ export type { QualityState } from "./qualityStore";
 export {
   useWetness,
   useRainIntensity,
+  useFogIntensity,
   getWetness,
   getRainIntensity,
+  getFogIntensity,
   wetnessToRoadParams,
   resetWeather,
 } from "./weather";

@@ -160,6 +160,16 @@ export interface SimTick {
   isNight: boolean;
   /** True in rain / reduced visibility (optional; absent = dry). */
   rain?: boolean;
+  /** True in FOG — drastically reduced visibility (doc 72 AC-03; optional;
+   * absent = clear). Distinct from `rain`: fog arms its own prudent-speed
+   * factor (harsher — чл. 20 ал. 2: stop within the VISIBLE distance) and the
+   * fog-lamp duty (чл. 74), never the rain-lights detector. */
+  fog?: boolean;
+  /** Front fog lamps on (the cockpit V key / driveline fogLightsOn channel).
+   * Optional and additive: absent = unknown = treated as OFF, but the only
+   * detector reading it (FOG_LIGHTS_OFF_IN_FOG) arms exclusively when
+   * `fog` is true — every existing drive stays byte-identically innocent. */
+  fogLightsOn?: boolean;
   /** Gap in meters to the nearest vehicle ahead in-lane (optional; absent/∞ = clear road). */
   leadGapM?: number;
   /** True when driving against the flow of a one-way street (runtime-computed). */
@@ -309,6 +319,7 @@ export type ViolationCode =
   | "HANDBRAKE_LEFT_ON" // второстепенна
   | "HEADLIGHTS_OFF_AT_NIGHT" // основна
   | "HEADLIGHTS_OFF_IN_RAIN" // второстепенна: reduced visibility, low beam should be on
+  | "FOG_LIGHTS_OFF_IN_FOG" // второстепенна: dense fog without front fog lamps (AC-03, чл. 74)
   | "POOR_LANE_KEEPING" // второстепенна: sustained off-centre / straddling positioning
   | "SPEED_TOO_FAST_FOR_CONDITIONS" // второстепенна: within the limit but imprudent for rain/night
   | "FOLLOWING_TOO_CLOSE" // основна: tailgating — under the 2-second gap
@@ -477,10 +488,25 @@ export interface RuleEngineConfig {
    * world signal, not a blanket night factor.
    */
   conditionSpeedNightFactor: number;
+  /**
+   * Prudent-speed factor on the posted limit in FOG (doc 72 AC-03). Fog is
+   * harsher than rain's 0.85: чл. 20 ал. 2 demands a speed you can stop at
+   * WITHIN YOUR VISIBLE DISTANCE, and the rendered dense fog leaves ~50 m of
+   * usable sight — 0.6 (a 50-zone envelope of 30 km/h) is the „смъкни
+   * драстично" band the AC-03 archetype teaches (40–50 % under the limit).
+   * Composes with rain/night by MIN like every condition factor (never the
+   * product — see conditionSpeedRainFactor); armed ONLY when tick.fog is
+   * true, so no existing drive can reach it.
+   */
+  conditionSpeedFogFactor: number;
   /** Seconds too-fast-for-conditions must hold before it fires. */
   conditionsSpeedSustainSec: number;
   /** Seconds of driving in rain without low beam before HEADLIGHTS_OFF_IN_RAIN. */
   rainLightsSustainSec: number;
+  /** Seconds of driving in FOG without front fog lamps before
+   *  FOG_LIGHTS_OFF_IN_FOG (mirrors rainLightsSustainSec — grace for the
+   *  moment between moving off and reaching for the V toggle). */
+  fogLightsSustainSec: number;
 
   /** Time-gap target for the 2-second rule, seconds. */
   followSafeSeconds: number;
@@ -805,8 +831,14 @@ export const DEFAULT_RULE_CONFIG: RuleEngineConfig = {
   // interface comment; factors compose by MIN, not product, so rain governs
   // a rainy night at 0.85.
   conditionSpeedNightFactor: 1,
+  // AC-03: 0.6 × 50 = 30 km/h — stop-within-the-visible-distance (чл. 20
+  // ал. 2) at the rendered ~50 m fog visibility; deliberately far below
+  // rain's 0.85 (fog composes by MIN and governs a foggy rain). Armed only
+  // by tick.fog — dry/rain/night drives never touch it.
+  conditionSpeedFogFactor: 0.6,
   conditionsSpeedSustainSec: 3,
   rainLightsSustainSec: 3,
+  fogLightsSustainSec: 3,
 
   followSafeSeconds: 1.8,
   followMinGapM: 4,

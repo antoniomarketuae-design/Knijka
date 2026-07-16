@@ -58,6 +58,9 @@ import {
 } from "three";
 import {
   ENVIRONMENT_PRESETS,
+  FOG_HEMISPHERE_DIM,
+  FOG_SUN_DIM,
+  FOG_TOPDOWN_MAX_OPTICAL,
   RAIN_HEMISPHERE_DIM,
   RAIN_SUN_DIM,
   sunDirection,
@@ -65,13 +68,22 @@ import {
 } from "./presets";
 import { QUALITY_PRESETS, type QualityLevel } from "./quality";
 import { useQuality } from "./qualityStore";
-import { setWeatherTarget, stepWeather, getRainIntensity, useRainIntensity } from "./weather";
+import {
+  setWeatherTarget,
+  stepWeather,
+  getFogIntensity,
+  getRainIntensity,
+  useRainIntensity,
+} from "./weather";
 import { SkyDome } from "./SkyDome";
 import { RainStreaks } from "./RainStreaks";
 
 export interface SimEnvironmentProps {
   timeOfDay: TimeOfDay;
   rain: boolean;
+  /** FOG weather (doc 72 AC-03) — dense FogExp2 + dimmed rig + grey sky wash.
+   *  Additive; absent/false = today's clear/rain behavior. */
+  fog?: boolean;
   /** Explicit quality level; omit to follow the quality store ("auto"). */
   quality?: QualityLevel;
 }
@@ -125,7 +137,7 @@ function dampColor(cur: Color, goal: Color, lambda: number, dt: number): void {
   cur.b = MathUtils.damp(cur.b, goal.b, lambda, dt);
 }
 
-export function SimEnvironment({ timeOfDay, rain, quality }: SimEnvironmentProps) {
+export function SimEnvironment({ timeOfDay, rain, fog = false, quality }: SimEnvironmentProps) {
   const store = useQuality();
   const level = quality ?? store.level;
   const qp = QUALITY_PRESETS[level];
@@ -154,10 +166,10 @@ export function SimEnvironment({ timeOfDay, rain, quality }: SimEnvironmentProps
     }
   }, [gl, qp.shadows]);
 
-  // Weather targets follow the rain prop; the store ramps toward them.
+  // Weather targets follow the rain/fog props; the store ramps toward them.
   useEffect(() => {
-    setWeatherTarget(rain);
-  }, [rain]);
+    setWeatherTarget(rain, fog);
+  }, [rain, fog]);
 
   // Streaks stay mounted while the rain intensity fades out after rain stops
   // (the store update re-renders us at quantized steps until it hits 0).
@@ -174,6 +186,7 @@ export function SimEnvironment({ timeOfDay, rain, quality }: SimEnvironmentProps
       hemiGround: new Color(preset.light.hemisphere.groundColor),
       fogColor: new Color(preset.fog.color),
       rainFogColor: new Color(preset.rainFog.color),
+      fogWeatherColor: new Color(preset.fogWeather.color),
     };
   }, [preset]);
 
@@ -193,12 +206,13 @@ export function SimEnvironment({ timeOfDay, rain, quality }: SimEnvironmentProps
   useFrame((state, delta) => {
     stepWeather(delta);
     const rainNow = getRainIntensity();
+    const fogNow = getFogIntensity();
 
     const hemi = hemiRef.current;
     const sun = sunRef.current;
-    const fog = fogRef.current;
+    const fogObj = fogRef.current;
     const sunTarget = targetRef.current;
-    if (!hemi || !sun || !fog || !sunTarget) return;
+    if (!hemi || !sun || !fogObj || !sunTarget) return;
 
     // While the composer is not in charge of the final image, keep the
     // renderer on the chosen tone mapper (the composer sets NoToneMapping
@@ -225,21 +239,24 @@ export function SimEnvironment({ timeOfDay, rain, quality }: SimEnvironmentProps
       dt,
     );
 
-    // Hemisphere fill.
+    // Hemisphere fill. Rain and fog dims stack multiplicatively (a foggy rain
+    // is darker than either alone; fog's own dim dominates via its constants).
     dampColor(hemi.color, goal.hemiSky, FADE_LAMBDA, dt);
     dampColor(hemi.groundColor, goal.hemiGround, FADE_LAMBDA, dt);
     hemi.intensity = MathUtils.damp(
       hemi.intensity,
-      preset.light.hemisphere.intensity * (1 - RAIN_HEMISPHERE_DIM * rainNow),
+      preset.light.hemisphere.intensity *
+        (1 - RAIN_HEMISPHERE_DIM * rainNow) *
+        (1 - FOG_HEMISPHERE_DIM * fogNow),
       FADE_LAMBDA,
       dt,
     );
 
-    // Key light (sun/moon).
+    // Key light (sun/moon) — fog diffuses it heavily (FOG_SUN_DIM 0.8).
     dampColor(sun.color, goal.sunColor, FADE_LAMBDA, dt);
     sun.intensity = MathUtils.damp(
       sun.intensity,
-      preset.light.sun.intensity * (1 - RAIN_SUN_DIM * rainNow),
+      preset.light.sun.intensity * (1 - RAIN_SUN_DIM * rainNow) * (1 - FOG_SUN_DIM * fogNow),
       FADE_LAMBDA,
       dt,
     );
@@ -249,12 +266,25 @@ export function SimEnvironment({ timeOfDay, rain, quality }: SimEnvironmentProps
     dir.z = MathUtils.damp(dir.z, goal.sunDir.z, FADE_LAMBDA, dt);
     dir.normalize();
 
-    // Fog: blend clear↔rain spec by rain intensity, then ease toward it.
+    // Fog: blend clear↔rain spec by rain intensity, then let FOG WEATHER win
+    // over that (a foggy scene is fog first), then ease toward the result.
     scratch.fogGoal.copy(goal.fogColor).lerp(goal.rainFogColor, rainNow);
-    dampColor(fog.color, scratch.fogGoal, FADE_LAMBDA, dt);
-    fog.density = MathUtils.damp(
-      fog.density,
-      preset.fog.density + (preset.rainFog.density - preset.fog.density) * rainNow,
+    scratch.fogGoal.lerp(goal.fogWeatherColor, fogNow);
+    dampColor(fogObj.color, scratch.fogGoal, FADE_LAMBDA, dt);
+    // FOG-weather density, capped by camera altitude so the ~110 m topdown
+    // view reads a clearly-foggy wash instead of a solid sheet (see
+    // FOG_TOPDOWN_MAX_OPTICAL — an honest view-aid concession; driving views
+    // sit far below the cap and render full density). The damp smooths the
+    // cap change across view-mode switches like every other rig value.
+    const camAltitudeM = Math.max(state.camera.position.y, 1);
+    const fogWeatherDensity = Math.min(
+      preset.fogWeather.density,
+      FOG_TOPDOWN_MAX_OPTICAL / camAltitudeM,
+    );
+    const baseDensity = preset.fog.density + (preset.rainFog.density - preset.fog.density) * rainNow;
+    fogObj.density = MathUtils.damp(
+      fogObj.density,
+      baseDensity + (fogWeatherDensity - baseDensity) * fogNow,
       FADE_LAMBDA,
       dt,
     );

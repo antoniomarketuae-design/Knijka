@@ -21,7 +21,12 @@ import {
   type ShaderMaterialParameters,
 } from "three";
 import { ENVIRONMENT_PRESETS, sunDirection, type TimeOfDay } from "./presets";
-import { getRainIntensity } from "./weather";
+import { getFogIntensity, getRainIntensity } from "./weather";
+
+/** How far the FOG weather pulls the whole sky gradient toward the fog color
+ *  at full intensity — near-total: in dense fog there IS no sky, only the
+ *  bank (0.85 keeps a hint of gradient so the dome never reads flat-painted). */
+const FOG_SKY_WASH = 0.85;
 
 /** Damping stiffness for preset crossfades (≈2 s to settle). */
 const FADE_LAMBDA = 2.2;
@@ -137,6 +142,7 @@ export function SkyDome({ timeOfDay, radius = 520 }: { timeOfDay: TimeOfDay; rad
     sun: new Color("#000000"),
     sunDir: new Vector3(0, 1, 0),
     gray: new Color(),
+    fogWash: new Color(),
   });
 
   // Goal values re-derived only when the preset changes.
@@ -147,6 +153,7 @@ export function SkyDome({ timeOfDay, radius = 520 }: { timeOfDay: TimeOfDay; rad
       zenith: new Color(p.sky.zenith),
       horizon: new Color(p.sky.horizon),
       sun: new Color(p.sky.sunTint),
+      fogWeather: new Color(p.fogWeather.color),
       sunDir: new Vector3(s.x, s.y, s.z),
       horizonCurve: p.sky.horizonCurve,
       discCos: Math.cos((p.sky.sunDiscDeg * Math.PI) / 180),
@@ -169,6 +176,7 @@ export function SkyDome({ timeOfDay, radius = 520 }: { timeOfDay: TimeOfDay; rad
     const u = material.uniforms;
     const base = scratchRef.current;
     const rain = getRainIntensity();
+    const fog = getFogIntensity();
 
     dampColor(base.zenith, goal.zenith, FADE_LAMBDA, dt);
     dampColor(base.horizon, goal.horizon, FADE_LAMBDA, dt);
@@ -178,10 +186,13 @@ export function SkyDome({ timeOfDay, radius = 520 }: { timeOfDay: TimeOfDay; rad
     base.sunDir.z = MathUtils.damp(base.sunDir.z, goal.sunDir.z, FADE_LAMBDA, dt);
 
     // Rain: pull the gradient toward its own luminance (overcast gray),
-    // soften the sun, hide the stars.
+    // soften the sun, hide the stars. FOG weather then washes the whole
+    // gradient toward the preset's fog color (in a dense bank there is no
+    // sky) — applied after the rain gray-out so fog wins a foggy rain.
     const grayOut = (target: Color, from: Color, amount: number) => {
       const l = 0.299 * from.r + 0.587 * from.g + 0.114 * from.b;
       target.copy(from).lerp(base.gray.setScalar(l * 0.85), rain * amount);
+      target.lerp(base.fogWash.copy(goal.fogWeather), fog * FOG_SKY_WASH);
     };
     grayOut(u.uZenith.value as Color, base.zenith, 0.55);
     grayOut(u.uHorizon.value as Color, base.horizon, 0.55);
@@ -192,13 +203,18 @@ export function SkyDome({ timeOfDay, radius = 520 }: { timeOfDay: TimeOfDay; rad
     u.uSunDiscCos.value = MathUtils.damp(u.uSunDiscCos.value as number, goal.discCos, FADE_LAMBDA, dt);
     u.uSunDiscIntensity.value = MathUtils.damp(
       u.uSunDiscIntensity.value as number,
-      goal.discIntensity * (1 - 0.85 * rain),
+      goal.discIntensity * (1 - 0.85 * rain) * (1 - fog),
       FADE_LAMBDA,
       dt,
     );
-    u.uGlow.value = MathUtils.damp(u.uGlow.value as number, goal.glow * (1 - 0.7 * rain), FADE_LAMBDA, dt);
+    u.uGlow.value = MathUtils.damp(
+      u.uGlow.value as number,
+      goal.glow * (1 - 0.7 * rain) * (1 - fog),
+      FADE_LAMBDA,
+      dt,
+    );
     u.uGlowPower.value = MathUtils.damp(u.uGlowPower.value as number, goal.glowPower, FADE_LAMBDA, dt);
-    u.uStars.value = MathUtils.damp(u.uStars.value as number, goal.stars * (1 - rain), FADE_LAMBDA, dt);
+    u.uStars.value = MathUtils.damp(u.uStars.value as number, goal.stars * (1 - rain) * (1 - fog), FADE_LAMBDA, dt);
     u.uTime.value = state.clock.elapsedTime;
   });
 

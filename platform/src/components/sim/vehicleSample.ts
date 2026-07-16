@@ -24,6 +24,7 @@ export function createVehicleSample(): VehicleSample {
     gear: 0,
     mirrorGlance: null,
     stalled: false,
+    fogLightsOn: false,
   };
 }
 
@@ -98,4 +99,7 @@ export function updateVehicleSample(
   // B1a (doc 72 VP-04): the driveline's latched stall flag — the rule engine
   // grades its rising edge as the официална второстепенна „загасване".
   out.stalled = cabin.driveline.stalled;
+  // FOG unlock (doc 72 AC-03): the driveline's fog-lamp state (V key /
+  // cockpit hotspot) — graded only when the lesson's world is in fog.
+  out.fogLightsOn = cabin.driveline.fogLightsOn;
 }

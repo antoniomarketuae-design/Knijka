@@ -28,8 +28,8 @@ function cruise(extra: DriveScript["steps"]): DriveScript {
   };
 }
 
-function record(script: DriveScript, isNight = false, rain = false) {
-  return recordScriptedDrive(ln, script, { scenarioId: "cockpit-probe", kind: "mistake", seed: 7, isNight, rain });
+function record(script: DriveScript, isNight = false, rain = false, fog = false) {
+  return recordScriptedDrive(ln, script, { scenarioId: "cockpit-probe", kind: "mistake", seed: 7, isNight, rain, fog });
 }
 
 function codes(d: ReturnType<typeof record>): string[] {
@@ -63,5 +63,28 @@ describe("recorder cockpit-state channels", () => {
     expect(codes(record(cruise([{ kind: "headlights", setting: "off" }]), false, true))).toContain(
       "HEADLIGHTS_OFF_IN_RAIN",
     );
+  });
+
+  it("fogLights channel: default OFF in fog → FOG_LIGHTS_OFF_IN_FOG; {on:true} → clean", () => {
+    // The 25 km/h cruise sits under the fog conditions envelope (0.6 × 50 =
+    // 30) so the ONLY gradable channel is the fog lamps. Default (no step) is
+    // the former hardcode — off — which in fog grades the fog-lamp duty…
+    const slow = (extra: DriveScript["steps"]): DriveScript => ({
+      steps: [
+        ...extra,
+        { kind: "drive", points: [[12.19, 15], [12.19, 240]], targetKmh: 25 },
+        { kind: "pause", sec: 1, brake: true },
+      ],
+    });
+    expect(codes(record(slow([]), false, false, true))).toContain("FOG_LIGHTS_OFF_IN_FOG");
+    // …and switching the channel on drives clean.
+    const lit = codes(record(slow([{ kind: "fogLights", on: true }]), false, false, true));
+    expect(lit).not.toContain("FOG_LIGHTS_OFF_IN_FOG");
+    expect(lit).not.toContain("SPEED_TOO_FAST_FOR_CONDITIONS");
+  });
+
+  it("fogLights step without fog stays inert (no fog code on a clear road)", () => {
+    expect(codes(record(cruise([{ kind: "fogLights", on: false }])))).not.toContain("FOG_LIGHTS_OFF_IN_FOG");
+    expect(codes(record(cruise([{ kind: "fogLights", on: true }])))).not.toContain("FOG_LIGHTS_OFF_IN_FOG");
   });
 });

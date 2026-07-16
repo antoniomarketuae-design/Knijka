@@ -14,6 +14,11 @@
 //                   maps it to roughness/darkening via wetnessToRoadParams.
 //   rainIntensity — how hard it is raining *right now* (cloud cover, streak
 //                   opacity, light dimming). Faster in/out than wetness.
+//   fogIntensity  — how dense the FOG weather is *right now* (doc 72 AC-03).
+//                   Drives the FogExp2 density/color blend, the light dims and
+//                   the SkyDome gray-out. Slower in/out than rain — fog banks
+//                   roll in, they don't switch. Fog does NOT wet the road
+//                   (wetness stays a rain channel).
 
 import { useSyncExternalStore } from "react";
 
@@ -25,11 +30,17 @@ export const WETNESS_OUT_PER_SEC = 1 / 12;
 export const RAIN_IN_PER_SEC = 1 / 1.5;
 /** Rain intensity decay rate (1/s). */
 export const RAIN_OUT_PER_SEC = 1 / 3;
+/** Fog intensity rise rate (1/s → full bank in ~5 s). */
+export const FOG_IN_PER_SEC = 1 / 5;
+/** Fog intensity decay rate (1/s → lifts in ~6 s). */
+export const FOG_OUT_PER_SEC = 1 / 6;
 
 let wetness = 0;
 let wetnessTarget = 0;
 let rainIntensity = 0;
 let rainTarget = 0;
+let fogIntensity = 0;
+let fogTarget = 0;
 
 const listeners = new Set<() => void>();
 
@@ -47,10 +58,12 @@ function approach(current: number, target: number, ratePerSec: number, dtSec: nu
   return Math.max(current - maxDelta, target);
 }
 
-/** Set both targets from the lesson's rain flag. Called by SimEnvironment. */
-export function setWeatherTarget(rain: boolean): void {
+/** Set the targets from the lesson's rain/fog flags. Called by SimEnvironment.
+ *  `fog` is additive (default false = today's rain-only behavior). */
+export function setWeatherTarget(rain: boolean, fog = false): void {
   wetnessTarget = rain ? 1 : 0;
   rainTarget = rain ? 1 : 0;
+  fogTarget = fog ? 1 : 0;
 }
 
 /**
@@ -61,13 +74,17 @@ export function stepWeather(dtSec: number): void {
   if (dtSec <= 0) return;
   const prevW = quantize(wetness);
   const prevR = quantize(rainIntensity);
+  const prevF = quantize(fogIntensity);
   wetness = clamp01(
     approach(wetness, wetnessTarget, wetness < wetnessTarget ? WETNESS_IN_PER_SEC : WETNESS_OUT_PER_SEC, dtSec),
   );
   rainIntensity = clamp01(
     approach(rainIntensity, rainTarget, rainIntensity < rainTarget ? RAIN_IN_PER_SEC : RAIN_OUT_PER_SEC, dtSec),
   );
-  if (quantize(wetness) !== prevW || quantize(rainIntensity) !== prevR) {
+  fogIntensity = clamp01(
+    approach(fogIntensity, fogTarget, fogIntensity < fogTarget ? FOG_IN_PER_SEC : FOG_OUT_PER_SEC, dtSec),
+  );
+  if (quantize(wetness) !== prevW || quantize(rainIntensity) !== prevR || quantize(fogIntensity) !== prevF) {
     for (const fn of listeners) fn();
   }
 }
@@ -82,12 +99,19 @@ export function getRainIntensity(): number {
   return rainIntensity;
 }
 
-/** Reset to bone-dry. For tests and full sim teardown. */
+/** Imperative read of current FOG intensity 0..1 (per-frame consumers). */
+export function getFogIntensity(): number {
+  return fogIntensity;
+}
+
+/** Reset to bone-dry and clear. For tests and full sim teardown. */
 export function resetWeather(): void {
   wetness = 0;
   wetnessTarget = 0;
   rainIntensity = 0;
   rainTarget = 0;
+  fogIntensity = 0;
+  fogTarget = 0;
   for (const fn of listeners) fn();
 }
 
@@ -113,6 +137,15 @@ export function useRainIntensity(): number {
   return useSyncExternalStore(
     subscribe,
     () => quantize(rainIntensity),
+    () => 0,
+  );
+}
+
+/** Fog intensity 0..1, quantized to 0.01 (occasional React consumers). */
+export function useFogIntensity(): number {
+  return useSyncExternalStore(
+    subscribe,
+    () => quantize(fogIntensity),
     () => 0,
   );
 }

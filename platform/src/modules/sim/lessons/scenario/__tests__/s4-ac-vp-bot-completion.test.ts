@@ -21,6 +21,7 @@ import { recordScVpReadinessDrive, type ScVpReadinessTraceName } from "../../../
 import { recordScAcNightLightsDrive, type ScAcNightLightsTraceName } from "../../../traces/scAcNightLights";
 import { recordScAcRainLightsDrive, type ScAcRainLightsTraceName } from "../../../traces/scAcRainLights";
 import { recordScAcHighbeamLeadDrive, type ScAcHighbeamLeadTraceName } from "../../../traces/scAcHighbeamLead";
+import { recordScAcFogDrive, type ScAcFogTraceName } from "../../../traces/scAcFog";
 import { recordScVpPoliceStopDrive, type ScVpPoliceStopTraceName } from "../../../traces/scVpPoliceStop";
 import { applyTick, buildLessonResult, createLessonSession } from "../../engine";
 import { gradeFinishWire, serializeRuleEvents } from "../../wire";
@@ -29,7 +30,7 @@ import { compileScenario } from "../compile";
 import { scenarioLessonById } from "../resolve";
 import { scoreRubric } from "../rubric";
 import { SC_VP_POLICE_STOP, SC_VP_READINESS } from "../templates-cockpit";
-import { SC_AC_NIGHT_LIGHTS, SC_AC_RAIN_LIGHTS, SC_AC_HIGHBEAM_LEAD } from "../templates-conditions";
+import { SC_AC_FOG, SC_AC_NIGHT_LIGHTS, SC_AC_RAIN_LIGHTS, SC_AC_HIGHBEAM_LEAD } from "../templates-conditions";
 import type { ScenarioSpec } from "../types";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -107,6 +108,13 @@ const CORRECT: Array<{ spec: ScenarioSpec; record: (d: unknown, onTick: OnTick) 
     record: (d, onTick) => recordScAcHighbeamLeadDrive(d, "shadow-correct" as ScAcHighbeamLeadTraceName, { onTick }),
   },
   {
+    // FOG unlock (doc 72 AC-03): compileScenario(L3) carries environment.fog,
+    // the recorder feeds tick.fog + the fogLights channel — the fog-adapted,
+    // fog-lamps-on shadow completes the compiled lesson clean.
+    spec: SC_AC_FOG,
+    record: (d, onTick) => recordScAcFogDrive(d, "shadow-correct" as ScAcFogTraceName, { onTick }),
+  },
+  {
     // ADR-006 stage 1c — VP-11: the pull-over-and-stop completion drill (the
     // policeStop officer figure is scenery; the curb-side low-speed reachZone
     // IS the graded duty, so the compliant shadow COMPLETES at rest).
@@ -175,6 +183,26 @@ describe("S4 counter-proofs — cockpit mistakes grade through the live pipeline
     );
     const codes = driveViolationCodes(outcome);
     expect(codes).toContain("HEADLIGHTS_OFF_IN_RAIN");
+    expect(codes).not.toContain("SPEED_TOO_FAST_FOR_CONDITIONS");
+    expect(driveCommendationCodes(outcome)).not.toContain("CLEAN_DRIVING");
+  });
+
+  it("fog dry-habit speed: SPEED_TOO_FAST_FOR_CONDITIONS surfaces under fog, no fog-lamp code, clean-driving absent", () => {
+    const outcome = driveThroughSession(SC_AC_FOG, (d, onTick) =>
+      recordScAcFogDrive(d, "mistake-dry-speed", { onTick }),
+    );
+    const codes = driveViolationCodes(outcome);
+    expect(codes).toContain("SPEED_TOO_FAST_FOR_CONDITIONS");
+    expect(codes).not.toContain("FOG_LIGHTS_OFF_IN_FOG");
+    expect(driveCommendationCodes(outcome)).not.toContain("CLEAN_DRIVING");
+  });
+
+  it("fog lamps left off: FOG_LIGHTS_OFF_IN_FOG surfaces under fog, no conditions-speed code, clean-driving absent", () => {
+    const outcome = driveThroughSession(SC_AC_FOG, (d, onTick) =>
+      recordScAcFogDrive(d, "mistake-no-fog-lights", { onTick }),
+    );
+    const codes = driveViolationCodes(outcome);
+    expect(codes).toContain("FOG_LIGHTS_OFF_IN_FOG");
     expect(codes).not.toContain("SPEED_TOO_FAST_FOR_CONDITIONS");
     expect(driveCommendationCodes(outcome)).not.toContain("CLEAN_DRIVING");
   });
