@@ -1,0 +1,163 @@
+{
+ "format": "district-v1",
+ "meta": {
+  "district": "sp-trans",
+  "label": "Учебна улица — преход 50→30, зона 30 (сценарий SP-03)",
+  "mapKind": "scenario-street",
+  "generator": "tools/maps/gen_sp_transition.mjs",
+  "boundsLocalMeters": {
+   "minX": -30.12,
+   "minY": 0,
+   "maxX": 14.125,
+   "maxY": 360
+  },
+  "attribution": {
+   "text": "Учебна улица с преход 50→30 (зона 30) — оригинален параметричен дизайн (без данни от OpenStreetMap)",
+   "license": "All rights reserved",
+   "licenseUrl": "/",
+   "copyrightUrl": "/",
+   "obligation": "none — original work, no ODbL attribution required for this map"
+  },
+  "defaults": {
+   "maxspeedUrbanKmh": 50,
+   "note": "Преход на зони: ограничението пада от 50 на 30 на средния възел (знак В26 „Зона 30“)."
+  },
+  "stats": {
+   "roadKm": 0.36,
+   "nodes": 3,
+   "edges": 2,
+   "intersections": 0,
+   "crossings": 0,
+   "buildings": 1,
+   "spawnPoints": 2
+  },
+  "scenario": {
+   "archetype": "straight-street",
+   "params": {
+    "approachM": 160,
+    "zoneM": 200,
+    "approachKmh": 50,
+    "zoneKmh": 30
+   },
+   "lanesPerDirection": 1,
+   "laneCenterRightM": 4.06,
+   "transitionY": 160
+  }
+ },
+ "roads": {
+  "nodes": [
+   {
+    "id": "sp-tr-n-end",
+    "x": 0,
+    "y": 360
+   },
+   {
+    "id": "sp-tr-n-mid",
+    "x": 0,
+    "y": 160
+   },
+   {
+    "id": "sp-tr-n-start",
+    "x": 0,
+    "y": 0
+   }
+  ],
+  "edges": [
+   {
+    "id": "sp-tr-e-approach",
+    "from": "sp-tr-n-start",
+    "to": "sp-tr-n-mid",
+    "class": "residential",
+    "name": "Права улица — подход преди зоната",
+    "oneway": false,
+    "roundabout": false,
+    "lanes": 2,
+    "lanesSource": "tag",
+    "maxspeed": 50,
+    "maxspeedSource": "tag",
+    "length": 160,
+    "geometry": [
+     [
+      0,
+      0
+     ],
+     [
+      0,
+      160
+     ]
+    ]
+   },
+   {
+    "id": "sp-tr-e-zone",
+    "from": "sp-tr-n-mid",
+    "to": "sp-tr-n-end",
+    "class": "residential",
+    "name": "Права улица — зона 30 (училище/жилищна)",
+    "oneway": false,
+    "roundabout": false,
+    "lanes": 2,
+    "lanesSource": "tag",
+    "maxspeed": 30,
+    "maxspeedSource": "tag",
+    "zone": "school",
+    "length": 200,
+    "geometry": [
+     [
+      0,
+      160
+     ],
+     [
+      0,
+      360
+     ]
+    ]
+   }
+  ]
+ },
+ "intersections": [],
+ "crossings": [],
+ "roundabouts": [],
+ "buildings": [
+  {
+   "id": "sp-tr-b-school",
+   "height": 9,
+   "heightSource": "default",
+   "footprint": [
+    [
+     -30.12,
+     200
+    ],
+    [
+     -16.12,
+     200
+    ],
+    [
+     -16.12,
+     230
+    ],
+    [
+     -30.12,
+     230
+    ]
+   ]
+  }
+ ],
+ "spawnPoints": [
+  {
+   "id": "sp-tr-spawn-approach",
+   "x": 4.06,
+   "y": 15,
+   "heading": 0,
+   "edgeId": "sp-tr-e-approach",
+   "name": "Начало на отсечката — преди зоната"
+  },
+  {
+   "id": "sp-tr-spawn-zone",
+   "x": 4.06,
+   "y": 180,
+   "heading": 0,
+   "edgeId": "sp-tr-e-zone",
+   "name": "Контролна точка — в зоната"
+  }
+ ]
+}

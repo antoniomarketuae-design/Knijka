@@ -387,6 +387,115 @@ export const SC_SPEED_ZONE: ScenarioSpec = {
   localeBg: "bg-BG",
 };
 
+// ---------------------------------------------------------------------------
+// 5. sc-speed-transition — „Преход 50→30 (навлизане в зона 30)" (SP-03) on
+//    sp-trans-v1: a street built from TWO segments — a 160 m approach posted 50
+//    then a 200 m zone posted 30 — so the limit DROPS mid-route. The runtime
+//    grades PER EDGE (each segment carries its own maxspeed), so keeping the
+//    approach speed past the transition sign fires the speeding codes against
+//    the LOCAL 30, not the 50 the driver just left.
+// ---------------------------------------------------------------------------
+
+/** Transition Y of sp-trans-v1 (= approachM); the В26 „Зона 30" sign line. */
+const TRANS_Y = 160;
+
+/**
+ * SP-03 — „Преходът на зони / Zone-transition blindness (50→30)" (ЗДвП чл. 21).
+ * The distinct value vs sc-speed-zone (a homogeneous 30-street): here the limit
+ * actually CHANGES mid-route, so the taught fault is the missing anticipatory
+ * lift at the sign. ONE template, TWO DISTINCT codes against the LOCAL 30 limit:
+ *   - „Само наполовина намалена" (~37 km/h) → SPEEDING_OVER_LIMIT (31–40 in the
+ *     30 zone → второстепенна);
+ *   - „Скоростта от преди зоната" (~48 km/h carried straight through) →
+ *     SPEEDING_DANGEROUS (> +10 = > 40 → опасна). The speed stays above 40
+ *     across the sign, so it never dwells in the 33–40 minor band — only the
+ *     dangerous code arms (the sc-speed-dangerous „flooring" pattern). Neither
+ *     fault grades on the 50 APPROACH: 48 < the graced 55 there.
+ */
+export const SC_SPEED_TRANSITION: ScenarioSpec = {
+  id: "sc-speed-transition",
+  family: "speed",
+  tagsBg: ["скорост", "зона 30", "преход на зони", "навлизане в зона", "училищна зона"],
+  titleBg: "Преход 50→30 — навлизане в зона 30",
+  objectiveBg:
+    "Намали НАВРЕМЕ на знака за зона 30: улицата минава от 50 на 30 км/ч в средата на маршрута, а скоростта трябва да падне заедно със знака — пренесеш ли скоростта от преди зоната, тя става грешка още с влизането.",
+  archetypeIds: ["SP-03"],
+  conceptIds: ["c-speed-limits", "c-speed-adaptation", "c-general-care-duty"],
+  map: {
+    archetype: "straight-street",
+    // The generator recipe — mirrored in sp-trans-v1.json meta.scenario.params
+    // (tools/maps/gen_sp_transition.mjs): 160 m @ 50 → 200 m @ 30.
+    params: { approachM: 160, zoneM: 200, approachKmh: 50, zoneKmh: 30 },
+    districtId: "sp-trans-v1",
+  },
+  start: {
+    spawnPointId: "sp-tr-spawn-approach",
+    vehicleStart: "ready",
+  },
+  instructionsBg: [
+    { n: 1, textBg: "Потегли по правата улица — тук ограничението все още е 50 км/ч." },
+    { n: 2, textBg: "Напред следва знак за зона 30 (училище/жилищна). Забележи го отрано — намаляването започва преди знака, не след него." },
+    { n: 3, textBg: "Вдигни крака от газта навреме и влез в зоната вече под 30 км/ч — около 26–28 км/ч." },
+    { n: 4, textBg: "Не пренасяй скоростта от преди зоната: същите 50 км/ч, законни допреди малко, в зоната са над +10 км/ч — опасна грешка." },
+    { n: 5, textBg: "Задръж под 30 км/ч до края на зоната." },
+  ],
+  success: [
+    {
+      id: "sc-trn-approach",
+      titleBg: "Измини подхода спокойно до знака за зоната",
+      // On the 50 approach — reach it under a relaxed cap (a normal ~46 drive).
+      params: { kind: "reachZone", x: LANE_X, y: 120, radiusM: 12, maxSpeedKmh: 52 },
+    },
+    {
+      id: "sc-trn-in-zone",
+      titleBg: "Влез в зона 30 вече под ограничението",
+      // Deep in the 30 zone with a cap just above the taught ~27 cruise: an
+      // anticipating driver satisfies it; one who carried 37+ km/h does not.
+      params: { kind: "reachZone", x: LANE_X, y: 250, radiusM: 12, maxSpeedKmh: 33 },
+    },
+    {
+      id: "sc-trn-finish",
+      titleBg: "Стигни края на зоната",
+      params: { kind: "reachZone", x: LANE_X, y: 345, radiusM: 12 },
+    },
+  ],
+  rubric: { parTimeSec: 70 },
+  shadow: { path: "content/traces/sc-speed-transition/shadow-correct.trace.json" },
+  mistakes: [
+    {
+      traceRef: { path: "content/traces/sc-speed-transition/mistake-carry-speed.trace.json" },
+      titleBg: "Скоростта от преди зоната",
+      whatWentWrongBg:
+        "Колата пренесе около 48 км/ч право през знака в зона 30 — законна допреди метри, тук над +10 км/ч. Знакът смени тавана на 30; неснижаването е опасна грешка, а не продължение на подхода.",
+      codeRefs: ["SPEEDING_DANGEROUS"],
+    },
+    {
+      traceRef: { path: "content/traces/sc-speed-transition/mistake-half-slow.trace.json" },
+      titleBg: "Само наполовина намалена",
+      whatWentWrongBg:
+        "Скоростта падна, но само до около 37 км/ч — все още над 30. Намаляването закъсня и остана недостатъчно: 31–40 км/ч в зона 30 е второстепенна грешка. Целѝ под тавана, не към него.",
+      codeRefs: ["SPEEDING_OVER_LIMIT"],
+    },
+  ],
+  teach: {
+    whenBg:
+      "При всяко влизане в зона с по-ниско ограничение — знак В26 „Зона 30“, училищна или жилищна зона, край на населено място наопаки. Ключът е преходът: таванът пада на знака, а с него трябва да падне и скоростта.",
+    whyBg:
+      "Проучванията за зони 30 показват типичната грешка: водачът „не регистрира“ прехода и влиза в зоната със старата скорост, като адаптацията закъснява със стотина метра — точно там, където живее по-ниският лимит заради децата. Навременното вдигане на газта на знака връща цялото предимство на зоната.",
+    lawRef: "ЗДвП чл. 21",
+    examinerBg:
+      "Изпитващият следи скоростта спрямо знаците през целия маршрут и очаква видимо, НАВРЕМЕННО намаляване при прехода към по-ниско ограничение. Движение над лимита в зоната е грешка, а над +10 км/ч (тук 40) — опасна грешка, която прекратява изпита.",
+  },
+  levels: [
+    { level: 1 },
+    { level: 2 },
+    { level: 3 },
+    { level: 4, vehicleStart: "cold" },
+  ],
+  conditions: { weather: "dry" },
+  localeBg: "bg-BG",
+};
+
 /** The speed-management templates, in catalog order (registered in
  *  templates.ts). */
 export const SCENARIO_TEMPLATES_SP: readonly ScenarioSpec[] = [
@@ -394,4 +503,5 @@ export const SCENARIO_TEMPLATES_SP: readonly ScenarioSpec[] = [
   SC_SPEED_DANGEROUS,
   SC_SPEED_RAIN,
   SC_SPEED_ZONE,
+  SC_SPEED_TRANSITION,
 ];

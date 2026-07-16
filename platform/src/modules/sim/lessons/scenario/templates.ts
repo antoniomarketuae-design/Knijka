@@ -26,6 +26,7 @@ import { SCENARIO_TEMPLATES_PK } from "./templates-pk";
 import { SCENARIO_TEMPLATES_COCKPIT } from "./templates-cockpit";
 import { SCENARIO_TEMPLATES_CONDITIONS } from "./templates-conditions";
 import { SCENARIO_TEMPLATES_MANEUVER } from "./templates-maneuver";
+import { SCENARIO_TEMPLATES_HAZARDS } from "./templates-hazards";
 
 /**
  * The TARGET bay of content/world/lot-perp-v1.json — meta.scenario bay
@@ -226,6 +227,7 @@ export const SCENARIO_TEMPLATES: readonly ScenarioSpec[] = [
   ...SCENARIO_TEMPLATES_COCKPIT,
   ...SCENARIO_TEMPLATES_CONDITIONS,
   ...SCENARIO_TEMPLATES_MANEUVER,
+  ...SCENARIO_TEMPLATES_HAZARDS,
 ];
 
 /** Lookup by template id; undefined for unknown ids. */

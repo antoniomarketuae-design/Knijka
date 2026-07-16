@@ -1,0 +1,132 @@
+{
+ "format": "district-v1",
+ "meta": {
+  "district": "wb-boulevard",
+  "label": "Учебен широк булевард — обръщане в едно движение (сценарий OV-17/PK-12)",
+  "mapKind": "scenario-street",
+  "generator": "tools/maps/gen_wide_boulevard.mjs",
+  "boundsLocalMeters": {
+   "minX": -36.25,
+   "minY": 0,
+   "maxX": 22.25,
+   "maxY": 200
+  },
+  "attribution": {
+   "text": "Учебен широк булевард за обръщане в едно движение — оригинален параметричен дизайн (без данни от OpenStreetMap)",
+   "license": "All rights reserved",
+   "licenseUrl": "/",
+   "copyrightUrl": "/",
+   "obligation": "none — original work, no ODbL attribution required for this map"
+  },
+  "defaults": {
+   "maxspeedUrbanKmh": 40,
+   "note": "Широк булевард: достатъчно място за обръщане в едно движение, без връщане назад."
+  },
+  "stats": {
+   "roadKm": 0.2,
+   "nodes": 2,
+   "edges": 1,
+   "intersections": 0,
+   "crossings": 0,
+   "buildings": 1,
+   "spawnPoints": 2
+  },
+  "scenario": {
+   "archetype": "straight-street",
+   "params": {
+    "lengthM": 200,
+    "maxspeedKmh": 40,
+    "lanes": 4
+   },
+   "lanesPerDirection": 2,
+   "laneCenterOuterM": 12.19,
+   "laneCenterInnerM": 4.06
+  }
+ },
+ "roads": {
+  "nodes": [
+   {
+    "id": "wb-n-end",
+    "x": 0,
+    "y": 200
+   },
+   {
+    "id": "wb-n-start",
+    "x": 0,
+    "y": 0
+   }
+  ],
+  "edges": [
+   {
+    "id": "wb-e-street",
+    "from": "wb-n-start",
+    "to": "wb-n-end",
+    "class": "residential",
+    "name": "Широк булевард с две ленти в посока",
+    "oneway": false,
+    "roundabout": false,
+    "lanes": 4,
+    "lanesSource": "tag",
+    "maxspeed": 40,
+    "maxspeedSource": "tag",
+    "length": 200,
+    "geometry": [
+     [
+      0,
+      0
+     ],
+     [
+      0,
+      200
+     ]
+    ]
+   }
+  ]
+ },
+ "intersections": [],
+ "crossings": [],
+ "roundabouts": [],
+ "buildings": [
+  {
+   "id": "wb-b-block",
+   "height": 7,
+   "heightSource": "default",
+   "footprint": [
+    [
+     -36.25,
+     130
+    ],
+    [
+     -24.25,
+     130
+    ],
+    [
+     -24.25,
+     158
+    ],
+    [
+     -36.25,
+     158
+    ]
+   ]
+  }
+ ],
+ "spawnPoints": [
+  {
+   "id": "wb-spawn-approach",
+   "x": 12.19,
+   "y": 15,
+   "heading": 0,
+   "edgeId": "wb-e-street",
+   "name": "Начало на отсечката — дясна лента"
+  },
+  {
+   "id": "wb-spawn-finish",
+   "x": -12.19,
+   "y": 40,
+   "heading": 180,
+   "edgeId": "wb-e-street",
+   "name": "Контролна точка — обратна посока"
+  }
+ ]
+}
