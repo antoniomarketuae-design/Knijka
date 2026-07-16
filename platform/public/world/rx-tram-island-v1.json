@@ -1,0 +1,179 @@
+{
+ "format": "district-v1",
+ "meta": {
+  "district": "rx-tram-island",
+  "label": "Учебна улица — трамвайна спирка с остров (сценарий RX-04)",
+  "mapKind": "scenario-street",
+  "generator": "tools/maps/gen_tram_street.mjs",
+  "boundsLocalMeters": {
+   "minX": -26,
+   "minY": 0,
+   "maxX": 14.125,
+   "maxY": 150
+  },
+  "attribution": {
+   "text": "Учебна улица с трамвайна спирка с остров — оригинален параметричен дизайн (без данни от OpenStreetMap)",
+   "license": "All rights reserved",
+   "licenseUrl": "/",
+   "copyrightUrl": "/",
+   "obligation": "none — original work, no ODbL attribution required for this map"
+  },
+  "defaults": {
+   "maxspeedUrbanKmh": 40,
+   "note": "Трамвайна спирка с остров на 90 м: пътници пресичат платното до острова — намали и при необходимост спри, за да преминат безопасно (чл. 66, ал. 2)."
+  },
+  "stats": {
+   "roadKm": 0.15,
+   "nodes": 2,
+   "edges": 1,
+   "intersections": 0,
+   "crossings": 1,
+   "buildings": 2,
+   "spawnPoints": 2
+  },
+  "scenario": {
+   "archetype": "zebra-block",
+   "params": {
+    "crossings": 1,
+    "signalized": "no",
+    "approachM": 90,
+    "tramStop": "island"
+   },
+   "primaryCrossingId": "rxt-x-1",
+   "laneCenterRightM": 4.06,
+   "crossings": [
+    {
+     "id": "rxt-x-1",
+     "x": 0,
+     "y": 90,
+     "kind": "marked"
+    }
+   ],
+   "tramStop": {
+    "islandId": "rxt-b-island",
+    "islandFromY": 92,
+    "islandToY": 106,
+    "tramLaneCenterM": -4.06,
+    "tramHoldY": 101
+   }
+  }
+ },
+ "roads": {
+  "nodes": [
+   {
+    "id": "rxt-n-end",
+    "x": 0,
+    "y": 150
+   },
+   {
+    "id": "rxt-n-start",
+    "x": 0,
+    "y": 0
+   }
+  ],
+  "edges": [
+   {
+    "id": "rxt-e-street",
+    "from": "rxt-n-start",
+    "to": "rxt-n-end",
+    "class": "residential",
+    "name": "Улица с трамвайна спирка",
+    "oneway": false,
+    "roundabout": false,
+    "lanes": 2,
+    "lanesSource": "tag",
+    "maxspeed": 40,
+    "maxspeedSource": "tag",
+    "length": 150,
+    "geometry": [
+     [
+      0,
+      0
+     ],
+     [
+      0,
+      150
+     ]
+    ]
+   }
+  ]
+ },
+ "intersections": [],
+ "crossings": [
+  {
+   "id": "rxt-x-1",
+   "x": 0,
+   "y": 90,
+   "kind": "marked",
+   "signalized": false,
+   "edgeId": "rxt-e-street"
+  }
+ ],
+ "roundabouts": [],
+ "buildings": [
+  {
+   "id": "rxt-b-island",
+   "height": 0.25,
+   "heightSource": "default",
+   "footprint": [
+    [
+     -1.6,
+     92
+    ],
+    [
+     -0.4,
+     92
+    ],
+    [
+     -0.4,
+     106
+    ],
+    [
+     -1.6,
+     106
+    ]
+   ]
+  },
+  {
+   "id": "rxt-b-shop",
+   "height": 4.5,
+   "heightSource": "default",
+   "footprint": [
+    [
+     -26,
+     56
+    ],
+    [
+     -16,
+     56
+    ],
+    [
+     -16,
+     68
+    ],
+    [
+     -26,
+     68
+    ]
+   ]
+  }
+ ],
+ "spawnPoints": [
+  {
+   "id": "rxt-spawn-approach",
+   "x": 4.06,
+   "y": 15,
+   "heading": 0,
+   "edgeId": "rxt-e-street",
+   "name": "Подход към трамвайната спирка"
+  },
+  {
+   "id": "rxt-spawn-finish",
+   "x": 4.06,
+   "y": 135,
+   "heading": 0,
+   "edgeId": "rxt-e-street",
+   "name": "Контролна точка — след спирката"
+  }
+ ]
+}

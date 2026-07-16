@@ -163,8 +163,30 @@ export class PedestrianDartOutRunner implements EventRunner {
         colorIndex: 3,
       });
       if (!view) throw new Error(`staged event ${s.id}: pedestrian path failed to stage`);
+      // Stationary prop vehicles (ADR-006 stage 3b — RX-04's halted tram at
+      // the island stop): the narrowMeeting-props recipe verbatim — staged
+      // held actors, cruise 0, NEVER commanded; `profile` renders the rig.
+      for (let i = 0; i < (s.props?.length ?? 0); i++) {
+        const p = s.props![i];
+        const propView = traffic.stage({
+          kind: "vehicle",
+          id: `${s.id}-prop-${i}`,
+          pathNodes: p.pathNodes,
+          hold: p.hold,
+          cruiseSpeedMps: 0, // halted scenery — never commanded
+          // NOTE: keep prop offsets at 0/negative — a positive curb offset
+          // tags the state as a cyclist proxy (A11 vehicleCollisionKind).
+          extraRightOffsetM: p.extraRightOffsetM,
+          colorIndex: p.colorIndex,
+          profile: p.profile,
+        });
+        if (!propView) throw new Error(`staged event ${s.id}: prop ${i} failed to stage`);
+      }
     } else {
       traffic.stagedCommand(s.id, { type: "reset" });
+      for (let i = 0; i < (s.props?.length ?? 0); i++) {
+        traffic.stagedCommand(`${s.id}-prop-${i}`, { type: "reset" });
+      }
     }
     this.triggerDistM = s.triggerDistM + (rng() * 2 - 1) * 3;
     this.phase = "armed";
@@ -935,6 +957,11 @@ export class OncomingLeftTurnRunner implements EventRunner {
         cruiseSpeedMps: s.actor.cruiseSpeedMps,
         loop: s.actor.loop,
         colorIndex: s.actor.colorIndex,
+        // RX-05: an oncoming TRAM publishes its profile so the fleet renders
+        // the articulated rig (absent = car, byte-identical — every pre-tram
+        // oncoming spec authors no profile). The N1 gap adjudication is
+        // untouched: the tram is a point-based path actor like any oncoming.
+        profile: s.actor.profile,
         playerGuard: true, // never ram the player — the guard-stopped victim
         // still convicts via the runtime's gap-memory latch
       });

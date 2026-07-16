@@ -29,6 +29,8 @@ import {
   FLEET,
   modelForVehicle,
   paintColorFor,
+  TRAM_DIMENSIONS,
+  TRAM_MODEL_INDEX,
   TRUCK_DIMENSIONS,
   TRUCK_MODEL_INDEX,
 } from "../vehicleFleet";
@@ -346,6 +348,36 @@ describe("large-vehicle profile (doc 72 FO-06)", () => {
     expect(blue.emissiveIntensity).toBeGreaterThan(0); // the light bar reads lit
     // The unused truck slot stays free alongside it.
     expect(fleet.models[TRUCK_MODEL_INDEX].mesh).toBeNull();
+    expect(() => disposeTrafficFleet(fleet)).not.toThrow();
+  });
+
+  it("builds the procedural articulated tram rig (RX-04/RX-05) — crimson body + graphite kit", () => {
+    const tram: TrafficVehicleState = { ...vehicle(9), profile: "tram" };
+    expect(modelForVehicle({ id: 9, profile: "tram" })).toBe(TRAM_MODEL_INDEX);
+    const fleet = buildTrafficFleet(makeScenes(), [tram, vehicle(10)]);
+    expect(fleet.assign[0]).toBe(TRAM_MODEL_INDEX);
+    expect(fleet.assign[1]).toBe(assignModel(10)); // ambient neighbor untouched
+    const model = fleet.models[TRAM_MODEL_INDEX];
+    expect(model.count).toBe(1);
+    expect(model.mesh).not.toBeNull();
+    expect(model.mesh?.name).toBe("traffic-body-tram");
+    const rig = model.rig;
+    // The rig is genuinely a TRAM: ~14 m — nearly twice the box truck, more
+    // than 3× every fleet car (the perceptual point of RX-05's actor).
+    expect(rig.halfLength).toBeCloseTo(TRAM_DIMENSIONS.lengthM / 2);
+    expect(rig.halfWidth).toBeCloseTo(TRAM_DIMENSIONS.widthM / 2);
+    expect(rig.halfLength).toBeGreaterThan(TRUCK_DIMENSIONS.lengthM / 2 + 3);
+    expect(rig.paint).toBeNull(); // no palette tint — the crimson IS the livery
+    expect(rig.customWheel).toBeNull(); // shared wheel, scaled to the 0.33 m bogies
+    expect(fleet.wheelScale[0]).toBeCloseTo(TRAM_DIMENSIONS.wheelRadiusM / 0.32);
+    // Two owned material groups: the crimson body segments + the graphite kit
+    // (bellows, roof strips, pantograph) — ADR-001: fictional, no insignia.
+    expect(rig.ownedMaterials.length).toBe(2);
+    expect(rig.bodyMaterials.length).toBe(2);
+    expect(rig.bodyMaterials.map((m) => m.name).sort()).toEqual(["tram_dark", "tram_paint"]);
+    // The unused truck + emergency slots stay free alongside it.
+    expect(fleet.models[TRUCK_MODEL_INDEX].mesh).toBeNull();
+    expect(fleet.models[EMERGENCY_MODEL_INDEX].mesh).toBeNull();
     expect(() => disposeTrafficFleet(fleet)).not.toThrow();
   });
 });

@@ -122,6 +122,9 @@ const BOXY_FALLBACK_INDEX = FLEET.indexOf("kolos");
 export const TRUCK_MODEL_INDEX = FLEET.length;
 /** Model slot of the procedural emergency rig (doc 72 VU-09) — after the truck. */
 export const EMERGENCY_MODEL_INDEX = FLEET.length + 1;
+/** Model slot of the procedural articulated tram rig (doc 72 RX-04/RX-05,
+ *  ADR-006 stage 3b) — after the emergency rig. */
+export const TRAM_MODEL_INDEX = FLEET.length + 2;
 const VAN_MODEL_INDEX = FLEET.indexOf("kargo_v");
 
 /** Box-truck body plan, meters (fictional): ~7.5 × 2.4 × 3.1 — longer, wider
@@ -144,6 +147,7 @@ export const TRUCK_DIMENSIONS = {
 export function modelForVehicle(v: Pick<TrafficVehicleState, "id" | "profile">): number {
   if (v.profile === "truck") return TRUCK_MODEL_INDEX;
   if (v.profile === "emergency") return EMERGENCY_MODEL_INDEX;
+  if (v.profile === "tram") return TRAM_MODEL_INDEX;
   if (v.profile === "van") return VAN_MODEL_INDEX;
   return assignModel(v.id);
 }
@@ -151,6 +155,7 @@ export function modelForVehicle(v: Pick<TrafficVehicleState, "id" | "profile">):
 /** Mesh-name base for a model slot (procedural slots are past FLEET). */
 function modelName(m: number): string {
   if (m === EMERGENCY_MODEL_INDEX) return "emergency";
+  if (m === TRAM_MODEL_INDEX) return "tram";
   return FLEET[m] ?? "box_truck";
 }
 
@@ -312,6 +317,117 @@ function buildEmergencyRig(): ModelRig {
     halfLength,
     lampY: 0.85,
     headY: 0.75,
+  };
+}
+
+/** Tram-rig body plan, meters (fictional, ADR-001 — no real livery): a LONG
+ *  articulated two-segment silhouette (~14 × 2.3 × 3.1) with a roof
+ *  pantograph hint — unmistakably "rail vehicle" in the junction mouth. The
+ *  point of the length is perceptual: a driver reads 14 m of tram and knows
+ *  it can neither stop like a car nor swerve at all (doc 72 RX-05). */
+export const TRAM_DIMENSIONS = {
+  lengthM: 14,
+  widthM: 2.3,
+  bodyHeightM: 3.05,
+  /** Articulation gap between the two body segments. */
+  gapM: 0.5,
+  wheelRadiusM: 0.33,
+  pantograph: { apexM: 3.85, armLenM: 1.05, barWidthM: 1.3 },
+} as const;
+
+/**
+ * The procedural articulated tram ModelRig (doc 72 §12 RX-04/RX-05, ADR-006
+ * stage 3b — the rail pack's actor): TWO joined box segments in a deep
+ * fictional crimson (one paint draw) + a graphite kit merged into one dark
+ * draw (articulation bellows, roof strip, skirt band, pantograph Λ-arms +
+ * contact bar). Ground-relative like the GLB kit (Y = 0 = tarmac, nose +Z);
+ * shared fleet wheels scaled to the 0.33 m bogie hubs sit tucked under the
+ * skirt. HONEST LIMITS (documented at VehicleProfile): the tram is a
+ * path-locked staged vehicle — its authored polyline is the "track"; no rail
+ * mesh, no separate rail physics, and every proximity query stays point-based
+ * at the body center. All geometry + materials are OWNED (disposed via
+ * ownedMaterials/geometry).
+ */
+function buildTramRig(): ModelRig {
+  const { lengthM, widthM, bodyHeightM, gapM, wheelRadiusM, pantograph } = TRAM_DIMENSIONS;
+  const halfLength = lengthM / 2;
+  const paintMat = new MeshStandardMaterial({
+    color: 0x7c1f2d, // deep fictional crimson (ADR-001 — no real livery)
+    metalness: 0.3,
+    roughness: 0.42,
+    envMapIntensity: 1.35,
+  });
+  paintMat.name = "tram_paint";
+  const darkMat = new MeshStandardMaterial({
+    color: 0x2b2f33, // graphite: bellows + roof kit + pantograph
+    metalness: 0.35,
+    roughness: 0.55,
+  });
+  darkMat.name = "tram_dark";
+  // Two body segments over a 0.35 m skirt clearance, separated by the gap.
+  const segLen = (lengthM - gapM) / 2;
+  const segH = bodyHeightM - 0.35;
+  const segFront = new BoxGeometry(widthM, segH, segLen);
+  segFront.translate(0, 0.35 + segH / 2, gapM / 2 + segLen / 2);
+  const segRear = new BoxGeometry(widthM, segH, segLen);
+  segRear.translate(0, 0.35 + segH / 2, -(gapM / 2 + segLen / 2));
+  const paintMerged = mergeGeometries([segFront, segRear], false) ?? segFront;
+  if (paintMerged !== segFront) {
+    segFront.dispose();
+    segRear.dispose();
+  }
+  // Dark kit: articulation bellows bridging the gap…
+  const bellows = new BoxGeometry(widthM - 0.3, segH - 0.4, gapM + 0.24);
+  bellows.translate(0, 0.55 + (segH - 0.4) / 2, 0);
+  // …a low roof strip along each segment (equipment boxes)…
+  const roofF = new BoxGeometry(widthM - 0.7, 0.16, segLen - 1.2);
+  roofF.translate(0, bodyHeightM + 0.08, gapM / 2 + segLen / 2);
+  const roofR = new BoxGeometry(widthM - 0.7, 0.16, segLen - 1.2);
+  roofR.translate(0, bodyHeightM + 0.08, -(gapM / 2 + segLen / 2));
+  // …and the pantograph hint on the FRONT segment: two Λ-leaning arms + a
+  // contact bar at the apex (three slim boxes — a silhouette, not a mechanism).
+  const pantoZ = gapM / 2 + segLen / 2;
+  const armRise = pantograph.apexM - (bodyHeightM + 0.16);
+  const armLean = Math.acos(Math.min(1, armRise / pantograph.armLenM));
+  const armA = new BoxGeometry(0.06, pantograph.armLenM, 0.06);
+  armA.rotateX(armLean);
+  armA.translate(0, bodyHeightM + 0.16 + armRise / 2, pantoZ + 0.3);
+  const armB = new BoxGeometry(0.06, pantograph.armLenM, 0.06);
+  armB.rotateX(-armLean);
+  armB.translate(0, bodyHeightM + 0.16 + armRise / 2, pantoZ - 0.3);
+  const bar = new BoxGeometry(pantograph.barWidthM, 0.05, 0.14);
+  bar.translate(0, pantograph.apexM, pantoZ);
+  const darkParts = [bellows, roofF, roofR, armA, armB, bar];
+  const darkMerged = mergeGeometries(darkParts, false) ?? bellows;
+  if (darkMerged !== bellows) for (const g of darkParts) g.dispose();
+  const bodyGeometry = mergeGeometries([paintMerged, darkMerged], true) ?? paintMerged;
+  if (bodyGeometry !== paintMerged) {
+    paintMerged.dispose();
+    darkMerged.dispose();
+  }
+  // Two bogies; wheels tucked inside the skirt line (track < half width).
+  const track = widthM / 2 - 0.3;
+  const frontBogieZ = gapM / 2 + segLen / 2;
+  const rearBogieZ = -(gapM / 2 + segLen / 2);
+  return {
+    bodyGeometry,
+    bodyMaterials: bodyGeometry.groups.length === 2 ? [paintMat, darkMat] : [paintMat],
+    ownedMaterials: [paintMat, darkMat],
+    paint: null, // no palette tint — the crimson IS the profile's identity
+    customWheel: null, // shared fleet wheel, scaled to the 0.33 m bogie hubs
+    wheelOffsets: [
+      new Vector3(track, wheelRadiusM, frontBogieZ), // FL (+X = left)
+      new Vector3(-track, wheelRadiusM, frontBogieZ), // FR
+      new Vector3(track, wheelRadiusM, rearBogieZ), // RL
+      new Vector3(-track, wheelRadiusM, rearBogieZ), // RR
+    ],
+    wheelRadius: wheelRadiusM,
+    rearZ: -halfLength,
+    frontZ: halfLength,
+    halfWidth: widthM / 2,
+    halfLength,
+    lampY: 0.9,
+    headY: 0.8,
   };
 }
 
@@ -937,6 +1053,9 @@ export function buildTrafficFleet(
   // VU-09 profile slot: the procedural emergency rig (EMERGENCY_MODEL_INDEX)
   // — same cost discipline: no InstancedMesh unless an emergency actor exists.
   rigs.push(buildEmergencyRig());
+  // RX-04/RX-05 profile slot: the procedural articulated tram rig
+  // (TRAM_MODEL_INDEX) — no InstancedMesh unless a tram actor exists.
+  rigs.push(buildTramRig());
   const sharedWheel = extractSharedWheel(scenes[0]);
   const nVeh = vehicles.length;
   const color = new Color();

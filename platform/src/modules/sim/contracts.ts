@@ -356,12 +356,16 @@ export interface StagedActorPathSpec {
   /**
    * Vehicle size/type profile (doc 72 §9 FO-06 „Зад камион"): "truck" renders
    * the box-truck rig, "van" the panel van, "emergency" (doc 72 §15 N9,
-   * VU-09) the white special-regime rig with the blue light bar; absent =
+   * VU-09) the white special-regime rig with the blue light bar, "tram"
+   * (doc 72 §12 RX-04/RX-05, ADR-006 stage 3b) the articulated two-segment
+   * tram rig — a tram actor is path-locked like every staged vehicle; its
+   * authored polyline IS the tram track (street-running rails share the
+   * traffic lane; no separate rail physics exists, honestly); absent =
    * "car" (the deterministic fleet pick — byte-identical pre-profile
    * behavior). Visual + data only: the leadGap/conflict queries stay
    * point-based (ADR-001: rigs fictional).
    */
-  profile?: "car" | "van" | "truck" | "emergency";
+  profile?: "car" | "van" | "truck" | "emergency" | "tram";
 }
 
 export type StagedEventKind =
@@ -405,6 +409,23 @@ export interface PedestrianDartOutSpec extends StagedEventBase {
   triggerDistM: number;
   /** …approaching it, at or above this speed. */
   minTriggerSpeedKmh: number;
+  /**
+   * Stationary prop vehicles dressing the encounter (ADR-006 stage 3b —
+   * RX-04's tram halted at the island stop): staged held actors in the
+   * narrowMeeting-props mold (doc 72 OV-18's "stage() with a hold pose"
+   * pattern) — cruiseSpeedMps 0, NEVER commanded; `profile` renders the rig
+   * ("tram" = the articulated two-segment rig). Purely scenery + physics
+   * presence; the dart-out grading chain is untouched by their existence.
+   */
+  props?: Array<{
+    pathNodes: string[];
+    hold: { nodeIndex: number; offsetM: number };
+    /** Keep 0/negative — a positive curb offset tags the state as a cyclist
+     *  proxy (A11 vehicleCollisionKind). */
+    extraRightOffsetM?: number;
+    colorIndex?: number;
+    profile?: "car" | "van" | "truck" | "emergency" | "tram";
+  }>;
 }
 
 /** A scripted car crosses the player's guarded junction from the right,

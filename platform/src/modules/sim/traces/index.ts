@@ -446,3 +446,18 @@ export {
   recordScRxGuardedDrive,
   type ScRxGuardedTraceName,
 } from "./scRxGuarded";
+
+// RAIL PACK actor slice (ADR-006 stage 3b — doc 72 RX-05 „Ляв завой през
+// трамвайно трасе" on sx-v1 + RX-04 „Трамвайна спирка с остров" on
+// rx-tram-island-v1): the TRAM as a staged actor — profile "tram" through
+// the shipped oncomingLeftTurn machinery, and the halted tram as a dart-out
+// PROP at the island stop. Committed traces under content/traces/<template>/
+// are recordings of exactly these scripts (gate: sc-rx-tram-traces).
+export {
+  SC_RX_TRAM_LEFT_ID,
+  SC_RX_TRAM_ISLAND_ID,
+  recordScRxTramDrive,
+  scRxTramTraceNames,
+  type ScRxTramTemplateId,
+  type ScRxTramTraceName,
+} from "./scRxTram";

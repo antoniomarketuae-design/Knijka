@@ -74,15 +74,20 @@ export interface TrafficDistrict {
  * unlock). Data + presentation only: "van" renders the panel-van rig,
  * "truck" the box-truck rig (longer / wider / taller than any car — the
  * vision-blocking lead of „Зад камион"); "emergency" (doc 72 §15 N9, VU-09)
- * renders the procedural white special-regime rig with the blue light bar
- * (fictional livery, ADR-001 — no real insignia). Absent = "car" = the
- * pre-profile deterministic fleet pick, byte-identical. HONEST LIMIT: every
- * rule-engine proximity query (leadGapMeters, conflictNear, …) stays
- * POINT-BASED around the vehicle center with one fixed car-length constant,
- * and the A11 physics shells stay car-sized — the profile changes NO
- * grading/collision geometry.
+ * renders the procedural white special-regime rig with the blue light bar;
+ * "tram" (doc 72 §12 RX-04/RX-05, ADR-006 stage 3b) renders the procedural
+ * two-segment articulated tram rig (~14 m, pantograph hint) — a tram is a
+ * PATH-LOCKED staged vehicle like every other actor; its "track" IS its
+ * authored polyline (street-running rails share the traffic lane — no
+ * separate rail physics exists, honestly). All liveries fictional (ADR-001 —
+ * no real insignia). Absent = "car" = the pre-profile deterministic fleet
+ * pick, byte-identical. HONEST LIMIT: every rule-engine proximity query
+ * (leadGapMeters, conflictNear, …) stays POINT-BASED around the vehicle
+ * center with one fixed car-length constant, and the A11 physics shells stay
+ * car-sized — the profile changes NO grading/collision geometry (a 14 m tram
+ * grades and collides as its center point; the copy carries the length).
  */
-export type VehicleProfile = "car" | "van" | "truck" | "emergency";
+export type VehicleProfile = "car" | "van" | "truck" | "emergency" | "tram";
 
 export interface TrafficVehicleState {
   id: number;
