@@ -596,3 +596,121 @@ describe("completeManeuver / roundabout (A10 — exit under right indicator)", (
     expect(r.done).toBe(false);
   });
 });
+
+describe("completeManeuver / threePointTurn (обратен завой — corridor-locked)", () => {
+  // Corridor centred at the origin, axis due north: inside ⇔ |x| ≤ 4, |y| ≤ 6.
+  // Start heading north (0); the turn must end facing back (~180°).
+  const params = parsed("completeManeuver", {
+    maneuver: "threePointTurn",
+    corridor: { x: 0, y: 0, halfWidthM: 4, halfLengthM: 6 },
+    startHeadingDeg: 0,
+    toleranceDeg: 20,
+    holdSec: 0.6,
+  });
+  /** Tick at (x, y) with the given speed/gear/heading. */
+  const at = (
+    t: number,
+    x: number,
+    y: number,
+    over: Partial<ReturnType<typeof makeTick>> = {},
+  ) => makeTick({ t, position: { x, y }, headingDeg: 0, ...over });
+
+  it("rejects a malformed corridor or a missing start heading", () => {
+    expect(() =>
+      parsed("completeManeuver", { maneuver: "threePointTurn", startHeadingDeg: 0 }),
+    ).toThrow(/corridor/);
+    expect(() =>
+      parsed("completeManeuver", {
+        maneuver: "threePointTurn",
+        corridor: { x: 0, y: 0, halfWidthM: 0, halfLengthM: 6 },
+        startHeadingDeg: 0,
+      }),
+    ).toThrow(/corridor/);
+    expect(() =>
+      parsed("completeManeuver", {
+        maneuver: "threePointTurn",
+        corridor: { x: 0, y: 0, halfWidthM: 4, halfLengthM: 6 },
+      }),
+    ).toThrow(/startHeadingDeg/);
+  });
+
+  it("applies tolerance/hold defaults", () => {
+    const p = parsed("completeManeuver", {
+      maneuver: "threePointTurn",
+      corridor: { x: 1, y: 2, halfWidthM: 4, halfLengthM: 6 },
+      startHeadingDeg: 90,
+    });
+    expect(p).toMatchObject({ maneuver: "threePointTurn", toleranceDeg: 20, holdSec: 0.6 });
+  });
+
+  it("FIRES ON COMPLETION: forward → reverse → forward, ends facing back, at rest, held", () => {
+    const r = run(params, [
+      at(0, 0, 5, { speedKmh: 6, gear: 1, headingDeg: 0 }), // enter, forward-left (move 1)
+      at(1, 0, 4, { speedKmh: 4, gear: -1, headingDeg: 95 }), // reverse-right (move 2 — shunt 1)
+      at(2, 0, 2, { speedKmh: 4, gear: 1, headingDeg: 160 }), // forward-away (move 3 — shunt 2)
+      at(3, -1, 0, { speedKmh: 0, gear: 1, headingDeg: 180 }), // at rest facing south — hold starts
+      at(3.4, -1, 0, { speedKmh: 0, gear: 0, headingDeg: 180 }), // held 0.4 s — not yet
+      at(3.7, -1, 0, { speedKmh: 0, gear: 0, headingDeg: 180 }), // held 0.7 s ≥ 0.6 => done
+    ]);
+    expect(r.done).toBe(true);
+    // A clean three-point turn: two direction changes → three movements.
+    expect(r.detail).toMatchObject({ kind: "threePointTurn", reversals: 2, movements: 3, entered: true });
+  });
+
+  it("counts extra shunts: a five-point turn reports 5 movements", () => {
+    const r = run(params, [
+      at(0, 0, 5, { speedKmh: 5, gear: 1, headingDeg: 0 }),
+      at(1, 0, 4, { speedKmh: 4, gear: -1, headingDeg: 60 }), // shunt 1
+      at(2, 0, 3, { speedKmh: 4, gear: 1, headingDeg: 110 }), // shunt 2
+      at(3, 0, 2, { speedKmh: 4, gear: -1, headingDeg: 150 }), // shunt 3
+      at(4, -1, 1, { speedKmh: 4, gear: 1, headingDeg: 175 }), // shunt 4
+      at(5, -1, 0, { speedKmh: 0, gear: 1, headingDeg: 180 }),
+      at(5.7, -1, 0, { speedKmh: 0, gear: 0, headingDeg: 180 }),
+    ]);
+    expect(r.done).toBe(true);
+    expect(r.detail).toMatchObject({ reversals: 4, movements: 5 });
+  });
+
+  it("FIRES ON FAILURE: stopping in the corridor still facing FORWARD never completes", () => {
+    const r = run(params, [
+      at(0, 0, 4, { speedKmh: 5, gear: 1, headingDeg: 0 }), // entered, forward
+      at(1, 0, 0, { speedKmh: 0, gear: 1, headingDeg: 0 }), // at rest — but never turned
+      at(3, 0, 0, { speedKmh: 0, gear: 0, headingDeg: 0 }), // held long — direction not reversed
+    ]);
+    expect(r.done).toBe(false);
+    expect(r.detail).toMatchObject({ kind: "threePointTurn", movements: 1, headingToTargetDeg: 180 });
+  });
+
+  it("FIRES ON FAILURE: an incomplete turn (stops facing east, ~90°) does not complete", () => {
+    const r = run(params, [
+      at(0, 0, 5, { speedKmh: 5, gear: 1, headingDeg: 0 }),
+      at(1, 0, 4, { speedKmh: 4, gear: -1, headingDeg: 60 }), // shunt 1
+      at(2, 0, 1, { speedKmh: 4, gear: 1, headingDeg: 90 }), // shunt 2, but only turned to east
+      at(3, 0, 0, { speedKmh: 0, gear: 1, headingDeg: 90 }),
+      at(3.7, 0, 0, { speedKmh: 0, gear: 0, headingDeg: 90 }),
+    ]);
+    expect(r.done).toBe(false); // heading 90° is 90° off the 180° target (> 20° tol)
+  });
+
+  it("FIRES ON FAILURE: reversing direction but coming to rest OUTSIDE the corridor", () => {
+    const r = run(params, [
+      at(0, 0, 5, { speedKmh: 5, gear: 1, headingDeg: 0 }),
+      at(1, 0, 4, { speedKmh: 4, gear: -1, headingDeg: 95 }),
+      at(2, 0, 2, { speedKmh: 4, gear: 1, headingDeg: 160 }),
+      at(3, 0, 10, { speedKmh: 0, gear: 1, headingDeg: 180 }), // faces back, but y=10 is outside
+      at(3.7, 0, 10, { speedKmh: 0, gear: 0, headingDeg: 180 }),
+    ]);
+    expect(r.done).toBe(false);
+  });
+
+  it("rolling resets the hold clock", () => {
+    const r = run(params, [
+      at(0, 0, 4, { speedKmh: 4, gear: -1, headingDeg: 120 }),
+      at(1, -1, 1, { speedKmh: 4, gear: 1, headingDeg: 178 }), // shunt, facing ~back
+      at(2, -1, 0, { speedKmh: 0, gear: 1, headingDeg: 180 }), // stop begins
+      at(2.4, -1, 0.2, { speedKmh: 5, gear: 1, headingDeg: 180 }), // rolled — clock resets
+      at(3, -1, 0, { speedKmh: 0, gear: 0, headingDeg: 180 }), // only ~0 s held — not done
+    ]);
+    expect(r.done).toBe(false);
+  });
+});

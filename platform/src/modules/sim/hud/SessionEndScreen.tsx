@@ -103,6 +103,10 @@ function objectiveDetailText(detail: ObjectiveDetail | undefined): string | null
       return detail.redMetHere ? "Изчака червения сигнал и потегли на зелено" : null;
     case "roundabout":
       return detail.exitSignaled ? "Излезе от кръговото с десен мигач" : null;
+    case "threePointTurn": {
+      if (detail.movements === 0) return null;
+      return `Обратен завой: ${detail.movements} ${detail.movements === 1 ? "движение" : "движения"}`;
+    }
   }
 }
 

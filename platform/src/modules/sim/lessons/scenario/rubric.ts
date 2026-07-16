@@ -43,6 +43,13 @@ function parkDetailOf(result: LessonResult, objectiveId: string): Extract<Object
   return null;
 }
 
+function turnDetailOf(result: LessonResult, objectiveId: string): Extract<ObjectiveDetail, { kind: "threePointTurn" }> | null {
+  for (const o of result.objectives) {
+    if (o.id === objectiveId && o.detail?.kind === "threePointTurn") return o.detail;
+  }
+  return null;
+}
+
 const fmt1 = (v: number) => (Math.round(v * 10) / 10).toString().replace(".", ",");
 
 export function scoreRubric(
@@ -92,6 +99,9 @@ export function scoreRubric(
   //    the S1 trace channel later — attempts are the honest signal today).
   if (rubric.economy) {
     const d = parkDetailOf(result, rubric.economy.objectiveId);
+    // The economy channel rides EITHER the parkInBay bay-entry attempts OR the
+    // threePointTurn direction-change movements (a clean turn = 3 movements).
+    const turn = d ? null : turnDetailOf(result, rubric.economy.objectiveId);
     if (d && d.attempts > 0) {
       const points = d.attempts <= rubric.economy.attemptsFor3Stars ? 2 : d.attempts <= rubric.economy.attemptsFor2Stars ? 1 : 0;
       earned += points;
@@ -105,6 +115,22 @@ export function scoreRubric(
             : points === 1
               ? `${d.attempts} опита — приемливо, целта е от първия.`
               : `${d.attempts} опита — твърде много корекции; подмини по-широко и започни отново.`,
+        points: points as 0 | 1 | 2,
+        measured: true,
+      });
+    } else if (turn && turn.movements > 0) {
+      const points = turn.movements <= rubric.economy.attemptsFor3Stars ? 2 : turn.movements <= rubric.economy.attemptsFor2Stars ? 1 : 0;
+      earned += points;
+      measuredCount += 1;
+      breakdownBg.push({
+        id: "economy",
+        labelBg: "Икономичност на маневрата",
+        detailBg:
+          points === 2
+            ? `Обратен завой в ${turn.movements} движения — чиста маневра.`
+            : points === 1
+              ? `${turn.movements} движения — приемливо, целта е в три.`
+              : `${turn.movements} движения — твърде много превключвания; при по-широко начало завоят става в три.`,
         points: points as 0 | 1 | 2,
         measured: true,
       });

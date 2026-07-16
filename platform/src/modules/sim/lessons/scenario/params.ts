@@ -83,6 +83,19 @@ export function serializeObjectiveParams(
               ...(p.entry === "forward" ? { entry: "forward" } : {}),
             },
           };
+        case "threePointTurn":
+          return {
+            kind: "completeManeuver",
+            params: {
+              maneuver: "threePointTurn",
+              corridor: { ...p.corridor },
+              startHeadingDeg: p.startHeadingDeg,
+              // toleranceScale widens the heading tolerance for the guided rungs
+              // (L1/L2), symmetric with parkInBay's tolerance widening.
+              toleranceDeg: r2(p.toleranceDeg * toleranceScale),
+              holdSec: p.holdSec,
+            },
+          };
       }
   }
 }

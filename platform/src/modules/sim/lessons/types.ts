@@ -158,11 +158,52 @@ export interface RoundaboutParams {
   exitRadiusM: number;
 }
 
+/**
+ * Corridor rect a three-point turn must complete inside (bay-locked, like
+ * parkInBay). Axis-oriented on the maneuver's `startHeadingDeg`: `halfLengthM`
+ * runs ALONG the start heading (up the street), `halfWidthM` ACROSS it. Center
+ * (x, y) in district space.
+ */
+export interface ThreePointTurnCorridor {
+  x: number;
+  y: number;
+  halfWidthM: number;
+  halfLengthM: number;
+}
+
+/**
+ * Three-point turn / обратен завой (Наредба-38 exam-required, ЗДвП чл. 38) —
+ * CORRIDOR-LOCKED, the parkInBay mold. Completes only when the car has REVERSED
+ * its travel direction (~180°, ending within `toleranceDeg` of
+ * `startHeadingDeg + 180`, folded to the 180° axis), at rest INSIDE the corridor
+ * rect, held `holdSec` continuous seconds. A genuine turn on a narrow street is
+ * three movements (forward-left, reverse-right, forward-away) — the evaluator
+ * counts direction-change shunts (forward↔reverse) into the detail's `movements`
+ * (= reversals + 1) so the rubric can grade economy; curb/obstacle contact
+ * grades COLLISION through the existing obstacle-rect machinery (collisionMinKmh
+ * 0, like parking). The evaluator never HARD-requires a reverse (a wide one-arc
+ * U-turn is a 1-movement completion) — the narrow corridor + curbs are what make
+ * the reverse physically necessary; economy is where the shunt count is judged.
+ */
+export interface ThreePointTurnParams {
+  kind: "completeManeuver";
+  maneuver: "threePointTurn";
+  /** The bounded turn box the maneuver must complete inside (axis = startHeadingDeg). */
+  corridor: ThreePointTurnCorridor;
+  /** Travel heading at the start of the maneuver, deg (0 = north, cw). */
+  startHeadingDeg: number;
+  /** Max |final heading − (startHeadingDeg + 180)| folded to the 180° axis, deg. */
+  toleranceDeg: number;
+  /** Continuous seconds at rest (inside the corridor, facing back) to finish. */
+  holdSec: number;
+}
+
 export type ManeuverParams =
   | SmoothStopParams
   | EmergencyStopParams
   | RoundaboutParams
-  | ParkInBayParams;
+  | ParkInBayParams
+  | ThreePointTurnParams;
 
 export type ObjectiveParams =
   | ReachZoneParams
@@ -232,6 +273,20 @@ export type ObjectiveEvalState =
       inBay: boolean;
       /** Bay entries so far (outside → inside transitions). */
       attempts: number;
+    }
+  | {
+      type: "threePointTurn";
+      /** Car centre has been inside the corridor at least once. */
+      entered: boolean;
+      /**
+       * Last non-zero travel direction (−1 reverse, +1 forward, 0 = none yet).
+       * Tracked only after entering the corridor — used to count shunts.
+       */
+      lastDir: number;
+      /** Direction-change shunts (forward↔reverse) since entering the corridor. */
+      reversals: number;
+      /** Session time the current continuous in-corridor at-rest stop began; null while moving/outside. */
+      stoppedSinceT: number | null;
     };
 
 // ---------------------------------------------------------------------------
@@ -280,7 +335,18 @@ export type ObjectiveDetail =
       /** This objective's junction contributed a met red. */
       redMetHere: boolean;
     }
-  | { kind: "roundabout"; entered: boolean; exitSignaled: boolean };
+  | { kind: "roundabout"; entered: boolean; exitSignaled: boolean }
+  | {
+      kind: "threePointTurn";
+      /** Car centre has been inside the corridor. */
+      entered: boolean;
+      /** Direction-change shunts (forward↔reverse) used in the corridor. */
+      reversals: number;
+      /** Movements = reversals + 1 (a clean three-point turn is 3); 0 before entering. */
+      movements: number;
+      /** Current |heading − target| folded to the 180° axis, deg; null before entering. */
+      headingToTargetDeg: number | null;
+    };
 
 export interface ObjectiveProgress {
   spec: LessonObjective;

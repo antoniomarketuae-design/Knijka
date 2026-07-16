@@ -129,6 +129,9 @@ export function guidanceGoalFor(
           return { kind: "ahead", meters: EMERGENCY_AHEAD_M };
         case "smoothStop":
           return null;
+        case "threePointTurn":
+          // Ribbon to the turn box; the marker sits at the corridor centre.
+          return { kind: "point", x: params.corridor.x, y: params.corridor.y, marker: true };
       }
   }
 }

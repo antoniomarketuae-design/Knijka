@@ -36,6 +36,7 @@ import type {
   PassSignalParams,
   ReactionBand,
   ReachZoneParams,
+  ThreePointTurnParams,
 } from "./types";
 
 // ---------------------------------------------------------------------------
@@ -70,6 +71,23 @@ function parseBay(v: unknown): ParkingBaySpec | null {
     return null;
   }
   return { x: b.x, y: b.y, headingDeg: b.headingDeg, widthM: b.widthM, lengthM: b.lengthM };
+}
+
+/** Narrow an untyped `corridor` param to a ThreePointTurnCorridor, null when malformed. */
+function parseTurnCorridor(v: unknown): ThreePointTurnParams["corridor"] | null {
+  if (typeof v !== "object" || v === null) return null;
+  const c = v as Record<string, unknown>;
+  if (
+    !num(c.x) ||
+    !num(c.y) ||
+    !num(c.halfWidthM) ||
+    !num(c.halfLengthM) ||
+    c.halfWidthM <= 0 ||
+    c.halfLengthM <= 0
+  ) {
+    return null;
+  }
+  return { x: c.x, y: c.y, halfWidthM: c.halfWidthM, halfLengthM: c.halfLengthM };
 }
 
 /** Narrow a LessonObjective's untyped params to a typed evaluator config. */
@@ -207,6 +225,29 @@ export function parseObjectiveParams(objective: LessonObjective): ObjectiveParam
           exitRadiusM: p.exitRadiusM,
         };
       }
+      if (p.maneuver === "threePointTurn") {
+        // Corridor-locked (the parkInBay pattern): the ~180° reversal must land
+        // inside the authored turn box.
+        const corridor = parseTurnCorridor(p.corridor);
+        if (corridor === null) {
+          throw new ObjectiveSpecError(
+            objective.id,
+            "threePointTurn needs corridor { x, y, halfWidthM > 0, halfLengthM > 0 }",
+          );
+        }
+        if (!num(p.startHeadingDeg)) {
+          throw new ObjectiveSpecError(objective.id, "threePointTurn needs startHeadingDeg");
+        }
+        return {
+          kind: "completeManeuver",
+          maneuver: "threePointTurn",
+          corridor,
+          startHeadingDeg: p.startHeadingDeg,
+          toleranceDeg:
+            num(p.toleranceDeg) && p.toleranceDeg > 0 ? p.toleranceDeg : TURN_TOLERANCE_DEG,
+          holdSec: num(p.holdSec) && p.holdSec > 0 ? p.holdSec : TURN_HOLD_SEC,
+        };
+      }
       throw new ObjectiveSpecError(
         objective.id,
         `unknown maneuver ${String(p.maneuver)}`,
@@ -247,6 +288,14 @@ export function createEvalState(params: ObjectiveParams): ObjectiveEvalState {
           };
         case "roundabout":
           return { type: "roundabout", entered: false, exitSignaled: false };
+        case "threePointTurn":
+          return {
+            type: "threePointTurn",
+            entered: false,
+            lastDir: 0,
+            reversals: 0,
+            stoppedSinceT: null,
+          };
       }
   }
 }
@@ -294,6 +343,11 @@ export const PARK_CENTER_TOL_M = 0.5;
 export const PARK_HEADING_TOL_DEG = 10;
 /** Reverse-gear credit for the park accrues only within this radius of the bay, m. */
 export const PARK_MANEUVER_ZONE_M = 15;
+
+/** Default max |final heading − (start + 180°)| for a three-point turn, deg. */
+export const TURN_TOLERANCE_DEG = 20;
+/** Default continuous seconds at rest (facing back, in the corridor) to finish a turn. */
+export const TURN_HOLD_SEC = 0.6;
 
 /**
  * Reaction grade bands on StagedEventOutcome.reactionTimeSec (A10; the
@@ -379,6 +433,8 @@ export function stepObjective(
             prev,
             tick,
           );
+        case "threePointTurn":
+          return stepThreePointTurn(params, prev, tick);
       }
   }
 }
@@ -717,5 +773,89 @@ function stepRoundabout(
     progress: done ? 1 : entered ? (exitSignaled ? 0.75 : 0.5) : 0,
     evalState: { type: "roundabout", entered, exitSignaled },
     detail: { kind: "roundabout", entered, exitSignaled },
+  };
+}
+
+/** Absolute DIRECTED angle difference, folded to 0..180° (NOT the 0..90° axis
+ *  fold — a U-turn must face BACK, not merely along the axis). */
+function headingDiffDeg(aDeg: number, bDeg: number): number {
+  const raw = (((aDeg - bDeg) % 360) + 360) % 360; // 0..360
+  return raw > 180 ? 360 - raw : raw; // 0..180
+}
+
+/**
+ * Three-point turn / обратен завой (Наредба-38; ЗДвП чл. 38) — CORRIDOR-LOCKED,
+ * the parkInBay mold. Completes when the car has REVERSED its travel direction
+ * (final heading within `toleranceDeg` of `startHeadingDeg + 180`), at rest
+ * INSIDE the corridor rect, held `holdSec` continuous seconds. Rolling or
+ * leaving the corridor resets the hold clock. Economy: the evaluator counts
+ * direction-change shunts (forward↔reverse) once the corridor is entered and
+ * reports `movements = reversals + 1` in the detail (a clean turn is 3);
+ * curb/obstacle contact grades COLLISION through the obstacle-rect machinery,
+ * separately. No hard reverse requirement — the narrow corridor + curbs make the
+ * reverse physically necessary; a wide one-arc U-turn is a 1-movement completion.
+ */
+function stepThreePointTurn(
+  params: ThreePointTurnParams,
+  prev: ObjectiveEvalState,
+  tick: SimTick,
+): ObjectiveStepResult {
+  if (prev.type !== "threePointTurn") return { done: false, progress: 0, evalState: prev };
+
+  const { corridor, startHeadingDeg, toleranceDeg, holdSec } = params;
+
+  // Corridor-local frame — axis along the start heading (parkInBay convention).
+  const h = startHeadingDeg * DEG_TO_RAD;
+  const axX = Math.sin(h);
+  const axY = Math.cos(h);
+  const relX = tick.position.x - corridor.x;
+  const relY = tick.position.y - corridor.y;
+  const lonM = relX * axX + relY * axY; // along the corridor length (start heading)
+  const latM = relX * axY - relY * axX; // across it
+  const inCorridor =
+    Math.abs(lonM) <= corridor.halfLengthM && Math.abs(latM) <= corridor.halfWidthM;
+
+  const entered = prev.entered || inCorridor;
+
+  // Shunt counting: a genuine direction reversal (forward↔reverse) while moving,
+  // once the maneuver has begun. A stop does not change direction — only a sign
+  // flip is a shunt, so accel/decel ramps never inflate the count.
+  const stopped = Math.abs(tick.speedKmh) <= STOPPED_SPEED_KMH;
+  const movingDir = stopped ? 0 : tick.gear < 0 ? -1 : 1;
+  let lastDir = prev.lastDir;
+  let reversals = prev.reversals;
+  if (entered && movingDir !== 0) {
+    if (lastDir !== 0 && movingDir !== lastDir) reversals += 1;
+    lastDir = movingDir;
+  }
+
+  // Heading reversal: within tolerance of the start heading turned 180°.
+  const headingToTargetDeg = headingDiffDeg(tick.headingDeg, startHeadingDeg + 180);
+  const reversedFacing = headingToTargetDeg <= toleranceDeg;
+
+  // Hold clock: at rest INSIDE the corridor (rolling or leaving resets it).
+  const stoppedSinceT = stopped && inCorridor ? (prev.stoppedSinceT ?? tick.t) : null;
+  const heldFor = stoppedSinceT !== null ? tick.t - stoppedSinceT : 0;
+
+  const done = entered && inCorridor && reversedFacing && stopped && heldFor >= holdSec;
+
+  const movements = entered ? reversals + 1 : 0;
+  const progress = done
+    ? 1
+    : entered
+      ? Math.min(0.95, Math.max(0, (180 - headingToTargetDeg) / 180))
+      : 0;
+
+  return {
+    done,
+    progress,
+    evalState: { type: "threePointTurn", entered, lastDir, reversals, stoppedSinceT },
+    detail: {
+      kind: "threePointTurn",
+      entered,
+      reversals,
+      movements,
+      headingToTargetDeg: entered ? headingToTargetDeg : null,
+    },
   };
 }

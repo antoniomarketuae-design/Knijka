@@ -347,6 +347,20 @@ function parseWireObjectiveDetail(value: unknown): ObjectiveDetail | null {
       if (typeof d.entered !== "boolean" || typeof d.exitSignaled !== "boolean") return null;
       return { kind: "roundabout", entered: d.entered, exitSignaled: d.exitSignaled };
     }
+    case "threePointTurn": {
+      if (typeof d.entered !== "boolean") return null;
+      if (!Number.isInteger(d.reversals) || (d.reversals as number) < 0 || (d.reversals as number) > 1000) return null;
+      if (!Number.isInteger(d.movements) || (d.movements as number) < 0 || (d.movements as number) > 1001) return null;
+      const headingToTargetDeg = numOrNull(d.headingToTargetDeg, 0, 180);
+      if (headingToTargetDeg === "bad") return null;
+      return {
+        kind: "threePointTurn",
+        entered: d.entered,
+        reversals: d.reversals as number,
+        movements: d.movements as number,
+        headingToTargetDeg,
+      };
+    }
     default:
       return null;
   }
