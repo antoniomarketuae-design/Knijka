@@ -41,6 +41,7 @@
  * PARTIAL or 🔴 NEW — left for later waves.
  */
 
+import type { BrakingLeadCarSpec } from "../../contracts";
 import type { ScenarioSpec } from "./types";
 
 // ---------------------------------------------------------------------------
@@ -225,9 +226,133 @@ export const SC_AC_RAIN_LIGHTS: ScenarioSpec = {
   localeBg: "bg-BG",
 };
 
+// ---------------------------------------------------------------------------
+// 3. sc-ac-highbeam-lead — „Дълги светлини зад кола" (AC-04) on fo-follow-v1
+//    (360 m straight street, limit 50, recorded at NIGHT with a pacing lead)
+// ---------------------------------------------------------------------------
+
+/**
+ * The staged LEAD CAR for sc-ac-highbeam-lead: paces the player's own
+ * northbound lane (x = 4.06, extraRightOffsetM 0) at a fixed ~20 m ahead
+ * (positive followGapM, matchPlayer). The gap is deliberately GENEROUS: it
+ * sits far above the 2-second following threshold at the calm ~28 km/h drive
+ * (so FOLLOWING_TOO_CLOSE never leaks), yet well inside the 150 m dip-duty
+ * window — so the ONLY thing the rule engine can grade against it is the
+ * driver's BEAM state (HIGH_BEAM_NOT_DIPPED). The slam tier is authored out of
+ * the corridor (slamAt y = 520, minSlamSpeedKmh 250): it is deterministic
+ * moving traffic, the car whose mirrors the long beam dazzles, not a braking
+ * drill. Reuses the committed fo-follow-v1 straight-street geometry (its
+ * fo-n-start/fo-n-end lane path + the fo-spawn-approach spawn) — a plain 1+1
+ * street with no zebra/junction/signal, so nothing else is gradable.
+ */
+const AH_LEAD_CAR: BrakingLeadCarSpec = {
+  id: "sc-ah-lead",
+  kind: "brakingLeadCar",
+  actor: {
+    pathNodes: ["fo-n-start", "fo-n-end"],
+    hold: { nodeIndex: 0, offsetM: 40 }, // dormant ~25 m ahead of the spawn
+    cruiseSpeedMps: 8,
+    extraRightOffsetM: 0, // the player's OWN lane (northbound, x = 4.06)
+    colorIndex: 2,
+  },
+  followGapM: 20, // pace ~20 m AHEAD — safe at the ~28 km/h drive, well inside the dip window
+  maxMatchSpeedMps: 15, // 54 km/h — holds 20 m at any legal player speed
+  slamAt: { x: 4.06, y: 520 }, // far past the 360 m road — never reached
+  slamRadiusM: 2,
+  slamDecelMps2: 6,
+  minSlamSpeedKmh: 250, // the slam tier is authored out of reach…
+  proximityFallbackM: 0.3, // …and the proximity fallback cannot occur (gap pinned at 20 m)
+  triggersHazard: false,
+  resumeAfterSec: 3,
+};
+
+/** AC-04 — превключване на къси светлини при движение зад друга кола нощем
+ *  (ЗДвП чл. 74: дългите светлини се превключват на къси, за да не се заслепява
+ *  водачът на движещото се отпред превозно средство през огледалата му). */
+export const SC_AC_HIGHBEAM_LEAD: ScenarioSpec = {
+  id: "sc-ac-highbeam-lead",
+  family: "conditions",
+  tagsBg: ["условия", "нощно каране", "дълги светлини", "заслепяване"],
+  titleBg: "Дълги светлини зад кола",
+  objectiveBg:
+    "Следвай движещата се пред теб кола нощем с включени КЪСИ светлини — дългите заслепяват водача отпред през огледалата му; на дълги минаваш само когато пътят напред е чист.",
+  archetypeIds: ["AC-04"],
+  conceptIds: ["c-dazzle-handling", "c-night-visibility", "c-general-care-duty"],
+  map: {
+    archetype: "straight-street",
+    // Reuses the committed fo-follow-v1 map (a plain 1+1 straight street) —
+    // its meta.scenario.params, mirrored here for provenance.
+    params: { lengthM: 360, maxspeedKmh: 50 },
+    districtId: "fo-follow-v1",
+  },
+  start: {
+    spawnPointId: "fo-spawn-approach",
+    vehicleStart: "ready",
+  },
+  instructionsBg: [
+    { n: 1, textBg: "Тъмно е и пред теб се движи кола — потегли спокойно с включени къси светлини." },
+    { n: 2, textBg: "Щом настигнеш кола пред теб, дългите светлини се превключват на къси — иначе я заслепяваш през огледалата ѝ." },
+    { n: 3, textBg: "Следвай предната кола на дистанция и с КЪСИ светлини през целия участък." },
+    { n: 4, textBg: "На дълги минаваш чак когато пред теб няма нито изпреварвана, нито насрещна кола." },
+    { n: 5, textBg: "Задръж късите светлини зад предната кола до края на отсечката." },
+  ],
+  success: [
+    {
+      id: "sc-ahl-follow",
+      titleBg: "Следвай предната кола с къси светлини",
+      params: { kind: "reachZone", x: LANE_X, y: 180, radiusM: 10, maxSpeedKmh: 45 },
+    },
+    {
+      id: "sc-ahl-finish",
+      titleBg: "Стигни края на отсечката",
+      params: { kind: "reachZone", x: LANE_X, y: 330, radiusM: 12 },
+    },
+  ],
+  rubric: { parTimeSec: 75 },
+  // RECORDED: committed deterministic recordings of the authored scripts in
+  // traces/scAcHighbeamLead.ts; gates in traces/__tests__/
+  // ac-highbeam-lead-traces.test.ts (re-record with RECORD_TRACES=1).
+  shadow: { path: "content/traces/sc-ac-highbeam-lead/shadow-correct.trace.json" },
+  mistakes: [
+    {
+      traceRef: { path: "content/traces/sc-ac-highbeam-lead/mistake-highs-all-way.trace.json" },
+      titleBg: "Дълги светлини през целия път зад предния",
+      whatWentWrongBg:
+        "Колата се движеше зад предната на дълги светлини целия участък — светлината биеше право в огледалата ѝ и заслепяваше водача отпред. При движение зад друга кола дългите се превключват на къси; това е второстепенна грешка (чл. 74).",
+      codeRefs: ["HIGH_BEAM_NOT_DIPPED"],
+    },
+    {
+      traceRef: { path: "content/traces/sc-ac-highbeam-lead/mistake-late-dip.trace.json" },
+      titleBg: "Не превключи, щом настигна предния",
+      whatWentWrongBg:
+        "Водачът тръгна правилно на къси, но включи дългите зад движещата се пред него кола и продължи така — вместо да я превключи на къси, щом я настигна. Дългите зад предна кола заслепяват през огледалата ѝ и се превключват веднага.",
+      codeRefs: ["HIGH_BEAM_NOT_DIPPED"],
+    },
+  ],
+  teach: {
+    whenBg:
+      "През нощта, всеки път когато настигнеш и следваш друга кола или срещнеш насрещна. Дългите светлини са за празен, тъмен път без коли пред и срещу теб; появи ли се кола — превключваш на къси.",
+    whyBg:
+      "Дългите светлини бият право в огледалата на предната кола (или в очите на насрещния) и за няколко секунди заслепяват водача точно когато той трябва да вижда пътя. Затова законът изисква да се превключат на къси при движение зад друго ППС и при разминаване — заслепеният отпред е също толкова опасен, колкото и ти да не виждаш.",
+    lawRef: "ЗДвП чл. 74",
+    examinerBg:
+      "Изпитващият следи ползването на светлините нощем: дългите се превключват на къси при настигане на движеща се отпред кола и при насрещно разминаване. Оставените дълги зад предна кола са второстепенна грешка — превключвай веднага, щом настигнеш предния.",
+  },
+  levels: [
+    { level: 1 },
+    { level: 2 },
+    { level: 3 },
+    { level: 4, vehicleStart: "cold" },
+  ],
+  staged: [AH_LEAD_CAR],
+  conditions: { weather: "dry", night: true },
+  localeBg: "bg-BG",
+};
+
 /** The adverse-conditions-family templates, in catalog order (registered in
  *  templates.ts). */
 export const SCENARIO_TEMPLATES_CONDITIONS: readonly ScenarioSpec[] = [
   SC_AC_NIGHT_LIGHTS,
   SC_AC_RAIN_LIGHTS,
+  SC_AC_HIGHBEAM_LEAD,
 ];

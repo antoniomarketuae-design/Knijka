@@ -1040,6 +1040,116 @@ describe("FP battery — amber & red+yellow signal semantics", () => {
 });
 
 // ---------------------------------------------------------------------------
+// B1a Wave-2 detector pack (doc 72 capability 1) — every new code ships its
+// innocent-driving cases HERE. Context fields (leadGapM, headlights, rain,
+// nextJunctionM…) are OPTIONAL: their absence must read as innocent, and their
+// presence must convict only the specific guilty pattern.
+// ---------------------------------------------------------------------------
+
+describe("FP battery — standstill gap (STANDSTILL_GAP_TOO_CLOSE)", () => {
+  it("stopping a safe distance behind the lead at a red", () => {
+    // Innocent: resting ~4 m back (you can see the lead's rear tyres) is the
+    // taught gap — only a real bumper-kiss under ~1.5 m may grade.
+    const { events } = drive([
+      tick(0, { speedKmh: 12, leadGapM: 8 }),
+      ...cruise(1, 12, { speedKmh: 0.4, leadGapM: 4 }),
+    ]);
+    expectInnocent(events);
+  });
+
+  it("standstill at a light with no vehicle ahead", () => {
+    // Innocent: nobody ahead → no gap to judge (leadGapM absent).
+    const { events } = drive(cruise(0, 12, { speedKmh: 0.4 }));
+    expectInnocent(events);
+  });
+
+  it("the final metre of a normal pull-up settles before the sustain", () => {
+    // Innocent: the gap reads close for an instant as you stop, then settles
+    // at a safe distance — no sustained bumper-kiss.
+    const { events } = drive([
+      tick(0, { speedKmh: 10, leadGapM: 6 }),
+      tick(1, { speedKmh: 4, leadGapM: 3 }),
+      tick(1.5, { speedKmh: 0.5, leadGapM: 2.4 }),
+      ...cruise(2, 12, { speedKmh: 0.4, leadGapM: 3 }),
+    ]);
+    expectInnocent(events);
+  });
+});
+
+describe("FP battery — high beam behind a lead (HIGH_BEAM_NOT_DIPPED)", () => {
+  it("high beam on the open night road with nobody ahead", () => {
+    // Innocent: long beam on an empty stretch is CORRECT; the dip duty only
+    // arms with a vehicle ahead (leadGapM present).
+    const { events } = drive(
+      cruise(0, 15, { speedKmh: 60, maxSpeedKmh: 90, isNight: true, headlights: "high" }),
+    );
+    expectInnocent(events);
+  });
+
+  it("high beam far behind a lead, beyond dip range", () => {
+    // Innocent: a car 200 m ahead is outside the dazzle window.
+    const { events } = drive(
+      cruise(0, 10, { speedKmh: 60, maxSpeedKmh: 90, isNight: true, headlights: "high", leadGapM: 200 }),
+    );
+    expectInnocent(events);
+  });
+
+  it("dipping to low within a second of acquiring a lead at night", () => {
+    // Innocent: catch a lead on high beam, dip promptly — the grace exists for
+    // exactly this.
+    const { events } = drive([
+      tick(0, { speedKmh: 55, isNight: true, headlights: "high" }),
+      tick(1, { speedKmh: 55, isNight: true, headlights: "high", leadGapM: 60 }),
+      ...cruise(2, 15, { speedKmh: 55, isNight: true, headlights: "low", leadGapM: 55 }),
+    ]);
+    expectInnocent(events);
+  });
+
+  it("high beam behind a lead in DAYLIGHT is not this code", () => {
+    // Innocent (of this code): the dazzle duty is a night rule.
+    const { events } = drive(
+      cruise(0, 10, { speedKmh: 60, maxSpeedKmh: 90, headlights: "high", leadGapM: 40 }),
+    );
+    expectInnocent(events);
+  });
+});
+
+describe("FP battery — overtaking at a crossing (OVERTAKING_AT_CROSSING)", () => {
+  it("a textbook lane change nowhere near a crossing", () => {
+    // Innocent: a signalled, mirrored lane change with a lead ahead but no
+    // crossing zone armed is an ordinary overtake — praised, never flagged.
+    const { events } = drive([
+      tick(0, { speedKmh: 45, leadGapM: 20, indicator: "left", events: [glance("left")] }),
+      tick(1, { speedKmh: 45, leadGapM: 20, indicator: "left", laneId: 1 }),
+    ]);
+    expectInnocent(events);
+  });
+
+  it("a lane change inside a crossing zone with NO vehicle ahead", () => {
+    // Innocent: repositioning at an empty crossing is not overtaking — there is
+    // no car to pass (leadGapM absent).
+    const { events } = drive([
+      tick(0, { speedKmh: 40, indicator: "left", events: [glance("left"), zoneEntered(false)] }),
+      tick(1, { speedKmh: 40, indicator: "left", laneId: 1 }),
+      tick(2, { speedKmh: 40, laneId: 1, events: [zonePassed(false)] }),
+    ]);
+    expectInnocent(events);
+  });
+
+  it("an in-lane approach behind a lead in a crossing zone (no lane change)", () => {
+    // Innocent: easing within the lane (no laneId change) behind a slowing car
+    // at a crossing is correct — the overtake ban needs an actual pass.
+    const { events } = drive([
+      tick(0, { speedKmh: 25, leadGapM: 15, laneOffsetM: 0.3, events: [zoneEntered(false)] }),
+      tick(1, { speedKmh: 18, leadGapM: 12, laneOffsetM: 0.5 }),
+      tick(2, { speedKmh: 12, leadGapM: 10, laneOffsetM: 0.2 }),
+      tick(3, { speedKmh: 12, leadGapM: 10, events: [zonePassed(false)] }),
+    ]);
+    expectInnocent(events);
+  });
+});
+
+// ---------------------------------------------------------------------------
 // Whole-drive integration
 // ---------------------------------------------------------------------------
 

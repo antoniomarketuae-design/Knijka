@@ -251,6 +251,10 @@ export type ViolationCode =
   | "HESITATION_AT_GREEN" // второстепенна: „закъснели действия" — green + clear + stationary (JU-09)
   | "YELLOW_LIGHT_NOT_STOPPED" // основна: amber entered although a comfortable stop existed (JU-06)
   | "RED_YELLOW_CROSSED" // основна: entered on the red+yellow combination (JU-08)
+  // B1a Wave-2 detector pack (doc 72 capability 1 — small-rule detectors on EXISTING telemetry)
+  | "STANDSTILL_GAP_TOO_CLOSE" // второстепенна: bumper-kissing behind a stopped lead at a standstill (FO-08)
+  | "HIGH_BEAM_NOT_DIPPED" // второстепенна: long beam left on behind a lead vehicle at night (AC-04)
+  | "OVERTAKING_AT_CROSSING" // опасна: overtaking (lane change past a lead) in a pedestrian-crossing zone (OV-07)
   // pre-drive procedure (procedures/machine.ts)
   | "PREDRIVE_STEP_SKIPPED" // второстепенна per skipped step
   | "PREDRIVE_SEATBELT_SKIPPED" // основна (skipping the belt is not a detail)
@@ -519,6 +523,42 @@ export interface RuleEngineConfig {
   hesitationMaxLineDistM: number;
   /** Lead gap at/under this means someone blocks the box — never fire, m. */
   hesitationClearGapM: number;
+
+  // -- B1a Wave-2 detector pack (doc 72 capability 1) ------------------------
+
+  /**
+   * FO-08 „дистанция на спиране в колона" — при пълно спиране зад спряла кола
+   * gap at/under which the standstill is bumper-kissing (see-the-tyres rule),
+   * m. Deliberately tiny (a genuine „no escape lane" gap): the exam-bot rests
+   * ~6 m behind a lead and dense stop-and-go keeps 3-4 m, so only a real
+   * bumper-kiss trips it (A12). Only judged at v ≈ 0 (a moving queue is the
+   * FOLLOWING_TOO_CLOSE family's business, with its own queue exemption). */
+  standstillMinGapM: number;
+  /** Seconds at a bumper-kissing standstill before STANDSTILL_GAP_TOO_CLOSE
+   * fires — long enough that the final metre of a normal pull-up (gap still
+   * settling) never fires before the car rests at a safe gap. */
+  standstillGapSustainSec: number;
+
+  /**
+   * AC-04 „дълги светлини зад кола" — lead gap at/under which long beam at
+   * night dazzles the lead's mirrors and must be dipped (чл. 74), m. Only
+   * armed when a lead is actually present (leadGapM finite) AND the beam is
+   * HIGH — open-road high beam (no lead) stays innocent, exactly as the
+   * existing lights-off detector leaves it. */
+  highBeamDipMaxGapM: number;
+  /** Seconds of undipped long beam behind a lead at night before the code
+   * fires — grace for a brief high-beam flash and for the moment between
+   * acquiring a lead and dipping. */
+  highBeamDipSustainSec: number;
+
+  /**
+   * OV-07 „изпреварване на пътека" — a lead within this gap (m) is the vehicle
+   * being overtaken when a lane change lands inside an armed crossing zone
+   * (чл. 119). The code rides the ALREADY-denoised lane-change signal (joint
+   * artifacts excluded), so its false-positive surface equals the lane-change
+   * detector's — zero on an innocent single-lane drive. A lane change with no
+   * lead ahead is a reposition, not an overtake, and never fires. */
+  crossingOvertakeLeadGapM: number;
 }
 
 export const DEFAULT_RULE_CONFIG: RuleEngineConfig = {
@@ -608,4 +648,16 @@ export const DEFAULT_RULE_CONFIG: RuleEngineConfig = {
   hesitationSustainSec: 5, // DVSA marks ~3 s; we grade only a clear freeze
   hesitationMaxLineDistM: 12,
   hesitationClearGapM: 12,
+
+  // B1a Wave-2 (doc 72 capability 1). Every threshold errs innocent (A12).
+  // FO-08: 1.5 m is unambiguously bumper-kissing; the exam-bot rests ~6 m and
+  // dense stop-and-go keeps 3-4 m, so both stay clean.
+  standstillMinGapM: 1.5,
+  standstillGapSustainSec: 1.5,
+  // AC-04: any lead within 150 m at night warrants low beam; the exam-bot
+  // drives on low beams throughout, so it can never trip this.
+  highBeamDipMaxGapM: 150,
+  highBeamDipSustainSec: 3,
+  // OV-07: a lead within 45 m is the car you are passing at the crossing.
+  crossingOvertakeLeadGapM: 45,
 };

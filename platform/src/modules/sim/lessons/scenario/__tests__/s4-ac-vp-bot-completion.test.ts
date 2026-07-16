@@ -20,6 +20,7 @@ import type { RecordedDrive } from "../../../traces/recorder";
 import { recordScVpReadinessDrive, type ScVpReadinessTraceName } from "../../../traces/scVpReadiness";
 import { recordScAcNightLightsDrive, type ScAcNightLightsTraceName } from "../../../traces/scAcNightLights";
 import { recordScAcRainLightsDrive, type ScAcRainLightsTraceName } from "../../../traces/scAcRainLights";
+import { recordScAcHighbeamLeadDrive, type ScAcHighbeamLeadTraceName } from "../../../traces/scAcHighbeamLead";
 import { applyTick, buildLessonResult, createLessonSession } from "../../engine";
 import { gradeFinishWire, serializeRuleEvents } from "../../wire";
 import type { LessonResult, LessonSessionState } from "../../types";
@@ -27,7 +28,7 @@ import { compileScenario } from "../compile";
 import { scenarioLessonById } from "../resolve";
 import { scoreRubric } from "../rubric";
 import { SC_VP_READINESS } from "../templates-cockpit";
-import { SC_AC_NIGHT_LIGHTS, SC_AC_RAIN_LIGHTS } from "../templates-conditions";
+import { SC_AC_NIGHT_LIGHTS, SC_AC_RAIN_LIGHTS, SC_AC_HIGHBEAM_LEAD } from "../templates-conditions";
 import type { ScenarioSpec } from "../types";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -100,6 +101,10 @@ const CORRECT: Array<{ spec: ScenarioSpec; record: (d: unknown, onTick: OnTick) 
     spec: SC_AC_RAIN_LIGHTS,
     record: (d, onTick) => recordScAcRainLightsDrive(d, "shadow-correct" as ScAcRainLightsTraceName, { onTick }),
   },
+  {
+    spec: SC_AC_HIGHBEAM_LEAD,
+    record: (d, onTick) => recordScAcHighbeamLeadDrive(d, "shadow-correct" as ScAcHighbeamLeadTraceName, { onTick }),
+  },
 ];
 
 for (const { spec, record } of CORRECT) {
@@ -163,6 +168,16 @@ describe("S4 counter-proofs — cockpit mistakes grade through the live pipeline
     const codes = driveViolationCodes(outcome);
     expect(codes).toContain("HEADLIGHTS_OFF_IN_RAIN");
     expect(codes).not.toContain("SPEED_TOO_FAST_FOR_CONDITIONS");
+    expect(driveCommendationCodes(outcome)).not.toContain("CLEAN_DRIVING");
+  });
+
+  it("high beam behind the lead: HIGH_BEAM_NOT_DIPPED surfaces at night, no following code, clean-driving absent", () => {
+    const outcome = driveThroughSession(SC_AC_HIGHBEAM_LEAD, (d, onTick) =>
+      recordScAcHighbeamLeadDrive(d, "mistake-highs-all-way", { onTick }),
+    );
+    const codes = driveViolationCodes(outcome);
+    expect(codes).toContain("HIGH_BEAM_NOT_DIPPED");
+    expect(codes).not.toContain("FOLLOWING_TOO_CLOSE");
     expect(driveCommendationCodes(outcome)).not.toContain("CLEAN_DRIVING");
   });
 });

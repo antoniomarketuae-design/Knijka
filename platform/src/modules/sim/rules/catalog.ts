@@ -360,6 +360,40 @@ export const VIOLATIONS: Record<ViolationCode, ViolationSpec> = {
     lawRef: "ППЗДвП чл. 31",
     conceptId: "c-traffic-light-signals",
   },
+  // -- B1a Wave-2 detector pack (doc 72 capability 1) -----------------------
+  STANDSTILL_GAP_TOO_CLOSE: {
+    severityClass: "vtorostepenna",
+    points: SEVERITY_POINTS.vtorostepenna,
+    titleBg: "Твърде малка дистанция при спиране в колона",
+    explanationBg:
+      "Спря прекалено близо до колата пред теб. При спиране в колона остави поне колкото да виждаш гумите на предната кола да опират в асфалта — така имаш място за маневра и не рискуваш удар при потегляне назад по наклон.",
+    correctiveBg:
+      "Спри така, че да виждаш мястото, където задните гуми на предната кола опират в пътя — това са около два метра и ти дават резерв, ако предният се върне назад или трябва да заобиколиш.",
+    lawRef: "ЗДвП чл. 23",
+    conceptId: "c-following-distance",
+  },
+  HIGH_BEAM_NOT_DIPPED: {
+    severityClass: "vtorostepenna",
+    points: SEVERITY_POINTS.vtorostepenna,
+    titleBg: "Дълги светлини зад движеща се кола",
+    explanationBg:
+      "Движеше се на дълги светлини непосредствено зад друга кола. Дългите светлини заслепяват водача отпред през огледалата му — при движение зад превозно средство се превключва на къси.",
+    correctiveBg:
+      "Щом настигнеш кола отпред, веднага превключи на къси светлини. На дълги минаваш пак чак когато пред теб няма нито изпреварвана, нито насрещна кола.",
+    lawRef: "ЗДвП чл. 74",
+    conceptId: "c-dazzle-handling",
+  },
+  OVERTAKING_AT_CROSSING: {
+    severityClass: "opasna",
+    points: SEVERITY_POINTS.opasna,
+    titleBg: "Изпреварване на пешеходна пътека",
+    explanationBg:
+      "Изпревари кола в зоната на пешеходна пътека. Точно там е забранено да изпреварваш — спрялата или намаляваща кола пред теб може да пропуска пешеходец, когото ти не виждаш иззад нея.",
+    correctiveBg:
+      "Пред пешеходна пътека не изпреварвай и не заобикаляй колата пред теб — намали и бъди готов да спреш. Ако предният намалява до пътеката, най-вероятно пропуска човек.",
+    lawRef: "ЗДвП чл. 119",
+    conceptId: "c-crosswalk-yield",
+  },
   PREDRIVE_STEP_SKIPPED: {
     severityClass: "vtorostepenna",
     points: SEVERITY_POINTS.vtorostepenna,

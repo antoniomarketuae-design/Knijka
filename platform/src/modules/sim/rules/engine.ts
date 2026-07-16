@@ -152,6 +152,11 @@ export interface RuleEngineState {
   moveOff: { restSeen: boolean; done: boolean };
   /** Last time a hazard-shaped tick event was seen (harsh-brake exemption). */
   lastHazardEventAt: number | null;
+  // -- B1a Wave-2 detector pack (doc 72 capability 1) ------------------------
+  /** Bumper-kissing at a standstill behind a stopped lead (FO-08). */
+  standstillGap: EpisodeState;
+  /** Long beam left on behind a lead vehicle at night (AC-04). */
+  highBeamDip: EpisodeState;
 }
 
 const IDLE_EPISODE: EpisodeState = { activeSince: null, emitted: false };
@@ -191,6 +196,8 @@ export function createRuleEngine(config?: Partial<RuleEngineConfig>): RuleEngine
     harshBrake: { activeSince: null, emitted: false, onsetKmh: 0, causeSeen: false },
     moveOff: { restSeen: false, done: false },
     lastHazardEventAt: null,
+    standstillGap: { ...IDLE_EPISODE },
+    highBeamDip: { ...IDLE_EPISODE },
   };
 }
 
@@ -219,6 +226,8 @@ function cloneState(s: RuleEngineState): RuleEngineState {
     hesitation: { ...s.hesitation },
     harshBrake: { ...s.harshBrake },
     moveOff: { ...s.moveOff },
+    standstillGap: { ...s.standstillGap },
+    highBeamDip: { ...s.highBeamDip },
   };
 }
 
@@ -399,19 +408,36 @@ export function reduceTick(prev: RuleEngineState, tick: SimTick): ReduceResult {
     const indicatorOk = lastOn !== null && t - lastOn <= cfg.indicatorLookbackSec;
     const lastGlance = s.lastGlanceAt[dir];
     const mirrorOk = lastGlance !== null && t - lastGlance <= cfg.mirrorLookbackSec;
-    if (tick.edgeId === undefined || s.prevEdgeId === undefined) {
+    const legacyBasis = tick.edgeId === undefined || s.prevEdgeId === undefined;
+    const gradableWithEdge =
+      !basisChanged &&
+      (s.laneChange.lastBasisChangeAt === null ||
+        t - s.laneChange.lastBasisChangeAt >= cfg.laneChangeJointGraceSec);
+    if (legacyBasis) {
       // Legacy source without segment ids — immediate grading.
       if (!indicatorOk) events.push(makeViolation("LANE_CHANGE_WITHOUT_INDICATOR", t));
       if (!mirrorOk) events.push(makeViolation("LANE_CHANGE_WITHOUT_MIRROR_CHECK", t));
       if (indicatorOk && mirrorOk) events.push(makeCommendation("SAFE_LANE_CHANGE", t));
-    } else if (
-      !basisChanged &&
-      (s.laneChange.lastBasisChangeAt === null ||
-        t - s.laneChange.lastBasisChangeAt >= cfg.laneChangeJointGraceSec)
-    ) {
+    } else if (gradableWithEdge) {
       s.laneChange.pending.push({ t, dir, indicatorOk, mirrorOk });
     }
     // else: renumbering at/near a segment joint — locator artifact, no grade.
+
+    // OV-07 (изпреварване на пътека): a REAL lane change (joint artifacts
+    // excluded by the branches above) landing inside an armed pedestrian-
+    // crossing zone while a lead vehicle is present to overtake is the чл. 119
+    // ban. It rides the SAME denoised signal as the lane-change codes, so its
+    // false-positive surface is theirs — zero on an innocent single-lane
+    // drive. A lane change with no lead ahead is a reposition, not an
+    // overtake, and never fires (A12). One опасна per pass, at detection time.
+    if (
+      (legacyBasis || gradableWithEdge) &&
+      s.crossing !== null &&
+      leadGapM !== null &&
+      leadGapM <= cfg.crossingOvertakeLeadGapM
+    ) {
+      events.push(makeViolation("OVERTAKING_AT_CROSSING", t));
+    }
   }
   s.prevLaneId = tick.laneId;
   s.prevEdgeId = tick.edgeId;
@@ -576,6 +602,67 @@ export function reduceTick(prev: RuleEngineState, tick: SimTick): ReduceResult {
   if (stepEpisode(s.keepRight, hoggingLeft, !hoggingLeft, t, cfg.keepRightSustainSec)) {
     events.push(makeViolation("NOT_KEEPING_RIGHT", t));
   }
+
+  // -- 4a2. B1a Wave-2 small-rule detectors (doc 72 capability 1). Each rides
+  // EXISTING telemetry and carries the exemptions that keep innocent driving
+  // clean (A12); the OV-07 overtake-at-crossing composite lives in the
+  // lane-change block above (it rides the denoised lane-change signal).
+
+  // Standstill gap (FO-08 — „дистанция на спиране в колона"): bumper-kissing
+  // behind a stopped lead at a full stop. Only at v ≈ 0 — a moving queue is
+  // the FOLLOWING_TOO_CLOSE family's business (its own queue exemption
+  // applies), so there is no double-bill. Needs a lead actually reported and
+  // closer than the tiny see-the-tyres floor; opening the gap or moving off
+  // re-arms.
+  const standstillTooClose =
+    speed <= cfg.fullStopMaxSpeedKmh &&
+    leadGapM !== null &&
+    leadGapM <= cfg.standstillMinGapM &&
+    forwardGear;
+  if (
+    stepEpisode(
+      s.standstillGap,
+      standstillTooClose,
+      speed > cfg.fullStopMaxSpeedKmh || leadGapM === null || leadGapM > cfg.standstillMinGapM,
+      t,
+      cfg.standstillGapSustainSec,
+    )
+  ) {
+    events.push(makeViolation("STANDSTILL_GAP_TOO_CLOSE", t));
+  }
+
+  // High beam behind a lead at night (AC-04 — „дълги светлини зад кола"): long
+  // beam left on while following a vehicle at night dazzles the lead's mirrors
+  // (чл. 74). Armed only on POSITIVE evidence — night, beam HIGH, and a lead
+  // actually reported within dip range. Open-road high beam (no lead) stays
+  // innocent, exactly as HEADLIGHTS_OFF_AT_NIGHT leaves it. Dipping, or the
+  // lead clearing, re-arms.
+  const highBeamBehindLead =
+    tick.isNight &&
+    tick.headlights === "high" &&
+    moving &&
+    leadGapM !== null &&
+    leadGapM <= cfg.highBeamDipMaxGapM &&
+    forwardGear;
+  if (
+    stepEpisode(
+      s.highBeamDip,
+      highBeamBehindLead,
+      !tick.isNight || tick.headlights !== "high" || leadGapM === null,
+      t,
+      cfg.highBeamDipSustainSec,
+    )
+  ) {
+    events.push(makeViolation("HIGH_BEAM_NOT_DIPPED", t));
+  }
+
+  // NOTE: SP-06 „обструктивно бавно каране" (obstructively slow) was
+  // prototyped here and REMOVED — with only rule-engine telemetry a
+  // legitimately cautious crawl (готовност за спиране toward a blind junction,
+  // a tight maneuver) is indistinguishable from an obstructive one, so it
+  // false-fired on innocent recorded traces (a blind-junction shadow drive
+  // among them). doc 72 flags SP-06 as needing the director's staged-hazard
+  // knowledge; it is not safely gradable as a pure rule (A12). Left to N-tier.
 
   // -- 4b. B1a Wave-1 world-context detectors (doc 72 capability 1). All of
   // them read the OPTIONAL tick context fields; absent context = silent.
@@ -749,6 +836,8 @@ export function reduceTick(prev: RuleEngineState, tick: SimTick): ReduceResult {
     s.centerLine,
     s.hesitation,
     s.harshBrake,
+    s.standstillGap,
+    s.highBeamDip,
   ].some((ep) => ep.emitted && ep.activeSince !== null);
   if (events.some((e) => e.kind === "violation")) {
     s.cleanDistanceM = 0; // any fresh mistake resets the streak
