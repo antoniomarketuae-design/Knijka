@@ -168,6 +168,43 @@ export const WET_GRIP_FACTOR = 0.7;
  */
 export const SNOW_GRIP_FACTOR = 0.4;
 /**
+ * SURFACE-PATCH grip band (the AQUAPLANE + ICE slice — doc 72 AC-07-full
+ * standing-water float / AC-08 ice band; the LAST named Phase-4 friction
+ * item after wet/snow/crosswind). Unlike WET/SNOW_GRIP_FACTOR these are NOT
+ * session-long constructor factors: they are the values of LOCALIZED
+ * `waterPatch` / `icePatch` district zone spans (runtime/district.ts), fed
+ * to the LIVE car at RUNTIME through VehicleSim.setSurfaceGripFactor as the
+ * chassis crosses the span (VehicleRig ← LessonScene ←
+ * resolveSurfaceGripPatches). The patch factor composes with the lesson's
+ * base grip by MIN — most restrictive wins, the LessonScene condition-factor
+ * discipline (a wet lesson's 0.7 with a 0.15 water patch runs 0.15 inside
+ * the span, 0.7 outside). Maps carry the values (the curveAdvisory data
+ * pattern); the district batteries assert the shipped spans EQUAL these
+ * constants, so this file stays the single documented truth.
+ *
+ * Values, honestly grounded and MEASURED (vehicle/surface-grip.test.ts):
+ *  - 0.15 of dry grip is the floating-tyre / glare-ice band of the tyre
+ *    literature (~0.1–0.2; the content bank's c-winter-ice and
+ *    c-rain-aquaplaning stories). Measured on the live car: full-brake
+ *    distance from 80 km/h grows ≈ 5.5× vs dry (≈ 144 m vs ≈ 26 m — aero
+ *    drag does some of the far-end work the tyres no longer can), and a
+ *    full-lock turn at speed yaws ≈ 0.14× of dry — braking and steering
+ *    genuinely stop answering, which IS the taught lesson (slow down BEFORE
+ *    the hazard; nothing works inside it).
+ *  - AQUAPLANE_ABOVE_KMH 65: aquaplaning is SPEED-DEPENDENT — above
+ *    ~60–70 km/h a street tyre can no longer evacuate the water of a deep
+ *    standing pool and floats; below, the tread bites again (doc 72 AC-07).
+ *    The gate is applied by the RIG per frame: a waterPatch only bites at or
+ *    above this speed, so the shadow's taught ~55 km/h transit keeps real
+ *    grip and the 80 km/h dry-habit entry genuinely floats. Ice has NO
+ *    speed gate — it is near-zero grip at any speed (the AC-08 band).
+ */
+export const AQUAPLANE_PATCH_GRIP_FACTOR = 0.15;
+/** Water-evacuation limit of the waterPatch gate, km/h (see above). */
+export const AQUAPLANE_ABOVE_KMH = 65;
+/** icePatch grip — the same 0.15 band, constant at any speed (AC-08). */
+export const ICE_PATCH_GRIP_FACTOR = 0.15;
+/**
  * CROSSWIND lateral force (N) of an exposed segment — bridge deck, gap
  * between buildings, the moment you clear an overtaken truck's bow wave
  * (doc 72 AC-12). Fed to VehicleSim.windLateralN ONLY when a lesson AUTHORS

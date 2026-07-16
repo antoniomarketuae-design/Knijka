@@ -354,6 +354,31 @@ export {
   recordScAcCrosswindDrive,
   type ScAcCrosswindTraceName,
 } from "./scAcCrosswind";
+// SURFACE-PATCH unlock (doc 72 AC-07-full aquaplane / AC-08 ice band — the
+// last named Phase-4 friction item): sc-ac-aquaplane rides the waterPatch
+// span of ac-aqua-v1 (the LIVE float is VehicleSim.setSurfaceGripFactor via
+// the rig; the ghosts AUTHOR it — unbraked span transit, WET_DECEL overrun,
+// the осева drift polyline); sc-ac-ice rides ac-ice-v1's icePatch (ICE_DECEL
+// = SCRIPT_DECEL × ICE_PATCH_GRIP_FACTOR authors every on-ice ramp). NO new
+// rule code — COLLISION / CENTER_LINE_TOUCHED / POOR_LANE_KEEPING /
+// SPEED_TOO_FAST_FOR_CONDITIONS grade the outcomes. Committed traces under
+// content/traces/<template>/ are recordings of exactly these scripts (gates:
+// traces/__tests__/sc-ac-aquaplane-traces + sc-ac-ice-traces).
+export {
+  SC_AC_AQUAPLANE_ID,
+  AQUA_WET_DECEL,
+  AQUA_PANIC_DECEL,
+  aquaVanObstacle,
+  recordScAcAquaplaneDrive,
+  type ScAcAquaplaneTraceName,
+} from "./scAcAquaplane";
+export {
+  SC_AC_ICE_ID,
+  ICE_DECEL,
+  iceCarObstacle,
+  recordScAcIceDrive,
+  type ScAcIceTraceName,
+} from "./scAcIce";
 
 // Detector pack unit 2 — Part A (shipped detectors: FO-08 standstill gap,
 // OV-07 crossing overtake) + Part B (config-gated drills: JU-23 junction scan,

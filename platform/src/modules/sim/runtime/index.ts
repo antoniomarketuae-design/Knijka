@@ -65,6 +65,15 @@ export {
   type RoadClass,
 } from "./district";
 export { LANE_WIDTH_M, OFF_ROAD_DISTANCE_M } from "./spatial";
+// SURFACE-PATCH slice (AC-07-full aquaplane / AC-08 ice): waterPatch/icePatch
+// spans → district-space rects for the PHYSICS RIG (LessonScene resolves,
+// VehicleRig queries per substep; worldRuntime deliberately ignores the kinds).
+export {
+  resolveSurfaceGripPatches,
+  surfacePatchGripAt,
+  type SurfaceGripPatch,
+  type SurfacePatchSource,
+} from "./surface";
 export {
   SIGNAL_TIMING,
   phaseTimingInCycle,

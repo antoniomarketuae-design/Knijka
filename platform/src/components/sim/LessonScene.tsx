@@ -96,7 +96,11 @@ import {
   assertDistrict,
   type WorldGeometry,
 } from "@/modules/sim/world";
-import { createWorldRuntime } from "@/modules/sim/runtime";
+import {
+  createWorldRuntime,
+  resolveSurfaceGripPatches,
+  type SurfaceGripPatch,
+} from "@/modules/sim/runtime";
 import { createTrafficSystem, TrafficLayer, type TrafficDistrict } from "@/modules/sim/traffic";
 import {
   buildPoligonGhostDemo,
@@ -298,6 +302,10 @@ interface Built {
   /** S1: precise hittable parked cars from the district's meta.scenario
    *  occupancy (scenario lessons only; [] everywhere else). */
   scenarioObstacles: ScenarioObstacleSpec[];
+  /** SURFACE-PATCH slice: waterPatch/icePatch rects resolved from the
+   *  district's zone spans — [] on every pre-slice map, so VehicleRig's
+   *  patch branch (and VehicleSim's grip setter) never runs there. */
+  gripPatches: SurfaceGripPatch[];
   /** S1: the template's recorded shadow trace — fetched only when the
    *  lesson's aids ask for the ghost or the ribbon; null otherwise. */
   shadowTrace: ScenarioTrace | null;
@@ -414,6 +422,12 @@ export default function LessonScene(props: LessonSceneProps) {
                 seed: i,
               }))
           : [];
+        // SURFACE-PATCH slice (AC-07-full aquaplane / AC-08 ice): resolve the
+        // district's authored waterPatch/icePatch spans into district-space
+        // rects for VehicleRig's per-substep grip modulation. DATA-DRIVEN:
+        // the map is the opt-in (no LessonSpec field) — every pre-slice map
+        // resolves to [] and the live physics stays untouched.
+        const gripPatches = resolveSurfaceGripPatches(district);
         // S1: the shadow/ribbon aids need the template's recorded trace.
         let shadowTrace: ScenarioTrace | null = null;
         if (props.lesson.aids?.shadowCar || props.lesson.aids?.pathRibbon) {
@@ -501,6 +515,7 @@ export default function LessonScene(props: LessonSceneProps) {
             spawnPoints,
             ghostDemoRaw,
             scenarioObstacles,
+            gripPatches,
             shadowTrace,
           });
         }
@@ -896,6 +911,12 @@ function ReadyScene({
                   lesson.physics?.wetGrip ? WET_GRIP_FACTOR : 1,
                   lesson.physics?.snowGrip ? SNOW_GRIP_FACTOR : 1,
                 )}
+                // SURFACE-PATCH slice: waterPatch/icePatch rects from the
+                // DISTRICT's authored zone spans (the map is the opt-in) —
+                // VehicleRig modulates the live grip as the chassis crosses
+                // them, MIN-composed with the base gripFactor above. [] on
+                // every pre-slice map.
+                gripPatches={built.gripPatches}
                 // AC-12: the OPT-IN crosswind, same authored-field-only law.
                 // NEGATIVE = the wind blows WEST (world −X = district west,
                 // vehicleSample.ts axis map): on the northbound drill street

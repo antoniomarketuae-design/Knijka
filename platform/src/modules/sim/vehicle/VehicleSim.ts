@@ -181,8 +181,14 @@ export class VehicleSim {
   private readonly controller: DynamicRayCastVehicleController;
 
   private steer = 0;
-  /** Surface grip factor (1 = dry; see VehicleSimOptions.gripFactor). */
-  private readonly gripFactor: number;
+  /** CURRENT surface grip factor (1 = dry; see VehicleSimOptions.gripFactor).
+   *  Mutable ONLY through setSurfaceGripFactor (the surface-patch slice) —
+   *  callers that never touch the setter keep the constructor value for the
+   *  sim's whole life, bit-identically. */
+  private gripFactor: number;
+  /** The LESSON-BASE grip the constructor resolved — what reset() restores
+   *  after a patch diverged the current factor (surface-patch slice). */
+  private readonly baseGripFactor: number;
   /** Constant lateral wind, N along world +X (0 = no wind code path). */
   private readonly windLateralN: number;
   /** Gust sine amplitude, N (0 = constant-only wind). */
@@ -221,6 +227,7 @@ export class VehicleSim {
     // dry car: every use below multiplies by 1.0, which is the IEEE-754
     // identity, so the dry path stays bit-identical (harness-proven).
     this.gripFactor = clamp(options?.gripFactor ?? 1, 0.3, 1);
+    this.baseGripFactor = this.gripFactor;
     // Crosswind (AC-12): defaults keep windActive FALSE, so the update loop
     // never enters the wind branch — the dry/calm path stays bit-identical
     // (no extra rapier calls, no clock advance; crosswind.test.ts is the proof).
@@ -444,9 +451,71 @@ export class VehicleSim {
     c.updateVehicle(dt, undefined, undefined, (col) => col.handle !== this.chassisColliderHandle);
   }
 
+  /**
+   * SURFACE-PATCH slice (doc 72 AC-07-full aquaplane float / AC-08 ice band):
+   * modulate the surface grip at RUNTIME as the chassis crosses an authored
+   * waterPatch/icePatch span. VehicleRig calls this per physics substep with
+   * MIN(lesson base, patch factor) — entering a span applies the patch grip,
+   * leaving it passes the base back (min(base, 1) = base), and the early
+   * return below turns that steady state into zero rapier calls.
+   *
+   * Re-applies EXACTLY the constructor's grip term set and nothing else:
+   *  - per-wheel frictionSlip (FRICTION_SLIP_FRONT/REAR × factor) here;
+   *  - the service-brake and handbrake forces in update() read the SAME
+   *    mutated field every step (BRAKE_FORCE_N / HANDBRAKE_FORCE_N ×
+   *    gripFactor), so they follow automatically;
+   *  - the parking pawl and rolling resistance stay unscaled — they are not
+   *    tyre-limited (the constructor contract, unchanged).
+   *
+   * ADDITIVE LAW: never called (every pre-slice caller — the CI harness, all
+   * shipped lessons) = the field never changes and no code here runs, so the
+   * dynamics stay bit-identical; calling it with the CURRENT value (an
+   * explicit 1 on the dry car, the wet 0.7 base after leaving a patch)
+   * returns BEFORE any rapier call — the same identity. Both are proven by
+   * lock-step trajectory equality in vehicle/surface-grip.test.ts.
+   *
+   * The clamp band [0.05, 1] is DELIBERATELY deeper than the constructor's
+   * 0.3 floor: a whole SESSION below 0.3 grip is undrivable (the constructor
+   * guards that), but a LOCALIZED patch must express standing water / glare
+   * ice honestly — ~0.1–0.2 of dry grip (tuning.AQUAPLANE_PATCH_GRIP_FACTOR /
+   * ICE_PATCH_GRIP_FACTOR run 0.15; measurements in their tuning note).
+   */
+  setSurfaceGripFactor(factor: number): void {
+    if (this.disposed) return;
+    const f = clamp(factor, 0.05, 1);
+    if (f === this.gripFactor) return;
+    this.gripFactor = f;
+    this.applyWheelGrip(f);
+  }
+
+  /** The CURRENT surface grip factor (test/HUD readout; 1 = dry). */
+  get surfaceGripFactor(): number {
+    return this.gripFactor;
+  }
+
+  /** Re-apply tyre μ for a grip factor — the constructor's exact per-wheel
+   *  frictionSlip term (surface-patch slice; see setSurfaceGripFactor). */
+  private applyWheelGrip(f: number): void {
+    const c = this.controller;
+    for (let i = 0; i < WHEEL_COUNT; i++) {
+      const isFront = i === FL || i === FR;
+      c.setWheelFrictionSlip(
+        i,
+        (isFront ? T.FRICTION_SLIP_FRONT : T.FRICTION_SLIP_REAR) * f,
+      );
+    }
+  }
+
   /** Teleport back to spawn with zeroed velocities/forces/filters. */
   reset(): void {
     if (this.disposed) return;
+    // Surface-patch slice: an attempt restart also rewinds the surface state
+    // to the lesson base — GUARDED so untouched rigs (every pre-slice caller)
+    // make zero extra rapier calls here (the bit-identity law).
+    if (this.gripFactor !== this.baseGripFactor) {
+      this.gripFactor = this.baseGripFactor;
+      this.applyWheelGrip(this.baseGripFactor);
+    }
     this.body.setTranslation(this.spawnTranslation, true);
     this.body.setRotation(this.spawnRotation, true);
     this.body.setLinvel({ x: 0, y: 0, z: 0 }, true);

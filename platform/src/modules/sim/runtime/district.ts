@@ -154,6 +154,27 @@ export interface DistrictBounds {
  *                        EMERGENCY_LANE_DRIVING (ЗДвП чл. 58, т. 3), and the
  *                        keep-right detector stops requiring that lane (the
  *                        busLane seam, mirrored).
+ * SURFACE-PATCH slice (AQUAPLANE + ICE — same shape, new kinds, so
+ * meta.zonesVersion stays 1; doc 72 §13 AC-07-full standing water / AC-08 ice
+ * band). UNLIKE every kind above, these are consumed by the PHYSICS RIG, not
+ * the rule-engine tick: worldRuntime deliberately does NOT know them (its
+ * unknown-kind tolerance keeps them inert there — no tick channel exists),
+ * while LessonScene resolves them to district-space rects
+ * (resolveSurfaceGripPatches, runtime/surface.ts) and VehicleRig modulates
+ * the LIVE car's grip as the chassis crosses them (VehicleSim
+ * .setSurfaceGripFactor — MIN with the lesson base grip). Grading needs no
+ * new rule code: the physical outcome (a blown stop objective, a collision,
+ * a drift over the осева) is graded by the shipped machinery.
+ *  - "waterPatch" — STANDING WATER across the span (дълбока вода на
+ *                   платното). SPEED-GATED: bites only at/above
+ *                   `aquaplaneAboveKmh` (above ~65 km/h the tyre stops
+ *                   evacuating the water and floats; below, grip returns —
+ *                   the doc-72 lesson is slow down BEFORE the water).
+ *                   Requires `patchGripFactor` + `aquaplaneAboveKmh`;
+ *                   either absent/malformed = the span is INERT (A12).
+ *  - "icePatch"   — ICE on the exposed span (лед по моста) — constant
+ *                   near-zero grip at ANY speed. Requires `patchGripFactor`;
+ *                   absent/malformed = INERT (A12).
  * Consumers MUST ignore zones with unknown kinds/edge ids (forward compat).
  */
 export type DistrictZoneKind =
@@ -164,7 +185,9 @@ export type DistrictZoneKind =
   | "busLane"
   | "railCrossing"
   | "curveAdvisory"
-  | "emergencyLane";
+  | "emergencyLane"
+  | "waterPatch"
+  | "icePatch";
 
 /**
  * Deterministic barrier timetable of a GUARDED rail crossing (railCrossing +
@@ -223,6 +246,24 @@ export interface DistrictZone {
    * kinds ignore the field.
    */
   advisoryKmh?: number;
+  /**
+   * waterPatch + icePatch only (surface-patch slice): the surface grip factor
+   * INSIDE the span, as a fraction of dry (tuning.AQUAPLANE_PATCH_GRIP_FACTOR
+   * / ICE_PATCH_GRIP_FACTOR = 0.15 — the values live in the map, the
+   * constants stay the documented truth the batteries pin). REQUIRED for the
+   * span to resolve: absent or malformed (non-finite, <= 0, >= 1) makes the
+   * whole span inert (the advisoryKmh tolerance discipline). Other kinds
+   * ignore the field.
+   */
+  patchGripFactor?: number;
+  /**
+   * waterPatch only (surface-patch slice): the aquaplane float speed, km/h —
+   * the patch bites at/above it and is INERT below (the tyre evacuates the
+   * water again; tuning.AQUAPLANE_ABOVE_KMH = 65). REQUIRED for a waterPatch
+   * to resolve: absent/malformed = the span is inert. icePatch (constant
+   * grip at any speed) and every other kind ignore the field.
+   */
+  aquaplaneAboveKmh?: number;
 }
 
 export interface District {

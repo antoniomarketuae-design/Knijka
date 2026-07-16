@@ -1,0 +1,144 @@
+{
+ "format": "district-v1",
+ "meta": {
+  "district": "ac-aqua",
+  "label": "Учебен извънграден път — аквапланинг върху стояща вода (сценарий AC-07)",
+  "mapKind": "scenario-street",
+  "generator": "tools/maps/gen_ac_surface.mjs",
+  "boundsLocalMeters": {
+   "minX": -28.12,
+   "minY": 0,
+   "maxX": 14.125,
+   "maxY": 520
+  },
+  "zonesVersion": 1,
+  "attribution": {
+   "text": "Учебна права улица с участък с влошено сцепление — оригинален параметричен дизайн (без данни от OpenStreetMap)",
+   "license": "All rights reserved",
+   "licenseUrl": "/",
+   "copyrightUrl": "/",
+   "obligation": "none — original work, no ODbL attribution required for this map"
+  },
+  "defaults": {
+   "maxspeedUrbanKmh": 90,
+   "note": "Прав извънградски път (90 км/ч): при [240, 280] м платното е покрито със стояща вода — над ~65 км/ч гумите изплуват (аквапланинг), под тази скорост сцеплението се връща."
+  },
+  "stats": {
+   "roadKm": 0.52,
+   "nodes": 2,
+   "edges": 1,
+   "intersections": 0,
+   "crossings": 0,
+   "buildings": 1,
+   "spawnPoints": 2,
+   "zones": 1
+  },
+  "scenario": {
+   "archetype": "straight-street",
+   "params": {
+    "lengthM": 520,
+    "maxspeedKmh": 90
+   },
+   "lanesPerDirection": 1,
+   "laneCenterRightM": 4.06
+  }
+ },
+ "roads": {
+  "nodes": [
+   {
+    "id": "ac-aqua-n-end",
+    "x": 0,
+    "y": 520
+   },
+   {
+    "id": "ac-aqua-n-start",
+    "x": 0,
+    "y": 0
+   }
+  ],
+  "edges": [
+   {
+    "id": "ac-aqua-e-street",
+    "from": "ac-aqua-n-start",
+    "to": "ac-aqua-n-end",
+    "class": "unclassified",
+    "name": "Прав извънградски път със стояща вода на платното",
+    "oneway": false,
+    "roundabout": false,
+    "lanes": 2,
+    "lanesSource": "tag",
+    "maxspeed": 90,
+    "maxspeedSource": "tag",
+    "length": 520,
+    "geometry": [
+     [
+      0,
+      0
+     ],
+     [
+      0,
+      520
+     ]
+    ]
+   }
+  ]
+ },
+ "intersections": [],
+ "crossings": [],
+ "roundabouts": [],
+ "buildings": [
+  {
+   "id": "ac-aqua-b-block",
+   "height": 6,
+   "heightSource": "default",
+   "footprint": [
+    [
+     -28.12,
+     110
+    ],
+    [
+     -16.12,
+     110
+    ],
+    [
+     -16.12,
+     128
+    ],
+    [
+     -28.12,
+     128
+    ]
+   ]
+  }
+ ],
+ "spawnPoints": [
+  {
+   "id": "ac-aqua-spawn-approach",
+   "x": 4.06,
+   "y": 15,
+   "heading": 0,
+   "edgeId": "ac-aqua-e-street",
+   "name": "Начало на отсечката"
+  },
+  {
+   "id": "ac-aqua-spawn-finish",
+   "x": 4.06,
+   "y": 505,
+   "heading": 0,
+   "edgeId": "ac-aqua-e-street",
+   "name": "Контролна точка — край на отсечката"
+  }
+ ],
+ "zones": [
+  {
+   "id": "ac-aqua-z-water",
+   "kind": "waterPatch",
+   "edgeId": "ac-aqua-e-street",
+   "fromM": 240,
+   "toM": 280,
+   "signRef": "А15",
+   "patchGripFactor": 0.15,
+   "aquaplaneAboveKmh": 65
+  }
+ ]
+}

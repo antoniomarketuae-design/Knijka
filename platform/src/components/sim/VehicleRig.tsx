@@ -32,6 +32,7 @@ import {
 } from "@/modules/sim/vehicle";
 import type { SimInput } from "@/modules/sim/engine";
 import type { VehicleSample } from "@/modules/sim/contracts";
+import { surfacePatchGripAt, type SurfaceGripPatch } from "@/modules/sim/runtime";
 import type { CabinControls } from "./cabin";
 import type { SimAudio } from "./simAudio";
 import { updateVehicleSample } from "./vehicleSample";
@@ -77,6 +78,11 @@ export interface VehicleSpawn {
  *  street nudge-tolerance stays 10 everywhere else. */
 export const COLLISION_MIN_KMH = 10;
 
+/** Stable empty default for gripPatches — a shared frozen constant so the
+ *  prop is value-stable across renders and the patch branch below never runs
+ *  for the (default) patch-less lessons. */
+const NO_GRIP_PATCHES: readonly SurfaceGripPatch[] = Object.freeze([]);
+
 export function VehicleRig({
   simRef,
   chassisGroupRef,
@@ -91,6 +97,7 @@ export function VehicleRig({
   collisionMinKmh = COLLISION_MIN_KMH,
   night = false,
   gripFactor = 1,
+  gripPatches = NO_GRIP_PATCHES,
   windLateralN = 0,
   windGustAmplitudeN = 0,
   windGustPeriodSec = 0,
@@ -129,6 +136,17 @@ export function VehicleRig({
    *  environment.rain/snow (shipped weather lessons were tuned dry — the
    *  flag is authored per scenario). */
   gripFactor?: number;
+  /** SURFACE-PATCH slice (doc 72 AC-07-full aquaplane / AC-08 ice) — OPT-IN
+   *  waterPatch/icePatch rects resolved by LessonScene from the district's
+   *  authored zone spans (runtime resolveSurfaceGripPatches). Per physics
+   *  substep the rig checks the chassis position against them
+   *  (surfacePatchGripAt — the water rects are speed-gated) and feeds
+   *  VehicleSim.setSurfaceGripFactor(MIN(gripFactor, patch)) — entering a
+   *  patch drops the grip, leaving it restores the lesson base. Empty
+   *  (default, every pre-slice map) = the branch below never runs and the
+   *  setter is NEVER called — bit-identical dynamics (the wet-grip law;
+   *  vehicle/surface-grip.test.ts is the proof). */
+  gripPatches?: readonly SurfaceGripPatch[];
   /** CROSSWIND slice (doc 72 AC-12) — OPT-IN constant lateral wind force, N
    *  along WORLD +X (district east; negative = west). 0 (default, every
    *  existing lesson) = the wind branch never runs, bit-identical dynamics;
@@ -192,6 +210,21 @@ export function VehicleRig({
   useBeforePhysicsStep(() => {
     const sim = simRef.current;
     if (!sim) return;
+    // SURFACE-PATCH slice: modulate grip from the authored waterPatch/icePatch
+    // rects BEFORE the step consumes it. District mapping (vehicleSample.ts):
+    // district x = world x, district y = −world z. Composition: MIN(lesson
+    // base, patch) — most restrictive wins; outside every rect the MIN is the
+    // base and the setter's early return makes this a no-op. The whole branch
+    // is skipped when no patches exist (every pre-slice lesson) — the setter
+    // is then never called at all (the bit-identity law).
+    if (gripPatches.length > 0) {
+      const body = bodyRef.current;
+      if (body) {
+        const t = body.translation();
+        const patchGrip = surfacePatchGripAt(gripPatches, t.x, -t.z, sim.speedKmh);
+        sim.setSurfaceGripFactor(Math.min(gripFactor, patchGrip));
+      }
+    }
     const raw = inputRef.current?.read() ?? IDLE_INPUT;
     const mode = difficultyRef?.current ?? DEFAULT_DIFFICULTY;
     // Shape input for the learner mode (throttle/governor/steer smoothing) —

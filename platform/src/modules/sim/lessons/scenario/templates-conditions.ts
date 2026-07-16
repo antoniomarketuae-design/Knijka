@@ -913,6 +913,297 @@ export const SC_AC_CROSSWIND: ScenarioSpec = {
   localeBg: "bg-BG",
 };
 
+// ---------------------------------------------------------------------------
+// 8. sc-ac-aquaplane — „Аквапланинг" (AC-07-full standing-water slice) on
+//    ac-aqua-v1 (520 m extra-urban 90 road, DAY RAIN, WET-GRIP PHYSICS + the
+//    FIRST waterPatch span — the surface-patch unlock)
+// ---------------------------------------------------------------------------
+
+/** The stop mark of sc-ac-aquaplane: the shadow eases to a full stop here,
+ *  ~5.7 m short of the broken-down van at y = 460 (the wet-braking spacing,
+ *  reused verbatim — nose 452.02 vs the van's rear face at 457.75).
+ *  Denormalized from ac-aqua-v1 (lane x = 4.06). */
+const AQUA_STOP_MARK_Y = 450;
+
+/**
+ * AC-07-full (the standing-water float) — аквапланинг върху дълбока вода
+ * (ЗДвП чл. 20, ал. 2: скоростта се съобразява със състоянието на пътя и
+ * атмосферните условия; при аквапланинг нито спирачка, нито волан достигат
+ * асфалта — спасението е превантивно).
+ *
+ * THE SPEED GATE IS THE LESSON (the first waterPatch template — the
+ * surface-patch slice on TOP of the shipped wet-grip seam):
+ *  - `physics.wetGrip` runs the LIVE car at tuning.WET_GRIP_FACTOR (0.7) —
+ *    the whole road is wet (rain), the shipped 4a seam;
+ *  - the MAP carries the hazard: ac-aqua-v1's `waterPatch` span [240, 280]
+ *    (patchGripFactor 0.15, aquaplaneAboveKmh 65 — tuning.AQUAPLANE_*).
+ *    LessonScene resolves it (resolveSurfaceGripPatches) and VehicleRig
+ *    drops the LIVE car's grip to MIN(0.7, 0.15) = 0.15 while the chassis
+ *    crosses it AT OR ABOVE 65 km/h — above the float speed the tyres stop
+ *    evacuating the water (doc 72 AC-07); below it the patch does NOT bite,
+ *    so the taught ~55 km/h transit keeps real wet grip. Measured: at 0.15
+ *    braking distance grows ≈ 5.5× and steering answers ≈ 0.14× of dry
+ *    (vehicle/surface-grip.test.ts) — inside the water nothing works, which
+ *    is exactly why the ONLY correct act happens BEFORE it.
+ *  - DUAL-CHANNEL HONESTY (the 4a law): the recorded demos are KINEMATIC, so
+ *    the float is AUTHORED — the mistakes carry speed through the span
+ *    unbraked (in the water no ramp exists at all) and pay after it (a
+ *    WET_DECEL overrun into the van / the authored drift onto the осева);
+ *    the shadow's ramps stay at SCRIPT_DECEL × WET_GRIP_FACTOR.
+ *  - NO NEW RULE CODE (the crosswind discipline): the float's consequences
+ *    grade through shipped machinery — COLLISION into the staged van,
+ *    CENTER_LINE_TOUCHED for the drift, SPEED_TOO_FAST_FOR_CONDITIONS for
+ *    the dry-limit habit in rain.
+ *  - HONEST VISUAL SCOPE (stated, not hidden): no water decal/reflection
+ *    asset ships in this slice (the snow/crosswind precedent) — the copy,
+ *    the shadow ghost, the ribbon and the objective markers narrate WHERE
+ *    the standing water is; the LIVE physics change is fully real.
+ * Like the wet/snow molds, the broken-down van is a RECORDER obstacle rect
+ * (trace channel), not a live prop — the live student's graded skill is the
+ * pre-water slow-down zone + the low-speed stop mark; the collision
+ * consequence is demonstrated by the red ghosts.
+ */
+export const SC_AC_AQUAPLANE: ScenarioSpec = {
+  id: "sc-ac-aquaplane",
+  family: "conditions",
+  tagsBg: ["условия", "дъжд", "аквапланинг", "стояща вода", "съобразена скорост"],
+  titleBg: "Аквапланинг",
+  objectiveBg:
+    "Мини участъка със стояща вода на извънградския път: намали под 60 км/ч ПРЕДИ водата, прекоси я с равна газ и прав волан и спри плавно на позицията зад авариралия автомобил — над ~65 км/ч гумите изплуват и нито спирачката, нито воланът работят.",
+  archetypeIds: ["AC-07"],
+  conceptIds: ["c-rain-aquaplaning", "c-speed-adaptation", "c-braking-distance"],
+  map: {
+    archetype: "straight-street",
+    // The generator recipe — mirrored in ac-aqua-v1.json meta.scenario.params
+    // (tools/maps/gen_ac_surface.mjs).
+    params: { lengthM: 520, maxspeedKmh: 90 },
+    districtId: "ac-aqua-v1",
+  },
+  start: {
+    spawnPointId: "ac-aqua-spawn-approach",
+    vehicleStart: "ready",
+  },
+  instructionsBg: [
+    { n: 1, textBg: "Вали от часове: включи късите светлини и потегли — извън населено място ограничението е 90, но дъждът сваля разумната скорост до около 70." },
+    {
+      n: 2,
+      textBg:
+        "Напред в ниското платното е покрито със стояща вода. Над ~65 км/ч гумите не смогват да изхвърлят водата и „изплуват“ — това е аквапланинг: воланът олеква и колата не слуша нищо.",
+    },
+    {
+      n: 3,
+      textBg:
+        "Затова намали ПРЕДИ водата — под 60 км/ч, само с плавно отпускане на газта и мека спирачка още на чистия асфалт.",
+    },
+    {
+      n: 4,
+      textBg:
+        "Във водата: равна газ, прав волан, никаква спирачка. Под скоростта на изплуване протекторът изхвърля водата и сцеплението остава при теб.",
+    },
+    { n: 5, textBg: "След водата има аварирал автомобил: спри напълно на маркираната позиция зад него — мокрият спирачен път е ~1,4 пъти по-дълъг." },
+  ],
+  success: [
+    {
+      id: "sc-acq-before",
+      titleBg: "Намали под 60 ПРЕДИ водата",
+      // Cap 58 sits UNDER the 65 km/h float speed with margin: a car that
+      // passes here at 58 or less physically cannot aquaplane in the span.
+      // The dry-habit 85+ (and the „lawful" 72) blow this zone.
+      params: { kind: "reachZone", x: LANE_X, y: 225, radiusM: 10, maxSpeedKmh: 58 },
+    },
+    {
+      id: "sc-acq-mark",
+      titleBg: "Спри точно на позицията зад авариралия",
+      // Completable ONLY at near-stop speed (the pk-smooth-stop discipline):
+      // a car that floated through the water arrives here without the meters
+      // it needed — on wet physics it cannot rest at the mark.
+      params: { kind: "reachZone", x: LANE_X, y: AQUA_STOP_MARK_Y, radiusM: 4, maxSpeedKmh: 6 },
+    },
+  ],
+  rubric: { parTimeSec: 75 },
+  // RECORDED: committed deterministic recordings of the authored scripts in
+  // traces/scAcAquaplane.ts; gates in traces/__tests__/
+  // sc-ac-aquaplane-traces.test.ts (re-record with RECORD_TRACES=1).
+  shadow: { path: "content/traces/sc-ac-aquaplane/shadow-correct.trace.json" },
+  mistakes: [
+    {
+      traceRef: { path: "content/traces/sc-ac-aquaplane/mistake-full-speed.trace.json" },
+      titleBg: "Полет във водата — 85 в дъжда",
+      whatWentWrongBg:
+        "Колата носеше 85 км/ч в пороя — несъобразена с дъжда скорост — и влетя в стоящата вода далеч над скоростта на изплуване: гумите заплуваха, спирачката и воланът престанаха да съществуват, а асфалтът се върна чак след водата — твърде късно за спиране зад авариралия. Ударът беше неизбежен още ПРЕДИ водата (чл. 20, ал. 2).",
+      codeRefs: ["COLLISION", "SPEED_TOO_FAST_FOR_CONDITIONS"],
+    },
+    {
+      traceRef: { path: "content/traces/sc-ac-aquaplane/mistake-float-drift.trace.json" },
+      titleBg: "„В нормата съм“ — 72 върху водата",
+      whatWentWrongBg:
+        "Скоростта уж беше съобразена с дъжда — но над скоростта на изплуване: върху водата предницата „заплува“, колата се понесе косо към осевата линия и я язди секунди наред срещу насрещното, докато водата свърши. Правилото не е „малко по-бавно“, а ПОД скоростта на изплуване — тук под 60 (чл. 20, ал. 2).",
+      codeRefs: ["CENTER_LINE_TOUCHED"],
+    },
+  ],
+  teach: {
+    whenBg:
+      "При силен дъжд и навсякъде, където водата се събира: ниските участъци, коловозите на изтъркан асфалт, страничната лента до бордюра, локвите след буря. Правилото е желязно: видиш ли стояща вода — намали ПРЕДИ нея, под скоростта на изплуване (за обикновени гуми ~60–70 км/ч, по-малко при изтъркан протектор).",
+    whyBg:
+      "Протекторът е помпа: до определена скорост той изхвърля водата изпод гумата, над нея водният клин повдига колата и тя се носи по водата като шейна — нула спирачка, нула волан, нула сцепление. В аквапланинг НИЩО не помага: рязката спирачка и завъртеният волан само подготвят занасянето за мига, в който гумите отново докоснат асфалт. Затова цялото умение е превантивно — по-ниска скорост преди водата, равна газ и прав волан в нея (чл. 20, ал. 2).",
+    lawRef: "ЗДвП чл. 20, ал. 2",
+    examinerBg:
+      "Изпитващият следи дали „четеш“ платното напред: при стояща вода очаква осезаемо намаляване ПРЕДИ участъка, спокойни ръце върху волана и никакво спиране във водата. Несъобразената с мокрия път скорост е грешка, а ударът в препятствие прекратява изпита.",
+  },
+  levels: [
+    { level: 1 },
+    { level: 2 },
+    { level: 3 },
+    { level: 4, vehicleStart: "cold" },
+  ],
+  conditions: { weather: "rain" },
+  // THE SLICE: the live car runs wet-grip physics (opt-in, authored); the
+  // waterPatch itself is MAP DATA — the district is the second opt-in.
+  physics: { wetGrip: true },
+  localeBg: "bg-BG",
+};
+
+// ---------------------------------------------------------------------------
+// 9. sc-ac-ice — „Лед по моста" (AC-08 ice band) on ac-ice-v1 (360 m street,
+//    limit 50, COLD CLEAR MORNING — day, dry, NO physics flag: the icePatch
+//    span in the map data is the whole hazard)
+// ---------------------------------------------------------------------------
+
+/** The stop mark of sc-ac-ice: the shadow crawls to a full stop here, ~5.7 m
+ *  short of the stalled car at y = 290 (nose 282.02 vs its rear face at
+ *  287.75) — ON the icy span [210, 300], which is why the approach must
+ *  already be crawling. Denormalized from ac-ice-v1 (lane x = 4.06). */
+const ICE_STOP_MARK_Y = 280;
+
+/**
+ * AC-08 (ice band) — лед по открит участък в ясна студена сутрин (ЗДвП чл. 20,
+ * ал. 2: скоростта се съобразява със СЪСТОЯНИЕТО НА ПЪТЯ — и невидимото;
+ * знакът А15 „Опасност от хлъзгане" в разказа предупреждава, но истинският
+ * урок е да очакваш лед там, където пътят е открит: мостове, надлези, сенки).
+ *
+ * THE MAP IS THE WHOLE HAZARD (the first icePatch template — and the first
+ * template whose reduced grip arrives PURELY through district data):
+ *  - NO physics flag is authored (base grip 1 — clear, dry, cold morning;
+ *    contrast sc-ac-aquaplane's wetGrip base) and NO weather tag (dry day —
+ *    ice on a bridge deck under a blue sky IS the doc-72 surprise);
+ *  - ac-ice-v1's `icePatch` span [210, 300] (patchGripFactor 0.15 —
+ *    tuning.ICE_PATCH_GRIP_FACTOR) is resolved by LessonScene and applied
+ *    by VehicleRig: MIN(1, 0.15) = 0.15 on the span, at ANY speed (ice has
+ *    no float gate). Measured: braking ≈ 5.5× longer, steering ≈ 0.14×
+ *    (vehicle/surface-grip.test.ts) — on the ice the car answers almost
+ *    nothing, so every input must be tiny and everything decided BEFORE
+ *    the bridge.
+ *  - DUAL-CHANNEL HONESTY: the demos are kinematic — the mistakes' slides
+ *    are AUTHORED (the brake-on-ice ramp runs SCRIPT_DECEL ×
+ *    ICE_PATCH_GRIP_FACTOR ≈ 0.69 m/s² and STILL cannot stop the car; the
+ *    harsh-steer slide glides wide past the stalled car), the shadow's
+ *    on-ice stop uses the same honest ≈0.69 envelope started absurdly early.
+ *  - NO NEW RULE CODE: COLLISION into the staged car and POOR_LANE_KEEPING
+ *    for the sliding swerve — shipped detectors only.
+ *  - HONEST VISUAL SCOPE: no ice sheen decal ships (the snow precedent) —
+ *    invisibility is not a descope here but the POINT of black ice; the
+ *    copy, the А15 story and the ghosts carry the warning.
+ */
+export const SC_AC_ICE: ScenarioSpec = {
+  id: "sc-ac-ice",
+  family: "conditions",
+  tagsBg: ["условия", "лед", "зимни условия", "плавни движения", "мостове"],
+  titleBg: "Лед по моста",
+  objectiveBg:
+    "Ясна студена сутрин — а откритият участък на моста е заледен: намали до пълзене ПРЕДИ моста, мини по леда с равна газ и прав волан и спри свръхплавно на позицията зад закъсалия автомобил — върху лед спирачката и воланът почти не съществуват.",
+  archetypeIds: ["AC-08"],
+  conceptIds: ["c-winter-ice", "c-braking-distance", "c-general-care-duty"],
+  map: {
+    archetype: "straight-street",
+    // The generator recipe — mirrored in ac-ice-v1.json meta.scenario.params
+    // (tools/maps/gen_ac_surface.mjs).
+    params: { lengthM: 360, maxspeedKmh: 50 },
+    districtId: "ac-ice-v1",
+  },
+  start: {
+    spawnPointId: "ac-ice-spawn-approach",
+    vehicleStart: "ready",
+  },
+  instructionsBg: [
+    { n: 1, textBg: "Ясно и студено е — минус градуси след влажна нощ. Знакът А15 „Опасност от хлъзгане“ преди моста не е украса: откритите участъци замръзват първи." },
+    {
+      n: 2,
+      textBg:
+        "Мостът няма топла земя отдолу — платното му е заледено, макар улицата да е суха. Намали до около 25 км/ч ОЩЕ ПРЕДИ моста, на чистия асфалт.",
+    },
+    {
+      n: 3,
+      textBg:
+        "Върху леда сцеплението е около 15% от сухото: никаква рязка спирачка, никакво рязко завъртане — равна газ и прав волан.",
+    },
+    {
+      n: 4,
+      textBg:
+        "На моста е закъсал автомобил — подхлъзнал се е преди теб. Започни да спираш многократно по-рано, с едва докосната спирачка.",
+    },
+    { n: 5, textBg: "Спри напълно на маркираната позиция зад него и задръж колата — плавността е цялото умение." },
+  ],
+  success: [
+    {
+      id: "sc-aci-before",
+      titleBg: "Намали до пълзене ПРЕДИ моста",
+      // Cap 30: the winter crawl must be established on the DRY approach —
+      // slowing ON the ice is exactly what the 0.15 grip cannot deliver.
+      params: { kind: "reachZone", x: LANE_X, y: 190, radiusM: 10, maxSpeedKmh: 30 },
+    },
+    {
+      id: "sc-aci-mark",
+      titleBg: "Спри свръхплавно на позицията зад закъсалия",
+      // ON the icy span (the stalled car stands where it slid to a stop) —
+      // completable only by a crawl with an absurdly early, feather-light
+      // brake; any dry habit blows through at speed.
+      params: { kind: "reachZone", x: LANE_X, y: ICE_STOP_MARK_Y, radiusM: 4, maxSpeedKmh: 6 },
+    },
+  ],
+  rubric: { parTimeSec: 90 },
+  // RECORDED: committed deterministic recordings of the authored scripts in
+  // traces/scAcIce.ts; gates in traces/__tests__/sc-ac-ice-traces.test.ts
+  // (re-record with RECORD_TRACES=1).
+  shadow: { path: "content/traces/sc-ac-ice/shadow-correct.trace.json" },
+  mistakes: [
+    {
+      traceRef: { path: "content/traces/sc-ac-ice/mistake-brake-on-ice.trace.json" },
+      titleBg: "Спирачка върху леда",
+      whatWentWrongBg:
+        "Улицата е суха и колата носи 50 — а мостът е заледен. Водачът видя закъсалия автомобил и натисна спирачката ВЪРХУ леда: при 15% сцепление тя почти не забавя и колата се плъзна десетки метри право в спрелия — ударът дойде с около 40 км/ч. Върху лед се пристига бавно: намаляването става ПРЕДИ открития участък, на чист асфалт (чл. 20, ал. 2).",
+      codeRefs: ["COLLISION"],
+    },
+    {
+      traceRef: { path: "content/traces/sc-ac-ice/mistake-harsh-steer.trace.json" },
+      titleBg: "Рязък волан върху леда",
+      whatWentWrongBg:
+        "Вместо спирачка — паническо дръпване на волана: върху леда завъртяното колело не води, а ПОДНАСЯ. Колата се плъзна косо покрай закъсалия на сантиметри, олюлявайки се чак до бордюра, и се събра в лентата едва след моста. Оцеляването ѝ беше късмет, не умение — на лед всяко движение е малко и плавно, а скоростта пада преди моста.",
+      codeRefs: ["POOR_LANE_KEEPING"],
+    },
+  ],
+  teach: {
+    whenBg:
+      "Във всяка студена сутрин след влажна нощ — и винаги на откритите места: мостове, надлези, крайречни участъци, сенките на сгради и дървета. Мостът замръзва пръв, защото няма топла земя под платното. Знакът А15 и термометърът около нулата значат едно: смъкни скоростта ПРЕДИ открития участък и мини по него без нито едно рязко движение.",
+    whyBg:
+      "Ледът оставя на гумите около 10–20% от сухото сцепление — спирачният път от 40 км/ч става колкото сухият от 100, а завъртеният волан не завива, а отключва занасяне. Най-коварното е, че ледът не се вижда: пътят изглежда сух, докато мостът лъщи под същото синьо небе. Затова законът връзва скоростта със СЪСТОЯНИЕТО на пътя, не с изгледа му (чл. 20, ал. 2) — който очаква леда там, където той се ражда, пристига върху него бавно и с прав волан.",
+    lawRef: "ЗДвП чл. 20, ал. 2",
+    examinerBg:
+      "Изпитващият очаква „зимно четене“ на пътя: разпознат риск от заледяване, намаляване преди открития участък, меки команди и многократно по-ранно спиране. Рязката спирачка или воланът върху лед е грешка в преценката, а плъзгането в препятствие прекратява изпита.",
+  },
+  levels: [
+    { level: 1 },
+    { level: 2 },
+    { level: 3 },
+    { level: 4, vehicleStart: "cold" },
+  ],
+  // A COLD CLEAR MORNING: day, dry, no weather render — the ice is the map's
+  // own data (icePatch span), never a weather tag. NO physics flag either:
+  // the base grip stays 1 and ONLY the span reduces it (the first pure
+  // map-data grip template).
+  conditions: { weather: "dry" },
+  localeBg: "bg-BG",
+};
+
 /** The adverse-conditions-family templates, in catalog order (registered in
  *  templates.ts). */
 export const SCENARIO_TEMPLATES_CONDITIONS: readonly ScenarioSpec[] = [
@@ -923,4 +1214,6 @@ export const SCENARIO_TEMPLATES_CONDITIONS: readonly ScenarioSpec[] = [
   SC_AC_FOG,
   SC_AC_SNOW,
   SC_AC_CROSSWIND,
+  SC_AC_AQUAPLANE,
+  SC_AC_ICE,
 ];
