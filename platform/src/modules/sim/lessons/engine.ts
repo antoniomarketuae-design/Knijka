@@ -90,7 +90,9 @@ export function createLessonSession(
     preDrive: lesson.preDrive
       ? createPreDriveMachine({ isNight, mode: lesson.preDriveMode ?? "instruction" })
       : null,
-    rules: createRuleEngine(opts.ruleConfig),
+    // The compiled lesson's ruleConfig (scenario drills for config-gated
+    // detectors) is the base; explicit opts win over it.
+    rules: createRuleEngine({ ...lesson.ruleConfig, ...opts.ruleConfig }),
     objectives,
     evalStates: objectives.map((o) => createEvalState(o.params)),
     currentObjectiveIndex: 0,

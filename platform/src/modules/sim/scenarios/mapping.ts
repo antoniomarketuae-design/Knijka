@@ -30,6 +30,9 @@ const CODE_TO_SCENARIO: Record<string, string> = {
   STANDSTILL_GAP_TOO_CLOSE: "ev-following-distance",
   HIGH_BEAM_NOT_DIPPED: "ev-lights-usage",
   OVERTAKING_AT_CROSSING: "ev-ped-crossing-marked",
+  // B1a Wave-3 detector pack (doc 72 capability 1)
+  JUNCTION_SCAN_INCOMPLETE: "ev-stop-sign",
+  FOLLOWING_TOO_CLOSE_FOR_RAIN: "ev-following-distance",
 };
 
 /** Scenario event id for a catalog code, or null when it maps to no scenario. */

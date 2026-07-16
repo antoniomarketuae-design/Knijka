@@ -157,6 +157,9 @@ export interface RuleEngineState {
   standstillGap: EpisodeState;
   /** Long beam left on behind a lead vehicle at night (AC-04). */
   highBeamDip: EpisodeState;
+  // -- B1a Wave-3 detector pack (doc 72 capability 1) — config-gated drills --
+  /** Following under the WET-prudent gap while it rains (FO-04; config-gated). */
+  followingRain: EpisodeState;
 }
 
 const IDLE_EPISODE: EpisodeState = { activeSince: null, emitted: false };
@@ -198,6 +201,7 @@ export function createRuleEngine(config?: Partial<RuleEngineConfig>): RuleEngine
     lastHazardEventAt: null,
     standstillGap: { ...IDLE_EPISODE },
     highBeamDip: { ...IDLE_EPISODE },
+    followingRain: { ...IDLE_EPISODE },
   };
 }
 
@@ -228,6 +232,7 @@ function cloneState(s: RuleEngineState): RuleEngineState {
     moveOff: { ...s.moveOff },
     standstillGap: { ...s.standstillGap },
     highBeamDip: { ...s.highBeamDip },
+    followingRain: { ...s.followingRain },
   };
 }
 
@@ -581,6 +586,32 @@ export function reduceTick(prev: RuleEngineState, tick: SimTick): ReduceResult {
     events.push(makeViolation("FOLLOWING_TOO_CLOSE", t));
   }
 
+  // Rain-aware following (FO-04 — „дистанция в дъжд"; config-gated per-lesson
+  // drill). In rain the braking distance grows ~1.5×, so the prudent gap does
+  // too. This fires ONLY in the band that is fine for DRY (the base основна
+  // FOLLOWING_TOO_CLOSE stays silent — gap ≥ its fire threshold) but under the
+  // WET-prudent gap — the direct analogue of SPEED_TOO_FAST_FOR_CONDITIONS
+  // sitting under the graced limit. The same cut-in recovery guard applies
+  // (a gap the driver is re-opening is not tailgating; A12). SHIPPED OFF: the
+  // exam-bot never widens its time-gap in rain, so a default-on grade would
+  // flag its innocent rainy drives — enabled per-lesson only.
+  const rainSafeGapM = Math.max(
+    cfg.followMinGapM,
+    (speed / 3.6) * cfg.followSafeSeconds * cfg.followRainSecondsFactor,
+  );
+  const tailgatingRain =
+    cfg.followRainAwareEnabled &&
+    raining &&
+    moving &&
+    speed >= cfg.followMinSpeedKmh &&
+    leadGapM !== null &&
+    leadGapM >= safeGapM * cfg.followFireRatio && // the base основна is NOT firing (no double-bill)
+    leadGapM < rainSafeGapM * cfg.followFireRatio &&
+    gapOpeningMps < cfg.followRecoveryRateMps;
+  if (stepEpisode(s.followingRain, tailgatingRain, !tailgatingRain, t, cfg.followRainSustainSec)) {
+    events.push(makeViolation("FOLLOWING_TOO_CLOSE_FOR_RAIN", t));
+  }
+
   // Wrong way against a one-way street (runtime sets tick.wrongWay). Reverse
   // gear is exempt (A12): reversing into a parking spot moves against the
   // flow by definition and is judged as a maneuver, not as wrong-way driving.
@@ -838,6 +869,7 @@ export function reduceTick(prev: RuleEngineState, tick: SimTick): ReduceResult {
     s.harshBrake,
     s.standstillGap,
     s.highBeamDip,
+    s.followingRain,
   ].some((ep) => ep.emitted && ep.activeSince !== null);
   if (events.some((e) => e.kind === "violation")) {
     s.cleanDistanceM = 0; // any fresh mistake resets the streak
@@ -893,6 +925,24 @@ function handleTickEvent(
           ? makeCommendation("FULL_STOP_AT_STOP_SIGN", t)
           : makeViolation("STOP_SIGN_NO_FULL_STOP", t),
       );
+      // JU-23 „един поглед не стига" — the junction-scan lookback (config-gated
+      // per-lesson drill). Crossing the Б2 line demands a FRESH ляво-дясно scan;
+      // the glance trackers were updated this same tick (step 1, before this
+      // handler). A left AND a right glance must each fall within the lookback.
+      // This is a DISTINCT fault from the full-stop grade above (a rolling stop
+      // can also skip the scan) — the "looked but failed to see" observation
+      // quality the doc grades separately. SHIPPED OFF (see types.ts): the A12
+      // whole-commute crosses a Б2 unglanced and must stay innocent by default.
+      if (cfg.junctionScanObservationEnabled) {
+        const lg = s.lastGlanceAt.left;
+        const rg = s.lastGlanceAt.right;
+        const scanned =
+          lg !== null &&
+          t - lg <= cfg.junctionScanLookbackSec &&
+          rg !== null &&
+          t - rg <= cfg.junctionScanLookbackSec;
+        if (!scanned) out.push(makeViolation("JUNCTION_SCAN_INCOMPLETE", t));
+      }
       break;
     }
 

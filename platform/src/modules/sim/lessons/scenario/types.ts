@@ -11,6 +11,7 @@
  */
 
 import type { LessonAidsSpec, StagedEventSpec } from "../../contracts";
+import type { RuleEngineConfig } from "../../rules";
 import type { ObjectiveParams } from "../types";
 
 // ---------------------------------------------------------------------------
@@ -308,6 +309,14 @@ export interface ScenarioSpec {
   staged?: StagedEventSpec[];
   /** Template-wide base conditions (levels may override). */
   conditions?: ConditionAxis;
+  /**
+   * Per-drill rule-engine config, propagated by compileScenario to the
+   * LessonSpec so the LIVE student session grades this drill's taught fault.
+   * Needed by drills for config-gated detectors (default-OFF so they never
+   * touch the exam bank / free-drive): the recorder enables it for the shadow;
+   * this makes the student's own attempt grade too.
+   */
+  ruleConfig?: Partial<RuleEngineConfig>;
   /** Bulgaria is the product (doc 76 §0 — locale from day one, no country packs). */
   localeBg: "bg-BG";
 }

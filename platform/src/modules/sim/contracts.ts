@@ -11,7 +11,7 @@
  * frame contract — runtime produces it, nothing else redefines it.
  */
 
-import type { SimTick } from "./rules/types";
+import type { RuleEngineConfig, SimTick } from "./rules/types";
 import type { PreDriveMode } from "./procedures/types";
 
 /**
@@ -142,6 +142,15 @@ export interface LessonSpec {
   objectives: LessonObjective[];
   /** Optional time-of-day/weather override. */
   environment?: { timeOfDay?: "day" | "dusk" | "night"; rain?: boolean };
+  /**
+   * Per-lesson rule-engine config override (merged over DEFAULT_RULE_CONFIG;
+   * createLessonSession opts win over this). Scenario drills for config-gated
+   * detectors (e.g. JUNCTION_SCAN_INCOMPLETE, FOLLOWING_TOO_CLOSE_FOR_RAIN,
+   * default-OFF so they never touch the exam bank / free-drive) set it here so
+   * the LIVE student session grades the taught fault — not only the recorded
+   * shadow. compileScenario propagates it from ScenarioSpec.ruleConfig.
+   */
+  ruleConfig?: Partial<RuleEngineConfig>;
   /** Marked parking bay this lesson's park objective targets (L7). The world
    * paints every lesson-authored bay by default (buildWorldGeometry ←
    * LESSON_PARKING_BAYS from lessons/specs). */

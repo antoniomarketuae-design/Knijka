@@ -17,7 +17,14 @@
 
 import type { StagedEventOutcome, StagedEventSpec, VehicleSample } from "../contracts";
 import { createScenarioDirector } from "../orchestrator";
-import { createRuleEngine, reduceTick, type HeadlightState, type RuleEvent, type SimTick } from "../rules";
+import {
+  createRuleEngine,
+  reduceTick,
+  type HeadlightState,
+  type RuleEngineConfig,
+  type RuleEvent,
+  type SimTick,
+} from "../rules";
 import { createWorldRuntime } from "../runtime";
 import { createTrafficSystem } from "../traffic/system";
 import type { TrafficDistrict } from "../traffic/types";
@@ -339,6 +346,15 @@ export interface RecordScriptedDriveOptions {
    * exercises objectives/coach/wire exactly like a live drive.
    */
   onTick?: (tick: SimTick) => void;
+  /**
+   * Rule-engine config override for the recorder's INTERNAL grader (the
+   * `ruleEvents` innocence/§9 channel only — the serialized trace bytes never
+   * depend on it). A lesson that DRILLS a config-gated detector
+   * (moveOffObservation, junctionScanObservation, followRainAware…) passes the
+   * enabling override here so its shadow/mistake demos grade through exactly
+   * the config the live lesson would run. Absent = DEFAULT_RULE_CONFIG.
+   */
+  ruleConfig?: Partial<RuleEngineConfig>;
 }
 
 export interface RecordedDrive {
@@ -476,7 +492,7 @@ export function recordScriptedDrive(
     staged.length > 0
       ? createScenarioDirector(staged, traffic, { seed: options.seed ?? 7, signals: runtime })
       : null;
-  let rules = createRuleEngine();
+  let rules = createRuleEngine(options.ruleConfig);
   const ruleEvents: RuleEvent[] = [];
   const outcomes: StagedEventOutcome[] = [];
 

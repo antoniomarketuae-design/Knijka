@@ -255,6 +255,9 @@ export type ViolationCode =
   | "STANDSTILL_GAP_TOO_CLOSE" // второстепенна: bumper-kissing behind a stopped lead at a standstill (FO-08)
   | "HIGH_BEAM_NOT_DIPPED" // второстепенна: long beam left on behind a lead vehicle at night (AC-04)
   | "OVERTAKING_AT_CROSSING" // опасна: overtaking (lane change past a lead) in a pedestrian-crossing zone (OV-07)
+  // B1a Wave-3 detector pack (doc 72 capability 1 — config-gated per-lesson drills on EXISTING telemetry)
+  | "JUNCTION_SCAN_INCOMPLETE" // основна: crossed a Б2 stop line without a fresh left-AND-right scan (JU-23; config-gated)
+  | "FOLLOWING_TOO_CLOSE_FOR_RAIN" // второстепенна: dry-appropriate gap held in rain — under the wet 3-second gap (FO-04; config-gated)
   // pre-drive procedure (procedures/machine.ts)
   | "PREDRIVE_STEP_SKIPPED" // второстепенна per skipped step
   | "PREDRIVE_SEATBELT_SKIPPED" // основна (skipping the belt is not a detail)
@@ -559,6 +562,47 @@ export interface RuleEngineConfig {
    * detector's — zero on an innocent single-lane drive. A lane change with no
    * lead ahead is a reposition, not an overtake, and never fires. */
   crossingOvertakeLeadGapM: number;
+
+  // -- B1a Wave-3 detector pack (doc 72 capability 1) — per-lesson DRILLS ------
+  // Both ship config-OFF (like moveOffObservation): the innocent-drive
+  // contract (the FP battery's whole-commute crosses a Б2 unglanced; the exam
+  // bot never widens its time-gap in rain) treats these patterns as innocent,
+  // so a DEFAULT-ON grade would flag the contract's own drives. Lessons that
+  // DRILL the specific skill opt in per-lesson via a rule-config override.
+
+  /**
+   * JU-23 „един поглед не стига" — the junction-scan lookback (config-gated).
+   * At a Б2 „Спри!" line the driver must scan ляво-дясно-ляво; the code fires
+   * when the STOP line is crossed without a FRESH left AND right glance in the
+   * lookback. SHIPPED FLAGGED OFF: the A12 whole-commute innocent drive crosses
+   * a stop sign with no glance events (an attentive human glances, but the
+   * contract does not model it), so a default-on grade would flag it. Enabled
+   * per-lesson for the Л-Д-Л observation drill.
+   */
+  junctionScanObservationEnabled: boolean;
+  /** A left AND a right glance must each fall within this window before the
+   *  Б2 line is crossed (mirror-lookback clone pointed at the stop line). */
+  junctionScanLookbackSec: number;
+
+  /**
+   * FO-04 „дистанция в дъжд" — rain-aware following (config-gated). In rain the
+   * braking distance grows ~1.5×, so the 2-second rule becomes 3+; the code
+   * fires when the gap is fine for DRY (base FOLLOWING_TOO_CLOSE silent) but
+   * under the WET-prudent gap. SHIPPED FLAGGED OFF: the exam-bot follows at a
+   * fixed ~1.9 s time-gap in rain AND dry (it reduces SPEED, not the time-gap),
+   * so a default-on grade would flag every rainy innocent exam drive. Enabled
+   * per-lesson for the wet-following drill.
+   */
+  followRainAwareEnabled: boolean;
+  /** Multiplier on followSafeSeconds when it is raining (1.6 → the 1.8 s dry
+   *  target becomes ~2.9 s wet). The rain code fires below this scaled gap; the
+   *  band ABOVE the plain dry safe gap keeps it clear of the base основна (no
+   *  double-bill). */
+  followRainSecondsFactor: number;
+  /** Seconds under the wet-prudent gap before FOLLOWING_TOO_CLOSE_FOR_RAIN
+   *  fires — generous (mirrors conditionsSpeedSustainSec): a brief dip toward
+   *  the wet gap while easing back is ordinary rain driving, not tailgating. */
+  followRainSustainSec: number;
 }
 
 export const DEFAULT_RULE_CONFIG: RuleEngineConfig = {
@@ -660,4 +704,14 @@ export const DEFAULT_RULE_CONFIG: RuleEngineConfig = {
   highBeamDipSustainSec: 3,
   // OV-07: a lead within 45 m is the car you are passing at the crossing.
   crossingOvertakeLeadGapM: 45,
+
+  // B1a Wave-3 (doc 72 capability 1) — per-lesson drills, config-OFF by default.
+  junctionScanObservationEnabled: false, // see the interface comment — lessons opt in
+  junctionScanLookbackSec: 5, // same window as the lane-change mirror lookback
+  followRainAwareEnabled: false, // see the interface comment — lessons opt in
+  // 1.6 × 1.8 s = 2.88 s wet-prudent target; fire ratio 0.7 → fires under
+  // ~2.0 s of actual gap. The exam-bot holds ~1.9 s in rain, so this is
+  // deliberately the DRILL band a wet-following lesson enables, not a route rule.
+  followRainSecondsFactor: 1.6,
+  followRainSustainSec: 3,
 };

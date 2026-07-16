@@ -236,3 +236,33 @@ export {
   recordScAcRainLightsDrive,
   type ScAcRainLightsTraceName,
 } from "./scAcRainLights";
+export {
+  SC_AC_HIGHBEAM_LEAD_ID,
+  recordScAcHighbeamLeadDrive,
+  type ScAcHighbeamLeadTraceName,
+} from "./scAcHighbeamLead";
+
+// Detector pack unit 2 — Part A (shipped detectors: FO-08 standstill gap,
+// OV-07 crossing overtake) + Part B (config-gated drills: JU-23 junction scan,
+// FO-04 rain following). Committed traces under content/traces/<template>/ are
+// recordings of exactly these scripts (gates: traces/__tests__/*).
+export {
+  SC_FOLLOW_STANDSTILL_ID,
+  recordScFollowStandstillDrive,
+  type ScFollowStandstillTraceName,
+} from "./scFollowStandstill";
+export {
+  SC_OV_CROSSING_OVERTAKE_ID,
+  recordScOvCrossingOvertakeDrive,
+  type ScOvCrossingOvertakeTraceName,
+} from "./scOvCrossingOvertake";
+export {
+  SC_JUNCTION_SCAN_ID,
+  recordScJunctionScanDrive,
+  type ScJunctionScanTraceName,
+} from "./scJunctionScan";
+export {
+  SC_FOLLOW_RAIN_GAP_ID,
+  recordScFollowRainGapDrive,
+  type ScFollowRainGapTraceName,
+} from "./scFollowRainGap";

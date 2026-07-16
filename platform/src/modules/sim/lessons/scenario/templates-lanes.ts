@@ -39,6 +39,7 @@
  * are 🟡 PARTIAL or 🔴 NEW — skipped for later waves.
  */
 
+import type { BrakingLeadCarSpec } from "../../contracts";
 import type { ScenarioSpec } from "./types";
 
 // ---------------------------------------------------------------------------
@@ -49,6 +50,10 @@ import type { ScenarioSpec } from "./types";
 /** ov-keepright-v1 (2+2 boulevard): the right (cruise) and left (hog) centers. */
 const KR_RIGHT = 12.19;
 const KR_LEFT = 4.06;
+/** ov-crossing-v1 (2+2 boulevard + a marked crossing at y = 220): the right
+ *  (cruise / lead) and left (overtake target) lane centers. */
+const OVC_RIGHT = 12.19;
+const OVC_LEFT = 4.06;
 /** ov-lane-v1 (1+1 street): the single lane center of the northbound bank. */
 const LN_CENTER = 4.06;
 /** ov-oneway-v1 (single-lane one-way): the lane centers on the polyline. */
@@ -325,10 +330,130 @@ export const SC_OV_ONEWAY: ScenarioSpec = {
   localeBg: "bg-BG",
 };
 
+// ---------------------------------------------------------------------------
+// 4. sc-ov-crossing-overtake — „Изпреварване на пешеходна пътека" (OV-07) on
+//    ov-crossing-v1 (320 m 2+2 road with a marked crossing at y = 220, limit 50)
+// ---------------------------------------------------------------------------
+
+/**
+ * The staged LEAD CAR for sc-ov-crossing-overtake: paces the player's RIGHT
+ * lane ~16 m ahead (matchPlayer). Its slam tier is authored out of reach — it
+ * is deterministic moving traffic (the car being illegally passed), not a
+ * braking drill. The shadow follows it THROUGH the crossing in the right lane
+ * (no overtake); the mistake pulls OUT to the left to overtake and then CUTS
+ * BACK into the right lane — toward the lead — INSIDE the armed zone. Only the
+ * cut-back grades: the OVERTAKING_AT_CROSSING check reads the lead gap at the
+ * lane-boundary frame, and a lane change TOWARD the lead's lane keeps it inside
+ * the lead-detection corridor at exactly that frame (чл. 119).
+ */
+const OVC_LEAD_CAR: BrakingLeadCarSpec = {
+  id: "sc-ovc-lead",
+  kind: "brakingLeadCar",
+  actor: {
+    pathNodes: ["ovc-n-start", "ovc-n-end"],
+    hold: { nodeIndex: 0, offsetM: 45 }, // dormant ~30 m ahead of the spawn
+    cruiseSpeedMps: 7,
+    extraRightOffsetM: 0, // right-lane center (the lead being cut back in front of)
+    colorIndex: 2,
+  },
+  followGapM: 16, // pace ~16 m AHEAD, matchPlayer — safe from FOLLOWING_TOO_CLOSE, inside the crossing-overtake gate
+  maxMatchSpeedMps: 12, // 43 km/h — holds the gap at the ~35 km/h approach
+  slamAt: { x: 12.19, y: 520 }, // far past the 320 m road — never reached
+  slamRadiusM: 2,
+  slamDecelMps2: 6,
+  minSlamSpeedKmh: 250, // the slam tier is authored out of reach…
+  proximityFallbackM: 0.3, // …and the proximity fallback cannot occur (gap pinned)
+  triggersHazard: false,
+  resumeAfterSec: 3,
+};
+
+/** OV-07 — забрана за изпреварване на и непосредствено преди пешеходна пътека
+ *  (ЗДвП чл. 119: на пешеходна пътека и преди нея не се изпреварва). */
+export const SC_OV_CROSSING_OVERTAKE: ScenarioSpec = {
+  id: "sc-ov-crossing-overtake",
+  family: "lanes",
+  tagsBg: ["ленти", "изпреварване", "пешеходна пътека", "забрана за изпреварване"],
+  titleBg: "Изпреварване на пешеходна пътека",
+  objectiveBg:
+    "Следвай колата пред теб през зоната на пешеходната пътека, без да я изпреварваш — пред пътека не се изпреварва и не се заобикаля: спрялата или намаляваща кола може да пропуска пешеходец, когото ти не виждаш иззад нея.",
+  archetypeIds: ["OV-07"],
+  conceptIds: ["c-crosswalk-yield", "c-overtaking-procedure", "c-general-care-duty"],
+  map: {
+    archetype: "zebra-block",
+    // The generator recipe — mirrored in ov-crossing-v1.json meta.scenario.params
+    // (tools/maps/gen_ov_crossing.mjs).
+    params: { lengthM: 320, crossingY: 220, maxspeedKmh: 50 },
+    districtId: "ov-crossing-v1",
+  },
+  start: {
+    spawnPointId: "ovc-spawn-start",
+    vehicleStart: "ready",
+  },
+  instructionsBg: [
+    { n: 1, textBg: "Потегли по булеварда в дясната лента — пред теб в твоята лента се движи друга кола." },
+    { n: 2, textBg: "Напред има пешеходна пътека. Пред и на пътека изпреварването е забранено — независимо дали виждаш пешеходец." },
+    { n: 3, textBg: "Не се престроявай в лявата лента, за да подминеш предния в зоната на пътеката — намали и остани зад него." },
+    { n: 4, textBg: "Ако предният намалява до пътеката, най-вероятно пропуска човек, когото ти не виждаш иззад колата му." },
+    { n: 5, textBg: "Мини пътеката зад предната кола и чак след нея, ако е нужно, изпреварвай на разрешено място." },
+  ],
+  success: [
+    {
+      id: "sc-ovc-approach",
+      titleBg: "Приближи пътеката в дясната лента зад предния",
+      params: { kind: "reachZone", x: OVC_RIGHT, y: 170, radiusM: 6, maxSpeedKmh: 55 },
+    },
+    {
+      id: "sc-ovc-finish",
+      titleBg: "Мини пътеката, без да изпреварваш, и продължи",
+      params: { kind: "reachZone", x: OVC_RIGHT, y: 285, radiusM: 6 },
+    },
+  ],
+  rubric: { parTimeSec: 55 },
+  // RECORDED: committed deterministic recordings of the authored scripts in
+  // traces/scOvCrossingOvertake.ts; gates in traces/__tests__/
+  // sc-ov-crossing-overtake-traces.test.ts (re-record with RECORD_TRACES=1).
+  shadow: { path: "content/traces/sc-ov-crossing-overtake/shadow-correct.trace.json" },
+  mistakes: [
+    {
+      traceRef: { path: "content/traces/sc-ov-crossing-overtake/mistake-overtake-in-zone.trace.json" },
+      titleBg: "Изпреварване в зоната на пътеката",
+      whatWentWrongBg:
+        "Колата излезе в лявата лента да изпревари предната и се върна в лентата точно в зоната на пешеходната пътека. Точно там е забранено да изпреварваш и да маневрираш: намаляващата пред теб кола може да пропуска пешеходец, скрит зад нея — престроявайки се на пътеката, влизаш в нея, без да го виждаш. Това е опасна грешка (чл. 119).",
+      codeRefs: ["OVERTAKING_AT_CROSSING"],
+    },
+    {
+      traceRef: { path: "content/traces/sc-ov-crossing-overtake/mistake-late-swerve.trace.json" },
+      titleBg: "Изпреварване в последния момент",
+      whatWentWrongBg:
+        "Водачът изчака до последно и започна изпреварването току пред пътеката — престрои се и се върна в лентата дълбоко в зоната на пешеходната пътека. Изпреварването и заобикалянето на пътека са забранени и опасни по същата причина: не виждаш какво пропуска предният.",
+      codeRefs: ["OVERTAKING_AT_CROSSING"],
+    },
+  ],
+  teach: {
+    whenBg:
+      "Пред и на всяка пешеходна пътека — маркирана или на кръстовище. Колкото и бавен да е предният, в зоната на пътеката не го изпреварваш и не го заобикаляш: изчакваш го да я премине.",
+    whyBg:
+      "Спрялата или намаляваща пред пътека кола почти винаги пропуска пешеходец. Изпреварвайки я, ти влизаш на пътеката с по-висока скорост, без да виждаш човека иззад нея — точно геометрията на най-тежките катастрофи с пешеходци. Затова законът забранява изпреварването на и непосредствено преди пътека.",
+    lawRef: "ЗДвП чл. 119",
+    examinerBg:
+      "Изпитващият следи поведението ти пред пешеходна пътека: намаляване, готовност за спиране и никакво изпреварване или заобикаляне на движещите се пред теб. Изпреварване в зоната на пътека е опасна грешка.",
+  },
+  levels: [
+    { level: 1 },
+    { level: 2 },
+    { level: 3 },
+    { level: 4, vehicleStart: "cold" },
+  ],
+  staged: [OVC_LEAD_CAR],
+  conditions: { weather: "dry" },
+  localeBg: "bg-BG",
+};
+
 /** The lane-discipline-family templates, in catalog order (registered in
  *  templates.ts). */
 export const SCENARIO_TEMPLATES_LANES: readonly ScenarioSpec[] = [
   SC_OV_KEEP_RIGHT,
   SC_OV_LANE_KEEPING,
   SC_OV_ONEWAY,
+  SC_OV_CROSSING_OVERTAKE,
 ];

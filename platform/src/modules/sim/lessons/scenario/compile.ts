@@ -193,6 +193,9 @@ export function compileScenario(spec: ScenarioSpec, level: ScenarioLevel): Lesso
     ...(parkingBay ? { parkingBay } : {}),
     ...(staged.length > 0 ? { stagedEvents: staged } : {}),
     ...(examMode ? { examMode: true } : {}),
+    // Config-gated drills: carry the detector opt-in to the LIVE session so
+    // the student's own attempt grades the taught fault (not only the shadow).
+    ...(spec.ruleConfig ? { ruleConfig: spec.ruleConfig } : {}),
   };
 
   const aids = mergeAids(level, rung.aids);

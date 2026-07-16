@@ -283,9 +283,248 @@ export const SC_FOLLOW_BRAKE: ScenarioSpec = {
   localeBg: "bg-BG",
 };
 
+// ---------------------------------------------------------------------------
+// 3. sc-follow-standstill — „Дистанция при спиране в колона" (FO-08) on
+//    fo-follow-v1 (reuses the 360 m straight street, limit 50)
+// ---------------------------------------------------------------------------
+
+/**
+ * The staged LEAD CAR for sc-follow-standstill: a STATIONARY queue-tail vehicle
+ * held at y = 290 in the player's own lane (a car stopped at the red light / at
+ * the back of a column). It NEVER arms — armDistM 3 m means it would only begin
+ * to pace if the player's CENTER came within 3 m (i.e. a bumper contact), which
+ * never happens — so its position is fully deterministic and the encounter is a
+ * pure pull-up-behind-a-stopped-car. That determinism is what lets the drives
+ * pin the standstill gap exactly (leadGapM = 290 − playerY − 4.1 m). The slam
+ * fields are inert (the lead never triggers) but kept well-formed.
+ */
+const FS_LEAD_CAR: BrakingLeadCarSpec = {
+  id: "sc-fs-lead",
+  kind: "brakingLeadCar",
+  actor: {
+    pathNodes: ["fo-n-start", "fo-n-end"],
+    hold: { nodeIndex: 0, offsetM: 290 }, // stationary queue tail at y = 290
+    cruiseSpeedMps: 8,
+    extraRightOffsetM: 0, // the player's OWN lane (northbound, x = 4.06)
+    colorIndex: 2,
+  },
+  followGapM: 14,
+  maxMatchSpeedMps: 12,
+  slamAt: { x: 4.06, y: 520 }, // far past the road — inert (the lead never arms)
+  slamRadiusM: 2,
+  slamDecelMps2: 6,
+  minSlamSpeedKmh: 250,
+  proximityFallbackM: 0.3,
+  armDistM: 3, // never arms — the lead stays a stationary queue tail at y = 290
+  triggersHazard: false,
+  resumeAfterSec: 3,
+};
+
+/** FO-08 — дистанция при пълно спиране в колона (ЗДвП чл. 23: дори при спиране
+ *  се държи достатъчно разстояние до движещото се/спрялото пред теб ППС). */
+export const SC_FOLLOW_STANDSTILL: ScenarioSpec = {
+  id: "sc-follow-standstill",
+  family: "following",
+  tagsBg: ["дистанция", "спиране в колона", "движение в колона", "разстояние при спиране"],
+  titleBg: "Дистанция при спиране в колона",
+  objectiveBg:
+    "Спри зад колата пред теб в колона с разумно разстояние — колкото да виждаш къде задните ѝ гуми опират в пътя (около два метра). Така имаш място за маневра и резерв, ако предният се върне назад.",
+  archetypeIds: ["FO-08"],
+  conceptIds: ["c-following-distance", "c-safety-space", "c-general-care-duty"],
+  map: {
+    archetype: "straight-street",
+    // Reuses the committed fo-follow-v1 map — its meta.scenario.params, here for provenance.
+    params: { lengthM: 360, maxspeedKmh: 50 },
+    districtId: "fo-follow-v1",
+  },
+  start: {
+    spawnPointId: "fo-spawn-approach",
+    vehicleStart: "ready",
+  },
+  instructionsBg: [
+    { n: 1, textBg: "Потегли по правата улица — пред теб се движи друга кола в твоята лента." },
+    { n: 2, textBg: "Предният спира в колона. Намали плавно и спри зад него, без да залепваш за бронята му." },
+    { n: 3, textBg: "Остави разумно разстояние: колкото да виждаш къде задните гуми на предната кола опират в асфалта — около два метра." },
+    { n: 4, textBg: "Това разстояние ти дава място да заобиколиш при нужда и резерв, ако предният се върне назад по наклон." },
+    { n: 5, textBg: "Изчакай спокойно зад него на тази дистанция до края на упражнението." },
+  ],
+  success: [
+    {
+      id: "sc-fs-approach",
+      titleBg: "Следвай спокойно преди спирането",
+      params: { kind: "reachZone", x: LANE_X, y: 150, radiusM: 12 },
+    },
+    {
+      id: "sc-fs-stopped",
+      titleBg: "Спри зад колоната на разумно разстояние",
+      // The shadow rests ~4 m behind the stationary lead (lead at y = 290,
+      // shadow at ~y = 281); a low speed cap makes reaching it AT REST the drill.
+      params: { kind: "reachZone", x: LANE_X, y: 281, radiusM: 8, maxSpeedKmh: 6 },
+    },
+  ],
+  rubric: { parTimeSec: 80 },
+  shadow: { path: "content/traces/sc-follow-standstill/shadow-correct.trace.json" },
+  mistakes: [
+    {
+      traceRef: { path: "content/traces/sc-follow-standstill/mistake-bumper-kiss.trace.json" },
+      titleBg: "Залепване за бронята при спиране",
+      whatWentWrongBg:
+        "Колата спря почти опряна в бронята на предната — под метър и половина разстояние. Толкова близо не виждаш гумите на предния, нямаш накъде да маневрираш и рискуваш удар, ако той се върне назад по наклон. При спиране в колона остави поне колкото да виждаш къде гумите му опират в пътя.",
+      codeRefs: ["STANDSTILL_GAP_TOO_CLOSE"],
+    },
+    {
+      traceRef: { path: "content/traces/sc-follow-standstill/mistake-creep-up.trace.json" },
+      titleBg: "Пълзене напред до бронята",
+      whatWentWrongBg:
+        "Колата спря на разумно разстояние, но после запълзя напред и се залепи за предната — „да не остане дупка“. Дистанцията при спиране не е дупка за запълване: тя е твоят резерв за маневра и за наклона. Спри веднъж на разумно място и стой там.",
+      codeRefs: ["STANDSTILL_GAP_TOO_CLOSE"],
+    },
+  ],
+  teach: {
+    whenBg:
+      "Всеки път, когато спираш зад друга кола — на светофар, на знак, в колона. Разстоянието при спиране е също толкова важно, колкото и в движение, а най-често се пренебрегва точно на спрелия автомобил.",
+    whyBg:
+      "Разумната дистанция при спиране ти оставя изход: място да заобиколиш, ако предният аварира или изгасне, и резерв, ако се върне назад по наклон. Залепването за бронята премахва всеки от тези изходи и превръща една дребна ситуация в удар. Правилото „да виждаш гумите на предния“ пази точно този резерв.",
+    lawRef: "ЗДвП чл. 23",
+    examinerBg:
+      "Изпитващият следи разстоянието и при спиране: спиране прекалено близо до предната кола е второстепенна грешка. Спри така, че да виждаш къде задните ѝ гуми опират в пътя — това е достатъчно разстояние за маневра и за наклона.",
+  },
+  levels: [
+    { level: 1 },
+    { level: 2 },
+    { level: 3 },
+    { level: 4, vehicleStart: "cold" },
+  ],
+  staged: [FS_LEAD_CAR],
+  conditions: { weather: "dry" },
+  localeBg: "bg-BG",
+};
+
+// ---------------------------------------------------------------------------
+// 4. sc-follow-rain-gap — „Дистанция в дъжд" (FO-04) on fo-follow-v1 (reuses the
+//    360 m straight street, limit 50) — the config-gated wet-following drill.
+// ---------------------------------------------------------------------------
+
+/**
+ * The staged LEAD CAR for sc-follow-rain-gap: paces the player's lane at a fixed
+ * ~18 m (matchPlayer), so the ONLY variable is the player's SPEED — exactly
+ * FO-04's lesson. 18 m is a prudent ~2.6 s at the shadow's calm 25 km/h, but an
+ * imprudent ~1.6 s at the mistakes' 40 km/h, where wet braking needs ~2.9 s. Its
+ * slam tier is authored out of reach — it is deterministic moving traffic, not a
+ * braking drill. Rides the config-gated FOLLOWING_TOO_CLOSE_FOR_RAIN detector
+ * (enabled per-lesson via the recorder's ruleConfig; see rules/types.ts).
+ */
+const FR_LEAD_CAR: BrakingLeadCarSpec = {
+  id: "sc-fr-lead",
+  kind: "brakingLeadCar",
+  actor: {
+    pathNodes: ["fo-n-start", "fo-n-end"],
+    hold: { nodeIndex: 0, offsetM: 30 }, // dormant ~15 m ahead of the spawn
+    cruiseSpeedMps: 7,
+    extraRightOffsetM: 0, // the player's OWN lane (northbound, x = 4.06)
+    colorIndex: 2,
+  },
+  followGapM: 23, // pace ~23 m AHEAD (bumper gap ~19 m) — prudent at 25 km/h, imprudent for rain at 40 km/h
+  maxMatchSpeedMps: 13, // 47 km/h — holds the gap at the 40 km/h mistakes
+  slamAt: { x: 4.06, y: 520 }, // far past the 360 m road — never reached
+  slamRadiusM: 2,
+  slamDecelMps2: 6,
+  minSlamSpeedKmh: 250, // the slam tier is authored out of reach…
+  proximityFallbackM: 0.3, // …and the proximity fallback cannot occur (gap pinned at 18 m)
+  triggersHazard: false,
+  resumeAfterSec: 3,
+};
+
+/** FO-04 — увеличена дистанция при дъжд (ЗДвП чл. 23: дистанцията се съобразява
+ *  с условията — при мокър път спирачният път нараства и 2-секундното правило
+ *  става 3 и повече). */
+export const SC_FOLLOW_RAIN_GAP: ScenarioSpec = {
+  id: "sc-follow-rain-gap",
+  family: "following",
+  tagsBg: ["дистанция", "дъжд", "мокър път", "следване"],
+  titleBg: "Дистанция в дъжд",
+  objectiveBg:
+    "Следвай колата пред теб в дъжд с УВЕЛИЧЕНА дистанция — при мокър път спирачният път нараства около един и половина пъти, затова правилото за 2 секунди става 3 и повече. Същите метри при по-висока скорост вече не стигат.",
+  archetypeIds: ["FO-04"],
+  conceptIds: ["c-following-distance", "c-rain-aquaplaning", "c-stopping-distance-total"],
+  map: {
+    archetype: "straight-street",
+    // Reuses the committed fo-follow-v1 map — its meta.scenario.params, here for provenance.
+    params: { lengthM: 360, maxspeedKmh: 50 },
+    districtId: "fo-follow-v1",
+  },
+  start: {
+    spawnPointId: "fo-spawn-approach",
+    vehicleStart: "ready",
+  },
+  instructionsBg: [
+    { n: 1, textBg: "Вали, а пред теб в твоята лента се движи друга кола — потегли спокойно." },
+    { n: 2, textBg: "В дъжд дистанцията се увеличава: същите метри при по-висока скорост значат по-малко време за спиране." },
+    { n: 3, textBg: "Дръж поне 3 секунди до предния при мокър път — брой „едно-и-две-и-три“, докато той подмине ориентир." },
+    { n: 4, textBg: "Не карай бързо на къса дистанция „както при сухо“ — на мокро спирачният път е с около половина по-дълъг." },
+    { n: 5, textBg: "Задръж увеличената дистанция до края на отсечката." },
+  ],
+  success: [
+    {
+      id: "sc-fr-follow",
+      titleBg: "Следвай с увеличена за дъжда дистанция",
+      // Cap 30 km/h keeps the calm wet-prudent approach; the gap grading is the
+      // rule engine's job (FOLLOWING_TOO_CLOSE_FOR_RAIN).
+      params: { kind: "reachZone", x: LANE_X, y: 175, radiusM: 10, maxSpeedKmh: 30 },
+    },
+    {
+      id: "sc-fr-finish",
+      titleBg: "Стигни края на отсечката",
+      params: { kind: "reachZone", x: LANE_X, y: 330, radiusM: 12 },
+    },
+  ],
+  rubric: { parTimeSec: 85 },
+  shadow: { path: "content/traces/sc-follow-rain-gap/shadow-correct.trace.json" },
+  mistakes: [
+    {
+      traceRef: { path: "content/traces/sc-follow-rain-gap/mistake-dry-habit.trace.json" },
+      titleBg: "Дистанция „за сухо“ в дъжд",
+      whatWentWrongBg:
+        "Валеше, а колата следваше предната на 40 км/ч само на около метри — дистанция, добра за сухо, но твърде малка за мокър път. На мокро спирачният път е с около половина по-дълъг, а секундата и половина дистанция не стига. В дъжд дръж 3 и повече секунди.",
+      codeRefs: ["FOLLOWING_TOO_CLOSE_FOR_RAIN"],
+    },
+    {
+      traceRef: { path: "content/traces/sc-follow-rain-gap/mistake-gap-melts.trace.json" },
+      titleBg: "Дистанцията се топи с ускоряването",
+      whatWentWrongBg:
+        "На спокойни 25 км/ч дистанцията беше добра дори за дъжда, но с ускоряването до 40 км/ч същите метри вече значеха под две секунди — а на мокро трябват три. Метрите останаха същите, нужната дистанция порасна: ускоряваш ли в дъжд, изостани още.",
+      codeRefs: ["FOLLOWING_TOO_CLOSE_FOR_RAIN"],
+    },
+  ],
+  teach: {
+    whenBg:
+      "При всеки дъжд, мокър път, сняг или лапавица. Дистанцията, която те пази при сухо, не стига на мокро — точно тогава, когато и без това е по-трудно да спреш.",
+    whyBg:
+      "На мокър път гумите зацепват по-слабо и спирачният път нараства около един и половина пъти. Двете секунди, които стигат при сухо, се превръщат в удар при дъжд — затова правилото става 3 и повече секунди. Дистанцията е единственото, което купуваш предварително срещу по-дългото спиране.",
+    lawRef: "ЗДвП чл. 23",
+    examinerBg:
+      "Изпитващият очаква съобразена с условията дистанция: при дъжд и мокър път — осезаемо по-голяма, отколкото при сухо. Близка дистанция в дъжд се отчита като несъобразена — увеличи разстоянието до предния.",
+  },
+  levels: [
+    { level: 1 },
+    { level: 2 },
+    { level: 3 },
+    { level: 4, vehicleStart: "cold" },
+  ],
+  staged: [FR_LEAD_CAR],
+  conditions: { weather: "rain" },
+  // The rain-following detector is default-OFF (the exam bot holds a fixed
+  // time-gap in rain and dry alike); this drill opts it in so the LIVE session
+  // grades a student who keeps a dry-habit gap in the wet, matching the shadow.
+  ruleConfig: { followRainAwareEnabled: true },
+  localeBg: "bg-BG",
+};
+
 /** The following-family templates, in catalog order (registered in
  *  templates.ts). */
 export const SCENARIO_TEMPLATES_FOLLOWING: readonly ScenarioSpec[] = [
   SC_FOLLOW_DISTANCE,
   SC_FOLLOW_BRAKE,
+  SC_FOLLOW_STANDSTILL,
+  SC_FOLLOW_RAIN_GAP,
 ];

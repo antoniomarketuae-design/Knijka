@@ -541,10 +541,112 @@ export const SC_TURN_LEFT_ONCOMING: ScenarioSpec = {
   localeBg: "bg-BG",
 };
 
+// ---------------------------------------------------------------------------
+// sc-junction-scan — „Един поглед не стига" (JU-23) on tj-stop-v1: the
+// ляво-дясно-ляво observation drill at a Б2 line. Rides the config-gated
+// JUNCTION_SCAN_INCOMPLETE detector (enabled per-lesson via the recorder's
+// ruleConfig; see rules/types.ts). Reuses the sc-junction-stop map + path.
+// ---------------------------------------------------------------------------
+
+/** JU-23 — оглеждане наляво-надясно-наляво преди навлизане на кръстовище с Б2
+ *  (ЗДвП чл. 50: на знак „Спри!“ водачът спира и пропуска, като се убеди, че не
+ *  идват ППС с предимство — убеждаването изисква пълно оглеждане). */
+export const SC_JUNCTION_SCAN: ScenarioSpec = {
+  id: "sc-junction-scan",
+  family: "junction",
+  tagsBg: ["кръстовище", "оглеждане", "знак Стоп", "ляво-дясно-ляво"],
+  titleBg: "Оглеждане на кръстовище (един поглед не стига)",
+  objectiveBg:
+    "На знак Б2 „Спри!“ спри напълно и се огледай по реда ляво-дясно-ляво — вторият поглед наляво хваща колата, приближила, докато си гледал надясно. Потегляш чак след ПЪЛНО оглеждане.",
+  archetypeIds: ["JU-23"],
+  conceptIds: ["c-give-way-stop-behavior", "c-mirrors-blind-spots", "c-junction-approach"],
+  map: {
+    archetype: "t-junction",
+    // Reuses the committed tj-stop-v1 map (its meta.scenario.params, for provenance).
+    params: {
+      control: "stop",
+      priorityArmM: 150,
+      minorArmM: 120,
+      lanes: 2,
+      priorityMaxKmh: 50,
+      minorMaxKmh: 40,
+    },
+    districtId: "tj-stop-v1",
+  },
+  start: {
+    spawnPointId: "tj-spawn-south",
+    vehicleStart: "ready",
+  },
+  instructionsBg: [
+    { n: 1, textBg: "Приближи знака Б2 „Спри!“ по страничната улица с намалена скорост и десен мигач." },
+    { n: 2, textBg: "Спри НАПЪЛНО преди стоп-линията — колелата неподвижни." },
+    { n: 3, textBg: "Огледай се по реда: наляво, надясно и ПАК наляво. Един поглед не стига." },
+    { n: 4, textBg: "Вторият поглед наляво е за колата, която е приближила, докато си гледал надясно." },
+    { n: 5, textBg: "Потегли и завий надясно чак когато си се убедил, че никой не идва с предимство." },
+  ],
+  success: [
+    {
+      id: "sc-jscan-approach",
+      titleBg: "Приближи знака Б2 с контролирана скорост",
+      params: { kind: "reachZone", x: 4.06, y: -45, radiusM: 8, maxSpeedKmh: 30 },
+    },
+    {
+      id: "sc-jscan-line",
+      titleBg: "Премини стоп-линията след пълно спиране и оглеждане",
+      params: { kind: "passSignal", nodeId: "tj-n-c", x: 0, y: 0, radiusM: 45, control: "stopSign" },
+    },
+    {
+      id: "sc-jscan-exit",
+      titleBg: "Завий надясно и продължи по пътя с предимство",
+      params: { kind: "reachZone", x: 55, y: -4.06, radiusM: 9 },
+    },
+  ],
+  rubric: { parTimeSec: 55 },
+  shadow: { path: "content/traces/sc-junction-scan/shadow-correct.trace.json" },
+  mistakes: [
+    {
+      traceRef: { path: "content/traces/sc-junction-scan/mistake-no-scan.trace.json" },
+      titleBg: "Потегляне без оглеждане",
+      whatWentWrongBg:
+        "Колата спря напълно на Б2, но потегли, без да се огледа нито наляво, нито надясно. Пълното спиране е половината работа — то ти дава секундите, в които главата трябва да се завърти и очите наистина да проверят пътя с предимство. „Гледах, но не видях“ е най-честата причина за удар на кръстовище.",
+      codeRefs: ["JUNCTION_SCAN_INCOMPLETE"],
+    },
+    {
+      traceRef: { path: "content/traces/sc-junction-scan/mistake-single-glance.trace.json" },
+      titleBg: "Само един поглед",
+      whatWentWrongBg:
+        "Водачът спря и погледна веднъж наляво, но не и надясно — а после потегли. Един поглед не стига: докато гледаш в едната посока, от другата може да приближи кола. Затова оглеждането е по реда ляво-дясно-ляво, с втори поглед наляво.",
+      codeRefs: ["JUNCTION_SCAN_INCOMPLETE"],
+    },
+  ],
+  teach: {
+    whenBg:
+      "На всеки знак Б2 „Спри!“ и на всяко кръстовище с ограничена видимост. Знакът се поставя точно там, където видимостта е лоша — затова оглеждането трябва да е пълно, а не един бегъл поглед в движение.",
+    whyBg:
+      "Най-цитираната причина за катастрофи на кръстовища е „гледах, но не видях“: водачът поглежда веднъж отдалеч и потегля в ситуация, която се е променила. Оглеждането наляво-надясно-наляво, СЛЕД пълното спиране, хваща именно колата, приближила междувременно — вторият поглед наляво е застраховката, която липсва при бързия единичен поглед.",
+    lawRef: "ЗДвП чл. 50",
+    examinerBg:
+      "Изпитващият следи за ПЪЛНО оглеждане след спирането на Б2: наляво, надясно и пак наляво, преди потегляне. Потегляне без оглеждане или само с един поглед е основна грешка (качество на наблюдението).",
+  },
+  levels: [
+    { level: 1 },
+    { level: 2 },
+    { level: 3 },
+    { level: 4, vehicleStart: "cold" },
+  ],
+  conditions: { weather: "dry" },
+  // The junction-scan detector is default-OFF (it would false-fire the exam
+  // bank's unglanced Б2 crossings); this drill opts it in so the LIVE session
+  // grades a student's missing observation, matching the shadow's gate.
+  ruleConfig: { junctionScanObservationEnabled: true },
+  localeBg: "bg-BG",
+};
+
 /** The JUNCTION/SIGNALS family batch (registered in templates.ts). */
 export const SCENARIO_TEMPLATES_JUNCTIONS: readonly ScenarioSpec[] = [
   SC_JUNCTION_RHR,
   SC_JUNCTION_STOP,
   SC_SIGNAL_RESPONSE,
   SC_TURN_LEFT_ONCOMING,
+  SC_JUNCTION_SCAN,
 ];

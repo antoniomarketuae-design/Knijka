@@ -394,6 +394,29 @@ export const VIOLATIONS: Record<ViolationCode, ViolationSpec> = {
     lawRef: "ЗДвП чл. 119",
     conceptId: "c-crosswalk-yield",
   },
+  // -- B1a Wave-3 detector pack (doc 72 capability 1) — per-lesson drills -----
+  JUNCTION_SCAN_INCOMPLETE: {
+    severityClass: "osnovna",
+    points: SEVERITY_POINTS.osnovna,
+    titleBg: "Непълно оглеждане на кръстовището",
+    explanationBg:
+      "Премина стоп-линията на знак Б2, без да огледаш и наляво, и надясно. „Един поглед не стига“ — най-честата причина за катастрофа на кръстовище е „гледах, но не видях“: погледнал си веднъж отдалеч и си потеглил в това, което се е променило.",
+    correctiveBg:
+      "На знак Б2 спри напълно и огледай по реда ляво-дясно-ляво — вторият поглед наляво е точно за колата, която е приближила, докато си гледал надясно. Потегляш чак след пълното оглеждане.",
+    lawRef: "ЗДвП чл. 50",
+    conceptId: "c-give-way-stop-behavior",
+  },
+  FOLLOWING_TOO_CLOSE_FOR_RAIN: {
+    severityClass: "vtorostepenna",
+    points: SEVERITY_POINTS.vtorostepenna,
+    titleBg: "Несъобразена с дъжда дистанция",
+    explanationBg:
+      "Дистанцията беше добра за сухо, но в дъжд е твърде малка. При мокър път спирачният път нараства около един и половина пъти — затова правилото за 2 секунди става 3 и повече. Дистанцията, която те пази при сухо, не стига при дъжд.",
+    correctiveBg:
+      "В дъжд удвои резерва: брой поне „едно-и-две-и-три“ до предния. Ако при сухо държиш 2 секунди, при мокър път изостани до 3 и повече — по-голямата дистанция компенсира по-дългото спиране.",
+    lawRef: "ЗДвП чл. 23",
+    conceptId: "c-following-distance",
+  },
   PREDRIVE_STEP_SKIPPED: {
     severityClass: "vtorostepenna",
     points: SEVERITY_POINTS.vtorostepenna,

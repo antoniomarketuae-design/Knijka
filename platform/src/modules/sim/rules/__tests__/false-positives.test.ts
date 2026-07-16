@@ -1150,6 +1150,120 @@ describe("FP battery — overtaking at a crossing (OVERTAKING_AT_CROSSING)", () 
 });
 
 // ---------------------------------------------------------------------------
+// B1a Wave-3 detector pack (doc 72 capability 1) — CONFIG-GATED per-lesson
+// drills. Two contracts per detector: (1) OFF by default the guilty pattern is
+// innocent (the whole-commute crosses a Б2 unglanced; the exam-bot never widens
+// its rain time-gap), and (2) even ENABLED, the correct skill stays clean.
+// ---------------------------------------------------------------------------
+
+describe("FP battery — junction scan (JUNCTION_SCAN_INCOMPLETE)", () => {
+  it("OFF by default: crossing a Б2 with no scan is innocent (the whole-commute contract)", () => {
+    // The detector ships config-OFF — the A12 innocent commute crosses a stop
+    // sign without modelled glances and must never be flagged by default.
+    const { events } = drive([
+      tick(0, { speedKmh: 12 }),
+      tick(1, { speedKmh: 0.4 }),
+      tick(2, { speedKmh: 0.4 }),
+      tick(3, { speedKmh: 6, events: [stopSign] }),
+    ]);
+    expectInnocent(events);
+    expect(events.map((e) => e.code)).toContain("FULL_STOP_AT_STOP_SIGN");
+  });
+
+  // The remaining cases prove the ENABLED drill safe for correct observation.
+  const enabled = { junctionScanObservationEnabled: true } as const;
+
+  it("a full ляво-дясно scan within the lookback before the Б2 is clean", () => {
+    // Innocent: the taught ritual — stop, glance left and right, then cross.
+    const { events } = drive(
+      [
+        tick(0, { speedKmh: 12 }),
+        tick(1, { speedKmh: 0.4, events: [glance("left")] }),
+        tick(2, { speedKmh: 0.4, events: [glance("right")] }),
+        tick(3, { speedKmh: 6, events: [stopSign] }),
+      ],
+      enabled,
+    );
+    expectInnocent(events);
+    expect(events.map((e) => e.code)).toContain("FULL_STOP_AT_STOP_SIGN");
+  });
+
+  it("scan order does not matter: right then left is equally clean", () => {
+    // Innocent: the rule needs BOTH sides fresh, in any order.
+    const { events } = drive(
+      [
+        tick(0, { speedKmh: 0.4, events: [glance("right")] }),
+        tick(1, { speedKmh: 0.4, events: [glance("left")] }),
+        tick(2, { speedKmh: 6, events: [stopSign] }),
+      ],
+      enabled,
+    );
+    expectInnocent(events);
+  });
+
+  it("a green traffic light is not a Б2 — the scan rule never applies there", () => {
+    // Innocent (of this code): the junction-scan drill grades stop-SIGN
+    // crossings only; a green-light crossing carries no ляво-дясно duty.
+    const { events } = drive(
+      [
+        tick(0, { speedKmh: 40 }),
+        tick(1, { speedKmh: 40, events: [greenLight] }),
+        tick(2, { speedKmh: 40 }),
+      ],
+      enabled,
+    );
+    expectInnocent(events);
+  });
+});
+
+describe("FP battery — rain-aware following (FOLLOWING_TOO_CLOSE_FOR_RAIN)", () => {
+  it("OFF by default: a dry-habit gap in rain is innocent (the exam-bot contract)", () => {
+    // The detector ships config-OFF — the exam-bot holds a fixed ~1.9 s gap in
+    // rain and dry alike and must never be flagged by default.
+    const { events } = drive(cruise(0, 6, { speedKmh: 40, rain: true, leadGapM: 18 }));
+    expectInnocent(events);
+  });
+
+  // The remaining cases prove the ENABLED drill safe for correct wet following.
+  const enabled = { followRainAwareEnabled: true } as const;
+
+  it("a wet-prudent 3-second gap in rain is clean", () => {
+    // Innocent: ~30 m at 40 km/h is ~2.7 s — the widened wet gap the drill
+    // teaches; above the wet fire threshold, no flag.
+    const { events } = drive(
+      cruise(0, 6, { speedKmh: 40, rain: true, leadGapM: 30 }),
+      enabled,
+    );
+    expectInnocent(events);
+  });
+
+  it("the same dry-appropriate gap on a DRY road is clean (rain-gated)", () => {
+    // Innocent (of this code): 18 m at 40 km/h is a fine dry gap; the wet rule
+    // only arms when it is actually raining.
+    const { events } = drive(cruise(0, 6, { speedKmh: 40, leadGapM: 18 }), enabled);
+    expectInnocent(events);
+  });
+
+  it("cut-in recovery in rain: a car merges close and the driver backs off", () => {
+    // Innocent: someone merged ahead in the rain and the driver is visibly
+    // re-opening the gap — the shared recovery-rate guard exempts it, exactly
+    // as it does for the dry base code.
+    const { events } = drive(
+      [
+        tick(0, { speedKmh: 40, rain: true, leadGapM: 30 }),
+        tick(1, { speedKmh: 40, rain: true, leadGapM: 16 }), // the cut-in
+        tick(2, { speedKmh: 38, rain: true, leadGapM: 18 }),
+        tick(3, { speedKmh: 37, rain: true, leadGapM: 20 }),
+        tick(4, { speedKmh: 36, rain: true, leadGapM: 22 }),
+        tick(5, { speedKmh: 36, rain: true, leadGapM: 24 }),
+      ],
+      enabled,
+    );
+    expectInnocent(events);
+  });
+});
+
+// ---------------------------------------------------------------------------
 // Whole-drive integration
 // ---------------------------------------------------------------------------
 
