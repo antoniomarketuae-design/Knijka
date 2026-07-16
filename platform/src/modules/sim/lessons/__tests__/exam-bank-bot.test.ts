@@ -15,7 +15,7 @@
  * re-derived identically by the wire regrade from the variant id alone.
  *
  * Default: one curated innocent variant per shell (all 15 encounter sites +
- * all six staged kinds + five of six conditions covered), the guilty folds,
+ * all six staged kinds + all six conditions covered), the guilty folds,
  * and a sim-replay determinism law. EXAM_BANK_REVISION_FULL=1 widens the
  * innocent sweep to ≥100 variants across every shell × condition cell.
  */
@@ -1039,9 +1039,9 @@ function describeViolations(r: BotResult): string {
 // The innocent contract — curated coverage of all 15 sites, 6 kinds
 // ---------------------------------------------------------------------------
 
-/** shell → [condition, distinctness-key requirements]. Together the seven
+/** shell → [condition, distinctness-key requirements]. Together the nine
  * drives hit every encounter SITE the bank stages and every staged kind, in
- * day / rain / dusk-rain / night / night-rain conditions, both bays. */
+ * ALL SIX conditions (H adds the dusk-dry cell), both bays. */
 const INNOCENT_MATRIX: Array<{ shell: string; cond: string; includes: string[] }> = [
   {
     shell: "A",
@@ -1077,6 +1077,18 @@ const INNOCENT_MATRIX: Array<{ shell: string; cond: string; includes: string[] }
     shell: "G",
     cond: "D1",
     includes: ["P2-bradistilov-4way=late", "A1-blvd-north=committed", "C9w-baku-mid=sprint", "R1-rb-se=tight"],
+  },
+  // Route-shell slice (H/I): tiers not yet exercised by the rows above —
+  // P1=late, A1=dilemma, R1=comfort, B6=firm, P3e=early, C9w=calm.
+  {
+    shell: "H",
+    cond: "V1",
+    includes: ["P1-b2-junction=late", "A1-blvd-north=dilemma", "R1-rb-se=comfort"],
+  },
+  {
+    shell: "I",
+    cond: "D2",
+    includes: ["B6-dimitrov-straight=firm", "P3e-kamenov-4way=early", "C9w-baku-mid=calm"],
   },
 ];
 

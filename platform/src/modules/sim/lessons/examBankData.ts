@@ -9,7 +9,7 @@
  * assigned archetype. Seed jitter does NOT count. Everything here encodes
  * exactly those four axes:
  *
- *  - ROUTE SHELLS (7): authored node-chains over district-v1.json, each
+ *  - ROUTE SHELLS (9): authored node-chains over district-v1.json, each
  *    machine-verified drivable (oneways honored) and официален-protocol
  *    compliant (≥3 regulated junctions, ≥5 right + ≥5 left turns, обратен
  *    завой, parking element) by lessons/__tests__/exam-bank.test.ts — the
@@ -98,7 +98,7 @@ export interface ExamSlot {
 }
 
 export interface ExamRouteShell {
-  /** Id segment ("A".."G"). */
+  /** Id segment ("A".."I"). */
   code: string;
   nameBg: string;
   descriptionBg: string;
@@ -833,7 +833,7 @@ const B2_OBJECTIVE = (id: string): LessonObjective => ({
 });
 
 // ---------------------------------------------------------------------------
-// THE SEVEN SHELLS
+// THE NINE SHELLS
 // ---------------------------------------------------------------------------
 
 export const EXAM_SHELLS: readonly ExamRouteShell[] = [
@@ -1166,6 +1166,127 @@ export const EXAM_SHELLS: readonly ExamRouteShell[] = [
       // wrong pass). The runner-visible constraint is honored, not fought.
       dartSlot("xG-dart", "C9w-baku-mid", ["n685714833", "n685714834"], C9W_SITE),
       roundaboutSlot("xG-roundabout", "R1-rb-se", ["n279646953", "n279646956"], R1_SITE),
+    ],
+  },
+  // -------------------------------------------------------------- Shell H —
+  // the central figure-eight: shell A's northern loop (spawn-4, Б2 stop, P1,
+  // boulevard + „Семов" U-turn) joined at the 4-way to a southern loop over
+  // the center grid (G's westbound „Брадистилов" traverse, the service drop
+  // to „Баку") with the roundabout as a second reversal, returning east over
+  // „Боровски" to the L7 bay. ROUTE-SHELL slice (doc 72 §16 constraint 1 +
+  // ADR-006 closing note): every hop AND every consecutive turn-triple below
+  // already appears in shells A/E/G — new exam SHAPE over machine-proven
+  // geometry, so the C1 bot inherits leg-local behavior wholesale.
+  {
+    code: "H",
+    nameBg: "Централната осмица",
+    descriptionBg:
+      "Знак „Спри!“, булевардът на север с обръщане при „Семов“, „Брадистилов“ на запад през центъра, тихата обслужваща улица към „Баку“ и кръговото като втори обратен завой.",
+    spawn: { pointId: "spawn-4" },
+    routeNodes: [
+      // A: spawn-4 corridor, Б2 stop, right to P1, boulevard north, „Семов"
+      // U-turn, boulevard south through the n179974491 light to the 4-way.
+      "n415950074", "n331942486", "n331942490", "n7010135318", "n9601848038", "n639792337",
+      "n5063751788", "n9601848047", "n6294463135", "n1805512602", "n5997970086", "n1805512645",
+      "n6294440266", "n6294440267", "n5613965861", "n6294440269", "n5063751788", "n1113186267",
+      "n179974491", "n348207502", "n332113263", "n415950003", "n179974484",
+      // G: the center grid westbound („Брадистилов" north → west legs).
+      "n8342452192", "n316786260", "n316786261", "n316786262", "n6293978467",
+      // G/E: service street south to „Баку".
+      "n11364730197", "n685714841", "n685714833",
+      // E: „Баку" west, roundabout U-turn, return east over „Боровски".
+      "n685714834", "n279646951", "n279646953", "n279646956", "n279646958", "n1038574156",
+      "n1038574251", "n707684255", "n707684256", "n279646953", "n279646951", "n685714834",
+      "n685714833", "n6805916117", "n415949424", "n179974484", "n415950003", "n332113263",
+      "n348207502", "n179974491", "n417233856",
+    ],
+    bayRef: "l7",
+    parkTitleBg: "Паркирай на заден ход в очертаното място вдясно и спри напълно",
+    objectives: [
+      B2_OBJECTIVE("xH-stop-b2"),
+      light("xH-signal-1", "След стопа завий надясно, после наляво по булеварда — премини светофара", "n1805512602", 430.13, 235.3),
+      light("xH-signal-2", "Продължи направо през следващия светофар", "n5997970086", 421.91, 275.44),
+      zone("xH-turnaround", "Веднага след светофара завий наляво по „Проф. Марко Семов“ и се върни по булеварда на юг", 427.0, 159.0, 18),
+      zone("xH-turn-bradistilov", "В края на булеварда завий надясно по „Проф. Георги Брадистилов“", 389.21, -271.99, 20),
+      zone("xH-center-north", "Следвай „Брадистилов“ надясно на север, после наляво на запад", 245.03, -211.56, 16),
+      zone("xH-center-west", "Продължи на запад по „Брадистилов“", 122.64, -147.86, 16),
+      zone("xH-service-south", "Завий наляво на юг по обслужващата улица", 112.76, -268.47, 16),
+      zone("xH-turn-west", "Долу завий надясно, на запад", 48.24, -385.6, 16),
+      ...roundaboutObjectives("xH", "На кръговото се върни в обратна посока — излез на изток с десен мигач"),
+      zone("xH-borovski", "След Т-образното завий наляво, на север по „Боровски“", 234.5, -336.5, 16),
+      zone("xH-street-stanoev", "Премини направо през светофара и продължи по „Трайко Станоев“", 620.96, -215.89, 20),
+    ],
+    slots: [
+      leadCarSlot("xH-corridor", "B1-spawn4-straight", B1_SITE),
+      priorityLineSlot("xH-priority", "P1-b2-junction", ["n639792337", "n5063751788"], P1_SITE),
+      amberSlot("xH-amber", "A1-blvd-north", ["n6294463135", "n1805512602"], A1_SITE),
+      // NOTE: no V1 cyclist — H passes the „Боровски" T in the n415949424 →
+      // n179974484 direction only (the hook geometry is authored for the
+      // opposite approach); no C1 dart — H enters „Баку" AT n685714833, past
+      // the C1 crossing's authored westbound approach arm.
+      dartSlot("xH-dart", "C9w-baku-mid", ["n685714833", "n685714834"], C9W_SITE),
+      roundaboutSlot("xH-roundabout", "R1-rb-se", ["n279646953", "n279646956"], R1_SITE),
+    ],
+  },
+  // -------------------------------------------------------------- Shell I —
+  // the western diagonal: F's residential descent (spawn-6 mesh, „Димитров"
+  // boulevard with the B6 corridor, the A6 signal cluster), then east over
+  // the full „Боян Каменов"/„Брадистилов" diagonal through the uncontrolled
+  // 4-way (P3e), the service drop to „Баку" and the roundabout through-move
+  // to the „Ташев" bay. Same proven-geometry discipline as shell H: every
+  // hop and turn-triple already lives in shells F/D/E/G.
+  {
+    code: "I",
+    nameBg: "Западният диагонал",
+    descriptionBg:
+      "Жилищната мрежа на „Чилов“, булевард „Димитров“ и светофарите на „Габровски“, целият диагонал на „Боян Каменов“ и „Брадистилов“ на изток, тихата зона към „Баку“ и кръговото към „Ташев“.",
+    spawn: { pointId: "spawn-6" },
+    routeNodes: [
+      // F: „Чилов"/„Трендафилов" mesh, „Кюлявков", „Димитров" boulevard (B6),
+      // NW signal cluster (A6), down to the „Габровски"/„Каменов" corner.
+      "n316457339", "n316457332", "n10584378815", "n316457330", "n316457328", "n316457204",
+      "n366683204", "n316457177", "n331953596", "n316456679", "n316459565", "n2341970006",
+      "n10576801890", "n11148400269", "n8297002516", "n2341970004", "n331953595", "n10201904164",
+      "n12155370041", "n148570715", "n12155370039", "n12155370032", "n5065993424", "n269951357",
+      // D: „Боян Каменов" east through the uncontrolled 4-way (P3e).
+      "n10579363851", "n269951355", "n639932179", "n10581457590", "n316786266",
+      // D: the center diagonal east.
+      "n8585789857", "n8585789858", "n316786265", "n415949137", "n6297569733", "n348707759",
+      "n415950249", "n6293978467",
+      // E: service street south + „Баку" west.
+      "n11364730197", "n685714841", "n685714833", "n685714834",
+      // G: roundabout through-move northwest, „Баку" west, „Ташев" tail.
+      "n279646951", "n279646953", "n279646956", "n279646958", "n1038574156", "n1038574251",
+      "n279646652", "n415949138", "n707737275", "n10911122202", "n10829705443", "n148575255",
+      "n148575257", "n4403415572", "n9135347504",
+    ],
+    bayRef: TASHEV_BAY,
+    parkTitleBg: "Паркирай на заден ход в очертаното място вдясно и спри напълно",
+    objectives: [
+      zone("xI-trendafilov", "Следвай улицата и завий по „Владимир Трендафилов“", -231.37, 344.7, 16),
+      zone("xI-kyulyavkov", "Продължи по „Крум Кюлявков“ на югозапад", -196.9, 287.12, 16),
+      zone("xI-south", "На „Крум Кюлявков“ завий наляво, на юг", -387.3, 201.32, 16),
+      zone("xI-dimitrov", "Излез на булевард „Д-р Г. М. Димитров“ надясно, на югозапад", -217.86, 155.61, 16),
+      light("xI-cluster", "Премини светофарите и продължи по „Габровски“ на юг", "n12155370041", -478.91, 17.39),
+      zone("xI-kamenov", "На кръстовището завий наляво, на изток по „Проф. Боян Каменов“", -437.26, -79.03, 16),
+      zone("xI-4way", "Продължи през кръстовището и надясно по „Брадистилов“", -146.49, -49.42, 16),
+      zone("xI-center", "Следвай „Брадистилов“ на изток", 122.64, -147.86, 16),
+      zone("xI-service-south", "Завий надясно на юг по обслужващата улица", 112.76, -268.47, 16),
+      zone("xI-turn-west", "В края завий надясно, на запад", 100.31, -390.86, 16),
+      ...roundaboutObjectives("xI", "През кръговото продължи на северозапад — излез с десен мигач"),
+      zone("xI-baku-west", "Продължи на запад по „Баку“", -164.71, -310.27, 18),
+      zone("xI-tashev", "Завий наляво на юг, после надясно по „Проф. Арх. Петър А. Ташев“", -334.95, -321.44, 16),
+    ],
+    slots: [
+      leadCarSlot("xI-corridor", "B6-dimitrov-straight", B6_SITE),
+      amberSlot("xI-amber", "A6-nw-cluster", ["n10201904164", "n12155370041"], A6_SITE),
+      priorityRhrSlot("xI-rhr", "P3e-kamenov-4way", ["n10581457590", "n316786266"], P3E_SITE),
+      // NOTE: no C2 dart — I reaches „Кюлявков" through the mesh, never on
+      // the n316459565 → n316456672 approach the site was authored for; no
+      // C10e dart — the tail drives that „Баку" stretch WESTBOUND while the
+      // site's dart is staged for the eastbound approach.
+      dartSlot("xI-dart", "C9w-baku-mid", ["n685714833", "n685714834"], C9W_SITE),
+      roundaboutSlot("xI-roundabout", "R1-rb-se", ["n279646953", "n279646956"], R1_SITE),
     ],
   },
 ];

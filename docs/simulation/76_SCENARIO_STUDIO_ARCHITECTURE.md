@@ -25,7 +25,7 @@ into a perpendicular bay — the visual language for path teaching.
    bank already proved the correct shape: **author FAMILIES, generate VARIANTS**.
    Target: **~50–60 scenario TEMPLATES** (hand-designed, high quality) × parametric
    variants (bay width, traffic density, weather, night, tier) = **400–1,500 playable
-   tasks** from a maintainable source of truth. 7 exam shells → 14,940 variants is the
+   tasks** from a maintainable source of truth. 9 exam shells → 18,396 variants is the
    existence proof.
 2. **The second-renderer trap.** "2D top-down view" must NOT become a separate 2D
    engine. It is an **orthographic camera mode over the same 3D scene** (+ path

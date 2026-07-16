@@ -251,10 +251,12 @@ describe("C1 oracle — bank arithmetic re-derived by convolution", () => {
     }
   });
 
-  it("total bank size is exactly Σ shells × 6 conditions (claimed 14,940)", () => {
+  it("total bank size is exactly Σ shells × 6 conditions (claimed 18,396)", () => {
     const total = [...perShell.values()].reduce((s, v) => s + v, 0) * EXAM_CONDITIONS.length;
     expect(EXAM_BANK_SIZE).toBe(total);
-    expect(total).toBe(14_940); // the builders' headline number, re-derived
+    // The headline number, re-derived: 14,940 over shells A–G + 2 × 1,728
+    // from the route-shell slice (H/I — 288 budget-valid assignments each).
+    expect(total).toBe(18_396);
   });
 
   it("authored `terminal` flags agree with the independent doc-72 classification", () => {
@@ -545,7 +547,7 @@ describe("C1 — determinism and the wire tamper surface", () => {
   });
 
   it("out-of-range and foreign ids stay unknown lessons", () => {
-    for (const bad of ["EX-A-D1-9999", "EX-H-D1-0000", "EX-A-D9-0001", "EX-A-D1-00000"]) {
+    for (const bad of ["EX-A-D1-9999", "EX-Z-D1-0000", "EX-A-D9-0001", "EX-A-D1-00000"]) {
       const graded = gradeFinishWire({
         lessonId: bad,
         startedAtMs: 0,

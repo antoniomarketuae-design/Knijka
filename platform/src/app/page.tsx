@@ -80,7 +80,7 @@ export default function LandingPage() {
   const questionsRounded = Math.floor(questionCount / 100) * 100;
   const questionsLabel =
     questionsRounded >= 100 ? `над ${questionsRounded}` : `${questionCount}`;
-  // Same honesty rule for the sim exam bank (14 940 today, grows with data).
+  // Same honesty rule for the sim exam bank (18 396 today, grows with data).
   const examVariantsRounded = Math.floor(EXAM_BANK_SIZE / 100) * 100;
   const examVariantsLabel = `над ${examVariantsRounded.toLocaleString("bg-BG")}`;
   const features = buildFeatures(questionsLabel, examVariantsLabel);

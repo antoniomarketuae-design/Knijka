@@ -7,8 +7,8 @@
  *     max-tier list of all its slots is staged at once — createRunner /
  *     traffic.stage throw on unresolvable paths, so a data bug in ANY of the
  *     new sites (B3–B6, P3e/P3w, P5, R2, C4, C9w, ambers) fails here first.
- *  2. Twelve drawn variants (seeds 1–12 — deterministic, spread over all
- *     seven shells) stage their generated stagedEvents exactly as the
+ *  2. Thirty drawn variants (seeds 1–30 — deterministic, spread over all
+ *     nine shells) stage their generated stagedEvents exactly as the
  *     LessonScene would.
  *  3. Scripted guilty drives on two sampled variants grade the expected
  *     codes through the EXISTING rule engine, and the official exam
@@ -82,10 +82,10 @@ describe("every encounter site stages on the real lane graph", () => {
   }
 });
 
-describe("twelve drawn variants stage like a session", () => {
-  const ids = Array.from({ length: 12 }, (_, i) => drawExamVariantId(i + 1));
+describe("thirty drawn variants stage like a session", () => {
+  const ids = Array.from({ length: 30 }, (_, i) => drawExamVariantId(i + 1));
 
-  it(`the deterministic draw covers all seven shells (${ids.join(", ")})`, () => {
+  it(`the deterministic draw covers all nine shells (${ids.join(", ")})`, () => {
     expect(new Set(ids.map((id) => id.split("-")[1])).size).toBe(EXAM_SHELLS.length);
   });
 
