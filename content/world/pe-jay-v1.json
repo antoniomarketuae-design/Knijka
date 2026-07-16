@@ -1,0 +1,274 @@
+{
+ "format": "district-v1",
+ "meta": {
+  "district": "pe-jay",
+  "label": "PE-13 jaywalker — signalized X with a north-arm crossing",
+  "mapKind": "scenario-junction",
+  "generator": "tools/maps/gen_signal_x.mjs",
+  "boundsLocalMeters": {
+   "minX": -90,
+   "minY": -120,
+   "maxX": 90,
+   "maxY": 120
+  },
+  "attribution": {
+   "text": "Учебно светофарно кръстовище — оригинален параметричен дизайн (без данни от OpenStreetMap)",
+   "license": "All rights reserved",
+   "licenseUrl": "/",
+   "copyrightUrl": "/",
+   "obligation": "none — original work, no ODbL attribution required for this map"
+  },
+  "defaults": {
+   "maxspeedUrbanKmh": 50,
+   "note": "Учебно светофарно кръстовище: ограниченията идват от таговете на улиците."
+  },
+  "stats": {
+   "roadKm": 0.42,
+   "nodes": 5,
+   "edges": 4,
+   "intersections": 1,
+   "crossings": 1,
+   "buildings": 2,
+   "spawnPoints": 3
+  },
+  "scenario": {
+   "archetype": "x-junction",
+   "params": {
+    "armNorthM": 120,
+    "armSouthM": 120,
+    "armEastM": 90,
+    "armWestM": 90,
+    "nsClass": "secondary",
+    "ewClass": "residential",
+    "nsMaxKmh": 50,
+    "ewMaxKmh": 40
+   },
+   "junctionNodeId": "sx-n-c",
+   "expectedControl": "trafficLight",
+   "expectedClusterGroup": "ns",
+   "crossingId": "pej-x-1",
+   "crossingY": 34
+  }
+ },
+ "roads": {
+  "nodes": [
+   {
+    "id": "sx-n-c",
+    "x": 0,
+    "y": 0
+   },
+   {
+    "id": "sx-n-e",
+    "x": 90,
+    "y": 0
+   },
+   {
+    "id": "sx-n-n",
+    "x": 0,
+    "y": 120
+   },
+   {
+    "id": "sx-n-s",
+    "x": 0,
+    "y": -120
+   },
+   {
+    "id": "sx-n-w",
+    "x": -90,
+    "y": 0
+   }
+  ],
+  "edges": [
+   {
+    "id": "sx-e-s",
+    "from": "sx-n-s",
+    "to": "sx-n-c",
+    "class": "secondary",
+    "name": "Булевард — южен подход",
+    "oneway": false,
+    "roundabout": false,
+    "lanes": 2,
+    "lanesSource": "tag",
+    "maxspeed": 50,
+    "maxspeedSource": "tag",
+    "length": 120,
+    "geometry": [
+     [
+      0,
+      -120
+     ],
+     [
+      0,
+      0
+     ]
+    ]
+   },
+   {
+    "id": "sx-e-n",
+    "from": "sx-n-c",
+    "to": "sx-n-n",
+    "class": "secondary",
+    "name": "Булевард — северен изход",
+    "oneway": false,
+    "roundabout": false,
+    "lanes": 2,
+    "lanesSource": "tag",
+    "maxspeed": 50,
+    "maxspeedSource": "tag",
+    "length": 120,
+    "geometry": [
+     [
+      0,
+      0
+     ],
+     [
+      0,
+      120
+     ]
+    ]
+   },
+   {
+    "id": "sx-e-w",
+    "from": "sx-n-w",
+    "to": "sx-n-c",
+    "class": "residential",
+    "name": "Пресечна улица — запад",
+    "oneway": false,
+    "roundabout": false,
+    "lanes": 2,
+    "lanesSource": "tag",
+    "maxspeed": 40,
+    "maxspeedSource": "tag",
+    "length": 90,
+    "geometry": [
+     [
+      -90,
+      0
+     ],
+     [
+      0,
+      0
+     ]
+    ]
+   },
+   {
+    "id": "sx-e-e",
+    "from": "sx-n-c",
+    "to": "sx-n-e",
+    "class": "residential",
+    "name": "Пресечна улица — изток",
+    "oneway": false,
+    "roundabout": false,
+    "lanes": 2,
+    "lanesSource": "tag",
+    "maxspeed": 40,
+    "maxspeedSource": "tag",
+    "length": 90,
+    "geometry": [
+     [
+      0,
+      0
+     ],
+     [
+      90,
+      0
+     ]
+    ]
+   }
+  ]
+ },
+ "intersections": [
+  {
+   "id": "sx-n-c",
+   "x": 0,
+   "y": 0,
+   "degree": 4,
+   "signalized": true
+  }
+ ],
+ "crossings": [
+  {
+   "id": "pej-x-1",
+   "x": 0,
+   "y": 34,
+   "kind": "marked",
+   "signalized": true,
+   "edgeId": "sx-e-n"
+  }
+ ],
+ "roundabouts": [],
+ "buildings": [
+  {
+   "id": "sx-b-sw",
+   "height": 7,
+   "heightSource": "default",
+   "footprint": [
+    [
+     -44,
+     -44
+    ],
+    [
+     -27,
+     -44
+    ],
+    [
+     -27,
+     -27
+    ],
+    [
+     -44,
+     -27
+    ]
+   ]
+  },
+  {
+   "id": "sx-b-ne",
+   "height": 5,
+   "heightSource": "default",
+   "footprint": [
+    [
+     27,
+     27
+    ],
+    [
+     42,
+     27
+    ],
+    [
+     42,
+     42
+    ],
+    [
+     27,
+     42
+    ]
+   ]
+  }
+ ],
+ "spawnPoints": [
+  {
+   "id": "sx-spawn-south",
+   "x": 0,
+   "y": -105,
+   "heading": 0,
+   "edgeId": "sx-e-s",
+   "name": "Южен подход към светофара"
+  },
+  {
+   "id": "sx-spawn-east",
+   "x": 75,
+   "y": 0,
+   "heading": 270,
+   "edgeId": "sx-e-e",
+   "name": "Източен подход към светофара"
+  },
+  {
+   "id": "sx-spawn-west",
+   "x": -75,
+   "y": 0,
+   "heading": 90,
+   "edgeId": "sx-e-w",
+   "name": "Западен подход към светофара"
+  }
+ ]
+}

@@ -829,6 +829,130 @@ export const SC_CROSSING_WHITE_CANE: ScenarioSpec = {
   localeBg: "bg-BG",
 };
 
+// ---------------------------------------------------------------------------
+// 8. sc-pe-jaywalker — „Пешеходец на червено" (PE-13) on pe-jay-v1
+// ---------------------------------------------------------------------------
+
+/**
+ * PE-13 — the jaywalker against red at a SIGNALIZED junction (ЗДвП чл. 120:
+ * грижата към пешеходеца на платното не зависи от неговото нарушение). The
+ * batch-1 header's skip note is now RESOLVED: pe-jay-v1 (gen_pe_jaywalk.mjs)
+ * reuses the signal-x builder — a real signalized INTERSECTION the runtime
+ * adjudicates — with ONE post-processed crossing (pej-x-1, north exit arm,
+ * y = 34, signalized: true — glued to the junction cluster). The STAGED
+ * walker ignores the red pedestrian phase by design: that IS the jaywalk.
+ * The crossing-zone grading arms on OCCUPANCY, not phase — the driver's
+ * green never suspends the duty of care. Trigger 55 m releases her as the
+ * player crosses the stop line on green (natural phases in live play only
+ * admit a line crossing on green, so the story holds structurally; the
+ * recorded ghosts pin the canonical green via signalOffsets).
+ */
+const JAY_PED: PedestrianDartOutSpec = {
+  id: "sc-jay-ped",
+  kind: "pedestrianDartOut",
+  crossingId: "pej-x-1",
+  crossing: { x: 0, y: 34 },
+  start: { x: CURB_X, y: 34 },
+  dir: { x: 1, y: 0 },
+  speedMps: 1.5,
+  travelM: 23.45, // curb → across the 16.25 m carriageway → 5.6 m walk-out
+  roadFromM: 1.6,
+  roadToM: 17.85,
+  triggerDistM: 55,
+  minTriggerSpeedKmh: 10,
+};
+
+export const SC_PE_JAYWALKER: ScenarioSpec = {
+  id: "sc-pe-jaywalker",
+  family: "pedestrians",
+  tagsBg: ["пешеходци", "светофар", "зелено", "грижа"],
+  titleBg: "Пешеходец на червено",
+  objectiveBg:
+    "Премини светофарното кръстовище на зелено — и спри за пешеходеца, който пресича на своето червено веднага след него. Зеленото разрешава на теб, но не отменя грижата към човека на платното.",
+  archetypeIds: ["PE-13"],
+  conceptIds: ["c-pedestrian-rights-duties", "c-crosswalk-yield", "c-traffic-light-signals"],
+  map: {
+    archetype: "x-junction",
+    // The generator recipe — mirrored in pe-jay-v1.json meta.scenario.params
+    // (tools/maps/gen_pe_jaywalk.mjs: buildSignalXDistrict + the one
+    // post-processed crossing).
+    params: {
+      armNorthM: 120,
+      armSouthM: 120,
+      armEastM: 90,
+      armWestM: 90,
+      nsClass: "secondary",
+      ewClass: "residential",
+      nsMaxKmh: 50,
+      ewMaxKmh: 40,
+    },
+    districtId: "pe-jay-v1",
+  },
+  start: {
+    spawnPointId: "sx-spawn-south",
+    vehicleStart: "ready",
+  },
+  instructionsBg: [
+    { n: 1, textBg: "Тръгни на север — напред е светофарно кръстовище с пешеходна пътека веднага след него." },
+    { n: 2, textBg: "Светофарът за теб е зелен — премини кръстовището с готовност: гледай и пътеката отвъд него." },
+    {
+      n: 3,
+      textBg:
+        "Пешеходец пресича на своето червено! Твоето зелено не отменя грижата — намали и спри преди пътеката.",
+    },
+    { n: 4, textBg: "Изчакай го да освободи платното напълно — не се разминавай с него „на косъм“." },
+    { n: 5, textBg: "Продължи на север, когато пътеката е свободна." },
+  ],
+  success: [
+    {
+      id: "sc-jay-approach",
+      titleBg: "Приближи кръстовището с премерена скорост",
+      params: { kind: "reachZone", x: LANE_2, y: -45, radiusM: 8, maxSpeedKmh: 45 },
+    },
+    {
+      id: "sc-jay-clear",
+      titleBg: "Премини пътеката след кръстовището, когато е свободна",
+      params: { kind: "reachZone", x: LANE_2, y: 70, radiusM: 10 },
+    },
+  ],
+  rubric: { parTimeSec: 75 },
+  shadow: { path: "content/traces/sc-pe-jaywalker/shadow-correct.trace.json" },
+  mistakes: [
+    {
+      traceRef: { path: "content/traces/sc-pe-jaywalker/mistake-my-green.trace.json" },
+      titleBg: "„Аз съм на зелено“",
+      whatWentWrongBg:
+        "Колата премина през заетата пътека, защото „светофарът е зелен“. Зеленото разрешава преминаването през кръстовището — но пешеходецът, стъпил на платното, е защитен от чл. 120 дори в нарушение: пропускаш го, а простъпката му я отбелязва законът, не бронята ти.",
+      codeRefs: ["PEDESTRIAN_NOT_YIELDED"],
+    },
+    {
+      traceRef: { path: "content/traces/sc-pe-jaywalker/mistake-collision.trace.json" },
+      titleBg: "Удар в пешеходеца",
+      whatWentWrongBg:
+        "Погледът остана върху зеления светофар, а не върху пътеката зад него — и колата удари пресичащия. Ударът в пешеходец прекратява изпита независимо чий сигнал е бил зелен: грижата по чл. 120 е абсолютна.",
+      codeRefs: ["COLLISION"],
+    },
+  ],
+  teach: {
+    whenBg:
+      "На всяко светофарно кръстовище с пътека след него — особено в града, където пешеходци дотичват „на червено“. Твоето зелено е разрешение да преминеш, не имунитет срещу човека на платното.",
+    whyBg:
+      "Най-тежките удари с пешеходци стават точно на зелено за колата: водачът гледа светофара, не пътеката, и скоростта е висока. Чл. 120 е категоричен — пешеходецът на платното се пропуска дори когато пресича неправилно, защото той губи живота, а ти само секунди.",
+    lawRef: "ЗДвП чл. 120",
+    examinerBg:
+      "Изпитващият гледа: премереното преминаване на зелено С наблюдение на пътеката отвъд, отчетливо спиране при пешеходец на платното (независимо от сигнала му) и потегляне едва на чиста пътека. Преминаване покрай пресичащ пешеходец е опасна грешка.",
+  },
+  levels: [
+    { level: 1 },
+    { level: 2 },
+    { level: 3 },
+    { level: 4, vehicleStart: "cold" },
+  ],
+  staged: [JAY_PED],
+  conditions: { weather: "dry" },
+  localeBg: "bg-BG",
+};
+
 /** The pedestrian-family templates, in catalog order (registered in
  *  templates.ts). */
 export const SCENARIO_TEMPLATES_PE: readonly ScenarioSpec[] = [
@@ -839,4 +963,5 @@ export const SCENARIO_TEMPLATES_PE: readonly ScenarioSpec[] = [
   SC_CROSSING_BUS_SHADOW,
   SC_CROSSING_CHILD_BALL,
   SC_CROSSING_WHITE_CANE,
+  SC_PE_JAYWALKER,
 ];

@@ -32,6 +32,7 @@ import {
 import { recordScCrossingBusShadowDrive } from "../../../traces/scCrossingBusShadow";
 import { recordScCrossingChildBallDrive } from "../../../traces/scCrossingChildBall";
 import { recordScCrossingWhiteCaneDrive } from "../../../traces/scCrossingWhiteCane";
+import { recordScPeJaywalkerDrive } from "../../../traces/scPeJaywalker";
 import { applyTick, buildLessonResult, createLessonSession } from "../../engine";
 import { gradeFinishWire, serializeRuleEvents } from "../../wire";
 import type { LessonResult, LessonSessionState } from "../../types";
@@ -45,6 +46,7 @@ import {
   SC_CROSSING_RAIN_SPRINT,
   SC_CROSSING_SLOW_CROSSER,
   SC_CROSSING_WHITE_CANE,
+  SC_PE_JAYWALKER,
 } from "../templates-pe";
 import type { ScenarioSpec } from "../types";
 
@@ -127,6 +129,10 @@ const CORRECT: Array<{ spec: ScenarioSpec; record: (d: unknown, onTick: OnTick) 
     record: (d, onTick) => recordScCrossingChildBallDrive(d, "shadow-correct", { onTick }),
   },
   {
+    spec: SC_PE_JAYWALKER,
+    record: (d, onTick) => recordScPeJaywalkerDrive(d, "shadow-correct", { onTick }),
+  },
+  {
     spec: SC_CROSSING_WHITE_CANE,
     record: (d, onTick) => recordScCrossingWhiteCaneDrive(d, "shadow-correct", { onTick }),
   },
@@ -207,6 +213,16 @@ describe("S3-A counter-proofs — pedestrian mistakes grade through the live pip
   it("white-cane not-yielded: PEDESTRIAN_NOT_YIELDED grades, no collision, not passed", () => {
     const outcome = driveThroughSession(SC_CROSSING_WHITE_CANE, (d, onTick) =>
       recordScCrossingWhiteCaneDrive(d, "mistake-not-yielded", { onTick }),
+    );
+    const codes = driveViolationCodes(outcome);
+    expect(codes).toContain("PEDESTRIAN_NOT_YIELDED");
+    expect(codes).not.toContain("COLLISION");
+    expect(outcome.result.passed).toBe(false);
+  });
+
+  it("jaywalker my-green: PEDESTRIAN_NOT_YIELDED grades on a GREEN light, not passed", () => {
+    const outcome = driveThroughSession(SC_PE_JAYWALKER, (d, onTick) =>
+      recordScPeJaywalkerDrive(d, "mistake-my-green", { onTick }),
     );
     const codes = driveViolationCodes(outcome);
     expect(codes).toContain("PEDESTRIAN_NOT_YIELDED");
