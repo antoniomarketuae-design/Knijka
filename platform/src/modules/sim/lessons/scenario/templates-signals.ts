@@ -549,10 +549,123 @@ export const SC_SIGNAL_CONTROLLER: ScenarioSpec = {
   localeBg: "bg-BG",
 };
 
+// ---------------------------------------------------------------------------
+// sc-signal-redyellow — „Тръгване на червено-жълто" (doc 72 JU-08) on sx-v1
+// (map REUSED; the 1 s red+yellow window pinned by signalOffsets)
+// ---------------------------------------------------------------------------
+
+/** JU-08 — потегляне на червено-жълто (ППЗДвП чл. 31: червено + жълто ЗАЕДНО
+ *  подготвя, но НЕ разрешава преминаването — тръгва се чак на чисто зелено).
+ *  The runtime models redYellow as its OWN 1 s lamp state and the reducer
+ *  grades a line crossing in it as RED_YELLOW_CROSSED — so this drill is pure
+ *  authoring: the recorder's determinism pins the 1 s window forever (the
+ *  byte-identity gate). No staged conflict; the fault is the driver's own
+ *  anticipation. */
+export const SC_SIGNAL_REDYELLOW: ScenarioSpec = {
+  id: "sc-signal-redyellow",
+  family: "signals",
+  tagsBg: ["светофар", "червено-жълто", "потегляне", "изпреварване на зеленото"],
+  titleBg: "Тръгване на червено-жълто",
+  objectiveBg:
+    "Изчакай на червено и се приготви на червено-жълто — но премини стоп-линията чак на чисто зелено. Комбинираният сигнал подготвя тръгването, не го разрешава.",
+  archetypeIds: ["JU-08"],
+  conceptIds: ["c-traffic-light-signals", "c-signal-hierarchy", "c-junction-approach"],
+  map: {
+    archetype: "x-junction",
+    params: {
+      armNorthM: 90,
+      armSouthM: 120,
+      armEastM: 120,
+      armWestM: 170,
+      nsClass: "secondary",
+      ewClass: "residential",
+      nsMaxKmh: 50,
+      ewMaxKmh: 40,
+    },
+    districtId: "sx-v1",
+  },
+  start: {
+    spawnPointId: "sx-spawn-south",
+    vehicleStart: "ready",
+  },
+  instructionsBg: [
+    { n: 1, textBg: "Тръгни на север — светофарът напред свети червено." },
+    { n: 2, textBg: "Спри плавно на стоп-линията и изчакай на червено." },
+    {
+      n: 3,
+      textBg:
+        "Светне ли червено + жълто: приготви се — скорост, съединител, поглед — но кракът остава на спирачката.",
+    },
+    { n: 4, textBg: "Премини чак на чисто зелено, след бърз поглед наляво и надясно." },
+    { n: 5, textBg: "Продължи на север с равномерна скорост." },
+  ],
+  success: [
+    {
+      id: "sc-sry-approach",
+      titleBg: "Спри на стоп-линията на червено",
+      params: { kind: "reachZone", x: 4.06, y: -34, radiusM: 8, maxSpeedKmh: 40 },
+    },
+    {
+      id: "sc-sry-pass",
+      titleBg: "Премини кръстовището на зелено",
+      params: {
+        kind: "passSignal",
+        nodeId: "sx-n-c",
+        x: 0,
+        y: 0,
+        radiusM: 45,
+        control: "trafficLight",
+        requireRedMet: true,
+      },
+    },
+    {
+      id: "sc-sry-exit",
+      titleBg: "Излез от кръстовището на север",
+      params: { kind: "reachZone", x: 4.06, y: 45, radiusM: 9 },
+    },
+  ],
+  rubric: { parTimeSec: 60 },
+  shadow: { path: "content/traces/sc-signal-redyellow/shadow-correct.trace.json" },
+  mistakes: [
+    {
+      traceRef: { path: "content/traces/sc-signal-redyellow/mistake-creep.trace.json" },
+      titleBg: "Пропълзяване на червено-жълто",
+      whatWentWrongBg:
+        "Колата тръгна с появата на жълтото към червеното и пресече линията, ПРЕДИ да светне зелено. Червено + жълто подготвя тръгването — преминаването остава забранено, а напречното направление може още да дочиства кръстовището.",
+      codeRefs: ["RED_YELLOW_CROSSED"],
+    },
+    {
+      traceRef: { path: "content/traces/sc-signal-redyellow/mistake-jump.trace.json" },
+      titleBg: "Изстрелване преди зеленото",
+      whatWentWrongBg:
+        "Ускорение „на изпреварване“ — колата се изстреля в секундата на червено-жълтото, за да „хване“ зеленото. Печели се под секунда, а се влиза в кръстовище, което насрещните и пешеходците още не са освободили.",
+      codeRefs: ["RED_YELLOW_CROSSED"],
+    },
+  ],
+  teach: {
+    whenBg:
+      "На всяко светофарно кръстовище с червено-жълта фаза — тя трае около секунда и изкушава да се тръгне отрано, особено при колона отзад.",
+    whyBg:
+      "Секундата на червено-жълто е точно секундата, в която закъснелите от напречното направление дочистват кръстовището. Тръгналият отрано се среща с тях в центъра. Комбинираният сигнал е подарен старт за подготовка, не за движение.",
+    lawRef: "ППЗДвП чл. 31",
+    examinerBg:
+      "Изпитващият гледа: пълно изчакване на червено, готовност на червено-жълто И потегляне чак на чисто зелено. Пресичане на линията преди зеленото е грешка срещу сигнала.",
+  },
+  levels: [
+    { level: 1 },
+    { level: 2 },
+    { level: 3 },
+    { level: 4, vehicleStart: "cold" },
+  ],
+  conditions: { weather: "dry" },
+  localeBg: "bg-BG",
+};
+
 /** The SIGNALS-family dead/flashing-signal templates (registered in templates.ts). */
 export const SCENARIO_TEMPLATES_SIGNALS: readonly ScenarioSpec[] = [
   SC_SIGNAL_DEAD,
   SC_SIGNAL_FLASHING,
   SC_SIGNAL_HESITATION,
   SC_SIGNAL_CONTROLLER,
+  SC_SIGNAL_REDYELLOW,
 ];

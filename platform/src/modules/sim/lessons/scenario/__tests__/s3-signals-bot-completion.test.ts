@@ -25,13 +25,18 @@ import {
   type ScSignalTemplateId,
   type ScSignalTraceName,
 } from "../../../traces/scSignals";
+import { recordScSignalRedYellowDrive } from "../../../traces/scSignalRedYellow";
 import { applyTick, buildLessonResult, createLessonSession } from "../../engine";
 import { gradeFinishWire, serializeRuleEvents } from "../../wire";
 import type { LessonResult, LessonSessionState } from "../../types";
 import { compileScenario } from "../compile";
 import { scenarioLessonById } from "../resolve";
 import { scoreRubric } from "../rubric";
-import { SC_SIGNAL_DEAD, SC_SIGNAL_FLASHING } from "../templates-signals";
+import {
+  SC_SIGNAL_DEAD,
+  SC_SIGNAL_FLASHING,
+  SC_SIGNAL_REDYELLOW,
+} from "../templates-signals";
 import type { ScenarioSpec } from "../types";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -133,3 +138,33 @@ for (const { spec, id } of CASES) {
     }
   });
 }
+
+
+describe("JU-08 bot completion — sc-signal-redyellow at L3", () => {
+  it("the shadow completes the live session: red met, green pass, zero violations", () => {
+    const lesson = compileScenario(SC_SIGNAL_REDYELLOW, 3);
+    let session = createLessonSession(lesson);
+    recordScSignalRedYellowDrive(loadDistrict("sx-v1"), "shadow-correct", {
+      onTick: (tick) => {
+        session = applyTick(session, tick).state;
+      },
+    });
+    const result = buildLessonResult(session);
+    expect(session.phase).toBe("completed");
+    expect(result.passed).toBe(true);
+    expect(result.score).toBe(0);
+  });
+
+  it("the creep counter-proof: RED_YELLOW_CROSSED grades through the stack", () => {
+    const lesson = compileScenario(SC_SIGNAL_REDYELLOW, 3);
+    let session = createLessonSession(lesson);
+    const drive = recordScSignalRedYellowDrive(loadDistrict("sx-v1"), "mistake-creep", {
+      onTick: (tick) => {
+        session = applyTick(session, tick).state;
+      },
+    });
+    const codes = drive.ruleEvents.filter((e) => e.kind === "violation").map((e) => e.code);
+    expect(codes).toContain("RED_YELLOW_CROSSED");
+    expect(buildLessonResult(session).passed).toBe(false);
+  });
+});
