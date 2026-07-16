@@ -63,9 +63,41 @@
  * The чл. 91 make-way TEACHING lives in this template's copy (objective,
  * instructions, teach card) — the graded code stays a shipped one.
  *
- * VU-05/06 stay 🟡 PARTIAL (recipe/world only) and VU-02/03/04/07/08/11/
- * 12/13/14 stay 🔴 NEW (lateral-clearance detector, door-swing/bus/e-scooter
- * actors) — later waves.
+ * VRU-INTERACTION pack slice 1 (doc 72 §15 item #8 / N8) adds VU-02 + VU-04
+ * on two purpose-built straight streets (tools/maps/gen_vu_streets.mjs):
+ *
+ *  - sc-vu-pass-clearance  „Изпреварване на велосипедист"  (VU-02, vu-pass-v1)
+ *    — the LATERAL-CLEARANCE duty (ЗДвП чл. 42). The staged actor REUSES the
+ *    shipped cyclistRightHook kind as a plain curb-cruise recipe: the
+ *    "junction" is the street's far end node, which the driver never turns
+ *    right at, so the CyclistRightHookRunner only ever contributes its
+ *    release choreography + the collision(cyclist) contact channel — the
+ *    GRADING is the NEW runtime vulnerable-pass tracker (worldRuntime
+ *    VULNERABLE_PASS_*: min lateral distance over the alongside phase;
+ *    prioritySituation "vulnerable-pass" → VULNERABLE_PASS_TOO_CLOSE /
+ *    YIELDED_TO_PRIORITY). NO new actor type (the N8 mandate).
+ *
+ *  - sc-vu-door-zone  „Зоната на вратата"  (VU-04, vu-door-v1) — the parked-
+ *    row discipline (ЗДвП чл. 20; the opener's duty чл. 95 lives in the
+ *    copy). The row is meta.scenario.bays (precise hittable cars in the
+ *    scene, lotObstacleRects headless); the DOOR is a TIMED trace obstacle
+ *    (ObstacleRect2D.trigger — arms on the player's approach, the telltale
+ *    position-latch discipline). Mistake composition (documented ruling):
+ *    hugging the row grades COLLISION (the door); the late dodge into the
+ *    oncoming bank grades CROSSED_SOLID_LINE via the authored М1 span over
+ *    the row — ONE honest code per demo, no staged oncoming needed. SCENE
+ *    DESCOPE (honest): the live scene renders the parked row but NO door
+ *    mesh/collider — the door ambush lives in the recorded demos + copy
+ *    (annotations carry the beat); a swinging-door scene prop is a later
+ *    polish item.
+ *
+ * NOTE on doc-72 numbering: the DOOR archetype is VU-04 („Вратата"); VU-03 is
+ * the cyclist swerve-out, which slice 1 ships only as the vulnerable-pass
+ * tracker's SWERVE STAND-DOWN (the margin lesson's honest half), not as a
+ * scripted path-deviation actor.
+ *
+ * VU-05/06 stay 🟡 PARTIAL (recipe/world only) and VU-03 (scripted swerve
+ * actor)/07/08/11/12/13/14 stay 🔴 NEW — later waves.
  */
 
 import type {
@@ -520,9 +552,284 @@ export const SC_VU_EMERGENCY_JUNCTION: ScenarioSpec = {
   localeBg: "bg-BG",
 };
 
+// ---------------------------------------------------------------------------
+// 4. sc-vu-pass-clearance — „Изпреварване на велосипедист" (VU-02) on
+//    vu-pass-v1 (360 m junction-free 1+1 street; the header documents WHY the
+//    staged cyclist rides the cyclistRightHook kind as a plain cruise recipe)
+// ---------------------------------------------------------------------------
+
+/** vu-pass-v1 northbound lane center (0.5 drawn lane east — the L7 pattern). */
+const VUP_LANE_X = 4.06;
+/** The cyclist's curb line: lane center + extraRightOffsetM 2.6 → x ≈ 6.66.
+ *  Pass-geometry honesty (runtime VULNERABLE_PASS_* doc): center-to-center
+ *  lateral carries ~1.25 m of bodies, so the clean line x 2.2 gives 4.46 m of
+ *  centers ≈ 3.2 m of air (≥ the 1.5 m norm), while the squeeze line x 4.3
+ *  gives 2.36 m of centers ≈ 1.1 m of air — inside the convict band, still
+ *  0.16 m clear of the runner's 2.2 m contact radius. */
+const VUP_CYCLIST_X = 6.66;
+
+/**
+ * The staged CYCLIST on vu-pass-v1: rides the east curb northbound the whole
+ * street at a city-cyclist ~11 km/h. REUSED cyclistRightHook kind (NO new
+ * actor type — the N8 mandate): the "junction" is the far end node the driver
+ * never turns right at, so the runner contributes only the release
+ * choreography + the collision(cyclist) contact channel; releaseDistM 360
+ * exceeds the spawn's ~345 m node distance, so the cyclist cruises from the
+ * first frame (no hold theater on an empty street). The GRADING is the
+ * runtime's vulnerable-pass tracker.
+ */
+const VU_PASS_CYCLIST: CyclistRightHookSpec = {
+  id: "sc-vup-cyclist",
+  kind: "cyclistRightHook",
+  libraryEventId: "ev-cyclist",
+  junction: { nodeId: "vup-n-end", x: 0, y: 360 },
+  actor: {
+    pathNodes: ["vup-n-start", "vup-n-end"],
+    hold: { nodeIndex: 1, offsetM: -250 }, // y = 110 — ~95 m ahead of the spawn
+    cruiseSpeedMps: 3.0,
+    extraRightOffsetM: 2.6, // the curb line (tags the proxy as a cyclist, A11)
+    colorIndex: 1,
+  },
+  junctionNodeIndex: 1,
+  releaseDistM: 360,
+  dangerRadiusM: 9, // inert here — no right turn exists on this street
+  conflictWindowM: 25,
+};
+
+/**
+ * VU-02 — тясно изпреварване на колело (ЗДвП чл. 42: изпреварваш велосипедист
+ * само с достатъчно СТРАНИЧНО РАЗСТОЯНИЕ и намалена скорост; учи се ~1,5 м
+ * въздух — bank-verified: q-uyazvimi-010/012/045 ground the duty at чл. 42).
+ * Graded by the runtime vulnerable-pass tracker: convict < ~1.2 m of air,
+ * teach band 1.2–1.5 m (silent — honest grace), ≥ 1.5 m earns the yielded
+ * commendation.
+ */
+export const SC_VU_PASS_CLEARANCE: ScenarioSpec = {
+  id: "sc-vu-pass-clearance",
+  family: "vru",
+  tagsBg: ["велосипедист", "странична дистанция", "изпреварване", "уязвими участници"],
+  titleBg: "Изпреварване на велосипедист",
+  objectiveBg:
+    "Покрай десния бордюр се движи велосипедист. Изпревари го с широка дъга — поне метър и половина въздух между вас: огледало, мигач наляво, отмести се осезаемо и се прибери чак когато е далеч зад теб.",
+  archetypeIds: ["VU-02"],
+  conceptIds: ["c-cyclists", "c-general-care-duty"],
+  map: {
+    archetype: "straight-street",
+    // The generator recipe — mirrored in vu-pass-v1.json meta.scenario.params
+    // (tools/maps/gen_vu_streets.mjs).
+    params: { lengthM: 360, maxspeedKmh: 50, variant: "pass" },
+    districtId: "vu-pass-v1",
+  },
+  start: {
+    spawnPointId: "vup-spawn-start",
+    vehicleStart: "ready",
+  },
+  instructionsBg: [
+    { n: 1, textBg: "Потегли по правата улица и се установи на спокойна градска скорост." },
+    {
+      n: 2,
+      textBg:
+        "Пред теб, покрай десния бордюр, кара велосипедист. Не се залепяй зад него — прецени отрано откъде ще минеш.",
+    },
+    {
+      n: 3,
+      textBg:
+        "Огледало, мигач наляво и се отмести осезаемо наляво — целта е поне метър и половина въздух между теб и колелото.",
+    },
+    {
+      n: 4,
+      textBg:
+        "Подмини го спокойно, без да ускоряваш рязко до него — велосипедистът може да се отклони внезапно заради дупка или вятър.",
+    },
+    { n: 5, textBg: "Прибери се плавно вдясно чак когато велосипедистът е изцяло зад теб, и продължи." },
+  ],
+  success: [
+    {
+      id: "sc-vup-pass",
+      titleBg: "Изпревари велосипедиста с широка дъга",
+      // Post-pass checkpoint back in the lane, ~60 m past where the pass lands.
+      params: { kind: "reachZone", x: VUP_LANE_X, y: 210, radiusM: 9 },
+    },
+    {
+      id: "sc-vup-finish",
+      titleBg: "Продължи до края на отсечката",
+      params: { kind: "reachZone", x: VUP_LANE_X, y: 300, radiusM: 9 },
+    },
+  ],
+  rubric: { parTimeSec: 60 },
+  // RECORDED (N8 slice 1): committed deterministic recordings of the authored
+  // scripts in traces/scVuPass.ts; the §5 gate (shadow replays with ZERO
+  // violations + YIELDED_TO_PRIORITY from the clean pass) and the §9 stage-5
+  // code asserts run in traces/__tests__/sc-vu-pass-clearance-traces.test.ts
+  // (re-record with RECORD_TRACES=1).
+  shadow: { path: "content/traces/sc-vu-pass-clearance/shadow-correct.trace.json" },
+  mistakes: [
+    {
+      traceRef: { path: "content/traces/sc-vu-pass-clearance/mistake-squeeze.trace.json" },
+      titleBg: "Провиране покрай велосипедиста",
+      whatWentWrongBg:
+        "Колата се провря покрай велосипедиста на около метър въздух, без изобщо да смени линията си. Законът изисква ДОСТАТЪЧНА странична дистанция (чл. 42) — учи се метър и половина: на метър всяко клатушкане на колелото е сблъсък, а велосипедистът се отклонява без предупреждение.",
+      codeRefs: ["VULNERABLE_PASS_TOO_CLOSE"],
+    },
+    {
+      traceRef: { path: "content/traces/sc-vu-pass-clearance/mistake-fast-close.trace.json" },
+      titleBg: "Бързо изпреварване с късно отместване",
+      whatWentWrongBg:
+        "Водачът се отмести едва в последния миг и профуча плътно покрай велосипедиста с непроменена скорост. Дъгата се строи ОТРАНО — късното отместване оставя същия половин метър въздух, само че при два пъти по-висока скорост: по-малко време за реакция и по-силен въздушен тласък върху колелото (чл. 42).",
+      codeRefs: ["VULNERABLE_PASS_TOO_CLOSE"],
+    },
+  ],
+  teach: {
+    whenBg:
+      "Всеки път, когато изпреварваш велосипедист, тротинетка или каруца в града и извън него — включително когато „само ще го подминеш“ в собствената си лента. Широката дъга важи и при пресичане на осевата, ако е прекъсната и насрещното е чисто.",
+    whyBg:
+      "Притиснатият велосипедист няма ламарина и няма втори шанс: дупка, шахта или порив на вятъра го отклоняват с метър встрани за миг. Дистанцията, която оставяш, е точно резервът за това отклонение — затова се учи метър и половина, а не „колкото се събере“.",
+    lawRef: "ЗДвП чл. 42",
+    examinerBg:
+      "Изпитващият гледа: навременна преценка (без залепяне зад колелото), огледало и мигач преди отместването, осезаема широка дъга с намалена скорост и плавно прибиране чак след като велосипедистът е чист. Провирането на по-малко от метър е грешка.",
+  },
+  levels: [
+    { level: 1 },
+    { level: 2 },
+    { level: 3 },
+    { level: 4, vehicleStart: "cold" },
+  ],
+  staged: [VU_PASS_CYCLIST],
+  conditions: { weather: "dry" },
+  localeBg: "bg-BG",
+};
+
+// ---------------------------------------------------------------------------
+// 5. sc-vu-door-zone — „Зоната на вратата" (VU-04) on vu-door-v1 (300 m 1+1
+//    street + occupied parallel row on the east curb + М1 span over the row;
+//    the header documents the door's timed-obstacle design + scene descope)
+// ---------------------------------------------------------------------------
+
+/** vu-door-v1 northbound lane center. */
+const VUD_LANE_X = 4.06;
+/** The door-zone DISCIPLINE line: ~1.2 m west of the lane center — the car's
+ *  right flank rides ≈ 2.3 m off the parked row (a full door width + margin).
+ *  Pinned with the row (bays x 6.75, parked-rect flank x 5.85) by the
+ *  vu-streets district battery. */
+const VUD_CLEAR_X = 2.6;
+
+/**
+ * VU-04 — вратата / the door zone (driver side: ЗДвП чл. 20 — контрол и
+ * готовност за спиране покрай редица паркирани коли; bank-verified:
+ * q-uyazvimi-056 grounds exactly the parked-row precautions at чл. 20. The
+ * OPENER's duty — чл. 95, не отваряй врата, ако застрашаваш някого — lives in
+ * the copy: the graded lesson is the DRIVER's positioning). The door itself
+ * is a TIMED trace obstacle (ObstacleRect2D.trigger, pinned in
+ * traces/scVuDoorZone.ts); the live scene mounts the hittable parked row from
+ * meta.scenario.bays but NO door prop (documented descope — the demos and the
+ * copy carry the ambush).
+ */
+export const SC_VU_DOOR_ZONE: ScenarioSpec = {
+  id: "sc-vu-door-zone",
+  family: "vru",
+  tagsBg: ["паркирани коли", "врата", "странична дистанция", "градско каране"],
+  titleBg: "Зоната на вратата",
+  objectiveBg:
+    "Минаваш покрай плътна редица паркирани коли. Дръж поне една отворена врата разстояние от тях и намали — вратата се отваря без предупреждение, а между колите може да излезе пешеходец.",
+  archetypeIds: ["VU-04"],
+  conceptIds: ["c-general-care-duty", "c-leaving-vehicle-safely"],
+  map: {
+    archetype: "straight-street",
+    // The generator recipe — mirrored in vu-door-v1.json meta.scenario.params
+    // (tools/maps/gen_vu_streets.mjs).
+    params: {
+      lengthM: 300,
+      maxspeedKmh: 40,
+      variant: "door",
+      banFromM: 90,
+      banToM: 240,
+      parkedRowXM: 6.75,
+    },
+    districtId: "vu-door-v1",
+  },
+  start: {
+    spawnPointId: "vud-spawn-start",
+    vehicleStart: "ready",
+  },
+  instructionsBg: [
+    { n: 1, textBg: "Потегли по улицата — напред вдясно започва дълга редица паркирани коли." },
+    {
+      n: 2,
+      textBg:
+        "Още преди редицата се отмести наляво в своята лента: дръж поне една отворена врата разстояние от паркираните коли.",
+    },
+    {
+      n: 3,
+      textBg:
+        "Намали и гледай КРАЙ колите, не само пътя: крака под браниците, сенки между колите, светнали стопове, глава зад волана.",
+    },
+    {
+      n: 4,
+      textBg:
+        "Ако врата се отвори пред теб, спокойно продължи по линията си — дистанцията, която държиш, Е спасението; не свивай рязко в насрещното.",
+    },
+    { n: 5, textBg: "След края на редицата се върни плавно към средата на лентата и продължи." },
+  ],
+  success: [
+    {
+      id: "sc-vud-row",
+      titleBg: "Премини покрай редицата с дистанция от вратите",
+      // Mid-row checkpoint on the discipline line, at calm pace.
+      params: { kind: "reachZone", x: VUD_CLEAR_X, y: 175, radiusM: 6, maxSpeedKmh: 40 },
+    },
+    {
+      id: "sc-vud-finish",
+      titleBg: "Продължи до края на улицата",
+      params: { kind: "reachZone", x: VUD_LANE_X, y: 270, radiusM: 9 },
+    },
+  ],
+  rubric: { parTimeSec: 55 },
+  // RECORDED (N8 slice 1): committed deterministic recordings of the authored
+  // scripts in traces/scVuDoorZone.ts; the §5 gate (shadow replays with ZERO
+  // violations while the door opens harmlessly beside it) and the §9 stage-5
+  // code asserts run in traces/__tests__/sc-vu-door-zone-traces.test.ts
+  // (re-record with RECORD_TRACES=1).
+  shadow: { path: "content/traces/sc-vu-door-zone/shadow-correct.trace.json" },
+  mistakes: [
+    {
+      traceRef: { path: "content/traces/sc-vu-door-zone/mistake-hug.trace.json" },
+      titleBg: "Каране плътно до паркираните коли",
+      whatWentWrongBg:
+        "Колата се движеше на педя от паркираната редица и когато врата се отвори пред нея, нямаше нито време, нито място — удар. „Зоната на вратата“ е около метър от всяка паркирана кола: който кара в нея, залага на това, че никой няма да отвори. Дистанцията се държи ПРЕДВАРИТЕЛНО (чл. 20).",
+      codeRefs: ["COLLISION"],
+    },
+    {
+      traceRef: { path: "content/traces/sc-vu-door-zone/mistake-swerve.trace.json" },
+      titleBg: "Рязко избягване през непрекъснатата линия",
+      whatWentWrongBg:
+        "Водачът караше плътно до редицата и когато вратата се отвори, сви рязко в насрещната лента — през непрекъснатата осева линия. Избегна вратата, но размени един риск за по-голям: насрещното платно зад М1 не е изход. Правилният отговор се взема ПРЕДИ редицата — дистанция, която прави маневрата излишна (чл. 20).",
+      codeRefs: ["CROSSED_SOLID_LINE"],
+    },
+  ],
+  teach: {
+    whenBg:
+      "По всяка градска улица с паркирани коли покрай бордюра — особено до училища, магазини и вечер, когато хората се прибират по колите си. Същата дисциплина пази и велосипедистите: те загиват точно в зоната на вратата.",
+    whyBg:
+      "Вратата се отваря за половин секунда и спира кола, дете или велосипедист. Никаква реакция не компенсира липсващия метър — единствената работеща защита е позицията: една отворена врата разстояние от редицата и намалена скорост. Затова водачът, който слиза, е длъжен да огледа (чл. 95), а водачът, който минава — да е извън обсега на вратата (чл. 20).",
+    lawRef: "ЗДвП чл. 20",
+    examinerBg:
+      "Изпитващият гледа: навременно отместване от паркираната редица (без да пресичаш непрекъснатата осева), намалена скорост и активно наблюдение на колите — стопове, глави, движение между браниците. Каране на педя от редицата е рискова позиция.",
+  },
+  levels: [
+    { level: 1 },
+    { level: 2 },
+    { level: 3 },
+    { level: 4, vehicleStart: "cold" },
+  ],
+  conditions: { weather: "dry" },
+  localeBg: "bg-BG",
+};
+
 /** The VRU-family templates, in catalog order (registered in templates.ts). */
 export const SCENARIO_TEMPLATES_VRU: readonly ScenarioSpec[] = [
   SC_VU_CYCLIST_HOOK,
   SC_VU_EMERGENCY,
   SC_VU_EMERGENCY_JUNCTION,
+  SC_VU_PASS_CLEARANCE,
+  SC_VU_DOOR_ZONE,
 ];

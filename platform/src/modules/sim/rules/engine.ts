@@ -1405,7 +1405,10 @@ function handleTickEvent(
       // grading FAILED_TO_YIELD byte-identically. OV-05: the runtime's
       // overtake-corridor adjudicator ("overtake-oncoming") likewise carries
       // its own code — the head-on gamble is a distinct law (чл. 42, ал. 1)
-      // and a distinct lesson from a junction priority slip.
+      // and a distinct lesson from a junction priority slip. VU-02: the
+      // runtime's vulnerable-pass adjudicator ("vulnerable-pass") is the same
+      // discipline again — squeezing a cyclist is the чл. 42 lateral-clearance
+      // duty, not a junction priority, so it bills its own основна.
       if (e.violated) {
         out.push(
           makeViolation(
@@ -1413,7 +1416,9 @@ function handleTickEvent(
               ? "EMERGENCY_NOT_YIELDED"
               : e.situation === "overtake-oncoming"
                 ? "OVERTAKE_INSUFFICIENT_GAP"
-                : "FAILED_TO_YIELD",
+                : e.situation === "vulnerable-pass"
+                  ? "VULNERABLE_PASS_TOO_CLOSE"
+                  : "FAILED_TO_YIELD",
             t,
             { detail: e.situation },
           ),

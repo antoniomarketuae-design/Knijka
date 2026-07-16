@@ -43,6 +43,7 @@ import {
 } from "./vehicles";
 import {
   DEFAULT_TRAFFIC_CONFIG,
+  type CyclistApproach,
   type OncomingApproach,
   type StagedActorSpec,
   type StagedActorView,
@@ -73,6 +74,10 @@ const CONFLICT_SAME_DIR_DEG = 50;
 const ONCOMING_MIN_DEG = 130;
 /** A vehicle must be at least this far to the player's right to count, meters. */
 const RIGHT_MIN_M = 1.5;
+/** VU-02 cyclist-pass query: a cyclist heading within this of the player's own
+ * heading rides the SAME direction (the pass duty applies); anything wider is
+ * crossing/oncoming — a different duty (meeting), never returned, deg. */
+const CYCLIST_SAME_DIR_DEG = 60;
 
 class TrafficSystemImpl implements TrafficSystem {
   readonly vehicles: TrafficVehicleState[] = [];
@@ -374,6 +379,62 @@ class TrafficSystemImpl implements TrafficSystem {
   ): boolean {
     return circulatingConflictFor(this.vehicles, cx, cy, px, py, headingDeg, bandRadiusM);
   }
+
+  cyclistNear(px: number, py: number, headingDeg: number, radiusM: number): CyclistApproach | null {
+    return cyclistNearFor(
+      this.vehicles,
+      (stateId) => this.cyclistStateIds.has(stateId),
+      px,
+      py,
+      headingDeg,
+      radiusM,
+    );
+  }
+}
+
+/**
+ * Pure "nearest same-direction cyclist proxy near the player" query (VU-02 —
+ * the lateral-clearance duty's telemetry seam). Only states the caller tags as
+ * cyclists qualify (the vehicleCollisionKind marker: staged curb-riding
+ * proxies, extraRightOffsetM > 0 at stage time); a cyclist heading more than
+ * CYCLIST_SAME_DIR_DEG off the player's own heading is crossing/oncoming — a
+ * MEETING, not a pass — and never returns (the oncoming bank is exempt by
+ * construction). Standing cyclists still return (a pass past a waiting rider
+ * carries the same clearance duty); the runtime's tracker owns every further
+ * bias (closing arm, speed floor, junction gate, swerve stand-down).
+ */
+export function cyclistNearFor(
+  vehicles: readonly {
+    id: number;
+    x: number;
+    y: number;
+    dirX: number;
+    dirY: number;
+    speedMps: number;
+  }[],
+  isCyclist: (stateId: number) => boolean,
+  px: number,
+  py: number,
+  headingDeg: number,
+  radiusM: number,
+): CyclistApproach | null {
+  const r2 = radiusM * radiusM;
+  let best: CyclistApproach | null = null;
+  let bestD2 = Infinity;
+  for (const v of vehicles) {
+    if (!isCyclist(v.id)) continue;
+    const dx = v.x - px;
+    const dy = v.y - py;
+    const d2 = dx * dx + dy * dy;
+    if (d2 > r2 || d2 >= bestD2) continue;
+    const vBearing = (Math.atan2(v.dirX, v.dirY) * 180) / Math.PI;
+    // Folded angular difference, 0 = same direction … 180 = head-on oncoming.
+    const delta = Math.abs((((vBearing - headingDeg) % 360) + 540) % 360 - 180);
+    if (delta > CYCLIST_SAME_DIR_DEG) continue; // oncoming/crossing → a meeting, not a pass
+    bestD2 = d2;
+    best = { x: v.x, y: v.y, dirX: v.dirX, dirY: v.dirY, speedMps: v.speedMps };
+  }
+  return best;
 }
 
 /**

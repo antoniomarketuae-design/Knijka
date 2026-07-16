@@ -151,6 +151,27 @@ export interface OncomingApproach {
   speedMps: number;
 }
 
+/**
+ * VU-02 (doc 72 „Тясно изпреварване на колело") — one same-direction CYCLIST
+ * PROXY's live pose, as returned by TrafficSystem.cyclistNear. The v1 cyclist
+ * IS a narrow staged vehicle-agent riding the curb (audit C3; tagged by
+ * `extraRightOffsetM > 0` at stage time — the vehicleCollisionKind marker,
+ * reused), so the query surfaces only those states, same-direction filtered:
+ * an ONCOMING cyclist is a different duty (meeting, not passing) and never
+ * returns. Point telemetry only (the VehicleProfile point-geometry law): the
+ * runtime's lateral-clearance tracker owns the half-width honesty.
+ */
+export interface CyclistApproach {
+  /** Proxy center, district space. */
+  x: number;
+  y: number;
+  /** Unit travel direction, district space. */
+  dirX: number;
+  dirY: number;
+  /** The proxy's own speed, m/s. */
+  speedMps: number;
+}
+
 // ---------------------------------------------------------------------------
 // Update context — what the integrator feeds the system each frame.
 // ---------------------------------------------------------------------------
@@ -467,6 +488,16 @@ export interface TrafficSystem {
     headingDeg: number,
     bandRadiusM: number,
   ): boolean;
+  /**
+   * The nearest SAME-DIRECTION cyclist proxy within `radiusM` of the player,
+   * or null (VU-02 — the lateral-clearance duty; doc 72 §7). Only staged
+   * curb-riding cyclist proxies qualify (the vehicleCollisionKind tag);
+   * oncoming cyclists are heading-filtered out (a meeting is not a pass).
+   * Wire into the runtime: `runtime.setCyclistQuery((px, py, h, r) =>
+   * traffic.cyclistNear(px, py, h, r))`. District space; headingDeg 0 =
+   * north, clockwise.
+   */
+  cyclistNear(px: number, py: number, headingDeg: number, radiusM: number): CyclistApproach | null;
   /**
    * Deploy a scripted actor, dormant at its hold pose (A8). MUST be called
    * before the presentation layer mounts — TrafficLayer sizes its instanced

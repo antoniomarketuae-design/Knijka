@@ -279,6 +279,16 @@ export interface ObstacleRect2D {
   halfWidthM: number;
   halfLengthM: number;
   withWhat: TraceCollisionWith;
+  /**
+   * TIMED-OBSTACLE activation (doc 72 VU-04 „Вратата" — the door-swing
+   * unlock): the rect is INERT until the PLAYER first comes within
+   * `trigger.distM` of `trigger` (x, y), then LATCHES armed for the rest of
+   * the drive — the telltale position-trigger discipline (deterministic per
+   * script pace, robust across shadow/mistake speeds; a time-based arm would
+   * silently drift with authored pacing). ABSENT = always active — the S1
+   * behavior, byte-identical for every shipped obstacle set.
+   */
+  trigger?: { x: number; y: number; distM: number };
 }
 
 /**
@@ -549,6 +559,7 @@ export function recordScriptedDrive(
   runtime.setCirculatingQuery((cx, cy, px, py, h, r) =>
     traffic.circulatingConflict(cx, cy, px, py, h, r),
   );
+  runtime.setCyclistQuery((px, py, h, r) => traffic.cyclistNear(px, py, h, r));
   const staged = options.stagedEvents ?? [];
   const director =
     staged.length > 0
@@ -632,9 +643,13 @@ export function recordScriptedDrive(
 
   // S1 obstacle contacts: rising-edge SAT overlap of the hero footprint vs
   // each authored rect (the ScenarioObstacles twin). Latched per obstacle so
-  // a continuing contact pushes once; separating re-arms it.
+  // a continuing contact pushes once; separating re-arms it. A rect with a
+  // `trigger` starts INERT and latches ARMED on the player's first approach
+  // (the VU-04 door swing — see the ObstacleRect2D doc); trigger-less rects
+  // start armed, byte-identical to the S1 behavior.
   const obstacles = options.obstacles ?? [];
   const obstacleContact = new Array<boolean>(obstacles.length).fill(false);
+  const obstacleArmed = obstacles.map((o) => o.trigger === undefined);
   const collisionMinKmh = options.collisionMinKmh ?? 10;
   const heroRect = {
     x: 0,
@@ -654,6 +669,19 @@ export function recordScriptedDrive(
       heroRect.headingDeg = pose.headingDeg;
       const speedKmh = Math.abs(speedMps) * 3.6;
       for (let i = 0; i < obstacles.length; i++) {
+        // Timed activation: latch the arm on the player's first approach to
+        // the authored trigger point; an unarmed rect is fully inert (no
+        // contact, no latched state — driving "through" it before the arm
+        // never bills, exactly the door-still-closed reality).
+        if (!obstacleArmed[i]) {
+          const trig = obstacles[i].trigger!;
+          if (Math.hypot(pose.x - trig.x, pose.y - trig.y) <= trig.distM) {
+            obstacleArmed[i] = true;
+          } else {
+            obstacleContact[i] = false;
+            continue;
+          }
+        }
         const hit = obstacleRectsOverlap(heroRect, obstacles[i]);
         if (hit && !obstacleContact[i] && speedKmh >= collisionMinKmh) {
           runtime.pushCollision(obstacles[i].withWhat);

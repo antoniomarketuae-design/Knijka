@@ -1,0 +1,131 @@
+{
+ "format": "district-v1",
+ "meta": {
+  "district": "vu-pass",
+  "label": "Учебна улица — изпреварване на велосипедист (сценарий VU-02)",
+  "mapKind": "scenario-vru",
+  "generator": "tools/maps/gen_vu_streets.mjs",
+  "boundsLocalMeters": {
+   "minX": -34.12,
+   "minY": -6,
+   "maxX": 14.13,
+   "maxY": 366
+  },
+  "attribution": {
+   "text": "Учебна улица за уязвими участници — оригинален параметричен дизайн (без данни от OpenStreetMap)",
+   "license": "All rights reserved",
+   "licenseUrl": "/",
+   "copyrightUrl": "/",
+   "obligation": "none — original work, no ODbL attribution required for this map"
+  },
+  "defaults": {
+   "maxspeedUrbanKmh": 50,
+   "note": "Покрай източния бордюр се движи велосипедист: изпреварвай го само с широка дъга — поне метър и половина въздух."
+  },
+  "stats": {
+   "roadKm": 0.36,
+   "nodes": 2,
+   "edges": 1,
+   "intersections": 0,
+   "crossings": 0,
+   "buildings": 1,
+   "spawnPoints": 2
+  },
+  "scenario": {
+   "archetype": "straight-street",
+   "params": {
+    "lengthM": 360,
+    "maxspeedKmh": 50,
+    "variant": "pass"
+   },
+   "lanesPerDirection": 1,
+   "laneCenterRightM": 4.06
+  }
+ },
+ "roads": {
+  "nodes": [
+   {
+    "id": "vup-n-end",
+    "x": 0,
+    "y": 360
+   },
+   {
+    "id": "vup-n-start",
+    "x": 0,
+    "y": 0
+   }
+  ],
+  "edges": [
+   {
+    "id": "vup-e-street",
+    "from": "vup-n-start",
+    "to": "vup-n-end",
+    "class": "residential",
+    "name": "Учебна улица — изпреварване на велосипедист (сценарий VU-02)",
+    "oneway": false,
+    "roundabout": false,
+    "lanes": 2,
+    "lanesSource": "tag",
+    "maxspeed": 50,
+    "maxspeedSource": "tag",
+    "length": 360,
+    "geometry": [
+     [
+      0,
+      0
+     ],
+     [
+      0,
+      360
+     ]
+    ]
+   }
+  ]
+ },
+ "intersections": [],
+ "crossings": [],
+ "roundabouts": [],
+ "buildings": [
+  {
+   "id": "vup-b-block",
+   "height": 6,
+   "heightSource": "default",
+   "footprint": [
+    [
+     -28.12,
+     150
+    ],
+    [
+     -16.12,
+     150
+    ],
+    [
+     -16.12,
+     166
+    ],
+    [
+     -28.12,
+     166
+    ]
+   ]
+  }
+ ],
+ "spawnPoints": [
+  {
+   "id": "vup-spawn-start",
+   "x": 4.06,
+   "y": 15,
+   "heading": 0,
+   "edgeId": "vup-e-street",
+   "name": "Начало — дясна лента"
+  },
+  {
+   "id": "vup-spawn-finish",
+   "x": 4.06,
+   "y": 345,
+   "heading": 0,
+   "edgeId": "vup-e-street",
+   "name": "Контролна точка — край на отсечката"
+  }
+ ]
+}

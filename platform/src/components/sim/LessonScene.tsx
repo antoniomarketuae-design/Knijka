@@ -457,6 +457,10 @@ export default function LessonScene(props: LessonSceneProps) {
         runtime.setCirculatingQuery((cx, cy, px, py, h, r) =>
           traffic.circulatingConflict(cx, cy, px, py, h, r),
         );
+        // VU-02 (vulnerable pass): the same-direction cyclist telemetry the
+        // runtime's lateral-clearance tracker reads — staged cyclist proxies
+        // only, so every cyclist-less lesson stays structurally silent.
+        runtime.setCyclistQuery((px, py, h, r) => traffic.cyclistNear(px, py, h, r));
         // A8: stage the lesson's scripted encounters NOW — before TrafficLayer
         // mounts — so staged actors land inside the instanced buffers. The
         // director is deterministic per (lesson seed, attempt).

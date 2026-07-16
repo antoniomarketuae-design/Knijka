@@ -1,13 +1,19 @@
 /**
  * S1 recorder seams — the 2D OBB overlap (the headless twin of the scene's
- * ScenarioObstacles colliders) and the scenario-lot obstacle derivation from
- * the district's meta.scenario occupancy.
+ * ScenarioObstacles colliders), the scenario-lot obstacle derivation from
+ * the district's meta.scenario occupancy, and the N8 TIMED activation
+ * (ObstacleRect2D.trigger — the VU-04 door-swing unlock).
  */
 
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
-import { obstacleRectsOverlap } from "../recorder";
+import {
+  obstacleRectsOverlap,
+  recordScriptedDrive,
+  type DriveScript,
+  type ObstacleRect2D,
+} from "../recorder";
 import {
   lotObstacleRects,
   PARKED_CAR_HALF_LENGTH_M,
@@ -76,5 +82,104 @@ describe("lotObstacleRects (occupancy → headless parked cars)", () => {
   it("districts without scenario meta yield no obstacles", () => {
     expect(lotObstacleRects({ meta: {} })).toEqual([]);
     expect(lotObstacleRects(null)).toEqual([]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// N8 timed activation (ObstacleRect2D.trigger — doc 72 VU-04 „Вратата")
+// ---------------------------------------------------------------------------
+
+describe("timed obstacles (trigger latch)", () => {
+  // A junction-free 1+1 street the drives run on (the vu-pass mold, minimal).
+  const street = {
+    format: "district-v1",
+    meta: { district: "t", label: "t", boundsLocalMeters: { minX: -10, minY: -6, maxX: 10, maxY: 206 } },
+    roads: {
+      nodes: [
+        { id: "n-a", x: 0, y: 0 },
+        { id: "n-b", x: 0, y: 200 },
+      ],
+      edges: [
+        {
+          id: "e-s",
+          from: "n-a",
+          to: "n-b",
+          class: "residential",
+          oneway: false,
+          roundabout: false,
+          lanes: 2,
+          maxspeed: 50,
+          length: 200,
+          geometry: [
+            [0, 0],
+            [0, 200],
+          ],
+        },
+      ],
+    },
+    intersections: [],
+    crossings: [],
+    roundabouts: [],
+    buildings: [],
+    spawnPoints: [],
+  };
+
+  /** A rect ON the driving line at y 100 (any drive through it overlaps). */
+  const rectAt100 = (trigger?: ObstacleRect2D["trigger"]): ObstacleRect2D => ({
+    x: 4.06,
+    y: 100,
+    headingDeg: 0,
+    halfWidthM: 0.5,
+    halfLengthM: 0.5,
+    withWhat: "staticObject",
+    ...(trigger !== undefined ? { trigger } : {}),
+  });
+
+  const driveThrough: DriveScript = {
+    steps: [{ kind: "drive", points: [[4.06, 10], [4.06, 190]], targetKmh: 40 }],
+  };
+
+  const collisions = (obstacles: ObstacleRect2D[]) =>
+    recordScriptedDrive(street, driveThrough, {
+      scenarioId: "probe-timed",
+      kind: "shadow",
+      seed: 7,
+      obstacles,
+      collisionMinKmh: 0,
+    }).ruleEvents.filter((e) => e.kind === "violation" && e.code === "COLLISION");
+
+  it("a trigger-less rect is ALWAYS active (byte-identical S1 behavior)", () => {
+    expect(collisions([rectAt100()])).toHaveLength(1);
+  });
+
+  it("a triggered rect ARMS on the player's approach and then collides", () => {
+    // Trigger at the rect itself, radius 25: latches ~25 m before contact.
+    expect(collisions([rectAt100({ x: 4.06, y: 100, distM: 25 })])).toHaveLength(1);
+  });
+
+  it("a rect whose trigger never latches stays fully INERT (the closed door)", () => {
+    // Trigger far off the street — the drive passes straight through the rect
+    // footprint without a contact.
+    expect(collisions([rectAt100({ x: 500, y: 500, distM: 10 })])).toHaveLength(0);
+  });
+
+  it("the latch is one-way: driving THROUGH the trigger zone arms it for good", () => {
+    // Trigger BEHIND the rect (y 40): armed long before the overlap at y 100.
+    expect(collisions([rectAt100({ x: 4.06, y: 40, distM: 12 })])).toHaveLength(1);
+  });
+
+  it("trace bytes are identical with and without an inert triggered rect (additive law)", () => {
+    const record = (obstacles: ObstacleRect2D[]) =>
+      recordScriptedDrive(street, driveThrough, {
+        scenarioId: "probe-timed",
+        kind: "shadow",
+        seed: 7,
+        obstacles,
+        collisionMinKmh: 0,
+      });
+    const bare = record([]);
+    const inert = record([rectAt100({ x: 500, y: 500, distM: 10 })]);
+    expect(JSON.stringify(inert.trace)).toBe(JSON.stringify(bare.trace));
+    expect(inert.ruleEvents).toEqual(bare.ruleEvents);
   });
 });

@@ -1,0 +1,246 @@
+{
+ "format": "district-v1",
+ "meta": {
+  "district": "vu-door",
+  "label": "Учебна улица — зоната на вратата (сценарий VU-04)",
+  "mapKind": "scenario-vru",
+  "generator": "tools/maps/gen_vu_streets.mjs",
+  "zonesVersion": 1,
+  "boundsLocalMeters": {
+   "minX": -34.12,
+   "minY": -6,
+   "maxX": 14.13,
+   "maxY": 306
+  },
+  "attribution": {
+   "text": "Учебна улица за уязвими участници — оригинален параметричен дизайн (без данни от OpenStreetMap)",
+   "license": "All rights reserved",
+   "licenseUrl": "/",
+   "copyrightUrl": "/",
+   "obligation": "none — original work, no ODbL attribution required for this map"
+  },
+  "defaults": {
+   "maxspeedUrbanKmh": 40,
+   "note": "Плътна редица паркирани коли вдясно: дръж поне една отворена врата разстояние от тях — вратата се отваря без предупреждение."
+  },
+  "stats": {
+   "roadKm": 0.3,
+   "nodes": 2,
+   "edges": 1,
+   "intersections": 0,
+   "crossings": 0,
+   "buildings": 1,
+   "spawnPoints": 2,
+   "zones": 1,
+   "bays": 10
+  },
+  "scenario": {
+   "archetype": "straight-street",
+   "params": {
+    "lengthM": 300,
+    "maxspeedKmh": 40,
+    "variant": "door",
+    "banFromM": 90,
+    "banToM": 240,
+    "parkedRowXM": 6.75
+   },
+   "lanesPerDirection": 1,
+   "laneCenterRightM": 4.06,
+   "banZone": {
+    "id": "vud-z-solidcenterline",
+    "kind": "solidCenterLine",
+    "signRef": "М1",
+    "fromM": 90,
+    "toM": 240
+   },
+   "bays": [
+    {
+     "id": "vud-bay-1",
+     "x": 6.75,
+     "y": 110,
+     "headingDeg": 0,
+     "widthM": 2,
+     "lengthM": 5,
+     "occupied": true
+    },
+    {
+     "id": "vud-bay-2",
+     "x": 6.75,
+     "y": 119,
+     "headingDeg": 0,
+     "widthM": 2,
+     "lengthM": 5,
+     "occupied": true
+    },
+    {
+     "id": "vud-bay-3",
+     "x": 6.75,
+     "y": 128,
+     "headingDeg": 0,
+     "widthM": 2,
+     "lengthM": 5,
+     "occupied": true
+    },
+    {
+     "id": "vud-bay-4",
+     "x": 6.75,
+     "y": 137,
+     "headingDeg": 0,
+     "widthM": 2,
+     "lengthM": 5,
+     "occupied": true
+    },
+    {
+     "id": "vud-bay-5",
+     "x": 6.75,
+     "y": 146,
+     "headingDeg": 0,
+     "widthM": 2,
+     "lengthM": 5,
+     "occupied": true
+    },
+    {
+     "id": "vud-bay-6",
+     "x": 6.75,
+     "y": 155,
+     "headingDeg": 0,
+     "widthM": 2,
+     "lengthM": 5,
+     "occupied": true
+    },
+    {
+     "id": "vud-bay-7",
+     "x": 6.75,
+     "y": 164,
+     "headingDeg": 0,
+     "widthM": 2,
+     "lengthM": 5,
+     "occupied": true
+    },
+    {
+     "id": "vud-bay-8",
+     "x": 6.75,
+     "y": 173,
+     "headingDeg": 0,
+     "widthM": 2,
+     "lengthM": 5,
+     "occupied": true
+    },
+    {
+     "id": "vud-bay-9",
+     "x": 6.75,
+     "y": 182,
+     "headingDeg": 0,
+     "widthM": 2,
+     "lengthM": 5,
+     "occupied": true
+    },
+    {
+     "id": "vud-bay-10",
+     "x": 6.75,
+     "y": 191,
+     "headingDeg": 0,
+     "widthM": 2,
+     "lengthM": 5,
+     "occupied": true
+    }
+   ]
+  }
+ },
+ "roads": {
+  "nodes": [
+   {
+    "id": "vud-n-end",
+    "x": 0,
+    "y": 300
+   },
+   {
+    "id": "vud-n-start",
+    "x": 0,
+    "y": 0
+   }
+  ],
+  "edges": [
+   {
+    "id": "vud-e-street",
+    "from": "vud-n-start",
+    "to": "vud-n-end",
+    "class": "residential",
+    "name": "Учебна улица — зоната на вратата (сценарий VU-04)",
+    "oneway": false,
+    "roundabout": false,
+    "lanes": 2,
+    "lanesSource": "tag",
+    "maxspeed": 40,
+    "maxspeedSource": "tag",
+    "length": 300,
+    "geometry": [
+     [
+      0,
+      0
+     ],
+     [
+      0,
+      300
+     ]
+    ]
+   }
+  ]
+ },
+ "intersections": [],
+ "crossings": [],
+ "roundabouts": [],
+ "buildings": [
+  {
+   "id": "vud-b-block",
+   "height": 6,
+   "heightSource": "default",
+   "footprint": [
+    [
+     -28.12,
+     60
+    ],
+    [
+     -16.12,
+     60
+    ],
+    [
+     -16.12,
+     76
+    ],
+    [
+     -28.12,
+     76
+    ]
+   ]
+  }
+ ],
+ "spawnPoints": [
+  {
+   "id": "vud-spawn-start",
+   "x": 4.06,
+   "y": 15,
+   "heading": 0,
+   "edgeId": "vud-e-street",
+   "name": "Начало — дясна лента"
+  },
+  {
+   "id": "vud-spawn-finish",
+   "x": 4.06,
+   "y": 285,
+   "heading": 0,
+   "edgeId": "vud-e-street",
+   "name": "Контролна точка — край на отсечката"
+  }
+ ],
+ "zones": [
+  {
+   "id": "vud-z-solidcenterline",
+   "kind": "solidCenterLine",
+   "edgeId": "vud-e-street",
+   "fromM": 90,
+   "toM": 240,
+   "signRef": "М1"
+  }
+ ]
+}

@@ -56,6 +56,7 @@ export type {
   NearMissTracker,
 } from "./proximity";
 export type {
+  CyclistApproach,
   DistrictCrossing,
   DistrictEdge,
   DistrictIntersection,

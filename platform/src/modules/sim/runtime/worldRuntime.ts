@@ -167,6 +167,67 @@ export const OVERTAKE_COMMIT_MIN_KMH = 20;
  * gamble, not the victim's rescue.
  */
 export const OVERTAKE_GAP_MEMORY_SEC = 1.5;
+/**
+ * VULNERABLE-PASS tracker (doc 72 §7 VU-02 „Тясно изпреварване на колело" —
+ * ЗДвП чл. 42: изпреварване на велосипедист само с ДОСТАТЪЧНА СТРАНИЧНА
+ * ДИСТАНЦИЯ; the BG/EU taught norm ≈ 1.5 m of open air between bodies). The
+ * graded act: the player OVERTAKES a same-direction cyclist proxy (closes from
+ * behind, draws alongside within the longitudinal window, leaves it behind) and
+ * the MINIMUM lateral distance during the alongside phase sits under the
+ * convict bar — one bill per pass, adjudicated at pass completion.
+ *
+ * GEOMETRY HONESTY (the VehicleProfile point-based law): both the player and
+ * the proxy are POINTS in this telemetry, so every threshold below is
+ * CENTER-TO-CENTER lateral distance. The documented body allowance converts:
+ * hero half-width 0.85 m (vehicle/tuning CHASSIS_HALF_EXTENTS.x) + an honest
+ * ~0.4 m cyclist half-width (handlebar) = 1.25 m of bodies inside any
+ * center-to-center measure. Bands (A12 — err innocent, doc 72: Н38 основна):
+ *  - center < CONVICT (2.45 m ≈ 1.2 m of air) while passing at speed →
+ *    VULNERABLE_PASS_TOO_CLOSE — genuinely squeezing, under every norm;
+ *  - 2.45–2.75 m (≈ 1.2–1.5 m of air): the honest TEACH band — under the
+ *    taught 1.5 m but graded silent (the JU-10 advisory-band ruling: the
+ *    grace is real, the copy teaches the norm);
+ *  - center ≥ SAFE (2.75 m ≈ 1.5 m of air): the textbook pass — earns the
+ *    yielded commendation when a genuine alongside happened.
+ * Structural innocence:
+ *  - the traffic query is SAME-DIRECTION only (an oncoming cyclist is a
+ *    meeting — different duty, never returned) and only staged cyclist
+ *    proxies qualify (no shipped ambient agent can arm this);
+ *  - junction areas disarm AND discard the episode (nearestIx gate — the
+ *    right-hook family is the CyclistRightHookRunner's act, VU-01);
+ *  - creeping/standing is exempt: only alongside frames at/above the pass
+ *    floor record, and arming needs genuine closing from behind;
+ *  - THE SWERVE STAND-DOWN: if the cyclist's OWN line drifts toward the
+ *    player beyond the allowance mid-pass (pothole dodge — doc 72 VU-03's
+ *    reality), the episode stands down entirely — the margin the driver SET
+ *    is what's graded, never the margin the cyclist consumed;
+ *  - a pass that got inside the contact bar is the collision machinery's act
+ *    (runner CYCLIST_CONTACT_M parity) — one act, one code;
+ *  - reverse maneuvering discards (A12).
+ */
+export const VULNERABLE_PASS_PROBE_RADIUS_M = 30;
+export const VULNERABLE_PASS_BODY_ALLOWANCE_M = 1.25; // 0.85 hero + 0.4 proxy (doc above)
+export const VULNERABLE_PASS_CONVICT_LATERAL_M = 2.45; // ≈ 1.2 m edge-to-edge
+export const VULNERABLE_PASS_SAFE_LATERAL_M = 2.75; // ≈ 1.5 m edge-to-edge (the norm)
+/** |forward offset| at/under which the pass is ALONGSIDE (bodies overlap:
+ * hero half-length 2.02 + bike half-length ~1 + slack), m. */
+export const VULNERABLE_PASS_ALONGSIDE_M = 5.5;
+/** Cyclist ahead within this (and closing) arms the pass episode, m. */
+export const VULNERABLE_PASS_ARM_AHEAD_M = 25;
+/** Cyclist this far behind = the pass is complete → adjudicate once, m. */
+export const VULNERABLE_PASS_DONE_BEHIND_M = 8;
+/** Below this the player is creeping/queueing, not passing at speed — no
+ * alongside frame records and nothing can convict, km/h. */
+export const VULNERABLE_PASS_MIN_KMH = 15;
+/** Arming needs the player genuinely closing from behind, m/s. */
+export const VULNERABLE_PASS_MIN_CLOSING_MPS = 1.0;
+/** The cyclist's OWN lateral drift toward the player (vs its line frozen at
+ * arm) that stands the episode down — the VU-03 swerve reality, m. */
+export const VULNERABLE_PASS_SWERVE_M = 0.6;
+/** At/under this center distance the act is a CONTACT — the collision
+ * machinery's code (orchestrator CYCLIST_CONTACT_M parity), never this one, m. */
+export const VULNERABLE_PASS_CONTACT_M = 2.2;
+
 /** Distance to the junction node within which the right-hand-rule check arms,
  * meters (2× — the junction box itself is 2.5× wider). */
 export const RHR_CORE_RADIUS_M = 18;
@@ -283,6 +344,28 @@ export type CirculatingQuery = (
   bandRadiusM: number,
 ) => boolean;
 
+/**
+ * VU-02 (doc 72 §7): the nearest SAME-DIRECTION cyclist proxy near the player
+ * — live pose telemetry for the vulnerable-pass lateral tracker. Structurally
+ * satisfied by the traffic module's CyclistApproach without a cross-module
+ * type import (the OncomingConflict discipline).
+ */
+export interface CyclistConflict {
+  x: number;
+  y: number;
+  dirX: number;
+  dirY: number;
+  speedMps: number;
+}
+
+/** The nearest same-direction cyclist proxy within radiusM, or null. */
+export type CyclistQuery = (
+  px: number,
+  py: number,
+  headingDeg: number,
+  radiusM: number,
+) => CyclistConflict | null;
+
 /** Phase + seconds-to-change read model (B1a N2 director API). */
 export interface SignalPhaseInfo {
   phase: SignalPhase;
@@ -336,6 +419,9 @@ export interface DistrictWorldRuntime extends WorldRuntime {
   setRightConflictQuery(fn: RightConflictQuery | null): void;
   /** Install the traffic module's roundabout-circulation lookup (default: none). */
   setCirculatingQuery(fn: CirculatingQuery | null): void;
+  /** Install the traffic module's same-direction cyclist lookup (default: none —
+   *  the vulnerable-pass tracker stays structurally silent). */
+  setCyclistQuery(fn: CyclistQuery | null): void;
   /** Physics layer reports a contact; drained into the next sample(). */
   pushCollision(withWhat: CollisionWith): void;
   /** Phase a driver approaching `signalNodeId` on `bearingDeg` sees (renderer helper). */
@@ -365,6 +451,7 @@ export function createWorldRuntime(districtJson: District | unknown): DistrictWo
   let oncomingQuery: OncomingQuery = () => false;
   let rightConflictQuery: RightConflictQuery = () => false;
   let circulatingQuery: CirculatingQuery = () => false;
+  let cyclistQuery: CyclistQuery = () => null;
 
   // Junction node positions (district space) for priority conflict lookups.
   const nodePos = new Map<string, { x: number; y: number }>();
@@ -540,6 +627,27 @@ export function createWorldRuntime(districtJson: District | unknown): DistrictWo
   let ocTightOnsetT = -Infinity; // stand-down window base (episode onset)
   let ocLastTightT = -Infinity; // last tight observation (memory latch)
   let ocTightGapSec: number | undefined; // gap recorded at that observation
+
+  // VULNERABLE-PASS tracker (doc 72 VU-02) — one adjudication per completed
+  // pass of a same-direction cyclist proxy; constants + bands + stand-downs
+  // documented at VULNERABLE_PASS_PROBE_RADIUS_M.
+  let vpActive = false; // pass episode armed (closing from behind)
+  let vpMinLateralM = Infinity; // tightest |lateral| while ALONGSIDE at speed
+  let vpSawAlongside = false; // a genuine alongside frame at speed happened
+  let vpSwerve = false; // the cyclist's own line drifted toward the player
+  let vpSideSign = 0; // player's side of the cyclist's frozen line at arm
+  let vpC0x = 0; // cyclist line anchor at arm…
+  let vpC0y = 0;
+  let vpD0x = 0; // …and its unit direction at arm
+  let vpD0y = 1;
+
+  const vpReset = () => {
+    vpActive = false;
+    vpMinLateralM = Infinity;
+    vpSawAlongside = false;
+    vpSwerve = false;
+    vpSideSign = 0;
+  };
 
   // Previous-frame tracking for line-crossing detection.
   let prevEdgeIdx = -1;
@@ -1282,6 +1390,98 @@ export function createWorldRuntime(districtJson: District | unknown): DistrictWo
         ocLastTightT = -Infinity;
         ocTightGapSec = undefined;
       }
+      // 6b. VULNERABLE-PASS tracker (doc 72 VU-02 — bands/stand-downs at
+      // VULNERABLE_PASS_PROBE_RADIUS_M). Mid-block only: a junction area
+      // DISCARDS the episode wholesale — the right-hook family there is the
+      // CyclistRightHookRunner's act (VU-01), and a turn's rotating frame
+      // would read as a phantom "pass". Reverse maneuvering discards (A12).
+      if (nearestIx !== null || v.gear < 0) {
+        if (vpActive) vpReset();
+      } else {
+        const cyc = cyclistQuery(
+          v.position.x,
+          v.position.y,
+          v.headingDeg,
+          VULNERABLE_PASS_PROBE_RADIUS_M,
+        );
+        if (cyc === null) {
+          // Left the probe without completing (player stopped short / turned
+          // away) — no pass happened; discard, never bill.
+          if (vpActive) vpReset();
+        } else {
+          const vpRad = (v.headingDeg * Math.PI) / 180;
+          const vpFx = Math.sin(vpRad);
+          const vpFy = Math.cos(vpRad);
+          const vpDx = cyc.x - v.position.x;
+          const vpDy = cyc.y - v.position.y;
+          const alongM = vpDx * vpFx + vpDy * vpFy;
+          const lateralM = Math.abs(vpDx * vpFy - vpDy * vpFx);
+          const playerMps = Math.abs(v.speedKmh) / 3.6;
+          if (
+            !vpActive &&
+            alongM > VULNERABLE_PASS_ALONGSIDE_M &&
+            alongM <= VULNERABLE_PASS_ARM_AHEAD_M &&
+            v.speedKmh > VULNERABLE_PASS_MIN_KMH &&
+            playerMps - cyc.speedMps >= VULNERABLE_PASS_MIN_CLOSING_MPS
+          ) {
+            // ARM: cyclist AHEAD in the window, the player at pass speed and
+            // genuinely CLOSING from behind (a cyclist overtaking a slower
+            // player never arms — err innocent). Freeze the cyclist's line.
+            vpActive = true;
+            vpMinLateralM = Infinity;
+            vpSawAlongside = false;
+            vpSwerve = false;
+            vpC0x = cyc.x;
+            vpC0y = cyc.y;
+            const dLen = Math.hypot(cyc.dirX, cyc.dirY);
+            vpD0x = dLen > 0 ? cyc.dirX / dLen : vpFx;
+            vpD0y = dLen > 0 ? cyc.dirY / dLen : vpFy;
+            const side = vpD0x * (v.position.y - cyc.y) - vpD0y * (v.position.x - cyc.x);
+            vpSideSign = side >= 0 ? 1 : -1;
+          }
+          if (vpActive) {
+            // Swerve stand-down: the cyclist's OWN drift off its frozen line,
+            // toward the player's side (the VU-03 pothole-dodge reality) —
+            // graded is the margin the driver SET, never what the cyclist
+            // consumed. Curved-road drift also lands here: it biases toward
+            // standing down, the A12 direction.
+            const drift = vpD0x * (cyc.y - vpC0y) - vpD0y * (cyc.x - vpC0x);
+            if (drift * vpSideSign >= VULNERABLE_PASS_SWERVE_M) vpSwerve = true;
+            if (
+              Math.abs(alongM) <= VULNERABLE_PASS_ALONGSIDE_M &&
+              v.speedKmh >= VULNERABLE_PASS_MIN_KMH
+            ) {
+              vpSawAlongside = true;
+              if (lateralM < vpMinLateralM) vpMinLateralM = lateralM;
+            }
+            if (alongM <= -VULNERABLE_PASS_DONE_BEHIND_M) {
+              // Pass complete — adjudicate ONCE, then re-arm for the next.
+              if (vpSawAlongside && !vpSwerve) {
+                if (
+                  vpMinLateralM < VULNERABLE_PASS_CONVICT_LATERAL_M &&
+                  vpMinLateralM > VULNERABLE_PASS_CONTACT_M
+                ) {
+                  events.push({
+                    kind: "prioritySituation",
+                    situation: "vulnerable-pass",
+                    violated: true,
+                  });
+                } else if (vpMinLateralM >= VULNERABLE_PASS_SAFE_LATERAL_M) {
+                  events.push({
+                    kind: "prioritySituation",
+                    situation: "vulnerable-pass",
+                    violated: false,
+                    yielded: true,
+                  });
+                }
+                // 2.45–2.75 m: the honest teach band — silent (doc above);
+                // ≤ the contact bar: the collision machinery's act.
+              }
+              vpReset();
+            }
+          }
+        }
+      }
       if (nextStopLineM !== undefined) {
         tick.nextStopLineM = nextStopLineM;
         tick.nextStopLineControl = nextStopLineControl;
@@ -1357,6 +1557,10 @@ export function createWorldRuntime(districtJson: District | unknown): DistrictWo
 
     setCirculatingQuery(fn: CirculatingQuery | null): void {
       circulatingQuery = fn ?? (() => false);
+    },
+
+    setCyclistQuery(fn: CyclistQuery | null): void {
+      cyclistQuery = fn ?? (() => null);
     },
 
     debugUncontrolledJunctions() {

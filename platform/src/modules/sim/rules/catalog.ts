@@ -614,6 +614,27 @@ export const VIOLATIONS: Record<ViolationCode, ViolationSpec> = {
     lawRef: "ЗДвП чл. 42, ал. 1",
     conceptId: "c-overtaking-procedure",
   },
+  VULNERABLE_PASS_TOO_CLOSE: {
+    // Doc 72 VU-02 „Тясно изпреварване на колело": Н38 основна (опасна only
+    // when the cyclist wobbles/reacts — which the sim adjudicates as the
+    // swerve stand-down, never an escalation; err innocent, A12).
+    // LAW VERIFICATION: ЗДвП чл. 42 — изпреварваш велосипедист само с
+    // ДОСТАТЪЧНО СТРАНИЧНО РАЗСТОЯНИЕ и намалена скорост (bank-verified:
+    // q-uyazvimi-010/012/045 all ground the clearance duty at чл. 42; the
+    // 1.5 m figure is the BG/EU taught GUIDANCE, not a statutory number —
+    // the copy teaches it, the tracker convicts only under ~1.2 m of air).
+    // GEOMETRY: the runtime tracker measures center-to-center and documents
+    // the ~1.25 m body allowance (runtime VULNERABLE_PASS_* constants).
+    severityClass: "osnovna",
+    points: SEVERITY_POINTS.osnovna,
+    titleBg: "Изпреварване на велосипедист без странична дистанция",
+    explanationBg:
+      "Мина покрай велосипедиста почти без странично разстояние. Законът изисква ДОСТАТЪЧНА странична дистанция — учи се около 1,5 метра въздух: велосипедистът няма ламарина около себе си и може всеки миг да се отклони заради дупка, шахта или порив на вятъра. На половин метър всяко негово клатушкане е сблъсък.",
+    correctiveBg:
+      "Преди велосипедист: огледало, мигач наляво и се отмести с реален метър и половина — при нужда изчакай насрещния да мине и чак тогава изпреварвай. Няма ли място за широка дъга, остани зад него; никога не се провирай.",
+    lawRef: "ЗДвП чл. 42",
+    conceptId: "c-cyclists",
+  },
   PREDRIVE_STEP_SKIPPED: {
     severityClass: "vtorostepenna",
     points: SEVERITY_POINTS.vtorostepenna,

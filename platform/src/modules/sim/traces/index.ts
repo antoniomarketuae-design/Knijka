@@ -261,6 +261,23 @@ export {
   recordScVuEmergencyJunctionDrive,
   type ScVuEmergencyJunctionTraceName,
 } from "./scVuEmergencyJunction";
+// N8 slice 1 (VRU-interaction pack) — the VU-02 lateral-clearance authored
+// drives (sc-vu-pass-clearance) and the VU-04 door-zone drives
+// (sc-vu-door-zone, the first TIMED ObstacleRect2D); committed traces are
+// recordings of exactly these scripts (gates: traces/__tests__/
+// sc-vu-pass-clearance- / sc-vu-door-zone-traces).
+export {
+  SC_VU_PASS_CLEARANCE_ID,
+  recordScVuPassDrive,
+  type ScVuPassTraceName,
+} from "./scVuPass";
+export {
+  SC_VU_DOOR_ZONE_ID,
+  doorObstacle,
+  doorZoneObstacles,
+  recordScVuDoorDrive,
+  type ScVuDoorTraceName,
+} from "./scVuDoorZone";
 // ADR-006 stage 1c — the VP-11 police-stop authored drives
 // (sc-vp-police-stop, the policeStop officer figure + curb-side completion
 // objectives); committed traces are recordings of exactly these scripts
