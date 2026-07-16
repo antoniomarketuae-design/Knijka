@@ -502,6 +502,24 @@ export const VIOLATIONS: Record<ViolationCode, ViolationSpec> = {
     lawRef: "ЗДвП чл. 15",
     conceptId: "c-other-markings",
   },
+  // -- RAIL PACK slice 1 (ADR-006 stage 3a; doc 72 §12 RX-01/02/03) -----------
+  RAIL_CROSSING_VIOLATION: {
+    // Doc 72 RX-01/RX-02: Н38 опасна (10, прекратяване-class) — rail-crossing
+    // crashes are rare but near-100% fatal. ONE code for the three graded
+    // acts (the detail channel carries which): unguarded entry without the
+    // mandatory stop, entry while barred, coming to rest ON the tracks.
+    // Deliberately NOT terminateSession — the catalog invariant keeps
+    // COLLISION the only terminating code (the sim continues for learning).
+    severityClass: "opasna",
+    points: SEVERITY_POINTS.opasna,
+    titleBg: "Нарушение на правилата за жп прелез",
+    explanationBg:
+      "Наруши желязното правило на жп прелеза. Пред прелез без бариери спираш напълно и се оглеждаш в двете посоки — ти си бариерата. При спуснати или спускащи се бариери и мигаща червена светлина не навлизаш, каквото и да ти се струва. И никога не спирай върху самите релси: влакът не може нито да спре, нито да те заобиколи.",
+    correctiveBg:
+      "Пред прелез: намали отрано. Без бариери — спри напълно преди релсите, огледай наляво и надясно по линията и премини решително, без да спираш върху коловоза. С бариери — изчакай зад стоп-линията, докато се вдигнат напълно, и премини едва когато прелезът е чист.",
+    lawRef: "ЗДвП чл. 51–53",
+    conceptId: "c-railway-crossing",
+  },
   PREDRIVE_STEP_SKIPPED: {
     severityClass: "vtorostepenna",
     points: SEVERITY_POINTS.vtorostepenna,

@@ -33,6 +33,7 @@ const FAMILY_ICONS: Record<string, string> = {
   conditions: "🌧️",
   cockpit: "🧰",
   vru: "🚲",
+  rail: "🚂",
   "exam-drills": "🎓",
 };
 

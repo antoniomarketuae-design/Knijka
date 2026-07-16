@@ -8,6 +8,7 @@
 export {
   createWorldRuntime,
   comfortableStopPossible,
+  RAIL_APPROACH_M,
   AMBER_REACTION_SEC,
   AMBER_COMFORT_DECEL_MPS2,
   AMBER_STOP_MARGIN,
@@ -36,6 +37,7 @@ export {
   type DistrictZone,
   type DistrictZoneKind,
   type EdgeZone,
+  type RailBarrierTimetable,
   type RoadClass,
 } from "./district";
 export { LANE_WIDTH_M, OFF_ROAD_DISTANCE_M } from "./spatial";

@@ -1,0 +1,164 @@
+{
+ "format": "district-v1",
+ "meta": {
+  "district": "rx-guarded",
+  "label": "Учебна улица — охраняем жп прелез с бариера А34 (сценарий RX-01)",
+  "mapKind": "scenario-street",
+  "generator": "tools/maps/gen_rail_crossing.mjs",
+  "zonesVersion": 1,
+  "boundsLocalMeters": {
+   "minX": -34.12,
+   "minY": -6,
+   "maxX": 14.13,
+   "maxY": 306
+  },
+  "attribution": {
+   "text": "Учебна улица с железопътен прелез — оригинален параметричен дизайн (без данни от OpenStreetMap)",
+   "license": "All rights reserved",
+   "licenseUrl": "/",
+   "copyrightUrl": "/",
+   "obligation": "none — original work, no ODbL attribution required for this map"
+  },
+  "defaults": {
+   "maxspeedUrbanKmh": 50,
+   "note": "Охраняем жп прелез на 150 м: при спуснати бариери изчакай зад стоп-линията; премини едва след пълното им вдигане, без да спираш върху релсите."
+  },
+  "stats": {
+   "roadKm": 0.3,
+   "nodes": 2,
+   "edges": 1,
+   "intersections": 0,
+   "crossings": 0,
+   "buildings": 1,
+   "spawnPoints": 2,
+   "zones": 1
+  },
+  "scenario": {
+   "archetype": "straight-street",
+   "params": {
+    "lengthM": 300,
+    "maxspeedKmh": 50,
+    "crossingFromM": 150,
+    "crossingToM": 156,
+    "guarded": "guarded"
+   },
+   "lanesPerDirection": 1,
+   "laneCenterRightM": 4.06,
+   "railCrossing": {
+    "id": "rxg-z-railcrossing",
+    "signRef": "А34",
+    "fromM": 150,
+    "toM": 156,
+    "guarded": true,
+    "stopLineY": 145,
+    "barrier": {
+     "cycleSec": 90,
+     "downFromSec": 0,
+     "downToSec": 40
+    }
+   }
+  }
+ },
+ "roads": {
+  "nodes": [
+   {
+    "id": "rxg-n-end",
+    "x": 0,
+    "y": 300
+   },
+   {
+    "id": "rxg-n-start",
+    "x": 0,
+    "y": 0
+   }
+  ],
+  "edges": [
+   {
+    "id": "rxg-e-street",
+    "from": "rxg-n-start",
+    "to": "rxg-n-end",
+    "class": "residential",
+    "name": "Учебна улица — охраняем жп прелез с бариера А34 (сценарий RX-01)",
+    "oneway": false,
+    "roundabout": false,
+    "lanes": 2,
+    "lanesSource": "tag",
+    "maxspeed": 50,
+    "maxspeedSource": "tag",
+    "length": 300,
+    "geometry": [
+     [
+      0,
+      0
+     ],
+     [
+      0,
+      300
+     ]
+    ]
+   }
+  ]
+ },
+ "intersections": [],
+ "crossings": [],
+ "roundabouts": [],
+ "buildings": [
+  {
+   "id": "rxg-b-block",
+   "height": 5,
+   "heightSource": "default",
+   "footprint": [
+    [
+     -28.12,
+     90
+    ],
+    [
+     -16.12,
+     90
+    ],
+    [
+     -16.12,
+     106
+    ],
+    [
+     -28.12,
+     106
+    ]
+   ]
+  }
+ ],
+ "spawnPoints": [
+  {
+   "id": "rxg-spawn-start",
+   "x": 4.06,
+   "y": 15,
+   "heading": 0,
+   "edgeId": "rxg-e-street",
+   "name": "Начало — преди прелеза"
+  },
+  {
+   "id": "rxg-spawn-finish",
+   "x": 4.06,
+   "y": 285,
+   "heading": 0,
+   "edgeId": "rxg-e-street",
+   "name": "Контролна точка — след прелеза"
+  }
+ ],
+ "zones": [
+  {
+   "id": "rxg-z-railcrossing",
+   "kind": "railCrossing",
+   "edgeId": "rxg-e-street",
+   "fromM": 150,
+   "toM": 156,
+   "signRef": "А34",
+   "guarded": true,
+   "barrier": {
+    "cycleSec": 90,
+    "downFromSec": 0,
+    "downToSec": 40
+   }
+  }
+ ]
+}

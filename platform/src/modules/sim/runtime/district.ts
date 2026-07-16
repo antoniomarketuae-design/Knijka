@@ -121,6 +121,14 @@ export interface DistrictBounds {
  *                        this span is a bus lane (BUS маркировка): sustained
  *                        car travel in it grades DRIVING_IN_BUS_LANE, and the
  *                        keep-right detector stops requiring that lane.
+ * Stage 3a (RAIL PACK slice 1 — same shape, new kind, so meta.zonesVersion
+ * stays 1; doc 72 §12 RX-01/RX-02/RX-03):
+ *  - "railCrossing"    — the TRACK BAND of a railway crossing across the host
+ *                        edge (the span IS the rails ± clearance). Optional
+ *                        `guarded` + `barrier` author the RX-01 variant; an
+ *                        unguarded span (guarded absent/false) is the RX-02
+ *                        mandatory-stop crossing (ЗДвП чл. 51–53). Grades the
+ *                        опасна RAIL_CROSSING_VIOLATION.
  * Consumers MUST ignore zones with unknown kinds/edge ids (forward compat).
  */
 export type DistrictZoneKind =
@@ -128,7 +136,25 @@ export type DistrictZoneKind =
   | "noParking"
   | "noOvertaking"
   | "solidCenterLine"
-  | "busLane";
+  | "busLane"
+  | "railCrossing";
+
+/**
+ * Deterministic barrier timetable of a GUARDED rail crossing (railCrossing +
+ * guarded — doc 72 RX-01). Periodic over session time, the signalOffsets /
+ * controller-schedule discipline: barred (barriers down / РЖ flashing red)
+ * exactly when (tSec mod cycleSec) ∈ [downFromSec, downToSec) — same session,
+ * same map, same phases, always. A malformed/absent timetable on a guarded
+ * span means NEVER barred (open — structurally innocent, A12).
+ */
+export interface RailBarrierTimetable {
+  /** Full cycle length, seconds (> 0). */
+  cycleSec: number;
+  /** Barred window start within the cycle, seconds (0 <= from < to <= cycle). */
+  downFromSec: number;
+  /** Barred window end within the cycle, seconds. */
+  downToSec: number;
+}
 
 /**
  * One authored ban zone: a span [fromM, toM] of arclength along the host
@@ -145,9 +171,23 @@ export interface DistrictZone {
   fromM: number;
   toM: number;
   /** The posting sign/marking of the span ("В24" / "В27" / "В28"; stage 2b:
-   *  "М1" for solidCenterLine, "BUS" for busLane — Наредба № 2 markings) —
-   *  provenance + (future) rendering; the runtime grades off `kind` alone. */
+   *  "М1" for solidCenterLine, "BUS" for busLane — Наредба № 2 markings;
+   *  stage 3a: "А34" guarded / "А35" unguarded rail crossing) — provenance +
+   *  (future) rendering; the runtime grades off `kind` alone. */
   signRef: string;
+  /**
+   * railCrossing only (stage 3a): true = GUARDED crossing (barriers/РЖ lamps
+   * — doc 72 RX-01). Legal asymmetry (ЗДвП чл. 51–53): an UNGUARDED crossing
+   * (absent/false — the author's explicit declaration, RX-02) carries the
+   * mandatory full-stop duty; a guarded crossing carries NO stop duty while
+   * open — only the barred-entry ban. Other kinds ignore the field.
+   */
+  guarded?: boolean;
+  /**
+   * railCrossing + guarded only: the deterministic barrier timetable. Absent
+   * or malformed = never barred (open, structurally innocent — A12).
+   */
+  barrier?: RailBarrierTimetable;
 }
 
 export interface District {

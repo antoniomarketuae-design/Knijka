@@ -33,6 +33,7 @@ export type ScenarioFamily =
   | "conditions"
   | "cockpit"
   | "vru"
+  | "rail"
   | "exam-drills";
 
 export const SCENARIO_FAMILIES: readonly ScenarioFamily[] = [
@@ -49,6 +50,7 @@ export const SCENARIO_FAMILIES: readonly ScenarioFamily[] = [
   "conditions",
   "cockpit",
   "vru",
+  "rail",
   "exam-drills",
 ];
 

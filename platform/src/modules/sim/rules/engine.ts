@@ -174,6 +174,19 @@ export interface RuleEngineState {
   solidCross: EpisodeState;
   /** Sustained car travel in an authored bus lane (SN-05). */
   busLane: EpisodeState;
+  // -- RAIL PACK slice 1 (ADR-006 stage 3a) ----------------------------------
+  /**
+   * Railway-crossing entry tracker (RX-01/RX-02): the band entry is graded at
+   * the approach→on transition of tick.railCrossing, and ONLY when a genuine
+   * "approach" frame was seen first — a vehicle materialising ON the band
+   * (spawn/teleport) is structurally innocent (A12).
+   */
+  rail: {
+    approachSeen: boolean;
+    prevPhase: "approach" | "on" | null;
+  };
+  /** At rest ON the track band (RX-03 — no queue exemption, short sustain). */
+  railRest: EpisodeState;
 }
 
 const IDLE_EPISODE: EpisodeState = { activeSince: null, emitted: false };
@@ -219,6 +232,8 @@ export function createRuleEngine(config?: Partial<RuleEngineConfig>): RuleEngine
     banZoneStop: { ...IDLE_EPISODE },
     solidCross: { ...IDLE_EPISODE },
     busLane: { ...IDLE_EPISODE },
+    rail: { approachSeen: false, prevPhase: null },
+    railRest: { ...IDLE_EPISODE },
   };
 }
 
@@ -253,6 +268,8 @@ function cloneState(s: RuleEngineState): RuleEngineState {
     banZoneStop: { ...s.banZoneStop },
     solidCross: { ...s.solidCross },
     busLane: { ...s.busLane },
+    rail: { ...s.rail },
+    railRest: { ...s.railRest },
   };
 }
 
@@ -837,6 +854,60 @@ export function reduceTick(prev: RuleEngineState, tick: SimTick): ReduceResult {
     events.push(makeViolation("DRIVING_IN_BUS_LANE", t));
   }
 
+  // Railway crossing (RAIL PACK slice 1, ADR-006 stage 3a — doc 72 RX-01/02/03,
+  // ЗДвП чл. 51–53; Н38 treats rail-crossing offences as опасна). All three
+  // cases bill the ONE dedicated code, each with a machine-readable detail:
+  //  (a) "no-stop"          — an UNGUARDED crossing's band entered without a
+  //      recent qualifying FULL STOP (the Б2 full-stop ledger discipline,
+  //      verbatim: stop.lastQualifyingStopAt within stopRecencySec). The
+  //      LEGAL ASYMMETRY is structural: a GUARDED crossing carries no stop
+  //      duty while open (чл. 52 — the driver-is-the-barrier duty exists only
+  //      where no barrier does), so railGuarded === true skips this case.
+  //  (b) "entered-barred"   — the band entered while the guarded crossing is
+  //      BARRED (authored timetable) — convicts regardless of any stop made
+  //      first (weaving past the barrier after a polite stop is the kill).
+  //  (c) "stopped-on-track" — came to REST on the band (railRest below).
+  // Structural innocence (A12): all context is authored zone data (absent =
+  // silent — every shipped v1 map); entries grade only after a genuine
+  // "approach" frame (spawns/teleports onto the band are inert); reverse
+  // maneuvering is exempt; braking THROUGH without stopping never bills.
+  const railPhase = tick.railCrossing ?? null;
+  if (railPhase === "on" && s.rail.prevPhase !== "on") {
+    if (s.rail.approachSeen && forwardGear) {
+      if (tick.railBarred === true) {
+        events.push(makeViolation("RAIL_CROSSING_VIOLATION", t, { detail: "entered-barred" }));
+      } else if (tick.railGuarded !== true) {
+        const last = s.stop.lastQualifyingStopAt;
+        const stopped = last !== null && t - last <= cfg.stopRecencySec;
+        if (!stopped) {
+          events.push(makeViolation("RAIL_CROSSING_VIOLATION", t, { detail: "no-stop" }));
+        }
+      }
+      // guarded + open: crossing without stopping is LEGAL — no code.
+    }
+  }
+  if (railPhase === "approach") s.rail.approachSeen = true;
+  else if (railPhase === null) s.rail.approachSeen = false;
+  s.rail.prevPhase = railPhase;
+
+  // At rest ON the track band (RX-03 — „опашка върху прелеза"): deliberately
+  // NO queue exemption (following the queue onto the tracks IS the taught
+  // kill) and a short sustain — resting on rails is never innocent. A stop
+  // BEFORE the band (the stop line, the approach queue) is a different phase
+  // ("approach") and never arms this. Driving on re-arms one bill per rest.
+  const restingOnRail = railPhase === "on" && speed <= cfg.fullStopMaxSpeedKmh && forwardGear;
+  if (
+    stepEpisode(
+      s.railRest,
+      restingOnRail,
+      railPhase !== "on" || speed > cfg.movingSpeedKmh,
+      t,
+      cfg.railRestSustainSec,
+    )
+  ) {
+    events.push(makeViolation("RAIL_CROSSING_VIOLATION", t, { detail: "stopped-on-track" }));
+  }
+
   // NOTE: SP-06 „обструктивно бавно каране" (obstructively slow) was
   // prototyped here and REMOVED — with only rule-engine telemetry a
   // legitimately cautious crawl (готовност за спиране toward a blind junction,
@@ -1023,6 +1094,7 @@ export function reduceTick(prev: RuleEngineState, tick: SimTick): ReduceResult {
     s.banZoneStop,
     s.solidCross,
     s.busLane,
+    s.railRest,
   ].some((ep) => ep.emitted && ep.activeSince !== null);
   if (events.some((e) => e.kind === "violation")) {
     s.cleanDistanceM = 0; // any fresh mistake resets the streak

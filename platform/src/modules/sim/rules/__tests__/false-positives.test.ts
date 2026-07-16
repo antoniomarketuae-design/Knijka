@@ -1478,6 +1478,72 @@ describe("FP battery — line types & bus lanes (CROSSED_SOLID_LINE / DRIVING_IN
 });
 
 // ---------------------------------------------------------------------------
+// Railway crossing (ADR-006 stage 3a — RAIL_CROSSING_VIOLATION)
+// ---------------------------------------------------------------------------
+
+describe("FP battery — railway crossing (stage 3a)", () => {
+  it("the correct unguarded ritual: full stop at the line, then a brisk crossing", () => {
+    // Innocent: the taught RX-02 sequence exactly — stop before the band,
+    // cross without stopping on it. The stop is what the detector demands;
+    // it must never also punish the brisk crossing that follows.
+    const { events } = drive([
+      tick(0, { speedKmh: 30, railCrossing: "approach" }),
+      tick(1, { speedKmh: 12, railCrossing: "approach" }),
+      tick(2, { speedKmh: 0, railCrossing: "approach" }),
+      tick(3, { speedKmh: 0, railCrossing: "approach" }),
+      tick(4, { speedKmh: 14, railCrossing: "approach" }),
+      tick(5, { speedKmh: 20, railCrossing: "on" }),
+      tick(6, { speedKmh: 25, railCrossing: "on" }),
+      ...cruise(7, 12, { speedKmh: 35 }),
+    ]);
+    expectInnocent(events);
+  });
+
+  it("regression: crossing a GUARDED-OPEN crossing without stopping is LEGAL (чл. 52)", () => {
+    // Innocent: the legal asymmetry — where a barrier guards the crossing and
+    // it is OPEN, there is NO stop duty. Grading this drive would flag every
+    // correct pass of every open barrier in the country.
+    const { events } = drive([
+      ...cruise(0, 3, { speedKmh: 40 }),
+      tick(4, { speedKmh: 40, railCrossing: "approach", railGuarded: true }),
+      tick(5, { speedKmh: 40, railCrossing: "approach", railGuarded: true }),
+      tick(6, { speedKmh: 40, railCrossing: "on", railGuarded: true }),
+      tick(7, { speedKmh: 40, railCrossing: "on", railGuarded: true }),
+      ...cruise(8, 12, { speedKmh: 40 }),
+    ]);
+    expectInnocent(events);
+  });
+
+  it("a brief brake-through on the band (slowing, never at rest) never convicts", () => {
+    // Innocent: prudence over the rails is not a rest — only coming to a
+    // genuine stop ON the band is the RX-03 kill.
+    const { events } = drive([
+      tick(0, { speedKmh: 30, railCrossing: "approach", railGuarded: true }),
+      tick(1, { speedKmh: 18, railCrossing: "approach", railGuarded: true }),
+      tick(2, { speedKmh: 9, railCrossing: "on", railGuarded: true }),
+      tick(3, { speedKmh: 6, railCrossing: "on", railGuarded: true }),
+      tick(4, { speedKmh: 14, railCrossing: "on", railGuarded: true }),
+      ...cruise(5, 9, { speedKmh: 30 }),
+    ]);
+    expectInnocent(events);
+  });
+
+  it("a long patient wait at the BARRED approach line is exactly correct", () => {
+    // Innocent: waiting out the barrier at the stop line — at rest on the
+    // APPROACH (never on the band) for as long as the train takes.
+    const { events } = drive([
+      tick(0, { speedKmh: 25, railCrossing: "approach", railGuarded: true, railBarred: true }),
+      tick(1, { speedKmh: 8, railCrossing: "approach", railGuarded: true, railBarred: true }),
+      ...cruise(2, 60, { speedKmh: 0, railCrossing: "approach", railGuarded: true, railBarred: true }),
+      tick(61, { speedKmh: 12, railCrossing: "approach", railGuarded: true }),
+      tick(62, { speedKmh: 18, railCrossing: "on", railGuarded: true }),
+      ...cruise(63, 67, { speedKmh: 30 }),
+    ]);
+    expectInnocent(events);
+  });
+});
+
+// ---------------------------------------------------------------------------
 // Whole-drive integration
 // ---------------------------------------------------------------------------
 

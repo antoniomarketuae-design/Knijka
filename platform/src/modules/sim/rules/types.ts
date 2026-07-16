@@ -229,6 +229,32 @@ export interface SimTick {
    * where the line is dashed — ONLY the solidCenterLine composite grades it.
    */
   opposingBank?: boolean;
+  // -- RAIL PACK slice 1 (ADR-006 stage 3a; doc 72 §12 RX-01/RX-02/RX-03).
+  // Same contract as every zone flag above: authored district `zones` spans
+  // only (kind "railCrossing"), never heuristics — absent = no crossing =
+  // innocent. No shipped v1 map carries a rail span.
+  /**
+   * Railway-crossing phase from the authored track-band span: "on" = the
+   * committed lane fix sits ON the band (between the rails ± clearance);
+   * "approach" = within the runtime's approach window BEFORE the band in the
+   * travel direction. The reducer grades the approach→on transition (the
+   * entry) and a rest while "on" — RAIL_CROSSING_VIOLATION.
+   */
+  railCrossing?: "approach" | "on";
+  /**
+   * The crossing in context is GUARDED (barriers/РЖ lamps — А34). The legal
+   * asymmetry the detector encodes (ЗДвП чл. 51–53): guarded + OPEN carries
+   * NO stop duty (crossing without stopping is legal); UNGUARDED (absent —
+   * the author's explicit declaration, А35) carries the mandatory full stop
+   * before the band.
+   */
+  railGuarded?: boolean;
+  /**
+   * The guarded crossing is currently BARRED (barriers down/closing per the
+   * authored deterministic timetable). Entering the band while set is the
+   * RX-01 kill — convicts regardless of any stop made first.
+   */
+  railBarred?: boolean;
   /** Distance to the next stop line ahead on the current edge (travel
    * direction), m, within the runtime's watch window; absent = none/unknown. */
   nextStopLineM?: number;
@@ -316,6 +342,8 @@ export type ViolationCode =
   // LINE TYPES + BUS LANES (ADR-006 stage 2b — authored М1/BUS district zones)
   | "CROSSED_SOLID_LINE" // опасна: fully crossed the solid осева inside an authored М1 span (OV-04/SN-03 escalation; a touch stays CENTER_LINE_TOUCHED)
   | "DRIVING_IN_BUS_LANE" // основна: sustained car travel in an authored bus lane (SN-05; brief transits to turn/park structurally innocent)
+  // RAIL PACK slice 1 (ADR-006 stage 3a — authored railCrossing district zones)
+  | "RAIL_CROSSING_VIOLATION" // опасна: unguarded band entry without the mandatory full stop / entry while barred / coming to rest ON the tracks (RX-01/02/03, чл. 51–53)
   // pre-drive procedure (procedures/machine.ts)
   | "PREDRIVE_STEP_SKIPPED" // второстепенна per skipped step
   | "PREDRIVE_SEATBELT_SKIPPED" // основна (skipping the belt is not a detail)
@@ -725,6 +753,19 @@ export interface RuleEngineConfig {
    * discipline, mirrored).
    */
   busLaneSustainSec: number;
+
+  // -- RAIL PACK slice 1 (ADR-006 stage 3a; doc 72 RX-01/02/03) ---------------
+
+  /**
+   * RX-03 „опашка върху прелеза" — seconds at rest ON the authored track band
+   * before RAIL_CROSSING_VIOLATION fires. Much shorter than the В27 rest
+   * sustain (4 s) on purpose: resting on rails is never innocent, and NO
+   * queue exemption applies (following the queue onto the tracks IS the
+   * taught kill — the barrier drops on your roof). Still long enough that a
+   * brisk brake-through or a physics-creep frame can never bill: only a car
+   * genuinely AT REST on the band holds v ≤ 1 km/h this long.
+   */
+  railRestSustainSec: number;
 }
 
 export const DEFAULT_RULE_CONFIG: RuleEngineConfig = {
@@ -856,4 +897,10 @@ export const DEFAULT_RULE_CONFIG: RuleEngineConfig = {
   // 4 s: a right-turn/curb transit crosses the bus lane in ~2-3 s; the cruise
   // the law targets holds it for blocks.
   busLaneSustainSec: 4,
+
+  // RAIL PACK slice 1 (ADR-006 stage 3a). Structurally data-armed like every
+  // zone detector: no shipped v1 map carries a railCrossing span.
+  // 2 s: resting on the tracks is never innocent (no queue exemption — the
+  // RX-03 kill), while braking THROUGH without stopping never holds v ≈ 0.
+  railRestSustainSec: 2,
 };

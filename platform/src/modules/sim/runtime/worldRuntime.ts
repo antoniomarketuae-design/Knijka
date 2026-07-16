@@ -64,6 +64,15 @@ export function comfortableStopPossible(distToLineM: number, speedKmh: number): 
 /** Heading opposes the one-way's flow by more than this → wrong way. */
 const WRONG_WAY_ANGLE_DEG = 120;
 
+/**
+ * RAIL PACK slice 1 (ADR-006 stage 3a — doc 72 RX-01/RX-02/RX-03): how far
+ * BEFORE the authored track band (travel direction) the "approach" phase of
+ * tick.railCrossing reaches, meters. The reducer requires a seen approach
+ * before it will adjudicate a band entry, so a vehicle materialising ON the
+ * band (teleport/spawn) is structurally innocent. Exported for tests.
+ */
+export const RAIL_APPROACH_M = 30;
+
 /** Radius around a junction to look for conflicting priority traffic, meters.
  * Junction catchments grew with the perceptual road scale (mouths now sit
  * 17–43 m out) — exported for tests. */
@@ -324,18 +333,25 @@ export function createWorldRuntime(districtJson: District | unknown): DistrictWo
     | "noParking"
     | "noOvertaking"
     | "solidCenterLine"
-    | "busLane";
+    | "busLane"
+    | "railCrossing";
   const KNOWN_ZONE_KINDS = new Set<string>([
     "noStopping",
     "noParking",
     "noOvertaking",
     "solidCenterLine",
     "busLane",
+    "railCrossing",
   ]);
-  const banZonesByEdge = new Map<
-    number,
-    Array<{ kind: KnownZoneKind; fromM: number; toM: number }>
-  >();
+  interface ZoneSpan {
+    kind: KnownZoneKind;
+    fromM: number;
+    toM: number;
+    /** railCrossing only (stage 3a): guarded flag + validated timetable. */
+    railGuarded: boolean;
+    railBarrier: { cycleSec: number; downFromSec: number; downToSec: number } | null;
+  }
+  const banZonesByEdge = new Map<number, ZoneSpan[]>();
   for (const z of district.zones ?? []) {
     if (!KNOWN_ZONE_KINDS.has(z.kind)) continue;
     if (!(Number.isFinite(z.fromM) && Number.isFinite(z.toM) && z.fromM < z.toM)) continue;
@@ -343,7 +359,30 @@ export function createWorldRuntime(districtJson: District | unknown): DistrictWo
     if (host === null) continue;
     let list = banZonesByEdge.get(host.idx);
     if (!list) banZonesByEdge.set(host.idx, (list = []));
-    list.push({ kind: z.kind as KnownZoneKind, fromM: z.fromM, toM: z.toM });
+    // Stage 3a rail fields — tolerant by construction: a malformed timetable
+    // is dropped (guarded-but-never-barred = open = innocent, A12); non-rail
+    // kinds carry neutral values.
+    const guarded = z.kind === "railCrossing" && z.guarded === true;
+    const b = z.barrier;
+    const barrierValid =
+      guarded &&
+      b !== undefined &&
+      Number.isFinite(b.cycleSec) &&
+      b.cycleSec > 0 &&
+      Number.isFinite(b.downFromSec) &&
+      Number.isFinite(b.downToSec) &&
+      b.downFromSec >= 0 &&
+      b.downFromSec < b.downToSec &&
+      b.downToSec <= b.cycleSec;
+    list.push({
+      kind: z.kind as KnownZoneKind,
+      fromM: z.fromM,
+      toM: z.toM,
+      railGuarded: guarded,
+      railBarrier: barrierValid
+        ? { cycleSec: b.cycleSec, downFromSec: b.downFromSec, downToSec: b.downToSec }
+        : null,
+    });
   }
 
   // Uncontrolled (right-hand-rule) junctions: real junctions (degree >= 3) that
@@ -1003,15 +1042,55 @@ export function createWorldRuntime(districtJson: District | unknown): DistrictWo
           if (headingSign !== fix.travelDir) tick.opposingBank = true;
         }
       }
-      // ZONE-BAN membership (ADR-006 stage 2a; stage 2b vocabulary): flags
-      // flow onto the tick exactly the way maxSpeedKmh does — from the
-      // resolved edge + the lane fix's arclength. Absent zones (every shipped
-      // v1 file) sets nothing.
+      // ZONE-BAN membership (ADR-006 stage 2a; stage 2b vocabulary; stage 3a
+      // rail): flags flow onto the tick exactly the way maxSpeedKmh does —
+      // from the resolved edge + the lane fix's arclength. Absent zones
+      // (every shipped v1 file) sets nothing.
       if (fix.edgeIdx >= 0) {
         const spans = banZonesByEdge.get(fix.edgeIdx);
         if (spans !== undefined) {
+          // Rail phase needs the travel direction (which side of the band
+          // lies AHEAD) — the same committed-fix tangent test the
+          // next-stop-line context runs. Computed lazily: only frames on a
+          // rail-carrying edge OUTSIDE the band pay for it.
+          let railTravelSign: 1 | -1 | 0 = 0;
           for (let i = 0; i < spans.length; i++) {
             const z = spans[i];
+            if (z.kind === "railCrossing") {
+              // RAIL PACK slice 1 (doc 72 RX-01/02/03): the span IS the track
+              // band; the phase is "on" inside it, "approach" within
+              // RAIL_APPROACH_M before it in the travel direction, absent
+              // otherwise (absent = innocent — the reducer's contract).
+              let phase: "approach" | "on" | null =
+                fix.sM >= z.fromM && fix.sM <= z.toM ? "on" : null;
+              if (phase === null) {
+                if (railTravelSign === 0) {
+                  const [rtx, rty] = index.tangentAt(fix.edgeIdx, fix.sM);
+                  railTravelSign =
+                    Math.abs(signedDeltaDeg(v.headingDeg, bearingDeg(rtx, rty))) <= 90 ? 1 : -1;
+                }
+                if (railTravelSign > 0 && fix.sM >= z.fromM - RAIL_APPROACH_M && fix.sM < z.fromM) {
+                  phase = "approach";
+                } else if (railTravelSign < 0 && fix.sM > z.toM && fix.sM <= z.toM + RAIL_APPROACH_M) {
+                  phase = "approach";
+                }
+              }
+              if (phase !== null) {
+                // "on" dominates an overlapping span's "approach".
+                if (phase === "on" || tick.railCrossing === undefined) tick.railCrossing = phase;
+                if (z.railGuarded) tick.railGuarded = true;
+                // Deterministic barrier timetable: barred exactly when the
+                // session clock sits in the authored down-window (periodic —
+                // same session, same phases, always). Guarded without a valid
+                // timetable = never barred (open — innocent, A12).
+                if (z.railBarrier !== null) {
+                  const b = z.railBarrier;
+                  const cyclePos = tSec % b.cycleSec;
+                  if (cyclePos >= b.downFromSec && cyclePos < b.downToSec) tick.railBarred = true;
+                }
+              }
+              continue;
+            }
             if (fix.sM >= z.fromM && fix.sM <= z.toM) {
               if (z.kind === "noStopping") tick.noStopZone = true;
               else if (z.kind === "noParking") tick.noParkZone = true;

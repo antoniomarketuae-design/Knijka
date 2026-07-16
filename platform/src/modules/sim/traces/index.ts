@@ -429,3 +429,20 @@ export {
   recordScOvBusLaneDrive,
   type ScOvBusLaneTraceName,
 } from "./scOvBusLane";
+
+// ADR-006 stage 3a — the RAIL PACK slice-1 authored drives (sc-rx-unguarded /
+// sc-rx-guarded: the first templates on the `railCrossing` zone kind — the
+// authored track band + deterministic barrier timetable consumed by the
+// runtime and the RAIL_CROSSING_VIOLATION detector). Committed traces under
+// content/traces/<template>/ are recordings of exactly these scripts (gates:
+// traces/__tests__/sc-rx-unguarded-traces + sc-rx-guarded-traces).
+export {
+  SC_RX_UNGUARDED_ID,
+  recordScRxUnguardedDrive,
+  type ScRxUnguardedTraceName,
+} from "./scRxUnguarded";
+export {
+  SC_RX_GUARDED_ID,
+  recordScRxGuardedDrive,
+  type ScRxGuardedTraceName,
+} from "./scRxGuarded";

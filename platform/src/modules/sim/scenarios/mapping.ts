@@ -40,6 +40,8 @@ const CODE_TO_SCENARIO: Record<string, string> = {
   // LINE TYPES + BUS LANES (ADR-006 stage 2b)
   CROSSED_SOLID_LINE: "ev-markings-response",
   DRIVING_IN_BUS_LANE: "ev-lane-discipline",
+  // RAIL PACK slice 1 (ADR-006 stage 3a)
+  RAIL_CROSSING_VIOLATION: "ev-railway-crossing",
 };
 
 /** Scenario event id for a catalog code, or null when it maps to no scenario. */
