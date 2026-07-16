@@ -143,6 +143,7 @@ const MINIMAP_PX_PER_M = 0.5;
  *  district ids fall back to a generic „света". */
 const WORLD_NAME_BG: Record<string, string> = {
   "district-v1": "Студентски град",
+  "d2-v1": "Лозенец",
   "poligon-v1": "учебния полигон",
   "lot-perp-v1": "учебния паркинг",
 };
