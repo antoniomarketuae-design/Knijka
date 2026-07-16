@@ -107,6 +107,20 @@ export interface DistrictSpawnPoint {
   name: string | null;
 }
 
+/** ZONE-BAN data layer (ADR-006 stage 2a; runtime/district.ts is the
+ *  documented contract — this mirror keeps world-side loads typed). */
+export type DistrictZoneKind = "noStopping" | "noParking" | "noOvertaking";
+
+/** One authored ban span along an edge's polyline arclength (В24/В27/В28). */
+export interface DistrictZone {
+  id: string;
+  kind: DistrictZoneKind;
+  edgeId: string;
+  fromM: number;
+  toM: number;
+  signRef: string;
+}
+
 export interface DistrictMeta {
   district: string;
   label: string;
@@ -131,6 +145,10 @@ export interface District {
   roundabouts: DistrictRoundabout[];
   buildings: DistrictBuilding[];
   spawnPoints: DistrictSpawnPoint[];
+  /** OPTIONAL ban zones (ADR-006 stage 2a; absent = plain v1 — the builder
+   *  passes them through untouched; only the runtime consumes them). Files
+   *  carrying zones set meta.zonesVersion = 1 (see runtime/district.ts). */
+  zones?: DistrictZone[];
 }
 
 /** Cheap structural guard for data loaded from JSON at the integration seam. */

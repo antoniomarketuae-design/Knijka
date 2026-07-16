@@ -311,6 +311,26 @@ export function createWorldRuntime(districtJson: District | unknown): DistrictWo
   const nodePos = new Map<string, { x: number; y: number }>();
   for (const n of district.roads.nodes) nodePos.set(n.id, { x: n.x, y: n.y });
 
+  // ZONE-BAN data layer (ADR-006 stage 2a — doc 72 PK-06/OV-06): authored
+  // В24/В27/В28 spans, resolved per frame from the SAME committed lane fix
+  // maxspeed uses (edge + sM membership — no radius geometry, no tracker).
+  // Tolerant by construction: unknown edge ids, unknown kinds and degenerate
+  // spans are inert; a v1 file without `zones` builds an empty map and the
+  // sample() below adds NOTHING to the tick (byte-identical v1 behavior).
+  const banZonesByEdge = new Map<
+    number,
+    Array<{ kind: "noStopping" | "noParking" | "noOvertaking"; fromM: number; toM: number }>
+  >();
+  for (const z of district.zones ?? []) {
+    if (z.kind !== "noStopping" && z.kind !== "noParking" && z.kind !== "noOvertaking") continue;
+    if (!(Number.isFinite(z.fromM) && Number.isFinite(z.toM) && z.fromM < z.toM)) continue;
+    const host = index.edgeRtById(z.edgeId);
+    if (host === null) continue;
+    let list = banZonesByEdge.get(host.idx);
+    if (!list) banZonesByEdge.set(host.idx, (list = []));
+    list.push({ kind: z.kind, fromM: z.fromM, toM: z.toM });
+  }
+
   // Uncontrolled (right-hand-rule) junctions: real junctions (degree >= 3) that
   // are neither signalized nor guarded by any stop/give-way line → equal
   // junctions where you give way to the right.
@@ -953,6 +973,22 @@ export function createWorldRuntime(districtJson: District | unknown): DistrictWo
         // N1 (doc 72 OV-14): one marked lane TOTAL on a two-way road = the
         // narrow-street-meeting context. Surface-only (see SimTick doc).
         if (!edgeRt.edge.oneway && edgeRt.edge.lanes <= 1) tick.narrowTwoWay = true;
+      }
+      // ZONE-BAN membership (ADR-006 stage 2a): flags flow onto the tick
+      // exactly the way maxSpeedKmh does — from the resolved edge + the lane
+      // fix's arclength. Absent zones (every shipped v1 file) sets nothing.
+      if (fix.edgeIdx >= 0) {
+        const spans = banZonesByEdge.get(fix.edgeIdx);
+        if (spans !== undefined) {
+          for (let i = 0; i < spans.length; i++) {
+            const z = spans[i];
+            if (fix.sM >= z.fromM && fix.sM <= z.toM) {
+              if (z.kind === "noStopping") tick.noStopZone = true;
+              else if (z.kind === "noParking") tick.noParkZone = true;
+              else tick.noOvertakeZone = true;
+            }
+          }
+        }
       }
       if (nextStopLineM !== undefined) {
         tick.nextStopLineM = nextStopLineM;

@@ -34,6 +34,9 @@ const CODE_TO_SCENARIO: Record<string, string> = {
   // B1a Wave-3 detector pack (doc 72 capability 1)
   JUNCTION_SCAN_INCOMPLETE: "ev-stop-sign",
   FOLLOWING_TOO_CLOSE_FOR_RAIN: "ev-following-distance",
+  // ZONE-BAN data layer (ADR-006 stage 2a)
+  ILLEGAL_STOP_IN_BAN_ZONE: "ev-illegal-stop-zone",
+  OVERTAKING_IN_BAN_ZONE: "ev-overtake",
 };
 
 /** Scenario event id for a catalog code, or null when it maps to no scenario. */

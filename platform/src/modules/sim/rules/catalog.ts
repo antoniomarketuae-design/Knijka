@@ -439,6 +439,35 @@ export const VIOLATIONS: Record<ViolationCode, ViolationSpec> = {
     lawRef: "ЗДвП чл. 23",
     conceptId: "c-following-distance",
   },
+  // -- ZONE-BAN data layer (ADR-006 stage 2a; doc 72 PK-06/OV-06) -------------
+  ILLEGAL_STOP_IN_BAN_ZONE: {
+    // Doc 72 PK-06: Н38 основна (3) — ev-illegal-stop-zone is the #3
+    // exam-weight event (29q/47pt).
+    severityClass: "osnovna",
+    points: SEVERITY_POINTS.osnovna,
+    titleBg: "Спиране в забранена зона",
+    explanationBg:
+      "Спря в участък, в който престоят е забранен — под знак В27 „Забранени са престоят и паркирането“. „Само за минутка“ не съществува: точно там спрялата кола закрива видимостта и запушва лентата — затова знакът забранява дори краткия престой.",
+    correctiveBg:
+      "Преди да спреш, огледай знаците и маркировката на участъка: под В27 не спираш изобщо. Подмини зоната и спри чак след края ѝ — на разрешено място, плътно вдясно до бордюра.",
+    lawRef: "ЗДвП чл. 98",
+    conceptId: "c-stopping-standing-rules",
+  },
+  OVERTAKING_IN_BAN_ZONE: {
+    // Doc 72 OV-06: Н38 „основна → опасна" — the base sign-zone tier grades
+    // основна; the опасна escalation needs the solid-line / oncoming-crossing
+    // evidence of a LATER slice (line types), so this slice deliberately
+    // grades the lower tier (A12 — err innocent on unmeasured escalation).
+    severityClass: "osnovna",
+    points: SEVERITY_POINTS.osnovna,
+    titleBg: "Изпреварване в зона със забрана",
+    explanationBg:
+      "Изпревари в участък, в който изпреварването е забранено със знак В24 „Забранено е изпреварването“. Знакът стои там, където видимостта или насрещното движение правят изпреварването опасно — забраната важи, дори колата пред теб да пълзи.",
+    correctiveBg:
+      "Видиш ли В24 — прибери се зад предния и изчакай търпеливо края на забраната. Изпреварвай чак след зоната: огледало, мигач, чиста съседна лента и обратно вдясно, щом видиш изпреварания в огледалото.",
+    lawRef: "ЗДвП чл. 42–43",
+    conceptId: "c-overtaking-prohibitions",
+  },
   PREDRIVE_STEP_SKIPPED: {
     severityClass: "vtorostepenna",
     points: SEVERITY_POINTS.vtorostepenna,

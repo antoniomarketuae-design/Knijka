@@ -394,3 +394,21 @@ export {
   scSignalControllerTraceNames,
   type ScSignalControllerTraceName,
 } from "./scSignalController";
+
+// ADR-006 stage 2a — the ZONE-BAN authored drives (sc-ov-ban-overtake /
+// sc-pk-ban-stop: the first templates on the district `zones` data layer —
+// В24 no-overtaking + В27 no-stopping spans consumed by the runtime and the
+// OVERTAKING_IN_BAN_ZONE / ILLEGAL_STOP_IN_BAN_ZONE detectors). Committed
+// traces under content/traces/<template>/ are recordings of exactly these
+// scripts (gates: traces/__tests__/sc-ov-ban-overtake-traces +
+// sc-pk-ban-stop-traces).
+export {
+  SC_OV_BAN_OVERTAKE_ID,
+  recordScOvBanOvertakeDrive,
+  type ScOvBanOvertakeTraceName,
+} from "./scOvBanOvertake";
+export {
+  SC_PK_BAN_STOP_ID,
+  recordScPkBanStopDrive,
+  type ScPkBanStopTraceName,
+} from "./scPkBanStop";

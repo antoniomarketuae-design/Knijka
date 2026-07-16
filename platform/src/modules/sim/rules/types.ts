@@ -190,6 +190,24 @@ export interface SimTick {
    * in the staged narrowMeeting spec). district-v1 has no such edge today —
    * the poligon apron and future districts do. */
   narrowTwoWay?: boolean;
+  // -- ZONE-BAN data layer (ADR-006 stage 2a; doc 72 PK-06/OV-06). All three
+  // flags come ONLY from authored district `zones` spans (В27/В28/В24), never
+  // from heuristics — a ban zone is authored data, which is what makes the
+  // deferred-illegal-stop FP finding structural: absent = no zone = innocent.
+  /** Inside an authored В27 no-stopping span (престоят и паркирането са
+   * забранени). Read by the ILLEGAL_STOP_IN_BAN_ZONE detector. */
+  noStopZone?: boolean;
+  /** Inside an authored В28 no-parking span. SURFACE-ONLY in this slice: a
+   * short престой under В28 is LEGAL, and parking vs престой cannot be told
+   * apart with current telemetry (the same A12 bar that deferred the generic
+   * illegal-stop idea) — no detector grades it. PK-07 rides it later. */
+  noParkZone?: boolean;
+  /** Inside an authored В24 no-overtaking span. Read by the
+   * OVERTAKING_IN_BAN_ZONE composite. DISTINCT from the edge-level
+   * `noOvertake` surface tag above, which stays ungraded (whole-edge hint,
+   * possibly present in shipped data) — only the bounded, sign-posted zone
+   * span convicts. */
+  noOvertakeZone?: boolean;
   /** Distance to the next stop line ahead on the current edge (travel
    * direction), m, within the runtime's watch window; absent = none/unknown. */
   nextStopLineM?: number;
@@ -271,6 +289,9 @@ export type ViolationCode =
   // B1a Wave-3 detector pack (doc 72 capability 1 — config-gated per-lesson drills on EXISTING telemetry)
   | "JUNCTION_SCAN_INCOMPLETE" // основна: crossed a Б2 stop line without a fresh left-AND-right scan (JU-23; config-gated)
   | "FOLLOWING_TOO_CLOSE_FOR_RAIN" // второстепенна: dry-appropriate gap held in rain — under the wet 3-second gap (FO-04; config-gated)
+  // ZONE-BAN data layer (ADR-006 stage 2a — authored В24/В27 district zones)
+  | "ILLEGAL_STOP_IN_BAN_ZONE" // основна: casual rest inside a В27 no-stopping zone (PK-06; queue/signal stops structurally innocent)
+  | "OVERTAKING_IN_BAN_ZONE" // основна: lane change past a lead inside a В24 no-overtaking zone (OV-06; the OV-07 corridor discipline)
   // pre-drive procedure (procedures/machine.ts)
   | "PREDRIVE_STEP_SKIPPED" // второстепенна per skipped step
   | "PREDRIVE_SEATBELT_SKIPPED" // основна (skipping the belt is not a detail)
@@ -616,6 +637,45 @@ export interface RuleEngineConfig {
    *  fires — generous (mirrors conditionsSpeedSustainSec): a brief dip toward
    *  the wet gap while easing back is ordinary rain driving, not tailgating. */
   followRainSustainSec: number;
+
+  // -- ZONE-BAN data layer (ADR-006 stage 2a; doc 72 PK-06/OV-06) -------------
+
+  /**
+   * PK-06 „спиране в забранена зона" master gate. DEFAULT ON — structurally
+   * safe: the flag only ever arms on tick.noStopZone, which comes exclusively
+   * from authored district `zones` data, and NO shipped map carries zones
+   * (the exam bank / free-drive districts are plain v1). The deferred
+   * illegal-stop FP finding („a legal red-light/yield stop near a junction
+   * looks identical to an illegal one") is answered structurally, not by
+   * this switch: the zone is authored data AND every traffic-shaped rest
+   * context below is exempt. The switch exists for lessons that want the
+   * zone as pure context.
+   */
+  banZoneStopEnabled: boolean;
+  /** Seconds at rest inside a В27 zone before ILLEGAL_STOP_IN_BAN_ZONE fires —
+   *  long enough to exclude traffic micro-stops (creep pauses, 2 s
+   *  hesitations); a deliberate „пусни ме тук за малко" curb stop holds far
+   *  longer. */
+  banZoneStopRestSec: number;
+  /** A lead at rest within this gap = a QUEUE — the stop has a traffic cause
+   *  and never convicts (the standstill-lead context of the harsh-brake
+   *  cause ledger, m). */
+  banZoneStopQueueGapM: number;
+  /** A stop line ahead within this distance = a CONTROL stop (Б2/light
+   *  queue), never convicts, m. Any FORBIDDING effective signal in the
+   *  runtime's watch window is likewise innocent at any distance. */
+  banZoneStopLineClearM: number;
+
+  /**
+   * OV-06 „изпреварване при забрана" — a lead within this gap (m) is the
+   * vehicle being overtaken when a lane change lands inside an armed В24
+   * zone. Mirrors crossingOvertakeLeadGapM exactly (the OV-07 corridor
+   * discipline): the code rides the ALREADY-denoised lane-change signal, so
+   * its false-positive surface equals the lane-change detector's — zero on
+   * an innocent single-lane drive; a lane change with no lead is a
+   * reposition, never an overtake.
+   */
+  banOvertakeLeadGapM: number;
 }
 
 export const DEFAULT_RULE_CONFIG: RuleEngineConfig = {
@@ -727,4 +787,15 @@ export const DEFAULT_RULE_CONFIG: RuleEngineConfig = {
   // deliberately the DRILL band a wet-following lesson enables, not a route rule.
   followRainSecondsFactor: 1.6,
   followRainSustainSec: 3,
+
+  // ZONE-BAN data layer (ADR-006 stage 2a). Default ON — see the interface
+  // comment: arming requires authored zone data no shipped map carries, and
+  // the queue/signal/crossing exemptions keep every traffic-shaped rest
+  // innocent (the FP battery locks them in).
+  banZoneStopEnabled: true,
+  banZoneStopRestSec: 4,
+  banZoneStopQueueGapM: 8,
+  banZoneStopLineClearM: 25,
+  // OV-06: same 45 m lead corridor as the crossing overtake (one discipline).
+  banOvertakeLeadGapM: 45,
 };

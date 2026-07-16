@@ -101,11 +101,47 @@ export interface DistrictBounds {
   maxY: number;
 }
 
+/**
+ * ZONE-BAN data layer (ADR-006 stage 2a; doc 72 N3 — PK-06/PK-07/OV-06,
+ * SN-02/03/04 ban signs). Kind vocabulary of the first slice:
+ *  - "noStopping"   — В27 „Забранени са престоят и паркирането" span;
+ *  - "noParking"    — В28 „Забранено е паркирането" span (surface-only
+ *                     context in this slice: престоят под В28 е разрешен, а
+ *                     паркиране vs престой не се различава с текущата
+ *                     телеметрия — the same A12 structural-innocence bar as
+ *                     the deferred illegal-stop finding);
+ *  - "noOvertaking" — В24 „Забранено е изпреварването" span.
+ * Consumers MUST ignore zones with unknown kinds/edge ids (forward compat).
+ */
+export type DistrictZoneKind = "noStopping" | "noParking" | "noOvertaking";
+
+/**
+ * One authored ban zone: a span [fromM, toM] of arclength along the host
+ * edge's polyline (the same s-measure the Locator's `sM` reports), so the
+ * runtime resolves membership exactly the way it resolves `maxspeed` — from
+ * the committed lane fix, no extra geometry.
+ */
+export interface DistrictZone {
+  id: string;
+  kind: DistrictZoneKind;
+  /** Host drivable edge (roads.edges id). Unknown ids are inert (tolerant). */
+  edgeId: string;
+  /** Span along the edge polyline, meters; requires 0 <= fromM < toM. */
+  fromM: number;
+  toM: number;
+  /** The posting sign of the ban ("В24" / "В27" / "В28") — provenance +
+   *  (future) sign-post rendering; the runtime grades off `kind` alone. */
+  signRef: string;
+}
+
 export interface District {
   format: "district-v1";
   meta: {
     boundsLocalMeters: DistrictBounds;
     defaults?: { maxspeedUrbanKmh?: number };
+    /** ZONE-BAN schema marker: files that carry `zones` set 1 (ADR-006 stage
+     *  2a version contract — see the `zones` field note). Absent = plain v1. */
+    zonesVersion?: number;
     /** Extra meta (attribution, stats, projection…) passes through untyped. */
     [key: string]: unknown;
   };
@@ -117,6 +153,17 @@ export interface District {
   crossings: DistrictCrossing[];
   roundabouts: DistrictRoundabout[];
   spawnPoints: DistrictSpawnPoint[];
+  /**
+   * ZONE-BAN data layer (ADR-006 stage 2a) — OPTIONAL and additive. The
+   * version contract:
+   *  - `format` stays "district-v1": every v1 consumer keeps working, and a
+   *    file WITHOUT `zones` is byte-identical in meaning to before this field
+   *    existed (the runtime adds nothing to the tick).
+   *  - a file that DOES carry zones also sets `meta.zonesVersion: 1` so the
+   *    data generation lineage is explicit; parsers must not require it.
+   *  - shipped v1 files are NEVER regenerated for this field.
+   */
+  zones?: DistrictZone[];
 }
 
 /** BG urban default when an edge is unknown / vehicle is off-road (ЗДвП чл. 21). */
@@ -145,6 +192,12 @@ export function parseDistrict(raw: unknown): District {
   const meta = d.meta as District["meta"] | undefined;
   if (!meta || typeof meta.boundsLocalMeters !== "object") {
     throw new Error("district: missing meta.boundsLocalMeters");
+  }
+  // ZONE-BAN layer (ADR-006 stage 2a): OPTIONAL — absent is plain v1; when
+  // present it must at least be an array (wrong-file guard, same bar as the
+  // checks above; per-zone tolerance lives at the consumer).
+  if (d.zones !== undefined && !Array.isArray(d.zones)) {
+    throw new Error("district: zones must be an array when present");
   }
   return raw as District;
 }

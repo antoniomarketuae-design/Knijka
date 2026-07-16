@@ -160,6 +160,9 @@ export interface RuleEngineState {
   // -- B1a Wave-3 detector pack (doc 72 capability 1) — config-gated drills --
   /** Following under the WET-prudent gap while it rains (FO-04; config-gated). */
   followingRain: EpisodeState;
+  // -- ZONE-BAN data layer (ADR-006 stage 2a) --------------------------------
+  /** Casual rest inside an authored В27 no-stopping zone (PK-06). */
+  banZoneStop: EpisodeState;
 }
 
 const IDLE_EPISODE: EpisodeState = { activeSince: null, emitted: false };
@@ -202,6 +205,7 @@ export function createRuleEngine(config?: Partial<RuleEngineConfig>): RuleEngine
     standstillGap: { ...IDLE_EPISODE },
     highBeamDip: { ...IDLE_EPISODE },
     followingRain: { ...IDLE_EPISODE },
+    banZoneStop: { ...IDLE_EPISODE },
   };
 }
 
@@ -233,6 +237,7 @@ function cloneState(s: RuleEngineState): RuleEngineState {
     standstillGap: { ...s.standstillGap },
     highBeamDip: { ...s.highBeamDip },
     followingRain: { ...s.followingRain },
+    banZoneStop: { ...s.banZoneStop },
   };
 }
 
@@ -442,6 +447,24 @@ export function reduceTick(prev: RuleEngineState, tick: SimTick): ReduceResult {
       leadGapM <= cfg.crossingOvertakeLeadGapM
     ) {
       events.push(makeViolation("OVERTAKING_AT_CROSSING", t));
+    }
+
+    // OV-06 (изпреварване при забрана — ADR-006 stage 2a): the SAME denoised
+    // lane-change signal landing inside an authored В24 ban zone while a lead
+    // is present to overtake. Reads ONLY tick.noOvertakeZone (bounded,
+    // sign-posted district `zones` data) — the legacy whole-edge noOvertake
+    // surface tag stays ungraded, so no shipped map can arm this. Same
+    // corridor discipline as OV-07 above: a change with no lead is a
+    // reposition (innocent), and the FP surface equals the lane-change
+    // detector's. Both codes CAN fire on one change when a crossing zone and
+    // a ban zone overlap — two distinct laws, two distinct lessons.
+    if (
+      (legacyBasis || gradableWithEdge) &&
+      tick.noOvertakeZone === true &&
+      leadGapM !== null &&
+      leadGapM <= cfg.banOvertakeLeadGapM
+    ) {
+      events.push(makeViolation("OVERTAKING_IN_BAN_ZONE", t));
     }
   }
   s.prevLaneId = tick.laneId;
@@ -687,6 +710,47 @@ export function reduceTick(prev: RuleEngineState, tick: SimTick): ReduceResult {
     events.push(makeViolation("HIGH_BEAM_NOT_DIPPED", t));
   }
 
+  // Illegal stop in a ban zone (PK-06 „спиране в забранена зона" — ADR-006
+  // stage 2a). The deferred-illegal-stop FP finding („a legal red-light/yield
+  // stop near a junction looks identical to an illegal one") is the DESIGN
+  // CONSTRAINT here, answered structurally:
+  //  - the zone is AUTHORED data (tick.noStopZone from a В27 district span) —
+  //    no heuristic zone inference, ever;
+  //  - every traffic-shaped rest inside the zone is innocent by construction:
+  //    a lead at rest within the queue gap, a stop line within the clear
+  //    window, ANY forbidding effective signal in the watch window (a halted
+  //    controller reads "red" — JU-18), an armed crossing zone, reverse gear;
+  //  - the sustain (4 s) excludes traffic micro-stops; the reset arms one
+  //    bill per stop (driving on at moving speed, or leaving the zone).
+  // В28 (noParkZone) deliberately does NOT convict — престоят под В28 е
+  // разрешен, and parking vs престой is indistinguishable with current
+  // telemetry (the same A12 bar; PK-07 rides the zone later).
+  const banZoneQueue = leadGapM !== null && leadGapM <= cfg.banZoneStopQueueGapM;
+  const banZoneControl =
+    (tick.nextStopLineM !== undefined && tick.nextStopLineM <= cfg.banZoneStopLineClearM) ||
+    (tick.nextStopLineControl === "trafficLight" &&
+      tick.nextStopLineState !== undefined &&
+      tick.nextStopLineState !== "green");
+  const illegalBanRest =
+    cfg.banZoneStopEnabled &&
+    tick.noStopZone === true &&
+    speed <= cfg.fullStopMaxSpeedKmh &&
+    forwardGear &&
+    !banZoneQueue &&
+    !banZoneControl &&
+    s.crossing === null;
+  if (
+    stepEpisode(
+      s.banZoneStop,
+      illegalBanRest,
+      tick.noStopZone !== true || speed > cfg.movingSpeedKmh,
+      t,
+      cfg.banZoneStopRestSec,
+    )
+  ) {
+    events.push(makeViolation("ILLEGAL_STOP_IN_BAN_ZONE", t));
+  }
+
   // NOTE: SP-06 „обструктивно бавно каране" (obstructively slow) was
   // prototyped here and REMOVED — with only rule-engine telemetry a
   // legitimately cautious crawl (готовност за спиране toward a blind junction,
@@ -870,6 +934,7 @@ export function reduceTick(prev: RuleEngineState, tick: SimTick): ReduceResult {
     s.standstillGap,
     s.highBeamDip,
     s.followingRain,
+    s.banZoneStop,
   ].some((ep) => ep.emitted && ep.activeSince !== null);
   if (events.some((e) => e.kind === "violation")) {
     s.cleanDistanceM = 0; // any fresh mistake resets the streak

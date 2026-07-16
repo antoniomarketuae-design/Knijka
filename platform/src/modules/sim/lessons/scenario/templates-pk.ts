@@ -290,5 +290,111 @@ export const SC_PK_DRIVEWAY: ScenarioSpec = {
   localeBg: "bg-BG",
 };
 
+// ---------------------------------------------------------------------------
+// sc-pk-ban-stop — „Спиране в забранена зона" (doc 72 PK-06) on pk-ban-v1: a
+// 1+1 street with a В27 no-stopping span @ y ∈ [70, 190] — the FIRST parking-
+// family template on the ZONE-BAN district data layer (ADR-006 stage 2a). The
+// „пусни ме тук за малко" trap: the driver is asked to stop „където е
+// позволено" — the skill is READING the zone, driving through it and resting
+// only after its end.
+// ---------------------------------------------------------------------------
+
+/** pk-ban-v1: the single northbound lane center (1+1 street). */
+const PKB_LANE = 4.06;
+/** pk-ban-v1: the В27 no-stopping span along the street (meta.scenario). */
+const PKB_BAN_FROM = 70;
+const PKB_BAN_TO = 190;
+/** The LEGAL stop mark — after the В27 zone ends. */
+const PKB_STOP_MARK_Y = 235;
+
+/** PK-06 — спиране в забранена зона, знак В27 (ЗДвП чл. 98: забрани за
+ *  престой и паркиране; знакът В27 забранява престоя и паркирането в
+ *  участъка на действието си). */
+export const SC_PK_BAN_STOP: ScenarioSpec = {
+  id: "sc-pk-ban-stop",
+  family: "parking",
+  tagsBg: ["спиране", "престой", "забранена зона", "знак В27"],
+  titleBg: "Спиране в забранена зона",
+  objectiveBg:
+    "Помолен си да спреш „тук някъде за малко“ — но участъкът е под знак В27 „Забранени са престоят и паркирането“. Премини през зоната, без да спираш, и спри чак след края ѝ, на разрешено място.",
+  archetypeIds: ["PK-06"],
+  conceptIds: ["c-stopping-standing-rules", "c-parking-prohibitions", "c-prohibition-signs"],
+  map: {
+    archetype: "straight-street",
+    // The generator recipe — mirrored in pk-ban-v1.json meta.scenario.params
+    // (tools/maps/gen_ban_zones.mjs).
+    params: { lengthM: 300, maxspeedKmh: 50, banKind: "noStopping", banFromM: PKB_BAN_FROM, banToM: PKB_BAN_TO },
+    districtId: "pk-ban-v1",
+  },
+  start: {
+    spawnPointId: "pkb-spawn-start",
+    vehicleStart: "ready",
+  },
+  instructionsBg: [
+    { n: 1, textBg: "Потегли по улицата — задачата е да спреш за кратко, но само където е позволено." },
+    { n: 2, textBg: "Напред започва участък със знак В27 „Забранени са престоят и паркирането“ — в него не се спира изобщо, дори „само за минутка“." },
+    { n: 3, textBg: "Премини през зоната с равномерна скорост, без да спираш и без да се колебаеш." },
+    { n: 4, textBg: "След края на зоната намали плавно и спри на разрешеното място." },
+    { n: 5, textBg: "Спри напълно и задръж колата — това е правилният „пусни ме тук“." },
+  ],
+  success: [
+    {
+      id: "sc-pkb-through",
+      titleBg: "Премини през зоната В27, без да спираш",
+      // A mid-zone progress checkpoint the non-stop transit passes through.
+      params: { kind: "reachZone", x: PKB_LANE, y: 130, radiusM: 6 },
+    },
+    {
+      id: "sc-pkb-legal-stop",
+      titleBg: "Спри на разрешеното място след зоната",
+      // Completable ONLY at near-stop speed at the legal mark past the zone
+      // end (the pk-smooth-stop mark discipline).
+      params: { kind: "reachZone", x: PKB_LANE, y: PKB_STOP_MARK_Y, radiusM: 4, maxSpeedKmh: 6 },
+    },
+  ],
+  rubric: { parTimeSec: 60 },
+  // RECORDED: committed deterministic recordings of the authored scripts in
+  // traces/scPkBanStop.ts; gates in traces/__tests__/sc-pk-ban-stop-traces
+  // .test.ts (re-record with RECORD_TRACES=1).
+  shadow: { path: "content/traces/sc-pk-ban-stop/shadow-correct.trace.json" },
+  mistakes: [
+    {
+      traceRef: { path: "content/traces/sc-pk-ban-stop/mistake-stop-in-zone.trace.json" },
+      titleBg: "„Само за минутка“ в зоната",
+      whatWentWrongBg:
+        "Колата спря по средата на участъка със знак В27 — „само за минутка, да те пусна“. Точно това забранява знакът: спрялата кола там закрива видимостта и запушва лентата. Престой под В27 няма — нито дълъг, нито кратък (чл. 98).",
+      codeRefs: ["ILLEGAL_STOP_IN_BAN_ZONE"],
+    },
+    {
+      traceRef: { path: "content/traces/sc-pk-ban-stop/mistake-stop-at-edge.trace.json" },
+      titleBg: "Спиране „почти в края“ на зоната",
+      whatWentWrongBg:
+        "Водачът изчака почти до края на зоната и спря на няколко метра преди знакът да спре да действа. Забраната важи до самия край на участъка — „почти след зоната“ е все още в зоната. Изчакай края ѝ и спри на разрешеното място.",
+      codeRefs: ["ILLEGAL_STOP_IN_BAN_ZONE"],
+    },
+  ],
+  teach: {
+    whenBg:
+      "Всеки път, когато търсиш място да спреш „за малко“ — пред училището, до спирката, на тясната улица. Първо прочети знаците и маркировката на участъка: под В27 не се спира изобщо, под В28 не се паркира.",
+    whyBg:
+      "Забранените за престой участъци не са произвол: там спряла кола закрива пешеходец, запушва лента или крие изглед към кръстовище. „Само за минутка“ е точно минутата, в която детето излиза иззад колата ти. Затова изпитът брои спирането в забранена зона като основна грешка.",
+    lawRef: "ЗДвП чл. 98",
+    examinerBg:
+      "Изпитващият дава инструкция „спри тук, където е безопасно и позволено“ и следи дали четеш знаците: спиране в зоната на В27 (или на пътека, кръстовище, спирка) е основна грешка. Правилният отговор е да продължиш и да спреш след края на забраната.",
+  },
+  levels: [
+    { level: 1 },
+    { level: 2 },
+    { level: 3 },
+    { level: 4, vehicleStart: "cold" },
+  ],
+  conditions: { weather: "dry" },
+  localeBg: "bg-BG",
+};
+
 /** The PK precision-stop templates, in catalog order (registered in templates.ts). */
-export const SCENARIO_TEMPLATES_PK: readonly ScenarioSpec[] = [SC_PK_SMOOTH_STOP, SC_PK_DRIVEWAY];
+export const SCENARIO_TEMPLATES_PK: readonly ScenarioSpec[] = [
+  SC_PK_SMOOTH_STOP,
+  SC_PK_DRIVEWAY,
+  SC_PK_BAN_STOP,
+];

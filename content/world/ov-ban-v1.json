@@ -1,0 +1,153 @@
+{
+ "format": "district-v1",
+ "meta": {
+  "district": "ov-ban",
+  "label": "Учебен булевард — изпреварване при забрана В24 (сценарий OV-06)",
+  "mapKind": "scenario-street",
+  "generator": "tools/maps/gen_ban_zones.mjs",
+  "zonesVersion": 1,
+  "boundsLocalMeters": {
+   "minX": -42.25,
+   "minY": -6,
+   "maxX": 22.25,
+   "maxY": 406
+  },
+  "attribution": {
+   "text": "Учебна улица със забранителна зона — оригинален параметричен дизайн (без данни от OpenStreetMap)",
+   "license": "All rights reserved",
+   "licenseUrl": "/",
+   "copyrightUrl": "/",
+   "obligation": "none — original work, no ODbL attribution required for this map"
+  },
+  "defaults": {
+   "maxspeedUrbanKmh": 50,
+   "note": "В24 забранява изпреварването в отсечката 90–210 м: следвай търпеливо и изпреварвай чак след края на зоната."
+  },
+  "stats": {
+   "roadKm": 0.4,
+   "nodes": 2,
+   "edges": 1,
+   "intersections": 0,
+   "crossings": 0,
+   "buildings": 1,
+   "spawnPoints": 2,
+   "zones": 1
+  },
+  "scenario": {
+   "archetype": "straight-street",
+   "params": {
+    "lengthM": 400,
+    "maxspeedKmh": 50,
+    "banKind": "noOvertaking",
+    "banFromM": 90,
+    "banToM": 210
+   },
+   "lanesPerDirection": 2,
+   "laneCenterRightM": 12.19,
+   "banZone": {
+    "id": "ovb-z-noovertaking",
+    "kind": "noOvertaking",
+    "signRef": "В24",
+    "fromM": 90,
+    "toM": 210
+   },
+   "laneCenterLeftM": 4.06
+  }
+ },
+ "roads": {
+  "nodes": [
+   {
+    "id": "ovb-n-end",
+    "x": 0,
+    "y": 400
+   },
+   {
+    "id": "ovb-n-start",
+    "x": 0,
+    "y": 0
+   }
+  ],
+  "edges": [
+   {
+    "id": "ovb-e-street",
+    "from": "ovb-n-start",
+    "to": "ovb-n-end",
+    "class": "tertiary",
+    "name": "Учебен булевард — изпреварване при забрана В24 (сценарий OV-06)",
+    "oneway": false,
+    "roundabout": false,
+    "lanes": 4,
+    "lanesSource": "tag",
+    "maxspeed": 50,
+    "maxspeedSource": "tag",
+    "length": 400,
+    "geometry": [
+     [
+      0,
+      0
+     ],
+     [
+      0,
+      400
+     ]
+    ]
+   }
+  ]
+ },
+ "intersections": [],
+ "crossings": [],
+ "roundabouts": [],
+ "buildings": [
+  {
+   "id": "ovb-b-block",
+   "height": 6,
+   "heightSource": "default",
+   "footprint": [
+    [
+     -36.25,
+     60
+    ],
+    [
+     -24.25,
+     60
+    ],
+    [
+     -24.25,
+     76
+    ],
+    [
+     -36.25,
+     76
+    ]
+   ]
+  }
+ ],
+ "spawnPoints": [
+  {
+   "id": "ovb-spawn-start",
+   "x": 12.19,
+   "y": 15,
+   "heading": 0,
+   "edgeId": "ovb-e-street",
+   "name": "Начало — дясна лента"
+  },
+  {
+   "id": "ovb-spawn-finish",
+   "x": 12.19,
+   "y": 385,
+   "heading": 0,
+   "edgeId": "ovb-e-street",
+   "name": "Контролна точка — след зоната"
+  }
+ ],
+ "zones": [
+  {
+   "id": "ovb-z-noovertaking",
+   "kind": "noOvertaking",
+   "edgeId": "ovb-e-street",
+   "fromM": 90,
+   "toM": 210,
+   "signRef": "В24"
+  }
+ ]
+}

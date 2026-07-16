@@ -1345,6 +1345,70 @@ describe("FP battery — rain-aware following (FOLLOWING_TOO_CLOSE_FOR_RAIN)", (
   });
 });
 
+describe("FP battery — ban zones (ILLEGAL_STOP_IN_BAN_ZONE / OVERTAKING_IN_BAN_ZONE)", () => {
+  // ADR-006 stage 2a. The deferred-illegal-stop finding is the contract here:
+  // a legal traffic stop INSIDE an authored В27 zone must stay structurally
+  // innocent — the zone is authored data, and every traffic-shaped rest
+  // context exempts.
+
+  it("a queue stop inside a В27 zone (lead at rest ahead) is innocent", () => {
+    const { events } = drive([
+      tick(0, { speedKmh: 20, noStopZone: true, leadGapM: 14 }),
+      ...cruise(1, 12, { speedKmh: 0, noStopZone: true, leadGapM: 6 }),
+    ]);
+    expectInnocent(events);
+  });
+
+  it("a red-light stop inside a В27 zone (forbidding signal ahead) is innocent", () => {
+    const { events } = drive([
+      tick(0, {
+        speedKmh: 25,
+        noStopZone: true,
+        nextStopLineM: 70,
+        nextStopLineControl: "trafficLight",
+        nextStopLineState: "red",
+      }),
+      ...cruise(1, 12, {
+        speedKmh: 0,
+        noStopZone: true,
+        nextStopLineM: 40,
+        nextStopLineControl: "trafficLight",
+        nextStopLineState: "red",
+      }),
+    ]);
+    expectInnocent(events);
+  });
+
+  it("a brief 2 s traffic stop inside a В27 zone is innocent (under the sustain)", () => {
+    const { events } = drive([
+      ...cruise(0, 4, { speedKmh: 30, noStopZone: true }),
+      ...cruise(5, 7, { speedKmh: 0, noStopZone: true }),
+      ...cruise(8, 12, { speedKmh: 30, noStopZone: true }),
+    ]);
+    expectInnocent(events);
+  });
+
+  it("patiently following a slow lead THROUGH a В24 zone (no lane change) is innocent", () => {
+    const { events } = drive(cruise(0, 14, { speedKmh: 22, noOvertakeZone: true, leadGapM: 16 }));
+    expectInnocent(events);
+  });
+
+  it("a signalled reposition (no lead) inside a В24 zone is innocent", () => {
+    const { events } = drive([
+      tick(0, {
+        speedKmh: 40,
+        laneCount: 2,
+        noOvertakeZone: true,
+        indicator: "left",
+        events: [glance("left")],
+      }),
+      tick(1, { speedKmh: 40, laneCount: 2, noOvertakeZone: true, indicator: "left", laneId: 1 }),
+      ...cruise(2, 6, { speedKmh: 40, laneCount: 2, noOvertakeZone: true, laneId: 1 }),
+    ]);
+    expectInnocent(events);
+  });
+});
+
 // ---------------------------------------------------------------------------
 // Whole-drive integration
 // ---------------------------------------------------------------------------

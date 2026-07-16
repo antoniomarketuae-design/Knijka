@@ -58,6 +58,13 @@ const OVC_LEFT = 4.06;
 const LN_CENTER = 4.06;
 /** ov-oneway-v1 (single-lane one-way): the lane centers on the polyline. */
 const OW_CENTER = 0;
+/** ov-ban-v1 (2+2 boulevard, В24 zone @ [90, 210]): the right (cruise / lead)
+ *  and left (overtake target) lane centers. */
+const OVB_RIGHT = 12.19;
+const OVB_LEFT = 4.06;
+/** ov-ban-v1: the В24 no-overtaking span along the street (meta.scenario). */
+const OVB_BAN_FROM = 90;
+const OVB_BAN_TO = 210;
 
 // ---------------------------------------------------------------------------
 // 1. sc-ov-keep-right — „Дръж вдясно" (OV-11) on ov-keepright-v1
@@ -568,10 +575,135 @@ export const SC_OV_NARROW: ScenarioSpec = {
   localeBg: "bg-BG",
 };
 
+// ---------------------------------------------------------------------------
+// 6. sc-ov-ban-overtake — „Изпреварване при забрана" (OV-06) on ov-ban-v1
+//    (400 m 2+2 boulevard, limit 50, В24 noOvertaking zone @ y ∈ [90, 210] —
+//    the FIRST map carrying the ZONE-BAN district data layer, ADR-006 stage 2a)
+// ---------------------------------------------------------------------------
+
+/**
+ * The staged LEAD CAR for sc-ov-ban-overtake: paces the player's RIGHT lane
+ * ~16 m ahead (matchPlayer), capped at ~21.6 km/h — the slow vehicle the В24
+ * zone tempts you to pass. Its slam tier is authored out of reach (it is
+ * deterministic moving traffic, not a braking drill — the OVC_LEAD_CAR mold).
+ * The shadow follows it patiently THROUGH the zone and overtakes AFTER the
+ * zone ends (a full legal pass: out, past, back — two SAFE_LANE_CHANGEs); the
+ * mistakes start the pass INSIDE the zone and cut back toward the lead while
+ * the ban is armed. Only the cut-back grades (the OV-07 corridor discipline:
+ * the OVERTAKING_IN_BAN_ZONE check reads the lead gap at the lane-boundary
+ * frame, and only a change TOWARD the lead's lane keeps it in the corridor).
+ */
+const OVB_LEAD_CAR: BrakingLeadCarSpec = {
+  id: "sc-ovb-lead",
+  kind: "brakingLeadCar",
+  actor: {
+    pathNodes: ["ovb-n-start", "ovb-n-end"],
+    hold: { nodeIndex: 0, offsetM: 45 }, // dormant ~30 m ahead of the spawn
+    cruiseSpeedMps: 6,
+    extraRightOffsetM: 0, // right-lane center (the slow vehicle being passed)
+    colorIndex: 2,
+  },
+  followGapM: 16, // pace ~16 m AHEAD, matchPlayer — inside the ban-overtake gate at a cut-back
+  maxMatchSpeedMps: 6, // ~21.6 km/h — slow enough that the post-zone pass completes on the map
+  slamAt: { x: 12.19, y: 600 }, // far past the 400 m road — never reached
+  slamRadiusM: 2,
+  slamDecelMps2: 6,
+  minSlamSpeedKmh: 250, // the slam tier is authored out of reach…
+  proximityFallbackM: 0.3, // …and the proximity fallback cannot occur (gap pinned)
+  triggersHazard: false,
+  resumeAfterSec: 3,
+};
+
+/** OV-06 — забрана за изпреварване, знак В24 (ЗДвП чл. 42–43: изпреварва се
+ *  само където и когато е разрешено; знакът В24 забранява изпреварването в
+ *  участъка до края на действието си). */
+export const SC_OV_BAN_OVERTAKE: ScenarioSpec = {
+  id: "sc-ov-ban-overtake",
+  family: "lanes",
+  tagsBg: ["ленти", "изпреварване", "забрана за изпреварване", "знак В24"],
+  titleBg: "Изпреварване при забрана",
+  objectiveBg:
+    "Следвай бавната кола търпеливо през участъка със знак В24 „Забранено е изпреварването“ и я изпревари чак след края на зоната — забраната важи, дори предният да пълзи.",
+  archetypeIds: ["OV-06"],
+  conceptIds: ["c-overtaking-prohibitions", "c-prohibition-signs", "c-overtaking-procedure"],
+  map: {
+    archetype: "straight-street",
+    // The generator recipe — mirrored in ov-ban-v1.json meta.scenario.params
+    // (tools/maps/gen_ban_zones.mjs).
+    params: { lengthM: 400, maxspeedKmh: 50, banKind: "noOvertaking", banFromM: OVB_BAN_FROM, banToM: OVB_BAN_TO },
+    districtId: "ov-ban-v1",
+  },
+  start: {
+    spawnPointId: "ovb-spawn-start",
+    vehicleStart: "ready",
+  },
+  instructionsBg: [
+    { n: 1, textBg: "Потегли по булеварда в дясната лента — пред теб се движи бавна кола." },
+    { n: 2, textBg: "Напред започва зона със знак В24 „Забранено е изпреварването“ — в нея не се изпреварва, независимо колко бавен е предният." },
+    { n: 3, textBg: "Остани зад бавната кола с равномерна дистанция и изчакай търпеливо края на зоната." },
+    { n: 4, textBg: "След края на забраната: огледало, мигач наляво и плавно излез в лявата лента за изпреварване." },
+    { n: 5, textBg: "Подмини бавната кола и се прибери вдясно с мигач, щом я видиш в огледалото — и продължи до края." },
+  ],
+  success: [
+    {
+      id: "sc-ovb-patience",
+      titleBg: "Следвай търпеливо през зоната В24",
+      // Radius 4 < the 8.125 m lane pitch: satisfiable ONLY from the RIGHT
+      // lane center, deep inside the ban span — the patience IS the drill.
+      params: { kind: "reachZone", x: OVB_RIGHT, y: 190, radiusM: 4, maxSpeedKmh: 35 },
+    },
+    {
+      id: "sc-ovb-finish",
+      titleBg: "Изпревари след зоната и завърши в дясната лента",
+      params: { kind: "reachZone", x: OVB_RIGHT, y: 370, radiusM: 5 },
+    },
+  ],
+  rubric: { parTimeSec: 80 },
+  // RECORDED: committed deterministic recordings of the authored scripts in
+  // traces/scOvBanOvertake.ts; gates in traces/__tests__/
+  // sc-ov-ban-overtake-traces.test.ts (re-record with RECORD_TRACES=1).
+  shadow: { path: "content/traces/sc-ov-ban-overtake/shadow-correct.trace.json" },
+  mistakes: [
+    {
+      traceRef: { path: "content/traces/sc-ov-ban-overtake/mistake-overtake-in-zone.trace.json" },
+      titleBg: "Изпреварване в зоната на забраната",
+      whatWentWrongBg:
+        "Колата излезе в лявата лента и се върна пред бавния автомобил дълбоко в зоната на знака В24. Точно там изпреварването е забранено: знакът стои, защото видимостта или насрещното движение го правят опасно — „предният е бавен“ не е разрешение (чл. 42–43).",
+      codeRefs: ["OVERTAKING_IN_BAN_ZONE"],
+    },
+    {
+      traceRef: { path: "content/traces/sc-ov-ban-overtake/mistake-early-jump.trace.json" },
+      titleBg: "Хвърляне точно преди знака",
+      whatWentWrongBg:
+        "Водачът започна изпреварването току пред знака В24 и завърши маневрата вече в зоната на забраната. Изпреварването трябва да ЗАВЪРШИ преди началото на зоната — започнатото „на ръба“ те вкарва в най-опасния участък по средата на маневрата.",
+      codeRefs: ["OVERTAKING_IN_BAN_ZONE"],
+    },
+  ],
+  teach: {
+    whenBg:
+      "Във всеки участък със знак В24 — изкачвания без видимост, училищни отсечки, ремонтни стеснения. Забраната важи от знака до края ѝ (знак В25 или следващото кръстовище) — и важи за всяко изпреварване, не само за „опасните“.",
+    whyBg:
+      "Знакът В24 стои точно там, където изпреварването убива: сляпо било, насрещен поток без резерв, стеснено платно. Търпението зад бавен водач струва секунди; изпреварването под забрана изнася колата в насрещното на най-лошото възможно място.",
+    lawRef: "ЗДвП чл. 42–43",
+    examinerBg:
+      "Изпитващият следи разчитането на знаците и дисциплината на маневрата: никакво изпреварване в зоната на В24, търпеливо следване и правилно изпълнено изпреварване (огледало-мигач-маневра) чак след края на забраната.",
+  },
+  levels: [
+    { level: 1 },
+    { level: 2 },
+    { level: 3 },
+    { level: 4, vehicleStart: "cold" },
+  ],
+  staged: [OVB_LEAD_CAR],
+  conditions: { weather: "dry" },
+  localeBg: "bg-BG",
+};
+
 export const SCENARIO_TEMPLATES_LANES: readonly ScenarioSpec[] = [
   SC_OV_KEEP_RIGHT,
   SC_OV_LANE_KEEPING,
   SC_OV_ONEWAY,
   SC_OV_CROSSING_OVERTAKE,
   SC_OV_NARROW,
+  SC_OV_BAN_OVERTAKE,
 ];

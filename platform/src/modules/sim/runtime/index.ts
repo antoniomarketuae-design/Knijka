@@ -33,6 +33,8 @@ export {
   type DistrictNode,
   type DistrictRoundabout,
   type DistrictSpawnPoint,
+  type DistrictZone,
+  type DistrictZoneKind,
   type EdgeZone,
   type RoadClass,
 } from "./district";
