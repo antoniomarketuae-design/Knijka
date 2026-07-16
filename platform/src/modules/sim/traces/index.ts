@@ -135,6 +135,27 @@ export {
   type ScCrossingRainSprintTraceName,
 } from "./scCrossingRainSprint";
 
+// PE batch 2 — the additional pedestrian-hazard authored drives (bus-stop kill
+// zone PE-10, child-after-ball PE-04, white-cane PE-14); committed traces are
+// recordings of exactly these scripts (gates: traces/__tests__/
+// sc-crossing-bus-shadow- / sc-crossing-child-ball- / sc-crossing-white-cane-).
+export {
+  SC_CROSSING_BUS_SHADOW_ID,
+  BUS_OBSTACLE,
+  recordScCrossingBusShadowDrive,
+  type ScCrossingBusShadowTraceName,
+} from "./scCrossingBusShadow";
+export {
+  SC_CROSSING_CHILD_BALL_ID,
+  recordScCrossingChildBallDrive,
+  type ScCrossingChildBallTraceName,
+} from "./scCrossingChildBall";
+export {
+  SC_CROSSING_WHITE_CANE_ID,
+  recordScCrossingWhiteCaneDrive,
+  type ScCrossingWhiteCaneTraceName,
+} from "./scCrossingWhiteCane";
+
 // S3-B — the speed-management authored drives (sc-speed-creep / sc-speed-
 // dangerous / sc-speed-rain); committed traces are recordings of exactly these
 // scripts (gates: traces/__tests__/sp-speed-*).

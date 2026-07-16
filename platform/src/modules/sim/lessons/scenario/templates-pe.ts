@@ -491,6 +491,344 @@ export const SC_CROSSING_DART: ScenarioSpec = {
   localeBg: "bg-BG",
 };
 
+// ---------------------------------------------------------------------------
+// 5. sc-crossing-bus-shadow — „Пешеходци иззад спрял автобус" (PE-10, the
+//    bus-stop kill zone) on pe-bus-v1 (crossing at y = 88). A large stopped
+//    vehicle occupies the NEAR (east) curb south of the zebra: a passenger who
+//    got off cuts in front of it and crosses toward the far curb — emerging
+//    into the player's lane from behind the bus, the „bus shadow". The bus is a
+//    trace-side obstacle rect (scCrossingBusShadow.ts BUS_OBSTACLE), clear of
+//    the driving lane; the shadow proves the car never touches it.
+// ---------------------------------------------------------------------------
+
+/** East (near-side) curb of a 1-lane-per-direction street (= −CURB_X): the
+ *  bus stands here and the passenger steps off it. */
+const EAST_CURB_X = 9.73;
+
+/**
+ * The staged NEAR-SIDE crosser at pe-x-1 (0, 88): steps off the EAST curb in
+ * front of the stopped bus at 1.4 m/s, heading WEST across the carriageway,
+ * once the player closes within ~44 m. Because she emerges from the bus shadow
+ * she is already in the player's lane by the time the sightline clears — the
+ * PE-10 kill zone. The road-occupancy span is symmetric about the centerline,
+ * so ROAD_FROM_M / ROAD_TO_M / TRAVEL_M are byte-identical to the west-curb
+ * crossers; only the start point and direction flip.
+ */
+const BUS_SHADOW_PED: PedestrianDartOutSpec = {
+  id: "sc-bsh-ped",
+  kind: "pedestrianDartOut",
+  crossingId: "pe-x-1",
+  crossing: { x: 0, y: 88 },
+  start: { x: EAST_CURB_X, y: 88 },
+  dir: { x: -1, y: 0 },
+  speedMps: 1.4,
+  travelM: TRAVEL_M,
+  roadFromM: ROAD_FROM_M,
+  roadToM: ROAD_TO_M,
+  triggerDistM: 44,
+  minTriggerSpeedKmh: 10,
+};
+
+/** PE-10 — пешеходци иззад спрял автобус (ЗДвП чл. 119 + чл. 20: спрелият
+ *  автобус крие гледката; приближавай с готовност за спиране и пропусни
+ *  изскочилия пешеходец). */
+export const SC_CROSSING_BUS_SHADOW: ScenarioSpec = {
+  id: "sc-crossing-bus-shadow",
+  family: "pedestrians",
+  tagsBg: ["пешеходци", "пешеходна пътека", "спрял автобус", "закрита гледка"],
+  titleBg: "Пешеходци иззад спрял автобус",
+  objectiveBg:
+    "Приближавай спрелия на спирката автобус с готовност за спиране — иззад него на пътеката може да излезе пешеходец, когото не виждаш. Пропусни го и премини едва когато пътеката е свободна.",
+  archetypeIds: ["PE-10"],
+  conceptIds: ["c-crosswalk-yield", "c-pedestrian-rights-duties", "c-speed-adaptation"],
+  map: {
+    archetype: "zebra-block",
+    // The generator recipe — mirrored in pe-bus-v1.json meta.scenario.params.
+    params: { crossings: 1, signalized: "no", approachM: 88 },
+    districtId: "pe-bus-v1",
+  },
+  start: {
+    spawnPointId: "pe-spawn-approach",
+    vehicleStart: "ready",
+  },
+  instructionsBg: [
+    { n: 1, textBg: "Потегли по улицата и приближавай спрелия вдясно автобус с готовност за спиране — кракът над спирачката." },
+    { n: 2, textBg: "Автобусът крие тротоара пред себе си — не разчитай, че щом не виждаш никого, няма никой." },
+    { n: 3, textBg: "Пешеходец излиза иззад автобуса на пътеката. Реагирай веднага: спирачка, без да завиваш встрани." },
+    { n: 4, textBg: "Спри напълно преди зебрата и го изчакай да освободи цялото платно." },
+    { n: 5, textBg: "Премини спокойно едва когато пътеката е свободна." },
+  ],
+  success: [
+    {
+      id: "sc-bsh-approach",
+      titleBg: "Приближи автобуса и пътеката с готовност за спиране",
+      params: { kind: "reachZone", x: LANE_2, y: 76, radiusM: 10, maxSpeedKmh: 40 },
+    },
+    {
+      id: "sc-bsh-clear",
+      titleBg: "Премини пътеката, след като е свободна",
+      params: { kind: "reachZone", x: LANE_2, y: 126, radiusM: 12 },
+    },
+  ],
+  rubric: { parTimeSec: 80 },
+  shadow: { path: "content/traces/sc-crossing-bus-shadow/shadow-correct.trace.json" },
+  mistakes: [
+    {
+      traceRef: { path: "content/traces/sc-crossing-bus-shadow/mistake-not-yielded.trace.json" },
+      titleBg: "Преминаване покрай автобуса без пропускане",
+      whatWentWrongBg:
+        "Водачът подмина спрелия автобус, без да пропусне излезлия иззад него пешеходец, и мина през заетата пътека. Спрелият на спирката автобус е предупреждение — пешеходецът на пътеката има предимство по чл. 119, дори да се появява внезапно иззад превозното средство.",
+      codeRefs: ["PEDESTRIAN_NOT_YIELDED"],
+    },
+    {
+      traceRef: { path: "content/traces/sc-crossing-bus-shadow/mistake-collision.trace.json" },
+      titleBg: "Удар в пешеходеца иззад автобуса",
+      whatWentWrongBg:
+        "Колата подмина автобуса със скорост и без готовност — и блъсна изскочилия иззад него пешеходец на самата пътека. При закрита от спрял автобус гледка скоростта и вниманието трябва да позволяват спиране при внезапна поява (чл. 20). Ударът прекратява изпита.",
+      codeRefs: ["COLLISION"],
+    },
+  ],
+  teach: {
+    whenBg:
+      "При всеки спрял на спирка автобус или голямо превозно средство до пътеката — там пешеходец може да излезе иззад него без предупреждение точно преди зебрата. Класическата „сляпа зона“ зад автобуса е сред най-честите места за прегазване в града.",
+    whyBg:
+      "Автобусът закрива и пешеходеца от теб, и теб от пешеходеца — а слезлите пътници бързат и пресичат отпред. Единствената защита е предварително намалената скорост и готовността за спиране: изскочи ли човек иззад автобуса, имаш части от секундата за реакция със спирачка, не със завиване.",
+    lawRef: "ЗДвП чл. 119",
+    examinerBg:
+      "Изпитващият очаква видимо намалена скорост и готовност за спиране при подминаване на спрял автобус до пътека, отчетлива реакция при появата на пешеходец и пълно спиране преди зебрата. Преминаване през пешеходец е опасна грешка, а удар — прекратяване на изпита.",
+  },
+  levels: [
+    { level: 1 },
+    { level: 2 },
+    { level: 3 },
+    { level: 4, vehicleStart: "cold" },
+  ],
+  staged: [BUS_SHADOW_PED],
+  conditions: { weather: "dry" },
+  localeBg: "bg-BG",
+};
+
+// ---------------------------------------------------------------------------
+// 6. sc-crossing-child-ball — „Дете тича след топка" (PE-04, the child dart)
+//    on pe-child-v1 (crossing at y = 78, a calm 40 km/h residential street). A
+//    child runs onto the crossing after a ball — FAST (2.6 m/s, faster than the
+//    rain sprinter) and from the residential frontage the generator's corner
+//    shop stands in for. This is the emergency-brake / anticipation lesson: the
+//    graded faults are approaching a residential crossing too fast to stop, and
+//    striking the child.
+// ---------------------------------------------------------------------------
+
+/**
+ * The staged RUNNING CHILD at pe-x-1 (0, 78): bolts off the WEST curb at
+ * 2.6 m/s — a small child chasing a ball, distinctly faster than any adult
+ * walk profile — only when the player closes within ~38 m (LATE: a reaction
+ * emergency, not a long approach). The corner shop just west of the zebra hides
+ * the frontage until the last moment (PE-04 world dressing, zero grading
+ * change). The occupancy span is the shared symmetric road window.
+ */
+const CHILD_BALL_PED: PedestrianDartOutSpec = {
+  id: "sc-cbl-ped",
+  kind: "pedestrianDartOut",
+  crossingId: "pe-x-1",
+  crossing: { x: 0, y: 78 },
+  start: { x: CURB_X, y: 78 },
+  dir: { x: 1, y: 0 },
+  speedMps: 2.6,
+  travelM: TRAVEL_M,
+  roadFromM: ROAD_FROM_M,
+  roadToM: ROAD_TO_M,
+  triggerDistM: 38,
+  minTriggerSpeedKmh: 10,
+};
+
+/** PE-04 — дете тича след топка на пътеката (ЗДвП чл. 119 + чл. 20: в
+ *  жилищна зона с деца скоростта и вниманието трябва да позволяват спиране при
+ *  внезапна поява). */
+export const SC_CROSSING_CHILD_BALL: ScenarioSpec = {
+  id: "sc-crossing-child-ball",
+  family: "pedestrians",
+  tagsBg: ["пешеходци", "пешеходна пътека", "дете", "жилищна зона"],
+  titleBg: "Дете тича след топка на пътеката",
+  objectiveBg:
+    "В квартална улица приближавай пътеката бавно и с готовност за спиране — дете може да изскочи след топка си на платното. Реагирай навреме, спри и го пропусни.",
+  archetypeIds: ["PE-04"],
+  conceptIds: ["c-crosswalk-yield", "c-speed-adaptation", "c-general-care-duty"],
+  map: {
+    archetype: "zebra-block",
+    // The generator recipe — mirrored in pe-child-v1.json meta.scenario.params.
+    params: { crossings: 1, signalized: "no", approachM: 78 },
+    districtId: "pe-child-v1",
+  },
+  start: {
+    spawnPointId: "pe-spawn-approach",
+    vehicleStart: "ready",
+  },
+  instructionsBg: [
+    { n: 1, textBg: "Улицата е квартална, с ограничение 40 км/ч — карай спокойно и наблюдавай тротоарите и дворовете." },
+    { n: 2, textBg: "Пред пътеката намали още повече и дръж крака над спирачката — тук играят деца." },
+    { n: 3, textBg: "Дете изтичва след топка си на пътеката. Реагирай веднага: спирачка, без да завиваш встрани." },
+    { n: 4, textBg: "Спри напълно преди зебрата и изчакай детето да освободи цялото платно." },
+    { n: 5, textBg: "Премини спокойно едва когато пътеката е свободна." },
+  ],
+  success: [
+    {
+      id: "sc-cbl-approach",
+      titleBg: "Приближи пътеката бавно, с готовност за спиране",
+      params: { kind: "reachZone", x: LANE_2, y: 66, radiusM: 10, maxSpeedKmh: 32 },
+    },
+    {
+      id: "sc-cbl-clear",
+      titleBg: "Премини пътеката, след като е свободна",
+      params: { kind: "reachZone", x: LANE_2, y: 116, radiusM: 12 },
+    },
+  ],
+  rubric: { parTimeSec: 75 },
+  shadow: { path: "content/traces/sc-crossing-child-ball/shadow-correct.trace.json" },
+  mistakes: [
+    {
+      traceRef: { path: "content/traces/sc-crossing-child-ball/mistake-too-fast.trace.json" },
+      titleBg: "Твърде бързо приближаване към детето",
+      whatWentWrongBg:
+        "Колата приближи кварталната пътека с непроменена скорост, докато детето вече беше на платното. Пред пътека с дете скоростта трябва да позволява спиране — чл. 119; дори при законно ограничение приближаването без готовност е опасната грешка, защото детето е малко, бързо и непредвидимо.",
+      codeRefs: ["PEDESTRIAN_CROSSING_TOO_FAST"],
+    },
+    {
+      traceRef: { path: "content/traces/sc-crossing-child-ball/mistake-collision.trace.json" },
+      titleBg: "Удар в детето",
+      whatWentWrongBg:
+        "Погледът беше другаде и колата изобщо не спря — блъсна изтичалото след топката дете на самата пътека. В квартална зона с деца скоростта и вниманието трябва да позволяват спиране при внезапна поява (чл. 20). Ударът прекратява изпита.",
+      codeRefs: ["COLLISION"],
+    },
+  ],
+  teach: {
+    whenBg:
+      "Във всяка квартална и жилищна зона, около училища, площадки и паркирани коли, иззад които може да изскочи дете. Появи ли се топка, ролер или тичащо дете — това е сигнал да си готов за пълно спиране.",
+    whyBg:
+      "Детето не преценява разстояния и скорости и тича право след топката, без да гледа. То е ниско и се появява внезапно иззад коли и огради. Единствената надеждна защита е предварително ниската скорост: при 30 км/ч спираш за метри, при 50 — прегазваш. Секунда закъсняла реакция струва живот.",
+    lawRef: "ЗДвП чл. 119",
+    examinerBg:
+      "Изпитващият очаква явно ниска скорост и готовност за спиране при приближаване към квартална пътека, незабавна реакция при появата на детето и пълно спиране преди зебрата. Преминаване през пешеходец е опасна грешка, а удар — прекратяване на изпита.",
+  },
+  levels: [
+    { level: 1 },
+    { level: 2 },
+    { level: 3 },
+    { level: 4, vehicleStart: "cold" },
+  ],
+  staged: [CHILD_BALL_PED],
+  conditions: { weather: "dry" },
+  localeBg: "bg-BG",
+};
+
+// ---------------------------------------------------------------------------
+// 7. sc-crossing-white-cane — „Пешеходец с бял бастун" (PE-14) on pe-cane-v1
+//    (crossing at y = 92, a 50 km/h urban street). A blind pedestrian signals
+//    with a white cane and crosses very slowly (0.75 m/s): absolute, everywhere
+//    priority (ЗДвП). The lesson is RECOGNITION — the cane is an unconditional
+//    stop command; you cannot rely on eye contact and must never creep or press.
+//    Distinct map/geometry + faster street than the elderly slow-crosser (PE-08).
+// ---------------------------------------------------------------------------
+
+/**
+ * The staged WHITE-CANE crosser at pe-x-1 (0, 92): steps off the WEST curb at
+ * 0.75 m/s — a blind pedestrian tapping across, even slower than the elderly
+ * profile, so the carriageway stays occupied ~22 s. Released early (within
+ * ~56 m) so a correct approach spots the cane far ahead and stops; the lesson
+ * is the absolute yield, not a reaction sprint.
+ */
+const WHITE_CANE_PED: PedestrianDartOutSpec = {
+  id: "sc-wcn-ped",
+  kind: "pedestrianDartOut",
+  crossingId: "pe-x-1",
+  crossing: { x: 0, y: 92 },
+  start: { x: CURB_X, y: 92 },
+  dir: { x: 1, y: 0 },
+  speedMps: 0.75,
+  travelM: TRAVEL_M,
+  roadFromM: ROAD_FROM_M,
+  roadToM: ROAD_TO_M,
+  triggerDistM: 56,
+  minTriggerSpeedKmh: 10,
+};
+
+/** PE-14 — пешеходец с бял бастун (ЗДвП чл. 119: незрящият пешеходец с бял
+ *  бастун има безусловно предимство навсякъде; спираш напълно и изчакваш). */
+export const SC_CROSSING_WHITE_CANE: ScenarioSpec = {
+  id: "sc-crossing-white-cane",
+  family: "pedestrians",
+  tagsBg: ["пешеходци", "пешеходна пътека", "бял бастун", "незрящ пешеходец"],
+  titleBg: "Пешеходец с бял бастун",
+  objectiveBg:
+    "Разпознай белия бастун — незрящият пешеходец има безусловно предимство. Спри напълно преди пътеката, без да настъпваш, и го изчакай да я освободи целия, без да разчиташ, че те вижда.",
+  archetypeIds: ["PE-14"],
+  conceptIds: ["c-crosswalk-yield", "c-pedestrian-rights-duties", "c-speed-adaptation"],
+  map: {
+    archetype: "zebra-block",
+    // The generator recipe — mirrored in pe-cane-v1.json meta.scenario.params.
+    params: { crossings: 1, signalized: "no", approachM: 92 },
+    districtId: "pe-cane-v1",
+  },
+  start: {
+    spawnPointId: "pe-spawn-approach",
+    vehicleStart: "ready",
+  },
+  instructionsBg: [
+    { n: 1, textBg: "Движи се спокойно в своята лента и наблюдавай пешеходната пътека напред." },
+    { n: 2, textBg: "Пешеходец с бял бастун стъпва на пътеката — това е незрящ човек с безусловно предимство. Намали рано." },
+    { n: 3, textBg: "Спри напълно преди зебрата, без да настъпваш — той не може да те види и се ориентира по слуха." },
+    { n: 4, textBg: "Изчакай търпеливо да измине ЦЯЛОТО платно; движи се бавно и има нужда от много време." },
+    { n: 5, textBg: "Потегли едва когато е слязъл напълно от пътеката, и премини спокойно." },
+  ],
+  success: [
+    {
+      id: "sc-wcn-approach",
+      titleBg: "Приближи пътеката с готовност за пълно спиране",
+      params: { kind: "reachZone", x: LANE_2, y: 80, radiusM: 10, maxSpeedKmh: 40 },
+    },
+    {
+      id: "sc-wcn-clear",
+      titleBg: "Премини пътеката, след като е свободна",
+      params: { kind: "reachZone", x: LANE_2, y: 130, radiusM: 12 },
+    },
+  ],
+  rubric: { parTimeSec: 100 },
+  shadow: { path: "content/traces/sc-crossing-white-cane/shadow-correct.trace.json" },
+  mistakes: [
+    {
+      traceRef: { path: "content/traces/sc-crossing-white-cane/mistake-too-fast.trace.json" },
+      titleBg: "Твърде бързо приближаване към незрящия",
+      whatWentWrongBg:
+        "Колата задържа висока скорост към пътеката, докато незрящият пешеходец с бял бастун вече пресичаше. Пред пешеходна пътека със стъпил пешеходец скоростта трябва да позволява спиране — чл. 119; при незрящ човек, който не може да реагира на теб, готовността за спиране е още по-задължителна.",
+      codeRefs: ["PEDESTRIAN_CROSSING_TOO_FAST"],
+    },
+    {
+      traceRef: { path: "content/traces/sc-crossing-white-cane/mistake-not-yielded.trace.json" },
+      titleBg: "Непропускане на незрящия пешеходец",
+      whatWentWrongBg:
+        "Водачът мина през пътеката, докато незрящият пешеходец още я пресичаше. Белият бастун означава безусловно предимство — незрящият не може да те види, да прецени скоростта ти или да отстъпи. Задължението да спреш и да изчакаш е изцяло твое.",
+      codeRefs: ["PEDESTRIAN_NOT_YIELDED"],
+    },
+  ],
+  teach: {
+    whenBg:
+      "Винаги когато пешеходец сигнализира с бял бастун — на пътека, на кръстовище, навсякъде. Белият бастун е знак за незрящ човек с безусловно предимство; разпознаването му е самата задача.",
+    whyBg:
+      "Незрящият пешеходец не може да разчита на зрителен контакт, да прецени скоростта ти или да отскочи в последния момент — цялата отговорност е твоя. Настъпването „под носа“ му е особено опасно, защото го дезориентира. Затова спираш напълно, рано и спокойно, и го изчакваш докрай.",
+    lawRef: "ЗДвП чл. 119",
+    examinerBg:
+      "Изпитващият очаква разпознаване на белия бастун, отчетливо намаляване и пълно спиране без настъпване, и потегляне едва след пълното освобождаване на платното. Преминаване през незрящ пешеходец е опасна грешка.",
+  },
+  levels: [
+    { level: 1 },
+    { level: 2 },
+    { level: 3 },
+    { level: 4, vehicleStart: "cold" },
+  ],
+  staged: [WHITE_CANE_PED],
+  conditions: { weather: "dry" },
+  localeBg: "bg-BG",
+};
+
 /** The pedestrian-family templates, in catalog order (registered in
  *  templates.ts). */
 export const SCENARIO_TEMPLATES_PE: readonly ScenarioSpec[] = [
@@ -498,4 +836,7 @@ export const SCENARIO_TEMPLATES_PE: readonly ScenarioSpec[] = [
   SC_CROSSING_SLOW_CROSSER,
   SC_CROSSING_RAIN_SPRINT,
   SC_CROSSING_DART,
+  SC_CROSSING_BUS_SHADOW,
+  SC_CROSSING_CHILD_BALL,
+  SC_CROSSING_WHITE_CANE,
 ];

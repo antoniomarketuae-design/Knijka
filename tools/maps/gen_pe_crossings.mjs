@@ -309,6 +309,24 @@ const INSTANCES = [
     approachM: 80,
     maxspeedKmh: 50,
   },
+  {
+    districtId: "pe-bus-v1",
+    label: "Учебна улица — пешеходци иззад спрял автобус (сценарий PE-10)",
+    approachM: 88,
+    maxspeedKmh: 50,
+  },
+  {
+    districtId: "pe-child-v1",
+    label: "Учебна улица — дете тича след топка (сценарий PE-04)",
+    approachM: 78,
+    maxspeedKmh: 40,
+  },
+  {
+    districtId: "pe-cane-v1",
+    label: "Учебна улица — пешеходец с бял бастун (сценарий PE-14)",
+    approachM: 92,
+    maxspeedKmh: 50,
+  },
 ];
 
 const line = (k, v) => console.log(`  ${String(k).padEnd(28)} ${v}`);

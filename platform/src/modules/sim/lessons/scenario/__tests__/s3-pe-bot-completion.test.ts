@@ -29,6 +29,9 @@ import {
   recordScCrossingRainSprintDrive,
   type ScCrossingRainSprintTraceName,
 } from "../../../traces/scCrossingRainSprint";
+import { recordScCrossingBusShadowDrive } from "../../../traces/scCrossingBusShadow";
+import { recordScCrossingChildBallDrive } from "../../../traces/scCrossingChildBall";
+import { recordScCrossingWhiteCaneDrive } from "../../../traces/scCrossingWhiteCane";
 import { applyTick, buildLessonResult, createLessonSession } from "../../engine";
 import { gradeFinishWire, serializeRuleEvents } from "../../wire";
 import type { LessonResult, LessonSessionState } from "../../types";
@@ -36,9 +39,12 @@ import { compileScenario } from "../compile";
 import { scenarioLessonById } from "../resolve";
 import { scoreRubric } from "../rubric";
 import {
+  SC_CROSSING_BUS_SHADOW,
+  SC_CROSSING_CHILD_BALL,
   SC_CROSSING_LET_PASS,
   SC_CROSSING_RAIN_SPRINT,
   SC_CROSSING_SLOW_CROSSER,
+  SC_CROSSING_WHITE_CANE,
 } from "../templates-pe";
 import type { ScenarioSpec } from "../types";
 
@@ -112,6 +118,18 @@ const CORRECT: Array<{ spec: ScenarioSpec; record: (d: unknown, onTick: OnTick) 
     record: (d, onTick) =>
       recordScCrossingRainSprintDrive(d, "shadow-correct" as ScCrossingRainSprintTraceName, { onTick }),
   },
+  {
+    spec: SC_CROSSING_BUS_SHADOW,
+    record: (d, onTick) => recordScCrossingBusShadowDrive(d, "shadow-correct", { onTick }),
+  },
+  {
+    spec: SC_CROSSING_CHILD_BALL,
+    record: (d, onTick) => recordScCrossingChildBallDrive(d, "shadow-correct", { onTick }),
+  },
+  {
+    spec: SC_CROSSING_WHITE_CANE,
+    record: (d, onTick) => recordScCrossingWhiteCaneDrive(d, "shadow-correct", { onTick }),
+  },
 ];
 
 for (const { spec, record } of CORRECT) {
@@ -161,6 +179,34 @@ describe("S3-A counter-proofs — pedestrian mistakes grade through the live pip
   it("rain-sprint not-yielded: PEDESTRIAN_NOT_YIELDED grades under rain+night, no collision, not passed", () => {
     const outcome = driveThroughSession(SC_CROSSING_RAIN_SPRINT, (d, onTick) =>
       recordScCrossingRainSprintDrive(d, "mistake-not-yielded", { onTick }),
+    );
+    const codes = driveViolationCodes(outcome);
+    expect(codes).toContain("PEDESTRIAN_NOT_YIELDED");
+    expect(codes).not.toContain("COLLISION");
+    expect(outcome.result.passed).toBe(false);
+  });
+
+  it("bus-shadow strike: COLLISION grades through the stack, not passed", () => {
+    const outcome = driveThroughSession(SC_CROSSING_BUS_SHADOW, (d, onTick) =>
+      recordScCrossingBusShadowDrive(d, "mistake-collision", { onTick }),
+    );
+    expect(driveViolationCodes(outcome)).toContain("COLLISION");
+    expect(outcome.result.passed).toBe(false);
+  });
+
+  it("child-ball too-fast: PEDESTRIAN_CROSSING_TOO_FAST grades, no collision, not passed", () => {
+    const outcome = driveThroughSession(SC_CROSSING_CHILD_BALL, (d, onTick) =>
+      recordScCrossingChildBallDrive(d, "mistake-too-fast", { onTick }),
+    );
+    const codes = driveViolationCodes(outcome);
+    expect(codes).toContain("PEDESTRIAN_CROSSING_TOO_FAST");
+    expect(codes).not.toContain("COLLISION");
+    expect(outcome.result.passed).toBe(false);
+  });
+
+  it("white-cane not-yielded: PEDESTRIAN_NOT_YIELDED grades, no collision, not passed", () => {
+    const outcome = driveThroughSession(SC_CROSSING_WHITE_CANE, (d, onTick) =>
+      recordScCrossingWhiteCaneDrive(d, "mistake-not-yielded", { onTick }),
     );
     const codes = driveViolationCodes(outcome);
     expect(codes).toContain("PEDESTRIAN_NOT_YIELDED");

@@ -1,0 +1,148 @@
+{
+ "format": "district-v1",
+ "meta": {
+  "district": "pe-cane",
+  "label": "Учебна улица — пешеходец с бял бастун (сценарий PE-14)",
+  "mapKind": "scenario-street",
+  "generator": "tools/maps/gen_pe_crossings.mjs",
+  "boundsLocalMeters": {
+   "minX": -26,
+   "minY": 0,
+   "maxX": 14.125,
+   "maxY": 152
+  },
+  "attribution": {
+   "text": "Учебна улица с пешеходна пътека — оригинален параметричен дизайн (без данни от OpenStreetMap)",
+   "license": "All rights reserved",
+   "licenseUrl": "/",
+   "copyrightUrl": "/",
+   "obligation": "none — original work, no ODbL attribution required for this map"
+  },
+  "defaults": {
+   "maxspeedUrbanKmh": 50,
+   "note": "Права улица: ограничението важи по цялата дължина; пред пътеката се кара с готовност за спиране."
+  },
+  "stats": {
+   "roadKm": 0.15,
+   "nodes": 2,
+   "edges": 1,
+   "intersections": 0,
+   "crossings": 1,
+   "buildings": 1,
+   "spawnPoints": 2
+  },
+  "scenario": {
+   "archetype": "zebra-block",
+   "params": {
+    "crossings": 1,
+    "signalized": "no",
+    "approachM": 92
+   },
+   "primaryCrossingId": "pe-x-1",
+   "laneCenterRightM": 4.06,
+   "crossings": [
+    {
+     "id": "pe-x-1",
+     "x": 0,
+     "y": 92,
+     "kind": "marked"
+    }
+   ]
+  }
+ },
+ "roads": {
+  "nodes": [
+   {
+    "id": "pe-n-end",
+    "x": 0,
+    "y": 152
+   },
+   {
+    "id": "pe-n-start",
+    "x": 0,
+    "y": 0
+   }
+  ],
+  "edges": [
+   {
+    "id": "pe-e-street",
+    "from": "pe-n-start",
+    "to": "pe-n-end",
+    "class": "residential",
+    "name": "Улица с пешеходна пътека",
+    "oneway": false,
+    "roundabout": false,
+    "lanes": 2,
+    "lanesSource": "tag",
+    "maxspeed": 50,
+    "maxspeedSource": "tag",
+    "length": 152,
+    "geometry": [
+     [
+      0,
+      0
+     ],
+     [
+      0,
+      152
+     ]
+    ]
+   }
+  ]
+ },
+ "intersections": [],
+ "crossings": [
+  {
+   "id": "pe-x-1",
+   "x": 0,
+   "y": 92,
+   "kind": "marked",
+   "signalized": false,
+   "edgeId": "pe-e-street"
+  }
+ ],
+ "roundabouts": [],
+ "buildings": [
+  {
+   "id": "pe-b-shop",
+   "height": 4.5,
+   "heightSource": "default",
+   "footprint": [
+    [
+     -26,
+     58
+    ],
+    [
+     -16,
+     58
+    ],
+    [
+     -16,
+     70
+    ],
+    [
+     -26,
+     70
+    ]
+   ]
+  }
+ ],
+ "spawnPoints": [
+  {
+   "id": "pe-spawn-approach",
+   "x": 4.06,
+   "y": 15,
+   "heading": 0,
+   "edgeId": "pe-e-street",
+   "name": "Подход към пешеходната пътека"
+  },
+  {
+   "id": "pe-spawn-finish",
+   "x": 4.06,
+   "y": 137,
+   "heading": 0,
+   "edgeId": "pe-e-street",
+   "name": "Контролна точка — след пътеката"
+  }
+ ]
+}
