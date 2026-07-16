@@ -230,6 +230,102 @@ export const SC_PK_MOVE_OFF: ScenarioSpec = {
   localeBg: "bg-BG",
 };
 
+// ---------------------------------------------------------------------------
+// sc-vp-stall — „Загасване при потегляне" (doc 72 VP-04) on vp-ready-v1
+//    (map REUSED; rides the recorder's stall channel — {kind:"stall"})
+// ---------------------------------------------------------------------------
+
+/** VP-04 — загасване на двигателя при потегляне (Наредба № 38: всяко загасване
+ *  е официална второстепенна грешка; повтарянето трупа точки). The classic
+ *  learner stall: clutch released too fast at move-off. Rides the recorder's
+ *  stall channel (the VP-04 capability unlock): the driveline's LATCHED
+ *  stalled flag reaches the rule engine, which grades each RISING EDGE as one
+ *  ENGINE_STALLED — the restart re-arms the episode, so the repeat demo grades
+ *  it twice. The shipped detector is default-ON (no ruleConfig needed): the
+ *  LIVE student session grades the same fault. */
+export const SC_VP_STALL: ScenarioSpec = {
+  id: "sc-vp-stall",
+  family: "cockpit",
+  tagsBg: ["кокпит", "потегляне", "загасване", "съединител", "изпитни упражнения"],
+  titleBg: "Загасване при потегляне",
+  objectiveBg:
+    "Потегли от място, без двигателят да загасне: съединител докрай, лек газ и плавно отпускане до точката на зацепване — загасването е класическата грешка от изпитни нерви и всяко се брои.",
+  archetypeIds: ["VP-04"],
+  conceptIds: ["c-vehicle-controls", "c-pre-drive-check"],
+  map: {
+    archetype: "straight-street",
+    // Map REUSED from sc-vp-readiness — mirrored in vp-ready-v1.json
+    // meta.scenario.params (tools/maps/gen_ac_vp_streets.mjs).
+    params: { lengthM: 360, maxspeedKmh: 50 },
+    districtId: "vp-ready-v1",
+  },
+  start: {
+    spawnPointId: "vp-spawn-approach",
+    vehicleStart: "ready",
+  },
+  instructionsBg: [
+    { n: 1, textBg: "Преди потегляне: съединител докрай, включи първа предавка и дай лек газ." },
+    { n: 2, textBg: "Отпускай съединителя ПЛАВНО до точката на зацепване — усещаш как колата „поляга“ напред." },
+    { n: 3, textBg: "Задръж крака в точката на зацепване, докато колата тръгне, и чак тогава отпусни докрай." },
+    { n: 4, textBg: "Ако двигателят все пак загасне: спокойно — съединител докрай, запали отново и повтори процедурата." },
+    { n: 5, textBg: "Продължи плавно по отсечката, без нито едно загасване, до края." },
+  ],
+  success: [
+    {
+      id: "sc-vps-moved",
+      titleBg: "Потегли плавно и мини контролната зона",
+      params: { kind: "reachZone", x: LANE_X, y: 150, radiusM: 14, maxSpeedKmh: 55 },
+    },
+    {
+      id: "sc-vps-finish",
+      titleBg: "Стигни края на отсечката",
+      params: { kind: "reachZone", x: LANE_X, y: 330, radiusM: 14 },
+    },
+  ],
+  rubric: { parTimeSec: 60 },
+  // RECORDED: committed deterministic recordings of the authored scripts in
+  // traces/scVpStall.ts; gates in traces/__tests__/vp-stall-traces.test.ts
+  // (re-record with RECORD_TRACES=1).
+  shadow: { path: "content/traces/sc-vp-stall/shadow-correct.trace.json" },
+  mistakes: [
+    {
+      traceRef: { path: "content/traces/sc-vp-stall/mistake-stall-once.trace.json" },
+      titleBg: "Загасване при потеглянето",
+      whatWentWrongBg:
+        "Съединителят беше отпуснат рязко и двигателят загасна още на първия метър — колата подскочи и спря. Всяко загасване е официална второстепенна грешка на изпита: не е драма, но се отбелязва. Спокойното повторение на процедурата е част от умението.",
+      codeRefs: ["ENGINE_STALLED"],
+    },
+    {
+      traceRef: { path: "content/traces/sc-vp-stall/mistake-stall-repeat.trace.json" },
+      titleBg: "Повторно загасване",
+      whatWentWrongBg:
+        "Двигателят загасна два пъти подред — след първото загасване дойде паниката, а с нея и същото рязко отпускане на съединителя. Повтарящото се загасване показва проблем с работата на съединителя и газта и трупа точки: всяко ново загасване се брои отделно.",
+      codeRefs: ["ENGINE_STALLED"],
+    },
+  ],
+  teach: {
+    whenBg:
+      "При всяко потегляне от място с ръчни скорости — на светофар, на знак Стоп, на наклон и в началото на изпита. Точно там нервите избързват с крака и двигателят гасне; процедурата е една и съща всеки път.",
+    whyBg:
+      "Загасването само по себе си е дребна грешка, но последствията не са: кола, която угасва на зелено или на кръстовище, блокира потока и кани удар отзад, а паниката след първото загасване ражда второто. Овладяната точка на зацепване прави потеглянето предвидимо — и на изпита, и на хълма пред колоната.",
+    lawRef: "Наредба № 38 (второстепенни грешки — загасване на двигателя)",
+    examinerBg:
+      "Изпитващият отбелязва всяко загасване на двигателя като второстепенна грешка — едно се преживява, но повтарянето показва липса на контрол над съединителя и газта и се трупа. Гледа се и реакцията: спокоен рестарт и правилно повторно потегляне, не газ до ламарината.",
+  },
+  levels: [
+    { level: 1 },
+    { level: 2 },
+    { level: 3 },
+    { level: 4, vehicleStart: "cold" },
+  ],
+  conditions: { weather: "dry" },
+  localeBg: "bg-BG",
+};
+
 /** The cockpit-procedure-family templates, in catalog order (registered in
  *  templates.ts). */
-export const SCENARIO_TEMPLATES_COCKPIT: readonly ScenarioSpec[] = [SC_VP_READINESS, SC_PK_MOVE_OFF];
+export const SCENARIO_TEMPLATES_COCKPIT: readonly ScenarioSpec[] = [
+  SC_VP_READINESS,
+  SC_PK_MOVE_OFF,
+  SC_VP_STALL,
+];

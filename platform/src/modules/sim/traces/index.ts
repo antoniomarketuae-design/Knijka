@@ -314,6 +314,22 @@ export {
   type ScSignalHesitationTraceName,
 } from "./scSignalHesitation";
 
+// Capability batch 2 (stall + hard-brake recorder channels — the VP-04/SP-11
+// unlock) — the stall-at-move-off + causeless-harsh-brake authored drives
+// (sc-vp-stall / sc-sp-harsh-brake); committed traces under
+// content/traces/<template>/ are recordings of exactly these scripts (gates:
+// traces/__tests__/vp-stall- / sp-harsh-brake-traces).
+export {
+  SC_VP_STALL_ID,
+  recordScVpStallDrive,
+  type ScVpStallTraceName,
+} from "./scVpStall";
+export {
+  SC_SP_HARSH_BRAKE_ID,
+  recordScSpHarshBrakeDrive,
+  type ScSpHarshBrakeTraceName,
+} from "./scSpHarshBrake";
+
 // Signals family — the dead/flashing-signal capability drives (sc-signal-dead /
 // sc-signal-flashing); the signal cluster is dialed DARK / flashing amber and
 // the junction falls back to the right-hand rule (doc 72 JU-20). Committed

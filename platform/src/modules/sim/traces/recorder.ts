@@ -205,6 +205,16 @@ export type DriveStep =
       /** Come to rest at the polyline end (default: stop only when the next
        *  timed step is not a same-direction drive). */
       stopAtEnd?: boolean;
+      /**
+       * Braking-rate override for THIS step, m/s² (capability phase — the
+       * SP-11/VP-09 unlock). The default SCRIPT_DECEL (4.6, the C1 comfortable
+       * rate) caps every stop below the HARSH_BRAKING_NO_CAUSE threshold
+       * (harshBrakeDecelMps2 = 7), which structurally blocked authoring the
+       * „рязко спиране без причина" mistake. A slam demo passes ≥ 10 here: the
+       * stop envelope tracks 0.7 × this value, so 12 ⇒ a sustained ~8.4 m/s²
+       * stab the detector grades. ABSENT = the former hardcode, byte-identical.
+       */
+      maxDecelMps2?: number;
     }
   | { kind: "pause"; sec: number; brake?: boolean }
   | { kind: "indicator"; setting: TraceIndicator }
@@ -230,7 +240,18 @@ export type DriveStep =
    */
   | { kind: "headlights"; setting: HeadlightState }
   | { kind: "seatbelt"; on: boolean }
-  | { kind: "handbrake"; on: boolean };
+  | { kind: "handbrake"; on: boolean }
+  /**
+   * Stall channel (capability phase — the VP-04 unlock). Mirrors the
+   * driveline's LATCHED stall flag (VehicleSample.stalled: set by a stall,
+   * cleared by the next successful restart), held until the next stall step —
+   * exactly the cockpit-channel discipline above. The rule engine grades the
+   * RISING EDGE as one официална второстепенна „загасване" (ENGINE_STALLED);
+   * emitting {on:false} is the restart that re-arms the episode. DEFAULT
+   * false = the recorder's former hardcode, so any script that never emits it
+   * records BYTE-IDENTICAL to before.
+   */
+  | { kind: "stall"; on: boolean };
 
 /**
  * One flat obstacle rect in district space (S1) — the headless twin of the
@@ -533,6 +554,7 @@ export function recordScriptedDrive(
   let headlights: HeadlightState = isNight ? "low" : "off";
   let seatbeltOn = true;
   let handbrakeOn = false;
+  let stalledOn = false;
 
   const emitEvent = (kind: TraceEventKind, textBg?: string, detail?: string) => {
     const e: TraceEvent = { tSec: t, kind };
@@ -632,7 +654,7 @@ export function recordScriptedDrive(
       handbrakeOn,
       gear: lastGear,
       mirrorGlance: pendingGlance,
-      stalled: false,
+      stalled: stalledOn,
     };
     pendingGlance = null;
     const tick = runtime.sample(vehicleSample, t, isNight, rain, leadGap);
@@ -710,6 +732,10 @@ export function recordScriptedDrive(
       handbrakeOn = step.on;
       continue;
     }
+    if (step.kind === "stall") {
+      stalledOn = step.on;
+      continue;
+    }
     if (step.kind === "pause") {
       const until = t + step.sec;
       speedMps = 0;
@@ -738,6 +764,9 @@ export function recordScriptedDrive(
     }
     let s = 0;
     const targetBase = step.targetKmh / 3.6;
+    // Per-step braking rate (see the DriveStep doc) — default is the former
+    // hardcode, so scripts without the override are byte-identical.
+    const decel = step.maxDecelMps2 ?? SCRIPT_DECEL;
     while (s < path.length - 0.05 && frame < maxFrames) {
       let target = targetBase;
       // Curve-speed cap (the C1 windows) so heading changes stay drivable.
@@ -750,12 +779,12 @@ export function recordScriptedDrive(
       }
       if (stopAtEnd) {
         const dEnd = path.length - s;
-        target = Math.min(target, Math.sqrt(2 * (SCRIPT_DECEL * 0.7) * Math.max(0, dEnd)));
+        target = Math.min(target, Math.sqrt(2 * (decel * 0.7) * Math.max(0, dEnd)));
       }
       const braking = target < speedMps - 0.05;
       const accelerating = target > speedMps + 0.05;
       if (accelerating) speedMps = Math.min(target, speedMps + SCRIPT_ACCEL * SCRIPT_DT);
-      else if (braking) speedMps = Math.max(target, speedMps - SCRIPT_DECEL * SCRIPT_DT);
+      else if (braking) speedMps = Math.max(target, speedMps - decel * SCRIPT_DT);
       s = Math.min(path.length, s + speedMps * SCRIPT_DT);
       prevHeading = pose.headingDeg;
       const p = path.poseAt(s);

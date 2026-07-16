@@ -496,6 +496,104 @@ export const SC_SPEED_TRANSITION: ScenarioSpec = {
   localeBg: "bg-BG",
 };
 
+// ---------------------------------------------------------------------------
+// 6. sc-sp-harsh-brake — „Рязко спиране без причина" (SP-11 / VP-09) on
+//    sp-creep-v1 (map REUSED; rides the recorder's maxDecelMps2 override —
+//    the hard-brake capability unlock)
+// ---------------------------------------------------------------------------
+
+/**
+ * SP-11 / VP-09 — рязко спиране без причина (Наредба № 38: „много рязко
+ * спиране, което създава предпоставка за ПТП" is an explicit BG examiner fail
+ * cause — phantom braking is graded, not just collisions). Rides the
+ * recorder's drive.maxDecelMps2 override: the default 4.6 m/s² stop envelope
+ * sits under the HARSH_BRAKING_NO_CAUSE threshold (7 m/s², emergency-grade),
+ * so only an authored ≥ 10 override can slam. The street is EMPTY (ambient 0,
+ * no crossing/junction/signal), so every cause in the detector's ledger is
+ * positively absent — the slam grades EXACTLY the phantom-brake code. The
+ * shadow demonstrates the correct habit: the same stop, planned early and
+ * braked progressively (~3.2 m/s²), grades nothing. Detector is default-ON
+ * (no ruleConfig needed): the LIVE student session grades the same fault.
+ */
+export const SC_SP_HARSH_BRAKE: ScenarioSpec = {
+  id: "sc-sp-harsh-brake",
+  family: "speed",
+  tagsBg: ["рязко спиране", "плавно спиране", "предвиждане", "удар отзад"],
+  titleBg: "Рязко спиране без причина",
+  objectiveBg:
+    "Спирай планирано и плавно: вдигни газта рано и намалявай постепенно, така че движещите се зад теб да разберат намерението ти — рязкото забиване на спирачките без опасност пред колата е предпоставка за удар отзад и се брои като грешка.",
+  archetypeIds: ["SP-11", "VP-09"],
+  conceptIds: ["c-general-care-duty", "c-speed-adaptation"],
+  map: {
+    archetype: "straight-street",
+    // Map REUSED from sc-speed-creep — mirrored in sp-creep-v1.json
+    // meta.scenario.params (tools/maps/gen_sp_speed.mjs).
+    params: { lengthM: 360, maxspeedKmh: 50 },
+    districtId: "sp-creep-v1",
+  },
+  start: {
+    spawnPointId: "sp-spawn-approach",
+    vehicleStart: "ready",
+  },
+  instructionsBg: [
+    { n: 1, textBg: "Потегли по правата улица и установи спокойна скорост около 45 км/ч." },
+    { n: 2, textBg: "Напред следва планирано спиране в контролната зона — реши да спреш ОТРАНО, не в последния момент." },
+    { n: 3, textBg: "Вдигни газта първо и остави колата да губи скорост, после спирай постепенно и равномерно до пълен покой." },
+    { n: 4, textBg: "Силната спирачка е само за истинска опасност: без причина пред колата рязкото спиране изненадва тези зад теб." },
+    { n: 5, textBg: "Потегли отново плавно и продължи до края на отсечката." },
+  ],
+  success: [
+    {
+      id: "sc-shb-stop",
+      titleBg: "Мини контролната зона с планирано, плавно спиране",
+      params: { kind: "reachZone", x: LANE_X, y: 180, radiusM: 12, maxSpeedKmh: 52 },
+    },
+    {
+      id: "sc-shb-finish",
+      titleBg: "Стигни края на отсечката",
+      params: { kind: "reachZone", x: LANE_X, y: 330, radiusM: 12 },
+    },
+  ],
+  rubric: { parTimeSec: 75 },
+  // RECORDED: committed deterministic recordings of the authored scripts in
+  // traces/scSpHarshBrake.ts; gates in traces/__tests__/sp-harsh-brake-traces
+  // .test.ts (re-record with RECORD_TRACES=1).
+  shadow: { path: "content/traces/sc-sp-harsh-brake/shadow-correct.trace.json" },
+  mistakes: [
+    {
+      traceRef: { path: "content/traces/sc-sp-harsh-brake/mistake-phantom-stop.trace.json" },
+      titleBg: "Фантомно спиране",
+      whatWentWrongBg:
+        "На съвсем празна улица колата заби спирачките до пълен покой — „стори ми се, че нещо мръдна“. Пред нея нямаше нищо: нито пешеходец, нито кола, нито знак. Рязкото спиране без причина е точно грешката, която изпитващите описват като „предпоставка за ПТП“ — движещият се отзад няма как да го очаква.",
+      codeRefs: ["HARSH_BRAKING_NO_CAUSE"],
+    },
+    {
+      traceRef: { path: "content/traces/sc-sp-harsh-brake/mistake-stab-crawl.trace.json" },
+      titleBg: "Рязък натиск до пълзене",
+      whatWentWrongBg:
+        "Паническо набиване на спирачката от 47 км/ч до пълзене — заради сянка между паркираните коли, без реална опасност на пътя. Дори без пълно спиране внезапното силно забавяне е същата грешка: този зад теб вижда стоповете късно и разстоянието се топи. Съмняваш ли се — вдигни газта и намали плавно, не забивай.",
+      codeRefs: ["HARSH_BRAKING_NO_CAUSE"],
+    },
+  ],
+  teach: {
+    whenBg:
+      "При всяко спиране, което можеш да предвидиш — автобусна спирка, адрес, място за паркиране, край на отсечка. Решението за спиране се взима рано и се съобщава на другите с постепенно, равномерно спиране; резкият крак е запазен само за истинска опасност.",
+    whyBg:
+      "Ударът отзад е сред най-честите катастрофи в града и в около една трета от случаите го „поръчва“ спиращият — с внезапна, необяснима за другите спирачка. Плавното, планирано спиране дава на движещия се зад теб време да реагира и запазва управлението на колата; рязкото без причина е грешка дори когато нищо не се удари.",
+    lawRef: "Наредба № 38 (рязко спиране — предпоставка за ПТП)",
+    examinerBg:
+      "Изпитващият следи как спираш през целия маршрут: „много рязко спиране, което създава предпоставка за ПТП“ е изрично посочена грешка. Очаква се ранно вдигане на газта, постепенно спиране и пълен контрол — силната спирачка е оправдана само при реална опасност пред колата.",
+  },
+  levels: [
+    { level: 1 },
+    { level: 2 },
+    { level: 3 },
+    { level: 4, vehicleStart: "cold" },
+  ],
+  conditions: { weather: "dry" },
+  localeBg: "bg-BG",
+};
+
 /** The speed-management templates, in catalog order (registered in
  *  templates.ts). */
 export const SCENARIO_TEMPLATES_SP: readonly ScenarioSpec[] = [
@@ -504,4 +602,5 @@ export const SCENARIO_TEMPLATES_SP: readonly ScenarioSpec[] = [
   SC_SPEED_RAIN,
   SC_SPEED_ZONE,
   SC_SPEED_TRANSITION,
+  SC_SP_HARSH_BRAKE,
 ];
