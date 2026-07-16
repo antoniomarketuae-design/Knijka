@@ -36,7 +36,7 @@
  * left for later waves.
  */
 
-import type { PoliceStopSpec } from "../../contracts";
+import type { PoliceStopSpec, TelltaleStimulusSpec } from "../../contracts";
 import type { ScenarioSpec } from "./types";
 
 // ---------------------------------------------------------------------------
@@ -485,6 +485,181 @@ export const SC_VP_POLICE_STOP: ScenarioSpec = {
   localeBg: "bg-BG",
 };
 
+// ---------------------------------------------------------------------------
+// sc-vp-telltale — „Контролна лампа в движение" (doc 72 VP-06, N11 cockpit-
+//    stimuli batch #10) on ln-v1 (map REUSED from sc-vp-police-stop: the
+//    400 m 2+2 boulevard with curb space for the pull-over)
+// ---------------------------------------------------------------------------
+
+/** ln-v1 northbound right-lane center (meta.scenario; pinned by value — L7). */
+const TT_RIGHT = 12.19;
+/** The stimulus: the red temperature telltale lights as the player passes
+ *  y = 140 in the right lane (mid-drive, well past the approach checkpoint). */
+const TT_TRIGGER = { x: TT_RIGHT, y: 140 };
+const TT_TRIGGER_DIST_M = 8;
+/** The curb-side halt point (right edge of the right lane, curb x = 16.25 —
+ *  the sc-vp-police-stop pull-over geometry, ~80 m of planning room after
+ *  the lamp). */
+const TT_STOP = { x: 13.9, y: 220 };
+const TT_STOP_RADIUS_M = 3;
+const TT_STOP_SPEED_KMH = 4;
+
+/**
+ * The staged COCKPIT STIMULUS on ln-v1 (kind "telltaleStimulus" — stimulus +
+ * measurement only, see contracts.ts): NO actor; at the trigger the director's
+ * telltaleLit channel lights the cluster's red temperature lamp (+ the L1/L2
+ * HUD cue). The runner emits ZERO SimTick events: the graded duty lives
+ * entirely in this template's objectives (the curb-side low-speed reachZone
+ * below = the pull-over-and-stop completion), so no new violation code exists
+ * to false-fire (A12). The outcome channel records "yielded" (with the
+ * stimulus→first-brake reactionTimeSec) / "passedWithoutStopping" for the
+ * debrief. ignoreBeyondM 120 sits comfortably past the stop zone (y 260 vs
+ * 220), so a compliant pull-over always resolves first.
+ */
+const VP_TELLTALE_LAMP: TelltaleStimulusSpec = {
+  id: "sc-vptt-lamp",
+  kind: "telltaleStimulus",
+  libraryEventId: "ev-warning-light",
+  lamp: "temperature",
+  trigger: TT_TRIGGER,
+  triggerDistM: TT_TRIGGER_DIST_M,
+  stop: TT_STOP, // single truth with the graded stop-zone objective below
+  stopRadiusM: TT_STOP_RADIUS_M,
+  stopSpeedKmh: TT_STOP_SPEED_KMH,
+  ignoreBeyondM: 120,
+};
+
+/**
+ * VP-06 — контролна лампа по време на движение (ЗДвП чл. 20: водачът е длъжен
+ * да контролира ППС; чл. 139: движение само с технически изправно превозно
+ * средство. Doc-65 ev-warning-light doctrine: ЧЕРВЕНА лампа = спри безопасно
+ * СЕГА — не паническо спиране насред лентата и не „ще стигна до вкъщи").
+ *
+ * COMPLETION DRILL (the sc-vp-police-stop mold): graded through EXISTING
+ * objective kinds only — a low-speed curb-side reachZone IS the
+ * notice-and-pull-over duty; no new violation code. The mistake demos grade
+ * shipped codes that honestly fit each wrong way:
+ *   - „Игнорирана лампа" — drives on past the lamp and HURRIES (the classic
+ *     ignore story: push on to get home before the car dies): the sustained
+ *     58 km/h in the 50 zone grades SPEEDING_OVER_LIMIT (чл. 21), and the
+ *     drill never completes (the stop zone stays unreached; the outcome
+ *     records "passedWithoutStopping");
+ *   - „Паника в лентата" — the doc-72 VP-06 mistake flavor (panic instead of
+ *     a plan): the ≥ 8 m/s² slam mid-lane on the empty street grades
+ *     HARSH_BRAKING_NO_CAUSE — HONEST grading verified against the ledger: a
+ *     dashboard lamp is NOT a forward cause (the harsh-brake ledger reads
+ *     leadGap/signal/junction/crossing channels only; the telltale runner
+ *     emits zero events), and the early mid-lane rest never reaches the stop
+ *     zone either.
+ * HONEST LIMIT (the sc-vp-police-stop note verbatim): the WITHIN-LANE
+ * pull-to-the-edge nuance (~1.7 m) is coached by the instructions and the
+ * shadow, not zone-graded.
+ */
+export const SC_VP_TELLTALE: ScenarioSpec = {
+  id: "sc-vp-telltale",
+  family: "cockpit",
+  tagsBg: ["контролна лампа", "табло", "прегряване", "спиране вдясно", "кокпит"],
+  titleBg: "Контролна лампа в движение",
+  objectiveBg:
+    "По време на движение на таблото светва червената лампа за температура на двигателя. Забележи я навреме и реагирай правилно: огледало, десен мигач, плавно намаляване и спиране плътно вдясно — червена лампа значи „спри безопасно сега“, не паника и не продължаване.",
+  archetypeIds: ["VP-06"],
+  conceptIds: ["c-vehicle-controls", "c-technical-condition", "c-braking-distance"],
+  map: {
+    archetype: "straight-street",
+    // Map REUSED from sc-lane-change / sc-vp-police-stop — mirrored in
+    // ln-v1.json meta.scenario.params (tools/maps/gen_two_lane_road.mjs).
+    params: { lengthM: 400, maxspeedKmh: 50 },
+    districtId: "ln-v1",
+  },
+  start: {
+    spawnPointId: "ln-spawn-start",
+    vehicleStart: "ready",
+  },
+  instructionsBg: [
+    { n: 1, textBg: "Движи се спокойно в дясната лента — и си създай навика да поглеждаш таблото." },
+    {
+      n: 2,
+      textBg:
+        "Светва червената лампа за температура на двигателя. Червена лампа значи: спри безопасно сега — двигателят прегрява.",
+    },
+    { n: 3, textBg: "Без паника: провери огледалото, пусни десен мигач и започни плавно да намаляваш отрано." },
+    {
+      n: 4,
+      textBg:
+        "Отдръпни се към десния край на лентата и спри плътно вдясно — не рязко насред платното и не „до вкъщи е близо“.",
+    },
+    { n: 5, textBg: "Остани спрял вдясно — при червена лампа двигателят се гаси и не се продължава." },
+  ],
+  success: [
+    {
+      id: "sc-vptt-approach",
+      titleBg: "Карай спокойно по булеварда",
+      // Right-lane checkpoint BEFORE the trigger (y 100 < 140) — the
+      // objectives complete in order, so the stop zone below can only be
+      // graded on the far side of the stimulus.
+      params: { kind: "reachZone", x: TT_RIGHT, y: 100, radiusM: 10, maxSpeedKmh: 55 },
+    },
+    {
+      id: "sc-vptt-stop",
+      titleBg: "Спри плътно вдясно след лампата",
+      // Completable ONLY at near-stop speed at the curb-side halt point (the
+      // sc-pk-smooth-stop stop-mark pattern), 80 m PAST the stimulus trigger
+      // — reaching it before the lamp is geometrically impossible (any drive
+      // to it crosses the trigger corridor, and the runner's passed-backstop
+      // covers a crawler). Same values as the staged TelltaleStimulusSpec's
+      // halt contract (single truth by value).
+      params: {
+        kind: "reachZone",
+        x: TT_STOP.x,
+        y: TT_STOP.y,
+        radiusM: TT_STOP_RADIUS_M,
+        maxSpeedKmh: TT_STOP_SPEED_KMH,
+      },
+    },
+  ],
+  rubric: { parTimeSec: 55 },
+  // RECORDED (N11 batch #10): committed deterministic recordings of the
+  // authored scripts in traces/scVpTelltale.ts; the §5 gate (shadow replays
+  // with ZERO violations + rests in the stop zone) and the §9 stage-5 code
+  // asserts run in traces/__tests__/sc-vp-telltale-traces.test.ts
+  // (re-record with RECORD_TRACES=1).
+  shadow: { path: "content/traces/sc-vp-telltale/shadow-correct.trace.json" },
+  mistakes: [
+    {
+      traceRef: { path: "content/traces/sc-vp-telltale/mistake-ignore.trace.json" },
+      titleBg: "Игнорирана лампа",
+      whatWentWrongBg:
+        "Червената лампа светна — а водачът само натисна газта: „ще стигна до вкъщи“. Прегряващ двигател не се лекува с бързане: няколко километра с червена лампа значат скъсан двигател насред пътя. А ускоряването „за да стигнеш“ прати колата и над ограничението (чл. 21). Червена лампа = спри безопасно сега.",
+      codeRefs: ["SPEEDING_OVER_LIMIT"],
+    },
+    {
+      traceRef: { path: "content/traces/sc-vp-telltale/mistake-panic-stop.trace.json" },
+      titleBg: "Паника в лентата",
+      whatWentWrongBg:
+        "Лампата стресна водача и кракът се заби в спирачката — колата спря аварийно насред лентата. Точно това е грешният рефлекс: червената лампа иска БЕЗОПАСНО спиране плътно вдясно, с огледало и мигач, а не аварийно спиране на място, което изненадва движещите се отзад и е предпоставка за удар.",
+      codeRefs: ["HARSH_BRAKING_NO_CAUSE"],
+    },
+  ],
+  teach: {
+    whenBg:
+      "Когато на таблото светне предупредителна лампа по време на движение — температура, налягане на маслото, спирачки. Цветът казва всичко: червена лампа значи „спри безопасно сега“, жълта — „внимание, до сервиз“. Навикът да поглеждаш таблото на всеки няколко секунди я хваща навреме.",
+    whyBg:
+      "Контролните лампи предупреждават за проблем, преди той да е станал опасен (чл. 20 — контролът над автомобила значи и контрол над състоянието му). Игнорирането на червена лампа завършва със счупена кола насред пътя, а паническото спиране в лентата — с удар отзад. Спокойната процедура — огледало, мигач, плавно вдясно — решава и двете.",
+    lawRef: "ЗДвП чл. 20",
+    examinerBg:
+      "Изпитващият гледа реакцията на водача при проблем: навременно забелязване, запазено самообладание, огледало и десен мигач, плавно намаляване и спиране плътно вдясно на безопасно място. Рязко спиране в лентата или продължаване с явна неизправност е грешка.",
+  },
+  levels: [
+    { level: 1 },
+    { level: 2 },
+    { level: 3 },
+    { level: 4, vehicleStart: "cold" },
+  ],
+  staged: [VP_TELLTALE_LAMP],
+  conditions: { weather: "dry" },
+  localeBg: "bg-BG",
+};
+
 /** The cockpit-procedure-family templates, in catalog order (registered in
  *  templates.ts). */
 export const SCENARIO_TEMPLATES_COCKPIT: readonly ScenarioSpec[] = [
@@ -492,4 +667,5 @@ export const SCENARIO_TEMPLATES_COCKPIT: readonly ScenarioSpec[] = [
   SC_PK_MOVE_OFF,
   SC_VP_STALL,
   SC_VP_POLICE_STOP,
+  SC_VP_TELLTALE,
 ];

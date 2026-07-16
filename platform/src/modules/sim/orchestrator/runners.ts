@@ -32,6 +32,7 @@ import type {
   RoundaboutEntrySpec,
   StagedEventOutcome,
   StagedEventSpec,
+  TelltaleStimulusSpec,
   TrafficControllerSpec,
 } from "../contracts";
 import type { SimTickEvent } from "../rules";
@@ -114,6 +115,11 @@ export interface EventRunner {
   outcome: StagedEventOutcome | null;
   /** True while this runner wants the lesson hazard visual animating. */
   hazardActive: boolean;
+  /** N11 cockpit-lamp channel (telltaleStimulus only): true while the staged
+   *  dashboard warning telltale is lit — the director ORs it into its own
+   *  `telltaleLit` scene seam (the hazardActive twin; the cluster and the
+   *  L1/L2 HUD cue read it). Absent on every other runner. */
+  readonly telltaleLit?: boolean;
   /** (Re)stage the actor + redraw per-attempt jitters. `firstTime` stages the
    *  actor into the traffic system; later calls reset it to its hold pose. */
   stage(traffic: StagedTrafficPort, rng: Rng, firstTime: boolean): void;
@@ -2076,6 +2082,100 @@ export class RearTailgaterRunner implements EventRunner {
 }
 
 // ---------------------------------------------------------------------------
+// 14. Telltale stimulus (N11 cockpit-stimuli — doc 72 §3 VP-06 „Контролна
+//     лампа по време на движение", ЗДвП чл. 20 / чл. 139, library
+//     ev-warning-light). STIMULUS + MEASUREMENT ONLY (the policeStop
+//     discipline): NO actor is staged — at the authored trigger the runner
+//     lights the director's cockpit-lamp channel (`telltaleLit`, the
+//     hazardActive-style scene seam: the cluster's red temperature lamp +
+//     the L1/L2 HUD cue) and records the outcome — "yielded" for a compliant
+//     curb-side rest (reactionTimeSec = stimulus→first-brake respondedSec),
+//     "passedWithoutStopping" for driving on ignoreBeyondM past the lamp —
+//     but emits ZERO SimTick events: no violation can ever grade from this
+//     runner (A12). The graded duty lives in the scenario's curb-side
+//     low-speed reachZone objective (sc-vp-police-stop stop-mark pattern);
+//     the panic-slam mistake grades through the SHIPPED
+//     HARSH_BRAKING_NO_CAUSE (a dashboard lamp is not a forward cause in the
+//     harsh-brake ledger — the honest read: red lamp = PLANNED pull-over).
+//     The lamp stays LIT through and after resolution (a real coolant fault
+//     does not clear because you stopped); reset() re-arms it dark.
+// ---------------------------------------------------------------------------
+
+/** Player at/above this counts as driving for the trigger, km/h (the lamp
+ *  must light mid-DRIVE, and the crawl backstop below covers the rest). */
+const TELLTALE_MOVING_KMH = 3;
+
+export class TelltaleStimulusRunner implements EventRunner {
+  phase: StagedEventPhase = "idle";
+  outcome: StagedEventOutcome | null = null;
+  hazardActive = false;
+  /** The cockpit-lamp channel the director ORs into `telltaleLit`. */
+  telltaleLit = false;
+
+  private approachSpeedKmh = 0;
+  private readonly timer = new ReactionTimer();
+
+  constructor(readonly spec: TelltaleStimulusSpec) {}
+
+  stage(_traffic: StagedTrafficPort, _rng: Rng, _firstTime: boolean): void {
+    // No actor and no jitter draw: the stimulus is authored scenery-of-state
+    // (the policeStop no-jitter discipline) — nothing about it varies.
+    this.phase = "armed";
+    this.outcome = null;
+    this.telltaleLit = false;
+    this.approachSpeedKmh = 0;
+    this.timer.reset();
+  }
+
+  step(_traffic: StagedTrafficPort, input: DirectorInput, _out: SimTickEvent[]): StagedEventOutcome | null {
+    const s = this.spec;
+    // The lamp stays lit after resolution — only reset() clears it.
+    if (this.phase === "resolved") return null;
+
+    if (this.phase === "armed") {
+      const d = dist(input.x, input.y, s.trigger.x, s.trigger.y);
+      // Fire within the trigger radius while moving, OR once the trigger is
+      // behind the player (backstop: a crawler below the radius check still
+      // can never reach the stop zone unlit).
+      const passed = aheadOfPlayerM(input, s.trigger.x, s.trigger.y) < -1;
+      if ((d <= s.triggerDistM || passed) && input.speedKmh >= TELLTALE_MOVING_KMH) {
+        this.telltaleLit = true;
+        this.timer.arm(input.tSec);
+        this.approachSpeedKmh = input.speedKmh;
+        this.phase = "triggered";
+      }
+      return null;
+    }
+
+    // triggered — measure the response. Outcome only, NO events (class doc).
+    this.timer.sample(input);
+    if (
+      input.speedKmh <= s.stopSpeedKmh &&
+      dist(input.x, input.y, s.stop.x, s.stop.y) <= s.stopRadiusM
+    ) {
+      return this.resolve(input, true, "yielded");
+    }
+    if (aheadOfPlayerM(input, s.trigger.x, s.trigger.y) < -s.ignoreBeyondM) {
+      return this.resolve(input, false, "passedWithoutStopping");
+    }
+    return null;
+  }
+
+  private resolve(
+    input: DirectorInput,
+    success: boolean,
+    detail: StagedEventOutcome["detail"],
+  ): StagedEventOutcome {
+    this.phase = "resolved";
+    this.outcome = outcomeOf(this.spec, input, success, detail, {
+      reactionTimeSec: this.timer.reactionSec,
+      approachSpeedKmh: this.approachSpeedKmh,
+    });
+    return this.outcome;
+  }
+}
+
+// ---------------------------------------------------------------------------
 
 export function createRunner(
   spec: StagedEventSpec,
@@ -2108,5 +2208,7 @@ export function createRunner(
       return new CutInLeadCarRunner(spec);
     case "rearTailgater":
       return new RearTailgaterRunner(spec);
+    case "telltaleStimulus":
+      return new TelltaleStimulusRunner(spec);
   }
 }

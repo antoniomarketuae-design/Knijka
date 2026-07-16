@@ -127,6 +127,15 @@ export interface ScenarioDirector {
   reset(): void;
   /** True while the lesson's HazardStimulusSpec visual should animate (L5). */
   readonly hazardActive: boolean;
+  /**
+   * N11 cockpit-lamp channel (telltaleStimulus): true while a staged
+   * dashboard warning telltale is lit — the hazardActive twin for the
+   * COCKPIT: LessonScene copies it into a render-free ref each frame; the
+   * Виток cluster lights its red temperature lamp and the L1/L2 HUD shows
+   * the cue off that ref. Stays true through/after resolution (a real fault
+   * does not clear because you stopped); reset() re-arms it dark.
+   */
+  readonly telltaleLit: boolean;
   /** 0-based attempt counter (increments on reset()). */
   readonly attempt: number;
   /** All outcomes resolved so far this attempt, in order. */

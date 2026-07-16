@@ -686,6 +686,12 @@ function ReadyScene({
     directorRef.current = director;
   }, [director]);
   const hazardActiveRef = useRef(false);
+  // N11 (VP-06): the cockpit-lamp twin of hazardActiveRef — RuntimeDriver
+  // copies director.telltaleLit here each frame; VitokCockpit's cluster lights
+  // the red temperature telltale off it (render-free). The edge additionally
+  // flips the L1/L2 HUD cue state below (state changes only on edges).
+  const telltaleLitRef = useRef(false);
+  const [telltaleCueOn, setTelltaleCueOn] = useState(false);
 
   /** Respawn (key R and the touch sheet's „Рестарт") — same code path. */
   const resetCar = useCallback(() => {
@@ -870,6 +876,8 @@ function ReadyScene({
                 // physics field only — never derived from environment.rain
                 // (shipped rain lessons were tuned against dry physics).
                 gripFactor={lesson.physics?.wetGrip ? WET_GRIP_FACTOR : 1}
+                // N11 (VP-06): director→cluster warning-lamp channel.
+                telltaleLitRef={telltaleLitRef}
               />
             </CockpitInteractionContext.Provider>
             {/* S1: precise hittable parked cars from the lot's occupancy —
@@ -888,6 +896,8 @@ function ReadyScene({
               traffic={traffic}
               director={director}
               hazardActiveRef={hazardActiveRef}
+              telltaleLitRef={telltaleLitRef}
+              onTelltale={setTelltaleCueOn}
               sampleRef={sampleRef}
               simRef={simRef}
               inputRef={inputRef}
@@ -1019,6 +1029,17 @@ function ReadyScene({
         <div className="pointer-events-none absolute left-1/2 top-16 z-10 -translate-x-1/2">
           <div className="rounded-full border border-accent/60 bg-background/85 px-3.5 py-1.5 text-xs font-bold text-accent shadow-glow-sm backdrop-blur">
             Следвай синята линия
+          </div>
+        </div>
+      ) : null}
+
+      {/* N11 (VP-06) telltale cue — the L1/L2 aid twin of the followHints
+          chip: while the staged dashboard lamp is lit, name it and the taught
+          response. L3+ strips it — noticing the CLUSTER is the drill. */}
+      {telltaleCueOn && aids?.pathRibbon ? (
+        <div className="pointer-events-none absolute left-1/2 top-24 z-10 -translate-x-1/2">
+          <div className="rounded-full border border-danger/60 bg-background/85 px-3.5 py-1.5 text-xs font-bold text-danger shadow-glow-sm backdrop-blur">
+            Контролна лампа: температура! Спри спокойно вдясно
           </div>
         </div>
       ) : null}
@@ -1252,6 +1273,8 @@ function RuntimeDriver({
   traffic,
   director,
   hazardActiveRef,
+  telltaleLitRef,
+  onTelltale,
   sampleRef,
   simRef,
   inputRef,
@@ -1280,6 +1303,11 @@ function RuntimeDriver({
   director: ScenarioDirector | null;
   /** A8 → TrafficLayer: animate the lesson hazard visual while true. */
   hazardActiveRef: React.RefObject<boolean>;
+  /** N11 (VP-06) → VitokCockpit: the staged dashboard lamp is lit while true
+   *  (the hazardActiveRef twin for the cockpit cluster). */
+  telltaleLitRef: React.RefObject<boolean>;
+  /** Edge callback for the L1/L2 HUD cue (state flips only on lamp edges). */
+  onTelltale?: (on: boolean) => void;
   sampleRef: React.RefObject<VehicleSample>;
   /** S0-View: live steer angle for the attempt recorder (visual channel). */
   simRef: React.RefObject<VehicleSim | null>;
@@ -1448,6 +1476,22 @@ function RuntimeDriver({
       });
       for (const e of staged.events) tick.events.push(e);
       hazardActiveRef.current = director.hazardActive;
+      // N11 (VP-06): the cockpit-lamp channel — the cluster reads the ref per
+      // frame; the HUD cue + the attempt trace react on EDGES only. The
+      // rising-edge annotation marks the stimulus moment for the ghost story
+      // of the student's own attempt (the recorder never renders).
+      const lit = director.telltaleLit;
+      if (lit !== telltaleLitRef.current) {
+        telltaleLitRef.current = lit;
+        onTelltale?.(lit);
+        if (lit) {
+          recorder?.addEvent(
+            "annotation",
+            tRef.current,
+            "Светна контролна лампа — температура на двигателя.",
+          );
+        }
+      }
       if (onStagedOutcome) {
         for (const o of staged.outcomes) onStagedOutcome(o);
       }

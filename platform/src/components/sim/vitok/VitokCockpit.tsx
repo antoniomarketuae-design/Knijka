@@ -122,6 +122,7 @@ function makeClusterRuntime(canvas: HTMLCanvasElement): ClusterRuntime {
       seatbeltOn: false,
       handbrakeOn: false,
       headlights: "off",
+      tempWarnOn: false,
     },
   };
 }
@@ -180,10 +181,14 @@ export function VitokCockpit({
   simRef,
   inputRef,
   cabinRef,
+  telltaleLitRef,
 }: {
   simRef: RefObject<VehicleSim | null>;
   inputRef: RefObject<SimInput | null>;
   cabinRef: RefObject<CabinControls | null>;
+  /** N11 (VP-06): director→cluster warning-lamp channel (render-free ref —
+   *  the hazardActiveRef pattern). Absent = the lamp never lights. */
+  telltaleLitRef?: RefObject<boolean>;
 }) {
   const { enabled: cockpitView } = useContext(CockpitInteractionContext);
   const camera = useThree((s) => s.camera);
@@ -331,6 +336,9 @@ export function VitokCockpit({
       d.handbrakeOn =
         (cabin?.driveline.parkingBrakeOn ?? false) || (input?.handbrake ?? false);
       d.headlights = cabin?.headlights ?? "off";
+      // N11 (VP-06): the staged cockpit stimulus — a director-lit red
+      // temperature telltale (LessonScene copies director.telltaleLit here).
+      d.tempWarnOn = telltaleLitRef?.current ?? false;
       const hash = clusterHash(d);
       if (hash !== rt.lastHash) {
         rt.lastHash = hash;

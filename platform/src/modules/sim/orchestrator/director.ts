@@ -88,6 +88,11 @@ class ScenarioDirectorImpl implements ScenarioDirector {
     return false;
   }
 
+  get telltaleLit(): boolean {
+    for (const runner of this.runners) if (runner.telltaleLit === true) return true;
+    return false;
+  }
+
   get outcomes(): readonly StagedEventOutcome[] {
     return this.allOutcomes;
   }

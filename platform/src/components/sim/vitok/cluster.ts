@@ -30,13 +30,16 @@ export interface ClusterData {
   seatbeltOn: boolean;
   handbrakeOn: boolean;
   headlights: "off" | "low" | "high";
+  /** N11 (VP-06): the red engine-temperature warning telltale — lit by the
+   *  scenario director's telltaleLit channel (a staged cockpit stimulus). */
+  tempWarnOn: boolean;
 }
 
 /** Cheap change detector so the texture only uploads when something changed. */
 export function clusterHash(d: ClusterData): string {
   return `${d.gear}|${d.indicatorLeftLit ? 1 : 0}${d.indicatorRightLit ? 1 : 0}${
     d.seatbeltOn ? 1 : 0
-  }${d.handbrakeOn ? 1 : 0}|${d.headlights}`;
+  }${d.handbrakeOn ? 1 : 0}${d.tempWarnOn ? 1 : 0}|${d.headlights}`;
 }
 
 const BG = "#0c1016";
@@ -222,6 +225,49 @@ export function drawCluster(ctx: CanvasRenderingContext2D, d: ClusterData): void
     ctx.moveTo(432, lampY + i * 8 + (d.headlights === "high" ? 0 : 2));
     ctx.lineTo(446, lampY + i * 8 + (d.headlights === "high" ? 0 : -2));
     ctx.stroke();
+  }
+
+  // --- Engine-temperature warning telltale (N11 VP-06) ----------------------
+  // Sits in the dial's unswept bottom sector (the 270° sweep leaves the
+  // down-pointing gap free) — where real clusters put the coolant lamp.
+  // Dark housing when off; RED + glow when the director's stimulus lights it.
+  {
+    const tw = d.tempWarnOn;
+    const tx = 140; // dial centre x
+    const ty = 210; // below "км/ч" (y 176), inside the panel
+    roundRect(ctx, tx - 27, ty - 18, 54, 36, 8);
+    ctx.fillStyle = tw ? "rgba(255,68,51,0.16)" : "#11161d";
+    ctx.fill();
+    ctx.strokeStyle = tw ? RED : PANEL_EDGE;
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    const tc = tw ? RED : "#3c4552";
+    ctx.strokeStyle = tc;
+    ctx.lineWidth = 3;
+    if (tw) {
+      ctx.shadowColor = RED;
+      ctx.shadowBlur = 10;
+    }
+    // Thermometer stem + bulb…
+    ctx.beginPath();
+    ctx.moveTo(tx, ty - 12);
+    ctx.lineTo(tx, ty + 1);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(tx, ty + 4, 3.5, 0, Math.PI * 2);
+    ctx.stroke();
+    // …over two coolant waves.
+    for (let row = 0; row < 2; row++) {
+      const wy = ty + 10 + row * 5;
+      ctx.beginPath();
+      ctx.moveTo(tx - 14, wy);
+      for (let i = 0; i < 4; i++) {
+        const x0 = tx - 14 + i * 7;
+        ctx.quadraticCurveTo(x0 + 3.5, wy + (i % 2 === 0 ? -3 : 3), x0 + 7, wy);
+      }
+      ctx.stroke();
+    }
+    ctx.shadowBlur = 0;
   }
 
   // --- Fuel gauge (static, ~62 %) -------------------------------------------

@@ -270,6 +270,15 @@ export {
   recordScVpPoliceStopDrive,
   type ScVpPoliceStopTraceName,
 } from "./scVpPoliceStop";
+// N11 cockpit-stimuli batch #10 — the VP-06 telltale authored drives
+// (sc-vp-telltale, the staged dashboard-lamp stimulus + curb-side completion
+// objectives); committed traces are recordings of exactly these scripts
+// (gate: traces/__tests__/sc-vp-telltale-traces).
+export {
+  SC_VP_TELLTALE_ID,
+  recordScVpTelltaleDrive,
+  type ScVpTelltaleTraceName,
+} from "./scVpTelltale";
 
 // S4 (cockpit channels — AC/VP unlock) — the cockpit-procedure + adverse-
 // conditions authored drives (sc-vp-readiness / sc-ac-night-lights /

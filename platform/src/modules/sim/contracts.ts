@@ -407,7 +407,8 @@ export type StagedEventKind =
   | "policeStop"
   | "trafficController"
   | "cutInLeadCar"
-  | "rearTailgater";
+  | "rearTailgater"
+  | "telltaleStimulus";
 
 interface StagedEventBase {
   /** Unique per lesson, e.g. "l4-dart-out". */
@@ -732,6 +733,52 @@ export interface PoliceStopSpec extends StagedEventBase {
 }
 
 /**
+ * N11 cockpit-stimuli (doc 72 §3 VP-06 „Контролна лампа по време на движение",
+ * ЗДвП чл. 20 / чл. 139; library ev-warning-light — doc 65's only drivable
+ * vehicle-knowledge action): a RED warning telltale lights on the dashboard
+ * mid-drive; the duty is to notice it and pull over safely — not to panic-slam
+ * in-lane and not to drive on for kilometers.
+ *
+ * STIMULUS + MEASUREMENT ONLY (the policeStop discipline): the runner stages
+ * NO actor — it flips the director's cockpit-lamp channel (`telltaleLit`, the
+ * hazardActive-style scene seam: the cluster lights the lamp, the L1/L2 HUD
+ * shows the cue) at the authored trigger and records the outcome
+ * ("yielded" = compliant curb-side rest, with `reactionTimeSec` as the
+ * stimulus→first-brake respondedSec; "passedWithoutStopping" = ignored) — but
+ * emits ZERO SimTick events, so no violation can ever grade from this runner
+ * (A12: an unmodelled duty must not convict). The graded contract is the
+ * scenario's curb-side low-speed reachZone objective (the sc-vp-police-stop
+ * stop-mark pattern); a post-stimulus mid-lane slam grades through the
+ * SHIPPED HARSH_BRAKING_NO_CAUSE — a dashboard lamp is not a forward cause
+ * in the harsh-brake ledger (it reads leadGap/signal/junction/crossing
+ * channels only), and that is the honest read: the lamp asks for a PLANNED
+ * pull-over, never an emergency stop.
+ */
+export interface TelltaleStimulusSpec extends StagedEventBase {
+  kind: "telltaleStimulus";
+  /** Which lamp lights. v1: the red engine-temperature telltale (ЗДвП чл. 20
+   *  doctrine: red = спри безопасно сега). */
+  lamp: "temperature";
+  /** The lamp lights when the player first comes within `triggerDistM` of
+   *  this point while moving (or has already passed it — the backstop, so a
+   *  crawling player can never reach the stop zone unlit). */
+  trigger: { x: number; y: number };
+  triggerDistM: number;
+  /** Curb-side halt point the compliant driver rests at (mirrors the
+   *  scenario's graded stop-zone objective — single truth by value). */
+  stop: { x: number; y: number };
+  /** Within this of `stop`… */
+  stopRadiusM: number;
+  /** …at/below this speed = responded (outcome "yielded"), km/h. */
+  stopSpeedKmh: number;
+  /** Trigger point this far behind the player (player-frame arc) without a
+   *  compliant stop = the lamp was ignored (outcome only, no grading), m.
+   *  Author it comfortably BEYOND the stop zone so a compliant pull-over
+   *  always resolves first. */
+  ignoreBeyondM: number;
+}
+
+/**
  * ADR-006 stage 1d (doc 72 §3 JU-18 — „Регулировчик на кръстовището", ЗДвП
  * чл. 7 / Наредба-38 termination item): a traffic CONTROLLER stands at a
  * SIGNALIZED junction whose lamps keep cycling, and the controller's hand
@@ -876,7 +923,8 @@ export type StagedEventSpec =
   | PoliceStopSpec
   | TrafficControllerSpec
   | CutInLeadCarSpec
-  | RearTailgaterSpec;
+  | RearTailgaterSpec
+  | TelltaleStimulusSpec;
 
 /**
  * Resolution record of one staged encounter (A8). The GRADING already

@@ -23,13 +23,14 @@ import { recordScAcRainLightsDrive, type ScAcRainLightsTraceName } from "../../.
 import { recordScAcHighbeamLeadDrive, type ScAcHighbeamLeadTraceName } from "../../../traces/scAcHighbeamLead";
 import { recordScAcFogDrive, type ScAcFogTraceName } from "../../../traces/scAcFog";
 import { recordScVpPoliceStopDrive, type ScVpPoliceStopTraceName } from "../../../traces/scVpPoliceStop";
+import { recordScVpTelltaleDrive, type ScVpTelltaleTraceName } from "../../../traces/scVpTelltale";
 import { applyTick, buildLessonResult, createLessonSession } from "../../engine";
 import { gradeFinishWire, serializeRuleEvents } from "../../wire";
 import type { LessonResult, LessonSessionState } from "../../types";
 import { compileScenario } from "../compile";
 import { scenarioLessonById } from "../resolve";
 import { scoreRubric } from "../rubric";
-import { SC_VP_POLICE_STOP, SC_VP_READINESS } from "../templates-cockpit";
+import { SC_VP_POLICE_STOP, SC_VP_READINESS, SC_VP_TELLTALE } from "../templates-cockpit";
 import { SC_AC_FOG, SC_AC_NIGHT_LIGHTS, SC_AC_RAIN_LIGHTS, SC_AC_HIGHBEAM_LEAD } from "../templates-conditions";
 import type { ScenarioSpec } from "../types";
 
@@ -120,6 +121,14 @@ const CORRECT: Array<{ spec: ScenarioSpec; record: (d: unknown, onTick: OnTick) 
     // IS the graded duty, so the compliant shadow COMPLETES at rest).
     spec: SC_VP_POLICE_STOP,
     record: (d, onTick) => recordScVpPoliceStopDrive(d, "shadow-correct" as ScVpPoliceStopTraceName, { onTick }),
+  },
+  {
+    // N11 batch #10 — VP-06: the telltale-response completion drill (the
+    // telltaleStimulus is state, not scenery; the curb-side low-speed
+    // reachZone past the lamp IS the graded duty — the compliant shadow
+    // notices, signals right and COMPLETES at rest).
+    spec: SC_VP_TELLTALE,
+    record: (d, onTick) => recordScVpTelltaleDrive(d, "shadow-correct" as ScVpTelltaleTraceName, { onTick }),
   },
 ];
 
@@ -237,6 +246,30 @@ describe("S4 counter-proofs — cockpit mistakes grade through the live pipeline
     expect(driveViolationCodes(outcome)).toContain("HARSH_BRAKING_NO_CAUSE");
     expect(outcome.result.completedAll).toBe(false);
     expect(outcome.result.objectives.find((o) => o.id === "sc-vpps-stop")!.done).toBe(false);
+    expect(outcome.result.passed).toBe(false);
+  });
+
+  // N11 batch #10 (VP-06) — the completion-drill counter-proofs: neither
+  // wrong way reaches the curb-side stop zone past the lamp, so the drill
+  // NEVER completes (the honest capped outcome), and each grades its own
+  // shipped code (the ignored lamp itself grades NOTHING — A12).
+  it("telltale / ignored lamp: SPEEDING_OVER_LIMIT surfaces, stop objective unmet, not passed", () => {
+    const outcome = driveThroughSession(SC_VP_TELLTALE, (d, onTick) =>
+      recordScVpTelltaleDrive(d, "mistake-ignore", { onTick }),
+    );
+    expect(driveViolationCodes(outcome)).toContain("SPEEDING_OVER_LIMIT");
+    expect(outcome.result.completedAll).toBe(false);
+    expect(outcome.result.objectives.find((o) => o.id === "sc-vptt-stop")!.done).toBe(false);
+    expect(outcome.result.passed).toBe(false);
+  });
+
+  it("telltale / panic in-lane slam: HARSH_BRAKING_NO_CAUSE surfaces, stop objective unmet, not passed", () => {
+    const outcome = driveThroughSession(SC_VP_TELLTALE, (d, onTick) =>
+      recordScVpTelltaleDrive(d, "mistake-panic-stop", { onTick }),
+    );
+    expect(driveViolationCodes(outcome)).toContain("HARSH_BRAKING_NO_CAUSE");
+    expect(outcome.result.completedAll).toBe(false);
+    expect(outcome.result.objectives.find((o) => o.id === "sc-vptt-stop")!.done).toBe(false);
     expect(outcome.result.passed).toBe(false);
   });
 });

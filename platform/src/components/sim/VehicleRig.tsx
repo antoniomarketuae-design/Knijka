@@ -91,6 +91,7 @@ export function VehicleRig({
   collisionMinKmh = COLLISION_MIN_KMH,
   night = false,
   gripFactor = 1,
+  telltaleLitRef,
 }: {
   simRef: RefObject<VehicleSim | null>;
   chassisGroupRef: RefObject<Group | null>;
@@ -123,6 +124,10 @@ export function VehicleRig({
    *  grip. Never derived from environment.rain (shipped rain lessons were
    *  tuned dry — the flag is authored per scenario). */
   gripFactor?: number;
+  /** N11 (VP-06): director→cluster warning-lamp channel, threaded to
+   *  VitokCockpit (the hazardActiveRef pattern — render-free ref, read per
+   *  frame). Absent = the temperature telltale never lights. */
+  telltaleLitRef?: RefObject<boolean>;
 }) {
   const { world } = useRapier();
   const bodyRef = useRef<RapierRigidBody>(null);
@@ -269,7 +274,12 @@ export function VehicleRig({
           GT-E interior via VitokCockpit (cockpit view, A3). */}
       <group ref={chassisGroupRef}>
         <HeroCarBody simRef={simRef} />
-        <VitokCockpit simRef={simRef} inputRef={inputRef} cabinRef={cabinRef} />
+        <VitokCockpit
+          simRef={simRef}
+          inputRef={inputRef}
+          cabinRef={cabinRef}
+          telltaleLitRef={telltaleLitRef}
+        />
 
         {/* Windshield glass — a faint cool-tinted, low-roughness plane raked
             through the A3 interior's windshield opening (the interior GLB has
