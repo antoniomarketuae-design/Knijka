@@ -509,3 +509,22 @@ export {
   type ScRxTramTemplateId,
   type ScRxTramTraceName,
 } from "./scRxTram";
+
+// OVERTAKE-CORRIDOR adjudication (doc 72 OV-05/OV-08 — the head-on family):
+// sc-ov-oncoming-gap rides the NEW oncomingStream staged kind + the runtime's
+// overtake-corridor tracker (OVERTAKE_INSUFFICIENT_GAP off the measured
+// oncoming gap on the opposing bank of a dashed two-way); sc-ov-abort is the
+// abort discipline — its shadow's braked tuck-back replays completely clean
+// (an aborted overtake NEVER convicts). Committed traces under
+// content/traces/<template>/ are recordings of exactly these scripts (gates:
+// traces/__tests__/sc-ov-oncoming-gap-traces + sc-ov-abort-traces).
+export {
+  SC_OV_ONCOMING_GAP_ID,
+  recordScOvOncomingGapDrive,
+  type ScOvOncomingGapTraceName,
+} from "./scOvOncomingGap";
+export {
+  SC_OV_ABORT_ID,
+  recordScOvAbortDrive,
+  type ScOvAbortTraceName,
+} from "./scOvAbort";

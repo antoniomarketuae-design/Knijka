@@ -1398,12 +1398,21 @@ function handleTickEvent(
       // real conflict and resolved it correctly → positive reinforcement.
       // VU-09: the reserved "emergency" situation carries its own catalog code
       // (special-regime duty, ЗДвП чл. 91) — every other situation keeps
-      // grading FAILED_TO_YIELD byte-identically.
+      // grading FAILED_TO_YIELD byte-identically. OV-05: the runtime's
+      // overtake-corridor adjudicator ("overtake-oncoming") likewise carries
+      // its own code — the head-on gamble is a distinct law (чл. 42, ал. 1)
+      // and a distinct lesson from a junction priority slip.
       if (e.violated) {
         out.push(
-          makeViolation(e.situation === "emergency" ? "EMERGENCY_NOT_YIELDED" : "FAILED_TO_YIELD", t, {
-            detail: e.situation,
-          }),
+          makeViolation(
+            e.situation === "emergency"
+              ? "EMERGENCY_NOT_YIELDED"
+              : e.situation === "overtake-oncoming"
+                ? "OVERTAKE_INSUFFICIENT_GAP"
+                : "FAILED_TO_YIELD",
+            t,
+            { detail: e.situation },
+          ),
         );
       } else if (e.yielded) out.push(makeCommendation("YIELDED_TO_PRIORITY", t));
       break;

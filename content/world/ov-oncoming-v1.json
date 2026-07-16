@@ -1,0 +1,131 @@
+{
+ "format": "district-v1",
+ "meta": {
+  "district": "ov-oncoming",
+  "label": "Учебен извънградски път — изпреварване срещу насрещни (сценарии OV-05/OV-08)",
+  "mapKind": "scenario-street",
+  "generator": "tools/maps/gen_ov_oncoming.mjs",
+  "boundsLocalMeters": {
+   "minX": -36.12,
+   "minY": -6,
+   "maxX": 14.13,
+   "maxY": 906
+  },
+  "attribution": {
+   "text": "Учебен извънградски път за изпреварване срещу насрещно движение — оригинален параметричен дизайн (без данни от OpenStreetMap)",
+   "license": "All rights reserved",
+   "licenseUrl": "/",
+   "copyrightUrl": "/",
+   "obligation": "none — original work, no ODbL attribution required for this map"
+  },
+  "defaults": {
+   "maxspeedUrbanKmh": 90,
+   "note": "Двупосочен път с прекъсната осева: изпреварването е разрешено — преценявай насрещния прозорец в секунди и прекъсвай маневрата, щом той се затваря."
+  },
+  "stats": {
+   "roadKm": 0.9,
+   "nodes": 2,
+   "edges": 1,
+   "intersections": 0,
+   "crossings": 0,
+   "buildings": 1,
+   "spawnPoints": 2
+  },
+  "scenario": {
+   "archetype": "straight-street",
+   "params": {
+    "lengthM": 900,
+    "maxspeedKmh": 90
+   },
+   "lanesPerDirection": 1,
+   "laneCenterRightM": 4.06,
+   "laneCenterOncomingM": -4.06
+  }
+ },
+ "roads": {
+  "nodes": [
+   {
+    "id": "ovg-n-end",
+    "x": 0,
+    "y": 900
+   },
+   {
+    "id": "ovg-n-start",
+    "x": 0,
+    "y": 0
+   }
+  ],
+  "edges": [
+   {
+    "id": "ovg-e-road",
+    "from": "ovg-n-start",
+    "to": "ovg-n-end",
+    "class": "tertiary",
+    "name": "Учебен извънградски път — изпреварване срещу насрещни (сценарии OV-05/OV-08)",
+    "oneway": false,
+    "roundabout": false,
+    "lanes": 2,
+    "lanesSource": "tag",
+    "maxspeed": 90,
+    "maxspeedSource": "tag",
+    "length": 900,
+    "geometry": [
+     [
+      0,
+      0
+     ],
+     [
+      0,
+      900
+     ]
+    ]
+   }
+  ]
+ },
+ "intersections": [],
+ "crossings": [],
+ "roundabouts": [],
+ "buildings": [
+  {
+   "id": "ovg-b-block",
+   "height": 5,
+   "heightSource": "default",
+   "footprint": [
+    [
+     -30.12,
+     40
+    ],
+    [
+     -17.12,
+     40
+    ],
+    [
+     -17.12,
+     58
+    ],
+    [
+     -30.12,
+     58
+    ]
+   ]
+  }
+ ],
+ "spawnPoints": [
+  {
+   "id": "ovg-spawn-start",
+   "x": 4.06,
+   "y": 15,
+   "heading": 0,
+   "edgeId": "ovg-e-road",
+   "name": "Начало — своята лента"
+  },
+  {
+   "id": "ovg-spawn-finish",
+   "x": 4.06,
+   "y": 885,
+   "heading": 0,
+   "edgeId": "ovg-e-road",
+   "name": "Контролна точка — край на отсечката"
+  }
+ ]
+}

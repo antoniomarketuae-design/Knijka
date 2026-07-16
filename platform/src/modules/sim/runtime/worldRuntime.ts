@@ -117,6 +117,56 @@ export const LEFT_TURN_GAP_MEMORY_SEC = 1.5;
 /** Below this closing speed an "oncoming" makes no arrival claim (stopped at
  * ITS red / queue creep / turning away — all A12-innocent), m/s. */
 const LEFT_TURN_MIN_CLOSING_MPS = 1.0;
+/**
+ * OVERTAKE-CORRIDOR adjudication (doc 72 OV-05/OV-08 — „изпреварване срещу
+ * насрещен", the head-on family; the N1 oncoming machinery composed with the
+ * stage-2b bank-flip channel). The graded act: COMMITTED occupancy of the
+ * opposing bank of a TWO-WAY road (tick.opposingBank — the locator's denoised
+ * bank fix) while an oncoming vehicle's measured arrival gap is inside the
+ * convict band. Gap = distM / closingMps of the most urgent oncoming (the
+ * left-turn adjudicator's own quantity): seconds until the oncoming reaches
+ * the player's position. NOTE the honest asymmetry: the player is ALSO
+ * closing, so a measured 4 s is ≈ 2 s to the actual meeting at comparable
+ * speeds — which is exactly why the overtake band sits at DOUBLE the JU-10
+ * left-turn convict bar (2 s): the same physical margin, measured one-sided.
+ * Bands (A12 — err innocent):
+ *  - gap ≤ CONVICT (4.0 s) while committed at speed → OVERTAKE_INSUFFICIENT_GAP
+ *    (опасна, Н38 „намеса"). A pass of a slow lead needs 6-10 s in the
+ *    oncoming lane; being out with the oncoming under 4 measured seconds is
+ *    the head-on gamble, not a judgment call.
+ *  - 4-7 s: the advisory band — surfaced through the gapSec measurement
+ *    channel for scenario rubrics, NEVER graded (the JU-10 founder ruling).
+ *  - gap ≥ SAFE (7.0 s): clean — the textbook window.
+ * THE ABORT IS SACRED (OV-08): a driver BRAKING out of the excursion within
+ * the bounded reaction window (the C1/D1 yield discipline), or one who
+ * returns to the own bank before the sustain matures, NEVER convicts — the
+ * abort is the taught response, and grading it would teach „push on".
+ * Structural exemptions:
+ *  - solidCenterLine spans: the corridor lives on DASHED segments — inside an
+ *    authored М1 span the act is CROSSED_SOLID_LINE's (one act, one code);
+ *  - narrow two-way roads (≤ 1 marked lane): no marked banks exist — the
+ *    narrow-meeting runner adjudicates who yields there (OV-14);
+ *  - junction areas: a left turn sweeps the crossing road's opposing bank by
+ *    geometry — that conflict is the JU-10 left-turn tracker's (OV-08's real
+ *    junction-overtake case is deliberately out of scope this slice);
+ *  - empty road (no oncoming inside the probe radius) = clean by silence.
+ */
+export const OVERTAKE_CONVICT_GAP_SEC = 4.0;
+export const OVERTAKE_GAP_SAFE_SEC = 7.0;
+/** Oncoming probe reach for the corridor, m — sized so the convict band is
+ * detectable against fast rural oncoming (4 s × 25 m/s = 100 m ≪ 150). */
+export const OVERTAKE_ONCOMING_RADIUS_M = 150;
+/** Below this speed the driver is not COMMITTED (creeping/aborting/stopped on
+ * the bank reads as anything but a pressed pass — err innocent), km/h. */
+export const OVERTAKE_COMMIT_MIN_KMH = 20;
+/**
+ * Gap-memory latch (the JU-10 discipline, verbatim): a convict-tight
+ * observation survives this long after the live query dissolves — the staged
+ * oncoming may be GUARD-STOPPED by the player's own incursion (its closing
+ * speed collapses under the arrival-claim floor), and the examiner grades the
+ * gamble, not the victim's rescue.
+ */
+export const OVERTAKE_GAP_MEMORY_SEC = 1.5;
 /** Distance to the junction node within which the right-hand-rule check arms,
  * meters (2× — the junction box itself is 2.5× wider). */
 export const RHR_CORE_RADIUS_M = 18;
@@ -477,6 +527,19 @@ export function createWorldRuntime(districtJson: District | unknown): DistrictWo
   let ltSustainedRecentT = -Infinity; // last frame with ≥ sustain visibility
   let ltLastTightT = -Infinity; // last convict-tight observation while moving
   let ltTightGapSec: number | undefined; // gap recorded at that observation
+
+  // OVERTAKE-CORRIDOR tracker (doc 72 OV-05/OV-08) — one adjudication per
+  // opposing-bank EXCURSION (the solidCross excursion discipline), with the
+  // JU-10 house rules: conflict-visible sustain, D1-bounded braking-response
+  // stand-down (the abort), and the gap-memory latch (guard-stopped victims
+  // still convict the gambler). Constants & bands documented at
+  // OVERTAKE_CONVICT_GAP_SEC.
+  let ocExcursion = false; // currently on the opposing bank (armed context)
+  let ocEmitted = false; // one bill per excursion
+  let ocTightSince: number | null = null; // current tight episode onset
+  let ocTightOnsetT = -Infinity; // stand-down window base (episode onset)
+  let ocLastTightT = -Infinity; // last tight observation (memory latch)
+  let ocTightGapSec: number | undefined; // gap recorded at that observation
 
   // Previous-frame tracking for line-crossing detection.
   let prevEdgeIdx = -1;
@@ -1140,6 +1203,81 @@ export function createWorldRuntime(districtJson: District | unknown): DistrictWo
             }
           }
         }
+      }
+      // 6. OVERTAKE-CORRIDOR tracker (doc 72 OV-05/OV-08) — runs on the
+      // ASSEMBLED tick context (opposingBank + solidCenterLine are resolved
+      // above; the director appends after sample(), so event order holds).
+      // Bands, disciplines and exemptions documented at
+      // OVERTAKE_CONVICT_GAP_SEC; state doc at the oc* declarations.
+      const ocArmed =
+        tick.opposingBank === true &&
+        tick.solidCenterLine !== true && // М1 span = CROSSED_SOLID_LINE's act
+        edgeRt !== null &&
+        !edgeRt.edge.oneway &&
+        edgeRt.edge.lanes >= 2 && // narrow two-way = the OV-14 runner's act
+        nearestIx === null && // junction sweeps = the JU-10 tracker's act
+        v.gear >= 0; // reverse maneuvering is exempt (A12)
+      if (ocArmed) {
+        ocExcursion = true;
+        const committed = v.speedKmh > OVERTAKE_COMMIT_MIN_KMH;
+        // Rich telemetry only: a legacy boolean probe carries no gap, and the
+        // corridor NEVER convicts on presence alone (err innocent — contrast
+        // the left-turn tight-radius fallback, whose conflict frame is a
+        // fixed node; here the frame travels with the player).
+        const probe = oncomingQuery(
+          v.position.x,
+          v.position.y,
+          v.headingDeg,
+          OVERTAKE_ONCOMING_RADIUS_M,
+        );
+        let gapSec: number | undefined;
+        if (typeof probe === "object" && probe !== null) {
+          if (probe.closingMps >= LEFT_TURN_MIN_CLOSING_MPS) {
+            gapSec = probe.distM / probe.closingMps;
+          }
+        }
+        if (committed && gapSec !== undefined && gapSec <= OVERTAKE_CONVICT_GAP_SEC) {
+          if (ocTightSince === null) {
+            ocTightSince = tSec;
+            ocTightOnsetT = tSec;
+          }
+          ocLastTightT = tSec;
+          ocTightGapSec = gapSec;
+        } else if (ocTightSince !== null && tSec - ocLastTightT > OVERTAKE_GAP_MEMORY_SEC) {
+          // The tight episode genuinely dissolved (oncoming passed/turned off,
+          // or the driver eased under the commit bar) — beyond the memory
+          // latch that keeps a guard-stopped victim's claim alive.
+          ocTightSince = null;
+        }
+        // THE ABORT (OV-08 — sacred): braking out of the excursion within the
+        // D1-bounded reaction window stands the conviction down; returning to
+        // the own bank resets the excursion below. A gambler who neither
+        // brakes nor returns holds the condition through the sustain.
+        const standDown =
+          brakingResponse && tSec - ocTightOnsetT <= YIELD_BRAKE_RESPONSE_MAX_SEC;
+        if (
+          !ocEmitted &&
+          ocTightSince !== null &&
+          committed &&
+          tSec - ocTightSince >= YIELD_CONVICT_SUSTAIN_SEC &&
+          !standDown
+        ) {
+          const ev: Extract<SimTickEvent, { kind: "prioritySituation" }> = {
+            kind: "prioritySituation",
+            situation: "overtake-oncoming",
+            violated: true,
+          };
+          if (ocTightGapSec !== undefined) ev.gapSec = ocTightGapSec;
+          events.push(ev);
+          ocEmitted = true;
+        }
+      } else if (ocExcursion) {
+        ocExcursion = false;
+        ocEmitted = false;
+        ocTightSince = null;
+        ocTightOnsetT = -Infinity;
+        ocLastTightT = -Infinity;
+        ocTightGapSec = undefined;
       }
       if (nextStopLineM !== undefined) {
         tick.nextStopLineM = nextStopLineM;

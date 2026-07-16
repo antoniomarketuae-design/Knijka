@@ -393,6 +393,8 @@ export type ViolationCode =
   // MOTORWAY-SEGMENT slice (doc 72 SP-10 — edge motorway tag + emergencyLane zones)
   | "DRIVING_TOO_SLOW_FOR_MOTORWAY" // второстепенна: sustained causeless crawl under the чл. 54 50 km/h line on a motorway (SP-10; queue/transition innocent)
   | "EMERGENCY_LANE_DRIVING" // опасна: sustained DRIVING in the лента за принудително спиране (чл. 58, т. 3; breakdown pull-off braking innocent, stopping descoped)
+  // OVERTAKE-CORRIDOR adjudication (doc 72 OV-05/OV-08 — the head-on family)
+  | "OVERTAKE_INSUFFICIENT_GAP" // опасна: committed on the opposing bank against an oncoming inside the convict gap (OV-05; the abort — braking + returning — NEVER convicts, OV-08)
   // pre-drive procedure (procedures/machine.ts)
   | "PREDRIVE_STEP_SKIPPED" // второстепенна per skipped step
   | "PREDRIVE_SEATBELT_SKIPPED" // основна (skipping the belt is not a detail)

@@ -25,6 +25,7 @@ import type {
   EmergencyApproachSpec,
   NarrowMeetingSpec,
   OncomingLeftTurnSpec,
+  OncomingStreamSpec,
   PedestrianDartOutSpec,
   PoliceStopSpec,
   PriorityFromRightSpec,
@@ -2176,6 +2177,109 @@ export class TelltaleStimulusRunner implements EventRunner {
 }
 
 // ---------------------------------------------------------------------------
+// 15. Oncoming stream (doc 72 OV-05/OV-08 — the overtake-corridor's staged
+//     oncoming machinery). PURE CHOREOGRAPHY: `count` cars on the oncoming
+//     bank, held at authored arc gaps, ALL released at fixed cruise on the
+//     player's first movement — deterministic clockwork the trace scripts are
+//     authored against. The runner emits ZERO SimTick events except the
+//     contact collision (the oncomingLeftTurn check): every gap adjudication
+//     lives in the runtime's overtake-corridor tracker, which sees these cars
+//     through the SAME TrafficSystem.oncomingNear query ambient traffic
+//     rides. No jitter draw (the policeStop discipline) — the tight/safe
+//     windows are authored data (OncomingStreamSpec.gapsM), and loosening
+//     them per-attempt would move the lesson itself.
+// ---------------------------------------------------------------------------
+
+/** The whole stream this far behind the player (its own travel frame) or
+ *  finished = the encounter is over, m. */
+const STREAM_CLEAR_BEHIND_M = 25;
+
+export class OncomingStreamRunner implements EventRunner {
+  phase: StagedEventPhase = "idle";
+  outcome: StagedEventOutcome | null = null;
+  hazardActive = false;
+
+  constructor(readonly spec: OncomingStreamSpec) {}
+
+  private carId(i: number): string {
+    return `${this.spec.id}-${i}`;
+  }
+
+  stage(traffic: StagedTrafficPort, _rng: Rng, firstTime: boolean): void {
+    const s = this.spec;
+    if (firstTime) {
+      for (let i = 0; i < s.count; i++) {
+        const view = traffic.stage({
+          kind: "vehicle",
+          id: this.carId(i),
+          pathNodes: s.actor.pathNodes,
+          hold: {
+            nodeIndex: s.actor.hold.nodeIndex,
+            // Car i holds gapsM[i-1] m BEHIND the stream head along travel.
+            offsetM: s.actor.hold.offsetM - (i === 0 ? 0 : s.gapsM[i - 1]),
+          },
+          cruiseSpeedMps: s.actor.cruiseSpeedMps,
+          extraRightOffsetM: s.actor.extraRightOffsetM,
+          colorIndex: ((s.actor.colorIndex ?? 0) + i) % 4,
+          profile: s.actor.profile,
+          playerGuard: true, // never ram the gambler — the runtime's
+          // gap-memory latch keeps the conviction honest past the rescue
+        });
+        if (!view) throw new Error(`staged event ${s.id}: oncoming car ${i} failed to stage`);
+      }
+    } else {
+      for (let i = 0; i < s.count; i++) {
+        traffic.stagedCommand(this.carId(i), { type: "reset" });
+      }
+    }
+    this.phase = "armed";
+    this.outcome = null;
+  }
+
+  step(traffic: StagedTrafficPort, input: DirectorInput, out: SimTickEvent[]): StagedEventOutcome | null {
+    const s = this.spec;
+    if (this.phase === "resolved") return null;
+
+    if (this.phase === "armed") {
+      if (input.speedKmh >= s.releaseKmh) {
+        for (let i = 0; i < s.count; i++) {
+          traffic.stagedCommand(this.carId(i), { type: "cruise" });
+        }
+        this.phase = "triggered";
+      }
+      return null;
+    }
+
+    // triggered — clockwork in motion; watch only for contact and completion.
+    let allClear = true;
+    for (let i = 0; i < s.count; i++) {
+      const car = traffic.staged(this.carId(i));
+      if (!car) continue;
+      if (
+        dist(input.x, input.y, car.x, car.y) < VEHICLE_CONTACT_M &&
+        input.speedKmh + car.speedMps * 3.6 > 5
+      ) {
+        // Head-on contact — the one event this runner ever emits.
+        out.push({ kind: "collision", withWhat: "vehicle" });
+        this.phase = "resolved";
+        this.outcome = outcomeOf(s, input, false, "collision");
+        return this.outcome;
+      }
+      // Behind the CAR's own travel frame = already met and passed.
+      const relAlong =
+        (input.x - car.x) * car.dirX + (input.y - car.y) * car.dirY;
+      if (!car.finished && !(relAlong < -STREAM_CLEAR_BEHIND_M)) allClear = false;
+    }
+    if (allClear) {
+      this.phase = "resolved";
+      this.outcome = outcomeOf(s, input, true, "clear");
+      return this.outcome;
+    }
+    return null;
+  }
+}
+
+// ---------------------------------------------------------------------------
 
 export function createRunner(
   spec: StagedEventSpec,
@@ -2210,5 +2314,7 @@ export function createRunner(
       return new RearTailgaterRunner(spec);
     case "telltaleStimulus":
       return new TelltaleStimulusRunner(spec);
+    case "oncomingStream":
+      return new OncomingStreamRunner(spec);
   }
 }

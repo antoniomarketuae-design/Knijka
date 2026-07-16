@@ -592,6 +592,28 @@ export const VIOLATIONS: Record<ViolationCode, ViolationSpec> = {
     lawRef: "ЗДвП чл. 58, т. 3",
     conceptId: "c-motorway-prohibitions",
   },
+  // -- OVERTAKE-CORRIDOR adjudication (doc 72 OV-05/OV-08 — the head-on family)
+  OVERTAKE_INSUFFICIENT_GAP: {
+    // Doc 72 OV-05 „Изпреварване срещу насрещен": Н38 опасна (10, намеса) —
+    // THE rural head-on killer; ev-overtake is the #1 exam-weight event.
+    // LAW VERIFICATION: ЗДвП чл. 42, ал. 1 — преди изпреварване водачът се
+    // убеждава, че има видимост и СВОБОДЕН ПЪТ на разстояние, достатъчно за
+    // маневрата (the content bank grounds чл. 41–42 for the preconditions AND
+    // the abort duty: „изчезнат ли условията — намаляваш и се прибираш";
+    // чл. 43 covers the banned PLACES, which is OV-06's В24 code, not this).
+    // The abort side is structural, never graded: braking + returning to the
+    // own bank stands the conviction down (OV-08 — an aborted overtake never
+    // convicts; that discipline IS the lesson).
+    severityClass: "opasna",
+    points: SEVERITY_POINTS.opasna,
+    titleBg: "Изпреварване срещу приближаващ насрещен",
+    explanationBg:
+      "Излезе в насрещната лента за изпреварване, когато насрещният автомобил беше твърде близо. Прозорецът за изпреварване се смята в секунди, не „на око“: при затваряща се дистанция коридорът, който изглежда достатъчен, се изпарява за миг — точно това е геометрията на челния удар.",
+    correctiveBg:
+      "Преди да излезеш: прецени насрещния в СЕКУНДИ (кола на хоризонта на прав участък ≈ 10-12 сек). Съмняваш ли се — оставаш зад бавния. Излязъл ли си и прозорецът се затваря — прекъсни веднага: спирачка и обратно зад изпреварвания; започнатото изпреварване не е договор.",
+    lawRef: "ЗДвП чл. 42, ал. 1",
+    conceptId: "c-overtaking-procedure",
+  },
   PREDRIVE_STEP_SKIPPED: {
     severityClass: "vtorostepenna",
     points: SEVERITY_POINTS.vtorostepenna,

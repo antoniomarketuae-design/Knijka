@@ -39,7 +39,7 @@
  * are 🟡 PARTIAL or 🔴 NEW — skipped for later waves.
  */
 
-import type { BrakingLeadCarSpec, NarrowMeetingSpec } from "../../contracts";
+import type { BrakingLeadCarSpec, NarrowMeetingSpec, OncomingStreamSpec } from "../../contracts";
 import type { ScenarioSpec } from "./types";
 
 // ---------------------------------------------------------------------------
@@ -1001,6 +1001,285 @@ export const SC_MW_EMERGENCY_LANE: ScenarioSpec = {
   localeBg: "bg-BG",
 };
 
+// ---------------------------------------------------------------------------
+// 10. sc-ov-oncoming-gap — „Изпреварване срещу насрещни" (OV-05) on
+//     ov-oncoming-v1 (900 m extra-urban 1+1 two-way, dashed осева, limit 90 —
+//     gen_ov_oncoming.mjs). THE head-on family: the graded quantity is the
+//     ONCOMING GAP in seconds (the runtime's overtake-corridor adjudicator),
+//     not the marking — crossing the dashed line is legal here.
+// ---------------------------------------------------------------------------
+
+/** ov-oncoming-v1 lane centers (meta.scenario — the L7 copy truth). */
+const OVG_OWN = 4.06;
+/** ov-oncoming-v1 road length (meta.scenario.params). */
+const OVG_LENGTH = 900;
+
+/**
+ * The staged SLOW LEAD both corridor templates share the mold of (per-lesson
+ * ids): paces the player's own lane ~16 m ahead (matchPlayer) capped at
+ * 11.1 m/s — the ~40 km/h rural crawler that makes overtaking tempting. Its
+ * slam tier is authored out of reach (the OVC/OVB mold: deterministic moving
+ * traffic, not a braking drill).
+ */
+function ovgLeadCar(id: string): BrakingLeadCarSpec {
+  return {
+    id,
+    kind: "brakingLeadCar",
+    actor: {
+      pathNodes: ["ovg-n-start", "ovg-n-end"],
+      hold: { nodeIndex: 0, offsetM: 45 }, // dormant ~30 m ahead of the spawn
+      cruiseSpeedMps: 11.1,
+      extraRightOffsetM: 0, // own-lane center (the vehicle being overtaken)
+      colorIndex: 2,
+    },
+    // Pace ~20 m of CENTERS ahead (matchPlayer's own frame) — ≈ 16 m of
+    // bumpers, which keeps the 34 km/h follow clear of the following-distance
+    // fire band (0.7 × 1.8 s ≈ 11.9 m at that speed) at any seeded jitter.
+    followGapM: 20,
+    maxMatchSpeedMps: 11.1, // ~40 km/h — the slow rural lead
+    slamAt: { x: OVG_OWN, y: 1300 }, // far past the 900 m road — never reached
+    slamRadiusM: 2,
+    slamDecelMps2: 6,
+    minSlamSpeedKmh: 250, // the slam tier is authored out of reach…
+    proximityFallbackM: 0.3, // …and the proximity fallback cannot occur
+    triggersHazard: false,
+    resumeAfterSec: 3,
+  };
+}
+
+/**
+ * The deterministic ONCOMING STREAM of sc-ov-oncoming-gap (OV-05): three cars
+ * southbound on the oncoming bank at 12 m/s, released together on the
+ * player's first movement — pure clockwork the drive scripts are authored
+ * against (the runner emits nothing; the runtime's corridor tracker grades).
+ * The authored windows, in INSTANT-CRUISE terms (a released car accelerates
+ * at the staged default 2.6 m/s², losing v²/2a ≈ 28 m vs an instant-cruise
+ * clock at 12 m/s — the holds sit 28 m further along so that, once at
+ * cruise, each car tracks the instant model y = Y − 12·t exactly):
+ *  - car 0, instant-model y 310 (hold @ y 282): meets the player early in
+ *    the follow phase — mistake-tight-gap pulls out into ITS ~3.5 s gap;
+ *  - car 1, +66 m (≈ 5.5 s headway): the between-window measures inside the
+ *    4–7 s advisory band — waiting it out is the taught call;
+ *  - car 2, +560 m: the BIG window after car 1 — the shadow's legal pass
+ *    lives here with ≥ 8 s of measured margin; mistake-overstay keeps
+ *    cruising the oncoming lane until car 2 closes under 4 s.
+ */
+const OVG_STREAM: OncomingStreamSpec = {
+  id: "sc-ovg-stream",
+  kind: "oncomingStream",
+  libraryEventId: "OV-05",
+  actor: {
+    pathNodes: ["ovg-n-end", "ovg-n-start"], // southbound = oncoming
+    hold: { nodeIndex: 0, offsetM: OVG_LENGTH - 282 }, // instant-model y 310
+    cruiseSpeedMps: 12,
+    colorIndex: 1,
+  },
+  count: 3,
+  gapsM: [66, 560], // instant-model y 376 / y 870
+  releaseKmh: 3,
+};
+
+/** OV-05 — изпреварване само при достатъчен насрещен прозорец (ЗДвП чл. 42,
+ *  ал. 1: свободен път на разстояние, достатъчно за маневрата). */
+export const SC_OV_ONCOMING_GAP: ScenarioSpec = {
+  id: "sc-ov-oncoming-gap",
+  family: "lanes",
+  tagsBg: ["изпреварване", "насрещно движение", "извънградски път", "преценка на прозореца"],
+  titleBg: "Изпреварване срещу насрещни",
+  objectiveBg:
+    "Изчакай зад бавната кола, докато насрещните преминат, и изпревари едва в големия прозорец — насрещният коридор се смята в секунди: излизаш само когато стига за цялата маневра, с резерв.",
+  archetypeIds: ["OV-05"],
+  conceptIds: ["c-overtaking-procedure", "c-overtaking-prohibitions", "c-general-care-duty"],
+  map: {
+    archetype: "straight-street",
+    // The generator recipe — mirrored in ov-oncoming-v1.json meta.scenario
+    // (tools/maps/gen_ov_oncoming.mjs).
+    params: { lengthM: OVG_LENGTH, maxspeedKmh: 90 },
+    districtId: "ov-oncoming-v1",
+  },
+  start: {
+    spawnPointId: "ovg-spawn-start",
+    vehicleStart: "ready",
+  },
+  instructionsBg: [
+    { n: 1, textBg: "Потегли по двупосочния път — пред теб пълзи бавна кола, а насреща идват автомобили." },
+    { n: 2, textBg: "Остани зад бавната кола с равномерна дистанция: осевата е прекъсната, но лентата отсреща е ЗАЕТА." },
+    { n: 3, textBg: "Преценявай насрещните в секунди, не „на око“: малкият прозорец между две коли не стига за цяло изпреварване." },
+    { n: 4, textBg: "След последната насрещна кола: огледало, мигач наляво и излез решително — подмини бавната кола без бавене." },
+    { n: 5, textBg: "Прибери се вдясно с мигач, щом видиш изпреварания в огледалото, и продължи до края на отсечката." },
+  ],
+  success: [
+    {
+      id: "sc-ovg-wait",
+      titleBg: "Изчакай зад бавната кола, докато насрещните минат",
+      // Radius 4 < the 8.125 m lane pitch: satisfiable ONLY from the own-lane
+      // center while the stream is still inbound — the patience IS the drill.
+      params: { kind: "reachZone", x: OVG_OWN, y: 150, radiusM: 4, maxSpeedKmh: 45 },
+    },
+    {
+      id: "sc-ovg-finish",
+      titleBg: "Изпревари в големия прозорец и завърши в своята лента",
+      params: { kind: "reachZone", x: OVG_OWN, y: 540, radiusM: 5 },
+    },
+  ],
+  rubric: { parTimeSec: 75 },
+  // RECORDED: committed deterministic recordings of the authored scripts in
+  // traces/scOvOncomingGap.ts; gates in traces/__tests__/
+  // sc-ov-oncoming-gap-traces.test.ts (re-record with RECORD_TRACES=1).
+  shadow: { path: "content/traces/sc-ov-oncoming-gap/shadow-correct.trace.json" },
+  mistakes: [
+    {
+      traceRef: { path: "content/traces/sc-ov-oncoming-gap/mistake-tight-gap.trace.json" },
+      titleBg: "Излизане в тесен насрещен прозорец",
+      whatWentWrongBg:
+        "Колата излезе за изпреварване, когато насрещният беше на около 3 секунди. При взаимно приближаване такъв „прозорец“ се изпарява почти двойно по-бързо, отколкото изглежда — това е геометрията на челния удар, най-тежкият изход на пътя (чл. 42, ал. 1).",
+      codeRefs: ["OVERTAKE_INSUFFICIENT_GAP"],
+    },
+    {
+      traceRef: { path: "content/traces/sc-ov-oncoming-gap/mistake-overstay.trace.json" },
+      titleBg: "Провлачено изпреварване до следващия насрещен",
+      whatWentWrongBg:
+        "Водачът излезе в голям прозорец, но „изпреварваше“ едва с 2–3 км/ч разлика и остана в насрещната лента, докато следващата насрещна кола дойде под 4 секунди. Изпреварването се прави решително и за кратко — не можеш ли да минеш бързо, връщаш се зад бавния.",
+      codeRefs: ["OVERTAKE_INSUFFICIENT_GAP"],
+    },
+  ],
+  teach: {
+    whenBg:
+      "На всеки двупосочен път с прекъсната осева — там изпреварването е разрешено, но разрешено не значи безопасно: преценката на насрещния прозорец е изцяло твоя. Смятай в секунди: кола на хоризонта на прав участък е на около 10–12 секунди.",
+    whyBg:
+      "Челният удар при изпреварване е най-смъртоносната грешка на извънградските пътища: скоростите се СЪБИРАТ, а прозорецът, който изглежда достатъчен, се затваря двойно по-бързо. Затова законът изисква свободен път за ЦЯЛАТА маневра, преди изобщо да излезеш (чл. 42, ал. 1).",
+    lawRef: "ЗДвП чл. 42, ал. 1",
+    examinerBg:
+      "Изпитващият следи преценката на насрещното: търпеливо изчакване зад бавния при заета насрещна лента, решително изпреварване едва при достатъчен прозорец и навременно прибиране вдясно. Излизане срещу близък насрещен е опасна грешка и проваля изпита.",
+  },
+  levels: [
+    { level: 1 },
+    { level: 2 },
+    { level: 3 },
+    { level: 4, vehicleStart: "cold" },
+  ],
+  staged: [ovgLeadCar("sc-ovg-lead"), OVG_STREAM],
+  conditions: { weather: "dry" },
+  localeBg: "bg-BG",
+};
+
+// ---------------------------------------------------------------------------
+// 11. sc-ov-abort — „Прекъснато изпреварване" (OV-08 abort discipline, the
+//     OV-05 companion) on ov-oncoming-v1: the shadow's ABORT — brake and tuck
+//     back when the window shrinks — is the whole lesson; an aborted overtake
+//     NEVER convicts (the adjudicator's sacred rule), pushing on does.
+// ---------------------------------------------------------------------------
+
+/**
+ * The single FAST oncoming of sc-ov-abort: 25 m/s (90 km/h — legal rural
+ * speed) released on the player's first movement. Authored so the pull-out
+ * moment reads a comfortable ~9 s measured gap — the trap is the SPEED: at
+ * mutual closing the window collapses, and the taught response is the abort.
+ * Hold in INSTANT-CRUISE terms (the OVG_STREAM note): the 2.6 m/s² spin-up
+ * loses 25²/5.2 ≈ 120 m, so the hold sits 120 m further along — instant
+ * model y = 882 − 25·t once at cruise.
+ */
+const OVA_STREAM: OncomingStreamSpec = {
+  id: "sc-ova-stream",
+  kind: "oncomingStream",
+  libraryEventId: "OV-08",
+  actor: {
+    pathNodes: ["ovg-n-end", "ovg-n-start"], // southbound = oncoming
+    hold: { nodeIndex: 0, offsetM: OVG_LENGTH - 762 }, // instant-model y 882
+    cruiseSpeedMps: 25,
+    colorIndex: 3,
+  },
+  count: 1,
+  gapsM: [],
+  releaseKmh: 3,
+};
+
+/** OV-08/OV-05 — прекъсване на изпреварването, когато условията изчезнат
+ *  (ЗДвП чл. 42: „започнатото се довършва" е рецепта за челен удар — намали
+ *  и се прибери зад изпреварвания). */
+export const SC_OV_ABORT: ScenarioSpec = {
+  id: "sc-ov-abort",
+  family: "lanes",
+  tagsBg: ["изпреварване", "прекъсване на маневрата", "насрещно движение", "план Б"],
+  titleBg: "Прекъснато изпреварване",
+  objectiveBg:
+    "Излез за изпреварване, но щом прозорецът срещу бързия насрещен се затвори — прекъсни: спирачка, обратно зад бавната кола, и довърши изпреварването чак когато пътят е чист. Прекъснатата маневра не е провал, а най-важното умение на изпреварването.",
+  archetypeIds: ["OV-05", "OV-08"],
+  conceptIds: ["c-overtaking-procedure", "c-general-care-duty"],
+  map: {
+    archetype: "straight-street",
+    // The generator recipe — mirrored in ov-oncoming-v1.json meta.scenario
+    // (tools/maps/gen_ov_oncoming.mjs; shared with sc-ov-oncoming-gap — the
+    // mw-v1 shared-district precedent).
+    params: { lengthM: OVG_LENGTH, maxspeedKmh: 90 },
+    districtId: "ov-oncoming-v1",
+  },
+  start: {
+    spawnPointId: "ovg-spawn-start",
+    vehicleStart: "ready",
+  },
+  instructionsBg: [
+    { n: 1, textBg: "Потегли и се установи зад бавната кола — далеч напред се задава насрещен автомобил." },
+    { n: 2, textBg: "Излез за изпреварване: разстоянието изглежда достатъчно. Но следи насрещния непрекъснато — разстоянието лъже, скоростта решава." },
+    { n: 3, textBg: "Щом прецениш, че прозорецът се затваря: НЕ настоявай. Спирачка, мигач надясно и се прибери зад бавната кола." },
+    { n: 4, textBg: "Прекъснатото изпреварване не е загуба — то е планът Б, който те пази жив. „Започнах, ще довърша“ е рецептата за челен удар." },
+    { n: 5, textBg: "След като насрещният премине и пътят е чист — изпревари отново: решително, с мигач, и се прибери вдясно." },
+  ],
+  success: [
+    {
+      id: "sc-ova-abort",
+      titleBg: "Прекъсни маневрата и се прибери зад бавната кола",
+      // Radius 4 pins the OWN lane center just past the abort tuck-back, at
+      // post-abort speed — reachable cleanly only by a driver who tucked back.
+      params: { kind: "reachZone", x: OVG_OWN, y: 250, radiusM: 4, maxSpeedKmh: 50 },
+    },
+    {
+      id: "sc-ova-finish",
+      titleBg: "Довърши изпреварването на чист път и завърши",
+      params: { kind: "reachZone", x: OVG_OWN, y: 540, radiusM: 5 },
+    },
+  ],
+  rubric: { parTimeSec: 85 },
+  // RECORDED: committed deterministic recordings of the authored scripts in
+  // traces/scOvAbort.ts; gates in traces/__tests__/sc-ov-abort-traces.test.ts
+  // (re-record with RECORD_TRACES=1).
+  shadow: { path: "content/traces/sc-ov-abort/shadow-correct.trace.json" },
+  mistakes: [
+    {
+      traceRef: { path: "content/traces/sc-ov-abort/mistake-push-on.trace.json" },
+      titleBg: "Настояване срещу затварящ се прозорец",
+      whatWentWrongBg:
+        "Прозорецът се затвори — насрещният идваше с 90 км/ч, — а водачът настоя да довърши изпреварването вместо да го прекъсне. Изпреварването е законно само докато условията му са налице: изчезнат ли, намаляваш и се прибираш зад изпреварвания (чл. 42). Настояването е опасна грешка.",
+      codeRefs: ["OVERTAKE_INSUFFICIENT_GAP"],
+    },
+    {
+      traceRef: { path: "content/traces/sc-ov-abort/mistake-head-on.trace.json" },
+      titleBg: "Челен сблъсък след пропуснат план Б",
+      whatWentWrongBg:
+        "Водачът не прекъсна маневрата и не се прибра — и се стигна до челен удар с насрещния. Точно това предотвратява планът Б на всяко изпреварване: спирачка и обратно зад бавния, ЩОМ прозорецът се затваря. При взаимно приближаване секундите се топят двойно по-бързо.",
+      codeRefs: ["COLLISION", "OVERTAKE_INSUFFICIENT_GAP"],
+    },
+  ],
+  teach: {
+    whenBg:
+      "При всяко изпреварване на двупосочен път — планът Б се прави ПРЕДИ да излезеш: докъде трябва да съм стигнал, за да продължа, и къде се прибирам, ако не съм. Следи насрещния през цялата маневра, не само в началото.",
+    whyBg:
+      "Най-често челният удар не идва от липса на преценка в началото, а от отказ да я преразгледаш по средата: „започнах, ще довърша“. Прекъснатото изпреварване струва три секунди чакане; настояването — среща с насрещен при събрани скорости. Умението да се откажеш навреме е по-важно от умението да изпревариш.",
+    lawRef: "ЗДвП чл. 42",
+    examinerBg:
+      "Изпитващият гледа готовността за план Б: непрекъснато следене на насрещния по време на маневрата и навременно прекъсване — спирачка и прибиране зад изпреварвания, — когато прозорецът се затваря. Прекъснатата маневра се оценява положително; настояването е опасна грешка.",
+  },
+  levels: [
+    { level: 1 },
+    { level: 2 },
+    { level: 3 },
+    { level: 4, vehicleStart: "cold" },
+  ],
+  staged: [ovgLeadCar("sc-ova-lead"), OVA_STREAM],
+  conditions: { weather: "dry" },
+  localeBg: "bg-BG",
+};
+
 export const SCENARIO_TEMPLATES_LANES: readonly ScenarioSpec[] = [
   SC_OV_KEEP_RIGHT,
   SC_OV_LANE_KEEPING,
@@ -1011,4 +1290,6 @@ export const SCENARIO_TEMPLATES_LANES: readonly ScenarioSpec[] = [
   SC_OV_SOLID_LINE,
   SC_OV_BUS_LANE,
   SC_MW_EMERGENCY_LANE,
+  SC_OV_ONCOMING_GAP,
+  SC_OV_ABORT,
 ];

@@ -408,7 +408,8 @@ export type StagedEventKind =
   | "trafficController"
   | "cutInLeadCar"
   | "rearTailgater"
-  | "telltaleStimulus";
+  | "telltaleStimulus"
+  | "oncomingStream";
 
 interface StagedEventBase {
   /** Unique per lesson, e.g. "l4-dart-out". */
@@ -910,6 +911,37 @@ export interface RearTailgaterSpec extends StagedEventBase {
   easeKmh: number;
 }
 
+/**
+ * OVERTAKE-CORRIDOR oncoming stream (doc 72 OV-05/OV-08 — the N1 oncoming
+ * machinery's mid-block form): `count` staged vehicles on the ONCOMING bank
+ * (author the path node order southbound, the narrowMeeting-actor recipe),
+ * held at authored arc gaps and released TOGETHER at fixed cruise when the
+ * player first moves. PRESSURE SCENERY under the learn-only policy: the
+ * runner emits ZERO SimTick events except a collision on physical contact
+ * (the oncomingLeftTurn contact check) — ALL gap adjudication lives in the
+ * runtime's overtake-corridor tracker, which reads these cars through the
+ * SAME TrafficSystem.oncomingNear query ambient traffic rides. Determinism:
+ * release is keyed to the player's own first movement (every recorded script
+ * moves off at t ≈ 0, so the stream clock is the session clock; a live
+ * student's move-off starts it the same way), car positions are then pure
+ * functions of time. playerGuard stays ON — the staged oncoming
+ * emergency-brakes rather than ram a player who gambles wrong; the runtime's
+ * gap-memory latch keeps the conviction honest against the guard's rescue.
+ */
+export interface OncomingStreamSpec extends StagedEventBase {
+  kind: "oncomingStream";
+  /** Oncoming-bank path (southbound node order) — the template each car of
+   *  the stream is staged from; `hold` positions car 0. */
+  actor: StagedActorPathSpec;
+  /** Cars in the stream (1..6 — one spec, `${id}-<i>` staged ids). */
+  count: number;
+  /** Extra hold arc of car i vs car 0, m (length count-1; authored spacing —
+   *  the tight window / safe window choreography lives HERE, not in code). */
+  gapsM: number[];
+  /** Player speed that releases the whole stream at cruise, km/h. */
+  releaseKmh: number;
+}
+
 export type StagedEventSpec =
   | PedestrianDartOutSpec
   | PriorityFromRightSpec
@@ -924,7 +956,8 @@ export type StagedEventSpec =
   | TrafficControllerSpec
   | CutInLeadCarSpec
   | RearTailgaterSpec
-  | TelltaleStimulusSpec;
+  | TelltaleStimulusSpec
+  | OncomingStreamSpec;
 
 /**
  * Resolution record of one staged encounter (A8). The GRADING already
