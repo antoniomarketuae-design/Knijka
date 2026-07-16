@@ -266,3 +266,18 @@ export {
   recordScFollowRainGapDrive,
   type ScFollowRainGapTraceName,
 } from "./scFollowRainGap";
+
+// Signals family — the dead/flashing-signal capability drives (sc-signal-dead /
+// sc-signal-flashing); the signal cluster is dialed DARK / flashing amber and
+// the junction falls back to the right-hand rule (doc 72 JU-20). Committed
+// traces under content/traces/<template>/ are recordings of exactly these
+// scripts (gate: traces/__tests__/sc-signals-traces).
+export {
+  recordScSignalDrive,
+  scSignalTraceNames,
+  SC_SIGNAL_RECORDINGS,
+  SC_SIGNAL_DEAD_ID,
+  SC_SIGNAL_FLASHING_ID,
+  type ScSignalTemplateId,
+  type ScSignalTraceName,
+} from "./scSignals";

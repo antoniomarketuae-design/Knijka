@@ -25,7 +25,7 @@ import { BG_URBAN_DEFAULT_KMH, parseDistrict, type District } from "./district";
 import { Locator } from "./locator";
 import { DistrictIndex, makeEdgeHit, OFF_ROAD_DISTANCE_M } from "./spatial";
 import { bearingDeg, signedDeltaDeg } from "./geometry";
-import { SignalController, type SignalClusterInfo } from "./signals";
+import { SignalController, type SignalClusterInfo, type SignalClusterMode } from "./signals";
 import { buildStopLines, type StopLine, type StopLineSet } from "./stoplines";
 import { CrossingZoneTracker, type PedestrianQuery } from "./zones";
 import { JUNCTION_AREA_RADIUS_M, TurnDetector } from "./turns";
@@ -242,6 +242,14 @@ export interface DistrictWorldRuntime extends WorldRuntime {
     phase: SignalPhase,
     inSec: number,
   ): number;
+  /**
+   * Set a signal cluster's control MODE (doc 72 JU-09/JU-20 — the sibling of
+   * setSignalClusterOffset). "dark"/"flashingAmber" make the junction behave as
+   * UNCONTROLLED: no signal codes fire on its stop lines, and the right-hand-
+   * rule tracker governs it. Deterministic session-start dial; "live" (default)
+   * = the shipped signalized behavior exactly.
+   */
+  setSignalClusterMode(signalNodeId: string, mode: SignalClusterMode): void;
   /** Install the traffic module's pedestrian lookup (default: nobody anywhere). */
   setPedestrianQuery(fn: PedestrianQuery | null): void;
   /** Install the traffic module's junction-conflict lookup (default: none). */
@@ -295,6 +303,23 @@ export function createWorldRuntime(districtJson: District | unknown): DistrictWo
     .map((it) => ({ id: it.id, x: it.x, y: it.y }));
   const uncontrolledIds = new Set(uncontrolledJunctions.map((j) => j.id));
   const roundabouts = district.roundabouts;
+
+  // Junctions that behave as UNCONTROLLED right now (doc 72 JU-09/JU-20): the
+  // structurally uncontrolled nodes above, PLUS any signalized junction whose
+  // cluster has been dialed DARK / flashing amber — its lamps carry no phase,
+  // so the right-hand-rule tracker governs it. Degree >= 3 mirrors the
+  // uncontrolledJunctions gate (a dark mid-block pedestrian signal is not a
+  // give-way junction). Absent any dark cluster this equals uncontrolledIds.
+  const intersectionDegree = new Map(district.intersections.map((it) => [it.id, it.degree]));
+  const isUncontrolledJunction = (nodeId: string): boolean => {
+    if (uncontrolledIds.has(nodeId)) return true;
+    const clusterIdx = signals.clusterIdxForNode(nodeId);
+    return (
+      clusterIdx >= 0 &&
+      signals.isClusterUncontrolled(clusterIdx) &&
+      (intersectionDegree.get(nodeId) ?? 0) >= 3
+    );
+  };
 
   // Right-hand-rule visit tracker (one violation per junction entry).
   let rhrNode: string | null = null;
@@ -374,6 +399,10 @@ export function createWorldRuntime(districtJson: District | unknown): DistrictWo
     if (tSec - lineLastFired[lineIdx] < STOP_LINE_REFIRE_SEC) return;
     lineLastFired[lineIdx] = tSec;
     if (line.control === "trafficLight") {
+      // Dark / flashing-amber cluster: the lamps carry no phase, so this line
+      // is not a controlled stop line — no signal code fires (the junction is
+      // uncontrolled; the right-hand-rule tracker adjudicates). doc 72 JU-09/20.
+      if (signals.isClusterUncontrolled(line.clusterIdx)) return;
       const state = lightStateOf(line);
       const ev: Extract<SimTickEvent, { kind: "stopLineCrossed" }> = {
         kind: "stopLineCrossed",
@@ -503,9 +532,16 @@ export function createWorldRuntime(districtJson: District | unknown): DistrictWo
       let nextStopLineState: SignalPhase | undefined;
       if (nextLineIdx >= 0) {
         const line = stopLines.all[nextLineIdx];
-        nextStopLineM = nextLineDistM;
-        nextStopLineControl = line.control;
-        if (line.control === "trafficLight") nextStopLineState = lightStateOf(line);
+        // A dark / flashing-amber trafficLight line is not a controlled stop
+        // line — surface no stop-line context at all (the junction is
+        // uncontrolled), so no signal-context detector reads a phantom phase.
+        const darkLine =
+          line.control === "trafficLight" && signals.isClusterUncontrolled(line.clusterIdx);
+        if (!darkLine) {
+          nextStopLineM = nextLineDistM;
+          nextStopLineControl = line.control;
+          if (line.control === "trafficLight") nextStopLineState = lightStateOf(line);
+        }
       }
 
       // Amber decision watch update (green snapshot / flip freeze).
@@ -680,7 +716,7 @@ export function createWorldRuntime(districtJson: District | unknown): DistrictWo
       // vehicle approaches from the right = failing to give way (once per
       // visit). Slowing for that same conflict and NOT barging in earns a
       // positive commendation, awarded on leaving the junction.
-      if (nearestIx !== null && uncontrolledIds.has(nearestIx.id)) {
+      if (nearestIx !== null && isUncontrolledJunction(nearestIx.id)) {
         if (rhrNode !== nearestIx.id) {
           rhrNode = nearestIx.id;
           rhrFired = false;
@@ -902,6 +938,10 @@ export function createWorldRuntime(districtJson: District | unknown): DistrictWo
 
     setSignalClusterOffset(signalNodeId: string, offsetSec: number): void {
       signals.setClusterOffset(signalNodeId, offsetSec);
+    },
+
+    setSignalClusterMode(signalNodeId: string, mode: SignalClusterMode): void {
+      signals.setClusterMode(signalNodeId, mode);
     },
 
     signalOffsetForPhaseStart(

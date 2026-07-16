@@ -25,7 +25,7 @@ import {
   type RuleEvent,
   type SimTick,
 } from "../rules";
-import { createWorldRuntime } from "../runtime";
+import { createWorldRuntime, type SignalClusterMode } from "../runtime";
 import { createTrafficSystem } from "../traffic/system";
 import type { TrafficDistrict } from "../traffic/types";
 import { CHASSIS_HALF_EXTENTS, ESTIMATE_WHEELBASE } from "../vehicle";
@@ -339,6 +339,15 @@ export interface RecordScriptedDriveOptions {
    */
   signalOffsets?: Readonly<Record<string, number>>;
   /**
+   * S2 (signals family): deterministic session-start signal CONTROL MODE — the
+   * sibling of signalOffsets. Sets a junction DARK / on FLASHING AMBER before
+   * the first frame (sorted-key order) through the runtime's PUBLIC
+   * setSignalClusterMode, so a dead-signal / flashing-amber drill grades the
+   * junction as UNCONTROLLED (right-hand rule; doc 72 JU-09/JU-20). Absent =
+   * every cluster live (today's behavior, byte-identical).
+   */
+  signalModes?: Readonly<Record<string, SignalClusterMode>>;
+  /**
    * S1 full-pipeline hook: every production tick of the drive, AFTER the
    * scenario director appended its events — the SAME object the internal
    * rule engine reduces. The bot-completion proof feeds these into a REAL
@@ -472,6 +481,13 @@ export function recordScriptedDrive(
     a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0,
   )) {
     runtime.setSignalClusterOffset(nodeId, offsetSec);
+  }
+  // Session-start control-mode pinning (S2) — same sorted-key discipline as
+  // signalOffsets, applied through the runtime's PUBLIC setSignalClusterMode.
+  for (const [nodeId, mode] of Object.entries(options.signalModes ?? {}).sort((a, b) =>
+    a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0,
+  )) {
+    runtime.setSignalClusterMode(nodeId, mode);
   }
   const traffic = createTrafficSystem(districtRaw as TrafficDistrict, {
     seed: options.seed ?? 7,

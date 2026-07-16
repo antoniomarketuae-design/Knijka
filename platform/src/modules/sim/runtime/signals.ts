@@ -54,6 +54,17 @@ export interface SignalClusterInfo {
   memberNodeIds: string[];
 }
 
+/**
+ * Runtime control mode of a signal cluster (doc 72 JU-09/JU-20). "live" — the
+ * shipped two-phase machine drives the lamps. "dark" (загаснал светофар) /
+ * "flashingAmber" (мигащо жълто) — the lamps carry NO phase, so the junction
+ * is treated as UNCONTROLLED and the right-hand rule governs it (ЗДвП чл. 50).
+ * Both non-live modes behave identically to the grader; the distinct names let
+ * the world layer render the right lamp state and the copy cite the right sign.
+ * Default "live" everywhere → absent = today's behavior, byte-for-byte.
+ */
+export type SignalClusterMode = "live" | "dark" | "flashingAmber";
+
 interface SignalNode {
   id: string;
   x: number;
@@ -123,6 +134,8 @@ export class SignalController {
   private readonly nodes = new Map<string, SignalNode>();
   private readonly clustersInfo: SignalClusterInfo[] = [];
   private readonly offsets: number[] = [];
+  /** Per-cluster control mode (index-aligned with offsets); default "live". */
+  private readonly modes: SignalClusterMode[] = [];
   private tSec = 0;
 
   constructor(district: District, index: DistrictIndex) {
@@ -185,6 +198,7 @@ export class SignalController {
       const offsetSec = fnv1a(clusterId) % SIGNAL_TIMING.cycleSec;
       this.clustersInfo.push({ id: clusterId, x: cx, y: cy, offsetSec, memberNodeIds: ids });
       this.offsets.push(offsetSec);
+      this.modes.push("live");
       for (const i of members[ci]) {
         const r = raw[i];
         this.nodes.set(r.id, {
@@ -302,6 +316,33 @@ export class SignalController {
     const norm = ((offsetSec % cycle) + cycle) % cycle;
     this.offsets[node.clusterIdx] = norm;
     this.clustersInfo[node.clusterIdx].offsetSec = norm;
+  }
+
+  /** Control mode of a cluster (index). "live" for out-of-range indices. */
+  clusterMode(clusterIdx: number): SignalClusterMode {
+    if (clusterIdx < 0 || clusterIdx >= this.modes.length) return "live";
+    return this.modes[clusterIdx];
+  }
+
+  /**
+   * True when a cluster's lamps carry no phase (dark / flashing amber) — the
+   * junction is UNCONTROLLED and the right-hand rule governs it (doc 72
+   * JU-09/JU-20). Out-of-range indices are live (controlled).
+   */
+  isClusterUncontrolled(clusterIdx: number): boolean {
+    return this.clusterMode(clusterIdx) !== "live";
+  }
+
+  /**
+   * Set a cluster's control mode (by any member node id). The sibling of
+   * setClusterOffset: a deterministic session-start dial (staged exams pin a
+   * junction DARK / on FLASHING AMBER to drill the uncontrolled-junction rule,
+   * doc 72 JU-09/JU-20). No-op for unknown ids.
+   */
+  setClusterMode(signalNodeId: string, mode: SignalClusterMode): void {
+    const node = this.nodes.get(signalNodeId);
+    if (!node) return;
+    this.modes[node.clusterIdx] = mode;
   }
 
   /**
