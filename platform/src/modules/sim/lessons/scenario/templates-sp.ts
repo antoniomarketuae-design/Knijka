@@ -294,10 +294,104 @@ export const SC_SPEED_RAIN: ScenarioSpec = {
   localeBg: "bg-BG",
 };
 
+// ---------------------------------------------------------------------------
+// 4. sc-speed-zone — „Зона 30 (училище/жилищна)" (SP-03 / PE-07) on
+//    sp-zone30-v1 (360 m straight street posted 30 — the whole street IS the
+//    zone; the map's own maxspeed grades it, no zone map layer needed)
+// ---------------------------------------------------------------------------
+
+/**
+ * SP-03 / PE-07 — съобразяване с по-ниско ограничение в зона 30 (ЗДвП чл. 21).
+ * ONE template, TWO DISTINCT codes (the sc-vp-readiness / sc-ov-lane-keeping
+ * precedent): the SAME 50 км/ч, законна по булевард, в зона 30 е ОПАСНА грешка.
+ *   - „Скорост от булеварда" (~37 км/ч) → SPEEDING_OVER_LIMIT (31–40 в зона 30
+ *     → второстепенна; над грациозния 33, под опасния праг 40);
+ *   - „Пълни 50 през зоната" (~50 км/ч) → SPEEDING_DANGEROUS (> +10 = > 40 →
+ *     опасна). Колата минава лентата 33–40 за под 2 s (движещ праг), затова
+ *     второстепенният код не се арма — точно като sc-speed-dangerous „flooring".
+ */
+export const SC_SPEED_ZONE: ScenarioSpec = {
+  id: "sc-speed-zone",
+  family: "speed",
+  tagsBg: ["скорост", "зона 30", "училищна зона", "жилищна зона"],
+  titleBg: "Зона 30 — училище и жилищен квартал",
+  objectiveBg:
+    "Измини улицата в зона 30, като държиш скоростта под 30 км/ч през цялото време — там, където има деца и пешеходци, същите 50 км/ч, законни по булеварда, стават опасна грешка.",
+  archetypeIds: ["SP-03", "PE-07"],
+  conceptIds: ["c-speed-limits", "c-speed-adaptation", "c-general-care-duty"],
+  map: {
+    archetype: "straight-street",
+    // The generator recipe — mirrored in sp-zone30-v1.json meta.scenario.params.
+    params: { lengthM: 360, maxspeedKmh: 30 },
+    districtId: "sp-zone30-v1",
+  },
+  start: {
+    spawnPointId: "sp-spawn-approach",
+    vehicleStart: "ready",
+  },
+  instructionsBg: [
+    { n: 1, textBg: "Влизаш в зона 30 — училище и жилищен квартал. Ограничението тук е 30 км/ч, не 50." },
+    { n: 2, textBg: "Свали скоростта осезаемо още на знака и установи спокойни около 26–28 км/ч." },
+    { n: 3, textBg: "Между паркираните коли и дворовете всеки момент може да излезе дете — карай с готовност за спиране." },
+    { n: 4, textBg: "Не пренасяй „скоростта от булеварда“ в зоната: 50 км/ч тук е над +10 км/ч, тоест опасна грешка." },
+    { n: 5, textBg: "Задръж под 30 км/ч до края на зоната." },
+  ],
+  success: [
+    {
+      id: "sc-zn-under-limit",
+      titleBg: "Мини контролната зона под 30 км/ч",
+      // Cap 33 (= graced limit) sits just above the taught ~27 cruise: a
+      // disciplined drive satisfies it, a 37+ speeder does not.
+      params: { kind: "reachZone", x: LANE_X, y: 180, radiusM: 10, maxSpeedKmh: 33 },
+    },
+    {
+      id: "sc-zn-finish",
+      titleBg: "Стигни края на зоната",
+      params: { kind: "reachZone", x: LANE_X, y: 330, radiusM: 12 },
+    },
+  ],
+  rubric: { parTimeSec: 70 },
+  shadow: { path: "content/traces/sc-speed-zone/shadow-correct.trace.json" },
+  mistakes: [
+    {
+      traceRef: { path: "content/traces/sc-speed-zone/mistake-boulevard-speed.trace.json" },
+      titleBg: "Скорост от булеварда в зона 30",
+      whatWentWrongBg:
+        "Колата задържа около 37 км/ч — нормална за булевард, но в зона 30 това е превишаване. 31–40 км/ч тук е второстепенна грешка; знакът смени тавана, скоростта трябваше да го последва.",
+      codeRefs: ["SPEEDING_OVER_LIMIT"],
+    },
+    {
+      traceRef: { path: "content/traces/sc-speed-zone/mistake-full-speed.trace.json" },
+      titleBg: "Пълни 50 през зоната",
+      whatWentWrongBg:
+        "Колата премина зоната с около 50 км/ч, все едно е булевард. В зона 30 това е над +10 км/ч — опасна грешка, която на изпита означава отпадане, а на улицата е разликата между спиране и прегазено дете.",
+      codeRefs: ["SPEEDING_DANGEROUS"],
+    },
+  ],
+  teach: {
+    whenBg:
+      "При всяка зона 30 — пред училища, детски градини, в жилищни квартали и там, където знакът В26 или табелата „Зона 30“ смъква тавана. Ниският лимит не е формалност: той е избран заради децата и пешеходците.",
+    whyBg:
+      "При 30 км/ч спирачният път и тежестта на удара са в пъти по-малки, отколкото при 50 — затова зоните 30 се поставят точно там, където пешеходец изскача без предупреждение. Пренасянето на булевардната скорост в зоната заличава цялото предимство, за което зоната съществува.",
+    lawRef: "ЗДвП чл. 21",
+    examinerBg:
+      "Изпитващият следи скоростта спрямо знаците: при влизане в зона с по-ниско ограничение очаква видимо и навременно намаляване. Движение над лимита в зоната е грешка, а над +10 км/ч (тук 40) — опасна грешка, която прекратява изпита.",
+  },
+  levels: [
+    { level: 1 },
+    { level: 2 },
+    { level: 3 },
+    { level: 4, vehicleStart: "cold" },
+  ],
+  conditions: { weather: "dry" },
+  localeBg: "bg-BG",
+};
+
 /** The speed-management templates, in catalog order (registered in
  *  templates.ts). */
 export const SCENARIO_TEMPLATES_SP: readonly ScenarioSpec[] = [
   SC_SPEED_CREEP,
   SC_SPEED_DANGEROUS,
   SC_SPEED_RAIN,
+  SC_SPEED_ZONE,
 ];

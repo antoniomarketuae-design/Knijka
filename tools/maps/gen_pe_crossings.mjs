@@ -303,6 +303,12 @@ const INSTANCES = [
     approachM: 95,
     maxspeedKmh: 50,
   },
+  {
+    districtId: "pe-dart-v1",
+    label: "Учебна улица — внезапен пешеходец на пътеката (сценарий PE-02/PE-04)",
+    approachM: 80,
+    maxspeedKmh: 50,
+  },
 ];
 
 const line = (k, v) => console.log(`  ${String(k).padEnd(28)} ${v}`);

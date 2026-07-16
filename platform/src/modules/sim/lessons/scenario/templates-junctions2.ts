@@ -286,8 +286,143 @@ export const SC_JUNCTION_BLIND: ScenarioSpec = {
   localeBg: "bg-BG",
 };
 
+// ---------------------------------------------------------------------------
+// sc-junction-left — „Ляв завой от Б2 през пътя с предимство" (JU-04 applied to
+// the LEFT turn — the harder emergence: the car crosses the near carriageway
+// AND merges into the far one) on tj-emerge-v1 (map REUSED from sc-junction-gap;
+// distinct maneuver + a conflict car from the player's RIGHT)
+// ---------------------------------------------------------------------------
+
+/**
+ * The staged conflict: a car travels the priority road from the player's RIGHT
+ * (east → west, straight through the junction), timed by the priorityFromRight
+ * runner against the player's arrival at the Б2 line. junctionControl
+ * "stopLine": the runtime's give-way check (conflictNear at the stop-line
+ * crossing) adjudicates — the runner emits the yielded commendation itself. The
+ * left-turning player must CROSS this car's lane, so pulling out in front of it
+ * is отнемане на предимство (FAILED_TO_YIELD). Timing values mirror
+ * SC_JUNCTION_GAP_CONFLICT verbatim (same map, same stem approach) — only the
+ * actor's direction and the player's turn differ.
+ */
+export const SC_JUNCTION_LEFT_CONFLICT: PriorityFromRightSpec = {
+  id: "sc-jleft-conflict",
+  kind: "priorityFromRight",
+  libraryEventId: "JU-04",
+  junction: { nodeId: "tj-n-c", x: 0, y: 0 },
+  junctionControl: "stopLine",
+  actor: {
+    pathNodes: ["tj-n-e", "tj-n-c", "tj-n-w"],
+    hold: { nodeIndex: 1, offsetM: -60 }, // 60 m east of the junction
+    cruiseSpeedMps: 6.5,
+    colorIndex: 2,
+  },
+  junctionNodeIndex: 1,
+  armDistM: 92,
+  leadSec: -3.5,
+  lineDistM: 27.73,
+  clearSpeedMps: 7,
+};
+
+export const SC_JUNCTION_LEFT: ScenarioSpec = {
+  id: "sc-junction-left",
+  family: "junction",
+  tagsBg: ["кръстовище", "ляв завой", "знак Стоп", "Б2", "предимство"],
+  titleBg: "Ляв завой от Б2 през пътя с предимство",
+  objectiveBg:
+    "Спри напълно на знака Б2 и завий наляво едва когато пътят е чист в ДВЕТЕ посоки: левият завой пресича насрещната лента и се влива в отсрещната — кола с предимство отдясно означава изчакване, не потегляне пред нея.",
+  archetypeIds: ["JU-04"],
+  conceptIds: ["c-give-way-stop-behavior", "c-priority-concept", "c-junction-approach"],
+  map: {
+    archetype: "t-junction",
+    // Map REUSED from sc-junction-gap — mirrored in tj-emerge-v1.json params.
+    params: {
+      control: "stop",
+      priorityArmM: 160,
+      minorArmM: 100,
+      lanes: 2,
+      priorityMaxKmh: 50,
+      minorMaxKmh: 40,
+    },
+    districtId: "tj-emerge-v1",
+  },
+  start: {
+    spawnPointId: "tj-spawn-south",
+    vehicleStart: "ready",
+  },
+  instructionsBg: [
+    { n: 1, textBg: "Тръгни по страничната улица — напред е път с предимство и знак Б2 „Спри!“. Ще завиваш НАЛЯВО." },
+    { n: 2, textBg: "Намали отрано и пусни ляв мигач." },
+    {
+      n: 3,
+      textBg:
+        "Спри НАПЪЛНО преди стоп-линията. Левият завой е по-опасен: пресичаш едната лента и се вливаш в другата.",
+    },
+    {
+      n: 4,
+      textBg:
+        "Огледай и в двете посоки. Кола с предимство отдясно, която ще пресечеш, на по-малко от 3–4 секунди означава изчакване.",
+    },
+    { n: 5, textBg: "Чак когато пътят е чист и в двете посоки, завий наляво плавно и уверено." },
+  ],
+  success: [
+    {
+      id: "sc-jleft-approach",
+      titleBg: "Приближи знака Б2 с контролирана скорост",
+      params: { kind: "reachZone", x: 4.06, y: -45, radiusM: 8, maxSpeedKmh: 30 },
+    },
+    {
+      id: "sc-jleft-line",
+      titleBg: "Премини стоп-линията след пълно спиране и пропуснат интервал",
+      params: { kind: "passSignal", nodeId: "tj-n-c", x: 0, y: 0, radiusM: 45, control: "stopSign" },
+    },
+    {
+      id: "sc-jleft-exit",
+      titleBg: "Завий наляво и продължи по пътя с предимство",
+      // West-arm westbound lane center, past the junction area.
+      params: { kind: "reachZone", x: -55, y: 4.06, radiusM: 9 },
+    },
+  ],
+  rubric: { parTimeSec: 65 },
+  shadow: { path: "content/traces/sc-junction-left/shadow-correct.trace.json" },
+  mistakes: [
+    {
+      traceRef: { path: "content/traces/sc-junction-left/mistake-cut-gap.trace.json" },
+      titleBg: "Ляв завой в тесен интервал",
+      whatWentWrongBg:
+        "Колата спря на Б2, но потегли наляво пред приближаваща отдясно кола с предимство — на около секунда и половина. Левият завой пресича нейната лента; тя трябваше да намали заради теб. Спирането не дава предимство — интервалът го дава.",
+      codeRefs: ["FAILED_TO_YIELD"],
+    },
+    {
+      traceRef: { path: "content/traces/sc-junction-left/mistake-creep-out.trace.json" },
+      titleBg: "Пълзящо навлизане в пътя с предимство",
+      whatWentWrongBg:
+        "След спирането колата запълзя навътре в кръстовището, докато колата с предимство приближаваше — носът навлезе в лентата, която левият завой трябва да пресече. Бавното навлизане също е отнемане на предимство: важна е позицията, не скоростта.",
+      codeRefs: ["FAILED_TO_YIELD"],
+    },
+  ],
+  teach: {
+    whenBg:
+      "На всеки ляв завой от улица с Б2 или „Пропусни предимството“ по натоварен път. Левият завой е сред най-опасните маневри: колата ти стои напречно, пресича едната лента и се влива в другата — трябва да е чисто и от двете страни.",
+    whyBg:
+      "Левият завой отнема повече време и излага колата ти на трафик от двете посоки едновременно. Най-честата грешка не е неспирането, а подцененият интервал към приближаващата с предимство кола, чиято лента ще пресечеш. Три-четири секунди резерв са разликата между уверен завой и отнето предимство.",
+    lawRef: "ЗДвП чл. 50",
+    examinerBg:
+      "Изпитващият гледа: пълно спиране преди линията, реална преценка на приближаващите по главния път в ДВЕТЕ посоки и завиване наляво само в достатъчен интервал. Потегляне пред кола с предимство — дори след коректно спиране — е тежка грешка.",
+  },
+  levels: [
+    { level: 1 },
+    { level: 2 },
+    { level: 3 },
+    { level: 4, vehicleStart: "cold" },
+  ],
+  staged: [SC_JUNCTION_LEFT_CONFLICT],
+  conditions: { weather: "dry" },
+  localeBg: "bg-BG",
+};
+
 /** The JUNCTION/PRIORITY S3 batch-4 templates (registered in templates.ts). */
 export const SCENARIO_TEMPLATES_JUNCTIONS2: readonly ScenarioSpec[] = [
   SC_JUNCTION_GAP,
   SC_JUNCTION_BLIND,
+  SC_JUNCTION_LEFT,
 ];

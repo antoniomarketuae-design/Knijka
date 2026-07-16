@@ -1,38 +1,38 @@
 /**
- * gen_sp_speed.mjs — the S3 SPEED-MANAGEMENT micro-maps (Scenario Studio,
- * doc 76 §3; doc 72 §8 archetypes SP-01 / SP-02 / SP-04). Same straight-street
- * shape as gen_pe_crossings.mjs but with NO crossing at all: one plain two-way
- * street (ONE marked lane per direction) carrying a posted limit and NOTHING
- * else — the cleanest possible stage for a pure overspeed fault. Each archetype
- * gets a purpose-built street so its ScenarioSpec pins its own length + limit:
+ * gen_narrow_street.mjs — the NARROW-STREET meeting micro-map (Scenario Studio,
+ * doc 76 §3; doc 72 §10 archetype OV-14 „Разминаване в тясна улица") →
+ * content/world/<districtId>.json (+ byte-identical publish to
+ * platform/public/world/).
  *
- *   - sp-creep-v1   „Пълзящо превишаване"      (SP-01, creeping over the limit)
- *   - sp-danger-v1  „Над +10 км/ч"             (SP-02, dangerous speeding)
- *   - sp-rain-v1    „Скорост в дъжд"           (SP-04, rain speed discipline ×N)
- *
- * The exact district-v1 format buildWorldGeometry (world), createWorldRuntime
- * (runtime — speedLimitAt resolves the edge's maxspeed everywhere) and
- * buildLaneGraph/createTrafficSystem (traffic) already consume — the
- * gen_pe_crossings.mjs / gen_two_lane_road.mjs mold. Contract battery:
- * platform/src/modules/sim/world/__tests__/sp-districts.test.ts.
+ * A plain straight two-way street (ONE marked lane per direction) — the stage
+ * for the narrow-passage meeting: a parked row (staged held props in the
+ * ScenarioSpec) blocks the player's lane through a mid-block section, and an
+ * oncoming actor is timed to transit it as the player arrives. ЗДвП
+ * narrow-passage priority: the side WITH the obstruction yields. NOTHING else
+ * is on the map (no crossing, junction, signal or sign), so the ONLY thing the
+ * scenario director grades is the narrow-meeting adjudication (FAILED_TO_YIELD /
+ * YIELDED_TO_PRIORITY). Same straight-street shape as gen_pk_smoothstop.mjs.
  *
  * Layout (x = east, y = north; the street runs south → north on x = 0):
  *
- *     sp-n-end (0, L)                   L = lengthM
+ *     nm-n-end (0, L)                    L = lengthM
  *         │
- *         │   1 lane per direction; right-lane center x = 4.06
+ *         │   1 lane per direction; right-lane center x = 4.06 (player,
+ *         │   northbound), oncoming lane center x = −4.06 (southbound actor).
+ *         │   A parked row sits in the player's lane through the mid-block
+ *         │   section; the player must swing into the oncoming lane to pass.
  *         │
- *     sp-spawn-approach (4.06, 15)
+ *     nm-spawn-approach (4.06, 15)
  *         │
- *     sp-n-start (0, 0)
+ *     nm-n-start (0, 0)
  *
- * No signals, no stop lines, no junctions, no crossings — the street teaches
- * speed discipline, nothing else (doc 76 §3). Ambient traffic is authored to
- * ZERO by every drive, so the ONLY thing the rule engine can grade is the
- * driver's own speed against the posted limit / the conditions envelope.
+ * The parked row + the oncoming actor are LESSON data (StagedEventSpec
+ * narrowMeeting in the ScenarioSpec); the map only hosts the two-way street.
  *
  * Deterministic: same params → byte-identical JSON. No randomness, no OSM.
- * Run:  node tools/maps/gen_sp_speed.mjs
+ * Run:  node tools/maps/gen_narrow_street.mjs
+ *
+ * Contract battery: platform/src/modules/sim/world/__tests__/nm-district.test.ts
  */
 
 import { mkdirSync, writeFileSync } from "node:fs";
@@ -40,10 +40,6 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
-
-// ---------------------------------------------------------------------------
-// Shared constants (must mirror the engine's perceptual scale — contracts.ts)
-// ---------------------------------------------------------------------------
 
 /** PERCEPTUAL_ROAD_SCALE × textbook lane — the drawn lane width, m. */
 const SCALED_LANE_W = 3.25 * 2.5;
@@ -58,35 +54,29 @@ function polylineLength(pts) {
   return r2(len);
 }
 
-// ---------------------------------------------------------------------------
-// The generator (one straight two-way street — the S3 SP micro-map)
-// ---------------------------------------------------------------------------
-
 /**
  * @param {{
- *   districtId: string,   // output file name + LessonSpec.world.districtId
+ *   districtId: string,   // output file name + map.districtId
  *   label: string,        // human label (meta)
  *   lengthM: number,      // street length (200..1000)
  *   maxspeedKmh: number,  // legal limit on the street (30..90)
  * }} params
  */
-export function buildSpSpeedStreet(params) {
+export function buildNarrowStreet(params) {
   const errors = [];
   const { districtId, label, lengthM, maxspeedKmh } = params;
 
-  // -- Parameter validation (actionable — the assembly line runs unattended).
   if (!/^[a-z0-9-]+$/.test(districtId ?? "")) errors.push(`districtId "${districtId}" must be kebab-case`);
   if (!(lengthM >= 200 && lengthM <= 1000)) errors.push(`lengthM must be within 200..1000 m, got ${lengthM}`);
   if (!(maxspeedKmh >= 30 && maxspeedKmh <= 90)) errors.push(`maxspeedKmh must be within 30..90, got ${maxspeedKmh}`);
-  if (errors.length > 0) throw new Error(`gen_sp_speed params invalid:\n  - ${errors.join("\n  - ")}`);
+  if (errors.length > 0) throw new Error(`gen_narrow_street params invalid:\n  - ${errors.join("\n  - ")}`);
 
-  const halfRoadM = SCALED_LANE_W; // 2 lanes total → half-width = one drawn lane
-  const laneCenterM = r2(SCALED_LANE_W / 2); // right-lane center offset from x=0
+  const halfRoadM = SCALED_LANE_W;
+  const laneCenterM = r2(SCALED_LANE_W / 2);
 
-  // -- Nodes / edge (one straight street; no junctions).
   const NODES = {
-    "sp-n-start": [0, 0],
-    "sp-n-end": [0, lengthM],
+    "nm-n-start": [0, 0],
+    "nm-n-end": [0, lengthM],
   };
   const geometry = [
     [0, 0],
@@ -94,11 +84,11 @@ export function buildSpSpeedStreet(params) {
   ];
   const EDGES = [
     {
-      id: "sp-e-street",
-      from: "sp-n-start",
-      to: "sp-n-end",
+      id: "nm-e-street",
+      from: "nm-n-start",
+      to: "nm-n-end",
       class: "residential",
-      name: "Права улица с ограничение на скоростта",
+      name: "Тясна двупосочна улица с паркирани коли",
       oneway: false,
       roundabout: false,
       lanes: 2,
@@ -110,47 +100,43 @@ export function buildSpSpeedStreet(params) {
     },
   ];
 
-  const INTERSECTIONS = []; // degree-2 street — none by the OSM-build convention
-  const CROSSINGS = []; // a pure speed street carries no crossing
+  const INTERSECTIONS = [];
+  const CROSSINGS = [];
   const ROUNDABOUTS = [];
 
-  // -- Spawns: approach start (right-lane center) + a finish reference point.
   const SPAWN_POINTS = [
     {
-      id: "sp-spawn-approach",
+      id: "nm-spawn-approach",
       x: laneCenterM,
       y: 15,
       heading: 0,
-      edgeId: "sp-e-street",
+      edgeId: "nm-e-street",
       name: "Начало на отсечката",
     },
     {
-      id: "sp-spawn-finish",
+      id: "nm-spawn-finish",
       x: laneCenterM,
       y: r2(lengthM - 15),
       heading: 0,
-      edgeId: "sp-e-street",
+      edgeId: "nm-e-street",
       name: "Контролна точка — край на отсечката",
     },
   ];
 
-  // -- One office block west of the street (visual anchor, clear of the
-  // carriageway + sidewalk: |x| > halfRoad + ~4 m sidewalk).
   const BUILDINGS = [
     {
-      id: "sp-b-block",
+      id: "nm-b-block",
       height: 7,
       heightSource: "default",
       footprint: [
-        [r2(-(halfRoadM + 20)), 150],
-        [r2(-(halfRoadM + 8)), 150],
-        [r2(-(halfRoadM + 8)), 168],
-        [r2(-(halfRoadM + 20)), 168],
+        [r2(-(halfRoadM + 20)), 100],
+        [r2(-(halfRoadM + 8)), 100],
+        [r2(-(halfRoadM + 8)), 130],
+        [r2(-(halfRoadM + 20)), 130],
       ],
     },
   ];
 
-  // -- Bounds + stats.
   const bounds = { minX: Infinity, minY: Infinity, maxX: -Infinity, maxY: -Infinity };
   for (const e of EDGES) {
     for (const [x, y] of e.geometry) {
@@ -160,7 +146,6 @@ export function buildSpSpeedStreet(params) {
       bounds.maxY = Math.max(bounds.maxY, y);
     }
   }
-  // Road body + buildings can outgrow the centerline bounds — cover them.
   bounds.minX = Math.min(bounds.minX, -halfRoadM - 6);
   bounds.maxX = Math.max(bounds.maxX, halfRoadM + 6);
   for (const bl of BUILDINGS) {
@@ -178,11 +163,10 @@ export function buildSpSpeedStreet(params) {
       district: districtId.replace(/-v\d+$/, ""),
       label,
       mapKind: "scenario-street",
-      generator: "tools/maps/gen_sp_speed.mjs",
+      generator: "tools/maps/gen_narrow_street.mjs",
       boundsLocalMeters: bounds,
       attribution: {
-        // Original, parametric layout — NOT derived from OpenStreetMap.
-        text: "Учебна права улица с ограничение на скоростта — оригинален параметричен дизайн (без данни от OpenStreetMap)",
+        text: "Учебна тясна двупосочна улица за разминаване — оригинален параметричен дизайн (без данни от OpenStreetMap)",
         license: "All rights reserved",
         licenseUrl: "/",
         copyrightUrl: "/",
@@ -190,7 +174,7 @@ export function buildSpSpeedStreet(params) {
       },
       defaults: {
         maxspeedUrbanKmh: maxspeedKmh,
-        note: "Права улица: ограничението важи по цялата дължина; таванът е за спазване, не за доближаване.",
+        note: "Тясна улица: при разминаване през стеснение отстъпва страната със стеснението.",
       },
       stats: {
         roadKm: r2(EDGES.reduce((s, e) => s + e.length, 0) / 1000),
@@ -201,13 +185,8 @@ export function buildSpSpeedStreet(params) {
         buildings: BUILDINGS.length,
         spawnPoints: SPAWN_POINTS.length,
       },
-      /**
-       * Scenario Studio payload (doc 76): the archetype recipe + the lane
-       * truth. ScenarioSpecs pin the right-lane center by value and the
-       * contract battery asserts the copy matches this file.
-       */
       scenario: {
-        archetype: "straight-street",
+        archetype: "narrow-street",
         params: { lengthM, maxspeedKmh },
         lanesPerDirection: 1,
         laneCenterRightM: laneCenterM,
@@ -226,9 +205,7 @@ export function buildSpSpeedStreet(params) {
     spawnPoints: SPAWN_POINTS,
   };
 
-  // -------------------------------------------------------------------------
-  // Self-validation (the invariants tools/osm/build.mjs + gen_poligon enforce)
-  // -------------------------------------------------------------------------
+  // Self-validation (mirrors gen_pk_smoothstop / gen_poligon invariants).
   const post = [];
   const nodeIds = new Set(Object.keys(NODES));
   for (const e of EDGES) {
@@ -244,72 +221,50 @@ export function buildSpSpeedStreet(params) {
   }
   const distToStreet = (x, y) => Math.abs(x) + (y < 0 ? -y : y > lengthM ? y - lengthM : 0);
   for (const s of SPAWN_POINTS) {
-    if (s.edgeId !== "sp-e-street") post.push(`${s.id}: unknown edgeId ${s.edgeId}`);
+    if (s.edgeId !== "nm-e-street") post.push(`${s.id}: unknown edgeId ${s.edgeId}`);
     if (distToStreet(s.x, s.y) > halfRoadM) post.push(`${s.id}: not on the carriageway`);
   }
   if (laneCenterM <= 0 || laneCenterM >= halfRoadM) post.push(`right-lane center ${laneCenterM} outside the northbound bank`);
   if (!Number.isFinite(bounds.minX) || bounds.maxX <= bounds.minX || bounds.maxY <= bounds.minY) {
     post.push("degenerate bounds");
   }
-  if (post.length > 0) {
-    throw new Error(`gen_sp_speed self-validation FAILED:\n  - ${post.join("\n  - ")}`);
-  }
+  if (post.length > 0) throw new Error(`gen_narrow_street self-validation FAILED:\n  - ${post.join("\n  - ")}`);
 
   return district;
 }
 
 // ---------------------------------------------------------------------------
-// The three committed instances (S3 SP batch 2)
+// Committed instance (the OV-14 narrow-meeting micro-map)
 // ---------------------------------------------------------------------------
 
 const INSTANCES = [
   {
-    districtId: "sp-creep-v1",
-    label: "Учебна улица — пълзящо превишаване (сценарий SP-01)",
-    lengthM: 360,
-    maxspeedKmh: 50,
-  },
-  {
-    districtId: "sp-danger-v1",
-    label: "Учебна улица — превишаване над +10 км/ч (сценарий SP-02)",
-    lengthM: 400,
-    maxspeedKmh: 50,
-  },
-  {
-    districtId: "sp-rain-v1",
-    label: "Учебна улица — скорост в дъжд през нощта (сценарий SP-04)",
-    lengthM: 360,
-    maxspeedKmh: 50,
-  },
-  {
-    // SP-03 / PE-07 host: a school/residential street posted 30 — the WHOLE
-    // street is the zone (the map's own maxspeed grades it; no zone layer).
-    districtId: "sp-zone30-v1",
-    label: "Учебна улица — зона 30 (училище/жилищна) (сценарий SP-03/PE-07)",
-    lengthM: 360,
-    maxspeedKmh: 30,
+    districtId: "ov-narrow-v1",
+    label: "Учебна тясна улица — разминаване през стеснение (сценарий OV-14)",
+    lengthM: 240,
+    maxspeedKmh: 40,
   },
 ];
 
 const line = (k, v) => console.log(`  ${String(k).padEnd(28)} ${v}`);
 
 for (const params of INSTANCES) {
-  const district = buildSpSpeedStreet(params);
+  const district = buildNarrowStreet(params);
   const out = JSON.stringify(district, null, 1) + "\n";
-  JSON.parse(out); // JSON validity self-check
+  JSON.parse(out);
 
   const CONTENT_FILE = path.join(REPO_ROOT, "content", "world", `${params.districtId}.json`);
   const PUBLIC_FILE = path.join(REPO_ROOT, "platform", "public", "world", `${params.districtId}.json`);
   mkdirSync(path.dirname(CONTENT_FILE), { recursive: true });
   mkdirSync(path.dirname(PUBLIC_FILE), { recursive: true });
   writeFileSync(CONTENT_FILE, out);
-  writeFileSync(PUBLIC_FILE, out); // byte-identical publish
+  writeFileSync(PUBLIC_FILE, out);
 
-  console.log(`=== sp-speed build: ${params.districtId} ===`);
+  console.log(`=== narrow-street build: ${params.districtId} ===`);
   line("length / limit", `${params.lengthM} m / ${params.maxspeedKmh} km/h`);
   line("right-lane center", `${district.meta.scenario.laneCenterRightM} m east`);
   line("nodes / edges", `${district.meta.stats.nodes} / ${district.meta.stats.edges}`);
   line("spawns", district.spawnPoints.map((s) => s.id).join(", "));
   line("output", `${CONTENT_FILE} (+ public copy)`);
+  console.log("Validation OK.");
 }
-console.log("Validation OK.");

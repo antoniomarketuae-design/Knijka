@@ -1,0 +1,130 @@
+{
+ "format": "district-v1",
+ "meta": {
+  "district": "ov-narrow",
+  "label": "Учебна тясна улица — разминаване през стеснение (сценарий OV-14)",
+  "mapKind": "scenario-street",
+  "generator": "tools/maps/gen_narrow_street.mjs",
+  "boundsLocalMeters": {
+   "minX": -28.12,
+   "minY": 0,
+   "maxX": 14.125,
+   "maxY": 240
+  },
+  "attribution": {
+   "text": "Учебна тясна двупосочна улица за разминаване — оригинален параметричен дизайн (без данни от OpenStreetMap)",
+   "license": "All rights reserved",
+   "licenseUrl": "/",
+   "copyrightUrl": "/",
+   "obligation": "none — original work, no ODbL attribution required for this map"
+  },
+  "defaults": {
+   "maxspeedUrbanKmh": 40,
+   "note": "Тясна улица: при разминаване през стеснение отстъпва страната със стеснението."
+  },
+  "stats": {
+   "roadKm": 0.24,
+   "nodes": 2,
+   "edges": 1,
+   "intersections": 0,
+   "crossings": 0,
+   "buildings": 1,
+   "spawnPoints": 2
+  },
+  "scenario": {
+   "archetype": "narrow-street",
+   "params": {
+    "lengthM": 240,
+    "maxspeedKmh": 40
+   },
+   "lanesPerDirection": 1,
+   "laneCenterRightM": 4.06
+  }
+ },
+ "roads": {
+  "nodes": [
+   {
+    "id": "nm-n-end",
+    "x": 0,
+    "y": 240
+   },
+   {
+    "id": "nm-n-start",
+    "x": 0,
+    "y": 0
+   }
+  ],
+  "edges": [
+   {
+    "id": "nm-e-street",
+    "from": "nm-n-start",
+    "to": "nm-n-end",
+    "class": "residential",
+    "name": "Тясна двупосочна улица с паркирани коли",
+    "oneway": false,
+    "roundabout": false,
+    "lanes": 2,
+    "lanesSource": "tag",
+    "maxspeed": 40,
+    "maxspeedSource": "tag",
+    "length": 240,
+    "geometry": [
+     [
+      0,
+      0
+     ],
+     [
+      0,
+      240
+     ]
+    ]
+   }
+  ]
+ },
+ "intersections": [],
+ "crossings": [],
+ "roundabouts": [],
+ "buildings": [
+  {
+   "id": "nm-b-block",
+   "height": 7,
+   "heightSource": "default",
+   "footprint": [
+    [
+     -28.12,
+     100
+    ],
+    [
+     -16.12,
+     100
+    ],
+    [
+     -16.12,
+     130
+    ],
+    [
+     -28.12,
+     130
+    ]
+   ]
+  }
+ ],
+ "spawnPoints": [
+  {
+   "id": "nm-spawn-approach",
+   "x": 4.06,
+   "y": 15,
+   "heading": 0,
+   "edgeId": "nm-e-street",
+   "name": "Начало на отсечката"
+  },
+  {
+   "id": "nm-spawn-finish",
+   "x": 4.06,
+   "y": 225,
+   "heading": 0,
+   "edgeId": "nm-e-street",
+   "name": "Контролна точка — край на отсечката"
+  }
+ ]
+}

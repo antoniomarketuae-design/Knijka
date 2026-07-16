@@ -39,6 +39,7 @@ const CASES: PeMapCase[] = [
   { id: "pe-clear-v1", crossingY: 90, limitKmh: 50, lengthM: 150 },
   { id: "pe-slow-v1", crossingY: 85, limitKmh: 40, lengthM: 145 },
   { id: "pe-rain-v1", crossingY: 95, limitKmh: 50, lengthM: 155 },
+  { id: "pe-dart-v1", crossingY: 80, limitKmh: 50, lengthM: 140 },
 ];
 
 const X_LANE = 4.06; // right-lane center of a 2-lane street (drawn lane 8.125 m)

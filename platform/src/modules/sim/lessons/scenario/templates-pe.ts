@@ -383,10 +383,119 @@ export const SC_CROSSING_RAIN_SPRINT: ScenarioSpec = {
   localeBg: "bg-BG",
 };
 
+// ---------------------------------------------------------------------------
+// 4. sc-crossing-dart — „Внезапен пешеходец на пътеката" (PE-02 dart-out +
+//    PE-04 occlusion) on pe-dart-v1 (crossing at y = 80, a corner shop west of
+//    the zebra hides the curb — the reaction emergency, not the patience test)
+// ---------------------------------------------------------------------------
+
+/**
+ * The staged DART at pe-x-1 (0, 80): a pedestrian steps off the WEST curb at
+ * 1.6 m/s (a hurried step-out, between the 1.4 m/s walk and the 2.2 m/s sprint)
+ * only when the player closes within ~40 m — LATE, so the encounter is a
+ * reaction test, not a long approach. The corner shop the generator places just
+ * west of the zebra hides the curb until the last moment (PE-04 world dressing,
+ * zero grading change). triggerDistM 40 still leaves a legal approach room to
+ * brake and stop (the shadow does exactly that).
+ */
+const DART_PED: PedestrianDartOutSpec = {
+  id: "sc-drt-ped",
+  kind: "pedestrianDartOut",
+  crossingId: "pe-x-1",
+  crossing: { x: 0, y: 80 },
+  start: { x: CURB_X, y: 80 },
+  dir: { x: 1, y: 0 },
+  speedMps: 1.6,
+  travelM: TRAVEL_M,
+  roadFromM: ROAD_FROM_M,
+  roadToM: ROAD_TO_M,
+  triggerDistM: 40,
+  minTriggerSpeedKmh: 10,
+};
+
+/** PE-02 / PE-04 — внезапен пешеходец иззад закрита гледка (ЗДвП чл. 119 +
+ *  чл. 20: скорост и внимание, позволяващи спиране при внезапна поява). */
+export const SC_CROSSING_DART: ScenarioSpec = {
+  id: "sc-crossing-dart",
+  family: "pedestrians",
+  tagsBg: ["пешеходци", "пешеходна пътека", "внезапна поява", "реакция"],
+  titleBg: "Внезапен пешеходец на пътеката",
+  objectiveBg:
+    "Приближи пешеходната пътека с готовност за спиране: пешеходец изскача иззад ъгъла точно когато наближаваш — реагирай навреме, спри и го пропусни, вместо да минеш през него.",
+  archetypeIds: ["PE-02", "PE-04"],
+  conceptIds: ["c-crosswalk-yield", "c-pedestrian-rights-duties", "c-speed-adaptation"],
+  map: {
+    archetype: "zebra-block",
+    // The generator recipe — mirrored in pe-dart-v1.json meta.scenario.params.
+    params: { crossings: 1, signalized: "no", approachM: 80 },
+    districtId: "pe-dart-v1",
+  },
+  start: {
+    spawnPointId: "pe-spawn-approach",
+    vehicleStart: "ready",
+  },
+  instructionsBg: [
+    { n: 1, textBg: "Потегли по улицата и приближавай пешеходната пътека с готовност за спиране — кракът над спирачката." },
+    { n: 2, textBg: "Ъгловият магазин вляво крие тротоара — не разчитай, че щом не виждаш никого, няма никой." },
+    { n: 3, textBg: "Пешеходец изскача на пътеката точно когато наближаваш. Реагирай веднага: спирачка, без да завиваш встрани." },
+    { n: 4, textBg: "Спри напълно преди зебрата и го изчакай да освободи цялото платно." },
+    { n: 5, textBg: "Премини спокойно едва когато пътеката е свободна." },
+  ],
+  success: [
+    {
+      id: "sc-drt-approach",
+      titleBg: "Приближи пътеката с готовност за спиране",
+      params: { kind: "reachZone", x: LANE_2, y: 68, radiusM: 10, maxSpeedKmh: 40 },
+    },
+    {
+      id: "sc-drt-clear",
+      titleBg: "Премини пътеката, след като е свободна",
+      params: { kind: "reachZone", x: LANE_2, y: 118, radiusM: 12 },
+    },
+  ],
+  rubric: { parTimeSec: 75 },
+  shadow: { path: "content/traces/sc-crossing-dart/shadow-correct.trace.json" },
+  mistakes: [
+    {
+      traceRef: { path: "content/traces/sc-crossing-dart/mistake-not-yielded.trace.json" },
+      titleBg: "Преминаване през пешеходеца",
+      whatWentWrongBg:
+        "Водачът не реагира на внезапната поява и мина през пътеката, докато пешеходецът още пресичаше. Дори когато пешеходецът изскача изненадващо, предимството е негово — задължението за спиране остава на водача (чл. 119).",
+      codeRefs: ["PEDESTRIAN_NOT_YIELDED"],
+    },
+    {
+      traceRef: { path: "content/traces/sc-crossing-dart/mistake-collision.trace.json" },
+      titleBg: "Удар в пешеходеца",
+      whatWentWrongBg:
+        "Погледът беше другаде и колата изобщо не спря — блъсна изскочилия пешеходец на самата пътека. Пред пешеходна пътека, особено със закрита гледка, скоростта и вниманието трябва да позволяват спиране при внезапна поява (чл. 20). Ударът прекратява изпита.",
+      codeRefs: ["COLLISION"],
+    },
+  ],
+  teach: {
+    whenBg:
+      "На всяка пешеходна пътека, чиято гледка е закрита от сграда, паркирани коли или спрял автобус — там, където пешеходец може да се появи без предупреждение точно преди зебрата.",
+    whyBg:
+      "Внезапната поява на пешеходец е защитаваната урбанистична спешност за начинаещите: секунда закъсняла реакция при 50 км/ч е близо 14 метра слепешком. Единствената защита е приближаване с готовност за спиране — вдигнат газ, крак над спирачката — и незабавна реакция със спирачка, не със завиване встрани.",
+    lawRef: "ЗДвП чл. 119",
+    examinerBg:
+      "Изпитващият очаква намалена скорост и готовност за спиране при приближаване към закрита пътека, отчетлива реакция при появата на пешеходец и пълно спиране преди зебрата. Преминаване през пешеходец е опасна грешка, а удар — прекратяване на изпита.",
+  },
+  levels: [
+    { level: 1 },
+    { level: 2 },
+    { level: 3 },
+    { level: 4, vehicleStart: "cold" },
+  ],
+  staged: [DART_PED],
+  conditions: { weather: "dry" },
+  localeBg: "bg-BG",
+};
+
 /** The pedestrian-family templates, in catalog order (registered in
  *  templates.ts). */
 export const SCENARIO_TEMPLATES_PE: readonly ScenarioSpec[] = [
   SC_CROSSING_LET_PASS,
   SC_CROSSING_SLOW_CROSSER,
   SC_CROSSING_RAIN_SPRINT,
+  SC_CROSSING_DART,
 ];

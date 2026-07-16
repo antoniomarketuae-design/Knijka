@@ -39,7 +39,7 @@
  * are 🟡 PARTIAL or 🔴 NEW — skipped for later waves.
  */
 
-import type { BrakingLeadCarSpec } from "../../contracts";
+import type { BrakingLeadCarSpec, NarrowMeetingSpec } from "../../contracts";
 import type { ScenarioSpec } from "./types";
 
 // ---------------------------------------------------------------------------
@@ -451,9 +451,127 @@ export const SC_OV_CROSSING_OVERTAKE: ScenarioSpec = {
 
 /** The lane-discipline-family templates, in catalog order (registered in
  *  templates.ts). */
+// ---------------------------------------------------------------------------
+// 5. sc-ov-narrow — „Разминаване в тясна улица" (OV-14) on ov-narrow-v1: a
+//    parked row narrows the player's lane to one; an oncoming car meets them —
+//    ЗДвП narrow-passage priority: the side WITH the obstruction yields.
+// ---------------------------------------------------------------------------
+
+/**
+ * The staged narrow meeting: a parked row (two held props) blocks the player's
+ * northbound lane through the mid-block section y ∈ [110, 145]; an oncoming car
+ * transits southbound, timed by the narrowMeeting runner to meet the player.
+ * The obstruction is on the PLAYER's side, so the player must yield (wait at the
+ * widening for the oncoming to clear before squeezing past). Barging into the
+ * oncoming's lane while it is inbound grades FAILED_TO_YIELD ("narrow-meeting");
+ * waiting earns YIELDED_TO_PRIORITY — the reserved vocabulary, no new code.
+ */
+const NARROW_MEETING: NarrowMeetingSpec = {
+  id: "sc-ovn-meeting",
+  kind: "narrowMeeting",
+  libraryEventId: "OV-14",
+  sectionStart: { x: 0, y: 110 },
+  sectionEnd: { x: 0, y: 145 },
+  obstructionSide: "player",
+  actor: {
+    pathNodes: ["nm-n-end", "nm-n-start"], // southbound = oncoming
+    hold: { nodeIndex: 0, offsetM: 40 }, // ~y = 200, before the section
+    cruiseSpeedMps: 6,
+    colorIndex: 2,
+  },
+  // Actor's section entrance = the far (north) end, path arc 240 − 145 = 95.
+  actorEntry: { nodeIndex: 0, offsetM: 95 },
+  armDistM: 70,
+  transitSpeedMps: 6,
+  props: [
+    // Parked row in the PLAYER's (northbound) lane through the section.
+    { pathNodes: ["nm-n-start", "nm-n-end"], hold: { nodeIndex: 0, offsetM: 120 } },
+    { pathNodes: ["nm-n-start", "nm-n-end"], hold: { nodeIndex: 0, offsetM: 135 } },
+  ],
+};
+
+/** OV-14 — разминаване в тясна улица (ЗДвП: при разминаване през стеснение
+ *  отстъпва водачът, от чиято страна е препятствието). */
+export const SC_OV_NARROW: ScenarioSpec = {
+  id: "sc-ov-narrow",
+  family: "lanes",
+  tagsBg: ["тясна улица", "разминаване", "паркирани коли", "предимство при стеснение"],
+  titleBg: "Разминаване в тясна улица",
+  objectiveBg:
+    "Паркиран ред стеснява твоята лента до една, а насреща идва кола: препятствието е от твоята страна, затова изчакай на разширението и се промъкни в насрещната лента едва след като насрещният премине.",
+  archetypeIds: ["OV-14"],
+  conceptIds: ["c-maneuver-principles", "c-priority-concept", "c-general-care-duty"],
+  map: {
+    archetype: "narrow-street",
+    // The generator recipe — mirrored in ov-narrow-v1.json meta.scenario.params.
+    params: { lengthM: 240, maxspeedKmh: 40 },
+    districtId: "ov-narrow-v1",
+  },
+  start: {
+    spawnPointId: "nm-spawn-approach",
+    vehicleStart: "ready",
+  },
+  instructionsBg: [
+    { n: 1, textBg: "Улицата е тясна и двупосочна. Напред паркиран ред заема твоята лента — ще трябва да го заобиколиш в насрещната." },
+    { n: 2, textBg: "Насреща идва кола. Препятствието е от ТВОЯТА страна, затова предимството е нейно — ти изчакваш." },
+    { n: 3, textBg: "Спри на разширението преди стеснението, в своята лента, и пусни насрещния да премине." },
+    { n: 4, textBg: "Не се вклинявай в насрещната лента, докато другата кола е още в стеснението — това е отнемане на предимство." },
+    { n: 5, textBg: "Щом пътят се освободи, промъкни се покрай паркираните коли и продължи." },
+  ],
+  success: [
+    {
+      id: "sc-ovn-wait",
+      titleBg: "Изчакай на разширението преди стеснението",
+      params: { kind: "reachZone", x: 4.06, y: 100, radiusM: 10, maxSpeedKmh: 30 },
+    },
+    {
+      id: "sc-ovn-finish",
+      titleBg: "Премини стеснението и стигни края на отсечката",
+      params: { kind: "reachZone", x: 4.06, y: 200, radiusM: 12 },
+    },
+  ],
+  rubric: { parTimeSec: 70 },
+  shadow: { path: "content/traces/sc-ov-narrow/shadow-correct.trace.json" },
+  mistakes: [
+    {
+      traceRef: { path: "content/traces/sc-ov-narrow/mistake-barge.trace.json" },
+      titleBg: "Вклиняване насреща",
+      whatWentWrongBg:
+        "Колата се вмъкна в насрещната лента, за да заобиколи паркирания ред, докато насрещният автомобил беше още в стеснението — и той трябваше да спре заради нея. При разминаване през стеснение отстъпва страната, от която е препятствието; тук това си ти.",
+      codeRefs: ["FAILED_TO_YIELD"],
+    },
+    {
+      traceRef: { path: "content/traces/sc-ov-narrow/mistake-force.trace.json" },
+      titleBg: "Насилване през стеснението",
+      whatWentWrongBg:
+        "Вместо да изчака, водачът форсира навлизането в стеснението срещу приближаващата кола с предимство. Тясното платно не се дели наполовина: този, от чиято страна е препятствието, изчаква другия да премине пръв.",
+      codeRefs: ["FAILED_TO_YIELD"],
+    },
+  ],
+  teach: {
+    whenBg:
+      "По тесни двупосочни улици с паркирани коли — ежедневието в кварталите. Когато паркиран ред заеме твоята лента, заобикалянето му минава през насрещната лента: значи насрещните имат предимство пред теб.",
+    whyBg:
+      "Тясната улица е място за преценка, не за надпревара: който насила се вклини срещу насрещния, създава задънена ситуация или челен удар. Правилото е просто и спестява нерви и ламарини — от чиято страна е препятствието, той изчаква.",
+    lawRef: "ЗДвП чл. 25",
+    examinerBg:
+      "Изпитващият гледа преценката при стеснение: навременно намаляване, изчакване на разширението от твоята страна и промъкване едва след като насрещният премине. Насилственото навлизане срещу насрещен с предимство е груба грешка.",
+  },
+  levels: [
+    { level: 1 },
+    { level: 2 },
+    { level: 3 },
+    { level: 4, vehicleStart: "cold" },
+  ],
+  staged: [NARROW_MEETING],
+  conditions: { weather: "dry" },
+  localeBg: "bg-BG",
+};
+
 export const SCENARIO_TEMPLATES_LANES: readonly ScenarioSpec[] = [
   SC_OV_KEEP_RIGHT,
   SC_OV_LANE_KEEPING,
   SC_OV_ONEWAY,
   SC_OV_CROSSING_OVERTAKE,
+  SC_OV_NARROW,
 ];

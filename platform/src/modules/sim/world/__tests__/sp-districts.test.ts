@@ -38,6 +38,7 @@ const CASES: SpMapCase[] = [
   { id: "sp-creep-v1", limitKmh: 50, lengthM: 360 },
   { id: "sp-danger-v1", limitKmh: 50, lengthM: 400 },
   { id: "sp-rain-v1", limitKmh: 50, lengthM: 360 },
+  { id: "sp-zone30-v1", limitKmh: 30, lengthM: 360 },
 ];
 
 const X_LANE = 4.06; // right-lane center of a 1+1 street (drawn lane 8.125 m)
