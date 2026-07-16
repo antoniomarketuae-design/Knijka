@@ -335,7 +335,8 @@ export function createWorldRuntime(districtJson: District | unknown): DistrictWo
     | "solidCenterLine"
     | "busLane"
     | "railCrossing"
-    | "curveAdvisory";
+    | "curveAdvisory"
+    | "emergencyLane";
   const KNOWN_ZONE_KINDS = new Set<string>([
     "noStopping",
     "noParking",
@@ -344,6 +345,7 @@ export function createWorldRuntime(districtJson: District | unknown): DistrictWo
     "busLane",
     "railCrossing",
     "curveAdvisory",
+    "emergencyLane",
   ]);
   interface ZoneSpan {
     kind: KnownZoneKind;
@@ -1044,6 +1046,10 @@ export function createWorldRuntime(districtJson: District | unknown): DistrictWo
         if (edgeRt.edge.zone !== undefined) tick.zone = edgeRt.edge.zone;
         if (edgeRt.edge.noOvertake !== undefined) tick.noOvertake = edgeRt.edge.noOvertake;
         if (edgeRt.edge.noUTurn !== undefined) tick.noUTurn = edgeRt.edge.noUTurn;
+        // MOTORWAY-SEGMENT slice (doc 72 SP-10): the authored edge tag flows
+        // onto the tick exactly like the other surface tags — data, never a
+        // heuristic; absent (every pre-slice map) sets nothing.
+        if (edgeRt.edge.motorway !== undefined) tick.motorway = edgeRt.edge.motorway;
         // N1 (doc 72 OV-14): one marked lane TOTAL on a two-way road = the
         // narrow-street-meeting context. Surface-only (see SimTick doc).
         if (!edgeRt.edge.oneway && edgeRt.edge.lanes <= 1) tick.narrowTwoWay = true;
@@ -1124,6 +1130,12 @@ export function createWorldRuntime(districtJson: District | unknown): DistrictWo
                 if (tick.curveAdvisoryKmh === undefined || z.advisoryKmh < tick.curveAdvisoryKmh) {
                   tick.curveAdvisoryKmh = z.advisoryKmh;
                 }
+              } else if (z.kind === "emergencyLane") {
+                // Motorway-segment slice (doc 72 SP-10): the curb lane of this
+                // span is the лента за принудително спиране — the busLaneRight
+                // seam, mirrored (the flag names the LANE's legality; the
+                // reducer's laneId gate decides the fault).
+                tick.emergencyLaneRight = true;
               } else tick.busLaneRight = true;
             }
           }

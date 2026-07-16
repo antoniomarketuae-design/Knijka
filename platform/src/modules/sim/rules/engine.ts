@@ -198,6 +198,19 @@ export interface RuleEngineState {
    * a second act and bills again (the speeding-episode discipline).
    */
   curveSpeed: EpisodeState;
+  // -- MOTORWAY-SEGMENT slice (doc 72 SP-10) ----------------------------------
+  /**
+   * Sustained causeless crawl under the flow floor on a motorway
+   * (tick.motorway — authored edge data). One bill per episode; re-arms only
+   * on genuine recovery (at/above the floor) or on leaving the motorway.
+   */
+  motorwaySlow: EpisodeState;
+  /**
+   * Sustained DRIVING in the лента за принудително спиране (laneId 0 inside
+   * an authored emergencyLane span). One bill per excursion; re-arms on
+   * leaving the lane/span.
+   */
+  emergencyLane: EpisodeState;
 }
 
 const IDLE_EPISODE: EpisodeState = { activeSince: null, emitted: false };
@@ -247,6 +260,8 @@ export function createRuleEngine(config?: Partial<RuleEngineConfig>): RuleEngine
     rail: { approachSeen: false, prevPhase: null },
     railRest: { ...IDLE_EPISODE },
     curveSpeed: { ...IDLE_EPISODE },
+    motorwaySlow: { ...IDLE_EPISODE },
+    emergencyLane: { ...IDLE_EPISODE },
   };
 }
 
@@ -285,6 +300,8 @@ function cloneState(s: RuleEngineState): RuleEngineState {
     rail: { ...s.rail },
     railRest: { ...s.railRest },
     curveSpeed: { ...s.curveSpeed },
+    motorwaySlow: { ...s.motorwaySlow },
+    emergencyLane: { ...s.emergencyLane },
   };
 }
 
@@ -784,7 +801,13 @@ export function reduceTick(prev: RuleEngineState, tick: SimTick): ReduceResult {
   // bus-lane span the CURB lane is not a legal travel lane for the car, so
   // the rightmost REQUIRED lane is laneId 1 — correctly avoiding the bus lane
   // must never grade NOT_KEEPING_RIGHT (the SN-05 interplay; FP-battery case).
-  const rightmostRequiredLane = tick.busLaneRight === true ? 1 : 0;
+  // MOTORWAY-SEGMENT slice: an authored emergencyLane span is the SAME seam —
+  // the лента за принудително спиране is never a travel lane, so correctly
+  // cruising the rightmost TRAVEL lane (laneId 1) stays innocent; on a 2+2
+  // motorway the keep-right story then works at any speed with zero new code
+  // (the ln-v1 precedent, doc 72 OV-11 on the SP-10 map).
+  const rightmostRequiredLane =
+    tick.busLaneRight === true || tick.emergencyLaneRight === true ? 1 : 0;
   const hoggingLeft =
     tick.laneId > rightmostRequiredLane &&
     (tick.laneCount ?? 1) > 1 &&
@@ -793,6 +816,75 @@ export function reduceTick(prev: RuleEngineState, tick: SimTick): ReduceResult {
     tick.indicator !== "left";
   if (stepEpisode(s.keepRight, hoggingLeft, !hoggingLeft, t, cfg.keepRightSustainSec)) {
     events.push(makeViolation("NOT_KEEPING_RIGHT", t));
+  }
+
+  // Motorway crawl (SP-10 „минимална скорост на магистрала" — MOTORWAY-SEGMENT
+  // slice). LAW NOTE (see the catalog entry): BG law has NO general motorway
+  // minimum — чл. 54's 50 km/h constructive line is the honest floor, and the
+  // graded fault is the SUSTAINED CAUSELESS crawl (the mobile chicane), never
+  // a transition. Innocent by construction (A12):
+  //  - only an authored edge `motorway: true` tag arms it (no shipped map);
+  //  - transitions are exempt (|a| ≥ the steady band: moving off up through
+  //    the band, braking down through it toward a stop);
+  //  - congestion is exempt (a lead within the queue gap), as is any recent
+  //    hazard-shaped event (the harsh-brake cause ledger, reused) and an
+  //    armed crossing zone (paranoid — no motorway map carries one);
+  //  - a crawl ALONG the emergency lane is the EMERGENCY_LANE_DRIVING act,
+  //    not this one (one act, one code);
+  //  - reverse maneuvering and the standstill are exempt (stopping on a
+  //    motorway is its own future story — descoped honestly).
+  const inEmergencyLane = tick.emergencyLaneRight === true && tick.laneId === 0;
+  const motorwayCrawl =
+    cfg.motorwayMinSpeedEnabled &&
+    tick.motorway === true &&
+    moving &&
+    speed < cfg.motorwayMinFlowKmh &&
+    Math.abs(accelMps2) < cfg.motorwaySlowSteadyMps2 &&
+    (leadGapM === null || leadGapM > cfg.motorwaySlowQueueGapM) &&
+    s.crossing === null &&
+    (s.lastHazardEventAt === null || t - s.lastHazardEventAt > cfg.harshBrakeHazardCooldownSec) &&
+    !inEmergencyLane &&
+    forwardGear;
+  if (
+    stepEpisode(
+      s.motorwaySlow,
+      motorwayCrawl,
+      tick.motorway !== true || speed >= cfg.motorwayMinFlowKmh,
+      t,
+      cfg.motorwaySlowSustainSec,
+    )
+  ) {
+    events.push(makeViolation("DRIVING_TOO_SLOW_FOR_MOTORWAY", t));
+  }
+
+  // Emergency-lane driving (чл. 58, т. 3 — MOTORWAY-SEGMENT slice): sustained
+  // travel in the CURB lane of an authored emergencyLane span
+  // (tick.emergencyLaneRight — data, never a heuristic). The legal sides:
+  //  - deliberately NO indicator exemption (contrast DRIVING_IN_BUS_LANE): a
+  //    signalled undertake through the emergency lane is still the fault —
+  //    crossing it is not a legal maneuver the way the bus-lane right turn is;
+  //  - the ONE legal use, the breakdown pull-off, is protected structurally:
+  //    firm braking toward a stop pauses the clock, and the STOP itself never
+  //    grades here (v ≤ movingSpeedKmh disarms — stopping is descoped);
+  //  - a degenerate span on a single-lane road never convicts (laneCount > 1
+  //    — the busLane guard, mirrored), reverse maneuvering is exempt.
+  // Reset on leaving the lane or the span — one bill per excursion.
+  const emergencyLaneDriving =
+    inEmergencyLane &&
+    (tick.laneCount ?? 1) > 1 &&
+    moving &&
+    forwardGear &&
+    accelMps2 > -cfg.emergencyLaneBrakeExemptMps2;
+  if (
+    stepEpisode(
+      s.emergencyLane,
+      emergencyLaneDriving,
+      !inEmergencyLane,
+      t,
+      cfg.emergencyLaneSustainSec,
+    )
+  ) {
+    events.push(makeViolation("EMERGENCY_LANE_DRIVING", t));
   }
 
   // -- 4a2. B1a Wave-2 small-rule detectors (doc 72 capability 1). Each rides
@@ -1163,6 +1255,8 @@ export function reduceTick(prev: RuleEngineState, tick: SimTick): ReduceResult {
     s.busLane,
     s.railRest,
     s.curveSpeed,
+    s.motorwaySlow,
+    s.emergencyLane,
   ].some((ep) => ep.emitted && ep.activeSince !== null);
   if (events.some((e) => e.kind === "violation")) {
     s.cleanDistanceM = 0; // any fresh mistake resets the streak

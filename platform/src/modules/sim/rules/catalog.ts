@@ -549,6 +549,49 @@ export const VIOLATIONS: Record<ViolationCode, ViolationSpec> = {
     lawRef: "ЗДвП чл. 20, ал. 2",
     conceptId: "c-speed-adaptation",
   },
+  // -- MOTORWAY-SEGMENT slice (doc 72 §8 SP-10; edge motorway tag +
+  // emergencyLane zones) ------------------------------------------------------
+  DRIVING_TOO_SLOW_FOR_MOTORWAY: {
+    // Doc 72 SP-10 „Минимална скорост на магистрала": the mobile chicane —
+    // motorway speed-differential crashes. LAW VERIFICATION NOTE: the slice
+    // brief cited „чл. 21 минимална 50 на АМ", which did NOT verify — the
+    // content bank (q-magistrali-i-izvangradsko-026, draft) teaches the
+    // opposite: NO general minimum exists; ЗДвП чл. 54 only admits vehicles
+    // constructively capable of > 50 km/h, and a posted minimum binds only
+    // under the mandatory sign. The code therefore grades the SOFTER tier
+    // (второстепенна — a correct-but-imprecise action, the „закъснели
+    // действия" family), anchored on чл. 54's 50 km/h line, not a phantom
+    // absolute limit. Doc 72's „Н38: основна" covers the whole SP-10
+    // archetype incl. the under-speed ramp MERGE (N/A on this segment).
+    severityClass: "vtorostepenna",
+    points: SEVERITY_POINTS.vtorostepenna,
+    titleBg: "Твърде бавно движение по автомагистрала",
+    explanationBg:
+      "Движеше се продължително далеч под скоростта на потока по магистралата — без задръстване или друга причина. Магистралата допуска само превозни средства, способни на повече от 50 км/ч: колата, пълзяща в лентата при поток от 120–140, е подвижно препятствие, което всички останали трябва да заобикалят.",
+    correctiveBg:
+      "Дръж скоростта близка до потока — на свободна магистрала това са поне 100–120 км/ч за лек автомобил. Ако не можеш или не искаш да поддържаш такава скорост, магистралата не е твоят път: избери успореден републикански път.",
+    lawRef: "ЗДвП чл. 54",
+    conceptId: "c-motorway-rules",
+  },
+  EMERGENCY_LANE_DRIVING: {
+    // Doc 72 SP-10-adjacent motorway discipline; ЗДвП чл. 58, т. 3 VERIFIED
+    // against the content bank (q-magistrali-i-izvangradsko-009: „Аварийната
+    // лента е за аварии, не за нетърпеливи (чл. 58, т. 3 ЗДвП)"). Опасна: the
+    // lane must stay free for ambulances, fire crews and broken-down cars —
+    // undertaking the queue through it at speed is exactly the act the ban
+    // exists for. NO indicator exemption (a signalled undertake is still the
+    // fault); the breakdown pull-off is protected structurally (the brake
+    // exemption + the moving gate — the STOP itself is out of grading scope).
+    severityClass: "opasna",
+    points: SEVERITY_POINTS.opasna,
+    titleBg: "Движение по аварийната лента",
+    explanationBg:
+      "Движеше се по лентата за принудително спиране. Тя не е „още една лента“ — по нея е забранено да се кара, защото трябва да остане свободна за аварирали коли, линейки и пожарна. Точно при задръстване, когато изкушението е най-голямо, тя е най-необходима.",
+    correctiveBg:
+      "Остани в лентите за движение, дори потокът да пълзи — аварийната лента се използва само при принудително спиране: изтегляш се, спираш, включваш аварийните светлини. За изпреварване тя не съществува.",
+    lawRef: "ЗДвП чл. 58, т. 3",
+    conceptId: "c-motorway-prohibitions",
+  },
   PREDRIVE_STEP_SKIPPED: {
     severityClass: "vtorostepenna",
     points: SEVERITY_POINTS.vtorostepenna,

@@ -1584,6 +1584,95 @@ describe("FP battery — railway crossing (stage 3a)", () => {
 // Whole-drive integration
 // ---------------------------------------------------------------------------
 
+// ---------------------------------------------------------------------------
+// Motorway (MOTORWAY-SEGMENT slice — doc 72 SP-10 + чл. 58 emergency lane)
+// ---------------------------------------------------------------------------
+
+describe("FP battery — motorway", () => {
+  /** A motorway frame: 140 limit, 3-lane bank, curb lane = emergency. */
+  const mw = (t: number, over: Partial<SimTick> = {}): SimTick =>
+    tick(t, {
+      maxSpeedKmh: 140,
+      motorway: true,
+      emergencyLaneRight: true,
+      laneId: 1,
+      laneCount: 3,
+      ...over,
+    });
+
+  it("moving off and accelerating up THROUGH the sub-50 band", () => {
+    // Innocent: every motorway drive starts at 0 — the acceleration phase
+    // crosses the crawl band with |a| far above the steady gate.
+    const { events } = drive([
+      mw(0, { speedKmh: 0 }),
+      mw(1, { speedKmh: 8 }),
+      mw(2, { speedKmh: 16 }),
+      mw(3, { speedKmh: 24 }),
+      mw(4, { speedKmh: 32 }),
+      mw(5, { speedKmh: 40 }),
+      mw(6, { speedKmh: 48 }),
+      mw(7, { speedKmh: 56 }),
+      ...cruise(8, 20, { speedKmh: 120, maxSpeedKmh: 140, motorway: true, emergencyLaneRight: true, laneId: 1, laneCount: 3 }),
+    ]);
+    expectInnocent(events);
+  });
+
+  it("braking firmly from cruise to a rest at the end of the segment", () => {
+    // Innocent: the stop passes down through the crawl band while braking —
+    // a transition, never a held crawl.
+    const { events } = drive([
+      ...cruise(0, 8, { speedKmh: 125, maxSpeedKmh: 140, motorway: true, emergencyLaneRight: true, laneId: 1, laneCount: 3 }),
+      mw(9, { speedKmh: 110 }),
+      mw(10, { speedKmh: 95 }),
+      mw(11, { speedKmh: 80 }),
+      mw(12, { speedKmh: 65 }),
+      mw(13, { speedKmh: 50 }),
+      mw(14, { speedKmh: 35 }),
+      mw(15, { speedKmh: 20 }),
+      mw(16, { speedKmh: 6 }),
+      mw(17, { speedKmh: 0 }),
+      mw(19, { speedKmh: 0 }),
+    ]);
+    expectInnocent(events);
+  });
+
+  it("a congestion crawl behind a lead on the motorway", () => {
+    // Innocent: stop-and-go on the ring road — the queue is the cause.
+    const { events } = drive(
+      Array.from({ length: 15 }, (_, t) => mw(t, { speedKmh: 25, leadGapM: 15 })),
+    );
+    expectInnocent(events);
+  });
+
+  it("regression: cruising the rightmost TRAVEL lane past the emergency lane for minutes", () => {
+    // Innocent: laneId 1 IS the correct lane when laneId 0 is the лента за
+    // принудително спиране — the emergencyLaneRight keep-right seam.
+    const { events } = drive(
+      Array.from({ length: 60 }, (_, t) => mw(t, { speedKmh: 125 })),
+    );
+    expectInnocent(events);
+  });
+
+  it("the breakdown pull-off: into the emergency lane under braking, to a rest", () => {
+    // Innocent: the ONE legal use of the lane (чл. 58, т. 3 exception) — the
+    // pull-off brakes throughout and the stop itself is out of grading scope.
+    const { events } = drive([
+      mw(0, { speedKmh: 90 }),
+      mw(1, { speedKmh: 90, indicator: "right", events: [glance("right")] }),
+      mw(2, { speedKmh: 79, laneId: 0, indicator: "right" }),
+      mw(3, { speedKmh: 68, laneId: 0, indicator: "right" }),
+      mw(4, { speedKmh: 56, laneId: 0, indicator: "right" }),
+      mw(5, { speedKmh: 44, laneId: 0 }),
+      mw(6, { speedKmh: 32, laneId: 0 }),
+      mw(7, { speedKmh: 20, laneId: 0 }),
+      mw(8, { speedKmh: 8, laneId: 0 }),
+      mw(9, { speedKmh: 0, laneId: 0, handbrakeOn: true }),
+      mw(12, { speedKmh: 0, laneId: 0, handbrakeOn: true }),
+    ]);
+    expectInnocent(events);
+  });
+});
+
 describe("FP battery — whole innocent commute", () => {
   it("a full mixed urban drive with zero mistakes produces zero violations", () => {
     // Innocent end-to-end: spawn with handbrake on, pull away, cruise at the

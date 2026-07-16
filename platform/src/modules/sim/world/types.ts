@@ -60,6 +60,8 @@ export interface DistrictEdge {
   noOvertake?: boolean;
   /** U-turn banned on this edge — surface-only context. */
   noUTurn?: boolean;
+  /** The edge is a motorway (MOTORWAY-SEGMENT slice — runtime/district.ts). */
+  motorway?: boolean;
 }
 
 export interface DistrictIntersection {
@@ -109,8 +111,9 @@ export interface DistrictSpawnPoint {
 
 /** ZONE-BAN data layer (ADR-006 stage 2a; stage 2b adds the line-type + bus
  *  vocabulary; stage 3a adds the railCrossing track band; the curve-envelope
- *  slice adds the curveAdvisory arc span — runtime/district.ts is the
- *  documented contract; this mirror keeps world-side loads typed). */
+ *  slice adds the curveAdvisory arc span; the motorway-segment slice adds the
+ *  emergencyLane curb span — runtime/district.ts is the documented contract;
+ *  this mirror keeps world-side loads typed). */
 export type DistrictZoneKind =
   | "noStopping"
   | "noParking"
@@ -118,7 +121,8 @@ export type DistrictZoneKind =
   | "solidCenterLine"
   | "busLane"
   | "railCrossing"
-  | "curveAdvisory";
+  | "curveAdvisory"
+  | "emergencyLane";
 
 /** One authored span along an edge's polyline arclength (В24/В27/В28 bans;
  *  stage 2b: М1 solid осева / BUS lane markings; stage 3a: the railCrossing

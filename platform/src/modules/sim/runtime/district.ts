@@ -54,6 +54,13 @@ export interface DistrictEdge {
   noOvertake?: boolean;
   /** U-turn banned on this edge — surface-only context (doc 72 OV-17). */
   noUTurn?: boolean;
+  /**
+   * The edge is an АВТОМАГИСТРАЛА (MOTORWAY-SEGMENT slice, doc 72 SP-10).
+   * Additive generator data (never OSM/heuristics in this slice): flows onto
+   * SimTick.motorway and arms the motorway detectors. Absent (every pre-slice
+   * map) = not a motorway — the detectors stay structurally silent.
+   */
+  motorway?: boolean;
 }
 
 export interface DistrictIntersection {
@@ -138,6 +145,15 @@ export interface DistrictBounds {
  *                        span grades the основна SPEED_TOO_FAST_FOR_CURVE
  *                        (ЗДвП чл. 20, ал. 2). A span whose advisoryKmh is
  *                        absent/malformed is INERT (tolerant, A12).
+ * MOTORWAY-SEGMENT slice (motorway-segment archetype — same shape, new kind,
+ * so meta.zonesVersion stays 1; doc 72 §8 SP-10 „Магистрала"):
+ *  - "emergencyLane"   — the CURB lane (laneId 0 of the vehicle's bank) of
+ *                        this span is the лента за принудително спиране
+ *                        (bounded by the wide solid edge line, М2): sustained
+ *                        DRIVING in it grades the опасна
+ *                        EMERGENCY_LANE_DRIVING (ЗДвП чл. 58, т. 3), and the
+ *                        keep-right detector stops requiring that lane (the
+ *                        busLane seam, mirrored).
  * Consumers MUST ignore zones with unknown kinds/edge ids (forward compat).
  */
 export type DistrictZoneKind =
@@ -147,7 +163,8 @@ export type DistrictZoneKind =
   | "solidCenterLine"
   | "busLane"
   | "railCrossing"
-  | "curveAdvisory";
+  | "curveAdvisory"
+  | "emergencyLane";
 
 /**
  * Deterministic barrier timetable of a GUARDED rail crossing (railCrossing +

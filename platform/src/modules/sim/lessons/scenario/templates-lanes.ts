@@ -894,6 +894,113 @@ export const SC_OV_BUS_LANE: ScenarioSpec = {
   localeBg: "bg-BG",
 };
 
+// ---------------------------------------------------------------------------
+// sc-mw-emergency-lane — „Аварийната лента" (SP-10-adjacent motorway lane
+// legality; SN-05 is the lane-tagged-legality sibling) on mw-v1 (the
+// motorway-segment archetype, gen_motorway.mjs). The emergency lane is the
+// carriageway's CURB lane covered by an authored "emergencyLane" zone span
+// (the busLane data seam, mirrored): sustained DRIVING in it grades the
+// опасна EMERGENCY_LANE_DRIVING (ЗДвП чл. 58, т. 3 — VERIFIED against the
+// content bank), with NO indicator exemption (a signalled undertake is still
+// the fault; contrast the bus lane's legal right-turn transit). The
+// breakdown SCENE the demos pass (a stalled car ON the emergency lane) is a
+// recorder obstacle rect — trace/demo data, NOT map data (the
+// sc-hazard-obstacle precedent; the live map hosts only the road).
+// ---------------------------------------------------------------------------
+
+/** mw-v1 northbound cruise-lane center (meta.scenario — the L7 copy truth). */
+const MW_X_CRUISE = 0;
+
+/**
+ * Чл. 58, т. 3 — движение по лентата за принудително спиране е забранено
+ * (освен при принудително спиране). The taught norm: the lane stays FREE —
+ * for ambulances, fire crews and broken-down cars; undertaking or
+ * queue-skipping through it is the опасна act. Detector is default-ON and
+ * structurally data-armed (only an authored emergencyLane span sets the tick
+ * field), so no ruleConfig is needed — the LIVE student session grades it.
+ */
+export const SC_MW_EMERGENCY_LANE: ScenarioSpec = {
+  id: "sc-mw-emergency-lane",
+  family: "lanes",
+  tagsBg: ["магистрала", "аварийна лента", "забрана", "лентова дисциплина"],
+  titleBg: "Аварийната лента не е лента за движение",
+  objectiveBg:
+    "Измини магистралния участък, без нито веднъж да навлезеш в аварийната лента — включително покрай авариралата кола в нея. Лентата за принудително спиране е само за аварии: по нея не се кара, не се изпреварва и не се „скъсява“ колоната.",
+  archetypeIds: ["SP-10", "SN-05"],
+  conceptIds: ["c-motorway-prohibitions", "c-motorway-rules", "c-emergency-lane-breakdown"],
+  map: {
+    archetype: "motorway-segment",
+    // The generator recipe — mirrored in mw-v1.json meta.scenario.params
+    // (tools/maps/gen_motorway.mjs).
+    params: { lengthM: 1000, maxspeedKmh: 140, lanesPerDirection: 2, medianM: 6 },
+    districtId: "mw-v1",
+  },
+  start: {
+    spawnPointId: "mw-spawn-approach",
+    vehicleStart: "ready",
+  },
+  instructionsBg: [
+    { n: 1, textBg: "Потегли по магистралата и се установи в дясната лента за движение — около 100–110 км/ч." },
+    { n: 2, textBg: "Вдясно от теб е аварийната лента: тя НЕ е лента за движение — по нея е забранено да се кара." },
+    { n: 3, textBg: "Напред в аварийната лента стои аварирала кола — подмини я в своята лента, без да докосваш аварийната." },
+    { n: 4, textBg: "Не се изкушавай да изпреварваш или да „скъсяваш“ през аварийната лента — точно тя трябва да остане свободна за линейка и пожарна." },
+    { n: 5, textBg: "Продължи в лентата за движение до края на участъка." },
+  ],
+  success: [
+    {
+      id: "sc-mwe-pass",
+      titleBg: "Подмини авариралата кола в лентата за движение",
+      // Just past the breakdown scene (the demos stage it at y = 780 on the
+      // emergency lane, x = 8.13): radius 6 pins the CRUISE lane — a car
+      // riding the emergency lane misses it.
+      params: { kind: "reachZone", x: MW_X_CRUISE, y: 830, radiusM: 6 },
+    },
+    {
+      id: "sc-mwe-finish",
+      titleBg: "Стигни края на участъка",
+      params: { kind: "reachZone", x: MW_X_CRUISE, y: 940, radiusM: 12 },
+    },
+  ],
+  rubric: { parTimeSec: 60 },
+  // RECORDED: committed deterministic recordings of the authored scripts in
+  // traces/scMwEmergencyLane.ts; gates in traces/__tests__/
+  // sc-mw-emergency-lane-traces.test.ts (re-record with RECORD_TRACES=1).
+  shadow: { path: "content/traces/sc-mw-emergency-lane/shadow-correct.trace.json" },
+  mistakes: [
+    {
+      traceRef: { path: "content/traces/sc-mw-emergency-lane/mistake-undertake.trace.json" },
+      titleBg: "Изпреварване през аварийната лента",
+      whatWentWrongBg:
+        "Колата подаде мигач и „изпревари“ отдясно — през аварийната лента, с над 100 км/ч. Мигачът не прави маневрата законна: по лентата за принудително спиране изобщо не се кара. Точно там може да стои аварирала кола с хора около нея — а разликата в скоростите не прощава.",
+      codeRefs: ["EMERGENCY_LANE_DRIVING"],
+    },
+    {
+      traceRef: { path: "content/traces/sc-mw-emergency-lane/mistake-shoulder-cruise.trace.json" },
+      titleBg: "Каране по аварийната лента",
+      whatWentWrongBg:
+        "Колата се настани в аварийната лента и я подкара като „своя“ — стотици метри, докато спрялата напред аварирала кола така или иначе не я върна в потока. Аварийната лента е коридорът на линейката и на повредения: движението по нея е опасна грешка, дори когато изглежда празна.",
+      codeRefs: ["EMERGENCY_LANE_DRIVING"],
+    },
+  ],
+  teach: {
+    whenBg:
+      "На всяка магистрала и скоростен път — особено при натоварен трафик и задръстване, когато изкушението да заобиколиш колоната по аварийната лента е най-голямо. Тогава тя е и най-необходима: по нея идват линейката и пожарната.",
+    whyBg:
+      "Аварийната лента е застраховката на магистралата: мястото, където повредената кола се изтегля, и коридорът, по който помощта стига до катастрофата. Кола, движеща се по нея, среща спрели автомобили, хора около тях и отломки — с магистрална скорост и без никакво време за реакция. Затова движението по нея е забранено, без изключение за „бързащите“.",
+    lawRef: "ЗДвП чл. 58, т. 3",
+    examinerBg:
+      "Изпитващият следи лентовата дисциплина: всяко движение по лентата за принудително спиране е опасна грешка — с мигач или без. Аварийната лента се ползва само при принудително спиране, а покрай аварирала кола се минава в лентата за движение, с готовност и внимание.",
+  },
+  levels: [
+    { level: 1 },
+    { level: 2 },
+    { level: 3 },
+    { level: 4, vehicleStart: "cold" },
+  ],
+  conditions: { weather: "dry" },
+  localeBg: "bg-BG",
+};
+
 export const SCENARIO_TEMPLATES_LANES: readonly ScenarioSpec[] = [
   SC_OV_KEEP_RIGHT,
   SC_OV_LANE_KEEPING,
@@ -903,4 +1010,5 @@ export const SCENARIO_TEMPLATES_LANES: readonly ScenarioSpec[] = [
   SC_OV_BAN_OVERTAKE,
   SC_OV_SOLID_LINE,
   SC_OV_BUS_LANE,
+  SC_MW_EMERGENCY_LANE,
 ];

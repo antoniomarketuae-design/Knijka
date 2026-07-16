@@ -28,11 +28,14 @@
  *
  * Doc-72 provenance: the batch-2 three are marked "Engine: ✅ FULL". Later
  * waves in this file: SP-03 (zone/transition — sc-speed-zone + sc-speed-
- * transition), SP-11/VP-09 (harsh brake — sc-sp-harsh-brake) and SP-05
+ * transition), SP-11/VP-09 (harsh brake — sc-sp-harsh-brake), SP-05
  * (curve envelope — sc-sp-curve on the rural-curve archetype + the
- * curveAdvisory zone layer). SP-06..SP-10 stay 🟡/🔴; SP-12 grades a crossing
- * code (pedestrian family); SP-13 needs ambient traffic set over the limit,
- * which the determinism law (ambient 0) forbids — left for later waves.
+ * curveAdvisory zone layer) and SP-10 (the motorway-segment archetype —
+ * sc-mw-discipline on mw-v1: the edge motorway tag arms the SP-10 crawl
+ * detector, and OV-11's keep-right works at 130 with zero new code).
+ * SP-06..SP-09 stay 🟡/🔴; SP-12 grades a crossing code (pedestrian family);
+ * SP-13 needs ambient traffic set over the limit, which the determinism law
+ * (ambient 0) forbids — left for later waves.
  */
 
 import type { ScenarioSpec } from "./types";
@@ -706,6 +709,114 @@ export const SC_SP_CURVE: ScenarioSpec = {
   localeBg: "bg-BG",
 };
 
+// ---------------------------------------------------------------------------
+// 8. sc-mw-discipline — „Дисциплина на магистралата" (SP-10 + OV-11) on mw-v1:
+//    the FIRST motorway-segment map (gen_motorway.mjs) — a divided 2+2
+//    motorway posted the honest АМ 140, each carriageway carrying an
+//    emergency curb lane (an authored "emergencyLane" zone span + the
+//    edge-level motorway tag). TWO DISTINCT lane/speed faults, one template
+//    (the sc-speed-zone precedent):
+//      - „Висене в лявата лента при 130" → NOT_KEEPING_RIGHT (the shipped
+//        keep-right detector at motorway speed — the ln-v1 precedent needed
+//        ZERO new code; the emergencyLaneRight seam makes laneId 1 the
+//        rightmost REQUIRED lane);
+//      - „Пълзене с 40 без причина" → DRIVING_TOO_SLOW_FOR_MOTORWAY (the
+//        SP-10 crawl detector this slice ships — второстепенна on the
+//        VERIFIED чл. 54 basis; NO general BG motorway minimum exists, see
+//        rules/catalog.ts).
+// ---------------------------------------------------------------------------
+
+/** mw-v1 northbound cruise-lane center (meta.scenario — the L7 copy truth). */
+const MW_X_CRUISE = 0;
+
+/**
+ * SP-10 — скорост на потока + дръж вдясно на автомагистрала (ЗДвП чл. 15,
+ * чл. 21, чл. 54; motorway speed-differential crash studies — the far-below-
+ * flow car is a mobile chicane). Detectors are default-ON and structurally
+ * data-armed (edge motorway tag + emergencyLane span — no other map carries
+ * them), so no ruleConfig is needed — the LIVE student session grades both.
+ */
+export const SC_MW_DISCIPLINE: ScenarioSpec = {
+  id: "sc-mw-discipline",
+  family: "speed",
+  tagsBg: ["магистрала", "скорост на потока", "дръж вдясно", "лентова дисциплина"],
+  titleBg: "Дисциплина на магистралата",
+  objectiveBg:
+    "Измини магистралния участък като част от потока: установи се в ДЯСНАТА лента за движение с около 120–130 км/ч и я дръж — лявата е само за изпреварване, а пълзенето далеч под потока е също толкова грешно, колкото и превишаването.",
+  archetypeIds: ["SP-10", "OV-11"],
+  conceptIds: ["c-motorway-rules", "c-speed-limits", "c-lane-choice"],
+  map: {
+    archetype: "motorway-segment",
+    // The generator recipe — mirrored in mw-v1.json meta.scenario.params
+    // (tools/maps/gen_motorway.mjs).
+    params: { lengthM: 1000, maxspeedKmh: 140, lanesPerDirection: 2, medianM: 6 },
+    districtId: "mw-v1",
+  },
+  start: {
+    spawnPointId: "mw-spawn-approach",
+    vehicleStart: "ready",
+  },
+  instructionsBg: [
+    { n: 1, textBg: "Потегли по магистралата — ограничението е 140 км/ч, платното е разделено с мантинела." },
+    { n: 2, textBg: "Ускорявай уверено и се установи около 120–130 км/ч — на магистрала се кара със скоростта на потока." },
+    { n: 3, textBg: "Дръж ДЯСНАТА лента за движение: лявата е само за изпреварване, а аварийната вдясно не е лента за движение изобщо." },
+    { n: 4, textBg: "Не пълзи: трайно движение далеч под потока (под 50 км/ч без причина) прави от колата ти подвижно препятствие." },
+    { n: 5, textBg: "Задръж скоростта и лентата до края на участъка." },
+  ],
+  success: [
+    {
+      id: "sc-mwd-lane",
+      titleBg: "Мини контролната зона в дясната лента за движение",
+      // Radius 6 pins the CRUISE lane (lane centers sit 8.12–8.13 m apart):
+      // the left-lane hog and an emergency-lane rider both miss it.
+      params: { kind: "reachZone", x: MW_X_CRUISE, y: 520, radiusM: 6, maxSpeedKmh: 140 },
+    },
+    {
+      id: "sc-mwd-finish",
+      titleBg: "Стигни края на участъка",
+      params: { kind: "reachZone", x: MW_X_CRUISE, y: 940, radiusM: 12 },
+    },
+  ],
+  rubric: { parTimeSec: 55 },
+  // RECORDED: committed deterministic recordings of the authored scripts in
+  // traces/scMwDiscipline.ts; gates in traces/__tests__/sc-mw-discipline-
+  // traces.test.ts (re-record with RECORD_TRACES=1).
+  shadow: { path: "content/traces/sc-mw-discipline/shadow-correct.trace.json" },
+  mistakes: [
+    {
+      traceRef: { path: "content/traces/sc-mw-discipline/mistake-left-hog.trace.json" },
+      titleBg: "Висене в лявата лента при 130",
+      whatWentWrongBg:
+        "Колата се настани в ЛЯВАТА лента и остана там с километри, без да изпреварва никого. И на магистрала важи чл. 15: движиш се във възможно най-дясната свободна лента за движение — лявата се освобождава за по-бързите, иначе целият поток се подрежда зад теб.",
+      codeRefs: ["NOT_KEEPING_RIGHT"],
+    },
+    {
+      traceRef: { path: "content/traces/sc-mw-discipline/mistake-crawl.trace.json" },
+      titleBg: "Пълзене с 40 по магистралата",
+      whatWentWrongBg:
+        "Колата запълзя трайно с около 40 км/ч по свободна магистрала — без задръстване, без повреда. Потокът тук се движи със 120–140: разликата от 80–100 км/ч прави пълзящата кола подвижно препятствие, което всички трябва да заобикалят. Магистралата изобщо допуска само превозни средства, способни на повече от 50 км/ч.",
+      codeRefs: ["DRIVING_TOO_SLOW_FOR_MOTORWAY"],
+    },
+  ],
+  teach: {
+    whenBg:
+      "При всяко движение по автомагистрала и скоростен път — от включването до напускането. Двете дисциплини вървят заедно: скорост, близка до потока, и възможно най-дясната свободна лента за движение.",
+    whyBg:
+      "Катастрофите на магистрала се раждат от РАЗЛИКИ в скоростта, не от самата скорост: кола с 40 км/ч в поток от 130 се приближава със 90 км/ч — колкото челен удар в града. Затова и пълзенето, и висенето в лявата лента са грешки: и двете карат потока да маневрира около теб, точно там, където маневрите са най-скъпи.",
+    lawRef: "ЗДвП чл. 15",
+    examinerBg:
+      "Изпитващият очаква уверено движение със скоростта на потока в дясната лента за движение: трайното движение в лява лента без изпреварване е грешка, а пълзенето далеч под потока без причина — също. Лентите се сменят само с огледало и мигач, с ясна причина.",
+  },
+  levels: [
+    { level: 1 },
+    { level: 2 },
+    { level: 3 },
+    { level: 4, vehicleStart: "cold" },
+  ],
+  conditions: { weather: "dry" },
+  localeBg: "bg-BG",
+};
+
 /** The speed-management templates, in catalog order (registered in
  *  templates.ts). */
 export const SCENARIO_TEMPLATES_SP: readonly ScenarioSpec[] = [
@@ -716,4 +827,5 @@ export const SCENARIO_TEMPLATES_SP: readonly ScenarioSpec[] = [
   SC_SPEED_TRANSITION,
   SC_SP_HARSH_BRAKE,
   SC_SP_CURVE,
+  SC_MW_DISCIPLINE,
 ];

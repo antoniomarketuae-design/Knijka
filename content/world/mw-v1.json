@@ -1,0 +1,194 @@
+{
+ "format": "district-v1",
+ "meta": {
+  "district": "mw",
+  "label": "Учебна автомагистрала — 2+2 с аварийна лента (сценарий SP-10)",
+  "mapKind": "scenario-street",
+  "generator": "tools/maps/gen_motorway.mjs",
+  "zonesVersion": 1,
+  "boundsLocalMeters": {
+   "minX": -48.56,
+   "minY": -6,
+   "maxX": 42.19,
+   "maxY": 1006
+  },
+  "attribution": {
+   "text": "Учебен участък от автомагистрала (2+2 с аварийна лента) — оригинален параметричен дизайн (без данни от OpenStreetMap)",
+   "license": "All rights reserved",
+   "licenseUrl": "/",
+   "copyrightUrl": "/",
+   "obligation": "none — original work, no ODbL attribution required for this map"
+  },
+  "defaults": {
+   "maxspeedUrbanKmh": 140,
+   "note": "Автомагистрала с ограничение 140 км/ч: движи се в дясната лента за движение със скоростта на потока; лявата е за изпреварване, а аварийната лента е само за принудително спиране."
+  },
+  "stats": {
+   "roadKm": 2,
+   "nodes": 4,
+   "edges": 2,
+   "intersections": 0,
+   "crossings": 0,
+   "buildings": 1,
+   "spawnPoints": 2,
+   "zones": 2
+  },
+  "scenario": {
+   "archetype": "motorway-segment",
+   "params": {
+    "lengthM": 1000,
+    "maxspeedKmh": 140,
+    "lanesPerDirection": 2,
+    "medianM": 6
+   },
+   "lanesPerDirection": 2,
+   "laneEmergencyX": 8.13,
+   "laneCruiseX": 0,
+   "laneLeftX": -8.12,
+   "emergencyZoneIds": [
+    "mw-z-emerg-nb",
+    "mw-z-emerg-sb"
+   ]
+  }
+ },
+ "roads": {
+  "nodes": [
+   {
+    "id": "mw-n-nb-end",
+    "x": 0,
+    "y": 1000
+   },
+   {
+    "id": "mw-n-nb-start",
+    "x": 0,
+    "y": 0
+   },
+   {
+    "id": "mw-n-sb-end",
+    "x": -30.37,
+    "y": 0
+   },
+   {
+    "id": "mw-n-sb-start",
+    "x": -30.37,
+    "y": 1000
+   }
+  ],
+  "edges": [
+   {
+    "id": "mw-e-nb",
+    "from": "mw-n-nb-start",
+    "to": "mw-n-nb-end",
+    "class": "primary",
+    "name": "Учебна автомагистрала — 2+2 с аварийна лента (сценарий SP-10)",
+    "oneway": true,
+    "roundabout": false,
+    "lanes": 3,
+    "lanesSource": "tag",
+    "maxspeed": 140,
+    "maxspeedSource": "tag",
+    "motorway": true,
+    "length": 1000,
+    "geometry": [
+     [
+      0,
+      0
+     ],
+     [
+      0,
+      1000
+     ]
+    ]
+   },
+   {
+    "id": "mw-e-sb",
+    "from": "mw-n-sb-start",
+    "to": "mw-n-sb-end",
+    "class": "primary",
+    "name": "Учебна автомагистрала — 2+2 с аварийна лента (сценарий SP-10)",
+    "oneway": true,
+    "roundabout": false,
+    "lanes": 3,
+    "lanesSource": "tag",
+    "maxspeed": 140,
+    "maxspeedSource": "tag",
+    "motorway": true,
+    "length": 1000,
+    "geometry": [
+     [
+      -30.37,
+      1000
+     ],
+     [
+      -30.37,
+      0
+     ]
+    ]
+   }
+  ]
+ },
+ "intersections": [],
+ "crossings": [],
+ "roundabouts": [],
+ "buildings": [
+  {
+   "id": "mw-b-service",
+   "height": 8,
+   "heightSource": "default",
+   "footprint": [
+    [
+     22.19,
+     440
+    ],
+    [
+     36.19,
+     440
+    ],
+    [
+     36.19,
+     470
+    ],
+    [
+     22.19,
+     470
+    ]
+   ]
+  }
+ ],
+ "spawnPoints": [
+  {
+   "id": "mw-spawn-approach",
+   "x": 0,
+   "y": 15,
+   "heading": 0,
+   "edgeId": "mw-e-nb",
+   "name": "Начало — дясна лента за движение"
+  },
+  {
+   "id": "mw-spawn-finish",
+   "x": 0,
+   "y": 985,
+   "heading": 0,
+   "edgeId": "mw-e-nb",
+   "name": "Контролна точка — край на отсечката"
+  }
+ ],
+ "zones": [
+  {
+   "id": "mw-z-emerg-nb",
+   "kind": "emergencyLane",
+   "edgeId": "mw-e-nb",
+   "fromM": 0,
+   "toM": 1000,
+   "signRef": "М2"
+  },
+  {
+   "id": "mw-z-emerg-sb",
+   "kind": "emergencyLane",
+   "edgeId": "mw-e-sb",
+   "fromM": 0,
+   "toM": 1000,
+   "signRef": "М2"
+  }
+ ]
+}

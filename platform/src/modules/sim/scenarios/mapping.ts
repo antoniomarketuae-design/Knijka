@@ -46,6 +46,11 @@ const CODE_TO_SCENARIO: Record<string, string> = {
   // CURVE-ENVELOPE slice (doc 72 SP-05) — the library event explicitly lists
   // curve geometry among its detections („в завой карай осезаемо по-бавно").
   SPEED_TOO_FAST_FOR_CURVE: "ev-speed-for-conditions",
+  // MOTORWAY-SEGMENT slice (doc 72 SP-10) — ev-speed-limit explicitly covers
+  // „don't crawl below a posted minimum"; the emergency-lane ban is the lane-
+  // legality discipline (which lane may be travelled — ev-lane-discipline).
+  DRIVING_TOO_SLOW_FOR_MOTORWAY: "ev-speed-limit",
+  EMERGENCY_LANE_DRIVING: "ev-lane-discipline",
 };
 
 /** Scenario event id for a catalog code, or null when it maps to no scenario. */

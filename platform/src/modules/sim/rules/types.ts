@@ -278,6 +278,26 @@ export interface SimTick {
    * `maxSpeedKmh` governing, exactly as before.
    */
   curveAdvisoryKmh?: number;
+  // -- MOTORWAY-SEGMENT slice (doc 72 SP-10 „Магистрала"; motorway-segment
+  // archetype). Same contract as every world-context field above: authored
+  // district DATA only, never heuristics — absent = not a motorway = every
+  // motorway detector silent. No pre-slice map carries either field.
+  /**
+   * The current edge is an АВТОМАГИСТРАЛА (edge-level `motorway: true` tag —
+   * generator data, the noOvertake/noUTurn surface-tag discipline). Arms the
+   * DRIVING_TOO_SLOW_FOR_MOTORWAY detector; the 140 limit itself already
+   * rides `maxSpeedKmh` (SPEEDING_* grade it with zero new code).
+   */
+  motorway?: boolean;
+  /**
+   * Inside an authored "emergencyLane" zone span: the CURB lane (laneId 0 of
+   * the vehicle's bank) is the лента за принудително спиране (ЗДвП чл. 58,
+   * т. 3 — движение по нея е забранено освен при принудително спиране).
+   * Read by EMERGENCY_LANE_DRIVING, and the keep-right detector stops
+   * requiring that lane (the busLaneRight seam, mirrored): cruising the
+   * rightmost TRAVEL lane (laneId 1) must never grade NOT_KEEPING_RIGHT.
+   */
+  emergencyLaneRight?: boolean;
   /** Distance to the next stop line ahead on the current edge (travel
    * direction), m, within the runtime's watch window; absent = none/unknown. */
   nextStopLineM?: number;
@@ -370,6 +390,9 @@ export type ViolationCode =
   | "RAIL_CROSSING_VIOLATION" // опасна: unguarded band entry without the mandatory full stop / entry while barred / coming to rest ON the tracks (RX-01/02/03, чл. 51–53)
   // CURVE-ENVELOPE slice (authored curveAdvisory district zones — doc 72 SP-05)
   | "SPEED_TOO_FAST_FOR_CURVE" // основна: sustained speed above the curve's posted advisory inside the marked arc (чл. 20 ал. 2)
+  // MOTORWAY-SEGMENT slice (doc 72 SP-10 — edge motorway tag + emergencyLane zones)
+  | "DRIVING_TOO_SLOW_FOR_MOTORWAY" // второстепенна: sustained causeless crawl under the чл. 54 50 km/h line on a motorway (SP-10; queue/transition innocent)
+  | "EMERGENCY_LANE_DRIVING" // опасна: sustained DRIVING in the лента за принудително спиране (чл. 58, т. 3; breakdown pull-off braking innocent, stopping descoped)
   // pre-drive procedure (procedures/machine.ts)
   | "PREDRIVE_STEP_SKIPPED" // второстепенна per skipped step
   | "PREDRIVE_SEATBELT_SKIPPED" // основна (skipping the belt is not a detail)
@@ -827,6 +850,61 @@ export interface RuleEngineConfig {
    * bend is exactly the SWOV loss-of-control novice the code teaches.
    */
   curveSpeedSustainSec: number;
+
+  // -- MOTORWAY-SEGMENT slice (doc 72 SP-10; edge motorway tag + emergencyLane
+  // zones) ---------------------------------------------------------------
+
+  /**
+   * SP-10 „минимална скорост на магистрала" master gate. DEFAULT ON —
+   * structurally safe (the zone-ban precedent): the detector only ever arms
+   * on tick.motorway, which comes exclusively from an authored edge-level
+   * `motorway: true` tag, and NO shipped map is a motorway — it cannot arm
+   * anywhere else. The switch exists for lessons that want the motorway
+   * context without the crawl grade.
+   */
+  motorwayMinSpeedEnabled: boolean;
+  /**
+   * The motorway flow floor, km/h. VERIFIED legal basis (content bank,
+   * q-magistrali-i-izvangradsko-026): Bulgarian law has NO general mandatory
+   * minimum driving speed on АМ — ЗДвП чл. 54 admits only vehicles whose
+   * CONSTRUCTIVE max exceeds 50 km/h, and a posted minimum applies only
+   * under the mandatory-minimum sign. 50 is therefore the honest line: a car
+   * SUSTAINED under it without a traffic cause sits below what the motorway
+   * legally admits — the SP-10 mobile chicane (speed-differential crashes).
+   */
+  motorwayMinFlowKmh: number;
+  /**
+   * |acceleration| (m/s²) below which the crawl counts as STEADY-STATE.
+   * Transitions are innocent by construction (A12): accelerating up through
+   * the sub-50 band after a move-off, or braking down through it toward a
+   * stop, both carry |a| well above this — only a HELD crawl grades.
+   */
+  motorwaySlowSteadyMps2: number;
+  /** A lead within this gap (m) means congestion — the crawl has a traffic
+   *  cause and never convicts (the cause-ledger discipline). Sized for
+   *  motorway headways: 60 m ≈ a 2 s gap at 110 km/h, so even a generous
+   *  queue crawl behind a lead stays innocent. */
+  motorwaySlowQueueGapM: number;
+  /** Seconds the causeless steady crawl must hold before
+   *  DRIVING_TOO_SLOW_FOR_MOTORWAY fires — one bill per episode, re-armed
+   *  only by genuine recovery (back at/над the flow floor). */
+  motorwaySlowSustainSec: number;
+
+  /**
+   * Чл. 58, т. 3 „движение по лентата за принудително спиране" — seconds of
+   * sustained DRIVING in the emergency lane before EMERGENCY_LANE_DRIVING
+   * fires. Deliberately SHORTER than the bus-lane 4 s and with NO indicator
+   * exemption: crossing the emergency lane is not a legal maneuver the way
+   * the bus-lane right-turn transit is — any sustained travel in it is the
+   * fault, signalled or not. The one legal use (the breakdown pull-off) is
+   * protected by the brake exemption below + the moving gate (the STOP
+   * itself is descoped — never graded here).
+   */
+  emergencyLaneSustainSec: number;
+  /** Deceleration (m/s², positive) at/above which emergency-lane presence is
+   *  a breakdown PULL-OFF in progress (braking to a stop) — the clock pauses.
+   *  A cruise/undertake holds speed or accelerates and still fires. */
+  emergencyLaneBrakeExemptMps2: number;
 }
 
 export const DEFAULT_RULE_CONFIG: RuleEngineConfig = {
@@ -976,4 +1054,20 @@ export const DEFAULT_RULE_CONFIG: RuleEngineConfig = {
   // advisoryKmh) can set tick.curveAdvisoryKmh — no pre-slice map carries one.
   curveSpeedGraceKmh: 5,
   curveSpeedSustainSec: 1.5,
+
+  // MOTORWAY-SEGMENT slice (doc 72 SP-10). Structurally data-armed like every
+  // zone detector: only an authored edge `motorway: true` tag sets
+  // tick.motorway, and only an authored emergencyLane span sets
+  // tick.emergencyLaneRight — no pre-slice map carries either.
+  motorwayMinSpeedEnabled: true,
+  motorwayMinFlowKmh: 50, // чл. 54's constructive line — see the interface note
+  // 0.5 m/s²: the recorder's own rates (accel 2.2 / brake ≥ 3.2) and any
+  // honest live transition sit far above it; a held crawl reads ~0.
+  motorwaySlowSteadyMps2: 0.5,
+  motorwaySlowQueueGapM: 60,
+  motorwaySlowSustainSec: 4,
+  // 3 s: an accidental clip of the lane edge can never hold it; the shortest
+  // deliberate undertake does (≈ 90+ m at motorway speed).
+  emergencyLaneSustainSec: 3,
+  emergencyLaneBrakeExemptMps2: 1,
 };
