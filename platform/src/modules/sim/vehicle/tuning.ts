@@ -167,6 +167,48 @@ export const WET_GRIP_FACTOR = 0.7;
  * model (doc 72 AC-08's invisible-hazard cue structure) and stays out.
  */
 export const SNOW_GRIP_FACTOR = 0.4;
+/**
+ * CROSSWIND lateral force (N) of an exposed segment — bridge deck, gap
+ * between buildings, the moment you clear an overtaken truck's bow wave
+ * (doc 72 AC-12). Fed to VehicleSim.windLateralN ONLY when a lesson AUTHORS
+ * LessonSpec.physics.crosswind (the wet-grip opt-in contract): the default
+ * wind is 0 and the calm path stays bit-identical (CI harness + the
+ * crosswind identity test are the proof).
+ *
+ * Value grounding, both channels documented honestly:
+ *  - AERO: side area of the fictional compact ≈ 4.0 m × 1.4 m ≈ 5.7 m²;
+ *    a strong gust of ~17 m/s (~60 km/h, the „силен вятър" warning band)
+ *    gives q = ½ρv² ≈ 177 Pa → F ≈ Cs(≈1.1) · A · q ≈ 1100 N. We run 1200 N
+ *    (a gust nearer 18 m/s) because the raycast tyre model bleeds part of
+ *    any sub-clamp lateral force each step — the honest number must survive
+ *    the model to stay teachable.
+ *  - MEASURED (crosswind.test.ts, the wet-braking-distance discipline): at
+ *    a hands-fixed ~70–80 km/h cruise, 1200 N drifts the car laterally
+ *    ≈ 0.5 m in 3 s, ≈ 1.0 m in 5 s, ≈ 2.7 m in 10 s (the drift compounds —
+ *    the heading itself slowly blows downwind); at a gust peak (1200 + 500)
+ *    ≈ 3.8 m in 10 s. Crossing a ~200 m exposed segment uncorrected
+ *    therefore drifts HALF A DRAWN LANE (8.125 m / 2) — exactly the AC-12
+ *    story („a gust shoves the car half a lane"). Wind accel = 1200/1220 ≈
+ *    0.98 m/s² ≈ 0.1 g vs the ≈ 13 m/s² tyre grip ceiling — the equilibrium
+ *    counter-steer measures BELOW 0.01 of full input (steer −0.01 already
+ *    out-pulls the wind ~4× at 80 km/h), so the duty the lesson teaches
+ *    (firm grip, gentle steady correction, reduced speed) genuinely works
+ *    and over-correction genuinely overshoots — the doc-72 second-swerve
+ *    killer is reproducible in the live car.
+ * Hurricane forces, tyre blowouts and the doc-65 Phase-4 wind-zone model
+ * (per-segment exposure) are NOT this constant and stay out of the slice.
+ */
+export const CROSSWIND_BRIDGE_N = 1200;
+/**
+ * Gust envelope on top of CROSSWIND_BRIDGE_N — a PURE SINE (VehicleSim
+ * windGust: no RNG, deterministic, reset() rewinds the clock), so the wind
+ * breathes between ~0.6× and ~1.4× of the base instead of reading as a
+ * constant lean. Amplitude stays below the base: the wind never reverses
+ * direction mid-lesson (a real gust front slackens, it does not flip).
+ */
+export const CROSSWIND_GUST_AMPLITUDE_N = 500;
+/** Gust sine period (s) — the slow breathing of a bridge-deck wind. */
+export const CROSSWIND_GUST_PERIOD_SEC = 5;
 
 // ---------------------------------------------------------------------------
 // Drivetrain

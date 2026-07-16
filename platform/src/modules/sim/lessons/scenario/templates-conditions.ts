@@ -47,9 +47,16 @@
  * ADR-006 stage 4a adds sc-ac-wet-braking — the FIRST template on the opt-in
  * wet-grip physics slice (LessonSpec.physics.wetGrip ← ScenarioSpec.physics):
  * the friction-model slice of the doc-72 AC-07 subsystem (wet braking distance
- * ~1.4×; the standing-water aquaplane FLOAT itself, and AC-12 crosswind,
- * remain Phase-4 work). See that template's header for the dual-channel
- * honesty note (live physics vs authored kinematic demos).
+ * ~1.4×; the standing-water aquaplane FLOAT itself remains Phase-4 work). See
+ * that template's header for the dual-channel honesty note (live physics vs
+ * authored kinematic demos).
+ *
+ * The CROSSWIND unlock adds sc-ac-crosswind (AC-12) — the wind slice on the
+ * SAME opt-in seam (physics.crosswind → VehicleSim windLateralN + the
+ * deterministic gust sine; vehicle/crosswind.test.ts is the bit-identity +
+ * measured-push proof). NO new rule code: the shipped lane detectors grade
+ * the drift, exactly as doc 72 called it. Per-segment wind ZONES / exposure
+ * modelling stay doc-65 Phase-4 work.
  *
  * The SNOW unlock adds sc-ac-snow (AC-08's packed-snow slice) — the LAST
  * weather ungated, by COMPOSING the two shipped seams: fog's render path
@@ -763,6 +770,149 @@ export const SC_AC_SNOW: ScenarioSpec = {
   localeBg: "bg-BG",
 };
 
+// ---------------------------------------------------------------------------
+// 7. sc-ac-crosswind — „Страничен вятър" (AC-12) on fo-follow-v1 (360 m
+//    straight street, limit 50, DAY DRY — the CROSSWIND physics unlock)
+// ---------------------------------------------------------------------------
+
+/**
+ * AC-12 — страничен вятър на открит участък (ЗДвП чл. 20, ал. 2: скоростта се
+ * съобразява с атмосферните условия — вятърът е изрично такова условие — така
+ * че водачът да запази контрол над превозното средство).
+ *
+ * THE WIND IS THE LESSON (the first opt-in crosswind template):
+ *  - `physics.crosswind` compiles to LessonSpec.physics.crosswind → the LIVE
+ *    student car takes a WESTWARD lateral force (−tuning.CROSSWIND_BRIDGE_N
+ *    along world X) plus the deterministic gust sine (CROSSWIND_GUST_*):
+ *    measured ≈1 m of downwind drift per 5 s hands-fixed at speed,
+ *    compounding as the heading blows over (vehicle/crosswind.test.ts). On
+ *    this northbound street „downwind" = toward the осева — the exact AC-12
+ *    danger. A small steady counter-steer holds the lane; an over-correction
+ *    genuinely overshoots.
+ *  - DUAL-CHANNEL HONESTY (the 4a law, wind edition): the recorded demos are
+ *    KINEMATIC (the recorder never runs VehicleSim), so the wind story is
+ *    AUTHORED into the ghost polylines — the shadow's small held-and-released
+ *    deviation, the mistakes' line-crossing drifts (traces/scAcCrosswind.ts).
+ *  - NO NEW RULE CODE (doc 72's own call: „the POOR_LANE_KEEPING detector
+ *    would grade the outcome unchanged"): the drift toward oncoming grades
+ *    CENTER_LINE_TOUCHED, the over-correction wobble POOR_LANE_KEEPING —
+ *    the shipped lane detectors ARE the honest grading.
+ *  - DELIBERATELY NOT coupled to any weather tag: conditions stay "dry"
+ *    (clear sky, full grip — wind is force, not friction), and no rain/fog/
+ *    snow lesson acquires wind. Only this template AUTHORS the flag.
+ *  - HONEST VISUAL SCOPE (stated, not hidden): no windsock/foliage assets and
+ *    no per-zone exposure model ship in this slice — the live wind blows over
+ *    the whole map; the copy narrates the exposed segment (y ≈ 150–265, the
+ *    „мост"), and the предупредителен знак for strong crosswind is copy-only.
+ *    Wind zones are doc-65 Phase-4 work.
+ */
+export const SC_AC_CROSSWIND: ScenarioSpec = {
+  id: "sc-ac-crosswind",
+  family: "conditions",
+  tagsBg: ["условия", "страничен вятър", "пориви", "контрол на волана"],
+  titleBg: "Страничен вятър",
+  objectiveBg:
+    "Мини открития участък въпреки страничния вятър: намали преди него, дръж волана здраво и посрещай поривите с леки, постоянни корекции — поривът бута колата към осевата линия, а рязката свръхкорекция е точно толкова опасна.",
+  archetypeIds: ["AC-12"],
+  conceptIds: ["c-speed-adaptation", "c-vehicle-controls", "c-general-care-duty"],
+  map: {
+    archetype: "straight-street",
+    // Reuses the committed fo-follow-v1 map (a plain 1+1 straight street) —
+    // its meta.scenario.params, mirrored here for provenance.
+    params: { lengthM: 360, maxspeedKmh: 50 },
+    districtId: "fo-follow-v1",
+  },
+  start: {
+    spawnPointId: "fo-spawn-approach",
+    vehicleStart: "ready",
+  },
+  instructionsBg: [
+    {
+      n: 1,
+      textBg:
+        "Напред е открит участък — мост, където страничният вятър духа силно отдясно. Хвани волана здраво с двете ръце още преди него.",
+    },
+    {
+      n: 2,
+      textBg:
+        "Намали ПРЕДИ открития участък — тук около 34 км/ч: колкото по-бавно караш, толкова по-малко те мести поривът.",
+    },
+    {
+      n: 3,
+      textBg:
+        "Поривът бута колата наляво, към осевата линия — посрещни го с лека, ПОСТОЯННА корекция надясно, не с рязко завъртане.",
+    },
+    {
+      n: 4,
+      textBg:
+        "Вятърът диша: отслабне ли поривът, отпусни корекцията плавно. Рязката „втора корекция“ изхвърля колата към бордюра — тя е истинският убиец при вятър.",
+    },
+    {
+      n: 5,
+      textBg:
+        "Дръж лентата до края на отсечката и очаквай нов порив при всяко следващо открито място — край на сграда, мост, изпреварен камион.",
+    },
+  ],
+  success: [
+    {
+      id: "sc-acx-open",
+      titleBg: "Мини открития участък със съобразена скорост",
+      // Cap 40 is the prudent-wind band this drill teaches (the shadow runs
+      // ~34): both mistake demos carry near-50 through the gap and cannot
+      // complete it — чл. 20 ал. 2 is graded by the objective, the LANE
+      // discipline by the shipped detectors.
+      params: { kind: "reachZone", x: LANE_X, y: 180, radiusM: 10, maxSpeedKmh: 40 },
+    },
+    {
+      id: "sc-acx-finish",
+      titleBg: "Стигни края на отсечката",
+      params: { kind: "reachZone", x: LANE_X, y: 330, radiusM: 12 },
+    },
+  ],
+  rubric: { parTimeSec: 75 },
+  // RECORDED: committed deterministic recordings of the authored scripts in
+  // traces/scAcCrosswind.ts; gates in traces/__tests__/
+  // sc-ac-crosswind-traces.test.ts (re-record with RECORD_TRACES=1).
+  shadow: { path: "content/traces/sc-ac-crosswind/shadow-correct.trace.json" },
+  mistakes: [
+    {
+      traceRef: { path: "content/traces/sc-ac-crosswind/mistake-full-speed.trace.json" },
+      titleBg: "Полет през открития участък",
+      whatWentWrongBg:
+        "Колата влезе в открития участък с 50 км/ч и отпусната ръка — поривът я премести с метри наляво и тя яздеше осевата линия срещу насрещното, докато водачът реагира. На открито място скоростта се смъква ПРЕДИ порива, а воланът се държи здраво (чл. 20, ал. 2).",
+      codeRefs: ["CENTER_LINE_TOUCHED"],
+    },
+    {
+      traceRef: { path: "content/traces/sc-ac-crosswind/mistake-overcorrect.trace.json" },
+      titleBg: "Свръхкорекцията — вторият замах",
+      whatWentWrongBg:
+        "Поривът премести колата наляво — а водачът дръпна волана рязко надясно и я изхвърли чак до бордюра, лъкатушейки през половината платно. Свръхкорекцията е по-опасна от самия порив: срещу вятър се стои с меки, постоянни корекции, никога с резки движения.",
+      codeRefs: ["POOR_LANE_KEEPING"],
+    },
+  ],
+  teach: {
+    whenBg:
+      "Навсякъде, където заслонът внезапно изчезва: мостове, отвори между сгради, краят на гора, изходът от тунел — и в мига, в който подминеш изпреварван камион и излезеш от завета му. Предупредителният знак за страничен вятър и ръкавът-ветропоказател са сигнал да намалиш и да стегнеш хвата ОЩЕ ПРЕДИ порива.",
+    whyBg:
+      "Поривът бута колата с постоянна сила встрани — при висока скорост изминаваш повече метри, докато реагираш, и дрейфът те изнася към осевата линия. Още по-опасен е рефлексът „рязко срещу вятъра“: когато поривът внезапно отслабне, рязко завъртяният волан сам изхвърля колата на другата страна — вторият замах е причината за повечето катастрофи при вятър. Затова законът връзва скоростта и с атмосферните условия (чл. 20, ал. 2): по-бавно, здрав хват, меки корекции.",
+    lawRef: "ЗДвП чл. 20, ал. 2",
+    examinerBg:
+      "Изпитващият следи контрола на волана при вятър и на открити участъци: очаква намаляване преди тях, стабилна лента и спокойни корекции. Лъкатушенето в лентата е грешка, а навлизането към осевата линия при насрещно движение — тежка: дръж две ръце на волана и смъкни скоростта.",
+  },
+  levels: [
+    { level: 1 },
+    { level: 2 },
+    { level: 3 },
+    { level: 4, vehicleStart: "cold" },
+  ],
+  // DRY, clear weather — the wind is PHYSICS, never a weather render tag.
+  conditions: { weather: "dry" },
+  // THE SLICE: the live student car runs the crosswind force (opt-in,
+  // authored — no weather tag ever flips physics, the wet precedent).
+  physics: { crosswind: true },
+  localeBg: "bg-BG",
+};
+
 /** The adverse-conditions-family templates, in catalog order (registered in
  *  templates.ts). */
 export const SCENARIO_TEMPLATES_CONDITIONS: readonly ScenarioSpec[] = [
@@ -772,4 +922,5 @@ export const SCENARIO_TEMPLATES_CONDITIONS: readonly ScenarioSpec[] = [
   SC_AC_WET_BRAKING,
   SC_AC_FOG,
   SC_AC_SNOW,
+  SC_AC_CROSSWIND,
 ];

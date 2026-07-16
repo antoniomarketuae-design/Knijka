@@ -201,13 +201,14 @@ export function compileScenario(spec: ScenarioSpec, level: ScenarioLevel): Lesso
     // the student's own attempt grades the taught fault (not only the shadow).
     ...(spec.ruleConfig ? { ruleConfig: spec.ruleConfig } : {}),
     // 4a physics opt-in (the ruleConfig pattern): only a template that AUTHORS
-    // physics.wetGrip / physics.snowGrip flips the live car to reduced grip —
-    // rain/snow weather alone never does.
-    ...(spec.physics?.wetGrip || spec.physics?.snowGrip
+    // physics.wetGrip / physics.snowGrip / physics.crosswind flips the live
+    // car to reduced grip or lateral wind — no weather tag ever does.
+    ...(spec.physics?.wetGrip || spec.physics?.snowGrip || spec.physics?.crosswind
       ? {
           physics: {
             ...(spec.physics.wetGrip ? { wetGrip: true } : {}),
             ...(spec.physics.snowGrip ? { snowGrip: true } : {}),
+            ...(spec.physics.crosswind ? { crosswind: true } : {}),
           },
         }
       : {}),

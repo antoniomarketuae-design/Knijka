@@ -84,6 +84,28 @@ export interface VehicleSimOptions {
    * NOT grip-limited and stay unscaled.
    */
   gripFactor?: number;
+  /**
+   * CROSSWIND slice (doc 72 AC-12) — constant lateral wind force, newtons,
+   * along the WORLD +X axis (district east; vehicleSample.ts maps district
+   * x = world x, so a NEGATIVE value blows west). WORLD-frame by design: wind
+   * blows from a compass direction, independent of the car's heading —
+   * driving into it head-on feels nothing lateral, crossing an exposed
+   * segment takes the full shove. Applied to the chassis every step exactly
+   * like the aero forces (addForce, cleared by the per-step resetForces).
+   * Crosswind lessons pass ±tuning.CROSSWIND_BRIDGE_N. Default 0 = the force
+   * is NEVER applied (the branch is skipped, zero extra rapier calls) —
+   * bit-identical dynamics, proven by the crosswind identity test and the
+   * untouched CI harness baselines.
+   */
+  windLateralN?: number;
+  /**
+   * Optional deterministic gust envelope on top of windLateralN: a PURE SINE
+   * (no RNG, no state beyond a clock that reset() rewinds), adding
+   * amplitudeN · sin(2π·t/periodSec) to the constant term. Same world +X
+   * axis and sign convention. Ignored unless periodSec > 0. Absent (or
+   * amplitude 0) with windLateralN 0 = no wind code path at all.
+   */
+  windGust?: { periodSec: number; amplitudeN: number };
 }
 
 const FL = 0;
@@ -161,6 +183,16 @@ export class VehicleSim {
   private steer = 0;
   /** Surface grip factor (1 = dry; see VehicleSimOptions.gripFactor). */
   private readonly gripFactor: number;
+  /** Constant lateral wind, N along world +X (0 = no wind code path). */
+  private readonly windLateralN: number;
+  /** Gust sine amplitude, N (0 = constant-only wind). */
+  private readonly windGustAmplitudeN: number;
+  /** Gust sine period, s (guarded > 0 in the constructor). */
+  private readonly windGustPeriodSec: number;
+  /** True when ANY wind term is non-zero — the single gate on the wind path. */
+  private readonly windActive: boolean;
+  /** Wind clock (s) for the deterministic gust sine; reset() rewinds it. */
+  private windClockSec = 0;
   /** Low-passed lateral acceleration (m/s², car-local, + = left). */
   private aLatSmooth = 0;
   private readonly prevVel: Vec3 = { x: 0, y: 0, z: 0 };
@@ -189,6 +221,14 @@ export class VehicleSim {
     // dry car: every use below multiplies by 1.0, which is the IEEE-754
     // identity, so the dry path stays bit-identical (harness-proven).
     this.gripFactor = clamp(options?.gripFactor ?? 1, 0.3, 1);
+    // Crosswind (AC-12): defaults keep windActive FALSE, so the update loop
+    // never enters the wind branch — the dry/calm path stays bit-identical
+    // (no extra rapier calls, no clock advance; crosswind.test.ts is the proof).
+    this.windLateralN = options?.windLateralN ?? 0;
+    const gust = options?.windGust;
+    this.windGustAmplitudeN = gust !== undefined && gust.periodSec > 0 ? gust.amplitudeN : 0;
+    this.windGustPeriodSec = gust !== undefined && gust.periodSec > 0 ? gust.periodSec : 1;
+    this.windActive = this.windLateralN !== 0 || this.windGustAmplitudeN !== 0;
     this.spawnRotation = yawQuat(spawn.yawRad);
     this.spawnTranslation = { x: spawn.x, y: spawn.y, z: spawn.z };
     this.chassisColliderHandle = body.collider(0).handle;
@@ -377,6 +417,22 @@ export class VehicleSim {
       );
     }
 
+    // --- Crosswind (AC-12, opt-in): world-frame lateral force ----------------
+    // Constant + optional pure-sine gust along world +X (see the options doc).
+    // Applied like the aero forces above (accumulates onto the same per-step
+    // force reset). Gate: windActive is false on every default construction,
+    // so calm sessions never touch this branch — bit-identity preserved.
+    if (this.windActive) {
+      this.windClockSec += dt;
+      let windN = this.windLateralN;
+      if (this.windGustAmplitudeN !== 0) {
+        windN +=
+          this.windGustAmplitudeN *
+          Math.sin((2 * Math.PI * this.windClockSec) / this.windGustPeriodSec);
+      }
+      this.body.addForce({ x: windN, y: 0, z: 0 }, true);
+    }
+
     // --- Body-roll coupling (see tuning.ts: rapier suppresses roll torque) --
     this.applyRollCoupling(dt);
 
@@ -399,6 +455,7 @@ export class VehicleSim {
     this.body.resetTorques(true);
     this.steer = 0;
     this.aLatSmooth = 0;
+    this.windClockSec = 0; // gust sine restarts with the attempt (determinism)
     this.prevVel.x = 0;
     this.prevVel.y = 0;
     this.prevVel.z = 0;

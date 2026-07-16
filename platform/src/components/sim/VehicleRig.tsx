@@ -91,6 +91,9 @@ export function VehicleRig({
   collisionMinKmh = COLLISION_MIN_KMH,
   night = false,
   gripFactor = 1,
+  windLateralN = 0,
+  windGustAmplitudeN = 0,
+  windGustPeriodSec = 0,
   telltaleLitRef,
 }: {
   simRef: RefObject<VehicleSim | null>;
@@ -126,6 +129,18 @@ export function VehicleRig({
    *  environment.rain/snow (shipped weather lessons were tuned dry — the
    *  flag is authored per scenario). */
   gripFactor?: number;
+  /** CROSSWIND slice (doc 72 AC-12) — OPT-IN constant lateral wind force, N
+   *  along WORLD +X (district east; negative = west). 0 (default, every
+   *  existing lesson) = the wind branch never runs, bit-identical dynamics;
+   *  crosswind lessons pass ±tuning.CROSSWIND_BRIDGE_N via
+   *  LessonSpec.physics.crosswind. Never derived from weather (the wet-grip
+   *  non-coupling law). Scalar props (not an options object) so the effect
+   *  dependency stays value-stable across renders. */
+  windLateralN?: number;
+  /** Gust sine amplitude, N, on the same world axis (0 = constant-only). */
+  windGustAmplitudeN?: number;
+  /** Gust sine period, s (must be > 0 for the gust to arm). */
+  windGustPeriodSec?: number;
   /** N11 (VP-06): director→cluster warning-lamp channel, threaded to
    *  VitokCockpit (the hazardActiveRef pattern — render-free ref, read per
    *  frame). Absent = the temperature telltale never lights. */
@@ -155,14 +170,22 @@ export function VehicleRig({
       spawn,
       // 4a: per-lesson surface grip. The default (1) constructs EXACTLY the
       // pre-4a car — the options object with gripFactor 1 is the identity.
-      { gripFactor },
+      // AC-12: per-lesson crosswind. The defaults (0) keep the wind branch
+      // dormant — same identity discipline as gripFactor.
+      {
+        gripFactor,
+        windLateralN,
+        ...(windGustAmplitudeN !== 0 && windGustPeriodSec > 0
+          ? { windGust: { periodSec: windGustPeriodSec, amplitudeN: windGustAmplitudeN } }
+          : {}),
+      },
     );
     simRef.current = sim;
     return () => {
       if (simRef.current === sim) simRef.current = null;
       sim.dispose();
     };
-  }, [world, simRef, spawn, gripFactor]);
+  }, [world, simRef, spawn, gripFactor, windLateralN, windGustAmplitudeN, windGustPeriodSec]);
 
   // Runs once per fixed 60 Hz substep, right before world.step() — exactly
   // the contract VehicleSim.update() requires. Always the fixed dt.

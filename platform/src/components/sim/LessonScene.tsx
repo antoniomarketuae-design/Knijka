@@ -34,6 +34,9 @@ import {
   TouchInputSource,
 } from "@/modules/sim/engine";
 import {
+  CROSSWIND_BRIDGE_N,
+  CROSSWIND_GUST_AMPLITUDE_N,
+  CROSSWIND_GUST_PERIOD_SEC,
   FIXED_DT,
   GRAVITY,
   SPAWN,
@@ -893,6 +896,15 @@ function ReadyScene({
                   lesson.physics?.wetGrip ? WET_GRIP_FACTOR : 1,
                   lesson.physics?.snowGrip ? SNOW_GRIP_FACTOR : 1,
                 )}
+                // AC-12: the OPT-IN crosswind, same authored-field-only law.
+                // NEGATIVE = the wind blows WEST (world −X = district west,
+                // vehicleSample.ts axis map): on the northbound drill street
+                // it shoves the car toward the center line — the taught
+                // danger. Constants stay in tuning.ts (the single truth the
+                // authored ghost story is written against).
+                windLateralN={lesson.physics?.crosswind ? -CROSSWIND_BRIDGE_N : 0}
+                windGustAmplitudeN={lesson.physics?.crosswind ? -CROSSWIND_GUST_AMPLITUDE_N : 0}
+                windGustPeriodSec={lesson.physics?.crosswind ? CROSSWIND_GUST_PERIOD_SEC : 0}
                 // N11 (VP-06): director→cluster warning-lamp channel.
                 telltaleLitRef={telltaleLitRef}
               />

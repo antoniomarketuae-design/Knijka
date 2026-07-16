@@ -342,6 +342,18 @@ export {
   recordScAcSnowDrive,
   type ScAcSnowTraceName,
 } from "./scAcSnow";
+// CROSSWIND unlock (doc 72 AC-12 — the opt-in lateral-wind physics slice on
+// the wet-grip seam) — the day-dry authored drives (sc-ac-crosswind: the
+// drift-and-correct wind story AUTHORED into the ghost polylines; the LIVE
+// wind is physics.crosswind → VehicleSim windLateralN + gust; the shipped
+// lane detectors grade the drift — NO new rule code). Committed traces under
+// content/traces/sc-ac-crosswind/ are recordings of exactly these scripts
+// (gate: traces/__tests__/sc-ac-crosswind-traces).
+export {
+  SC_AC_CROSSWIND_ID,
+  recordScAcCrosswindDrive,
+  type ScAcCrosswindTraceName,
+} from "./scAcCrosswind";
 
 // Detector pack unit 2 — Part A (shipped detectors: FO-08 standstill gap,
 // OV-07 crossing overtake) + Part B (config-gated drills: JU-23 junction scan,

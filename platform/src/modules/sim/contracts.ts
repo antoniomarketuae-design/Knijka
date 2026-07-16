@@ -167,15 +167,24 @@ export interface LessonSpec {
    * cornering grip. `snowGrip: true` runs it at tuning.SNOW_GRIP_FACTOR
    * (0.4, packed snow → ~2.5× braking distance); when both are authored the
    * MOST RESTRICTIVE factor wins (min — the condition-factor discipline).
-   * DELIBERATELY DECOUPLED from environment.rain/snow: today's rain lessons
-   * were authored and recorded against dry physics, and flipping them would
-   * silently change shipped feel — only a scenario that AUTHORS the physics
-   * field (compileScenario ← ScenarioSpec.physics) gets reduced-grip
-   * dynamics. Absent = gripFactor 1.0 = bit-identical dry physics (the CI
-   * harness baselines are the proof). Recorded traces are kinematic and never
-   * read this field — their wet/snow honesty is authored in the trace scripts.
+   * `crosswind: true` (doc 72 AC-12 — the wind unlock) blows a constant
+   * westward lateral wind + a deterministic sine gust through the LIVE
+   * session (tuning.CROSSWIND_BRIDGE_N ± CROSSWIND_GUST_*, world −X =
+   * district west; on a northbound street it shoves the car toward the
+   * center line — the AC-12 story). An ORTHOGONAL channel: it composes with
+   * the grip flags and touches force, never μ.
+   * DELIBERATELY DECOUPLED from environment.rain/snow (and every weather
+   * tag): today's rain lessons were authored and recorded against dry, CALM
+   * physics, and flipping them would silently change shipped feel — only a
+   * scenario that AUTHORS the physics field (compileScenario ←
+   * ScenarioSpec.physics) gets reduced-grip or wind dynamics. Absent =
+   * gripFactor 1.0, wind 0 = bit-identical dry physics (the CI harness
+   * baselines are the proof). Recorded traces are kinematic and never read
+   * this field — their wet/snow/wind honesty is authored in the trace
+   * scripts (the dual-channel notes in traces/scAcWetBraking.ts and
+   * traces/scAcCrosswind.ts).
    */
-  physics?: { wetGrip?: boolean; snowGrip?: boolean };
+  physics?: { wetGrip?: boolean; snowGrip?: boolean; crosswind?: boolean };
   /**
    * Per-lesson rule-engine config override (merged over DEFAULT_RULE_CONFIG;
    * createLessonSession opts win over this). Scenario drills for config-gated

@@ -325,14 +325,17 @@ export interface ScenarioSpec {
    * `wetGrip: true` runs the STUDENT's car at the wet grip factor (~1.4×
    * braking distance, reduced cornering grip); `snowGrip: true` at the snow
    * grip factor (packed snow ≈ 0.4 — ~2.5× braking distance; the SNOW
-   * unlock, doc 72 AC-08). Deliberately NOT implied by conditions.weather
-   * ("rain"/"snow" render without touching physics): shipped weather lessons
-   * were tuned against dry physics — only a template that AUTHORS this field
-   * gets reduced-grip dynamics. Semantic booleans, not raw numbers, so the
-   * factor constants (vehicle/tuning.ts) stay the single source of truth the
-   * authored ghost envelopes are pinned against.
+   * unlock, doc 72 AC-08); `crosswind: true` blows the westward lateral wind
+   * + deterministic gust through the live car (CROSSWIND_BRIDGE_N ±
+   * CROSSWIND_GUST_* — the AC-12 wind unlock). Deliberately NOT implied by
+   * conditions.weather ("rain"/"snow" render without touching physics, and
+   * NO weather tag implies wind): shipped weather lessons were tuned against
+   * dry, calm physics — only a template that AUTHORS this field gets
+   * reduced-grip or wind dynamics. Semantic booleans, not raw numbers, so
+   * the factor constants (vehicle/tuning.ts) stay the single source of truth
+   * the authored ghost envelopes are pinned against.
    */
-  physics?: { wetGrip?: boolean; snowGrip?: boolean };
+  physics?: { wetGrip?: boolean; snowGrip?: boolean; crosswind?: boolean };
   /** Bulgaria is the product (doc 76 §0 — locale from day one, no country packs). */
   localeBg: "bg-BG";
 }
