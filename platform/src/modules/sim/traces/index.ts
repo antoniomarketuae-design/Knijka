@@ -288,6 +288,32 @@ export {
   type ScFollowRainGapTraceName,
 } from "./scFollowRainGap";
 
+// Final harvest — config-gated move-off-observation drill (doc 72 PK-05) +
+// reverse-into-a-driveway (doc 72 PK-11); committed traces under
+// content/traces/<template>/ are recordings of exactly these scripts (gates:
+// traces/__tests__/sc-pk-move-off- / sc-pk-driveway-traces).
+export {
+  SC_PK_MOVE_OFF_ID,
+  recordScPkMoveOffDrive,
+  type ScPkMoveOffTraceName,
+} from "./scPkMoveOff";
+export {
+  SC_PK_DRIVEWAY_ID,
+  PK_DRIVE_TARGET_BAY,
+  drivewayObstacles,
+  recordScPkDrivewayDrive,
+  type ScPkDrivewayTraceName,
+} from "./scPkDriveway";
+// Final harvest — green-hesitation drill on a LIVE green phase (doc 72 JU-09);
+// committed traces under content/traces/sc-signal-hesitation/ are recordings of
+// exactly these scripts (gate: traces/__tests__/sc-signal-hesitation-traces).
+export {
+  SC_SIGNAL_HESITATION_ID,
+  SX_PIN_NS_GREEN_HOLD,
+  recordScSignalHesitationDrive,
+  type ScSignalHesitationTraceName,
+} from "./scSignalHesitation";
+
 // Signals family — the dead/flashing-signal capability drives (sc-signal-dead /
 // sc-signal-flashing); the signal cluster is dialed DARK / flashing amber and
 // the junction falls back to the right-hand rule (doc 72 JU-20). Committed

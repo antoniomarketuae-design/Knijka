@@ -1,0 +1,131 @@
+{
+ "format": "district-v1",
+ "meta": {
+  "district": "pk-drive",
+  "label": "Учебна жилищна улица — заден ход в алея (сценарий PK-11)",
+  "mapKind": "scenario-street",
+  "generator": "tools/maps/gen_pk_driveway.mjs",
+  "boundsLocalMeters": {
+   "minX": -14.125,
+   "minY": 0,
+   "maxX": 18,
+   "maxY": 90
+  },
+  "attribution": {
+   "text": "Учебна жилищна улица с алея за паркиране на заден ход — оригинален параметричен дизайн (без данни от OpenStreetMap)",
+   "license": "All rights reserved",
+   "licenseUrl": "/",
+   "copyrightUrl": "/",
+   "obligation": "none — original work, no ODbL attribution required for this map"
+  },
+  "defaults": {
+   "maxspeedUrbanKmh": 30,
+   "note": "Жилищна улица: фокусът е върху заден ход в алея — оглеждане, контрол и краен резултат в очертанията."
+  },
+  "stats": {
+   "roadKm": 0.09,
+   "nodes": 2,
+   "edges": 1,
+   "intersections": 0,
+   "crossings": 0,
+   "buildings": 1,
+   "spawnPoints": 2
+  },
+  "scenario": {
+   "archetype": "straight-street",
+   "params": {
+    "lengthM": 90,
+    "maxspeedKmh": 30,
+    "drivewayY": 45
+   },
+   "lanesPerDirection": 1,
+   "laneCenterRightM": 4.06
+  }
+ },
+ "roads": {
+  "nodes": [
+   {
+    "id": "pkd-n-end",
+    "x": 0,
+    "y": 90
+   },
+   {
+    "id": "pkd-n-start",
+    "x": 0,
+    "y": 0
+   }
+  ],
+  "edges": [
+   {
+    "id": "pkd-e-street",
+    "from": "pkd-n-start",
+    "to": "pkd-n-end",
+    "class": "residential",
+    "name": "Жилищна улица с алея за паркиране на заден ход",
+    "oneway": false,
+    "roundabout": false,
+    "lanes": 2,
+    "lanesSource": "tag",
+    "maxspeed": 30,
+    "maxspeedSource": "tag",
+    "length": 90,
+    "geometry": [
+     [
+      0,
+      0
+     ],
+     [
+      0,
+      90
+     ]
+    ]
+   }
+  ]
+ },
+ "intersections": [],
+ "crossings": [],
+ "roundabouts": [],
+ "buildings": [
+  {
+   "id": "pkd-b-garage",
+   "height": 4,
+   "heightSource": "default",
+   "footprint": [
+    [
+     12,
+     37
+    ],
+    [
+     18,
+     37
+    ],
+    [
+     18,
+     53
+    ],
+    [
+     12,
+     53
+    ]
+   ]
+  }
+ ],
+ "spawnPoints": [
+  {
+   "id": "pkd-spawn-approach",
+   "x": 4.06,
+   "y": 15,
+   "heading": 0,
+   "edgeId": "pkd-e-street",
+   "name": "Начало на отсечката"
+  },
+  {
+   "id": "pkd-spawn-finish",
+   "x": 4.06,
+   "y": 80,
+   "heading": 0,
+   "edgeId": "pkd-e-street",
+   "name": "Контролна точка — край на отсечката"
+  }
+ ]
+}

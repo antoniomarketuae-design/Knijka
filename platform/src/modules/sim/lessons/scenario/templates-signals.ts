@@ -297,8 +297,113 @@ export const SC_SIGNAL_FLASHING: ScenarioSpec = {
   localeBg: "bg-BG",
 };
 
+// ---------------------------------------------------------------------------
+// sc-signal-hesitation — „Спане на зелено" (doc 72 JU-09) on sx-v1 (map REUSED;
+// a LIVE green phase pinned over the encounter — no staged conflict, the fault
+// is the driver's own delay)
+// ---------------------------------------------------------------------------
+
+/** JU-09 — закъснели действия на зелено (ППЗДвП чл. 31: зеленият сигнал
+ *  разрешава преминаването; ЗДвП чл. 20 — водачът контролира ППС и не създава
+ *  ненужни пречки за движението). Distinct from the dead/flashing fallbacks: a
+ *  LIVE green light where the taught fault is FREEZING instead of proceeding.
+ *  No staged conflict — the drives cross straight through on green, so the ONLY
+ *  gradeable event is the hesitation (config-free: HESITATION_AT_GREEN is a
+ *  default-on detector that the shipped junction shadows deliberately avoid). */
+export const SC_SIGNAL_HESITATION: ScenarioSpec = {
+  id: "sc-signal-hesitation",
+  family: "signals",
+  tagsBg: ["светофар", "зелено", "закъснели действия", "спане на зелено"],
+  titleBg: "Спане на зелено",
+  objectiveBg:
+    "Светофарът свети зелено и напред е чисто: тръгни без бавене. Зеленото разрешава преминаване — замразяването на зелено блокира кръстовището и е закъсняло действие, което изпитващият отбелязва.",
+  archetypeIds: ["JU-09"],
+  conceptIds: ["c-traffic-light-signals", "c-signal-hierarchy", "c-junction-approach"],
+  map: {
+    archetype: "x-junction",
+    // Map REUSED from the signals family — mirrored in sx-v1.json params. The
+    // green phase is a runtime session-start dial (signalOffsets), not a map
+    // property.
+    params: {
+      armNorthM: 90,
+      armSouthM: 120,
+      armEastM: 120,
+      armWestM: 170,
+      nsClass: "secondary",
+      ewClass: "residential",
+      nsMaxKmh: 50,
+      ewMaxKmh: 40,
+    },
+    districtId: "sx-v1",
+  },
+  start: {
+    spawnPointId: "sx-spawn-south",
+    vehicleStart: "ready",
+  },
+  instructionsBg: [
+    { n: 1, textBg: "Тръгни по булеварда на север — напред е светофарно кръстовище, което свети ЗЕЛЕНО." },
+    { n: 2, textBg: "Зеленото не значи „чакай“, а „премини, ако е безопасно“. Провери, че кутията на кръстовището е чиста." },
+    { n: 3, textBg: "Щом напред е чисто, премини правó напред без излишно спиране и бавене." },
+    { n: 4, textBg: "Не замръзвай на зелено „за всеки случай“ — това блокира кръстовището и колоната зад теб." },
+    { n: 5, textBg: "Продължи спокойно на север след кръстовището." },
+  ],
+  success: [
+    {
+      id: "sc-shes-approach",
+      titleBg: "Приближи зеленото кръстовище с готовност",
+      params: { kind: "reachZone", x: 4.06, y: -35, radiusM: 8, maxSpeedKmh: 35 },
+    },
+    {
+      id: "sc-shes-cross",
+      titleBg: "Премини правó напред на зелено, без да замръзваш",
+      // North-arm northbound lane center, past the 40 m junction area.
+      params: { kind: "reachZone", x: 4.06, y: 45, radiusM: 9 },
+    },
+  ],
+  rubric: { parTimeSec: 55 },
+  // RECORDED: committed deterministic recordings of the authored scripts in
+  // traces/scSignalHesitation.ts; the §5 gate (shadow replays ZERO violations)
+  // and the §9 stage-5 code asserts run in
+  // traces/__tests__/sc-signal-hesitation-traces.test.ts (re-record RECORD_TRACES=1).
+  shadow: { path: "content/traces/sc-signal-hesitation/shadow-correct.trace.json" },
+  mistakes: [
+    {
+      traceRef: { path: "content/traces/sc-signal-hesitation/mistake-freeze.trace.json" },
+      titleBg: "Замръзване на зелено",
+      whatWentWrongBg:
+        "Светофарът свети зелено и напред е чисто, но колата спря на линията и не потегли няколко секунди. Зеленото разрешава преминаване — ненужното изчакване е закъсняло действие, което блокира кръстовището и колоната отзад.",
+      codeRefs: ["HESITATION_AT_GREEN"],
+    },
+    {
+      traceRef: { path: "content/traces/sc-signal-hesitation/mistake-filter.trace.json" },
+      titleBg: "Изпуснато зелено",
+      whatWentWrongBg:
+        "Колата спря преди линията на зелено и се колеба прекалено дълго „за всеки случай“ — цялото зелено се изпусна, а кръстовището остана блокирано. Чист път напред на зелено означава тръгвай, а не изчаквай.",
+      codeRefs: ["HESITATION_AT_GREEN"],
+    },
+  ],
+  teach: {
+    whenBg:
+      "Когато светофарът свети зелено, кутията на кръстовището е чиста и все пак се колебаеш дали да тръгнеш — най-често от притеснение на изпита или пред зелена стрелка. Зеленото е за движение, не за изчакване.",
+    whyBg:
+      "Замразяването на зелено запушва кръстовището, вбесява движението отзад и е сред най-често отбелязваните „закъснели действия“ на изпита. Който тръгва решително на зелено с чист път — след кратка проверка, че напред е свободно — държи кръстовището да работи, вместо да го блокира.",
+    lawRef: "ППЗДвП чл. 31",
+    examinerBg:
+      "Изпитващият очаква тръгване в рамките на секунда-две при зелено и чист път напред. Ненужното застояване на зелено е второстепенна грешка („закъснели действия“) и при натрупване проваля изпита.",
+  },
+  levels: [
+    { level: 1 },
+    { level: 2 },
+    { level: 3 },
+    { level: 4, vehicleStart: "cold" },
+  ],
+  conditions: { weather: "dry" },
+  localeBg: "bg-BG",
+};
+
 /** The SIGNALS-family dead/flashing-signal templates (registered in templates.ts). */
 export const SCENARIO_TEMPLATES_SIGNALS: readonly ScenarioSpec[] = [
   SC_SIGNAL_DEAD,
   SC_SIGNAL_FLASHING,
+  SC_SIGNAL_HESITATION,
 ];

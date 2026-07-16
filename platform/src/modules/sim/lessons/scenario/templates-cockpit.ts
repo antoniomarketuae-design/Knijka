@@ -132,6 +132,104 @@ export const SC_VP_READINESS: ScenarioSpec = {
   localeBg: "bg-BG",
 };
 
+// ---------------------------------------------------------------------------
+// sc-pk-move-off — „Потегляне от място без оглеждане" (doc 72 PK-05) on
+//    vp-ready-v1 (map REUSED; the config-gated move-off-observation drill)
+// ---------------------------------------------------------------------------
+
+/** PK-05 — потегляне от място с оглеждане (ЗДвП чл. 25: преди навлизане в
+ *  движението и всяка маневра водачът се убеждава, че няма да създаде опасност
+ *  и няма да попречи на другите — огледало + поглед през рамо преди тръгване от
+ *  банкета). Config-gated: the move-off-observation detector ships OFF and this
+ *  drill opts it IN (ruleConfig below → the LIVE session grades the student too;
+ *  the recorder passes the same override for the §9 code assert). */
+export const SC_PK_MOVE_OFF: ScenarioSpec = {
+  id: "sc-pk-move-off",
+  family: "cockpit",
+  tagsBg: ["потегляне от място", "оглеждане", "огледала", "мъртва зона", "изпитни упражнения"],
+  titleBg: "Потегляне от място с оглеждане",
+  objectiveBg:
+    "Потегли от банкета правилно: преди да тръгнеш, погледни в огледалото и през лявото рамо в мъртвата зона — потеглянето от място е маневра и започва с оглеждане, не с газта.",
+  // Doc-72 provenance: PK-05 IS this moment (move-off without observation —
+  // DVSA move-off top-5; the BG изпит starts with потегляне от място).
+  archetypeIds: ["PK-05"],
+  conceptIds: ["c-mirrors-blind-spots", "c-maneuver-principles", "c-general-care-duty"],
+  map: {
+    archetype: "straight-street",
+    // Map REUSED from sc-vp-readiness — mirrored in vp-ready-v1.json
+    // meta.scenario.params (tools/maps/gen_ac_vp_streets.mjs).
+    params: { lengthM: 360, maxspeedKmh: 50 },
+    districtId: "vp-ready-v1",
+  },
+  start: {
+    spawnPointId: "vp-spawn-approach",
+    vehicleStart: "ready",
+  },
+  instructionsBg: [
+    { n: 1, textBg: "Колата е спряла на банкета. Потеглянето от място е маневра — започва с оглеждане." },
+    { n: 2, textBg: "Погледни в лявото огледало и прецени идва ли кола или колоездач отзад." },
+    { n: 3, textBg: "Хвърли поглед и през ЛЯВОТО рамо — в мъртвата зона, която огледалото не показва." },
+    { n: 4, textBg: "Чак когато е чисто, пусни мигач при нужда и потегли плавно в дясната лента." },
+    { n: 5, textBg: "Продължи спокойно и центрирано по отсечката, под ограничението." },
+  ],
+  success: [
+    {
+      id: "sc-pmo-moved",
+      titleBg: "Потегли и се нареди в дясната лента",
+      params: { kind: "reachZone", x: LANE_X, y: 150, radiusM: 14 },
+    },
+    {
+      id: "sc-pmo-finish",
+      titleBg: "Стигни края на отсечката",
+      params: { kind: "reachZone", x: LANE_X, y: 310, radiusM: 14 },
+    },
+  ],
+  rubric: { parTimeSec: 55 },
+  // RECORDED: committed deterministic recordings of the authored scripts in
+  // traces/scPkMoveOff.ts; the §5 gate (shadow replays ZERO violations +
+  // CLEAN_DRIVING) and the §9 stage-5 code asserts run in
+  // traces/__tests__/sc-pk-move-off-traces.test.ts (re-record RECORD_TRACES=1).
+  shadow: { path: "content/traces/sc-pk-move-off/shadow-correct.trace.json" },
+  mistakes: [
+    {
+      traceRef: { path: "content/traces/sc-pk-move-off/mistake-no-look.trace.json" },
+      titleBg: "Потегляне без оглеждане",
+      whatWentWrongBg:
+        "Колата потегли от банкета, без нито едно оглеждане — „нали ще тръгна бавно“. Потеглянето от място е маневра (чл. 25): приближаващият отзад-отляво остана невидим до последно. Едно огледало и поглед през рамо преди тръгване спестяват челен удар отстрани.",
+      codeRefs: ["MOVE_OFF_WITHOUT_OBSERVATION"],
+    },
+    {
+      traceRef: { path: "content/traces/sc-pk-move-off/mistake-curb-glance.trace.json" },
+      titleBg: "Поглед само към бордюра",
+      whatWentWrongBg:
+        "Колата погледна само надясно, към тротоара, и потегли — но опасността при потегляне идва отзад и отляво, от движението. Оглеждането за потегляне е към огледалото и през ЛЯВОТО рамо; погледът към бордюра не замества мъртвата зона отляво.",
+      codeRefs: ["MOVE_OFF_WITHOUT_OBSERVATION"],
+    },
+  ],
+  teach: {
+    whenBg:
+      "Всеки път, когато потегляш от място — от банкета, от паркинг, след спиране на пътник. Изпитът в града често започва точно с този момент: потегляне от място. Две секунди оглеждане преди газта решават всичко.",
+    whyBg:
+      "Потеглянето от място без оглеждане е сред най-честите причини за странични удари и за помитане на колоездач в мъртвата зона. Огледалото показва по-голямата част, но не и мъртвата зона зад лявото рамо — затова се гледа и през рамо, преди колелата да се завъртят.",
+    lawRef: "ЗДвП чл. 25",
+    examinerBg:
+      "Изпитващият следи точно за това при потегляне от място: поглед в огледалото и през рамо в мъртвата зона, преди колата да тръгне. Потегляне без оглеждане е основна грешка — маневра без убеждаване, че е безопасно.",
+  },
+  levels: [
+    { level: 1 },
+    { level: 2 },
+    { level: 3 },
+    { level: 4, vehicleStart: "cold" },
+  ],
+  // Config-gated drill: opt the move-off-observation detector IN so the LIVE
+  // student session grades the taught fault (default-OFF elsewhere — see
+  // rules/types.ts moveOffObservationEnabled). compileScenario propagates this
+  // to the LessonSpec; the recorder passes the same override for the §9 assert.
+  ruleConfig: { moveOffObservationEnabled: true },
+  conditions: { weather: "dry" },
+  localeBg: "bg-BG",
+};
+
 /** The cockpit-procedure-family templates, in catalog order (registered in
  *  templates.ts). */
-export const SCENARIO_TEMPLATES_COCKPIT: readonly ScenarioSpec[] = [SC_VP_READINESS];
+export const SCENARIO_TEMPLATES_COCKPIT: readonly ScenarioSpec[] = [SC_VP_READINESS, SC_PK_MOVE_OFF];

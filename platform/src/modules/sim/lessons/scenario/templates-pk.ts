@@ -33,6 +33,7 @@
  */
 
 import type { ScenarioSpec } from "./types";
+import type { ParkingBaySpec } from "../../contracts";
 
 /** Right-lane center of the 1-lane-per-direction street (pk-stop-v1). */
 const LANE_X = 4.06;
@@ -147,5 +148,147 @@ export const SC_PK_SMOOTH_STOP: ScenarioSpec = {
   localeBg: "bg-BG",
 };
 
+// ---------------------------------------------------------------------------
+// sc-pk-driveway — „Заден ход в алея" (doc 72 PK-11 „Reverse around the corner /
+// into a driveway") on pk-drive-v1: a Grundfahraufgabe-class reverse maneuver
+// NOT among the four shipped bay parks (perp-rev / parallel / 45 / narrow), the
+// sc-park-perp-rev mold with the driveway's own WALLS as the collision hazard.
+// ---------------------------------------------------------------------------
+
+/** The driveway bay (content/world/pk-drive-v1.json east kerb at y = 45) —
+ *  copied by VALUE (the lesson-specs law; the trace-gate battery asserts it
+ *  matches traces/scPkDriveway.ts PK_DRIVE_TARGET_BAY value-for-value). */
+export const PK_DRIVE_TARGET_BAY: ParkingBaySpec = {
+  x: 8.0,
+  y: 45.0,
+  headingDeg: 90,
+  widthM: 2.7,
+  lengthM: 5,
+};
+
+/** PK-11 — заден ход в алея (ЗДвП чл. 40: при движение назад водачът е длъжен
+ *  да се убеди, че пътят зад него е свободен и да пропусне останалите участници;
+ *  ЗДвП чл. 25 — маневрата се извършва след като водачът се убеди, че е
+ *  безопасна). The reverse-into-a-driveway form of the Наредба-38 reversing
+ *  family, distinct from the four bay parks: a residential-street kerb, walls
+ *  instead of parked neighbours. */
+export const SC_PK_DRIVEWAY: ScenarioSpec = {
+  id: "sc-pk-driveway",
+  family: "parking",
+  tagsBg: ["паркиране", "заден ход", "алея", "двор", "изпитни упражнения"],
+  titleBg: "Заден ход в алея",
+  objectiveBg:
+    "Влез на заден ход в алея вдясно: подмини входа, огледай се преди и по време на маневрата и вкарай колата точно в очертанията между стените, с нос към улицата и без да ги докоснеш.",
+  // Doc-72 provenance: PK-11 IS this maneuver (reverse around a corner / into a
+  // driveway — the German Grundfahraufgabe reverse, full observation).
+  archetypeIds: ["PK-11"],
+  conceptIds: ["c-reversing", "c-maneuver-principles", "c-mirrors-blind-spots"],
+  map: {
+    archetype: "straight-street",
+    // The generator recipe — mirrored in pk-drive-v1.json meta.scenario.params
+    // (tools/maps/gen_pk_driveway.mjs).
+    params: { lengthM: 90, maxspeedKmh: 30, drivewayY: 45 },
+    districtId: "pk-drive-v1",
+  },
+  start: {
+    spawnPointId: "pkd-spawn-approach",
+    vehicleStart: "ready",
+  },
+  instructionsBg: [
+    { n: 1, textBg: "Приближи бавно по улицата — не повече от 15 км/ч — и намери алеята вдясно." },
+    {
+      n: 2,
+      textBg: "Подмини входа на алеята и спри, когато задната ти броня подмине входа ѝ.",
+    },
+    {
+      n: 3,
+      textBg: "Включи на задна. Огледай се — двете огледала, после през рамо — и чак тогава завий назад към алеята.",
+    },
+    {
+      n: 4,
+      textBg: "Движи се назад с пешеходна скорост, следи стените на алеята в огледалата и изправяй волана, щом влезеш в очертанията.",
+    },
+    {
+      n: 5,
+      textBg: "Спри напълно вътре в алеята — центрирано, с нос към улицата — и задръж колата в покой.",
+    },
+  ],
+  success: [
+    {
+      id: "sc-pkd-position",
+      titleBg: "Заеми изходна позиция покрай входа на алеята",
+      // The pull-past pose in the lane just north of the driveway mouth.
+      params: { kind: "reachZone", x: LANE_X, y: 50, radiusM: 7, maxSpeedKmh: 15 },
+    },
+    {
+      id: "sc-pkd-park",
+      titleBg: "Влез на заден ход в алеята и спри напълно",
+      // Bay-locked parkInBay (A10): at rest INSIDE the driveway, aligned, via
+      // reverse, held 1.5 s. Tolerances are evaluator defaults at L3/L4; L1/L2
+      // widen them via toleranceScale (compile).
+      params: {
+        kind: "completeManeuver",
+        maneuver: "parkInBay",
+        holdSec: 1.5,
+        bay: PK_DRIVE_TARGET_BAY,
+        centerTolM: 0.5,
+        headingTolDeg: 10,
+      },
+    },
+  ],
+  rubric: {
+    placement: { objectiveId: "sc-pkd-park" },
+    // German Grundfahraufgaben codify > 2 correction pulls as a fault (doc 72
+    // PK-11 evidence): 1 entry clean, 2 acceptable.
+    economy: { objectiveId: "sc-pkd-park", attemptsFor3Stars: 1, attemptsFor2Stars: 2 },
+    observation: {
+      moments: [
+        { id: "obs-before-reverse", titleBg: "Огледала и рамо преди включване на задна" },
+        { id: "obs-during-reverse", titleBg: "Наблюдение назад по време на движението на заден ход" },
+        { id: "obs-final-check", titleBg: "Контролен поглед към стените преди окончателното спиране" },
+      ],
+    },
+    parTimeSec: 90,
+  },
+  // RECORDED: committed deterministic recordings of the authored scripts in
+  // traces/scPkDriveway.ts; the §5 gate (shadow replays ZERO violations +
+  // completes parkInBay) and the §9 stage-5 code asserts run in
+  // traces/__tests__/sc-pk-driveway-traces.test.ts (re-record RECORD_TRACES=1).
+  shadow: { path: "content/traces/sc-pk-driveway/shadow-correct.trace.json" },
+  mistakes: [
+    {
+      traceRef: { path: "content/traces/sc-pk-driveway/mistake-wide.trace.json" },
+      titleBg: "Твърде широк замах",
+      whatWentWrongBg:
+        "Замахът назад тръгна твърде широко и задницата се качи на оградата на алеята. На заден ход в алея се влиза на части: волан докрай, бавно назад и СПИРАНЕ — гледаш докъде стига колата в огледалото, не караш, докато стената не те спре.",
+      codeRefs: ["COLLISION"],
+    },
+    {
+      traceRef: { path: "content/traces/sc-pk-driveway/mistake-deep.trace.json" },
+      titleBg: "Твърде дълбоко назад",
+      whatWentWrongBg:
+        "Колата продължи на заден ход без да спре и се вряза в дъното на алеята. Спираш на мястото, не когато стената те спре — движението назад се планира и се следи в огледалото за обратно виждане (чл. 40).",
+      codeRefs: ["COLLISION"],
+    },
+  ],
+  teach: {
+    whenBg:
+      "Когато влизаш на заден ход в алея, двор или тесен вход между стени или огради — ежедневната маневра пред блока и вкъщи. На заден ход колата завива по-остро и виждаш по-добре входа, затова заден ход в алея е по-безопасен от влизането напред.",
+    whyBg:
+      "Повечето леки удари при влизане в двор стават при широк замах на задницата или при заден ход без спиране до стената. Който владее замаха и спира на мястото — с постоянна работа с огледалата — не чупи огледала, не бели ламарина и не удря детето зад колата.",
+    lawRef: "ЗДвП чл. 40",
+    examinerBg:
+      "Изпитващият гледа три неща: непрекъснато наблюдение (огледала + рамо, преди и по време на маневрата), контролирана пешеходна скорост и краен резултат в очертанията между стените, без излишни корекции. Прекъсни маневрата, ако се появи пешеходец или кола.",
+  },
+  levels: [
+    { level: 1, toleranceScale: 1.5 },
+    { level: 2, toleranceScale: 1.25 },
+    { level: 3 },
+    { level: 4, vehicleStart: "cold" },
+  ],
+  conditions: { weather: "dry" },
+  localeBg: "bg-BG",
+};
+
 /** The PK precision-stop templates, in catalog order (registered in templates.ts). */
-export const SCENARIO_TEMPLATES_PK: readonly ScenarioSpec[] = [SC_PK_SMOOTH_STOP];
+export const SCENARIO_TEMPLATES_PK: readonly ScenarioSpec[] = [SC_PK_SMOOTH_STOP, SC_PK_DRIVEWAY];
