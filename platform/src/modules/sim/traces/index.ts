@@ -230,6 +230,14 @@ export {
   recordScVuCyclistDrive,
   type ScVuCyclistTraceName,
 } from "./scVuCyclist";
+// ADR-006 stage 1b — the VU-09 emergency-approach authored drives
+// (sc-vu-emergency); committed traces are recordings of exactly these scripts
+// (gate: traces/__tests__/sc-vu-emergency-traces).
+export {
+  SC_VU_EMERGENCY_ID,
+  recordScVuEmergencyDrive,
+  type ScVuEmergencyTraceName,
+} from "./scVuEmergency";
 export {
   SC_PK_SMOOTH_STOP_ID,
   pkVanObstacle,

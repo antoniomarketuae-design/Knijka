@@ -235,6 +235,17 @@ export const VIOLATIONS: Record<ViolationCode, ViolationSpec> = {
     lawRef: "ЗДвП чл. 47",
     conceptId: "c-priority-concept",
   },
+  EMERGENCY_NOT_YIELDED: {
+    severityClass: "opasna",
+    points: SEVERITY_POINTS.opasna,
+    titleBg: "Непропускане на автомобил със специален режим",
+    explanationBg:
+      "Автомобил със специален режим на движение (включени светлинен и звуков сигнал) приближаваше зад теб, а ти не му направи път. Длъжен си незабавно да го пропуснеш — отдръпни се вдясно и при нужда намали или спри, без да блокираш коридора му.",
+    correctiveBg:
+      "Чуеш ли сирена или видиш ли синя лампа в огледалото: не спирай рязко в лентата. Мигач надясно, плавно се отдръпни към десния край и намали, докато премине — чак тогава продължи спокойно.",
+    lawRef: "ЗДвП чл. 91",
+    conceptId: "c-emergency-priority",
+  },
   PEDESTRIAN_CROSSING_TOO_FAST: {
     severityClass: "opasna",
     points: SEVERITY_POINTS.opasna,

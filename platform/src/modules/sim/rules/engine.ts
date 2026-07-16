@@ -1000,8 +1000,16 @@ function handleTickEvent(
       // reducer just grades it. `situation` (give-way / uncontrolled / …) is
       // carried into the detail for the debrief. `yielded` = the driver met a
       // real conflict and resolved it correctly → positive reinforcement.
-      if (e.violated) out.push(makeViolation("FAILED_TO_YIELD", t, { detail: e.situation }));
-      else if (e.yielded) out.push(makeCommendation("YIELDED_TO_PRIORITY", t));
+      // VU-09: the reserved "emergency" situation carries its own catalog code
+      // (special-regime duty, ЗДвП чл. 91) — every other situation keeps
+      // grading FAILED_TO_YIELD byte-identically.
+      if (e.violated) {
+        out.push(
+          makeViolation(e.situation === "emergency" ? "EMERGENCY_NOT_YIELDED" : "FAILED_TO_YIELD", t, {
+            detail: e.situation,
+          }),
+        );
+      } else if (e.yielded) out.push(makeCommendation("YIELDED_TO_PRIORITY", t));
       break;
     }
 

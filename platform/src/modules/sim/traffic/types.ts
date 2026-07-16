@@ -73,13 +73,16 @@ export interface TrafficDistrict {
  * Vehicle size/type profile (doc 72 §9 FO-06 — the large-vehicle actor
  * unlock). Data + presentation only: "van" renders the panel-van rig,
  * "truck" the box-truck rig (longer / wider / taller than any car — the
- * vision-blocking lead of „Зад камион"). Absent = "car" = the pre-profile
- * deterministic fleet pick, byte-identical. HONEST LIMIT: every rule-engine
- * proximity query (leadGapMeters, conflictNear, …) stays POINT-BASED around
- * the vehicle center with one fixed car-length constant, and the A11 physics
- * shells stay car-sized — the profile changes NO grading/collision geometry.
+ * vision-blocking lead of „Зад камион"); "emergency" (doc 72 §15 N9, VU-09)
+ * renders the procedural white special-regime rig with the blue light bar
+ * (fictional livery, ADR-001 — no real insignia). Absent = "car" = the
+ * pre-profile deterministic fleet pick, byte-identical. HONEST LIMIT: every
+ * rule-engine proximity query (leadGapMeters, conflictNear, …) stays
+ * POINT-BASED around the vehicle center with one fixed car-length constant,
+ * and the A11 physics shells stay car-sized — the profile changes NO
+ * grading/collision geometry.
  */
-export type VehicleProfile = "car" | "van" | "truck";
+export type VehicleProfile = "car" | "van" | "truck" | "emergency";
 
 export interface TrafficVehicleState {
   id: number;

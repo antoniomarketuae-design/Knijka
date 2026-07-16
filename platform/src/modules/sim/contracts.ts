@@ -355,11 +355,13 @@ export interface StagedActorPathSpec {
   colorIndex?: number;
   /**
    * Vehicle size/type profile (doc 72 §9 FO-06 „Зад камион"): "truck" renders
-   * the box-truck rig, "van" the panel van; absent = "car" (the deterministic
-   * fleet pick — byte-identical pre-profile behavior). Visual + data only:
-   * the leadGap/conflict queries stay point-based (ADR-001: rigs fictional).
+   * the box-truck rig, "van" the panel van, "emergency" (doc 72 §15 N9,
+   * VU-09) the white special-regime rig with the blue light bar; absent =
+   * "car" (the deterministic fleet pick — byte-identical pre-profile
+   * behavior). Visual + data only: the leadGap/conflict queries stay
+   * point-based (ADR-001: rigs fictional).
    */
-  profile?: "car" | "van" | "truck";
+  profile?: "car" | "van" | "truck" | "emergency";
 }
 
 export type StagedEventKind =
@@ -370,7 +372,8 @@ export type StagedEventKind =
   | "roundaboutEntry"
   | "amberDilemma"
   | "oncomingLeftTurn"
-  | "narrowMeeting";
+  | "narrowMeeting"
+  | "emergencyApproach";
 
 interface StagedEventBase {
   /** Unique per lesson, e.g. "l4-dart-out". */
@@ -597,6 +600,53 @@ export interface NarrowMeetingSpec extends StagedEventBase {
   }>;
 }
 
+/**
+ * ADR-006 stage 1b (doc 72 §15 N9 — VU-09 „Линейка отзад", ЗДвП чл. 91): an
+ * EMERGENCY actor (profile "emergency" — white rig + blue light bar) closes
+ * FROM BEHIND at higher speed, pathed on the player's left edge (author the
+ * actor path with a negative extraRightOffsetM so it passes to the LEFT).
+ * The graded duty is to MAKE WAY — ease right and/or slow so it can pass,
+ * never block it. No runtime detector looks behind the player, so the
+ * ADJUDICATION lives in the runner (cyclist-right-hook precedent), emitting
+ * ONLY the reserved prioritySituation vocabulary ("emergency" → the reducer
+ * grades EMERGENCY_NOT_YIELDED / YIELDED_TO_PRIORITY).
+ *
+ * Choreography: the actor holds dormant behind the spawn; once the player is
+ * `releaseGapM` ahead along its path it starts its run at cruise. The DUTY
+ * arms when the actor is behind within `armBehindM` and closing; the player
+ * then has a GENEROUS `responseWindowSec` to show a yield response — a
+ * rightward lane-offset shift ≥ `yieldShiftM` (covers the full lane change
+ * right too), OR slowing to ≤ `yieldSlowKmh` while keeping right, OR already
+ * standing (≤ ~3 km/h, the stopped-at-the-curb innocent). Only a window that
+ * EXPIRES with the player still centered/blocking AT SPEED convicts; once the
+ * actor has passed (`passAheadM` ahead) the runner stands down — one
+ * adjudication per approach, and a fast pass convicts nobody.
+ */
+export interface EmergencyApproachSpec extends StagedEventBase {
+  kind: "emergencyApproach";
+  /** The emergency actor: path from behind the spawn along the player's road,
+   *  offset LEFT (negative extraRightOffsetM), profile "emergency", cruise
+   *  faster than the player's plausible speed (special-regime exemption). */
+  actor: StagedActorPathSpec;
+  /** Player this far ahead of the held actor (along its path direction)
+   *  releases the run, m (± seeded jitter). */
+  releaseGapM: number;
+  /** The yield DUTY arms when the actor is behind within this and closing, m. */
+  armBehindM: number;
+  /** Generous response window from duty-arm to adjudication, s (± jitter). */
+  responseWindowSec: number;
+  /** Rightward lateral shift vs the duty-arm baseline that counts as making
+   *  way, m (a full lane change right trivially exceeds it). */
+  yieldShiftM: number;
+  /** At/below this speed counts as the slowing response while keeping right,
+   *  km/h (author ~10 under the road's limit). */
+  yieldSlowKmh: number;
+  /** Actor this far ahead of the player = passed → stand down, m. */
+  passAheadM: number;
+  /** Speed after passing (clears ahead and away), m/s. Default: cruise. */
+  clearSpeedMps?: number;
+}
+
 export type StagedEventSpec =
   | PedestrianDartOutSpec
   | PriorityFromRightSpec
@@ -605,7 +655,8 @@ export type StagedEventSpec =
   | RoundaboutEntrySpec
   | AmberDilemmaSpec
   | OncomingLeftTurnSpec
-  | NarrowMeetingSpec;
+  | NarrowMeetingSpec
+  | EmergencyApproachSpec;
 
 /**
  * Resolution record of one staged encounter (A8). The GRADING already

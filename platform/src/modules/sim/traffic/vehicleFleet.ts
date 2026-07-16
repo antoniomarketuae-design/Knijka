@@ -120,6 +120,8 @@ const BOXY_FALLBACK_INDEX = FLEET.indexOf("kolos");
 
 /** Model slot of the procedural box truck — one PAST the GLB fleet. */
 export const TRUCK_MODEL_INDEX = FLEET.length;
+/** Model slot of the procedural emergency rig (doc 72 VU-09) — after the truck. */
+export const EMERGENCY_MODEL_INDEX = FLEET.length + 1;
 const VAN_MODEL_INDEX = FLEET.indexOf("kargo_v");
 
 /** Box-truck body plan, meters (fictional): ~7.5 × 2.4 × 3.1 — longer, wider
@@ -141,12 +143,14 @@ export const TRUCK_DIMENSIONS = {
  */
 export function modelForVehicle(v: Pick<TrafficVehicleState, "id" | "profile">): number {
   if (v.profile === "truck") return TRUCK_MODEL_INDEX;
+  if (v.profile === "emergency") return EMERGENCY_MODEL_INDEX;
   if (v.profile === "van") return VAN_MODEL_INDEX;
   return assignModel(v.id);
 }
 
-/** Mesh-name base for a model slot (the truck slot is past FLEET). */
+/** Mesh-name base for a model slot (procedural slots are past FLEET). */
 function modelName(m: number): string {
+  if (m === EMERGENCY_MODEL_INDEX) return "emergency";
   return FLEET[m] ?? "box_truck";
 }
 
@@ -211,6 +215,103 @@ function buildBoxTruckRig(): ModelRig {
     halfLength,
     lampY: 0.95,
     headY: 0.85,
+  };
+}
+
+/** Emergency-rig body plan, meters (fictional, ADR-001): a compact white
+ *  box-van silhouette (~5.6 × 2.1 × 2.5) with a roof-mounted BLUE light bar —
+ *  unmistakably "special regime" in the mirror without any real-world livery
+ *  or insignia (no crosses, no stars, no lettering). */
+export const EMERGENCY_DIMENSIONS = {
+  lengthM: 5.6,
+  widthM: 2.1,
+  cabHeightM: 2.0,
+  boxHeightM: 2.5,
+  wheelRadiusM: 0.38,
+  lightBar: { widthM: 1.2, heightM: 0.2, lengthM: 0.36 },
+} as const;
+
+/**
+ * The procedural emergency ModelRig (doc 72 §15 N9 / VU-09 „Линейка отзад"):
+ * a white cab + white box body (merged, one draw) topped by an emissive BLUE
+ * light-bar box + a blue beltline stripe on each flank (merged into one blue
+ * draw). Static-emissive light bar is the honest v1 — a strobing beacon is a
+ * TrafficLayer polish pass, not a rig concern. Ground-relative like the GLB
+ * kit (Y = 0 = tarmac, nose +Z); shared fleet wheels scaled to 0.38 m hubs.
+ * All geometry + materials are OWNED (disposed via ownedMaterials/geometry).
+ */
+function buildEmergencyRig(): ModelRig {
+  const { lengthM, widthM, cabHeightM, boxHeightM, wheelRadiusM, lightBar } = EMERGENCY_DIMENSIONS;
+  const halfLength = lengthM / 2;
+  const bodyMat = new MeshStandardMaterial({
+    color: 0xe9eae6, // clean fleet white (fictional livery, ADR-001)
+    metalness: 0.15,
+    roughness: 0.5,
+    envMapIntensity: 1.35,
+  });
+  bodyMat.name = "emergency_body";
+  const blueMat = new MeshStandardMaterial({
+    color: 0x1c4fd8, // signal blue: light bar + beltline stripe
+    metalness: 0.2,
+    roughness: 0.35,
+    emissive: 0x2a5cff,
+    emissiveIntensity: 1.2,
+  });
+  blueMat.name = "emergency_blue";
+  // Cab over the front axle, slightly narrower + lower than the patient box.
+  const cabLen = 1.7;
+  const cab = new BoxGeometry(widthM - 0.12, cabHeightM - 0.5, cabLen);
+  cab.translate(0, 0.5 + (cabHeightM - 0.5) / 2, halfLength - cabLen / 2);
+  const boxLen = lengthM - cabLen - 0.15;
+  const box = new BoxGeometry(widthM, boxHeightM - 0.55, boxLen);
+  box.translate(0, 0.55 + (boxHeightM - 0.55) / 2, -halfLength + boxLen / 2);
+  const whiteMerged = mergeGeometries([cab, box], false) ?? cab;
+  if (whiteMerged !== cab) {
+    cab.dispose();
+    box.dispose();
+  }
+  // Blue kit: roof light bar (over the cab, the identity) + beltline stripes.
+  const bar = new BoxGeometry(lightBar.widthM, lightBar.heightM, lightBar.lengthM);
+  bar.translate(0, cabHeightM + lightBar.heightM / 2, halfLength - cabLen / 2 - 0.1);
+  const stripeY = 1.05;
+  const stripeLen = boxLen - 0.3;
+  const stripeL = new BoxGeometry(0.05, 0.28, stripeLen);
+  stripeL.translate(widthM / 2 + 0.01, stripeY, -halfLength + boxLen / 2);
+  const stripeR = new BoxGeometry(0.05, 0.28, stripeLen);
+  stripeR.translate(-widthM / 2 - 0.01, stripeY, -halfLength + boxLen / 2);
+  const blueMerged = mergeGeometries([bar, stripeL, stripeR], false) ?? bar;
+  if (blueMerged !== bar) {
+    bar.dispose();
+    stripeL.dispose();
+    stripeR.dispose();
+  }
+  const bodyGeometry = mergeGeometries([whiteMerged, blueMerged], true) ?? whiteMerged;
+  if (bodyGeometry !== whiteMerged) {
+    whiteMerged.dispose();
+    blueMerged.dispose();
+  }
+  const track = widthM / 2 - 0.2;
+  const frontAxleZ = halfLength - 1.0;
+  const rearAxleZ = -halfLength + 1.25;
+  return {
+    bodyGeometry,
+    bodyMaterials: bodyGeometry.groups.length === 2 ? [bodyMat, blueMat] : [bodyMat],
+    ownedMaterials: [bodyMat, blueMat],
+    paint: null, // no palette tint — white + blue IS the profile's identity
+    customWheel: null, // shared fleet wheel, scaled to the 0.38 m hubs
+    wheelOffsets: [
+      new Vector3(track, wheelRadiusM, frontAxleZ), // FL (+X = left)
+      new Vector3(-track, wheelRadiusM, frontAxleZ), // FR
+      new Vector3(track, wheelRadiusM, rearAxleZ), // RL
+      new Vector3(-track, wheelRadiusM, rearAxleZ), // RR
+    ],
+    wheelRadius: wheelRadiusM,
+    rearZ: -halfLength,
+    frontZ: halfLength,
+    halfWidth: widthM / 2,
+    halfLength,
+    lampY: 0.85,
+    headY: 0.75,
   };
 }
 
@@ -833,6 +934,9 @@ export function buildTrafficFleet(
   // (TRUCK_MODEL_INDEX). Costs nothing unless a truck-profile vehicle exists
   // (count 0 => no InstancedMesh), beyond building the two-box rig itself.
   rigs.push(buildBoxTruckRig());
+  // VU-09 profile slot: the procedural emergency rig (EMERGENCY_MODEL_INDEX)
+  // — same cost discipline: no InstancedMesh unless an emergency actor exists.
+  rigs.push(buildEmergencyRig());
   const sharedWheel = extractSharedWheel(scenes[0]);
   const nVeh = vehicles.length;
   const color = new Color();

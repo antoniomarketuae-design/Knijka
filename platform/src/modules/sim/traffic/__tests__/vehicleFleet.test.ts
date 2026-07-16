@@ -24,6 +24,8 @@ import {
   carPaintMaterial,
   carPaintStandardMaterial,
   disposeTrafficFleet,
+  EMERGENCY_DIMENSIONS,
+  EMERGENCY_MODEL_INDEX,
   FLEET,
   modelForVehicle,
   paintColorFor,
@@ -316,6 +318,34 @@ describe("large-vehicle profile (doc 72 FO-06)", () => {
     expect(fleet.models[KARGO_V_INDEX].count).toBe(1);
     expect(fleet.models[TRUCK_MODEL_INDEX].count).toBe(0);
     expect(fleet.models[TRUCK_MODEL_INDEX].mesh).toBeNull(); // costs nothing unused
+    expect(() => disposeTrafficFleet(fleet)).not.toThrow();
+  });
+
+  it("builds the procedural emergency rig (VU-09) — white body + blue light-bar group", () => {
+    const ev: TrafficVehicleState = { ...vehicle(5), profile: "emergency" };
+    expect(modelForVehicle({ id: 5, profile: "emergency" })).toBe(EMERGENCY_MODEL_INDEX);
+    const fleet = buildTrafficFleet(makeScenes(), [ev, vehicle(6)]);
+    expect(fleet.assign[0]).toBe(EMERGENCY_MODEL_INDEX);
+    expect(fleet.assign[1]).toBe(assignModel(6)); // ambient neighbor untouched
+    const model = fleet.models[EMERGENCY_MODEL_INDEX];
+    expect(model.count).toBe(1);
+    expect(model.mesh).not.toBeNull();
+    expect(model.mesh?.name).toBe("traffic-body-emergency");
+    const rig = model.rig;
+    expect(rig.halfLength).toBeCloseTo(EMERGENCY_DIMENSIONS.lengthM / 2);
+    expect(rig.halfWidth).toBeCloseTo(EMERGENCY_DIMENSIONS.widthM / 2);
+    expect(rig.paint).toBeNull(); // no palette tint — white + blue IS the livery
+    expect(rig.customWheel).toBeNull(); // shared wheel, scaled to the 0.38 m hubs
+    expect(fleet.wheelScale[0]).toBeCloseTo(EMERGENCY_DIMENSIONS.wheelRadiusM / 0.32);
+    // Two owned material groups: the white body + the emissive blue kit
+    // (light bar + beltline stripes) — ADR-001: fictional, no insignia.
+    expect(rig.ownedMaterials.length).toBe(2);
+    expect(rig.bodyMaterials.length).toBe(2);
+    const blue = rig.bodyMaterials.find((m) => m.name === "emergency_blue") as MeshStandardMaterial;
+    expect(blue).toBeDefined();
+    expect(blue.emissiveIntensity).toBeGreaterThan(0); // the light bar reads lit
+    // The unused truck slot stays free alongside it.
+    expect(fleet.models[TRUCK_MODEL_INDEX].mesh).toBeNull();
     expect(() => disposeTrafficFleet(fleet)).not.toThrow();
   });
 });

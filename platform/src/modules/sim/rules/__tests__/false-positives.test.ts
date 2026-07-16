@@ -614,6 +614,54 @@ describe("FP battery — pedestrian crossings & priority", () => {
 });
 
 // ---------------------------------------------------------------------------
+// Emergency vehicle from behind (ADR-006 stage 1b, doc 72 VU-09). The FULL
+// yield adjudication lives in the EmergencyApproachRunner — see the innocent
+// battery in orchestrator/__tests__/emergency-approach.test.ts (prompt yield,
+// already-stopped-at-the-curb, never-armed approach). The reducer-side
+// contract protected HERE: ONLY an armed adjudicator that reports `violated`
+// can convict — a resolved/yielded emergency approach and plain driving with
+// no prioritySituation event must stay spotless.
+// ---------------------------------------------------------------------------
+
+describe("FP battery — emergency vehicle behind", () => {
+  it("a player who yields promptly (adjudicator reports yielded) is commended, never penalised", () => {
+    // Innocent: eased right + slowed; the runner emits yielded:true.
+    const { events } = drive([
+      tick(0, { speedKmh: 42 }),
+      tick(1, { speedKmh: 34 }),
+      tick(2, {
+        speedKmh: 30,
+        events: [{ kind: "prioritySituation", situation: "emergency", violated: false, yielded: true }],
+      }),
+      tick(3, { speedKmh: 40 }),
+    ]);
+    expectInnocent(events);
+  });
+
+  it("an emergency approach that dissolves without a live conflict grades nothing", () => {
+    // Innocent: the EV got past before any duty question arose — the runner
+    // reports the situation resolved, unviolated, unyielded.
+    const { events } = drive([
+      tick(0, {
+        speedKmh: 45,
+        events: [{ kind: "prioritySituation", situation: "emergency", violated: false }],
+      }),
+      tick(1, { speedKmh: 45 }),
+    ]);
+    expectInnocent(events);
+  });
+
+  it("ordinary cruising can never conjure the emergency code (no event = no detector)", () => {
+    // Innocent: EMERGENCY_NOT_YIELDED has no tick-telemetry detector of its
+    // own — without the runner's armed prioritySituation event it cannot
+    // exist, no matter how the innocent drives (ambient traffic never arms it).
+    const { events } = drive(cruise(0, 120, { speedKmh: 48 }));
+    expectInnocent(events);
+    expect(events.some((e) => e.kind === "violation" && e.code === "EMERGENCY_NOT_YIELDED")).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
 // B1a Wave-1 detector pack (doc 72 capability 1 + N2) — every new code ships
 // with its innocent-driving cases HERE, before anything else (the mission's
 // own law). Context fields (nextStopLine*, oneway, stalled…) are OPTIONAL:

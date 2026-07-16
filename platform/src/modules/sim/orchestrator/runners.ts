@@ -21,6 +21,7 @@ import type {
   AmberDilemmaSpec,
   BrakingLeadCarSpec,
   CyclistRightHookSpec,
+  EmergencyApproachSpec,
   NarrowMeetingSpec,
   OncomingLeftTurnSpec,
   PedestrianDartOutSpec,
@@ -1297,6 +1298,233 @@ export class NarrowMeetingRunner implements EventRunner {
 }
 
 // ---------------------------------------------------------------------------
+// 9. Emergency approach (ADR-006 stage 1b — doc 72 §15 N9, VU-09 „Линейка
+//    отзад", ЗДвП чл. 91). The emergency actor (profile "emergency") closes
+//    from behind on the player's left edge; the graded duty is to MAKE WAY —
+//    ease right and/or slow so it can pass, never block. Every runtime
+//    priority query looks AHEAD of the player, so the adjudication lives here
+//    (cyclist-right-hook precedent), emitting ONLY the reserved
+//    prioritySituation vocabulary ("emergency" → EMERGENCY_NOT_YIELDED /
+//    YIELDED_TO_PRIORITY through the existing reducer).
+//
+//    Bias away from false positives (the A12 law):
+//     - the duty arms ONLY for this staged actor, behind within armBehindM
+//       and genuinely closing — ambient traffic can never arm it;
+//     - the response window is generous (authored 6–8 s), and conviction
+//       requires the window to EXPIRE with the player still centered at
+//       speed — a rightward shift ≥ yieldShiftM, slowing to ≤ yieldSlowKmh
+//       while keeping right, or simply standing (stopped at the curb) all
+//       latch the yield permanently;
+//     - an active brake pedal at expiry DEFERS the conviction (a student
+//       mid-response is responding, not refusing);
+//     - once the actor has passed, the runner stands down — one adjudication
+//       per approach; an EV that got by cleanly convicts nobody.
+// ---------------------------------------------------------------------------
+
+/** Actor must be faster than the player by this to count as closing, km/h. */
+const EM_CLOSING_MIN_KMH = 3;
+/** Player at/under this is standing — the immediate yield response, km/h. */
+const EM_STOPPED_KMH = 3;
+/** Slowing counts while not drifted LEFT of the baseline by more than this, m. */
+const EM_KEEP_RIGHT_TOL_M = 0.4;
+/** Conviction needs the player above yieldSlowKmh by this margin, km/h. */
+const EM_SPEED_MARGIN_KMH = 2;
+/** Guard-stopped actor pinned behind a drifted-left player this long = the
+ *  block stands even at low speed (nose-to-tail stalemate they caused), s. */
+const EM_BLOCK_CONVICT_SEC = 3;
+/** Actor still counts as behind/alongside beyond this player-frame arc, m. */
+const EM_STILL_BEHIND_M = 2;
+
+export class EmergencyApproachRunner implements EventRunner {
+  phase: StagedEventPhase = "idle";
+  outcome: StagedEventOutcome | null = null;
+  hazardActive = false;
+
+  private releaseGapM = 0;
+  private responseWindowSec = 0;
+  private dutyArmedAt: number | null = null;
+  private blockSince: number | null = null;
+  private sawYield = false;
+  private approachSpeedKmh = 0;
+  // Signed lateral drift since duty-arm, ACCUMULATED in the vehicle frame
+  // (+ = right). Incremental — each frame adds the position delta projected
+  // on the mid-heading right axis, so forward travel along a CURVING road
+  // never bleeds into the measure (a fixed world-frame baseline would decay
+  // over a bending block and rob a slowing yielder of the latch).
+  private shiftRightM = 0;
+  private prevX = 0;
+  private prevY = 0;
+  private prevHeadingDeg = 0;
+
+  constructor(readonly spec: EmergencyApproachSpec) {}
+
+  stage(traffic: StagedTrafficPort, rng: Rng, firstTime: boolean): void {
+    const s = this.spec;
+    if (firstTime) {
+      const view = traffic.stage({
+        kind: "vehicle",
+        id: s.id,
+        pathNodes: s.actor.pathNodes,
+        hold: s.actor.hold,
+        cruiseSpeedMps: s.actor.cruiseSpeedMps,
+        extraRightOffsetM: s.actor.extraRightOffsetM,
+        colorIndex: s.actor.colorIndex,
+        // VU-09: publish the emergency profile so the fleet renders the
+        // white special-regime rig with the blue light bar (ADR-001).
+        profile: s.actor.profile,
+        playerGuard: true, // never rams a player blocking its corridor — the
+        // guard standstill IS the blocking evidence
+      });
+      if (!view) throw new Error(`staged event ${s.id}: emergency path failed to stage`);
+    } else {
+      traffic.stagedCommand(s.id, { type: "reset" });
+    }
+    this.releaseGapM = s.releaseGapM + (rng() * 2 - 1) * 4;
+    this.responseWindowSec = s.responseWindowSec + (rng() * 2 - 1) * 0.4;
+    this.phase = "armed";
+    this.outcome = null;
+    this.dutyArmedAt = null;
+    this.blockSince = null;
+    this.sawYield = false;
+    this.approachSpeedKmh = 0;
+    this.shiftRightM = 0;
+  }
+
+  step(traffic: StagedTrafficPort, input: DirectorInput, out: SimTickEvent[]): StagedEventOutcome | null {
+    const s = this.spec;
+    if (this.phase === "resolved") return null;
+    const actor = traffic.staged(s.id);
+    if (!actor) return null;
+
+    // Player-frame arc of the actor: > 0 = the actor is ahead of the player.
+    const actorAheadM = aheadOfPlayerM(input, actor.x, actor.y);
+    const behindM = -actorAheadM;
+
+    // Contact — the player steered into the passing actor (the rear is
+    // covered by the player guard; a side swipe is the player's doing).
+    if (
+      dist(input.x, input.y, actor.x, actor.y) < VEHICLE_CONTACT_M &&
+      input.speedKmh + actor.speedMps * 3.6 > 5
+    ) {
+      out.push({ kind: "collision", withWhat: "vehicle" });
+      return this.resolve(traffic, input, false, "collision");
+    }
+
+    if (this.phase === "armed") {
+      // Release the run once the player is far enough ahead along the road
+      // and travelling the actor's direction (a reversed/lost player never
+      // stages a rear approach at their face).
+      const actorBearing = (Math.atan2(actor.dirX, actor.dirY) * 180) / Math.PI;
+      const delta = Math.abs((((actorBearing - input.headingDeg) % 360) + 540) % 360 - 180);
+      if (behindM >= this.releaseGapM && delta <= APPROACH_MAX_DEG) {
+        traffic.stagedCommand(s.id, { type: "cruise" });
+        this.phase = "triggered";
+      }
+      return null;
+    }
+
+    // triggered — the actor is running.
+    if (this.dutyArmedAt === null) {
+      const closing = actor.speedMps * 3.6 > input.speedKmh + EM_CLOSING_MIN_KMH;
+      if (behindM > EM_STILL_BEHIND_M && behindM <= s.armBehindM && closing) {
+        this.dutyArmedAt = input.tSec;
+        this.approachSpeedKmh = input.speedKmh;
+        this.shiftRightM = 0;
+        this.prevX = input.x;
+        this.prevY = input.y;
+        this.prevHeadingDeg = input.headingDeg;
+      }
+    } else {
+      // Accumulate the lateral drift on the mid-heading right axis
+      // (x east, y north; heading 0 = north, cw ⇒ right = (cos θ, −sin θ)).
+      const dh = ((input.headingDeg - this.prevHeadingDeg) % 360 + 540) % 360 - 180;
+      const midRad = ((this.prevHeadingDeg + dh / 2) * Math.PI) / 180;
+      this.shiftRightM +=
+        (input.x - this.prevX) * Math.cos(midRad) - (input.y - this.prevY) * Math.sin(midRad);
+      this.prevX = input.x;
+      this.prevY = input.y;
+      this.prevHeadingDeg = input.headingDeg;
+    }
+
+    // Yield watch — latched permanently once observed during the approach.
+    const rightShift = this.shiftRightM;
+    if (this.dutyArmedAt !== null) {
+      const slowedKeepingRight =
+        input.speedKmh <= s.yieldSlowKmh && rightShift >= -EM_KEEP_RIGHT_TOL_M;
+      if (
+        rightShift >= s.yieldShiftM ||
+        slowedKeepingRight ||
+        input.speedKmh <= EM_STOPPED_KMH
+      ) {
+        this.sawYield = true;
+      }
+    }
+
+    // Passed — stand down (one adjudication per approach), clear ahead & away.
+    if (actorAheadM >= s.passAheadM) {
+      if (this.dutyArmedAt !== null && this.sawYield) {
+        out.push({ kind: "prioritySituation", situation: "emergency", violated: false, yielded: true });
+        return this.resolve(traffic, input, true, "yielded");
+      }
+      // No duty ever armed (or a fast pass beat the window): nothing grades.
+      return this.resolve(traffic, input, true, "clear");
+    }
+
+    if (this.dutyArmedAt === null) {
+      // Defensive: the run dissolved without ever arming (actor parked at its
+      // path end far behind a sprinting player).
+      if (actor.finished) return this.resolve(traffic, input, true, "clear");
+      return null;
+    }
+
+    // Blocking evidence: the guard-stopped actor pinned behind a player who
+    // drifted into its corridor (only possible while unyielding).
+    const blocked =
+      !this.sawYield && actor.speedMps < 0.5 && behindM > EM_STILL_BEHIND_M && behindM < 25;
+    if (blocked) {
+      if (this.blockSince === null) this.blockSince = input.tSec;
+    } else {
+      this.blockSince = null;
+    }
+    const blockedOut =
+      this.blockSince !== null && input.tSec - this.blockSince >= EM_BLOCK_CONVICT_SEC;
+
+    const windowExpired = input.tSec - this.dutyArmedAt >= this.responseWindowSec;
+    const respondingOnBrake = input.brakePedal >= BRAKE_ONSET_THRESHOLD;
+    if (
+      !this.sawYield &&
+      windowExpired &&
+      ((input.speedKmh > s.yieldSlowKmh + EM_SPEED_MARGIN_KMH &&
+        rightShift < s.yieldShiftM &&
+        !respondingOnBrake) ||
+        blockedOut)
+    ) {
+      out.push({ kind: "prioritySituation", situation: "emergency", violated: true });
+      return this.resolve(traffic, input, false, "violation");
+    }
+    return null;
+  }
+
+  private resolve(
+    traffic: StagedTrafficPort,
+    input: DirectorInput,
+    success: boolean,
+    detail: StagedEventOutcome["detail"],
+  ): StagedEventOutcome {
+    // Clear ahead and away regardless of the grade — the encounter is over.
+    traffic.stagedCommand(this.spec.id, {
+      type: "cruise",
+      speedMps: this.spec.clearSpeedMps ?? this.spec.actor.cruiseSpeedMps,
+    });
+    this.phase = "resolved";
+    this.outcome = outcomeOf(this.spec, input, success, detail, {
+      ...(this.approachSpeedKmh > 0 ? { approachSpeedKmh: this.approachSpeedKmh } : {}),
+    });
+    return this.outcome;
+  }
+}
+
+// ---------------------------------------------------------------------------
 
 export function createRunner(
   spec: StagedEventSpec,
@@ -1319,5 +1547,7 @@ export function createRunner(
       return new OncomingLeftTurnRunner(spec);
     case "narrowMeeting":
       return new NarrowMeetingRunner(spec);
+    case "emergencyApproach":
+      return new EmergencyApproachRunner(spec);
   }
 }
