@@ -40,6 +40,9 @@
  *   + furniture 4 (bench + bollard + trash_bin + planter)
  *   + billboards 4 (large/small × body+face) + bus stops 2 (body + face)
  *   + parking kit 1 (merged cluster) = 27  (was 18).
+ * Zone-sign kinds (SIGN-ASSET drop) add draws ONLY on maps whose zones place
+ * them (+2 per textured kind, +1 for the geometry-only crossbuck/barrier);
+ * zones-less districts render exactly the fixed set above.
  * All fixed + instanced; low tier decimates trees via preset.treeFraction.
  */
 
@@ -76,8 +79,24 @@ const SIGN_GLB: Record<SignKind, string> = {
   giveWay: "sign_give_way",
   limit50: "sign_speed_limit_50",
   roundabout: "sign_roundabout",
+  // Zone-driven posts (SIGN-ASSET drop, tools/blender/signs_v2.py). Loaded
+  // TOLERANTLY: a missing GLB logs once and its kind simply doesn't render,
+  // so the sim never hard-fails on a partially shipped kit.
+  noOvertaking: "sign_no_overtaking",
+  noStopping: "sign_no_stopping",
+  slippery: "sign_slippery",
+  curve: "sign_warning_bend", // А1 — the shipped v1 asset serves curveAdvisory
+  railGuarded: "sign_rail_guarded",
+  railUnguarded: "sign_rail_unguarded",
+  railCross: "sign_rail_cross", // geometry-only crossbuck (no face_* prim)
+  barrier: "rail_barrier", // geometry-only striped arm, static down pose
 };
 const SIGN_KINDS = Object.keys(SIGN_GLB) as SignKind[];
+/** The v1 four load strictly (as always); everything after them is tolerant. */
+const CORE_SIGN_KINDS: readonly SignKind[] = ["stop", "giveWay", "limit50", "roundabout"];
+const ZONE_SIGN_KINDS: readonly SignKind[] = SIGN_KINDS.filter(
+  (k) => !CORE_SIGN_KINDS.includes(k),
+);
 
 // ---------------------------------------------------------------------------
 // GLB baking
@@ -154,12 +173,13 @@ function bakeVertexColored(
  * Extract the sign's textured face primitive (material name starts with
  * "face_") as its own geometry + a cloned material that keeps the baked webp
  * face (alphaMode MASK → alphaTest 0.5). Same Y-rotation as the body so they
- * stay aligned.
+ * stay aligned. Returns null for geometry-only assemblies (crossbuck,
+ * barrier arm) that carry no face primitive.
  */
 function bakeSignFace(
   scene: THREE.Object3D,
   rotateY: number,
-): { geometry: THREE.BufferGeometry; material: THREE.MeshStandardMaterial } {
+): { geometry: THREE.BufferGeometry; material: THREE.MeshStandardMaterial } | null {
   scene.updateWorldMatrix(true, true);
   let out: { geometry: THREE.BufferGeometry; material: THREE.MeshStandardMaterial } | null = null;
 
@@ -190,7 +210,6 @@ function bakeSignFace(
     out = { geometry: g, material };
   });
 
-  if (!out) throw new Error("bakeSignFace: no face_* primitive found");
   return out;
 }
 
@@ -200,8 +219,9 @@ function bakeSignFace(
 
 interface SignAsset {
   body: THREE.BufferGeometry;
-  faceGeometry: THREE.BufferGeometry;
-  faceMaterial: THREE.MeshStandardMaterial;
+  /** null for geometry-only assemblies (crossbuck / barrier arm). */
+  faceGeometry: THREE.BufferGeometry | null;
+  faceMaterial: THREE.MeshStandardMaterial | null;
 }
 
 /** Body + separately-baked emissive ad face (aligned, same frame). */
@@ -211,7 +231,9 @@ interface AdPropAsset {
 }
 
 interface PropAssets {
-  signs: Record<SignKind, SignAsset>;
+  /** null = the kind's GLB failed to load (tolerated for zone kinds only —
+   *  its placements are simply skipped; the core four still load strictly). */
+  signs: Record<SignKind, SignAsset | null>;
   signalHousing: THREE.BufferGeometry;
   streetlightHousing: THREE.BufferGeometry;
   streetlightGlow: THREE.BufferGeometry;
@@ -303,6 +325,19 @@ function makeSharedMaterials(): PropAssets["materials"] {
 async function buildPropAssets(): Promise<PropAssets> {
   const loader = createGltfLoader();
   const load = (base: string, file: string): Promise<GLTF> => loader.loadAsync(`${base}/${file}.glb`);
+  /** Zone-sign kits load tolerantly: a missing/broken GLB skips its kind. */
+  const loadOptional = async (base: string, file: string): Promise<GLTF | null> => {
+    try {
+      return await load(base, file);
+    } catch {
+      console.warn(`sim/world: optional sign GLB missing — ${base}/${file}.glb (kind skipped)`);
+      return null;
+    }
+  };
+
+  const zoneSignsPromise = Promise.all(
+    ZONE_SIGN_KINDS.map((kind) => loadOptional(SIGN_BASE, SIGN_GLB[kind])),
+  );
 
   const [
     stop,
@@ -356,15 +391,32 @@ async function buildPropAssets(): Promise<PropAssets> {
       rotateY: Math.PI,
     });
     const face = bakeSignFace(gltf.scene, Math.PI);
-    return { body, faceGeometry: face.geometry, faceMaterial: face.material };
+    return {
+      body,
+      faceGeometry: face ? face.geometry : null,
+      faceMaterial: face ? face.material : null,
+    };
   };
 
-  const signs: Record<SignKind, SignAsset> = {
+  const zoneSignGltfs = await zoneSignsPromise;
+  const signs: Record<SignKind, SignAsset | null> = {
     stop: bakeSign(stop),
     giveWay: bakeSign(giveWay),
     limit50: bakeSign(limit50),
     roundabout: bakeSign(roundabout),
+    noOvertaking: null,
+    noStopping: null,
+    slippery: null,
+    curve: null,
+    railGuarded: null,
+    railUnguarded: null,
+    railCross: null,
+    barrier: null,
   };
+  ZONE_SIGN_KINDS.forEach((kind, i) => {
+    const gltf = zoneSignGltfs[i];
+    if (gltf) signs[kind] = bakeSign(gltf);
+  });
 
   const signalHousing = bakeVertexColored(signal.scene, {
     include: (n) => !n.startsWith("lamp_"),
@@ -439,10 +491,12 @@ async function buildPropAssets(): Promise<PropAssets> {
 
 function disposePropAssets(a: PropAssets): void {
   for (const kind of SIGN_KINDS) {
-    a.signs[kind].body.dispose();
-    a.signs[kind].faceGeometry.dispose();
-    a.signs[kind].faceMaterial.map?.dispose();
-    a.signs[kind].faceMaterial.dispose();
+    const s = a.signs[kind];
+    if (!s) continue; // tolerated missing zone-sign kit
+    s.body.dispose();
+    s.faceGeometry?.dispose();
+    s.faceMaterial?.map?.dispose();
+    s.faceMaterial?.dispose();
   }
   disposeAll([
     a.signalHousing,
@@ -652,18 +706,21 @@ function Signs({
       const placements = signs.filter((s) => s.kind === kind);
       if (placements.length === 0) continue;
       const a = assets.signs[kind];
+      if (!a) continue; // kit missing (tolerated) — skip the kind's posts
       out.push(
         createInstancedMesh(a.body, assets.materials.signBody, placements, {
           castShadow,
           name: `signs-${kind}-body`,
         }),
       );
-      out.push(
-        createInstancedMesh(a.faceGeometry, a.faceMaterial, placements, {
-          castShadow: false,
-          name: `signs-${kind}-face`,
-        }),
-      );
+      if (a.faceGeometry && a.faceMaterial) {
+        out.push(
+          createInstancedMesh(a.faceGeometry, a.faceMaterial, placements, {
+            castShadow: false,
+            name: `signs-${kind}-face`,
+          }),
+        );
+      }
     }
     return out;
   }, [assets, signs, preset.castShadows]);

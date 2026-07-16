@@ -67,8 +67,28 @@ export function buildWorldGeometry(
     giveWay: 0,
     limit50: 0,
     roundabout: 0,
+    // Zone-driven posts (SIGN-ASSET drop) — 0 on every zones-less district.
+    noOvertaking: 0,
+    noStopping: 0,
+    slippery: 0,
+    curve: 0,
+    railGuarded: 0,
+    railUnguarded: 0,
+    railCross: 0,
+    barrier: 0,
   };
   for (const s of props.signs) signCounts[s.kind]++;
+
+  // Zone-sign draws: +2 per placed textured kind (body + face), +1 for the
+  // geometry-only crossbuck/barrier. Zero on zones-less districts, so their
+  // estimate is untouched.
+  let zoneSignDraws = 0;
+  for (const [kind, count] of Object.entries(signCounts) as [SignKind, number][]) {
+    if (count === 0) continue;
+    if (kind === "stop" || kind === "giveWay" || kind === "limit50" || kind === "roundabout")
+      continue; // inside the fixed 27 below
+    zoneSignDraws += kind === "railCross" || kind === "barrier" ? 1 : 2;
+  }
 
   const meshes = [
     roads.surface,
@@ -112,8 +132,9 @@ export function buildWorldGeometry(
     // road-decal batch, grass, paved, 4 facade-wall variants, roofs) + 27
     // fixed WorldProps instanced draws (2 signals + 8 signs + 2 streetlights +
     // 4 trees + 4 furniture + 4 billboards + 2 bus stops + 1 parking kit) +
+    // zone-sign draws (only on maps whose zones place posts) +
     // towers (chunked & frustum-culled at runtime; count ~model-order).
-    drawCallEstimate: 13 + 27 + CITY_MODELS.length,
+    drawCallEstimate: 13 + 27 + zoneSignDraws + CITY_MODELS.length,
   };
 
   return {

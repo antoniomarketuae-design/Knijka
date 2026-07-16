@@ -232,7 +232,21 @@ export interface TrafficLightPlacement extends StaticTransform {
   nodeId: string;
 }
 
-export type SignKind = "stop" | "giveWay" | "limit50" | "roundabout";
+export type SignKind =
+  | "stop"
+  | "giveWay"
+  | "limit50"
+  | "roundabout"
+  // -- SIGN-ASSET drop: zone-driven posts (render-only — grading reads the
+  //    District.zones spans, never these placements; builders/zoneSigns.ts).
+  | "noOvertaking" // В24 (zones kind noOvertaking)
+  | "noStopping" // В27 (zones kind noStopping)
+  | "slippery" // А15 (zones kinds waterPatch + icePatch)
+  | "curve" // А1 (zones kind curveAdvisory — reuses sign_warning_bend.glb)
+  | "railGuarded" // А32-style guarded rail warning (railCrossing + guarded)
+  | "railUnguarded" // А33-style unguarded rail warning (railCrossing)
+  | "railCross" // Андреевски кръст crossbuck at the line
+  | "barrier"; // striped barrier arm, static down (railCrossing + guarded)
 
 export interface SignPlacement extends StaticTransform {
   kind: SignKind;

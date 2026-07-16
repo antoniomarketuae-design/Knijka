@@ -64,6 +64,7 @@ import {
 } from "./math2d";
 import { toWorld, yawFromFacing } from "./mesh";
 import type { Approach, RoadNetwork } from "./network";
+import { buildZoneSigns } from "./zoneSigns";
 
 export interface PropBuildResult {
   trafficLights: TrafficLightPlacement[];
@@ -437,6 +438,11 @@ export function buildProps(
     acceptedStops.push(c.p);
     busStops.push({ position: toWorld(c.p[0], c.p[1], SIDEWALK_TOP_Y), yaw: c.yaw });
   }
+
+  // -- zone-driven posts (SIGN-ASSET drop) ---------------------------------------
+  // One post per authored District.zones span (rail spans place the full
+  // crossing furniture). Pure + additive: zones-less districts add nothing.
+  signs.push(...buildZoneSigns(district, network));
 
   // -- surface-parking dressing kits (hand-anchored, doc 70 REF 1) ---------------
   for (const site of PARKING_KIT_SITES) {

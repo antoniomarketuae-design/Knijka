@@ -17,7 +17,9 @@
 import * as THREE from "three";
 import type { SignKind } from "../types";
 
-export const SIGN_SVG_FILES: Record<SignKind, string> = {
+/** Partial: only the legacy flat-plate kinds carry an SVG mapping here. The
+ *  zone-sign kinds (SIGN-ASSET drop) exist solely as authored GLBs. */
+export const SIGN_SVG_FILES: Partial<Record<SignKind, string>> = {
   giveWay: "b1.svg",
   stop: "b2.svg",
   limit50: "v26.svg",
@@ -150,7 +152,9 @@ export async function loadSignTextureFromSvg(
   size: number,
 ): Promise<THREE.CanvasTexture | null> {
   try {
-    const res = await fetch(`${baseUrl.replace(/\/$/, "")}/${SIGN_SVG_FILES[kind]}`);
+    const file = SIGN_SVG_FILES[kind];
+    if (!file) return null; // zone-sign kinds have no flat-plate SVG path
+    const res = await fetch(`${baseUrl.replace(/\/$/, "")}/${file}`);
     if (!res.ok) return null;
     let svg = await res.text();
     if (kind === "limit50") {
