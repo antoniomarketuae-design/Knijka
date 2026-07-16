@@ -172,6 +172,7 @@ export const SC_FOLLOW_DISTANCE: ScenarioSpec = {
     { level: 2 },
     { level: 3 },
     { level: 4, vehicleStart: "cold" },
+      { level: 5, conditions: { weather: "rain" } }, // L5: мокра дистанция — the 2 s rule wants 3
   ],
   staged: [FD_LEAD_CAR],
   conditions: { weather: "dry" },
@@ -646,6 +647,7 @@ export const SC_FOLLOW_TRUCK: ScenarioSpec = {
     { level: 2 },
     { level: 3 },
     { level: 4, vehicleStart: "cold" },
+      { level: 5, conditions: { weather: "rain" } }, // L5: камион + дъжд — spray-blind following
   ],
   staged: [FT_LEAD_TRUCK],
   conditions: { weather: "dry" },

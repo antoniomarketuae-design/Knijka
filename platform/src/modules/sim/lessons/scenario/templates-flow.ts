@@ -168,6 +168,7 @@ export const SC_ZEBRA_APPROACH: ScenarioSpec = {
       // Изпитни условия: full cold-start protocol (exam ladder default aids).
       vehicleStart: "cold",
     },
+      { level: 5, conditions: { night: true } }, // L5: пътека нощем — късно разпознаване
   ],
   staged: [ZEBRA_PED],
   conditions: { weather: "dry" },
@@ -318,6 +319,7 @@ export const SC_ROUNDABOUT_ENTRY: ScenarioSpec = {
       level: 4,
       vehicleStart: "cold",
     },
+      { level: 5, traffic: { vehicleCount: 4 } }, // L5: живо кръгово
   ],
   staged: [RB_CIRCULATING],
   conditions: { weather: "dry" },
@@ -452,6 +454,7 @@ export const SC_LANE_CHANGE: ScenarioSpec = {
       level: 4,
       vehicleStart: "cold",
     },
+      { level: 5, conditions: { weather: "rain", night: true } }, // L5: престрояване в дъжд нощем
   ],
   staged: [LN_TARGET_LANE_CAR],
   conditions: { weather: "dry" },

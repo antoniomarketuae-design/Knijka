@@ -157,6 +157,7 @@ export const SC_JUNCTION_RHR: ScenarioSpec = {
     { level: 2 },
     { level: 3 },
     { level: 4, vehicleStart: "cold" },
+      { level: 5, traffic: { vehicleCount: 8 } }, // L5: живо движение около кръстовището
   ],
   staged: [SC_JUNCTION_RHR_CONFLICT],
   conditions: { weather: "dry" },
@@ -390,6 +391,7 @@ export const SC_SIGNAL_RESPONSE: ScenarioSpec = {
     { level: 2 },
     { level: 3 },
     { level: 4, vehicleStart: "cold" },
+      { level: 5, conditions: { night: true } }, // L5: светофар нощем — сигналът носи цялата информация
   ],
   staged: [SC_SIGNAL_AMBER_EVENT],
   conditions: { weather: "dry" },

@@ -160,6 +160,7 @@ export const SC_JUNCTION_GAP: ScenarioSpec = {
     { level: 2 },
     { level: 3 },
     { level: 4, vehicleStart: "cold" },
+      { level: 5, traffic: { vehicleCount: 6 } }, // L5: живо движение по пътя с предимство
   ],
   staged: [SC_JUNCTION_GAP_CONFLICT],
   conditions: { weather: "dry" },

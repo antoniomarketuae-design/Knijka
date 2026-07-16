@@ -184,6 +184,7 @@ export const SC_PARK_PARALLEL: ScenarioSpec = {
     { level: 2, toleranceScale: 1.25 },
     { level: 3 },
     { level: 4, vehicleStart: "cold" },
+      { level: 5, toleranceScale: 0.8 }, // L5: по-строг допуск — прецизно прибиране
   ],
   conditions: { weather: "dry" },
   localeBg: "bg-BG",
