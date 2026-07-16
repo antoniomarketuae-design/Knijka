@@ -414,6 +414,43 @@ describe("FP battery — rain & night conditions", () => {
 });
 
 // ---------------------------------------------------------------------------
+// Curve advisory (SP-05 — authored curveAdvisory spans)
+// ---------------------------------------------------------------------------
+
+describe("FP battery — curve advisory", () => {
+  it("the taught curve drive: at the advisory through the whole marked arc", () => {
+    // Innocent: 50 through an advisory-50 curve on a 90 road IS the textbook
+    // SP-05 behaviour — the envelope must never flag its own lesson.
+    const { events } = drive(
+      cruise(0, 20, { speedKmh: 50, maxSpeedKmh: 90, curveAdvisoryKmh: 50 }),
+    );
+    expectInnocent(events);
+  });
+
+  it("regression: the fast-but-legal approach BEFORE the advisory span", () => {
+    // Innocent: 85 on a 90 rural road with no span on the tick — the advisory
+    // envelope governs the ARC only, never the approach (structural: the
+    // field exists exclusively inside authored spans).
+    const { events } = drive(cruise(0, 60, { speedKmh: 85, maxSpeedKmh: 90 }));
+    expectInnocent(events);
+  });
+
+  it("brief entry overshoot into the curve, corrected within the sustain", () => {
+    // Innocent: arriving a touch hot (58 for ~1 s) and settling to the
+    // advisory is adaptation, not the SP-05 fault (grace 5 + sustain 1.5 s).
+    const { events } = drive([
+      tick(0, { speedKmh: 58, maxSpeedKmh: 90, curveAdvisoryKmh: 50 }),
+      tick(0.5, { speedKmh: 57, maxSpeedKmh: 90, curveAdvisoryKmh: 50 }),
+      tick(1, { speedKmh: 53, maxSpeedKmh: 90, curveAdvisoryKmh: 50 }),
+      tick(1.4, { speedKmh: 49, maxSpeedKmh: 90, curveAdvisoryKmh: 50 }),
+      tick(2, { speedKmh: 48, maxSpeedKmh: 90, curveAdvisoryKmh: 50 }),
+      tick(3, { speedKmh: 48, maxSpeedKmh: 90, curveAdvisoryKmh: 50 }),
+    ]);
+    expectInnocent(events);
+  });
+});
+
+// ---------------------------------------------------------------------------
 // Following distance
 // ---------------------------------------------------------------------------
 

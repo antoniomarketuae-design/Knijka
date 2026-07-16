@@ -26,11 +26,13 @@
  * Family: "speed" — the catalog chip added for the SP family (doc 72 §8);
  * the ids (sc-speed-*) match the sc-<family>-<slug> naming standard.
  *
- * Doc-72 provenance: all three are marked "Engine: ✅ FULL". SP-03 (zone
- * transition), SP-05..SP-11 (curve/slow/night/warning-sign/red-drag/harsh-brake)
- * are 🟡 PARTIAL or 🔴 NEW and skipped; SP-12 grades a crossing code (pedestrian
- * family); SP-13 needs ambient traffic set over the limit, which the determinism
- * law (ambient 0) forbids — all left for later waves.
+ * Doc-72 provenance: the batch-2 three are marked "Engine: ✅ FULL". Later
+ * waves in this file: SP-03 (zone/transition — sc-speed-zone + sc-speed-
+ * transition), SP-11/VP-09 (harsh brake — sc-sp-harsh-brake) and SP-05
+ * (curve envelope — sc-sp-curve on the rural-curve archetype + the
+ * curveAdvisory zone layer). SP-06..SP-10 stay 🟡/🔴; SP-12 grades a crossing
+ * code (pedestrian family); SP-13 needs ambient traffic set over the limit,
+ * which the determinism law (ambient 0) forbids — left for later waves.
  */
 
 import type { ScenarioSpec } from "./types";
@@ -594,6 +596,116 @@ export const SC_SP_HARSH_BRAKE: ScenarioSpec = {
   localeBg: "bg-BG",
 };
 
+// ---------------------------------------------------------------------------
+// 7. sc-sp-curve — „Скорост в завой" (SP-05) on sp-curve-v1: the FIRST
+//    rural-curve map (gen_rural_curve.mjs) — an extra-urban 1+1 road posted 90
+//    with a marked 90° arc (R 170) carrying the first curveAdvisory zone span
+//    (advisory 50, знак А1 + табела). Sustained speed above the advisory
+//    INSIDE the arc grades the CURVE-ENVELOPE основна SPEED_TOO_FAST_FOR_CURVE
+//    (чл. 20 ал. 2); the approach and exit stay governed by the posted 90.
+// ---------------------------------------------------------------------------
+
+/** Inside-lane arc midpoint of sp-curve-v1 (meta.scenario.laneCurveMid). */
+const CURVE_MID = { x: 52.66, y: 337.34 };
+/** Exit-leg lane center of sp-curve-v1 (meta.scenario.exitLaneY). */
+const CURVE_EXIT_Y = 385.94;
+
+/**
+ * SP-05 — несъобразена скорост в завой (ЗДвП чл. 20, ал. 2; SWOV: загубата на
+ * контрол В ЗАВОЙ е НАЙ-свръхпредставената грешка на начинаещите — влизане
+ * ~10 км/ч по-бързо, паническо спиране в дъгата, поднасяне/излизане от пътя).
+ * The taught discipline: brake BEFORE the curve, never in it. Detector is
+ * default-ON and structurally data-armed (only an authored curveAdvisory span
+ * sets the tick field), so no ruleConfig is needed — the LIVE student session
+ * grades the same fault.
+ */
+export const SC_SP_CURVE: ScenarioSpec = {
+  id: "sc-sp-curve",
+  family: "speed",
+  tagsBg: ["скорост", "завой", "извънградско", "препоръчителна скорост", "знак А1"],
+  titleBg: "Скорост в завой",
+  objectiveBg:
+    "Мини обозначения завой безопасно: свали скоростта до препоръчителните 50 км/ч ПРЕДИ завоя, дръж я равномерно през дъгата и ускорявай чак на излизане — спирачките работят на правата, не в завоя.",
+  archetypeIds: ["SP-05"],
+  conceptIds: ["c-speed-adaptation", "c-speed-limits", "c-general-care-duty"],
+  map: {
+    archetype: "rural-curve",
+    // The generator recipe — mirrored in sp-curve-v1.json meta.scenario.params
+    // (tools/maps/gen_rural_curve.mjs).
+    params: { approachM: 220, radiusM: 170, sweepDeg: 90, exitM: 200, maxspeedKmh: 90, advisoryKmh: 50 },
+    districtId: "sp-curve-v1",
+  },
+  start: {
+    spawnPointId: "spc-spawn-approach",
+    vehicleStart: "ready",
+  },
+  instructionsBg: [
+    { n: 1, textBg: "Потегли по извънградския път — тук ограничението е 90 км/ч и правата е свободна." },
+    { n: 2, textBg: "Напред следва знак А1 „Опасен завой надясно“ с табела „50“ — препоръчителната скорост за завоя." },
+    { n: 3, textBg: "Свали скоростта ПРЕДИ завоя: вдигни газта отрано и спри намаляването около 45–50 км/ч още на правата." },
+    { n: 4, textBg: "Дръж скоростта равномерна през цялата дъга — без спирачки и без газ в завоя; гледай към изхода му." },
+    { n: 5, textBg: "Щом воланът започне да се изправя, ускори плавно обратно към скоростта за правата." },
+  ],
+  success: [
+    {
+      id: "sc-spcv-approach",
+      titleBg: "Измини подхода с разрешената скорост",
+      // On the 90 approach — a normal ~85 rural cruise satisfies it.
+      params: { kind: "reachZone", x: LANE_X, y: 170, radiusM: 12, maxSpeedKmh: 92 },
+    },
+    {
+      id: "sc-spcv-curve",
+      titleBg: "Мини средата на завоя с препоръчителната скорост",
+      // Mid-arc control zone (meta.scenario.laneCurveMid), cap just above the
+      // advisory + grace: the adapted 48 passes, the 70 hold does not.
+      params: { kind: "reachZone", x: CURVE_MID.x, y: CURVE_MID.y, radiusM: 12, maxSpeedKmh: 55 },
+    },
+    {
+      id: "sc-spcv-finish",
+      titleBg: "Излез от завоя и продължи по правата",
+      params: { kind: "reachZone", x: 330, y: CURVE_EXIT_Y, radiusM: 12 },
+    },
+  ],
+  rubric: { parTimeSec: 60 },
+  // RECORDED: committed deterministic recordings of the authored scripts in
+  // traces/scSpCurve.ts; gates in traces/__tests__/sc-sp-curve-traces.test.ts
+  // (re-record with RECORD_TRACES=1).
+  shadow: { path: "content/traces/sc-sp-curve/shadow-correct.trace.json" },
+  mistakes: [
+    {
+      traceRef: { path: "content/traces/sc-sp-curve/mistake-hold-speed.trace.json" },
+      titleBg: "Със скоростта от правата в завоя",
+      whatWentWrongBg:
+        "Колата влезе в обозначения завой с около 70 км/ч — цели 20 над препоръчителните 50 от табелата. В дъгата гумите нямат резерв за нищо друго: една дупка, мокро петно или по-остър радиус и колата излиза от пътя. Точно тази грешка е най-честата причина начинаещи да катастрофират сами, без никой друг на пътя.",
+      codeRefs: ["SPEED_TOO_FAST_FOR_CURVE"],
+    },
+    {
+      traceRef: { path: "content/traces/sc-sp-curve/mistake-brake-late.trace.json" },
+      titleBg: "Спиране В завоя вместо преди него",
+      whatWentWrongBg:
+        "Намаляването започна чак В дъгата — колата влезе с ~85 и спирачките работиха в самия завой, а скоростта така и не слезе под препоръчителната. Спирането в завой краде от сцеплението за завиване и е рецептата за поднасяне: цялото намаляване се прави на правата, преди волана да се завърти.",
+      codeRefs: ["SPEED_TOO_FAST_FOR_CURVE"],
+    },
+  ],
+  teach: {
+    whenBg:
+      "При всеки обозначен завой извън населено място — знак А1/А2, често с табела с препоръчителна скорост. Ограничението 90 важи за правата; завоят има собствена безопасна скорост и тя се чете от знака и от геометрията на пътя.",
+    whyBg:
+      "Изследванията на SWOV показват: загубата на контрол в завой е НАЙ-типичната самостоятелна катастрофа на начинаещия водач — влизане само с 10 км/ч повече, паника, спирачка в дъгата, поднасяне. Гумите имат едно сцепление и то се дели между завиване и спиране: свалиш ли скоростта преди завоя, цялото сцепление остава за завиването.",
+    lawRef: "ЗДвП чл. 20, ал. 2",
+    examinerBg:
+      "Изпитващият очаква видимо, навременно намаляване ПРЕДИ завоя — не спирачки в дъгата. Несъобразената с пътните условия скорост е грешка дори в рамките на общото ограничение; равномерното преминаване и плавното ускоряване на излизане показват контрол.",
+  },
+  levels: [
+    { level: 1 },
+    { level: 2 },
+    { level: 3 },
+    { level: 4, vehicleStart: "cold" },
+  ],
+  conditions: { weather: "dry" },
+  localeBg: "bg-BG",
+};
+
 /** The speed-management templates, in catalog order (registered in
  *  templates.ts). */
 export const SCENARIO_TEMPLATES_SP: readonly ScenarioSpec[] = [
@@ -603,4 +715,5 @@ export const SCENARIO_TEMPLATES_SP: readonly ScenarioSpec[] = [
   SC_SPEED_ZONE,
   SC_SPEED_TRANSITION,
   SC_SP_HARSH_BRAKE,
+  SC_SP_CURVE,
 ];

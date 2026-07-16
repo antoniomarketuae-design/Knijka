@@ -189,6 +189,15 @@ export interface RuleEngineState {
   };
   /** At rest ON the track band (RX-03 — no queue exemption, short sustain). */
   railRest: EpisodeState;
+  // -- CURVE-ENVELOPE slice (doc 72 SP-05) ------------------------------------
+  /**
+   * Sustained speed above the curve's posted advisory inside an authored
+   * curveAdvisory span (tick.curveAdvisoryKmh). One bill per episode; the
+   * episode re-arms only on genuine correction (at/under the advisory) or on
+   * leaving the span — a second, distinct overspeed in the same long curve is
+   * a second act and bills again (the speeding-episode discipline).
+   */
+  curveSpeed: EpisodeState;
 }
 
 const IDLE_EPISODE: EpisodeState = { activeSince: null, emitted: false };
@@ -237,6 +246,7 @@ export function createRuleEngine(config?: Partial<RuleEngineConfig>): RuleEngine
     busLane: { ...IDLE_EPISODE },
     rail: { approachSeen: false, prevPhase: null },
     railRest: { ...IDLE_EPISODE },
+    curveSpeed: { ...IDLE_EPISODE },
   };
 }
 
@@ -274,6 +284,7 @@ function cloneState(s: RuleEngineState): RuleEngineState {
     busLane: { ...s.busLane },
     rail: { ...s.rail },
     railRest: { ...s.railRest },
+    curveSpeed: { ...s.curveSpeed },
   };
 }
 
@@ -658,6 +669,41 @@ export function reduceTick(prev: RuleEngineState, tick: SimTick): ReduceResult {
     )
   ) {
     events.push(makeViolation("SPEED_TOO_FAST_FOR_CONDITIONS", t));
+  }
+
+  // Curve-advisory overspeed (SP-05 „скорост в завой" — the CURVE-ENVELOPE
+  // slice, чл. 20 ал. 2): inside an AUTHORED curveAdvisory span
+  // (tick.curveAdvisoryKmh — district `zones` data, never a heuristic),
+  // sustained speed above the advisory + grace grades the curve основна.
+  // Design decisions (documented):
+  //  - DELIBERATELY NOT capped at the graced posted limit the way the
+  //    conditions code is: the advisory envelope (50) lives on 90-roads, so a
+  //    within-grace 95 into the bend must still bill the curve code; where the
+  //    driver is ALSO over the limit, the SPEEDING_* codes bill their own
+  //    distinct fault — two laws, two lessons (the OV-06/CROSSED_SOLID_LINE
+  //    precedent).
+  //  - Innocent by construction (A12): no span (every map without the layer)
+  //    = silent; the approach BEFORE the span is governed only by the posted
+  //    limit; at/under advisory (+ the grace band) never arms; a brief entry
+  //    overshoot corrected within the sustain never bills; reverse
+  //    maneuvering is exempt. Reset re-arms only after genuine correction
+  //    (at/under the advisory) or after leaving the span — one bill per act.
+  const advisoryKmh = tick.curveAdvisoryKmh;
+  const curveOverspeed =
+    advisoryKmh !== undefined &&
+    moving &&
+    forwardGear &&
+    speed > advisoryKmh + cfg.curveSpeedGraceKmh;
+  if (
+    stepEpisode(
+      s.curveSpeed,
+      curveOverspeed,
+      advisoryKmh === undefined || speed <= advisoryKmh,
+      t,
+      cfg.curveSpeedSustainSec,
+    )
+  ) {
+    events.push(makeViolation("SPEED_TOO_FAST_FOR_CURVE", t));
   }
 
   // Lights in rain (daytime — night is covered by HEADLIGHTS_OFF_AT_NIGHT).
@@ -1116,6 +1162,7 @@ export function reduceTick(prev: RuleEngineState, tick: SimTick): ReduceResult {
     s.solidCross,
     s.busLane,
     s.railRest,
+    s.curveSpeed,
   ].some((ep) => ep.emitted && ep.activeSince !== null);
   if (events.some((e) => e.kind === "violation")) {
     s.cleanDistanceM = 0; // any fresh mistake resets the streak

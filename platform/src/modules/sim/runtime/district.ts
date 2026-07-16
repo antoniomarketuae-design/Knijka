@@ -129,6 +129,15 @@ export interface DistrictBounds {
  *                        unguarded span (guarded absent/false) is the RX-02
  *                        mandatory-stop crossing (ЗДвП чл. 51–53). Grades the
  *                        опасна RAIL_CROSSING_VIOLATION.
+ * CURVE-ENVELOPE slice (rural-curve archetype — same shape, new kind, so
+ * meta.zonesVersion stays 1; doc 72 §8 SP-05 „Скорост в завой"):
+ *  - "curveAdvisory"   — the marked CURVE of the host edge (the span IS the
+ *                        arc), carrying the posted advisory speed
+ *                        (`advisoryKmh` — the Т-table under the А1/А2 warning
+ *                        sign). Sustained speed above the advisory inside the
+ *                        span grades the основна SPEED_TOO_FAST_FOR_CURVE
+ *                        (ЗДвП чл. 20, ал. 2). A span whose advisoryKmh is
+ *                        absent/malformed is INERT (tolerant, A12).
  * Consumers MUST ignore zones with unknown kinds/edge ids (forward compat).
  */
 export type DistrictZoneKind =
@@ -137,7 +146,8 @@ export type DistrictZoneKind =
   | "noOvertaking"
   | "solidCenterLine"
   | "busLane"
-  | "railCrossing";
+  | "railCrossing"
+  | "curveAdvisory";
 
 /**
  * Deterministic barrier timetable of a GUARDED rail crossing (railCrossing +
@@ -188,6 +198,14 @@ export interface DistrictZone {
    * or malformed = never barred (open, structurally innocent — A12).
    */
   barrier?: RailBarrierTimetable;
+  /**
+   * curveAdvisory only (curve-envelope slice): the posted advisory speed of
+   * the marked curve, km/h (the Т-table under А1/А2 — doc 72 SP-05). REQUIRED
+   * for the span to grade: absent or malformed (non-finite, <= 0) makes the
+   * whole span inert (tolerant, A12 — a data slip must never convict). Other
+   * kinds ignore the field.
+   */
+  advisoryKmh?: number;
 }
 
 export interface District {

@@ -108,20 +108,22 @@ export interface DistrictSpawnPoint {
 }
 
 /** ZONE-BAN data layer (ADR-006 stage 2a; stage 2b adds the line-type + bus
- *  vocabulary; stage 3a adds the railCrossing track band —
- *  runtime/district.ts is the documented contract; this mirror keeps
- *  world-side loads typed). */
+ *  vocabulary; stage 3a adds the railCrossing track band; the curve-envelope
+ *  slice adds the curveAdvisory arc span — runtime/district.ts is the
+ *  documented contract; this mirror keeps world-side loads typed). */
 export type DistrictZoneKind =
   | "noStopping"
   | "noParking"
   | "noOvertaking"
   | "solidCenterLine"
   | "busLane"
-  | "railCrossing";
+  | "railCrossing"
+  | "curveAdvisory";
 
 /** One authored span along an edge's polyline arclength (В24/В27/В28 bans;
  *  stage 2b: М1 solid осева / BUS lane markings; stage 3a: the railCrossing
- *  track band with its optional guarded flag + barrier timetable). */
+ *  track band with its optional guarded flag + barrier timetable; the
+ *  curve-envelope slice: the curveAdvisory arc with its advisory speed). */
 export interface DistrictZone {
   id: string;
   kind: DistrictZoneKind;
@@ -133,6 +135,8 @@ export interface DistrictZone {
   guarded?: boolean;
   /** railCrossing + guarded only: deterministic periodic barrier timetable. */
   barrier?: { cycleSec: number; downFromSec: number; downToSec: number };
+  /** curveAdvisory only: posted advisory speed of the marked curve, km/h. */
+  advisoryKmh?: number;
 }
 
 export interface DistrictMeta {

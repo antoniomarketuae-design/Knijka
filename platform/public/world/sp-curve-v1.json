@@ -1,0 +1,308 @@
+{
+ "format": "district-v1",
+ "meta": {
+  "district": "sp-curve",
+  "label": "Учебен извънградски път — скорост в завой (сценарий SP-05)",
+  "mapKind": "scenario-street",
+  "generator": "tools/maps/gen_rural_curve.mjs",
+  "zonesVersion": 1,
+  "boundsLocalMeters": {
+   "minX": -36.12,
+   "minY": -6,
+   "maxX": 376,
+   "maxY": 404.13
+  },
+  "attribution": {
+   "text": "Учебен извънградски път с обозначен завой — оригинален параметричен дизайн (без данни от OpenStreetMap)",
+   "license": "All rights reserved",
+   "licenseUrl": "/",
+   "copyrightUrl": "/",
+   "obligation": "none — original work, no ODbL attribution required for this map"
+  },
+  "defaults": {
+   "maxspeedUrbanKmh": 90,
+   "note": "Извънградски път с ограничение 90 км/ч; знак А1 с табела препоръчва 50 км/ч в обозначения завой — свали скоростта ПРЕДИ завоя, дръж я равномерно през дъгата."
+  },
+  "stats": {
+   "roadKm": 0.69,
+   "nodes": 2,
+   "edges": 1,
+   "intersections": 0,
+   "crossings": 0,
+   "buildings": 1,
+   "spawnPoints": 2,
+   "zones": 1
+  },
+  "scenario": {
+   "archetype": "rural-curve",
+   "params": {
+    "approachM": 220,
+    "radiusM": 170,
+    "sweepDeg": 90,
+    "exitM": 200,
+    "maxspeedKmh": 90,
+    "advisoryKmh": 50
+   },
+   "lanesPerDirection": 1,
+   "laneCenterRightM": 4.06,
+   "curveZone": {
+    "id": "spc-z-curve",
+    "kind": "curveAdvisory",
+    "signRef": "А1",
+    "fromM": 220,
+    "toM": 487.02,
+    "advisoryKmh": 50
+   },
+   "laneCurveMid": {
+    "x": 52.66,
+    "y": 337.34
+   },
+   "exitLaneY": 385.94
+  }
+ },
+ "roads": {
+  "nodes": [
+   {
+    "id": "spc-n-end",
+    "x": 370,
+    "y": 390
+   },
+   {
+    "id": "spc-n-start",
+    "x": 0,
+    "y": 0
+   }
+  ],
+  "edges": [
+   {
+    "id": "spc-e-road",
+    "from": "spc-n-start",
+    "to": "spc-n-end",
+    "class": "unclassified",
+    "name": "Учебен извънградски път — скорост в завой (сценарий SP-05)",
+    "oneway": false,
+    "roundabout": false,
+    "lanes": 2,
+    "lanesSource": "tag",
+    "maxspeed": 90,
+    "maxspeedSource": "tag",
+    "length": 687.02,
+    "geometry": [
+     [
+      0,
+      0
+     ],
+     [
+      0,
+      220
+     ],
+     [
+      0.16,
+      227.42
+     ],
+     [
+      0.65,
+      234.82
+     ],
+     [
+      1.45,
+      242.19
+     ],
+     [
+      2.58,
+      249.52
+     ],
+     [
+      4.03,
+      256.79
+     ],
+     [
+      5.79,
+      264
+     ],
+     [
+      7.87,
+      271.12
+     ],
+     [
+      10.25,
+      278.14
+     ],
+     [
+      12.94,
+      285.06
+     ],
+     [
+      15.93,
+      291.85
+     ],
+     [
+      19.21,
+      298.5
+     ],
+     [
+      22.78,
+      305
+     ],
+     [
+      26.62,
+      311.34
+     ],
+     [
+      30.74,
+      317.51
+     ],
+     [
+      35.13,
+      323.49
+     ],
+     [
+      39.77,
+      329.27
+     ],
+     [
+      44.66,
+      334.85
+     ],
+     [
+      49.79,
+      340.21
+     ],
+     [
+      55.15,
+      345.34
+     ],
+     [
+      60.73,
+      350.23
+     ],
+     [
+      66.51,
+      354.87
+     ],
+     [
+      72.49,
+      359.26
+     ],
+     [
+      78.66,
+      363.38
+     ],
+     [
+      85,
+      367.22
+     ],
+     [
+      91.5,
+      370.79
+     ],
+     [
+      98.15,
+      374.07
+     ],
+     [
+      104.94,
+      377.06
+     ],
+     [
+      111.86,
+      379.75
+     ],
+     [
+      118.88,
+      382.13
+     ],
+     [
+      126,
+      384.21
+     ],
+     [
+      133.21,
+      385.97
+     ],
+     [
+      140.48,
+      387.42
+     ],
+     [
+      147.81,
+      388.55
+     ],
+     [
+      155.18,
+      389.35
+     ],
+     [
+      162.58,
+      389.84
+     ],
+     [
+      170,
+      390
+     ],
+     [
+      370,
+      390
+     ]
+    ]
+   }
+  ]
+ },
+ "intersections": [],
+ "crossings": [],
+ "roundabouts": [],
+ "buildings": [
+  {
+   "id": "spc-b-barn",
+   "height": 6,
+   "heightSource": "default",
+   "footprint": [
+    [
+     -30.12,
+     160
+    ],
+    [
+     -17.12,
+     160
+    ],
+    [
+     -17.12,
+     178
+    ],
+    [
+     -30.12,
+     178
+    ]
+   ]
+  }
+ ],
+ "spawnPoints": [
+  {
+   "id": "spc-spawn-approach",
+   "x": 4.06,
+   "y": 15,
+   "heading": 0,
+   "edgeId": "spc-e-road",
+   "name": "Начало — подход към завоя"
+  },
+  {
+   "id": "spc-spawn-exit",
+   "x": 355,
+   "y": 385.94,
+   "heading": 90,
+   "edgeId": "spc-e-road",
+   "name": "Контролна точка — след завоя"
+  }
+ ],
+ "zones": [
+  {
+   "id": "spc-z-curve",
+   "kind": "curveAdvisory",
+   "edgeId": "spc-e-road",
+   "fromM": 220,
+   "toM": 487.02,
+   "signRef": "А1",
+   "advisoryKmh": 50
+  }
+ ]
+}

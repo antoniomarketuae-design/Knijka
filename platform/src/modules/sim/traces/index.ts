@@ -174,6 +174,14 @@ export {
   recordScSpeedRainDrive,
   type ScSpeedRainTraceName,
 } from "./scSpeedRain";
+// The curve-envelope wave (doc 72 SP-05, rural-curve archetype); committed
+// traces are recordings of exactly this script (gate: traces/__tests__/
+// sc-sp-curve-traces.test.ts).
+export {
+  SC_SP_CURVE_ID,
+  recordScSpCurveDrive,
+  type ScSpCurveTraceName,
+} from "./scSpCurve";
 
 // S3-C — the following/gap-management authored drives (sc-follow-distance /
 // sc-follow-brake); committed traces are recordings of exactly these scripts

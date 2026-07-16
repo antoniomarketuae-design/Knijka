@@ -334,7 +334,8 @@ export function createWorldRuntime(districtJson: District | unknown): DistrictWo
     | "noOvertaking"
     | "solidCenterLine"
     | "busLane"
-    | "railCrossing";
+    | "railCrossing"
+    | "curveAdvisory";
   const KNOWN_ZONE_KINDS = new Set<string>([
     "noStopping",
     "noParking",
@@ -342,6 +343,7 @@ export function createWorldRuntime(districtJson: District | unknown): DistrictWo
     "solidCenterLine",
     "busLane",
     "railCrossing",
+    "curveAdvisory",
   ]);
   interface ZoneSpan {
     kind: KnownZoneKind;
@@ -350,11 +352,22 @@ export function createWorldRuntime(districtJson: District | unknown): DistrictWo
     /** railCrossing only (stage 3a): guarded flag + validated timetable. */
     railGuarded: boolean;
     railBarrier: { cycleSec: number; downFromSec: number; downToSec: number } | null;
+    /** curveAdvisory only (curve-envelope slice): validated advisory, km/h. */
+    advisoryKmh: number;
   }
   const banZonesByEdge = new Map<number, ZoneSpan[]>();
   for (const z of district.zones ?? []) {
     if (!KNOWN_ZONE_KINDS.has(z.kind)) continue;
     if (!(Number.isFinite(z.fromM) && Number.isFinite(z.toM) && z.fromM < z.toM)) continue;
+    // Curve-envelope slice: a curveAdvisory span without a valid advisory
+    // speed is dropped WHOLE — with no envelope there is nothing to grade
+    // (a data slip must never convict; the rail-timetable discipline, A12).
+    if (
+      z.kind === "curveAdvisory" &&
+      !(Number.isFinite(z.advisoryKmh) && (z.advisoryKmh as number) > 0)
+    ) {
+      continue;
+    }
     const host = index.edgeRtById(z.edgeId);
     if (host === null) continue;
     let list = banZonesByEdge.get(host.idx);
@@ -382,6 +395,7 @@ export function createWorldRuntime(districtJson: District | unknown): DistrictWo
       railBarrier: barrierValid
         ? { cycleSec: b.cycleSec, downFromSec: b.downFromSec, downToSec: b.downToSec }
         : null,
+      advisoryKmh: z.kind === "curveAdvisory" ? (z.advisoryKmh as number) : 0,
     });
   }
 
@@ -1102,7 +1116,15 @@ export function createWorldRuntime(districtJson: District | unknown): DistrictWo
               else if (z.kind === "noParking") tick.noParkZone = true;
               else if (z.kind === "noOvertaking") tick.noOvertakeZone = true;
               else if (z.kind === "solidCenterLine") tick.solidCenterLine = true;
-              else tick.busLaneRight = true;
+              else if (z.kind === "curveAdvisory") {
+                // Curve-envelope slice (doc 72 SP-05): the advisory speed of
+                // the marked arc, resolved like maxspeed — from the committed
+                // lane fix. Overlapping spans compose by MIN (the most
+                // restrictive envelope governs, the condition-factor law).
+                if (tick.curveAdvisoryKmh === undefined || z.advisoryKmh < tick.curveAdvisoryKmh) {
+                  tick.curveAdvisoryKmh = z.advisoryKmh;
+                }
+              } else tick.busLaneRight = true;
             }
           }
         }

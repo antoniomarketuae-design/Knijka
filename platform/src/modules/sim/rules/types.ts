@@ -265,6 +265,19 @@ export interface SimTick {
    * RX-01 kill — convicts regardless of any stop made first.
    */
   railBarred?: boolean;
+  // -- CURVE-ENVELOPE slice (doc 72 SP-05 „Скорост в завой"; rural-curve
+  // archetype). Same contract as every zone field above: authored district
+  // `zones` spans only (kind "curveAdvisory" with a valid advisoryKmh), never
+  // heuristics — absent = no envelope = innocent. No pre-slice map carries one.
+  /**
+   * Advisory-speed envelope of the authored curve span the vehicle is INSIDE,
+   * km/h (the Т-table under the А1/А2 warning — doc 72 SP-05). Overlapping
+   * spans resolve to the MOST RESTRICTIVE (min). Read by the
+   * SPEED_TOO_FAST_FOR_CURVE detector; absent (every frame outside a span —
+   * including the whole approach BEFORE the curve) leaves only the posted
+   * `maxSpeedKmh` governing, exactly as before.
+   */
+  curveAdvisoryKmh?: number;
   /** Distance to the next stop line ahead on the current edge (travel
    * direction), m, within the runtime's watch window; absent = none/unknown. */
   nextStopLineM?: number;
@@ -355,6 +368,8 @@ export type ViolationCode =
   | "DRIVING_IN_BUS_LANE" // основна: sustained car travel in an authored bus lane (SN-05; brief transits to turn/park structurally innocent)
   // RAIL PACK slice 1 (ADR-006 stage 3a — authored railCrossing district zones)
   | "RAIL_CROSSING_VIOLATION" // опасна: unguarded band entry without the mandatory full stop / entry while barred / coming to rest ON the tracks (RX-01/02/03, чл. 51–53)
+  // CURVE-ENVELOPE slice (authored curveAdvisory district zones — doc 72 SP-05)
+  | "SPEED_TOO_FAST_FOR_CURVE" // основна: sustained speed above the curve's posted advisory inside the marked arc (чл. 20 ал. 2)
   // pre-drive procedure (procedures/machine.ts)
   | "PREDRIVE_STEP_SKIPPED" // второстепенна per skipped step
   | "PREDRIVE_SEATBELT_SKIPPED" // основна (skipping the belt is not a detail)
@@ -792,6 +807,26 @@ export interface RuleEngineConfig {
    * genuinely AT REST on the band holds v ≤ 1 km/h this long.
    */
   railRestSustainSec: number;
+
+  // -- CURVE-ENVELOPE slice (doc 72 SP-05; authored curveAdvisory spans) ------
+
+  /**
+   * SP-05 „скорост в завой" — grace band ABOVE the posted advisory, km/h,
+   * before the curve code can arm. An advisory is a taught envelope, not a
+   * radar limit: a speedometer's worth of slack (+5 on a 50 advisory) keeps
+   * the at-the-advisory drive — the textbook behaviour — structurally clear
+   * of the threshold (A12), while the real fault the archetype targets
+   * (10–20+ km/h too hot into the bend) sits far above it.
+   */
+  curveSpeedGraceKmh: number;
+  /**
+   * Seconds the over-advisory condition must hold INSIDE the span before
+   * SPEED_TOO_FAST_FOR_CURVE fires. Covers the honest entry overshoot: a
+   * driver who arrives a touch hot and corrects within ~1.5 s is adapting,
+   * not ignoring the advisory (A12); one who HOLDS the speed through the
+   * bend is exactly the SWOV loss-of-control novice the code teaches.
+   */
+  curveSpeedSustainSec: number;
 }
 
 export const DEFAULT_RULE_CONFIG: RuleEngineConfig = {
@@ -935,4 +970,10 @@ export const DEFAULT_RULE_CONFIG: RuleEngineConfig = {
   // 2 s: resting on the tracks is never innocent (no queue exemption — the
   // RX-03 kill), while braking THROUGH without stopping never holds v ≈ 0.
   railRestSustainSec: 2,
+
+  // CURVE-ENVELOPE slice (doc 72 SP-05). Structurally data-armed like every
+  // zone detector: only an authored curveAdvisory span (with a valid
+  // advisoryKmh) can set tick.curveAdvisoryKmh — no pre-slice map carries one.
+  curveSpeedGraceKmh: 5,
+  curveSpeedSustainSec: 1.5,
 };

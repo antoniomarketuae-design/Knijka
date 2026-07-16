@@ -531,6 +531,24 @@ export const VIOLATIONS: Record<ViolationCode, ViolationSpec> = {
     lawRef: "ЗДвП чл. 51–53",
     conceptId: "c-railway-crossing",
   },
+  // -- CURVE-ENVELOPE slice (doc 72 §8 SP-05; authored curveAdvisory zones) ---
+  SPEED_TOO_FAST_FOR_CURVE: {
+    // Doc 72 SP-05: Н38 основна (несъобразена скорост) → ПТП — SWOV's headline
+    // novice finding: single-vehicle loss of control IN CURVES is THE novice
+    // over-representation. The advisory envelope binds regardless of the
+    // posted limit (an advisory 50 lives on 90-roads), so this code is NOT
+    // capped at the graced limit the way the conditions code is — above the
+    // limit the SPEEDING_* codes bill their own distinct fault.
+    severityClass: "osnovna",
+    points: SEVERITY_POINTS.osnovna,
+    titleBg: "Несъобразена скорост в завой",
+    explanationBg:
+      "Влезе в обозначения завой със скорост над препоръчителната от табелата. В завоя гумите делят сцеплението между завиване и спиране — влезеш ли твърде бързо, паническото спиране в дъгата изнася колата извън пътя. Точно затова скоростта се сваля ПРЕДИ завоя, не в него.",
+    correctiveBg:
+      "Прочети знака А1/А2 и табелата под него отрано: спирачките работят на правата — свали до препоръчителната скорост преди завоя, дръж я равномерно през дъгата и ускорявай чак когато волана се изправя.",
+    lawRef: "ЗДвП чл. 20, ал. 2",
+    conceptId: "c-speed-adaptation",
+  },
   PREDRIVE_STEP_SKIPPED: {
     severityClass: "vtorostepenna",
     points: SEVERITY_POINTS.vtorostepenna,

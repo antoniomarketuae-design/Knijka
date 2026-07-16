@@ -43,6 +43,9 @@ const CODE_TO_SCENARIO: Record<string, string> = {
   DRIVING_IN_BUS_LANE: "ev-lane-discipline",
   // RAIL PACK slice 1 (ADR-006 stage 3a)
   RAIL_CROSSING_VIOLATION: "ev-railway-crossing",
+  // CURVE-ENVELOPE slice (doc 72 SP-05) — the library event explicitly lists
+  // curve geometry among its detections („в завой карай осезаемо по-бавно").
+  SPEED_TOO_FAST_FOR_CURVE: "ev-speed-for-conditions",
 };
 
 /** Scenario event id for a catalog code, or null when it maps to no scenario. */
