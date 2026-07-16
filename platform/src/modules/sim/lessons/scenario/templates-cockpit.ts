@@ -36,6 +36,7 @@
  * left for later waves.
  */
 
+import type { PoliceStopSpec } from "../../contracts";
 import type { ScenarioSpec } from "./types";
 
 // ---------------------------------------------------------------------------
@@ -322,10 +323,173 @@ export const SC_VP_STALL: ScenarioSpec = {
   localeBg: "bg-BG",
 };
 
+// ---------------------------------------------------------------------------
+// sc-vp-police-stop — „Спиране по полицейски сигнал" (doc 72 VP-11) on ln-v1
+//    (map REUSED from sc-lane-change / sc-vu-emergency: the 400 m 2+2
+//    boulevard — a left lane must exist so the „подминаване" demo can grade)
+// ---------------------------------------------------------------------------
+
+/** ln-v1 northbound lane centers (meta.scenario; pinned by value — L7). */
+const PS_RIGHT = 12.19;
+const PS_LEFT = 4.06;
+/** The officer's post on the RIGHT sidewalk (curb line x = 16.25). */
+const PS_OFFICER = { x: 17.0, y: 210 };
+/** The curb-side halt point: right edge of the right lane, just short of the
+ *  officer — the driver stops with the window at the officer's level. */
+const PS_STOP = { x: 13.9, y: 206 };
+const PS_STOP_RADIUS_M = 3;
+const PS_STOP_SPEED_KMH = 4;
+
+/**
+ * The staged OFFICER FIGURE on ln-v1 (kind "policeStop" — scenery +
+ * measurement only, see contracts.ts): stands at the curb at y = 210 facing
+ * the roadway (west), right arm raised — the стоп-сигнал pose, hi-vis vest,
+ * fictional per ADR-001. The runner emits ZERO SimTick events: the graded
+ * duty lives entirely in this template's objectives (the curb-side low-speed
+ * reachZone below = the pull-over-and-stop completion), so no new violation
+ * code exists to false-fire (A12). The outcome channel records "yielded" /
+ * "passedWithoutStopping" for the debrief.
+ */
+const VP_POLICE_OFFICER: PoliceStopSpec = {
+  id: "sc-vpps-officer",
+  kind: "policeStop",
+  libraryEventId: "ev-police-stop-signal",
+  officer: PS_OFFICER,
+  facing: { x: -1, y: 0 }, // toward the roadway (west)
+  stop: PS_STOP, // single truth with the graded stop-zone objective below
+  stopRadiusM: PS_STOP_RADIUS_M,
+  stopSpeedKmh: PS_STOP_SPEED_KMH,
+  passBeyondM: 25,
+};
+
+/**
+ * VP-11 — спиране по полицейски сигнал (ЗДвП чл. 170: разпорежданията на
+ * органите за контрол са задължителни за участниците в движението; сигналът
+ * за спиране изисква БЕЗОПАСНО спиране плътно вдясно — не паническо спиране
+ * насред лентата и не подминаване).
+ *
+ * COMPLETION DRILL (the stage-1c mandate): graded through EXISTING objective
+ * kinds only — a low-speed curb-side reachZone (the sc-pk-smooth-stop
+ * stop-mark pattern) IS the pull-over-and-stop duty; no new violation code.
+ * The mistake demos grade shipped codes that honestly fit each wrong way:
+ *   - „Подминаване на сигнала" — swerves LEFT around the officer and drives
+ *     on: the left-lane hog grades NOT_KEEPING_RIGHT (чл. 15) and the drill
+ *     never completes (the stop zone stays unreached — capped outcome);
+ *   - „Паника в лентата" — the doc-72 mistake verbatim (panic-brake in-lane
+ *     instead of pulling right): the ≥ 8 m/s² slam on an empty street grades
+ *     HARSH_BRAKING_NO_CAUSE, and the early mid-lane rest never reaches the
+ *     stop zone either.
+ * HONEST LIMIT (documented like sc-pk-smooth-stop's smoothness note): the
+ * WITHIN-LANE pull-to-the-edge nuance (~1.7 m) is coached by the instructions
+ * and the shadow, not zone-graded — a circular reachZone cannot honestly
+ * discriminate lateral position inside one lane.
+ */
+export const SC_VP_POLICE_STOP: ScenarioSpec = {
+  id: "sc-vp-police-stop",
+  family: "cockpit",
+  tagsBg: ["полицейски сигнал", "спиране", "проверка", "чл. 170"],
+  titleBg: "Спиране по полицейски сигнал",
+  objectiveBg:
+    "Полицай на тротоара ти подава сигнал за спиране. Изпълни го правилно: мигач надясно, плавно намаляване и спиране плътно вдясно при полицая — без паническо спиране насред лентата и без подминаване. Разпорежданията на контролните органи са задължителни (чл. 170).",
+  archetypeIds: ["VP-11"],
+  conceptIds: ["c-general-care-duty", "c-vehicle-controls", "c-braking-distance"],
+  map: {
+    archetype: "straight-street",
+    // Map REUSED from sc-lane-change — mirrored in ln-v1.json
+    // meta.scenario.params (tools/maps/gen_two_lane_road.mjs).
+    params: { lengthM: 400, maxspeedKmh: 50 },
+    districtId: "ln-v1",
+  },
+  start: {
+    spawnPointId: "ln-spawn-start",
+    vehicleStart: "ready",
+  },
+  instructionsBg: [
+    { n: 1, textBg: "Движи се спокойно в дясната лента по булеварда." },
+    {
+      n: 2,
+      textBg:
+        "Напред вдясно на тротоара стои полицай с вдигната ръка — сигналът за спиране е за теб и е задължителен (чл. 170).",
+    },
+    { n: 3, textBg: "Без паника: провери огледалото, пусни десен мигач и започни плавно да намаляваш отрано." },
+    {
+      n: 4,
+      textBg:
+        "Отдръпни се към десния край на лентата и спри плътно вдясно, точно при полицая — не насред платното.",
+    },
+    { n: 5, textBg: "Остани спрял с работещ двигател и ръце на волана — изчакваш указанията на полицая." },
+  ],
+  success: [
+    {
+      id: "sc-vpps-approach",
+      titleBg: "Приближи полицая с контролирана скорост",
+      // Right-lane checkpoint well before the officer's post.
+      params: { kind: "reachZone", x: PS_RIGHT, y: 120, radiusM: 10, maxSpeedKmh: 55 },
+    },
+    {
+      id: "sc-vpps-stop",
+      titleBg: "Спри плътно вдясно при полицая",
+      // Completable ONLY at near-stop speed at the curb-side halt point (the
+      // sc-pk-smooth-stop stop-mark pattern): the drill ENDS at rest by the
+      // officer — pulled over right and stopped. Same values as the staged
+      // PoliceStopSpec's halt contract (single truth by value).
+      params: {
+        kind: "reachZone",
+        x: PS_STOP.x,
+        y: PS_STOP.y,
+        radiusM: PS_STOP_RADIUS_M,
+        maxSpeedKmh: PS_STOP_SPEED_KMH,
+      },
+    },
+  ],
+  rubric: { parTimeSec: 55 },
+  // RECORDED (ADR-006 stage 1c): committed deterministic recordings of the
+  // authored scripts in traces/scVpPoliceStop.ts; the §5 gate (shadow replays
+  // with ZERO violations + rests in the stop zone) and the §9 stage-5 code
+  // asserts run in traces/__tests__/sc-vp-police-stop-traces.test.ts
+  // (re-record with RECORD_TRACES=1).
+  shadow: { path: "content/traces/sc-vp-police-stop/shadow-correct.trace.json" },
+  mistakes: [
+    {
+      traceRef: { path: "content/traces/sc-vp-police-stop/mistake-drive-past.trace.json" },
+      titleBg: "Подминаване на сигнала",
+      whatWentWrongBg:
+        "Водачът видя сигнала, измести се в лявата лента и просто отмина полицая. Разпореждането за спиране е задължително (чл. 170) — неизпълнението му е сериозно нарушение с глоба и книжка на масата. А оставането в лявата лента при свободна дясна е и „висене“ в лентата за изпреварване (чл. 15).",
+      codeRefs: ["NOT_KEEPING_RIGHT"],
+    },
+    {
+      traceRef: { path: "content/traces/sc-vp-police-stop/mistake-panic-stop.trace.json" },
+      titleBg: "Паника в лентата",
+      whatWentWrongBg:
+        "Сигналът стресна водача и кракът се заби в спирачката — колата спря рязко насред лентата, далеч преди полицая. Точно това е класическата грешка на новите водачи: сигналът иска БЕЗОПАСНО спиране плътно вдясно, а не аварийно спиране на място, което изненадва движещите се отзад и е предпоставка за удар.",
+      codeRefs: ["HARSH_BRAKING_NO_CAUSE"],
+    },
+  ],
+  teach: {
+    whenBg:
+      "Когато униформен полицай (или контролен орган със стоп-палка) ти подаде сигнал за спиране — при проверка, при произшествие напред, при отклоняване на движението. Сигналът е задължителен винаги и навсякъде.",
+    whyBg:
+      "Паническото спиране насред лентата е толкова опасно, колкото и подминаването: движещият се зад теб не очаква аварийно спиране без причина. Спокойната процедура — огледало, мигач, плавно вдясно, спиране при полицая — пази и теб, и колоната зад теб, и показва контрол над колата.",
+    lawRef: "ЗДвП чл. 170",
+    examinerBg:
+      "Изпитващият (и полицаят) гледа: навременно забелязване на сигнала, огледало и десен мигач, плавно намаляване и спиране плътно вдясно на посоченото място, двигател работещ и изчакване на указания. Рязко спиране в лентата или подминаване на сигнала е грешка.",
+  },
+  levels: [
+    { level: 1 },
+    { level: 2 },
+    { level: 3 },
+    { level: 4, vehicleStart: "cold" },
+  ],
+  staged: [VP_POLICE_OFFICER],
+  conditions: { weather: "dry" },
+  localeBg: "bg-BG",
+};
+
 /** The cockpit-procedure-family templates, in catalog order (registered in
  *  templates.ts). */
 export const SCENARIO_TEMPLATES_COCKPIT: readonly ScenarioSpec[] = [
   SC_VP_READINESS,
   SC_PK_MOVE_OFF,
   SC_VP_STALL,
+  SC_VP_POLICE_STOP,
 ];

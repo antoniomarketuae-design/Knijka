@@ -101,6 +101,14 @@ export interface TrafficVehicleState {
   profile?: VehicleProfile;
 }
 
+/**
+ * Presentation pose override for a STANDING pedestrian figure (staged actors
+ * only today — doc 72 VP-11): "stopSignal" renders one arm raised + hi-vis
+ * clothing (the fictional roadside officer, ADR-001 — no real insignia).
+ * Visual only: no query or detector reads it.
+ */
+export type PedestrianPose = "stopSignal";
+
 export interface TrafficPedestrianState {
   id: number;
   x: number;
@@ -114,6 +122,9 @@ export interface TrafficPedestrianState {
   /** True while the pedestrian is on the roadway span of a crossing. */
   onCrossing: boolean;
   colorIndex: number;
+  /** Standing pose override (see PedestrianPose). Absent = the normal
+   *  walk/stand rig — ambient pedestrians publish the exact pre-pose shape. */
+  pose?: PedestrianPose;
 }
 
 /**
@@ -317,6 +328,9 @@ export interface StagedPedestrianSpec {
   roadFromM?: number;
   roadToM?: number;
   colorIndex?: number;
+  /** Standing pose published on the actor's TrafficPedestrianState (doc 72
+   *  VP-11 — the roadside officer figure). Visual only; default absent. */
+  pose?: PedestrianPose;
 }
 
 export type StagedActorSpec = StagedVehicleSpec | StagedPedestrianSpec;

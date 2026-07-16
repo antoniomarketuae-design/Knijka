@@ -200,6 +200,38 @@ describe("staged pedestrian", () => {
     expect(view.finished).toBe(false);
     expect(system.pedestrianOnCrossing("x1")).toBe(false);
   });
+
+  it("publishes the standing pose ONLY when the spec authors one (VP-11 officer)", () => {
+    const system = squareSystem();
+    system.stage({
+      kind: "pedestrian",
+      id: "officer",
+      path: [
+        { x: 150, y: 9.7 },
+        { x: 148.5, y: 9.7 },
+      ],
+      speedMps: 0,
+      pose: "stopSignal",
+    });
+    system.stage({
+      kind: "pedestrian",
+      id: "plain-ped",
+      path: [
+        { x: 160, y: 9.7 },
+        { x: 160, y: -13.8 },
+      ],
+      speedMps: 2.9,
+    });
+    const officer = system.pedestrians.find((p) => p.pose === "stopSignal")!;
+    expect(officer).toBeDefined();
+    expect(officer.x).toBeCloseTo(150, 3); // stands at the path start…
+    run(system, 3, ctx());
+    expect(officer.x).toBeCloseTo(150, 3); // …and never walks uncommanded
+    expect(officer.speedMps).toBe(0);
+    // The pose-less staged pedestrian publishes the exact pre-pose shape.
+    const plain = system.pedestrians.find((p) => p !== officer && p.id >= 1000)!;
+    expect("pose" in plain).toBe(false);
+  });
 });
 
 describe("staged determinism", () => {

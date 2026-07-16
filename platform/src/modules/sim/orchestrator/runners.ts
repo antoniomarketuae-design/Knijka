@@ -25,6 +25,7 @@ import type {
   NarrowMeetingSpec,
   OncomingLeftTurnSpec,
   PedestrianDartOutSpec,
+  PoliceStopSpec,
   PriorityFromRightSpec,
   RoundaboutEntrySpec,
   StagedEventOutcome,
@@ -280,6 +281,10 @@ export class PriorityFromRightRunner implements EventRunner {
         extraRightOffsetM: s.actor.extraRightOffsetM,
         loop: s.actor.loop,
         colorIndex: s.actor.colorIndex,
+        // VU-10: a crossing EMERGENCY actor publishes its profile so the
+        // fleet renders the special-regime rig (absent = car, byte-identical
+        // — every pre-VU-10 priority spec authors no profile).
+        profile: s.actor.profile,
         playerGuard: true,
       });
       if (!view) throw new Error(`staged event ${s.id}: vehicle path failed to stage`);
@@ -1525,6 +1530,86 @@ export class EmergencyApproachRunner implements EventRunner {
 }
 
 // ---------------------------------------------------------------------------
+// 10. Police stop (ADR-006 stage 1c — doc 72 §3 VP-11 „Спиране по полицейски
+//     сигнал", Наредба-38 / ЗДвП чл. 170). SCENERY + MEASUREMENT ONLY: the
+//     runner stages the officer FIGURE (a staged pedestrian that never walks —
+//     pose "stopSignal" renders the raised arm + hi-vis vest, ADR-001) and
+//     records the outcome, but emits ZERO SimTick events — no violation can
+//     ever grade from this runner (the A12 bias: an unmodelled duty must not
+//     convict; the graded contract is the scenario's low-speed curb-side
+//     reachZone objective, the sc-pk-smooth-stop stop-mark pattern).
+// ---------------------------------------------------------------------------
+
+/** Short standing path for the officer figure (buildStagedPedPath needs a
+ *  polyline > 0.2 m; the figure holds at its start forever), m. */
+const POLICE_FACING_PATH_M = 1.5;
+
+export class PoliceStopRunner implements EventRunner {
+  phase: StagedEventPhase = "idle";
+  outcome: StagedEventOutcome | null = null;
+  hazardActive = false;
+
+  constructor(readonly spec: PoliceStopSpec) {}
+
+  stage(traffic: StagedTrafficPort, _rng: Rng, firstTime: boolean): void {
+    const s = this.spec;
+    if (firstTime) {
+      const view = traffic.stage({
+        kind: "pedestrian",
+        id: s.id,
+        // Standing at `officer`, facing along `facing` (toward the roadway).
+        // The walk is NEVER commanded — the figure stands for the session.
+        path: [
+          { x: s.officer.x, y: s.officer.y },
+          {
+            x: s.officer.x + s.facing.x * POLICE_FACING_PATH_M,
+            y: s.officer.y + s.facing.y * POLICE_FACING_PATH_M,
+          },
+        ],
+        speedMps: 0,
+        colorIndex: 0,
+        pose: "stopSignal",
+      });
+      if (!view) throw new Error(`staged event ${s.id}: officer figure failed to stage`);
+    } else {
+      traffic.stagedCommand(s.id, { type: "reset" });
+    }
+    // No jitter draw: the officer is scenery — nothing about it varies.
+    this.phase = "armed";
+    this.outcome = null;
+  }
+
+  step(_traffic: StagedTrafficPort, input: DirectorInput, _out: SimTickEvent[]): StagedEventOutcome | null {
+    const s = this.spec;
+    if (this.phase === "resolved") return null;
+    // Complied: at rest (≤ stopSpeedKmh) inside the halt zone — the same
+    // radius/speed contract the scenario's stop objective grades (by value).
+    if (
+      input.speedKmh <= s.stopSpeedKmh &&
+      dist(input.x, input.y, s.stop.x, s.stop.y) <= s.stopRadiusM
+    ) {
+      return this.resolve(input, true, "yielded");
+    }
+    // Ignored: the officer fell passBeyondM behind without a compliant stop.
+    // Outcome only — NO event is emitted, nothing grades (see class doc).
+    if (aheadOfPlayerM(input, s.officer.x, s.officer.y) < -s.passBeyondM) {
+      return this.resolve(input, false, "passedWithoutStopping");
+    }
+    return null;
+  }
+
+  private resolve(
+    input: DirectorInput,
+    success: boolean,
+    detail: StagedEventOutcome["detail"],
+  ): StagedEventOutcome {
+    this.phase = "resolved";
+    this.outcome = outcomeOf(this.spec, input, success, detail);
+    return this.outcome;
+  }
+}
+
+// ---------------------------------------------------------------------------
 
 export function createRunner(
   spec: StagedEventSpec,
@@ -1549,5 +1634,7 @@ export function createRunner(
       return new NarrowMeetingRunner(spec);
     case "emergencyApproach":
       return new EmergencyApproachRunner(spec);
+    case "policeStop":
+      return new PoliceStopRunner(spec);
   }
 }

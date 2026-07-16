@@ -278,6 +278,9 @@ export function createStagedPedestrian(
       walkPhase: 0,
       onCrossing: false,
       colorIndex: spec.colorIndex ?? 0,
+      // VP-11 standing pose — only present when the spec authors one, so
+      // pose-less staged pedestrians publish the exact pre-pose state shape.
+      ...(spec.pose !== undefined ? { pose: spec.pose } : {}),
     },
     view: {
       id: spec.id,

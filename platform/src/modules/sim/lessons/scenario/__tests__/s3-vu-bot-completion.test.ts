@@ -19,13 +19,14 @@ import { describe, expect, it } from "vitest";
 import type { RecordedDrive } from "../../../traces/recorder";
 import { recordScVuCyclistDrive, type ScVuCyclistTraceName } from "../../../traces/scVuCyclist";
 import { recordScVuEmergencyDrive } from "../../../traces/scVuEmergency";
+import { recordScVuEmergencyJunctionDrive } from "../../../traces/scVuEmergencyJunction";
 import { applyTick, buildLessonResult, createLessonSession } from "../../engine";
 import { gradeFinishWire, serializeRuleEvents } from "../../wire";
 import type { LessonResult, LessonSessionState } from "../../types";
 import { compileScenario } from "../compile";
 import { scenarioLessonById } from "../resolve";
 import { scoreRubric } from "../rubric";
-import { SC_VU_CYCLIST_HOOK, SC_VU_EMERGENCY } from "../templates-vru";
+import { SC_VU_CYCLIST_HOOK, SC_VU_EMERGENCY, SC_VU_EMERGENCY_JUNCTION } from "../templates-vru";
 import type { ScenarioSpec } from "../types";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -195,6 +196,79 @@ describe("ADR-006 counter-proofs — refusing the emergency vehicle grades throu
       recordScVuEmergencyDrive(d, "mistake-speed-up", { onTick }),
     );
     expect(driveViolationCodes(outcome)).toContain("EMERGENCY_NOT_YIELDED");
+    expect(outcome.result.passed).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// ADR-006 stage 1c — sc-vu-emergency-junction („Линейка на кръстовището",
+// VU-10) rides the same live-pipeline proof: the yield shadow completes at L3
+// and regrades identically over the wire; both refusal demos convict
+// FAILED_TO_YIELD (the documented junction-machinery mechanic — the crossing
+// EV grades through the RHR tracker, never the rear-approach emergency code)
+// and do NOT pass.
+// ---------------------------------------------------------------------------
+
+describe("S3 bot completion — sc-vu-emergency-junction („Линейка на кръстовището“) correct attempt at L3", () => {
+  const outcome = driveThroughSession(SC_VU_EMERGENCY_JUNCTION, (d, onTick) =>
+    recordScVuEmergencyJunctionDrive(d, "shadow-correct", { onTick }),
+  );
+
+  it("completes the session: every objective done, zero violations, passed", () => {
+    expect(outcome.session.phase).toBe("completed");
+    expect(outcome.result.completedAll).toBe(true);
+    expect(outcome.result.passed).toBe(true);
+    expect(outcome.result.score).toBe(0);
+    expect(outcome.result.objectives.every((o) => o.done)).toBe(true);
+    expect(outcome.session.events.filter((e) => e.kind === "violation")).toEqual([]);
+    expect(driveCommendationCodes(outcome)).toContain("YIELDED_TO_PRIORITY");
+  });
+
+  it("the server regrades identically from the id alone (wire round-trip)", () => {
+    const { session, result } = outcome;
+    const graded = gradeFinishWire({
+      lessonId: `${SC_VU_EMERGENCY_JUNCTION.id}@L3`,
+      startedAtMs: 1_000,
+      finishedAtMs: 1_000 + Math.round(result.durationSec * 1000),
+      aborted: false,
+      ruleEvents: serializeRuleEvents(session.events),
+      objectives: result.objectives.map((o) => ({
+        id: o.id,
+        done: o.done,
+        completedAtSec: o.completedAtSec,
+        ...(o.detail !== undefined ? { detail: o.detail } : {}),
+      })),
+    });
+    expect(graded.status).toBe("ok");
+    if (graded.status !== "ok") return;
+    expect(graded.lesson.id).toBe(`${SC_VU_EMERGENCY_JUNCTION.id}@L3`);
+    expect(graded.lesson).toEqual(scenarioLessonById(`${SC_VU_EMERGENCY_JUNCTION.id}@L3`));
+    expect(graded.result.passed).toBe(true);
+    expect(graded.result.score).toBe(0);
+  });
+
+  it("earns full stars from cleanliness (par time is informational only)", () => {
+    const rubric = scoreRubric(outcome.result, SC_VU_EMERGENCY_JUNCTION.rubric!);
+    expect(rubric.stars).toBe(3);
+  });
+});
+
+describe("ADR-006 stage 1c counter-proofs — barging the crossing EV grades through the live pipeline", () => {
+  it("barge: FAILED_TO_YIELD surfaces (never the rear-approach code), not passed, no yield commendation", () => {
+    const outcome = driveThroughSession(SC_VU_EMERGENCY_JUNCTION, (d, onTick) =>
+      recordScVuEmergencyJunctionDrive(d, "mistake-barge", { onTick }),
+    );
+    expect(driveViolationCodes(outcome)).toContain("FAILED_TO_YIELD");
+    expect(driveViolationCodes(outcome)).not.toContain("EMERGENCY_NOT_YIELDED");
+    expect(outcome.result.passed).toBe(false);
+    expect(driveCommendationCodes(outcome)).not.toContain("YIELDED_TO_PRIORITY");
+  });
+
+  it("race-the-siren: FAILED_TO_YIELD surfaces, not passed", () => {
+    const outcome = driveThroughSession(SC_VU_EMERGENCY_JUNCTION, (d, onTick) =>
+      recordScVuEmergencyJunctionDrive(d, "mistake-race", { onTick }),
+    );
+    expect(driveViolationCodes(outcome)).toContain("FAILED_TO_YIELD");
     expect(outcome.result.passed).toBe(false);
   });
 });

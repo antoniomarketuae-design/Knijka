@@ -21,13 +21,14 @@ import { recordScVpReadinessDrive, type ScVpReadinessTraceName } from "../../../
 import { recordScAcNightLightsDrive, type ScAcNightLightsTraceName } from "../../../traces/scAcNightLights";
 import { recordScAcRainLightsDrive, type ScAcRainLightsTraceName } from "../../../traces/scAcRainLights";
 import { recordScAcHighbeamLeadDrive, type ScAcHighbeamLeadTraceName } from "../../../traces/scAcHighbeamLead";
+import { recordScVpPoliceStopDrive, type ScVpPoliceStopTraceName } from "../../../traces/scVpPoliceStop";
 import { applyTick, buildLessonResult, createLessonSession } from "../../engine";
 import { gradeFinishWire, serializeRuleEvents } from "../../wire";
 import type { LessonResult, LessonSessionState } from "../../types";
 import { compileScenario } from "../compile";
 import { scenarioLessonById } from "../resolve";
 import { scoreRubric } from "../rubric";
-import { SC_VP_READINESS } from "../templates-cockpit";
+import { SC_VP_POLICE_STOP, SC_VP_READINESS } from "../templates-cockpit";
 import { SC_AC_NIGHT_LIGHTS, SC_AC_RAIN_LIGHTS, SC_AC_HIGHBEAM_LEAD } from "../templates-conditions";
 import type { ScenarioSpec } from "../types";
 
@@ -105,6 +106,13 @@ const CORRECT: Array<{ spec: ScenarioSpec; record: (d: unknown, onTick: OnTick) 
     spec: SC_AC_HIGHBEAM_LEAD,
     record: (d, onTick) => recordScAcHighbeamLeadDrive(d, "shadow-correct" as ScAcHighbeamLeadTraceName, { onTick }),
   },
+  {
+    // ADR-006 stage 1c — VP-11: the pull-over-and-stop completion drill (the
+    // policeStop officer figure is scenery; the curb-side low-speed reachZone
+    // IS the graded duty, so the compliant shadow COMPLETES at rest).
+    spec: SC_VP_POLICE_STOP,
+    record: (d, onTick) => recordScVpPoliceStopDrive(d, "shadow-correct" as ScVpPoliceStopTraceName, { onTick }),
+  },
 ];
 
 for (const { spec, record } of CORRECT) {
@@ -179,5 +187,28 @@ describe("S4 counter-proofs — cockpit mistakes grade through the live pipeline
     expect(codes).toContain("HIGH_BEAM_NOT_DIPPED");
     expect(codes).not.toContain("FOLLOWING_TOO_CLOSE");
     expect(driveCommendationCodes(outcome)).not.toContain("CLEAN_DRIVING");
+  });
+
+  // ADR-006 stage 1c (VP-11) — the completion-drill counter-proofs: neither
+  // wrong way reaches the curb-side stop zone, so the drill NEVER completes
+  // (the honest capped outcome), and each grades its own shipped code.
+  it("police stop / drive-past: NOT_KEEPING_RIGHT surfaces, stop objective unmet, not passed", () => {
+    const outcome = driveThroughSession(SC_VP_POLICE_STOP, (d, onTick) =>
+      recordScVpPoliceStopDrive(d, "mistake-drive-past", { onTick }),
+    );
+    expect(driveViolationCodes(outcome)).toContain("NOT_KEEPING_RIGHT");
+    expect(outcome.result.completedAll).toBe(false);
+    expect(outcome.result.objectives.find((o) => o.id === "sc-vpps-stop")!.done).toBe(false);
+    expect(outcome.result.passed).toBe(false);
+  });
+
+  it("police stop / panic in-lane slam: HARSH_BRAKING_NO_CAUSE surfaces, stop objective unmet, not passed", () => {
+    const outcome = driveThroughSession(SC_VP_POLICE_STOP, (d, onTick) =>
+      recordScVpPoliceStopDrive(d, "mistake-panic-stop", { onTick }),
+    );
+    expect(driveViolationCodes(outcome)).toContain("HARSH_BRAKING_NO_CAUSE");
+    expect(outcome.result.completedAll).toBe(false);
+    expect(outcome.result.objectives.find((o) => o.id === "sc-vpps-stop")!.done).toBe(false);
+    expect(outcome.result.passed).toBe(false);
   });
 });

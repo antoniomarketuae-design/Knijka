@@ -373,7 +373,8 @@ export type StagedEventKind =
   | "amberDilemma"
   | "oncomingLeftTurn"
   | "narrowMeeting"
-  | "emergencyApproach";
+  | "emergencyApproach"
+  | "policeStop";
 
 interface StagedEventBase {
   /** Unique per lesson, e.g. "l4-dart-out". */
@@ -647,6 +648,39 @@ export interface EmergencyApproachSpec extends StagedEventBase {
   clearSpeedMps?: number;
 }
 
+/**
+ * ADR-006 stage 1c (doc 72 §3 VP-11 — „Спиране по полицейски сигнал",
+ * Наредба-38 / ЗДвП чл. 170): a uniformed OFFICER FIGURE stands at the curb
+ * signalling THE PLAYER to stop (a staged pedestrian actor that never walks —
+ * pose "stopSignal" renders the raised arm + hi-vis vest, ADR-001 fictional).
+ *
+ * SCENERY + MEASUREMENT ONLY — deliberately NOT an adjudicator: the runner
+ * stages the figure and records an outcome ("yielded" when the player rests
+ * at the curb-side halt point, "passedWithoutStopping" when the officer falls
+ * `passBeyondM` behind without a compliant stop), but emits ZERO SimTick
+ * events, so NO violation can ever grade from it (the A12 bias — an
+ * unmodelled duty must not convict). The graded contract lives entirely in
+ * the scenario's EXISTING objectives (a low-speed curb-side reachZone = the
+ * pull-over-and-stop completion, the sc-pk-smooth-stop stop-mark pattern).
+ */
+export interface PoliceStopSpec extends StagedEventBase {
+  kind: "policeStop";
+  /** Officer's standing point (sidewalk, clear of the roadway), district space. */
+  officer: { x: number; y: number };
+  /** Unit facing direction (toward the roadway) — the figure's pose heading. */
+  facing: { x: number; y: number };
+  /** Curb-side halt point the compliant driver rests at (mirrors the
+   *  scenario's graded stop-zone objective — single truth by value). */
+  stop: { x: number; y: number };
+  /** Within this of `stop`… */
+  stopRadiusM: number;
+  /** …at/below this speed = complied (outcome "yielded"), km/h. */
+  stopSpeedKmh: number;
+  /** Officer this far behind the player (player-frame arc) without a
+   *  compliant stop = the signal was ignored (outcome only, no grading), m. */
+  passBeyondM: number;
+}
+
 export type StagedEventSpec =
   | PedestrianDartOutSpec
   | PriorityFromRightSpec
@@ -656,7 +690,8 @@ export type StagedEventSpec =
   | AmberDilemmaSpec
   | OncomingLeftTurnSpec
   | NarrowMeetingSpec
-  | EmergencyApproachSpec;
+  | EmergencyApproachSpec
+  | PoliceStopSpec;
 
 /**
  * Resolution record of one staged encounter (A8). The GRADING already

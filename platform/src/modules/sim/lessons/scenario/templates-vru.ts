@@ -39,12 +39,40 @@
  *
  *  - sc-vu-emergency  „Линейка отзад"  (VU-09, ln-v1 — the 2+2 boulevard)
  *
- * VU-05/06 stay 🟡 PARTIAL (recipe/world only) and VU-02/03/04/07/08/10/11/
+ * ADR-006 stage 1c adds VU-10 („Линейка на кръстовището" — the junction EV
+ * recipe on the shipped machinery):
+ *
+ *  - sc-vu-emergency-junction  „Линейка на кръстовището"  (VU-10, tj-rhr-v1)
+ *
+ * MECHANIC CHOICE (documented per the stage-1c mandate): the shipped
+ * emergencyApproach adjudication arms strictly on BEHIND + CLOSING in the
+ * player's frame (EM arm: behindM > 2 && ≤ armBehindM && actor faster) — a
+ * CROSSING EV approaches from the side/ahead, so that runner structurally
+ * cannot see it, and forking a second "emergency" adjudicator for crossing
+ * geometry would be new grading, which VU-10 explicitly does not add (doc 72:
+ * "extends VU-09's capability, no extra grading"). The clean, honest mechanic
+ * is the existing junction-conflict machinery: the EV is staged as the
+ * priorityFromRight crossing actor (profile "emergency" — the white rig +
+ * blue light bar) through the UNCONTROLLED tj-rhr junction, arriving from the
+ * player's right, so the runtime's own right-hand-rule tracker adjudicates:
+ *   - barging in front of it grades EXACTLY FAILED_TO_YIELD (опасна, 10 т.) —
+ *     on this junction the EV holds priority twice over (чл. 91 special
+ *     regime AND чл. 50 право отдясно), so the junction-priority conviction
+ *     is legally honest;
+ *   - yielding earns YIELDED_TO_PRIORITY (the tracker's own commendation).
+ * The чл. 91 make-way TEACHING lives in this template's copy (objective,
+ * instructions, teach card) — the graded code stays a shipped one.
+ *
+ * VU-05/06 stay 🟡 PARTIAL (recipe/world only) and VU-02/03/04/07/08/11/
  * 12/13/14 stay 🔴 NEW (lateral-clearance detector, door-swing/bus/e-scooter
- * actors, the junction EV recipe) — later waves.
+ * actors) — later waves.
  */
 
-import type { CyclistRightHookSpec, EmergencyApproachSpec } from "../../contracts";
+import type {
+  CyclistRightHookSpec,
+  EmergencyApproachSpec,
+  PriorityFromRightSpec,
+} from "../../contracts";
 import type { ScenarioSpec } from "./types";
 
 // ---------------------------------------------------------------------------
@@ -343,8 +371,158 @@ export const SC_VU_EMERGENCY: ScenarioSpec = {
   localeBg: "bg-BG",
 };
 
+// ---------------------------------------------------------------------------
+// 3. sc-vu-emergency-junction — „Линейка на кръстовището" (VU-10) on tj-rhr-v1
+//    (the sc-junction-rhr uncontrolled T, reused: the header documents WHY the
+//    crossing EV rides the priorityFromRight machinery, not emergencyApproach)
+// ---------------------------------------------------------------------------
+
+/** tj-rhr-v1 drawn lane-center offset from the road centerline, m. */
+const VUEJ_LANE = 4.0625;
+
+/**
+ * The staged EMERGENCY VEHICLE on tj-rhr-v1: holds on the east arm, then
+ * crosses the equal T-junction from the player's RIGHT (east arm → west arm,
+ * straight through), timed by the priorityFromRight runner against the
+ * player's approach up the stem — the sc-junction-rhr recipe (negative
+ * leadSec: the EV reaches the node ~3.5 s AFTER the player's projected
+ * line-crossing, so a barging player crosses its path with the conflict still
+ * inbound, while a yielding player watches it flash through). profile
+ * "emergency" renders the white special-regime rig with the blue light bar
+ * (ADR-001 fictional); junctionControl "uncontrolled" — the runtime's OWN
+ * right-hand-rule tracker adjudicates (FAILED_TO_YIELD / YIELDED_TO_PRIORITY),
+ * the runner only records the outcome. Faster than the JU-01 civilian
+ * (cruise 10 m/s, clear sprint 14) — an EV moves with urgency.
+ */
+const VU_EV_CROSSING: PriorityFromRightSpec = {
+  id: "sc-vuej-ev",
+  kind: "priorityFromRight",
+  libraryEventId: "ev-emergency-vehicle",
+  junction: { nodeId: "tj-n-c", x: 0, y: 0 },
+  junctionControl: "uncontrolled",
+  actor: {
+    pathNodes: ["tj-n-e", "tj-n-c", "tj-n-w"],
+    hold: { nodeIndex: 1, offsetM: -95 },
+    cruiseSpeedMps: 10, // ~36 km/h through the box — EV urgency, still plausible
+    colorIndex: 0,
+    profile: "emergency", // white rig + blue light bar (ADR-001 fictional)
+  },
+  junctionNodeIndex: 1,
+  armDistM: 70,
+  leadSec: -3.5,
+  lineDistM: 18,
+  clearSpeedMps: 14,
+};
+
+/**
+ * VU-10 — линейка през кръстовището (ЗДвП чл. 91: при светлинен и звуков
+ * сигнал от автомобил със специален режим водачите са ДЛЪЖНИ да го пропуснат
+ * — включително когато иначе биха имали предимство; тук, на равнозначно
+ * кръстовище, линейката идва и отдясно, чл. 50 — двойно нейното предимство).
+ */
+export const SC_VU_EMERGENCY_JUNCTION: ScenarioSpec = {
+  id: "sc-vu-emergency-junction",
+  family: "vru",
+  tagsBg: ["линейка", "специален режим", "кръстовище", "направи път"],
+  titleBg: "Линейка на кръстовището",
+  objectiveBg:
+    "Пропусни линейката със специален режим, която пресича кръстовището пред теб: чуеш ли сирена или видиш ли синя лампа, спри преди кръстовището и я изчакай да премине изцяло — линейката минава първа ВИНАГИ, независимо кой е с предимство.",
+  archetypeIds: ["VU-10"],
+  conceptIds: ["c-emergency-priority", "c-special-regime-vehicles", "c-priority-concept"],
+  map: {
+    archetype: "t-junction",
+    // The generator recipe — mirrored in tj-rhr-v1.json meta.scenario.params
+    // (tools/maps/gen_t_junction.mjs; map REUSED from sc-junction-rhr).
+    params: {
+      control: "none",
+      priorityArmM: 150,
+      minorArmM: 120,
+      lanes: 2,
+      priorityMaxKmh: 40,
+      minorMaxKmh: 40,
+    },
+    districtId: "tj-rhr-v1",
+  },
+  start: {
+    spawnPointId: "tj-spawn-south",
+    vehicleStart: "ready",
+  },
+  instructionsBg: [
+    { n: 1, textBg: "Тръгни по страничната улица към кръстовището и намали отрано — ще завиваш наляво." },
+    {
+      n: 2,
+      textBg:
+        "Чуваш сирена. Огледай се и я намери: отдясно приближава линейка със синя лампа — автомобил със специален режим.",
+    },
+    {
+      n: 3,
+      textBg:
+        "Линейката минава първа — винаги. Дори светофар да ти дава зелено или пътят да е твой, чл. 91 е над реда на кръстовището.",
+    },
+    { n: 4, textBg: "Спри преди кръстовището и я изчакай да премине ИЗЦЯЛО — без да навлизаш и без да ѝ режеш коридора." },
+    { n: 5, textBg: "Щом линейката е преминала и пътят е чист, завий наляво и продължи." },
+  ],
+  success: [
+    {
+      id: "sc-vuej-approach",
+      titleBg: "Приближи кръстовището бавно и с готовност за спиране",
+      // Stem lane center, just before the junction area (the JU-01 geometry).
+      params: { kind: "reachZone", x: VUEJ_LANE, y: -30, radiusM: 8, maxSpeedKmh: 25 },
+    },
+    {
+      id: "sc-vuej-cross",
+      titleBg: "Премини кръстовището, след като линейката е преминала",
+      // West-arm westbound lane center, past the 40 m junction area (the
+      // right-hand-rule tracker commends on leaving it).
+      params: { kind: "reachZone", x: -50, y: VUEJ_LANE, radiusM: 9 },
+    },
+  ],
+  rubric: { parTimeSec: 60 },
+  // RECORDED (ADR-006 stage 1c): committed deterministic recordings of the
+  // authored scripts in traces/scVuEmergencyJunction.ts; the §5 gate (shadow
+  // replays with ZERO violations + YIELDED_TO_PRIORITY) and the §9 stage-5
+  // code asserts run in traces/__tests__/sc-vu-emergency-junction-traces
+  // .test.ts (re-record with RECORD_TRACES=1).
+  shadow: { path: "content/traces/sc-vu-emergency-junction/shadow-correct.trace.json" },
+  mistakes: [
+    {
+      traceRef: { path: "content/traces/sc-vu-emergency-junction/mistake-barge.trace.json" },
+      titleBg: "Навлизане пред линейката",
+      whatWentWrongBg:
+        "Колата навлезе в кръстовището с непроменена скорост, докато отдясно приближаваше линейка със сирена и синя лампа. Автомобилът със специален режим минава първи — задължението по чл. 91 е абсолютно, а тук линейката идва и отдясно. Навлизането пред нея е отнето предимство — опасна грешка, която на изпита прекратява всичко.",
+      codeRefs: ["FAILED_TO_YIELD"],
+    },
+    {
+      traceRef: { path: "content/traces/sc-vu-emergency-junction/mistake-race.trace.json" },
+      titleBg: "Надбягване със сирената",
+      whatWentWrongBg:
+        "Водачът чу сирената, прецени „ще мина преди нея“ и даде газ през кръстовището. Точно обратното на дълга: при сигнал от специален режим се спира и се чака, а не се спринтира — секундата, която „печелиш“, кара линейката да спира заради теб. Пресичането на пътя ѝ е непропускане на автомобил с предимство (чл. 91).",
+      codeRefs: ["FAILED_TO_YIELD"],
+    },
+  ],
+  teach: {
+    whenBg:
+      "На всяко кръстовище, когато чуеш сирена или видиш синя/червена лампа — линейка, пожарна, полиция. Правилото не зависи от реда на кръстовището: и на зелено, и с предимство, автомобилът със специален режим минава пръв.",
+    whyBg:
+      "Кръстовището е най-честото място за удар с линейка: водачът гледа „своя“ ред — светофара, знака, дясното — и изключва ушите си. Сирената се чува секунди преди лампата да се види; който при сирена автоматично сваля газта и оглежда пресечните посоки, никога не се среща с линейка в кръстовището.",
+    lawRef: "ЗДвП чл. 91",
+    examinerBg:
+      "Изпитващият гледа: реакция на сирената още при приближаването (намаляване, оглеждане), решително спиране преди кръстовището, изчакване линейката да премине изцяло и чак тогава продължаване. Навлизане пред автомобил със специален режим е опасна грешка.",
+  },
+  levels: [
+    { level: 1 },
+    { level: 2 },
+    { level: 3 },
+    { level: 4, vehicleStart: "cold" },
+  ],
+  staged: [VU_EV_CROSSING],
+  conditions: { weather: "dry" },
+  localeBg: "bg-BG",
+};
+
 /** The VRU-family templates, in catalog order (registered in templates.ts). */
 export const SCENARIO_TEMPLATES_VRU: readonly ScenarioSpec[] = [
   SC_VU_CYCLIST_HOOK,
   SC_VU_EMERGENCY,
+  SC_VU_EMERGENCY_JUNCTION,
 ];

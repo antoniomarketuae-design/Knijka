@@ -16,7 +16,7 @@ const HERE = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(HERE, "../../../../../../..");
 
 describe("S2 catalog integrity", () => {
-  it("registers the full S1+S2+S3+S4+unit-2+breadth+signals+maneuver+hazards+final-harvest+cap-2+FO-06+VU-09 wave (54 templates across the families)", () => {
+  it("registers the full S1+S2+S3+S4+unit-2+breadth+signals+maneuver+hazards+final-harvest+cap-2+FO-06+VU-09+stage-1c wave (56 templates across the families)", () => {
     const ids = SCENARIO_TEMPLATES.map((s) => s.id).sort();
     expect(ids).toEqual(
       [
@@ -64,6 +64,8 @@ describe("S2 catalog integrity", () => {
         "sc-ov-narrow",
         "sc-vu-cyclist-hook",
         "sc-vu-emergency",
+        "sc-vu-emergency-junction",
+        "sc-vp-police-stop",
         "sc-pk-smooth-stop",
         "sc-vp-readiness",
         "sc-ac-night-lights",

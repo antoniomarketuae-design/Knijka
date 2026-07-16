@@ -244,6 +244,24 @@ export {
   recordScPkSmoothStopDrive,
   type ScPkSmoothStopTraceName,
 } from "./scPkSmoothStop";
+// ADR-006 stage 1c — the VU-10 junction-EV authored drives
+// (sc-vu-emergency-junction, the priorityFromRight crossing recipe with
+// profile "emergency"); committed traces are recordings of exactly these
+// scripts (gate: traces/__tests__/sc-vu-emergency-junction-traces).
+export {
+  SC_VU_EMERGENCY_JUNCTION_ID,
+  recordScVuEmergencyJunctionDrive,
+  type ScVuEmergencyJunctionTraceName,
+} from "./scVuEmergencyJunction";
+// ADR-006 stage 1c — the VP-11 police-stop authored drives
+// (sc-vp-police-stop, the policeStop officer figure + curb-side completion
+// objectives); committed traces are recordings of exactly these scripts
+// (gate: traces/__tests__/sc-vp-police-stop-traces).
+export {
+  SC_VP_POLICE_STOP_ID,
+  recordScVpPoliceStopDrive,
+  type ScVpPoliceStopTraceName,
+} from "./scVpPoliceStop";
 
 // S4 (cockpit channels — AC/VP unlock) — the cockpit-procedure + adverse-
 // conditions authored drives (sc-vp-readiness / sc-ac-night-lights /
