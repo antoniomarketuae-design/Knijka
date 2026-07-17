@@ -75,8 +75,10 @@ export { parkingObservationFromTrace } from "./observation";
 // (catalog order = SCENARIO_TEMPLATES order; the star gate mirrors doc 76 §8).
 export {
   resolveScenarioNextStep,
+  resolveScenarioNextSteps,
   type ScenarioNextStep,
   type ScenarioNextStepInput,
+  type ScenarioNextSteps,
 } from "./nextStep";
 
 // Authored templates (P0: sc-park-perp-rev)

@@ -78,6 +78,7 @@ exports[`compileScenario — sc-park-perp-rev > golden compile snapshot per leve
   "aids": {
     "hintsAfterIdleSec": 20,
     "pathRibbon": true,
+    "topdownAllowed": true,
   },
   "collisionMinKmh": 0,
   "conceptIds": [
@@ -145,6 +146,9 @@ exports[`compileScenario — sc-park-perp-rev > golden compile snapshot per leve
 
 exports[`compileScenario — sc-park-perp-rev > golden compile snapshot per level (the compiled contract — review on change) > L3 1`] = `
 {
+  "aids": {
+    "topdownAllowed": true,
+  },
   "collisionMinKmh": 0,
   "conceptIds": [
     "c-reversing",
@@ -211,6 +215,9 @@ exports[`compileScenario — sc-park-perp-rev > golden compile snapshot per leve
 
 exports[`compileScenario — sc-park-perp-rev > golden compile snapshot per level (the compiled contract — review on change) > L4 1`] = `
 {
+  "aids": {
+    "topdownAllowed": true,
+  },
   "collisionMinKmh": 0,
   "conceptIds": [
     "c-reversing",

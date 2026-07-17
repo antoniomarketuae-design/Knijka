@@ -28,6 +28,20 @@ import { SCENARIO_TEMPLATES_CONDITIONS } from "./templates-conditions";
 import { SCENARIO_TEMPLATES_MANEUVER } from "./templates-maneuver";
 import { SCENARIO_TEMPLATES_HAZARDS } from "./templates-hazards";
 import { SCENARIO_TEMPLATES_RAIL } from "./templates-rail";
+import { SCENARIO_TEMPLATES_JUNCTIONS3 } from "./templates-junctions3";
+import { SCENARIO_TEMPLATES_SIGNALS2 } from "./templates-signals2";
+import { SCENARIO_TEMPLATES_PARKING2 } from "./templates-parking2";
+import { SCENARIO_TEMPLATES_LANES2 } from "./templates-lanes2";
+import { SCENARIO_TEMPLATES_PE2 } from "./templates-pe2";
+import { SCENARIO_TEMPLATES_ROUNDABOUT } from "./templates-roundabout";
+import { SCENARIO_TEMPLATES_MERGING } from "./templates-merging";
+import { SCENARIO_TEMPLATES_EXAM } from "./templates-exam";
+import { SCENARIO_TEMPLATES_VRU2 } from "./templates-vru2";
+import { SCENARIO_TEMPLATES_RAIL2 } from "./templates-rail2";
+import { SCENARIO_TEMPLATES_CONDITIONS2 } from "./templates-conditions2";
+import { SCENARIO_TEMPLATES_SPEED2 } from "./templates-speed2";
+import { SCENARIO_TEMPLATES_HAZARDS2 } from "./templates-hazards2";
+import { SCENARIO_TEMPLATES_FOLLOWING2 } from "./templates-following2";
 
 /**
  * The TARGET bay of content/world/lot-perp-v1.json — meta.scenario bay
@@ -230,6 +244,26 @@ export const SCENARIO_TEMPLATES: readonly ScenarioSpec[] = [
   ...SCENARIO_TEMPLATES_MANEUVER,
   ...SCENARIO_TEMPLATES_HAZARDS,
   ...SCENARIO_TEMPLATES_RAIL,
+  // Wave 1 — one family file per item (each authored by its own build agent).
+  ...SCENARIO_TEMPLATES_JUNCTIONS3,
+  ...SCENARIO_TEMPLATES_SIGNALS2,
+  ...SCENARIO_TEMPLATES_PARKING2,
+  ...SCENARIO_TEMPLATES_LANES2,
+  ...SCENARIO_TEMPLATES_PE2,
+  ...SCENARIO_TEMPLATES_ROUNDABOUT,
+  ...SCENARIO_TEMPLATES_MERGING,
+  ...SCENARIO_TEMPLATES_EXAM,
+  // Wave 2 — four items extend a wave-1 family file in place (merging, lanes2,
+  // parking2, roundabout: already spread above), four open a new family.
+  ...SCENARIO_TEMPLATES_VRU2,
+  ...SCENARIO_TEMPLATES_RAIL2,
+  ...SCENARIO_TEMPLATES_CONDITIONS2,
+  ...SCENARIO_TEMPLATES_SPEED2,
+  // Wave 3 — six items extend a wave-1 family file in place (merging, lanes2,
+  // parking2, roundabout, junctions3, signals2: already spread above), two open
+  // a new family.
+  ...SCENARIO_TEMPLATES_HAZARDS2,
+  ...SCENARIO_TEMPLATES_FOLLOWING2,
 ];
 
 /** Lookup by template id; undefined for unknown ids. */

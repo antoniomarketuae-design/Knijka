@@ -11,8 +11,10 @@
  *  - the file satisfies the full engine contract (builder / runtime / traffic);
  *  - the corridor context surfaces on the tick exactly as designed
  *    (opposingBank on the oncoming bank; NO zone flag anywhere);
- *  - BOTH corridor templates' staged actor paths resolve against the real
- *    lane graph with their holds inside the path (the timing single truth);
+ *  - EVERY corridor template's staged actor paths resolve against the real
+ *    lane graph with their holds inside the path (the timing single truth) —
+ *    the day pair (OV-05/OV-08) and the NIGHT drill (sc-ov-night-gap), which
+ *    reuses this district in the dark;
  *  - the published copy is byte-identical (the map pipeline law).
  */
 import fs from "node:fs";
@@ -20,6 +22,8 @@ import path from "node:path";
 import { beforeAll, describe, expect, it } from "vitest";
 import type { OncomingStreamSpec, VehicleSample } from "../../contracts";
 import { SC_OV_ABORT, SC_OV_ONCOMING_GAP } from "../../lessons/scenario/templates-lanes";
+import { SC_OV_BEING_OVERTAKEN, SC_OV_NIGHT_GAP } from "../../lessons/scenario/templates-lanes2";
+import { DEFAULT_RULE_CONFIG } from "../../rules";
 import { createWorldRuntime, type DistrictWorldRuntime } from "../../runtime";
 import { buildLaneGraph } from "../../traffic/graph";
 import { resolveStagedVehiclePath } from "../../traffic/staged";
@@ -167,14 +171,24 @@ describe("ov-oncoming-v1 through the world runtime — the corridor context", ()
   });
 });
 
+/** Every template that lives on this district — the day corridor pair, the
+ *  night drill (sc-ov-night-gap) and the BEING-overtaken drill
+ *  (sc-ov-being-overtaken), both templates-lanes2. */
+const CORRIDOR_TEMPLATES = [
+  SC_OV_ONCOMING_GAP,
+  SC_OV_ABORT,
+  SC_OV_NIGHT_GAP,
+  SC_OV_BEING_OVERTAKEN,
+];
+
 describe("ov-oncoming-v1 — the corridor templates' staged paths resolve (single truth)", () => {
-  it("both templates' actor paths resolve on the real lane graph with holds inside the path", () => {
+  it("every template's actor paths resolve on the real lane graph with holds inside the path", () => {
     const graph = buildLaneGraph(loadRaw() as TrafficDistrict, {
       laneWidthM: DEFAULT_TRAFFIC_CONFIG.laneWidthM,
       excludedRoadClasses: DEFAULT_TRAFFIC_CONFIG.excludedRoadClasses,
       crossingSignalRadiusM: 45,
     });
-    for (const spec of [SC_OV_ONCOMING_GAP, SC_OV_ABORT]) {
+    for (const spec of CORRIDOR_TEMPLATES) {
       for (const staged of spec.staged ?? []) {
         if (!("actor" in staged) || staged.actor === undefined || !("pathNodes" in staged.actor)) continue;
         const actor = staged.actor;
@@ -195,16 +209,128 @@ describe("ov-oncoming-v1 — the corridor templates' staged paths resolve (singl
     }
   });
 
-  it("both templates pin THIS district and the generator recipe (the L7 copy truth)", () => {
+  it("every template pins THIS district and the generator recipe (the L7 copy truth)", () => {
     const d = loadRaw() as {
       meta: { scenario?: { laneCenterRightM?: number; laneCenterOncomingM?: number; params?: Record<string, number> } };
     };
-    for (const spec of [SC_OV_ONCOMING_GAP, SC_OV_ABORT]) {
+    for (const spec of CORRIDOR_TEMPLATES) {
       expect(spec.map.districtId).toBe("ov-oncoming-v1");
       expect(d.meta.scenario?.params?.lengthM).toBe(spec.map.params.lengthM);
       expect(d.meta.scenario?.params?.maxspeedKmh).toBe(spec.map.params.maxspeedKmh);
     }
     expect(d.meta.scenario?.laneCenterRightM).toBe(X_OWN);
     expect(d.meta.scenario?.laneCenterOncomingM).toBe(X_ONCOMING);
+  });
+});
+
+describe("ov-oncoming-v1 — the invariants the NIGHT drill rests on (sc-ov-night-gap)", () => {
+  it("nothing but the GAP is gradable here — the night drill inherits the corridor's silence", () => {
+    // The night template's honesty rests on this: no zones (crossing the осева
+    // is legal), no signals, no zebras. So „не започвай срещу фаровете" cannot
+    // be passed by obeying a painted line — the only thing that can convict is
+    // the measured oncoming window. The lesson is the JUDGEMENT, not the sign.
+    const d = assertDistrict(loadRaw());
+    expect(d.zones).toBeUndefined();
+    const world = buildWorldGeometry(d, { seed: 7 });
+    expect(world.trafficLights.length).toBe(0);
+    expect(world.stats.zebraCrossings).toBe(0);
+  });
+
+  it("the night drill starts on the own-lane spawn both day templates use", () => {
+    const d = loadRaw() as { spawnPoints: Array<{ id: string; x: number; y: number; heading: number }> };
+    const spawn = d.spawnPoints.find((s) => s.id === SC_OV_NIGHT_GAP.start.spawnPointId);
+    expect(spawn, `${String(SC_OV_NIGHT_GAP.start.spawnPointId)} must exist on ov-oncoming-v1`).toBeDefined();
+    expect(spawn!.x).toBe(X_OWN);
+    expect(spawn!.heading).toBe(0); // northbound — the oncoming bank is the other one
+  });
+
+  it("the BEING-overtaken drill starts on the same own-lane spawn", () => {
+    const d = loadRaw() as { spawnPoints: Array<{ id: string; x: number; heading: number }> };
+    const spawn = d.spawnPoints.find((s) => s.id === SC_OV_BEING_OVERTAKEN.start.spawnPointId);
+    expect(spawn, "sc-ov-being-overtaken must spawn on ov-oncoming-v1").toBeDefined();
+    expect(spawn!.x).toBe(X_OWN);
+    expect(spawn!.heading).toBe(0); // northbound — the overtaker comes from behind
+  });
+
+  it("the night stream's TWO holds — the trap and the dark window — fit the 900 m path", () => {
+    // The generic staged-path loop above proves resolvability; this pins the
+    // AUTHORED story: car 0 near the follow zone, car 1 far enough behind that
+    // the pass window is real (both in instant-cruise terms — see the template).
+    const stream = (SC_OV_NIGHT_GAP.staged ?? []).find((s) => s.kind === "oncomingStream") as
+      | OncomingStreamSpec
+      | undefined;
+    expect(stream).toBeDefined();
+    expect(stream!.count).toBe(2);
+    expect(stream!.gapsM).toEqual([560]);
+    // Hold is measured from ovg-n-end southbound: 900 − 282 ⇒ instant model y 310.
+    expect(stream!.actor.hold.offsetM).toBe(618);
+    // …and the trailing car, held 560 m BEHIND the head on the SAME path, still
+    // starts ON it (offset 58). A gap > the head's hold would silently push it
+    // off the path's start — the generic loop above is the law, this is the WHY.
+    expect(stream!.actor.hold.offsetM - stream!.gapsM[0]).toBeGreaterThanOrEqual(0);
+  });
+});
+
+describe("ov-oncoming-v1 — the lane geometry sc-ov-being-overtaken's OV-12 code rests on", () => {
+  /** laneKeepMaxOffsetM = 1.3 × PERCEPTUAL_ROAD_SCALE — the off-centre band. */
+  const MAX_OFF = DEFAULT_RULE_CONFIG.laneKeepMaxOffsetM;
+
+  it("laneOffsetM is measured from the NEAREST lane centre and PEAKS on the осева", () => {
+    // The template's whole code choice depends on this shape. Offset (+ = left)
+    // grows as the car leans toward the осева, tops out at the half-pitch on
+    // x = 0, and SHRINKS again past it (the other lane's centre takes over) —
+    // which is why a driver sitting fully on the oncoming bank is graded by
+    // opposingBank, not by lane-keeping.
+    const rt = createWorldRuntime(loadRaw());
+    const offsetAt = (x: number): number => {
+      rt.update(1 / 60);
+      return rt.sample(sample(x, 300, 0, 70), 1, false).laneOffsetM;
+    };
+    expect(offsetAt(X_OWN)).toBeCloseTo(0, 1); // own centre
+    expect(offsetAt(0)).toBeGreaterThan(MAX_OFF); // the осева itself — peak
+    expect(offsetAt(0)).toBeCloseTo(4.06, 1);
+    expect(offsetAt(-2.5)).toBeLessThan(MAX_OFF); // past it: the OTHER centre governs
+  });
+
+  it("the CENTER-LINE band is a narrow corridor on the own side of the осева", () => {
+    // sc-ov-being-overtaken's „Ляво дърпане" demo rides x = 0.3. It must clear
+    // the band (offset > MAX_OFF) while STAYING on the own bank — a drift that
+    // slipped past x = 0 would be graded as an opposing-bank excursion instead,
+    // a different lesson entirely.
+    const rt = createWorldRuntime(loadRaw());
+    const at = (x: number) => {
+      rt.update(1 / 60);
+      return rt.sample(sample(x, 300, 0, 65), 1, false);
+    };
+    const ride = at(0.3);
+    expect(ride.laneOffsetM).toBeGreaterThan(MAX_OFF);
+    expect(ride.opposingBank).toBeUndefined(); // still legally on our own side
+    // …and a car merely right-of-centre (the shadow's hug) is nowhere near it.
+    expect(Math.abs(at(5.6).laneOffsetM)).toBeLessThan(MAX_OFF);
+  });
+
+  it("no lane RENUMBERS anywhere across the road — laneId 0 / laneCount 1 throughout", () => {
+    // The proof behind every „no lane-change code can exist here" assertion in
+    // the sc-ov-night-gap and sc-ov-being-overtaken gates: on this 1+1 the bank
+    // flip does not change laneId, so the lane-change tracker has no edge to
+    // fire on — in EITHER direction, positive or negative.
+    const rt = createWorldRuntime(loadRaw());
+    for (let x = -6; x <= 8; x += 0.5) {
+      rt.update(1 / 60);
+      const s = rt.sample(sample(x, 300, 0, 70), 1, false);
+      expect(s.laneId, `laneId at x=${x}`).toBe(0);
+      expect(s.laneCount, `laneCount at x=${x}`).toBe(1);
+    }
+  });
+
+  it("sc-ov-being-overtaken's success zones sit in the own lane, inside the road", () => {
+    for (const objective of SC_OV_BEING_OVERTAKEN.success) {
+      const p = objective.params as { x: number; y: number; radiusM: number };
+      expect(p.x).toBe(X_OWN);
+      expect(p.y).toBeGreaterThan(0);
+      expect(p.y).toBeLessThan(900); // inside the committed 900 m road
+      // Radius under the lane pitch: unsatisfiable from the oncoming bank.
+      expect(p.radiusM).toBeLessThan(8.125);
+    }
   });
 });

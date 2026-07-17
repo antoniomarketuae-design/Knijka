@@ -1,0 +1,319 @@
+{
+ "format": "district-v1",
+ "meta": {
+  "district": "mw-entry",
+  "label": "Учебен вход на автомагистрала — лента за ускоряване (сценарий OV-15/SP-10)",
+  "mapKind": "scenario-street",
+  "generator": "tools/maps/gen_mw_entry.mjs",
+  "zonesVersion": 1,
+  "boundsLocalMeters": {
+   "minX": -48.56,
+   "minY": -6,
+   "maxX": 54.06,
+   "maxY": 966
+  },
+  "attribution": {
+   "text": "Учебен вход на автомагистрала с лента за ускоряване — оригинален параметричен дизайн (без данни от OpenStreetMap)",
+   "license": "All rights reserved",
+   "licenseUrl": "/",
+   "copyrightUrl": "/",
+   "obligation": "none — original work, no ODbL attribution required for this map"
+  },
+  "defaults": {
+   "maxspeedUrbanKmh": 140,
+   "note": "Вход на автомагистрала: използвай лентата за ускоряване, за да изравниш скоростта си с потока, огледай се и се влей — предимството е на движещите се по магистралата. След края на лентата вдясно вече е аварийната лента."
+  },
+  "stats": {
+   "roadKm": 2.06,
+   "nodes": 8,
+   "edges": 5,
+   "intersections": 0,
+   "crossings": 0,
+   "buildings": 1,
+   "spawnPoints": 3,
+   "zones": 3
+  },
+  "scenario": {
+   "archetype": "merge-lane",
+   "params": {
+    "approachM": 260,
+    "accelM": 200,
+    "mainM": 500,
+    "maxspeedKmh": 140,
+    "rampKmh": 90,
+    "lanesPerDirection": 2,
+    "medianM": 6
+   },
+   "lanesPerDirection": 2,
+   "laneCurbX": 8.13,
+   "laneCruiseX": 0,
+   "laneLeftX": -8.12,
+   "noseY": 260,
+   "taperY": 460,
+   "endY": 960,
+   "accelLaneFromY": 260,
+   "accelLaneToY": 460,
+   "rampSpawn": [
+    35.56,
+    139.5,
+    347.18
+   ],
+   "accelEdgeId": "mwe-e-nb-accel",
+   "emergencyZoneIds": [
+    "mwe-z-emerg-approach",
+    "mwe-z-emerg-main",
+    "mwe-z-emerg-sb"
+   ]
+  }
+ },
+ "roads": {
+  "nodes": [
+   {
+    "id": "mwe-n-nb-end",
+    "x": 0,
+    "y": 960
+   },
+   {
+    "id": "mwe-n-nb-start",
+    "x": 0,
+    "y": 0
+   },
+   {
+    "id": "mwe-n-nose",
+    "x": 0,
+    "y": 260
+   },
+   {
+    "id": "mwe-n-ramp-nose",
+    "x": 8.13,
+    "y": 260
+   },
+   {
+    "id": "mwe-n-ramp-start",
+    "x": 40,
+    "y": 120
+   },
+   {
+    "id": "mwe-n-sb-end",
+    "x": -30.37,
+    "y": 0
+   },
+   {
+    "id": "mwe-n-sb-start",
+    "x": -30.37,
+    "y": 960
+   },
+   {
+    "id": "mwe-n-taper",
+    "x": 0,
+    "y": 460
+   }
+  ],
+  "edges": [
+   {
+    "id": "mwe-e-nb-approach",
+    "from": "mwe-n-nb-start",
+    "to": "mwe-n-nose",
+    "class": "primary",
+    "name": "Учебен вход на автомагистрала — лента за ускоряване (сценарий OV-15/SP-10) — подход",
+    "oneway": true,
+    "roundabout": false,
+    "lanes": 3,
+    "lanesSource": "tag",
+    "maxspeed": 140,
+    "maxspeedSource": "tag",
+    "motorway": true,
+    "length": 260,
+    "geometry": [
+     [
+      0,
+      0
+     ],
+     [
+      0,
+      260
+     ]
+    ]
+   },
+   {
+    "id": "mwe-e-nb-accel",
+    "from": "mwe-n-nose",
+    "to": "mwe-n-taper",
+    "class": "primary",
+    "name": "Учебен вход на автомагистрала — лента за ускоряване (сценарий OV-15/SP-10) — лента за ускоряване",
+    "oneway": true,
+    "roundabout": false,
+    "lanes": 3,
+    "lanesSource": "tag",
+    "maxspeed": 140,
+    "maxspeedSource": "tag",
+    "motorway": true,
+    "length": 200,
+    "geometry": [
+     [
+      0,
+      260
+     ],
+     [
+      0,
+      460
+     ]
+    ]
+   },
+   {
+    "id": "mwe-e-nb-main",
+    "from": "mwe-n-taper",
+    "to": "mwe-n-nb-end",
+    "class": "primary",
+    "name": "Учебен вход на автомагистрала — лента за ускоряване (сценарий OV-15/SP-10) — платно след вливането",
+    "oneway": true,
+    "roundabout": false,
+    "lanes": 3,
+    "lanesSource": "tag",
+    "maxspeed": 140,
+    "maxspeedSource": "tag",
+    "motorway": true,
+    "length": 500,
+    "geometry": [
+     [
+      0,
+      460
+     ],
+     [
+      0,
+      960
+     ]
+    ]
+   },
+   {
+    "id": "mwe-e-sb",
+    "from": "mwe-n-sb-start",
+    "to": "mwe-n-sb-end",
+    "class": "primary",
+    "name": "Учебен вход на автомагистрала — лента за ускоряване (сценарий OV-15/SP-10) — насрещно платно",
+    "oneway": true,
+    "roundabout": false,
+    "lanes": 3,
+    "lanesSource": "tag",
+    "maxspeed": 140,
+    "maxspeedSource": "tag",
+    "motorway": true,
+    "length": 960,
+    "geometry": [
+     [
+      -30.37,
+      960
+     ],
+     [
+      -30.37,
+      0
+     ]
+    ]
+   },
+   {
+    "id": "mwe-e-ramp",
+    "from": "mwe-n-ramp-start",
+    "to": "mwe-n-ramp-nose",
+    "class": "secondary_link",
+    "name": "Учебен вход на автомагистрала — лента за ускоряване (сценарий OV-15/SP-10) — рампа за включване",
+    "oneway": true,
+    "roundabout": false,
+    "lanes": 1,
+    "lanesSource": "tag",
+    "maxspeed": 90,
+    "maxspeedSource": "default",
+    "length": 143.58,
+    "geometry": [
+     [
+      40,
+      120
+     ],
+     [
+      8.13,
+      260
+     ]
+    ]
+   }
+  ]
+ },
+ "intersections": [],
+ "crossings": [],
+ "roundabouts": [],
+ "buildings": [
+  {
+   "id": "mwe-b-service",
+   "height": 8,
+   "heightSource": "default",
+   "footprint": [
+    [
+     22.19,
+     600
+    ],
+    [
+     36.19,
+     600
+    ],
+    [
+     36.19,
+     630
+    ],
+    [
+     22.19,
+     630
+    ]
+   ]
+  }
+ ],
+ "spawnPoints": [
+  {
+   "id": "mwe-spawn-ramp",
+   "x": 35.56,
+   "y": 139.5,
+   "heading": 347.18,
+   "edgeId": "mwe-e-ramp",
+   "name": "Начало — рампата за включване"
+  },
+  {
+   "id": "mwe-spawn-accel",
+   "x": 8.13,
+   "y": 300,
+   "heading": 0,
+   "edgeId": "mwe-e-nb-accel",
+   "name": "Контролна точка — в лентата за ускоряване"
+  },
+  {
+   "id": "mwe-spawn-finish",
+   "x": 0,
+   "y": 945,
+   "heading": 0,
+   "edgeId": "mwe-e-nb-main",
+   "name": "Контролна точка — край на отсечката"
+  }
+ ],
+ "zones": [
+  {
+   "id": "mwe-z-emerg-approach",
+   "kind": "emergencyLane",
+   "edgeId": "mwe-e-nb-approach",
+   "fromM": 0,
+   "toM": 260,
+   "signRef": "М2"
+  },
+  {
+   "id": "mwe-z-emerg-main",
+   "kind": "emergencyLane",
+   "edgeId": "mwe-e-nb-main",
+   "fromM": 0,
+   "toM": 500,
+   "signRef": "М2"
+  },
+  {
+   "id": "mwe-z-emerg-sb",
+   "kind": "emergencyLane",
+   "edgeId": "mwe-e-sb",
+   "fromM": 0,
+   "toM": 960,
+   "signRef": "М2"
+  }
+ ]
+}

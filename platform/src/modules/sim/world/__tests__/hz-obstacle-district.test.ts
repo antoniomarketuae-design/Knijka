@@ -126,6 +126,62 @@ describe(`${ID} through the world runtime — the speed-limit surface`, () => {
   });
 });
 
+describe(`${ID} — the invariants sc-hz-emergency-stop depends on (wave-3 PE-04)`, () => {
+  // The second template on this map („Екстрено спиране", templates-hazards2)
+  // stages a mid-block child dart on a street with NO crossing. Its whole
+  // grading design rests on the four absences below — if any of them ever
+  // appears here, the drill silently changes shape:
+  //  - a crossing would arm the CrossingZoneTracker and start billing
+  //    PEDESTRIAN_* on the mistake demos (their codeRefs are exact);
+  //  - a crossing/junction/stop line would also feed the harsh-brake cause
+  //    ledger, which is what the template's ruleConfig override compensates for
+  //    (see the templates-hazards2 header) — that override would become wrong.
+  let district: District;
+
+  beforeAll(() => {
+    district = assertDistrict(loadRaw(ID));
+  });
+
+  it("carries NO crossing, junction or zone: the emergency stop grades braking, not a zebra duty", () => {
+    expect(district.crossings.length).toBe(0);
+    expect(district.intersections.length).toBe(0);
+    const rt = createWorldRuntime(loadRaw(ID));
+    expect(rt.debugSignalClusters().length).toBe(0);
+    expect(rt.debugStopLines().length).toBe(0);
+    expect(rt.debugUncontrolledJunctions().length).toBe(0);
+  });
+
+  it("hosts the dart geometry: the child's line and the stop mark are on the drivable street", () => {
+    const rt = createWorldRuntime(loadRaw(ID));
+    rt.update(1 / 60);
+    // The child crosses at y = 150 and the shadow rests at y = 148 — both must
+    // sit on hz-e-street, inside the 240 m span, at the posted 50.
+    for (const y of [148, 150]) {
+      const tick = rt.sample(sample(X_LANE, y, 0, 30), 1, false);
+      expect(tick.edgeId, `y=${y}`).toBe("hz-e-street");
+      expect(tick.maxSpeedKmh, `y=${y}`).toBe(LIMIT_KMH);
+    }
+    expect(LENGTH_M).toBeGreaterThan(190); // the swerve demo runs out to y = 190
+  });
+
+  it("the wide lane puts the swerve line past the lane-keep tolerance, and the driving line under it", () => {
+    const rt = createWorldRuntime(loadRaw(ID));
+    rt.update(1 / 60);
+    // The template's SWERVE_X = 7.8 must exceed the 3.25 m tolerance (so
+    // POOR_LANE_KEEPING bills) with a NEGATIVE offset (curb side — so the
+    // CENTER_LINE_TOUCHED arm, which needs a positive offset toward oncoming,
+    // stays disarmed). The driving line must sit at zero.
+    const onLine = rt.sample(sample(X_LANE, 150, 0, 30), 1, false);
+    expect(onLine.laneOffsetM).toBeCloseTo(0, 2);
+    const swerved = rt.sample(sample(7.8, 150, 0, 30), 1.1, false);
+    expect(swerved.laneOffsetM).toBeLessThan(-3.25);
+    expect(swerved.laneId).toBe(0);
+    // …and the parked car the swerve hits (x = 7.2) is still on the carriageway.
+    const parked = rt.sample(sample(7.2, 185, 0, 30), 1.2, false);
+    expect(parked.edgeId).toBe("hz-e-street");
+  });
+});
+
 describe(`${ID} through the traffic lane graph`, () => {
   it("builds the lane graph: 2 directed lanes, no crossing bindings", () => {
     const raw = loadRaw(ID) as TrafficDistrict;

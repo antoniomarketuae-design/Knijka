@@ -366,3 +366,116 @@ for (const id of ["tj-rhr-v1", "tj-stop-v1"] as const) {
     });
   });
 }
+
+// ---------------------------------------------------------------------------
+// tj-stop-v1, the OTHER seat — the contract sc-jx-priority-confidence rests on
+// ---------------------------------------------------------------------------
+
+/**
+ * Everything above drives tj-stop-v1 from the STEM (sc-junction-stop / JU-03:
+ * the student is the one who must stop). The wave-3 template
+ * sc-jx-priority-confidence drives the same committed map from the PRIMARY arm,
+ * west → east, and its entire premise is that the engine has nothing to say to a
+ * driver who simply keeps going. That premise is a set of facts about this
+ * district, not about the template — so it is pinned here, once, where a change
+ * to the stop-line heuristic or the lane geometry would trip it.
+ */
+describe("tj-stop-v1 from the priority arm (sc-jx-priority-confidence)", () => {
+  const id = "tj-stop-v1";
+  /** The player's eastbound lane center on the primary arm, m. */
+  const LANE_Y = -4.0625;
+  /** The derived Б2 line's distance from tj-n-c, m — TJ_STOP_B2_LINE_M in
+   *  templates-junctions3.ts is this number (the waiting car's authored hold).
+   *  Derived above from the line's sM 92.275 on the 120 m stem. */
+  const B2_LINE_M = 27.725;
+
+  it("the west spawn is the eastbound approach the template starts from", () => {
+    const district = assertDistrict(loadRaw(id));
+    const west = district.spawnPoints.find((s) => s.id === "tj-spawn-west")!;
+    expect(west).toBeDefined();
+    // start.spawnPointId "tj-spawn-west": (−135, 0) facing east (heading 90).
+    expect(west.x).toBe(-135);
+    expect(west.y).toBe(0);
+    expect(west.heading).toBe(90);
+    expect(west.edgeId).toBe("tj-e-w");
+  });
+
+  it("the Б2 line sits exactly where the waiting car is authored to hold", () => {
+    const rt = createWorldRuntime(loadRaw(id));
+    const line = rt.debugStopLines()[0];
+    // 120 m stem, line at sM 92.275 → 27.725 m short of the node. The staged
+    // waiter holds at −TJ_STOP_B2_LINE_M on the same arc: it waits ON its line.
+    expect(120 - line.sM).toBeCloseTo(B2_LINE_M, 3);
+  });
+
+  it("THE PREMISE: an eastbound run through the node is silent — no line, no priority claim", () => {
+    // If this ever fails, sc-jx-priority-confidence starts billing the student
+    // for having the right of way, and its shadow stops being a shadow.
+    const rt = createWorldRuntime(loadRaw(id));
+    rt.update(1 / 60);
+    let t = 0;
+    for (let x = -120; x <= 60; x += 2) {
+      t += 0.15;
+      const tick = rt.sample(sample(x, LANE_Y, 90, 46), t, false);
+      expect(tick.maxSpeedKmh, `x=${x}`).toBe(50);
+      expect(tick.wrongWay, `x=${x}`).toBe(false);
+      expect(tick.events.filter((e) => e.kind === "stopLineCrossed"), `x=${x}`).toEqual([]);
+      expect(tick.events.filter((e) => e.kind === "prioritySituation"), `x=${x}`).toEqual([]);
+      // The priority arm carries no stop line at all — the Б2 belongs to the
+      // stem, and the runtime never offers it to this approach.
+      expect(tick.nextStopLineM, `x=${x}`).toBeUndefined();
+    }
+  });
+
+  it("tj-n-c is NOT an uncontrolled junction — the right-hand-rule tracker cannot arm", () => {
+    // The stem's derived line guards the node, so worldRuntime's
+    // uncontrolledJunctions excludes it. This is WHY a car arriving from the
+    // player's right (the stem is to their right, running west→east) can never
+    // bill them FAILED_TO_YIELD. Asserted above too, from the stem's seat; kept
+    // here because it is this template's load-bearing fact, not a detail.
+    const rt = createWorldRuntime(loadRaw(id));
+    expect(rt.debugUncontrolledJunctions()).toEqual([]);
+  });
+
+  it("the junction-distance channel clears 35 m where the phantom-brake demo slams", () => {
+    // HARSH_BRAKING_NO_CAUSE refuses to fire with a junction inside
+    // harshBrakeJunctionClearM (35). The mistake demo slams at x ≈ −50, so the
+    // channel must genuinely read > 35 there — otherwise the demo's taught
+    // fault silently stops grading.
+    const rt = createWorldRuntime(loadRaw(id));
+    rt.update(1 / 60);
+    const tick = rt.sample(sample(-50, LANE_Y, 90, 46), 0.5, false);
+    expect(tick.nextJunctionM).toBeDefined();
+    expect(tick.nextJunctionM!).toBeGreaterThan(35);
+  });
+
+  it("stages both of the template's actor paths (stem left-turn + eastbound лепка)", () => {
+    const raw = loadRaw(id) as TrafficDistrict;
+    const traffic = createTrafficSystem(raw, { seed: 7, vehicleCount: 0, pedestrianCount: 0 });
+    // The waiting/creeping cars: up the stem, then LEFT onto the west arm —
+    // authored that way so they never share the лепка's eastbound lane.
+    const stem = traffic.stage({
+      kind: "vehicle",
+      id: "tj-prio-stem",
+      pathNodes: ["tj-n-s", "tj-n-c", "tj-n-w"],
+      hold: { nodeIndex: 1, offsetM: -B2_LINE_M },
+      cruiseSpeedMps: 4.5,
+    });
+    expect(stem).not.toBeNull();
+    expect(stem!.nodeS.length).toBe(3);
+    // It holds ON the Б2 line, in the stem's northbound lane.
+    expect(stem!.x).toBeCloseTo(4.0625, 2);
+    expect(stem!.y).toBeCloseTo(-B2_LINE_M, 1);
+    // The лепка: the player's own lane, west → east through the node.
+    const tail = traffic.stage({
+      kind: "vehicle",
+      id: "tj-prio-tail",
+      pathNodes: ["tj-n-w", "tj-n-c", "tj-n-e"],
+      hold: { nodeIndex: 0, offsetM: 5 },
+      cruiseSpeedMps: 13,
+      extraRightOffsetM: 0,
+    });
+    expect(tail).not.toBeNull();
+    expect(tail!.y).toBeCloseTo(LANE_Y, 2);
+  });
+});

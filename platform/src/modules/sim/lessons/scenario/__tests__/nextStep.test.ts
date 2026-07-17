@@ -9,7 +9,7 @@
 
 import { describe, expect, it } from "vitest";
 import { SCENARIO_TEMPLATES } from "../templates";
-import { resolveScenarioNextStep } from "../nextStep";
+import { resolveScenarioNextStep, resolveScenarioNextSteps } from "../nextStep";
 import type { ScenarioFamily, ScenarioLevel, ScenarioSpec } from "../types";
 
 /** A spec stub — the resolver reads id/family/titleBg/levels only. */
@@ -153,6 +153,94 @@ describe("resolveScenarioNextStep — the gates", () => {
   });
 });
 
+/**
+ * The TWO-target view (founder 2026-07-17: „the button for next lesson goes to
+ * stage 2 of the same lesson … we also have to add a button that switches to
+ * the NEXT LESSON"). The end screen renders one button per non-null target —
+ * so which of them is null IS the product behavior under test.
+ */
+describe("resolveScenarioNextSteps — both targets", () => {
+  it("offers the rung AND the next card mid-ladder", () => {
+    const steps = resolveScenarioNextSteps(
+      { templateId: "sc-park-a", level: 1, ...green },
+      CATALOG,
+    );
+    expect(steps.level).toMatchObject({
+      kind: "level",
+      templateId: "sc-park-a",
+      level: 2,
+      lessonId: "sc-park-a@L2",
+    });
+    // Independent of the rung — „Следващ сценарий" leaves this ladder.
+    expect(steps.template).toMatchObject({
+      kind: "template",
+      templateId: "sc-park-b",
+      level: 1,
+      lessonId: "sc-park-b@L1",
+    });
+  });
+
+  it("withholds ONLY the rung when the stars leave it locked (doc 76 §8)", () => {
+    // Green but 1★: L2 would be refused server-side (LEVEL_LOCKED) after a
+    // full drive, so no „Следващо ниво" button — but L1 of the next card is
+    // never gated, so the student still has somewhere to go.
+    const steps = resolveScenarioNextSteps(
+      { templateId: "sc-park-a", level: 1, passed: true, allObjectivesPassed: true, stars: 1 },
+      CATALOG,
+    );
+    expect(steps.level).toBeNull();
+    expect(steps.template).toMatchObject({ templateId: "sc-park-b", level: 1 });
+  });
+
+  it("withholds ONLY the rung at the top of the ladder", () => {
+    const steps = resolveScenarioNextSteps(
+      { templateId: "sc-park-a", level: 4, ...green },
+      CATALOG,
+    );
+    expect(steps.level).toBeNull();
+    expect(steps.template).toMatchObject({ templateId: "sc-park-b", level: 1 });
+  });
+
+  it("withholds ONLY the card on the last template's lower rungs", () => {
+    // The ladder continues, the library does not — one button, no „премина
+    // целия каталог" line (the end screen keys that off BOTH being null).
+    const steps = resolveScenarioNextSteps(
+      { templateId: "sc-rail-a", level: 1, ...green },
+      CATALOG,
+    );
+    expect(steps.level).toMatchObject({ templateId: "sc-rail-a", level: 2 });
+    expect(steps.template).toBeNull();
+  });
+
+  it("offers nothing at the end of the catalog", () => {
+    expect(
+      resolveScenarioNextSteps({ templateId: "sc-rail-a", level: 4, ...green }, CATALOG),
+    ).toEqual({ level: null, template: null });
+  });
+
+  it("offers nothing when the run was not green, foreign, or an unauthored rung", () => {
+    const none = { level: null, template: null };
+    expect(
+      resolveScenarioNextSteps(
+        { templateId: "sc-park-a", level: 1, passed: false, allObjectivesPassed: true },
+        CATALOG,
+      ),
+    ).toEqual(none);
+    expect(
+      resolveScenarioNextSteps(
+        { templateId: "sc-park-a", level: 1, passed: true, allObjectivesPassed: false },
+        CATALOG,
+      ),
+    ).toEqual(none);
+    expect(
+      resolveScenarioNextSteps({ templateId: "sc-nope", level: 1, ...green }, CATALOG),
+    ).toEqual(none);
+    expect(
+      resolveScenarioNextSteps({ templateId: "sc-park-a", level: 5, ...green }, CATALOG),
+    ).toEqual(none);
+  });
+});
+
 describe("resolveScenarioNextStep — invariants over the real catalog", () => {
   const top = (s: ScenarioSpec) => Math.max(...s.levels.map((l) => l.level)) as ScenarioLevel;
   const low = (s: ScenarioSpec) => Math.min(...s.levels.map((l) => l.level)) as ScenarioLevel;
@@ -177,6 +265,40 @@ describe("resolveScenarioNextStep — invariants over the real catalog", () => {
         templateId: successor.id,
         level: low(successor),
       });
+    }
+  });
+
+  it("the single-target view is exactly `level ?? template` everywhere", () => {
+    // ONE ordering source: the singular export must stay a view of the plural
+    // resolution, never a second walk of the catalog that could drift.
+    for (const s of SCENARIO_TEMPLATES) {
+      for (const rung of s.levels) {
+        for (const stars of [1, 2, 3] as const) {
+          const input = { templateId: s.id, level: rung.level, passed: true, allObjectivesPassed: true, stars };
+          const steps = resolveScenarioNextSteps(input);
+          expect(resolveScenarioNextStep(input)).toEqual(steps.level ?? steps.template);
+        }
+      }
+    }
+  });
+
+  it("the next CARD is offered on every green rung, star-locked or not", () => {
+    // The star gate must never strand a student: L1 of the successor is
+    // ungated, so „Следващ сценарий" survives a 1★ pass on any non-last card.
+    const last = SCENARIO_TEMPLATES[SCENARIO_TEMPLATES.length - 1];
+    for (const s of SCENARIO_TEMPLATES) {
+      if (s.id === last.id) continue;
+      for (const rung of s.levels) {
+        const steps = resolveScenarioNextSteps({
+          templateId: s.id,
+          level: rung.level,
+          passed: true,
+          allObjectivesPassed: true,
+          stars: 1,
+        });
+        expect(steps.level).toBeNull(); // 1★ never opens a rung
+        expect(steps.template).not.toBeNull();
+      }
     }
   });
 

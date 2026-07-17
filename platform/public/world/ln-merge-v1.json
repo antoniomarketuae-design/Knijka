@@ -1,0 +1,171 @@
+{
+ "format": "district-v1",
+ "meta": {
+  "district": "ln-merge",
+  "label": "Учебна улица — краят на дясната лента (сценарий OV-16)",
+  "mapKind": "scenario-street",
+  "generator": "tools/maps/gen_ln_merge.mjs",
+  "boundsLocalMeters": {
+   "minX": -38.13,
+   "minY": -6,
+   "maxX": 36.13,
+   "maxY": 286
+  },
+  "attribution": {
+   "text": "Учебна еднопосочна улица с край на дясната лента — оригинален параметричен дизайн (без данни от OpenStreetMap)",
+   "license": "All rights reserved",
+   "licenseUrl": "/",
+   "copyrightUrl": "/",
+   "obligation": "none — original work, no ODbL attribution required for this map"
+  },
+  "defaults": {
+   "maxspeedUrbanKmh": 50,
+   "note": "Дясната лента свършва след 180 метра. Твоята лента свършва — значи ти се съобразяваш: огледало, мигач и вливане в пролука, без да изтласкваш движещите се в лявата лента."
+  },
+  "stats": {
+   "roadKm": 0.28,
+   "nodes": 2,
+   "edges": 1,
+   "intersections": 0,
+   "crossings": 0,
+   "buildings": 2,
+   "spawnPoints": 3
+  },
+  "scenario": {
+   "archetype": "merge-lane",
+   "params": {
+    "lengthM": 280,
+    "taperFromM": 180,
+    "taperM": 60,
+    "maxspeedKmh": 50,
+    "lanesBefore": 2,
+    "lanesAfter": 1
+   },
+   "lanesPerDirection": 2,
+   "laneEndingX": 4.06,
+   "laneThroughX": -4.06,
+   "taperFromY": 180,
+   "taperToY": 240,
+   "endY": 280,
+   "streetEdgeId": "lnm-e-street",
+   "spawnY": 12
+  }
+ },
+ "roads": {
+  "nodes": [
+   {
+    "id": "lnm-n-end",
+    "x": 0,
+    "y": 280
+   },
+   {
+    "id": "lnm-n-start",
+    "x": 0,
+    "y": 0
+   }
+  ],
+  "edges": [
+   {
+    "id": "lnm-e-street",
+    "from": "lnm-n-start",
+    "to": "lnm-n-end",
+    "class": "primary",
+    "name": "Учебна улица — краят на дясната лента (сценарий OV-16) — платно",
+    "oneway": true,
+    "roundabout": false,
+    "lanes": 2,
+    "lanesSource": "tag",
+    "maxspeed": 50,
+    "maxspeedSource": "tag",
+    "length": 280,
+    "geometry": [
+     [
+      0,
+      0
+     ],
+     [
+      0,
+      280
+     ]
+    ]
+   }
+  ]
+ },
+ "intersections": [],
+ "crossings": [],
+ "roundabouts": [],
+ "buildings": [
+  {
+   "id": "lnm-b-west",
+   "height": 12,
+   "heightSource": "default",
+   "footprint": [
+    [
+     -34.13,
+     140
+    ],
+    [
+     -16.13,
+     140
+    ],
+    [
+     -16.13,
+     172
+    ],
+    [
+     -34.13,
+     172
+    ]
+   ]
+  },
+  {
+   "id": "lnm-b-east",
+   "height": 9,
+   "heightSource": "default",
+   "footprint": [
+    [
+     16.13,
+     186
+    ],
+    [
+     32.13,
+     186
+    ],
+    [
+     32.13,
+     250
+    ],
+    [
+     16.13,
+     250
+    ]
+   ]
+  }
+ ],
+ "spawnPoints": [
+  {
+   "id": "lnm-spawn-ending-lane",
+   "x": 4.06,
+   "y": 12,
+   "heading": 0,
+   "edgeId": "lnm-e-street",
+   "name": "Начало — в дясната лента, която свършва"
+  },
+  {
+   "id": "lnm-spawn-through",
+   "x": -4.06,
+   "y": 160,
+   "heading": 0,
+   "edgeId": "lnm-e-street",
+   "name": "Контролна точка — в оставащата лента"
+  },
+  {
+   "id": "lnm-spawn-finish",
+   "x": -4.06,
+   "y": 265,
+   "heading": 0,
+   "edgeId": "lnm-e-street",
+   "name": "Контролна точка — край на отсечката"
+  }
+ ]
+}

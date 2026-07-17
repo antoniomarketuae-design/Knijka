@@ -1,0 +1,300 @@
+{
+ "format": "district-v1",
+ "meta": {
+  "district": "ln-arrows",
+  "label": "Учебно кръстовище с лентови стрелки (сценарий SN-04/JU-14)",
+  "mapKind": "scenario-junction",
+  "generator": "tools/maps/gen_ln_arrows.mjs",
+  "boundsLocalMeters": {
+   "minX": -170,
+   "minY": -150,
+   "maxX": 100,
+   "maxY": 100
+  },
+  "attribution": {
+   "text": "Учебно кръстовище с лентови стрелки — оригинален параметричен дизайн (без данни от OpenStreetMap)",
+   "license": "All rights reserved",
+   "licenseUrl": "/",
+   "copyrightUrl": "/",
+   "obligation": "none — original work, no ODbL attribution required for this map"
+  },
+  "defaults": {
+   "maxspeedUrbanKmh": 50,
+   "note": "Учебно светофарно кръстовище с лентови стрелки: ограниченията идват от таговете на улиците."
+  },
+  "stats": {
+   "roadKm": 0.52,
+   "nodes": 5,
+   "edges": 4,
+   "intersections": 1,
+   "crossings": 0,
+   "buildings": 2,
+   "spawnPoints": 3
+  },
+  "scenario": {
+   "archetype": "x-junction",
+   "params": {
+    "armNorthM": 100,
+    "armSouthM": 150,
+    "armEastM": 100,
+    "armWestM": 170,
+    "nsLanes": 6,
+    "ewLanes": 2,
+    "nsClass": "secondary",
+    "ewClass": "residential",
+    "nsMaxKmh": 50,
+    "ewMaxKmh": 40,
+    "arrowsFromM": 120
+   },
+   "junctionNodeId": "ln-n-c",
+   "expectedControl": "trafficLight",
+   "expectedClusterGroup": "ns",
+   "nsLanesPerDirection": 3,
+   "nsLaneCentersM": [
+    20.31,
+    12.19,
+    4.06
+   ],
+   "ewWestboundLaneY": 4.06,
+   "ewEastboundLaneY": -4.06,
+   "laneArrows": {
+    "edgeId": "ln-e-s",
+    "travelDir": 1,
+    "fromM": 30,
+    "toM": 150,
+    "lanes": [
+     {
+      "laneId": 0,
+      "centerM": 20.31,
+      "arrow": "right",
+      "labelBg": "само надясно"
+     },
+     {
+      "laneId": 1,
+      "centerM": 12.19,
+      "arrow": "through",
+      "labelBg": "само направо"
+     },
+     {
+      "laneId": 2,
+      "centerM": 4.06,
+      "arrow": "left",
+      "labelBg": "само наляво"
+     }
+    ]
+   }
+  }
+ },
+ "roads": {
+  "nodes": [
+   {
+    "id": "ln-n-c",
+    "x": 0,
+    "y": 0
+   },
+   {
+    "id": "ln-n-e",
+    "x": 100,
+    "y": 0
+   },
+   {
+    "id": "ln-n-n",
+    "x": 0,
+    "y": 100
+   },
+   {
+    "id": "ln-n-s",
+    "x": 0,
+    "y": -150
+   },
+   {
+    "id": "ln-n-w",
+    "x": -170,
+    "y": 0
+   }
+  ],
+  "edges": [
+   {
+    "id": "ln-e-s",
+    "from": "ln-n-s",
+    "to": "ln-n-c",
+    "class": "secondary",
+    "name": "Булевард — южен подход с лентови стрелки",
+    "oneway": false,
+    "roundabout": false,
+    "lanes": 6,
+    "lanesSource": "tag",
+    "maxspeed": 50,
+    "maxspeedSource": "tag",
+    "length": 150,
+    "geometry": [
+     [
+      0,
+      -150
+     ],
+     [
+      0,
+      0
+     ]
+    ]
+   },
+   {
+    "id": "ln-e-n",
+    "from": "ln-n-c",
+    "to": "ln-n-n",
+    "class": "secondary",
+    "name": "Булевард — северен изход",
+    "oneway": false,
+    "roundabout": false,
+    "lanes": 6,
+    "lanesSource": "tag",
+    "maxspeed": 50,
+    "maxspeedSource": "tag",
+    "length": 100,
+    "geometry": [
+     [
+      0,
+      0
+     ],
+     [
+      0,
+      100
+     ]
+    ]
+   },
+   {
+    "id": "ln-e-w",
+    "from": "ln-n-w",
+    "to": "ln-n-c",
+    "class": "residential",
+    "name": "Пресечна улица — запад",
+    "oneway": false,
+    "roundabout": false,
+    "lanes": 2,
+    "lanesSource": "tag",
+    "maxspeed": 40,
+    "maxspeedSource": "tag",
+    "length": 170,
+    "geometry": [
+     [
+      -170,
+      0
+     ],
+     [
+      0,
+      0
+     ]
+    ]
+   },
+   {
+    "id": "ln-e-e",
+    "from": "ln-n-c",
+    "to": "ln-n-e",
+    "class": "residential",
+    "name": "Пресечна улица — изток",
+    "oneway": false,
+    "roundabout": false,
+    "lanes": 2,
+    "lanesSource": "tag",
+    "maxspeed": 40,
+    "maxspeedSource": "tag",
+    "length": 100,
+    "geometry": [
+     [
+      0,
+      0
+     ],
+     [
+      100,
+      0
+     ]
+    ]
+   }
+  ]
+ },
+ "intersections": [
+  {
+   "id": "ln-n-c",
+   "x": 0,
+   "y": 0,
+   "degree": 4,
+   "signalized": true
+  }
+ ],
+ "crossings": [],
+ "roundabouts": [],
+ "buildings": [
+  {
+   "id": "ln-b-sw",
+   "height": 8,
+   "heightSource": "default",
+   "footprint": [
+    [
+     -56,
+     -56
+    ],
+    [
+     -36,
+     -56
+    ],
+    [
+     -36,
+     -36
+    ],
+    [
+     -56,
+     -36
+    ]
+   ]
+  },
+  {
+   "id": "ln-b-ne",
+   "height": 5,
+   "heightSource": "default",
+   "footprint": [
+    [
+     36,
+     36
+    ],
+    [
+     52,
+     36
+    ],
+    [
+     52,
+     52
+    ],
+    [
+     36,
+     52
+    ]
+   ]
+  }
+ ],
+ "spawnPoints": [
+  {
+   "id": "ln-spawn-south",
+   "x": 20.31,
+   "y": -135,
+   "heading": 0,
+   "edgeId": "ln-e-s",
+   "name": "Южен подход — дясна лента („само надясно“)"
+  },
+  {
+   "id": "ln-spawn-east",
+   "x": 85,
+   "y": 4.06,
+   "heading": 270,
+   "edgeId": "ln-e-e",
+   "name": "Източен подход към светофара"
+  },
+  {
+   "id": "ln-spawn-west",
+   "x": -155,
+   "y": -4.06,
+   "heading": 90,
+   "edgeId": "ln-e-w",
+   "name": "Западен подход към светофара"
+  }
+ ]
+}

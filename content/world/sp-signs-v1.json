@@ -1,0 +1,324 @@
+{
+ "format": "district-v1",
+ "meta": {
+  "district": "sp-signs",
+  "label": "Учебна улица — обхват на В26: край при кръстовище и край при знак (сценарий SP-03)",
+  "mapKind": "scenario-street",
+  "generator": "tools/maps/gen_sp_signs.mjs",
+  "boundsLocalMeters": {
+   "minX": -32.12,
+   "minY": 0,
+   "maxX": 60,
+   "maxY": 800
+  },
+  "attribution": {
+   "text": "Учебна улица с две зони В26 и два различни края (кръстовище / знак за край) — оригинален параметричен дизайн (без данни от OpenStreetMap)",
+   "license": "All rights reserved",
+   "licenseUrl": "/",
+   "copyrightUrl": "/",
+   "obligation": "none — original work, no ODbL attribution required for this map"
+  },
+  "defaults": {
+   "maxspeedUrbanKmh": 50,
+   "note": "Обхват на знака: В26 40 важи до кръстовището (първата зона) и до знака за край (втората)."
+  },
+  "stats": {
+   "roadKm": 0.86,
+   "nodes": 7,
+   "edges": 6,
+   "intersections": 1,
+   "crossings": 0,
+   "buildings": 1,
+   "spawnPoints": 3
+  },
+  "scenario": {
+   "archetype": "straight-street",
+   "params": {
+    "approachM": 100,
+    "limit1M": 240,
+    "betweenM": 120,
+    "limit2M": 240,
+    "tailM": 100,
+    "baseKmh": 50,
+    "limitKmh": 40,
+    "sideArmM": 60
+   },
+   "lanesPerDirection": 1,
+   "laneCenterRightM": 4.06,
+   "routeEdgeIds": [
+    "sp-sg-e-approach",
+    "sp-sg-e-limit1",
+    "sp-sg-e-between",
+    "sp-sg-e-limit2",
+    "sp-sg-e-end"
+   ],
+   "limit1": {
+    "fromY": 100,
+    "toY": 340,
+    "endsAt": "junction"
+   },
+   "limit2": {
+    "fromY": 460,
+    "toY": 700,
+    "endsAt": "endSign"
+   },
+   "junctionY": 340,
+   "junctionNodeId": "sp-sg-n-junction",
+   "endSignY": 700,
+   "routeLimitsKmh": [
+    50,
+    40,
+    50,
+    40,
+    50
+   ]
+  }
+ },
+ "roads": {
+  "nodes": [
+   {
+    "id": "sp-sg-n-end",
+    "x": 0,
+    "y": 800
+   },
+   {
+    "id": "sp-sg-n-endsign",
+    "x": 0,
+    "y": 700
+   },
+   {
+    "id": "sp-sg-n-junction",
+    "x": 0,
+    "y": 340
+   },
+   {
+    "id": "sp-sg-n-limit1",
+    "x": 0,
+    "y": 100
+   },
+   {
+    "id": "sp-sg-n-limit2",
+    "x": 0,
+    "y": 460
+   },
+   {
+    "id": "sp-sg-n-side",
+    "x": 60,
+    "y": 340
+   },
+   {
+    "id": "sp-sg-n-start",
+    "x": 0,
+    "y": 0
+   }
+  ],
+  "edges": [
+   {
+    "id": "sp-sg-e-approach",
+    "from": "sp-sg-n-start",
+    "to": "sp-sg-n-limit1",
+    "class": "residential",
+    "name": "Права улица — подход преди първия знак В26",
+    "oneway": false,
+    "roundabout": false,
+    "lanes": 2,
+    "lanesSource": "tag",
+    "maxspeed": 50,
+    "maxspeedSource": "tag",
+    "length": 100,
+    "geometry": [
+     [
+      0,
+      0
+     ],
+     [
+      0,
+      100
+     ]
+    ]
+   },
+   {
+    "id": "sp-sg-e-limit1",
+    "from": "sp-sg-n-limit1",
+    "to": "sp-sg-n-junction",
+    "class": "residential",
+    "name": "Зона В26 40 — до кръстовището",
+    "oneway": false,
+    "roundabout": false,
+    "lanes": 2,
+    "lanesSource": "tag",
+    "maxspeed": 40,
+    "maxspeedSource": "tag",
+    "length": 240,
+    "geometry": [
+     [
+      0,
+      100
+     ],
+     [
+      0,
+      340
+     ]
+    ]
+   },
+   {
+    "id": "sp-sg-e-between",
+    "from": "sp-sg-n-junction",
+    "to": "sp-sg-n-limit2",
+    "class": "residential",
+    "name": "Права улица — след кръстовището ограничението е отменено",
+    "oneway": false,
+    "roundabout": false,
+    "lanes": 2,
+    "lanesSource": "tag",
+    "maxspeed": 50,
+    "maxspeedSource": "tag",
+    "length": 120,
+    "geometry": [
+     [
+      0,
+      340
+     ],
+     [
+      0,
+      460
+     ]
+    ]
+   },
+   {
+    "id": "sp-sg-e-limit2",
+    "from": "sp-sg-n-limit2",
+    "to": "sp-sg-n-endsign",
+    "class": "residential",
+    "name": "Зона В26 40 — до знака за край",
+    "oneway": false,
+    "roundabout": false,
+    "lanes": 2,
+    "lanesSource": "tag",
+    "maxspeed": 40,
+    "maxspeedSource": "tag",
+    "length": 240,
+    "geometry": [
+     [
+      0,
+      460
+     ],
+     [
+      0,
+      700
+     ]
+    ]
+   },
+   {
+    "id": "sp-sg-e-end",
+    "from": "sp-sg-n-endsign",
+    "to": "sp-sg-n-end",
+    "class": "residential",
+    "name": "Права улица — след знака за край на забраната",
+    "oneway": false,
+    "roundabout": false,
+    "lanes": 2,
+    "lanesSource": "tag",
+    "maxspeed": 50,
+    "maxspeedSource": "tag",
+    "length": 100,
+    "geometry": [
+     [
+      0,
+      700
+     ],
+     [
+      0,
+      800
+     ]
+    ]
+   },
+   {
+    "id": "sp-sg-e-side",
+    "from": "sp-sg-n-junction",
+    "to": "sp-sg-n-side",
+    "class": "residential",
+    "name": "Странична улица — кръстовището, което отменя В26",
+    "oneway": false,
+    "roundabout": false,
+    "lanes": 2,
+    "lanesSource": "tag",
+    "maxspeed": 50,
+    "maxspeedSource": "tag",
+    "length": 60,
+    "geometry": [
+     [
+      0,
+      340
+     ],
+     [
+      60,
+      340
+     ]
+    ]
+   }
+  ]
+ },
+ "intersections": [
+  {
+   "id": "sp-sg-n-junction",
+   "x": 0,
+   "y": 340,
+   "degree": 3,
+   "signalized": false
+  }
+ ],
+ "crossings": [],
+ "roundabouts": [],
+ "buildings": [
+  {
+   "id": "sp-sg-b-block",
+   "height": 11,
+   "heightSource": "default",
+   "footprint": [
+    [
+     -32.12,
+     500
+    ],
+    [
+     -16.12,
+     500
+    ],
+    [
+     -16.12,
+     550
+    ],
+    [
+     -32.12,
+     550
+    ]
+   ]
+  }
+ ],
+ "spawnPoints": [
+  {
+   "id": "sp-sg-spawn-approach",
+   "x": 4.06,
+   "y": 15,
+   "heading": 0,
+   "edgeId": "sp-sg-e-approach",
+   "name": "Начало на отсечката — преди първия знак В26"
+  },
+  {
+   "id": "sp-sg-spawn-limit1",
+   "x": 4.06,
+   "y": 120,
+   "heading": 0,
+   "edgeId": "sp-sg-e-limit1",
+   "name": "Контролна точка — в първата зона (край: кръстовището)"
+  },
+  {
+   "id": "sp-sg-spawn-limit2",
+   "x": 4.06,
+   "y": 480,
+   "heading": 0,
+   "edgeId": "sp-sg-e-limit2",
+   "name": "Контролна точка — във втората зона (край: знакът за край)"
+  }
+ ]
+}

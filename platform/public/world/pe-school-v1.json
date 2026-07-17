@@ -1,0 +1,187 @@
+{
+ "format": "district-v1",
+ "meta": {
+  "district": "pe-school",
+  "label": "Учебна улица — училищна пътека със стоп-палка (сценарий PE-школа)",
+  "mapKind": "scenario-street",
+  "generator": "tools/maps/gen_pe_school.mjs",
+  "boundsLocalMeters": {
+   "minX": -34.12,
+   "minY": 0,
+   "maxX": 14.125,
+   "maxY": 310
+  },
+  "attribution": {
+   "text": "Учебна улица пред училище (зона 30 + пешеходна пътека) — оригинален параметричен дизайн (без данни от OpenStreetMap)",
+   "license": "All rights reserved",
+   "licenseUrl": "/",
+   "copyrightUrl": "/",
+   "obligation": "none — original work, no ODbL attribution required for this map"
+  },
+  "defaults": {
+   "maxspeedUrbanKmh": 50,
+   "note": "Училищна зона: ограничението пада от 50 на 30 на средния възел; пред пътеката се кара с готовност за спиране."
+  },
+  "stats": {
+   "roadKm": 0.31,
+   "nodes": 3,
+   "edges": 2,
+   "intersections": 0,
+   "crossings": 1,
+   "buildings": 1,
+   "spawnPoints": 2
+  },
+  "scenario": {
+   "archetype": "zebra-block",
+   "params": {
+    "crossings": 1,
+    "signalized": "no",
+    "approachM": 140,
+    "zoneCrossingM": 110,
+    "zoneKmh": 30
+   },
+   "primaryCrossingId": "pes-x-1",
+   "laneCenterRightM": 4.06,
+   "curbXWest": -9.72,
+   "zoneEntryY": 140,
+   "crossingY": 250,
+   "patrolPost": {
+    "x": -9.72,
+    "y": 246
+   },
+   "crossings": [
+    {
+     "id": "pes-x-1",
+     "x": 0,
+     "y": 250,
+     "kind": "marked"
+    }
+   ]
+  }
+ },
+ "roads": {
+  "nodes": [
+   {
+    "id": "pes-n-end",
+    "x": 0,
+    "y": 310
+   },
+   {
+    "id": "pes-n-mid",
+    "x": 0,
+    "y": 140
+   },
+   {
+    "id": "pes-n-start",
+    "x": 0,
+    "y": 0
+   }
+  ],
+  "edges": [
+   {
+    "id": "pes-e-approach",
+    "from": "pes-n-start",
+    "to": "pes-n-mid",
+    "class": "residential",
+    "name": "Улица пред училището — подход преди зоната",
+    "oneway": false,
+    "roundabout": false,
+    "lanes": 2,
+    "lanesSource": "tag",
+    "maxspeed": 50,
+    "maxspeedSource": "tag",
+    "length": 140,
+    "geometry": [
+     [
+      0,
+      0
+     ],
+     [
+      0,
+      140
+     ]
+    ]
+   },
+   {
+    "id": "pes-e-zone",
+    "from": "pes-n-mid",
+    "to": "pes-n-end",
+    "class": "residential",
+    "name": "Улица пред училището — зона 30 с пешеходна пътека",
+    "oneway": false,
+    "roundabout": false,
+    "lanes": 2,
+    "lanesSource": "tag",
+    "maxspeed": 30,
+    "maxspeedSource": "tag",
+    "zone": "school",
+    "length": 170,
+    "geometry": [
+     [
+      0,
+      140
+     ],
+     [
+      0,
+      310
+     ]
+    ]
+   }
+  ]
+ },
+ "intersections": [],
+ "crossings": [
+  {
+   "id": "pes-x-1",
+   "x": 0,
+   "y": 250,
+   "kind": "marked",
+   "signalized": false,
+   "edgeId": "pes-e-zone"
+  }
+ ],
+ "roundabouts": [],
+ "buildings": [
+  {
+   "id": "pes-b-school",
+   "height": 9,
+   "heightSource": "default",
+   "footprint": [
+    [
+     -34.12,
+     220
+    ],
+    [
+     -16.12,
+     220
+    ],
+    [
+     -16.12,
+     272
+    ],
+    [
+     -34.12,
+     272
+    ]
+   ]
+  }
+ ],
+ "spawnPoints": [
+  {
+   "id": "pes-spawn-approach",
+   "x": 4.06,
+   "y": 15,
+   "heading": 0,
+   "edgeId": "pes-e-approach",
+   "name": "Начало на отсечката — преди училищната зона"
+  },
+  {
+   "id": "pes-spawn-finish",
+   "x": 4.06,
+   "y": 295,
+   "heading": 0,
+   "edgeId": "pes-e-zone",
+   "name": "Контролна точка — след пътеката"
+  }
+ ]
+}

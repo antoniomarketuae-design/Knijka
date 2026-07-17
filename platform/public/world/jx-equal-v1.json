@@ -1,0 +1,314 @@
+{
+ "format": "district-v1",
+ "meta": {
+  "district": "jx-equal",
+  "label": "Учебно равнозначно кръстовище с четири равностойни улици (сценарий JU-01/JU-10)",
+  "mapKind": "scenario-junction",
+  "generator": "tools/maps/gen_jx_equal.mjs",
+  "boundsLocalMeters": {
+   "minX": -130,
+   "minY": -130,
+   "maxX": 130,
+   "maxY": 130
+  },
+  "attribution": {
+   "text": "Учебно равнозначно кръстовище — оригинален параметричен дизайн (без данни от OpenStreetMap)",
+   "license": "All rights reserved",
+   "licenseUrl": "/",
+   "copyrightUrl": "/",
+   "obligation": "none — original work, no ODbL attribution required for this map"
+  },
+  "defaults": {
+   "maxspeedUrbanKmh": 40,
+   "note": "Учебно кръстовище: ограниченията идват от таговете на улиците."
+  },
+  "stats": {
+   "roadKm": 0.52,
+   "nodes": 5,
+   "edges": 4,
+   "intersections": 1,
+   "crossings": 0,
+   "buildings": 4,
+   "spawnPoints": 4
+  },
+  "scenario": {
+   "archetype": "x-junction",
+   "params": {
+    "control": "none",
+    "ewArmM": 130,
+    "nsArmM": 130,
+    "lanes": 2,
+    "maxKmh": 40,
+    "sightClearM": 30
+   },
+   "junctionNodeId": "jx-n-c",
+   "expectedControl": "rightHandRule"
+  }
+ },
+ "roads": {
+  "nodes": [
+   {
+    "id": "jx-n-c",
+    "x": 0,
+    "y": 0
+   },
+   {
+    "id": "jx-n-e",
+    "x": 130,
+    "y": 0
+   },
+   {
+    "id": "jx-n-n",
+    "x": 0,
+    "y": 130
+   },
+   {
+    "id": "jx-n-s",
+    "x": 0,
+    "y": -130
+   },
+   {
+    "id": "jx-n-w",
+    "x": -130,
+    "y": 0
+   }
+  ],
+  "edges": [
+   {
+    "id": "jx-e-w",
+    "from": "jx-n-w",
+    "to": "jx-n-c",
+    "class": "residential",
+    "name": "Западна улица",
+    "oneway": false,
+    "roundabout": false,
+    "lanes": 2,
+    "lanesSource": "tag",
+    "maxspeed": 40,
+    "maxspeedSource": "tag",
+    "length": 130,
+    "geometry": [
+     [
+      -130,
+      0
+     ],
+     [
+      0,
+      0
+     ]
+    ]
+   },
+   {
+    "id": "jx-e-e",
+    "from": "jx-n-c",
+    "to": "jx-n-e",
+    "class": "residential",
+    "name": "Източна улица",
+    "oneway": false,
+    "roundabout": false,
+    "lanes": 2,
+    "lanesSource": "tag",
+    "maxspeed": 40,
+    "maxspeedSource": "tag",
+    "length": 130,
+    "geometry": [
+     [
+      0,
+      0
+     ],
+     [
+      130,
+      0
+     ]
+    ]
+   },
+   {
+    "id": "jx-e-s",
+    "from": "jx-n-s",
+    "to": "jx-n-c",
+    "class": "residential",
+    "name": "Южна улица",
+    "oneway": false,
+    "roundabout": false,
+    "lanes": 2,
+    "lanesSource": "tag",
+    "maxspeed": 40,
+    "maxspeedSource": "tag",
+    "length": 130,
+    "geometry": [
+     [
+      0,
+      -130
+     ],
+     [
+      0,
+      0
+     ]
+    ]
+   },
+   {
+    "id": "jx-e-n",
+    "from": "jx-n-c",
+    "to": "jx-n-n",
+    "class": "residential",
+    "name": "Северна улица",
+    "oneway": false,
+    "roundabout": false,
+    "lanes": 2,
+    "lanesSource": "tag",
+    "maxspeed": 40,
+    "maxspeedSource": "tag",
+    "length": 130,
+    "geometry": [
+     [
+      0,
+      0
+     ],
+     [
+      0,
+      130
+     ]
+    ]
+   }
+  ]
+ },
+ "intersections": [
+  {
+   "id": "jx-n-c",
+   "x": 0,
+   "y": 0,
+   "degree": 4,
+   "signalized": false
+  }
+ ],
+ "crossings": [],
+ "roundabouts": [],
+ "buildings": [
+  {
+   "id": "jx-b-ne",
+   "height": 5,
+   "heightSource": "default",
+   "footprint": [
+    [
+     30,
+     30
+    ],
+    [
+     46,
+     30
+    ],
+    [
+     46,
+     46
+    ],
+    [
+     30,
+     46
+    ]
+   ]
+  },
+  {
+   "id": "jx-b-nw",
+   "height": 5,
+   "heightSource": "default",
+   "footprint": [
+    [
+     -46,
+     30
+    ],
+    [
+     -30,
+     30
+    ],
+    [
+     -30,
+     46
+    ],
+    [
+     -46,
+     46
+    ]
+   ]
+  },
+  {
+   "id": "jx-b-se",
+   "height": 5,
+   "heightSource": "default",
+   "footprint": [
+    [
+     30,
+     -46
+    ],
+    [
+     46,
+     -46
+    ],
+    [
+     46,
+     -30
+    ],
+    [
+     30,
+     -30
+    ]
+   ]
+  },
+  {
+   "id": "jx-b-sw",
+   "height": 5,
+   "heightSource": "default",
+   "footprint": [
+    [
+     -46,
+     -46
+    ],
+    [
+     -30,
+     -46
+    ],
+    [
+     -30,
+     -30
+    ],
+    [
+     -46,
+     -30
+    ]
+   ]
+  }
+ ],
+ "spawnPoints": [
+  {
+   "id": "jx-spawn-south",
+   "x": 0,
+   "y": -115,
+   "heading": 0,
+   "edgeId": "jx-e-s",
+   "name": "Южна улица — подход към кръстовището"
+  },
+  {
+   "id": "jx-spawn-north",
+   "x": 0,
+   "y": 115,
+   "heading": 180,
+   "edgeId": "jx-e-n",
+   "name": "Северна улица — подход към кръстовището"
+  },
+  {
+   "id": "jx-spawn-east",
+   "x": 115,
+   "y": 0,
+   "heading": 270,
+   "edgeId": "jx-e-e",
+   "name": "Източна улица — подход към кръстовището"
+  },
+  {
+   "id": "jx-spawn-west",
+   "x": -115,
+   "y": 0,
+   "heading": 90,
+   "edgeId": "jx-e-w",
+   "name": "Западна улица — подход към кръстовището"
+  }
+ ]
+}

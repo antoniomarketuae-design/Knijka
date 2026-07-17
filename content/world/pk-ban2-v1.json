@@ -1,0 +1,257 @@
+{
+ "format": "district-v1",
+ "meta": {
+  "district": "pk-ban2",
+  "label": "Учебна улица — В27 срещу В28 (сценарий PK-06)",
+  "mapKind": "scenario-street",
+  "generator": "tools/maps/gen_pk_ban2.mjs",
+  "zonesVersion": 1,
+  "boundsLocalMeters": {
+   "minX": -36.12,
+   "minY": -6,
+   "maxX": 38.13,
+   "maxY": 386
+  },
+  "attribution": {
+   "text": "Учебна улица със знаци В27 и В28 — оригинален параметричен дизайн (без данни от OpenStreetMap)",
+   "license": "All rights reserved",
+   "licenseUrl": "/",
+   "copyrightUrl": "/",
+   "obligation": "none — original work, no ODbL attribution required for this map"
+  },
+  "defaults": {
+   "maxspeedUrbanKmh": 50,
+   "note": "Улицата е подписана два пъти: В28 от 70-ия до 170-ия метър (престоят за слизане е разрешен, паркирането — не) и В27 от 170-ия до 290-ия метър (нищо не е разрешено). Паркирай чак след 290-ия метър — на 330-ия."
+  },
+  "stats": {
+   "roadKm": 0.38,
+   "nodes": 2,
+   "edges": 1,
+   "intersections": 0,
+   "crossings": 0,
+   "buildings": 4,
+   "spawnPoints": 3,
+   "zones": 2
+  },
+  "scenario": {
+   "archetype": "straight-street",
+   "params": {
+    "lengthM": 380,
+    "maxspeedKmh": 50,
+    "parkFromM": 70,
+    "parkToM": 170,
+    "stopToM": 290,
+    "legalBayY": 330,
+    "banKind": "noParking+noStopping",
+    "banBasis": "sign"
+   },
+   "lanesPerDirection": 1,
+   "laneCenterRightM": 4.06,
+   "dropoffSpanY": {
+    "fromY": 70,
+    "toY": 170
+   },
+   "legalBayY": 330,
+   "signSeamY": 170,
+   "banZonesY": [
+    {
+     "id": "pkb2-z-noparking",
+     "signRef": "В28",
+     "lawRef": "ЗДвП чл. 93; Наредба № РД-02-21-1/2023 — В28",
+     "fromY": 70,
+     "toY": 170,
+     "graded": false
+    },
+    {
+     "id": "pkb2-z-nostopping",
+     "signRef": "В27",
+     "lawRef": "ЗДвП чл. 98; Наредба № РД-02-21-1/2023 — В27",
+     "fromY": 170,
+     "toY": 290,
+     "graded": true
+    }
+   ]
+  }
+ },
+ "roads": {
+  "nodes": [
+   {
+    "id": "pkb2-n-end",
+    "x": 0,
+    "y": 380
+   },
+   {
+    "id": "pkb2-n-start",
+    "x": 0,
+    "y": 0
+   }
+  ],
+  "edges": [
+   {
+    "id": "pkb2-e-street",
+    "from": "pkb2-n-start",
+    "to": "pkb2-n-end",
+    "class": "residential",
+    "name": "Учебна улица — В27 срещу В28 (сценарий PK-06)",
+    "oneway": false,
+    "roundabout": false,
+    "lanes": 2,
+    "lanesSource": "tag",
+    "maxspeed": 50,
+    "maxspeedSource": "tag",
+    "length": 380,
+    "geometry": [
+     [
+      0,
+      0
+     ],
+     [
+      0,
+      380
+     ]
+    ]
+   }
+  ]
+ },
+ "intersections": [],
+ "crossings": [],
+ "roundabouts": [],
+ "buildings": [
+  {
+   "id": "pkb2-b-approach",
+   "height": 9,
+   "heightSource": "default",
+   "footprint": [
+    [
+     -36.12,
+     30
+    ],
+    [
+     -14.12,
+     30
+    ],
+    [
+     -14.12,
+     60
+    ],
+    [
+     -36.12,
+     60
+    ]
+   ]
+  },
+  {
+   "id": "pkb2-b-park-block",
+   "height": 15,
+   "heightSource": "default",
+   "footprint": [
+    [
+     14.13,
+     76
+    ],
+    [
+     38.13,
+     76
+    ],
+    [
+     38.13,
+     164
+    ],
+    [
+     14.13,
+     164
+    ]
+   ]
+  },
+  {
+   "id": "pkb2-b-stop-block",
+   "height": 12,
+   "heightSource": "default",
+   "footprint": [
+    [
+     14.13,
+     176
+    ],
+    [
+     34.13,
+     176
+    ],
+    [
+     34.13,
+     284
+    ],
+    [
+     14.13,
+     284
+    ]
+   ]
+  },
+  {
+   "id": "pkb2-b-bay-block",
+   "height": 6,
+   "heightSource": "default",
+   "footprint": [
+    [
+     14.13,
+     316
+    ],
+    [
+     34.13,
+     316
+    ],
+    [
+     34.13,
+     342
+    ],
+    [
+     14.13,
+     342
+    ]
+   ]
+  }
+ ],
+ "spawnPoints": [
+  {
+   "id": "pkb2-spawn-start",
+   "x": 4.06,
+   "y": 15,
+   "heading": 0,
+   "edgeId": "pkb2-e-street",
+   "name": "Начало — дясна лента"
+  },
+  {
+   "id": "pkb2-spawn-dropoff",
+   "x": 4.06,
+   "y": 120,
+   "heading": 0,
+   "edgeId": "pkb2-e-street",
+   "name": "Място за престой — под В28 (слизане на пътник)"
+  },
+  {
+   "id": "pkb2-spawn-bay",
+   "x": 4.06,
+   "y": 330,
+   "heading": 0,
+   "edgeId": "pkb2-e-street",
+   "name": "Място за паркиране — след двата знака"
+  }
+ ],
+ "zones": [
+  {
+   "id": "pkb2-z-noparking",
+   "kind": "noParking",
+   "edgeId": "pkb2-e-street",
+   "fromM": 70,
+   "toM": 170,
+   "signRef": "В28"
+  },
+  {
+   "id": "pkb2-z-nostopping",
+   "kind": "noStopping",
+   "edgeId": "pkb2-e-street",
+   "fromM": 170,
+   "toM": 290,
+   "signRef": "В27"
+  }
+ ]
+}

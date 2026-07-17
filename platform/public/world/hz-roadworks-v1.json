@@ -1,0 +1,289 @@
+{
+ "format": "district-v1",
+ "meta": {
+  "district": "hz-roadworks",
+  "label": "Учебна улица — ремонт в дясната лента (сценарий OV-16)",
+  "mapKind": "scenario-street",
+  "generator": "tools/maps/gen_hz_roadworks.mjs",
+  "boundsLocalMeters": {
+   "minX": -38.13,
+   "minY": -6,
+   "maxX": 36.13,
+   "maxY": 316
+  },
+  "attribution": {
+   "text": "Учебна еднопосочна улица с ремонт в дясната лента — оригинален параметричен дизайн (без данни от OpenStreetMap)",
+   "license": "All rights reserved",
+   "licenseUrl": "/",
+   "copyrightUrl": "/",
+   "obligation": "none — original work, no ODbL attribution required for this map"
+  },
+  "defaults": {
+   "maxspeedUrbanKmh": 50,
+   "note": "Дясната лента е затворена за ремонт: конусите я стесняват от 216-ия метър и я затварят на 240-ия. Временната сигнализация е закон — намали до 30, влей се навреме в лявата лента и дръж новата траектория през целия участък."
+  },
+  "stats": {
+   "roadKm": 0.31,
+   "nodes": 4,
+   "edges": 3,
+   "intersections": 0,
+   "crossings": 0,
+   "buildings": 2,
+   "spawnPoints": 3
+  },
+  "scenario": {
+   "archetype": "merge-lane",
+   "params": {
+    "approachM": 240,
+    "worksM": 36,
+    "exitM": 34,
+    "taperM": 24,
+    "maxspeedKmh": 50,
+    "worksKmh": 30,
+    "lanesBefore": 2,
+    "lanesAfter": 1
+   },
+   "lanesPerDirection": 2,
+   "laneClosedX": 4.06,
+   "laneOpenX": -4.06,
+   "taperFromY": 216,
+   "taperToY": 240,
+   "worksFromY": 240,
+   "worksToY": 276,
+   "endY": 310,
+   "approachEdgeId": "hzr-e-approach",
+   "worksEdgeId": "hzr-e-works",
+   "exitEdgeId": "hzr-e-exit",
+   "spawnY": 12,
+   "coneHalfM": 0.3,
+   "coneLineX": 0.6,
+   "cones": [
+    {
+     "id": "hzr-cone-taper-1",
+     "x": 7.6,
+     "y": 216
+    },
+    {
+     "id": "hzr-cone-taper-2",
+     "x": 5.85,
+     "y": 222
+    },
+    {
+     "id": "hzr-cone-taper-3",
+     "x": 4.1,
+     "y": 228
+    },
+    {
+     "id": "hzr-cone-taper-4",
+     "x": 2.35,
+     "y": 234
+    },
+    {
+     "id": "hzr-cone-taper-5",
+     "x": 0.6,
+     "y": 240
+    },
+    {
+     "id": "hzr-cone-works-1",
+     "x": 0.6,
+     "y": 246
+    },
+    {
+     "id": "hzr-cone-works-2",
+     "x": 0.6,
+     "y": 253
+    },
+    {
+     "id": "hzr-cone-works-3",
+     "x": 0.6,
+     "y": 260
+    },
+    {
+     "id": "hzr-cone-works-4",
+     "x": 0.6,
+     "y": 267
+    },
+    {
+     "id": "hzr-cone-works-5",
+     "x": 0.6,
+     "y": 274
+    }
+   ]
+  }
+ },
+ "roads": {
+  "nodes": [
+   {
+    "id": "hzr-n-end",
+    "x": 0,
+    "y": 310
+   },
+   {
+    "id": "hzr-n-start",
+    "x": 0,
+    "y": 0
+   },
+   {
+    "id": "hzr-n-works-end",
+    "x": 0,
+    "y": 276
+   },
+   {
+    "id": "hzr-n-works-start",
+    "x": 0,
+    "y": 240
+   }
+  ],
+  "edges": [
+   {
+    "id": "hzr-e-approach",
+    "from": "hzr-n-start",
+    "to": "hzr-n-works-start",
+    "class": "primary",
+    "name": "Учебна улица — ремонт в дясната лента (сценарий OV-16) — подход",
+    "oneway": true,
+    "roundabout": false,
+    "lanes": 2,
+    "lanesSource": "tag",
+    "maxspeed": 50,
+    "maxspeedSource": "tag",
+    "length": 240,
+    "geometry": [
+     [
+      0,
+      0
+     ],
+     [
+      0,
+      240
+     ]
+    ]
+   },
+   {
+    "id": "hzr-e-works",
+    "from": "hzr-n-works-start",
+    "to": "hzr-n-works-end",
+    "class": "primary",
+    "name": "Учебна улица — ремонт в дясната лента (сценарий OV-16) — участък в ремонт",
+    "oneway": true,
+    "roundabout": false,
+    "lanes": 2,
+    "lanesSource": "tag",
+    "maxspeed": 30,
+    "maxspeedSource": "tag",
+    "length": 36,
+    "geometry": [
+     [
+      0,
+      240
+     ],
+     [
+      0,
+      276
+     ]
+    ]
+   },
+   {
+    "id": "hzr-e-exit",
+    "from": "hzr-n-works-end",
+    "to": "hzr-n-end",
+    "class": "primary",
+    "name": "Учебна улица — ремонт в дясната лента (сценарий OV-16) — изход",
+    "oneway": true,
+    "roundabout": false,
+    "lanes": 2,
+    "lanesSource": "tag",
+    "maxspeed": 50,
+    "maxspeedSource": "tag",
+    "length": 34,
+    "geometry": [
+     [
+      0,
+      276
+     ],
+     [
+      0,
+      310
+     ]
+    ]
+   }
+  ]
+ },
+ "intersections": [],
+ "crossings": [],
+ "roundabouts": [],
+ "buildings": [
+  {
+   "id": "hzr-b-west",
+   "height": 14,
+   "heightSource": "default",
+   "footprint": [
+    [
+     -34.13,
+     156
+    ],
+    [
+     -16.13,
+     156
+    ],
+    [
+     -16.13,
+     192
+    ],
+    [
+     -34.13,
+     192
+    ]
+   ]
+  },
+  {
+   "id": "hzr-b-east",
+   "height": 9,
+   "heightSource": "default",
+   "footprint": [
+    [
+     16.13,
+     224
+    ],
+    [
+     32.13,
+     224
+    ],
+    [
+     32.13,
+     284
+    ],
+    [
+     16.13,
+     284
+    ]
+   ]
+  }
+ ],
+ "spawnPoints": [
+  {
+   "id": "hzr-spawn-closed-lane",
+   "x": 4.06,
+   "y": 12,
+   "heading": 0,
+   "edgeId": "hzr-e-approach",
+   "name": "Начало — в дясната лента, която е затворена за ремонт"
+  },
+  {
+   "id": "hzr-spawn-works",
+   "x": -4.06,
+   "y": 258,
+   "heading": 0,
+   "edgeId": "hzr-e-works",
+   "name": "Контролна точка — през стеснението по временната лента"
+  },
+  {
+   "id": "hzr-spawn-finish",
+   "x": -4.06,
+   "y": 295,
+   "heading": 0,
+   "edgeId": "hzr-e-exit",
+   "name": "Контролна точка — край на отсечката"
+  }
+ ]
+}

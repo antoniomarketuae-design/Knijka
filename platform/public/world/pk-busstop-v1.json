@@ -1,0 +1,221 @@
+{
+ "format": "district-v1",
+ "meta": {
+  "district": "pk-busstop",
+  "label": "Учебна улица — престой на автобусна спирка (сценарий PK-06)",
+  "mapKind": "scenario-street",
+  "generator": "tools/maps/gen_pk_busstop.mjs",
+  "zonesVersion": 1,
+  "boundsLocalMeters": {
+   "minX": -36.12,
+   "minY": -6,
+   "maxX": 38.13,
+   "maxY": 346
+  },
+  "attribution": {
+   "text": "Учебна улица с автобусна спирка — оригинален параметричен дизайн (без данни от OpenStreetMap)",
+   "license": "All rights reserved",
+   "licenseUrl": "/",
+   "copyrightUrl": "/",
+   "obligation": "none — original work, no ODbL attribution required for this map"
+  },
+  "defaults": {
+   "maxspeedUrbanKmh": 50,
+   "note": "Зоната на спирката започва на зигзага, не при табелата: чл. 98, ал. 1 забранява дори кратък престой от 150-ия до 210-ия метър. Разрешеното място е след зоната — на 250-ия метър."
+  },
+  "stats": {
+   "roadKm": 0.34,
+   "nodes": 2,
+   "edges": 1,
+   "intersections": 0,
+   "crossings": 0,
+   "buildings": 3,
+   "spawnPoints": 2,
+   "zones": 2
+  },
+  "scenario": {
+   "archetype": "straight-street",
+   "params": {
+    "lengthM": 340,
+    "maxspeedKmh": 50,
+    "markingFromM": 150,
+    "pocketFromM": 180,
+    "pocketToM": 210,
+    "legalBayY": 250,
+    "banKind": "noStopping",
+    "banBasis": "law"
+   },
+   "lanesPerDirection": 1,
+   "laneCenterRightM": 4.06,
+   "busStopPocketY": {
+    "fromY": 180,
+    "toY": 210
+   },
+   "legalBayY": 250,
+   "banZonesY": [
+    {
+     "id": "pkbs-z-stop-marking",
+     "lawRef": "ЗДвП чл. 98, ал. 1",
+     "fromY": 150,
+     "toY": 180
+    },
+    {
+     "id": "pkbs-z-stop-pocket",
+     "lawRef": "ЗДвП чл. 98, ал. 1",
+     "fromY": 180,
+     "toY": 210
+    }
+   ]
+  }
+ },
+ "roads": {
+  "nodes": [
+   {
+    "id": "pkbs-n-end",
+    "x": 0,
+    "y": 340
+   },
+   {
+    "id": "pkbs-n-start",
+    "x": 0,
+    "y": 0
+   }
+  ],
+  "edges": [
+   {
+    "id": "pkbs-e-street",
+    "from": "pkbs-n-start",
+    "to": "pkbs-n-end",
+    "class": "residential",
+    "name": "Учебна улица — престой на автобусна спирка (сценарий PK-06)",
+    "oneway": false,
+    "roundabout": false,
+    "lanes": 2,
+    "lanesSource": "tag",
+    "maxspeed": 50,
+    "maxspeedSource": "tag",
+    "length": 340,
+    "geometry": [
+     [
+      0,
+      0
+     ],
+     [
+      0,
+      340
+     ]
+    ]
+   }
+  ]
+ },
+ "intersections": [],
+ "crossings": [],
+ "roundabouts": [],
+ "buildings": [
+  {
+   "id": "pkbs-b-approach",
+   "height": 9,
+   "heightSource": "default",
+   "footprint": [
+    [
+     -36.12,
+     90
+    ],
+    [
+     -14.12,
+     90
+    ],
+    [
+     -14.12,
+     122
+    ],
+    [
+     -36.12,
+     122
+    ]
+   ]
+  },
+  {
+   "id": "pkbs-b-stop-block",
+   "height": 12,
+   "heightSource": "default",
+   "footprint": [
+    [
+     14.13,
+     154
+    ],
+    [
+     38.13,
+     154
+    ],
+    [
+     38.13,
+     214
+    ],
+    [
+     14.13,
+     214
+    ]
+   ]
+  },
+  {
+   "id": "pkbs-b-bay-block",
+   "height": 6,
+   "heightSource": "default",
+   "footprint": [
+    [
+     14.13,
+     236
+    ],
+    [
+     34.13,
+     236
+    ],
+    [
+     34.13,
+     262
+    ],
+    [
+     14.13,
+     262
+    ]
+   ]
+  }
+ ],
+ "spawnPoints": [
+  {
+   "id": "pkbs-spawn-start",
+   "x": 4.06,
+   "y": 15,
+   "heading": 0,
+   "edgeId": "pkbs-e-street",
+   "name": "Начало — дясна лента"
+  },
+  {
+   "id": "pkbs-spawn-bay",
+   "x": 4.06,
+   "y": 250,
+   "heading": 0,
+   "edgeId": "pkbs-e-street",
+   "name": "Разрешено място за престой — след зоната на спирката"
+  }
+ ],
+ "zones": [
+  {
+   "id": "pkbs-z-stop-marking",
+   "kind": "noStopping",
+   "edgeId": "pkbs-e-street",
+   "fromM": 150,
+   "toM": 180,
+   "signRef": "ЗДвП-98-1 / Наредба № 2/2001 — зигзаг"
+  },
+  {
+   "id": "pkbs-z-stop-pocket",
+   "kind": "noStopping",
+   "edgeId": "pkbs-e-street",
+   "fromM": 180,
+   "toM": 210,
+   "signRef": "ЗДвП-98-1 — спирка"
+  }
+ ]
+}

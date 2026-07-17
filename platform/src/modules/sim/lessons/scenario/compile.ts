@@ -7,12 +7,25 @@
  * Level differences are PARAMETER DELTAS (doc 76 §7) applied here:
  *
  *   | Level | Aids (DEFAULT_LEVEL_AIDS)                       | examMode |
- *   |  L1   | shadow + ribbon + follow hints + pause-on-error |          |
- *   |       | + top-down driving allowed                      |   off    |
+ *   |  L1   | shadow + ribbon + follow hints + pause-on-error |   off    |
  *   |  L2   | ribbon only, hints after idle                   |   off    |
  *   |  L3   | none                                            |   off    |
- *   |  L4   | none, cockpit-locked (no aids flag set)         |   ON     |
+ *   |  L4   | none, exam protocol                             |   ON     |
  *   |  L5   | none + traffic/conditions/staged complications  |   off    |
+ *
+ * TOP-DOWN IS ON EVERY RUNG, L1..L5 (founder ruling 2026-07-17; doc 76 §12
+ * „Top-down mode confirmed as a first-class POV option"). topdownAllowed is a
+ * POV, not an aid: it reveals no answer the driver's own mirrors do not, and a
+ * reverse-park is unreadable without it. Denying G on a scenario L4 rung while
+ * every one of the 18,396 exam-bank practical variants grants it unconditionally
+ * (LessonScene topdownInCycle) was an INCONSISTENCY, not a principle — the
+ * cockpit-lock line of doc 76 §4 governs the GRADED views (grading never reads
+ * the camera), never the student's ability to look.
+ *
+ * Escape hatch, kept honest: mergeAids() drops falsy flags, so a template or
+ * rung that means it may still opt OUT by passing aids: { topdownAllowed: false }
+ * in its LevelSpec — the compiled lesson then omits the flag and LessonScene
+ * drops G from the C cycle. No shipped template opts out today.
  *
  * Compile decisions (documented):
  *  - preDrive is OFF: a maneuver drill starts at the skill, not the 13-step
@@ -46,7 +59,8 @@ import {
 // Ladder defaults (doc 76 §7)
 // ---------------------------------------------------------------------------
 
-/** The §7 aid table — per-level defaults a LevelSpec may override. */
+/** The §7 aid table — per-level defaults a LevelSpec may override.
+ *  topdownAllowed rides on EVERY rung: a POV, not an aid (see the header). */
 export const DEFAULT_LEVEL_AIDS: Record<ScenarioLevel, LessonAidsSpec> = {
   1: {
     shadowCar: true,
@@ -55,10 +69,12 @@ export const DEFAULT_LEVEL_AIDS: Record<ScenarioLevel, LessonAidsSpec> = {
     pauseOnError: true,
     topdownAllowed: true,
   },
-  2: { pathRibbon: true, hintsAfterIdleSec: 20 },
-  3: {},
-  4: {}, // examMode carries the exam-protocol behavior; no aids by definition
-  5: {},
+  2: { pathRibbon: true, hintsAfterIdleSec: 20, topdownAllowed: true },
+  3: { topdownAllowed: true },
+  // L4: examMode carries the exam-protocol behavior; top-down stays — the
+  // real-exam cockpit-lock governs GRADING, and every exam-bank variant grants G.
+  4: { topdownAllowed: true },
+  5: { topdownAllowed: true },
 };
 
 /** Scenario micro-lessons carry NO ambient traffic unless a rung opts in. */

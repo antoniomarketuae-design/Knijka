@@ -53,28 +53,30 @@ describe("compileScenario — sc-park-perp-rev", () => {
     expect(l1.vehicleStart).toBe("ready");
   });
 
-  it("L2 (Частична помощ): ribbon + idle hints only", () => {
+  it("L2 (Частична помощ): ribbon + idle hints, and top-down (the POV every rung gets)", () => {
     const l2 = compileScenario(SC_PARK_PERP_REV, 2);
-    expect(l2.aids).toEqual({ pathRibbon: true, hintsAfterIdleSec: 20 });
+    expect(l2.aids).toEqual({ pathRibbon: true, hintsAfterIdleSec: 20, topdownAllowed: true });
     const park = l2.objectives[1].params;
     expect(park.centerTolM).toBe(0.63); // 0.5 × 1.25, rounded 2dp
     expect(park.headingTolDeg).toBe(12.5);
   });
 
-  it("L3 (Самостоятелно): no aids, evaluator-default tolerances", () => {
+  it("L3 (Самостоятелно): no aids but top-down, evaluator-default tolerances", () => {
     const l3 = compileScenario(SC_PARK_PERP_REV, 3);
-    expect(l3.aids).toBeUndefined();
+    expect(l3.aids).toEqual({ topdownAllowed: true }); // a POV, not an aid
     expect(l3.examMode).toBeUndefined();
     const park = l3.objectives[1].params;
     expect(park.centerTolM).toBe(0.5);
     expect(park.headingTolDeg).toBe(10);
   });
 
-  it("L4 (Изпитни условия): examMode ON, cold start, no aids", () => {
+  it("L4 (Изпитни условия): examMode ON, cold start, no aids — top-down still granted", () => {
     const l4 = compileScenario(SC_PARK_PERP_REV, 4);
     expect(l4.examMode).toBe(true);
     expect(l4.vehicleStart).toBe("cold");
-    expect(l4.aids).toBeUndefined();
+    // Founder ruling 2026-07-17: the exam rung keeps the POV. §4's cockpit-lock
+    // is about GRADED views; every exam-bank practical variant grants G too.
+    expect(l4.aids).toEqual({ topdownAllowed: true });
   });
 
   it("paints exactly the rect it grades (the L7 single-truth pattern)", () => {
@@ -167,9 +169,23 @@ describe("compileScenario — sc-park-perp-rev", () => {
       pauseOnError: true,
       topdownAllowed: true,
     });
-    expect(DEFAULT_LEVEL_AIDS[2]).toEqual({ pathRibbon: true, hintsAfterIdleSec: 20 });
-    expect(DEFAULT_LEVEL_AIDS[3]).toEqual({});
-    expect(DEFAULT_LEVEL_AIDS[4]).toEqual({});
-    expect(DEFAULT_LEVEL_AIDS[5]).toEqual({});
+    expect(DEFAULT_LEVEL_AIDS[2]).toEqual({
+      pathRibbon: true,
+      hintsAfterIdleSec: 20,
+      topdownAllowed: true,
+    });
+    expect(DEFAULT_LEVEL_AIDS[3]).toEqual({ topdownAllowed: true });
+    expect(DEFAULT_LEVEL_AIDS[4]).toEqual({ topdownAllowed: true });
+    expect(DEFAULT_LEVEL_AIDS[5]).toEqual({ topdownAllowed: true });
+  });
+
+  it("every rung grants top-down; only an explicit false takes it away", () => {
+    for (const level of LEVELS) {
+      expect(compileScenario(SC_PARK_PERP_REV, level).aids?.topdownAllowed).toBe(true);
+    }
+    // The escape hatch (mergeAids drops falsy flags) — kept working on purpose.
+    const s = clone();
+    s.levels[3].aids = { topdownAllowed: false };
+    expect(compileScenario(s, 4).aids?.topdownAllowed).toBeUndefined();
   });
 });

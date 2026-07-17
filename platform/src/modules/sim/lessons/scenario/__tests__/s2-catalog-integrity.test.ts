@@ -16,7 +16,7 @@ const HERE = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(HERE, "../../../../../../..");
 
 describe("S2 catalog integrity", () => {
-  it("registers the full S1+S2+S3+S4+unit-2+breadth+signals+maneuver+hazards+final-harvest+cap-2+FO-06+VU-09+stage-1c+stage-1d+stage-2a+stage-2b+stage-3a+stage-3b+stage-4a+FO-pair+fog+curve+motorway+N11-telltale+OV-corridor+snow+N8-vru+OV-return+AC-12-crosswind+surface-patch wave (84 templates across the families)", () => {
+  it("registers the full S1+S2+S3+S4+unit-2+breadth+signals+maneuver+hazards+final-harvest+cap-2+FO-06+VU-09+stage-1c+stage-1d+stage-2a+stage-2b+stage-3a+stage-3b+stage-4a+FO-pair+fog+curve+motorway+N11-telltale+OV-corridor+snow+N8-vru+OV-return+AC-12-crosswind+surface-patch+w1+w2+w3 wave (108 templates across the families)", () => {
     const ids = SCENARIO_TEMPLATES.map((s) => s.id).sort();
     expect(ids).toEqual(
       [
@@ -104,6 +104,33 @@ describe("S2 catalog integrity", () => {
         "sc-ov-oncoming-gap",
         "sc-ov-abort",
         "sc-ov-return-gap",
+        // Wave 1.
+        "sc-jx-equal-left",
+        "sc-sig-flash-amber-ped",
+        "sc-pk-crossing-ban",
+        "sc-ln-turn-lane-arrows",
+        "sc-pe-school-patrol",
+        "sc-rb-exit-signal",
+        "sc-merge-accel-lane",
+        "sc-ed-d2-city-run",
+        // Wave 2.
+        "sc-merge-lane-end",
+        "sc-ov-night-gap",
+        "sc-pk-busstop-ban",
+        "sc-rb-circulate-priority",
+        "sc-vu-blindspot-moto",
+        "sc-rx-queue-clear",
+        "sc-ac-night-overdrive",
+        "sc-sp-limit-end",
+        // Wave 3.
+        "sc-merge-roadworks-shift",
+        "sc-ov-being-overtaken",
+        "sc-pk-stop-vs-park",
+        "sc-rb-busy-gap",
+        "sc-jx-priority-confidence",
+        "sc-sig-green-wave",
+        "sc-hz-emergency-stop",
+        "sc-fo-brakelight-chain",
       ].sort(),
     );
   });

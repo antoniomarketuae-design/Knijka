@@ -1,0 +1,335 @@
+{
+ "format": "district-v1",
+ "meta": {
+  "district": "pk-banx",
+  "label": "Учебна улица — престой до пътека и кръстовище (сценарий PK-06)",
+  "mapKind": "scenario-street",
+  "generator": "tools/maps/gen_pk_banx.mjs",
+  "zonesVersion": 1,
+  "boundsLocalMeters": {
+   "minX": -70,
+   "minY": -6,
+   "maxX": 70,
+   "maxY": 366
+  },
+  "attribution": {
+   "text": "Учебна улица със законови забрани за престой — оригинален параметричен дизайн (без данни от OpenStreetMap)",
+   "license": "All rights reserved",
+   "licenseUrl": "/",
+   "copyrightUrl": "/",
+   "obligation": "none — original work, no ODbL attribution required for this map"
+  },
+  "defaults": {
+   "maxspeedUrbanKmh": 50,
+   "note": "Забраните тук не са поставени със знак — те следват от закона: чл. 98 забранява престоя на кръстовището и на по-малко от 5 м от него, както и на пешеходната пътека и на 5 м преди нея. Разрешеното място е след пътеката."
+  },
+  "stats": {
+   "roadKm": 0.5,
+   "nodes": 5,
+   "edges": 4,
+   "intersections": 1,
+   "crossings": 1,
+   "buildings": 3,
+   "spawnPoints": 2,
+   "zones": 3
+  },
+  "scenario": {
+   "archetype": "x-junction",
+   "params": {
+    "lengthM": 360,
+    "maxspeedKmh": 50,
+    "junctionY": 150,
+    "zebraY": 260,
+    "legalBayY": 300,
+    "banKind": "noStopping",
+    "banBasis": "law"
+   },
+   "lanesPerDirection": 1,
+   "laneCenterRightM": 4.06,
+   "primaryCrossingId": "pkx-x-zebra",
+   "junctionNodeId": "pkx-n-jx",
+   "banZonesY": [
+    {
+     "id": "pkx-z-jx-before",
+     "lawRef": "ЗДвП чл. 98, ал. 1, т. 2",
+     "fromY": 136.87,
+     "toY": 150
+    },
+    {
+     "id": "pkx-z-jx-after",
+     "lawRef": "ЗДвП чл. 98, ал. 1, т. 2",
+     "fromY": 150,
+     "toY": 163.13
+    },
+    {
+     "id": "pkx-z-zebra",
+     "lawRef": "ЗДвП чл. 98, ал. 1, т. 1",
+     "fromY": 255,
+     "toY": 262.5
+    }
+   ]
+  }
+ },
+ "roads": {
+  "nodes": [
+   {
+    "id": "pkx-n-cross-e",
+    "x": 70,
+    "y": 150
+   },
+   {
+    "id": "pkx-n-cross-w",
+    "x": -70,
+    "y": 150
+   },
+   {
+    "id": "pkx-n-end",
+    "x": 0,
+    "y": 360
+   },
+   {
+    "id": "pkx-n-jx",
+    "x": 0,
+    "y": 150
+   },
+   {
+    "id": "pkx-n-start",
+    "x": 0,
+    "y": 0
+   }
+  ],
+  "edges": [
+   {
+    "id": "pkx-e-street-s",
+    "from": "pkx-n-start",
+    "to": "pkx-n-jx",
+    "class": "residential",
+    "name": "Учебна улица — престой до пътека и кръстовище (сценарий PK-06)",
+    "oneway": false,
+    "roundabout": false,
+    "lanes": 2,
+    "lanesSource": "tag",
+    "maxspeed": 50,
+    "maxspeedSource": "tag",
+    "length": 150,
+    "geometry": [
+     [
+      0,
+      0
+     ],
+     [
+      0,
+      150
+     ]
+    ]
+   },
+   {
+    "id": "pkx-e-street-n",
+    "from": "pkx-n-jx",
+    "to": "pkx-n-end",
+    "class": "residential",
+    "name": "Учебна улица — престой до пътека и кръстовище (сценарий PK-06)",
+    "oneway": false,
+    "roundabout": false,
+    "lanes": 2,
+    "lanesSource": "tag",
+    "maxspeed": 50,
+    "maxspeedSource": "tag",
+    "length": 210,
+    "geometry": [
+     [
+      0,
+      150
+     ],
+     [
+      0,
+      360
+     ]
+    ]
+   },
+   {
+    "id": "pkx-e-cross-w",
+    "from": "pkx-n-cross-w",
+    "to": "pkx-n-jx",
+    "class": "residential",
+    "name": "Напречна улица (запад)",
+    "oneway": false,
+    "roundabout": false,
+    "lanes": 2,
+    "lanesSource": "tag",
+    "maxspeed": 50,
+    "maxspeedSource": "tag",
+    "length": 70,
+    "geometry": [
+     [
+      -70,
+      150
+     ],
+     [
+      0,
+      150
+     ]
+    ]
+   },
+   {
+    "id": "pkx-e-cross-e",
+    "from": "pkx-n-jx",
+    "to": "pkx-n-cross-e",
+    "class": "residential",
+    "name": "Напречна улица (изток)",
+    "oneway": false,
+    "roundabout": false,
+    "lanes": 2,
+    "lanesSource": "tag",
+    "maxspeed": 50,
+    "maxspeedSource": "tag",
+    "length": 70,
+    "geometry": [
+     [
+      0,
+      150
+     ],
+     [
+      70,
+      150
+     ]
+    ]
+   }
+  ]
+ },
+ "intersections": [
+  {
+   "id": "pkx-n-jx",
+   "x": 0,
+   "y": 150,
+   "degree": 4,
+   "signalized": false
+  }
+ ],
+ "crossings": [
+  {
+   "id": "pkx-x-zebra",
+   "x": 0,
+   "y": 260,
+   "kind": "marked",
+   "signalized": false,
+   "edgeId": "pkx-e-street-n"
+  }
+ ],
+ "roundabouts": [],
+ "buildings": [
+  {
+   "id": "pkx-b-corner-nw",
+   "height": 12,
+   "heightSource": "default",
+   "footprint": [
+    [
+     -40.12,
+     164.13
+    ],
+    [
+     -14.12,
+     164.13
+    ],
+    [
+     -14.12,
+     190.13
+    ],
+    [
+     -40.12,
+     190.13
+    ]
+   ]
+  },
+  {
+   "id": "pkx-b-corner-se",
+   "height": 9,
+   "heightSource": "default",
+   "footprint": [
+    [
+     14.13,
+     109.88
+    ],
+    [
+     40.13,
+     109.88
+    ],
+    [
+     40.13,
+     135.88
+    ],
+    [
+     14.13,
+     135.88
+    ]
+   ]
+  },
+  {
+   "id": "pkx-b-shop-zebra",
+   "height": 6,
+   "heightSource": "default",
+   "footprint": [
+    [
+     -34.12,
+     230
+    ],
+    [
+     -14.12,
+     230
+    ],
+    [
+     -14.12,
+     250
+    ],
+    [
+     -34.12,
+     250
+    ]
+   ]
+  }
+ ],
+ "spawnPoints": [
+  {
+   "id": "pkx-spawn-start",
+   "x": 4.06,
+   "y": 15,
+   "heading": 0,
+   "edgeId": "pkx-e-street-s",
+   "name": "Начало — дясна лента"
+  },
+  {
+   "id": "pkx-spawn-bay",
+   "x": 4.06,
+   "y": 300,
+   "heading": 0,
+   "edgeId": "pkx-e-street-n",
+   "name": "Разрешено място за престой — след пътеката"
+  }
+ ],
+ "zones": [
+  {
+   "id": "pkx-z-jx-before",
+   "kind": "noStopping",
+   "edgeId": "pkx-e-street-s",
+   "fromM": 136.87,
+   "toM": 150,
+   "signRef": "ЗДвП-98-1-2"
+  },
+  {
+   "id": "pkx-z-jx-after",
+   "kind": "noStopping",
+   "edgeId": "pkx-e-street-n",
+   "fromM": 0,
+   "toM": 13.13,
+   "signRef": "ЗДвП-98-1-2"
+  },
+  {
+   "id": "pkx-z-zebra",
+   "kind": "noStopping",
+   "edgeId": "pkx-e-street-n",
+   "fromM": 105,
+   "toM": 112.5,
+   "signRef": "ЗДвП-98-1-1"
+  }
+ ]
+}

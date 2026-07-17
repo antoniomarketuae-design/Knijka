@@ -1,0 +1,549 @@
+{
+ "format": "district-v1",
+ "meta": {
+  "district": "sig-wave",
+  "label": "Учебен булевард със зелена вълна (сценарий sc-sig-green-wave)",
+  "mapKind": "scenario-junction",
+  "generator": "tools/maps/gen_sig_wave.mjs",
+  "boundsLocalMeters": {
+   "minX": -90,
+   "minY": -304,
+   "maxX": 90,
+   "maxY": 648
+  },
+  "attribution": {
+   "text": "Учебен булевард със зелена вълна — оригинален параметричен дизайн (без данни от OpenStreetMap)",
+   "license": "All rights reserved",
+   "licenseUrl": "/",
+   "copyrightUrl": "/",
+   "obligation": "none — original work, no ODbL attribution required for this map"
+  },
+  "defaults": {
+   "maxspeedUrbanKmh": 50,
+   "note": "Учебен булевард със зелена вълна: ограниченията идват от таговете на улиците."
+  },
+  "stats": {
+   "roadKm": 1.49,
+   "nodes": 11,
+   "edges": 10,
+   "intersections": 3,
+   "crossings": 0,
+   "buildings": 6,
+   "spawnPoints": 2
+  },
+  "scenario": {
+   "archetype": "signal-wave",
+   "params": {
+    "armSouthM": 304,
+    "blockM": 264,
+    "armNorthM": 120,
+    "crossArmM": 90,
+    "avenueClass": "secondary",
+    "crossClass": "residential",
+    "avenueMaxKmh": 50,
+    "crossMaxKmh": 40,
+    "waveSpeedKmh": 50
+   },
+   "junctionNodeIds": [
+    "sw-n-tl1",
+    "sw-n-tl2",
+    "sw-n-tl3"
+   ],
+   "expectedControl": "trafficLight",
+   "expectedClusterGroup": "ns",
+   "wave": {
+    "speedKmh": 50,
+    "blockTravelSec": 19.01,
+    "naturalOffsetsSec": [
+     36,
+     17,
+     48
+    ]
+   }
+  }
+ },
+ "roads": {
+  "nodes": [
+   {
+    "id": "sw-n-e1",
+    "x": 90,
+    "y": 0
+   },
+   {
+    "id": "sw-n-e2",
+    "x": 90,
+    "y": 264
+   },
+   {
+    "id": "sw-n-e3",
+    "x": 90,
+    "y": 528
+   },
+   {
+    "id": "sw-n-n",
+    "x": 0,
+    "y": 648
+   },
+   {
+    "id": "sw-n-s",
+    "x": 0,
+    "y": -304
+   },
+   {
+    "id": "sw-n-tl1",
+    "x": 0,
+    "y": 0
+   },
+   {
+    "id": "sw-n-tl2",
+    "x": 0,
+    "y": 264
+   },
+   {
+    "id": "sw-n-tl3",
+    "x": 0,
+    "y": 528
+   },
+   {
+    "id": "sw-n-w1",
+    "x": -90,
+    "y": 0
+   },
+   {
+    "id": "sw-n-w2",
+    "x": -90,
+    "y": 264
+   },
+   {
+    "id": "sw-n-w3",
+    "x": -90,
+    "y": 528
+   }
+  ],
+  "edges": [
+   {
+    "id": "sw-e-a0",
+    "from": "sw-n-s",
+    "to": "sw-n-tl1",
+    "class": "secondary",
+    "name": "Булевард „Зелена вълна“ — южен подход",
+    "oneway": false,
+    "roundabout": false,
+    "lanes": 2,
+    "lanesSource": "tag",
+    "maxspeed": 50,
+    "maxspeedSource": "tag",
+    "length": 304,
+    "geometry": [
+     [
+      0,
+      -304
+     ],
+     [
+      0,
+      0
+     ]
+    ]
+   },
+   {
+    "id": "sw-e-a1",
+    "from": "sw-n-tl1",
+    "to": "sw-n-tl2",
+    "class": "secondary",
+    "name": "Булевард „Зелена вълна“ — първа отсечка",
+    "oneway": false,
+    "roundabout": false,
+    "lanes": 2,
+    "lanesSource": "tag",
+    "maxspeed": 50,
+    "maxspeedSource": "tag",
+    "length": 264,
+    "geometry": [
+     [
+      0,
+      0
+     ],
+     [
+      0,
+      264
+     ]
+    ]
+   },
+   {
+    "id": "sw-e-a2",
+    "from": "sw-n-tl2",
+    "to": "sw-n-tl3",
+    "class": "secondary",
+    "name": "Булевард „Зелена вълна“ — втора отсечка",
+    "oneway": false,
+    "roundabout": false,
+    "lanes": 2,
+    "lanesSource": "tag",
+    "maxspeed": 50,
+    "maxspeedSource": "tag",
+    "length": 264,
+    "geometry": [
+     [
+      0,
+      264
+     ],
+     [
+      0,
+      528
+     ]
+    ]
+   },
+   {
+    "id": "sw-e-a3",
+    "from": "sw-n-tl3",
+    "to": "sw-n-n",
+    "class": "secondary",
+    "name": "Булевард „Зелена вълна“ — северен изход",
+    "oneway": false,
+    "roundabout": false,
+    "lanes": 2,
+    "lanesSource": "tag",
+    "maxspeed": 50,
+    "maxspeedSource": "tag",
+    "length": 120,
+    "geometry": [
+     [
+      0,
+      528
+     ],
+     [
+      0,
+      648
+     ]
+    ]
+   },
+   {
+    "id": "sw-e-w1",
+    "from": "sw-n-w1",
+    "to": "sw-n-tl1",
+    "class": "residential",
+    "name": "Пресечна улица 1 — запад",
+    "oneway": false,
+    "roundabout": false,
+    "lanes": 2,
+    "lanesSource": "tag",
+    "maxspeed": 40,
+    "maxspeedSource": "tag",
+    "length": 90,
+    "geometry": [
+     [
+      -90,
+      0
+     ],
+     [
+      0,
+      0
+     ]
+    ]
+   },
+   {
+    "id": "sw-e-e1",
+    "from": "sw-n-tl1",
+    "to": "sw-n-e1",
+    "class": "residential",
+    "name": "Пресечна улица 1 — изток",
+    "oneway": false,
+    "roundabout": false,
+    "lanes": 2,
+    "lanesSource": "tag",
+    "maxspeed": 40,
+    "maxspeedSource": "tag",
+    "length": 90,
+    "geometry": [
+     [
+      0,
+      0
+     ],
+     [
+      90,
+      0
+     ]
+    ]
+   },
+   {
+    "id": "sw-e-w2",
+    "from": "sw-n-w2",
+    "to": "sw-n-tl2",
+    "class": "residential",
+    "name": "Пресечна улица 2 — запад",
+    "oneway": false,
+    "roundabout": false,
+    "lanes": 2,
+    "lanesSource": "tag",
+    "maxspeed": 40,
+    "maxspeedSource": "tag",
+    "length": 90,
+    "geometry": [
+     [
+      -90,
+      264
+     ],
+     [
+      0,
+      264
+     ]
+    ]
+   },
+   {
+    "id": "sw-e-e2",
+    "from": "sw-n-tl2",
+    "to": "sw-n-e2",
+    "class": "residential",
+    "name": "Пресечна улица 2 — изток",
+    "oneway": false,
+    "roundabout": false,
+    "lanes": 2,
+    "lanesSource": "tag",
+    "maxspeed": 40,
+    "maxspeedSource": "tag",
+    "length": 90,
+    "geometry": [
+     [
+      0,
+      264
+     ],
+     [
+      90,
+      264
+     ]
+    ]
+   },
+   {
+    "id": "sw-e-w3",
+    "from": "sw-n-w3",
+    "to": "sw-n-tl3",
+    "class": "residential",
+    "name": "Пресечна улица 3 — запад",
+    "oneway": false,
+    "roundabout": false,
+    "lanes": 2,
+    "lanesSource": "tag",
+    "maxspeed": 40,
+    "maxspeedSource": "tag",
+    "length": 90,
+    "geometry": [
+     [
+      -90,
+      528
+     ],
+     [
+      0,
+      528
+     ]
+    ]
+   },
+   {
+    "id": "sw-e-e3",
+    "from": "sw-n-tl3",
+    "to": "sw-n-e3",
+    "class": "residential",
+    "name": "Пресечна улица 3 — изток",
+    "oneway": false,
+    "roundabout": false,
+    "lanes": 2,
+    "lanesSource": "tag",
+    "maxspeed": 40,
+    "maxspeedSource": "tag",
+    "length": 90,
+    "geometry": [
+     [
+      0,
+      528
+     ],
+     [
+      90,
+      528
+     ]
+    ]
+   }
+  ]
+ },
+ "intersections": [
+  {
+   "id": "sw-n-tl1",
+   "x": 0,
+   "y": 0,
+   "degree": 4,
+   "signalized": true
+  },
+  {
+   "id": "sw-n-tl2",
+   "x": 0,
+   "y": 264,
+   "degree": 4,
+   "signalized": true
+  },
+  {
+   "id": "sw-n-tl3",
+   "x": 0,
+   "y": 528,
+   "degree": 4,
+   "signalized": true
+  }
+ ],
+ "crossings": [],
+ "roundabouts": [],
+ "buildings": [
+  {
+   "id": "sw-b-0w",
+   "height": 6,
+   "heightSource": "default",
+   "footprint": [
+    [
+     -44,
+     -167
+    ],
+    [
+     -27,
+     -167
+    ],
+    [
+     -27,
+     -137
+    ],
+    [
+     -44,
+     -137
+    ]
+   ]
+  },
+  {
+   "id": "sw-b-0e",
+   "height": 5,
+   "heightSource": "default",
+   "footprint": [
+    [
+     27,
+     -164
+    ],
+    [
+     42,
+     -164
+    ],
+    [
+     42,
+     -140
+    ],
+    [
+     27,
+     -140
+    ]
+   ]
+  },
+  {
+   "id": "sw-b-1w",
+   "height": 8,
+   "heightSource": "default",
+   "footprint": [
+    [
+     -44,
+     117
+    ],
+    [
+     -27,
+     117
+    ],
+    [
+     -27,
+     147
+    ],
+    [
+     -44,
+     147
+    ]
+   ]
+  },
+  {
+   "id": "sw-b-1e",
+   "height": 8,
+   "heightSource": "default",
+   "footprint": [
+    [
+     27,
+     120
+    ],
+    [
+     42,
+     120
+    ],
+    [
+     42,
+     144
+    ],
+    [
+     27,
+     144
+    ]
+   ]
+  },
+  {
+   "id": "sw-b-2w",
+   "height": 10,
+   "heightSource": "default",
+   "footprint": [
+    [
+     -44,
+     381
+    ],
+    [
+     -27,
+     381
+    ],
+    [
+     -27,
+     411
+    ],
+    [
+     -44,
+     411
+    ]
+   ]
+  },
+  {
+   "id": "sw-b-2e",
+   "height": 11,
+   "heightSource": "default",
+   "footprint": [
+    [
+     27,
+     384
+    ],
+    [
+     42,
+     384
+    ],
+    [
+     42,
+     408
+    ],
+    [
+     27,
+     408
+    ]
+   ]
+  }
+ ],
+ "spawnPoints": [
+  {
+   "id": "sw-spawn-south",
+   "x": 0,
+   "y": -289,
+   "heading": 0,
+   "edgeId": "sw-e-a0",
+   "name": "Южен подход към зелената вълна"
+  },
+  {
+   "id": "sw-spawn-cross2-west",
+   "x": -75,
+   "y": 264,
+   "heading": 90,
+   "edgeId": "sw-e-w2",
+   "name": "Западен подход към средния светофар"
+  }
+ ]
+}

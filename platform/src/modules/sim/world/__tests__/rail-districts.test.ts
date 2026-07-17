@@ -362,3 +362,70 @@ describe("rail maps through the traffic lane graph + system", () => {
     });
   }
 });
+
+// ---------------------------------------------------------------------------
+// RX-03 („опашка върху прелеза", sc-rx-queue-clear) — the invariants the
+// QUEUE drill adds on top of the RX-01 map it reuses. The drill's whole
+// tuning rests on three properties of rx-guarded-v1 that nothing else pins:
+// the queue tail's rest pose is on the drivable street PAST the band, the
+// gaps that pose implies fall on the right side of the standstill threshold,
+// and the barrier's open window is long enough to hold a whole crossing.
+// ---------------------------------------------------------------------------
+
+describe("rx-guarded-v1 hosts the RX-03 queue drill (sc-rx-queue-clear)", () => {
+  /** The staged queue tail's hold arc (templates-rail2 RXQ_QUEUE_TAIL_Y). */
+  const TAIL_Y = 166;
+  /** The rule engine's standstill threshold + the recorder's lead-gap datum. */
+  const STANDSTILL_MIN_GAP_M = 1.5;
+  const VEHICLE_LENGTH_M = 4.1;
+
+  it("the tail's pose is real road, clear of the band, and inside the street", () => {
+    const raw = loadRaw("rx-guarded-v1") as District;
+    const edge = raw.roads.edges[0];
+    // The street runs 0 → 300 on x = 0, so the actor's hold offset IS its y.
+    expect(edge.length).toBe(300);
+    expect(TAIL_Y).toBeGreaterThan(BAND_TO); // past the far rail…
+    expect(TAIL_Y).toBeLessThan(edge.length); // …and still on the street.
+    // Ten meters of it: the gap that makes the drill's two mistakes distinct.
+    expect(TAIL_Y - BAND_TO).toBe(10);
+  });
+
+  it("the tail's geometry puts each demo's rest on the RIGHT side of the standstill line", () => {
+    // leadGapM = tailY − playerY − VEHICLE_LENGTH_M (traffic/system leadGapFor).
+    const gapAt = (playerY: number) => TAIL_Y - playerY - VEHICLE_LENGTH_M;
+    // The shadow + the rails-freeze demo rest far enough back that the
+    // standstill code CANNOT fire — so their sheets are the rail question only.
+    expect(gapAt(146)).toBeGreaterThan(STANDSTILL_MIN_GAP_M); // shadow, at the line
+    expect(gapAt(153)).toBeGreaterThan(STANDSTILL_MIN_GAP_M); // frozen mid-band
+    // The kiss demo rests inside the threshold — AND clear of the band, so it
+    // bills the gap and nothing else.
+    expect(gapAt(160.8)).toBeLessThan(STANDSTILL_MIN_GAP_M);
+    expect(160.8).toBeGreaterThan(BAND_TO);
+  });
+
+  it("the barrier's OPEN window is long enough to hold a whole crossing (the drill's clock)", () => {
+    const raw = loadRaw("rx-guarded-v1") as District;
+    const b = raw.zones![0].barrier!;
+    // Open = [downToSec, cycleSec). The drill enters the band at t ≈ 44–57 and
+    // is across in seconds — every authored entry must fit with room to spare.
+    const openSec = b.cycleSec - b.downToSec;
+    expect(b.downFromSec).toBe(0);
+    expect(openSec).toBeGreaterThanOrEqual(45);
+    // …and the tail rolls at ~51.7 s (32 s after the player's ~19.7 s stop),
+    // which must land INSIDE that window — otherwise the lawful crossing would
+    // be barred and the drill would teach RX-01's lesson by accident.
+    expect(51.7).toBeGreaterThan(b.downToSec);
+    expect(51.7).toBeLessThan(b.cycleSec);
+  });
+
+  it("an OPEN-window transit that never rests on the band is innocent — the drill's shadow, in miniature", () => {
+    // The RX-03 shadow's exact shape through the REAL reducer: session clock
+    // at 45 s (barrier up), no stop at the line, brisk across the band.
+    expect(violations(railDrive("rx-guarded-v1", { t0: 45 }))).toEqual([]);
+    // …and the SAME transit that freezes mid-band bills the one code the drill
+    // is built to teach — the queue, not the train.
+    expect(violations(railDrive("rx-guarded-v1", { t0: 45, restOnBandSec: 3 }))).toEqual([
+      "RAIL_CROSSING_VIOLATION",
+    ]);
+  });
+});
