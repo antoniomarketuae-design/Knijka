@@ -25,6 +25,7 @@ import { recordScMergeFromPropertyDrive } from "../../../traces/scMergeFromPrope
 import { recordScMwMinSpeedDrive } from "../../../traces/scMwMinSpeed";
 import { recordScOvSolidReturnDrive } from "../../../traces/scOvSolidReturn";
 import { recordScParkBayExitRevDrive } from "../../../traces/scParkBayExitRev";
+import { recordScRxBarrierDropDrive } from "../../../traces/scRxBarrierDrop";
 import { applyTick, buildLessonResult, createLessonSession } from "../../engine";
 import { gradeFinishWire, serializeRuleEvents } from "../../wire";
 import { compileScenario } from "../compile";
@@ -35,6 +36,7 @@ import { SC_JX_BLOCKED_EXIT } from "../templates-junctions4";
 import { SC_OV_SOLID_RETURN } from "../templates-lanes2";
 import { SC_MERGE_FROM_PROPERTY } from "../templates-merging";
 import { SC_PARK_BAY_EXIT_REV } from "../templates-parking2";
+import { SC_RX_BARRIER_DROP } from "../templates-rail";
 import { SC_MW_MIN_SPEED } from "../templates-speed2";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -1045,6 +1047,119 @@ describe("wave-5 bot completion — sc-merge-from-property at L3", () => {
         compileScenario(SC_MERGE_FROM_PROPERTY, level).stagedEvents?.map((e) => e.kind),
         `L${level}`,
       ).toContain("pedestrianDartOut");
+    }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// sc-rx-barrier-drop — the DESCENDING barrier (RX-01): the arm drops in front
+//                      of the player at t = 20; „вдигната бариера" is not
+//                      „минавай" once it starts down (чл. 52)
+// ---------------------------------------------------------------------------
+
+describe("wave-5 bot completion — sc-rx-barrier-drop at L3", () => {
+  const lesson = compileScenario(SC_RX_BARRIER_DROP, 3);
+  let session = createLessonSession(lesson);
+  recordScRxBarrierDropDrive(loadDistrict("rx-drop-v1"), "shadow-correct", {
+    onTick: (tick) => {
+      session = applyTick(session, tick).state;
+    },
+  });
+  const result = buildLessonResult(session);
+
+  it("completes: both objectives done, zero violations, passed, 3★", () => {
+    expect(session.phase).toBe("completed");
+    expect(result.completedAll).toBe(true);
+    expect(result.passed).toBe(true);
+    expect(result.score).toBe(0);
+    expect(session.events.filter((e) => e.kind === "violation")).toEqual([]);
+    expect(scoreRubric(result, SC_RX_BARRIER_DROP.rubric!).stars).toBe(3);
+  });
+
+  it("the drill is won by the WAIT: hold the line through the down-window, then cross", () => {
+    const at = (id: string) => result.objectives.find((o) => o.id === id)!;
+    // The wait gate has teeth: maxSpeedKmh 5 at the stop line — diving under the
+    // descending arm can never satisfy „изчакай зад стоп-линията".
+    expect(at("sc-rxd-wait").done).toBe(true);
+    expect(at("sc-rxd-finish").done).toBe(true);
+    // In order — waited at the line FIRST, crossed after the lift.
+    expect(at("sc-rxd-wait").completedAtSec!).toBeLessThan(at("sc-rxd-finish").completedAtSec!);
+    // And the wait was real: the barrier is down [20, 60), so a whole 40 s
+    // separates reaching the line from clearing the crossing — the arm starting
+    // up was never the moment to go.
+    expect(at("sc-rxd-finish").completedAtSec! - at("sc-rxd-wait").completedAtSec!).toBeGreaterThan(30);
+  });
+
+  it("the server regrades identically from the id alone (wire round-trip)", () => {
+    const graded = gradeFinishWire({
+      lessonId: "sc-rx-barrier-drop@L3",
+      startedAtMs: 1_000,
+      finishedAtMs: 1_000 + Math.round(result.durationSec * 1000),
+      aborted: false,
+      ruleEvents: serializeRuleEvents(session.events),
+      objectives: result.objectives.map((o) => ({
+        id: o.id,
+        done: o.done,
+        completedAtSec: o.completedAtSec,
+        ...(o.detail !== undefined ? { detail: o.detail } : {}),
+      })),
+    });
+    expect(graded.status).toBe("ok");
+    if (graded.status !== "ok") return;
+    expect(graded.lesson).toEqual(scenarioLessonById("sc-rx-barrier-drop@L3"));
+    expect(graded.result.passed).toBe(true);
+    expect(graded.result.score).toBe(0);
+  });
+
+  it("counter-proof: diving under the descending arm grades RAIL_CROSSING_VIOLATION, not passed, 1★", () => {
+    let s = createLessonSession(compileScenario(SC_RX_BARRIER_DROP, 3));
+    recordScRxBarrierDropDrive(loadDistrict("rx-drop-v1"), "mistake-dive-barrier", {
+      onTick: (tick) => {
+        s = applyTick(s, tick).state;
+      },
+    });
+    const r = buildLessonResult(s);
+    // RAIL_CROSSING_VIOLATION is опасна (10 points) — SCORED on the first
+    // encounter rather than softened onto the teach-moment channel.
+    expect(s.events.some((e) => e.kind === "violation" && e.code === "RAIL_CROSSING_VIOLATION")).toBe(true);
+    expect(r.passed).toBe(false);
+    expect(scoreRubric(r, SC_RX_BARRIER_DROP.rubric!).stars).toBe(1);
+    // …and it never even reaches the wait gate — it blew through the line at
+    // speed, so „изчакай зад стоп-линията" stays incomplete.
+    expect(r.objectives.find((o) => o.id === "sc-rxd-wait")!.done).toBe(false);
+  });
+
+  it("counter-proof: freezing on the rails grades RAIL_CROSSING_VIOLATION too, not passed, 1★", () => {
+    let s = createLessonSession(compileScenario(SC_RX_BARRIER_DROP, 3));
+    recordScRxBarrierDropDrive(loadDistrict("rx-drop-v1"), "mistake-stop-on-track", {
+      onTick: (tick) => {
+        s = applyTick(s, tick).state;
+      },
+    });
+    const r = buildLessonResult(s);
+    // The SAME опасна code from a DIFFERENT act (the rest on the band): the
+    // entry was innocent (guarded + open), the freeze is the kill — see the
+    // trace gate, which pins the "stopped-on-track" detail. Here we prove the
+    // student-facing verdict: scored, failed, one star.
+    expect(s.events.some((e) => e.kind === "violation" && e.code === "RAIL_CROSSING_VIOLATION")).toBe(true);
+    expect(r.passed).toBe(false);
+    expect(scoreRubric(r, SC_RX_BARRIER_DROP.rubric!).stars).toBe(1);
+    // It braked to a halt ON the rails, so it never held the line at ≤ 5 km/h —
+    // the wait gate is unreachable from a car that stops between the rails.
+    expect(r.objectives.find((o) => o.id === "sc-rxd-wait")!.done).toBe(false);
+  });
+
+  it("the barrier is the trap, nothing is staged, and the ladder runs 1→5 with L4 the exam rung", () => {
+    for (const level of [1, 2, 3, 4, 5] as const) {
+      expect(compileScenario(SC_RX_BARRIER_DROP, level).id).toBe(`sc-rx-barrier-drop@L${level}`);
+    }
+    expect(compileScenario(SC_RX_BARRIER_DROP, 4).vehicleStart).toBe("cold");
+    expect(compileScenario(SC_RX_BARRIER_DROP, 4).examMode).toBe(true);
+    // The descent is WORLD DATA (rx-drop-v1's timetable) — no staged actor on
+    // any rung, and the authored ghost envelope is dry-tuned (no physics seam).
+    for (const level of [1, 3, 5] as const) {
+      expect(compileScenario(SC_RX_BARRIER_DROP, level).stagedEvents ?? [], `L${level}`).toEqual([]);
+      expect(compileScenario(SC_RX_BARRIER_DROP, level).physics, `L${level}`).toBeUndefined();
     }
   });
 });

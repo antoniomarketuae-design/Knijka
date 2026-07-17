@@ -349,6 +349,24 @@ const INSTANCES = [
     barrier: { cycleSec: 90, downFromSec: 0, downToSec: 40 },
     noteBg: "Охраняем жп прелез на 150 м: при спуснати бариери изчакай зад стоп-линията; премини едва след пълното им вдигане, без да спираш върху релсите.",
   },
+  {
+    // RX-01 „спускане" host: guarded crossing whose barrier is OPEN at session
+    // start and DESCENDS in front of the player — down [20, 60) of every 90 s
+    // cycle. The whole trap moves into the drive: a t = 0 arrival meets the
+    // OPEN barrier, watches it drop at t = 20, and must wait out the down-
+    // window ([20, 60)) before crossing in the open window [60, 90). No per-
+    // attempt director arming — the descent is world data, same session, same
+    // phases, always (the rx-guarded-v1 timetable discipline, re-phased).
+    districtId: "rx-drop-v1",
+    label: "Учебна улица — охраняем жп прелез със спускаща се бариера А34 (сценарий RX-01)",
+    idPrefix: "rxd",
+    lengthM: 300,
+    maxspeedKmh: 50,
+    band: { fromM: 150, toM: 156 },
+    guarded: true,
+    barrier: { cycleSec: 90, downFromSec: 20, downToSec: 60 },
+    noteBg: "Охраняем жп прелез на 150 м: бариерата е вдигната, но след малко тръгва надолу. Спри зад стоп-линията и изчакай пълното ѝ вдигане — не се гмуркай под спускащата се бариера и никога не спирай върху релсите.",
+  },
 ];
 
 const line = (k, v) => console.log(`  ${String(k).padEnd(28)} ${v}`);

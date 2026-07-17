@@ -23,6 +23,7 @@ import { recordScAcBridgeIceDrive } from "../../../traces/scAcBridgeIce";
 import { recordScLnObstacleMeetingDrive } from "../../../traces/scLnObstacleMeeting";
 import { recordScPeZoneLivingDrive } from "../../../traces/scPeZoneLiving";
 import { recordScPkRailBanDrive } from "../../../traces/scPkRailBan";
+import { recordScSpEcoCoastDrive } from "../../../traces/scSpEcoCoast";
 import { recordScVuChildCyclistDrive } from "../../../traces/scVuChildCyclist";
 import { applyTick, buildLessonResult, createLessonSession } from "../../engine";
 import { gradeFinishWire, serializeRuleEvents } from "../../wire";
@@ -33,6 +34,7 @@ import { SC_AC_BRIDGE_ICE } from "../templates-conditions2";
 import { SC_LN_OBSTACLE_MEETING } from "../templates-lanes2";
 import { SC_PK_RAIL_BAN } from "../templates-parking2";
 import { SC_PE_ZONE_LIVING } from "../templates-pe2";
+import { SC_SP_ECO_COAST } from "../templates-speed";
 import { SC_VU_CHILD_CYCLIST } from "../templates-vru2";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -988,6 +990,192 @@ describe("wave-7 bot completion — sc-vu-child-cyclist at L3", () => {
     expect(graded.status).toBe("ok");
     if (graded.status !== "ok") return;
     expect(graded.lesson).toEqual(scenarioLessonById("sc-vu-child-cyclist@L3"));
+    expect(graded.result.passed).toBe(true);
+    expect(graded.result.score).toBe(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// sc-sp-eco-coast — the drill is won BEFORE the line: read the red early, lift
+//                   off, and let the engine brake the car down to a smooth halt.
+//                   The graded fault of NOT doing so is the overrun the late
+//                   brake buys (STOP_LINE_OVERSHOOT), and its mirror is the
+//                   wasted stop's second cost (HESITATION_AT_GREEN). The first
+//                   attempt was BLOCKED because HARSH_BRAKING_NO_CAUSE is
+//                   unreachable here — a visible red is a lawful cause to brake
+//                   for the whole 120 m the runtime can see it; these two codes
+//                   are the honest, reachable ones.
+// ---------------------------------------------------------------------------
+
+describe("wave-7 bot completion — sc-sp-eco-coast at L3", () => {
+  const lesson = compileScenario(SC_SP_ECO_COAST, 3);
+  let session = createLessonSession(lesson);
+  recordScSpEcoCoastDrive(loadDistrict("sx-v1"), "shadow-correct", {
+    onTick: (tick) => {
+      session = applyTick(session, tick).state;
+    },
+  });
+  const result = buildLessonResult(session);
+
+  it("completes: all three objectives done, zero violations, passed, 3★", () => {
+    expect(session.phase).toBe("completed");
+    expect(result.completedAll).toBe(true);
+    expect(result.passed).toBe(true);
+    expect(result.score).toBe(0);
+    expect(session.events.filter((e) => e.kind === "violation")).toEqual([]);
+    expect(scoreRubric(result, SC_SP_ECO_COAST.rubric!).stars).toBe(3);
+  });
+
+  it("THE POINT, on the STUDENT path: the coast is a GATE, not narration", () => {
+    // The trace gate proves the recorder's engine sees a clean drive; this proves
+    // the student-facing session agrees — and that the lift-off is a GATE rather
+    // than a slogan. sc-ecoc-coast is a reachZone 17 m short of the line, on the
+    // lane centre, capped at 36 km/h: a driver who lifted off at ~80 m is already
+    // under it (the shadow reads ~23 km/h), while a driver who keeps the gas on
+    // arrives at ~50 and misses it entirely. Because objectives advance
+    // sequentially, a racer who blows the coast gate never activates the rest.
+    const at = (id: string) => result.objectives.find((o) => o.id === id)!;
+    for (const id of ["sc-ecoc-coast", "sc-ecoc-pass", "sc-ecoc-exit"]) {
+      expect(at(id).done, id).toBe(true);
+    }
+    expect(at("sc-ecoc-coast").completedAtSec!).toBeLessThan(at("sc-ecoc-pass").completedAtSec!);
+    expect(at("sc-ecoc-pass").completedAtSec!).toBeLessThan(at("sc-ecoc-exit").completedAtSec!);
+  });
+
+  it("stages NOTHING and opts into NOTHING but the arrival pin", () => {
+    // Every dial this drill could have reached for is deliberately empty, and
+    // each absence is load-bearing:
+    //  - no staged actor: the empty corridor is the point — a lead car would give
+    //    the late brake a confounding cause and dissolve the overshoot demo;
+    //  - no ruleConfig: STOP_LINE_OVERSHOOT and HESITATION_AT_GREEN are default-on
+    //    for everyone (no config gate), so the student's own attempt grades too;
+    //  - no physics: the ghosts are dry-tuned (ADR-006 stage 4a).
+    // The ONE dial it does set is the signal pin — without it a wall-clock
+    // arrival could land on green and delete the „see the red early" premise.
+    expect(lesson.stagedEvents ?? []).toEqual([]);
+    expect(lesson.ruleConfig).toBeUndefined();
+    expect(lesson.physics).toBeUndefined();
+    expect(lesson.signalPlan).toEqual({ arm: "redFresh", triggerM: 45 });
+  });
+
+  it("the LIVE session bills no phantom for the lawful coast itself", () => {
+    // Where a sloppy tune would surface: the car sheds 27 km/h by lifting off,
+    // eases to a dead stop in front of a red line, waits, and pulls away on the
+    // green. A brake for a red is a lawful response, and a stop in front of the
+    // paint is exactly right — none of it may cost a thing.
+    const codes = session.events.filter((e) => e.kind === "violation").map((e) => e.code);
+    for (const c of [
+      "HARSH_BRAKING_NO_CAUSE",
+      "STOP_LINE_OVERSHOOT",
+      "RED_LIGHT_CROSSED",
+      "HESITATION_AT_GREEN",
+      "SPEEDING_OVER_LIMIT",
+      "POOR_LANE_KEEPING",
+    ]) {
+      expect(codes).not.toContain(c);
+    }
+  });
+
+  /** Replay a demo through a LIVE session at one rung, splitting the coach's two
+   *  channels: what it TAUGHT (first-encounter pause card) vs what it SCORED. */
+  const replay = (name: Parameters<typeof recordScSpEcoCoastDrive>[1], level: 3 | 4) => {
+    let s = createLessonSession(compileScenario(SC_SP_ECO_COAST, level));
+    const taught: string[] = [];
+    recordScSpEcoCoastDrive(loadDistrict("sx-v1"), name, {
+      onTick: (tick) => {
+        const step = applyTick(s, tick);
+        s = step.state;
+        for (const m of step.teachMoments ?? []) taught.push(m.code);
+      },
+    });
+    return {
+      taught,
+      scored: s.events.filter((e) => e.kind === "violation").map((e) => e.code),
+      r: buildLessonResult(s),
+    };
+  };
+
+  it("counter-proof: „газ до последно“ overshoots the line — TAUGHT at L3, SCORED at L4, never finishes", () => {
+    // The template's first claim. This driver kept the gas on to the line and the
+    // late brake could not stop him in front of it — the nose ran onto the mouth
+    // of the junction. STOP_LINE_OVERSHOOT is второстепенна, so the FIRST
+    // encounter pauses with a card and costs no points (teach-first, doc 76 §0),
+    // and at the exam rung the same drive is billed one point instead.
+    const l3 = replay("mistake-late-brake", 3);
+    expect(l3.taught).toContain("STOP_LINE_OVERSHOOT");
+    expect(l3.scored).not.toContain("STOP_LINE_OVERSHOOT");
+    // The harsh stab itself is a LAWFUL red response and is never billed, and he
+    // never runs the red — the overrun clears only once the light opens.
+    expect(l3.scored).not.toContain("HARSH_BRAKING_NO_CAUSE");
+    expect(l3.scored).not.toContain("RED_LIGHT_CROSSED");
+    // …and the drill does not complete: keeping the gas on misses the coast gate,
+    // and objectives advance sequentially, so the sheet stalls at step one.
+    expect(l3.r.objectives.find((o) => o.id === "sc-ecoc-coast")!.done).toBe(false);
+    expect(l3.r.completedAll).toBe(false);
+    const l4 = replay("mistake-late-brake", 4);
+    expect(l4.taught).toEqual([]);
+    expect(l4.scored).toEqual(["STOP_LINE_OVERSHOOT"]);
+    expect(l4.r.score).toBe(1); // one второстепенна (Наредба-38, rules/scoring.ts)
+    expect(l4.r.completedAll).toBe(false);
+  });
+
+  it("counter-proof: the clean stop that dawdles on green — TAUGHT at L3, SCORED at L4, still finishes", () => {
+    // The mirror image, and the reason both demos exist. This driver coasted
+    // perfectly — he cleared the coast gate — but then sat through the opening
+    // green. HESITATION_AT_GREEN is второстепенна: taught first at L3 (no points,
+    // and the sheet still passes), billed one point at L4. Unlike the overshoot,
+    // this drive DOES complete — the fault is the delay, not the route.
+    const l3 = replay("mistake-sleep-at-green", 3);
+    expect(l3.taught).toContain("HESITATION_AT_GREEN");
+    expect(l3.scored).not.toContain("HESITATION_AT_GREEN");
+    expect(l3.scored).not.toContain("STOP_LINE_OVERSHOOT"); // the stop was in front of the line
+    expect(l3.r.objectives.find((o) => o.id === "sc-ecoc-coast")!.done).toBe(true);
+    expect(l3.r.completedAll).toBe(true);
+    expect(l3.r.passed).toBe(true);
+    const l4 = replay("mistake-sleep-at-green", 4);
+    expect(l4.taught).toEqual([]);
+    expect(l4.scored).toEqual(["HESITATION_AT_GREEN"]);
+    expect(l4.r.score).toBe(1);
+    expect(l4.r.passed).toBe(true); // one второстепенна < the 9-point budget
+    expect(l4.r.completedAll).toBe(true);
+    expect(scoreRubric(l4.r, SC_SP_ECO_COAST.rubric!).stars).toBeLessThanOrEqual(2);
+  });
+
+  it("compiles at every authored rung; L4 is the exam cold start, and there is no L5", () => {
+    for (const level of [1, 2, 3, 4] as const) {
+      expect(compileScenario(SC_SP_ECO_COAST, level).id).toBe(`sc-sp-eco-coast@L${level}`);
+    }
+    expect(compileScenario(SC_SP_ECO_COAST, 4).vehicleStart).toBe("cold");
+    expect(compileScenario(SC_SP_ECO_COAST, 4).examMode).toBe(true);
+    // No L5 by design (the backlog's own rung list): the difficulty axis here is
+    // anticipation timing, not grip or light — a wet/night rung would want the
+    // ADR-006 stage-4a physics opt-in the dry-tuned ghost cannot honour.
+    expect(SC_SP_ECO_COAST.levels.map((l) => l.level)).toEqual([1, 2, 3, 4]);
+    // The arrival pin rides every rung; nothing else is staged at any rung.
+    for (const level of [1, 2, 3, 4] as const) {
+      const l = compileScenario(SC_SP_ECO_COAST, level);
+      expect(l.signalPlan, `L${level}`).toEqual({ arm: "redFresh", triggerM: 45 });
+      expect(l.stagedEvents ?? [], `L${level}`).toEqual([]);
+    }
+  });
+
+  it("the server regrades identically from the id alone (wire round-trip)", () => {
+    const graded = gradeFinishWire({
+      lessonId: "sc-sp-eco-coast@L3",
+      startedAtMs: 1_000,
+      finishedAtMs: 1_000 + Math.round(result.durationSec * 1000),
+      aborted: false,
+      ruleEvents: serializeRuleEvents(session.events),
+      objectives: result.objectives.map((o) => ({
+        id: o.id,
+        done: o.done,
+        completedAtSec: o.completedAtSec,
+        ...(o.detail !== undefined ? { detail: o.detail } : {}),
+      })),
+    });
+    expect(graded.status).toBe("ok");
+    if (graded.status !== "ok") return;
+    expect(graded.lesson).toEqual(scenarioLessonById("sc-sp-eco-coast@L3"));
     expect(graded.result.passed).toBe(true);
     expect(graded.result.score).toBe(0);
   });

@@ -63,6 +63,11 @@ const RX_STOP_LINE_Y = 145;
 const RXG_BARRIER_CYCLE_SEC = 90;
 const RXG_BARRIER_DOWN_FROM_SEC = 0;
 const RXG_BARRIER_DOWN_TO_SEC = 40;
+/** rx-drop-v1: the DESCENDING-barrier timetable — OPEN at spawn, down [20, 60)
+ *  of every 90 s (the barrier drops in front of the player at t = 20). */
+const RXD_BARRIER_CYCLE_SEC = 90;
+const RXD_BARRIER_DOWN_FROM_SEC = 20;
+const RXD_BARRIER_DOWN_TO_SEC = 60;
 
 // ---------------------------------------------------------------------------
 // 1. sc-rx-unguarded — „Неохраняем жп прелез" (RX-02) on rx-unguarded-v1
@@ -254,6 +259,117 @@ export const SC_RX_GUARDED: ScenarioSpec = {
     { level: 2 },
     { level: 3 },
     { level: 4, vehicleStart: "cold" },
+  ],
+  conditions: { weather: "dry" },
+  localeBg: "bg-BG",
+};
+
+// ---------------------------------------------------------------------------
+// 2b. sc-rx-barrier-drop — „Бариерата тръгва надолу" (RX-01, the DESCENDING
+//     barrier) on rx-drop-v1 (300 m 1+1 street, limit 50, guarded track band @
+//     y ∈ [150, 156], stop line y = 145, barrier OPEN at spawn and down
+//     [20, 60) of every 90 s — the drop happens IN FRONT of the player at
+//     t = 20, world data, no per-attempt director arming)
+//
+// THE SIBLING OF sc-rx-guarded (honest map contrast, not reuse): sc-rx-guarded
+// arrives to a barrier ALREADY down ([0, 40)); this drill spawns with the
+// barrier UP and watches it DESCEND ([20, 60)). The lesson is чл. 52's other
+// half — „СПУСКАЩИ СЕ бариери" are as absolute as lowered ones: the moment the
+// arm starts down, entry is forbidden, and racing it under is the fatal move.
+// The barrier is WORLD DATA (rx-drop-v1's timetable), so no staged actor is
+// needed — the descent is deterministic in session time, same phases always.
+// ---------------------------------------------------------------------------
+
+/** RX-01 „спускане" — охраняем прелез със спускаща се бариера (ЗДвП чл. 52: при
+ *  спуснати ИЛИ СПУСКАЩИ СЕ бариери не се навлиза — никога; преминаваш едва
+ *  след пълното им вдигане, без да спираш върху коловоза). */
+export const SC_RX_BARRIER_DROP: ScenarioSpec = {
+  id: "sc-rx-barrier-drop",
+  family: "rail",
+  tagsBg: ["жп прелез", "спускаща се бариера", "охраняем прелез", "търпение"],
+  titleBg: "Бариерата тръгва надолу",
+  objectiveBg:
+    "Пристигаш пред жп прелез с вдигната бариера — но тя тръгва надолу пред теб. Спри зад стоп-линията и изчакай пълното ѝ вдигане; не се гмуркай под спускащата се бариера и никога не спирай върху релсите.",
+  archetypeIds: ["RX-01"],
+  conceptIds: ["c-railway-crossing", "c-warning-signs", "c-general-care-duty"],
+  map: {
+    archetype: "straight-street",
+    // The generator recipe — mirrored in rx-drop-v1.json meta.scenario.params
+    // (tools/maps/gen_rail_crossing.mjs; identical to rx-guarded-v1 EXCEPT the
+    // barrier is OPEN at spawn and descends at t = 20 — down [20, 60) of 90 s).
+    params: {
+      lengthM: 300,
+      maxspeedKmh: 50,
+      crossingFromM: RX_BAND_FROM,
+      crossingToM: RX_BAND_TO,
+      guarded: "guarded",
+      barrierCycleSec: RXD_BARRIER_CYCLE_SEC,
+      barrierDownFromSec: RXD_BARRIER_DOWN_FROM_SEC,
+      barrierDownToSec: RXD_BARRIER_DOWN_TO_SEC,
+    },
+    districtId: "rx-drop-v1",
+  },
+  start: {
+    spawnPointId: "rxd-spawn-start",
+    vehicleStart: "ready",
+  },
+  instructionsBg: [
+    { n: 1, textBg: "Потегли по улицата — напред има охраняем жп прелез (знак А34). Бариерата е вдигната, но всеки момент може да тръгне надолу." },
+    { n: 2, textBg: "Намали отрано. Щом бариерата започне да се спуска, спри зад стоп-линията — не се гмуркай под нея, за да „успееш“." },
+    { n: 3, textBg: "Изчакай търпеливо: спускащата се бариера значи влак в участъка. Не се промъквай и не влизай, докато не се вдигне напълно — никога." },
+    { n: 4, textBg: "Едва след ПЪЛНОТО вдигане на бариерата се огледай и премини решително, без спиране върху коловоза." },
+    { n: 5, textBg: "Продължи спокойно до края на отсечката." },
+  ],
+  success: [
+    {
+      id: "sc-rxd-wait",
+      titleBg: "Изчакай зад стоп-линията пред спускащата се бариера",
+      // Completable ONLY at near-stop speed at the barrier line — the wait IS
+      // the drill (diving under the descending arm can never satisfy it).
+      params: { kind: "reachZone", x: RX_LANE, y: RX_STOP_LINE_Y, radiusM: 4, maxSpeedKmh: 5 },
+    },
+    {
+      id: "sc-rxd-finish",
+      titleBg: "Премини прелеза след вдигането и стигни края",
+      params: { kind: "reachZone", x: RX_LANE, y: 285, radiusM: 6 },
+    },
+  ],
+  rubric: { parTimeSec: 110 },
+  // RECORDED: committed deterministic recordings of the authored scripts in
+  // traces/scRxBarrierDrop.ts; gates in traces/__tests__/sc-rx-barrier-drop-
+  // traces.test.ts (re-record with RECORD_TRACES=1).
+  shadow: { path: "content/traces/sc-rx-barrier-drop/shadow-correct.trace.json" },
+  mistakes: [
+    {
+      traceRef: { path: "content/traces/sc-rx-barrier-drop/mistake-dive-barrier.trace.json" },
+      titleBg: "Гмуркане под спускащата се бариера",
+      whatWentWrongBg:
+        "Бариерата тръгна надолу, но колата се хвърли през прелеза, за да „успее преди влака“. Точно това е фаталният ход: бариерата се спуска, защото влакът ВЕЧЕ е в участъка, а надбягването с него е катастрофа с почти сигурен смъртен изход. При спуснати или спускащи се бариери не се навлиза — никога (чл. 52).",
+      codeRefs: ["RAIL_CROSSING_VIOLATION"],
+    },
+    {
+      traceRef: { path: "content/traces/sc-rx-barrier-drop/mistake-stop-on-track.trace.json" },
+      titleBg: "Спиране върху релсите",
+      whatWentWrongBg:
+        "Колата влезе на прелеза при още вдигната бариера, но се поколеба и спря върху коловоза — а бариерата тръгна надолу точно над нея. Върху релсите не се спира никога: премини на едно движение и спри чак когато целият автомобил е отвъд релсите. Замръзването между релсите, докато бариерата слиза, е сценарият, който убива.",
+      codeRefs: ["RAIL_CROSSING_VIOLATION"],
+    },
+  ],
+  teach: {
+    whenBg:
+      "На всеки охраняем жп прелез, към който приближаваш с вдигната бариера — тя може да тръгне надолу всеки момент. Спускащата се бариера и мигащата червена светлина значат едно: влак в участъка. Преминаваш едва след пълното ѝ вдигане.",
+    whyBg:
+      "Спускащата се бариера е най-подценяваната опасност на прелеза: изглежда, че „още има време“, и водачът се гмурка под нея. Но бариерата не пада по разписание — пада, защото влакът вече идва, и спирачният му път е над километър. Гмуркането под спускащия се лост и замръзването върху релсите убиват по една и съща причина: озоваваш се на коловоза точно когато влакът не може нито да спре, нито да те заобиколи. Търпението пред прелеза струва две минути; всичко друго може да струва всичко.",
+    lawRef: "ЗДвП чл. 52",
+    examinerBg:
+      "Изпитващият следи поведението пред спускаща се бариера: навременно спиране зад стоп-линията в мига, в който лостът тръгне надолу, търпеливо изчакване без промъкване и преминаване едва след пълното вдигане, без спиране върху коловоза. Навлизане под спускаща се бариера е опасна грешка от прекратяващия клас.",
+  },
+  levels: [
+    { level: 1 },
+    { level: 2 },
+    { level: 3 },
+    { level: 4, vehicleStart: "cold" },
+    { level: 5 },
   ],
   conditions: { weather: "dry" },
   localeBg: "bg-BG",
@@ -538,4 +654,5 @@ export const SCENARIO_TEMPLATES_RAIL: readonly ScenarioSpec[] = [
   SC_RX_GUARDED,
   SC_RX_TRAM_LEFT,
   SC_RX_TRAM_ISLAND,
+  SC_RX_BARRIER_DROP,
 ];

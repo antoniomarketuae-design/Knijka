@@ -40,6 +40,7 @@ import { SCENARIO_TEMPLATES_VRU2 } from "./templates-vru2";
 import { SCENARIO_TEMPLATES_RAIL2 } from "./templates-rail2";
 import { SCENARIO_TEMPLATES_CONDITIONS2 } from "./templates-conditions2";
 import { SCENARIO_TEMPLATES_SPEED2 } from "./templates-speed2";
+import { SCENARIO_TEMPLATES_SPEED } from "./templates-speed";
 import { SCENARIO_TEMPLATES_HAZARDS2 } from "./templates-hazards2";
 import { SCENARIO_TEMPLATES_FOLLOWING2 } from "./templates-following2";
 import { SCENARIO_TEMPLATES_COCKPIT2 } from "./templates-cockpit2";
@@ -275,24 +276,22 @@ export const SCENARIO_TEMPLATES: readonly ScenarioSpec[] = [
   ...SCENARIO_TEMPLATES_COCKPIT2,
   // Wave 5 — five items extend a family file already spread above (merging,
   // lanes2, parking2, conditions2, speed2); junctions4 is the wave's one new
-  // family. The wave's seventh item (sc-rx-barrier-drop) is NOT authored — the
-  // barrier-drop director is unbuilt, so nothing is registered for it.
+  // family. sc-rx-barrier-drop (re-issued on the new rx-drop-v1 map, whose
+  // barrier descends in front of the player) rides SCENARIO_TEMPLATES_RAIL.
   ...SCENARIO_TEMPLATES_JUNCTIONS4,
   // Wave 6 — five items extend a family file already spread above (lanes2,
   // parking2, signals2, hazards2, exam); merging2 and roundabout2 are the
   // wave's two new families.
   ...SCENARIO_TEMPLATES_MERGING2,
   ...SCENARIO_TEMPLATES_ROUNDABOUT2,
-  // Wave 7 — no new family and no new import: all five landed items extend a
-  // family file already spread above (lanes2, parking2, pe2, vru2,
-  // conditions2). Two of the wave's seven items are NOT authored and nothing is
-  // registered for them (the sc-rx-barrier-drop precedent):
-  //  - sc-jx-giveway-b1: the engine has no Б1/give-way vocabulary — every
-  //    non-signal stop-line crossing is adjudicated as a Б2 full-stop demand,
-  //    so the drill's correct rolling yield grades STOP_SIGN_NO_FULL_STOP;
-  //  - sc-sp-eco-coast: HARSH_BRAKING_NO_CAUSE is unreachable under the item's
-  //    own premise (a red light IS a braking cause for the full 120 m the
-  //    runtime can see it), and the drill duplicates shipped sc-sig-green-wave.
+  // Wave 7 — five items extend a family file already spread above (lanes2,
+  // parking2, pe2, vru2, conditions2); sc-sp-eco-coast opens the speed family
+  // (SCENARIO_TEMPLATES_SPEED, spread below). It ships STOP_LINE_OVERSHOOT +
+  // HESITATION_AT_GREEN — the originally-briefed HARSH_BRAKING_NO_CAUSE proved
+  // unreachable (a visible red is a lawful braking cause for the full 120 m the
+  // runtime can see it), so two honest reachable codes replaced it. The wave's
+  // seventh item, sc-jx-giveway-b1, follows once the Б1 scan seam lands.
+  ...SCENARIO_TEMPLATES_SPEED,
   // Wave 8 — seven items, all landed. Six extend a family file already spread
   // above (signals2, vru2, rail2, hazards2, following2, exam); lanes3 is the
   // wave's one new family (sc-ln-decisive-change, deepening sc-lane-change).

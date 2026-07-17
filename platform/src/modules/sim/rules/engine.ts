@@ -1321,31 +1321,20 @@ function handleTickEvent(
       // traffic is the duty, NOT a full stop. „Пълно спиране при Б1 се налага
       // само когато иначе би ги засякъл" (content bank q-krastovishta-006 /
       // concept c-give-way-stop-behavior), so crossing a give-way line demands
-      // NOTHING here — rolling through a clear Б1 mouth is ZERO violations, and
-      // a full stop at it is equally legal (never penalized). The failure-to-
-      // yield case is adjudicated by the world's conflict-query pipeline
-      // (conflictNear) and delivered as a SEPARATE prioritySituation
-      // {situation:"give-way"} event → FAILED_TO_YIELD (detail "give-way"), the
-      // same channel the uncontrolled right-hand rule rides — no full-stop grade
-      // and no Б2 ляво-дясно scan (both are Б2-specific) apply to a Б1 line.
-      if (e.control === "giveWay") break;
-      // Б2 stop sign: a qualifying full stop must have ended recently.
-      const last = s.stop.lastQualifyingStopAt;
-      const stopped = last !== null && t - last <= cfg.stopRecencySec;
-      out.push(
-        stopped
-          ? makeCommendation("FULL_STOP_AT_STOP_SIGN", t)
-          : makeViolation("STOP_SIGN_NO_FULL_STOP", t),
-      );
+      // no FULL STOP here — rolling through a clear Б1 mouth is zero violations
+      // on the full-stop axis, and a full stop at it is equally legal. The
+      // failure-to-yield case is adjudicated by the world's conflict-query
+      // pipeline (conflictNear) and delivered as a SEPARATE prioritySituation
+      // {situation:"give-way"} event → FAILED_TO_YIELD (detail "give-way").
+      //
       // JU-23 „един поглед не стига" — the junction-scan lookback (config-gated
-      // per-lesson drill). Crossing the Б2 line demands a FRESH ляво-дясно scan;
-      // the glance trackers were updated this same tick (step 1, before this
-      // handler). A left AND a right glance must each fall within the lookback.
-      // This is a DISTINCT fault from the full-stop grade above (a rolling stop
-      // can also skip the scan) — the "looked but failed to see" observation
-      // quality the doc grades separately. SHIPPED OFF (see types.ts): the A12
-      // whole-commute crosses a Б2 unglanced and must stay innocent by default.
-      if (cfg.junctionScanObservationEnabled) {
+      // per-lesson drill; SHIPPED OFF, so the A12 whole-commute stays innocent).
+      // The FRESH ляво-дясно scan applies to a Б1 give-way line JUST AS to a Б2
+      // stop line: you cannot yield to (or cross) priority traffic you never
+      // looked for — the observation quality is the crux of the Б1 lesson, not a
+      // Б2-only demand. A left AND a right glance must each fall in the lookback.
+      const scanIncomplete = (): boolean => {
+        if (!cfg.junctionScanObservationEnabled) return false;
         const lg = s.lastGlanceAt.left;
         const rg = s.lastGlanceAt.right;
         const scanned =
@@ -1353,8 +1342,24 @@ function handleTickEvent(
           t - lg <= cfg.junctionScanLookbackSec &&
           rg !== null &&
           t - rg <= cfg.junctionScanLookbackSec;
-        if (!scanned) out.push(makeViolation("JUNCTION_SCAN_INCOMPLETE", t));
+        return !scanned;
+      };
+      if (e.control === "giveWay") {
+        // Б1: no full-stop grade; the scan-observation fault still applies.
+        if (scanIncomplete()) out.push(makeViolation("JUNCTION_SCAN_INCOMPLETE", t));
+        break;
       }
+      // Б2 stop sign: a qualifying full stop must have ended recently. The scan
+      // grade follows the full-stop grade (order preserved for existing gates) —
+      // it is a DISTINCT fault (a rolling stop can also skip the scan).
+      const last = s.stop.lastQualifyingStopAt;
+      const stopped = last !== null && t - last <= cfg.stopRecencySec;
+      out.push(
+        stopped
+          ? makeCommendation("FULL_STOP_AT_STOP_SIGN", t)
+          : makeViolation("STOP_SIGN_NO_FULL_STOP", t),
+      );
+      if (scanIncomplete()) out.push(makeViolation("JUNCTION_SCAN_INCOMPLETE", t));
       break;
     }
 
