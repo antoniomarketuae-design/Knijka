@@ -208,6 +208,18 @@ export interface LevelSpec {
   traffic?: ScenarioTraffic;
   /** Condition override for this rung (L5 rain/night variants). */
   conditions?: ConditionAxis;
+  /**
+   * Live-physics override for this rung — the SAME opt-in shape as
+   * ScenarioSpec.physics (reused, never duplicated), merged PER KEY over the
+   * template's by compileScenario (the conditions precedent above). This is
+   * what lets ONE template teach the dry rung and the wet rung: physics was
+   * template-wide, so "L5 = rain + wet grip" would have dragged L1–L4 onto
+   * wet grip too and invalidated their dry-tuned ghosts (4a pinned ghosts to
+   * the tuning constants) — such rungs had to ship render-only weather, the
+   * rain looking wet while the car was not. Absent = inherit the template's;
+   * absent on BOTH = no physics at all (dry, bit-identical).
+   */
+  physics?: ScenarioSpec["physics"];
   /** Vehicle-start override (L4 usually flips to "cold" — exam protocol). */
   vehicleStart?: "cold" | "ready";
   /** examMode override; absent = the ladder default (true only at L4). */

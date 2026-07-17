@@ -11,7 +11,7 @@
  *    rb-mini-v1) — EXIT discipline: circulate past the spokes that are not
  *    yours and announce the exit with the right indicator only AFTER the last
  *    approach before it.
- *  - sc-rb-circulate-priority „В кръга си с предимство“ (RB-03/RB-05,
+ *  - sc-rb-circulate-priority „В кръга си с предимство“ (RB-03/OV-12,
  *    rb-mini-v1) — the INVERSE of the entry drill: once you are on the ring
  *    the priority is yours, and the cars standing at the mouths are waiting
  *    for YOU. Hold one line and one pace; do not brake for them.
@@ -260,8 +260,8 @@ export const SC_RB_EXIT_SIGNAL: ScenarioSpec = {
 };
 
 // ---------------------------------------------------------------------------
-// sc-rb-circulate-priority — „В кръга си с предимство“ (RB-03 causeless stop
-// inside the ring / RB-05 wandering line in the ring) on rb-mini-v1
+// sc-rb-circulate-priority — „В кръга си с предимство“ (RB-03 hesitation and
+// the causeless stop inside the ring / OV-12 the wandering line) on rb-mini-v1
 // ---------------------------------------------------------------------------
 
 /**
@@ -326,9 +326,13 @@ export const SC_RB_CIRCULATE_PRIORITY: ScenarioSpec = {
   titleBg: "В кръга си с предимство",
   objectiveBg:
     "Докато си вътре в кръговото, дръж равномерна скорост и НЕ спирай заради чакащите на входовете — предимството е твое.",
-  // Doc-72 provenance: RB-03 (causeless stop inside the ring) + RB-05 (the
-  // wandering, hesitant line in the ring).
-  archetypeIds: ["RB-03", "RB-05"],
+  // Doc-72 provenance: RB-03 („Колебание и спиране в кръга" — the needless stop
+  // AND the hesitation that drives it: „crawling the ring at 5 km/h clear") +
+  // OV-12 („Возене по линията" — sustained off-center lane keeping, the
+  // POOR_LANE_KEEPING archetype the wandering-line mistake card grades).
+  // NOT RB-05: that id is „Пешеходец на изхода на кръговото" and belongs to
+  // sc-rb-ped-exit; this drill stages no pedestrian at all.
+  archetypeIds: ["RB-03", "OV-12"],
   conceptIds: [
     "c-roundabout-rules", // „Кръгово движение: кой е с предимство“ — the core
     "c-roundabout-behavior", // „Движение и излизане от кръговото“

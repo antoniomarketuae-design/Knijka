@@ -11,7 +11,7 @@
  *   |  L2   | ribbon only, hints after idle                   |   off    |
  *   |  L3   | none                                            |   off    |
  *   |  L4   | none, exam protocol                             |   ON     |
- *   |  L5   | none + traffic/conditions/staged complications  |   off    |
+ *   |  L5   | none + traffic/conditions/physics/staged deltas |   off    |
  *
  * TOP-DOWN IS ON EVERY RUNG, L1..L5 (founder ruling 2026-07-17; doc 76 §12
  * „Top-down mode confirmed as a first-class POV option"). topdownAllowed is a
@@ -40,8 +40,8 @@
  *  - weather: EVERY condition compiles — dry/rain/fog/snow (the doc 76 §0
  *    weather gaps are closed: fog via the AC-03 unlock, snow via the AC-08
  *    winter-grip unlock: snow haze render + tick.snow conditions envelope;
- *    the snow-grip PHYSICS stays the scenario's explicit physics.snowGrip
- *    opt-in — the wet precedent, never implied by the weather tag).
+ *    the snow-grip PHYSICS stays an explicit physics.snowGrip opt-in, authored
+ *    template-wide or per rung — the wet precedent, never implied by the tag).
  */
 
 import type { LessonAidsSpec, LessonObjective, LessonSpec, ParkingBaySpec } from "../../contracts";
@@ -159,6 +159,17 @@ export function compileScenario(spec: ScenarioSpec, level: ScenarioLevel): Lesso
         }
       : undefined;
 
+  // Physics: rung over template, PER KEY — the conditions merge above applied
+  // literally, NOT a wholesale replace: an L5 may ADD crosswind without
+  // clearing an inherited wetGrip, and may drop an inherited flag with an
+  // explicit `false` (the falsy-drop at the propagation site then omits it —
+  // the mergeAids escape-hatch pattern). The rung-level half of the 4a opt-in:
+  // physics used to be template-wide only, so "L5 = rain + wet grip" would
+  // have dragged L1..L4 onto wet grip too and invalidated their dry-tuned
+  // ghosts — those rungs shipped render-only weather instead. Absent on both
+  // spec and rung = {} = no physics key at all (bit-identical dry compile).
+  const physics = { ...(spec.physics ?? {}), ...(rung.physics ?? {}) };
+
   const toleranceScale = rung.toleranceScale ?? 1;
   const objectives: LessonObjective[] = spec.success.map((o) => {
     const { kind, params } = serializeObjectiveParams(o.params, toleranceScale);
@@ -216,15 +227,15 @@ export function compileScenario(spec: ScenarioSpec, level: ScenarioLevel): Lesso
     // Config-gated drills: carry the detector opt-in to the LIVE session so
     // the student's own attempt grades the taught fault (not only the shadow).
     ...(spec.ruleConfig ? { ruleConfig: spec.ruleConfig } : {}),
-    // 4a physics opt-in (the ruleConfig pattern): only a template that AUTHORS
-    // physics.wetGrip / physics.snowGrip / physics.crosswind flips the live
-    // car to reduced grip or lateral wind — no weather tag ever does.
-    ...(spec.physics?.wetGrip || spec.physics?.snowGrip || spec.physics?.crosswind
+    // 4a physics opt-in (the ruleConfig pattern): only a template OR RUNG that
+    // AUTHORS physics.wetGrip / physics.snowGrip / physics.crosswind flips the
+    // live car to reduced grip or lateral wind — no weather tag ever does.
+    ...(physics.wetGrip || physics.snowGrip || physics.crosswind
       ? {
           physics: {
-            ...(spec.physics.wetGrip ? { wetGrip: true } : {}),
-            ...(spec.physics.snowGrip ? { snowGrip: true } : {}),
-            ...(spec.physics.crosswind ? { crosswind: true } : {}),
+            ...(physics.wetGrip ? { wetGrip: true } : {}),
+            ...(physics.snowGrip ? { snowGrip: true } : {}),
+            ...(physics.crosswind ? { crosswind: true } : {}),
           },
         }
       : {}),

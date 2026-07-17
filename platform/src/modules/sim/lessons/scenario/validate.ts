@@ -69,6 +69,27 @@ function checkTraceRef(ref: TraceRef | undefined, label: string, errors: string[
 }
 
 /**
+ * Physics opt-in shape (ADR-006 stage 4a + the snow/crosswind unlocks):
+ * booleans when present. ONE gate for both authoring sites — the template's
+ * spec.physics and a rung's LevelSpec.physics carry the same shape, so they
+ * get the same message (only the label differs).
+ */
+function checkPhysics(p: ScenarioSpec["physics"], label: string, errors: string[]): void {
+  if (p === undefined) return;
+  if (typeof p !== "object" || p === null) {
+    errors.push(
+      `${label} must be an object ({ wetGrip?: boolean; snowGrip?: boolean; crosswind?: boolean }) when present`,
+    );
+    return;
+  }
+  for (const k of ["wetGrip", "snowGrip", "crosswind"] as const) {
+    if (p[k] !== undefined && typeof p[k] !== "boolean") {
+      errors.push(`${label}.${k} must be boolean when present`);
+    }
+  }
+}
+
+/**
  * Validate a ScenarioSpec. Returns the full list of problems (empty = valid).
  * Use assertScenarioSpec to throw instead.
  */
@@ -264,25 +285,9 @@ export function validateScenarioSpec(
     }
   }
 
-  // -- Physics opt-in (ADR-006 stage 4a + the snow/crosswind unlocks):
-  //    booleans when present.
-  if (spec.physics !== undefined) {
-    if (typeof spec.physics !== "object" || spec.physics === null) {
-      errors.push(
-        `physics must be an object ({ wetGrip?: boolean; snowGrip?: boolean; crosswind?: boolean }) when present`,
-      );
-    } else {
-      if (spec.physics.wetGrip !== undefined && typeof spec.physics.wetGrip !== "boolean") {
-        errors.push(`physics.wetGrip must be boolean when present`);
-      }
-      if (spec.physics.snowGrip !== undefined && typeof spec.physics.snowGrip !== "boolean") {
-        errors.push(`physics.snowGrip must be boolean when present`);
-      }
-      if (spec.physics.crosswind !== undefined && typeof spec.physics.crosswind !== "boolean") {
-        errors.push(`physics.crosswind must be boolean when present`);
-      }
-    }
-  }
+  // -- Physics opt-in, template-wide (rung-level physics is checked per level
+  //    in validateLevel — same gate, same messages).
+  checkPhysics(spec.physics, "physics", errors);
 
   // -- Signal plan (approach-relative one-shot pin): shape when present.
   if (spec.signalPlan !== undefined) {
@@ -328,6 +333,8 @@ function validateLevel(l: LevelSpec, seen: Set<number>, errors: string[]): void 
   if (l.vehicleStart !== undefined && !["cold", "ready"].includes(l.vehicleStart)) {
     errors.push(`levels L${l.level}: vehicleStart must be "cold" | "ready"`);
   }
+  // The rung's physics delta (merged per key over the template's at compile).
+  checkPhysics(l.physics, `levels L${l.level}: physics`, errors);
   if (l.stagedAdd) {
     l.stagedAdd.forEach((s, i) => {
       if (typeof s?.id !== "string" || s.id.length === 0 || typeof s?.kind !== "string") {
