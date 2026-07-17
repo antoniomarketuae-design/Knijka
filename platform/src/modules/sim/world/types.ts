@@ -309,6 +309,9 @@ export interface WorldStats {
   parkingLaneStrips: number;
   /** Batched road decals (one quad each; the whole batch is ONE draw call). */
   roadDecals: number;
+  /** Standing-water quads over waterPatch spans (aquaplane visibility slice;
+   *  icePatch spans stay invisible BY DESIGN — black ice is the lesson). */
+  waterDecals: number;
   buildings: number;
   /** Instanced glass towers placed on tall, compact footprints. */
   buildingInstances: number;
@@ -344,6 +347,10 @@ export interface WorldGeometry {
    *  one draw call, co-planar with the asphalt (doc 71 §4.4). UVs address the
    *  procedural decal atlas (builders/decals.ts manifest). */
   roadDecals: MeshData;
+  /** Glossy standing-water sheets over the waterPatch zone spans, merged into
+   *  ONE mesh (builders/waterDecals.ts). Empty on every map without live
+   *  water spans — the additive/bit-identity contract. */
+  waterDecals: MeshData;
   /** Open ground (grass): parks, verges, district edges. Subtle off-road relief. */
   terrain: MeshData;
   /** Paved ground (concrete): courtyards/parking in the built-up fabric.

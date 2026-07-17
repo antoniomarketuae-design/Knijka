@@ -397,6 +397,13 @@ export const SC_SIGNAL_HESITATION: ScenarioSpec = {
     { level: 3 },
     { level: 4, vehicleStart: "cold" },
   ],
+  // LIVE arrival pin (LessonSpec.signalPlan — the founder traffic-light fix):
+  // the JU-09 lesson is DECIDING on a live green, so the student must MEET a
+  // live green — greenFresh rebases the cluster to a full 20 s green when the
+  // approach reaches 45 m, mirroring the recordings' pinned green hold
+  // (scSignalHesitation offset 44) without touching them. Wall-clock arrival
+  // could land on red and turn the anti-hesitation drill into a red wait.
+  signalPlan: { arm: "greenFresh", triggerM: 45 },
   conditions: { weather: "dry" },
   localeBg: "bg-BG",
 };
@@ -545,6 +552,12 @@ export const SC_SIGNAL_CONTROLLER: ScenarioSpec = {
     { level: 4, vehicleStart: "cold" },
   ],
   staged: [SC_SIGNAL_CONTROLLER_EVENT],
+  // NO signalPlan (deliberate): the lamps here are pinned at session start by
+  // the staged event's signalOffsetSec 45, synchronized with the controller's
+  // SESSION-TIME timetable (flipAtSec 30) — an approach-relative rebase would
+  // desync the misleading-green window from the permission flip and break the
+  // hierarchy lesson. Same for sc-signal-dead / sc-signal-flashing above:
+  // their cluster carries NO phase (dark / flashing amber), a pin is inert.
   conditions: { weather: "dry" },
   localeBg: "bg-BG",
 };
@@ -657,6 +670,13 @@ export const SC_SIGNAL_REDYELLOW: ScenarioSpec = {
     { level: 3 },
     { level: 4, vehicleStart: "cold" },
   ],
+  // LIVE arrival pin (LessonSpec.signalPlan — the founder traffic-light fix):
+  // the JU-08 lesson IS waiting out the red into the 1 s red-yellow window,
+  // so the student must ARRIVE at a fresh red — redFresh rebases the cluster
+  // to the start of the full 26 s red at 45 m, guaranteeing the whole taught
+  // arc (red → redYellow → clean green) on every attempt. Wall-clock arrival
+  // could land on green and skip the entire lesson.
+  signalPlan: { arm: "redFresh", triggerM: 45 },
   conditions: { weather: "dry" },
   localeBg: "bg-BG",
 };

@@ -139,6 +139,7 @@ interface WorldGeometries {
   markings: THREE.BufferGeometry;
   parkingLanes: THREE.BufferGeometry;
   roadDecals: THREE.BufferGeometry;
+  waterDecals: THREE.BufferGeometry;
   terrain: THREE.BufferGeometry;
   terrainPaved: THREE.BufferGeometry;
   walls: THREE.BufferGeometry[];
@@ -154,6 +155,7 @@ function useWorldGeometries(world: WorldGeometry): WorldGeometries {
       markings: meshDataToGeometry(world.markings),
       parkingLanes: meshDataToGeometry(world.parkingLanes),
       roadDecals: meshDataToGeometry(world.roadDecals),
+      waterDecals: meshDataToGeometry(world.waterDecals),
       terrain: meshDataToGeometry(world.terrain),
       terrainPaved: meshDataToGeometry(world.terrainPaved),
       walls: world.buildingWalls.map(meshDataToGeometry),
@@ -170,6 +172,7 @@ function useWorldGeometries(world: WorldGeometry): WorldGeometries {
         geometries.markings,
         geometries.parkingLanes,
         geometries.roadDecals,
+        geometries.waterDecals,
         geometries.terrain,
         geometries.terrainPaved,
         ...geometries.walls,
@@ -376,6 +379,29 @@ export function StaticWorld({
             color={decalTint}
             roughness={decalWet.roughness}
             metalness={0}
+            envMapIntensity={ROAD_ENV_INTENSITY}
+          />
+        </mesh>
+      ) : null}
+      {/* Standing-water sheets over the waterPatch zone spans (aquaplane
+          visibility slice, builders/waterDecals.ts): the puddle the physics
+          rig floats on is finally VISIBLE — glossy near-black blue-grey, low
+          roughness so the sky/HDRI smears into a wet mirror. Slightly Y-lifted
+          above the paint AND polygonOffset (belt + braces against z-fighting
+          on the long flat span). icePatch spans render NOTHING by design —
+          invisible black ice is the AC-08 lesson. */}
+      {geometries.waterDecals.getAttribute("position") &&
+      geometries.waterDecals.getAttribute("position").count > 0 ? (
+        <mesh geometry={geometries.waterDecals} receiveShadow={receive} renderOrder={2}>
+          <meshStandardMaterial
+            color={0x0d141b}
+            transparent
+            opacity={0.4}
+            depthWrite={false}
+            polygonOffset
+            polygonOffsetFactor={-4}
+            roughness={0.12}
+            metalness={0.55}
             envMapIntensity={ROAD_ENV_INTENSITY}
           />
         </mesh>

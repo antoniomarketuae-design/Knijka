@@ -10,6 +10,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   BRAKE_ATTACK_S,
   BRAKE_RELEASE_S,
+  KEY_LOG_SIZE,
   MAX_RAMP_DT_S,
   SimInput,
   stepPedal,
@@ -19,9 +20,12 @@ import {
 
 type Handler = (e: unknown) => void;
 
-function stubWindow() {
+function stubWindow(opts: { search?: string } = {}) {
   const handlers = new Map<string, Handler[]>();
   vi.stubGlobal("window", {
+    // The ?debugkeys=1 detector reads window.location.search (absent by
+    // default — the detector fails closed, like the real headless paths).
+    ...(opts.search !== undefined ? { location: { search: opts.search } } : {}),
     addEventListener: (type: string, fn: Handler) => {
       handlers.set(type, [...(handlers.get(type) ?? []), fn]);
     },
@@ -39,22 +43,23 @@ function stubWindow() {
   };
 }
 
-function keyEvent(code: string) {
-  return { code, repeat: false, preventDefault: () => {} };
+function keyEvent(code: string, key = "") {
+  return { code, key, repeat: false, preventDefault: () => {} };
 }
 
 /** SimInput + fake clock harness. `advance` steps wall time in small frames,
  * calling read() each frame (like the render/physics loops do). */
-function harness() {
-  const win = stubWindow();
+function harness(winOpts: { search?: string } = {}) {
+  const win = stubWindow(winOpts);
   let tMs = 0;
   const input = new SimInput({}, () => tMs);
   input.read(); // prime the clock (first read has dt=0)
 
   return {
     input,
-    press: (code: string) => win.fire("keydown", keyEvent(code)),
-    release: (code: string) => win.fire("keyup", keyEvent(code)),
+    fire: win.fire,
+    press: (code: string, key = "") => win.fire("keydown", keyEvent(code, key)),
+    release: (code: string, key = "") => win.fire("keyup", keyEvent(code, key)),
     blur: () => win.fire("blur", {}),
     /** Advance wall time by `ms` in 10 ms frames; returns the last read. */
     advance(ms: number) {
@@ -173,6 +178,112 @@ describe("SimInput keyboard pedal ramps", () => {
     const h = harness();
     h.press("Space");
     expect(h.advance(100).handbrake).toBe(false);
+    h.input.dispose();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// e.key fallback channel (founder bug 2026-07-17: "WASD dead, arrows work" —
+// remote-desktop translate mode / Bulgarian layout stacks mangle e.code)
+// ---------------------------------------------------------------------------
+
+describe("SimInput e.key fallback channel", () => {
+  it("Latin 'w' with a mangled e.code still ramps the throttle", () => {
+    const h = harness();
+    h.press("Unidentified", "w");
+    expect(h.advance(THROTTLE_ATTACK_S * 1100).throttle).toBe(1);
+    h.release("Unidentified", "w");
+    expect(h.advance(THROTTLE_RELEASE_S * 1100).throttle).toBe(0);
+    h.input.dispose();
+  });
+
+  it("Bulgarian phonetic 'в' (on the W key) drives the throttle", () => {
+    const h = harness();
+    h.press("Unidentified", "в");
+    expect(h.advance(THROTTLE_ATTACK_S * 1100).throttle).toBe(1);
+    h.release("Unidentified", "в");
+    expect(h.advance(THROTTLE_RELEASE_S * 1100).throttle).toBe(0);
+    h.input.dispose();
+  });
+
+  it("matches case-insensitively (Shift held → 'Д' still steers right)", () => {
+    const h = harness();
+    h.press("", "Д");
+    expect(h.advance(0).steer).toBe(-1);
+    h.release("", "д"); // Shift released before the key — cases differ
+    expect(h.advance(0).steer).toBe(0);
+    h.input.dispose();
+  });
+
+  it("'с' brakes and 'а' steers left (the full в/а/с/д set)", () => {
+    const h = harness();
+    h.press("", "с");
+    h.press("", "а");
+    const out = h.advance(BRAKE_ATTACK_S * 1100);
+    expect(out.brake).toBe(1);
+    expect(out.steer).toBe(1);
+    h.input.dispose();
+  });
+
+  it("arrow keys match by e.key when e.code is missing too", () => {
+    const h = harness();
+    h.press("Unidentified", "ArrowDown");
+    expect(h.advance(BRAKE_ATTACK_S * 1100).brake).toBe(1);
+    h.release("Unidentified", "ArrowDown");
+    expect(h.advance(BRAKE_RELEASE_S * 1100).brake).toBe(0);
+    h.input.dispose();
+  });
+
+  it("the physical e.code channel still works when e.key is a layout character", () => {
+    // BDS-style layout: physical W reports a valid code but a non-mapped key.
+    const h = harness();
+    h.press("KeyW", "ц");
+    expect(h.advance(THROTTLE_ATTACK_S * 1100).throttle).toBe(1);
+    h.release("KeyW", "ц");
+    expect(h.advance(THROTTLE_RELEASE_S * 1100).throttle).toBe(0);
+    h.input.dispose();
+  });
+
+  it("blur clears the fallback channel (no stuck reverse-key)", () => {
+    const h = harness();
+    h.press("Unidentified", "в");
+    h.advance(1000);
+    h.blur();
+    expect(h.advance(THROTTLE_RELEASE_S * 1100).throttle).toBe(0);
+    h.input.dispose();
+  });
+
+  it("preventDefaults fallback matches (ArrowDown with Unidentified code must not scroll)", () => {
+    const h = harness();
+    const prevented = vi.fn();
+    h.fire("keydown", { code: "Unidentified", key: "ArrowDown", repeat: false, preventDefault: prevented });
+    expect(prevented).toHaveBeenCalledTimes(1);
+    const notPrevented = vi.fn();
+    h.fire("keydown", { code: "Unidentified", key: "x", repeat: false, preventDefault: notPrevented });
+    expect(notPrevented).not.toHaveBeenCalled();
+    h.input.dispose();
+  });
+});
+
+describe("SimInput ?debugkeys=1 diagnostic", () => {
+  it("keeps the last KEY_LOG_SIZE keydown {code,key} pairs on window.__aidriveKeyLog", () => {
+    vi.spyOn(console, "info").mockImplementation(() => {});
+    const h = harness({ search: "?debugkeys=1" });
+    for (let i = 0; i < KEY_LOG_SIZE + 2; i++) h.press("KeyW", "w");
+    const log = (window as { __aidriveKeyLog?: Array<{ code: string; key: string }> })
+      .__aidriveKeyLog;
+    expect(log).toHaveLength(KEY_LOG_SIZE);
+    expect(log![0]).toEqual({ code: "KeyW", key: "w" });
+    h.input.dispose();
+    vi.restoreAllMocks();
+  });
+
+  it("stays off without the URL flag (no window pollution)", () => {
+    const h = harness(); // window without location — detector fails closed
+    h.press("KeyW", "w");
+    expect(
+      (window as { __aidriveKeyLog?: unknown }).__aidriveKeyLog,
+    ).toBeUndefined();
     h.input.dispose();
   });
 });

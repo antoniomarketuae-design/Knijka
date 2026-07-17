@@ -29,6 +29,61 @@ const HANDLED_CODES = new Set([
   "KeyR",
 ]);
 
+// ---------------------------------------------------------------------------
+// e.key fallback channel (founder bug 2026-07-17: "W A S D not working,
+// arrows work")
+// ---------------------------------------------------------------------------
+// The primary match stays e.code (physical key, layout-independent). But some
+// input stacks — remote-desktop "translate" modes (the founder drives this PC
+// over AnyDesk) and certain Bulgarian layout drivers — deliver the
+// layout-translated CHARACTER with a wrong or "Unidentified" e.code. Arrow
+// keys survive those stacks (their e.key is layout-independent), letters do
+// not — exactly the "arrows work, WASD doesn't" symptom. So pressed keys are
+// tracked on TWO channels: by e.code (unchanged) and by normalized-lowercase
+// e.key mapped back to the canonical code via this table. Latin w/a/s/d,
+// their Bulgarian phonetic equivalents в/а/с/д (В sits on the W key, А on A,
+// С on S, Д on D), and the arrow key names.
+const KEY_FALLBACKS: Readonly<Record<string, string>> = {
+  w: "KeyW",
+  a: "KeyA",
+  s: "KeyS",
+  d: "KeyD",
+  в: "KeyW",
+  а: "KeyA",
+  с: "KeyS",
+  д: "KeyD",
+  arrowup: "ArrowUp",
+  arrowdown: "ArrowDown",
+  arrowleft: "ArrowLeft",
+  arrowright: "ArrowRight",
+};
+
+/** Canonical code for the event's e.key fallback channel, or null. Synthetic
+ *  events without a `key` (older tests, exotic stacks) resolve to null. */
+function keyFallbackCode(e: KeyboardEvent): string | null {
+  const key = typeof e.key === "string" ? e.key.toLowerCase() : "";
+  return KEY_FALLBACKS[key] ?? null;
+}
+
+/** ?debugkeys=1 diagnostic — how many keydown {code,key} pairs to retain. */
+export const KEY_LOG_SIZE = 6;
+
+/**
+ * Dev-only key diagnostic (never in production builds): `?debugkeys=1` on the
+ * URL keeps the last KEY_LOG_SIZE keydown {code, key} pairs on
+ * `window.__aidriveKeyLog` (+ one console.info per press), so a future
+ * founder report of a dead key yields the EXACT values the input stack
+ * delivered — no more guessing which layer ate the event.
+ */
+function debugKeysEnabled(): boolean {
+  if (process.env.NODE_ENV === "production") return false;
+  try {
+    return new URLSearchParams(window.location.search).get("debugkeys") === "1";
+  } catch {
+    return false; // headless/node test window has no location — fail closed
+  }
+}
+
 /** Stick values below this are treated as centre (worn-stick drift). */
 const GAMEPAD_DEADZONE = 0.12;
 
@@ -76,6 +131,13 @@ export function stepPedal(
 
 export class SimInput {
   private readonly pressed = new Set<string>();
+  /** Second press channel: canonical codes reached via the e.key fallback
+   *  table (layout characters / remote-desktop stacks — see KEY_FALLBACKS).
+   *  Kept separate from `pressed` so a stack that reports a valid code on
+   *  keydown but a different key on keyup (layout switch mid-hold) can never
+   *  strand the primary channel; blur clears both. */
+  private readonly pressedViaKey = new Set<string>();
+  private readonly debugKeys = debugKeysEnabled();
   private readonly out: VehicleInput = { ...IDLE_INPUT };
   // Ramped keyboard pedal state, integrated against wall time in read().
   private throttlePedal = 0;
@@ -99,6 +161,7 @@ export class SimInput {
     window.removeEventListener("keyup", this.onKeyUp);
     window.removeEventListener("blur", this.onBlur);
     this.pressed.clear();
+    this.pressedViaKey.clear();
   }
 
   /**
@@ -123,7 +186,11 @@ export class SimInput {
    * make the ramp advance by real elapsed time regardless of call frequency.
    */
   read(): VehicleInput {
-    const on = (code: string): boolean => this.pressed.has(code);
+    // A key counts as held when EITHER channel saw it: physical e.code
+    // (primary) or the normalized e.key fallback (layout/remote-desktop
+    // stacks that mangle e.code — see KEY_FALLBACKS).
+    const on = (code: string): boolean =>
+      this.pressed.has(code) || this.pressedViaKey.has(code);
     const left = on("KeyA") || on("ArrowLeft");
     const right = on("KeyD") || on("ArrowRight");
 
@@ -192,9 +259,14 @@ export class SimInput {
   }
 
   private readonly onKeyDown = (e: KeyboardEvent): void => {
-    if (HANDLED_CODES.has(e.code)) e.preventDefault();
+    const fallback = keyFallbackCode(e);
+    // preventDefault stays consistent across both channels: an ArrowDown that
+    // arrives with e.code "Unidentified" must still not scroll the page.
+    if (HANDLED_CODES.has(e.code) || fallback !== null) e.preventDefault();
     if (e.repeat) return;
+    if (this.debugKeys) this.logKey(e);
     this.pressed.add(e.code);
+    if (fallback !== null) this.pressedViaKey.add(fallback);
     if (e.code === "KeyC") this.callbacks.onToggleCamera?.();
     if (e.code === "KeyR") this.callbacks.onReset?.();
     if (e.code === "Escape") this.callbacks.onTogglePause?.();
@@ -202,9 +274,23 @@ export class SimInput {
 
   private readonly onKeyUp = (e: KeyboardEvent): void => {
     this.pressed.delete(e.code);
+    const fallback = keyFallbackCode(e);
+    if (fallback !== null) this.pressedViaKey.delete(fallback);
   };
 
   private readonly onBlur = (): void => {
     this.pressed.clear();
+    this.pressedViaKey.clear();
   };
+
+  /** ?debugkeys=1: ring-buffer the press on window.__aidriveKeyLog + one
+   *  console.info line. Non-repeat presses only — human rate, no throttle
+   *  needed. */
+  private logKey(e: KeyboardEvent): void {
+    const w = window as { __aidriveKeyLog?: Array<{ code: string; key: string }> };
+    const log = (w.__aidriveKeyLog ??= []);
+    log.push({ code: e.code, key: e.key });
+    if (log.length > KEY_LOG_SIZE) log.shift();
+    console.info(`[sim-keys] code=${e.code} key=${e.key}`);
+  }
 }

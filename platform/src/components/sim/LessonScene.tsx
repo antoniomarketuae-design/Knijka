@@ -27,9 +27,12 @@ import { Environment } from "@react-three/drei";
 import { Physics } from "@react-three/rapier";
 import { Euler, type Group } from "three";
 import {
+  applyReversePedalRemap,
   createTelemetry,
   hasTouchScreen,
   isTouchOnlyDevice,
+  ReverseAssist,
+  shouldRemapReversePedals,
   SimInput,
   TouchInputSource,
 } from "@/modules/sim/engine";
@@ -83,7 +86,11 @@ import {
   type PreDriveStepId,
 } from "@/modules/sim/procedures";
 import type { SimTick } from "@/modules/sim/rules";
-import type { MinimapFrame } from "@/modules/sim/hud";
+import {
+  createDashboardStatus,
+  type DashboardStatus,
+  type MinimapFrame,
+} from "@/modules/sim/hud";
 import {
   SimEnvironment,
   WindshieldDroplets,
@@ -226,6 +233,14 @@ function shouldShowTouchHint(): boolean {
  */
 class GatedSimInput extends SimInput {
   driveLocked = false;
+  /** Auto-reverse assist rule b (engine/reverseAssist.ts): while true —
+   *  selector R × automatic box × non-exam lesson, kept current by the
+   *  driveline subscription in the input lifecycle effect — read() swaps the
+   *  pedals so S/↓ accelerates backward and W/↑ brakes ("down = backwards"
+   *  is literally true in R). Applied BEFORE the raw capture below, so the
+   *  A2 observer, the scenario director and the recorder all see the
+   *  FUNCTIONAL pedals. */
+  reversePedalRemap = false;
   /** Raw (pre-gate) pedal values from the last read — the A2 procedure
    *  observer edge-detects these: a real brake press performs "press-brake",
    *  a throttle press on a ready driveline performs "move-off". */
@@ -235,6 +250,7 @@ class GatedSimInput extends SimInput {
 
   override read(): VehicleInput {
     const out = super.read();
+    if (this.reversePedalRemap) applyReversePedalRemap(out);
     this.rawThrottle = out.throttle;
     this.rawBrake = out.brake;
     if (this.driveLocked) {
@@ -357,6 +373,10 @@ export interface LessonSceneProps {
    * finish() at session end for compare-vs-shadow / replay.
    */
   attemptRecorderRef?: React.RefObject<LiveTraceRecorder | null>;
+  /** Status-dashboard channel (additive): mutated once per frame with the
+   *  live cabin/driveline/sample state — the shell's StatusDashboard bar
+   *  samples it low-Hz (hud/dashboardStatus.ts). Absent = no writes. */
+  dashboardStatusRef?: React.RefObject<DashboardStatus>;
 }
 
 export default function LessonScene(props: LessonSceneProps) {
@@ -455,6 +475,21 @@ export default function LessonScene(props: LessonSceneProps) {
         // Counts are per-lesson data since the полигон (doc 74 §5.5); the
         // defaults are the pre-seam city values.
         const anchorPose = spawnPose(props.lesson, spawnPoints);
+        // SIGNAL-PLAN (founder bug 2026-07-17: wall-clock phases made the
+        // arrival phase arbitrary after the 20–40 s pre-drive): arm the
+        // lesson's approach-relative ONE-SHOT pin — the runtime rebases the
+        // cluster's cycle when the player first comes within triggerM, so
+        // the taught arrival phase is deterministic. LIVE sessions only:
+        // the trace recorder never arms a plan (recorded traces pin via
+        // authored signalOffsets — the byte-identity contract). The spawn
+        // anchor resolves the default cluster (nearest) when the plan
+        // names none; district y = −world z (the traffic-anchor convention).
+        if (props.lesson.signalPlan) {
+          runtime.armSignalPlan(props.lesson.signalPlan, {
+            x: anchorPose.x,
+            y: -anchorPose.z,
+          });
+        }
         const trafficSpec = props.lesson.traffic;
         const traffic = createTrafficSystem(
           raw as Parameters<typeof createTrafficSystem>[0],
@@ -586,6 +621,7 @@ function ReadyScene({
   onNearMiss,
   onToggleFullscreen,
   attemptRecorderRef,
+  dashboardStatusRef,
 }: LessonSceneProps & {
   built: Built;
   menuPaused: boolean;
@@ -668,6 +704,17 @@ function ReadyScene({
   const [perfLog] = useState(() => shouldLogPerf());
   const [touchSource] = useState(() => new TouchInputSource());
   const [showTouchHint, setShowTouchHint] = useState(shouldShowTouchHint);
+
+  // Auto-reverse assist (founder 2026-07-17: „стрелката надолу не кара
+  // назад"): the pure timing machine (engine/reverseAssist.ts) plus the flag
+  // that marks assist-driven selector steps, so the driveline subscription
+  // below can tell them from MANUAL shifts ([ / ], touch gear sheet, cockpit
+  // hotspots) — manual shifts silence the assist for 2 s (never fight
+  // explicit input). DISABLED for the whole session on examMode lessons:
+  // the exam grades the real selector procedure (D↔R via the gate).
+  const [reverseAssist] = useState(() => new ReverseAssist());
+  const assistShiftingRef = useRef(false);
+  const reverseAssistEnabled = lesson.examMode !== true;
   const dismissTouchHint = useCallback(() => {
     setShowTouchHint(false);
     try {
@@ -771,6 +818,17 @@ function ReadyScene({
     // brake/…) — RuntimeDriver drains the queue and resolves steps from it.
     const unsubscribeDriveline = cabin.driveline.subscribe((event) => {
       drivelineEventsRef.current.push(event);
+      // Auto-reverse assist bookkeeping: a selector change NOT initiated by
+      // the assist itself is an explicit driver shift → 2 s of silence; and
+      // the rule-b pedal remap tracks the live selector × transmission on
+      // every event (selectorChanged, transmissionChanged — recomputing on
+      // the rest is a cheap no-op).
+      if (event.kind === "selectorChanged" && !assistShiftingRef.current) {
+        reverseAssist.noteManualShift();
+      }
+      input.reversePedalRemap =
+        reverseAssistEnabled &&
+        shouldRemapReversePedals(cabin.driveline.selector, cabin.driveline.transmission);
     });
     const unlock = () => audio.unlock();
     window.addEventListener("pointerdown", unlock);
@@ -955,6 +1013,10 @@ function ReadyScene({
               cabinRef={cabinRef}
               audioRef={audioRef}
               attemptRecorderRef={attemptRecorderRef}
+              dashboardStatusRef={dashboardStatusRef}
+              reverseAssist={reverseAssist}
+              reverseAssistEnabled={reverseAssistEnabled}
+              assistShiftingRef={assistShiftingRef}
               driveLocked={driveLocked}
               drivelineEventsRef={drivelineEventsRef}
               glanceQueueRef={glanceQueueRef}
@@ -1063,17 +1125,11 @@ function ReadyScene({
 
       {/* S0-View ?ghost=demo: playback deck for the Shadow Car — scrub bar,
           speeds, annotation ticks, step-by-step, loop-section. */}
-      {ghostDemo ? (
-        <div className="absolute bottom-3 left-1/2 z-10 w-[min(92%,36rem)] -translate-x-1/2">
-          <TraceTimeline trace={ghostDemo.trace} clockRef={ghostClockRef} />
-        </div>
-      ) : null}
+      {ghostDemo ? <DemoDeck trace={ghostDemo.trace} clockRef={ghostClockRef} /> : null}
 
       {/* S1 L1 aid: the same playback deck for the scenario's shadow demo. */}
       {shadowTrace && aids?.shadowCar ? (
-        <div className="absolute bottom-3 left-1/2 z-10 w-[min(92%,36rem)] -translate-x-1/2">
-          <TraceTimeline trace={shadowTrace} clockRef={aidClockRef} />
-        </div>
+        <DemoDeck trace={shadowTrace} clockRef={aidClockRef} />
       ) : null}
 
       {/* S1 followHints chip — „you are off the demonstrated line". */}
@@ -1318,6 +1374,40 @@ function cabinPollBaseline(cabin: CabinControls | null, rawBrake: number): Cabin
   };
 }
 
+/**
+ * Demonstration playback deck wrapper — founder ruling 2026-07-17: the demo
+ * deck must not dominate the frame; the car STATUS dashboard (the shell's
+ * bottom-center bar) is the visual anchor. So the deck is ~40 % smaller
+ * (26 rem vs 36 rem width + TraceTimeline `compact` controls), sits ABOVE
+ * the status bar (bottom-[6.75rem] clears the bar's ~100 px strip), and
+ * collapses to a small pill via the toggle.
+ */
+function DemoDeck({
+  trace,
+  clockRef,
+}: {
+  trace: ScenarioTrace;
+  clockRef: React.RefObject<TraceClock>;
+}) {
+  const [open, setOpen] = useState(true);
+  return (
+    <div className="absolute bottom-[6.75rem] left-1/2 z-10 flex w-[min(88%,26rem)] -translate-x-1/2 flex-col items-center gap-1">
+      <button
+        type="button"
+        tabIndex={-1}
+        onMouseDown={(e) => e.preventDefault()}
+        onClick={() => setOpen((o) => !o)}
+        aria-expanded={open}
+        className="pointer-events-auto flex items-center gap-1.5 rounded-lg border border-border bg-background/80 px-2.5 py-1 text-[11px] font-semibold text-muted backdrop-blur transition hover:text-foreground"
+      >
+        <span aria-hidden>🎬</span>
+        Демонстрация {open ? "▾" : "▸"}
+      </button>
+      {open ? <TraceTimeline trace={trace} clockRef={clockRef} compact /> : null}
+    </div>
+  );
+}
+
 /** In-canvas per-frame driver: signals → traffic → sample → onTick + minimap
  *  + the A2 pre-drive transition observer. */
 function RuntimeDriver({
@@ -1333,6 +1423,10 @@ function RuntimeDriver({
   cabinRef,
   audioRef,
   attemptRecorderRef,
+  dashboardStatusRef,
+  reverseAssist,
+  reverseAssistEnabled,
+  assistShiftingRef,
   driveLocked,
   drivelineEventsRef,
   glanceQueueRef,
@@ -1369,6 +1463,19 @@ function RuntimeDriver({
   audioRef: React.RefObject<SimAudio | null>;
   /** S0-View attempt recording — absent/null = off (default). */
   attemptRecorderRef?: React.RefObject<LiveTraceRecorder | null>;
+  /** Status-dashboard channel — mutated in place per frame (no allocation);
+   *  the shell's bar polls it low-Hz. Absent = no writes. */
+  dashboardStatusRef?: React.RefObject<DashboardStatus>;
+  /** Auto-reverse assist machine (engine/reverseAssist.ts) — stepped once
+   *  per live frame; emitted commands are executed through the SAME
+   *  DrivelineState gear gate as the [ / ] keys. */
+  reverseAssist: ReverseAssist;
+  /** Lesson-static gate: false on examMode lessons (the exam grades the
+   *  real selector procedure — the assist stays completely silent). */
+  reverseAssistEnabled: boolean;
+  /** True only for the microtask of executing an assist shift, so the
+   *  driveline subscription can tell assist steps from MANUAL ones. */
+  assistShiftingRef: React.RefObject<boolean>;
   /** True while the procedure runs — the observer only listens then. */
   driveLocked: boolean;
   drivelineEventsRef: React.RefObject<DrivelineEvent[]>;
@@ -1391,6 +1498,9 @@ function RuntimeDriver({
 }) {
   const tRef = useRef(0);
   const lastMinimapRef = useRef(0);
+  // Scene-owned status-dashboard scratch (created on the first frame; the
+  // shell's dashboardStatusRef is pointed at it — see the useFrame block).
+  const dashScratchRef = useRef<DashboardStatus | null>(null);
 
   // A2 observer state: the signal tracker + polled-edge baseline reset on
   // every RISING edge of driveLocked (lesson start AND retry), re-baselined
@@ -1406,6 +1516,37 @@ function RuntimeDriver({
     // QW10: consume the throttle-while-locked latch every frame (so attempts
     // during a pause never queue up), surface it only on live frames.
     const blockedAttempt = inputRef.current?.consumeBlockedDriveAttempt() ?? false;
+
+    // Status-dashboard channel: fill a scene-owned scratch object (local-ref
+    // contents — the pollRef mutation grammar) from the REAL cabin state each
+    // frame — including the live blink-lamp levels off CabinControls' 600 ms
+    // clock, so the DOM bar flashes in phase with the 3D cluster — then
+    // publish it by pointing the shell's ref at it (the hazardActiveRef write
+    // grammar). Zero allocation after the first frame. Runs BEFORE the paused
+    // early-out: cabin keys still work during a pause and the dashboard must
+    // mirror them.
+    const dashCabin = cabinRef.current;
+    if (dashboardStatusRef && dashCabin) {
+      const dash = (dashScratchRef.current ??= createDashboardStatus());
+      const dl = dashCabin.driveline;
+      dash.leftLampLit =
+        (dashCabin.blinkOn && dashCabin.indicator === "left") || dashCabin.hazardBlinkOn;
+      dash.rightLampLit =
+        (dashCabin.blinkOn && dashCabin.indicator === "right") || dashCabin.hazardBlinkOn;
+      dash.indicator = dashCabin.indicator;
+      dash.hazardsOn = dl.hazardsOn;
+      dash.engineOn = dl.engineOn;
+      dash.stalled = dl.stalled;
+      dash.gearLabel = dl.gearLabel;
+      dash.parkingBrakeOn = dl.parkingBrakeOn;
+      dash.seatbeltOn = dashCabin.seatbeltOn;
+      dash.headlights = dashCabin.headlights;
+      dash.fogLightsOn = dl.fogLightsOn;
+      dash.wipersOn = dl.wipersOn;
+      dash.speedKmh = sampleRef.current.speedKmh;
+      dashboardStatusRef.current = dash;
+    }
+
     if (paused) return;
 
     // ---- A2: performed pre-drive — real transitions drive the machine ----
@@ -1496,6 +1637,40 @@ function RuntimeDriver({
     const dt = Math.min(delta, 0.1);
     tRef.current += dt;
     const sample = sampleRef.current;
+
+    // Auto-reverse assist (founder 2026-07-17): hold the brake at a
+    // standstill in D → the assist works the SAME selector gate as the
+    // [ / ] keys (two gearDown steps, D→N→R); in R the pedals are already
+    // remapped by GatedSimInput (S/↓ = reverse throttle, W/↑ = brake), so
+    // holding the remapped brake at a standstill walks the gate back up
+    // (R→N→D). Interlocks, DrivelineEvents, HUD telltales and the recorder
+    // all see canonical transitions. Hard gates: never on examMode lessons
+    // (prop), never during the pre-drive procedure (a held brake there IS a
+    // step), automatic box only (the manual tier keeps the real gearbox),
+    // engine running only.
+    if (reverseAssistEnabled && !driveLocked && cabin) {
+      const dl = cabin.driveline;
+      if (dl.transmission === "automatic" && dl.engineOn) {
+        const cmd = reverseAssist.update({
+          speedKmh: sample.speedKmh,
+          selector: dl.selector,
+          brakePedal: input?.rawBrake ?? 0,
+          throttlePedal: input?.rawThrottle ?? 0,
+          dtSec: dt,
+        });
+        if (cmd) {
+          // Mark the steps assist-driven so the driveline subscription does
+          // not count them as manual (which would self-suppress for 2 s).
+          assistShiftingRef.current = true;
+          try {
+            const step = cmd === "shiftToR" ? () => dl.gearDown() : () => dl.gearUp();
+            if (step()) step(); // second gate step only if the first engaged
+          } finally {
+            assistShiftingRef.current = false;
+          }
+        }
+      }
+    }
 
     runtime.update(dt);
     traffic.update(dt, {
@@ -1619,6 +1794,7 @@ function ControlsHelp({
     ["W A S D", "кормуване (или стрелки)"],
     ["I", "двигател: старт / стоп"],
     ["[ ]", "скорости: към P / към D"],
+    ["S / ↓", "задръж на място → задна / напред"],
     ["Space", "ръчна спирачка"],
     ["Z", "съединител — задръж („Напреднал“)"],
     ["B", "предпазен колан"],

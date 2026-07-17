@@ -19,7 +19,7 @@
  * Pure TypeScript — no React/three/Rapier imports (vitest-safe, ADR-002).
  */
 
-import type { SignalPhase, VehicleSample, WorldRuntime } from "../contracts";
+import type { SignalPhase, SignalPlanSpec, VehicleSample, WorldRuntime } from "../contracts";
 import type { SimTick, SimTickEvent } from "../rules/types";
 import { BG_URBAN_DEFAULT_KMH, parseDistrict, type District } from "./district";
 import { Locator } from "./locator";
@@ -480,6 +480,26 @@ export interface DistrictWorldRuntime extends WorldRuntime {
    * the controller (back to "live"). Default absent = today's behavior.
    */
   setSignalClusterController(signalNodeId: string, schedule: SignalControllerSchedule | null): void;
+  /**
+   * Arm the lesson's approach-relative SIGNAL PLAN (LessonSpec.signalPlan —
+   * founder bug 2026-07-17: wall-clock phases made the arrival phase
+   * arbitrary after a 20–40 s pre-drive). A ONE-SHOT pin: the first sample()
+   * frame that finds the player within plan.triggerM of the plan's cluster
+   * rebases that cluster's offset so the phase facing the player's OWN
+   * approach heading starts exactly then — "greenFresh" = a full green
+   * begins, "redFresh" = a full red begins (wait → redYellow → green, the
+   * taught arc). Single fire, then the normal cycle continues from the
+   * rebased clock; later pins (amberDilemma, controller) land over it like
+   * they land over the natural offset. Deterministic — a pure function of
+   * the player's own trajectory. Cluster resolution: plan.clusterId
+   * (cluster id or any member node id) when given, else the cluster nearest
+   * `near` (the lesson spawn), else a lone cluster if the district has
+   * exactly one. Unresolvable/invalid plans arm nothing (fail-innocent).
+   * Re-arming replaces the previous plan and resets the latch. LIVE
+   * sessions only by construction: the trace recorder never arms a plan, so
+   * recorded traces keep their authored signalOffsets byte-identically.
+   */
+  armSignalPlan(plan: SignalPlanSpec, near?: { x: number; y: number }): void;
   /** Install the traffic module's pedestrian lookup (default: nobody anywhere). */
   setPedestrianQuery(fn: PedestrianQuery | null): void;
   /** Install the traffic module's junction-conflict lookup (default: none). */
@@ -762,6 +782,22 @@ export function createWorldRuntime(districtJson: District | unknown): DistrictWo
   let amberGreenSpeedKmh = 0;
   let amberFrozen = false;
 
+  // SIGNAL-PLAN one-shot pin state (armSignalPlan — LessonSpec.signalPlan).
+  // Null until armed; `fired` latches after the single rebase. The check
+  // lives in sample() because the LIVE session is the only caller that
+  // feeds player positions here every frame — the trace recorder never
+  // arms a plan (its signal truth is the authored signalOffsets).
+  let signalPlanPin: {
+    /** Any member node id — setClusterOffset addresses the whole cluster. */
+    nodeId: string;
+    x: number;
+    y: number;
+    /** triggerM², so the per-frame check stays sqrt-free. */
+    trigger2: number;
+    arm: "greenFresh" | "redFresh";
+    fired: boolean;
+  } | null = null;
+
   const speedLimitHit = makeEdgeHit();
 
   /** Lamp state of a signalized line's approach group — redYellow is its own
@@ -887,6 +923,28 @@ export function createWorldRuntime(districtJson: District | unknown): DistrictWo
       // 2. Mirror glance passthrough (input layer sets it on the glance frame).
       if (v.mirrorGlance !== null) {
         events.push({ kind: "mirrorGlance", mirror: v.mirrorGlance });
+      }
+
+      // 2b. SIGNAL-PLAN one-shot pin (armSignalPlan): the first frame inside
+      // the trigger ring rebases the cluster so the phase facing THIS
+      // approach heading starts now — before any stop-line / next-line read
+      // of this frame, so the very tick that fires already sees the fresh
+      // phase. Latch first: the rebase must happen exactly once.
+      if (signalPlanPin !== null && !signalPlanPin.fired) {
+        const pdx = v.position.x - signalPlanPin.x;
+        const pdy = v.position.y - signalPlanPin.y;
+        if (pdx * pdx + pdy * pdy <= signalPlanPin.trigger2) {
+          signalPlanPin.fired = true;
+          signals.setClusterOffset(
+            signalPlanPin.nodeId,
+            signals.offsetForPhaseStart(
+              signalPlanPin.nodeId,
+              v.headingDeg,
+              signalPlanPin.arm === "greenFresh" ? "green" : "red",
+              0,
+            ),
+          );
+        }
       }
 
       // 3. Lane fix (committed hysteresis, heading-gated lock stealing) +
@@ -1737,6 +1795,39 @@ export function createWorldRuntime(districtJson: District | unknown): DistrictWo
       inSec: number,
     ): number {
       return signals.offsetForPhaseStart(signalNodeId, approachBearingDeg, phase, inSec);
+    },
+
+    armSignalPlan(plan: SignalPlanSpec, near?: { x: number; y: number }): void {
+      signalPlanPin = null;
+      // Fail-innocent on malformed data: no pin beats a wrong pin (A12).
+      if (plan.arm !== "greenFresh" && plan.arm !== "redFresh") return;
+      if (!(Number.isFinite(plan.triggerM) && plan.triggerM > 0)) return;
+      const clusters = signals.clusters;
+      let target: SignalClusterInfo | null = null;
+      if (plan.clusterId !== undefined) {
+        const wanted = plan.clusterId;
+        target = clusters.find((c) => c.id === wanted || c.memberNodeIds.includes(wanted)) ?? null;
+      } else if (near !== undefined) {
+        let best = Infinity;
+        for (const c of clusters) {
+          const d2 = (c.x - near.x) * (c.x - near.x) + (c.y - near.y) * (c.y - near.y);
+          if (d2 < best) {
+            best = d2;
+            target = c;
+          }
+        }
+      } else if (clusters.length === 1) {
+        target = clusters[0];
+      }
+      if (target === null) return;
+      signalPlanPin = {
+        nodeId: target.memberNodeIds[0],
+        x: target.x,
+        y: target.y,
+        trigger2: plan.triggerM * plan.triggerM,
+        arm: plan.arm,
+        fired: false,
+      };
     },
 
     speedLimitAt(pos: { x: number; y: number }): number {

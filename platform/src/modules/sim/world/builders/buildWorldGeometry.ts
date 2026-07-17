@@ -21,6 +21,7 @@ import { analyzeNetwork } from "./network";
 import { buildProps } from "./props";
 import { buildRoads } from "./roads";
 import { buildTerrain } from "./terrain";
+import { buildWaterDecals } from "./waterDecals";
 
 export const DEFAULT_SEED = 1337;
 
@@ -32,6 +33,9 @@ export function buildWorldGeometry(
   const roads = buildRoads(network);
   // Seeded street-wear decal batch (cracks/patches/manholes) — one draw call.
   const decals = buildRoadDecals(network, options.seed ?? DEFAULT_SEED);
+  // Standing-water sheets over waterPatch zone spans (aquaplane visibility
+  // slice) — one merged mesh, zero quads on every map without live spans.
+  const water = buildWaterDecals(district, network);
   // Tall, compact buildings become glass-tower instances; every other
   // footprint keeps its facade prism (walls/roofs), so the split below tells
   // the prism builder which ids to leave to the instanced pass (doc 68 QW3).
@@ -97,6 +101,7 @@ export function buildWorldGeometry(
     roads.parkingLanes,
     markings.markings,
     decals.decals,
+    water.water,
     terrain.grass,
     terrain.paved,
     ...buildings.walls,
@@ -117,6 +122,7 @@ export function buildWorldGeometry(
     parkingBays: markings.parkingBays,
     parkingLaneStrips: roads.parkingLaneStripCount,
     roadDecals: decals.count,
+    waterDecals: water.count,
     buildings: buildings.count,
     buildingInstances: buildingInstances.length,
     trafficLights: props.trafficLights.length,
@@ -133,8 +139,9 @@ export function buildWorldGeometry(
     // fixed WorldProps instanced draws (2 signals + 8 signs + 2 streetlights +
     // 4 trees + 4 furniture + 4 billboards + 2 bus stops + 1 parking kit) +
     // zone-sign draws (only on maps whose zones place posts) +
+    // the water-sheet mesh (only on maps with live waterPatch spans) +
     // towers (chunked & frustum-culled at runtime; count ~model-order).
-    drawCallEstimate: 13 + 27 + zoneSignDraws + CITY_MODELS.length,
+    drawCallEstimate: 13 + 27 + zoneSignDraws + (water.count > 0 ? 1 : 0) + CITY_MODELS.length,
   };
 
   return {
@@ -144,6 +151,7 @@ export function buildWorldGeometry(
     markings: markings.markings.toMeshData(),
     parkingLanes: roads.parkingLanes.toMeshData(),
     roadDecals: decals.decals.toMeshData(),
+    waterDecals: water.water.toMeshData(),
     terrain: terrain.grass.toMeshData(),
     terrainPaved: terrain.paved.toMeshData(),
     buildingWalls: buildings.walls.map((w) => w.toMeshData()),

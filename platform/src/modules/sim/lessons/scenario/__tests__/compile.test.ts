@@ -141,6 +141,18 @@ describe("compileScenario — sc-park-perp-rev", () => {
     expect(compileScenario(SC_PARK_PERP_REV, 2)).toEqual(compileScenario(SC_PARK_PERP_REV, 2));
   });
 
+  it("propagates signalPlan to the lesson (the ruleConfig/physics opt-in pattern)", () => {
+    // Absent on the template = absent on the lesson — today's wall-clock
+    // signal behavior, bit-identical (no field to arm).
+    expect(compileScenario(SC_PARK_PERP_REV, 3).signalPlan).toBeUndefined();
+    const s = clone();
+    s.signalPlan = { arm: "redFresh", triggerM: 45, clusterId: "sx-n-c" };
+    const lesson = compileScenario(s, 3);
+    expect(lesson.signalPlan).toEqual({ arm: "redFresh", triggerM: 45, clusterId: "sx-n-c" });
+    // Compiled copy, not the template's own object (specs are shared data).
+    expect(lesson.signalPlan).not.toBe(s.signalPlan);
+  });
+
   it("golden compile snapshot per level (the compiled contract — review on change)", () => {
     for (const level of LEVELS) {
       expect(compileScenario(SC_PARK_PERP_REV, level)).toMatchSnapshot(`L${level}`);

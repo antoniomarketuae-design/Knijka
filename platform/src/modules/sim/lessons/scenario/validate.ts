@@ -284,6 +284,27 @@ export function validateScenarioSpec(
     }
   }
 
+  // -- Signal plan (approach-relative one-shot pin): shape when present.
+  if (spec.signalPlan !== undefined) {
+    const sp = spec.signalPlan;
+    if (typeof sp !== "object" || sp === null) {
+      errors.push(`signalPlan must be an object ({ arm; triggerM; clusterId? }) when present`);
+    } else {
+      if (sp.arm !== "greenFresh" && sp.arm !== "redFresh") {
+        errors.push(`signalPlan.arm must be "greenFresh" | "redFresh"`);
+      }
+      if (!(Number.isFinite(sp.triggerM) && sp.triggerM > 0)) {
+        errors.push(`signalPlan.triggerM must be a positive number of meters`);
+      }
+      if (
+        sp.clusterId !== undefined &&
+        (typeof sp.clusterId !== "string" || sp.clusterId.length === 0)
+      ) {
+        errors.push(`signalPlan.clusterId must be a non-empty string when present`);
+      }
+    }
+  }
+
   return errors;
 }
 

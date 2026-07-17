@@ -212,6 +212,10 @@ export function compileScenario(spec: ScenarioSpec, level: ScenarioLevel): Lesso
           },
         }
       : {}),
+    // Approach-relative signal pin (the ruleConfig/physics opt-in pattern):
+    // only a template that AUTHORS signalPlan gets the one-shot pin — the
+    // LIVE session arms it on the runtime; recorded traces are untouched.
+    ...(spec.signalPlan ? { signalPlan: { ...spec.signalPlan } } : {}),
   };
 
   const aids = mergeAids(level, rung.aids);

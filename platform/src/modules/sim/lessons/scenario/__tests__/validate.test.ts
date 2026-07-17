@@ -168,6 +168,19 @@ describe("validateScenarioSpec", () => {
     );
   });
 
+  it("signalPlan shape: arm enum + positive triggerM + non-empty clusterId", () => {
+    expect(errorsOf((s) => (s.signalPlan = { arm: "greenFresh", triggerM: 45 }))).toEqual([]);
+    expect(
+      errorsOf((s) => (s.signalPlan = { arm: "amber" as "greenFresh", triggerM: 45 }))[0],
+    ).toContain('signalPlan.arm must be "greenFresh" | "redFresh"');
+    expect(errorsOf((s) => (s.signalPlan = { arm: "redFresh", triggerM: 0 }))[0]).toContain(
+      "signalPlan.triggerM must be a positive number",
+    );
+    expect(
+      errorsOf((s) => (s.signalPlan = { arm: "redFresh", triggerM: 45, clusterId: "" }))[0],
+    ).toContain("signalPlan.clusterId must be a non-empty string");
+  });
+
   it("localeBg is pinned to bg-BG (doc 76 §0 — no country packs)", () => {
     expect(errorsOf((s) => (s.localeBg = "en-GB" as "bg-BG"))[0]).toContain('localeBg must be "bg-BG"');
   });

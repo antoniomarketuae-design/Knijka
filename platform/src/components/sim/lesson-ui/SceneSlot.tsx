@@ -53,7 +53,7 @@ import type {
   NearMissStats,
   StagedEventOutcome,
 } from "@/modules/sim/lessons";
-import type { MinimapFrame } from "@/modules/sim/hud";
+import type { DashboardStatus, MinimapFrame } from "@/modules/sim/hud";
 import type { PreDriveStepId } from "@/modules/sim/procedures";
 import type { SimTick } from "@/modules/sim/rules";
 import type { LiveTraceRecorder } from "@/modules/sim/traces";
@@ -105,6 +105,11 @@ export interface SceneSlotProps {
    *  the scene streams the student's 20 Hz kinematics + glance/signal/
    *  driveline events into it; absent = recording off (default). */
   attemptRecorderRef?: React.RefObject<LiveTraceRecorder | null>;
+  /** Status-dashboard channel (additive): the scene MUTATES this shared
+   *  object once per frame from the live cabin/driveline/sample state; the
+   *  shell's StatusDashboard bar samples it on a low-Hz interval (see
+   *  hud/dashboardStatus.ts). Absent = no writes (bar shows cold defaults). */
+  dashboardStatusRef?: React.RefObject<DashboardStatus>;
 }
 
 // The heavy Three.js/rapier bundle loads client-side only (rapier wasm must

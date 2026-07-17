@@ -33,6 +33,11 @@ export interface TraceTimelineProps {
   clockRef: React.RefObject<TraceClock>;
   /** Deck label, e.g. „Демонстрация — сянка" (default per trace kind). */
   titleBg?: string;
+  /** Compact deck (~40 % smaller controls) — founder ruling 2026-07-17: the
+   *  demo deck yields visual priority to the car status dashboard. Touch
+   *  targets drop below the P1 ≥44 px law here by explicit founder request;
+   *  the deck is a secondary, keyboard-era control surface. */
+  compact?: boolean;
 }
 
 const KIND_TITLE_BG: Record<ScenarioTrace["meta"]["kind"], string> = {
@@ -41,8 +46,12 @@ const KIND_TITLE_BG: Record<ScenarioTrace["meta"]["kind"], string> = {
   attempt: "Твоят опит — повторение",
 };
 
-export function TraceTimeline({ trace, clockRef, titleBg }: TraceTimelineProps) {
+export function TraceTimeline({ trace, clockRef, titleBg, compact = false }: TraceTimelineProps) {
   const duration = Math.max(trace.meta.durationSec, 0.001);
+  // Size grammar: one place per control class, so compact stays consistent.
+  const btnSize = compact ? "h-8 w-8 text-sm" : "h-11 w-11";
+  const barH = compact ? "h-7" : "h-11";
+  const tickH = compact ? "h-7" : "h-11";
   const annotations = useMemo(() => traceAnnotations(trace), [trace]);
 
   const [snap, setSnap] = useState({ t: 0, playing: true, speed: 1, looping: false });
@@ -168,7 +177,11 @@ export function TraceTimeline({ trace, clockRef, titleBg }: TraceTimelineProps) 
         </div>
       ) : null}
 
-      <div className="flex flex-col gap-2 rounded-2xl border border-border bg-background/80 px-3 py-2.5 shadow-glow-sm backdrop-blur-md">
+      <div
+        className={`flex flex-col rounded-2xl border border-border bg-background/80 shadow-glow-sm backdrop-blur-md ${
+          compact ? "gap-1.5 px-2.5 py-1.5" : "gap-2 px-3 py-2.5"
+        }`}
+      >
         <div className="flex items-center justify-between gap-2">
           <span className="truncate text-[11px] font-bold uppercase tracking-wider text-muted">
             {titleBg ?? KIND_TITLE_BG[trace.meta.kind]}
@@ -186,7 +199,7 @@ export function TraceTimeline({ trace, clockRef, titleBg }: TraceTimelineProps) 
           aria-valuemin={0}
           aria-valuemax={Math.round(duration)}
           aria-valuenow={Math.round(snap.t)}
-          className="relative h-11 cursor-pointer touch-none"
+          className={`relative ${barH} cursor-pointer touch-none`}
           onPointerDown={(e) => {
             scrubbing.current = true;
             e.currentTarget.setPointerCapture(e.pointerId);
@@ -228,7 +241,7 @@ export function TraceTimeline({ trace, clockRef, titleBg }: TraceTimelineProps) 
                 if (clock) clock.playing = false;
                 seek(a.tSec);
               }}
-              className="absolute top-1/2 h-11 w-6 -translate-x-1/2 -translate-y-1/2"
+              className={`absolute top-1/2 ${tickH} ${compact ? "w-5" : "w-6"} -translate-x-1/2 -translate-y-1/2`}
               style={{ left: `${(a.tSec / duration) * 100}%` }}
             >
               <span
@@ -252,7 +265,9 @@ export function TraceTimeline({ trace, clockRef, titleBg }: TraceTimelineProps) 
               type="button"
               onClick={togglePlay}
               aria-label={snap.playing ? "Пауза" : "Пусни"}
-              className="flex h-11 w-11 items-center justify-center rounded-full bg-accent text-lg text-background"
+              className={`flex ${btnSize} items-center justify-center rounded-full bg-accent ${
+                compact ? "" : "text-lg"
+              } text-background`}
             >
               {snap.playing ? "⏸" : "▶"}
             </button>
@@ -261,7 +276,7 @@ export function TraceTimeline({ trace, clockRef, titleBg }: TraceTimelineProps) 
               onClick={() => step(-1)}
               aria-label="Предишна стъпка"
               title="Стъпка по стъпка — назад"
-              className="flex h-11 w-11 items-center justify-center rounded-full border border-border text-muted transition hover:text-foreground"
+              className={`flex ${btnSize} items-center justify-center rounded-full border border-border text-muted transition hover:text-foreground`}
             >
               ⏮
             </button>
@@ -270,7 +285,7 @@ export function TraceTimeline({ trace, clockRef, titleBg }: TraceTimelineProps) 
               onClick={() => step(1)}
               aria-label="Следваща стъпка"
               title="Стъпка по стъпка — напред"
-              className="flex h-11 w-11 items-center justify-center rounded-full border border-border text-muted transition hover:text-foreground"
+              className={`flex ${btnSize} items-center justify-center rounded-full border border-border text-muted transition hover:text-foreground`}
             >
               ⏭
             </button>
@@ -283,7 +298,9 @@ export function TraceTimeline({ trace, clockRef, titleBg }: TraceTimelineProps) 
                 type="button"
                 onClick={() => setSpeed(sp)}
                 aria-pressed={snap.speed === sp}
-                className={`flex h-9 min-w-11 items-center justify-center rounded-full px-2 text-[11px] font-semibold transition ${
+                className={`flex ${
+                  compact ? "h-6 min-w-9 text-[10px]" : "h-9 min-w-11 text-[11px]"
+                } items-center justify-center rounded-full px-2 font-semibold transition ${
                   snap.speed === sp ? "bg-accent text-background" : "text-muted hover:text-foreground"
                 }`}
               >
@@ -296,7 +313,9 @@ export function TraceTimeline({ trace, clockRef, titleBg }: TraceTimelineProps) 
             type="button"
             onClick={toggleLoop}
             aria-pressed={snap.looping}
-            className={`flex h-11 items-center justify-center gap-1.5 rounded-full border px-3 text-[11px] font-semibold transition ${
+            className={`flex ${
+              compact ? "h-8 px-2.5" : "h-11 px-3"
+            } items-center justify-center gap-1.5 rounded-full border text-[11px] font-semibold transition ${
               snap.looping
                 ? "border-accent bg-accent/15 text-accent"
                 : "border-border text-muted hover:text-foreground"

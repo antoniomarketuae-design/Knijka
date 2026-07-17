@@ -7,6 +7,14 @@
 export { HudStyles } from "./HudStyles";
 export { SpeedCard } from "./SpeedCard";
 export { GearIndicatorCard } from "./GearIndicatorCard";
+export { StatusDashboard } from "./StatusDashboard";
+export {
+  createDashboardStatus,
+  dashboardHash,
+  displaySpeedKmh,
+  speedTone,
+  type DashboardStatus,
+} from "./dashboardStatus";
 export { ObjectiveBanner, type ObjectiveFlash } from "./ObjectiveBanner";
 export { HudToasts, useHudToastQueue, type HudToast } from "./HudToasts";
 export {

@@ -94,6 +94,18 @@ export {
   type ObjectiveContext,
 } from "./objectives";
 
+// „Съветник" — pure next-action prompts for the drill HUD (advisor.ts)
+export {
+  ADVISOR_STORAGE_KEY,
+  advisorPromptForObjective,
+  advisorPromptForPreDriveStep,
+  advisorPromptForSession,
+  defaultAdvisorEnabled,
+  parseStoredAdvisorSetting,
+  serializeAdvisorSetting,
+  type AdvisorPrompt,
+} from "./advisor";
+
 // Debrief (template v1 — AI tutor seam documented in debrief.ts)
 export { buildDebrief, type DebriefContext, type DebriefOutput } from "./debrief";
 

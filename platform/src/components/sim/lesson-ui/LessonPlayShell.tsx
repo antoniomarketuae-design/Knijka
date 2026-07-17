@@ -16,20 +16,23 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-  GearIndicatorCard,
+  createDashboardStatus,
   HudStyles,
   HudToasts,
   Minimap,
   ObjectiveBanner,
   PreDriveChecklist,
   SessionEndScreen,
-  SpeedCard,
+  StatusDashboard,
   useHudToastQueue,
+  type DashboardStatus,
   type MinimapFrame,
   type ObjectiveFlash,
 } from "@/modules/sim/hud";
 import {
   abortSession,
+  ADVISOR_STORAGE_KEY,
+  advisorPromptForSession,
   applyNearMiss,
   applyPreDriveStep,
   applyStagedOutcome,
@@ -38,16 +41,20 @@ import {
   buildLessonResult,
   createLessonSession,
   createQuizTriggerState,
+  defaultAdvisorEnabled,
   EXAM_TERMINATION_TEXT_BG,
   finishSession,
   isDriveLocked,
   observeQuizTick,
   parkingObservationFromTrace,
   parseScenarioLessonId,
+  parseStoredAdvisorSetting,
   scenarioById,
   scoreRubric,
+  serializeAdvisorSetting,
   serializeNearMisses,
   serializeRuleEvents,
+  type AdvisorPrompt,
   type LessonResult,
   type LessonSessionState,
   type LessonSpec,
@@ -77,6 +84,7 @@ import {
   loadMicroQuizBank,
   submitMicroQuizAnswer,
 } from "@/app/(dashboard)/simulator/micro-quiz-actions";
+import { AdvisorCard } from "./AdvisorCard";
 import { MicroQuizOverlay } from "./MicroQuizOverlay";
 import { SceneSlot } from "./SceneSlot";
 import { TeachMomentOverlay } from "./TeachMomentOverlay";
@@ -187,6 +195,8 @@ interface HudSnapshot {
   preDriveWrongOrder: PreDriveStepId[];
   /** Canonical next pending step while in the pre-drive phase, else null. */
   preDriveNextStepId: PreDriveStepId | null;
+  /** „Съветник": the next expected action (pure advisor.ts derivation). */
+  advisorPrompt: AdvisorPrompt | null;
   vehicle: { x: number; y: number; headingDeg: number } | null;
   /** A13: live official tally (exam sessions only, null otherwise). */
   examTally: { totalPoints: number; osnovniPoints: number; opasniCount: number } | null;
@@ -225,6 +235,7 @@ function snapshotOf(
       s.phase === "preDrive" && preDrive
         ? PRE_DRIVE_STEP_ORDER.find((id) => !preDrive.completedStepIds.includes(id)) ?? null
         : null,
+    advisorPrompt: advisorPromptForSession(s),
     vehicle: lastTick
       ? {
           x: lastTick.position.x,
@@ -279,6 +290,21 @@ function useQuizFrequency(): [QuizFrequency, (f: QuizFrequency) => void] {
     }
   };
   return [freq, update];
+}
+
+/**
+ * Persisted „Съветник" preference; nothing stored → the lesson-level default
+ * (ON for beginner rungs, OFF for level 3+ — advisor.ts). Same lazy-init
+ * safety as readStoredQuizFrequency: this shell mounts client-side only.
+ */
+function readStoredAdvisorOn(lesson: LessonSpec): boolean {
+  if (typeof window === "undefined") return defaultAdvisorEnabled(lesson);
+  try {
+    const stored = parseStoredAdvisorSetting(window.localStorage.getItem(ADVISOR_STORAGE_KEY));
+    return stored ?? defaultAdvisorEnabled(lesson);
+  } catch {
+    return defaultAdvisorEnabled(lesson);
+  }
 }
 
 function QuizFrequencySelector({
@@ -346,6 +372,10 @@ export function LessonPlayShell({
   const handleDriveline = useCallback((snap: DrivelineSnapshot) => {
     drivelineRef.current = snap;
   }, []);
+  // Status dashboard channel: the scene MUTATES this shared object per frame
+  // (real blink clock, driveline, speed); the StatusDashboard bar samples it
+  // on its own low-Hz interval (hud/dashboardStatus.ts perf grammar).
+  const dashboardStatusRef = useRef<DashboardStatus>(createDashboardStatus());
   // Rejected driveline actions (start interlock / selector gate) → visible
   // feedback: gear-telltale flash + a short hint toast (handler below, after
   // nowSec/push exist). The counter keys the one-shot CSS flash.
@@ -437,6 +467,22 @@ export function LessonPlayShell({
   // ON. The always-grade + termination behavior lives in the engine (it reads
   // lesson.examMode itself); the shell only adapts the presentation.
   const examMode = lesson.examMode === true;
+
+  // „Съветник" (advisor) toggle: persisted preference wins; otherwise ON for
+  // the beginner rungs, OFF from level 3 up. Hidden & inert entirely on exam
+  // sessions (the pure module also returns null there — defense in depth).
+  const [advisorOn, setAdvisorOn] = useState<boolean>(() => readStoredAdvisorOn(lesson));
+  const toggleAdvisor = useCallback(() => {
+    setAdvisorOn((on) => {
+      const next = !on;
+      try {
+        window.localStorage.setItem(ADVISOR_STORAGE_KEY, serializeAdvisorSetting(next));
+      } catch {
+        // Private mode etc. — the in-memory value still applies this session.
+      }
+      return next;
+    });
+  }, []);
 
   // A2: pre-drive mode (Instruction→Practice→Assess). The machine applies the
   // matching order-scoring; the shell derives the presentation from it.
@@ -824,6 +870,23 @@ export function LessonPlayShell({
         <div className="ml-auto flex flex-wrap items-center gap-2">
           {!ended ? (
             <>
+              {/* „Съветник": show/hide the next-action prompt card. Hidden on
+                  exams — the advisor is a training aid, not the car. */}
+              {!examMode ? (
+                <button
+                  type="button"
+                  aria-pressed={advisorOn}
+                  onClick={toggleAdvisor}
+                  title="Съветник: показва следващото действие и клавиша за него"
+                  className={`rounded-xl border px-3 py-1.5 text-xs font-bold transition motion-reduce:transition-none ${
+                    advisorOn
+                      ? "border-accent-2/60 bg-accent-2/15 text-accent-2"
+                      : "border-border bg-surface text-muted hover:text-foreground"
+                  }`}
+                >
+                  Съветник {advisorOn ? "вкл." : "изкл."}
+                </button>
+              ) : null}
               {/* A13: no micro-quizzes on an exam — the selector disappears. */}
               {!examMode ? <QuizFrequencySelector value={quizFreq} onChange={setQuizFreq} /> : null}
               {lesson.objectives.length === 0 ? (
@@ -893,11 +956,17 @@ export function LessonPlayShell({
             // S1: scenario sessions record the student's attempt (glances →
             // observation stars; the future compare-vs-shadow view).
             attemptRecorderRef={attemptRecorderRef}
+            // Car status dashboard: the scene writes the live cabin state
+            // (blink clock included) into this shared per-frame channel.
+            dashboardStatusRef={dashboardStatusRef}
           />
         </div>
 
-        {/* Objective banner — top center */}
-        <div className="absolute left-1/2 top-3 -translate-x-1/2">
+        {/* Objective banner — top center; the advisor prompt stacks under it
+            (during pre-drive the banner is empty, so the advisor card stands
+            alone). The advisor hides while a pause overlay (quiz/teach) is up
+            — it must never compete with a modal card. */}
+        <div className="absolute left-1/2 top-3 flex -translate-x-1/2 flex-col items-center gap-1.5">
           <ObjectiveBanner
             titleBg={snap.objectiveTitle}
             index={Math.min(snap.objectiveIndex, Math.max(1, snap.objectiveTotal))}
@@ -905,6 +974,14 @@ export function LessonPlayShell({
             progress={snap.objectiveProgress}
             flash={flash}
           />
+          {advisorOn &&
+          !examMode &&
+          !ended &&
+          activeQuiz === null &&
+          teachQueue.length === 0 &&
+          snap.advisorPrompt !== null ? (
+            <AdvisorCard prompt={snap.advisorPrompt} />
+          ) : null}
         </div>
 
         {/* Toasts — right side */}
@@ -912,24 +989,26 @@ export function LessonPlayShell({
           <HudToasts toasts={toasts} />
         </div>
 
-        {/* Speed + gear — bottom left */}
+        {/* Car status dashboard — bottom center, THE visual anchor (founder
+            2026-07-17: „табло като на кола"). Replaces the old bottom-left
+            SpeedCard + GearIndicatorCard pair; reads the scene's per-frame
+            status channel so the ◀ ▶ arrows blink on the real cabin clock.
+            Stays up in exam mode — it is the car's own instrument panel,
+            not a training aid. */}
         {!ended ? (
-          <div className="absolute bottom-3 left-3 flex items-end gap-2">
-            <SpeedCard speedKmh={snap.speedKmh} limitKmh={snap.limitKmh} />
-            <GearIndicatorCard
-              gear={snap.gear}
-              indicator={snap.indicator}
-              headlights={snap.headlights}
-              seatbeltOn={snap.seatbeltOn}
-              driveline={snap.driveline}
+          <div className="absolute bottom-2 left-1/2 z-10 flex w-max max-w-[calc(100%-1rem)] -translate-x-1/2 justify-center">
+            <StatusDashboard
+              statusRef={dashboardStatusRef}
+              limitKmh={snap.limitKmh}
               rejectFlashKey={gearRejectFlash}
             />
           </div>
         ) : null}
 
-        {/* Minimap — bottom right */}
+        {/* Minimap — bottom right, RAISED above the status-bar strip (the
+            centered bar can reach the right edge on laptop widths). */}
         {!ended ? (
-          <div className="absolute bottom-3 right-3">
+          <div className="absolute bottom-[6.75rem] right-3">
             <Minimap
               polylines={minimapFrame?.polylines ?? []}
               transform={

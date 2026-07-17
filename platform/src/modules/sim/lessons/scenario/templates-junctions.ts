@@ -394,6 +394,17 @@ export const SC_SIGNAL_RESPONSE: ScenarioSpec = {
       { level: 5, conditions: { night: true } }, // L5: светофар нощем — сигналът носи цялата информация
   ],
   staged: [SC_SIGNAL_AMBER_EVENT],
+  // LIVE arrival pin (LessonSpec.signalPlan — the founder traffic-light fix):
+  // the JU-05 arc AND the requireRedMet gate above need a RED arrival — a
+  // wall-clock arrival on green completes nothing (the passSignal objective
+  // demands a handled red) and one on stale yellow teaches chaos. redFresh
+  // rebases to a fresh 26 s red so every attempt gets stop → wait →
+  // redYellow → green. triggerM 75 sits deliberately ABOVE the amber
+  // runner's 60 m arm ring: a ≥ 21 km/h approach still re-pins the JU-06
+  // green→yellow flip OVER this baseline (the runner fires second — its
+  // authored dilemma wins exactly as it wins over the natural offset), while
+  // slower approaches keep the fresh-red teaching arc.
+  signalPlan: { arm: "redFresh", triggerM: 75 },
   conditions: { weather: "dry" },
   localeBg: "bg-BG",
 };
@@ -539,6 +550,15 @@ export const SC_TURN_LEFT_ONCOMING: ScenarioSpec = {
     { level: 4, vehicleStart: "cold" },
   ],
   staged: [SC_LTAP_TIGHT_EVENT, SC_LTAP_FOLLOW_EVENT],
+  // LIVE arrival pin (LessonSpec.signalPlan — the founder traffic-light fix):
+  // the JU-10 lesson is GAP JUDGMENT on „зелено за всички" — the signal must
+  // carry no information, only the oncoming does. greenFresh gives the
+  // westbound approach a full 20 s green from 45 m (approach ~3 s + yield
+  // ~8 s + turn ~5 s fits inside it), mirroring the recordings' authored EW
+  // green window (SX_PIN_EW_GREEN_WINDOW). Wall-clock arrival on red would
+  // stack a signal wait onto the gap lesson and desync nothing — the staged
+  // actors sync to the player's ETA, not to the lamps.
+  signalPlan: { arm: "greenFresh", triggerM: 45 },
   conditions: { weather: "dry" },
   localeBg: "bg-BG",
 };

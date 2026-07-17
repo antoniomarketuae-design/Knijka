@@ -194,6 +194,15 @@ export interface LessonSpec {
    * shadow. compileScenario propagates it from ScenarioSpec.ruleConfig.
    */
   ruleConfig?: Partial<RuleEngineConfig>;
+  /**
+   * Approach-relative signal pin for this lesson's taught junction (see
+   * SignalPlanSpec — founder bug 2026-07-17). LessonScene arms it on the
+   * world runtime after the build; the trace RECORDER never reads it, so
+   * recorded traces keep their authored signalOffsets byte-identically.
+   * compileScenario propagates it from ScenarioSpec.signalPlan; absent =
+   * wall-clock phases (today's behavior, bit-identical).
+   */
+  signalPlan?: SignalPlanSpec;
   /** Marked parking bay this lesson's park objective targets (L7). The world
    * paints every lesson-authored bay by default (buildWorldGeometry ←
    * LESSON_PARKING_BAYS from lessons/specs). */
@@ -247,6 +256,40 @@ export interface LessonSpec {
    * existing lesson omits it and keeps street behavior byte-identical.
    */
   collisionMinKmh?: number;
+}
+
+/**
+ * Approach-relative signal pinning (founder bug 2026-07-17: „зеленото и
+ * червеното сменят твърде бързо, жълто не видях — потеглям на зелено, а
+ * минавам на червено"). Signal clusters run on the WALL CLOCK from scene
+ * start, and the pre-drive procedure takes 20–40 s — so the phase a student
+ * ARRIVED at was arbitrary. A signalPlan makes the arrival approach-relative
+ * instead: the FIRST time the player comes within `triggerM` of the plan's
+ * cluster, the runtime rebases that cluster's phase offset so the phase
+ * facing the player's approach STARTS at that moment —
+ *  - "greenFresh": a full 20 s green begins (drive through / decide on a
+ *    fresh green — the light can no longer expire underneath the approach);
+ *  - "redFresh": a full red begins (arrive on red, wait it out, see
+ *    redYellow then green — the taught signal arc, JU-05/JU-08).
+ * ONE-SHOT and deterministic (a pure function of the player's own
+ * trajectory); after the fire the normal 50 s cycle continues from the
+ * rebased clock, so later staged re-pins (e.g. the JU-06 amberDilemma
+ * runner) land over it exactly as they land over the natural offset today.
+ * Authoring notes: keep the spawn OUTSIDE the trigger ring (a spawn inside
+ * fires the pin on frame one and the wall clock owns the arrival again),
+ * and keep triggerM ABOVE any staged runner's own pin-arming distance when
+ * both target the same cluster (the staged pin must fire second). LIVE
+ * sessions only: LessonScene arms it on the world runtime; the trace
+ * recorder never does — recorded traces pin via authored signalOffsets
+ * (the byte-identity gate). Absent = today's behavior, bit-identical.
+ */
+export interface SignalPlanSpec {
+  arm: "greenFresh" | "redFresh";
+  /** Trigger ring radius around the target cluster's centroid, m (~45). */
+  triggerM: number;
+  /** Target cluster (cluster id or any member signal-node id); absent =
+   * the cluster nearest the lesson spawn. */
+  clusterId?: string;
 }
 
 /**

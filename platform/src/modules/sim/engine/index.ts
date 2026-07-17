@@ -12,8 +12,20 @@ export {
   BRAKE_ATTACK_S,
   BRAKE_RELEASE_S,
   MAX_RAMP_DT_S,
+  KEY_LOG_SIZE,
 } from "./input";
 export type { SimInputCallbacks } from "./input";
+
+export {
+  ReverseAssist,
+  applyReversePedalRemap,
+  shouldRemapReversePedals,
+  REVERSE_ASSIST_STANDSTILL_KMH,
+  REVERSE_ASSIST_HOLD_S,
+  REVERSE_ASSIST_SUPPRESS_S,
+  REVERSE_ASSIST_PEDAL_ON,
+} from "./reverseAssist";
+export type { ReverseAssistCommand, ReverseAssistFrame } from "./reverseAssist";
 
 export {
   TouchInputSource,

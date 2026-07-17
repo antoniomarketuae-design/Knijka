@@ -10,7 +10,7 @@
  * rules catalog (validation), never engine/world/runtime internals.
  */
 
-import type { LessonAidsSpec, StagedEventSpec } from "../../contracts";
+import type { LessonAidsSpec, SignalPlanSpec, StagedEventSpec } from "../../contracts";
 import type { RuleEngineConfig } from "../../rules";
 import type { ObjectiveParams } from "../types";
 
@@ -336,6 +336,14 @@ export interface ScenarioSpec {
    * the authored ghost envelopes are pinned against.
    */
   physics?: { wetGrip?: boolean; snowGrip?: boolean; crosswind?: boolean };
+  /**
+   * Approach-relative signal pin (contracts SignalPlanSpec — the founder
+   * traffic-light fix), propagated by compileScenario to
+   * LessonSpec.signalPlan (the ruleConfig/physics opt-in pattern: absent =
+   * today's wall-clock phases, bit-identical). The LIVE session arms it on
+   * the runtime; recorded traces keep their authored signalOffsets.
+   */
+  signalPlan?: SignalPlanSpec;
   /** Bulgaria is the product (doc 76 §0 — locale from day one, no country packs). */
   localeBg: "bg-BG";
 }
