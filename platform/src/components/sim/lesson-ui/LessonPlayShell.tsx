@@ -49,6 +49,7 @@ import {
   parkingObservationFromTrace,
   parseScenarioLessonId,
   parseStoredAdvisorSetting,
+  resolveScenarioNextStep,
   scenarioById,
   scoreRubric,
   serializeAdvisorSetting,
@@ -64,6 +65,7 @@ import {
   type QuizTriggerState,
   type RubricObservationInput,
   type RubricScore,
+  type ScenarioLevel,
   type ScenarioSpec,
   type StagedEventOutcome,
   type TeachMoment,
@@ -353,6 +355,7 @@ export function LessonPlayShell({
   nextLesson,
   onExitToSelect,
   onStartLesson,
+  onStartScenario,
 }: {
   lesson: LessonSpec;
   quality: QualityPreset;
@@ -360,6 +363,12 @@ export function LessonPlayShell({
   nextLesson: { id: string; titleBg: string } | null;
   onExitToSelect: () => void;
   onStartLesson: (lessonId: string) => void;
+  /**
+   * S1 „Следващ сценарий": launch another scenario rung. Same (templateId,
+   * level) shape the catalog's own picker uses (ScenarioCatalog onStart) —
+   * the owner compiles and remounts. Absent on curriculum sessions ⇒ no CTA.
+   */
+  onStartScenario?: (templateId: string, level: ScenarioLevel) => void;
 }) {
   // Engine state: ref-resident, frame-rate mutations, zero re-renders.
   const [initialSession] = useState(() => createLessonSession(lesson));
@@ -401,10 +410,11 @@ export function LessonPlayShell({
   // The template (rubric + teach copy), a live ATTEMPT recorder the scene
   // streams into (glances feed the observation stars), and the rubric result
   // for the end screen. All null/inert on curriculum lessons.
-  const scenarioSpec: ScenarioSpec | null = useMemo(() => {
-    const parsed = parseScenarioLessonId(lesson.id);
-    return (parsed ? scenarioById(parsed.templateId) : undefined) ?? null;
-  }, [lesson.id]);
+  const scenarioRef = useMemo(() => parseScenarioLessonId(lesson.id), [lesson.id]);
+  const scenarioSpec: ScenarioSpec | null = useMemo(
+    () => (scenarioRef ? scenarioById(scenarioRef.templateId) : undefined) ?? null,
+    [scenarioRef],
+  );
   const [attemptRecorder] = useState<LiveTraceRecorder | null>(() =>
     parseScenarioLessonId(lesson.id) !== null
       ? createTraceRecorder({ scenarioId: lesson.id, kind: "attempt" })
@@ -842,6 +852,30 @@ export function LessonPlayShell({
       : buildDebrief(lesson, result).text
     : null;
 
+  // S1 „Следващ сценарий" (founder 2026-07-17: „if the user passes green on
+  // all points … there must be a button go to the next exam"). GREEN = the
+  // official verdict passed AND every objective done. WHICH rung comes next
+  // (next authored level → next card in catalog order → end of the library)
+  // and the doc 76 §8 star gate are the pure resolver's call — this component
+  // only renders the answer.
+  const scenarioGreen =
+    scenarioRef !== null && result !== null && result.passed && result.completedAll;
+  const nextScenario = useMemo(
+    () =>
+      scenarioRef !== null && result !== null && scenarioGreen
+        ? resolveScenarioNextStep({
+            templateId: scenarioRef.templateId,
+            level: scenarioRef.level,
+            passed: result.passed,
+            allObjectivesPassed: result.completedAll,
+            // The client's rubric mirrors the server's recompute; unknown
+            // (no rubric yet) leaves the gate to the server.
+            stars: rubric?.stars ?? null,
+          })
+        : null,
+    [scenarioRef, result, scenarioGreen, rubric],
+  );
+
   return (
     <div
       ref={rootRef}
@@ -1144,6 +1178,24 @@ export function LessonPlayShell({
                 nextLessonTitleBg={nextLesson?.titleBg ?? null}
                 onNextLesson={
                   nextLesson && result.passed ? () => onStartLesson(nextLesson.id) : null
+                }
+                // S1: the green-run CTA — „Следващ сценарий" (primary) or, at
+                // the end of the library, a closing line instead of a dead
+                // button. Both stay null on curriculum lessons.
+                nextScenarioLabelBg={
+                  nextScenario !== null
+                    ? `${nextScenario.titleBg} · Ниво ${nextScenario.level}`
+                    : null
+                }
+                onNextScenario={
+                  nextScenario !== null && onStartScenario !== undefined
+                    ? () => onStartScenario(nextScenario.templateId, nextScenario.level)
+                    : null
+                }
+                catalogCompleteBg={
+                  scenarioGreen && nextScenario === null
+                    ? "Това беше последният сценарий в библиотеката — премина целия каталог. Браво!"
+                    : null
                 }
                 // A15 mistake map: the last live minimap frame carries the FULL
                 // district polylines (LessonScene builds them once) — a static

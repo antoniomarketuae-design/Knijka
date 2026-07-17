@@ -126,8 +126,10 @@ export function SimulatorClient({
   const active = allEntries.find((e) => e.lesson.id === activeLessonId) ?? null;
 
   // S1: a picked scenario rung mounts the SAME play shell with the compiled
-  // micro-lesson (no "next lesson" — a practice shelf, not the curriculum
-  // chain; exiting returns to the select screen with fresh progression).
+  // micro-lesson. `nextLesson` stays null — the scenario library is a practice
+  // shelf, not the curriculum chain — but a GREEN rung offers „Следващ
+  // сценарий" along its own ladder (onStartScenario below). Exiting returns to
+  // the select screen with fresh progression.
   if (scenarioLesson !== null) {
     return (
       <LessonPlayShell
@@ -144,6 +146,11 @@ export function SimulatorClient({
           setScenarioPick(null);
           setActiveLessonId(id);
         }}
+        // S1 „Следващ сценарий": a green rung hands over to the next one via
+        // the SAME (templateId, level) seam the catalog's picker uses — the
+        // pick recompiles and the shell remounts on its `key`. No route hop:
+        // scenario rungs are client state on /simulator, not a URL param.
+        onStartScenario={(templateId, level) => setScenarioPick({ templateId, level })}
       />
     );
   }

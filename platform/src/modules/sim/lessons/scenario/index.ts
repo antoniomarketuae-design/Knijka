@@ -71,6 +71,14 @@ export {
 } from "./progress";
 export { parkingObservationFromTrace } from "./observation";
 
+// „Следващ сценарий" — the next-target resolver behind the end-screen CTA
+// (catalog order = SCENARIO_TEMPLATES order; the star gate mirrors doc 76 §8).
+export {
+  resolveScenarioNextStep,
+  type ScenarioNextStep,
+  type ScenarioNextStepInput,
+} from "./nextStep";
+
 // Authored templates (P0: sc-park-perp-rev)
 export {
   LOT_PERP_TARGET_BAY,

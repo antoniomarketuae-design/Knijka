@@ -164,6 +164,9 @@ export function SessionEndScreen({
   onNextLesson,
   mapPolylines = null,
   rubric = null,
+  nextScenarioLabelBg = null,
+  onNextScenario = null,
+  catalogCompleteBg = null,
 }: {
   lessonTitleBg: string;
   result: LessonResult;
@@ -188,10 +191,29 @@ export function SessionEndScreen({
    * the primary result). null (every curriculum lesson) = no section.
    */
   rubric?: RubricScore | null;
+  /**
+   * S1 „Следващ сценарий" (founder 2026-07-17): the resolved next rung's
+   * name („<заглавие> · Ниво N"). Set together with onNextScenario — a green
+   * scenario run must lead somewhere, so that pair becomes the PRIMARY action
+   * and „Повтори" steps back to secondary.
+   */
+  nextScenarioLabelBg?: string | null;
+  /** null = no next rung to offer (not green, or the catalog is done). */
+  onNextScenario?: (() => void) | null;
+  /** End of the scenario library: a closing line instead of a dead button. */
+  catalogCompleteBg?: string | null;
 }) {
   const { summary } = result;
   const score = summary.score;
   const nearMisses = result.nearMisses ?? [];
+
+  // S1: the „Следващ сценарий" CTA needs BOTH a target and a handler — pair
+  // them once so the actions row can never half-render (a primary button with
+  // no destination, or „Повтори" demoted for a CTA that never appears).
+  const scenarioCta =
+    onNextScenario !== null && nextScenarioLabelBg !== null
+      ? { onClick: onNextScenario, labelBg: nextScenarioLabelBg }
+      : null;
 
   // -- A15 mistake map state ---------------------------------------------------
   const [showGood, setShowGood] = useState(false);
@@ -591,9 +613,30 @@ export function SessionEndScreen({
         ) : null}
       </section>
 
+      {/* S1: the library is finished — say so instead of offering nothing. */}
+      {catalogCompleteBg !== null ? (
+        <p
+          aria-label="Край на библиотеката със сценарии"
+          className="rounded-xl border border-success/50 bg-success/10 px-4 py-3 text-sm font-semibold text-success"
+        >
+          {catalogCompleteBg}
+        </p>
+      ) : null}
+
       {/* Actions */}
       <div className="flex flex-wrap items-center gap-3">
-        <button type="button" className="btn-accent" onClick={onRetry}>
+        {/* S1: a green rung leads to the next one — that is THE action here;
+            „Повтори" stays available, one step down in weight. */}
+        {scenarioCta !== null ? (
+          <button type="button" className="btn-accent" onClick={scenarioCta.onClick}>
+            Следващ сценарий: {scenarioCta.labelBg} →
+          </button>
+        ) : null}
+        <button
+          type="button"
+          className={scenarioCta !== null ? "btn-ghost" : "btn-accent"}
+          onClick={onRetry}
+        >
           Повтори
         </button>
         {nextLessonTitleBg !== null ? (
