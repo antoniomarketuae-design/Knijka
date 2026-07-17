@@ -137,6 +137,12 @@ export default function CookiesPage() {
               </code>,
               "Графичните настройки на симулатора (качество на картината)",
             ],
+            [
+              <code key="k" className="text-xs">
+                aidrive.sim.reverseView.v1
+              </code>,
+              "Дали изгледът в симулатора да се обръща автоматично назад при заден ход",
+            ],
           ]}
         />
       </LegalSection>

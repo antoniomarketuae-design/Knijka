@@ -350,9 +350,12 @@ export function scenarioBaysOf(districtRaw: unknown): ScenarioBayMeta[] {
  *  - pathRibbon — the A7 guidance ribbon restyled as the correct-path overlay;
  *  - pauseOnError — the shell freezes physics on the first graded mistake
  *    (beyond the A9 teach-moment machinery, which stays coach-policy-driven);
- *  - topdownAllowed — the orthographic top-down POV may be used WHILE DRIVING
- *    (L1); demo/replay views are always free to use it. L4 locks to cockpit
- *    like the real exam (doc 76 §4) — flag absent;
+ *  - topdownAllowed — the orthographic top-down POV may be used WHILE DRIVING.
+ *    A POV, not an aid (founder ruling 2026-07-17): every scenario rung L1..L5
+ *    and every curriculum/exam-bank lesson grants it; a rung opts OUT only by
+ *    authoring the flag false. Demo/replay views are always free to use it.
+ *    Doc 76 §4's cockpit-lock governs GRADED views — grading never reads the
+ *    camera;
  *  - hintsAfterIdleSec — idle seconds before a contextual hint (L2 pattern).
  */
 export interface LessonAidsSpec {

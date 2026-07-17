@@ -1,7 +1,9 @@
 /**
  * sim/engine — public API of the simulator runtime services:
  * driver input, telemetry channel, device capability checks.
- * React-independent; the R3F layer (src/components/sim) is the only consumer.
+ * React-independent (the R3F layer, src/components/sim, is the only consumer)
+ * with ONE exception: reverseViewStore, a client-side user setting, which
+ * exposes a useSyncExternalStore hook like the quality store it copies.
  */
 
 export {
@@ -26,6 +28,30 @@ export {
   REVERSE_ASSIST_PEDAL_ON,
 } from "./reverseAssist";
 export type { ReverseAssistCommand, ReverseAssistFrame } from "./reverseAssist";
+
+export {
+  reverseViewTarget,
+  stepReverseSwing,
+  reverseSwingEnvelope,
+  chaseOrbitLock,
+  REVERSE_SWING_LAMBDA,
+  REVERSE_SWING_EPSILON,
+  REVERSE_VIEW_FORWARD_HOLD_KMH,
+  CHASE_REVERSE_ORBIT_RAD,
+  CHASE_ORBIT_LOCK_GAIN,
+  COCKPIT_SHOULDER_YAW,
+  COCKPIT_SHOULDER_PITCH,
+} from "./reverseView";
+export type { ReverseViewFrame, ReverseViewMode } from "./reverseView";
+
+export {
+  getReverseViewEnabled,
+  setReverseViewEnabled,
+  toggleReverseViewEnabled,
+  subscribeReverseView,
+  useReverseViewEnabled,
+  REVERSE_VIEW_STORAGE_KEY,
+} from "./reverseViewStore";
 
 export {
   TouchInputSource,

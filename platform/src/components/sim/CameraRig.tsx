@@ -25,7 +25,19 @@ import {
   STEER_MAX_ANGLE,
   type VehicleSim,
 } from "@/modules/sim/vehicle";
-import { FpsMeter, type SimTelemetry } from "@/modules/sim/engine";
+import {
+  FpsMeter,
+  chaseOrbitLock,
+  getReverseViewEnabled,
+  reverseSwingEnvelope,
+  reverseViewTarget,
+  stepReverseSwing,
+  toggleReverseViewEnabled,
+  CHASE_REVERSE_ORBIT_RAD,
+  COCKPIT_SHOULDER_PITCH,
+  COCKPIT_SHOULDER_YAW,
+  type SimTelemetry,
+} from "@/modules/sim/engine";
 import type { CabinControls, MirrorGlanceKind } from "./cabin";
 
 export type CameraMode = "chase" | "cockpit" | "topdown";
@@ -67,6 +79,15 @@ function clampAbs(v: number, limit: number): number {
 /** 180° about +Y: cameras look down -Z, the car drives along +Z. */
 const FLIP_Y = new Quaternion(0, 1, 0, 0);
 
+/** World up — the axis the chase camera orbits about while reversing.
+ *  Module-level: `applyAxisAngle` must never allocate one per frame. */
+const UP_AXIS = new Vector3(0, 1, 0);
+
+/** K — toggle the automatic reversing POV (persisted setting, default ON).
+ *  Sits with G/N (the view keys the rig owns), clear of every binding in
+ *  cabin.ts CABIN_KEYS / DRIVELINE_KEYS and engine/input.ts. */
+const REVERSE_VIEW_KEY = "KeyK";
+
 /** Cockpit orientation damping (1/s) — softer than the eye position so the
  * view leans gently instead of transmitting every suspension tick. */
 const COCKPIT_ROT_DAMPING = 16;
@@ -107,6 +128,12 @@ const GLANCE_OFFSETS: Record<MirrorGlanceKind, { yaw: number; pitch: number }> =
  * both cameras get a subtle speed-based FOV widen, and the cockpit performs
  * the HOLD-to-glance mirror look (Q/E/F held / hotspot pressed) that feeds
  * the rule engine's mirror-check detector once per hold.
+ *
+ * REVERSING POV: while the selector is in R the view turns to look back — the
+ * chase camera orbits to the car's rear-facing aspect, the cockpit does the
+ * over-the-shoulder check — and swings home on the way back to D/P/N. Every
+ * rule and constant is in engine/reverseView.ts (pure, unit-tested); this file
+ * only renders the resulting 0..1 swing. K opts out (persisted).
  */
 export function CameraRig({
   chassisGroupRef,
@@ -116,6 +143,7 @@ export function CameraRig({
   telemetryRef,
   topdownAllowed = true,
   enterTopdown,
+  driveLocked = false,
 }: {
   chassisGroupRef: RefObject<Group | null>;
   simRef: RefObject<VehicleSim | null>;
@@ -126,9 +154,15 @@ export function CameraRig({
   topdownAllowed?: boolean;
   /** Switch the shared view state into top-down (parent owns cockpit state). */
   enterTopdown?: () => void;
+  /** QW10 pre-drive gate is up: the car cannot move and a held brake is a
+   *  procedure step — never a reverse. Vetoes the reversing POV. */
+  driveLocked?: boolean;
 }) {
   const fpsMeterRef = useRef(new FpsMeter());
   const lastMode = useRef<CameraMode | null>(null);
+  /** Reversing-POV swing, 0 = looking forward … 1 = looking back
+   *  (engine/reverseView.ts owns every rule and constant behind it). */
+  const swingRef = useRef(0);
   // Smoothed G-force lean state (cockpit head motion).
   const leanRef = useRef({ latG: 0, longG: 0, prevSpeedMps: 0 });
   // Top-down state (refs — render-free): zoom preset index + orientation.
@@ -158,6 +192,19 @@ export function CameraRig({
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [cameraModeRef, topdownAllowed, enterTopdown]);
+
+  // K — opt out of (or back into) the automatic reversing POV. Persisted, so
+  // the choice survives the lesson; live from the next frame (the rig reads
+  // the setting per frame, it does not subscribe). Available in every view and
+  // on every rung — a POV is not an aid.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.repeat || e.code !== REVERSE_VIEW_KEY) return;
+      toggleReverseViewEnabled();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
 
   // Scratch objects — never allocate in useFrame.
   const scratchRef = useRef({
@@ -209,6 +256,27 @@ export function CameraRig({
             : cockpitVFovForAspect(cam.aspect);
       cam.updateProjectionMatrix();
     }
+
+    // --- Reversing POV (founder 2026-07-17). One damped 0..1 swing, shared by
+    // every view: engine/reverseView.ts decides WHETHER to look back (selector
+    // / speed / mode / glance / setting / pre-drive gate), this rig decides
+    // what looking back LOOKS like per view. A mode switch snaps it, like
+    // every other state here. ------------------------------------------------
+    const cabin = cabinRef.current;
+    const glanceS = cabin?.glanceStrength() ?? 0;
+    const swingTarget = reverseViewTarget({
+      selector: cabin?.driveline.selector ?? "P",
+      speedKmh: sim?.speedKmh ?? 0,
+      mode,
+      glanceHeld: glanceS > 0,
+      enabled: getReverseViewEnabled(),
+      driveLocked,
+    });
+    swingRef.current = switched
+      ? swingTarget
+      : stepReverseSwing(swingRef.current, swingTarget, delta);
+    // Smoothstepped so the swing eases in as well as out (the glance's easing).
+    const swing = reverseSwingEnvelope(swingRef.current);
 
     const { pos, quat, fwd, fwdFlat, desired, look, lookSmooth, eye, rotSmooth, glanceQuat, glanceEuler, sway, leanQuat, leanEuler, prevPos, upSmooth } =
       scratchRef.current;
@@ -273,13 +341,27 @@ export function CameraRig({
       fwdFlat.set(fwd.x, 0, fwd.z);
       if (fwdFlat.lengthSq() < 1e-6) fwdFlat.set(0, 0, 1);
       fwdFlat.normalize();
+      // Reversing: ORBIT the whole rig around the car by rotating its view
+      // axis about +Y (in place — fwdFlat is rebuilt every frame). At swing 1
+      // the axis is reversed, i.e. the exact mirror of the forward chase: the
+      // camera sits off the NOSE looking back down the car, so the car fills
+      // the lower frame with the boot at its far edge and the reversing path
+      // opens beyond it. Halfway through, the axis points car-left (+X) and
+      // the camera is therefore at the car's RIGHT flank — the same side as
+      // the cockpit's shoulder check, and never a path through the car.
+      if (swing > 0) fwdFlat.applyAxisAngle(UP_AXIS, swing * CHASE_REVERSE_ORBIT_RAD);
       desired.copy(pos).addScaledVector(fwdFlat, -CHASE_DISTANCE);
       desired.y += CHASE_HEIGHT;
-      const k = switched ? 1 : 1 - Math.exp(-CHASE_STIFFNESS * delta);
+      // The chase lerp trails its target by v/rate — far too slack to track an
+      // orbiting desired (it would be dragged across the car instead of round
+      // it), so the swing locks the follow onto the arc while it is in motion
+      // and hands the trailing feel back as it settles.
+      const lock = chaseOrbitLock(swingRef.current, swingTarget);
+      const k = switched ? 1 : Math.max(1 - Math.exp(-CHASE_STIFFNESS * delta), lock);
       cam.position.lerp(desired, k);
       look.copy(pos).addScaledVector(fwdFlat, CHASE_LOOK_AHEAD);
       look.y += CHASE_LOOK_HEIGHT;
-      const kl = switched ? 1 : 1 - Math.exp(-CHASE_LOOK_DAMPING * delta);
+      const kl = switched ? 1 : Math.max(1 - Math.exp(-CHASE_LOOK_DAMPING * delta), lock);
       lookSmooth.lerp(look, kl);
       cam.up.set(0, 1, 0);
       cam.lookAt(lookSmooth);
@@ -354,16 +436,30 @@ export function CameraRig({
       leanQuat.setFromEuler(leanEuler);
       cam.quaternion.multiply(leanQuat);
 
-      // Mirror glance: head turns toward the mirror while the key/hotspot is
-      // HELD (founder contract) — GlanceHold's 0..1 envelope, smoothstepped
-      // here so the turn eases in, holds steady, and eases back on release.
-      const cabin = cabinRef.current;
-      const s = cabin?.glanceStrength() ?? 0;
+      // Head turn — ONE rotation, two sources that share the neck:
+      //  · Mirror glance: toward the mirror while the key/hotspot is HELD
+      //    (founder contract) — GlanceHold's 0..1 envelope, smoothstepped here
+      //    so the turn eases in, holds steady, and eases back on release.
+      //  · Reversing shoulder check: over the right shoulder while in R.
+      // They are summed, not fought over: an explicit glance already zeroes the
+      // swing TARGET (reverseViewTarget), so the shoulder is easing home over
+      // the same ~0.5 s the glance is easing in and the neck reads one
+      // continuous motion — no snap at the handover, in either direction.
       const mirror = cabin?.glanceMirror;
-      if (s > 0 && mirror) {
-        const env = s * s * (3 - 2 * s);
+      let headYaw = 0;
+      let headPitch = 0;
+      if (glanceS > 0 && mirror) {
+        const env = glanceS * glanceS * (3 - 2 * glanceS);
         const o = GLANCE_OFFSETS[mirror];
-        glanceEuler.set(o.pitch * env, o.yaw * env, 0, "YXZ");
+        headYaw += o.yaw * env;
+        headPitch += o.pitch * env;
+      }
+      if (swing > 0) {
+        headYaw += COCKPIT_SHOULDER_YAW * swing;
+        headPitch += COCKPIT_SHOULDER_PITCH * swing;
+      }
+      if (headYaw !== 0 || headPitch !== 0) {
+        glanceEuler.set(headPitch, headYaw, 0, "YXZ");
         glanceQuat.setFromEuler(glanceEuler);
         cam.quaternion.multiply(glanceQuat);
       }

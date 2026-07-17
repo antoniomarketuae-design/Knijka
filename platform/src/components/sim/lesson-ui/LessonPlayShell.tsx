@@ -49,7 +49,7 @@ import {
   parkingObservationFromTrace,
   parseScenarioLessonId,
   parseStoredAdvisorSetting,
-  resolveScenarioNextStep,
+  resolveScenarioNextSteps,
   scenarioById,
   scoreRubric,
   serializeAdvisorSetting,
@@ -852,18 +852,18 @@ export function LessonPlayShell({
       : buildDebrief(lesson, result).text
     : null;
 
-  // S1 „Следващ сценарий" (founder 2026-07-17: „if the user passes green on
-  // all points … there must be a button go to the next exam"). GREEN = the
-  // official verdict passed AND every objective done. WHICH rung comes next
-  // (next authored level → next card in catalog order → end of the library)
-  // and the doc 76 §8 star gate are the pure resolver's call — this component
-  // only renders the answer.
+  // S1 (founder 2026-07-17: „the button for next lesson goes to stage 2 of
+  // the same lesson — we also have to add a button that switches to the NEXT
+  // LESSON"). GREEN = the official verdict passed AND every objective done.
+  // BOTH targets — one rung up this ladder, and the next card in catalog
+  // order — plus the doc 76 §8 star gate that can withhold the rung, are the
+  // pure resolver's call; this component only renders the answer.
   const scenarioGreen =
     scenarioRef !== null && result !== null && result.passed && result.completedAll;
   const nextScenario = useMemo(
     () =>
       scenarioRef !== null && result !== null && scenarioGreen
-        ? resolveScenarioNextStep({
+        ? resolveScenarioNextSteps({
             templateId: scenarioRef.templateId,
             level: scenarioRef.level,
             passed: result.passed,
@@ -872,8 +872,22 @@ export function LessonPlayShell({
             // (no rubric yet) leaves the gate to the server.
             stars: rubric?.stars ?? null,
           })
-        : null,
+        : { level: null, template: null },
     [scenarioRef, result, scenarioGreen, rubric],
+  );
+
+  // Each target → a labelled launcher, or null. Same (templateId, level) seam
+  // the catalog's own picker uses; absent onStartScenario (curriculum
+  // sessions) means nothing to launch into, so no button.
+  const scenarioTarget = useCallback(
+    (step: { templateId: string; level: ScenarioLevel; titleBg: string } | null) =>
+      step !== null && onStartScenario !== undefined
+        ? {
+            labelBg: `${step.titleBg} · Ниво ${step.level}`,
+            onStart: () => onStartScenario(step.templateId, step.level),
+          }
+        : null,
+    [onStartScenario],
   );
 
   return (
@@ -1179,21 +1193,17 @@ export function LessonPlayShell({
                 onNextLesson={
                   nextLesson && result.passed ? () => onStartLesson(nextLesson.id) : null
                 }
-                // S1: the green-run CTA — „Следващ сценарий" (primary) or, at
-                // the end of the library, a closing line instead of a dead
-                // button. Both stay null on curriculum lessons.
-                nextScenarioLabelBg={
-                  nextScenario !== null
-                    ? `${nextScenario.titleBg} · Ниво ${nextScenario.level}`
-                    : null
-                }
-                onNextScenario={
-                  nextScenario !== null && onStartScenario !== undefined
-                    ? () => onStartScenario(nextScenario.templateId, nextScenario.level)
-                    : null
-                }
+                // S1: the green-run CTAs — „Следващо ниво" (this maneuver, one
+                // rung harder; withheld while star-locked) and „Следващ
+                // сценарий" (the next card). At the end of the library, a
+                // closing line instead of a dead button. All null on
+                // curriculum lessons.
+                nextScenarioLevel={scenarioTarget(nextScenario.level)}
+                nextScenarioTemplate={scenarioTarget(nextScenario.template)}
                 catalogCompleteBg={
-                  scenarioGreen && nextScenario === null
+                  scenarioGreen &&
+                  nextScenario.level === null &&
+                  nextScenario.template === null
                     ? "Това беше последният сценарий в библиотеката — премина целия каталог. Браво!"
                     : null
                 }

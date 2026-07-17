@@ -145,8 +145,10 @@ obstacles + spawn + finish, nothing else (the brief's principle).
 - **NEW Orbit/cinematic**: damped free orbit for demo playback only (never graded)
 - **NEW Step-by-step instructional**: the timeline pauses at authored keyframes with
   the teach cards (this + timeline = the founder's "4D": time, guidance, consequence)
-- Grading runs ONLY in cockpit/chase; top-down/orbit are learning views (config flag
-  per level — L1 allows top-down driving, L4 locks to cockpit like the real exam).
+- Grading runs ONLY in cockpit/chase; top-down/orbit are learning views. The
+  cockpit-lock is about what GRADES, not about what the student may look at: since
+  the 2026-07-17 ruling every rung L1–L5 allows top-down driving (§7), and a rung
+  removes it only by authoring `topdownAllowed: false`.
 
 ## 5. Shadow Car (the ghost system)
 - **Recording**: the C1 driver-bot (extended with maneuver primitives: reverse-park
@@ -182,12 +184,17 @@ feed mastery/XP via the shipped A14 path.
 ## 7. Difficulty levels (mapped to existing machinery)
 | Level | Name | Aids | Machinery |
 |---|---|---|---|
-| L1 | Воден опит | Shadow ON + follow-hints + pause-on-error + top-down allowed | teach-first coach, Instruction mode |
+| L1 | Воден опит | Shadow ON + follow-hints + pause-on-error | teach-first coach, Instruction mode |
 | L2 | Частична помощ | Path ribbon only, hints after idle | Practice mode patterns |
 | L3 | Самостоятелно | No aids, normal grading | standard lesson grading |
-| L4 | Изпитни условия | Cockpit-locked, coach OFF, official protocol | examMode (exists) |
+| L4 | Изпитни условия | Coach OFF, official protocol | examMode (exists) |
 | L5 | Усложнени | + traffic/pedestrians/rain/night/narrow/time | variant tiers + staged events + conditions |
 Level = parameter delta on the SAME template — never a copy.
+**Top-down (`topdownAllowed`) is granted on EVERY rung, L1–L5** — founder ruling
+2026-07-17: it is a POV, not an aid (§12), and a reverse-park is unreadable without
+it; denying it at L4 while every exam-bank practical variant granted it was an
+inconsistency. §4's cockpit-lock governs the GRADED views only. A rung may still opt
+out explicitly with `aids: { topdownAllowed: false }`; none ships that way today.
 
 ## 8. Catalog UX (the Simulator category)
 `/simulator` gains a third zone (beside curriculum + exam): **„Сценарии"** — filter

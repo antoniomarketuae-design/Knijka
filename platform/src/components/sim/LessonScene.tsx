@@ -35,6 +35,7 @@ import {
   shouldRemapReversePedals,
   SimInput,
   TouchInputSource,
+  useReverseViewEnabled,
 } from "@/modules/sim/engine";
 import {
   CROSSWIND_BRIDGE_N,
@@ -153,6 +154,21 @@ const WORLD_NAME_BG: Record<string, string> = {
   "d2-v1": "Лозенец",
   "poligon-v1": "учебния полигон",
   "lot-perp-v1": "учебния паркинг",
+  // Wave 1 districts. Names are the genitive/definite form the two copy
+  // strings below need („Зареждане на …" / „Данните за …").
+  "jx-equal-v1": "равнозначното кръстовище",
+  "ln-arrows-v1": "кръстовището с лентови стрелки",
+  "pk-banx-v1": "улицата с пътека и кръстовище",
+  "pe-school-v1": "улицата пред училището",
+  "mw-entry-v1": "входа на магистралата",
+  // Wave 2 districts. The five reuse items keep their existing map's name.
+  "ln-merge-v1": "улицата със стеснение",
+  "pk-busstop-v1": "улицата със спирка",
+  "sp-signs-v1": "улицата със знаци за скорост",
+  // Wave 3 districts. The five reuse items keep their existing map's name.
+  "hz-roadworks-v1": "улицата с пътния ремонт",
+  "pk-ban2-v1": "улицата със знаци В27 и В28",
+  "sig-wave-v1": "булеварда със зелена вълна",
 };
 
 /**
@@ -725,12 +741,15 @@ function ReadyScene({
   }, []);
 
   // Camera toggle + car reset, shared by the key callbacks (C/R) and the
-  // touch overlay buttons — one code path per action. S0-View: C now CYCLES
-  // three views — cockpit → chase → top-down (doc 76 §4, view-only concern:
-  // grading never reads the camera). S1: on SCENARIO lessons top-down joins
-  // the driving cycle only when the level's aids allow it (L1 „Воден опит");
-  // L2–L4 lock to cockpit/chase like the doc 76 §4 ladder. Curriculum
-  // lessons keep the full three-view cycle unchanged.
+  // touch overlay buttons — one code path per action. S0-View: C CYCLES three
+  // views — cockpit → chase → top-down (doc 76 §4, view-only concern: grading
+  // never reads the camera). Curriculum lessons and the exam bank always carry
+  // the full cycle. SCENARIO rungs read their compiled aids — which since the
+  // 2026-07-17 founder ruling grant top-down on EVERY level (compile.ts
+  // DEFAULT_LEVEL_AIDS): a POV is not an aid, and reverse-park is unreadable
+  // without G. The read stays instead of collapsing to `true` because a rung
+  // may still opt OUT explicitly (aids: { topdownAllowed: false }) — that rung
+  // must really lose G.
   const topdownInCycle = !isScenarioLessonId(lesson.id) || aids?.topdownAllowed === true;
   const toggleCamera = useCallback(() => {
     const order: CameraMode[] = topdownInCycle
@@ -1114,6 +1133,7 @@ function ReadyScene({
           telemetryRef={telemetryRef}
           topdownAllowed={topdownInCycle}
           enterTopdown={enterTopdown}
+          driveLocked={driveLocked}
         />
         {cockpit && rain ? <WindshieldDroplets /> : null}
       </Canvas>
@@ -1790,6 +1810,10 @@ function ControlsHelp({
   topdownAllowed?: boolean;
 }) {
   const [open, setOpen] = useState(defaultOpen);
+  // The reversing-POV setting is persisted and toggled by K inside the canvas
+  // (CameraRig owns the key, with G/N) — the row shows its live state so the
+  // legend never lies about which way the view will turn.
+  const reverseViewOn = useReverseViewEnabled();
   const rows: Array<[string, string]> = [
     ["W A S D", "кормуване (или стрелки)"],
     ["I", "двигател: старт / стоп"],
@@ -1807,6 +1831,10 @@ function ControlsHelp({
     ["Q E F", "огледала — задръж (ляво / дясно / назад)"],
     ["Клик", "контролите в кабината (изглед кокпит)"],
     ["C", topdownAllowed ? "изглед: кокпит / отвън / отгоре" : "изглед: кокпит / отвън"],
+    [
+      "K",
+      `автоматичен поглед назад при заден ход: ${reverseViewOn ? "вкл." : "изкл."}`,
+    ],
     ...(topdownAllowed
       ? ([
           ["G", "мащаб отгоре: 20 / 40 / 80 м (влиза в изглед отгоре)"],

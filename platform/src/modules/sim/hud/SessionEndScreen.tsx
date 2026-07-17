@@ -39,6 +39,11 @@ import {
   type MinimapPolyline,
   type MistakeMapMarker,
 } from "./Minimap";
+import {
+  retryCtaClass,
+  scenarioCtaRow,
+  type SessionEndScenarioTarget,
+} from "./sessionEndCtas";
 
 export interface SessionEndConcept {
   id: string;
@@ -164,8 +169,8 @@ export function SessionEndScreen({
   onNextLesson,
   mapPolylines = null,
   rubric = null,
-  nextScenarioLabelBg = null,
-  onNextScenario = null,
+  nextScenarioLevel = null,
+  nextScenarioTemplate = null,
   catalogCompleteBg = null,
 }: {
   lessonTitleBg: string;
@@ -192,14 +197,16 @@ export function SessionEndScreen({
    */
   rubric?: RubricScore | null;
   /**
-   * S1 „Следващ сценарий" (founder 2026-07-17): the resolved next rung's
-   * name („<заглавие> · Ниво N"). Set together with onNextScenario — a green
-   * scenario run must lead somewhere, so that pair becomes the PRIMARY action
-   * and „Повтори" steps back to secondary.
+   * S1 (founder 2026-07-17): the two forward targets of a green scenario run
+   * — one rung harder on the SAME maneuver („Следващо ниво"), and the next
+   * card in the library („Следващ сценарий"). Either may be null on its own:
+   * a star-locked rung (doc 76 §8) leaves `nextScenarioLevel` null while the
+   * ungated next card still shows. Whenever any of them renders, „Повтори"
+   * steps back to secondary. Both null on every curriculum lesson.
    */
-  nextScenarioLabelBg?: string | null;
-  /** null = no next rung to offer (not green, or the catalog is done). */
-  onNextScenario?: (() => void) | null;
+  nextScenarioLevel?: SessionEndScenarioTarget | null;
+  /** null = topped out on the last card, or the run was not green. */
+  nextScenarioTemplate?: SessionEndScenarioTarget | null;
   /** End of the scenario library: a closing line instead of a dead button. */
   catalogCompleteBg?: string | null;
 }) {
@@ -207,13 +214,12 @@ export function SessionEndScreen({
   const score = summary.score;
   const nearMisses = result.nearMisses ?? [];
 
-  // S1: the „Следващ сценарий" CTA needs BOTH a target and a handler — pair
-  // them once so the actions row can never half-render (a primary button with
-  // no destination, or „Повтори" demoted for a CTA that never appears).
-  const scenarioCta =
-    onNextScenario !== null && nextScenarioLabelBg !== null
-      ? { onClick: onNextScenario, labelBg: nextScenarioLabelBg }
-      : null;
+  // S1: which forward buttons exist and which one carries the accent is the
+  // pure builder's call (sessionEndCtas.ts) — 0, 1 or 2 of them.
+  const scenarioCtas = scenarioCtaRow({
+    level: nextScenarioLevel,
+    template: nextScenarioTemplate,
+  });
 
   // -- A15 mistake map state ---------------------------------------------------
   const [showGood, setShowGood] = useState(false);
@@ -623,20 +629,44 @@ export function SessionEndScreen({
         </p>
       ) : null}
 
+      {/* S1: the forward actions — a green rung leads on, and (founder
+          2026-07-17) it leads TWO ways: one rung harder on this maneuver, or
+          out to the next card. Own row, side by side from `sm` up: each label
+          names its destination, so they are far too long to sit in the
+          wrapping utility row below without breaking into ragged lines at
+          laptop width. The grid gives them equal halves; the accent/ghost
+          pair (never two accents) says which one is the default. */}
+      {scenarioCtas.length > 0 ? (
+        <div className={`grid gap-3 ${scenarioCtas.length > 1 ? "sm:grid-cols-2" : ""}`}>
+          {scenarioCtas.map((cta) => (
+            <button
+              key={cta.id}
+              type="button"
+              className={`${cta.className} w-full min-w-0 flex-col items-start gap-0.5 px-4 py-2.5 text-left`}
+              onClick={cta.onStart}
+            >
+              <span className="text-[10px] font-black uppercase tracking-wider opacity-70">
+                {cta.leadBg}
+              </span>
+              {/* Long template titles ellipsis rather than reflow the row —
+                  the full name stays in the DOM for the accessible name. The
+                  arrow sits outside the truncation so it never gets eaten. */}
+              <span className="flex w-full items-baseline gap-1 text-sm font-bold">
+                <span className="min-w-0 truncate">{cta.labelBg}</span>
+                <span aria-hidden className="shrink-0">
+                  →
+                </span>
+              </span>
+            </button>
+          ))}
+        </div>
+      ) : null}
+
       {/* Actions */}
       <div className="flex flex-wrap items-center gap-3">
-        {/* S1: a green rung leads to the next one — that is THE action here;
-            „Повтори" stays available, one step down in weight. */}
-        {scenarioCta !== null ? (
-          <button type="button" className="btn-accent" onClick={scenarioCta.onClick}>
-            Следващ сценарий: {scenarioCta.labelBg} →
-          </button>
-        ) : null}
-        <button
-          type="button"
-          className={scenarioCta !== null ? "btn-ghost" : "btn-accent"}
-          onClick={onRetry}
-        >
+        {/* „Повтори" keeps its weight only while nothing leads forward — and
+            it is the way back to the stars when a rung is locked. */}
+        <button type="button" className={retryCtaClass(scenarioCtas)} onClick={onRetry}>
           Повтори
         </button>
         {nextLessonTitleBg !== null ? (

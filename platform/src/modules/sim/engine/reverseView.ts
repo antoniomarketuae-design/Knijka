@@ -1,0 +1,183 @@
+/**
+ * Reversing POV (founder report 2026-07-17: „когато потребителят започне да
+ * кара назад, изгледът да се обръща от отпред назад") — the VIEW half of the
+ * reverse story whose INPUT half is reverseAssist.ts. Same complaint as the L2
+ * reverse-park one from the other side: reversing while the camera looks
+ * forward is what makes reverse parking blind. Real drivers turn their head
+ * and look over their shoulder — that is the behaviour modelled here.
+ *
+ * Pure decision logic — no DOM, no three.js, no React, fully unit-testable in
+ * Node. CameraRig is a dumb consumer: once per frame it asks
+ * reverseViewTarget() what the view SHOULD want, damps its 0..1 swing toward
+ * that with stepReverseSwing(), and renders the swing through
+ * reverseSwingEnvelope(). Nothing here allocates.
+ *
+ * THE SWING IS A VIEW ASPECT, NOT A FOURTH CAMERA MODE. Each POV keeps its own
+ * reverse aspect (chase orbits to the car's rear-facing side; the cockpit does
+ * the shoulder check; top-down already sees everything and does nothing), so
+ * C keeps cycling exactly the modes it always did and the student is never
+ * moved out of the view they chose.
+ *
+ * EXAM HONESTY: a POV is not an aid — the swing stays available on exam rungs,
+ * consistent with the top-down ruling (LessonScene `topdownInCycle`). Grading
+ * never reads the camera. The one hard gate is the PRE-DRIVE gate: a held
+ * brake there is a procedure step, not a reverse.
+ */
+
+import type { SelectorPosition } from "../vehicle";
+import { REVERSE_ASSIST_STANDSTILL_KMH } from "./reverseAssist";
+
+/** The POVs the rig can be in. Structurally identical to (and assignable
+ *  from) CameraRig's `CameraMode` — declared here so the module never has to
+ *  import a type out of the component layer. */
+export type ReverseViewMode = "chase" | "cockpit" | "topdown";
+
+/**
+ * Swing damping rate (1/s). Exponential: 1 − e^(−λ·t) settled, so λ = 6
+ * reaches 95 % in 0.5 s — the founder's "smooth transition, never a hard cut",
+ * at the same order as the rig's own constants (CHASE_STIFFNESS 5,
+ * TOPDOWN_UP_DAMPING 4, COCKPIT_LEAN_DAMPING). TUNE HERE: raise for a snappier
+ * swing, lower for a lazier one; nothing else needs to change.
+ */
+export const REVERSE_SWING_LAMBDA = 6;
+
+/** Below this distance from the target the swing snaps — kills the asymptotic
+ *  tail so a settled view is exactly settled (and chaseOrbitLock() reaches 0). */
+export const REVERSE_SWING_EPSILON = 1e-4;
+
+/**
+ * Selector R while still rolling FORWARD faster than this (km/h) does not
+ * swing. The gate interlock (SELECTOR_ENGAGE_MAX_KMH = 3) lets R engage while
+ * the car still creeps forward; whipping the view backwards while the car
+ * moves forward is exactly the disorientation this feature exists to prevent.
+ * Same standstill band as the assist's hold rules — one definition of "the car
+ * is not going forward any more" across the reverse family.
+ */
+export const REVERSE_VIEW_FORWARD_HOLD_KMH = REVERSE_ASSIST_STANDSTILL_KMH;
+
+/**
+ * Chase reverse aspect: how far the camera orbits around the car, rad. π is
+ * the exact mirror of the forward chase — the camera sits off the NOSE looking
+ * back down the car, so the car fills the lower frame with the boot at its far
+ * edge and the reversing path opens beyond it. Literally the founder's "from
+ * front to back".
+ *
+ * The rig applies it as a rotation about +Y of the car's flat forward vector,
+ * so the swing is an ORBIT (the camera passes the car's right side at the
+ * halfway point — the same side as the cockpit's shoulder check) instead of a
+ * teleport or a lerp straight through the car.
+ */
+export const CHASE_REVERSE_ORBIT_RAD = Math.PI;
+
+/**
+ * Cockpit reverse aspect — the shoulder check, in the same frame as
+ * CameraRig's GLANCE_OFFSETS (yaw + = toward car-left, so a look over the
+ * RIGHT shoulder is negative; pitch is relative to the pitched base view,
+ * − = down) and applied through the same head-rotation machinery.
+ *
+ * −1.85 rad ≈ −106°: a head-on-neck turn, not a 180° spin. Two reasons it is
+ * capped there and not swung to the rear window: (1) it is the real limit —
+ * beyond ~90–110° a driver's head stops and the TORSO does the rest, which the
+ * cockpit camera (a head at COCKPIT_EYE, not a body) cannot model; (2) it aims
+ * out the right rear quarter — where the kerb and the space you reverse into
+ * actually are for a right-side park in right-hand traffic. The mirrors stay in
+ * frame and Q/E/F still win over it.
+ */
+export const COCKPIT_SHOULDER_YAW = -1.85;
+/** Shoulder-check pitch (rad, − = down): eyes drop toward the kerb/boot line. */
+export const COCKPIT_SHOULDER_PITCH = -0.12;
+
+export interface ReverseViewFrame {
+  /** Live selector (DrivelineState.selector) — the canonical reverse signal. */
+  selector: SelectorPosition;
+  /** SIGNED speed, km/h (+ forward) — VehicleSim.speedKmh. */
+  speedKmh: number;
+  /** The POV the student is in right now. */
+  mode: ReverseViewMode;
+  /** A mirror glance (Q/E/F or a cockpit hotspot) is held or easing. */
+  glanceHeld: boolean;
+  /** The reverse-view setting (reverseViewStore) — false = student opted out. */
+  enabled: boolean;
+  /** The pre-drive gate is up (LessonScene `driveLocked`). */
+  driveLocked: boolean;
+}
+
+/**
+ * What the view should want this frame: 1 = look back, 0 = look forward.
+ *
+ * Deliberately binary. The swing between the two is the RIG's job (damping),
+ * not this function's — which keeps the decision honest, cheap and testable,
+ * and means every override below takes effect as a smooth swing home rather
+ * than a cut.
+ *
+ * Override order (first match wins):
+ *  1. setting off        — the student opted out; never impose a POV.
+ *  2. pre-drive gate up  — a held brake there is a procedure step, not a
+ *                          reverse (and the car cannot move at all).
+ *  3. top-down           — it already sees everything; nothing to swing.
+ *  4. cockpit + glance   — an EXPLICIT glance wins over the automatic head
+ *                          turn. Chase is exempt: Q/E/F move no camera there,
+ *                          so there is no head for the glance to claim.
+ *  5. not in R           — rolling backwards down a hill in D/N is not
+ *                          reversing; only the selector states intent.
+ *  6. still rolling forward — see REVERSE_VIEW_FORWARD_HOLD_KMH.
+ */
+export function reverseViewTarget(f: ReverseViewFrame): 0 | 1 {
+  if (!f.enabled) return 0;
+  if (f.driveLocked) return 0;
+  if (f.mode === "topdown") return 0;
+  if (f.mode === "cockpit" && f.glanceHeld) return 0;
+  if (f.selector !== "R") return 0;
+  if (f.speedKmh > REVERSE_VIEW_FORWARD_HOLD_KMH) return 0;
+  return 1;
+}
+
+/**
+ * One frame of exponential damping of the 0..1 swing toward `target`.
+ * Frame-rate independent (the rig's own `1 − exp(−k·dt)` form); snaps inside
+ * REVERSE_SWING_EPSILON. A non-positive dt (paused tab, first frame) is a
+ * no-op rather than a NaN.
+ */
+export function stepReverseSwing(
+  current: number,
+  target: 0 | 1,
+  dtSec: number,
+  lambda: number = REVERSE_SWING_LAMBDA,
+): number {
+  if (!(dtSec > 0)) return current;
+  const next = current + (target - current) * (1 - Math.exp(-lambda * dtSec));
+  return Math.abs(target - next) < REVERSE_SWING_EPSILON ? target : next;
+}
+
+/**
+ * Smoothstep envelope of the raw swing — the exact easing the mirror glance
+ * already uses (`s*s*(3-2*s)` in CameraRig), reused so the head/orbit eases IN
+ * as well as out. Raw exponential damping is fastest at t=0, which reads as a
+ * whip off the mark; this makes the start and the arrival both gentle.
+ */
+export function reverseSwingEnvelope(swing: number): number {
+  const s = swing < 0 ? 0 : swing > 1 ? 1 : swing;
+  return s * s * (3 - 2 * s);
+}
+
+/**
+ * How rigidly the CHASE camera must ride the orbit arc this frame (0 = the
+ * normal trailing chase lerp, 1 = glued to the arc).
+ *
+ * WHY THIS EXISTS: the chase camera follows its desired position with an
+ * exponential lerp whose steady-state lag is v/rate (CHASE_STIFFNESS = 5/s —
+ * the same maths as the cockpit's back-seat-POV fix). A π orbit in ~0.5 s
+ * sweeps the desired along a 6 m-radius arc at tens of m/s, i.e. an order of
+ * magnitude past what that lerp can track: it would not orbit at all, it would
+ * be dragged in a straight line ACROSS the car. So while the swing is in
+ * motion the follow rate is locked to the arc, easing back into the normal
+ * trailing feel over the last quarter (|Δ| < 1/CHASE_ORBIT_LOCK_GAIN). At rest
+ * (current === target) this is 0 and the chase behaves exactly as it always
+ * has — forwards or reversed.
+ */
+export const CHASE_ORBIT_LOCK_GAIN = 4;
+
+export function chaseOrbitLock(current: number, target: 0 | 1): number {
+  const lock = CHASE_ORBIT_LOCK_GAIN * Math.abs(target - current);
+  return lock > 1 ? 1 : lock;
+}
