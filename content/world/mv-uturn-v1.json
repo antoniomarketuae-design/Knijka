@@ -1,0 +1,288 @@
+{
+ "format": "district-v1",
+ "meta": {
+  "district": "mv-uturn",
+  "label": "Учебен булевард — къде обратният завой е забранен (сценарий OV-17/PK-12)",
+  "mapKind": "scenario-street",
+  "generator": "tools/maps/gen_mv_uturn.mjs",
+  "zonesVersion": 1,
+  "boundsLocalMeters": {
+   "minX": -88,
+   "minY": -6,
+   "maxX": 46.25,
+   "maxY": 626
+  },
+  "attribution": {
+   "text": "Учебен булевард със забранен и разрешен обратен завой — оригинален параметричен дизайн (без данни от OpenStreetMap)",
+   "license": "All rights reserved",
+   "licenseUrl": "/",
+   "copyrightUrl": "/",
+   "obligation": "none — original work, no ODbL attribution required for this map"
+  },
+  "defaults": {
+   "maxspeedUrbanKmh": 50,
+   "note": "От 40-ия до 220-ия метър осевата е непрекъсната (М1) и е поставен знак В23 „Забранено е завиването в обратна посока“: платното е широко, но обратният завой ТАМ е забранен. От 220-ия метър маркировката се прекъсва, а на 280-ия метър разделителната ивица се отваря при страничната улица — там обръщането е разрешено, с пълен оглед и пропускане на насрещните."
+  },
+  "stats": {
+   "roadKm": 0.71,
+   "nodes": 4,
+   "edges": 3,
+   "intersections": 1,
+   "crossings": 0,
+   "buildings": 2,
+   "spawnPoints": 4,
+   "zones": 1
+  },
+  "scenario": {
+   "archetype": "straight-street",
+   "params": {
+    "lengthM": 620,
+    "maxspeedKmh": 50,
+    "lanes": 4,
+    "banFromM": 40,
+    "banToM": 220,
+    "temptingY": 130,
+    "gapY": 280
+   },
+   "lanesPerDirection": 2,
+   "laneCenterOuterM": 12.19,
+   "laneCenterInnerM": 4.06,
+   "junctionNodeId": "mvu-n-gap",
+   "expectedControl": "stopSignOnMinor",
+   "banZone": {
+    "id": "mvu-z-solidcenterline",
+    "kind": "solidCenterLine",
+    "signRef": "М1",
+    "fromM": 40,
+    "toM": 220
+   },
+   "uturnBanSign": {
+    "signRef": "В23",
+    "nameBg": "Забранено е завиването в обратна посока",
+    "lawRef": "Наредба № РД-02-21-1/23.11.2023 — прил. № 3, знак В23",
+    "atY": 40,
+    "spanY": {
+     "fromY": 40,
+     "toY": 220
+    },
+    "graded": false
+   },
+   "temptingSpotY": 130,
+   "legalGapY": 280,
+   "gapReachM": 150,
+   "dashedRunInY": {
+    "fromY": 220,
+    "toY": 280,
+    "lengthM": 60,
+    "markingRef": "М2"
+   },
+   "uturnCorridor": {
+    "x": 0,
+    "y": 280,
+    "halfWidthM": 15,
+    "halfLengthM": 20
+   }
+  }
+ },
+ "roads": {
+  "nodes": [
+   {
+    "id": "mvu-n-end",
+    "x": 0,
+    "y": 620
+   },
+   {
+    "id": "mvu-n-gap",
+    "x": 0,
+    "y": 280
+   },
+   {
+    "id": "mvu-n-start",
+    "x": 0,
+    "y": 0
+   },
+   {
+    "id": "mvu-n-west",
+    "x": -88,
+    "y": 280
+   }
+  ],
+  "edges": [
+   {
+    "id": "mvu-e-ban",
+    "from": "mvu-n-start",
+    "to": "mvu-n-gap",
+    "class": "primary",
+    "name": "Учебен булевард — къде обратният завой е забранен (сценарий OV-17/PK-12)",
+    "oneway": false,
+    "roundabout": false,
+    "lanes": 4,
+    "lanesSource": "tag",
+    "maxspeed": 50,
+    "maxspeedSource": "tag",
+    "length": 280,
+    "geometry": [
+     [
+      0,
+      0
+     ],
+     [
+      0,
+      280
+     ]
+    ]
+   },
+   {
+    "id": "mvu-e-beyond",
+    "from": "mvu-n-gap",
+    "to": "mvu-n-end",
+    "class": "primary",
+    "name": "Учебен булевард — къде обратният завой е забранен (сценарий OV-17/PK-12)",
+    "oneway": false,
+    "roundabout": false,
+    "lanes": 4,
+    "lanesSource": "tag",
+    "maxspeed": 50,
+    "maxspeedSource": "tag",
+    "length": 340,
+    "geometry": [
+     [
+      0,
+      280
+     ],
+     [
+      0,
+      620
+     ]
+    ]
+   },
+   {
+    "id": "mvu-e-cross",
+    "from": "mvu-n-west",
+    "to": "mvu-n-gap",
+    "class": "residential",
+    "name": "Странична улица към отвора",
+    "oneway": false,
+    "roundabout": false,
+    "lanes": 2,
+    "lanesSource": "tag",
+    "maxspeed": 30,
+    "maxspeedSource": "tag",
+    "length": 88,
+    "geometry": [
+     [
+      -88,
+      280
+     ],
+     [
+      0,
+      280
+     ]
+    ]
+   }
+  ]
+ },
+ "intersections": [
+  {
+   "id": "mvu-n-gap",
+   "x": 0,
+   "y": 280,
+   "degree": 3,
+   "signalized": false
+  }
+ ],
+ "crossings": [],
+ "roundabouts": [],
+ "buildings": [
+  {
+   "id": "mvu-b-ban-block",
+   "height": 12,
+   "heightSource": "default",
+   "footprint": [
+    [
+     22.25,
+     50
+    ],
+    [
+     46.25,
+     50
+    ],
+    [
+     46.25,
+     210
+    ],
+    [
+     22.25,
+     210
+    ]
+   ]
+  },
+  {
+   "id": "mvu-b-corner-block",
+   "height": 9,
+   "heightSource": "default",
+   "footprint": [
+    [
+     -62.25,
+     294.13
+    ],
+    [
+     -38.25,
+     294.13
+    ],
+    [
+     -38.25,
+     320.13
+    ],
+    [
+     -62.25,
+     320.13
+    ]
+   ]
+  }
+ ],
+ "spawnPoints": [
+  {
+   "id": "mvu-spawn-start",
+   "x": 12.19,
+   "y": 15,
+   "heading": 0,
+   "edgeId": "mvu-e-ban",
+   "name": "Начало на булеварда — дясна лента"
+  },
+  {
+   "id": "mvu-spawn-tempting",
+   "x": 12.19,
+   "y": 130,
+   "heading": 0,
+   "edgeId": "mvu-e-ban",
+   "name": "Изкушаващото място — плътна осева и В23: обратният завой е ЗАБРАНЕН"
+  },
+  {
+   "id": "mvu-spawn-gap",
+   "x": 4.06,
+   "y": 262,
+   "heading": 0,
+   "edgeId": "mvu-e-ban",
+   "name": "Разрешеният отвор — вътрешна лента преди страничната улица"
+  },
+  {
+   "id": "mvu-spawn-finish",
+   "x": -12.19,
+   "y": 250,
+   "heading": 180,
+   "edgeId": "mvu-e-ban",
+   "name": "Контролна точка — обратната посока след завоя"
+  }
+ ],
+ "zones": [
+  {
+   "id": "mvu-z-solidcenterline",
+   "kind": "solidCenterLine",
+   "edgeId": "mvu-e-ban",
+   "fromM": 40,
+   "toM": 220,
+   "signRef": "М1"
+  }
+ ]
+}

@@ -1,11 +1,13 @@
 /**
- * Scenario templates — the PEDESTRIAN family, wave 1 (doc 72 §6 „Family PE"),
- * DATA ONLY in the templates.ts mold (coordinates denormalized from the
+ * Scenario templates — the PEDESTRIAN family, waves 1+4 (doc 72 §6 „Family
+ * PE"), DATA ONLY in the templates.ts mold (coordinates denormalized from the
  * committed district files so nothing loads world JSON at runtime; the
  * batteries assert every pinned value against the generated maps):
  *
  *  - sc-pe-school-patrol  „Училищна пътека със стоп-палка"  (PE-07 + PE-02,
  *    pe-school-v1 — the 50 → 30 school zone with a zebra deep inside it)
+ *  - sc-pe-night-unlit    „Неосветена пътека нощем"        (PE-09 + PE-02,
+ *    pe-dart-v1 — the live daytime dart's district, driven at NIGHT)
  *
  * PE-07 („Училищна зона") was 🟡 PARTIAL in doc 72 for exactly one reason:
  * „SPEEDING_* grades automatically once maxSpeedKmh reflects the zone; NEW:
@@ -228,5 +230,200 @@ export const SC_PE_SCHOOL_PATROL: ScenarioSpec = {
   localeBg: "bg-BG",
 };
 
-/** The PE-family wave-1 templates (registered in templates.ts). */
-export const SCENARIO_TEMPLATES_PE2: readonly ScenarioSpec[] = [SC_PE_SCHOOL_PATROL];
+// ---------------------------------------------------------------------------
+// sc-pe-night-unlit — „Неосветена пътека нощем" (PE-09 + PE-02) on pe-dart-v1
+// ---------------------------------------------------------------------------
+
+/**
+ * THE DELTA AGAINST THE LIVE DAYTIME DART (read before editing): this template
+ * REUSES pe-dart-v1 — the same street, the same zebra at y = 80, the same
+ * corner shop west of it. Nothing about the map is new; the axes that are:
+ *
+ *  1. NIGHT (`conditions.night`, all five rungs). PE-09's defining condition.
+ *  2. A SHORTER LEASH: triggerDistM 30 against sc-crossing-dart's 40 — the
+ *     figure is released a quarter later, because at night she does not exist
+ *     until she is in the beam. The two templates cannot play identically.
+ *  3. A CALMER FIGURE: 1.4 m/s (the adult walk tier) against the day dart's
+ *     1.6 m/s hurried step-out. The night lesson is not „react to a sprinter";
+ *     it is „you never saw her at all" — she is walking normally, in the dark.
+ *
+ * WHAT GRADES, HONESTLY (the A12 discipline): PE-09's own doc-72 line asks for
+ * a per-segment LIGHTING flag so SPEED_TOO_FAST_FOR_CONDITIONS arms on unlit
+ * blocks. That flag does not exist, and this template does NOT fake one:
+ * `ruleConfig` is absent, so conditionSpeedNightFactor stays the shipped 1 and
+ * the night NEVER bills a conditions-speed code here. The graded contract is
+ * PE-02's crossing vocabulary — crossingApproachMaxKmh (30) with a pedestrian
+ * on the zebra, the чл. 119 yield, and the lights channel — which is exactly
+ * the duty чл. 20 + чл. 119 put on the driver of q-uyazvimi-026's frame
+ * („нощ, дъжд, разрешените 50, неосветена пътека"). The unlit-segment envelope
+ * is authored ONE district over, on sc-ac-night-overdrive (templates-
+ * conditions2.ts), where the drill IS the envelope; here it would be a second
+ * detector firing on the same metre of road.
+ *
+ * TWO HONEST GAPS, both render-only (neither touches grading):
+ *  - „darker clothing colorway" (the backlog's L5 wish): PedestrianDartOutRunner
+ *    hardcodes colorIndex 3 for every dart — the colourway is not an authored
+ *    channel. L5 therefore carries rain, not wardrobe.
+ *  - L5 `wetGrip`: LevelSpec has no `physics` seam (compileScenario reads
+ *    physics off the TEMPLATE, never off the rung), so a per-rung wet-grip
+ *    opt-in is not expressible today. Authoring template-wide physics would
+ *    hand L1–L4 a wet car their dry-tuned ghost envelopes were never recorded
+ *    against — the doc 76 §7 rule. L5 is the rain RENDER + the longer real
+ *    stopping story in the copy; the grip stays dry until the rung seam lands
+ *    (the same call sc-ac-night-overdrive made in wave 2).
+ */
+
+/** The zebra pe-x-1 of pe-dart-v1 (the day dart's own crossing). */
+const NU_CROSSING_Y = 80;
+/**
+ * The compliant halt: 6 m short of the zebra — the PE-family stop distance,
+ * single truth with the graded halt objective below.
+ */
+const NU_HALT_Y = NU_CROSSING_Y - 6;
+
+/**
+ * The staged NIGHT FIGURE at pe-x-1 (0, 80): steps off the WEST curb at
+ * 1.4 m/s — an ordinary walk, no sprint — only when the player closes within
+ * ~30 m (± the director's seeded 3 m jitter). She is at the edge of what low
+ * beams show, in dark clothes, on an unlit zebra: the last 30 m ARE the whole
+ * encounter, which is why a 50 km/h city approach cannot end well.
+ *
+ * The occupancy span is the PE family's shared symmetric road window: the
+ * west-curb stand-back is the same L4 convention templates-pe.ts pins at
+ * −9.73 (the 1 cm is rounding of one 9.725 m stand-back — it never reaches
+ * grading, which reads roadFromM/roadToM, not the curb x).
+ */
+const NIGHT_UNLIT_PED: PedestrianDartOutSpec = {
+  id: "sc-pnu-ped",
+  kind: "pedestrianDartOut",
+  crossingId: "pe-x-1",
+  crossing: { x: 0, y: NU_CROSSING_Y },
+  start: { x: CURB_X, y: NU_CROSSING_Y },
+  dir: { x: 1, y: 0 },
+  speedMps: 1.4,
+  travelM: TRAVEL_M,
+  roadFromM: ROAD_FROM_M,
+  roadToM: ROAD_TO_M,
+  triggerDistM: 30,
+  minTriggerSpeedKmh: 10,
+};
+
+/** PE-09 / PE-02 — неосветената пътека нощем (ЗДвП чл. 20: скорост според
+ *  видимостта, не според табелата; чл. 119: пропусни стъпилия на пътеката). */
+export const SC_PE_NIGHT_UNLIT: ScenarioSpec = {
+  id: "sc-pe-night-unlit",
+  family: "pedestrians",
+  tagsBg: ["пешеходци", "пешеходна пътека", "нощно каране", "неосветен участък", "видимост"],
+  titleBg: "Неосветена пътека нощем",
+  objectiveBg:
+    "Нощем и в дъжд приближавай неосветената пътека с готовност да спреш — пешеходецът се появява едва в снопа на фаровете.",
+  archetypeIds: ["PE-09", "PE-02"],
+  conceptIds: [
+    "c-crosswalk-yield",
+    "c-night-visibility",
+    "c-speed-adaptation",
+    "c-pedestrian-rights-duties",
+    "c-lights-overview",
+  ],
+  map: {
+    archetype: "zebra-block",
+    // The generator recipe — mirrored in pe-dart-v1.json meta.scenario.params
+    // (tools/maps/gen_pe_crossings.mjs). REUSED map: no generator work.
+    params: { crossings: 1, signalized: "no", approachM: 80 },
+    districtId: "pe-dart-v1",
+  },
+  start: {
+    spawnPointId: "pe-spawn-approach",
+    vehicleStart: "ready",
+  },
+  instructionsBg: [
+    {
+      n: 1,
+      textBg:
+        "Нощ е и улицата е неосветена. Провери, че късите светлини са включени — без тях нямаш дори 40-те метра, които те показват.",
+    },
+    {
+      n: 2,
+      textBg:
+        "Знакът разрешава 50, но ти виждаш докъдето стигат фаровете. Ограничението е таван, не цел — карай със скорост, с която спираш в осветеното.",
+    },
+    {
+      n: 3,
+      textBg:
+        "Пътеката отпред е неосветена: свали скоростта ПРЕДИ нея, под 30 км/ч, докато още не виждаш никого. Готовността се създава рано, не при появата.",
+    },
+    {
+      n: 4,
+      textBg:
+        "На ръба на снопа се появява тъмна фигура — човек в тъмни дрехи вече стъпва на зебрата. Спирачка, без да завиваш встрани.",
+    },
+    { n: 5, textBg: "Спри напълно на няколко метра преди зебрата и я изчакай да освободи цялото платно." },
+    { n: 6, textBg: "Огледай се и премини спокойно едва когато пътеката е свободна." },
+  ],
+  success: [
+    {
+      id: "sc-pnu-approach",
+      titleBg: "Приближи неосветената пътека със скорост за видимостта",
+      // 12 m before the zebra, at/below the 30 km/h crossing-approach cap —
+      // the readiness the dark demands, graded as a gate.
+      params: { kind: "reachZone", x: LANE_2, y: NU_CROSSING_Y - 12, radiusM: 10, maxSpeedKmh: 30 },
+    },
+    {
+      id: "sc-pnu-halt",
+      titleBg: "Спри пред пътеката за появилия се пешеходец",
+      // Single truth with the shadow's rest point — the чл. 119 duty, as a mark.
+      params: { kind: "reachZone", x: LANE_2, y: NU_HALT_Y, radiusM: 4, maxSpeedKmh: 5 },
+    },
+    {
+      id: "sc-pnu-clear",
+      titleBg: "Премини, след като пътеката е свободна",
+      params: { kind: "reachZone", x: LANE_2, y: NU_CROSSING_Y + 38, radiusM: 12 },
+    },
+  ],
+  rubric: { parTimeSec: 85 },
+  shadow: { path: "content/traces/sc-pe-night-unlit/shadow-correct.trace.json" },
+  mistakes: [
+    {
+      traceRef: { path: "content/traces/sc-pe-night-unlit/mistake-city-speed.trace.json" },
+      titleBg: "Градска скорост срещу невидимия пешеходец",
+      whatWentWrongBg:
+        "Колата държеше обичайната градска скорост към неосветената пътека — законна, но сляпа. Пешеходката влезе в снопа на фаровете, когато вече беше твърде късно: приближаването без готовност се отсъжда по чл. 119, а ударът прекратява изпита. Разрешените километри в час не удължават нито фаровете, нито спирачния път — нощем таванът ти е осветеното, не табелата (чл. 20).",
+      codeRefs: ["PEDESTRIAN_CROSSING_TOO_FAST", "COLLISION"],
+    },
+    {
+      traceRef: { path: "content/traces/sc-pe-night-unlit/mistake-lights-off.trace.json" },
+      titleBg: "Нощно каране без светлини",
+      whatWentWrongBg:
+        "Скоростта беше премерена, но колата пое в тъмната улица с изгасени светлини — и спря още преди пътеката, защото без къси светлини зебрата на 40 метра просто не съществува. Тъмната фигура върху нея — също. Късите се включват със запалването по тъмно; чак след това се говори за скорост.",
+      codeRefs: ["HEADLIGHTS_OFF_AT_NIGHT"],
+    },
+  ],
+  teach: {
+    whenBg:
+      "На всяка пешеходна пътека без улично осветление след мръкване — в кварталите, по околовръстните улици, пред блоковете. Пешеходецът е в тъмни дрехи, няма светлоотразител и е убеден, че щом ТОЙ вижда твоите фарове, ти виждаш него.",
+    whyBg:
+      "Това е най-смъртоносната комбинация за пешеходци у нас. На къси светлини човек в тъмни дрехи се появява на около 30–50 метра; от 50 км/ч ти трябват близо 27 метра до спиране, а преди тях реагираш още 14 — резервът се стопява точно там, където пътеката е неосветена. Дъждът добавя и мокър асфалт, и отблясъци по стъклото. Затова отговорът не е по-остра реакция, а по-ниска скорост ПРЕДИ пътеката: тя връща едновременно и метрите, и секундата за реакция.",
+    lawRef: "ЗДвП чл. 119; чл. 20",
+    examinerBg:
+      "Изпитващият очаква включени къси светлини по тъмно, видимо намаляване пред всяка неосветена пътека още преди да се е появил някой, отчетлива реакция със спирачка при появата на пешеходеца и потегляне едва след освобождаването на платното. Преминаване покрай пресичащ пешеходец е опасна грешка, а удар — прекратяване на изпита.",
+  },
+  levels: [
+    { level: 1 },
+    { level: 2 },
+    { level: 3 },
+    { level: 4, vehicleStart: "cold" },
+    // L5 — дъжд върху нощта (q-uyazvimi-026's exact frame). Conditions/render
+    // axis only: night carries from the template conditions (compileScenario
+    // spreads the rung OVER the template), rain adds the reflections and the
+    // longer real stopping distance the copy teaches. NO `physics` — see the
+    // header's second honest gap (LevelSpec has no per-rung physics seam, and
+    // the ghosts are dry-tuned).
+    { level: 5, conditions: { weather: "rain" } },
+  ],
+  staged: [NIGHT_UNLIT_PED],
+  conditions: { weather: "dry", night: true },
+  localeBg: "bg-BG",
+};
+
+/** The PE-family wave-1 + wave-4 templates (registered in templates.ts). */
+export const SCENARIO_TEMPLATES_PE2: readonly ScenarioSpec[] = [SC_PE_SCHOOL_PATROL, SC_PE_NIGHT_UNLIT];

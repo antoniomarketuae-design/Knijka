@@ -19,6 +19,10 @@
  *    entry drill's SECOND half: sc-roundabout-entry teaches THAT you yield to
  *    one circulator; this grades WHICH gap you then take out of two on offer,
  *    with a pair of cars in the ring.
+ *  - sc-rb-lane-choice „Коя лента в двулентово кръгово“ (RB-04/RB-06,
+ *    rb-2lane-v1 — a NEW district) — the question a single-lane ring cannot
+ *    ask: the far exit needs the INNER lane, announced with a left indicator,
+ *    and left again as a proper lane change before the exit.
  *
  * Every staged encounter uses EXISTING StagedEventSpec kinds and every
  * mistake demo cites EXISTING rules-catalog codes — verified by replaying the
@@ -714,9 +718,299 @@ export const SC_RB_BUSY_GAP: ScenarioSpec = {
   localeBg: "bg-BG",
 };
 
+// ---------------------------------------------------------------------------
+// sc-rb-lane-choice — „Коя лента в двулентово кръгово“ (RB-04 wrong lane in a
+// two-lane ring / RB-06 long circulation discipline) on the NEW rb-2lane-v1
+// ---------------------------------------------------------------------------
+
+/**
+ * THE FIRST TEMPLATE ON A TWO-LANE RING. Everything above rides rb-mini-v1's
+ * single-lane R = 18 ring, where "which lane" is not a question. This drill
+ * needs a ring that HAS lanes, so it ships its own district
+ * (tools/maps/gen_rb_2lane.mjs → rb-2lane-v1: R = 26, `lanes: 2` oneway ring
+ * edges, 2×2-lane arms, arrows in meta.scenario.laneArrows). Doc 72 RB-04
+ * called exactly that: „NEW: a multi-lane roundabout in the world … + lane-
+ * tracked ring; grading then falls to existing lane-change + priority
+ * vocabulary". It does — no engine change, and the vocabulary is the one the
+ * doc predicted.
+ *
+ * THE LANE GEOMETRY IS DERIVED, NOT DECORATIVE. The locator centres `lanes`
+ * procedural bands on a oneway edge's polyline, so on this ring laneId 0 (the
+ * rightmost OF TRAVEL — the ring turns CCW, so right is outward) rides
+ * r = 30.06 and laneId 1 rides r = 21.94. Those two numbers are the drill:
+ * the shadow holds 21.94, both mistakes are measured against 30.06, and the
+ * district battery asserts the pair against the generated file.
+ *
+ * WHY THE LEFT INDICATOR IS ON FOR HALF THE DRILL — and it is NOT a trick.
+ * The Bulgarian canon for a two-lane roundabout is: далечен изход ⇒ вътрешна
+ * лента ⇒ ЛЯВ мигач на входа и докато подминаваш чуждите изходи, десен чак
+ * след последния подход преди твоя (чл. 25 — всяка маневра се обявява). The
+ * engine agrees from the other side: NOT_KEEPING_RIGHT (чл. 15) grades any
+ * sustained non-rightmost lane and exempts exactly one thing — a left
+ * indicator. So the signal the law demands IS the detector's own exemption,
+ * and a shadow that rides the inner lane silently convicts in 12 s (measured).
+ * The two halves of чл. 25/чл. 15 meet on this drill; nothing was bent to make
+ * them.
+ */
+
+/** Ring centerline radius (rb-2lane-v1 meta.scenario.params.ringRadiusM). */
+const RB2_R = 26;
+/**
+ * The INNER ring lane's centre radius (rb-2lane-v1 meta.scenario.ringLaneRadiiM
+ * [1] — laneId 0 is the OUTER lane at r = 30.06, which the staged car rides and
+ * both mistakes are measured against). This is the lane the drill is about.
+ */
+const RB2_LANE_INNER_R = 21.94;
+/** The south arm's INNER inbound lane centre (meta.scenario.armLaneCentersM[1];
+ *  laneId 0, the curb lane, sits at x = 12.19). The drill's start lane. */
+const RB2_ARM_INNER_X = 4.06;
+
+/**
+ * The staged CIRCULATING CAR — and the lane it rides is the whole encounter.
+ * `extraRightOffsetM` is left at the lane graph's own default (0), which on a
+ * `lanes: 2` ONEWAY edge offsets the actor by ((lanes − 1) / 2) × laneWidth =
+ * +4.06 m to the right of the ring centerline: r = 30.06, the OUTER lane,
+ * bit-for-bit the same number the locator gives the player there. So the car
+ * sits in the lane the drill is about — the one the shadow legitimately passes
+ * on the inside, and the one mistake 2 turns across.
+ *
+ * cruiseSpeedMps 4.0 (14.4 km/h under the ring's 30 limit) is a MEASURED
+ * choice, not the sibling drills' 2.9. It is fast enough that the car is still
+ * a live conflict at the mouth when the shadow arrives, and slow enough in
+ * ANGULAR terms — 4.0 m/s on r = 30.06 is 7.63 °/s against the player's 8.70
+ * °/s at 12 km/h on r = 21.94 — that a driver holding the inner lane gradually
+ * draws ahead of it and is clear of the outer lane long before the exit. That
+ * angular gap IS the lesson's physics: the inner lane is the far-exit lane
+ * because it is the faster arc.
+ *
+ * The sync is PINNED OUT (minSync = maxSync = cruise — the sc-rb-busy-gap
+ * ruling): the runner would otherwise rubber-band the car to `conflictLeadM`
+ * at the player's arrival, and every timing below is arithmetic on a metronome
+ * instead. conflictLeadM stays DESCRIPTIVE — it records where the car actually
+ * stands when the player reaches the line, rather than being left a dead zero.
+ */
+const RB2_CIRCULATING: RoundaboutEntrySpec = {
+  id: "sc-rb2-circulating",
+  kind: "roundaboutEntry",
+  center: { x: 0, y: 0 },
+  ringRadiusM: RB2_R,
+  actor: {
+    pathNodes: ["rb2-n-w", "rb2-n-s", "rb2-n-e", "rb2-n-n", "rb2-n-w"],
+    hold: { nodeIndex: 0, offsetM: 0 }, // the west node (φ = 270°) — see the trace header
+    cruiseSpeedMps: 4.0,
+    loop: true,
+    colorIndex: 0,
+  },
+  entry: { x: 0, y: -RB2_R }, // the player's south entry mouth (rb2-n-s)
+  entryNodeIndex: 1,
+  conflictLeadM: 12, // descriptive: ~12 m short of the mouth as the player settles
+  armDistM: 60,
+  minSyncSpeedMps: 4.0, // = maxSync = cruise: the sync is pinned out (see above)
+  maxSyncSpeedMps: 4.0,
+};
+
+/**
+ * L5 „Усложнени“ — a SECOND car in the OTHER ring lane (the INNER one, the
+ * player's own), authored with `extraRightOffsetM: −8.125` = one drawn lane
+ * left of the graph's default ⇒ r = 21.94. Held half a ring away
+ * (conflictLeadM 94 ≈ half of the 187.3 m outer lap) so the rung is harder in
+ * the honest way — the far-exit lane is no longer empty and the driver must
+ * read TWO lanes — instead of unwinnable.
+ */
+const RB2_CIRCULATING_INNER: RoundaboutEntrySpec = {
+  ...RB2_CIRCULATING,
+  id: "sc-rb2-circulating-inner",
+  actor: {
+    pathNodes: ["rb2-n-e", "rb2-n-n", "rb2-n-w", "rb2-n-s", "rb2-n-e"],
+    hold: { nodeIndex: 0, offsetM: 0 },
+    cruiseSpeedMps: 4.0,
+    loop: true,
+    colorIndex: 2,
+    extraRightOffsetM: -8.125, // one drawn lane LEFT of the outer lane ⇒ the inner ring lane
+  },
+  entryNodeIndex: 3, // rb2-n-s on THIS loop's node order
+  conflictLeadM: 94, // ≈ half a ring behind car 1
+};
+
+/**
+ * RB-04 + RB-06 — the question a single-lane ring cannot ask. „Пропусни
+ * движещите се в кръга" is settled by the three drills above; this one starts
+ * where they stop, at the two-lane ring every Sofia boulevard has, and asks
+ * the thing the exam and the crash statistics both ask: WHICH LANE. The answer
+ * is decided on the approach, not in the ring — which is why both mistakes are
+ * already lost before the wheels touch the circle.
+ */
+export const SC_RB_LANE_CHOICE: ScenarioSpec = {
+  id: "sc-rb-lane-choice",
+  family: "roundabout",
+  tagsBg: ["кръгово движение", "двулентово кръгово", "избор на лента", "мигачи"],
+  titleBg: "Коя лента в двулентово кръгово",
+  objectiveBg:
+    "Външната лента е за първите изходи, вътрешната — за далечния: избери лентата ПРЕДИ кръга и я дръж до изхода си.",
+  // Doc-72 provenance: RB-04 (wrong lane in a two-lane roundabout — the
+  // exiting-circulating crash geometry) + RB-06 (the long circulation past
+  // three mouths, holding one lane and signalling only at the final exit).
+  archetypeIds: ["RB-04", "RB-06"],
+  conceptIds: [
+    "c-roundabout-rules", // „Кръгово движение: кой е с предимство“
+    "c-roundabout-behavior", // „Движение и излизане от кръговото“
+    "c-lane-choice", // „Избор на лента“ — the drill's core
+    "c-driver-signals", // „Светлинни сигнали“ — ляв на входа, десен на изхода
+  ],
+  map: {
+    archetype: "roundabout",
+    // The generator recipe — mirrored in rb-2lane-v1.json meta.scenario.params
+    // (tools/maps/gen_rb_2lane.mjs). NEW map: this template ships it.
+    params: {
+      ringRadiusM: RB2_R,
+      ringLanes: 2,
+      arms: 4,
+      armLengthM: 90,
+      armLanes: 4,
+      ringSpeedKmh: 30,
+      armSpeedKmh: 50,
+      arrowsFromM: 60,
+    },
+    districtId: "rb-2lane-v1",
+  },
+  start: {
+    // The INNER approach lane (x = 4.06) — the drill starts you where the
+    // arrows say the third exit begins. Choosing it is the lesson; the
+    // district also publishes rb2-spawn-south-outer for the near-exit story.
+    spawnPointId: "rb2-spawn-south-inner",
+    vehicleStart: "ready",
+  },
+  instructionsBg: [
+    {
+      n: 1,
+      textBg:
+        "Твоят изход е ТРЕТИЯТ (западният). Стрелките на платното казват: външната лента води към първите изходи, вътрешната — към далечните. Затова тръгваш от вътрешната лента.",
+    },
+    {
+      n: 2,
+      textBg:
+        "Подай ЛЯВ мигач още на подхода. Той казва на всички: „минавам покрай първите изходи, оставам в кръга“ — и е задължителен, докато си във вътрешната лента.",
+    },
+    {
+      n: 3,
+      textBg:
+        "Намали до линията за пропускане и погледни наляво. В кръга има кола по външната лента — тя е с предимство. Изчакай я да мине и влез след нея.",
+    },
+    {
+      n: 4,
+      textBg:
+        "В кръга дръж вътрешната лента: една линия, около 12 км/ч, ляв мигач. Подминаваш първия изход (изток) и втория (север) — не са твои.",
+    },
+    {
+      n: 5,
+      textBg:
+        "СЛЕД северния подход — последния преди твоя — огледало, десен мигач и чак тогава плавно във външната лента. Излизаш на третия изход (запад) и изключваш мигача.",
+    },
+  ],
+  success: [
+    {
+      id: "sc-rb2-inner-lane",
+      titleBg: "Заеми вътрешната лента преди кръга",
+      // The lane gate, and it has teeth: radius 3.5 m (< the 8.125 m lane
+      // pitch) on the inner approach lane's centre, 8 m before the ring's
+      // reach. A car in the curb lane (x = 12.19) misses it by 8.13 m — the
+      // objective IS „take the lane your arrow commands", exactly the
+      // sc-ln-turn-lane-arrows ruling (no detector reads a painted arrow).
+      params: { kind: "reachZone", x: RB2_ARM_INNER_X, y: -46, radiusM: 3.5, maxSpeedKmh: 50 },
+    },
+    {
+      id: "sc-rb2-past-north",
+      titleBg: "Подмини първите два изхода по вътрешната лента",
+      // The north mouth ON THE INNER LANE (r = 21.94 at φ = 180 ⇒ (0, 21.94)).
+      // radiusM 3.5 is under half the lane pitch, so riding the OUTER lane
+      // round (mistake 1's line, r = 30.06 ⇒ (0, 30.06)) misses it by 8.12 m.
+      params: { kind: "reachZone", x: 0, y: RB2_LANE_INNER_R, radiusM: 3.5, maxSpeedKmh: 20 },
+    },
+    {
+      id: "sc-rb2-exit",
+      titleBg: "Излез на третия изход с включен десен мигач",
+      // The L3 roundabout contract (A10): enter the ring, exit ONLY under a
+      // right indicator. enterRadiusM 33 admits the whole two-lane band (the
+      // outer lane rides 30.06); exitRadiusM 46 sits clear of it.
+      params: {
+        kind: "completeManeuver",
+        maneuver: "roundabout",
+        x: 0,
+        y: 0,
+        enterRadiusM: 33,
+        exitRadiusM: 46,
+      },
+    },
+  ],
+  // Informational only (doc 76 §6 — par time never hard-fails). The authored
+  // shadow waits the circulator out at the line and still rides ~240° of a
+  // 26 m ring in ~69 s; 85 leaves room for an L1 crawl.
+  rubric: { parTimeSec: 85 },
+  // RECORDED: committed deterministic recordings of the authored scripts in
+  // traces/scRbLaneChoice.ts; gates in traces/__tests__/
+  // sc-rb-lane-choice-traces.test.ts (re-record with RECORD_TRACES=1).
+  shadow: { path: "content/traces/sc-rb-lane-choice/shadow-correct.trace.json" },
+  mistakes: [
+    {
+      traceRef: {
+        path: "content/traces/sc-rb-lane-choice/mistake-outer-lane-far-exit.trace.json",
+      },
+      titleBg: "Обикаляне по външната до далечния изход",
+      whatWentWrongBg:
+        "Входът беше изряден — колата пропусна циркулиращата и влезе чисто. Само че влезе във ВЪНШНАТА лента, а изходът ѝ беше третият. Външната лента е лентата на първите изходи: тя изкарва от кръга на всеки подход. Тръгнеш ли по нея към далечен изход, три четвърти от кръга караш в лента, която иска да те изведе — и линията ти го показва: колата се залепи за разделителната линия и остана там през два подхода, нито в едната лента, нито в другата. За чакащите на входовете и за колата зад теб това не е траектория, а гатанка. Лентата се избира ПРЕДИ кръга, по стрелките на платното.",
+      codeRefs: ["POOR_LANE_KEEPING"],
+    },
+    {
+      traceRef: {
+        path: "content/traces/sc-rb-lane-choice/mistake-exit-across-outer.trace.json",
+      },
+      titleBg: "Изход направо през външната кола",
+      whatWentWrongBg:
+        "Вътрешната лента беше правилният избор и до последния подход всичко беше наред. После волът тръгна направо навън — през външната лента, без огледало, без десен мигач и без да пропусне колата, която се движеше в нея. Това е най-честият удар в двулентово кръгово в света: излизащ отвътре срещу циркулиращ отвън. Едно движение на волана наруши целия чл. 25 наведнъж — маневрата не беше обявена, огледалото не беше погледнато и предимството на движещия се в съседната лента не беше зачетено. Изходът от вътрешната лента не е завой, а ПРЕСТРОЯВАНЕ и после завой: огледало, десен мигач, плавно във външната лента след последния подход — и чак тогава навън.",
+      codeRefs: [
+        "FAILED_TO_YIELD",
+        "LANE_CHANGE_WITHOUT_INDICATOR",
+        "LANE_CHANGE_WITHOUT_MIRROR_CHECK",
+        "TURN_WITHOUT_INDICATOR",
+        "COLLISION",
+      ],
+    },
+  ],
+  teach: {
+    whenBg:
+      "На всяко кръгово с повече от една лента: булевардните кръгови в София, големите кръстовища на околовръстното, изпитният маршрут. Правилото важи от мига, в който видиш стрелките на платното — тоест преди кръга, не в него.",
+    whyBg:
+      "Двулентовото кръгово има едно допълнително правило над еднолентовото и то е цялото в стрелките на платното: външната лента е за първите изходи, вътрешната — за далечните и за обратния завой (чл. 15 — движение по определената лента; чл. 50а). Причината не е бюрократична, а геометрична. Външната лента пресича всеки изход: който тръгне по нея към далечен изход, блокира всички, които наистина излизат, и стои в чужда лента три четвърти от кръга. А който влезе вътре и после излезе НАПРАВО през външната, прави точно обратното — пресича лентата на човек, който има предимство пред него. Това е доминиращата геометрия на удара в двулентовите кръгови по света: излизащ отвътре срещу циркулиращ отвън. И двете грешки имат един и същи корен и едно и също лекарство: лентата се избира ПРЕДИ кръга и се напуска като всяко друго престрояване — с огледало и мигач, след последния подход преди твоя изход.",
+    lawRef: "ЗДвП чл. 50а; чл. 15; чл. 25",
+    examinerBg:
+      "Изпитващият чете двулентовото кръгово на три такта: заета ли е правилната лента ПРЕДИ входа според стрелките, обявена ли е с ляв мигач, ако е вътрешната, и напусната ли е като престрояване — огледало, десен мигач, след последния подход. Грешна лента за изхода се отбелязва като второстепенна; изход от вътрешната лента през външната пред движеща се кола е основна, а при принудено спиране или контакт — опасна.",
+  },
+  levels: [
+    { level: 1 },
+    { level: 2 },
+    { level: 3 },
+    {
+      level: 4,
+      vehicleStart: "cold",
+    },
+    {
+      // L5: втора кола в ДРУГАТА лента на пръстена (вътрешната — твоята) +
+      // дъжд. Physics stays dry (the authored ghost envelope is dry-tuned —
+      // ADR-006 opt-in discipline).
+      level: 5,
+      conditions: { weather: "rain" },
+      stagedAdd: [RB2_CIRCULATING_INNER],
+    },
+  ],
+  staged: [RB2_CIRCULATING],
+  conditions: { weather: "dry" },
+  localeBg: "bg-BG",
+};
+
 /** The roundabout-family templates, in catalog order (registered in templates.ts). */
 export const SCENARIO_TEMPLATES_ROUNDABOUT: readonly ScenarioSpec[] = [
   SC_RB_EXIT_SIGNAL,
   SC_RB_CIRCULATE_PRIORITY,
   SC_RB_BUSY_GAP,
+  SC_RB_LANE_CHOICE,
 ];

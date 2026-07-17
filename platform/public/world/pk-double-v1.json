@@ -1,0 +1,491 @@
+{
+ "format": "district-v1",
+ "meta": {
+  "district": "pk-double",
+  "label": "Учебна улица — двойно паркиране до спряла кола (сценарий PK-06)",
+  "mapKind": "scenario-street",
+  "generator": "tools/maps/gen_pk_double.mjs",
+  "zonesVersion": 1,
+  "boundsLocalMeters": {
+   "minX": -40.12,
+   "minY": -6,
+   "maxX": 40.13,
+   "maxY": 366
+  },
+  "attribution": {
+   "text": "Учебна улица с двустранно паркирана редица — оригинален параметричен дизайн (без данни от OpenStreetMap)",
+   "license": "All rights reserved",
+   "licenseUrl": "/",
+   "copyrightUrl": "/",
+   "obligation": "none — original work, no ODbL attribution required for this map"
+  },
+  "defaults": {
+   "maxspeedUrbanKmh": 50,
+   "note": "От 70-ия до 210-ия метър и двата бордюра са заети: спреш ли тук, си на втора линия и улицата се затваря (чл. 98, ал. 1). Свободното място е на 290-ия метър — на 80 метра след редицата."
+  },
+  "stats": {
+   "roadKm": 0.36,
+   "nodes": 2,
+   "edges": 1,
+   "intersections": 0,
+   "crossings": 0,
+   "buildings": 4,
+   "spawnPoints": 2,
+   "zones": 1,
+   "bays": 28
+  },
+  "scenario": {
+   "archetype": "straight-street",
+   "params": {
+    "lengthM": 360,
+    "maxspeedKmh": 50,
+    "rowFromM": 75,
+    "rowToM": 205,
+    "banFromM": 70,
+    "banToM": 210,
+    "legalBayY": 290,
+    "banKind": "noStopping",
+    "banBasis": "law"
+   },
+   "lanesPerDirection": 1,
+   "laneCenterRightM": 4.06,
+   "laneCenterOncomingM": -4.06,
+   "parkedRowY": {
+    "fromY": 75,
+    "toY": 205
+   },
+   "parkedRowX": {
+    "eastX": 6.8,
+    "westX": -6.8
+   },
+   "legalBayY": 290,
+   "banZonesY": [
+    {
+     "id": "pkd-z-second-line",
+     "lawRef": "ЗДвП чл. 98, ал. 1",
+     "fromY": 70,
+     "toY": 210
+    }
+   ],
+   "bays": [
+    {
+     "id": "pkd-bay-e01",
+     "x": 6.8,
+     "y": 75,
+     "headingDeg": 0,
+     "widthM": 2.7,
+     "lengthM": 5,
+     "occupied": true
+    },
+    {
+     "id": "pkd-bay-e02",
+     "x": 6.8,
+     "y": 85,
+     "headingDeg": 0,
+     "widthM": 2.7,
+     "lengthM": 5,
+     "occupied": true
+    },
+    {
+     "id": "pkd-bay-e03",
+     "x": 6.8,
+     "y": 95,
+     "headingDeg": 0,
+     "widthM": 2.7,
+     "lengthM": 5,
+     "occupied": true
+    },
+    {
+     "id": "pkd-bay-e04",
+     "x": 6.8,
+     "y": 105,
+     "headingDeg": 0,
+     "widthM": 2.7,
+     "lengthM": 5,
+     "occupied": true
+    },
+    {
+     "id": "pkd-bay-e05",
+     "x": 6.8,
+     "y": 115,
+     "headingDeg": 0,
+     "widthM": 2.7,
+     "lengthM": 5,
+     "occupied": true
+    },
+    {
+     "id": "pkd-bay-e06",
+     "x": 6.8,
+     "y": 125,
+     "headingDeg": 0,
+     "widthM": 2.7,
+     "lengthM": 5,
+     "occupied": true
+    },
+    {
+     "id": "pkd-bay-e07",
+     "x": 6.8,
+     "y": 135,
+     "headingDeg": 0,
+     "widthM": 2.7,
+     "lengthM": 5,
+     "occupied": true
+    },
+    {
+     "id": "pkd-bay-e08",
+     "x": 6.8,
+     "y": 145,
+     "headingDeg": 0,
+     "widthM": 2.7,
+     "lengthM": 5,
+     "occupied": true
+    },
+    {
+     "id": "pkd-bay-e09",
+     "x": 6.8,
+     "y": 155,
+     "headingDeg": 0,
+     "widthM": 2.7,
+     "lengthM": 5,
+     "occupied": true
+    },
+    {
+     "id": "pkd-bay-e10",
+     "x": 6.8,
+     "y": 165,
+     "headingDeg": 0,
+     "widthM": 2.7,
+     "lengthM": 5,
+     "occupied": true
+    },
+    {
+     "id": "pkd-bay-e11",
+     "x": 6.8,
+     "y": 175,
+     "headingDeg": 0,
+     "widthM": 2.7,
+     "lengthM": 5,
+     "occupied": true
+    },
+    {
+     "id": "pkd-bay-e12",
+     "x": 6.8,
+     "y": 185,
+     "headingDeg": 0,
+     "widthM": 2.7,
+     "lengthM": 5,
+     "occupied": true
+    },
+    {
+     "id": "pkd-bay-e13",
+     "x": 6.8,
+     "y": 195,
+     "headingDeg": 0,
+     "widthM": 2.7,
+     "lengthM": 5,
+     "occupied": true
+    },
+    {
+     "id": "pkd-bay-e14",
+     "x": 6.8,
+     "y": 205,
+     "headingDeg": 0,
+     "widthM": 2.7,
+     "lengthM": 5,
+     "occupied": true
+    },
+    {
+     "id": "pkd-bay-w01",
+     "x": -6.8,
+     "y": 80,
+     "headingDeg": 0,
+     "widthM": 2.7,
+     "lengthM": 5,
+     "occupied": true
+    },
+    {
+     "id": "pkd-bay-w02",
+     "x": -6.8,
+     "y": 90,
+     "headingDeg": 0,
+     "widthM": 2.7,
+     "lengthM": 5,
+     "occupied": true
+    },
+    {
+     "id": "pkd-bay-w03",
+     "x": -6.8,
+     "y": 100,
+     "headingDeg": 0,
+     "widthM": 2.7,
+     "lengthM": 5,
+     "occupied": true
+    },
+    {
+     "id": "pkd-bay-w04",
+     "x": -6.8,
+     "y": 110,
+     "headingDeg": 0,
+     "widthM": 2.7,
+     "lengthM": 5,
+     "occupied": true
+    },
+    {
+     "id": "pkd-bay-w05",
+     "x": -6.8,
+     "y": 120,
+     "headingDeg": 0,
+     "widthM": 2.7,
+     "lengthM": 5,
+     "occupied": true
+    },
+    {
+     "id": "pkd-bay-w06",
+     "x": -6.8,
+     "y": 130,
+     "headingDeg": 0,
+     "widthM": 2.7,
+     "lengthM": 5,
+     "occupied": true
+    },
+    {
+     "id": "pkd-bay-w07",
+     "x": -6.8,
+     "y": 140,
+     "headingDeg": 0,
+     "widthM": 2.7,
+     "lengthM": 5,
+     "occupied": true
+    },
+    {
+     "id": "pkd-bay-w08",
+     "x": -6.8,
+     "y": 150,
+     "headingDeg": 0,
+     "widthM": 2.7,
+     "lengthM": 5,
+     "occupied": true
+    },
+    {
+     "id": "pkd-bay-w09",
+     "x": -6.8,
+     "y": 160,
+     "headingDeg": 0,
+     "widthM": 2.7,
+     "lengthM": 5,
+     "occupied": true
+    },
+    {
+     "id": "pkd-bay-w10",
+     "x": -6.8,
+     "y": 170,
+     "headingDeg": 0,
+     "widthM": 2.7,
+     "lengthM": 5,
+     "occupied": true
+    },
+    {
+     "id": "pkd-bay-w11",
+     "x": -6.8,
+     "y": 180,
+     "headingDeg": 0,
+     "widthM": 2.7,
+     "lengthM": 5,
+     "occupied": true
+    },
+    {
+     "id": "pkd-bay-w12",
+     "x": -6.8,
+     "y": 190,
+     "headingDeg": 0,
+     "widthM": 2.7,
+     "lengthM": 5,
+     "occupied": true
+    },
+    {
+     "id": "pkd-bay-w13",
+     "x": -6.8,
+     "y": 200,
+     "headingDeg": 0,
+     "widthM": 2.7,
+     "lengthM": 5,
+     "occupied": true
+    },
+    {
+     "id": "pkd-bay-free",
+     "x": 6.8,
+     "y": 290,
+     "headingDeg": 0,
+     "widthM": 2.7,
+     "lengthM": 5,
+     "occupied": false
+    }
+   ]
+  }
+ },
+ "roads": {
+  "nodes": [
+   {
+    "id": "pkd-n-end",
+    "x": 0,
+    "y": 360
+   },
+   {
+    "id": "pkd-n-start",
+    "x": 0,
+    "y": 0
+   }
+  ],
+  "edges": [
+   {
+    "id": "pkd-e-street",
+    "from": "pkd-n-start",
+    "to": "pkd-n-end",
+    "class": "residential",
+    "name": "Учебна улица — двойно паркиране до спряла кола (сценарий PK-06)",
+    "oneway": false,
+    "roundabout": false,
+    "lanes": 2,
+    "lanesSource": "tag",
+    "maxspeed": 50,
+    "maxspeedSource": "tag",
+    "length": 360,
+    "geometry": [
+     [
+      0,
+      0
+     ],
+     [
+      0,
+      360
+     ]
+    ]
+   }
+  ]
+ },
+ "intersections": [],
+ "crossings": [],
+ "roundabouts": [],
+ "buildings": [
+  {
+   "id": "pkd-b-approach",
+   "height": 15,
+   "heightSource": "default",
+   "footprint": [
+    [
+     -38.12,
+     20
+    ],
+    [
+     -14.12,
+     20
+    ],
+    [
+     -14.12,
+     60
+    ],
+    [
+     -38.12,
+     60
+    ]
+   ]
+  },
+  {
+   "id": "pkd-b-row-west",
+   "height": 18,
+   "heightSource": "default",
+   "footprint": [
+    [
+     -40.12,
+     75
+    ],
+    [
+     -14.12,
+     75
+    ],
+    [
+     -14.12,
+     205
+    ],
+    [
+     -40.12,
+     205
+    ]
+   ]
+  },
+  {
+   "id": "pkd-b-row-east",
+   "height": 18,
+   "heightSource": "default",
+   "footprint": [
+    [
+     14.13,
+     75
+    ],
+    [
+     40.13,
+     75
+    ],
+    [
+     40.13,
+     205
+    ],
+    [
+     14.13,
+     205
+    ]
+   ]
+  },
+  {
+   "id": "pkd-b-bay-block",
+   "height": 9,
+   "heightSource": "default",
+   "footprint": [
+    [
+     14.13,
+     274
+    ],
+    [
+     34.13,
+     274
+    ],
+    [
+     34.13,
+     304
+    ],
+    [
+     14.13,
+     304
+    ]
+   ]
+  }
+ ],
+ "spawnPoints": [
+  {
+   "id": "pkd-spawn-start",
+   "x": 4.06,
+   "y": 15,
+   "heading": 0,
+   "edgeId": "pkd-e-street",
+   "name": "Начало — дясна лента"
+  },
+  {
+   "id": "pkd-spawn-bay",
+   "x": 6.8,
+   "y": 290,
+   "heading": 0,
+   "edgeId": "pkd-e-street",
+   "name": "Свободно място до бордюра — след паркираната редица"
+  }
+ ],
+ "zones": [
+  {
+   "id": "pkd-z-second-line",
+   "kind": "noStopping",
+   "edgeId": "pkd-e-street",
+   "fromM": 70,
+   "toM": 210,
+   "signRef": "ЗДвП-98-1 — до спряло ППС"
+  }
+ ]
+}

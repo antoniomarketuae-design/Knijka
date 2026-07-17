@@ -1,0 +1,533 @@
+{
+ "format": "district-v1",
+ "meta": {
+  "district": "rb-ped",
+  "label": "Учебно кръгово движение с пешеходни пътеки на изходите — еднолентов кръг с 4 рамена (сценарий RB)",
+  "mapKind": "scenario-roundabout",
+  "generator": "tools/maps/gen_rb_ped.mjs",
+  "boundsLocalMeters": {
+   "minX": -116.12,
+   "minY": -116.12,
+   "maxX": 116.13,
+   "maxY": 116.13
+  },
+  "attribution": {
+   "text": "Учебно кръгово движение с пешеходни пътеки на изходите — оригинален параметричен дизайн (без данни от OpenStreetMap)",
+   "license": "All rights reserved",
+   "licenseUrl": "/",
+   "copyrightUrl": "/",
+   "obligation": "none — original work, no ODbL attribution required for this map"
+  },
+  "defaults": {
+   "maxspeedUrbanKmh": 40,
+   "note": "Кръгово с пътеки на изходите: изходът е десен завой — мигач, а после пропусни пешеходеца. Спира се МЕЖДУ пръстена и пътеката, никога в пръстена."
+  },
+  "stats": {
+   "roadKm": 0.47,
+   "nodes": 8,
+   "edges": 8,
+   "intersections": 4,
+   "crossings": 3,
+   "buildings": 1,
+   "spawnPoints": 2
+  },
+  "scenario": {
+   "archetype": "roundabout",
+   "params": {
+    "ringRadiusM": 18,
+    "arms": 4,
+    "armLengthM": 90,
+    "entryArm": "south",
+    "crossingOffsetM": 12,
+    "ringSpeedKmh": 30,
+    "armSpeedKmh": 40
+   },
+   "center": {
+    "x": 0,
+    "y": 0
+   },
+   "ringNodeIds": [
+    "rbp-n-s",
+    "rbp-n-e",
+    "rbp-n-n",
+    "rbp-n-w"
+   ],
+   "ringEdgeIds": [
+    "rbp-e-ring-se",
+    "rbp-e-ring-en",
+    "rbp-e-ring-nw",
+    "rbp-e-ring-ws"
+   ],
+   "entryArm": "south",
+   "exitArm": "north",
+   "primaryCrossingId": "rbp-x-n",
+   "exitOrderFromSouth": [
+    "rbp-n-e",
+    "rbp-n-n",
+    "rbp-n-w"
+   ],
+   "laneCenterRightM": 4.06,
+   "armHalfCarriagewayM": 8.125,
+   "crossings": [
+    {
+     "id": "rbp-x-e",
+     "x": 30,
+     "y": 0,
+     "kind": "marked",
+     "edgeId": "rbp-e-arm-e"
+    },
+    {
+     "id": "rbp-x-n",
+     "x": 0,
+     "y": 30,
+     "kind": "marked",
+     "edgeId": "rbp-e-arm-n"
+    },
+    {
+     "id": "rbp-x-w",
+     "x": -30,
+     "y": 0,
+     "kind": "marked",
+     "edgeId": "rbp-e-arm-w"
+    }
+   ],
+   "pocket": {
+    "ringOuterEdgeM": 22.06,
+    "crossingRadiusM": 30,
+    "lengthM": 7.94,
+    "carLengthM": 4.3
+   }
+  }
+ },
+ "roads": {
+  "nodes": [
+   {
+    "id": "rbp-n-e",
+    "x": 18,
+    "y": 0
+   },
+   {
+    "id": "rbp-n-e-out",
+    "x": 108,
+    "y": 0
+   },
+   {
+    "id": "rbp-n-n",
+    "x": 0,
+    "y": 18
+   },
+   {
+    "id": "rbp-n-n-out",
+    "x": 0,
+    "y": 108
+   },
+   {
+    "id": "rbp-n-s",
+    "x": 0,
+    "y": -18
+   },
+   {
+    "id": "rbp-n-s-out",
+    "x": 0,
+    "y": -108
+   },
+   {
+    "id": "rbp-n-w",
+    "x": -18,
+    "y": 0
+   },
+   {
+    "id": "rbp-n-w-out",
+    "x": -108,
+    "y": 0
+   }
+  ],
+  "edges": [
+   {
+    "id": "rbp-e-ring-se",
+    "from": "rbp-n-s",
+    "to": "rbp-n-e",
+    "class": "unclassified",
+    "name": "Кръгово движение",
+    "oneway": true,
+    "roundabout": true,
+    "lanes": 1,
+    "lanesSource": "tag",
+    "maxspeed": 30,
+    "maxspeedSource": "tag",
+    "length": 28.2,
+    "geometry": [
+     [
+      0,
+      -18
+     ],
+     [
+      4.66,
+      -17.39
+     ],
+     [
+      9,
+      -15.59
+     ],
+     [
+      12.73,
+      -12.73
+     ],
+     [
+      15.59,
+      -9
+     ],
+     [
+      17.39,
+      -4.66
+     ],
+     [
+      18,
+      0
+     ]
+    ]
+   },
+   {
+    "id": "rbp-e-ring-en",
+    "from": "rbp-n-e",
+    "to": "rbp-n-n",
+    "class": "unclassified",
+    "name": "Кръгово движение",
+    "oneway": true,
+    "roundabout": true,
+    "lanes": 1,
+    "lanesSource": "tag",
+    "maxspeed": 30,
+    "maxspeedSource": "tag",
+    "length": 28.2,
+    "geometry": [
+     [
+      18,
+      0
+     ],
+     [
+      17.39,
+      4.66
+     ],
+     [
+      15.59,
+      9
+     ],
+     [
+      12.73,
+      12.73
+     ],
+     [
+      9,
+      15.59
+     ],
+     [
+      4.66,
+      17.39
+     ],
+     [
+      0,
+      18
+     ]
+    ]
+   },
+   {
+    "id": "rbp-e-ring-nw",
+    "from": "rbp-n-n",
+    "to": "rbp-n-w",
+    "class": "unclassified",
+    "name": "Кръгово движение",
+    "oneway": true,
+    "roundabout": true,
+    "lanes": 1,
+    "lanesSource": "tag",
+    "maxspeed": 30,
+    "maxspeedSource": "tag",
+    "length": 28.2,
+    "geometry": [
+     [
+      0,
+      18
+     ],
+     [
+      -4.66,
+      17.39
+     ],
+     [
+      -9,
+      15.59
+     ],
+     [
+      -12.73,
+      12.73
+     ],
+     [
+      -15.59,
+      9
+     ],
+     [
+      -17.39,
+      4.66
+     ],
+     [
+      -18,
+      0
+     ]
+    ]
+   },
+   {
+    "id": "rbp-e-ring-ws",
+    "from": "rbp-n-w",
+    "to": "rbp-n-s",
+    "class": "unclassified",
+    "name": "Кръгово движение",
+    "oneway": true,
+    "roundabout": true,
+    "lanes": 1,
+    "lanesSource": "tag",
+    "maxspeed": 30,
+    "maxspeedSource": "tag",
+    "length": 28.2,
+    "geometry": [
+     [
+      -18,
+      0
+     ],
+     [
+      -17.39,
+      -4.66
+     ],
+     [
+      -15.59,
+      -9
+     ],
+     [
+      -12.73,
+      -12.73
+     ],
+     [
+      -9,
+      -15.59
+     ],
+     [
+      -4.66,
+      -17.39
+     ],
+     [
+      0,
+      -18
+     ]
+    ]
+   },
+   {
+    "id": "rbp-e-arm-s",
+    "from": "rbp-n-s-out",
+    "to": "rbp-n-s",
+    "class": "unclassified",
+    "name": "Подход към кръговото",
+    "oneway": false,
+    "roundabout": false,
+    "lanes": 2,
+    "lanesSource": "tag",
+    "maxspeed": 40,
+    "maxspeedSource": "tag",
+    "length": 90,
+    "geometry": [
+     [
+      0,
+      -108
+     ],
+     [
+      0,
+      -18
+     ]
+    ]
+   },
+   {
+    "id": "rbp-e-arm-e",
+    "from": "rbp-n-e-out",
+    "to": "rbp-n-e",
+    "class": "unclassified",
+    "name": "Подход към кръговото",
+    "oneway": false,
+    "roundabout": false,
+    "lanes": 2,
+    "lanesSource": "tag",
+    "maxspeed": 40,
+    "maxspeedSource": "tag",
+    "length": 90,
+    "geometry": [
+     [
+      108,
+      0
+     ],
+     [
+      18,
+      0
+     ]
+    ]
+   },
+   {
+    "id": "rbp-e-arm-n",
+    "from": "rbp-n-n-out",
+    "to": "rbp-n-n",
+    "class": "unclassified",
+    "name": "Подход към кръговото",
+    "oneway": false,
+    "roundabout": false,
+    "lanes": 2,
+    "lanesSource": "tag",
+    "maxspeed": 40,
+    "maxspeedSource": "tag",
+    "length": 90,
+    "geometry": [
+     [
+      0,
+      108
+     ],
+     [
+      0,
+      18
+     ]
+    ]
+   },
+   {
+    "id": "rbp-e-arm-w",
+    "from": "rbp-n-w-out",
+    "to": "rbp-n-w",
+    "class": "unclassified",
+    "name": "Подход към кръговото",
+    "oneway": false,
+    "roundabout": false,
+    "lanes": 2,
+    "lanesSource": "tag",
+    "maxspeed": 40,
+    "maxspeedSource": "tag",
+    "length": 90,
+    "geometry": [
+     [
+      -108,
+      0
+     ],
+     [
+      -18,
+      0
+     ]
+    ]
+   }
+  ]
+ },
+ "intersections": [
+  {
+   "id": "rbp-n-s",
+   "x": 0,
+   "y": -18,
+   "degree": 3,
+   "signalized": false
+  },
+  {
+   "id": "rbp-n-e",
+   "x": 18,
+   "y": 0,
+   "degree": 3,
+   "signalized": false
+  },
+  {
+   "id": "rbp-n-n",
+   "x": 0,
+   "y": 18,
+   "degree": 3,
+   "signalized": false
+  },
+  {
+   "id": "rbp-n-w",
+   "x": -18,
+   "y": 0,
+   "degree": 3,
+   "signalized": false
+  }
+ ],
+ "crossings": [
+  {
+   "id": "rbp-x-e",
+   "x": 30,
+   "y": 0,
+   "kind": "marked",
+   "signalized": false,
+   "edgeId": "rbp-e-arm-e"
+  },
+  {
+   "id": "rbp-x-n",
+   "x": 0,
+   "y": 30,
+   "kind": "marked",
+   "signalized": false,
+   "edgeId": "rbp-e-arm-n"
+  },
+  {
+   "id": "rbp-x-w",
+   "x": -30,
+   "y": 0,
+   "kind": "marked",
+   "signalized": false,
+   "edgeId": "rbp-e-arm-w"
+  }
+ ],
+ "roundabouts": [
+  {
+   "id": "rbp-rb-1",
+   "x": 0,
+   "y": 0,
+   "radius": 18,
+   "edgeIds": [
+    "rbp-e-ring-se",
+    "rbp-e-ring-en",
+    "rbp-e-ring-nw",
+    "rbp-e-ring-ws"
+   ]
+  }
+ ],
+ "buildings": [
+  {
+   "id": "rbp-b-cafe",
+   "height": 4,
+   "heightSource": "default",
+   "footprint": [
+    [
+     -44,
+     -44
+    ],
+    [
+     -34,
+     -44
+    ],
+    [
+     -34,
+     -34
+    ],
+    [
+     -44,
+     -34
+    ]
+   ]
+  }
+ ],
+ "spawnPoints": [
+  {
+   "id": "rbp-spawn-south",
+   "x": 4.06,
+   "y": -93,
+   "heading": 0,
+   "edgeId": "rbp-e-arm-s",
+   "name": "Подход към кръговото (юг)"
+  },
+  {
+   "id": "rbp-spawn-finish",
+   "x": 4.06,
+   "y": 55,
+   "heading": 0,
+   "edgeId": "rbp-e-arm-n",
+   "name": "Контролна точка — след пътеката на изхода (север)"
+  }
+ ]
+}

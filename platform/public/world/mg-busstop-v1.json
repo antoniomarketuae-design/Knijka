@@ -1,0 +1,213 @@
+{
+ "format": "district-v1",
+ "meta": {
+  "district": "mg-busstop",
+  "label": "Учебна улица — потеглящ автобус от спирка (сценарий VU-11)",
+  "mapKind": "scenario-street",
+  "generator": "tools/maps/gen_mg_busstop.mjs",
+  "zonesVersion": 1,
+  "boundsLocalMeters": {
+   "minX": -44.25,
+   "minY": -6,
+   "maxX": 48.25,
+   "maxY": 406
+  },
+  "attribution": {
+   "text": "Учебна улица с автобусна спирка в бус лента — оригинален параметричен дизайн (без данни от OpenStreetMap)",
+   "license": "All rights reserved",
+   "licenseUrl": "/",
+   "copyrightUrl": "/",
+   "obligation": "none — original work, no ODbL attribution required for this map"
+  },
+  "defaults": {
+   "maxspeedUrbanKmh": 50,
+   "note": "Дясната лента е бус лента и в нея е спирката — ти пътуваш в лявата, обща лента. В населено място намали и пропусни автобуса от редовната линия, който потегля от спирката (ЗДвП чл. 67)."
+  },
+  "stats": {
+   "roadKm": 0.4,
+   "nodes": 2,
+   "edges": 1,
+   "intersections": 0,
+   "crossings": 0,
+   "buildings": 3,
+   "spawnPoints": 3,
+   "zones": 1
+  },
+  "scenario": {
+   "archetype": "straight-street",
+   "params": {
+    "lengthM": 400,
+    "maxspeedKmh": 50,
+    "lanes": 4,
+    "bayFromM": 130,
+    "bayToM": 176,
+    "banKind": "busLane"
+   },
+   "lanesPerDirection": 2,
+   "laneCenterRightM": 12.19,
+   "laneCenterLeftM": 4.06,
+   "actorLaneX": 12.1875,
+   "actorShiftM": -8.125,
+   "busBayY": {
+    "fromY": 130,
+    "toY": 176
+   },
+   "busLaneY": {
+    "id": "mgb-z-buslane",
+    "lawRef": "Наредба № 2/2001 — BUS",
+    "fromY": 0,
+    "toY": 400
+   }
+  }
+ },
+ "roads": {
+  "nodes": [
+   {
+    "id": "mgb-n-end",
+    "x": 0,
+    "y": 400
+   },
+   {
+    "id": "mgb-n-start",
+    "x": 0,
+    "y": 0
+   }
+  ],
+  "edges": [
+   {
+    "id": "mgb-e-street",
+    "from": "mgb-n-start",
+    "to": "mgb-n-end",
+    "class": "tertiary",
+    "name": "Учебна улица — потеглящ автобус от спирка (сценарий VU-11)",
+    "oneway": false,
+    "roundabout": false,
+    "lanes": 4,
+    "lanesSource": "tag",
+    "maxspeed": 50,
+    "maxspeedSource": "tag",
+    "length": 400,
+    "geometry": [
+     [
+      0,
+      0
+     ],
+     [
+      0,
+      400
+     ]
+    ]
+   }
+  ]
+ },
+ "intersections": [],
+ "crossings": [],
+ "roundabouts": [],
+ "buildings": [
+  {
+   "id": "mgb-b-approach",
+   "height": 12,
+   "heightSource": "default",
+   "footprint": [
+    [
+     -44.25,
+     40
+    ],
+    [
+     -22.25,
+     40
+    ],
+    [
+     -22.25,
+     96
+    ],
+    [
+     -44.25,
+     96
+    ]
+   ]
+  },
+  {
+   "id": "mgb-b-stop-block",
+   "height": 15,
+   "heightSource": "default",
+   "footprint": [
+    [
+     22.25,
+     124
+    ],
+    [
+     48.25,
+     124
+    ],
+    [
+     48.25,
+     182
+    ],
+    [
+     22.25,
+     182
+    ]
+   ]
+  },
+  {
+   "id": "mgb-b-runout-block",
+   "height": 9,
+   "heightSource": "default",
+   "footprint": [
+    [
+     22.25,
+     236
+    ],
+    [
+     42.25,
+     236
+    ],
+    [
+     42.25,
+     284
+    ],
+    [
+     22.25,
+     284
+    ]
+   ]
+  }
+ ],
+ "spawnPoints": [
+  {
+   "id": "mgb-spawn-start",
+   "x": 4.06,
+   "y": 15,
+   "heading": 0,
+   "edgeId": "mgb-e-street",
+   "name": "Начало — общата лента (дясната е бус лента)"
+  },
+  {
+   "id": "mgb-spawn-bay",
+   "x": 12.19,
+   "y": 140,
+   "heading": 0,
+   "edgeId": "mgb-e-street",
+   "name": "Спирката — автобусът чака в бус лентата"
+  },
+  {
+   "id": "mgb-spawn-finish",
+   "x": 4.06,
+   "y": 385,
+   "heading": 0,
+   "edgeId": "mgb-e-street",
+   "name": "Контролна точка — след спирката"
+  }
+ ],
+ "zones": [
+  {
+   "id": "mgb-z-buslane",
+   "kind": "busLane",
+   "edgeId": "mgb-e-street",
+   "fromM": 0,
+   "toM": 400,
+   "signRef": "BUS"
+  }
+ ]
+}

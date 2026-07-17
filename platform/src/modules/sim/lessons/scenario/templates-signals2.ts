@@ -36,7 +36,7 @@
  *     crossing zone therefore arms at y ≈ −0.76 from the southern approach.
  */
 
-import type { PedestrianDartOutSpec } from "../../contracts";
+import type { PedestrianDartOutSpec, TrafficControllerSpec } from "../../contracts";
 import type { ScenarioSpec } from "./types";
 
 /** Northbound right-lane center of pe-jay-v1's ns road, m. */
@@ -374,8 +374,217 @@ export const SC_SIG_GREEN_WAVE: ScenarioSpec = {
   localeBg: "bg-BG",
 };
 
+// ---------------------------------------------------------------------------
+// sc-sig-controller-live — „Регулировчикът бие светофара" on sx-v1 (map REUSED;
+// the lamps run LIVE and contradict the officer in both directions)
+// ---------------------------------------------------------------------------
+
+/** Northbound right-lane center of sx-v1's ns road, m (battery sx-district). */
+const SX_LANE = 4.0625;
+
+/**
+ * The staged authority: a CONTROLLER posted at sx-n-c with the cluster's lamps
+ * LEFT RUNNING (mode "controlled" — runtime/signals.ts: the phase machine keeps
+ * cycling, only stop-line adjudication reads the officer). Session-start dials,
+ * all authored constants (the signalOffsets discipline — no step-time RNG):
+ *
+ *  - signalOffsetSec 23 puts the ns lamps on RED for session time t ∈ [0, 26)
+ *    of the 50 s cycle, GREEN for t ∈ [27, 47), yellow to 50, red again after;
+ *  - haltedGroup "ew" halts the CROSS axis from t = 0 — i.e. the player's south
+ *    approach is PERMITTED while its own lamp shows red;
+ *  - flipAtSec 26 is the single authored flip: from t = 26 the halt moves onto
+ *    the ns axis — the player is stopped exactly as their lamp turns green.
+ *
+ * THE INVERSION IS THE TEMPLATE (and the whole reason it is not a second
+ * sc-signal-controller): that drill runs halt→proceed, so its shadow WAITS and
+ * the lesson is patience. This one runs proceed→halt, so its shadow must ACT on
+ * a permission its own red lamp contradicts — the half of ЗДвП чл. 7 a driver
+ * never believes until he has done it. The two mistakes are then the two ways of
+ * refusing to: leaving on „your" green (t ≈ 28, lamp GREEN) and dithering until
+ * even the lamp forbids it (t ≈ 52, lamp RED). Both grade the same code, and the
+ * red one proves the point twice — the officer's halt REPLACES the lamp grading,
+ * so it is never RED_LIGHT_CROSSED.
+ *
+ * ACCEPTED CONSEQUENCE (instructionsBg step 4 exists for it): the permission
+ * window rides the SESSION clock and the schedule carries ONE flip
+ * (SignalControllerSchedule), so a student who dawdles past t = 26 is halted for
+ * the rest of the attempt and must retry. That is the drill: the officer's wave
+ * is an instruction with an expiry, not a standing offer.
+ *
+ * Grading is 100% the production pipeline: the runtime attaches the permission
+ * to stopLineCrossed and the reducer grades it (halt → CONTROLLER_SIGNAL_VIOLATED
+ * even on green; proceed → innocent even on red). No ruleConfig, no physics.
+ * HESITATION_AT_GREEN is structurally unreachable here: with a controller posted
+ * the runtime surfaces the EFFECTIVE signal, so a halted approach reads "red"
+ * however green its lamp is (worldRuntime.ts) — waiting is never billed, only
+ * moving is. The figure (pose "directTraffic", ADR-001 fictional) is a static
+ * visual anchor; the authored timetable is the law the drill grades.
+ *
+ * Geometry pinned to sx-v1 (battery sx-district.test.ts): single-node cluster
+ * sx-n-c at the origin; south-approach stop line 27.725 m south of it
+ * (sx-e-s@92.3, group "ns"); drawn lane centers at ±4.0625; spawn at (0, −105).
+ */
+export const SC_SIG_CONTROLLER_LIVE_EVENT: TrafficControllerSpec = {
+  id: "sc-sctl-officer",
+  kind: "trafficController",
+  libraryEventId: "JU-18",
+  signalNodeId: "sx-n-c",
+  junction: { x: 0, y: 0 },
+  // The junction-center post, facing the south approach the officer talks to
+  // for the whole drill — first waving it through, then stopping it.
+  officer: { x: 0, y: 0 },
+  facing: { x: 0, y: -1 },
+  haltedGroup: "ew",
+  flipAtSec: 26,
+  signalOffsetSec: 23,
+  lineDistM: 27.7,
+};
+
+export const SC_SIG_CONTROLLER_LIVE: ScenarioSpec = {
+  id: "sc-sig-controller-live",
+  family: "signals",
+  tagsBg: ["регулировчик", "светофар", "йерархия на сигналите", "червен сигнал", "предимство"],
+  titleBg: "Регулировчикът бие светофара",
+  objectiveBg:
+    "Подчини се на регулировчика дори когато работещият светофар показва друго — неговите сигнали са над светлините, знаците и маркировката.",
+  archetypeIds: ["JU-18"],
+  conceptIds: ["c-signal-hierarchy", "c-traffic-light-signals", "c-junction-approach"],
+  map: {
+    archetype: "x-junction",
+    // Map REUSED from the signals family — mirrored in sx-v1.json params. The
+    // controller (mode + timetable + lamp pin) is a runtime session-start dial
+    // armed by the staged event, not a map property.
+    params: {
+      armNorthM: 90,
+      armSouthM: 120,
+      armEastM: 120,
+      armWestM: 170,
+      nsClass: "secondary",
+      ewClass: "residential",
+      nsMaxKmh: 50,
+      ewMaxKmh: 40,
+    },
+    districtId: "sx-v1",
+  },
+  start: {
+    spawnPointId: "sx-spawn-south",
+    vehicleStart: "ready",
+  },
+  instructionsBg: [
+    {
+      n: 1,
+      textBg:
+        "Тръгни по булеварда на север — светофарът на кръстовището напред работи нормално, но на самото кръстовище стои РЕГУЛИРОВЧИК.",
+    },
+    {
+      n: 2,
+      textBg:
+        "Редът е един и той не се обсъжда: регулировчик → светофар → знаци → маркировка. Има ли регулировчик, важи само неговият сигнал.",
+    },
+    {
+      n: 3,
+      textBg:
+        "Твоята лампа свети ЧЕРВЕНО, а регулировчикът е отворил твоята посока. Приближи с намалена скорост, огледай се и премини — червеното не е забрана срещу неговото разрешение.",
+    },
+    {
+      n: 4,
+      textBg:
+        "Не чакай „своето“ зелено. Регулировчикът пуска посоките една по една: докато гледаш лампата, той вече е отворил напречното направление — и тогава зеленото пред теб не разрешава нищо.",
+    },
+    {
+      n: 5,
+      textBg: "Премини кръстовището спокойно и продължи на север.",
+    },
+  ],
+  success: [
+    {
+      id: "sc-sctl-read",
+      titleBg: "Приближи бавно и прочети регулировчика, не лампата",
+      // Stem lane center, 6 m short of the 27.725 m stop line: the drive must be
+      // slow enough here to have actually LOOKED at the officer.
+      params: { kind: "reachZone", x: SX_LANE, y: -34, radiusM: 7, maxSpeedKmh: 20 },
+    },
+    {
+      id: "sc-sctl-cross",
+      titleBg: "Премини стоп-линията по разрешение на регулировчика — въпреки червената лампа",
+      // requireRedMet is not decoration here, it is the drill's thesis made
+      // gradable: the ONLY way this run completes is a crossing the lamp said no
+      // to (objectives.ts: lightState "red" at the crossing IS a met red). A
+      // student who waits for green never satisfies it — by then the officer has
+      // halted him, and the crossing costs the 10-point опасна instead.
+      params: {
+        kind: "passSignal",
+        nodeId: "sx-n-c",
+        x: 0,
+        y: 0,
+        radiusM: 45,
+        control: "trafficLight",
+        requireRedMet: true,
+      },
+    },
+    {
+      id: "sc-sctl-exit",
+      titleBg: "Излез от кръстовището на север",
+      params: { kind: "reachZone", x: SX_LANE, y: 45, radiusM: 9 },
+    },
+  ],
+  rubric: { parTimeSec: 55 },
+  // RECORDED: committed deterministic recordings of the authored scripts in
+  // traces/scSigControllerLive.ts; the §5 gate (shadow replays ZERO violations,
+  // crossing probed for lightState "red" + controller "proceed") and the §9
+  // stage-5 code asserts run in
+  // traces/__tests__/sc-sig-controller-live-traces.test.ts (RECORD_TRACES=1).
+  shadow: { path: "content/traces/sc-sig-controller-live/shadow-correct.trace.json" },
+  mistakes: [
+    {
+      traceRef: { path: "content/traces/sc-sig-controller-live/mistake-wait-for-green.trace.json" },
+      titleBg: "Тръгване на „твоето“ зелено срещу регулировчика",
+      whatWentWrongBg:
+        "Колата спря на червената лампа и изчака зеленото — само че регулировчикът беше отворил нейната посока още докато чакаше, а щом лампата стана зелена, той вече пускаше напречното направление. Зеленото не е разрешение, когато на кръстовището има регулировчик: то е просто лампа, която в този момент никого не командва. Преминаването срещу неговия сигнал е опасна грешка, с която изпитът се прекратява — и реален страничен сблъсък, защото отляво и отдясно вече се движат по негова команда.",
+      codeRefs: ["CONTROLLER_SIGNAL_VIOLATED"],
+    },
+    {
+      traceRef: {
+        path: "content/traces/sc-sig-controller-live/mistake-refuse-then-creep.trace.json",
+      },
+      titleBg: "Отказ да минеш на червено при негов знак — после засечка",
+      whatWentWrongBg:
+        "Регулировчикът пусна посоката, но „нали свети червено“ — и колата остана на линията. След това моментът отмина: зеленото дойде и си отиде, а колата най-накрая припълзя през линията тогава, когато вече и лампата, и регулировчикът ѝ забраняваха. Отказът да изпълниш сигнала на регулировчика не е предпазливост — той просто премества грешката по-нататък. Забележи и кое е отсъдено: не „преминаване на червено“, а неподчинение на регулировчика — при него лампата изобщо не се брои, нито за, нито против.",
+      codeRefs: ["CONTROLLER_SIGNAL_VIOLATED"],
+    },
+  ],
+  teach: {
+    whenBg:
+      "Когато на кръстовището има регулировчик, а светофарът ПРОДЪЛЖАВА да работи — при ПТП, повреда в контролера, протоколно преминаване или тежко задръстване, когато лампите вече не подреждат нищо. Тогава двата сигнала си противоречат открито и точно това е ситуацията, в която важи чл. 7.",
+      whyBg:
+      "Този урок е по-трудният от двата: да спреш на зелено е неприятно, но да ТРЪГНЕШ на червено изисква доверие — и точно затова водачите замръзват на линията, макар регулировчикът да им маха. Замръзването не е безопасно: зад теб има колона, а той е разчел кръстовището за секунди напред и вече е пуснал напречното. Който чака „своето“ зелено, го получава чак когато отсрещните вече се движат — и минава точно в тях.",
+    lawRef: "ЗДвП чл. 7",
+    examinerBg:
+      "Изпитващият гледа кого слушаш: при регулировчик преминаването по негов сигнал — независимо от червената лампа — е правилното изпълнение, а изчакването на зеленото и потеглянето срещу него е опасна грешка, с която изпитът се прекратява. Очаква се намален подход, оглед и решително, но спокойно преминаване, без ускоряване в кръстовището.",
+  },
+  levels: [
+    { level: 1 },
+    { level: 2 },
+    { level: 3 },
+    { level: 4, vehicleStart: "cold" },
+    // No L5 (the backlog's own rung list): the difficulty axis here is the
+    // CLOCK — rain or night would only add a grip/visibility story the
+    // dry-tuned ghost cannot honour (ADR-006 stage 4a), and a cold start at L4
+    // already spends the permission window's slack.
+  ],
+  staged: [SC_SIG_CONTROLLER_LIVE_EVENT],
+  // NO signalPlan (deliberate, the sc-signal-controller ruling): the lamps are
+  // pinned at session start by the staged event's signalOffsetSec, synchronized
+  // with the controller's SESSION-TIME timetable (flipAtSec) — an
+  // approach-relative rebase would desync the red-permission window from the
+  // flip and dissolve the hierarchy lesson.
+  conditions: { weather: "dry" },
+  localeBg: "bg-BG",
+};
+
 /** The SIGNALS-family wave-2 templates (registered in templates.ts). */
 export const SCENARIO_TEMPLATES_SIGNALS2: readonly ScenarioSpec[] = [
   SC_SIG_FLASH_AMBER_PED,
   SC_SIG_GREEN_WAVE,
+  SC_SIG_CONTROLLER_LIVE,
 ];

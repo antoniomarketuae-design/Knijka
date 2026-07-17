@@ -42,6 +42,10 @@ import { SCENARIO_TEMPLATES_CONDITIONS2 } from "./templates-conditions2";
 import { SCENARIO_TEMPLATES_SPEED2 } from "./templates-speed2";
 import { SCENARIO_TEMPLATES_HAZARDS2 } from "./templates-hazards2";
 import { SCENARIO_TEMPLATES_FOLLOWING2 } from "./templates-following2";
+import { SCENARIO_TEMPLATES_COCKPIT2 } from "./templates-cockpit2";
+import { SCENARIO_TEMPLATES_JUNCTIONS4 } from "./templates-junctions4";
+import { SCENARIO_TEMPLATES_MERGING2 } from "./templates-merging2";
+import { SCENARIO_TEMPLATES_ROUNDABOUT2 } from "./templates-roundabout2";
 
 /**
  * The TARGET bay of content/world/lot-perp-v1.json — meta.scenario bay
@@ -264,6 +268,20 @@ export const SCENARIO_TEMPLATES: readonly ScenarioSpec[] = [
   // a new family.
   ...SCENARIO_TEMPLATES_HAZARDS2,
   ...SCENARIO_TEMPLATES_FOLLOWING2,
+  // Wave 4 — seven items extend a family file already spread above (merging,
+  // lanes2, parking2, roundabout, pe2, vru2, exam); cockpit2 is the wave's one
+  // new family.
+  ...SCENARIO_TEMPLATES_COCKPIT2,
+  // Wave 5 — five items extend a family file already spread above (merging,
+  // lanes2, parking2, conditions2, speed2); junctions4 is the wave's one new
+  // family. The wave's seventh item (sc-rx-barrier-drop) is NOT authored — the
+  // barrier-drop director is unbuilt, so nothing is registered for it.
+  ...SCENARIO_TEMPLATES_JUNCTIONS4,
+  // Wave 6 — five items extend a family file already spread above (lanes2,
+  // parking2, signals2, hazards2, exam); merging2 and roundabout2 are the
+  // wave's two new families.
+  ...SCENARIO_TEMPLATES_MERGING2,
+  ...SCENARIO_TEMPLATES_ROUNDABOUT2,
 ];
 
 /** Lookup by template id; undefined for unknown ids. */

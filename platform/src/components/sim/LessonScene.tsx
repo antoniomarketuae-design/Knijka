@@ -169,6 +169,19 @@ const WORLD_NAME_BG: Record<string, string> = {
   "hz-roadworks-v1": "улицата с пътния ремонт",
   "pk-ban2-v1": "улицата със знаци В27 и В28",
   "sig-wave-v1": "булеварда със зелена вълна",
+  // Wave 4 districts. The four reuse items keep their existing map's name.
+  "mg-busstop-v1": "улицата с бус лента",
+  "ov-crest-v1": "завоя извън населено място",
+  "pk-double-v1": "улицата с паркирани коли",
+  "rb-2lane-v1": "двулентовото кръгово",
+  // Wave 5 districts. The four reuse items keep their existing map's name.
+  "mg-property-v1": "изхода от бензиностанцията",
+  "ov-solid2-v1": "пътя със затварящ се прозорец за изпреварване",
+  // Wave 6 districts. The three reuse items keep their existing map's name.
+  "mw-exit-v1": "изхода на магистралата",
+  "mv-uturn-v1": "булеварда с остров",
+  "rb-ped-v1": "кръговото с пътеки на изходите",
+  "hz-debris-v1": "улицата с препятствие в лентата",
 };
 
 /**

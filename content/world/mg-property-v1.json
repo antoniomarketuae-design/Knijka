@@ -1,0 +1,223 @@
+{
+ "format": "district-v1",
+ "meta": {
+  "district": "mg-property",
+  "label": "Учебен изход от бензиностанция към булевард (сценарий OV-15)",
+  "mapKind": "scenario-junction",
+  "generator": "tools/maps/gen_mg_property.mjs",
+  "boundsLocalMeters": {
+   "minX": -18.125,
+   "minY": -260,
+   "maxX": 78,
+   "maxY": 140
+  },
+  "attribution": {
+   "text": "Учебен изход от имот (бензиностанция) към булевард — оригинален параметричен дизайн (без данни от OpenStreetMap)",
+   "license": "All rights reserved",
+   "licenseUrl": "/",
+   "copyrightUrl": "/",
+   "obligation": "none — original work, no ODbL attribution required for this map"
+  },
+  "defaults": {
+   "maxspeedUrbanKmh": 50,
+   "note": "Изход от имот: тротоарът се пресича преди знака Б2, а предимството на булеварда е на движещите се по него (ЗДвП чл. 25)."
+  },
+  "stats": {
+   "roadKm": 0.47,
+   "nodes": 4,
+   "edges": 3,
+   "intersections": 1,
+   "crossings": 1,
+   "buildings": 1,
+   "spawnPoints": 2
+  },
+  "scenario": {
+   "archetype": "t-junction",
+   "params": {
+    "southM": 260,
+    "northM": 140,
+    "exitM": 68,
+    "walkX": 34,
+    "streetKmh": 50,
+    "exitKmh": 20
+   },
+   "junctionNodeId": "mgp-n-c",
+   "expectedControl": "stopSignOnExit",
+   "lanesPerDirection": 1,
+   "laneCenterRightM": 4.06,
+   "exitLaneCenterY": 4.06,
+   "streamRunUpM": 260,
+   "stopLineX": 27.73,
+   "primaryCrossingId": "mgp-x-walk",
+   "crossings": [
+    {
+     "id": "mgp-x-walk",
+     "x": 34,
+     "y": 0,
+     "kind": "marked"
+    }
+   ]
+  }
+ },
+ "roads": {
+  "nodes": [
+   {
+    "id": "mgp-n-c",
+    "x": 0,
+    "y": 0
+   },
+   {
+    "id": "mgp-n-fore",
+    "x": 68,
+    "y": 0
+   },
+   {
+    "id": "mgp-n-n",
+    "x": 0,
+    "y": 140
+   },
+   {
+    "id": "mgp-n-s",
+    "x": 0,
+    "y": -260
+   }
+  ],
+  "edges": [
+   {
+    "id": "mgp-e-street-s",
+    "from": "mgp-n-s",
+    "to": "mgp-n-c",
+    "class": "primary",
+    "name": "Булевард — южен подход",
+    "oneway": false,
+    "roundabout": false,
+    "lanes": 2,
+    "lanesSource": "tag",
+    "maxspeed": 50,
+    "maxspeedSource": "tag",
+    "length": 260,
+    "geometry": [
+     [
+      0,
+      -260
+     ],
+     [
+      0,
+      0
+     ]
+    ]
+   },
+   {
+    "id": "mgp-e-street-n",
+    "from": "mgp-n-c",
+    "to": "mgp-n-n",
+    "class": "primary",
+    "name": "Булевард — северен изход",
+    "oneway": false,
+    "roundabout": false,
+    "lanes": 2,
+    "lanesSource": "tag",
+    "maxspeed": 50,
+    "maxspeedSource": "tag",
+    "length": 140,
+    "geometry": [
+     [
+      0,
+      0
+     ],
+     [
+      0,
+      140
+     ]
+    ]
+   },
+   {
+    "id": "mgp-e-drive",
+    "from": "mgp-n-c",
+    "to": "mgp-n-fore",
+    "class": "service",
+    "name": "Изход от бензиностанция",
+    "oneway": false,
+    "roundabout": false,
+    "lanes": 2,
+    "lanesSource": "tag",
+    "maxspeed": 20,
+    "maxspeedSource": "tag",
+    "length": 68,
+    "geometry": [
+     [
+      0,
+      0
+     ],
+     [
+      68,
+      0
+     ]
+    ]
+   }
+  ]
+ },
+ "intersections": [
+  {
+   "id": "mgp-n-c",
+   "x": 0,
+   "y": 0,
+   "degree": 3,
+   "signalized": false
+  }
+ ],
+ "crossings": [
+  {
+   "id": "mgp-x-walk",
+   "x": 34,
+   "y": 0,
+   "kind": "marked",
+   "signalized": false,
+   "edgeId": "mgp-e-drive"
+  }
+ ],
+ "roundabouts": [],
+ "buildings": [
+  {
+   "id": "mgp-b-shop",
+   "height": 5,
+   "heightSource": "default",
+   "footprint": [
+    [
+     38,
+     14
+    ],
+    [
+     78,
+     14
+    ],
+    [
+     78,
+     34
+    ],
+    [
+     38,
+     34
+    ]
+   ]
+  }
+ ],
+ "spawnPoints": [
+  {
+   "id": "mgp-spawn-forecourt",
+   "x": 62,
+   "y": 4.06,
+   "heading": 270,
+   "edgeId": "mgp-e-drive",
+   "name": "Изход на бензиностанцията"
+  },
+  {
+   "id": "mgp-spawn-finish",
+   "x": 4.06,
+   "y": 125,
+   "heading": 0,
+   "edgeId": "mgp-e-street-n",
+   "name": "Контролна точка — по булеварда след изхода"
+  }
+ ]
+}

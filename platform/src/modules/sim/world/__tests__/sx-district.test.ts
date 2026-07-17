@@ -342,3 +342,200 @@ describe("sx-v1 through the traffic lane graph + system", () => {
     }
   });
 });
+
+/**
+ * JU-16 host contract (sc-jx-blocked-exit, templates-junctions4.ts) — the
+ * invariants the block-the-box drill pins on this map. sx-v1 was built for the
+ * signal drills; this battery states WHY it can also host a gridlock trap, so a
+ * future regeneration cannot silently break the scenario. Every number here is
+ * denormalized into the template + its trace script by value.
+ */
+describe("sx-v1 as the JU-16 block-the-box host", () => {
+  const raw = loadRaw() as TrafficDistrict;
+
+  it("the south stop line sits where the template pins it (y = −27.73)", () => {
+    const runtime = createWorldRuntime(loadRaw());
+    const south = runtime.debugStopLines().find((l) => l.id === "sx-e-s@92.3:trafficLight")!;
+    expect(south).toBeDefined();
+    expect(south.control).toBe("trafficLight");
+    expect(south.dirSign).toBe(1); // crossed by northbound (with-geometry) travel
+    // sx-e-s runs (0, −120) → (0, 0), so the line's arclength converts straight
+    // to the y the template denormalizes as JX_STOP_LINE_Y = −27.73 and the
+    // trace script's hold pose (y = −29.5) rests 1.77 m short of.
+    const lineY = -120 + south.sM;
+    expect(lineY).toBeCloseTo(-27.725, 2);
+    expect(lineY).toBeGreaterThan(-29.5); // the pose really is BEHIND the paint
+  });
+
+  it("stages the queue tail on the northbound ns road, past the node and short of the far mouth", () => {
+    const traffic = createTrafficSystem(raw, { seed: 7, vehicleCount: 0, pedestrianCount: 0 });
+    // The template's OWN actor geometry (templates-junctions4 JXB_QUEUE_TAIL).
+    const staged = traffic.stage({
+      kind: "vehicle",
+      id: "sx-jxb-tail",
+      pathNodes: ["sx-n-s", "sx-n-c", "sx-n-n"],
+      hold: { nodeIndex: 1, offsetM: 16 },
+      cruiseSpeedMps: 8,
+    });
+    expect(staged).not.toBeNull();
+    expect(staged!.nodeS.length).toBe(3);
+    // It rests 16 m PAST the junction node — beyond the crossing roadway (so
+    // the EXIT is what is full) but short of the far stop line at 27.725 (so a
+    // driver who follows it in strands INSIDE the box). This is the template's
+    // whole geometric premise.
+    expect(staged!.y).toBeCloseTo(16, 1);
+    expect(staged!.y).toBeGreaterThan(0);
+    expect(staged!.y).toBeLessThan(27.725);
+    // …in the player's OWN lane: within the 4 m lead corridor of a northbound
+    // car on the drawn lane center, so leadGapMeters reports it as the lead.
+    expect(Math.abs(staged!.x - 4.06)).toBeLessThan(4);
+    const gap = traffic.leadGapMeters(4.06, -29.5, 0);
+    expect(Number.isFinite(gap)).toBe(true);
+    // The measured 41.44 m the trace gate and the ruleConfig flag are pinned to
+    // (bumper gap = 16 − (−29.5) − 4.1 m of car).
+    expect(gap).toBeCloseTo(41.4, 0);
+  });
+
+  it("the staged column can clear the junction northward — the 'exit freed' half of the drill", () => {
+    const traffic = createTrafficSystem(raw, { seed: 7, vehicleCount: 0, pedestrianCount: 0 });
+    traffic.stage({
+      kind: "vehicle",
+      id: "sx-jxb-tail",
+      pathNodes: ["sx-n-s", "sx-n-c", "sx-n-n"],
+      hold: { nodeIndex: 1, offsetM: 16 },
+      cruiseSpeedMps: 8,
+    });
+    traffic.stagedCommand("sx-jxb-tail", { type: "cruise" });
+    for (let i = 0; i < 60 * 8; i++) {
+      traffic.update(1 / 60, { signalPhase: () => "green", playerPos: null });
+    }
+    // After 8 s at 8 m/s it is far up the north arm — so the waiting player's
+    // lead gap really does open, which is what releases JU-09's clear-ahead
+    // flag and re-arms the hesitation detector for the prompt-start half.
+    expect(traffic.staged("sx-jxb-tail")!.y).toBeGreaterThan(60);
+    expect(traffic.leadGapMeters(4.06, -29.5, 0)).toBeGreaterThan(48);
+  });
+
+  it("the ns green is a full 20 s — refusing one is a real, teachable cost", () => {
+    // The drill's premise: the shadow gives up an ENTIRE green rather than
+    // enter a blocked box. If the phase machine ever shortened, the sacrifice
+    // (and the ~7 s stationary-at-green window the trace pins) would change.
+    expect(SIGNAL_TIMING.greenSec).toBe(20);
+    expect(SIGNAL_TIMING.cycleSec).toBe(50);
+  });
+});
+
+/**
+ * JU-18 host contract, INVERTED timetable (sc-sig-controller-live,
+ * templates-signals2.ts) — the invariants the „регулировчикът бие светофара"
+ * drill pins on this map. sc-signal-controller already runs halt→proceed here;
+ * this battery states the OTHER arrangement (the officer opens the player's
+ * axis first, closes it as the lamps go green) so a future change to the phase
+ * machine, the offsets or the permission seam cannot silently turn the drill's
+ * innocent red crossing into a 10-point опасна. Every number is denormalized
+ * into the template + its trace script by value.
+ */
+describe("sx-v1 as the JU-18 live-lamp controller host (inverted timetable)", () => {
+  /** The template's authored dials (SC_SIG_CONTROLLER_LIVE_EVENT). */
+  const OFFSET_SEC = 23;
+  const FLIP_AT_SEC = 26;
+
+  /** Runtime pinned exactly as the staged trafficController arms it. */
+  function armed(): DistrictWorldRuntime {
+    const rt = createWorldRuntime(loadRaw());
+    rt.setSignalClusterOffset("sx-n-c", OFFSET_SEC);
+    rt.setSignalClusterController("sx-n-c", { haltedGroup: "ew", flipAtSec: FLIP_AT_SEC });
+    return rt;
+  }
+
+  /**
+   * Drive a northbound car over the south stop line at ≈ `atSec` of session
+   * time and return the crossing event the production runtime emits. Winds the
+   * signal clock forward with update() alone, then sweeps the last 8 m.
+   */
+  function crossAt(atSec: number): { lightState?: string; controller?: string } {
+    const rt = armed();
+    let t = 0;
+    const sweepSec = 0.27; // 16 frames of the sweep below
+    while (t < atSec - sweepSec) {
+      rt.update(1 / 60);
+      t += 1 / 60;
+    }
+    let seen: { lightState?: string; controller?: string } | null = null;
+    for (let y = -32; y <= -24; y += 0.5) {
+      rt.update(1 / 60);
+      t += 1 / 60;
+      const tick = rt.sample(sample(4.0625, y, 0, 25), t, false);
+      for (const e of tick.events) {
+        if (e.kind === "stopLineCrossed" && e.control === "trafficLight") {
+          seen = { lightState: e.lightState, controller: e.controller };
+        }
+      }
+    }
+    expect(seen, `no crossing swept at t ≈ ${atSec}`).not.toBeNull();
+    return seen!;
+  }
+
+  it("offset 23 pins the lamp timeline the three drives are authored against", () => {
+    // The whole staging rests on this: RED across the permission window, GREEN
+    // exactly when the officer closes the direction, RED again by ~50 s. Read
+    // off the phase machine, not off the template's comment.
+    const rt = armed();
+    const phaseAt = (target: number): string => {
+      const r = armed();
+      for (let i = 0; i < Math.round(target * 60); i++) r.update(1 / 60);
+      return r.signalPhaseForApproach("sx-n-c", 0); // bearing 0 = the ns approach
+    };
+    expect(rt.signalPhaseForApproach("sx-n-c", 0)).toBe("red"); // t = 0
+    expect(phaseAt(13.4)).toBe("red"); // the shadow's crossing
+    expect(phaseAt(25.5)).toBe("red"); // still red at the end of the window
+    expect(phaseAt(29.1)).toBe("green"); // mistake-wait-for-green's crossing
+    expect(phaseAt(53.5)).toBe("red"); // mistake-refuse-then-creep's crossing
+  });
+
+  it("the permission INVERTS at the authored flip — the player is waved through, then stopped", () => {
+    // The seam the whole template hangs on, read through the production
+    // pipeline (the runtime attaches the permission to the crossing event).
+    const early = crossAt(13.4);
+    expect(early.controller).toBe("proceed");
+    expect(early.lightState).toBe("red"); // …and the lamp says the opposite
+    const late = crossAt(29.1);
+    expect(late.controller).toBe("halt");
+    expect(late.lightState).toBe("green"); // …and again the lamp says the opposite
+  });
+
+  it("the officer's halt outlives the green — the schedule carries ONE flip", () => {
+    // The accepted consequence the template's instructionsBg step 4 exists for
+    // (and the second mistake demo dramatises): there is no second wave, so a
+    // driver who refuses the first one is halted for the rest of the attempt.
+    // If SignalControllerSchedule ever grew a repeating timetable, this is the
+    // assert that would flag the drill for a re-tune.
+    const veryLate = crossAt(53.5);
+    expect(veryLate.controller).toBe("halt");
+    expect(veryLate.lightState).toBe("red"); // both authorities forbid it now
+  });
+
+  it("the permission window is long enough for the authored approach (26 s vs ~13 s)", () => {
+    // Feasibility, stated as a number: the drill is only fair if a prudent
+    // 26 km/h approach from the spawn reaches the paint well inside the window.
+    // The recorded shadow crosses at t = 13.38 — a full 12 s of slack.
+    expect(FLIP_AT_SEC).toBeGreaterThan(20);
+    const spawnToLineM = 105 - 27.725;
+    const cruiseMps = 26 / 3.6;
+    expect(spawnToLineM / cruiseMps).toBeLessThan(FLIP_AT_SEC - 8);
+  });
+
+  it("the hold pose clears the STOP_LINE_OVERSHOOT window by 4 m", () => {
+    // Both mistake demos rest at y = −33 for 14–37 s while the surfaced signal
+    // reads red the whole time (a halted approach reads red however green its
+    // lamp is), and this drill's lamp is never green-surfaced at all — so the
+    // detector's lawful-presence latch never disarms it. The ONLY thing keeping
+    // the wait innocent is the setback: 5.275 m against a 1.2 m window.
+    const runtime = createWorldRuntime(loadRaw());
+    const south = runtime.debugStopLines().find((l) => l.id === "sx-e-s@92.3:trafficLight")!;
+    const lineY = -120 + south.sM;
+    expect(lineY).toBeCloseTo(-27.725, 2);
+    expect(lineY - -33).toBeCloseTo(5.275, 2);
+    expect(lineY - -33).toBeGreaterThan(1.2 + 4);
+  });
+});

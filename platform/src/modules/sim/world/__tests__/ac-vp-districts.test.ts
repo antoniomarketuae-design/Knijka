@@ -235,3 +235,48 @@ for (const c of CASES) {
     });
   });
 }
+
+// ---------------------------------------------------------------------------
+// The L7 pin: the cockpit templates DENORMALIZE this district's geometry by
+// value (templates-cockpit.ts / templates-cockpit2.ts carry `LANE_X = 4.06` as
+// a literal, and sc-vp-handbrake's objective zones are hand-placed y-values), so
+// nothing loads world JSON at runtime. That copy is only safe if a battery
+// asserts it against the generated map — otherwise a generator tweak silently
+// slides every graded zone off the lane and the drills keep "passing" while
+// grading nothing. This block is that assert.
+// ---------------------------------------------------------------------------
+
+describe("vp-ready-v1 — the geometry the cockpit templates pin by value", () => {
+  it("meta.scenario publishes the right-lane center the templates hardcode (4.06)", () => {
+    const raw = loadRaw("vp-ready-v1") as {
+      meta: { scenario?: { laneCenterRightM?: number; lanesPerDirection?: number } };
+    };
+    expect(raw.meta.scenario?.laneCenterRightM).toBe(X_LANE);
+    expect(raw.meta.scenario?.lanesPerDirection).toBe(1);
+  });
+
+  it("vp-spawn-approach is the pinned start pose (4.06, 15) facing north", () => {
+    // The trace scripts' first polyline point is [4.06, 15] and every template's
+    // start.spawnPointId resolves here — a moved spawn would desync the two.
+    const district = assertDistrict(loadRaw("vp-ready-v1"));
+    const spawn = district.spawnPoints.find((s) => s.id === "vp-spawn-approach")!;
+    expect(spawn).toBeDefined();
+    expect(spawn.x).toBe(X_LANE);
+    expect(spawn.y).toBe(15);
+    expect(spawn.heading).toBe(0); // north — the direction the RUN drives
+  });
+
+  it("sc-vp-handbrake's graded zones (y = 150, y = 330) sit centered on the northbound lane at the posted 50", () => {
+    const runtime = createWorldRuntime(loadRaw("vp-ready-v1"));
+    runtime.update(1 / 60);
+    for (const y of [150, 330]) {
+      expect(runtime.speedLimitAt({ x: X_LANE, y })).toBe(50);
+      const tick = runtime.sample(sample(X_LANE, y, 0, 40), 1, false);
+      expect(tick.edgeId).toBe("vp-e-street");
+      expect(Math.abs(tick.laneOffsetM)).toBeLessThan(0.2);
+    }
+    // The finish zone (y 330, radius 12) must fall INSIDE the 360 m street, or
+    // the drill would be completable off the far end of the road.
+    expect(330 + 12).toBeLessThan(360);
+  });
+});

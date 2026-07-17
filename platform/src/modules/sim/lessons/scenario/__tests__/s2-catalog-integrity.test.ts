@@ -16,7 +16,7 @@ const HERE = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(HERE, "../../../../../../..");
 
 describe("S2 catalog integrity", () => {
-  it("registers the full S1+S2+S3+S4+unit-2+breadth+signals+maneuver+hazards+final-harvest+cap-2+FO-06+VU-09+stage-1c+stage-1d+stage-2a+stage-2b+stage-3a+stage-3b+stage-4a+FO-pair+fog+curve+motorway+N11-telltale+OV-corridor+snow+N8-vru+OV-return+AC-12-crosswind+surface-patch+w1+w2+w3 wave (108 templates across the families)", () => {
+  it("registers the full S1+S2+S3+S4+unit-2+breadth+signals+maneuver+hazards+final-harvest+cap-2+FO-06+VU-09+stage-1c+stage-1d+stage-2a+stage-2b+stage-3a+stage-3b+stage-4a+FO-pair+fog+curve+motorway+N11-telltale+OV-corridor+snow+N8-vru+OV-return+AC-12-crosswind+surface-patch+w1+w2+w3+w4+w5+w6 wave (129 templates across the families)", () => {
     const ids = SCENARIO_TEMPLATES.map((s) => s.id).sort();
     expect(ids).toEqual(
       [
@@ -131,6 +131,33 @@ describe("S2 catalog integrity", () => {
         "sc-sig-green-wave",
         "sc-hz-emergency-stop",
         "sc-fo-brakelight-chain",
+        // Wave 4.
+        "sc-merge-bus-pullout",
+        "sc-ov-crest-curve",
+        "sc-pk-double-park",
+        "sc-rb-lane-choice",
+        "sc-pe-night-unlit",
+        "sc-vu-cyclist-group",
+        "sc-ed-d2-priority-run",
+        "sc-vp-handbrake",
+        // Wave 5. Six of the wave's seven items landed; sc-rx-barrier-drop is
+        // deliberately absent — its barrier-drop director is unbuilt and the
+        // fixed-clock fallback collapses into the shipped sc-rx-guarded, so
+        // nothing was authored for it (see the wave notes).
+        "sc-merge-from-property",
+        "sc-ov-solid-return",
+        "sc-park-bay-exit-rev",
+        "sc-jx-blocked-exit",
+        "sc-ac-truck-spray",
+        "sc-mw-min-speed",
+        // Wave 6 — all seven items landed.
+        "sc-merge-motorway-exit",
+        "sc-ln-boulevard-discipline",
+        "sc-mv-uturn-ban",
+        "sc-rb-ped-exit",
+        "sc-sig-controller-live",
+        "sc-hz-brake-dont-swerve",
+        "sc-ed-d2-stop-address",
       ].sort(),
     );
   });

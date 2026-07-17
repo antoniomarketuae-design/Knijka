@@ -1,0 +1,201 @@
+{
+ "format": "district-v1",
+ "meta": {
+  "district": "ov-solid2",
+  "label": "Учебен път — прозорецът за изпреварване се затваря (сценарий OV-04)",
+  "mapKind": "scenario-street",
+  "generator": "tools/maps/gen_ov_solid2.mjs",
+  "zonesVersion": 1,
+  "boundsLocalMeters": {
+   "minX": -36.12,
+   "minY": -6,
+   "maxX": 38.13,
+   "maxY": 626
+  },
+  "attribution": {
+   "text": "Учебен път с прекъсната и непрекъсната осева линия — оригинален параметричен дизайн (без данни от OpenStreetMap)",
+   "license": "All rights reserved",
+   "licenseUrl": "/",
+   "copyrightUrl": "/",
+   "obligation": "none — original work, no ODbL attribution required for this map"
+  },
+  "defaults": {
+   "maxspeedUrbanKmh": 90,
+   "note": "Осевата линия е прекъсната (М2) до 300-ия метър и непрекъсната (М1) от 300-ия до 500-ия: изпреварвай в прозореца и се прибери изцяло вдясно най-късно на 270-ия метър. От 240-ия метър прекъсванията се удължават — това е предупреждението, че прозорецът свършва."
+  },
+  "stats": {
+   "roadKm": 0.62,
+   "nodes": 2,
+   "edges": 1,
+   "intersections": 0,
+   "crossings": 0,
+   "buildings": 2,
+   "spawnPoints": 3,
+   "zones": 1
+  },
+  "scenario": {
+   "archetype": "straight-street",
+   "params": {
+    "lengthM": 620,
+    "maxspeedKmh": 90,
+    "banKind": "solidCenterLine",
+    "banFromM": 300,
+    "banToM": 500,
+    "warnFromM": 240,
+    "returnMarginM": 30
+   },
+   "lanesPerDirection": 1,
+   "laneCenterRightM": 4.06,
+   "laneCenterOncomingM": -4.06,
+   "banZone": {
+    "id": "ovs2-z-solidcenterline",
+    "kind": "solidCenterLine",
+    "signRef": "М1",
+    "fromM": 300,
+    "toM": 500
+   },
+   "passWindowY": {
+    "fromY": 15,
+    "toY": 300,
+    "lengthM": 285,
+    "markingRef": "М2"
+   },
+   "warningDashSpanY": {
+    "fromY": 240,
+    "toY": 300,
+    "lengthM": 60,
+    "markingRef": "М2",
+    "lawRef": "Наредба № 2/2001 — надлъжна маркировка М2 (удължени прекъсвания)",
+    "graded": false
+   },
+   "returnByY": 270
+  }
+ },
+ "roads": {
+  "nodes": [
+   {
+    "id": "ovs2-n-end",
+    "x": 0,
+    "y": 620
+   },
+   {
+    "id": "ovs2-n-start",
+    "x": 0,
+    "y": 0
+   }
+  ],
+  "edges": [
+   {
+    "id": "ovs2-e-road",
+    "from": "ovs2-n-start",
+    "to": "ovs2-n-end",
+    "class": "tertiary",
+    "name": "Учебен път — прозорецът за изпреварване се затваря (сценарий OV-04)",
+    "oneway": false,
+    "roundabout": false,
+    "lanes": 2,
+    "lanesSource": "tag",
+    "maxspeed": 90,
+    "maxspeedSource": "tag",
+    "length": 620,
+    "geometry": [
+     [
+      0,
+      0
+     ],
+     [
+      0,
+      620
+     ]
+    ]
+   }
+  ]
+ },
+ "intersections": [],
+ "crossings": [],
+ "roundabouts": [],
+ "buildings": [
+  {
+   "id": "ovs2-b-warn-block",
+   "height": 9,
+   "heightSource": "default",
+   "footprint": [
+    [
+     -36.12,
+     230
+    ],
+    [
+     -14.12,
+     230
+    ],
+    [
+     -14.12,
+     296
+    ],
+    [
+     -36.12,
+     296
+    ]
+   ]
+  },
+  {
+   "id": "ovs2-b-solid-block",
+   "height": 12,
+   "heightSource": "default",
+   "footprint": [
+    [
+     14.13,
+     310
+    ],
+    [
+     38.13,
+     310
+    ],
+    [
+     38.13,
+     490
+    ],
+    [
+     14.13,
+     490
+    ]
+   ]
+  }
+ ],
+ "spawnPoints": [
+  {
+   "id": "ovs2-spawn-start",
+   "x": 4.06,
+   "y": 15,
+   "heading": 0,
+   "edgeId": "ovs2-e-road",
+   "name": "Начало — дясна лента зад бавната кола"
+  },
+  {
+   "id": "ovs2-spawn-returnby",
+   "x": 4.06,
+   "y": 270,
+   "heading": 0,
+   "edgeId": "ovs2-e-road",
+   "name": "Прибери се дотук — преди началото на непрекъснатата линия"
+  },
+  {
+   "id": "ovs2-spawn-finish",
+   "x": 4.06,
+   "y": 605,
+   "heading": 0,
+   "edgeId": "ovs2-e-road",
+   "name": "Контролна точка — след зоната на М1"
+  }
+ ],
+ "zones": [
+  {
+   "id": "ovs2-z-solidcenterline",
+   "kind": "solidCenterLine",
+   "edgeId": "ovs2-e-road",
+   "fromM": 300,
+   "toM": 500,
+   "signRef": "М1"
+  }
+ ]
+}

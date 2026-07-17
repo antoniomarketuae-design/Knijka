@@ -10,7 +10,16 @@
  * against the generated map and the sc-hz-emergency-stop trace gate replays the
  * drives through the production stack.
  *
- *  - sc-hz-emergency-stop  „Екстрено спиране"  (PE-04)
+ *  - sc-hz-emergency-stop      „Екстрено спиране"                  (PE-04)
+ *  - sc-hz-brake-dont-swerve  „Спри в лентата, не свивай на сляпо" (OV-18)
+ *
+ * The two are ONE lesson split along its natural seam, and they are deliberately
+ * NOT on the same map. The first teaches the PEDAL against an empty road (the
+ * wheel is wrong because straight is shorter). The second — added in wave 6 on
+ * its own district hz-debris-v1 (a 2-lane ONE-WAY street) — teaches the WHEEL:
+ * there the swerve is not clumsy steering but престрояване into an OCCUPIED
+ * lane, graded by the shipped lane-change adjudication, which a two-way 1+1 map
+ * structurally cannot host. Its section below carries the full argument.
  *
  * WHY hz-obstacle-v1 (the map is the lesson, and its EMPTINESS is the point):
  * this drill grades ONE thing — the full-force stop for a hazard that appears
@@ -69,7 +78,7 @@
  * after sc-hazard-obstacle (templates-hazards.ts).
  */
 
-import type { PedestrianDartOutSpec } from "../../contracts";
+import type { CutInLeadCarSpec, PedestrianDartOutSpec } from "../../contracts";
 import type { ScenarioSpec } from "./types";
 
 // ---------------------------------------------------------------------------
@@ -292,6 +301,295 @@ export const SC_HZ_EMERGENCY_STOP: ScenarioSpec = {
   localeBg: "bg-BG",
 };
 
-/** The wave-3 hazards templates, in catalog order (registered in templates.ts
- *  by the integration pass). */
-export const SCENARIO_TEMPLATES_HAZARDS2: readonly ScenarioSpec[] = [SC_HZ_EMERGENCY_STOP];
+// ═══════════════════════════════════════════════════════════════════════════
+// 2. sc-hz-brake-dont-swerve — „Спри в лентата, не свивай на сляпо" (OV-18)
+//    on hz-debris-v1 (wave 6). The sibling above teaches the PEDAL; this one
+//    teaches the WHEEL that must not move while the pedal does its work.
+// ═══════════════════════════════════════════════════════════════════════════
+
+/**
+ * WHY A NEW DISTRICT (hz-debris-v1) INSTEAD OF THE SIBLING'S hz-obstacle-v1:
+ * this drill's claim is „спирай В ЛЕНТАТА, а не встрани", and a claim about
+ * lanes needs a second lane in the SAME direction — one that is occupied, and
+ * one the wheel can actually reach by a REAL, gradable laneId delta.
+ * hz-obstacle-v1 is a two-way 1+1: over there a swerve can only ever be a
+ * lane-keep excursion toward the kerb (which is exactly what the sibling's
+ * „Отклонение от лентата" demo grades). Here the swerve is a LANE CHANGE into
+ * an occupied lane, and the engine's shipped lane-change adjudication —
+ * indicator + mirror, rules/engine.ts §3 — is what convicts it. That is the
+ * whole difference between the two templates, and it is structural, not
+ * cosmetic. gen_hz_debris.mjs asserts every clause of it at build time; the
+ * battery hz-debris-districts.test.ts re-proves each against the real reducer.
+ *
+ * Two absences on that map are load-bearing here (both pinned by the battery):
+ *  - ONE-WAY ⇒ rules/engine.ts guards CROSSED_SOLID_LINE and
+ *    CENTER_LINE_TOUCHED on `tick.oneway === false`, so both are structurally
+ *    disarmed: the leftward swerve grades as the lane change it IS, and the
+ *    mistake's codeRefs stay exactly two;
+ *  - NO crossings / junctions / stop lines ⇒ the same crossing-shaped cause
+ *    ledger the sibling documents at length is empty here too, which is why
+ *    this template carries the SAME `ruleConfig` override, for the same reason.
+ *    See the file header — the argument is not repeated, it is inherited.
+ */
+
+/** hz-debris-v1 lane centers (meta.scenario — the L7 copy truth). */
+const DEBRIS_LANE_PLAYER_X = 4.06; // laneId 0 — the curb lane; the debris lands here
+const DEBRIS_LANE_ESCORT_X = -4.06; // laneId 1 — the escort's lane; the swerve's target
+/** One drawn lane width on hz-debris-v1 (3.25 m × perceptual scale 2.5), m. */
+const DEBRIS_LANE_SHIFT = 8.125;
+/** The reveal: the debris rect's trigger arms 30 m out (meta.scenario.revealY). */
+const DEBRIS_REVEAL_Y = 160;
+/** The debris rect's center (meta.scenario.debrisY) — recorder data, not map data. */
+const DEBRIS_Y = 190;
+/** The shadow's rest mark: 6 m short of the debris, wheel dead straight. */
+const DEBRIS_STOP_MARK_Y = 184;
+
+/**
+ * The ESCORT (the reason the wheel is not an option). A `cutInLeadCar` actor
+ * REPURPOSED — the honest v1 proxy this template flags out loud:
+ *
+ *  - it rides the NEIGHBOURING lane the whole approach (`extraRightOffsetM` =
+ *    −one lane pitch → x ≈ −4.06), pinned essentially ABREAST of the player's
+ *    door (`paceAheadM` 1 — matchPlayer, slaved to the player's own progress).
+ *    That is the entire staging: when the debris appears, the lane you would
+ *    swerve into is already full, which is the situation the лекция is about;
+ *  - `cutShiftM` is ZERO — the defining departure from every other cutInLeadCar
+ *    in the catalog (FC_CUTTER, templates-following.ts, shifts a full lane).
+ *    The escort NEVER enters the player's lane; there is no cut to survive.
+ *    The runner's „cut" is used here purely as a RELEASE: at the reveal it
+ *    swaps matchPlayer for a plain cruise, so the escort — whose lane is
+ *    clear — simply carries on past the braking player, exactly as a real
+ *    neighbour would. Without that release the actor would be slaved to the
+ *    player's progress and would absurdly stop DEAD ALONGSIDE a car braking
+ *    for debris that was never in its lane;
+ *  - the runner emits NO SimTick event before the release, and after it only a
+ *    physical-contact collision (runners.ts) — so the escort can never convict
+ *    the player of anything it is not actually hit by. It is scenery with one
+ *    consequence, which is precisely what „а до теб има кола" needs to mean.
+ *
+ * WHAT IT CANNOT DO, stated plainly: it never enters the harsh-brake cause
+ * ledger. `leadGapFor` (traffic/system.ts) drops every vehicle more than
+ * LEAD_CORRIDOR_M = 4.0 m off the driving line, and the escort sits a full
+ * 8.125 m pitch away — so a car ABREAST of the student is invisible to the
+ * engine's notion of „why might he be braking". That is a second, independent
+ * reason this template needs the `ruleConfig` override below, and it is the
+ * same underlying gap the sibling filed: the engine has no hazard channel.
+ */
+export const SC_HZ_BRAKE_DONT_SWERVE_ESCORT: CutInLeadCarSpec = {
+  id: "sc-hzbds-escort",
+  kind: "cutInLeadCar",
+  libraryEventId: "ev-emergency-braking",
+  actor: {
+    pathNodes: ["hzd-n-start", "hzd-n-end"],
+    // Dormant just ahead-left of the spawn; matchPlayer takes over on the
+    // player's first movement and pins it abreast for the whole approach.
+    hold: { nodeIndex: 0, offsetM: 18 },
+    cruiseSpeedMps: 13.89, // 50 km/h — the posted limit; it is not speeding either
+    extraRightOffsetM: -DEBRIS_LANE_SHIFT, // the LEFT lane (x ≈ −4.06)
+    colorIndex: 2,
+  },
+  paceAheadM: 1, // ABREAST (± the runner's seeded jitter) — beside your door
+  maxMatchSpeedMps: 16,
+  // The RELEASE point, on the ACTOR's own (left-lane) path, at the reveal:
+  // from here the escort stops pacing and drives its own clear lane.
+  cutAt: { x: DEBRIS_LANE_ESCORT_X, y: 162 },
+  cutRadiusM: 4,
+  minCutSpeedKmh: 25, // the 50 km/h approach clears it — the release fires
+  cutShiftM: 0, // ZERO LATERAL: the escort never enters the player's lane
+  cutRampSec: 1.5,
+  cutSpeedMps: 13.89, // ~50 km/h locked cruise — it sails past the braking player
+  clearAheadM: 60,
+};
+
+/**
+ * OV-18 — препятствие на платното: спиране в лентата вместо сляпо отклонение
+ * (ЗДвП чл. 20: при възникване на опасност водачът намалява скоростта и при
+ * необходимост СПИРА; чл. 23: дистанцията и скоростта се съобразяват така, че
+ * да може да спре; чл. 25: маневра — включително престрояване — се предприема
+ * едва след като водачът се убеди, че няма да застраши останалите).
+ *
+ * THE TEACHING CLAIM, and why it is NOT the sibling's: sc-hz-emergency-stop
+ * teaches „натисни докрай" against an empty road — there, the wheel is wrong
+ * because the stop is shorter straight. HERE the wheel is wrong for a harder
+ * reason: the metre of tarmac the reflex reaches for IS ALREADY OCCUPIED, and
+ * the driver does not know it because he never looked. The лекция therefore
+ * grades the swerve as what the law calls it — престрояване, a manoeuvre owed
+ * a mirror (чл. 25) — and not as clumsy steering. The trap the drill is built
+ * around: a blind swerve TRADES a hazard you can see for one you cannot.
+ *
+ * And the honest completion, which is the shadow's second half: the drill does
+ * NOT teach „never go around". It teaches ORDER. Stop first — in your lane,
+ * at full force, wheel straight. THEN look, signal, and pass the obstacle at
+ * walking pace, having earned the lane you are taking. Both the correct pass
+ * and the fatal one enter the same neighbouring lane; the only differences are
+ * a mirror, a signal and 30 km/h — which is exactly the lesson, and exactly why
+ * the shadow drives the pass-around instead of parking in front of the debris
+ * forever.
+ */
+export const SC_HZ_BRAKE_DONT_SWERVE: ScenarioSpec = {
+  id: "sc-hz-brake-dont-swerve",
+  family: "hazards",
+  tagsBg: [
+    "опасност",
+    "препятствие на платното",
+    "екстрено спиране",
+    "спирачна система ABS",
+    "сляпо отклонение",
+    "мъртва зона",
+    "престрояване",
+  ],
+  titleBg: "Спри в лентата, не свивай на сляпо",
+  objectiveBg:
+    "Падне ли препятствие в лентата ти, а до теб има кола — спирай силно В лентата: сляпото рязко отклонение е по-опасно от удара, който избягваш.",
+  archetypeIds: ["OV-18"],
+  conceptIds: [
+    "c-hazard-perception",
+    "c-animals-obstacles",
+    "c-abs-systems",
+    "c-braking-distance",
+    "c-stopping-distance-total",
+    "c-reaction-time",
+    "c-mirrors-blind-spots",
+    "c-lane-change",
+  ],
+  map: {
+    archetype: "straight-street",
+    // The committed hz-debris-v1 map; its meta.scenario.params, mirrored here
+    // for provenance (gen_hz_debris.mjs).
+    params: { lengthM: 300, maxspeedKmh: 50 },
+    districtId: "hz-debris-v1",
+  },
+  start: {
+    spawnPointId: "hzd-spawn-approach",
+    vehicleStart: "ready",
+  },
+  instructionsBg: [
+    {
+      n: 1,
+      textBg:
+        "Еднопосочна улица с две ленти, ограничение 50. Ти си в дясната лента — потегли и се стабилизирай на 50 км/ч.",
+    },
+    {
+      n: 2,
+      textBg:
+        "Погледни вляво: в съседната лента, почти наравно с вратата ти, се движи кола. Запомни я — тя е причината днешният урок да не е „завърти волана“.",
+    },
+    {
+      n: 3,
+      textBg:
+        "Някъде напред в ТВОЯТА лента ще се появи препятствие. Първият ти рефлекс ще каже „встрани“. Не му се доверявай: встрани е заета лента, а ти не си погледнал в нея.",
+    },
+    {
+      n: 4,
+      textBg:
+        "Щом го видиш: спирачка ДОКРАЙ и волан ПРАВ. Педалът ще вибрира под крака ти — това е ABS, който работи. Не отпускай и не дърпай волана: спирачката е твоята маневра.",
+    },
+    {
+      n: 5,
+      textBg:
+        "Спри преди препятствието, в своята лента, и остани там. Дотук задачата е решена — колата стои, а ти си жив и с избор.",
+    },
+    {
+      n: 6,
+      textBg:
+        "Гледай колата отляво как си минава по своята лента. Точно това е урокът: лентата, която воланът искаше, не беше празна. Заобикалянето е следващ, ОТДЕЛЕН ход — пак с оглед, пак с мигач и на скорост на пешеходец.",
+    },
+  ],
+  success: [
+    {
+      id: "sc-hzbds-approach",
+      titleBg: "Мини участъка с разрешената скорост",
+      // The drill is worthless from a crawl: the approach gate keeps the driver
+      // lawful (≤ 52) without letting him pre-empt the reveal by dawdling.
+      params: { kind: "reachZone", x: DEBRIS_LANE_PLAYER_X, y: 110, radiusM: 12, maxSpeedKmh: 52 },
+    },
+    {
+      id: "sc-hzbds-stop",
+      titleBg: "Спри преди препятствието — с пълна спирачка, В своята лента",
+      // THE objective (the sc-hzes-stop discipline): completable ONLY at rest,
+      // ONLY short of the debris, and ONLY from the player's own lane — the
+      // 4 m radius is half a lane pitch, so a car that swerved into lane 1
+      // (x = −4.06) can never satisfy it. Stopping is not enough; stopping
+      // WHERE YOU WERE is the graded claim.
+      params: { kind: "reachZone", x: DEBRIS_LANE_PLAYER_X, y: DEBRIS_STOP_MARK_Y, radiusM: 4, maxSpeedKmh: 6 },
+    },
+    // NO third „заобиколи и продължи" gate, deliberately. The drill's claim
+    // ENDS at the stop (the brief's own shadow plan: „full straight-line stop
+    // in-lane with the escort untouched"), and an objective is a promise the
+    // ghost must be able to keep. A pass-around gate was authored and cut: from
+    // a rest mark 6 m short of the debris there is no honest line around it —
+    // the ghost clipped the rect every time (measured, not assumed), because a
+    // car that stopped THAT close has to reverse or crawl a lock-to-lock arc
+    // neither the recorder nor the лекция wants to teach. The pass-around
+    // survives where it belongs — in `teach.whyBg` and instruction 6 as the
+    // NEXT, separate move — rather than as a gate the drill cannot honour.
+  ],
+  rubric: { parTimeSec: 45 },
+  // RECORDED: committed deterministic recordings of the authored scripts in
+  // traces/scHzBrakeDontSwerve.ts; gates in traces/__tests__/
+  // sc-hz-brake-dont-swerve-traces.test.ts (re-record with RECORD_TRACES=1).
+  shadow: { path: "content/traces/sc-hz-brake-dont-swerve/shadow-correct.trace.json" },
+  mistakes: [
+    {
+      traceRef: { path: "content/traces/sc-hz-brake-dont-swerve/mistake-blind-swerve.trace.json" },
+      titleBg: "Рязко отклонение в съседната кола",
+      whatWentWrongBg:
+        "Воланът тръгна преди очите. Мигачът дори светна — и точно това прави грешката поучителна: мигачът ОБЯВЯВА маневра, но не я ПРОВЕРЯВА. В лявата лента, на една ръка разстояние, вече имаше кола; тя беше там през цялото време, откакто потегли. Рефлексът размина препятствието и намери автомобил — сделка, при която единият удар се сменя за друг, само че този път в някой, който няма никаква вина. Препятствието се вижда; колата в мъртвата ти зона — не. Затова първо спирачка, а волан само след огледало.",
+      codeRefs: ["LANE_CHANGE_WITHOUT_MIRROR_CHECK", "COLLISION"],
+    },
+    {
+      traceRef: { path: "content/traces/sc-hz-brake-dont-swerve/mistake-late-brake.trace.json" },
+      titleBg: "Късно спиране в препятствието",
+      whatWentWrongBg:
+        "Волан прав, лента спазена — и въпреки това удар, защото кракът тръгна твърде късно. Тези 30 метра стигаха: пълното спиране от 50 км/ч иска към 11 метра. Не стигна решителността — натискът дойде след колебание, а колебанието при 50 км/ч се мери в метри: всяка секунда чудене е близо 14 метра, изядени преди спирачката изобщо да е поела. Спирачният път е физика и не се пазари; реакцията е единственото, което е твое. Стъпалото стои НАД спирачката, а натискът е докрай от първия сантиметър — не постепенно „опипване“.",
+      codeRefs: ["COLLISION"],
+    },
+  ],
+  teach: {
+    whenBg:
+      "Винаги когато нещо се появи в твоята лента, а до теб или зад теб има движение: паднал товар от камион, отчупена гума, клон, дупка, спрял на аварийни. Общото им е, че рефлексът ти предлага изход встрани — точно там, където не си погледнал от километър насам.",
+    whyBg:
+      "Първо физиката: пълното спиране от 50 км/ч иска около 11 метра, но пътят на реакцията се добавя отгоре — при 50 км/ч колата минава близо 14 метра за всяка секунда чудене. Затова кракът, а не спирачката, най-често решава изхода. ABS не скъсява тези метри, но не позволява на колелата да блокират — а въртящото се колело продължава да се управлява. Оттук и правилото: пълна спирачка, прав волан. Вибрацията под крака е знак, че системата работи, и единствената грешка е да отпуснеш заради нея. Сега главното: защо НЕ волан. Препятствието пред теб е известно — виждаш го, знаеш къде е и колко е голямо. Лентата встрани е НЕИЗВЕСТНА, ако не си погледнал: там може да има кола, мотор или колоездач, а точно съседната лента е мястото, където живее мъртвата ти зона. Сляпото отклонение затова е лоша сделка — то заменя удар, който можеш да намалиш със спирачката, с удар, за който не подозираш, при това често челен или страничен в някой невинен. И юридически това не е „избягване“, а престрояване: чл. 25 иска маневрата да започне едва след като си се убедил, че не застрашаваш никого. Убеждаването се казва огледало и поглед през рамо. Затова редът е спирачка → спиране → оглед → мигач → бавно заобикаляне. Не „никога не заобикаляй“, а „не заобикаляй СЛЯПО и не заобикаляй със скоростта, с която си пътувал“.",
+    lawRef: "ЗДвП чл. 20, чл. 23, чл. 25",
+    examinerBg:
+      "Изпитващият гледа последователността, не героизма. Очаква стъпало в готовност над спирачката, незабавно и ПЪЛНО натискане при поява на препятствие, прав волан по време на спирането — и едва след пълното спиране оглед, мигач и бавно заобикаляне с връщане вдясно. Рязко отклонение без оглед е отсъдено като опасна маневра дори когато „се е разминало“; удар в съседен автомобил прекратява изпита.",
+  },
+  levels: [
+    { level: 1 },
+    { level: 2 },
+    { level: 3 },
+    { level: 4, vehicleStart: "cold" },
+    // L5 — дъжд върху същата опасност: the RENDER/conditions axis ONLY. The
+    // stopping-distance point would double beautifully on wet, and the backlog
+    // asked for wetGrip here — but the seam is missing in exactly the way the
+    // sibling documents above: `physics` is a TEMPLATE-WIDE ScenarioSpec field
+    // (LevelSpec carries `conditions` but no physics override), so opting in
+    // would run L1–L4 wet too, against a ghost that is dry-tuned — and on THIS
+    // drill that is not cosmetic: the whole map is sized around a 10.68 m dry
+    // stop fitting a 30 m reveal window (gen_hz_debris asserts it), and a wet
+    // envelope would put the shadow INTO the debris. Reported in the agent
+    // notes; when LevelSpec.physics lands, this rung takes wetGrip, the reveal
+    // window grows on that rung, and the ghost gets a WET_DECEL twin.
+    { level: 5, conditions: { weather: "rain" } },
+  ],
+  staged: [SC_HZ_BRAKE_DONT_SWERVE_ESCORT],
+  conditions: { weather: "dry" },
+  // INHERITED CORRECTNESS FIX — the file header carries the full argument and
+  // it applies here unchanged: hz-debris-v1 has no crossings, no junctions and
+  // no stop lines, and the escort sits a full lane pitch outside the 4 m lead
+  // corridor, so `noBrakeCause` is TRUE for the whole drill by construction.
+  // Without this the lesson would order the student to brake ДОКРАЙ and then
+  // bill him 10 points (основна) for obeying. 25 m/s² is beyond the car's
+  // physical maximum (full pedal ≈ 9.0): the detector stands down for this
+  // drill and only for it. Every other detector stays live — and both mistake
+  // demos grade on their own channels (lane change, contact), untouched.
+  ruleConfig: { harshBrakeDecelMps2: 25 },
+  localeBg: "bg-BG",
+};
+
+/** The hazards templates of this file, in catalog order (registered in
+ *  templates.ts by the integration pass). */
+export const SCENARIO_TEMPLATES_HAZARDS2: readonly ScenarioSpec[] = [
+  SC_HZ_EMERGENCY_STOP,
+  SC_HZ_BRAKE_DONT_SWERVE,
+];

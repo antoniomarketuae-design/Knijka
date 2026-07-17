@@ -8,6 +8,13 @@
  *    (OV-16 + OV-01/OV-02, ln-merge-v1 — tools/maps/gen_ln_merge.mjs)
  *  - sc-merge-roadworks-shift „Ремонт затваря лентата ти"
  *    (SN-07 + OV-16/OV-02/OV-12, hz-roadworks-v1 — tools/maps/gen_hz_roadworks.mjs)
+ *  - sc-merge-bus-pullout „Автобусът потегля от спирката"
+ *    (VU-11 + FO-03, mg-busstop-v1 — tools/maps/gen_mg_busstop.mjs); the odd one
+ *    out: here SOMEONE ELSE merges and the duty is to LET them (ЗДвП чл. 67)
+ *  - sc-merge-from-property „Излизане от бензиностанция през тротоара"
+ *    (OV-15 + PE-03, mg-property-v1 — tools/maps/gen_mg_property.mjs); the
+ *    family's smallest merge and its strictest: leaving a property you yield to
+ *    EVERYONE — pavement first, then the flow (ЗДвП чл. 25)
  *
  * DATA ONLY, the templates.ts mold: every coordinate below is denormalized
  * from the committed district file (meta.scenario), so nothing loads world
@@ -35,7 +42,12 @@
  *     demo's whole point is that signalling is not looking).
  */
 
-import type { RearTailgaterSpec } from "../../contracts";
+import type {
+  CutInLeadCarSpec,
+  OncomingStreamSpec,
+  PedestrianDartOutSpec,
+  RearTailgaterSpec,
+} from "../../contracts";
 import type { ScenarioSpec } from "./types";
 
 // ---------------------------------------------------------------------------
@@ -559,9 +571,492 @@ export const SC_MERGE_ROADWORKS_SHIFT: ScenarioSpec = {
   localeBg: "bg-BG",
 };
 
+// ---------------------------------------------------------------------------
+// sc-merge-bus-pullout — „Автобусът потегля от спирката"
+// (VU-11 „Потеглящ автобус" + FO-03 — the cut-in actor recipe, inverted)
+// ---------------------------------------------------------------------------
+
+/** mg-busstop-v1 lane centers (meta.scenario — the L7 copy truth). The EXACT
+ *  (unrounded) lane-graph values: the district battery pins meta's rounded
+ *  12.19/4.06 against these, and everything below is written in these. */
+const MGB_X_BUS = 12.1875; // laneId 0 — the бус лента; the спирка sits in it
+const MGB_X_GENERAL = 4.0625; // laneId 1 — the general lane; the player's whole drive
+/** One drawn lane width on mg-busstop-v1 (3.25 m × perceptual scale 2.5), m —
+ *  the bus's pull-out is exactly this, leftward. */
+const MGB_LANE_SHIFT = 8.125;
+/** mg-busstop-v1 story arclengths in district y (meta.scenario). */
+const MGB_BAY_FROM_Y = 130; // the спирка window opens…
+const MGB_BAY_TO_Y = 176; // …and the bus swings out of it here
+const MGB_END_Y = 400;
+
+/**
+ * THE BUS: the shipped cutInLeadCar actor with the box rig (`profile: "truck"`
+ * — the only large-vehicle rig that exists; ADR-001 fictional), dwelling in the
+ * бус лента at the спирка and gliding out into the player's lane.
+ *
+ * WHY IT DWELLS WITHOUT A DWELL COMMAND: the runner issues one matchPlayer with
+ * gapM = paceAheadM, whose target is `playerSpeed + 0.55 × (paceAheadM − gap)`
+ * CLAMPED AT ZERO (traffic/staged.ts). Held 100+ m ahead of a spawning player,
+ * that term is deeply negative, so the rig sits at the спирка with its target
+ * pinned to 0 — a genuine dwell, expressed in the shipped controller. It only
+ * gets under way when the player closes to roughly paceAheadM + v/0.55 ≈ 55 m
+ * of it, which IS the encounter: the bus always pulls out just as you arrive.
+ *
+ * WHY extraRightOffsetM IS ZERO: buildLaneGraph rides a two-way edge's lane on
+ * the CURB lane (x = 12.1875 — the ln-v1 precedent, re-proved on this map by
+ * mg-busstop-districts.test.ts), which here IS the бус лента. So the default
+ * offset parks the bus exactly where the спирка is, and — decisively — a
+ * POSITIVE curb offset is what tags a staged actor as the A11 cyclist proxy.
+ * The bus must never be one: it would arm the vulnerable-pass tracker and make
+ * „минах покрай автобуса" grade as a cyclist offence.
+ *
+ * HONEST GAP (flagged — the whole family's discipline): TrafficVehicleState
+ * carries NO indicator channel (traffic/types.ts), so the bus CANNOT show the
+ * ляв мигач the law and the copy are about. The visible cue is the rig itself
+ * rolling out of the bay; the card copy carries „подал ляв мигач", and nothing
+ * grades off the missing lamp. Everything graded here is the player's own
+ * channel: the ease gate at the pull-out, the gap he keeps afterwards, and the
+ * contact he earns by forcing past.
+ */
+const MGB_BUS: CutInLeadCarSpec = {
+  id: "sc-mgb-bus",
+  kind: "cutInLeadCar",
+  actor: {
+    pathNodes: ["mgb-n-start", "mgb-n-end"],
+    hold: { nodeIndex: 0, offsetM: 140 }, // dormant at the спирка, inside the bay
+    cruiseSpeedMps: 9,
+    extraRightOffsetM: 0, // the graph's curb lane IS the бус лента
+    colorIndex: 4,
+    profile: "truck", // the box rig — the largest actor the fleet has
+  },
+  paceAheadM: 30,
+  maxMatchSpeedMps: 11, // ~40 km/h: a city bus rolling out, never a sports car
+  cutAt: { x: MGB_X_BUS, y: MGB_BAY_TO_Y }, // on the ACTOR's path, at the bay's exit
+  cutRadiusM: 4,
+  minCutSpeedKmh: 18, // the taught ease (~28) still clears it — the bus comes out
+  cutShiftM: -MGB_LANE_SHIFT, // one lane LEFT — out of the бус лента into yours
+  cutRampSec: 2.5, // a 12 m rig glides out; it does not dart
+  cutSpeedMps: 8.5, // ~31 km/h — a bus getting under way, and staying slow
+  clearAheadM: 45,
+};
+
+/**
+ * VU-11 — потегляне на автобус от спирка (ЗДвП чл. 67: в населено място
+ * водачът е длъжен да намали и при необходимост да спре, за да пропусне
+ * автобус от редовна линия, подал сигнал, че потегля от спирка).
+ *
+ * LAW NOTE (ADR-002 — retrieval + citation only; the divergence is flagged, not
+ * hidden): the repo's own event library (scenarios/event-library.json
+ * ev-bus-pullout) and doc 72 §15 VU-11 both cite чл. 67 — the library entry is
+ * itself a recorded correction of an earlier, wrong чл. 100. The QUESTION BANK
+ * cites the same duty as „чл. 68?" (q-predimstvo-020/041) and „чл. 69?"
+ * (q-manevri-036), every one of them status needs-review, and
+ * content/audits/manevri-i-izprevarvane.audit.json argues чл. 69 for the other
+ * drivers' duty while c-bus-pullout in concepts.json still says чл. 68?. Three
+ * repo sources, three numbers, all flagged — this template cites the library's
+ * чл. 67 (the brief's own ref) and the reconciliation belongs to the content
+ * review, not to the sim. The SUBSTANCE is not in doubt anywhere: намали, при
+ * нужда спри, само в населено място, само за подал сигнал автобус от редовна
+ * линия — verbatim the taught norm of q-manevri-036 / q-predimstvo-020/041.
+ *
+ * WHAT ACTUALLY GRADES (doc 72 VU-11 marks the bus-yield adjudicator 🔴 NEW —
+ * `prioritySituation("bus-pullout")` is reserved vocabulary and NOT shipped, so
+ * no detector convicts „не пропуснах автобуса"). The drill is therefore graded
+ * on channels that exist and are exact:
+ *   - the OBJECTIVE gate at the pull-out (maxSpeedKmh 30 on the general lane):
+ *     „намали" made a contract — a driver who forces past is simply never
+ *     there slowly enough, and objectives advance sequentially, so his run
+ *     stops at that gate (the sc-ov-being-overtaken pattern);
+ *   - COLLISION, from the contact forcing past earns;
+ *   - FOLLOWING_TOO_CLOSE, from the gap he keeps once the bus is in front (the
+ *     shipped cut-in pipeline, with its followRecoveryRateMps guard keeping the
+ *     honest ease innocent).
+ */
+export const SC_MERGE_BUS_PULLOUT: ScenarioSpec = {
+  id: "sc-merge-bus-pullout",
+  family: "merging",
+  tagsBg: ["автобус", "спирка", "бус лента", "пропускане", "дистанция", "населено място"],
+  titleBg: "Автобусът потегля от спирката",
+  objectiveBg:
+    "В населено място пропусни автобуса, който е подал ляв мигач да потегли от спирка — намали и го пусни да се влее.",
+  archetypeIds: ["VU-11", "FO-03"],
+  conceptIds: ["c-bus-pullout", "c-merging-traffic", "c-following-distance", "c-hazard-perception", "c-safety-space"],
+  map: {
+    archetype: "straight-street",
+    // The generator recipe — mirrored in mg-busstop-v1.json meta.scenario.params
+    // (tools/maps/gen_mg_busstop.mjs).
+    params: { lengthM: 400, maxspeedKmh: 50, lanes: 4, bayFromM: 130, bayToM: 176, banKind: "busLane" },
+    districtId: "mg-busstop-v1",
+  },
+  start: {
+    spawnPointId: "mgb-spawn-start",
+    vehicleStart: "ready",
+  },
+  instructionsBg: [
+    { n: 1, textBg: "Пътуваш в лявата, обща лента на градска улица. Дясната лента е бус лента — в нея е спирката, и там не се кара." },
+    { n: 2, textBg: "Напред, на около 130 метра, на спирката стои автобус от редовната линия. Виж го РАНО: спрелият автобус е подвижна стена — крие пешеходци и всеки момент може да потегли." },
+    { n: 3, textBg: "Щом автобусът подаде ляв мигач и тръгне да излиза от спирката, решението вече е взето от закона: в населено място си длъжен да го пропуснеш (чл. 67)." },
+    { n: 4, textBg: "Отпусни газта плавно и му отвори мястото. Не се нуждае от твоята учтивост — нуждае се от метрите пред теб." },
+    { n: 5, textBg: "Не форсирай покрай него „преди да е излязъл“. Автобусът е дълъг 12 метра и потегля бавно — от кабината му ти си в мъртва зона точно когато решаваш да се промъкнеш." },
+    { n: 6, textBg: "След като се влее, се нареди зад него на две секунди. Пред автобус се залепва само този, който няма да види нищо: нито пътя, нито спирачките му, нито пешеходеца отпред." },
+  ],
+  success: [
+    {
+      id: "sc-mgb-ease",
+      titleBg: "Намали, за да пропуснеш потеглящия автобус",
+      // THE чл. 67 CONTRACT, made graded. Radius 5 < the 8.125 m lane pitch, so
+      // it is satisfiable ONLY from the general lane; maxSpeedKmh 30 is what
+      // „намали и при необходимост спри" means in numbers on a 50 street. The
+      // forcing-past demo passes this y at ~48 and misses it outright — and
+      // objectives advance sequentially, so its run stops here.
+      params: { kind: "reachZone", x: MGB_X_GENERAL, y: 168, radiusM: 5, maxSpeedKmh: 30 },
+    },
+    {
+      id: "sc-mgb-behind-bus",
+      titleBg: "Нареди се зад автобуса и го следвай в неговото темпо",
+      // The second half of the duty: пропускането не свършва с вдигане на
+      // газта. Pinned deep in the run-out, on the general lane, capped just
+      // above the bus's own ~31 km/h — a driver who „пропусна" the bus and
+      // then went round it is doing 45+ here and misses it.
+      params: { kind: "reachZone", x: MGB_X_GENERAL, y: 280, radiusM: 6, maxSpeedKmh: 38 },
+    },
+    {
+      id: "sc-mgb-finish",
+      titleBg: "Продължи по общата лента до края на отсечката",
+      params: { kind: "reachZone", x: MGB_X_GENERAL, y: 380, radiusM: 8 },
+    },
+  ],
+  rubric: {
+    observation: {
+      moments: [
+        { id: "sc-mgb-glance-stop", titleBg: "Оглед на спирката отрано — още преди автобусът да тръгне" },
+        { id: "sc-mgb-glance-mirror", titleBg: "Огледало назад, преди да отпуснеш газта" },
+      ],
+    },
+    parTimeSec: 55,
+  },
+  // RECORDED: committed deterministic recordings of the authored scripts in
+  // traces/scMergeBusPullout.ts; gates in traces/__tests__/
+  // sc-merge-bus-pullout-traces.test.ts (re-record with RECORD_TRACES=1).
+  shadow: { path: "content/traces/sc-merge-bus-pullout/shadow-correct.trace.json" },
+  mistakes: [
+    {
+      traceRef: { path: "content/traces/sc-merge-bus-pullout/mistake-force-past.trace.json" },
+      titleBg: "Форсиране покрай потеглящия автобус",
+      whatWentWrongBg:
+        "Автобусът вече излизаше от спирката, а водачът натисна газта — „ще мина преди него“. Мина, но в него. Автобусът е дълъг 12 метра и завива с целия си корпус: докато носът му е още в спирката, задницата му вече е в твоята лента. Шофьорът му седи на два метра над земята и има мъртва зона точно там, откъдето ти реши да се промъкнеш — той няма как да те види и няма как да спре. И най-важното: тук не се преценява, а се пропуска. В населено място законът вече е решил вместо теб (чл. 67) — намаляваш и при необходимост спираш. Няколкото секунди, които „печелиш“, не съществуват: автобусът пак ще е пред теб на следващия светофар.",
+      codeRefs: ["COLLISION"],
+    },
+    {
+      traceRef: { path: "content/traces/sc-merge-bus-pullout/mistake-glue-behind.trace.json" },
+      titleBg: "Залепване зад автобуса след вливането",
+      whatWentWrongBg:
+        "Водачът пропусна автобуса коректно — и веднага след това залепи за него на няколко метра, сякаш да си върне „загубеното“. Пропускането обаче не е услуга, за която да си вземеш ресто. Зад автобус на две коли разстояние ти не виждаш НИЩО: нито платното пред него, нито пешеходеца, който излиза отпред му, нито собствените му стопове навреме. Автобусът спира на всяка спирка, и то по-рязко, отколкото очакваш. Две секунди зад него не са учтивост, а единственото място, от което изобщо можеш да реагираш.",
+      codeRefs: ["FOLLOWING_TOO_CLOSE"],
+    },
+  ],
+  teach: {
+    whenBg:
+      "На всяка градска спирка, всеки ден, по всяко време — Софийският градски транспорт спира и потегля хиляди пъти на ден. Същият рефлекс работи и при всяко друго превозно средство, което те моли да се влееш: колата от паркомястото, тролейбусът, боклукчийският камион. Разликата е, че за автобуса от редовната линия това не е молба, а закон — и само в населено място.",
+    whyBg:
+      "Автобусът вози шейсет души, тежи петнайсет тона и потегля бавно. Ако всеки, който минава покрай спирката, реши, че „има още време“, автобусът не потегля никога — затова законът обръща предимството в негова полза, вместо да го остави да чака целия поток. Двете типични грешки тук са огледални и еднакво човешки: единият форсира покрай носа му и се озовава в мъртвата зона на дванайсетметров корпус; другият коректно го пропуска и после залепва за задницата му, защото „все пак изгуби време“. И двете идват от една и съща сметка — че секундите се печелят на пътя. Не се печелят: автобусът ще е пред теб и на следващата спирка. Това, което се губи, е видимостта — а тя е единственото, което имаш.",
+    lawRef: "ЗДвП чл. 67",
+    examinerBg:
+      "Изпитващият гледа кога виждаш автобуса, а не как се разминаваш с него: забелязваш ли спрелия автобус отдалеч, отпускаш ли газта още щом той тръгне да излиза, и оставяш ли му място без да те принуждава да набиваш спирачки в последния момент. Форсирането покрай потеглящ автобус е основна грешка (Н38: непропускане при задължение да пропуснеш); ако принудиш автобуса да спре или се стигне до контакт — опасна. Залепването зад него след вливането е основна грешка по дистанцията.",
+  },
+  levels: [
+    { level: 1 },
+    { level: 2 },
+    { level: 3 },
+    { level: 4, vehicleStart: "cold" },
+    // L5: „привечер, на мокър път" — the q-uyazvimi-065 frame. HONEST SCOPE:
+    // ConditionAxis has no dusk axis (weather + night are the two dials), so
+    // привечер renders as the night one — the low-light half of the frame,
+    // which is the half that matters for reading a dark rig against a dark
+    // curb. Deliberately NO physics.wetGrip: the authored ghost envelope of
+    // this template is dry-tuned (the ADR-006 stage-4a opt-in rule), and the
+    // taught delta here is SEEING the bus leave, not braking distance.
+    { level: 5, conditions: { weather: "rain", night: true } },
+  ],
+  staged: [MGB_BUS],
+  conditions: { weather: "dry" },
+  localeBg: "bg-BG",
+};
+
+// ---------------------------------------------------------------------------
+// sc-merge-from-property — „Излизане от бензиностанция през тротоара"
+// (OV-15 „Включване в движението" at its smallest scale + PE-03)
+// ---------------------------------------------------------------------------
+
+/** mg-property-v1 truths (meta.scenario — the L7 copy law; the district
+ *  battery world/__tests__/mg-property-districts.test.ts pins every one of
+ *  these against the generated map AND against the runtime's own derivation). */
+const MFP_Y_EXIT = 4.06; // the outbound (westbound) exit-lane center
+const MFP_X_WALK = 34; // mgp-x-walk — the тротоар band across the exit
+const MFP_X_LINE = 27.73; // the DERIVED Б2 line on mgp-e-drive (see below)
+const MFP_X_LANE = 4.06; // the boulevard's northbound lane center
+/** Curb-start convention (the templates-pe LET_PASS_PED recipe, rotated 90°):
+ *  half-carriageway 8.125 + 0.4 curb + 1.2 stand-back = 9.73 m off the exit
+ *  lane's centerline — here NORTH of it, on the station-shop pavement. */
+const MFP_WALK_CURB_Y = 9.73;
+
+/**
+ * THE ТРОТОАР WALKER: the shipped pedestrianDartOut actor, walking SOUTH along
+ * the pavement across the exit mouth — from the player's RIGHT, which is the
+ * half he occupies, so she is in his path from her first step (the templates-pe
+ * geometry, rotated onto a driveway).
+ *
+ * roadFromM/roadToM span the EXIT's carriageway along her walk (9.73 − 8.125 =
+ * 1.6 m in, 9.73 + 8.125 = 17.85 m out), so the runtime's crossing-occupancy
+ * query — and therefore PEDESTRIAN_NOT_YIELDED / PEDESTRIAN_YIELDED — is
+ * measured against the band the player actually crosses, not a street zebra.
+ *
+ * triggerDistM 22 releases her while the player is still ~22 m up the
+ * forecourt: early enough that a 22 km/h roll-off can stop short of the band
+ * comfortably (so the walk-through demo grades a REFUSED duty, never a braking
+ * failure), late enough that she is mid-band as he arrives.
+ */
+const MFP_WALKER: PedestrianDartOutSpec = {
+  id: "sc-mfp-walker",
+  kind: "pedestrianDartOut",
+  crossingId: "mgp-x-walk",
+  crossing: { x: MFP_X_WALK, y: 0 },
+  start: { x: MFP_X_WALK, y: MFP_WALK_CURB_Y },
+  dir: { x: 0, y: -1 },
+  speedMps: 1.4,
+  travelM: 23.45, // curb → across the 16.25 m exit → a few m of south walk-out
+  roadFromM: 1.6,
+  roadToM: 17.85,
+  triggerDistM: 22,
+  minTriggerSpeedKmh: 8,
+};
+
+/**
+ * THE ПОТОК: the shipped oncomingStream actor — three cars northbound on the
+ * boulevard's curb lane (x = 4.06), released by the player's own first metres
+ * off the forecourt and then pure clockwork.
+ *
+ * NAMING, HONESTLY: the spec's doc calls its path „the oncoming bank" because
+ * every shipped user stages it head-on. Mechanically it is „N cars on a path
+ * with authored spacing, released at a player speed" — which is exactly what a
+ * поток is, and the direction is the author's. Here the cars run WITH the node
+ * order (mgp-n-s → mgp-n-c → mgp-n-n), so buildLaneGraph rides them on the
+ * northbound curb lane: the near bank, the one a right-turner out of the
+ * property crosses into. Nothing about the runner assumes head-on.
+ *
+ * WHY THIS ACTOR AND NOT priorityFromRight (the flagged design call): the
+ * priority runner SYNCS its car to arrive `leadSec` before the player's
+ * PROJECTED line-crossing and commits once he is 22 m from his line
+ * (PRIORITY_COMMIT_PLAYER_M). On this map the player is inside 22 m of the Б2
+ * before he even reaches the тротоар — and then he stops there for ~12 s of
+ * walker. The synced car would launch, cross and sprint clear long before he
+ * ever met the line, and „изчакай потока" would be a claim about an empty road.
+ * A clockwork stream is the only shipped actor whose timing survives a player
+ * who legitimately stops twice on one approach.
+ *
+ * LEARN-ONLY SCENERY (doc 72 FO-07): the runner emits ZERO SimTick events bar
+ * a contact. What convicts is the PLAYER's own channel — the runtime's give-way
+ * adjudication at the derived Б2 (conflictNear over PRIORITY_CONFLICT_RADIUS_M
+ * at the moment he crosses the line), which is чл. 25 exactly: crossing out of
+ * a property while someone is coming, from either side.
+ */
+const MFP_STREAM: OncomingStreamSpec = {
+  id: "sc-mfp-stream",
+  kind: "oncomingStream",
+  actor: {
+    pathNodes: ["mgp-n-s", "mgp-n-c", "mgp-n-n"],
+    hold: { nodeIndex: 0, offsetM: 0 }, // dormant at the south end — 260 m of run-up
+    cruiseSpeedMps: 14, // 50 km/h — the posted limit, driven at the posted limit
+    colorIndex: 2,
+  },
+  count: 3,
+  gapsM: [26, 26], // ~1.9 s headway at 50 — a real Sofia boulevard column
+  releaseKmh: 15, // the player's own roll-off starts the clock
+};
+
+/**
+ * OV-15 / PE-03 — излизане от имот (ЗДвП чл. 25, ал. 1: водачът, който
+ * навлиза в пътното платно от прилежащ имот, е длъжен да пропусне пътните
+ * превозни средства и пешеходците, които се движат по него; ал. 2: при
+ * маневрата водачът е длъжен да пропусне пешеходците). The taught norm,
+ * grounded in the content bank (q-manevri-003/022/064, q-predimstvo-018,
+ * q-krastovishta-056, q-uyazvimi-020): излизаш от имот → нямаш предимство пред
+ * НИКОГО → тротоарът първо, после потокът → сигналът обявява, не дава.
+ *
+ * WHAT ACTUALLY GRADES, and why the map is shaped the way it is (the whole
+ * design in one place — see tools/maps/gen_mg_property.mjs's header):
+ *
+ *   - „не пропуснах пешеходеца по тротоара" → PEDESTRIAN_NOT_YIELDED, from the
+ *     shipped crossing-occupancy chain. The тротоар is authored as a district
+ *     CROSSING on the exit edge, so the duty is measured, not narrated.
+ *   - „не пропуснах потока" → FAILED_TO_YIELD, from the runtime's give-way
+ *     adjudication at a Б2 line the map DERIVES rather than declares: the
+ *     boulevard is `primary` (rank 5) and the exit is `service` (rank 1), so
+ *     the minor-meets-arterial heuristic (runtime/stoplines.ts) puts the line
+ *     at the exit's mouth and the world builder paints the matching Б2. There
+ *     is no other shipped way to convict a property exit: чл. 25 has no
+ *     dedicated detector, and the uncontrolled right-hand-rule tracker would
+ *     acquit exactly the car this drill is about (it comes from the LEFT).
+ *     conflictNearFor excludes only SAME-DIRECTION traffic — which makes the
+ *     derived line grade чл. 25's „пропусни всички" faithfully.
+ *   - THE ORDER IS THE TEMPLATE. The тротоар (x = 34) sits OUTSIDE the derived
+ *     line (x = 27.73), so the two demos fail on two different beats and
+ *     neither can leak the other's codes (the generator VALIDATES that gap).
+ *
+ * HONEST GAP (flagged, ADR-002 discipline — the card copy says велоалея because
+ * the real чл. 25 duty covers it, and the student's real exit crosses one):
+ * DistrictZoneKind has no cycle-lane member and the world builder paints no
+ * cycle track, so the велоалея is TAUGHT and never GRADED. No rider is staged;
+ * nothing here pretends a bike lane is measured. The pavement carries the
+ * vulnerable-user duty this drill grades.
+ */
+export const SC_MERGE_FROM_PROPERTY: ScenarioSpec = {
+  id: "sc-merge-from-property",
+  family: "merging",
+  tagsBg: ["изход от имот", "бензиностанция", "тротоар", "предимство", "вливане", "пешеходци"],
+  titleBg: "Излизане от бензиностанция през тротоара",
+  objectiveBg:
+    "На изхода от имот пресичаш тротоар и велоалея: пропусни пешеходците, колоездачите и потока на пътя — мигачът не ти дава предимство.",
+  archetypeIds: ["OV-15", "PE-03"],
+  // Integration fix (wave 5): the authored list cited "c-right-of-way-basics"
+  // and "c-pedestrian-priority" — neither exists in the content/concepts.json
+  // 152-graph, so templates.test.ts's registry check rejected the spec. Mapped
+  // onto the real ids that carry this drill's duties: c-exit-from-adjacent IS
+  // ЗДвП чл. 25 (излизане от прилежаща територия), c-pedestrian-rights-duties
+  // carries the тротоар yield.
+  conceptIds: [
+    "c-merging-traffic",
+    "c-exit-from-adjacent",
+    "c-pedestrian-rights-duties",
+    "c-driver-signals",
+    "c-hazard-perception",
+  ],
+  map: {
+    archetype: "t-junction",
+    // The generator recipe — mirrored in mg-property-v1.json
+    // meta.scenario.params (tools/maps/gen_mg_property.mjs).
+    params: { southM: 260, northM: 140, exitM: 68, walkX: 34, streetKmh: 50, exitKmh: 20 },
+    districtId: "mg-property-v1",
+  },
+  start: {
+    spawnPointId: "mgp-spawn-forecourt",
+    vehicleStart: "ready",
+  },
+  instructionsBg: [
+    { n: 1, textBg: "Ти си на изхода на бензиностанцията, с лице към булеварда. Между теб и платното има тротоар и велоалея — те не са „ничия земя“, а чужда територия." },
+    { n: 2, textBg: "Тръгни бавно и спри ПРЕД тротоара, не върху него. Оттам се вижда надлъж по пешеходната зона; спреш ли върху нея, вече си отнел нечий път, за да видиш нещо." },
+    { n: 3, textBg: "Пропусни пешеходците и колоездачите. Ти излизаш от имот — предимството е тяхно, независимо колко бързаш и колко празен изглежда тротоарът." },
+    { n: 4, textBg: "Освободи ли се тротоарът напълно — не „почти“ — продължи бавно до знака Б2 на изхода и спри напълно на линията." },
+    { n: 5, textBg: "Оттук гледаш само едно: потока по булеварда. Изчакай да мине целият — пролуката, която ти трябва, е ЗАД последната кола, а не между колите." },
+    { n: 6, textBg: "Подай десен мигач и се влей плавно, когато платното е наистина свободно. Мигачът обявява намерението ти — той не създава предимство и не кара никого да спре." },
+    { n: 7, textBg: "След вливането ускори до скоростта на потока. Кола, която изпълзява от имот и после се мъкне, е същият проблем, само по-късно." },
+  ],
+  success: [
+    {
+      id: "sc-mfp-walk-yield",
+      titleBg: "Спри пред тротоара и пропусни пешеходеца",
+      // THE чл. 25, ал. 2 CONTRACT, made graded. Pinned 3.5 m before the band
+      // on the exit lane, capped at 5 km/h: satisfiable ONLY by a car that
+      // actually came to rest short of the pavement. The walk-through demo
+      // passes this x at 25 km/h and misses it outright — and objectives
+      // advance sequentially, so its run stops here.
+      params: { kind: "reachZone", x: 37.5, y: MFP_Y_EXIT, radiusM: 3, maxSpeedKmh: 5 },
+    },
+    {
+      id: "sc-mfp-stop-line",
+      titleBg: "Спри напълно на Б2 на изхода",
+      // The second duty, on the derived line's own metre: radius 3 at 3 km/h
+      // is a real halt, not a roll. Both the shadow AND the „с мигача“ demo
+      // clear it — which is the point of that card: everything up to here was
+      // right.
+      params: { kind: "reachZone", x: 29, y: MFP_Y_EXIT, radiusM: 3, maxSpeedKmh: 3 },
+    },
+    {
+      id: "sc-mfp-merged",
+      titleBg: "Влей се в лентата на булеварда",
+      // Radius 4 < half the 8.125 m lane pitch, pinned 40 m up the northbound
+      // lane: satisfiable only from the correct bank, and only by a car that
+      // actually joined rather than nosed out and stopped.
+      params: { kind: "reachZone", x: MFP_X_LANE, y: 40, radiusM: 4 },
+    },
+    {
+      id: "sc-mfp-finish",
+      titleBg: "Продължи по булеварда до края на отсечката",
+      params: { kind: "reachZone", x: MFP_X_LANE, y: 118, radiusM: 8 },
+    },
+  ],
+  rubric: {
+    observation: {
+      moments: [
+        { id: "sc-mfp-glance-walk", titleBg: "Оглед по тротоара — преди да го пресечеш" },
+        { id: "sc-mfp-glance-flow", titleBg: "Оглед наляво по булеварда — от линията, преди да тръгнеш" },
+      ],
+    },
+    parTimeSec: 60,
+  },
+  // RECORDED: committed deterministic recordings of the authored scripts in
+  // traces/scMergeFromProperty.ts; gates in traces/__tests__/
+  // sc-merge-from-property-traces.test.ts (re-record with RECORD_TRACES=1).
+  shadow: { path: "content/traces/sc-merge-from-property/shadow-correct.trace.json" },
+  mistakes: [
+    {
+      traceRef: { path: "content/traces/sc-merge-from-property/mistake-walk-through.trace.json" },
+      titleBg: "Изнасяне през тротоара без спиране",
+      whatWentWrongBg:
+        "Колата излезе от бензиностанцията, без да спре нито веднъж — погледът беше вече на булеварда, търсеше пролука. А между двора и булеварда има тротоар, и по него вървеше човек. Точно това е капанът: докато търсиш предимството, което ти трябва, пропускаш задължението, което имаш. Тротоарът не е част от изхода ти — той е пътят на пешеходеца и ти го ПРЕСИЧАШ. Излизането от имот е маневра (чл. 25): в нея ти се съобразяваш с всички — пешеходци, колоездачи, коли — и никой не се съобразява с теб. Скоростта тук дори не беше висока; вината не е в километрите, а в това, че решението „ще мина“ беше взето, преди да е погледнато.",
+      codeRefs: ["PEDESTRIAN_NOT_YIELDED", "COLLISION"],
+    },
+    {
+      traceRef: { path: "content/traces/sc-merge-from-property/mistake-signal-and-go.trace.json" },
+      titleBg: "Вливане „с мигача“ пред потока",
+      whatWentWrongBg:
+        "Всичко до знака беше учебникарско: бавно потегляне, спиране пред тротоара, изчакан пешеходец, пълно спиране на Б2. И после — мигач и газ, в същата секунда. По булеварда обаче идваха коли и те трябваше да се съобразят с човек, който излиза от двор. Мигачът е ОБЯВЯВАНЕ на намерение, а не предимство: той казва „ще завия“, не „пуснете ме“ (чл. 25). Пролуката, от която имаш нужда, не е между колите — тя е зад последната. Разликата с правилното каране е едно решение и няколко секунди; разликата в последствията е между скучно излизане и кола, набила спирачки в дясната лента заради теб.",
+      codeRefs: ["FAILED_TO_YIELD"],
+    },
+  ],
+  teach: {
+    whenBg:
+      "На всеки изход от бензиностанция, паркинг, двор, гараж или магазин — тоест по няколко пъти на всяко пътуване. Същото правило важи и когато излизаш от паркомясто напряко през тротоара, и когато потегляш от банкета: щом идваш отнякъде, което не е път, ти влизаш в чуждото движение, а не то в твоето.",
+    whyBg:
+      "Изходът от имот е мястото, където водачът е най-силно изкушен да смята, че вече кара — а всъщност още не е. Затова законът е безкомпромисен и подреден: пропускаш пешеходците и колоездачите по тротоара и велоалеята, после пропускаш движещите се по платното, и чак тогава си участник в движението. Двете типични грешки тук са огледални и еднакво човешки: единият гледа наляво за пролука и минава през тротоара, без изобщо да го е видял — защото очите му вече са на булеварда; другият прави всичко правилно, спира на знака, светва мигач и тръгва, защото „нали показах“. Мигачът обаче не е разрешение. Той обявява какво ще направиш; дали МОЖЕШ да го направиш, решава потокът. И двете грешки идват от една и съща сметка — че секундите на изхода се печелят. Не се печелят: тротоарът се пресича за две секунди, а пролуката зад колоната идва след пет.",
+    lawRef: "ЗДвП чл. 25",
+    examinerBg:
+      "Изпитващият гледа реда, а не бързината: спираш ли пред тротоара (а не върху него), оглеждаш ли пешеходната зона в двете посоки, изчакваш ли пълното ѝ освобождаване, спираш ли напълно на Б2, и влизаш ли в пролука, която е СВОБОДНА, а не в такава, която си взел. Непропускането на пешеходец при излизане от имот и непропускането на движещите се по пътя са отсъждани грешки; ако принудиш някого по булеварда да спира рязко или да отбива — опасна. Изпълзяването на изхода без спиране е класиката, която проваля кандидати още в първата минута.",
+  },
+  levels: [
+    { level: 1 },
+    { level: 2 },
+    { level: 3 },
+    { level: 4, vehicleStart: "cold" },
+    // L5: „пролуката струва цяла минута търпение" — a SECOND column arriving
+    // behind the first, so the road is never briefly-empty and the only way
+    // out is to actually wait for a gap rather than take the first hole.
+    // Authored as its own stream (LevelSpec.stagedAdd ADDS specs; it cannot
+    // re-tune the base one), held further back and released by the same
+    // roll-off, so the two columns arrive as a train.
+    {
+      level: 5,
+      stagedAdd: [
+        {
+          ...MFP_STREAM,
+          id: "sc-mfp-stream-2",
+          actor: { ...MFP_STREAM.actor, hold: { nodeIndex: 0, offsetM: 0 }, colorIndex: 0 },
+          count: 3,
+          gapsM: [110, 136], // …the next column, ~7 s of boulevard behind the first
+        } satisfies OncomingStreamSpec,
+      ],
+    },
+  ],
+  staged: [MFP_WALKER, MFP_STREAM],
+  conditions: { weather: "dry" },
+  localeBg: "bg-BG",
+};
+
 /** The merging-family templates, in catalog order (registered in templates.ts). */
 export const SCENARIO_TEMPLATES_MERGING: readonly ScenarioSpec[] = [
   SC_MERGE_ACCEL_LANE,
   SC_MERGE_LANE_END,
   SC_MERGE_ROADWORKS_SHIFT,
+  SC_MERGE_BUS_PULLOUT,
+  SC_MERGE_FROM_PROPERTY,
 ];

@@ -296,6 +296,34 @@ describe("mw-v1 — motorway adjudication through the real reducer", () => {
     expect(violations(events)).toContain("SPEEDING_DANGEROUS");
     expect(violations(events)).not.toContain("SPEEDING_OVER_LIMIT");
   });
+
+  // The COMPOUND fault — the invariant sc-mw-min-speed's second demo is built
+  // on (templates-speed2.ts). The cases above prove each code alone: the crawl
+  // in the right lane, the 130 hog in the left. Neither proves they STACK, and
+  // stacking is not obvious — the two detectors share the same tick and each
+  // carries its own exemptions (the crawl's queue/transition innocence, the
+  // keep-right emergencyLaneRight seam), so a future guard on either could
+  // silently swallow the other and leave the template's demo grading one code
+  // while its card promises two.
+  it("the causeless 40 km/h crawl IN THE LEFT LANE grades BOTH codes — once each", () => {
+    const events = motorwayDrive(() => ({ x: X_LEFT, kmh: 40 }), 400);
+    expect([...violations(events)].sort()).toEqual([
+      "DRIVING_TOO_SLOW_FOR_MOTORWAY",
+      "NOT_KEEPING_RIGHT",
+    ]);
+  });
+
+  it("…and the low speed is no excuse for the lane: keep-right does not need motorway pace", () => {
+    // The mirror of the case above, stated as its own claim: NOT_KEEPING_RIGHT
+    // is a LANE rule, and a driver crawling in the overtaking lane must not get
+    // an implicit pass on it just because he is slow (the sc-mw-min-speed card
+    // tells the student the bill is double — this is why that is true).
+    const crawlLeft = motorwayDrive(() => ({ x: X_LEFT, kmh: 40 }), 400);
+    const hogLeft = motorwayDrive(() => ({ x: X_LEFT, kmh: 130 }));
+    for (const events of [crawlLeft, hogLeft]) {
+      expect(violations(events)).toContain("NOT_KEEPING_RIGHT");
+    }
+  });
 });
 
 // ---------------------------------------------------------------------------

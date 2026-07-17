@@ -1,0 +1,167 @@
+{
+ "format": "district-v1",
+ "meta": {
+  "district": "hz-debris",
+  "label": "Учебна улица — препятствие в лентата и кола отляво (сценарий „Спри, не свивай“)",
+  "mapKind": "scenario-street",
+  "generator": "tools/maps/gen_hz_debris.mjs",
+  "boundsLocalMeters": {
+   "minX": -38.13,
+   "minY": -6,
+   "maxX": 36.13,
+   "maxY": 306
+  },
+  "attribution": {
+   "text": "Учебна еднопосочна улица с две ленти и препятствие на платното — оригинален параметричен дизайн (без данни от OpenStreetMap)",
+   "license": "All rights reserved",
+   "licenseUrl": "/",
+   "copyrightUrl": "/",
+   "obligation": "none — original work, no ODbL attribution required for this map"
+  },
+  "defaults": {
+   "maxspeedUrbanKmh": 50,
+   "note": "Две ленти в една посока. В дясната лента пада препятствие, а вляво до теб се движи кола: спирачка ДОКРАЙ в своята лента, а не сляп волан встрани."
+  },
+  "stats": {
+   "roadKm": 0.3,
+   "nodes": 2,
+   "edges": 1,
+   "intersections": 0,
+   "crossings": 0,
+   "buildings": 2,
+   "spawnPoints": 3
+  },
+  "scenario": {
+   "archetype": "straight-street",
+   "params": {
+    "lengthM": 300,
+    "maxspeedKmh": 50
+   },
+   "lanesPerDirection": 2,
+   "lanePlayerX": 4.06,
+   "laneEscortX": -4.06,
+   "revealY": 160,
+   "debrisY": 190,
+   "endY": 300,
+   "streetEdgeId": "hzd-e-street",
+   "spawnY": 15
+  }
+ },
+ "roads": {
+  "nodes": [
+   {
+    "id": "hzd-n-end",
+    "x": 0,
+    "y": 300
+   },
+   {
+    "id": "hzd-n-start",
+    "x": 0,
+    "y": 0
+   }
+  ],
+  "edges": [
+   {
+    "id": "hzd-e-street",
+    "from": "hzd-n-start",
+    "to": "hzd-n-end",
+    "class": "primary",
+    "name": "Учебна улица — препятствие в лентата и кола отляво (сценарий „Спри, не свивай“) — платно",
+    "oneway": true,
+    "roundabout": false,
+    "lanes": 2,
+    "lanesSource": "tag",
+    "maxspeed": 50,
+    "maxspeedSource": "tag",
+    "length": 300,
+    "geometry": [
+     [
+      0,
+      0
+     ],
+     [
+      0,
+      300
+     ]
+    ]
+   }
+  ]
+ },
+ "intersections": [],
+ "crossings": [],
+ "roundabouts": [],
+ "buildings": [
+  {
+   "id": "hzd-b-west",
+   "height": 12,
+   "heightSource": "default",
+   "footprint": [
+    [
+     -34.13,
+     120
+    ],
+    [
+     -16.13,
+     120
+    ],
+    [
+     -16.13,
+     152
+    ],
+    [
+     -34.13,
+     152
+    ]
+   ]
+  },
+  {
+   "id": "hzd-b-east",
+   "height": 9,
+   "heightSource": "default",
+   "footprint": [
+    [
+     16.13,
+     176
+    ],
+    [
+     32.13,
+     176
+    ],
+    [
+     32.13,
+     208
+    ],
+    [
+     16.13,
+     208
+    ]
+   ]
+  }
+ ],
+ "spawnPoints": [
+  {
+   "id": "hzd-spawn-approach",
+   "x": 4.06,
+   "y": 15,
+   "heading": 0,
+   "edgeId": "hzd-e-street",
+   "name": "Начало — в дясната лента"
+  },
+  {
+   "id": "hzd-spawn-escort",
+   "x": -4.06,
+   "y": 15,
+   "heading": 0,
+   "edgeId": "hzd-e-street",
+   "name": "Контролна точка — съседната (лява) лента"
+  },
+  {
+   "id": "hzd-spawn-finish",
+   "x": 4.06,
+   "y": 285,
+   "heading": 0,
+   "edgeId": "hzd-e-street",
+   "name": "Контролна точка — край на отсечката"
+  }
+ ]
+}

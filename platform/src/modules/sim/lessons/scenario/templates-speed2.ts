@@ -1,10 +1,12 @@
 /**
- * Scenario templates — the SPEED-MANAGEMENT family, wave 2 (doc 72 §8 „Family
- * SP"): the SIGN-SCOPE rung, DATA ONLY in the templates.ts mold (coordinates
- * denormalized from the committed district file so nothing loads world JSON at
- * runtime; the batteries assert every pinned value against the generated map).
+ * Scenario templates — the SPEED-MANAGEMENT family, waves 2 + 5 (doc 72 §8
+ * „Family SP"): the SIGN-SCOPE rung and the MOTORWAY-FLOOR rung, DATA ONLY in
+ * the templates.ts mold (coordinates denormalized from the committed district
+ * file so nothing loads world JSON at runtime; the batteries assert every
+ * pinned value against the generated map).
  *
- *  - sc-sp-limit-end  „Докъде важи ограничението"  (SP-03, sp-signs-v1)
+ *  - sc-sp-limit-end   „Докъде важи ограничението"      (SP-03, sp-signs-v1)
+ *  - sc-mw-min-speed   „Магистрален ритъм — не пълзи"   (SP-10 + OV-11, mw-v1)
  *
  * templates-sp.ts already teaches where a В26 restriction STARTS
  * (sc-speed-transition: the 50→30 entry). This file opens the family's OTHER
@@ -12,10 +14,17 @@
  * the district's per-edge `maxspeed` surface IS the legal endpoint, so no new
  * engine capability is involved.
  *
+ * The wave-5 addition turns the family's other axis: every other SP template
+ * grades the CEILING (SPEEDING_*, the conditions envelope, the curve advisory).
+ * sc-mw-min-speed is the one that grades the FLOOR, and it is the only template
+ * that bills DRIVING_TOO_SLOW_FOR_MOTORWAY together with NOT_KEEPING_RIGHT on
+ * one drive — the compound fault (see its own header).
+ *
  * Family: "speed" — the existing catalog chip (doc 72 §8); the id follows the
  * sc-<family>-<slug> naming standard.
  */
 
+import type { RearTailgaterSpec } from "../../contracts";
 import type { ScenarioSpec } from "./types";
 
 // ---------------------------------------------------------------------------
@@ -156,5 +165,210 @@ export const SC_SP_LIMIT_END: ScenarioSpec = {
   localeBg: "bg-BG",
 };
 
-/** The wave-2 speed templates, in catalog order (registered in templates.ts). */
-export const SCENARIO_TEMPLATES_SPEED2: readonly ScenarioSpec[] = [SC_SP_LIMIT_END];
+// ---------------------------------------------------------------------------
+// 2. sc-mw-min-speed — „Магистрален ритъм — не пълзи" (SP-10 + OV-11) on the
+//    committed mw-v1 motorway (divided 2+2 posted 140, each carriageway an
+//    emergency curb lane + 2 travel lanes). The family's FLOOR rung.
+//
+//    WHY IT IS NOT sc-mw-discipline (templates-sp.ts), which rides the same
+//    map: that template pairs the two motorway faults as SEPARATE demos — a
+//    130 km/h left-lane hog (NOT_KEEPING_RIGHT alone) and a 40 km/h crawl in
+//    the right lane (DRIVING_TOO_SLOW_FOR_MOTORWAY alone). This one holds the
+//    speed FIXED at the crawl and moves only the LANE, so the two demos differ
+//    by exactly one variable and the second one bills BOTH codes at once. That
+//    compound conviction — the crawler who is also in the overtaking lane — is
+//    the drill: it exists nowhere else in the catalog, and it is the shape the
+//    fault actually takes on a real motorway.
+//
+//    THE STAGED FLOW CAR is what makes the WHY physical rather than narrated:
+//    a car travelling at motorway pace catches the player and is FORCED down
+//    to the player's speed. That is чл. 54's harm in one picture — your crawl
+//    becomes everyone's crawl — and in the left-lane demo the drill ends with
+//    the flow car still trapped behind, because a crawler in the overtaking
+//    lane is a crawler nobody can get past.
+// ---------------------------------------------------------------------------
+
+/** mw-v1 northbound lane centers (meta.scenario — the L7 copy truth;
+ *  world/__tests__/mw-district.test.ts asserts these against the generator). */
+const MWM_X_EMERG = 8.13; // laneId 0 — лентата за принудително спиране
+const MWM_X_CRUISE = 0; // laneId 1 — the right TRAVEL lane (the rightmost REQUIRED one)
+// (laneId 2, the overtaking lane at x = −8.12, is pinned in traces/scMwMinSpeed.ts —
+//  no graded zone of this template lives there.)
+/** mw-v1 lane pitch (gen_motorway.mjs SCALED_LANE_W = 3.25 × 2.5). */
+const MWM_LANE_PITCH = 8.125;
+
+/**
+ * ПОТОКЪТ — the shipped rearTailgater actor as the car that arrives at
+ * motorway pace and has to deal with you. PRESSURE SCENERY under the
+ * learn-only policy: the runner emits ZERO SimTick events, so no violation and
+ * no collision can ever grade from it (doc 72 FO-07 / A12). Everything graded
+ * here is the player's own channel — the crawl detector and keep-right, both
+ * default-ON and structurally data-armed by mw-v1's edge `motorway` tag +
+ * emergencyLane span. Hence no ruleConfig: the LIVE student session grades the
+ * same two faults the trace gate asserts.
+ *
+ * The lane arithmetic (the sc-merge-accel-lane precedent): the traffic graph
+ * lays ONE lane down the middle of a oneway edge's marked width, which on this
+ * 3-lane carriageway lands on the EMERGENCY lane (x ≈ +8.13). extraRightOffsetM
+ * = −MWM_X_EMERG walks it one lane left onto the cruise lane (x ≈ 0), and
+ * passShiftM = −MWM_LANE_PITCH runs the pass one lane left again, into the
+ * overtaking lane. So the actor never uses a lane it is not entitled to.
+ *
+ * THE TIMING, stated because it is load-bearing (see traces/scMwMinSpeed.ts):
+ * releaseGapM 8 is under the actor's 13 m standing lead-in behind the spawn, so
+ * the run releases on frame 1 and the latch (behindM ≤ followBehindM + 4) lands
+ * immediately — pressureSec is therefore measured from the session start in
+ * every drive, which makes the pass commit at a SHARED, deterministic t ≈ 22 s.
+ * The two long demos (shadow, right-lane crawl) run past it and the pass plays;
+ * the left-lane demo is authored to END before it, so the actor is never
+ * commanded into the lane the player is occupying. easeKmh is vestigial under
+ * this timing (the latch speed is 0, so „yielded" can never latch) — the
+ * outcome is measurement-only and nothing grades off it.
+ */
+const MWM_FLOW_CAR: RearTailgaterSpec = {
+  id: "sc-mwms-flow-car",
+  kind: "rearTailgater",
+  libraryEventId: "ev-speed-limit",
+  actor: {
+    pathNodes: ["mw-n-nb-start", "mw-n-nb-end"], // northbound — the player's own carriageway
+    hold: { nodeIndex: 0, offsetM: 2 }, // dormant at (0, 2) — 13 m behind the spawn
+    cruiseSpeedMps: 33, // ~119 km/h — its own pace before it meets you
+    extraRightOffsetM: -MWM_X_EMERG, // graph lane rides the curb lane; step one left ⇒ x ≈ 0
+    colorIndex: 2,
+  },
+  releaseGapM: 8,
+  followBehindM: 26, // ~22 m of bumpers — a car that has had to lift, not a лепка
+  maxMatchSpeedMps: 36, // 130 km/h — it keeps station behind even a brisk player
+  // 28 s of patience. MEASURED, not guessed: with pressureSec 22 the actor
+  // finished its lane shift into the left lane at t ≈ 23.5 and drew level with
+  // a left-lane player at t ≈ 25.8 — only ~3 s clear of the left-lane demo's
+  // 20.5 s runtime. 28 moves the commit to t ≈ 28 and the arrival to t ≈ 32,
+  // giving that demo ~9 s of headroom while both long demos (43 s / 43.8 s)
+  // still play the pass out in full.
+  pressureSec: 28,
+  passShiftM: -MWM_LANE_PITCH, // the pass runs one lane LEFT (never through the player)
+  passSpeedMps: 38, // ~137 km/h — under the posted 140: the flow car is never the lawbreaker
+  passAheadM: 45,
+  easeKmh: 6,
+};
+
+/**
+ * SP-10 (the floor half) + OV-11 — ритъмът на потока и дясната лента на
+ * автомагистрала (ЗДвП чл. 54: магистралата допуска само ПС, конструктивно
+ * способни на над 50 км/ч; чл. 15: движение във възможно най-дясната свободна
+ * лента).
+ *
+ * LAW HONESTY (the catalog's own verification note, rules/catalog.ts
+ * DRIVING_TOO_SLOW_FOR_MOTORWAY, grounded on q-magistrali-i-izvangradsko-026):
+ * Bulgaria has NO general mandatory motorway minimum. A minimum binds only
+ * under the mandatory sign; чл. 54 only bars vehicles that CANNOT exceed
+ * 50 km/h. Every card below therefore teaches „ритъм на потока", anchored on
+ * чл. 54's 50 km/h construction line — never „законът ти забранява под 50".
+ * The backlog brief's phrasing („долна граница … не се движи под 50") is the
+ * phantom-minimum claim the content bank explicitly marks WRONG, so it is not
+ * repeated here.
+ *
+ * TWO DEMOS, ONE VARIABLE — both crawl at ~40 km/h, and only the lane moves:
+ *   - „Пълзене с 40 в активната лента" → DRIVING_TOO_SLOW_FOR_MOTORWAY alone;
+ *   - „Пълзене с 40, и то в лявата лента" → DRIVING_TOO_SLOW_FOR_MOTORWAY +
+ *     NOT_KEEPING_RIGHT — the compound bill (the emergencyLaneRight seam makes
+ *     laneId 1 the rightmost REQUIRED lane, so laneId 2 hogs with no excuse).
+ * Both detectors read only data mw-v1 already carries, so no ruleConfig and no
+ * physics override: the student's own attempt grades identically.
+ */
+export const SC_MW_MIN_SPEED: ScenarioSpec = {
+  id: "sc-mw-min-speed",
+  family: "speed",
+  tagsBg: ["магистрала", "скорост на потока", "твърде бавно", "дръж вдясно", "лентова дисциплина"],
+  titleBg: "Магистрален ритъм — не пълзи",
+  objectiveBg:
+    "Измини магистралния участък с ритъма на потока в дясната лента за движение: общ задължителен минимум няма, но кола, която пълзи с 40 в поток от 130, е подвижно препятствие — а пълзене в лявата лента е двойна грешка.",
+  archetypeIds: ["SP-10", "OV-11"],
+  conceptIds: ["c-motorway-rules", "c-motorway-prohibitions", "c-speed-adaptation", "c-lane-choice"],
+  map: {
+    archetype: "motorway-segment",
+    // The generator recipe — mirrored in mw-v1.json meta.scenario.params
+    // (tools/maps/gen_motorway.mjs). REUSED, not regenerated: the district is
+    // already exactly the segment this drill needs.
+    params: { lengthM: 1000, maxspeedKmh: 140, lanesPerDirection: 2, medianM: 6 },
+    districtId: "mw-v1",
+  },
+  start: {
+    spawnPointId: "mw-spawn-approach",
+    vehicleStart: "ready",
+  },
+  instructionsBg: [
+    { n: 1, textBg: "Потегли по магистралата — ограничението е 140 км/ч, а платното е разделено с мантинела." },
+    { n: 2, textBg: "Ускорявай уверено и се установи около 110 км/ч в ДЯСНАТА лента за движение: това е ритъмът на потока тук." },
+    { n: 3, textBg: "Погледни в огледалото за задно виждане. Колата зад теб се движи с магистрална скорост — дръж своя ритъм и я остави спокойно да те изпревари отляво." },
+    { n: 4, textBg: "Не сваляй скоростта без причина. Продължително пълзене далеч под потока (тук около 40 км/ч) превръща колата ти в подвижно препятствие, което всички трябва да заобикалят." },
+    { n: 5, textBg: "Лявата лента е само за изпреварване, а аварийната вдясно не е лента за движение изобщо — дръж дясната до края на участъка." },
+  ],
+  success: [
+    {
+      id: "sc-mwms-join",
+      titleBg: "Влез в ритъма на потока в дясната лента за движение",
+      // Radius 6 pins the CRUISE lane (lane centers sit 8.12–8.13 m apart):
+      // the left-lane crawler misses it, the right-lane crawler makes it — that
+      // asymmetry IS the two demos' difference, made visible on the end screen.
+      params: { kind: "reachZone", x: MWM_X_CRUISE, y: 300, radiusM: 6, maxSpeedKmh: 140 },
+    },
+    {
+      id: "sc-mwms-hold",
+      titleBg: "Задръж лентата и ритъма през средата на участъка",
+      params: { kind: "reachZone", x: MWM_X_CRUISE, y: 640, radiusM: 6, maxSpeedKmh: 140 },
+    },
+    {
+      id: "sc-mwms-finish",
+      titleBg: "Стигни края на участъка",
+      // Neither crawl demo gets here: at 40 km/h the kilometre is a 90-second
+      // drive, and both demos end long before it. The crawler does not merely
+      // score badly — he never finishes the road (rubric.parTimeSec tells the
+      // rest of the story: 110 covers this in ~40 s).
+      params: { kind: "reachZone", x: MWM_X_CRUISE, y: 940, radiusM: 12 },
+    },
+  ],
+  rubric: { parTimeSec: 60 },
+  // RECORDED: committed deterministic recordings of the authored scripts in
+  // traces/scMwMinSpeed.ts; gates in traces/__tests__/sc-mw-min-speed-traces
+  // .test.ts (re-record with RECORD_TRACES=1).
+  shadow: { path: "content/traces/sc-mw-min-speed/shadow-correct.trace.json" },
+  staged: [MWM_FLOW_CAR],
+  mistakes: [
+    {
+      traceRef: { path: "content/traces/sc-mw-min-speed/mistake-crawl-right.trace.json" },
+      titleBg: "Пълзене с 40 в активната лента",
+      whatWentWrongBg:
+        "Колата запълзя с около 40 км/ч в дясната лента за движение по свободна магистрала — без задръстване, без повреда, без причина. Лентата е вярната, скоростта не е: потокът тук се движи със 120–140 и те застига с 80–100 км/ч разлика. Виж какво стана зад теб — колата, която идваше с магистрална скорост, трябваше да свали до твоите 40 и после да излиза отляво, за да се измъкне. Общ задължителен минимум наистина няма, но чл. 54 пуска на магистралата само коли, способни на над 50 км/ч, точно защото по-бавното тук е препятствие.",
+      codeRefs: ["DRIVING_TOO_SLOW_FOR_MOTORWAY"],
+    },
+    {
+      traceRef: { path: "content/traces/sc-mw-min-speed/mistake-crawl-left.trace.json" },
+      titleBg: "Пълзене с 40, и то в лявата лента",
+      whatWentWrongBg:
+        "Същите 40 км/ч, но този път в ЛЯВАТА лента — и сметката е двойна. Първо, пълзенето: далеч под потока, без причина. Второ, лентата: и на магистрала важи чл. 15 — движиш се във възможно най-дясната свободна лента за движение, а дясната беше празна през цялото време. Резултатът се вижда зад теб: колата, която те застигна, остана заклещена там до края. Пълзящият в лявата лента не просто пречи — той спира изпреварването изобщо, защото никой не може законно да го подмине.",
+      codeRefs: ["DRIVING_TOO_SLOW_FOR_MOTORWAY", "NOT_KEEPING_RIGHT"],
+    },
+  ],
+  teach: {
+    whenBg:
+      "При всяко движение по автомагистрала и скоростен път — и особено в момента, в който нещо те кара да свалиш скоростта: навигация, несигурност, разсейване, „не бързам никъде“. Въпросът тогава е един: движа ли се с ритъма на останалите, или ги карам да ме заобикалят?",
+    whyBg:
+      "Катастрофите на магистрала се раждат от РАЗЛИКИТЕ в скоростта, не от самата скорост. Кола с 40 км/ч в поток от 130 се приближава с 90 км/ч — колкото челен удар в града — и всеки зад нея трябва или да спира рязко, или да сменя лента. Затова законът не пуска на магистралата превозни средства, неспособни на над 50 км/ч (чл. 54): по-бавното тук е препятствие по конструкция. Общ задължителен минимум обаче няма — минимална скорост важи само там, където знак я въвежда; правилото, което те пази, е чл. 20: съобразявай се. А пълзенето в ЛЯВАТА лента събира двете грешки в една: бавен си И заемаш лентата, през която единствено могат да те подминат.",
+    lawRef: "ЗДвП чл. 54; ЗДвП чл. 15",
+    examinerBg:
+      "Изпитващият очаква уверено движение със скоростта на потока в дясната лента за движение. Продължителното движение далеч под потока без причина е грешка (второстепенна — закъснели, нерешителни действия), а трайното висене в лявата лента без изпреварване е отделна грешка към нея. Ако не можеш или не искаш да поддържаш магистрален ритъм, магистралата не е твоят път — изборът на успореден републикански път е част от преценката.",
+  },
+  levels: [
+    { level: 1 },
+    { level: 2 },
+    { level: 3 },
+    { level: 4, vehicleStart: "cold" },
+  ],
+  conditions: { weather: "dry" },
+  localeBg: "bg-BG",
+};
+
+/** The wave-2 + wave-5 speed templates, in catalog order (registered in
+ *  templates.ts). */
+export const SCENARIO_TEMPLATES_SPEED2: readonly ScenarioSpec[] = [SC_SP_LIMIT_END, SC_MW_MIN_SPEED];

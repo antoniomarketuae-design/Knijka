@@ -14,6 +14,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { beforeAll, describe, expect, it } from "vitest";
 import type { VehicleSample } from "../../contracts";
+import { SC_LN_BOULEVARD_DISCIPLINE } from "../../lessons/scenario/templates-lanes2";
 import { createWorldRuntime, type DistrictWorldRuntime } from "../../runtime";
 import { buildLaneGraph } from "../../traffic/graph";
 import { createTrafficSystem } from "../../traffic/system";
@@ -149,5 +150,103 @@ describe(`${ID} through the traffic lane graph`, () => {
     expect(graph.crossingLanes.size).toBe(0);
     const traffic = createTrafficSystem(raw, { seed: 7, vehicleCount: 0, pedestrianCount: 0 });
     expect(traffic.stats.vehicleCount).toBe(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// sc-ln-boulevard-discipline (wave 6) — the SECOND tenant of this map. The
+// U-turn drill above only ever needed „a wide street"; this one needs the
+// street to be a specific 2+2 with a specific curb lane, because its whole
+// contract is WHICH lane you are in and its whole staging is a crawler that
+// must sit in the player's OWN lane. Every value the template denormalizes by
+// value (the L7 copy law) and every runtime behaviour its three committed
+// traces are tuned against is pinned here — if the generator ever moves one,
+// this battery fails LOUDLY instead of the traces failing mysteriously.
+// ---------------------------------------------------------------------------
+describe(`${ID} — the sc-ln-boulevard-discipline contract`, () => {
+  it("the template's pinned map params ARE the committed map's (the L7 copy law)", () => {
+    const district = assertDistrict(loadRaw(ID));
+    const scenario = district.meta.scenario as {
+      params: { lengthM: number; maxspeedKmh: number; lanes: number };
+      lanesPerDirection: number;
+      laneCenterOuterM: number;
+      laneCenterInnerM: number;
+    };
+    expect(SC_LN_BOULEVARD_DISCIPLINE.map.districtId).toBe(ID);
+    expect(SC_LN_BOULEVARD_DISCIPLINE.map.params).toEqual({
+      lengthM: scenario.params.lengthM,
+      maxspeedKmh: scenario.params.maxspeedKmh,
+      lanes: scenario.params.lanes,
+    });
+    expect(scenario.lanesPerDirection).toBe(2);
+    expect(scenario.laneCenterOuterM).toBe(X_OUT);
+    expect(scenario.laneCenterInnerM).toBe(X_IN);
+  });
+
+  it("spawns the drill in the CURB lane and fits all three gates on the carriageway", () => {
+    const district = assertDistrict(loadRaw(ID));
+    const spawn = district.spawnPoints.find((s) => s.id === SC_LN_BOULEVARD_DISCIPLINE.start.spawnPointId);
+    expect(spawn).toBeDefined();
+    expect(spawn!.x).toBe(X_OUT); // the drill starts where you belong
+    expect(spawn!.heading).toBe(0); // northbound
+    // The gates: right (y 40) → left (y 115) → right again (y 175), all inside
+    // the 200 m road with the spawn behind them. A 175 m homecoming gate is the
+    // tightest thing this map can carry — the battery is what says so.
+    for (const obj of SC_LN_BOULEVARD_DISCIPLINE.success) {
+      const p = obj.params as { kind: string; x: number; y: number; radiusM: number };
+      expect(p.kind).toBe("reachZone");
+      expect(p.y).toBeGreaterThan(spawn!.y);
+      expect(p.y).toBeLessThan(LENGTH_M);
+      // Radius 4 < the 8.125 m lane pitch: every gate is lane-EXCLUSIVE, which
+      // is the only reason objective-gating can grade a lane choice at all.
+      expect(p.radiusM).toBeLessThan(8.125 / 2);
+      expect([X_OUT, X_IN]).toContain(p.x);
+    }
+  });
+
+  it("the staged crawler rides the player's OWN lane: extraRightOffsetM 0 = x 12.19", () => {
+    // The template's premise in one number. On a 2+2 the traffic graph's lane
+    // rides the CURB-lane center (± 12.19 — see the lane-graph block above), so
+    // extraRightOffsetM 0 puts the slow car exactly where the player lives and
+    // the pass is a real pass. Any other offset and the drill is theatre.
+    const crawler = SC_LN_BOULEVARD_DISCIPLINE.staged![0];
+    expect(crawler.kind).toBe("brakingLeadCar");
+    const spec = crawler as { actor: { pathNodes: string[]; hold: { nodeIndex: number; offsetM: number }; extraRightOffsetM?: number } };
+    expect(spec.actor.extraRightOffsetM).toBe(0);
+    const traffic = createTrafficSystem(loadRaw(ID) as TrafficDistrict, {
+      seed: 7,
+      vehicleCount: 0,
+      pedestrianCount: 0,
+    });
+    const staged = traffic.stage({
+      kind: "vehicle",
+      id: "wb-test-crawler",
+      pathNodes: spec.actor.pathNodes,
+      hold: spec.actor.hold,
+      cruiseSpeedMps: 5.5,
+      extraRightOffsetM: 0,
+    });
+    expect(staged).not.toBeNull();
+    const view = traffic.staged("wb-test-crawler")!;
+    expect(Math.abs(view.x - X_OUT)).toBeLessThan(0.05);
+    expect(Math.abs(view.y - spec.actor.hold.offsetM)).toBeLessThan(0.05); // holds at y = 60
+  });
+
+  it("the weave's straddle line (x = 8.0) reads as laneId 1 off-centre, NOT a lane change", () => {
+    // The mistake-weaving demo's spine (traces/scLnBoulevardDiscipline.ts): the
+    // car hangs on the 0/1 boundary from the LEFT lane. The locator's
+    // hysteresis (deadband W/2 + 0.35 = 4.4125) must HOLD laneId 1 there —
+    // otherwise the straddle becomes a lane-change storm and the demo grades
+    // the wrong codes. |laneOffsetM| ≈ 3.94 clears laneKeepMaxOffsetM (3.25);
+    // its NEGATIVE sign (toward the curb) is what keeps centerLineCond
+    // disarmed, so POOR_LANE_KEEPING — not CENTER_LINE_TOUCHED — is the bill.
+    const rt = createWorldRuntime(loadRaw(ID));
+    rt.update(1 / 60);
+    expect(rt.sample(sample(X_IN, 56, 0, 22), 1, false).laneId).toBe(1); // settled left
+    const straddle = rt.sample(sample(8.0, 70, 0, 22), 2, false);
+    expect(straddle.laneId).toBe(1); // hysteresis holds — no crossing
+    expect(straddle.laneOffsetM).toBeLessThan(-3.25); // off-centre, toward the CURB
+    expect(straddle.laneOffsetM).toBeGreaterThan(-4.4125); // …and inside the deadband
+    expect(straddle.oneway).toBe(false);
   });
 });

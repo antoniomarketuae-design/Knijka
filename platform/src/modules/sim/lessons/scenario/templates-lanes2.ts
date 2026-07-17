@@ -13,6 +13,15 @@
  *                            (OV-05 + AC-04, ov-oncoming-v1 REUSED at NIGHT)
  *  - sc-ov-being-overtaken   „Изпреварват те — не ускорявай" (OV-10 + OV-12,
  *                            ov-oncoming-v1 REUSED by day; wave 3)
+ *  - sc-ov-crest-curve       „Забранено изпреварване преди било и завой"
+ *                            (OV-06 + OV-05 + SP-05, ov-crest-v1 — the first
+ *                            map carrying В24 + А1 spans on one edge; wave 4)
+ *  - sc-ov-solid-return      „Прибери се преди плътната линия" (OV-04 + OV-09 +
+ *                            SN-03, ov-solid2-v1 — the М2→М1 closing window;
+ *                            wave 5)
+ *  - sc-ln-boulevard-discipline „Лентова дисциплина на булеварда" (OV-11 +
+ *                            OV-02 + OV-12, wb-boulevard-v1 REUSED — the urban
+ *                            2+2 with a LEGITIMATE pass in the middle; wave 6)
  *
  * WHY THE MISTAKES GRADE WHAT THEY GRADE. The lane-intent layer (per-approach-
  * lane allowed movements in district data) is doc 72 N3 work that has NOT
@@ -577,10 +586,743 @@ export const SC_OV_BEING_OVERTAKEN: ScenarioSpec = {
   localeBg: "bg-BG",
 };
 
+// ---------------------------------------------------------------------------
+// 4. sc-ov-crest-curve — „Забранено изпреварване преди било и завой" (OV-06 ban
+//    × OV-05 corridor × SP-05 curve) on ov-crest-v1, the FIRST map carrying a
+//    В24 noOvertaking span and an А1 curveAdvisory span on ONE edge: a rural
+//    1+1 posted 90, a 90° blind bend with a slope block inside its arc, and a
+//    450 m straight after it where passing is legal (tools/maps/gen_ov_crest.mjs).
+//
+// „БИЛО" IS NARRATIVE, THE CURVE IS REAL. Doc 76 flags hill-ramp as a reserved
+// archetype with no ramp geometry — no elevation exists in this engine. So the
+// bank's crest frame (q-manevri-012 „изкачваш се към билото… зад бавен камион")
+// is taught here through its twin, the closed bend (q-manevri-013 „в участък с
+// ограничена видимост, например в закрит завой"; q-magistrali-i-izvangradsko-014
+// „пред вас има десен завой, след който пътят не се вижда"): SAME law, SAME
+// decision, geometry we can actually build. Every line of copy below is
+// curve-based — nothing claims a slope the map does not have.
+//
+// WHY THE MISTAKES GRADE WHAT THEY GRADE. The В24 span is authored, posted and
+// on the tick (tick.noOvertakeZone — the district battery pins all three), and
+// yet OVERTAKING_IN_BAN_ZONE CANNOT fire here, by construction: the detector
+// rides the denoised lane-change signal (rules/engine.ts stage 3 — a laneId
+// DELTA), and on a 1+1 laneId is „rightmost lane OF THE VEHICLE'S CARRIAGEWAY"
+// (locator.ts), i.e. 0 on BOTH banks. Crossing the осева flips travelDir, never
+// laneId — which is exactly why sc-ov-ban-overtake had to live on a 2+2
+// boulevard. A blind rural bend is a 1+1 or it is a lie, so this template grades
+// the honest way, on what a pass here ACTUALLY is:
+//   - „Изпреварване в слепия завой" grades OVERTAKE_INSUFFICIENT_GAP — the
+//     corridor tracker measures the real window against the car that comes out
+//     of the bend, which IS чл. 43's whole point: the ban exists because the
+//     window cannot be seen, and the demo shows the window that was not there;
+//   - „Прекалена скорост в дъгата" grades SPEED_TOO_FAST_FOR_CURVE off the А1
+//     advisory span (ЗДвП чл. 20, ал. 2).
+// SUCCESS carries the ban itself, objective-gated (the sc-ln-turn-lane-arrows
+// road, above): a radius-4 patience gate on the OWN lane inside the bend, with
+// a speed ceiling — satisfiable only by the driver who neither pulls out nor
+// carries speed in. ov-crest-districts.test.ts pins the negative so the day the
+// ban detector learns about 1+1 banks it fails loudly and this template gains
+// its code deliberately.
+// ---------------------------------------------------------------------------
+
+/** ov-crest-v1 pins, denormalized from the committed map by value (the L7 copy
+ *  law — ov-crest-districts.test.ts asserts every one against meta.scenario). */
+const OVCC_OWN = 4.06; // approach right-lane center
+/** The mid-arc point of the OWN lane — the patience gate's anchor
+ *  (meta.scenario.laneCurveMid). The opposing bank's mid-arc sits one 8.125 m
+ *  lane pitch away, so a radius-4 gate here is unreachable from an excursion. */
+const OVCC_ARC_MID_X = 42.41;
+const OVCC_ARC_MID_Y = 332.59;
+/** Exit-leg lane centers: own (eastbound) and the oncoming bank the legal pass
+ *  borrows (meta.scenario.exitLaneY / exitOncomingLaneY). */
+const OVCC_EXIT_Y = 370.94;
+const OVCC_EXIT_ONCOMING_Y = 379.06;
+
+/**
+ * The slow LEAD of sc-ov-crest-curve: a TRUCK (profile — visual/data only; the
+ * leadGap query stays point-based, ADR-001) pacing the player's own lane at
+ * ~57 km/h on a 90 km/h road. This is the bank's „бавен камион" and it is the
+ * single most load-bearing number in the template, because ONE spec has to
+ * serve three drives that want opposite things:
+ *   - maxMatchSpeedMps 15.8 (~56.9 km/h) sits ABOVE the 54 km/h guilty-curve
+ *     demo, so that demo's overspeed NEVER becomes a following fault: the truck
+ *     simply keeps pace and the only thing billed is the arc. One demo, one
+ *     lesson — the whole point of the §9 exact-code assert;
+ *   - …and it sits far enough under the posted 90 that the shadow's legal pass
+ *     in the straight closes at ~28 km/h and completes inside the authored
+ *     450 m window (the generator asserts the window fits a whole pass);
+ *   - followGapM 38 (≈ 34 m of bumpers) is chosen against the SAME 54 km/h:
+ *     the follow band there is followFireRatio 0.7 × followSafeSeconds 1.8 ×
+ *     15 m/s ≈ 19 m, so every drive here keeps its distance by construction and
+ *     FOLLOWING_TOO_CLOSE can never leak into a demo about anything else.
+ * Its slam tier is authored out of reach (the OVN/OVB mold): this is
+ * deterministic moving traffic, not a braking drill.
+ */
+const OVCC_LEAD_TRUCK: BrakingLeadCarSpec = {
+  id: "sc-ovcc-lead",
+  kind: "brakingLeadCar",
+  libraryEventId: "ev-overtake",
+  actor: {
+    pathNodes: ["ovc-n-start", "ovc-n-end"],
+    hold: { nodeIndex: 0, offsetM: 55 }, // dormant ~40 m ahead of the spawn
+    cruiseSpeedMps: 15.8,
+    extraRightOffsetM: 0, // own-lane center (the vehicle being overtaken)
+    colorIndex: 2,
+    profile: "truck",
+  },
+  followGapM: 38,
+  maxMatchSpeedMps: 15.8, // ~57 km/h — see the doc above: the hinge of all three
+  slamAt: { x: OVCC_OWN, y: 1400 }, // far past the 902 m road — never reached
+  slamRadiusM: 2,
+  slamDecelMps2: 6,
+  minSlamSpeedKmh: 250, // the slam tier is authored out of reach…
+  proximityFallbackM: 0.3, // …and the proximity fallback cannot occur
+  triggersHazard: false,
+  resumeAfterSec: 3,
+};
+
+/**
+ * The car that comes OUT OF THE BEND — the reason for the ban, made physical.
+ * TWO cars southbound at 12 m/s, released together on the player's first
+ * movement: pure clockwork the drive scripts are authored against (the OVN
+ * mold). Both are timed to meet the player INSIDE the arc, which does two jobs
+ * at once and is why the count is 2 and not 1:
+ *   - in the shadow they sweep past while the bot waits in its own lane —
+ *     the lesson's „ето защо" arrives unprompted, at zero grading cost (the
+ *     corridor is disarmed on the own bank);
+ *   - in the blind-pass demo they are what the excursion runs into: the tracker
+ *     reads distM / closingMps against a 12 m/s car, so the convict band
+ *     (OVERTAKE_CONVICT_GAP_SEC 4.0) is ~48 m of real road — a window that was
+ *     never visible from behind the truck.
+ * And by spending BOTH inside the bend they leave the legal straight genuinely
+ * empty, which is what makes the shadow's pass there lawful rather than lucky.
+ */
+const OVCC_STREAM: OncomingStreamSpec = {
+  id: "sc-ovcc-stream",
+  kind: "oncomingStream",
+  libraryEventId: "ev-overtake",
+  actor: {
+    pathNodes: ["ovc-n-end", "ovc-n-start"], // southbound = oncoming
+    // In INSTANT-CRUISE terms (a released car accelerating at the staged
+    // default 2.6 m/s² loses v²/2a ≈ 27.7 m against an instant clock at 12
+    // m/s): held at path arc 215 ⇒ road position 902.04 − 215 ⇒ the instant
+    // model has car 0 crossing road-s = 934.54 − 12·t. Tuned so it meets a
+    // 40–44 km/h drive at road-s ≈ 360, i.e. PAST the arc's midpoint — which is
+    // what puts the blind-pass demo's whole excursion, conviction included,
+    // ACROSS the bend's blindest point instead of short of it.
+    hold: { nodeIndex: 0, offsetM: 215 },
+    cruiseSpeedMps: 12,
+    colorIndex: 1,
+  },
+  count: 2,
+  gapsM: [90], // car 1 rides 90 m further up the road — ~4 s behind car 0
+  releaseKmh: 3,
+};
+
+/** OV-06 × OV-05 × SP-05 — изпреварване при ограничена видимост (ЗДвП чл. 43:
+ *  забранено е изпреварването при ограничена видимост — в закрит завой и при
+ *  приближаване към връх на изкачване; чл. 42: изпреварва се само при свободен
+ *  насрещен участък за ЦЯЛАТА маневра; чл. 20, ал. 2: скоростта се съобразява с
+ *  видимостта и с обозначения завой). Bank-verified: q-manevri-012 („зад билото
+ *  не виждаш дали идва насрещен автомобил"), q-manevri-013 („в участък с
+ *  ограничена видимост, например в закрит завой"), q-magistrali-i-izvangradsko-014
+ *  („едва след завоя, когато видя достатъчно дълъг свободен насрещен участък"),
+ *  q-manevri-065. */
+export const SC_OV_CREST_CURVE: ScenarioSpec = {
+  id: "sc-ov-crest-curve",
+  family: "lanes",
+  tagsBg: ["изпреварване", "забрана за изпреварване", "знак В24", "сляп завой", "ограничена видимост"],
+  titleBg: "Забранено изпреварване преди било и завой",
+  objectiveBg:
+    "Не започвай изпреварване там, където пътят се крие — преди връх на изкачване или сляп завой изчакваш, колкото и бавен да е предният.",
+  archetypeIds: ["OV-06", "OV-05", "SP-05"],
+  conceptIds: [
+    "c-overtaking-prohibitions",
+    "c-overtaking-procedure",
+    "c-speed-adaptation",
+    "c-warning-signs",
+  ],
+  map: {
+    archetype: "rural-curve",
+    // The generator recipe — mirrored in ov-crest-v1.json meta.scenario.params
+    // (tools/maps/gen_ov_crest.mjs).
+    params: {
+      approachM: 240,
+      radiusM: 135,
+      sweepDeg: 90,
+      exitM: 450,
+      maxspeedKmh: 90,
+      advisoryKmh: 40,
+      banAheadM: 90,
+    },
+    districtId: "ov-crest-v1",
+  },
+  start: {
+    spawnPointId: "ovc-spawn-approach",
+    vehicleStart: "ready",
+  },
+  instructionsBg: [
+    { n: 1, textBg: "Извънградски път, по една лента в посока, ограничение 90. Пред теб пълзи бавен камион и ти се иска да го подминеш." },
+    { n: 2, textBg: "Отдалеч се появява знак В24 „Забранено е изпреварването“, а след него знак А1 с табела 40 — напред пътят завива надясно и се скрива зад склона." },
+    { n: 3, textBg: "Не започвай нищо. Забраната важи от знака, а не от завоя: маневра, започната „на ръба“, ЗАВЪРШВА вътре в слепия участък." },
+    { n: 4, textBg: "Свали скоростта още на правата — в дъгата дръж около 40 и остани зад камиона, дори да ти се струва, че насреща е чисто. Празното платно, което виждаш, свършва там, където свършва и погледът ти." },
+    { n: 5, textBg: "Изчакай завоя да те изведе на дългата права. Чак когато видиш свободен насрещен участък за ЦЯЛАТА маневра: огледало, ляв мигач, решително изпреварване." },
+    { n: 6, textBg: "Прибери се вдясно с мигач, щом видиш камиона в огледалото, и завърши в своята лента." },
+  ],
+  success: [
+    {
+      id: "sc-ovcc-patience",
+      titleBg: "Изчакай зад камиона през целия сляп завой",
+      // THE drill, in one gate. Radius 4 < the 8.125 m lane pitch, so it is
+      // satisfiable ONLY from the OWN lane at the arc's midpoint — an excursion
+      // onto the oncoming bank is 8.13 m away and fails it. maxSpeedKmh 46 sits
+      // just above the А1 advisory band (40 + the engine's 5 km/h grace) — the
+      // driver who carries speed through the bend fails the SAME gate. Both
+      // taught faults, one objective: patience IS being here, slow, on your side.
+      params: { kind: "reachZone", x: OVCC_ARC_MID_X, y: OVCC_ARC_MID_Y, radiusM: 4, maxSpeedKmh: 46 },
+    },
+    {
+      id: "sc-ovcc-pass",
+      titleBg: "Изпревари в правата след завоя",
+      // The other half of чл. 43: the ban is not „никога", it is „не ТУК". This
+      // gate sits on the oncoming bank of the LEGAL straight — reachable only by
+      // actually committing the pass where the law allows it, 100+ m past the
+      // end of the В24 span. Radius 4 again: the own lane is a full pitch away.
+      params: { kind: "reachZone", x: 300, y: OVCC_EXIT_ONCOMING_Y, radiusM: 4 },
+    },
+    {
+      id: "sc-ovcc-finish",
+      titleBg: "Прибери се вдясно и завърши в своята лента",
+      params: { kind: "reachZone", x: 545, y: OVCC_EXIT_Y, radiusM: 5 },
+    },
+  ],
+  rubric: { parTimeSec: 95 },
+  // RECORDED: committed deterministic recordings of the authored scripts in
+  // traces/scOvCrestCurve.ts; gates in traces/__tests__/
+  // sc-ov-crest-curve-traces.test.ts (re-record with RECORD_TRACES=1).
+  shadow: { path: "content/traces/sc-ov-crest-curve/shadow-correct.trace.json" },
+  mistakes: [
+    {
+      traceRef: { path: "content/traces/sc-ov-crest-curve/mistake-blind-pass.trace.json" },
+      titleBg: "Изпреварване в слепия завой",
+      whatWentWrongBg:
+        "„Камионът пълзи, а насреща е чисто“ — и колата излезе в дъгата. Само че „чисто“ там значи единствено „не виждам“: зад склона на завоя пътят продължава, а по него идва кола. Тя се появи, когато маневрата вече беше започнала — измереният прозорец се оказа секунди, а не метри. Точно това забранява чл. 43: не се изпреварва при ограничена видимост, независимо колко бавен е предният и колко празно изглежда платното. Знакът В24 стои 90 метра преди завоя именно защото решението се взема ТАМ, не в дъгата.",
+      codeRefs: ["OVERTAKE_INSUFFICIENT_GAP"],
+    },
+    {
+      traceRef: { path: "content/traces/sc-ov-crest-curve/mistake-curve-speed.trace.json" },
+      titleBg: "Прекалена скорост в дъгата",
+      whatWentWrongBg:
+        "Тук никой не изпреварва — водачът просто влезе в обозначения завой с около 54 км/ч при табела 40 под знака А1. Табелата не е препоръка за плахите: тя е скоростта, при която успяваш да спреш в отсечката, която ВИЖДАШ. В сляп завой пред теб може да стои спрял автомобил, паднал клон или насрещен, който реже дъгата — а сцеплението, което харчиш за скоростта, вече не ти достига за спирачката. Намаляването се прави на правата ПРЕДИ завоя; в дъгата кракът стои спокоен (чл. 20, ал. 2).",
+      codeRefs: ["SPEED_TOO_FAST_FOR_CURVE"],
+    },
+  ],
+  teach: {
+    whenBg:
+      "На всеки двупосочен извънградски път зад по-бавно превозно средство — камион, каравана, трактор — щом напред пътят се скрие: закрит завой, връх на изкачване, стеснение. Разпознава се лесно: виждаш знак В24 или просто не виждаш края на маневрата си. Това е моментът, в който отговорът почти винаги е „не сега, след завоя“.",
+    whyBg:
+      "Изпреварването е единствената нормална маневра, при която доброволно излизаш в насрещното платно — и остава безопасна само докато виждаш целия участък, който ще ти трябва. При изпреварване скоростите се СЪБИРАТ: срещу теб и другия се затварят по 50 метра в секунда, така че прозорец, който „изглежда достатъчен“ на 300 метра, е шест секунди — колкото самата маневра. А в закрит завой или зад било ти не виждаш 300 метра: виждаш склона. Празното платно пред теб не е информация, а липса на информация — насрещният излиза иззад дъгата вече на стотина метра и вие оставате без нищо освен спирачки, каквито няма къде да използвате. Затова законът не оставя това на преценка: при ограничена видимост изпреварването е ЗАБРАНЕНО. Цената на търпението е минута зад камиона; цената на грешката е челен удар, при който двете скорости се събират.",
+    lawRef: "ЗДвП чл. 43",
+    examinerBg:
+      "Изпитващият следи къде вземаш решението, а не колко си бърз: очаква да разчетеш В24 и А1 отдалеч, да свалиш скоростта преди дъгата, да останеш зад бавния през целия участък с ограничена видимост и да изпревариш чисто чак на правата след него. Започнато изпреварване в зоната на забраната или в закрит завой е опасна грешка и проваля изпита; несъобразената скорост в обозначения завой е основна грешка.",
+  },
+  levels: [
+    { level: 1 },
+    { level: 2 },
+    { level: 3 },
+    { level: 4, vehicleStart: "cold" },
+    // L5 — дъжд: a RENDER/conditions axis only. `physics` is a TEMPLATE-wide
+    // field (LevelSpec carries no physics override), so authoring wetGrip for
+    // this rung would run L1–L4 on wet grip too and invalidate the dry-tuned
+    // ghost envelope of every committed trace (ADR-006 stage 4a) — the same
+    // ruling sc-ov-night-gap took for its drizzle rung.
+    { level: 5, conditions: { weather: "rain" } },
+  ],
+  staged: [OVCC_LEAD_TRUCK, OVCC_STREAM],
+  conditions: { weather: "dry" },
+  localeBg: "bg-BG",
+};
+
+// ---------------------------------------------------------------------------
+// 5. sc-ov-solid-return — „Прибери се преди плътната линия" (OV-04 × OV-09 ×
+//    SN-03) on ov-solid2-v1, the CLOSING-WINDOW road: a rural 1+1 posted 90,
+//    285 m of dashed М2 with a crawler to pass, 60 m of lengthened warning
+//    dashes, then an М1 solid span at y ∈ [300, 500] (tools/maps/gen_ov_solid2.mjs).
+//
+// WHY THIS IS NOT sc-ov-solid-line, AND WHY IT NEEDED ITS OWN MAP. The live
+// template teaches the WALL: „не пресичай" — a pure line-discipline drive on
+// ov-solid-v1, no lead, no oncoming, nothing to plan. This one teaches the
+// WINDOW: the same marking read forward, as the clock it actually is. The
+// backlog asked for the shipped district and its own feasibility note flagged
+// the fallback; the arithmetic settled it. ov-solid-v1's М1 span starts at
+// y = 90 and its spawn sits at y = 15 — 75 m of dashed road, while a ~62 km/h
+// pass of a 40 km/h crawler closes ~6 m/s and needs ~100 m of travel to gain
+// its 36 m. The maneuver does not fit before the span at all, let alone
+// „finished 30 m early" as the lesson's whole contract requires. So the map is
+// its own file (gen_ov_solid2.mjs, the gen_ban_zones.mjs mold by way of
+// gen_pk_ban2.mjs), exactly as the item's fallback directs.
+//
+// WHY THE MISTAKES GRADE WHAT THEY GRADE — and why these two codes and no
+// others can BOTH be reached on one road. The М1 span is a hard seam in the
+// runtime: `ocArmed` (worldRuntime) requires `tick.solidCenterLine !== true`,
+// so an excursion that rides into the span drops out of the corridor's and the
+// return tracker's arming on that very frame — and the return adjudication's
+// exit test (`returned`) fails, because the bank has not flipped home yet. The
+// episode is discarded silently and the act becomes CROSSED_SOLID_LINE's alone
+// (the stage-2b one-act-one-code ruling). That seam is what lets the two taught
+// faults be told apart by the ONE thing that separates them in real life —
+// WHERE the return landed:
+//   - „Връщане върху вече плътната линия": the excursion crosses y = 300 still
+//     on the oncoming bank and lands inside the span → EXACTLY
+//     CROSSED_SOLID_LINE (опасна). The return tracker is structurally silent
+//     here, so the card names the marking and nothing else;
+//   - „Отрязване на изпреварения при късното прибиране": the same late start,
+//     but the driver SEES the line coming and cuts back onto the dashed road in
+//     front of the crawler → EXACTLY OVERTAKE_RETURN_TOO_EARLY (основна). Same
+//     mis-timed window, the other way out of it, and the price is the
+//     brake-forcing cut instead of the wall.
+// The two demos are one decision apart, which is the pedagogy: by the time you
+// are choosing between them you have already made the mistake — 200 m earlier,
+// when you started.
+//
+// SUCCESS carries the timing itself, objective-gated (the sc-ln-turn-lane-arrows
+// road). No detector reads the М2 warning dashes — no ZoneKind carries them and
+// none could grade INFORMATION — so the drill is graded as geometry: a radius-5
+// gate on the oncoming bank early in the window (the pass must START early) and
+// a radius-4 gate on the own-lane center at y = 270, the authored returnByY (be
+// HOME, 30 m before the wall). A driver still out at 270 is a full 8.125 m lane
+// pitch away from it.
+// ---------------------------------------------------------------------------
+
+/** ov-solid2-v1 pins, denormalized from the committed map by value (the L7 copy
+ *  law — ov-solid2-districts.test.ts asserts every one against meta.scenario). */
+const OVS2_LENGTH = 620;
+const OVS2_OWN = 4.06;
+/** The committed-pass line on the oncoming bank (the sc-ov-return-gap x). */
+const OVS2_OUT = -2.5;
+/** The М1 span — the wall the window closes against (meta.scenario.banZone). */
+const OVS2_SOLID_FROM = 300;
+const OVS2_SOLID_TO = 500;
+/** Where the М2 dashes lengthen — the warning (meta.scenario.warningDashSpanY).
+ *  Authored, UNGRADED: the copy and the gates carry it, no detector reads it. */
+const OVS2_WARN_FROM = 240;
+/** The drill's contract as a coordinate (meta.scenario.returnByY): fully home
+ *  by here, 30 m before the wall. */
+const OVS2_RETURN_BY = 270;
+
+/**
+ * The CRAWLER — the reason to overtake at all, and the mate the late return
+ * cuts off. The ovgLeadCar mold (matchPlayer ~20 m of centers ≈ 16 m of bumpers
+ * ahead, capped 11.1 m/s ≈ 40 km/h), pacing the player's OWN lane. ONE spec
+ * serves three drives that want different things, and the cap is the hinge:
+ *   - capped at 11.1 m/s on a 90 km/h road, a ~62 km/h pass closes ~6 m/s and
+ *     completes inside the authored 285 m window with the 30 m landing margin
+ *     intact — the generator asserts the window fits it;
+ *   - the same cap makes the two LATE demos late for the same reason a real
+ *     driver is: they dawdle behind it and start the identical maneuver 70 m
+ *     further up the road;
+ *   - followGapM 20 keeps every trail phase (30–38 km/h here) far above the
+ *     following-distance fire band (0.7 × 1.8 s × 10.6 m/s ≈ 13 m), so
+ *     FOLLOWING_TOO_CLOSE can never leak into a demo about the marking.
+ * Its slam tier is authored out of reach (the OVN/OVCC mold): deterministic
+ * moving traffic, not a braking drill.
+ */
+const OVS2_LEAD_CAR: BrakingLeadCarSpec = {
+  id: "sc-ovsr-lead",
+  kind: "brakingLeadCar",
+  libraryEventId: "ev-overtake",
+  actor: {
+    pathNodes: ["ovs2-n-start", "ovs2-n-end"],
+    hold: { nodeIndex: 0, offsetM: 45 }, // dormant ~30 m ahead of the spawn
+    cruiseSpeedMps: 11.1,
+    extraRightOffsetM: 0, // own-lane center (the vehicle being overtaken)
+    colorIndex: 2,
+  },
+  followGapM: 20,
+  maxMatchSpeedMps: 11.1, // ~40 km/h — the slow rural lead
+  slamAt: { x: OVS2_OWN, y: 1400 }, // far past the 620 m road — never reached
+  slamRadiusM: 2,
+  slamDecelMps2: 6,
+  minSlamSpeedKmh: 250, // the slam tier is authored out of reach…
+  proximityFallbackM: 0.3, // …and the proximity fallback cannot occur
+  triggersHazard: false,
+  resumeAfterSec: 3,
+};
+
+/**
+ * The ONCOMING STREAM — the reason the window is SHORTER than the marking says.
+ * TWO cars southbound at 12 m/s, released together on the player's first
+ * movement: pure clockwork the drive scripts are authored against (the OVN
+ * mold). Both are timed to MEET THE PLAYER EARLY, during the trail phase, and
+ * that timing is the template's whole first act:
+ *   - they eat the first ~100 m of the 285 m window, so the driver who „waits
+ *     for a chance" arrives at the decision with two thirds of his dashes left,
+ *     not all of them — the window on the paint and the window in the world are
+ *     different numbers, and the second one is the one that counts;
+ *   - having spent them BEFORE any excursion, the oncoming lane is genuinely
+ *     empty for the rest of the drive. That is deliberate and load-bearing: the
+ *     corridor tracker convicts an excursion whose measured oncoming gap sits
+ *     under 4 s, and this template is not about the head-on gamble (that is
+ *     sc-ov-oncoming-gap / sc-ov-abort, one district over). Here the pass is
+ *     always SAFE and always legal — and still wrong, because it was late. One
+ *     act, one lesson.
+ * In INSTANT-CRUISE terms (a released car accelerating at the staged default
+ * 2.6 m/s² loses v²/2a ≈ 28 m against an instant clock at 12 m/s, so a hold at
+ * y tracks y + 28 − 12·t): car 0 holds at path arc 498 ⇒ y 122 ⇒ instant model
+ * y 150; car 1 rides 60 m further up (instant model y 210), ~5 s behind it.
+ */
+const OVS2_STREAM: OncomingStreamSpec = {
+  id: "sc-ovsr-stream",
+  kind: "oncomingStream",
+  libraryEventId: "ev-overtake",
+  actor: {
+    pathNodes: ["ovs2-n-end", "ovs2-n-start"], // southbound = oncoming
+    hold: { nodeIndex: 0, offsetM: OVS2_LENGTH - 122 }, // instant model y 150
+    cruiseSpeedMps: 12,
+    colorIndex: 1,
+  },
+  count: 2,
+  gapsM: [60], // instant model y 210 — the second half of the early pair
+  releaseKmh: 3,
+};
+
+/** OV-04 × OV-09 × SN-03 — комбинираната надлъжна маркировка като ЧАСОВНИК
+ *  (Наредба № 2/2001: М2 е прекъсната осева — пресича се при изпреварване; М1 е
+ *  непрекъсната — не се пресича и не се застъпва; удължените прекъсвания на М2
+ *  предупреждават, че следва М1. ЗДвП чл. 42: изпреварването включва и
+ *  ВРЪЩАНЕТО вдясно, без засичане на изпреварения). Bank-verified:
+ *  q-signali-i-markirovka-055, q-signali-i-markirovka-054 (прекъсната срещу
+ *  непрекъсната осева), q-signali-i-markirovka-014 (удължени прекъсвания —
+ *  предупреждение за наближаваща непрекъсната), q-manevri-048 (маневрата
+ *  завършва изцяло в своята лента). */
+export const SC_OV_SOLID_RETURN: ScenarioSpec = {
+  id: "sc-ov-solid-return",
+  family: "lanes",
+  tagsBg: ["изпреварване", "осева линия", "непрекъсната линия", "маркировка", "прибиране вдясно"],
+  titleBg: "Прибери се преди плътната линия",
+  objectiveBg:
+    "Планирай изпреварването така, че връщането вдясно да приключи ПРЕДИ началото на непрекъснатата линия — комбинираната маркировка ти казва кога прозорецът се затваря.",
+  archetypeIds: ["OV-04", "OV-09", "SN-03"],
+  conceptIds: [
+    "c-longitudinal-markings",
+    "c-overtaking-procedure",
+    "c-overtaking-prohibitions",
+    "c-general-care-duty",
+  ],
+  map: {
+    archetype: "straight-street",
+    // The generator recipe — mirrored in ov-solid2-v1.json meta.scenario.params
+    // (tools/maps/gen_ov_solid2.mjs).
+    params: {
+      lengthM: OVS2_LENGTH,
+      maxspeedKmh: 90,
+      banKind: "solidCenterLine",
+      banFromM: OVS2_SOLID_FROM,
+      banToM: OVS2_SOLID_TO,
+      warnFromM: OVS2_WARN_FROM,
+      returnMarginM: 30,
+    },
+    districtId: "ov-solid2-v1",
+  },
+  start: {
+    spawnPointId: "ovs2-spawn-start",
+    vehicleStart: "ready",
+  },
+  instructionsBg: [
+    { n: 1, textBg: "Извънградски път, по една лента в посока, ограничение 90. Пред теб пълзи бавна кола с около 40 км/ч." },
+    { n: 2, textBg: "Осевата линия е ПРЕКЪСНАТА (М2): изпреварването тук е разрешено. Но напред, на 300-ия метър, тя става НЕПРЕКЪСНАТА (М1) — там прозорецът свършва." },
+    { n: 3, textBg: "Първо изчакай насрещните коли да минат — докато те идват, прозорецът не е твой, колкото и прекъсната да е линията." },
+    { n: 4, textBg: "Щом насрещното платно се изчисти, ЗАПОЧНИ ВЕДНАГА: огледало, ляв мигач, решително излизане. Всяка изчакана секунда е метри, отнети от връщането ти." },
+    { n: 5, textBg: "Виж ли, че прекъсванията се удължават — това е предупреждението: плътната линия е на 60 метра. Оттам вече не се започва нищо." },
+    { n: 6, textBg: "Прибери се вдясно с мигач, щом видиш ЦЯЛАТА изпреварена кола в огледалото — и бъди изцяло в своята лента най-късно на 270-ия метър." },
+    { n: 7, textBg: "Продължи в своята лента през целия участък с непрекъсната линия до края на отсечката." },
+  ],
+  success: [
+    {
+      id: "sc-ovsr-pass",
+      titleBg: "Започни изпреварването рано, в отворения прозорец",
+      // The commitment gate, and the half of the drill nobody grades: the
+      // maneuver has to START where it still fits. x = −2.5 is 6.56 m from the
+      // own-lane center, so radius 5 is satisfiable ONLY from a genuine
+      // excursion; y = 180 is 120 m of dashes before the wall — the last mark
+      // from which a whole pass and a 30 m landing margin still fit. The two
+      // late demos both pull out past it and complete NOTHING, which is the
+      // honest verdict on „щях да успея".
+      params: { kind: "reachZone", x: OVS2_OUT, y: 180, radiusM: 5 },
+    },
+    {
+      id: "sc-ovsr-home",
+      titleBg: "Бъди изцяло в своята лента преди началото на М1",
+      // THE drill, in one gate — the map's own returnByY. Radius 4 < the
+      // 8.125 m lane pitch: a driver still on the oncoming bank at y = 270 is a
+      // full lane away and fails it, whether he is about to cross the solid
+      // line or about to cut back in front of the crawler. Both taught faults,
+      // one objective.
+      params: { kind: "reachZone", x: OVS2_OWN, y: OVS2_RETURN_BY, radiusM: 4 },
+    },
+    {
+      id: "sc-ovsr-finish",
+      titleBg: "Премини участъка с непрекъсната линия в своята лента",
+      params: { kind: "reachZone", x: OVS2_OWN, y: 560, radiusM: 5 },
+    },
+  ],
+  rubric: { parTimeSec: 85 },
+  // RECORDED: committed deterministic recordings of the authored scripts in
+  // traces/scOvSolidReturn.ts; gates in traces/__tests__/
+  // sc-ov-solid-return-traces.test.ts (re-record with RECORD_TRACES=1).
+  shadow: { path: "content/traces/sc-ov-solid-return/shadow-correct.trace.json" },
+  mistakes: [
+    {
+      traceRef: { path: "content/traces/sc-ov-solid-return/mistake-return-on-solid.trace.json" },
+      titleBg: "Връщане върху вече плътната линия",
+      whatWentWrongBg:
+        "Изпреварването беше законно, когато започна — и незаконно, когато свърши. Водачът се помая зад бавната кола, излезе чак на 190-ия метър и подмина чисто; само че връщането го завари СЛЕД 300-ия метър, където осевата вече е непрекъсната. И той я пресече, защото друг избор вече нямаше. Точно това е капанът на комбинираната маркировка: М1 не забранява само излизането — тя забранява и прибирането, а маневра, започната в прозореца, ЗАВЪРШВА там, където линията вече е плътна. Удължените прекъсвания от 240-ия метър бяха предупреждението, което щеше да го спре навреме.",
+      codeRefs: ["CROSSED_SOLID_LINE"],
+    },
+    {
+      traceRef: { path: "content/traces/sc-ov-solid-return/mistake-late-cut.trace.json" },
+      titleBg: "Отрязване на изпреварения при късното прибиране",
+      whatWentWrongBg:
+        "Същото закъсняло излизане, другият изход от него: този водач видя плътната линия да идва и се хвърли обратно вдясно — на метри пред носа на изпреварения, под секунда дистанция. Изпревареният натисна спирачка заради чужда маневра. Забележи какво НЕ е сгрешено тук: насрещното платно беше празно, линията беше прекъсната, прибирането стана навреме спрямо маркировката. Сгрешено е планирането — прозорецът беше премерен за подминаването, а не за цялата маневра. Прибираш се едва когато видиш целия изпреваран в огледалото (чл. 42), а това означава да излезеш достатъчно рано, че да имаш място за него.",
+      codeRefs: ["OVERTAKE_RETURN_TOO_EARLY"],
+    },
+  ],
+  teach: {
+    whenBg:
+      "На всеки двупосочен извънградски път зад по-бавно превозно средство — тоест почти при всяко изпреварване извън града. Маркировката те предупреждава два пъти и двата пъти отдалеч: прекъснатата осева казва „може“, удължените прекъсвания казват „остават ти шейсет метра“, а непрекъснатата казва „свърши“. Решението се взема при ПЪРВИЯ знак, не при последния.",
+    whyBg:
+      "Изпреварването е една маневра, а не две: излизане, подминаване и ВРЪЩАНЕ — и законна е само ако цялата се побира там, където е разрешена. Точно това пропуска мисленето „ще успея да го мина“: успяваш да го минеш, а нямаш къде да се прибереш. Оттам нататък всички изходи са лоши — или пресичаш непрекъснатата линия, нарисувана именно защото там навлизането в насрещното убива, или се хвърляш вдясно пред носа на изпреварения и го караш да спира заради теб. Затова маркировката е часовник, а не декорация: прекъснатата линия ти дава прозорец, удължените прекъсвания ти казват колко е останало от него, а плътната идва точно там, където видимостта или ширината вече не прощават. Прочети ги отдалеч, започни рано или изобщо не започвай — минута зад бавната кола не струва нищо, а маневра без изход струва челен удар или чужда спирачка.",
+    lawRef: "Наредба № 2/2001; ЗДвП чл. 42",
+    examinerBg:
+      "Изпитващият гледа кога вземаш решението, а не колко бързо минаваш: очаква да разчетеш комбинираната маркировка отдалеч, да изчакаш насрещните, да излезеш решително в отворения прозорец и да си изцяло в своята лента преди началото на непрекъснатата линия. Пресичане на непрекъснатата осева при прибирането е опасна грешка и проваля изпита; засичането на изпреварения е основна грешка. Започнато изпреварване след удължените прекъсвания се отбелязва като неразчитане на маркировката дори когато „се размине“.",
+  },
+  levels: [
+    { level: 1 },
+    { level: 2 },
+    { level: 3 },
+    { level: 4, vehicleStart: "cold" },
+  ],
+  staged: [OVS2_LEAD_CAR, OVS2_STREAM],
+  conditions: { weather: "dry" },
+  localeBg: "bg-BG",
+};
+
+// ---------------------------------------------------------------------------
+// 6. sc-ln-boulevard-discipline — „Лентова дисциплина на булеварда" (OV-11
+//    keep-right × OV-02 lane-change signalling × OV-12 lane keeping) on
+//    wb-boulevard-v1, REUSED: a 200 m URBAN 2+2 posted 40, whose only other
+//    tenant is the sc-maneuver-uturn drill (different file, no conflict).
+//
+// WHY THIS IS NOT sc-ov-keep-right, AND WHY IT NEEDED A CAR. The live OV-11
+// template is a PURE ride: 360 m of rural-feeling boulevard, no actor, and the
+// whole contract is „never leave laneId 0". That teaches half of чл. 15 — the
+// half that says where you live. It cannot teach the other half, because
+// nothing on that map ever gives you a REASON to leave: „лявата е за
+// изпреварване" is a sentence the student reads, never a thing the student
+// does. This template is the other half: the same law on an urban 2+2, with a
+// legitimate pass-and-return arc in the middle. Keeping right is not the drill;
+// COMING BACK is.
+//
+// THE BACKLOG SAID `staged: []` AND ALSO „a signaled pass of a slow prop car".
+// Those cannot both be true, and the shadow plan wins: a pass of nothing is
+// theatre, and without the pass this template is sc-ov-keep-right with a
+// shorter road. So the slow car is staged — in the OVN/OVCC/OVS2 mold
+// (brakingLeadCar with its slam tier authored out of reach), the house pattern
+// for „deterministic slow traffic you overtake", never a braking drill.
+//
+// WHY THE MISTAKES GRADE WHAT THEY GRADE. Both faults have shipped detectors
+// and this map arms them cleanly — no honest-proxy footnote needed:
+//   - „Постоянно каране в лявата лента" → NOT_KEEPING_RIGHT (чл. 15), the 12 s
+//     keep-right sustain in laneId 1 with the left indicator OFF. The demo
+//     enters the left lane BY THE BOOK (mirror → indicator → move, so no
+//     lane-change code can leak) and then simply never comes home: the isolated
+//     fault is the STAY, which is exactly the урбанистичен грях this template
+//     exists for;
+//   - „Лутане между лентите без мигач" → LANE_CHANGE_WITHOUT_INDICATOR +
+//     POOR_LANE_KEEPING. The weave glances every time (mirrorOk holds, so the
+//     _MIRROR_CHECK code never leaks) and signals never — three crossings, one
+//     code — and the long straddle of the LANE BOUNDARY bills the lane-keep
+//     episode.
+//
+// THE STRADDLE'S SIDE IS LOAD-BEARING, not decoration. centerLineCond
+// (rules/engine.ts stage 4) arms on `laneId === laneCount-1 && laneOffsetM >
+// laneKeepMaxOffsetM` — i.e. the LEFTMOST lane drifting TOWARD the осева — and
+// when it arms it SUPPRESSES the generic lane-keep episode and bills
+// CENTER_LINE_TOUCHED instead (one act, one code). So a weave that wanders
+// toward x = 0 would grade the wrong code entirely. This one straddles the
+// 0/1 LANE BOUNDARY (x ≈ 8.125) from the left lane: |laneOffsetM| ≈ 3.9 > the
+// 3.25 m tolerance (offCentre ✓) while laneOffsetM is NEGATIVE (centerLineCond
+// ✗, it is a drift toward the CURB side of its own lane) — POOR_LANE_KEEPING,
+// which is what doc 72 OV-12 names and what „лутане" actually looks like.
+//
+// NO CLEAN_DRIVING HERE, AND THAT IS THE MAP'S FAULT, NOT THE DRIVE'S:
+// cleanDrivingDistanceM is 250 m and this boulevard is 200 m long, so the
+// shadow's ~170 m of violation-free road cannot reach the streak. Its gate
+// asserts ZERO violations + the TWO SAFE_LANE_CHANGE commendations the arc
+// earns (out and back) — the positive evidence this road can actually pay.
+// ---------------------------------------------------------------------------
+
+/** wb-boulevard-v1 lane centers, pinned by value from the committed map (the L7
+ *  copy law — wb-district.test.ts asserts both against meta.scenario). laneId 0
+ *  = the curb lane you live in; laneId 1 = the lane you only VISIT. */
+const LNBD_RIGHT = 12.19;
+const LNBD_LEFT = 4.06;
+/** wb-boulevard-v1 road length / posted limit (meta.scenario.params). */
+const LNBD_LENGTH = 200;
+const LNBD_LIMIT = 40;
+
+/**
+ * The CRAWLER („бавната кола") — the only reason lane 1 exists on this drill,
+ * and the single
+ * most load-bearing number in the template. The OVN/OVCC/OVS2 mold: a
+ * brakingLeadCar whose slam tier is authored out of reach (slamAt 700 m past a
+ * 200 m road + minSlamSpeedKmh 250 + proximityFallbackM 0.3), so the encounter
+ * never resolves and never grades — deterministic moving traffic, not a braking
+ * drill. extraRightOffsetM 0 = the traffic graph's curb-lane centerline, which
+ * on a 2+2 lands on x = 12.19 (the ln-v1 precedent; the wb battery pins it).
+ *
+ * maxMatchSpeedMps 5.5 (~20 km/h) is the hinge ONE spec has to swing three ways:
+ *   - the shadow approaches at 38 and closes ~5 m/s, so the pass is a real
+ *     overtake that still completes inside 200 m of road with the return landed
+ *     ~25 m clear of the crawler's nose;
+ *   - the left-lane hog leaves at y ≈ 44 and never comes back, so the crawler
+ *     is never its lead again — its 12 s in laneId 1 bill NOTHING but чл. 15;
+ *   - the weave runs at ~22 km/h, one hair over the crawler's pace, so the
+ *     45 m followGapM barely closes across the whole demo: at 6.1 m/s the
+ *     follow band is 0.7 × 1.8 s × 6.1 ≈ 7.7 m of bumpers, and the gap never
+ *     goes near it. FOLLOWING_TOO_CLOSE cannot leak into a demo about mirrors.
+ */
+const LNBD_CRAWLER: BrakingLeadCarSpec = {
+  id: "sc-lnbd-crawler",
+  kind: "brakingLeadCar",
+  libraryEventId: "ev-lane-discipline",
+  actor: {
+    pathNodes: ["wb-n-start", "wb-n-end"],
+    hold: { nodeIndex: 0, offsetM: 60 }, // dormant 45 m ahead of the spawn
+    cruiseSpeedMps: 5.5,
+    extraRightOffsetM: 0, // curb-lane center = the player's own lane
+    colorIndex: 2,
+  },
+  followGapM: 45,
+  maxMatchSpeedMps: 5.5, // ~20 km/h — see the doc above: the hinge of all three
+  slamAt: { x: LNBD_RIGHT, y: 900 }, // far past the 200 m road — never reached
+  slamRadiusM: 2,
+  slamDecelMps2: 6,
+  minSlamSpeedKmh: 250, // the slam tier is authored out of reach…
+  proximityFallbackM: 0.3, // …and the proximity fallback cannot occur
+  triggersHazard: false,
+  resumeAfterSec: 3,
+};
+
+/** OV-11 × OV-02 × OV-12 — лентова дисциплина на многолентов път в населено
+ *  място (ЗДвП чл. 15, ал. 1: извън изпреварване и ляв завой водачът се движи
+ *  възможно най-вдясно; чл. 25: маневрата се обявява и се прави след оглед).
+ *  Bank-verified: q-manevri-032 и q-manevri-004 (дясната лента е лентата за
+ *  движение; лявата — за изпреварване), q-magistrali-i-izvangradsko-003
+ *  („възможно най-вдясно"), q-manevri-005 и q-manevri-058 (престрояването е
+ *  маневра: огледало, мигач, оглед). */
+export const SC_LN_BOULEVARD_DISCIPLINE: ScenarioSpec = {
+  id: "sc-ln-boulevard-discipline",
+  family: "lanes",
+  tagsBg: ["ленти", "лентова дисциплина", "булевард", "дръж вдясно", "изпреварване в града"],
+  titleBg: "Лентова дисциплина на булеварда",
+  objectiveBg:
+    "На многолентов булевард се движиш в дясната лента, лявата е за изпреварване и ляв завой — без лутане между лентите.",
+  archetypeIds: ["OV-11", "OV-02", "OV-12"],
+  conceptIds: ["c-right-side-rule", "c-lane-choice", "c-lane-change", "c-overtaking-procedure"],
+  map: {
+    archetype: "straight-street",
+    // The generator recipe — mirrored in wb-boulevard-v1.json meta.scenario.params
+    // (tools/maps/gen_wide_boulevard.mjs; REUSED — sc-maneuver-uturn is the
+    // other tenant, and it never leaves the mid-block turn corridor).
+    params: { lengthM: LNBD_LENGTH, maxspeedKmh: LNBD_LIMIT, lanes: 4 },
+    districtId: "wb-boulevard-v1",
+  },
+  start: {
+    spawnPointId: "wb-spawn-approach",
+    vehicleStart: "ready",
+  },
+  instructionsBg: [
+    { n: 1, textBg: "Градски булевард с две ленти в посока, ограничение 40. Потегли и се установи в ДЯСНАТА лента — тя е лентата ти за движение." },
+    { n: 2, textBg: "Пред теб пълзи бавна кола с около 20 км/ч. Ето сега лявата лента ти трябва — и точно за това е тя." },
+    { n: 3, textBg: "По реда: огледало, ляв мигач, поглед през рамо, после плавно излизане в лявата лента." },
+    { n: 4, textBg: "Изпревари решително и без да превишаваш 40 — лявата лента е за маневра, а не за скорост." },
+    { n: 5, textBg: "Щом видиш ЦЯЛАТА изпреварена кола в огледалото: десен мигач и веднага се прибери вдясно. Тук свършва маневрата — не „като стане нужда“." },
+    { n: 6, textBg: "Продължи в дясната лента до края на отсечката. Едно излизане, едно прибиране — без лутане между лентите." },
+  ],
+  success: [
+    {
+      id: "sc-lnbd-right",
+      titleBg: "Установи се в дясната лента",
+      // Radius 4 < the 8.125 m lane pitch: satisfiable ONLY from the curb lane.
+      // Placed BEFORE the pass — the drill starts where you belong.
+      params: { kind: "reachZone", x: LNBD_RIGHT, y: 40, radiusM: 4, maxSpeedKmh: 45 },
+    },
+    {
+      id: "sc-lnbd-pass",
+      titleBg: "Изпревари бавната кола през лявата лента",
+      // The other half of чл. 15: the ban is „не живей там", not „не влизай".
+      // Radius 4 on the LEFT-lane center — reachable only by actually committing
+      // the pass. maxSpeedKmh 45 keeps it a MANEUVER, not a sprint.
+      params: { kind: "reachZone", x: LNBD_LEFT, y: 115, radiusM: 4, maxSpeedKmh: 45 },
+    },
+    {
+      id: "sc-lnbd-home",
+      titleBg: "Прибери се вдясно и завърши в своята лента",
+      // THE drill, in one gate: a driver still in laneId 1 at y = 175 is a full
+      // 8.125 m lane pitch away from it and fails — which is precisely the
+      // left-lane hog's verdict.
+      params: { kind: "reachZone", x: LNBD_RIGHT, y: 175, radiusM: 4 },
+    },
+  ],
+  rubric: { parTimeSec: 55 },
+  // RECORDED: committed deterministic recordings of the authored scripts in
+  // traces/scLnBoulevardDiscipline.ts; gates in traces/__tests__/
+  // sc-ln-boulevard-discipline-traces.test.ts (re-record with RECORD_TRACES=1).
+  shadow: { path: "content/traces/sc-ln-boulevard-discipline/shadow-correct.trace.json" },
+  mistakes: [
+    {
+      traceRef: { path: "content/traces/sc-ln-boulevard-discipline/mistake-left-lane-hog.trace.json" },
+      titleBg: "Постоянно каране в лявата лента",
+      whatWentWrongBg:
+        "Излизането беше учебникарско — огледало, мигач, плавно — и точно затова грешката личи толкова ясно: този водач не сгреши маневрата, а забрави, че тя има край. Бавната кола остана далеч назад, дясната лента е празна цялата отсечка, а колата продължава вляво „за всеки случай“, „и без това пак ще изпреварвам“. Не пак: сега. Лявата лента не е по-бърза, а по-подредена — тя е празното място, което другите ползват, за да минат. Като стоиш в нея, зад теб се събира колона, която няма законен изход, и рано или късно някой ще те подмине отдясно — най-опасното изпреварване, което съществува. Извън изпреварване и ляв завой мястото ти е във възможно най-дясната свободна лента (чл. 15).",
+      codeRefs: ["NOT_KEEPING_RIGHT"],
+    },
+    {
+      traceRef: { path: "content/traces/sc-ln-boulevard-discipline/mistake-weaving.trace.json" },
+      titleBg: "Лутане между лентите без мигач",
+      whatWentWrongBg:
+        "Наляво, надясно, пак наляво — и нито един мигач. Водачът дори се оглеждаше: проблемът не е, че не гледа, а че никой друг не знае какво е видял. Мигачът не е за теб, а за останалите: той е единственият начин колата ти да обяви решение, преди да го изпълни. Между двете дръпвания колата увисна на самата линия между лентите — нито в едната, нито в другата, тоест в двете едновременно: в лявата някой те изпреварва, в дясната някой те подминава, и двамата се оказват до колa, която не заема нито едно място докрай. На булевард лентата е обещание — заеми една, обяви я и я дръж; смяната е отделно решение, не навик на волана.",
+      codeRefs: ["LANE_CHANGE_WITHOUT_INDICATOR", "POOR_LANE_KEEPING"],
+    },
+  ],
+  teach: {
+    whenBg:
+      "На всеки градски булевард с две и повече ленти в посока — тоест по цялата „Цариградско“, по всяко околовръстно, на всеки изход от квартала към голямата улица. Правилото работи всяка секунда, а не само когато има трафик: пътуваш в най-дясната свободна лента, влизаш в лявата само за да изпревариш или да завиеш наляво, и се прибираш веднага щом маневрата свърши.",
+    whyBg:
+      "Многолентовият булевард е по-безопасен от еднолентовата улица само докато лентите значат нещо. Значението е просто: дясната е за пътуване, лявата е свободното място, през което другите минават. Който се настани вляво, изяжда точно това свободно място — зад него се трупа колона без законен изход, а натискът намира най-лошия: изпреварване отдясно, през лентата, в която никой не очаква изпреварващ. Втората половина на същия закон е връщането: маневрата не е „излизане“, а излизане И прибиране, и незавършената маневра оставя колата ти легнала върху чуждото решение. А лутането между лентите без мигач е третата страна на същата монета — то не нарушава лентата, а обещанието: другите планират спрямо мястото, което заемаш, и когато то се мени без предупреждение, планът им е грешен, преди да си направил нещо забранено.",
+    lawRef: "ЗДвП чл. 15",
+    examinerBg:
+      "Изпитващият следи лентовата ти дисциплина през целия маршрут: движение в дясната лента, ползване на лявата само за изпреварване или ляв завой, огледало и мигач преди всяко престрояване и своевременно прибиране вдясно веднага след маневрата. Продължителното движение в лявата лента без причина е второстепенна грешка; престрояването без мигач е основна; непрекъснатото местене между лентите се отбелязва като липса на лентова дисциплина.",
+  },
+  levels: [
+    { level: 1 },
+    { level: 2 },
+    { level: 3 },
+    { level: 4, vehicleStart: "cold" },
+  ],
+  staged: [LNBD_CRAWLER],
+  conditions: { weather: "dry" },
+  localeBg: "bg-BG",
+};
+
 /** The lane-arrow templates, in catalog order (registered in templates.ts by
  *  the integration pass). */
 export const SCENARIO_TEMPLATES_LANES2: readonly ScenarioSpec[] = [
   SC_LN_TURN_LANE_ARROWS,
   SC_OV_NIGHT_GAP,
   SC_OV_BEING_OVERTAKEN,
+  SC_OV_CREST_CURVE,
+  SC_OV_SOLID_RETURN,
+  SC_LN_BOULEVARD_DISCIPLINE,
 ];

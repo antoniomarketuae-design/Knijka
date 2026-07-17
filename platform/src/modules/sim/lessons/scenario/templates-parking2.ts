@@ -12,6 +12,12 @@
  *  - sc-pk-stop-vs-park  „В27 срещу В28 — престой и паркиране"  (pk-ban2-v1,
  *    tools/maps/gen_pk_ban2.mjs — the one member of this file that DOES ride a
  *    plate, because its whole subject is WHICH plate)
+ *  - sc-pk-double-park   „Двойното паркиране блокира улицата"  (pk-double-v1,
+ *    tools/maps/gen_pk_double.mjs — the one member whose ban is posted by
+ *    nothing at all: the parked cars themselves are the sign)
+ *  - sc-park-bay-exit-rev „Излизане на заден от перпендикулярно място"
+ *    (lot-perp-v1, map REUSED — the ONE member that is not a ban drill at all:
+ *    the mirror image of the P0, see its own header block below)
  *
  * WHY THIS IS NOT sc-pk-ban-stop AGAIN. The shipped PK-06 template teaches the
  * SIGN: a В27 plate marks a span, and the drill is to read the plate. The first
@@ -45,6 +51,7 @@
  * sc-<family>-<slug> standard.
  */
 
+import type { OncomingStreamSpec, PedestrianDartOutSpec } from "../../contracts";
 import type { ScenarioSpec } from "./types";
 
 /** The single northbound lane center of pk-banx-v1 (1+1, perceptual scale). */
@@ -474,10 +481,776 @@ export const SC_PK_STOP_VS_PARK: ScenarioSpec = {
   localeBg: "bg-BG",
 };
 
-/** The law-implied-ban parking templates, in catalog order (registered in
- *  templates.ts by the integration pass). */
+// ---------------------------------------------------------------------------
+// sc-pk-double-park — the ban nobody posted: the parked cars ARE the sign
+//                     (pk-double-v1)
+// ---------------------------------------------------------------------------
+
+/** The single northbound lane center of pk-double-v1 (1+1, perceptual scale). */
+const PKD_LANE = 4.06;
+/** The oncoming lane center — where the stream lives, 8.12 m over. */
+const PKD_ONCOMING = -4.06;
+/** |x| of both parked rows (east = the driver's own curb). */
+const PKD_ROW_X = 6.8;
+/** The parked row: first and last car. */
+const PKD_ROW_FROM_Y = 75;
+const PKD_ROW_TO_Y = 205;
+/** The чл. 98 second-line span — the row ± a bumper's margin. */
+const PKD_BAN_FROM_Y = 70;
+const PKD_BAN_TO_Y = 210;
+/** The ONE free curb bay: 80 m past the row, outside the span. */
+const PKD_BAY_Y = 290;
+/** Street length (the map's own run-out past the bay). */
+const PKD_LENGTH = 360;
+
+/**
+ * The oncoming stream (OncomingStreamSpec) — the squeeze, not a conflict.
+ *
+ * TWO cars southbound at 5 m/s (18 km/h), released on the player's first
+ * movement, so from then on their positions are pure functions of time. The
+ * crawl is not timidity: 18 km/h is the honest pace of a street whose passage
+ * has been narrowed to one car by the people who parked on it, and it is what
+ * makes the cars still be HERE, beside the player, while he sits on the second
+ * line — the whole visual argument. Car 0 holds at arc 73 (instant-model y 287)
+ * so it draws level with a hero stopped at y = 175 around t ≈ 24 s; car 1 holds
+ * 20 m behind it (north) and arrives ~4 s later, which is the beat the second
+ * demo's contact is fired on.
+ *
+ * THE GAP CEILING IS REAL, NOT A PREFERENCE. runners.ts holds car i at
+ * holdArc − gapsM[i−1], so a gap wider than car 0's own hold arc silently
+ * places car 1 off the path's start and the stream collapses into a nose-to-tail
+ * pair (the ov-oncoming battery pins the same law as holdArc − gap ≥ 0). Here
+ * that ceiling is 73 m, and the authored 20 m sits well under it — but only
+ * because the stream crawls: at a 29 km/h cruise, meeting the player this deep
+ * into a 360 m street would need a hold arc of ~5 m and leave no room for a
+ * second car at all.
+ *
+ * WHY THE STREAM CANNOT ACQUIT THE REST IT MOTIVATES. leadGapFor (traffic/
+ * system.ts) is direction-agnostic: any vehicle ahead within LEAD_CORRIDOR_M
+ * (4.0 m lateral) counts as a lead, and a lead within banZoneStopQueueGapM (8 m)
+ * makes a rest queue-innocent. The oncoming bank sits 8.12 m over — one full
+ * perceptual lane, comfortably outside the corridor — so an approaching car can
+ * fill the windscreen and still leave `leadGapM === Infinity`. That margin is
+ * the reason this template may stage traffic at all where its siblings could
+ * not stage a single bus, and it is pinned in the trace gate.
+ */
+const PKD_STREAM: OncomingStreamSpec = {
+  id: "sc-pkd-stream",
+  kind: "oncomingStream",
+  libraryEventId: "PK-06",
+  actor: {
+    pathNodes: ["pkd-n-end", "pkd-n-start"], // southbound = oncoming
+    hold: { nodeIndex: 0, offsetM: 73 }, // instant-model y 287
+    cruiseSpeedMps: 5,
+    colorIndex: 2,
+  },
+  count: 2,
+  gapsM: [20], // car 1 held 20 m behind (north of) the head — under the 73 m ceiling
+  releaseKmh: 3,
+};
+
+/**
+ * „Двойното паркиране блокира улицата" — the FIFTH cue of the чл. 98 detector,
+ * and the only one with nothing to read. The other four parking drills all end
+ * in an act of READING: pk-ban-v1 a В27 plate, pk-ban2-v1 which of two plates,
+ * pk-busstop-v1 the зигзаг, pk-banx-v1 the zebra and the corner. Here the road
+ * is bare. No plate, no paint, no geometry — the ban is a RELATION: чл. 98,
+ * ал. 1 forbids stopping beside a vehicle already standing at the curb on your
+ * side, so the ban exists exactly where other people have already parked, and
+ * it evaporates the metre their row ends. The only way to know is to look at
+ * the other cars. Source questions q-spirane-i-parkirane-009 („спреш успоредно
+ * до вече паркиран автомобил, откъм страната на движението"), -055 („улицата е
+ * тясна… заради мястото за преминаване") and -061 („всеки, който те заобикаля,
+ * трябва да навлезе в насрещното" — which is this template's second demo,
+ * verbatim).
+ *
+ * WHY ITS OWN MAP (pk-double-v1, tools/maps/gen_pk_double.mjs). The ban's cause
+ * has to BE on the map: a second-line span with no row beside it would be an
+ * arbitrary forbidden stretch, i.e. exactly the plate-reading drill this
+ * template exists to be the opposite of. So the district authors 27 parked cars
+ * in `meta.scenario.bays` — the same single truth the parking-lot family uses —
+ * and the span [70, 210] is the row and only the row. Occupied bays become
+ * PRECISE hittable colliders (ScenarioObstacles in the scene, ObstacleRect2D in
+ * the recorder), because they are neighbours, not scenery: the backlog's own
+ * note, honoured.
+ *
+ * WHY BOTH CURBS ARE PARKED. One row makes the double-parker rude; two make the
+ * street NARROW, and narrow is what makes чл. 98 lethal rather than pedantic.
+ * With both curbs full, the through passage is a single shared lane over the
+ * осева — so a car stopped in it does not slow the oncoming, it puts the
+ * oncoming into the stopper's half, with the west row denying it anywhere else
+ * to be. That is q-spirane-i-parkirane-061 rendered in geometry.
+ *
+ * WHERE THE DEMOS REST (the §9 stage-5 auto-assert). Both grade
+ * ILLEGAL_STOP_IN_BAN_ZONE (основна, чл. 98) inside pkd-z-second-line, at marks
+ * that mean different things — and the second one shows the bill:
+ *   - „Спиране на втора линия" → y = 130 (mid-row: the excuse, alone);
+ *   - „Двойно спиране, което вкарва насрещния в твоята половина" → y = 175
+ *     (deep in the row, with the stream arriving) → + COLLISION.
+ *
+ * HONEST SCOPE — the COLLISION is an AUTHORED consequence, not a geometric one,
+ * and the reason is the perceptual road scale. OncomingStreamRunner does emit a
+ * real head-on collision, but it needs centre-to-centre < 3 m; the two banks of
+ * this „narrow" street sit 8.12 m apart, because PERCEPTUAL_ROAD_SCALE (×2.5)
+ * draws a 6.5 m carriageway as 16 m. The squeeze is real in Sofia and not real
+ * in the geometry. Faking it would mean narrowing the lanes below the scale
+ * every other district uses — so the second demo's contact is instead a scripted
+ * narrative beat (the `collision` DriveStep, the same seam the no-observation
+ * demos use for „пешеходец зад колата"), fired while the stream is genuinely
+ * abreast of the stopped hero. What is NOT authored is the conviction beside it:
+ * the чл. 98 rest bills through the real reducer, with the row unable to acquit
+ * it (bays are colliders, never traffic) and the oncoming unable to acquit it
+ * (8.12 m > the 4 m lead corridor). Both pinned in
+ * world/__tests__/pk-double-districts.test.ts.
+ *
+ * THE CAPABILITY THIS TEMPLATE IS WAITING FOR: a per-district lane-width scale
+ * (or a `narrowStreet` flag the runtime honours) would let the two banks close
+ * to within VEHICLE_CONTACT_M and make the squeeze grade itself. It lives in
+ * shared runtime/spatial code, so it is named here rather than taken.
+ */
+export const SC_PK_DOUBLE_PARK: ScenarioSpec = {
+  id: "sc-pk-double-park",
+  family: "parking",
+  tagsBg: ["престой", "паркиране", "втора линия", "тясна улица", "насрещно движение", "чл. 98"],
+  titleBg: "Двойното паркиране блокира улицата",
+  objectiveBg:
+    "Не спирай успоредно до вече паркирана кола „само за малко“ — продължи до свободното легално място напред.",
+  archetypeIds: ["PK-06"],
+  conceptIds: [
+    "c-parking-prohibitions",
+    "c-stop-parking-definitions",
+    "c-stopping-standing-rules",
+    "c-oncoming-passing",
+  ],
+  map: {
+    archetype: "straight-street",
+    // The generator recipe — mirrored in pk-double-v1.json meta.scenario.params
+    // (tools/maps/gen_pk_double.mjs); the district battery asserts the match.
+    params: {
+      lengthM: PKD_LENGTH,
+      maxspeedKmh: 50,
+      rowFromM: PKD_ROW_FROM_Y,
+      rowToM: PKD_ROW_TO_Y,
+      banFromM: PKD_BAN_FROM_Y,
+      banToM: PKD_BAN_TO_Y,
+      legalBayY: PKD_BAY_Y,
+      banKind: "noStopping",
+      banBasis: "law",
+    },
+    districtId: "pk-double-v1",
+  },
+  start: {
+    spawnPointId: "pkd-spawn-start",
+    vehicleStart: "ready",
+  },
+  staged: [PKD_STREAM],
+  instructionsBg: [
+    { n: 1, textBg: "Потегли по улицата. Задачата е „спри някъде тук“ — а улицата напред е паркирана и от двете страни." },
+    { n: 2, textBg: "Не търси знак: тук няма. Забраната я пишат другите коли — до вече спряла кола откъм страната на движението не се спира (чл. 98, ал. 1)." },
+    { n: 3, textBg: "Виж колко е останало за минаване: между двете редици има място за ЕДНА кола. Спреш ли, улицата не се стеснява — тя се затваря." },
+    { n: 4, textBg: "Насреща идва кола. Тя няма къде да отбие — редицата вляво ѝ е стена, а ти си ѝ пътят." },
+    { n: 5, textBg: "Подмини цялата редица, без да спираш до нея — колкото и празно да изглежда платното вляво от теб." },
+    { n: 6, textBg: "След редицата, на 290-ия метър, има свободно място до бордюра. Подай десен мигач, влез в него и спри — там колата ти не пречи на никого." },
+  ],
+  success: [
+    {
+      id: "sc-pkd-past-row",
+      titleBg: "Подмини цялата паркирана редица, без да спираш до нея",
+      // A checkpoint on the clear road past the row's end (y = 210).
+      params: { kind: "reachZone", x: PKD_LANE, y: 225, radiusM: 6 },
+    },
+    {
+      id: "sc-pkd-legal-park",
+      titleBg: "Спри на свободното място до бордюра след редицата",
+      // Completable ONLY at near-stop speed AT THE CURB (x = 6.8, not at lane
+      // center): the drill's answer is a place where the car stops being an
+      // obstacle, and that place is the free bay — 80 m past every чл. 98 metre.
+      params: { kind: "reachZone", x: PKD_ROW_X, y: PKD_BAY_Y, radiusM: 4, maxSpeedKmh: 6 },
+    },
+  ],
+  rubric: { parTimeSec: 80 },
+  // RECORDED: committed deterministic recordings of the authored scripts in
+  // traces/scPkDoublePark.ts; gates in
+  // traces/__tests__/sc-pk-double-park-traces.test.ts (RECORD_TRACES=1).
+  shadow: { path: "content/traces/sc-pk-double-park/shadow-correct.trace.json" },
+  mistakes: [
+    {
+      traceRef: { path: "content/traces/sc-pk-double-park/mistake-second-line.trace.json" },
+      titleBg: "Спиране на втора линия",
+      whatWentWrongBg:
+        "Колата спря успоредно до паркираната редица — „за две минути, никого не бавя“. Чл. 98, ал. 1 забранява спирането до вече спряло превозно средство откъм страната на движението, и то без никакъв знак: забраната я поставят другите коли, а не табела. Разликата между теб и тях е, че те са до бордюра, а ти си в платното — и платното е за движение. Двете минути на втора линия не струват две минути на никого: те струват по няколко на всеки, който идва след теб.",
+      codeRefs: ["ILLEGAL_STOP_IN_BAN_ZONE"],
+    },
+    {
+      traceRef: { path: "content/traces/sc-pk-double-park/mistake-oncoming-squeeze.trace.json" },
+      titleBg: "Двойно спиране, което вкарва насрещния в твоята половина",
+      whatWentWrongBg:
+        "Водачът спря на втора линия по средата на редицата — там, където между двете паркирани редици остава място точно за една кола. Насрещният нямаше избор: вляво от него е стена от паркирани коли, а единственият проход минава през твоята половина. Затова спрялата на втора линия кола не „забавя“ движението — тя го изтласква в насрещното, и следващият, който заобикаля, го прави сляпо. Ти не си там, за да видиш какво става после: това е разликата между пречка и опасност.",
+      codeRefs: ["ILLEGAL_STOP_IN_BAN_ZONE", "COLLISION"],
+    },
+  ],
+  teach: {
+    whenBg:
+      "Всеки ден, на всяка тясна улица в квартала: мястото го няма, бързаш „за две минути“, а вдясно вече стои цяла редица коли, която сякаш ти казва, че тук се спира. Точно обратното е: редицата е знакът, че тук вече НЕ се спира. Забраната по чл. 98 не е поставена с табела — поставили са я хората, които са паркирали преди теб.",
+    whyBg:
+      "Паркиралите до бордюра са извън платното; ти, спрял до тях, си В платното — и на тясна улица платното е точно колкото една кола. Затова двойното паркиране не забавя движението, а го измества: всеки, който те заобикаля, влиза в насрещната лента, при това сляпо, защото твоята кола му крие какво идва. Насрещният, от своя страна, няма къде да отбие — вляво от него е втората редица. Така „само за малко“ превръща една улица в едно платно, по което две коли се разминават на доверие. Същата логика важи и за пожарната, и за линейката: те не могат да те заобиколят, а спрелият на втора линия почти никога не е в колата си. Затова изпитът брои престоя в забранена зона като основна грешка — не заради глобата, а защото мястото, което си взел, не е било твое.",
+    lawRef: "ЗДвП чл. 98, ал. 1",
+    examinerBg:
+      "Изпитващият казва „спри някъде тук“ и мълчи — изборът на място Е изпитът. Спиране или паркиране до вече спряло пътно превозно средство откъм страната на движението е основна грешка, независимо колко кратко е и колко „широко изглежда“ платното. Очаква се да прочетеш заетия бордюр като забрана, да подминеш цялата редица без да намаляваш до нея, да подадеш десен мигач и да спреш плътно вдясно на първото свободно място след нея. Оправданието „щях да тръгна веднага“ не се приема: чл. 98 не брои минути.",
+  },
+  levels: [
+    { level: 1 },
+    { level: 2 },
+    { level: 3 },
+    { level: 4, vehicleStart: "cold" },
+  ],
+  conditions: { weather: "dry" },
+  localeBg: "bg-BG",
+};
+
+// ---------------------------------------------------------------------------
+// sc-park-bay-exit-rev — „Излизане на заден от перпендикулярно място"
+//    (doc 72 PK-02/PK-11/PK-05) on lot-perp-v1 — the map REUSED, untouched
+// ---------------------------------------------------------------------------
+
+/**
+ * WHY THIS TEMPLATE IS NOT sc-park-perp-rev BACKWARDS. The P0 teaches getting
+ * IN: the bay is the target, the aisle is the workshop, and the only traffic is
+ * the geometry. This one starts where the P0 ends — parked nose-in, boxed by an
+ * occupied bay on each side — and teaches getting OUT, which is the half of the
+ * maneuver that actually hurts people. The driver reversing INTO a bay is
+ * looking at the thing he is aiming for; the driver reversing OUT of one is
+ * aiming at everything he cannot see. Чл. 40 is written for exactly this
+ * direction: убеди се, че пътят зад теб е свободен, ПРЕДИ да потеглиш.
+ *
+ * SAME DISTRICT, MIRRORED POSE. `map.reuse` — not one byte of
+ * content/world/lot-perp-v1.json is touched. The start is an explicit POSE
+ * instead of a spawn point (ScenarioStart.position, the one seam that lets a
+ * template begin somewhere the generator never authored a spawn): the centre of
+ * lot-bay-3 (5.03, 0) facing 90° — nose east, deep in the bay, exactly where
+ * the P0's shadow does NOT end (it reverses in and rests nose-out). The two
+ * templates are therefore the two halves of one bay, never the same drive.
+ *
+ * THE GRADED CONTRACT IS A CORRIDOR, NOT A BAY. parkInBay grades a rect you
+ * come to rest in; there is no such rect here — the whole point is leaving one.
+ * So the success pair is two reachZone gates that bracket the maneuver:
+ *   - sc-pbe-out   — the aisle exit point (1.0, −3.03), armed at maxSpeedKmh 8:
+ *     the ONLY way through it is at пешеходна скорост, in the arc;
+ *   - sc-pbe-away  — the checkpoint up the aisle (0, 20), past the whole row.
+ * Consequently the rubric carries NO placement/economy component (both read the
+ * parkInBay detail channel and would score `measured: false` — a silent lie);
+ * observation + par time are the honest channels, and the star fold falls back
+ * to official cleanliness, which is what a corridor drill actually measures.
+ *
+ * THE STAGED WALKER, AND WHY SHE CROSSES WHERE SHE DOES. The taught fault is
+ * blind reversing, and the live encounter that punishes it must be able to FIRE:
+ * PedestrianDartOutRunner only triggers on a player who is `approaching` the
+ * crossing point (±80° of heading) at/above minTriggerSpeedKmh. A walker staged
+ * BEHIND the reversing car is unreachable by that test — reverse keeps the car's
+ * heading pointed INTO the bay while it travels the other way. So the staged
+ * walker crosses the aisle at (1.0, 10), on the drive-away leg, and
+ * minTriggerSpeedKmh 7 puts her strictly above the 4 km/h reverse: she can only
+ * ever fire on the forward leg, never mid-arc. The person BEHIND the car — the
+ * one чл. 40 is about — is where she belongs: in the mistake demo, where she is
+ * demonstrated and never practised (doc 76 §0).
+ * Her `crossingId` names no zone in lot-perp-v1 (a lot has no zebras, and the
+ * district battery pins crossings.length === 0). That is deliberate and it costs
+ * nothing: the id is only the traffic system's occupancy key, so the
+ * PEDESTRIAN_NOT_YIELDED path stays dark and the encounter grades on CONTACT
+ * alone — which is the honest reading. Nobody has right of way on a zebra that
+ * does not exist; a person in a parking aisle simply must not be hit.
+ *
+ * HONEST SCOPE — the L5 the backlog asked for. The brief's L5 is „a car rolls
+ * down the aisle mid-maneuver — pause, let it pass, resume". It cannot be built
+ * on this district today: lot-e-aisle is class "service", and
+ * DEFAULT_TRAFFIC_CONFIG.excludedRoadClasses keeps service edges OUT of the lane
+ * graph (lot-perp-district.test.ts pins graph.lanes.length === 2 — the approach
+ * road only). Every staged VEHICLE resolves its path through that graph
+ * (resolveStagedVehiclePath), so no car can be put on the aisle at all; a staged
+ * vehicle authored there fails to stage and throws. Rather than fake it, L5
+ * escalates on the axes this map does support: night (a lot after closing —
+ * mirrors carry less, the reverse lights are the whole story) plus a SECOND
+ * walker who steps out later and closer than the L1–L4 one. The aisle car is
+ * named as a capability need, not taken: it wants either a `service` edge opted
+ * into the lane graph per-district, or a free-path staged vehicle (the
+ * pedestrian seam already has one).
+ *
+ * THE SWING-OUT CONTACT IS SCRIPTED, AND SAYS SO. „Изнасяне със замах в минаваща
+ * кола" needs a car moving down the aisle — the same thing L5 cannot stage. The
+ * demo therefore fires the contact through the `collision` DriveStep (the
+ * authored-consequence seam the P0's own „пешеходец зад колата" demo uses), at
+ * the frame the tail is genuinely across the aisle lane. What is NOT authored is
+ * the grading: the COLLISION bills through the real reducer at
+ * collisionMinKmh 0, and the arc it is fired from is the same one the shadow
+ * proves clean — so the ONLY difference between the demo and the shadow is the
+ * two missing pauses and the missing look. That is the lesson, and it is real.
+ *
+ * Family: "parking" — the doc-76 §2 chip; the id (sc-park-*) matches the P0's
+ * sc-park-<slug> form, since this is the P0's other half.
+ */
+
+/** Target bay lot-bay-3's centre — the START pose of this drill (the P0's
+ *  finish). Pinned from content/world/lot-perp-v1.json meta.scenario.bays. */
+const LOT_BAY_X = 5.03;
+const LOT_BAY_Y = 0;
+/** Nose-in heading: the bay axis (headingDeg 90), nose pointing east, deep. */
+const LOT_BAY_NOSE_DEG = 90;
+/** The aisle exit point the reverse arc lands on — see traces/scParkBayExitRev
+ *  (straight back to x = 4.03, then a quarter arc of radius 3.03). Kept in the
+ *  lane-detector-safe band: |x − 4.0625| = 3.06 < 3.25 (the P0's envelope note). */
+const LOT_EXIT_X = 1.0;
+const LOT_EXIT_Y = -3.03;
+/** The staged walker's aisle crossing point (no zebra exists — see the header). */
+const LOT_WALK_Y = 10;
+
+/** L1–L4: the walker who crosses the aisle on the drive-away leg. */
+const PBE_WALKER: PedestrianDartOutSpec = {
+  id: "pbe-aisle-walker",
+  kind: "pedestrianDartOut",
+  libraryEventId: "ev-uturn-reverse",
+  // Names no district zone by design (lot-perp-v1 has no crossings): the id is
+  // the occupancy key only, so this encounter grades on contact alone.
+  crossingId: "lot-aisle-walk",
+  crossing: { x: LOT_EXIT_X, y: LOT_WALK_Y },
+  start: { x: -4.2, y: LOT_WALK_Y },
+  dir: { x: 1, y: 0 },
+  speedMps: 1.3,
+  travelM: 8.4,
+  roadFromM: 1.2,
+  roadToM: 7.2,
+  // Range 9..15 m after the runner's ±3 m seeded jitter — she arms on the
+  // drive-away leg from its first metres.
+  triggerDistM: 12,
+  // ABOVE the 4 km/h reverse and BELOW the 9 km/h drive-away: the one dial that
+  // keeps her out of the arc, where the runner's `approaching` test cannot see
+  // a reversing car anyway.
+  minTriggerSpeedKmh: 7,
+};
+
+/** L5 only: the second walker — later, closer, in the dark. */
+const PBE_WALKER_LATE: PedestrianDartOutSpec = {
+  id: "pbe-aisle-walker-late",
+  kind: "pedestrianDartOut",
+  libraryEventId: "ev-uturn-reverse",
+  crossingId: "lot-aisle-walk-late",
+  crossing: { x: LOT_EXIT_X, y: 16 },
+  start: { x: 4.6, y: 16 },
+  dir: { x: -1, y: 0 },
+  speedMps: 1.5,
+  travelM: 8.8,
+  roadFromM: 1.4,
+  roadToM: 7.4,
+  // Tighter than the first walker's 12: she appears with less road left.
+  triggerDistM: 8,
+  minTriggerSpeedKmh: 7,
+};
+
+/**
+ * PK-02 mirrored (перпендикулярно място — the exit half), PK-11 (заден ход с
+ * пълно наблюдение и спиране за участници) and PK-05 (потеглянето от място е
+ * маневра и започва с оглеждане). Law: ЗДвП чл. 40 (движение назад — водачът е
+ * длъжен да се убеди, че пътят зад него е свободен и да пропусне останалите
+ * участници), the same ref content/concepts.json c-reversing cites.
+ */
+export const SC_PARK_BAY_EXIT_REV: ScenarioSpec = {
+  id: "sc-park-bay-exit-rev",
+  family: "parking",
+  tagsBg: ["паркиране", "заден ход", "излизане от място", "перпендикулярно", "чл. 40", "изпитни упражнения"],
+  titleBg: "Излизане на заден от перпендикулярно място",
+  objectiveBg:
+    "Излез на заден ход от заето отвсякъде място: оглед през рамо ПРЕДИ включване, пешеходна скорост и спиране при всяко движение зад теб.",
+  // Doc-72 provenance: PK-02 owns the bay geometry and the swing-out, PK-11 the
+  // reverse-with-observation discipline, PK-05 the „потеглянето е маневра" duty.
+  archetypeIds: ["PK-02", "PK-11", "PK-05"],
+  conceptIds: ["c-reversing", "c-maneuver-principles", "c-mirrors-blind-spots"],
+  map: {
+    archetype: "parking-lot",
+    // The P0's generator recipe verbatim — the map is REUSED, not regenerated
+    // (tools/maps/gen_parking_lot.mjs; mirrored in lot-perp-v1.json
+    // meta.scenario.params, asserted by world/__tests__/lot-exit-districts).
+    params: {
+      bays: 5,
+      bayWidthM: 2.7,
+      bayDepthM: 5,
+      angle: "90",
+      aisleWidthM: 7,
+      occupancy: "XX_XX",
+      approachM: 90,
+      entry: "south",
+    },
+    districtId: "lot-perp-v1",
+  },
+  start: {
+    // An explicit POSE, not a spawn point: the generator authored no spawn
+    // inside a bay, and the whole drill starts there (lot-bay-3's centre,
+    // nose-in on the bay axis). The district battery pins the pose inside the
+    // bay rect and clear of both neighbours.
+    position: { x: LOT_BAY_X, y: LOT_BAY_Y },
+    headingDeg: LOT_BAY_NOSE_DEG,
+    vehicleStart: "ready",
+  },
+  staged: [PBE_WALKER],
+  instructionsBg: [
+    { n: 1, textBg: "Колата е паркирана с предницата навътре, а вляво и вдясно има коли. Нищо зад теб не се вижда от седалката — затова оглеждането е ПРЕДИ включването на задната, не след него." },
+    { n: 2, textBg: "Двете огледала, после поглед през ДЯСНОТО рамо и през задното стъкло. Чак когато си сигурен, че алеята зад теб е чиста, включи задна." },
+    { n: 3, textBg: "Излез бавно НАЗАД около метър, без да завърташ волана — така предницата още не подрязва съседа." },
+    { n: 4, textBg: "Чак когато задницата е в алеята, завърти волана и изнеси плавно, с пешеходна скорост — не повече от 4-5 км/ч." },
+    { n: 5, textBg: "Спри при всяко движение зад теб и се огледай отново. Двете спирания по време на маневрата не са загубено време — те са маневрата." },
+    { n: 6, textBg: "Изправи волана в алеята, погледни по нея в двете посоки и чак тогава потегли напред. Пропусни всеки пешеходец — в паркинга хората вървят по платното." },
+  ],
+  success: [
+    {
+      id: "sc-pbe-out",
+      titleBg: "Излез от мястото на заден ход, с пешеходна скорост",
+      // The corridor gate (NOT parkInBay — see the header): the aisle exit
+      // point the arc lands on, armed at walking speed. Coordinates pinned to
+      // content/world/lot-perp-v1.json like every lesson pins its district.
+      params: { kind: "reachZone", x: LOT_EXIT_X, y: LOT_EXIT_Y, radiusM: 2.5, maxSpeedKmh: 8 },
+    },
+    {
+      id: "sc-pbe-away",
+      titleBg: "Подравни се по алеята и напусни зоната напред",
+      // Past the whole bay row (bays span y ∈ [−5.4, 5.4]) and past the staged
+      // walker's crossing (y = 10) — the checkpoint completes at y ≈ 14, so the
+      // encounter can never be skipped by finishing early.
+      params: { kind: "reachZone", x: 0, y: 20, radiusM: 6, maxSpeedKmh: 20 },
+    },
+  ],
+  rubric: {
+    // No placement/economy: both read the parkInBay detail channel this drill
+    // never produces (the header's corridor note) — a component that cannot
+    // measure must not pretend to.
+    observation: {
+      moments: [
+        { id: "obs-before-reverse", titleBg: "Огледала и през рамо ПРЕДИ включване на задна" },
+        { id: "obs-during-reverse", titleBg: "Оглед назад при всяко спиране по време на маневрата" },
+        { id: "obs-before-moveoff", titleBg: "Поглед по алеята в двете посоки преди потегляне напред" },
+      ],
+    },
+    parTimeSec: 75,
+  },
+  // RECORDED: committed deterministic recordings of the authored scripts in
+  // traces/scParkBayExitRev.ts; the §5 gate (shadow replays with ZERO
+  // violations, parked-car obstacles armed at collisionMinKmh 0) and the §9
+  // stage-5 code asserts run in
+  // traces/__tests__/sc-park-bay-exit-rev-traces.test.ts (RECORD_TRACES=1).
+  shadow: { path: "content/traces/sc-park-bay-exit-rev/shadow-correct.trace.json" },
+  mistakes: [
+    {
+      traceRef: { path: "content/traces/sc-park-bay-exit-rev/mistake-blind-reverse.trace.json" },
+      titleBg: "Заден ход без оглед — пешеходец зад колата",
+      whatWentWrongBg:
+        "Задната предавка влезе веднага — без огледала, без рамо. Между двете съседни коли се вижда точно нищо, а зад колата вървеше човек: от седалката той не е бил невидим случайно, а по устройство. Чл. 40 не иска от теб да внимаваш, докато излизаш — иска да си се убедил, че пътят зад теб е свободен, ПРЕДИ да потеглиш назад. И понеже дори одраскването е ПТП, това тук не е „контакт на паркинга“ — това е пътнотранспортно произшествие с пострадал пешеходец, със спиране на място и повикване на органите. Единственото, което щеше да го предотврати, са двете секунди преди задната.",
+      codeRefs: ["COLLISION"],
+    },
+    {
+      traceRef: { path: "content/traces/sc-park-bay-exit-rev/mistake-swing-out.trace.json" },
+      titleBg: "Изнасяне със замах в минаваща кола",
+      whatWentWrongBg:
+        "Същата дъга като на правилната маневра — но изкарана наведнъж, без нито едно спиране и без нито един поглед назад. По алеята минаваше кола; докато задницата излизаше, тя вече беше отстрани и нямаше как да спре. Заден ход от място между коли се прави на части точно заради това: спираш, поглеждаш, продължаваш — защото излизащият назад е този, който трябва да пропусне, а не минаващият по алеята. „Замахът“ не печели секунди: той просто маха проверките, при които щеше да я видиш. И тук ламарината пак е ПТП — с попълване на протокол и с виновен, който е излязъл, без да пропусне.",
+      codeRefs: ["COLLISION"],
+    },
+  ],
+  teach: {
+    whenBg:
+      "Всеки път, когато си паркирал с предницата навътре — пред мола, пред блока, на служебния паркинг. Влизането е избор; излизането не е: рано или късно трябва да излезеш назад между две коли, които крият всичко. Именно затова обратното паркиране е по-безопасно — то мести този момент в началото, когато алеята е още пред очите ти.",
+    whyBg:
+      "Излизането на заден от място между коли е ситуацията с най-лошата видимост, която един водач изпълнява доброволно. Съседните коли режат цялата картина настрани, огледалата не показват алеята, докато задницата не е вече в нея, а точно по алеята вървят хора — деца до количките, човек с торби, някой между колите. Затова законът обръща тежестта: при движение назад НИЕ пропускаме всички. Оттам идват и трите неща, които маневрата изисква — оглед преди включването, пешеходна скорост (за да можеш да спреш в рамките на видяното) и спиране при всяко движение зад теб. Дори леко закачане тук е пътнотранспортно произшествие по определение, а не „нищо работа“: с него идват задължението да спреш, да обозначиш и да не местиш колата. Никой не излиза бавно, защото се страхува — излиза бавно, защото не вижда.",
+    lawRef: "ЗДвП чл. 40",
+    examinerBg:
+      "Изпитващият гледа реда, не резултата: оглеждане ПРЕДИ да влезе задната (огледала + през рамо, не само камерата), скорост на пешеходец през цялата маневра, прекъсване и нов оглед при всяко движение зад колата, и подравняване в алеята преди потеглянето напред. Заден ход без предварителен оглед е основна грешка дори когато нищо не се случи — оценява се убеждаването, а не късметът.",
+  },
+  levels: [
+    {
+      level: 1,
+      // Воден опит: the ladder's full aid set + shadow (compile defaults).
+    },
+    {
+      level: 2,
+      // Частична помощ: ribbon + idle hints (ladder defaults).
+    },
+    {
+      level: 3,
+      // Самостоятелно: no aids, evaluator defaults.
+    },
+    {
+      level: 4,
+      // Изпитни условия: examMode (ladder) + the full cold-start protocol —
+      // on the exam the car is standing and switched off in the bay.
+      vehicleStart: "cold",
+    },
+    {
+      level: 5,
+      // Усложнени: the lot after dark + a second walker, later and closer.
+      // NOT the backlog's aisle car — see the header's honest-scope note.
+      conditions: { night: true },
+      stagedAdd: [PBE_WALKER_LATE],
+    },
+  ],
+  conditions: { weather: "dry" },
+  localeBg: "bg-BG",
+};
+
+// ---------------------------------------------------------------------------
+// sc-mv-uturn-ban — „Къде обратният завой е забранен" (wave 6; doc 72 OV-17
+// „Обратен завой" / PK-12 „Обръщане"; ЗДвП чл. 38) on the purpose-built
+// mv-uturn-v1 boulevard (tools/maps/gen_mv_uturn.mjs).
+//
+// WHY THIS IS NOT sc-maneuver-uturn AGAIN. The shipped OV-17 template teaches
+// the ARC: wb-boulevard-v1 is 200 m of empty boulevard with nothing on it, so
+// every metre of it is a legal place to turn and the whole drill is vehicle
+// control. This one keeps that arc — the SAME shipped threePointTurn evaluator,
+// the same „в едно движение" contract — and puts it at the END of a decision.
+// The first 220 m carry an М1 непрекъсната осева + a В23 posting: the boulevard
+// is wide, the car would fit, and the turn is banned. 150 m on the median opens
+// at a cross street and the identical maneuver is lawful. Nothing about the
+// maneuver changed; the READING is the lesson (source questions q-manevri-020 /
+// -021 / -052 / -053, q-osnovni-026).
+//
+// THE TWO DEMOS ARE THE TWO HALVES OF чл. 38, and they fail differently on
+// purpose: „Обръщане през плътната линия" grades EXACTLY CROSSED_SOLID_LINE
+// (опасна) — the WHERE; „Обратен завой пред насрещния поток" grades
+// FAILED_TO_YIELD + COLLISION at the LAWFUL gap — the WHEN. A student who reads
+// only the first learns to drive to the opening and turn into a moving car.
+// ---------------------------------------------------------------------------
+
+/** Northbound OUTER (curb) lane centre of mv-uturn-v1 (2+2, perceptual scale). */
+const MVU_LANE_OUT = 12.19;
+/** Northbound INNER lane centre — обръщането се започва от лентата до осевата. */
+const MVU_LANE_IN = 4.06;
+/** The tempting-but-banned spot (mv-uturn-v1 meta.scenario.temptingSpotY). */
+const MVU_TEMPTING_Y = 130;
+/** The legal median gap = the cross-street junction node (…legalGapY). */
+const MVU_GAP_Y = 280;
+
+/**
+ * The deterministic ONCOMING STREAM of sc-mv-uturn-ban: three cars southbound
+ * at 8 m/s (~29 km/h — urban boulevard flow), released together on the player's
+ * first movement, so their positions are pure functions of the session clock and
+ * the drive scripts are authored against them (the sc-ov-oncoming-gap recipe).
+ * The runner emits NOTHING but a contact; the runtime's JU-10 left-turn tracker
+ * does all the grading, reading these cars through the same
+ * TrafficSystem.oncomingNear query ambient traffic rides.
+ *
+ * WHY extraRightOffsetM PUTS THE STREAM IN THE INNER LANE — the load-bearing
+ * dial of this template, and not a styling choice. The traffic lane graph parks
+ * every actor in the CURB lane of its direction (traffic/graph.laneOffsetFor:
+ * (perDir − 0.5) × laneWidth = x = −12.19 here). The JU-10 tracker measures its
+ * gap from the JUNCTION NODE (0, 280), so a car 12.19 m off that axis carries a
+ * permanent lateral term: gapSec = dist²/(d·v) bottoms out at 2·12.19/8 = 3.05 s
+ * — ABOVE the 2.0 s convict bar, at every speed and every distance. On the curb
+ * lane the тежката грешка of this drill is structurally ungradable. Shifted
+ * 8.125 m back toward the осева (the negative = leftward offset), the same
+ * arithmetic bottoms out at 1.02 s and the tight band is a real 1.7 s window.
+ * It is also the truer picture: the lane a U-turn crosses FIRST, and the one
+ * whose driver has no room to swerve, is the one against the centre line.
+ *
+ * The authored arrivals, in INSTANT-CRUISE terms (a released car accelerates at
+ * the staged default 2.6 m/s², losing v²/2a ≈ 12.3 m against an instant-cruise
+ * clock at 8 m/s — the holds sit 12.3 m further back so that, once at cruise,
+ * each car tracks y = Y − 8·t exactly; release lands at t ≈ 0.37 s, when the
+ * player first rolls). The path runs mvu-n-end → mvu-n-gap → mvu-n-start, so
+ * hold arc s ⇒ y = 620 − s:
+ *  - car 0, hold s 160 (y 460, instant-model Y 472.3): reaches the gap at
+ *    t ≈ 24 s — just as the shadow arrives. It is the car the patient driver
+ *    lets go and the impatient one thinks was the only one;
+ *  - car 1, +40 m (5 s of headway): the one that makes „чисто е" a guess;
+ *  - car 2, +80 m: the car the mistake demo turns in front of, and the reason
+ *    the shadow does not move for another ten seconds. That wait IS the drill.
+ */
+const MVU_STREAM: OncomingStreamSpec = {
+  id: "sc-mvu-stream",
+  kind: "oncomingStream",
+  libraryEventId: "ev-uturn-reverse",
+  actor: {
+    pathNodes: ["mvu-n-end", "mvu-n-gap", "mvu-n-start"], // southbound = oncoming
+    hold: { nodeIndex: 0, offsetM: 160 }, // y 460 → instant-model Y 472.3
+    cruiseSpeedMps: 8,
+    // −8.125 m of the graph's own curb offset = the INNER oncoming lane
+    // (x = −4.06). See the block above: without it the JU-10 gap can never
+    // reach the convict band and mistake #2 grades nothing.
+    extraRightOffsetM: -8.125,
+    colorIndex: 1,
+  },
+  count: 3,
+  gapsM: [40, 80], // car i's EXTRA hold arc vs car 0 → 5 s / 10 s of headway
+  releaseKmh: 3,
+};
+
+/**
+ * OV-17 / PK-12 — „Къде обратният завой е забранен" (ЗДвП чл. 38: обратен завой
+ * се извършва там, където не е забранен и водачът има видимост; Наредба
+ * № 2/2001 М1: непрекъснатата осева не се пресича — вж. и знак В23 „Забранено е
+ * завиването в обратна посока", Наредба № РД-02-21-1/2023, прил. № 3).
+ */
+export const SC_MV_UTURN_BAN: ScenarioSpec = {
+  id: "sc-mv-uturn-ban",
+  family: "parking",
+  tagsBg: [
+    "обратен завой",
+    "забрана",
+    "плътна осева",
+    "знак В23",
+    "широк булевард",
+    "изпитни упражнения",
+  ],
+  titleBg: "Къде обратният завой е забранен",
+  objectiveBg:
+    "Разчети мястото: плътна осева и знак значат НЕ — продължи до разрешения участък и обърни там с пълен оглед.",
+  archetypeIds: ["OV-17", "PK-12"],
+  conceptIds: [
+    "c-u-turn",
+    "c-prohibition-signs",
+    "c-longitudinal-markings",
+    "c-left-turn-oncoming",
+    "c-mirrors-blind-spots",
+  ],
+  map: {
+    archetype: "straight-street",
+    // Mirrored in mv-uturn-v1.json meta.scenario.params (tools/maps/gen_mv_uturn.mjs).
+    params: { lengthM: 620, maxspeedKmh: 50, lanes: 4, banFromM: 40, banToM: 220, gapY: MVU_GAP_Y },
+    districtId: "mv-uturn-v1",
+  },
+  start: {
+    spawnPointId: "mvu-spawn-start",
+    vehicleStart: "ready",
+  },
+  instructionsBg: [
+    {
+      n: 1,
+      textBg:
+        "Тръгни по булеварда в дясната лента. Още от 40-ия метър осевата линия е ПЛЪТНА и е поставен знак В23 „Забранено е завиването в обратна посока“.",
+    },
+    {
+      n: 2,
+      textBg:
+        "На 130-ия метър платното е широко и празно — изглежда идеално за обръщане. Не е: плътната осева не се пресича, а знакът е още в сила. Подмини го.",
+    },
+    {
+      n: 3,
+      textBg:
+        "От 220-ия метър маркировката се прекъсва — това е първият знак, че забраната свършва. Огледай се, включи ляв мигач и премини във вътрешната лента, до осевата.",
+    },
+    {
+      n: 4,
+      textBg:
+        "На 280-ия метър разделителната ивица се отваря при страничната улица — тук обръщането е разрешено. Спри и се убеди, че насрещните са преминали: широчината не е предимство.",
+    },
+    {
+      n: 5,
+      textBg:
+        "Когато потокът мине, завърти волана наляво и опиши ЕДНА плавна дъга с пешеходна скорост през насрещните ленти. Изправи волана в дясната лента на обратната посока и спри.",
+    },
+  ],
+  success: [
+    {
+      id: "sc-mvu-pass-ban",
+      titleBg: "Подмини забраненото място и стигни до разрешения отвор",
+      // The gate that IS the lesson: the inner lane, PAST the М1 span, at
+      // approach speed. It is unreachable by anyone who turned at y = 130 —
+      // objectives advance sequentially, so „обърнах по-рано" completes nothing.
+      params: { kind: "reachZone", x: MVU_LANE_IN, y: 250, radiusM: 6, maxSpeedKmh: 40 },
+    },
+    {
+      id: "sc-mvu-turn",
+      titleBg: "Обърни посоката на 180° в отвора, след като потокът мине",
+      // Corridor-locked threePointTurn (Наредба-38), the sc-maneuver-uturn
+      // contract verbatim: reversed travel direction, at rest inside the turn
+      // box facing back. On this WIDE boulevard the reversal is a single
+      // forward arc — the evaluator reports movements = 1. halfLengthM 20 is
+      // the map's own uturnCorridor (meta.scenario): an arc launched from a
+      // standstill in the inner lane exits ~16 m short of the node.
+      params: {
+        kind: "completeManeuver",
+        maneuver: "threePointTurn",
+        corridor: { x: 0, y: MVU_GAP_Y, halfWidthM: 15, halfLengthM: 20 },
+        startHeadingDeg: 0,
+        toleranceDeg: 20,
+        holdSec: 0.6,
+      },
+    },
+  ],
+  rubric: {
+    // Economy = direction-change movements. A clean single-arc U-turn on a wide
+    // boulevard is ONE movement (no reverse shunt); two is still acceptable.
+    // No placement channel (threePointTurn publishes no parkInBay detail).
+    economy: { objectiveId: "sc-mvu-turn", attemptsFor3Stars: 1, attemptsFor2Stars: 2 },
+    parTimeSec: 60,
+  },
+  // RECORDED: committed deterministic recordings of traces/scMvUturnBan.ts; the
+  // §5 gate (shadow replays ZERO violations, passes the ban, waits the stream
+  // out and completes the turn in ONE movement) and the §9 stage-5 code asserts
+  // run in traces/__tests__/sc-mv-uturn-ban-traces.test.ts (RECORD_TRACES=1).
+  shadow: { path: "content/traces/sc-mv-uturn-ban/shadow-correct.trace.json" },
+  mistakes: [
+    {
+      traceRef: { path: "content/traces/sc-mv-uturn-ban/mistake-cross-solid.trace.json" },
+      titleBg: "Обръщане през плътната линия",
+      whatWentWrongBg:
+        "Мястото беше широко и празно — и точно затова изглеждаше разрешено. Не беше: осевата линия е непрекъсната (М1) и знакът В23 е в сила, а непрекъснатата осева не се пресича по никаква причина, включително за обръщане. Широчината на платното не отменя маркировката — тя само те кара да мислиш, че ще успееш.",
+      codeRefs: ["CROSSED_SOLID_LINE"],
+    },
+    {
+      traceRef: { path: "content/traces/sc-mv-uturn-ban/mistake-into-stream.trace.json" },
+      titleBg: "Обратен завой пред насрещния поток",
+      whatWentWrongBg:
+        "Мястото беше правилно — моментът не. След първата кола водачът реши, че е чисто, и тръгна пред втората. Обръщането пресича и двете насрещни ленти и отнема секунди, в които не можеш да спреш и не можеш да се върнеш: пропускаш ЦЕЛИЯ поток, не първата кола. „Разрешено“ казва къде, не кога.",
+      codeRefs: ["FAILED_TO_YIELD", "COLLISION"],
+    },
+  ],
+  teach: {
+    whenBg:
+      "Винаги, когато ти трябва обратна посока в града. Обратният завой не се прави „където има място“, а където законът го позволява: не се пресича непрекъсната осева, не се обръща под знак В23, на кръстовище със знак В23, на магистрала, на мост, в тунел или при видимост под 100 м.",
+    whyBg:
+      "Обръщането е най-бавната маневра, която пресича насрещното движение — колата стои напряко на платното секунди наред. Затова забраните стоят точно там, където няма как да те видят навреме или няма как да те заобиколят. Плътната осева и знакът не са формалност: те казват „тук ще те ударят“. Който ги прочете и потърпи 150 метра, прави същата маневра на място, където тя е безопасна.",
+    lawRef: "ЗДвП чл. 38",
+    examinerBg:
+      "Изпитващият гледа: прочете ли маркировката и знака и подмина ли забраненото място без колебание; избра ли вътрешната лента с мигач и оглеждане; спря ли на отвора и пропусна ли ЦЕЛИЯ насрещен поток, а не първата кола; една плавна дъга с пешеходна скорост и обърната посока в дясната лента. Обръщане през плътна осева е опасна грешка и се оценява като такава.",
+  },
+  levels: [
+    { level: 1, toleranceScale: 1.5 },
+    { level: 2, toleranceScale: 1.25 },
+    { level: 3 },
+    { level: 4, vehicleStart: "cold" },
+    {
+      level: 5,
+      // DENSER oncoming — the backlog's own L5 dial. A second stream INTERLEAVED
+      // 20 m behind each car of the first (hold 140 vs 160), so arrivals at the
+      // gap fall every ~2.5 s instead of every 5: the road is never briefly
+      // empty, and the hole the L3 driver turned into no longer exists. The L5
+      // delta here is PATIENCE, not grip — no weather and no physics dial
+      // (ADR-006 stage 4a: this ghost is dry-tuned, and rain would add a braking
+      // story a creep-speed arc cannot honour).
+      toleranceScale: 0.8,
+      stagedAdd: [
+        {
+          ...MVU_STREAM,
+          id: "sc-mvu-stream-2",
+          actor: {
+            ...MVU_STREAM.actor,
+            hold: { nodeIndex: 0, offsetM: 140 }, // y 480 → 2.5 s behind car 0
+            colorIndex: 2,
+          },
+        } as OncomingStreamSpec,
+      ],
+    },
+  ],
+  staged: [MVU_STREAM],
+  conditions: { weather: "dry" },
+  localeBg: "bg-BG",
+};
+
+/** The parking templates of this file, in catalog order (the array is spread
+ *  into SCENARIO_TEMPLATES by templates.ts; the integration pass owns that edit
+ *  and the s2-catalog-integrity id list). The first four are the law-implied-ban
+ *  set the file was opened for; sc-park-bay-exit-rev is the wave-5 lot-maneuver
+ *  member and sc-mv-uturn-ban the wave-6 U-turn-ban member — same family chip,
+ *  different subjects (see their headers). */
 export const SCENARIO_TEMPLATES_PARKING2: readonly ScenarioSpec[] = [
   SC_PK_CROSSING_BAN,
   SC_PK_BUSSTOP_BAN,
   SC_PK_STOP_VS_PARK,
+  SC_PK_DOUBLE_PARK,
+  SC_PARK_BAY_EXIT_REV,
+  SC_MV_UTURN_BAN,
 ];

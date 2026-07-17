@@ -1,0 +1,472 @@
+{
+ "format": "district-v1",
+ "meta": {
+  "district": "mw-exit",
+  "label": "Учебен изход от автомагистрала — лента за намаляване и рампа (сценарий SP-10/SP-05)",
+  "mapKind": "scenario-street",
+  "generator": "tools/maps/gen_mw_exit.mjs",
+  "zonesVersion": 1,
+  "boundsLocalMeters": {
+   "minX": -48.56,
+   "minY": -6,
+   "maxX": 137.84,
+   "maxY": 1226
+  },
+  "attribution": {
+   "text": "Учебен изход от автомагистрала с лента за намаляване и рампа — оригинален параметричен дизайн (без данни от OpenStreetMap)",
+   "license": "All rights reserved",
+   "licenseUrl": "/",
+   "copyrightUrl": "/",
+   "obligation": "none — original work, no ODbL attribution required for this map"
+  },
+  "defaults": {
+   "maxspeedUrbanKmh": 140,
+   "note": "Изход от автомагистрала: престрой се в дясната лента навреме, влез в лентата за намаляване и намали ЧАК в нея — рампата е с препоръчителна скорост 60 км/ч. Ако изпуснеш изхода, продължаваш до следващия: спиране и движение назад по магистралата са забранени."
+  },
+  "stats": {
+   "roadKm": 2.7,
+   "nodes": 8,
+   "edges": 5,
+   "intersections": 0,
+   "crossings": 0,
+   "buildings": 1,
+   "spawnPoints": 3,
+   "zones": 4
+  },
+  "scenario": {
+   "archetype": "merge-lane",
+   "params": {
+    "approachM": 520,
+    "decelM": 280,
+    "mainM": 420,
+    "maxspeedKmh": 140,
+    "rampKmh": 90,
+    "advisoryKmh": 60,
+    "lanesPerDirection": 2,
+    "medianM": 6,
+    "rampRadiusM": 250,
+    "rampSweepDeg": 45,
+    "rampTailM": 60
+   },
+   "lanesPerDirection": 2,
+   "laneCurbX": 8.13,
+   "laneCruiseX": 0,
+   "laneLeftX": -8.12,
+   "taperY": 520,
+   "noseY": 800,
+   "endY": 1220,
+   "decelLaneFromY": 520,
+   "decelLaneToY": 800,
+   "decelEdgeId": "mwx-e-nb-decel",
+   "rampEdgeId": "mwx-e-ramp",
+   "rampArc": {
+    "cx": 258.13,
+    "cy": 800,
+    "radiusM": 250,
+    "sweepDeg": 45,
+    "stepDeg": 1.5
+   },
+   "rampArcEnd": [
+    81.35,
+    976.78
+   ],
+   "rampEnd": [
+    123.78,
+    1019.21
+   ],
+   "rampTailHeadingDeg": 45,
+   "curveZone": {
+    "id": "mwx-z-ramp-curve",
+    "kind": "curveAdvisory",
+    "signRef": "А1",
+    "fromM": 0,
+    "toM": 196.34,
+    "advisoryKmh": 60
+   },
+   "emergencyZoneIds": [
+    "mwx-z-emerg-approach",
+    "mwx-z-emerg-main",
+    "mwx-z-emerg-sb"
+   ]
+  }
+ },
+ "roads": {
+  "nodes": [
+   {
+    "id": "mwx-n-nb-end",
+    "x": 0,
+    "y": 1220
+   },
+   {
+    "id": "mwx-n-nb-start",
+    "x": 0,
+    "y": 0
+   },
+   {
+    "id": "mwx-n-nose",
+    "x": 0,
+    "y": 800
+   },
+   {
+    "id": "mwx-n-ramp-end",
+    "x": 123.78,
+    "y": 1019.21
+   },
+   {
+    "id": "mwx-n-ramp-gore",
+    "x": 8.13,
+    "y": 800
+   },
+   {
+    "id": "mwx-n-sb-end",
+    "x": -30.37,
+    "y": 0
+   },
+   {
+    "id": "mwx-n-sb-start",
+    "x": -30.37,
+    "y": 1220
+   },
+   {
+    "id": "mwx-n-taper",
+    "x": 0,
+    "y": 520
+   }
+  ],
+  "edges": [
+   {
+    "id": "mwx-e-nb-approach",
+    "from": "mwx-n-nb-start",
+    "to": "mwx-n-taper",
+    "class": "primary",
+    "name": "Учебен изход от автомагистрала — лента за намаляване и рампа (сценарий SP-10/SP-05) — подход",
+    "oneway": true,
+    "roundabout": false,
+    "lanes": 3,
+    "lanesSource": "tag",
+    "maxspeed": 140,
+    "maxspeedSource": "tag",
+    "motorway": true,
+    "length": 520,
+    "geometry": [
+     [
+      0,
+      0
+     ],
+     [
+      0,
+      520
+     ]
+    ]
+   },
+   {
+    "id": "mwx-e-nb-decel",
+    "from": "mwx-n-taper",
+    "to": "mwx-n-nose",
+    "class": "primary",
+    "name": "Учебен изход от автомагистрала — лента за намаляване и рампа (сценарий SP-10/SP-05) — лента за намаляване",
+    "oneway": true,
+    "roundabout": false,
+    "lanes": 3,
+    "lanesSource": "tag",
+    "maxspeed": 140,
+    "maxspeedSource": "tag",
+    "motorway": true,
+    "length": 280,
+    "geometry": [
+     [
+      0,
+      520
+     ],
+     [
+      0,
+      800
+     ]
+    ]
+   },
+   {
+    "id": "mwx-e-nb-main",
+    "from": "mwx-n-nose",
+    "to": "mwx-n-nb-end",
+    "class": "primary",
+    "name": "Учебен изход от автомагистрала — лента за намаляване и рампа (сценарий SP-10/SP-05) — платно след изхода",
+    "oneway": true,
+    "roundabout": false,
+    "lanes": 3,
+    "lanesSource": "tag",
+    "maxspeed": 140,
+    "maxspeedSource": "tag",
+    "motorway": true,
+    "length": 420,
+    "geometry": [
+     [
+      0,
+      800
+     ],
+     [
+      0,
+      1220
+     ]
+    ]
+   },
+   {
+    "id": "mwx-e-sb",
+    "from": "mwx-n-sb-start",
+    "to": "mwx-n-sb-end",
+    "class": "primary",
+    "name": "Учебен изход от автомагистрала — лента за намаляване и рампа (сценарий SP-10/SP-05) — насрещно платно",
+    "oneway": true,
+    "roundabout": false,
+    "lanes": 3,
+    "lanesSource": "tag",
+    "maxspeed": 140,
+    "maxspeedSource": "tag",
+    "motorway": true,
+    "length": 1220,
+    "geometry": [
+     [
+      -30.37,
+      1220
+     ],
+     [
+      -30.37,
+      0
+     ]
+    ]
+   },
+   {
+    "id": "mwx-e-ramp",
+    "from": "mwx-n-ramp-gore",
+    "to": "mwx-n-ramp-end",
+    "class": "secondary_link",
+    "name": "Учебен изход от автомагистрала — лента за намаляване и рампа (сценарий SP-10/SP-05) — рампа за изход",
+    "oneway": true,
+    "roundabout": false,
+    "lanes": 1,
+    "lanesSource": "tag",
+    "maxspeed": 90,
+    "maxspeedSource": "default",
+    "length": 256.35,
+    "geometry": [
+     [
+      8.13,
+      800
+     ],
+     [
+      8.22,
+      806.54
+     ],
+     [
+      8.47,
+      813.08
+     ],
+     [
+      8.9,
+      819.61
+     ],
+     [
+      9.5,
+      826.13
+     ],
+     [
+      10.27,
+      832.63
+     ],
+     [
+      11.21,
+      839.11
+     ],
+     [
+      12.32,
+      845.56
+     ],
+     [
+      13.59,
+      851.98
+     ],
+     [
+      15.04,
+      858.36
+     ],
+     [
+      16.65,
+      864.7
+     ],
+     [
+      18.43,
+      871
+     ],
+     [
+      20.37,
+      877.25
+     ],
+     [
+      22.47,
+      883.45
+     ],
+     [
+      24.73,
+      889.59
+     ],
+     [
+      27.16,
+      895.67
+     ],
+     [
+      29.74,
+      901.68
+     ],
+     [
+      32.48,
+      907.63
+     ],
+     [
+      35.38,
+      913.5
+     ],
+     [
+      38.43,
+      919.29
+     ],
+     [
+      41.62,
+      925
+     ],
+     [
+      44.97,
+      930.62
+     ],
+     [
+      48.46,
+      936.16
+     ],
+     [
+      52.1,
+      941.6
+     ],
+     [
+      55.88,
+      946.95
+     ],
+     [
+      59.79,
+      952.19
+     ],
+     [
+      63.84,
+      957.33
+     ],
+     [
+      68.03,
+      962.36
+     ],
+     [
+      72.34,
+      967.28
+     ],
+     [
+      76.79,
+      972.09
+     ],
+     [
+      81.35,
+      976.78
+     ],
+     [
+      123.78,
+      1019.21
+     ]
+    ]
+   }
+  ]
+ },
+ "intersections": [],
+ "crossings": [],
+ "roundabouts": [],
+ "buildings": [
+  {
+   "id": "mwx-b-service",
+   "height": 8,
+   "heightSource": "default",
+   "footprint": [
+    [
+     22.19,
+     560
+    ],
+    [
+     36.19,
+     560
+    ],
+    [
+     36.19,
+     590
+    ],
+    [
+     22.19,
+     590
+    ]
+   ]
+  }
+ ],
+ "spawnPoints": [
+  {
+   "id": "mwx-spawn-left-lane",
+   "x": -8.12,
+   "y": 15,
+   "heading": 0,
+   "edgeId": "mwx-e-nb-approach",
+   "name": "Начало — лявата лента на магистралата"
+  },
+  {
+   "id": "mwx-spawn-decel",
+   "x": 8.13,
+   "y": 740,
+   "heading": 0,
+   "edgeId": "mwx-e-nb-decel",
+   "name": "Контролна точка — в лентата за намаляване"
+  },
+  {
+   "id": "mwx-spawn-ramp-exit",
+   "x": 113.17,
+   "y": 1008.6,
+   "heading": 45,
+   "edgeId": "mwx-e-ramp",
+   "name": "Контролна точка — край на рампата"
+  }
+ ],
+ "zones": [
+  {
+   "id": "mwx-z-emerg-approach",
+   "kind": "emergencyLane",
+   "edgeId": "mwx-e-nb-approach",
+   "fromM": 0,
+   "toM": 520,
+   "signRef": "М2"
+  },
+  {
+   "id": "mwx-z-emerg-main",
+   "kind": "emergencyLane",
+   "edgeId": "mwx-e-nb-main",
+   "fromM": 0,
+   "toM": 420,
+   "signRef": "М2"
+  },
+  {
+   "id": "mwx-z-emerg-sb",
+   "kind": "emergencyLane",
+   "edgeId": "mwx-e-sb",
+   "fromM": 0,
+   "toM": 1220,
+   "signRef": "М2"
+  },
+  {
+   "id": "mwx-z-ramp-curve",
+   "kind": "curveAdvisory",
+   "edgeId": "mwx-e-ramp",
+   "fromM": 0,
+   "toM": 196.34,
+   "signRef": "А1",
+   "advisoryKmh": 60
+  }
+ ]
+}
