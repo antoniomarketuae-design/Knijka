@@ -133,6 +133,7 @@ import { RouteGuidance } from "./RouteGuidance";
 import { ScenarioObstacles, type ScenarioObstacleSpec } from "./ScenarioObstacles";
 import { ShadowCar } from "./ShadowCar";
 import { TraceTimeline } from "./lesson-ui/TraceTimeline";
+import { worldNameBg } from "./worldNames";
 import type { QualityPreset } from "./lesson-ui/types";
 
 // Minimal structural mirrors of the district shapes we read here — the runtime
@@ -146,55 +147,6 @@ interface SpawnPointLike {
 
 const MINIMAP_MS = 200;
 const MINIMAP_PX_PER_M = 0.5;
-
-/** BG display names of the shipped worlds (loading/error copy). Unknown
- *  district ids fall back to a generic „света". */
-const WORLD_NAME_BG: Record<string, string> = {
-  "district-v1": "Студентски град",
-  "d2-v1": "Лозенец",
-  "poligon-v1": "учебния полигон",
-  "lot-perp-v1": "учебния паркинг",
-  // Wave 1 districts. Names are the genitive/definite form the two copy
-  // strings below need („Зареждане на …" / „Данните за …").
-  "jx-equal-v1": "равнозначното кръстовище",
-  "ln-arrows-v1": "кръстовището с лентови стрелки",
-  "pk-banx-v1": "улицата с пътека и кръстовище",
-  "pe-school-v1": "улицата пред училището",
-  "mw-entry-v1": "входа на магистралата",
-  // Wave 2 districts. The five reuse items keep their existing map's name.
-  "ln-merge-v1": "улицата със стеснение",
-  "pk-busstop-v1": "улицата със спирка",
-  "sp-signs-v1": "улицата със знаци за скорост",
-  // Wave 3 districts. The five reuse items keep their existing map's name.
-  "hz-roadworks-v1": "улицата с пътния ремонт",
-  "pk-ban2-v1": "улицата със знаци В27 и В28",
-  "sig-wave-v1": "булеварда със зелена вълна",
-  // Wave 4 districts. The four reuse items keep their existing map's name.
-  "mg-busstop-v1": "улицата с бус лента",
-  "ov-crest-v1": "завоя извън населено място",
-  "pk-double-v1": "улицата с паркирани коли",
-  "rb-2lane-v1": "двулентовото кръгово",
-  // Wave 5 districts. The four reuse items keep their existing map's name.
-  "mg-property-v1": "изхода от бензиностанцията",
-  "ov-solid2-v1": "пътя със затварящ се прозорец за изпреварване",
-  // Wave 6 districts. The three reuse items keep their existing map's name.
-  "mw-exit-v1": "изхода на магистралата",
-  "mv-uturn-v1": "булеварда с остров",
-  "rb-ped-v1": "кръговото с пътеки на изходите",
-  "hz-debris-v1": "улицата с препятствие в лентата",
-  // Wave 7 districts — the wave's four new maps. Its one reuse item
-  // (sc-ln-obstacle-meeting on ov-narrow-v1) is unchanged: like most older
-  // districts ov-narrow-v1 carries no entry and takes the „света" fallback.
-  "pk-rail-v1": "улицата с жп прелеза",
-  "pe-zone-v1": "зоната за живеене",
-  "vu-child-v1": "улицата с детето на велосипед",
-  "ac-bridge-v1": "заледения мост",
-  // Wave 8 districts — the wave's three new maps. Its four reuse items
-  // (ln-v1, sx-v1, mw-v1, poligon-v1) keep their existing map's name.
-  "vu-bikelane-v1": "улицата с велоалея",
-  "rx-tram-stop-v1": "улицата с трамвайна спирка",
-  "hz-accident-v1": "улицата с произшествие",
-};
 
 /**
  * S1: public URL of a committed trace (content/traces/… is published to
@@ -608,7 +560,7 @@ export default function LessonScene(props: LessonSceneProps) {
 
   // P1: the old touch refusal GateCard is GONE — touch-only devices now get
   // the TouchControls overlay (ReadyScene) and a one-time orientation hint.
-  const worldName = WORLD_NAME_BG[lessonDistrictId(props.lesson)] ?? "света";
+  const worldName = worldNameBg(lessonDistrictId(props.lesson));
   if (loadError) {
     return (
       <GateCard

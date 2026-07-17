@@ -37,12 +37,13 @@
  *
  * Doc-72 provenance: AC-01 and AC-02 are the "Engine: ✅ FULL" adverse-condition
  * archetypes gradable from the shipped headlight detectors. AC-04 (dazzle
- * channel) and AC-07's friction slice shipped next; the FOG unlock adds AC-03
- * (sc-ac-fog — the compilable weather="fog" condition: dense FogExp2 render,
- * tick.fog conditions envelope at conditionSpeedFogFactor 0.6, and the
- * FOG_LIGHTS_OFF_IN_FOG fog-lamp duty on the recorder's fogLights channel).
- * The remaining AC archetypes need an oncoming actor or a snow/ice condition
- * and stay 🟡 PARTIAL or 🔴 NEW — left for later waves.
+ * channel) and AC-07's friction slice shipped next; the FOG unlock adds AC-05
+ * (sc-ac-fog — fog-lamp discipline: the compilable weather="fog" condition,
+ * dense FogExp2 render, tick.fog conditions envelope at conditionSpeedFogFactor
+ * 0.6, and the FOG_LIGHTS_OFF_IN_FOG fog-lamp duty on the recorder's fogLights
+ * channel). The remaining AC archetypes need an oncoming actor (e.g. AC-03
+ * high-beams-vs-oncoming) or a snow/ice condition and stay 🟡 PARTIAL or 🔴 NEW
+ * — left for later waves.
  *
  * ADR-006 stage 4a adds sc-ac-wet-braking — the FIRST template on the opt-in
  * wet-grip physics slice (LessonSpec.physics.wetGrip ← ScenarioSpec.physics):
@@ -509,15 +510,16 @@ export const SC_AC_WET_BRAKING: ScenarioSpec = {
 };
 
 // ---------------------------------------------------------------------------
-// 5. sc-ac-fog — „Мъгла" (AC-03) on ac-rain-v1 (360 m straight street,
-//    limit 50, DAY dense fog — the FOG weather unlock)
+// 5. sc-ac-fog — „Мъгла" (AC-05, fog-lamp discipline) on ac-rain-v1 (360 m
+//    straight street, limit 50, DAY dense fog — the FOG weather unlock)
 // ---------------------------------------------------------------------------
 
 /**
- * AC-03 — движение в гъста мъгла (ЗДвП чл. 20, ал. 2: скоростта се съобразява
- * с видимостта, така че водачът да може да спре в рамките на ВИДИМОТО платно;
- * чл. 74: при значително намалена видимост се включват предните фарове за
- * мъгла, заедно с късите светлини).
+ * AC-05 — дисциплина на фаровете за мъгла + съобразена скорост в гъста мъгла
+ * (ЗДвП чл. 20, ал. 2: скоростта се съобразява с видимостта, така че водачът
+ * да може да спре в рамките на ВИДИМОТО платно; чл. 74: при значително
+ * намалена видимост се включват предните фарове за мъгла, заедно с късите
+ * светлини). Няма насрещен участник — това НЕ е AC-03 (дълги срещу насрещни).
  *
  * THE FOG IS THE LESSON (the first compilable weather="fog" template):
  *  - conditions.weather "fog" compiles to LessonSpec.environment.fog → the
@@ -542,7 +544,7 @@ export const SC_AC_FOG: ScenarioSpec = {
   titleBg: "Мъгла",
   objectiveBg:
     "Измини правата улица в гъста мъгла с включени фарове за мъгла и скорост, при която можеш да спреш в рамките на видимия участък — в мъглата виждаш 50 метра напред, а правото да караш 50 км/ч не значи, че е безопасно.",
-  archetypeIds: ["AC-03"],
+  archetypeIds: ["AC-05"],
   conceptIds: ["c-fog-driving", "c-stopping-distance-total", "c-general-care-duty"],
   map: {
     archetype: "straight-street",

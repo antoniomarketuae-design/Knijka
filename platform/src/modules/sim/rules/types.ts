@@ -57,7 +57,19 @@ export type SimTickEvent =
    */
   | {
       kind: "stopLineCrossed";
-      control: "stopSign" | "trafficLight";
+      /**
+       * "stopSign" = Б2 „Стоп" — a full stop at the line is demanded regardless
+       * of traffic (ЗДвП чл. 50). "trafficLight" = signalized (lightState/
+       * controller adjudicate). "giveWay" = Б1 „Пропусни движението" — NO full
+       * stop is demanded at the line: yielding is the duty, and a clear mouth
+       * is legal at a roll (same чл. 50 — „пълно спиране се налага само когато
+       * иначе би ги засякъл", content bank q-krastovishta-006). The failure-to-
+       * yield case is NOT graded here — it rides the SEPARATE prioritySituation
+       * {situation:"give-way"} event (→ FAILED_TO_YIELD), exactly as an
+       * uncontrolled junction does. Absent Б1 authoring no runtime emits it, so
+       * every shipped drive is byte-identical.
+       */
+      control: "stopSign" | "trafficLight" | "giveWay";
       lightState?: "red" | "redYellow" | "yellow" | "green";
       stoppable?: boolean;
       /**
@@ -307,8 +319,8 @@ export interface SimTick {
   /** Distance to the next stop line ahead on the current edge (travel
    * direction), m, within the runtime's watch window; absent = none/unknown. */
   nextStopLineM?: number;
-  /** Control of that line. */
-  nextStopLineControl?: "stopSign" | "trafficLight";
+  /** Control of that line (see stopLineCrossed.control — "giveWay" = Б1). */
+  nextStopLineControl?: "stopSign" | "trafficLight" | "giveWay";
   /** Live lamp state of that line's approach (trafficLight lines only). */
   nextStopLineState?: "red" | "redYellow" | "yellow" | "green";
   /** Distance to the nearest intersection node, m (within ~80 m); absent =

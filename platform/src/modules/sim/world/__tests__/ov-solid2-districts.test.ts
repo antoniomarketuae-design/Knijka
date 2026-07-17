@@ -21,12 +21,13 @@
  *    SAME wrong-bank excursion grades NOTHING at y = 200 (М2 — изпреварването е
  *    разрешено) and exactly CROSSED_SOLID_LINE at y = 350 (М1), on one road.
  *
- * PINNED GAP — the marking nobody paints. The markings builder renders neither a
- * solid осева along an М1 span nor lengthened dashes along a warning span, and
- * no М-marking has a sign face: the wall and its warning are invisible today.
- * That is RENDER-only (grading reads authored spans, never paint), and it is
- * pinned below rather than left as a comment so the day the builder learns М1,
- * this test fails loudly and tells its author what to check.
+ * М1 NOW RENDERED — the marking the drill needs a learner to SEE. The markings
+ * builder reads district.zones and paints a solid осева over the М1 span
+ * (suppressing the dashed centre line there); solidCenterLine remains a
+ * marking-only kind with no sign face. Still RENDER-only (grading reads authored
+ * spans, never paint). The last describe pins the closed gap so a regression
+ * that stops the builder reading zones fails loudly. (The М2 „lengthened vs
+ * wide" meaning conflict is a human content-review call, not resolved here.)
  */
 import fs from "node:fs";
 import path from "node:path";
@@ -401,27 +402,33 @@ describe(`${ID} — the М2/М1 adjudication through the real reducer`, () => {
 // Known render gap — the marking the drill most needs a learner to SEE
 // ---------------------------------------------------------------------------
 
-describe(`${ID} — marking furniture (KNOWN GAP, pinned)`, () => {
-  it("paints NO solid осева and NO lengthened dashes — the wall and its warning are invisible today", () => {
-    // The gen_ban_zones.mjs header's honest gap, inherited and made checkable:
-    // solidCenterLine is a MARKING-ONLY zone kind (zoneSigns.ts says so in as
-    // many words), and markings.ts never looks at district zones at all — so an
-    // authored М1 span changes neither the paint nor the posts. The ONE thing
-    // this template asks a learner to read is the one thing the world does not
-    // draw; the scenario copy and the instructions carry it, and the grading is
-    // exact regardless (authored spans, never paint reads).
-    // FIX: an М1 span renderer + an М2 lengthened-dash variant in markings.ts
-    // (shared files — not taken here); then this expects the marking buffer to
-    // differ across the seam. Until then this pins the gap so the day it lands,
-    // this test fails loudly and tells its author which template was waiting.
+describe(`${ID} — marking furniture (М1 осева now RENDERED)`, () => {
+  it("paints the solid осева over the М1 span while posting no sign — the gap is closed", () => {
+    // GAP CLOSED (zone-driven marking renderer, markings.ts): markings.ts now
+    // reads district.zones and paints a SOLID осева over a solidCenterLine span
+    // (suppressing the dashed centre line there), so the wall the drill asks a
+    // learner to read is finally drawn. solidCenterLine stays a MARKING-ONLY
+    // kind — it posts NO sign (zoneSigns.ts has no entry), and grading still
+    // reads the authored span, never the paint. (The М2 „lengthened / wide"
+    // meaning conflict between gen_ov_solid2 and gen_motorway is a human
+    // content-review call and is NOT resolved here; ov-solid2 authors only the
+    // one М1 span.)
     const world = buildWorldGeometry(assertDistrict(loadRaw(ID)), { seed: 7 });
-    // Not one sign on this road is derived from the zone layer: the М1 span
-    // posts nothing, because marking kinds post nothing.
+    // Still not one sign is derived from the zone layer: the М1 span posts
+    // nothing, because marking kinds post nothing.
     for (const kind of ["noOvertaking", "noStopping", "slippery", "curve"] as const) {
       expect(world.stats.signs[kind] ?? 0, kind).toBe(0);
     }
     expect(zoneSignKindHandles("solidCenterLine")).toBe(false);
-    expect(markingsBuilderReadsZones()).toBe(false);
+    // The builder now consults the zone layer, and the marking buffer differs
+    // across the seam: stripping the zones drops the solid osева + restores the
+    // dashes it replaced (fewer/other quads → a different buffer length).
+    expect(markingsBuilderReadsZones()).toBe(true);
+    const zoneless = buildWorldGeometry(assertDistrict({ ...(loadRaw(ID) as District), zones: undefined }), {
+      seed: 7,
+    });
+    expect(world.stats.markingQuads).not.toBe(zoneless.stats.markingQuads);
+    expect(world.markings.positions.length).not.toBe(zoneless.markings.positions.length);
   });
 
   it("posts the generic edge-limit plates and nothing else — the SHIPPED quirk, not this map's", () => {
@@ -450,8 +457,8 @@ function zoneSignKindHandles(kind: string): boolean {
   return new RegExp(`${kind}\\s*:`).test(src.slice(from, src.indexOf("};", from)));
 }
 
-/** The other half of the same gap: the markings builder never reads
- *  district.zones, so no span of any kind can change what is painted. */
+/** Gap-closed check: the markings builder now reads district.zones, so an
+ *  authored span changes what is painted (a solid осева over an М1 span). */
 function markingsBuilderReadsZones(): boolean {
   const src = fs.readFileSync(path.resolve(__dirname, "..", "builders", "markings.ts"), "utf8");
   return /\bzones\b/.test(src);

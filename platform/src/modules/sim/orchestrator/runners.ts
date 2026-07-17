@@ -84,6 +84,16 @@ function loopArc(a: number, len: number): number {
   return ((a % len) + len) % len;
 }
 
+/** Fold a compass bearing (0 = north, cw) onto the N-S / E-W axis it is closest
+ *  to (45° split). Mirrors runtime/geometry axisOfBearing WITHOUT a cross-module
+ *  import — the orchestrator keeps its own tiny geometry (aheadOfPlayerM &co).
+ *  Used by the traffic-controller runner to attribute the halt to the player's
+ *  OWN approach axis regardless of which group the schedule halts. */
+function axisOfBearing(deg: number): "ns" | "ew" {
+  const folded = (((deg % 360) + 360) % 360) % 180; // [0, 180)
+  return folded <= 45 || folded >= 135 ? "ns" : "ew";
+}
+
 /** Stimulus→brake-onset stopwatch (deterministic; sampled per frame). */
 class ReactionTimer {
   private t0: number | null = null;
@@ -460,6 +470,12 @@ export class BrakingLeadCarRunner implements EventRunner {
         pathNodes: s.actor.pathNodes,
         hold: s.actor.hold,
         cruiseSpeedMps: s.actor.cruiseSpeedMps,
+        // The authored lane offset (≤ 0 — a positive curb offset would tag the
+        // actor as a cyclist proxy, A11 vehicleCollisionKind). Forwarded like
+        // CutInLeadCarRunner does: a lane-locked lead (sc-lane-change's
+        // blind-spot pace car authors −8.125 to sit in the TARGET lane) must
+        // stage in that lane, not the player's own.
+        extraRightOffsetM: s.actor.extraRightOffsetM,
         colorIndex: s.actor.colorIndex,
         // FO-06: a "truck"/"van" lead publishes its size profile so the fleet
         // renders the large-vehicle rig (absent = car, byte-identical).
@@ -1730,10 +1746,20 @@ export class TrafficControllerRunner implements EventRunner {
     if (this.phase === "resolved") return null;
     const d = dist(input.x, input.y, s.junction.x, s.junction.y);
 
-    // Holding at the line while the player's approach is HALTED (authored
+    // Holding at the line while the player's OWN approach is HALTED (authored
     // schedule — a pure function of session time, same truth the runtime
-    // reads): latches the "waited for the controller" credit.
-    const halted = s.flipAtSec === undefined || input.tSec < s.flipAtSec;
+    // reads): latches the "waited for the controller" credit. The player's
+    // axis comes from their heading; the controller halts `haltedGroup` from
+    // session start and, at flipAtSec, moves the halt to the OTHER axis
+    // (mirrors SignalController.controllerPermission). The former code assumed
+    // haltedGroup WAS the player's axis (halted ⟺ before the flip), which
+    // mislabels the outcome for any INVERTED schedule — sc-sig-controller-live
+    // halts "ew" while the player approaches on "ns", so the player is PERMITTED
+    // before the flip and HALTED after, the exact opposite of that assumption.
+    const playerAxis = axisOfBearing(input.headingDeg);
+    const flipped = s.flipAtSec !== undefined && input.tSec >= s.flipAtSec;
+    const haltedAxis = flipped ? (s.haltedGroup === "ns" ? "ew" : "ns") : s.haltedGroup;
+    const halted = playerAxis === haltedAxis;
     if (
       halted &&
       input.speedKmh <= CONTROLLER_HOLD_KMH &&
@@ -2209,6 +2235,7 @@ export class OncomingStreamRunner implements EventRunner {
     const s = this.spec;
     if (firstTime) {
       for (let i = 0; i < s.count; i++) {
+        const gap = i === 0 ? 0 : s.gapsM[i - 1];
         const view = traffic.stage({
           kind: "vehicle",
           id: this.carId(i),
@@ -2216,7 +2243,7 @@ export class OncomingStreamRunner implements EventRunner {
           hold: {
             nodeIndex: s.actor.hold.nodeIndex,
             // Car i holds gapsM[i-1] m BEHIND the stream head along travel.
-            offsetM: s.actor.hold.offsetM - (i === 0 ? 0 : s.gapsM[i - 1]),
+            offsetM: s.actor.hold.offsetM - gap,
           },
           cruiseSpeedMps: s.actor.cruiseSpeedMps,
           extraRightOffsetM: s.actor.extraRightOffsetM,
@@ -2226,6 +2253,25 @@ export class OncomingStreamRunner implements EventRunner {
           // gap-memory latch keeps the conviction honest past the rescue
         });
         if (!view) throw new Error(`staged event ${s.id}: oncoming car ${i} failed to stage`);
+        // A gap wider than the head's own hold arc drives this car to a NEGATIVE
+        // path arc, which clampArc pins to the path start — the intended column
+        // silently collapses to a nose-to-tail clump, and a gap-window drill that
+        // relied on the spacing then grades nothing. The ov-oncoming battery pins
+        // the same law statically (holdArc − gap ≥ 0); this is its stage-time
+        // twin, so a gap-drill spec the battery does not cover can never collapse
+        // in silence. Guarded on a POSITIVE head arc: a stream authored with its
+        // head AT the path origin (holdArc 0) has no room behind by construction
+        // — that is the deliberate "release a clump from the spawn" pattern
+        // (sc-mfp-stream: a property-exit give-way drill graded off ANY oncoming
+        // car, not a measured window), not the over-gapped-deep-head accident
+        // this guard exists to catch.
+        const holdArc = view.nodeS[s.actor.hold.nodeIndex] + s.actor.hold.offsetM;
+        if (holdArc > 0 && holdArc - gap < 0) {
+          throw new Error(
+            `staged event ${s.id}: oncoming car ${i} gap ${gap} m exceeds head hold arc ` +
+              `${holdArc} m — the car falls off the path start (stream collapse)`,
+          );
+        }
       }
     } else {
       for (let i = 0; i < s.count; i++) {

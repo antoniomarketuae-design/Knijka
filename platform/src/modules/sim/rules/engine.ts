@@ -1317,6 +1317,18 @@ function handleTickEvent(
         }
         break;
       }
+      // Б1 „Пропусни движението" (give-way) — ЗДвП чл. 50: yielding to priority
+      // traffic is the duty, NOT a full stop. „Пълно спиране при Б1 се налага
+      // само когато иначе би ги засякъл" (content bank q-krastovishta-006 /
+      // concept c-give-way-stop-behavior), so crossing a give-way line demands
+      // NOTHING here — rolling through a clear Б1 mouth is ZERO violations, and
+      // a full stop at it is equally legal (never penalized). The failure-to-
+      // yield case is adjudicated by the world's conflict-query pipeline
+      // (conflictNear) and delivered as a SEPARATE prioritySituation
+      // {situation:"give-way"} event → FAILED_TO_YIELD (detail "give-way"), the
+      // same channel the uncontrolled right-hand rule rides — no full-stop grade
+      // and no Б2 ляво-дясно scan (both are Б2-specific) apply to a Б1 line.
+      if (e.control === "giveWay") break;
       // Б2 stop sign: a qualifying full stop must have ended recently.
       const last = s.stop.lastQualifyingStopAt;
       const stopped = last !== null && t - last <= cfg.stopRecencySec;

@@ -7,9 +7,10 @@
  */
 
 import type { ParkingBaySpec } from "../../contracts";
-import type { District } from "../types";
+import type { District, DistrictZone } from "../types";
 import {
   ARTERIAL_CLASSES,
+  BUS_LANE_SEAM_WIDTH_M,
   DASH_GAP_M,
   DASH_LENGTH_M,
   DASH_WIDTH_M,
@@ -17,6 +18,7 @@ import {
   EDGE_LINE_WIDTH_M,
   MARKED_CLASSES,
   MARKING_Y,
+  SOLID_CENTER_LINE_WIDTH_M,
   STOP_LINE_WIDTH_M,
   ZEBRA_GAP_M,
   ZEBRA_LENGTH_M,
@@ -35,7 +37,7 @@ import {
   type Vec2,
 } from "./math2d";
 import { MeshAccumulator, toWorld, UP } from "./mesh";
-import { STOP_LINE_BEYOND_CUT_M, type Approach, type RoadNetwork } from "./network";
+import { STOP_LINE_BEYOND_CUT_M, type Approach, type EdgeBuild, type RoadNetwork } from "./network";
 
 export interface MarkingBuildResult {
   markings: MeshAccumulator;
@@ -106,6 +108,162 @@ function paintDashedLine(
     paintQuad(acc, mid.point, mid.tangent, dashLen / 2, width / 2);
     quads++;
     s += dashLen + gapLen;
+  }
+  return quads;
+}
+
+// ---------------------------------------------------------------------------
+// Zone-authored SOLID markings (ADR-006 stage 2b — the world SHOWS what
+// District.zones GRADE). Until this pass markings.ts never read district.zones,
+// so an authored М1 осева was invisible AND, worse, a DASHED "overtaking OK"
+// line was painted over a span the engine grades as CROSSED_SOLID_LINE. Two
+// kinds render here: solidCenterLine (a continuous осева over its span) and
+// busLane/emergencyLane (a solid seam on the laneId-0 curb-lane boundary).
+//
+// Arclength frame: zone fromM/toM are arclength along the FULL edge geometry
+// (the same s-measure the runtime + zoneSigns.ts use). The painted lane lines
+// run along `line` — the junction-trimmed centreline, offset 0.8 m more at each
+// end (see the lane-line loop). `line` is a contiguous sub-path of the geometry
+// starting at geometry-arclength eb.trimFrom + 0.8, so a geometry arclength s
+// maps to line arclength s - (eb.trimFrom + 0.8). No arclength math is
+// re-derived: membership + span extraction reuse polylineLength / trimPolyline.
+// ---------------------------------------------------------------------------
+
+/** One authored solid marking on a lane boundary, over one or more spans. */
+interface SolidBoundary {
+  /** Dashed-lane-loop boundary index (1..lanes-1) this solid replaces, or -1
+   *  when the host paints no dashes there (residential centre line, odd-lane
+   *  centre) — then nothing is suppressed, only the solid is added. */
+  k: number;
+  /** Lateral offset from the centreline, offsetPolyline convention (+ = right
+   *  of geometry-forward). Kept identical to the loop's `-travelHalf + k*W` so
+   *  the solid lands exactly on the (suppressed) dashed divider. */
+  off: number;
+  width: number;
+  /** Solid spans in `line` (trimmed-centreline) arclength, clamped to the drawn
+   *  extent [0, lineLen]. */
+  segs: Array<{ from: number; to: number }>;
+}
+
+/**
+ * The authored solid markings on one edge, derived from district.zones. Pure
+ * function of the edge + zones, so the lane-line loop (dash suppression) and
+ * the solid-paint pass call it identically and cannot diverge.
+ *
+ * laneId-0 boundary (bus/emergency): mirrors runtime/spatial.ts buildEdge() —
+ * lanesPerDir = oneway ? lanes : floor(lanes/2); laneId 0 is the curb lane, so
+ * its inner boundary sits (lanesPerDir-1) lane widths off the centreline. On a
+ * two-way road BOTH banks carry a curb lane 0 (the zone flags the whole edge;
+ * the reducer's laneId gate grades either bank), so both seams are drawn.
+ */
+function authoredSolidBoundaries(
+  eb: EdgeBuild,
+  line: Vec2[],
+  s0: number,
+  travelHalf: number,
+  lanes: number,
+  zones: readonly DistrictZone[],
+): SolidBoundary[] {
+  const lineLen = polylineLength(line);
+  const W = LANE_WIDTH_M;
+  const out: SolidBoundary[] = [];
+  const addSeg = (k: number, off: number, width: number, fromM: number, toM: number) => {
+    const from = Math.max(0, Math.min(lineLen, fromM - s0));
+    const to = Math.max(0, Math.min(lineLen, toM - s0));
+    if (to - from <= 0.5) return; // span outside the drawn extent
+    let b = out.find((x) => x.k === k && Math.abs(x.off - off) < 1e-6 && x.width === width);
+    if (!b) out.push((b = { k, off, width, segs: [] }));
+    b.segs.push({ from, to });
+  };
+  for (const z of zones) {
+    if (z.edgeId !== eb.edge.id) continue;
+    if (!(Number.isFinite(z.fromM) && Number.isFinite(z.toM) && z.fromM < z.toM)) continue;
+    if (z.kind === "solidCenterLine") {
+      // осева = the bank boundary (off 0). The off-0 dash exists only for an
+      // even lane count; odd/residential hosts paint no centre dash (k = -1)
+      // but STILL get the solid — the lesson depends on the line being visible.
+      addSeg(lanes % 2 === 0 ? lanes / 2 : -1, 0, SOLID_CENTER_LINE_WIDTH_M, z.fromM, z.toM);
+    } else if (z.kind === "busLane" || z.kind === "emergencyLane") {
+      const lanesPerDir = eb.edge.oneway ? Math.max(1, lanes) : Math.max(1, Math.floor(lanes / 2));
+      if (lanesPerDir < 2) continue; // no boundary between laneId 0 and 1 to seam
+      if (eb.edge.oneway) {
+        const k = lanesPerDir - 1;
+        addSeg(k, -travelHalf + k * W, BUS_LANE_SEAM_WIDTH_M, z.fromM, z.toM);
+      } else {
+        // Right bank (k = lanes-1, off = +(lanesPerDir-1)*W) and left bank
+        // (k = 1, off = -(lanesPerDir-1)*W): both curb-lane-0 boundaries.
+        addSeg(lanes - 1, -travelHalf + (lanes - 1) * W, BUS_LANE_SEAM_WIDTH_M, z.fromM, z.toM);
+        addSeg(1, -travelHalf + W, BUS_LANE_SEAM_WIDTH_M, z.fromM, z.toM);
+      }
+    }
+  }
+  return out;
+}
+
+/**
+ * Dashed line with span exclusion: byte-identical to paintDashedLine for every
+ * dash whose midpoint arclength falls OUTSIDE `exclude`, and skips the rest
+ * (an authored solid covers those). `exclude` is in the same arclength frame as
+ * the walk (line-frame ≈ offset-line frame; the sub-dash miter drift on curves
+ * is cosmetically irrelevant against 100 m+ spans).
+ */
+function paintDashedLineExcluding(
+  acc: MeshAccumulator,
+  line: Vec2[],
+  width: number,
+  exclude: ReadonlyArray<{ from: number; to: number }>,
+  dashLen = DASH_LENGTH_M,
+  gapLen = DASH_GAP_M,
+): number {
+  const total = polylineLength(line);
+  let s = gapLen / 2;
+  let quads = 0;
+  while (s + dashLen < total) {
+    const mid = s + dashLen / 2;
+    let skip = false;
+    for (const ex of exclude) {
+      if (mid >= ex.from && mid <= ex.to) {
+        skip = true;
+        break;
+      }
+    }
+    if (!skip) {
+      const p = pointAlong(line, mid);
+      paintQuad(acc, p.point, p.tangent, dashLen / 2, width / 2);
+      quads++;
+    }
+    s += dashLen + gapLen;
+  }
+  return quads;
+}
+
+/**
+ * Paint every authored solid marking (solidCenterLine осева + bus/emergency
+ * curb seams) over its span. Runs for ALL edges (not just MARKED_CLASSES): a
+ * residential host authoring an М1 span paints no dashes yet must still show
+ * the solid osева. Byte-identity: only edges with a matching zone add geometry,
+ * so a zoneless district leaves this pass empty.
+ */
+function paintZoneSolids(acc: MeshAccumulator, district: District, network: RoadNetwork): number {
+  const zones = district.zones;
+  if (!zones || zones.length === 0) return 0;
+  let quads = 0;
+  for (const eb of network.edges) {
+    if (!eb.line) continue;
+    const line = trimPolyline(eb.line, 0.8, 0.8, 2.5);
+    if (!line) continue;
+    const s0 = eb.trimFrom + 0.8;
+    const travelHalf = eb.halfWidth - eb.parkingM;
+    const lanes = Math.max(1, eb.edge.lanes);
+    const lineLen = polylineLength(line);
+    for (const b of authoredSolidBoundaries(eb, line, s0, travelHalf, lanes, zones)) {
+      for (const seg of b.segs) {
+        const sub = trimPolyline(line, seg.from, lineLen - seg.to, 0.5);
+        if (!sub) continue;
+        const offSub = b.off === 0 ? sub : offsetPolyline(sub, b.off);
+        quads += paintSolidLine(acc, offSub, b.width);
+      }
+    }
   }
   return quads;
 }
@@ -205,6 +363,7 @@ export function buildMarkings(
   let zebraCrossings = 0;
 
   // -- lane lines ------------------------------------------------------------
+  const zones = district.zones ?? [];
   for (const eb of network.edges) {
     if (!eb.line) continue;
     if (!MARKED_CLASSES.has(eb.edge.class)) continue;
@@ -215,13 +374,26 @@ export function buildMarkings(
     // doc 68 QW3) is inside eb.halfWidth but carries no lane lines; the solid
     // edge line separates the travel lanes from the parking band.
     const travelHalf = eb.halfWidth - eb.parkingM;
+    // Zone-authored solids on this edge → per-boundary spans whose dashes are
+    // suppressed here (the solid is painted in paintZoneSolids below). Empty on
+    // a zoneless district, so the dash geometry stays byte-identical there.
+    const suppress = new Map<number, Array<{ from: number; to: number }>>();
+    if (zones.length) {
+      const s0 = eb.trimFrom + 0.8;
+      for (const b of authoredSolidBoundaries(eb, line, s0, travelHalf, lanes, zones)) {
+        if (b.k >= 1) suppress.set(b.k, [...(suppress.get(b.k) ?? []), ...b.segs]);
+      }
+    }
     // Lane boundaries at every internal multiple of LANE_WIDTH from the left
     // edge. For two-way edges the middle boundary is the center line.
     for (let k = 1; k < lanes; k++) {
       const off = -travelHalf + k * LANE_WIDTH_M;
       if (Math.abs(off) > travelHalf - 0.4) continue;
       const offLine = offsetPolyline(line, off);
-      markingQuads += paintDashedLine(acc, offLine, DASH_WIDTH_M);
+      const ex = suppress.get(k);
+      markingQuads += ex
+        ? paintDashedLineExcluding(acc, offLine, DASH_WIDTH_M, ex)
+        : paintDashedLine(acc, offLine, DASH_WIDTH_M);
     }
     if (ARTERIAL_CLASSES.has(eb.edge.class)) {
       // With a parking band the edge line sits ON the travel/parking boundary;
@@ -267,6 +439,9 @@ export function buildMarkings(
   for (const bay of parkingBays) {
     markingQuads += paintParkingBay(acc, bay);
   }
+
+  // -- zone-authored solids (М1 осева + bus/emergency curb seams) --------------
+  markingQuads += paintZoneSolids(acc, district, network);
 
   return {
     markings: acc,

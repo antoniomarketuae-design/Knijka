@@ -384,8 +384,8 @@ export const SC_CROSSING_RAIN_SPRINT: ScenarioSpec = {
 };
 
 // ---------------------------------------------------------------------------
-// 4. sc-crossing-dart — „Внезапен пешеходец на пътеката" (PE-02 dart-out +
-//    PE-04 occlusion) on pe-dart-v1 (crossing at y = 80, a corner shop west of
+// 4. sc-crossing-dart — „Внезапен пешеходец на пътеката" (PE-02 dart-out at a
+//    MARKED crossing) on pe-dart-v1 (crossing at y = 80, a corner shop west of
 //    the zebra hides the curb — the reaction emergency, not the patience test)
 // ---------------------------------------------------------------------------
 
@@ -394,9 +394,11 @@ export const SC_CROSSING_RAIN_SPRINT: ScenarioSpec = {
  * 1.6 m/s (a hurried step-out, between the 1.4 m/s walk and the 2.2 m/s sprint)
  * only when the player closes within ~40 m — LATE, so the encounter is a
  * reaction test, not a long approach. The corner shop the generator places just
- * west of the zebra hides the curb until the last moment (PE-04 world dressing,
- * zero grading change). triggerDistM 40 still leaves a legal approach room to
- * brake and stop (the shadow does exactly that).
+ * west of the zebra hides the curb until the last moment (occlusion world
+ * dressing, zero grading change — NOT PE-04: that archetype is an unmarked
+ * mid-block child behind PARKED CARS; this is a dart at a MARKED crossing).
+ * triggerDistM 40 still leaves a legal approach room to brake and stop (the
+ * shadow does exactly that).
  */
 const DART_PED: PedestrianDartOutSpec = {
   id: "sc-drt-ped",
@@ -413,7 +415,7 @@ const DART_PED: PedestrianDartOutSpec = {
   minTriggerSpeedKmh: 10,
 };
 
-/** PE-02 / PE-04 — внезапен пешеходец иззад закрита гледка (ЗДвП чл. 119 +
+/** PE-02 — внезапен пешеходец на пътеката иззад закрита гледка (ЗДвП чл. 119 +
  *  чл. 20: скорост и внимание, позволяващи спиране при внезапна поява). */
 export const SC_CROSSING_DART: ScenarioSpec = {
   id: "sc-crossing-dart",
@@ -422,7 +424,7 @@ export const SC_CROSSING_DART: ScenarioSpec = {
   titleBg: "Внезапен пешеходец на пътеката",
   objectiveBg:
     "Приближи пешеходната пътека с готовност за спиране: пешеходец изскача иззад ъгъла точно когато наближаваш — реагирай навреме, спри и го пропусни, вместо да минеш през него.",
-  archetypeIds: ["PE-02", "PE-04"],
+  archetypeIds: ["PE-02"],
   conceptIds: ["c-crosswalk-yield", "c-pedestrian-rights-duties", "c-speed-adaptation"],
   map: {
     archetype: "zebra-block",
@@ -609,7 +611,8 @@ export const SC_CROSSING_BUS_SHADOW: ScenarioSpec = {
 };
 
 // ---------------------------------------------------------------------------
-// 6. sc-crossing-child-ball — „Дете тича след топка" (PE-04, the child dart)
+// 6. sc-crossing-child-ball — „Дете тича след топка" (PE-02 dart at a MARKED
+//    crossing + PE-04 child-after-ball anticipation stimulus)
 //    on pe-child-v1 (crossing at y = 78, a calm 40 km/h residential street). A
 //    child runs onto the crossing after a ball — FAST (2.6 m/s, faster than the
 //    rain sprinter) and from the residential frontage the generator's corner
@@ -622,9 +625,11 @@ export const SC_CROSSING_BUS_SHADOW: ScenarioSpec = {
  * The staged RUNNING CHILD at pe-x-1 (0, 78): bolts off the WEST curb at
  * 2.6 m/s — a small child chasing a ball, distinctly faster than any adult
  * walk profile — only when the player closes within ~38 m (LATE: a reaction
- * emergency, not a long approach). The corner shop just west of the zebra hides
- * the frontage until the last moment (PE-04 world dressing, zero grading
- * change). The occupancy span is the shared symmetric road window.
+ * emergency, not a long approach). The staged dart at a MARKED crossing is the
+ * PE-02 mechanic; the child-after-ball is the PE-04 anticipation stimulus (the
+ * canonical hazard-perception clip). The corner shop just west of the zebra
+ * hides the frontage until the last moment (occlusion world dressing, zero
+ * grading change). The occupancy span is the shared symmetric road window.
  */
 const CHILD_BALL_PED: PedestrianDartOutSpec = {
   id: "sc-cbl-ped",
@@ -641,9 +646,10 @@ const CHILD_BALL_PED: PedestrianDartOutSpec = {
   minTriggerSpeedKmh: 10,
 };
 
-/** PE-04 — дете тича след топка на пътеката (ЗДвП чл. 119 + чл. 20: в
+/** PE-02 / PE-04 — дете тича след топка на пътеката (ЗДвП чл. 119 + чл. 20: в
  *  жилищна зона с деца скоростта и вниманието трябва да позволяват спиране при
- *  внезапна поява). */
+ *  внезапна поява). PE-02 = дартът на маркирана пътека; PE-04 = стимулът
+ *  „дете след топка" (класическото разпознаване на опасност). */
 export const SC_CROSSING_CHILD_BALL: ScenarioSpec = {
   id: "sc-crossing-child-ball",
   family: "pedestrians",
@@ -651,7 +657,7 @@ export const SC_CROSSING_CHILD_BALL: ScenarioSpec = {
   titleBg: "Дете тича след топка на пътеката",
   objectiveBg:
     "В квартална улица приближавай пътеката бавно и с готовност за спиране — дете може да изскочи след топка си на платното. Реагирай навреме, спри и го пропусни.",
-  archetypeIds: ["PE-04"],
+  archetypeIds: ["PE-02", "PE-04"],
   conceptIds: ["c-crosswalk-yield", "c-speed-adaptation", "c-general-care-duty"],
   map: {
     archetype: "zebra-block",

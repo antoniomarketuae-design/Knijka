@@ -23,6 +23,8 @@ import { createRuleEngine, reduceTick } from "../../rules";
 import { createTrafficSystem } from "../../traffic/system";
 import type { TrafficDistrict } from "../../traffic/types";
 import { SC_SIGNAL_CONTROLLER_EVENT } from "../../lessons/scenario/templates-signals";
+import { SC_SIG_CONTROLLER_LIVE_EVENT } from "../../lessons/scenario/templates-signals2";
+import type { TrafficControllerSpec } from "../../contracts";
 import { createScenarioDirector } from "../director";
 import { commendationCodes, DT, PolyDriver, violationCodes, type Stack } from "./helpers";
 
@@ -40,6 +42,12 @@ function loadSx(): TrafficDistrict {
 
 /** The production stack on sx-v1 (mirrors helpers.makeStack, sx district). */
 function makeSxStack(seed = 7): Stack {
+  return makeSxStackFor(SC_SIGNAL_CONTROLLER_EVENT, seed);
+}
+
+/** The same stack armed with an arbitrary trafficController spec (BUG-3: the
+ *  inverted-schedule attribution test drives SC_SIG_CONTROLLER_LIVE_EVENT). */
+function makeSxStackFor(event: TrafficControllerSpec, seed = 7): Stack {
   const raw = loadSx();
   const runtime = createWorldRuntime(raw);
   const traffic = createTrafficSystem(raw, { seed, vehicleCount: 0, pedestrianCount: 0 });
@@ -52,7 +60,7 @@ function makeSxStack(seed = 7): Stack {
   runtime.setCirculatingQuery((cx, cy, px, py, h, r) =>
     traffic.circulatingConflict(cx, cy, px, py, h, r),
   );
-  const director = createScenarioDirector([SC_SIGNAL_CONTROLLER_EVENT], traffic, {
+  const director = createScenarioDirector([event], traffic, {
     seed,
     signals: runtime,
   });
@@ -225,5 +233,74 @@ describe("trafficController (integration, sx-v1)", () => {
     runBarge(b);
     expect(a.outcomes).toEqual(b.outcomes);
     expect(violationCodes(a.ruleEvents)).toEqual(violationCodes(b.ruleEvents));
+  });
+});
+
+/**
+ * BUG-3 — the „halted" attribution must follow the PLAYER's own approach axis,
+ * not assume `haltedGroup` is it. Two schedules, both graded here:
+ *   - NORMAL (SC_SIGNAL_CONTROLLER_EVENT, haltedGroup "ns" = the player's south
+ *     stem): the player is halted BEFORE the flip, so a wait-then-go is
+ *     „yielded" (the existing „innocent side" test); re-asserted here as the
+ *     baseline.
+ *   - INVERTED (SC_SIG_CONTROLLER_LIVE_EVENT, haltedGroup "ew" = the CROSS
+ *     axis): the player's ns approach is PERMITTED before the flip and halted
+ *     only after it — the mirror. A driver who reads the officer (drops under
+ *     CONTROLLER_HOLD_KMH at the line) and is then waved through crosses on the
+ *     controller's „proceed" and must resolve „clear" (waved through), NOT
+ *     „yielded". The pre-fix code, computing halted = tSec < flipAtSec, latched
+ *     sawHold during that permitted slow-down and mislabeled it „yielded".
+ */
+const HOLD_ZONE_D = 27.7 + 12; // lineDistM + CONTROLLER_HOLD_ZONE_M
+
+/** Slow to a near-stop at the line, then proceed — parametrised by the halt
+ *  window (mistake-free, one attempt). Records whether the drive ever crept
+ *  under CONTROLLER_HOLD_KMH within the hold zone while the halt window was
+ *  live (the exact condition the pre-fix code latched sawHold on). */
+function runReadThenGo(stack: Stack, haltWindowEndSec: number): { sawSlowInHaltWindow: boolean } {
+  const driver = new PolyDriver(PATH, 0);
+  let sawSlowInHaltWindow = false;
+  let dwellFrames = 0;
+  const dwellTarget = Math.ceil(1.2 / DT); // ~1.2 s of reading pace at the line
+  for (let i = 0; i < 90 * 30 && stack.outcomes.length === 0; i++) {
+    const dwelling = driver.s >= HOLD_ARC - 2 && dwellFrames < dwellTarget;
+    if (dwelling) dwellFrames++;
+    const frame = driver.advance(DT, dwelling ? 0.6 : 7); // 0.6 m/s ≈ 2.2 km/h
+    step(stack, { ...frame, brakePedal: dwelling ? 0.6 : 0 });
+    const d = Math.hypot(frame.x, frame.y);
+    if (frame.speedKmh <= 4 && d <= HOLD_ZONE_D && stack.t < haltWindowEndSec) {
+      sawSlowInHaltWindow = true;
+    }
+    if (driver.s >= driver.length) break;
+  }
+  return { sawSlowInHaltWindow };
+}
+
+describe("trafficController — halt attributed to the player's OWN axis (BUG-3)", () => {
+  it("NORMAL schedule (halts the player's axis): wait through the halt, go after the flip ⇒ „yielded“", () => {
+    const stack = makeSxStackFor(SC_SIGNAL_CONTROLLER_EVENT);
+    runYield(stack); // holds through the halt (t < 32), proceeds after flip 30
+    expect(stack.outcomes).toHaveLength(1);
+    expect(stack.outcomes[0]).toMatchObject({ success: true, detail: "yielded" });
+    expect(stack.outcomes[0].tSec).toBeGreaterThan(30);
+  });
+
+  it("INVERTED schedule (halts the CROSS axis): read the officer while PERMITTED, get waved through ⇒ „clear“, not „yielded“", () => {
+    const stack = makeSxStackFor(SC_SIG_CONTROLLER_LIVE_EVENT);
+    // flipAtSec 26 — the ns approach is permitted for t < 26. The driver creeps
+    // under the hold speed at the line BEFORE the flip (what the old code read
+    // as „halted"), then crosses on the controller's „proceed".
+    const { sawSlowInHaltWindow } = runReadThenGo(stack, 26);
+    expect(sawSlowInHaltWindow).toBe(true); // the pre-fix latch condition WAS met
+    expect(stack.outcomes).toHaveLength(1);
+    expect(stack.outcomes[0]).toMatchObject({
+      eventId: "sc-sctl-officer",
+      kind: "trafficController",
+      success: true,
+      detail: "clear", // pre-fix: mislabeled „yielded"
+    });
+    expect(stack.outcomes[0].tSec).toBeLessThan(26); // crossed while permitted
+    // Crossing a red lamp on the controller's permission is innocent (ЗДвП чл. 7).
+    expect(violationCodes(stack.ruleEvents)).toEqual([]);
   });
 });

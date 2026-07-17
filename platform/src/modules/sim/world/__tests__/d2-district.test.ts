@@ -363,7 +363,9 @@ describe("d2-v1 through the world runtime", () => {
   it("derives 19 stop lines: 16 signal approaches + 3 heuristic Б2 lines", () => {
     const lines = runtime.debugStopLines();
     expect(lines.length).toBe(19);
-    const byControl = { trafficLight: 0, stopSign: 0 };
+    // Record<string, number>: StopLine.control now admits "giveWay" (Б1); this
+    // district authors none, so the tally still resolves to only these two keys.
+    const byControl: Record<string, number> = { trafficLight: 0, stopSign: 0 };
     for (const l of lines) byControl[l.control]++;
     expect(byControl).toEqual({ trafficLight: 16, stopSign: 3 });
     // Every line sits on a real edge, inside its arclength.

@@ -63,18 +63,26 @@ const ARTERIAL_MIN_RANK = 4;
 const MINOR_MAX_RANK = 2;
 
 /**
- * HAND-PLACED Б2 stop lines — a deterministic override table applied AFTER
+ * HAND-PLACED priority lines — a deterministic override table applied AFTER
  * the derived sources, for junctions the heuristics can never reach (doc 68
- * QW4). Each entry pins a stop-sign line on the `edgeId` approach into
- * `nodeId` (both ends of a two-way edge that touch the node get the line,
- * same as the heuristic). The world builder mirrors this table for the
- * visible Б2 sign + painted line (world/builders/props.ts), so grading and
- * visuals always agree. Entries survive until the hand-polish overlay
- * (doc 17 §6/§8) replaces per-junction control wholesale.
+ * QW4). Each entry pins a line on the `edgeId` approach into `nodeId` (both
+ * ends of a two-way edge that touch the node get the line, same as the
+ * heuristic). The world builder mirrors this table for the visible sign +
+ * painted line (world/builders/props.ts), so grading and visuals always agree.
+ * Entries survive until the hand-polish overlay (doc 17 §6/§8) replaces
+ * per-junction control wholesale.
+ *
+ * `control` picks the sign: absent/"stopSign" = Б2 „Стоп" (full stop);
+ * "giveWay" = Б1 „Пропусни движението" (yield only). Give-way is the authoring
+ * hook for a Б1 node — a junction node carrying a Б1 sign resolves to a giveWay
+ * line here (the heuristic never manufactures one, and no entry sets it today,
+ * so every shipped map is byte-identical).
  */
 export interface StopLineOverride {
   nodeId: string;
   edgeId: string;
+  /** Sign kind of the pinned line; default "stopSign" (Б2). "giveWay" = Б1. */
+  control?: "stopSign" | "giveWay";
 }
 
 export const STOP_LINE_OVERRIDES: readonly StopLineOverride[] = [
@@ -95,7 +103,17 @@ export interface StopLine {
   sM: number;
   /** Travel direction that crosses this line: +1 = with geometry, -1 = against. */
   dirSign: 1 | -1;
-  control: "trafficLight" | "stopSign";
+  /**
+   * Sign kind guarding the line. "trafficLight" = signalized; "stopSign" = Б2
+   * „Стоп" (full stop demanded at the line regardless of traffic, ЗДвП чл. 50);
+   * "giveWay" = Б1 „Пропусни движението" (yield to priority traffic, NO full
+   * stop when the mouth is clear — same чл. 50, „пълно спиране се налага само
+   * когато иначе би ги засякъл", content bank q-krastovishta-006). A giveWay
+   * line appears ONLY where a Б1 node is authored (STOP_LINE_OVERRIDES.control),
+   * of which there are none today — so every shipped map still emits only
+   * stopSign/trafficLight (byte-identical).
+   */
+  control: "trafficLight" | "stopSign" | "giveWay";
   /** Intersection node the line guards. */
   junctionNodeId: string;
   /** Signal cluster (trafficLight lines), -1 for stop signs. */
@@ -140,7 +158,7 @@ export function buildStopLines(
     edgeIdx: number,
     junctionNodeId: string,
     atFromEnd: boolean,
-    control: "trafficLight" | "stopSign",
+    control: "trafficLight" | "stopSign" | "giveWay",
     fallbackM: number,
   ): void => {
     const rt = index.edgeRt(edgeIdx);
@@ -214,12 +232,13 @@ export function buildStopLines(
       (li) => all[li].junctionNodeId === ov.nodeId,
     );
     if (alreadyGuarded) continue;
+    const control = ov.control ?? "stopSign";
     const rt = index.edgeRt(edgeIdx);
     if (rt.edge.from === ov.nodeId) {
-      addApproach(edgeIdx, ov.nodeId, true, "stopSign", STOP_SIGN_SETBACK_M);
+      addApproach(edgeIdx, ov.nodeId, true, control, STOP_SIGN_SETBACK_M);
     }
     if (rt.edge.to === ov.nodeId) {
-      addApproach(edgeIdx, ov.nodeId, false, "stopSign", STOP_SIGN_SETBACK_M);
+      addApproach(edgeIdx, ov.nodeId, false, control, STOP_SIGN_SETBACK_M);
     }
   }
 

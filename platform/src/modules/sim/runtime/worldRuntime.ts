@@ -839,9 +839,17 @@ export function createWorldRuntime(districtJson: District | unknown): DistrictWo
       }
       events.push(ev);
     } else {
-      events.push({ kind: "stopLineCrossed", control: "stopSign" });
-      // Give-way/stop: crossing into the junction while conflicting traffic is
-      // present now = failing to yield (graded FAILED_TO_YIELD by the reducer).
+      // Non-signal line: emit the sign kind the geometry carries. Б2 „Стоп"
+      // (stopSign) demands a full stop at the line; Б1 „Пропусни движението"
+      // (giveWay) demands only the yield below — no full stop (ЗДвП чл. 50; the
+      // reducer's giveWay branch grades nothing at the line itself). Byte-
+      // identical for every shipped map: no Б1 node is authored, so line.control
+      // is always "stopSign" in this branch.
+      events.push({ kind: "stopLineCrossed", control: line.control });
+      // Give-way / stop: crossing into the junction while conflicting priority
+      // traffic is present = failing to yield — graded FAILED_TO_YIELD (detail
+      // "give-way") by the reducer's prioritySituation handler. This is the ONLY
+      // grade a clear-mouth Б1 escapes and a conflicted Б1 earns.
       const node = nodePos.get(line.junctionNodeId);
       if (node && conflictQuery(node.x, node.y, PRIORITY_CONFLICT_RADIUS_M, line.approachBearingDeg)) {
         events.push({ kind: "prioritySituation", situation: "give-way", violated: true });
@@ -977,7 +985,7 @@ export function createWorldRuntime(districtJson: District | unknown): DistrictWo
         if (nextLineDistM > NEXT_LINE_WATCH_M) nextLineIdx = -1;
       }
       let nextStopLineM: number | undefined;
-      let nextStopLineControl: "stopSign" | "trafficLight" | undefined;
+      let nextStopLineControl: "stopSign" | "trafficLight" | "giveWay" | undefined;
       let nextStopLineState: SignalPhase | undefined;
       if (nextLineIdx >= 0) {
         const line = stopLines.all[nextLineIdx];

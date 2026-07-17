@@ -126,6 +126,15 @@ export const STOP_LINE_WIDTH_M = 0.8;
 export const ZEBRA_STRIPE_ACROSS_M = 0.8; // stripe width across the road
 export const ZEBRA_GAP_M = 0.6;
 export const ZEBRA_LENGTH_M = 6.0; // extent along the road axis
+/**
+ * Zone-authored SOLID markings (ADR-006 stage 2b — the world SHOWS what
+ * District.zones GRADE; markings.ts). М1 „единична непрекъсната" осева over a
+ * solidCenterLine span reuses the dash stroke it replaces, so a suppressed
+ * span reads as one filled line; the bus-/emergency-lane curb seam (М8.1/М2
+ * continuous edge of laneId 0) is a hair bolder so the restricted lane reads.
+ */
+export const SOLID_CENTER_LINE_WIDTH_M = DASH_WIDTH_M;
+export const BUS_LANE_SEAM_WIDTH_M = EDGE_LINE_WIDTH_M;
 
 /** Facade bay module (whole-bay UV offsets snap to this). */
 export const FACADE_BAY_M = 3;

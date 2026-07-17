@@ -367,23 +367,19 @@ describe(`${ID} — bus-stop furniture (KNOWN GAPS, pinned)`, () => {
     // stop lines and a junction posts stop lines — either would acquit the very
     // rest this map exists to convict. The pocket renders as plain curb.
     expect(world.busStops).toHaveLength(0);
-    // markings.ts does not read District.zones at all, so the зигзаг that marks
-    // the zone out in reality is not painted either. FIX for both: a
-    // `busStop?: boolean` on DistrictZone that props/markings honour.
-    expect(district_markingsReadZones()).toBe(false);
+    // markings.ts now reads District.zones — but only for the SOLID kinds
+    // (solidCenterLine осева, bus/emergency curb seams). A noStopping span still
+    // paints no зигзаг, so stripping THIS map's zones leaves the marking buffer
+    // byte-identical: the зигзаг gap remains. FIX for both: a `busStop?: boolean`
+    // on DistrictZone that props/markings honour.
+    const zoneless = buildWorldGeometry(
+      assertDistrict({ ...(loadRaw(ID) as District), zones: undefined }),
+      { seed: 7 },
+    );
+    expect(world.stats.markingQuads).toBe(zoneless.stats.markingQuads);
+    expect(world.markings.positions.length).toBe(zoneless.markings.positions.length);
   });
 });
-
-/** Documentation-as-assertion: markings are derived from EDGES, never from
- *  zones — so no authored span can paint anything today. Kept as a function so
- *  the claim above is checkable, not folklore. */
-function district_markingsReadZones(): boolean {
-  const src = fs.readFileSync(
-    path.resolve(__dirname, "..", "builders", "markings.ts"),
-    "utf8",
-  );
-  return /\bdistrict\.zones\b/.test(src);
-}
 
 // ---------------------------------------------------------------------------
 // Traffic layer

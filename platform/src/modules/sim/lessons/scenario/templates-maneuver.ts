@@ -152,7 +152,7 @@ export const SC_MANEUVER_3POINT: ScenarioSpec = {
 
 // ---------------------------------------------------------------------------
 // sc-maneuver-uturn — „Обръщане в едно движение" (обратен завой на широк
-// булевард; doc 72 OV-17 „Обратен завой" / PK-12 „Обръщане") on the committed
+// булевард; doc 72 OV-17 „Обратен завой") on the committed
 // wb-boulevard-v1 wide street. The SAME shipped threePointTurn objective as the
 // 3-point turn, but on a WIDER carriageway the reversal completes in ONE smooth
 // forward arc (movements = 1 → best economy) instead of three shunts.
@@ -164,9 +164,9 @@ const BLVD_LANE_OUT = 12.19;
 const UTURN_Y = 76;
 
 /**
- * OV-17 / PK-12 — обръщане в едно движение (ЗДвП чл. 38: обратен завой е
- * разрешен там, където не е забранен и водачът има видимост; на широко платно
- * се извършва наведнъж — в една дъга, без движение назад). The wide-street
+ * OV-17 — обръщане в едно движение (ЗДвП чл. 38: обратен завой е разрешен
+ * там, където не е забранен и водачът има видимост; на широко платно се
+ * извършва наведнъж — в една дъга, без движение назад). The wide-street
  * counterpart of sc-maneuver-3point: same maneuver, fewer movements.
  */
 export const SC_MANEUVER_UTURN: ScenarioSpec = {
@@ -176,9 +176,10 @@ export const SC_MANEUVER_UTURN: ScenarioSpec = {
   titleBg: "Обръщане в едно движение на широк булевард",
   objectiveBg:
     "Обърни посоката на 180° на широкия булевард в ЕДНА плавна дъга — без връщане назад: широкото платно позволява завоят да се направи наведнъж, с оглеждане преди започване и без да опреш бордюра.",
-  // Doc-72 provenance: OV-17 „Обратен завой" (the U-turn as such) + PK-12
-  // „Обръщане" (the same Наредба-38 обратен завой family, here in one move).
-  archetypeIds: ["OV-17", "PK-12"],
+  // Doc-72 provenance: OV-17 „Обратен завой" (the U-turn maneuver itself; чл. 38
+  // legal execution). PK-12 „Обръщане в три хода" dropped — that is the THREE-
+  // move turn, whereas this is a single forward-arc U-turn on a wide street.
+  archetypeIds: ["OV-17"],
   conceptIds: ["c-u-turn", "c-maneuver-principles", "c-mirrors-blind-spots", "c-general-care-duty"],
   map: {
     archetype: "straight-street",
