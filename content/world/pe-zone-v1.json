@@ -1,0 +1,277 @@
+{
+ "format": "district-v1",
+ "meta": {
+  "district": "pe-zone",
+  "label": "Учебна жилищна зона (Д15/Д16) с изход на обикновена улица (сценарий PE-15)",
+  "mapKind": "scenario-street",
+  "generator": "tools/maps/gen_pe_zone.mjs",
+  "boundsLocalMeters": {
+   "minX": -36,
+   "minY": 0,
+   "maxX": 70,
+   "maxY": 365
+  },
+  "attribution": {
+   "text": "Учебна жилищна зона (Д15/Д16) с изход на обикновена улица — оригинален параметричен дизайн (без данни от OpenStreetMap)",
+   "license": "All rights reserved",
+   "licenseUrl": "/",
+   "copyrightUrl": "/",
+   "obligation": "none — original work, no ODbL attribution required for this map"
+  },
+  "defaults": {
+   "maxspeedUrbanKmh": 50,
+   "note": "Жилищна зона: ограничението пада от 50 на 20 на входа и важи до изхода; пешеходците ползват цялото платно."
+  },
+  "stats": {
+   "roadKm": 0.44,
+   "nodes": 5,
+   "edges": 4,
+   "intersections": 1,
+   "crossings": 1,
+   "buildings": 2,
+   "spawnPoints": 2
+  },
+  "scenario": {
+   "archetype": "zebra-block",
+   "params": {
+    "crossings": 1,
+    "signalized": "no",
+    "approachM": 120,
+    "zoneCrossingM": 95,
+    "crossingExitM": 70,
+    "zoneKmh": 20
+   },
+   "primaryCrossingId": "pz-x-1",
+   "laneCenterRightM": 4.06,
+   "curbXWest": -9.72,
+   "curbXEast": 9.73,
+   "zoneEntryY": 120,
+   "zoneExitY": 285,
+   "crossingY": 215,
+   "exitJunctionNodeId": "pz-n-exit",
+   "expectedExitControl": "rightHandRule",
+   "crossings": [
+    {
+     "id": "pz-x-1",
+     "x": 0,
+     "y": 215,
+     "kind": "unmarked"
+    }
+   ]
+  }
+ },
+ "roads": {
+  "nodes": [
+   {
+    "id": "pz-n-e",
+    "x": 70,
+    "y": 285
+   },
+   {
+    "id": "pz-n-end",
+    "x": 0,
+    "y": 365
+   },
+   {
+    "id": "pz-n-entry",
+    "x": 0,
+    "y": 120
+   },
+   {
+    "id": "pz-n-exit",
+    "x": 0,
+    "y": 285
+   },
+   {
+    "id": "pz-n-start",
+    "x": 0,
+    "y": 0
+   }
+  ],
+  "edges": [
+   {
+    "id": "pz-e-approach",
+    "from": "pz-n-start",
+    "to": "pz-n-entry",
+    "class": "tertiary",
+    "name": "Улица преди жилищната зона",
+    "oneway": false,
+    "roundabout": false,
+    "lanes": 2,
+    "lanesSource": "tag",
+    "maxspeed": 50,
+    "maxspeedSource": "tag",
+    "length": 120,
+    "geometry": [
+     [
+      0,
+      0
+     ],
+     [
+      0,
+      120
+     ]
+    ]
+   },
+   {
+    "id": "pz-e-zone",
+    "from": "pz-n-entry",
+    "to": "pz-n-exit",
+    "class": "residential",
+    "name": "Жилищна зона",
+    "oneway": false,
+    "roundabout": false,
+    "lanes": 2,
+    "lanesSource": "tag",
+    "maxspeed": 20,
+    "maxspeedSource": "tag",
+    "zone": "residential",
+    "length": 165,
+    "geometry": [
+     [
+      0,
+      120
+     ],
+     [
+      0,
+      285
+     ]
+    ]
+   },
+   {
+    "id": "pz-e-out",
+    "from": "pz-n-exit",
+    "to": "pz-n-end",
+    "class": "tertiary",
+    "name": "Улицата извън зоната",
+    "oneway": false,
+    "roundabout": false,
+    "lanes": 2,
+    "lanesSource": "tag",
+    "maxspeed": 50,
+    "maxspeedSource": "tag",
+    "length": 80,
+    "geometry": [
+     [
+      0,
+      285
+     ],
+     [
+      0,
+      365
+     ]
+    ]
+   },
+   {
+    "id": "pz-e-cross",
+    "from": "pz-n-exit",
+    "to": "pz-n-e",
+    "class": "tertiary",
+    "name": "Напречна улица — движението, което пропускаш",
+    "oneway": false,
+    "roundabout": false,
+    "lanes": 2,
+    "lanesSource": "tag",
+    "maxspeed": 50,
+    "maxspeedSource": "tag",
+    "length": 70,
+    "geometry": [
+     [
+      0,
+      285
+     ],
+     [
+      70,
+      285
+     ]
+    ]
+   }
+  ]
+ },
+ "intersections": [
+  {
+   "id": "pz-n-exit",
+   "x": 0,
+   "y": 285,
+   "degree": 3,
+   "signalized": false
+  }
+ ],
+ "crossings": [
+  {
+   "id": "pz-x-1",
+   "x": 0,
+   "y": 215,
+   "kind": "unmarked",
+   "signalized": false,
+   "edgeId": "pz-e-zone"
+  }
+ ],
+ "roundabouts": [],
+ "buildings": [
+  {
+   "id": "pz-b-west",
+   "height": 12,
+   "heightSource": "default",
+   "footprint": [
+    [
+     -36,
+     135
+    ],
+    [
+     -20,
+     135
+    ],
+    [
+     -20,
+     185
+    ],
+    [
+     -36,
+     185
+    ]
+   ]
+  },
+  {
+   "id": "pz-b-east",
+   "height": 12,
+   "heightSource": "default",
+   "footprint": [
+    [
+     20,
+     225
+    ],
+    [
+     36,
+     225
+    ],
+    [
+     36,
+     260
+    ],
+    [
+     20,
+     260
+    ]
+   ]
+  }
+ ],
+ "spawnPoints": [
+  {
+   "id": "pz-spawn-approach",
+   "x": 4.06,
+   "y": 15,
+   "heading": 0,
+   "edgeId": "pz-e-approach",
+   "name": "Начало на отсечката — преди жилищната зона"
+  },
+  {
+   "id": "pz-spawn-finish",
+   "x": 4.06,
+   "y": 350,
+   "heading": 0,
+   "edgeId": "pz-e-out",
+   "name": "Контролна точка — след изхода от зоната"
+  }
+ ]
+}

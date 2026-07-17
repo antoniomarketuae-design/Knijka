@@ -182,6 +182,18 @@ const WORLD_NAME_BG: Record<string, string> = {
   "mv-uturn-v1": "булеварда с остров",
   "rb-ped-v1": "кръговото с пътеки на изходите",
   "hz-debris-v1": "улицата с препятствие в лентата",
+  // Wave 7 districts — the wave's four new maps. Its one reuse item
+  // (sc-ln-obstacle-meeting on ov-narrow-v1) is unchanged: like most older
+  // districts ov-narrow-v1 carries no entry and takes the „света" fallback.
+  "pk-rail-v1": "улицата с жп прелеза",
+  "pe-zone-v1": "зоната за живеене",
+  "vu-child-v1": "улицата с детето на велосипед",
+  "ac-bridge-v1": "заледения мост",
+  // Wave 8 districts — the wave's three new maps. Its four reuse items
+  // (ln-v1, sx-v1, mw-v1, poligon-v1) keep their existing map's name.
+  "vu-bikelane-v1": "улицата с велоалея",
+  "rx-tram-stop-v1": "улицата с трамвайна спирка",
+  "hz-accident-v1": "улицата с произшествие",
 };
 
 /**

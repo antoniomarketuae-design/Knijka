@@ -22,6 +22,9 @@
  *  - sc-ln-boulevard-discipline „Лентова дисциплина на булеварда" (OV-11 +
  *                            OV-02 + OV-12, wb-boulevard-v1 REUSED — the urban
  *                            2+2 with a LEGITIMATE pass in the middle; wave 6)
+ *  - sc-ln-obstacle-meeting  „Препятствието е в твоята половина" (OV-18 + OV-14,
+ *                            ov-narrow-v1 REUSED — the чл. 44 queue: the second
+ *                            oncoming car IS the lesson; wave 7)
  *
  * WHY THE MISTAKES GRADE WHAT THEY GRADE. The lane-intent layer (per-approach-
  * lane allowed movements in district data) is doc 72 N3 work that has NOT
@@ -47,6 +50,7 @@
 
 import type {
   BrakingLeadCarSpec,
+  NarrowMeetingSpec,
   OncomingStreamSpec,
   RearTailgaterSpec,
 } from "../../contracts";
@@ -1316,6 +1320,259 @@ export const SC_LN_BOULEVARD_DISCIPLINE: ScenarioSpec = {
   localeBg: "bg-BG",
 };
 
+// ---------------------------------------------------------------------------
+// 7. sc-ln-obstacle-meeting — „Препятствието е в твоята половина" (OV-18
+//    „Обект на платното — заобикаляне" × OV-14 narrow meeting) on ov-narrow-v1,
+//    REUSED: the live sc-ov-narrow (templates-flow-era, templates-lanes.ts) is
+//    the other tenant of this 240 m 1+1, and the two are deliberately different
+//    drills on the same street.
+//
+// WHAT THIS TEACHES THAT sc-ov-narrow DOES NOT. The live template is a
+// SYMMETRIC negotiation: a parked row narrows the street, someone comes, and the
+// lesson is the rule („from whose side the obstruction is, he waits"). Its
+// mistakes grade FAILED_TO_YIELD — the priority ABSTRACTION. This one is the
+// bank's own frame (q-manevri-016: „паркиран бус заема половината от твоята
+// лента, а насреща идва автомобил"; q-predimstvo-030; q-manevri-050 — the
+// mirrored case; q-manevri-049 — the obstacle that closes the lane entirely),
+// and it teaches the CONSEQUENCE instead: the metre of tarmac you are about to
+// borrow belongs to a car that is already using it, and чл. 44's „не пречи на
+// насрещните" is a description of physics before it is a rule. So the drill is
+// a QUEUE — the first oncoming car passes, and the second one is the whole
+// lesson: the driver who reads „the road is clear" from the first car's tail
+// lights is the driver this template exists for.
+//
+// WHY THE MISTAKES GRADE WHAT THEY GRADE. Meeting priority has no dedicated
+// detector and deliberately gets none (doc 76's deferred list; the OV-14 runner
+// adjudicates the narrow-passage act and its vocabulary is spoken for by
+// sc-ov-narrow). The honest grading here is therefore the pair the act carries
+// with it in the real world:
+//   - the pull-out in front of an approaching car ends in CONTACT — a real one:
+//     both demos physically hit the staged oncoming car through the shipped
+//     OncomingStreamRunner contact check (the staged car's playerGuard brakes it
+//     to a standstill 6 m short — and the demo drives into it anyway, which is
+//     exactly what „изнасяне пред идваща кола" looks like from inside the other
+//     car). Nothing is narrated: no scripted collision beat is used;
+//   - the squeeze-past („провиране") rides the осева with the indicator dark for
+//     4 s before it ever meets anyone, which is CENTER_LINE_TOUCHED verbatim
+//     (rules/engine.ts stage 4: `laneId === laneCount-1 && laneOffsetM >
+//     3.25 && indicator === "off"` — on this 1+1 the whole road is laneId 0 with
+//     laneCount 1, so the band is |x| < 0.81 m, the paint itself).
+// SUCCESS is objective-gated, and the gates are the drill: a reachZone of radius
+// 4 (< the 8.125 m lane pitch) with maxSpeedKmh 6 behind the obstacle can only
+// be satisfied by a car that ACTUALLY STOPPED in its own half, and the pass gate
+// on the opposing lane centre can only be satisfied by a car that actually went
+// around. Wait → round → home, in that order.
+//
+// THE TWO CONVICTIONS THE DEMOS MUST NOT LEAK, and why they cannot:
+//   - FAILED_TO_YIELD (the OV-14 runner's narrow-passage bill) needs the player
+//     BARGING INSIDE the section (`playerAlong >= -2`, i.e. y >= 138) for 0.9 s.
+//     Both demos die at y ≈ 128-133 — a dozen metres short of the section — so
+//     the barge condition is never even armed. That is not a dodge: they never
+//     reach the стеснение, because the car that had the right of way was already
+//     there. The runner's own contact check never fires either (its actor is the
+//     SECOND car, still north of the section when both demos end).
+//   - OVERTAKE_INSUFFICIENT_GAP (the corridor tracker) arms on opposingBank and
+//     needs > 20 km/h (OVERTAKE_COMMIT_MIN_KMH) to count as committed. Both
+//     demos cross the line at 14-16 km/h — a squeeze, not a pass — so the
+//     corridor never bills. The shadow's own pass is 12 km/h for the same
+//     reason. This is honest for the map: заобикалянето на препятствие is not
+//     изпреварване, and grading it as one would teach the wrong law.
+// ---------------------------------------------------------------------------
+
+/** ov-narrow-v1 lane centres / road length / posted limit — pinned by value
+ *  from the committed map (the L7 copy law; nm-district.test.ts asserts every
+ *  one of these against meta.scenario + the runtime's own lane fix). */
+const LNOM_OWN = 4.06;
+const LNOM_ONC = -4.06;
+const LNOM_LENGTH = 240;
+const LNOM_LIMIT = 40;
+
+/**
+ * The obstacle + the FIRST oncoming car, in one shipped spec. The OV-14
+ * narrowMeeting runner is the only staged event that carries held PROPS on the
+ * player's own lane, and it is what makes this street a стеснение at all:
+ *  - `props` = the parked row at y = 148 and y = 161, on the traffic graph's
+ *    own lane centre (extraRightOffsetM 0 ⇒ x = 4.06 — the player's half,
+ *    closed). They are staged held actors, never commanded (cruiseSpeedMps 0);
+ *  - `obstructionSide: "player"` is the чл. 44 truth of the scene and the
+ *    runner's adjudication axis: the side WITH the obstruction waits. The
+ *    shadow's wait in its own lane earns YIELDED_TO_PRIORITY through it;
+ *  - the ACTOR is oncoming car #2 — the one the runner syncs to arrive as the
+ *    player arrives (armDistM 70), so the meeting is guaranteed no matter how
+ *    fast the student drove up. It holds at y = 228, NORTH of the stream car
+ *    below, so the queue arrives in authored order and no staged car ever
+ *    drives through another.
+ * Section [140, 174] wraps the parked row with ~8 m of margin at each end.
+ * The car-rig HONESTY footnote: NarrowMeetingSpec.props carries no `profile`
+ * field (PedestrianDartOutSpec.props does), so the „бус" of q-manevri-016 is
+ * rendered by the default car rig and the copy says „паркирани коли" — the
+ * lesson is the closed half of the carriageway, not the make of what closed it.
+ */
+const LNOM_MEETING: NarrowMeetingSpec = {
+  id: "sc-lnom-meeting",
+  kind: "narrowMeeting",
+  libraryEventId: "ev-oncoming-meeting",
+  sectionStart: { x: 0, y: 140 },
+  sectionEnd: { x: 0, y: 174 },
+  obstructionSide: "player",
+  actor: {
+    pathNodes: ["nm-n-end", "nm-n-start"], // southbound = oncoming
+    hold: { nodeIndex: 0, offsetM: 12 }, // y = 228 — behind the stream car
+    cruiseSpeedMps: 6,
+    colorIndex: 2,
+  },
+  // The actor's section entrance = the far (north) end: path arc 240 − 174.
+  actorEntry: { nodeIndex: 0, offsetM: 66 },
+  armDistM: 70,
+  transitSpeedMps: 6,
+  props: [
+    { pathNodes: ["nm-n-start", "nm-n-end"], hold: { nodeIndex: 0, offsetM: 148 } },
+    { pathNodes: ["nm-n-start", "nm-n-end"], hold: { nodeIndex: 0, offsetM: 161 } },
+  ],
+};
+
+/**
+ * Oncoming car #1 — the FIRST of the queue, and the template's whole difference
+ * from sc-ov-narrow. ONE car (count 1, gapsM []), because the drill is not
+ * „traffic": it is the single most expensive misreading in this scene — „едната
+ * мина, значи мога". The oncomingStream runner is the right vehicle for it
+ * precisely because it is CLOCKWORK: released the moment the player first moves
+ * and then a pure function of time (no sync, no reaction to the student's
+ * pace), so the car that arrives while you are still deciding is the same car
+ * every single run. It emits ZERO SimTick events except a collision on physical
+ * contact — which is exactly the grading channel both mistake demos ride.
+ * hold y = 215 at 5.5 m/s ⇒ (instant-cruise model: hold + v²/2a ≈ +5.8 m) it
+ * tracks y ≈ 221 − 5.5·t and passes the shadow's stopped nose at t ≈ 17 s.
+ */
+const LNOM_STREAM: OncomingStreamSpec = {
+  id: "sc-lnom-stream",
+  kind: "oncomingStream",
+  libraryEventId: "ev-oncoming-meeting",
+  actor: {
+    pathNodes: ["nm-n-end", "nm-n-start"], // southbound = oncoming
+    hold: { nodeIndex: 0, offsetM: 25 }, // y = 215
+    cruiseSpeedMps: 5.5,
+    colorIndex: 1,
+  },
+  count: 1,
+  gapsM: [],
+  releaseKmh: 3,
+};
+
+/** OV-18 × OV-14 — препятствие в собствената половина (ЗДвП чл. 44: при
+ *  разминаване водачът, от чиято страна е препятствието, изчаква насрещните и
+ *  ги пропуска; самото разминаване става с достатъчно странично разстояние).
+ *  Bank-verified: q-manevri-016 („Ти изчакваш — препятствието е в твоята
+ *  половина от платното"), q-predimstvo-030 („нямаш предимство — изчакваш
+ *  насрещния"), q-manevri-050 (огледалният случай: препятствието е в НЕГОВАТА
+ *  половина, минаваш пръв, но с готовност да намалиш), q-manevri-049
+ *  (заобикалянето започва едва след като насрещната лента е свободна). */
+export const SC_LN_OBSTACLE_MEETING: ScenarioSpec = {
+  id: "sc-ln-obstacle-meeting",
+  family: "lanes",
+  tagsBg: ["разминаване", "препятствие", "тясна улица", "предимство", "паркирани коли"],
+  titleBg: "Препятствието е в твоята половина",
+  objectiveBg:
+    "Паркиран ред затваря ТВОЯТА половина: насрещният има предимство — изчакай зад препятствието и премини едва когато насрещното е чисто.",
+  archetypeIds: ["OV-18", "OV-14"],
+  conceptIds: [
+    "c-oncoming-passing",
+    "c-priority-concept",
+    "c-maneuver-principles",
+    "c-animals-obstacles",
+  ],
+  map: {
+    archetype: "narrow-street",
+    // The generator recipe — mirrored in ov-narrow-v1.json meta.scenario.params
+    // (tools/maps/gen_narrow_street.mjs; REUSED — sc-ov-narrow is the other
+    // tenant, and its own section sits at y ∈ [110, 145], clear of this one).
+    params: { lengthM: LNOM_LENGTH, maxspeedKmh: LNOM_LIMIT },
+    districtId: "ov-narrow-v1",
+  },
+  start: {
+    spawnPointId: "nm-spawn-approach",
+    vehicleStart: "ready",
+  },
+  instructionsBg: [
+    { n: 1, textBg: "Тясна двупосочна улица, ограничение 40. Напред в ТВОЯТА лента е паркиран ред — половината ти платно е затворено и заобикалянето минава през насрещната лента." },
+    { n: 2, textBg: "Точно това решава спора: препятствието е от твоята страна, значи предимството е на насрещния. Ти изчакваш, той минава (чл. 44)." },
+    { n: 3, textBg: "Намали навреме и спри в СВОЯТА лента на няколко метра пред препятствието — оттам виждаш насрещното платно и не пречиш на никого." },
+    { n: 4, textBg: "Насреща идват ДВЕ коли. Първата ще мине бързо — не тръгвай след нея: втората вече е зад завоя на вниманието ти." },
+    { n: 5, textBg: "Изчакай и двете да отминат покрай теб. Чак когато насрещната лента е празна докрай: ляв мигач, оглед и една спокойна дъга покрай паркираните коли." },
+    { n: 6, textBg: "Минавай с достатъчно странично разстояние от паркираните коли и се прибери в своята лента веднага след тях — маневрата свършва там, не по-късно." },
+  ],
+  success: [
+    {
+      id: "sc-lnom-wait",
+      titleBg: "Спри в своята лента пред препятствието",
+      // Radius 4 < the 8.125 m lane pitch: satisfiable ONLY from the own-lane
+      // centre, and maxSpeedKmh 6 makes it unsatisfiable in motion. The gate IS
+      // чл. 44: a car that rolled through here never waited for anybody.
+      params: { kind: "reachZone", x: LNOM_OWN, y: 130, radiusM: 4, maxSpeedKmh: 6 },
+    },
+    {
+      id: "sc-lnom-round",
+      titleBg: "Заобиколи препятствието през свободната насрещна лента",
+      // The other half of the act, and lane-exclusive the same way: this point
+      // is reachable only from the opposing lane, beside the parked row — the
+      // pass a driver who never committed cannot narrate.
+      params: { kind: "reachZone", x: LNOM_ONC, y: 155, radiusM: 4, maxSpeedKmh: 30 },
+    },
+    {
+      id: "sc-lnom-home",
+      titleBg: "Прибери се в своята лента и завърши отсечката",
+      // Radius 4 again: the маневра ends where you came home, so the last gate
+      // is unsatisfiable by a car still hanging in the opposing lane 30 m past
+      // the parked row — прибирането е част от заобикалянето, not an afterthought.
+      params: { kind: "reachZone", x: LNOM_OWN, y: 205, radiusM: 4 },
+    },
+  ],
+  rubric: { parTimeSec: 90 },
+  // RECORDED: committed deterministic recordings of the authored scripts in
+  // traces/scLnObstacleMeeting.ts; gates in traces/__tests__/
+  // sc-ln-obstacle-meeting-traces.test.ts (re-record with RECORD_TRACES=1).
+  shadow: { path: "content/traces/sc-ln-obstacle-meeting/shadow-correct.trace.json" },
+  mistakes: [
+    {
+      traceRef: { path: "content/traces/sc-ln-obstacle-meeting/mistake-pull-out.trace.json" },
+      titleBg: "Изнасяне в насрещното пред идваща кола",
+      whatWentWrongBg:
+        "Колата не спря — изнесе се в насрещната лента точно пред приближаващия автомобил и го удари челно. Обърни внимание какво НЕ спаси положението: другият водач наби спирачки и спря напълно, а ударът все пак се случи, защото инерцията на изнеслия се не пита кой е прав. Тук няма „ще се разминем“ — при разминаване през стеснение платното не се дели наполовина: щом препятствието е в твоята половина, насрещният има предимство и ти нямаш какво да делиш с него. Заобикалянето започва след като насрещната лента е свободна, а не докато някой се движи по нея (чл. 44).",
+      codeRefs: ["COLLISION"],
+    },
+    {
+      traceRef: { path: "content/traces/sc-ln-obstacle-meeting/mistake-squeeze.trace.json" },
+      titleBg: "Провиране с настъпване на осевата под насрещен",
+      whatWentWrongBg:
+        "Класическото „ще се промъкна“: колата не изчака, а увисна върху осевата линия — нито в своята лента, нито в насрещната, тоест в двете едновременно — и продължи така срещу приближаващата кола, докато не я закачи. Настъпването на осевата не е половин решение, а два проблема наведнъж: ти не си минал покрай препятствието, а вече си отнел на насрещния лентата, по която той се движи, и си му оставил сантиметри за преценка. Тясната улица не се дели: или си зад препятствието и чакаш, или насрещната лента е ПРАЗНА и минаваш цял, с достатъчно странично разстояние (чл. 44).",
+      codeRefs: ["CENTER_LINE_TOUCHED", "COLLISION"],
+    },
+  ],
+  teach: {
+    whenBg:
+      "Всеки ден, във всеки квартал: паркиран бус, спрял камион на доставка, контейнер, паднал клон — нещо заема твоята половина от тясната двупосочна улица и единственият път напред минава през насрещната лента. Същото правило важи и огледално: когато препятствието е в НЕГОВАТА половина, ти минаваш пръв, но с готовност да намалиш, ако той вече е тръгнал.",
+    whyBg:
+      "Правилото звучи като въпрос за предимство, но всъщност е въпрос за пространство. Насрещната лента не е ничия — тя вече се ползва от някого, и когато твоята половина е затворена, ти си този, който иска чуждото място назаем. Затова законът е категоричен и удобно лесен за помнене: от чиято страна е препятствието, той изчаква. Двете грешки, които този урок показва, са двете страни на нетърпението — изнасянето пред идваща кола и провирането по осевата — и двете свършват на едно и също място, защото тясното платно не се дели наполовина: половин лента за теб и половин за насрещния е челен удар с добри намерения. Опасната част не е първата кола, а втората: щом първата отмине, пътят „изглежда чист“ точно в мига, в който не е. Затова се чака, докато насрещната лента е празна ДОКРАЙ, а не докато отмине този, когото си видял.",
+    lawRef: "ЗДвП чл. 44",
+    examinerBg:
+      "Изпитващият гледа преценката при препятствие: навременно намаляване, спиране в собствената лента преди стеснението, изчакване на ЦЕЛИЯ насрещен поток и едва след това една спокойна дъга покрай препятствието с достатъчно странично разстояние и своевременно прибиране. Навлизането в насрещната лента пред движещ се насрещен автомобил е опасна грешка; возенето по осевата линия е второстепенна.",
+  },
+  levels: [
+    { level: 1 },
+    { level: 2 },
+    { level: 3 },
+    { level: 4, vehicleStart: "cold" },
+    // L5 — нощем: the headlights are the only thing that says a car is coming,
+    // and „чакай втората" gets much harder when the first pair of lights leaves
+    // the street black behind it. RENDER/conditions axis only — no `physics`:
+    // the authored ghost envelope is dry-tuned (ADR-006 stage 4a).
+    { level: 5, conditions: { night: true } },
+  ],
+  staged: [LNOM_STREAM, LNOM_MEETING],
+  conditions: { weather: "dry" },
+  localeBg: "bg-BG",
+};
+
 /** The lane-arrow templates, in catalog order (registered in templates.ts by
  *  the integration pass). */
 export const SCENARIO_TEMPLATES_LANES2: readonly ScenarioSpec[] = [
@@ -1325,4 +1582,5 @@ export const SCENARIO_TEMPLATES_LANES2: readonly ScenarioSpec[] = [
   SC_OV_CREST_CURVE,
   SC_OV_SOLID_RETURN,
   SC_LN_BOULEVARD_DISCIPLINE,
+  SC_LN_OBSTACLE_MEETING,
 ];

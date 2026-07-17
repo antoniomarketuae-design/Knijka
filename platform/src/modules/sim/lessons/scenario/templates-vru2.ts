@@ -4,11 +4,15 @@
  *
  *  - sc-vu-blindspot-moto  „Мотор в мъртвата зона"       (VU-07, ln-v1)
  *  - sc-vu-cyclist-group   „Изпреварване на група ..."   (VU-02, vu-pass-v1)
+ *  - sc-vu-child-cyclist   „Дете на колело лъкатуши"     (VU-03, vu-child-v1)
  *
  * The wave-2 member is staged on the committed ln-v1 boulevard (the
  * sc-lane-change map, reused — a plain 2+2 straight is exactly where the
  * queue-filtering drill lives); the wave-4 member reuses vu-pass-v1, the
- * junction-free 1+1 street sc-vu-pass-clearance already proves.
+ * junction-free 1+1 street sc-vu-pass-clearance already proves; the wave-7
+ * member is the only one with a map of its own (vu-child-v1 — the same
+ * junction-free bones at жилищна scale, plus an authored mid-block swerve arc
+ * the street itself owns; tools/maps/gen_vu_child.mjs).
  *
  * DATA ONLY, the templates.ts mold: every coordinate below is denormalized
  * from the committed district file (meta.scenario), so nothing loads world
@@ -68,6 +72,7 @@
  */
 
 import type {
+  CutInLeadCarSpec,
   CyclistRightHookSpec,
   OncomingStreamSpec,
   RearTailgaterSpec,
@@ -549,8 +554,539 @@ export const SC_VU_CYCLIST_GROUP: ScenarioSpec = {
   localeBg: "bg-BG",
 };
 
+// ---------------------------------------------------------------------------
+// sc-vu-child-cyclist — „Дете на колело лъкатуши" (VU-03 „Колелото завива около
+// дупка" + VU-02's lateral machinery) on the NEW vu-child-v1 residential street
+// ---------------------------------------------------------------------------
+
+/** vu-child-v1 meta.scenario.laneCenterRightM — the northbound lane center. */
+const VUCC_LANE_X = 4.06;
+/** meta.scenario.wobble.curbXM — the child's line BEFORE the swerve. The SAME
+ *  curb line sc-vu-pass-clearance and sc-vu-cyclist-group ride (lane center +
+ *  extraRightOffsetM 2.6): three templates, one cyclist line, one set of proven
+ *  lateral numbers. */
+const VUCC_CURB_X = 6.66;
+/**
+ * meta.scenario.wobble.apexXM — where the swerve LEAVES him, and the number the
+ * whole template turns on. 4.66 is 0.6 m east of the driver's own lane center:
+ * after the wobble the child is not „near the curb", he is IN YOUR LANE. Every
+ * clearance in this drill is measured against THIS line, never against 6.66 —
+ * which is precisely the mistake the second demo commits.
+ */
+const VUCC_APEX_X = 4.66;
+/** meta.scenario.wobble — the authored mid-block swerve-out, district space. */
+const VUCC_WOBBLE_Y = 100;
+const VUCC_WOBBLE_RADIUS_M = 2;
+const VUCC_WOBBLE_ARC_M = 6.5;
+const VUCC_WOBBLE_AMPLITUDE_M = 2.0;
+/** ~9.4 km/h — a child's pedalling pace, not an adult commuter's. It is also a
+ *  grading dial: the pass floor is 15 km/h and the follow detector's floor is
+ *  20, so the demos have to squeeze in a 15–20 km/h band, and only a genuinely
+ *  slow child leaves enough closing speed inside it to complete a pass at all. */
+const VUCC_CHILD_MPS = 2.6;
+/** The taught wide line — the oncoming bank (vu-child-v1 carries `zones: []`,
+ *  so no М1 span exists and crossing the crown is free by construction). */
+const VUCC_WIDE_X = -2.0;
+/** vu-child-v1 is one 300 m edge, start → end. */
+const VUCC_STREET_M = 300;
+
+/**
+ * THE CHILD — the shipped cutInLeadCar actor, repurposed whole. Doc 72 VU-03
+ * reads „🔴 NEW: path-deviation command for staged actors (scripted lateral
+ * offset pulse at a trigger point)"; that command turned out to be ALREADY
+ * SHIPPED as the FO-03 cut-in's own machinery, so this template needs no engine
+ * work — it needs the right actor. Four dials do the whole job:
+ *
+ *  1. THE RIG + THE GRADING TAG: `extraRightOffsetM` +2.6 puts him on the curb
+ *     line AND tags him a CYCLIST (A11 vehicleCollisionKind — the marker that
+ *     drives `cyclistNear`, which is the vulnerable-pass tracker's only feed).
+ *     The spec's own doc-comment says to keep the offset ≤ 0 „a positive curb
+ *     offset tags the actor as a cyclist proxy" — here that IS the requirement.
+ *  2. THE PACE: matchPlayer with `paceAheadM` 400 — an unreachable gap, so the
+ *     proportional law's target (playerMps + 0.55 × (400 − gap)) is ALWAYS far
+ *     above `maxMatchSpeedMps`, and the actor simply saturates the cap. Net
+ *     effect: a dead-constant 2.6 m/s from the first frame the player rolls,
+ *     never slaved to the player's speed. A small paceAheadM would have made
+ *     the child brake to a stop whenever the driver hung back — the opposite of
+ *     a child, who pedals on regardless of what you do.
+ *  3. THE WOBBLE: `cutAt` is a point on the ACTOR's path, so the swerve fires
+ *     at an authored MID-BLOCK LOCATION (the drain at y = 100), not off a
+ *     player-relative trigger — the child swerves because of the road, not
+ *     because of you, which is VU-03's entire premise. `cutShiftM` −2.0 glides
+ *     him from 6.66 to 4.66 over `cutRampSec` 2.5 s (= the map's 6.5 m arc at
+ *     2.6 m/s), and the traffic layer noses the rig into the glide direction, so
+ *     he visibly leans into it. `minCutSpeedKmh` 5 is authored DOWN to a floor
+ *     no drive can miss: the swerve must be a fact of the street, identical in
+ *     all three recordings, never a function of how the driver behaved.
+ *  4. THE CONTACT: the runner's ONLY emitted event is collision(vehicle) inside
+ *     VEHICLE_CONTACT_M, and only AFTER the cut has fired. Both halves are
+ *     load-bearing and both are asserted in the district battery — see the
+ *     mistake demos' notes in traces/scVuChildCyclist.ts.
+ */
+const VUCC_CHILD: CutInLeadCarSpec = {
+  id: "sc-vucc-child",
+  kind: "cutInLeadCar",
+  libraryEventId: "ev-cyclist",
+  actor: {
+    // vu-child-v1 is one edge: start → end, northbound.
+    pathNodes: ["vuc-n-start", "vuc-n-end"],
+    hold: { nodeIndex: 0, offsetM: 45 }, // y = 45 — 30 m up the road from the spawn
+    cruiseSpeedMps: VUCC_CHILD_MPS,
+    extraRightOffsetM: VUCC_CURB_X - VUCC_LANE_X, // 2.6 — the curb line + the A11 tag
+    colorIndex: 2,
+  },
+  paceAheadM: 400, // unreachable by design — see dial 2 above
+  maxMatchSpeedMps: VUCC_CHILD_MPS,
+  cutAt: { x: VUCC_CURB_X, y: VUCC_WOBBLE_Y },
+  cutRadiusM: VUCC_WOBBLE_RADIUS_M,
+  minCutSpeedKmh: 5,
+  cutShiftM: VUCC_APEX_X - VUCC_CURB_X, // −2.0 — LEFT, into the driver's lane
+  cutRampSec: VUCC_WOBBLE_ARC_M / VUCC_CHILD_MPS, // 2.5 s = the map's 6.5 m arc
+  cutSpeedMps: VUCC_CHILD_MPS, // he does not speed up or slow down for the swerve
+  clearAheadM: 400, // longer than the street: the child is never „cleared",
+  // he is simply still there when the lesson ends — which is the point
+};
+
+/**
+ * L5's complication — ONE southbound car, released the moment the player rolls
+ * and timed to be ALONGSIDE the wobble. „Nowhere to go but BEHIND the child":
+ * the wide line this drill teaches is the ONCOMING BANK, and at L5 the bank is
+ * occupied for exactly the seconds the child spends swinging into your lane. The
+ * rung's answer is not a better line, it is the brake — which is the half of
+ * чл. 20, ал. 2 the lower rungs never force.
+ *
+ * ONE car, not a stream: this street is 300 m and the honest pass needs ~8 s of
+ * unbroken excursion, so a second car would make the rung unpassable rather than
+ * harder (the sc-vu-cyclist-group ruling, reused).
+ */
+const VUCC_ONCOMING: OncomingStreamSpec = {
+  id: "sc-vucc-oncoming",
+  kind: "oncomingStream",
+  libraryEventId: "ev-cyclist",
+  actor: {
+    pathNodes: ["vuc-n-end", "vuc-n-start"], // southbound = oncoming
+    hold: { nodeIndex: 0, offsetM: VUCC_STREET_M - 190 }, // y = 190
+    cruiseSpeedMps: 8, // ~29 km/h — the street's own posted pace
+    colorIndex: 6,
+  },
+  count: 1,
+  gapsM: [], // length count − 1
+  releaseKmh: 3, // rolls as soon as the player does
+};
+
+/**
+ * VU-03 — колелото завива около дупка (ЗДвП чл. 42: изпреварване на велосипедист
+ * само с ДОСТАТЪЧНА странична дистанция; чл. 20, ал. 2: скорост, съобразена с
+ * конкретните условия — а дете на велосипед Е условие. Bank-verified:
+ * q-uyazvimi-051 grounds the group/уязвими clearance duty at чл. 42, q-eco-009
+ * the „скорост, при която можеш да спреш" reading of чл. 20, q-uyazvimi-010 the
+ * децата-са-непредвидими care duty. The 1.5 m figure is the taught BG/EU
+ * GUIDANCE, not a statutory number — the copy teaches it, the tracker convicts
+ * only under ~1.2 m of air).
+ *
+ * WHY IT IS NOT A DUPLICATE of sc-vu-pass-clearance (one rider, one margin) or
+ * sc-vu-cyclist-group (five riders, one commitment): both of those grade a
+ * margin against a line the cyclist HOLDS. This one grades a margin against a
+ * line the cyclist ABANDONS. The child starts 2.6 m off your lane center and
+ * ends 0.6 m off it, and nothing announced the move — so the only clearance that
+ * was ever real is the one you budgeted for where he might GO. That is a
+ * different skill from „leave 1.5 m", and it is the one that keeps children
+ * alive: не просветът, а резервът в просвета.
+ */
+export const SC_VU_CHILD_CYCLIST: ScenarioSpec = {
+  id: "sc-vu-child-cyclist",
+  family: "vru",
+  tagsBg: [
+    "дете",
+    "велосипедист",
+    "лъкатушене",
+    "странична дистанция",
+    "жилищна улица",
+    "уязвими участници",
+  ],
+  titleBg: "Дете на колело лъкатуши",
+  objectiveBg:
+    "Дете на велосипед е непредсказуемо: очаквай завиване без знак, дръж двойно по-широк просвет и скорост, с която можеш да спреш веднага.",
+  archetypeIds: ["VU-03", "VU-02"],
+  conceptIds: ["c-children-on-road", "c-cyclists", "c-general-care-duty"],
+  map: {
+    archetype: "straight-street",
+    // The generator recipe — mirrored in vu-child-v1.json meta.scenario.params
+    // (tools/maps/gen_vu_child.mjs; the map is NEW and this template owns it).
+    params: { lengthM: VUCC_STREET_M, maxspeedKmh: 30, variant: "child" },
+    districtId: "vu-child-v1",
+  },
+  start: {
+    spawnPointId: "vuc-spawn-start",
+    vehicleStart: "ready",
+  },
+  instructionsBg: [
+    {
+      n: 1,
+      textBg:
+        "Жилищна улица, 30 км/ч. По десния бордюр пред теб кара дете на велосипед — бавно, на около 10 км/ч.",
+    },
+    {
+      n: 2,
+      textBg:
+        "Не се залепяй зад него и не бързай да го подминеш. Остани назад, на разстояние, от което виждаш цялото колело.",
+    },
+    {
+      n: 3,
+      textBg:
+        "Карай със скорост, с която можеш да спреш ВЕДНАГА — не „почти веднага“. Тук това е около 10–12 км/ч зад детето.",
+    },
+    {
+      n: 4,
+      textBg:
+        "Гледай предното колело, не гърба му. Точно то ще ти каже накъде тръгва — половин секунда преди самото дете да знае.",
+    },
+    {
+      n: 5,
+      textBg:
+        "Ще стане: около средата на улицата детето заобикаля нещо и излиза цели два метра навътре — без мигач, без поглед назад. Ти вече си отзад и просто отпускаш газта.",
+    },
+    {
+      n: 6,
+      textBg:
+        "Чак когато се успокои и хване нова линия: огледало, ляв мигач и ЕДНА широка дъга — през насрещната лента, не покрай него.",
+    },
+    {
+      n: 7,
+      textBg:
+        "Мери просвета от НОВАТА му линия, не от бордюра. И го удвои: детето може да лъкатуши пак, докато си до него.",
+    },
+    { n: 8, textBg: "Прибери се плавно чак когато детето е изцяло в огледалото ти, и продължи до края." },
+  ],
+  success: [
+    {
+      id: "sc-vucc-hold-back",
+      titleBg: "Остани зад детето, докато лъкатуши",
+      // The gate that CANNOT be narrated: maxSpeedKmh 14 is under the tracker's
+      // own 15 km/h pass floor, so reaching (4.06, 80) inside it means the car
+      // was genuinely crawling behind the child at the moment of the swerve —
+      // and a driver who was already committed to a pass here is, by
+      // construction, going too fast to satisfy it.
+      params: { kind: "reachZone", x: VUCC_LANE_X, y: 80, radiusM: 5, maxSpeedKmh: 14 },
+    },
+    {
+      id: "sc-vucc-wide",
+      titleBg: "Изпревари по широката дъга, а не покрай детето",
+      // Radius 3.5 < the 4.31 m from the wide line to the nudge line the first
+      // mistake demo drives: satisfiable ONLY from the oncoming bank. A driver
+      // who „went around" the child inside his own lane misses it — which is
+      // exactly the fault that demo exists to name.
+      params: { kind: "reachZone", x: VUCC_WIDE_X, y: 175, radiusM: 3.5 },
+    },
+    {
+      id: "sc-vucc-finish",
+      titleBg: "Прибери се и продължи до края на отсечката",
+      params: { kind: "reachZone", x: VUCC_LANE_X, y: 265, radiusM: 8 },
+    },
+  ],
+  rubric: {
+    observation: {
+      moments: [
+        { id: "sc-vucc-watch-wheel", titleBg: "Наблюдение на предното колело, преди да се случи" },
+        { id: "sc-vucc-glance-mirror", titleBg: "Огледало преди широката дъга и преди прибирането" },
+      ],
+    },
+    parTimeSec: 95,
+  },
+  // RECORDED: committed deterministic recordings of the authored scripts in
+  // traces/scVuChildCyclist.ts; the §5 gate (shadow replays with ZERO
+  // violations + YIELDED_TO_PRIORITY) and the §9 stage-5 code asserts run in
+  // traces/__tests__/sc-vu-child-cyclist-traces.test.ts (re-record with
+  // RECORD_TRACES=1).
+  shadow: { path: "content/traces/sc-vu-child-cyclist/shadow-correct.trace.json" },
+  mistakes: [
+    {
+      traceRef: { path: "content/traces/sc-vu-child-cyclist/mistake-pass-in-wobble.trace.json" },
+      titleBg: "Изпреварване точно в лъкатушенето",
+      whatWentWrongBg:
+        "Водачът видя всичко. Изчака детето да излезе от бордюра, изчака го да се успокои — и после мина покрай него точно както би минал покрай кола: на около метър въздух. Само че детето вече не е до бордюра, а В ТВОЯТА ЛЕНТА, и метърът, който му остави, е целият му резерв. Второто залитане дойде, докато колата беше до него. Просветът се мери от линията, на която детето Е СЕГА, и се удвоява, защото то може да я смени пак — това е разликата между чл. 42 и „разминах се“.",
+      codeRefs: ["VULNERABLE_PASS_TOO_CLOSE", "COLLISION"],
+    },
+    {
+      traceRef: { path: "content/traces/sc-vu-child-cyclist/mistake-narrow.trace.json" },
+      titleBg: "Тесен просвет покрай детето",
+      whatWentWrongBg:
+        "Тук водачът дори не изчака: провря се покрай детето на метър въздух още преди дупката, докато то още караше кротко до бордюра. И се размина — детето залитна две секунди по-късно, вече зад него. Точно това прави навика опасен: сметката не идва всеки път. Метър до дете на велосипед не е дистанция, а залог — че то няма да мръдне в следващата секунда. Чл. 42 иска ДОСТАТЪЧНО странично разстояние, а достатъчно значи такова, което оцелява едно залитане.",
+      codeRefs: ["VULNERABLE_PASS_TOO_CLOSE"],
+    },
+  ],
+  teach: {
+    whenBg:
+      "Във всяка жилищна улица, покрай всяко училище и всеки парк, по крайните квартали в събота сутрин. Същото важи за дете на тротинетка, за първокласник, който бута колело, и за всеки възрастен велосипедист, който изглежда несигурен на седлото.",
+    whyBg:
+      "Детето на велосипед не кара по линия — то кара по внимание. Балансът му е по-лош, колелото е по-леко, а решенията му са мигновени и необявени: заобикаля шахта, гони котка, поглежда назад и волво завива натам, накъдето гледа. Затова покрай дете правилото „метър и половина“ не стига — то е сметнато за възрастен, който държи линия. Резервът се удвоява не защото законът казва два метра (не казва), а защото чл. 42 иска ДОСТАТЪЧНО разстояние, а достатъчно е онова, което оцелява едно залитане. Оттам идва и второто число: скоростта. Чл. 20, ал. 2 иска скорост, съобразена с условията, а дете на колело е условие — значи скорост, при която спираш ВЕДНАГА, а не „почти“. Двете заедно дават единствения безопасен ред: назад, бавно, изчакваш детето да покаже линията си, и чак тогава една широка дъга през насрещната лента. Ако насрещната е заета — не съществува половин изпреварване: оставаш отзад. Няма закъснение, което да струва колкото едно дете.",
+    lawRef: "ЗДвП чл. 42; чл. 20",
+    examinerBg:
+      "Изпитващият гледа: ранно забелязване на детето и осезаемо намаляване ПРЕДИ да се е случило нещо, задържане назад без залепване, преценка на насрещното преди маневрата, огледало и мигач, една широка и решителна дъга през насрещната лента с просвет, измерен от текущата линия на детето, и прибиране чак след него. Провирането покрай дете на велосипед е основна грешка; принудата върху него или контактът е опасна и прекратява изпита.",
+  },
+  levels: [
+    { level: 1 },
+    { level: 2 },
+    { level: 3 },
+    { level: 4, vehicleStart: "cold" },
+    // L5 — НЕ дъжд: на този сценарий условията са ТРАФИК, не време. The rung
+    // adds ONE oncoming car timed to the swerve, and it changes the answer
+    // rather than the difficulty of the same answer: the wide line this drill
+    // teaches is unavailable for exactly the seconds the child needs it, so the
+    // only lawful move left is the one the objective's second half names —
+    // stay behind and brake. Physics stays DRY (ADR-006 stage 4a): the authored
+    // ghost envelope of this template is dry-tuned, and the taught delta here
+    // is a decision, not grip.
+    { level: 5, stagedAdd: [VUCC_ONCOMING] },
+  ],
+  staged: [VUCC_CHILD],
+  conditions: { weather: "dry" },
+  localeBg: "bg-BG",
+};
+
+// ---------------------------------------------------------------------------
+// sc-vu-bikelane-turn — „Десен завой през велоалея" (VU-01, the TWO-WAY /
+// COUNTER-FLOW variant) on the NEW vu-bikelane-v1 junction
+// ---------------------------------------------------------------------------
+
+/** vu-bikelane-v1 lane centers (meta.scenario — pinned by value; the
+ *  vu-bikelane-districts battery asserts each against the generated map). */
+const VBL_THROUGH_Y = -4.06; // eastbound through-lane center (driver's lane)
+const VBL_STEM_X = -4.06; // southbound stem lane center — where the right turn lands
+/**
+ * The curb-separated TWO-WAY cycle track lines on the through road's SOUTH edge
+ * (meta.scenario.cycleTrack). Both directions ride the south side; the driver
+ * crosses the whole track as the right turn lands on the stem.
+ *  · WF (with-flow, eastbound): the driver's own direction, curb-side. The
+ *    SAME 2.6 m curb line vu-cyclist-v1 pins — 2.6 m of centers clears the
+ *    2.2 m contact radius, so the driver overtakes it before the mouth without
+ *    a spurious touch (the sc-vu-cyclist-hook precedent).
+ *  · CF (counter-flow, westbound): the STAR — a rider coming from AHEAD on the
+ *    same south track, crossing the mouth from the driver's FRONT-RIGHT. A
+ *    "look back over the shoulder" check never covers it. Pushed 4.2 m off the
+ *    lane center (its own sub-lane), 4.2 m of daylight from the driver's lane.
+ */
+const VBL_WF_Y = -6.66; // eastbound rider line (lane center − 2.6, offsetPolyline south)
+const VBL_CF_Y = -8.26; // westbound rider line (lane center − 4.2)
+
+/**
+ * THE WITH-FLOW RIDER — the classic curb cyclist going the driver's own
+ * direction (the sc-vu-cyclist-hook recipe, reused). Holds ~26 m short of the
+ * mouth curb-side; released as the driver closes; cruises STRAIGHT through the
+ * junction as the driver overtakes then turns across it. extraRightOffsetM 2.6
+ * lands it on the south track's inner line (y = −6.66) AND tags it a cyclist
+ * (A11 vehicleCollisionKind → collision(cyclist)). Adjudicated by the shipped
+ * CyclistRightHookRunner (prioritySituation "cyclist-right-hook").
+ */
+const VBL_RIDER_WF: CyclistRightHookSpec = {
+  id: "sc-vbl-rider-wf",
+  kind: "cyclistRightHook",
+  libraryEventId: "ev-cyclist",
+  junction: { nodeId: "vu-n-c", x: 0, y: 0 },
+  actor: {
+    // Eastbound through the junction: vu-n-w → vu-n-c → vu-n-e.
+    pathNodes: ["vu-n-w", "vu-n-c", "vu-n-e"],
+    hold: { nodeIndex: 1, offsetM: -30 }, // curb-side, 30 m short of vu-n-c
+    cruiseSpeedMps: 3.0, // ~11 km/h — a city cyclist; overtaken below the follow floor
+    extraRightOffsetM: VBL_WF_Y - VBL_THROUGH_Y, // +2.6 — the south curb line + the A11 tag
+    colorIndex: 1,
+  },
+  junctionNodeIndex: 1,
+  releaseDistM: 60,
+  dangerRadiusM: 9,
+  conflictWindowM: 25,
+};
+
+/**
+ * THE COUNTER-FLOW RIDER — the REVERSED path (vu-n-e → vu-n-c → vu-n-w), the
+ * whole point of the template: a rider approaching the mouth from AHEAD on the
+ * same south track. Its extraRightOffsetM is NEGATIVE (−12.32) because
+ * offsetPolyline offsets to the RIGHT OF TRAVEL, and this actor travels WEST —
+ * so a negative offset carries it across to the SOUTH side (y = −8.26), onto
+ * the two-way track next to its with-flow mate. A negative offset also leaves
+ * it UNTAGGED by the cyclistNear feed (that marker is offset > 0), which is
+ * correct here: the counter-flow rider is graded ONLY by its own
+ * CyclistRightHookRunner (prioritySituation + the runner's collision channel),
+ * never by the vulnerable-pass tracker. Held ~36 m short of the mouth so it
+ * arrives ~2.4 s AFTER the with-flow rider — the driver clears one, then the
+ * other, then turns.
+ */
+const VBL_RIDER_CF: CyclistRightHookSpec = {
+  id: "sc-vbl-rider-cf",
+  kind: "cyclistRightHook",
+  libraryEventId: "ev-cyclist",
+  junction: { nodeId: "vu-n-c", x: 0, y: 0 },
+  actor: {
+    // Westbound through the junction (the reversed path): vu-n-e → vu-n-c → vu-n-w.
+    pathNodes: ["vu-n-e", "vu-n-c", "vu-n-w"],
+    hold: { nodeIndex: 1, offsetM: -30 }, // 30 m short of vu-n-c on the EAST arm
+    cruiseSpeedMps: 4.0, // ~14 km/h — a brisk commuter; clears the mouth briskly
+    extraRightOffsetM: VBL_CF_Y - 4.06, // −12.32 — westbound lane (+4.06) shoved south
+    colorIndex: 3,
+  },
+  junctionNodeIndex: 1,
+  releaseDistM: 60,
+  dangerRadiusM: 9,
+  conflictWindowM: 25,
+};
+
+/**
+ * VU-01, the TWO-WAY / counter-flow variant — десен завой през велоалея (ЗДвП
+ * чл. 25, ал. 2, т. 3: при завиване надясно водачът пропуска движещите се по
+ * велоалея, която пресича платното; чл. 37: при завиване наляво/надясно
+ * пропуска velосипедистите; чл. 42: изпреварване/разминаване с достатъчно
+ * разстояние. Bank-verified: q-predimstvo-062 grounds the right-turn-across-
+ * cycleway yield duty, q-uyazvimi-011/034/063 the cyclist-priority-on-the-path
+ * cases, q-krastovishta-031 the two-way-approach scan).
+ *
+ * WHY IT IS NOT A DUPLICATE of the live sc-vu-cyclist-hook: that template grades
+ * the OVERTAKEN-FROM-BEHIND rider only — a curb cyclist going the driver's own
+ * direction. This one adds the COUNTER-FLOW half a two-way track forces: a
+ * rider from AHEAD, on the driver's front-right, which the shoulder check
+ * behind never sees. Two riders, two directions, one right turn.
+ */
+export const SC_VU_BIKELANE_TURN: ScenarioSpec = {
+  id: "sc-vu-bikelane-turn",
+  family: "vru",
+  tagsBg: [
+    "велосипедист",
+    "велоалея",
+    "двупосочна",
+    "десен завой",
+    "насрещно колело",
+    "уязвими участници",
+  ],
+  titleBg: "Десен завой през велоалея",
+  objectiveBg:
+    "Преди десния завой пресичаш ДВУПОСОЧНА велоалея: огледай и надясно-назад, и НАДЯСНО-НАПРЕД — колелото може да идва и от двете посоки, и то е с предимство.",
+  archetypeIds: ["VU-01"],
+  conceptIds: ["c-cyclists", "c-priority-concept", "c-mirrors-blind-spots"],
+  map: {
+    archetype: "t-junction",
+    // The generator recipe — mirrored in vu-bikelane-v1.json meta.scenario.params
+    // (tools/maps/gen_vu_bikelane.mjs; the map is NEW and this template owns it).
+    params: { control: "none", throughArmM: 150, stemArmM: 90, throughMaxKmh: 50, stemMaxKmh: 50 },
+    districtId: "vu-bikelane-v1",
+  },
+  start: {
+    spawnPointId: "vu-spawn-west",
+    vehicleStart: "ready",
+  },
+  instructionsBg: [
+    {
+      n: 1,
+      textBg:
+        "Движи се спокойно в дясната лента към кръстовището. Ще завиваш надясно по страничната улица.",
+    },
+    {
+      n: 2,
+      textBg:
+        "Преди завоя пресичаш велоалея, а тя е ДВУПОСОЧНА — колело може да дойде и отзад, и насреща по същата алея.",
+    },
+    {
+      n: 3,
+      textBg:
+        "Затова не стига само поглед назад: провери дясното огледало и рамо за движещия се направо велосипедист, НО и напред-надясно по алеята.",
+    },
+    {
+      n: 4,
+      textBg:
+        "Точно отпред-дясно се задава колело срещу теб — то е на алеята и има предимство. Намали до крачка и го изчакай да премине устието.",
+    },
+    {
+      n: 5,
+      textBg:
+        "Завий надясно чак когато и двете посоки на алеята са чисти — не отрязвай нито движещия се направо, нито насрещния велосипедист.",
+    },
+    { n: 6, textBg: "Влез плавно в страничната улица, изключи мигача и продължи." },
+  ],
+  success: [
+    {
+      id: "sc-vbl-approach",
+      titleBg: "Приближи завоя бавно, готов да пропуснеш и двете посоки",
+      // Pre-junction checkpoint ~22 m before vu-n-c on the eastbound lane:
+      // arriving slowly is the yield-setup skill.
+      params: { kind: "reachZone", x: -22, y: VBL_THROUGH_Y, radiusM: 9, maxSpeedKmh: 35 },
+    },
+    {
+      id: "sc-vbl-turned",
+      titleBg: "Завий надясно, след като велоалеята е чиста в двете посоки",
+      // Down the south stem — reachable ONLY from a completed right turn.
+      params: { kind: "reachZone", x: VBL_STEM_X, y: -45, radiusM: 10 },
+    },
+    {
+      id: "sc-vbl-finish",
+      titleBg: "Продължи по страничната улица",
+      params: { kind: "reachZone", x: VBL_STEM_X, y: -70, radiusM: 8 },
+    },
+  ],
+  rubric: {
+    observation: {
+      moments: [
+        { id: "sc-vbl-glance-back", titleBg: "Огледало и рамо назад — движещият се направо велосипедист" },
+        { id: "sc-vbl-glance-ahead", titleBg: "Поглед напред-надясно по алеята — насрещното колело" },
+      ],
+    },
+    parTimeSec: 80,
+  },
+  // RECORDED: committed deterministic recordings of the authored scripts in
+  // traces/scVuBikelaneTurn.ts; the §5 gate (shadow replays with ZERO
+  // violations + YIELDED_TO_PRIORITY) and the §9 stage-5 code asserts run in
+  // traces/__tests__/sc-vu-bikelane-turn-traces.test.ts (re-record with
+  // RECORD_TRACES=1).
+  shadow: { path: "content/traces/sc-vu-bikelane-turn/shadow-correct.trace.json" },
+  mistakes: [
+    {
+      traceRef: { path: "content/traces/sc-vu-bikelane-turn/mistake-only-behind.trace.json" },
+      titleBg: "Завой само с поглед назад — колело отпред-дясно",
+      whatWentWrongBg:
+        "Водачът провери назад — дясно огледало и рамо, — видя, че движещият се направо велосипедист е преминал, и зави. Но алеята е ДВУПОСОЧНА: точно отпред-дясно, срещу него, се задаваше второ колело, което погледът назад никога не покрива. Завиването пред него е непропускане на участник с предимство (чл. 25, ал. 2, т. 3; чл. 37), а на велоалея цената е контакт с уязвим участник. При двупосочна алея се гледат ОБЕ посоки — назад И напред-надясно.",
+      codeRefs: ["FAILED_TO_YIELD", "COLLISION"],
+    },
+    {
+      traceRef: { path: "content/traces/sc-vu-bikelane-turn/mistake-cut-path.trace.json" },
+      titleBg: "Отрязване на колелото по алеята",
+      whatWentWrongBg:
+        "Колата зави надясно точно докато велосипедистът по алеята още не беше преминал устието — класическият „десен капан“. Велосипедистът, който се движи направо по велоалеята, има предимство пред завиващия (чл. 37); отрязването му е непропускане на участник с предимство. Един поглед и изчакване, докато алеята се освободи, го предотвратява.",
+      codeRefs: ["FAILED_TO_YIELD"],
+    },
+  ],
+  teach: {
+    whenBg:
+      "При всеки десен завой, който пресича велоалея — на кръстовище, на изход от булевард, покрай отделена от платното велосипедна писта. В София повечето обособени велоалеи са ДВУПОСОЧНИ, затова колело идва и отзад, и насреща.",
+    whyBg:
+      "Десният завой през велосипедист е сред най-честите тежки градски произшествия с уязвими участници — колелото няма ламарина. Двупосочната алея добавя капана, който убива: навикът да „погледнеш през дясното рамо“ покрива само колелото, което идва отзад, докато насрещното — отпред-дясно, срещу теб — остава извън всяко огледало и всеки поглед назад. То е и по-бързо в общата картина, защото се движи към теб. Затова редът при завой през двупосочна алея е ДВОЕН: назад за движещия се направо, и напред-надясно за насрещния, и завиваш едва когато и двете посоки са чисти. Велосипедистът по алеята върви направо и има предимство пред теб, който завиваш (чл. 37); ти изчакваш, той минава.",
+    lawRef: "ЗДвП чл. 25; чл. 37; чл. 42",
+    examinerBg:
+      "Изпитващият гледа: проверка на дясното огледало и рамо назад И осезаем поглед напред-надясно по алеята преди десния завой, намаляване до крачка, пропускане на движещите се по велоалеята в ДВЕТЕ посоки, и завиване едва когато алеята е чиста. Завиване пред велосипедист по алеята е основна грешка; контакт с уязвим участник е опасна и прекратява изпита.",
+  },
+  levels: [
+    { level: 1 },
+    { level: 2 },
+    { level: 3 },
+    { level: 4, vehicleStart: "cold" },
+    // L5 — дъжд върху двупосочната алея. The backlog asked this rung to „release
+    // riders from BOTH directions in the same window" (a tighter, simultaneous
+    // crossing). That is not authorable per-rung: the two riders' arrival timing
+    // is a property of the staged actors (hold offsets + releaseDistM), which are
+    // TEMPLATE-WIDE — LevelSpec carries `conditions`/`stagedAdd`, not a retiming
+    // of existing actors — so tightening the window would tighten it for L1 too,
+    // against a ghost tuned for the sequential clear (the sc-vu-child-cyclist
+    // crosswind honesty, reused). The base already presents BOTH directions; the
+    // authorable delta on this rung is the wet crown and the harder-to-read wet
+    // mirror. Physics stays DRY (ADR-006 stage 4a): the taught delta here is the
+    // second scan, not braking grip.
+    { level: 5, conditions: { weather: "rain" } },
+  ],
+  staged: [VBL_RIDER_WF, VBL_RIDER_CF],
+  conditions: { weather: "dry" },
+  localeBg: "bg-BG",
+};
+
 /** The VRU-family templates, file 2 — in catalog order (registered in templates.ts). */
 export const SCENARIO_TEMPLATES_VRU2: readonly ScenarioSpec[] = [
   SC_VU_BLINDSPOT_MOTO,
   SC_VU_CYCLIST_GROUP,
+  SC_VU_CHILD_CYCLIST,
+  SC_VU_BIKELANE_TURN,
 ];

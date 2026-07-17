@@ -225,3 +225,36 @@ for (const c of CASES) {
     });
   });
 }
+
+// sc-sp-wet-limit-plate (wave 9) REUSES sp-rain-v1 — the same flat 50 street
+// sc-speed-rain rides. It depends on exactly two negative facts and one
+// corridor: (1) the posted limit is a FLAT 50 with NO swap span (there is no
+// zone layer to load a 60/90 plate — the feasibility cut documented in the
+// template); (2) there is NO curveAdvisory zone, so SPEED_TOO_FAST_FOR_CURVE is
+// structurally unreachable here; (3) the right-lane corridor at x = 4.06 that
+// the drives and the objective zones (y 180, y 330) sit on resolves cleanly.
+describe("sp-rain-v1 — the sc-sp-wet-limit-plate corridor pins (wave 9)", () => {
+  let runtime: DistrictWorldRuntime;
+
+  beforeAll(() => {
+    runtime = createWorldRuntime(loadRaw("sp-rain-v1"));
+  });
+
+  it("resolves the flat 50 limit at the plate checkpoint and the finish — no swap span exists", () => {
+    for (const y of [15, 180, 330, 345]) {
+      expect(runtime.speedLimitAt({ x: X_LANE, y })).toBe(50);
+    }
+  });
+
+  it("carries NO curveAdvisory and a clean 50 corridor under rain (the wet-rung tick surface)", () => {
+    const rt = createWorldRuntime(loadRaw("sp-rain-v1"));
+    rt.update(1 / 60);
+    // sample(sample, t, isNight, rain) — the wet rungs feed rain=true.
+    const tick = rt.sample(sample(X_LANE, 180, 0, 38), 1, false, true);
+    expect(tick.curveAdvisoryKmh).toBeUndefined(); // no curve arm on this street
+    expect(tick.maxSpeedKmh).toBe(50);
+    expect(tick.laneId).toBe(0);
+    expect(Math.abs(tick.laneOffsetM)).toBeLessThan(0.2);
+    expect(tick.rain).toBe(true);
+  });
+});

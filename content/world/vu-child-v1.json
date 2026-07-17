@@ -1,0 +1,180 @@
+{
+ "format": "district-v1",
+ "meta": {
+  "district": "vu-child",
+  "label": "Учебна жилищна улица — дете на велосипед (сценарий VU-03)",
+  "mapKind": "scenario-vru",
+  "generator": "tools/maps/gen_vu_child.mjs",
+  "boundsLocalMeters": {
+   "minX": -36.12,
+   "minY": -6,
+   "maxX": 14.13,
+   "maxY": 306
+  },
+  "attribution": {
+   "text": "Учебна жилищна улица с дете на велосипед — оригинален параметричен дизайн (без данни от OpenStreetMap)",
+   "license": "All rights reserved",
+   "licenseUrl": "/",
+   "copyrightUrl": "/",
+   "obligation": "none — original work, no ODbL attribution required for this map"
+  },
+  "defaults": {
+   "maxspeedUrbanKmh": 30,
+   "note": "По десния бордюр кара дете на велосипед. Децата не държат линия: остави му двойно повече място и скорост, с която спираш веднага."
+  },
+  "stats": {
+   "roadKm": 0.3,
+   "nodes": 2,
+   "edges": 1,
+   "intersections": 0,
+   "crossings": 0,
+   "buildings": 2,
+   "spawnPoints": 2
+  },
+  "scenario": {
+   "archetype": "straight-street",
+   "params": {
+    "lengthM": 300,
+    "maxspeedKmh": 30,
+    "variant": "child"
+   },
+   "lanesPerDirection": 1,
+   "laneCenterRightM": 4.06,
+   "wobble": {
+    "curbXM": 6.66,
+    "apexXM": 4.66,
+    "amplitudeM": 2,
+    "triggerYM": 100,
+    "triggerRadiusM": 2,
+    "arcM": 6.5
+   },
+   "childPath": [
+    [
+     6.66,
+     0
+    ],
+    [
+     6.66,
+     100
+    ],
+    [
+     4.66,
+     106.5
+    ],
+    [
+     4.66,
+     300
+    ]
+   ]
+  }
+ },
+ "roads": {
+  "nodes": [
+   {
+    "id": "vuc-n-end",
+    "x": 0,
+    "y": 300
+   },
+   {
+    "id": "vuc-n-start",
+    "x": 0,
+    "y": 0
+   }
+  ],
+  "edges": [
+   {
+    "id": "vuc-e-street",
+    "from": "vuc-n-start",
+    "to": "vuc-n-end",
+    "class": "residential",
+    "name": "Учебна жилищна улица — дете на велосипед (сценарий VU-03)",
+    "oneway": false,
+    "roundabout": false,
+    "lanes": 2,
+    "lanesSource": "tag",
+    "maxspeed": 30,
+    "maxspeedSource": "tag",
+    "length": 300,
+    "geometry": [
+     [
+      0,
+      0
+     ],
+     [
+      0,
+      300
+     ]
+    ]
+   }
+  ]
+ },
+ "intersections": [],
+ "crossings": [],
+ "roundabouts": [],
+ "buildings": [
+  {
+   "id": "vuc-b-block-1",
+   "height": 8,
+   "heightSource": "default",
+   "footprint": [
+    [
+     -30.12,
+     30
+    ],
+    [
+     -16.12,
+     30
+    ],
+    [
+     -16.12,
+     70
+    ],
+    [
+     -30.12,
+     70
+    ]
+   ]
+  },
+  {
+   "id": "vuc-b-block-2",
+   "height": 8,
+   "heightSource": "default",
+   "footprint": [
+    [
+     -30.12,
+     120
+    ],
+    [
+     -16.12,
+     120
+    ],
+    [
+     -16.12,
+     160
+    ],
+    [
+     -30.12,
+     160
+    ]
+   ]
+  }
+ ],
+ "spawnPoints": [
+  {
+   "id": "vuc-spawn-start",
+   "x": 4.06,
+   "y": 15,
+   "heading": 0,
+   "edgeId": "vuc-e-street",
+   "name": "Начало — дясна лента"
+  },
+  {
+   "id": "vuc-spawn-finish",
+   "x": 4.06,
+   "y": 285,
+   "heading": 0,
+   "edgeId": "vuc-e-street",
+   "name": "Контролна точка — край на отсечката"
+  }
+ ]
+}

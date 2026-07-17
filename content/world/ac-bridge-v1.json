@@ -1,0 +1,212 @@
+{
+ "format": "district-v1",
+ "meta": {
+  "district": "ac-bridge",
+  "label": "Учебна улица с мост — заледена настилка на съоръжението (сценарий AC-08, антиципация)",
+  "mapKind": "scenario-street",
+  "generator": "tools/maps/gen_ac_bridge.mjs",
+  "boundsLocalMeters": {
+   "minX": -28.13,
+   "minY": 0,
+   "maxX": 28.13,
+   "maxY": 520
+  },
+  "zonesVersion": 1,
+  "attribution": {
+   "text": "Учебна права улица с мостово съоръжение и заледена настилка на моста — оригинален параметричен дизайн (без данни от OpenStreetMap)",
+   "license": "All rights reserved",
+   "licenseUrl": "/",
+   "copyrightUrl": "/",
+   "obligation": "none — original work, no ODbL attribution required for this map"
+  },
+  "defaults": {
+   "maxspeedUrbanKmh": 50,
+   "note": "Права улица (50 км/ч) с мост при [250, 340] м: улицата е суха, но настилката на съоръжението е заледена — под нея няма топла земя. Сцеплението на моста е ~15% от сухото при всяка скорост; знакът А15 „Опасност от хлъзгане“ стои на близкия устой."
+  },
+  "stats": {
+   "roadKm": 0.52,
+   "nodes": 2,
+   "edges": 1,
+   "intersections": 0,
+   "crossings": 0,
+   "buildings": 4,
+   "spawnPoints": 2,
+   "zones": 1
+  },
+  "scenario": {
+   "archetype": "straight-street",
+   "params": {
+    "lengthM": 520,
+    "maxspeedKmh": 50
+   },
+   "lanesPerDirection": 1,
+   "laneCenterRightM": 4.06
+  }
+ },
+ "roads": {
+  "nodes": [
+   {
+    "id": "ac-bridge-n-end",
+    "x": 0,
+    "y": 520
+   },
+   {
+    "id": "ac-bridge-n-start",
+    "x": 0,
+    "y": 0
+   }
+  ],
+  "edges": [
+   {
+    "id": "ac-bridge-e-street",
+    "from": "ac-bridge-n-start",
+    "to": "ac-bridge-n-end",
+    "class": "residential",
+    "name": "Улица с мост над дерето",
+    "oneway": false,
+    "roundabout": false,
+    "lanes": 2,
+    "lanesSource": "tag",
+    "maxspeed": 50,
+    "maxspeedSource": "tag",
+    "length": 520,
+    "geometry": [
+     [
+      0,
+      0
+     ],
+     [
+      0,
+      520
+     ]
+    ]
+   }
+  ]
+ },
+ "intersections": [],
+ "crossings": [],
+ "roundabouts": [],
+ "buildings": [
+  {
+   "id": "ac-bridge-b-approach-w",
+   "height": 9,
+   "heightSource": "default",
+   "footprint": [
+    [
+     -16.13,
+     110
+    ],
+    [
+     -28.13,
+     110
+    ],
+    [
+     -28.13,
+     200
+    ],
+    [
+     -16.13,
+     200
+    ]
+   ]
+  },
+  {
+   "id": "ac-bridge-b-approach-e",
+   "height": 9,
+   "heightSource": "default",
+   "footprint": [
+    [
+     16.13,
+     110
+    ],
+    [
+     28.13,
+     110
+    ],
+    [
+     28.13,
+     200
+    ],
+    [
+     16.13,
+     200
+    ]
+   ]
+  },
+  {
+   "id": "ac-bridge-b-far-w",
+   "height": 9,
+   "heightSource": "default",
+   "footprint": [
+    [
+     -16.13,
+     390
+    ],
+    [
+     -28.13,
+     390
+    ],
+    [
+     -28.13,
+     465
+    ],
+    [
+     -16.13,
+     465
+    ]
+   ]
+  },
+  {
+   "id": "ac-bridge-b-far-e",
+   "height": 9,
+   "heightSource": "default",
+   "footprint": [
+    [
+     16.13,
+     390
+    ],
+    [
+     28.13,
+     390
+    ],
+    [
+     28.13,
+     465
+    ],
+    [
+     16.13,
+     465
+    ]
+   ]
+  }
+ ],
+ "spawnPoints": [
+  {
+   "id": "ac-bridge-spawn-approach",
+   "x": 4.06,
+   "y": 15,
+   "heading": 0,
+   "edgeId": "ac-bridge-e-street",
+   "name": "Начало на отсечката — преди моста"
+  },
+  {
+   "id": "ac-bridge-spawn-finish",
+   "x": 4.06,
+   "y": 505,
+   "heading": 0,
+   "edgeId": "ac-bridge-e-street",
+   "name": "Контролна точка — след отсрещния устой"
+  }
+ ],
+ "zones": [
+  {
+   "id": "ac-bridge-z-deck-ice",
+   "kind": "icePatch",
+   "edgeId": "ac-bridge-e-street",
+   "fromM": 250,
+   "toM": 340,
+   "signRef": "А15",
+   "patchGripFactor": 0.15
+  }
+ ]
+}

@@ -582,9 +582,199 @@ export const SC_SIG_CONTROLLER_LIVE: ScenarioSpec = {
   localeBg: "bg-BG",
 };
 
+// ---------------------------------------------------------------------------
+// sc-sig-controller-postures — „Езикът на регулировчика" on sx-v1 (map REUSED;
+// the lamps are DARK — the officer's POSTURES are the only law source)
+// ---------------------------------------------------------------------------
+
+/**
+ * The staged authority: a CONTROLLER posted at sx-n-c whose HAND POSTURES —
+ * not any lamp — govern the south approach (ППЗДвП чл. 66; ЗДвП чл. 7). This
+ * is the canonical dead-signal case: the светофар is out and the officer
+ * directs by hand, so his pose is the ONLY signal at the junction. Session-
+ * start dials, all authored constants (the signalOffsets discipline, no RNG):
+ *
+ *  - haltedGroup "ns" HALTS the player's south-stem approach from t = 0 — the
+ *    officer is turned toward the player (гърди/гръб or вдигната ръка = стоп);
+ *  - flipAtSec 30 is the single authored flip: at t = 30 the officer turns
+ *    SIDE-ON to the ns axis (страничен профил, отпуснати ръце = премини) and
+ *    the direction is PERMITTED — the shadow proceeds only then.
+ *
+ * WHY NO signalOffsetSec (the deliberate contrast with sc-sig-controller-live
+ * and sc-signal-controller): those two PIN a misleading live lamp (green while
+ * halted) so the drill is „the officer beats the light". Here the light is
+ * DARK — there is no competing lamp to pin, and none to read. The postures are
+ * the sole law source, exactly the teach goal. The engine still runs the
+ * cluster "controlled" (setClusterController is what makes the officer's
+ * permission the effective signal — controllerPermission requires it), but
+ * with no offset pin the crossing simply carries the permission the reducer
+ * grades; the natural lamp phase is never the point and never read.
+ *
+ * GRADING IS 100% THE PRODUCTION PIPELINE: stopLineCrossed carries the
+ * controller permission and the reducer grades it (halt → CONTROLLER_SIGNAL_
+ * VIOLATED regardless of lamp, proceed → innocent). Both mistakes cross while
+ * the officer halts the approach — barging past his chest, and false-starting
+ * on the raised arm — so both grade EXACTLY that opasna code (ЗДвП чл. 7).
+ * HESITATION_AT_GREEN is structurally unreachable: with a controller posted a
+ * halted approach reads „red" however the dark lamp renders, so the wait at
+ * the line is never billed — only moving against the posture is. The figure
+ * (pose "directTraffic", ADR-001 fictional) is the visual anchor; the authored
+ * timetable encodes the posture the drill grades.
+ *
+ * ACCEPTED CONSEQUENCE (instructionsBg step 4 exists for it): the permission
+ * rides the SESSION clock and the schedule carries ONE flip — a student who
+ * has not read the officer by the flip still gets his „go" at t = 30; the
+ * drill is reading the posture, not racing a stopwatch.
+ *
+ * Geometry pinned to sx-v1 (battery sx-district.test.ts): single-node cluster
+ * sx-n-c at the origin; south-approach stop line 27.725 m south of it
+ * (sx-e-s@92.3, group "ns"); drawn lane centers at ±4.0625; spawn at (0, −105).
+ */
+export const SC_SIG_CONTROLLER_POSTURES_EVENT: TrafficControllerSpec = {
+  id: "sc-sctp-officer",
+  kind: "trafficController",
+  libraryEventId: "JU-18",
+  signalNodeId: "sx-n-c",
+  junction: { x: 0, y: 0 },
+  // Junction-center post, turned toward the south approach it halts, then
+  // turns side-on at the flip to wave it through.
+  officer: { x: 0, y: 0 },
+  facing: { x: 0, y: -1 },
+  haltedGroup: "ns",
+  flipAtSec: 30,
+  // NO signalOffsetSec: the lamps are dark, the posture is the law.
+  lineDistM: 27.7,
+};
+
+export const SC_SIG_CONTROLLER_POSTURES: ScenarioSpec = {
+  id: "sc-sig-controller-postures",
+  family: "signals",
+  tagsBg: ["регулировчик", "жестове", "поза", "йерархия на сигналите", "загаснал светофар"],
+  titleBg: "Езикът на регулировчика",
+  objectiveBg:
+    "Разчети позата: страничен профил с отпуснати ръце = премини; гърди или гръб към теб = спри; вдигната ръка = „внимание“ за всички.",
+  archetypeIds: ["JU-18"],
+  conceptIds: ["c-regulator-signals", "c-signal-hierarchy", "c-junction-approach"],
+  map: {
+    archetype: "x-junction",
+    // Map REUSED from the signals family — mirrored in sx-v1.json params. The
+    // controller (mode + posture timetable) is a runtime session-start dial
+    // armed by the staged event, not a map property.
+    params: {
+      armNorthM: 90,
+      armSouthM: 120,
+      armEastM: 120,
+      armWestM: 170,
+      nsClass: "secondary",
+      ewClass: "residential",
+      nsMaxKmh: 50,
+      ewMaxKmh: 40,
+    },
+    districtId: "sx-v1",
+  },
+  start: {
+    spawnPointId: "sx-spawn-south",
+    vehicleStart: "ready",
+  },
+  instructionsBg: [
+    {
+      n: 1,
+      textBg:
+        "Тръгни по булеварда на север — светофарът на кръстовището е ЗАГАСНАЛ, а движението нарежда РЕГУЛИРОВЧИК. Тук важи само неговата поза.",
+    },
+    {
+      n: 2,
+      textBg:
+        "Научи езика на тялото му: страничен профил с отпуснати ръце = свободно, премини; гърди или гръб към теб = спри; вдигната нагоре ръка = „внимание“ — смяна на посоките за всички.",
+    },
+    {
+      n: 3,
+      textBg:
+        "В момента регулировчикът е с лице/гръб към теб — твоята посока е спряна. Приближи бавно, огледай се и спри ПРЕДИ стоп-линията. Няма лампа за четене — четеш човека.",
+    },
+    {
+      n: 4,
+      textBg:
+        "Вдигнатата ръка НЕ е „тръгвай“ — тя значи „внимание, сменям посоките“. Изчакай спокойно; той разпределя кръстовището и ще пусне теб, когато е готов.",
+    },
+    {
+      n: 5,
+      textBg:
+        "Щом се обърне със страничен профил към теб и отпусне ръце, посоката ти е свободна — премини решително и спокойно на север.",
+    },
+  ],
+  success: [
+    {
+      id: "sc-sctp-read",
+      titleBg: "Приближи бавно и прочети позата на регулировчика",
+      // Stem lane center, before the 27.7 m stop line: slow enough to have
+      // actually LOOKED at the officer, not read a (dark) lamp.
+      params: { kind: "reachZone", x: SX_LANE, y: -42, radiusM: 8, maxSpeedKmh: 30 },
+    },
+    {
+      id: "sc-sctp-cross",
+      titleBg: "Премини кръстовището, когато позата разреши посоката ти",
+      // North-arm northbound lane center, past the 40 m junction area.
+      params: { kind: "reachZone", x: SX_LANE, y: 45, radiusM: 9 },
+    },
+  ],
+  rubric: { parTimeSec: 70 },
+  // RECORDED: committed deterministic recordings of the authored scripts in
+  // traces/scSigControllerPostures.ts; the §5 gate (shadow replays ZERO
+  // violations, crossing probed for controller "proceed") and the §9 stage-5
+  // code asserts run in
+  // traces/__tests__/sc-sig-controller-postures-traces.test.ts (RECORD_TRACES=1).
+  shadow: { path: "content/traces/sc-sig-controller-postures/shadow-correct.trace.json" },
+  mistakes: [
+    {
+      traceRef: {
+        path: "content/traces/sc-sig-controller-postures/mistake-barge-chest.trace.json",
+      },
+      titleBg: "Преминаване срещу гърдите на регулировчика",
+      whatWentWrongBg:
+        "Колата премина кръстовището с равномерна скорост, без изобщо да спре — а регулировчикът беше с лице към нея: гърди към теб значи СПРИ. Загасналият светофар не е разрешение да минеш „както прецениш“: щом движението се нарежда от регулировчик, неговата поза замества всичко. Преминаването срещу сигнала му е опасна грешка, с която изпитът се прекратява — и реален страничен удар, защото напречното направление вече се движи по негова команда.",
+      codeRefs: ["CONTROLLER_SIGNAL_VIOLATED"],
+    },
+    {
+      traceRef: {
+        path: "content/traces/sc-sig-controller-postures/mistake-start-on-raised-arm.trace.json",
+      },
+      titleBg: "Тръгване на вдигнатата ръка",
+      whatWentWrongBg:
+        "Колата спря правилно пред линията, но щом регулировчикът вдигна ръка — потегли. Вдигнатата ръка не е „тръгвай“: тя означава „внимание, сменям посоките“ и задължава всички да изчакат. Тръгването точно тогава е преминаване срещу сигнала на регулировчика — същата опасна грешка, отсъдена и когато колата е спряла коректно преди това. Изчаква се страничният профил с отпуснати ръце.",
+      codeRefs: ["CONTROLLER_SIGNAL_VIOLATED"],
+    },
+  ],
+  teach: {
+    whenBg:
+      "Когато светофарът е загаснал (авария, ремонт, изключен режим) или на кръстовището има произшествие, задръстване или протоколно преминаване — и движението се нарежда от регулировчик. Тогава лампите и знаците мълчат, а единственият сигнал е позата на човека в средата.",
+    whyBg:
+      "Позите на регулировчика се бъркат постоянно: вдигнатата ръка се чете като „тръгвай“, а тя е точно обратното — „внимание, спрете всички“; а страничният профил, който наистина разрешава, се пропуска, защото водачът гледа за лампа, каквато няма. Който не чете човека, влиза в кръстовището точно когато напречното направление е пуснато — и удря отстрани. Тялото на регулировчика е азбука: профил = свободно, гърди/гръб = стоп, ръка нагоре = смяна на фазата.",
+    lawRef: "ППЗДвП чл. 66",
+    examinerBg:
+      "Изпитващият гледа кого четеш при загаснал светофар: намален подход с оглед, реално спиране преди линията при поза „стоп“ (гърди/гръб или вдигната ръка) и решително преминаване чак при страничния профил. Тръгване срещу позата — включително на вдигнатата ръка — е опасна грешка, с която изпитът се прекратява.",
+  },
+  levels: [
+    { level: 1 },
+    { level: 2 },
+    { level: 3 },
+    { level: 4, vehicleStart: "cold" },
+    // No L5 (the backlog's own rung list [1-4]): the difficulty axis here is
+    // reading the posture, not grip/visibility — rain or night would only add
+    // a story the dry-tuned ghost cannot honour (ADR-006 stage 4a).
+  ],
+  staged: [SC_SIG_CONTROLLER_POSTURES_EVENT],
+  // NO signalPlan (deliberate): the lamps are dark — the officer's posture
+  // timetable (haltedGroup + flipAtSec) is the only signal, and an
+  // approach-relative lamp rebase would be inert.
+  conditions: { weather: "dry" },
+  localeBg: "bg-BG",
+};
+
 /** The SIGNALS-family wave-2 templates (registered in templates.ts). */
 export const SCENARIO_TEMPLATES_SIGNALS2: readonly ScenarioSpec[] = [
   SC_SIG_FLASH_AMBER_PED,
   SC_SIG_GREEN_WAVE,
   SC_SIG_CONTROLLER_LIVE,
+  SC_SIG_CONTROLLER_POSTURES,
 ];

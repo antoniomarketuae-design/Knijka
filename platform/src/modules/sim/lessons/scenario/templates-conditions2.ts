@@ -11,6 +11,8 @@
  *                           AC-01, ov-oncoming-v1 REUSED at NIGHT)
  *  - sc-ac-truck-spray      „Водна пелена зад камиона" (FO-04 + FO-06 + AC-02,
  *                           mw-v1 REUSED in RAIN — the wave-5 addition)
+ *  - sc-ac-bridge-ice       „Мостът замръзва пръв" (AC-08 ANTICIPATION, on the
+ *                           NEW ac-bridge-v1 — the wave-7 addition)
  *
  * Family: "conditions" — the existing catalog chip (doc 76 §2).
  */
@@ -440,9 +442,459 @@ export const SC_AC_TRUCK_SPRAY: ScenarioSpec = {
   localeBg: "bg-BG",
 };
 
+// ---------------------------------------------------------------------------
+// sc-ac-bridge-ice — „Мостът замръзва пръв" (AC-08, the ANTICIPATION arm) on
+// the NEW ac-bridge-v1 (520 m urban 50 street, icePatch deck [250, 340]).
+// ---------------------------------------------------------------------------
+
+/** Right-lane (northbound) center of ac-bridge-v1 (1+1 street) — the by-value
+ *  pin; the trace gate asserts the copy against meta.scenario.laneCenterRightM. */
+const BRIDGE_LANE_X = 4.06;
+/** The deck = the icePatch span (ac-bridge-v1 zones[0]; battery-pinned). */
+const DECK_FROM_M = 250;
+const DECK_TO_M = 340;
+
+/**
+ * AC-08 — „Лед по моста", the ANTICIPATION arm: ЗДвП чл. 20, ал. 2 (скоростта
+ * се съобразява със СЪСТОЯНИЕТО на пътя, не с изгледа му).
+ *
+ * WHY A SECOND ICE TEMPLATE (the distinctness that earns this slot — read
+ * before merging it into sc-ac-ice):
+ *  - sc-ac-ice grades ICE RESPONSE: you are on the span, a stalled car is in
+ *    front of you, and the skill is the feather-light stop. Its whole graded
+ *    contract is a crawl gate + a stop mark. It answers „какво правя ВЪРХУ
+ *    леда".
+ *  - This template answers the question that comes FIRST and kills more
+ *    people: „КЪДЕ ще има лед и кога вдигам крака". Nothing is in the way. The
+ *    road is dry, the sky is clear, the sign is a warning triangle and not a
+ *    limit, and the ONLY thing that separates a pass from a slide is whether
+ *    the driver read the bridge from 200 m and lifted off on the dry asphalt.
+ *    The graded contract is therefore three gates in a row — slow BEFORE the
+ *    near abutment, still slow AT the far one, and only then the throttle —
+ *    and NOT a stop.
+ *  - The map carries the difference (see gen_ac_bridge.mjs): ac-ice-v1's
+ *    „bridge" is a word in a lesson card; ac-bridge-v1's deck is a 90 m span
+ *    with 170 m of authored void around it and the А15 post standing on the
+ *    near abutment — the cues the anticipation is supposed to be built from
+ *    actually exist in the world.
+ *
+ * THE ENGINE SEES AN ORDINARY 50-STREET, AND THAT IS THE ARCHITECTURE (read
+ * before "fixing" the mistake codeRefs — the backlog asked for
+ * SPEED_TOO_FAST_FOR_CONDITIONS + HARSH_BRAKING_NO_CAUSE and the engine cannot
+ * honour either HERE; see the file report):
+ *  - SPEED_TOO_FAST_FOR_CONDITIONS is armed EXCLUSIVELY by tick.rain / fog /
+ *    snow / isNight (engine.ts: conditionFactor = MIN of the four, and a factor
+ *    of 1 disarms it). This drill is a CLEAR DRY MORNING on purpose — the
+ *    invisible ice under a blue sky IS the doc-72 surprise, and a weather tag
+ *    would delete it. So the conditions code is structurally unreachable here,
+ *    and the demo bills what actually happens instead: the tail steps out
+ *    (POOR_LANE_KEEPING). The honest hook would be per-segment SURFACE-aware
+ *    prudence — the rules/types.ts night-factor note anticipates exactly that
+ *    shape („a per-segment world signal, not a blanket factor"). NOT authored
+ *    as a ruleConfig night factor the way sc-ac-night-overdrive does it: that
+ *    template's own header explains why a 50-zone cannot carry one („on a
+ *    50-zone the limit already fits inside the beam… „не изпреварвай фаровете"
+ *    would be a fabricated rule"), and this is a 50-zone in the morning.
+ *  - HARSH_BRAKING_NO_CAUSE needs accel ≤ −7 m/s² (harshBrakeDecelMps2). On
+ *    0.15 grip the car cannot produce a THIRD of that. „Спирачка върху леда" is
+ *    physically incapable of being harsh — that IS the lesson the demo teaches,
+ *    so the code's absence is the honest outcome, not a gap. sc-ac-ice's gate
+ *    asserts the same thing in the negative („0.69 m/s² is anything but harsh").
+ *
+ * Like sc-ac-ice / sc-ac-aquaplane, the bridge PARAPETS are RECORDER obstacle
+ * rects (trace channel), not live props: the live student's graded skill is the
+ * three-gate anticipation, and the consequence of getting it wrong — the wall
+ * that is always exactly there on a bridge and nowhere else — is demonstrated
+ * by the red ghosts.
+ */
+export const SC_AC_BRIDGE_ICE: ScenarioSpec = {
+  id: "sc-ac-bridge-ice",
+  family: "conditions",
+  tagsBg: ["условия", "лед", "зимни условия", "мостове", "съобразена скорост", "предвиждане"],
+  titleBg: "Мостът замръзва пръв",
+  objectiveBg:
+    "При температури около нулата настилката на моста заледява преди пътя: вдигни крака от газта ПРЕДИ моста, мини съоръжението с равна скорост и прав волан, и дай газ чак след отсрещния устой.",
+  archetypeIds: ["AC-08"],
+  conceptIds: [
+    "c-winter-ice",
+    "c-hazard-perception",
+    "c-speed-adaptation",
+    "c-braking-distance",
+    "c-general-care-duty",
+  ],
+  map: {
+    archetype: "straight-street",
+    // The generator recipe — mirrored in ac-bridge-v1.json meta.scenario.params
+    // (tools/maps/gen_ac_bridge.mjs).
+    params: { lengthM: 520, maxspeedKmh: 50 },
+    districtId: "ac-bridge-v1",
+  },
+  start: {
+    spawnPointId: "ac-bridge-spawn-approach",
+    vehicleStart: "ready",
+  },
+  instructionsBg: [
+    {
+      n: 1,
+      textBg:
+        "Ясна зимна сутрин около нулата. Улицата под теб е суха и черна — точно затова нищо не те подготвя за това, което идва.",
+    },
+    {
+      n: 2,
+      textBg:
+        "Погледни напред: сградите свършват от двете страни и пътят тръгва над дерето. Това е мост — а мостът няма топла земя под платното си и замръзва пръв, докато улицата още е суха.",
+    },
+    {
+      n: 3,
+      textBg:
+        "На близкия устой стои знак А15 „Опасност от хлъзгане“ — тук той не е украса. Реши СЕГА, на сухия асфалт: смъкни до около 25 км/ч, преди колелата да са стъпили на съоръжението.",
+    },
+    {
+      n: 4,
+      textBg:
+        "Върху леда сцеплението е около 15% от сухото — спирачката и воланът почти не съществуват. Мини целия мост с равна газ и прав волан, без нито една корекция.",
+    },
+    {
+      n: 5,
+      textBg:
+        "И най-важното: не бързай да даваш газ. Ускорението е също толкова рязка команда, колкото спирачката. Чакай отсрещния устой — там свършва ледът и чак там свършва и мостът.",
+    },
+  ],
+  success: [
+    {
+      id: "sc-acbi-before",
+      titleBg: "Вдигни крака от газта ПРЕДИ близкия устой",
+      // THE WHOLE TEMPLATE, in one gate. Cap 30 must be met 15 m BEFORE the
+      // deck starts (250), i.e. on dry asphalt — the only surface where slowing
+      // down still works. A driver who plans to brake „on the bridge" fails
+      // here before the physics ever gets a chance to teach him.
+      params: { kind: "reachZone", x: BRIDGE_LANE_X, y: 235, radiusM: 10, maxSpeedKmh: 30 },
+    },
+    {
+      id: "sc-acbi-deck",
+      titleBg: "Стигни отсрещния устой все още бавно — без газ по моста",
+      // The anti-cheat on gate 1: cap 30 again at the FAR abutment (340). You
+      // cannot satisfy both by dipping under 30 for one tick and flooring it —
+      // the 90 m between them must be driven at the crawl, which is exactly the
+      // „равна газ, прав волан" the ice demands. radiusM 5 keeps the zone WHOLLY
+      // on the deck ([330, 340]): a gate that spilled past the abutment could be
+      // met on dry asphalt, which is the one thing it must never accept.
+      params: { kind: "reachZone", x: BRIDGE_LANE_X, y: 335, radiusM: 5, maxSpeedKmh: 30 },
+    },
+    {
+      id: "sc-acbi-past",
+      titleBg: "Ускори чак на сухото, след съоръжението",
+      // No cap: past the far abutment the dry street is back and normal speed
+      // is not just allowed, it is correct. The gate exists to prove the drill
+      // ends on the far side — the bridge is crossed, not stopped on.
+      params: { kind: "reachZone", x: BRIDGE_LANE_X, y: 440, radiusM: 12 },
+    },
+  ],
+  rubric: { parTimeSec: 85 },
+  // RECORDED: committed deterministic recordings of the authored scripts in
+  // traces/scAcBridgeIce.ts; gates in traces/__tests__/
+  // sc-ac-bridge-ice-traces.test.ts (re-record with RECORD_TRACES=1).
+  shadow: { path: "content/traces/sc-ac-bridge-ice/shadow-correct.trace.json" },
+  mistakes: [
+    {
+      traceRef: { path: "content/traces/sc-ac-bridge-ice/mistake-road-speed.trace.json" },
+      titleBg: "Мостът с пътна скорост — задницата тръгва",
+      whatWentWrongBg:
+        "Колата влезе на моста с разрешените 50 — „нали е в ограничението, пътят е сух“. Само че сухата беше улицата, не съоръжението: на първите метри лед задницата тръгна настрани и колата се понесе към парапета, олюлявайки се през половината платно. Никой не я е карал в тези секунди — воланът върху 15% сцепление не води, а моли. Ограничението е таван за платно в добро състояние; чл. 20, ал. 2 връзва скоростта със СЪСТОЯНИЕТО на пътя, а на мост в мразовита сутрин състоянието е лед, докато не се докаже обратното. Решението е взето 200 метра по-рано или изобщо не е взето.",
+      codeRefs: ["POOR_LANE_KEEPING"],
+    },
+    {
+      traceRef: { path: "content/traces/sc-ac-bridge-ice/mistake-brake-on-deck.trace.json" },
+      titleBg: "Спирачка ВЪРХУ леда",
+      whatWentWrongBg:
+        "Този водач поне разбра, че мостът е лед — но разбра го със закъснение от 90 метра и натисна спирачката ВЪРХУ съоръжението. При 15% сцепление педалът не спира колата, а само ѝ отнема посоката: за 40 метра с натисната докрай спирачка скоростта падна от 50 на 42 км/ч — на сух асфалт същата спирачка щеше да е спряла колата в 24 метра. Вместо това колата се понесе по инерцията си и намери единственото нещо, което на един мост е винаги там — парапета. Забележи какво НЕ се случи: няма рязко спиране, защото рязко спиране на лед е физически невъзможно. Точно затова намаляването не е реакция, а предвиждане — то се прави преди устоя, на чист асфалт (чл. 20, ал. 2).",
+      codeRefs: ["COLLISION"],
+    },
+  ],
+  teach: {
+    whenBg:
+      "Във всяка сутрин около нулата — и винаги на откритите съоръжения: мостове, надлези, естакади, крайречни участъци, сенките на сгради и дървета. Мостът е първият, защото под платното му няма топла земя, а студеният въздух го брули отгоре И отдолу: той може да е заледен, докато улицата преди и след него е суха и черна. Разпознава се по геометрия, не по цвят — сградите свършват, пътят тръгва над празното, парапет от двете страни. Видиш ли това при термометър около нулата, кракът се вдига от газта ОЩЕ ТАМ.",
+    whyBg:
+      "Ледът оставя на гумите около 10–20% от сухото сцепление — спирачният път от 40 км/ч става колкото сухият от 100, а завъртеният волан не завива, а отключва занасяне. Най-коварното е, че той не се вижда: асфалтът на моста лъщи под същото синьо небе като сухата улица зад него. Затова на мост няма реакция — има само предвиждане. Всяка команда, която би те спасила (спирачка, волан, дори газ), изисква сцепление, а точно него ледът ти е взел: единственият момент, в който още имаш сцепление и избор, е ДОКАТО СИ НА СУХОТО. Оттам нататък мостът не ти оставя нищо — нито място да завиеш, нито банкет да избягаш, само парапет отляво и отдясно и дере отдолу. Законът казва същото с две думи: скоростта се съобразява със състоянието на пътното покритие (чл. 20, ал. 2) — а състоянието на моста в мразовита сутрин е лед, докато не се докаже обратното.",
+    lawRef: "ЗДвП чл. 20, ал. 2",
+    examinerBg:
+      "Изпитващият следи дали изобщо си видял моста: очаква осезаемо вдигане на газта ПРЕДИ съоръжението, без подкана и без знак, който да го изисква — знакът А15 предупреждава, не задължава. Равномерното преминаване с прав волан и липсата на ускорение до отсрещния устой се четат като зимно четене на пътя; всяка рязка команда върху съоръжението е грешка в преценката, а плъзгането в парапета прекратява изпита.",
+  },
+  levels: [
+    { level: 1 },
+    { level: 2 },
+    { level: 3 },
+    { level: 4, vehicleStart: "cold" },
+    // L5 — НОЩЕН МРАЗ: RENDER/conditions axis only (compileScenario spreads the
+    // rung OVER the template's conditions, so weather stays "dry" and night is
+    // added). NOTHING re-tunes: conditionSpeedNightFactor ships at 1
+    // (rules/types.ts — the lit-urban-Sofia A12 FP case), so the envelope is
+    // unchanged and no drive changes by a tick. What the rung actually adds is
+    // the real thing: in the dark the geometry cue this whole template is built
+    // on — the buildings ending, the void, the parapets — is much harder to
+    // read, so the anticipation has to come from the thermometer and the А15
+    // post instead of the skyline. NO `physics`: the deck's icePatch already
+    // does the grip locally, and a template-wide flag would ice the approach —
+    // deleting the dry/icy contrast that IS the lesson.
+    { level: 5, conditions: { night: true } },
+  ],
+  // A COLD CLEAR MORNING: day, dry, no weather render — the ice is the map's own
+  // data (the deck's icePatch span), never a weather tag. Consequence, stated
+  // plainly: the rule engine sees an ordinary dry 50-street and arms NO
+  // conditions envelope (see the header) — the ice speaks only through physics.
+  conditions: { weather: "dry" },
+  // NO ruleConfig: every code this drill grades is shipped default-on.
+  // NO physics: base grip stays 1 and ONLY the deck span reduces it — the
+  // sc-ac-ice precedent (the pure map-data grip contract).
+  localeBg: "bg-BG",
+};
+
+// ---------------------------------------------------------------------------
+// sc-ac-wind-truck-pass — „Страничен вятър след камиона" (AC-12 crosswind, the
+// OVERTAKING beat) on mw-v1 (the 1000 m 2+2 motorway, REUSED, DAY DRY + WIND).
+// ---------------------------------------------------------------------------
+
+/** mw-v1 northbound OVERTAKING-lane center — laneId 2 (meta.scenario.laneLeftX;
+ *  the L7 copy truth, asserted against the map by the trace gate). The cruise
+ *  lane (laneId 1) is x = 0 (MW_X_CRUISE, above), the emergency lane x = 8.13. */
+const MW_X_OVERTAKE = -8.12;
+
+/**
+ * THE STAGED TRUCK — the rig whose lee (завет) is the whole lesson.
+ *
+ * WHY cutInLeadCar (the sc-ac-truck-spray precedent, verbatim rationale): on a
+ * ONEWAY multi-lane carriageway the traffic graph's lane for the lead sits on
+ * the EMERGENCY lane (x = 8.13 — graph.laneOffsetFor(oneway) = +8.125), so only
+ * the runner that FORWARDS extraRightOffsetM to traffic.stage()
+ * (CutInLeadCarRunner) can place a rig in the CRUISE lane (x = 0). Its CUT tier
+ * is authored out of reach (cutAt 400 m past the road end + minCutSpeedKmh 250,
+ * the sc-follow-rain-gap slam-out-of-reach pattern): the actor is deterministic
+ * scenery — the truck the player overtakes — and executes NO cut. It emits no
+ * SimTick events and resolves no outcome (the runner's collision arm only ever
+ * arms AFTER a cut, which never fires here — verified by probe), so no drive can
+ * grade from it.
+ *
+ * HONEST LIVE LIMIT (stated, not hidden — the sc-ac-crosswind dual-channel law):
+ * cutInLeadCar has only a matchPlayer motion mode, so in the LIVE re-sim the rig
+ * PACES the player and never physically falls behind — the overtake is not
+ * completed in world space. The pass NARRATIVE (drawing level with the trailer,
+ * the nose clearing the cab, the gust in the lee's edge) is carried by the
+ * AUTHORED shadow polyline + the copy, exactly the way sc-ac-crosswind authors
+ * the wind itself into the ghost (the recorder is kinematic — it never runs the
+ * live crosswind force). A plain slow-cruiser lead actor (or a hold-only truck
+ * slot) would make the live pass complete in world space — flagged for a
+ * follow-up (see the file report): NOT taken here because it is new runner work
+ * on a shared file, and the taught skill (hold the lane through the gust) is
+ * fully LIVE regardless of the rig's relative position.
+ *
+ * paceAheadM 60: generous enough that the brief return to the cruise lane at the
+ * end never re-approaches the rig inside the FOLLOWING band (56 m of bumper gap
+ * ≈ 2.6 s at the ~78 km/h finish — over the 1.8 s dry threshold), so the ONLY
+ * things this template grades are the wind-control channels.
+ */
+const ACTS_WIND_TRUCK: CutInLeadCarSpec = {
+  id: "sc-acw-truck",
+  kind: "cutInLeadCar",
+  actor: {
+    pathNodes: ["mw-n-nb-start", "mw-n-nb-end"],
+    hold: { nodeIndex: 0, offsetM: 95 }, // dormant ~80 m ahead of the spawn, cruise lane
+    cruiseSpeedMps: 17, // ~61 km/h — the slow truck the player overtakes
+    extraRightOffsetM: -8.125, // one drawn lane LEFT of the graph lane → the CRUISE lane (x = 0)
+    colorIndex: 2,
+    profile: "truck", // FO-06 box-truck rig — the wall of the lee
+  },
+  paceAheadM: 60, // see the header — keeps the return FOLLOWING-innocent
+  maxMatchSpeedMps: 33, // 118.8 km/h — never the constraint at this drill's speeds
+  cutAt: { x: MW_X_CRUISE, y: 1400 }, // 400 m PAST the 1000 m road — the cut tier is out of reach…
+  cutRadiusM: 2,
+  minCutSpeedKmh: 250, // …and double-locked: no player speed can fire it
+  cutShiftM: 0,
+  cutRampSec: 1.5,
+  cutSpeedMps: 17,
+  clearAheadM: 45,
+};
+
+/**
+ * AC-12 — страничен вятър при изпреварване на камион (ЗДвП чл. 20, ал. 2:
+ * скоростта се съобразява с атмосферните условия — вятърът е изрично такова —
+ * така че водачът да запази контрол над превозното средство). The OVERTAKING
+ * beat of the wind archetype, distinct from live sc-ac-crosswind (the plain
+ * open-segment gust): here the danger is the TRANSITION — the truck's lee
+ * (завет) shelters you while you are alongside, and the gust hits the instant
+ * your nose clears the cab.
+ *
+ * WHY mw-v1 AND NOT the fo-follow-v1 street sc-ac-crosswind uses:
+ *  - The lesson needs a SLOW vehicle to overtake and a wide carriageway to do
+ *    it on — a motorway is where „изпреварвам камион в силен вятър" actually
+ *    lives (доц-72 AC-12's own „изпреварен камион" cue). The player pulls into
+ *    the overtaking lane (laneId 2, x = −8.12), passes the rig in the cruise
+ *    lane, and is struck by the gust at the cab line.
+ *  - mw-v1 carries no zones, crossings, junctions or signals, so nothing but
+ *    the wind-control channels is gradable. Every speed stays ≥ 50 km/h (the
+ *    motorway floor) and well under 140, so no motorway-crawl and no speeding
+ *    code can attach.
+ *
+ * THE GRADING IS ALL LANE DISCIPLINE, AND THAT IS THE ARCHITECTURE (read before
+ * „fixing" the mistake codeRefs):
+ *  - The carriageway is ONEWAY (oneway === true), so CENTER_LINE_TOUCHED is
+ *    STRUCTURALLY unreachable (engine.ts centerLineCond requires oneway ===
+ *    false — there is no oncoming half). Any sustained excursion, either bank,
+ *    grades POOR_LANE_KEEPING (|laneOffsetM| > laneKeepMaxOffsetM = 3.25 m for
+ *    laneKeepSustainSec) — the shipped detector, unchanged.
+ *  - The overtake is a REAL lane change graded by the shipped machinery: the
+ *    shadow signals + glances each way → SAFE_LANE_CHANGE (a commendation, not
+ *    a violation); the LEFT indicator stays on across the pass, which EXEMPTS
+ *    NOT_KEEPING_RIGHT (engine.ts keepRight indicator carve-out) while the car
+ *    is in the overtaking lane.
+ *  - The COLLISION mistake is the recorder's AUTHORED-consequence seam (a
+ *    scripted `collision` step — the „пешеходец зад колата" pattern), the gust
+ *    throwing the car against the trailer in the тясна пролука of the pass. It
+ *    is a narrative beat at the current clock, never a geometric contact with
+ *    the paced rig (which stays 8 m away in its own lane), so it bills EXACTLY
+ *    COLLISION and nothing else.
+ *
+ * DUAL-CHANNEL HONESTY (the 4a law, wind edition — sc-ac-crosswind verbatim):
+ * `physics.crosswind` runs the LIVE student's car under the westward force +
+ * deterministic gust sine (CROSSWIND_BRIDGE_N ± CROSSWIND_GUST_*, the same
+ * whole-map wind the crosswind template ships — a truck-phase-locked gust is
+ * doc-65 Phase-4 work, stated). The recorded demos are KINEMATIC, so the
+ * lee-then-gust story is AUTHORED into the polylines (traces/scAcWindTruckPass
+ * .ts): the shadow's small held-and-released correction at the cab line, the
+ * mistakes' excursion / clip.
+ */
+export const SC_AC_WIND_TRUCK_PASS: ScenarioSpec = {
+  id: "sc-ac-wind-truck-pass",
+  family: "conditions",
+  tagsBg: ["условия", "страничен вятър", "пориви", "изпреварване", "камион", "контрол на волана"],
+  titleBg: "Страничен вятър след камиона",
+  objectiveBg:
+    "При силен страничен вятър изпревари бавния камион и бъди готов за порива в мига, в който носът ти излезе от завета му: намали преди маневрата, дръж волана здраво и посрещай поривите с леки, постоянни корекции — не с рязко дръпване.",
+  archetypeIds: ["AC-12"],
+  conceptIds: [
+    "c-vehicle-controls",
+    "c-speed-adaptation",
+    "c-overtaking-procedure",
+    "c-hazard-perception",
+    "c-general-care-duty",
+  ],
+  map: {
+    archetype: "motorway-segment",
+    // Reuses the committed mw-v1 map (1000 m divided 2+2 АМ, posted 140, an
+    // emergencyLane span per carriageway, NO junctions/crossings/signals) —
+    // its meta.scenario.params, mirrored here for provenance.
+    params: { lengthM: 1000, maxspeedKmh: 140, lanesPerDirection: 2, medianM: 6 },
+    districtId: "mw-v1",
+  },
+  start: {
+    spawnPointId: "mw-spawn-approach",
+    vehicleStart: "ready",
+  },
+  instructionsBg: [
+    {
+      n: 1,
+      textBg:
+        "Магистрала, а вятърът бие силно отстрани. Пред теб в дясната лента пъпли бавен камион — хвани волана здраво с двете ръце още отсега.",
+    },
+    {
+      n: 2,
+      textBg:
+        "Докато си зад камиона и до него, той ти прави завет: вятърът сякаш е спрял. Не се лъжи — това е най-опасната секунда преди порива.",
+    },
+    {
+      n: 3,
+      textBg:
+        "Намали ПРЕДИ да излезеш за изпреварване и подай ляв мигач: колкото по-бавно минаваш покрай камиона, толкова по-малко ще те отмести поривът.",
+    },
+    {
+      n: 4,
+      textBg:
+        "В мига, в който носът ти излезе пред кабината, заветът изчезва и вятърът те удря отстрани. Посрещни го с лека, ПОСТОЯННА корекция към камиона — никога с рязко дръпване на волана.",
+    },
+    {
+      n: 5,
+      textBg:
+        "Прибери се плавно надясно чак когато целият камион е в огледалото ти, с десен мигач. И очаквай нов порив при всяко следващо открито място.",
+    },
+  ],
+  success: [
+    {
+      id: "sc-acw-pass",
+      titleBg: "Изпревари камиона със съобразена скорост, без да излизаш от лентата",
+      // The pass point in the overtaking lane, at the cab line where the gust
+      // lands. Cap 100 is the prudent-wind band this drill teaches (the shadow
+      // rides ~70): both mistakes carry the pass off — the excursion demo
+      // leaves the lane, the clip demo never reaches the far marker — so чл. 20
+      // ал. 2 is graded by the objective and the LANE discipline by the shipped
+      // POOR_LANE_KEEPING detector.
+      params: { kind: "reachZone", x: MW_X_OVERTAKE, y: 340, radiusM: 12, maxSpeedKmh: 100 },
+    },
+    {
+      id: "sc-acw-finish",
+      titleBg: "Върни се в дясната лента и стигни края на отсечката",
+      params: { kind: "reachZone", x: MW_X_CRUISE, y: 600, radiusM: 12 },
+    },
+  ],
+  rubric: { parTimeSec: 90 },
+  // RECORDED: committed deterministic recordings of the authored scripts in
+  // traces/scAcWindTruckPass.ts; gates in traces/__tests__/
+  // sc-ac-wind-truck-pass-traces.test.ts (re-record with RECORD_TRACES=1).
+  shadow: { path: "content/traces/sc-ac-wind-truck-pass/shadow-correct.trace.json" },
+  mistakes: [
+    {
+      traceRef: { path: "content/traces/sc-ac-wind-truck-pass/mistake-blown-out.trace.json" },
+      titleBg: "Изненадан от порива — към мантинелата",
+      whatWentWrongBg:
+        "Колата излезе да изпреварва с отпусната ръка и с пътна скорост. В мига, в който носът мина пред кабината, заветът изчезна и поривът блъсна колата към мантинелата — тя се понесе през половин лента, докато водачът реагира. На открито място, а и при излизане от завета на камион, скоростта се смъква ПРЕДИ порива, а воланът се държи здраво с двете ръце (чл. 20, ал. 2).",
+      codeRefs: ["POOR_LANE_KEEPING"],
+    },
+    {
+      traceRef: { path: "content/traces/sc-ac-wind-truck-pass/mistake-clip-truck.trace.json" },
+      titleBg: "Порив в тясната пролука — удар в камиона",
+      whatWentWrongBg:
+        "Точно докато колата беше до кабината, в тясната пролука между нея и ремаркето, поривът я хвърли обратно към камиона — и последва удар. Изпреварването в силен вятър иска и по-широк страничен просвет, и по-ниска скорост: тръгне ли колата, за да намери просвета е нужно време, а вятърът не чака. По-бавно, здрав хват и повече място встрани (чл. 20, ал. 2).",
+      codeRefs: ["COLLISION"],
+    },
+  ],
+  teach: {
+    whenBg:
+      "Винаги когато изпреварваш висок автомобил — камион, автобус, бус — при силен страничен вятър, най-често на магистрала и по откритите извънградски пътища. Разпознава се предварително: ветропоказателят или клоните се навеждат в една посока, а самата кола „плава“ при поривите. Докато си в завета на камиона вятърът мълчи — но точно затова ударът при излизане е двоен.",
+    whyBg:
+      "Камионът е стена, която спира вятъра — докато си зад него и до него, си в неговия завет и поривът не те бута. В секундата, в която носът ти излезе пред кабината, тази стена изчезва и целият вятър те удря наведнъж, странично. При висока скорост изминаваш повече метри, докато реагираш, и дрейфът те изнася — или към мантинелата отляво, или обратно към камиона отдясно. Още по-опасен е рефлексът „рязко срещу вятъра“: отслабне ли поривът, рязко завъртеният волан сам изхвърля колата на другата страна — вторият замах е убиецът при вятър. Затова законът връзва скоростта с атмосферните условия (чл. 20, ал. 2): преди такова изпреварване се намалява, воланът се държи здраво с двете ръце, а поривите се посрещат с меки, постоянни корекции.",
+    lawRef: "ЗДвП чл. 20, ал. 2",
+    examinerBg:
+      "Изпитващият следи контрола на волана при вятър и при изпреварване на високи превозни средства: очаква по-ниска скорост преди маневрата, стабилна лента през целия участък и спокойни, постоянни корекции. Лъкатушенето в лентата е грешка, а изхвърлянето към мантинелата или към изпреварвания камион — тежка: две ръце на волана и смъкната скорост.",
+  },
+  levels: [
+    { level: 1 },
+    { level: 2 },
+    { level: 3 },
+    { level: 4, vehicleStart: "cold" },
+    // L5 — ДЪЖД върху вятъра. The conditions rung spreads OVER the template's
+    // (compileScenario), so weather becomes "rain" (render + the tick.rain
+    // conditions envelope, 0.85 × 140 = 119 km/h — still above every speed this
+    // drill uses, so no conditions code attaches). physics MERGES per key over
+    // the template's { crosswind: true }, so this rung ALSO runs wetGrip: the
+    // wet road makes holding the lane against the gust genuinely harder — the
+    // harder-conditions rung, honestly physical. The recorded ghosts are DAY
+    // DRY (base), untouched.
+    { level: 5, conditions: { weather: "rain" }, physics: { wetGrip: true } },
+  ],
+  staged: [ACTS_WIND_TRUCK],
+  // DRY, clear weather — the wind is PHYSICS, never a weather render tag (the
+  // sc-ac-crosswind law: no weather tag flips physics, and wind couples to none).
+  conditions: { weather: "dry" },
+  // THE SLICE: the live student's car runs the crosswind force (opt-in, authored
+  // — the same whole-map wind sc-ac-crosswind ships). The recorded ghosts are
+  // kinematic; their lee-then-gust story is authored (traces/scAcWindTruckPass.ts).
+  physics: { crosswind: true },
+  localeBg: "bg-BG",
+};
+
 /** The wave-2 adverse-conditions templates, in catalog order (registered in
  *  templates.ts by the integration pass). */
 export const SCENARIO_TEMPLATES_CONDITIONS2: readonly ScenarioSpec[] = [
   SC_AC_NIGHT_OVERDRIVE,
   SC_AC_TRUCK_SPRAY,
+  SC_AC_BRIDGE_ICE,
+  SC_AC_WIND_TRUCK_PASS,
 ];

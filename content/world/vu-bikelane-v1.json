@@ -1,0 +1,215 @@
+{
+ "format": "district-v1",
+ "meta": {
+  "district": "vu-bikelane",
+  "label": "Учебно Т-кръстовище с двупосочна велоалея по южния бордюр (сценарий VU — велоалея)",
+  "mapKind": "scenario-vru-bikelane",
+  "generator": "tools/maps/gen_vu_bikelane.mjs",
+  "boundsLocalMeters": {
+   "minX": -150,
+   "minY": -90,
+   "maxX": 150,
+   "maxY": 40
+  },
+  "attribution": {
+   "text": "Учебно кръстовище с двупосочна велоалея — оригинален параметричен дизайн (без данни от OpenStreetMap)",
+   "license": "All rights reserved",
+   "licenseUrl": "/",
+   "copyrightUrl": "/",
+   "obligation": "none — original work, no ODbL attribution required for this map"
+  },
+  "defaults": {
+   "maxspeedUrbanKmh": 50,
+   "note": "Учебно кръстовище: ограниченията идват от таговете на улиците."
+  },
+  "stats": {
+   "roadKm": 0.39,
+   "nodes": 4,
+   "edges": 3,
+   "intersections": 1,
+   "crossings": 0,
+   "buildings": 1,
+   "spawnPoints": 3
+  },
+  "scenario": {
+   "archetype": "t-junction",
+   "params": {
+    "control": "none",
+    "throughArmM": 150,
+    "stemArmM": 90,
+    "throughMaxKmh": 50,
+    "stemMaxKmh": 50
+   },
+   "junctionNodeId": "vu-n-c",
+   "expectedControl": "rightHandRule",
+   "laneHalfM": 4.06,
+   "cycleTrack": {
+    "side": "south",
+    "twoWay": true,
+    "withFlowYM": -6.66,
+    "counterFlowYM": -8.26,
+    "marking": "green-paint+elephant-feet (render overlay, descoped)"
+   }
+  }
+ },
+ "roads": {
+  "nodes": [
+   {
+    "id": "vu-n-c",
+    "x": 0,
+    "y": 0
+   },
+   {
+    "id": "vu-n-e",
+    "x": 150,
+    "y": 0
+   },
+   {
+    "id": "vu-n-s",
+    "x": 0,
+    "y": -90
+   },
+   {
+    "id": "vu-n-w",
+    "x": -150,
+    "y": 0
+   }
+  ],
+  "edges": [
+   {
+    "id": "vu-e-w",
+    "from": "vu-n-w",
+    "to": "vu-n-c",
+    "class": "residential",
+    "name": "Улица с велоалея — запад",
+    "oneway": false,
+    "roundabout": false,
+    "lanes": 2,
+    "lanesSource": "tag",
+    "maxspeed": 50,
+    "maxspeedSource": "tag",
+    "length": 150,
+    "geometry": [
+     [
+      -150,
+      0
+     ],
+     [
+      0,
+      0
+     ]
+    ]
+   },
+   {
+    "id": "vu-e-e",
+    "from": "vu-n-c",
+    "to": "vu-n-e",
+    "class": "residential",
+    "name": "Улица с велоалея — изток",
+    "oneway": false,
+    "roundabout": false,
+    "lanes": 2,
+    "lanesSource": "tag",
+    "maxspeed": 50,
+    "maxspeedSource": "tag",
+    "length": 150,
+    "geometry": [
+     [
+      0,
+      0
+     ],
+     [
+      150,
+      0
+     ]
+    ]
+   },
+   {
+    "id": "vu-e-s",
+    "from": "vu-n-s",
+    "to": "vu-n-c",
+    "class": "residential",
+    "name": "Странична улица",
+    "oneway": false,
+    "roundabout": false,
+    "lanes": 2,
+    "lanesSource": "tag",
+    "maxspeed": 50,
+    "maxspeedSource": "tag",
+    "length": 90,
+    "geometry": [
+     [
+      0,
+      -90
+     ],
+     [
+      0,
+      0
+     ]
+    ]
+   }
+  ]
+ },
+ "intersections": [
+  {
+   "id": "vu-n-c",
+   "x": 0,
+   "y": 0,
+   "degree": 3,
+   "signalized": false
+  }
+ ],
+ "crossings": [],
+ "roundabouts": [],
+ "buildings": [
+  {
+   "id": "vu-b-corner",
+   "height": 5,
+   "heightSource": "default",
+   "footprint": [
+    [
+     -40,
+     26
+    ],
+    [
+     -26,
+     26
+    ],
+    [
+     -26,
+     40
+    ],
+    [
+     -40,
+     40
+    ]
+   ]
+  }
+ ],
+ "spawnPoints": [
+  {
+   "id": "vu-spawn-west",
+   "x": -135,
+   "y": 0,
+   "heading": 90,
+   "edgeId": "vu-e-w",
+   "name": "Улица с велоалея — подход от запад"
+  },
+  {
+   "id": "vu-spawn-east",
+   "x": 135,
+   "y": 0,
+   "heading": 270,
+   "edgeId": "vu-e-e",
+   "name": "Улица с велоалея — подход от изток"
+  },
+  {
+   "id": "vu-spawn-south",
+   "x": 0,
+   "y": -75,
+   "heading": 0,
+   "edgeId": "vu-e-s",
+   "name": "Странична улица — подход към кръстовището"
+  }
+ ]
+}

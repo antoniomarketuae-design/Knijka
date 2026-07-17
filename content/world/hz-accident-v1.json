@@ -1,0 +1,149 @@
+{
+ "format": "district-v1",
+ "meta": {
+  "district": "hz-accident",
+  "label": "Учебна улица — място на произшествие (сценарий VP-12)",
+  "mapKind": "scenario-street",
+  "generator": "tools/maps/gen_hz_accident.mjs",
+  "zonesVersion": 1,
+  "boundsLocalMeters": {
+   "minX": -28.12,
+   "minY": 0,
+   "maxX": 14.125,
+   "maxY": 260
+  },
+  "attribution": {
+   "text": "Учебна права улица с място на произшествие — оригинален параметричен дизайн (без данни от OpenStreetMap)",
+   "license": "All rights reserved",
+   "licenseUrl": "/",
+   "copyrightUrl": "/",
+   "obligation": "none — original work, no ODbL attribution required for this map"
+  },
+  "defaults": {
+   "maxspeedUrbanKmh": 50,
+   "note": "Покрай произшествие: намали под лимита, мини широко от хората и ламарините и не спирай в лентата да зяпаш — В27 забранява престоя през зоната на сцената."
+  },
+  "stats": {
+   "roadKm": 0.26,
+   "nodes": 2,
+   "edges": 1,
+   "intersections": 0,
+   "crossings": 0,
+   "buildings": 1,
+   "spawnPoints": 2,
+   "zones": 1
+  },
+  "scenario": {
+   "archetype": "straight-street",
+   "params": {
+    "lengthM": 260,
+    "maxspeedKmh": 50
+   },
+   "lanesPerDirection": 1,
+   "laneCenterRightM": 4.06,
+   "banZone": {
+    "id": "hza-z-nostopping",
+    "kind": "noStopping",
+    "signRef": "В27",
+    "fromM": 120,
+    "toM": 195
+   }
+  }
+ },
+ "roads": {
+  "nodes": [
+   {
+    "id": "hza-n-end",
+    "x": 0,
+    "y": 260
+   },
+   {
+    "id": "hza-n-start",
+    "x": 0,
+    "y": 0
+   }
+  ],
+  "edges": [
+   {
+    "id": "hza-e-street",
+    "from": "hza-n-start",
+    "to": "hza-n-end",
+    "class": "residential",
+    "name": "Права улица с място на произшествие",
+    "oneway": false,
+    "roundabout": false,
+    "lanes": 2,
+    "lanesSource": "tag",
+    "maxspeed": 50,
+    "maxspeedSource": "tag",
+    "length": 260,
+    "geometry": [
+     [
+      0,
+      0
+     ],
+     [
+      0,
+      260
+     ]
+    ]
+   }
+  ]
+ },
+ "intersections": [],
+ "crossings": [],
+ "roundabouts": [],
+ "buildings": [
+  {
+   "id": "hza-b-block",
+   "height": 7,
+   "heightSource": "default",
+   "footprint": [
+    [
+     -28.12,
+     124
+    ],
+    [
+     -16.12,
+     124
+    ],
+    [
+     -16.12,
+     146
+    ],
+    [
+     -28.12,
+     146
+    ]
+   ]
+  }
+ ],
+ "spawnPoints": [
+  {
+   "id": "hza-spawn-approach",
+   "x": 4.06,
+   "y": 15,
+   "heading": 0,
+   "edgeId": "hza-e-street",
+   "name": "Начало на отсечката"
+  },
+  {
+   "id": "hza-spawn-finish",
+   "x": 4.06,
+   "y": 245,
+   "heading": 0,
+   "edgeId": "hza-e-street",
+   "name": "Контролна точка — след произшествието"
+  }
+ ],
+ "zones": [
+  {
+   "id": "hza-z-nostopping",
+   "kind": "noStopping",
+   "edgeId": "hza-e-street",
+   "fromM": 120,
+   "toM": 195,
+   "signRef": "В27"
+  }
+ ]
+}

@@ -1240,12 +1240,215 @@ export const SC_MV_UTURN_BAN: ScenarioSpec = {
   localeBg: "bg-BG",
 };
 
+// ---------------------------------------------------------------------------
+// sc-pk-rail-ban — the ban whose two halves carry DIFFERENT codes: чл. 98 owns
+//                  the approach, the rails own themselves (pk-rail-v1)
+// ---------------------------------------------------------------------------
+
+/** The single northbound lane center of pk-rail-v1 (1+1, perceptual scale). */
+const PKR_LANE = 4.06;
+/** Where the чл. 98 ban starts — 50 m before the near rail, with no plate. */
+const PKR_BAN_FROM_Y = 150;
+/** The authored track band: the six metres чл. 98 does NOT cover (see below). */
+const PKR_BAND_FROM_Y = 200;
+const PKR_BAND_TO_Y = 206;
+/** Where the чл. 98 ban ends — the same reach on the far side. */
+const PKR_BAN_TO_Y = 256;
+/** The ONE legal stopping mark: 74 m past the whole zone. */
+const PKR_BAY_Y = 330;
+
+/**
+ * „Никакъв престой около жп прелез" — the SIXTH cue of the чл. 98 detector, and
+ * the only one where the ban does not answer to a single code. The other five
+ * parking drills all end in one verdict: pk-ban-v1 reads a В27 plate, pk-ban2-v1
+ * chooses between two plates, pk-busstop-v1 reads the зигзаг, pk-banx-v1 reads
+ * the zebra and the corner, pk-double-v1 reads the other cars. Each of them
+ * grades ILLEGAL_STOP_IN_BAN_ZONE and nothing else, because each of them bans a
+ * stretch of ordinary street. This one bans a stretch of street WITH SIX METRES
+ * OF RAILWAY IN THE MIDDLE OF IT, and those six metres are not the same kind of
+ * forbidden as the fifty on either side. Source questions
+ * q-spirane-i-parkirane-056 (the zone around the crossing), -011 („забранени,
+ * дори когато на мястото няма забранителен знак") and -008 (the чл. 98 family).
+ *
+ * WHERE THE TWO DETECTORS SPLIT, AND WHY THAT IS THE LESSON. The district
+ * (tools/maps/gen_pk_rail.mjs) authors the ban spans up to the near rail and
+ * from the far rail on — never over the band:
+ *   - y ∈ [150, 200] and [206, 256] → pkr-z-ban-before / pkr-z-ban-after: a rest
+ *     is ILLEGAL_STOP_IN_BAN_ZONE (основна), and it is QUEUE-INNOCENT — a lead
+ *     within banZoneStopQueueGapM acquits it, because being stuck in traffic
+ *     before a crossing is not престой;
+ *   - y ∈ [200, 206] → pkr-z-railcrossing: a rest is RAIL_CROSSING_VIOLATION
+ *     (опасна, detail "stopped-on-track"), and the queue acquits NOTHING —
+ *     engine.ts refuses that exemption by name, because following the column
+ *     onto the tracks IS the taught kill.
+ * Six metres apart, the same excuse works and then does not. A single ban span
+ * laid over the whole stretch would bill one code everywhere and teach that the
+ * rails are just more forbidden street. The asymmetry is pinned end-to-end
+ * through the real reducer in world/__tests__/pk-rail-districts.test.ts („THE
+ * ASYMMETRY: a queue lead acquits the ban rest — and never acquits the rails
+ * rest").
+ *
+ * WHY THE CROSSING IS GUARDED, AND WHY THAT IS NOT A CONVENIENCE. An unguarded
+ * crossing (А35) carries чл. 52's MANDATORY full stop before the band — which on
+ * this map would land inside pkr-z-ban-before, i.e. the law would order the
+ * student to commit the fault the drill grades. Чл. 52 asks no stop of a
+ * guarded-open crossing, so here the correct drive really is one unbroken
+ * motion and „спрях за малко пред прелеза" really is a choice. The А34 variant
+ * is what makes this template authorable at all.
+ *
+ * WHERE THE DEMOS REST (the §9 stage-5 auto-assert). One per detector — the pair
+ * maps the whole forbidden stretch:
+ *   - „Престой в зоната пред прелеза" → y = 175, in pkr-z-ban-before →
+ *     ILLEGAL_STOP_IN_BAN_ZONE;
+ *   - „Спиране върху самата прелезна ивица" → y = 203, mid-band →
+ *     RAIL_CROSSING_VIOLATION.
+ *
+ * HONEST SCOPE — the exact distance is the content bank's OPEN QUESTION, so the
+ * copy does not drill it. q-spirane-i-parkirane-056 keys „на самия прелез и на
+ * по-малко от 50 метра от двете му страни", but it ships `status: needs-review`
+ * with „[REVIEW: потвърди точното разстояние (50 м?)]" and lawRef „чл. 98?". The
+ * SUBSTANCE is certain (the zone around a crossing stays clear, both sides, band
+ * included) and that is what every card below teaches; the metre count is not,
+ * so no instruction, teach card or debrief states one — ADR-002 is retrieval +
+ * citation, never free recall, and a number the bank itself flags is not
+ * retrieved, it is guessed. The MAP still needs a length, so banReachM = 50
+ * mirrors that item's keyed option as data; when review confirms the distance,
+ * the generator's one param changes and this template needs no edit.
+ *
+ * HONEST SCOPE — the barrier never falls, and that is authored, not lucky. The
+ * timetable is real data (down [480, 540) of a 600 s cycle) but sits outside the
+ * 180 s drill window, because a wait at a lowered barrier inside a ban span is
+ * LAWFUL (чл. 93: that is спиране for a traffic reason, not престой) and
+ * ILLEGAL_STOP_IN_BAN_ZONE cannot see it — its innocent-context set reads leads,
+ * stop lines and signals, never tick.railCrossing/railBarred. A drill that
+ * dropped the barrier over the span would convict a student for obeying it. THE
+ * CAPABILITY THIS TEMPLATE IS WAITING FOR: `tick.railBarred === true` joining
+ * banZoneQueue/banZoneControl in the detector's innocent set (rules/engine.ts —
+ * a shared file), which would unlock the drill this one cannot be: „изчакай
+ * бариерата, без да се разкараш из зоната". Named here rather than taken; the
+ * district battery pins the barrier's real schedule so the day it lands, the map
+ * is ready.
+ *
+ * Family: "parking" — the doc-76 §2 chip; the ban is the subject, the railway is
+ * the reason. The rail FAMILY drills (templates-rail/rail2) teach crossing the
+ * band; this one teaches not standing near it.
+ */
+export const SC_PK_RAIL_BAN: ScenarioSpec = {
+  id: "sc-pk-rail-ban",
+  family: "parking",
+  tagsBg: ["престой", "паркиране", "жп прелез", "релси", "бариера", "чл. 98"],
+  titleBg: "Никакъв престой около жп прелез",
+  objectiveBg:
+    "В зоната на жп прелеза не спираш и не паркираш — прелезната ивица трябва да е винаги чиста за колоната и влака.",
+  archetypeIds: ["PK-06", "RX-03"],
+  conceptIds: [
+    "c-parking-prohibitions",
+    "c-stop-parking-definitions",
+    "c-stopping-standing-rules",
+    "c-railway-crossing",
+  ],
+  map: {
+    archetype: "straight-street",
+    // The generator recipe — mirrored in pk-rail-v1.json meta.scenario.params
+    // (tools/maps/gen_pk_rail.mjs); the district battery asserts the match.
+    params: {
+      lengthM: 400,
+      maxspeedKmh: 50,
+      bandFromM: PKR_BAND_FROM_Y,
+      bandToM: PKR_BAND_TO_Y,
+      banReachM: 50,
+      legalBayY: PKR_BAY_Y,
+      banKind: "noStopping",
+      banBasis: "law",
+      guarded: "guarded",
+    },
+    districtId: "pk-rail-v1",
+  },
+  start: {
+    spawnPointId: "pkr-spawn-start",
+    vehicleStart: "ready",
+  },
+  instructionsBg: [
+    { n: 1, textBg: "Потегли по улицата. Задачата е „спри някъде тук за малко“ — но напред е железопътен прелез, а около него правилата са други." },
+    { n: 2, textBg: "Забраната започва много преди релсите и знак за нея няма — тя е в закона: около прелеза престоят и паркирането са забранени от двете страни (чл. 98)." },
+    { n: 3, textBg: "Прелезът е охраняем (А34) и бариерата е вдигната — не си длъжен да спираш. Не спирай и „за всеки случай“: спрялата тук кола е точно това, което не бива да е тук." },
+    { n: 4, textBg: "Премини коловоза на едно движение. Върху релсите не се спира при никакви обстоятелства — там колата ти няма изход." },
+    { n: 5, textBg: "След релсите забраната продължава още дълго: „минах прелеза, вече може“ е същата грешка, само от другата страна." },
+    { n: 6, textBg: "Чак когато цялата зона е зад теб, подай десен мигач и спри плътно вдясно на свободното място край платното." },
+  ],
+  success: [
+    {
+      id: "sc-pkr-cross",
+      titleBg: "Премини коловоза на едно движение, без да спираш върху релсите",
+      // A checkpoint past the far rail. It cannot be reached by anyone who is
+      // still on the band, and the ONLY lawful way to it is a transit — the
+      // guarded-open crossing asks no stop (чл. 52), and stopping on it grades.
+      params: { kind: "reachZone", x: PKR_LANE, y: 230, radiusM: 6 },
+    },
+    {
+      id: "sc-pkr-past-zone",
+      titleBg: "Подмини цялата забранена зона, без престой в нея",
+      // The clear road past the run-out ban's end (y = 256): the far side of the
+      // whole чл. 98 stretch, where „вече може" finally becomes true.
+      params: { kind: "reachZone", x: PKR_LANE, y: 275, radiusM: 6 },
+    },
+    {
+      id: "sc-pkr-legal-stop",
+      titleBg: "Спри на разрешеното място далеч след прелеза",
+      // Completable ONLY at near-stop speed at the legal mark (the
+      // pk-smooth-stop mark discipline) — 74 m past every чл. 98 metre and every
+      // rail metre. This gate is the drill's answer: the stop was never
+      // forbidden, only the PLACE was.
+      params: { kind: "reachZone", x: PKR_LANE, y: PKR_BAY_Y, radiusM: 4, maxSpeedKmh: 6 },
+    },
+  ],
+  rubric: { parTimeSec: 85 },
+  // RECORDED: committed deterministic recordings of the authored scripts in
+  // traces/scPkRailBan.ts; gates in
+  // traces/__tests__/sc-pk-rail-ban-traces.test.ts (RECORD_TRACES=1).
+  shadow: { path: "content/traces/sc-pk-rail-ban/shadow-correct.trace.json" },
+  mistakes: [
+    {
+      traceRef: { path: "content/traces/sc-pk-rail-ban/mistake-stop-before-crossing.trace.json" },
+      titleBg: "Престой в зоната пред прелеза",
+      whatWentWrongBg:
+        "Колата спря на десетина метра пред релсите — „бариерата е вдигната, никого не преча, за секунда е“. Чл. 98 забранява престоя и паркирането около прелеза от двете му страни, и то без никакъв знак. Причината не е формална: спрялата тук кола е стената, зад която не се вижда идващият влак, и е препятствието, което кара следващия да спре точно върху коловоза. Ти си пред релсите, но грешката ти чака зад теб.",
+      codeRefs: ["ILLEGAL_STOP_IN_BAN_ZONE"],
+    },
+    {
+      traceRef: { path: "content/traces/sc-pk-rail-ban/mistake-stop-on-rails.trace.json" },
+      titleBg: "Спиране върху самата прелезна ивица",
+      whatWentWrongBg:
+        "Шест метра по-нататък същото решение вече не е нарушение на реда, а въпрос на живот: колата спря между релсите. Тук законът не признава никакво извинение — нито „колоната спря“, нито „само за миг“: на прелеза се влиза само когато отсрещната страна е свободна за ЦЯЛАТА кола. Влакът спира след километър и не завива, а бариерата се спуска за секунди. Разликата между тази грешка и предишната е шест метра — и точно затова изпитът ги оценява различно: престоят пред прелеза е основна грешка, спирането върху него е опасна.",
+      codeRefs: ["RAIL_CROSSING_VIOLATION"],
+    },
+  ],
+  teach: {
+    whenBg:
+      "Всеки път, когато прелезът е точно там, където ти трябва: магазинът до него, човекът, който слиза „ей тук“, колоната, която пълзи през релсите в пиков час. Около прелеза няма табела „не спирай“ — има закон, и той важи от двете страни, доста преди и доста след самите релси.",
+    whyBg:
+      "Прелезът е единственото място по пътя, където другият участник не може да спре и не може да завие. Затова зоната около него трябва да е празна по три причини наведнъж. Първо — видимост: спрялата кола крие идващия влак от всички зад нея, а те решават да минат по това, което виждат. Второ — изход: колоната пред прелеза се движи на пресекулки, и всеки, който е спрял в зоната, отнема на следващия метрите, в които той трябва да спре ПРЕДИ релсите, а не върху тях. Трето — самата ивица: тя не е „по-забранена улица“, тя е капан. Колата върху коловоза няма накъде — назад е следващият, напред е колоната, а бариерата се спуска за секунди. Затова законът пази цялата зона, а не само релсите: който спре до прелеза, обикновено не е този, който плаща.",
+    lawRef: "ЗДвП чл. 98",
+    examinerBg:
+      "Изпитващият казва „спри някъде тук“ и мълчи — изборът на място Е изпитът. Очаква се да разпознаеш зоната на прелеза без знак, да я подминеш без спиране и без колебание, да преминеш коловоза на едно движение (при вдигната бариера охраняемият прелез не изисква спиране) и да спреш чак когато цялата зона е зад теб. Престой в забранената зона около прелеза е основна грешка. Спиране върху самия прелез е опасна грешка и се оценява като такава, независимо от причината — включително „колоната пред мен спря“.",
+  },
+  levels: [
+    { level: 1 },
+    { level: 2 },
+    { level: 3 },
+    { level: 4, vehicleStart: "cold" },
+  ],
+  conditions: { weather: "dry" },
+  localeBg: "bg-BG",
+};
+
 /** The parking templates of this file, in catalog order (the array is spread
  *  into SCENARIO_TEMPLATES by templates.ts; the integration pass owns that edit
  *  and the s2-catalog-integrity id list). The first four are the law-implied-ban
  *  set the file was opened for; sc-park-bay-exit-rev is the wave-5 lot-maneuver
- *  member and sc-mv-uturn-ban the wave-6 U-turn-ban member — same family chip,
- *  different subjects (see their headers). */
+ *  member, sc-mv-uturn-ban the wave-6 U-turn-ban member and sc-pk-rail-ban the
+ *  wave-7 rail-zone member — same family chip, different subjects (see their
+ *  headers). */
 export const SCENARIO_TEMPLATES_PARKING2: readonly ScenarioSpec[] = [
   SC_PK_CROSSING_BAN,
   SC_PK_BUSSTOP_BAN,
@@ -1253,4 +1456,5 @@ export const SCENARIO_TEMPLATES_PARKING2: readonly ScenarioSpec[] = [
   SC_PK_DOUBLE_PARK,
   SC_PARK_BAY_EXIT_REV,
   SC_MV_UTURN_BAN,
+  SC_PK_RAIL_BAN,
 ];

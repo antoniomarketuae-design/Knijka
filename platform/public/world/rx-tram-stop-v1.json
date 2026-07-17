@@ -1,0 +1,180 @@
+{
+ "format": "district-v1",
+ "meta": {
+  "district": "rx-tram-stop",
+  "label": "Учебна улица — трамвайна спирка без остров (сценарий RX-04 обратен)",
+  "mapKind": "scenario-street",
+  "generator": "tools/maps/gen_rx_tram_stop.mjs",
+  "boundsLocalMeters": {
+   "minX": -26,
+   "minY": 0,
+   "maxX": 14.125,
+   "maxY": 150
+  },
+  "attribution": {
+   "text": "Учебна улица с трамвайна спирка без остров — оригинален параметричен дизайн (без данни от OpenStreetMap)",
+   "license": "All rights reserved",
+   "licenseUrl": "/",
+   "copyrightUrl": "/",
+   "obligation": "none — original work, no ODbL attribution required for this map"
+  },
+  "defaults": {
+   "maxspeedUrbanKmh": 40,
+   "note": "Трамвайна спирка без остров на 90 м: спрелият трамвай изсипва пътници направо на платното — спираш зад отворените врати и ги изчакваш да се приберат (чл. 66, ал. 1)."
+  },
+  "stats": {
+   "roadKm": 0.15,
+   "nodes": 2,
+   "edges": 1,
+   "intersections": 0,
+   "crossings": 1,
+   "buildings": 2,
+   "spawnPoints": 2
+  },
+  "scenario": {
+   "archetype": "zebra-block",
+   "params": {
+    "crossings": 1,
+    "signalized": "no",
+    "approachM": 90,
+    "tramStop": "none"
+   },
+   "primaryCrossingId": "rts-x-1",
+   "laneCenterRightM": 4.06,
+   "crossings": [
+    {
+     "id": "rts-x-1",
+     "x": 0,
+     "y": 90,
+     "kind": "marked"
+    }
+   ],
+   "tramStop": {
+    "hasIsland": false,
+    "shelterId": "rts-b-shelter",
+    "shelterFromY": 84,
+    "shelterToY": 96,
+    "tramLaneCenterM": -4.06,
+    "tramHoldY": 97
+   }
+  }
+ },
+ "roads": {
+  "nodes": [
+   {
+    "id": "rts-n-end",
+    "x": 0,
+    "y": 150
+   },
+   {
+    "id": "rts-n-start",
+    "x": 0,
+    "y": 0
+   }
+  ],
+  "edges": [
+   {
+    "id": "rts-e-street",
+    "from": "rts-n-start",
+    "to": "rts-n-end",
+    "class": "residential",
+    "name": "Улица с трамвайна спирка без остров",
+    "oneway": false,
+    "roundabout": false,
+    "lanes": 2,
+    "lanesSource": "tag",
+    "maxspeed": 40,
+    "maxspeedSource": "tag",
+    "length": 150,
+    "geometry": [
+     [
+      0,
+      0
+     ],
+     [
+      0,
+      150
+     ]
+    ]
+   }
+  ]
+ },
+ "intersections": [],
+ "crossings": [
+  {
+   "id": "rts-x-1",
+   "x": 0,
+   "y": 90,
+   "kind": "marked",
+   "signalized": false,
+   "edgeId": "rts-e-street"
+  }
+ ],
+ "roundabouts": [],
+ "buildings": [
+  {
+   "id": "rts-b-shelter",
+   "height": 2.6,
+   "heightSource": "default",
+   "footprint": [
+    [
+     9,
+     84
+    ],
+    [
+     13,
+     84
+    ],
+    [
+     13,
+     96
+    ],
+    [
+     9,
+     96
+    ]
+   ]
+  },
+  {
+   "id": "rts-b-shop",
+   "height": 4.5,
+   "heightSource": "default",
+   "footprint": [
+    [
+     -26,
+     56
+    ],
+    [
+     -16,
+     56
+    ],
+    [
+     -16,
+     68
+    ],
+    [
+     -26,
+     68
+    ]
+   ]
+  }
+ ],
+ "spawnPoints": [
+  {
+   "id": "rts-spawn-approach",
+   "x": 4.06,
+   "y": 15,
+   "heading": 0,
+   "edgeId": "rts-e-street",
+   "name": "Подход към трамвайната спирка без остров"
+  },
+  {
+   "id": "rts-spawn-finish",
+   "x": 4.06,
+   "y": 135,
+   "heading": 0,
+   "edgeId": "rts-e-street",
+   "name": "Контролна точка — след спирката"
+  }
+ ]
+}

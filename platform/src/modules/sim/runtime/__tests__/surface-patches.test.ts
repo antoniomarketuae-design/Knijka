@@ -225,10 +225,24 @@ describe("the runtime stays ignorant by design — no tick channel exists", () =
   });
 });
 
-describe("FP sweep — no shipped map carries the kinds", () => {
-  it("across ALL content/world files, only ac-aqua-v1 (water) and ac-ice-v1 (ice) resolve patches", () => {
+/**
+ * The COMPLETE roster of maps allowed to carry a surface-grip patch, and the
+ * exact zone vocabulary each one may carry. Adding a map here is a deliberate
+ * act: the sweep below proves EVERY other shipped district resolves zero
+ * patches, which is what keeps the physics rig off the exam bank and the free
+ * drive. A new surface map lands one line here plus its own contract battery.
+ */
+const PATCH_MAPS: Record<string, string[]> = {
+  "ac-aqua-v1": ["waterPatch"], // AC-07-full — the standing-water float
+  "ac-ice-v1": ["icePatch"], // AC-08 — the ice band (ice RESPONSE: sc-ac-ice)
+  "ac-bridge-v1": ["icePatch"], // AC-08 — the frozen deck (ice ANTICIPATION: sc-ac-bridge-ice)
+};
+
+describe("FP sweep — no unlisted map carries the kinds", () => {
+  it("across ALL content/world files, only the PATCH_MAPS roster resolves patches", () => {
     const files = fs.readdirSync(WORLD_DIR).filter((f) => f.endsWith(".json"));
     expect(files.length).toBeGreaterThan(40); // the whole shipped fleet is swept
+    const seen: string[] = [];
     for (const f of files) {
       const id = f.replace(/\.json$/, "");
       const raw = JSON.parse(fs.readFileSync(path.join(WORLD_DIR, f), "utf8")) as {
@@ -236,17 +250,19 @@ describe("FP sweep — no shipped map carries the kinds", () => {
       };
       const patches = resolveSurfaceGripPatches(raw as unknown as SurfacePatchSource);
       const kinds = (raw.zones ?? []).map((z) => z.kind);
-      if (id === "ac-aqua-v1") {
-        expect(patches).toHaveLength(1);
-        expect(kinds).toEqual(["waterPatch"]);
-      } else if (id === "ac-ice-v1") {
-        expect(patches).toHaveLength(1);
-        expect(kinds).toEqual(["icePatch"]);
+      const expected = PATCH_MAPS[id];
+      if (expected) {
+        seen.push(id);
+        expect(patches, `${id} must resolve its authored patch`).toHaveLength(expected.length);
+        expect(kinds).toEqual(expected);
       } else {
         expect(patches, `${id} must carry no surface patches`).toEqual([]);
         expect(kinds).not.toContain("waterPatch");
         expect(kinds).not.toContain("icePatch");
       }
     }
+    // The roster is exact in BOTH directions: a listed map that stopped
+    // existing would otherwise quietly weaken the sweep into a no-op.
+    expect(seen.sort()).toEqual(Object.keys(PATCH_MAPS).sort());
   });
 });

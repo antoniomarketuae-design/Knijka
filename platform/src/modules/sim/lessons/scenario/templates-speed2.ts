@@ -5,8 +5,9 @@
  * file so nothing loads world JSON at runtime; the batteries assert every
  * pinned value against the generated map).
  *
- *  - sc-sp-limit-end   „Докъде важи ограничението"      (SP-03, sp-signs-v1)
- *  - sc-mw-min-speed   „Магистрален ритъм — не пълзи"   (SP-10 + OV-11, mw-v1)
+ *  - sc-sp-limit-end       „Докъде важи ограничението"    (SP-03, sp-signs-v1)
+ *  - sc-mw-min-speed       „Магистрален ритъм — не пълзи" (SP-10 + OV-11, mw-v1)
+ *  - sc-sp-wet-limit-plate „Табела „при мокра настилка""  (SP-04, sp-rain-v1)
  *
  * templates-sp.ts already teaches where a В26 restriction STARTS
  * (sc-speed-transition: the 50→30 entry). This file opens the family's OTHER
@@ -369,6 +370,141 @@ export const SC_MW_MIN_SPEED: ScenarioSpec = {
   localeBg: "bg-BG",
 };
 
-/** The wave-2 + wave-5 speed templates, in catalog order (registered in
- *  templates.ts). */
-export const SCENARIO_TEMPLATES_SPEED2: readonly ScenarioSpec[] = [SC_SP_LIMIT_END, SC_MW_MIN_SPEED];
+// ---------------------------------------------------------------------------
+// 3. sc-sp-wet-limit-plate — „Табела „при мокра настилка"" (SP-04) on sp-rain-v1
+//    (the SAME 360 m / limit-50 street sc-speed-rain rides, REUSED — map.reuse).
+//    The drill is the CONDITIONAL PLATE: a допълнителна табела „при мокра
+//    настилка" under the speed sign is a CONDITION, not a second number. Dry it
+//    sleeps and the base 50 applies; wet it binds a lower ceiling (~40, sitting
+//    under the 0.85 × 50 = 42.5 km/h conditions envelope). The template
+//    ALTERNATES the ladder — L1–L2 run the street DRY (the plate sleeps, the
+//    full 50 is lawful), L3–L5 run it WET with REAL reduced grip (physics
+//    .wetGrip on those rungs ONLY, ADR-006 stage 4a) — and the CONTRAST across
+//    the rungs IS the lesson.
+//
+//    WHY IT IS NOT sc-speed-rain (templates-sp.ts, same district): that template
+//    is rain+night at EVERY rung and teaches the generic „намали за дъжд/нощ"
+//    with render-only weather. Here the axis is the PLATE (the same road, dry
+//    vs wet), the grip is physically real on the wet rungs, and the wet mistake
+//    reaches the SPEEDING band the rain template never touches.
+//
+//    FEASIBILITY — documented deviation from the backlog brief (the notes' own
+//    fallback, taken honestly): the brief asked for a PER-RUNG posted-limit swap
+//    (90 dry / 60 wet plate) plus a protected curve with an aquaplaning
+//    SPEED_TOO_FAST_FOR_CURVE mistake. sp-rain-v1 is map.reuse — a flat 50 km/h
+//    street with NO curveAdvisory span — and ScenarioSpec carries NO speed-span
+//    override (the posted limit is district edge data). Both the limit swap and
+//    the curve arm are therefore unreachable without editing the map / compile /
+//    types (owned elsewhere), so the brief's stated fallback („else split into a
+//    wet-only template") is used: the plate is realised on the honest 50/40
+//    numbers of this street, graded by the conditions envelope + real wetGrip.
+// ---------------------------------------------------------------------------
+
+/**
+ * SP-04 (the conditional-plate half) — табелата „при мокра настилка" под знака
+ * за скорост (ЗДвП чл. 21 — знакът; чл. 20, ал. 2 — съобразената скорост). TWO
+ * DISTINCT codes, both against the WET rungs' rain envelope (the sc-speed-rain /
+ * sc-speed-zone precedent — one template, distinct code SETS):
+ *   - „Сухата скорост под мократа табела" (~50 held in the rain, the plate
+ *     ignored) → SPEED_TOO_FAST_FOR_CONDITIONS ALONE (50 > 42.5 envelope, ≤ 55
+ *     graced ⇒ NOT speeding: lawful by the base sign, wrong under the plate);
+ *   - „Пълно превишение в дъжда" (~57, over even the base 50) →
+ *     SPEEDING_OVER_LIMIT ALONE (> 55 graced, ≤ 60 ⇒ второстепенна; above the
+ *     graced limit the conditions episode stands down BY BAND — speed > graced
+ *     clears its accumulator — so it never double-bills).
+ * Both detectors read only tick.maxSpeedKmh + tick.rain, so NO ruleConfig — the
+ * LIVE student session grades the same two faults. Success gates are POSITION-
+ * only (no maxSpeedKmh cap) on purpose: a speed cap is template-wide, so it
+ * would fail a LAWFUL dry 50 drive on L1–L2 and break the very contrast the
+ * template teaches; the wet ceiling is carried by the conditions detector
+ * (teach-first coaching), not by an objective gate.
+ */
+export const SC_SP_WET_LIMIT_PLATE: ScenarioSpec = {
+  id: "sc-sp-wet-limit-plate",
+  family: "speed",
+  tagsBg: ["скорост", "мокра настилка", "допълнителна табела", "съобразена скорост", "дъжд"],
+  titleBg: "Табела „при мокра настилка“",
+  objectiveBg:
+    "Табелата под знака е условие: на сухо важи основното ограничение, но щом настилката е мокра — по-ниският таван е твой, без изпитващият да ти напомня.",
+  archetypeIds: ["SP-04"],
+  conceptIds: ["c-speed-limits", "c-speed-adaptation", "c-rain-aquaplaning", "c-speed-signs-zone"],
+  map: {
+    archetype: "straight-street",
+    // The generator recipe — mirrored in sp-rain-v1.json meta.scenario.params
+    // (tools/maps/gen_sp_speed.mjs). REUSED, not regenerated: the district is
+    // already exactly the 360 m / limit-50 straight street this drill needs.
+    params: { lengthM: 360, maxspeedKmh: 50 },
+    districtId: "sp-rain-v1",
+  },
+  start: {
+    spawnPointId: "sp-spawn-approach",
+    vehicleStart: "ready",
+  },
+  instructionsBg: [
+    { n: 1, textBg: "Потегли по улицата. Основното ограничение е 50 км/ч, а под знака виси допълнителна табела „при мокра настилка — 40“." },
+    { n: 2, textBg: "На сухо табелата спи: важи основното ограничение и 50 км/ч е напълно законно." },
+    { n: 3, textBg: "Днес обаче вали и настилката е мокра — затова табелата вече важи: твоят таван става 40 км/ч." },
+    { n: 4, textBg: "Влез в зоната на табелата вече около 38 км/ч и задръж под 40 по цялата отсечка — без да чакаш някой да ти го каже." },
+    { n: 5, textBg: "На мокър път спирачният път е около 1,4 пъти по-дълъг; съобразената скорост връща разстоянието и времето за реакция." },
+    { n: 6, textBg: "Задръж мокрия таван до края на отсечката." },
+  ],
+  success: [
+    {
+      id: "sc-swp-past-plate",
+      titleBg: "Подмини табелата „при мокра настилка“",
+      params: { kind: "reachZone", x: LANE_X, y: 180, radiusM: 10 },
+    },
+    {
+      id: "sc-swp-finish",
+      titleBg: "Стигни края на отсечката, задържал мокрия таван",
+      params: { kind: "reachZone", x: LANE_X, y: 330, radiusM: 12 },
+    },
+  ],
+  rubric: { parTimeSec: 72 },
+  // RECORDED: committed deterministic recordings of the authored scripts in
+  // traces/scSpWetLimitPlate.ts; gates in traces/__tests__/
+  // sc-sp-wet-limit-plate-traces.test.ts (re-record with RECORD_TRACES=1).
+  shadow: { path: "content/traces/sc-sp-wet-limit-plate/shadow-correct.trace.json" },
+  mistakes: [
+    {
+      traceRef: { path: "content/traces/sc-sp-wet-limit-plate/mistake-dry-speed-in-wet.trace.json" },
+      titleBg: "Сухата скорост под мократа табела",
+      whatWentWrongBg:
+        "Колата държа 50 км/ч „по знака“, все едно настилката е суха. Основното ограничение наистина е 50, но допълнителната табела „при мокра настилка“ въведе по-нисък таван, а вали: 50 в дъжда е над съобразената скорост (чл. 20, ал. 2) — второстепенна грешка. При мокро таванът тук е около 40; над 42–43 км/ч вече караш несъобразено.",
+      codeRefs: ["SPEED_TOO_FAST_FOR_CONDITIONS"],
+    },
+    {
+      traceRef: { path: "content/traces/sc-sp-wet-limit-plate/mistake-over-limit-in-wet.trace.json" },
+      titleBg: "Пълно превишение в дъжда",
+      whatWentWrongBg:
+        "Тук колата дори не спази основния знак: около 57 км/ч по улица с ограничение 50, и то в дъжд. Това е превишаване над самото ограничение (второстепенна грешка), а на мокра настилка е двойно безотговорно — табелата искаше 40, а стрелката показа 57. Първо се спазва знакът, после и табелата под него.",
+      codeRefs: ["SPEEDING_OVER_LIMIT"],
+    },
+  ],
+  teach: {
+    whenBg:
+      "При всеки знак за скорост с допълнителна табела „при мокра настилка“ (или „при дъжд“, „при сняг“) — и изобщо винаги, щом завали. Табелата не е втора цифра „за всеки случай“: тя е условие, което ту важи, ту не, според настилката под гумите.",
+    whyBg:
+      "Ограничението на такава табела пази точно там, където мокрото е най-опасно — завой, наклон, износена настилка. На сухо рискът го няма и основното ограничение стига; на мокро сцеплението пада, спирачният път нараства около 1,4 пъти и същата скорост вече не спира колата в нужното разстояние. Затова законът връзва по-ниския таван за УСЛОВИЕТО, а не за час от денонощието: водачът сам разпознава кога важи и не чака знак да му светне.",
+    lawRef: "ЗДвП чл. 21; чл. 20, ал. 2",
+    examinerBg:
+      "Изпитващият няма да ти напомни, че вали — очаква сам да приложиш табелата. Каране на „сухата“ скорост в дъжда се отбелязва като несъобразена скорост, а превишаването над самото ограничение е отделна грешка към него. Разпознай условието и дръж по-ниския таван, докато настилката е мокра.",
+  },
+  levels: [
+    { level: 1 },
+    { level: 2 },
+    { level: 3, conditions: { weather: "rain" }, physics: { wetGrip: true } },
+    { level: 4, conditions: { weather: "rain" }, physics: { wetGrip: true }, vehicleStart: "cold" },
+    { level: 5, conditions: { weather: "rain", night: true }, physics: { wetGrip: true } },
+  ],
+  conditions: { weather: "dry" },
+  localeBg: "bg-BG",
+};
+
+/** The wave-2 + wave-5 + wave-9 speed templates, in catalog order (registered
+ *  in templates.ts). */
+export const SCENARIO_TEMPLATES_SPEED2: readonly ScenarioSpec[] = [
+  SC_SP_LIMIT_END,
+  SC_MW_MIN_SPEED,
+  SC_SP_WET_LIMIT_PLATE,
+];

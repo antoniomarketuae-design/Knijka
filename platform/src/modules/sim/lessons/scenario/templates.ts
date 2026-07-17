@@ -46,6 +46,7 @@ import { SCENARIO_TEMPLATES_COCKPIT2 } from "./templates-cockpit2";
 import { SCENARIO_TEMPLATES_JUNCTIONS4 } from "./templates-junctions4";
 import { SCENARIO_TEMPLATES_MERGING2 } from "./templates-merging2";
 import { SCENARIO_TEMPLATES_ROUNDABOUT2 } from "./templates-roundabout2";
+import { SCENARIO_TEMPLATES_LANES3 } from "./templates-lanes3";
 
 /**
  * The TARGET bay of content/world/lot-perp-v1.json — meta.scenario bay
@@ -282,6 +283,20 @@ export const SCENARIO_TEMPLATES: readonly ScenarioSpec[] = [
   // wave's two new families.
   ...SCENARIO_TEMPLATES_MERGING2,
   ...SCENARIO_TEMPLATES_ROUNDABOUT2,
+  // Wave 7 — no new family and no new import: all five landed items extend a
+  // family file already spread above (lanes2, parking2, pe2, vru2,
+  // conditions2). Two of the wave's seven items are NOT authored and nothing is
+  // registered for them (the sc-rx-barrier-drop precedent):
+  //  - sc-jx-giveway-b1: the engine has no Б1/give-way vocabulary — every
+  //    non-signal stop-line crossing is adjudicated as a Б2 full-stop demand,
+  //    so the drill's correct rolling yield grades STOP_SIGN_NO_FULL_STOP;
+  //  - sc-sp-eco-coast: HARSH_BRAKING_NO_CAUSE is unreachable under the item's
+  //    own premise (a red light IS a braking cause for the full 120 m the
+  //    runtime can see it), and the drill duplicates shipped sc-sig-green-wave.
+  // Wave 8 — seven items, all landed. Six extend a family file already spread
+  // above (signals2, vru2, rail2, hazards2, following2, exam); lanes3 is the
+  // wave's one new family (sc-ln-decisive-change, deepening sc-lane-change).
+  ...SCENARIO_TEMPLATES_LANES3,
 ];
 
 /** Lookup by template id; undefined for unknown ids. */

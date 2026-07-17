@@ -16,7 +16,7 @@ const HERE = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(HERE, "../../../../../../..");
 
 describe("S2 catalog integrity", () => {
-  it("registers the full S1+S2+S3+S4+unit-2+breadth+signals+maneuver+hazards+final-harvest+cap-2+FO-06+VU-09+stage-1c+stage-1d+stage-2a+stage-2b+stage-3a+stage-3b+stage-4a+FO-pair+fog+curve+motorway+N11-telltale+OV-corridor+snow+N8-vru+OV-return+AC-12-crosswind+surface-patch+w1+w2+w3+w4+w5+w6 wave (129 templates across the families)", () => {
+  it("registers the full S1+S2+S3+S4+unit-2+breadth+signals+maneuver+hazards+final-harvest+cap-2+FO-06+VU-09+stage-1c+stage-1d+stage-2a+stage-2b+stage-3a+stage-3b+stage-4a+FO-pair+fog+curve+motorway+N11-telltale+OV-corridor+snow+N8-vru+OV-return+AC-12-crosswind+surface-patch+w1+w2+w3+w4+w5+w6+w7+w8+w9 wave (147 templates across the families)", () => {
     const ids = SCENARIO_TEMPLATES.map((s) => s.id).sort();
     expect(ids).toEqual(
       [
@@ -158,6 +158,39 @@ describe("S2 catalog integrity", () => {
         "sc-sig-controller-live",
         "sc-hz-brake-dont-swerve",
         "sc-ed-d2-stop-address",
+        // Wave 7. Five of the wave's seven items landed; sc-jx-giveway-b1 and
+        // sc-sp-eco-coast are deliberately absent — the first needs a Б1/
+        // give-way adjudicator the engine does not have (its correct rolling
+        // yield grades STOP_SIGN_NO_FULL_STOP today), the second asks for
+        // HARSH_BRAKING_NO_CAUSE at a red light, where the red is itself a
+        // braking cause. Neither was authored (see the wave notes).
+        "sc-ln-obstacle-meeting",
+        "sc-pk-rail-ban",
+        "sc-pe-zone-living",
+        "sc-vu-child-cyclist",
+        "sc-ac-bridge-ice",
+        // Wave 8 — all seven items landed. sc-ln-decisive-change opens the
+        // wave's one new family (lanes3); the other six extend a family file
+        // already registered above.
+        "sc-ln-decisive-change",
+        "sc-sig-controller-postures",
+        "sc-vu-bikelane-turn",
+        "sc-rx-tram-stop-doors",
+        "sc-hz-accident-scene",
+        "sc-fo-motorway-gap",
+        "sc-ed-reverse-line",
+        // Wave 9 — all six items landed on reused districts (pe-child-v1,
+        // mw-v1, sp-rain-v1, ln-v1, poligon-v1), each appended to a family
+        // file already spread in templates.ts. sc-sp-wet-limit-plate shipped
+        // the brief's documented wet-only fallback (the posted-limit swap +
+        // curve-advisory primary needs a new sp-* district + a ScenarioSpec
+        // speed-span field — see the wave notes).
+        "sc-pe-parked-row-scan",
+        "sc-ac-wind-truck-pass",
+        "sc-sp-wet-limit-plate",
+        "sc-vp-telltale-red",
+        "sc-hz-breakdown-pulloff",
+        "sc-ed-poligon-chain",
       ].sort(),
     );
   });

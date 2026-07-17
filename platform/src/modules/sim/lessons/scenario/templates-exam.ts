@@ -737,9 +737,460 @@ export const SC_ED_D2_STOP_ADDRESS: ScenarioSpec = {
   localeBg: "bg-BG",
 };
 
+// ---------------------------------------------------------------------------
+// sc-ed-reverse-line — „Заден ход по права линия" on poligon-v1
+// ---------------------------------------------------------------------------
+
+/**
+ * THE Наредба-38 REVERSE MANEUVER AS A DRILL — and the two honest limits that
+ * shaped it (the sc-ed-d2-stop-address pattern, on the полигон instead of the
+ * city).
+ *
+ * WHY poligon-v1: the „Старт-стоп права" (edge pg-e-s1, the southern two-way
+ * straight, limit 30) is a closed training ground with NOTHING staged on it —
+ * no signals, no crossings, no other actors. That emptiness IS the drill: with
+ * every other grading axis positively absent, the only things the rule engine
+ * can judge are the two this lesson is about — the оглед before the wheels turn
+ * and any contact with the CURB. This is the FIRST scenario template to drive
+ * the полигон (it has shipped with only the legacy L-lesson today).
+ *
+ * HONEST LIMIT 1 — THE STRAIGHT-REVERSE HAS NO EVALUATOR PRIMITIVE. The maneuver
+ * evaluator set ships parkInBay + threePointTurn, but no „reverse in a straight
+ * line" objective. Rather than fork the engine, the 25 m reverse is graded by a
+ * reachZone CHAIN read in reverse (the sc-ln-turn-lane-arrows precedent): a
+ * settle gate after the observed pull-away, a narrow mid-corridor gate (radiusM
+ * 1.8 < a lane — a drift off the curb line misses it: the lateral band), and a
+ * rest gate 25 m back (maxSpeedKmh 4 — at walking pace, stopped). Curb contact
+ * grades COLLISION through the recorder's obstacle-rect machinery (collisionMinKmh
+ * 0 — the sc-maneuver-3point precedent), not through the objective layer.
+ *
+ * HONEST LIMIT 2 — WHY THE DRILL OPENS WITH A FORWARD MOVE-OFF. The оглед that
+ * ЗДвП чл. 40 demands before backing is the same „look before the wheels turn"
+ * PK-05 grades — but the move-off detector (engine.ts) grades the SESSION'S FIRST
+ * move-off and is FORWARD-GEAR ONLY: „whose first motion is a reverse maneuver is
+ * never graded (conservative)". A pure reverse latches nothing. So the exam pair
+ * „потегляне + заден ход" runs in the order the engine can grade: the car pulls
+ * away from the curb FORWARD (observed), settles into the изходна позиция, and
+ * only THEN reverses the 25 m. The observation the drill teaches — and the „без
+ * поглед" mistake convicts — is that opening move-off; on the exam a maneuver
+ * begun with no оглед at all ends the run before the reverse is even judged.
+ */
+export const SC_ED_REVERSE_LINE: ScenarioSpec = {
+  id: "sc-ed-reverse-line",
+  family: "exam-drills",
+  tagsBg: ["изпит", "заден ход", "права линия", "полигон", "оглед", "бордюр"],
+  titleBg: "Заден ход по права линия",
+  objectiveBg:
+    "Изпитната маневра: 25 метра назад по права линия покрай бордюра — с поглед през рамо, пешеходна скорост и без докосване на бордюра.",
+  // PK-11 „Заден ход" IS the maneuver; PK-05 „Потегляне без оглеждане" is the
+  // graded observation fault (the engine convicts the FORWARD move-off — HONEST
+  // LIMIT 2). ЗДвП чл. 40 is the reverse duty the drill teaches.
+  archetypeIds: ["PK-11", "PK-05"],
+  conceptIds: [
+    "c-reversing",
+    "c-maneuver-principles",
+    "c-mirrors-blind-spots",
+    "c-driver-signals",
+    "c-general-care-duty",
+  ],
+  map: {
+    archetype: "straight-street",
+    // poligon-v1 is a hand-authored NON-OSM training ground (gen_poligon.mjs); it
+    // carries no meta.scenario.params, so these mirror meta.generator/stats as
+    // provenance (the d2-v1 pattern for a committed non-recipe district).
+    params: {
+      generator: "tools/maps/gen_poligon.mjs",
+      district: "poligon",
+      mapKind: "training-ground",
+      laneEdge: "pg-e-s1",
+      segmentRoad: "Старт-стоп права",
+      reverseM: 25,
+    },
+    districtId: "poligon-v1",
+  },
+  start: {
+    // At rest against the south curb of the „Старт-стоп права", facing east
+    // (heading 90 = +X), on the clean western stretch (x = -132, well clear of
+    // the g2 junction at x = -95 and the SW corner joint at x = -170). The
+    // полигон's three spawnPoints sit elsewhere, so the drill authors its own
+    // pose (validate.ts: position + headingDeg) — the d2 drills' pattern.
+    position: { x: -132, y: -136.4 },
+    headingDeg: 90,
+    vehicleStart: "ready",
+  },
+  instructionsBg: [
+    {
+      n: 1,
+      textBg:
+        "Стоиш до бордюра на „Старт-стоп правата“. Изпитната маневра е „движение назад по права линия“ — но първо огледът.",
+    },
+    {
+      n: 2,
+      textBg:
+        "Преди колелата да се завъртят: поглед в огледалото и през ЛЯВОТО рамо. Потеглянето от място е маневра (чл. 25) и започва с оглед, не с газ.",
+    },
+    {
+      n: 3,
+      textBg:
+        "Излез напред в лентата и заеми изходната позиция — плътно вдясно до бордюра, спри спокойно.",
+    },
+    {
+      n: 4,
+      textBg:
+        "Включи на задна и се убеди, че пътят ЗАД теб е свободен: обърни се и гледай през рамо назад, не разчитай само на огледалото (чл. 40).",
+    },
+    {
+      n: 5,
+      textBg:
+        "Карай назад бавно, с пешеходна скорост, като държиш права линия успоредно на бордюра — фини движения на волана, очите назад.",
+    },
+    {
+      n: 6,
+      textBg:
+        "Спри плавно след около 25 метра, без нито веднъж да докоснеш бордюра. Ако усетиш, че губиш линията — спри и коригирай, не карай до бордюра.",
+    },
+  ],
+  success: [
+    {
+      id: "sc-edrl-moveoff",
+      titleBg: "Потегли с оглед и заеми изходната позиция",
+      // The settle after the observed forward pull-away (the move-off itself is
+      // graded by PK-05, not by this gate). Pinned to poligon-v1 pg-e-s1.
+      params: { kind: "reachZone", x: -121, y: -136.4, radiusM: 4 },
+    },
+    {
+      id: "sc-edrl-reverse-mid",
+      titleBg: "Дръж права линия по средата на заден ход",
+      // The lateral band: radiusM 1.8 < a lane, so a reverse that wanders off the
+      // curb line misses this gate. ~13 m into the 25 m reverse.
+      params: { kind: "reachZone", x: -134, y: -136.4, radiusM: 1.8 },
+    },
+    {
+      id: "sc-edrl-reverse-end",
+      titleBg: "Спри след 25 метра заден ход до бордюра",
+      // 25 m back, at rest — maxSpeedKmh 4 (пешеходна скорост, stopped): the
+      // reverse must actually be completed slowly, not run out.
+      params: { kind: "reachZone", x: -144, y: -136.4, radiusM: 2.2, maxSpeedKmh: 4 },
+    },
+  ],
+  // parTime only: the rubric's observation channel is not wired to a glance feed
+  // yet (rubric.ts scores it measured:false), so authoring observation moments
+  // here would promise what the pipeline cannot keep — even though this drill is
+  // about observation. PK-05 carries that weight, the honest place for it. Par
+  // 50 s ≈ 1.8× the C1 shadow's ~28 s: the student band with the L4 cold start
+  // and a careful, corrected reverse. Informational only (doc 76 §6), never a
+  // penalty.
+  rubric: { parTimeSec: 50 },
+  // RECORDED: committed deterministic recordings of the authored scripts in
+  // traces/scEdReverseLine.ts; the §5 gate (shadow replays ZERO violations) and
+  // the §9 stage-5 code asserts run in
+  // traces/__tests__/sc-ed-reverse-line-traces.test.ts (re-record RECORD_TRACES=1).
+  shadow: { path: "content/traces/sc-ed-reverse-line/shadow-correct.trace.json" },
+  mistakes: [
+    {
+      traceRef: { path: "content/traces/sc-ed-reverse-line/mistake-curb.trace.json" },
+      titleBg: "Качване на бордюра",
+      whatWentWrongBg:
+        "Огледът преди потегляне беше налице — затова грешката е чиста и единствена: по време на заден ход колата се отклони и задницата се качи на бордюра. Заден ход се кара с пешеходна скорост и с постоянно внимание докъде стига колата; бордюрът се пази с фини корекции на волана и с поглед назад, а не с надежда, че „ще се получи“. Едно докосване на бордюра на изпита е отсъдена грешка, независимо колко бавно е станало.",
+      codeRefs: ["COLLISION"],
+    },
+    {
+      traceRef: { path: "content/traces/sc-ed-reverse-line/mistake-no-look.trace.json" },
+      titleBg: "Заден ход без поглед назад",
+      whatWentWrongBg:
+        "Колата тръгна за маневрата без нито един поглед назад. Точно затова грешката личи ясно: движението назад изисква водачът да се убеди, че пътят зад него е свободен (чл. 40), а потеглянето от място — оглед през рамо и в огледалото (чл. 25). Тук нямаше нито едното. На изпита това е основна грешка още при потеглянето — маневрата приключва, преди изобщо да си стигнал до правата линия назад. Мотористът, колоездачът или детето зад колата живеят точно в тази непогледната секунда.",
+      codeRefs: ["MOVE_OFF_WITHOUT_OBSERVATION"],
+    },
+  ],
+  teach: {
+    whenBg:
+      "На всеки изпит — движението назад по права линия е една от задължителните маневри на площадката — и после на всеки паркинг и всяка тясна улица, където се налага да върнеш колата назад.",
+    whyBg:
+      "Заден ход е сред най-подценяваните маневри: видимостта назад е ограничена, а колата се движи натам, накъдето водачът гледа най-малко. Две неща я правят безопасна и двете се бъркат от кандидатите. Първо — огледът: и потеглянето, и заден ход са маневри, а маневра се прави СЛЕД оглед, не преди него; погледът през рамо показва това, което огледалото и мигачът не могат. Второ — контролът: назад се кара с пешеходна скорост и по права линия, с фини движения на волана и с очи, които следят докъде стига задницата спрямо бордюра. Който бърза или гледа само напред, качва бордюра или криволичи — и двете са отсъдени грешки.",
+    lawRef: "Наредба № 38; ЗДвП чл. 40",
+    examinerBg:
+      "Изпитващият гледа цялата верига: оглед — огледало и през рамо — преди колата да тръгне; заемане на изходна позиция плътно до бордюра; убеждаване, че пътят назад е свободен, преди задния ход; движение назад с пешеходна скорост по права линия, успоредно на бордюра; и спиране без нито едно докосване на бордюра. Потегляне без оглеждане и качване/докосване на бордюра са отсъдени грешки.",
+  },
+  // Config-gated drill: the move-off-observation detector ships OFF
+  // (rules/types.ts moveOffObservationEnabled — the A12 whole-commute pulls away
+  // unglanced by default), so this drill opts it IN. compileScenario propagates
+  // it to the LIVE LessonSpec so the student's own pull-away grades; the recorder
+  // passes the same override for the §9 assert. It is the exam-grade
+  // differentiator: without it, „тръгнах, без да погледна" is an ungraded pass.
+  // COLLISION needs no gate (default-ON).
+  ruleConfig: { moveOffObservationEnabled: true },
+  levels: [
+    { level: 1 },
+    { level: 2 },
+    { level: 3 },
+    // L4: изпитни условия — студен старт по протокола (examMode is the ladder
+    // default at this rung).
+    { level: 4, vehicleStart: "cold" },
+    // No L5: the backlog authors rungs 1–4 only. The полигон is a closed площадка
+    // (no rain/night exam maneuver) and the fault is a low-speed control habit,
+    // not a conditions skill; a wet rung would need the ADR-006 stage-4a physics
+    // opt-in the dry-tuned ghost cannot honour.
+  ],
+  conditions: { weather: "dry" },
+  localeBg: "bg-BG",
+};
+
+// ---------------------------------------------------------------------------
+// sc-ed-poligon-chain — „Полигонът на един дъх" on poligon-v1 (the capstone)
+// ---------------------------------------------------------------------------
+
+/**
+ * THE THREE Наредба-38 площадкови МАНЕВРИ AS ONE UNBROKEN GRADED ROUTE — the
+ * capstone that chains the three existing maneuver evaluators (parkInBay +
+ * corridor reachZone gates + threePointTurn) into a single rubric, on the
+ * committed poligon-v1 training ground (the sc-ed-reverse-line precedent, one
+ * lesson up: that drill graded ONE площадкова маневра; this one grades the
+ * whole set „на един дъх", in the order the exam площадка runs them).
+ *
+ * WHY THE GEOMETRY IS WHAT IT IS — the turn-detector's 40 m junction rule.
+ * The runtime emits `turnStarted` (→ TURN_WITHOUT_INDICATOR) only when a >55°
+ * heading swing happens INSIDE a junction area (≤40 m of an intersection node —
+ * runtime/turns.ts). poligon-v1's south straight („Старт-стоп права", y=-130)
+ * has intersection nodes at x = −95 (g2), 0 (s0), +95 (p1); its degree-2
+ * corners (sw-a x=−170, se-a x=+170) are NOT junctions. So the two TURNING
+ * maneuvers — the perpendicular reverse-park (~90° swing) and the three-point
+ * turn (~180°) — are pinned to the junction-free END BANDS (x > 135 east of p1;
+ * x < −135 west of g2), where a swing fires nothing. The STRAIGHT reverse has
+ * no swing, so it is graded by a reachZone corridor chain (the reverse-line
+ * precedent) anywhere on the straight; the transit between stations is a
+ * straight run and crosses the junctions freely (no swing = no turnStarted).
+ * The exam-districts battery (poligon-chain-districts.test.ts) pins every band.
+ *
+ * WHY IT OPENS WITH A FORWARD MOVE-OFF (the reverse-line HONEST LIMIT 2). The
+ * move-off-observation detector (engine.ts) grades the SESSION'S FIRST move-off
+ * and is FORWARD-GEAR ONLY — a run whose first motion is a reverse latches
+ * nothing. A capstone whose first act was the bay-reverse would leave the taught
+ * оглед ungraded for the STUDENT. So the drive opens with the observed forward
+ * APPROACH past the bay (the pull-past every reverse-park needs anyway), which
+ * IS the graded move-off; the ruleConfig opt-in below then has teeth on the
+ * student's own run. MOVE_OFF_WITHOUT_OBSERVATION is enabled but is NOT one of
+ * this drill's demonstrated faults: it must stay OFF the sheet in all three
+ * drives, which is why every drive glances before the first forward metre.
+ *
+ * THE GRADED CHAIN (success objectives, in the sequential order the engine
+ * advances them — objectives complete strictly in list order, engine.ts):
+ *   1. parkInBay        — перпендикулярно паркиране на заден в гнездото (east band);
+ *   2/3/4. reachZone     — заден ход по права: settle → mid → rest (the corridor
+ *                          chain, the reverse-line mold — no straight-reverse
+ *                          evaluator primitive exists);
+ *   5. threePointTurn    — обръщане в три маневри, посоката обърната (west band).
+ * Economy rides the parkInBay bay-entry attempts (a clean chain parks in one);
+ * the three-point movements ride the objective detail for the debrief.
+ *
+ * Longest trace in the catalog (the backlog's flagged size check): the C1
+ * shadow runs the whole ground in ~164 s — ~3300 20 Hz samples, ~630 KB. That
+ * is denser than the backlog's ~25 KB/60 s rule of thumb, but it lands a hair
+ * above the existing longest committed trace (sc-ed-d2-priority-run, ~623 KB)
+ * and well inside the recorder's 300 s ring; parse.ts imposes no replay-size
+ * limit, so the size is in-band, not a blocker. Geometry pinned to
+ * content/world/poligon-v1.json by literal.
+ */
+
+/** South curb lane of the „Старт-стоп права" (the reverse-line baseline). */
+const PGC_Y = -136.4;
+/** The perpendicular bay in the EAST band (>40 m east of p1 x=95). */
+const PGC_BAY = { x: 143, y: -127, headingDeg: 0, widthM: 2.6, lengthM: 5.0 } as const;
+/** The three-point corridor in the WEST band (>40 m west of g2 x=−95). */
+const PGC_TURN = { x: -150, y: -131.5, halfWidthM: 8, halfLengthM: 11 } as const;
+
+export const SC_ED_POLIGON_CHAIN: ScenarioSpec = {
+  id: "sc-ed-poligon-chain",
+  family: "exam-drills",
+  tagsBg: ["изпит", "полигон", "паркиране на заден", "заден ход", "обръщане", "площадка"],
+  titleBg: "Полигонът на един дъх",
+  objectiveBg:
+    "Трите изпитни маневри последователно, без нулиране: перпендикулярно паркиране на заден, заден ход по права и обръщане от три маневри — както на изпита, с една кола и един дъх.",
+  // PK-02 перпендикулярно паркиране, PK-11 заден ход, PK-12 обръщане в три хода,
+  // PK-05 потегляне с оглед — the chain's four doc-72 primitives.
+  archetypeIds: ["PK-02", "PK-11", "PK-12", "PK-05"],
+  conceptIds: [
+    "c-reversing",
+    "c-maneuver-principles",
+    "c-mirrors-blind-spots",
+    "c-u-turn",
+    "c-driver-signals",
+    "c-general-care-duty",
+  ],
+  map: {
+    archetype: "straight-street",
+    // poligon-v1 is a hand-authored NON-OSM training ground (gen_poligon.mjs); it
+    // carries no meta.scenario.params, so these mirror meta.generator/stats as
+    // provenance (the sc-ed-reverse-line pattern for this committed district).
+    params: {
+      generator: "tools/maps/gen_poligon.mjs",
+      district: "poligon",
+      mapKind: "training-ground",
+      bayEdge: "pg-e-s4",
+      turnEdge: "pg-e-s1",
+      maneuvers: 3,
+    },
+    districtId: "poligon-v1",
+  },
+  start: {
+    // At rest on the „Старт-стоп права" curb lane, EAST band, facing WEST — the
+    // pull-past the bay opens the drive (validate.ts: position + headingDeg). The
+    // полигон's spawnPoints sit elsewhere, so the drill authors its own pose (the
+    // reverse-line pattern).
+    position: { x: 155, y: PGC_Y },
+    headingDeg: 270,
+    vehicleStart: "ready",
+  },
+  instructionsBg: [
+    {
+      n: 1,
+      textBg:
+        "Това е целият площадков изпит наведнъж: три маневри една след друга, без спиране между тях. Първо огледът — огледало и през ЛЯВОТО рамо, чак после потегляш.",
+    },
+    {
+      n: 2,
+      textBg:
+        "Първа маневра — перпендикулярно паркиране на заден. Подмини гнездото между конусите, спри, огледай се и влез на заден до центъра на мястото; задръж колата спряна.",
+    },
+    {
+      n: 3,
+      textBg:
+        "Излез от мястото и продължи по правата към втората станция — спокойно, с пешеходна скорост в маневрите и без да закачаш конус.",
+    },
+    {
+      n: 4,
+      textBg:
+        "Втора маневра — заден ход по права линия. Заеми изходната позиция, убеди се, че отзад е чисто (чл. 40), и върни колата назад по права линия до знака.",
+    },
+    {
+      n: 5,
+      textBg:
+        "Трета маневра — обръщане в три хода. Обърни посоката на 180° в коридора: напред-настрани, назад, после напред по обратната посока — с оглеждане преди всяко движение.",
+    },
+    {
+      n: 6,
+      textBg:
+        "Веригата се кара като на изпит: една отсъдена грешка — закачен конус или загасване под напрежение — тежи, независимо колко чисто е било дотам. Точността е преди бързината.",
+    },
+  ],
+  success: [
+    {
+      id: "sc-pgc-park",
+      titleBg: "Паркирай на заден в перпендикулярното място",
+      // parkInBay in the EAST band bay (>40 m from p1). Reverse credit accrues
+      // within 15 m of the bay; centered stop completes it.
+      params: {
+        kind: "completeManeuver",
+        maneuver: "parkInBay",
+        holdSec: 1.4,
+        bay: PGC_BAY,
+        centerTolM: 0.6,
+        headingTolDeg: 12,
+      },
+    },
+    {
+      id: "sc-pgc-rev-settle",
+      titleBg: "Заеми изходната позиция за заден ход по права",
+      // The settle at the west end of the straight-reverse (the car has
+      // transited here and stopped); maxSpeedKmh gates it to a real halt.
+      params: { kind: "reachZone", x: -135, y: PGC_Y, radiusM: 3, maxSpeedKmh: 6 },
+    },
+    {
+      id: "sc-pgc-rev-mid",
+      titleBg: "Дръж права линия по средата на заден ход",
+      // The lateral band mid-reverse: radiusM 2 < a lane, so a reverse that
+      // wanders off the curb line misses this gate.
+      params: { kind: "reachZone", x: -127.5, y: PGC_Y, radiusM: 2 },
+    },
+    {
+      id: "sc-pgc-rev-end",
+      titleBg: "Спри след заден ход по права до знака",
+      // The reverse ends here at rest (maxSpeedKmh 4 — пешеходна скорост, stopped).
+      params: { kind: "reachZone", x: -120, y: PGC_Y, radiusM: 2.5, maxSpeedKmh: 4 },
+    },
+    {
+      id: "sc-pgc-turn",
+      titleBg: "Обърни посоката на 180° в три маневри",
+      // Corridor-locked threePointTurn in the WEST band (>40 m from g2): the
+      // reversed travel direction, at rest inside the box, in as few movements
+      // as possible (a clean поли́гон turn is 3).
+      params: {
+        kind: "completeManeuver",
+        maneuver: "threePointTurn",
+        corridor: PGC_TURN,
+        startHeadingDeg: 270,
+        toleranceDeg: 20,
+        holdSec: 0.8,
+      },
+    },
+  ],
+  rubric: {
+    // The shared economy budget rides the FIRST maneuver's bay-entry attempts
+    // (a clean chain parks in one); the three-point's movement count rides its
+    // own objective detail for the debrief. placement is deliberately NOT
+    // claimed — a capstone grades the CHAIN's cleanliness, not one bay's
+    // centering — so a single economy channel carries the star math honestly.
+    economy: { objectiveId: "sc-pgc-park", attemptsFor3Stars: 1, attemptsFor2Stars: 2 },
+    parTimeSec: 210,
+  },
+  // RECORDED: committed deterministic recordings of the authored scripts in
+  // traces/scEdPoligonChain.ts; the §5 gate (shadow replays ZERO violations +
+  // completes all five objectives) and the §9 stage-5 code asserts run in
+  // traces/__tests__/sc-ed-poligon-chain-traces.test.ts (re-record RECORD_TRACES=1).
+  shadow: { path: "content/traces/sc-ed-poligon-chain/shadow-correct.trace.json" },
+  mistakes: [
+    {
+      traceRef: { path: "content/traces/sc-ed-poligon-chain/mistake-cone.trace.json" },
+      titleBg: "Удар в конус по веригата",
+      whatWentWrongBg:
+        "Огледът при потеглянето беше налице — затова грешката е чиста и единствена: при влизането на заден колата тръгна твърде широко и закачи конуса, който очертава мястото. Конусът не е декор, а границата на маневрата: перпендикулярното паркиране се прави на пешеходна скорост, като следиш докъде стига колата и коригираш с волана, а не с надежда. Един закачен конус на площадката е отсъдена грешка — независимо колко чисти са били предишните маневри от веригата.",
+      codeRefs: ["COLLISION"],
+    },
+    {
+      traceRef: { path: "content/traces/sc-ed-poligon-chain/mistake-stall.trace.json" },
+      titleBg: "Загасване под напрежение",
+      whatWentWrongBg:
+        "Маневрите изискват фин съединител на съвсем ниска скорост, а под напрежението на изпита кракът отпуска рязко — двигателят загасва. Загасването е второстепенна грешка и се брои всеки път, а на верига от маневри то идва точно когато вниманието е най-разпиляно. Спокоен рестарт по процедурата и продължаваш; но всяко загасване тежи в общата сметка, затова маневрите се карат бавно и с търпение, не с газ.",
+      codeRefs: ["ENGINE_STALLED"],
+    },
+  ],
+  teach: {
+    whenBg:
+      "На площадковата част на изпита и после при всяко реално паркиране, връщане на заден и обръщане в тясна улица. На изпита трите маневри идват една след друга — точно преходът между тях къса кандидатите: паркирал е чисто, а после е загасил при потеглянето; върнал е по права, а на обръщането е закачил конус.",
+    whyBg:
+      "Всяка маневра поотделно е лесна на спокойствие; трудното е да ги свържеш без нулиране на вниманието. Трите имат едно общо ядро: оглед ПРЕДИ движение (потеглянето и заден ход са маневри по чл. 25 и чл. 40), пешеходна скорост и постоянен контрол докъде стигат предницата и задницата. Който бърза, закача конус или загасва; който отпуска вниманието между маневрите, губи точно там, където изпитът го проверява. Веригата тренира издръжливостта на маневрената дисциплина: три маневри, в които нито един момент не е почивка.",
+    lawRef: "Наредба № 38",
+    examinerBg:
+      "Изпитващият гледа целия площадков блок като едно цяло: оглед преди всяко потегляне, перпендикулярно паркиране на заден с центрирано спиране, заден ход по права линия без отклонение, обръщане в три контролирани хода с обърната посока — всичко на пешеходна скорост и без закачен конус. Закачането на конус (съоръжение) и загасването на двигателя са отсъдени грешки и се броят отделно, независимо колко чисто е карано преди тях.",
+  },
+  // Config-gated drill: the move-off-observation detector ships OFF
+  // (rules/types.ts moveOffObservationEnabled — the A12 whole-commute pulls
+  // away unglanced by default), so this capstone opts it IN. compileScenario
+  // propagates it to the LIVE LessonSpec so the student's own opening pull-away
+  // grades; the recorder passes the same override for the §5/§9 gates. It is NOT
+  // a demonstrated fault here — it must stay off all three sheets — but the exam
+  // grades the оглед and so must the drill. COLLISION and ENGINE_STALLED are
+  // default-ON and need no gate.
+  ruleConfig: { moveOffObservationEnabled: true },
+  levels: [
+    { level: 1, toleranceScale: 1.5 },
+    { level: 2, toleranceScale: 1.25 },
+    { level: 3 },
+    // L4: изпитни условия — студен старт + examMode (ladder), цялата верига без
+    // прекъсване (the backlog's L4 = cold start + examMode + full chain unbroken).
+    { level: 4, vehicleStart: "cold" },
+    // No L5: the backlog authors rungs 1–4 only. The полигон is a closed
+    // площадка (no rain/night exam maneuver) and the faults are low-speed
+    // control habits, not conditions skills.
+  ],
+  conditions: { weather: "dry" },
+  localeBg: "bg-BG",
+};
+
 /** The EXAM-DRILLS family templates (registered in templates.ts). */
 export const SCENARIO_TEMPLATES_EXAM: readonly ScenarioSpec[] = [
   SC_ED_D2_CITY_RUN,
   SC_ED_D2_PRIORITY_RUN,
   SC_ED_D2_STOP_ADDRESS,
+  SC_ED_REVERSE_LINE,
+  SC_ED_POLIGON_CHAIN,
 ];

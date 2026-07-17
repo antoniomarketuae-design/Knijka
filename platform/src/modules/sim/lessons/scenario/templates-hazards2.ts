@@ -78,7 +78,12 @@
  * after sc-hazard-obstacle (templates-hazards.ts).
  */
 
-import type { CutInLeadCarSpec, PedestrianDartOutSpec } from "../../contracts";
+import type {
+  CutInLeadCarSpec,
+  EmergencyApproachSpec,
+  PedestrianDartOutSpec,
+  TelltaleStimulusSpec,
+} from "../../contracts";
 import type { ScenarioSpec } from "./types";
 
 // ---------------------------------------------------------------------------
@@ -587,9 +592,471 @@ export const SC_HZ_BRAKE_DONT_SWERVE: ScenarioSpec = {
   localeBg: "bg-BG",
 };
 
+// ═══════════════════════════════════════════════════════════════════════════
+// 3. sc-hz-accident-scene — „Покрай прясна катастрофа" (VP-12) on
+//    hz-accident-v1 (wave 8). The two siblings above teach the STOP the hazard
+//    demands; this one teaches the PASS a hazard you are NOT part of demands —
+//    slow, arc wide, and above all do NOT stop in the lane to look.
+// ═══════════════════════════════════════════════════════════════════════════
+
+/**
+ * Geometry pinned from content/world/hz-accident-v1.json (gen_hz_accident.mjs) —
+ * the L7 copy-by-value law; hz-accident-districts.test.ts asserts these against
+ * the generated map, and the sc-hz-accident-scene trace gate replays the drives
+ * through the production stack.
+ */
+/** Northbound right-lane center of hz-accident-v1 (260 m two-way street, 1+1). */
+const ACC_LANE_X = 4.06;
+/** The wide-pass line the shadow arcs onto to clear the wreck — inside the
+ *  lane-keep tolerance (offset −2.26 < 3.25), so the arc bills no lane-keep. */
+const ACC_WIDE_X = 1.8;
+/** Mid-scene y — the wreck tableau sits here (recorder data, not map data). */
+const ACC_SCENE_Y = 155;
+/** The В27 no-stopping span [fromM, toM] wrapping the scene (map data). */
+const ACC_BAN_FROM_Y = 120;
+const ACC_BAN_TO_Y = 195;
+
+/**
+ * The BYSTANDER (a person milling by the wreck). A `pedestrianDartOut` on a
+ * street with NO crossing — the sc-hz-emergency-stop pattern, and the reason it
+ * matters here too: the traffic system stages the walk from `path` geometry
+ * alone, so the synthetic `crossingId` ("hzac-scene", matching no district
+ * crossing) NEVER arms the CrossingZoneTracker, and no PEDESTRIAN_* code can
+ * fire off this actor in ANY drive. It is a contact channel and a scene dressing,
+ * not a zebra duty — exactly what a person standing at a wreck is.
+ *
+ * He steps WEST off the east kerb at (7.8, 152) and walks to x = 4.4 — the
+ * curb-HALF of the lane, never reaching the shadow's wide line (x = 1.8), so the
+ * shadow that arcs around him is contact-free BY CONSTRUCTION (|Δx| ≥ 2.6 m >
+ * PEDESTRIAN_CONTACT_M 1.5 for every frame, whatever the timing). A tight pass
+ * that stays on x ≈ 5.5 threads exactly where he is walking — the tight-and-fast
+ * demo finds him (or the wreck rects beside him); both are COLLISION.
+ */
+export const SC_HZ_ACCIDENT_BYSTANDER: PedestrianDartOutSpec = {
+  id: "sc-hzac-bystander",
+  kind: "pedestrianDartOut",
+  libraryEventId: "ev-accident-scene-conduct",
+  crossingId: "hzac-scene",
+  crossing: { x: ACC_LANE_X, y: 152 },
+  start: { x: 7.8, y: 152 },
+  dir: { x: -1, y: 0 },
+  speedMps: 1.4,
+  // He crosses only the curb-half of the lane (x 7.8 → 4.4) and stops there.
+  travelM: 3.4,
+  // The whole short walk is on the carriageway (x ∈ [−8.125, 8.125]).
+  roadFromM: 0,
+  roadToM: 3.4,
+  triggerDistM: 26,
+  minTriggerSpeedKmh: 22,
+};
+
+/**
+ * The ARRIVING RIG (ambience — ЗДвП чл. 91). An `emergencyApproach` closing from
+ * behind on the LEFT (oncoming) lane, heading to the scene: the player must not
+ * block it. It is tuned to PASS before the scene and never convict: a fast rig
+ * (24 m/s) starting only 16 m behind clears the arm-window (26 m + 12 m at ≥
+ * 11.5 m/s closing ≈ 3.4 s, well inside the generous 9 s window) in every drive,
+ * so the adjudication resolves „clear" (or „yielded" when the shadow slows) —
+ * never EMERGENCY_NOT_YIELDED. It rides x ≈ −4.06 (the oncoming lane), a full
+ * lane pitch from the player, so it also never enters the harsh-brake lead
+ * corridor and never collides. Scenery with one duty (make way), discharged the
+ * moment the player is not a wall in its lane.
+ */
+export const SC_HZ_ACCIDENT_EMERGENCY: EmergencyApproachSpec = {
+  id: "sc-hzac-rig",
+  kind: "emergencyApproach",
+  libraryEventId: "ev-accident-scene-conduct",
+  actor: {
+    pathNodes: ["hza-n-start", "hza-n-end"],
+    hold: { nodeIndex: 0, offsetM: 0 }, // y = 0 — 15 m behind hza-spawn-approach
+    cruiseSpeedMps: 24, // ~86 km/h: the special-regime rig runs above the 50 (чл. 91)
+    extraRightOffsetM: -ACC_LANE_X, // the LEFT (oncoming) lane, x ≈ −4.06
+    colorIndex: 0,
+    profile: "emergency", // white rig + blue light bar (ADR-001 fictional)
+  },
+  releaseGapM: 16,
+  armBehindM: 26,
+  responseWindowSec: 9,
+  yieldShiftM: 0.8,
+  yieldSlowKmh: 40, // ~10 under the posted 50
+  passAheadM: 12,
+  clearSpeedMps: 24,
+};
+
+/**
+ * VP-12 — поведение покрай място на произшествие (ЗДвП чл. 123: при пътно-
+ * транспортно произшествие водачите на приближаващите превозни средства са
+ * длъжни да намалят скоростта, да не създават опасност и да не пречат на
+ * оказването на помощ; чл. 20, ал. 2: скоростта се съобразява с обстановката,
+ * така че водачът да може да спре пред всяко предвидимо препятствие).
+ *
+ * THE TEACHING CLAIM, and why it is NOT the two siblings': sc-hz-emergency-stop
+ * and sc-hz-brake-dont-swerve teach the STOP a hazard IN your path demands.
+ * HERE the hazard is NOT in your path — it is a crash already stopped in the
+ * curb-half of the lane — and the whole skill is to pass it WITHOUT becoming a
+ * second incident: shed speed early, arc WIDE of the people and the sheet metal,
+ * and — the graded core — do NOT stop in the live lane to look. A car parked to
+ * gawk turns one accident into a blockage that the ambulance behind you cannot
+ * get past; that is what the В27 span over the scene grades
+ * (ILLEGAL_STOP_IN_BAN_ZONE), and it is exactly the „standing in live traffic"
+ * mistake doc 72 files under VP-12.
+ *
+ * WHAT IS GRADED vs WHAT IS TAUGHT (the honest scope): чл. 123 also owns the
+ * DUTIES OF A PARTICIPANT — stop, secure the scene, give aid, report, never
+ * flee or drink. None of that is drivable, and inventing a detector for it
+ * would bill an unmodelled duty (A12). So those stay TEACH-CARD content, and the
+ * sim grades only the DRIVE-PAST conduct the accident topic's own questions
+ * cannot cover: the gawk-stop (ILLEGAL_STOP_IN_BAN_ZONE) and the tight-and-fast
+ * squeeze past the people (COLLISION). The arriving ambulance is scenery with
+ * one duty — make way — and the map's В27 span + the wreck rects carry the rest.
+ */
+export const SC_HZ_ACCIDENT_SCENE: ScenarioSpec = {
+  id: "sc-hz-accident-scene",
+  family: "hazards",
+  tagsBg: [
+    "произшествие",
+    "катастрофа",
+    "намали скоростта",
+    "мини широко",
+    "не спирай да зяпаш",
+    "линейка",
+    "специален режим",
+    "забрана за престой В27",
+  ],
+  titleBg: "Покрай прясна катастрофа",
+  objectiveBg:
+    "Покрай ПТП: намали рязко под лимита, мини широко от хората и ламарините и НЕ спирай в лентата да зяпаш — освободи пътя за помощта.",
+  archetypeIds: ["VP-12", "OV-18"],
+  conceptIds: [
+    "c-accident-duties",
+    "c-hazard-perception",
+    "c-speed-adaptation",
+    "c-stopping-standing-rules",
+    "c-emergency-priority",
+    "c-reaction-time",
+  ],
+  map: {
+    archetype: "straight-street",
+    // Reuses the committed hz-accident-v1 map; its meta.scenario.params,
+    // mirrored here for provenance (gen_hz_accident.mjs).
+    params: { lengthM: 260, maxspeedKmh: 50 },
+    districtId: "hz-accident-v1",
+  },
+  start: {
+    spawnPointId: "hza-spawn-approach",
+    vehicleStart: "ready",
+  },
+  instructionsBg: [
+    {
+      n: 1,
+      textBg:
+        "Права градска улица, ограничение 50. Напред вдясно има прясна катастрофа — смачкани коли и хора около тях, изял е половината от твоята лента.",
+    },
+    {
+      n: 2,
+      textBg:
+        "Намали РАНО и слез чувствително под 50 — покрий спирачката. Не защото те задължава знак, а защото не знаеш какво ще излезе иззад ламарините.",
+    },
+    {
+      n: 3,
+      textBg:
+        "Тук има знак В27 — престоят е забранен през зоната на сцената. Не спирай в лентата да зяпаш: спрелият да гледа е тапа, а зад теб иде линейка, на която пътят трябва да е чист.",
+    },
+    {
+      n: 4,
+      textBg:
+        "Мини ШИРОКО от хората и от колите — вземи вътрешната част на лентата, далеч от бордюра. Някой може да пристъпи към платното; кракът стои готов над спирачката.",
+    },
+    {
+      n: 5,
+      textBg:
+        "Зад теб приближава линейка със специален режим. Направи ѝ път — дръж вдясно и намали, за да те подмине по свободната половина; не ѝ спирай в коридора.",
+    },
+    {
+      n: 6,
+      textBg:
+        "Щом подминеш сцената и платното пред теб е чисто, чак тогава се върни в средата на лентата и ускори плавно до края на отсечката.",
+    },
+  ],
+  success: [
+    {
+      id: "sc-hzac-slow",
+      titleBg: "Влез в зоната на произшествието с намалена скорост",
+      // The graded core of чл. 20: come off the limit BEFORE the scene. Capped
+      // at 35 (well under 50) at the mouth of the В27 span — a driver who holds
+      // city speed to „get a look" cannot satisfy it and stalls the drill here.
+      params: { kind: "reachZone", x: ACC_LANE_X, y: 122, radiusM: 12, maxSpeedKmh: 35 },
+    },
+    {
+      id: "sc-hzac-wide",
+      titleBg: "Мини широко и бавно покрай хората и ламарините",
+      // THE „мини широко" objective: completable ONLY from the wide line
+      // (x = 1.8, radius 2.5 < a lane half-pitch), AND only slowly (≤ 32). A car
+      // that squeezed past on x ≈ 5.5 is neither wide enough nor — having hit
+      // something — still driving.
+      params: { kind: "reachZone", x: ACC_WIDE_X, y: ACC_SCENE_Y, radiusM: 2.5, maxSpeedKmh: 32 },
+    },
+    {
+      id: "sc-hzac-clear",
+      titleBg: "Освободи сцената и продължи до края на отсечката",
+      // Beyond the В27 span (y > 195) — the legal place to be back at speed on
+      // the driving line, proving the car cleared the scene and resumed.
+      params: { kind: "reachZone", x: ACC_LANE_X, y: 232, radiusM: 10 },
+    },
+  ],
+  rubric: { parTimeSec: 55 },
+  // RECORDED: committed deterministic recordings of the authored scripts in
+  // traces/scHzAccidentScene.ts; gates in traces/__tests__/
+  // sc-hz-accident-scene-traces.test.ts (re-record with RECORD_TRACES=1).
+  shadow: { path: "content/traces/sc-hz-accident-scene/shadow-correct.trace.json" },
+  mistakes: [
+    {
+      traceRef: { path: "content/traces/sc-hz-accident-scene/mistake-gawk-stop.trace.json" },
+      titleBg: "Зяпане със спиране в лентата",
+      whatWentWrongBg:
+        "Колата спря в лентата — да се погледне. И точно това превръща една катастрофа в две: спрелият да зяпа е стена, зад която се трупа опашка, а линейката, която бърза натам, няма как да мине. Знакът В27 не е случаен — престоят покрай произшествие е забранен именно защото пътят трябва да остане чист за помощта. Любопитството се плаща от някого другиго. Ако не си участник, покрай ПТП има само едно правило за движение: намали, мини и освободи платното — не спирай да гледаш.",
+      codeRefs: ["ILLEGAL_STOP_IN_BAN_ZONE"],
+    },
+    {
+      traceRef: { path: "content/traces/sc-hz-accident-scene/mistake-squeeze.trace.json" },
+      titleBg: "Минаване плътно и бързо покрай хората",
+      whatWentWrongBg:
+        "Покрай сцената колата мина плътно и бързо — на една ръка от ламарините и от хората около тях. А около една катастрофа платното не е предвидимо: някой се навежда над ранен, друг пристъпва назад, без да гледа. Тесният и бърз проход не оставя нито метър, нито миг за грешката им — и я намери. Затова покрай произшествие се минава широко и бавно: вземаш вътрешната част на лентата, далеч от хората, със скорост, при която всяко тяхно движение е още само изненада, а не удар.",
+      codeRefs: ["COLLISION"],
+    },
+  ],
+  teach: {
+    whenBg:
+      "Винаги, когато минаваш покрай вече случило се произшествие, а ти не си участник: катастрофирали коли на платното, аварирал бус с триъгълник, спрели екипи. Общото е, че опасността е СПРЯЛА встрани от пътя ти — задачата не е да спреш заради нея, а да я подминеш, без да станеш втори инцидент и без да пречиш на помощта.",
+    whyBg:
+      "Три неща се събират тук. Първо — скоростта (чл. 20): около сцената платното е непредвидимо, затова слизаш чувствително под лимита и покриваш спирачката, за да можеш да спреш пред всичко, което изскочи иззад ламарините. Второ — траекторията: минаваш ШИРОКО от хората и колите, по вътрешната част на лентата, защото тесният проход не прощава едно неволно пристъпване. Трето, и най-важно за изпита — престоят: спирането в лентата „само да погледнеш“ е забранено (В27 покрай произшествие) и е опасно по същество — спрелият да зяпа е тапа, която запушва пътя точно когато по него бърза линейка. Ако зад теб идва автомобил със специален режим, си длъжен да му направиш път (чл. 91): дръж вдясно, намали, пусни го да мине. Отделно стоят задълженията на УЧАСТНИКА в ПТП по чл. 123 — да спреш, да обезопасиш мястото, да окажеш помощ, да уведомиш и никога да не бягаш и да не пиеш алкохол след удар; те са важни, но се учат, а не се карат тук. Тази задача упражнява само едното: как се МИНАВА покрай чуждо произшествие.",
+    lawRef: "ЗДвП чл. 123; чл. 20",
+    examinerBg:
+      "Изпитващият гледа три неща покрай сцена на произшествие: намаляваш ли предварително и осезаемо, минаваш ли с достатъчна странична дистанция от хората и — задължително — НЕ спираш ли в лентата да гледаш. Спиране за зяпане покрай произшествие е груба грешка (пречиш на движението и на помощта); удар в човек или в спряло превозно средство прекратява изпита. Ако приближава специален режим — правиш му път без забавяне.",
+  },
+  levels: [
+    { level: 1 },
+    { level: 2 },
+    { level: 3 },
+    { level: 4, vehicleStart: "cold" },
+    // L5 — night: the difficulty axis is SEEING the scene in time. A crash at
+    // night is read from flares and the light bar, not the skyline, so the
+    // early slow-down has to come from those cues. RENDER only — no physics
+    // (ADR-006 stage 4a: the authored ghost is dry-tuned), no new grading.
+    { level: 5, conditions: { night: true } },
+  ],
+  staged: [SC_HZ_ACCIDENT_BYSTANDER, SC_HZ_ACCIDENT_EMERGENCY],
+  conditions: { weather: "dry" },
+  localeBg: "bg-BG",
+};
+
+// ═══════════════════════════════════════════════════════════════════════════
+// 4. sc-hz-breakdown-pulloff — „Авария на магистралата — протоколът" (PK-10)
+//    on the committed mw-v1 motorway segment (map REUSED from
+//    sc-mw-emergency-lane). The DRIVABLE half of the big triangle cluster
+//    (ev-emergency-stop-triangle, 21 q / 43 pt): the pull-off arc itself —
+//    signal, cross to the emergency lane in one clean diagonal, stop hard
+//    right. The ON-FOOT half (vest before exit, triangle at 100 m, wait behind
+//    the barrier, call 112) has NO cockpit mechanic and stays in the debrief
+//    card — a deliberate, documented scope cut (the final-report note).
+// ═══════════════════════════════════════════════════════════════════════════
+
+/**
+ * WHY mw-v1 (map REUSED, not authored): the fault this drill teaches only
+ * exists on a road WITH an emergency lane. mw-v1 (gen_motorway.mjs) is the
+ * committed divided 2+2 with the авариЙна лента as laneId 0 under an
+ * "emergencyLane" zone span (mw-district.test.ts pins it): emergency x = 8.13
+ * (laneId 0), cruise x = 0 (laneId 1), limit 140. The чл. 58, т. 3 detector
+ * (EMERGENCY_LANE_DRIVING, default-ON, structurally data-armed) is the graded
+ * fault of the wrong pull-off; the correct one is protected structurally — the
+ * detector's ONE innocence case is exactly the breakdown stop this drill
+ * teaches: firm braking toward a halt keeps the clock reset, and the stop
+ * itself disarms (v ≤ movingSpeed). No ruleConfig, no physics: the taught act
+ * grades clean on the LIVE map with zero overrides.
+ */
+
+/** mw-v1 northbound lane centers (meta.scenario — the L7 copy truth). */
+const BP_X_CRUISE = 0; // laneId 1 — the right TRAVEL lane
+const BP_X_EMERG = 8.13; // laneId 0 — the авариЙна лента (лента за принудително спиране)
+/** The red telltale lights as the player passes y = 250 in the travel lane —
+ *  mid-segment, well past the approach checkpoint (single truth by value with
+ *  the staged TelltaleStimulusSpec below). */
+const BP_TRIGGER = { x: BP_X_CRUISE, y: 250 };
+const BP_TRIGGER_DIST_M = 8;
+/** The compliant halt: hard right in the emergency lane, ~130 m of planning
+ *  room past the lamp. Mirrors the graded stop-zone objective by value. */
+const BP_STOP = { x: BP_X_EMERG, y: 378 };
+const BP_STOP_RADIUS_M = 5;
+const BP_STOP_SPEED_KMH = 6;
+
+/**
+ * The staged COCKPIT STIMULUS (kind "telltaleStimulus" — stimulus + measurement
+ * only, contracts.ts): at the trigger the director lights the red engine lamp
+ * (the breakdown cue). The runner stages NO actor and emits ZERO SimTick
+ * events, so nothing it does can convict the player: the graded contract lives
+ * entirely in this template's objectives (the emergency-lane low-speed
+ * reachZone below = the pull-over-and-stop completion) plus the SHIPPED
+ * EMERGENCY_LANE_DRIVING / HARSH_BRAKING_NO_CAUSE codes the mistake demos trip
+ * on the driver's OWN channels. `ignoreBeyondM` 200 sits comfortably past the
+ * stop (y 378 is 128 m past the trigger), so a compliant pull-over always
+ * resolves "yielded" first; a rider who keeps going records
+ * "passedWithoutStopping".
+ */
+const SC_HZ_BREAKDOWN_TELLTALE: TelltaleStimulusSpec = {
+  id: "sc-hzbp-lamp",
+  kind: "telltaleStimulus",
+  libraryEventId: "ev-emergency-stop-triangle",
+  lamp: "temperature",
+  trigger: BP_TRIGGER,
+  triggerDistM: BP_TRIGGER_DIST_M,
+  stop: BP_STOP, // single truth with the graded emergency-lane stop objective
+  stopRadiusM: BP_STOP_RADIUS_M,
+  stopSpeedKmh: BP_STOP_SPEED_KMH,
+  ignoreBeyondM: 200,
+};
+
+/**
+ * PK-10 — обезопасяване при принудително спиране на магистрала (ЗДвП чл. 58,
+ * т. 3: движение по лентата за принудително спиране е забранено, освен при
+ * принудително спиране; чл. 97: задълженията при повреда — извеждане на
+ * автомобила извън платното за движение, аварийни светлини, светлоотразителна
+ * жилетка и триъгълник).
+ *
+ * THE TEACHING CLAIM: when the car breaks down at speed, the ONLY correct move
+ * is the disciplined pull-off — signal, ease across to the emergency lane in
+ * one predictable diagonal, stop as far right as possible, engine off. The two
+ * wrong ways are the two mistakes the road punishes:
+ *   - „Каране по аварийната лента до изхода" — instead of STOPPING, the driver
+ *     keeps rolling down the emergency lane toward the next exit: sustained
+ *     travel in laneId 0 grades EXACTLY EMERGENCY_LANE_DRIVING (чл. 58, т. 3 —
+ *     the lane is the corridor of the ambulance and of the car already stopped
+ *     ahead, never a bypass);
+ *   - „Спиране в активната лента при работеща кола" — panic instead of a plan:
+ *     the driver stamps the brake and stops DEAD in the live travel lane. A
+ *     dashboard lamp is not a forward cause in the harsh-brake ledger (it reads
+ *     leadGap/signal/junction/crossing channels only, and the telltale runner
+ *     emits zero events), so the mid-lane slam grades EXACTLY
+ *     HARSH_BRAKING_NO_CAUSE — the honest read: a breakdown asks for a PLANNED
+ *     pull-off at motorway speed, never an emergency stop in the flow.
+ *
+ * HONEST SCOPE CUT (documented for the final report): ev-emergency-stop-triangle
+ * is 21 questions, and roughly half of it — жилетка преди слизане, триъгълник
+ * на 100 m, изчакване зад мантинелата, обаждане на 112 — is an ON-FOOT
+ * checklist with no cockpit mechanic. That half stays in the teach/debrief
+ * card (чл. 97, чл. 101). This template owns the DRIVABLE half: the pull-off
+ * arc and the lane discipline that the engine can actually grade.
+ */
+export const SC_HZ_BREAKDOWN_PULLOFF: ScenarioSpec = {
+  id: "sc-hz-breakdown-pulloff",
+  family: "hazards",
+  tagsBg: ["магистрала", "авария", "аварийна лента", "принудително спиране", "обезопасяване", "спиране вдясно"],
+  titleBg: "Авария на магистралата — протоколът",
+  objectiveBg:
+    "При повреда на магистрала: мигач, плавно до аварийната лента, спри максимално вдясно и не се движи по нея нито метър повече от нужното — лентата за принудително спиране е коридорът на помощта, не байпас до изхода.",
+  archetypeIds: ["PK-10", "SN-05"],
+  conceptIds: [
+    "c-emergency-lane-breakdown",
+    "c-motorway-prohibitions",
+    "c-motorway-rules",
+    "c-technical-condition",
+  ],
+  map: {
+    archetype: "motorway-segment",
+    // Reuses the committed mw-v1 map; its meta.scenario.params, mirrored here
+    // for provenance (gen_motorway.mjs).
+    params: { lengthM: 1000, maxspeedKmh: 140, lanesPerDirection: 2, medianM: 6 },
+    districtId: "mw-v1",
+  },
+  start: {
+    spawnPointId: "mw-spawn-approach",
+    vehicleStart: "ready",
+  },
+  instructionsBg: [
+    { n: 1, textBg: "Магистрала, две ленти за движение и аварийна лента вдясно. Потегли и се установи в дясната лента за движение — около 90–95 км/ч." },
+    { n: 2, textBg: "По време на движение на таблото светва червената лампа за налягане на маслото — двигателят отказва. Не бързай да реагираш рязко: имаш време за план." },
+    { n: 3, textBg: "Провери огледалото, пусни десен мигач и започни плавно да намаляваш още в лентата за движение — предвидимо за движещите се зад теб." },
+    { n: 4, textBg: "Прекоси плавно в аварийната лента в едно движение и спри максимално вдясно. Аварийната лента е само за принудително спиране — по нея не се кара до изхода." },
+    { n: 5, textBg: "Спри плътно вдясно и угаси двигателя. Оттук нататък протоколът е пеша: аварийни светлини, жилетка ПРЕДИ да слезеш, триъгълник на 100 м зад колата, изчакване зад мантинелата и обаждане на 112." },
+  ],
+  success: [
+    {
+      id: "sc-hzbp-approach",
+      titleBg: "Мини участъка с разрешена скорост",
+      // Right-lane checkpoint BEFORE the trigger (y 200 < 250) — the objectives
+      // complete in order, so the pull-off stop below is graded only on the far
+      // side of the stimulus. Limit is 140; 130 keeps the gate lawful without
+      // forcing a crawl.
+      params: { kind: "reachZone", x: BP_X_CRUISE, y: 200, radiusM: 12, maxSpeedKmh: 130 },
+    },
+    {
+      id: "sc-hzbp-stop",
+      titleBg: "Спри плътно вдясно в аварийната лента",
+      // THE objective (the sc-vp-telltale / pk-smooth-stop discipline):
+      // completable ONLY at near-stop speed at the emergency-lane halt point,
+      // 128 m PAST the stimulus trigger. A driver who KEEPS ROLLING down the
+      // emergency lane passes through it above 6 km/h and never satisfies it; a
+      // driver who panic-stops in the travel lane is on x = 0, not x = 8.13.
+      params: {
+        kind: "reachZone",
+        x: BP_STOP.x,
+        y: BP_STOP.y,
+        radiusM: BP_STOP_RADIUS_M,
+        maxSpeedKmh: BP_STOP_SPEED_KMH,
+      },
+    },
+  ],
+  rubric: { parTimeSec: 50 },
+  // RECORDED: committed deterministic recordings of the authored scripts in
+  // traces/scHzBreakdownPulloff.ts; gates in traces/__tests__/
+  // sc-hz-breakdown-pulloff-traces.test.ts (re-record with RECORD_TRACES=1).
+  shadow: { path: "content/traces/sc-hz-breakdown-pulloff/shadow-correct.trace.json" },
+  mistakes: [
+    {
+      traceRef: { path: "content/traces/sc-hz-breakdown-pulloff/mistake-shoulder-drive.trace.json" },
+      titleBg: "Каране по аварийната лента до изхода",
+      whatWentWrongBg:
+        "Двигателят отказа — и вместо да спре, водачът се настани в аварийната лента и я подкара като „своя“ до следващия изход. Аварийната лента не е байпас: тя е коридорът на линейката и мястото, където вече стои друга аварирала кола с хора около нея. Движението по лентата за принудително спиране е забранено (чл. 58, т. 3) — при повреда се спира в нея максимално вдясно, не се пътува по нея.",
+      codeRefs: ["EMERGENCY_LANE_DRIVING"],
+    },
+    {
+      traceRef: { path: "content/traces/sc-hz-breakdown-pulloff/mistake-lane-stop.trace.json" },
+      titleBg: "Спиране в активната лента при работеща кола",
+      whatWentWrongBg:
+        "Лампата стресна водача и кракът се заби в спирачката още в лентата за движение — колата спря аварийно насред активната лента, при магистрална скорост зад нея. Точно това е грешният рефлекс: една лампа иска ПЛАН, не паника. При скоростите на магистралата спрял в лентата автомобил е предпоставка за верижен удар — правилното е плавно, предвидимо намаляване и излизане в аварийната лента, а чак там — спиране.",
+      codeRefs: ["HARSH_BRAKING_NO_CAUSE"],
+    },
+  ],
+  teach: {
+    whenBg:
+      "При всяка повреда в движение на магистрала или скоростен път — спукана гума, отказал двигател, димяща предница, светнала червена лампа. Общото е, че трябва да махнеш колата от потока при скорости, при които спрелият в лентата не се прощава.",
+    whyBg:
+      "Аварийната лента съществува точно за този момент: мястото, където повредената кола се изтегля, и коридорът, по който линейката и пътната помощ стигат до нея. Затова движението по нея е забранено — кола, която я ползва като байпас, среща спрели автомобили, хора около тях и отломки с магистрална скорост и без време за реакция. Но самата аварийна лента е и правилният изход при повреда: влизаш в нея с мигач и плавно намаляване, спираш максимално вдясно и гасиш двигателя. Двете грешки са двете крайности — да останеш в потока (паническо спиране в активната лента, което кани удар отзад) и да тръгнеш по аварийната като по нормална лента. Спокойната процедура е между тях: предвиди, покажи намерението си, прекоси в едно движение и спри вдясно.",
+    lawRef: "ЗДвП чл. 58, т. 3",
+    examinerBg:
+      "Изпитващият следи лентовата дисциплина и обезопасяването: при повреда очаква навременно забелязване, огледало и десен мигач, плавно намаляване в лентата за движение и извеждане на автомобила в аварийната лента максимално вдясно. Движение по аварийната лента е опасна грешка (с мигач или без), а рязкото спиране насред активната лента е предпоставка за ПТП.",
+  },
+  levels: [
+    { level: 1 },
+    { level: 2 },
+    { level: 3 },
+    { level: 4, vehicleStart: "cold" },
+    // L5 — нощ: чл. 97's night duties (жилетка + триъгълник видимост) carry into
+    // the debrief card. The conditions/RENDER axis only — NO physics opt-in (the
+    // pull-off ghost is dry-tuned; ADR-006 stage 4a), and the recorded day trace
+    // is never replayed at this rung (bot-completion drives L3; the trace gate
+    // runs the default rule config), so no HEADLIGHTS_OFF_AT_NIGHT can false-fire.
+    { level: 5, conditions: { night: true } },
+  ],
+  staged: [SC_HZ_BREAKDOWN_TELLTALE],
+  conditions: { weather: "dry" },
+  localeBg: "bg-BG",
+};
+
 /** The hazards templates of this file, in catalog order (registered in
  *  templates.ts by the integration pass). */
 export const SCENARIO_TEMPLATES_HAZARDS2: readonly ScenarioSpec[] = [
   SC_HZ_EMERGENCY_STOP,
   SC_HZ_BRAKE_DONT_SWERVE,
+  SC_HZ_ACCIDENT_SCENE,
+  SC_HZ_BREAKDOWN_PULLOFF,
 ];

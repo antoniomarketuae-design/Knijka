@@ -38,7 +38,7 @@
  * and the ghost narration carry the visual story until the animated-arm drop.
  */
 
-import type { BrakingLeadCarSpec } from "../../contracts";
+import type { BrakingLeadCarSpec, PedestrianDartOutSpec } from "../../contracts";
 import type { ScenarioSpec } from "./types";
 
 // ---------------------------------------------------------------------------
@@ -235,5 +235,190 @@ export const SC_RX_QUEUE_CLEAR: ScenarioSpec = {
   localeBg: "bg-BG",
 };
 
+// ---------------------------------------------------------------------------
+// 2. sc-rx-tram-stop-doors — „Трамвай на спирка без остров" (RX-04 INVERSE) on
+//    rx-tram-stop-v1 (150 m 1+1 street, limit 40, marked door crossing @
+//    y = 90, halted tram body center y = 97 on the southbound lane — its front
+//    door at the zebra — NO island: the lane IS the spill area; the east-kerb
+//    shelter marks the stop; tools/maps/gen_rx_tram_stop.mjs)
+//
+// THE INVERSE OF sc-rx-tram-island (the exam's favourite contrast): the island
+// stop (RX-04, чл. 66, ал. 2) protects the passenger on a refuge, so the driver
+// SLOWS and stops IF NEEDED; strip the island and чл. 66, ал. 1 makes the stop
+// MANDATORY — passengers alight straight onto the carriageway and it is theirs
+// until they reach the kerb. Same dart-out machinery as the island (the
+// sc-vu-emergency-junction precedent: honest reuse of the pedestrian chain, no
+// new codes — the teach copy carries the „няма остров = задължително спиране"
+// lesson), one deletion (the platform) and one addition (the shelter).
+// ---------------------------------------------------------------------------
+
+/** rx-tram-stop-v1: the northbound player-lane center and the door crossing. */
+const RTS_LANE = 4.06;
+const RTS_CROSSING_Y = 90;
+/** rx-tram-stop-v1: halted tram body center on the southbound lane (front door
+ *  at the zebra); hold offsetM on the end→start path = lengthM − tramHoldY. */
+const RTS_TRAM_HOLD_Y = 97;
+const RTS_STREET_LENGTH_M = 150;
+
+/**
+ * The staged encounter: a HALTED tram at the no-island stop (a dart-out PROP —
+ * the narrowMeeting-props recipe: staged held actor, cruise 0, never commanded,
+ * profile "tram" renders the rig) + an ALIGHTING PASSENGER who steps off the
+ * tram's front door STRAIGHT onto the player's lane (1.8 m/s — between the 1.4
+ * walk and the 2.2 sprint) and crosses to the east kerb. With no island there
+ * is no refuge: the passenger owns the whole lane from the door to the kerb.
+ * Grading is 100% the shipped pedestrian chain: crossing occupancy →
+ * PEDESTRIAN_NOT_YIELDED / PEDESTRIAN_YIELDED, contact → COLLISION.
+ */
+export const SC_RX_TRAM_STOP_EVENT: PedestrianDartOutSpec = {
+  id: "sc-rts-passenger",
+  kind: "pedestrianDartOut",
+  crossingId: "rts-x-1",
+  crossing: { x: 0, y: RTS_CROSSING_Y },
+  // The tram's front door edge (southbound lane center −4.06 + half-width 1.15
+  // = −2.91), crossing EAST across the player's lane toward the kerb.
+  start: { x: -2.9, y: RTS_CROSSING_Y },
+  dir: { x: 1, y: 0 },
+  // A careful alighting step-down (1.2 m/s — slower than a mid-road darter):
+  // the whole lane is theirs, and the long occupancy is the point.
+  speedMps: 1.2,
+  travelM: 12.7,
+  // Steps straight onto the roadway (no refuge) → on the lane from s = 0 until
+  // it clears the east road edge (x = 8.125 → s = 8.125 − (−2.9) = 11.03).
+  roadFromM: 0,
+  roadToM: 11.03,
+  // Fires late (25 m out) so the door-side crossing lands right in the driver's
+  // path — the „appears a stride from the bumper" reality of a no-island stop.
+  triggerDistM: 25,
+  minTriggerSpeedKmh: 10,
+  props: [
+    {
+      // The halted tram on the southbound corridor: end → start path, body
+      // center at y = 150 − 53 = 97 (nose at 90 — AT the door zebra, doors
+      // toward the player's lane; the rx-tram-stop-v1 meta.scenario pins).
+      pathNodes: ["rts-n-end", "rts-n-start"],
+      hold: { nodeIndex: 0, offsetM: RTS_STREET_LENGTH_M - RTS_TRAM_HOLD_Y },
+      colorIndex: 0,
+      profile: "tram",
+    },
+  ],
+};
+
+/**
+ * L5 complication — a LATE RUNNER chasing the tram (the conditionsNote): a
+ * second passenger SPRINTS the other way, from the east kerb toward the closing
+ * doors, at 2.4 m/s. Added at L5 only (stagedAdd — the LevelSpec seam; the
+ * template's own darter is never re-timed, the RXQ precedent) and paired with
+ * rain + wet grip so the stop must be read late and braked long.
+ */
+const RTS_LATE_RUNNER: PedestrianDartOutSpec = {
+  id: "sc-rts-runner",
+  kind: "pedestrianDartOut",
+  crossingId: "rts-x-1",
+  crossing: { x: 0, y: RTS_CROSSING_Y },
+  // East kerb, sprinting WEST toward the tram doors (a late boarder).
+  start: { x: 9.73, y: RTS_CROSSING_Y },
+  dir: { x: -1, y: 0 },
+  speedMps: 2.4,
+  travelM: 12.7,
+  roadFromM: 1.6,
+  roadToM: 12.6,
+  triggerDistM: 40,
+  minTriggerSpeedKmh: 12,
+};
+
+/** RX-04 обратен — трамвайна спирка БЕЗ остров (ЗДвП чл. 66, ал. 1: при спрял
+ *  трамвай на спирка без островче за качване и слизане водачът СПИРА и не
+ *  потегля, докато всички пътници не напуснат платното — платното е тяхно). */
+export const SC_RX_TRAM_STOP: ScenarioSpec = {
+  id: "sc-rx-tram-stop-doors",
+  family: "rail",
+  tagsBg: ["трамвай", "спирка без остров", "слизащи пътници", "задължително спиране"],
+  titleBg: "Трамвай на спирка без остров",
+  objectiveBg:
+    "Трамвай е спрял на спирка без остров и изсипва пътници направо на платното. Спри зад отворените му врати и не потегляй, докато и последният пътник не се прибере — платното е тяхно, не твое.",
+  archetypeIds: ["RX-04"],
+  conceptIds: ["c-tram-priority", "c-crosswalk-yield", "c-pedestrian-rights-duties"],
+  map: {
+    archetype: "zebra-block",
+    // The generator recipe — mirrored in rx-tram-stop-v1.json meta.scenario
+    // .params (tools/maps/gen_rx_tram_stop.mjs).
+    params: { crossings: 1, signalized: "no", approachM: 90, tramStop: "none" },
+    districtId: "rx-tram-stop-v1",
+  },
+  start: {
+    spawnPointId: "rts-spawn-approach",
+    vehicleStart: "ready",
+  },
+  instructionsBg: [
+    { n: 1, textBg: "Потегли по улицата — вляво на спирка БЕЗ остров е спрял трамвай с отворени врати." },
+    { n: 2, textBg: "Без остров пътниците слизат право на платното. Спрелият трамвай значи едно: хора пред теб. Вдигни крак от газта." },
+    { n: 3, textBg: "Пътник слиза и тръгва през твоята лента към тротоара. Спри напълно зад отворените врати — не се провирай покрай тях." },
+    { n: 4, textBg: "Изчакай платното да се освободи изцяло — платното е на пътниците, докато и последният се прибере на тротоара." },
+    { n: 5, textBg: "Чак когато лентата е чиста, потегли спокойно покрай спрелия трамвай и продължи до края." },
+  ],
+  success: [
+    {
+      id: "sc-rts-approach",
+      titleBg: "Приближи спирката с намалена скорост и готовност за спиране",
+      params: { kind: "reachZone", x: RTS_LANE, y: 76, radiusM: 10, maxSpeedKmh: 30 },
+    },
+    {
+      id: "sc-rts-clear",
+      titleBg: "Премини покрай спрелия трамвай, пропуснал слизащия пътник",
+      params: { kind: "reachZone", x: RTS_LANE, y: 122, radiusM: 10 },
+    },
+  ],
+  rubric: { parTimeSec: 75 },
+  // RECORDED: committed deterministic recordings of the authored scripts in
+  // traces/scRxTramStopDoors.ts; gates in traces/__tests__/sc-rx-tram-stop-
+  // doors-traces.test.ts (re-record with RECORD_TRACES=1).
+  shadow: { path: "content/traces/sc-rx-tram-stop-doors/shadow-correct.trace.json" },
+  mistakes: [
+    {
+      traceRef: { path: "content/traces/sc-rx-tram-stop-doors/mistake-thread-doors.trace.json" },
+      titleBg: "Провиране покрай отворените врати",
+      whatWentWrongBg:
+        "Колата се провря покрай спрелия трамвай, без да спре за слизащия пътник — премина през пътеката, докато той беше на платното, и го удари пред самите отворени врати. Спирка без остров значи пътници направо на платното: чл. 66, ал. 1 изисква да спреш зад отворените врати и да не потегляш, докато не се приберат. Провирането покрай отворени врати е класическата смъртоносна грешка на трамвайната спирка.",
+      codeRefs: ["PEDESTRIAN_NOT_YIELDED", "COLLISION"],
+    },
+    {
+      traceRef: { path: "content/traces/sc-rx-tram-stop-doors/mistake-creep-through.trace.json" },
+      titleBg: "Пълзене през слизащите",
+      whatWentWrongBg:
+        "Водачът намали, но не спря: пропълзя през пътеката, докато пътникът още пресичаше платното към тротоара. Без остров пътникът няма къде да се скрие — платното е негово, докато не се прибере. „Бавно и внимателно“ покрай слизащи пътници не е пропускане: чл. 66, ал. 1 иска пълно спиране зад отворените врати, не пълзене под носа им.",
+      codeRefs: ["PEDESTRIAN_NOT_YIELDED"],
+    },
+  ],
+  teach: {
+    whenBg:
+      "На всяка трамвайна спирка БЕЗ остров на платното — щом видиш спрял трамвай с отворени врати и няма очертан остров между релсите и тротоара, пътниците слизат право на платното. В София това е ежедневна картина по тесните трасета без островчета.",
+    whyBg:
+      "Спирката без остров е най-коварната: пътникът стъпва от вратата направо в лентата за движение, без никаква защита между него и колите. Той не гледа за коли — гледа да хване или да слезе от трамвая. Затова законът обръща учтивостта в задължение: при спирка без остров спираш и чакаш, докато платното се освободи изцяло. Провирането покрай отворени врати убива точно защото пътникът се появява внезапно, на крачка от бронята.",
+    lawRef: "ЗДвП чл. 66, ал. 1",
+    examinerBg:
+      "Изпитващият следи поведението при спрял трамвай на спирка без остров: отчетливо намаляване, ПЪЛНО спиране зад отворените врати, реално изчакване на всички слизащи пътници и внимателно потегляне едва след като платното е чисто. Провиране покрай отворени врати е опасна грешка, удар — прекратяване.",
+  },
+  levels: [
+    { level: 1 },
+    { level: 2 },
+    { level: 3 },
+    { level: 4, vehicleStart: "cold" },
+    // L5 — дъжд + закъснял пътник: the stop reads late through the rain, the
+    // wet grip stretches the braking, and a second passenger sprints the other
+    // way for the doors (stagedAdd — the RXQ LevelSpec precedent; the base
+    // darter is never re-timed).
+    {
+      level: 5,
+      conditions: { weather: "rain" },
+      physics: { wetGrip: true },
+      stagedAdd: [RTS_LATE_RUNNER],
+    },
+  ],
+  staged: [SC_RX_TRAM_STOP_EVENT],
+  conditions: { weather: "dry" },
+  localeBg: "bg-BG",
+};
+
 /** The RAIL-family wave-2 templates (registered in templates.ts). */
-export const SCENARIO_TEMPLATES_RAIL2: readonly ScenarioSpec[] = [SC_RX_QUEUE_CLEAR];
+export const SCENARIO_TEMPLATES_RAIL2: readonly ScenarioSpec[] = [SC_RX_QUEUE_CLEAR, SC_RX_TRAM_STOP];

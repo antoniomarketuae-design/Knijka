@@ -1,0 +1,223 @@
+{
+ "format": "district-v1",
+ "meta": {
+  "district": "pk-rail",
+  "label": "Учебна улица — престой около жп прелез (сценарий PK-06 / RX-03)",
+  "mapKind": "scenario-street",
+  "generator": "tools/maps/gen_pk_rail.mjs",
+  "zonesVersion": 1,
+  "boundsLocalMeters": {
+   "minX": -36.12,
+   "minY": -6,
+   "maxX": 14.13,
+   "maxY": 406
+  },
+  "attribution": {
+   "text": "Учебна улица с жп прелез и забранена за престой зона — оригинален параметричен дизайн (без данни от OpenStreetMap)",
+   "license": "All rights reserved",
+   "licenseUrl": "/",
+   "copyrightUrl": "/",
+   "obligation": "none — original work, no ODbL attribution required for this map"
+  },
+  "defaults": {
+   "maxspeedUrbanKmh": 50,
+   "note": "Забраните тук не са поставени със знак — те следват от закона: чл. 98 забранява престоя и паркирането около железопътния прелез, от двете му страни. Върху самите релси спирането е най-тежкото от всичко: прелезът трябва да е чист и за колоната, и за влака. Разрешеното място е далеч след зоната."
+  },
+  "stats": {
+   "roadKm": 0.4,
+   "nodes": 2,
+   "edges": 1,
+   "intersections": 0,
+   "crossings": 0,
+   "buildings": 2,
+   "spawnPoints": 2,
+   "zones": 3
+  },
+  "scenario": {
+   "archetype": "straight-street",
+   "params": {
+    "lengthM": 400,
+    "maxspeedKmh": 50,
+    "bandFromM": 200,
+    "bandToM": 206,
+    "banReachM": 50,
+    "legalBayY": 330,
+    "banKind": "noStopping",
+    "banBasis": "law",
+    "guarded": "guarded"
+   },
+   "lanesPerDirection": 1,
+   "laneCenterRightM": 4.06,
+   "legalBayY": 330,
+   "railCrossing": {
+    "id": "pkr-z-railcrossing",
+    "signRef": "А34",
+    "fromM": 200,
+    "toM": 206,
+    "guarded": true,
+    "stopLineY": 195,
+    "barrier": {
+     "cycleSec": 600,
+     "downFromSec": 480,
+     "downToSec": 540
+    },
+    "drillWindowSec": 180
+   },
+   "banZonesY": [
+    {
+     "id": "pkr-z-ban-before",
+     "lawRef": "ЗДвП чл. 98",
+     "fromY": 150,
+     "toY": 200
+    },
+    {
+     "id": "pkr-z-ban-after",
+     "lawRef": "ЗДвП чл. 98",
+     "fromY": 206,
+     "toY": 256
+    }
+   ]
+  }
+ },
+ "roads": {
+  "nodes": [
+   {
+    "id": "pkr-n-end",
+    "x": 0,
+    "y": 400
+   },
+   {
+    "id": "pkr-n-start",
+    "x": 0,
+    "y": 0
+   }
+  ],
+  "edges": [
+   {
+    "id": "pkr-e-street",
+    "from": "pkr-n-start",
+    "to": "pkr-n-end",
+    "class": "residential",
+    "name": "Учебна улица — престой около жп прелез (сценарий PK-06 / RX-03)",
+    "oneway": false,
+    "roundabout": false,
+    "lanes": 2,
+    "lanesSource": "tag",
+    "maxspeed": 50,
+    "maxspeedSource": "tag",
+    "length": 400,
+    "geometry": [
+     [
+      0,
+      0
+     ],
+     [
+      0,
+      400
+     ]
+    ]
+   }
+  ]
+ },
+ "intersections": [],
+ "crossings": [],
+ "roundabouts": [],
+ "buildings": [
+  {
+   "id": "pkr-b-block-approach",
+   "height": 6,
+   "heightSource": "default",
+   "footprint": [
+    [
+     -34.12,
+     126
+    ],
+    [
+     -14.12,
+     126
+    ],
+    [
+     -14.12,
+     144
+    ],
+    [
+     -34.12,
+     144
+    ]
+   ]
+  },
+  {
+   "id": "pkr-b-block-bay",
+   "height": 9,
+   "heightSource": "default",
+   "footprint": [
+    [
+     -36.12,
+     316
+    ],
+    [
+     -14.12,
+     316
+    ],
+    [
+     -14.12,
+     344
+    ],
+    [
+     -36.12,
+     344
+    ]
+   ]
+  }
+ ],
+ "spawnPoints": [
+  {
+   "id": "pkr-spawn-start",
+   "x": 4.06,
+   "y": 15,
+   "heading": 0,
+   "edgeId": "pkr-e-street",
+   "name": "Начало — преди зоната на прелеза"
+  },
+  {
+   "id": "pkr-spawn-bay",
+   "x": 4.06,
+   "y": 330,
+   "heading": 0,
+   "edgeId": "pkr-e-street",
+   "name": "Разрешено място за престой — след зоната на прелеза"
+  }
+ ],
+ "zones": [
+  {
+   "id": "pkr-z-ban-before",
+   "kind": "noStopping",
+   "edgeId": "pkr-e-street",
+   "fromM": 150,
+   "toM": 200,
+   "signRef": "ЗДвП-98"
+  },
+  {
+   "id": "pkr-z-railcrossing",
+   "kind": "railCrossing",
+   "edgeId": "pkr-e-street",
+   "fromM": 200,
+   "toM": 206,
+   "signRef": "А34",
+   "guarded": true,
+   "barrier": {
+    "cycleSec": 600,
+    "downFromSec": 480,
+    "downToSec": 540
+   }
+  },
+  {
+   "id": "pkr-z-ban-after",
+   "kind": "noStopping",
+   "edgeId": "pkr-e-street",
+   "fromM": 206,
+   "toM": 256,
+   "signRef": "ЗДвП-98"
+  }
+ ]
+}

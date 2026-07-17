@@ -1,15 +1,18 @@
 /**
- * Scenario templates — the FOLLOWING family, wave 3: the CHAIN-READING slice.
- * Every shipped FO template grades the gap to the ONE car in front
- * (templates-following.ts: FO-01/02/03/04/06/07/08); none of them puts a
- * SECOND car in front of that one, which is where the taught skill actually
- * lives — „гледай през колата пред теб". DATA ONLY, in the templates.ts mold
+ * Scenario templates — the FOLLOWING family, wave 3: the CHAIN-READING slice,
+ * plus the wave-8 MOTORWAY-SPEED slice. Every shipped city FO template grades
+ * the gap to the car in front at urban speed (templates-following.ts:
+ * FO-01/02/03/04/06/07/08); this file adds the reads the city drills cannot —
+ * the two-car chain, and the SAME чл. 23 rule at 130 km/h where the метри and
+ * the closure rate change everything. DATA ONLY, in the templates.ts mold
  * (coordinates denormalized from the committed district file so nothing loads
  * world JSON at runtime; the trace gate asserts every pinned value against the
  * generated map):
  *
  *  - sc-fo-brakelight-chain  „Стоповете два автомобила напред" (FO-05 + FO-01,
  *                            fo-brake-v1 REUSED with a TWO-car chain)
+ *  - sc-fo-motorway-gap      „Дистанция при 130" (FO-01 + SP-10, mw-v1 REUSED —
+ *                            the following rule in the SPEED domain)
  *
  * Family: "following" — the existing catalog chip (doc 76 §2).
  */
@@ -207,6 +210,160 @@ export const SC_FO_BRAKELIGHT_CHAIN: ScenarioSpec = {
   localeBg: "bg-BG",
 };
 
-/** The wave-3 following templates, in catalog order (registered in templates.ts
+// ---------------------------------------------------------------------------
+// sc-fo-motorway-gap — „Дистанция при 130" (FO-01 + SP-10) on mw-v1 REUSED:
+// the SAME чл. 23 following rule the city drills teach, moved into the SPEED
+// domain. At 130 km/h the two-second gap is 72 m, not 15, and the closure rate
+// behind a braking lead is lethal — same detector, a different world.
+// ---------------------------------------------------------------------------
+
+/** mw-v1 northbound cruise-lane center (meta.scenario.laneCruiseX — the L7 copy
+ *  truth; sc-mw-discipline pins the same value). */
+const MW_X_CRUISE = 0;
+
+/**
+ * THE LEAD is a single lead car in the player's OWN cruise lane, doing motorway
+ * flow. It is modelled with the cutInLeadCar recipe used PURELY as an in-lane
+ * decelerating lead (cutShiftM 0 — no lateral cut, the sc-fbc-mid precedent):
+ * the brakingLeadCar runner is the natural fit but it does not forward the
+ * actor's extraRightOffsetM (every OTHER runner does — see the file note),
+ * which this template needs to shift the mw-e-nb path off the EMERGENCY lane
+ * (its default resolution, x = 8.13) into the CRUISE lane (x = 0). The
+ * cutInLeadCar runner forwards the offset AND slows via a gentle cruise-decel
+ * (~4.5 m/s²) — exactly the firm-but-survivable motorway brake this drill wants.
+ *
+ * The design that makes ONE staged car teach BOTH the safe gap and the tailgate:
+ *   paceAheadM 76 (leadGap ~72 m ≈ 2.1 s at flow) is the gap the lead PREFERS,
+ *   and maxMatchSpeedMps 34 (~122 km/h flow) is barely above the lead's own
+ *   cruise — so a disciplined player who settles at flow is simply held at 76 m
+ *   (the shadow), while a tailgater who RACES into the gap (a burst under the
+ *   150 km/h dangerous-speed line) finds the lead has no headroom to escape and
+ *   sits on ~38 m / ~14 m of held gap (the mistakes). The pin works FOR the
+ *   disciplined driver and AGAINST the impatient one — exactly the road.
+ *
+ * At y = 720 the lead brakes firmly to a stop (cruise 0, ~4.5 m/s²): the shadow,
+ * 72 m back, absorbs it and stops with a big margin; the bumper-rider, ~14 m
+ * back, cannot (COLLISION). The 1-second demo ends BEFORE the brake — its fault
+ * is the gap, nothing else.
+ */
+const FMG_LEAD: CutInLeadCarSpec = {
+  id: "sc-fmg-lead",
+  kind: "cutInLeadCar",
+  actor: {
+    pathNodes: ["mw-n-nb-start", "mw-n-nb-end"],
+    hold: { nodeIndex: 0, offsetM: 91 }, // ~76 m ahead of the spawn (y = 15) — the pinned 2-second gap
+    cruiseSpeedMps: 30, // 108 km/h — the pre-arm hold cruise (matchPlayer overrides once armed)
+    // The mw-e-nb node pair resolves to the EMERGENCY lane (x = 8.13); shift the
+    // whole path -8.13 m into the CRUISE lane (x = 0) where the player drives.
+    extraRightOffsetM: -8.13,
+    colorIndex: 2,
+  },
+  paceAheadM: 76, // ~76 m of centers (leadGap ~72 m): ~2.1 s at flow — the taught gap
+  maxMatchSpeedMps: 34, // ~122 km/h — holds 76 m at flow; a tailgater who races in finds no escape headroom
+  cutAt: { x: MW_X_CRUISE, y: 720 }, // the staged firm brake, mid-segment
+  cutRadiusM: 3,
+  minCutSpeedKmh: 60, // the shadow and the collision demo are >100 km/h here; the 1-s demo ends earlier
+  cutShiftM: 0, // NO lateral cut — a pure in-lane speed event (the sc-fbc-mid precedent)
+  cutRampSec: 1.2,
+  cutSpeedMps: 0, // brake to a stop at the staged point (gentle ~4.5 m/s² cruise-decel)
+  clearAheadM: 150, // keep the encounter live to the finish (no early resolution)
+};
+
+/** FO-01/SP-10 — дистанция на магистрала (ЗДвП чл. 23: достатъчна е дистанцията,
+ *  която ти дава време да спреш — а при 130 км/ч това време струва 72 метра, не
+ *  15; същото правило, друг мащаб). */
+export const SC_FO_MOTORWAY_GAP: ScenarioSpec = {
+  id: "sc-fo-motorway-gap",
+  family: "following",
+  tagsBg: ["дистанция", "магистрала", "скорост на потока", "спирачен път", "следване"],
+  titleBg: "Дистанция при 130",
+  objectiveBg:
+    "При 130 км/ч двете секунди са 72 метра — дръж ги и виж защо „плътно зад бързия“ на магистрала е самоубийствен навик: при тази скорост спирачният път и скоростта на сближаване не прощават.",
+  archetypeIds: ["FO-01", "SP-10"],
+  conceptIds: ["c-following-distance", "c-reaction-time", "c-stopping-distance-total", "c-motorway-rules"],
+  map: {
+    archetype: "motorway-segment",
+    // The generator recipe — mirrored in mw-v1.json meta.scenario.params.
+    params: { lengthM: 1000, maxspeedKmh: 140, lanesPerDirection: 2, medianM: 6 },
+    districtId: "mw-v1",
+  },
+  start: {
+    spawnPointId: "mw-spawn-approach",
+    vehicleStart: "ready",
+  },
+  instructionsBg: [
+    { n: 1, textBg: "Магистрала, ограничение 140 — установи се в дясната лента за движение зад колата пред теб, със скоростта на потока." },
+    { n: 2, textBg: "На 130 км/ч изминаваш 36 метра всяка секунда: правилото за 2 секунди тук значи цели 72 метра дистанция." },
+    { n: 3, textBg: "Избери си ориентир (табела, стълб): предният го подмине — брой „двадесет и едно, двадесет и две“. Стигнеш ли го преди „две“, изостани." },
+    { n: 4, textBg: "Не залепвай зад по-бързия „да те тегли“: при тази скорост, светне ли стоп отпред, метрите свършват за части от секундата." },
+    { n: 5, textBg: "Светне ли стоп на предния — не рязко в паника, а плавно и право: голямата дистанция е това, което ти купува спокойното спиране." },
+  ],
+  success: [
+    {
+      id: "sc-fmg-gap",
+      titleBg: "Дръж 2-секундната дистанция със скоростта на потока",
+      // maxSpeedKmh 140: the whole point is holding flow speed AND the gap — the
+      // gap grading is the rule engine's job (FOLLOWING_TOO_CLOSE against the lead).
+      params: { kind: "reachZone", x: MW_X_CRUISE, y: 400, radiusM: 8, maxSpeedKmh: 140 },
+    },
+    {
+      id: "sc-fmg-stop",
+      titleBg: "Спри зад спирачещия, без да го удариш",
+      // The shadow absorbs the firm brake and rolls to rest with a big margin
+      // (~46 m); the low speed cap makes reaching this AT REST the drill.
+      params: { kind: "reachZone", x: MW_X_CRUISE, y: 790, radiusM: 18, maxSpeedKmh: 8 },
+    },
+  ],
+  rubric: { parTimeSec: 60 },
+  shadow: { path: "content/traces/sc-fo-motorway-gap/shadow-correct.trace.json" },
+  mistakes: [
+    {
+      traceRef: { path: "content/traces/sc-fo-motorway-gap/mistake-one-second.trace.json" },
+      titleBg: "Една секунда зад водещия при 130",
+      whatWentWrongBg:
+        "Колата се залепи на около 40 метра зад водещия при 130 км/ч — една секунда дистанция там, където трябват две. На тази скорост изминаваш 36 метра за секунда: 40 метра са по-малко от времето, нужно дори само за да реагираш. Несъобразената дистанция е основна грешка, а на магистрала е и най-честата причина за верижни удари.",
+      codeRefs: ["FOLLOWING_TOO_CLOSE"],
+    },
+    {
+      traceRef: { path: "content/traces/sc-fo-motorway-gap/mistake-bumper-crash.trace.json" },
+      titleBg: "Каране на бронята и закъсняла реакция",
+      whatWentWrongBg:
+        "Колата се движеше почти на бронята на водещия при 130 км/ч. Когато той спря, метрите вече ги нямаше — реакцията дойде късно, а от 130 спирачният път е над сто метра. Удар отзад на магистрала при тази скорост е сред най-тежките ПТП. Дистанцията не е учтивост към предния — тя е единственото време, което имаш за себе си.",
+      codeRefs: ["FOLLOWING_TOO_CLOSE", "COLLISION"],
+    },
+  ],
+  teach: {
+    whenBg:
+      "При всяко движение по автомагистрала и скоростен път зад друга кола. Колкото по-висока е скоростта, толкова по-голяма е дистанцията в МЕТРИ за същите две секунди — а на 130 това са над 70 метра.",
+    whyBg:
+      "Дистанцията е време, преведено в метри. При 130 км/ч изминаваш 36 метра всяка секунда, а спирачният път от тази скорост е над сто метра — двете секунди се превръщат в над 70 метра само за да имаш време да реагираш и да спреш. „Плътно зад бързия“ спестява секунди, но при първия светнал стоп отпред няма метри за спиране: точно така се раждат верижните удари на магистрала. Дистанцията се купува предварително — когато вече ти трябва, е късно да я създадеш.",
+    lawRef: "ЗДвП чл. 23",
+    examinerBg:
+      "Изпитващият очаква съобразена със скоростта дистанция: на магистрала — осезаемо по-голяма, отколкото в града. Движение на несъобразена дистанция е основна грешка, а удар в предната кола е ПТП — незабавно прекратяване на изпита.",
+  },
+  levels: [
+    { level: 1 },
+    { level: 2 },
+    { level: 3 },
+    { level: 4, vehicleStart: "cold" },
+    // L5: мокра магистрала — rain + real reduced grip; the wet-gap detector
+    // (armed template-wide via ruleConfig) only bites once it actually rains,
+    // so L1–L4 stay dry-tuned and only THIS rung grades the wet-prudent gap.
+    { level: 5, conditions: { weather: "rain" }, physics: { wetGrip: true } },
+  ],
+  staged: [FMG_LEAD],
+  conditions: { weather: "dry" },
+  // The rain-aware following detector is default-OFF (the exam bot never widens
+  // its time-gap in rain); this drill opts it in so the LIVE session grades a
+  // student who keeps a dry-habit gap on the wet L5 rung. Harmless on the dry
+  // rungs — the detector guards `raining`, which is true only at L5.
+  ruleConfig: { followRainAwareEnabled: true },
+  localeBg: "bg-BG",
+};
+
+/** The following templates, in catalog order (registered in templates.ts
  *  by the integration pass). */
-export const SCENARIO_TEMPLATES_FOLLOWING2: readonly ScenarioSpec[] = [SC_FO_BRAKELIGHT_CHAIN];
+export const SCENARIO_TEMPLATES_FOLLOWING2: readonly ScenarioSpec[] = [
+  SC_FO_BRAKELIGHT_CHAIN,
+  SC_FO_MOTORWAY_GAP,
+];
