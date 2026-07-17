@@ -93,6 +93,21 @@ export const STOP_LINE_OVERRIDES: readonly StopLineOverride[] = [
   // (audit 04 D10, curriculum-bricking risk). Verified missing 2026-07-10.
   // The pinned approach is the player's: northbound oneway e897608662.0.
   { nodeId: "n331942490", edgeId: "e897608662.0" },
+
+  // sc-jx-giveway-b1 („Б1 не значи спри винаги") — the give-way CAPABILITY's
+  // first shipped author-hook (tools/maps/gen_jx_giveway.mjs → jxg-giveway-v1).
+  // The map is a TERTIARY north-south street crossing TWO SECONDARY boulevards,
+  // so the stop-sign heuristic derives NOTHING at either mouth (a tertiary
+  // minor is rank 3 > MINOR_MAX_RANK 2 — skipped) and these giveWay entries are
+  // the SOLE grading lines. control "giveWay" = Б1: rolling through a clear
+  // mouth is zero violations, an unyielded conflict is FAILED_TO_YIELD (ЗДвП
+  // чл. 50; engine.ts give-way branch) — and each line makes its node GUARDED,
+  // so the right-hand-rule tracker never double-grades. The world builder
+  // paints the matching VISIBLE Б1 on the same minor approach (props.ts:
+  // maxRank 4 < 5 → "giveWay"). jxg-* ids keep both entries skip-safe on every
+  // foreign shipped map (the idempotent-override law, doc 74 §5.6).
+  { nodeId: "jxg-n-j1", edgeId: "jxg-e-s", control: "giveWay" }, // mouth 1 (clear — the rolling-pass crux)
+  { nodeId: "jxg-n-j2", edgeId: "jxg-e-m", control: "giveWay" }, // mouth 2 (conflicted — the yield)
 ];
 
 export interface StopLine {

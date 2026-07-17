@@ -87,6 +87,7 @@ export const WORLD_NAME_BG: Record<string, string> = {
   // Wave 1 districts. Names are the genitive/definite form the two copy
   // strings below need („Зареждане на …" / „Данните за …").
   "jx-equal-v1": "равнозначното кръстовище",
+  "jxg-giveway-v1": "улицата с два знака „Пропусни движението“",
   "ln-arrows-v1": "кръстовището с лентови стрелки",
   "pk-banx-v1": "улицата с пътека и кръстовище",
   "pe-school-v1": "улицата пред училището",

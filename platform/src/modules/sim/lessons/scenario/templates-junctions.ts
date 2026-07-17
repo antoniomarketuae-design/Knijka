@@ -32,6 +32,7 @@ import type {
   AmberDilemmaSpec,
   OncomingLeftTurnSpec,
   PriorityFromRightSpec,
+  RearTailgaterSpec,
 } from "../../contracts";
 
 /** Drawn lane-center offset from the road centerline on every S2-B map, m. */
@@ -664,6 +665,177 @@ export const SC_JUNCTION_SCAN: ScenarioSpec = {
   localeBg: "bg-BG",
 };
 
+// ---------------------------------------------------------------------------
+// sc-jx-giveway-b1 — „Б1 не значи спри винаги" (JU-02) on jxg-giveway-v1: the
+// give-way CAPABILITY's shipped lesson, and the 150th (final) template. A
+// tertiary street crosses TWO secondary boulevards under Б1 „Пропусни
+// движението". Mouth 1 is CLEAR — the crux: a rolling yield with a full scan,
+// NO full stop, grading ZERO violations (Б1 ≠ „спри винаги", ЗДвП чл. 50).
+// Mouth 2 is CONFLICTED by a staged priorityFromRight car — the full wait.
+// Rides the give-way stop-line adjudication (prioritySituation "give-way" →
+// FAILED_TO_YIELD) and the config-gated JUNCTION_SCAN_INCOMPLETE detector.
+//
+// NOTE for the integration pass (main session): NOT spread into
+// SCENARIO_TEMPLATES_JUNCTIONS below — the main session adds it + bumps the
+// roster to 150 (s2-catalog-integrity). Its map lives in
+// tools/maps/gen_jx_giveway.mjs → jxg-giveway-v1, its two Б1 grading lines in
+// runtime STOP_LINE_OVERRIDES (control "giveWay").
+// ---------------------------------------------------------------------------
+
+/** The mouth-2 conflict: a car crosses the SECOND junction (jxg-n-j2) from the
+ *  player's RIGHT (east arm → west arm) on the priority boulevard, timed to the
+ *  player's approach. junctionControl "stopLine": the runtime's give-way
+ *  adjudication (conflictNear at the Б1 line crossing) grades FAILED_TO_YIELD /
+ *  the runner commends the yield (the stop-line case is the runner's to
+ *  commend). Mouth 1 has NO staged car — its rolling pass is structurally clear. */
+export const SC_JX_GIVEWAY_CONFLICT: PriorityFromRightSpec = {
+  id: "sc-jxgb-conflict",
+  kind: "priorityFromRight",
+  libraryEventId: "JU-02",
+  junction: { nodeId: "jxg-n-j2", x: 0, y: 150 },
+  junctionControl: "stopLine",
+  actor: {
+    pathNodes: ["jxg-n-e2", "jxg-n-j2", "jxg-n-w2"],
+    hold: { nodeIndex: 1, offsetM: -95 },
+    cruiseSpeedMps: 8,
+  },
+  junctionNodeIndex: 1,
+  armDistM: 70,
+  leadSec: -3.2,
+  // The player's Б1 line sits 27.725 m short of jxg-n-j2 (the secondary-mouth
+  // derivation, proven by the district battery) — its authored stop-line dist.
+  lineDistM: 27.725,
+  clearSpeedMps: 11.5,
+};
+
+/** Learn-only rear pressure (доп. натиск): a car glued behind the player, so
+ *  the „не бързай да минеш" decision is made with a лепка in the mirror. The
+ *  rearTailgater runner emits ZERO SimTick events (pressure scenery, A12) — it
+ *  never grades and never conflicts (same-direction bearing). */
+export const SC_JX_GIVEWAY_TAILGATER: RearTailgaterSpec = {
+  id: "sc-jxgb-tailgater",
+  kind: "rearTailgater",
+  actor: {
+    pathNodes: ["jxg-n-s", "jxg-n-j1", "jxg-n-j2"],
+    hold: { nodeIndex: 0, offsetM: 6 },
+    cruiseSpeedMps: 9,
+    extraRightOffsetM: 0,
+  },
+  releaseGapM: 12,
+  followBehindM: 11,
+  maxMatchSpeedMps: 9,
+  pressureSec: 4,
+  passShiftM: -8.125,
+  passSpeedMps: 11,
+  passAheadM: 16,
+  easeKmh: 6,
+};
+
+/** JU-02 — Влизане от „Пропусни" (Б1) без изчакване (ЗДвП чл. 50: при Б1
+ *  намаляваш и пропускаш всички по пътя с предимство, спираш само ако иначе би
+ *  ги засякъл — content bank c-give-way-stop-behavior / q-krastovishta-006). */
+export const SC_JX_GIVEWAY_B1: ScenarioSpec = {
+  id: "sc-jx-giveway-b1",
+  family: "junction",
+  tagsBg: ["кръстовище", "Б1", "пропусни", "предимство", "оглеждане"],
+  titleBg: "Б1 не значи спри винаги",
+  objectiveBg:
+    "На знак Б1 „Пропусни движението“ намали и се огледай — ако пътят с предимство е чист, минаваш БЕЗ да спираш; ако идва кола, спираш и я пропускаш. Пълно спиране се налага само когато иначе би я засякъл.",
+  archetypeIds: ["JU-02", "JU-23"],
+  conceptIds: ["c-give-way-stop-behavior", "c-stop-give-way-signs", "c-junction-approach"],
+  map: {
+    archetype: "x-junction",
+    // Mirrored in jxg-giveway-v1.json meta.scenario.params: a TERTIARY NS
+    // street crossing TWO SECONDARY boulevards — the heuristic derives no line
+    // (tertiary minor rank 3 > MINOR_MAX_RANK 2), so the two giveWay
+    // STOP_LINE_OVERRIDES are the sole grading lines and props paints a VISIBLE
+    // Б1 (maxRank 4 < 5).
+    params: {
+      southArmM: 130,
+      midArmM: 150,
+      northArmM: 90,
+      ewArmM: 120,
+      lanes: 2,
+      minorMaxKmh: 40,
+      priorityMaxKmh: 50,
+    },
+    districtId: "jxg-giveway-v1",
+  },
+  start: {
+    spawnPointId: "jxg-spawn-south",
+    vehicleStart: "ready",
+  },
+  instructionsBg: [
+    { n: 1, textBg: "Тръгни по второстепенната улица на север — напред са две кръстовища със знак Б1 „Пропусни движението“." },
+    { n: 2, textBg: "Първо кръстовище: намали и се огледай наляво и надясно. Пътят с предимство е чист — минаваш плавно, БЕЗ да спираш. Б1 не е „Спри!“." },
+    { n: 3, textBg: "Второ кръстовище: пак се оглеждаш. Този път отдясно по булеварда идва кола с предимство." },
+    { n: 4, textBg: "Спираш преди линията и я пропускаш изцяло — тук пълното спиране е задължително, защото иначе би я засякъл." },
+    { n: 5, textBg: "Щом пътят е чист, потегляш и продължаваш на север." },
+  ],
+  success: [
+    {
+      id: "sc-jxgb-roll",
+      titleBg: "Премини първия Б1 след оглед, без излишно спиране",
+      // Just north of jxg-n-j1 (the clear mouth) — reached while rolling.
+      params: { kind: "reachZone", x: 4.06, y: 22, radiusM: 8 },
+    },
+    {
+      id: "sc-jxgb-yield",
+      titleBg: "Пропусни колата с предимство на второто кръстовище",
+      // The yield pose before the mouth-2 Б1 line (y = 122.275): a crawl gate
+      // (<= 6 km/h) unsatisfiable by anyone who barges through.
+      params: { kind: "reachZone", x: 4.06, y: 118, radiusM: 4, maxSpeedKmh: 6 },
+    },
+    {
+      id: "sc-jxgb-exit",
+      titleBg: "Премини второто кръстовище и продължи на север",
+      // North arm, past the jxg-n-j2 junction area.
+      params: { kind: "reachZone", x: 4.06, y: 178, radiusM: 9 },
+    },
+  ],
+  rubric: { parTimeSec: 80 },
+  shadow: { path: "content/traces/sc-jx-giveway-b1/shadow-correct.trace.json" },
+  mistakes: [
+    {
+      traceRef: { path: "content/traces/sc-jx-giveway-b1/mistake-barge-priority.trace.json" },
+      titleBg: "Навлизане пред колата по главния",
+      whatWentWrongBg:
+        "На второто кръстовище водачът се огледа, видя приближаващата кола по пътя с предимство — и въпреки това навлезе пред нея. Б1 задължава да пропуснеш всички по главния път; „ще успея“ пред кола на секунди е отнето предимство, а на изпита — прекратяване при намеса.",
+      codeRefs: ["FAILED_TO_YIELD"],
+    },
+    {
+      traceRef: { path: "content/traces/sc-jx-giveway-b1/mistake-no-scan.trace.json" },
+      titleBg: "Излизане без пълен оглед в двете посоки",
+      whatWentWrongBg:
+        "Колата навлезе през първия Б1, без да се огледа наляво-надясно. При „Пропусни“ не спираш винаги — но задължително проверяваш и в двете посоки, защото само оглеждането ти казва дали пътят с предимство наистина е чист. Един поглед (или никакъв) е основната причина за удар на такова кръстовище.",
+      codeRefs: ["JUNCTION_SCAN_INCOMPLETE"],
+    },
+  ],
+  teach: {
+    whenBg:
+      "На всеки знак Б1 „Пропусни движението“ и обърнат триъгълник с акулски зъби — второстепенна улица, вливаща се в път с предимство. Знакът иска да пропуснеш, не непременно да спреш.",
+    whyBg:
+      "Най-честата грешка на Б1 е едната от двете крайности: или спираш излишно на всеки празен изход (и объркваш движението отзад), или влиташ „на прескок“ без оглед пред кола с предимство. Правилото е просто: намаляваш до скорост, от която можеш да спреш, оглеждаш се, и спираш САМО ако иначе би засякъл някого. Пълно спиране при Б1 не се изисква — изисква се реално пропускане.",
+    lawRef: "ЗДвП чл. 50",
+    examinerBg:
+      "Изпитващият гледа: осезаемо намаляване преди Б1, оглеждане наляво и надясно, минаване без излишно спиране при чист път, и реално пропускане (спиране при нужда) когато по главния идва превозно средство. Влизане пред кола с предимство е отнемане на предимство; липсата на оглед е грешка в наблюдението.",
+  },
+  levels: [
+    { level: 1 },
+    { level: 2 },
+    { level: 3 },
+    { level: 4, vehicleStart: "cold" },
+    { level: 5, traffic: { vehicleCount: 8 } }, // L5: живо движение по булевардите
+  ],
+  staged: [SC_JX_GIVEWAY_CONFLICT, SC_JX_GIVEWAY_TAILGATER],
+  // The junction-scan detector is default-OFF (it would false-fire the exam
+  // bank's unglanced crossings); this drill opts it in so the LIVE session
+  // grades a student's missing observation at a Б1 line, matching the shadow.
+  ruleConfig: { junctionScanObservationEnabled: true },
+  conditions: { weather: "dry" },
+  localeBg: "bg-BG",
+};
+
 /** The JUNCTION/SIGNALS family batch (registered in templates.ts). */
 export const SCENARIO_TEMPLATES_JUNCTIONS: readonly ScenarioSpec[] = [
   SC_JUNCTION_RHR,
@@ -671,4 +843,5 @@ export const SCENARIO_TEMPLATES_JUNCTIONS: readonly ScenarioSpec[] = [
   SC_SIGNAL_RESPONSE,
   SC_TURN_LEFT_ONCOMING,
   SC_JUNCTION_SCAN,
+  SC_JX_GIVEWAY_B1,
 ];

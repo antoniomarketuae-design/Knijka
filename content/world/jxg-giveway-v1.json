@@ -1,0 +1,360 @@
+{
+ "format": "district-v1",
+ "meta": {
+  "district": "jxg-giveway",
+  "label": "Учебна улица с два знака Б1 „Пропусни движението“ (сценарий JU-02)",
+  "mapKind": "scenario-junction",
+  "generator": "tools/maps/gen_jx_giveway.mjs",
+  "boundsLocalMeters": {
+   "minX": -120,
+   "minY": -130,
+   "maxX": 120,
+   "maxY": 240
+  },
+  "attribution": {
+   "text": "Учебна улица с два знака Б1 „Пропусни движението“ — оригинален параметричен дизайн (без данни от OpenStreetMap)",
+   "license": "All rights reserved",
+   "licenseUrl": "/",
+   "copyrightUrl": "/",
+   "obligation": "none — original work, no ODbL attribution required for this map"
+  },
+  "defaults": {
+   "maxspeedUrbanKmh": 50,
+   "note": "Учебно кръстовище: ограниченията идват от таговете на улиците."
+  },
+  "stats": {
+   "roadKm": 0.85,
+   "nodes": 8,
+   "edges": 7,
+   "intersections": 2,
+   "crossings": 0,
+   "buildings": 2,
+   "spawnPoints": 2
+  },
+  "scenario": {
+   "archetype": "x-junction",
+   "params": {
+    "southArmM": 130,
+    "midArmM": 150,
+    "northArmM": 90,
+    "ewArmM": 120,
+    "lanes": 2,
+    "minorMaxKmh": 40,
+    "priorityMaxKmh": 50
+   },
+   "junctionNodeIds": [
+    "jxg-n-j1",
+    "jxg-n-j2"
+   ],
+   "giveWayApproaches": [
+    {
+     "nodeId": "jxg-n-j1",
+     "edgeId": "jxg-e-s"
+    },
+    {
+     "nodeId": "jxg-n-j2",
+     "edgeId": "jxg-e-m"
+    }
+   ],
+   "expectedControl": "giveWayOnMinor"
+  }
+ },
+ "roads": {
+  "nodes": [
+   {
+    "id": "jxg-n-e1",
+    "x": 120,
+    "y": 0
+   },
+   {
+    "id": "jxg-n-e2",
+    "x": 120,
+    "y": 150
+   },
+   {
+    "id": "jxg-n-j1",
+    "x": 0,
+    "y": 0
+   },
+   {
+    "id": "jxg-n-j2",
+    "x": 0,
+    "y": 150
+   },
+   {
+    "id": "jxg-n-n",
+    "x": 0,
+    "y": 240
+   },
+   {
+    "id": "jxg-n-s",
+    "x": 0,
+    "y": -130
+   },
+   {
+    "id": "jxg-n-w1",
+    "x": -120,
+    "y": 0
+   },
+   {
+    "id": "jxg-n-w2",
+    "x": -120,
+    "y": 150
+   }
+  ],
+  "edges": [
+   {
+    "id": "jxg-e-s",
+    "from": "jxg-n-s",
+    "to": "jxg-n-j1",
+    "class": "tertiary",
+    "name": "ул. Второстепенна — подход",
+    "oneway": false,
+    "roundabout": false,
+    "lanes": 2,
+    "lanesSource": "tag",
+    "maxspeed": 40,
+    "maxspeedSource": "tag",
+    "length": 130,
+    "geometry": [
+     [
+      0,
+      -130
+     ],
+     [
+      0,
+      0
+     ]
+    ]
+   },
+   {
+    "id": "jxg-e-m",
+    "from": "jxg-n-j1",
+    "to": "jxg-n-j2",
+    "class": "tertiary",
+    "name": "ул. Второстепенна — между кръстовищата",
+    "oneway": false,
+    "roundabout": false,
+    "lanes": 2,
+    "lanesSource": "tag",
+    "maxspeed": 40,
+    "maxspeedSource": "tag",
+    "length": 150,
+    "geometry": [
+     [
+      0,
+      0
+     ],
+     [
+      0,
+      150
+     ]
+    ]
+   },
+   {
+    "id": "jxg-e-n",
+    "from": "jxg-n-j2",
+    "to": "jxg-n-n",
+    "class": "tertiary",
+    "name": "ул. Второстепенна — изход",
+    "oneway": false,
+    "roundabout": false,
+    "lanes": 2,
+    "lanesSource": "tag",
+    "maxspeed": 40,
+    "maxspeedSource": "tag",
+    "length": 90,
+    "geometry": [
+     [
+      0,
+      150
+     ],
+     [
+      0,
+      240
+     ]
+    ]
+   },
+   {
+    "id": "jxg-e-w1",
+    "from": "jxg-n-w1",
+    "to": "jxg-n-j1",
+    "class": "secondary",
+    "name": "бул. Първи — запад",
+    "oneway": false,
+    "roundabout": false,
+    "lanes": 2,
+    "lanesSource": "tag",
+    "maxspeed": 50,
+    "maxspeedSource": "tag",
+    "length": 120,
+    "geometry": [
+     [
+      -120,
+      0
+     ],
+     [
+      0,
+      0
+     ]
+    ]
+   },
+   {
+    "id": "jxg-e-e1",
+    "from": "jxg-n-j1",
+    "to": "jxg-n-e1",
+    "class": "secondary",
+    "name": "бул. Първи — изток",
+    "oneway": false,
+    "roundabout": false,
+    "lanes": 2,
+    "lanesSource": "tag",
+    "maxspeed": 50,
+    "maxspeedSource": "tag",
+    "length": 120,
+    "geometry": [
+     [
+      0,
+      0
+     ],
+     [
+      120,
+      0
+     ]
+    ]
+   },
+   {
+    "id": "jxg-e-w2",
+    "from": "jxg-n-w2",
+    "to": "jxg-n-j2",
+    "class": "secondary",
+    "name": "бул. Втори — запад",
+    "oneway": false,
+    "roundabout": false,
+    "lanes": 2,
+    "lanesSource": "tag",
+    "maxspeed": 50,
+    "maxspeedSource": "tag",
+    "length": 120,
+    "geometry": [
+     [
+      -120,
+      150
+     ],
+     [
+      0,
+      150
+     ]
+    ]
+   },
+   {
+    "id": "jxg-e-e2",
+    "from": "jxg-n-j2",
+    "to": "jxg-n-e2",
+    "class": "secondary",
+    "name": "бул. Втори — изток",
+    "oneway": false,
+    "roundabout": false,
+    "lanes": 2,
+    "lanesSource": "tag",
+    "maxspeed": 50,
+    "maxspeedSource": "tag",
+    "length": 120,
+    "geometry": [
+     [
+      0,
+      150
+     ],
+     [
+      120,
+      150
+     ]
+    ]
+   }
+  ]
+ },
+ "intersections": [
+  {
+   "id": "jxg-n-j1",
+   "x": 0,
+   "y": 0,
+   "degree": 4,
+   "signalized": false
+  },
+  {
+   "id": "jxg-n-j2",
+   "x": 0,
+   "y": 150,
+   "degree": 4,
+   "signalized": false
+  }
+ ],
+ "crossings": [],
+ "roundabouts": [],
+ "buildings": [
+  {
+   "id": "jxg-b-mid-e",
+   "height": 5,
+   "heightSource": "default",
+   "footprint": [
+    [
+     30,
+     40
+    ],
+    [
+     46,
+     40
+    ],
+    [
+     46,
+     56
+    ],
+    [
+     30,
+     56
+    ]
+   ]
+  },
+  {
+   "id": "jxg-b-mid-w",
+   "height": 5,
+   "heightSource": "default",
+   "footprint": [
+    [
+     -46,
+     94
+    ],
+    [
+     -30,
+     94
+    ],
+    [
+     -30,
+     110
+    ],
+    [
+     -46,
+     110
+    ]
+   ]
+  }
+ ],
+ "spawnPoints": [
+  {
+   "id": "jxg-spawn-south",
+   "x": 0,
+   "y": -115,
+   "heading": 0,
+   "edgeId": "jxg-e-s",
+   "name": "Второстепенна улица — подход към първото кръстовище"
+  },
+  {
+   "id": "jxg-spawn-e2",
+   "x": 105,
+   "y": 150,
+   "heading": 270,
+   "edgeId": "jxg-e-e2",
+   "name": "Булевард с предимство — подход от изток"
+  }
+ ]
+}

@@ -209,19 +209,23 @@ export function buildProps(
     }
   }
 
-  // -- hand-placed Б2 signs (QW4) ----------------------------------------------
-  // Mirrors runtime STOP_LINE_OVERRIDES so every hard-placed graded stop line
-  // has a visible Б2 sign here and a painted line in the markings pass (which
-  // reads stopSignApproaches) — grading must never reference invisible control.
+  // -- hand-placed Б2/Б1 signs (QW4) -------------------------------------------
+  // Mirrors runtime STOP_LINE_OVERRIDES so every hard-placed graded line has a
+  // visible sign here and a painted line in the markings pass — grading must
+  // never reference invisible control. The sign MUST match the override's
+  // control: a Б1 give-way override (control "giveWay") paints a Б1 sign, not a
+  // Б2 „Стоп" (a Б2 sign over a give-way line teaches the opposite of the rule
+  // the лесон grades — the sc-jx-giveway-b1 lesson's whole point is Б1≠Б2).
   for (const ov of STOP_LINE_OVERRIDES) {
     const key = `${ov.nodeId}:${ov.edgeId}`;
-    if (stopSignApproaches.has(key)) continue;
+    if (stopSignApproaches.has(key) || giveWayApproaches.has(key)) continue;
     const info = network.nodes.get(ov.nodeId);
     const ap = info?.approaches.find((a) => a.edgeId === ov.edgeId);
     if (!ap || !ap.incoming) continue;
+    const kind: SignKind = ov.control === "giveWay" ? "giveWay" : "stop";
     const { p, yaw } = approachPropPose(ap, 1.4, 0.8);
-    signs.push({ kind: "stop", position: toWorld(p[0], p[1], ROAD_Y), yaw });
-    stopSignApproaches.add(key);
+    signs.push({ kind, position: toWorld(p[0], p[1], ROAD_Y), yaw });
+    (kind === "giveWay" ? giveWayApproaches : stopSignApproaches).add(key);
   }
 
   // -- speed limit 50 at district entries -------------------------------------

@@ -20,6 +20,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { recordScAcBridgeIceDrive } from "../../../traces/scAcBridgeIce";
+import { recordScJxGivewayB1Drive } from "../../../traces/scJxGivewayB1";
 import { recordScLnObstacleMeetingDrive } from "../../../traces/scLnObstacleMeeting";
 import { recordScPeZoneLivingDrive } from "../../../traces/scPeZoneLiving";
 import { recordScPkRailBanDrive } from "../../../traces/scPkRailBan";
@@ -31,6 +32,7 @@ import { compileScenario } from "../compile";
 import { scenarioLessonById } from "../resolve";
 import { scoreRubric } from "../rubric";
 import { SC_AC_BRIDGE_ICE } from "../templates-conditions2";
+import { SC_JX_GIVEWAY_B1 } from "../templates-junctions";
 import { SC_LN_OBSTACLE_MEETING } from "../templates-lanes2";
 import { SC_PK_RAIL_BAN } from "../templates-parking2";
 import { SC_PE_ZONE_LIVING } from "../templates-pe2";
@@ -1176,6 +1178,212 @@ describe("wave-7 bot completion — sc-sp-eco-coast at L3", () => {
     expect(graded.status).toBe("ok");
     if (graded.status !== "ok") return;
     expect(graded.lesson).toEqual(scenarioLessonById("sc-sp-eco-coast@L3"));
+    expect(graded.result.passed).toBe(true);
+    expect(graded.result.score).toBe(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// sc-jx-giveway-b1 — the give-way CAPABILITY's shipped lesson and the 150th
+//                    (final) template. Б1 is not „Спри!": a CLEAR mouth is
+//                    rolled with a scan and grades zero; a CONFLICTED mouth is
+//                    the full wait. Two mouths on ONE tertiary street prove the
+//                    difference (ЗДвП чл. 50), on a map whose two graded Б1
+//                    lines come from runtime STOP_LINE_OVERRIDES (control
+//                    "giveWay") and whose visible Б1 signs props paints itself.
+// ---------------------------------------------------------------------------
+
+describe("wave-7 bot completion — sc-jx-giveway-b1 at L3", () => {
+  const lesson = compileScenario(SC_JX_GIVEWAY_B1, 3);
+  let session = createLessonSession(lesson);
+  recordScJxGivewayB1Drive(loadDistrict("jxg-giveway-v1"), "shadow-correct", {
+    onTick: (tick) => {
+      session = applyTick(session, tick).state;
+    },
+  });
+  const result = buildLessonResult(session);
+
+  it("completes: all three objectives done, zero violations, passed, 3★", () => {
+    expect(session.phase).toBe("completed");
+    expect(result.completedAll).toBe(true);
+    expect(result.passed).toBe(true);
+    expect(result.score).toBe(0);
+    expect(session.events.filter((e) => e.kind === "violation")).toEqual([]);
+    expect(scoreRubric(result, SC_JX_GIVEWAY_B1.rubric!).stars).toBe(3);
+  });
+
+  it("THE POINT, on the STUDENT path: the sheet is passed BECAUSE mouth 1 was ROLLED and mouth 2 was WAITED", () => {
+    // The trace gate proves the recorder's engine sees a clean drive; this proves
+    // the student-facing session agrees, and that both halves are GATES rather
+    // than narration. sc-jxgb-roll sits just past the CLEAR mouth 1 (rolled
+    // through), sc-jxgb-yield is a crawl gate (maxSpeedKmh 6) at the mouth-2
+    // yield pose — unsatisfiable by anyone who barges — and sc-jxgb-exit sits
+    // past mouth 2. The order IS the teaching, and objectives advance
+    // sequentially: roll the clear one, wait at the conflicted one, only then
+    // leave.
+    const at = (id: string) => result.objectives.find((o) => o.id === id)!;
+    for (const id of ["sc-jxgb-roll", "sc-jxgb-yield", "sc-jxgb-exit"]) {
+      expect(at(id).done, id).toBe(true);
+    }
+    expect(at("sc-jxgb-roll").completedAtSec!).toBeLessThan(at("sc-jxgb-yield").completedAtSec!);
+    expect(at("sc-jxgb-yield").completedAtSec!).toBeLessThan(at("sc-jxgb-exit").completedAtSec!);
+  });
+
+  it("the LIVE session earns YIELDED_TO_PRIORITY — the taught yield, not just the absence of faults", () => {
+    // Exactly one: mouth 1 is clear (nothing to yield to — the roll), mouth 2
+    // carries the priority car (the wait). One yield proof, no violation.
+    const yields = session.events.filter(
+      (e) => e.kind === "commendation" && e.code === "YIELDED_TO_PRIORITY",
+    );
+    expect(yields.length).toBe(1);
+  });
+
+  it("opts into the scan drill and stages the conflict + the лепка — nothing else", () => {
+    // The config-gated JUNCTION_SCAN_INCOMPLETE detector is default-OFF; this
+    // drill enables it so the LIVE student's missing scan at a Б1 grades too.
+    expect(lesson.ruleConfig?.junctionScanObservationEnabled).toBe(true);
+    // One priority car at mouth 2 + one learn-only rear лепка. The tailgater is
+    // pressure scenery (rearTailgater emits zero SimTick events, A12) and the
+    // priority car is the only thing that can grade a yield.
+    expect((lesson.stagedEvents ?? []).map((e) => e.kind).sort()).toEqual([
+      "priorityFromRight",
+      "rearTailgater",
+    ]);
+    expect(lesson.physics).toBeUndefined();
+  });
+
+  it("the LIVE session bills no phantom for the rolling pass or the wait", () => {
+    // Where a sloppy tune would surface: the car ROLLS through a Б1 mouth
+    // without stopping (a full-stop demand there would teach the exact myth this
+    // template kills), then sits still for ~9 s at a second Б1 with a car glued
+    // to its bumper. Every detector this map can anger is watching, and all of
+    // it must cost nothing.
+    const codes = session.events.filter((e) => e.kind === "violation").map((e) => e.code);
+    for (const c of [
+      "STOP_SIGN_NO_FULL_STOP", // the crux: a clear Б1 roll demands NO full stop
+      "JUNCTION_SCAN_INCOMPLETE",
+      "FAILED_TO_YIELD",
+      "FOLLOWING_TOO_CLOSE", // the лепка is BEHIND — never the player's lead
+      "STANDSTILL_GAP_TOO_CLOSE",
+      "HARSH_BRAKING_NO_CAUSE",
+      "POOR_LANE_KEEPING",
+      "SPEEDING_OVER_LIMIT",
+    ]) {
+      expect(codes, c).not.toContain(c);
+    }
+  });
+
+  /** Replay a demo through a LIVE session at one rung, splitting the coach's
+   *  two channels: what it TAUGHT (first-encounter pause card) vs what it
+   *  SCORED (session.events → the sheet). */
+  const replay = (name: Parameters<typeof recordScJxGivewayB1Drive>[1], level: 3 | 4) => {
+    let s = createLessonSession(compileScenario(SC_JX_GIVEWAY_B1, level));
+    const taught: string[] = [];
+    recordScJxGivewayB1Drive(loadDistrict("jxg-giveway-v1"), name, {
+      onTick: (tick) => {
+        const step = applyTick(s, tick);
+        s = step.state;
+        for (const m of step.teachMoments ?? []) taught.push(m.code);
+      },
+    });
+    return {
+      taught,
+      scored: s.events.filter((e) => e.kind === "violation").map((e) => e.code),
+      r: buildLessonResult(s),
+    };
+  };
+
+  it("counter-proof: barging in front of the priority car is опасна — SCORED, never taught, and misses the wait gate", () => {
+    // The template's sharpest claim: this driver did everything right at mouth 1
+    // AND looked both ways at mouth 2 — and still failed, because Б1 means
+    // PROPUSNI, and he entered in front of a car that had the priority. FAILED_TO_YIELD
+    // is опасна, so it is SCORED with a toast rather than a teach card even at
+    // L3 (a dangerous code must never pop a modal mid-junction).
+    const l3 = replay("mistake-barge-priority", 3);
+    expect(l3.taught).toEqual([]);
+    expect(l3.scored).toEqual(["FAILED_TO_YIELD"]);
+    expect(l3.r.score).toBe(10); // one опасна > the 9-point budget (Наредба-38)
+    expect(l3.r.passed).toBe(false);
+    // He rolled the clear mouth 1 fine, but blew the crawl gate at mouth 2 (14
+    // km/h > its 6 km/h cap) — so the drill cannot be passed by „ще се промъкна".
+    expect(l3.r.objectives.find((o) => o.id === "sc-jxgb-roll")!.done).toBe(true);
+    expect(l3.r.objectives.find((o) => o.id === "sc-jxgb-yield")!.done).toBe(false);
+    expect(l3.r.completedAll).toBe(false);
+    // The exam rung grades the identical drive identically.
+    const l4 = replay("mistake-barge-priority", 4);
+    expect(l4.taught).toEqual([]);
+    expect(l4.scored).toEqual(["FAILED_TO_YIELD"]);
+    expect(l4.r.passed).toBe(false);
+  });
+
+  it("counter-proof: rolling a Б1 without a scan TEACHES at L3 and is SCORED at L4 — never a full-stop demand", () => {
+    // The other half of the lesson: Б1 does not ask you to STOP, but it always
+    // asks you to LOOK. This driver rolled the clear mouth 1 with no left/right
+    // scan at all. JUNCTION_SCAN_INCOMPLETE is основна: first encounter pauses
+    // with a card and costs no points (teach-first, doc 76 §0)…
+    const l3 = replay("mistake-no-scan", 3);
+    expect(l3.taught).toContain("JUNCTION_SCAN_INCOMPLETE");
+    expect(l3.scored).not.toContain("JUNCTION_SCAN_INCOMPLETE");
+    // Crucially NOT a full-stop demand — a clear Б1 roll never earns one, so
+    // the drill never punishes the very thing it teaches (roll, don't stop).
+    expect(l3.scored).not.toContain("STOP_SIGN_NO_FULL_STOP");
+    expect(l3.r.score).toBe(0);
+    // …and at the EXAM rung the coach stops teaching and bills the identical
+    // drive: one основна = 3 of the 9-point budget (Наредба-38).
+    const l4 = replay("mistake-no-scan", 4);
+    expect(l4.taught).toEqual([]);
+    expect(l4.scored).toEqual(["JUNCTION_SCAN_INCOMPLETE"]);
+    expect(l4.r.score).toBe(3);
+    expect(l4.scored).not.toContain("STOP_SIGN_NO_FULL_STOP");
+  });
+
+  it("compiles at every authored rung; L4 is the exam cold start, L5 adds live traffic", () => {
+    for (const level of [1, 2, 3, 4, 5] as const) {
+      expect(compileScenario(SC_JX_GIVEWAY_B1, level).id).toBe(`sc-jx-giveway-b1@L${level}`);
+    }
+    expect(compileScenario(SC_JX_GIVEWAY_B1, 4).vehicleStart).toBe("cold");
+    expect(compileScenario(SC_JX_GIVEWAY_B1, 4).examMode).toBe(true);
+    expect(SC_JX_GIVEWAY_B1.levels.map((l) => l.level)).toEqual([1, 2, 3, 4, 5]);
+    // L5's difficulty axis is живо движение on the priority boulevards — more
+    // cars to read at both mouths, no physics/conditions delta (the ghost
+    // envelope is dry-tuned).
+    expect(compileScenario(SC_JX_GIVEWAY_B1, 5).traffic?.vehicleCount).toBe(8);
+    expect(compileScenario(SC_JX_GIVEWAY_B1, 5).physics).toBeUndefined();
+    // The two staged actors ride every rung: the priority car IS the mouth-2
+    // encounter, the лепка IS the pressure to rush it.
+    for (const level of [1, 2, 3, 4, 5] as const) {
+      expect(
+        compileScenario(SC_JX_GIVEWAY_B1, level)
+          .stagedEvents?.map((e) => e.kind)
+          .sort(),
+        `L${level}`,
+      ).toEqual(["priorityFromRight", "rearTailgater"]);
+    }
+  });
+
+  it("the server regrades identically from the id alone (wire round-trip; PENDING the main session's spread)", () => {
+    // doc 76 §10 convention (this file's header): the wire resolves the lesson
+    // id through the templates.ts registry, so this goes green only once
+    // SC_JX_GIVEWAY_B1 is spread into SCENARIO_TEMPLATES_JUNCTIONS + the roster
+    // bumped to 150 — the integration edit the main session owns. Until then
+    // gradeFinishWire cannot resolve the id (exactly like s2-catalog-integrity
+    // still expecting 149).
+    const graded = gradeFinishWire({
+      lessonId: "sc-jx-giveway-b1@L3",
+      startedAtMs: 1_000,
+      finishedAtMs: 1_000 + Math.round(result.durationSec * 1000),
+      aborted: false,
+      ruleEvents: serializeRuleEvents(session.events),
+      objectives: result.objectives.map((o) => ({
+        id: o.id,
+        done: o.done,
+        completedAtSec: o.completedAtSec,
+        ...(o.detail !== undefined ? { detail: o.detail } : {}),
+      })),
+    });
+    expect(graded.status).toBe("ok");
+    if (graded.status !== "ok") return;
+    expect(graded.lesson).toEqual(scenarioLessonById("sc-jx-giveway-b1@L3"));
     expect(graded.result.passed).toBe(true);
     expect(graded.result.score).toBe(0);
   });
