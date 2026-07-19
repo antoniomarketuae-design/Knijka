@@ -7,7 +7,7 @@ collision — both people building the same item, or stepping on the same files.
 
 ## The layout
 
-- **origin** → GitHub private repo (the claim board + PR review + CI).
+- **origin** → `git@github.com:antoniomarketuae-design/Knijka.git` (the claim board + PR review + CI — the `gate` workflow runs tsc+vitest+harness+build on every PR).
 - **vps** → `ssh://root@213.218.160.60/opt/knijka.git` (bare; staging deploy
   source + offsite backup). Push here too — it is the disaster copy.
 - **Staging** → the VPS runs the production build from `scenario-engine`

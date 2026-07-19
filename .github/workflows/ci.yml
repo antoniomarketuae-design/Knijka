@@ -1,0 +1,43 @@
+# The gate, mechanized (doc 61): every PR and every push to an integration
+# branch runs the same four checks each developer runs locally. Nobody merges
+# red. Dummy env values — no test connects to a real database; prisma only
+# needs the vars to exist to generate/config-load.
+name: gate
+
+on:
+  pull_request:
+  push:
+    branches: [main, scenario-engine]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  gate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: platform
+    env:
+      DATABASE_URL: "postgresql://ci:ci@localhost:5432/ci"
+      SHADOW_DATABASE_URL: "postgresql://ci:ci@localhost:5432/ci_shadow"
+      AUTH_SECRET: "ci-dummy-secret"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: platform/package-lock.json
+      - run: npm ci --no-audit --no-fund
+      - run: npx prisma generate
+      - name: typecheck
+        run: npx tsc --noEmit
+      - name: tests
+        run: npx vitest run
+      - name: sim harness
+        run: node scripts/sim-harness.mjs
+      - name: build
+        run: npm run build
