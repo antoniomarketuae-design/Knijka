@@ -18,3 +18,7 @@ AI-powered driving education platform: Bulgarian theory academy (adaptive practi
 ## Layout & commands
 
 `platform/` Next.js app (TS, Tailwind, App Router, src dir) — `npm run dev` inside. `content/` versioned JSON learning content. `spike/` throwaway prototypes, never imported.
+
+## Two-developer mode
+
+Two developers (each with their own Claude) share this repo. **Before starting ANY work item, follow [docs/development/61_TWO_DEV_COLLABORATION.md](docs/development/61_TWO_DEV_COLLABORATION.md)**: claim the item first (GitHub Issue self-assign), work on your own branch (`<name>/<slug>`), full gate before PR, never commit to the integration branch directly. Staging = the `vps` remote's `/opt/knijka/deploy.sh` (doc 61 has the details).
