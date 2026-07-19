@@ -77,6 +77,7 @@ export {
 export {
   SIGNAL_TIMING,
   phaseTimingInCycle,
+  type ControllerFigureState,
   type SignalClusterInfo,
   type SignalClusterMode,
   type SignalControllerSchedule,

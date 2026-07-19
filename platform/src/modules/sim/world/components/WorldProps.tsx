@@ -41,8 +41,12 @@
  *   + billboards 4 (large/small × body+face) + bus stops 2 (body + face)
  *   + parking kit 1 (merged cluster) = 27  (was 18).
  * Zone-sign kinds (SIGN-ASSET drop) add draws ONLY on maps whose zones place
- * them (+2 per textured kind, +1 for the geometry-only crossbuck/barrier);
+ * them (+2 per textured kind, +1 for the geometry-only crossbuck);
  * zones-less districts render exactly the fixed set above.
+ * The guarded-crossing BARRIER is the one ANIMATED world prop: post + arm +
+ * blink lamp as plain meshes (+3 draws per guarded map, 1–2 barriers ever),
+ * the arm pose driven per frame by the runtime's graded timetable
+ * (getRailBarrierDown → WorldRuntime.railBarrierDownAt — single truth).
  * All fixed + instanced; low tier decimates trees via preset.treeFraction.
  */
 
@@ -89,7 +93,7 @@ const SIGN_GLB: Record<SignKind, string> = {
   railGuarded: "sign_rail_guarded",
   railUnguarded: "sign_rail_unguarded",
   railCross: "sign_rail_cross", // geometry-only crossbuck (no face_* prim)
-  barrier: "rail_barrier", // geometry-only striped arm, static down pose
+  barrier: "rail_barrier", // striped arm — ANIMATED (RailBarriers), never instanced
 };
 const SIGN_KINDS = Object.keys(SIGN_GLB) as SignKind[];
 /** The v1 four load strictly (as always); everything after them is tolerant. */
@@ -232,8 +236,16 @@ interface AdPropAsset {
 
 interface PropAssets {
   /** null = the kind's GLB failed to load (tolerated for zone kinds only —
-   *  its placements are simply skipped; the core four still load strictly). */
+   *  its placements are simply skipped; the core four still load strictly).
+   *  `barrier` is ALWAYS null here — its GLB bakes into `railBarrier` below
+   *  instead, so the static instanced pass structurally skips the kind. */
   signs: Record<SignKind, SignAsset | null>;
+  /** Guarded-crossing barrier, split for animation: static post + arm
+   *  assembly (hub/counterweight/stripes) re-based so the arm PIVOT sits at
+   *  the geometry origin (rotate z = swing). Baked from the same rail_barrier
+   *  GLB in the same authored frame; null = kit missing/bake failed
+   *  (tolerated — the crossing shows no arm, exactly like a missing kind). */
+  railBarrier: { post: THREE.BufferGeometry; arm: THREE.BufferGeometry } | null;
   signalHousing: THREE.BufferGeometry;
   streetlightHousing: THREE.BufferGeometry;
   streetlightGlow: THREE.BufferGeometry;
@@ -259,6 +271,16 @@ interface PropAssets {
 }
 
 const TREE_KINDS: TreeKind[] = ["palm", "ornamental", "leafyA", "leafyB"];
+
+// rail_barrier GLB frame (tools/blender/signs_v2.py build_rail_barrier): the
+// pivot hub sits at Blender (0.09, 0, arm_z=1.0) → after the π yaw bake the
+// pivot lands at (-0.09, 1.0, 0); the arm spans local -X (the driver's left,
+// across the incoming lane). Post primitives carry the "galv_pole" material;
+// everything else (hub + counterweight + red/white stripes) IS the swinging
+// assembly.
+const BARRIER_PIVOT_X = -0.09;
+const BARRIER_PIVOT_Y = 1.0;
+const BARRIER_POST_MAT = "galv_pole";
 
 /**
  * Merge already-baked part geometries at local offsets into one cluster
@@ -413,9 +435,35 @@ async function buildPropAssets(): Promise<PropAssets> {
     railCross: null,
     barrier: null,
   };
+  let railBarrier: PropAssets["railBarrier"] = null;
   ZONE_SIGN_KINDS.forEach((kind, i) => {
     const gltf = zoneSignGltfs[i];
-    if (gltf) signs[kind] = bakeSign(gltf);
+    if (!gltf) return;
+    if (kind === "barrier") {
+      // Animated prop: post and arm bake SEPARATELY in the shared authored
+      // frame (normalize off — the arm floats at pivot height and must not be
+      // dropped to y=0), then the arm re-bases so its pivot is the origin.
+      // signs.barrier stays null → the instanced pass skips the kind.
+      try {
+        const post = bakeVertexColored(gltf.scene, {
+          include: (n) => n === BARRIER_POST_MAT,
+          rotateY: Math.PI,
+          normalize: false,
+        });
+        const arm = bakeVertexColored(gltf.scene, {
+          include: (n) => n !== BARRIER_POST_MAT,
+          rotateY: Math.PI,
+          normalize: false,
+        });
+        arm.translate(-BARRIER_PIVOT_X, -BARRIER_PIVOT_Y, 0);
+        arm.computeBoundingSphere();
+        railBarrier = { post, arm };
+      } catch {
+        console.warn("sim/world: rail_barrier bake failed (barrier kind skipped)");
+      }
+      return;
+    }
+    signs[kind] = bakeSign(gltf);
   });
 
   const signalHousing = bakeVertexColored(signal.scene, {
@@ -464,6 +512,7 @@ async function buildPropAssets(): Promise<PropAssets> {
 
   return {
     signs,
+    railBarrier,
     signalHousing,
     streetlightHousing,
     streetlightGlow,
@@ -498,6 +547,7 @@ function disposePropAssets(a: PropAssets): void {
     s.faceMaterial?.map?.dispose();
     s.faceMaterial?.dispose();
   }
+  if (a.railBarrier) disposeAll([a.railBarrier.post, a.railBarrier.arm]);
   disposeAll([
     a.signalHousing,
     a.streetlightHousing,
@@ -730,6 +780,131 @@ function Signs({
     <group name="signs">
       {meshes.map((m, i) => (
         <primitive key={i} object={m} />
+      ))}
+    </group>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Rail barriers — the guarded-crossing arm, the one MOVING world prop.
+//
+// Pose truth: the runtime's graded timetable, read per frame through
+// getRailBarrierDown (LessonScene wires it to WorldRuntime.railBarrierDownAt,
+// which evaluates at the last GRADED clock) — never a second clock, so the
+// rendered arm and tick.railBarred cannot disagree. Down = the authored pose
+// (rotation 0); up = ~86°; exponential damp gives the ~2.5 s real-РЖ swing,
+// no snap. A red lamp on the arm blinks while the barrier is down or moving
+// (the traffic-lamp on/off color pattern, LAMP_ON/LAMP_OFF.red).
+//
+// Perf: 1–2 barriers per map ever → plain meshes (shared signBody material,
+// cache-owned geometry; only the tiny lamp geometry + its materials are owned
+// here). Zero per-frame allocations: pose + blink mutate group rotation and
+// a preallocated material color.
+// ---------------------------------------------------------------------------
+
+/** Arm swing target when open: ~86° up (negative z-rotation lifts the -X arm). */
+const BARRIER_ARM_UP_RAD = -1.5;
+/** Exponential damp λ — full swing reads as ~2–3 s, soft at both ends. */
+const BARRIER_ARM_DAMP = 2.0;
+/** Arm counts as "moving" (lamp keeps blinking) until this close to target. */
+const BARRIER_ARM_SETTLED_RAD = 0.03;
+const BARRIER_BLINK_PERIOD_SEC = 0.9;
+const BARRIER_BLINK_ON_SEC = 0.45;
+
+interface BarrierRig {
+  root: THREE.Group;
+  pivot: THREE.Group;
+  lampMaterial: THREE.MeshBasicMaterial;
+  /** District-space prop position (world [x, h, -y]) for the runtime query. */
+  dx: number;
+  dy: number;
+}
+
+function RailBarriers({
+  world,
+  assets,
+  preset,
+  getRailBarrierDown,
+}: {
+  world: WorldGeometry;
+  assets: PropAssets;
+  preset: QualityPreset;
+  getRailBarrierDown?: (x: number, y: number) => boolean;
+}) {
+  const placements = useMemo(
+    () => world.signs.filter((s) => s.kind === "barrier"),
+    [world.signs],
+  );
+
+  const built = useMemo(() => {
+    const rb = assets.railBarrier;
+    if (!rb || placements.length === 0) return null;
+    const lampGeometry = new THREE.SphereGeometry(0.055, 10, 8);
+    const castShadow = preset.castShadows === "full";
+    const rigs: BarrierRig[] = placements.map((p, i) => {
+      const root = new THREE.Group();
+      root.name = `rail-barrier-${i}`;
+      root.position.set(p.position[0], p.position[1], p.position[2]);
+      root.rotation.y = p.yaw;
+      const post = new THREE.Mesh(rb.post, assets.materials.signBody);
+      post.castShadow = castShadow;
+      const pivot = new THREE.Group();
+      pivot.position.set(BARRIER_PIVOT_X, BARRIER_PIVOT_Y, 0);
+      const arm = new THREE.Mesh(rb.arm, assets.materials.signBody);
+      arm.castShadow = castShadow;
+      const lampMaterial = new THREE.MeshBasicMaterial({ toneMapped: false });
+      lampMaterial.color.copy(LAMP_OFF.red);
+      const lamp = new THREE.Mesh(lampGeometry, lampMaterial);
+      lamp.position.set(-1.05, 0, 0.1); // 1 m out on the arm, proud of its face
+      pivot.add(arm);
+      pivot.add(lamp);
+      root.add(post);
+      root.add(pivot);
+      const dx = p.position[0];
+      const dy = -p.position[2];
+      // Snap to the truthful pose at mount (no phantom swing on spawn); no
+      // wiring (standalone world mounts) keeps the authored down pose.
+      const down = getRailBarrierDown ? getRailBarrierDown(dx, dy) : true;
+      pivot.rotation.z = down ? 0 : BARRIER_ARM_UP_RAD;
+      return { root, pivot, lampMaterial, dx, dy };
+    });
+    return { rigs, lampGeometry };
+  }, [assets, placements, preset.castShadows, getRailBarrierDown]);
+  // Per-frame pose writes go through a ref (the TrafficLights lampsRef
+  // grammar — render values stay immutable for the compiler).
+  const rigsRef = useRef<BarrierRig[] | null>(null);
+  useEffect(() => {
+    if (!built) return;
+    rigsRef.current = built.rigs;
+    return () => {
+      rigsRef.current = null;
+      built.lampGeometry.dispose();
+      for (const r of built.rigs) r.lampMaterial.dispose();
+    };
+  }, [built]);
+
+  useFrame((state, delta) => {
+    const rigs = rigsRef.current;
+    if (!rigs) return;
+    for (let i = 0; i < rigs.length; i++) {
+      const r = rigs[i]!;
+      const down = getRailBarrierDown ? getRailBarrierDown(r.dx, r.dy) : true;
+      const target = down ? 0 : BARRIER_ARM_UP_RAD;
+      const z = THREE.MathUtils.damp(r.pivot.rotation.z, target, BARRIER_ARM_DAMP, delta);
+      r.pivot.rotation.z = z;
+      const moving = Math.abs(z - target) > BARRIER_ARM_SETTLED_RAD;
+      const lit =
+        (down || moving) &&
+        state.clock.elapsedTime % BARRIER_BLINK_PERIOD_SEC < BARRIER_BLINK_ON_SEC;
+      r.lampMaterial.color.copy(lit ? LAMP_ON.red : LAMP_OFF.red);
+    }
+  });
+
+  if (!built) return null;
+  return (
+    <group name="rail-barriers">
+      {built.rigs.map((r, i) => (
+        <primitive key={i} object={r.root} />
       ))}
     </group>
   );
@@ -1022,11 +1197,15 @@ export function WorldPropsGroup({
   preset,
   night,
   getSignalPhase,
+  getRailBarrierDown,
 }: {
   world: WorldGeometry;
   preset: QualityPreset;
   night: boolean;
   getSignalPhase?: (signalNodeId: string) => SignalPhase;
+  /** Barrier-arm state per guarded crossing (district meters) — wire to
+   *  WorldRuntime.railBarrierDownAt. Absent = arms hold the authored down pose. */
+  getRailBarrierDown?: (x: number, y: number) => boolean;
   /** Retained for the DistrictWorld prop contract; the 3D sign faces are baked
    *  into the GLBs now, so the SVG catalog is no longer consulted. */
   signSvgBaseUrl?: string | null;
@@ -1044,6 +1223,12 @@ export function WorldPropsGroup({
             getSignalPhase={getSignalPhase}
           />
           <Signs world={world} assets={assets} preset={preset} />
+          <RailBarriers
+            world={world}
+            assets={assets}
+            preset={preset}
+            getRailBarrierDown={getRailBarrierDown}
+          />
           <Streetlights world={world} assets={assets} preset={preset} night={night} />
           <Trees world={world} assets={assets} preset={preset} />
           <Furniture world={world} assets={assets} preset={preset} />

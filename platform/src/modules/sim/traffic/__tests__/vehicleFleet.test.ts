@@ -33,10 +33,14 @@ import {
   FLEET,
   modelForVehicle,
   paintColorFor,
+  STROBE_HALF_PERIOD_S,
+  STROBE_OFF,
+  STROBE_ON,
   TRAM_DIMENSIONS,
   TRAM_MODEL_INDEX,
   TRUCK_DIMENSIONS,
   TRUCK_MODEL_INDEX,
+  updateEmergencyStrobe,
 } from "../vehicleFleet";
 
 const POLICE_INDEX = FLEET.length - 1;
@@ -343,15 +347,54 @@ describe("large-vehicle profile (doc 72 FO-06)", () => {
     expect(rig.paint).toBeNull(); // no palette tint — white + blue IS the livery
     expect(rig.customWheel).toBeNull(); // shared wheel, scaled to the 0.38 m hubs
     expect(fleet.wheelScale[0]).toBeCloseTo(EMERGENCY_DIMENSIONS.wheelRadiusM / 0.32);
-    // Two owned material groups: the white body + the emissive blue kit
-    // (light bar + beltline stripes) — ADR-001: fictional, no insignia.
-    expect(rig.ownedMaterials.length).toBe(2);
-    expect(rig.bodyMaterials.length).toBe(2);
+    // Four owned material groups: the white body + the emissive blue kit
+    // (light bar + beltline stripes) + the two beacon lamp domes — ADR-001:
+    // fictional, no insignia.
+    expect(rig.ownedMaterials.length).toBe(4);
+    expect(rig.bodyMaterials.length).toBe(4);
     const blue = rig.bodyMaterials.find((m) => m.name === "emergency_blue") as MeshStandardMaterial;
     expect(blue).toBeDefined();
     expect(blue.emissiveIntensity).toBeGreaterThan(0); // the light bar reads lit
+    // Strobe channel: the two lamp-dome materials, unlit-lens dark at build.
+    expect(rig.strobe).toBeDefined();
+    expect(rig.strobe?.left.toneMapped).toBe(false);
+    expect(rig.strobe?.right.toneMapped).toBe(false);
+    expect(rig.strobe?.left.color.getHex()).toBe(STROBE_OFF);
+    expect(rig.strobe?.right.color.getHex()).toBe(STROBE_OFF);
     // The unused truck slot stays free alongside it.
     expect(fleet.models[TRUCK_MODEL_INDEX].mesh).toBeNull();
+    expect(() => disposeTrafficFleet(fleet)).not.toThrow();
+  });
+
+  it("strobes the emergency beacon in anti-phase on the blink clock", () => {
+    const ev: TrafficVehicleState = { ...vehicle(5), profile: "emergency" };
+    const fleet = buildTrafficFleet(makeScenes(), [ev]);
+    const strobe = fleet.models[EMERGENCY_MODEL_INDEX].rig.strobe;
+    expect(strobe).toBeDefined();
+    // Phase 0: left lit, right dark.
+    updateEmergencyStrobe(fleet, 0);
+    expect(strobe?.left.color.getHex()).toBe(STROBE_ON);
+    expect(strobe?.right.color.getHex()).toBe(STROBE_OFF);
+    // Same phase again — cached, colors unchanged.
+    updateEmergencyStrobe(fleet, STROBE_HALF_PERIOD_S * 0.9);
+    expect(strobe?.left.color.getHex()).toBe(STROBE_ON);
+    // Phase 1: flipped.
+    updateEmergencyStrobe(fleet, STROBE_HALF_PERIOD_S * 1.1);
+    expect(strobe?.left.color.getHex()).toBe(STROBE_OFF);
+    expect(strobe?.right.color.getHex()).toBe(STROBE_ON);
+    // And back on the next half period.
+    updateEmergencyStrobe(fleet, STROBE_HALF_PERIOD_S * 2.2);
+    expect(strobe?.left.color.getHex()).toBe(STROBE_ON);
+    expect(strobe?.right.color.getHex()).toBe(STROBE_OFF);
+    expect(() => disposeTrafficFleet(fleet)).not.toThrow();
+  });
+
+  it("emergency strobe is a no-op without a staged emergency actor", () => {
+    const fleet = buildTrafficFleet(makeScenes(), [vehicle(1)]);
+    expect(fleet.models[EMERGENCY_MODEL_INDEX].mesh).toBeNull();
+    expect(() => updateEmergencyStrobe(fleet, 1.23)).not.toThrow();
+    // Unused rig's lenses stay dark (no phase ever written).
+    expect(fleet.models[EMERGENCY_MODEL_INDEX].rig.strobe?.phase).toBe(-1);
     expect(() => disposeTrafficFleet(fleet)).not.toThrow();
   });
 

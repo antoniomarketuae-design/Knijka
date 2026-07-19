@@ -132,6 +132,7 @@ import { createVehicleSample } from "./vehicleSample";
 import { buildMinimapPolylines } from "./lessonMinimap";
 import { RouteGuidance } from "./RouteGuidance";
 import { ScenarioObstacles, type ScenarioObstacleSpec } from "./ScenarioObstacles";
+import { heldSceneryFor } from "./scenarioSceneryProps";
 import { ShadowCar } from "./ShadowCar";
 import { TraceTimeline } from "./lesson-ui/TraceTimeline";
 import { worldNameBg } from "./worldNames";
@@ -427,15 +428,21 @@ export default function LessonScene(props: LessonSceneProps) {
         // — scenario lessons only; curriculum districts carry no scenario
         // meta, so this stays [] and nothing mounts.
         const scenarioObstacles: ScenarioObstacleSpec[] = isScenarioLessonId(props.lesson.id)
-          ? scenarioBays
-              .filter((b) => b.occupied)
-              .map((b, i) => ({
-                kind: "vehicle" as const,
-                x: b.x,
-                y: b.y,
-                headingDeg: b.headingDeg,
-                seed: i,
-              }))
+          ? [
+              ...scenarioBays
+                .filter((b) => b.occupied)
+                .map((b, i) => ({
+                  kind: "vehicle" as const,
+                  x: b.x,
+                  y: b.y,
+                  headingDeg: b.headingDeg,
+                  seed: i,
+                })),
+              // Held scenery (render wave): district-authored cones (hittable
+              // props — the hz-roadworks seam) + per-template stalled/wreck/
+              // parked-row dressing (visual-only bodies, no new colliders).
+              ...heldSceneryFor(props.lesson.id, raw),
+            ]
           : [];
         // SURFACE-PATCH slice (AC-07-full aquaplane / AC-08 ice): resolve the
         // district's authored waterPatch/icePatch spans into district-space
@@ -878,6 +885,14 @@ function ReadyScene({
     [runtime],
   );
 
+  // Rail-barrier arm sync (agent R): the guarded-crossing arm follows the
+  // SAME validated timetable runtime.sample() grades, at the last graded
+  // clock — one truth, never a render-side second clock (rx-guarded/rx-drop).
+  const getRailBarrierDown = useCallback(
+    (x: number, y: number) => runtime.railBarrierDownAt(x, y),
+    [runtime],
+  );
+
   // A real impact (VehicleRig gates by relative speed) → queue a collision for
   // the rule engine, which grades it опасна and terminates the session. A11:
   // `withWhat` now reflects what was actually hit — NPC shells classify as
@@ -948,6 +963,7 @@ function ReadyScene({
               quality={level}
               night={isNight}
               getSignalPhase={getSignalPhase}
+              getRailBarrierDown={getRailBarrierDown}
               signSvgBaseUrl={null}
             />
             {/* A2: the provider gives VitokCockpit's hotspot layer its
@@ -1071,6 +1087,11 @@ function ReadyScene({
               hazardActiveRef={hazardActiveRef}
               // Perf tier (doc 71): SUV clearcoat on the high tier only.
               clearcoat={level === "high"}
+              // JU-18: the officer FIGURE reads the controller schedule
+              // through the runtime — the same channel + clock the stop-line
+              // adjudication uses — so the posture turns exactly when the
+              // grading flips (render-only; inert without a posted controller).
+              controllerFigure={runtime}
             />
           </Physics>
         </Suspense>
@@ -1695,7 +1716,18 @@ function RuntimeDriver({
     );
     // A6 audio pass: sticky scene state for the audio layer (rain patter +
     // NPC proximity hum) — consumed by VehicleRig's per-frame audio update.
-    audioRef.current?.setEnvironment({ rain, nearestNpcM: leadGap });
+    // Siren channel (VU-09): nearest ACTIVE (moving) emergency actor off the
+    // published traffic state — render-only scan, Infinity = no siren. A
+    // guard-stalled actor (speed 0) fades out; honest limit for now.
+    let sirenM = Infinity;
+    const tvs = traffic.vehicles;
+    for (let i = 0; i < tvs.length; i++) {
+      const tv = tvs[i];
+      if (tv.profile !== "emergency" || tv.speedMps < 0.5) continue;
+      const d = Math.hypot(tv.x - sample.position.x, tv.y - sample.position.y);
+      if (d < sirenM) sirenM = d;
+    }
+    audioRef.current?.setEnvironment({ rain, nearestNpcM: leadGap, sirenM });
     const tick = runtime.sample(sample, tRef.current, isNight, rain, leadGap, fog, snow);
 
     // A8: the scenario director steps AFTER traffic.update + runtime.sample —

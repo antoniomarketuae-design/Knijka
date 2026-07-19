@@ -34,6 +34,10 @@ export interface DistrictWorldProps {
   night?: boolean;
   /** Lamp state per signal node id — wire to WorldRuntime.signalPhase. Default: all green. */
   getSignalPhase?: (signalNodeId: string) => SignalPhase;
+  /** Guarded-crossing barrier-arm state (district meters) — wire to
+   *  WorldRuntime.railBarrierDownAt so the arm animates in lockstep with the
+   *  graded timetable. Default: arms hold the authored down pose. */
+  getRailBarrierDown?: (x: number, y: number) => boolean;
   /**
    * Base URL serving content/signs/svg (b1/b2/v26/d11). Default
    * "/content/signs/svg"; pass null to keep the built-in procedural sign
@@ -53,6 +57,7 @@ export function DistrictWorld({
   quality = "med",
   night = false,
   getSignalPhase,
+  getRailBarrierDown,
   signSvgBaseUrl = "/content/signs/svg",
   physics = true,
   buildOptions,
@@ -72,6 +77,7 @@ export function DistrictWorld({
         preset={preset}
         night={night}
         getSignalPhase={getSignalPhase}
+        getRailBarrierDown={getRailBarrierDown}
         signSvgBaseUrl={signSvgBaseUrl}
       />
       {physics ? <WorldColliders colliders={world.colliders} /> : null}

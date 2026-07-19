@@ -241,7 +241,10 @@ describe("S2 catalog integrity", () => {
     }
   });
 
-  it("every shadow + mistake trace ref points at a committed, parseable file", () => {
+  // 450 trace JSONs get parsed here — well past vitest's 5 s default when the
+  // box is under load (agent waves / dev server). Twice-observed flake; the
+  // 30 s budget is for I/O contention, not slow code.
+  it("every shadow + mistake trace ref points at a committed, parseable file", { timeout: 30_000 }, () => {
     for (const spec of SCENARIO_TEMPLATES) {
       const refs = [spec.shadow, ...spec.mistakes.map((m) => m.traceRef)];
       for (const ref of refs) {

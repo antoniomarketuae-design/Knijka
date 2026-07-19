@@ -2,8 +2,9 @@
  * Painted road markings as flat geometry strips slightly above the asphalt:
  * dashed white lane separators, solid edge lines (arterials), stop lines at
  * signalized/stop-controlled approaches, give-way dash lines, zebra
- * crossings at crossing positions, and lesson-authored parking-bay U-shapes
- * (doc 68 A5 — L7's bay).
+ * crossings at crossing positions, lesson-authored parking-bay U-shapes
+ * (doc 68 A5 — L7's bay), and meta-authored lane-intent arrows
+ * (meta.scenario.laneArrows — the SN-04/RB approach glyphs).
  */
 
 import type { ParkingBaySpec } from "../../contracts";
@@ -45,6 +46,9 @@ export interface MarkingBuildResult {
   stopLines: number;
   zebraCrossings: number;
   parkingBays: number;
+  /** Lane-intent arrow quads painted from meta.scenario.laneArrows (0 on
+   *  every district without the meta — the byte-identity contract). */
+  laneArrowQuads: number;
 }
 
 /** Flat quad centered at `p`, extending ±alongHalf along `dir`, ±acrossHalf sideways. */
@@ -349,6 +353,172 @@ function paintZebra(
 }
 
 // ---------------------------------------------------------------------------
+// Lane-intent arrows (meta.scenario.laneArrows — the SN-04 sc-ln-turn-lane-
+// arrows drill + the rb-2lane roundabout approach). The arrows are META, not a
+// data layer (doc 72 N3's lane-intent zone kind is still outstanding): the map
+// generator authors edge(s) + travel bank + geometry-arclength span + per-lane
+// arrow, the ScenarioSpec teaches from it, and this pass makes it VISIBLE —
+// М10-style glyphs built procedurally (stem/bend quads + triangle heads, no
+// textures) into the SAME markings accumulator. Painted LAST, so a district
+// without the meta keeps byte-identical marking buffers.
+//
+// Frames: fromM/toM are arclength along the FULL edge geometry (the zone-solid
+// frame above: line arclength = geometry arclength − (eb.trimFrom + 0.8)).
+// `centerM` is the lane centre's offset from the centreline toward the RIGHT
+// of the travelling bank's own forward (runtime/spatial.ts locator math), so
+// one read serves either travelDir.
+// ---------------------------------------------------------------------------
+
+/** Glyph length along travel; sized against the 8.125 m perceptual lanes. */
+const LANE_ARROW_LENGTH_M = 7.5;
+/** Repeat spacing of glyph stations along the authored span. */
+const LANE_ARROW_PITCH_M = 30;
+const ARROW_STEM_W = 1.0;
+const ARROW_HEAD_W = 2.6;
+const ARROW_HEAD_L = 2.5;
+const SQ2 = Math.SQRT1_2;
+
+type ArrowGlyph = "through" | "left" | "right" | "throughRight";
+
+/** Authored arrow vocab → painted glyph. Unknown vocab paints nothing (a
+ *  future kind must add its glyph here, never crash a build). Roundabout
+ *  vocab (rb-2lane): the outer lane serves the near exits (right + through),
+ *  the inner lane the far exits / U-turn (reads as the left glyph). */
+const ARROW_GLYPHS: Readonly<Record<string, ArrowGlyph>> = {
+  through: "through",
+  left: "left",
+  right: "right",
+  nearExits: "throughRight",
+  farExits: "left",
+};
+
+/** One CCW quad in the glyph's local frame (u = right of travel, v = along
+ *  travel, origin at the glyph centre). Triangle heads repeat the apex — the
+ *  degenerate second tri keeps the markings mesh's 6-index-per-quad shape. */
+type GlyphQuad = [Vec2, Vec2, Vec2, Vec2];
+
+/** Rectangle stroke from `base` along unit `e` (local frame), CCW. */
+function glyphStroke(base: Vec2, e: Vec2, lengthM: number, widthM: number): GlyphQuad {
+  const pe: Vec2 = [e[1], -e[0]]; // perpRight in the local frame
+  const a = add(base, mul(pe, -widthM / 2));
+  const b = add(base, mul(pe, widthM / 2));
+  return [a, b, add(b, mul(e, lengthM)), add(a, mul(e, lengthM))];
+}
+
+/** Arrowhead triangle (as a degenerate quad) pointing along unit `e`. */
+function glyphHead(base: Vec2, e: Vec2, lengthM: number, halfWidthM: number): GlyphQuad {
+  const pe: Vec2 = [e[1], -e[0]];
+  const apex = add(base, mul(e, lengthM));
+  return [add(base, mul(pe, -halfWidthM)), add(base, mul(pe, halfWidthM)), apex, apex];
+}
+
+/** The four glyphs, built once. Turn glyphs bend at 45° and stay inside the
+ *  lane: max lateral reach ≈ 2.2 m against the 4.06 m half-lane. */
+const GLYPH_QUADS: Readonly<Record<ArrowGlyph, readonly GlyphQuad[]>> = (() => {
+  const half = LANE_ARROW_LENGTH_M / 2;
+  const up: Vec2 = [0, 1];
+  const through: GlyphQuad[] = [
+    glyphStroke([0, -half], up, LANE_ARROW_LENGTH_M - ARROW_HEAD_L, ARROW_STEM_W),
+    glyphHead([0, half - ARROW_HEAD_L], up, ARROW_HEAD_L, ARROW_HEAD_W / 2),
+  ];
+  const turn = (s: 1 | -1): GlyphQuad[] => {
+    const diag: Vec2 = [s * SQ2, SQ2];
+    return [
+      glyphStroke([0, -half], up, half + 1.2, ARROW_STEM_W),
+      glyphStroke([0, 1.2], diag, 1.7, ARROW_STEM_W),
+      glyphHead(add([0, 1.2], mul(diag, 1.7)), diag, 1.35, 1.3),
+    ];
+  };
+  const branch: Vec2 = [SQ2, SQ2];
+  const throughRight: GlyphQuad[] = [
+    ...through,
+    glyphStroke([0, -0.8], branch, 1.5, 0.9),
+    glyphHead(add([0, -0.8], mul(branch, 1.5)), branch, 1.2, 1.05),
+  ];
+  return { through, left: turn(-1), right: turn(1), throughRight };
+})();
+
+interface LaneArrowsAuthored {
+  edgeIds: string[];
+  travelDir: 1 | -1;
+  fromM: number;
+  toM: number;
+  lanes: Array<{ centerM: number; glyph: ArrowGlyph }>;
+}
+
+/** Defensive read of meta.scenario.laneArrows (single edgeId or edgeIds[]).
+ *  Anything malformed → null, and the whole pass is a no-op. */
+function readLaneArrows(district: District): LaneArrowsAuthored | null {
+  const sc = district.meta.scenario as { laneArrows?: Record<string, unknown> } | undefined;
+  const la = sc?.laneArrows;
+  if (!la || typeof la !== "object") return null;
+  const edgeIds = Array.isArray(la.edgeIds)
+    ? (la.edgeIds as unknown[]).filter((e): e is string => typeof e === "string")
+    : typeof la.edgeId === "string"
+      ? [la.edgeId]
+      : [];
+  const { fromM, toM } = la;
+  if (edgeIds.length === 0) return null;
+  if (typeof fromM !== "number" || typeof toM !== "number" || !(fromM < toM)) return null;
+  const lanes: LaneArrowsAuthored["lanes"] = [];
+  if (Array.isArray(la.lanes)) {
+    for (const l of la.lanes as Array<Record<string, unknown> | null>) {
+      const glyph = typeof l?.arrow === "string" ? ARROW_GLYPHS[l.arrow] : undefined;
+      if (glyph && typeof l?.centerM === "number" && Number.isFinite(l.centerM)) {
+        lanes.push({ centerM: l.centerM, glyph });
+      }
+    }
+  }
+  if (lanes.length === 0) return null;
+  return { edgeIds, travelDir: la.travelDir === -1 ? -1 : 1, fromM, toM, lanes };
+}
+
+/** Paint every authored lane-intent glyph. Runs for ALL road classes (the
+ *  rb-2lane arms are unclassified and paint no lane lines, yet the approach
+ *  arrows are the whole lesson — the residential-осева precedent). */
+function paintLaneArrows(acc: MeshAccumulator, district: District, network: RoadNetwork): number {
+  const authored = readLaneArrows(district);
+  if (!authored) return 0;
+  const halfLen = LANE_ARROW_LENGTH_M / 2;
+  let quads = 0;
+  for (const edgeId of authored.edgeIds) {
+    const eb = network.edgeById.get(edgeId);
+    if (!eb?.line) continue;
+    const line = trimPolyline(eb.line, 0.8, 0.8, 2.5);
+    if (!line) continue;
+    const s0 = eb.trimFrom + 0.8; // geometry arclength of line[0] (solids frame)
+    const lineLen = polylineLength(line);
+    // Stations walk the authored span at a fixed pitch; a station whose full
+    // glyph falls off the junction-trimmed line is skipped, so the paint
+    // clamps to the drawn extent exactly like the zone solids do.
+    for (let sGeom = authored.fromM + halfLen; sGeom + halfLen <= authored.toM; sGeom += LANE_ARROW_PITCH_M) {
+      const sLine = sGeom - s0;
+      if (sLine - halfLen < 0 || sLine + halfLen > lineLen) continue;
+      const at = pointAlong(line, sLine);
+      const fwd = authored.travelDir === -1 ? mul(at.tangent, -1) : at.tangent;
+      const right = perpRight(fwd);
+      for (const lane of authored.lanes) {
+        const origin = add(at.point, mul(right, lane.centerM));
+        for (const q of GLYPH_QUADS[lane.glyph]) {
+          const idx = [0, 0, 0, 0];
+          for (let i = 0; i < 4; i++) {
+            const [u, v] = q[i] as Vec2;
+            const p = add(add(origin, mul(right, u)), mul(fwd, v));
+            idx[i] = acc.vertex(toWorld(p[0], p[1], MARKING_Y), UP, [
+              i === 1 || i === 2 ? 1 : 0,
+              i >= 2 ? 1 : 0,
+            ]);
+          }
+          acc.quad(idx[0] as number, idx[1] as number, idx[2] as number, idx[3] as number);
+          quads++;
+        }
+      }
+    }
+  }
+  return quads;
+}
+
+// ---------------------------------------------------------------------------
 
 export function buildMarkings(
   district: District,
@@ -443,11 +613,17 @@ export function buildMarkings(
   // -- zone-authored solids (М1 осева + bus/emergency curb seams) --------------
   markingQuads += paintZoneSolids(acc, district, network);
 
+  // -- lane-intent arrows (meta.scenario.laneArrows) — LAST, so a district
+  //    without the meta keeps byte-identical marking buffers ------------------
+  const laneArrowQuads = paintLaneArrows(acc, district, network);
+  markingQuads += laneArrowQuads;
+
   return {
     markings: acc,
     markingQuads,
     stopLines,
     zebraCrossings,
     parkingBays: parkingBays.length,
+    laneArrowQuads,
   };
 }

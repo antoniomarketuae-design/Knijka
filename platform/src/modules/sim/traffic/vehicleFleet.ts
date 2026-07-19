@@ -65,6 +65,7 @@ import {
   InstancedMesh,
   type Material,
   Mesh,
+  MeshBasicMaterial,
   MeshPhysicalMaterial,
   MeshStandardMaterial,
   type Object3D,
@@ -247,14 +248,45 @@ export const EMERGENCY_DIMENSIONS = {
   lightBar: { widthM: 1.2, heightM: 0.2, lengthM: 0.36 },
 } as const;
 
+/** Beacon strobe lens colors: lit blue flash vs dark navy lens (the same
+ *  lit/unlit-lens discipline as TrafficLayer's BLINK_ON/BLINK_OFF quads). */
+export const STROBE_ON = 0x2f7dff;
+export const STROBE_OFF = 0x0c1f4e;
+/** Strobe alternation half-period, s — half TrafficLayer's indicator blink
+ *  period (0.9), so the beacon flips sides ~2.2×/s off the SAME deterministic
+ *  clock the NPC blinkers already accumulate. */
+export const STROBE_HALF_PERIOD_S = 0.45;
+
+/**
+ * Flip the emergency beacon (left/right lamp domes in anti-phase) from the
+ * shared blink clock. The lamp materials are SHARED across every emergency
+ * instance, so this is one cached-phase check per frame and two color writes
+ * per flip edge — no per-instance work, no allocations. No-op (early return)
+ * when no emergency actor is staged.
+ */
+export function updateEmergencyStrobe(fleet: TrafficFleet, blinkClockSec: number): void {
+  const em = fleet.models[EMERGENCY_MODEL_INDEX];
+  const strobe = em?.rig.strobe;
+  if (!strobe || !em.mesh) return;
+  const phase = Math.floor(blinkClockSec / STROBE_HALF_PERIOD_S) & 1;
+  if (phase === strobe.phase) return;
+  strobe.phase = phase;
+  strobe.left.color.setHex(phase === 0 ? STROBE_ON : STROBE_OFF);
+  strobe.right.color.setHex(phase === 0 ? STROBE_OFF : STROBE_ON);
+}
+
 /**
  * The procedural emergency ModelRig (doc 72 §15 N9 / VU-09 „Линейка отзад"):
  * a white cab + white box body (merged, one draw) topped by an emissive BLUE
  * light-bar box + a blue beltline stripe on each flank (merged into one blue
- * draw). Static-emissive light bar is the honest v1 — a strobing beacon is a
- * TrafficLayer polish pass, not a rig concern. Ground-relative like the GLB
- * kit (Y = 0 = tarmac, nose +Z); shared fleet wheels scaled to 0.38 m hubs.
- * All geometry + materials are OWNED (disposed via ownedMaterials/geometry).
+ * draw), PLUS two beacon lamp domes at the bar ends on their own unlit-basic
+ * materials (toneMapped false — the TrafficLayer lamp-quad look). The domes
+ * are the STROBE: updateEmergencyStrobe flips their colors in anti-phase on
+ * the shared indicator blink clock — two color writes per edge, shared across
+ * every emergency instance, zero per-frame cost otherwise. Ground-relative
+ * like the GLB kit (Y = 0 = tarmac, nose +Z); shared fleet wheels scaled to
+ * 0.38 m hubs. All geometry + materials are OWNED (disposed via
+ * ownedMaterials/geometry).
  */
 function buildEmergencyRig(): ModelRig {
   const { lengthM, widthM, cabHeightM, boxHeightM, wheelRadiusM, lightBar } = EMERGENCY_DIMENSIONS;
@@ -287,8 +319,9 @@ function buildEmergencyRig(): ModelRig {
     box.dispose();
   }
   // Blue kit: roof light bar (over the cab, the identity) + beltline stripes.
+  const barZ = halfLength - cabLen / 2 - 0.1;
   const bar = new BoxGeometry(lightBar.widthM, lightBar.heightM, lightBar.lengthM);
-  bar.translate(0, cabHeightM + lightBar.heightM / 2, halfLength - cabLen / 2 - 0.1);
+  bar.translate(0, cabHeightM + lightBar.heightM / 2, barZ);
   const stripeY = 1.05;
   const stripeLen = boxLen - 0.3;
   const stripeL = new BoxGeometry(0.05, 0.28, stripeLen);
@@ -301,18 +334,38 @@ function buildEmergencyRig(): ModelRig {
     stripeL.dispose();
     stripeR.dispose();
   }
-  const bodyGeometry = mergeGeometries([whiteMerged, blueMerged], true) ?? whiteMerged;
+  // Beacon lamp domes at the bar ends — unlit basic materials (the lamp-quad
+  // look: no lighting, no tone mapping) so a color flip reads as LIGHT. Both
+  // start dark; updateEmergencyStrobe drives the anti-phase flash.
+  const strobeLMat = new MeshBasicMaterial({ color: STROBE_OFF, toneMapped: false });
+  strobeLMat.name = "emergency_strobe_l";
+  const strobeRMat = new MeshBasicMaterial({ color: STROBE_OFF, toneMapped: false });
+  strobeRMat.name = "emergency_strobe_r";
+  const lampH = lightBar.heightM + 0.06; // domes poke above the bar
+  const lampX = lightBar.widthM / 2 - 0.16;
+  const lampL = new BoxGeometry(0.32, lampH, lightBar.lengthM + 0.06);
+  lampL.translate(lampX, cabHeightM + lampH / 2, barZ); // +X = left
+  const lampR = new BoxGeometry(0.32, lampH, lightBar.lengthM + 0.06);
+  lampR.translate(-lampX, cabHeightM + lampH / 2, barZ);
+  const bodyGeometry =
+    mergeGeometries([whiteMerged, blueMerged, lampL, lampR], true) ?? whiteMerged;
   if (bodyGeometry !== whiteMerged) {
     whiteMerged.dispose();
     blueMerged.dispose();
+    lampL.dispose();
+    lampR.dispose();
   }
   const track = widthM / 2 - 0.2;
   const frontAxleZ = halfLength - 1.0;
   const rearAxleZ = -halfLength + 1.25;
   return {
     bodyGeometry,
-    bodyMaterials: bodyGeometry.groups.length === 2 ? [bodyMat, blueMat] : [bodyMat],
-    ownedMaterials: [bodyMat, blueMat],
+    bodyMaterials:
+      bodyGeometry.groups.length === 4
+        ? [bodyMat, blueMat, strobeLMat, strobeRMat]
+        : [bodyMat],
+    ownedMaterials: [bodyMat, blueMat, strobeLMat, strobeRMat],
+    strobe: { left: strobeLMat, right: strobeRMat, phase: -1 },
     paint: null, // no palette tint — white + blue IS the profile's identity
     customWheel: null, // shared fleet wheel, scaled to the 0.38 m hubs
     wheelOffsets: [
@@ -867,6 +920,11 @@ export interface ModelRig {
   /** Materials WE created (not from the drei cache) — disposed by
    *  disposeTrafficFleet. Today: the hero SUV's clearcoat paint clone. */
   ownedMaterials: Material[];
+  /** Emergency beacon strobe channel (emergency rig only): the two lamp-dome
+   *  materials updateEmergencyStrobe flips on the shared blink clock; `phase`
+   *  caches the last written state so a flip costs two color writes per edge.
+   *  Absent for every other model. */
+  strobe?: { left: MeshBasicMaterial; right: MeshBasicMaterial; phase: number };
   /** Split paint shell for per-instance palette tint (null: paint stays in
    *  the body merge — police livery / hero SUV). Material is OUR white clone. */
   paint: GeoSet | null;

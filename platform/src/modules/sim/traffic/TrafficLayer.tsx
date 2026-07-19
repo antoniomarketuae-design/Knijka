@@ -36,6 +36,13 @@
  * lesson supplies `hazard` — dormant until the A8 orchestrator flips
  * `hazardActiveRef` true.
  *
+ * JU-18 controller figure (doc 72 регулировчик): when `controllerFigure`
+ * supplies the runtime's schedule read model, the staged "directTraffic"
+ * officer is a LIVE rig — it faces the currently halted axis (chest/back =
+ * стоп, side profile = премини), raises an arm through the pre-flip
+ * „внимание" window and turns smoothly at the authored flip. One schedule
+ * read per frame into a reused record; the same clock the grading reads.
+ *
  * ADR-001: all vehicles are FICTIONAL — no real car-brand names anywhere.
  *
  * Draw-call budget stays flat in agent count: a fixed handful of instanced
@@ -80,6 +87,7 @@ import {
   disposeTrafficFleet,
   DRACO_DECODER_PATH,
   FLEET_URLS,
+  updateEmergencyStrobe,
 } from "./vehicleFleet";
 
 // Pedestrian palettes: tops (existing 4 variants) + trousers per variant.
@@ -117,8 +125,29 @@ const PED_SWING_FULL_SPEED_MPS = 1.1;
  *  raised nearly straight up, the стоп-сигнал gesture (VP-11 officer). */
 const PED_POSE_ARM_RAISE_RAD = 2.9;
 /** "directTraffic" pose (JU-18 регулировчик): the RIGHT arm held rotated 90°
- *  about the shoulder — extended horizontally along the facing direction. */
+ *  about the shoulder — extended horizontally along the facing direction.
+ *  LEGACY STATIC fallback only — with a `controllerFigure` channel wired the
+ *  officer runs the live OFC_* rig below instead. */
 const PED_POSE_ARM_EXTEND_RAD = Math.PI / 2;
+
+// JU-18 scheduled officer rig (doc 72 / ППЗДвП чл. 66 — the posture alphabet
+// the controller templates teach). Driven from the SAME schedule + clock the
+// stop-line adjudication grades (props.controllerFigure — never a second
+// clock): the figure FACES the currently halted axis — chest/back = стоп —
+// with BOTH arms out sideways, a wall across the halted path; the permitted
+// axis sees his side profile, the arm extended along its travel direction
+// (the wave-through). Through the last OFC_RAISE_LEAD_SEC before the authored
+// flip the right arm goes straight up — „внимание, сменям посоките", the
+// raised-arm phase both templates warn about — then the figure turns smoothly
+// (~1 s damp, no teleport) onto the new halted axis.
+const OFC_ARM_OUT_RAD = 1.47; // both-arms-out sideways raise (about local Z)
+/** „Внимание" window before the flip, s — sized to the recorded narrations:
+ *  the postures shadow's „ръката му се вдига" lands ≈ t 19 on the flip-30
+ *  drills (raise = 30 − 11), and the live drill's shadow crosses at ≈ t 13,
+ *  safely before its own raise at 26 − 11 = 15. */
+const OFC_RAISE_LEAD_SEC = 11;
+const OFC_TURN_RATE = 3.2; // whole-figure yaw damp toward the halted axis, 1/s
+const OFC_ARM_RATE = 4.2; // posture damp, 1/s
 
 // L5 hazard ball (doc 68 A5): bright, big enough to read at speed.
 const HAZARD_BALL_RADIUS_M = 0.36;
@@ -137,6 +166,7 @@ const BLINK_DUTY = 0.55; // fraction "on"
 
 const UP = new Vector3(0, 1, 0);
 const AXIS_X = new Vector3(1, 0, 0); // wheel spin axis (GLB wheels are X-axial)
+const AXIS_Z = new Vector3(0, 0, 1); // officer lateral arm-raise axis
 
 /** Shortest-signed angular difference a-b wrapped to (-pi, pi]. */
 function wrapPi(a: number): number {
@@ -259,6 +289,14 @@ function makeBlobTexture(): CanvasTexture {
   return new CanvasTexture(c);
 }
 
+/** Structural slice of the runtime's JU-18 read model (module boundary: the
+ *  presentation depends on the shape, not the runtime barrel — the same
+ *  pattern as the `runtime` prop). `signalControllerFigure` writes the posted
+ *  controller's live truth into `out` and returns false when none is posted. */
+export interface ControllerFigureRead {
+  signalControllerFigure(out: { halted: "ns" | "ew"; secToFlip: number }): boolean;
+}
+
 export interface TrafficLayerProps {
   system: TrafficSystem;
   /** When provided, the layer calls system.update each frame (drop-in mode). */
@@ -305,6 +343,16 @@ export interface TrafficLayerProps {
    *  clearcoat paint (doc 71 perf tiering — high only). Default true keeps the
    *  full look; LessonScene passes `level === "high"`. */
   clearcoat?: boolean;
+  /**
+   * JU-18 officer-figure schedule channel — pass the world runtime (its
+   * `signalControllerFigure` is the SAME schedule + clock the stop-line
+   * adjudication reads, so the figure never runs a second clock). With a
+   * controller posted, the staged "directTraffic" figure faces the LIVE
+   * halted axis (chest = стоп, profile = премини), raises the right arm
+   * through the pre-flip „внимание" window and turns smoothly at the flip.
+   * Omit = the legacy static pose and zero extra per-frame work.
+   */
+  controllerFigure?: ControllerFigureRead | null;
 }
 
 export function TrafficLayer({
@@ -320,6 +368,7 @@ export function TrafficLayer({
   hazard = null,
   hazardActiveRef,
   clearcoat = true,
+  controllerFigure = null,
 }: TrafficLayerProps) {
   const nVeh = system.vehicles.length;
   const nPed = system.pedestrians.length;
@@ -416,6 +465,13 @@ export function TrafficLayer({
     // Per-pedestrian deterministic body variation (id-hashed).
     pedHeight: Float32Array; // 0.90..1.12 height scale
     pedBuild: Float32Array; // 0.88..1.14 lateral build scale
+    // JU-18 scheduled officer rig ("directTraffic" + a posted schedule).
+    ofcSeeded: Uint8Array; // officer state initialised yet?
+    ofcYaw: Float32Array; // damped whole-figure facing
+    ofcArmLat: Float32Array; // nPed*2 — damped sideways arm raise (local Z)
+    ofcArmSag: Float32Array; // nPed*2 — damped sagittal arm raise (local X)
+    /** Reused out-record for the once-per-frame signalControllerFigure read. */
+    figure: { halted: "ns" | "ew"; secToFlip: number };
     // L5 hazard animation clock (seconds since hazardActiveRef went true).
     hazardT: number;
     // Reused rotation scratch.
@@ -424,6 +480,7 @@ export function TrafficLayer({
     qWheel: Quaternion;
     qFlat: Quaternion; // Rx(-90): lays a decal flat on the ground
     qBlob: Quaternion;
+    qLat: Quaternion; // officer lateral arm raise about local Z
     ctx: TrafficUpdateContext;
   }
   const scratchRef = useRef<Scratch | null>(null);
@@ -452,12 +509,18 @@ export function TrafficLayer({
       blinkClock: 0,
       pedHeight: new Float32Array(nPed),
       pedBuild: new Float32Array(nPed),
+      ofcSeeded: new Uint8Array(nPed),
+      ofcYaw: new Float32Array(nPed),
+      ofcArmLat: new Float32Array(nPed * 2),
+      ofcArmSag: new Float32Array(nPed * 2),
+      figure: { halted: "ns", secToFlip: Infinity },
       hazardT: 0,
       qYaw: new Quaternion(),
       qRoll: new Quaternion(),
       qWheel: new Quaternion(),
       qFlat,
       qBlob: new Quaternion(),
+      qLat: new Quaternion(),
       ctx: { signalPhase: () => "green", playerPos: null },
     };
     scratchRef.current = scratch;
@@ -597,6 +660,10 @@ export function TrafficLayer({
     const dtc = Math.min(dt, 0.1);
     scratch.blinkClock += dtc;
     const blinkOn = scratch.blinkClock % BLINK_PERIOD_S < BLINK_PERIOD_S * BLINK_DUTY;
+    // Emergency beacon strobe (VU-09): anti-phase blue lamp flip off the same
+    // clock — shared materials, two color writes per edge, no-op without an
+    // emergency actor (see vehicleFleet.updateEmergencyStrobe).
+    updateEmergencyStrobe(fleet, scratch.blinkClock);
     const yawT = 1 - Math.exp(-YAW_SMOOTH_RATE * dtc);
     const steerT = 1 - Math.exp(-STEER_SMOOTH_RATE * dtc);
 
@@ -801,6 +868,14 @@ export function TrafficLayer({
     const pedArm = pedArmRef.current;
     const pedLeg = pedLegRef.current;
     if (pedBlob && pedTorso && pedHead && pedArm && pedLeg) {
+      // JU-18: ONE schedule read per frame through the runtime channel (the
+      // reused out-record keeps the loop allocation-free). figOn false — no
+      // channel wired or no controller posted — renders every pose exactly
+      // as before.
+      const fig = scratch.figure;
+      const figOn = controllerFigure !== null && controllerFigure.signalControllerFigure(fig);
+      const ofcTurnT = 1 - Math.exp(-OFC_TURN_RATE * dtc);
+      const ofcArmT = 1 - Math.exp(-OFC_ARM_RATE * dtc);
       for (let i = 0; i < nPed; i++) {
         const p = system.pedestrians[i];
         const tx = p.x;
@@ -824,7 +899,34 @@ export function TrafficLayer({
         const hgt = scratch.pedHeight[i];
         const bld = scratch.pedBuild[i];
         const bob = p.speedMps > 0.01 ? Math.sin(p.walkPhase) * 0.04 : 0;
-        const yaw = Math.atan2(p.dirX, -p.dirY);
+        let yaw = Math.atan2(p.dirX, -p.dirY);
+        // JU-18 scheduled officer: re-aim the WHOLE figure at the axis the
+        // controller halts right now (chest-on = стоп; the permitted axis
+        // sees the profile). The published dir is the authored `facing` (the
+        // staged standing path), so: halted axis == facing axis → face it;
+        // otherwise face it rotated 90°. Damped — the flip is a smooth turn,
+        // never a teleport.
+        const officer = figOn && p.pose === "directTraffic";
+        const attention = officer && fig.secToFlip <= OFC_RAISE_LEAD_SEC;
+        if (officer) {
+          const facingNs = Math.abs(p.dirY) >= Math.abs(p.dirX);
+          const haltMatches = (fig.halted === "ns") === facingNs;
+          const hx = haltMatches ? p.dirX : p.dirY;
+          const hy = haltMatches ? p.dirY : -p.dirX;
+          const targetYaw = Math.atan2(hx, -hy);
+          if (!scratch.ofcSeeded[i]) {
+            // First sighting: land IN pose (no settle-in at session start).
+            scratch.ofcSeeded[i] = 1;
+            scratch.ofcYaw[i] = targetYaw;
+            scratch.ofcArmLat[i * 2] = attention ? 0 : OFC_ARM_OUT_RAD;
+            scratch.ofcArmLat[i * 2 + 1] = attention ? 0 : -OFC_ARM_OUT_RAD;
+            scratch.ofcArmSag[i * 2] = 0;
+            scratch.ofcArmSag[i * 2 + 1] = attention ? PED_POSE_ARM_RAISE_RAD : 0;
+          } else {
+            scratch.ofcYaw[i] += wrapPi(targetYaw - scratch.ofcYaw[i]) * ofcTurnT;
+          }
+          yaw = scratch.ofcYaw[i];
+        }
         const cos = Math.cos(yaw);
         const sin = Math.sin(yaw);
         // Counter-phase swing from the accumulated walk phase, damped to zero
@@ -859,15 +961,30 @@ export function TrafficLayer({
           const legX = sign * PED_HIP_HALF * bld;
           // Arm — the VP-11 "stopSignal" pose holds side 1 raised (the
           // стоп-сигнал gesture), the JU-18 "directTraffic" pose holds it
-          // extended horizontally; everything else swings with the walk.
-          const armRad =
-            p.pose === "stopSignal" && side === 1
-              ? PED_POSE_ARM_RAISE_RAD
-              : p.pose === "directTraffic" && side === 1
-                ? PED_POSE_ARM_EXTEND_RAD
-                : -sign * swing * PED_ARM_SWING_RAD;
-          scratch.qRoll.setFromAxisAngle(AXIS_X, armRad);
-          scratch.qWheel.copy(scratch.qYaw).multiply(scratch.qRoll);
+          // extended horizontally (static fallback — the scheduled officer
+          // branch below replaces it); everything else swings with the walk.
+          if (officer) {
+            // Live officer arms: both out sideways (the halt wall / the
+            // wave-through profile), except the „внимание" window — right
+            // arm straight up, left dropped. Damped per-side toward target.
+            const li = i * 2 + side;
+            const latTarget = attention ? 0 : sign * OFC_ARM_OUT_RAD;
+            const sagTarget = attention && side === 1 ? PED_POSE_ARM_RAISE_RAD : 0;
+            scratch.ofcArmLat[li] += (latTarget - scratch.ofcArmLat[li]) * ofcArmT;
+            scratch.ofcArmSag[li] += (sagTarget - scratch.ofcArmSag[li]) * ofcArmT;
+            scratch.qLat.setFromAxisAngle(AXIS_Z, scratch.ofcArmLat[li]);
+            scratch.qRoll.setFromAxisAngle(AXIS_X, scratch.ofcArmSag[li]);
+            scratch.qWheel.copy(scratch.qYaw).multiply(scratch.qLat).multiply(scratch.qRoll);
+          } else {
+            const armRad =
+              p.pose === "stopSignal" && side === 1
+                ? PED_POSE_ARM_RAISE_RAD
+                : p.pose === "directTraffic" && side === 1
+                  ? PED_POSE_ARM_EXTEND_RAD
+                  : -sign * swing * PED_ARM_SWING_RAD;
+            scratch.qRoll.setFromAxisAngle(AXIS_X, armRad);
+            scratch.qWheel.copy(scratch.qYaw).multiply(scratch.qRoll);
+          }
           dummy.quaternion.copy(scratch.qWheel);
           dummy.scale.set(bld, hgt, bld);
           dummy.position.set(

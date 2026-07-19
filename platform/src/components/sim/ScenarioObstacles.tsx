@@ -90,6 +90,15 @@ export interface ScenarioVehicleObstacle extends ObstaclePose {
   model?: string;
   /** Stable seed: paint palette pick (+ fallback model). Default: list index. */
   seed?: number;
+  /**
+   * HELD DRESSING: render the body through the same instanced parked pass but
+   * mount NO collider — the TrafficLayer curb-decoration convention (visible,
+   * not hittable). For drills whose collision consequence is authored in the
+   * trace channel (recorder ObstacleRect2D) / objective zones, a purely
+   * visual body must not add a crash surface the grading never authored
+   * (scenarioSceneryProps.ts). Absent = hittable (the S0 default).
+   */
+  visual?: boolean;
 }
 
 export type ScenarioPropKind = "cone" | "pole";
@@ -423,23 +432,27 @@ function ObstacleVehicles({
           polygonOffsetFactor={-2}
         />
       </primitive>
-      {resolved.map((r, i) => (
-        <RigidBody
-          key={`sc-veh-${i}`}
-          type="fixed"
-          colliders={false}
-          position={[r.spec.x, 0, -r.spec.y]}
-          rotation={[0, r.yawRad, 0]}
-          userData={r.tag}
-        >
-          <CuboidCollider
-            args={[r.dims.half.x, r.dims.half.y, r.dims.half.z]}
-            position={[0, r.dims.centerY, 0]}
-            friction={0.5}
-            restitution={0.05}
-          />
-        </RigidBody>
-      ))}
+      {resolved.map((r, i) =>
+        // `visual` dressing renders in the pass above but mounts NO body —
+        // its consequence channel (if any) is authored elsewhere.
+        r.spec.visual ? null : (
+          <RigidBody
+            key={`sc-veh-${i}`}
+            type="fixed"
+            colliders={false}
+            position={[r.spec.x, 0, -r.spec.y]}
+            rotation={[0, r.yawRad, 0]}
+            userData={r.tag}
+          >
+            <CuboidCollider
+              args={[r.dims.half.x, r.dims.half.y, r.dims.half.z]}
+              position={[0, r.dims.centerY, 0]}
+              friction={0.5}
+              restitution={0.05}
+            />
+          </RigidBody>
+        ),
+      )}
     </>
   );
 }

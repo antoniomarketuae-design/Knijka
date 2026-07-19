@@ -11,6 +11,7 @@
 //   - ambient city bed: very quiet murmur + slow distant-traffic swell (LFO),
 //   - NPC hum: one shared voice, gain follows the nearest traffic car,
 //   - rain patter + rhythmic wiper swish (flags in the update payload),
+//   - two-tone emergency siren, gain by distance to the active actor (VU-09),
 //   - indicator relay tick-tock, collision thump, seatbelt click.
 //
 // Autoplay policy: nothing is created until unlock() is called from a real
@@ -44,6 +45,15 @@ export const WIND_START_KMH = 40;
 export const WIND_FULL_KMH = 110;
 /** NPC proximity hum is inaudible beyond this distance (meters). */
 export const NPC_HEAR_M = 45;
+/** Emergency siren is inaudible beyond this distance (meters) — a two-tone
+ *  carries far past the engine hum; the player must HEAR the special-regime
+ *  vehicle before it fills the mirror (чл. 91 stimulus, VU-09). */
+export const SIREN_HEAR_M = 160;
+/** Two-tone siren notes (Hz) + per-note hold (s) — fictional two-tone in the
+ *  European hi-lo idiom, no real service's signature (ADR-001 discipline). */
+export const SIREN_LO_HZ = 435;
+export const SIREN_HI_HZ = 580;
+export const SIREN_TONE_S = 0.62;
 /** Full wiper cycle (out + back) in seconds — two swishes per cycle. */
 export const WIPER_PERIOD_S = 1.35;
 
@@ -75,6 +85,9 @@ export const LAYER_GAIN = {
   wiper: 0.05,
   /** Horn (A1) — deliberately the loudest voice; a horn must cut through. */
   horn: 0.12,
+  /** Emergency siren at point-blank range — second only to the horn; the
+   *  whole point of the layer is an unmissable yield stimulus. */
+  siren: 0.1,
 } as const;
 
 // --- Pure gain curves (unit-tested in simAudio.test.ts) ---------------------
@@ -116,6 +129,15 @@ export function npcHumLevel(nearestNpcM: number): number {
   if (!Number.isFinite(nearestNpcM) || nearestNpcM >= NPC_HEAR_M) return 0;
   const d = Math.max(nearestNpcM, 2);
   const x = 1 - d / NPC_HEAR_M;
+  return x * x;
+}
+
+/** Siren loudness 0..1 vs distance (m) — the npcHumLevel curve stretched to
+ *  SIREN_HEAR_M. Infinity/far ⇒ 0, ≤2 m ⇒ 1. */
+export function sirenLevel(sirenM: number): number {
+  if (!Number.isFinite(sirenM) || sirenM >= SIREN_HEAR_M) return 0;
+  const d = Math.max(sirenM, 2);
+  const x = 1 - d / SIREN_HEAR_M;
   return x * x;
 }
 
@@ -165,6 +187,9 @@ export interface EngineFrame {
   hornOn?: boolean;
   /** Meters to the nearest traffic vehicle (default Infinity ⇒ silent). */
   nearestNpcM?: number;
+  /** Meters to the nearest ACTIVE emergency actor — drives the two-tone
+   *  siren loop (default Infinity ⇒ silent). */
+  sirenM?: number;
 }
 
 /**
@@ -175,6 +200,7 @@ export interface EngineFrame {
 export interface SceneAudioEnv {
   rain?: boolean;
   nearestNpcM?: number;
+  sirenM?: number;
   wipersOn?: boolean;
   engineOn?: boolean;
 }
@@ -200,6 +226,9 @@ interface LayerNodes {
   wiperGain: GainNode;
   wiperFilter: BiquadFilterNode;
   hornGain: GainNode;
+  sirenGain: GainNode;
+  sirenOsc: OscillatorNode;
+  sirenOsc2: OscillatorNode;
 }
 
 export class SimAudio {
@@ -214,6 +243,8 @@ export class SimAudio {
   private enginePrimed = false;
   private lastUpdateT = 0;
   private wiperPhase = 0;
+  /** Two-tone siren note currently sounding (0 lo / 1 hi; -1 = silent). */
+  private sirenTone = -1;
   /** Post-ignition rev flare deadline (ctx time, seconds). */
   private flareUntil = 0;
   private env: SceneAudioEnv = {};
@@ -401,6 +432,32 @@ export class SimAudio {
     hornBp.connect(hornGain);
     hornGain.connect(master);
 
+    // --- Siren: two-tone „специален режим" loop (VU-09) — a fundamental
+    // triangle + a quiet octave shimmer through a bandpass so it wails
+    // instead of beeping. Both notes are retuned on the tone clock in
+    // update(); gain follows the emergency actor's distance.
+    const sirenGain = ctx.createGain();
+    sirenGain.gain.value = 0;
+    const sirenBp = ctx.createBiquadFilter();
+    sirenBp.type = "bandpass";
+    sirenBp.frequency.value = 950;
+    sirenBp.Q.value = 0.6;
+    const mkSirenOsc = (freq: number, g: number): OscillatorNode => {
+      const osc = ctx.createOscillator();
+      osc.type = "triangle";
+      osc.frequency.value = freq;
+      const og = ctx.createGain();
+      og.gain.value = g;
+      osc.connect(og);
+      og.connect(sirenBp);
+      osc.start();
+      return osc;
+    };
+    const sirenOsc = mkSirenOsc(SIREN_LO_HZ, 0.6);
+    const sirenOsc2 = mkSirenOsc(SIREN_LO_HZ * 2, 0.18);
+    sirenBp.connect(sirenGain);
+    sirenGain.connect(master);
+
     this.nodes = {
       master,
       engineGain,
@@ -419,6 +476,9 @@ export class SimAudio {
       wiperGain: wiper.gain,
       wiperFilter: wiper.filter,
       hornGain,
+      sirenGain,
+      sirenOsc,
+      sirenOsc2,
     };
 
     if (ctx.state === "suspended") void ctx.resume();
@@ -460,6 +520,7 @@ export class SimAudio {
     const engineOn = f.engineOn ?? this.env.engineOn ?? true;
     const hornOn = f.hornOn ?? false;
     const nearestNpcM = f.nearestNpcM ?? this.env.nearestNpcM ?? Infinity;
+    const sirenM = f.sirenM ?? this.env.sirenM ?? Infinity;
     const brake = f.brake ?? 0;
     const live = !f.paused;
     const v = Math.abs(f.speedKmh);
@@ -549,6 +610,23 @@ export class SimAudio {
 
     // --- Horn: fast attack, quick release — it must track the key. ----------
     n.hornGain.gain.setTargetAtTime(live && hornOn ? LAYER_GAIN.horn : 0, t, 0.015);
+
+    // --- Emergency siren: two-tone loop, volume by distance (чл. 91). -------
+    // The note flips on the ctx-time tone clock; retune only on the flip edge
+    // (one cached-int compare per frame, zero allocations).
+    const siren = sirenLevel(sirenM);
+    n.sirenGain.gain.setTargetAtTime(live ? LAYER_GAIN.siren * siren : 0, t, 0.12);
+    if (live && siren > 0) {
+      const tone = Math.floor(t / SIREN_TONE_S) & 1;
+      if (tone !== this.sirenTone) {
+        this.sirenTone = tone;
+        const hz = tone === 0 ? SIREN_LO_HZ : SIREN_HI_HZ;
+        n.sirenOsc.frequency.setTargetAtTime(hz, t, 0.02);
+        n.sirenOsc2.frequency.setTargetAtTime(hz * 2, t, 0.02);
+      }
+    } else {
+      this.sirenTone = -1; // re-arm the note clock for the next approach
+    }
 
     // Indicator relay: tick on lamp-on edge, lower tock on lamp-off edge.
     if (!f.paused && f.indicatorActive && f.blinkOn !== this.lastBlinkOn) {

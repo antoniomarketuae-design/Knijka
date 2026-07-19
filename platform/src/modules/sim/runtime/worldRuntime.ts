@@ -27,6 +27,7 @@ import { DistrictIndex, makeEdgeHit, OFF_ROAD_DISTANCE_M } from "./spatial";
 import { bearingDeg, signedDeltaDeg } from "./geometry";
 import {
   SignalController,
+  type ControllerFigureState,
   type SignalClusterInfo,
   type SignalClusterMode,
   type SignalControllerSchedule,
@@ -72,6 +73,11 @@ const WRONG_WAY_ANGLE_DEG = 120;
  * band (teleport/spawn) is structurally innocent. Exported for tests.
  */
 export const RAIL_APPROACH_M = 30;
+
+/** railBarrierDownAt nearest-match radius: the arm prop stands ~3 m before
+ *  the band + the curb offset (~9 m lateral); crossings on distinct maps sit
+ *  hundreds of meters apart, so 60 m is unambiguous and forgiving. */
+const RAIL_BARRIER_MATCH_M = 60;
 
 /** Radius around a junction to look for conflicting priority traffic, meters.
  * Junction catchments grew with the perceptual road scale (mouths now sit
@@ -481,6 +487,16 @@ export interface DistrictWorldRuntime extends WorldRuntime {
    */
   setSignalClusterController(signalNodeId: string, schedule: SignalControllerSchedule | null): void;
   /**
+   * JU-18 officer-FIGURE read model (render seam, doc 72 регулировчик): the
+   * posted controller's live truth — which axis he halts right now + seconds
+   * to the single authored flip — written into `out` (the caller reuses one
+   * record; the frame loop must not allocate). Same schedule + same clock the
+   * stop-line adjudication reads (controllerPermission), so the posed figure
+   * can never disagree with the grading. Returns false when no controller is
+   * posted anywhere (out untouched). Nothing grades this.
+   */
+  signalControllerFigure(out: ControllerFigureState): boolean;
+  /**
    * Arm the lesson's approach-relative SIGNAL PLAN (LessonSpec.signalPlan —
    * founder bug 2026-07-17: wall-clock phases made the arrival phase
    * arbitrary after a 20–40 s pre-drive). A ONE-SHOT pin: the first sample()
@@ -522,6 +538,17 @@ export interface DistrictWorldRuntime extends WorldRuntime {
   pushCollision(withWhat: CollisionWith): void;
   /** Phase a driver approaching `signalNodeId` on `bearingDeg` sees (renderer helper). */
   signalPhaseForApproach(signalNodeId: string, bearingDeg: number): SignalPhase;
+  /**
+   * Rail-barrier ARM state for the guarded crossing nearest (x, y) (district
+   * meters — the world prop's own position): true = down/barred. Read-only
+   * render seam (the animated arm), evaluated from the SAME validated
+   * timetable sample() grades, at the LAST GRADED clock (the tSec of the most
+   * recent sample()) — the renderer never runs a second clock, so the arm and
+   * tick.railBarred can never disagree. No guarded crossing within the match
+   * radius, or guarded without a valid timetable (never barred = open,
+   * innocent, A12) = false (up).
+   */
+  railBarrierDownAt(x: number, y: number): boolean;
   readonly district: District;
   /** Introspection for tests/devtools. */
   debugStopLines(): readonly StopLine[];
@@ -592,6 +619,17 @@ export function createWorldRuntime(districtJson: District | unknown): DistrictWo
     advisoryKmh: number;
   }
   const banZonesByEdge = new Map<number, ZoneSpan[]>();
+  // Render seam (railBarrierDownAt): one entry per GUARDED railCrossing span,
+  // at the band start (the zoneSigns arm stands 3 m before it + the curb
+  // offset — the nearest-match radius covers both). cycleSec 0 = guarded but
+  // never barred (invalid/absent timetable) — the arm renders UP (open, A12).
+  const railBarrierProps: {
+    x: number;
+    y: number;
+    cycleSec: number;
+    downFromSec: number;
+    downToSec: number;
+  }[] = [];
   for (const z of district.zones ?? []) {
     if (!KNOWN_ZONE_KINDS.has(z.kind)) continue;
     if (!(Number.isFinite(z.fromM) && Number.isFinite(z.toM) && z.fromM < z.toM)) continue;
@@ -633,6 +671,20 @@ export function createWorldRuntime(districtJson: District | unknown): DistrictWo
         : null,
       advisoryKmh: z.kind === "curveAdvisory" ? (z.advisoryKmh as number) : 0,
     });
+    if (guarded) {
+      const [bx, by] = index.pointAt(host.idx, z.fromM);
+      railBarrierProps.push(
+        barrierValid
+          ? {
+              x: bx,
+              y: by,
+              cycleSec: b.cycleSec,
+              downFromSec: b.downFromSec,
+              downToSec: b.downToSec,
+            }
+          : { x: bx, y: by, cycleSec: 0, downFromSec: 0, downToSec: 0 },
+      );
+    }
   }
 
   // Uncontrolled (right-hand-rule) junctions: real junctions (degree >= 3) that
@@ -905,6 +957,10 @@ export function createWorldRuntime(districtJson: District | unknown): DistrictWo
     }
   }
 
+  // The last clock sample() graded with — railBarrierDownAt evaluates the
+  // barrier timetable at exactly this time (render/grading lockstep).
+  let lastSampleTSec = 0;
+
   const runtime: DistrictWorldRuntime = {
     district,
 
@@ -921,6 +977,7 @@ export function createWorldRuntime(districtJson: District | unknown): DistrictWo
       fog = false,
       snow = false,
     ): SimTick {
+      lastSampleTSec = tSec; // the barrier prop reads THIS clock (see getter)
       const events: SimTickEvent[] = [];
 
       // 1. Collisions reported by physics since the last tick.
@@ -1777,6 +1834,26 @@ export function createWorldRuntime(districtJson: District | unknown): DistrictWo
       return signals.phaseForApproach(signalNodeId, bearingDeg);
     },
 
+    railBarrierDownAt(x: number, y: number): boolean {
+      let best = -1;
+      let bestD2 = RAIL_BARRIER_MATCH_M * RAIL_BARRIER_MATCH_M;
+      for (let i = 0; i < railBarrierProps.length; i++) {
+        const p = railBarrierProps[i];
+        const dx = p.x - x;
+        const dy = p.y - y;
+        const d2 = dx * dx + dy * dy;
+        if (d2 < bestD2) {
+          bestD2 = d2;
+          best = i;
+        }
+      }
+      if (best < 0) return false; // no guarded crossing near = nothing barred
+      const p = railBarrierProps[best];
+      if (p.cycleSec <= 0) return false; // guarded-but-never-barred = open (A12)
+      const cyclePos = lastSampleTSec % p.cycleSec;
+      return cyclePos >= p.downFromSec && cyclePos < p.downToSec;
+    },
+
     signalPhaseInfo(signalNodeId: string, approachBearingDeg?: number): SignalPhaseInfo {
       return signals.phaseInfo(signalNodeId, approachBearingDeg);
     },
@@ -1794,6 +1871,10 @@ export function createWorldRuntime(districtJson: District | unknown): DistrictWo
       schedule: SignalControllerSchedule | null,
     ): void {
       signals.setClusterController(signalNodeId, schedule);
+    },
+
+    signalControllerFigure(out: ControllerFigureState): boolean {
+      return signals.figureState(out);
     },
 
     signalOffsetForPhaseStart(

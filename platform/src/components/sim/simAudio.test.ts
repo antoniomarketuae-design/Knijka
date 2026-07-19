@@ -1,12 +1,17 @@
 import { describe, expect, it } from "vitest";
 import {
   IDLE_RPM,
+  SIREN_HEAR_M,
+  SIREN_HI_HZ,
+  SIREN_LO_HZ,
+  SIREN_TONE_S,
   TOP_RPM,
   TYRE_LP_MAX_HZ,
   TYRE_LP_MIN_HZ,
   brakeHissLevel,
   npcHumLevel,
   rpmTarget,
+  sirenLevel,
   tyreCutoffHz,
   tyreLevel,
   windLevel,
@@ -95,6 +100,31 @@ describe("npcHumLevel", () => {
   it("clamps point-blank distances (leadGap can hit 0)", () => {
     expect(npcHumLevel(0)).toBe(npcHumLevel(2));
     expect(npcHumLevel(0)).toBeLessThanOrEqual(1);
+  });
+});
+
+describe("sirenLevel (VU-09 emergency stimulus)", () => {
+  it("is silent with no active emergency actor (Infinity) or beyond earshot", () => {
+    expect(sirenLevel(Infinity)).toBe(0);
+    expect(sirenLevel(SIREN_HEAR_M)).toBe(0);
+    expect(sirenLevel(1000)).toBe(0);
+  });
+
+  it("carries much further than the NPC hum and rises as the actor closes", () => {
+    expect(sirenLevel(120)).toBeGreaterThan(0); // audible before the mirror fills
+    expect(sirenLevel(60)).toBeGreaterThan(sirenLevel(120));
+    expect(sirenLevel(15)).toBeGreaterThan(sirenLevel(60));
+    expect(npcHumLevel(120)).toBe(0); // the hum is long gone out here
+  });
+
+  it("clamps point-blank distances", () => {
+    expect(sirenLevel(0)).toBe(sirenLevel(2));
+    expect(sirenLevel(0)).toBeLessThanOrEqual(1);
+  });
+
+  it("two-tone constants are a genuine hi-lo pair", () => {
+    expect(SIREN_HI_HZ).toBeGreaterThan(SIREN_LO_HZ);
+    expect(SIREN_TONE_S).toBeGreaterThan(0);
   });
 });
 

@@ -83,6 +83,18 @@ export interface SignalControllerSchedule {
   flipAtSec?: number;
 }
 
+/**
+ * Mutable out-record for `SignalController.figureState` (the JU-18 officer
+ * FIGURE's render channel). The caller owns and reuses ONE instance — the
+ * presentation frame loop must not allocate. `halted` is the axis-group the
+ * posted controller currently halts; `secToFlip` counts down to the single
+ * authored flip (Infinity when none lies ahead).
+ */
+export interface ControllerFigureState {
+  halted: Axis;
+  secToFlip: number;
+}
+
 interface SignalNode {
   id: string;
   x: number;
@@ -406,6 +418,33 @@ export class SignalController {
         : "ns"
       : schedule.haltedGroup;
     return group === halted ? "halt" : "proceed";
+  }
+
+  /**
+   * JU-18 render read model: the FIRST posted controller's live figure truth,
+   * written into `out` — which axis he halts RIGHT NOW (post-flip aware) and
+   * how long until the authored flip. Derived from the SAME schedule and the
+   * SAME clock controllerPermission adjudicates with, so the posed officer
+   * can never disagree with the grading. Returns false when no cluster is
+   * "controlled" with a schedule posted (`out` untouched). At most one
+   * controller is ever posted today (the staged trafficController dial);
+   * cluster order keeps a hypothetical second deterministic.
+   */
+  figureState(out: ControllerFigureState): boolean {
+    for (let i = 0; i < this.controllers.length; i++) {
+      const schedule = this.controllers[i];
+      if (schedule == null || this.modes[i] !== "controlled") continue;
+      const flipAt = schedule.flipAtSec;
+      const flipped = flipAt !== undefined && this.tSec >= flipAt;
+      out.halted = flipped
+        ? schedule.haltedGroup === "ns"
+          ? "ew"
+          : "ns"
+        : schedule.haltedGroup;
+      out.secToFlip = flipAt !== undefined && !flipped ? flipAt - this.tSec : Infinity;
+      return true;
+    }
+    return false;
   }
 
   /**
