@@ -45,9 +45,10 @@ import {
   GRAVITY,
   SPAWN,
   CHASE_FOV,
-  DEFAULT_DIFFICULTY,
   DIFFICULTY_ORDER,
   DIFFICULTY_PRESETS,
+  loadDifficulty,
+  storeDifficulty,
   SNOW_GRIP_FACTOR,
   WET_GRIP_FACTOR,
   type DifficultyMode,
@@ -681,11 +682,22 @@ function ReadyScene({
   const audioRef = useRef<SimAudio | null>(null);
   const sampleRef = useRef<VehicleSample>(createVehicleSample());
   const [cockpit, setCockpit] = useState(true);
-  const [difficulty, setDifficulty] = useState<DifficultyMode>(DEFAULT_DIFFICULTY);
-  const difficultyRef = useRef<DifficultyMode>(DEFAULT_DIFFICULTY);
+  // Difficulty: an explicit selector click is authoritative (persisted);
+  // otherwise DEFAULT_DIFFICULTY — "normal" since the 2026-07-19 founder
+  // ruling (beginner's 40 km/h governor made speeding mistakes impossible to
+  // commit, see vehicle/difficulty.ts). Lazy init is safe: SceneSlot mounts
+  // this scene with ssr:false, so localStorage exists on first render.
+  const [difficulty, setDifficultyState] = useState<DifficultyMode>(loadDifficulty);
+  const difficultyRef = useRef<DifficultyMode>(difficulty);
   useEffect(() => {
     difficultyRef.current = difficulty;
   }, [difficulty]);
+  // Selector click path ONLY — never called with the default (the storage
+  // contract: absent key = no explicit choice, follows future default flips).
+  const setDifficulty = useCallback((mode: DifficultyMode) => {
+    setDifficultyState(mode);
+    storeDifficulty(mode);
+  }, []);
 
   // P1 touch layer: capability decides the overlay mount (touch laptops
   // included — the overlay auto-hides while the keyboard is in use, so

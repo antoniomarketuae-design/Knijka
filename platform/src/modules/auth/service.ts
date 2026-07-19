@@ -50,7 +50,9 @@ export async function registerUser(input: unknown): Promise<RegisterResult> {
       },
       select: { id: true, email: true, name: true },
     });
-    return { ok: true, user };
+    // Self-registration always creates a plain student (role defaults in the
+    // schema); admin is granted only by seed/ops, never through this path.
+    return { ok: true, user: { ...user, isAdmin: false } };
   } catch (err) {
     if (
       err instanceof Prisma.PrismaClientKnownRequestError &&
@@ -75,7 +77,7 @@ export async function verifyCredentials(
 
   const user = await db.user.findUnique({
     where: { email: normalizedEmail },
-    select: { id: true, email: true, name: true, passwordHash: true },
+    select: { id: true, email: true, name: true, passwordHash: true, role: true },
   });
 
   if (!user?.passwordHash) {
@@ -86,5 +88,10 @@ export async function verifyCredentials(
   const passwordOk = await compare(password, user.passwordHash);
   if (!passwordOk) return null;
 
-  return { id: user.id, email: user.email, name: user.name };
+  return {
+    id: user.id,
+    email: user.email,
+    name: user.name,
+    isAdmin: user.role === "admin",
+  };
 }

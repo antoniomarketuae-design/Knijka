@@ -17,6 +17,7 @@ model User {
   passwordHash String?
   birthYear    Int?
   locale       String    @default("bg")
+  role         String    @default("student") // student | admin — internal access flag, not PII (GDPR-neutral)
   consentAt    DateTime?
   createdAt    DateTime  @default(now())
 

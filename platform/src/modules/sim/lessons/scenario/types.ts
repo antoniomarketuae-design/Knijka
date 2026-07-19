@@ -90,7 +90,7 @@ export const MAP_ARCHETYPES: readonly MapArchetype[] = [
 export type ScenarioLevel = 1 | 2 | 3 | 4 | 5;
 
 export const SCENARIO_LEVEL_NAMES_BG: Record<ScenarioLevel, string> = {
-  1: "Воден опит",
+  1: "Пълна помощ",
   2: "Частична помощ",
   3: "Самостоятелно",
   4: "Изпитни условия",

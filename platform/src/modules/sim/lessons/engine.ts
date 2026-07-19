@@ -270,7 +270,7 @@ export function applyTick(prev: LessonSessionState, tick: SimTick): LessonStepRe
   // A13: exam sessions bypass the whole teach-first layer — see coach.ts.
   const examMode = prev.lesson.examMode === true;
   const coachOpts = examMode ? { examMode: true } : undefined;
-  // S1 pauseOnError (doc 76 §7 L1 „Воден опит"): in a guided scenario drill
+  // S1 pauseOnError (doc 76 §7 L1 „Пълна помощ"): in a guided scenario drill
   // EVERY graded violation ALSO freezes into a teach card — including codes
   // the coach normally only toasts (опасна/terminating like COLLISION: at
   // walking speed in a parking lot the freeze IS the lesson, unlike street

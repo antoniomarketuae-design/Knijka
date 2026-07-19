@@ -60,7 +60,7 @@ exports[`compileScenario — sc-park-perp-rev > golden compile snapshot per leve
   "spawn": {
     "pointId": "lot-spawn-approach",
   },
-  "titleBg": "Перпендикулярно паркиране на заден ход · Ниво 1 — Воден опит",
+  "titleBg": "Перпендикулярно паркиране на заден ход · Ниво 1 — Пълна помощ",
   "traffic": {
     "anchorRadiusM": 400,
     "pedestrianCount": 0,

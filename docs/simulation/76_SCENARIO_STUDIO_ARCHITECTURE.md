@@ -184,7 +184,7 @@ feed mastery/XP via the shipped A14 path.
 ## 7. Difficulty levels (mapped to existing machinery)
 | Level | Name | Aids | Machinery |
 |---|---|---|---|
-| L1 | Воден опит | Shadow ON + follow-hints + pause-on-error | teach-first coach, Instruction mode |
+| L1 | Пълна помощ | Shadow ON + follow-hints + pause-on-error | teach-first coach, Instruction mode |
 | L2 | Частична помощ | Path ribbon only, hints after idle | Practice mode patterns |
 | L3 | Самостоятелно | No aids, normal grading | standard lesson grading |
 | L4 | Изпитни условия | Coach OFF, official protocol | examMode (exists) |

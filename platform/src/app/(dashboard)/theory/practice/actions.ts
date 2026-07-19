@@ -46,8 +46,11 @@ export async function submitPracticeAnswer(
   }
 
   // Free tier: 20 practice questions per Sofia day; packs lift the limit.
-  const quota = await checkPracticeQuota(user.id);
-  if (!quota.allowed) redirect("/pricing?status=quota");
+  // Admins (role from the SERVER session) are never quota-gated.
+  if (!user.isAdmin) {
+    const quota = await checkPracticeQuota(user.id);
+    if (!quota.allowed) redirect("/pricing?status=quota");
+  }
 
   const result = await submitAnswer(
     user.id,

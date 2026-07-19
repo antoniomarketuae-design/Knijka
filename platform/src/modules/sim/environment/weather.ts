@@ -22,10 +22,10 @@
 //   snowIntensity — how heavy the SNOW weather is *right now* (doc 72 AC-08
 //                   winter grip). Drives a LIGHTER, colder fog-like haze than
 //                   the fog bank (snowfall veils the distance, it does not
-//                   blind), a milder rig dim and a cold SkyDome wash. Like
-//                   fog, snow does NOT wet the road (an honest scope cut —
-//                   white ground cover is asset work; the winter story is
-//                   carried by the haze, the copy and the snow-grip physics).
+//                   blind), a milder rig dim, a cold SkyDome wash, the
+//                   SnowFlakes fall opacity and the cold ground-bounce
+//                   whitening (SNOW_GROUND_WHITEN). Like fog, snow does NOT
+//                   wet the road (white ground textures remain asset work).
 
 import { useSyncExternalStore } from "react";
 

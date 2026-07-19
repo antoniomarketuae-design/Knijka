@@ -34,9 +34,10 @@ export default async function PracticePage({ searchParams }: PracticePageProps) 
 
   // Free tier is visible BEFORE it bites: the counter renders over the
   // session, and a spent quota shows an inline paywall card here instead of
-  // the mid-session hard redirect from the submit action.
-  const quota = await checkPracticeQuota(user.id);
-  if (!quota.unlimited && quota.remainingToday === 0) {
+  // the mid-session hard redirect from the submit action. Admins (server
+  // session role) skip the quota entirely — no counter, no paywall.
+  const quota = user.isAdmin ? null : await checkPracticeQuota(user.id);
+  if (quota !== null && !quota.unlimited && quota.remainingToday === 0) {
     return <QuotaExhausted limit={quota.limit} />;
   }
 
@@ -111,7 +112,7 @@ export default async function PracticePage({ searchParams }: PracticePageProps) 
           key={crypto.randomUUID()}
           questions={questions}
           quota={
-            quota.unlimited
+            quota === null || quota.unlimited
               ? null
               : {
                   usedToday: quota.limit - quota.remainingToday,

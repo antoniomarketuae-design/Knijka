@@ -208,7 +208,7 @@ export const SC_PARK_PERP_REV: ScenarioSpec = {
   levels: [
     {
       level: 1,
-      // Воден опит: widest tolerances + the full aid set (ladder default).
+      // Пълна помощ: widest tolerances + the full aid set (ladder default).
       toleranceScale: 1.5,
     },
     {

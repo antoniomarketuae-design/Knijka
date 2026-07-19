@@ -53,6 +53,10 @@ export {
   DIFFICULTY_PRESETS,
   DIFFICULTY_ORDER,
   DEFAULT_DIFFICULTY,
+  DIFFICULTY_STORAGE_KEY,
+  parseDifficultyMode,
+  loadDifficulty,
+  storeDifficulty,
   // S0 low-speed maneuvering bands (parking envelope, doc 76 §0/§12).
   CREEP_CAP_FULL_KMH,
   CREEP_CAP_END_KMH,

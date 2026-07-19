@@ -449,12 +449,18 @@ export interface StagedActorPathSpec {
    * (doc 72 §12 RX-04/RX-05, ADR-006 stage 3b) the articulated two-segment
    * tram rig — a tram actor is path-locked like every staged vehicle; its
    * authored polyline IS the tram track (street-running rails share the
-   * traffic lane; no separate rail physics exists, honestly); absent =
+   * traffic lane; no separate rail physics exists, honestly); "cyclist" /
+   * "childCyclist" render the procedural bicycle + rider rigs (adult / child
+   * size). Cyclist actors normally need NOT author this: the
+   * CyclistRightHookRunner defaults its actor's render profile to "cyclist"
+   * at stage time (runtime only — compiled specs are untouched); author it
+   * explicitly only when another runner stages the rider (the child-cyclist
+   * cut-in) or the child size is wanted. Absent =
    * "car" (the deterministic fleet pick — byte-identical pre-profile
    * behavior). Visual + data only: the leadGap/conflict queries stay
    * point-based (ADR-001: rigs fictional).
    */
-  profile?: "car" | "van" | "truck" | "emergency" | "tram";
+  profile?: "car" | "van" | "truck" | "emergency" | "tram" | "cyclist" | "childCyclist";
 }
 
 export type StagedEventKind =

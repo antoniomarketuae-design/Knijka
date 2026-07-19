@@ -59,6 +59,7 @@ import {
   type BufferGeometry,
   Color,
   type ColorRepresentation,
+  CylinderGeometry,
   DynamicDrawUsage,
   Group,
   InstancedMesh,
@@ -67,6 +68,7 @@ import {
   MeshPhysicalMaterial,
   MeshStandardMaterial,
   type Object3D,
+  SphereGeometry,
   Vector3,
 } from "three";
 import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
@@ -125,6 +127,11 @@ export const EMERGENCY_MODEL_INDEX = FLEET.length + 1;
 /** Model slot of the procedural articulated tram rig (doc 72 RX-04/RX-05,
  *  ADR-006 stage 3b) — after the emergency rig. */
 export const TRAM_MODEL_INDEX = FLEET.length + 2;
+/** Model slot of the procedural ADULT bicycle + rider rig (audit C3's render
+ *  half — the VU-01/02 cyclist proxy finally looks like a bicycle). */
+export const CYCLIST_MODEL_INDEX = FLEET.length + 3;
+/** Model slot of the CHILD bicycle + rider rig (VU-03 „дете с колело"). */
+export const CHILD_CYCLIST_MODEL_INDEX = FLEET.length + 4;
 const VAN_MODEL_INDEX = FLEET.indexOf("kargo_v");
 
 /** Box-truck body plan, meters (fictional): ~7.5 × 2.4 × 3.1 — longer, wider
@@ -148,6 +155,8 @@ export function modelForVehicle(v: Pick<TrafficVehicleState, "id" | "profile">):
   if (v.profile === "truck") return TRUCK_MODEL_INDEX;
   if (v.profile === "emergency") return EMERGENCY_MODEL_INDEX;
   if (v.profile === "tram") return TRAM_MODEL_INDEX;
+  if (v.profile === "cyclist") return CYCLIST_MODEL_INDEX;
+  if (v.profile === "childCyclist") return CHILD_CYCLIST_MODEL_INDEX;
   if (v.profile === "van") return VAN_MODEL_INDEX;
   return assignModel(v.id);
 }
@@ -156,6 +165,8 @@ export function modelForVehicle(v: Pick<TrafficVehicleState, "id" | "profile">):
 function modelName(m: number): string {
   if (m === EMERGENCY_MODEL_INDEX) return "emergency";
   if (m === TRAM_MODEL_INDEX) return "tram";
+  if (m === CYCLIST_MODEL_INDEX) return "cyclist";
+  if (m === CHILD_CYCLIST_MODEL_INDEX) return "cyclist_child";
   return FLEET[m] ?? "box_truck";
 }
 
@@ -428,6 +439,186 @@ function buildTramRig(): ModelRig {
     halfLength,
     lampY: 0.9,
     headY: 0.8,
+  };
+}
+
+/** Bicycle body plan, meters (fictional, ADR-001): a ~1.7 m city bike + a
+ *  seated rider whose helmet tops out ~1.7 m — visibly NARROW and TALL next
+ *  to every car, which is the entire perceptual point of VU-01/02/03. The
+ *  child variant scales the whole plan by CHILD_CYCLIST_SCALE with a
+ *  proportionally LARGER head/helmet and an upright posture — the two
+ *  strongest silhouette cues for „child". */
+export const BICYCLE_DIMENSIONS = {
+  wheelRadiusM: 0.34,
+  /** Front/rear hub distance from the bottom-bracket origin, m. */
+  hubZM: 0.53,
+  /** halfLength = hubZM + wheelRadiusM (the wheels ARE the footprint). */
+  halfLengthM: 0.87,
+  /** halfWidth = the handlebar half-span. */
+  halfWidthM: 0.23,
+} as const;
+/** Uniform body-plan scale of the child rig (≈ a 7-year-old's 16" bike). */
+export const CHILD_CYCLIST_SCALE = 0.72;
+
+/**
+ * The procedural BICYCLE + RIDER ModelRig (audit C3's missing render half —
+ * doc 72 §7 VU-01/02/03: the „cyclist" proxy used to render with the CAR
+ * fleet, which is exactly the founder-reported bug „казва дете с колело, а
+ * отпред кара кола"). Three merged material groups: frame kit (tubes, bars,
+ * saddle, pedals, helmet), rider clothes (torso, arms, legs) and skin (head).
+ * The two REAL wheels ride the custom-wheel channel so they spin from
+ * speed·dt/r and the front one steers: cwL carries the visible wheel at the
+ * front/rear hubs; cwR (the mechanism is side-paired for the hero SUV) gets a
+ * 1 cm placeholder box hidden INSIDE the hub — same slots, nothing drawn.
+ * Ground-relative like the GLB kit (Y = 0 = tarmac, nose +Z); rider is STATIC
+ * (honest v1 — pedalling legs are a TrafficLayer polish pass, the pedestrian
+ * swing machinery does not reach instanced vehicle bodies today). Entirely
+ * fictional (ADR-001 — no brands, no insignia); all geometry + materials are
+ * OWNED (disposed via ownedMaterials/geometry).
+ */
+function buildBicycleRig(child: boolean): ModelRig {
+  const s = child ? CHILD_CYCLIST_SCALE : 1;
+  /** Child heads read big for the body — scaled ON TOP of the body scale. */
+  const headScale = (child ? 1.18 : 1) * s;
+  /** Torso lean: adult commuter tips forward, a child sits upright. */
+  const lean = child ? 0.2 : 0.42;
+  const r = BICYCLE_DIMENSIONS.wheelRadiusM * s;
+  const hubZ = BICYCLE_DIMENSIONS.hubZM * s;
+  const halfLength = BICYCLE_DIMENSIONS.halfLengthM * s;
+  const halfWidth = BICYCLE_DIMENSIONS.halfWidthM * s;
+
+  const frameMat = new MeshStandardMaterial({
+    // Fictional liveries: brick-red adult frame, bright-green child frame.
+    color: child ? 0x2e8a5f : 0x8a3a2e,
+    metalness: 0.45,
+    roughness: 0.4,
+    envMapIntensity: 1.35,
+  });
+  frameMat.name = child ? "bike_frame_child" : "bike_frame";
+  const clothesMat = new MeshStandardMaterial({
+    // The child wears hi-vis orange — the silhouette the drill is ABOUT.
+    color: child ? 0xd97a1f : 0x4f6d8a,
+    metalness: 0.05,
+    roughness: 0.85,
+  });
+  clothesMat.name = "bike_rider";
+  const skinMat = new MeshStandardMaterial({
+    color: 0xc9a184, // the pedestrian head tone (one skin, one palette)
+    metalness: 0.0,
+    roughness: 0.85,
+  });
+  skinMat.name = "bike_skin";
+
+  /** Slanted strut: Box(w, len, w) rotated about X, centered at (x, y, z). */
+  const strut = (w: number, len: number, rotX: number, x: number, y: number, z: number) => {
+    const g = new BoxGeometry(w * s, len * s, w * s);
+    if (rotX !== 0) g.rotateX(rotX);
+    g.translate(x * s, y * s, z * s);
+    return g;
+  };
+  const box = (
+    sx: number,
+    sy: number,
+    sz: number,
+    x: number,
+    y: number,
+    z: number,
+    rotX = 0,
+  ) => {
+    const g = new BoxGeometry(sx * s, sy * s, sz * s);
+    if (rotX !== 0) g.rotateX(rotX);
+    g.translate(x * s, y * s, z * s);
+    return g;
+  };
+
+  // Frame kit (frame material): fork, down tube, seat tube, chainstay, top
+  // tube, handlebar, saddle, crank + two pedals (fixed crank pose), helmet.
+  const helmet = new SphereGeometry(0.125 * headScale, 8, 6, 0, Math.PI * 2, 0, Math.PI / 2);
+  helmet.translate(0, 1.57 * s, 0.06 * s);
+  const frameParts = [
+    strut(0.05, 0.68, 0.165, 0, 0.67, 0.475), // head tube + fork
+    strut(0.06, 0.74, 0.65, 0, 0.655, 0.175), // down tube
+    strut(0.06, 0.57, -0.305, 0, 0.63, -0.135), // seat tube + post
+    box(0.05, 0.05, 0.5, 0, 0.35, -0.29), // chainstay
+    box(0.05, 0.05, 0.62, 0, 0.93, 0.09), // top tube
+    box(0.46, 0.04, 0.04, 0, 1.02, 0.42), // handlebar
+    box(0.09, 0.05, 0.26, 0, 0.92, -0.22), // saddle
+    box(0.24, 0.05, 0.05, 0, 0.36, -0.05), // crank axle
+    box(0.1, 0.03, 0.09, 0.15, 0.28, 0.07), // left pedal (forward-low)
+    box(0.1, 0.03, 0.09, -0.15, 0.44, -0.17), // right pedal (back-high)
+    helmet,
+  ];
+  const frameMerged = mergeGeometries(frameParts, false) ?? frameParts[0];
+  if (frameMerged !== frameParts[0]) for (const g of frameParts) g.dispose();
+
+  // Rider clothes: two legs astride the frame (feet on the fixed pedals),
+  // forward-leaning torso, two arms reaching the handlebar.
+  const clothesParts = [
+    box(0.1, 0.6, 0.13, 0.1, 0.56, -0.06, 0.3), // left leg (extended)
+    box(0.1, 0.46, 0.13, -0.1, 0.64, -0.17, -0.15), // right leg (bent)
+    box(0.32, 0.56, 0.2, 0, 1.16, -0.04, lean), // torso
+    box(0.07, 0.5, 0.07, 0.155, 1.2, 0.2, 2.33), // left arm to the bar
+    box(0.07, 0.5, 0.07, -0.155, 1.2, 0.2, 2.33), // right arm to the bar
+  ];
+  const clothesMerged = mergeGeometries(clothesParts, false) ?? clothesParts[0];
+  if (clothesMerged !== clothesParts[0]) for (const g of clothesParts) g.dispose();
+
+  const head = new SphereGeometry(0.11 * headScale, 8, 6);
+  head.translate(0, 1.52 * s, 0.06 * s);
+
+  const bodyGeometry = mergeGeometries([frameMerged, clothesMerged, head], true) ?? frameMerged;
+  if (bodyGeometry !== frameMerged) {
+    frameMerged.dispose();
+    clothesMerged.dispose();
+    head.dispose();
+  }
+
+  // Custom-wheel channel: the LEFT set is the visible wheel (X-axial tire ring
+  // + a pale spoke disc), instanced at BOTH hubs; the RIGHT set is a 1 cm
+  // placeholder parked inside the hub (the channel is side-paired — see the
+  // rig doc above). Wheel offsets sit ON the centerline (x = 0): FL/FR are the
+  // front hub twice, RL/RR the rear — so the front wheel steers and both roll.
+  const tireMat = new MeshStandardMaterial({ color: 0x23262a, metalness: 0.1, roughness: 0.85 });
+  tireMat.name = "bike_tire";
+  const spokeMat = new MeshStandardMaterial({ color: 0x9aa0a6, metalness: 0.6, roughness: 0.4 });
+  spokeMat.name = "bike_spokes";
+  const tire = new CylinderGeometry(r, r, 0.05 * s, 14);
+  tire.rotateZ(Math.PI / 2); // cylinder axis Y -> X (the fleet spin axis)
+  const disc = new CylinderGeometry(r - 0.05 * s, r - 0.05 * s, 0.02 * s, 12);
+  disc.rotateZ(Math.PI / 2);
+  const wheelGeo = mergeGeometries([tire, disc], true) ?? tire;
+  if (wheelGeo !== tire) {
+    tire.dispose();
+    disc.dispose();
+  }
+  const hiddenGeo = new BoxGeometry(0.01, 0.01, 0.01);
+
+  return {
+    bodyGeometry,
+    bodyMaterials:
+      bodyGeometry.groups.length === 3 ? [frameMat, clothesMat, skinMat] : [frameMat],
+    ownedMaterials: [frameMat, clothesMat, skinMat, tireMat, spokeMat],
+    paint: null, // no palette tint — the frame color IS the variant's identity
+    customWheel: {
+      left: {
+        geometry: wheelGeo,
+        materials: wheelGeo.groups.length === 2 ? [tireMat, spokeMat] : [tireMat],
+      },
+      right: { geometry: hiddenGeo, materials: [tireMat] },
+    },
+    wheelOffsets: [
+      new Vector3(0, r, hubZ), // FL -> the front wheel (steers)
+      new Vector3(0, r, hubZ), // FR -> the hidden placeholder, same hub
+      new Vector3(0, r, -hubZ), // RL -> the rear wheel
+      new Vector3(0, r, -hubZ), // RR -> the hidden placeholder
+    ],
+    wheelRadius: r,
+    rearZ: -halfLength,
+    frontZ: halfLength,
+    halfWidth,
+    halfLength,
+    lampY: 0.62 * s, // the tail bar reads as a rear reflector/light
+    headY: 0.8 * s,
   };
 }
 
@@ -1056,6 +1247,11 @@ export function buildTrafficFleet(
   // RX-04/RX-05 profile slot: the procedural articulated tram rig
   // (TRAM_MODEL_INDEX) — no InstancedMesh unless a tram actor exists.
   rigs.push(buildTramRig());
+  // VU-01/02/03 profile slots: the procedural bicycle + rider rigs
+  // (CYCLIST_MODEL_INDEX adult, CHILD_CYCLIST_MODEL_INDEX child) — same cost
+  // discipline: no InstancedMesh unless a cyclist actor exists.
+  rigs.push(buildBicycleRig(false));
+  rigs.push(buildBicycleRig(true));
   const sharedWheel = extractSharedWheel(scenes[0]);
   const nVeh = vehicles.length;
   const color = new Color();
@@ -1124,7 +1320,7 @@ export function buildTrafficFleet(
     );
     mesh.instanceMatrix.setUsage(DynamicDrawUsage);
     mesh.frustumCulled = false;
-    mesh.name = `traffic-wheels-${FLEET[m]}-L`;
+    mesh.name = `traffic-wheels-${modelName(m)}-L`;
     hideAll(mesh);
     group.add(mesh);
     return mesh;
@@ -1138,7 +1334,7 @@ export function buildTrafficFleet(
     );
     mesh.instanceMatrix.setUsage(DynamicDrawUsage);
     mesh.frustumCulled = false;
-    mesh.name = `traffic-wheels-${FLEET[m]}-R`;
+    mesh.name = `traffic-wheels-${modelName(m)}-R`;
     hideAll(mesh);
     group.add(mesh);
     return mesh;

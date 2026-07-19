@@ -18,11 +18,15 @@ import type { TrafficVehicleState } from "../types";
 import {
   assignCivilianModel,
   assignModel,
+  BICYCLE_DIMENSIONS,
   BOXY_INDEX,
   BOXY_MAX_INSTANCES,
   buildTrafficFleet,
   carPaintMaterial,
   carPaintStandardMaterial,
+  CHILD_CYCLIST_MODEL_INDEX,
+  CHILD_CYCLIST_SCALE,
+  CYCLIST_MODEL_INDEX,
   disposeTrafficFleet,
   EMERGENCY_DIMENSIONS,
   EMERGENCY_MODEL_INDEX,
@@ -378,6 +382,70 @@ describe("large-vehicle profile (doc 72 FO-06)", () => {
     // The unused truck + emergency slots stay free alongside it.
     expect(fleet.models[TRUCK_MODEL_INDEX].mesh).toBeNull();
     expect(fleet.models[EMERGENCY_MODEL_INDEX].mesh).toBeNull();
+    expect(() => disposeTrafficFleet(fleet)).not.toThrow();
+  });
+});
+
+describe("cyclist bicycle rigs (audit C3's render half — VU-01/02/03)", () => {
+  it("modelForVehicle: cyclist profiles map to the bicycle slots", () => {
+    expect(modelForVehicle({ id: 7, profile: "cyclist" })).toBe(CYCLIST_MODEL_INDEX);
+    expect(modelForVehicle({ id: 7, profile: "childCyclist" })).toBe(CHILD_CYCLIST_MODEL_INDEX);
+  });
+
+  it("builds the adult bicycle + rider rig: narrow footprint, real spinning wheels", () => {
+    const bike: TrafficVehicleState = { ...vehicle(11), profile: "cyclist" };
+    const fleet = buildTrafficFleet(makeScenes(), [bike, vehicle(12)]);
+    expect(fleet.assign[0]).toBe(CYCLIST_MODEL_INDEX);
+    expect(fleet.assign[1]).toBe(assignModel(12)); // ambient neighbor untouched
+    const model = fleet.models[CYCLIST_MODEL_INDEX];
+    expect(model.count).toBe(1);
+    expect(model.mesh).not.toBeNull();
+    expect(model.mesh?.name).toBe("traffic-body-cyclist");
+    const rig = model.rig;
+    // Genuinely a BICYCLE footprint: ~1.7 × 0.46 m vs the fixture cars'
+    // ~4.35 × 1.8 — the narrow-and-tall silhouette IS the perceptual point.
+    expect(rig.halfLength).toBeCloseTo(BICYCLE_DIMENSIONS.halfLengthM);
+    expect(rig.halfWidth).toBeCloseTo(BICYCLE_DIMENSIONS.halfWidthM);
+    expect(rig.paint).toBeNull(); // no palette tint — the frame IS the livery
+    // Custom-wheel channel: 2 slots per side; the visible wheel rides the LEFT
+    // set at both centerline hubs, so the front steers and both roll.
+    expect(rig.customWheel).not.toBeNull();
+    expect(fleet.customWheelL[CYCLIST_MODEL_INDEX]?.count).toBe(2);
+    expect(fleet.customWheelR[CYCLIST_MODEL_INDEX]?.count).toBe(2);
+    expect(fleet.customWheelL[CYCLIST_MODEL_INDEX]?.name).toBe("traffic-wheels-cyclist-L");
+    expect(fleet.wheelScale[0]).toBe(1); // custom wheels: no shared-wheel draw
+    expect(fleet.wheelRadius[0]).toBeCloseTo(BICYCLE_DIMENSIONS.wheelRadiusM);
+    expect(rig.wheelOffsets[0].x).toBe(0); // centerline, front hub
+    expect(rig.wheelOffsets[0].z).toBeCloseTo(BICYCLE_DIMENSIONS.hubZM);
+    expect(rig.wheelOffsets[2].z).toBeCloseTo(-BICYCLE_DIMENSIONS.hubZM);
+    // Three merged groups — frame kit + rider clothes + skin — all OWNED
+    // (frame, clothes, skin + the two wheel materials; ADR-001 fictional).
+    expect(rig.bodyMaterials.map((m) => m.name)).toEqual([
+      "bike_frame",
+      "bike_rider",
+      "bike_skin",
+    ]);
+    expect(rig.ownedMaterials.length).toBe(5);
+    expect(() => disposeTrafficFleet(fleet)).not.toThrow();
+  });
+
+  it("the child rig is the scaled plan — the „дете с колело“ silhouette", () => {
+    const child: TrafficVehicleState = { ...vehicle(13), profile: "childCyclist" };
+    const fleet = buildTrafficFleet(makeScenes(), [child]);
+    expect(fleet.assign[0]).toBe(CHILD_CYCLIST_MODEL_INDEX);
+    const model = fleet.models[CHILD_CYCLIST_MODEL_INDEX];
+    expect(model.count).toBe(1);
+    expect(model.mesh?.name).toBe("traffic-body-cyclist_child");
+    const rig = model.rig;
+    expect(rig.halfLength).toBeCloseTo(BICYCLE_DIMENSIONS.halfLengthM * CHILD_CYCLIST_SCALE);
+    expect(rig.wheelRadius).toBeCloseTo(BICYCLE_DIMENSIONS.wheelRadiusM * CHILD_CYCLIST_SCALE);
+    expect(rig.bodyMaterials.map((m) => m.name)).toEqual([
+      "bike_frame_child",
+      "bike_rider",
+      "bike_skin",
+    ]);
+    // Each variant costs only itself: the adult slot stays free alongside.
+    expect(fleet.models[CYCLIST_MODEL_INDEX].mesh).toBeNull();
     expect(() => disposeTrafficFleet(fleet)).not.toThrow();
   });
 });

@@ -38,6 +38,10 @@ export interface QualityPreset {
   shadowRadiusM: number;
   /** Instanced rain streak count (0 = rain particles disabled at this level). */
   rainParticles: number;
+  /** Instanced snowflake count (0 = snowfall disabled at this level). Same
+   *  GPU design as rain (static seeds, one draw call) so it shares the rain
+   *  budget tier-for-tier. */
+  snowParticles: number;
   /**
    * Whether the EffectComposer is mounted at all. When true it owns the final
    * image: N8AO + SMAA + ACES ToneMapping (+ bloom/color-grade at high). When
@@ -100,6 +104,7 @@ export const QUALITY_PRESETS: Record<QualityLevel, QualityPreset> = {
     shadowMapSize: 1024,
     shadowRadiusM: 45,
     rainParticles: 0,
+    snowParticles: 0,
     postprocessing: false,
     aoEnabled: false,
     aoHalfRes: true,
@@ -127,6 +132,7 @@ export const QUALITY_PRESETS: Record<QualityLevel, QualityPreset> = {
     shadowMapSize: 1024,
     shadowRadiusM: 55,
     rainParticles: 800,
+    snowParticles: 800,
     postprocessing: true,
     aoEnabled: true,
     aoHalfRes: true,
@@ -151,6 +157,7 @@ export const QUALITY_PRESETS: Record<QualityLevel, QualityPreset> = {
     shadowMapSize: 2048,
     shadowRadiusM: 75,
     rainParticles: 1400,
+    snowParticles: 1400,
     postprocessing: true,
     aoEnabled: true,
     aoHalfRes: true,

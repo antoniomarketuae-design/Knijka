@@ -103,8 +103,52 @@ export const DIFFICULTY_ORDER: DifficultyMode[] = [
   "advanced",
 ];
 
-/** The safe default for a driving-education product: gentle and forgiving. */
-export const DEFAULT_DIFFICULTY: DifficultyMode = "beginner";
+/**
+ * Default for a fresh drive: NORMAL, not beginner (founder ruling 2026-07-19).
+ * Beginner's 40 km/h governor (throttle dead from ~34, settles ~39) sits
+ * BELOW the speeds the curriculum grades against (~42 km/h "не карай повече
+ * от" questions; SPEEDING_OVER_LIMIT needs limit×1.1 — unreachable in 40+
+ * zones). Defaulting to beginner meant the student physically could not make
+ * the mistake the lesson exists to catch — an unfailable trap, not teaching.
+ * Normal (90 cap) keeps mistakes possible; students who want assistance
+ * switch to beginner explicitly (persisted via DIFFICULTY_STORAGE_KEY).
+ */
+export const DEFAULT_DIFFICULTY: DifficultyMode = "normal";
+
+/**
+ * localStorage key for the EXPLICITLY chosen difficulty. Contract: written
+ * only on a user click of the selector — never eagerly with the default —
+ * so an absent key always means "no explicit choice" and silently follows
+ * whatever DEFAULT_DIFFICULTY says (this is what let the 2026-07-19 default
+ * flip reach existing users who never touched the selector).
+ */
+export const DIFFICULTY_STORAGE_KEY = "sim.difficulty";
+
+/** Parse a persisted difficulty value; null = unset/garbage → caller default. */
+export function parseDifficultyMode(v: unknown): DifficultyMode | null {
+  return v === "beginner" || v === "normal" || v === "advanced" ? v : null;
+}
+
+/** Stored explicit choice if any, else DEFAULT_DIFFICULTY (client only). */
+export function loadDifficulty(): DifficultyMode {
+  try {
+    return (
+      parseDifficultyMode(window.localStorage.getItem(DIFFICULTY_STORAGE_KEY)) ??
+      DEFAULT_DIFFICULTY
+    );
+  } catch {
+    return DEFAULT_DIFFICULTY; // private mode / SSR — session default applies
+  }
+}
+
+/** Persist an explicit selector click (and ONLY that — see the key contract). */
+export function storeDifficulty(mode: DifficultyMode): void {
+  try {
+    window.localStorage.setItem(DIFFICULTY_STORAGE_KEY, mode);
+  } catch {
+    // Private mode — the in-memory choice still applies this session.
+  }
+}
 
 /** Per-session mutable smoothing state (steering low-pass). */
 export interface DriveAssistState {

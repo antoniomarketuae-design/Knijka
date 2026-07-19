@@ -634,6 +634,12 @@ const VUCC_CHILD: CutInLeadCarSpec = {
     cruiseSpeedMps: VUCC_CHILD_MPS,
     extraRightOffsetM: VUCC_CURB_X - VUCC_LANE_X, // 2.6 — the curb line + the A11 tag
     colorIndex: 2,
+    // The CHILD bicycle rig (render only — CutInLeadCarRunner forwards the
+    // profile; without it the cut-in actor renders as a fleet CAR, the exact
+    // founder-reported bug). "childCyclist" ≈ 0.72-scale bike + upright
+    // hi-vis rider; grading is untouched (the A11 curb-offset tag above is
+    // still what feeds cyclistNear / collision(cyclist)).
+    profile: "childCyclist",
   },
   paceAheadM: 400, // unreachable by design — see dial 2 above
   maxMatchSpeedMps: VUCC_CHILD_MPS,

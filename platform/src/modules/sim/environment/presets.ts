@@ -92,9 +92,11 @@ export interface EnvironmentPreset {
    * bank: heavy snowfall shortens usable sight to ~80–120 m (at 0.012,
    * FogExp2 transmittance is ~40 % at 80 m and ~9 % at 130 m) — you see the
    * road, you just cannot STOP on it (the grip physics carries the lesson).
-   * Cold desaturated white, never the warm haze. HONEST SCOPE (doc 76 §0):
-   * no snowfall particles and no white ground cover ship in this slice —
-   * asset work; the haze + copy + snow-grip physics carry the winter story.
+   * Cold desaturated white, never the warm haze. This color pulls double
+   * duty: SnowFlakes fall through it AND the hemisphere ground bounce lerps
+   * toward it (SNOW_GROUND_WHITEN) so the world reads snow-lit — the
+   * particles + light blend carry the look; white ground textures remain
+   * world-module asset work (the original scope note, now half-closed).
    * FOG weather wins over snow when both are on (fog is the denser veil).
    */
   snowWeather: FogSpec;
@@ -124,6 +126,16 @@ export const SNOW_SUN_DIM = 0.6;
 /** How much SNOW dims the hemisphere fill — LIGHTEST of the three: snowfall
  *  scatters light everywhere and a winter sky stays bright (high albedo). */
 export const SNOW_HEMISPHERE_DIM = 0.1;
+/**
+ * How far the hemisphere GROUND bounce lerps toward the preset's snowWeather
+ * color at full snow intensity — the ground-whitening lever. Fresh snow cover
+ * has ~0.8 albedo where dry asphalt has ~0.1: under snowfall the light bounced
+ * up from the ground turns cold and bright, and every underside in the scene
+ * reads "the world is white below me" — zero extra draw calls, zero new
+ * materials, no z-fighting risk (the cheapest honest whitening; actual white
+ * ground textures/meshes remain world-module asset work).
+ */
+export const SNOW_GROUND_WHITEN = 0.85;
 
 /**
  * Top-down fog cap (doc 76 §4 note: the topdown camera flies at a constant

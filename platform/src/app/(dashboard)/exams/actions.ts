@@ -53,7 +53,10 @@ export async function startExamAction(): Promise<void> {
   // bounces to /pricing and the exam appears to "not start". Production keeps
   // the freemium gate fully intact (1 free exam, then /pricing) — flip this by
   // removing the guard once a dev entitlement seed exists.
-  const enforceExamLimit = process.env.NODE_ENV === "production";
+  //
+  // Admin accounts (role from the SERVER session, never the wire) bypass the
+  // cap in every environment — founder/test accounts rehearse freely.
+  const enforceExamLimit = process.env.NODE_ENV === "production" && !user.isAdmin;
   if (enforceExamLimit && !(await requireEntitlementForExam(user.id))) {
     redirect("/pricing?status=exam-limit");
   }

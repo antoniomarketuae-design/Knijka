@@ -100,6 +100,8 @@ export interface ContinueLesson {
 
 export interface StudentProfile {
   firstName: string;
+  /** Server-resolved role flag — renders the tiny „админ" badge. */
+  isAdmin: boolean;
 }
 
 /** One „sim weak spot" — a concept the driver keeps violating on the road. */
@@ -124,7 +126,7 @@ export interface SimWeakSpotsSnapshot {
 export async function getStudentProfile(): Promise<StudentProfile> {
   const user = await requireUser();
   const first = (user.name ?? "").trim().split(/\s+/)[0];
-  return { firstName: first || "шофьор" };
+  return { firstName: first || "шофьор", isAdmin: user.isAdmin };
 }
 
 export async function getReadiness(): Promise<ReadinessSnapshot> {

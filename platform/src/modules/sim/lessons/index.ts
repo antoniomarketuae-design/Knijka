@@ -160,6 +160,7 @@ export {
   type LevelSpec,
   type MapArchetype,
   type MistakeDemo,
+  type ProgressGateOptions,
   type RubricBreakdownLine,
   type RubricObservationInput,
   type RubricScore,
@@ -199,6 +200,7 @@ export {
   isExamUnlocked,
   type LessonAttemptRow,
   type LessonProgressEntry,
+  type ProgressionGateOptions,
 } from "./progression";
 
 // NOTE: the Prisma-backed session store is intentionally NOT re-exported here.

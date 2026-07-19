@@ -65,8 +65,16 @@ describe("QUALITY_PRESETS", () => {
     expect(med.maxDpr).toBeLessThanOrEqual(high.maxDpr);
     expect(low.rainParticles).toBeLessThanOrEqual(med.rainParticles);
     expect(med.rainParticles).toBeLessThanOrEqual(high.rainParticles);
+    expect(low.snowParticles).toBeLessThanOrEqual(med.snowParticles);
+    expect(med.snowParticles).toBeLessThanOrEqual(high.snowParticles);
     expect(med.shadowMapSize).toBeLessThanOrEqual(high.shadowMapSize);
     expect(med.shadowRadiusM).toBeLessThanOrEqual(high.shadowRadiusM);
+  });
+
+  it("gates snowfall exactly like rain: none at low, on at med + high", () => {
+    expect(QUALITY_PRESETS.low.snowParticles).toBe(0);
+    expect(QUALITY_PRESETS.med.snowParticles).toBeGreaterThan(0);
+    expect(QUALITY_PRESETS.high.snowParticles).toBeGreaterThan(0);
   });
 
   it("levels self-identify", () => {

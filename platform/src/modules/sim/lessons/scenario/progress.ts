@@ -18,6 +18,15 @@ import type { ScenarioLevel, ScenarioSpec } from "./types";
 /** Stars on the previous level required to unlock the next (doc 76 §8). */
 export const SCENARIO_UNLOCK_MIN_STARS = 2;
 
+/**
+ * Explicit gate override, passed by callers that resolved it SERVER-SIDE
+ * (admin role from the session — never from client input). `unlockAll` opens
+ * every authored rung; attempts/stars folding is unaffected.
+ */
+export interface ProgressGateOptions {
+  unlockAll?: boolean;
+}
+
 /** The slice of a persisted session row the progression fold reads. */
 export interface ScenarioAttemptRow {
   lessonId: string;
@@ -37,7 +46,9 @@ export interface ScenarioLevelProgress {
 export function scenarioLevelProgress(
   spec: Pick<ScenarioSpec, "id" | "levels">,
   rows: ReadonlyArray<ScenarioAttemptRow>,
+  opts?: ProgressGateOptions,
 ): ScenarioLevelProgress[] {
+  const unlockAll = opts?.unlockAll === true;
   const byLevel = new Map<number, { attempts: number; best: 1 | 2 | 3 | null }>();
   for (const row of rows) {
     const parsed = parseScenarioLessonId(row.lessonId);
@@ -56,7 +67,8 @@ export function scenarioLevelProgress(
   let first = true;
   return ordered.map((rung) => {
     const acc = byLevel.get(rung.level);
-    const unlocked = first || (prevBest !== null && prevBest >= SCENARIO_UNLOCK_MIN_STARS);
+    const unlocked =
+      unlockAll || first || (prevBest !== null && prevBest >= SCENARIO_UNLOCK_MIN_STARS);
     first = false;
     prevBest = acc?.best ?? null;
     return {
@@ -73,6 +85,11 @@ export function isScenarioLevelUnlocked(
   spec: Pick<ScenarioSpec, "id" | "levels">,
   level: ScenarioLevel,
   rows: ReadonlyArray<ScenarioAttemptRow>,
+  opts?: ProgressGateOptions,
 ): boolean {
-  return scenarioLevelProgress(spec, rows).some((p) => p.level === level && p.unlocked);
+  // Note: even with unlockAll, a level the template does not author stays
+  // locked — the override opens real rungs, it never invents them.
+  return scenarioLevelProgress(spec, rows, opts).some(
+    (p) => p.level === level && p.unlocked,
+  );
 }

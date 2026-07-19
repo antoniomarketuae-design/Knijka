@@ -1,11 +1,16 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
   applyDifficulty,
   CRAWL_BRAKE_END_KMH,
   CREEP_CAP_END_KMH,
   createDriveAssistState,
+  DEFAULT_DIFFICULTY,
   DIFFICULTY_PRESETS,
+  DIFFICULTY_STORAGE_KEY,
   FULL_LOCK_FADE_END_KMH,
+  loadDifficulty,
+  parseDifficultyMode,
+  storeDifficulty,
 } from "./difficulty";
 import type { VehicleInput } from "./VehicleSim";
 
@@ -144,5 +149,57 @@ describe("applyDifficulty", () => {
       createDriveAssistState(),
     );
     expect(bandEnd.brake).toBeCloseTo(1, 5);
+  });
+});
+
+describe("default difficulty (founder ruling 2026-07-19)", () => {
+  it("defaults to normal — the default tier must let speeding mistakes happen", () => {
+    expect(DEFAULT_DIFFICULTY).toBe("normal");
+    // The trap that forced the flip: beginner's 40 km/h governor sits below
+    // the graced street threshold (50 × 1.1 = 55, rules/types.ts), so
+    // SPEEDING_OVER_LIMIT could never fire — the default tier's cap must
+    // clear it so the mistake is committable (and gradable).
+    const cap = DIFFICULTY_PRESETS[DEFAULT_DIFFICULTY].speedCapKmh;
+    expect(cap === null || cap > 55).toBe(true);
+    expect(DIFFICULTY_PRESETS.beginner.speedCapKmh).toBeLessThan(55);
+  });
+
+  it("parseDifficultyMode: valid modes round-trip, everything else → null", () => {
+    for (const m of ["beginner", "normal", "advanced"] as const) {
+      expect(parseDifficultyMode(m)).toBe(m);
+    }
+    expect(parseDifficultyMode(null)).toBeNull();
+    expect(parseDifficultyMode("")).toBeNull();
+    expect(parseDifficultyMode("expert")).toBeNull();
+    expect(parseDifficultyMode(2)).toBeNull();
+  });
+
+  it("loadDifficulty: no storage at all (node env) → the default", () => {
+    expect(loadDifficulty()).toBe(DEFAULT_DIFFICULTY);
+  });
+
+  it("explicit stored choice is authoritative; absent/garbage → default", () => {
+    const store = new Map<string, string>();
+    vi.stubGlobal("window", {
+      localStorage: {
+        getItem: (k: string) => store.get(k) ?? null,
+        setItem: (k: string, v: string) => void store.set(k, v),
+      },
+    });
+    try {
+      // Nothing stored (fresh user OR an existing user who never clicked the
+      // selector — the key is only ever written on an explicit click, so both
+      // look identical here): the new default applies.
+      expect(loadDifficulty()).toBe(DEFAULT_DIFFICULTY);
+      // Explicit click persists and stays authoritative over the default.
+      storeDifficulty("beginner");
+      expect(store.get(DIFFICULTY_STORAGE_KEY)).toBe("beginner");
+      expect(loadDifficulty()).toBe("beginner");
+      // Corrupted value degrades to the default, never throws.
+      store.set(DIFFICULTY_STORAGE_KEY, "turbo");
+      expect(loadDifficulty()).toBe(DEFAULT_DIFFICULTY);
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 });

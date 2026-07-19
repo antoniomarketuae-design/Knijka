@@ -626,6 +626,12 @@ export class CyclistRightHookRunner implements EventRunner {
         cruiseSpeedMps: s.actor.cruiseSpeedMps,
         extraRightOffsetM: s.actor.extraRightOffsetM,
         colorIndex: s.actor.colorIndex,
+        // A cyclistRightHook actor IS a cyclist by definition — default the
+        // RENDER profile to the bicycle rig at stage time (runtime only, so
+        // compiled LessonSpecs stay byte-identical; covers the counter-flow
+        // rider too, whose NEGATIVE curb offset the A11 grading tag ignores
+        // on purpose). Authored profiles (e.g. "childCyclist") win.
+        profile: s.actor.profile ?? "cyclist",
         playerGuard: true,
       });
       if (!view) throw new Error(`staged event ${s.id}: cyclist path failed to stage`);

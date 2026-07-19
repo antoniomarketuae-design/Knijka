@@ -29,6 +29,7 @@ export {
   FOG_TOPDOWN_MAX_OPTICAL,
   SNOW_SUN_DIM,
   SNOW_HEMISPHERE_DIM,
+  SNOW_GROUND_WHITEN,
 } from "./presets";
 export { BENCHMARK_CAMERAS } from "./benchmarkCameras";
 export type { BenchmarkCameraPose } from "./benchmarkCameras";

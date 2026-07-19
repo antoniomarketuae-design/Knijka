@@ -37,7 +37,7 @@ describe("compileScenario — sc-park-perp-rev", () => {
     }
   });
 
-  it("L1 (Воден опит): the full §7 aid set + widened tolerances", () => {
+  it("L1 (Пълна помощ): the full §7 aid set + widened tolerances", () => {
     const l1 = compileScenario(SC_PARK_PERP_REV, 1);
     expect(l1.aids).toEqual({
       shadowCar: true,

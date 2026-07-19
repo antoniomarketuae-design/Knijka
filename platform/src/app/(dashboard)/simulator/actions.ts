@@ -97,6 +97,9 @@ export async function finishLessonAction(
         scenarioSpec,
         scenarioRef.level,
         historyRows.map((r) => ({ lessonId: r.lessonId, rubricStars: r.rubricStars })),
+        // Admin bypass — flag from the SERVER session (requireUser), never
+        // from the wire: an admin session may persist any authored level.
+        { unlockAll: user.isAdmin },
       )
     ) {
       return { ok: false, code: "LEVEL_LOCKED" };

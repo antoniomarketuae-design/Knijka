@@ -9,8 +9,8 @@ import {
   useRapier,
   type RapierRigidBody,
 } from "@react-three/rapier";
-import { DoubleSide } from "three";
-import type { Group, PointLight } from "three";
+import { DoubleSide, Object3D } from "three";
+import type { Group, PointLight, SpotLight } from "three";
 import type { RigidBody as RapierBody, World as RapierWorld } from "@dimforge/rapier3d-compat";
 import {
   chassisMassProperties,
@@ -39,6 +39,7 @@ import { updateVehicleSample } from "./vehicleSample";
 import { INTERIOR_LAYER, VitokCockpit } from "./vitok/VitokCockpit";
 import { HeroCarBody } from "./HeroCarBody";
 import { readNpcColliderUserData } from "./NpcColliders";
+import { loadQualityPreset } from "./lesson-ui/QualityPresetSelector";
 
 /** Contact classification (mirrors SimTickEvent collision `withWhat`). */
 export type CollisionWithWhat = "vehicle" | "pedestrian" | "cyclist" | "staticObject";
@@ -83,6 +84,44 @@ export const COLLISION_MIN_KMH = 10;
  *  for the (default) patch-less lessons. */
 const NO_GRIP_PATCHES: readonly SurfaceGripPatch[] = Object.freeze([]);
 
+// ---------------------------------------------------------------------------
+// NIGHT headlight throw (founder report 2026-07-19: "the vehicle lights never
+// actually turn on"). Two front SpotLights that pool real light on the road,
+// driven by CabinControls.headlights. Cost discipline:
+//  - mounted ONLY on night lessons (day = zero lights, zero shader delta);
+//  - the LOW quality preset mounts a single centre beam (forward renderer:
+//    every visible light adds per-fragment cost to every lit pixel);
+//  - "off" drives intensity to 0 but keeps the light VISIBLE — a constant
+//    light count means three.js never recompiles every material mid-drive
+//    (the SimEnvironment structural-constancy rule);
+//  - castShadow stays false, distance-limited falloff, no per-frame allocs
+//    (state-keyed writes only on a headlight-mode change).
+// Intensities are physical-ish candela (decay 2): pool brightness at range d
+// ≈ intensity / d². Tune LOW_BEAM.intensity / HIGH_BEAM.intensity first if
+// the founder wants more/less throw.
+// ---------------------------------------------------------------------------
+/** Low beam: warm, wide, aimed at the tarmac ~18 m out. */
+const LOW_BEAM = { intensity: 400, angle: 0.5, penumbra: 0.45, distance: 60, color: 0xffe6b8, targetY: -0.35, targetZ: 18 } as const;
+/** High beam: brighter AND whiter, tighter cone, aimed ~45 m out and flatter. */
+const HIGH_BEAM = { intensity: 1500, angle: 0.36, penumbra: 0.35, distance: 120, color: 0xf2f6ff, targetY: -0.1, targetZ: 45 } as const;
+/** Single-beam (low preset) intensity compensation. */
+const SINGLE_BEAM_SCALE = 1.6;
+
+/** Write one beam state to a spotlight (no-ops on null / day mount). */
+function applyHeadlightBeam(spot: SpotLight | null, headKey: number, scale: number): void {
+  if (!spot) return;
+  if (headKey === 0) {
+    spot.intensity = 0; // visible stays true — constant light count
+    return;
+  }
+  const b = headKey === 2 ? HIGH_BEAM : LOW_BEAM;
+  spot.intensity = b.intensity * scale;
+  spot.angle = b.angle;
+  spot.penumbra = b.penumbra;
+  spot.distance = b.distance;
+  spot.color.setHex(b.color);
+}
+
 export function VehicleRig({
   simRef,
   chassisGroupRef,
@@ -123,8 +162,10 @@ export function VehicleRig({
    *  contact registers as the mistake it is. The sub-threshold thump audio
    *  is unaffected. */
   collisionMinKmh?: number;
-  /** Lesson night flag — raises the interior fill light's floor at dusk. The
-   *  cabin's own headlights / night-preview toggle also raise it, so the cabin
+  /** Lesson night flag — raises the interior fill light's floor at dusk,
+   *  mounts the headlight SpotLight throw (driven by CabinControls.headlights)
+   *  and arms the exterior tail-lamp night glow (HeroCarBody). The cabin's own
+   *  headlights / night-preview toggle also raise the fill, so the cabin
    *  never goes near-black even when this is left at its default. */
   night?: boolean;
   /** ADR-006 stage 4a — OPT-IN surface grip for the live physics car. 1
@@ -169,6 +210,20 @@ export function VehicleRig({
   const assistRef = useRef(createDriveAssistState());
   // Interior fill light — driven per frame (never re-renders).
   const fillRef = useRef<PointLight>(null);
+  // Night headlight throw (see the module header block above).
+  const spotLRef = useRef<SpotLight>(null);
+  const spotRRef = useRef<SpotLight>(null);
+  const beamStateRef = useRef(-1);
+  // LOW preset = one centre beam; med/high = the real pair. Fixed per session
+  // (same one-time read as HeroCarBody's clearcoat gate).
+  const spotCount = useMemo(() => (loadQualityPreset() === "low" ? 1 : 2), []);
+  // Shared aim target for both beams (converging pools read fine) — mounted
+  // into the chassis group via <primitive> so its matrix follows the car.
+  const spotTarget = useMemo(() => {
+    const o = new Object3D();
+    o.position.set(0, LOW_BEAM.targetY, LOW_BEAM.targetZ);
+    return o;
+  }, []);
 
   // Stable identity so @react-three/rapier does not re-apply mass props.
   const massProperties = useMemo(() => chassisMassProperties(), []);
@@ -270,6 +325,21 @@ export function VehicleRig({
       const target = (dusk ? 0.55 : 0.12) + (lightsOn ? 0.7 : 0);
       fill.intensity += (target - fill.intensity) * Math.min(1, delta * 6);
     }
+
+    // Night headlight throw — state-keyed: the beams are rewritten only when
+    // the headlight mode changes (off/low/high). Day lessons mount no spots,
+    // so this whole branch is two null checks.
+    if (night) {
+      const headKey = cabin?.headlights === "high" ? 2 : cabin?.headlights === "low" ? 1 : 0;
+      if (headKey !== beamStateRef.current) {
+        beamStateRef.current = headKey;
+        const perLamp = spotCount === 1 ? SINGLE_BEAM_SCALE : 1;
+        applyHeadlightBeam(spotLRef.current, headKey, perLamp);
+        applyHeadlightBeam(spotRRef.current, headKey, perLamp);
+        const b = headKey === 2 ? HIGH_BEAM : LOW_BEAM;
+        spotTarget.position.set(0, b.targetY, b.targetZ);
+      }
+    }
     audioRef.current?.update({
       speedKmh: sim.speedKmh,
       throttle: input?.throttle ?? 0,
@@ -331,13 +401,51 @@ export function VehicleRig({
           Hero "Aurelis GT-E" exterior (Draco glTF, chase view) + the authored
           GT-E interior via VitokCockpit (cockpit view, A3). */}
       <group ref={chassisGroupRef}>
-        <HeroCarBody simRef={simRef} />
+        <HeroCarBody simRef={simRef} cabinRef={cabinRef} inputRef={inputRef} night={night} />
         <VitokCockpit
           simRef={simRef}
           inputRef={inputRef}
           cabinRef={cabinRef}
           telltaleLitRef={telltaleLitRef}
         />
+
+        {/* NIGHT headlight throw — real SpotLight pools on the road, visible
+            from the cockpit too (the exterior shell hides in cockpit view but
+            these live on the chassis). Mounted only on night lessons; "off"
+            drives intensity 0 while keeping the light count constant (no
+            material recompiles — see the module header block). Lamp height
+            matches the GLB's drl bar (~0.59 m above tarmac = chassis y 0.24). */}
+        {night ? (
+          <>
+            <primitive object={spotTarget} />
+            <spotLight
+              ref={spotLRef}
+              position={[spotCount === 1 ? 0 : 0.58, 0.24, 2.05]}
+              target={spotTarget}
+              intensity={0}
+              angle={LOW_BEAM.angle}
+              penumbra={LOW_BEAM.penumbra}
+              distance={LOW_BEAM.distance}
+              decay={2}
+              color={LOW_BEAM.color}
+              castShadow={false}
+            />
+            {spotCount === 2 ? (
+              <spotLight
+                ref={spotRRef}
+                position={[-0.58, 0.24, 2.05]}
+                target={spotTarget}
+                intensity={0}
+                angle={LOW_BEAM.angle}
+                penumbra={LOW_BEAM.penumbra}
+                distance={LOW_BEAM.distance}
+                decay={2}
+                color={LOW_BEAM.color}
+                castShadow={false}
+              />
+            ) : null}
+          </>
+        ) : null}
 
         {/* Windshield glass — a faint cool-tinted, low-roughness plane raked
             through the A3 interior's windshield opening (the interior GLB has

@@ -67,6 +67,11 @@ export default async function SimulatorPage() {
     console.warn("simulator: listSessions failed, using empty progression", err);
   }
 
+  // Admin (server-resolved role, never client input): every gate below takes
+  // the flag explicitly, so the founder/test account sees the whole catalog
+  // unlocked and the save action agrees (no LEVEL_LOCKED refusal).
+  const gate = { unlockAll: user.isAdmin };
+
   // S1 „Сценарии" catalog (doc 76 §8): per-template level progression from
   // the SAME persisted rows — the pure fold the save action's soft gate runs,
   // so the picker and the server always agree on what is open.
@@ -80,7 +85,7 @@ export default async function SimulatorPage() {
     objectiveBg: spec.objectiveBg,
     family: spec.family,
     tagsBg: [...spec.tagsBg],
-    levels: scenarioLevelProgress(spec, scenarioRows).map((l) => ({
+    levels: scenarioLevelProgress(spec, scenarioRows, gate).map((l) => ({
       level: l.level,
       unlocked: l.unlocked,
       attempts: l.attempts,
@@ -95,7 +100,7 @@ export default async function SimulatorPage() {
     const specAttempts = attempts.filter((a) => a.lessonId === spec.id);
     return {
       lesson: spec,
-      unlocked: isExamUnlocked(spec, attempts),
+      unlocked: isExamUnlocked(spec, attempts, gate),
       passed: specAttempts.some((a) => a.passed),
       attempts: specAttempts.length,
       bestScore: specAttempts.reduce<number | null>(
@@ -109,7 +114,7 @@ export default async function SimulatorPage() {
   // by order (полигон orders 0.5 / 1.5 slot the cards after L0 / L1 — the
   // площадка comes before city traffic, as in a real driving school).
   const entries: LessonEntryView[] = [
-    ...computeProgression(LESSONS, attempts).map((e) => ({
+    ...computeProgression(LESSONS, attempts, gate).map((e) => ({
       lesson: e.lesson,
       unlocked: e.unlocked,
       passed: e.passed,
@@ -127,7 +132,7 @@ export default async function SimulatorPage() {
   );
   const examEntry: LessonEntryView = {
     lesson: EXAM_LESSON,
-    unlocked: isExamUnlocked(EXAM_LESSON, attempts),
+    unlocked: isExamUnlocked(EXAM_LESSON, attempts, gate),
     passed: examAttempts.some((a) => a.passed),
     attempts: examAttempts.length,
     bestScore: examAttempts.reduce<number | null>(

@@ -30,10 +30,21 @@ export interface LessonProgressEntry {
   bestScore: number | null;
 }
 
+/**
+ * Explicit gate override, passed by callers that resolved it SERVER-SIDE
+ * (admin role from the session — never from client input). `unlockAll` opens
+ * every lesson; pass/attempt/best folding is unaffected.
+ */
+export interface ProgressionGateOptions {
+  unlockAll?: boolean;
+}
+
 export function computeProgression(
   lessons: ReadonlyArray<LessonSpec>,
   attempts: ReadonlyArray<LessonAttemptRow>,
+  opts?: ProgressionGateOptions,
 ): LessonProgressEntry[] {
+  const unlockAll = opts?.unlockAll === true;
   const byLesson = new Map<string, { passed: boolean; attempts: number; best: number | null }>();
   for (const a of attempts) {
     const acc = byLesson.get(a.lessonId) ?? { passed: false, attempts: 0, best: null };
@@ -55,7 +66,7 @@ export function computeProgression(
     const prevPassed = passedByOrder.get(lesson.order - 1) ?? false;
     return {
       lesson,
-      unlocked: isFirst || prevPassed,
+      unlocked: unlockAll || isFirst || prevPassed,
       passed: acc?.passed ?? false,
       attempts: acc?.attempts ?? 0,
       bestScore: acc?.best ?? null,
@@ -73,7 +84,9 @@ export function computeProgression(
 export function isExamUnlocked(
   exam: Pick<LessonSpec, "unlockAfterLessonId">,
   attempts: ReadonlyArray<LessonAttemptRow>,
+  opts?: ProgressionGateOptions,
 ): boolean {
+  if (opts?.unlockAll === true) return true;
   const prereq = exam.unlockAfterLessonId;
   if (prereq === undefined) return true;
   return attempts.some((a) => a.lessonId === prereq && a.passed);

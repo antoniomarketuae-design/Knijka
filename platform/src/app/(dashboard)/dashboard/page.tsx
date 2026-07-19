@@ -62,6 +62,11 @@ export default async function DashboardPage() {
           <p className="hud-label">Табло · Категория B</p>
           <h1 className="mt-1 font-display text-3xl font-black tracking-tight sm:text-4xl">
             Здравей, {profile.firstName}!
+            {profile.isAdmin ? (
+              <span className="ml-2 inline-block translate-y-[-0.35em] rounded-full border border-accent/40 bg-accent/10 px-2 py-0.5 align-middle font-mono text-[10px] font-bold uppercase tracking-widest text-accent">
+                админ
+              </span>
+            ) : null}
           </h1>
           <p className="mt-1 text-sm text-muted">
             Днес е добър ден да станеш по-добър шофьор.

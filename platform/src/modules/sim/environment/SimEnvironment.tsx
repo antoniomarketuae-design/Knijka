@@ -63,6 +63,7 @@ import {
   FOG_TOPDOWN_MAX_OPTICAL,
   RAIN_HEMISPHERE_DIM,
   RAIN_SUN_DIM,
+  SNOW_GROUND_WHITEN,
   SNOW_HEMISPHERE_DIM,
   SNOW_SUN_DIM,
   sunDirection,
@@ -77,9 +78,11 @@ import {
   getRainIntensity,
   getSnowIntensity,
   useRainIntensity,
+  useSnowIntensity,
 } from "./weather";
 import { SkyDome } from "./SkyDome";
 import { RainStreaks } from "./RainStreaks";
+import { SnowFlakes } from "./SnowFlakes";
 
 export interface SimEnvironmentProps {
   timeOfDay: TimeOfDay;
@@ -88,10 +91,11 @@ export interface SimEnvironmentProps {
    *  Additive; absent/false = today's clear/rain behavior. */
   fog?: boolean;
   /** SNOW weather (doc 72 AC-08 winter grip) — a LIGHTER, colder fog-like
-   *  haze (presets.ts snowWeather) + a milder rig dim + a cold sky wash.
-   *  HONEST SCOPE: no snowfall particles / white ground textures in this
-   *  slice (asset work) — the haze + copy + snow-grip physics carry the
-   *  winter story. Additive; absent/false = the shipped behavior. */
+   *  haze (presets.ts snowWeather) + a milder rig dim + a cold sky wash +
+   *  instanced snowfall (SnowFlakes, gated by quality like rain) + a cold
+   *  ground-bounce whitening (SNOW_GROUND_WHITEN). White ground TEXTURES
+   *  remain world-module asset work. Additive; absent/false = the shipped
+   *  behavior. */
   snow?: boolean;
   /** Explicit quality level; omit to follow the quality store ("auto"). */
   quality?: QualityLevel;
@@ -184,6 +188,9 @@ export function SimEnvironment({ timeOfDay, rain, fog = false, snow = false, qua
   // (the store update re-renders us at quantized steps until it hits 0).
   const rainFade = useRainIntensity();
   const rainVisible = rain || rainFade > 0.01;
+  // Same lifecycle for snowfall — flakes fade out, they don't pop.
+  const snowFade = useSnowIntensity();
+  const snowVisible = snow || snowFade > 0.01;
 
   // Per-preset goal values (allocated only when timeOfDay changes).
   const goal = useMemo(() => {
@@ -208,6 +215,7 @@ export function SimEnvironment({ timeOfDay, rain, fog = false, snow = false, qua
     right: new Vector3(),
     upL: new Vector3(),
     fogGoal: new Color(),
+    hemiGroundGoal: new Color(),
     up: new Vector3(0, 1, 0),
   });
 
@@ -254,7 +262,17 @@ export function SimEnvironment({ timeOfDay, rain, fog = false, snow = false, qua
     // rain is darker than either alone; fog's own dim dominates via its
     // constants; snow's is the mildest — a winter sky stays bright).
     dampColor(hemi.color, goal.hemiSky, FADE_LAMBDA, dt);
-    dampColor(hemi.groundColor, goal.hemiGround, FADE_LAMBDA, dt);
+    // Ground whitening under snow rides the LIGHT, not new geometry: lerp the
+    // hemisphere ground bounce toward the preset's cold snowWeather color
+    // (already graded per time of day — bright white by day, faint cold grey
+    // at night). Fresh snow albedo ~0.8 vs asphalt ~0.1, so undersides start
+    // reading "white world below". Zero extra draw calls, no z-fighting — the
+    // road-overlay-plane alternative was rejected: any plane above the road
+    // either buries the raised lane markings or shimmers against them.
+    scratch.hemiGroundGoal
+      .copy(goal.hemiGround)
+      .lerp(goal.snowWeatherColor, snowNow * SNOW_GROUND_WHITEN);
+    dampColor(hemi.groundColor, scratch.hemiGroundGoal, FADE_LAMBDA, dt);
     hemi.intensity = MathUtils.damp(
       hemi.intensity,
       preset.light.hemisphere.intensity *
@@ -435,6 +453,9 @@ export function SimEnvironment({ timeOfDay, rain, fog = false, snow = false, qua
       <object3D ref={targetRef} />
       {rainVisible && qp.rainParticles > 0 && (
         <RainStreaks count={qp.rainParticles} timeOfDay={timeOfDay} />
+      )}
+      {snowVisible && qp.snowParticles > 0 && (
+        <SnowFlakes count={qp.snowParticles} timeOfDay={timeOfDay} />
       )}
       {qp.postprocessing && (
         // SMAA (not canvas MSAA) antialiases here: the composer renders

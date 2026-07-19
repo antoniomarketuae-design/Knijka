@@ -79,15 +79,27 @@ export interface TrafficDistrict {
  * two-segment articulated tram rig (~14 m, pantograph hint) — a tram is a
  * PATH-LOCKED staged vehicle like every other actor; its "track" IS its
  * authored polyline (street-running rails share the traffic lane — no
- * separate rail physics exists, honestly). All liveries fictional (ADR-001 —
- * no real insignia). Absent = "car" = the pre-profile deterministic fleet
+ * separate rail physics exists, honestly); "cyclist" / "childCyclist" render
+ * the procedural BICYCLE + RIDER rigs (adult / child size — the „дете с
+ * колело" actor), closing audit C3's RENDER half: the v1 cyclist stays a
+ * narrow curb-riding vehicle-agent for grading (the extraRightOffsetM tag and
+ * every query are untouched), it just no longer wears a car body. All
+ * liveries fictional (ADR-001 — no real insignia). Absent = "car" = the
+ * pre-profile deterministic fleet
  * pick, byte-identical. HONEST LIMIT: every rule-engine proximity query
  * (leadGapMeters, conflictNear, …) stays POINT-BASED around the vehicle
  * center with one fixed car-length constant, and the A11 physics shells stay
  * car-sized — the profile changes NO grading/collision geometry (a 14 m tram
  * grades and collides as its center point; the copy carries the length).
  */
-export type VehicleProfile = "car" | "van" | "truck" | "emergency" | "tram";
+export type VehicleProfile =
+  | "car"
+  | "van"
+  | "truck"
+  | "emergency"
+  | "tram"
+  | "cyclist"
+  | "childCyclist";
 
 export interface TrafficVehicleState {
   id: number;

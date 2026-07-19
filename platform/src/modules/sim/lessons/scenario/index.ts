@@ -66,6 +66,7 @@ export {
   SCENARIO_UNLOCK_MIN_STARS,
   isScenarioLevelUnlocked,
   scenarioLevelProgress,
+  type ProgressGateOptions,
   type ScenarioAttemptRow,
   type ScenarioLevelProgress,
 } from "./progress";
