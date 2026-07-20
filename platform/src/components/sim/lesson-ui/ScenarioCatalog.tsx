@@ -115,7 +115,8 @@ export function ScenarioCatalogSection({
       </div>
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
-        {scenarios.map((sc) => {
+        {scenarios.map((sc, i) => {
+          const taskNo = i + 1;
           const open = openId === sc.templateId;
           const bestOverall = sc.levels.reduce<1 | 2 | 3 | null>(
             (best, l) =>
@@ -131,6 +132,12 @@ export function ScenarioCatalogSection({
               className="card relative flex flex-col gap-3 p-5 transition hover:border-accent hover:shadow-glow-sm motion-reduce:transition-none"
             >
               <header className="flex items-start gap-3">
+                <span
+                  aria-label={`Задача ${taskNo}`}
+                  className="flex h-7 min-w-7 shrink-0 items-center justify-center rounded-lg border border-border-strong bg-surface px-1.5 text-sm font-black tabular-nums text-foreground"
+                >
+                  {taskNo}
+                </span>
                 <span aria-hidden className="text-2xl">
                   {FAMILY_ICONS[sc.family] ?? "🚗"}
                 </span>
