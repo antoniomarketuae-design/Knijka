@@ -71,7 +71,7 @@ export default async function TheoryPage() {
               id="smart-training-title"
               className="font-display text-base font-extrabold sm:text-lg"
             >
-              Умна тренировка
+              Практика — умна тренировка
             </h2>
             <p className="mt-1 max-w-[54ch] text-sm leading-relaxed text-muted">
               {totalDue > 0
