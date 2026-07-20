@@ -13,7 +13,7 @@ import type { PracticeSubmitResult } from "@/components/theory/types";
 import { getContentRepo } from "@/lib/content/repo";
 import { requireUser } from "@/modules/auth";
 import { trackActivity } from "@/modules/gamification";
-import { submitAnswer } from "@/modules/learning";
+import { resolveWhyPanel, submitAnswer } from "@/modules/learning";
 import { checkPracticeQuota } from "@/modules/payments";
 
 const MAX_ID_LENGTH = 120;
@@ -66,6 +66,10 @@ export async function submitPracticeAnswer(
     points: weight,
   });
 
+  // THEO-2 why-panel: the recorded drill demonstrating this question's fault.
+  // Stored refs only (ADR-002) — text + citations already ride on `result`.
+  const simRef = resolveWhyPanel(questionId)?.sim;
+
   // Constrain the return value to exactly what the UI renders.
   return {
     correct: result.correct,
@@ -74,5 +78,19 @@ export async function submitPracticeAnswer(
     lawRefs: result.lawRefs.map(({ act, ref }) => ({ act, ref })),
     masteryBefore: result.masteryBefore,
     masteryAfter: result.masteryAfter,
+    sim:
+      simRef === undefined
+        ? null
+        : {
+            templateId: simRef.templateId,
+            level: simRef.level,
+            titleBg: simRef.titleBg,
+            mistake: {
+              titleBg: simRef.mistake.titleBg,
+              whatWentWrongBg: simRef.mistake.whatWentWrongBg,
+              tracePath: simRef.mistake.tracePath,
+              districtId: simRef.mistake.districtId,
+            },
+          },
   };
 }

@@ -23,6 +23,15 @@ export { recordSimObservations } from "./simFeed";
 export type { SimObservation } from "./simFeed";
 export type { SimSeverity } from "./store";
 
+// THEO-2 Stage 1 (doc 64) — the why-panel resolver: question id → stored
+// explanation + citations (+ the scenario drill demonstrating the fault).
+export { resolveWhyPanel } from "./whyPanel";
+export type {
+  WhyPanelMistakeRef,
+  WhyPanelPayload,
+  WhyPanelSimRef,
+} from "./whyPanel";
+
 export {
   getReadiness,
   getSectionOverview,

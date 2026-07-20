@@ -30,7 +30,7 @@
  */
 
 import { useRouter } from "next/navigation";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   compileScenario,
   drawExamVariantId,
@@ -49,6 +49,7 @@ import type {
   LessonEntryView,
   ScenarioCatalogEntry,
 } from "@/components/sim/lesson-ui/types";
+import type { ScenarioDeepLink } from "./scenarioDeepLink";
 import {
   SessionHistorySection,
   type SessionHistoryEntry,
@@ -67,6 +68,7 @@ export function SimulatorClient({
   examEntry = null,
   history = [],
   scenarios = [],
+  deepLink = null,
 }: {
   entries: LessonEntryView[];
   /** A13: the exam card's view (server-gated unlock); null hides the card. */
@@ -75,6 +77,9 @@ export function SimulatorClient({
   history?: SessionHistoryEntry[];
   /** S1: the „Сценарии" catalog cards (server-computed level progression). */
   scenarios?: ScenarioCatalogEntry[];
+  /** THEO-2: ?scenario&level, server-resolved against the same progression —
+   *  unlocked → auto-start the rung, locked → anchor its catalog card. */
+  deepLink?: ScenarioDeepLink | null;
 }) {
   const router = useRouter();
   const [quality, setQuality] = useQualityPreset();
@@ -85,15 +90,37 @@ export function SimulatorClient({
   const [examVariantId, setExamVariantId] = useState<string | null>(null);
   // S1: the picked scenario rung — compiling is pure/cheap (the exam-variant
   // pattern: the id IS the recipe; the server recompiles it to regrade).
+  // THEO-2: an unlocked deep-linked rung IS the initial pick (the theory
+  // why-panel's „Опитай в симулатора" click carries the user activation).
   const [scenarioPick, setScenarioPick] = useState<{
     templateId: string;
     level: ScenarioLevel;
-  } | null>(null);
+  } | null>(
+    deepLink !== null && deepLink.unlocked
+      ? { templateId: deepLink.templateId, level: deepLink.level }
+      : null,
+  );
   // R3 #5/#23: leaving a scenario session („Назад към таблото" / „← Всички
   // уроци") lands back on the catalog ANCHORED at the just-played template —
   // the founder returns to his position in the list, not to the page top
   // (and never to /dashboard, whose route hop is what errored on him).
-  const [focusTemplateId, setFocusTemplateId] = useState<string | null>(null);
+  // A LOCKED deep-link target anchors its card the same way instead of
+  // launching (the soft gate stands; the picker shows what unlocks it).
+  const [focusTemplateId, setFocusTemplateId] = useState<string | null>(
+    deepLink !== null && !deepLink.unlocked ? deepLink.templateId : null,
+  );
+
+  // The deep link is consumed ONCE: strip its params so a reload (or a
+  // router.refresh after the session) never relaunches the drill.
+  useEffect(() => {
+    if (deepLink === null) return;
+    const url = new URL(window.location.href);
+    url.searchParams.delete("scenario");
+    url.searchParams.delete("level");
+    window.history.replaceState(null, "", url);
+    // Mount-only by design (consume-once semantics).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Regenerating from the id is pure and cheap — the id IS the spec recipe.
   const examVariant = useMemo(

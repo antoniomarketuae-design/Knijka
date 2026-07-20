@@ -1,0 +1,156 @@
+/**
+ * whyPanelModel — THEO-2 Stage 1: the pure answer → panel-model fold.
+ *
+ * Battery: wrong/correct framing (headers, lead-in, replay collapse), the
+ * ADR-002 guarantees (stored text passes through VERBATIM; a blank stored
+ * explanation degrades to the citation-only fallback, never invented copy),
+ * the drill deep link, and the display-dedupe of citations.
+ */
+import { describe, expect, it } from "vitest";
+import type { WhyPanelSimRef } from "@/modules/learning";
+import {
+  AVOIDED_MISTAKE_TOGGLE_BG,
+  buildWhyPanelModel,
+  CORRECT_LEAD_IN_BG,
+  simulatorDrillHref,
+  traceUrlForRepoPath,
+  WHY_NOT_HEADER_BG,
+  WHY_YES_HEADER_BG,
+  type WhyPanelSource,
+} from "./whyPanelModel";
+
+const SIM: WhyPanelSimRef = {
+  templateId: "sc-park-perp-rev",
+  level: 1,
+  titleBg: "Успоредно паркиране на заден ход",
+  mistake: {
+    titleBg: "Качване на бордюра",
+    whatWentWrongBg: "Волан завъртян твърде късно — задното колело се качи на бордюра.",
+    // Repo-relative, exactly as the resolver hands it out.
+    tracePath: "content/traces/sc-park-perp-rev/mistake-curb.trace.json",
+    districtId: "zx-v1",
+  },
+};
+
+function source(overrides: Partial<WhyPanelSource> = {}): WhyPanelSource {
+  return {
+    correct: false,
+    explanationBg: "При заден ход водачът е длъжен да пропусне преминаващите.",
+    lawRefs: [{ act: "ЗДвП", ref: "чл. 40" }],
+    sim: SIM,
+    ...overrides,
+  };
+}
+
+describe("buildWhyPanelModel — wrong answer", () => {
+  const model = buildWhyPanelModel(source());
+
+  it("frames as „Защо не“ with the stored text verbatim, no lead-in", () => {
+    expect(model.tone).toBe("wrong");
+    expect(model.headerBg).toBe(WHY_NOT_HEADER_BG);
+    expect(model.leadInBg).toBeNull();
+    expect(model.explanationBg).toBe(
+      "При заден ход водачът е длъжен да пропусне преминаващите.",
+    );
+    expect(model.missingExplanation).toBe(false);
+  });
+
+  it("plays the replay open (not collapsed) with the stored mistake copy", () => {
+    expect(model.replay).not.toBeNull();
+    expect(model.replay?.collapsed).toBe(false);
+    expect(model.replay?.toggleBg).toBeNull();
+    expect(model.replay?.whatWentWrongBg).toBe(SIM.mistake.whatWentWrongBg);
+    expect(model.replay?.mistakeTitleBg).toBe(SIM.mistake.titleBg);
+    expect(model.replay?.districtId).toBe(SIM.mistake.districtId);
+  });
+
+  it("maps the repo-relative trace path to its /public URL for the fetch", () => {
+    expect(model.replay?.tracePath).toBe(
+      "/traces/sc-park-perp-rev/mistake-curb.trace.json",
+    );
+  });
+
+  it("links the drill's entry rung on /simulator", () => {
+    expect(model.replay?.drillHref).toBe("/simulator?scenario=sc-park-perp-rev&level=1");
+  });
+});
+
+describe("buildWhyPanelModel — correct answer", () => {
+  const model = buildWhyPanelModel(source({ correct: true }));
+
+  it("frames as „Защо да“ with the fixed lead-in + the SAME stored text", () => {
+    expect(model.tone).toBe("correct");
+    expect(model.headerBg).toBe(WHY_YES_HEADER_BG);
+    expect(model.leadInBg).toBe(CORRECT_LEAD_IN_BG);
+    expect(model.explanationBg).toBe(
+      "При заден ход водачът е длъжен да пропусне преминаващите.",
+    );
+  });
+
+  it("offers the replay collapsed behind the avoided-mistake toggle", () => {
+    expect(model.replay?.collapsed).toBe(true);
+    expect(model.replay?.toggleBg).toBe(AVOIDED_MISTAKE_TOGGLE_BG);
+  });
+});
+
+describe("buildWhyPanelModel — ADR-002 fallbacks", () => {
+  it("blank stored explanation → citation-only fallback, nothing invented", () => {
+    const model = buildWhyPanelModel(source({ explanationBg: "   " }));
+    expect(model.explanationBg).toBeNull();
+    expect(model.missingExplanation).toBe(true);
+    // The citations still teach — they must survive the missing text.
+    expect(model.lawRefs).toEqual([{ act: "ЗДвП", ref: "чл. 40" }]);
+  });
+
+  it("blank explanation on a CORRECT answer drops the lead-in too (a lead-in over nothing would read as generated copy)", () => {
+    const model = buildWhyPanelModel(source({ correct: true, explanationBg: "" }));
+    expect(model.leadInBg).toBeNull();
+    expect(model.missingExplanation).toBe(true);
+  });
+
+  it("no sim ref → no replay section", () => {
+    const model = buildWhyPanelModel(source({ sim: null }));
+    expect(model.replay).toBeNull();
+  });
+});
+
+describe("law citations", () => {
+  it("dedupes identical act+ref pairs, keeps first-seen order", () => {
+    const model = buildWhyPanelModel(
+      source({
+        lawRefs: [
+          { act: "ЗДвП", ref: "чл. 40" },
+          { act: "ЗДвП", ref: "чл. 25" },
+          { act: "ЗДвП", ref: "чл. 40" },
+        ],
+      }),
+    );
+    expect(model.lawRefs).toEqual([
+      { act: "ЗДвП", ref: "чл. 40" },
+      { act: "ЗДвП", ref: "чл. 25" },
+    ]);
+  });
+});
+
+describe("simulatorDrillHref", () => {
+  it("URL-encodes the template id", () => {
+    expect(simulatorDrillHref("sc a&b", 3)).toBe("/simulator?scenario=sc%20a%26b&level=3");
+  });
+});
+
+describe("traceUrlForRepoPath", () => {
+  it("strips the leading content/ (the publish mapping)", () => {
+    expect(traceUrlForRepoPath("content/traces/sc-x/m.trace.json")).toBe(
+      "/traces/sc-x/m.trace.json",
+    );
+  });
+
+  it("passes through already-public paths unchanged", () => {
+    expect(traceUrlForRepoPath("/traces/sc-x/m.trace.json")).toBe(
+      "/traces/sc-x/m.trace.json",
+    );
+    expect(traceUrlForRepoPath("traces/sc-x/m.trace.json")).toBe(
+      "/traces/sc-x/m.trace.json",
+    );
+  });
+});

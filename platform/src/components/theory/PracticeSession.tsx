@@ -2,18 +2,45 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useState, useTransition } from "react";
+import {
+  useEffect,
+  useMemo,
+  useState,
+  useSyncExternalStore,
+  useTransition,
+} from "react";
 import { submitPracticeAnswer } from "@/app/(dashboard)/theory/practice/actions";
 import { IconArrowRight, IconCheck, IconTarget, IconX } from "@/components/icons";
 import { Gauge } from "@/components/hud/Gauge";
 import type { PracticeQuestionDto, PracticeSubmitResult } from "./types";
+import { WhyPanel, WhyPanelIdle } from "./WhyPanel";
+import { buildWhyPanelModel } from "./whyPanelModel";
 
 /**
  * Client-side practice runner: one question at a time, immediate feedback
  * after each answer via the submitPracticeAnswer server action, summary at
  * the end. All grading happens on the server — the client never sees the
  * correct options before submitting.
+ *
+ * THEO-2 (doc 64): every submitted answer feeds the why-panel — on desktop a
+ * SIDE PANEL ~20% of the viewport width beside the card (founder ruling,
+ * never a modal), on mobile an in-card section right under the verdict. One
+ * mount point at a time (matchMedia), so the replay never double-fetches.
+ * The panel never blocks „Напред" — answering replaces its content.
  */
+
+/** Tailwind lg — the side-panel/in-card switch. */
+const DESKTOP_QUERY = "(min-width: 1024px)";
+
+function subscribeDesktop(onChange: () => void): () => void {
+  const mq = window.matchMedia(DESKTOP_QUERY);
+  mq.addEventListener("change", onChange);
+  return () => mq.removeEventListener("change", onChange);
+}
+
+function readDesktop(): boolean {
+  return window.matchMedia(DESKTOP_QUERY).matches;
+}
 
 const REASON_BADGES: Record<
   PracticeQuestionDto["reason"],
@@ -149,6 +176,15 @@ export function PracticeSession({
     return () => window.removeEventListener("keydown", onKey);
   });
 
+  // THEO-2: one why-panel mount point at a time — the desktop side column or
+  // the in-card mobile section — so MistakeReplay never fetches twice. Safe
+  // for hydration: `result` is always null at SSR, so nothing renders early.
+  const isDesktop = useSyncExternalStore(subscribeDesktop, readDesktop, () => false);
+  const panelModel = useMemo(
+    () => (result === null ? null : buildWhyPanelModel(result)),
+    [result],
+  );
+
   if (current === null) {
     return <SessionSummary answers={answers} />;
   }
@@ -158,9 +194,10 @@ export function PracticeSession({
   const badge = REASON_BADGES[current.reason];
 
   return (
+    <div className="mx-auto flex w-full max-w-2xl flex-col gap-4 lg:max-w-none lg:flex-row lg:items-start lg:justify-center lg:gap-6">
     <section
       aria-label={`Въпрос ${index + 1} от ${questions.length}`}
-      className="card mx-auto flex w-full max-w-2xl flex-col gap-6 p-5 sm:p-7"
+      className="card flex w-full min-w-0 flex-col gap-6 p-5 sm:p-7 lg:max-w-2xl"
     >
       {/* Progress */}
       <div className="flex flex-col gap-2.5">
@@ -286,10 +323,17 @@ export function PracticeSession({
         </ul>
       </fieldset>
 
-      {/* Feedback — the live region stays mounted so the update is announced */}
+      {/* Feedback — the live region stays mounted so the update is announced.
+          Verdict + mastery stay in-card; the why-panel teaches beside (lg)
+          or right below (mobile — the honest bottom section, not a sheet). */}
       <div aria-live="polite">
         {result !== null ? (
-          <FeedbackPanel result={result} conceptTitleBg={current.conceptTitleBg} />
+          <div className="flex flex-col gap-3">
+            <VerdictStrip result={result} conceptTitleBg={current.conceptTitleBg} />
+            {!isDesktop && panelModel !== null ? (
+              <WhyPanel key={current.id} model={panelModel} />
+            ) : null}
+          </div>
         ) : null}
       </div>
 
@@ -321,12 +365,36 @@ export function PracticeSession({
         </p>
       </div>
     </section>
+
+    {/* THEO-2 founder ruling: the why-panel as a SIDE PANEL ~20% of the
+        viewport width on desktop (min-width keeps it readable), sticky so
+        the explanation stays in view over long option lists. Rendered even
+        before the first answer (idle hint) so the card never jumps. */}
+    <aside
+      aria-label="Защо-панел"
+      className="hidden lg:sticky lg:top-6 lg:block lg:w-[20vw] lg:min-w-[250px] lg:shrink-0"
+    >
+      <div aria-live="polite">
+        {isDesktop && panelModel !== null ? (
+          <WhyPanel key={current.id} model={panelModel} />
+        ) : (
+          <WhyPanelIdle />
+        )}
+      </div>
+    </aside>
+    </div>
   );
 }
 
 /* ----------------------------------------------------------- feedback */
 
-function FeedbackPanel({
+/**
+ * Slim in-card verdict: correct/wrong + the mastery move. The TEACHING
+ * (explanation, citations, replay) lives in the why-panel — the founder rule
+ * "never a bare Correct/Wrong" is satisfied by the pair, with the panel
+ * directly below this strip on mobile and beside the card on desktop.
+ */
+function VerdictStrip({
   result,
   conceptTitleBg,
 }: {
@@ -339,7 +407,7 @@ function FeedbackPanel({
 
   return (
     <div
-      className={`rounded-xl border p-4 sm:p-5 ${
+      className={`rounded-xl border p-4 ${
         result.correct
           ? "border-success/40 bg-success/10"
           : "border-danger/40 bg-danger/10"
@@ -357,22 +425,7 @@ function FeedbackPanel({
         )}
         {result.correct ? "Правилен отговор!" : "Грешен отговор"}
       </p>
-      <p className="mt-2 max-w-[62ch] text-sm leading-relaxed text-foreground">
-        {result.explanationBg}
-      </p>
-      {result.lawRefs.length > 0 ? (
-        <ul aria-label="Правни основания" className="mt-3 flex flex-wrap gap-1.5">
-          {result.lawRefs.map((law) => (
-            <li
-              key={`${law.act}-${law.ref}`}
-              className="rounded-full border border-hair bg-surface px-2.5 py-1 font-mono text-[11px] font-bold text-muted"
-            >
-              {law.act} {law.ref}
-            </li>
-          ))}
-        </ul>
-      ) : null}
-      <p className="mt-3 font-mono text-[11px] font-semibold text-muted">
+      <p className="mt-2 font-mono text-[11px] font-semibold text-muted">
         Усвояване на „{conceptTitleBg}“: {before}% → {after}%{" "}
         <span className={`font-bold ${deltaClass(delta)}`}>
           ({formatDelta(delta)})

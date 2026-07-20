@@ -1,5 +1,5 @@
 import type { LawRef } from "@/lib/content/types";
-import type { SessionReason } from "@/modules/learning";
+import type { SessionReason, WhyPanelSimRef } from "@/modules/learning";
 
 /**
  * Client-safe DTOs for the practice flow. The learning module's
@@ -39,4 +39,8 @@ export interface PracticeSubmitResult {
   masteryBefore: number;
   /** Avg mastery across the question's concepts after the answer (0..1). */
   masteryAfter: number;
+  /** THEO-2 why-panel: the drill whose RECORDED mistake demo shows this
+   *  question's fault (resolveWhyPanel); null when no scenario event or no
+   *  recorded demo covers the question — the panel shows text + citations. */
+  sim: WhyPanelSimRef | null;
 }

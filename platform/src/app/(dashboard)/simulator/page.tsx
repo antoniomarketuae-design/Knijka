@@ -23,6 +23,7 @@ import type {
   LessonEntryView,
   ScenarioCatalogEntry,
 } from "@/components/sim/lesson-ui/types";
+import { resolveScenarioDeepLink } from "./scenarioDeepLink";
 import { SimulatorClient } from "./simulator-client";
 import type {
   SessionHistoryEntry,
@@ -38,6 +39,10 @@ export const metadata: Metadata = {
 /** How many recent sessions the „История на сесиите" list shows. */
 const HISTORY_LIMIT = 12;
 
+interface SimulatorPageProps {
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
+}
+
 /**
  * /simulator v2 — lesson select + play shell. Server component: loads the
  * student's SimSessions, computes the unlock progression and hands plain
@@ -47,8 +52,12 @@ const HISTORY_LIMIT = 12;
  * A15 adds the session history: the same store provides detailed recent rows
  * (stored debrief + canonical event log) which are folded into serializable
  * history entries here, server-side.
+ *
+ * THEO-2: `?scenario=<templateId>&level=<n>` deep-links a scenario drill (the
+ * theory why-panel's „Опитай в симулатора" seam) — resolved against the same
+ * server-computed progression, so the link can never bypass the soft gate.
  */
-export default async function SimulatorPage() {
+export default async function SimulatorPage({ searchParams }: SimulatorPageProps) {
   const user = await requireUser();
 
   let attempts: LessonAttemptRow[] = [];
@@ -141,12 +150,17 @@ export default async function SimulatorPage() {
     ),
   };
 
+  // THEO-2 drill deep link — resolved against the JUST-computed progression.
+  const params = await searchParams;
+  const deepLink = resolveScenarioDeepLink(params.scenario, params.level, scenarios);
+
   return (
     <SimulatorClient
       entries={entries}
       examEntry={examEntry}
       history={history}
       scenarios={scenarios}
+      deepLink={deepLink}
     />
   );
 }
