@@ -9,6 +9,7 @@ AI-powered driving education platform: Bulgarian theory academy (adaptive practi
 ## Hard rules
 
 - North star test for every feature: does it produce safer, more competent real drivers?
+- Theory-module requirement-zero (doc 64 THEO-4, founder-ratified): every theory feature must act as a **virtual driving instructor that explains every decision** — no bare correct/wrong verdicts anywhere, ever. A theory PR states how it serves this.
 - ADR-001 fictional vehicles (no real brands) · ADR-002 hybrid AI (rule engine real-time, content-bank grounding, LLM for dialogue/debriefs only — the AI must NEVER free-recall Bulgarian law; retrieval + citation only) · ADR-003 no certificates · ADR-005 Three.js+R3F+Rapier, browser-first.
 - Content: original questions only (never copy official listovki), every item cites `lawRefs`, `status: draft` until reviewed. Contract: [content/SCHEMA.md](content/SCHEMA.md).
 - Mock exam format is law: 45 questions / 97 points / ≥87 pass / 40 min / 1-2-3 weights (docs/education/32).
