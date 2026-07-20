@@ -47,11 +47,16 @@ presents it — visually, in context. The exam itself is image-heavy.
 itself can screenshot staged scenes (cheaper than illustration); content
 schema rules stay: original questions only, `lawRefs` on every item,
 `status: draft` until reviewed (content/SCHEMA.md).
+**FOUNDER RULING (2026-07-20).** Coverage is BREADTH-FIRST: do not limit the
+visual treatment to signs + priority — spread it across as many of the 1,016
+questions as each family's imagery allows ("we limit ourselves" otherwise).
+Signs/priority may still land first chronologically, but the schema, renderer
+and authoring pipeline must be built family-generic from day one.
 
 ### THEO-2 · Interactive feedback on every answer — **Next · M/L**
 
 **What.**
-- **Wrong answer →** an educational popup, never a bare "X": WHY it is wrong +
+- **Wrong answer →** an educational panel, never a bare "X": WHY it is wrong +
   the relevant image with the key element HIGHLIGHTED + a short animation +
   a 10–20 s mini reel of the situation playing out + an explicit
   wrong-vs-right comparison + the real-world consequence.
@@ -59,6 +64,10 @@ schema rules stay: original questions only, `lawRefs` on every item,
   never a bare "Correct". Founder's canonical example: you proceed on green
   and a red-runner crosses — the reinforcement shows the defensive glance
   before proceeding that would save you even when you are in the right.
+
+**FOUNDER RULING (2026-07-20) — presentation format:** a SIDE PANEL taking
+~20% of the screen width (not a modal popup), for both wrong-answer teaching
+and correct-answer reinforcement. The panel is the why-window (P1) surface.
 
 **Why.** P2 applied to theory: feedback is the lesson, not the verdict. This
 is the why-window (P1) instantiated for theory answers.
