@@ -45,3 +45,6 @@ converted into Issues.
 - [ ] D2 buildings/visual pass (doc 71 program)
 - [ ] rx-map founder eyeball of sign placements
 - [ ] 726 draft theory questions → review to `approved`
+
+### Infra regression (2026-07-20)
+- [ ] Next 16.2.10 streaming/suspense: any App-Router loading.tsx boundary under (dashboard) never delivers its content chunk (dev + prod, proxied auth routes). Boundaries removed as the fix; re-add + re-test after the next Next.js upgrade.
