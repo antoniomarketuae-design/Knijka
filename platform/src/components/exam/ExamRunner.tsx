@@ -17,6 +17,7 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { ExamQuestion } from "@/modules/exam";
 import { submitExamAction } from "@/app/(dashboard)/exams/actions";
+import { QuestionMediaView, SignFace } from "@/components/theory/QuestionMedia";
 import { ExamResultView } from "./ExamResultView";
 import {
   answersStorageKey,
@@ -392,7 +393,11 @@ export function ExamRunner({
           <fieldset className="flex flex-col gap-4">
             <legend className="text-lg font-bold leading-snug">{q.textBg}</legend>
 
-            {q.media ? (
+            {q.media !== null && "kind" in q.media ? (
+              // THEO-1 data-driven media — the exact components the practice
+              // runner mounts, so exam and practice can never diverge.
+              <QuestionMediaView media={q.media} />
+            ) : q.media !== null ? (
               <p className="rounded-xl border border-dashed border-border px-4 py-6 text-center text-sm text-muted">
                 Към този въпрос има{" "}
                 {q.media.type === "image" ? "изображение" : "видеоклип"}, който
@@ -422,6 +427,15 @@ export function ExamRunner({
                       }
                       className="mt-0.5 h-4 w-4 shrink-0 accent-accent"
                     />
+                    {option.media != null ? (
+                      // THEO-1 sign-face option (same <SignFace> as practice);
+                      // the adjacent text is the accessible name.
+                      <SignFace
+                        signRef={option.media.signRef}
+                        altBg=""
+                        className="h-16 w-16 shrink-0"
+                      />
+                    ) : null}
                     <span className="text-sm leading-relaxed">
                       {option.textBg}
                     </span>

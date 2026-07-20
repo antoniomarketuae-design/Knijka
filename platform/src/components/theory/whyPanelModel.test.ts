@@ -12,6 +12,7 @@ import {
   AVOIDED_MISTAKE_TOGGLE_BG,
   buildWhyPanelModel,
   CORRECT_LEAD_IN_BG,
+  mistakeExperienceHref,
   simulatorDrillHref,
   traceUrlForRepoPath,
   WHY_NOT_HEADER_BG,
@@ -30,6 +31,9 @@ const SIM: WhyPanelSimRef = {
     tracePath: "content/traces/sc-park-perp-rev/mistake-curb.trace.json",
     districtId: "zx-v1",
   },
+  // THEO-3: not wired for this event by default; the experience cases below
+  // override it.
+  experience: null,
 };
 
 function source(overrides: Partial<WhyPanelSource> = {}): WhyPanelSource {
@@ -72,6 +76,30 @@ describe("buildWhyPanelModel — wrong answer", () => {
 
   it("links the drill's entry rung on /simulator", () => {
     expect(model.replay?.drillHref).toBe("/simulator?scenario=sc-park-perp-rev&level=1");
+  });
+
+  it("carries no experience link when the event is not wired (THEO-3)", () => {
+    expect(model.replay?.experienceHref).toBeNull();
+    expect(model.replay?.experienceTitleBg).toBeNull();
+  });
+});
+
+describe("buildWhyPanelModel — THEO-3 „Преживей грешката“", () => {
+  it("builds the mistake-experience deep link from the wired seed ref", () => {
+    const model = buildWhyPanelModel(
+      source({
+        sim: {
+          ...SIM,
+          experience: {
+            templateId: "sc-zebra-approach",
+            mistakeIndex: 1,
+            titleBg: "Непропускане на пешеходец",
+          },
+        },
+      }),
+    );
+    expect(model.replay?.experienceHref).toBe("/simulator?scenario=sc-zebra-approach&mistake=1");
+    expect(model.replay?.experienceTitleBg).toBe("Непропускане на пешеходец");
   });
 });
 
@@ -135,6 +163,12 @@ describe("law citations", () => {
 describe("simulatorDrillHref", () => {
   it("URL-encodes the template id", () => {
     expect(simulatorDrillHref("sc a&b", 3)).toBe("/simulator?scenario=sc%20a%26b&level=3");
+  });
+});
+
+describe("mistakeExperienceHref", () => {
+  it("URL-encodes and targets the mistake param (entry rung — no level)", () => {
+    expect(mistakeExperienceHref("sc a&b", 0)).toBe("/simulator?scenario=sc%20a%26b&mistake=0");
   });
 });
 

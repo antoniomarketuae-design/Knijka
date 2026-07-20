@@ -49,6 +49,12 @@ export interface RawContent {
   signs: unknown;
   /** True if the svg asset referenced by a sign exists (path relative to /content). */
   svgExists: (svgFile: string) => boolean;
+  /**
+   * True if platform/public/world/<districtId>.json exists — sceneStill media
+   * (THEO-1) must reference a committed district. Optional so lightweight
+   * fixtures need not provide it; absent = every district is unknown.
+   */
+  districtExists?: (districtId: string) => boolean;
 }
 
 function duplicates(values: readonly string[]): string[] {
@@ -229,6 +235,30 @@ export function buildContentRepo(raw: RawContent): ContentRepo {
     }
   }
 
+  // Media references (THEO-1): every signRef must be an official code in
+  // signs/signs.json; every sceneStill district must be a committed world map.
+  const signCodes = new Set(signs.map((s) => s.code));
+  const districtExists = raw.districtExists ?? (() => false);
+  for (const [slug, questions] of questionFiles) {
+    for (const question of questions) {
+      const at = `questions/${slug}.json: question "${question.id}"`;
+      const media = question.media;
+      if (media !== null && "kind" in media) {
+        if (media.kind === "sign" && !signCodes.has(media.signRef)) {
+          errors.push(`${at} media references unknown signRef "${media.signRef}" (no such code in signs/signs.json)`);
+        }
+        if (media.kind === "sceneStill" && !districtExists(media.districtId)) {
+          errors.push(`${at} media references unknown districtId "${media.districtId}" (no platform/public/world/${media.districtId}.json)`);
+        }
+      }
+      for (const option of question.options) {
+        if (option.media !== undefined && !signCodes.has(option.media.signRef)) {
+          errors.push(`${at} option "${option.id}" media references unknown signRef "${option.media.signRef}" (no such code in signs/signs.json)`);
+        }
+      }
+    }
+  }
+
   // The concept dependency graph must be acyclic.
   const cycle = findDependencyCycle(concepts);
   if (cycle) {
@@ -335,9 +365,10 @@ function readJson(file: string): unknown {
 /**
  * /content lives at the repo root, one level above platform/. Next.js and
  * vitest run with cwd = platform/, repo-level tooling with cwd = repo root —
- * probe both.
+ * probe both. Exported for server code that streams content-owned assets
+ * (e.g. the sign artwork route) — client code never touches the filesystem.
  */
-function resolveContentDir(): string {
+export function resolveContentDir(): string {
   const candidates = [
     path.join(process.cwd(), "content"),
     path.resolve(process.cwd(), "..", "content"),
@@ -363,6 +394,8 @@ function loadRawContentFromDisk(): RawContent {
   }
 
   const sectionsFile = path.join(contentDir, "sections.json");
+  // content/ and platform/ are siblings at the repo root.
+  const worldDir = path.resolve(contentDir, "..", "platform", "public", "world");
 
   return {
     topics: readJson(path.join(contentDir, "topics.json")),
@@ -371,6 +404,7 @@ function loadRawContentFromDisk(): RawContent {
     sections: fs.existsSync(sectionsFile) ? readJson(sectionsFile) : undefined,
     signs: readJson(path.join(contentDir, "signs", "signs.json")),
     svgExists: (svgFile) => fs.existsSync(path.join(contentDir, svgFile)),
+    districtExists: (districtId) => fs.existsSync(path.join(worldDir, `${districtId}.json`)),
   };
 }
 

@@ -1,4 +1,4 @@
-import type { LawRef } from "@/lib/content/types";
+import type { LawRef, QuestionMedia, SignMediaRef } from "@/lib/content/types";
 import type { SessionReason, WhyPanelSimRef } from "@/modules/learning";
 
 /**
@@ -11,6 +11,8 @@ import type { SessionReason, WhyPanelSimRef } from "@/modules/learning";
 export interface PracticeOptionDto {
   id: string;
   textBg: string;
+  /** THEO-1 sign-face option: a sign code only — carries no answer signal. */
+  media: SignMediaRef | null;
 }
 
 export interface PracticeQuestionDto {
@@ -19,6 +21,8 @@ export interface PracticeQuestionDto {
   /** Official exam weight (1|2|3). */
   points: 1 | 2 | 3;
   textBg: string;
+  /** THEO-1 visual media (sign face / scene still); null = text-only. */
+  media: QuestionMedia | null;
   options: PracticeOptionDto[];
   /** Why the engine picked this question. */
   reason: SessionReason;

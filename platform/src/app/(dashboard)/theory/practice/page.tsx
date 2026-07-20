@@ -74,8 +74,15 @@ export default async function PracticePage({ searchParams }: PracticePageProps) 
         type: question.type,
         points: question.points,
         textBg: question.textBg,
+        // THEO-1 media is safe to ship pre-answer: sign codes and scene data
+        // describe the QUESTION, never the answer.
+        media: question.media,
         // Deliberately drop `correct` — it must never reach the client early.
-        options: question.options.map((o) => ({ id: o.id, textBg: o.textBg })),
+        options: question.options.map((o) => ({
+          id: o.id,
+          textBg: o.textBg,
+          media: o.media ?? null,
+        })),
         reason,
         conceptId,
         conceptTitleBg: concept?.titleBg ?? "",

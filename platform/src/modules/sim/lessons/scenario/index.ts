@@ -43,12 +43,30 @@ export { DOC72_ARCHETYPE_IDS, isDoc72ArchetypeId } from "./registry";
 // Compiler: ScenarioSpec × level → LessonSpec (micro-lesson, no engine fork)
 export {
   DEFAULT_LEVEL_AIDS,
+  MISTAKE_EXPERIENCE_LEAD_IN_BG,
   SCENARIO_DEFAULT_TRAFFIC,
   SCENARIO_LESSON_ORDER,
   ScenarioCompileError,
   compileScenario,
+  mistakeExperienceLessonId,
   serializeObjectiveParams,
+  type ScenarioCompileOptions,
 } from "./compile";
+
+// THEO-3 — the mistake-experience mode („Направи грешката", doc 64):
+// `~m<i>` id seam, entry-rung compile, the six founder-seeded classes.
+export {
+  MISTAKE_EXPERIENCE_DEMO_OFFER_SEC,
+  MISTAKE_EXPERIENCE_SEEDS,
+  compileMistakeExperience,
+  mistakeExperienceSeedForEvent,
+  parseMistakeExperienceLessonId,
+  scenarioEntryLevel,
+  type MistakeExperienceClassId,
+  type MistakeExperienceSeed,
+  type MistakeExperienceSeedRef,
+  type ParsedMistakeExperienceLessonId,
+} from "./mistakeExperience";
 
 // Rubric scorer (pure; S1 wires the end screen)
 export { scoreRubric } from "./rubric";

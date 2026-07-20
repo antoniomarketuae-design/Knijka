@@ -124,9 +124,23 @@ export function WhyPanel({
                   className="mt-2"
                 />
               ) : null}
+              {/* THEO-3: the wired mistake-experience — do the wrong thing
+                  on purpose in the sandbox, live the consequence, retry. */}
+              {replay.experienceHref !== null ? (
+                <Link
+                  href={replay.experienceHref}
+                  title={replay.experienceTitleBg ?? undefined}
+                  className="mt-3 flex w-full items-center justify-center gap-1.5 rounded-xl border border-danger/50 bg-danger/10 px-3 py-2 text-xs font-bold text-danger transition hover:bg-danger/15 motion-reduce:transition-none"
+                >
+                  Преживей грешката
+                  <IconArrowRight className="h-3.5 w-3.5" />
+                </Link>
+              ) : null}
               <Link
                 href={replay.drillHref}
-                className="btn-ghost mt-3 w-full px-3 py-2 text-xs"
+                className={`btn-ghost w-full px-3 py-2 text-xs ${
+                  replay.experienceHref !== null ? "mt-2" : "mt-3"
+                }`}
               >
                 Опитай в симулатора
                 <IconArrowRight className="h-3.5 w-3.5" />

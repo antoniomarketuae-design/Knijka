@@ -97,3 +97,37 @@ describe("resolveScenarioDeepLink", () => {
     ).toBeNull();
   });
 });
+
+describe("resolveScenarioDeepLink — THEO-3 ?mistake links", () => {
+  it("targets the ENTRY rung with the mistake index (mode ignores ?level)", () => {
+    expect(resolveScenarioDeepLink("sc-park-perp-rev", "3", CATALOG, "1")).toEqual({
+      templateId: "sc-park-perp-rev",
+      level: 1,
+      unlocked: true,
+      mistakeIndex: 1,
+    });
+  });
+
+  it("works without a level param and on ladders starting above L1", () => {
+    expect(resolveScenarioDeepLink("sc-jx-giveway-b1", undefined, CATALOG, "0")).toEqual({
+      templateId: "sc-jx-giveway-b1",
+      level: 2,
+      unlocked: true,
+      mistakeIndex: 0,
+    });
+  });
+
+  it("garbage mistake param degrades to the normal link semantics", () => {
+    for (const bad of ["", "x", "-1", "1.5", ["0"] as string[]]) {
+      expect(resolveScenarioDeepLink("sc-park-perp-rev", "2", CATALOG, bad)).toEqual({
+        templateId: "sc-park-perp-rev",
+        level: 2,
+        unlocked: true,
+      });
+    }
+  });
+
+  it("unknown template stays null with a mistake param too", () => {
+    expect(resolveScenarioDeepLink("sc-nope", undefined, CATALOG, "0")).toBeNull();
+  });
+});

@@ -163,7 +163,12 @@ export function buildExam(seed?: number): BuiltExam {
     points: q.points,
     textBg: q.textBg,
     media: q.media,
-    options: shuffle(q.options, rng).map((o) => ({ id: o.id, textBg: o.textBg })),
+    // Safe views: never `correct`; option media (sign faces) may pass through.
+    options: shuffle(q.options, rng).map((o) =>
+      o.media === undefined
+        ? { id: o.id, textBg: o.textBg }
+        : { id: o.id, textBg: o.textBg, media: o.media },
+    ),
   }));
 
   const totalPoints = questions.reduce((n, q) => n + q.points, 0);

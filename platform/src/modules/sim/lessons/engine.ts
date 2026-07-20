@@ -120,6 +120,15 @@ export interface LessonStepResult {
    * pause (the shell queues the cards).
    */
   teachMoments?: TeachMoment[];
+  /**
+   * THEO-3 (lesson.mistakeExperience sessions only): the targeted wrong
+   * action just fired — the ONE-SHOT consequence moment. The shell pauses on
+   * it and shows the consequence overlay (red-ghost replay + the stored
+   * whatWentWrongBg + the lawRef citation) instead of the teach card. At
+   * most one per session (state.mistakeExperienceHitAtSec latches); the same
+   * TeachMoment shape rides catalog copy only (ADR-002).
+   */
+  mistakeMoment?: TeachMoment;
 }
 
 /**
@@ -304,8 +313,16 @@ export function applyTick(prev: LessonSessionState, tick: SimTick): LessonStepRe
   const { state: rules, events: ruleEvents } = reduceTick(prev.rules, tick);
 
   // A13: exam sessions bypass the whole teach-first layer — see coach.ts.
+  // THEO-3: mistake-experience sessions ride the coach's learn-only
+  // suppression channel instead — the sandbox where the wrong action is the
+  // assignment, so nothing scores and nothing terminates (coach.ts learnOnly).
   const examMode = prev.lesson.examMode === true;
-  const coachOpts = examMode ? { examMode: true } : undefined;
+  const mistakeXp = examMode ? undefined : prev.lesson.mistakeExperience;
+  const coachOpts = examMode
+    ? { examMode: true }
+    : mistakeXp !== undefined
+      ? { learnOnly: true }
+      : undefined;
   // S1 pauseOnError (doc 76 §7 L1 „Пълна помощ"): in a guided scenario drill
   // EVERY graded violation ALSO freezes into a teach card — including codes
   // the coach normally only toasts (опасна/terminating like COLLISION: at
@@ -322,6 +339,8 @@ export function applyTick(prev: LessonSessionState, tick: SimTick): LessonStepRe
   let encounters = prev.scenarioEncounters;
   let escalations = prev.penaltyEscalations;
   let lastTeachAt = prev.lastTeachMomentAtSec;
+  let mistakeHitAt = prev.mistakeExperienceHitAtSec;
+  let mistakeMoment: TeachMoment | undefined;
   const hudEvents: HudEvent[] = [];
   const scoredEvents: ScorableEvent[] = [];
   const teachMoments: TeachMoment[] = [];
@@ -422,6 +441,27 @@ export function applyTick(prev: LessonSessionState, tick: SimTick): LessonStepRe
         });
       }
     } else {
+      // THEO-3: the targeted wrong action just happened — latch the one-shot
+      // consequence moment (the shell pauses on it) and swallow the ambient
+      // toast: the consequence overlay presents the same catalog copy.
+      if (
+        mistakeXp !== undefined &&
+        mistakeHitAt === undefined &&
+        mistakeXp.codes.includes(e.code)
+      ) {
+        mistakeHitAt = tick.t;
+        mistakeMoment = {
+          code: e.code,
+          scenarioId: step.decision.scenarioId,
+          titleBg: e.titleBg,
+          explanationBg,
+          lawRef: e.lawRef,
+          severity: e.severityClass,
+          points: e.points,
+          t: e.t,
+        };
+        continue;
+      }
       // learn-only scenarios stay ambient: surfaced as a toast, never scored,
       // never interrupting.
       hudEvents.push({
@@ -541,9 +581,11 @@ export function applyTick(prev: LessonSessionState, tick: SimTick): LessonStepRe
       lastT: Math.max(prev.lastT, tick.t),
       ...(eventPositions !== undefined ? { eventPositions } : {}),
       ...(examTermination !== undefined ? { examTermination } : {}),
+      ...(mistakeHitAt !== undefined ? { mistakeExperienceHitAtSec: mistakeHitAt } : {}),
     },
     hudEvents,
     teachMoments,
+    ...(mistakeMoment !== undefined ? { mistakeMoment } : {}),
   };
 }
 

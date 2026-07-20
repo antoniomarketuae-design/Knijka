@@ -17,6 +17,14 @@ import { fileURLToPath } from "node:url";
 const STATUSES = ["draft", "needs-review", "approved"];
 const KEBAB_SLUG = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 
+// THEO-1 media limits — mirror of src/lib/content/schemas.ts (keep in lockstep).
+const SCENE_ZOOM_MIN_M = 6;
+const SCENE_ZOOM_MAX_M = 500;
+const SCENE_MAX_POSES = 12;
+const SCENE_MAX_MARKS = 8;
+const SCENE_POSE_KINDS = ["car", "truck", "bus", "tram", "bike", "ped"];
+const SCENE_MARK_KINDS = ["danger", "target"];
+
 // --------------------------------------------------------------------------
 // Locate /content (repo root), robust to cwd.
 // --------------------------------------------------------------------------
@@ -148,6 +156,120 @@ function checkConcept(item, index) {
   c.require([1, 2, 3].includes(item.difficulty), "difficulty must be 1, 2 or 3");
 }
 
+/** Finite number guard (NaN/Infinity are authoring garbage). */
+const isFinite_ = (v) => typeof v === "number" && Number.isFinite(v);
+
+/** { kind: "sign", signRef } shape (question media and option media). */
+function checkSignMedia(c, media, label) {
+  for (const key of Object.keys(media)) {
+    if (key !== "kind" && key !== "signRef") c.fail(`${label}: unrecognized key "${key}"`);
+  }
+  c.require(isNonEmptyString(media.signRef), `${label}.signRef must be a non-empty string`);
+}
+
+/** THEO-1 question media union — mirror of QuestionMediaSchema in schemas.ts. */
+function checkQuestionMedia(c, media) {
+  if (!c.require(isPlainObject(media), "media must be null or an object")) return;
+
+  if (media.kind === "sign") {
+    checkSignMedia(c, media, "media");
+    return;
+  }
+
+  if (media.kind === "sceneStill") {
+    for (const key of Object.keys(media)) {
+      if (!["kind", "districtId", "focus", "poses", "marks"].includes(key)) {
+        c.fail(`media: unrecognized key "${key}"`);
+      }
+    }
+    c.require(
+      isNonEmptyString(media.districtId) && KEBAB_SLUG.test(media.districtId),
+      "media.districtId must be kebab-case",
+    );
+    const focusOk =
+      isPlainObject(media.focus) &&
+      isFinite_(media.focus.x) &&
+      isFinite_(media.focus.y) &&
+      isFinite_(media.focus.zoomM);
+    c.require(focusOk, "media.focus must be { x, y, zoomM } with finite numbers");
+    if (focusOk) {
+      c.require(
+        media.focus.zoomM >= SCENE_ZOOM_MIN_M && media.focus.zoomM <= SCENE_ZOOM_MAX_M,
+        `media.focus.zoomM must be between ${SCENE_ZOOM_MIN_M} and ${SCENE_ZOOM_MAX_M} meters`,
+      );
+      for (const key of Object.keys(media.focus)) {
+        if (!["x", "y", "zoomM"].includes(key)) c.fail(`media.focus: unrecognized key "${key}"`);
+      }
+    }
+    const half = focusOk ? media.focus.zoomM / 2 : Infinity;
+    const outside = (x, y) =>
+      focusOk && (Math.abs(x - media.focus.x) > half || Math.abs(y - media.focus.y) > half);
+
+    if (c.require(Array.isArray(media.poses), "media.poses must be an array")) {
+      if (media.poses.length > SCENE_MAX_POSES) {
+        c.fail(`media.poses must contain at most ${SCENE_MAX_POSES} entries`);
+      }
+      media.poses.forEach((pose, i) => {
+        if (!isPlainObject(pose)) return c.fail(`media.poses[${i}] must be an object`);
+        for (const key of Object.keys(pose)) {
+          if (!["kind", "x", "y", "headingDeg", "variant"].includes(key)) {
+            c.fail(`media.poses[${i}]: unrecognized key "${key}"`);
+          }
+        }
+        c.require(
+          SCENE_POSE_KINDS.includes(pose.kind),
+          `media.poses[${i}].kind must be one of: ${SCENE_POSE_KINDS.join(", ")}`,
+        );
+        c.require(isFinite_(pose.x) && isFinite_(pose.y), `media.poses[${i}] x/y must be finite numbers`);
+        c.require(
+          isFinite_(pose.headingDeg) && pose.headingDeg >= -360 && pose.headingDeg <= 360,
+          `media.poses[${i}].headingDeg must be a finite number in [-360, 360]`,
+        );
+        if (pose.variant !== undefined) {
+          c.require(pose.variant === "ego", `media.poses[${i}].variant must be "ego" when present`);
+        }
+        if (isFinite_(pose.x) && isFinite_(pose.y) && outside(pose.x, pose.y)) {
+          c.fail(`media.poses[${i}] at (${pose.x}, ${pose.y}) is outside the focus window (±${half} m around the focus)`);
+        }
+      });
+    }
+
+    if (media.marks !== undefined) {
+      if (c.require(Array.isArray(media.marks), "media.marks must be an array when present")) {
+        if (media.marks.length > SCENE_MAX_MARKS) {
+          c.fail(`media.marks must contain at most ${SCENE_MAX_MARKS} entries`);
+        }
+        media.marks.forEach((mark, i) => {
+          if (!isPlainObject(mark)) return c.fail(`media.marks[${i}] must be an object`);
+          for (const key of Object.keys(mark)) {
+            if (!["kind", "x", "y"].includes(key)) c.fail(`media.marks[${i}]: unrecognized key "${key}"`);
+          }
+          c.require(
+            SCENE_MARK_KINDS.includes(mark.kind),
+            `media.marks[${i}].kind must be one of: ${SCENE_MARK_KINDS.join(", ")}`,
+          );
+          c.require(isFinite_(mark.x) && isFinite_(mark.y), `media.marks[${i}] x/y must be finite numbers`);
+          if (isFinite_(mark.x) && isFinite_(mark.y) && outside(mark.x, mark.y)) {
+            c.fail(`media.marks[${i}] at (${mark.x}, ${mark.y}) is outside the focus window (±${half} m around the focus)`);
+          }
+        });
+      }
+    }
+    return;
+  }
+
+  // Legacy binary-ref shape (kept for contract compatibility, unused).
+  if (media.type === "image" || media.type === "video") {
+    c.require(isNonEmptyString(media.ref), "media.ref must be a non-empty string");
+    for (const key of Object.keys(media)) {
+      if (key !== "type" && key !== "ref") c.fail(`media: unrecognized key "${key}"`);
+    }
+    return;
+  }
+
+  c.fail('media must be null, { kind: "sign" }, { kind: "sceneStill" } or the legacy { type: "image"|"video" } shape');
+}
+
 function checkQuestion(item, index, relFile) {
   const c = checker(relFile, index, item);
   if (!c.require(isPlainObject(item), "question must be an object")) return;
@@ -172,18 +294,7 @@ function checkQuestion(item, index, relFile) {
   c.require(isNonEmptyString(item.textBg), "textBg must be a non-empty string");
   c.require(isNonEmptyString(item.explanationBg), "explanationBg must be a non-empty string");
   checkLawRefs(c, item.lawRefs, { min: 1 });
-  if (item.media !== null) {
-    if (c.require(isPlainObject(item.media), "media must be null or an object")) {
-      c.require(
-        item.media.type === "image" || item.media.type === "video",
-        'media.type must be "image" or "video"',
-      );
-      c.require(isNonEmptyString(item.media.ref), "media.ref must be a non-empty string");
-      for (const key of Object.keys(item.media)) {
-        if (key !== "type" && key !== "ref") c.fail(`media: unrecognized key "${key}"`);
-      }
-    }
-  }
+  if (item.media !== null) checkQuestionMedia(c, item.media);
   c.require(STATUSES.includes(item.status), `status must be one of: ${STATUSES.join(", ")}`);
 
   if (!c.require(Array.isArray(item.options), "options must be an array")) return;
@@ -196,8 +307,15 @@ function checkQuestion(item, index, relFile) {
     c.require(typeof option.correct === "boolean", `options[${i}].correct must be a boolean`);
     if (option.correct === true) correctCount += 1;
     for (const key of Object.keys(option)) {
-      if (!["id", "textBg", "correct"].includes(key)) {
+      if (!["id", "textBg", "correct", "media"].includes(key)) {
         c.fail(`options[${i}]: unrecognized key "${key}"`);
+      }
+    }
+    // Option media (THEO-1): sign faces only.
+    if (option.media !== undefined) {
+      if (c.require(isPlainObject(option.media), `options[${i}].media must be an object when present`)) {
+        c.require(option.media.kind === "sign", `options[${i}].media.kind must be "sign"`);
+        checkSignMedia(c, option.media, `options[${i}].media`);
       }
     }
   });
@@ -326,17 +444,40 @@ for (const concept of concepts) {
   }
 }
 
+// Media references (THEO-1): signRef -> signs.json code, districtId -> world map.
+const signCodes = new Set(signs.filter(isPlainObject).map((s) => s.code));
+const worldDir = path.resolve(contentDir, "..", "platform", "public", "world");
+const districtExists = (districtId) => fs.existsSync(path.join(worldDir, `${districtId}.json`));
+
 for (const [slug, questions] of questionFiles) {
   if (!topicSlugs.has(slug)) {
     errors.push(`questions/${slug}.json: no topic with slug "${slug}" in topics.json`);
   }
   for (const question of questions) {
     if (!isPlainObject(question)) continue;
+    const at = `questions/${slug}.json: question "${question.id}"`;
     for (const conceptId of Array.isArray(question.conceptIds) ? question.conceptIds : []) {
       if (!conceptIds.has(conceptId)) {
-        errors.push(
-          `questions/${slug}.json: question "${question.id}" references unknown concept "${conceptId}"`,
-        );
+        errors.push(`${at} references unknown concept "${conceptId}"`);
+      }
+    }
+    const media = question.media;
+    if (isPlainObject(media)) {
+      if (media.kind === "sign" && !signCodes.has(media.signRef)) {
+        errors.push(`${at} media references unknown signRef "${media.signRef}" (no such code in signs/signs.json)`);
+      }
+      if (
+        media.kind === "sceneStill" &&
+        isNonEmptyString(media.districtId) &&
+        KEBAB_SLUG.test(media.districtId) &&
+        !districtExists(media.districtId)
+      ) {
+        errors.push(`${at} media references unknown districtId "${media.districtId}" (no platform/public/world/${media.districtId}.json)`);
+      }
+    }
+    for (const option of Array.isArray(question.options) ? question.options : []) {
+      if (isPlainObject(option) && isPlainObject(option.media) && !signCodes.has(option.media.signRef)) {
+        errors.push(`${at} option "${option.id}" media references unknown signRef "${option.media.signRef}" (no such code in signs/signs.json)`);
       }
     }
   }

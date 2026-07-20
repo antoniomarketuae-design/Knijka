@@ -215,6 +215,25 @@ describe("applyDecision — edit", () => {
     expect(result.ok).toBe(true);
     if (result.ok) expect(result.question.explanationBg).toBe("Междувременно това важи.");
   });
+
+  it("preserves option sign-face media across an options edit (THEO-1)", () => {
+    const question = flaggedSingle();
+    question.options[0].media = { kind: "sign", signRef: "Б2" };
+    const result = applyDecision(question, {
+      action: "edit",
+      patch: {
+        options: [
+          { id: "a", textBg: "Верен (поправен)", correct: true },
+          { id: "b", textBg: "Грешен", correct: false },
+        ],
+      },
+    });
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.question.options[0].media).toEqual({ kind: "sign", signRef: "Б2" });
+      expect(result.question.options[1].media).toBeUndefined();
+    }
+  });
 });
 
 describe("parseReviewRequest", () => {
@@ -283,6 +302,29 @@ describe("serializeQuestionsFile", () => {
     };
     const text = serializeQuestionsFile([withMedia]);
     expect(JSON.parse(text)).toEqual([withMedia]);
+  });
+
+  it("serialises THEO-1 media kinds and option media without dropping them", () => {
+    const base = flaggedMulti();
+    const withMedia: Question = {
+      ...base,
+      options: [
+        { ...base.options[0], media: { kind: "sign", signRef: "Б1" } },
+        base.options[1],
+        base.options[2],
+      ],
+      media: {
+        kind: "sceneStill",
+        districtId: "tj-stop-v1",
+        focus: { x: 0, y: 0, zoomM: 60 },
+        poses: [{ kind: "car", x: 0, y: -10, headingDeg: 0, variant: "ego" }],
+        marks: [{ kind: "danger", x: 2, y: 2 }],
+      },
+    };
+    const text = serializeQuestionsFile([withMedia]);
+    expect(JSON.parse(text)).toEqual([withMedia]);
+    // house style survives: option media inline on the option's line
+    expect(text).toContain('"media": {"kind":"sign","signRef":"Б1"} }');
   });
 
   it("renders lawRefs one-per-line in block style and round-trips", () => {

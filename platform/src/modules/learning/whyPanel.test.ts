@@ -72,6 +72,12 @@ describe("resolveWhyPanel — the question → drill chain (pinned picks)", () =
         tracePath: "content/traces/sc-junction-stop/mistake-rolling-stop.trace.json",
         districtId: "tj-stop-v1",
       },
+      // THEO-3: ev-stop-sign is one of the six wired classes.
+      experience: {
+        templateId: "sc-junction-stop",
+        mistakeIndex: 0,
+        titleBg: "Търкалящо спиране",
+      },
     });
   });
 
@@ -84,6 +90,8 @@ describe("resolveWhyPanel — the question → drill chain (pinned picks)", () =
       "content/traces/sc-vp-readiness/mistake-no-belt.trace.json",
     );
     expect(payload?.sim?.mistake.districtId).toBe("vp-ready-v1");
+    // THEO-3: ev-seatbelt is not a wired class — no experience entry.
+    expect(payload?.sim?.experience).toBeNull();
   });
 
   it("q-krastovishta-030 (ev-ped-crossing-marked) → sc-zebra-approach / „Твърде бързо приближаване“", () => {
@@ -93,6 +101,13 @@ describe("resolveWhyPanel — the question → drill chain (pinned picks)", () =
       "content/traces/sc-zebra-approach/mistake-too-fast.trace.json",
     );
     expect(payload?.sim?.mistake.districtId).toBe("zb-v1");
+    // THEO-3: the card REPLAYS the representative mistake [0], but the wired
+    // „Преживей грешката" entry is the founder class — zebra-no-stop [1].
+    expect(payload?.sim?.experience).toEqual({
+      templateId: "sc-zebra-approach",
+      mistakeIndex: 1,
+      titleBg: "Непропускане на пешеходец",
+    });
   });
 
   it("q-krastovishta-005 (ev-junction-priority-sign) → sc-roundabout-entry (catalog order: flow spreads before junctions)", () => {

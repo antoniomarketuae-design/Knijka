@@ -75,10 +75,53 @@ Section mastery is simply the aggregate of its concepts. Rules:
   ],
   "explanationBg": "One-breath explanation WHY (teen-readable), cites the rule",
   "lawRefs": [{ "act": "ЗДвП", "ref": "чл. 47" }],
-  "media": null,                     // future: { "type": "image|video", "ref": "…" }
+  "media": null,                     // null or one of the media kinds below
   "status": "draft"                  // draft | needs-review | approved
 }]
 ```
+
+### Question media (THEO-1) — data-driven kinds only
+
+No binary assets: every kind renders client-side from data this repo owns.
+Validated by the loader AND `platform/scripts/validate-content.mjs` (lockstep).
+
+**Sign face** — shows the project's own sign artwork (signs/svg via signs.json):
+```json
+"media": { "kind": "sign", "signRef": "В24" }
+```
+`signRef` must equal the `code` of a sign in `signs/signs.json` (load-time error
+otherwise). Renders through the platform's sign artwork endpoint — never
+copies of official drawings.
+
+**Scene still** — a static top-down traffic scene over a committed district map
+(`platform/public/world/<districtId>.json`, the sim's own world data):
+```json
+"media": {
+  "kind": "sceneStill",
+  "districtId": "tj-stop-v1",              // must exist in platform/public/world
+  "focus": { "x": 0, "y": 0, "zoomM": 60 },// square window, zoomM meters wide, centered on (x, y)
+  "poses": [                                // ≤ 12; x/y inside the focus window
+    { "kind": "car", "x": -4, "y": -12, "headingDeg": 0, "variant": "ego" },
+    { "kind": "ped", "x": 6, "y": 8, "headingDeg": 180 }
+  ],
+  "marks": [ { "kind": "danger", "x": 2, "y": 2 } ] // optional, ≤ 8, inside window
+}
+```
+Pose kinds: `car | truck | bus | tram | bike | ped`; `variant: "ego"` marks the
+learner's car. `headingDeg`: 0 = north, clockwise (sim trace convention).
+`zoomM` ∈ [6, 500]. Mark kinds: `danger` (conflict point) | `target` (look here).
+
+**Sign-face options** — for sign-identification questions the options themselves
+may be signs; `textBg` stays REQUIRED (it is the accessible label):
+```json
+"options": [
+  { "id": "a", "textBg": "Знак А", "correct": true,  "media": { "kind": "sign", "signRef": "Б2" } },
+  { "id": "b", "textBg": "Знак Б", "correct": false, "media": { "kind": "sign", "signRef": "Б1" } }
+]
+```
+Option media supports ONLY the sign kind. The legacy
+`{ "type": "image|video", "ref": "…" }` question-media shape remains valid but
+unused — prefer the data-driven kinds.
 
 ## signs/signs.json
 ```json

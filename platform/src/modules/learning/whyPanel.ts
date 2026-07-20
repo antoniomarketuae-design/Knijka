@@ -28,6 +28,7 @@ import { getContentRepo } from "@/lib/content/repo";
 import type { LawRef } from "@/lib/content/types";
 import {
   SCENARIO_TEMPLATES,
+  mistakeExperienceSeedForEvent,
   type ScenarioLevel,
   type ScenarioSpec,
 } from "@/modules/sim/lessons";
@@ -45,6 +46,18 @@ export interface WhyPanelMistakeRef {
   districtId: string;
 }
 
+/** THEO-3 „Преживей грешката": the founder-wired mistake-experience matching
+ *  this card's scenario event (six seed classes today — sim/lessons
+ *  MISTAKE_EXPERIENCE_SEEDS). May point at a DIFFERENT mistake of the same or
+ *  another template than the replayed demo — it is the class's vetted
+ *  experience, not the replay. */
+export interface WhyPanelExperienceRef {
+  templateId: string;
+  mistakeIndex: number;
+  /** STORED mistake-demo title (context for the button — ADR-002). */
+  titleBg: string;
+}
+
 /** "Виж го в симулатора" — the drill that demonstrates this question's fault. */
 export interface WhyPanelSimRef {
   templateId: string;
@@ -52,6 +65,8 @@ export interface WhyPanelSimRef {
   level: ScenarioLevel;
   titleBg: string;
   mistake: WhyPanelMistakeRef;
+  /** Wired mistake-experience for this event; null = not wired. */
+  experience: WhyPanelExperienceRef | null;
 }
 
 export interface WhyPanelPayload {
@@ -108,6 +123,9 @@ function buildSimRefIndex(): ReadonlyMap<string, WhyPanelSimRef> {
     }
     if (best === null) continue;
     const mistake = best.spec.mistakes[best.mistakeIndex];
+    // THEO-3: the wired „Преживей грешката" seed for this event's codes —
+    // resolved from the founder seed list (sim/lessons), stored refs only.
+    const seed = mistakeExperienceSeedForEvent(codes);
     index.set(
       event,
       Object.freeze<WhyPanelSimRef>({
@@ -120,6 +138,14 @@ function buildSimRefIndex(): ReadonlyMap<string, WhyPanelSimRef> {
           tracePath: mistake.traceRef.path,
           districtId: best.spec.map.districtId,
         }),
+        experience:
+          seed === null
+            ? null
+            : Object.freeze<WhyPanelExperienceRef>({
+                templateId: seed.templateId,
+                mistakeIndex: seed.mistakeIndex,
+                titleBg: seed.titleBg,
+              }),
       }),
     );
   }

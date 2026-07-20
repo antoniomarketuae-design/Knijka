@@ -5,7 +5,9 @@
  */
 import { describe, expect, it } from "vitest";
 import { buildContentRepo, contentRepo } from "./loader";
+import { makeSceneStillQuestion, makeSignMediaQuestion } from "./mediaFixtures";
 import { getContentRepo } from "./repo";
+import type { Question, SceneStillMedia } from "./types";
 
 // --------------------------------------------------------------------------
 // Real repo content (loaded from /content at module init)
@@ -208,8 +210,12 @@ function fixtureData() {
   };
 }
 
-function build(data: ReturnType<typeof fixtureData>, svgExists: (f: string) => boolean = () => true) {
-  return buildContentRepo({ ...data, svgExists });
+function build(
+  data: ReturnType<typeof fixtureData>,
+  svgExists: (f: string) => boolean = () => true,
+  districtExists: (d: string) => boolean = () => true,
+) {
+  return buildContentRepo({ ...data, svgExists, districtExists });
 }
 
 describe("buildContentRepo on fixtures", () => {
@@ -337,5 +343,128 @@ describe("buildContentRepo on fixtures", () => {
     const data = fixtureData();
     data.concepts[0].lawRefs = [];
     expect(() => build(data)).toThrow(/concepts\.json/);
+  });
+});
+
+// --------------------------------------------------------------------------
+// THEO-1 media kinds: sign faces + scene stills
+// --------------------------------------------------------------------------
+
+/** Narrow a fixture's media to the sceneStill member (or fail loudly). */
+function sceneOf(q: Question): SceneStillMedia {
+  if (q.media === null || !("kind" in q.media) || q.media.kind !== "sceneStill") {
+    throw new Error("fixture drifted");
+  }
+  return q.media;
+}
+
+/** Fixture bank + extra (possibly broken) media questions in osnovni. */
+function buildWithMedia(
+  extraQuestions: unknown[],
+  districtExists: (d: string) => boolean = () => true,
+) {
+  const data = fixtureData();
+  return buildContentRepo({
+    ...data,
+    questionsBySlug: { osnovni: [...data.questionsBySlug.osnovni, ...extraQuestions] },
+    svgExists: () => true,
+    districtExists,
+  });
+}
+
+describe("buildContentRepo — question media (THEO-1)", () => {
+  it("accepts sign and sceneStill media questions and serves them unchanged", () => {
+    const repo = buildWithMedia([makeSignMediaQuestion(), makeSceneStillQuestion()]);
+    const sign = repo.questionById("q-media-sign");
+    expect(sign?.media).toEqual({ kind: "sign", signRef: "Б2" });
+    expect(sign?.options[0].media).toEqual({ kind: "sign", signRef: "Б2" });
+    expect(sign?.options[1].media).toBeUndefined();
+    const scene = repo.questionById("q-media-scene");
+    expect(scene?.media).toMatchObject({ kind: "sceneStill", districtId: "tj-stop-v1" });
+  });
+
+  it("rejects a question media signRef with no matching sign code", () => {
+    const q = makeSignMediaQuestion();
+    q.media = { kind: "sign", signRef: "Х99" };
+    expect(() => buildWithMedia([q])).toThrow(/media references unknown signRef "Х99"/);
+  });
+
+  it("rejects an OPTION media signRef with no matching sign code", () => {
+    const q = makeSignMediaQuestion();
+    q.options[0].media = { kind: "sign", signRef: "Х99" };
+    expect(() => buildWithMedia([q])).toThrow(
+      /option "a" media references unknown signRef "Х99"/,
+    );
+  });
+
+  it("rejects a sceneStill whose district map does not exist", () => {
+    expect(() => buildWithMedia([makeSceneStillQuestion()], () => false)).toThrow(
+      /unknown districtId "tj-stop-v1"/,
+    );
+  });
+
+  it("treats every district as unknown when districtExists is not provided", () => {
+    const data = fixtureData();
+    expect(() =>
+      buildContentRepo({
+        ...data,
+        questionsBySlug: {
+          osnovni: [...data.questionsBySlug.osnovni, makeSceneStillQuestion()],
+        },
+        svgExists: () => true,
+      }),
+    ).toThrow(/unknown districtId/);
+  });
+
+  it("rejects a pose outside the focus window", () => {
+    const q = makeSceneStillQuestion();
+    sceneOf(q).poses[0] = { kind: "car", x: 31, y: 0, headingDeg: 0 }; // zoomM 60 → ±30
+    expect(() => buildWithMedia([q])).toThrow(/outside the focus window/);
+  });
+
+  it("rejects a mark outside the focus window", () => {
+    const q = makeSceneStillQuestion();
+    sceneOf(q).marks = [{ kind: "danger", x: 0, y: -31 }];
+    expect(() => buildWithMedia([q])).toThrow(/outside the focus window/);
+  });
+
+  it("rejects a zoomM outside the allowed range", () => {
+    const q = makeSceneStillQuestion();
+    sceneOf(q).focus.zoomM = 2;
+    expect(() => buildWithMedia([q])).toThrow(/questions\/osnovni\.json/);
+  });
+
+  it("rejects a districtId that is not kebab-case (fetch-URL charset lock)", () => {
+    const q = makeSceneStillQuestion();
+    (sceneOf(q) as { districtId: string }).districtId = "../secrets";
+    expect(() => buildWithMedia([q])).toThrow(/questions\/osnovni\.json/);
+  });
+
+  it("rejects an unknown media kind", () => {
+    const q = makeSignMediaQuestion();
+    (q as { media: unknown }).media = { kind: "hologram", ref: "x" };
+    expect(() => buildWithMedia([q])).toThrow(/questions\/osnovni\.json/);
+  });
+
+  it("rejects non-sign option media", () => {
+    const q = makeSignMediaQuestion();
+    (q.options[1] as { media?: unknown }).media = {
+      kind: "sceneStill",
+      districtId: "tj-stop-v1",
+      focus: { x: 0, y: 0, zoomM: 60 },
+      poses: [],
+    };
+    expect(() => buildWithMedia([q])).toThrow(/questions\/osnovni\.json/);
+  });
+
+  it("still accepts the legacy image/video media shape", () => {
+    const q = makeSignMediaQuestion("q-media-legacy");
+    q.media = { type: "image", ref: "media/foo.png" };
+    q.options[0].media = undefined;
+    const repo = buildWithMedia([q]);
+    expect(repo.questionById("q-media-legacy")?.media).toEqual({
+      type: "image",
+      ref: "media/foo.png",
+    });
   });
 });

@@ -295,6 +295,20 @@ export interface LessonSpec {
    * existing lesson omits it and keeps street behavior byte-identical.
    */
   collisionMinKmh?: number;
+  /**
+   * THEO-3 mistake-experience mode („Направи грешката", doc 64): the student
+   * performs the template's demonstrated WRONG action ON PURPOSE in a
+   * sandboxed, never-scored pass. When present the session engine routes
+   * EVERY violation through the coach's existing learn-only suppression
+   * channel (nothing scores, nothing terminates — scenarios/coach.ts
+   * `learnOnly`) and emits the ONE-SHOT consequence moment the first time a
+   * `codes` member fires (the shell pauses on it — consequence overlay).
+   * `codes` is the targeted mistake's codeRefs, denormalized at compile time
+   * (the parkingBay single-truth pattern). Written ONLY by compileScenario's
+   * mistakeExperience opt-in (the ruleConfig/signalPlan precedent); absent =
+   * normal graded session, bit-identical.
+   */
+  mistakeExperience?: { mistakeIndex: number; codes: readonly string[] };
 }
 
 /**

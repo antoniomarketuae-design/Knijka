@@ -44,10 +44,72 @@ export interface Section {
   conceptIds: string[]; // >= 1, all within topicId, globally partition-exclusive
 }
 
+// ---------------------------------------------------------------------------
+// Question media (THEO-1, doc 64) — DATA-DRIVEN kinds only: no binary assets,
+// everything renders client-side from data this repo owns.
+// ---------------------------------------------------------------------------
+
+/**
+ * The project's OWN sign artwork: `signRef` is an official sign CODE from
+ * signs/signs.json (e.g. "В24") — validated to resolve at content load.
+ */
+export interface SignMediaRef {
+  kind: "sign";
+  signRef: string;
+}
+
+/** Viewport of a scene still: a square window `zoomM` meters wide centered
+ *  on (x, y) in the district's world coordinates (x east, y north). */
+export interface SceneStillFocus {
+  x: number;
+  y: number;
+  zoomM: number;
+}
+
+export type SceneStillPoseKind = "car" | "truck" | "bus" | "tram" | "bike" | "ped";
+
+/** One actor drawn on the still. headingDeg: 0 = north, clockwise (the sim
+ *  trace convention). All positions must sit inside the focus window. */
+export interface SceneStillPose {
+  kind: SceneStillPoseKind;
+  x: number;
+  y: number;
+  headingDeg: number;
+  /** "ego" = the learner's own car (rendered highlighted). */
+  variant?: "ego";
+}
+
+/** Attention mark: danger = conflict point (red), target = look-here (accent). */
+export interface SceneStillMark {
+  kind: "danger" | "target";
+  x: number;
+  y: number;
+}
+
+/**
+ * A static top-down scene rendered from a committed district map
+ * (platform/public/world/<districtId>.json) — the mistake-replay drawing
+ * machinery without animation. districtId is validated to exist at load.
+ */
+export interface SceneStillMedia {
+  kind: "sceneStill";
+  districtId: string;
+  focus: SceneStillFocus;
+  poses: SceneStillPose[];
+  marks?: SceneStillMark[];
+}
+
+export type QuestionMedia =
+  | { type: "image" | "video"; ref: string } // legacy placeholder shape (unused)
+  | SignMediaRef
+  | SceneStillMedia;
+
 export interface QuestionOption {
   id: string;
-  textBg: string;
+  textBg: string; // for sign-face options this is the accessible label
   correct: boolean;
+  /** Sign-identification questions: the option IS a sign face. */
+  media?: SignMediaRef;
 }
 
 export interface Question {
@@ -59,7 +121,7 @@ export interface Question {
   options: QuestionOption[];
   explanationBg: string;
   lawRefs: LawRef[];
-  media: { type: "image" | "video"; ref: string } | null;
+  media: QuestionMedia | null;
   status: ContentStatus;
 }
 

@@ -91,6 +91,16 @@ export async function submitPracticeAnswer(
               tracePath: simRef.mistake.tracePath,
               districtId: simRef.mistake.districtId,
             },
+            // THEO-3: the wired „Преживей грешката" entry (six founder
+            // classes today); stored refs only.
+            experience:
+              simRef.experience === null
+                ? null
+                : {
+                    templateId: simRef.experience.templateId,
+                    mistakeIndex: simRef.experience.mistakeIndex,
+                    titleBg: simRef.experience.titleBg,
+                  },
           },
   };
 }

@@ -523,6 +523,13 @@ export interface LessonSessionState {
    * lessons and on exams that finished the route within limits.
    */
   examTermination?: ExamTermination;
+  /**
+   * THEO-3 (additive; lesson.mistakeExperience sessions only): session time
+   * the targeted wrong action first fired — the one-shot latch behind the
+   * consequence moment (applyTick emits `mistakeMoment` exactly once).
+   * Absent on every other session and until the mistake happens.
+   */
+  mistakeExperienceHitAtSec?: number;
 }
 
 // ---------------------------------------------------------------------------

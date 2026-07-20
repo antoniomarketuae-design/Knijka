@@ -36,9 +36,20 @@ export interface CoachInput {
  * floor and the repeat-escalation ladder are TRAINING devices; an exam
  * scores exactly what the official protocol scores, nothing softer and
  * nothing harder. Encounter counts still accumulate (session bookkeeping).
+ *
+ * THEO-3 `learnOnly` — the exam mode's mirror image: the WHOLE session rides
+ * the existing "learn-only" suppression channel (resolveEncounter's most
+ * lenient policy — mode "learn", never scored, ×0). This is the
+ * mistake-experience sandbox where the student performs the wrong action ON
+ * PURPOSE: even the опасна/terminating safety floor is deliberately bypassed
+ * — the dangerous act IS the assignment, and the consequence is presented by
+ * the mode's overlay, never by the score. Mutually exclusive with examMode
+ * by construction (the compiler never authors both); examMode wins if both
+ * ever arrive (grading integrity outranks the sandbox).
  */
 export interface CoachOptions {
   examMode?: boolean;
+  learnOnly?: boolean;
 }
 
 export interface CoachDecision {
@@ -90,8 +101,14 @@ export function coachStep(
 
   // Severity ladder (policy.ts): опасна/terminating always grade; второстепенна
   // warns once before grading regardless of mapping; основна follows the map.
+  // THEO-3 learnOnly: the sandbox overrides the ladder with the existing
+  // learn-only policy for every code — the same suppression channel
+  // learn-only-mapped scenarios always used, applied session-wide.
   const mappedPolicy = scenarioId ? getScenarioEvent(scenarioId)?.policyDefault : undefined;
-  const override = policyForViolation(v.severityClass, v.terminateSession === true, mappedPolicy);
+  const override =
+    opts?.learnOnly === true
+      ? "learn-only"
+      : policyForViolation(v.severityClass, v.terminateSession === true, mappedPolicy);
   const outcome = resolveEncounter(key, prior, override);
   return {
     decision: {

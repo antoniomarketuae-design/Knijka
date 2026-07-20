@@ -13,6 +13,7 @@ import { submitPracticeAnswer } from "@/app/(dashboard)/theory/practice/actions"
 import { IconArrowRight, IconCheck, IconTarget, IconX } from "@/components/icons";
 import { Gauge } from "@/components/hud/Gauge";
 import type { PracticeQuestionDto, PracticeSubmitResult } from "./types";
+import { hasSignOptions, QuestionMediaView, SignFace } from "./QuestionMedia";
 import { WhyPanel, WhyPanelIdle } from "./WhyPanel";
 import { buildWhyPanelModel } from "./whyPanelModel";
 
@@ -192,6 +193,8 @@ export function PracticeSession({
   const answeredCount = answers.length;
   const correctCount = answers.reduce((n, a) => n + (a.correct ? 1 : 0), 0);
   const badge = REASON_BADGES[current.reason];
+  // Any sign-face option switches the whole list to the picture grid.
+  const signGrid = hasSignOptions(current.options);
 
   return (
     <div className="mx-auto flex w-full max-w-2xl flex-col gap-4 lg:max-w-none lg:flex-row lg:items-start lg:justify-center lg:gap-6">
@@ -247,6 +250,10 @@ export function PracticeSession({
         </div>
       </div>
 
+      {/* THEO-1: visual media renders ABOVE the question text. Sign codes
+          and scene data describe the situation, never the answer. */}
+      {current.media !== null ? <QuestionMediaView media={current.media} /> : null}
+
       {/* Question + options */}
       <fieldset className="min-w-0" disabled={isChecking}>
         <legend className="max-w-[62ch] text-lg font-bold leading-relaxed text-foreground sm:text-xl">
@@ -257,7 +264,13 @@ export function PracticeSession({
             Избери всички верни отговори.
           </p>
         ) : null}
-        <ul className="mt-4 flex flex-col gap-2.5">
+        <ul
+          className={
+            signGrid
+              ? "mt-4 grid grid-cols-2 gap-2.5 sm:grid-cols-3"
+              : "mt-4 flex flex-col gap-2.5"
+          }
+        >
           {current.options.map((option, optionIndex) => {
             const isSelected = selected.includes(option.id);
             const isCorrectOption =
@@ -277,6 +290,63 @@ export function PracticeSession({
               stateClasses = "border-danger bg-danger/10";
             } else {
               stateClasses = "border-border opacity-55";
+            }
+
+            if (signGrid) {
+              // Sign-identification: a tappable picture tile per option. The
+              // whole tile is the label; textBg stays the accessible name.
+              return (
+                <li key={option.id} className="min-w-0">
+                  <label
+                    className={`flex h-full flex-col items-center gap-2 rounded-xl border p-3 transition duration-200 ease-out focus-within:ring-2 focus-within:ring-accent/50 motion-reduce:transition-none motion-reduce:transform-none ${stateClasses} ${
+                      result === null ? "cursor-pointer" : "cursor-default"
+                    }`}
+                  >
+                    <input
+                      type={current.type === "single" ? "radio" : "checkbox"}
+                      name={`practice-${current.id}`}
+                      value={option.id}
+                      checked={isSelected}
+                      onChange={() => toggleOption(option.id)}
+                      disabled={result !== null}
+                      className="sr-only"
+                    />
+                    <span className="flex w-full items-center justify-between">
+                      <span
+                        aria-hidden
+                        className="flex h-6 w-6 items-center justify-center rounded-md border border-hair bg-surface font-mono text-[11px] font-bold text-muted"
+                      >
+                        {optionIndex + 1}
+                      </span>
+                      {isCorrectOption ? (
+                        <IconCheck aria-hidden className="h-4 w-4 text-success" />
+                      ) : isWrongPick ? (
+                        <IconX aria-hidden className="h-4 w-4 text-danger" />
+                      ) : null}
+                    </span>
+                    {option.media !== null ? (
+                      <SignFace
+                        signRef={option.media.signRef}
+                        altBg={option.textBg}
+                        className="h-20 w-20 sm:h-24 sm:w-24"
+                      />
+                    ) : (
+                      <span className="flex min-h-20 items-center text-center text-sm leading-relaxed">
+                        {option.textBg}
+                      </span>
+                    )}
+                    {isCorrectOption ? (
+                      <span className="text-[11px] font-bold text-success">
+                        Верен отговор
+                      </span>
+                    ) : isWrongPick ? (
+                      <span className="text-[11px] font-bold text-danger">
+                        Твоят избор
+                      </span>
+                    ) : null}
+                  </label>
+                </li>
+              );
             }
 
             return (

@@ -96,6 +96,48 @@ export const SCENARIO_LESSON_ORDER = 1000;
 export { serializeObjectiveParams } from "./params";
 
 // ---------------------------------------------------------------------------
+// THEO-3 — the mistake-experience opt-in (doc 64: „Направи грешката")
+// ---------------------------------------------------------------------------
+
+/**
+ * Fixed instruction lead-in of a mistake-experience session; the compiled
+ * descriptionBg is this + the targeted mistake's STORED titleBg (ADR-002:
+ * fixed UI chrome + stored text, never generated).
+ */
+export const MISTAKE_EXPERIENCE_LEAD_IN_BG =
+  "Направи грешката нарочно — тук нищо не се оценява. Задачата:";
+
+/**
+ * Lesson-id of a compiled mistake-experience session. DELIBERATELY foreign to
+ * the `<templateId>@L<n>` rung namespace (resolve.ts regex rejects the `~m`
+ * suffix): the sandbox never persists and the wire must never regrade it as a
+ * real attempt — an id that ever leaks server-side resolves to nothing and is
+ * refused (UNKNOWN_LESSON). Parser lives in mistakeExperience.ts (the
+ * compile/resolve split precedent); round-trip pinned by tests.
+ */
+export function mistakeExperienceLessonId(
+  templateId: string,
+  level: ScenarioLevel,
+  mistakeIndex: number,
+): string {
+  return `${templateId}@L${level}~m${mistakeIndex}`;
+}
+
+/**
+ * Opt-in compile modes (the ruleConfig/signalPlan/physics precedent applied
+ * to the CALL: absent/empty = bit-identical output — golden-tested).
+ * `mistakeExperience` compiles the rung as the THEO-3 sandbox: same world,
+ * same staged encounters, same detectors and aids — but the id moves to the
+ * `~m<i>` namespace, the instruction copy tells the student to DO the wrong
+ * thing, examMode is dropped (a sandbox is never an exam) and the lesson
+ * carries the targeted mistake's codeRefs for the engine's one-shot
+ * consequence moment (engine.ts `mistakeMoment`).
+ */
+export interface ScenarioCompileOptions {
+  mistakeExperience?: { mistakeIndex: number };
+}
+
+// ---------------------------------------------------------------------------
 // The compiler
 // ---------------------------------------------------------------------------
 
@@ -128,7 +170,11 @@ function mergeAids(level: ScenarioLevel, overrides?: Partial<LessonAidsSpec>): L
  * authored / condition gated). Pure + deterministic: same spec + level =
  * identical LessonSpec (golden-snapshot-tested).
  */
-export function compileScenario(spec: ScenarioSpec, level: ScenarioLevel): LessonSpec {
+export function compileScenario(
+  spec: ScenarioSpec,
+  level: ScenarioLevel,
+  opts: ScenarioCompileOptions = {},
+): LessonSpec {
   assertScenarioSpec(spec);
 
   const rung: LevelSpec | undefined = spec.levels.find((l) => l.level === level);
@@ -255,6 +301,32 @@ export function compileScenario(spec: ScenarioSpec, level: ScenarioLevel): Lesso
 
   const aids = mergeAids(level, rung.aids);
   if (aids) lesson.aids = aids;
+
+  // THEO-3 mistake-experience delta (opt-in; absent = bit-identical). Applied
+  // LAST so the sandbox inherits everything above unchanged — world, staged
+  // encounters (they create the mistake's conditions), detectors, aids (the
+  // lowest rung is the full-help rung by the §7 ladder — „aids are on").
+  const mx = opts.mistakeExperience;
+  if (mx !== undefined) {
+    const idx = mx.mistakeIndex;
+    if (!Number.isInteger(idx) || idx < 0 || idx >= spec.mistakes.length) {
+      throw new ScenarioCompileError(
+        spec.id,
+        level,
+        `mistakeExperience.mistakeIndex ${idx} is out of range (template authors ${spec.mistakes.length} mistakes)`,
+      );
+    }
+    const mistake = spec.mistakes[idx];
+    lesson.id = mistakeExperienceLessonId(spec.id, level, idx);
+    lesson.titleBg = `${spec.titleBg} · Преживей грешката`;
+    // Fixed lead-in + the STORED mistake title — the instruction that tells
+    // the student to DO the wrong thing (ADR-002: stored text, never free).
+    lesson.descriptionBg = `${MISTAKE_EXPERIENCE_LEAD_IN_BG} ${mistake.titleBg}.`;
+    // A sandbox is never an exam — drop the flag even if a template ever
+    // authored its lowest rung as exam protocol.
+    delete lesson.examMode;
+    lesson.mistakeExperience = { mistakeIndex: idx, codes: [...mistake.codeRefs] };
+  }
 
   // Final guarantee: the compiled objectives round-trip the REAL parser —
   // a compile that returns can never explode inside createLessonSession.

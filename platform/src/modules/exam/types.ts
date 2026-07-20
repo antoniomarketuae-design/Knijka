@@ -20,10 +20,12 @@ export const EXAM_GRACE_SEC = 30;
 // Safe exam payload (what the candidate is allowed to see)
 // ---------------------------------------------------------------------------
 
-/** Option as shown during the exam — deliberately NO `correct` flag. */
+/** Option as shown during the exam — deliberately NO `correct` flag.
+ *  `media` (THEO-1 sign face) carries only a sign code — no answer leak. */
 export interface ExamQuestionOption {
   id: string;
   textBg: string;
+  media?: Question["options"][number]["media"];
 }
 
 /**

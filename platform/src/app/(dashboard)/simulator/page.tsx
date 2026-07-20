@@ -152,7 +152,12 @@ export default async function SimulatorPage({ searchParams }: SimulatorPageProps
 
   // THEO-2 drill deep link — resolved against the JUST-computed progression.
   const params = await searchParams;
-  const deepLink = resolveScenarioDeepLink(params.scenario, params.level, scenarios);
+  const deepLink = resolveScenarioDeepLink(
+    params.scenario,
+    params.level,
+    scenarios,
+    params.mistake,
+  );
 
   return (
     <SimulatorClient

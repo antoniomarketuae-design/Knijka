@@ -69,11 +69,15 @@ function mergePatch(question: Question, patch: QuestionPatch): unknown {
   if (patch.type !== undefined) next.type = patch.type;
   if (patch.explanationBg !== undefined) next.explanationBg = patch.explanationBg;
   if (patch.options !== undefined) {
-    next.options = patch.options.map((o) => ({
-      id: o.id,
-      textBg: o.textBg,
-      correct: o.correct,
-    }));
+    // Option media (THEO-1 sign faces) is NOT founder-editable — like
+    // question media it is preserved by id so an edit can never drop it.
+    const mediaById = new Map(question.options.map((o) => [o.id, o.media]));
+    next.options = patch.options.map((o) => {
+      const media = mediaById.get(o.id);
+      return media === undefined
+        ? { id: o.id, textBg: o.textBg, correct: o.correct }
+        : { id: o.id, textBg: o.textBg, correct: o.correct, media };
+    });
   }
   if (patch.lawRefs !== undefined) {
     next.lawRefs = patch.lawRefs.map((l) => ({ act: l.act, ref: l.ref }));
@@ -189,13 +193,15 @@ function renderScalarArray(values: string[]): string {
   return `[${values.map(j).join(", ")}]`;
 }
 
-function renderOptions(
-  options: { id: string; textBg: string; correct: boolean }[],
-  indent: string,
-): string {
+function renderOptions(options: Question["options"], indent: string): string {
   const inner = `${indent}  `;
   const body = options
-    .map((o) => `${inner}{ "id": ${j(o.id)}, "textBg": ${j(o.textBg)}, "correct": ${j(o.correct)} }`)
+    .map(
+      (o) =>
+        `${inner}{ "id": ${j(o.id)}, "textBg": ${j(o.textBg)}, "correct": ${j(o.correct)}${
+          o.media !== undefined ? `, "media": ${j(o.media)}` : ""
+        } }`,
+    )
     .join(",\n");
   return `[\n${body}\n${indent}]`;
 }

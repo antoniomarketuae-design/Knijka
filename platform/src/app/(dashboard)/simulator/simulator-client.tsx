@@ -32,6 +32,7 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import {
+  compileMistakeExperience,
   compileScenario,
   drawExamVariantId,
   generateExamVariant,
@@ -92,12 +93,22 @@ export function SimulatorClient({
   // pattern: the id IS the recipe; the server recompiles it to regrade).
   // THEO-2: an unlocked deep-linked rung IS the initial pick (the theory
   // why-panel's „Опитай в симулатора" click carries the user activation).
+  // THEO-3: a mistakeIndex on the pick compiles the MISTAKE-EXPERIENCE
+  // sandbox instead of a graded rung (the „Преживей грешката" deep link);
+  // the shell's „Сега опитай правилно" re-picks WITHOUT the index.
   const [scenarioPick, setScenarioPick] = useState<{
     templateId: string;
     level: ScenarioLevel;
+    mistakeIndex?: number;
   } | null>(
     deepLink !== null && deepLink.unlocked
-      ? { templateId: deepLink.templateId, level: deepLink.level }
+      ? {
+          templateId: deepLink.templateId,
+          level: deepLink.level,
+          ...(deepLink.mistakeIndex !== undefined
+            ? { mistakeIndex: deepLink.mistakeIndex }
+            : {}),
+        }
       : null,
   );
   // R3 #5/#23: leaving a scenario session („Назад към таблото" / „← Всички
@@ -117,6 +128,7 @@ export function SimulatorClient({
     const url = new URL(window.location.href);
     url.searchParams.delete("scenario");
     url.searchParams.delete("level");
+    url.searchParams.delete("mistake");
     window.history.replaceState(null, "", url);
     // Mount-only by design (consume-once semantics).
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -133,9 +145,12 @@ export function SimulatorClient({
     const spec = scenarioById(scenarioPick.templateId);
     if (spec === undefined) return null;
     try {
-      return compileScenario(spec, scenarioPick.level);
+      // THEO-3: a mistake pick compiles the sandbox at the ENTRY rung.
+      return scenarioPick.mistakeIndex !== undefined
+        ? compileMistakeExperience(spec, scenarioPick.mistakeIndex)
+        : compileScenario(spec, scenarioPick.level);
     } catch {
-      return null; // unauthored level — nothing mounts
+      return null; // unauthored level / out-of-range mistake — nothing mounts
     }
   }, [scenarioPick]);
 

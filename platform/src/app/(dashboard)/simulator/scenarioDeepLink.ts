@@ -19,6 +19,13 @@ export interface ScenarioDeepLink {
   level: ScenarioLevel;
   /** false → the client only focuses the catalog card (locked rung). */
   unlocked: boolean;
+  /**
+   * THEO-3 (?mistake=<i>): launch the template's MISTAKE-EXPERIENCE sandbox
+   * instead of a graded rung. The mode always compiles the ENTRY rung
+   * (always open per founder ruling), so `level` is the entry level here and
+   * any ?level param is ignored. Client-side compile validates the index.
+   */
+  mistakeIndex?: number;
 }
 
 /** The slice of ScenarioCatalogEntry the resolver needs (structural). */
@@ -37,10 +44,29 @@ export function resolveScenarioDeepLink(
   scenarioParam: string | string[] | undefined,
   levelParam: string | string[] | undefined,
   scenarios: readonly CatalogEntryLike[],
+  mistakeParam?: string | string[] | undefined,
 ): ScenarioDeepLink | null {
   if (typeof scenarioParam !== "string" || scenarioParam.length === 0) return null;
   const entry = scenarios.find((s) => s.templateId === scenarioParam);
   if (entry === undefined || entry.levels.length === 0) return null;
+
+  // Entry rung = the lowest authored level (always open per founder ruling).
+  const entryRung = entry.levels.reduce((min, l) => (l.level < min.level ? l : min));
+
+  // THEO-3 mistake-experience link: the mode plays the ENTRY rung only —
+  // ?level is ignored, garbage indexes are ignored (normal link semantics).
+  const mistakeIndex =
+    typeof mistakeParam === "string" && /^\d{1,2}$/.test(mistakeParam)
+      ? Number(mistakeParam)
+      : null;
+  if (mistakeIndex !== null) {
+    return {
+      templateId: entry.templateId,
+      level: entryRung.level,
+      unlocked: entryRung.unlocked,
+      mistakeIndex,
+    };
+  }
 
   const requested =
     typeof levelParam === "string" && /^[1-5]$/.test(levelParam)
@@ -50,9 +76,7 @@ export function resolveScenarioDeepLink(
     requested !== null
       ? entry.levels.find((l) => l.level === requested)
       : undefined;
-  // Entry rung = the lowest authored level (always open per founder ruling).
-  const target =
-    rung ?? entry.levels.reduce((min, l) => (l.level < min.level ? l : min));
+  const target = rung ?? entryRung;
 
   return {
     templateId: entry.templateId,

@@ -27,6 +27,7 @@ export type { SimSeverity } from "./store";
 // explanation + citations (+ the scenario drill demonstrating the fault).
 export { resolveWhyPanel } from "./whyPanel";
 export type {
+  WhyPanelExperienceRef,
   WhyPanelMistakeRef,
   WhyPanelPayload,
   WhyPanelSimRef,

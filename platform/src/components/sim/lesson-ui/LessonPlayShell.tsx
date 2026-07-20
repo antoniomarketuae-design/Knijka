@@ -45,8 +45,10 @@ import {
   EXAM_TERMINATION_TEXT_BG,
   finishSession,
   isDriveLocked,
+  MISTAKE_EXPERIENCE_DEMO_OFFER_SEC,
   observeQuizTick,
   parkingObservationFromTrace,
+  parseMistakeExperienceLessonId,
   parseScenarioLessonId,
   parseStoredAdvisorSetting,
   resolveScenarioNextSteps,
@@ -60,6 +62,7 @@ import {
   type LessonSessionState,
   type LessonSpec,
   type MicroQuizQuestion,
+  type MistakeDemo,
   type NearMissEvent,
   type QuizFrequency,
   type QuizTriggerState,
@@ -88,6 +91,7 @@ import {
 } from "@/app/(dashboard)/simulator/micro-quiz-actions";
 import { AdvisorCard } from "./AdvisorCard";
 import { MicroQuizOverlay } from "./MicroQuizOverlay";
+import { MistakeConsequenceOverlay } from "./MistakeConsequenceOverlay";
 import { SceneSlot } from "./SceneSlot";
 import { TeachMomentOverlay } from "./TeachMomentOverlay";
 import {
@@ -428,6 +432,27 @@ export function LessonPlayShell({
   const attemptRecorderRef = useRef<LiveTraceRecorder | null>(attemptRecorder);
   const [rubric, setRubric] = useState<RubricScore | null>(null);
 
+  // -- THEO-3: mistake-experience sessions (<templateId>@L<n>~m<i>) -------------
+  // The sandbox where the student performs the wrong action ON PURPOSE.
+  // Resolution mirrors the scenarioRef block (scenarioRef itself stays null —
+  // the `~m` id is foreign to the rung namespace, so no rubric, no recorder,
+  // no next-scenario CTAs). The engine's suppression + one-shot moment are
+  // driven by lesson.mistakeExperience; the shell only presents.
+  const mistakeRef = useMemo(() => parseMistakeExperienceLessonId(lesson.id), [lesson.id]);
+  const mistakeSpec: ScenarioSpec | null = useMemo(
+    () => (mistakeRef !== null ? scenarioById(mistakeRef.templateId) ?? null : null),
+    [mistakeRef],
+  );
+  const mistakeDemo: MistakeDemo | null =
+    lesson.mistakeExperience !== undefined && mistakeRef !== null && mistakeSpec !== null
+      ? mistakeSpec.mistakes[mistakeRef.mistakeIndex] ?? null
+      : null;
+  const mistakeMode = mistakeDemo !== null;
+  // The consequence pause: the live moment, or null-moment = „Виж
+  // демонстрацията" (the fallback after the generous no-mistake window).
+  const [consequence, setConsequence] = useState<{ moment: TeachMoment | null } | null>(null);
+  const [demoOffered, setDemoOffered] = useState(false);
+
   // -- QW1: fullscreen (immersive) mode ----------------------------------------
   // The fullscreen ELEMENT is the shell root (not just the canvas): the
   // browser then hides all surrounding dashboard chrome for free, while the
@@ -519,8 +544,10 @@ export function LessonPlayShell({
   // then build the pure trigger from it. No bank ⇒ no quizzes (graceful).
   // A13: exam sessions never quiz — the bank is not even fetched, so the
   // trigger stays null and observeQuizTick is never armed.
+  // THEO-3: the mistake-experience sandbox never quizzes either — the one
+  // assignment is the mistake; a quiz pause would fight the consequence pause.
   useEffect(() => {
-    if (examMode) return;
+    if (examMode || lesson.mistakeExperience !== undefined) return;
     let cancelled = false;
     void loadMicroQuizBank(lesson.id).then(
       (bank) => {
@@ -535,7 +562,7 @@ export function LessonPlayShell({
     return () => {
       cancelled = true;
     };
-  }, [lesson.id, examMode]);
+  }, [lesson.id, lesson.mistakeExperience, examMode]);
 
   // Frequency changes apply immediately, keeping the session's counters.
   useEffect(() => {
@@ -621,6 +648,11 @@ export function LessonPlayShell({
         setRubric(scoreRubric(r, scenarioSpec.rubric, observation));
       }
 
+      // THEO-3: a mistake-experience session is a SANDBOX — never persisted
+      // (no attempt rows, no stars, no XP; the wire refuses the foreign `~m`
+      // id anyway). The graded retry that follows persists normally.
+      if (lesson.mistakeExperience !== undefined) return;
+
       void finishLessonAction({
         lessonId: lesson.id,
         startedAtMs: startedAtMsRef.current ?? Date.now(),
@@ -649,7 +681,7 @@ export function LessonPlayShell({
         ...(observedMomentIds !== undefined ? { observedMomentIds } : {}),
       }).then(setSaveResult, () => setSaveResult({ ok: false, code: "SAVE_FAILED" }));
     },
-    [lesson.id, scenarioSpec],
+    [lesson.id, lesson.mistakeExperience, scenarioSpec],
   );
 
   // -- SceneSlot callbacks -------------------------------------------------------
@@ -657,9 +689,25 @@ export function LessonPlayShell({
     (tick: SimTick) => {
       const prev = sessionRef.current;
       if (prev.phase === "completed" || prev.phase === "aborted") return;
-      const { state, hudEvents, teachMoments } = applyTick(prev, tick);
+      const { state, hudEvents, teachMoments, mistakeMoment } = applyTick(prev, tick);
       sessionRef.current = state;
       lastTickRef.current = tick;
+
+      // THEO-3: the targeted wrong action fired — pause into the consequence
+      // overlay (one-shot; the functional update keeps an already-open card).
+      if (mistakeMoment !== undefined) {
+        setConsequence((c) => c ?? { moment: mistakeMoment });
+      }
+      // THEO-3 fallback: a generous window without the mistake → offer the
+      // recorded demonstration instead (never a dead end). Idempotent set.
+      if (
+        mistakeMode &&
+        state.mistakeExperienceHitAtSec === undefined &&
+        state.phase === "driving" &&
+        tick.t >= MISTAKE_EXPERIENCE_DEMO_OFFER_SEC
+      ) {
+        setDemoOffered(true);
+      }
 
       if (hudEvents.length > 0) {
         push(
@@ -699,7 +747,7 @@ export function LessonPlayShell({
       // finished on this very frame → grade and persist (finalize is guarded).
       if (state.phase === "completed") finalize(state);
     },
-    [push, finalize, activeQuiz, teachQueue],
+    [push, finalize, activeQuiz, teachQueue, mistakeMode],
   );
 
   // A8/A15 measurement channels — ref-resident like the tick path (no
@@ -836,6 +884,10 @@ export function LessonPlayShell({
     quizStatsRef.current = { total: 0, correct: 0 };
     setActiveQuiz(null);
     setTeachQueue([]);
+    // THEO-3: a fresh sandbox pass re-arms the one-shot moment (the fresh
+    // engine state above dropped the latch) and the demo offer window.
+    setConsequence(null);
+    setDemoOffered(false);
     quizTriggerRef.current =
       quizBankRef.current.length > 0
         ? createQuizTriggerState(quizFreqRef.current, quizBankRef.current)
@@ -929,12 +981,20 @@ export function LessonPlayShell({
             Изпит
           </span>
         ) : null}
+        {/* THEO-3: unmistakable sandbox framing — nothing here is graded. */}
+        {mistakeMode ? (
+          <span className="rounded-full bg-danger/15 px-2.5 py-1 text-[10px] font-black uppercase tracking-wider text-danger">
+            Пясъчник — не се оценява
+          </span>
+        ) : null}
         <div className="ml-auto flex flex-wrap items-center gap-2">
           {!ended ? (
             <>
               {/* „Съветник": show/hide the next-action prompt card. Hidden on
-                  exams — the advisor is a training aid, not the car. */}
-              {!examMode ? (
+                  exams — the advisor is a training aid, not the car — and in
+                  the THEO-3 sandbox, where prompting the CORRECT next action
+                  would fight the „направи грешката" assignment. */}
+              {!examMode && !mistakeMode ? (
                 <button
                   type="button"
                   aria-pressed={advisorOn}
@@ -949,8 +1009,11 @@ export function LessonPlayShell({
                   Съветник {advisorOn ? "вкл." : "изкл."}
                 </button>
               ) : null}
-              {/* A13: no micro-quizzes on an exam — the selector disappears. */}
-              {!examMode ? <QuizFrequencySelector value={quizFreq} onChange={setQuizFreq} /> : null}
+              {/* A13: no micro-quizzes on an exam — the selector disappears.
+                  THEO-3: none in the sandbox either (the bank never loads). */}
+              {!examMode && !mistakeMode ? (
+                <QuizFrequencySelector value={quizFreq} onChange={setQuizFreq} />
+              ) : null}
               {lesson.objectives.length === 0 ? (
                 <button type="button" className="btn-accent px-4 py-1.5 text-xs" onClick={finishNow}>
                   Завърши сесията
@@ -990,7 +1053,9 @@ export function LessonPlayShell({
             key={sceneEpoch}
             lesson={lesson}
             quality={quality}
-            paused={ended || activeQuiz !== null || teachQueue.length > 0}
+            paused={
+              ended || activeQuiz !== null || teachQueue.length > 0 || consequence !== null
+            }
             driveLocked={snap.driveLocked && !ended}
             preDriveHighlightStepId={
               // Instruction mode only: pulse the pending step's hotspot(s).
@@ -1030,15 +1095,39 @@ export function LessonPlayShell({
             alone). The advisor hides while a pause overlay (quiz/teach) is up
             — it must never compete with a modal card. */}
         <div className="absolute left-1/2 top-3 flex -translate-x-1/2 flex-col items-center gap-1.5">
-          <ObjectiveBanner
-            titleBg={snap.objectiveTitle}
-            index={Math.min(snap.objectiveIndex, Math.max(1, snap.objectiveTotal))}
-            total={snap.objectiveTotal}
-            progress={snap.objectiveProgress}
-            flash={flash}
-          />
+          {mistakeMode ? (
+            // THEO-3: the sandbox's ONE instruction replaces the objective
+            // banner — the assignment is the mistake (fixed lead-in + the
+            // STORED mistake title, compiled into descriptionBg).
+            !ended ? (
+              <div className="max-w-md rounded-2xl border border-danger/60 bg-background/85 px-4 py-2.5 text-center backdrop-blur">
+                <p className="text-[10px] font-black uppercase tracking-wider text-danger">
+                  Преживей грешката
+                </p>
+                <p className="mt-0.5 text-xs font-bold leading-snug">{lesson.descriptionBg}</p>
+                {demoOffered && consequence === null ? (
+                  <button
+                    type="button"
+                    onClick={() => setConsequence({ moment: null })}
+                    className="btn-ghost mt-1.5 px-3 py-1 text-[11px]"
+                  >
+                    Не се получава? Виж демонстрацията
+                  </button>
+                ) : null}
+              </div>
+            ) : null
+          ) : (
+            <ObjectiveBanner
+              titleBg={snap.objectiveTitle}
+              index={Math.min(snap.objectiveIndex, Math.max(1, snap.objectiveTotal))}
+              total={snap.objectiveTotal}
+              progress={snap.objectiveProgress}
+              flash={flash}
+            />
+          )}
           {advisorOn &&
           !examMode &&
+          !mistakeMode &&
           !ended &&
           activeQuiz === null &&
           teachQueue.length === 0 &&
@@ -1181,6 +1270,26 @@ export function LessonPlayShell({
             moment={teachQueue[0]}
             remaining={teachQueue.length - 1}
             onAcknowledge={handleTeachAcknowledged}
+          />
+        ) : null}
+
+        {/* THEO-3 consequence — pause + the „Какво направи" card: stored
+            what-went-wrong copy + lawRef + the recorded red-ghost replay,
+            then „Сега опитай правилно" restarts the SAME rung graded (the
+            onStartScenario seam — the same remount path as „Следващ
+            сценарий"). Sandbox sessions never queue teach moments or
+            quizzes, so this pause never competes with them. */}
+        {mistakeMode && mistakeDemo !== null && consequence !== null && !ended ? (
+          <MistakeConsequenceOverlay
+            demo={mistakeDemo}
+            districtId={mistakeSpec!.map.districtId}
+            moment={consequence.moment}
+            onRetryCorrect={
+              onStartScenario !== undefined && mistakeRef !== null
+                ? () => onStartScenario(mistakeRef.templateId, mistakeRef.level)
+                : null
+            }
+            onDismiss={() => setConsequence(null)}
           />
         ) : null}
 
