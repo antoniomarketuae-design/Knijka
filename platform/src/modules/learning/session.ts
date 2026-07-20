@@ -62,6 +62,15 @@ export interface PracticeSessionOptions {
   size?: number;
   /** Include "needs-review" questions. Default true (practice only). */
   includeUnreviewed?: boolean;
+  /**
+   * ADMIN ONLY (founder review, 2026-07-20): skip the prerequisite-mastery
+   * gate entirely so every concept's questions are reachable regardless of
+   * progress. A fresh account otherwise funnels into the entry concepts —
+   * which are the definitional, sim-unmapped questions — hiding the whole
+   * why-panel/replay surface from a reviewer. Callers must pass this from the
+   * SERVER session's isAdmin only, never from client input.
+   */
+  ignorePrerequisites?: boolean;
   /** Injectable clock for tests. Default: new Date(). */
   now?: Date;
 }
@@ -75,6 +84,7 @@ export async function buildPracticeSession(
     conceptIds,
     size = DEFAULT_SESSION_SIZE,
     includeUnreviewed = true,
+    ignorePrerequisites = false,
     now = new Date(),
   } = options;
 
@@ -115,6 +125,7 @@ export async function buildPracticeSession(
     progressByConcept.get(conceptId)?.mastery ?? 0;
 
   const prereqsMet = (conceptId: string): boolean =>
+    ignorePrerequisites ||
     repo
       .prerequisites(conceptId)
       .every((p) => masteryOf(p.id) >= PREREQ_MASTERY_THRESHOLD);

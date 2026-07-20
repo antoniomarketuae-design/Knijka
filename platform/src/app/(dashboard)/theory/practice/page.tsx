@@ -62,6 +62,10 @@ export default async function PracticePage({ searchParams }: PracticePageProps) 
     topicSlug: topic?.slug,
     conceptIds: section?.conceptIds,
     size: SESSION_SIZE,
+    // Admin (server session role): every concept reachable regardless of
+    // prerequisite mastery — the founder reviews the whole bank, not a
+    // beginner's slice. Students keep the pedagogical gate.
+    ignorePrerequisites: user.isAdmin,
   });
 
   const topicsById = new Map(repo.topics().map((t) => [t.id, t]));
