@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { requireUser } from "@/modules/auth";
+import { CLIP_PLAN } from "@/modules/learning";
 import { ClipsGalleryClient } from "./ClipsGalleryClient";
 
 export const metadata: Metadata = {
@@ -25,5 +26,7 @@ export default async function ClipsReviewPage() {
   const user = await requireUser();
   if (!user.isAdmin) notFound();
 
-  return <ClipsGalleryClient />;
+  // Requirements cards (doc 66) — the generated plan, resolved server-side
+  // so the client never bundles the learning barrel (the clip-capture law).
+  return <ClipsGalleryClient plan={CLIP_PLAN} />;
 }

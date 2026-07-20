@@ -10,7 +10,8 @@ reviews every clip at `/review/clips` (admin-only) before mass production.
 ## What is in git vs what is not
 
 - `manifest.json` and this README are COMMITTED. Everything else in this
-  folder (the `.webm` binaries) is GITIGNORED — see `platform/.gitignore`.
+  folder (the `.webm` binaries and the `.k0..k4.png` keyframe stills) is
+  GITIGNORED — see `platform/.gitignore`.
 - A fresh clone therefore has an empty gallery and canvas-only panels.
   Every reader tolerates a missing clip file quietly (falls back to canvas).
 
@@ -41,12 +42,22 @@ path). Readers match clips to panels by this path, normalized through
 `traceUrlForRepoPath` (`src/components/theory/clipManifest.ts` is the reader
 module — keep it in sync with any contract change).
 
+Doc 66 (CaptureScene v2) adds three ADDITIVE per-clip fields — version stays
+1, pre-R0 readers ignore them:
+
+- `keyframes`: the five R0 stills `"/clips/<id>.k0..k4.png"` (window start,
+  fault−2, fault, fault+2, window end) — what Claude inspects with vision
+  before the founder reviews;
+- `actors`: the R1 checklist `[{ "kind", "label", "present" }]` — the plan
+  card's required actors vs what the capture actually staged;
+- `view`: `"exterior" | "cockpit" | "exterior+dashboard"` (R4).
+
 ## Deploying the binaries to staging
 
 The `.webm` files never travel through git. After a capture batch:
 
 ```
-scp platform/public/clips/*.webm root@<vps>:/opt/knijka/platform/public/clips/
+scp platform/public/clips/*.webm platform/public/clips/*.png root@<vps>:/opt/knijka/platform/public/clips/
 ```
 
 Untracked files in the VPS checkout SURVIVE `deploy.sh` (git only touches

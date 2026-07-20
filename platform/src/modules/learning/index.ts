@@ -32,6 +32,17 @@ export { resolveWhyPanel } from "./whyPanel";
 // static data — needs no content repo.
 export { clipIdFor, clipPilotList } from "./clipPilot";
 export type { ClipPilotEntry } from "./clipPilot";
+
+// Produced-media requirements card (doc 66): the generated per-clip plan —
+// engine-computed fault time + R1/R2/R4 card. PLAN writes it, the RIG
+// consumes it verbatim, /review/clips renders it. Pure static data.
+export { CLIP_PLAN, clipPlanForId } from "./clipPlan.generated";
+export type {
+  ClipGoverningControl,
+  ClipPlanEntry,
+  ClipRequiredActor,
+  ClipView,
+} from "./clipPlan.generated";
 export type {
   WhyPanelExperienceRef,
   WhyPanelMistakeRef,

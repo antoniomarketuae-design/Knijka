@@ -1,15 +1,22 @@
 /**
- * DEV-ONLY clip sink for the /dev/clip-capture rig (the why-panel video
- * pilot):
+ * DEV-ONLY clip sink for the /dev/clip-capture rig (doc 66, CaptureScene v2):
  *
  *   GET  /api/dev/clips → the current public/clips/manifest.json
  *   POST /api/dev/clips → multipart form { id, templateId, mistakeIndex,
- *        tracePath, titleBg, durationSec, file } — writes
- *        public/clips/<id>.webm and UPSERTS the manifest entry.
+ *        tracePath, titleBg, durationSec, view, actors, file, k0..k4 } —
+ *        writes public/clips/<id>.webm + the five R0 keyframe stills
+ *        public/clips/<id>.k0..k4.png and UPSERTS the manifest entry
+ *        (keyframes + actor checklist + view are ADDITIVE manifest fields;
+ *        version stays 1, readers that predate them keep parsing).
+ *
+ * The keyframes are the R0 evidence: Claude inspects them WITH VISION against
+ * R1–R6 before the founder sees anything ("tests green" is not evidence for
+ * visual work — only looking is). The actors field is the R1 cross-check:
+ * what the capture actually staged vs the plan card.
  *
  * 404 in production (the /api/review convention) — the capture rig is a
  * founder/dev tool; nothing here ships to students. Idempotent by design:
- * re-recording a clip overwrites the binary and replaces the entry, so the
+ * re-recording a clip overwrites the binaries and replaces the entry, so the
  * main session re-runs stragglers freely.
  *
  * Contract: src/lib/clips/manifest.ts (writer side) ↔
@@ -21,14 +28,23 @@ import path from "node:path";
 import { NextResponse } from "next/server";
 import {
   CLIP_ID_RE,
+  CLIP_KEYFRAME_COUNT,
   CLIPS_MANIFEST_VERSION,
+  clipKeyframeSrc,
   clipSrcFor,
+  type ClipActorCheck,
   type ClipManifest,
   type ClipManifestEntry,
 } from "@/lib/clips/manifest";
 
 // Reads/writes the filesystem — never cache, always run at request time.
 export const dynamic = "force-dynamic";
+
+/** Per-still ceiling — a 1280×720 PNG is ~0.5–2 MB; 8 MB flags a bad blob. */
+const MAX_KEYFRAME_BYTES = 8 * 1024 * 1024;
+
+const CLIP_VIEWS = ["exterior", "cockpit", "exterior+dashboard"] as const;
+type ClipView = (typeof CLIP_VIEWS)[number];
 
 /** 404 in production so the rig is unreachable in the shipped app. */
 function productionBlocked(): NextResponse | null {
@@ -65,6 +81,26 @@ function readManifest(): ClipManifest {
   return { version: CLIPS_MANIFEST_VERSION, clips: [] };
 }
 
+/** The rig's R1 checklist JSON → typed rows; null = malformed (fail loud). */
+function parseActors(raw: string): ClipActorCheck[] | null {
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return null;
+    const out: ClipActorCheck[] = [];
+    for (const row of parsed) {
+      if (typeof row !== "object" || row === null) return null;
+      const { kind, label, present } = row as Record<string, unknown>;
+      if (typeof kind !== "string" || kind.length === 0) return null;
+      if (typeof label !== "string") return null;
+      if (typeof present !== "boolean") return null;
+      out.push({ kind, label, present });
+    }
+    return out;
+  } catch {
+    return null;
+  }
+}
+
 export async function GET(): Promise<NextResponse> {
   const blocked = productionBlocked();
   if (blocked) return blocked;
@@ -89,8 +125,10 @@ export async function POST(request: Request): Promise<NextResponse> {
   const titleBg = String(form.get("titleBg") ?? "");
   const durationSec = Number(form.get("durationSec"));
   const file = form.get("file");
+  const viewRaw = form.get("view");
+  const actorsRaw = form.get("actors");
 
-  // The id names a file on disk — the regex is the traversal guard.
+  // The id names files on disk — the regex is the traversal guard.
   if (!CLIP_ID_RE.test(id) || id !== `${templateId}__m${mistakeIndex}`) {
     return NextResponse.json({ error: "bad_id" }, { status: 400 });
   }
@@ -108,10 +146,52 @@ export async function POST(request: Request): Promise<NextResponse> {
     return NextResponse.json({ error: "bad_file" }, { status: 400 });
   }
 
+  // View (doc 66 R4) — optional (v1 rigs never sent it), strict when sent.
+  let view: ClipView | undefined;
+  if (viewRaw !== null) {
+    const v = String(viewRaw);
+    if (!(CLIP_VIEWS as readonly string[]).includes(v)) {
+      return NextResponse.json({ error: "bad_view" }, { status: 400 });
+    }
+    view = v as ClipView;
+  }
+
+  // Actor checklist (doc 66 R1) — optional, strict when sent (the rig is the
+  // only writer; a malformed checklist is a rig bug that must surface).
+  let actors: ClipActorCheck[] | undefined;
+  if (actorsRaw !== null) {
+    const parsed = parseActors(String(actorsRaw));
+    if (parsed === null) {
+      return NextResponse.json({ error: "bad_actors" }, { status: 400 });
+    }
+    actors = parsed;
+  }
+
+  // R0 keyframes k0..k4 — all five or none (a partial strip would let a
+  // defective still slip past the vision inspection unnoticed).
+  const stills: Blob[] = [];
+  for (let i = 0; i < CLIP_KEYFRAME_COUNT; i++) {
+    const still = form.get(`k${i}`);
+    if (still === null) break;
+    if (!(still instanceof Blob) || still.size === 0 || still.size > MAX_KEYFRAME_BYTES) {
+      return NextResponse.json({ error: "bad_keyframe" }, { status: 400 });
+    }
+    stills.push(still);
+  }
+  if (stills.length !== 0 && stills.length !== CLIP_KEYFRAME_COUNT) {
+    return NextResponse.json({ error: "bad_keyframe_count" }, { status: 400 });
+  }
+
   const dir = clipsDir();
   await fs.promises.mkdir(dir, { recursive: true });
   const bytes = Buffer.from(await file.arrayBuffer());
   await fs.promises.writeFile(path.join(dir, `${id}.webm`), bytes);
+  const keyframes: string[] = [];
+  for (let i = 0; i < stills.length; i++) {
+    const stillBytes = Buffer.from(await stills[i].arrayBuffer());
+    await fs.promises.writeFile(path.join(dir, `${id}.k${i}.png`), stillBytes);
+    keyframes.push(clipKeyframeSrc(id, i));
+  }
 
   const entry: ClipManifestEntry = {
     id,
@@ -122,6 +202,9 @@ export async function POST(request: Request): Promise<NextResponse> {
     durationSec: Math.round(durationSec * 100) / 100,
     recordedAt: new Date().toISOString(),
     titleBg,
+    ...(keyframes.length > 0 ? { keyframes } : {}),
+    ...(actors !== undefined ? { actors } : {}),
+    ...(view !== undefined ? { view } : {}),
   };
 
   const manifest = readManifest();
@@ -134,5 +217,10 @@ export async function POST(request: Request): Promise<NextResponse> {
   await fs.promises.writeFile(tmp, JSON.stringify(next, null, 2) + "\n", "utf8");
   await fs.promises.rename(tmp, manifestPath());
 
-  return NextResponse.json({ ok: true, entry, sizeBytes: bytes.length });
+  return NextResponse.json({
+    ok: true,
+    entry,
+    sizeBytes: bytes.length,
+    keyframeCount: keyframes.length,
+  });
 }

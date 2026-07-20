@@ -38,6 +38,13 @@ export interface MistakeClip {
   recordedAt: string;
   /** STORED mistake titleBg (ADR-002 — copied, never generated). */
   titleBg: string;
+  /**
+   * Keyframe still URLs the rig saved alongside the clip (doc 66 R0 — the
+   * vision-inspection strip). OPTIONAL and lenient: absent/malformed reads as
+   * "no keyframes" so pre-R0 manifests keep parsing; the gallery degrades to
+   * video-only.
+   */
+  keyframes?: string[];
 }
 
 export const CLIP_MANIFEST_URL = "/clips/manifest.json";
@@ -62,7 +69,7 @@ function parseClip(raw: unknown): MistakeClip | null {
   if (typeof durationSec !== "number" || !Number.isFinite(durationSec) || durationSec < 0) {
     return null;
   }
-  return {
+  const clip: MistakeClip = {
     id,
     templateId,
     mistakeIndex,
@@ -72,6 +79,13 @@ function parseClip(raw: unknown): MistakeClip | null {
     recordedAt: typeof recordedAt === "string" ? recordedAt : "",
     titleBg,
   };
+  // Keyframes (doc 66 R0): keep only non-empty string URLs; anything else
+  // degrades to "no keyframes" without dropping the clip.
+  if (Array.isArray(raw.keyframes)) {
+    const frames = raw.keyframes.filter((k): k is string => typeof k === "string" && k.length > 0);
+    if (frames.length > 0) clip.keyframes = frames;
+  }
+  return clip;
 }
 
 /**

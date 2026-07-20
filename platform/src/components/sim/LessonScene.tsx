@@ -61,16 +61,13 @@ import {
 import {
   DEFAULT_LESSON_TRAFFIC,
   lessonDistrictId,
-  scenarioBaysOf,
   type NearMissEvent,
   type NearMissStats,
-  type ParkingBaySpec,
   type StagedEventOutcome,
   type VehicleSample,
 } from "@/modules/sim/contracts";
 import {
   isScenarioLessonId,
-  lessonParkingBaysFor,
   parseScenarioLessonId,
   scenarioById,
   type LessonSpec,
@@ -100,17 +97,8 @@ import {
   QUALITY_PRESETS,
   type QualityLevel,
 } from "@/modules/sim/environment";
-import {
-  DistrictWorld,
-  buildWorldGeometry,
-  assertDistrict,
-  type WorldGeometry,
-} from "@/modules/sim/world";
-import {
-  createWorldRuntime,
-  resolveSurfaceGripPatches,
-  type SurfaceGripPatch,
-} from "@/modules/sim/runtime";
+import { DistrictWorld, assertDistrict, type WorldGeometry } from "@/modules/sim/world";
+import { createWorldRuntime, type SurfaceGripPatch } from "@/modules/sim/runtime";
 import { createTrafficSystem, TrafficLayer, type TrafficDistrict } from "@/modules/sim/traffic";
 import {
   buildPoligonGhostDemo,
@@ -131,9 +119,13 @@ import { VehicleRig, type CollisionWithWhat, type VehicleSpawn } from "./Vehicle
 import { NpcColliders } from "./NpcColliders";
 import { createVehicleSample } from "./vehicleSample";
 import { buildMinimapPolylines } from "./lessonMinimap";
+import {
+  applySignalModes,
+  buildLessonWorldCore,
+  wireTrafficQueries,
+} from "./lessonWorldRecipe";
 import { RouteGuidance } from "./RouteGuidance";
 import { ScenarioObstacles, type ScenarioObstacleSpec } from "./ScenarioObstacles";
-import { heldSceneryFor } from "./scenarioSceneryProps";
 import { ShadowCar } from "./ShadowCar";
 // [glance-pings] the look-left/right teaching overlay (see the wiring block).
 import { GlanceEdgePings, type GlancePingTap } from "./lesson-ui/GlanceEdgePings";
@@ -409,64 +401,13 @@ export default function LessonScene(props: LessonSceneProps) {
         const res = await fetch(`/world/${districtId}.json`);
         if (!res.ok) throw new Error(`district ${districtId} ${res.status}`);
         const raw: unknown = await res.json();
-        const runtime = createWorldRuntime(raw);
-        const district = assertDistrict(raw);
-        // Bay paint is CURRICULUM data, per district (doc 74 §5.4): pass the
-        // loaded map's bays explicitly so city bays never paint onto the
-        // полигон (and vice versa) — the builder's default is district-v1's.
-        // S1: scenario-lot districts ADD their meta.scenario bay rects (the
-        // generator's single geometric truth — the compiled lesson's
-        // parkingBay IS one of them by the templates contract test), plus
-        // the lesson's own graded rect defensively deduped — the L7
-        // painted-rect-equals-graded-rect law survives the generated maps.
-        const scenarioBays = scenarioBaysOf(raw);
-        const paintBays: ParkingBaySpec[] = [
-          ...lessonParkingBaysFor(districtId),
-          ...scenarioBays.map((b) => ({
-            x: b.x,
-            y: b.y,
-            headingDeg: b.headingDeg,
-            widthM: b.widthM,
-            lengthM: b.lengthM,
-          })),
-        ];
-        if (
-          props.lesson.parkingBay &&
-          !paintBays.some(
-            (b) => b.x === props.lesson.parkingBay!.x && b.y === props.lesson.parkingBay!.y,
-          )
-        ) {
-          paintBays.push({ ...props.lesson.parkingBay });
-        }
-        const geometry = buildWorldGeometry(district, {
-          parkingBays: paintBays,
-        });
-        // S1: occupied bays become PRECISE hittable parked cars (doc 76 §0)
-        // — scenario lessons only; curriculum districts carry no scenario
-        // meta, so this stays [] and nothing mounts.
-        const scenarioObstacles: ScenarioObstacleSpec[] = isScenarioLessonId(props.lesson.id)
-          ? [
-              ...scenarioBays
-                .filter((b) => b.occupied)
-                .map((b, i) => ({
-                  kind: "vehicle" as const,
-                  x: b.x,
-                  y: b.y,
-                  headingDeg: b.headingDeg,
-                  seed: i,
-                })),
-              // Held scenery (render wave): district-authored cones (hittable
-              // props — the hz-roadworks seam) + per-template stalled/wreck/
-              // parked-row dressing (visual-only bodies, no new colliders).
-              ...heldSceneryFor(props.lesson.id, raw),
-            ]
-          : [];
-        // SURFACE-PATCH slice (AC-07-full aquaplane / AC-08 ice): resolve the
-        // district's authored waterPatch/icePatch spans into district-space
-        // rects for VehicleRig's per-substep grip modulation. DATA-DRIVEN:
-        // the map is the opt-in (no LessonSpec field) — every pre-slice map
-        // resolves to [] and the live physics stays untouched.
-        const gripPatches = resolveSurfaceGripPatches(district);
+        // THE drill's world recipe — extracted verbatim to lessonWorldRecipe
+        // (doc 66 R5: the clip-capture rig mounts the SAME core, so the two
+        // scenes cannot drift apart): runtime, validated district, bay paint,
+        // buildWorldGeometry, occupied-bay obstacles + held scenery, grip
+        // patches, spawn points.
+        const core = buildLessonWorldCore(props.lesson, raw);
+        const { runtime, district, geometry, scenarioObstacles, gripPatches } = core;
         // S1: the shadow/ribbon aids need the template's recorded trace.
         let shadowTrace: ScenarioTrace | null = null;
         if (props.lesson.aids?.shadowCar || props.lesson.aids?.pathRibbon) {
@@ -484,9 +425,7 @@ export default function LessonScene(props: LessonSceneProps) {
             }
           }
         }
-        const spawnPoints = (
-          (raw as { spawnPoints?: SpawnPointLike[] }).spawnPoints ?? []
-        );
+        const spawnPoints = core.spawnPoints;
         // Anchor traffic at the lesson spawn so cars + pedestrians are where the
         // driver actually is — routes otherwise scatter across the ~1.6 km map
         // and every agent gets distance-culled (nearest car was ~340 m away).
@@ -513,14 +452,9 @@ export default function LessonScene(props: LessonSceneProps) {
         // dials its cluster DARK / FLASHING AMBER at session start, so LIVE
         // play matches the recorded traces — grading falls back to the
         // uncontrolled-junction rules AND the lamps render unlit/blinking
-        // from the same mode state (signalLampState). Sorted application
-        // keeps a hypothetical multi-cluster dial deterministic. A staged
+        // from the same mode state (signalLampState). A staged
         // trafficController armed later overrides the mode (its own law).
-        for (const [nodeId, mode] of Object.entries(props.lesson.signalModes ?? {}).sort(
-          (a, b) => (a[0] < b[0] ? -1 : 1),
-        )) {
-          runtime.setSignalClusterMode(nodeId, mode);
-        }
+        applySignalModes(runtime, props.lesson);
         const trafficSpec = props.lesson.traffic;
         const traffic = createTrafficSystem(
           raw as Parameters<typeof createTrafficSystem>[0],
@@ -532,23 +466,9 @@ export default function LessonScene(props: LessonSceneProps) {
               trafficSpec?.pedestrianCount ?? DEFAULT_LESSON_TRAFFIC.pedestrianCount,
           },
         );
-        runtime.setPedestrianQuery((id) => traffic.pedestrianOnCrossing(id));
-        runtime.setJunctionConflictQuery((x, y, r, b) => traffic.conflictNear(x, y, r, b));
-        runtime.setOncomingQuery((px, py, h, r) => traffic.oncomingNear(px, py, h, r));
-        runtime.setRightConflictQuery((jx, jy, px, py, h, r) =>
-          traffic.conflictFromRight(jx, jy, px, py, h, r),
-        );
-        runtime.setCirculatingQuery((cx, cy, px, py, h, r) =>
-          traffic.circulatingConflict(cx, cy, px, py, h, r),
-        );
-        // VU-02 (vulnerable pass): the same-direction cyclist telemetry the
-        // runtime's lateral-clearance tracker reads — staged cyclist proxies
-        // only, so every cyclist-less lesson stays structurally silent.
-        runtime.setCyclistQuery((px, py, h, r) => traffic.cyclistNear(px, py, h, r));
-        // OV-09 (overtake return): the same-direction VEHICLE telemetry the
-        // runtime's return-gap tracker reads (cyclist proxies excluded at the
-        // source — their pass duty is VU-02's act).
-        runtime.setOvertakenQuery((px, py, h, r) => traffic.overtakenNear(px, py, h, r));
+        // Telemetry queries (pedestrian/junction/oncoming/right/circulating/
+        // cyclist/overtaken) — the shared seven-hookup set (lessonWorldRecipe).
+        wireTrafficQueries(runtime, traffic);
         // A8: stage the lesson's scripted encounters NOW — before TrafficLayer
         // mounts — so staged actors land inside the instanced buffers. The
         // director is deterministic per (lesson seed, attempt).

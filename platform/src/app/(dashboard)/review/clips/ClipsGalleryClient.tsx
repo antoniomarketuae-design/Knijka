@@ -8,6 +8,12 @@
  * textarea kept in localStorage ONLY (pilot rule: no approval persistence —
  * the founder reports verbally).
  *
+ * Doc 66 additions: under each video the REQUIREMENTS CARD from the generated
+ * clip plan (изисквани участници / управляващ елемент / изглед / момент на
+ * грешката — the R0 checklist, passed in server-side so the learning barrel
+ * never bundles) and the keyframe strip the rig saved (manifest `keyframes`).
+ * Both degrade quietly when absent.
+ *
  * Fetches /clips/manifest.json fresh (no-store) — the founder re-reviews
  * right after a capture batch re-runs. A missing/empty manifest degrades to
  * the empty state; a 404-ing .webm (binaries deploy by scp, not git) shows a
@@ -22,6 +28,7 @@ import {
   parseClipManifest,
   type MistakeClip,
 } from "@/components/theory/clipManifest";
+import type { ClipPlanEntry } from "@/modules/learning";
 
 const NOTES_KEY_PREFIX = "clip-notes:";
 
@@ -93,7 +100,80 @@ function ClipNotes({ clipId }: { clipId: string }) {
   );
 }
 
-function ClipCard({ clip }: { clip: MistakeClip }) {
+const VIEW_BG: Record<ClipPlanEntry["view"], string> = {
+  exterior: "Отвън",
+  cockpit: "Кокпит",
+  "exterior+dashboard": "Отвън + табло",
+};
+
+/** One row of the requirements card. */
+function PlanRow({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className="flex gap-2 text-xs leading-snug">
+      <dt className="w-24 shrink-0 text-muted">{label}</dt>
+      <dd className="min-w-0 flex-1">{children}</dd>
+    </div>
+  );
+}
+
+/** The doc-66 requirements card — WHAT this clip was required to show
+ *  (the same card Claude's R0 inspection checks against). */
+function RequirementsCard({ plan }: { plan: ClipPlanEntry }) {
+  const control = plan.governingControl;
+  return (
+    <dl className="flex flex-col gap-1 rounded-xl border border-border bg-surface-2/40 p-2.5">
+      <PlanRow label="Участници">
+        {plan.requiredActors.length === 0
+          ? "—"
+          : plan.requiredActors.map((a) => a.label).join("; ")}
+      </PlanRow>
+      <PlanRow label="Управляващ">
+        {control.kind === "none" ? "Няма" : control.label}
+        {control.approxPos ? (
+          <span className="ml-1 font-mono text-[10px] text-muted">
+            ({control.approxPos.x}; {control.approxPos.y})
+          </span>
+        ) : null}
+      </PlanRow>
+      <PlanRow label="Изглед">{VIEW_BG[plan.view]}</PlanRow>
+      <PlanRow label="Грешката при">
+        <span className="font-mono tabular-nums">{plan.faultTimeSec.toFixed(1)} с</span>
+        <span className="ml-1 text-muted">от записа (изчислено от двигателя)</span>
+      </PlanRow>
+      {plan.notes !== "" ? (
+        <p className="mt-0.5 text-[11px] leading-snug text-muted">{plan.notes}</p>
+      ) : null}
+    </dl>
+  );
+}
+
+/** Keyframe strip (doc 66 R0) — the stills the rig saved for inspection.
+ *  A 404-ing frame hides itself; an empty list renders nothing. */
+function KeyframeStrip({ clip }: { clip: MistakeClip }) {
+  const frames = clip.keyframes ?? [];
+  if (frames.length === 0) return null;
+  return (
+    <ul className="flex gap-1.5 overflow-x-auto" aria-label={`Ключови кадри: ${clip.titleBg}`}>
+      {frames.map((src) => (
+        <li key={src} className="shrink-0">
+          {/* Static rig-saved stills next to the .webm — plain <img> on purpose. */}
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={src}
+            alt={`Кадър от ${clip.id}`}
+            loading="lazy"
+            onError={(e) => {
+              e.currentTarget.style.display = "none";
+            }}
+            className="h-14 w-auto rounded-lg border border-border bg-surface-2/60 object-cover"
+          />
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+function ClipCard({ clip, plan }: { clip: MistakeClip; plan: ClipPlanEntry | null }) {
   // The .webm 404s until the binaries are scp'd — note it, keep the card.
   const [fileMissing, setFileMissing] = useState(false);
 
@@ -136,6 +216,12 @@ function ClipCard({ clip }: { clip: MistakeClip }) {
         </p>
       </div>
 
+      <KeyframeStrip clip={clip} />
+
+      {/* The requirements card (doc 66) — degrades quietly when the clip is
+          outside the generated plan (e.g. a stale manifest entry). */}
+      {plan !== null ? <RequirementsCard plan={plan} /> : null}
+
       <div className="flex items-center gap-2">
         <CopyIdButton id={clip.id} />
       </div>
@@ -145,7 +231,7 @@ function ClipCard({ clip }: { clip: MistakeClip }) {
   );
 }
 
-export function ClipsGalleryClient() {
+export function ClipsGalleryClient({ plan }: { plan: readonly ClipPlanEntry[] }) {
   // null = loading; [] = loaded and empty (or manifest missing/malformed).
   const [clips, setClips] = useState<MistakeClip[] | null>(null);
   const [family, setFamily] = useState<string | null>(null);
@@ -179,6 +265,12 @@ export function ClipsGalleryClient() {
     if (family === null) return clips;
     return clips.filter((c) => familyPrefixOf(c.templateId) === family);
   }, [clips, family]);
+
+  const planById = useMemo(() => {
+    const map = new Map<string, ClipPlanEntry>();
+    for (const entry of plan) map.set(entry.id, entry);
+    return map;
+  }, [plan]);
 
   return (
     <div className="flex flex-col gap-5">
@@ -244,7 +336,7 @@ export function ClipsGalleryClient() {
 
           <ul className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {shown.map((clip) => (
-              <ClipCard key={clip.id} clip={clip} />
+              <ClipCard key={clip.id} clip={clip} plan={planById.get(clip.id) ?? null} />
             ))}
           </ul>
         </>

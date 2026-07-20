@@ -70,6 +70,22 @@ describe("parseClipManifest", () => {
     const clips = parseClipManifest(manifest([entry]));
     expect(clips).toEqual([{ ...CLIP, recordedAt: "" }]);
   });
+
+  it("keeps the keyframe strip when present (doc 66 R0)", () => {
+    const frames = ["/clips/keyframes/x__m0-01.jpg", "/clips/keyframes/x__m0-02.jpg"];
+    const clips = parseClipManifest(manifest([{ ...CLIP, keyframes: frames }]));
+    expect(clips).toEqual([{ ...CLIP, keyframes: frames }]);
+  });
+
+  it("degrades malformed/empty keyframes to none without dropping the clip", () => {
+    for (const keyframes of [[], [3, null], "nope", { a: 1 }]) {
+      const clips = parseClipManifest(manifest([{ ...CLIP, keyframes }]));
+      expect(clips, JSON.stringify(keyframes)).toEqual([CLIP]);
+    }
+    // Junk entries are filtered, string URLs survive.
+    const clips = parseClipManifest(manifest([{ ...CLIP, keyframes: ["", "/k1.jpg", 7] }]));
+    expect(clips).toEqual([{ ...CLIP, keyframes: ["/k1.jpg"] }]);
+  });
 });
 
 describe("clipForTracePath", () => {

@@ -1,25 +1,31 @@
 "use client";
 
 /**
- * Clip-capture client (DEV ONLY) — drives CaptureScene through the pilot:
+ * Clip-capture client v2 (DEV ONLY) — drives CaptureScene through the pilot
+ * against the GENERATED PLAN (clipPlan.generated.ts — the doc 66 contract:
+ * PLAN writes, this rig consumes verbatim):
  *
  *   /dev/clip-capture                      → the pilot list (links per clip)
  *   /dev/clip-capture?template=X&mistake=N → single-clip capture + debug deck
  *   /dev/clip-capture?auto=1               → UNATTENDED batch over the whole
  *                                            pilot list, „ГОТОВО n/N" at end
  *
- * Per clip: fetch + parse the committed mistake trace → trim window
- * (lib/clips/trim — [fault−8, fault+4] grown to ≥10 s) → mount the real 3D
- * scene → seek the shared TraceClock to the window start → record
- * canvas.captureStream(30) via MediaRecorder (vp9 → vp8 → webm fallback,
- * ~1.5 Mbps) over exactly the window → POST to /api/dev/clips (writes the
- * .webm + upserts manifest.json). Failures log and the batch continues —
- * the main session re-runs stragglers.
+ * Per clip: plan lookup (NO plan = NO clip — fail loud, doc 66) → fetch +
+ * parse the committed mistake trace → v2 window (captureWindowFor: anchored
+ * on the ENGINE faultTimeSec, control lead-in, hop-guarded end) → mount the
+ * real 3D scene (view per the card) → seek the shared TraceClock → SETTLE
+ * (SETTLE_MS + ≥SETTLE_FRAMES fresh rendered frames — never record the seek)
+ * → record canvas.captureStream(30) via MediaRecorder over exactly the
+ * window, copying the five R0 keyframes off the live canvas as their
+ * playback times pass (cheap drawImage during; PNG-serialized after stop, so
+ * the recording never hitches) → POST clip + keyframes + the R1 actor
+ * checklist to /api/dev/clips. Failures log and the batch continues — the
+ * main session re-runs stragglers.
  */
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import dynamic from "next/dynamic";
-import type { ClipPilotEntry } from "@/modules/learning";
+import type { ClipPilotEntry, ClipPlanEntry } from "@/modules/learning";
 import {
   compileScenario,
   scenarioById,
@@ -34,8 +40,21 @@ import {
 } from "@/modules/sim/traces";
 import { TraceTimeline } from "@/components/sim/lesson-ui/TraceTimeline";
 import { traceUrlForRepoPath } from "@/components/theory/whyPanelModel";
-import { clipWindowFor, type RecordingWindow } from "@/lib/clips/trim";
-import { CAPTURE_H, CAPTURE_W } from "./CaptureScene";
+import type { RecordingWindow } from "@/lib/clips/trim";
+import {
+  buildActorChecklist,
+  cabinChannelsFor,
+  captureWindowFor,
+  checklistSummary,
+  controlPassTimeSec,
+  createActorPresenceLog,
+  keyframesDueThrough,
+  keyframeTimes,
+  type ActorCheck,
+  type ActorPresenceLog,
+  type CaptureCabinChannels,
+} from "@/lib/clips/capturePlan";
+import { CAPTURE_H, CAPTURE_W, type CaptureControlFraming } from "./CaptureScene";
 
 const CaptureScene = dynamic(
   () => import("./CaptureScene").then((m) => ({ default: m.CaptureScene })),
@@ -52,8 +71,12 @@ const CaptureScene = dynamic(
   },
 );
 
-/** Seek settle time before the recorder starts (pose + lamps stabilize). */
+/** Seek settle time before the recorder starts (pose + lamps stabilize)… */
 const SETTLE_MS = 600;
+/** …plus this many FRESH rendered frames (doc 66 R5 — never record the seek;
+ *  a sleep alone proves nothing about the render loop). */
+const SETTLE_FRAMES = 3;
+const SETTLE_FRAMES_TIMEOUT_MS = 4_000;
 /** Warmup/build ceiling per clip before it counts as failed. */
 const READY_TIMEOUT_MS = 90_000;
 const RECORD_BITS_PER_S = 1_500_000;
@@ -67,9 +90,16 @@ interface ClipStatus {
 
 interface ClipRun {
   entry: ClipPilotEntry;
+  plan: ClipPlanEntry;
   lesson: LessonSpec;
   trace: ScenarioTrace;
   window: RecordingWindow;
+  /** The five R0 still times (window start, fault−2, fault, fault+2, end). */
+  keyframeAt: number[];
+  /** R2 control framing (positioned governing control only). */
+  framing: CaptureControlFraming | null;
+  /** Honest R4 cabin channels from the mistake's graded codeRefs. */
+  cabin: CaptureCabinChannels;
 }
 
 interface Mode {
@@ -105,19 +135,49 @@ function sleep(ms: number): Promise<void> {
   return new Promise((r) => window.setTimeout(r, ms));
 }
 
-/** Build the run for one pilot entry: compile the drill + fetch the trace. */
-async function loadRun(entry: ClipPilotEntry): Promise<ClipRun> {
+/** Build the run for one pilot entry: plan card + compiled drill + trace. */
+async function loadRun(entry: ClipPilotEntry, plan: ClipPlanEntry | undefined): Promise<ClipRun> {
+  // Doc 66: the requirements card IS the recording order — no card, no clip.
+  if (!plan) throw new Error("липсва в генерирания план (clipPlan)");
   const spec = scenarioById(entry.templateId);
   if (!spec) throw new Error(`непознат шаблон ${entry.templateId}`);
+  const mistake = spec.mistakes[entry.mistakeIndex];
+  if (!mistake) throw new Error(`непозната грешка m${entry.mistakeIndex}`);
   const lesson = compileScenario(spec, scenarioEntryLevel(spec));
   const res = await fetch(traceUrlForRepoPath(entry.tracePath));
   if (!res.ok) throw new Error(`trace ${res.status}`);
   const trace = parseScenarioTrace(await res.json());
   if (trace === null) throw new Error("невалидна следа");
-  return { entry, lesson, trace, window: clipWindowFor(trace) };
+  const control = plan.governingControl;
+  const hasPositionedControl = control.kind !== "none" && control.approxPos !== undefined;
+  const window = captureWindowFor(trace.meta.durationSec, plan.faultTimeSec, hasPositionedControl);
+  const framing: CaptureControlFraming | null = hasPositionedControl
+    ? {
+        x: control.approxPos!.x,
+        y: control.approxPos!.y,
+        passTSec: controlPassTimeSec(trace, control.approxPos!, window.startSec, plan.faultTimeSec),
+      }
+    : null;
+  const isNight = (lesson.environment?.timeOfDay ?? "day") === "night";
+  return {
+    entry,
+    plan,
+    lesson,
+    trace,
+    window,
+    keyframeAt: keyframeTimes(window, plan.faultTimeSec),
+    framing,
+    cabin: cabinChannelsFor(mistake.codeRefs, isNight),
+  };
 }
 
-export function ClipCaptureClient({ pilot }: { pilot: ClipPilotEntry[] }) {
+export function ClipCaptureClient({
+  pilot,
+  plan,
+}: {
+  pilot: ClipPilotEntry[];
+  plan: readonly ClipPlanEntry[];
+}) {
   const [mode, setMode] = useState<Mode | null>(null);
   const [run, setRun] = useState<ClipRun | null>(null);
   const [statuses, setStatuses] = useState<Record<string, ClipStatus>>({});
@@ -128,6 +188,12 @@ export function ClipCaptureClient({ pilot }: { pilot: ClipPilotEntry[] }) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const readyRef = useRef<{ resolve: () => void; reject: (e: Error) => void } | null>(null);
   const startedRef = useRef(false);
+  /** R1 presence log — reset per run, filled by the mounted scene. */
+  const presenceRef = useRef<ActorPresenceLog>(createActorPresenceLog());
+  /** Rendered-frame counter (the settle gate) — incremented by the scene. */
+  const frameCountRef = useRef(0);
+
+  const planById = useMemo(() => new Map(plan.map((p) => [p.id, p])), [plan]);
 
   // Mode comes off window.location AFTER mount (SSR renders null — the
   // ghost-demo URL-read pattern). setTimeout, not rAF: rAF never fires in a
@@ -152,87 +218,145 @@ export function ClipCaptureClient({ pilot }: { pilot: ClipPilotEntry[] }) {
     canvasRef.current = canvas;
   }, []);
 
-  /** Record the CURRENTLY MOUNTED scene over the run's trim window. */
-  const recordMounted = useCallback(async (r: ClipRun): Promise<void> => {
-    // rAF (rendering + captureStream frames) is PAUSED in hidden tabs —
-    // fail fast with a clear message instead of hanging to the deadline.
-    if (document.visibilityState === "hidden") {
-      throw new Error("разделът е на заден план — дръж го видим по време на запис");
+  /** Wait for `count` FRESH rendered frames (the settle law). */
+  const awaitFreshFrames = useCallback(async (count: number): Promise<void> => {
+    const start = frameCountRef.current;
+    const deadline = performance.now() + SETTLE_FRAMES_TIMEOUT_MS;
+    while (frameCountRef.current < start + count) {
+      if (performance.now() > deadline) {
+        throw new Error("сцената не рендира кадри — разделът видим ли е?");
+      }
+      await sleep(16);
     }
-    const clock = clockRef.current;
-    // Seek to the window start, paused; let the pose/lamps settle.
-    clock.playing = false;
-    clock.speed = 1;
-    clock.loop = null;
-    clock.tSec = r.window.startSec;
-    await sleep(SETTLE_MS);
-
-    const canvas = canvasRef.current;
-    if (!canvas) throw new Error("няма канава");
-    const mimeType = pickMimeType();
-    const stream = canvas.captureStream(30);
-    const recorder = new MediaRecorder(stream, {
-      ...(mimeType ? { mimeType } : {}),
-      videoBitsPerSecond: RECORD_BITS_PER_S,
-    });
-    const chunks: Blob[] = [];
-    recorder.ondataavailable = (e) => {
-      if (e.data.size > 0) chunks.push(e.data);
-    };
-    const stopped = new Promise<void>((resolve) => {
-      recorder.onstop = () => resolve();
-    });
-
-    recorder.start(250);
-    clock.tSec = r.window.startSec;
-    clock.playing = true;
-    // Watch the shared clock; stop at the window end. Wrap detection is the
-    // backstop for windows ending exactly at the trace end (ShadowCar loops
-    // the clock to 0 there).
-    const spanMs = (r.window.endSec - r.window.startSec) * 1000;
-    const deadline = performance.now() + spanMs + 20_000;
-    let lastT = clock.tSec;
-    try {
-      await new Promise<void>((resolve, reject) => {
-        const iv = window.setInterval(() => {
-          const t = clockRef.current.tSec;
-          if (t >= r.window.endSec - 0.1 || t < lastT - 1) {
-            window.clearInterval(iv);
-            resolve();
-          } else if (performance.now() > deadline) {
-            window.clearInterval(iv);
-            reject(new Error("времето за запис изтече"));
-          }
-          lastT = t;
-        }, 50);
-      });
-    } finally {
-      clock.playing = false;
-      recorder.stop();
-      for (const track of stream.getTracks()) track.stop();
-    }
-    await stopped;
-
-    const blob = new Blob(chunks, { type: mimeType || "video/webm" });
-    if (blob.size === 0) throw new Error("празен запис");
-
-    const fd = new FormData();
-    fd.set("id", r.entry.id);
-    fd.set("templateId", r.entry.templateId);
-    fd.set("mistakeIndex", String(r.entry.mistakeIndex));
-    fd.set("tracePath", r.entry.tracePath);
-    fd.set("titleBg", r.entry.titleBg);
-    fd.set("durationSec", String(r.window.endSec - r.window.startSec));
-    fd.set("file", blob, `${r.entry.id}.webm`);
-    const res = await fetch("/api/dev/clips", { method: "POST", body: fd });
-    if (!res.ok) throw new Error(`API ${res.status}`);
   }, []);
+
+  /** Record the CURRENTLY MOUNTED scene over the run's trim window,
+   *  keyframes + actor checklist included. */
+  const recordMounted = useCallback(
+    async (r: ClipRun): Promise<ActorCheck[]> => {
+      // rAF (rendering + captureStream frames) is PAUSED in hidden tabs —
+      // fail fast with a clear message instead of hanging to the deadline.
+      if (document.visibilityState === "hidden") {
+        throw new Error("разделът е на заден план — дръж го видим по време на запис");
+      }
+      const clock = clockRef.current;
+      // Seek to the window start, paused; let the pose/lamps settle: the
+      // sleep, then ≥SETTLE_FRAMES fresh frames at the settled pose (R5 —
+      // the recording can never contain the seek).
+      clock.playing = false;
+      clock.speed = 1;
+      clock.loop = null;
+      clock.tSec = r.window.startSec;
+      await sleep(SETTLE_MS);
+      await awaitFreshFrames(SETTLE_FRAMES);
+
+      const canvas = canvasRef.current;
+      if (!canvas) throw new Error("няма канава");
+      // R0 keyframe copy targets — drawImage during recording is cheap
+      // (GPU-side); PNG serialization waits until after recorder.stop so
+      // the recording itself never hitches.
+      const shots = r.keyframeAt.map(() => {
+        const c = document.createElement("canvas");
+        c.width = CAPTURE_W;
+        c.height = CAPTURE_H;
+        return c;
+      });
+      let nextShot = 0;
+      const copyDueShots = (tSec: number) => {
+        const due = keyframesDueThrough(r.keyframeAt, nextShot, tSec);
+        for (; nextShot < due; nextShot++) {
+          shots[nextShot].getContext("2d")?.drawImage(canvas, 0, 0);
+        }
+      };
+
+      const mimeType = pickMimeType();
+      const stream = canvas.captureStream(30);
+      const recorder = new MediaRecorder(stream, {
+        ...(mimeType ? { mimeType } : {}),
+        videoBitsPerSecond: RECORD_BITS_PER_S,
+      });
+      const chunks: Blob[] = [];
+      recorder.ondataavailable = (e) => {
+        if (e.data.size > 0) chunks.push(e.data);
+      };
+      const stopped = new Promise<void>((resolve) => {
+        recorder.onstop = () => resolve();
+      });
+
+      recorder.start(250);
+      clock.tSec = r.window.startSec;
+      clock.playing = true;
+      // Watch the shared clock; stop at the window end. Wrap detection stays
+      // as a backstop only — the v2 window never touches the trace end
+      // (WINDOW_END_GUARD_S, the v1 №6 hop fix).
+      const spanMs = (r.window.endSec - r.window.startSec) * 1000;
+      const deadline = performance.now() + spanMs + 20_000;
+      let lastT = clock.tSec;
+      try {
+        await new Promise<void>((resolve, reject) => {
+          const iv = window.setInterval(() => {
+            const t = clockRef.current.tSec;
+            copyDueShots(t);
+            if (t >= r.window.endSec - 0.1 || t < lastT - 1) {
+              window.clearInterval(iv);
+              resolve();
+            } else if (performance.now() > deadline) {
+              window.clearInterval(iv);
+              reject(new Error("времето за запис изтече"));
+            }
+            lastT = t;
+          }, 50);
+        });
+      } finally {
+        clock.playing = false;
+        // Flush any stills not yet copied (the window-end frame).
+        copyDueShots(Number.POSITIVE_INFINITY);
+        recorder.stop();
+        for (const track of stream.getTracks()) track.stop();
+      }
+      await stopped;
+
+      const blob = new Blob(chunks, { type: mimeType || "video/webm" });
+      if (blob.size === 0) throw new Error("празен запис");
+
+      // Serialize the five stills (post-recording — see above).
+      const stillBlobs: Blob[] = [];
+      for (const shot of shots) {
+        const still = await new Promise<Blob | null>((resolve) =>
+          shot.toBlob((b) => resolve(b), "image/png"),
+        );
+        if (still === null || still.size === 0) throw new Error("празен ключов кадър");
+        stillBlobs.push(still);
+      }
+
+      // The R1 checklist — what the capture actually staged vs the card.
+      const actors = buildActorChecklist(r.plan.requiredActors, presenceRef.current);
+
+      const fd = new FormData();
+      fd.set("id", r.entry.id);
+      fd.set("templateId", r.entry.templateId);
+      fd.set("mistakeIndex", String(r.entry.mistakeIndex));
+      fd.set("tracePath", r.entry.tracePath);
+      fd.set("titleBg", r.entry.titleBg);
+      fd.set("durationSec", String(r.window.endSec - r.window.startSec));
+      fd.set("view", r.plan.view);
+      fd.set("actors", JSON.stringify(actors));
+      fd.set("file", blob, `${r.entry.id}.webm`);
+      stillBlobs.forEach((still, i) => {
+        fd.set(`k${i}`, still, `${r.entry.id}.k${i}.png`);
+      });
+      const res = await fetch("/api/dev/clips", { method: "POST", body: fd });
+      if (!res.ok) throw new Error(`API ${res.status}`);
+      return actors;
+    },
+    [awaitFreshFrames],
+  );
 
   /** Full pipeline for one entry: load → mount → ready → record → save. */
   const captureEntry = useCallback(
     async (entry: ClipPilotEntry): Promise<void> => {
       setStatus(entry.id, { state: "loading" });
-      const r = await loadRun(entry);
+      const r = await loadRun(entry, planById.get(entry.id));
       // Arm readiness BEFORE the scene mounts (onReady may fire fast).
       const ready = new Promise<void>((resolve, reject) => {
         readyRef.current = { resolve, reject };
@@ -241,19 +365,25 @@ export function ClipCaptureClient({ pilot }: { pilot: ClipPilotEntry[] }) {
         throw new Error("светът не се зареди навреме");
       });
       canvasRef.current = null;
+      presenceRef.current = createActorPresenceLog();
       clockRef.current = createTraceClock();
       clockRef.current.playing = false;
       clockRef.current.tSec = r.window.startSec;
       setRun(r);
       await Promise.race([ready, timeout]);
       setStatus(entry.id, { state: "recording" });
-      await recordMounted(r);
+      const actors = await recordMounted(r);
+      const missing = actors.filter((a) => !a.present);
+      const summary = checklistSummary(actors);
       setStatus(entry.id, {
         state: "done",
-        note: `${(r.window.endSec - r.window.startSec).toFixed(1)} с`,
+        note:
+          `${(r.window.endSec - r.window.startSec).toFixed(1)} с` +
+          (summary ? ` · актьори ${summary}` : "") +
+          (missing.length > 0 ? ` · ⚠ ЛИПСВА: ${missing.map((m) => m.kind).join(", ")}` : ""),
       });
     },
-    [recordMounted, setStatus],
+    [recordMounted, setStatus, planById],
   );
 
   /** The unattended batch: every pilot entry, failures logged + skipped. */
@@ -291,12 +421,13 @@ export function ClipCaptureClient({ pilot }: { pilot: ClipPilotEntry[] }) {
     return (
       <main className="mx-auto flex w-full max-w-3xl flex-col gap-5 p-6">
         <header>
-          <h1 className="font-display text-2xl font-black">Запис на клипове — пилот</h1>
+          <h1 className="font-display text-2xl font-black">Запис на клипове — пилот v2</h1>
           <p className="mt-1 text-sm text-muted">
-            Dev-only: {pilot.length} представителни грешки (изведени от why-panel
-            индекса). Записът е 1280×720, 10–20 с около момента на грешката.
-            Разделът трябва да остане ВИДИМ по време на запис (скрит раздел не
-            рендира кадри).
+            Dev-only: {pilot.length} представителни грешки, записвани по
+            генерирания план (doc 66): актьорите се разиграват отново, камерата
+            следва изискването на картата, петте ключови кадъра се запазват за
+            R0 проверката. Записът е 1280×720. Разделът трябва да остане ВИДИМ
+            по време на запис (скрит раздел не рендира кадри).
           </p>
         </header>
         <a
@@ -306,23 +437,27 @@ export function ClipCaptureClient({ pilot }: { pilot: ClipPilotEntry[] }) {
           ▶ Автоматичен запис — всичките {pilot.length}
         </a>
         <ol className="flex flex-col gap-1.5">
-          {pilot.map((e, i) => (
-            <li key={e.id} className="flex items-center gap-3 rounded-xl border border-border bg-surface px-3 py-2">
-              <span className="w-6 text-right font-mono text-xs text-muted">{i + 1}</span>
-              <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-semibold">{e.titleBg}</p>
-                <p className="truncate font-mono text-[11px] text-muted">
-                  {e.id} · {e.eventTypes.join(", ")}
-                </p>
-              </div>
-              <a
-                href={`/dev/clip-capture?template=${encodeURIComponent(e.templateId)}&mistake=${e.mistakeIndex}`}
-                className="btn-ghost shrink-0 px-3 py-1.5 text-xs"
-              >
-                Запиши
-              </a>
-            </li>
-          ))}
+          {pilot.map((e, i) => {
+            const p = planById.get(e.id);
+            return (
+              <li key={e.id} className="flex items-center gap-3 rounded-xl border border-border bg-surface px-3 py-2">
+                <span className="w-6 text-right font-mono text-xs text-muted">{i + 1}</span>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-semibold">{e.titleBg}</p>
+                  <p className="truncate font-mono text-[11px] text-muted">
+                    {e.id}
+                    {p ? ` · ${p.view} · грешка @${p.faultTimeSec.toFixed(1)}с` : " · ⚠ БЕЗ ПЛАН"}
+                  </p>
+                </div>
+                <a
+                  href={`/dev/clip-capture?template=${encodeURIComponent(e.templateId)}&mistake=${e.mistakeIndex}`}
+                  className="btn-ghost shrink-0 px-3 py-1.5 text-xs"
+                >
+                  Запиши
+                </a>
+              </li>
+            );
+          })}
         </ol>
       </main>
     );
@@ -333,6 +468,9 @@ export function ClipCaptureClient({ pilot }: { pilot: ClipPilotEntry[] }) {
     const spec = mode.templateId ? scenarioById(mode.templateId) : undefined;
     const mi = mode.mistakeIndex ?? 0;
     const mistake = spec?.mistakes[mi];
+    // Same id format as clipIdFor (learning/clipPilot) — the manifest law.
+    const singleId = spec ? `${spec.id}__m${mi}` : "";
+    const singlePlan = planById.get(singleId);
     if (!spec || !mistake || mistake.traceRef.pending === true) {
       return (
         <main className="p-6 text-sm text-danger">
@@ -340,9 +478,16 @@ export function ClipCaptureClient({ pilot }: { pilot: ClipPilotEntry[] }) {
         </main>
       );
     }
-    // Same id format as clipIdFor (learning/clipPilot) — the manifest law.
+    if (!singlePlan) {
+      return (
+        <main className="p-6 text-sm text-danger">
+          {singleId} липсва в генерирания план (tools/clips/gen_clip_plan.mjs)
+          — без карта с изисквания не се записва (doc 66).
+        </main>
+      );
+    }
     const entry: ClipPilotEntry = {
-      id: `${spec.id}__m${mi}`,
+      id: singleId,
       templateId: spec.id,
       mistakeIndex: mi,
       tracePath: mistake.traceRef.path,
@@ -354,7 +499,9 @@ export function ClipCaptureClient({ pilot }: { pilot: ClipPilotEntry[] }) {
       <main className="flex flex-col gap-4 p-6">
         <header className="flex flex-wrap items-center gap-3">
           <h1 className="font-display text-xl font-black">{mistake.titleBg}</h1>
-          <span className="font-mono text-xs text-muted">{entry.id}</span>
+          <span className="font-mono text-xs text-muted">
+            {entry.id} · {singlePlan.view} · грешка @{singlePlan.faultTimeSec.toFixed(1)}с
+          </span>
           <button
             type="button"
             disabled={busy}
@@ -386,6 +533,11 @@ export function ClipCaptureClient({ pilot }: { pilot: ClipPilotEntry[] }) {
               trace={run.trace}
               clockRef={clockRef}
               startSec={run.window.startSec}
+              view={run.plan.view}
+              controlFraming={run.framing}
+              cabin={run.cabin}
+              presenceRef={presenceRef}
+              frameCountRef={frameCountRef}
               onCanvas={onCanvas}
               onReady={onSceneReady}
               onError={onSceneError}
@@ -396,7 +548,8 @@ export function ClipCaptureClient({ pilot }: { pilot: ClipPilotEntry[] }) {
             </div>
             <p className="font-mono text-xs text-muted">
               прозорец {run.window.startSec.toFixed(1)}–{run.window.endSec.toFixed(1)} с ·
-              следа {run.trace.meta.durationSec.toFixed(1)} с
+              следа {run.trace.meta.durationSec.toFixed(1)} с · кадри при{" "}
+              {run.keyframeAt.map((t) => t.toFixed(1)).join(" / ")} с
             </p>
           </>
         ) : (
@@ -404,8 +557,9 @@ export function ClipCaptureClient({ pilot }: { pilot: ClipPilotEntry[] }) {
             type="button"
             className="btn-ghost self-start px-3 py-2 text-sm"
             onClick={() => {
-              loadRun(entry)
+              loadRun(entry, singlePlan)
                 .then((r) => {
+                  presenceRef.current = createActorPresenceLog();
                   clockRef.current = createTraceClock();
                   clockRef.current.playing = false;
                   clockRef.current.tSec = r.window.startSec;
@@ -455,6 +609,11 @@ export function ClipCaptureClient({ pilot }: { pilot: ClipPilotEntry[] }) {
           trace={run.trace}
           clockRef={clockRef}
           startSec={run.window.startSec}
+          view={run.plan.view}
+          controlFraming={run.framing}
+          cabin={run.cabin}
+          presenceRef={presenceRef}
+          frameCountRef={frameCountRef}
           onCanvas={onCanvas}
           onReady={onSceneReady}
           onError={onSceneError}
