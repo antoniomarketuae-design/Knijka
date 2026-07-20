@@ -71,6 +71,10 @@ export const SC_SIGNAL_DEAD_CONFLICT: PriorityFromRightSpec = {
   leadSec: -3.5,
   lineDistM: 18,
   clearSpeedMps: 11.5,
+  // Doc 62 S2 (founder R3 #17 „колата минава много рано"): the release is
+  // gated on the player's true arrival at the mouth, so the dead-signal
+  // right-of-way decision is made against a car that is actually there.
+  witnessArm: { etaSec: 8, nearLineM: 6 },
 };
 
 export const SC_SIGNAL_DEAD: ScenarioSpec = {
@@ -166,6 +170,12 @@ export const SC_SIGNAL_DEAD: ScenarioSpec = {
     { level: 4, vehicleStart: "cold" },
   ],
   staged: [SC_SIGNAL_DEAD_CONFLICT],
+  // The LIVE half of the recorder's dial (doc 62 S1 #17 — the drill showed a
+  // LIVE GREEN and graded signal codes because nothing dialed the mode in
+  // live play): sx-n-c goes DARK at session start, the same node→mode map
+  // traces/scSignals.ts records with. Grading falls back to the right-hand
+  // rule and the lamps render unlit (signalLampState "dark").
+  signalModes: { "sx-n-c": "dark" },
   conditions: { weather: "dry" },
   localeBg: "bg-BG",
 };
@@ -200,6 +210,9 @@ export const SC_SIGNAL_FLASHING_CONFLICT: PriorityFromRightSpec = {
   leadSec: -3.5,
   lineDistM: 18,
   clearSpeedMps: 11.5,
+  // Doc 62 S2 (founder R3 #18): same witness release as sc-signal-dead —
+  // the flashing-amber caution is graded against a present car, any pace.
+  witnessArm: { etaSec: 8, nearLineM: 6 },
 };
 
 export const SC_SIGNAL_FLASHING: ScenarioSpec = {
@@ -293,6 +306,12 @@ export const SC_SIGNAL_FLASHING: ScenarioSpec = {
     { level: 4, vehicleStart: "cold" },
   ],
   staged: [SC_SIGNAL_FLASHING_CONFLICT],
+  // The LIVE half of the recorder's dial (doc 62 S1 #18 — no yellow blink in
+  // live play because nothing dialed the mode): sx-n-c FLASHES AMBER at
+  // session start, matching traces/scSignals.ts. Grading falls back to the
+  // right-hand rule; the lamps blink on the runtime clock (signalLampState
+  // amberFlashOn/Off).
+  signalModes: { "sx-n-c": "flashingAmber" },
   conditions: { weather: "dry" },
   localeBg: "bg-BG",
 };
@@ -579,8 +598,16 @@ export const SC_SIGNAL_REDYELLOW: ScenarioSpec = {
   family: "signals",
   tagsBg: ["светофар", "червено-жълто", "потегляне", "изпреварване на зеленото"],
   titleBg: "Тръгване на червено-жълто",
+  // Founder R3 #21 (doc 62 — „drill incomprehensible; revise"): the copy now
+  // walks the WHOLE lamp arc stъпка по стъпка (спри на червено → изчакай →
+  // на червено-жълто се готви → потегли на чисто зелено), with honest timing
+  // expectations from the runtime's own SIGNAL_TIMING (red 26 s, redYellow
+  // 1 s, green 20 s) so the wait reads as intended, not broken. Rule wording
+  // per the content bank (q-signali-i-markirovka-002): „Червено плюс жълто
+  // означава „приготви се" — зеленото идва след миг, но докато не светне,
+  // преминаването остава забранено (ППЗДвП, чл. 31)."
   objectiveBg:
-    "Изчакай на червено и се приготви на червено-жълто — но премини стоп-линията чак на чисто зелено. Комбинираният сигнал подготвя тръгването, не го разрешава.",
+    "Мини целия цикъл на светофара стъпка по стъпка: спри на червено, изчакай търпеливо, на червено + жълто се приготви — и премини чак на чисто зелено. Комбинираният сигнал означава „приготви се“: подготвя тръгването, но преминаването остава забранено.",
   archetypeIds: ["JU-08"],
   conceptIds: ["c-traffic-light-signals", "c-signal-hierarchy", "c-junction-approach"],
   map: {
@@ -602,15 +629,19 @@ export const SC_SIGNAL_REDYELLOW: ScenarioSpec = {
     vehicleStart: "ready",
   },
   instructionsBg: [
-    { n: 1, textBg: "Тръгни на север — светофарът напред свети червено." },
-    { n: 2, textBg: "Спри плавно на стоп-линията и изчакай на червено." },
+    { n: 1, textBg: "Тръгни на север. Светофарът пред теб ще светне ЧЕРВЕНО — приближи спокойно и спри плавно преди стоп-линията." },
+    {
+      n: 2,
+      textBg:
+        "Изчакай на червено. Търпение: пълното червено трае около 20–25 секунди, точно както на истинско кръстовище — това чакане Е част от урока.",
+    },
     {
       n: 3,
       textBg:
-        "Светне ли червено + жълто: приготви се — скорост, съединител, поглед — но кракът остава на спирачката.",
+        "Гледай светофара: когато към червеното светне и ЖЪЛТО (двете ЗАЕДНО, около секунда), това значи „приготви се“ — но кракът остава на спирачката: преминаването е още забранено.",
     },
-    { n: 4, textBg: "Премини чак на чисто зелено, след бърз поглед наляво и надясно." },
-    { n: 5, textBg: "Продължи на север с равномерна скорост." },
+    { n: 4, textBg: "Светне ли ЧИСТО зелено: бърз поглед наляво и надясно — и потегли решително през кръстовището." },
+    { n: 5, textBg: "Продължи на север с равномерна скорост. Запомни реда: червено → червено-жълто → зелено." },
   ],
   success: [
     {

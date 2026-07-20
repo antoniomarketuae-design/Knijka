@@ -19,6 +19,7 @@ function violationsOf(events: RuleEvent[], code: string): ViolationEvent[] {
 
 const glance = (mirror: "left" | "right" | "rear"): SimTickEvent => ({ kind: "mirrorGlance", mirror });
 const stopSign: SimTickEvent = { kind: "stopLineCrossed", control: "stopSign" };
+const giveWay: SimTickEvent = { kind: "stopLineCrossed", control: "giveWay" };
 
 // ---------------------------------------------------------------------------
 // JU-23 — junction-scan lookback (single-glance emergence)
@@ -61,12 +62,65 @@ describe("JUNCTION_SCAN_INCOMPLETE (JU-23 — един поглед не сти�
     expect(violationsOf(events, "JUNCTION_SCAN_INCOMPLETE")).toHaveLength(1);
   });
 
-  it("a stale scan (glances older than the lookback) grades — one look at t-5s is not fresh", () => {
+  it("a stale scan while MOVING grades — freshness is per mouth, not per drive", () => {
+    // Glances taken 8 s (and ~45 m) of DRIVING before the line are the mouth-1
+    // scan arriving at mouth 2 — moving time ages the scan at full rate.
+    const { events } = drive(
+      [
+        tick(0, { speedKmh: 20, events: [glance("left"), glance("right")] }),
+        ...cruise(1, 7, { speedKmh: 20 }), // driving on — the world changes
+        tick(8, { speedKmh: 12, events: [stopSign] }),
+      ],
+      enabled,
+    );
+    expect(violationsOf(events, "JUNCTION_SCAN_INCOMPLETE")).toHaveLength(1);
+  });
+
+  it("founder R3 #13: glance both sides at the mouth, WAIT for the priority car, cross — clean", () => {
+    // The founder's live sequence at sc-jx-giveway-b1's second Б1 mouth: crawl
+    // up, look left and right AT the mouth, stand waiting for the staged
+    // priority car to pass (~7 s), then cross. Before the wait-freeze fix the
+    // 5 s lookback expired DURING the legally-required wait and the crossing
+    // graded JUNCTION_SCAN_INCOMPLETE although he had scanned; stopped time
+    // must not stale a scan of a world that is not moving past you.
+    const { events } = drive(
+      [
+        tick(0, { speedKmh: 10 }),
+        tick(1, { speedKmh: 3, events: [glance("left")] }),
+        tick(2, { speedKmh: 0.4, events: [glance("right")] }),
+        ...cruise(3, 9, { speedKmh: 0.4 }), // waiting for the priority car
+        tick(10, { speedKmh: 6, events: [giveWay] }),
+      ],
+      enabled,
+    );
+    expect(violationsOf(events, "JUNCTION_SCAN_INCOMPLETE")).toHaveLength(0);
+  });
+
+  it("the same wait at a Б2 stays clean too — and still earns the full-stop praise", () => {
+    const { events } = drive(
+      [
+        tick(0, { speedKmh: 10 }),
+        tick(1, { speedKmh: 0.4, events: [glance("left")] }),
+        tick(2, { speedKmh: 0.4, events: [glance("right")] }),
+        ...cruise(3, 9, { speedKmh: 0.4 }), // long queue wait at the sign
+        tick(10, { speedKmh: 6, events: [stopSign] }),
+      ],
+      enabled,
+    );
+    expect(violationsOf(events, "JUNCTION_SCAN_INCOMPLETE")).toHaveLength(0);
+    expect(codes(events)).toContain("FULL_STOP_AT_STOP_SIGN");
+  });
+
+  it("the wait-freeze credits only STOPPED time — a wait followed by a long roll still goes stale", () => {
+    // Scan at the mouth, wait 4 s, then ROLL 8 s (and ~40 m) before crossing:
+    // the moving tail alone exceeds the lookback — the scan is a memory of a
+    // different place and grades.
     const { events } = drive(
       [
         tick(0, { speedKmh: 0.4, events: [glance("left"), glance("right")] }),
-        ...cruise(1, 7, { speedKmh: 0.4 }), // long wait, scan goes stale
-        tick(8, { speedKmh: 6, events: [stopSign] }),
+        ...cruise(1, 4, { speedKmh: 0.4 }), // waiting (frozen)
+        ...cruise(5, 12, { speedKmh: 18 }), // rolling on (ages at full rate)
+        tick(13, { speedKmh: 12, events: [giveWay] }),
       ],
       enabled,
     );

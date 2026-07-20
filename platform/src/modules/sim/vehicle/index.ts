@@ -57,6 +57,11 @@ export {
   parseDifficultyMode,
   loadDifficulty,
   storeDifficulty,
+  // Domain-scaled governor (founder review R3 #37 — the motorway drill).
+  governorCapKmh,
+  NORMAL_CAP_MARGIN_KMH,
+  BEGINNER_CAP_UNDER_KMH,
+  DOMAIN_CAP_FLOOR_KMH,
   // S0 low-speed maneuvering bands (parking envelope, doc 76 §0/§12).
   CREEP_CAP_FULL_KMH,
   CREEP_CAP_END_KMH,

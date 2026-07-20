@@ -264,12 +264,17 @@ describe("buildWorldGeometry on a synthetic X-junction", () => {
     expect(world.stats.markingQuads).toBeGreaterThan(4);
   });
 
-  it("places one traffic light per approach with the junction node id", () => {
-    expect(world.trafficLights.length).toBe(4);
+  it("places near + far-side traffic lights per approach with the junction node id", () => {
+    // Doc 62 S1/#19: each incoming approach gets its near head AND a
+    // far-side companion mirrored through the node (the head a driver
+    // waiting at the line actually sees) — 4 approaches × 2 heads.
+    expect(world.trafficLights.length).toBe(8);
     for (const tl of world.trafficLights) {
       expect(tl.nodeId).toBe("nC");
+      expect(Number.isFinite(tl.approachBearingDeg)).toBe(true);
       // Poles stand outside the roadway but near the junction mouth (the
-      // scaled open radius reaches ~35 m here, pole ~42 m out).
+      // scaled open radius reaches ~35 m here, pole ~42 m out; the mirrored
+      // companion sits at the same radius on the far corner).
       const d = Math.hypot(tl.position[0], tl.position[2]);
       expect(d).toBeGreaterThan(LANE_WIDTH_M);
       expect(d).toBeLessThan(50);

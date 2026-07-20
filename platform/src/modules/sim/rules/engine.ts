@@ -95,6 +95,17 @@ export interface RuleEngineState {
   prevLeadGapM: number | null;
   lastIndicatorOnAt: Record<TurnDirection, number | null>;
   lastGlanceAt: Record<MirrorKind, number | null>;
+  /**
+   * JU-23 wait-freeze ledger (founder R3 #13, doc 62): seconds spent
+   * effectively STOPPED (speed < movingSpeedKmh) since each SIDE's last
+   * glance. The junction-scan check subtracts it from the glance age, so a
+   * ляво-дясно scan made at the mouth does NOT go stale while the driver
+   * legally WAITS for the priority car to pass — the world they scanned was
+   * not moving past them. Moving time still ages the scan normally (a glance
+   * at mouth 1 stays stale by mouth 2). Scan-only: the lane-change mirror
+   * lookback and move-off observation keep the plain wall-clock windows.
+   */
+  scanStopCreditSec: { left: number; right: number };
   stop: {
     /** When the vehicle most recently came to (and stayed at) a full stop. */
     stoppedSince: number | null;
@@ -226,6 +237,7 @@ export function createRuleEngine(config?: Partial<RuleEngineConfig>): RuleEngine
     prevLeadGapM: null,
     lastIndicatorOnAt: { left: null, right: null },
     lastGlanceAt: { left: null, right: null, rear: null },
+    scanStopCreditSec: { left: 0, right: 0 },
     stop: { stoppedSince: null, lastQualifyingStopAt: null },
     speedingMinor: { ...IDLE_EPISODE },
     speedingDangerous: { ...IDLE_EPISODE },
@@ -270,6 +282,7 @@ function cloneState(s: RuleEngineState): RuleEngineState {
     ...s,
     lastIndicatorOnAt: { ...s.lastIndicatorOnAt },
     lastGlanceAt: { ...s.lastGlanceAt },
+    scanStopCreditSec: { ...s.scanStopCreditSec },
     stop: { ...s.stop },
     speedingMinor: { ...s.speedingMinor },
     speedingDangerous: { ...s.speedingDangerous },
@@ -381,8 +394,19 @@ export function reduceTick(prev: RuleEngineState, tick: SimTick): ReduceResult {
   if (tick.indicator === "left") s.lastIndicatorOnAt.left = t;
   if (tick.indicator === "right") s.lastIndicatorOnAt.right = t;
 
+  // JU-23 wait-freeze accrual (founder R3 #13): stopped/creeping time counts
+  // toward each side's credit BEFORE this tick's glances reset it — the credit
+  // covers the interval since the previous tick, the reset covers now.
+  if (speed < cfg.movingSpeedKmh) {
+    s.scanStopCreditSec.left += dt;
+    s.scanStopCreditSec.right += dt;
+  }
+
   for (const e of tick.events) {
-    if (e.kind === "mirrorGlance") s.lastGlanceAt[e.mirror] = t;
+    if (e.kind === "mirrorGlance") {
+      s.lastGlanceAt[e.mirror] = t;
+      if (e.mirror !== "rear") s.scanStopCreditSec[e.mirror] = 0;
+    }
     // Hazard ledger (A12): anything hazard-shaped in the recent past makes a
     // hard brake explainable — the causeless-harsh-brake detector stands down.
     if (
@@ -1333,15 +1357,19 @@ function handleTickEvent(
       // stop line: you cannot yield to (or cross) priority traffic you never
       // looked for — the observation quality is the crux of the Б1 lesson, not a
       // Б2-only demand. A left AND a right glance must each fall in the lookback.
+      // Wait-freeze (founder R3 #13): stopped time since a side's glance does
+      // not age it — the driver who scanned at the mouth and then WAITED for
+      // the priority car still crossed with a valid scan. Only MOVING time
+      // counts against the lookback (mouth-to-mouth freshness preserved).
       const scanIncomplete = (): boolean => {
         if (!cfg.junctionScanObservationEnabled) return false;
         const lg = s.lastGlanceAt.left;
         const rg = s.lastGlanceAt.right;
         const scanned =
           lg !== null &&
-          t - lg <= cfg.junctionScanLookbackSec &&
+          t - lg - s.scanStopCreditSec.left <= cfg.junctionScanLookbackSec &&
           rg !== null &&
-          t - rg <= cfg.junctionScanLookbackSec;
+          t - rg - s.scanStopCreditSec.right <= cfg.junctionScanLookbackSec;
         return !scanned;
       };
       if (e.control === "giveWay") {

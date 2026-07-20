@@ -228,8 +228,17 @@ export interface StaticTransform {
 }
 
 export interface TrafficLightPlacement extends StaticTransform {
-  /** Signal node id — key for WorldRuntime.signalPhase(). */
+  /** Signal node id — key for WorldRuntime.signalLampState(). */
   nodeId: string;
+  /**
+   * Compass bearing (district space, 0 = north, clockwise) of travel INTO the
+   * junction on the arm this head addresses. The lamp render callback passes
+   * it to WorldRuntime.signalLampState so every head lights its OWN approach
+   * axis-group — the phase the stop line on that arm grades — instead of the
+   * node's single assigned group (doc 62 S1: heads on the cross street showed
+   * the player's phase, and pinned rebases lit the wrong arm).
+   */
+  approachBearingDeg: number;
 }
 
 export type SignKind =

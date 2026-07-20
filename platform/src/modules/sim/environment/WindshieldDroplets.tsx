@@ -9,8 +9,14 @@
 // active. Intensity follows the shared weather channel by default (droplets
 // while raining, a faint residue while the world dries) and can be overridden
 // via the `intensity` prop. Renders nothing when dry or on the low preset.
+//
+// WIPED ARC (doc 62 #24): when a `wiperRef` channel is provided (VehicleRig
+// writes the live blade state into it), the droplet field inside the blades'
+// swept sector is suppressed by the channel's `clearing` level — the arc
+// stays clear while the wipers run and droplets creep back after they stop.
+// Two extra uniforms; the sector test is a handful of fragment ALU ops.
 
-import { useMemo, useRef } from "react";
+import { useMemo, useRef, type RefObject } from "react";
 import { useFrame } from "@react-three/fiber";
 import type { ShaderMaterial, ShaderMaterialParameters } from "three";
 import { useQuality } from "./qualityStore";
@@ -32,6 +38,7 @@ precision highp float;
 uniform float uIntensity;
 uniform float uTime;
 uniform float uAspect;
+uniform float uWipeLevel;
 varying vec2 vUv;
 
 float hash21(vec2 p) {
@@ -63,11 +70,30 @@ void main() {
           + dropLayer(vUv, 38.0, uTime * 1.3, 7.7) * 0.7;
   // Slightly denser toward the edges — reads as windshield, not screen dirt.
   float edge = 0.65 + 0.35 * smoothstep(0.25, 0.95, distance(vUv, vec2(0.5, 0.45)));
+  // Wiped arc (doc 62 #24): a sector around the blade pivot (below the frame's
+  // bottom centre) is kept clear while uWipeLevel is up. The angular band spans
+  // the blades' sweep; soft radial + angular edges so the boundary reads as a
+  // wipe line, not a mask. uWipeLevel = 0 compiles to a no-op multiply.
+  vec2 pv = vec2((vUv.x - 0.5) * uAspect, vUv.y + 0.18);
+  float ang = atan(pv.x, pv.y); // 0 = straight up, +right / -left
+  float inSweep = (1.0 - smoothstep(0.9, 1.15, abs(ang - 0.12)))
+                * smoothstep(0.10, 0.22, length(pv))
+                * (1.0 - smoothstep(1.05, 1.3, length(pv)));
+  a *= 1.0 - uWipeLevel * 0.92 * inSweep;
   gl_FragColor = vec4(vec3(0.82, 0.88, 0.96), a * edge * uIntensity * 0.16);
 }
 `;
 
-export function WindshieldDroplets({ intensity }: { intensity?: number }) {
+export function WindshieldDroplets({
+  intensity,
+  wiperRef,
+}: {
+  intensity?: number;
+  /** Live wiper state (doc 62 #24) — written per frame by VehicleRig.
+   *  `clearing` 0..1 drives the wiped-arc droplet suppression. Absent =
+   *  the shipped always-wet glass. */
+  wiperRef?: RefObject<{ sweep01: number; clearing: number }>;
+}) {
   const { level } = useQuality();
   const rain = useRainIntensity();
   const wetness = useWetness();
@@ -82,6 +108,7 @@ export function WindshieldDroplets({ intensity }: { intensity?: number }) {
           uIntensity: { value: 0 },
           uTime: { value: 0 },
           uAspect: { value: 1 },
+          uWipeLevel: { value: 0 },
         },
         transparent: true,
         depthTest: false,
@@ -99,6 +126,7 @@ export function WindshieldDroplets({ intensity }: { intensity?: number }) {
     material.uniforms.uAspect.value = state.size.width / Math.max(state.size.height, 1);
     material.uniforms.uIntensity.value =
       intensity ?? Math.max(getRainIntensity(), getWetness() * 0.3);
+    material.uniforms.uWipeLevel.value = wiperRef?.current?.clearing ?? 0;
   });
 
   // Rain visuals are med+ (matching the streaks); skip entirely when dry.

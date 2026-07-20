@@ -54,7 +54,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
 import type { GLTF } from "three/examples/jsm/loaders/GLTFLoader.js";
-import type { SignalPhase } from "../../contracts";
+import type { SignalLampState } from "../../contracts";
 import type {
   BillboardSize,
   SignKind,
@@ -649,15 +649,29 @@ const LAMP_OFF = {
   green: LAMP_ON.green.clone().multiplyScalar(0.1),
 } as const;
 
-function lampColorsFor(phase: SignalPhase): [THREE.Color, THREE.Color, THREE.Color] {
-  const red = phase === "red" || phase === "redYellow";
-  const yellow = phase === "yellow" || phase === "redYellow";
-  const green = phase === "green";
-  return [
-    red ? LAMP_ON.red : LAMP_OFF.red,
-    yellow ? LAMP_ON.yellow : LAMP_OFF.yellow,
-    green ? LAMP_ON.green : LAMP_OFF.green,
-  ];
+/**
+ * Lens colors for a lamp state (doc 62 S1): "dark" = every lens unlit
+ * (загаснал светофар); "amberFlashOn"/"amberFlashOff" = the flashing-amber
+ * blink pair driven by the runtime's signal clock (the getter alternates the
+ * STATE, so the per-lamp change cache below repaints exactly on blink edges —
+ * no extra render-side timer, no per-frame writes while steady).
+ * Writes into a module-scoped scratch tuple (returned for convenience): blink
+ * edges recur at 2 Hz inside useFrame, and the perf law is zero useFrame
+ * allocations — callers must consume the tuple before the next call.
+ */
+const LAMP_COLORS_SCRATCH: [THREE.Color, THREE.Color, THREE.Color] = [
+  LAMP_OFF.red,
+  LAMP_OFF.yellow,
+  LAMP_OFF.green,
+];
+function lampColorsFor(state: SignalLampState): [THREE.Color, THREE.Color, THREE.Color] {
+  const red = state === "red" || state === "redYellow";
+  const yellow = state === "yellow" || state === "redYellow" || state === "amberFlashOn";
+  const green = state === "green";
+  LAMP_COLORS_SCRATCH[0] = red ? LAMP_ON.red : LAMP_OFF.red;
+  LAMP_COLORS_SCRATCH[1] = yellow ? LAMP_ON.yellow : LAMP_OFF.yellow;
+  LAMP_COLORS_SCRATCH[2] = green ? LAMP_ON.green : LAMP_OFF.green;
+  return LAMP_COLORS_SCRATCH;
 }
 
 function TrafficLights({
@@ -669,7 +683,7 @@ function TrafficLights({
   world: WorldGeometry;
   assets: PropAssets;
   preset: QualityPreset;
-  getSignalPhase?: (signalNodeId: string) => SignalPhase;
+  getSignalPhase?: (signalNodeId: string, approachBearingDeg: number) => SignalLampState;
 }) {
   const lights = world.trafficLights;
 
@@ -683,11 +697,15 @@ function TrafficLights({
   useEffect(() => () => housing.dispose(), [housing]);
 
   const lamps = useMemo(() => {
-    const geometry = new THREE.SphereGeometry(0.085, 10, 8);
+    // r 0.13 (was 0.085): the lens must read from a 50+ m approach on the
+    // 2.5×-scaled roads — founder R3 "no visible traffic light" (doc 62 S1).
+    const geometry = new THREE.SphereGeometry(0.13, 10, 8);
     const material = new THREE.MeshBasicMaterial({ toneMapped: false });
     const mesh = createOffsetInstancedMesh(geometry, material, lights, LAMP_OFFSETS);
     mesh.name = "traffic-light-lamps";
-    const initial = lampColorsFor("green");
+    // Mount unlit ("dark") — the first frame paints the true state; a wrong
+    // pre-wiring green must never flash (the S1 dead-drill-shows-green trap).
+    const initial = lampColorsFor("dark");
     for (let i = 0; i < lights.length; i++) {
       mesh.setColorAt(i * 3, initial[0]);
       mesh.setColorAt(i * 3 + 1, initial[1]);
@@ -704,9 +722,9 @@ function TrafficLights({
   );
 
   const lampsRef = useRef<THREE.InstancedMesh | null>(null);
-  const lastPhases = useRef<(SignalPhase | null)[]>([]);
+  const lastPhases = useRef<(SignalLampState | null)[]>([]);
   useEffect(() => {
-    lastPhases.current = new Array<SignalPhase | null>(lights.length).fill(null);
+    lastPhases.current = new Array<SignalLampState | null>(lights.length).fill(null);
   }, [lights, lamps]);
 
   useFrame(() => {
@@ -714,10 +732,12 @@ function TrafficLights({
     if (!mesh) return;
     let dirty = false;
     for (let i = 0; i < lights.length; i++) {
-      const phase: SignalPhase = getSignalPhase?.(lights[i]!.nodeId) ?? "green";
-      if (lastPhases.current[i] === phase) continue;
-      lastPhases.current[i] = phase;
-      const colors = lampColorsFor(phase);
+      const light = lights[i]!;
+      const state: SignalLampState =
+        getSignalPhase?.(light.nodeId, light.approachBearingDeg) ?? "green";
+      if (lastPhases.current[i] === state) continue;
+      lastPhases.current[i] = state;
+      const colors = lampColorsFor(state);
       mesh.setColorAt(i * 3, colors[0]);
       mesh.setColorAt(i * 3 + 1, colors[1]);
       mesh.setColorAt(i * 3 + 2, colors[2]);
@@ -1202,7 +1222,9 @@ export function WorldPropsGroup({
   world: WorldGeometry;
   preset: QualityPreset;
   night: boolean;
-  getSignalPhase?: (signalNodeId: string) => SignalPhase;
+  /** Lamp state per head — wire to WorldRuntime.signalLampState (mode- and
+   *  approach-aware, doc 62 S1). Absent = all green (standalone mounts). */
+  getSignalPhase?: (signalNodeId: string, approachBearingDeg: number) => SignalLampState;
   /** Barrier-arm state per guarded crossing (district meters) — wire to
    *  WorldRuntime.railBarrierDownAt. Absent = arms hold the authored down pose. */
   getRailBarrierDown?: (x: number, y: number) => boolean;

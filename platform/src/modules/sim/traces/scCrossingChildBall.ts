@@ -3,7 +3,12 @@
  * shadow + TWO mistake demos for „Дете тича след топка на пътеката" (PE-04, the
  * child dart) on the committed pe-child-v1 district, recorded with the
  * template's OWN staged runner (pedestrianDartOut sc-cbl-ped, 2.6 m/s — a small
- * child bolting across, single truth, imported from the template).
+ * child bolting across, single truth, imported from the template). Founder R3
+ * #27: the figure renders as the CHILD rig and the template's `hazard` BALL
+ * rolls out at the trigger with the child following ballLeadSec = 0.5 s later
+ * (the ball is the warning cue) — so every occupancy window in these drives
+ * sits 0.5 s later than the pre-ball recordings, and the scripts are retimed
+ * for it. The ball itself is render-only and never reaches the trace bytes.
  *
  * The trace gate replays exactly these through the production stack:
  *   - shadow: ZERO violations + PEDESTRIAN_YIELDED (slowed early, stopped, waited);
@@ -45,7 +50,14 @@ export function scCrossingChildBallShadowScript(): DriveScript {
       { kind: "annotation", textBg: "Квартална улица с деца — карай бавно и наблюдавай дворовете и паркираните коли." },
       { kind: "glance", mirror: "rear" },
       // ~20 km/h — под прага за приближаване; готов за изскачащо дете.
-      { kind: "drive", points: [[X_LANE, 15], [X_LANE, 32]], targetKmh: 20 },
+      { kind: "drive", points: [[X_LANE, 15], [X_LANE, 38]], targetKmh: 20 },
+      {
+        // The BALL beat (R3 #27): the trigger fires at y ≈ 37–43 and the ball
+        // rolls out FIRST — the annotation teaches the read before the child.
+        kind: "annotation",
+        textBg: "Топка се търкаля на платното — това е предупреждение: след топката тича дете!",
+      },
+      { kind: "drive", points: [[X_LANE, 38], [X_LANE, 46]], targetKmh: 20 },
       {
         kind: "annotation",
         textBg: "Дете изтичва след топка си на пътеката! Реагирай веднага — спирачка, без да завиваш.",
@@ -53,7 +65,7 @@ export function scCrossingChildBallShadowScript(): DriveScript {
       {
         // Firm, planned stop 6 m short of the crossing line.
         kind: "drive",
-        points: [[X_LANE, 32], [X_LANE, 54], [X_LANE, Y_ZEBRA - 6]],
+        points: [[X_LANE, 46], [X_LANE, Y_ZEBRA - 6]],
         targetKmh: 20,
       },
       // Wait the child out — the 2.6 m/s runner clears the carriageway in ~7 s.
@@ -87,14 +99,20 @@ export function scCrossingChildBallMistakeTooFastScript(): DriveScript {
       { kind: "glance", mirror: "rear" },
       // Hold 38 km/h (legal in the 40 zone, but too fast for an occupied
       // crossing) through the zone entry — over a second of „без готовност" is
-      // the graded fault, regardless of the legal limit.
-      { kind: "drive", points: [[X_LANE, 15], [X_LANE, 60]], targetKmh: 38, stopAtEnd: false },
+      // the graded fault, regardless of the legal limit. Held to y = 66 (was
+      // 60 pre-ball): the child now enters the road ~0.5 s later (the ball
+      // leads — probed occupancy at car y ≈ 54), so the fast-while-occupied
+      // window needs the longer hold to clear crossingTooFastSustainSec (1 s).
+      { kind: "drive", points: [[X_LANE, 15], [X_LANE, 66]], targetKmh: 38, stopAtEnd: false },
       { kind: "annotation", textBg: "Чак сега спирачка — късно за спокойно спиране." },
       {
-        // The late hard brake still stops ~4 m short of the line — ONE fault.
+        // The late HARD brake (12 → the ~8.4 m/s² envelope) still stops ~4 m
+        // short of the line — ONE fault: braking inside an occupied crossing
+        // zone is a CAUSED stop (s.crossing != null), so no harsh-brake code.
         kind: "drive",
-        points: [[X_LANE, 60], [X_LANE, Y_ZEBRA - 4]],
+        points: [[X_LANE, 66], [X_LANE, Y_ZEBRA - 4]],
         targetKmh: 5,
+        maxDecelMps2: 12,
       },
       { kind: "pause", sec: 7, brake: true },
       { kind: "glance", mirror: "left" },

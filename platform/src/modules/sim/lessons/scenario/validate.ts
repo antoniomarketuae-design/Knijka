@@ -310,6 +310,23 @@ export function validateScenarioSpec(
     }
   }
 
+  // -- Signal modes (session-start cluster dials, doc 62 S1): shape when
+  //    present — node id → "dark" | "flashingAmber" only ("controlled" is the
+  //    trafficController runner's own dial, never authorable here).
+  if (spec.signalModes !== undefined) {
+    const sm = spec.signalModes;
+    if (typeof sm !== "object" || sm === null || Array.isArray(sm)) {
+      errors.push(`signalModes must be a { nodeId: "dark" | "flashingAmber" } record when present`);
+    } else {
+      for (const [nodeId, mode] of Object.entries(sm)) {
+        if (nodeId.length === 0) errors.push(`signalModes: node id must be non-empty`);
+        if (mode !== "dark" && mode !== "flashingAmber") {
+          errors.push(`signalModes["${nodeId}"] must be "dark" | "flashingAmber"`);
+        }
+      }
+    }
+  }
+
   return errors;
 }
 

@@ -63,6 +63,7 @@ import {
   DRACO_DECODER_PATH,
   FLEET,
   FLEET_URLS,
+  TRUCK_MODEL_INDEX,
   type ModelRig,
   type TrafficFleet,
 } from "@/modules/sim/traffic";
@@ -83,9 +84,12 @@ interface ObstaclePose {
 export interface ScenarioVehicleObstacle extends ObstaclePose {
   kind: "vehicle";
   /**
-   * Fleet model basename ("vela_h3", "corva_s", "kargo_v", …). Absent or
-   * unknown → deterministic civilian pick from `seed` (parked pool — no
-   * police/route minibus/hero SUV).
+   * Fleet model basename ("vela_h3", "corva_s", "kargo_v", …), or
+   * "box_truck" for the PROCEDURAL box-truck rig (the R3 #26 large-occluder
+   * stopgap — vehicleFleet builds it after the GLB models, and the parked
+   * pass instances it exactly like a GLB rig). Absent or unknown →
+   * deterministic civilian pick from `seed` (parked pool — no police/route
+   * minibus/hero SUV).
    */
   model?: string;
   /** Stable seed: paint palette pick (+ fallback model). Default: list index. */
@@ -148,8 +152,11 @@ export function obstacleYawRad(headingDeg: number): number {
   return Math.PI - (headingDeg * Math.PI) / 180;
 }
 
-/** Resolve a vehicle spec to a fleet model index (civilian fallback). */
+/** Resolve a vehicle spec to a fleet model index (civilian fallback). The
+ *  procedural box-truck slot resolves by its rig name ("box_truck" —
+ *  TRUCK_MODEL_INDEX rides one past the GLB fleet). */
 export function resolveVehicleModel(model: string | undefined, seed: number): number {
+  if (model === "box_truck") return TRUCK_MODEL_INDEX;
   if (model) {
     const idx = (FLEET as readonly string[]).indexOf(model);
     if (idx >= 0) return idx;

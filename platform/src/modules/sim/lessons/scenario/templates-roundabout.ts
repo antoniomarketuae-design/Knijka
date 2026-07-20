@@ -193,12 +193,19 @@ export const SC_RB_EXIT_SIGNAL: ScenarioSpec = {
       // The L3 roundabout contract (A10): enter the ring, exit ONLY under a
       // right indicator — an unsignalled exit voids the traversal and the
       // student must go round again.
+      //
+      // enterRadiusM 24 (was 21) — founder R3 #6 geometry fix, applied
+      // family-wide: the rb-mini drivable band reaches 18 + 4.06 = 22.06, so
+      // a driver keeping right could never latch `entered` at 21 and the
+      // objective was uncompletable on a legal line. Committed traces replay
+      // identically at 21 and 24 (proven in the R3 W-FLOW pass) — see
+      // sc-rb-ring in templates-flow.ts for the full derivation.
       params: {
         kind: "completeManeuver",
         maneuver: "roundabout",
         x: 0,
         y: 0,
-        enterRadiusM: 21,
+        enterRadiusM: 24,
         exitRadiusM: 34,
       },
     },
@@ -385,12 +392,15 @@ export const SC_RB_CIRCULATE_PRIORITY: ScenarioSpec = {
       titleBg: "Излез на северния изход с включен десен мигач",
       // The L3 roundabout contract (A10): enter the ring, exit ONLY under a
       // right indicator — an unsignalled exit voids the traversal.
+      // enterRadiusM 24 (was 21) — R3 #6 family-wide geometry fix: the
+      // drivable band reaches 22.06, so 21 could never latch `entered` on a
+      // keep-right line. Traces replay identically (see sc-rb-ring).
       params: {
         kind: "completeManeuver",
         maneuver: "roundabout",
         x: 0,
         y: 0,
-        enterRadiusM: 21,
+        enterRadiusM: 24,
         exitRadiusM: 34,
       },
     },
@@ -651,12 +661,15 @@ export const SC_RB_BUSY_GAP: ScenarioSpec = {
       titleBg: "Излез на втория изход с включен десен мигач",
       // The L3 roundabout contract (A10): enter the ring, exit ONLY under a
       // right indicator — an unsignalled exit voids the traversal.
+      // enterRadiusM 24 (was 21) — R3 #6 family-wide geometry fix: the
+      // drivable band reaches 22.06, so 21 could never latch `entered` on a
+      // keep-right line. Traces replay identically (see sc-rb-ring).
       params: {
         kind: "completeManeuver",
         maneuver: "roundabout",
         x: 0,
         y: 0,
-        enterRadiusM: 21,
+        enterRadiusM: 24,
         exitRadiusM: 34,
       },
     },

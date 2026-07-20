@@ -19,6 +19,7 @@
  * addresses (approaching traffic).
  */
 
+import { bearingDeg } from "../../runtime/geometry";
 import { STOP_LINE_OVERRIDES } from "../../runtime/stoplines";
 import type {
   BillboardPlacement,
@@ -64,7 +65,7 @@ import {
 } from "./math2d";
 import { toWorld, yawFromFacing } from "./mesh";
 import type { Approach, RoadNetwork } from "./network";
-import { buildZoneSigns } from "./zoneSigns";
+import { buildZoneSigns, scenarioSignScale } from "./zoneSigns";
 
 export interface PropBuildResult {
   trafficLights: TrafficLightPlacement[];
@@ -155,6 +156,11 @@ export function buildProps(
   const parkingKits: StaticTransform[] = [];
   const stopSignApproaches = new Set<string>();
   const giveWayApproaches = new Set<string>();
+  // Lesson-critical sign prominence (doc 62 S4/#6): scenario micro-maps scale
+  // the signs that ARE the lesson; undefined elsewhere keeps placements
+  // byte-identical (no `scale` key) on city/exam/полигон maps.
+  const lessonScale = scenarioSignScale(district);
+  const lessonSized = lessonScale !== undefined ? { scale: lessonScale } : {};
 
   // -- roundabout membership --------------------------------------------------
   const roundaboutNodes = new Set<string>();
@@ -169,14 +175,58 @@ export function buildProps(
   }
 
   // -- traffic lights at signalized junctions ---------------------------------
+  // Two heads per incoming approach (doc 62 S1/#19 — „green appeared once and
+  // never again"): the NEAR head stands right of the driver at the stop line
+  // (the shipped pose), and a FAR-SIDE companion mirrors it through the node —
+  // the far-left corner across the junction, the head a driver WAITING AT THE
+  // LINE actually has in view (the near pole is abeam of the A-pillar there,
+  // invisible from both cockpit and chase cameras). Both carry the approach's
+  // own travel bearing so the render callback lights the arm's graded
+  // axis-group (WorldRuntime.signalLampState), never the node's single group.
+  // The companion is skipped when its mirrored point lands inside another
+  // arm's corridor (organic OSM junctions are not orthogonal) — deterministic
+  // geometry, no RNG.
   for (const node of network.nodes.values()) {
     if (!node.signalized || node.degree < 3) continue;
-    let placed = 0;
+    let approachesLit = 0;
     for (const ap of node.approaches) {
-      if (!ap.incoming || placed >= 4) continue;
+      if (!ap.incoming || approachesLit >= 4) continue;
       const { p, yaw } = approachPropPose(ap, 1.0, 0.9);
-      trafficLights.push({ nodeId: node.id, position: toWorld(p[0], p[1], ROAD_Y), yaw });
-      placed++;
+      const travel = mul(ap.cutTangentAway, -1); // into the junction
+      const approachBearingDeg = bearingDeg(travel[0], travel[1]);
+      trafficLights.push({
+        nodeId: node.id,
+        position: toWorld(p[0], p[1], ROAD_Y),
+        yaw,
+        approachBearingDeg,
+      });
+      // Far-side companion: the mirror of the near head through the node.
+      // Clearance check: must sit outside every arm's carriageway corridor
+      // (projected in FRONT of the node toward that arm, lateral > halfWidth
+      // + margin) — a pole may stand on a verge, never on asphalt.
+      const m: Vec2 = [2 * node.pos[0] - p[0], 2 * node.pos[1] - p[1]];
+      let clear = true;
+      for (const other of node.approaches) {
+        const dir = other.cutTangentAway;
+        const vx = m[0] - node.pos[0];
+        const vy = m[1] - node.pos[1];
+        const proj = vx * dir[0] + vy * dir[1];
+        if (proj <= 0) continue; // behind the node for this arm
+        const lateral = Math.abs(dir[0] * vy - dir[1] * vx);
+        if (lateral < other.halfWidth + 0.3) {
+          clear = false;
+          break;
+        }
+      }
+      if (clear) {
+        trafficLights.push({
+          nodeId: node.id,
+          position: toWorld(m[0], m[1], ROAD_Y),
+          yaw, // same facing: it addresses the same incoming driver
+          approachBearingDeg,
+        });
+      }
+      approachesLit++;
     }
   }
 
@@ -189,8 +239,8 @@ export function buildProps(
       for (const ap of node.approaches) {
         if (ap.edge.roundabout || !ap.incoming) continue;
         const { p, yaw } = approachPropPose(ap, 1.4, 0.8);
-        signs.push({ kind: "giveWay", position: toWorld(p[0], p[1], ROAD_Y), yaw });
-        signs.push({ kind: "roundabout", position: toWorld(p[0], p[1], ROAD_Y), yaw });
+        signs.push({ kind: "giveWay", position: toWorld(p[0], p[1], ROAD_Y), yaw, ...lessonSized });
+        signs.push({ kind: "roundabout", position: toWorld(p[0], p[1], ROAD_Y), yaw, ...lessonSized });
         giveWayApproaches.add(`${node.id}:${ap.edgeId}`);
       }
       continue;
@@ -204,7 +254,7 @@ export function buildProps(
       if (ranks[i] !== minRank || !ap.incoming) continue;
       const kind: SignKind = maxRank >= 5 ? "stop" : "giveWay";
       const { p, yaw } = approachPropPose(ap, 1.4, 0.8);
-      signs.push({ kind, position: toWorld(p[0], p[1], ROAD_Y), yaw });
+      signs.push({ kind, position: toWorld(p[0], p[1], ROAD_Y), yaw, ...lessonSized });
       (kind === "stop" ? stopSignApproaches : giveWayApproaches).add(`${node.id}:${ap.edgeId}`);
     }
   }
@@ -224,7 +274,7 @@ export function buildProps(
     if (!ap || !ap.incoming) continue;
     const kind: SignKind = ov.control === "giveWay" ? "giveWay" : "stop";
     const { p, yaw } = approachPropPose(ap, 1.4, 0.8);
-    signs.push({ kind, position: toWorld(p[0], p[1], ROAD_Y), yaw });
+    signs.push({ kind, position: toWorld(p[0], p[1], ROAD_Y), yaw, ...lessonSized });
     (kind === "giveWay" ? giveWayApproaches : stopSignApproaches).add(key);
   }
 

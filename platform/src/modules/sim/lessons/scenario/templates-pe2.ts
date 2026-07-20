@@ -124,6 +124,7 @@ const SCHOOL_CHILDREN: PedestrianDartOutSpec = {
   roadToM: ROAD_TO_M,
   triggerDistM: 40,
   minTriggerSpeedKmh: 8,
+  variant: "child", // R3 P6: the school figure RENDERS as the child rig
 };
 
 /** PE-07 + PE-02 — училищна зона със стоп-палка (ЗДвП чл. 119: пропусни
@@ -250,12 +251,14 @@ export const SC_PE_SCHOOL_PATROL: ScenarioSpec = {
  * corner shop west of it. Nothing about the map is new; the axes that are:
  *
  *  1. NIGHT (`conditions.night`, all five rungs). PE-09's defining condition.
- *  2. A SHORTER LEASH: triggerDistM 30 against sc-crossing-dart's 40 — the
- *     figure is released a quarter later, because at night she does not exist
- *     until she is in the beam. The two templates cannot play identically.
+ *  2. THE BEAM LEASH: triggerDistM 30 — the figure is released only at the
+ *     edge of what low beams show, because at night she does not exist until
+ *     she is in the beam. (The day dart, since its R3 #25 suddenness retune,
+ *     releases even later — 26 m — but at a bolt; see 3.)
  *  3. A CALMER FIGURE: 1.4 m/s (the adult walk tier) against the day dart's
- *     1.6 m/s hurried step-out. The night lesson is not „react to a sprinter";
- *     it is „you never saw her at all" — she is walking normally, in the dark.
+ *     2.5 m/s bolt (R3 #25). The night lesson is not „react to a sprinter";
+ *     it is „you never saw her at all" — she is walking normally, in the
+ *     dark. The two templates cannot play identically.
  *
  * WHAT GRADES, HONESTLY (the A12 discipline): PE-09's own doc-72 line asks for
  * a per-segment LIGHTING flag so SPEED_TOO_FAST_FOR_CONDITIONS arms on unlit
@@ -777,6 +780,7 @@ const PARKED_ROW_CHILD: PedestrianDartOutSpec = {
   roadToM: ROW_ROAD_TO_M,
   triggerDistM: 14,
   minTriggerSpeedKmh: 10,
+  variant: "child", // R3 P6: renders as the small child rig
 };
 
 /**
@@ -800,6 +804,7 @@ const ROW_SECOND_CHILD: PedestrianDartOutSpec = {
   roadToM: ROW_ROAD_TO_M,
   triggerDistM: 10,
   minTriggerSpeedKmh: 6,
+  variant: "child", // R3 P6: renders as the small child rig
 };
 
 /** PE-04 — покрай редицата паркирани коли (ЗДвП чл. 20: скорост и разстояние,

@@ -231,6 +231,87 @@ describe("mw-v1 — emergencyLane seam lands on the oneway curb-lane-0 boundary"
 });
 
 // ---------------------------------------------------------------------------
+// noOvertaking — В24 paints the solid М1 over the ban span (founder R3 #50)
+// ---------------------------------------------------------------------------
+
+describe("ov-ban-v1 — a В24 span paints the solid осева and suppresses the centre dashes", () => {
+  // tertiary 2+2, straight edge (0,0)→(0,400) at x=0; В24 span [90, 210]. The
+  // founder's #50: the ban map painted a DASHED centre (= overtaking allowed)
+  // over the very span the runtime grades OVERTAKING_IN_BAN_ZONE — В24 on a
+  // two-way road means the centre line is not to be crossed, so it renders
+  // exactly like an authored solidCenterLine span.
+  const district = loadDistrict("ov-ban-v1");
+  const zoned = quads(markingsOf(district));
+  const stripped = quads(markingsOf({ ...district, zones: undefined }));
+
+  const zonedCenter = lineQuadsAtX(zoned, 0);
+  const strippedCenter = lineQuadsAtX(stripped, 0);
+
+  it("paints ONE solid centre strip over exactly the ban span [90, 210]", () => {
+    const strip = solids(zonedCenter);
+    expect(strip).toHaveLength(1);
+    expect(strip[0].minY).toBeCloseTo(90, 1);
+    expect(strip[0].maxY).toBeCloseTo(210, 1);
+    expect(Math.abs(strip[0].cx)).toBeLessThan(0.05);
+  });
+
+  it("suppresses every dashed centre segment INSIDE the span — none survive", () => {
+    for (const d of dashes(zonedCenter)) {
+      expect(d.cy > 90 && d.cy < 210).toBe(false);
+    }
+    // ...and dashes still exist outside the span (the road is not all-solid).
+    expect(dashes(zonedCenter).length).toBeGreaterThan(0);
+  });
+
+  it("leaves the same-direction lane dividers (±W) dashed — В24 bans overtaking, not lane paint", () => {
+    for (const side of [W, -W]) {
+      const divider = lineQuadsAtX(zoned, side);
+      expect(solids(divider)).toHaveLength(0);
+      expect(dashes(divider).some((d) => d.cy > 100 && d.cy < 200)).toBe(true);
+    }
+  });
+
+  it("the zoneless build has NO solid and dashes straight through (the pre-fix render)", () => {
+    expect(solids(strippedCenter)).toHaveLength(0);
+    expect(dashes(strippedCenter).some((d) => d.cy > 95 && d.cy < 205)).toBe(true);
+  });
+
+  it("blast radius: every centre dash OUTSIDE the span is byte-identical to the zoneless build", () => {
+    const key = (q: Quad) => `${q.minY.toFixed(3)}:${q.maxY.toFixed(3)}:${q.cx.toFixed(3)}`;
+    const zonedKeys = new Set(dashes(zonedCenter).map(key));
+    const strippedKeys = new Set(dashes(strippedCenter).map(key));
+    for (const k of zonedKeys) expect(strippedKeys.has(k)).toBe(true);
+    for (const d of dashes(strippedCenter)) {
+      if (!zonedKeys.has(key(d))) expect(d.cy > 89 && d.cy < 211).toBe(true);
+    }
+    expect(dashes(zonedCenter).length).toBeLessThan(dashes(strippedCenter).length);
+  });
+});
+
+describe("ov-crest-v1 — the unmarked-class В24 host still shows the solid осева", () => {
+  // unclassified 1+1 (not in MARKED_CLASSES → paints NO lane lines at all);
+  // В24 span [150, 452.04] runs over the straight [150, 240] then follows the
+  // arc — the residential-осева precedent: the solid still renders. The road
+  // bends past y=240, so assertions stay in the straight stretch.
+  const district = loadDistrict("ov-crest-v1");
+  const zoned = quads(markingsOf(district));
+  const stripped = quads(markingsOf({ ...district, zones: undefined }));
+
+  it("paints centre paint over the ban span where there was NONE before", () => {
+    // Zone-stripped: an unmarked class paints zero markings.
+    expect(stripped).toHaveLength(0);
+    expect(zoned.length).toBeGreaterThan(0);
+    // The straight stretch of the span carries centreline paint at x ≈ 0.
+    const straightPart = zoned.filter((q) => Math.abs(q.cx) < 0.4 && q.cy > 150 && q.cy < 240);
+    expect(straightPart.length).toBeGreaterThan(0);
+    const minY = Math.min(...straightPart.map((q) => q.minY));
+    expect(minY).toBeCloseTo(150, 0);
+    // ...and nothing paints before the span starts.
+    expect(zoned.some((q) => q.maxY < 149)).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
 // residential — the founder call: a no-lane-line host STILL shows the осева
 // ---------------------------------------------------------------------------
 
@@ -251,11 +332,75 @@ describe("ov-solid-v1 — a residential solidCenterLine host renders the solid s
 });
 
 // ---------------------------------------------------------------------------
+// Painted zone-speed numerals (founder R3 #33/#34 — the honest В26-30 stopgap)
+// ---------------------------------------------------------------------------
+
+describe("painted zone-speed numerals — «30»/«20» road glyphs on zone streets", () => {
+  /** Glyph quads = the zoned build's extra quads vs a mapKind-stripped build
+   *  (the pass gates on the scenario mapKind, so stripping it is the exact
+   *  pre-slice geometry). */
+  const glyphQuadsOf = (id: string) => {
+    const district = loadDistrict(id);
+    const withGlyphs = quads(markingsOf(district));
+    const without = quads(
+      markingsOf({ ...district, meta: { ...district.meta, mapKind: undefined } }),
+    );
+    return { withGlyphs, without, extra: withGlyphs.slice(without.length) };
+  };
+
+  it("sp-zone30-v1 (#33): the 360 m zone street paints «30» stations in BOTH banks", () => {
+    const { withGlyphs, without, extra } = glyphQuadsOf("sp-zone30-v1");
+    expect(withGlyphs.length).toBeGreaterThan(without.length);
+    // Seven-segment «30» = 11 quads per station; 3 stations per bank × 2.
+    expect(extra.length).toBe(66);
+    // Stations sit in each bank's own curb lane (±4.06 lane centres).
+    expect(extra.some((q) => q.cx > 1 && q.cx < 7.2)).toBe(true);
+    expect(extra.some((q) => q.cx < -1 && q.cx > -7.2)).toBe(true);
+    // The first northbound station is fully visible ahead of the y=15 spawn.
+    const north = extra.filter((q) => q.cx > 0);
+    expect(Math.min(...north.map((q) => q.minY))).toBeGreaterThan(15);
+  });
+
+  it("sp-trans-v1 (#34): ONLY the 30-zone edge paints — the 50 approach stays clean", () => {
+    const { extra } = glyphQuadsOf("sp-trans-v1");
+    expect(extra.length).toBeGreaterThan(0);
+    // The zone edge starts at the y=160 transition; every glyph lands past it.
+    for (const q of extra) expect(q.minY).toBeGreaterThan(160);
+  });
+
+  it("pe-zone-v1: the residential-20 edge paints «20»; pk-drive-v1's 90 m stub paints NOTHING", () => {
+    const { extra } = glyphQuadsOf("pe-zone-v1");
+    expect(extra.length).toBeGreaterThan(0); // «20» = 11 quads per station
+    const stub = glyphQuadsOf("pk-drive-v1");
+    expect(stub.extra).toHaveLength(0); // min-length gate: not a zone street
+  });
+
+  it("the digits are honest: glyph quads span the digit box, not random paint", () => {
+    const { extra } = glyphQuadsOf("sp-zone30-v1");
+    for (const q of extra) {
+      // Every segment quad fits inside one 6 m × 2.4 m digit box.
+      expect(q.wy).toBeLessThanOrEqual(6.05);
+      expect(q.wx).toBeLessThanOrEqual(6.05);
+    }
+  });
+});
+
+// ---------------------------------------------------------------------------
 // Whole-build guards on every zoned archetype (finite + deterministic)
 // ---------------------------------------------------------------------------
 
 describe("zoned archetypes build finite, deterministic marking geometry", () => {
-  for (const id of ["ov-solid2-v1", "mv-uturn-v1", "ov-bus-v1", "mw-v1", "ov-solid-v1"]) {
+  for (const id of [
+    "ov-solid2-v1",
+    "mv-uturn-v1",
+    "ov-bus-v1",
+    "mw-v1",
+    "ov-solid-v1",
+    "ov-ban-v1",
+    "ov-crest-v1",
+    "sp-zone30-v1",
+    "sp-trans-v1",
+  ]) {
     it(`${id}: markings are all-finite and stable for a fixed seed`, () => {
       const district = loadDistrict(id);
       const a = buildWorldGeometry(district, { seed: 7 });

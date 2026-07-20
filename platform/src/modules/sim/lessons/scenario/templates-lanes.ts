@@ -10,6 +10,18 @@
  *  - sc-ov-lane-keeping  „Движение в средата на лентата" (OV-12 + OV-04, ov-lane-v1)
  *  - sc-ov-oneway        „Еднопосочна улица"           (OV-13, ov-oneway-v1)
  *
+ * FOUNDER R3 REDESIGNS (doc 62 #45/#46/#47 — the „press W and win" family):
+ * each of the three now has an act the player can genuinely fail:
+ *   - keep-right SPAWNS IN THE LEFT LANE (ov-kr-spawn-left), so „дръж вдясно"
+ *     is an actual mirror-signal-move lane change, and staying put grades;
+ *   - lane-keeping runs on the regenerated S-CURVE ov-lane-v1 (sway ±14 m),
+ *     so holding the middle takes real steering with a direction reversal —
+ *     cutting or running wide grades;
+ *   - oneway runs on the regenerated T-JUNCTION ov-oneway-v1 whose cross
+ *     street is one-way EAST (М10 right-only arrows painted on the approach
+ *     lane): the drill is CHOOSING the legal entry, and the left turn — fully
+ *     drivable — grades WRONG_WAY.
+ *
  * Each is a pure lane/position drive: NO staged actor, ambient traffic ZERO
  * (seed 7), so the ONLY thing the rule engine can grade is the driver's own
  * lane choice / lateral position / direction of travel. Each mistake demo cites
@@ -54,10 +66,17 @@ const KR_LEFT = 4.06;
  *  (cruise / lead) and left (overtake target) lane centers. */
 const OVC_RIGHT = 12.19;
 const OVC_LEFT = 4.06;
-/** ov-lane-v1 (1+1 street): the single lane center of the northbound bank. */
-const LN_CENTER = 4.06;
-/** ov-oneway-v1 (single-lane one-way): the lane centers on the polyline. */
-const OW_CENTER = 0;
+/** ov-lane-v1 (1+1 S-curve street, sway ±14 m): the graded apex/finish gates —
+ *  lane-center points at the sway apexes, pinned from meta.scenario.gates. */
+const LN_GATE_EAST = { x: 18.06, y: 75 };
+const LN_GATE_WEST = { x: -9.94, y: 225 };
+const LN_GATE_FINISH = { x: -0.42, y: 283.91 };
+/** ov-oneway-v1 (T-junction, one-way bar flowing EAST): the approach lane
+ *  center + the graded gates, pinned from meta.scenario.gates. */
+const OW_APPROACH_X = 4.06;
+const OW_GATE_MOUTH = { x: 4.06, y: 170 };
+const OW_GATE_LEGAL = { x: 60, y: 200 };
+const OW_GATE_FINISH = { x: 125, y: 200 };
 /** ov-ban-v1 (2+2 boulevard, В24 zone @ [90, 210]): the right (cruise / lead)
  *  and left (overtake target) lane centers. */
 const OVB_RIGHT = 12.19;
@@ -67,20 +86,33 @@ const OVB_BAN_FROM = 90;
 const OVB_BAN_TO = 210;
 
 // ---------------------------------------------------------------------------
-// 1. sc-ov-keep-right — „Дръж вдясно" (OV-11) on ov-keepright-v1
+// 1. sc-ov-keep-right — „Дръж вдясно" (OV-11 + OV-02) on ov-keepright-v1
 //    (360 m 2+2 boulevard, limit 50)
+//
+// FOUNDER R3 REDESIGN (doc 62 #45: „starts already right, straight road;
+// nothing to do"). The drill now SPAWNS IN THE LEFT LANE (ov-kr-spawn-left):
+// „дръж вдясно" is finally an ACT — mirror, right indicator, move over, come
+// home — and NOT doing it is finally a fault: staying left past the 12 s
+// keep-right sustain grades NOT_KEEPING_RIGHT on the live session exactly as
+// in the demos. The success gates (radius 4 < the 8.125 m lane pitch) are
+// satisfiable ONLY from the right lane center, so the lane change is required
+// to finish, and the change itself must be signalled (the shipped
+// lane-change observation detectors stay armed — the shadow shows the full
+// mirror-indicator-move discipline and earns SAFE_LANE_CHANGE).
 // ---------------------------------------------------------------------------
 
-/** OV-11 — движение във възможно най-дясната свободна лента (ЗДвП чл. 15:
- *  извън изпреварване водачът се движи възможно най-вдясно). */
+/** OV-11 + OV-02 — движение във възможно най-дясната свободна лента (ЗДвП
+ *  чл. 15: извън изпреварване водачът се движи възможно най-вдясно) — но
+ *  започнато от ГРЕШНАТА лента, така че прибирането вдясно е истинска
+ *  маневра: огледало, мигач, престрояване. */
 export const SC_OV_KEEP_RIGHT: ScenarioSpec = {
   id: "sc-ov-keep-right",
   family: "lanes",
-  tagsBg: ["ленти", "дръж вдясно", "лентова дисциплина", "булевард"],
+  tagsBg: ["ленти", "дръж вдясно", "лентова дисциплина", "престрояване", "булевард"],
   titleBg: "Дръж вдясно",
   objectiveBg:
-    "Измини булеварда в дясната лента — лявата е за изпреварване, не за пътуване. Извън маневра се движи във възможно най-дясната свободна лента.",
-  archetypeIds: ["OV-11"],
+    "Започваш в ЛЯВАТА лента на булеварда — мястото ти не е там. Огледало, десен мигач, престрой се в дясната лента и я дръж до края: лявата е за изпреварване, не за пътуване. Останеш ли вляво, това е отбелязана грешка.",
+  archetypeIds: ["OV-11", "OV-02"],
   conceptIds: ["c-right-side-rule", "c-lane-choice", "c-overtaking-procedure"],
   map: {
     archetype: "straight-street",
@@ -90,23 +122,24 @@ export const SC_OV_KEEP_RIGHT: ScenarioSpec = {
     districtId: "ov-keepright-v1",
   },
   start: {
-    spawnPointId: "ov-kr-spawn-start",
+    spawnPointId: "ov-kr-spawn-left",
     vehicleStart: "ready",
   },
   instructionsBg: [
-    { n: 1, textBg: "Потегли по булеварда и се установи в дясната лента с постоянна скорост." },
-    { n: 2, textBg: "Дясната лента е твоята лента за пътуване — дръж се в нея, докато няма причина да я напуснеш." },
-    { n: 3, textBg: "Лявата лента е само за изпреварване или за ляв завой — влизаш в нея с мигач, изпреварваш и се прибираш." },
-    { n: 4, textBg: "Не оставай в лявата лента „за всеки случай“ — зад теб се събира колона, която не може да те подмине отдясно законно." },
-    { n: 5, textBg: "Продължи в дясната лента до края на отсечката." },
+    { n: 1, textBg: "Потегляш в ЛЯВАТА лента — например след изпреварване. По чл. 15 мястото ти е във възможно най-дясната свободна лента." },
+    { n: 2, textBg: "Дясната е свободна: огледало, поглед през рамо, десен мигач." },
+    { n: 3, textBg: "Престрой се плавно в дясната лента и изключи мигача — това е цялата маневра „прибиране“." },
+    { n: 4, textBg: "Не отлагай: висенето в лявата лента без причина е грешка, която тече със секундите, а зад теб се събира колона." },
+    { n: 5, textBg: "Продължи в дясната лента до края на отсечката — лявата се посещава, в дясната се живее." },
   ],
   success: [
     {
-      id: "sc-ovkr-cruise",
-      titleBg: "Установи се в дясната лента",
+      id: "sc-ovkr-move-right",
+      titleBg: "Престрой се в дясната лента",
       // Radius 4 < the 8.125 m lane pitch: the zone is satisfiable ONLY from
-      // the RIGHT lane center — staying right is the drill itself.
-      params: { kind: "reachZone", x: KR_RIGHT, y: 170, radiusM: 4, maxSpeedKmh: 55 },
+      // the RIGHT lane center — the lane change IS the drill. Reaching it
+      // needs the move to happen well inside the 12 s keep-right sustain.
+      params: { kind: "reachZone", x: KR_RIGHT, y: 150, radiusM: 4, maxSpeedKmh: 55 },
     },
     {
       id: "sc-ovkr-finish",
@@ -124,25 +157,25 @@ export const SC_OV_KEEP_RIGHT: ScenarioSpec = {
       traceRef: { path: "content/traces/sc-ov-keep-right/mistake-hog.trace.json" },
       titleBg: "Висене в лявата лента",
       whatWentWrongBg:
-        "Колата се движеше в лявата лента през цялата отсечка, при свободна дясна — без да изпреварва. Лявата лента не е за пътуване: извън изпреварване се движиш във възможно най-дясната свободна лента (чл. 15), иначе събираш колона зад себе си.",
+        "Колата така и не се прибра: остана в лявата лента, в която тръгна, при съвсем свободна дясна — без да изпреварва никого. Лявата лента не е за пътуване: извън изпреварване се движиш във възможно най-дясната свободна лента (чл. 15), иначе събираш колона зад себе си.",
       codeRefs: ["NOT_KEEPING_RIGHT"],
     },
     {
       traceRef: { path: "content/traces/sc-ov-keep-right/mistake-slow-hog.trace.json" },
       titleBg: "Бавно в лявата лента",
       whatWentWrongBg:
-        "Водачът се настани в лявата лента и се движеше по-бавно от потока, „за да е спокоен“ — и запуши бързата лента. По-бавното движение в лявата лента е същата грешка: мястото ти е вдясно, а лявата се освобождава за по-бързите.",
+        "Водачът не само остана в лявата лента, но и кара по-бавно от потока, „за да е спокоен“ — и запуши бързата лента. По-бавното движение в лявата лента е същата грешка: мястото ти е вдясно, а лявата се освобождава за по-бързите.",
       codeRefs: ["NOT_KEEPING_RIGHT"],
     },
   ],
   teach: {
     whenBg:
-      "На всеки булевард и многолентов път с повече от една лента в посока. Правилото е просто: пътуваш в най-дясната свободна лента, а лявата ползваш само за да изпревариш или да завиеш наляво — и веднага се прибираш.",
+      "На всеки булевард и многолентов път — най-често точно СЛЕД изпреварване или ляв завой, когато вече си в лявата лента и прибирането е твоя следваща маневра: огледало, мигач, вдясно.",
     whyBg:
       "Висенето в лявата лента запушва потока и тласка другите да те изпреварват отдясно — най-опасния вид изпреварване. „Дръж вдясно“ не е учтивост, а закон (чл. 15): подредеността по ленти е това, което прави многолентовия път по-безопасен от еднолентовия.",
     lawRef: "ЗДвП чл. 15",
     examinerBg:
-      "Изпитващият следи лентовата ти дисциплина: движение в дясната лента, ползване на лявата само за изпреварване или ляв завой и своевременно прибиране вдясно след маневрата. Продължителното висене в лявата лента без причина е второстепенна грешка.",
+      "Изпитващият следи лентовата ти дисциплина: движение в дясната лента, ползване на лявата само за изпреварване или ляв завой и СВОЕВРЕМЕННО прибиране вдясно след маневрата — с огледало и мигач. Продължителното висене в лявата лента без причина е второстепенна грешка.",
   },
   levels: [
     { level: 1 },
@@ -159,27 +192,40 @@ export const SC_OV_KEEP_RIGHT: ScenarioSpec = {
 
 // ---------------------------------------------------------------------------
 // 2. sc-ov-lane-keeping — „Движение в средата на лентата" (OV-12 straddle +
-//    OV-04 center-line touch) on ov-lane-v1 (300 m 1+1 street, limit 50)
+//    OV-04 center-line touch) on ov-lane-v1 (300 m 1+1 S-CURVE street, sway
+//    ±14 m, limit 50)
+//
+// FOUNDER R3 REDESIGN (doc 62 #46: „hold W to win"). The regenerated
+// ov-lane-v1 is an S-curve: a right-hand bend into a left-hand bend, apex
+// radius ≈ 160 m. Holding the middle of the lane now takes continuous, real
+// steering with a direction reversal — and the two classic curve errors are
+// finally COMMITTABLE: not steering enough in the right-hand bend (or cutting
+// the left-hand one) drifts the car onto the осева toward oncoming
+// (CENTER_LINE_TOUCHED); running wide in the left-hand bend drifts it to the
+// curb edge (POOR_LANE_KEEPING). The success gates sit ON the curved lane
+// center at both apexes, pinned from meta.scenario.gates (the L7 copy law).
 // ---------------------------------------------------------------------------
 
 /** OV-12 / OV-04 — устойчиво движение в средата на своята лента (ЗДвП чл. 15;
- *  Наредба № 38 — настъпване на осевата линия е второстепенна грешка). */
+ *  Наредба № 38 — настъпване на осевата линия е второстепенна грешка) — през
+ *  улица с S-извивка, където средата на лентата се ДЪРЖИ с волана, не се
+ *  подарява от правата. */
 export const SC_OV_LANE_KEEPING: ScenarioSpec = {
   id: "sc-ov-lane-keeping",
   family: "lanes",
-  tagsBg: ["ленти", "средата на лентата", "осева линия", "лентова дисциплина"],
+  tagsBg: ["ленти", "средата на лентата", "осева линия", "завой", "лентова дисциплина"],
   titleBg: "Движение в средата на лентата",
   objectiveBg:
-    "Измини улицата, като държиш колата устойчиво в средата на своята лента — нито върху осевата линия към насрещните, нито опряна до бордюра.",
+    "Улицата прави S-извивка — надясно, после наляво. Дръж колата устойчиво в средата на своята лента през двата завоя: не срязвай към осевата линия и не се оставяй да те изнесе към бордюра. Колата отива там, където гледаш — гледай далеч напред по лентата.",
   // Doc-72 provenance: OV-12 (lane straddling / off-centre positioning) +
   // OV-04 (touching the center line toward oncoming — the „настъпване" tier).
   archetypeIds: ["OV-12", "OV-04"],
   conceptIds: ["c-lane-choice", "c-longitudinal-markings", "c-general-care-duty"],
   map: {
-    archetype: "straight-street",
+    archetype: "s-curve-street",
     // The generator recipe — mirrored in ov-lane-v1.json meta.scenario.params
     // (tools/maps/gen_ov_lanekeep.mjs).
-    params: { lengthM: 300, maxspeedKmh: 50 },
+    params: { lengthM: 300, maxspeedKmh: 50, swayM: 14 },
     districtId: "ov-lane-v1",
   },
   start: {
@@ -187,22 +233,27 @@ export const SC_OV_LANE_KEEPING: ScenarioSpec = {
     vehicleStart: "ready",
   },
   instructionsBg: [
-    { n: 1, textBg: "Потегли по правата улица и се установи в средата на своята лента." },
+    { n: 1, textBg: "Потегли и се установи в средата на своята лента — улицата напред НЕ е права: следва извивка надясно, после наляво." },
     { n: 2, textBg: "Гледай далеч напред по средата на лентата, не в предния капак — колата отива там, където гледаш." },
-    { n: 3, textBg: "Не се притискай към осевата линия — оттам навлизаш в пространството на насрещните." },
-    { n: 4, textBg: "Не се долепяй и до бордюра — дръж равномерно разстояние от двете страни на лентата." },
-    { n: 5, textBg: "Задръж средата на лентата с малки, ранни корекции до края на отсечката." },
+    { n: 3, textBg: "В десния завой не оставяй колата да „изплува“ навън към осевата линия — води я с малки, ранни корекции." },
+    { n: 4, textBg: "В левия завой не срязвай през осевата и не се оставяй да те изнесе към бордюра — дръж равни отстояния от двете страни." },
+    { n: 5, textBg: "Задръж средата на лентата през цялата S-извивка до края на отсечката." },
   ],
   success: [
     {
-      id: "sc-ovln-middle",
-      titleBg: "Дръж средата на лентата",
-      params: { kind: "reachZone", x: LN_CENTER, y: 150, radiusM: 5, maxSpeedKmh: 55 },
+      id: "sc-ovln-east-apex",
+      titleBg: "Мини върха на десния завой центрирано",
+      params: { kind: "reachZone", x: LN_GATE_EAST.x, y: LN_GATE_EAST.y, radiusM: 5, maxSpeedKmh: 55 },
+    },
+    {
+      id: "sc-ovln-west-apex",
+      titleBg: "Мини върха на левия завой центрирано",
+      params: { kind: "reachZone", x: LN_GATE_WEST.x, y: LN_GATE_WEST.y, radiusM: 5, maxSpeedKmh: 55 },
     },
     {
       id: "sc-ovln-finish",
-      titleBg: "Стигни края на отсечката центрирано в лентата",
-      params: { kind: "reachZone", x: LN_CENTER, y: 270, radiusM: 6 },
+      titleBg: "Излез от S-извивката центрирано в лентата",
+      params: { kind: "reachZone", x: LN_GATE_FINISH.x, y: LN_GATE_FINISH.y, radiusM: 6 },
     },
   ],
   rubric: { parTimeSec: 55 },
@@ -213,27 +264,27 @@ export const SC_OV_LANE_KEEPING: ScenarioSpec = {
   mistakes: [
     {
       traceRef: { path: "content/traces/sc-ov-lane-keeping/mistake-straddle.trace.json" },
-      titleBg: "Возене встрани от средата",
+      titleBg: "Изнасяне към бордюра в левия завой",
       whatWentWrongBg:
-        "Колата се движеше трайно встрани от средата на лентата — опряна до дясната маркировка. Неустойчивото движение в лентата те прави непредвидим за другите и изяжда страничния резерв; дръж средата с ранни, малки корекции на волана.",
+        "В левия завой воланът не води колата достатъчно и тя се изнесе навън — трайно до дясната маркировка, на педя от бордюра. Неустойчивото движение в лентата те прави непредвидим и изяжда страничния резерв точно там, където вървят пешеходци и паркирани коли; дръж средата с ранни, малки корекции.",
       codeRefs: ["POOR_LANE_KEEPING"],
     },
     {
       traceRef: { path: "content/traces/sc-ov-lane-keeping/mistake-center-line.trace.json" },
-      titleBg: "Настъпване на осевата линия",
+      titleBg: "Изплуване върху осевата в десния завой",
       whatWentWrongBg:
-        "Колата се движеше трайно върху осевата линия, към насрещното движение. Настъпването на осевата линия е класическа второстепенна грешка на изпита — навлизаш в пространството на насрещните. Дръж се в средата на своята лента.",
+        "В десния завой колата „изплува“ навън и се вози трайно върху осевата линия, към насрещното движение — класическото недозавиване. Настъпването на осевата линия е второстепенна грешка на изпита, а на пътя е навлизане в пространството на насрещните точно където видимостта е най-къса. Води колата през завоя, не я оставяй да се носи.",
       codeRefs: ["CENTER_LINE_TOUCHED"],
     },
   ],
   teach: {
     whenBg:
-      "През цялото време на движение по права отсечка и в завой — най-вече по тесни улици с една лента в посока, където осевата линия е на ръка разстояние от колелото.",
+      "През цялото време на движение — но най-вече в завои и извивки по тесни улици с една лента в посока, където осевата линия е на ръка разстояние и всяко „изплуване“ навън или срязване навътре се брои.",
     whyBg:
-      "Средата на лентата е позицията с най-голям страничен резерв от двете страни. Настъпването на осевата линия те вкарва в пътя на насрещните, а долепянето до бордюра — в пътя на пешеходци и паркирани коли. Предвидимата, центрирана траектория е и по-спокойна за управление.",
+      "Средата на лентата е позицията с най-голям страничен резерв от двете страни. В завой колата напуска средата САМА, ако не я водиш: недозавиването я изнася върху осевата към насрещните, срязването — към бордюра и пешеходците. Погледът далеч напред по лентата е това, което прави корекциите малки и ранни вместо късни и резки.",
     lawRef: "ЗДвП чл. 15",
     examinerBg:
-      "Изпитващият следи траекторията ти в лентата: устойчиво движение по средата, без настъпване на осевата линия и без долепяне до бордюра. Настъпването на осевата линия и неустойчивото водене в лентата се отбелязват като второстепенни грешки.",
+      "Изпитващият следи траекторията ти в лентата — особено в завои: устойчиво движение по средата, без настъпване на осевата линия и без долепяне до бордюра. Настъпването на осевата линия и неустойчивото водене в лентата се отбелязват като второстепенни грешки.",
   },
   levels: [
     { level: 1 },
@@ -250,25 +301,39 @@ export const SC_OV_LANE_KEEPING: ScenarioSpec = {
 
 // ---------------------------------------------------------------------------
 // 3. sc-ov-oneway — „Еднопосочна улица" (OV-13) on ov-oneway-v1
-//    (300 m single-lane one-way, limit 50)
+//    (T-JUNCTION: 200 m two-way approach into a one-way cross street flowing
+//    EAST, ±140 m arms, limit 50)
+//
+// FOUNDER R3 REDESIGN (doc 62 #47: „hold W to win"). The old map was a
+// straight one-way the player could only ride with the flow — the wrong-way
+// fault existed solely in the demos. The regenerated ov-oneway-v1 is a T:
+// the player arrives on the stem and must CHOOSE an entry into the one-way
+// bar. Turning right enters WITH the eastbound flow (legal); turning left —
+// fully drivable — enters AGAINST it and grades the опасна WRONG_WAY on the
+// live session exactly as in the demos. The flow direction is world truth:
+// М10 „right-only" arrows are painted in the approach lane before the mouth
+// (meta.scenario.laneArrows — the SN-04 machinery). The sign kit ships no
+// В2/Д face yet, so the arrows are the honest visible cue; the copy teaches
+// reading them (and the В2 rule in the teach block for the real street).
 // ---------------------------------------------------------------------------
 
-/** OV-13 — движение по еднопосочна улица само по посока на движението (ЗДвП
- *  чл. 6; знак В2 „Влизането забранено"). */
+/** OV-13 — влизане в еднопосочна улица само по посока на движението (ЗДвП
+ *  чл. 6; знак В2 „Влизането забранено" / стрелките на платното) — на
+ *  Т-кръстовище, където грешният вход е напълно възможен и затова е урок. */
 export const SC_OV_ONEWAY: ScenarioSpec = {
   id: "sc-ov-oneway",
   family: "lanes",
-  tagsBg: ["ленти", "еднопосочна улица", "посока на движение", "знак В2"],
+  tagsBg: ["ленти", "еднопосочна улица", "посока на движение", "избор на вход", "маркировка"],
   titleBg: "Еднопосочна улица",
   objectiveBg:
-    "Мини по еднопосочната улица само по посока на движението — влизаш откъм разрешения вход и никога срещу насрещния поток.",
+    "Стигаш Т-кръстовище: напречната улица е еднопосочна и се движи НАДЯСНО от теб (на изток) — стрелките на платното ти го казват отдалеч. Избери законния вход: завий надясно, по посоката. Левият завой е физически възможен — и е точно опасната грешка „срещу еднопосочното“.",
   archetypeIds: ["OV-13"],
   conceptIds: ["c-sign-groups", "c-prohibition-signs", "c-general-care-duty"],
   map: {
-    archetype: "straight-street",
+    archetype: "t-junction",
     // The generator recipe — mirrored in ov-oneway-v1.json meta.scenario.params
     // (tools/maps/gen_ov_oneway.mjs).
-    params: { lengthM: 300, maxspeedKmh: 50 },
+    params: { approachM: 200, armM: 140, maxspeedKmh: 50 },
     districtId: "ov-oneway-v1",
   },
   start: {
@@ -276,22 +341,29 @@ export const SC_OV_ONEWAY: ScenarioSpec = {
     vehicleStart: "ready",
   },
   instructionsBg: [
-    { n: 1, textBg: "Влез в еднопосочната улица по посока на движението и се движи спокойно в лентата." },
-    { n: 2, textBg: "Оглеждай знаците на входа на всяка улица: В2 „Влизането забранено“ значи, че оттам не влизаш." },
-    { n: 3, textBg: "По еднопосочна се движиш само по разрешената посока — насрещните нямат как да те очакват." },
-    { n: 4, textBg: "Ако по грешка си влязъл срещу движението, спри веднага, включи аварийните и излез внимателно." },
-    { n: 5, textBg: "Продължи по посока на движението до края на улицата." },
+    { n: 1, textBg: "Потегли по подхода — напред улицата свършва в Т-кръстовище с еднопосочна улица." },
+    { n: 2, textBg: "Чети платното отдалеч: стрелките „само надясно“ в твоята лента казват, че напречната улица се движи само на изток." },
+    { n: 3, textBg: "Намали преди кръстовището, десен мигач и завий НАДЯСНО — по посоката на движението." },
+    { n: 4, textBg: "Наляво НЕ се влиза: там щеше да си срещу насрещните, които нямат как да те очакват. На реалната улица този вход носи знак В2 „Влизането забранено“." },
+    { n: 5, textBg: "Продължи по еднопосочната до края — движението по нея е само в разрешената посока." },
   ],
   success: [
     {
-      id: "sc-ovow-flow",
-      titleBg: "Движи се по посока на движението",
-      params: { kind: "reachZone", x: OW_CENTER, y: 150, radiusM: 6, maxSpeedKmh: 55 },
+      id: "sc-ovow-mouth",
+      titleBg: "Приближи кръстовището овладяно, готов за завой",
+      params: { kind: "reachZone", x: OW_GATE_MOUTH.x, y: OW_GATE_MOUTH.y, radiusM: 8, maxSpeedKmh: 30 },
+    },
+    {
+      id: "sc-ovow-entry",
+      titleBg: "Влез в еднопосочната по посоката ѝ (надясно)",
+      // On the EAST arm — reachable only through the legal right turn; the
+      // west arm never satisfies it.
+      params: { kind: "reachZone", x: OW_GATE_LEGAL.x, y: OW_GATE_LEGAL.y, radiusM: 6 },
     },
     {
       id: "sc-ovow-finish",
-      titleBg: "Стигни края на улицата по разрешената посока",
-      params: { kind: "reachZone", x: OW_CENTER, y: 270, radiusM: 6 },
+      titleBg: "Продължи по посоката до края на улицата",
+      params: { kind: "reachZone", x: OW_GATE_FINISH.x, y: OW_GATE_FINISH.y, radiusM: 8 },
     },
   ],
   rubric: { parTimeSec: 55 },
@@ -302,27 +374,27 @@ export const SC_OV_ONEWAY: ScenarioSpec = {
   mistakes: [
     {
       traceRef: { path: "content/traces/sc-ov-oneway/mistake-wrong-way.trace.json" },
-      titleBg: "Срещу движението по еднопосочна",
+      titleBg: "Ляв завой срещу еднопосочната",
       whatWentWrongBg:
-        "Колата навлезе в еднопосочната улица срещу разрешената посока — покрай знака В2 „Влизането забранено“. Движението срещу еднопосочното е сред най-опасните грешки и прекратява изпита: насрещните нямат как да те очакват.",
+        "На Т-кръстовището водачът зави наляво — срещу посоката, която стрелките на платното показваха от петдесет метра. Всеки метър по западното рамо е движение срещу насрещните: те карат с очакването, че никой няма да се появи насреща им. Движението срещу еднопосочно е опасна грешка и прекратява изпита.",
       codeRefs: ["WRONG_WAY"],
     },
     {
       traceRef: { path: "content/traces/sc-ov-oneway/mistake-wrong-way-short.trace.json" },
-      titleBg: "Кратко в грешната посока",
+      titleBg: "„Само няколко метра“ в грешната посока",
       whatWentWrongBg:
-        "Водачът пое срещу движението само за няколко метра — „колкото да стигне до входа“ — но и краткото движение срещу еднопосочното е същата опасна грешка. По еднопосочна се влиза и се движи единствено по посока на движението.",
+        "Водачът зави наляво „колкото да спре ей там“ и измина само двайсетина метра срещу посоката, преди да закове. И краткото движение срещу еднопосочното е същата опасна грешка — насрещният, който излиза иззад завоя, не получава нито метър предупреждение. По еднопосочна се влиза единствено по посоката ѝ.",
       codeRefs: ["WRONG_WAY"],
     },
   ],
   teach: {
     whenBg:
-      "На всяка еднопосочна улица — гъсти в центъра и кварталите. Преди да завиеш в която и да е улица, прочети знаците на входа ѝ: В2 „Влизането забранено“ или стрелките на еднопосочното казват откъде се влиза.",
+      "На всеки вход на улица — особено в центъра и кварталите, където еднопосочните са гъсти. Преди да завиеш, прочети входа: знак В2 „Влизането забранено“, знак Д за посоката или стрелките на платното казват откъде се влиза и откъде — никога.",
     whyBg:
-      "Движението срещу еднопосочното е особено опасно, защото водачите насреща карат с очакването, че никой няма да се появи насреща им — реакцията им закъснява фатално. Затова законът го нарежда сред грешките, които прекратяват изпита начаса.",
+      "Движението срещу еднопосочното е особено опасно, защото водачите насреща карат с очакването, че никой няма да се появи насреща им — реакцията им закъснява фатално. Затова законът го нарежда сред грешките, които прекратяват изпита начаса: изборът на вход е избор преди маневрата, не поправка след нея.",
     lawRef: "ЗДвП чл. 6",
     examinerBg:
-      "Изпитващият следи разчитането на пътните знаци и посоката на движение. Влизане или движение срещу еднопосочна улица е опасна грешка и прекратява изпита незабавно — оглеждай знаците на всеки вход.",
+      "Изпитващият следи разчитането на знаците и маркировката ПРЕДИ маневрата: очаква намаляване, мигач и вход само по посоката на движението. Влизане или движение срещу еднопосочна улица е опасна грешка и прекратява изпита незабавно.",
   },
   levels: [
     { level: 1 },

@@ -28,10 +28,23 @@
  */
 
 import type { District, DistrictZoneKind, SignKind, SignPlacement } from "../types";
-import { ROAD_Y } from "./constants";
+import { ROAD_Y, SCENARIO_SIGN_SCALE } from "./constants";
 import { add, mul, perpRight, pointAlong, polylineLength, type Vec2 } from "./math2d";
 import { toWorld, yawFromFacing } from "./mesh";
 import type { RoadNetwork } from "./network";
+
+/**
+ * Lesson-critical sign scale of a district (founder R3 doc 62 #6): scenario
+ * micro-maps (meta.mapKind "scenario-*") get SCENARIO_SIGN_SCALE, everything
+ * else (city / exam / полигон / mapKind-less) gets undefined so their
+ * placements stay byte-identical (no `scale` key at all).
+ */
+export function scenarioSignScale(district: District): number | undefined {
+  const mapKind = district.meta.mapKind;
+  return typeof mapKind === "string" && mapKind.startsWith("scenario")
+    ? SCENARIO_SIGN_SCALE
+    : undefined;
+}
 
 /** Curb offset used by the existing sign passes (props.ts): just past the
  *  carriageway edge. */
@@ -43,6 +56,11 @@ const RAIL_WARNING_AHEAD_M = 50;
 const RAIL_CROSS_AHEAD_M = 5;
 /** Guarded maps: the barrier arm pivots between the line and the band. */
 const RAIL_BARRIER_AHEAD_M = 3;
+/** The В26-50 advisory plate stands this far before its А1 curve warning. */
+const CURVE_ADVISORY_PLATE_AHEAD_M = 2;
+/** …and this much further off the curb, so neither post occludes the other
+ *  on the dead-straight approach. */
+const CURVE_ADVISORY_PLATE_OUT_M = 1.4;
 
 /** Marking-only / physics-only kinds place no post. */
 const ZONE_SIGN_KIND: Partial<Record<DistrictZoneKind, SignKind>> = {
@@ -61,6 +79,7 @@ export function buildZoneSigns(district: District, network: RoadNetwork): SignPl
   const out: SignPlacement[] = [];
   const zones = district.zones;
   if (!zones || zones.length === 0) return out;
+  const scale = scenarioSignScale(district);
 
   for (const zone of zones) {
     const eb = network.edgeById.get(zone.edgeId);
@@ -69,15 +88,19 @@ export function buildZoneSigns(district: District, network: RoadNetwork): SignPl
     const total = polylineLength(g);
     if (total <= 2) continue;
 
-    const placeAt = (s: number, kind: SignKind) => {
+    const placeAt = (s: number, kind: SignKind, lateralExtraM = 0) => {
       const clamped = Math.min(Math.max(s, 1), total - 1);
       const { point, tangent } = pointAlong(g, clamped);
       const r = perpRight(tangent); // right of geometry-forward travel
-      const p = add(point, mul(r, eb.halfWidth + ZONE_SIGN_LATERAL_M));
+      const p = add(point, mul(r, eb.halfWidth + ZONE_SIGN_LATERAL_M + lateralExtraM));
       out.push({
         kind,
         position: toWorld(p[0], p[1], ROAD_Y),
         yaw: yawFromFacing(mul(tangent, -1)), // face the approaching driver
+        // Lesson-critical prominence on scenario maps — never on the barrier
+        // arm (RailBarriers builds its own rig; the arm must stay real-size
+        // so it spans exactly the incoming lane it is authored across).
+        ...(scale !== undefined && kind !== "barrier" ? { scale } : {}),
       });
     };
 
@@ -90,6 +113,18 @@ export function buildZoneSigns(district: District, network: RoadNetwork): SignPl
 
     const kind = ZONE_SIGN_KIND[zone.kind];
     if (kind) placeAt(zone.fromM, kind);
+
+    // Founder R3 #36 („Скорост в завой"): the copy promises „знак А1 с табела
+    // „50"" — pair the curve warning with the В26-50 plate the sign kit DOES
+    // ship, 2 m before the А1 and staggered 1.4 m further off the curb so the
+    // pair reads as one signed station without the near post occluding the
+    // far one on the straight approach. Honest by construction: only an
+    // advisory the shipped face can state (50) places the plate; other
+    // advisories (40/60/90…) stay А1-only until the В26 face set grows
+    // (reported asset need — never post a face that lies).
+    if (zone.kind === "curveAdvisory" && zone.advisoryKmh === 50) {
+      placeAt(zone.fromM - CURVE_ADVISORY_PLATE_AHEAD_M, "limit50", CURVE_ADVISORY_PLATE_OUT_M);
+    }
   }
 
   return out;

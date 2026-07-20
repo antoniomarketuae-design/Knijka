@@ -90,6 +90,7 @@ import {
 import type { SimTick } from "@/modules/sim/rules";
 import {
   createDashboardStatus,
+  RearProximityCue,
   type DashboardStatus,
   type MinimapFrame,
 } from "@/modules/sim/hud";
@@ -134,6 +135,8 @@ import { RouteGuidance } from "./RouteGuidance";
 import { ScenarioObstacles, type ScenarioObstacleSpec } from "./ScenarioObstacles";
 import { heldSceneryFor } from "./scenarioSceneryProps";
 import { ShadowCar } from "./ShadowCar";
+// [glance-pings] the look-left/right teaching overlay (see the wiring block).
+import { GlanceEdgePings, type GlancePingTap } from "./lesson-ui/GlanceEdgePings";
 import { TraceTimeline } from "./lesson-ui/TraceTimeline";
 import { worldNameBg } from "./worldNames";
 import type { QualityPreset } from "./lesson-ui/types";
@@ -321,6 +324,20 @@ interface Built {
   /** S1: the template's recorded shadow trace — fetched only when the
    *  lesson's aids ask for the ghost or the ribbon; null otherwise. */
   shadowTrace: ScenarioTrace | null;
+  /** SPD (founder review R3 #37): the lesson's speed DOMAIN — max edge
+   *  maxspeed of the loaded map, km/h — scales the difficulty governor
+   *  (VehicleRig → applyDifficulty). undefined = no edges (never in
+   *  practice) → the legacy static caps. */
+  lessonMaxLegalKmh: number | undefined;
+}
+
+/** Max legal speed anywhere on the loaded map (km/h); undefined = unknown. */
+function maxLegalSpeedOf(district: ReturnType<typeof assertDistrict>): number | undefined {
+  let max = 0;
+  for (const e of district.roads.edges) {
+    if (Number.isFinite(e.maxspeed) && e.maxspeed > max) max = e.maxspeed;
+  }
+  return max > 0 ? max : undefined;
 }
 
 export interface LessonSceneProps {
@@ -491,6 +508,19 @@ export default function LessonScene(props: LessonSceneProps) {
             y: -anchorPose.z,
           });
         }
+        // SIGNAL MODES (doc 62 S1 — the live half of the recorder's
+        // signalModes dial): a „загаснал светофар"/„мигащо жълто" lesson
+        // dials its cluster DARK / FLASHING AMBER at session start, so LIVE
+        // play matches the recorded traces — grading falls back to the
+        // uncontrolled-junction rules AND the lamps render unlit/blinking
+        // from the same mode state (signalLampState). Sorted application
+        // keeps a hypothetical multi-cluster dial deterministic. A staged
+        // trafficController armed later overrides the mode (its own law).
+        for (const [nodeId, mode] of Object.entries(props.lesson.signalModes ?? {}).sort(
+          (a, b) => (a[0] < b[0] ? -1 : 1),
+        )) {
+          runtime.setSignalClusterMode(nodeId, mode);
+        }
         const trafficSpec = props.lesson.traffic;
         const traffic = createTrafficSystem(
           raw as Parameters<typeof createTrafficSystem>[0],
@@ -554,6 +584,10 @@ export default function LessonScene(props: LessonSceneProps) {
             scenarioObstacles,
             gripPatches,
             shadowTrace,
+            // #37: the map's own speed domain drives the governor cap — the
+            // АМ-140 map lets Нормален reach the flow, the 50-city keeps
+            // governing just above the limit.
+            lessonMaxLegalKmh: maxLegalSpeedOf(district),
           });
         }
       } catch (err) {
@@ -785,6 +819,10 @@ function ReadyScene({
   // flips the L1/L2 HUD cue state below (state changes only on edges).
   const telltaleLitRef = useRef(false);
   const [telltaleCueOn, setTelltaleCueOn] = useState(false);
+  // #24 wiper visual channel: VehicleRig writes the live blade sweep +
+  // wiped-arc clearing level per frame; WindshieldDroplets reads it (render-
+  // free ref, the hazardActiveRef pattern).
+  const wiperVisualRef = useRef({ sweep01: 0, clearing: 0 });
 
   /** Respawn (key R and the touch sheet's „Рестарт") — same code path. */
   const resetCar = useCallback(() => {
@@ -799,6 +837,22 @@ function ReadyScene({
   // Q/E/F keys AND mirror-hotspot clicks land there — one graded path).
   const drivelineEventsRef = useRef<DrivelineEvent[]>([]);
   const glanceQueueRef = useRef<MirrorGlanceKind[]>([]);
+
+  // -- [glance-pings] look-left/right teaching affordances (founder
+  // 2026-07-20) — ISOLATED ADDITIVE WIRING, nothing else in this file.
+  // GlanceEdgePings (mounted in the overlay below) installs a read-only
+  // observer into this ref; the wrapper feeds every tick through it BEFORE
+  // the shell's handler. No new engine channel, grading untouched — the
+  // overlay only consumes the junction-proximity + mirrorGlance data the
+  // HUD tick stream already carries.
+  const glancePingTapRef = useRef<GlancePingTap | null>(null);
+  const onTickWithGlancePings = useCallback(
+    (t: SimTick) => {
+      glancePingTapRef.current?.(t);
+      onTickCb(t);
+    },
+    [onTickCb],
+  );
 
   // Input + cabin + audio lifecycle.
   useEffect(() => {
@@ -880,8 +934,13 @@ function ReadyScene({
     [cockpit, preDriveHighlightStepId],
   );
 
+  // S1 (doc 62): the lamp render callback consumes the GRADED signal state —
+  // runtime.signalLampState is mode-aware (dark → unlit, flashingAmber → the
+  // blink pair on the runtime clock) and approach-aware (each head lights its
+  // own arm's axis-group, including any signalPlan/staged pin rebase). Never
+  // wire runtime.signalPhase here: it ignores cluster modes by contract.
   const getSignalPhase = useCallback(
-    (id: string) => runtime.signalPhase(id),
+    (id: string, approachBearingDeg: number) => runtime.signalLampState(id, approachBearingDeg),
     [runtime],
   );
 
@@ -980,11 +1039,20 @@ function ReadyScene({
                 paused={physicsPaused}
                 spawn={spawn}
                 difficultyRef={difficultyRef}
+                // #37: the loaded map's speed domain scales the governor.
+                lessonMaxLegalKmh={built.lessonMaxLegalKmh}
                 onCollision={handleCollision}
                 // S1: scenario drills grade ANY contact (compile writes 0);
                 // absent = the street nudge tolerance (default 10).
                 collisionMinKmh={lesson.collisionMinKmh}
                 night={isNight}
+                // #41: rain lessons mount the (dimmed) beam throw + tail glow
+                // so switching the lights on is VISIBLE. Render-only — the
+                // graded headlight state still flows cabin → sample → tick.
+                rain={rain}
+                // #24: the rig writes the live wiper sweep/clearing here; the
+                // cockpit droplet layer below reads it to clear the wiped arc.
+                wiperVisualRef={wiperVisualRef}
                 // 4a + snow: the OPT-IN reduced-grip physics. Read from the
                 // AUTHORED physics field only — never derived from
                 // environment.rain/snow (shipped weather lessons were tuned
@@ -1046,7 +1114,7 @@ function ReadyScene({
               glanceQueueRef={glanceQueueRef}
               onPreDriveStep={onPreDriveStep}
               onBlockedDriveAttempt={onBlockedDriveAttempt}
-              onTick={onTickCb}
+              onTick={onTickWithGlancePings} // [glance-pings] read-only tap → shell
               onMinimap={onMinimap}
               onDriveline={onDriveline}
               onDrivelineRejection={onDrivelineRejection}
@@ -1145,13 +1213,21 @@ function ReadyScene({
           enterTopdown={enterTopdown}
           driveLocked={driveLocked}
         />
-        {cockpit && rain ? <WindshieldDroplets /> : null}
+        {cockpit && rain ? <WindshieldDroplets wiperRef={wiperVisualRef} /> : null}
       </Canvas>
 
       {/* Controls legend — collapsible, top-left of the canvas (clear of the
           bottom cards + minimap). Collapsed by default on touch-only devices
           (the keys are real but secondary there). */}
       <ControlsHelp defaultOpen={!touchOnly} topdownAllowed={topdownInCycle} />
+
+      {/* PROX rear-proximity cue (isolated additive block): „Кола отзад · X м"
+          above the dashboard while a REAL vehicle is within ~15 m behind —
+          the every-POV/every-preset rear-awareness fallback. Self-contained:
+          polls traffic.rearGapMeters off sampleRef at ~5 Hz internally (no
+          frame-loop wiring, no grading read/write). hidden while any pause/
+          quiz/teach/end overlay is up (physicsPaused ∪ shell paused). */}
+      <RearProximityCue traffic={traffic} sampleRef={sampleRef} hidden={physicsPaused} />
 
       {/* S0-View ?ghost=demo: playback deck for the Shadow Car — scrub bar,
           speeds, annotation ticks, step-by-step, loop-section. */}
@@ -1181,6 +1257,18 @@ function ReadyScene({
           </div>
         </div>
       ) : null}
+
+      {/* [glance-pings] edge pings („◄ огледай") + the desktop glance-button
+          cluster. Gating lives in the component (glancePingsEligible: JU-23
+          drills, L1–L2, „Съветник" ON, never exams); on touch devices the
+          buttons stay with TouchControls' mirror row, so only the pings show. */}
+      <GlanceEdgePings
+        lesson={lesson}
+        cabinRef={cabinRef}
+        tapRef={glancePingTapRef}
+        hidden={physicsPaused}
+        showButtons={!touchCapable}
+      />
 
       {/* P1: touch input overlay — mounts on any touch-capable device, hides
           itself during keyboard use and while paused/quiz/teach/end overlays

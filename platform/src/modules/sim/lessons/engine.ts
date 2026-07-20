@@ -30,6 +30,7 @@ import {
   type RuleEvent,
   type ScorableEvent,
   type SimTick,
+  type ViolationEvent,
 } from "../rules";
 import { coachStep } from "../scenarios";
 import {
@@ -130,6 +131,41 @@ export interface LessonStepResult {
  * driving time.
  */
 export const TEACH_PAUSE_MIN_GAP_S = 15;
+
+/**
+ * SPD (founder review R3 #39/#48 — „distance warnings while visibly far"):
+ * the FOLLOWING_TOO_CLOSE family is TIME-GAP math (the 2-second rule), and at
+ * street speed its fire threshold is 14–17 METERS — a gap that genuinely
+ * reads "far" through a windshield. The math was verified correct (fires
+ * only under ~0.7 × the taught gap, sustained, while not recovering), so the
+ * detector stays untouched; what was missing is the WHY. This appends the
+ * MEASURED gap at warning time — „Дистанция в момента: 1,4 с (16 м) — дръж
+ * поне 2 с." — to the DISPLAY text (HUD toast + teach card) only. The scored
+ * ScorableEvent, the wire serialization and the server grade keep the
+ * catalog's fixed copy byte-identically (ADR-002: authored text + measured
+ * numbers, never free text). Targets derive from the session's own rule
+ * config (ceil(1.8) = 2 dry; ceil(1.8 × 1.6) = 3 rain — exactly the numbers
+ * the catalog copy teaches), so per-lesson overrides stay honest.
+ */
+function withFollowingGapDetail(
+  e: ViolationEvent,
+  tick: SimTick,
+  cfg: RuleEngineConfig,
+): string {
+  if (e.code !== "FOLLOWING_TOO_CLOSE" && e.code !== "FOLLOWING_TOO_CLOSE_FOR_RAIN") {
+    return e.explanationBg;
+  }
+  const gapM = tick.leadGapM;
+  const mps = tick.speedKmh / 3.6;
+  if (gapM === undefined || !Number.isFinite(gapM) || mps <= 0.5) return e.explanationBg;
+  const gapSec = gapM / mps;
+  const targetSec = Math.ceil(
+    cfg.followSafeSeconds *
+      (e.code === "FOLLOWING_TOO_CLOSE_FOR_RAIN" ? cfg.followRainSecondsFactor : 1),
+  );
+  const gapTxt = gapSec.toFixed(1).replace(".", ",");
+  return `${e.explanationBg} Дистанция в момента: ${gapTxt} с (${Math.round(gapM)} м) — дръж поне ${targetSec} с.`;
+}
 
 /**
  * Run-wide met-reds tally (A10): completed passSignal objectives keep their
@@ -295,6 +331,10 @@ export function applyTick(prev: LessonSessionState, tick: SimTick): LessonStepRe
       scoredEvents.push(e);
       continue;
     }
+    // SPD #39/#48: DISPLAY text only — the FOLLOWING family carries the
+    // measured time-gap readout; every other code passes through unchanged.
+    // The scored event (scoredEvents/state.events/wire) keeps catalog copy.
+    const explanationBg = withFollowingGapDetail(e, tick, prev.rules.config);
     const step = coachStep(
       encounters,
       {
@@ -315,7 +355,7 @@ export function applyTick(prev: LessonSessionState, tick: SimTick): LessonStepRe
       hudEvents.push({
         kind: "violation",
         titleBg: e.titleBg,
-        explanationBg: e.explanationBg,
+        explanationBg,
         points: e.points,
         severity: e.severityClass,
         lawRef: e.lawRef,
@@ -333,7 +373,7 @@ export function applyTick(prev: LessonSessionState, tick: SimTick): LessonStepRe
             code: e.code,
             scenarioId: null,
             titleBg: e.titleBg,
-            explanationBg: e.explanationBg,
+            explanationBg,
             lawRef: e.lawRef,
             severity: e.severityClass,
             points: e.points,
@@ -366,7 +406,7 @@ export function applyTick(prev: LessonSessionState, tick: SimTick): LessonStepRe
           code: e.code,
           scenarioId: step.decision.scenarioId,
           titleBg: e.titleBg,
-          explanationBg: e.explanationBg,
+          explanationBg,
           lawRef: e.lawRef,
           severity: e.severityClass,
           points: e.points,
@@ -377,7 +417,7 @@ export function applyTick(prev: LessonSessionState, tick: SimTick): LessonStepRe
         hudEvents.push({
           kind: "lesson",
           titleBg: e.titleBg,
-          explanationBg: e.explanationBg,
+          explanationBg,
           lawRef: e.lawRef,
         });
       }
@@ -387,7 +427,7 @@ export function applyTick(prev: LessonSessionState, tick: SimTick): LessonStepRe
       hudEvents.push({
         kind: "lesson",
         titleBg: e.titleBg,
-        explanationBg: e.explanationBg,
+        explanationBg,
         lawRef: e.lawRef,
       });
     }

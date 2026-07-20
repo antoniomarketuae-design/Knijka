@@ -271,7 +271,9 @@ export function buildSpTransitionStreet(params) {
 }
 
 // ---------------------------------------------------------------------------
-// Committed instance (the SP-03 50→30 transition micro-map)
+// Committed instances (the SP-03 50→30 transition micro-map + the founder-P5
+// long creep road — doc 62 #30: „a LONG road: sign 50 → hold under 50 → sign
+// 30 → drop to 30. Signed, staged, failable — not an empty cap.")
 // ---------------------------------------------------------------------------
 
 const INSTANCES = [
@@ -280,6 +282,20 @@ const INSTANCES = [
     label: "Учебна улица — преход 50→30, зона 30 (сценарий SP-03)",
     approachM: 160,
     zoneM: 200,
+    approachKmh: 50,
+    zoneKmh: 30,
+  },
+  {
+    // sc-speed-creep's P5 redesign host (doc 62 #30/P5): the same two-segment
+    // shape, stretched LONG — 400 m of 50 where the needle creeps up, then
+    // 280 m of zone 30 where the carried speed becomes the graded fault. The
+    // В26-50 plate derives at the entry (props.ts district-entry pass) and the
+    // zone edge's tagged 30 paints the road numerals (markings.ts speed
+    // glyphs), so both caps are VISIBLE world truth, not copy.
+    districtId: "sp-creep2-v1",
+    label: "Учебна дълга улица — пълзящо превишаване 50→30 (сценарий SP-01/SP-03, док. 62 P5)",
+    approachM: 400,
+    zoneM: 280,
     approachKmh: 50,
     zoneKmh: 30,
   },

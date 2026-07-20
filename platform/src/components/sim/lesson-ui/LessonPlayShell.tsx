@@ -399,6 +399,11 @@ export function LessonPlayShell({
   }, []);
 
   const [snap, setSnap] = useState<HudSnapshot>(() => snapshotOf(initialSession, null));
+  // R3 #22: the scene's remount key — „Повтори" bumps it so the 3D world
+  // restarts from spawn (fresh physics, re-armed staged encounters) exactly
+  // like a first mount. The shell itself stays mounted (its owner keys it on
+  // the lesson id, which does not change on a retry).
+  const [sceneEpoch, setSceneEpoch] = useState(0);
   const [flash, setFlash] = useState<ObjectiveFlash | null>(null);
   const flashKey = useRef(0);
   const [minimapFrame, setMinimapFrame] = useState<MinimapFrame | null>(null);
@@ -835,9 +840,18 @@ export function LessonPlayShell({
       quizBankRef.current.length > 0
         ? createQuizTriggerState(quizFreqRef.current, quizBankRef.current)
         : null;
-    // The cabin/driveline keeps its physical state across a retry (the car
-    // does not teleport or reset) — keep showing the live telltales.
-    setSnap(snapshotOf(sessionRef.current, null, drivelineRef.current));
+    // Founder R3 #22 („Повтори" does not restart): the engine state above is
+    // fresh, but the SCENE used to survive the retry — the car stayed parked
+    // at the END of the route with the staged encounters already consumed, so
+    // the "restarted" drill was undrivable. The scene mounts on `sceneEpoch`;
+    // bumping it remounts SceneSlot exactly like entering the drill from the
+    // catalog: car at lesson.spawn, staged events re-armed, shadow clock at 0.
+    // The per-scene channels reset with it so no stale frame data leaks in.
+    setSceneEpoch((e) => e + 1);
+    drivelineRef.current = null;
+    dashboardStatusRef.current = createDashboardStatus();
+    setMinimapFrame(null);
+    setSnap(snapshotOf(sessionRef.current, null, null));
   };
 
   // Debrief: the template is deterministic — render it instantly client-side;
@@ -973,6 +987,7 @@ export function LessonPlayShell({
       >
         <div className={isFullscreen ? "h-full w-full" : "aspect-video w-full"}>
           <SceneSlot
+            key={sceneEpoch}
             lesson={lesson}
             quality={quality}
             paused={ended || activeQuiz !== null || teachQueue.length > 0}
@@ -1050,6 +1065,38 @@ export function LessonPlayShell({
               limitKmh={snap.limitKmh}
               rejectFlashKey={gearRejectFlash}
             />
+          </div>
+        ) : null}
+
+        {/* R3 #15: the two in-world lines finally get names. On L1/L2 scenario
+            rungs BOTH ribbons render at once — the BLUE one is the shadow
+            car's recorded demonstration (ShadowCar KIND_TINT.shadow #3f8cff)
+            and the TEAL one is the live route guidance to the next objective
+            (RouteGuidance --accent-2, what the founder read as „зелена"). The
+            shadow ribbon ends where the recording ends, so mid-route the
+            colors visibly hand over with zero explanation — this small legend
+            is the honest fix (unifying the colors would hide WHICH line is
+            teachware and which is wayfinding). */}
+        {!ended &&
+        (lesson.aids?.shadowCar === true || lesson.aids?.pathRibbon === true) &&
+        lesson.objectives.length > 0 ? (
+          <div className="absolute bottom-[6.75rem] left-3 flex flex-col gap-0.5 rounded-lg border border-border bg-surface/80 px-2 py-1.5 text-[10px] font-semibold leading-tight text-muted backdrop-blur">
+            <span>
+              <span
+                aria-hidden
+                className="mr-1 inline-block h-1.5 w-3.5 rounded-full align-middle"
+                style={{ background: "#3f8cff" }}
+              />
+              синя — пътят на колата-сянка
+            </span>
+            <span>
+              <span
+                aria-hidden
+                className="mr-1 inline-block h-1.5 w-3.5 rounded-full align-middle"
+                style={{ background: "var(--accent-2)" }}
+              />
+              зелена — маршрутът до целта
+            </span>
           </div>
         ) : null}
 
@@ -1189,6 +1236,10 @@ export function LessonPlayShell({
                 concepts={saveResult?.ok ? saveResult.concepts : []}
                 xpEarned={saveResult?.ok ? saveResult.xpEarned : null}
                 onRetry={retry}
+                // R3 #5/#23: „Назад към таблото" = the same client-side exit
+                // as „← Всички уроци" — back to the catalog (anchored at this
+                // template by the owner), never a /dashboard route hop.
+                onExit={onExitToSelect}
                 nextLessonTitleBg={nextLesson?.titleBg ?? null}
                 onNextLesson={
                   nextLesson && result.passed ? () => onStartLesson(nextLesson.id) : null

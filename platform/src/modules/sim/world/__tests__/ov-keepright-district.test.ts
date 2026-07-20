@@ -81,8 +81,13 @@ describe("ov-keepright-v1 through the world builder", () => {
     expect(district.roundabouts.length).toBe(0);
     expect(district.spawnPoints.map((s) => s.id).sort()).toEqual([
       "ov-kr-spawn-finish",
+      "ov-kr-spawn-left",
       "ov-kr-spawn-start",
     ]);
+    // The R3 #45 redesign spawn: the LEFT lane, so „дръж вдясно" is an act.
+    const left = district.spawnPoints.find((s) => s.id === "ov-kr-spawn-left")!;
+    expect(left.x).toBe(LANE_LEFT_X);
+    expect(left.y).toBe(15);
   });
 
   it("hosts a plain boulevard: no lights, no stop signs, no zebras", () => {

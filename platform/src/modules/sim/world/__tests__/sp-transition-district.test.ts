@@ -148,3 +148,88 @@ describe(`${ID} through the traffic lane graph`, () => {
     expect(traffic.stats.vehicleCount).toBe(0);
   });
 });
+
+// ---------------------------------------------------------------------------
+// sp-creep2-v1 — the founder R3 P5 road (doc 62 #30: sc-speed-creep's LONG
+// 50→30 street, 400 m approach + 280 m zone). Same generator, same two-segment
+// contract; this block pins the P5-specific truths the redesigned template
+// copies by value.
+// ---------------------------------------------------------------------------
+
+describe("sp-creep2-v1 — the P5 long creep road (doc 62 #30)", () => {
+  const CREEP2 = "sp-creep2-v1";
+  const CREEP2_TRANSITION_Y = 400;
+  const CREEP2_TOTAL_M = 680;
+
+  it("is a structurally valid two-segment street: 400 m @ 50 → 280 m @ 30, tagged zone", () => {
+    const district = assertDistrict(loadRaw(CREEP2));
+    expect(district.roads.nodes.length).toBe(3);
+    expect(district.roads.edges.length).toBe(2);
+    const approach = district.roads.edges.find((e) => e.id === "sp-tr-e-approach")!;
+    const zone = district.roads.edges.find((e) => e.id === "sp-tr-e-zone")!;
+    expect(approach.maxspeed).toBe(50);
+    expect(approach.length).toBe(400);
+    expect(zone.maxspeed).toBe(30);
+    expect(zone.length).toBe(280);
+    // The tagged zone edge is what qualifies the painted „30" road numerals
+    // (markings.ts speed glyphs) — the world's own signage for the lower cap.
+    expect(zone.zone).toBe("school");
+    expect(district.intersections.length).toBe(0);
+    expect(district.spawnPoints.some((s) => s.id === "sp-tr-spawn-approach")).toBe(true);
+  });
+
+  it("resolves 50 on the approach and 30 in the zone (the per-edge surface the drill grades)", () => {
+    const rt = createWorldRuntime(loadRaw(CREEP2));
+    rt.update(1 / 60);
+    expect(rt.speedLimitAt({ x: X_LANE, y: 240 })).toBe(50);
+    expect(rt.speedLimitAt({ x: X_LANE, y: CREEP2_TRANSITION_Y + 120 })).toBe(30);
+    expect(rt.debugStopLines().length).toBe(0);
+    expect(rt.debugUncontrolledJunctions().length).toBe(0);
+  });
+
+  it("builds world geometry + the lane graph end to end", () => {
+    const district = assertDistrict(loadRaw(CREEP2));
+    const world = buildWorldGeometry(district, { seed: 7 });
+    let nonFinite = 0;
+    for (const mesh of [world.roadSurface, world.markings, world.sidewalks, world.terrain]) {
+      for (let i = 0; i < mesh.positions.length; i++) {
+        if (!Number.isFinite(mesh.positions[i])) nonFinite++;
+      }
+    }
+    expect(nonFinite).toBe(0);
+    const graph = buildLaneGraph(loadRaw(CREEP2) as TrafficDistrict, {
+      laneWidthM: DEFAULT_TRAFFIC_CONFIG.laneWidthM,
+      excludedRoadClasses: DEFAULT_TRAFFIC_CONFIG.excludedRoadClasses,
+      crossingSignalRadiusM: 45,
+    });
+    expect(graph.lanes.length).toBe(4);
+    expect(CREEP2_TOTAL_M).toBe(680);
+  });
+
+  it("SHOWS both caps (doc 62 S4 world-truth): the В26-50 entry plate + painted „30“ zone numerals", () => {
+    const district = assertDistrict(loadRaw(CREEP2));
+    const world = buildWorldGeometry(district, { seed: 7 });
+    // The props.ts district-entry pass posts the 50 plate at the south entry.
+    expect(world.stats.signs.limit50).toBeGreaterThanOrEqual(1);
+    // The markings.ts speed-glyph seam paints the zone's „30" numerals:
+    // raising the zone edge's tagged limit above the glyph gate must REMOVE
+    // marking quads — proving the numerals derive from the authored 30.
+    const noZone = JSON.parse(JSON.stringify(loadRaw(CREEP2))) as {
+      roads: { edges: Array<{ id: string; maxspeed: number }> };
+    };
+    noZone.roads.edges.find((e) => e.id === "sp-tr-e-zone")!.maxspeed = 50;
+    const bare = buildWorldGeometry(assertDistrict(noZone), { seed: 7 });
+    expect(world.stats.markingQuads).toBeGreaterThan(bare.stats.markingQuads);
+  });
+
+  it("the published copy is byte-identical to the content source", () => {
+    const srcCandidates = [
+      path.join(process.cwd(), "content", "world", `${CREEP2}.json`),
+      path.resolve(process.cwd(), "..", "content", "world", `${CREEP2}.json`),
+    ];
+    const src = srcCandidates.find((f) => fs.existsSync(f))!;
+    const pub = path.resolve(path.dirname(src), "..", "..", "platform", "public", "world", `${CREEP2}.json`);
+    expect(fs.existsSync(pub)).toBe(true);
+    expect(fs.readFileSync(pub).equals(fs.readFileSync(src))).toBe(true);
+  });
+});

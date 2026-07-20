@@ -2,26 +2,31 @@
  * OV one-way archetype contract battery (Scenario Studio doc 76 §3; the
  * sp-districts.test.ts pattern).
  *
- * content/world/ov-oneway-v1.json is the lane-discipline generated micro-map
- * (tools/maps/gen_ov_oneway.mjs — one straight single-lane one-way street, 300 m,
- * 50 km/h, legal flow north). The battery proves the file satisfies the FULL
- * engine contract, with the archetype's REASON TO EXIST verified end-to-end: the
- * runtime's oneway / wrongWay surface feeds the rule engine's WRONG_WAY grading
- * (heading against the flow), and the with-flow drive stays clean.
+ * content/world/ov-oneway-v1.json is — since the founder R3 redesign (doc 62
+ * #47) — a T-JUNCTION micro-map (tools/maps/gen_ov_oneway.mjs): a 200 m
+ * two-way approach stem meets a single-lane one-way cross street flowing EAST
+ * (±140 m arms, 50 km/h). The battery proves the file satisfies the FULL
+ * engine contract, with the archetype's REASON TO EXIST verified end-to-end:
+ * the runtime's oneway / wrongWay surface feeds the rule engine's WRONG_WAY
+ * grading on the bar (heading WEST = against the flow), the with-flow
+ * eastbound drive stays clean, the stem stays two-way, and the approach lane
+ * carries the authored М10 right-only arrows (meta.scenario.laneArrows) that
+ * make the legal entry readable from the road.
  */
 import fs from "node:fs";
 import path from "node:path";
 import { beforeAll, describe, expect, it } from "vitest";
 import type { VehicleSample } from "../../contracts";
 import { createRuleEngine, reduceTick, type RuleEvent } from "../../rules";
-import { createWorldRuntime, type DistrictWorldRuntime } from "../../runtime";
+import { createWorldRuntime } from "../../runtime";
 import { buildLaneGraph } from "../../traffic/graph";
 import { createTrafficSystem } from "../../traffic/system";
 import { DEFAULT_TRAFFIC_CONFIG, type TrafficDistrict } from "../../traffic/types";
 import { buildWorldGeometry } from "../builders/buildWorldGeometry";
 import { assertDistrict, type District, type WorldGeometry } from "../types";
 
-const X_LANE = 0; // the one-way lane centers on the polyline
+const X_STEM = 4.06; // approach stem, northbound lane center
+const BAR_Y = 200; // the one-way bar's polyline (lane center)
 
 function loadRaw(): unknown {
   const candidates = [
@@ -57,25 +62,55 @@ describe("ov-oneway-v1 through the world builder", () => {
     world = buildWorldGeometry(district, { seed: 7 });
   });
 
-  it("is a structurally valid district-v1 document (single-lane one-way)", () => {
+  it("is a structurally valid district-v1 T-junction (two-way stem + one-way bar flowing east)", () => {
     expect(district.meta.attribution.text).toContain("оригинален");
-    expect(district.roads.nodes.length).toBe(2);
-    expect(district.roads.edges.length).toBe(1);
-    const road = district.roads.edges[0];
-    expect(road.lanes).toBe(1);
-    expect(road.oneway).toBe(true);
-    expect(road.maxspeed).toBe(50);
-    expect(road.length).toBe(300);
-    expect(district.intersections.length).toBe(0);
+    expect(district.roads.nodes.length).toBe(4);
+    expect(district.roads.edges.length).toBe(3);
+    const stem = district.roads.edges.find((e) => e.id === "ov-ow-approach")!;
+    expect(stem.lanes).toBe(2);
+    expect(stem.oneway).toBe(false);
+    expect(stem.length).toBe(200);
+    for (const id of ["ov-ow-oneway-w", "ov-ow-oneway-e"]) {
+      const bar = district.roads.edges.find((e) => e.id === id)!;
+      expect(bar.lanes).toBe(1);
+      expect(bar.oneway).toBe(true);
+      expect(bar.maxspeed).toBe(50);
+      expect(bar.length).toBe(140);
+      // Flow EAST: geometry x strictly increasing from → to.
+      const g = bar.geometry as Array<[number, number]>;
+      expect(g[g.length - 1][0]).toBeGreaterThan(g[0][0]);
+    }
+    expect(district.intersections.length).toBe(1);
+    expect(district.intersections[0]).toMatchObject({ id: "ov-ow-n-junction", degree: 3 });
     expect(district.crossings.length).toBe(0);
-    expect(district.roundabouts.length).toBe(0);
     expect(district.spawnPoints.map((s) => s.id).sort()).toEqual([
+      "ov-ow-spawn-east",
       "ov-ow-spawn-entry",
-      "ov-ow-spawn-finish",
     ]);
   });
 
-  it("hosts a plain one-way street: no lights, no stop signs, no zebras", () => {
+  it("authors the М10 right-only arrows on the approach lane (the readable legal entry)", () => {
+    const sc = district.meta.scenario as {
+      laneArrows?: { edgeId?: string; lanes?: Array<{ centerM?: number; arrow?: string }> };
+      gates?: Record<string, { x: number; y: number }>;
+      onewayFlow?: string;
+    };
+    expect(sc.onewayFlow).toBe("east");
+    expect(sc.laneArrows?.edgeId).toBe("ov-ow-approach");
+    expect(sc.laneArrows?.lanes).toEqual([{ centerM: X_STEM, arrow: "right" }]);
+    // The gates the ScenarioSpec pins by value (the L7 copy law).
+    expect(sc.gates?.mouth).toEqual({ x: X_STEM, y: 170 });
+    expect(sc.gates?.legalEntry).toEqual({ x: 60, y: BAR_Y });
+    expect(sc.gates?.finish).toEqual({ x: 125, y: BAR_Y });
+    // …and the arrows actually PAINT: stripping the authored laneArrows from
+    // the meta must remove marking quads (the markings.ts SN-04 pass).
+    const stripped = JSON.parse(JSON.stringify(raw)) as { meta: { scenario: Record<string, unknown> } };
+    delete stripped.meta.scenario.laneArrows;
+    const bare = buildWorldGeometry(assertDistrict(stripped), { seed: 7 });
+    expect(world.stats.markingQuads).toBeGreaterThan(bare.stats.markingQuads);
+  });
+
+  it("hosts no lights, no stop signs, no zebras (direction choice, not priority)", () => {
     expect(world.trafficLights.length).toBe(0);
     expect(world.stats.signs.stop).toBe(0);
     expect(world.stats.zebraCrossings).toBe(0);
@@ -130,45 +165,49 @@ describe("ov-oneway-v1 through the world builder", () => {
   });
 });
 
-describe("ov-oneway-v1 through the world runtime — the oneway/wrongWay surface", () => {
-  it("derives ZERO signals, stop lines and junction trackers", () => {
+describe("ov-oneway-v1 through the world runtime — the oneway/wrongWay surface at the T", () => {
+  it("derives NO stop lines and NO signals (all-residential T; the uncontrolled tracker may arm)", () => {
     const runtime = createWorldRuntime(loadRaw());
     expect(runtime.debugSignalClusters().length).toBe(0);
     expect(runtime.debugStopLines().length).toBe(0);
-    expect(runtime.debugUncontrolledJunctions().length).toBe(0);
   });
 
-  it("marks the edge oneway=true and flags the heading against the flow as wrongWay", () => {
-    const withFlow = createWorldRuntime(loadRaw());
-    withFlow.update(1 / 60);
-    const north = withFlow.sample(sample(X_LANE, 100, 0, 40), 1, false); // heading north = flow
-    expect(north.edgeId).toBe("ov-ow-street");
-    expect(north.laneCount ?? 1).toBe(1);
-    expect(north.oneway).toBe(true);
-    expect(north.wrongWay).toBe(false);
-    expect(Math.abs(north.laneOffsetM)).toBeLessThan(0.2);
+  it("keeps the stem two-way and flags only the against-flow bar heading as wrongWay", () => {
+    const rt = createWorldRuntime(loadRaw());
+    rt.update(1 / 60);
+    const stem = rt.sample(sample(X_STEM, 100, 0, 40), 1, false); // northbound approach
+    expect(stem.edgeId).toBe("ov-ow-approach");
+    expect(stem.oneway).toBe(false);
+    expect(stem.wrongWay).toBe(false);
 
-    const against = createWorldRuntime(loadRaw());
-    against.update(1 / 60);
-    const south = against.sample(sample(X_LANE, 100, 180, 40), 1, false); // heading south = against
-    expect(south.wrongWay).toBe(true);
+    const east = createWorldRuntime(loadRaw());
+    east.update(1 / 60);
+    const withFlow = east.sample(sample(60, BAR_Y, 90, 40), 1, false); // heading east = flow
+    expect(withFlow.oneway).toBe(true);
+    expect(withFlow.wrongWay).toBe(false);
+
+    const west = createWorldRuntime(loadRaw());
+    west.update(1 / 60);
+    const against = west.sample(sample(-60, BAR_Y, 270, 40), 1, false); // heading west = against
+    expect(against.oneway).toBe(true);
+    expect(against.wrongWay).toBe(true);
   });
 
-  it("grades direction through the REAL reducer: against the flow = WRONG_WAY; with the flow = clean", () => {
-    const drive = (headingDeg: number, yStep: number): RuleEvent[] => {
+  it("grades direction through the REAL reducer: west on the bar = WRONG_WAY; east = clean", () => {
+    const drive = (headingDeg: number, x0: number, xStep: number): RuleEvent[] => {
       const rt = createWorldRuntime(loadRaw());
       let rules = createRuleEngine();
       const out: RuleEvent[] = [];
       const dt = 0.1;
       let t = 0;
-      let y = 150;
-      // ~3 s of forward driving at 40 km/h in the given heading (past the 1.5 s
+      let x = x0;
+      // ~3 s of forward driving at 40 km/h along the bar (past the 1.5 s
       // wrong-way sustain).
       for (let i = 0; i < 30; i++) {
         t += dt;
-        y += yStep;
+        x += xStep;
         rt.update(dt);
-        const tick = rt.sample(sample(X_LANE, y, headingDeg, 40), t, false);
+        const tick = rt.sample(sample(x, BAR_Y, headingDeg, 40), t, false);
         const r = reduceTick(rules, tick);
         rules = r.state;
         out.push(...r.events);
@@ -176,10 +215,10 @@ describe("ov-oneway-v1 through the world runtime — the oneway/wrongWay surface
       return out;
     };
 
-    const withFlow = drive(0, (40 / 3.6) * 0.1); // north, y increasing
+    const withFlow = drive(90, 30, (40 / 3.6) * 0.1); // east, x increasing
     expect(withFlow.filter((e) => e.kind === "violation")).toEqual([]);
 
-    const against = drive(180, -(40 / 3.6) * 0.1); // south, y decreasing
+    const against = drive(270, -30, -(40 / 3.6) * 0.1); // west, x decreasing
     const codes = against.filter((e) => e.kind === "violation").map((e) => e.code);
     expect([...new Set(codes)]).toEqual(["WRONG_WAY"]);
   });
@@ -192,24 +231,24 @@ describe("ov-oneway-v1 through the traffic lane graph + system", () => {
     raw = loadRaw() as TrafficDistrict;
   });
 
-  it("builds the lane graph: 1 directed lane (one-way)", () => {
+  it("builds the lane graph: 2 stem lanes + 1 per one-way arm", () => {
     const graph = buildLaneGraph(raw, {
       laneWidthM: DEFAULT_TRAFFIC_CONFIG.laneWidthM,
       excludedRoadClasses: DEFAULT_TRAFFIC_CONFIG.excludedRoadClasses,
       crossingSignalRadiusM: 45,
     });
-    expect(graph.lanes.length).toBe(1);
+    expect(graph.lanes.length).toBe(4);
   });
 
-  it("vehicleCount 0 / pedestrianCount 0 is a LEGAL config (empty street)", () => {
+  it("vehicleCount 0 / pedestrianCount 0 is a LEGAL config (empty junction)", () => {
     const traffic = createTrafficSystem(raw, {
       seed: 7,
       vehicleCount: 0,
       pedestrianCount: 0,
-      anchor: { x: X_LANE, y: 15 },
-      anchorRadiusM: 400,
+      anchor: { x: X_STEM, y: 15 },
+      anchorRadiusM: 500,
     });
     expect(traffic.stats.vehicleCount).toBe(0);
-    expect(traffic.leadGapMeters(X_LANE, 15, 0)).toBe(Infinity);
+    expect(traffic.leadGapMeters(X_STEM, 15, 0)).toBe(Infinity);
   });
 });

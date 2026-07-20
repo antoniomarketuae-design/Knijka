@@ -2,13 +2,15 @@
  * OV lane-keeping archetype contract battery (Scenario Studio doc 76 §3; the
  * sp-districts.test.ts pattern).
  *
- * content/world/ov-lane-v1.json is the lane-discipline generated micro-map
- * (tools/maps/gen_ov_lanekeep.mjs — one straight 1+1 two-way street, 300 m,
- * 50 km/h). The battery proves the file satisfies the FULL engine contract, with
- * the archetype's REASON TO EXIST verified end-to-end: the runtime's
- * laneOffsetM / oneway surface feeds the rule engine's lane-keeping grading
- * (POOR_LANE_KEEPING toward the curb; CENTER_LINE_TOUCHED toward oncoming), and
- * the centered drive stays clean.
+ * content/world/ov-lane-v1.json is the lane-discipline generated micro-map —
+ * since the founder R3 redesign (doc 62 #46) an S-CURVE 1+1 two-way street
+ * (tools/maps/gen_ov_lanekeep.mjs — 300 m run, sway ±14 m, 50 km/h): holding
+ * the middle takes real steering. The battery proves the file satisfies the
+ * FULL engine contract, with the archetype's REASON TO EXIST verified
+ * end-to-end ON THE CURVE: the runtime's laneOffsetM / oneway surface feeds
+ * the rule engine's lane-keeping grading (POOR_LANE_KEEPING toward the curb;
+ * CENTER_LINE_TOUCHED toward oncoming), and the curve-following centred drive
+ * stays clean.
  */
 import fs from "node:fs";
 import path from "node:path";
@@ -22,9 +24,28 @@ import { DEFAULT_TRAFFIC_CONFIG, type TrafficDistrict } from "../../traffic/type
 import { buildWorldGeometry } from "../builders/buildWorldGeometry";
 import { assertDistrict, type District, type WorldGeometry } from "../types";
 
-const X_LANE = 4.06; // right-lane center of a 1+1 street (drawn lane 8.125 m)
-const X_CURB_EDGE = 7.7; // toward the curb (offset ≈ −3.64)
-const X_CENTER_LINE = 0.5; // toward the осева линия (offset ≈ +3.56)
+// The generator's curve math, replicated (gen_ov_lanekeep.mjs — the L7 twin).
+const SWAY_M = 14;
+const LENGTH_M = 300;
+const O_CENTER = 4.06; // lane center, right of the centreline
+const O_CURB_EDGE = 7.7; // toward the curb (laneOffset ≈ −3.64)
+const O_CENTER_LINE = 0.5; // toward the осева линия (laneOffset ≈ +3.56)
+
+function centerX(y: number): number {
+  return SWAY_M * Math.sin((2 * Math.PI * y) / LENGTH_M);
+}
+function slope(y: number): number {
+  return SWAY_M * ((2 * Math.PI) / LENGTH_M) * Math.cos((2 * Math.PI * y) / LENGTH_M);
+}
+function offsetPoint(y: number, offsetM: number): { x: number; y: number; headingDeg: number } {
+  const dx = slope(y);
+  const n = Math.hypot(dx, 1);
+  return {
+    x: centerX(y) + offsetM / n,
+    y: y - (offsetM * dx) / n,
+    headingDeg: (Math.atan2(dx, 1) * 180) / Math.PI,
+  };
+}
 
 function loadRaw(): unknown {
   const candidates = [
@@ -60,7 +81,7 @@ describe("ov-lane-v1 through the world builder", () => {
     world = buildWorldGeometry(district, { seed: 7 });
   });
 
-  it("is a structurally valid district-v1 document (plain 1+1 street)", () => {
+  it("is a structurally valid district-v1 document (S-curved 1+1 street)", () => {
     expect(district.meta.attribution.text).toContain("оригинален");
     expect(district.roads.nodes.length).toBe(2);
     expect(district.roads.edges.length).toBe(1);
@@ -68,7 +89,12 @@ describe("ov-lane-v1 through the world builder", () => {
     expect(road.lanes).toBe(2);
     expect(road.oneway).toBe(false);
     expect(road.maxspeed).toBe(50);
-    expect(road.length).toBe(300);
+    // The S-curve is REAL: arclength exceeds the 300 m run…
+    expect(road.length).toBeGreaterThan(300);
+    // …and the polyline genuinely sways to both banks.
+    const xs = (road.geometry as Array<[number, number]>).map((p) => p[0]);
+    expect(Math.max(...xs)).toBeGreaterThan(13);
+    expect(Math.min(...xs)).toBeLessThan(-13);
     expect(district.intersections.length).toBe(0);
     expect(district.crossings.length).toBe(0);
     expect(district.roundabouts.length).toBe(0);
@@ -76,6 +102,11 @@ describe("ov-lane-v1 through the world builder", () => {
       "ov-ln-spawn-approach",
       "ov-ln-spawn-finish",
     ]);
+    // The apex gates the ScenarioSpec pins by value (the L7 copy law).
+    const gates = (district.meta.scenario as { gates?: Record<string, { x: number; y: number }> }).gates!;
+    expect(gates.eastApex).toEqual({ x: 18.06, y: 75 });
+    expect(gates.westApex).toEqual({ x: -9.94, y: 225 });
+    expect(gates.finish).toEqual({ x: -0.42, y: 283.91 });
   });
 
   it("hosts a plain street: no lights, no stop signs, no zebras", () => {
@@ -134,7 +165,7 @@ describe("ov-lane-v1 through the world builder", () => {
   });
 });
 
-describe("ov-lane-v1 through the world runtime — the laneOffset surface", () => {
+describe("ov-lane-v1 through the world runtime — the laneOffset surface ON THE CURVE", () => {
   let runtime: DistrictWorldRuntime;
 
   beforeAll(() => {
@@ -147,31 +178,34 @@ describe("ov-lane-v1 through the world runtime — the laneOffset surface", () =
     expect(runtime.debugUncontrolledJunctions().length).toBe(0);
   });
 
-  it("surfaces the single northbound lane (laneId 0, laneCount 1, oneway=false)", () => {
+  it("surfaces the single northbound lane at the east apex (laneId 0, laneCount 1, oneway=false)", () => {
     const rt = createWorldRuntime(loadRaw());
     rt.update(1 / 60);
-    const tick = rt.sample(sample(X_LANE, 100, 0, 40), 1, false);
+    const p = offsetPoint(75, O_CENTER); // the east apex — tangent due north
+    const tick = rt.sample(sample(p.x, p.y, p.headingDeg, 40), 1, false);
     expect(tick.edgeId).toBe("ov-ln-street");
     expect(tick.laneId).toBe(0);
     expect(tick.laneCount ?? 1).toBe(1); // 1 lane per direction — keep-right never applies
-    expect(Math.abs(tick.laneOffsetM)).toBeLessThan(0.2);
+    expect(Math.abs(tick.laneOffsetM)).toBeLessThan(0.35);
     expect(tick.maxSpeedKmh).toBe(50);
     expect(tick.oneway).toBe(false);
   });
 
-  it("grades lane position through the REAL reducer: curb-edge = POOR_LANE_KEEPING; center-line = CENTER_LINE_TOUCHED; centered = clean", () => {
-    const cruise = (x: number): RuleEvent[] => {
+  it("grades lane position through the REAL reducer along the curve: curb-edge = POOR_LANE_KEEPING; center-line = CENTER_LINE_TOUCHED; centred = clean", () => {
+    const cruise = (offsetM: number, y0: number, y1: number): RuleEvent[] => {
       const rt = createWorldRuntime(loadRaw());
       let rules = createRuleEngine();
       const out: RuleEvent[] = [];
       const dt = 0.1;
       let t = 0;
-      // ~6 s of forward cruising at 30 km/h at the given lateral position (past
-      // both the 3 s lane-keep and 3.5 s center-line sustains).
-      for (let y = 15; y < 15 + 30 / 3.6 * 6; y += (30 / 3.6) * dt) {
+      // Curve-following forward cruise at 30 km/h at the given lane offset —
+      // long enough to clear both the 3 s lane-keep and 3.5 s center-line
+      // sustains.
+      for (let y = y0; y < y1; y += (30 / 3.6) * dt) {
         t += dt;
         rt.update(dt);
-        const tick = rt.sample(sample(x, y, 0, 30), t, false);
+        const p = offsetPoint(y, offsetM);
+        const tick = rt.sample(sample(p.x, p.y, p.headingDeg, 30), t, false);
         const r = reduceTick(rules, tick);
         rules = r.state;
         out.push(...r.events);
@@ -179,13 +213,16 @@ describe("ov-lane-v1 through the world runtime — the laneOffset surface", () =
       return out;
     };
 
-    const centered = cruise(X_LANE);
-    expect(centered.filter((e) => e.kind === "violation")).toEqual([]);
+    // Centred through the RIGHT-hand bend (across the east apex): clean.
+    const centred = cruise(O_CENTER, 30, 130);
+    expect(centred.filter((e) => e.kind === "violation")).toEqual([]);
 
-    const curb = cruise(X_CURB_EDGE).filter((e) => e.kind === "violation").map((e) => e.code);
+    // Running wide toward the curb through the LEFT-hand bend: lane-keeping.
+    const curb = cruise(O_CURB_EDGE, 170, 280).filter((e) => e.kind === "violation").map((e) => e.code);
     expect([...new Set(curb)]).toEqual(["POOR_LANE_KEEPING"]);
 
-    const centerLine = cruise(X_CENTER_LINE).filter((e) => e.kind === "violation").map((e) => e.code);
+    // Drifted onto the осева through the RIGHT-hand bend: the center-line code.
+    const centerLine = cruise(O_CENTER_LINE, 30, 140).filter((e) => e.kind === "violation").map((e) => e.code);
     expect([...new Set(centerLine)]).toEqual(["CENTER_LINE_TOUCHED"]);
   });
 });
@@ -209,14 +246,15 @@ describe("ov-lane-v1 through the traffic lane graph + system", () => {
   });
 
   it("vehicleCount 0 / pedestrianCount 0 is a LEGAL config (empty street)", () => {
+    const start = offsetPoint(15, O_CENTER);
     const traffic = createTrafficSystem(raw, {
       seed: 7,
       vehicleCount: 0,
       pedestrianCount: 0,
-      anchor: { x: X_LANE, y: 15 },
+      anchor: { x: start.x, y: start.y },
       anchorRadiusM: 400,
     });
     expect(traffic.stats.vehicleCount).toBe(0);
-    expect(traffic.leadGapMeters(X_LANE, 15, 0)).toBe(Infinity);
+    expect(traffic.leadGapMeters(start.x, start.y, start.headingDeg)).toBe(Infinity);
   });
 });

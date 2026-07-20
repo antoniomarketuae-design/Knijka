@@ -130,7 +130,10 @@ describe("ln-arrows-v1 through the world builder", () => {
   });
 
   it("hosts a signalized junction: lamp heads on every incoming approach, no signs, no zebras", () => {
-    expect(world.trafficLights.length).toBe(4);
+    // 4 approaches × 2 heads since the R3 signal-visibility fix: every incoming
+    // approach gets its near head PLUS the far-side companion a driver waiting
+    // AT the line actually sees (the sx/pe-jay/sig-wave batteries pin the same).
+    expect(world.trafficLights.length).toBe(8);
     for (const tl of world.trafficLights) expect(tl.nodeId).toBe("ln-n-c");
     expect(world.stats.signs.stop).toBe(0);
     expect(world.stats.signs.giveWay).toBe(0);

@@ -160,6 +160,9 @@ export class PedestrianDartOutRunner implements EventRunner {
   private triggerDistM = 0;
   private approachSpeedKmh = 0;
   private sawSlow = false;
+  /** Ball-lead walker release clock (spec.ballLeadSec): tSec at/after which
+   *  the walker cruises; null = released (or no ball authored). */
+  private releaseAtSec: number | null = null;
   private readonly timer = new ReactionTimer();
 
   constructor(readonly spec: PedestrianDartOutSpec) {}
@@ -180,6 +183,9 @@ export class PedestrianDartOutRunner implements EventRunner {
         roadFromM: s.roadFromM,
         roadToM: s.roadToM,
         colorIndex: 3,
+        // R3 #25–28 body variant (child / elder+white-cane) — render-side
+        // mapping only; absent = the adult rig, byte-identical staging.
+        ...(s.variant !== undefined ? { variant: s.variant } : {}),
       });
       if (!view) throw new Error(`staged event ${s.id}: pedestrian path failed to stage`);
       // Stationary prop vehicles (ADR-006 stage 3b — RX-04's halted tram at
@@ -212,6 +218,8 @@ export class PedestrianDartOutRunner implements EventRunner {
     this.outcome = null;
     this.sawSlow = false;
     this.approachSpeedKmh = 0;
+    this.hazardActive = false;
+    this.releaseAtSec = null;
     this.timer.reset();
   }
 
@@ -236,7 +244,17 @@ export class PedestrianDartOutRunner implements EventRunner {
         input.speedKmh >= s.minTriggerSpeedKmh &&
         approaching(input, s.crossing.x, s.crossing.y)
       ) {
-        traffic.stagedCommand(s.id, { type: "cruise" });
+        // R3 #27 ball cue: with `ballLeadSec` authored, the trigger first
+        // rolls the lesson's hazard ball (the WARNING the anticipation
+        // lesson teaches) and releases the walker a beat later; the
+        // reaction stopwatch arms at the BALL — that is the stimulus.
+        // Without it: the walker releases now, byte-identical.
+        if (s.ballLeadSec !== undefined) {
+          this.hazardActive = true;
+          this.releaseAtSec = input.tSec + s.ballLeadSec;
+        } else {
+          traffic.stagedCommand(s.id, { type: "cruise" });
+        }
         this.phase = "triggered";
         this.timer.arm(input.tSec);
         this.approachSpeedKmh = input.speedKmh;
@@ -245,6 +263,10 @@ export class PedestrianDartOutRunner implements EventRunner {
     }
 
     // triggered
+    if (this.releaseAtSec !== null && input.tSec >= this.releaseAtSec) {
+      traffic.stagedCommand(s.id, { type: "cruise" });
+      this.releaseAtSec = null;
+    }
     this.timer.sample(input);
     const actor = traffic.staged(s.id);
     if (!actor) return null;
@@ -300,6 +322,10 @@ const PRIORITY_COMMIT_PLAYER_M = 22;
  * runtime's PRIORITY_CONFLICT_RADIUS_M so a stopped-then-proceeding player
  * can never cross into a stale conflict. */
 const PRIORITY_CLEAR_ARC_M = 30;
+/** Witness-gate ETA floor, m/s — low on purpose (unlike the sync's 3 m/s
+ * floor): a stopped/creeping student must read as NOT arriving, so the held
+ * car keeps waiting for them instead of crossing an empty box (doc 62 S2). */
+const WITNESS_MIN_SPEED_MPS = 0.5;
 
 export class PriorityFromRightRunner implements EventRunner {
   phase: StagedEventPhase = "idle";
@@ -356,9 +382,26 @@ export class PriorityFromRightRunner implements EventRunner {
       // sit 50 m euclidean from the junction for the length of a whole
       // corner), so the car never crosses "unwitnessed" on a distance guess.
       if (playerLineDist <= PRIORITY_COMMIT_PLAYER_M) {
-        traffic.stagedCommand(s.id, { type: "cruise" }); // through the box
-        this.phase = "triggered";
-        return null;
+        // S2 witness gate (doc 62 founder R3 #15/#16/#17/#18): the distance
+        // gate alone still lies about ARRIVAL — a hesitant live student 22 m
+        // out can be half a minute from the line, and a car released now has
+        // long cleared the box when they finally arrive ("waits for
+        // nothing"). When the spec opts in, defer the release until the
+        // player is truly about to witness it: raw (unfloored) ETA at/under
+        // etaSec, or physically at the mouth (nearLineM). A scripted-pace
+        // approach passes the ETA test on the same frame the distance gate
+        // fires, so recorded choreography is untouched.
+        const w = s.witnessArm;
+        const rawEtaSec =
+          playerLineDist / Math.max(input.speedKmh * KMH_TO_MPS, WITNESS_MIN_SPEED_MPS);
+        if (w === undefined || playerLineDist <= w.nearLineM || rawEtaSec <= w.etaSec) {
+          traffic.stagedCommand(s.id, { type: "cruise" }); // through the box
+          this.phase = "triggered";
+          return null;
+        }
+        // Not committed: fall through — the hold/sync branches below keep
+        // walking the car to (and pin it at) its hold short of the box, so
+        // the eventual release is always a short, fully visible crossing.
       }
       if (carDist <= PRIORITY_COMMIT_CAR_M + 3) {
         // Staged and waiting: hold just short of the box until the player

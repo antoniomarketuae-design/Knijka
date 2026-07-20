@@ -1320,6 +1320,23 @@ describe("FP battery — junction scan (JUNCTION_SCAN_INCOMPLETE)", () => {
     expectInnocent(events);
   });
 
+  it("waiting out priority traffic after the scan is innocent — stopped time does not stale it", () => {
+    // Innocent (founder R3 #13): scan at the mouth, stand waiting 8 s for the
+    // priority car to clear, then cross. The legally-required wait must never
+    // convert a real scan into JUNCTION_SCAN_INCOMPLETE.
+    const { events } = drive(
+      [
+        tick(0, { speedKmh: 0.4, events: [glance("left")] }),
+        tick(1, { speedKmh: 0.4, events: [glance("right")] }),
+        ...cruise(2, 9, { speedKmh: 0.4 }), // the wait for the priority car
+        tick(10, { speedKmh: 6, events: [stopSign] }),
+      ],
+      enabled,
+    );
+    expectInnocent(events);
+    expect(events.map((e) => e.code)).toContain("FULL_STOP_AT_STOP_SIGN");
+  });
+
   it("a green traffic light is not a Б2 — the scan rule never applies there", () => {
     // Innocent (of this code): the junction-scan drill grades stop-SIGN
     // crossings only; a green-light crossing carries no ляво-дясно duty.

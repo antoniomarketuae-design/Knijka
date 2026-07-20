@@ -127,6 +127,18 @@ export interface TrafficVehicleState {
  */
 export type PedestrianPose = "stopSignal" | "directTraffic";
 
+/**
+ * Presentation BODY VARIANT for a pedestrian figure (staged actors only today
+ * — founder R3 #25–28, doc 62 P6 „better NPC actors where the actor IS the
+ * lesson"): "child" renders the small rig (~0.72 scale, bigger head ratio —
+ * the CHILD_CYCLIST_SCALE precedent, vehicleFleet.ts), "elder" the slightly
+ * stooped rig carrying the WHITE CANE (PE-14 „Пешеходец с бял бастун" — the
+ * cane IS the recognition cue the drill teaches). Visual only: no query,
+ * detector or update-path branch reads it; the walk/crossing machinery is
+ * byte-identical with or without it.
+ */
+export type PedestrianVariant = "child" | "elder";
+
 export interface TrafficPedestrianState {
   id: number;
   x: number;
@@ -143,6 +155,9 @@ export interface TrafficPedestrianState {
   /** Standing pose override (see PedestrianPose). Absent = the normal
    *  walk/stand rig — ambient pedestrians publish the exact pre-pose shape. */
   pose?: PedestrianPose;
+  /** Body variant (see PedestrianVariant). Absent = the adult rig — ambient
+   *  pedestrians publish the exact pre-variant state shape. */
+  variant?: PedestrianVariant;
 }
 
 /**
@@ -370,6 +385,10 @@ export interface StagedPedestrianSpec {
   /** Standing pose published on the actor's TrafficPedestrianState (doc 72
    *  VP-11 — the roadside officer figure). Visual only; default absent. */
   pose?: PedestrianPose;
+  /** Body variant published on the actor's TrafficPedestrianState (founder
+   *  R3 #25–28 — child rig / elder-with-white-cane rig). Visual only;
+   *  default absent = the adult rig. */
+  variant?: PedestrianVariant;
 }
 
 export type StagedActorSpec = StagedVehicleSpec | StagedPedestrianSpec;
@@ -455,6 +474,14 @@ export interface TrafficSystem {
    * clear. Player pose in district space; headingDeg 0 = north, clockwise.
    */
   leadGapMeters(px: number, py: number, headingDeg: number): number;
+  /**
+   * Gap in meters (bumper-to-bumper approx) to the nearest vehicle BEHIND the
+   * player within the same lane-width corridor, or Infinity when nothing is
+   * behind — leadGapMeters mirrored. HUD-ONLY channel (the PROX rear-proximity
+   * cue): no rule-engine detector reads it, so it changes no grading. Player
+   * pose in district space; headingDeg 0 = north, clockwise.
+   */
+  rearGapMeters(px: number, py: number, headingDeg: number): number;
   /**
    * True when a moving vehicle is within `radiusM` of (x,y) on a CONFLICTING
    * path — i.e. crossing/oncoming relative to `approachBearingDeg` (your

@@ -58,6 +58,20 @@ export interface VehicleSample {
 /** Traffic-signal runtime state, per signal node id from district-v1.json. */
 export type SignalPhase = "red" | "redYellow" | "green" | "yellow";
 
+/**
+ * What a signal head's LAMPS show — the render read model (founder review R3,
+ * doc 62 S1 "signal render desync"). A superset of SignalPhase: a cluster
+ * dialed DARK shows no lamp at all, and a FLASHING-AMBER cluster alternates
+ * "amberFlashOn"/"amberFlashOff" on the runtime's own signal clock (so the
+ * blink and the grading share one clock — never a render-side second timer).
+ * Derived from the SAME mode + offset state stop-line adjudication reads
+ * (SignalController), so the rendered lamp can never disagree with the graded
+ * phase: dark/flashing clusters grade as UNCONTROLLED junctions and render
+ * unlit/blinking; live and "controlled" clusters render the live cycle
+ * ("controlled" lamps stay misleading-but-visible by design, ЗДвП чл. 7).
+ */
+export type SignalLampState = SignalPhase | "dark" | "amberFlashOn" | "amberFlashOff";
+
 export interface WorldRuntime {
   /** Advance signal phases etc.; call once per render frame. */
   update(dtSec: number): void;
@@ -74,8 +88,18 @@ export interface WorldRuntime {
     fog?: boolean,
     snow?: boolean,
   ): SimTick;
-  /** Current phase for a signal node (world renderer reads this to light the lamps). */
+  /** Current phase for a signal node (grading/traffic read model; ignores
+   *  cluster MODES — a dark cluster still reports its underlying cycle). */
   signalPhase(signalNodeId: string): SignalPhase;
+  /**
+   * Lamp state for a signal HEAD the world renderer lights (doc 62 S1 fix):
+   * mode-aware (dark → "dark", flashingAmber → the blink pair on the runtime
+   * clock) and approach-aware (`approachBearingDeg` = compass bearing of
+   * travel INTO the junction on the head's arm — omit to fall back to the
+   * node's own axis-group). This is THE render source of truth: it reads the
+   * same cluster mode + (pin-rebased) offset stop-line grading reads.
+   */
+  signalLampState(signalNodeId: string, approachBearingDeg?: number): SignalLampState;
   /** Resolved speed limit at a position (edge maxspeed or BG urban default 50). */
   speedLimitAt(pos: { x: number; y: number }): number;
   /** Nearest drivable edge + lane info (for HUD/minimap and lane tracking). */
@@ -203,6 +227,21 @@ export interface LessonSpec {
    * wall-clock phases (today's behavior, bit-identical).
    */
   signalPlan?: SignalPlanSpec;
+  /**
+   * Session-start signal-cluster MODE dials, per signal node id (doc 62 S1 —
+   * the live half of the recorder's `signalModes` option): LessonScene applies
+   * each through runtime.setSignalClusterMode right after the runtime is
+   * built, so a „загаснал светофар"/„мигащо жълто" drill is DARK / FLASHING
+   * AMBER in LIVE play exactly as in its recorded traces — grading falls back
+   * to the uncontrolled-junction rules AND the lamps render unlit/blinking
+   * from the same mode state. Only the two teaching dials are authorable
+   * ("controlled" is armed by the trafficController staged runner, never
+   * here). compileScenario propagates it from ScenarioSpec.signalModes; the
+   * trace RECORDER never reads this field (its truth is the trace scripts'
+   * own signalModes option — the byte-identity contract). Absent = every
+   * cluster live, today's behavior bit-identical.
+   */
+  signalModes?: Readonly<Record<string, "dark" | "flashingAmber">>;
   /** Marked parking bay this lesson's park objective targets (L7). The world
    * paints every lesson-authored bay by default (buildWorldGeometry ←
    * LESSON_PARKING_BAYS from lessons/specs). */
@@ -509,6 +548,28 @@ export interface PedestrianDartOutSpec extends StagedEventBase {
   /** …approaching it, at or above this speed. */
   minTriggerSpeedKmh: number;
   /**
+   * Presentation body variant of the walker (founder R3 #25–28, doc 62 P6):
+   * "child" renders the small pedestrian rig (~0.72 scale, bigger head — the
+   * CHILD_CYCLIST proportion precedent), "elder" the stooped rig CARRYING THE
+   * WHITE CANE (PE-14's признак — the cane IS the recognition cue, so only
+   * the white-cane drill authors it; the PE-08 slow crosser deliberately does
+   * NOT — a cane there would dilute the unique lesson). Visual + data only:
+   * flows through StagedPedestrianSpec.variant onto the published
+   * TrafficPedestrianState; no query, detector or timing reads it. Absent =
+   * the adult rig, byte-identical staging.
+   */
+  variant?: "child" | "elder";
+  /**
+   * PE-04 ball warning cue (founder R3 #27 — „ball rolls out, child follows"):
+   * when authored, the TRIGGER first flips the runner's `hazardActive` (the
+   * lesson's `hazard` ballDartOut visual starts rolling — the WHY the lesson
+   * teaches: the ball IS the warning) and releases the walker only this many
+   * seconds LATER. The reaction stopwatch arms at the BALL (the stimulus the
+   * anticipation lesson grades). Deterministic — pure tSec arithmetic, no
+   * RNG. Absent = the walker releases on the trigger frame, byte-identical.
+   */
+  ballLeadSec?: number;
+  /**
    * Stationary prop vehicles dressing the encounter (ADR-006 stage 3b —
    * RX-04's tram halted at the island stop): staged held actors in the
    * narrowMeeting-props mold (doc 72 OV-18's "stage() with a hold pose"
@@ -553,6 +614,19 @@ export interface PriorityFromRightSpec extends StagedEventBase {
   lineDistM: number;
   /** Speed after clearing the junction (leave the conflict radius fast), m/s. */
   clearSpeedMps: number;
+  /**
+   * S2 witness gate (doc 62 founder R3 — staged-car timing vs live pacing):
+   * when set, reaching the near-line commit distance alone does NOT release
+   * the held car through the box. The release additionally waits until the
+   * player is genuinely about to arrive: raw (unfloored) ETA to their own
+   * stop line at/under `etaSec`, OR within `nearLineM` of the line (a
+   * stopped/creeping student at the mouth). This guarantees the conflict is
+   * PRESENT when a slow live player reaches the junction, at any pace —
+   * while a scripted-pace approach (≳ 10 km/h at the commit gate) commits on
+   * the same frame as the legacy rule, keeping recorded choreography
+   * identical. Absent = the legacy distance-only commit, byte-identical.
+   */
+  witnessArm?: { etaSec: number; nearLineM: number };
 }
 
 /** A lead car matches the player's speed at a fixed gap, then brake-slams at

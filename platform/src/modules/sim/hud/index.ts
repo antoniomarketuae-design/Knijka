@@ -28,6 +28,10 @@ export {
   type MistakeMapMarker,
   type MistakeMapMarkerKind,
 } from "./Minimap";
+// PROX: rear-proximity badge — the universal rear-awareness fallback cue.
+export { RearProximityCue } from "./RearProximityCue";
+export type { RearCuePose, RearGapSource } from "./RearProximityCue";
+export { rearCueLabelBg, stepRearCue, type RearCue, type RearCueLevel } from "./rearProximity";
 export { PreDriveChecklist } from "./PreDriveChecklist";
 export { SessionEndScreen, type SessionEndConcept } from "./SessionEndScreen";
 export {

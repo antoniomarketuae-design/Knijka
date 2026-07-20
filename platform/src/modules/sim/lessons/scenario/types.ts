@@ -10,7 +10,12 @@
  * rules catalog (validation), never engine/world/runtime internals.
  */
 
-import type { LessonAidsSpec, SignalPlanSpec, StagedEventSpec } from "../../contracts";
+import type {
+  HazardStimulusSpec,
+  LessonAidsSpec,
+  SignalPlanSpec,
+  StagedEventSpec,
+} from "../../contracts";
 import type { RuleEngineConfig } from "../../rules";
 import type { ObjectiveParams } from "../types";
 
@@ -62,6 +67,7 @@ export const SCENARIO_FAMILIES: readonly ScenarioFamily[] = [
 export type MapArchetype =
   | "parking-lot"
   | "straight-street"
+  | "s-curve-street"
   | "t-junction"
   | "x-junction"
   | "roundabout"
@@ -75,6 +81,7 @@ export type MapArchetype =
 export const MAP_ARCHETYPES: readonly MapArchetype[] = [
   "parking-lot",
   "straight-street",
+  "s-curve-street",
   "t-junction",
   "x-junction",
   "roundabout",
@@ -356,6 +363,27 @@ export interface ScenarioSpec {
    * the runtime; recorded traces keep their authored signalOffsets.
    */
   signalPlan?: SignalPlanSpec;
+  /**
+   * Session-start signal-cluster MODE dials (doc 62 S1 — the live half of the
+   * recorder's signalModes option), propagated by compileScenario to
+   * LessonSpec.signalModes (the signalPlan opt-in pattern). A dead-signal /
+   * flashing-amber template MUST author this with the same node→mode map its
+   * trace scripts record with, or LIVE play runs the cluster live (lamps
+   * cycling, signal codes firing) while the drill narrates a dark light — the
+   * founder R3 #17/#18 desync. Absent = every cluster live, bit-identical.
+   */
+  signalModes?: Readonly<Record<string, "dark" | "flashingAmber">>;
+  /**
+   * Lesson hazard-ball stimulus (contracts HazardStimulusSpec — the L5
+   * ballDartOut visual TrafficLayer already renders), propagated by
+   * compileScenario to LessonSpec.hazard (the signalPlan opt-in pattern).
+   * Founder R3 #27: sc-crossing-child-ball authors the ball that rolls out
+   * a beat BEFORE the child (PedestrianDartOutSpec.ballLeadSec flips the
+   * runner's hazardActive at the trigger) — the ball IS the warning cue the
+   * anticipation lesson teaches. Render-only; recorded traces never carry it.
+   * Absent = no ball, bit-identical compile.
+   */
+  hazard?: HazardStimulusSpec;
   /** Bulgaria is the product (doc 76 §0 — locale from day one, no country packs). */
   localeBg: "bg-BG";
 }

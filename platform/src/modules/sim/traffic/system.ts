@@ -350,6 +350,10 @@ class TrafficSystemImpl implements TrafficSystem {
     return leadGapFor(this.vehicles, px, py, headingDeg);
   }
 
+  rearGapMeters(px: number, py: number, headingDeg: number): number {
+    return rearGapFor(this.vehicles, px, py, headingDeg);
+  }
+
   conflictNear(x: number, y: number, radiusM: number, approachBearingDeg: number): boolean {
     return conflictNearFor(this.vehicles, x, y, radiusM, approachBearingDeg);
   }
@@ -655,6 +659,36 @@ export function leadGapFor(
     const lat = Math.abs(rx * -fy + ry * fx); // perpendicular offset
     if (lat > LEAD_CORRIDOR_M) continue; // not in my lane/path
     const gap = fwd - VEHICLE_LENGTH_M;
+    if (gap < best) best = gap;
+  }
+  return best === Infinity ? Infinity : Math.max(0, best);
+}
+
+/**
+ * Pure gap-to-nearest-vehicle-BEHIND helper — leadGapFor with the forward test
+ * flipped (same corridor, same bumper constant). HUD-ONLY channel (the PROX
+ * rear-proximity cue reads it at ~5 Hz); no rule-engine detector consumes it,
+ * so adding it changes no grading. Returns Infinity when nothing is behind —
+ * the cue's honesty contract (no vehicle ⇒ no badge) rests on that.
+ */
+export function rearGapFor(
+  vehicles: readonly { x: number; y: number }[],
+  px: number,
+  py: number,
+  headingDeg: number,
+): number {
+  const rad = (headingDeg * Math.PI) / 180;
+  const fx = Math.sin(rad); // forward x (0° = north = +y)
+  const fy = Math.cos(rad); // forward y
+  let best = Infinity;
+  for (const v of vehicles) {
+    const rx = v.x - px;
+    const ry = v.y - py;
+    const fwd = rx * fx + ry * fy;
+    if (fwd >= 0) continue; // not behind
+    const lat = Math.abs(rx * -fy + ry * fx); // perpendicular offset
+    if (lat > LEAD_CORRIDOR_M) continue; // not in my lane/path
+    const gap = -fwd - VEHICLE_LENGTH_M;
     if (gap < best) best = gap;
   }
   return best === Infinity ? Infinity : Math.max(0, best);

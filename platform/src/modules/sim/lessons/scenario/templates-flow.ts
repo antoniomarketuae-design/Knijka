@@ -274,7 +274,18 @@ export const SC_ROUNDABOUT_ENTRY: ScenarioSpec = {
       titleBg: "Премини през кръговото и излез с десен мигач",
       // The L3 roundabout contract (A10): enter the ring, exit ONLY under a
       // right indicator — an unsignalled exit voids the traversal.
-      params: { kind: "completeManeuver", maneuver: "roundabout", x: 0, y: 0, enterRadiusM: 21, exitRadiusM: 34 },
+      //
+      // enterRadiusM 24, AGAINST THE GEOMETRY (founder R3 #6: „reaching the
+      // end did not end the lesson"). The rb-mini ring polyline sits at r=18,
+      // but the drivable band is 18 ± LANE_WIDTH_M/2 = 18 ± 4.06 — a live
+      // driver keeping honestly right circulates at r ≈ 20–22 and at the old
+      // 21 the `entered` latch (d <= enterRadiusM) could NEVER fire, leaving
+      // the objective structurally uncompletable on a legal line. 24 covers
+      // the outer drivable edge (22.06) + margin, and stays inside the exit
+      // window's start so mid-ring wobble cannot bank a false exit signal.
+      // All three committed traces replay IDENTICALLY at 21 and 24 (shadow
+      // dips to d=17.9; the no-signal demo still voids) — traces untouched.
+      params: { kind: "completeManeuver", maneuver: "roundabout", x: 0, y: 0, enterRadiusM: 24, exitRadiusM: 34 },
     },
   ],
   rubric: { parTimeSec: 70 },

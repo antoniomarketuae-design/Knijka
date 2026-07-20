@@ -66,6 +66,7 @@ import {
   CanvasTexture,
   CapsuleGeometry,
   Color,
+  CylinderGeometry,
   DynamicDrawUsage,
   Object3D,
   Quaternion,
@@ -148,6 +149,38 @@ const OFC_ARM_OUT_RAD = 1.47; // both-arms-out sideways raise (about local Z)
 const OFC_RAISE_LEAD_SEC = 11;
 const OFC_TURN_RATE = 3.2; // whole-figure yaw damp toward the halted axis, 1/s
 const OFC_ARM_RATE = 4.2; // posture damp, 1/s
+
+// R3 #25–28 pedestrian BODY VARIANTS (doc 62 P6 — „better NPC actors where
+// the actor IS the lesson"): the CHILD follows the child-cyclist proportion
+// precedent (CHILD_CYCLIST_SCALE 0.72, head ratio ×~1.18 — vehicleFleet.ts);
+// the ELDER is slightly stooped and carries the WHITE CANE (PE-14's признак —
+// the cane IS the recognition cue). Variant body factors are PINNED (no
+// per-id jitter) so the cane geometry and the child silhouette read
+// identically on every attempt; variant-less pedestrians keep the hashed
+// height/build variation byte-identically.
+const PED_CHILD_HEIGHT = 0.72; // the child-cyclist scale — ~1.25 m figure
+const PED_CHILD_BUILD = 0.8;
+/** Absolute head scale: smaller than the adult head, but a BIGGER ratio to
+ *  the 0.72 body (0.72 × ~1.19 — the childCyclist headScale recipe). */
+const PED_CHILD_HEAD_SCALE = 0.86;
+const PED_CHILD_TOP = "#e0562f"; // bright jacket — the small figure must read
+const PED_CHILD_LEGS = "#37517d";
+const PED_ELDER_HEIGHT = 0.93;
+const PED_ELDER_STOOP_RAD = 0.16; // forward pitch of torso + head
+const PED_ELDER_TOP = "#9a938a"; // muted overcoat
+const PED_ELDER_LEGS = "#4a453f";
+// The white cane: a thin white cylinder from the right hand to the tarmac
+// ahead, sweeping laterally with the walk phase (the tapping read). Pitch is
+// tuned so the tip grazes the ground at the pinned elder height:
+// (1.42 − 0.5) × 0.93 ≈ 0.86 m grip height ≈ 1.05 × cos(0.62).
+const CANE_LEN_M = 1.05;
+const CANE_RADIUS_M = 0.013;
+const CANE_PITCH_RAD = 0.62; // forward reach from vertical
+const CANE_SWEEP_RAD = 0.14; // lateral tap amplitude (walk-phase driven)
+const CANE_HAND_DROP = 0.5; // grip below the shoulder joint (pre-height-scale)
+const CANE_HAND_FWD = 0.28; // grip forward of the shoulder (the extended arm)
+/** Elder right arm held forward toward the cane grip instead of swinging. */
+const PED_ELDER_ARM_FWD_RAD = 0.55;
 
 // L5 hazard ball (doc 68 A5): bright, big enough to read at speed.
 const HAZARD_BALL_RADIUS_M = 0.36;
@@ -398,6 +431,8 @@ export function TrafficLayer({
   const pedHeadRef = useRef<InstancedMesh>(null);
   const pedArmRef = useRef<InstancedMesh>(null);
   const pedLegRef = useRef<InstancedMesh>(null);
+  // PE-14 white cane (1 instance per agent; zero-scaled unless variant elder).
+  const pedCaneRef = useRef<InstancedMesh>(null);
   // L5 hazard ball (single mesh — one per lesson at most).
   const hazardBallRef = useRef<Mesh>(null);
   const hazardBlobRef = useRef<Mesh>(null);
@@ -434,7 +469,10 @@ export function TrafficLayer({
     arm.translate(0, -0.298, 0); // origin at the shoulder, hangs down
     const leg = new CapsuleGeometry(0.068, 0.62, 3, 8);
     leg.translate(0, -0.378, 0); // origin at the hip, hangs down
-    return { torso, head, arm, leg };
+    // PE-14 white cane (elder variant only — everyone else zero-scales it).
+    const cane = new CylinderGeometry(CANE_RADIUS_M, CANE_RADIUS_M, CANE_LEN_M, 6);
+    cane.translate(0, -CANE_LEN_M / 2, 0); // origin at the grip, hangs down
+    return { torso, head, arm, leg, cane };
   }, []);
   useEffect(
     () => () => {
@@ -442,6 +480,7 @@ export function TrafficLayer({
       pedGeoms.head.dispose();
       pedGeoms.arm.dispose();
       pedGeoms.leg.dispose();
+      pedGeoms.cane.dispose();
     },
     [pedGeoms],
   );
@@ -465,6 +504,11 @@ export function TrafficLayer({
     // Per-pedestrian deterministic body variation (id-hashed).
     pedHeight: Float32Array; // 0.90..1.12 height scale
     pedBuild: Float32Array; // 0.88..1.14 lateral build scale
+    // R3 #25–28 body variants (set once from state.variant in the layout
+    // effect — the frame loop only reads).
+    pedHeadScale: Float32Array; // absolute head scale (child: bigger ratio)
+    pedStoop: Float32Array; // forward torso/head pitch, rad (elder)
+    pedCaneOn: Uint8Array; // 1 = render the white cane (elder)
     // JU-18 scheduled officer rig ("directTraffic" + a posted schedule).
     ofcSeeded: Uint8Array; // officer state initialised yet?
     ofcYaw: Float32Array; // damped whole-figure facing
@@ -509,6 +553,9 @@ export function TrafficLayer({
       blinkClock: 0,
       pedHeight: new Float32Array(nPed),
       pedBuild: new Float32Array(nPed),
+      pedHeadScale: new Float32Array(nPed),
+      pedStoop: new Float32Array(nPed),
+      pedCaneOn: new Uint8Array(nPed),
       ofcSeeded: new Uint8Array(nPed),
       ofcYaw: new Float32Array(nPed),
       ofcArmLat: new Float32Array(nPed * 2),
@@ -536,6 +583,7 @@ export function TrafficLayer({
       pedHeadRef,
       pedArmRef,
       pedLegRef,
+      pedCaneRef,
     ];
     for (const ref of dynamic) {
       ref.current?.instanceMatrix.setUsage(DynamicDrawUsage);
@@ -550,16 +598,44 @@ export function TrafficLayer({
       const h = hash32(p.id);
       scratch.pedHeight[i] = 0.9 + ((h & 0xff) / 255) * 0.22;
       scratch.pedBuild[i] = 0.88 + (((h >>> 8) & 0xff) / 255) * 0.26;
+      scratch.pedHeadScale[i] = 1;
+      scratch.pedStoop[i] = 0;
+      scratch.pedCaneOn[i] = 0;
+      // R3 #25–28 body variants: PINNED factors override the hashed jitter so
+      // the child silhouette / cane geometry read identically every attempt.
+      if (p.variant === "child") {
+        scratch.pedHeight[i] = PED_CHILD_HEIGHT;
+        scratch.pedBuild[i] = PED_CHILD_BUILD;
+        scratch.pedHeadScale[i] = PED_CHILD_HEAD_SCALE;
+      } else if (p.variant === "elder") {
+        scratch.pedHeight[i] = PED_ELDER_HEIGHT;
+        scratch.pedBuild[i] = 1;
+        scratch.pedStoop[i] = PED_ELDER_STOOP_RAD;
+        scratch.pedCaneOn[i] = 1;
+      }
       // VP-11 / JU-18 officer figures: hi-vis vest + dark trousers (ADR-001
-      // fictional) — any authored pose wears the uniform.
+      // fictional) — any authored pose wears the uniform (and wins over a
+      // variant colourway; no shipped actor authors both).
       const top =
-        p.pose !== undefined ? PED_POSE_HIVIS : PED_COLORS[p.colorIndex % PED_COLORS.length];
+        p.pose !== undefined
+          ? PED_POSE_HIVIS
+          : p.variant === "child"
+            ? PED_CHILD_TOP
+            : p.variant === "elder"
+              ? PED_ELDER_TOP
+              : PED_COLORS[p.colorIndex % PED_COLORS.length];
       torso?.setColorAt(i, color.set(top));
       color.set(top).multiplyScalar(0.92); // sleeves a touch darker
       arm?.setColorAt(i * 2, color);
       arm?.setColorAt(i * 2 + 1, color);
       color.set(
-        p.pose !== undefined ? PED_POSE_LEGS : PED_LEG_COLORS[p.colorIndex % PED_LEG_COLORS.length],
+        p.pose !== undefined
+          ? PED_POSE_LEGS
+          : p.variant === "child"
+            ? PED_CHILD_LEGS
+            : p.variant === "elder"
+              ? PED_ELDER_LEGS
+              : PED_LEG_COLORS[p.colorIndex % PED_LEG_COLORS.length],
       );
       leg?.setColorAt(i * 2, color);
       leg?.setColorAt(i * 2 + 1, color);
@@ -867,7 +943,8 @@ export function TrafficLayer({
     const pedHead = pedHeadRef.current;
     const pedArm = pedArmRef.current;
     const pedLeg = pedLegRef.current;
-    if (pedBlob && pedTorso && pedHead && pedArm && pedLeg) {
+    const pedCane = pedCaneRef.current;
+    if (pedBlob && pedTorso && pedHead && pedArm && pedLeg && pedCane) {
       // JU-18: ONE schedule read per frame through the runtime channel (the
       // reused out-record keeps the loop allocation-free). figOn false — no
       // channel wired or no controller posted — renders every pose exactly
@@ -894,6 +971,7 @@ export function TrafficLayer({
           pedArm.setMatrixAt(i * 2 + 1, dummy.matrix);
           pedLeg.setMatrixAt(i * 2, dummy.matrix);
           pedLeg.setMatrixAt(i * 2 + 1, dummy.matrix);
+          pedCane.setMatrixAt(i, dummy.matrix);
           continue;
         }
         const hgt = scratch.pedHeight[i];
@@ -940,21 +1018,36 @@ export function TrafficLayer({
         dummy.position.set(tx, BLOB_Y, tz);
         dummy.updateMatrix();
         pedBlob.setMatrixAt(i, dummy.matrix);
-        // Torso (origin at the hips).
-        dummy.rotation.set(0, yaw, 0);
+        // Torso (origin at the hips; the elder variant pitches forward).
+        scratch.qYaw.setFromAxisAngle(UP, yaw);
+        const stoop = scratch.pedStoop[i];
+        if (stoop !== 0) {
+          scratch.qRoll.setFromAxisAngle(AXIS_X, stoop);
+          dummy.quaternion.copy(scratch.qYaw).multiply(scratch.qRoll);
+        } else {
+          dummy.rotation.set(0, yaw, 0);
+        }
         dummy.scale.set(bld, hgt, bld);
         dummy.position.set(tx, PED_HIP_Y * hgt + bob, tz);
         dummy.updateMatrix();
         pedTorso.setMatrixAt(i, dummy.matrix);
-        // Head (constant size — height variation reads through the joints).
-        dummy.scale.set(1, 1, 1);
-        dummy.position.set(tx, PED_HEAD_Y * hgt + bob, tz);
+        // Head (per-variant scale — the child reads through the head ratio;
+        // the elder's head follows the stooped torso top).
+        let headY = PED_HEAD_Y * hgt;
+        let headFwd = 0;
+        if (stoop !== 0) {
+          const lever = (PED_HEAD_Y - PED_HIP_Y) * hgt;
+          headY = PED_HIP_Y * hgt + Math.cos(stoop) * lever;
+          headFwd = Math.sin(stoop) * lever;
+        }
+        const hs = scratch.pedHeadScale[i];
+        dummy.scale.set(hs, hs, hs);
+        dummy.position.set(tx + sin * headFwd, headY + bob, tz + cos * headFwd);
         dummy.updateMatrix();
         pedHead.setMatrixAt(i, dummy.matrix);
         // Limbs: instance = yaw · swing about the local side axis; geometry is
         // origin-at-joint so the same matrix places AND swings. Left limbs at
         // 2i, right at 2i+1; arms counter-swing their side's leg.
-        scratch.qYaw.setFromAxisAngle(UP, yaw);
         for (let side = 0; side < 2; side++) {
           const sign = side === 0 ? 1 : -1;
           const armX = sign * PED_SHOULDER_HALF * bld;
@@ -981,7 +1074,9 @@ export function TrafficLayer({
                 ? PED_POSE_ARM_RAISE_RAD
                 : p.pose === "directTraffic" && side === 1
                   ? PED_POSE_ARM_EXTEND_RAD
-                  : -sign * swing * PED_ARM_SWING_RAD;
+                  : scratch.pedCaneOn[i] === 1 && side === 1
+                    ? PED_ELDER_ARM_FWD_RAD // the cane hand, held forward
+                    : -sign * swing * PED_ARM_SWING_RAD;
             scratch.qRoll.setFromAxisAngle(AXIS_X, armRad);
             scratch.qWheel.copy(scratch.qYaw).multiply(scratch.qRoll);
           }
@@ -1006,12 +1101,36 @@ export function TrafficLayer({
           dummy.updateMatrix();
           pedLeg.setMatrixAt(i * 2 + side, dummy.matrix);
         }
+        // White cane (PE-14, elder variant): a thin white rod from the right
+        // hand to the tarmac ahead, sweeping laterally with the walk phase —
+        // the tapping read. Everyone else zero-scales the instance.
+        if (scratch.pedCaneOn[i] === 1) {
+          const handX = -PED_SHOULDER_HALF * bld; // right side (limb sign −1)
+          const fwd = CANE_HAND_FWD * hgt;
+          scratch.qLat.setFromAxisAngle(AXIS_Z, Math.sin(p.walkPhase) * CANE_SWEEP_RAD);
+          scratch.qRoll.setFromAxisAngle(AXIS_X, CANE_PITCH_RAD);
+          scratch.qWheel.copy(scratch.qYaw).multiply(scratch.qLat).multiply(scratch.qRoll);
+          dummy.quaternion.copy(scratch.qWheel);
+          dummy.scale.set(1, 1, 1);
+          dummy.position.set(
+            tx + handX * cos + sin * fwd,
+            (PED_SHOULDER_Y - CANE_HAND_DROP) * hgt + bob,
+            tz - handX * sin + cos * fwd,
+          );
+          dummy.updateMatrix();
+          pedCane.setMatrixAt(i, dummy.matrix);
+        } else {
+          dummy.scale.set(0, 0, 0);
+          dummy.updateMatrix();
+          pedCane.setMatrixAt(i, dummy.matrix);
+        }
       }
       pedBlob.instanceMatrix.needsUpdate = true;
       pedTorso.instanceMatrix.needsUpdate = true;
       pedHead.instanceMatrix.needsUpdate = true;
       pedArm.instanceMatrix.needsUpdate = true;
       pedLeg.instanceMatrix.needsUpdate = true;
+      pedCane.instanceMatrix.needsUpdate = true;
     }
 
     // --- L5 hazard ball (render-only; A8 owns the trigger).
@@ -1133,6 +1252,17 @@ export function TrafficLayer({
         castShadow
       >
         <meshStandardMaterial color="#ffffff" roughness={0.85} />
+      </instancedMesh>
+      {/* PE-14 white cane — one instance per agent, zero-scaled except on the
+          elder variant (the бял бастун recognition cue). */}
+      <instancedMesh
+        ref={pedCaneRef}
+        args={[undefined, undefined, nPed]}
+        geometry={pedGeoms.cane}
+        frustumCulled={false}
+        castShadow
+      >
+        <meshStandardMaterial color="#f4f2ec" roughness={0.35} />
       </instancedMesh>
 
       {/* Parked-car blob shadows — the GLB bodies + wheels themselves live in

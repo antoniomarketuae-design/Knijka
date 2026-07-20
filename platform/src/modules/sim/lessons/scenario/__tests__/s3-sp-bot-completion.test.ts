@@ -133,9 +133,9 @@ for (const { spec, record } of CORRECT) {
 }
 
 describe("S3-B counter-proofs — speed mistakes grade through the live pipeline", () => {
-  it("dangerous flooring: SPEEDING_DANGEROUS grades on the spot, not passed", () => {
+  it("chasing the flow to 66: SPEEDING_DANGEROUS grades on the spot, not passed", () => {
     const outcome = driveThroughSession(SC_SPEED_DANGEROUS, (d, onTick) =>
-      recordScSpeedDangerousDrive(d, "mistake-flooring", { onTick }),
+      recordScSpeedDangerousDrive(d, "mistake-chase-flow", { onTick }),
     );
     const codes = driveViolationCodes(outcome);
     expect(codes).toContain("SPEEDING_DANGEROUS");
@@ -143,11 +143,31 @@ describe("S3-B counter-proofs — speed mistakes grade through the live pipeline
     expect(outcome.result.passed).toBe(false);
   });
 
+  it("pacing the flow at 58: SPEEDING_OVER_LIMIT surfaces (the band's other side), clean-driving absent", () => {
+    const outcome = driveThroughSession(SC_SPEED_DANGEROUS, (d, onTick) =>
+      recordScSpeedDangerousDrive(d, "mistake-pace-flow", { onTick }),
+    );
+    const codes = driveViolationCodes(outcome);
+    expect(codes).toContain("SPEEDING_OVER_LIMIT");
+    expect(codes).not.toContain("SPEEDING_DANGEROUS");
+    expect(driveCommendationCodes(outcome)).not.toContain("CLEAN_DRIVING");
+  });
+
   it("creeping over: SPEEDING_OVER_LIMIT surfaces through the stack, the clean-driving positive is absent", () => {
     const outcome = driveThroughSession(SC_SPEED_CREEP, (d, onTick) =>
       recordScSpeedCreepDrive(d, "mistake-flow-along", { onTick }),
     );
     expect(driveViolationCodes(outcome)).toContain("SPEEDING_OVER_LIMIT");
+    expect(driveCommendationCodes(outcome)).not.toContain("CLEAN_DRIVING");
+  });
+
+  it("creeping in the ZONE 30 of the P5 road: SPEEDING_OVER_LIMIT against the LOCAL 30, clean-driving absent", () => {
+    const outcome = driveThroughSession(SC_SPEED_CREEP, (d, onTick) =>
+      recordScSpeedCreepDrive(d, "mistake-zone-creep", { onTick }),
+    );
+    const codes = driveViolationCodes(outcome);
+    expect(codes).toContain("SPEEDING_OVER_LIMIT");
+    expect(codes).not.toContain("SPEEDING_DANGEROUS");
     expect(driveCommendationCodes(outcome)).not.toContain("CLEAN_DRIVING");
   });
 

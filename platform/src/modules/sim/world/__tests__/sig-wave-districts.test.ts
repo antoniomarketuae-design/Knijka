@@ -129,9 +129,10 @@ describe("sig-wave-v1 through the world builder", () => {
     expect(world.stats.junctionPatches).toBeGreaterThanOrEqual(3);
   });
 
-  it("hosts three signalized junctions: lamp heads on every approach, no signs, no zebras", () => {
-    // 3 junctions × 4 incoming approaches.
-    expect(world.trafficLights.length).toBe(12);
+  it("hosts three signalized junctions: near + far-side lamp heads per approach, no signs, no zebras", () => {
+    // 3 junctions × 4 incoming approaches × (near head + far-side companion,
+    // doc 62 S1/#19 — the head a driver waiting at the line actually sees).
+    expect(world.trafficLights.length).toBe(24);
     expect(new Set(world.trafficLights.map((t) => t.nodeId))).toEqual(new Set(SIGNALS));
     expect(world.stats.signs.stop).toBe(0);
     expect(world.stats.signs.giveWay).toBe(0);

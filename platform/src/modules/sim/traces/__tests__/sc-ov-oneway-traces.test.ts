@@ -1,10 +1,13 @@
 /**
  * S3-E trace gate — „Еднопосочна улица" (sc-ov-oneway on ov-oneway-v1, doc 72
- * OV-13), doc 76 §5/§9 stages 3+5:
- *   1. SHADOW replays with ZERO violations and earns CLEAN_DRIVING (the whole
- *      street WITH the flow, heading north = the legal direction).
- *   2. MISTAKE DEMOS grade EXACTLY their template codeRefs (WRONG_WAY) — driving
- *      against the one-way flow, and NOTHING else.
+ * OV-13; founder R3 redesign doc 62 #47 — the T-JUNCTION entry choice, the
+ * one-way bar flowing EAST), doc 76 §5/§9 stages 3+5:
+ *   1. SHADOW replays with ZERO violations and earns CLEAN_DRIVING (approach,
+ *      right indicator, RIGHT turn WITH the eastbound flow, east arm to the
+ *      end).
+ *   2. MISTAKE DEMOS grade EXACTLY their template codeRefs (WRONG_WAY) — the
+ *      LEFT turn against the one-way flow, full-length and „само няколко
+ *      метра", and NOTHING else.
  *   3. COMMITTED FILES under content/traces/sc-ov-oneway/ ARE the recordings of
  *      these scripts, byte-for-byte, with identical public copies.
  *
@@ -50,12 +53,12 @@ describe("sc-ov-oneway — the shadow gate (doc 76 §5)", () => {
     expect(commendationCodes(shadow)).toContain("CLEAN_DRIVING");
   });
 
-  it("drives the whole street WITH the flow (north) with Bulgarian annotations", () => {
+  it("approaches on the stem and turns RIGHT — east, WITH the flow — with Bulgarian annotations", () => {
     const first = shadow.trace.samples[0];
+    expect(Math.abs(first.x - 4.06)).toBeLessThan(1.5); // spawned on the approach stem
     const last = shadow.trace.samples[shadow.trace.samples.length - 1];
-    expect(last.y).toBeGreaterThan(270);
-    expect(last.y).toBeGreaterThan(first.y); // travelled northbound (with the flow)
-    expect(Math.abs(last.x)).toBeLessThan(1.5); // stayed in the one-way lane
+    expect(last.x).toBeGreaterThan(115); // deep on the EAST arm (the legal entry)
+    expect(Math.abs(last.y - 200)).toBeLessThan(1.5); // on the bar's lane line
     const annotations = shadow.trace.events.filter((e) => e.kind === "annotation");
     expect(annotations.length).toBeGreaterThanOrEqual(4);
     for (const a of annotations) expect(a.textBg ?? "").toMatch(/[Ѐ-ӿ]/);
@@ -63,16 +66,21 @@ describe("sc-ov-oneway — the shadow gate (doc 76 §5)", () => {
 });
 
 describe("sc-ov-oneway — mistake demos grade their exact codes (doc 76 §9 stage 5)", () => {
-  it("„Срещу движението по еднопосочна“: exactly WRONG_WAY", () => {
+  it("„Ляв завой срещу еднопосочната“: exactly WRONG_WAY, deep on the west arm", () => {
     const drive = drives.get("mistake-wrong-way")!;
     const codes = [...new Set(violationCodes(drive))].sort();
     expect(codes).toEqual([...SC_OV_ONEWAY.mistakes[0].codeRefs].sort());
+    const last = drive.trace.samples[drive.trace.samples.length - 1];
+    expect(last.x).toBeLessThan(-60); // travelled far AGAINST the eastbound flow
   });
 
-  it("„Кратко в грешната посока“: exactly WRONG_WAY", () => {
+  it("„«Само няколко метра» в грешната посока“: exactly WRONG_WAY after ~25 m", () => {
     const drive = drives.get("mistake-wrong-way-short")!;
     const codes = [...new Set(violationCodes(drive))].sort();
     expect(codes).toEqual([...SC_OV_ONEWAY.mistakes[1].codeRefs].sort());
+    const last = drive.trace.samples[drive.trace.samples.length - 1];
+    expect(last.x).toBeLessThan(-20); // entered against the flow…
+    expect(last.x).toBeGreaterThan(-60); // …but only briefly — still the same опасна
   });
 });
 

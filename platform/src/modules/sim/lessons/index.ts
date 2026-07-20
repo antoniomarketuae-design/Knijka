@@ -100,10 +100,18 @@ export {
   advisorPromptForObjective,
   advisorPromptForPreDriveStep,
   advisorPromptForSession,
+  createGlancePingsState,
   defaultAdvisorEnabled,
+  GLANCE_PING_APPROACH_M,
+  GLANCE_PING_MIN_ARM_KMH,
+  glancePingsEligible,
+  observeGlancePingsTick,
   parseStoredAdvisorSetting,
+  resetGlancePings,
   serializeAdvisorSetting,
   type AdvisorPrompt,
+  type GlancePingPhase,
+  type GlancePingsState,
 } from "./advisor";
 
 // Debrief (template v1 — AI tutor seam documented in debrief.ts)

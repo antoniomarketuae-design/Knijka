@@ -29,7 +29,7 @@
    "intersections": 0,
    "crossings": 0,
    "buildings": 1,
-   "spawnPoints": 2
+   "spawnPoints": 3
   },
   "scenario": {
    "archetype": "straight-street",
@@ -118,6 +118,14 @@
    "heading": 0,
    "edgeId": "ov-kr-road",
    "name": "Начало — дясна лента"
+  },
+  {
+   "id": "ov-kr-spawn-left",
+   "x": 4.06,
+   "y": 15,
+   "heading": 0,
+   "edgeId": "ov-kr-road",
+   "name": "Начало — лява лента (престрой се вдясно)"
   },
   {
    "id": "ov-kr-spawn-finish",

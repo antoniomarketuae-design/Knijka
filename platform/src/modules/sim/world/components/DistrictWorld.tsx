@@ -6,7 +6,10 @@
  *
  * The component is presentation-only: signal phase logic, zones and speed
  * limits live in sim/runtime (WorldRuntime). Wire the lamp state with
- * `getSignalPhase={(nodeId) => worldRuntime.signalPhase(nodeId)}`.
+ * `getSignalPhase={(nodeId, bearing) => worldRuntime.signalLampState(nodeId, bearing)}`
+ * — the mode- and approach-aware getter (doc 62 S1): dark clusters render
+ * unlit, flashing-amber blinks on the runtime clock, and every head lights
+ * its own arm's graded axis-group.
  *
  * Lighting is owned by sim/environment — this scene only needs an ambient +
  * directional light to look right; `night` toggles window/streetlight glow
@@ -17,7 +20,7 @@
  */
 
 import { useMemo } from "react";
-import type { SignalPhase } from "../../contracts";
+import type { SignalLampState } from "../../contracts";
 import { buildWorldGeometry } from "../builders/buildWorldGeometry";
 import type { BuildWorldOptions, District, WorldGeometry, WorldQuality } from "../types";
 import { QUALITY_PRESETS } from "./quality";
@@ -32,8 +35,9 @@ export interface DistrictWorldProps {
   quality?: WorldQuality;
   /** Night mode: lit windows + streetlight glow. Default false. */
   night?: boolean;
-  /** Lamp state per signal node id — wire to WorldRuntime.signalPhase. Default: all green. */
-  getSignalPhase?: (signalNodeId: string) => SignalPhase;
+  /** Lamp state per signal head — wire to WorldRuntime.signalLampState
+   *  (mode- and approach-aware). Default: all green. */
+  getSignalPhase?: (signalNodeId: string, approachBearingDeg: number) => SignalLampState;
   /** Guarded-crossing barrier-arm state (district meters) — wire to
    *  WorldRuntime.railBarrierDownAt so the arm animates in lockstep with the
    *  graded timetable. Default: arms hold the authored down pose. */

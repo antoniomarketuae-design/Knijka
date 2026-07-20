@@ -6,22 +6,33 @@
  * runtime; the trace-gate batteries assert every pinned value against the
  * generated maps):
  *
- *  - sc-speed-creep     „Пълзящо превишаване"  (SP-01, sp-creep-v1)
- *  - sc-speed-dangerous „Над +10 км/ч"         (SP-02, sp-danger-v1)
- *  - sc-speed-rain      „Скорост в дъжд"        (SP-04, sp-rain-v1, ×N)
+ *  - sc-speed-creep     „Пълзящо превишаване"  (SP-01 + SP-03, sp-creep2-v1 —
+ *    the founder R3 P5 redesign, doc 62 #30: a LONG 50→30 road, both caps
+ *    signed by the world and both failable)
+ *  - sc-speed-dangerous „Над +10 км/ч"         (SP-02 + SP-13, ov-keepright-v1
+ *    REUSED — the founder R3 redesign, doc 62 #31: staged „поток" traffic at
+ *    an illegal pace makes resisting the flow the actual drill)
+ *  - sc-speed-rain      „Скорост в дъжд"        (SP-04, sp-rain-v1, ×N — the
+ *    doc 62 #32 redesign: BOTH gates enforce the wet envelope, so the
+ *    dry-legal pace fails the drill, which is the drill)
  *
  * Each mistake demo cites SHIPPED rules-catalog SPEED codes and grades EXACTLY
  * them, with NO extra codes, when replayed through the production stack (the
  * §5/§9 gates, traces/__tests__/sp-speed-*-traces.test.ts):
- *   - SP-01 → SPEEDING_OVER_LIMIT (второстепенна: 51–60 in a 50 zone);
- *   - SP-02 → SPEEDING_DANGEROUS  (опасна: > +10 км/ч — the exam-termination band);
+ *   - SP-01 → SPEEDING_OVER_LIMIT (второстепенна: graced-limit..+10 — on BOTH
+ *     the 50 approach and the 30 zone of the P5 road);
+ *   - SP-02 → SPEEDING_OVER_LIMIT vs SPEEDING_DANGEROUS (the BAND contrast —
+ *     pacing the flow at 58 is второстепенна, chasing it at 66 ends the exam);
  *   - SP-04 → SPEED_TOO_FAST_FOR_CONDITIONS (второстепенна: legal but imprudent
  *     for rain/night — the rain factor 0.85 × 50 = 42.5 km/h envelope).
  *
- * The maps carry NO crossing, junction, signal or sign, and every drive runs
- * ambient traffic ZERO (seed 7): the ONLY fault the rule engine can grade is
- * the driver's own speed. The shadow drives disciplined and clean and earns the
- * family positive CLEAN_DRIVING (a sustained violation-free streak).
+ * Ambient traffic is ZERO in every drive (seed 7). sc-speed-creep and
+ * sc-speed-rain carry no actor at all — the only gradable fault is the
+ * driver's own speed. sc-speed-dangerous stages TWO learn-only flow actors
+ * (a runaway pace car + an overtaking passer, both structurally unable to
+ * emit events — the FTG_LEAD / rearTailgater precedents), so its only
+ * gradable fault is STILL the driver's own speed. The shadow drives
+ * disciplined and clean and earns the family positive CLEAN_DRIVING.
  *
  * Family: "speed" — the catalog chip added for the SP family (doc 72 §8);
  * the ids (sc-speed-*) match the sc-<family>-<slug> naming standard.
@@ -38,90 +49,116 @@
  * (ambient 0) forbids — left for later waves.
  */
 
+import type { BrakingLeadCarSpec, RearTailgaterSpec } from "../../contracts";
 import type { ScenarioSpec } from "./types";
 
 // ---------------------------------------------------------------------------
-// Shared geometry constant (pinned from the generated districts by value —
-// the L7 pattern; the sp-districts battery asserts the copy matches the maps)
+// Shared geometry constants (pinned from the generated districts by value —
+// the L7 pattern; the sp-districts / sp-transition / ov-keepright batteries
+// assert the copies match the maps)
 // ---------------------------------------------------------------------------
 
 /** Right-lane center of a 1-lane-per-direction street (sp-*-v1). */
 const LANE_X = 4.06;
+/** ov-keepright-v1 (2+2 boulevard): right (cruise) / left (pass) centers. */
+const KRD_RIGHT = 12.19;
+const KRD_LEFT = 4.06;
 
 // ---------------------------------------------------------------------------
-// 1. sc-speed-creep — „Пълзящо превишаване" (SP-01) on sp-creep-v1
-//    (360 m straight street, limit 50)
+// 1. sc-speed-creep — „Пълзящо превишаване" (SP-01 + SP-03) on sp-creep2-v1:
+//    the founder R3 P5 road (doc 62 #30 — „a LONG road: sign 50 → hold under
+//    50 → sign 30 → drop to 30. Signed, staged, failable — not an empty
+//    cap."). 400 m posted 50, then a 280 m zone 30 (per-edge maxspeed — the
+//    runtime grades the LOCAL limit), В26-50 plate at the entry (props.ts
+//    district-entry pass) and painted „30" road numerals through the zone
+//    (markings.ts speed glyphs on the tagged school edge). BOTH caps are
+//    failable: creeping over 50 on the approach and creeping over 30 in the
+//    zone each grade SPEEDING_OVER_LIMIT against their own edge.
 // ---------------------------------------------------------------------------
 
-/** SP-01 — движение над разрешената скорост в рамките на +10 км/ч (ЗДвП
- *  чл. 21: ограничението е таван, не цел). */
+/** Transition Y of sp-creep2-v1 (= approachM); where the zone 30 begins. */
+const CRP_TRANS_Y = 400;
+/** Total length of sp-creep2-v1 (approachM + zoneM). */
+const CRP_TOTAL_Y = 680;
+
+/** SP-01 + SP-03 — движение над разрешената скорост в рамките на +10 км/ч
+ *  (ЗДвП чл. 21: ограничението е таван, не цел) — по ДЪЛЪГ маршрут с два
+ *  тавана (50, после зона 30), така че пълзенето на стрелката е грешка и в
+ *  двата участъка. */
 export const SC_SPEED_CREEP: ScenarioSpec = {
   id: "sc-speed-creep",
   family: "speed",
-  tagsBg: ["скорост", "ограничение на скоростта", "градско каране", "самоконтрол"],
+  tagsBg: ["скорост", "ограничение на скоростта", "зона 30", "градско каране", "самоконтрол"],
   titleBg: "Пълзящо превишаване на скоростта",
   objectiveBg:
-    "Измини правата улица, като държиш скоростта под разрешените 50 км/ч през цялото време — ограничението е таван, не цел, и „с потока“ не е оправдание.",
-  archetypeIds: ["SP-01"],
+    "Измини дългата улица с два тавана: дръж под 50 км/ч по целия подход, а на знака за зона 30 свали НАВРЕМЕ до под 30 и задръж до края. Скоростта пълзи неусетно — стрелката се проверява, не се усеща.",
+  archetypeIds: ["SP-01", "SP-03"],
   conceptIds: ["c-speed-limits", "c-speed-adaptation", "c-general-care-duty"],
   map: {
     archetype: "straight-street",
-    // The generator recipe — mirrored in sp-creep-v1.json meta.scenario.params
-    // (tools/maps/gen_sp_speed.mjs).
-    params: { lengthM: 360, maxspeedKmh: 50 },
-    districtId: "sp-creep-v1",
+    // The generator recipe — mirrored in sp-creep2-v1.json meta.scenario.params
+    // (tools/maps/gen_sp_transition.mjs — the P5 long two-segment street).
+    params: { approachM: 400, zoneM: 280, approachKmh: 50, zoneKmh: 30 },
+    districtId: "sp-creep2-v1",
   },
   start: {
-    spawnPointId: "sp-spawn-approach",
+    spawnPointId: "sp-tr-spawn-approach",
     vehicleStart: "ready",
   },
   instructionsBg: [
-    { n: 1, textBg: "Потегли по правата улица — ограничението е 50 км/ч." },
-    { n: 2, textBg: "Установи спокойна скорост около 46–48 км/ч и я задръж — остави си резерв под тавана." },
-    { n: 3, textBg: "Поглеждай скоростомера от време на време; в равномерно движение скоростта пълзи нагоре неусетно." },
-    { n: 4, textBg: "Не се води по „потока“ — дори другите да карат по-бързо, таванът за теб остава 50 км/ч." },
-    { n: 5, textBg: "Продължи под ограничението до края на отсечката." },
+    { n: 1, textBg: "Потегли по дългата улица — знакът на входа казва 50 км/ч. Установи спокойни 46–48 и ги ЗАДРЪЖ." },
+    { n: 2, textBg: "Поглеждай скоростомера на всеки няколко секунди: при дълго равномерно каране скоростта пълзи нагоре, без да усетиш." },
+    { n: 3, textBg: "Напред започва зона 30 — цифрите „30“ са изписани на самото платно. Вдигни газта отрано и влез в зоната вече под 30." },
+    { n: 4, textBg: "В зоната дръж 26–28 км/ч — и тук стрелката пълзи: същият навик, по-нисък таван." },
+    { n: 5, textBg: "Задръж под 30 до края на зоната — двата тавана са един и същ урок: таванът е граница, не цел." },
   ],
   success: [
     {
-      id: "sc-crp-under-limit",
-      titleBg: "Мини контролната зона под ограничението",
-      // reachZone with a speed cap just above the taught cruise (46–48): a
-      // disciplined drive satisfies it, a „с потока" speeder at 57 does not.
-      params: { kind: "reachZone", x: LANE_X, y: 180, radiusM: 10, maxSpeedKmh: 52 },
+      id: "sc-crp-approach",
+      titleBg: "Мини подхода под 50 км/ч",
+      // Cap just above the taught 46–48 cruise: a disciplined drive satisfies
+      // it, a „с потока" speeder at 57 does not.
+      params: { kind: "reachZone", x: LANE_X, y: 240, radiusM: 10, maxSpeedKmh: 52 },
+    },
+    {
+      id: "sc-crp-zone",
+      titleBg: "Мини зоната 30 под 30 км/ч",
+      // Deep in the zone, cap = the graced 33: an adapted ~27 drive satisfies
+      // it; a zone-creeper at 37 does not.
+      params: { kind: "reachZone", x: LANE_X, y: 520, radiusM: 10, maxSpeedKmh: 33 },
     },
     {
       id: "sc-crp-finish",
-      titleBg: "Стигни края на отсечката",
-      params: { kind: "reachZone", x: LANE_X, y: 330, radiusM: 12 },
+      titleBg: "Стигни края на зоната, още под 30",
+      params: { kind: "reachZone", x: LANE_X, y: 650, radiusM: 12, maxSpeedKmh: 33 },
     },
   ],
-  rubric: { parTimeSec: 55 },
+  rubric: { parTimeSec: 90 },
   shadow: { path: "content/traces/sc-speed-creep/shadow-correct.trace.json" },
   mistakes: [
     {
       traceRef: { path: "content/traces/sc-speed-creep/mistake-flow-along.trace.json" },
-      titleBg: "Носене с потока",
+      titleBg: "Носене с потока по подхода",
       whatWentWrongBg:
-        "Колата задържа около 57 км/ч, защото „всички карат така“ — но 51–60 км/ч в зона 50 е второстепенна грешка. Ограничението е таван за всеки поотделно; потокът не го вдига.",
+        "По дългия подход колата задържа около 57 км/ч, защото „всички карат така“ — но 51–60 км/ч в зона 50 е второстепенна грешка. В зоната водачът намали правилно; грешката вече беше отбелязана: ограничението е таван за всеки поотделно, потокът не го вдига.",
       codeRefs: ["SPEEDING_OVER_LIMIT"],
     },
     {
-      traceRef: { path: "content/traces/sc-speed-creep/mistake-creep-up.trace.json" },
-      titleBg: "Скоростта пълзи нагоре",
+      traceRef: { path: "content/traces/sc-speed-creep/mistake-zone-creep.trace.json" },
+      titleBg: "Пълзене в зоната 30",
       whatWentWrongBg:
-        "Без поглед към скоростомера скоростта се покачи от законните 48 до 59 км/ч — усещането е същото, но стрелката вече е над тавана. Превишаването до +10 км/ч е второстепенна грешка, която се трупа.",
+        "Подходът беше дисциплиниран и колата влезе в зоната правилно, с 27 км/ч — но без поглед към скоростомера стрелката изпълзя до 37. Усещането при 37 в зона 30 е „бавно“; присъдата е същата второстепенна грешка като 57 в зона 50. Навикът да проверяваш стрелката важи двойно там, където таванът е нисък.",
       codeRefs: ["SPEEDING_OVER_LIMIT"],
     },
   ],
   teach: {
     whenBg:
-      "При всяко продължително движение с постоянна скорост в града — по булеварди и прави отсечки, където потокът тегли нагоре и стрелката пълзи, без да усетиш.",
+      "При всяко продължително равномерно каране — по булеварди, прави отсечки и особено след преход към по-нисък таван (зона 30, жилищна зона): точно там пълзенето на стрелката е най-неусетно и най-скъпо.",
     whyBg:
-      "Рискът от тежко нараняване при удар расте стръмно със скоростта — няколко километра в час над тавана свиват дистанцията за спиране и полето на видимост точно там, където се появяват пешеходци. Ограничението е граница, оставяш си резерв под нея, не я доближаваш.",
+      "Рискът от тежко нараняване при удар расте стръмно със скоростта — няколко километра в час над тавана свиват дистанцията за спиране и полето на видимост точно там, където се появяват пешеходци. Усещането за скорост се приспособява за минути; затова стрелката се ПРОВЕРЯВА периодично, а таванът е граница, под която си оставяш резерв.",
     lawRef: "ЗДвП чл. 21",
     examinerBg:
-      "Изпитващият следи скоростта спрямо знаците през целия маршрут: движение над разрешеното е грешка дори без друга злополука, а над +10 км/ч е опасна грешка и прекратява изпита. Дръж стрелката осезаемо под тавана.",
+      "Изпитващият следи скоростта спрямо знаците през ЦЕЛИЯ маршрут — и на булеварда, и в зоната: движение над разрешеното е грешка дори без злополука, а над +10 км/ч е опасна грешка и прекратява изпита. Очаква се и навременно сваляне при влизане в зона с по-нисък таван.",
   },
   levels: [
     { level: 1 },
@@ -134,76 +171,160 @@ export const SC_SPEED_CREEP: ScenarioSpec = {
 };
 
 // ---------------------------------------------------------------------------
-// 2. sc-speed-dangerous — „Над +10 км/ч" (SP-02) on sp-danger-v1
-//    (400 m straight street, limit 50)
+// 2. sc-speed-dangerous — „Над +10 км/ч" (SP-02 + SP-13) on ov-keepright-v1
+//    (REUSED 360 m 2+2 boulevard, limit 50 — the map-reuse house pattern:
+//    sc-sp-harsh-brake↔sp-creep-v1, sc-follow-tailgater↔ln-v1).
+//
+// FOUNDER R3 REDESIGN (doc 62 #31: „IDENTICAL to #30; if a user sees this he
+// will start to feel the platform is a scam"). The drill's own concept — the
+// +10 band — is a THRESHOLD, and a threshold is taught by CONTRAST plus the
+// pressure that makes real drivers cross it: the flow. Doc 72's SP-13 („скорост
+// на потока") was parked because AMBIENT traffic must stay zero; staged
+// DETERMINISTIC actors are the honest unlock:
+//   - the RUNAWAY PACE CAR ahead (brakingLeadCar with followGapM authored far
+//     above the real gap — the FTG_LEAD constant-cruise trick) pulls away at
+//     ~61 km/h: the carrot;
+//   - the PASSER behind (rearTailgater — learn-only, emits ZERO events by its
+//     runner contract) glues briefly, then overtakes on the left at the same
+//     illegal pace: the push.
+// Neither actor can grade anything; the ONLY gradable fault stays the
+// player's own speed. The two mistakes now demonstrate the BAND ITSELF:
+// pacing the flow at ~58 grades второстепенна SPEEDING_OVER_LIMIT; chasing it
+// at ~66 grades опасна SPEEDING_DANGEROUS — same road, same flow, 8 km/h
+// apart, an exam continued vs an exam terminated. That contrast IS the +10
+// lesson, and it is distinct from sc-speed-creep (zones, no actors) by both
+// staging and graded band.
 // ---------------------------------------------------------------------------
 
-/** SP-02 — превишаване с повече от 10 км/ч (ЗДвП чл. 21; doc 32: опасна
- *  грешка — изпитът се прекратява). */
+/**
+ * The RUNAWAY PACE CAR — „потокът" ahead. followGapM 400 on a 360 m road can
+ * never be satisfied, so the matchPlayer controller pins the actor at its
+ * maxMatchSpeedMps constantly (the FTG_LEAD documented precedent): a car in
+ * the player's own lane pulling away at ~61 km/h. Slam tier authored out of
+ * reach (slamAt past the road end + minSlamSpeedKmh 250) — deterministic
+ * moving traffic, never a braking drill. It starts ~55 m ahead and only
+ * GAINS distance on a lawful player, so FOLLOWING_TOO_CLOSE structurally
+ * cannot arm even against the 66 km/h chase demo (gap stays ≥ ~50 m).
+ */
+const SPD_FLOW_LEAD: BrakingLeadCarSpec = {
+  id: "sc-dng-flow-lead",
+  kind: "brakingLeadCar",
+  actor: {
+    pathNodes: ["ov-kr-n-start", "ov-kr-n-end"],
+    hold: { nodeIndex: 0, offsetM: 70 }, // dormant ~55 m ahead of the spawn
+    cruiseSpeedMps: 17,
+    extraRightOffsetM: 0, // the player's own (right) lane, x ≈ 12.19
+    colorIndex: 2,
+  },
+  followGapM: 400, // ABOVE any possible gap → constant maxMatchSpeedMps cruise
+  maxMatchSpeedMps: 17, // ~61 km/h — the flow's illegal pace
+  slamAt: { x: KRD_RIGHT, y: 900 }, // far past the 360 m road — never reached
+  slamRadiusM: 2,
+  slamDecelMps2: 6,
+  minSlamSpeedKmh: 250, // the slam tier is authored out of reach…
+  proximityFallbackM: 0.3, // …and the proximity fallback cannot occur
+  triggersHazard: false,
+  resumeAfterSec: 3,
+};
+
+/**
+ * The PASSER — „потокът" behind. The shipped rearTailgater actor (learn-only:
+ * its runner emits ZERO SimTick events, the FO-07 contract), released once the
+ * player pulls ~15 m ahead: it closes, sits ~10 m of centers behind for ~5 s,
+ * then laneShift-passes on the LEFT at ~61 km/h and drives off — the driver
+ * who „не издържа" and breaks the limit around you. Against the 66 km/h chase
+ * demo its 16 m/s match cap simply leaves it behind — still zero events.
+ */
+const SPD_FLOW_PASSER: RearTailgaterSpec = {
+  id: "sc-dng-flow-passer",
+  kind: "rearTailgater",
+  actor: {
+    pathNodes: ["ov-kr-n-start", "ov-kr-n-end"],
+    hold: { nodeIndex: 0, offsetM: 2 }, // dormant ~13 m behind the spawn
+    cruiseSpeedMps: 15,
+    extraRightOffsetM: 0, // the player's own (right) lane
+    colorIndex: 4,
+  },
+  releaseGapM: 15,
+  followBehindM: 10, // ~10 m of centers ≈ 6 m of bumpers — pressure, not лепка
+  maxMatchSpeedMps: 16, // ~58 km/h — keeps the pressure on a flow-pacing player
+  pressureSec: 5,
+  passShiftM: -8.125, // one drawn lane LEFT — the legal-side pass
+  passSpeedMps: 17, // ~61 km/h — the flow's pace again
+  passAheadM: 30,
+  easeKmh: 8,
+};
+
+/** SP-02 + SP-13 — превишаване с повече от 10 км/ч под натиска на потока
+ *  (ЗДвП чл. 21; doc 32: опасна грешка — изпитът се прекратява; чл. 20 ал. 1:
+ *  скоростта е твое решение, не на колоната). */
 export const SC_SPEED_DANGEROUS: ScenarioSpec = {
   id: "sc-speed-dangerous",
   family: "speed",
-  tagsBg: ["скорост", "ограничение на скоростта", "опасна грешка", "изпит"],
+  tagsBg: ["скорост", "ограничение на скоростта", "скорост на потока", "опасна грешка", "изпит"],
   titleBg: "Превишаване над +10 км/ч",
   objectiveBg:
-    "Измини правата улица, без нито веднъж да превишиш с повече от 10 км/ч разрешените 50 — над +10 км/ч е опасна грешка, която на изпита означава директно отпадане.",
-  archetypeIds: ["SP-02"],
+    "Потокът по булеварда лети с над 60 км/ч — една кола ти се отдалечава отпред, друга те притиска и изпреварва. Задачата е да НЕ тръгнеш с тях: дръж 46–48 км/ч в дясната лента. 51–60 е второстепенна грешка; над 60 (+10) е опасна и на изпита значи директно отпадане.",
+  archetypeIds: ["SP-02", "SP-13"],
   conceptIds: ["c-speed-limits", "c-speed-adaptation", "c-general-care-duty"],
   map: {
     archetype: "straight-street",
-    // The generator recipe — mirrored in sp-danger-v1.json meta.scenario.params.
-    params: { lengthM: 400, maxspeedKmh: 50 },
-    districtId: "sp-danger-v1",
+    // The generator recipe — mirrored in ov-keepright-v1.json
+    // meta.scenario.params (tools/maps/gen_ov_keepright.mjs; map REUSED).
+    params: { lengthM: 360, maxspeedKmh: 50 },
+    districtId: "ov-keepright-v1",
   },
   start: {
-    spawnPointId: "sp-spawn-approach",
+    spawnPointId: "ov-kr-spawn-start",
     vehicleStart: "ready",
   },
   instructionsBg: [
-    { n: 1, textBg: "Потегли по правата улица — ограничението е 50 км/ч." },
-    { n: 2, textBg: "Ускорявай плавно и спри покачването около 46–48 км/ч; не давай пълна газ „защото е чисто“." },
-    { n: 3, textBg: "Помни границата: 60 км/ч (+10) е опасната граница на изпита, не буфер за прекрачване." },
-    { n: 4, textBg: "Дръж крака готов да вдигнеш газта — скоростта се сваля преди да е станала проблем." },
-    { n: 5, textBg: "Продължи под ограничението до края на отсечката." },
+    { n: 1, textBg: "Потегли по булеварда в дясната лента — ограничението е 50 км/ч, а потокът около теб няма да го спазва." },
+    { n: 2, textBg: "Колата пред теб се отдалечава с над 60 — остави я. Скоростта се чете от знака и скоростомера, не от гърба на предния." },
+    { n: 3, textBg: "В огледалото се появява кола, която те притиска и после те изпреварва отляво. Нейната грешка е нейна — не я прави своя." },
+    { n: 4, textBg: "Помни границата: 55–60 е второстепенна грешка, а НАД 60 км/ч (+10) е опасна — на изпита това е директно отпадане." },
+    { n: 5, textBg: "Задръж 46–48 км/ч до края на отсечката — да те изпреварват е нормално; да отпаднеш от изпита не е." },
   ],
   success: [
     {
-      id: "sc-dng-under-limit",
-      titleBg: "Мини контролната зона под ограничението",
-      params: { kind: "reachZone", x: LANE_X, y: 200, radiusM: 10, maxSpeedKmh: 52 },
+      id: "sc-dng-hold",
+      titleBg: "Задръж под 50, докато потокът те подминава",
+      // Radius 6 < the 8.125 m lane pitch: satisfiable ONLY from the RIGHT
+      // lane, at a lawful pace — resisting the flow IS the drill.
+      params: { kind: "reachZone", x: KRD_RIGHT, y: 200, radiusM: 6, maxSpeedKmh: 52 },
     },
     {
       id: "sc-dng-finish",
-      titleBg: "Стигни края на отсечката",
-      params: { kind: "reachZone", x: LANE_X, y: 370, radiusM: 12 },
+      titleBg: "Стигни края на отсечката, още под тавана",
+      params: { kind: "reachZone", x: KRD_RIGHT, y: 330, radiusM: 6, maxSpeedKmh: 52 },
     },
   ],
-  rubric: { parTimeSec: 60 },
+  rubric: { parTimeSec: 55 },
   shadow: { path: "content/traces/sc-speed-dangerous/shadow-correct.trace.json" },
   mistakes: [
     {
-      traceRef: { path: "content/traces/sc-speed-dangerous/mistake-flooring.trace.json" },
-      titleBg: "Пълна газ след потеглянето",
+      traceRef: { path: "content/traces/sc-speed-dangerous/mistake-pace-flow.trace.json" },
+      titleBg: "Със скоростта на потока — 58",
       whatWentWrongBg:
-        "Колата даде пълна газ и стрелката прескочи 60, стигайки около 66 км/ч. Над +10 км/ч над ограничението е опасна грешка — на практическия изпит това е незабавно отпадане.",
-      codeRefs: ["SPEEDING_DANGEROUS"],
+        "Водачът се лепна за потока и задържа около 58 км/ч, „за да не пречи“. 51–60 км/ч в зона 50 е второстепенна грешка — коригируема, но записана. Потокът не вдига тавана: той просто кара сбъркано пред свидетел.",
+      codeRefs: ["SPEEDING_OVER_LIMIT"],
     },
     {
-      traceRef: { path: "content/traces/sc-speed-dangerous/mistake-accelerate.trace.json" },
-      titleBg: "Ускоряване без поглед към скоростомера",
+      traceRef: { path: "content/traces/sc-speed-dangerous/mistake-chase-flow.trace.json" },
+      titleBg: "Гонене на потока — 66",
       whatWentWrongBg:
-        "Силното ускоряване изнесе скоростта до около 63 км/ч в зона 50 — отново над +10 км/ч. Опасната грешка не изисква злополука: самото прекрачване на границата прекратява изпита.",
+        "Отдалечаващата се кола „дръпна“ и водачът я подгони до около 66 км/ч — над +10 км/ч над ограничението. Само 8 км/ч делят тази присъда от предишната: 58 беше второстепенна грешка, 66 е опасна и на практическия изпит значи незабавно отпадане. Границата +10 не е буфер, а ръбът на изпита.",
       codeRefs: ["SPEEDING_DANGEROUS"],
     },
   ],
   teach: {
     whenBg:
-      "При ускоряване по свободна отсечка, надолнище или след кръстовище — точно там, където кракът натежава и стрелката минава +10 км/ч, без да усетиш.",
+      "Винаги, когато потокът кара над ограничението — по булеварди, при „дърпащ“ преден автомобил и при натиск отзад. Точно там се решава дали скоростомерът ти се управлява от теб или от колоната.",
     whyBg:
-      "Наредба № 38 отделя превишаването с повече от 10 км/ч като опасна грешка не случайно: при тази скорост спирачният път и тежестта на евентуалния удар нарастват рязко. Затова +10 км/ч е граница, а не буфер — вдигаш газта веднага щом видиш знака.",
+      "Наредба № 38 дели превишаването на две присъди с граница +10 км/ч: до нея грешката е второстепенна, над нея — опасна, с прекратен изпит. Границата е рязка, а натискът на потока е точно силата, която неусетно те прекарва през нея: няколко секунди „в крак с другите“ струват колкото цял изпит — а на улицата спирачен път, който вече не стига.",
     lawRef: "ЗДвП чл. 21",
     examinerBg:
-      "Изпитващият следи скоростомера спрямо знаците през целия маршрут. Едно превишаване с повече от 10 км/ч е опасна грешка и прекратява изпита на място — дръж скоростта осезаемо под тавана и никога не се доближавай до +10 км/ч.",
+      "Изпитващият вижда потока около теб и точно затова гледа ТВОЯ скоростомер: движение „със потока“ над ограничението е грешка, а едно-единствено превишаване с повече от 10 км/ч прекратява изпита на място. Спокойното изоставане от потока се брои за зрялост, не за колебание.",
   },
   levels: [
     { level: 1 },
@@ -211,6 +332,7 @@ export const SC_SPEED_DANGEROUS: ScenarioSpec = {
     { level: 3 },
     { level: 4, vehicleStart: "cold" },
   ],
+  staged: [SPD_FLOW_LEAD, SPD_FLOW_PASSER],
   conditions: { weather: "dry" },
   localeBg: "bg-BG",
 };
@@ -228,7 +350,7 @@ export const SC_SPEED_RAIN: ScenarioSpec = {
   tagsBg: ["скорост", "дъжд", "нощно каране", "съобразена скорост"],
   titleBg: "Скорост в дъжд през нощта",
   objectiveBg:
-    "Измини правата улица в дъжд и тъмнина с чувствително намалена скорост — под ограничението не е достатъчно; съобразената скорост е тази, при която спираш в рамките на видимото платно.",
+    "Знакът остава 50, но тази вечер той ЛЪЖЕ: в дъжд и тъмнина съобразената скорост е около 38 км/ч, и карането „законно по знак“ с 48–50 тук се брои за грешка. Урокът е точно този — под ограничението НЕ значи безопасно; спираш в рамките на видимото платно.",
   archetypeIds: ["SP-04"],
   conceptIds: ["c-speed-limits", "c-speed-adaptation", "c-rain-aquaplaning", "c-night-visibility"],
   map: {
@@ -242,24 +364,28 @@ export const SC_SPEED_RAIN: ScenarioSpec = {
     vehicleStart: "ready",
   },
   instructionsBg: [
-    { n: 1, textBg: "Потегли по правата улица в дъжд и тъмнина — ограничението е 50 км/ч, но условията искат по-малко." },
-    { n: 2, textBg: "Свали скоростта с около 10–15% под тавана — тук това значи около 38 км/ч." },
+    { n: 1, textBg: "Потегли по правата улица в дъжд и тъмнина. Знакът казва 50 — но знакът е писан за сух ден." },
+    { n: 2, textBg: "Тук е разликата от урока „Пълзящо превишаване“: там таваните бяха на знаците; тук таванът го смъква НЕБЕТО. Свали до около 38 км/ч." },
     { n: 3, textBg: "На мокър път спирачният път е около 1,4 пъти по-дълъг, а фаровете осветяват само няколко метра напред." },
-    { n: 4, textBg: "Карай така, че да можеш да спреш в рамките на осветеното платно пред теб." },
-    { n: 5, textBg: "Задръж намалената за условията скорост до края на отсечката." },
+    { n: 4, textBg: "Карай така, че да можеш да спреш в рамките на осветеното платно — с 48 „под знака“ това вече е невъзможно и се брои за грешка." },
+    { n: 5, textBg: "Задръж намалената за условията скорост ДО КРАЯ — дъждът не спира на контролната зона." },
   ],
   success: [
     {
       id: "sc-rn-adapted",
       titleBg: "Мини контролната зона със съобразена за дъжда скорост",
       // Cap 42 km/h sits just under the rain envelope (0.85 × 50 = 42.5): the
-      // adapted ~38 km/h drive satisfies it; a dry-speed 50 km/h does not.
+      // adapted ~38 km/h drive satisfies it; a dry-speed 50 km/h does not —
+      // the „legal by the sign" pace FAILS this gate, which is the lesson.
       params: { kind: "reachZone", x: LANE_X, y: 180, radiusM: 10, maxSpeedKmh: 42 },
     },
     {
       id: "sc-rn-finish",
-      titleBg: "Стигни края на отсечката",
-      params: { kind: "reachZone", x: LANE_X, y: 330, radiusM: 12 },
+      titleBg: "Стигни края на отсечката, още под мокрия таван",
+      // The wet cap holds to the END (doc 62 #32): sprinting to 50 after the
+      // first gate is the same fault — the envelope is the road's, not a
+      // checkpoint's.
+      params: { kind: "reachZone", x: LANE_X, y: 330, radiusM: 12, maxSpeedKmh: 42 },
     },
   ],
   rubric: { parTimeSec: 70 },
@@ -267,9 +393,9 @@ export const SC_SPEED_RAIN: ScenarioSpec = {
   mistakes: [
     {
       traceRef: { path: "content/traces/sc-speed-rain/mistake-dry-speed.trace.json" },
-      titleBg: "Суха скорост в дъжда",
+      titleBg: "„Карам под знака“ — 50 в дъжда",
       whatWentWrongBg:
-        "Колата държа 50 км/ч, все едно е сух ден — законно по знак, но несъобразено с дъжда и тъмнината. При намалена видимост и хлъзгав път съобразената скорост е чувствително по-ниска (чл. 20); това е второстепенна грешка.",
+        "Колата държа 50 км/ч, все едно е сух ден — по знака НУЛА нарушение, и точно това е капанът на урока: в дъжд и тъмнина съобразената скорост е чувствително по-ниска (чл. 20) и „законните“ 50 се броят за несъобразена скорост. Знакът дава тавана за идеални условия; условията тази вечер не са идеални.",
       codeRefs: ["SPEED_TOO_FAST_FOR_CONDITIONS"],
     },
     {
@@ -540,11 +666,23 @@ export const SC_SP_HARSH_BRAKE: ScenarioSpec = {
     spawnPointId: "sp-spawn-approach",
     vehicleStart: "ready",
   },
+  // Founder R3 #35 (doc 62 — „braking with no visible reason"): the CALL here
+  // is honest framing, NOT a staged obstacle. The drill's whole point is the
+  // HARSH_BRAKING_NO_CAUSE detector — „рязко спиране БЕЗ причина": the street
+  // must stay positively empty (the detector's cause ledger and both mistake
+  // demos narrate exactly that emptiness), so a staged hazard would contradict
+  // the graded code and the demos. Instead the copy now names the REASON the
+  // planned stop exists (your own errand — спирка/адрес) and points at the
+  // on-screen zone marker, so the stop is motivated without inventing danger.
   instructionsBg: [
-    { n: 1, textBg: "Потегли по правата улица и установи спокойна скорост около 45 км/ч." },
-    { n: 2, textBg: "Напред следва планирано спиране в контролната зона — реши да спреш ОТРАНО, не в последния момент." },
-    { n: 3, textBg: "Вдигни газта първо и остави колата да губи скорост, после спирай постепенно и равномерно до пълен покой." },
-    { n: 4, textBg: "Силната спирачка е само за истинска опасност: без причина пред колата рязкото спиране изненадва тези зад теб." },
+    { n: 1, textBg: "Потегли по правата улица и установи спокойна скорост около 45 км/ч. Улицата е празна — никаква опасност: спирането тук е ТВОЕ решение, не реакция." },
+    {
+      n: 2,
+      textBg:
+        "Напред светещият маркер отбелязва контролната зона — представи си, че това е твоята спирка или адрес. Реши да спреш ОТРАНО, не в последния момент.",
+    },
+    { n: 3, textBg: "Вдигни газта първо и остави колата да губи скорост, после спирай постепенно и равномерно до пълен покой в зоната." },
+    { n: 4, textBg: "Силната спирачка е само за истинска опасност: на празна улица рязкото забиване изненадва движещите се зад теб — точно това се брои за грешка." },
     { n: 5, textBg: "Потегли отново плавно и продължи до края на отсечката." },
   ],
   success: [

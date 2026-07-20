@@ -295,6 +295,10 @@ export function createStagedPedestrian(
       // VP-11 standing pose — only present when the spec authors one, so
       // pose-less staged pedestrians publish the exact pre-pose state shape.
       ...(spec.pose !== undefined ? { pose: spec.pose } : {}),
+      // R3 #25–28 body variant (child / elder+cane) — the same discipline:
+      // only present when authored; variant-less actors publish the exact
+      // pre-variant state shape. Visual only (TrafficLayer's rig mapping).
+      ...(spec.variant !== undefined ? { variant: spec.variant } : {}),
     },
     view: {
       id: spec.id,

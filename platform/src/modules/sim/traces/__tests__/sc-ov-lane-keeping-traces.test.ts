@@ -1,11 +1,13 @@
 /**
  * S3-E trace gate — „Движение в средата на лентата" (sc-ov-lane-keeping on
- * ov-lane-v1, doc 72 OV-12 + OV-04), doc 76 §5/§9 stages 3+5:
+ * ov-lane-v1, doc 72 OV-12 + OV-04; founder R3 redesign doc 62 #46 — the
+ * S-CURVE street, sway ±14 m), doc 76 §5/§9 stages 3+5:
  *   1. SHADOW replays with ZERO violations and earns CLEAN_DRIVING (the whole
- *      street held in the MIDDLE of the lane).
- *   2. MISTAKE DEMOS grade EXACTLY their template codeRefs — straddle isolates
- *      POOR_LANE_KEEPING (toward the curb), center-line isolates
- *      CENTER_LINE_TOUCHED (toward oncoming); neither leaks the other.
+ *      S-curve held in the MIDDLE of the lane — real steering, both bends).
+ *   2. MISTAKE DEMOS grade EXACTLY their template codeRefs — running wide in
+ *      the left-hand bend isolates POOR_LANE_KEEPING (toward the curb);
+ *      under-steering the right-hand bend isolates CENTER_LINE_TOUCHED
+ *      (toward oncoming); neither leaks the other.
  *   3. COMMITTED FILES under content/traces/sc-ov-lane-keeping/ ARE the
  *      recordings of these scripts, byte-for-byte, with identical public copies.
  *
@@ -51,10 +53,15 @@ describe("sc-ov-lane-keeping — the shadow gate (doc 76 §5)", () => {
     expect(commendationCodes(shadow)).toContain("CLEAN_DRIVING");
   });
 
-  it("drives the whole street centered in the lane with Bulgarian annotations", () => {
+  it("rides the whole S-curve centered in the lane with Bulgarian annotations", () => {
     const last = shadow.trace.samples[shadow.trace.samples.length - 1];
     expect(last.y).toBeGreaterThan(270);
-    expect(Math.abs(last.x - 4.06)).toBeLessThan(1.5); // stayed in the lane center
+    // The finish gate of the CURVED lane center (meta.scenario.gates.finish).
+    expect(Math.abs(last.x - -0.42)).toBeLessThan(1.5);
+    // The route genuinely swayed: it reached both the east and the west bank.
+    const xs = shadow.trace.samples.map((s) => s.x);
+    expect(Math.max(...xs)).toBeGreaterThan(14); // east apex ≈ 18.06
+    expect(Math.min(...xs)).toBeLessThan(-6); // west apex ≈ −9.94
     const annotations = shadow.trace.events.filter((e) => e.kind === "annotation");
     expect(annotations.length).toBeGreaterThanOrEqual(4);
     for (const a of annotations) expect(a.textBg ?? "").toMatch(/[Ѐ-ӿ]/);
@@ -62,14 +69,14 @@ describe("sc-ov-lane-keeping — the shadow gate (doc 76 §5)", () => {
 });
 
 describe("sc-ov-lane-keeping — mistake demos grade their exact codes (doc 76 §9 stage 5)", () => {
-  it("„Возене встрани от средата“: exactly POOR_LANE_KEEPING, never the center-line code", () => {
+  it("„Изнасяне към бордюра в левия завой“: exactly POOR_LANE_KEEPING, never the center-line code", () => {
     const drive = drives.get("mistake-straddle")!;
     const codes = [...new Set(violationCodes(drive))].sort();
     expect(codes).toEqual([...SC_OV_LANE_KEEPING.mistakes[0].codeRefs].sort());
     expect(codes).not.toContain("CENTER_LINE_TOUCHED");
   });
 
-  it("„Настъпване на осевата линия“: exactly CENTER_LINE_TOUCHED, never generic lane-keeping", () => {
+  it("„Изплуване върху осевата в десния завой“: exactly CENTER_LINE_TOUCHED, never generic lane-keeping", () => {
     const drive = drives.get("mistake-center-line")!;
     const codes = [...new Set(violationCodes(drive))].sort();
     expect(codes).toEqual([...SC_OV_LANE_KEEPING.mistakes[1].codeRefs].sort());

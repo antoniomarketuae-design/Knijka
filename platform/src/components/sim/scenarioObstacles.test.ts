@@ -3,7 +3,7 @@
 // and poses are built from).
 
 import { describe, expect, it } from "vitest";
-import { FLEET } from "@/modules/sim/traffic";
+import { FLEET, TRUCK_MODEL_INDEX } from "@/modules/sim/traffic";
 import {
   obstacleYawRad,
   PARKING_COLLISION_MIN_KMH,
@@ -26,6 +26,10 @@ describe("scenario obstacle helpers", () => {
   it("named fleet models resolve; unknown/absent fall back to a civilian", () => {
     expect(resolveVehicleModel("vela_h3", 0)).toBe(FLEET.indexOf("vela_h3"));
     expect(resolveVehicleModel("kargo_v", 0)).toBe(FLEET.indexOf("kargo_v"));
+    // R3 #26 bus stopgap: the procedural box-truck slot resolves by rig name
+    // (one past the GLB fleet — the parked pass instances it like a GLB rig).
+    expect(resolveVehicleModel("box_truck", 0)).toBe(TRUCK_MODEL_INDEX);
+    expect(TRUCK_MODEL_INDEX).toBe(FLEET.length);
     const police = FLEET.indexOf("police");
     const boxy = FLEET.indexOf("suv_boxy_lux");
     for (const seed of [0, 1, 7, 42, 1234]) {

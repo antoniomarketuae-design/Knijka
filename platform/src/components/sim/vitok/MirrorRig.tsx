@@ -22,8 +22,10 @@
 //   targets: rear 256x96 (24.6k px) + 2x 160x96 (15.4k px each) ≈ 0.45 MB
 //   RGBA16F + depth total (HalfFloat so the composer tone-maps mirror
 //   content identically to the direct view — see the aim-table comment).
-//   cadence (MIRROR_CADENCE): at most ONE mirror pass per frame —
-//     low    = no RTT at all (authored dark-gloss glass stays);
+//   cadence (MIRROR_CADENCE / LOW_REAR_CADENCE): at most ONE mirror pass per
+//   frame —
+//     low    = rear only, every 4th frame (doc 62 #44 — the rear mirror is
+//              safety-critical; doors keep the authored dark-gloss glass);
 //     medium = rear only, rendered every 2nd frame;
 //     high   = rear every 2nd frame, doors every 4th (staggered on the
 //              rear's off-frames, phases 1 and 3).
@@ -141,6 +143,7 @@ const MIRROR_FOG_MIN_DENSITY = 1.5 / MIRROR_FAR;
  * Per-mirror refresh cadence: render mirror `kind` on frames where
  * frame % interval === phase. Phases are disjoint (rear owns 0 and 2 mod 4,
  * doors own 1 and 3), so AT MOST ONE mirror pass ever runs per frame:
+ *   low    (rear only) — rear every 4th frame (~15 Hz; see LOW_REAR_CADENCE);
  *   medium (rear only) — passes on half the frames;
  *   high (all three)   — rear at 30 Hz, each door at 15 Hz.
  * Glass is small and mostly glanced at — 15 Hz doors read fine.
@@ -151,12 +154,20 @@ const MIRROR_CADENCE: Record<MirrorKind, { interval: number; phase: number }> = 
   right: { interval: 4, phase: 3 },
 };
 
+/** LOW-preset rear cadence (founder review doc 62 #44 — "the cockpit rear
+ *  mirror shows NOTHING": on low the rig used to mount no RTT at all and the
+ *  glass stayed authored dark gloss). The rear mirror is the safety-critical
+ *  one — a tailgater lesson is unplayable without it — so low now runs the
+ *  REAR pass only, at ~15 Hz: one 256×96 reduced-scene render (far plane
+ *  200 m, frozen shadows, no composer) every 4th frame. The door mirrors stay
+ *  dark gloss on low — that remains the honest budget cut. */
+const LOW_REAR_CADENCE = { interval: 4, phase: 0 } as const;
+
 /** Which mirrors run RTT per quality tier (lesson-ui preset, fixed for the
  *  life of the scene — the selector lives on the pre-lesson screen). */
 function activeKindsFor(preset: "low" | "medium" | "high"): MirrorKind[] {
   if (preset === "high") return ["rear", "left", "right"];
-  if (preset === "medium") return ["rear"];
-  return [];
+  return ["rear"]; // medium AND low — see LOW_REAR_CADENCE
 }
 
 interface MirrorRigEntry {
@@ -237,10 +248,12 @@ export function MirrorRig({ mirrors, active }: { mirrors: MirrorMeshes; active: 
   useFrame(() => {
     if (!active || entries.length === 0) return;
     const frame = frameRef.current++;
-    // MIRROR_CADENCE phases are disjoint → at most one entry matches.
+    // MIRROR_CADENCE phases are disjoint → at most one entry matches. The low
+    // preset carries only the rear entry, at its own gentler cadence.
     let entry: MirrorRigEntry | null = null;
     for (const e of entries) {
-      const c = MIRROR_CADENCE[e.kind];
+      const c =
+        preset === "low" && e.kind === "rear" ? LOW_REAR_CADENCE : MIRROR_CADENCE[e.kind];
       if (frame % c.interval === c.phase) {
         entry = e;
         break;

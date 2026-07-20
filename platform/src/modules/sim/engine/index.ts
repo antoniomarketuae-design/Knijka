@@ -45,6 +45,15 @@ export {
 export type { ReverseViewFrame, ReverseViewMode } from "./reverseView";
 
 export {
+  chaseGlanceOrbit,
+  glanceOrbitLock,
+  CHASE_GLANCE_SIDE_ORBIT_RAD,
+  CHASE_GLANCE_ASPECT_RAD,
+  CHASE_GLANCE_LOCK_RATE_RADS,
+} from "./glanceView";
+export type { GlanceViewMirror } from "./glanceView";
+
+export {
   getReverseViewEnabled,
   setReverseViewEnabled,
   toggleReverseViewEnabled,

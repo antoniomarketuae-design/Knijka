@@ -1,9 +1,14 @@
 /**
- * S3 trace gate — „Пълзящо превишаване" (sc-speed-creep on sp-creep-v1, doc 72
- * SP-01), doc 76 §5/§9 stages 3+5:
- *   1. SHADOW replays with ZERO violations and earns CLEAN_DRIVING.
- *   2. MISTAKE DEMOS grade EXACTLY their template codeRefs (SPEEDING_OVER_LIMIT),
- *      and NEVER the dangerous band.
+ * S3 trace gate — „Пълзящо превишаване" (sc-speed-creep on sp-creep2-v1, doc 72
+ * SP-01 + SP-03; the founder R3 P5 road — doc 62 #30: 400 m @ 50 → 280 m of
+ * zone 30, both caps failable), doc 76 §5/§9 stages 3+5:
+ *   1. SHADOW replays with ZERO violations and earns CLEAN_DRIVING — 46 held
+ *      on the approach, an early lift, ~27 held through the zone.
+ *   2. MISTAKE DEMOS grade EXACTLY their template codeRefs
+ *      (SPEEDING_OVER_LIMIT), each against its OWN edge cap (57 on the 50
+ *      approach; a 27→37 creep in the 30 zone), and NEVER the dangerous band.
+ *      The zone-creep demo must NOT earn the shadow's CLEAN_DRIVING (its
+ *      clean prefix is authored under the 250 m streak).
  *   3. COMMITTED FILES under content/traces/sc-speed-creep/ ARE the recordings
  *      of these scripts, byte-for-byte, with identical public copies.
  *
@@ -24,7 +29,7 @@ const HERE = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(HERE, "../../../../../..");
 const RECORD = process.env.RECORD_TRACES === "1";
 const SCENARIO_ID = "sc-speed-creep";
-const NAMES: ScSpeedCreepTraceName[] = ["shadow-correct", "mistake-flow-along", "mistake-creep-up"];
+const NAMES: ScSpeedCreepTraceName[] = ["shadow-correct", "mistake-flow-along", "mistake-zone-creep"];
 
 function loadDistrict(id: string): unknown {
   return JSON.parse(readFileSync(path.join(REPO_ROOT, "content", "world", `${id}.json`), "utf-8"));
@@ -36,7 +41,7 @@ function commendationCodes(d: RecordedDrive): string[] {
   return d.ruleEvents.filter((e) => e.kind === "commendation").map((e) => e.code);
 }
 
-const district = loadDistrict("sp-creep-v1");
+const district = loadDistrict("sp-creep2-v1");
 const drives = new Map<ScSpeedCreepTraceName, RecordedDrive>(
   NAMES.map((n) => [n, recordScSpeedCreepDrive(district, n)]),
 );
@@ -49,11 +54,17 @@ describe("sc-speed-creep — the shadow gate (doc 76 §5)", () => {
     expect(commendationCodes(shadow)).toContain("CLEAN_DRIVING");
   });
 
-  it("drives the whole street under the limit with Bulgarian annotations", () => {
-    const maxKmh = Math.max(...shadow.trace.samples.map((s) => Math.abs(s.speedKmh)));
-    expect(maxKmh).toBeLessThan(50); // never touches the posted limit
+  it("holds both caps — under 50 on the approach, under 30 in the zone — with Bulgarian annotations", () => {
+    const approachMax = Math.max(
+      ...shadow.trace.samples.filter((s) => s.y < 390).map((s) => Math.abs(s.speedKmh)),
+    );
+    expect(approachMax).toBeLessThan(50); // never touches the posted 50
+    const zoneMax = Math.max(
+      ...shadow.trace.samples.filter((s) => s.y > 410).map((s) => Math.abs(s.speedKmh)),
+    );
+    expect(zoneMax).toBeLessThan(30); // never touches the zone's 30
     const last = shadow.trace.samples[shadow.trace.samples.length - 1];
-    expect(last.y).toBeGreaterThan(330);
+    expect(last.y).toBeGreaterThan(640); // the WHOLE long road, zone included
     const annotations = shadow.trace.events.filter((e) => e.kind === "annotation");
     expect(annotations.length).toBeGreaterThanOrEqual(4);
     for (const a of annotations) expect(a.textBg ?? "").toMatch(/[Ѐ-ӿ]/);
@@ -61,18 +72,25 @@ describe("sc-speed-creep — the shadow gate (doc 76 §5)", () => {
 });
 
 describe("sc-speed-creep — mistake demos grade their exact codes (doc 76 §9 stage 5)", () => {
-  it("„Носене с потока“: exactly SPEEDING_OVER_LIMIT, never the dangerous band", () => {
+  it("„Носене с потока по подхода“: exactly SPEEDING_OVER_LIMIT against the 50, never the dangerous band", () => {
     const drive = drives.get("mistake-flow-along")!;
     const codes = [...new Set(violationCodes(drive))].sort();
     expect(codes).toEqual([...SC_SPEED_CREEP.mistakes[0].codeRefs].sort());
     expect(codes).not.toContain("SPEEDING_DANGEROUS");
   });
 
-  it("„Скоростта пълзи нагоре“: exactly SPEEDING_OVER_LIMIT, never the dangerous band", () => {
-    const drive = drives.get("mistake-creep-up")!;
+  it("„Пълзене в зоната 30“: exactly SPEEDING_OVER_LIMIT against the LOCAL 30, never dangerous, no CLEAN_DRIVING", () => {
+    const drive = drives.get("mistake-zone-creep")!;
     const codes = [...new Set(violationCodes(drive))].sort();
     expect(codes).toEqual([...SC_SPEED_CREEP.mistakes[1].codeRefs].sort());
     expect(codes).not.toContain("SPEEDING_DANGEROUS");
+    // The demo's creep tops out at ~37 — a fault ONLY against the zone's 30.
+    const zoneMax = Math.max(
+      ...drive.trace.samples.filter((s) => s.y > 410).map((s) => Math.abs(s.speedKmh)),
+    );
+    expect(zoneMax).toBeGreaterThan(33); // over the graced 30…
+    expect(zoneMax).toBeLessThanOrEqual(40); // …never into the dangerous band
+    expect(commendationCodes(drive)).not.toContain("CLEAN_DRIVING");
   });
 });
 

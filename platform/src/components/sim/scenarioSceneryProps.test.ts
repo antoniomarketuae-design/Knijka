@@ -7,7 +7,7 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
-import { pkVanObstacle } from "@/modules/sim/traces";
+import { BUS_OBSTACLE, pkVanObstacle } from "@/modules/sim/traces";
 import { heldSceneryFor, scenarioConesOf } from "./scenarioSceneryProps";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -122,6 +122,83 @@ describe("heldSceneryFor — per-template dressing", () => {
       // чл. 98 daylight around the zebra (pe-x-1 at y = 78): no body within
       // ~7.5 m of the crossing centre (car half-length 2.25 + 5 m clearance).
       expect(Math.abs(o.y - 78)).toBeGreaterThanOrEqual(7.5);
+    }
+  });
+
+  it("sc-crossing-bus-shadow's truck occluder sits ON the BUS_OBSTACLE rect (R3 #26)", () => {
+    // Founder ruling: the procedural box truck stands in for the bus until a
+    // real bus rig exists — same center/heading as the trace-graded rect, so
+    // the body the student sees IS the zone the shadow proves it never touches.
+    const held = heldSceneryFor("sc-crossing-bus-shadow@L3", loadDistrict("pe-bus-v1"));
+    expect(held.length).toBe(1);
+    const truck = held[0];
+    expect(truck.kind).toBe("vehicle");
+    if (truck.kind !== "vehicle") return;
+    expect(truck.model).toBe("box_truck");
+    expect(truck.x).toBe(BUS_OBSTACLE.x);
+    expect(truck.y).toBe(BUS_OBSTACLE.y);
+    expect(truck.headingDeg).toBe(BUS_OBSTACLE.headingDeg);
+    // Visual-only: the collision consequence stays in the trace channel
+    // (BUS_OBSTACLE's SAT test) where the drill authored it.
+    expect(truck.visual).toBe(true);
+    // The 7.5 m truck body fits INSIDE the graded 12 m rect — the visible
+    // occluder never exceeds the no-touch zone the shadow proves.
+    expect(BUS_OBSTACLE.halfLengthM * 2).toBeGreaterThanOrEqual(7.5);
+    expect(BUS_OBSTACLE.halfWidthM * 2).toBeGreaterThanOrEqual(2.4);
+  });
+
+  it("sc-follow-standstill's kolona stands AHEAD of the staged lead, visual-only", () => {
+    // Founder R3 #40: the lead (FS_LEAD_CAR, templates-following.ts) holds at
+    // (4.0625, 290); the queue bodies continue the column past it. The player
+    // and shadow never pass y ≈ 281, so the dressing can never be driven into.
+    const held = heldSceneryFor("sc-follow-standstill@L2", loadDistrict("fo-follow-v1"));
+    expect(held.length).toBe(2);
+    let prevY = 290; // the staged lead's pinned rest
+    for (const o of held) {
+      expect(o.kind).toBe("vehicle");
+      if (o.kind !== "vehicle") continue;
+      expect(o.visual).toBe(true);
+      expect(o.x).toBe(4.0625); // the lead's own lane center
+      expect(o.headingDeg).toBe(0); // queued northbound, like the lead
+      // A queue, not a scatter: 4.5–12 m of centers between consecutive cars.
+      expect(o.y - prevY).toBeGreaterThanOrEqual(4.5);
+      expect(o.y - prevY).toBeLessThanOrEqual(12);
+      prevY = o.y;
+    }
+  });
+
+  it("sc-ov-narrow's both-side rows narrow the corridor without touching a driven line", () => {
+    // Founder R3 #49: driven lines (traces/scOvNarrow.ts) span x ∈ [−4.06,
+    // 4.06] (flank 4.91); the squeeze corridor y ∈ [105, 150] runs in the
+    // west lane and the staged oncoming holds at (−4.06, 200).
+    const held = heldSceneryFor("sc-ov-narrow@L1", loadDistrict("ov-narrow-v1"));
+    expect(held.length).toBeGreaterThanOrEqual(12);
+    const CAR_HALF_LEN = 2.25;
+    for (const o of held) {
+      expect(o.kind).toBe("vehicle");
+      if (o.kind !== "vehicle") continue;
+      expect(o.visual).toBe(true); // dressing tier — no collider, no grading
+      // Curb-hugging: inner flank at |6.0| clears every driven flank (4.91)
+      // by ≥ 1.09 m; outer flank stays inside the carriageway edge (8.125).
+      expect(Math.abs(o.x)).toBe(7.0);
+      // The west (oncoming) lane through the squeeze section stays undressed —
+      // that IS the meeting corridor — and the staged oncoming's hold at
+      // y = 200 keeps daylight too.
+      if (o.x < 0) {
+        expect(o.headingDeg).toBe(180); // parked with the southbound flow
+        const clearOfSection = o.y + CAR_HALF_LEN < 105 || o.y - CAR_HALF_LEN > 150;
+        expect(clearOfSection, `west body at y=${o.y}`).toBe(true);
+        expect(Math.abs(o.y - 200)).toBeGreaterThanOrEqual(4.5);
+      } else {
+        expect(o.headingDeg).toBe(0);
+        // East bodies keep clear of the corner-cut diagonals (y 96..114 and
+        // 146..154 reach x = 1..2 only; at x = 7 the only true constraint is
+        // the wait pose at (4.06, 104) — flank clearance already proven — so
+        // pin the authored bands: south row ends before the section, north
+        // row resumes after the return cut.
+        const inBands = o.y + CAR_HALF_LEN < 96 || o.y - CAR_HALF_LEN > 158;
+        expect(inBands, `east body at y=${o.y}`).toBe(true);
+      }
     }
   });
 

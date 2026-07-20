@@ -80,9 +80,21 @@ describe("sx-v1 through the world builder", () => {
     expect(world.stats.junctionPatches).toBeGreaterThanOrEqual(1);
   });
 
-  it("hosts a signalized junction: lamp heads on every incoming approach, no signs", () => {
-    expect(world.trafficLights.length).toBe(4);
+  it("hosts a signalized junction: near + far-side lamp heads per incoming approach, no signs", () => {
+    // Doc 62 S1/#19: every approach gets its NEAR head (right of the driver
+    // at the line) AND a FAR-SIDE companion mirrored through the node — the
+    // head a driver waiting AT the line actually sees. 4 approaches × 2.
+    expect(world.trafficLights.length).toBe(8);
     for (const tl of world.trafficLights) expect(tl.nodeId).toBe("sx-n-c");
+    // Each approach's pair shares ONE travel bearing (the graded axis-group
+    // key for WorldRuntime.signalLampState) — 4 distinct bearings, 2 heads each.
+    const byBearing = new Map<number, number>();
+    for (const tl of world.trafficLights) {
+      expect(Number.isFinite(tl.approachBearingDeg)).toBe(true);
+      byBearing.set(tl.approachBearingDeg, (byBearing.get(tl.approachBearingDeg) ?? 0) + 1);
+    }
+    expect(byBearing.size).toBe(4);
+    for (const n of byBearing.values()) expect(n).toBe(2);
     expect(world.stats.signs.stop).toBe(0);
     expect(world.stats.signs.giveWay).toBe(0);
     expect(world.stats.zebraCrossings).toBe(0);

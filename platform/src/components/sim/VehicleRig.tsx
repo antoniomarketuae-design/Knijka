@@ -106,6 +106,43 @@ const LOW_BEAM = { intensity: 400, angle: 0.5, penumbra: 0.45, distance: 60, col
 const HIGH_BEAM = { intensity: 1500, angle: 0.36, penumbra: 0.35, distance: 120, color: 0xf2f6ff, targetY: -0.1, targetZ: 45 } as const;
 /** Single-beam (low preset) intensity compensation. */
 const SINGLE_BEAM_SCALE = 1.6;
+/** DAY-RAIN beam scale (founder review doc 62 #41 — "turning lights ON
+ *  changes nothing visually" in the rain drill): rain lessons now mount the
+ *  same beam rig as night, dimmed so the pool reads as a subtle throw on the
+ *  darkened wet scene instead of a night-strength cone under residual
+ *  daylight. Night rain keeps the full night values (night wins). */
+const RAIN_DAY_BEAM_SCALE = 0.45;
+
+// ---------------------------------------------------------------------------
+// WIPERS (founder review doc 62 #24: "the wiper button does nothing visible").
+// Two blade meshes riding the chassis at the windshield plane's pose, so BOTH
+// views see them: the cockpit looks through the glass at them, the chase view
+// sees them on the car (the exterior shell hides in cockpit view, but these —
+// like the windshield plane and the beam spots — live on the chassis group).
+// Parked they rest near-horizontal at the cowl; while
+// CabinControls.driveline.wipersOn they sweep a ~70° arc; switched off they
+// finish the stroke and ease back to park (a real wiper relay). Render-only,
+// zero-allocation: two rotation.z writes per frame, and only while the blades
+// are away from park.
+// ---------------------------------------------------------------------------
+/** Full wipe cycle (park → up → park), seconds — the audio swish cadence. */
+const WIPER_PERIOD_S = 1.3;
+/** Blade angle at park (rad about the glass normal; +Z rotation maps blade-Y
+ *  toward −X = the passenger side on this LHD car — lying along the cowl). */
+const WIPER_PARK_RAD = 1.15;
+/** Blade angle at the top of the sweep (just past vertical, driver side). */
+const WIPER_TOP_RAD = -0.2;
+/** Return-to-park rate when switched off mid-stroke (sweep fraction /s). */
+const WIPER_PARK_RETURN_PER_S = 1.4;
+/** Wiped-arc droplet clearing: ramp-in while wiping / creep-back after (1/s). */
+const WIPER_CLEAR_IN_PER_S = 1.2;
+const WIPER_CLEAR_OUT_PER_S = 0.15;
+
+/** Ping-pong 0..1 over the wipe cycle from a running phase in [0, 1). */
+function wiperSweep01(phase: number): number {
+  const p = phase * 2;
+  return p < 1 ? p : 2 - p;
+}
 
 /** Write one beam state to a spotlight (no-ops on null / day mount). */
 function applyHeadlightBeam(spot: SpotLight | null, headKey: number, scale: number): void {
@@ -132,9 +169,12 @@ export function VehicleRig({
   paused,
   spawn = SPAWN,
   difficultyRef,
+  lessonMaxLegalKmh,
   onCollision,
   collisionMinKmh = COLLISION_MIN_KMH,
   night = false,
+  rain = false,
+  wiperVisualRef,
   gripFactor = 1,
   gripPatches = NO_GRIP_PATCHES,
   windLateralN = 0,
@@ -152,6 +192,12 @@ export function VehicleRig({
   spawn?: VehicleSpawn;
   /** Current driving-assist mode (Beginner/Normal/Advanced). Read each step. */
   difficultyRef?: RefObject<DifficultyMode>;
+  /** The lesson's speed DOMAIN (max legal speed anywhere on the loaded map,
+   *  km/h) — scales the difficulty governor so Нормален can reach the АМ-140
+   *  flow while still governing ~55–60 in a 50-city (founder review R3 #37;
+   *  vehicle/difficulty.ts governorCapKmh). Absent = the preset's researched
+   *  static caps, byte-identical legacy behavior. */
+  lessonMaxLegalKmh?: number;
   /** Fired on a real (fast-enough) impact so the rule engine can grade it.
    *  A11: `withWhat` classifies the contact from the other body's NPC-shell
    *  userData tag — untagged bodies (world meshes) are static objects. */
@@ -168,6 +214,17 @@ export function VehicleRig({
    *  headlights / night-preview toggle also raise the fill, so the cabin
    *  never goes near-black even when this is left at its default. */
   night?: boolean;
+  /** Lesson rain flag (doc 62 #41) — mounts the SAME beam SpotLight rig as
+   *  night (dimmed by RAIN_DAY_BEAM_SCALE unless night is also set) and arms
+   *  the exterior tail-lamp glow in rain, so switching the headlights ON in a
+   *  rain lesson is VISIBLE. Fixed per lesson, so the mounted light count
+   *  stays structurally constant for the session (the SimEnvironment rule). */
+  rain?: boolean;
+  /** Wiper visual channel (doc 62 #24) — this rig writes the live blade sweep
+   *  (0 = parked … 1 = top of stroke) and whether the arc is being kept clear;
+   *  WindshieldDroplets reads it to clear the wiped arc in cockpit view.
+   *  Render-only, per-frame ref writes (never React state). */
+  wiperVisualRef?: RefObject<{ sweep01: number; clearing: number }>;
   /** ADR-006 stage 4a — OPT-IN surface grip for the live physics car. 1
    *  (default, every existing lesson) = today's dry dynamics bit-identical;
    *  wet-grip lessons pass tuning.WET_GRIP_FACTOR (0.7) via
@@ -210,10 +267,18 @@ export function VehicleRig({
   const assistRef = useRef(createDriveAssistState());
   // Interior fill light — driven per frame (never re-renders).
   const fillRef = useRef<PointLight>(null);
-  // Night headlight throw (see the module header block above).
+  // Night/rain headlight throw (see the module header block above).
   const spotLRef = useRef<SpotLight>(null);
   const spotRRef = useRef<SpotLight>(null);
   const beamStateRef = useRef(-1);
+  // The beam rig mounts on night AND rain lessons (doc 62 #41) — fixed per
+  // lesson, so the light count stays structurally constant for the session.
+  const beamsMounted = night || rain;
+  // Wiper blade pivots + animation state (doc 62 #24) — pure refs, written
+  // only while the blades are away from park (zero cost with wipers off).
+  const wiperLRef = useRef<Group>(null);
+  const wiperRRef = useRef<Group>(null);
+  const wiperAnimRef = useRef({ phase: 0, sweep: 0, clearing: 0, active: false });
   // LOW preset = one centre beam; med/high = the real pair. Fixed per session
   // (same one-time read as HeroCarBody's clearcoat gate).
   const spotCount = useMemo(() => (loadQualityPreset() === "low" ? 1 : 2), []);
@@ -283,8 +348,16 @@ export function VehicleRig({
     const raw = inputRef.current?.read() ?? IDLE_INPUT;
     const mode = difficultyRef?.current ?? DEFAULT_DIFFICULTY;
     // Shape input for the learner mode (throttle/governor/steer smoothing) —
-    // physics constants untouched, so the CI harness stays valid.
-    const shaped = applyDifficulty(raw, mode, sim.speedKmh, FIXED_DT, assistRef.current);
+    // physics constants untouched, so the CI harness stays valid. The lesson
+    // speed domain (when threaded) scales the governor cap (#37).
+    const shaped = applyDifficulty(
+      raw,
+      mode,
+      sim.speedKmh,
+      FIXED_DT,
+      assistRef.current,
+      lessonMaxLegalKmh,
+    );
     // A1: the driveline gates traction (ignition/selector/clutch/parking
     // brake). Without a cabin (headless/legacy) the default keeps the car
     // permanently ready-to-drive — exactly the pre-A1 behavior.
@@ -326,18 +399,54 @@ export function VehicleRig({
       fill.intensity += (target - fill.intensity) * Math.min(1, delta * 6);
     }
 
-    // Night headlight throw — state-keyed: the beams are rewritten only when
-    // the headlight mode changes (off/low/high). Day lessons mount no spots,
-    // so this whole branch is two null checks.
-    if (night) {
+    // Night/rain headlight throw — state-keyed: the beams are rewritten only
+    // when the headlight mode changes (off/low/high). Dry day lessons mount no
+    // spots, so this whole branch is two null checks. Day-rain lessons (doc 62
+    // #41) run the same rig dimmed by RAIN_DAY_BEAM_SCALE; night keeps full
+    // strength whether or not it also rains.
+    if (beamsMounted) {
       const headKey = cabin?.headlights === "high" ? 2 : cabin?.headlights === "low" ? 1 : 0;
       if (headKey !== beamStateRef.current) {
         beamStateRef.current = headKey;
-        const perLamp = spotCount === 1 ? SINGLE_BEAM_SCALE : 1;
+        const perLamp =
+          (spotCount === 1 ? SINGLE_BEAM_SCALE : 1) * (night ? 1 : RAIN_DAY_BEAM_SCALE);
         applyHeadlightBeam(spotLRef.current, headKey, perLamp);
         applyHeadlightBeam(spotRRef.current, headKey, perLamp);
         const b = headKey === 2 ? HIGH_BEAM : LOW_BEAM;
         spotTarget.position.set(0, b.targetY, b.targetZ);
+      }
+    }
+
+    // Wiper blades (doc 62 #24) — sweep from the driveline truth. ON advances
+    // the ping-pong stroke; OFF eases the blades back to park and then stops
+    // writing entirely (w.active latches false). The visual channel feeds the
+    // cockpit droplet layer: `clearing` ramps while wiping so the wiped arc
+    // stays clear, then droplets creep back after the wipers stop.
+    {
+      const w = wiperAnimRef.current;
+      const on = cabin?.driveline.wipersOn ?? false;
+      if (on || w.active || w.clearing > 0) {
+        if (on) {
+          w.phase = (w.phase + delta / WIPER_PERIOD_S) % 1;
+          w.sweep = wiperSweep01(w.phase);
+          w.active = true;
+          w.clearing = Math.min(1, w.clearing + delta * WIPER_CLEAR_IN_PER_S);
+        } else {
+          w.sweep = Math.max(0, w.sweep - delta * WIPER_PARK_RETURN_PER_S);
+          if (w.sweep === 0) {
+            w.phase = 0;
+            w.active = false;
+          }
+          w.clearing = Math.max(0, w.clearing - delta * WIPER_CLEAR_OUT_PER_S);
+        }
+        const angle = WIPER_PARK_RAD + (WIPER_TOP_RAD - WIPER_PARK_RAD) * w.sweep;
+        if (wiperLRef.current) wiperLRef.current.rotation.z = angle;
+        if (wiperRRef.current) wiperRRef.current.rotation.z = angle;
+        const viz = wiperVisualRef?.current;
+        if (viz) {
+          viz.sweep01 = w.sweep;
+          viz.clearing = w.clearing;
+        }
       }
     }
     audioRef.current?.update({
@@ -401,7 +510,7 @@ export function VehicleRig({
           Hero "Aurelis GT-E" exterior (Draco glTF, chase view) + the authored
           GT-E interior via VitokCockpit (cockpit view, A3). */}
       <group ref={chassisGroupRef}>
-        <HeroCarBody simRef={simRef} cabinRef={cabinRef} inputRef={inputRef} night={night} />
+        <HeroCarBody simRef={simRef} cabinRef={cabinRef} inputRef={inputRef} night={night} rain={rain} />
         <VitokCockpit
           simRef={simRef}
           inputRef={inputRef}
@@ -409,13 +518,14 @@ export function VehicleRig({
           telltaleLitRef={telltaleLitRef}
         />
 
-        {/* NIGHT headlight throw — real SpotLight pools on the road, visible
-            from the cockpit too (the exterior shell hides in cockpit view but
-            these live on the chassis). Mounted only on night lessons; "off"
+        {/* NIGHT/RAIN headlight throw — real SpotLight pools on the road,
+            visible from the cockpit too (the exterior shell hides in cockpit
+            view but these live on the chassis). Mounted on night AND rain
+            lessons (doc 62 #41 — lights ON must be visible in rain); "off"
             drives intensity 0 while keeping the light count constant (no
             material recompiles — see the module header block). Lamp height
             matches the GLB's drl bar (~0.59 m above tarmac = chassis y 0.24). */}
-        {night ? (
+        {beamsMounted ? (
           <>
             <primitive object={spotTarget} />
             <spotLight
@@ -470,6 +580,27 @@ export function VehicleRig({
             depthWrite={false}
           />
         </mesh>
+
+        {/* Wiper blades (doc 62 #24) — two thin dark blades in the windshield
+            plane's own frame (same pose as the glass above, nudged outward),
+            parked at the cowl and swept by useFrame while the wipers run.
+            Chassis-mounted, so the chase view sees them on the car and the
+            cockpit sees them through the glass. Default layer 0: the A4 mirror
+            cameras look backward and never frame the windshield. */}
+        <group position={[0, 0.66, 0.76]} rotation={[-0.62, 0, 0]}>
+          <group ref={wiperLRef} position={[0.3, -0.26, 0.02]} rotation={[0, 0, WIPER_PARK_RAD]}>
+            <mesh position={[0, 0.19, 0]}>
+              <boxGeometry args={[0.022, 0.38, 0.008]} />
+              <meshStandardMaterial color="#23262b" roughness={0.7} metalness={0.25} />
+            </mesh>
+          </group>
+          <group ref={wiperRRef} position={[-0.34, -0.26, 0.02]} rotation={[0, 0, WIPER_PARK_RAD]}>
+            <mesh position={[0, 0.17, 0]}>
+              <boxGeometry args={[0.022, 0.34, 0.008]} />
+              <meshStandardMaterial color="#23262b" roughness={0.7} metalness={0.25} />
+            </mesh>
+          </group>
+        </group>
 
         {/* Interior fill light — soft, cabin-local (short range so it doesn't
             leak onto the street); intensity is animated in useFrame. */}

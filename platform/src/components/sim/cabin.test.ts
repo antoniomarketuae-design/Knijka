@@ -10,11 +10,21 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { GLANCE_EASE_S, GLANCE_TAP_HOLD_S, GlanceHold } from "./cabin";
+import { GLANCE_EASE_S, GLANCE_REFRESH_S, GLANCE_TAP_HOLD_S, GlanceHold } from "./cabin";
 
 /** Advance in render-ish frames (like CabinControls.update does). */
 function tick(g: GlanceHold, seconds: number, step = 1 / 60): void {
   for (let t = 0; t < seconds; t += step) g.update(step);
+}
+
+/** Advance like tick() but collect the graded refresh latches update() emits. */
+function tickCollect(g: GlanceHold, seconds: number, step = 1 / 60): Array<"left" | "right" | "rear"> {
+  const out: Array<"left" | "right" | "rear"> = [];
+  for (let t = 0; t < seconds; t += step) {
+    const m = g.update(step);
+    if (m) out.push(m);
+  }
+  return out;
 }
 
 describe("GlanceHold — founder contract: the view HOLDS while pressed", () => {
@@ -109,5 +119,53 @@ describe("GlanceHold — founder contract: the view HOLDS while pressed", () => 
     tick(g, GLANCE_EASE_S * 2);
     expect(g.mirror).toBeNull();
     expect(g.strength).toBe(0);
+  });
+});
+
+describe("GlanceHold — held-glance refresh (founder R3 #13: the look stays fresh)", () => {
+  it("an ongoing hold re-latches the graded sample every GLANCE_REFRESH_S", () => {
+    // The founder's live failure at the second Б1 mouth: he HELD the look
+    // button while waiting for the priority car — the press latched once, the
+    // 5 s lookback expired mid-hold, and the crossing graded „no scan" while
+    // his head was literally on the mirror. The refresh stream is the fix.
+    const g = new GlanceHold();
+    expect(g.start("left")).toBe(true); // the press latch (once)
+    const refreshes = tickCollect(g, GLANCE_REFRESH_S * 3.5);
+    expect(refreshes.length).toBeGreaterThanOrEqual(3);
+    expect(refreshes.every((m) => m === "left")).toBe(true);
+  });
+
+  it("mashing the same touch button keeps the refresh stream alive without re-latching", () => {
+    // Touch taps auto-release after GLANCE_TAP_HOLD_S; re-taps inside the hold
+    // return false (no second press latch) but re-arm the hold — so a masher
+    // at the mouth stays continuously fresh through the refresh stream.
+    const g = new GlanceHold();
+    expect(g.start("right", true)).toBe(true);
+    const collected: string[] = [];
+    for (let k = 0; k < 6; k++) {
+      collected.push(...tickCollect(g, GLANCE_TAP_HOLD_S / 2));
+      expect(g.start("right", true)).toBe(false); // re-tap mid-hold: no re-latch
+    }
+    expect(collected.length).toBeGreaterThanOrEqual(2);
+    expect(collected.every((m) => m === "right")).toBe(true);
+  });
+
+  it("no refresh once released — the ease-out is not a look", () => {
+    const g = new GlanceHold();
+    g.start("rear");
+    tickCollect(g, GLANCE_REFRESH_S * 1.5); // consume any held refreshes
+    g.end("rear");
+    expect(tickCollect(g, GLANCE_REFRESH_S * 2)).toEqual([]);
+  });
+
+  it("a new hold restarts the refresh clock at the press", () => {
+    const g = new GlanceHold();
+    g.start("left");
+    tickCollect(g, GLANCE_REFRESH_S * 0.8);
+    g.end("left");
+    tick(g, GLANCE_EASE_S * 2);
+    g.start("left"); // new hold — fresh press latch, fresh clock
+    expect(tickCollect(g, GLANCE_REFRESH_S * 0.9)).toEqual([]); // not yet due
+    expect(tickCollect(g, GLANCE_REFRESH_S * 0.2)).toEqual(["left"]);
   });
 });

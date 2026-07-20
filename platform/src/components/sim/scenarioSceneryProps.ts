@@ -126,11 +126,84 @@ const PARKED_ROW: readonly ScenarioObstacleSpec[] = (
  * VALUE (the L7 copy law — each entry cites its truth); `visual: true` on
  * every vehicle (see the header for why), colliders on the poligon cones.
  */
+/**
+ * The sc-follow-standstill „колона" (founder R3 #40 — „line of cars is ONE
+ * car"): 1–2 visual-only queue cars AHEAD of the staged stationary lead, so
+ * the column the copy narrates exists. Truth: the lead is FS_LEAD_CAR
+ * (templates-following.ts) held at y = 290 on the fo-follow-v1 northbound
+ * lane center x = 4.0625; the shadow rests at y ≈ 281 and the player stops
+ * behind it — nothing ever drives past y 290, so bodies at y = 298 / 306
+ * (≈ 3.9 m bumper gaps — a real queue) are pure dressing. Grading unchanged:
+ * leadGapM still measures the REAL staged lead (visual bodies are not
+ * traffic), the trace bytes carry no world actors — no re-record.
+ */
+const STANDSTILL_COLUMN: readonly ScenarioObstacleSpec[] = [
+  { kind: "vehicle", x: 4.0625, y: 298, headingDeg: 0, model: "corva_s", seed: 21, visual: true },
+  { kind: "vehicle", x: 4.0625, y: 306, headingDeg: 0, model: "vela_h3", seed: 22, visual: true },
+];
+
+/**
+ * The sc-ov-narrow corridor dressing (founder R3 #49 — „street not actually
+ * narrow"): parked rows on BOTH curbs squeeze the 1+1 street visually without
+ * touching the map or the choreography. Truths (traces/scOvNarrow.ts +
+ * templates-lanes.ts NARROW_MEETING): driven lines span x ∈ [−4.06, 4.06]
+ * with corner cuts at x = 1..2 over y ∈ [96, 114] and [146, 154]; the staged
+ * in-lane row sits at (4.06, 120/135); the oncoming holds at (−4.06, 200) and
+ * transits the west lane. Bodies hug the carriageway edge at |x| = 7.0 (spans
+ * |6.0..8.0|, edge 8.125 — the pe-child parked-row convention), so every
+ * driven line keeps ≥ 1.09 m of flank clearance (worst case: lane center
+ * |4.06| + hero half-width 0.85 = 4.91 vs body flank 6.0). The squeeze
+ * section itself (y ∈ [105, 150]) stays undressed on the west side — the
+ * meeting corridor — and on the east the staged row IS the obstruction.
+ * Visual-only: no colliders, no grading change, no re-record.
+ */
+const NARROW_ROWS: readonly ScenarioObstacleSpec[] = (
+  [
+    // East (player) curb — south approach, clear of the wait pose (4.06, 104).
+    [7.0, 25, 0, "vela_h3"],
+    [7.0, 40, 0, "pino"],
+    [7.0, 55, 0, "corva_s"],
+    [7.0, 70, 0, "dret_90"],
+    [7.0, 85, 0, "arden_x"],
+    // East curb — past the section, clear of the return cut (ends y 154).
+    [7.0, 162, 0, "corva_sw"],
+    [7.0, 177, 0, "pino"],
+    [7.0, 192, 0, "vela_h3"],
+    // West (oncoming) curb — parked facing south; the section (y 105..150)
+    // and the staged oncoming's hold (−4.06, 200) stay clear.
+    [-7.0, 25, 180, "corva_s"],
+    [-7.0, 45, 180, "tarpan"],
+    [-7.0, 65, 180, "vela_h3"],
+    [-7.0, 85, 180, "pino"],
+    [-7.0, 160, 180, "dret_90"],
+    [-7.0, 176, 180, "corva_sw"],
+    [-7.0, 192, 180, "arden_x"],
+  ] as const
+).map(([x, y, headingDeg, model], i) => ({
+  kind: "vehicle" as const,
+  x,
+  y,
+  headingDeg,
+  model,
+  seed: 30 + i,
+  visual: true as const,
+}));
+
 const HELD_SCENERY: Record<string, readonly ScenarioObstacleSpec[]> = {
   // traces/scHazardObstacle.ts hazardObstacleRects(): the stalled car
   // curb-side of the driving line the ease-around bends past.
   "sc-hazard-obstacle": [
     { kind: "vehicle", x: 5.5, y: 130, headingDeg: 0, model: "dret_90", seed: 4, visual: true },
+  ],
+  // traces/scCrossingBusShadow.ts BUS_OBSTACLE: the stopped large occluder at
+  // the near (east) curb, nose just south of the zebra — founder R3 #26 („NO
+  // BUS AT ALL") ruling: the PROCEDURAL BOX TRUCK stands in until a real bus
+  // rig exists (the audit's costed stopgap; the template copy honestly says
+  // „камион"). Center/heading are the trace rect's own (8.0, 80, north);
+  // `visual: true` keeps the collision consequence in the trace channel where
+  // the drill authored it (the graded rect stays the recorder's SAT test).
+  "sc-crossing-bus-shadow": [
+    { kind: "vehicle", x: 8.0, y: 80, headingDeg: 0, model: "box_truck", seed: 7, visual: true },
   ],
   // traces/scPkSmoothStop.ts pkVanObstacle(): the stopped van behind the
   // smooth-stop mark (test-pinned against the public export).
@@ -158,6 +231,8 @@ const HELD_SCENERY: Record<string, readonly ScenarioObstacleSpec[]> = {
     { kind: "prop", prop: "cone", x: 146.5, y: -129, headingDeg: 0 },
   ],
   "sc-pe-parked-row-scan": PARKED_ROW,
+  "sc-follow-standstill": STANDSTILL_COLUMN,
+  "sc-ov-narrow": NARROW_ROWS,
 };
 
 // ---------------------------------------------------------------------------

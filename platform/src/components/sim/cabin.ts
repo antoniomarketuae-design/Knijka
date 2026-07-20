@@ -30,6 +30,15 @@ export const GLANCE_EASE_S = 0.18;
 /** Tap fallback: sources without a release edge (the touch overlay's round
  *  buttons call glance() once) hold the view this long, then auto-release. */
 export const GLANCE_TAP_HOLD_S = 0.9;
+/** While a glance stays HELD, its graded freshness re-latches every this many
+ *  seconds (founder R3 #13, doc 62 — QA-13: the founder pressed/held the look
+ *  buttons at the second Б1 mouth and was still graded „no scan"). A driver
+ *  whose head is ON the mirror is looking at it the whole hold, not only at
+ *  the press instant — so the rule engine's lastGlanceAt must track the
+ *  ongoing hold. Must sit well inside junctionScanLookbackSec (5 s) so a held
+ *  look can never expire mid-hold; 1 s also keeps the attempt-trace glance
+ *  events sparse. */
+export const GLANCE_REFRESH_S = 1.0;
 
 /**
  * Pure hold-to-glance state machine (extracted so it is unit-testable in
@@ -44,6 +53,10 @@ export const GLANCE_TAP_HOLD_S = 0.9;
  *     GLANCE_TAP_HOLD_S (touch buttons have no keyup).
  *   - update(dt)     → advances the 0..1 envelope; `mirror` clears only after
  *     the head has eased fully back (the camera reads mirror+strength).
+ *     Returns the mirror to RE-LATCH for grading when the hold has lasted
+ *     another GLANCE_REFRESH_S (founder R3 #13 — a held look stays fresh),
+ *     null otherwise. Mashing the same button re-arms the hold (and the tap
+ *     timer) without a second latch — the refresh stream carries freshness.
  */
 export class GlanceHold {
   /** Mirror the head is turned toward (stays set through the ease-out). */
@@ -51,6 +64,7 @@ export class GlanceHold {
   private held = false;
   private env = 0;
   private tapRemainingS = -1;
+  private sinceLatchS = 0;
 
   /** Head-turn envelope 0..1 (0 = forward, 1 = full mirror deflection). */
   get strength(): number {
@@ -64,6 +78,7 @@ export class GlanceHold {
     this.mirror = mirror;
     this.held = true;
     this.tapRemainingS = tap ? GLANCE_TAP_HOLD_S : -1;
+    if (isNewGlance) this.sinceLatchS = 0; // refresh clock restarts per hold
     return isNewGlance;
   }
 
@@ -79,8 +94,8 @@ export class GlanceHold {
     this.tapRemainingS = -1;
   }
 
-  update(dtSec: number): void {
-    if (!this.mirror) return;
+  update(dtSec: number): MirrorGlanceKind | null {
+    if (!this.mirror) return null;
     if (this.held && this.tapRemainingS >= 0) {
       this.tapRemainingS -= dtSec;
       if (this.tapRemainingS <= 0) this.release();
@@ -88,10 +103,18 @@ export class GlanceHold {
     const step = dtSec / GLANCE_EASE_S;
     if (this.held) {
       this.env = Math.min(1, this.env + step);
+      // Founder R3 #13: an ONGOING hold periodically re-latches the graded
+      // sample so the rule engine's freshness tracks the look, not the press.
+      this.sinceLatchS += dtSec;
+      if (this.sinceLatchS >= GLANCE_REFRESH_S) {
+        this.sinceLatchS -= GLANCE_REFRESH_S;
+        return this.mirror;
+      }
     } else {
       this.env = Math.max(0, this.env - step);
       if (this.env <= 0) this.mirror = null;
     }
+    return null;
   }
 }
 
@@ -171,8 +194,13 @@ export class CabinControls {
 
   private clock = 0;
   private indicatorChangedAt = 0;
-  /** One-frame latch consumed by the VehicleSample builder. */
-  private pendingGlanceSample: MirrorGlanceKind | null = null;
+  /** Latch QUEUE consumed by the VehicleSample builder, ONE per frame.
+   *  A queue, not a single slot (founder R3 #13): left+right pressed inside
+   *  one render frame (easy at low FPS on the 16 GB box) must BOTH reach the
+   *  rule engine — the second drains one frame later instead of silently
+   *  overwriting the first. Bounded (drop past 4) so a stalled consumer can
+   *  never grow it. */
+  private readonly pendingGlanceSamples: MirrorGlanceKind[] = [];
   private autocancelArmed = false;
   private disposed = false;
 
@@ -203,7 +231,11 @@ export class CabinControls {
    */
   update(dtSec: number, steerRad: number): void {
     this.clock += dtSec;
-    this.glances.update(dtSec);
+    // Held-glance refresh (founder R3 #13): sample-only — the driver's head is
+    // still on the mirror, not a new act, so no onGlance callback re-fires
+    // (the pre-drive observer and audio react to presses, not to holding).
+    const refresh = this.glances.update(dtSec);
+    if (refresh) this.enqueueGlanceSample(refresh);
 
     if (this.indicator !== "off") {
       const toward = this.indicator === "left" ? steerRad : -steerRad;
@@ -240,13 +272,12 @@ export class CabinControls {
   }
 
   /**
-   * The mirror glanced THIS frame, exactly once (VehicleSample.mirrorGlance
-   * is a one-frame event for the rule engine's mirror-check detector).
+   * The next queued glance, exactly once (VehicleSample.mirrorGlance is a
+   * one-frame event for the rule engine's mirror-check detector); glances
+   * queued in the same frame drain over consecutive frames.
    */
   consumeGlanceSample(): MirrorGlanceKind | null {
-    const m = this.pendingGlanceSample;
-    this.pendingGlanceSample = null;
-    return m;
+    return this.pendingGlanceSamples.shift() ?? null;
   }
 
   // -- public control actions (A2) ---------------------------------------------
@@ -322,8 +353,13 @@ export class CabinControls {
 
   /** The graded once-per-hold press: rule-engine sample + observer callback. */
   private latchGlance(mirror: MirrorGlanceKind): void {
-    this.pendingGlanceSample = mirror;
+    this.enqueueGlanceSample(mirror);
     this.callbacks.onGlance?.(mirror);
+  }
+
+  /** Bounded push into the sample queue (press latches and hold refreshes). */
+  private enqueueGlanceSample(mirror: MirrorGlanceKind): void {
+    if (this.pendingGlanceSamples.length < 4) this.pendingGlanceSamples.push(mirror);
   }
 
   private readonly onKeyDown = (e: KeyboardEvent): void => {

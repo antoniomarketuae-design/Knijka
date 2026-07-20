@@ -96,6 +96,15 @@ for (const id of ["tj-rhr-v1", "tj-stop-v1"] as const) {
           // props.ts: minor approach into a maxRank >= 5 junction → Б2.
           expect(world.stats.signs.stop).toBe(1);
           expect(world.stats.signs.giveWay).toBe(0);
+          // Doc 62 S4/#9: the Б2 must stand AT THE PLAYER'S APPROACH — the
+          // stem's right curb beside the derived line — and carry the
+          // lesson-critical scenario scale („those signs must be big").
+          const b2 = world.signs.find((s) => s.kind === "stop")!;
+          expect(b2.position[0]).toBeGreaterThan(8); // right of the stem lane
+          expect(b2.position[0]).toBeLessThan(10);
+          expect(b2.position[2]).toBeCloseTo(28.5, 0); // district y ≈ −28.5, at the line
+          expect(Math.abs(b2.yaw)).toBeLessThan(1e-6); // faces the northbound driver
+          expect(b2.scale).toBeGreaterThanOrEqual(1.3);
         } else {
           expect(world.stats.signs.stop).toBe(0);
           expect(world.stats.signs.giveWay).toBe(0);

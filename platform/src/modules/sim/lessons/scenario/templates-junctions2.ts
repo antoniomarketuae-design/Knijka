@@ -46,9 +46,13 @@ export const JUNCTION2_STOP_LINE_M = 27.725;
  * "stopLine": the runtime's give-way check (conflictNear at the stop-line
  * crossing) adjudicates — the runner emits the yielded commendation itself
  * (the RHR/roundabout trackers commend on their own; the stop-line give-way
- * case is the orchestrator's to commend, doc 72 N-notes). leadSec is POSITIVE
- * (the car passes the node ~1.1 s before the player's projected crossing), so
+ * case is the orchestrator's to commend, doc 72 N-notes). leadSec is NEGATIVE
+ * (the car reaches the node ~3.5 s AFTER the player's projected crossing), so
  * an emerging player who does NOT wait meets the car still in the box.
+ * witnessArm (doc 62 S2): the release is gated on the player's true arrival
+ * (raw ETA ≤ 8 s or within 6 m of the Б2 line), so a hesitant live student
+ * still MEETS the car at the line instead of finding an empty junction; the
+ * recorded drives commit on the same frame (≥ ~12 km/h at the 22 m gate).
  */
 export const SC_JUNCTION_GAP_CONFLICT: PriorityFromRightSpec = {
   id: "sc-jgap-conflict",
@@ -67,6 +71,7 @@ export const SC_JUNCTION_GAP_CONFLICT: PriorityFromRightSpec = {
   leadSec: -3.5,
   lineDistM: 27.73,
   clearSpeedMps: 7,
+  witnessArm: { etaSec: 8, nearLineM: 6 },
 };
 
 export const SC_JUNCTION_GAP: ScenarioSpec = {
@@ -119,7 +124,14 @@ export const SC_JUNCTION_GAP: ScenarioSpec = {
     {
       id: "sc-jgap-line",
       titleBg: "Премини стоп-линията след пълно спиране и пропуснат интервал",
-      params: { kind: "passSignal", nodeId: "tj-n-c", x: 0, y: 0, radiusM: 45, control: "stopSign" },
+      // Founder R3 #14 (doc 62 — „stop marker wrong"): the guidance pillar
+      // stands at THIS point (guidanceGoalFor renders passSignal x/y), so it
+      // is pinned to the Б2 stop line in the player's lane (lane center
+      // 4.0625, line at y = −27.725 — JUNCTION2_STOP_LINE_M), NOT the
+      // junction node center: the marker must say „спри ТУК", never mid-box.
+      // Completion is unchanged: the zone (r 45) still covers both the line
+      // crossing and the node.
+      params: { kind: "passSignal", nodeId: "tj-n-c", x: 4.06, y: -27.73, radiusM: 45, control: "stopSign" },
     },
     {
       id: "sc-jgap-exit",
@@ -197,6 +209,9 @@ export const SC_JUNCTION_BLIND_CONFLICT: PriorityFromRightSpec = {
   leadSec: -3.5,
   lineDistM: 18,
   clearSpeedMps: 11.5,
+  // Doc 62 S2 (founder R3 #15): release only on the player's true arrival —
+  // a creeping student behind the corner building still meets the car.
+  witnessArm: { etaSec: 8, nearLineM: 6 },
 };
 
 export const SC_JUNCTION_BLIND: ScenarioSpec = {
@@ -322,6 +337,9 @@ export const SC_JUNCTION_LEFT_CONFLICT: PriorityFromRightSpec = {
   leadSec: -3.5,
   lineDistM: 27.73,
   clearSpeedMps: 7,
+  // Doc 62 S2 (founder R3 #16 „колата минава преди да стигна знака"): the
+  // release waits for the player's true arrival at the Б2 line, any pace.
+  witnessArm: { etaSec: 8, nearLineM: 6 },
 };
 
 export const SC_JUNCTION_LEFT: ScenarioSpec = {

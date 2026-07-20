@@ -2,17 +2,17 @@
  "format": "district-v1",
  "meta": {
   "district": "ov-oneway",
-  "label": "Учебна еднопосочна улица (сценарий OV-13)",
+  "label": "Учебно Т-кръстовище — вход в еднопосочна улица (сценарий OV-13)",
   "mapKind": "scenario-street",
   "generator": "tools/maps/gen_ov_oneway.mjs",
   "boundsLocalMeters": {
-   "minX": -24.06,
-   "minY": 0,
-   "maxX": 10.0625,
-   "maxY": 300
+   "minX": -146,
+   "minY": -6,
+   "maxX": 146,
+   "maxY": 210.0625
   },
   "attribution": {
-   "text": "Учебна еднопосочна улица — оригинален параметричен дизайн (без данни от OpenStreetMap)",
+   "text": "Учебно Т-кръстовище с еднопосочна улица — оригинален параметричен дизайн (без данни от OpenStreetMap)",
    "license": "All rights reserved",
    "licenseUrl": "/",
    "copyrightUrl": "/",
@@ -20,55 +20,102 @@
   },
   "defaults": {
    "maxspeedUrbanKmh": 50,
-   "note": "Еднопосочна улица: влизаш само по посока на движението; знакът В2 „Влизането забранено“ значи не влизаш."
+   "note": "Т-кръстовище с еднопосочна: стрелките на платното показват посоката на движение — влиза се само по нея (надясно)."
   },
   "stats": {
-   "roadKm": 0.3,
-   "nodes": 2,
-   "edges": 1,
-   "intersections": 0,
+   "roadKm": 0.48,
+   "nodes": 4,
+   "edges": 3,
+   "intersections": 1,
    "crossings": 0,
    "buildings": 1,
    "spawnPoints": 2
   },
   "scenario": {
-   "archetype": "straight-street",
+   "archetype": "t-junction",
    "params": {
-    "lengthM": 300,
+    "approachM": 200,
+    "armM": 140,
     "maxspeedKmh": 50
    },
    "oneway": true,
+   "onewayFlow": "east",
+   "junction": {
+    "x": 0,
+    "y": 200
+   },
    "lanesPerDirection": 1,
-   "laneCenterM": 0
+   "laneCenterRightM": 4.06,
+   "barLaneCenterM": 0,
+   "gates": {
+    "mouth": {
+     "x": 4.06,
+     "y": 170
+    },
+    "legalEntry": {
+     "x": 60,
+     "y": 200
+    },
+    "finish": {
+     "x": 125,
+     "y": 200
+    },
+    "wrongEntry": {
+     "x": -60,
+     "y": 200
+    }
+   },
+   "laneArrows": {
+    "edgeId": "ov-ow-approach",
+    "travelDir": 1,
+    "fromM": 130,
+    "toM": 190,
+    "lanes": [
+     {
+      "centerM": 4.06,
+      "arrow": "right"
+     }
+    ]
+   }
   }
  },
  "roads": {
   "nodes": [
    {
-    "id": "ov-ow-n-end",
-    "x": 0,
-    "y": 300
+    "id": "ov-ow-n-east",
+    "x": 140,
+    "y": 200
    },
    {
-    "id": "ov-ow-n-start",
+    "id": "ov-ow-n-junction",
+    "x": 0,
+    "y": 200
+   },
+   {
+    "id": "ov-ow-n-south",
     "x": 0,
     "y": 0
+   },
+   {
+    "id": "ov-ow-n-west",
+    "x": -140,
+    "y": 200
    }
   ],
   "edges": [
    {
-    "id": "ov-ow-street",
-    "from": "ov-ow-n-start",
-    "to": "ov-ow-n-end",
+    "id": "ov-ow-approach",
+    "from": "ov-ow-n-south",
+    "to": "ov-ow-n-junction",
     "class": "residential",
-    "name": "Еднопосочна улица",
-    "oneway": true,
+    "name": "Подход към еднопосочната улица",
+    "oneway": false,
     "roundabout": false,
-    "lanes": 1,
+    "lanes": 2,
     "lanesSource": "tag",
     "maxspeed": 50,
     "maxspeedSource": "tag",
-    "length": 300,
+    "length": 200,
     "geometry": [
      [
       0,
@@ -76,36 +123,92 @@
      ],
      [
       0,
-      300
+      200
+     ]
+    ]
+   },
+   {
+    "id": "ov-ow-oneway-w",
+    "from": "ov-ow-n-west",
+    "to": "ov-ow-n-junction",
+    "class": "residential",
+    "name": "Еднопосочна улица — западно рамо (посока изток)",
+    "oneway": true,
+    "roundabout": false,
+    "lanes": 1,
+    "lanesSource": "tag",
+    "maxspeed": 50,
+    "maxspeedSource": "tag",
+    "length": 140,
+    "geometry": [
+     [
+      -140,
+      200
+     ],
+     [
+      0,
+      200
+     ]
+    ]
+   },
+   {
+    "id": "ov-ow-oneway-e",
+    "from": "ov-ow-n-junction",
+    "to": "ov-ow-n-east",
+    "class": "residential",
+    "name": "Еднопосочна улица — източно рамо (посока изток)",
+    "oneway": true,
+    "roundabout": false,
+    "lanes": 1,
+    "lanesSource": "tag",
+    "maxspeed": 50,
+    "maxspeedSource": "tag",
+    "length": 140,
+    "geometry": [
+     [
+      0,
+      200
+     ],
+     [
+      140,
+      200
      ]
     ]
    }
   ]
  },
- "intersections": [],
+ "intersections": [
+  {
+   "id": "ov-ow-n-junction",
+   "x": 0,
+   "y": 200,
+   "degree": 3,
+   "signalized": false
+  }
+ ],
  "crossings": [],
  "roundabouts": [],
  "buildings": [
   {
-   "id": "ov-ow-b-block",
+   "id": "ov-ow-b-corner",
    "height": 7,
    "heightSource": "default",
    "footprint": [
     [
-     -24.06,
+     -40.12,
      150
     ],
     [
-     -12.06,
+     -20.12,
      150
     ],
     [
-     -12.06,
-     168
+     -20.12,
+     178
     ],
     [
-     -24.06,
-     168
+     -40.12,
+     178
     ]
    ]
   }
@@ -113,19 +216,19 @@
  "spawnPoints": [
   {
    "id": "ov-ow-spawn-entry",
-   "x": 0,
+   "x": 4.06,
    "y": 15,
    "heading": 0,
-   "edgeId": "ov-ow-street",
-   "name": "Вход по посока на движението"
+   "edgeId": "ov-ow-approach",
+   "name": "Подход към еднопосочната"
   },
   {
-   "id": "ov-ow-spawn-finish",
-   "x": 0,
-   "y": 285,
-   "heading": 0,
-   "edgeId": "ov-ow-street",
-   "name": "Контролна точка — край на улицата"
+   "id": "ov-ow-spawn-east",
+   "x": 125,
+   "y": 200,
+   "heading": 90,
+   "edgeId": "ov-ow-oneway-e",
+   "name": "Контролна точка — източно рамо (по посоката)"
   }
  ]
 }

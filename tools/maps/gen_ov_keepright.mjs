@@ -110,7 +110,10 @@ export function buildOvKeepRightDistrict(params) {
   const CROSSINGS = [];
   const ROUNDABOUTS = [];
 
-  // -- Spawns: right-lane start (where you belong) + a finish reference point.
+  // -- Spawns: right-lane start (where you belong) + the LEFT-lane start the
+  // redesigned sc-ov-keep-right opens in (founder R3 doc 62 #45: „дръж
+  // вдясно" must START wrong so keeping right is an actual mirror-signal-move
+  // lane change, not a no-op) + a finish reference point.
   const SPAWN_POINTS = [
     {
       id: "ov-kr-spawn-start",
@@ -119,6 +122,14 @@ export function buildOvKeepRightDistrict(params) {
       heading: 0,
       edgeId: "ov-kr-road",
       name: "Начало — дясна лента",
+    },
+    {
+      id: "ov-kr-spawn-left",
+      x: laneLeftM,
+      y: 15,
+      heading: 0,
+      edgeId: "ov-kr-road",
+      name: "Начало — лява лента (престрой се вдясно)",
     },
     {
       id: "ov-kr-spawn-finish",

@@ -42,7 +42,7 @@ const X_LANE = 4.06;
 export function scSpeedRainShadowScript(): DriveScript {
   return {
     steps: [
-      { kind: "annotation", textBg: "Дъжд и тъмнина — карай чувствително под ограничението, около 38 км/ч." },
+      { kind: "annotation", textBg: "Знакът казва 50, но тази вечер той лъже: в дъжд и тъмнина съобразената скорост е около 38 км/ч." },
       { kind: "glance", mirror: "rear" },
       // 38 km/h — under the rain envelope (42.5 km/h) for the whole street.
       { kind: "drive", points: [[X_LANE, 15], [X_LANE, 120]], targetKmh: 38, stopAtEnd: false },
@@ -65,7 +65,7 @@ export function scSpeedRainMistakeDrySpeedScript(): DriveScript {
     steps: [
       {
         kind: "annotation",
-        textBg: "Грешка: суха скорост в дъжда — стрелката на 50, все едно е сух ден.",
+        textBg: "Грешка: „карам под знака“ — стрелката на 50 в дъжда, все едно е сух ден. Знакът важи за идеални условия.",
       },
       { kind: "glance", mirror: "rear" },
       // Hold 50 km/h (the posted limit): above the 42.5 rain envelope but at the

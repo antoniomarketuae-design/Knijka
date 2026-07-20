@@ -68,6 +68,15 @@ describe("zone-driven sign posts (SIGN-ASSET drop)", () => {
     expectPost(zonePosts(world), "noOvertaking", 90);
   });
 
+  it("zone posts on scenario maps carry the lesson-critical scale (doc 62 #6)", () => {
+    // The sign IS the lesson on a micro-map — real-size posts read miniature
+    // against the 2.5× perceptual road, so scenario maps scale them up.
+    const world = loadWorld("ov-ban-v1");
+    const post = world.signs.find((s) => s.kind === "noOvertaking")!;
+    expect(post.scale).toBeGreaterThanOrEqual(1.3);
+    expect(post.scale).toBeLessThanOrEqual(1.6);
+  });
+
   it("pk-ban-v1: one В27 post at the span start (70 m)", () => {
     const world = loadWorld("pk-ban-v1");
     expect(world.stats.signs.noStopping).toBe(1);
@@ -78,6 +87,31 @@ describe("zone-driven sign posts (SIGN-ASSET drop)", () => {
     const world = loadWorld("sp-curve-v1");
     expect(world.stats.signs.curve).toBe(1);
     expectPost(zonePosts(world), "curve", 220);
+  });
+
+  it("sp-curve-v1: the В26-50 companion plate the copy promises stands beside the А1 (doc 62 #36)", () => {
+    // „знак А1 с табела „50"" — the advisory 50 pairs the shipped limit50
+    // face with the warning: 2 m before it, staggered further off the curb so
+    // neither occludes the other on the straight approach. Placed ONLY when
+    // the authored advisory matches the shipped face (50) — mw-exit-v1's
+    // advisory-60 ramp stays А1-only (the В26-60 face is a reported asset
+    // need, and a „50" post there would lie).
+    const world = loadWorld("sp-curve-v1");
+    const a1 = world.signs.find((s) => s.kind === "curve")!;
+    const plates = world.signs.filter(
+      (s) => s.kind === "limit50" && Math.abs(s.position[2] - -218) < 0.5,
+    );
+    expect(plates).toHaveLength(1);
+    const plate = plates[0]!;
+    expect(plate.position[0]).toBeGreaterThan(a1.position[0]); // staggered outward
+    expect(plate.scale).toBe(a1.scale); // one signed station, one prominence
+    // District-entry plates (the shipped generic pass) + the companion.
+    expect(world.stats.signs.limit50).toBe(3);
+
+    const mwExit = loadWorld("mw-exit-v1");
+    expect(mwExit.stats.signs.curve).toBe(1);
+    // No companion on the advisory-60 ramp: only the two generic entry plates.
+    expect(mwExit.stats.signs.limit50).toBe(2);
   });
 
   it("ac-aqua-v1 + ac-ice-v1: one А15 post each at the patch start", () => {

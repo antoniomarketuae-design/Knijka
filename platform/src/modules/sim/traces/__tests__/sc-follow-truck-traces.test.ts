@@ -49,7 +49,9 @@ const drives = new Map<ScFollowTruckTraceName, RecordedDrive>(
 describe("sc-follow-truck — the FO-06 profile is staged (doc 72 §9)", () => {
   it("the template's lead actor is a truck-profile brakingLeadCar", () => {
     const staged = SC_FOLLOW_TRUCK.staged ?? [];
-    expect(staged.length).toBe(1);
+    // Founder R3 #42 (doc 62): the truck lead PLUS the oncoming counter-flow
+    // that makes overtaking visibly unsafe — two staged events, exactly.
+    expect(staged.length).toBe(2);
     const lead = staged[0];
     expect(lead.kind).toBe("brakingLeadCar");
     if (lead.kind !== "brakingLeadCar") return;
@@ -57,6 +59,23 @@ describe("sc-follow-truck — the FO-06 profile is staged (doc 72 §9)", () => {
     // The slam tier is authored OUT of reach — pure gap management.
     expect(lead.minSlamSpeedKmh).toBeGreaterThan(200);
     expect(lead.slamAt.y).toBeGreaterThan(360);
+  });
+
+  it("the oncoming counter-flow occupies the opposite bank for the whole follow (R3 #42)", () => {
+    const staged = SC_FOLLOW_TRUCK.staged ?? [];
+    const stream = staged[1];
+    expect(stream.kind).toBe("oncomingStream");
+    if (stream.kind !== "oncomingStream") return;
+    // Southbound = oncoming on fo-follow-v1; pressure scenery (learn-only).
+    expect(stream.actor.pathNodes).toEqual(["fo-n-end", "fo-n-start"]);
+    expect(stream.count).toBe(6);
+    // Every headway sits far under an overtake window around a 7.5 m truck.
+    for (const g of stream.gapsM) expect(g).toBeLessThanOrEqual(50);
+    // Hold feasibility (the ov-oncoming battery law): trailing cars stay
+    // on-path — Σ gaps never exceeds the head's hold arc.
+    const total = stream.gapsM.reduce((a, b) => a + b, 0);
+    expect(stream.gapsM.length).toBe(stream.count - 1);
+    expect(total).toBeLessThanOrEqual(stream.actor.hold.offsetM);
   });
 });
 

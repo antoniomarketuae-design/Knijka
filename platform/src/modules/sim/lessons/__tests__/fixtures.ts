@@ -4,7 +4,7 @@
  * must never depend on it), SimTick builders and an in-memory session store.
  */
 
-import type { SignalPhase, VehicleSample, WorldRuntime } from "../../contracts";
+import type { SignalLampState, SignalPhase, VehicleSample, WorldRuntime } from "../../contracts";
 import type { SimTick, SimTickEvent } from "../../rules";
 import type {
   SaveSimSessionInput,
@@ -45,6 +45,9 @@ export function createStubWorldRuntime(opts: StubWorldOptions = {}): WorldRuntim
       });
     },
     signalPhase(signalNodeId: string): SignalPhase {
+      return phases[signalNodeId] ?? "green";
+    },
+    signalLampState(signalNodeId: string): SignalLampState {
       return phases[signalNodeId] ?? "green";
     },
     speedLimitAt(): number {

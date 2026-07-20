@@ -27,8 +27,10 @@ import {
 } from "@/modules/sim/vehicle";
 import {
   FpsMeter,
+  chaseGlanceOrbit,
   chaseOrbitLock,
   getReverseViewEnabled,
+  glanceOrbitLock,
   reverseSwingEnvelope,
   reverseViewTarget,
   stepReverseSwing,
@@ -127,7 +129,10 @@ const GLANCE_OFFSETS: Record<MirrorGlanceKind, { yaw: number; pitch: number }> =
  * rigid cockpit cams transmit every suspension tick into the viewer's neck);
  * both cameras get a subtle speed-based FOV widen, and the cockpit performs
  * the HOLD-to-glance mirror look (Q/E/F held / hotspot pressed) that feeds
- * the rule engine's mirror-check detector once per hold.
+ * the rule engine's mirror-check detector once per hold. In the CHASE view
+ * the same held glance ORBITS the camera toward the glanced quarter
+ * (engine/glanceView.ts — the founder glance-payoff law: a graded press must
+ * SHOW something), on exam rungs too; top-down needs nothing, it sees all.
  *
  * REVERSING POV: while the selector is in R the view turns to look back — the
  * chase camera orbits to the car's rear-facing aspect, the cockpit does the
@@ -163,6 +168,9 @@ export function CameraRig({
   /** Reversing-POV swing, 0 = looking forward … 1 = looking back
    *  (engine/reverseView.ts owns every rule and constant behind it). */
   const swingRef = useRef(0);
+  /** Chase orbit angle rendered LAST frame (reverse + glance, rad about +Y) —
+   *  feeds glanceOrbitLock's observed-rate arc lock (engine/glanceView.ts). */
+  const chasePrevOrbitRef = useRef(0);
   // Smoothed G-force lean state (cockpit head motion).
   const leanRef = useRef({ latG: 0, longG: 0, prevSpeedMps: 0 });
   // Top-down state (refs — render-free): zoom preset index + orientation.
@@ -349,14 +357,30 @@ export function CameraRig({
       // opens beyond it. Halfway through, the axis points car-left (+X) and
       // the camera is therefore at the car's RIGHT flank — the same side as
       // the cockpit's shoulder check, and never a path through the car.
-      if (swing > 0) fwdFlat.applyAxisAngle(UP_AXIS, swing * CHASE_REVERSE_ORBIT_RAD);
+      //
+      // CHASE GLANCES (doc 62 #44 tailgater / #7 #13 "make the button real"):
+      // a held Q/E/F adds its own orbit share on the SAME axis —
+      // engine/glanceView.ts decides how much (reverse swing keeps priority;
+      // REAR aims at the identical over-the-boot aspect, so F reveals a close
+      // tailgater; sides show the glanced quarter). Grading is untouched —
+      // the mirrorGlance sample latched on the press, exactly as before.
+      const orbitRad =
+        swing * CHASE_REVERSE_ORBIT_RAD +
+        chaseGlanceOrbit(mode, cabin?.glanceMirror ?? null, glanceS, swing);
+      if (orbitRad !== 0) fwdFlat.applyAxisAngle(UP_AXIS, orbitRad);
       desired.copy(pos).addScaledVector(fwdFlat, -CHASE_DISTANCE);
       desired.y += CHASE_HEIGHT;
       // The chase lerp trails its target by v/rate — far too slack to track an
       // orbiting desired (it would be dragged across the car instead of round
       // it), so the swing locks the follow onto the arc while it is in motion
-      // and hands the trailing feel back as it settles.
-      const lock = chaseOrbitLock(swingRef.current, swingTarget);
+      // and hands the trailing feel back as it settles. The glance's share has
+      // no 0/1 target to measure from — its lock keys on the observed orbital
+      // RATE instead (glanceOrbitLock); take the stronger of the two.
+      const lock = Math.max(
+        chaseOrbitLock(swingRef.current, swingTarget),
+        glanceOrbitLock(chasePrevOrbitRef.current, orbitRad, delta),
+      );
+      chasePrevOrbitRef.current = orbitRad;
       const k = switched ? 1 : Math.max(1 - Math.exp(-CHASE_STIFFNESS * delta), lock);
       cam.position.lerp(desired, k);
       look.copy(pos).addScaledVector(fwdFlat, CHASE_LOOK_AHEAD);

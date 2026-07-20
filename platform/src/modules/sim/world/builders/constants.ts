@@ -136,6 +136,36 @@ export const ZEBRA_LENGTH_M = 6.0; // extent along the road axis
 export const SOLID_CENTER_LINE_WIDTH_M = DASH_WIDTH_M;
 export const BUS_LANE_SEAM_WIDTH_M = EDGE_LINE_WIDTH_M;
 
+/**
+ * Lesson-critical sign prominence (founder review R3 doc 62 S4/#6: „those
+ * signs must be big because they are a major part"). On scenario micro-maps
+ * (meta.mapKind "scenario-*") every sign that IS the lesson — the junction
+ * Б2/Б1, the roundabout Д11, the zone-driven В24/В27/А1/А15/rail posts —
+ * renders at this uniform instance scale. Real-size signs read miniature
+ * against the 2.5× perceptually scaled road; the drills' own signs must be
+ * unmissable. City (district-v1), exam (d2-v1) and полигон maps carry no
+ * scenario mapKind and keep scale-free (byte-identical) placements.
+ */
+export const SCENARIO_SIGN_SCALE = 1.5;
+
+// --- painted zone-speed glyphs (founder R3 #33/#34 — the honest stopgap
+// while the В26-30 face is missing from the sign kit) ------------------------
+
+/** Only zone speeds paint (30/20). Higher tagged limits stay paint-free. */
+export const SPEED_GLYPH_MAX_KMH = 30;
+/** Untagged straight-street hosts qualify only past this length (a real zone
+ *  street like sp-zone30's 360 m, not a 90 m driveway stub). */
+export const SPEED_GLYPH_MIN_EDGE_M = 150;
+/** First glyph this far into the drawn line (ahead of the entry spawns). */
+export const SPEED_GLYPH_INSET_M = 20;
+/** Repeat pitch of glyph stations along the street. */
+export const SPEED_GLYPH_PITCH_M = 120;
+/** Digit box (road numerals elongate along travel; 2.5× road scale). */
+export const SPEED_GLYPH_DIGIT_H_M = 6.0;
+export const SPEED_GLYPH_DIGIT_W_M = 2.4;
+export const SPEED_GLYPH_STROKE_M = 0.5;
+export const SPEED_GLYPH_DIGIT_GAP_M = 0.9;
+
 /** Facade bay module (whole-bay UV offsets snap to this). */
 export const FACADE_BAY_M = 3;
 /**

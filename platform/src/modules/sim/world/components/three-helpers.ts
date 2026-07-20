@@ -83,7 +83,11 @@ export function createInstancedMesh(
 
 /**
  * Instanced mesh where each instance is offset from a base transform —
- * used for traffic-light lamps (3 per head, colored per phase).
+ * used for traffic-light lamps (3 per head, colored per phase). Honors the
+ * base's `scale` exactly like createInstancedMesh: both the child geometry
+ * AND its local offset scale, so a scaled signal housing keeps its lenses
+ * registered in the enlarged lamp windows (doc 62 S1 — the lesson-critical
+ * prop prominence on scenario maps).
  */
 export function createOffsetInstancedMesh(
   geometry: THREE.BufferGeometry,
@@ -96,12 +100,13 @@ export function createOffsetInstancedMesh(
   const offset = new THREE.Vector3();
   for (let i = 0; i < bases.length; i++) {
     const b = bases[i]!;
+    const s = b.scale ?? 1;
     tmpQuat.setFromAxisAngle(Y_AXIS, b.yaw);
     for (let j = 0; j < localOffsets.length; j++) {
       const o = localOffsets[j]!;
-      offset.set(o[0], o[1], o[2]).applyQuaternion(tmpQuat);
+      offset.set(o[0] * s, o[1] * s, o[2] * s).applyQuaternion(tmpQuat);
       tmpPos.set(b.position[0] + offset.x, b.position[1] + offset.y, b.position[2] + offset.z);
-      tmpScale.set(1, 1, 1);
+      tmpScale.set(s, s, s);
       tmpMat.compose(tmpPos, tmpQuat, tmpScale);
       mesh.setMatrixAt(i * localOffsets.length + j, tmpMat);
     }

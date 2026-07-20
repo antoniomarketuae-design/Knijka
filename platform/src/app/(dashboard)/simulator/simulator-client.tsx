@@ -89,6 +89,11 @@ export function SimulatorClient({
     templateId: string;
     level: ScenarioLevel;
   } | null>(null);
+  // R3 #5/#23: leaving a scenario session („Назад към таблото" / „← Всички
+  // уроци") lands back on the catalog ANCHORED at the just-played template —
+  // the founder returns to his position in the list, not to the page top
+  // (and never to /dashboard, whose route hop is what errored on him).
+  const [focusTemplateId, setFocusTemplateId] = useState<string | null>(null);
 
   // Regenerating from the id is pure and cheap — the id IS the spec recipe.
   const examVariant = useMemo(
@@ -131,6 +136,7 @@ export function SimulatorClient({
   // сценарий" along its own ladder (onStartScenario below). Exiting returns to
   // the select screen with fresh progression.
   if (scenarioLesson !== null) {
+    const playedTemplateId = scenarioPick!.templateId;
     return (
       <LessonPlayShell
         key={scenarioLesson.id}
@@ -138,6 +144,7 @@ export function SimulatorClient({
         quality={quality}
         nextLesson={null}
         onExitToSelect={() => {
+          setFocusTemplateId(playedTemplateId); // catalog re-anchors here
           setScenarioPick(null);
           router.refresh(); // fresh stars/unlocks after new attempts
         }}
@@ -205,6 +212,7 @@ export function SimulatorClient({
         {/* S1: the „Сценарии" zone — the scenario practice library. */}
         <ScenarioCatalogSection
           scenarios={scenarios}
+          focusTemplateId={focusTemplateId}
           onStart={(templateId, level) => setScenarioPick({ templateId, level })}
         />
         {/* A15: past sessions — result + stored debrief on expand. */}
@@ -247,6 +255,7 @@ export function SimulatorClient({
       nextLesson={next ? { id: next.id, titleBg: next.titleBg } : null}
       onExitToSelect={() => {
         setActiveLessonId(null);
+        setFocusTemplateId(null); // a curriculum exit needs no catalog anchor
         router.refresh(); // pull fresh progression after new attempts
       }}
       onStartLesson={setActiveLessonId}

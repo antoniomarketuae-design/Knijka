@@ -7,9 +7,11 @@
  *      not-yielded, never SPEEDING_*); the dark drive grades only
  *      HEADLIGHTS_OFF_AT_NIGHT (never a crossing code — it stops outside the
  *      zone).
- *   3. The NIGHT axis is real (every drive records isNight) and the leash is
- *      genuinely shorter than the live daytime dart's — the two templates on
- *      this district cannot play identically.
+ *   3. The NIGHT axis is real (every drive records isNight) and the delta
+ *      against the live daytime dart holds — since the R3 #25 suddenness
+ *      retune the DAY dart releases later (26 m) at a bolt (2.5 m/s) while
+ *      the NIGHT figure walks (1.4 m/s) from the low-beam edge (30 m) in the
+ *      dark: the two templates on this district cannot play identically.
  *   4. COMMITTED FILES under content/traces/sc-pe-night-unlit/ ARE the
  *      recordings of these scripts, byte-for-byte, with identical public copies.
  *
@@ -119,17 +121,26 @@ describe("the NIGHT delta against the live daytime dart on the same district", (
     expect(violationCodes(drives.get("shadow-correct")!)).not.toContain("HEADLIGHTS_OFF_AT_NIGHT");
   });
 
-  it("the leash is meaningfully shorter than sc-crossing-dart's (they cannot play alike)", () => {
+  it("the delta against sc-crossing-dart holds (R3 #25: they cannot play alike)", () => {
     const night = SC_PE_NIGHT_UNLIT.staged![0];
     const day = SC_CROSSING_DART.staged![0];
     expect(night.kind).toBe("pedestrianDartOut");
     expect(day.kind).toBe("pedestrianDartOut");
     if (night.kind !== "pedestrianDartOut" || day.kind !== "pedestrianDartOut") return;
-    // Same district, same zebra — the encounter differs by WHEN she is released
-    // (and by her pace: the night figure walks, she does not sprint).
+    // Same district, same zebra — but since the founder R3 #25 suddenness
+    // retune the encounters differ on BOTH remaining axes, pinned here at
+    // full strength:
     expect(night.crossing).toEqual(day.crossing);
-    expect(night.triggerDistM).toBeLessThanOrEqual(day.triggerDistM - 8);
-    expect(night.speedMps).toBeLessThan(day.speedMps);
+    // PACE: the day figure BOLTS (the reaction emergency), the night figure
+    // WALKS (the visibility lesson) — at least a full 1.0 m/s apart.
+    expect(day.speedMps - night.speedMps).toBeGreaterThanOrEqual(1.0);
+    // LEASH: the day dart is the LATE release (suddenness — at most 30 m);
+    // the night figure appears no later than the low-beam edge, and never
+    // inside the day dart's leash (the night drill must stay the calmer,
+    // earlier-appearing figure, or the two drills converge again).
+    expect(day.triggerDistM).toBeLessThanOrEqual(30);
+    expect(night.triggerDistM).toBeGreaterThanOrEqual(day.triggerDistM + 4);
+    // CONDITIONS: the night axis is the night template's alone.
     expect(SC_PE_NIGHT_UNLIT.conditions?.night).toBe(true);
     expect(SC_CROSSING_DART.conditions?.night ?? false).toBe(false);
   });

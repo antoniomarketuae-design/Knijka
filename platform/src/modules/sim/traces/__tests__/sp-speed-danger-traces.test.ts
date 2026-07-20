@@ -1,9 +1,14 @@
 /**
- * S3 trace gate — „Над +10 км/ч" (sc-speed-dangerous on sp-danger-v1, doc 72
- * SP-02), doc 76 §5/§9 stages 3+5:
- *   1. SHADOW replays with ZERO violations and earns CLEAN_DRIVING.
- *   2. MISTAKE DEMOS grade EXACTLY SPEEDING_DANGEROUS and NEVER the minor band
- *      (the fast band-crossing keeps SPEEDING_OVER_LIMIT from arming).
+ * S3 trace gate — „Над +10 км/ч" (sc-speed-dangerous on ov-keepright-v1, doc 72
+ * SP-02 + SP-13; founder R3 redesign doc 62 #31 — the FLOW-PRESSURE drill),
+ * doc 76 §5/§9 stages 3+5:
+ *   1. SHADOW replays with ZERO violations and earns CLEAN_DRIVING while the
+ *      two staged learn-only flow actors run their illegal pace around it.
+ *   2. MISTAKE DEMOS demonstrate the BAND: pacing the flow at ~58 grades
+ *      EXACTLY SPEEDING_OVER_LIMIT (never the dangerous code); chasing it to
+ *      ~66 grades EXACTLY SPEEDING_DANGEROUS (never the minor band — the fast
+ *      band-crossing keeps it from arming) and never FOLLOWING_TOO_CLOSE
+ *      (the pace car starts ~75 m ahead and the chase closes ~1.4 m/s).
  *   3. COMMITTED FILES under content/traces/sc-speed-dangerous/ ARE the
  *      recordings of these scripts, byte-for-byte, with identical public copies.
  *
@@ -24,7 +29,7 @@ const HERE = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(HERE, "../../../../../..");
 const RECORD = process.env.RECORD_TRACES === "1";
 const SCENARIO_ID = "sc-speed-dangerous";
-const NAMES: ScSpeedDangerousTraceName[] = ["shadow-correct", "mistake-flooring", "mistake-accelerate"];
+const NAMES: ScSpeedDangerousTraceName[] = ["shadow-correct", "mistake-pace-flow", "mistake-chase-flow"];
 
 function loadDistrict(id: string): unknown {
   return JSON.parse(readFileSync(path.join(REPO_ROOT, "content", "world", `${id}.json`), "utf-8"));
@@ -36,7 +41,7 @@ function commendationCodes(d: RecordedDrive): string[] {
   return d.ruleEvents.filter((e) => e.kind === "commendation").map((e) => e.code);
 }
 
-const district = loadDistrict("sp-danger-v1");
+const district = loadDistrict("ov-keepright-v1");
 const drives = new Map<ScSpeedDangerousTraceName, RecordedDrive>(
   NAMES.map((n) => [n, recordScSpeedDangerousDrive(district, n)]),
 );
@@ -49,30 +54,37 @@ describe("sc-speed-dangerous — the shadow gate (doc 76 §5)", () => {
     expect(commendationCodes(shadow)).toContain("CLEAN_DRIVING");
   });
 
-  it("drives the whole street well under the +10 band with Bulgarian annotations", () => {
+  it("drives the whole boulevard well under the +10 band, in the RIGHT lane, with Bulgarian annotations", () => {
     const maxKmh = Math.max(...shadow.trace.samples.map((s) => Math.abs(s.speedKmh)));
     expect(maxKmh).toBeLessThan(50); // never touches the posted limit, let alone +10
     const last = shadow.trace.samples[shadow.trace.samples.length - 1];
-    expect(last.y).toBeGreaterThan(370);
+    expect(last.y).toBeGreaterThan(330);
+    expect(Math.abs(last.x - 12.19)).toBeLessThan(1.5); // held the right lane
     const annotations = shadow.trace.events.filter((e) => e.kind === "annotation");
     expect(annotations.length).toBeGreaterThanOrEqual(4);
     for (const a of annotations) expect(a.textBg ?? "").toMatch(/[Ѐ-ӿ]/);
   });
+
+  it("the flow actors are STAGED by the template (the SP-13 unlock), learn-only by contract", () => {
+    const kinds = (SC_SPEED_DANGEROUS.staged ?? []).map((s) => s.kind).sort();
+    expect(kinds).toEqual(["brakingLeadCar", "rearTailgater"]);
+  });
 });
 
 describe("sc-speed-dangerous — mistake demos grade their exact codes (doc 76 §9 stage 5)", () => {
-  it("„Пълна газ“: exactly SPEEDING_DANGEROUS, never the minor band", () => {
-    const drive = drives.get("mistake-flooring")!;
+  it("„Със скоростта на потока — 58“: exactly SPEEDING_OVER_LIMIT, never the dangerous band", () => {
+    const drive = drives.get("mistake-pace-flow")!;
     const codes = [...new Set(violationCodes(drive))].sort();
     expect(codes).toEqual([...SC_SPEED_DANGEROUS.mistakes[0].codeRefs].sort());
-    expect(codes).not.toContain("SPEEDING_OVER_LIMIT");
+    expect(codes).not.toContain("SPEEDING_DANGEROUS");
   });
 
-  it("„Ускоряване“: exactly SPEEDING_DANGEROUS, never the minor band", () => {
-    const drive = drives.get("mistake-accelerate")!;
+  it("„Гонене на потока — 66“: exactly SPEEDING_DANGEROUS, never the minor band, never tailgating", () => {
+    const drive = drives.get("mistake-chase-flow")!;
     const codes = [...new Set(violationCodes(drive))].sort();
     expect(codes).toEqual([...SC_SPEED_DANGEROUS.mistakes[1].codeRefs].sort());
     expect(codes).not.toContain("SPEEDING_OVER_LIMIT");
+    expect(codes).not.toContain("FOLLOWING_TOO_CLOSE");
   });
 });
 

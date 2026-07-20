@@ -1,29 +1,44 @@
 /**
  * gen_ov_oneway.mjs — the OV one-way micro-map (Scenario Studio, doc 76 §3;
  * doc 72 §10 archetype OV-13 „Влизане срещу еднопосочна / Wrong-way entry").
- * ONE straight ONE-WAY street with a single marked lane, the exact district-v1
- * shape buildWorldGeometry (world), createWorldRuntime (runtime — an oneway edge
- * makes tick.oneway=true and the tangent-vs-heading test drives tick.wrongWay)
- * and buildLaneGraph/createTrafficSystem (traffic) already consume — the
- * gen_sp_speed.mjs mold, tuned to a oneway edge. Contract battery:
- * platform/src/modules/sim/world/__tests__/ov-oneway-district.test.ts.
+ * Since the founder R3 redesign (doc 62 #47: „hold W to win… the drill must
+ * become: read the entry, CHOOSE the legal direction") the map is a
+ * T-JUNCTION, not a straight ride: a two-way approach stem meets a single-lane
+ * ONE-WAY cross street flowing EAST. Turning RIGHT enters the one-way with the
+ * flow (legal); turning LEFT enters it against the flow — the exact wrong-way
+ * entry the OV-13 archetype names, graded by the shipped WRONG_WAY detector
+ * (runtime oneway + tangent-vs-heading test). The choice is REAL: both turns
+ * are physically drivable, only one is lawful.
  *
- * Layout (x = east, y = north; the street runs south → north on x = 0, and the
- * legal flow is northbound — the „from → to" geometry direction):
+ * The flow direction is world truth, not copy: the approach lane carries
+ * painted М10 „right-only" arrows (meta.scenario.laneArrows — the SN-04
+ * machinery, markings.ts), so the legal entry is readable from the road
+ * itself. (No В2/Д-face ships in the sign kit yet — the honest render is the
+ * arrow markings; the sign post joins when the face set grows.)
  *
- *     ov-ow-n-end (0, L)                  L = lengthM
- *         ▲   legal flow = NORTH
- *         │   single lane, center on the polyline (x = 0)
- *         │
- *     ov-ow-spawn-entry (0, 15) heading 0 (north = with the flow)
- *         │
- *     ov-ow-n-start (0, 0)
+ * The exact district-v1 shape buildWorldGeometry (world), createWorldRuntime
+ * (runtime — oneway edges make tick.oneway=true and the tangent-vs-heading
+ * test drives tick.wrongWay; the degree-3 node derives an uncontrolled
+ * junction, and with every edge residential NO stop line appears) and
+ * buildLaneGraph/createTrafficSystem (traffic) already consume. Contract
+ * battery: platform/src/modules/sim/world/__tests__/ov-oneway-district.test.ts.
  *
- * No signals, no stop lines, no junctions, no crossings — the street teaches
- * entering a one-way in the flow direction only (чл. 6; В2 „Влизането
- * забранено"), nothing else (doc 76 §3). Ambient traffic is authored to ZERO by
- * every drive, so the ONLY thing the rule engine can grade is the driver's own
- * direction of travel against the one-way flow.
+ * Layout (x = east, y = north; approach runs south → north on x = 0, the bar
+ * runs west → east on y = approachM — the „from → to" geometry direction IS
+ * the legal flow):
+ *
+ *   ov-ow-n-west (−armM, A) ──►── ov-ow-n-junction (0, A) ──►── ov-ow-n-east (armM, A)
+ *                 one-way, flow EAST      │                one-way, flow EAST
+ *                                         │  two-way approach stem
+ *                                         │  (М10 „right-only" arrows before the mouth)
+ *                            ov-ow-spawn-entry (4.06, 15)
+ *                                         │
+ *                            ov-ow-n-south (0, 0)
+ *
+ * No signals, no stop lines, no crossings — ambient traffic is authored to
+ * ZERO by every drive, so the ONLY thing the rule engine can grade at the
+ * empty junction is the driver's own direction of travel against the one-way
+ * flow (the right-hand tracker arms but has no one to convict for).
  *
  * Deterministic: same params → byte-identical JSON. No randomness, no OSM.
  * Run:  node tools/maps/gen_ov_oneway.mjs
@@ -53,95 +68,139 @@ function polylineLength(pts) {
 }
 
 // ---------------------------------------------------------------------------
-// The generator (one straight one-way street — the S3 OV wrong-way map)
+// The generator (two-way stem + one-way bar — the OV-13 entry-choice map)
 // ---------------------------------------------------------------------------
 
 /**
  * @param {{
  *   districtId: string,   // output file name + LessonSpec.world.districtId
  *   label: string,        // human label (meta)
- *   lengthM: number,      // street length (200..1000)
- *   maxspeedKmh: number,  // legal limit on the street (30..90)
+ *   approachM: number,    // stem length up to the junction (150..600)
+ *   armM: number,         // one-way bar length each side of the stem (80..400)
+ *   maxspeedKmh: number,  // legal limit everywhere (30..90)
  * }} params
  */
 export function buildOvOneWayStreet(params) {
   const errors = [];
-  const { districtId, label, lengthM, maxspeedKmh } = params;
+  const { districtId, label, approachM, armM, maxspeedKmh } = params;
 
   // -- Parameter validation (actionable — the assembly line runs unattended).
   if (!/^[a-z0-9-]+$/.test(districtId ?? "")) errors.push(`districtId "${districtId}" must be kebab-case`);
-  if (!(lengthM >= 200 && lengthM <= 1000)) errors.push(`lengthM must be within 200..1000 m, got ${lengthM}`);
+  if (!(approachM >= 150 && approachM <= 600)) errors.push(`approachM must be within 150..600 m, got ${approachM}`);
+  if (!(armM >= 80 && armM <= 400)) errors.push(`armM must be within 80..400 m, got ${armM}`);
   if (!(maxspeedKmh >= 30 && maxspeedKmh <= 90)) errors.push(`maxspeedKmh must be within 30..90, got ${maxspeedKmh}`);
   if (errors.length > 0) throw new Error(`gen_ov_oneway params invalid:\n  - ${errors.join("\n  - ")}`);
 
-  // Oneway lane bank (runtime/spatial.ts): lanesPerDir = lanes (all one way);
-  // the single lane's bank is centered on the polyline, so its center is x = 0.
-  const halfRoadM = SCALED_LANE_W / 2; // one drawn lane, centered on x = 0
-  const laneCenterM = 0;
+  const stemHalfM = SCALED_LANE_W; // 1+1 stem → half-width = one drawn lane
+  const barHalfM = SCALED_LANE_W / 2; // single one-way lane, centered on the polyline
+  const laneCenterRightM = r2(SCALED_LANE_W / 2); // stem northbound lane center (x)
+  const barLaneCenterM = 0; // bar lane center offset from its polyline
 
-  // -- Nodes / edge (one straight one-way street; no junctions).
+  // -- Nodes / edges (a T: two-way stem + one-way bar flowing EAST).
   const NODES = {
-    "ov-ow-n-start": [0, 0],
-    "ov-ow-n-end": [0, lengthM],
+    "ov-ow-n-south": [0, 0],
+    "ov-ow-n-junction": [0, approachM],
+    "ov-ow-n-west": [-armM, approachM],
+    "ov-ow-n-east": [armM, approachM],
   };
-  const geometry = [
+  const stemGeom = [
     [0, 0],
-    [0, lengthM],
+    [0, approachM],
+  ];
+  const barWestGeom = [
+    [-armM, approachM],
+    [0, approachM],
+  ];
+  const barEastGeom = [
+    [0, approachM],
+    [armM, approachM],
   ];
   const EDGES = [
     {
-      id: "ov-ow-street",
-      from: "ov-ow-n-start",
-      to: "ov-ow-n-end",
+      id: "ov-ow-approach",
+      from: "ov-ow-n-south",
+      to: "ov-ow-n-junction",
       class: "residential",
-      name: "Еднопосочна улица",
+      name: "Подход към еднопосочната улица",
+      oneway: false,
+      roundabout: false,
+      lanes: 2,
+      lanesSource: "tag",
+      maxspeed: maxspeedKmh,
+      maxspeedSource: "tag",
+      length: polylineLength(stemGeom),
+      geometry: stemGeom,
+    },
+    {
+      id: "ov-ow-oneway-w",
+      from: "ov-ow-n-west",
+      to: "ov-ow-n-junction",
+      class: "residential",
+      name: "Еднопосочна улица — западно рамо (посока изток)",
       oneway: true,
       roundabout: false,
       lanes: 1,
       lanesSource: "tag",
       maxspeed: maxspeedKmh,
       maxspeedSource: "tag",
-      length: polylineLength(geometry),
-      geometry,
+      length: polylineLength(barWestGeom),
+      geometry: barWestGeom,
+    },
+    {
+      id: "ov-ow-oneway-e",
+      from: "ov-ow-n-junction",
+      to: "ov-ow-n-east",
+      class: "residential",
+      name: "Еднопосочна улица — източно рамо (посока изток)",
+      oneway: true,
+      roundabout: false,
+      lanes: 1,
+      lanesSource: "tag",
+      maxspeed: maxspeedKmh,
+      maxspeedSource: "tag",
+      length: polylineLength(barEastGeom),
+      geometry: barEastGeom,
     },
   ];
 
-  const INTERSECTIONS = []; // degree-2 street — none by the OSM-build convention
+  const INTERSECTIONS = [
+    { id: "ov-ow-n-junction", x: 0, y: approachM, degree: 3, signalized: false },
+  ];
   const CROSSINGS = [];
   const ROUNDABOUTS = [];
 
-  // -- Spawns: the legal entry (heading north = with the flow) + a finish.
+  // -- Spawns: the approach entry + an east-arm reference point.
   const SPAWN_POINTS = [
     {
       id: "ov-ow-spawn-entry",
-      x: laneCenterM,
+      x: laneCenterRightM,
       y: 15,
-      heading: 0, // north = the legal flow direction (from → to)
-      edgeId: "ov-ow-street",
-      name: "Вход по посока на движението",
+      heading: 0,
+      edgeId: "ov-ow-approach",
+      name: "Подход към еднопосочната",
     },
     {
-      id: "ov-ow-spawn-finish",
-      x: laneCenterM,
-      y: r2(lengthM - 15),
-      heading: 0,
-      edgeId: "ov-ow-street",
-      name: "Контролна точка — край на улицата",
+      id: "ov-ow-spawn-east",
+      x: r2(armM - 15),
+      y: approachM,
+      heading: 90,
+      edgeId: "ov-ow-oneway-e",
+      name: "Контролна точка — източно рамо (по посоката)",
     },
   ];
 
-  // -- One office block west of the street (visual anchor, clear of the
-  // carriageway + sidewalk: |x| > halfRoad + ~4 m sidewalk).
+  // -- One corner block SW of the junction (visual anchor, clear of both
+  // carriageways + sidewalks).
   const BUILDINGS = [
     {
-      id: "ov-ow-b-block",
+      id: "ov-ow-b-corner",
       height: 7,
       heightSource: "default",
       footprint: [
-        [r2(-(halfRoadM + 20)), 150],
-        [r2(-(halfRoadM + 8)), 150],
-        [r2(-(halfRoadM + 8)), 168],
-        [r2(-(halfRoadM + 20)), 168],
+        [r2(-(stemHalfM + 32)), r2(approachM - 50)],
+        [r2(-(stemHalfM + 12)), r2(approachM - 50)],
+        [r2(-(stemHalfM + 12)), r2(approachM - 22)],
+        [r2(-(stemHalfM + 32)), r2(approachM - 22)],
       ],
     },
   ];
@@ -156,9 +215,10 @@ export function buildOvOneWayStreet(params) {
       bounds.maxY = Math.max(bounds.maxY, y);
     }
   }
-  // Road body + buildings can outgrow the centerline bounds — cover them.
-  bounds.minX = Math.min(bounds.minX, -halfRoadM - 6);
-  bounds.maxX = Math.max(bounds.maxX, halfRoadM + 6);
+  bounds.minY = Math.min(bounds.minY, -6);
+  bounds.maxY = Math.max(bounds.maxY, approachM + barHalfM + 6);
+  bounds.minX = Math.min(bounds.minX, -armM - 6);
+  bounds.maxX = Math.max(bounds.maxX, armM + 6);
   for (const bl of BUILDINGS) {
     for (const [x, y] of bl.footprint) {
       bounds.minX = Math.min(bounds.minX, x);
@@ -178,7 +238,7 @@ export function buildOvOneWayStreet(params) {
       boundsLocalMeters: bounds,
       attribution: {
         // Original, parametric layout — NOT derived from OpenStreetMap.
-        text: "Учебна еднопосочна улица — оригинален параметричен дизайн (без данни от OpenStreetMap)",
+        text: "Учебно Т-кръстовище с еднопосочна улица — оригинален параметричен дизайн (без данни от OpenStreetMap)",
         license: "All rights reserved",
         licenseUrl: "/",
         copyrightUrl: "/",
@@ -186,7 +246,7 @@ export function buildOvOneWayStreet(params) {
       },
       defaults: {
         maxspeedUrbanKmh: maxspeedKmh,
-        note: "Еднопосочна улица: влизаш само по посока на движението; знакът В2 „Влизането забранено“ значи не влизаш.",
+        note: "Т-кръстовище с еднопосочна: стрелките на платното показват посоката на движение — влиза се само по нея (надясно).",
       },
       stats: {
         roadKm: r2(EDGES.reduce((s, e) => s + e.length, 0) / 1000),
@@ -198,16 +258,34 @@ export function buildOvOneWayStreet(params) {
         spawnPoints: SPAWN_POINTS.length,
       },
       /**
-       * Scenario Studio payload (doc 76): the archetype recipe + the lane
-       * truth. The single one-way lane centers on the polyline (x = 0); the
-       * contract battery asserts the copy matches this file.
+       * Scenario Studio payload (doc 76): the archetype recipe + the lane and
+       * gate truth (the L7 copy law — ScenarioSpecs pin these BY VALUE and the
+       * contract battery asserts the copies match this file). laneArrows is
+       * the SN-04 painted-arrow machinery: М10 „right-only" glyphs in the
+       * approach lane before the mouth — the visible flow-direction truth.
        */
       scenario: {
-        archetype: "straight-street",
-        params: { lengthM, maxspeedKmh },
+        archetype: "t-junction",
+        params: { approachM, armM, maxspeedKmh },
         oneway: true,
+        onewayFlow: "east",
+        junction: { x: 0, y: approachM },
         lanesPerDirection: 1,
-        laneCenterM,
+        laneCenterRightM,
+        barLaneCenterM,
+        gates: {
+          mouth: { x: laneCenterRightM, y: r2(approachM - 30) },
+          legalEntry: { x: 60, y: approachM },
+          finish: { x: r2(armM - 15), y: approachM },
+          wrongEntry: { x: -60, y: approachM },
+        },
+        laneArrows: {
+          edgeId: "ov-ow-approach",
+          travelDir: 1,
+          fromM: r2(approachM - 70),
+          toM: r2(approachM - 10),
+          lanes: [{ centerM: laneCenterRightM, arrow: "right" }],
+        },
       },
     },
     roads: {
@@ -228,22 +306,44 @@ export function buildOvOneWayStreet(params) {
   // -------------------------------------------------------------------------
   const post = [];
   const nodeIds = new Set(Object.keys(NODES));
+  const degree = new Map();
   for (const e of EDGES) {
     if (!nodeIds.has(e.from)) post.push(`${e.id}: unknown from ${e.from}`);
     if (!nodeIds.has(e.to)) post.push(`${e.id}: unknown to ${e.to}`);
+    degree.set(e.from, (degree.get(e.from) ?? 0) + 1);
+    degree.set(e.to, (degree.get(e.to) ?? 0) + 1);
     const g0 = e.geometry[0];
     const gn = e.geometry[e.geometry.length - 1];
     if (g0[0] !== NODES[e.from][0] || g0[1] !== NODES[e.from][1]) post.push(`${e.id}: geometry[0] != from node`);
     if (gn[0] !== NODES[e.to][0] || gn[1] !== NODES[e.to][1]) post.push(`${e.id}: geometry[-1] != to node`);
     if (Math.abs(polylineLength(e.geometry) - e.length) > 0.01) post.push(`${e.id}: length mismatch`);
     if (e.length <= 0) post.push(`${e.id}: zero length`);
-    if (e.lanes !== 1 || !e.oneway) post.push(`${e.id}: the archetype is a single-lane one-way street (lanes 1, oneway)`);
   }
-  const distToStreet = (x, y) => Math.abs(x) + (y < 0 ? -y : y > lengthM ? y - lengthM : 0);
+  const stem = EDGES.find((e) => e.id === "ov-ow-approach");
+  if (stem.lanes !== 2 || stem.oneway) post.push("the approach stem must be a two-way 1+1 street (lanes 2)");
+  for (const id of ["ov-ow-oneway-w", "ov-ow-oneway-e"]) {
+    const bar = EDGES.find((e) => e.id === id);
+    if (bar.lanes !== 1 || !bar.oneway) post.push(`${id}: the bar is a single-lane one-way (lanes 1, oneway)`);
+    // The legal flow must be EAST: geometry x strictly increasing from → to.
+    if (!(bar.geometry[bar.geometry.length - 1][0] > bar.geometry[0][0])) post.push(`${id}: flow must run west → east`);
+  }
+  if ((degree.get("ov-ow-n-junction") ?? 0) !== 3) post.push("ov-ow-n-junction must join stem + both arms (degree 3)");
+  // No arterial edge → the runtime derives NO stop line at the T (the drill
+  // grades direction choice, not priority).
+  const RANK = { primary: 5, secondary: 4, tertiary: 3, unclassified: 2, residential: 2, service: 1 };
+  if (Math.max(...EDGES.map((e) => RANK[e.class] ?? 2)) >= 4) post.push("an arterial edge would derive a stop line at the T");
   for (const s of SPAWN_POINTS) {
-    if (s.edgeId !== "ov-ow-street") post.push(`${s.id}: unknown edgeId ${s.edgeId}`);
-    if (distToStreet(s.x, s.y) > halfRoadM) post.push(`${s.id}: not on the carriageway`);
+    const e = EDGES.find((ed) => ed.id === s.edgeId);
+    if (!e) post.push(`${s.id}: unknown edgeId ${s.edgeId}`);
+    else if (e.id === "ov-ow-approach" && (Math.abs(s.x) > stemHalfM || s.y < 0 || s.y > approachM)) {
+      post.push(`${s.id}: not on the stem carriageway`);
+    } else if (e.id !== "ov-ow-approach" && (Math.abs(s.y - approachM) > barHalfM || Math.abs(s.x) > armM)) {
+      post.push(`${s.id}: not on the bar carriageway`);
+    }
   }
+  const la = district.meta.scenario.laneArrows;
+  if (!(la.fromM >= 0 && la.toM <= approachM && la.fromM < la.toM)) post.push("laneArrows span must sit on the approach stem");
+  if (laneCenterRightM <= 0 || laneCenterRightM >= stemHalfM) post.push(`stem lane center ${laneCenterRightM} outside the northbound bank`);
   if (!Number.isFinite(bounds.minX) || bounds.maxX <= bounds.minX || bounds.maxY <= bounds.minY) {
     post.push("degenerate bounds");
   }
@@ -255,14 +355,15 @@ export function buildOvOneWayStreet(params) {
 }
 
 // ---------------------------------------------------------------------------
-// ov-oneway-v1 instance — the sc-ov-oneway product map (doc 76 §3):
-// 300 m of straight single-lane one-way at the urban 50.
+// ov-oneway-v1 instance — the sc-ov-oneway product map (doc 76 §3; founder R3
+// doc 62 #47 redesign): a 200 m approach to a one-way bar with 140 m arms.
 // ---------------------------------------------------------------------------
 
 const OW_PARAMS = {
   districtId: "ov-oneway-v1",
-  label: "Учебна еднопосочна улица (сценарий OV-13)",
-  lengthM: 300,
+  label: "Учебно Т-кръстовище — вход в еднопосочна улица (сценарий OV-13)",
+  approachM: 200,
+  armM: 140,
   maxspeedKmh: 50,
 };
 
@@ -279,8 +380,9 @@ writeFileSync(PUBLIC_FILE, out); // byte-identical publish
 
 const line = (k, v) => console.log(`  ${String(k).padEnd(28)} ${v}`);
 console.log(`=== ov-oneway build: ${OW_PARAMS.districtId} ===`);
-line("length / limit", `${OW_PARAMS.lengthM} m / ${OW_PARAMS.maxspeedKmh} km/h`);
-line("lane center", `${district.meta.scenario.laneCenterM} m (on the polyline)`);
+line("approach / arms / limit", `${OW_PARAMS.approachM} m / ±${OW_PARAMS.armM} m / ${OW_PARAMS.maxspeedKmh} km/h`);
+line("junction", JSON.stringify(district.meta.scenario.junction));
+line("gates", JSON.stringify(district.meta.scenario.gates));
 line("nodes / edges", `${district.meta.stats.nodes} / ${district.meta.stats.edges}`);
 line("spawns", district.spawnPoints.map((s) => s.id).join(", "));
 line("output", `${CONTENT_FILE} (+ public copy)`);

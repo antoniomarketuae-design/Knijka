@@ -14,9 +14,14 @@
  * same fold; a locked level's session is refused server-side too).
  */
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { SCENARIO_LEVEL_NAMES_BG, SCENARIO_UNLOCK_MIN_STARS } from "@/modules/sim/lessons";
 import type { ScenarioCatalogEntry } from "./types";
+
+/** Stable DOM id per catalog card — the return-from-session scroll anchor. */
+function cardDomId(templateId: string): string {
+  return `sc-card-${templateId}`;
+}
 
 /** Family icon map (doc 76 §2 families; P0 ships parking). */
 const FAMILY_ICONS: Record<string, string> = {
@@ -66,13 +71,34 @@ function Stars({ stars }: { stars: 1 | 2 | 3 | null }) {
 
 export function ScenarioCatalogSection({
   scenarios,
+  focusTemplateId = null,
   onStart,
 }: {
   scenarios: ScenarioCatalogEntry[];
+  /**
+   * R3 #5/#23: the just-played template — this section mounts back after a
+   * session with that card's level picker OPEN and scrolls it into view, so
+   * „Назад към таблото" returns the founder to his position in the catalog
+   * (not to the page top, and never off /simulator).
+   */
+  focusTemplateId?: string | null;
   /** Start one compiled rung — the client compiles + mounts the play shell. */
   onStart: (templateId: string, level: 1 | 2 | 3 | 4 | 5) => void;
 }) {
-  const [openId, setOpenId] = useState<string | null>(null);
+  const [openId, setOpenId] = useState<string | null>(focusTemplateId);
+
+  // Scroll AFTER first paint (the section mounts fresh when the play shell
+  // unmounts, so this runs exactly once per return-from-session).
+  useEffect(() => {
+    if (focusTemplateId === null) return;
+    document
+      .getElementById(cardDomId(focusTemplateId))
+      ?.scrollIntoView({ block: "center", behavior: "auto" });
+    // Mount-only by design: a LATER prop change must not yank the scroll
+    // while the founder is browsing the list.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   if (scenarios.length === 0) return null;
 
   return (
@@ -100,6 +126,7 @@ export function ScenarioCatalogSection({
           return (
             <article
               key={sc.templateId}
+              id={cardDomId(sc.templateId)}
               aria-label={sc.titleBg}
               className="card relative flex flex-col gap-3 p-5 transition hover:border-accent hover:shadow-glow-sm motion-reduce:transition-none"
             >

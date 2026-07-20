@@ -19,7 +19,13 @@
  * Pure TypeScript — no React/three/Rapier imports (vitest-safe, ADR-002).
  */
 
-import type { SignalPhase, SignalPlanSpec, VehicleSample, WorldRuntime } from "../contracts";
+import type {
+  SignalLampState,
+  SignalPhase,
+  SignalPlanSpec,
+  VehicleSample,
+  WorldRuntime,
+} from "../contracts";
 import type { SimTick, SimTickEvent } from "../rules/types";
 import { BG_URBAN_DEFAULT_KMH, parseDistrict, type District } from "./district";
 import { Locator } from "./locator";
@@ -1828,6 +1834,10 @@ export function createWorldRuntime(districtJson: District | unknown): DistrictWo
 
     signalPhase(signalNodeId: string): SignalPhase {
       return signals.phase(signalNodeId);
+    },
+
+    signalLampState(signalNodeId: string, approachBearingDeg?: number): SignalLampState {
+      return signals.lampState(signalNodeId, approachBearingDeg);
     },
 
     signalPhaseForApproach(signalNodeId: string, bearingDeg: number): SignalPhase {

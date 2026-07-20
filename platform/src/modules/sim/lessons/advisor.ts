@@ -25,6 +25,7 @@ import {
   PRE_DRIVE_STEP_ORDER,
   type PreDriveStepId,
 } from "../procedures";
+import type { SimTick } from "../rules";
 import { parseScenarioLessonId } from "./scenario";
 import type { LessonSessionState, ObjectiveEvalState, ObjectiveParams } from "./types";
 
@@ -183,4 +184,114 @@ export function advisorPromptForSession(s: LessonSessionState): AdvisorPrompt | 
     active.params,
     s.evalStates[s.currentObjectiveIndex],
   );
+}
+
+// ---------------------------------------------------------------------------
+// Glance edge pings (founder 2026-07-20: „low visibility pinging things on
+// the screen pointing to look left and right") — pure derivation for the
+// GlanceEdgePings overlay. NOTHING here touches grading: pings only CONSUME
+// the tick stream the HUD already receives (junction proximity + the graded
+// mirrorGlance events), and satisfying a ping is the very glance the JU-23
+// junction-scan detector reads — the information payoff of the graded act.
+// ---------------------------------------------------------------------------
+
+/** Arm distance (m) before a scan-graded stop line — ~5 s at drill speeds,
+ *  the same order as the detector's junctionScanLookbackSec window. */
+export const GLANCE_PING_APPROACH_M = 45;
+
+/** Min speed to ARM (km/h): a car spawned near a line must not ping through
+ *  the pre-drive checklist. Once armed, stopping AT the line keeps the
+ *  pending pings — waiting there is exactly when the scan matters. */
+export const GLANCE_PING_MIN_ARM_KMH = 3;
+
+/** The watched distance jumping UP by ≥ this (m) while armed = the old line
+ *  was crossed and a NEW mouth is already inside the window → fresh pings. */
+const GLANCE_PING_NEW_LINE_JUMP_M = 8;
+
+/** "ping" = pulsing „огледай" cue; "done" = glance registered, the cue is a
+ *  fading confirmation; "off" = nothing rendered for that side. */
+export type GlancePingPhase = "off" | "ping" | "done";
+
+/** Mutable tick-rate state (zero allocations after creation) — advance it
+ *  ONLY via observeGlancePingsTick / resetGlancePings. */
+export interface GlancePingsState {
+  /** True while inside the approach window of a scan-graded line. */
+  armed: boolean;
+  /** Watched line distance on the previous armed tick (new-line detection). */
+  lastLineM: number;
+  left: GlancePingPhase;
+  right: GlancePingPhase;
+}
+
+export function createGlancePingsState(): GlancePingsState {
+  return { armed: false, lastLineM: Number.POSITIVE_INFINITY, left: "off", right: "off" };
+}
+
+/** Back to idle (advisor toggled off mid-approach, scene retry). */
+export function resetGlancePings(s: GlancePingsState): void {
+  s.armed = false;
+  s.lastLineM = Number.POSITIVE_INFINITY;
+  s.left = "off";
+  s.right = "off";
+}
+
+/**
+ * Founder-ratified gate (2026-07-20): pings exist only where the drill really
+ * GRADES the junction scan (the JU-23 per-lesson opt-in), at the beginner
+ * rungs L1–L2, never on exams. The rung/exam half IS defaultAdvisorEnabled —
+ * the advisor's one gate, deliberately not a second one. The live „Съветник"
+ * on/off toggle stacks on top at the caller (the overlay reads the same
+ * persisted setting the shell writes).
+ */
+export function glancePingsEligible(lesson: LessonSpec): boolean {
+  return (
+    lesson.ruleConfig?.junctionScanObservationEnabled === true &&
+    defaultAdvisorEnabled(lesson)
+  );
+}
+
+/**
+ * Advance ping state from one HUD tick (mutates in place — frame rate, so
+ * allocations are banned). Returns true when a VISIBLE phase changed; the
+ * overlay snapshots React state only then.
+ *
+ * Model: a scan-graded line (Б1 give-way / Б2 stop — exactly the controls
+ * the JU-23 detector grades; traffic lights never arm) entering the approach
+ * window pings BOTH sides; the graded mirrorGlance event of a side flips its
+ * ping to the "done" confirmation; leaving the window (line crossed / no
+ * line watched) clears everything for the next junction.
+ */
+export function observeGlancePingsTick(s: GlancePingsState, tick: SimTick): boolean {
+  const scanControlled =
+    tick.nextStopLineControl === "stopSign" || tick.nextStopLineControl === "giveWay";
+  const lineM = scanControlled ? tick.nextStopLineM : undefined;
+
+  if (lineM === undefined || lineM > GLANCE_PING_APPROACH_M) {
+    const hadVisible = s.left !== "off" || s.right !== "off";
+    if (s.armed || hadVisible) resetGlancePings(s);
+    return hadVisible;
+  }
+
+  let changed = false;
+  const newLine = s.armed && lineM > s.lastLineM + GLANCE_PING_NEW_LINE_JUMP_M;
+  if ((!s.armed && tick.speedKmh >= GLANCE_PING_MIN_ARM_KMH) || newLine) {
+    s.armed = true;
+    s.left = "ping";
+    s.right = "ping";
+    changed = true;
+  }
+  if (!s.armed) return false;
+
+  s.lastLineM = lineM;
+  for (const e of tick.events) {
+    if (e.kind !== "mirrorGlance") continue;
+    if (e.mirror === "left" && s.left === "ping") {
+      s.left = "done";
+      changed = true;
+    } else if (e.mirror === "right" && s.right === "ping") {
+      s.right = "done";
+      changed = true;
+    }
+  }
+  return changed;
 }

@@ -143,6 +143,7 @@ export const SC_HZ_EMERGENCY_STOP_DART: PedestrianDartOutSpec = {
   roadToM: 17.625,
   triggerDistM: 30,
   minTriggerSpeedKmh: 25,
+  variant: "child", // R3 P6: the PE-04 figure renders as the small child rig
 };
 
 /**

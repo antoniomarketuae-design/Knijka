@@ -2,9 +2,10 @@
  * sc-crossing-dart — the authored drives (doc 76 §5/§9): ONE correct shadow +
  * TWO mistake demos for „Внезапен пешеходец на пътеката" (PE-02 dart-out +
  * PE-04 occlusion) on the committed pe-dart-v1 district, recorded with the
- * template's OWN staged darter (pedestrianDartOut sc-drt-ped, 1.6 m/s, released
- * only when the player closes within 40 m — single truth, imported from the
- * template).
+ * template's OWN staged darter (pedestrianDartOut sc-drt-ped, 2.5 m/s, released
+ * only when the player closes within ~26 m — the founder R3 #25 suddenness
+ * retune: the old 40 m / 1.6 m/s dart was „95% identical to the basic zebra";
+ * single truth, imported from the template).
  *
  * The trace gate replays exactly these through the production stack:
  *   - shadow: ZERO violations + PEDESTRIAN_YIELDED (reacted, stopped, waited);
@@ -46,7 +47,9 @@ export function scCrossingDartShadowScript(): DriveScript {
       { kind: "annotation", textBg: "Приближавай пътеката с готовност за спиране — ъгловият магазин крие тротоара вляво." },
       { kind: "glance", mirror: "rear" },
       // ~26 km/h — under the 30 km/h approach cap; ready for the surprise.
-      { kind: "drive", points: [[X_LANE, 15], [X_LANE, 34]], targetKmh: 26 },
+      // The dart releases only inside ~26 m (y ≈ 51–57), so the „изскача"
+      // beat sits at y = 52 — narration lands ON the appearance, not before.
+      { kind: "drive", points: [[X_LANE, 15], [X_LANE, 52]], targetKmh: 26 },
       {
         kind: "annotation",
         textBg: "Пешеходец изскача на пътеката! Реагирай веднага — спирачка, без да завиваш встрани.",
@@ -54,11 +57,13 @@ export function scCrossingDartShadowScript(): DriveScript {
       {
         // Firm, planned stop 6 m short of the crossing line.
         kind: "drive",
-        points: [[X_LANE, 34], [X_LANE, 58], [X_LANE, Y_ZEBRA - 6]],
+        points: [[X_LANE, 52], [X_LANE, Y_ZEBRA - 6]],
         targetKmh: 26,
       },
-      // Wait the darter out — the 1.6 m/s crosser clears the carriageway in ~11 s.
-      { kind: "pause", sec: 11, brake: true },
+      // Wait the darter out — the 2.5 m/s bolt clears the carriageway in ~7 s
+      // of its late (~26 m) release; the stop lands ~2.7 s in, so 7 s covers
+      // the rest with margin.
+      { kind: "pause", sec: 7, brake: true },
       { kind: "annotation", textBg: "Изчакай го да освободи цялото платно — не потегляй под носа му." },
       { kind: "glance", mirror: "left" },
       { kind: "glance", mirror: "right" },

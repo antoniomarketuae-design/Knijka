@@ -108,9 +108,15 @@ describe("pe-jay-v1 through the world builder", () => {
     expect(world.stats.zebraCrossings).toBe(1);
   });
 
-  it("hosts a signalized junction: lamp heads on every incoming approach, no signs", () => {
-    expect(world.trafficLights.length).toBe(4);
-    for (const tl of world.trafficLights) expect(tl.nodeId).toBe("sx-n-c");
+  it("hosts a signalized junction: near + far-side lamp heads per incoming approach, no signs", () => {
+    // Doc 62 S1/#19: 4 approaches × (near head + far-side companion). The
+    // signalized CROSSING pej-x-1 gets no head of its own (builder gap —
+    // heads are junction-node only), so the junction pair is what renders.
+    expect(world.trafficLights.length).toBe(8);
+    for (const tl of world.trafficLights) {
+      expect(tl.nodeId).toBe("sx-n-c");
+      expect(Number.isFinite(tl.approachBearingDeg)).toBe(true);
+    }
     expect(world.stats.signs.stop).toBe(0);
     expect(world.stats.signs.giveWay).toBe(0);
   });

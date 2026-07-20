@@ -233,6 +233,55 @@ describe("staged pedestrian", () => {
     expect("pose" in plain).toBe(false);
   });
 
+  it("publishes the body variant ONLY when the spec authors one (R3 #25–28)", () => {
+    const system = squareSystem();
+    system.stage({
+      kind: "pedestrian",
+      id: "child-ped",
+      path: [
+        { x: 150, y: 9.7 },
+        { x: 150, y: -13.8 },
+      ],
+      speedMps: 2.6,
+      variant: "child",
+    });
+    system.stage({
+      kind: "pedestrian",
+      id: "cane-ped",
+      path: [
+        { x: 160, y: 9.7 },
+        { x: 160, y: -13.8 },
+      ],
+      speedMps: 0.75,
+      variant: "elder",
+    });
+    system.stage({
+      kind: "pedestrian",
+      id: "plain-ped",
+      path: [
+        { x: 170, y: 9.7 },
+        { x: 170, y: -13.8 },
+      ],
+      speedMps: 1.4,
+    });
+    const child = system.pedestrians.find((p) => p.variant === "child")!;
+    const elder = system.pedestrians.find((p) => p.variant === "elder")!;
+    expect(child).toBeDefined();
+    expect(elder).toBeDefined();
+    expect(child.x).toBeCloseTo(150, 3);
+    expect(elder.x).toBeCloseTo(160, 3);
+    // The variant is presentation data only — the walk machinery is untouched:
+    // released, the child crosses exactly like any staged walker.
+    system.stagedCommand("child-ped", { type: "cruise" });
+    run(system, 2, ctx());
+    expect(child.y).toBeLessThan(9.7);
+    // The variant-less staged pedestrian publishes the exact pre-variant shape.
+    const plain = system.pedestrians.find(
+      (p) => p.id >= 1000 && p !== child && p !== elder,
+    )!;
+    expect("variant" in plain).toBe(false);
+  });
+
   it("publishes the directTraffic pose for the JU-18 controller figure", () => {
     const system = squareSystem();
     system.stage({

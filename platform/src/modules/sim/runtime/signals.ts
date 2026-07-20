@@ -25,7 +25,7 @@
  * are bit-identical.
  */
 
-import type { SignalPhase } from "../contracts";
+import type { SignalLampState, SignalPhase } from "../contracts";
 import type { District } from "./district";
 import { axisOfBearing, bearingDeg, fnv1a, type Axis } from "./geometry";
 import type { DistrictIndex } from "./spatial";
@@ -38,6 +38,15 @@ export const SIGNAL_TIMING = {
   /** Full two-phase cycle: 2 × (green + yellow + allRed + redYellow). */
   cycleSec: 50,
 } as const;
+
+/**
+ * Flashing-amber blink timetable (doc 62 S1 — „мигащо жълто"): ~60 flashes a
+ * minute, on for the first half of each period. Driven by the controller's OWN
+ * clock (tSec), the same clock every phase read uses — deterministic, and the
+ * renderer never runs a second timer.
+ */
+export const FLASHING_AMBER_PERIOD_SEC = 1.0;
+export const FLASHING_AMBER_ON_SEC = 0.5;
 
 const HALF = SIGNAL_TIMING.cycleSec / 2; // 25
 
@@ -304,6 +313,36 @@ export class SignalController {
     const node = this.nodes.get(signalNodeId);
     if (!node) return "red";
     return phaseInCycle(this.tSec + this.offsets[node.clusterIdx], axisOfBearing(approachBearingDeg));
+  }
+
+  /**
+   * Lamp state of a signal HEAD — the render source of truth (doc 62 S1 fix:
+   * what the head SHOWS must derive from the same state the stop lines GRADE).
+   *  - mode "dark" → "dark" (загаснал светофар: no lamp lit, the junction
+   *    grades as uncontrolled — isClusterUncontrolled is true);
+   *  - mode "flashingAmber" → "amberFlashOn"/"amberFlashOff" alternating on
+   *    THIS controller's clock (FLASHING_AMBER_* timetable) — also graded
+   *    uncontrolled;
+   *  - mode "live"/"controlled" → the live cycle for the head's APPROACH
+   *    axis-group (approachBearingDeg = travel bearing INTO the junction;
+   *    omitted = the node's own assigned group), through the SAME offsets any
+   *    pin rebase (setClusterOffset / armSignalPlan / amberDilemma) writes.
+   *    "controlled" deliberately keeps the misleading live lamps (JU-18: the
+   *    officer's permission — not the lamp — grades, ЗДвП чл. 7).
+   * Unknown ids fail exactly like phase(): "red" (never a phantom green).
+   */
+  lampState(signalNodeId: string, approachBearingDeg?: number): SignalLampState {
+    const node = this.nodes.get(signalNodeId);
+    if (!node) return "red";
+    const mode = this.modes[node.clusterIdx];
+    if (mode === "dark") return "dark";
+    if (mode === "flashingAmber") {
+      const inPeriod = this.tSec % FLASHING_AMBER_PERIOD_SEC;
+      return inPeriod < FLASHING_AMBER_ON_SEC ? "amberFlashOn" : "amberFlashOff";
+    }
+    const group =
+      approachBearingDeg === undefined ? node.group : axisOfBearing(approachBearingDeg);
+    return phaseInCycle(this.tSec + this.offsets[node.clusterIdx], group);
   }
 
   /** Phase of an axis-group inside a cluster (stop-line adjudication). */

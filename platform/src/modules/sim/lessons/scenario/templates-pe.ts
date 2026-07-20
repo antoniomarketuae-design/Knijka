@@ -390,15 +390,21 @@ export const SC_CROSSING_RAIN_SPRINT: ScenarioSpec = {
 // ---------------------------------------------------------------------------
 
 /**
- * The staged DART at pe-x-1 (0, 80): a pedestrian steps off the WEST curb at
- * 1.6 m/s (a hurried step-out, between the 1.4 m/s walk and the 2.2 m/s sprint)
- * only when the player closes within ~40 m — LATE, so the encounter is a
- * reaction test, not a long approach. The corner shop the generator places just
- * west of the zebra hides the curb until the last moment (occlusion world
- * dressing, zero grading change — NOT PE-04: that archetype is an unmarked
- * mid-block child behind PARKED CARS; this is a dart at a MARKED crossing).
- * triggerDistM 40 still leaves a legal approach room to brake and stop (the
- * shadow does exactly that).
+ * The staged DART at pe-x-1 (0, 80): a pedestrian BOLTS off the WEST curb at
+ * 2.5 m/s — faster than the 2.2 m/s rain sprinter, a genuine step-off-and-go —
+ * and only when the player closes within ~26 m (± the seeded 3 m jitter).
+ * Founder R3 #25 ruling: the old 40 m / 1.6 m/s tuning made this drill „95%
+ * identical to the basic zebra" — the trigger fired so early and the walk was
+ * so calm that a live player experienced the same long-approach patience test
+ * as sc-crossing-let-pass. Now the figure appears ~2.5 s before a 40 km/h
+ * arrival: still stoppable at the graded 40 km/h approach cap (≈ 20 m
+ * reaction + braking), but ONLY with an immediate brake — the reaction
+ * emergency the PE-02 archetype is. The corner shop the generator places just
+ * west of the zebra hides the curb until the last moment (the occluded start —
+ * occlusion world dressing, zero grading change; NOT PE-04: that archetype is
+ * an unmarked mid-block child behind PARKED CARS, sc-hz-emergency-stop's
+ * drill). Delta discipline vs the siblings: let-pass 55 m/1.4 (patience),
+ * night-unlit 30 m/1.4 (visibility), THIS 26 m/2.5 (suddenness).
  */
 const DART_PED: PedestrianDartOutSpec = {
   id: "sc-drt-ped",
@@ -407,11 +413,11 @@ const DART_PED: PedestrianDartOutSpec = {
   crossing: { x: 0, y: 80 },
   start: { x: CURB_X, y: 80 },
   dir: { x: 1, y: 0 },
-  speedMps: 1.6,
+  speedMps: 2.5,
   travelM: TRAVEL_M,
   roadFromM: ROAD_FROM_M,
   roadToM: ROAD_TO_M,
-  triggerDistM: 40,
+  triggerDistM: 26,
   minTriggerSpeedKmh: 10,
 };
 
@@ -494,13 +500,20 @@ export const SC_CROSSING_DART: ScenarioSpec = {
 };
 
 // ---------------------------------------------------------------------------
-// 5. sc-crossing-bus-shadow — „Пешеходци иззад спрял автобус" (PE-10, the
-//    bus-stop kill zone) on pe-bus-v1 (crossing at y = 88). A large stopped
-//    vehicle occupies the NEAR (east) curb south of the zebra: a passenger who
-//    got off cuts in front of it and crosses toward the far curb — emerging
-//    into the player's lane from behind the bus, the „bus shadow". The bus is a
+// 5. sc-crossing-bus-shadow — „Пешеходци иззад спрял камион" (PE-10, the
+//    stopped-large-vehicle kill zone) on pe-bus-v1 (crossing at y = 88). A
+//    large stopped vehicle occupies the NEAR (east) curb south of the zebra: a
+//    pedestrian cuts in front of it and crosses toward the far curb — emerging
+//    into the player's lane from behind it, the „shadow". Graded as a
 //    trace-side obstacle rect (scCrossingBusShadow.ts BUS_OBSTACLE), clear of
-//    the driving lane; the shadow proves the car never touches it.
+//    the driving lane; the shadow drive proves the car never touches it. LIVE
+//    play shows the occluder too (founder R3 #26 „NO BUS AT ALL" ruling): the
+//    procedural BOX TRUCK body stands at the BUS_OBSTACLE rect via the
+//    heldSceneryFor dressing channel (components/sim/scenarioSceneryProps.ts)
+//    — the audit's costed stopgap until a real bus rig exists. The COPY is
+//    honest about it („камион", not „автобус"); a future bus rig restores the
+//    original bus-stop framing. Template id stays sc-crossing-bus-shadow
+//    (trace paths + claims are keyed on it).
 // ---------------------------------------------------------------------------
 
 /** East (near-side) curb of a 1-lane-per-direction street (= −CURB_X): the
@@ -509,12 +522,12 @@ const EAST_CURB_X = 9.73;
 
 /**
  * The staged NEAR-SIDE crosser at pe-x-1 (0, 88): steps off the EAST curb in
- * front of the stopped bus at 1.4 m/s, heading WEST across the carriageway,
- * once the player closes within ~44 m. Because she emerges from the bus shadow
- * she is already in the player's lane by the time the sightline clears — the
- * PE-10 kill zone. The road-occupancy span is symmetric about the centerline,
- * so ROAD_FROM_M / ROAD_TO_M / TRAVEL_M are byte-identical to the west-curb
- * crossers; only the start point and direction flip.
+ * front of the stopped truck at 1.4 m/s, heading WEST across the carriageway,
+ * once the player closes within ~44 m. Because she emerges from the truck's
+ * shadow she is already in the player's lane by the time the sightline clears
+ * — the PE-10 kill zone. The road-occupancy span is symmetric about the
+ * centerline, so ROAD_FROM_M / ROAD_TO_M / TRAVEL_M are byte-identical to the
+ * west-curb crossers; only the start point and direction flip.
  */
 const BUS_SHADOW_PED: PedestrianDartOutSpec = {
   id: "sc-bsh-ped",
@@ -531,16 +544,18 @@ const BUS_SHADOW_PED: PedestrianDartOutSpec = {
   minTriggerSpeedKmh: 10,
 };
 
-/** PE-10 — пешеходци иззад спрял автобус (ЗДвП чл. 119 + чл. 20: спрелият
- *  автобус крие гледката; приближавай с готовност за спиране и пропусни
- *  изскочилия пешеходец). */
+/** PE-10 — пешеходци иззад спряло голямо превозно средство (ЗДвП чл. 119 +
+ *  чл. 20: спрелият до пътеката камион крие гледката; приближавай с готовност
+ *  за спиране и пропусни изскочилия пешеходец). Copy says КАМИОН — that is
+ *  what the world stages today (the R3 #26 truck stopgap; see the section
+ *  header). */
 export const SC_CROSSING_BUS_SHADOW: ScenarioSpec = {
   id: "sc-crossing-bus-shadow",
   family: "pedestrians",
-  tagsBg: ["пешеходци", "пешеходна пътека", "спрял автобус", "закрита гледка"],
-  titleBg: "Пешеходци иззад спрял автобус",
+  tagsBg: ["пешеходци", "пешеходна пътека", "спрял камион", "закрита гледка"],
+  titleBg: "Пешеходци иззад спрял камион",
   objectiveBg:
-    "Приближавай спрелия на спирката автобус с готовност за спиране — иззад него на пътеката може да излезе пешеходец, когото не виждаш. Пропусни го и премини едва когато пътеката е свободна.",
+    "Приближавай спрелия до пътеката камион с готовност за спиране — иззад него на пътеката може да излезе пешеходец, когото не виждаш. Пропусни го и премини едва когато пътеката е свободна.",
   archetypeIds: ["PE-10"],
   conceptIds: ["c-crosswalk-yield", "c-pedestrian-rights-duties", "c-speed-adaptation"],
   map: {
@@ -554,16 +569,16 @@ export const SC_CROSSING_BUS_SHADOW: ScenarioSpec = {
     vehicleStart: "ready",
   },
   instructionsBg: [
-    { n: 1, textBg: "Потегли по улицата и приближавай спрелия вдясно автобус с готовност за спиране — кракът над спирачката." },
-    { n: 2, textBg: "Автобусът крие тротоара пред себе си — не разчитай, че щом не виждаш никого, няма никой." },
-    { n: 3, textBg: "Пешеходец излиза иззад автобуса на пътеката. Реагирай веднага: спирачка, без да завиваш встрани." },
+    { n: 1, textBg: "Потегли по улицата и приближавай спрелия вдясно камион с готовност за спиране — кракът над спирачката." },
+    { n: 2, textBg: "Камионът крие тротоара пред себе си — не разчитай, че щом не виждаш никого, няма никой." },
+    { n: 3, textBg: "Пешеходец излиза иззад камиона на пътеката. Реагирай веднага: спирачка, без да завиваш встрани." },
     { n: 4, textBg: "Спри напълно преди зебрата и го изчакай да освободи цялото платно." },
     { n: 5, textBg: "Премини спокойно едва когато пътеката е свободна." },
   ],
   success: [
     {
       id: "sc-bsh-approach",
-      titleBg: "Приближи автобуса и пътеката с готовност за спиране",
+      titleBg: "Приближи камиона и пътеката с готовност за спиране",
       params: { kind: "reachZone", x: LANE_2, y: 76, radiusM: 10, maxSpeedKmh: 40 },
     },
     {
@@ -577,27 +592,27 @@ export const SC_CROSSING_BUS_SHADOW: ScenarioSpec = {
   mistakes: [
     {
       traceRef: { path: "content/traces/sc-crossing-bus-shadow/mistake-not-yielded.trace.json" },
-      titleBg: "Преминаване покрай автобуса без пропускане",
+      titleBg: "Преминаване покрай камиона без пропускане",
       whatWentWrongBg:
-        "Водачът подмина спрелия автобус, без да пропусне излезлия иззад него пешеходец, и мина през заетата пътека. Спрелият на спирката автобус е предупреждение — пешеходецът на пътеката има предимство по чл. 119, дори да се появява внезапно иззад превозното средство.",
+        "Водачът подмина спрелия камион, без да пропусне излезлия иззад него пешеходец, и мина през заетата пътека. Спрялото до пътеката голямо превозно средство е предупреждение — пешеходецът на пътеката има предимство по чл. 119, дори да се появява внезапно иззад него.",
       codeRefs: ["PEDESTRIAN_NOT_YIELDED"],
     },
     {
       traceRef: { path: "content/traces/sc-crossing-bus-shadow/mistake-collision.trace.json" },
-      titleBg: "Удар в пешеходеца иззад автобуса",
+      titleBg: "Удар в пешеходеца иззад камиона",
       whatWentWrongBg:
-        "Колата подмина автобуса със скорост и без готовност — и блъсна изскочилия иззад него пешеходец на самата пътека. При закрита от спрял автобус гледка скоростта и вниманието трябва да позволяват спиране при внезапна поява (чл. 20). Ударът прекратява изпита.",
+        "Колата подмина камиона със скорост и без готовност — и блъсна изскочилия иззад него пешеходец на самата пътека. При закрита от спряло превозно средство гледка скоростта и вниманието трябва да позволяват спиране при внезапна поява (чл. 20). Ударът прекратява изпита.",
       codeRefs: ["COLLISION"],
     },
   ],
   teach: {
     whenBg:
-      "При всеки спрял на спирка автобус или голямо превозно средство до пътеката — там пешеходец може да излезе иззад него без предупреждение точно преди зебрата. Класическата „сляпа зона“ зад автобуса е сред най-честите места за прегазване в града.",
+      "При всяко спряло до пътеката голямо превозно средство — камион, автобус на спирка, бус — там пешеходец може да излезе иззад него без предупреждение точно преди зебрата. Класическата „сляпа зона“ зад голямото превозно средство е сред най-честите места за прегазване в града.",
     whyBg:
-      "Автобусът закрива и пешеходеца от теб, и теб от пешеходеца — а слезлите пътници бързат и пресичат отпред. Единствената защита е предварително намалената скорост и готовността за спиране: изскочи ли човек иззад автобуса, имаш части от секундата за реакция със спирачка, не със завиване.",
+      "Голямото превозно средство закрива и пешеходеца от теб, и теб от пешеходеца — а бързащите хора пресичат точно отпред. Единствената защита е предварително намалената скорост и готовността за спиране: изскочи ли човек иззад него, имаш части от секундата за реакция със спирачка, не със завиване.",
     lawRef: "ЗДвП чл. 119",
     examinerBg:
-      "Изпитващият очаква видимо намалена скорост и готовност за спиране при подминаване на спрял автобус до пътека, отчетлива реакция при появата на пешеходец и пълно спиране преди зебрата. Преминаване през пешеходец е опасна грешка, а удар — прекратяване на изпита.",
+      "Изпитващият очаква видимо намалена скорост и готовност за спиране при подминаване на спрял камион или автобус до пътека, отчетлива реакция при появата на пешеходец и пълно спиране преди зебрата. Преминаване през пешеходец е опасна грешка, а удар — прекратяване на изпита.",
   },
   levels: [
     { level: 1 },
@@ -630,6 +645,18 @@ export const SC_CROSSING_BUS_SHADOW: ScenarioSpec = {
  * canonical hazard-perception clip). The corner shop just west of the zebra
  * hides the frontage until the last moment (occlusion world dressing, zero
  * grading change). The occupancy span is the shared symmetric road window.
+ *
+ * Founder R3 #27 („no kid, no ball; completely wrong"): the figure now
+ * RENDERS as a child (`variant: "child"` — the small rig, 0.72 scale, bigger
+ * head, bright jacket), and the BALL leads it: at the trigger the template's
+ * `hazard` ball (below) rolls out across the zebra, and the child follows
+ * `ballLeadSec` 0.5 s behind — the ball IS the warning cue the anticipation
+ * lesson teaches (see a ball → expect a child). The reaction stopwatch arms
+ * at the ball. 0.5 s (not more): the ball launches faster (4.5 vs 2.6 m/s),
+ * so the visual lead keeps growing across the road — while the child still
+ * reaches the roadway early enough that the too-fast demo's 38 km/h hold
+ * meets a genuinely occupied zebra (the crossingTooFastSustainSec = 1 s
+ * window; probed against the seeded choreography).
  */
 const CHILD_BALL_PED: PedestrianDartOutSpec = {
   id: "sc-cbl-ped",
@@ -644,6 +671,8 @@ const CHILD_BALL_PED: PedestrianDartOutSpec = {
   roadToM: ROAD_TO_M,
   triggerDistM: 38,
   minTriggerSpeedKmh: 10,
+  variant: "child",
+  ballLeadSec: 0.5,
 };
 
 /** PE-02 / PE-04 — дете тича след топка на пътеката (ЗДвП чл. 119 + чл. 20: в
@@ -722,6 +751,21 @@ export const SC_CROSSING_CHILD_BALL: ScenarioSpec = {
     { level: 4, vehicleStart: "cold" },
   ],
   staged: [CHILD_BALL_PED],
+  // R3 #27 — the BALL: the lesson's ballDartOut visual (TrafficLayer's L5
+  // ball, reused) rolls from the same west curb across the zebra at 4.5 m/s
+  // the moment the encounter triggers; the child follows 0.5 s later
+  // (CHILD_BALL_PED.ballLeadSec). travelM 20.5 carries it across the 16.25 m
+  // carriageway and onto the far curb, where it rests. Render-only — the
+  // recorded traces and the grading never read it.
+  hazard: {
+    kind: "ballDartOut",
+    x: CURB_X,
+    y: 78,
+    dirX: 1,
+    dirY: 0,
+    speedMps: 4.5,
+    travelM: 20.5,
+  },
   conditions: { weather: "dry" },
   localeBg: "bg-BG",
 };
@@ -741,6 +785,13 @@ export const SC_CROSSING_CHILD_BALL: ScenarioSpec = {
  * profile, so the carriageway stays occupied ~22 s. Released early (within
  * ~56 m) so a correct approach spots the cane far ahead and stops; the lesson
  * is the absolute yield, not a reaction sprint.
+ *
+ * Founder R3 #28 („same adult, no cane, just slower; useless"): the figure
+ * now RENDERS as the elder-with-white-cane rig (`variant: "elder"` — slight
+ * stoop, right arm extended, the thin white cane sweeping the tarmac ahead).
+ * The cane IS the recognition cue this drill grades the response to — which
+ * is also why the PE-08 slow crosser (sc-crossing-slow-crosser) deliberately
+ * stays variant-less: a white cane there would dilute PE-14's unique признак.
  */
 const WHITE_CANE_PED: PedestrianDartOutSpec = {
   id: "sc-wcn-ped",
@@ -755,6 +806,7 @@ const WHITE_CANE_PED: PedestrianDartOutSpec = {
   roadToM: ROAD_TO_M,
   triggerDistM: 56,
   minTriggerSpeedKmh: 10,
+  variant: "elder",
 };
 
 /** PE-14 — пешеходец с бял бастун (ЗДвП чл. 119: незрящият пешеходец с бял
@@ -873,8 +925,14 @@ export const SC_PE_JAYWALKER: ScenarioSpec = {
   family: "pedestrians",
   tagsBg: ["пешеходци", "светофар", "зелено", "грижа"],
   titleBg: "Пешеходец на червено",
+  // Founder R3 #29 (doc 62 — „zebra placement dubious"): the crossing pej-x-1
+  // sits ~34 m past the junction node (a real Sofia pattern: пътека на
+  // изхода, не на самото кръстовище), so the copy says „малко след", not
+  // „веднага след". The „no traffic light" half of #29 is the lamp-render
+  // path (W-SIG): pe-jay-v1 IS signalized (sx-n-c signalized: true,
+  // pej-x-1 signalized: true) — the map needs no reuse swap.
   objectiveBg:
-    "Премини светофарното кръстовище на зелено — и спри за пешеходеца, който пресича на своето червено веднага след него. Зеленото разрешава на теб, но не отменя грижата към човека на платното.",
+    "Премини светофарното кръстовище на зелено — и спри за пешеходеца, който пресича на своето червено на пътеката малко след него. Зеленото разрешава на теб, но не отменя грижата към човека на платното.",
   archetypeIds: ["PE-13"],
   conceptIds: ["c-pedestrian-rights-duties", "c-crosswalk-yield", "c-traffic-light-signals"],
   map: {
@@ -899,7 +957,7 @@ export const SC_PE_JAYWALKER: ScenarioSpec = {
     vehicleStart: "ready",
   },
   instructionsBg: [
-    { n: 1, textBg: "Тръгни на север — напред е светофарно кръстовище с пешеходна пътека веднага след него." },
+    { n: 1, textBg: "Тръгни на север — напред е светофарно кръстовище, а малко след него има пешеходна пътека." },
     { n: 2, textBg: "Светофарът за теб е зелен — премини кръстовището с готовност: гледай и пътеката отвъд него." },
     {
       n: 3,

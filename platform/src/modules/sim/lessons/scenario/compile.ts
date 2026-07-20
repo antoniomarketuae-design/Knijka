@@ -243,6 +243,14 @@ export function compileScenario(spec: ScenarioSpec, level: ScenarioLevel): Lesso
     // only a template that AUTHORS signalPlan gets the one-shot pin — the
     // LIVE session arms it on the runtime; recorded traces are untouched.
     ...(spec.signalPlan ? { signalPlan: { ...spec.signalPlan } } : {}),
+    // Session-start cluster MODE dials (doc 62 S1, the signalPlan pattern):
+    // only a template that AUTHORS signalModes dials its clusters dark /
+    // flashing-amber in LIVE play; recorded traces keep their own dials.
+    ...(spec.signalModes ? { signalModes: { ...spec.signalModes } } : {}),
+    // R3 #27 ball cue (the signalPlan opt-in pattern): only a template that
+    // AUTHORS `hazard` mounts the TrafficLayer ball — the scenario director
+    // flips hazardActiveRef when its dart runner triggers (ballLeadSec).
+    ...(spec.hazard ? { hazard: { ...spec.hazard } } : {}),
   };
 
   const aids = mergeAids(level, rung.aids);

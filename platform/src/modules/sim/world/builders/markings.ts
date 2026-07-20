@@ -20,6 +20,14 @@ import {
   MARKED_CLASSES,
   MARKING_Y,
   SOLID_CENTER_LINE_WIDTH_M,
+  SPEED_GLYPH_DIGIT_GAP_M,
+  SPEED_GLYPH_DIGIT_H_M,
+  SPEED_GLYPH_DIGIT_W_M,
+  SPEED_GLYPH_INSET_M,
+  SPEED_GLYPH_MAX_KMH,
+  SPEED_GLYPH_MIN_EDGE_M,
+  SPEED_GLYPH_PITCH_M,
+  SPEED_GLYPH_STROKE_M,
   STOP_LINE_WIDTH_M,
   ZEBRA_GAP_M,
   ZEBRA_LENGTH_M,
@@ -49,6 +57,9 @@ export interface MarkingBuildResult {
   /** Lane-intent arrow quads painted from meta.scenario.laneArrows (0 on
    *  every district without the meta — the byte-identity contract). */
   laneArrowQuads: number;
+  /** Painted zone-speed numeral quads („30"/„20" road glyphs — founder R3
+   *  #33/#34; 0 on every map without a qualifying zone edge). */
+  speedGlyphQuads: number;
 }
 
 /** Flat quad centered at `p`, extending ±alongHalf along `dir`, ±acrossHalf sideways. */
@@ -182,10 +193,17 @@ function authoredSolidBoundaries(
   for (const z of zones) {
     if (z.edgeId !== eb.edge.id) continue;
     if (!(Number.isFinite(z.fromM) && Number.isFinite(z.toM) && z.fromM < z.toM)) continue;
-    if (z.kind === "solidCenterLine") {
+    if (z.kind === "solidCenterLine" || z.kind === "noOvertaking") {
       // осева = the bank boundary (off 0). The off-0 dash exists only for an
       // even lane count; odd/residential hosts paint no centre dash (k = -1)
       // but STILL get the solid — the lesson depends on the line being visible.
+      //
+      // noOvertaking (В24) paints the SAME solid М1 over its span (founder R3
+      // doc 62 #50): a dashed centre line over the ban span visually PERMITS
+      // exactly what the zone grades as OVERTAKING_IN_BAN_ZONE — В24 on a
+      // two-way road means the centre line is not to be crossed, so the paint
+      // must say so. Same-direction lane dividers (k != centre) keep their
+      // dashes: В24 bans overtaking, not lane discipline paint.
       addSeg(lanes % 2 === 0 ? lanes / 2 : -1, 0, SOLID_CENTER_LINE_WIDTH_M, z.fromM, z.toM);
     } else if (z.kind === "busLane" || z.kind === "emergencyLane") {
       const lanesPerDir = eb.edge.oneway ? Math.max(1, lanes) : Math.max(1, Math.floor(lanes / 2));
@@ -519,6 +537,124 @@ function paintLaneArrows(acc: MeshAccumulator, district: District, network: Road
 }
 
 // ---------------------------------------------------------------------------
+// Painted zone-speed numerals (founder R3 doc 62 #33/#34: the 30-zone drills
+// show NO „30" anywhere, and the sign kit ships no В26-30 face — placing the
+// 50 face would lie, so the HONEST render stopgap is the road glyph BG zone
+// streets actually paint). Procedural seven-segment digits in the same
+// markings accumulator — the lane-arrow precedent: no textures, painted last,
+// and a map without a qualifying edge keeps byte-identical marking buffers.
+//
+// Qualifying edge (deliberately narrow — blast-radius discipline):
+//   - scenario micro-map (meta.mapKind "scenario-*"; city/exam/полигон never
+//     change), AND the edge's maxspeed is TAGGED at a zone speed (<= 30), AND
+//   - the edge carries the B1a legality `zone` tag (sp-trans/pe-school school,
+//     pe-zone residential — the signed-zone edges), OR the map is a
+//     straight-street archetype whose long street IS the zone (sp-zone30's
+//     360 m / vu-child's 300 m; the >= 150 m gate keeps 90 m driveway stubs
+//     like pk-drive paint-free), AND
+//   - every digit of the limit has a glyph (0/2/3 cover the legal 20/30).
+// ---------------------------------------------------------------------------
+
+/** Seven-segment rectangles in a unit digit box (x right, y along travel),
+ *  as [x0, y0, x1, y1] fractions. s = stroke fraction of the box width. */
+type Seg7 = "A" | "B" | "C" | "D" | "E" | "F" | "G";
+const SEG7_DIGITS: Readonly<Record<string, readonly Seg7[]>> = {
+  "0": ["A", "B", "C", "D", "E", "F"],
+  "2": ["A", "B", "G", "E", "D"],
+  "3": ["A", "B", "C", "D", "G"],
+};
+
+/** One digit's segment quads in LOCAL meters (u right, v along travel, origin
+ *  at the digit's bottom-left). Emitted per station — cheap (<= 6 quads). */
+function digitSegmentRects(ch: string): Array<[number, number, number, number]> {
+  const segs = SEG7_DIGITS[ch];
+  if (!segs) return [];
+  const w = SPEED_GLYPH_DIGIT_W_M;
+  const h = SPEED_GLYPH_DIGIT_H_M;
+  const t = SPEED_GLYPH_STROKE_M;
+  const rects: Record<Seg7, [number, number, number, number]> = {
+    A: [0, h - t, w, h],
+    B: [w - t, h / 2, w, h],
+    C: [w - t, 0, w, h / 2],
+    D: [0, 0, w, t],
+    E: [0, 0, t, h / 2],
+    F: [0, h / 2, t, h],
+    G: [0, h / 2 - t / 2, w, h / 2 + t / 2],
+  };
+  return segs.map((s) => rects[s]);
+}
+
+/** Does the district's meta say "scenario micro-map"? (zoneSigns.ts twin.) */
+function isScenarioMap(district: District): boolean {
+  const mapKind = district.meta.mapKind;
+  return typeof mapKind === "string" && mapKind.startsWith("scenario");
+}
+
+/** Paint the numeral stations for every qualifying zone edge. */
+function paintSpeedGlyphs(acc: MeshAccumulator, district: District, network: RoadNetwork): number {
+  if (!isScenarioMap(district)) return 0;
+  const scenario = district.meta.scenario as { archetype?: unknown } | undefined;
+  const straightStreet = scenario?.archetype === "straight-street";
+  let quads = 0;
+
+  for (const eb of network.edges) {
+    const edge = eb.edge;
+    if (!eb.line) continue;
+    if (edge.maxspeedSource !== "tag" || edge.maxspeed > SPEED_GLYPH_MAX_KMH) continue;
+    const zoneTagged = edge.zone !== undefined;
+    const wholeStreetZone = straightStreet && edge.length >= SPEED_GLYPH_MIN_EDGE_M;
+    if (!zoneTagged && !wholeStreetZone) continue;
+    const digits = String(edge.maxspeed).split("");
+    if (!digits.every((d) => SEG7_DIGITS[d])) continue; // no glyph → no paint
+
+    const line = trimPolyline(eb.line, 0.8, 0.8, 2.5);
+    if (!line) continue;
+    const lineLen = polylineLength(line);
+    const travelHalf = eb.halfWidth - eb.parkingM;
+    // Curb-lane centre of each bank (the driver's own lane).
+    const laneCenter = Math.max(LANE_WIDTH_M / 2, travelHalf - LANE_WIDTH_M / 2);
+    const glyphLen = SPEED_GLYPH_DIGIT_H_M;
+    const totalW = digits.length * SPEED_GLYPH_DIGIT_W_M + (digits.length - 1) * SPEED_GLYPH_DIGIT_GAP_M;
+
+    // One station run per travel bank (forward always; reverse on two-way).
+    for (const bank of edge.oneway ? [1] : [1, -1]) {
+      for (let s = SPEED_GLYPH_INSET_M; s + glyphLen <= lineLen - 2; s += SPEED_GLYPH_PITCH_M) {
+        // Station base at the driver's near end: forward bank at arclength s
+        // (glyph spans [s, s+len]); reverse bank at lineLen−s (glyph spans
+        // [lineLen−s−len, lineLen−s] along its own travel direction).
+        const at = pointAlong(line, bank === 1 ? s : lineLen - s);
+        // The glyph's BASE faces its own approaching driver: v runs along the
+        // bank's travel direction, u right of it — digits read upright.
+        const fwd = bank === 1 ? at.tangent : mul(at.tangent, -1);
+        const right = perpRight(fwd); // flips with fwd → each bank's own right
+        const base = add(at.point, mul(right, laneCenter));
+        for (let d = 0; d < digits.length; d++) {
+          const u0 = -totalW / 2 + d * (SPEED_GLYPH_DIGIT_W_M + SPEED_GLYPH_DIGIT_GAP_M);
+          for (const [x0, y0, x1, y1] of digitSegmentRects(digits[d]!)) {
+            const corners: Vec2[] = [
+              [u0 + x0, y0],
+              [u0 + x1, y0],
+              [u0 + x1, y1],
+              [u0 + x0, y1],
+            ];
+            const idx = corners.map(([u, v], i) => {
+              const p = add(add(base, mul(right, u)), mul(fwd, v));
+              return acc.vertex(toWorld(p[0], p[1], MARKING_Y), UP, [
+                i === 1 || i === 2 ? 1 : 0,
+                i >= 2 ? 1 : 0,
+              ]);
+            });
+            acc.quad(idx[0]!, idx[1]!, idx[2]!, idx[3]!);
+            quads++;
+          }
+        }
+      }
+    }
+  }
+  return quads;
+}
+
+// ---------------------------------------------------------------------------
 
 export function buildMarkings(
   district: District,
@@ -618,6 +754,12 @@ export function buildMarkings(
   const laneArrowQuads = paintLaneArrows(acc, district, network);
   markingQuads += laneArrowQuads;
 
+  // -- painted zone-speed numerals („30"/„20" glyphs, founder R3 #33/#34) —
+  //    appended after everything, so any map without a qualifying zone edge
+  //    keeps byte-identical marking buffers -----------------------------------
+  const speedGlyphQuads = paintSpeedGlyphs(acc, district, network);
+  markingQuads += speedGlyphQuads;
+
   return {
     markings: acc,
     markingQuads,
@@ -625,5 +767,6 @@ export function buildMarkings(
     zebraCrossings,
     parkingBays: parkingBays.length,
     laneArrowQuads,
+    speedGlyphQuads,
   };
 }

@@ -31,6 +31,10 @@ export {
   DRACO_DECODER_PATH,
   FLEET,
   FLEET_URLS,
+  // R3 #26 bus stopgap: the procedural box-truck slot, so ScenarioObstacles
+  // can stage the large occluder body ("box_truck") through the same parked
+  // pass until a real bus rig exists.
+  TRUCK_MODEL_INDEX,
 } from "./vehicleFleet";
 export type { ModelRig, ParkedPlacement, TrafficFleet } from "./vehicleFleet";
 export { mulberry32 } from "./rng";
@@ -62,6 +66,7 @@ export type {
   DistrictIntersection,
   DistrictNode,
   OncomingApproach,
+  PedestrianVariant,
   SignalPhaseFn,
   StagedActorSpec,
   StagedActorView,

@@ -103,6 +103,7 @@ export function HeroCarBody({
   cabinRef,
   inputRef,
   night = false,
+  rain = false,
 }: {
   simRef?: RefObject<VehicleSim | null>;
   /** Cabin electrics truth (headlights / indicator / hazards / fog) — the
@@ -114,6 +115,10 @@ export function HeroCarBody({
   inputRef?: RefObject<SimInput | null>;
   /** Lesson night flag — arms the dim red tail glow with headlights on. */
   night?: boolean;
+  /** Lesson rain flag (doc 62 #41) — the tail glow also arms in day rain, so
+   *  switching the lights on in a rain lesson visibly lights the car's rear
+   *  (the beam throw itself lives in VehicleRig, mounted on night || rain). */
+  rain?: boolean;
 }) {
   const { scene } = useGLTF(HERO_URL, DRACO_PATH);
   // Cockpit view (context.enabled) → hide the shell; see the header comment.
@@ -314,9 +319,11 @@ export function HeroCarBody({
       drlMaterial.emissive.setRGB(s[0], s[1], s[2]);
       drlMaterial.emissiveIntensity = s[3];
     }
-    // Tail: brake > night-tail > barely-lit lens (the fleet's exact ordering).
+    // Tail: brake > lit-tail > barely-lit lens (the fleet's exact ordering).
+    // The lit-tail state arms at night AND in rain (doc 62 #41) — with the
+    // headlights on, the rear lamp bar must read lit in a rain lesson too.
     const brakeOn = (inputRef?.current?.read().brake ?? 0) > BRAKE_LAMP_THRESHOLD;
-    const tailKey = brakeOn ? 2 : night && headKey !== 0 ? 1 : 0;
+    const tailKey = brakeOn ? 2 : (night || rain) && headKey !== 0 ? 1 : 0;
     if (tailMaterial && tailKey !== st.tail) {
       st.tail = tailKey;
       tailMaterial.emissiveIntensity = TAIL_INTENSITY[tailKey];

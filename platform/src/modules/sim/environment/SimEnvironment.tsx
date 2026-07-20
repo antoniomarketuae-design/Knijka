@@ -27,9 +27,11 @@
 //
 // Composer structure by quality level:
 //   low  — none (renderer AgX + canvas MSAA)
-//   med  — N8AO (half-res) → Bloom → HueSaturation + BrightnessContrast +
-//          Vignette → SMAA → AgX ToneMapping (grade effects merge into ONE
-//          fullscreen pass with SMAA/ToneMapping — ~free, doc 71 §4.3)
+//   med  — N8AO (half-res) → Bloom → SMAA → AgX ToneMapping →
+//          HueSaturation + BrightnessContrast + Vignette (grade effects merge
+//          into ONE fullscreen pass with SMAA/ToneMapping — ~free, doc 71
+//          §4.3; the grade runs AFTER the tone map on purpose — see the
+//          NaN note at the chain builder, doc 62 #4/#24)
 //   high — same chain, more AO samples
 
 import { useEffect, useMemo, useRef, type JSX } from "react";
@@ -363,8 +365,9 @@ export function SimEnvironment({ timeOfDay, rain, fog = false, snow = false, qua
   // The composer's effect chain for this quality level, memoized on the level
   // flags so it stays a stable array across the frequent rain-fade re-renders
   // — otherwise the EffectComposer would tear down and rebuild every pass on
-  // each one. Order is load-bearing: N8AO (a Pass) runs first; ToneMapping is
-  // the final Effect so ACES lands on the fully-composited HDR image.
+  // each one. Order is load-bearing: N8AO (a Pass) runs first; ToneMapping
+  // maps the fully-composited HDR image; the color grade runs LAST, on the
+  // tone-mapped output (the doc 62 #4/#24 NaN fix — see below).
   const composerChildren = useMemo<JSX.Element[]>(() => {
     const chain: JSX.Element[] = [];
     if (qp.aoEnabled) {
@@ -400,22 +403,33 @@ export function SimEnvironment({ timeOfDay, rain, fog = false, snow = false, qua
         />,
       );
     }
+    // SMAA (the AA that replaces canvas MSAA) then the tone map: ToneMapping
+    // maps the fully-composited HDR image with the SAME operator as the
+    // non-composer renderer path.
+    chain.push(<SMAA key="smaa" />);
+    chain.push(<ToneMapping key="tonemap" mode={TONE_MAPPING_MODE} />);
     if (qp.colorGrade) {
       // Finishing grade (med + high — doc 71 §4.3: pmndrs merges consecutive
       // effects into ONE fullscreen pass with SMAA + ToneMapping, ~free):
       // saturation + contrast counter the tone mapper's flattening, plus a
       // soft vignette.
+      //
+      // ORDER IS LOAD-BEARING — the grade must run AFTER ToneMapping (founder
+      // review doc 62 #4/#24 "dark spots"): HueSaturation's boost is
+      // mix(luminance, color, 1 + s), which drives the weakest channel of any
+      // saturated bright pixel NEGATIVE in HDR (amber indicator glow, the
+      // cyan objective pillar, fleet blinker lamps). The merged EffectPass
+      // then feeds that negative value through a pow() colorspace conversion
+      // → NaN → the pixel renders BLACK. Post-AgX the input is display-
+      // referred [0,1] and never saturated enough to go negative, so the
+      // same grade is NaN-safe (verified pixel-exact in the doc 62 S5 wave:
+      // pre-fix lamp pixel (0,0,0), post-fix (224,178,89)).
       chain.push(<HueSaturation key="grade" hue={0} saturation={GRADE_SATURATION} />);
       chain.push(
         <BrightnessContrast key="contrast" brightness={0} contrast={GRADE_CONTRAST} />,
       );
       chain.push(<Vignette key="vignette" eskil={false} offset={0.28} darkness={0.45} />);
     }
-    // SMAA (the AA that replaces canvas MSAA) then the tone map close every
-    // chain; ToneMapping stays LAST so it maps the fully-composited image
-    // with the SAME operator as the non-composer renderer path.
-    chain.push(<SMAA key="smaa" />);
-    chain.push(<ToneMapping key="tonemap" mode={TONE_MAPPING_MODE} />);
     return chain;
   }, [qp.aoEnabled, qp.aoHalfRes, qp.aoQuality, qp.bloom, qp.colorGrade]);
 

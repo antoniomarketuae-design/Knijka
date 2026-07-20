@@ -167,6 +167,59 @@ export function createDriveAssistState(): DriveAssistState {
 const GOVERNOR_BAND_KMH = 6;
 
 // ---------------------------------------------------------------------------
+// Domain-scaled governor (founder review R3 #37, doc 62 S6): the static caps
+// below were researched for the URBAN 50 km/h domain — on the АМ-140 motorway
+// map Нормален's 90 cap made the drill absurd (the copy demands „установи се
+// около 120–130", the car died at ~87). The cap therefore RESPECTS THE
+// LESSON'S SPEED DOMAIN: the max legal speed of the loaded map (max edge
+// maxspeed, threaded by LessonScene → VehicleRig). The character of each tier
+// is preserved, just expressed relative to the domain:
+//  - Нормален: domain + 10 — mistakes stay committable (the 2026-07-19
+//    founder ruling: SPEEDING_OVER_LIMIT needs limit×1.1, so a 50-domain cap
+//    of 60 still lets the student sustain 55+ and FAIL), while a 50-street
+//    joyride to 87 is gone (the governor now governs ~55–60 in the city);
+//  - Начинаещ: domain − 10 — the training wheel stays UNDER the posted max
+//    (identical 40 in the 50-city, byte-for-byte), but a motorway beginner
+//    can now ride the flow (~130 cap) instead of crawling at 40;
+//  - Напреднал: no cap, unchanged.
+// When no domain is threaded (headless callers, tests, legacy mounts) the
+// preset's researched static cap applies — byte-identical shipped behavior.
+// ---------------------------------------------------------------------------
+/** Нормален's governor margin ABOVE the lesson's max legal speed (km/h). */
+export const NORMAL_CAP_MARGIN_KMH = 10;
+/** Начинаещ's governor distance BELOW the lesson's max legal speed (km/h). */
+export const BEGINNER_CAP_UNDER_KMH = 10;
+/** Floor for any domain-scaled cap (km/h) — the полигон's 20–30 domain must
+ *  still allow maneuvering pace (a 20 km/h beginner cap would fight the
+ *  crawl bands this same layer exists to serve). */
+export const DOMAIN_CAP_FLOOR_KMH = 30;
+
+/**
+ * The effective governor cap (km/h) for a mode, or null (uncapped).
+ * `lessonMaxLegalKmh` = the lesson's speed domain (max legal speed anywhere
+ * on the loaded map); absent/invalid = the preset's static researched cap.
+ */
+export function governorCapKmh(
+  mode: DifficultyMode,
+  lessonMaxLegalKmh?: number,
+): number | null {
+  const preset = DIFFICULTY_PRESETS[mode];
+  if (preset.speedCapKmh === null) return null; // advanced: never capped
+  if (
+    lessonMaxLegalKmh === undefined ||
+    !Number.isFinite(lessonMaxLegalKmh) ||
+    lessonMaxLegalKmh <= 0
+  ) {
+    return preset.speedCapKmh;
+  }
+  const cap =
+    mode === "beginner"
+      ? lessonMaxLegalKmh - BEGINNER_CAP_UNDER_KMH
+      : lessonMaxLegalKmh + NORMAL_CAP_MARGIN_KMH;
+  return Math.max(cap, DOMAIN_CAP_FLOOR_KMH);
+}
+
+// ---------------------------------------------------------------------------
 // S0 low-speed maneuvering bands (parking envelope, doc 76 §0). All ramps are
 // linear in |speed| and fully faded out well below street speed, so nothing
 // here can touch the 50/90 km/h behavior the presets were researched for.
@@ -203,7 +256,9 @@ function rampUp(absKmh: number, from: number, to: number): number {
 /**
  * Shape raw input for the given mode. Mutates and returns `state.out` (no
  * per-frame allocation). `speedKmh` is the current signed/abs speed; `dt` is
- * the fixed physics step.
+ * the fixed physics step. `lessonMaxLegalKmh` (optional, additive) scales the
+ * governor to the lesson's speed domain — see governorCapKmh above; absent =
+ * the preset's static cap, byte-identical legacy behavior.
  */
 export function applyDifficulty(
   input: VehicleInput,
@@ -211,6 +266,7 @@ export function applyDifficulty(
   speedKmh: number,
   dt: number,
   state: DriveAssistState,
+  lessonMaxLegalKmh?: number,
 ): VehicleInput {
   const p = DIFFICULTY_PRESETS[mode];
   const out = state.out;
@@ -220,8 +276,10 @@ export function applyDifficulty(
   let throttle = Math.pow(clamp01(input.throttle), p.throttleExp) * p.throttleMul;
 
   // Speed governor: ramp throttle down as we approach the cap; 0 at/over it.
-  if (p.speedCapKmh !== null) {
-    const over = absKmh - (p.speedCapKmh - GOVERNOR_BAND_KMH);
+  // The cap follows the LESSON's speed domain when one is threaded (#37).
+  const capKmh = governorCapKmh(mode, lessonMaxLegalKmh);
+  if (capKmh !== null) {
+    const over = absKmh - (capKmh - GOVERNOR_BAND_KMH);
     if (over > 0) {
       const scale = clamp01(1 - over / GOVERNOR_BAND_KMH);
       throttle *= scale;

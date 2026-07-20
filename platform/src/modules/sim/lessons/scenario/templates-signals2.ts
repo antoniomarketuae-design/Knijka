@@ -198,6 +198,11 @@ export const SC_SIG_FLASH_AMBER_PED: ScenarioSpec = {
   staged: [SC_SIG_FLASH_AMBER_PED_PED],
   // NO signalPlan (deliberate): the cluster is dialed flashingAmber, so it
   // carries no phase at all — an approach-relative green/red pin would be inert.
+  // The LIVE half of that dial (doc 62 S1): sx-n-c (resolves through the
+  // member-node map to the merged pej cluster) flashes amber at session
+  // start, matching traces/scSigFlashAmberPed.ts — grading treats the
+  // junction as uncontrolled and the lamps blink on the runtime clock.
+  signalModes: { "sx-n-c": "flashingAmber" },
   conditions: { weather: "dry" },
   localeBg: "bg-BG",
 };

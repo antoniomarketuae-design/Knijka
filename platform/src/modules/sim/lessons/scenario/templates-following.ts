@@ -47,7 +47,12 @@
  * SPEEDING_OVER_LIMIT off the player's own choices).
  */
 
-import type { BrakingLeadCarSpec, CutInLeadCarSpec, RearTailgaterSpec } from "../../contracts";
+import type {
+  BrakingLeadCarSpec,
+  CutInLeadCarSpec,
+  OncomingStreamSpec,
+  RearTailgaterSpec,
+} from "../../contracts";
 import type { ScenarioSpec } from "./types";
 
 // ---------------------------------------------------------------------------
@@ -572,6 +577,39 @@ const FT_LEAD_TRUCK: BrakingLeadCarSpec = {
   resumeAfterSec: 3,
 };
 
+/**
+ * The ONCOMING counter-flow of sc-follow-truck (founder R3 #42, doc 62 —
+ * „nothing stops you overtaking; the stay-behind has no taught reason"): six
+ * cars southbound on the oncoming bank make overtaking the truck VISIBLY
+ * insane — you cannot see past the box AND the opposite lane is occupied.
+ * PRESSURE SCENERY under the learn-only policy (the runner emits nothing but
+ * a contact collision; fo-follow-v1 carries no overtake-corridor data, so no
+ * new grading path opens — the drill's graded fault stays FOLLOWING_TOO_CLOSE
+ * and the shadow/mistake codes are unchanged). In INSTANT-CRUISE terms (the
+ * OVG_STREAM note: a released car accelerating at the staged 2.6 m/s² loses
+ * v²/2a ≈ 12.3 m against an instant clock at 8 m/s, so holds sit 12.3 m
+ * lower): head instant-model y = 137, five more at +45 m headways (≈ 5.6 s —
+ * every window far under an overtake around a 7.5 m truck). Against the
+ * shadow's ~7 m/s follow (closing ≈ 15 m/s) the parade streams past from
+ * t ≈ 8 s to t ≈ 23 s — bracketing the graded follow zone (y = 175); the
+ * final stretch after the flow clears is where the drill already ends.
+ * Hold feasibility: Σ gaps 225 ≤ head hold arc 235.3 (cars stay on-path).
+ */
+const FT_ONCOMING: OncomingStreamSpec = {
+  id: "sc-ft-oncoming",
+  kind: "oncomingStream",
+  libraryEventId: "FO-06",
+  actor: {
+    pathNodes: ["fo-n-end", "fo-n-start"], // southbound = oncoming
+    hold: { nodeIndex: 0, offsetM: 235.3 }, // y = 124.7 ⇒ instant model y 137
+    cruiseSpeedMps: 8,
+    colorIndex: 1,
+  },
+  count: 6,
+  gapsM: [45, 45, 45, 45, 45], // hold y 169.7 … 349.7 — a rolling counter-column
+  releaseKmh: 3,
+};
+
 /** FO-06 — следване зад камион със закрит обзор (ЗДвП чл. 23: дистанцията се
  *  съобразява и с видимостта — зад висок камион тя е нулева напред, затова
  *  дистанцията е по-голяма, не по-малка). */
@@ -598,8 +636,12 @@ export const SC_FOLLOW_TRUCK: ScenarioSpec = {
     { n: 1, textBg: "Пред теб в твоята лента се движи камион — потегли спокойно след него." },
     { n: 2, textBg: "Зад камион не виждаш нищо от пътя напред: нито пешеходци, нито спрели коли, нито какво го кара да натисне спирачката." },
     { n: 3, textBg: "Затова дистанцията расте: дръж поне 3 секунди до камиона — брой „едно-и-две-и-три“, докато той подмине ориентир." },
-    { n: 4, textBg: "Не се доближавай, „за да виждаш“ — колкото по-близо си, толкова ПО-МАЛКО виждаш и толкова по-малко време имаш." },
-    { n: 5, textBg: "Задръж увеличената дистанция до края на отсечката." },
+    {
+      n: 4,
+      textBg:
+        "И не мисли за изпреварване: насрещното платно е заето, а зад камиона не виждаш нищо от него. Оставането зад камиона не е примирение — то е единственото разумно решение тук.",
+    },
+    { n: 5, textBg: "Не се доближавай, „за да виждаш“ — колкото по-близо си, толкова ПО-МАЛКО виждаш. Задръж увеличената дистанция до края на отсечката." },
   ],
   success: [
     {
@@ -649,7 +691,7 @@ export const SC_FOLLOW_TRUCK: ScenarioSpec = {
     { level: 4, vehicleStart: "cold" },
       { level: 5, conditions: { weather: "rain" } }, // L5: камион + дъжд — spray-blind following
   ],
-  staged: [FT_LEAD_TRUCK],
+  staged: [FT_LEAD_TRUCK, FT_ONCOMING],
   conditions: { weather: "dry" },
   localeBg: "bg-BG",
 };

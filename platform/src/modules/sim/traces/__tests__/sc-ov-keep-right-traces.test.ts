@@ -1,8 +1,9 @@
 /**
  * S3-E trace gate — „Дръж вдясно" (sc-ov-keep-right on ov-keepright-v1, doc 72
- * OV-11), doc 76 §5/§9 stages 3+5:
- *   1. SHADOW replays with ZERO violations and earns CLEAN_DRIVING (the whole
- *      boulevard held in the RIGHT lane).
+ * OV-11 + OV-02; founder R3 redesign doc 62 #45 — the drill SPAWNS IN THE
+ * LEFT LANE), doc 76 §5/§9 stages 3+5:
+ *   1. SHADOW replays with ZERO violations, STARTS in the LEFT lane, performs
+ *      the signalled change and earns CLEAN_DRIVING + SAFE_LANE_CHANGE.
  *   2. MISTAKE DEMOS grade EXACTLY their template codeRefs (NOT_KEEPING_RIGHT),
  *      and NEVER a lane-change code (the hog never leaves its lane).
  *   3. COMMITTED FILES under content/traces/sc-ov-keep-right/ ARE the recordings
@@ -45,15 +46,19 @@ const drives = new Map<ScOvKeepRightTraceName, RecordedDrive>(
 describe("sc-ov-keep-right — the shadow gate (doc 76 §5)", () => {
   const shadow = drives.get("shadow-correct")!;
 
-  it("replays with ZERO violations and earns CLEAN_DRIVING", () => {
+  it("replays with ZERO violations and earns CLEAN_DRIVING + SAFE_LANE_CHANGE", () => {
     expect(violationCodes(shadow)).toEqual([]);
     expect(commendationCodes(shadow)).toContain("CLEAN_DRIVING");
+    // The redesign's whole point: the shadow DEMONSTRATES the signalled move.
+    expect(commendationCodes(shadow)).toContain("SAFE_LANE_CHANGE");
   });
 
-  it("drives the whole boulevard in the RIGHT lane with Bulgarian annotations", () => {
+  it("starts in the LEFT lane, comes home and finishes in the RIGHT lane, with Bulgarian annotations", () => {
+    const first = shadow.trace.samples[0];
+    expect(Math.abs(first.x - 4.06)).toBeLessThan(1.5); // spawned in the LEFT lane
     const last = shadow.trace.samples[shadow.trace.samples.length - 1];
     expect(last.y).toBeGreaterThan(330);
-    expect(Math.abs(last.x - 12.19)).toBeLessThan(1.5); // stayed in the right-lane center
+    expect(Math.abs(last.x - 12.19)).toBeLessThan(1.5); // finished in the right-lane center
     const annotations = shadow.trace.events.filter((e) => e.kind === "annotation");
     expect(annotations.length).toBeGreaterThanOrEqual(4);
     for (const a of annotations) expect(a.textBg ?? "").toMatch(/[Ѐ-ӿ]/);

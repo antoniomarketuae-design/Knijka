@@ -165,6 +165,7 @@ export function SessionEndScreen({
   concepts,
   xpEarned,
   onRetry,
+  onExit,
   nextLessonTitleBg,
   onNextLesson,
   mapPolylines = null,
@@ -180,6 +181,17 @@ export function SessionEndScreen({
   concepts: SessionEndConcept[];
   xpEarned: number | null;
   onRetry: () => void;
+  /**
+   * „Назад към таблото" (founder R3 #5/#23): leave the session back to the
+   * simulator select screen — a CLIENT-SIDE exit through the shell's own
+   * owner, never a route hop. The old <Link href="/dashboard"> left the
+   * /simulator page entirely: any hiccup on the dashboard route (its data
+   * layer has no DB fallback, unlike /simulator's) surfaced the (dashboard)
+   * error boundary, and its recovery links walked the founder to the landing
+   * page. The owner (simulator-client) restores the catalog anchored at the
+   * just-played template instead.
+   */
+  onExit: () => void;
   /** Next lesson in the curriculum; null on the last lesson. */
   nextLessonTitleBg: string | null;
   /** null = next lesson locked (this attempt did not pass). */
@@ -680,9 +692,9 @@ export function SessionEndScreen({
             </span>
           )
         ) : null}
-        <Link href="/dashboard" className="btn-ghost ml-auto">
-          Към таблото
-        </Link>
+        <button type="button" className="btn-ghost ml-auto" onClick={onExit}>
+          Назад към таблото
+        </button>
       </div>
     </div>
   );

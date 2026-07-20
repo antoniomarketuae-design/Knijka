@@ -8,6 +8,7 @@ import {
   DIFFICULTY_PRESETS,
   DIFFICULTY_STORAGE_KEY,
   FULL_LOCK_FADE_END_KMH,
+  governorCapKmh,
   loadDifficulty,
   parseDifficultyMode,
   storeDifficulty,
@@ -149,6 +150,57 @@ describe("applyDifficulty", () => {
       createDriveAssistState(),
     );
     expect(bandEnd.brake).toBeCloseTo(1, 5);
+  });
+});
+
+describe("domain-scaled governor (founder review R3 #37 — the motorway drill)", () => {
+  it("no threaded domain = the legacy static caps, byte-identically", () => {
+    expect(governorCapKmh("beginner")).toBe(DIFFICULTY_PRESETS.beginner.speedCapKmh);
+    expect(governorCapKmh("normal")).toBe(DIFFICULTY_PRESETS.normal.speedCapKmh);
+    expect(governorCapKmh("advanced")).toBeNull();
+    // Garbage domains degrade to the preset, never throw / never NaN.
+    expect(governorCapKmh("normal", Number.NaN)).toBe(90);
+    expect(governorCapKmh("normal", 0)).toBe(90);
+    expect(governorCapKmh("normal", -5)).toBe(90);
+  });
+
+  it("Нормален on the АМ-140 map reaches the flow: full throttle at 140, cut by 150", () => {
+    expect(governorCapKmh("normal", 140)).toBe(150);
+    // At the drill's own ceiling (140) the governor band (144–150) is not yet
+    // entered — the shaped 0.75 throttle survives untouched.
+    const at140 = applyDifficulty(FULL, "normal", 140, DT, createDriveAssistState(), 140);
+    expect(at140.throttle).toBeCloseTo(0.75, 5);
+    const at150 = applyDifficulty(FULL, "normal", 150, DT, createDriveAssistState(), 140);
+    expect(at150.throttle).toBe(0);
+  });
+
+  it("Нормален in the 50-city governs ~60 but keeps the speeding mistake committable", () => {
+    expect(governorCapKmh("normal", 50)).toBe(60);
+    // The founder's original ruling: SPEEDING_OVER_LIMIT needs limit × 1.1
+    // (= 55 in a 50-zone, rules/types.ts speedingGraceRatio) — the domain cap
+    // must leave usable throttle above it so the mistake stays failable.
+    const at55 = applyDifficulty(FULL, "normal", 55, DT, createDriveAssistState(), 50);
+    expect(at55.throttle).toBeGreaterThan(0.5); // 5/6 of the shaped 0.75
+    const at60 = applyDifficulty(FULL, "normal", 60, DT, createDriveAssistState(), 50);
+    expect(at60.throttle).toBe(0);
+  });
+
+  it("Начинаещ keeps the training wheel: 40 in the 50-city (identical), 130 on the АМ", () => {
+    expect(governorCapKmh("beginner", 50)).toBe(DIFFICULTY_PRESETS.beginner.speedCapKmh);
+    expect(governorCapKmh("beginner", 140)).toBe(130);
+    // Still UNDER the domain everywhere — a beginner can never speed.
+    expect(governorCapKmh("beginner", 140)!).toBeLessThan(140);
+  });
+
+  it("полигон floor: the 20–30 domain never squeezes a cap below 30", () => {
+    expect(governorCapKmh("beginner", 30)).toBe(30);
+    expect(governorCapKmh("normal", 30)).toBe(40);
+  });
+
+  it("Напреднал stays uncapped in every domain", () => {
+    const fast = applyDifficulty(FULL, "advanced", 200, DT, createDriveAssistState(), 140);
+    expect(fast.throttle).toBeCloseTo(1, 5);
+    expect(governorCapKmh("advanced", 50)).toBeNull();
   });
 });
 

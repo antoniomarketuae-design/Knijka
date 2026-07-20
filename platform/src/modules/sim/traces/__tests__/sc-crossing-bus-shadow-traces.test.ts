@@ -1,5 +1,5 @@
 /**
- * S trace gate — „Пешеходци иззад спрял автобус" (sc-crossing-bus-shadow on
+ * S trace gate — „Пешеходци иззад спрял камион" (sc-crossing-bus-shadow on
  * pe-bus-v1, doc 72 PE-10), doc 76 §5/§9 stages 3+5:
  *   1. SHADOW replays with ZERO violations and earns PEDESTRIAN_YIELDED.
  *   2. MISTAKE DEMOS grade EXACTLY their template codeRefs — passing the bus
