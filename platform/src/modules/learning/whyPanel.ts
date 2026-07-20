@@ -160,6 +160,17 @@ function simRefIndex(): ReadonlyMap<string, WhyPanelSimRef> {
 }
 
 /**
+ * MODULE-INTERNAL (clipPilot.ts): the full ev-* event → representative-drill
+ * index the resolver serves per question. The clip-capture pilot list derives
+ * from THIS map so every recorded clip lands on the exact demo the why-panel
+ * would replay — never a hand-picked set. Needs no content repo (built from
+ * the static templates + catalog only). Not re-exported by the barrel.
+ */
+export function whyPanelSimRefIndex(): ReadonlyMap<string, WhyPanelSimRef> {
+  return simRefIndex();
+}
+
+/**
  * Resolve the why-panel payload for a question. Pure lookup — no persistence,
  * no I/O; requires the content repo (import '@/lib/content/loader' server-side
  * first, like every learning entry point). Null for an unknown question id.

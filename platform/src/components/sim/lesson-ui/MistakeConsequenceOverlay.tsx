@@ -7,9 +7,10 @@
  * teach-pause `paused` mechanism), and this card presents the consequence:
  *
  *   „Какво направи" — the STORED whatWentWrongBg of the template mistake +
- *   the lawRef citation, SIDE BY SIDE with the recorded red-ghost replay of
- *   that same mistake (MistakeReplay — THEO Stage 1 reuse, 2D canvas, no
- *   extra three.js), framed by the mistake's OFFICIAL severity class
+ *   the lawRef citation, SIDE BY SIDE with the recorded replay of that same
+ *   mistake (MistakeMedia — the real-engine clip when the manifest has one,
+ *   the THEO Stage 1 2D canvas as fallback; the WhyPanel component, shared,
+ *   no forks), framed by the mistake's OFFICIAL severity class
  *   (опасна/основна/второстепенна — stored in the rules catalog, never
  *   invented). „Сега опитай правилно →" restarts the SAME rung in normal
  *   graded mode (the shell's onStartScenario seam).
@@ -26,7 +27,7 @@ import { traceUrlForRepoPath } from "@/components/theory/whyPanelModel";
 import type { MistakeDemo, TeachMoment } from "@/modules/sim/lessons";
 import { VIOLATIONS, type SeverityClass, type ViolationSpec } from "@/modules/sim/rules";
 
-const MistakeReplay = dynamic(() => import("@/components/theory/MistakeReplay"), {
+const MistakeMedia = dynamic(() => import("@/components/theory/MistakeMedia"), {
   ssr: false,
   loading: () => (
     <div
@@ -149,11 +150,12 @@ export function MistakeConsequenceOverlay({
             </div>
           </div>
 
-          {/* The consequence visual: the recorded RED-GHOST replay of this
-              same mistake (Stage 1 MistakeReplay — reuse, lazy, 2D). */}
+          {/* The consequence visual: the recorded replay of this same
+              mistake (MistakeMedia — real-engine clip if produced, the
+              Stage 1 2D canvas otherwise; lazy either way). */}
           <div className="min-w-0">
             <p className="hud-label">Погледни отстрани</p>
-            <MistakeReplay
+            <MistakeMedia
               tracePath={traceUrlForRepoPath(demo.traceRef.path)}
               districtId={districtId}
               className="mt-1.5"

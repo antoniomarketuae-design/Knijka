@@ -13,6 +13,13 @@
 # testing
 /coverage
 
+# why-panel clip pilot: the .webm binaries stay out of git — they deploy by
+# scp to the VPS public dir (see public/clips/README.md). Only the manifest
+# contract + the README are tracked.
+/public/clips/*
+!/public/clips/manifest.json
+!/public/clips/README.md
+
 # next.js
 /.next/
 /out/

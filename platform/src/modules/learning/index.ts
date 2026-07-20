@@ -26,6 +26,12 @@ export type { SimSeverity } from "./store";
 // THEO-2 Stage 1 (doc 64) — the why-panel resolver: question id → stored
 // explanation + citations (+ the scenario drill demonstrating the fault).
 export { resolveWhyPanel } from "./whyPanel";
+
+// Why-panel VIDEO pilot: the derived clip list the /dev/clip-capture rig
+// records (one clip per resolvable event's representative mistake). Pure
+// static data — needs no content repo.
+export { clipIdFor, clipPilotList } from "./clipPilot";
+export type { ClipPilotEntry } from "./clipPilot";
 export type {
   WhyPanelExperienceRef,
   WhyPanelMistakeRef,

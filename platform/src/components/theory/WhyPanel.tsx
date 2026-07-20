@@ -10,10 +10,11 @@
  * Placement is the parent's job (side panel on desktop, in-card section on
  * mobile — PracticeSession). This component is one panel body, never a modal.
  *
- * Perf: MistakeReplay code-splits via next/dynamic (ssr:false) and mounts
- * ONLY when its section is shown — auto for a wrong answer (the panel itself
- * appears on submit), behind the „Виж грешката, която избегна" disclosure for
- * a correct one. Its data fetch is lazy on mount already.
+ * Perf: MistakeMedia (the real-engine clip when the manifest has one, the 2D
+ * canvas replay as the founder-chosen fallback) code-splits via next/dynamic
+ * (ssr:false) and mounts ONLY when its section is shown — auto for a wrong
+ * answer (the panel itself appears on submit), behind the „Виж грешката,
+ * която избегна" disclosure for a correct one. Its fetches are lazy already.
  */
 
 import dynamic from "next/dynamic";
@@ -22,7 +23,7 @@ import { useState } from "react";
 import { IconArrowRight } from "@/components/icons";
 import type { WhyPanelModel } from "./whyPanelModel";
 
-const MistakeReplay = dynamic(() => import("./MistakeReplay"), {
+const MistakeMedia = dynamic(() => import("./MistakeMedia"), {
   ssr: false,
   loading: () => (
     <div
@@ -118,7 +119,7 @@ export function WhyPanel({
                 {replay.whatWentWrongBg}
               </p>
               {replayShown ? (
-                <MistakeReplay
+                <MistakeMedia
                   tracePath={replay.tracePath}
                   districtId={replay.districtId}
                   className="mt-2"
