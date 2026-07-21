@@ -65,11 +65,16 @@ export function captureWindowFor(
 ): RecordingWindow {
   const base = recordingWindow(durationSec, faultTimeSec);
   let startSec = base.startSec;
-  if (control) {
+  // Only shift for the control lead-in when the pass time is a REAL number.
+  // If the ghost never passes near the positioned control, controlPassTimeSec
+  // returns NaN — Math.min(n, NaN) is NaN, which poisoned the whole window and
+  // hung the scene at a NaN seek (sc-ov-ban-overtake: the В24 sits off to the
+  // side, the ghost never gets near it). Fall back to the fault-centered window.
+  if (control && Number.isFinite(control.passTSec)) {
     startSec = Math.min(base.startSec - CONTROL_LEAD_S, control.passTSec - CONTROL_APPROACH_S);
     startSec = Math.max(startSec, faultTimeSec - CONTROL_MAX_PRE_FAULT_S);
   }
-  startSec = Math.max(0, startSec);
+  startSec = Number.isFinite(startSec) ? Math.max(0, startSec) : base.startSec;
   const endSec = Math.max(
     Math.min(base.endSec, durationSec - WINDOW_END_GUARD_S),
     Math.min(startSec + 1, durationSec), // degenerate ultra-short traces
