@@ -163,6 +163,28 @@ export function familyPrefixOf(templateId: string): string {
   return parts.length >= 2 ? `${parts[0]}-${parts[1]}` : templateId;
 }
 
+/** Playback-order index of the FAULT still among the five R0 keyframes
+ *  (window start, fault−2, FAULT, fault+2, end). */
+export const FAULT_KEYFRAME_INDEX = 2;
+
+/**
+ * The <video poster> for a clip — its FAULT keyframe, the frame that IS the
+ * teaching moment (the ❌ marker over the violation). Returning the still lets
+ * every card paint its fault image INSTANTLY as an image, so a 20-clip gallery
+ * shows all twenty at once WITHOUT decoding twenty MediaRecorder webm streams
+ * — the concurrent-decoder cap that silently blanked clips 14–20.
+ *
+ * keyframes[2] is the fault (see FAULT_KEYFRAME_INDEX); a partial save with
+ * fewer than three stills falls back to the middle frame; a clip that saved no
+ * keyframes at all (pre-R0 recordings) returns `undefined` — the element then
+ * has no poster and shows a blank box until played, exactly as before.
+ */
+export function posterFrameFor(clip: Pick<MistakeClip, "keyframes">): string | undefined {
+  const frames = clip.keyframes;
+  if (frames === undefined || frames.length === 0) return undefined;
+  return frames[FAULT_KEYFRAME_INDEX] ?? frames[Math.floor(frames.length / 2)];
+}
+
 /** Seconds → "m:ss" for the gallery cards. */
 export function formatClipDuration(durationSec: number): string {
   const total = Math.max(0, Math.round(durationSec));

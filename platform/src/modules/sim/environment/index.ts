@@ -73,5 +73,7 @@ export {
   getSnowIntensity,
   wetnessToRoadParams,
   resetWeather,
+  setWeatherTarget,
+  stepWeather,
 } from "./weather";
 export type { RoadWetnessParams } from "./weather";

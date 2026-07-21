@@ -62,10 +62,16 @@ function expectPost(
 }
 
 describe("zone-driven sign posts (SIGN-ASSET drop)", () => {
-  it("ov-ban-v1: one В24 post at the span start (90 m), right-hand curb", () => {
+  it("ov-ban-v1: a В24 at the span start (90 m) plus one in-zone repeat, right-hand curb", () => {
     const world = loadWorld("ov-ban-v1");
-    expect(world.stats.signs.noOvertaking).toBe(1);
-    expectPost(zonePosts(world), "noOvertaking", 90);
+    // Entry post + one repeat (ZONE_SIGN_REPEAT_M into the span) so the ban
+    // stays in frame at the overtake fault deep in the zone (doc 66 R2).
+    expect(world.stats.signs.noOvertaking).toBe(2);
+    const posts = zonePosts(world).filter((p) => p.kind === "noOvertaking");
+    expectPost(posts, "noOvertaking", 90); // entry (the first post)
+    const repeat = posts.find((p) => Math.abs(p.position[2] - -170) < 1);
+    expect(repeat, "expected a В24 repeat ~170 m in").toBeDefined();
+    expect(repeat!.position[0]).toBeGreaterThan(0); // right of travel, like the entry
   });
 
   it("zone posts on scenario maps carry the lesson-critical scale (doc 62 #6)", () => {

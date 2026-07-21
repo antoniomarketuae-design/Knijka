@@ -247,13 +247,21 @@ export function StaticWorld({
     () => new Color(decalWet.darken, decalWet.darken, decalWet.darken),
     [decalWet.darken],
   );
-  // Asphalt env response (doc 71 §4.4, retuned by the doc 66 R5 measurement
-  // above): WETNESS-LERPED 1.5 dry → 1.1 soaked, so the wet-gloss state
-  // smears the golden HDRI like damp asphalt without blowing past AgX's
-  // shoulder, while a DRY scene keeps the authored 1.5 ambient response
-  // BYTE-IDENTICAL (roughness 1.0 still samples the blurred IBL — a constant
-  // trim would have dimmed the founder-passed dry clips too).
-  const ROAD_ENV_INTENSITY = 1.5 + (1.1 - 1.5) * wetness;
+  // Asphalt env response (doc 71 §4.4, retuned by the doc 66 R5 measurements):
+  // WETNESS-LERPED 1.5 dry → 0.55 soaked. The wet endpoint is the sky-glare
+  // dial: at a grazing angle a wet road mirrors the sky just above the horizon,
+  // which by DAY is bright and — crucially — is NOT dimmed for rain (the rig
+  // dims only the sun + hemisphere fill, never the HDRI reflection or the
+  // exposure), so the far carriageway blows out while the near field darkens
+  // correctly. Round-2's 1.1 still measured the far wet band ≈ [180,170,162]
+  // vs the dry road's far ≈ [64,62,70] (founder round-3 „still too bright,
+  // can't tell rain from dry"). Dropping the soaked env response to 0.55
+  // (≈half the reflected sky) lands the far band in the ~[110–125] range —
+  // clearly a DARK, damp, reflective road, no longer a white sheet — while the
+  // roughness-0.5 gloss lobe keeps the specular STREAKS off lit windows/sun
+  // (still reads „wet"). A DRY scene keeps the authored 1.5 response
+  // BYTE-IDENTICAL (wetness 0), so the founder-passed dry clips never dim.
+  const ROAD_ENV_INTENSITY = 1.5 + (0.55 - 1.5) * wetness;
   // Parking bands read a touch lighter/cooler than the travel lanes so the
   // extra width reads as parking, not as another lane (doc 68 QW3).
   const parkingTint = useMemo(

@@ -61,6 +61,19 @@ const CURVE_ADVISORY_PLATE_AHEAD_M = 2;
 /** …and this much further off the curb, so neither post occludes the other
  *  on the dead-straight approach. */
 const CURVE_ADVISORY_PLATE_OUT_M = 1.4;
+/**
+ * В24 repeat cadence inside a noOvertaking span (doc 66 R2 — the governing
+ * control must be IN FRAME at the fault, not only at the kerb entry). A single
+ * post at the span START leaves the ban unsigned deep in the zone — exactly
+ * where a slow-lead overtake is attempted and where the pilot mistake clip
+ * frames the violation (~70 m past the entry on ov-ban-v1). Bulgarian practice
+ * repeats В24 through a long ban stretch; one reminder post this far past the
+ * start restates the ban where it is broken. Render-only, like every post here.
+ */
+const ZONE_SIGN_REPEAT_M = 80;
+/** …but never within this of the span end, so the repeat never reads as the
+ *  ban lifting right where it is being restated. */
+const ZONE_SIGN_REPEAT_END_CLEAR_M = 30;
 
 /** Marking-only / physics-only kinds place no post. */
 const ZONE_SIGN_KIND: Partial<Record<DistrictZoneKind, SignKind>> = {
@@ -112,7 +125,15 @@ export function buildZoneSigns(district: District, network: RoadNetwork): SignPl
     }
 
     const kind = ZONE_SIGN_KIND[zone.kind];
-    if (kind) placeAt(zone.fromM, kind);
+    if (kind) {
+      placeAt(zone.fromM, kind); // the entry post (span start, right kerb)
+      // В24: restate the ban deep in the span so it stays in the fault
+      // sightline (doc 66 R2). One repeat, kept clear of the span end.
+      if (zone.kind === "noOvertaking") {
+        const repeatAt = zone.fromM + ZONE_SIGN_REPEAT_M;
+        if (repeatAt < zone.toM - ZONE_SIGN_REPEAT_END_CLEAR_M) placeAt(repeatAt, kind);
+      }
+    }
 
     // Founder R3 #36 („Скорост в завой"): the copy promises „знак А1 с табела
     // „50"" — pair the curve warning with the В26-50 plate the sign kit DOES

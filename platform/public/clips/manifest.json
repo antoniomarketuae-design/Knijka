@@ -8,7 +8,7 @@
       "tracePath": "content/traces/sc-ac-night-lights/mistake-never-on.trace.json",
       "src": "/clips/sc-ac-night-lights__m0.webm",
       "durationSec": 10,
-      "recordedAt": "2026-07-21T04:48:09.367Z",
+      "recordedAt": "2026-07-21T06:53:49.435Z",
       "titleBg": "Никога не включени светлини",
       "keyframes": [
         "/clips/sc-ac-night-lights__m0.k0.png",
@@ -18,7 +18,8 @@
         "/clips/sc-ac-night-lights__m0.k4.png"
       ],
       "actors": [],
-      "view": "exterior+dashboard"
+      "view": "exterior+dashboard",
+      "quality": "high"
     },
     {
       "id": "sc-ac-rain-lights__m0",
@@ -27,7 +28,7 @@
       "tracePath": "content/traces/sc-ac-rain-lights/mistake-never-on.trace.json",
       "src": "/clips/sc-ac-rain-lights__m0.webm",
       "durationSec": 10,
-      "recordedAt": "2026-07-21T04:48:22.986Z",
+      "recordedAt": "2026-07-21T06:54:03.559Z",
       "titleBg": "„Виждам си добре“ — без светлини",
       "keyframes": [
         "/clips/sc-ac-rain-lights__m0.k0.png",
@@ -37,7 +38,8 @@
         "/clips/sc-ac-rain-lights__m0.k4.png"
       ],
       "actors": [],
-      "view": "exterior+dashboard"
+      "view": "exterior+dashboard",
+      "quality": "high"
     },
     {
       "id": "sc-ed-d2-city-run__m0",
@@ -71,7 +73,7 @@
       "tracePath": "content/traces/sc-follow-distance/mistake-tailgate.trace.json",
       "src": "/clips/sc-follow-distance__m0.webm",
       "durationSec": 10,
-      "recordedAt": "2026-07-21T04:48:54.119Z",
+      "recordedAt": "2026-07-21T06:54:36.476Z",
       "titleBg": "Лепене за предния",
       "keyframes": [
         "/clips/sc-follow-distance__m0.k0.png",
@@ -87,7 +89,8 @@
           "present": true
         }
       ],
-      "view": "exterior"
+      "view": "exterior",
+      "quality": "high"
     },
     {
       "id": "sc-junction-stop__m0",
@@ -96,7 +99,7 @@
       "tracePath": "content/traces/sc-junction-stop/mistake-rolling-stop.trace.json",
       "src": "/clips/sc-junction-stop__m0.webm",
       "durationSec": 14,
-      "recordedAt": "2026-07-21T04:49:11.312Z",
+      "recordedAt": "2026-07-21T06:54:53.853Z",
       "titleBg": "Търкалящо спиране",
       "keyframes": [
         "/clips/sc-junction-stop__m0.k0.png",
@@ -106,7 +109,8 @@
         "/clips/sc-junction-stop__m0.k4.png"
       ],
       "actors": [],
-      "view": "exterior"
+      "view": "exterior",
+      "quality": "high"
     },
     {
       "id": "sc-lane-change__m0",
@@ -140,7 +144,7 @@
       "tracePath": "content/traces/sc-mw-discipline/mistake-left-hog.trace.json",
       "src": "/clips/sc-mw-discipline__m0.webm",
       "durationSec": 12,
-      "recordedAt": "2026-07-21T04:49:41.683Z",
+      "recordedAt": "2026-07-21T06:55:25.141Z",
       "titleBg": "Висене в лявата лента при 130",
       "keyframes": [
         "/clips/sc-mw-discipline__m0.k0.png",
@@ -150,7 +154,8 @@
         "/clips/sc-mw-discipline__m0.k4.png"
       ],
       "actors": [],
-      "view": "exterior"
+      "view": "exterior",
+      "quality": "high"
     },
     {
       "id": "sc-ov-ban-overtake__m0",
@@ -158,8 +163,8 @@
       "mistakeIndex": 0,
       "tracePath": "content/traces/sc-ov-ban-overtake/mistake-overtake-in-zone.trace.json",
       "src": "/clips/sc-ov-ban-overtake__m0.webm",
-      "durationSec": 14,
-      "recordedAt": "2026-07-21T04:49:58.590Z",
+      "durationSec": 18.17,
+      "recordedAt": "2026-07-21T06:55:46.576Z",
       "titleBg": "Изпреварване в зоната на забраната",
       "keyframes": [
         "/clips/sc-ov-ban-overtake__m0.k0.png",
@@ -175,7 +180,8 @@
           "present": true
         }
       ],
-      "view": "exterior"
+      "view": "exterior",
+      "quality": "high"
     },
     {
       "id": "sc-ov-oneway__m0",
@@ -184,7 +190,7 @@
       "tracePath": "content/traces/sc-ov-oneway/mistake-wrong-way.trace.json",
       "src": "/clips/sc-ov-oneway__m0.webm",
       "durationSec": 14,
-      "recordedAt": "2026-07-21T04:50:16.012Z",
+      "recordedAt": "2026-07-21T06:56:04.208Z",
       "titleBg": "Ляв завой срещу еднопосочната",
       "keyframes": [
         "/clips/sc-ov-oneway__m0.k0.png",
@@ -194,7 +200,8 @@
         "/clips/sc-ov-oneway__m0.k4.png"
       ],
       "actors": [],
-      "view": "exterior"
+      "view": "exterior",
+      "quality": "high"
     },
     {
       "id": "sc-ov-solid-line__m0",
@@ -202,8 +209,8 @@
       "mistakeIndex": 0,
       "tracePath": "content/traces/sc-ov-solid-line/mistake-pullout.trace.json",
       "src": "/clips/sc-ov-solid-line__m0.webm",
-      "durationSec": 14,
-      "recordedAt": "2026-07-21T04:50:33.801Z",
+      "durationSec": 14.38,
+      "recordedAt": "2026-07-21T06:56:21.904Z",
       "titleBg": "Изпреварващо излизане през плътната линия",
       "keyframes": [
         "/clips/sc-ov-solid-line__m0.k0.png",
@@ -213,7 +220,8 @@
         "/clips/sc-ov-solid-line__m0.k4.png"
       ],
       "actors": [],
-      "view": "exterior"
+      "view": "exterior",
+      "quality": "high"
     },
     {
       "id": "sc-park-perp-rev__m0",
@@ -222,7 +230,7 @@
       "tracePath": "content/traces/sc-park-perp-rev/mistake-wide-approach.trace.json",
       "src": "/clips/sc-park-perp-rev__m0.webm",
       "durationSec": 12,
-      "recordedAt": "2026-07-21T04:50:48.602Z",
+      "recordedAt": "2026-07-21T06:56:37.254Z",
       "titleBg": "Твърде широк подход",
       "keyframes": [
         "/clips/sc-park-perp-rev__m0.k0.png",
@@ -238,7 +246,8 @@
           "present": true
         }
       ],
-      "view": "exterior"
+      "view": "exterior",
+      "quality": "high"
     },
     {
       "id": "sc-pk-ban-stop__m0",
@@ -246,8 +255,8 @@
       "mistakeIndex": 0,
       "tracePath": "content/traces/sc-pk-ban-stop/mistake-stop-in-zone.trace.json",
       "src": "/clips/sc-pk-ban-stop__m0.webm",
-      "durationSec": 14,
-      "recordedAt": "2026-07-21T04:51:05.248Z",
+      "durationSec": 19.75,
+      "recordedAt": "2026-07-21T06:57:00.349Z",
       "titleBg": "„Само за минутка“ в зоната",
       "keyframes": [
         "/clips/sc-pk-ban-stop__m0.k0.png",
@@ -257,7 +266,8 @@
         "/clips/sc-pk-ban-stop__m0.k4.png"
       ],
       "actors": [],
-      "view": "exterior"
+      "view": "exterior",
+      "quality": "high"
     },
     {
       "id": "sc-roundabout-entry__m0",

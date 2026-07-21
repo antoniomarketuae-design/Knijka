@@ -14,6 +14,7 @@ import {
   familyPrefixOf,
   formatClipDuration,
   parseClipManifest,
+  posterFrameFor,
   type MistakeClip,
 } from "./clipManifest";
 
@@ -159,5 +160,34 @@ describe("gallery helpers", () => {
     expect(formatClipDuration(62)).toBe("1:02");
     expect(formatClipDuration(0)).toBe("0:00");
     expect(formatClipDuration(-3)).toBe("0:00");
+  });
+});
+
+describe("posterFrameFor", () => {
+  const frames = [
+    "/clips/x__m0.k0.png",
+    "/clips/x__m0.k1.png",
+    "/clips/x__m0.k2.png",
+    "/clips/x__m0.k3.png",
+    "/clips/x__m0.k4.png",
+  ];
+
+  it("picks keyframes[2] — the FAULT still — from the standard five", () => {
+    expect(posterFrameFor({ keyframes: frames })).toBe("/clips/x__m0.k2.png");
+  });
+
+  it("falls back to the middle frame when a partial save has fewer than three", () => {
+    expect(posterFrameFor({ keyframes: [frames[0], frames[1]] })).toBe(frames[1]);
+    expect(posterFrameFor({ keyframes: [frames[0]] })).toBe(frames[0]);
+  });
+
+  it("keeps the fault frame for a three-still partial (start, fault−2, fault)", () => {
+    expect(posterFrameFor({ keyframes: frames.slice(0, 3) })).toBe(frames[2]);
+  });
+
+  it("returns undefined when the clip saved no keyframes (pre-R0 recordings)", () => {
+    expect(posterFrameFor({ keyframes: undefined })).toBeUndefined();
+    expect(posterFrameFor({ keyframes: [] })).toBeUndefined();
+    expect(posterFrameFor({})).toBeUndefined();
   });
 });

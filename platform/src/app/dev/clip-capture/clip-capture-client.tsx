@@ -43,6 +43,8 @@ import {
 import { loadQualityPreset } from "@/components/sim/lesson-ui/QualityPresetSelector";
 import { TraceTimeline } from "@/components/sim/lesson-ui/TraceTimeline";
 import { traceUrlForRepoPath } from "@/components/theory/whyPanelModel";
+import { CLIP_MANIFEST_URL, parseClipManifest } from "@/components/theory/clipManifest";
+import { missingFreshClips } from "@/lib/clips/batch";
 import type { RecordingWindow } from "@/lib/clips/trim";
 import {
   buildActorChecklist,
@@ -89,12 +91,28 @@ const SETTLE_FRAMES_TIMEOUT_MS = 4_000;
 /** Warmup/build ceiling per clip before it counts as failed. */
 const READY_TIMEOUT_MS = 90_000;
 const RECORD_BITS_PER_S = 1_500_000;
+/** Hard wall-clock ceiling for ONE clip's whole pipeline (mount → record →
+ *  save). Above every inner deadline (READY 90s + record span + save) — the
+ *  batch backstop so a stall in ANY stage marks the clip failed and CONTINUES
+ *  instead of freezing the run at ~13/20 (the pilot-v2 death). */
+const PER_CLIP_WALL_MS = 180_000;
+/** localStorage key: ISO time the last FULL batch began — the „fresh webm"
+ *  baseline for „запиши само липсващите" after a reload. */
+const BATCH_STARTED_KEY = "clip-capture:batch-started-at";
 
 type ClipState = "pending" | "loading" | "recording" | "saving" | "done" | "error";
 
 interface ClipStatus {
   state: ClipState;
   note?: string;
+}
+
+/** Outcome of a batch run — the failed ids (with reasons) are shown verbatim
+ *  so a stall never hides WHICH clips the founder is missing (not just a count). */
+interface BatchResult {
+  ok: number;
+  total: number;
+  failed: { id: string; note: string }[];
 }
 
 interface ClipRun {
@@ -120,12 +138,14 @@ interface Mode {
   kind: "list" | "single" | "auto";
   templateId?: string;
   mistakeIndex?: number;
+  /** auto only: re-record just the clips missing a fresh webm (?only=missing). */
+  onlyMissing?: boolean;
 }
 
 function parseMode(): Mode {
   try {
     const q = new URLSearchParams(window.location.search);
-    if (q.get("auto") === "1") return { kind: "auto" };
+    if (q.get("auto") === "1") return { kind: "auto", onlyMissing: q.get("only") === "missing" };
     const templateId = q.get("template");
     const mistake = q.get("mistake");
     if (templateId) {
@@ -147,6 +167,28 @@ function pickMimeType(): string {
 
 function sleep(ms: number): Promise<void> {
   return new Promise((r) => window.setTimeout(r, ms));
+}
+
+/** Race a promise against a wall-clock deadline. The loser (a stalled capture)
+ *  keeps running detached — the next entry remounts a fresh scene by key — but
+ *  the batch is FREED to advance instead of hanging forever. */
+function withWallTimeout<T>(p: Promise<T>, ms: number): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const id = window.setTimeout(
+      () => reject(new Error(`изтече лимитът за клипа (${Math.round(ms / 1000)}с)`)),
+      ms,
+    );
+    p.then(
+      (v) => {
+        window.clearTimeout(id);
+        resolve(v);
+      },
+      (e: unknown) => {
+        window.clearTimeout(id);
+        reject(e instanceof Error ? e : new Error(String(e)));
+      },
+    );
+  });
 }
 
 /** Build the run for one pilot entry: plan card + compiled drill + trace. */
@@ -179,14 +221,18 @@ async function loadRun(entry: ClipPilotEntry, plan: ClipPlanEntry | undefined): 
     hasPositionedControl && passTSec !== null
       ? { x: control.approxPos!.x, y: control.approxPos!.y, passTSec }
       : null;
-  // Lot maps: the roof ❌ badge floats ~camera height and parallax-projects
-  // onto near backgrounds — swap it for a ground ❌ at the ENGINE fault pose.
-  let groundMarker: CaptureGroundMarker | null = null;
-  if (spec.map.archetype === "parking-lot") {
-    const faultPt = createTracePoint();
-    sampleAt(trace, plan.faultTimeSec, faultPt);
-    groundMarker = { x: faultPt.x, y: faultPt.y };
-  }
+  // The fault ❌ is a GROUND-ANCHORED marker at the CAR's pose at faultTimeSec
+  // on EVERY map (doc 66 R5, founder round-3 „✗ floats over grass"). The old
+  // roof badge (ShadowCar's sprite 2.9 m above the car) sits near the chase
+  // camera's own height, so it projects onto the HORIZON — over whatever lies
+  // beyond the road (grass on sc-ov-oneway k1, a field on a t-junction) — and
+  // reads as a detached marker in space, not „the mistake happened HERE".
+  // A flat ❌ at the ghost's trace pose (faultMarkerPose: (x,y)→(x,·,−y), the
+  // exact ShadowCar pose law) lands on the road AT the car in every frame and
+  // every map; ShadowCar's badge yields to it (showBadge = groundMarker null).
+  const faultPt = createTracePoint();
+  sampleAt(trace, plan.faultTimeSec, faultPt);
+  const groundMarker: CaptureGroundMarker = { x: faultPt.x, y: faultPt.y };
   const isNight = (lesson.environment?.timeOfDay ?? "day") === "night";
   return {
     entry,
@@ -214,8 +260,10 @@ export function ClipCaptureClient({
   const [mode, setMode] = useState<Mode | null>(null);
   const [run, setRun] = useState<ClipRun | null>(null);
   const [statuses, setStatuses] = useState<Record<string, ClipStatus>>({});
-  const [batchDone, setBatchDone] = useState<{ ok: number; total: number } | null>(null);
+  const [batchDone, setBatchDone] = useState<BatchResult | null>(null);
   const [busy, setBusy] = useState(false);
+  /** How many clips THIS run processes (pilot.length, or the missing subset). */
+  const [runTotal, setRunTotal] = useState(pilot.length);
 
   const clockRef = useRef<TraceClock>(createTraceClock());
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -433,33 +481,87 @@ export function ClipCaptureClient({
     [recordMounted, setStatus, planById],
   );
 
-  /** The unattended batch: every pilot entry, failures logged + skipped. */
+  /** Record a list of entries in order. EVERY entry is wrapped in a wall-clock
+   *  timeout, so a stall in any stage marks that one failed and the run moves
+   *  on — never the pilot-v2 freeze at 13/20. Returns the ok count + the failed
+   *  ids (with reasons) for the end-of-batch summary. */
+  const runEntries = useCallback(
+    async (entries: readonly ClipPilotEntry[]): Promise<BatchResult> => {
+      const failed: { id: string; note: string }[] = [];
+      let ok = 0;
+      for (const entry of entries) {
+        try {
+          await withWallTimeout(captureEntry(entry), PER_CLIP_WALL_MS);
+          ok++;
+        } catch (err) {
+          const note = err instanceof Error ? err.message : "грешка";
+          console.error(`clip-capture: ${entry.id} failed`, err);
+          setStatus(entry.id, { state: "error", note });
+          failed.push({ id: entry.id, note });
+        }
+      }
+      return { ok, total: entries.length, failed };
+    },
+    [captureEntry, setStatus],
+  );
+
+  /** The unattended batch: every pilot entry. Stamps the „fresh webm" baseline
+   *  first (so „запиши само липсващите" can tell stragglers from this run's
+   *  successes even after a reload), then records the lot. */
   const runBatch = useCallback(async () => {
     setBusy(true);
-    let ok = 0;
-    for (const entry of pilot) {
-      try {
-        await captureEntry(entry);
-        ok++;
-      } catch (err) {
-        console.error(`clip-capture: ${entry.id} failed`, err);
-        setStatus(entry.id, {
-          state: "error",
-          note: err instanceof Error ? err.message : "грешка",
-        });
-      }
+    setBatchDone(null);
+    setRunTotal(pilot.length);
+    const startedAt = new Date().toISOString();
+    try {
+      window.localStorage.setItem(BATCH_STARTED_KEY, startedAt);
+    } catch {
+      // Storage blocked — the in-session run still works; only the
+      // post-reload „missing" baseline is lost.
     }
+    const result = await runEntries(pilot);
     setRun(null);
-    setBatchDone({ ok, total: pilot.length });
+    setBatchDone(result);
     setBusy(false);
-  }, [pilot, captureEntry, setStatus]);
+  }, [pilot, runEntries]);
 
-  // ?auto=1 runs unattended (guarded against the dev double-effect).
+  /** Re-record ONLY the clips missing a fresh webm: fetch the live manifest,
+   *  compare recordedAt against the last full batch's baseline, record just the
+   *  stragglers. So a stall never leaves the founder with silently-stale clips
+   *  — one click refreshes exactly what the last run failed to produce. */
+  const runMissing = useCallback(async () => {
+    setBusy(true);
+    setBatchDone(null);
+    let manifestClips: { id: string; recordedAt: string }[] = [];
+    try {
+      const res = await fetch(CLIP_MANIFEST_URL, { cache: "no-store" });
+      if (res.ok) manifestClips = parseClipManifest((await res.json()) as unknown) ?? [];
+    } catch {
+      // No manifest → every clip reads as missing (recorded below).
+    }
+    let since: string | null = null;
+    try {
+      since = window.localStorage.getItem(BATCH_STARTED_KEY);
+    } catch {
+      // no baseline available — missingFreshClips then selects only absent ones
+    }
+    const byId = new Map(manifestClips.map((c) => [c.id, { recordedAt: c.recordedAt }]));
+    const targetIds = new Set(missingFreshClips(pilot, byId, since));
+    const targets = pilot.filter((e) => targetIds.has(e.id));
+    setRunTotal(targets.length);
+    const result = await runEntries(targets);
+    setRun(null);
+    setBatchDone(result);
+    setBusy(false);
+  }, [pilot, runEntries]);
+
+  // ?auto=1 runs unattended (guarded against the dev double-effect);
+  // ?auto=1&only=missing re-records just the stragglers.
   useEffect(() => {
     if (mode?.kind !== "auto" || startedRef.current) return;
     startedRef.current = true;
-    void runBatch();
-  }, [mode, runBatch]);
+    void (mode.onlyMissing ? runMissing() : runBatch());
+  }, [mode, runBatch, runMissing]);
 
   if (mode === null) return null;
 
@@ -477,12 +579,18 @@ export function ClipCaptureClient({
             по време на запис (скрит раздел не рендира кадри).
           </p>
         </header>
-        <a
-          href="/dev/clip-capture?auto=1"
-          className="btn-accent self-start"
-        >
-          ▶ Автоматичен запис — всичките {pilot.length}
-        </a>
+        <div className="flex flex-wrap items-center gap-2">
+          <a href="/dev/clip-capture?auto=1" className="btn-accent self-start">
+            ▶ Автоматичен запис — всичките {pilot.length}
+          </a>
+          <a
+            href="/dev/clip-capture?auto=1&only=missing"
+            className="btn-ghost self-start px-3 py-2 text-sm"
+            title="Записва само клиповете без свеж .webm (сравнява recordedAt с последния пълен запис)"
+          >
+            ↻ Запиши само липсващите
+          </a>
+        </div>
         <ol className="flex flex-col gap-1.5">
           {pilot.map((e, i) => {
             const p = planById.get(e.id);
@@ -638,14 +746,16 @@ export function ClipCaptureClient({
   return (
     <main className="flex flex-col gap-4 p-6">
       <header className="flex flex-wrap items-center gap-3">
-        <h1 className="font-display text-xl font-black">Автоматичен запис</h1>
+        <h1 className="font-display text-xl font-black">
+          Автоматичен запис{mode.onlyMissing ? " · само липсващите" : ""}
+        </h1>
         <span className="rounded-full border border-border bg-surface px-3 py-1 font-mono text-sm">
-          {done}/{pilot.length}
+          {done}/{runTotal}
         </span>
         {batchDone ? (
           <span
             className={`rounded-full px-3 py-1 text-sm font-black ${
-              batchDone.ok === batchDone.total
+              batchDone.failed.length === 0
                 ? "border border-success/50 bg-success/10 text-success"
                 : "border border-danger/50 bg-danger/10 text-danger"
             }`}
@@ -653,7 +763,44 @@ export function ClipCaptureClient({
             ГОТОВО {batchDone.ok}/{batchDone.total}
           </span>
         ) : null}
+        {batchDone && !busy ? (
+          <a
+            href="/dev/clip-capture?auto=1&only=missing"
+            className="btn-ghost px-3 py-1.5 text-xs"
+            title="Записва отново само клиповете без свеж .webm"
+          >
+            ↻ Запиши само липсващите
+          </a>
+        ) : null}
       </header>
+
+      {/* End-of-batch summary — the FAILED ids verbatim (with reasons), so a
+          stall never hides which clips the founder is missing (doc 66 R0:
+          Claude watches everything; a silent count is not evidence). */}
+      {batchDone ? (
+        batchDone.failed.length === 0 ? (
+          <p className="rounded-xl border border-success/40 bg-success/5 px-3 py-2 text-sm font-bold text-success">
+            Всички {batchDone.total} успешни.
+          </p>
+        ) : (
+          <div className="rounded-xl border border-danger/40 bg-danger/5 p-3">
+            <p className="text-sm font-bold text-danger">
+              Успешни {batchDone.ok}/{batchDone.total} · неуспешни {batchDone.failed.length}:
+            </p>
+            <ul className="mt-1.5 flex flex-col gap-1">
+              {batchDone.failed.map((f) => (
+                <li key={f.id} className="font-mono text-[11px] leading-snug text-danger/90">
+                  {f.id} — {f.note}
+                </li>
+              ))}
+            </ul>
+            <p className="mt-2 text-xs text-muted">
+              Натисни „↻ Запиши само липсващите“ по-горе — записва наново само тези.
+            </p>
+          </div>
+        )
+      ) : null}
+
       {run ? (
         <CaptureScene
           key={run.entry.id}

@@ -210,13 +210,15 @@ describe("ov-crest-v1 through the world builder", () => {
     expect(world.stats.zebraCrossings).toBe(0);
   });
 
-  it("POSTS both signs the law implies — one В24 at the ban, one А1 at the arc", () => {
+  it("POSTS the signs the law implies — В24 at the ban (+ one in-zone repeat), one А1 at the arc", () => {
     // The sign-asset drop's zone pass: the driver SEES what the spans grade.
-    expect(world.stats.signs.noOvertaking).toBe(1);
+    // The 302 m В24 span carries the entry post plus one repeat deep in the
+    // zone (doc 66 R2 — the ban stays in frame where it is broken).
+    expect(world.stats.signs.noOvertaking).toBe(2);
     expect(world.stats.signs.curve).toBe(1);
     expect(world.stats.signs.noStopping).toBe(0);
     expect(world.stats.signs.slippery).toBe(0);
-    expect(world.signs.filter((s) => s.kind === "noOvertaking" || s.kind === "curve")).toHaveLength(2);
+    expect(world.signs.filter((s) => s.kind === "noOvertaking" || s.kind === "curve")).toHaveLength(3);
   });
 
   it("the slope block sits INSIDE the arc — the only reason this curve is blind", () => {

@@ -87,7 +87,14 @@ import {
 import type { SimInput } from "@/modules/sim/engine";
 import type { LessonSpec } from "@/modules/sim/lessons";
 import { lessonDistrictId } from "@/modules/sim/contracts";
-import { QUALITY_PRESETS, SimEnvironment, type QualityLevel } from "@/modules/sim/environment";
+import {
+  QUALITY_PRESETS,
+  resetWeather,
+  setWeatherTarget,
+  SimEnvironment,
+  stepWeather,
+  type QualityLevel,
+} from "@/modules/sim/environment";
 import { DistrictWorld } from "@/modules/sim/world";
 import {
   createTracePoint,
@@ -176,6 +183,10 @@ const NIGHT_ENV_ROTATION = new Euler(0, 0, 0);
 const RECORDER_SEED = 7;
 /** Frames rendered after Suspense resolves before onReady (texture warmup). */
 const READY_WARMUP_FRAMES = 30;
+/** A "dt→∞" weather step (s) — snaps the shared weather channels to their
+ *  targets on the capture's first frame (the drill's settled steady state),
+ *  the same first-frame-snap contract SimEnvironment's lighting damp uses. */
+const WEATHER_PRIME_DT_S = 1000;
 
 const DEG2RAD = Math.PI / 180;
 /** 180° about +Y — cameras look down −Z, the car drives along +Z
@@ -334,6 +345,26 @@ export function CaptureScene({
           cameraProfile,
           getLog: () => presenceRef.current,
         });
+        // WEATHER PARITY (doc 66 R5 — founder round-3 „rain road too bright,
+        // can't tell rain from dry"): the wet-road look is driven by the SHARED
+        // weather WETNESS channel, which RAMPS 0→1 over ~4 s of rain
+        // (WETNESS_IN_PER_SEC) and PERSISTS across the batch (no per-clip
+        // reset). The drill runs for minutes, so its rain road is FULLY SOAKED
+        // (the value StaticWorld's wet-gloss retune targets); the capture only
+        // settles ~0.6 s, so without this it records a TRANSIENT, batch-order-
+        // dependent wetness — a "parallel value", not the drill's settled look.
+        // Snap the store to THIS clip's steady state so frame 1 already renders
+        // the drill's soaked road (and a dry clip after a rain clip is bone-dry,
+        // not left damp) — the same "settle on frame 1" contract the lighting
+        // damp uses (dt→∞). SimEnvironment's own per-frame stepWeather then
+        // holds it, already at target.
+        resetWeather();
+        setWeatherTarget(
+          lesson.environment?.rain ?? false,
+          lesson.environment?.fog ?? false,
+          lesson.environment?.snow ?? false,
+        );
+        stepWeather(WEATHER_PRIME_DT_S);
         // Pre-roll: lamps, barrier arms AND staged actors reach their
         // recorded-era state at the window start (v1 pre-rolled lamps only —
         // actors then never moved: the R1 failure class).

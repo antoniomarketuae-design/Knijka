@@ -20,14 +20,16 @@
  * quiet per-card note instead of a broken player.
  */
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   CLIP_MANIFEST_URL,
   familyPrefixOf,
   formatClipDuration,
   parseClipManifest,
+  posterFrameFor,
   type MistakeClip,
 } from "@/components/theory/clipManifest";
+import { durationFixStep } from "@/components/theory/webmDuration";
 import type { ClipPlanEntry } from "@/modules/learning";
 
 const NOTES_KEY_PREFIX = "clip-notes:";
@@ -200,9 +202,55 @@ function ActorChecklistStrip({ clip }: { clip: MistakeClip }) {
   );
 }
 
-function ClipCard({ clip, plan }: { clip: MistakeClip; plan: ClipPlanEntry | null }) {
+function ClipCard({
+  clip,
+  plan,
+  activeId,
+  onActivate,
+}: {
+  clip: MistakeClip;
+  plan: ClipPlanEntry | null;
+  /** The clip whose video is currently playing (only one at a time). */
+  activeId: string | null;
+  /** This card's video started — pause every other one. */
+  onActivate: (id: string) => void;
+}) {
   // The .webm 404s until the binaries are scp'd — note it, keep the card.
   const [fileMissing, setFileMissing] = useState(false);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  // webm-duration probe in flight (see fixDuration) — MediaRecorder clips
+  // report duration=Infinity until seeked, which kills the scrubber.
+  const probingRef = useRef(false);
+
+  // One active <video> at a time: when another card starts, pause this one.
+  // With preload="none" nothing decodes until played, so the gallery never
+  // holds 20 live decoders (the cap that silently blanked clips 14–20).
+  useEffect(() => {
+    if (activeId !== null && activeId !== clip.id) videoRef.current?.pause();
+  }, [activeId, clip.id]);
+
+  const fixDuration = useCallback(() => {
+    const video = videoRef.current;
+    if (!video) return;
+    const step = durationFixStep(video.duration, probingRef.current);
+    if (step.action === "probe") {
+      probingRef.current = true;
+      try {
+        video.currentTime = step.seekToSec;
+      } catch {
+        // Not seekable yet — durationchange retries.
+      }
+    } else if (step.action === "reset") {
+      probingRef.current = false;
+      try {
+        video.currentTime = step.seekToSec;
+      } catch {
+        // ignore — next timeupdate lands at 0 anyway
+      }
+    }
+  }, []);
+
+  const poster = posterFrameFor(clip);
 
   return (
     <li className="card flex flex-col gap-2 p-3">
@@ -214,13 +262,19 @@ function ClipCard({ clip, plan }: { clip: MistakeClip; plan: ClipPlanEntry | nul
           </p>
         </div>
       ) : (
-        // preload="metadata" = the first frame is the thumbnail; play stays
-        // a click away (native controls), nothing heavier loads up front.
+        // poster = the fault keyframe (instant, no decode) + preload="none":
+        // the still IS the teaching moment; only the clip the founder clicks
+        // ever loads its webm, and starting it pauses the others.
         <video
+          ref={videoRef}
           src={clip.src}
-          preload="metadata"
+          poster={poster}
+          preload="none"
           controls
           playsInline
+          onPlay={() => onActivate(clip.id)}
+          onLoadedMetadata={fixDuration}
+          onDurationChange={fixDuration}
           onError={() => setFileMissing(true)}
           aria-label={`Клип: ${clip.titleBg}`}
           className="aspect-video w-full rounded-xl border border-border bg-surface-2/60 object-contain"
@@ -265,6 +319,9 @@ export function ClipsGalleryClient({ plan }: { plan: readonly ClipPlanEntry[] })
   // null = loading; [] = loaded and empty (or manifest missing/malformed).
   const [clips, setClips] = useState<MistakeClip[] | null>(null);
   const [family, setFamily] = useState<string | null>(null);
+  // The one clip whose video is playing (only one decoder alive at a time).
+  const [activeId, setActiveId] = useState<string | null>(null);
+  const onActivate = useCallback((id: string) => setActiveId(id), []);
 
   useEffect(() => {
     let alive = true;
@@ -366,7 +423,13 @@ export function ClipsGalleryClient({ plan }: { plan: readonly ClipPlanEntry[] })
 
           <ul className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {shown.map((clip) => (
-              <ClipCard key={clip.id} clip={clip} plan={planById.get(clip.id) ?? null} />
+              <ClipCard
+                key={clip.id}
+                clip={clip}
+                plan={planById.get(clip.id) ?? null}
+                activeId={activeId}
+                onActivate={onActivate}
+              />
             ))}
           </ul>
         </>

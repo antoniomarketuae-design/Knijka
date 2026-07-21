@@ -16,12 +16,14 @@
  * the panel layout.
  */
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   clipForTracePath,
   fetchClipManifest,
+  posterFrameFor,
   type MistakeClip,
 } from "./clipManifest";
+import { durationFixStep } from "./webmDuration";
 import MistakeReplay from "./MistakeReplay";
 
 /** The canvas replay's height rule — kept identical to avoid layout jumps. */
@@ -43,6 +45,9 @@ function ClipVideo({
   const videoRef = useRef<HTMLVideoElement>(null);
   const [widthPx, setWidthPx] = useState(0);
   const [visible, setVisible] = useState(false);
+  // The webm-duration probe is in flight (see fixDuration): MediaRecorder
+  // clips report duration=Infinity until seeked, which kills the scrubber.
+  const probingRef = useRef(false);
 
   useEffect(() => {
     const el = wrapRef.current;
@@ -79,18 +84,46 @@ function ClipVideo({
     }
   }, [visible]);
 
+  // MediaRecorder webm carry no duration index → duration=Infinity and a dead
+  // scrubber. Force the demuxer to index by seeking past the end once, then
+  // seek home (webmDuration.durationFixStep drives it; wired to both
+  // loadedmetadata and durationchange).
+  const fixDuration = useCallback(() => {
+    const video = videoRef.current;
+    if (!video) return;
+    const step = durationFixStep(video.duration, probingRef.current);
+    if (step.action === "probe") {
+      probingRef.current = true;
+      try {
+        video.currentTime = step.seekToSec;
+      } catch {
+        // Seeking before the element is seekable — durationchange retries.
+      }
+    } else if (step.action === "reset") {
+      probingRef.current = false;
+      try {
+        video.currentTime = step.seekToSec;
+      } catch {
+        // ignore — the next timeupdate lands at 0 anyway
+      }
+    }
+  }, []);
+
   return (
     <div ref={wrapRef} className={`w-full ${className ?? ""}`}>
-      {/* No poster asset in the manifest contract — the first frame stands
-          in once metadata loads (visible → preload="metadata"). */}
+      {/* poster = the fault keyframe: it IS the teaching moment (the ❌ over
+          the violation) and paints instantly, so nothing decodes until play. */}
       <video
         ref={videoRef}
         src={clip.src}
+        poster={posterFrameFor(clip)}
         preload={visible ? "metadata" : "none"}
         muted
         loop
         playsInline
         controls
+        onLoadedMetadata={fixDuration}
+        onDurationChange={fixDuration}
         onError={onFail}
         aria-label={`Видео от симулатора: ${clip.titleBg}`}
         className="w-full rounded-xl border border-border bg-surface-2/60 object-contain"
