@@ -118,7 +118,27 @@ const DISPOSE_SETTLE_MS = 400;
  *  settle so nothing is in flight when the browser unloads. */
 const RELOAD_SETTLE_MS = 300;
 
-type ClipState = "pending" | "loading" | "recording" | "saving" | "done" | "error";
+/** rAF (rendering + captureStream) is frozen while the tab is hidden, so a
+ *  clip cannot record then. Instead of failing the whole run when the founder
+ *  clicks away during the ~15 min batch, WAIT until the tab is visible again
+ *  and continue — a 15-minute hands-off requirement was the real reason the
+ *  batch kept dying. Resolves immediately when already visible. */
+function awaitVisible(): Promise<void> {
+  if (typeof document === "undefined" || document.visibilityState === "visible") {
+    return Promise.resolve();
+  }
+  return new Promise((resolve) => {
+    const on = () => {
+      if (document.visibilityState === "visible") {
+        document.removeEventListener("visibilitychange", on);
+        resolve();
+      }
+    };
+    document.addEventListener("visibilitychange", on);
+  });
+}
+
+type ClipState = "pending" | "loading" | "recording" | "saving" | "done" | "error" | "waiting";
 
 interface ClipStatus {
   state: ClipState;
@@ -360,11 +380,11 @@ export function ClipCaptureClient({
    *  keyframes + actor checklist included. */
   const recordMounted = useCallback(
     async (r: ClipRun): Promise<ActorCheck[]> => {
-      // rAF (rendering + captureStream frames) is PAUSED in hidden tabs —
-      // fail fast with a clear message instead of hanging to the deadline.
-      if (document.visibilityState === "hidden") {
-        throw new Error("разделът е на заден план — дръж го видим по време на запис");
-      }
+      // rAF (rendering + captureStream frames) is PAUSED in hidden tabs. Rather
+      // than fail the whole run when the founder clicks away mid-batch, WAIT for
+      // the tab to be visible again, then record — the batch survives a founder
+      // who steps away and comes back (the real 15-min-hands-off failure).
+      await awaitVisible();
       const clock = clockRef.current;
       // Seek to the window start, paused; let the pose/lamps settle: the
       // sleep, then ≥SETTLE_FRAMES fresh frames at the settled pose (R5 —
@@ -993,6 +1013,7 @@ const STATE_LABEL_BG: Record<ClipState, string> = {
   saving: "запазва",
   done: "записан",
   error: "грешка",
+  waiting: "чака да видим раздела",
 };
 
 function StatusPill({ status }: { status: ClipStatus }) {
