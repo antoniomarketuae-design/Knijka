@@ -34,6 +34,24 @@ export interface ClipGoverningControl {
 /** Camera requirement per doc 66 R4 (cabin faults show the cabin). */
 export type ClipView = "exterior" | "cockpit" | "exterior+dashboard";
 
+/** Exterior camera profile (doc 66 R1): "rearAware" when the mistake's key
+ *  actor approaches from BEHIND the ghost (ambulance, tailgater) — a side
+ *  three-quarter framing that keeps both the ghost and the rear approach in
+ *  frame; "chase" everywhere else. Ignored for cockpit clips. */
+export type ClipCameraProfile = "chase" | "rearAware";
+
+/** Positional-fault readability: the REQUIRED lane's band, tinted green for
+ *  ~2 s at the fault by the rig (district space; derived from the map's own
+ *  lane meta). Emitted only where the fault is positional. */
+export interface ClipLaneHighlight {
+  /** Lane-center x, district m. */
+  xM: number;
+  /** Fault y — the band renders around it, district m. */
+  yM: number;
+  /** Band width, m (lane spacing minus an edge margin). */
+  widthM: number;
+}
+
 export interface ClipPlanEntry {
   /** Manifest clip id — `<templateId>__m<mistakeIndex>` (clipPilot contract). */
   id: string;
@@ -46,6 +64,8 @@ export interface ClipPlanEntry {
   requiredActors: ClipRequiredActor[];
   governingControl: ClipGoverningControl;
   view: ClipView;
+  camera: ClipCameraProfile;
+  laneHighlight?: ClipLaneHighlight;
   /** Derivation caveats (Bulgarian, terse); "" = fully unambiguous. */
   notes: string;
 }
@@ -63,6 +83,7 @@ export const CLIP_PLAN: readonly ClipPlanEntry[] = [
       "label": "Няма"
     },
     "view": "exterior+dashboard",
+    "camera": "chase",
     "notes": "Управляващ елемент: няма — нощни условия; Светлинна грешка (R4) — фаровете отвън + лентата на таблото"
   },
   {
@@ -77,6 +98,7 @@ export const CLIP_PLAN: readonly ClipPlanEntry[] = [
       "label": "Няма"
     },
     "view": "exterior+dashboard",
+    "camera": "chase",
     "notes": "Управляващ елемент: няма — дъждовни условия; Светлинна грешка (R4) — фаровете отвън + лентата на таблото"
   },
   {
@@ -100,6 +122,7 @@ export const CLIP_PLAN: readonly ClipPlanEntry[] = [
       }
     },
     "view": "exterior",
+    "camera": "chase",
     "notes": ""
   },
   {
@@ -119,6 +142,7 @@ export const CLIP_PLAN: readonly ClipPlanEntry[] = [
       "label": "Няма"
     },
     "view": "exterior",
+    "camera": "chase",
     "notes": "Управляващ елемент: няма — правило за поведение (без знак/сигнал)"
   },
   {
@@ -132,11 +156,12 @@ export const CLIP_PLAN: readonly ClipPlanEntry[] = [
       "kind": "sign",
       "label": "Знак Б2 „Спри!“",
       "approxPos": {
-        "x": 0,
-        "y": 0
+        "x": 8.93,
+        "y": -28.52
       }
     },
     "view": "exterior",
+    "camera": "chase",
     "notes": ""
   },
   {
@@ -156,6 +181,7 @@ export const CLIP_PLAN: readonly ClipPlanEntry[] = [
       "label": "Няма"
     },
     "view": "exterior",
+    "camera": "chase",
     "notes": "Управляващ елемент: няма — правило за поведение (без знак/сигнал)"
   },
   {
@@ -170,7 +196,13 @@ export const CLIP_PLAN: readonly ClipPlanEntry[] = [
       "label": "Няма"
     },
     "view": "exterior",
-    "notes": "Управляващ елемент: няма — правило за поведение (без знак/сигнал)"
+    "camera": "chase",
+    "laneHighlight": {
+      "xM": 0,
+      "yM": 190.33,
+      "widthM": 6.52
+    },
+    "notes": "Управляващ елемент: няма — правило за поведение (без знак/сигнал); Позиционна грешка — ДЯСНАТА (изискваната) лента светва зелено ~2 с при грешката"
   },
   {
     "id": "sc-ov-ban-overtake__m0",
@@ -188,11 +220,12 @@ export const CLIP_PLAN: readonly ClipPlanEntry[] = [
       "kind": "sign",
       "label": "Знак В24 (забранено изпреварване)",
       "approxPos": {
-        "x": 0,
+        "x": 21.05,
         "y": 90
       }
     },
     "view": "exterior",
+    "camera": "chase",
     "notes": ""
   },
   {
@@ -211,7 +244,8 @@ export const CLIP_PLAN: readonly ClipPlanEntry[] = [
       }
     },
     "view": "exterior",
-    "notes": ""
+    "camera": "chase",
+    "notes": "СЪДЪРЖАНИЕ: „Знак В1 „Забранено е влизането“ (еднопосочна улица)“ няма рендиран стълб (noEntry) до очакваната позиция — камерата няма какво да покаже"
   },
   {
     "id": "sc-ov-solid-line__m0",
@@ -229,6 +263,7 @@ export const CLIP_PLAN: readonly ClipPlanEntry[] = [
       }
     },
     "view": "exterior",
+    "camera": "chase",
     "notes": ""
   },
   {
@@ -248,6 +283,7 @@ export const CLIP_PLAN: readonly ClipPlanEntry[] = [
       "label": "Няма"
     },
     "view": "exterior",
+    "camera": "chase",
     "notes": "Управляващ елемент: няма — правило за поведение (без знак/сигнал)"
   },
   {
@@ -261,11 +297,12 @@ export const CLIP_PLAN: readonly ClipPlanEntry[] = [
       "kind": "sign",
       "label": "Знак В27 (забранени престой и паркиране)",
       "approxPos": {
-        "x": 0,
+        "x": 8.93,
         "y": 70
       }
     },
     "view": "exterior",
+    "camera": "chase",
     "notes": ""
   },
   {
@@ -284,11 +321,12 @@ export const CLIP_PLAN: readonly ClipPlanEntry[] = [
       "kind": "sign",
       "label": "Знак Б1 „Пропусни движещите се по пътя с предимство“ на входа на кръговото",
       "approxPos": {
-        "x": 0,
-        "y": -18
+        "x": 8.93,
+        "y": -36.52
       }
     },
     "view": "exterior",
+    "camera": "chase",
     "notes": "Б1 е изведен от архетипа кръгово (входът, най-близък до грешката)"
   },
   {
@@ -308,6 +346,7 @@ export const CLIP_PLAN: readonly ClipPlanEntry[] = [
       "label": "Няма"
     },
     "view": "exterior",
+    "camera": "chase",
     "notes": "Управляващ елемент: няма — правило за поведение (без знак/сигнал)"
   },
   {
@@ -321,11 +360,12 @@ export const CLIP_PLAN: readonly ClipPlanEntry[] = [
       "kind": "sign",
       "label": "Знак А35 (жп прелез)",
       "approxPos": {
-        "x": 0,
-        "y": 150
+        "x": 8.93,
+        "y": 145
       }
     },
     "view": "exterior",
+    "camera": "chase",
     "notes": ""
   },
   {
@@ -337,14 +377,15 @@ export const CLIP_PLAN: readonly ClipPlanEntry[] = [
     "requiredActors": [],
     "governingControl": {
       "kind": "sign",
-      "label": "Знак В26 (30 км/ч)",
+      "label": "Знак В26 (50 км/ч)",
       "approxPos": {
-        "x": 4.06,
-        "y": 400
+        "x": 8.93,
+        "y": 14
       }
     },
-    "view": "exterior",
-    "notes": ""
+    "view": "exterior+dashboard",
+    "camera": "chase",
+    "notes": "Грешката е ПРЕДИ прехода на ограничението (y≈99 < 400) — важи В26 (50) от входа на отсечката; Скоростна грешка (R4/5) — километражът на лентата на таблото я показва"
   },
   {
     "id": "sc-speed-rain__m0",
@@ -357,8 +398,9 @@ export const CLIP_PLAN: readonly ClipPlanEntry[] = [
       "kind": "none",
       "label": "Няма"
     },
-    "view": "exterior",
-    "notes": "Управляващ елемент: няма — нощни условия"
+    "view": "exterior+dashboard",
+    "camera": "chase",
+    "notes": "Управляващ елемент: няма — нощни условия; Скоростна грешка (R4/5) — километражът на лентата на таблото я показва"
   },
   {
     "id": "sc-vp-readiness__m0",
@@ -372,6 +414,7 @@ export const CLIP_PLAN: readonly ClipPlanEntry[] = [
       "label": "Няма"
     },
     "view": "cockpit",
+    "camera": "chase",
     "notes": "Управляващ елемент: няма — правило за поведение (без знак/сигнал); Кабинна грешка (R4) — коланът/ръчната/загасването се виждат само отвътре"
   },
   {
@@ -391,7 +434,8 @@ export const CLIP_PLAN: readonly ClipPlanEntry[] = [
       "label": "Няма"
     },
     "view": "exterior",
-    "notes": "Управляващ елемент: няма — правило за поведение (без знак/сигнал)"
+    "camera": "rearAware",
+    "notes": "Управляващ елемент: няма — правило за поведение (без знак/сигнал); Ключовият участник идва ОТЗАД — страничен три-четвърти кадър (rearAware), който държи и призрака, и приближаващия отзад в рамката"
   },
   {
     "id": "sc-zebra-approach__m0",
@@ -414,6 +458,7 @@ export const CLIP_PLAN: readonly ClipPlanEntry[] = [
       }
     },
     "view": "exterior",
+    "camera": "chase",
     "notes": ""
   }
 ];

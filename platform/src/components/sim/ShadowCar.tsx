@@ -104,8 +104,9 @@ function prefersReducedMotion(): boolean {
   );
 }
 
-/** Emoji sprite texture (dev-grade chrome: badge/mirror icons). */
-function emojiTexture(emoji: string): THREE.CanvasTexture {
+/** Emoji sprite texture (dev-grade chrome: badge/mirror icons). Exported for
+ *  the clip-capture rig's ground fault marker (same visual vocabulary). */
+export function emojiTexture(emoji: string): THREE.CanvasTexture {
   const size = 128;
   const canvas = document.createElement("canvas");
   canvas.width = size;
@@ -141,9 +142,22 @@ export interface ShadowCarProps {
    * would resume in sync.
    */
   showGhost?: boolean;
+  /**
+   * Render the roof ❌ badge on mistake demos (default true). The clip rig
+   * passes false on lot maps, where the badge's 2.9 m float parallax-projects
+   * onto near backgrounds ("X on the grass", pilot v2) — a ground-anchored
+   * marker at the ENGINE fault position replaces it there.
+   */
+  showBadge?: boolean;
 }
 
-export function ShadowCar({ trace, clockRef, showRibbon = true, showGhost = true }: ShadowCarProps) {
+export function ShadowCar({
+  trace,
+  clockRef,
+  showRibbon = true,
+  showGhost = true,
+  showBadge = true,
+}: ShadowCarProps) {
   const { scene } = useGLTF(HERO_URL, DRACO_PATH);
   const kind = trace.meta.kind;
   const tint = useMemo(() => new THREE.Color(KIND_TINT[kind]), [kind]);
@@ -372,7 +386,7 @@ export function ShadowCar({ trace, clockRef, showRibbon = true, showGhost = true
         </sprite>
 
         {/* Mistake demos carry the ❌ chrome — never a neutral pattern. */}
-        {kind === "mistake" ? (
+        {kind === "mistake" && showBadge ? (
           <sprite position={[0, 2.9, 0]} scale={[0.8, 0.8, 1]}>
             <spriteMaterial map={badgeTexArgs[0]} transparent depthWrite={false} />
           </sprite>

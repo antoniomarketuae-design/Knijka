@@ -38,7 +38,11 @@ import {
   type SurfaceGripPatch,
 } from "@/modules/sim/runtime";
 import type { createTrafficSystem } from "@/modules/sim/traffic";
-import { heldSceneryFor } from "./scenarioSceneryProps";
+import {
+  heldSceneryFor,
+  parkedClearZonesFor,
+  type ParkedClearZone,
+} from "./scenarioSceneryProps";
 import type { ScenarioObstacleSpec } from "./ScenarioObstacles";
 
 /** Minimal structural mirror of the district's spawn points (the runtime and
@@ -56,6 +60,10 @@ export interface LessonWorldCore {
   geometry: WorldGeometry;
   /** S1: precise hittable parked cars + held scenery (scenario lessons only). */
   scenarioObstacles: ScenarioObstacleSpec[];
+  /** Authored clear zones for TrafficLayer's parked-car curb pass (doc 66 R5,
+   *  founder v1 №9 — visual-only; [] for templates without one). Mount them
+   *  on the layer: `<TrafficLayer parkedClearZones={core.parkedClearZones}>`. */
+  parkedClearZones: readonly ParkedClearZone[];
   /** SURFACE-PATCH slice: waterPatch/icePatch rects ([] on pre-slice maps). */
   gripPatches: SurfaceGripPatch[];
   spawnPoints: SpawnPointLike[];
@@ -117,7 +125,15 @@ export function buildLessonWorldCore(lesson: LessonSpec, raw: unknown): LessonWo
     : [];
   const gripPatches = resolveSurfaceGripPatches(district);
   const spawnPoints = (raw as { spawnPoints?: SpawnPointLike[] }).spawnPoints ?? [];
-  return { runtime, district, geometry, scenarioObstacles, gripPatches, spawnPoints };
+  return {
+    runtime,
+    district,
+    geometry,
+    scenarioObstacles,
+    parkedClearZones: parkedClearZonesFor(lesson.id),
+    gripPatches,
+    spawnPoints,
+  };
 }
 
 /**

@@ -235,8 +235,10 @@ const PARK_END_MARGIN_M = 11;
  * curbside parking band (world PARKING_LANE_WIDTH_M / 2 — keep in sync). */
 const PARK_BAND_CENTER_M = 2.0;
 const PARK_CAP = 150;
+/** Stable default for the optional clear-zone prop (memo identity). */
+const EMPTY_CLEAR_ZONES: readonly ParkedClearZoneLike[] = [];
 
-interface ParkedCar {
+export interface ParkedCar {
   x: number;
   y: number;
   yaw: number;
@@ -246,9 +248,26 @@ interface ParkedCar {
   seed: number;
 }
 
-function computeParkedCars(
+/** A circle no parked decoration body may center inside (structural twin of
+ *  components/sim scenarioSceneryProps.ParkedClearZone — the zones are
+ *  CONTENT, authored per template there; this layer only honors them). */
+export interface ParkedClearZoneLike {
+  x: number;
+  y: number;
+  radiusM: number;
+}
+
+/**
+ * The deterministic curb pass. `clearZones` (doc 66 R5, founder v1 №9 — the
+ * junction-corner car both sc-junction-stop ghost lines drove through) drops
+ * any slot whose center falls inside a zone AFTER the hash walk, so every
+ * other body keeps its exact position — templates without zones render
+ * byte-identically.
+ */
+export function computeParkedCars(
   district: TrafficDistrict,
   laneWidthM: number,
+  clearZones: readonly ParkedClearZoneLike[] = [],
 ): ParkedCar[] {
   const out: ParkedCar[] = [];
   const edges = district.roads?.edges ?? [];
@@ -287,14 +306,18 @@ function computeParkedCars(
         // Deterministic hash: skip ~1 in 5 slots for natural gaps + pick model.
         const h = ((e * 73856093) ^ (slot * 19349663)) >>> 0;
         if (h % 5 !== 0) {
-          out.push({
-            x: ax + dx * t + nx * offset,
-            y: ay + dy * t + ny * offset,
-            yaw: Math.atan2(dx, -dy),
-            model: assignCivilianModel(h),
-            seed: h,
-          });
-          if (out.length >= PARK_CAP) return out;
+          const px = ax + dx * t + nx * offset;
+          const py = ay + dy * t + ny * offset;
+          if (!clearZones.some((z) => Math.hypot(px - z.x, py - z.y) < z.radiusM)) {
+            out.push({
+              x: px,
+              y: py,
+              yaw: Math.atan2(dx, -dy),
+              model: assignCivilianModel(h),
+              seed: h,
+            });
+            if (out.length >= PARK_CAP) return out;
+          }
         }
         nextAt += PARK_SPACING_M;
         slot++;
@@ -360,6 +383,13 @@ export interface TrafficLayerProps {
    *  drawn world or parked cars land inside the travel lanes). */
   laneWidthM?: number;
   /**
+   * Authored clear zones for the parked-car curb pass (doc 66 R5 — content
+   * lives in components/sim scenarioSceneryProps.parkedClearZonesFor and
+   * flows here through LessonWorldCore so drill and capture stay one recipe).
+   * Omit/[] = today's placement, byte-identical.
+   */
+  parkedClearZones?: readonly ParkedClearZoneLike[];
+  /**
    * L5 sudden-obstacle stimulus (lesson spec `hazard`, doc 68 A5). Render-only:
    * the ball stays hidden until `hazardActiveRef.current` flips true. Omit on
    * lessons without a staged hazard.
@@ -398,6 +428,7 @@ export function TrafficLayer({
   night = false,
   district = null,
   laneWidthM = 3.25 * PERCEPTUAL_ROAD_SCALE,
+  parkedClearZones = EMPTY_CLEAR_ZONES,
   hazard = null,
   hazardActiveRef,
   clearcoat = true,
@@ -407,8 +438,8 @@ export function TrafficLayer({
   const nPed = system.pedestrians.length;
 
   const parked = useMemo(
-    () => (district ? computeParkedCars(district, laneWidthM) : []),
-    [district, laneWidthM],
+    () => (district ? computeParkedCars(district, laneWidthM, parkedClearZones) : []),
+    [district, laneWidthM, parkedClearZones],
   );
   const nPark = parked.length;
 

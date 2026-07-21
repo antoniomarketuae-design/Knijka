@@ -7,8 +7,14 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
+import { PERCEPTUAL_ROAD_SCALE } from "@/modules/sim/contracts";
+import { computeParkedCars, type TrafficDistrict } from "@/modules/sim/traffic";
 import { BUS_OBSTACLE, pkVanObstacle } from "@/modules/sim/traces";
-import { heldSceneryFor, scenarioConesOf } from "./scenarioSceneryProps";
+import {
+  heldSceneryFor,
+  parkedClearZonesFor,
+  scenarioConesOf,
+} from "./scenarioSceneryProps";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(HERE, "../../../..");
@@ -17,6 +23,13 @@ function loadDistrict(id: string): unknown {
   return JSON.parse(
     readFileSync(path.join(REPO_ROOT, "content", "world", `${id}.json`), "utf-8"),
   ) as unknown;
+}
+
+function loadTraceSamples(repoPath: string): Array<{ x: number; y: number }> {
+  const raw = JSON.parse(readFileSync(path.join(REPO_ROOT, ...repoPath.split("/")), "utf-8")) as {
+    samples: Array<{ x: number; y: number }>;
+  };
+  return raw.samples;
 }
 
 describe("scenarioConesOf — the district meta.scenario.cones seam", () => {
@@ -207,5 +220,73 @@ describe("heldSceneryFor — per-template dressing", () => {
     expect(heldSceneryFor("sc-ed-reverse-line@L1", loadDistrict("poligon-v1"))).toEqual([]);
     expect(heldSceneryFor("not-a-scenario-id", loadDistrict("hz-roadworks-v1")).length).toBe(10);
     expect(heldSceneryFor("not-a-scenario-id", {})).toEqual([]);
+  });
+});
+
+describe("parkedClearZonesFor — the curb-decoration clear zones (doc 66 R5, v1 №9)", () => {
+  // The three committed sc-junction-stop drives — the mistake the pilot clip
+  // replays, the second mistake, and the shadow (BOTH ghost lines per the R0
+  // ruling; m1 stops short of the junction but is pinned along for free).
+  const JSTOP_TRACES = [
+    "content/traces/sc-junction-stop/mistake-rolling-stop.trace.json",
+    "content/traces/sc-junction-stop/mistake-past-line.trace.json",
+    "content/traces/sc-junction-stop/shadow-correct.trace.json",
+  ];
+  const LANE_W = 3.25 * PERCEPTUAL_ROAD_SCALE;
+  /** Worst-case body half-length of the parked fleet + hero half-width —
+   *  the same flank vocabulary the dressing tests above use. */
+  const CAR_HALF_LEN = 2.25;
+  const HERO_HALF_W = 0.85;
+
+  it("pins the sc-junction-stop zone: the tj-n-c corner, radius 16", () => {
+    // 16 = the priority arm's carriageway half-width (8.125) + чл. 98's 5 m
+    // no-parking band before a junction + ~2.5 m half body, rounded.
+    expect(parkedClearZonesFor("sc-junction-stop@L1")).toEqual([{ x: 0, y: 0, radiusM: 16 }]);
+    expect(parkedClearZonesFor("sc-follow-distance@L2")).toEqual([]);
+    expect(parkedClearZonesFor("not-a-scenario-id")).toEqual([]);
+  });
+
+  it("WITHOUT the zone the curb pass seats the corner car both ghost lines cut through", () => {
+    // The regression the R0 inspection caught (pilot v2 k3): edge tj-e-e's
+    // first slot lands at (11, −10.125), 15.0 m from the node, and the
+    // corner-cut turn arcs pass INSIDE its footprint.
+    const district = loadDistrict("tj-stop-v1") as TrafficDistrict;
+    const bare = computeParkedCars(district, LANE_W);
+    const corner = bare.find((c) => Math.hypot(c.x - 11, c.y + 10.125) < 0.01);
+    expect(corner).toBeDefined();
+    const mistake = loadTraceSamples(JSTOP_TRACES[0]);
+    const shadow = loadTraceSamples(JSTOP_TRACES[2]);
+    for (const samples of [mistake, shadow]) {
+      const nearest = Math.min(...samples.map((s) => Math.hypot(s.x - 11, s.y + 10.125)));
+      expect(nearest).toBeLessThan(1); // measured: 0.84 m / 0.85 m — inside the body
+    }
+  });
+
+  it("WITH the zone every remaining parked body clears every committed ghost line", () => {
+    const district = loadDistrict("tj-stop-v1") as TrafficDistrict;
+    const zones = parkedClearZonesFor("sc-junction-stop@L1");
+    const parked = computeParkedCars(district, LANE_W, zones);
+    // Exactly one slot is removed — the corner offender; the rest of the
+    // deterministic pass is untouched (positions never shift, only filter).
+    const bare = computeParkedCars(district, LANE_W);
+    expect(bare.length - parked.length).toBe(1);
+    for (const c of parked) {
+      expect(Math.hypot(c.x, c.y)).toBeGreaterThanOrEqual(16);
+    }
+    // The R0 geometric check: no ghost sample comes within a car's worst-case
+    // half-length + the hero's half-width of any remaining body center
+    // (nearest survivor (17.6, −10.125) measures 4.57 m — daylight ≥ 1.4 m).
+    for (const tracePath of JSTOP_TRACES) {
+      const samples = loadTraceSamples(tracePath);
+      for (const c of parked) {
+        let nearest = Number.POSITIVE_INFINITY;
+        for (const s of samples) {
+          const d = Math.hypot(s.x - c.x, s.y - c.y);
+          if (d < nearest) nearest = d;
+        }
+        expect(nearest, `${tracePath} vs parked (${c.x.toFixed(1)}, ${c.y.toFixed(1)})`)
+          .toBeGreaterThan(CAR_HALF_LEN + HERO_HALF_W);
+      }
+    }
   });
 });

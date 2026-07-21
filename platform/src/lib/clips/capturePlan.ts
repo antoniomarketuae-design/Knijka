@@ -24,11 +24,14 @@
  *    telltales (belt / lights / gear / speed / blinkers), field-for-field the
  *    hud/dashboardStatus vocabulary, driven from the trace samples.
  *  - actorSpawned      — the R1 checklist matcher: PLAN requiredActors vs what
- *    the capture stack actually staged (ambient traffic is zero in capture, so
- *    every live agent IS a staged actor).
+ *    the capture stack actually put IN THE PLANNED FRAME during the fault beat
+ *    (pilot-v2 lesson: the staged pool count LIED — a dormant actor parked
+ *    540 m away, or a blind-spot pace car 39 m BEHIND the chase camera, both
+ *    counted "present" while the founder saw an empty frame; presence is now
+ *    measured with actorInPlannedFrame over [fault−0.5, fault+0.5]).
  */
 
-import { COCKPIT_EYE, COCKPIT_PITCH_BASE } from "@/modules/sim/vehicle";
+import { CHASE_FOV, COCKPIT_EYE, COCKPIT_PITCH_BASE } from "@/modules/sim/vehicle";
 import { recordingWindow, type RecordingWindow } from "./trim";
 
 // ---------------------------------------------------------------------------
@@ -37,18 +40,36 @@ import { recordingWindow, type RecordingWindow } from "./trim";
 
 /** Extra lead-in when a POSITIONED governing control must pass through frame. */
 export const CONTROL_LEAD_S = 2;
+/** The control must be visible AHEAD for at least this long before the ghost
+ *  passes it (pilot v2 lesson: В24/В27 were already BEHIND the car at the
+ *  window start — no camera can show a sign the window never contains). */
+export const CONTROL_APPROACH_S = 2.5;
+/** Window-length guard: never open more than this long before the fault even
+ *  for an early control pass (keeps clips fault-centered per trim.ts). */
+export const CONTROL_MAX_PRE_FAULT_S = 16;
 /** Never let the window touch the trace end — ShadowCar wraps its clock to 0
  *  there, and one wrapped frame in the recording is the v1 №6 "hop". */
 export const WINDOW_END_GUARD_S = 0.08;
 
-/** The v2 recording window: engine fault time in, hop-guarded window out. */
+/**
+ * The v2 recording window: engine fault time in, hop-guarded window out.
+ * `control` carries the trace-computed PASS time of the positioned governing
+ * control (controlPassTimeSec over the WHOLE trace, startSec 0): the window
+ * opens early enough that the sign is ahead of the car for CONTROL_APPROACH_S
+ * before it passes — doc 66 R2 anchored on data, not on a fixed lead.
+ */
 export function captureWindowFor(
   durationSec: number,
   faultTimeSec: number,
-  hasPositionedControl: boolean,
+  control: { passTSec: number } | null,
 ): RecordingWindow {
   const base = recordingWindow(durationSec, faultTimeSec);
-  const startSec = Math.max(0, base.startSec - (hasPositionedControl ? CONTROL_LEAD_S : 0));
+  let startSec = base.startSec;
+  if (control) {
+    startSec = Math.min(base.startSec - CONTROL_LEAD_S, control.passTSec - CONTROL_APPROACH_S);
+    startSec = Math.max(startSec, faultTimeSec - CONTROL_MAX_PRE_FAULT_S);
+  }
+  startSec = Math.max(0, startSec);
   const endSec = Math.max(
     Math.min(base.endSec, durationSec - WINDOW_END_GUARD_S),
     Math.min(startSec + 1, durationSec), // degenerate ultra-short traces
@@ -56,14 +77,28 @@ export function captureWindowFor(
   return { startSec, endSec };
 }
 
+/** Half-width of the fault BEAT, s — the k1..k3 keyframe band. */
+export const FAULT_BEAT_SPAN_S = 2;
+/** Half-width of the R1 PRESENCE band, s — deliberately narrower than the
+ *  keyframe beat: the actor the mistake concerns must be in frame AT THE
+ *  FAULT (founder pilot-v2 ruling on sc-roundabout-entry: the circulator
+ *  visible at fault−2 but gone from the fault frame is an ABSENT conflict —
+ *  the viewer never sees WHY the entry was wrong). */
+export const FAULT_PRESENCE_SPAN_S = 0.5;
+
 /** The five R0 stills: [start, fault−2, fault, fault+2, end], clamped into the
  *  window and forced non-decreasing (duplicates allowed — always 5 entries). */
+/** The fewest DISTINCT capture instants an R0 strip may carry (pilot-v2 7b
+ *  hardening): start, one mid-window beat, end. Fewer would leave the fault
+ *  visually unverifiable on short/degenerate windows. */
+export const KEYFRAME_MIN_DISTINCT = 3;
+
 export function keyframeTimes(window: RecordingWindow, faultTimeSec: number): number[] {
   const raw = [
     window.startSec,
-    faultTimeSec - 2,
+    faultTimeSec - FAULT_BEAT_SPAN_S,
     faultTimeSec,
-    faultTimeSec + 2,
+    faultTimeSec + FAULT_BEAT_SPAN_S,
     window.endSec,
   ];
   const out: number[] = [];
@@ -72,6 +107,16 @@ export function keyframeTimes(window: RecordingWindow, faultTimeSec: number): nu
     const clamped = Math.min(Math.max(t, floor), window.endSec);
     out.push(clamped);
     floor = clamped;
+  }
+  // SHORT-WINDOW CLAMP LAW (7b): when the fault anchor falls outside (or on
+  // the edge of) the window, the clamp above can collapse the strip onto the
+  // two boundaries — an R0 strip with under three distinct instants cannot
+  // show before/at/after. Fall back to the even five-point spread over the
+  // window; every real window is ≥ 1 s (captureWindowFor's degenerate floor),
+  // so the spread instants stay distinct.
+  if (new Set(out).size < KEYFRAME_MIN_DISTINCT && window.endSec > window.startSec) {
+    const span = window.endSec - window.startSec;
+    return [0, 0.25, 0.5, 0.75, 1].map((u) => window.startSec + span * u);
   }
   return out;
 }
@@ -154,6 +199,24 @@ export function controlWeightAt(tSec: number, passTSec: number): number {
   return 1 - u * u * (3 - 2 * u); // 1 − smoothstep
 }
 
+/** The look-pull only engages while the control is IN FRONT of the ghost —
+ *  ramped over this forward distance. Pilot-v2 lesson (sc-pk-ban-stop k0, the
+ *  near-black frame): a pass at the window start left weight 1 on a control
+ *  BEHIND the car and yanked the look backward through the ghost shell. */
+export const CONTROL_FRONT_RAMP_M = 5;
+
+/** 0..1: how much of the control framing applies given where the control sits
+ *  relative to the ghost (1 = ≥5 m ahead, 0 = behind). Continuous in t. */
+export function controlFrontness(
+  ghost: { x: number; y: number; headingDeg: number },
+  control: { x: number; y: number },
+): number {
+  const h = ghost.headingDeg * DEG2RAD;
+  const proj =
+    (control.x - ghost.x) * Math.sin(h) + (control.y - ghost.y) * Math.cos(h);
+  return Math.max(0, Math.min(1, proj / CONTROL_FRONT_RAMP_M));
+}
+
 /**
  * The deterministic exterior camera: standard chase framing behind the ghost,
  * widened + oriented toward the governing control while `framing` is active.
@@ -165,7 +228,9 @@ export function plannedChasePose(
   framing: { passTSec: number; x: number; y: number } | null,
   out: ChaseCamPose,
 ): ChaseCamPose {
-  const w = framing ? controlWeightAt(tSec, framing.passTSec) : 0;
+  const w = framing
+    ? controlWeightAt(tSec, framing.passTSec) * controlFrontness(ghost, framing)
+    : 0;
   const yaw = Math.PI - ghost.headingDeg * DEG2RAD;
   const fx = Math.sin(yaw); // three-space forward (x, z) of the ghost
   const fz = Math.cos(yaw);
@@ -189,6 +254,93 @@ export function plannedChasePose(
   out.lookY = ly;
   out.lookZ = lz;
   return out;
+}
+
+// ---------------------------------------------------------------------------
+// The rear-aware exterior camera (R1 — actors approaching from BEHIND)
+// ---------------------------------------------------------------------------
+
+/** Exterior camera profile per clip (PLAN card `camera`): "rearAware" when
+ *  the mistake's key actor approaches from BEHIND the ghost (ambulance,
+ *  tailgater) — the chase framing can never show it (pilot v2:
+ *  sc-vu-emergency, the ambulance entered frame only after it had passed). */
+export type CameraProfile = "chase" | "rearAware";
+
+/** Three-quarter tracking framing: camera ahead of the ghost on the KERB side
+ *  (the pass corridor is the other side), looking back past the ghost at the
+ *  rear approach. Held for the whole clip — nothing blends, nothing pops. */
+export const REAR_CAM_AHEAD_M = 9.5;
+export const REAR_CAM_SIDE_M = 6.0;
+export const REAR_CAM_UP_M = 3.1;
+export const REAR_LOOK_BACK_M = 14;
+export const REAR_LOOK_UP_M = 1.0;
+
+/**
+ * District-space ghost pose → the rear-aware three-space camera pose. Pure —
+ * the same "nothing to settle" guarantee as plannedChasePose. The ghost rides
+ * the lower-left/right third; the road behind it (strobes, closing actor)
+ * fills the frame.
+ */
+export function plannedRearAwarePose(
+  ghost: { x: number; y: number; headingDeg: number },
+  out: ChaseCamPose,
+): ChaseCamPose {
+  const yaw = Math.PI - ghost.headingDeg * DEG2RAD;
+  const fx = Math.sin(yaw); // three-space forward (x, z) of the ghost
+  const fz = Math.cos(yaw);
+  const rx = -fz; // three-space right of travel (forward × up)
+  const rz = fx;
+  out.camX = ghost.x + fx * REAR_CAM_AHEAD_M + rx * REAR_CAM_SIDE_M;
+  out.camY = REAR_CAM_UP_M;
+  out.camZ = -ghost.y + fz * REAR_CAM_AHEAD_M + rz * REAR_CAM_SIDE_M;
+  out.lookX = ghost.x - fx * REAR_LOOK_BACK_M;
+  out.lookY = REAR_LOOK_UP_M;
+  out.lookZ = -ghost.y - fz * REAR_LOOK_BACK_M;
+  return out;
+}
+
+// ---------------------------------------------------------------------------
+// Fault readability chrome (doc 66 R3/R6 — the fault must be identifiable)
+// ---------------------------------------------------------------------------
+
+/** Ground ❌ height above the road (over markings, under the ribbon). */
+export const FAULT_MARKER_Y = 0.06;
+/** The marker fades in over this span ending AT the fault, then holds. */
+export const FAULT_MARKER_RAMP_S = 0.25;
+
+export interface FaultMarkerPose {
+  x: number;
+  y: number;
+  z: number;
+}
+
+/** District-space fault position → the three-space ground-marker pose (the
+ *  ShadowCar pose law: (x, y) → (x, ·, −y)). The roof ❌ badge reads as a
+ *  floating world marker from the chase camera (pilot v2: the lot clip's X
+ *  "on the grass" was the roof badge against a near background) — lot clips
+ *  swap it for this ground-anchored X at the ENGINE fault position. */
+export function faultMarkerPose(pt: { x: number; y: number }): FaultMarkerPose {
+  return { x: pt.x, y: FAULT_MARKER_Y, z: -pt.y };
+}
+
+/** 0..1 marker opacity: fades in over [fault−ramp, fault], holds to clip end. */
+export function faultMarkerAlphaAt(tSec: number, faultTimeSec: number): number {
+  const u = (tSec - (faultTimeSec - FAULT_MARKER_RAMP_S)) / FAULT_MARKER_RAMP_S;
+  return Math.max(0, Math.min(1, u));
+}
+
+/** Lane-highlight pulse (positional faults): the REQUIRED lane tints green
+ *  for LANE_HIGHLIGHT_DUR_S starting at the fault, soft ramps both ends —
+ *  doc 66 spirit: visual explanation, not decoration. */
+export const LANE_HIGHLIGHT_DUR_S = 2;
+export const LANE_HIGHLIGHT_RAMP_S = 0.3;
+
+export function laneHighlightAlphaAt(tSec: number, faultTimeSec: number): number {
+  const u = tSec - faultTimeSec;
+  if (u <= -LANE_HIGHLIGHT_RAMP_S || u >= LANE_HIGHLIGHT_DUR_S) return 0;
+  const rise = (u + LANE_HIGHLIGHT_RAMP_S) / LANE_HIGHLIGHT_RAMP_S;
+  const fall = (LANE_HIGHLIGHT_DUR_S - u) / LANE_HIGHLIGHT_RAMP_S;
+  return Math.max(0, Math.min(1, Math.min(rise, fall)));
 }
 
 // ---------------------------------------------------------------------------
@@ -359,50 +511,153 @@ export function dashModelHash(m: CaptureDashModel): string {
 }
 
 // ---------------------------------------------------------------------------
-// The R1 actor checklist matcher
+// The R1 actor checklist matcher — presence means IN THE PLANNED FRAME
 // ---------------------------------------------------------------------------
 
-/** What the capture stack actually staged (ambient traffic is ZERO in the
- *  capture mount — recorder parity — so every live agent is a staged actor). */
+/**
+ * The planned exterior frame as a pure district-space cone — the honesty test
+ * behind the R1 checklist. Approximates the planned chase camera (CAM_BACK_M
+ * behind the ghost, looking along its heading, CHASE_FOV vertical at the
+ * pinned 16:9 output): an actor is "in frame" when it sits in front of the
+ * lens inside the horizontal frustum and within a legibility cap. Deliberate
+ * approximations, both conservative-in-spirit and documented:
+ *  - the R2 control widen/look-pull is ignored (base framing only);
+ *  - FRAME_MAX_AHEAD_M caps "visible" at a distance where a fleet car is
+ *    still legible pixels, not a speck (doc 66 R1 says VISIBLE, not rendered).
+ */
+export const FRAME_ASPECT = 16 / 9;
+export const FRAME_NEAR_M = 2;
+export const FRAME_MAX_AHEAD_M = 120;
+const FRAME_HALF_TAN = Math.tan((CHASE_FOV * DEG2RAD) / 2) * FRAME_ASPECT;
+
+export function actorInPlannedFrame(
+  ghost: { x: number; y: number; headingDeg: number },
+  actorX: number,
+  actorY: number,
+): boolean {
+  const h = ghost.headingDeg * DEG2RAD;
+  const fx = Math.sin(h); // district forward (0° = north = +y)
+  const fy = Math.cos(h);
+  const rx = actorX - ghost.x;
+  const ry = actorY - ghost.y;
+  const ahead = rx * fx + ry * fy;
+  if (ahead > FRAME_MAX_AHEAD_M) return false;
+  const depth = ahead + CAM_BACK_M; // distance in front of the LENS
+  if (depth < FRAME_NEAR_M) return false;
+  const lat = rx * fy - ry * fx;
+  return Math.abs(lat) <= depth * FRAME_HALF_TAN;
+}
+
+/**
+ * The rear-aware twin of actorInPlannedFrame — the same pure cone test run
+ * against plannedRearAwarePose's framing (camera ahead on the kerb side,
+ * looking back past the ghost). Without it the R1 presence law would grade an
+ * ambulance the rear camera plainly shows as "absent" (the chase cone points
+ * the other way).
+ */
+export function actorInRearAwareFrame(
+  ghost: { x: number; y: number; headingDeg: number },
+  actorX: number,
+  actorY: number,
+): boolean {
+  const h = ghost.headingDeg * DEG2RAD;
+  const fx = Math.sin(h); // district forward
+  const fy = Math.cos(h);
+  const rx = fy; // district right of travel
+  const ry = -fx;
+  const camX = ghost.x + fx * REAR_CAM_AHEAD_M + rx * REAR_CAM_SIDE_M;
+  const camY = ghost.y + fy * REAR_CAM_AHEAD_M + ry * REAR_CAM_SIDE_M;
+  // View axis: camera → look point (REAR_LOOK_BACK_M behind the ghost).
+  let ax = -fx * (REAR_CAM_AHEAD_M + REAR_LOOK_BACK_M) - rx * REAR_CAM_SIDE_M;
+  let ay = -fy * (REAR_CAM_AHEAD_M + REAR_LOOK_BACK_M) - ry * REAR_CAM_SIDE_M;
+  const len = Math.hypot(ax, ay);
+  ax /= len;
+  ay /= len;
+  const dx = actorX - camX;
+  const dy = actorY - camY;
+  const depth = dx * ax + dy * ay;
+  if (depth < FRAME_NEAR_M || depth > FRAME_MAX_AHEAD_M) return false;
+  const lat = dx * ay - dy * ax;
+  return Math.abs(lat) <= depth * FRAME_HALF_TAN;
+}
+
+/** Profile-aware dispatch — the rig passes the PLAN card's camera profile so
+ *  the presence law measures the frame the viewer actually gets. */
+export function actorInPlannedFrameFor(
+  profile: CameraProfile,
+  ghost: { x: number; y: number; headingDeg: number },
+  actorX: number,
+  actorY: number,
+): boolean {
+  return profile === "rearAware"
+    ? actorInRearAwareFrame(ghost, actorX, actorY)
+    : actorInPlannedFrame(ghost, actorX, actorY);
+}
+
+/**
+ * What the capture actually showed. The staging-truth counters (vehicles /
+ * pedestrians / profiles / obstacleVehicles: peak counts over pre-roll +
+ * window) are kept for debugging, but the R1 checklist reads ONLY
+ * `framedKinds` — actor kinds observed INSIDE the planned frame during the
+ * presence band [fault−FAULT_PRESENCE_SPAN_S, fault+FAULT_PRESENCE_SPAN_S].
+ * Pilot-v2 lesson: pool counts said "present" for a dormant walker 540 m away
+ * (sc-ed-d2-city-run) and a pace car 39 m behind the camera (sc-lane-change);
+ * the founder's frame-by-frame verdict was ABSENT. The log may no longer
+ * disagree with looking.
+ */
 export interface ActorPresenceLog {
-  /** Peak live vehicle-agent count over pre-roll + window. */
+  /** Peak live vehicle-agent count over pre-roll + window (staging truth). */
   vehicles: number;
-  /** Peak live pedestrian-agent count. */
+  /** Peak live pedestrian-agent count (staging truth). */
   pedestrians: number;
   /** Distinct VehicleProfile values seen ("car" for profile-less agents). */
   profiles: string[];
   /** Parked-car obstacle count from the district's occupied bays. */
   obstacleVehicles: number;
+  /** Actor kinds seen INSIDE the planned frame during the fault beat —
+   *  lower-case tokens: "vehicle", "pedestrian", "parkedvehicle", plus any
+   *  vehicle profile ("cyclist", "tram", "emergency", …). */
+  framedKinds: string[];
 }
 
 export function createActorPresenceLog(): ActorPresenceLog {
-  return { vehicles: 0, pedestrians: 0, profiles: [], obstacleVehicles: 0 };
+  return { vehicles: 0, pedestrians: 0, profiles: [], obstacleVehicles: 0, framedKinds: [] };
+}
+
+/** Record a kind as seen in the planned frame (deduped, normalized). */
+export function markFramedKind(log: ActorPresenceLog, kind: string): void {
+  const k = kind.trim().toLowerCase();
+  if (k.length > 0 && !log.framedKinds.includes(k)) log.framedKinds.push(k);
 }
 
 /**
- * Did an actor of the PLAN card's kind actually spawn? Kinds per the plan
- * contract: "vehicle" | "pedestrian" | "cyclist" | "emergency" | "police" |
- * "controller" | "parkedVehicle" | "tram". Unknown kinds return false —
- * fail-loud into the checklist, never a silent pass (doc 66 R0).
+ * Was an actor of the PLAN card's kind IN THE PLANNED FRAME at the fault
+ * beat? Kinds per the plan contract: "vehicle" | "pedestrian" | "cyclist" |
+ * "emergency" | "police" | "controller" | "parkedVehicle" | "tram". Unknown
+ * kinds return false — fail-loud into the checklist, never a silent pass
+ * (doc 66 R0). KIND-level honesty, not per-actor-id: the card rows carry no
+ * ids, so a same-kind prop in frame can still satisfy a row — acceptable for
+ * the pilot, noted for the scale gate.
  */
 export function actorSpawned(kind: string, log: ActorPresenceLog): boolean {
   const k = kind.trim().toLowerCase();
   switch (k) {
     case "pedestrian":
-      return log.pedestrians > 0;
     case "vehicle":
-      return log.vehicles > 0;
-    case "parkedvehicle":
-      return log.obstacleVehicles > 0 || log.vehicles > 0;
     case "cyclist":
     case "tram":
     case "emergency":
-      return log.profiles.includes(k);
+      return log.framedKinds.includes(k);
+    case "parkedvehicle":
+      return log.framedKinds.includes("parkedvehicle") || log.framedKinds.includes("vehicle");
     case "police":
-      return log.profiles.includes("police") || log.profiles.includes("emergency");
+      return log.framedKinds.includes("police") || log.framedKinds.includes("emergency");
     case "controller":
       // The регулировчик figure renders through the runtime controller
-      // channel, not the traffic agent pool — count any staged presence.
+      // channel, not the traffic agent pool — the frame scan cannot see it.
+      // Kept on the staging-truth rule (any staged presence) with an explicit
+      // honesty debt: no controller template is in the pilot; revisit at the
+      // scale gate before capturing one.
       return log.vehicles > 0 || log.pedestrians > 0;
     default:
       return false;

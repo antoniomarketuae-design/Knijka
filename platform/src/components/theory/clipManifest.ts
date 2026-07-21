@@ -23,6 +23,16 @@
 
 import { traceUrlForRepoPath } from "./whyPanelModel";
 
+/** One row of the R1 actor checklist the rig recorded with the clip (doc 66
+ *  — writer twin: lib/clips/manifest.ClipActorCheck). `present` is the HONEST
+ *  in-frame-at-the-fault verdict (capturePlan.actorSpawned), so the gallery
+ *  can flag „ЛИПСВА" before the founder ever presses play. */
+export interface MistakeClipActorCheck {
+  kind: string;
+  label: string;
+  present: boolean;
+}
+
 /** One pre-produced mistake clip, as the capture rig recorded it. */
 export interface MistakeClip {
   /** "<templateId>__m<mistakeIndex>" — also the .webm basename. */
@@ -45,6 +55,15 @@ export interface MistakeClip {
    * video-only.
    */
   keyframes?: string[];
+  /**
+   * R1 actor checklist the rig logged for this recording (doc 66). OPTIONAL
+   * and lenient like keyframes: absent/malformed reads as "no checklist"
+   * (pre-v2 recordings), a malformed ROW is dropped, and an EMPTY valid list
+   * is kept — it means "the card requires no actors", which is information.
+   */
+  actors?: MistakeClipActorCheck[];
+  /** Doc 66 R4 camera the clip used. OPTIONAL (pre-v2 rigs never wrote it). */
+  view?: string;
 }
 
 export const CLIP_MANIFEST_URL = "/clips/manifest.json";
@@ -85,6 +104,23 @@ function parseClip(raw: unknown): MistakeClip | null {
     const frames = raw.keyframes.filter((k): k is string => typeof k === "string" && k.length > 0);
     if (frames.length > 0) clip.keyframes = frames;
   }
+  // R1 actor checklist (doc 66): valid rows only; a malformed row is dropped,
+  // a non-array degrades to "no checklist" — never blanks the clip. A valid
+  // EMPTY list is kept (= the card requires no actors).
+  if (Array.isArray(raw.actors)) {
+    const rows: MistakeClipActorCheck[] = [];
+    for (const row of raw.actors) {
+      if (!isRecord(row)) continue;
+      const { kind, label, present } = row;
+      if (typeof kind !== "string" || kind.length === 0) continue;
+      if (typeof label !== "string") continue;
+      if (typeof present !== "boolean") continue;
+      rows.push({ kind, label, present });
+    }
+    clip.actors = rows;
+  }
+  // Doc 66 R4 camera (lenient string — the writer validates strictly).
+  if (typeof raw.view === "string" && raw.view.length > 0) clip.view = raw.view;
   return clip;
 }
 

@@ -34,10 +34,13 @@ import {
 } from "@/modules/sim/lessons";
 import {
   createTraceClock,
+  createTracePoint,
   parseScenarioTrace,
+  sampleAt,
   type ScenarioTrace,
   type TraceClock,
 } from "@/modules/sim/traces";
+import { loadQualityPreset } from "@/components/sim/lesson-ui/QualityPresetSelector";
 import { TraceTimeline } from "@/components/sim/lesson-ui/TraceTimeline";
 import { traceUrlForRepoPath } from "@/components/theory/whyPanelModel";
 import type { RecordingWindow } from "@/lib/clips/trim";
@@ -54,7 +57,13 @@ import {
   type ActorPresenceLog,
   type CaptureCabinChannels,
 } from "@/lib/clips/capturePlan";
-import { CAPTURE_H, CAPTURE_W, type CaptureControlFraming } from "./CaptureScene";
+import { recordedSignalOffsetsFor, type SignalOffsets } from "@/lib/clips/captureSignalDials";
+import {
+  CAPTURE_H,
+  CAPTURE_W,
+  type CaptureControlFraming,
+  type CaptureGroundMarker,
+} from "./CaptureScene";
 
 const CaptureScene = dynamic(
   () => import("./CaptureScene").then((m) => ({ default: m.CaptureScene })),
@@ -98,8 +107,13 @@ interface ClipRun {
   keyframeAt: number[];
   /** R2 control framing (positioned governing control only). */
   framing: CaptureControlFraming | null;
+  /** Ground ❌ at the ENGINE fault position — lot maps only, where the roof
+   *  badge parallax-reads as a detached marker (pilot v2 "X on the grass"). */
+  groundMarker: CaptureGroundMarker | null;
   /** Honest R4 cabin channels from the mistake's graded codeRefs. */
   cabin: CaptureCabinChannels;
+  /** The RECORDING's signal pins (captureSignalDials; null = natural). */
+  signalOffsets: SignalOffsets | null;
 }
 
 interface Mode {
@@ -150,14 +164,29 @@ async function loadRun(entry: ClipPilotEntry, plan: ClipPlanEntry | undefined): 
   if (trace === null) throw new Error("невалидна следа");
   const control = plan.governingControl;
   const hasPositionedControl = control.kind !== "none" && control.approxPos !== undefined;
-  const window = captureWindowFor(trace.meta.durationSec, plan.faultTimeSec, hasPositionedControl);
-  const framing: CaptureControlFraming | null = hasPositionedControl
-    ? {
-        x: control.approxPos!.x,
-        y: control.approxPos!.y,
-        passTSec: controlPassTimeSec(trace, control.approxPos!, window.startSec, plan.faultTimeSec),
-      }
+  // Control pass time over the WHOLE trace (startSec 0) — the window contract:
+  // captureWindowFor opens early enough that the control is still AHEAD for
+  // CONTROL_APPROACH_S before the ghost passes it (doc 66 R2, data-anchored).
+  const passTSec = hasPositionedControl
+    ? controlPassTimeSec(trace, control.approxPos!, 0, plan.faultTimeSec)
     : null;
+  const window = captureWindowFor(
+    trace.meta.durationSec,
+    plan.faultTimeSec,
+    passTSec !== null ? { passTSec } : null,
+  );
+  const framing: CaptureControlFraming | null =
+    hasPositionedControl && passTSec !== null
+      ? { x: control.approxPos!.x, y: control.approxPos!.y, passTSec }
+      : null;
+  // Lot maps: the roof ❌ badge floats ~camera height and parallax-projects
+  // onto near backgrounds — swap it for a ground ❌ at the ENGINE fault pose.
+  let groundMarker: CaptureGroundMarker | null = null;
+  if (spec.map.archetype === "parking-lot") {
+    const faultPt = createTracePoint();
+    sampleAt(trace, plan.faultTimeSec, faultPt);
+    groundMarker = { x: faultPt.x, y: faultPt.y };
+  }
   const isNight = (lesson.environment?.timeOfDay ?? "day") === "night";
   return {
     entry,
@@ -167,7 +196,11 @@ async function loadRun(entry: ClipPilotEntry, plan: ClipPlanEntry | undefined): 
     window,
     keyframeAt: keyframeTimes(window, plan.faultTimeSec),
     framing,
+    groundMarker,
     cabin: cabinChannelsFor(mistake.codeRefs, isNight),
+    // The signal pins THIS recording ran with (CAUSE-4): resolved per
+    // (template, trace) — null = the map's natural offsets, apply nothing.
+    signalOffsets: recordedSignalOffsetsFor(entry.templateId, entry.tracePath),
   };
 }
 
@@ -331,6 +364,15 @@ export function ClipCaptureClient({
 
       // The R1 checklist — what the capture actually staged vs the card.
       const actors = buildActorChecklist(r.plan.requiredActors, presenceRef.current);
+      // R1 MACHINE PRE-CHECK (doc 66 — pilot-v2 hardening): a clip whose
+      // required actors never appeared is FALSE by definition. FAIL the clip
+      // here — nothing is posted, the batch logs the error and moves on. The
+      // sink enforces the same gate server-side (422 r1_actor_missing), so a
+      // silent success is impossible from either end.
+      const missingActors = actors.filter((a) => !a.present);
+      if (missingActors.length > 0) {
+        throw new Error(`R1: липсва ${missingActors.map((m) => m.kind).join(", ")}`);
+      }
 
       const fd = new FormData();
       fd.set("id", r.entry.id);
@@ -341,6 +383,11 @@ export function ClipCaptureClient({
       fd.set("durationSec", String(r.window.endSec - r.window.startSec));
       fd.set("view", r.plan.view);
       fd.set("actors", JSON.stringify(actors));
+      // R5 audit: the level this recording ACTUALLY rendered (doc 66 — "the
+      // founder's own preset" only holds when the founder's browser records;
+      // recording it makes a preset mismatch machine-visible in R0).
+      const preset = loadQualityPreset();
+      fd.set("quality", preset === "medium" ? "med" : preset);
       fd.set("file", blob, `${r.entry.id}.webm`);
       stillBlobs.forEach((still, i) => {
         fd.set(`k${i}`, still, `${r.entry.id}.k${i}.png`);
@@ -372,15 +419,15 @@ export function ClipCaptureClient({
       setRun(r);
       await Promise.race([ready, timeout]);
       setStatus(entry.id, { state: "recording" });
+      // recordMounted THROWS on any missing required actor (R1 pre-check),
+      // so a "done" pill always means the full card staged.
       const actors = await recordMounted(r);
-      const missing = actors.filter((a) => !a.present);
       const summary = checklistSummary(actors);
       setStatus(entry.id, {
         state: "done",
         note:
           `${(r.window.endSec - r.window.startSec).toFixed(1)} с` +
-          (summary ? ` · актьори ${summary}` : "") +
-          (missing.length > 0 ? ` · ⚠ ЛИПСВА: ${missing.map((m) => m.kind).join(", ")}` : ""),
+          (summary ? ` · актьори ${summary}` : ""),
       });
     },
     [recordMounted, setStatus, planById],
@@ -533,8 +580,13 @@ export function ClipCaptureClient({
               trace={run.trace}
               clockRef={clockRef}
               startSec={run.window.startSec}
+              faultTimeSec={run.plan.faultTimeSec}
+              signalOffsets={run.signalOffsets}
               view={run.plan.view}
+              cameraProfile={run.plan.camera}
               controlFraming={run.framing}
+              laneHighlight={run.plan.laneHighlight ?? null}
+              groundMarker={run.groundMarker}
               cabin={run.cabin}
               presenceRef={presenceRef}
               frameCountRef={frameCountRef}
@@ -609,8 +661,13 @@ export function ClipCaptureClient({
           trace={run.trace}
           clockRef={clockRef}
           startSec={run.window.startSec}
+          faultTimeSec={run.plan.faultTimeSec}
+          signalOffsets={run.signalOffsets}
           view={run.plan.view}
+          cameraProfile={run.plan.camera}
           controlFraming={run.framing}
+          laneHighlight={run.plan.laneHighlight ?? null}
+          groundMarker={run.groundMarker}
           cabin={run.cabin}
           presenceRef={presenceRef}
           frameCountRef={frameCountRef}

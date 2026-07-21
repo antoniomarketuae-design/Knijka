@@ -17,7 +17,21 @@
  *    (signRef), the stop-sign junction meta, signalized nodes nearest the
  *    fault, the speed-zone transition, marked crossings, the one-way gate.
  *    Ambiguous → conservative "none" WITH a note (a wrong card poisons R0).
- *  - view (R4): cabin-state codeRefs → cockpit / exterior+dashboard.
+ *    approxPos is then SNAPPED to the actual RENDERED sign post
+ *    (buildWorldGeometry — the world's own builder, never a parallel
+ *    reconstruction): pilot v2 aimed the camera at zone-centerline points
+ *    while the posts stand at the right kerb, and claimed signs (В1, the
+ *    В26-30 transition) that no world pass places — those now carry a
+ *    CONTENT note instead of poisoning R0.
+ *  - view (R4): cabin-state codeRefs → cockpit / exterior+dashboard; SPEED
+ *    codeRefs (over-limit / too-fast-for-conditions) → exterior+dashboard —
+ *    a speeding fault is unreadable without the speed readout (pilot v2
+ *    cause 5).
+ *  - camera (R1): "rearAware" when a staged actor approaches from BEHIND
+ *    (emergencyApproach/rearTailgater) — the chase camera can never show it.
+ *  - laneHighlight: positional lane faults (NOT_KEEPING_RIGHT) emit the
+ *    REQUIRED lane's center so the rig can tint it green for ~2 s at the
+ *    fault (visual explanation, not decoration — doc 66 spirit).
  */
 
 import { readFileSync } from "node:fs";
@@ -25,9 +39,11 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { scenarioById } from "@/modules/sim/lessons";
 import { replayPilotMistake, serializeScenarioTrace } from "@/modules/sim/traces";
+import { assertDistrict, buildWorldGeometry } from "@/modules/sim/world";
 import { clipPilotList } from "./clipPilot";
 import type {
   ClipGoverningControl,
+  ClipLaneHighlight,
   ClipPlanEntry,
   ClipRequiredActor,
   ClipView,
@@ -80,6 +96,72 @@ interface DistrictDoc {
 function loadDistrict(districtId: string): DistrictDoc {
   const file = path.join(REPO_ROOT, "content", "world", `${districtId}.json`);
   return JSON.parse(readFileSync(file, "utf-8")) as DistrictDoc;
+}
+
+// ---------------------------------------------------------------------------
+// Rendered sign posts — the world's OWN builder output (doc 66 R5: no
+// parallel reconstruction). District space: three (x, ·, z) → (x, −z).
+// ---------------------------------------------------------------------------
+
+interface SignPost {
+  kind: string;
+  x: number;
+  y: number;
+}
+
+const signPostCache = new Map<string, SignPost[]>();
+
+function renderedSignPosts(districtId: string, raw: DistrictDoc): SignPost[] {
+  let posts = signPostCache.get(districtId);
+  if (!posts) {
+    const geometry = buildWorldGeometry(assertDistrict(raw), { parkingBays: [] });
+    posts = geometry.signs.map((s) => ({
+      kind: s.kind,
+      x: round2(s.position[0]),
+      y: round2(-s.position[2]),
+    }));
+    signPostCache.set(districtId, posts);
+  }
+  return posts;
+}
+
+/** How far from the coarse (data-derived) position the matching rendered post
+ *  may stand — a kerb offset plus map slack, never a different station. */
+const POST_SNAP_RADIUS_M = 60;
+
+/**
+ * Snap a control's approxPos to the nearest RENDERED post of the expected
+ * kind(s). Found → the camera orients at the actual pole the viewer sees.
+ * Missing → CONTENT note (the card claims a control the world cannot show —
+ * report, never fake; doc 66 R0).
+ */
+function snapControlToPost(
+  control: ClipGoverningControl,
+  expectedKinds: readonly string[],
+  posts: readonly SignPost[],
+  notes: string[],
+): ClipGoverningControl {
+  const anchor = control.approxPos;
+  if (anchor === undefined) return control;
+  let best: SignPost | null = null;
+  let bestD = POST_SNAP_RADIUS_M;
+  for (const post of posts) {
+    if (!expectedKinds.includes(post.kind)) continue;
+    const d = Math.hypot(post.x - anchor.x, post.y - anchor.y);
+    if (d < bestD) {
+      bestD = d;
+      best = post;
+    }
+  }
+  if (best) {
+    control.approxPos = { x: best.x, y: best.y };
+  } else {
+    notes.push(
+      `СЪДЪРЖАНИЕ: „${control.label}“ няма рендиран стълб (${expectedKinds.join("/")}) ` +
+        `до очакваната позиция — камерата няма какво да покаже`,
+    );
+  }
+  return control;
 }
 
 const round2 = (v: number): number => Math.round(v * 100) / 100;
@@ -219,6 +301,16 @@ const ZONE_CODE_KINDS: ReadonlyArray<readonly [string, string]> = [
   ["RAIL_CROSSING_VIOLATION", "railCrossing"],
 ];
 
+/** Zone kind → the RENDERED post kinds that can stand for it (zoneSigns.ts).
+ *  Empty = marking-only (paint, not a pole) — nothing to snap to. */
+const ZONE_POST_KINDS: Readonly<Record<string, readonly string[]>> = {
+  noOvertaking: ["noOvertaking"],
+  noStopping: ["noStopping"],
+  railCrossing: ["railCross", "railUnguarded", "railGuarded"],
+  solidCenterLine: [],
+  busLane: [],
+};
+
 const ZONE_KIND_BG: Readonly<Record<string, string>> = {
   noOvertaking: "забранено изпреварване",
   noStopping: "забранени престой и паркиране",
@@ -248,15 +340,25 @@ function deriveControl(
   archetype: string,
   conditions: { weather?: string; night?: boolean } | undefined,
   faultPos: { x: number; y: number },
+  startPos: { x: number; y: number },
+  posts: readonly SignPost[],
   notes: string[],
 ): ClipGoverningControl {
   const scenario = district.meta?.scenario ?? {};
 
-  // 1. Zone-governed codes (В24/В27/М1/бус/жп) — the zone's own signRef.
+  // 1. Zone-governed codes (В24/В27/М1/бус/жп) — the zone's own signRef,
+  //    snapped to the zone's rendered post (kerb side, zoneSigns.ts) so the
+  //    camera orients at the pole the viewer sees, not the centerline.
   for (const [code, zoneKind] of ZONE_CODE_KINDS) {
     if (!codes.has(code)) continue;
     const zone = (district.zones ?? []).find((z) => z.kind === zoneKind);
-    if (zone) return controlForZone(zone, district);
+    if (zone) {
+      const control = controlForZone(zone, district);
+      const postKinds = ZONE_POST_KINDS[zoneKind] ?? [];
+      return postKinds.length > 0
+        ? snapControlToPost(control, postKinds, posts, notes)
+        : control;
+    }
     notes.push(`Кодът ${code} очаква зона „${zoneKind}“, но картата няма такава`);
   }
 
@@ -267,7 +369,7 @@ function deriveControl(
     const node = (district.roads?.nodes ?? []).find((n) => n.id === nodeId);
     if (node) control.approxPos = { x: round2(node.x), y: round2(node.y) };
     else notes.push("Стоп-кръстовището няма junctionNodeId в картата — позицията липсва");
-    return control;
+    return snapControlToPost(control, ["stop"], posts, notes);
   }
 
   // 3. Signal-governed codes — the signalized node nearest the fault moment.
@@ -284,7 +386,8 @@ function deriveControl(
     notes.push("Сигнален код без светофарен възел в картата — елементът не е изведен");
   }
 
-  // 4. Priority yield at a roundabout mouth (Б1 at the barged entry).
+  // 4. Priority yield at a roundabout mouth (Б1 at the barged entry) —
+  //    snapped to the entry's rendered Б1 post (props.ts roundabout pass).
   if (codes.has("FAILED_TO_YIELD") && archetype === "roundabout") {
     const ringIds = Array.isArray(scenario.ringNodeIds)
       ? scenario.ringNodeIds.filter((v): v is string => typeof v === "string")
@@ -297,23 +400,54 @@ function deriveControl(
       label: "Знак Б1 „Пропусни движещите се по пътя с предимство“ на входа на кръговото",
     };
     if (node) control.approxPos = { x: round2(node.x), y: round2(node.y) };
-    return control;
+    return snapControlToPost(control, ["giveWay"], posts, notes);
   }
 
-  // 5. Posted-limit speeding — the limit-transition sign of the speed maps.
+  // 5. Posted-limit speeding — the sign of the limit IN FORCE at the fault.
+  //    Pilot-v2 cause 3 lesson (sc-speed-creep): the card pointed at the
+  //    zone-transition В26 (y=400) while the ENGINE graded the fault at
+  //    y≈100 — still under the APPROACH limit, whose В26 stands at the
+  //    segment entry. The card must cite the limit the fault broke.
   if (codes.has("SPEEDING_OVER_LIMIT")) {
     const transitionY = asNumber(scenario.transitionY);
     const params = (scenario.params ?? {}) as Record<string, unknown>;
     const zoneKmh = asNumber(params.zoneKmh);
-    if (transitionY !== null && zoneKmh !== null) {
+    const approachKmh = asNumber(params.approachKmh) ?? asNumber(params.maxspeedKmh);
+    if (transitionY !== null && zoneKmh !== null && faultPos.y >= transitionY) {
       const laneX = asNumber(scenario.laneCenterRightM) ?? 0;
-      return {
+      const control: ClipGoverningControl = {
         kind: "sign",
         label: `Знак В26 (${zoneKmh} км/ч)`,
         approxPos: { x: round2(laneX), y: round2(transitionY) },
       };
+      // The world ships only the В26-50 face — a zone post must MATCH it.
+      return snapControlToPost(
+        control,
+        zoneKmh === 50 ? ["limit50"] : [`limit${zoneKmh}`],
+        posts,
+        notes,
+      );
     }
-    notes.push("Превишена скорост без авториран преход на ограничението — знакът не е изведен");
+    if (approachKmh !== null) {
+      if (transitionY !== null) {
+        notes.push(
+          `Грешката е ПРЕДИ прехода на ограничението (y≈${Math.round(faultPos.y)} < ` +
+            `${Math.round(transitionY)}) — важи В26 (${approachKmh}) от входа на отсечката`,
+        );
+      }
+      const control: ClipGoverningControl = {
+        kind: "sign",
+        label: `Знак В26 (${approachKmh} км/ч)`,
+        approxPos: { x: round2(startPos.x), y: round2(startPos.y) },
+      };
+      return snapControlToPost(
+        control,
+        approachKmh === 50 ? ["limit50"] : [`limit${approachKmh}`],
+        posts,
+        notes,
+      );
+    }
+    notes.push("Превишена скорост без изводимо ограничение от картата — знакът не е изведен");
   }
 
   // 6. Marked-crossing codes — the zebra nearest the fault.
@@ -329,7 +463,10 @@ function deriveControl(
     notes.push("Пешеходен код без пътека в картата — елементът не е изведен");
   }
 
-  // 7. Wrong way into a one-way street — the no-entry gate.
+  // 7. Wrong way into a one-way street — the no-entry gate. The world does
+  //    not yet PLACE a В1 post (no SignKind, no placement pass — the GLB
+  //    sign_no_entry.glb exists unwired): the snap fails loudly into a
+  //    CONTENT note so R0 knows the clip cannot show its governing sign.
   if (codes.has("WRONG_WAY") && scenario.oneway === true) {
     const control: ClipGoverningControl = {
       kind: "sign",
@@ -339,7 +476,7 @@ function deriveControl(
     const jx = asNumber(junction?.x);
     const jy = asNumber(junction?.y);
     if (jx !== null && jy !== null) control.approxPos = { x: round2(jx), y: round2(jy) };
-    return control;
+    return snapControlToPost(control, ["noEntry"], posts, notes);
   }
 
   // 8. Conservative default: no control — the fault follows from a conduct
@@ -363,6 +500,9 @@ function deriveControl(
 
 const COCKPIT_CODE = /^(SEATBELT_|HANDBRAKE_|ENGINE_STALLED|PREDRIVE_)/;
 const DASHBOARD_CODE = /^(HEADLIGHTS_|FOG_LIGHTS_|HIGH_BEAM_|WIPERS_)/;
+/** Speed faults are unreadable without the speed readout (pilot v2 cause 5):
+ *  over-limit, too-fast-for-conditions and too-slow all get the strip. */
+const SPEED_CODE = /^(SPEEDING_|SPEED_TOO_FAST|DRIVING_TOO_SLOW)/;
 
 function deriveView(codes: ReadonlySet<string>, notes: string[]): ClipView {
   if ([...codes].some((c) => COCKPIT_CODE.test(c))) {
@@ -373,7 +513,64 @@ function deriveView(codes: ReadonlySet<string>, notes: string[]): ClipView {
     notes.push("Светлинна грешка (R4) — фаровете отвън + лентата на таблото");
     return "exterior+dashboard";
   }
+  if ([...codes].some((c) => SPEED_CODE.test(c))) {
+    notes.push("Скоростна грешка (R4/5) — километражът на лентата на таблото я показва");
+    return "exterior+dashboard";
+  }
   return "exterior";
+}
+
+// ---------------------------------------------------------------------------
+// Camera profile (R1 — rear approaches) + the positional lane highlight
+// ---------------------------------------------------------------------------
+
+/** Staged kinds whose key actor closes from BEHIND the ghost — the chase
+ *  camera can never show them (pilot v2: the sc-vu-emergency ambulance
+ *  entered frame only after it had already passed). */
+const REAR_APPROACH_KINDS: ReadonlySet<string> = new Set([
+  "emergencyApproach",
+  "rearTailgater",
+]);
+
+function deriveCamera(staged: readonly StagedLike[], notes: string[]): "chase" | "rearAware" {
+  if (staged.some((s) => REAR_APPROACH_KINDS.has(s.kind))) {
+    notes.push(
+      "Ключовият участник идва ОТЗАД — страничен три-четвърти кадър (rearAware), " +
+        "който държи и призрака, и приближаващия отзад в рамката",
+    );
+    return "rearAware";
+  }
+  return "chase";
+}
+
+/** Clearance kept between the tinted band and the lane lines, m. */
+const LANE_HIGHLIGHT_EDGE_M = 1.6;
+
+/** Positional lane faults (NOT_KEEPING_RIGHT): the REQUIRED lane's band so
+ *  the rig can tint it green for ~2 s at the fault. Derived from the map's
+ *  own lane meta — never guessed. */
+function deriveLaneHighlight(
+  codes: ReadonlySet<string>,
+  district: DistrictDoc,
+  faultPos: { x: number; y: number },
+  notes: string[],
+): ClipLaneHighlight | undefined {
+  if (!codes.has("NOT_KEEPING_RIGHT")) return undefined;
+  const scenario = district.meta?.scenario ?? {};
+  const cruiseX = asNumber(scenario.laneCruiseX);
+  const leftX = asNumber(scenario.laneLeftX);
+  if (cruiseX === null || leftX === null) {
+    notes.push(
+      "NOT_KEEPING_RIGHT без изводими ленти (laneCruiseX/laneLeftX) — лентата не се осветява",
+    );
+    return undefined;
+  }
+  notes.push("Позиционна грешка — ДЯСНАТА (изискваната) лента светва зелено ~2 с при грешката");
+  return {
+    xM: round2(cruiseX),
+    yM: round2(faultPos.y),
+    widthM: round2(Math.abs(cruiseX - leftX) - LANE_HIGHLIGHT_EDGE_M),
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -422,18 +619,28 @@ export function buildClipPlan(): ClipPlanEntry[] {
       else break;
     }
 
+    // Route start — anchors the in-force-limit derivation (case 5).
+    const first = drive.trace.samples[0];
+    const startPos = first ? { x: first.x, y: first.y } : { x: 0, y: 0 };
+
     // --- R1/R2/R4 cards ------------------------------------------------------
     const notes: string[] = [];
-    const requiredActors = deriveActors((spec.staged ?? []) as StagedLike[], district, notes);
+    const staged = (spec.staged ?? []) as StagedLike[];
+    const requiredActors = deriveActors(staged, district, notes);
+    const posts = renderedSignPosts(spec.map.districtId, district);
     const governingControl = deriveControl(
       codes,
       district,
       spec.map.archetype,
       spec.conditions,
       faultPos,
+      startPos,
+      posts,
       notes,
     );
     const view = deriveView(codes, notes);
+    const camera = deriveCamera(staged, notes);
+    const laneHighlight = deriveLaneHighlight(codes, district, faultPos, notes);
 
     entries.push({
       id: pilot.id,
@@ -444,6 +651,8 @@ export function buildClipPlan(): ClipPlanEntry[] {
       requiredActors,
       governingControl,
       view,
+      camera,
+      ...(laneHighlight ? { laneHighlight } : {}),
       notes: notes.join("; "),
     });
   }
@@ -491,6 +700,24 @@ export interface ClipGoverningControl {
 /** Camera requirement per doc 66 R4 (cabin faults show the cabin). */
 export type ClipView = "exterior" | "cockpit" | "exterior+dashboard";
 
+/** Exterior camera profile (doc 66 R1): "rearAware" when the mistake's key
+ *  actor approaches from BEHIND the ghost (ambulance, tailgater) — a side
+ *  three-quarter framing that keeps both the ghost and the rear approach in
+ *  frame; "chase" everywhere else. Ignored for cockpit clips. */
+export type ClipCameraProfile = "chase" | "rearAware";
+
+/** Positional-fault readability: the REQUIRED lane's band, tinted green for
+ *  ~2 s at the fault by the rig (district space; derived from the map's own
+ *  lane meta). Emitted only where the fault is positional. */
+export interface ClipLaneHighlight {
+  /** Lane-center x, district m. */
+  xM: number;
+  /** Fault y — the band renders around it, district m. */
+  yM: number;
+  /** Band width, m (lane spacing minus an edge margin). */
+  widthM: number;
+}
+
 export interface ClipPlanEntry {
   /** Manifest clip id — \`<templateId>__m<mistakeIndex>\` (clipPilot contract). */
   id: string;
@@ -503,6 +730,8 @@ export interface ClipPlanEntry {
   requiredActors: ClipRequiredActor[];
   governingControl: ClipGoverningControl;
   view: ClipView;
+  camera: ClipCameraProfile;
+  laneHighlight?: ClipLaneHighlight;
   /** Derivation caveats (Bulgarian, terse); "" = fully unambiguous. */
   notes: string;
 }

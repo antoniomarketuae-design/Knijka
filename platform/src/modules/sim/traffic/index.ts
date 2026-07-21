@@ -39,8 +39,13 @@ export {
 export type { ModelRig, ParkedPlacement, TrafficFleet } from "./vehicleFleet";
 export { mulberry32 } from "./rng";
 export type { Rng } from "./rng";
-export { TrafficLayer } from "./TrafficLayer";
-export type { ControllerFigureRead, TrafficLayerProps } from "./TrafficLayer";
+export { computeParkedCars, TrafficLayer } from "./TrafficLayer";
+export type {
+  ControllerFigureRead,
+  ParkedCar,
+  ParkedClearZoneLike,
+  TrafficLayerProps,
+} from "./TrafficLayer";
 export { DEFAULT_TRAFFIC_CONFIG } from "./types";
 // A11 hittable traffic — pure proximity/near-miss helpers for the physics
 // shell pool (components/sim/NpcColliders binds them to rapier).

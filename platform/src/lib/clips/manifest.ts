@@ -11,7 +11,12 @@
  *               these with vision before the founder sees anything);
  *   actors    — the per-clip R1 checklist (PLAN requiredActors × what the
  *               capture actually staged);
- *   view      — which doc-66 R4 camera the clip was recorded with.
+ *   view      — which doc-66 R4 camera the clip was recorded with;
+ *   quality   — the environment quality level the recording browser actually
+ *               rendered (loadQualityPreset of THAT browser — doc 66 R5:
+ *               "the founder's own preset" only holds when the founder's
+ *               browser records; recording the level makes a preset mismatch
+ *               machine-visible in R0 instead of a founder taste surprise).
  *
  * manifest.json is COMMITTED; the binary .webm clips and .k*.png stills
  * beside it are gitignored and reach staging by scp into the VPS public dir
@@ -53,6 +58,8 @@ export interface ClipManifestEntry {
   actors?: ClipActorCheck[];
   /** Doc 66 R4 camera the clip used. */
   view?: "exterior" | "cockpit" | "exterior+dashboard";
+  /** Environment quality level the recording actually rendered (R5 audit). */
+  quality?: "low" | "med" | "high";
 }
 
 export interface ClipManifest {

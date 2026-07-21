@@ -3,11 +3,17 @@
  *
  *   GET  /api/dev/clips → the current public/clips/manifest.json
  *   POST /api/dev/clips → multipart form { id, templateId, mistakeIndex,
- *        tracePath, titleBg, durationSec, view, actors, file, k0..k4 } —
- *        writes public/clips/<id>.webm + the five R0 keyframe stills
- *        public/clips/<id>.k0..k4.png and UPSERTS the manifest entry
- *        (keyframes + actor checklist + view are ADDITIVE manifest fields;
- *        version stays 1, readers that predate them keep parsing).
+ *        tracePath, titleBg, durationSec, view, actors, quality, file,
+ *        k0..k4 } — writes public/clips/<id>.webm + the five R0 keyframe
+ *        stills public/clips/<id>.k0..k4.png and UPSERTS the manifest entry
+ *        (keyframes + actor checklist + view + quality are ADDITIVE manifest
+ *        fields; version stays 1, readers that predate them keep parsing).
+ *
+ * MACHINE GATES (doc 66 R0/R1, post pilot-v2): the sink rejects what R0
+ * could never certify — a clip without its plan card (no_plan), a clip whose
+ * required actors did not all stage (r1_actor_missing, 422) and a clip
+ * without ALL FIVE keyframes (bad_keyframe; the v1-era "or none" leniency is
+ * gone — a keyframe-less artifact is R0-blind by construction).
  *
  * The keyframes are the R0 evidence: Claude inspects them WITH VISION against
  * R1–R6 before the founder sees anything ("tests green" is not evidence for
@@ -26,6 +32,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { NextResponse } from "next/server";
+import { clipPlanForId } from "@/modules/learning";
 import {
   CLIP_ID_RE,
   CLIP_KEYFRAME_COUNT,
@@ -167,19 +174,48 @@ export async function POST(request: Request): Promise<NextResponse> {
     actors = parsed;
   }
 
-  // R0 keyframes k0..k4 — all five or none (a partial strip would let a
-  // defective still slip past the vision inspection unnoticed).
+  // Recorded quality level (doc 66 R5 audit) — optional, strict when sent.
+  let quality: ClipManifestEntry["quality"];
+  const qualityRaw = form.get("quality");
+  if (qualityRaw !== null) {
+    const q = String(qualityRaw);
+    if (q !== "low" && q !== "med" && q !== "high") {
+      return NextResponse.json({ error: "bad_quality" }, { status: 400 });
+    }
+    quality = q;
+  }
+
+  // R1 MACHINE PRE-CHECK (doc 66 R0 — "Claude watches everything BEFORE the
+  // founder"): the sink itself verifies the card. No plan card = no clip; a
+  // card with required actors demands a checklist row proving each one
+  // actually staged. A clip whose actors never appeared is FALSE by R1 —
+  // rejecting it here makes silent success impossible even if a rig
+  // regression stops checking client-side (the pilot-v2 zebra lesson: a
+  // failed re-record left a stale, R0-blind entry looking "recorded").
+  const plan = clipPlanForId(id);
+  if (!plan) {
+    return NextResponse.json({ error: "no_plan" }, { status: 400 });
+  }
+  for (const required of plan.requiredActors) {
+    const row = actors?.find((a) => a.kind === required.kind);
+    if (!row || !row.present) {
+      return NextResponse.json(
+        { error: "r1_actor_missing", kind: required.kind },
+        { status: 422 },
+      );
+    }
+  }
+
+  // R0 keyframes k0..k4 — ALL FIVE, always. The v1-era "or none" leniency is
+  // gone: a keyframe-less artifact cannot be vision-inspected, and doc 66 R0
+  // forbids anything reaching the founder uninspected.
   const stills: Blob[] = [];
   for (let i = 0; i < CLIP_KEYFRAME_COUNT; i++) {
     const still = form.get(`k${i}`);
-    if (still === null) break;
-    if (!(still instanceof Blob) || still.size === 0 || still.size > MAX_KEYFRAME_BYTES) {
-      return NextResponse.json({ error: "bad_keyframe" }, { status: 400 });
+    if (still === null || !(still instanceof Blob) || still.size === 0 || still.size > MAX_KEYFRAME_BYTES) {
+      return NextResponse.json({ error: "bad_keyframe", index: i }, { status: 400 });
     }
     stills.push(still);
-  }
-  if (stills.length !== 0 && stills.length !== CLIP_KEYFRAME_COUNT) {
-    return NextResponse.json({ error: "bad_keyframe_count" }, { status: 400 });
   }
 
   const dir = clipsDir();
@@ -205,6 +241,7 @@ export async function POST(request: Request): Promise<NextResponse> {
     ...(keyframes.length > 0 ? { keyframes } : {}),
     ...(actors !== undefined ? { actors } : {}),
     ...(view !== undefined ? { view } : {}),
+    ...(quality !== undefined ? { quality } : {}),
   };
 
   const manifest = readManifest();

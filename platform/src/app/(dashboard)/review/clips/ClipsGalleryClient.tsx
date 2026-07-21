@@ -173,6 +173,33 @@ function KeyframeStrip({ clip }: { clip: MistakeClip }) {
   );
 }
 
+/** The rig's HONEST R1 checklist (manifest `actors`) — presence measured in
+ *  the planned frame AT the fault (capturePlan.actorSpawned), so a „ЛИПСВА"
+ *  here is a doc-66 R1 fail before anyone presses play. Absent on pre-v2
+ *  recordings; an empty list = the card requires no actors. */
+function ActorChecklistStrip({ clip }: { clip: MistakeClip }) {
+  const actors = clip.actors;
+  if (actors === undefined || actors.length === 0) return null;
+  return (
+    <ul className="flex flex-wrap gap-1.5" aria-label={`Участници в кадър: ${clip.titleBg}`}>
+      {actors.map((a) => (
+        <li
+          key={`${a.kind}:${a.label}`}
+          title={a.label}
+          className={`max-w-full truncate rounded-full border px-2 py-0.5 text-[11px] font-bold ${
+            a.present
+              ? "border-success/50 bg-success/10 text-success"
+              : "border-danger/50 bg-danger/10 text-danger"
+          }`}
+        >
+          {a.present ? "✓ " : "✗ ЛИПСВА: "}
+          {a.label}
+        </li>
+      ))}
+    </ul>
+  );
+}
+
 function ClipCard({ clip, plan }: { clip: MistakeClip; plan: ClipPlanEntry | null }) {
   // The .webm 404s until the binaries are scp'd — note it, keep the card.
   const [fileMissing, setFileMissing] = useState(false);
@@ -217,6 +244,9 @@ function ClipCard({ clip, plan }: { clip: MistakeClip; plan: ClipPlanEntry | nul
       </div>
 
       <KeyframeStrip clip={clip} />
+
+      {/* R1 honesty first: what the capture actually framed at the fault. */}
+      <ActorChecklistStrip clip={clip} />
 
       {/* The requirements card (doc 66) — degrades quietly when the clip is
           outside the generated plan (e.g. a stale manifest entry). */}

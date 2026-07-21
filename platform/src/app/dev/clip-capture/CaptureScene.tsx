@@ -11,9 +11,13 @@
  * traffic.update → runtime.sample → director.step, the recorder's exact frame
  * order). Seed 7 + ambient 0/0 = recordScriptedDrive's staging parity, so the
  * lead cars / conflict cars / pedestrians / ambulances re-enact their
- * recorded-era behavior around the replayed mistake. A presence log
- * (capturePlan.ActorPresenceLog) records what actually staged for the R1
- * checklist. HONEST LIMIT: no rule engine runs here (nothing is graded) and
+ * recorded-era behavior around the replayed mistake. The feed is the SHARED
+ * captureGhostFeed stepper (node-tested per pilot clip for arming parity in
+ * captureFeedParity.test.ts), the recording's signal pins re-apply through
+ * the signalOffsets prop (captureSignalDials — the pilot-v2 CAUSE-4 seam),
+ * and the presence log (capturePlan.ActorPresenceLog) records staging truth
+ * AND the honest R1 channel: what was actually IN the planned frame during
+ * the fault beat. HONEST LIMIT: no rule engine runs here (nothing is graded) and
  * script-authored collision beats are not re-pushed — runner ADJUDICATION
  * outcomes may differ from the recorded run, actor MOTION does not.
  *
@@ -23,6 +27,21 @@
  * exposure/tone-mapping/AO/bloom match what the founder sees in the drill.
  * Canvas gl flags mirror LessonScene's; dpr stays pinned at 1 — the one
  * deliberate divergence (fixed 1280×720 output across machines).
+ *
+ * R5 EXPOSURE AUDIT (pilot-v2 „too bright", CAUSE-6): the tone path here is
+ * pixel-identical to the drill at EQUAL preset — SimEnvironment applies the
+ * per-preset exposure on frame 1 (damp snaps), the HDRI files/intensities/
+ * rotations are LessonScene's own lines, and the chase grazing profile
+ * matches the drill's (≈8.4° vs ≈7.6° depression). Two real findings:
+ * (1) loadQualityPreset() reads the RECORDING browser's localStorage — an
+ *     automated batch in a fresh profile silently records "medium" whatever
+ *     the founder drills on; the level now travels with every POST and lands
+ *     in the manifest (`quality`) so R0 can machine-check the preset used.
+ * (2) The measured blowouts were bright-sky speculars on low-roughness
+ *     surfaces, worst on the WET road (R0 pixel probe, rain-lights k2 far
+ *     road ≈ [213,206,194] vs dry follow-distance [117,117,120]) — retuned
+ *     at the material truth (world StaticWorld wet-gloss note), never by a
+ *     capture-only exposure fork, so drill and clip stay one look.
  *
  * R5 (no hop): the camera is a PURE function of playback time
  * (plannedChasePose / plannedCockpitPose — zero damping state, nothing to
@@ -90,11 +109,10 @@ import {
   type LessonWorldCore,
 } from "@/components/sim/lessonWorldRecipe";
 import { ScenarioObstacles } from "@/components/sim/ScenarioObstacles";
-import { ShadowCar } from "@/components/sim/ShadowCar";
+import { emojiTexture, ShadowCar } from "@/components/sim/ShadowCar";
 import { VitokCockpit } from "@/components/sim/vitok/VitokCockpit";
 import { CockpitInteractionContext } from "@/components/sim/vitok/hotspots";
 import type { CabinControls } from "@/components/sim/cabin";
-import { createVehicleSample } from "@/components/sim/vehicleSample";
 import { loadQualityPreset } from "@/components/sim/lesson-ui/QualityPresetSelector";
 import {
   blinkOnAt,
@@ -103,13 +121,22 @@ import {
   createCockpitCamPose,
   dashModelFor,
   dashModelHash,
+  faultMarkerAlphaAt,
+  faultMarkerPose,
   gearLabelFor,
   GHOST_CHASSIS_REST_Y,
+  laneHighlightAlphaAt,
   plannedChasePose,
   plannedCockpitPose,
+  plannedRearAwarePose,
   type ActorPresenceLog,
+  type CameraProfile,
   type CaptureCabinChannels,
 } from "@/lib/clips/capturePlan";
+import {
+  createCaptureFeedStepper,
+  type CaptureFeedStepper,
+} from "@/lib/clips/captureGhostFeed";
 
 /** Fixed capture size — consistent clips across machines/windows. */
 export const CAPTURE_W = 1280;
@@ -126,6 +153,20 @@ export interface CaptureControlFraming {
   passTSec: number;
 }
 
+/** The PLAN card's positional lane band (mirrors learning ClipLaneHighlight —
+ *  structural, no learning import): tinted green ~2 s at the fault. */
+export interface CaptureLaneHighlight {
+  xM: number;
+  yM: number;
+  widthM: number;
+}
+
+/** Ground ❌ anchor (district m) — the ENGINE fault position on lot maps. */
+export interface CaptureGroundMarker {
+  x: number;
+  y: number;
+}
+
 /** LessonScene's HDRI constants (doc 71 §4.2 — keep in sync). */
 const DAY_ENV_ROTATION = new Euler(0, (119 * Math.PI) / 180, 0);
 const NIGHT_ENV_ROTATION = new Euler(0, 0, 0);
@@ -133,8 +174,6 @@ const NIGHT_ENV_ROTATION = new Euler(0, 0, 0);
 /** The house recording seed — recordScriptedDrive's default; the staged
  *  actors were recorded with it, so the capture re-stages with it. */
 const RECORDER_SEED = 7;
-/** World-stack sub-step, s — SCRIPT_DT parity (the recorder ran 1/60). */
-const STACK_STEP_S = 1 / 60;
 /** Frames rendered after Suspense resolves before onReady (texture warmup). */
 const READY_WARMUP_FRAMES = 30;
 
@@ -153,7 +192,7 @@ interface Built {
   core: LessonWorldCore;
   traffic: TrafficSystem;
   director: ScenarioDirector | null;
-  stepper: GhostWorldStepper;
+  stepper: CaptureFeedStepper;
   level: QualityLevel;
 }
 
@@ -166,10 +205,24 @@ export interface CaptureSceneProps {
   clockRef: RefObject<TraceClock>;
   /** Trim-window start — the world stack pre-rolls here (ghost-as-player). */
   startSec: number;
+  /** The PLAN's engine fault time — centers the R1 presence beat. */
+  faultTimeSec: number;
+  /** The RECORDING's signal-cluster pins (captureSignalDials), or null when
+   *  the recording ran on the map's natural offsets (CAUSE-4 seam). */
+  signalOffsets: Readonly<Record<string, number>> | null;
   /** Doc 66 R4 camera for THIS clip (the PLAN card's view). */
   view: CaptureView;
+  /** The PLAN card's exterior camera profile — "rearAware" holds a side
+   *  three-quarter frame so an actor closing from BEHIND is visible (R1). */
+  cameraProfile: CameraProfile;
   /** R2 governing-control framing, or null (no positioned control). */
   controlFraming: CaptureControlFraming | null;
+  /** The PLAN card's lane highlight, or null (non-positional faults). */
+  laneHighlight: CaptureLaneHighlight | null;
+  /** Ground ❌ at the ENGINE fault position (lot maps), or null — when set,
+   *  ShadowCar's roof badge is hidden (its 2.9 m float parallax-reads as a
+   *  detached marker against near backgrounds; pilot v2 "X on the grass"). */
+  groundMarker: CaptureGroundMarker | null;
   /** Honest R4 cabin channels (capturePlan.cabinChannelsFor). */
   cabin: CaptureCabinChannels;
   /** R1 presence log — the scene fills it; the client builds the checklist. */
@@ -189,8 +242,13 @@ export function CaptureScene({
   trace,
   clockRef,
   startSec,
+  faultTimeSec,
+  signalOffsets,
   view,
+  cameraProfile,
   controlFraming,
+  laneHighlight,
+  groundMarker,
   cabin,
   presenceRef,
   frameCountRef,
@@ -218,12 +276,21 @@ export function CaptureScene({
         // two scenes cannot drift apart (doc 66 R5, the v1 root cause).
         const core = buildLessonWorldCore(lesson, raw);
         applySignalModes(core.runtime, lesson);
-        // NOTE (scale gate): lesson.signalPlan is a LIVE-session dial — the
-        // recorder never arms it, so neither does capture. Recorder-side
-        // signalOffsets pins (scJunctions/scRxTram-style) do NOT flow through
-        // the compiled lesson; no pilot template uses them — extend the plan
-        // contract with the recording's offsets before scaling to one that
-        // does, or its lamp phases will silently diverge from the trace.
+        // The RECORDING's signal pins (CAUSE-4 seam, pilot v2): recorder-side
+        // signalOffsets do NOT flow through the compiled lesson — the client
+        // resolves them per recording via captureSignalDials and the capture
+        // re-applies them EXACTLY as recordScriptedDrive does: sorted-key
+        // order, through the runtime's PUBLIC setSignalClusterOffset, BEFORE
+        // the first frame. null = the map's natural FNV-1a offsets (most
+        // templates, incl. the whole pilot) — apply nothing.
+        // (lesson.signalPlan stays un-armed — a LIVE-session dial the
+        // recorder never runs; lesson.signalModes applied above are the
+        // template-authored dial both sides already share.)
+        for (const [nodeId, offsetSec] of Object.entries(signalOffsets ?? {}).sort((a, b) =>
+          a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0,
+        )) {
+          core.runtime.setSignalClusterOffset(nodeId, offsetSec);
+        }
         // Recorder parity (traces/recorder.ts): seed 7, ZERO ambient traffic
         // — the committed encounter is staged actors only; ambient agents
         // would be actors the recorded era never had.
@@ -244,14 +311,28 @@ export function CaptureScene({
                 signals: core.runtime,
               })
             : null;
-        const stepper = createGhostWorldStepper({
-          core,
+        // The ghost-as-player feed — the SHARED stepper (captureGhostFeed),
+        // node-tested for arming parity per clip (captureFeedParity.test.ts).
+        const stepper = createCaptureFeedStepper({
+          runtime: core.runtime,
           traffic,
           director,
           trace,
           cabin,
-          lesson,
-          presenceRef,
+          env: {
+            night: (lesson.environment?.timeOfDay ?? "day") === "night",
+            rain: lesson.environment?.rain ?? false,
+            fog: lesson.environment?.fog ?? false,
+            snow: lesson.environment?.snow ?? false,
+          },
+          obstacleVehicles: core.scenarioObstacles
+            .filter((o) => o.kind === "vehicle")
+            .map((o) => ({ x: o.x, y: o.y })),
+          windowStartSec: startSec,
+          faultTimeSec,
+          // The presence law measures the frame the card's camera shows.
+          cameraProfile,
+          getLog: () => presenceRef.current,
         });
         // Pre-roll: lamps, barrier arms AND staged actors reach their
         // recorded-era state at the window start (v1 pre-rolled lamps only —
@@ -289,6 +370,10 @@ export function CaptureScene({
       const pose = plannedCockpitPose(pt, createCockpitCamPose());
       return new Vector3(pose.camX, pose.camY, pose.camZ);
     }
+    if (cameraProfile === "rearAware") {
+      const pose = plannedRearAwarePose(pt, createChaseCamPose());
+      return new Vector3(pose.camX, pose.camY, pose.camZ);
+    }
     const pose = plannedChasePose(
       startSec,
       pt,
@@ -296,7 +381,7 @@ export function CaptureScene({
       createChaseCamPose(),
     );
     return new Vector3(pose.camX, pose.camY, pose.camZ);
-  }, [trace, startSec, isCockpit, controlFraming]);
+  }, [trace, startSec, isCockpit, cameraProfile, controlFraming]);
 
   if (!built) {
     return (
@@ -366,6 +451,10 @@ export function CaptureScene({
               maxDrawDistanceM={420}
               night={isNight}
               district={core.district as TrafficDistrict}
+              // Doc 66 R5 (founder v1 №9 / R0 k3): the recipe's authored
+              // junction-corner clear zones — the drill mounts the SAME list,
+              // so the corner the ghost sweeps stays car-free in both scenes.
+              parkedClearZones={core.parkedClearZones}
               hazard={lesson.hazard ?? null}
               hazardActiveRef={hazardActiveRef}
               clearcoat={level === "high"}
@@ -374,12 +463,14 @@ export function CaptureScene({
           </Physics>
           {/* The production playback path: red mistake ghost + ribbon + ❌.
               Cockpit clips hide the shell/ribbon (the camera sits inside the
-              car) — the ghost group still drives the shared clock. */}
+              car) — the ghost group still drives the shared clock. The roof
+              badge yields to the ground ❌ where one is mounted (lot maps). */}
           <ShadowCar
             trace={trace}
             clockRef={clockRef}
             showGhost={!isCockpit}
             showRibbon={!isCockpit}
+            showBadge={groundMarker === null}
           />
           {/* Ghost-as-player world feed: lamps + barrier arms + staged
               actors advance by PLAYBACK time, in the recorder's frame order. */}
@@ -395,11 +486,26 @@ export function CaptureScene({
           ) : null}
           <PlannedCameraRig
             view={view}
+            cameraProfile={cameraProfile}
             trace={trace}
             clockRef={clockRef}
             controlFraming={controlFraming}
             viewFov={viewFov}
           />
+          {laneHighlight && !isCockpit ? (
+            <LaneHighlightBand
+              highlight={laneHighlight}
+              faultTimeSec={faultTimeSec}
+              clockRef={clockRef}
+            />
+          ) : null}
+          {groundMarker && !isCockpit ? (
+            <GroundFaultMarker
+              marker={groundMarker}
+              faultTimeSec={faultTimeSec}
+              clockRef={clockRef}
+            />
+          ) : null}
           {withDashStrip ? (
             <DashStripOverlay trace={trace} clockRef={clockRef} cabin={cabin} viewFov={viewFov} />
           ) : null}
@@ -411,98 +517,8 @@ export function CaptureScene({
 }
 
 // ---------------------------------------------------------------------------
-// Ghost-as-player world stepper (R1) — the recorder's stepStack, replayed
+// Ghost-as-player world driver (R1) — playback time → the shared feed stepper
 // ---------------------------------------------------------------------------
-
-interface GhostWorldStepper {
-  readonly tSec: number;
-  /** Step the production stack forward to `target` in ≤ STACK_STEP_S bites. */
-  advanceTo(target: number): void;
-}
-
-function createGhostWorldStepper(args: {
-  core: LessonWorldCore;
-  traffic: TrafficSystem;
-  director: ScenarioDirector | null;
-  trace: ScenarioTrace;
-  cabin: CaptureCabinChannels;
-  lesson: LessonSpec;
-  presenceRef: RefObject<ActorPresenceLog>;
-}): GhostWorldStepper {
-  const { core, traffic, director, trace, cabin, lesson, presenceRef } = args;
-  const runtime = core.runtime;
-  const isNight = (lesson.environment?.timeOfDay ?? "day") === "night";
-  const rain = lesson.environment?.rain ?? false;
-  const fog = lesson.environment?.fog ?? false;
-  const snow = lesson.environment?.snow ?? false;
-  const obstacleVehicles = core.scenarioObstacles.filter((o) => o.kind === "vehicle").length;
-  const pt = createTracePoint();
-  const sample = createVehicleSample();
-  let t = 0;
-
-  const notePresence = () => {
-    const log = presenceRef.current;
-    if (!log) return;
-    if (traffic.vehicles.length > log.vehicles) log.vehicles = traffic.vehicles.length;
-    if (traffic.pedestrians.length > log.pedestrians) log.pedestrians = traffic.pedestrians.length;
-    for (const v of traffic.vehicles) {
-      const p = v.profile ?? "car";
-      if (!log.profiles.includes(p)) log.profiles.push(p);
-    }
-    log.obstacleVehicles = obstacleVehicles;
-  };
-
-  return {
-    get tSec() {
-      return t;
-    },
-    advanceTo(target: number): void {
-      while (t < target - 1e-6) {
-        const dt = Math.min(STACK_STEP_S, target - t);
-        t += dt;
-        sampleAt(trace, t, pt);
-        // The recorder's frame order (recordScriptedDrive.stepStack):
-        // runtime → traffic → leadGap → sample → director.
-        runtime.update(dt);
-        traffic.update(dt, {
-          signalPhase: (id) => runtime.signalPhase(id),
-          playerPos: { x: pt.x, y: pt.y },
-          playerSpeedKmh: Math.abs(pt.speedKmh),
-          playerHeadingDeg: pt.headingDeg,
-        });
-        const leadGap = traffic.leadGapMeters(pt.x, pt.y, pt.headingDeg);
-        sample.position.x = pt.x;
-        sample.position.y = pt.y;
-        sample.headingDeg = pt.headingDeg;
-        sample.speedKmh = pt.speedKmh; // signed — the recorder's convention
-        sample.indicator = pt.indicator;
-        sample.headlights = cabin.headlights;
-        sample.seatbeltOn = cabin.seatbeltOn;
-        sample.handbrakeOn = false;
-        sample.gear = pt.gear;
-        sample.mirrorGlance = null;
-        sample.stalled = false;
-        sample.fogLightsOn = false;
-        const tick = runtime.sample(sample, t, isNight, rain, leadGap, fog, snow);
-        if (director) {
-          // brakePedal 0 + unsigned speed — recordScriptedDrive's exact feed
-          // (the staged actors were recorded against these values).
-          director.step({
-            tSec: t,
-            dtSec: dt,
-            x: pt.x,
-            y: pt.y,
-            speedKmh: Math.abs(pt.speedKmh),
-            headingDeg: pt.headingDeg,
-            brakePedal: 0,
-            tickEvents: tick.events,
-          });
-        }
-      }
-      notePresence();
-    },
-  };
-}
 
 /** Advances the whole world stack by PLAYBACK time — LessonScene's
  *  RuntimeDriver twin, with the ghost pose as the player and no grading.
@@ -514,7 +530,7 @@ function GhostWorldDriver({
   frameCountRef,
   hazardActiveRef,
 }: {
-  stepper: GhostWorldStepper;
+  stepper: CaptureFeedStepper;
   director: ScenarioDirector | null;
   clockRef: RefObject<TraceClock>;
   frameCountRef: RefObject<number>;
@@ -540,12 +556,14 @@ function GhostWorldDriver({
 
 function PlannedCameraRig({
   view,
+  cameraProfile,
   trace,
   clockRef,
   controlFraming,
   viewFov,
 }: {
   view: CaptureView;
+  cameraProfile: CameraProfile;
   trace: ScenarioTrace;
   clockRef: RefObject<TraceClock>;
   controlFraming: CaptureControlFraming | null;
@@ -590,12 +608,113 @@ function PlannedCameraRig({
       cam.quaternion.copy(s.quat.multiply(s.pitch));
       return;
     }
-    const pose = plannedChasePose(clock.tSec, s.pt, framing, s.chase);
+    // Exterior: the card's profile — rearAware holds the side three-quarter
+    // frame for the WHOLE clip (nothing blends, nothing pops — R5).
+    const pose =
+      cameraProfile === "rearAware"
+        ? plannedRearAwarePose(s.pt, s.chase)
+        : plannedChasePose(clock.tSec, s.pt, framing, s.chase);
     cam.position.set(pose.camX, pose.camY, pose.camZ);
     cam.up.set(0, 1, 0);
     cam.lookAt(s.look.set(pose.lookX, pose.lookY, pose.lookZ));
   });
   return null;
+}
+
+// ---------------------------------------------------------------------------
+// Fault readability chrome (doc 66 — the fault must be visually identifiable)
+// ---------------------------------------------------------------------------
+
+/** Lane-band length along the road, m — long enough to read as THE LANE. */
+const LANE_BAND_LENGTH_M = 46;
+const LANE_BAND_COLOR = "#35c07e";
+const LANE_BAND_MAX_OPACITY = 0.3;
+
+/** The PLAN card's positional highlight: the REQUIRED lane tints green for
+ *  ~2 s at the fault (laneHighlightAlphaAt) — flat quad just above the road,
+ *  additive-free, toneMapped off so the green stays literal. */
+function LaneHighlightBand({
+  highlight,
+  faultTimeSec,
+  clockRef,
+}: {
+  highlight: CaptureLaneHighlight;
+  faultTimeSec: number;
+  clockRef: RefObject<TraceClock>;
+}) {
+  const materialRef = useRef<MeshBasicMaterial>(null);
+  useFrame(() => {
+    const clock = clockRef.current;
+    const material = materialRef.current;
+    if (!clock || !material) return;
+    const alpha = laneHighlightAlphaAt(clock.tSec, faultTimeSec) * LANE_BAND_MAX_OPACITY;
+    material.opacity = alpha;
+    material.visible = alpha > 0.001;
+  });
+  return (
+    <mesh
+      position={[highlight.xM, 0.05, -highlight.yM]}
+      rotation={[-Math.PI / 2, 0, 0]}
+      renderOrder={18}
+      frustumCulled={false}
+    >
+      <planeGeometry args={[highlight.widthM, LANE_BAND_LENGTH_M]} />
+      <meshBasicMaterial
+        ref={materialRef}
+        color={LANE_BAND_COLOR}
+        transparent
+        opacity={0}
+        depthWrite={false}
+        toneMapped={false}
+      />
+    </mesh>
+  );
+}
+
+/** Ground-anchored ❌ at the ENGINE fault position (faultMarkerPose): fades
+ *  in over the fault beat's last 0.25 s and stays — replaces the roof badge
+ *  on lot maps, where the floating sprite mis-reads (pilot v2 cause 5). */
+const GROUND_MARKER_SIZE_M = 2.2;
+
+function GroundFaultMarker({
+  marker,
+  faultTimeSec,
+  clockRef,
+}: {
+  marker: CaptureGroundMarker;
+  faultTimeSec: number;
+  clockRef: RefObject<TraceClock>;
+}) {
+  const materialRef = useRef<MeshBasicMaterial>(null);
+  const texArgs = useMemo(() => [emojiTexture("❌")] as const, []);
+  useEffect(() => () => texArgs[0].dispose(), [texArgs]);
+  const pose = useMemo(() => faultMarkerPose(marker), [marker]);
+  useFrame(() => {
+    const clock = clockRef.current;
+    const material = materialRef.current;
+    if (!clock || !material) return;
+    const alpha = faultMarkerAlphaAt(clock.tSec, faultTimeSec);
+    material.opacity = alpha;
+    material.visible = alpha > 0.001;
+  });
+  return (
+    <mesh
+      position={[pose.x, pose.y, pose.z]}
+      rotation={[-Math.PI / 2, 0, 0]}
+      renderOrder={20}
+      frustumCulled={false}
+    >
+      <planeGeometry args={[GROUND_MARKER_SIZE_M, GROUND_MARKER_SIZE_M]} />
+      <meshBasicMaterial
+        ref={materialRef}
+        map={texArgs[0]}
+        transparent
+        opacity={0}
+        depthWrite={false}
+        toneMapped={false}
+      />
+    </mesh>
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -939,13 +1058,24 @@ function DashStripOverlay({
   );
 }
 
-/** Fires onReady once, READY_WARMUP_FRAMES after the Suspense subtree
- *  (HDRI + ghost GLB + interior GLB) resolved — textures/shaders are warm. */
+/** Fires onReady once, READY_WARMUP_FRAMES after (a) the Suspense subtree
+ *  (HDRI + ghost GLB + interior GLB) resolved AND (b) the world PROPS are
+ *  actually mounted — usePropModels does NOT suspend (it returns null while
+ *  the sign/tree/lamp GLBs bake), and pilot v2 recorded whole clips into that
+ *  gap: rx-unguarded shipped with NO rail signs, no crossbuck, no trees (the
+ *  frames prove it) because the recorder started before the props landed.
+ *  The <group name="signs"> node mounts only once assets are non-null
+ *  (WorldPropsGroup), so its presence IS the props-ready signal; the warmup
+ *  count restarts from it so the recorded frames are prop-complete (R5/R2). */
 function ReadyProbe({ onReady }: { onReady: () => void }) {
   const framesRef = useRef(0);
   const firedRef = useRef(false);
-  useFrame(() => {
+  useFrame(({ scene }) => {
     if (firedRef.current) return;
+    if (!scene.getObjectByName("signs")) {
+      framesRef.current = 0;
+      return;
+    }
     framesRef.current += 1;
     if (framesRef.current >= READY_WARMUP_FRAMES) {
       firedRef.current = true;

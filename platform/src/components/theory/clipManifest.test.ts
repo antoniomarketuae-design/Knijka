@@ -86,6 +86,35 @@ describe("parseClipManifest", () => {
     const clips = parseClipManifest(manifest([{ ...CLIP, keyframes: ["", "/k1.jpg", 7] }]));
     expect(clips).toEqual([{ ...CLIP, keyframes: ["/k1.jpg"] }]);
   });
+
+  it("carries the R1 actor checklist + view when present (doc 66)", () => {
+    const actors = [
+      { kind: "vehicle", label: "Автомобил в кръговото (с предимство)", present: false },
+    ];
+    const clips = parseClipManifest(manifest([{ ...CLIP, actors, view: "exterior" }]));
+    expect(clips).toEqual([{ ...CLIP, actors, view: "exterior" }]);
+  });
+
+  it("keeps a VALID empty checklist (= the card requires no actors)", () => {
+    const clips = parseClipManifest(manifest([{ ...CLIP, actors: [] }]));
+    expect(clips).toEqual([{ ...CLIP, actors: [] }]);
+  });
+
+  it("drops malformed checklist rows, degrades a non-array to none", () => {
+    const good = { kind: "pedestrian", label: "Пешеходец", present: true };
+    const clips = parseClipManifest(
+      manifest([
+        {
+          ...CLIP,
+          actors: [good, { kind: "", label: "x", present: true }, { kind: "y" }, "junk", 7],
+        },
+      ]),
+    );
+    expect(clips).toEqual([{ ...CLIP, actors: [good] }]);
+    for (const actors of ["nope", { a: 1 }, 42]) {
+      expect(parseClipManifest(manifest([{ ...CLIP, actors }]))).toEqual([CLIP]);
+    }
+  });
 });
 
 describe("clipForTracePath", () => {

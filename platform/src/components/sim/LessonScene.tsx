@@ -123,6 +123,7 @@ import {
   applySignalModes,
   buildLessonWorldCore,
   wireTrafficQueries,
+  type LessonWorldCore,
 } from "./lessonWorldRecipe";
 import { RouteGuidance } from "./RouteGuidance";
 import { ScenarioObstacles, type ScenarioObstacleSpec } from "./ScenarioObstacles";
@@ -309,6 +310,9 @@ interface Built {
   /** S1: precise hittable parked cars from the district's meta.scenario
    *  occupancy (scenario lessons only; [] everywhere else). */
   scenarioObstacles: ScenarioObstacleSpec[];
+  /** Authored clear zones for the parked-car curb decoration (doc 66 R5,
+   *  founder v1 №9 — recipe-supplied, template-scoped, visual-only). */
+  parkedClearZones: LessonWorldCore["parkedClearZones"];
   /** SURFACE-PATCH slice: waterPatch/icePatch rects resolved from the
    *  district's zone spans — [] on every pre-slice map, so VehicleRig's
    *  patch branch (and VehicleSim's grip setter) never runs there. */
@@ -502,6 +506,7 @@ export default function LessonScene(props: LessonSceneProps) {
             spawnPoints,
             ghostDemoRaw,
             scenarioObstacles,
+            parkedClearZones: core.parkedClearZones,
             gripPatches,
             shadowTrace,
             // #37: the map's own speed domain drives the governor cap — the
@@ -1071,6 +1076,9 @@ function ReadyScene({
               // world `District` ⊇ `TrafficDistrict` (only differs on a field
               // TrafficLayer doesn't read — crossings.edgeId nullability).
               district={district as TrafficDistrict}
+              // Doc 66 R5 (founder v1 №9): recipe-authored junction-corner
+              // clear zones for the curb decoration — same list capture mounts.
+              parkedClearZones={built.parkedClearZones}
               hazard={lesson.hazard ?? null}
               hazardActiveRef={hazardActiveRef}
               // Perf tier (doc 71): SUV clearcoat on the high tier only.

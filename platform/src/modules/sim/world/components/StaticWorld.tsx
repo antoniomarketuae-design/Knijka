@@ -211,31 +211,49 @@ export function StaticWorld({
   const facadeMaps = facadeMapsFor(preset);
 
   // Wet-road response: as the shared rain channel soaks the asphalt, drop its
-  // roughness (dry matte 1.0 → wet gloss 0.35 so the sky/streetlights smear
-  // into reflections) and darken its albedo. Grass + concrete stay dry-matte.
-  // useWetness re-renders only on quantized 0.01 steps (~a few dozen over the
-  // several-second ramp, none at steady state) — memoized geometries/textures
-  // are untouched, so this only reconciles the road material props.
+  // roughness (dry matte 1.0 → wet gloss) and darken its albedo. Grass +
+  // concrete stay dry-matte. useWetness re-renders only on quantized 0.01
+  // steps (~a few dozen over the several-second ramp, none at steady state) —
+  // memoized geometries/textures are untouched, so this only reconciles the
+  // road material props.
+  //
+  // WET-GLOSS RETUNE (doc 66 R5 — founder „too bright" in BOTH clip pilots;
+  // pilot-v2 R0 measurement on sc-ac-rain-lights k2 vs the dry
+  // sc-follow-distance k2, same day preset, same chase framing): at the old
+  // wetRoughness 0.35 + envMapIntensity 1.5 the far wet carriageway measured
+  // RGB ≈ [213, 206, 194] against the dry road's [117, 117, 120] — the sharp
+  // specular of the bright golden sky OVERWHELMED the darkened albedo
+  // (wet asphalt must read DARKER than dry, wetDarken 0.6) and med/high's
+  // bloom (threshold 0.9) smeared the blown band into a white sheet.
+  // wetRoughness 0.35 → 0.5 spreads the lobe (~0.5× peak) and the env
+  // response lerps 1.5 → 1.1 with wetness (×0.73 soaked): reasoned far-field
+  // lands near the dry-road band with visible gloss streaks — damp asphalt,
+  // not a mirror. Dry scenes stay byte-identical (wetness 0 → the authored
+  // 1.0 roughness AND the authored 1.5 env response, untouched).
   const wetness = useWetness();
   const wet = useMemo(
-    () => wetnessToRoadParams(wetness, { dryRoughness: 1.0, wetRoughness: 0.35, wetDarken: 0.6 }),
+    () => wetnessToRoadParams(wetness, { dryRoughness: 1.0, wetRoughness: 0.5, wetDarken: 0.6 }),
     [wetness],
   );
   const roadTint = useMemo(() => new Color(wet.darken, wet.darken, wet.darken), [wet.darken]);
   // Decals share the road's wetness response (doc 71 §4.4) with a slightly
-  // glossier wet floor — oil/tar stains go reflective FIRST in rain.
+  // glossier wet floor — oil/tar stains go reflective FIRST in rain (the
+  // ordering survives the retune: 0.45 < 0.5).
   const decalWet = useMemo(
-    () => wetnessToRoadParams(wetness, { dryRoughness: 0.95, wetRoughness: 0.3, wetDarken: 0.6 }),
+    () => wetnessToRoadParams(wetness, { dryRoughness: 0.95, wetRoughness: 0.45, wetDarken: 0.6 }),
     [wetness],
   );
   const decalTint = useMemo(
     () => new Color(decalWet.darken, decalWet.darken, decalWet.darken),
     [decalWet.darken],
   );
-  // Asphalt env response (doc 71 §4.4): 1.5 so the wet-gloss state (roughness
-  // 0.35) smears the golden HDRI like damp asphalt — dry roughness ~1.0 keeps
-  // it matte, so this only shows where the surface goes smooth.
-  const ROAD_ENV_INTENSITY = 1.5;
+  // Asphalt env response (doc 71 §4.4, retuned by the doc 66 R5 measurement
+  // above): WETNESS-LERPED 1.5 dry → 1.1 soaked, so the wet-gloss state
+  // smears the golden HDRI like damp asphalt without blowing past AgX's
+  // shoulder, while a DRY scene keeps the authored 1.5 ambient response
+  // BYTE-IDENTICAL (roughness 1.0 still samples the blurred IBL — a constant
+  // trim would have dimmed the founder-passed dry clips too).
+  const ROAD_ENV_INTENSITY = 1.5 + (1.1 - 1.5) * wetness;
   // Parking bands read a touch lighter/cooler than the travel lanes so the
   // extra width reads as parking, not as another lane (doc 68 QW3).
   const parkingTint = useMemo(

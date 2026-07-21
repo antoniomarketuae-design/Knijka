@@ -236,6 +236,53 @@ const HELD_SCENERY: Record<string, readonly ScenarioObstacleSpec[]> = {
 };
 
 // ---------------------------------------------------------------------------
+// Source 3 — parked-decoration CLEAR ZONES (doc 66 R5, founder v1 №9)
+// ---------------------------------------------------------------------------
+
+/** A circle (district space) inside which the TrafficLayer parked-car curb
+ *  pass must not seat a decoration body. Purely visual — the curb pass has no
+ *  colliders and feeds no proximity query, so removing a body changes zero
+ *  grading. */
+export interface ParkedClearZone {
+  x: number;
+  y: number;
+  radiusM: number;
+}
+
+/**
+ * Template id → junction-corner clear zones for the deterministic parked-car
+ * curb pass (TrafficLayer.computeParkedCars — NOT the held dressing above:
+ * the audit that landed here first looked for a held-scenery body, but the
+ * corner car is the curb pass's slot 0 of the priority arm).
+ *
+ * sc-junction-stop (founder v1 №9 + pilot-v2 R0 k3): on tj-stop-v1 the curb
+ * pass seats a body at (11, −10.125) — edge tj-e-e (east arm), first slot at
+ * arc 11 m, offset 8.125 · 2 · 0.5 + 2.0 south of the centerline — only
+ * 15.0 m from the junction node tj-n-c (0, 0). BOTH committed ghost lines cut
+ * the corner straight through its footprint: min sample distance 0.84 m
+ * (mistake-rolling-stop, t ≈ 22.9) and 0.85 m (shadow-correct, t ≈ 23.65)
+ * against a ~2.25 m half-length body. The zone radius pins the lawful corner
+ * daylight: the priority arm's carriageway half-width 8.125 m + чл. 98's 5 m
+ * no-parking band before a junction + ~2.5 m half body ≈ 15.6 → 16. Radius 16
+ * removes exactly that one slot; the survivors stay ≥ 17.0 m out and the
+ * nearest of them clears both ghost lines by ≥ 4.57 m center-to-path
+ * (pinned in scenarioSceneryProps.test.ts against the committed traces).
+ */
+const PARKED_CLEAR_ZONES: Record<string, readonly ParkedClearZone[]> = {
+  "sc-junction-stop": [{ x: 0, y: 0, radiusM: 16 }],
+};
+
+/**
+ * Clear zones for one lesson's parked-car curb pass ([] for templates without
+ * an authored zone). Flows through LessonWorldCore so the drill and the
+ * capture rig mount the SAME filtered decoration (doc 66 R5 — one recipe).
+ */
+export function parkedClearZonesFor(lessonId: string): readonly ParkedClearZone[] {
+  const parsed = parseScenarioLessonId(lessonId);
+  return (parsed && PARKED_CLEAR_ZONES[parsed.templateId]) || [];
+}
+
+// ---------------------------------------------------------------------------
 // The composition LessonScene mounts
 // ---------------------------------------------------------------------------
 
