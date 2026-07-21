@@ -522,6 +522,14 @@ export function ClipCaptureClient({
     async (entry: ClipPilotEntry): Promise<void> => {
       const gen = ++runGenRef.current;
       try {
+        // The scene must RENDER to signal ready — rAF is frozen while hidden,
+        // so a clip whose LOAD begins in a hidden tab would time out at 90s
+        // ("светът не се зареди навреме"). Wait for a visible tab before the
+        // load, so the founder can step away between clips and it resumes.
+        if (document.visibilityState !== "visible") {
+          setStatus(entry.id, { state: "waiting" });
+          await awaitVisible();
+        }
         setStatus(entry.id, { state: "loading" });
         const r = await loadRun(entry, planById.get(entry.id));
         // Arm readiness BEFORE the scene mounts (onReady may fire fast).
