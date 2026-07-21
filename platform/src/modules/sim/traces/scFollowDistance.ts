@@ -8,8 +8,12 @@
  *   - shadow: ZERO violations + CLEAN_DRIVING (a calm ~26 km/h follow that
  *     keeps the pinned ~13 m gap safely above the 2-second threshold for its
  *     speed);
- *   - „Лепене за предния": steady ~48 km/h behind the SAME 13 m gap grades
- *     EXACTLY FOLLOWING_TOO_CLOSE (under 1.3 s at that speed);
+ *   - „Лепене за предния": eases up behind a CLOSER-pacing clone of the lead
+ *     (followGapM 8, hold 27 — demo-only; see scFollowDistanceStaged) and holds
+ *     a visually GLUED ~4.5 m bumper gap (one car length, ~0.35 s at 48 km/h)
+ *     for a sustained stretch → grades EXACTLY FOLLOWING_TOO_CLOSE. The shared
+ *     13 m lead read as a normal follow on video (founder R-media #4); only the
+ *     tailgate demo's lead moved — the shadow and gap-melts keep the 13 m lead;
  *   - „Дистанцията се топи": starts safe at 26, accelerates to 48 without
  *     opening the gap → grades EXACTLY FOLLOWING_TOO_CLOSE.
  *
@@ -62,12 +66,15 @@ export function scFollowDistanceShadowScript(): DriveScript {
 export function scFollowDistanceMistakeTailgateScript(): DriveScript {
   return {
     steps: [
-      { kind: "annotation", textBg: "Грешка: залепен за предния на 48 км/ч — под секунда дистанция." },
+      { kind: "annotation", textBg: "Грешка: залепяне за предния — дистанцията се стопява до една дължина кола." },
       { kind: "glance", mirror: "rear" },
-      // ~48 km/h behind the SAME ~13 m gap: ~1.0 s — sustained tailgating.
-      { kind: "drive", points: [[X_LANE, 15], [X_LANE, 160]], targetKmh: 48, stopAtEnd: false },
-      { kind: "annotation", textBg: "На 48 км/ч трябва над два пъти по-голяма дистанция — 13 метра са опасно малко." },
-      { kind: "drive", points: [[X_LANE, 160], [X_LANE, 330]], targetKmh: 48 },
+      // Ease up behind the closer lead (a smooth close from ~8 m to ~4.5 m of
+      // bumpers — never overshooting into it), then GLUE on at 48 km/h.
+      { kind: "drive", points: [[X_LANE, 15], [X_LANE, 70]], targetKmh: 30, stopAtEnd: false },
+      { kind: "annotation", textBg: "На 48 км/ч една дължина кола е под секунда — няма никакво време за реакция." },
+      // The sustained tailgate: ~4.5 m bumper gap (~0.35 s) held for ~16 s.
+      { kind: "drive", points: [[X_LANE, 70], [X_LANE, 300]], targetKmh: 48, stopAtEnd: false },
+      { kind: "drive", points: [[X_LANE, 300], [X_LANE, 330]], targetKmh: 48 },
       { kind: "pause", sec: 1.5, brake: true },
       { kind: "annotation", textBg: "Ако предният спре рязко, тук няма никакъв шанс за спиране — изостани." },
     ],
@@ -113,9 +120,29 @@ const SCRIPTS: Record<
 };
 
 /**
+ * The staged lead for a given demo. The shadow and gap-melts demos replay the
+ * TEMPLATE's single-truth lead (13 m of centers). The „Лепене за предния" demo
+ * re-records against a CLOSER-pacing clone (followGapM 8 → a HELD ~4.5 m bumper
+ * gap = one car length, ~0.35 s at 48 km/h; hold 27 so the initial gap is ~8 m
+ * and the close is smooth, never overshooting into the lead) — the shared 13 m
+ * lead read as a normal follow on video, not tailgating (founder R-media #4).
+ * This changes only the DEMO's recording; the live lesson still uses the
+ * template's own staged lead, and grading is unchanged (FOLLOWING_TOO_CLOSE).
+ */
+function scFollowDistanceStaged(name: ScFollowDistanceTraceName): StagedEventSpec[] {
+  const base = [...(SC_FOLLOW_DISTANCE.staged ?? [])] as StagedEventSpec[];
+  if (name !== "mistake-tailgate") return base;
+  return base.map((e) =>
+    e.kind === "brakingLeadCar" && e.id === "sc-fd-lead"
+      ? { ...e, followGapM: 8, actor: { ...e.actor, hold: { nodeIndex: 0, offsetM: 27 } } }
+      : e,
+  );
+}
+
+/**
  * Record one of the three drives against a loaded fo-follow-v1 document — the
- * TEMPLATE's staged lead car armed (single truth), ambient traffic zero (the
- * harness law). Deterministic: same district → same trace.
+ * demo's staged lead car armed (see scFollowDistanceStaged), ambient traffic
+ * zero (the harness law). Deterministic: same district → same trace.
  */
 export function recordScFollowDistanceDrive(
   districtRaw: unknown,
@@ -127,7 +154,7 @@ export function recordScFollowDistanceDrive(
     scenarioId: SC_FOLLOW_DISTANCE_ID,
     kind,
     seed: 7,
-    stagedEvents: [...(SC_FOLLOW_DISTANCE.staged ?? [])] as StagedEventSpec[],
+    stagedEvents: scFollowDistanceStaged(name),
     ...(extra?.onTick ? { onTick: extra.onTick } : {}),
   });
 }

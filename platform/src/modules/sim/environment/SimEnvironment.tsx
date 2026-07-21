@@ -63,6 +63,7 @@ import {
   FOG_HEMISPHERE_DIM,
   FOG_SUN_DIM,
   FOG_TOPDOWN_MAX_OPTICAL,
+  RAIN_EXPOSURE_DIM,
   RAIN_HEMISPHERE_DIM,
   RAIN_SUN_DIM,
   SNOW_GROUND_WHITEN,
@@ -253,9 +254,13 @@ export function SimEnvironment({ timeOfDay, rain, fog = false, snow = false, qua
     // switches crossfade. Applies on BOTH paths: the renderer's built-in tone
     // map (no composer) and the composer's ToneMapping effect (three copies
     // gl.toneMappingExposure into that effect's shader uniform each frame).
+    // Rain lowers it (RAIN_EXPOSURE_DIM) — the founder-v4 missing lever: without
+    // this the whole image still metered like a bright day under the shower.
+    // Rain-only: fog/snow keep the preset exposure (rainNow is 0 in a dry/fog/
+    // snow scene, so this term is a no-op there).
     state.gl.toneMappingExposure = MathUtils.damp(
       state.gl.toneMappingExposure,
-      preset.exposure,
+      preset.exposure * (1 - RAIN_EXPOSURE_DIM * rainNow),
       FADE_LAMBDA,
       dt,
     );

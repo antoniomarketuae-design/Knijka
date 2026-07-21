@@ -109,10 +109,26 @@ export interface EnvironmentPreset {
   exposure: number;
 }
 
-/** How much rain dims the key light (multiplier at full rain intensity). */
-export const RAIN_SUN_DIM = 0.55;
-/** How much rain dims the hemisphere fill. */
-export const RAIN_HEMISPHERE_DIM = 0.3;
+/** How much rain dims the key light (multiplier at full rain intensity). Raised
+ *  from the shipped 0.55 (founder v4: „road very bright from the Sun, no
+ *  difference"): a light-rain overcast has almost no directional sun on the
+ *  road, so the key must fall further than half. At full rain the day key
+ *  (1.9) lands ~0.61 — a soft, low-contrast light, not the dry golden throw. */
+export const RAIN_SUN_DIM = 0.68;
+/** How much rain dims the hemisphere fill. Raised from 0.3 so the whole scene
+ *  loses the bright-day ambient along with the key (an overcast sky is a dimmer
+ *  fill, not just a hidden sun). */
+export const RAIN_HEMISPHERE_DIM = 0.42;
+/**
+ * How much rain lowers tone-mapping exposure (multiplier at full rain). The
+ * missing lever behind the founder v4 complaint: v4 dimmed the wet-road
+ * reflection but the renderer exposure stayed at the dry preset (day 1.15), so
+ * the sky, sun and road all still metered like a bright day. A light shower is
+ * roughly a quarter-stop darker overall; at full rain the day exposure lands
+ * ~0.98 (still above night's 0.95 — a gloomy DAY, never night-dark). RAIN-ONLY:
+ * fog and snow keep their preset exposure (their own dims carry those looks).
+ */
+export const RAIN_EXPOSURE_DIM = 0.15;
 
 /** How much FOG dims the key light at full fog intensity — heavier than rain:
  *  a fog bank diffuses the sun into the ambient, killing directionality. */
@@ -185,7 +201,11 @@ export const ENVIRONMENT_PRESETS: Record<TimeOfDay, EnvironmentPreset> = {
     // streets (and 100 m signage — rule-engine hard constraint, ~96 % clear)
     // stay legible.
     fog: { color: "#e3c49c", density: 0.0028 },
-    rainFog: { color: "#9aabbd", density: 0.0034 },
+    // Rain haze: a darker, cooler grey than the shipped silver-blue #9aabbd,
+    // and a touch denser so the distance greys out under the shower instead of
+    // reading the warm dry haze. 0.0042 still clears 100 m signage (~84 %) —
+    // the rule-engine legibility floor holds.
+    rainFog: { color: "#7c8794", density: 0.0042 },
     // Day fog: bright desaturated grey (fog scatters daylight) — ~50 m sight.
     fogWeather: { color: "#c9cdd2", density: 0.02 },
     // Day snow: bright COLD white haze, lighter than fog (~80–120 m usable
@@ -215,7 +235,9 @@ export const ENVIRONMENT_PRESETS: Record<TimeOfDay, EnvironmentPreset> = {
     // A hair denser than day's 0.0028 — the 8° sun reads hazier, and the
     // day < dusk < night fog ordering is a tested invariant.
     fog: { color: "#d9a06b", density: 0.0032 },
-    rainFog: { color: "#958b91", density: 0.0042 },
+    // Dusk rain: the warm low light is gone under cloud — a cool grey haze,
+    // darker and a hair denser than the shipped #958b91.
+    rainFog: { color: "#787c84", density: 0.005 },
     // Dusk fog: the low warm light barely tints the bank.
     fogWeather: { color: "#aca7a3", density: 0.022 },
     // Dusk snow: cold grey-blue veil — the day < dusk < night ordering of the
@@ -245,7 +267,9 @@ export const ENVIRONMENT_PRESETS: Record<TimeOfDay, EnvironmentPreset> = {
       hemisphere: { skyColor: "#26324e", groundColor: "#10141d", intensity: 0.3 },
     },
     fog: { color: "#121c2e", density: 0.004 },
-    rainFog: { color: "#0e141f", density: 0.0058 },
+    // Night rain already reads gloomy; nudge it a touch darker/denser so a rainy
+    // night sits below a clear one (streetlights still glow into the haze).
+    rainFog: { color: "#0b1019", density: 0.0066 },
     // Night fog: a faintly-lit dark grey (streetlights glow into the bank),
     // denser than day — night fog is the blindest condition we render.
     fogWeather: { color: "#1a2028", density: 0.024 },

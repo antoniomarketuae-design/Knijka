@@ -183,8 +183,14 @@ export const GROUND_BAND_M = 4.0;
 export const GROUND_BAND_TINT = 0.62;
 export const FACADE_VARIANTS = 4;
 
-/** Road classes that receive painted lane lines. */
+/** Road classes that receive painted lane lines. `motorway`/`trunk` are marked
+ *  (lane dividers on a motorway carriageway) but deliberately absent from
+ *  ARTERIAL_CLASSES, PARKING_LANE_CLASSES and SIDEWALK_CLASSES below — a
+ *  motorway carries no arterial parking band, palms, streetlights or sidewalks
+ *  (gen_motorway.mjs mw-v1; founder R-media #7/#8). */
 export const MARKED_CLASSES: ReadonlySet<string> = new Set([
+  "motorway",
+  "trunk",
   "primary",
   "primary_link",
   "secondary",

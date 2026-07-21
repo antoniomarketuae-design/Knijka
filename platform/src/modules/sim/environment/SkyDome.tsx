@@ -37,6 +37,30 @@ const SNOW_SKY_WASH = 0.75;
 /** Damping stiffness for preset crossfades (≈2 s to settle). */
 const FADE_LAMBDA = 2.2;
 
+/** How far RAIN pulls the sky gradient toward its cool overcast grey at full
+ *  intensity (0 = keep the dry hue, 1 = flat overcast). Raised from the shipped
+ *  inline 0.55 — the founder v4 read the rained-out sky as a bright warm day
+ *  because it kept nearly half its cream/blue. At 0.8 the warm dry gradient is
+ *  mostly gone and the dome reads as a grey sheet. RAIN-ONLY (gated by `rain`),
+ *  so dry/fog/snow skies are byte-identical. */
+const RAIN_SKY_GRAY = 0.8;
+/** Luminance multiplier of the rain overcast grey target — below 1 so the
+ *  rained-out sky sits DARKER than the dry gradient's own brightness (a gloomy
+ *  sheet, not a bright silver one). Was inline 0.85. */
+const RAIN_SKY_LUMA = 0.55;
+/** Cool cast of the overcast grey (r,g,b multipliers): a rain sky is faintly
+ *  blue-cool, the opposite of the warm dry haze — the cue that sells „rain" over
+ *  „dim". Kept subtle so the dome never reads tinted-blue, just un-warm. */
+const RAIN_SKY_COOL_R = 0.94;
+const RAIN_SKY_COOL_G = 0.98;
+const RAIN_SKY_COOL_B = 1.06;
+/** Rain hides the sun disc almost entirely (was 0.85) — a light-rain overcast
+ *  has no sun disc at all, only a vague bright patch the glow still hints at. */
+const RAIN_SUN_DISC_DIM = 0.97;
+/** …and cuts the wide glow hard (was 0.7): the diffuse brightness stays as a
+ *  faint hotspot so the sun's rough position still reads, without the dry beam. */
+const RAIN_SUN_GLOW_DIM = 0.88;
+
 /** Scene name of the dome mesh. The A4 mirror rig (MirrorRig.tsx) looks it up
  *  to temporarily SHRINK the dome inside its short mirror-camera far plane
  *  during RTT passes — safe because the shader is scale-invariant (vDir is the
@@ -200,13 +224,14 @@ export function SkyDome({ timeOfDay, radius = 520 }: { timeOfDay: TimeOfDay; rad
     // weather washes over BOTH toward the preset's fog color (in a dense
     // bank there is no sky) — applied last so fog wins a foggy rain/snow.
     const grayOut = (target: Color, from: Color, amount: number) => {
-      const l = 0.299 * from.r + 0.587 * from.g + 0.114 * from.b;
-      target.copy(from).lerp(base.gray.setScalar(l * 0.85), rain * amount);
+      const l = (0.299 * from.r + 0.587 * from.g + 0.114 * from.b) * RAIN_SKY_LUMA;
+      base.gray.setRGB(l * RAIN_SKY_COOL_R, l * RAIN_SKY_COOL_G, l * RAIN_SKY_COOL_B);
+      target.copy(from).lerp(base.gray, rain * amount);
       target.lerp(base.snowWash.copy(goal.snowWeather), snow * SNOW_SKY_WASH);
       target.lerp(base.fogWash.copy(goal.fogWeather), fog * FOG_SKY_WASH);
     };
-    grayOut(u.uZenith.value as Color, base.zenith, 0.55);
-    grayOut(u.uHorizon.value as Color, base.horizon, 0.55);
+    grayOut(u.uZenith.value as Color, base.zenith, RAIN_SKY_GRAY);
+    grayOut(u.uHorizon.value as Color, base.horizon, RAIN_SKY_GRAY);
     (u.uSunColor.value as Color).copy(base.sun);
     (u.uSunDir.value as Vector3).copy(base.sunDir).normalize();
 
@@ -214,13 +239,13 @@ export function SkyDome({ timeOfDay, radius = 520 }: { timeOfDay: TimeOfDay; rad
     u.uSunDiscCos.value = MathUtils.damp(u.uSunDiscCos.value as number, goal.discCos, FADE_LAMBDA, dt);
     u.uSunDiscIntensity.value = MathUtils.damp(
       u.uSunDiscIntensity.value as number,
-      goal.discIntensity * (1 - 0.85 * rain) * (1 - fog) * (1 - 0.9 * snow),
+      goal.discIntensity * (1 - RAIN_SUN_DISC_DIM * rain) * (1 - fog) * (1 - 0.9 * snow),
       FADE_LAMBDA,
       dt,
     );
     u.uGlow.value = MathUtils.damp(
       u.uGlow.value as number,
-      goal.glow * (1 - 0.7 * rain) * (1 - fog) * (1 - 0.8 * snow),
+      goal.glow * (1 - RAIN_SUN_GLOW_DIM * rain) * (1 - fog) * (1 - 0.8 * snow),
       FADE_LAMBDA,
       dt,
     );

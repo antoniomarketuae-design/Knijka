@@ -64,7 +64,7 @@
  */
 
 import { Suspense, useEffect, useMemo, useRef, useState, type RefObject } from "react";
-import { Canvas, useFrame } from "@react-three/fiber";
+import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { Environment } from "@react-three/drei";
 import { Physics } from "@react-three/rapier";
 import {
@@ -208,6 +208,9 @@ interface Built {
 }
 
 export interface CaptureSceneProps {
+  /** The clip's manifest id — WebGL-context lifecycle logging only (proves the
+   *  per-clip mount/dispose pairs so a context leak is visible in the console). */
+  clipId: string;
   /** Compiled entry rung of the clip's template (environment + district). */
   lesson: LessonSpec;
   /** The committed mistake trace the red ghost replays. */
@@ -249,6 +252,7 @@ export interface CaptureSceneProps {
 }
 
 export function CaptureScene({
+  clipId,
   lesson,
   trace,
   clockRef,
@@ -448,7 +452,10 @@ export function CaptureScene({
           // The recorder + keyframe copies read the canvas between frames.
           preserveDrawingBuffer: true,
         }}
-        onCreated={(state) => onCanvas(state.gl.domElement)}
+        onCreated={(state) => {
+          noteContextCreated(clipId);
+          onCanvas(state.gl.domElement);
+        }}
       >
         {/* The founder's OWN drill preset (loadQualityPreset) — same
             exposure/tone-mapping/composer chain as the drills (R5). */}
@@ -542,9 +549,85 @@ export function CaptureScene({
           ) : null}
           <ReadyProbe onReady={onReady} />
         </Suspense>
+        {/* OUTSIDE Suspense so it mounts with the Canvas (needs only `gl`) and
+            its cleanup ALWAYS runs on unmount — even a clip torn down while the
+            HDRI is still suspending. Hard WebGL disposal (RELIABILITY, the
+            clip-12 death): drops this scene's context immediately instead of on
+            R3F's slipping 500 ms timer, so contexts never pile past the cap. */}
+        <SceneDisposer clipId={clipId} />
       </Canvas>
     </div>
   );
+}
+
+// ---------------------------------------------------------------------------
+// Hard WebGL disposal (RELIABILITY) — the per-clip context release + leak signal
+// ---------------------------------------------------------------------------
+
+/**
+ * Module-level live-context bookkeeping — the batch's leak signal. A healthy
+ * run OSCILLATES 0↔1 (one scene mounted at a time, torn down before the next);
+ * a count that CLIMBS is the pilot-v2 context leak — browsers cap live WebGL
+ * contexts at ~16, so an accumulating count is exactly the ~clip-12 stall the
+ * founder hit four rounds running. The console line is the reachable proxy for
+ * "live-context count" (no browser API exposes the real number).
+ */
+let liveContextCount = 0;
+
+function noteContextCreated(clipId: string): void {
+  liveContextCount += 1;
+  if (typeof console !== "undefined") {
+    console.info(`[capture] context CREATED ${clipId} · live=${liveContextCount}`);
+  }
+}
+
+/**
+ * Renders nothing; on unmount it IMMEDIATELY disposes the renderer and drops
+ * the WebGL context. R3F does the same — but 500 ms LATER, on a setTimeout that
+ * slips under memory pressure (react-three-fiber unmountComponentAtNode), so
+ * without this the outgoing clip's context lingers while the next clip's mounts
+ * and the two overlap; twenty such overlaps blow past the ~16-context cap.
+ *
+ * DISPOSAL PATH (documented — deliberately narrow):
+ *  - gl.renderLists.dispose() + gl.dispose() free the programs/buffers three
+ *    tracks for THIS renderer;
+ *  - gl.forceContextLoss() is the hard release — the driver frees EVERY GPU
+ *    resource bound to the context (framebuffers, textures, VBOs, the
+ *    preserveDrawingBuffer backbuffer, the captureStream surface) in one shot.
+ *  We do NOT traverse the scene disposing geometries/materials/textures: the
+ *  world core geometry is CPU typed-arrays (no GPU handle), the scene's own
+ *  overlays (dash-strip CanvasTexture, ground-marker texture) already self-
+ *  dispose, and the rest are drei-CACHED GLB/HDRI shared across clips — blowing
+ *  those away would corrupt the cache the NEXT clip reuses. forceContextLoss
+ *  frees their GPU memory anyway; the fresh context re-uploads from the intact
+ *  cache. The chunk reload (clip-capture-client) reclaims the JS heap.
+ */
+function SceneDisposer({ clipId }: { clipId: string }): null {
+  const gl = useThree((s) => s.gl);
+  useEffect(() => {
+    return () => {
+      try {
+        gl.renderLists?.dispose?.();
+      } catch {
+        /* best effort — a partly-built renderer */
+      }
+      try {
+        gl.dispose();
+      } catch {
+        /* idem */
+      }
+      try {
+        gl.forceContextLoss();
+      } catch {
+        /* already lost (or the extension is unavailable) — fine */
+      }
+      liveContextCount = Math.max(0, liveContextCount - 1);
+      if (typeof console !== "undefined") {
+        console.info(`[capture] context DISPOSED ${clipId} · live=${liveContextCount}`);
+      }
+    };
+  }, [gl, clipId]);
+  return null;
 }
 
 // ---------------------------------------------------------------------------

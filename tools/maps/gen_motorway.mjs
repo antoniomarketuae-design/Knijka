@@ -143,7 +143,18 @@ export function buildMotorwaySegment(params) {
       id: `${idPrefix}-e-nb`,
       from: `${idPrefix}-n-nb-start`,
       to: `${idPrefix}-n-nb-end`,
-      class: "primary",
+      // Class "motorway" (not "primary"): a motorway carriageway is NOT an
+      // arterial street — it carries no curbside parking band and no
+      // palm/leafy street-tree rows. Tagging it "primary" put a 4 m
+      // ARTERIAL_CLASSES/PARKING_LANE_CLASSES parking band on each side, which
+      // widened each bank's half-width past the median half-gap and overlapped
+      // the two carriageways (palms then planted on the opposing asphalt —
+      // founder R-media #7/#8). "motorway" is EXCLUDED from ARTERIAL_CLASSES +
+      // PARKING_LANE_CLASSES + SIDEWALK_CLASSES but kept in MARKED_CLASSES, so
+      // the lane dividers still paint (the OV-11 keep-right story needs a
+      // visible lane line) while the parking band, palms, streetlights and
+      // sidewalks are gone. Grading is unaffected: it reads `motorway: true`.
+      class: "motorway",
       name: label,
       oneway: true,
       roundabout: false,
@@ -159,7 +170,18 @@ export function buildMotorwaySegment(params) {
       id: `${idPrefix}-e-sb`,
       from: `${idPrefix}-n-sb-start`,
       to: `${idPrefix}-n-sb-end`,
-      class: "primary",
+      // Class "motorway" (not "primary"): a motorway carriageway is NOT an
+      // arterial street — it carries no curbside parking band and no
+      // palm/leafy street-tree rows. Tagging it "primary" put a 4 m
+      // ARTERIAL_CLASSES/PARKING_LANE_CLASSES parking band on each side, which
+      // widened each bank's half-width past the median half-gap and overlapped
+      // the two carriageways (palms then planted on the opposing asphalt —
+      // founder R-media #7/#8). "motorway" is EXCLUDED from ARTERIAL_CLASSES +
+      // PARKING_LANE_CLASSES + SIDEWALK_CLASSES but kept in MARKED_CLASSES, so
+      // the lane dividers still paint (the OV-11 keep-right story needs a
+      // visible lane line) while the parking band, palms, streetlights and
+      // sidewalks are gone. Grading is unaffected: it reads `motorway: true`.
+      class: "motorway",
       name: label,
       oneway: true,
       roundabout: false,

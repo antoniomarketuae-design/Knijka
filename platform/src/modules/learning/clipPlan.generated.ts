@@ -130,7 +130,7 @@ export const CLIP_PLAN: readonly ClipPlanEntry[] = [
     "templateId": "sc-follow-distance",
     "mistakeIndex": 0,
     "tracePath": "content/traces/sc-follow-distance/mistake-tailgate.trace.json",
-    "faultTimeSec": 5.38,
+    "faultTimeSec": 4.53,
     "requiredActors": [
       {
         "kind": "vehicle",

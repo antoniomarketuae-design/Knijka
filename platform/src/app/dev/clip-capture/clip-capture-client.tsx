@@ -44,7 +44,14 @@ import { loadQualityPreset } from "@/components/sim/lesson-ui/QualityPresetSelec
 import { TraceTimeline } from "@/components/sim/lesson-ui/TraceTimeline";
 import { traceUrlForRepoPath } from "@/components/theory/whyPanelModel";
 import { CLIP_MANIFEST_URL, parseClipManifest } from "@/components/theory/clipManifest";
-import { missingFreshClips } from "@/lib/clips/batch";
+import type { RecordedClipLike } from "@/lib/clips/batch";
+import {
+  CAPTURE_CHUNK_SIZE,
+  missingIdSet,
+  nextChunkToRecord,
+  parseFromIndex,
+  runSummary,
+} from "@/lib/clips/captureChunks";
 import type { RecordingWindow } from "@/lib/clips/trim";
 import {
   buildActorChecklist,
@@ -97,8 +104,19 @@ const RECORD_BITS_PER_S = 1_500_000;
  *  instead of freezing the run at ~13/20 (the pilot-v2 death). */
 const PER_CLIP_WALL_MS = 180_000;
 /** localStorage key: ISO time the last FULL batch began — the „fresh webm"
- *  baseline for „запиши само липсващите" after a reload. */
+ *  baseline for „запиши само липсващите" (survives across runs/tabs). */
 const BATCH_STARTED_KEY = "clip-capture:batch-started-at";
+/** sessionStorage key: ISO time THIS chunked run began — the baseline the
+ *  chunk reloads carry so a resumed page knows which clips it already recorded
+ *  (survives window.location reloads IN-TAB; cleared when the run completes). */
+const RUN_STARTED_KEY = "clip-capture:run-started-at";
+/** After a clip's scene unmounts, wait this long before mounting the next so
+ *  the forced context loss (CaptureScene.SceneDisposer) actually lands and the
+ *  GPU reclaims — a zero-context gap between every clip. */
+const DISPOSE_SETTLE_MS = 400;
+/** Beat before the chunk's full page reload — lets the last POST + teardown
+ *  settle so nothing is in flight when the browser unloads. */
+const RELOAD_SETTLE_MS = 300;
 
 type ClipState = "pending" | "loading" | "recording" | "saving" | "done" | "error";
 
@@ -140,12 +158,21 @@ interface Mode {
   mistakeIndex?: number;
   /** auto only: re-record just the clips missing a fresh webm (?only=missing). */
   onlyMissing?: boolean;
+  /** auto only: the pilot index this chunk resumes at (?from=N) — the chunk
+   *  reload loop's cursor. Clamped against pilot.length before use. */
+  fromRaw?: string | null;
 }
 
 function parseMode(): Mode {
   try {
     const q = new URLSearchParams(window.location.search);
-    if (q.get("auto") === "1") return { kind: "auto", onlyMissing: q.get("only") === "missing" };
+    if (q.get("auto") === "1") {
+      return {
+        kind: "auto",
+        onlyMissing: q.get("only") === "missing",
+        fromRaw: q.get("from"),
+      };
+    }
     const templateId = q.get("template");
     const mistake = q.get("mistake");
     if (templateId) {
@@ -264,15 +291,29 @@ export function ClipCaptureClient({
   const [busy, setBusy] = useState(false);
   /** How many clips THIS run processes (pilot.length, or the missing subset). */
   const [runTotal, setRunTotal] = useState(pilot.length);
+  /** Clips already fresh when this CHUNK started (cumulative across reloads) —
+   *  the base the live progress counter adds this chunk's successes onto. */
+  const [baseDone, setBaseDone] = useState(0);
+  /** The current chunk's window, for the „парче" indicator (auto mode). */
+  const [chunkInfo, setChunkInfo] = useState<{ from: number; to: number; size: number } | null>(
+    null,
+  );
 
   const clockRef = useRef<TraceClock>(createTraceClock());
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const readyRef = useRef<{ resolve: () => void; reject: (e: Error) => void } | null>(null);
   const startedRef = useRef(false);
+  /** Teardown generation — each captureEntry bumps it; the per-clip teardown
+   *  only unmounts the scene if a NEWER clip has not already claimed it (guards
+   *  a wall-timed-out clip from nulling the scene a later clip just mounted). */
+  const runGenRef = useRef(0);
   /** R1 presence log — reset per run, filled by the mounted scene. */
   const presenceRef = useRef<ActorPresenceLog>(createActorPresenceLog());
   /** Rendered-frame counter (the settle gate) — incremented by the scene. */
   const frameCountRef = useRef(0);
+  /** Live mirror of `statuses` — finishRun reads the LATEST notes off this (it
+   *  runs at the end of a long async run whose closure captured a stale map). */
+  const statusesRef = useRef<Record<string, ClipStatus>>({});
 
   const planById = useMemo(() => new Map(plan.map((p) => [p.id, p])), [plan]);
 
@@ -285,7 +326,11 @@ export function ClipCaptureClient({
   }, []);
 
   const setStatus = useCallback((id: string, status: ClipStatus) => {
-    setStatuses((prev) => ({ ...prev, [id]: status }));
+    setStatuses((prev) => {
+      const next = { ...prev, [id]: status };
+      statusesRef.current = next;
+      return next;
+    });
   }, []);
 
   // Scene callbacks — resolve/reject the per-clip readiness promise.
@@ -447,36 +492,53 @@ export function ClipCaptureClient({
     [awaitFreshFrames],
   );
 
-  /** Full pipeline for one entry: load → mount → ready → record → save. */
+  /** Full pipeline for one entry: load → mount → ready → record → save, then
+   *  HARD teardown (unmount the scene so its WebGL context is force-released
+   *  before the next clip mounts — the pilot-v2 context leak fix). The teardown
+   *  runs in `finally`, so a FAILED clip disposes just the same, and is
+   *  generation-guarded so a wall-timed-out clip cannot null a scene a later
+   *  clip has already mounted. */
   const captureEntry = useCallback(
     async (entry: ClipPilotEntry): Promise<void> => {
-      setStatus(entry.id, { state: "loading" });
-      const r = await loadRun(entry, planById.get(entry.id));
-      // Arm readiness BEFORE the scene mounts (onReady may fire fast).
-      const ready = new Promise<void>((resolve, reject) => {
-        readyRef.current = { resolve, reject };
-      });
-      const timeout = sleep(READY_TIMEOUT_MS).then(() => {
-        throw new Error("светът не се зареди навреме");
-      });
-      canvasRef.current = null;
-      presenceRef.current = createActorPresenceLog();
-      clockRef.current = createTraceClock();
-      clockRef.current.playing = false;
-      clockRef.current.tSec = r.window.startSec;
-      setRun(r);
-      await Promise.race([ready, timeout]);
-      setStatus(entry.id, { state: "recording" });
-      // recordMounted THROWS on any missing required actor (R1 pre-check),
-      // so a "done" pill always means the full card staged.
-      const actors = await recordMounted(r);
-      const summary = checklistSummary(actors);
-      setStatus(entry.id, {
-        state: "done",
-        note:
-          `${(r.window.endSec - r.window.startSec).toFixed(1)} с` +
-          (summary ? ` · актьори ${summary}` : ""),
-      });
+      const gen = ++runGenRef.current;
+      try {
+        setStatus(entry.id, { state: "loading" });
+        const r = await loadRun(entry, planById.get(entry.id));
+        // Arm readiness BEFORE the scene mounts (onReady may fire fast).
+        const ready = new Promise<void>((resolve, reject) => {
+          readyRef.current = { resolve, reject };
+        });
+        const timeout = sleep(READY_TIMEOUT_MS).then(() => {
+          throw new Error("светът не се зареди навреме");
+        });
+        canvasRef.current = null;
+        presenceRef.current = createActorPresenceLog();
+        clockRef.current = createTraceClock();
+        clockRef.current.playing = false;
+        clockRef.current.tSec = r.window.startSec;
+        setRun(r);
+        await Promise.race([ready, timeout]);
+        setStatus(entry.id, { state: "recording" });
+        // recordMounted THROWS on any missing required actor (R1 pre-check),
+        // so a "done" pill always means the full card staged.
+        const actors = await recordMounted(r);
+        const summary = checklistSummary(actors);
+        setStatus(entry.id, {
+          state: "done",
+          note:
+            `${(r.window.endSec - r.window.startSec).toFixed(1)} с` +
+            (summary ? ` · актьори ${summary}` : ""),
+        });
+      } finally {
+        // Unmount THIS clip's scene so SceneDisposer force-loses its context,
+        // then settle so the GPU reclaims before the next clip mounts — unless
+        // a newer clip already superseded this one (wall-timeout race).
+        if (runGenRef.current === gen) {
+          setRun(null);
+          await sleep(0); // let React commit the unmount + run the disposer
+          await sleep(DISPOSE_SETTLE_MS);
+        }
+      }
     },
     [recordMounted, setStatus, planById],
   );
@@ -505,63 +567,137 @@ export function ClipCaptureClient({
     [captureEntry, setStatus],
   );
 
-  /** The unattended batch: every pilot entry. Stamps the „fresh webm" baseline
-   *  first (so „запиши само липсващите" can tell stragglers from this run's
-   *  successes even after a reload), then records the lot. */
-  const runBatch = useCallback(async () => {
-    setBusy(true);
-    setBatchDone(null);
-    setRunTotal(pilot.length);
-    const startedAt = new Date().toISOString();
-    try {
-      window.localStorage.setItem(BATCH_STARTED_KEY, startedAt);
-    } catch {
-      // Storage blocked — the in-session run still works; only the
-      // post-reload „missing" baseline is lost.
-    }
-    const result = await runEntries(pilot);
-    setRun(null);
-    setBatchDone(result);
-    setBusy(false);
-  }, [pilot, runEntries]);
-
-  /** Re-record ONLY the clips missing a fresh webm: fetch the live manifest,
-   *  compare recordedAt against the last full batch's baseline, record just the
-   *  stragglers. So a stall never leaves the founder with silently-stale clips
-   *  — one click refreshes exactly what the last run failed to produce. */
-  const runMissing = useCallback(async () => {
-    setBusy(true);
-    setBatchDone(null);
-    let manifestClips: { id: string; recordedAt: string }[] = [];
+  /** The live manifest as id → recordedAt (empty on any failure → all clips
+   *  read as missing, so the run records rather than silently skips). */
+  const fetchManifestById = useCallback(async (): Promise<Map<string, RecordedClipLike>> => {
     try {
       const res = await fetch(CLIP_MANIFEST_URL, { cache: "no-store" });
-      if (res.ok) manifestClips = parseClipManifest((await res.json()) as unknown) ?? [];
+      if (res.ok) {
+        const clips = parseClipManifest((await res.json()) as unknown) ?? [];
+        return new Map(clips.map((c) => [c.id, { recordedAt: c.recordedAt }]));
+      }
     } catch {
-      // No manifest → every clip reads as missing (recorded below).
+      // No/broken manifest → empty map (everything missing).
     }
-    let since: string | null = null;
-    try {
-      since = window.localStorage.getItem(BATCH_STARTED_KEY);
-    } catch {
-      // no baseline available — missingFreshClips then selects only absent ones
-    }
-    const byId = new Map(manifestClips.map((c) => [c.id, { recordedAt: c.recordedAt }]));
-    const targetIds = new Set(missingFreshClips(pilot, byId, since));
-    const targets = pilot.filter((e) => targetIds.has(e.id));
-    setRunTotal(targets.length);
-    const result = await runEntries(targets);
-    setRun(null);
-    setBatchDone(result);
-    setBusy(false);
-  }, [pilot, runEntries]);
+    return new Map();
+  }, []);
 
-  // ?auto=1 runs unattended (guarded against the dev double-effect);
-  // ?auto=1&only=missing re-records just the stragglers.
+  /** Close a run: the manifest is ground truth (it outlived the chunk reloads),
+   *  so recompute fresh/missing over the WHOLE pilot vs the baseline and post
+   *  the honest end result — „ГОТОВО 20/20" only when NOTHING is still missing.
+   *  Clears the in-tab run baseline so the next ▶ starts a fresh run. */
+  const finishRun = useCallback(
+    async (runStart: string | null) => {
+      const byId = await fetchManifestById();
+      const missing = missingIdSet(pilot, byId, runStart);
+      const summary = runSummary(pilot, missing);
+      setRun(null);
+      setChunkInfo(null);
+      setBaseDone(summary.fresh.length);
+      setBatchDone({
+        ok: summary.fresh.length,
+        total: pilot.length,
+        // Reasons for THIS page's failures are in `statuses`; earlier-chunk
+        // failures (pre-reload) only survive as "still missing" — enough for
+        // the founder to re-run „само липсващите".
+        failed: summary.missing.map((id) => ({
+          id,
+          note: statusesRef.current[id]?.note ?? "липсва свеж запис",
+        })),
+      });
+      setBusy(false);
+      try {
+        window.sessionStorage.removeItem(RUN_STARTED_KEY);
+      } catch {
+        /* storage blocked — nothing to clean up */
+      }
+    },
+    [pilot, fetchManifestById],
+  );
+
+  /**
+   * The chunked unattended run (?auto=1[&only=missing][&from=N]). Records ONE
+   * chunk (CAPTURE_CHUNK_SIZE clips) then FULL-page-reloads to the next `from`
+   * — the nuclear memory reset that keeps the browser from ever holding more
+   * than a chunk's worth of freed-but-uncollected WebGL/MediaRecorder state.
+   * The run baseline (persisted across reloads) tells a resumed page which
+   * clips it already recorded, so it never re-records nor silently skips.
+   */
+  const runAuto = useCallback(
+    async (from: number, onlyMissing: boolean) => {
+      setBusy(true);
+      setBatchDone(null);
+      setRunTotal(pilot.length);
+
+      // The run baseline: „fresh webm" means recordedAt ≥ this.
+      let runStart: string | null = null;
+      if (onlyMissing) {
+        // „само липсващите" measures against the LAST full run — never resets it.
+        try {
+          runStart =
+            window.localStorage.getItem(BATCH_STARTED_KEY) ??
+            window.sessionStorage.getItem(RUN_STARTED_KEY);
+        } catch {
+          runStart = null;
+        }
+      } else if (from === 0) {
+        // A fresh full run: stamp a new baseline, mirror it to localStorage so
+        // the standalone „само липсващите" button can compare against it later.
+        runStart = new Date().toISOString();
+        try {
+          window.sessionStorage.setItem(RUN_STARTED_KEY, runStart);
+          window.localStorage.setItem(BATCH_STARTED_KEY, runStart);
+        } catch {
+          /* storage blocked — in-tab run still works, only=missing loses its baseline */
+        }
+      } else {
+        // Resuming a full run after a chunk reload: carry the in-tab baseline.
+        try {
+          runStart =
+            window.sessionStorage.getItem(RUN_STARTED_KEY) ??
+            window.localStorage.getItem(BATCH_STARTED_KEY);
+        } catch {
+          runStart = null;
+        }
+        if (runStart === null) runStart = new Date().toISOString();
+      }
+
+      // Which clips still need recording, and this chunk's window.
+      const byId = await fetchManifestById();
+      const missing = missingIdSet(pilot, byId, runStart);
+      setBaseDone(pilot.length - missing.size);
+      const plan = nextChunkToRecord(pilot, from, CAPTURE_CHUNK_SIZE, missing);
+
+      // Nothing left from `from` onward → the run is complete.
+      if (plan === null) {
+        await finishRun(runStart);
+        return;
+      }
+
+      setChunkInfo({ from: plan.from, to: plan.nextFrom, size: plan.toRecord.length });
+      await runEntries(plan.toRecord);
+
+      if (plan.isLastChunk) {
+        await finishRun(runStart);
+        return;
+      }
+      // FULL page reload — reclaim everything, then resume at the next window.
+      const url = `/dev/clip-capture?auto=1${onlyMissing ? "&only=missing" : ""}&from=${plan.nextFrom}`;
+      await sleep(RELOAD_SETTLE_MS);
+      window.location.href = url;
+    },
+    [pilot, runEntries, fetchManifestById, finishRun],
+  );
+
+  // ?auto=1 runs unattended, one chunk per page then a reload to the next
+  // (guarded against the dev double-effect). ?only=missing re-records just the
+  // stragglers; ?from=N is the chunk cursor.
   useEffect(() => {
     if (mode?.kind !== "auto" || startedRef.current) return;
     startedRef.current = true;
-    void (mode.onlyMissing ? runMissing() : runBatch());
-  }, [mode, runBatch, runMissing]);
+    const from = parseFromIndex(mode.fromRaw ?? null, pilot.length);
+    void runAuto(from, mode.onlyMissing ?? false);
+  }, [mode, runAuto, pilot.length]);
 
   if (mode === null) return null;
 
@@ -684,6 +820,7 @@ export function ClipCaptureClient({
           <>
             <CaptureScene
               key={run.entry.id}
+              clipId={run.entry.id}
               lesson={run.lesson}
               trace={run.trace}
               clockRef={clockRef}
@@ -742,7 +879,11 @@ export function ClipCaptureClient({
   }
 
   // ---- auto (batch) mode ---------------------------------------------------
-  const done = Object.values(statuses).filter((s) => s.state === "done").length;
+  // Cumulative across chunk reloads: clips already fresh when this chunk began
+  // (baseDone) + this page's successes. Each reload recomputes baseDone from the
+  // manifest, so a resumed page shows the true „X от 20", not just this chunk.
+  const doneThisChunk = Object.values(statuses).filter((s) => s.state === "done").length;
+  const done = Math.min(runTotal, baseDone + doneThisChunk);
   return (
     <main className="flex flex-col gap-4 p-6">
       <header className="flex flex-wrap items-center gap-3">
@@ -752,6 +893,11 @@ export function ClipCaptureClient({
         <span className="rounded-full border border-border bg-surface px-3 py-1 font-mono text-sm">
           {done}/{runTotal}
         </span>
+        {chunkInfo && !batchDone ? (
+          <span className="rounded-full border border-accent/40 bg-accent/10 px-3 py-1 font-mono text-xs text-accent">
+            парче {chunkInfo.from + 1}–{chunkInfo.to} · {chunkInfo.size} за запис
+          </span>
+        ) : null}
         {batchDone ? (
           <span
             className={`rounded-full px-3 py-1 text-sm font-black ${
@@ -804,6 +950,7 @@ export function ClipCaptureClient({
       {run ? (
         <CaptureScene
           key={run.entry.id}
+          clipId={run.entry.id}
           lesson={run.lesson}
           trace={run.trace}
           clockRef={clockRef}

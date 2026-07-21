@@ -8,7 +8,7 @@
       "tracePath": "content/traces/sc-ac-night-lights/mistake-never-on.trace.json",
       "src": "/clips/sc-ac-night-lights__m0.webm",
       "durationSec": 10,
-      "recordedAt": "2026-07-21T06:53:49.435Z",
+      "recordedAt": "2026-07-21T07:52:12.751Z",
       "titleBg": "Никога не включени светлини",
       "keyframes": [
         "/clips/sc-ac-night-lights__m0.k0.png",
@@ -28,7 +28,7 @@
       "tracePath": "content/traces/sc-ac-rain-lights/mistake-never-on.trace.json",
       "src": "/clips/sc-ac-rain-lights__m0.webm",
       "durationSec": 10,
-      "recordedAt": "2026-07-21T06:54:03.559Z",
+      "recordedAt": "2026-07-21T07:52:26.143Z",
       "titleBg": "„Виждам си добре“ — без светлини",
       "keyframes": [
         "/clips/sc-ac-rain-lights__m0.k0.png",
@@ -73,7 +73,7 @@
       "tracePath": "content/traces/sc-follow-distance/mistake-tailgate.trace.json",
       "src": "/clips/sc-follow-distance__m0.webm",
       "durationSec": 10,
-      "recordedAt": "2026-07-21T06:54:36.476Z",
+      "recordedAt": "2026-07-21T07:52:57.783Z",
       "titleBg": "Лепене за предния",
       "keyframes": [
         "/clips/sc-follow-distance__m0.k0.png",
@@ -99,7 +99,7 @@
       "tracePath": "content/traces/sc-junction-stop/mistake-rolling-stop.trace.json",
       "src": "/clips/sc-junction-stop__m0.webm",
       "durationSec": 14,
-      "recordedAt": "2026-07-21T06:54:53.853Z",
+      "recordedAt": "2026-07-21T07:53:15.253Z",
       "titleBg": "Търкалящо спиране",
       "keyframes": [
         "/clips/sc-junction-stop__m0.k0.png",
@@ -144,7 +144,7 @@
       "tracePath": "content/traces/sc-mw-discipline/mistake-left-hog.trace.json",
       "src": "/clips/sc-mw-discipline__m0.webm",
       "durationSec": 12,
-      "recordedAt": "2026-07-21T06:55:25.141Z",
+      "recordedAt": "2026-07-21T07:53:45.773Z",
       "titleBg": "Висене в лявата лента при 130",
       "keyframes": [
         "/clips/sc-mw-discipline__m0.k0.png",
@@ -164,7 +164,7 @@
       "tracePath": "content/traces/sc-ov-ban-overtake/mistake-overtake-in-zone.trace.json",
       "src": "/clips/sc-ov-ban-overtake__m0.webm",
       "durationSec": 18.17,
-      "recordedAt": "2026-07-21T06:55:46.576Z",
+      "recordedAt": "2026-07-21T07:54:07.627Z",
       "titleBg": "Изпреварване в зоната на забраната",
       "keyframes": [
         "/clips/sc-ov-ban-overtake__m0.k0.png",
@@ -190,7 +190,7 @@
       "tracePath": "content/traces/sc-ov-oneway/mistake-wrong-way.trace.json",
       "src": "/clips/sc-ov-oneway__m0.webm",
       "durationSec": 14,
-      "recordedAt": "2026-07-21T06:56:04.208Z",
+      "recordedAt": "2026-07-21T07:54:24.848Z",
       "titleBg": "Ляв завой срещу еднопосочната",
       "keyframes": [
         "/clips/sc-ov-oneway__m0.k0.png",
@@ -210,7 +210,7 @@
       "tracePath": "content/traces/sc-ov-solid-line/mistake-pullout.trace.json",
       "src": "/clips/sc-ov-solid-line__m0.webm",
       "durationSec": 14.38,
-      "recordedAt": "2026-07-21T06:56:21.904Z",
+      "recordedAt": "2026-07-21T07:54:42.387Z",
       "titleBg": "Изпреварващо излизане през плътната линия",
       "keyframes": [
         "/clips/sc-ov-solid-line__m0.k0.png",
@@ -230,7 +230,7 @@
       "tracePath": "content/traces/sc-park-perp-rev/mistake-wide-approach.trace.json",
       "src": "/clips/sc-park-perp-rev__m0.webm",
       "durationSec": 12,
-      "recordedAt": "2026-07-21T06:56:37.254Z",
+      "recordedAt": "2026-07-21T07:54:58.113Z",
       "titleBg": "Твърде широк подход",
       "keyframes": [
         "/clips/sc-park-perp-rev__m0.k0.png",
