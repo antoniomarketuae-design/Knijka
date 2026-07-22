@@ -2,13 +2,33 @@
   "version": 1,
   "clips": [
     {
+      "id": "sc-ac-crosswind__m1",
+      "templateId": "sc-ac-crosswind",
+      "mistakeIndex": 1,
+      "tracePath": "content/traces/sc-ac-crosswind/mistake-overcorrect.trace.json",
+      "src": "/clips/sc-ac-crosswind__m1.webm",
+      "durationSec": 12,
+      "recordedAt": "2026-07-21T20:18:24.531Z",
+      "titleBg": "Свръхкорекцията — вторият замах",
+      "keyframes": [
+        "/clips/sc-ac-crosswind__m1.k0.png",
+        "/clips/sc-ac-crosswind__m1.k1.png",
+        "/clips/sc-ac-crosswind__m1.k2.png",
+        "/clips/sc-ac-crosswind__m1.k3.png",
+        "/clips/sc-ac-crosswind__m1.k4.png"
+      ],
+      "actors": [],
+      "view": "exterior",
+      "quality": "high"
+    },
+    {
       "id": "sc-ac-night-lights__m0",
       "templateId": "sc-ac-night-lights",
       "mistakeIndex": 0,
       "tracePath": "content/traces/sc-ac-night-lights/mistake-never-on.trace.json",
       "src": "/clips/sc-ac-night-lights__m0.webm",
       "durationSec": 10,
-      "recordedAt": "2026-07-21T07:52:12.751Z",
+      "recordedAt": "2026-07-21T11:34:41.748Z",
       "titleBg": "Никога не включени светлини",
       "keyframes": [
         "/clips/sc-ac-night-lights__m0.k0.png",
@@ -28,7 +48,7 @@
       "tracePath": "content/traces/sc-ac-rain-lights/mistake-never-on.trace.json",
       "src": "/clips/sc-ac-rain-lights__m0.webm",
       "durationSec": 10,
-      "recordedAt": "2026-07-21T07:52:26.143Z",
+      "recordedAt": "2026-07-21T13:24:22.463Z",
       "titleBg": "„Виждам си добре“ — без светлини",
       "keyframes": [
         "/clips/sc-ac-rain-lights__m0.k0.png",
@@ -42,20 +62,66 @@
       "quality": "high"
     },
     {
-      "id": "sc-ed-d2-city-run__m0",
-      "templateId": "sc-ed-d2-city-run",
+      "id": "sc-accident-own-conduct__m0",
+      "templateId": "sc-accident-own-conduct",
       "mistakeIndex": 0,
-      "tracePath": "content/traces/sc-ed-d2-city-run/mistake-red-light.trace.json",
-      "src": "/clips/sc-ed-d2-city-run__m0.webm",
-      "durationSec": 14,
-      "recordedAt": "2026-07-21T04:48:40.908Z",
-      "titleBg": "Преминаване на червено по маршрута",
+      "tracePath": "content/traces/sc-accident-own-conduct/mistake-hit-and-flee.trace.json",
+      "src": "/clips/sc-accident-own-conduct__m0.webm",
+      "durationSec": 12.000000000000002,
+      "recordedAt": "2026-07-22T09:13:29.214Z",
+      "titleBg": "Удар в паркирания автомобил и бягство",
       "keyframes": [
-        "/clips/sc-ed-d2-city-run__m0.k0.png",
-        "/clips/sc-ed-d2-city-run__m0.k1.png",
-        "/clips/sc-ed-d2-city-run__m0.k2.png",
-        "/clips/sc-ed-d2-city-run__m0.k3.png",
-        "/clips/sc-ed-d2-city-run__m0.k4.png"
+        "/clips/sc-accident-own-conduct__m0.k0.png",
+        "/clips/sc-accident-own-conduct__m0.k1.png",
+        "/clips/sc-accident-own-conduct__m0.k2.png",
+        "/clips/sc-accident-own-conduct__m0.k3.png",
+        "/clips/sc-accident-own-conduct__m0.k4.png"
+      ],
+      "actors": [],
+      "view": "exterior",
+      "quality": "high"
+    },
+    {
+      "id": "sc-animal-hazard__m0",
+      "templateId": "sc-animal-hazard",
+      "mistakeIndex": 0,
+      "tracePath": "content/traces/sc-animal-hazard/mistake-swerve-oncoming.trace.json",
+      "src": "/clips/sc-animal-hazard__m0.webm",
+      "durationSec": 12.490000000000343,
+      "recordedAt": "2026-07-22T09:42:21.101Z",
+      "titleBg": "Отбиване в насрещното при животното",
+      "keyframes": [
+        "/clips/sc-animal-hazard__m0.k0.png",
+        "/clips/sc-animal-hazard__m0.k1.png",
+        "/clips/sc-animal-hazard__m0.k2.png",
+        "/clips/sc-animal-hazard__m0.k3.png",
+        "/clips/sc-animal-hazard__m0.k4.png"
+      ],
+      "actors": [
+        {
+          "kind": "vehicle",
+          "label": "Насрещен поток автомобили",
+          "present": true
+        }
+      ],
+      "view": "exterior",
+      "quality": "high"
+    },
+    {
+      "id": "sc-driver-distraction__m0",
+      "templateId": "sc-driver-distraction",
+      "mistakeIndex": 0,
+      "tracePath": "content/traces/sc-driver-distraction/mistake-late-react.trace.json",
+      "src": "/clips/sc-driver-distraction__m0.webm",
+      "durationSec": 9.92,
+      "recordedAt": "2026-07-22T08:28:19.057Z",
+      "titleBg": "Закъсняла реакция от разсейване",
+      "keyframes": [
+        "/clips/sc-driver-distraction__m0.k0.png",
+        "/clips/sc-driver-distraction__m0.k1.png",
+        "/clips/sc-driver-distraction__m0.k2.png",
+        "/clips/sc-driver-distraction__m0.k3.png",
+        "/clips/sc-driver-distraction__m0.k4.png"
       ],
       "actors": [
         {
@@ -64,7 +130,8 @@
           "present": true
         }
       ],
-      "view": "exterior"
+      "view": "exterior",
+      "quality": "high"
     },
     {
       "id": "sc-follow-distance__m0",
@@ -73,7 +140,7 @@
       "tracePath": "content/traces/sc-follow-distance/mistake-tailgate.trace.json",
       "src": "/clips/sc-follow-distance__m0.webm",
       "durationSec": 10,
-      "recordedAt": "2026-07-21T07:52:57.783Z",
+      "recordedAt": "2026-07-21T16:55:46.247Z",
       "titleBg": "Лепене за предния",
       "keyframes": [
         "/clips/sc-follow-distance__m0.k0.png",
@@ -93,13 +160,85 @@
       "quality": "high"
     },
     {
+      "id": "sc-hz-brake-dont-swerve__m0",
+      "templateId": "sc-hz-brake-dont-swerve",
+      "mistakeIndex": 0,
+      "tracePath": "content/traces/sc-hz-brake-dont-swerve/mistake-blind-swerve.trace.json",
+      "src": "/clips/sc-hz-brake-dont-swerve__m0.webm",
+      "durationSec": 11.766666666666902,
+      "recordedAt": "2026-07-21T20:30:48.120Z",
+      "titleBg": "Рязко отклонение в съседната кола",
+      "keyframes": [
+        "/clips/sc-hz-brake-dont-swerve__m0.k0.png",
+        "/clips/sc-hz-brake-dont-swerve__m0.k1.png",
+        "/clips/sc-hz-brake-dont-swerve__m0.k2.png",
+        "/clips/sc-hz-brake-dont-swerve__m0.k3.png",
+        "/clips/sc-hz-brake-dont-swerve__m0.k4.png"
+      ],
+      "actors": [
+        {
+          "kind": "vehicle",
+          "label": "Автомобил, който се вклинява отпред",
+          "present": true
+        }
+      ],
+      "view": "exterior",
+      "quality": "high"
+    },
+    {
+      "id": "sc-hz-breakdown-pulloff__m0",
+      "templateId": "sc-hz-breakdown-pulloff",
+      "mistakeIndex": 0,
+      "tracePath": "content/traces/sc-hz-breakdown-pulloff/mistake-shoulder-drive.trace.json",
+      "src": "/clips/sc-hz-breakdown-pulloff__m0.webm",
+      "durationSec": 12,
+      "recordedAt": "2026-07-22T06:59:15.633Z",
+      "titleBg": "Каране по аварийната лента до изхода",
+      "keyframes": [
+        "/clips/sc-hz-breakdown-pulloff__m0.k0.png",
+        "/clips/sc-hz-breakdown-pulloff__m0.k1.png",
+        "/clips/sc-hz-breakdown-pulloff__m0.k2.png",
+        "/clips/sc-hz-breakdown-pulloff__m0.k3.png",
+        "/clips/sc-hz-breakdown-pulloff__m0.k4.png"
+      ],
+      "actors": [],
+      "view": "exterior+dashboard",
+      "quality": "high"
+    },
+    {
+      "id": "sc-junction-rhr__m1",
+      "templateId": "sc-junction-rhr",
+      "mistakeIndex": 1,
+      "tracePath": "content/traces/sc-junction-rhr/mistake-no-look.trace.json",
+      "src": "/clips/sc-junction-rhr__m1.webm",
+      "durationSec": 10.140000000000025,
+      "recordedAt": "2026-07-22T05:57:47.661Z",
+      "titleBg": "Навлизане без оглеждане",
+      "keyframes": [
+        "/clips/sc-junction-rhr__m1.k0.png",
+        "/clips/sc-junction-rhr__m1.k1.png",
+        "/clips/sc-junction-rhr__m1.k2.png",
+        "/clips/sc-junction-rhr__m1.k3.png",
+        "/clips/sc-junction-rhr__m1.k4.png"
+      ],
+      "actors": [
+        {
+          "kind": "vehicle",
+          "label": "Автомобил отдясно с предимство",
+          "present": true
+        }
+      ],
+      "view": "exterior",
+      "quality": "high"
+    },
+    {
       "id": "sc-junction-stop__m0",
       "templateId": "sc-junction-stop",
       "mistakeIndex": 0,
       "tracePath": "content/traces/sc-junction-stop/mistake-rolling-stop.trace.json",
       "src": "/clips/sc-junction-stop__m0.webm",
       "durationSec": 14,
-      "recordedAt": "2026-07-21T07:53:15.253Z",
+      "recordedAt": "2026-07-21T11:38:53.777Z",
       "titleBg": "Търкалящо спиране",
       "keyframes": [
         "/clips/sc-junction-stop__m0.k0.png",
@@ -113,29 +252,190 @@
       "quality": "high"
     },
     {
-      "id": "sc-lane-change__m0",
-      "templateId": "sc-lane-change",
+      "id": "sc-jx-priority-confidence__m0",
+      "templateId": "sc-jx-priority-confidence",
       "mistakeIndex": 0,
-      "tracePath": "content/traces/sc-lane-change/mistake-no-indicator.trace.json",
-      "src": "/clips/sc-lane-change__m0.webm",
+      "tracePath": "content/traces/sc-jx-priority-confidence/mistake-phantom-brake.trace.json",
+      "src": "/clips/sc-jx-priority-confidence__m0.webm",
       "durationSec": 12,
-      "recordedAt": "2026-07-21T04:49:26.389Z",
-      "titleBg": "Престрояване без мигач",
+      "recordedAt": "2026-07-21T20:14:16.854Z",
+      "titleBg": "Паническо спиране на предимство с кола зад теб",
       "keyframes": [
-        "/clips/sc-lane-change__m0.k0.png",
-        "/clips/sc-lane-change__m0.k1.png",
-        "/clips/sc-lane-change__m0.k2.png",
-        "/clips/sc-lane-change__m0.k3.png",
-        "/clips/sc-lane-change__m0.k4.png"
+        "/clips/sc-jx-priority-confidence__m0.k0.png",
+        "/clips/sc-jx-priority-confidence__m0.k1.png",
+        "/clips/sc-jx-priority-confidence__m0.k2.png",
+        "/clips/sc-jx-priority-confidence__m0.k3.png",
+        "/clips/sc-jx-priority-confidence__m0.k4.png"
       ],
       "actors": [
         {
           "kind": "vehicle",
-          "label": "Автомобил отпред в лентата (води)",
+          "label": "Автомобил отдясно с предимство",
+          "present": true
+        },
+        {
+          "kind": "vehicle",
+          "label": "Автомобил плътно отзад",
           "present": true
         }
       ],
-      "view": "exterior"
+      "view": "exterior",
+      "quality": "high"
+    },
+    {
+      "id": "sc-lane-control-signal__m0",
+      "templateId": "sc-lane-control-signal",
+      "mistakeIndex": 0,
+      "tracePath": "content/traces/sc-lane-control-signal/mistake-closed-lane.trace.json",
+      "src": "/clips/sc-lane-control-signal__m0.webm",
+      "durationSec": 10,
+      "recordedAt": "2026-07-22T09:51:24.461Z",
+      "titleBg": "Навлизане в затворената лента (червен X)",
+      "keyframes": [
+        "/clips/sc-lane-control-signal__m0.k0.png",
+        "/clips/sc-lane-control-signal__m0.k1.png",
+        "/clips/sc-lane-control-signal__m0.k2.png",
+        "/clips/sc-lane-control-signal__m0.k3.png",
+        "/clips/sc-lane-control-signal__m0.k4.png"
+      ],
+      "actors": [
+        {
+          "kind": "vehicle",
+          "label": "Насрещен поток автомобили",
+          "present": true
+        }
+      ],
+      "view": "exterior",
+      "quality": "high"
+    },
+    {
+      "id": "sc-ln-obstacle-meeting__m0",
+      "templateId": "sc-ln-obstacle-meeting",
+      "mistakeIndex": 0,
+      "tracePath": "content/traces/sc-ln-obstacle-meeting/mistake-pull-out.trace.json",
+      "src": "/clips/sc-ln-obstacle-meeting__m0.webm",
+      "durationSec": 11.690000000000076,
+      "recordedAt": "2026-07-21T20:22:41.533Z",
+      "titleBg": "Изнасяне в насрещното пред идваща кола",
+      "keyframes": [
+        "/clips/sc-ln-obstacle-meeting__m0.k0.png",
+        "/clips/sc-ln-obstacle-meeting__m0.k1.png",
+        "/clips/sc-ln-obstacle-meeting__m0.k2.png",
+        "/clips/sc-ln-obstacle-meeting__m0.k3.png",
+        "/clips/sc-ln-obstacle-meeting__m0.k4.png"
+      ],
+      "actors": [
+        {
+          "kind": "vehicle",
+          "label": "Насрещен поток автомобили",
+          "present": true
+        },
+        {
+          "kind": "vehicle",
+          "label": "Насрещен автомобил в стеснението",
+          "present": true
+        }
+      ],
+      "view": "exterior",
+      "quality": "high"
+    },
+    {
+      "id": "sc-merge-accel-lane__m0",
+      "templateId": "sc-merge-accel-lane",
+      "mistakeIndex": 0,
+      "tracePath": "content/traces/sc-merge-accel-lane/mistake-stop-at-end.trace.json",
+      "src": "/clips/sc-merge-accel-lane__m0.webm",
+      "durationSec": 11.999999999999998,
+      "recordedAt": "2026-07-22T06:03:30.961Z",
+      "titleBg": "Спиране в края на лентата за ускоряване",
+      "keyframes": [
+        "/clips/sc-merge-accel-lane__m0.k0.png",
+        "/clips/sc-merge-accel-lane__m0.k1.png",
+        "/clips/sc-merge-accel-lane__m0.k2.png",
+        "/clips/sc-merge-accel-lane__m0.k3.png",
+        "/clips/sc-merge-accel-lane__m0.k4.png"
+      ],
+      "actors": [],
+      "view": "exterior",
+      "quality": "high"
+    },
+    {
+      "id": "sc-merge-bus-pullout__m0",
+      "templateId": "sc-merge-bus-pullout",
+      "mistakeIndex": 0,
+      "tracePath": "content/traces/sc-merge-bus-pullout/mistake-force-past.trace.json",
+      "src": "/clips/sc-merge-bus-pullout__m0.webm",
+      "durationSec": 10.533333333333541,
+      "recordedAt": "2026-07-21T20:28:16.976Z",
+      "titleBg": "Форсиране покрай потеглящия автобус",
+      "keyframes": [
+        "/clips/sc-merge-bus-pullout__m0.k0.png",
+        "/clips/sc-merge-bus-pullout__m0.k1.png",
+        "/clips/sc-merge-bus-pullout__m0.k2.png",
+        "/clips/sc-merge-bus-pullout__m0.k3.png",
+        "/clips/sc-merge-bus-pullout__m0.k4.png"
+      ],
+      "actors": [
+        {
+          "kind": "vehicle",
+          "label": "Камион, който се вклинява отпред",
+          "present": true
+        }
+      ],
+      "view": "exterior",
+      "quality": "high"
+    },
+    {
+      "id": "sc-merge-from-property__m1",
+      "templateId": "sc-merge-from-property",
+      "mistakeIndex": 1,
+      "tracePath": "content/traces/sc-merge-from-property/mistake-signal-and-go.trace.json",
+      "src": "/clips/sc-merge-from-property__m1.webm",
+      "durationSec": 12,
+      "recordedAt": "2026-07-22T06:02:22.890Z",
+      "titleBg": "Вливане „с мигача“ пред потока",
+      "keyframes": [
+        "/clips/sc-merge-from-property__m1.k0.png",
+        "/clips/sc-merge-from-property__m1.k1.png",
+        "/clips/sc-merge-from-property__m1.k2.png",
+        "/clips/sc-merge-from-property__m1.k3.png",
+        "/clips/sc-merge-from-property__m1.k4.png"
+      ],
+      "actors": [
+        {
+          "kind": "vehicle",
+          "label": "Насрещен поток автомобили",
+          "present": true
+        }
+      ],
+      "view": "exterior",
+      "quality": "high"
+    },
+    {
+      "id": "sc-mv-uturn-ban__m1",
+      "templateId": "sc-mv-uturn-ban",
+      "mistakeIndex": 1,
+      "tracePath": "content/traces/sc-mv-uturn-ban/mistake-into-stream.trace.json",
+      "src": "/clips/sc-mv-uturn-ban__m1.webm",
+      "durationSec": 11.766666666665849,
+      "recordedAt": "2026-07-22T05:58:55.746Z",
+      "titleBg": "Обратен завой пред насрещния поток",
+      "keyframes": [
+        "/clips/sc-mv-uturn-ban__m1.k0.png",
+        "/clips/sc-mv-uturn-ban__m1.k1.png",
+        "/clips/sc-mv-uturn-ban__m1.k2.png",
+        "/clips/sc-mv-uturn-ban__m1.k3.png",
+        "/clips/sc-mv-uturn-ban__m1.k4.png"
+      ],
+      "actors": [
+        {
+          "kind": "vehicle",
+          "label": "Насрещен поток автомобили",
+          "present": true
+        }
+      ],
+      "view": "exterior",
+      "quality": "high"
     },
     {
       "id": "sc-mw-discipline__m0",
@@ -143,8 +443,8 @@
       "mistakeIndex": 0,
       "tracePath": "content/traces/sc-mw-discipline/mistake-left-hog.trace.json",
       "src": "/clips/sc-mw-discipline__m0.webm",
-      "durationSec": 12,
-      "recordedAt": "2026-07-21T07:53:45.773Z",
+      "durationSec": 11.999999999999998,
+      "recordedAt": "2026-07-21T13:25:34.085Z",
       "titleBg": "Висене в лявата лента при 130",
       "keyframes": [
         "/clips/sc-mw-discipline__m0.k0.png",
@@ -163,8 +463,8 @@
       "mistakeIndex": 0,
       "tracePath": "content/traces/sc-ov-ban-overtake/mistake-overtake-in-zone.trace.json",
       "src": "/clips/sc-ov-ban-overtake__m0.webm",
-      "durationSec": 18.17,
-      "recordedAt": "2026-07-21T07:54:07.627Z",
+      "durationSec": 18.169999999999682,
+      "recordedAt": "2026-07-21T11:42:40.863Z",
       "titleBg": "Изпреварване в зоната на забраната",
       "keyframes": [
         "/clips/sc-ov-ban-overtake__m0.k0.png",
@@ -190,7 +490,7 @@
       "tracePath": "content/traces/sc-ov-oneway/mistake-wrong-way.trace.json",
       "src": "/clips/sc-ov-oneway__m0.webm",
       "durationSec": 14,
-      "recordedAt": "2026-07-21T07:54:24.848Z",
+      "recordedAt": "2026-07-21T11:43:56.969Z",
       "titleBg": "Ляв завой срещу еднопосочната",
       "keyframes": [
         "/clips/sc-ov-oneway__m0.k0.png",
@@ -209,8 +509,8 @@
       "mistakeIndex": 0,
       "tracePath": "content/traces/sc-ov-solid-line/mistake-pullout.trace.json",
       "src": "/clips/sc-ov-solid-line__m0.webm",
-      "durationSec": 14.38,
-      "recordedAt": "2026-07-21T07:54:42.387Z",
+      "durationSec": 14.379999999999905,
+      "recordedAt": "2026-07-21T11:45:20.411Z",
       "titleBg": "Изпреварващо излизане през плътната линия",
       "keyframes": [
         "/clips/sc-ov-solid-line__m0.k0.png",
@@ -224,13 +524,39 @@
       "quality": "high"
     },
     {
+      "id": "sc-park-parallel__m0",
+      "templateId": "sc-park-parallel",
+      "mistakeIndex": 0,
+      "tracePath": "content/traces/sc-park-parallel/mistake-far-from-lead.trace.json",
+      "src": "/clips/sc-park-parallel__m0.webm",
+      "durationSec": 12,
+      "recordedAt": "2026-07-21T20:23:49.294Z",
+      "titleBg": "Твърде далеч от предната кола",
+      "keyframes": [
+        "/clips/sc-park-parallel__m0.k0.png",
+        "/clips/sc-park-parallel__m0.k1.png",
+        "/clips/sc-park-parallel__m0.k2.png",
+        "/clips/sc-park-parallel__m0.k3.png",
+        "/clips/sc-park-parallel__m0.k4.png"
+      ],
+      "actors": [
+        {
+          "kind": "parkedVehicle",
+          "label": "Паркирани автомобили в съседните клетки",
+          "present": true
+        }
+      ],
+      "view": "exterior",
+      "quality": "high"
+    },
+    {
       "id": "sc-park-perp-rev__m0",
       "templateId": "sc-park-perp-rev",
       "mistakeIndex": 0,
       "tracePath": "content/traces/sc-park-perp-rev/mistake-wide-approach.trace.json",
       "src": "/clips/sc-park-perp-rev__m0.webm",
       "durationSec": 12,
-      "recordedAt": "2026-07-21T07:54:58.113Z",
+      "recordedAt": "2026-07-21T11:46:25.967Z",
       "titleBg": "Твърде широк подход",
       "keyframes": [
         "/clips/sc-park-perp-rev__m0.k0.png",
@@ -250,13 +576,65 @@
       "quality": "high"
     },
     {
+      "id": "sc-pe-parked-row-scan__m0",
+      "templateId": "sc-pe-parked-row-scan",
+      "mistakeIndex": 0,
+      "tracePath": "content/traces/sc-pe-parked-row-scan/mistake-fast-row.trace.json",
+      "src": "/clips/sc-pe-parked-row-scan__m0.webm",
+      "durationSec": 10.503333333333439,
+      "recordedAt": "2026-07-21T20:20:43.991Z",
+      "titleBg": "50 покрай редицата — детето е невидимо до последно",
+      "keyframes": [
+        "/clips/sc-pe-parked-row-scan__m0.k0.png",
+        "/clips/sc-pe-parked-row-scan__m0.k1.png",
+        "/clips/sc-pe-parked-row-scan__m0.k2.png",
+        "/clips/sc-pe-parked-row-scan__m0.k3.png",
+        "/clips/sc-pe-parked-row-scan__m0.k4.png"
+      ],
+      "actors": [
+        {
+          "kind": "pedestrian",
+          "label": "Пешеходец, който стъпва на пътеката",
+          "present": true
+        }
+      ],
+      "view": "exterior+dashboard",
+      "quality": "high"
+    },
+    {
+      "id": "sc-pe-zone-living__m0",
+      "templateId": "sc-pe-zone-living",
+      "mistakeIndex": 0,
+      "tracePath": "content/traces/sc-pe-zone-living/mistake-city-speed.trace.json",
+      "src": "/clips/sc-pe-zone-living__m0.webm",
+      "durationSec": 11.999999999999998,
+      "recordedAt": "2026-07-22T06:58:03.652Z",
+      "titleBg": "Квартална улица с 50",
+      "keyframes": [
+        "/clips/sc-pe-zone-living__m0.k0.png",
+        "/clips/sc-pe-zone-living__m0.k1.png",
+        "/clips/sc-pe-zone-living__m0.k2.png",
+        "/clips/sc-pe-zone-living__m0.k3.png",
+        "/clips/sc-pe-zone-living__m0.k4.png"
+      ],
+      "actors": [
+        {
+          "kind": "pedestrian",
+          "label": "Пешеходец, който стъпва на пътеката",
+          "present": true
+        }
+      ],
+      "view": "exterior+dashboard",
+      "quality": "high"
+    },
+    {
       "id": "sc-pk-ban-stop__m0",
       "templateId": "sc-pk-ban-stop",
       "mistakeIndex": 0,
       "tracePath": "content/traces/sc-pk-ban-stop/mistake-stop-in-zone.trace.json",
       "src": "/clips/sc-pk-ban-stop__m0.webm",
       "durationSec": 19.75,
-      "recordedAt": "2026-07-21T06:57:00.349Z",
+      "recordedAt": "2026-07-21T11:48:09.517Z",
       "titleBg": "„Само за минутка“ в зоната",
       "keyframes": [
         "/clips/sc-pk-ban-stop__m0.k0.png",
@@ -270,54 +648,30 @@
       "quality": "high"
     },
     {
-      "id": "sc-roundabout-entry__m0",
-      "templateId": "sc-roundabout-entry",
+      "id": "sc-rx-tram-left__m0",
+      "templateId": "sc-rx-tram-left",
       "mistakeIndex": 0,
-      "tracePath": "content/traces/sc-roundabout-entry/mistake-barge-entry.trace.json",
-      "src": "/clips/sc-roundabout-entry__m0.webm",
-      "durationSec": 14,
-      "recordedAt": "2026-07-21T04:51:22.326Z",
-      "titleBg": "Влизане без пропускане",
-      "keyframes": [
-        "/clips/sc-roundabout-entry__m0.k0.png",
-        "/clips/sc-roundabout-entry__m0.k1.png",
-        "/clips/sc-roundabout-entry__m0.k2.png",
-        "/clips/sc-roundabout-entry__m0.k3.png",
-        "/clips/sc-roundabout-entry__m0.k4.png"
-      ],
-      "actors": [
-        {
-          "kind": "vehicle",
-          "label": "Автомобил в кръговото (с предимство)",
-          "present": true
-        }
-      ],
-      "view": "exterior"
-    },
-    {
-      "id": "sc-roundabout-entry__m1",
-      "templateId": "sc-roundabout-entry",
-      "mistakeIndex": 1,
-      "tracePath": "content/traces/sc-roundabout-entry/mistake-exit-no-signal.trace.json",
-      "src": "/clips/sc-roundabout-entry__m1.webm",
+      "tracePath": "content/traces/sc-rx-tram-left/mistake-cut-tram.trace.json",
+      "src": "/clips/sc-rx-tram-left__m0.webm",
       "durationSec": 12,
-      "recordedAt": "2026-07-21T04:51:37.484Z",
-      "titleBg": "Излизане без десен мигач",
+      "recordedAt": "2026-07-22T06:56:45.694Z",
+      "titleBg": "Рязане пред трамвая",
       "keyframes": [
-        "/clips/sc-roundabout-entry__m1.k0.png",
-        "/clips/sc-roundabout-entry__m1.k1.png",
-        "/clips/sc-roundabout-entry__m1.k2.png",
-        "/clips/sc-roundabout-entry__m1.k3.png",
-        "/clips/sc-roundabout-entry__m1.k4.png"
+        "/clips/sc-rx-tram-left__m0.k0.png",
+        "/clips/sc-rx-tram-left__m0.k1.png",
+        "/clips/sc-rx-tram-left__m0.k2.png",
+        "/clips/sc-rx-tram-left__m0.k3.png",
+        "/clips/sc-rx-tram-left__m0.k4.png"
       ],
       "actors": [
         {
-          "kind": "vehicle",
-          "label": "Автомобил в кръговото (с предимство)",
+          "kind": "tram",
+          "label": "Трамвай насреща",
           "present": true
         }
       ],
-      "view": "exterior"
+      "view": "exterior",
+      "quality": "high"
     },
     {
       "id": "sc-rx-unguarded__m0",
@@ -326,7 +680,7 @@
       "tracePath": "content/traces/sc-rx-unguarded/mistake-roll-through.trace.json",
       "src": "/clips/sc-rx-unguarded__m0.webm",
       "durationSec": 14,
-      "recordedAt": "2026-07-21T04:51:54.403Z",
+      "recordedAt": "2026-07-21T15:50:38.917Z",
       "titleBg": "Преминаване без спиране",
       "keyframes": [
         "/clips/sc-rx-unguarded__m0.k0.png",
@@ -336,7 +690,54 @@
         "/clips/sc-rx-unguarded__m0.k4.png"
       ],
       "actors": [],
-      "view": "exterior"
+      "view": "exterior",
+      "quality": "high"
+    },
+    {
+      "id": "sc-sign-warning__m0",
+      "templateId": "sc-sign-warning",
+      "mistakeIndex": 0,
+      "tracePath": "content/traces/sc-sign-warning/mistake-hold-speed.trace.json",
+      "src": "/clips/sc-sign-warning__m0.webm",
+      "durationSec": 12,
+      "recordedAt": "2026-07-22T09:12:17.940Z",
+      "titleBg": "Задържана скорост през хлъзгавия участък",
+      "keyframes": [
+        "/clips/sc-sign-warning__m0.k0.png",
+        "/clips/sc-sign-warning__m0.k1.png",
+        "/clips/sc-sign-warning__m0.k2.png",
+        "/clips/sc-sign-warning__m0.k3.png",
+        "/clips/sc-sign-warning__m0.k4.png"
+      ],
+      "actors": [],
+      "view": "exterior+dashboard",
+      "quality": "high"
+    },
+    {
+      "id": "sc-signal-controller__m0",
+      "templateId": "sc-signal-controller",
+      "mistakeIndex": 0,
+      "tracePath": "content/traces/sc-signal-controller/mistake-run.trace.json",
+      "src": "/clips/sc-signal-controller__m0.webm",
+      "durationSec": 13.999999999999998,
+      "recordedAt": "2026-07-21T20:25:08.791Z",
+      "titleBg": "Зеленото „печели“ срещу регулировчика",
+      "keyframes": [
+        "/clips/sc-signal-controller__m0.k0.png",
+        "/clips/sc-signal-controller__m0.k1.png",
+        "/clips/sc-signal-controller__m0.k2.png",
+        "/clips/sc-signal-controller__m0.k3.png",
+        "/clips/sc-signal-controller__m0.k4.png"
+      ],
+      "actors": [
+        {
+          "kind": "controller",
+          "label": "Регулировчик на кръстовището",
+          "present": true
+        }
+      ],
+      "view": "exterior",
+      "quality": "high"
     },
     {
       "id": "sc-speed-creep__m0",
@@ -345,7 +746,7 @@
       "tracePath": "content/traces/sc-speed-creep/mistake-flow-along.trace.json",
       "src": "/clips/sc-speed-creep__m0.webm",
       "durationSec": 12.93,
-      "recordedAt": "2026-07-21T04:52:19.943Z",
+      "recordedAt": "2026-07-21T15:05:14.645Z",
       "titleBg": "Носене с потока по подхода",
       "keyframes": [
         "/clips/sc-speed-creep__m0.k0.png",
@@ -355,7 +756,8 @@
         "/clips/sc-speed-creep__m0.k4.png"
       ],
       "actors": [],
-      "view": "exterior"
+      "view": "exterior+dashboard",
+      "quality": "high"
     },
     {
       "id": "sc-speed-rain__m0",
@@ -363,9 +765,9 @@
       "mistakeIndex": 0,
       "tracePath": "content/traces/sc-speed-rain/mistake-dry-speed.trace.json",
       "src": "/clips/sc-speed-rain__m0.webm",
-      "durationSec": 12,
-      "recordedAt": "2026-07-21T04:52:35.259Z",
-      "titleBg": "„Карам под знака“ — 50 в дъжда",
+      "durationSec": 12.57,
+      "recordedAt": "2026-07-21T17:39:42.424Z",
+      "titleBg": "Като на сухо — 72 при знак 50 в дъжда",
       "keyframes": [
         "/clips/sc-speed-rain__m0.k0.png",
         "/clips/sc-speed-rain__m0.k1.png",
@@ -374,7 +776,85 @@
         "/clips/sc-speed-rain__m0.k4.png"
       ],
       "actors": [],
-      "view": "exterior"
+      "view": "exterior+dashboard",
+      "quality": "high"
+    },
+    {
+      "id": "sc-speed-rain__m1",
+      "templateId": "sc-speed-rain",
+      "mistakeIndex": 1,
+      "tracePath": "content/traces/sc-speed-rain/mistake-flow-along.trace.json",
+      "src": "/clips/sc-speed-rain__m1.webm",
+      "durationSec": 12,
+      "recordedAt": "2026-07-21T17:36:51.473Z",
+      "titleBg": "Каране с потока в дъжда",
+      "keyframes": [
+        "/clips/sc-speed-rain__m1.k0.png",
+        "/clips/sc-speed-rain__m1.k1.png",
+        "/clips/sc-speed-rain__m1.k2.png",
+        "/clips/sc-speed-rain__m1.k3.png",
+        "/clips/sc-speed-rain__m1.k4.png"
+      ],
+      "actors": [],
+      "view": "exterior+dashboard",
+      "quality": "high"
+    },
+    {
+      "id": "sc-turn-left-oncoming__m0",
+      "templateId": "sc-turn-left-oncoming",
+      "mistakeIndex": 0,
+      "tracePath": "content/traces/sc-turn-left-oncoming/mistake-cut-gap.trace.json",
+      "src": "/clips/sc-turn-left-oncoming__m0.webm",
+      "durationSec": 12,
+      "recordedAt": "2026-07-21T20:19:40.860Z",
+      "titleBg": "Рязане на тесния интервал",
+      "keyframes": [
+        "/clips/sc-turn-left-oncoming__m0.k0.png",
+        "/clips/sc-turn-left-oncoming__m0.k1.png",
+        "/clips/sc-turn-left-oncoming__m0.k2.png",
+        "/clips/sc-turn-left-oncoming__m0.k3.png",
+        "/clips/sc-turn-left-oncoming__m0.k4.png"
+      ],
+      "actors": [
+        {
+          "kind": "vehicle",
+          "label": "Автомобил насреща",
+          "present": true
+        },
+        {
+          "kind": "vehicle",
+          "label": "Автомобил насреща",
+          "present": true
+        }
+      ],
+      "view": "exterior",
+      "quality": "high"
+    },
+    {
+      "id": "sc-vp-police-stop__m1",
+      "templateId": "sc-vp-police-stop",
+      "mistakeIndex": 1,
+      "tracePath": "content/traces/sc-vp-police-stop/mistake-panic-stop.trace.json",
+      "src": "/clips/sc-vp-police-stop__m1.webm",
+      "durationSec": 11.400000000000192,
+      "recordedAt": "2026-07-22T06:01:19.295Z",
+      "titleBg": "Паника в лентата",
+      "keyframes": [
+        "/clips/sc-vp-police-stop__m1.k0.png",
+        "/clips/sc-vp-police-stop__m1.k1.png",
+        "/clips/sc-vp-police-stop__m1.k2.png",
+        "/clips/sc-vp-police-stop__m1.k3.png",
+        "/clips/sc-vp-police-stop__m1.k4.png"
+      ],
+      "actors": [
+        {
+          "kind": "police",
+          "label": "Полицейски служител със стоп-палка",
+          "present": true
+        }
+      ],
+      "view": "exterior",
+      "quality": "high"
     },
     {
       "id": "sc-vp-readiness__m0",
@@ -383,7 +863,7 @@
       "tracePath": "content/traces/sc-vp-readiness/mistake-no-belt.trace.json",
       "src": "/clips/sc-vp-readiness__m0.webm",
       "durationSec": 10,
-      "recordedAt": "2026-07-21T04:52:48.272Z",
+      "recordedAt": "2026-07-21T11:54:20.368Z",
       "titleBg": "Тръгване без колан",
       "keyframes": [
         "/clips/sc-vp-readiness__m0.k0.png",
@@ -393,7 +873,28 @@
         "/clips/sc-vp-readiness__m0.k4.png"
       ],
       "actors": [],
-      "view": "cockpit"
+      "view": "cockpit",
+      "quality": "high"
+    },
+    {
+      "id": "sc-vp-telltale-red__m0",
+      "templateId": "sc-vp-telltale-red",
+      "mistakeIndex": 0,
+      "tracePath": "content/traces/sc-vp-telltale-red/mistake-drive-on.trace.json",
+      "src": "/clips/sc-vp-telltale-red__m0.webm",
+      "durationSec": 10.140000000000018,
+      "recordedAt": "2026-07-22T06:55:34.867Z",
+      "titleBg": "Каране нататък с червената лампа",
+      "keyframes": [
+        "/clips/sc-vp-telltale-red__m0.k0.png",
+        "/clips/sc-vp-telltale-red__m0.k1.png",
+        "/clips/sc-vp-telltale-red__m0.k2.png",
+        "/clips/sc-vp-telltale-red__m0.k3.png",
+        "/clips/sc-vp-telltale-red__m0.k4.png"
+      ],
+      "actors": [],
+      "view": "exterior+dashboard",
+      "quality": "high"
     },
     {
       "id": "sc-vu-emergency__m0",
@@ -401,8 +902,8 @@
       "mistakeIndex": 0,
       "tracePath": "content/traces/sc-vu-emergency/mistake-block.trace.json",
       "src": "/clips/sc-vu-emergency__m0.webm",
-      "durationSec": 12,
-      "recordedAt": "2026-07-21T04:53:03.279Z",
+      "durationSec": 12.000000000000002,
+      "recordedAt": "2026-07-21T17:35:46.991Z",
       "titleBg": "Блокиране на линейката",
       "keyframes": [
         "/clips/sc-vu-emergency__m0.k0.png",
@@ -418,7 +919,34 @@
           "present": true
         }
       ],
-      "view": "exterior"
+      "view": "exterior",
+      "quality": "high"
+    },
+    {
+      "id": "sc-vu-pass-clearance__m1",
+      "templateId": "sc-vu-pass-clearance",
+      "mistakeIndex": 1,
+      "tracePath": "content/traces/sc-vu-pass-clearance/mistake-fast-close.trace.json",
+      "src": "/clips/sc-vu-pass-clearance__m1.webm",
+      "durationSec": 11.999999999999998,
+      "recordedAt": "2026-07-22T06:00:10.399Z",
+      "titleBg": "Бързо изпреварване с късно отместване",
+      "keyframes": [
+        "/clips/sc-vu-pass-clearance__m1.k0.png",
+        "/clips/sc-vu-pass-clearance__m1.k1.png",
+        "/clips/sc-vu-pass-clearance__m1.k2.png",
+        "/clips/sc-vu-pass-clearance__m1.k3.png",
+        "/clips/sc-vu-pass-clearance__m1.k4.png"
+      ],
+      "actors": [
+        {
+          "kind": "cyclist",
+          "label": "Велосипедист отдясно",
+          "present": true
+        }
+      ],
+      "view": "exterior",
+      "quality": "high"
     },
     {
       "id": "sc-zebra-approach__m0",
@@ -426,9 +954,25 @@
       "mistakeIndex": 0,
       "tracePath": "content/traces/sc-zebra-approach/mistake-too-fast.trace.json",
       "src": "/clips/sc-zebra-approach__m0.webm",
-      "durationSec": 11.23,
-      "recordedAt": "2026-07-20T20:51:08.480Z",
-      "titleBg": "Твърде бързо приближаване"
+      "durationSec": 11.07,
+      "recordedAt": "2026-07-21T11:56:31.305Z",
+      "titleBg": "Твърде бързо приближаване",
+      "keyframes": [
+        "/clips/sc-zebra-approach__m0.k0.png",
+        "/clips/sc-zebra-approach__m0.k1.png",
+        "/clips/sc-zebra-approach__m0.k2.png",
+        "/clips/sc-zebra-approach__m0.k3.png",
+        "/clips/sc-zebra-approach__m0.k4.png"
+      ],
+      "actors": [
+        {
+          "kind": "pedestrian",
+          "label": "Пешеходец, който стъпва на пътеката",
+          "present": true
+        }
+      ],
+      "view": "exterior",
+      "quality": "high"
     }
   ]
 }
