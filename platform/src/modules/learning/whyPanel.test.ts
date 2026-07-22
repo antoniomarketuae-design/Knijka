@@ -110,17 +110,14 @@ describe("resolveWhyPanel — the question → drill chain (pinned picks)", () =
     });
   });
 
-  it("q-krastovishta-005 (ev-junction-priority-sign) → sc-roundabout-entry (catalog order: flow spreads before junctions)", () => {
-    // FAILED_TO_YIELD is the event's only catalog code; the FIRST template in
-    // SCENARIO_TEMPLATES order whose mistake cites it exactly is
-    // sc-roundabout-entry (templates-flow.ts) — sc-junction-rhr comes later.
-    // Pinned so a template reorder is caught here, never silently shipped.
+  it("q-krastovishta-005 (ev-junction-priority-sign) → sc-jx-priority-confidence (coverage batch wiring)", () => {
+    // ev-junction-priority-sign was UNWIRED: the code-match (FAILED_TO_YIELD)
+    // fell through to sc-roundabout-entry — a ROUNDABOUT (wrong topic) with no
+    // rendered reel, so the panel showed the 2D fallback. The 2026-07-22
+    // coverage batch wires the event straight at the priority-junction reel.
     const payload = resolveWhyPanel("q-krastovishta-005");
-    expect(payload?.sim?.templateId).toBe("sc-roundabout-entry");
-    expect(payload?.sim?.mistake.titleBg).toBe("Влизане без пропускане");
-    expect(payload?.sim?.mistake.tracePath).toBe(
-      "content/traces/sc-roundabout-entry/mistake-barge-entry.trace.json",
-    );
+    expect(payload?.sim?.templateId).toBe("sc-jx-priority-confidence");
+    expect(payload?.sim?.mistake.tracePath).toContain("sc-jx-priority-confidence");
   });
 
   it("returns the STORED explanation + citations verbatim (ADR-002)", () => {
@@ -151,11 +148,31 @@ describe("resolveWhyPanel — fallbacks", () => {
     expect("sim" in payload!).toBe(false);
   });
 
-  it("event without rule-engine codes (q-krastovishta-012, ev-roundabout) → no sim", () => {
+  it("a Half-B reel wiring (q-signs-005, ev-sign-warning) → sc-sign-warning reel", () => {
+    // ev-sign-warning used to be a no-sim (text-only) event; the Half-B reel
+    // wave wires it straight at the А15 slippery-sign drill (EVENT_TO_SCENARIO
+    // → sc-sign-warning, mistake 0). The no-sim fallback for a question with no
+    // scenario-map event at all stays covered by q-ptp-002 above.
+    expect(QUESTION_EVENT_TYPE["q-signs-005"]).toBe("ev-sign-warning");
+    const payload = resolveWhyPanel("q-signs-005");
+    expect(payload?.sim?.templateId).toBe("sc-sign-warning");
+    expect(payload?.sim?.mistake.tracePath).toBe(
+      "content/traces/sc-sign-warning/mistake-hold-speed.trace.json",
+    );
+  });
+
+  it("a directly-wired event (q-krastovishta-012, ev-roundabout) → sc-roundabout-entry reel", () => {
+    // The EVENT→SCENARIO resolver: ev-roundabout has no rule codes, but the
+    // direct wiring points it straight at the roundabout barge-entry demo.
     expect(QUESTION_EVENT_TYPE["q-krastovishta-012"]).toBe("ev-roundabout");
     const payload = resolveWhyPanel("q-krastovishta-012");
-    expect(payload).not.toBeNull();
-    expect(payload!.sim).toBeUndefined();
+    expect(payload?.sim?.templateId).toBe("sc-roundabout-entry");
+    expect(payload?.sim?.mistake.titleBg).toBe("Влизане без пропускане");
+    expect(payload?.sim?.mistake.tracePath).toBe(
+      "content/traces/sc-roundabout-entry/mistake-barge-entry.trace.json",
+    );
+    // No rule codes → no founder mistake-experience class wired.
+    expect(payload?.sim?.experience).toBeNull();
   });
 
   it("unknown question id → null", () => {
@@ -184,7 +201,11 @@ describe("resolveWhyPanel — every resolvable drill ref is playable", () => {
       expect(sim.titleBg.length).toBeGreaterThan(0);
       expect(sim.mistake.whatWentWrongBg.length).toBeGreaterThan(0);
     }
-    // 20 of the 45 events carry rule-engine codes today; all must resolve.
-    expect(resolved).toBe(20);
+    // After the 2026-07-22 coverage batch (EVENT_TO_SCENARIO now wires every
+    // question-event to the reel that depicts it), all 45 distinct mapped
+    // events resolve to a playable drill — no behavior question falls through
+    // to a code-match-roulette scenario. (ev-accident-own-conduct is wired but
+    // has no question mapping yet, so it is not among these 45.)
+    expect(resolved).toBe(45);
   });
 });

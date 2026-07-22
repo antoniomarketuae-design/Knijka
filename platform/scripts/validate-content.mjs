@@ -23,7 +23,7 @@ const SCENE_ZOOM_MAX_M = 500;
 const SCENE_MAX_POSES = 12;
 const SCENE_MAX_MARKS = 8;
 const SCENE_POSE_KINDS = ["car", "truck", "bus", "tram", "bike", "ped"];
-const SCENE_MARK_KINDS = ["danger", "target"];
+const SCENE_MARK_KINDS = ["danger", "target", "proceed", "yield"];
 
 // --------------------------------------------------------------------------
 // Locate /content (repo root), robust to cwd.
