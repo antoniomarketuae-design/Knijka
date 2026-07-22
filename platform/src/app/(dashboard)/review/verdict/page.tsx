@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { requireUser } from "@/modules/auth";
 import { loadHalfAItems } from "@/app/dev/verdict-board/halfAData";
+import { loadCoverage } from "@/app/dev/verdict-board/coverageData";
 import { VerdictBoardClient } from "@/app/dev/verdict-board/VerdictBoardClient";
 
 export const metadata: Metadata = {
@@ -24,5 +25,5 @@ export const metadata: Metadata = {
 export default async function VerdictBoardStagingPage() {
   const user = await requireUser();
   if (!user.isAdmin) notFound();
-  return <VerdictBoardClient halfA={loadHalfAItems()} />;
+  return <VerdictBoardClient halfA={loadHalfAItems()} coverage={loadCoverage()} />;
 }

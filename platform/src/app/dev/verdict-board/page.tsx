@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { loadHalfAItems } from "./halfAData";
+import { loadCoverage } from "./coverageData";
 import { VerdictBoardClient } from "./VerdictBoardClient";
 
 export const metadata: Metadata = {
@@ -21,5 +22,5 @@ export const metadata: Metadata = {
  */
 export default function VerdictBoardPage() {
   if (process.env.NODE_ENV === "production") notFound();
-  return <VerdictBoardClient halfA={loadHalfAItems()} />;
+  return <VerdictBoardClient halfA={loadHalfAItems()} coverage={loadCoverage()} />;
 }

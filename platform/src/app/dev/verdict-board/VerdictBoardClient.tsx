@@ -31,6 +31,8 @@ import { durationFixStep } from "@/components/theory/webmDuration";
 import { r0StatusFor, type R0Level } from "./r0Status";
 import type { HalfAItem } from "./halfAData";
 import { HalfASection } from "./HalfASection";
+import type { CoverageSummary } from "./coverageData";
+import { CoverageTab } from "./CoverageTab";
 
 type Verdict = "ok" | "problem";
 const VERDICT_KEY_PREFIX = "clip-verdict:";
@@ -234,13 +236,19 @@ function ReelCard({
 
 // --- board -------------------------------------------------------------------
 
-export function VerdictBoardClient({ halfA }: { halfA: readonly HalfAItem[] }) {
+export function VerdictBoardClient({
+  halfA,
+  coverage,
+}: {
+  halfA: readonly HalfAItem[];
+  coverage: CoverageSummary;
+}) {
   const [clips, setClips] = useState<MistakeClip[] | null>(null);
   const [verdicts, setVerdicts] = useState<Record<string, Verdict>>({});
   const [family, setFamily] = useState<string | null>(null);
   const [onlyFlagged, setOnlyFlagged] = useState(false);
   const [activeId, setActiveId] = useState<string | null>(null);
-  const [tab, setTab] = useState<"reels" | "signs">("reels");
+  const [tab, setTab] = useState<"reels" | "signs" | "coverage">("reels");
   const onActivate = useCallback((id: string) => setActiveId(id), []);
 
   // Load the manifest + hydrate stored verdicts once.
@@ -334,6 +342,10 @@ export function VerdictBoardClient({ halfA }: { halfA: readonly HalfAItem[] }) {
           [
             ["reels", `Half B — клипове (${clips?.length ?? 0})`],
             ["signs", `Half A — картинки (${halfA.length})`],
+            [
+              "coverage",
+              `Покритие (${coverage.totalQuestions === 0 ? 0 : Math.round((coverage.reelQuestions / coverage.totalQuestions) * 100)}%)`,
+            ],
           ] as const
         ).map(([id, label]) => (
           <button
@@ -455,8 +467,10 @@ export function VerdictBoardClient({ halfA }: { halfA: readonly HalfAItem[] }) {
             </ul>
           )}
         </>
-      ) : (
+      ) : tab === "signs" ? (
         <HalfASection items={halfA} />
+      ) : (
+        <CoverageTab coverage={coverage} />
       )}
     </div>
   );
