@@ -72,6 +72,21 @@ export interface ClipPlanEntry {
 
 export const CLIP_PLAN: readonly ClipPlanEntry[] = [
   {
+    "id": "sc-ac-crosswind__m1",
+    "templateId": "sc-ac-crosswind",
+    "mistakeIndex": 1,
+    "tracePath": "content/traces/sc-ac-crosswind/mistake-overcorrect.trace.json",
+    "faultTimeSec": 21.23,
+    "requiredActors": [],
+    "governingControl": {
+      "kind": "none",
+      "label": "Няма"
+    },
+    "view": "exterior",
+    "camera": "chase",
+    "notes": "Управляващ елемент: няма — правило за поведение (без знак/сигнал)"
+  },
+  {
     "id": "sc-ac-night-lights__m0",
     "templateId": "sc-ac-night-lights",
     "mistakeIndex": 0,
@@ -100,6 +115,65 @@ export const CLIP_PLAN: readonly ClipPlanEntry[] = [
     "view": "exterior+dashboard",
     "camera": "chase",
     "notes": "Управляващ елемент: няма — дъждовни условия; Светлинна грешка (R4) — фаровете отвън + лентата на таблото"
+  },
+  {
+    "id": "sc-accident-own-conduct__m0",
+    "templateId": "sc-accident-own-conduct",
+    "mistakeIndex": 0,
+    "tracePath": "content/traces/sc-accident-own-conduct/mistake-hit-and-flee.trace.json",
+    "faultTimeSec": 14.67,
+    "requiredActors": [],
+    "governingControl": {
+      "kind": "none",
+      "label": "Няма"
+    },
+    "view": "exterior",
+    "camera": "chase",
+    "notes": "Управляващ елемент: няма — правило за поведение (без знак/сигнал)"
+  },
+  {
+    "id": "sc-animal-hazard__m0",
+    "templateId": "sc-animal-hazard",
+    "mistakeIndex": 0,
+    "tracePath": "content/traces/sc-animal-hazard/mistake-swerve-oncoming.trace.json",
+    "faultTimeSec": 13.98,
+    "requiredActors": [
+      {
+        "kind": "vehicle",
+        "label": "Насрещен поток автомобили"
+      }
+    ],
+    "governingControl": {
+      "kind": "marking",
+      "label": "Маркировка М1 (плътна осева линия)",
+      "approxPos": {
+        "x": 0,
+        "y": 90
+      }
+    },
+    "view": "exterior",
+    "camera": "chase",
+    "notes": ""
+  },
+  {
+    "id": "sc-driver-distraction__m0",
+    "templateId": "sc-driver-distraction",
+    "mistakeIndex": 0,
+    "tracePath": "content/traces/sc-driver-distraction/mistake-late-react.trace.json",
+    "faultTimeSec": 12.17,
+    "requiredActors": [
+      {
+        "kind": "pedestrian",
+        "label": "Пешеходец, който стъпва на пътеката"
+      }
+    ],
+    "governingControl": {
+      "kind": "none",
+      "label": "Няма"
+    },
+    "view": "exterior",
+    "camera": "chase",
+    "notes": "Управляващ елемент: няма — правило за поведение (без знак/сигнал)"
   },
   {
     "id": "sc-ed-d2-city-run__m0",
@@ -146,6 +220,61 @@ export const CLIP_PLAN: readonly ClipPlanEntry[] = [
     "notes": "Управляващ елемент: няма — правило за поведение (без знак/сигнал)"
   },
   {
+    "id": "sc-hz-brake-dont-swerve__m0",
+    "templateId": "sc-hz-brake-dont-swerve",
+    "mistakeIndex": 0,
+    "tracePath": "content/traces/sc-hz-brake-dont-swerve/mistake-blind-swerve.trace.json",
+    "faultTimeSec": 14.62,
+    "requiredActors": [
+      {
+        "kind": "vehicle",
+        "label": "Автомобил, който се вклинява отпред"
+      }
+    ],
+    "governingControl": {
+      "kind": "none",
+      "label": "Няма"
+    },
+    "view": "exterior",
+    "camera": "chase",
+    "notes": "Управляващ елемент: няма — правило за поведение (без знак/сигнал)"
+  },
+  {
+    "id": "sc-hz-breakdown-pulloff__m0",
+    "templateId": "sc-hz-breakdown-pulloff",
+    "mistakeIndex": 0,
+    "tracePath": "content/traces/sc-hz-breakdown-pulloff/mistake-shoulder-drive.trace.json",
+    "faultTimeSec": 20.72,
+    "requiredActors": [],
+    "governingControl": {
+      "kind": "none",
+      "label": "Няма"
+    },
+    "view": "exterior+dashboard",
+    "camera": "chase",
+    "notes": "Управляващ елемент: няма — правило за поведение (без знак/сигнал); Контролна лампа (R4) — червеният индикатор свети на лентата на таблото при грешката"
+  },
+  {
+    "id": "sc-junction-rhr__m1",
+    "templateId": "sc-junction-rhr",
+    "mistakeIndex": 1,
+    "tracePath": "content/traces/sc-junction-rhr/mistake-no-look.trace.json",
+    "faultTimeSec": 19.93,
+    "requiredActors": [
+      {
+        "kind": "vehicle",
+        "label": "Автомобил отдясно с предимство"
+      }
+    ],
+    "governingControl": {
+      "kind": "none",
+      "label": "Няма"
+    },
+    "view": "exterior",
+    "camera": "chase",
+    "notes": "Управляващ елемент: няма — правило за поведение (без знак/сигнал)"
+  },
+  {
     "id": "sc-junction-stop__m0",
     "templateId": "sc-junction-stop",
     "mistakeIndex": 0,
@@ -165,6 +294,26 @@ export const CLIP_PLAN: readonly ClipPlanEntry[] = [
     "notes": ""
   },
   {
+    "id": "sc-jx-priority-confidence__m0",
+    "templateId": "sc-jx-priority-confidence",
+    "mistakeIndex": 0,
+    "tracePath": "content/traces/sc-jx-priority-confidence/mistake-phantom-brake.trace.json",
+    "faultTimeSec": 9.28,
+    "requiredActors": [
+      {
+        "kind": "vehicle",
+        "label": "Автомобил отдясно с предимство"
+      }
+    ],
+    "governingControl": {
+      "kind": "none",
+      "label": "Няма"
+    },
+    "view": "exterior",
+    "camera": "rearAware",
+    "notes": "Управляващ елемент: няма — правило за поведение (без знак/сигнал); Ключовият участник идва ОТЗАД — страничен три-четвърти кадър (rearAware), който държи и призрака, и приближаващия отзад в рамката"
+  },
+  {
     "id": "sc-lane-change__m0",
     "templateId": "sc-lane-change",
     "mistakeIndex": 0,
@@ -174,6 +323,125 @@ export const CLIP_PLAN: readonly ClipPlanEntry[] = [
       {
         "kind": "vehicle",
         "label": "Автомобил отпред в лентата (води)"
+      }
+    ],
+    "governingControl": {
+      "kind": "none",
+      "label": "Няма"
+    },
+    "view": "exterior",
+    "camera": "chase",
+    "notes": "Управляващ елемент: няма — правило за поведение (без знак/сигнал)"
+  },
+  {
+    "id": "sc-lane-control-signal__m0",
+    "templateId": "sc-lane-control-signal",
+    "mistakeIndex": 0,
+    "tracePath": "content/traces/sc-lane-control-signal/mistake-closed-lane.trace.json",
+    "faultTimeSec": 2.13,
+    "requiredActors": [
+      {
+        "kind": "vehicle",
+        "label": "Насрещен поток автомобили"
+      }
+    ],
+    "governingControl": {
+      "kind": "none",
+      "label": "Няма"
+    },
+    "view": "exterior",
+    "camera": "chase",
+    "notes": "Управляващ елемент: няма — правило за поведение (без знак/сигнал)"
+  },
+  {
+    "id": "sc-ln-obstacle-meeting__m0",
+    "templateId": "sc-ln-obstacle-meeting",
+    "mistakeIndex": 0,
+    "tracePath": "content/traces/sc-ln-obstacle-meeting/mistake-pull-out.trace.json",
+    "faultTimeSec": 17.48,
+    "requiredActors": [
+      {
+        "kind": "vehicle",
+        "label": "Насрещен поток автомобили"
+      },
+      {
+        "kind": "vehicle",
+        "label": "Насрещен автомобил в стеснението"
+      }
+    ],
+    "governingControl": {
+      "kind": "none",
+      "label": "Няма"
+    },
+    "view": "exterior",
+    "camera": "chase",
+    "notes": "Управляващ елемент: няма — правило за поведение (без знак/сигнал)"
+  },
+  {
+    "id": "sc-merge-accel-lane__m0",
+    "templateId": "sc-merge-accel-lane",
+    "mistakeIndex": 0,
+    "tracePath": "content/traces/sc-merge-accel-lane/mistake-stop-at-end.trace.json",
+    "faultTimeSec": 14.47,
+    "requiredActors": [],
+    "governingControl": {
+      "kind": "none",
+      "label": "Няма"
+    },
+    "view": "exterior",
+    "camera": "rearAware",
+    "notes": "Управляващ елемент: няма — правило за поведение (без знак/сигнал); Ключовият участник идва ОТЗАД — страничен три-четвърти кадър (rearAware), който държи и призрака, и приближаващия отзад в рамката"
+  },
+  {
+    "id": "sc-merge-bus-pullout__m0",
+    "templateId": "sc-merge-bus-pullout",
+    "mistakeIndex": 0,
+    "tracePath": "content/traces/sc-merge-bus-pullout/mistake-force-past.trace.json",
+    "faultTimeSec": 16.32,
+    "requiredActors": [
+      {
+        "kind": "vehicle",
+        "label": "Камион, който се вклинява отпред"
+      }
+    ],
+    "governingControl": {
+      "kind": "none",
+      "label": "Няма"
+    },
+    "view": "exterior",
+    "camera": "chase",
+    "notes": "Управляващ елемент: няма — правило за поведение (без знак/сигнал)"
+  },
+  {
+    "id": "sc-merge-from-property__m1",
+    "templateId": "sc-merge-from-property",
+    "mistakeIndex": 1,
+    "tracePath": "content/traces/sc-merge-from-property/mistake-signal-and-go.trace.json",
+    "faultTimeSec": 23.48,
+    "requiredActors": [
+      {
+        "kind": "vehicle",
+        "label": "Насрещен поток автомобили"
+      }
+    ],
+    "governingControl": {
+      "kind": "none",
+      "label": "Няма"
+    },
+    "view": "exterior",
+    "camera": "chase",
+    "notes": "Управляващ елемент: няма — правило за поведение (без знак/сигнал)"
+  },
+  {
+    "id": "sc-mv-uturn-ban__m1",
+    "templateId": "sc-mv-uturn-ban",
+    "mistakeIndex": 1,
+    "tracePath": "content/traces/sc-mv-uturn-ban/mistake-into-stream.trace.json",
+    "faultTimeSec": 33.22,
+    "requiredActors": [
+      {
+        "kind": "vehicle",
+        "label": "Насрещен поток автомобили"
       }
     ],
     "governingControl": {
@@ -267,6 +535,26 @@ export const CLIP_PLAN: readonly ClipPlanEntry[] = [
     "notes": ""
   },
   {
+    "id": "sc-park-parallel__m0",
+    "templateId": "sc-park-parallel",
+    "mistakeIndex": 0,
+    "tracePath": "content/traces/sc-park-parallel/mistake-far-from-lead.trace.json",
+    "faultTimeSec": 39.03,
+    "requiredActors": [
+      {
+        "kind": "parkedVehicle",
+        "label": "Паркирани автомобили в съседните клетки"
+      }
+    ],
+    "governingControl": {
+      "kind": "none",
+      "label": "Няма"
+    },
+    "view": "exterior",
+    "camera": "chase",
+    "notes": "Управляващ елемент: няма — правило за поведение (без знак/сигнал)"
+  },
+  {
     "id": "sc-park-perp-rev__m0",
     "templateId": "sc-park-perp-rev",
     "mistakeIndex": 0,
@@ -285,6 +573,46 @@ export const CLIP_PLAN: readonly ClipPlanEntry[] = [
     "view": "exterior",
     "camera": "chase",
     "notes": "Управляващ елемент: няма — правило за поведение (без знак/сигнал)"
+  },
+  {
+    "id": "sc-pe-parked-row-scan__m0",
+    "templateId": "sc-pe-parked-row-scan",
+    "mistakeIndex": 0,
+    "tracePath": "content/traces/sc-pe-parked-row-scan/mistake-fast-row.trace.json",
+    "faultTimeSec": 7.57,
+    "requiredActors": [
+      {
+        "kind": "pedestrian",
+        "label": "Пешеходец, който стъпва на пътеката"
+      }
+    ],
+    "governingControl": {
+      "kind": "none",
+      "label": "Няма"
+    },
+    "view": "exterior+dashboard",
+    "camera": "chase",
+    "notes": "Превишена скорост без изводимо ограничение от картата — знакът не е изведен; Управляващ елемент: няма — правило за поведение (без знак/сигнал); Скоростна грешка (R4/5) — километражът на лентата на таблото я показва"
+  },
+  {
+    "id": "sc-pe-zone-living__m0",
+    "templateId": "sc-pe-zone-living",
+    "mistakeIndex": 0,
+    "tracePath": "content/traces/sc-pe-zone-living/mistake-city-speed.trace.json",
+    "faultTimeSec": 12.22,
+    "requiredActors": [
+      {
+        "kind": "pedestrian",
+        "label": "Пешеходец, който стъпва на пътеката"
+      }
+    ],
+    "governingControl": {
+      "kind": "none",
+      "label": "Няма"
+    },
+    "view": "exterior+dashboard",
+    "camera": "chase",
+    "notes": "Превишена скорост без изводимо ограничение от картата — знакът не е изведен; Управляващ елемент: няма — правило за поведение (без знак/сигнал); Скоростна грешка (R4/5) — километражът на лентата на таблото я показва"
   },
   {
     "id": "sc-pk-ban-stop__m0",
@@ -350,6 +678,26 @@ export const CLIP_PLAN: readonly ClipPlanEntry[] = [
     "notes": "Управляващ елемент: няма — правило за поведение (без знак/сигнал)"
   },
   {
+    "id": "sc-rx-tram-left__m0",
+    "templateId": "sc-rx-tram-left",
+    "mistakeIndex": 0,
+    "tracePath": "content/traces/sc-rx-tram-left/mistake-cut-tram.trace.json",
+    "faultTimeSec": 17.5,
+    "requiredActors": [
+      {
+        "kind": "tram",
+        "label": "Трамвай насреща"
+      }
+    ],
+    "governingControl": {
+      "kind": "none",
+      "label": "Няма"
+    },
+    "view": "exterior",
+    "camera": "chase",
+    "notes": "Управляващ елемент: няма — правило за поведение (без знак/сигнал)"
+  },
+  {
     "id": "sc-rx-unguarded__m0",
     "templateId": "sc-rx-unguarded",
     "mistakeIndex": 0,
@@ -366,14 +714,53 @@ export const CLIP_PLAN: readonly ClipPlanEntry[] = [
     },
     "view": "exterior",
     "camera": "chase",
+    "notes": "Непознат staged вид „trainPass“ — участникът не е изведен"
+  },
+  {
+    "id": "sc-sign-warning__m0",
+    "templateId": "sc-sign-warning",
+    "mistakeIndex": 0,
+    "tracePath": "content/traces/sc-sign-warning/mistake-hold-speed.trace.json",
+    "faultTimeSec": 22.15,
+    "requiredActors": [],
+    "governingControl": {
+      "kind": "none",
+      "label": "Няма"
+    },
+    "view": "exterior+dashboard",
+    "camera": "chase",
+    "notes": "Управляващ елемент: няма — дъждовни условия; Скоростна грешка (R4/5) — километражът на лентата на таблото я показва"
+  },
+  {
+    "id": "sc-signal-controller__m0",
+    "templateId": "sc-signal-controller",
+    "mistakeIndex": 0,
+    "tracePath": "content/traces/sc-signal-controller/mistake-run.trace.json",
+    "faultTimeSec": 14.33,
+    "requiredActors": [
+      {
+        "kind": "controller",
+        "label": "Регулировчик на кръстовището"
+      }
+    ],
+    "governingControl": {
+      "kind": "signal",
+      "label": "Светофар на кръстовището",
+      "approxPos": {
+        "x": 0,
+        "y": 0
+      }
+    },
+    "view": "exterior",
+    "camera": "chase",
     "notes": ""
   },
   {
-    "id": "sc-speed-creep__m0",
-    "templateId": "sc-speed-creep",
+    "id": "sc-speed-rain__m0",
+    "templateId": "sc-speed-rain",
     "mistakeIndex": 0,
-    "tracePath": "content/traces/sc-speed-creep/mistake-flow-along.trace.json",
-    "faultTimeSec": 8.93,
+    "tracePath": "content/traces/sc-speed-rain/mistake-dry-speed.trace.json",
+    "faultTimeSec": 8.57,
     "requiredActors": [],
     "governingControl": {
       "kind": "sign",
@@ -385,13 +772,13 @@ export const CLIP_PLAN: readonly ClipPlanEntry[] = [
     },
     "view": "exterior+dashboard",
     "camera": "chase",
-    "notes": "Грешката е ПРЕДИ прехода на ограничението (y≈99 < 400) — важи В26 (50) от входа на отсечката; Скоростна грешка (R4/5) — километражът на лентата на таблото я показва"
+    "notes": "Скоростна грешка (R4/5) — километражът на лентата на таблото я показва"
   },
   {
-    "id": "sc-speed-rain__m0",
+    "id": "sc-speed-rain__m1",
     "templateId": "sc-speed-rain",
-    "mistakeIndex": 0,
-    "tracePath": "content/traces/sc-speed-rain/mistake-dry-speed.trace.json",
+    "mistakeIndex": 1,
+    "tracePath": "content/traces/sc-speed-rain/mistake-flow-along.trace.json",
     "faultTimeSec": 8.35,
     "requiredActors": [],
     "governingControl": {
@@ -401,6 +788,50 @@ export const CLIP_PLAN: readonly ClipPlanEntry[] = [
     "view": "exterior+dashboard",
     "camera": "chase",
     "notes": "Управляващ елемент: няма — нощни условия; Скоростна грешка (R4/5) — километражът на лентата на таблото я показва"
+  },
+  {
+    "id": "sc-turn-left-oncoming__m0",
+    "templateId": "sc-turn-left-oncoming",
+    "mistakeIndex": 0,
+    "tracePath": "content/traces/sc-turn-left-oncoming/mistake-cut-gap.trace.json",
+    "faultTimeSec": 17.5,
+    "requiredActors": [
+      {
+        "kind": "vehicle",
+        "label": "Автомобил насреща"
+      },
+      {
+        "kind": "vehicle",
+        "label": "Автомобил насреща"
+      }
+    ],
+    "governingControl": {
+      "kind": "none",
+      "label": "Няма"
+    },
+    "view": "exterior",
+    "camera": "chase",
+    "notes": "Управляващ елемент: няма — правило за поведение (без знак/сигнал)"
+  },
+  {
+    "id": "sc-vp-police-stop__m1",
+    "templateId": "sc-vp-police-stop",
+    "mistakeIndex": 1,
+    "tracePath": "content/traces/sc-vp-police-stop/mistake-panic-stop.trace.json",
+    "faultTimeSec": 15.72,
+    "requiredActors": [
+      {
+        "kind": "police",
+        "label": "Полицейски служител със стоп-палка"
+      }
+    ],
+    "governingControl": {
+      "kind": "none",
+      "label": "Няма"
+    },
+    "view": "exterior",
+    "camera": "chase",
+    "notes": "Управляващ елемент: няма — правило за поведение (без знак/сигнал)"
   },
   {
     "id": "sc-vp-readiness__m0",
@@ -418,11 +849,26 @@ export const CLIP_PLAN: readonly ClipPlanEntry[] = [
     "notes": "Управляващ елемент: няма — правило за поведение (без знак/сигнал); Кабинна грешка (R4) — коланът/ръчната/загасването се виждат само отвътре"
   },
   {
+    "id": "sc-vp-telltale-red__m0",
+    "templateId": "sc-vp-telltale-red",
+    "mistakeIndex": 0,
+    "tracePath": "content/traces/sc-vp-telltale-red/mistake-drive-on.trace.json",
+    "faultTimeSec": 20.08,
+    "requiredActors": [],
+    "governingControl": {
+      "kind": "none",
+      "label": "Няма"
+    },
+    "view": "exterior+dashboard",
+    "camera": "chase",
+    "notes": "Управляващ елемент: няма — правило за поведение (без знак/сигнал); Контролна лампа (R4) — червеният индикатор свети на лентата на таблото при грешката"
+  },
+  {
     "id": "sc-vu-emergency__m0",
     "templateId": "sc-vu-emergency",
     "mistakeIndex": 0,
     "tracePath": "content/traces/sc-vu-emergency/mistake-block.trace.json",
-    "faultTimeSec": 18.82,
+    "faultTimeSec": 13.6,
     "requiredActors": [
       {
         "kind": "emergency",
@@ -436,6 +882,26 @@ export const CLIP_PLAN: readonly ClipPlanEntry[] = [
     "view": "exterior",
     "camera": "rearAware",
     "notes": "Управляващ елемент: няма — правило за поведение (без знак/сигнал); Ключовият участник идва ОТЗАД — страничен три-четвърти кадър (rearAware), който държи и призрака, и приближаващия отзад в рамката"
+  },
+  {
+    "id": "sc-vu-pass-clearance__m1",
+    "templateId": "sc-vu-pass-clearance",
+    "mistakeIndex": 1,
+    "tracePath": "content/traces/sc-vu-pass-clearance/mistake-fast-close.trace.json",
+    "faultTimeSec": 14.08,
+    "requiredActors": [
+      {
+        "kind": "cyclist",
+        "label": "Велосипедист отдясно"
+      }
+    ],
+    "governingControl": {
+      "kind": "none",
+      "label": "Няма"
+    },
+    "view": "exterior",
+    "camera": "chase",
+    "notes": "Управляващ елемент: няма — правило за поведение (без знак/сигнал)"
   },
   {
     "id": "sc-zebra-approach__m0",

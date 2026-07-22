@@ -468,6 +468,11 @@ export interface CaptureDashModel {
   gearLabel: string;
   speedKmh: number;
   brakeOn: boolean;
+  /** N11 (VP-06): the red engine-temperature warning telltale — lit from the
+   *  director's telltaleLit channel at capture time (the strip's twin of the
+   *  cockpit cluster's tempWarnOn). Not a trace channel, so the caller feeds
+   *  it into dashModelFor. */
+  tempWarnOn: boolean;
 }
 
 export function createCaptureDashModel(): CaptureDashModel {
@@ -479,10 +484,13 @@ export function createCaptureDashModel(): CaptureDashModel {
     gearLabel: "D",
     speedKmh: 0,
     brakeOn: false,
+    tempWarnOn: false,
   };
 }
 
-/** Fill the dash model from the trace point + derived cabin channels. */
+/** Fill the dash model from the trace point + derived cabin channels. The
+ *  telltale lamp has no trace channel — the caller passes the director's
+ *  live `telltaleLit` (default off for every non-telltale clip). */
 export function dashModelFor(
   pt: {
     indicator: "off" | "left" | "right";
@@ -493,6 +501,7 @@ export function dashModelFor(
   channels: CaptureCabinChannels,
   tSec: number,
   out: CaptureDashModel,
+  tempWarnOn = false,
 ): CaptureDashModel {
   const blink = blinkOnAt(tSec);
   out.leftLampLit = pt.indicator === "left" && blink;
@@ -502,6 +511,7 @@ export function dashModelFor(
   out.gearLabel = gearLabelFor(pt.gear);
   out.speedKmh = pt.speedKmh;
   out.brakeOn = pt.brakeOn;
+  out.tempWarnOn = tempWarnOn;
   return out;
 }
 
@@ -511,6 +521,7 @@ export function dashModelHash(m: CaptureDashModel): string {
   return (
     `${m.leftLampLit ? 1 : 0}${m.rightLampLit ? 1 : 0}${m.seatbeltOn ? 1 : 0}|` +
     `${m.headlights}|${m.gearLabel}|${m.brakeOn ? 1 : 0}|` +
+    `${m.tempWarnOn ? 1 : 0}|` +
     `${Math.max(0, Math.round(Math.abs(m.speedKmh)))}`
   );
 }
@@ -623,10 +634,18 @@ export interface ActorPresenceLog {
    *  lower-case tokens: "vehicle", "pedestrian", "parkedvehicle", plus any
    *  vehicle profile ("cyclist", "tram", "emergency", …). */
   framedKinds: string[];
+  /** TEMP DEBUG (remove): per-beat snapshots for capture geometry inspection. */
+  debugFrames?: Array<{
+    t: number;
+    gx: number;
+    gy: number;
+    gh: number;
+    cars: Array<{ x: number; y: number; inFrame: boolean }>;
+  }>;
 }
 
 export function createActorPresenceLog(): ActorPresenceLog {
-  return { vehicles: 0, pedestrians: 0, profiles: [], obstacleVehicles: 0, framedKinds: [] };
+  return { vehicles: 0, pedestrians: 0, profiles: [], obstacleVehicles: 0, framedKinds: [], debugFrames: [] };
 }
 
 /** Record a kind as seen in the planned frame (deduped, normalized). */
@@ -656,7 +675,16 @@ export function actorSpawned(kind: string, log: ActorPresenceLog): boolean {
     case "parkedvehicle":
       return log.framedKinds.includes("parkedvehicle") || log.framedKinds.includes("vehicle");
     case "police":
-      return log.framedKinds.includes("police") || log.framedKinds.includes("emergency");
+      // The officer figure renders through the traffic PEDESTRIAN pool — a
+      // staged pedestrian that never walks, pose "stopSignal" (runners.ts
+      // policeStop) — so the frame scan marks it "pedestrian"; there is no
+      // "police" vehicle profile to see. A framed pedestrian at the fault beat
+      // IS the officer (a police-stop template stages no other walker).
+      return (
+        log.framedKinds.includes("police") ||
+        log.framedKinds.includes("emergency") ||
+        log.framedKinds.includes("pedestrian")
+      );
     case "controller":
       // The регулировчик figure renders through the runtime controller
       // channel, not the traffic agent pool — the frame scan cannot see it.

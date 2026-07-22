@@ -344,3 +344,50 @@ describe("staged determinism", () => {
     }
   });
 });
+
+// ---------------------------------------------------------------------------
+// RX „жп прелез" — a staged vehicle riding an EXPLICIT rail polyline (railPath)
+// instead of a lane-graph path (the TRAIN crosses a line that is NOT a road).
+// ---------------------------------------------------------------------------
+
+describe("staged vehicle on an authored railPath (the RX train)", () => {
+  const RAIL_TRAIN: StagedVehicleSpec = {
+    kind: "vehicle",
+    id: "rail-train",
+    pathNodes: [], // no lane-graph path — the rail line is authored
+    railPath: [
+      { x: -130, y: 153 },
+      { x: 130, y: 153 },
+    ],
+    hold: { nodeIndex: 0, offsetM: 80 },
+    cruiseSpeedMps: 12,
+    accelMps2: 3.5,
+    profile: "train",
+    playerGuard: false,
+  };
+
+  it("resolves the explicit polyline (no road graph): nodeS at each vertex, holds off-axis", () => {
+    const system = squareSystem();
+    const view = system.stage(RAIL_TRAIN);
+    expect(view).not.toBeNull();
+    expect(view!.pathLengthM).toBeCloseTo(260); // -130 → 130
+    expect(view!.nodeS).toEqual([0, 260]); // both endpoints exposed as node arcs
+    expect(view!.s).toBeCloseTo(80); // hold arc (partway down the line, off-frame)
+    // Dormant pose sits on the band-centre line, west of the street axis.
+    expect(view!.y).toBeCloseTo(153);
+    expect(view!.x).toBeCloseTo(-50); // -130 + 80
+    // Published as a rail vehicle, not tagged a cyclist proxy (offset 0).
+    expect(system.vehicleCollisionKind(view === null ? -1 : 1000)).toBe("vehicle");
+  });
+
+  it("runs east across the axis on cruise and finishes at the far end", () => {
+    const system = squareSystem();
+    system.stage(RAIL_TRAIN);
+    system.stagedCommand("rail-train", { type: "cruise" });
+    run(system, 30, ctx());
+    const view = system.staged("rail-train")!;
+    expect(view.finished).toBe(true);
+    expect(view.x).toBeCloseTo(130); // reached the east end
+    expect(view.y).toBeCloseTo(153); // never left the rail line
+  });
+});

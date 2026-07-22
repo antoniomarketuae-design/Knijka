@@ -140,6 +140,23 @@ function pickPalmStreetEdges(network: RoadNetwork): Set<string> {
   return palmEdges;
 }
 
+/**
+ * Scenario opt-out for the procedural roadside tree passes (LC gantry reel fix).
+ * A teaching micro-map whose hero is an OVERHEAD element — the LC lane-signal
+ * gantry (LaneSignalGantry, gated on meta.scenario.laneGantry) — sets
+ * `meta.scenario.suppressRoadsideTrees: true` so the arterial / residential /
+ * park tree rows never grow on its verges and bury the chase camera between the
+ * ego and the red-✕ gantry. Default (flag absent / false) leaves every other
+ * district's tree placement byte-identical: this is read ONLY to skip the three
+ * tree passes below, nothing else about the build changes.
+ */
+function suppressRoadsideTreesOf(district: District): boolean {
+  const scenario = (district.meta as { scenario?: unknown }).scenario as
+    | { suppressRoadsideTrees?: unknown }
+    | undefined;
+  return scenario?.suppressRoadsideTrees === true;
+}
+
 export function buildProps(
   district: District,
   network: RoadNetwork,
@@ -296,6 +313,26 @@ export function buildProps(
     // Entering traffic flows AWAY from the boundary node; needs `outgoing`.
     if (ap.edge.oneway && ap.edge.to === nodeId) continue;
     if ((CLASS_RANK[ap.edge.class] ?? 2) < 2) continue; // skip service stubs
+    // Derive the plate from the LOCAL limit instead of hard-coding 50. The kit
+    // ships only the В26-50 face, so it stays honest on a >=50 edge (the
+    // documented ov-* understating quirk is preserved). But on the LOW-SPEED
+    // TAIL of a collinear zone transition — a reduced segment (e.g. the зона-30
+    // end of a 50→30 creep/school street) whose far end is a plain degree-2
+    // limit change back UP to a faster segment — a 50 face would OVERSTATE the
+    // graded cap, so suppress it there rather than post a sign that lies.
+    const localLimit = ap.edge.maxspeed;
+    if (typeof localLimit === "number" && localLimit < 50) {
+      const farId = ap.edge.from === nodeId ? ap.edge.to : ap.edge.from;
+      const touchingFar = network.edges.filter(
+        (eb) => eb.edge.from === farId || eb.edge.to === farId,
+      );
+      const continuation = touchingFar.filter((eb) => eb.edge.id !== ap.edge.id);
+      const isDropTail =
+        touchingFar.length === 2 &&
+        continuation.length === 1 &&
+        (continuation[0]!.edge.maxspeed ?? Infinity) > localLimit;
+      if (isDropTail) continue;
+    }
     const g = ap.edge.geometry as Vec2[];
     const len = polylineLength(g);
     const sFromNode = Math.min(14, len * 0.35);
@@ -304,10 +341,15 @@ export function buildProps(
     const travel = ap.edge.from === nodeId ? tangent : mul(tangent, -1); // into district
     const r = perpRight(travel);
     const p = add(point, mul(r, ap.halfWidth + 0.8));
+    // Lesson-critical prominence on scenario micro-maps (doc 62 S4/#6): the
+    // entry В26-50 IS the speed context, so it renders at scenario scale like
+    // every other lesson sign — undefined elsewhere keeps city/exam placements
+    // byte-identical.
     signs.push({
       kind: "limit50",
       position: toWorld(p[0], p[1], ROAD_Y),
       yaw: yawFromFacing(mul(travel, -1)),
+      ...lessonSized,
     });
   }
 
@@ -331,6 +373,10 @@ export function buildProps(
   }
 
   // -- trees (streetscape v2 mix, doc 70 REF 3) ---------------------------------
+  // A gantry-hero micro-map (lc-gantry-v1) opts every roadside tree pass out so
+  // no canopy occludes the overhead-signal shot; every other district keeps its
+  // trees (placeTrees stays true).
+  const placeTrees = !suppressRoadsideTreesOf(district);
   const roadGrid = new SegmentGrid(24);
   for (const eb of network.edges) roadGrid.addPolyline(eb.edge.geometry as Vec2[]);
 
@@ -355,7 +401,8 @@ export function buildProps(
   // Arterial rows: regularly-spaced leafy trees both sides (REF 3's tree-lined
   // boulevards); the palm streets keep their palms. Per-edge dominant leafy
   // species so a street reads as one planted row, not confetti.
-  for (const eb of network.edges) {
+  if (placeTrees)
+    for (const eb of network.edges) {
     if (!eb.line || eb.edge.roundabout || !ARTERIAL_CLASSES.has(eb.edge.class)) continue;
     const palmStreet = palmStreetEdges.has(eb.edge.id);
     const dominant: TreeKind = hashString(eb.edge.id) % 2 === 0 ? "leafyA" : "leafyB";
@@ -383,7 +430,8 @@ export function buildProps(
 
   // Street trees on residential-ish streets, outside the sidewalk — leafy mix
   // with ornamental accents (palms are reserved for the palm streets).
-  for (const eb of network.edges) {
+  if (placeTrees)
+    for (const eb of network.edges) {
     if (!eb.line) continue;
     const cls = eb.edge.class;
     if (cls !== "residential" && cls !== "unclassified" && cls !== "living_street") continue;
@@ -402,7 +450,8 @@ export function buildProps(
 
   // Park fill between blocks (jittered grid, away from roads and buildings).
   const step = PARK_TREE_GRID_M;
-  for (let gx = bounds.minX; gx < bounds.maxX; gx += step) {
+  if (placeTrees)
+    for (let gx = bounds.minX; gx < bounds.maxX; gx += step) {
     for (let gy = bounds.minY; gy < bounds.maxY; gy += step) {
       if (rng() > 0.55 * options.treeDensity) continue;
       const p: Vec2 = [gx + rng() * step, gy + rng() * step];

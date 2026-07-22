@@ -145,6 +145,21 @@ export function buildStagedPedPath(path: ReadonlyArray<{ x: number; y: number }>
   return { px, py, cum, length: cum[n - 1], nodeS: [] };
 }
 
+/**
+ * Explicit polyline path for a staged VEHICLE that rides an authored line
+ * OUTSIDE the road graph (the RX „жп прелез" train on its perpendicular rail).
+ * Identical geometry to buildStagedPedPath, but every vertex's arc is exposed
+ * as a `nodeS` entry so `hold.nodeIndex`/`offsetM` index the polyline exactly
+ * like a lane-graph path (createStagedVehicle reads path.nodeS[nodeIndex]).
+ */
+export function buildStagedVehiclePolylinePath(
+  path: ReadonlyArray<{ x: number; y: number }>,
+): StagedPath | null {
+  const base = buildStagedPedPath(path);
+  if (!base) return null;
+  return { ...base, nodeS: Array.from(base.cum) };
+}
+
 // ---------------------------------------------------------------------------
 // Agents
 // ---------------------------------------------------------------------------

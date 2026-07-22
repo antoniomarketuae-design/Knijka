@@ -10,9 +10,13 @@
  *   - shadow: ZERO violations + CLEAN_DRIVING (a 38 km/h drive, under the
  *     0.85 × 50 = 42.5 km/h rain envelope; low beams on at night avoid
  *     HEADLIGHTS_OFF_IN_RAIN);
- *   - „Суха скорост в дъжд": holding 50 km/h grades EXACTLY
- *     SPEED_TOO_FAST_FOR_CONDITIONS (over the 42.5 envelope, at/under the 50
- *     limit so NOT SPEEDING_OVER_LIMIT);
+ *   - „Като на сухо в дъжда": accelerating to ~72 km/h grades EXACTLY
+ *     SPEEDING_DANGEROUS (over the +10 dangerous band, i.e. > 60). The
+ *     acceleration crosses the 55–60 minor band too fast to arm
+ *     SPEEDING_OVER_LIMIT, and at 72 > graced 55 the engine's
+ *     conditions code is out of range (it is capped at the graced limit) —
+ *     the wet-envelope SPEED_TOO_FAST_FOR_CONDITIONS is carried by the
+ *     „Каране с потока" demo instead;
  *   - „Каране с потока": holding 48 km/h grades EXACTLY
  *     SPEED_TOO_FAST_FOR_CONDITIONS.
  *
@@ -57,7 +61,13 @@ export function scSpeedRainShadowScript(): DriveScript {
 }
 
 // ---------------------------------------------------------------------------
-// Mistake demo 1 — „Суха скорост в дъжд" (SPEED_TOO_FAST_FOR_CONDITIONS)
+// Mistake demo 1 — „Като на сухо в дъжда" (SPEEDING_DANGEROUS)
+// Founder taste-pass: the over-speed must be OBVIOUS. The ghost blows past the
+// В26-50 at the district entry and guns to ~72 km/h — +22 over the posted 50,
+// well past the +10 dangerous band, so the fault reads as flat-out illegal
+// (not a subtle „too fast for the wet"). At 72 > graced 55 the engine's
+// conditions code is out of range, so this demo grades SPEEDING_DANGEROUS
+// alone; the wet-envelope SPEED_TOO_FAST_FOR_CONDITIONS stays the „поток" demo's.
 // ---------------------------------------------------------------------------
 
 export function scSpeedRainMistakeDrySpeedScript(): DriveScript {
@@ -65,16 +75,18 @@ export function scSpeedRainMistakeDrySpeedScript(): DriveScript {
     steps: [
       {
         kind: "annotation",
-        textBg: "Грешка: „карам под знака“ — стрелката на 50 в дъжда, все едно е сух ден. Знакът важи за идеални условия.",
+        textBg: "Грешка: газ като на сух, открит път — стрелката прескача 70 при знак В26 „50“ и проливен дъжд.",
       },
       { kind: "glance", mirror: "rear" },
-      // Hold 50 km/h (the posted limit): above the 42.5 rain envelope but at the
-      // limit — SPEED_TOO_FAST_FOR_CONDITIONS ALONE, never SPEEDING_OVER_LIMIT.
-      { kind: "drive", points: [[X_LANE, 15], [X_LANE, 150]], targetKmh: 50, stopAtEnd: false },
-      { kind: "annotation", textBg: "На мокър и тъмен път 50 е несъобразена скорост — спирачният път е по-дълъг." },
-      { kind: "drive", points: [[X_LANE, 150], [X_LANE, 320]], targetKmh: 50 },
+      // Accelerate to ~72 km/h (+22 over the posted 50): past the +10 dangerous
+      // band (> 60) → SPEEDING_DANGEROUS. The climb crosses the 55–60 minor
+      // band in under 2 s, so SPEEDING_OVER_LIMIT never arms; 72 > graced 55
+      // keeps it out of the conditions code's at/under-graced-limit range.
+      { kind: "drive", points: [[X_LANE, 15], [X_LANE, 150]], targetKmh: 72, stopAtEnd: false },
+      { kind: "annotation", textBg: "72 при ограничение 50 е над +10 км/ч — опасна грешка; на мокрия, тъмен път е и невъзможно да спреш в осветеното платно." },
+      { kind: "drive", points: [[X_LANE, 150], [X_LANE, 320]], targetKmh: 72 },
       { kind: "pause", sec: 1.5, brake: true },
-      { kind: "annotation", textBg: "Свали 10–15% под ограничението — тук съобразената скорост е около 38 км/ч." },
+      { kind: "annotation", textBg: "Съобразената скорост тук е около 38 км/ч — над 30 км/ч под тази, с която мина." },
     ],
   };
 }

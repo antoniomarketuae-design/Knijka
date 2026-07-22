@@ -1,0 +1,173 @@
+{
+ "format": "district-v1",
+ "meta": {
+  "district": "lc-gantry",
+  "label": "Учебен булевард — сигнал над лентата (X) (сценарий LC)",
+  "mapKind": "scenario-street",
+  "generator": "tools/maps/gen_lc_gantry.mjs",
+  "boundsLocalMeters": {
+   "minX": -14,
+   "minY": -6,
+   "maxX": 14,
+   "maxY": 366
+  },
+  "attribution": {
+   "text": "Учебен разделен булевард с еднопосочни платна и сигнален портал над лентите — оригинален параметричен дизайн (без данни от OpenStreetMap)",
+   "license": "All rights reserved",
+   "licenseUrl": "/",
+   "copyrightUrl": "/",
+   "obligation": "none — original work, no ODbL attribution required for this map"
+  },
+  "defaults": {
+   "maxspeedUrbanKmh": 50,
+   "note": "Зелена стрелка ↓ над отвореното платно (x=+6); червен X над затвореното (x=−6), което е насрещно."
+  },
+  "stats": {
+   "roadKm": 0.72,
+   "nodes": 4,
+   "edges": 2,
+   "intersections": 0,
+   "crossings": 0,
+   "buildings": 1,
+   "spawnPoints": 2
+  },
+  "scenario": {
+   "archetype": "straight-street",
+   "params": {
+    "lengthM": 360,
+    "maxspeedKmh": 50
+   },
+   "lanesPerDirection": 1,
+   "laneCenterRightM": 6,
+   "suppressRoadsideTrees": true,
+   "laneGantry": {
+    "y": 48,
+    "x": 0,
+    "halfSpanM": 9,
+    "heightM": 5.6,
+    "openLaneX": 6,
+    "closedLaneX": -6
+   }
+  }
+ },
+ "roads": {
+  "nodes": [
+   {
+    "id": "lcg-n-open-s",
+    "x": 6,
+    "y": 0
+   },
+   {
+    "id": "lcg-n-open-n",
+    "x": 6,
+    "y": 360
+   },
+   {
+    "id": "lcg-n-closed-n",
+    "x": -6,
+    "y": 360
+   },
+   {
+    "id": "lcg-n-closed-s",
+    "x": -6,
+    "y": 0
+   }
+  ],
+  "edges": [
+   {
+    "id": "lcg-e-open",
+    "from": "lcg-n-open-s",
+    "to": "lcg-n-open-n",
+    "class": "secondary",
+    "name": "Булевард — отворено платно (север)",
+    "oneway": true,
+    "roundabout": false,
+    "lanes": 1,
+    "lanesSource": "tag",
+    "maxspeed": 50,
+    "maxspeedSource": "tag",
+    "length": 360,
+    "geometry": [
+     [
+      6,
+      0
+     ],
+     [
+      6,
+      360
+     ]
+    ]
+   },
+   {
+    "id": "lcg-e-closed",
+    "from": "lcg-n-closed-n",
+    "to": "lcg-n-closed-s",
+    "class": "secondary",
+    "name": "Булевард — затворено платно (юг, насрещно)",
+    "oneway": true,
+    "roundabout": false,
+    "lanes": 1,
+    "lanesSource": "tag",
+    "maxspeed": 50,
+    "maxspeedSource": "tag",
+    "length": 360,
+    "geometry": [
+     [
+      -6,
+      360
+     ],
+     [
+      -6,
+      0
+     ]
+    ]
+   }
+  ]
+ },
+ "intersections": [],
+ "crossings": [],
+ "roundabouts": [],
+ "buildings": [
+  {
+   "id": "lcg-b-office",
+   "height": 9,
+   "heightSource": "default",
+   "footprint": [
+    [
+     -13.5,
+     120
+    ],
+    [
+     -9.5,
+     120
+    ],
+    [
+     -9.5,
+     150
+    ],
+    [
+     -13.5,
+     150
+    ]
+   ]
+  }
+ ],
+ "spawnPoints": [
+  {
+   "id": "lcg-spawn-start",
+   "x": 6,
+   "y": 15,
+   "heading": 0,
+   "edgeId": "lcg-e-open",
+   "name": "Начало — отворено платно"
+  },
+  {
+   "id": "lcg-spawn-finish",
+   "x": 6,
+   "y": 345,
+   "heading": 0,
+   "edgeId": "lcg-e-open",
+   "name": "Контролна точка — отворено платно"
+  }
+ ]
+}

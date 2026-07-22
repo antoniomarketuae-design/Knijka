@@ -51,6 +51,17 @@
     "toM": 156,
     "guarded": true,
     "stopLineY": 145,
+    "bandCenterY": 153,
+    "railPath": [
+     [
+      -130,
+      153
+     ],
+     [
+      130,
+      153
+     ]
+    ],
     "barrier": {
      "cycleSec": 90,
      "downFromSec": 0,

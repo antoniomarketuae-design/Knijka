@@ -80,6 +80,15 @@ const LANE_X = 4.06;
  * The slam tier is authored OUT of the play corridor (slamAt at y = 520, well
  * past the 360 m road; minSlamSpeedKmh 250; proximityFallbackM 0.3), so the
  * lead never brakes — it is deterministic moving traffic, not a braking drill.
+ *
+ * DO NOT lower followGapM to make the tailgate CLIP read closer: this 13 m is
+ * the DRILL's pinned gap AND the gap the shadow/gap-melts recordings are graded
+ * against (the shadow sits ~8.7 m of leadGap at 26 km/h, barely above the fire
+ * threshold — dropping it fires FOLLOWING_TOO_CLOSE on the shadow and fails the
+ * trace gate; matchPlayer would also pin the LIVE player into a permanent
+ * tailgate). The „Лепене за предния" CLIP re-enacts a CLOSER lead scoped to the
+ * clip build only — see scFollowDistanceClipStaged (traces/scFollowDistance.ts)
+ * and clipStagedOverrideFor (traces/clipReplay.ts).
  */
 const FD_LEAD_CAR: BrakingLeadCarSpec = {
   id: "sc-fd-lead",
@@ -152,7 +161,7 @@ export const SC_FOLLOW_DISTANCE: ScenarioSpec = {
       traceRef: { path: "content/traces/sc-follow-distance/mistake-tailgate.trace.json" },
       titleBg: "Лепене за предния",
       whatWentWrongBg:
-        "Колата се движеше на около 48 км/ч само на една дължина зад предния — по-малко от секунда дистанция. При тази скорост е нужна над два пъти по-голяма дистанция; толкова близо няма никакъв шанс за спиране, ако предният забави. Несъобразената дистанция е основна грешка.",
+        "Колата се движеше на около 48 км/ч само на половин дължина кола зад предния — под две десети от секундата дистанция. При тази скорост е нужна над десет пъти по-голяма дистанция; толкова близо няма никакъв шанс за спиране, ако предният забави. Несъобразената дистанция е основна грешка.",
       codeRefs: ["FOLLOWING_TOO_CLOSE"],
     },
     {

@@ -130,6 +130,18 @@ export const RAIN_HEMISPHERE_DIM = 0.42;
  */
 export const RAIN_EXPOSURE_DIM = 0.15;
 
+/**
+ * How much RAIN dims the DAY image-based (HDRI) ambient — the last
+ * un-rain-aware daylight source. The drei <Environment> IBL is a constant
+ * (day 0.5 / night 0.12) and never read the rain channel, so under day rain the
+ * bright golden-hour day HDRI kept lighting AND reflecting off the wet road and
+ * the scene still read "sunny" no matter how much the sun/exposure/sky dimmed
+ * (founder, three rounds: "road still too bright"). Day IBL 0.5 → 0.20 at full
+ * rain: a gloomy DAY, still clearly above night's 0.12. Gated to day only
+ * (night rain is already dark); dry/fog/snow lessons (rain=false) unaffected.
+ */
+export const RAIN_IBL_DIM = 0.6;
+
 /** How much FOG dims the key light at full fog intensity — heavier than rain:
  *  a fog bank diffuses the sun into the ambient, killing directionality. */
 export const FOG_SUN_DIM = 0.8;

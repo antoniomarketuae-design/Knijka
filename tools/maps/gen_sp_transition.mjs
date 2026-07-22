@@ -163,6 +163,52 @@ export function buildSpTransitionStreet(params) {
     },
   ];
 
+  // A built-up residential row flanking the APPROACH (render-only context, doc
+  // 62 P5): the 50 cap needs a town reason — a car creeping over 50 on a bare
+  // strip has no legible speed context. Residential class draws no streetlights,
+  // so the buildings carry the "populated area" cue. The row opens at the entry
+  // as a both-sides gateway pinch (the town-entry cue) by the spawn, then
+  // alternates up the approach so the whole creep reads urban. Clear of the
+  // carriageway + sidewalk (inner face at half-road + 8 m); deterministic — no
+  // RNG, so the same params emit byte-identical JSON. Grading is untouched: the
+  // rule engine reads maxspeed, never these footprints.
+  const bXi = r2(halfRoadM + 8); // inner face, just past the sidewalk
+  const bXe = r2(halfRoadM + 22); // outer face
+  const bHeights = [12, 15, 9, 13, 10, 14, 11]; // residential storey mix
+  const B_DEPTH = 22;
+  const B_PITCH = 46;
+  const rowEndY = approachM - 24; // stay on the 50 approach, clear of the zone
+  let bIdx = 0;
+  for (let cy = 30, k = 0; cy <= rowEndY; cy += B_PITCH, k++) {
+    const yA = r2(cy - B_DEPTH / 2);
+    const yB = r2(cy + B_DEPTH / 2);
+    // Gateway pinch: both sides at the entry; then alternate sides.
+    const sides = k === 0 ? [1, -1] : [k % 2 === 1 ? 1 : -1];
+    for (const s of sides) {
+      const footprint =
+        s > 0
+          ? [
+              [bXi, yA],
+              [bXe, yA],
+              [bXe, yB],
+              [bXi, yB],
+            ]
+          : [
+              [r2(-bXe), yA],
+              [r2(-bXi), yA],
+              [r2(-bXi), yB],
+              [r2(-bXe), yB],
+            ];
+      BUILDINGS.push({
+        id: `sp-tr-b-approach-${bIdx}`,
+        height: bHeights[bIdx % bHeights.length],
+        heightSource: "default",
+        footprint,
+      });
+      bIdx++;
+    }
+  }
+
   const bounds = { minX: Infinity, minY: Infinity, maxX: -Infinity, maxY: -Infinity };
   for (const e of EDGES) {
     for (const [x, y] of e.geometry) {

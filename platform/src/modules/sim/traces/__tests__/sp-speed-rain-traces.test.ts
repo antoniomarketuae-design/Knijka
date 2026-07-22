@@ -4,8 +4,11 @@
  *   1. SHADOW replays (rain + night) with ZERO violations and earns
  *      CLEAN_DRIVING — the 38 km/h drive stays under the 0.85 × 50 = 42.5 km/h
  *      rain envelope, and low beams on at night avoid HEADLIGHTS_OFF_IN_RAIN.
- *   2. MISTAKE DEMOS grade EXACTLY SPEED_TOO_FAST_FOR_CONDITIONS and NEVER a
- *      speeding or headlights code (they stay at/under the 50 limit, lights on).
+ *   2. MISTAKE DEMOS grade EXACTLY their codeRefs and no headlights code (lights
+ *      on): „Като на сухо в дъжда" blasts to ~72 → SPEEDING_DANGEROUS (+22 over
+ *      the 50, past the +10 band; too fast through the 55–60 minor band to arm
+ *      SPEEDING_OVER_LIMIT, and above graced 55 the conditions code is out of
+ *      range); „Каране с потока" holds 48 → SPEED_TOO_FAST_FOR_CONDITIONS.
  *   3. COMMITTED FILES under content/traces/sc-speed-rain/ ARE the recordings
  *      of these scripts, byte-for-byte, with identical public copies.
  *
@@ -63,12 +66,12 @@ describe("sc-speed-rain — the shadow gate (doc 76 §5)", () => {
 });
 
 describe("sc-speed-rain — mistake demos grade their exact codes (doc 76 §9 stage 5)", () => {
-  it("„Суха скорост в дъжд“: exactly SPEED_TOO_FAST_FOR_CONDITIONS, no speeding or lights code", () => {
+  it("„Като на сухо в дъжда“ (72): exactly SPEEDING_DANGEROUS, no minor-speeding, conditions, or lights code", () => {
     const drive = drives.get("mistake-dry-speed")!;
     const codes = [...new Set(violationCodes(drive))].sort();
     expect(codes).toEqual([...SC_SPEED_RAIN.mistakes[0].codeRefs].sort());
-    expect(codes).not.toContain("SPEEDING_OVER_LIMIT");
-    expect(codes).not.toContain("SPEEDING_DANGEROUS");
+    expect(codes).not.toContain("SPEEDING_OVER_LIMIT"); // crosses the 55–60 minor band too fast to arm
+    expect(codes).not.toContain("SPEED_TOO_FAST_FOR_CONDITIONS"); // 72 > graced 55: conditions code is capped at the graced limit
     expect(codes).not.toContain("HEADLIGHTS_OFF_IN_RAIN");
   });
 

@@ -98,6 +98,9 @@ describe("heldSceneryFor — per-template dressing", () => {
           [7.2, 162, -15],
         ],
       ],
+      // scReels.ts accidentMistake(): the parked car hit-and-fled at the
+      // authored COLLISION point (~5.7, 148) — bodied at the collision spot.
+      ["sc-accident-own-conduct@L1", [[6.4, 149, 0]]],
     ];
     for (const [lessonId, poses] of wrecks) {
       const held = heldSceneryFor(lessonId, {});

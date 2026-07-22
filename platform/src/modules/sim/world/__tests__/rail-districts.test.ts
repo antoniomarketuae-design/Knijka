@@ -102,6 +102,25 @@ for (const { id, guarded, signRef, edgeId } of [
       }
     });
 
+    it("authors the perpendicular rail path the staged TRAIN rides (ADR-006 stage 3c)", () => {
+      const rc = (raw as {
+        meta: { scenario?: { railCrossing?: { bandCenterY?: number; railPath?: number[][] } } };
+      }).meta.scenario?.railCrossing;
+      expect(rc?.bandCenterY).toBe((BAND_FROM + BAND_TO) / 2); // 153
+      const rp = rc?.railPath;
+      expect(Array.isArray(rp)).toBe(true);
+      expect(rp).toHaveLength(2);
+      // East–west line ON the band centre, symmetric, crossing the whole
+      // carriageway so the ~34 m consist enters + exits (aligns with the
+      // rendered rail deck stamped at the same band centre).
+      expect(rp![0][1]).toBe(153);
+      expect(rp![1][1]).toBe(153);
+      expect(rp![0][0]).toBe(-rp![1][0]);
+      const halfRoadM = 8.125; // SCALED_LANE_W = 3.25 × 2.5 (the 1+1 street)
+      expect(rp![0][0]).toBeLessThan(-halfRoadM);
+      expect(rp![1][0]).toBeGreaterThan(halfRoadM);
+    });
+
     it("hosts a plain street: no lights, no stop signs, no zebras", () => {
       expect(world.trafficLights.length).toBe(0);
       expect(world.stats.signs.stop).toBe(0);

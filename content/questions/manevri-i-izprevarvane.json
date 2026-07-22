@@ -1135,7 +1135,7 @@
     ],
     "explanationBg": "Изпреварването тук иска навлизане в насрещната лента, а непрекъснатата осева линия М1 забранява застъпването и пресичането ѝ. Оставаш зад камиона, увеличаваш дистанцията за видимост и чакаш прекъсната линия (Наредба № 2/2001; ЗДвП, чл. 44?).",
     "lawRefs": [{ "act": "Наредба № 2/2001", "ref": "надлъжна маркировка?" }, { "act": "ЗДвП", "ref": "чл. 44?" }],
-    "media": {"kind":"sceneStill","districtId":"ov-solid-v1","focus":{"x":0,"y":168,"zoomM":70},"poses":[{"kind":"car","x":4.06,"y":140,"headingDeg":0,"variant":"ego"},{"kind":"truck","x":4.06,"y":168,"headingDeg":0},{"kind":"car","x":-4.06,"y":195,"headingDeg":180}],"marks":[]},
+    "media": {"kind":"sceneStill","districtId":"ov-solid-v1","focus":{"x":0,"y":168,"zoomM":70},"poses":[{"kind":"car","x":4.06,"y":140,"headingDeg":0,"variant":"ego"},{"kind":"truck","x":4.06,"y":168,"headingDeg":0},{"kind":"car","x":-4.06,"y":195,"headingDeg":180}],"marks":[{"kind":"danger","x":-4.06,"y":160}]},
     "status": "draft"
   },
   {
@@ -1152,7 +1152,7 @@
     ],
     "explanationBg": "В24 забранява изпреварването на моторни превозни средства, но прави изключение за двуколесните без кош — велосипедът дори не е моторно ПС. Истинското ограничение тук е безопасността: широка странична дистанция и плавно връщане (Наредба № РД-02-21-1/2023, знак В24; ЗДвП, чл. 42).",
     "lawRefs": [{ "act": "Наредба № РД-02-21-1/23.11.2023", "ref": "прил. № 3, знак В24" }, { "act": "ЗДвП", "ref": "чл. 42" }],
-    "media": {"kind":"sceneStill","districtId":"ov-ban-v1","focus":{"x":0,"y":135,"zoomM":70},"poses":[{"kind":"car","x":12.19,"y":120,"headingDeg":0,"variant":"ego"},{"kind":"bike","x":15,"y":148,"headingDeg":0}],"marks":[]},
+    "media": {"kind":"sceneStill","districtId":"ov-ban-v1","focus":{"x":0,"y":135,"zoomM":70},"poses":[{"kind":"car","x":12.19,"y":120,"headingDeg":0,"variant":"ego"},{"kind":"bike","x":15,"y":148,"headingDeg":0}],"marks":[{"kind":"target","x":11,"y":158}]},
     "status": "draft"
   },
   {
@@ -1169,7 +1169,7 @@
     ],
     "explanationBg": "Тук и знакът В23, и непрекъснатата линия казват едно и също: никакъв обратен завой. Няколкостотин метра търпение струват по-малко от челен удар — обръщаш след края на забраната, при прекъсната маркировка (Наредба № РД-02-21-1/2023, знак В23; ЗДвП, чл. 38?).",
     "lawRefs": [{ "act": "Наредба № РД-02-21-1/23.11.2023", "ref": "прил. № 3, знак В23" }, { "act": "ЗДвП", "ref": "чл. 38?" }],
-    "media": {"kind":"sceneStill","districtId":"mv-uturn-v1","focus":{"x":0,"y":148,"zoomM":70},"poses":[{"kind":"car","x":4.06,"y":125,"headingDeg":0,"variant":"ego"},{"kind":"car","x":-4.06,"y":170,"headingDeg":180}],"marks":[]},
+    "media": {"kind":"sceneStill","districtId":"mv-uturn-v1","focus":{"x":0,"y":148,"zoomM":70},"poses":[{"kind":"car","x":4.06,"y":125,"headingDeg":0,"variant":"ego"},{"kind":"car","x":-4.06,"y":170,"headingDeg":180}],"marks":[{"kind":"proceed","x":4.06,"y":131}]},
     "status": "draft"
   },
   {

@@ -18,6 +18,7 @@ import { createWorldRuntime, type DistrictWorldRuntime } from "../../runtime";
 import { buildLaneGraph } from "../../traffic/graph";
 import { createTrafficSystem } from "../../traffic/system";
 import { DEFAULT_TRAFFIC_CONFIG, type TrafficDistrict } from "../../traffic/types";
+import { SCENARIO_SIGN_SCALE } from "../builders/constants";
 import { buildWorldGeometry } from "../builders/buildWorldGeometry";
 import { assertDistrict, type District, type WorldGeometry } from "../types";
 
@@ -206,11 +207,24 @@ describe("sp-creep2-v1 — the P5 long creep road (doc 62 #30)", () => {
     expect(CREEP2_TOTAL_M).toBe(680);
   });
 
-  it("SHOWS both caps (doc 62 S4 world-truth): the В26-50 entry plate + painted „30“ zone numerals", () => {
+  it("SHOWS legible speed context (doc 62 P5 taste-pass): prominent entry В26-50, no false 50 on the 30 zone, a built-up approach + painted „30“ numerals", () => {
     const district = assertDistrict(loadRaw(CREEP2));
     const world = buildWorldGeometry(district, { seed: 7 });
-    // The props.ts district-entry pass posts the 50 plate at the south entry.
-    expect(world.stats.signs.limit50).toBeGreaterThanOrEqual(1);
+    const plates = world.signs.filter((s) => s.kind === "limit50");
+    // The В26-50 posts ONCE, at the south entry where the creep begins — and at
+    // scenario prominence (lessonSized) so it reads against the 2.5× road, not
+    // miniature at the spawn as it shipped.
+    expect(plates.length).toBe(1);
+    expect(world.stats.signs.limit50).toBe(1);
+    expect(plates.every((s) => s.scale === SCENARIO_SIGN_SCALE)).toBe(true);
+    // NONE rides the 30 zone: local y > transitionY maps to world z < -400
+    // (toWorld: y → -z). The reduced-zone tail no longer wears a 50 it would
+    // overstate — the scenario audit the clip doubles as.
+    expect(plates.every((s) => s.position[2] > -CREEP2_TRANSITION_Y)).toBe(true);
+    // The approach now reads built-up — a town reason for the urban 50 cap, not
+    // a bare strip: the school block PLUS the residential row flanking the creep.
+    expect(district.buildings.length).toBeGreaterThan(1);
+    expect(district.buildings.some((b) => b.id.startsWith("sp-tr-b-approach"))).toBe(true);
     // The markings.ts speed-glyph seam paints the zone's „30" numerals:
     // raising the zone edge's tagged limit above the glyph gate must REMOVE
     // marking quads — proving the numerals derive from the authored 30.

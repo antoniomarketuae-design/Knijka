@@ -8,11 +8,47 @@
 
 import { makeSceneStillQuestion, makeSignMediaQuestion } from "@/lib/content/mediaFixtures";
 import { QuestionMediaView, SignFace } from "@/components/theory/QuestionMedia";
+import { WhyPanel } from "@/components/theory/WhyPanel";
+import { buildWhyPanelModel } from "@/components/theory/whyPanelModel";
 
 const signQuestion = makeSignMediaQuestion();
 const sceneQuestion = makeSceneStillQuestion();
 
 const GRID_SIGNS = ["Б1", "Б2", "В24", "А12"];
+
+// THEO Half A: the why-panel picture card over the three data-driven shapes.
+// sim:null is the Half A gate (no scenario reel), so buildWhyPanelModel emits
+// the picture card the founder eyeballs here.
+const signMeaningModel = buildWhyPanelModel({
+  correct: false,
+  explanationBg:
+    "Белият кръг с коси черни ленти отменя всички забрани, въведени по-рано с пътни знаци.",
+  lawRefs: [{ act: "ЗДвП", ref: "чл. 6" }],
+  sim: null,
+  media: { kind: "sign", signRef: "В34" },
+});
+
+const whichSignModel = buildWhyPanelModel({
+  correct: false,
+  explanationBg: "Осмоъгълникът е единственият знак с тази форма — Б2 „Спри!“.",
+  lawRefs: [{ act: "ЗДвП", ref: "чл. 47" }],
+  sim: null,
+  correctOptionIds: ["b"],
+  options: [
+    { id: "a", textBg: "Знак Б1", media: { kind: "sign", signRef: "Б1" } },
+    { id: "b", textBg: "Спри! Пропусни движещите се по пътя с предимство", media: { kind: "sign", signRef: "Б2" } },
+    { id: "c", textBg: "Знак В24", media: { kind: "sign", signRef: "В24" } },
+  ],
+});
+
+const prioritySceneModel = buildWhyPanelModel({
+  correct: true,
+  explanationBg:
+    "На равнозначно кръстовище пропускаш идващия отдясно — маркиран е конфликтната точка.",
+  lawRefs: [{ act: "ЗДвП", ref: "чл. 47" }],
+  sim: null,
+  media: sceneQuestion.media,
+});
 
 export function MediaDemoClient() {
   return (
@@ -48,6 +84,22 @@ export function MediaDemoClient() {
       <section className="flex flex-col gap-3">
         <h2 className="hud-label">3 · Question media: scene still</h2>
         <QuestionMediaView media={sceneQuestion.media} />
+      </section>
+
+      <section className="flex flex-col gap-3">
+        <h2 className="hud-label">
+          4 · Why-panel picture card (THEO Half A · sim:null)
+        </h2>
+        <p className="text-xs text-muted">
+          The wrong-answer panel now leads with the sign face / diagram + the
+          stored explanation. Left→right: „what sign is this“ (sign face),
+          „which sign“ grid (correct sign spotlighted), priority scene.
+        </p>
+        <div className="grid gap-4 sm:grid-cols-3">
+          <WhyPanel model={signMeaningModel} />
+          <WhyPanel model={whichSignModel} />
+          <WhyPanel model={prioritySceneModel} />
+        </div>
       </section>
     </main>
   );

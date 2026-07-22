@@ -142,6 +142,68 @@ describe("buildWhyPanelModel — ADR-002 fallbacks", () => {
   });
 });
 
+describe("buildWhyPanelModel — THEO Half A picture card", () => {
+  it("spotlights the correct sign face on a „which sign?“ grid (sim === null)", () => {
+    const model = buildWhyPanelModel(
+      source({
+        sim: null,
+        media: null,
+        correctOptionIds: ["b"],
+        options: [
+          { id: "a", textBg: "Знак А", media: { kind: "sign", signRef: "А1" } },
+          { id: "b", textBg: "Спри! Пропусни движението", media: { kind: "sign", signRef: "Б2" } },
+          { id: "c", textBg: "Знак В", media: { kind: "sign", signRef: "В1" } },
+        ],
+      }),
+    );
+    expect(model.picture).not.toBeNull();
+    expect(model.picture?.media).toBeNull();
+    expect(model.picture?.correctSign).toEqual({
+      signRef: "Б2",
+      labelBg: "Спри! Пропусни движението",
+    });
+  });
+
+  it("redraws the question's scene still (priority/marking question)", () => {
+    const media = {
+      kind: "sceneStill" as const,
+      districtId: "zx-v1",
+      focus: { x: 0, y: 0, zoomM: 40 },
+      poses: [],
+    };
+    const model = buildWhyPanelModel(source({ sim: null, media }));
+    expect(model.picture?.media).toEqual(media);
+    expect(model.picture?.correctSign).toBeNull();
+  });
+
+  it("redraws the question's sign face (sign-meaning question)", () => {
+    const model = buildWhyPanelModel(
+      source({ sim: null, media: { kind: "sign", signRef: "В24" } }),
+    );
+    expect(model.picture?.media).toEqual({ kind: "sign", signRef: "В24" });
+  });
+
+  it("leaves the reel path untouched: no picture card when a sim reel owns the visual", () => {
+    const model = buildWhyPanelModel(
+      source({ media: { kind: "sign", signRef: "В24" } }), // sim === SIM (non-null)
+    );
+    expect(model.picture).toBeNull();
+    expect(model.replay).not.toBeNull();
+  });
+
+  it("no picture for a pure text-knowledge question (no media, no sign options)", () => {
+    const model = buildWhyPanelModel(source({ sim: null }));
+    expect(model.picture).toBeNull();
+  });
+
+  it("ignores the legacy image/video placeholder shape (renders nothing)", () => {
+    const model = buildWhyPanelModel(
+      source({ sim: null, media: { type: "image", ref: "legacy" } }),
+    );
+    expect(model.picture).toBeNull();
+  });
+});
+
 describe("law citations", () => {
   it("dedupes identical act+ref pairs, keeps first-seen order", () => {
     const model = buildWhyPanelModel(

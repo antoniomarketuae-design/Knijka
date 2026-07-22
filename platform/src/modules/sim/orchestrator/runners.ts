@@ -35,6 +35,7 @@ import type {
   StagedEventSpec,
   TelltaleStimulusSpec,
   TrafficControllerSpec,
+  TrainPassSpec,
 } from "../contracts";
 import type { SimTickEvent } from "../rules";
 import type { Rng } from "../traffic/rng";
@@ -1474,6 +1475,11 @@ export class EmergencyApproachRunner implements EventRunner {
         pathNodes: s.actor.pathNodes,
         hold: s.actor.hold,
         cruiseSpeedMps: s.actor.cruiseSpeedMps,
+        // VU-09: hold the actor to the player's launch pace (author ≤ the
+        // ghost's ramp) so an early-released ambulance rides the player's tail
+        // through the slow launch instead of surging past it — the yield duty
+        // then arms only once the player is at cruise and still in the corridor.
+        ...(s.actor.accelMps2 !== undefined ? { accelMps2: s.actor.accelMps2 } : {}),
         extraRightOffsetM: s.actor.extraRightOffsetM,
         colorIndex: s.actor.colorIndex,
         // VU-09: publish the emergency profile so the fleet renders the
@@ -2375,6 +2381,72 @@ export class OncomingStreamRunner implements EventRunner {
 }
 
 // ---------------------------------------------------------------------------
+// 16. Train pass (RX-02/RX-01 — doc 72 §12 „жп прелез"). A real TRAIN crosses
+//     the road at the level crossing, timed to the player's approach so the
+//     „stop and look" ritual meets a genuine hazard. PURE CHOREOGRAPHY: the
+//     runner stages a path-locked train on the authored PERPENDICULAR rail
+//     polyline, releases it when the player nears the crossing, and emits ZERO
+//     SimTick events — the world-data rail detectors alone grade the crossing,
+//     so this actor is byte-neutral to grading (the policeStop discipline).
+//     playerGuard is OFF: a train does not brake for cars.
+// ---------------------------------------------------------------------------
+
+export class TrainPassRunner implements EventRunner {
+  phase: StagedEventPhase = "idle";
+  outcome: StagedEventOutcome | null = null;
+  hazardActive = false;
+
+  constructor(readonly spec: TrainPassSpec) {}
+
+  stage(traffic: StagedTrafficPort, _rng: Rng, firstTime: boolean): void {
+    const s = this.spec;
+    if (firstTime) {
+      const view = traffic.stage({
+        kind: "vehicle",
+        id: s.id,
+        pathNodes: [], // the rail line is authored, not a lane-graph path
+        railPath: s.railPath,
+        hold: { nodeIndex: 0, offsetM: s.holdOffsetM },
+        cruiseSpeedMps: s.cruiseSpeedMps,
+        accelMps2: s.accelMps2,
+        colorIndex: s.colorIndex,
+        profile: "train",
+        playerGuard: false, // the train is the hazard — it never yields to a car
+      });
+      if (!view) throw new Error(`staged event ${s.id}: rail path failed to stage`);
+    } else {
+      traffic.stagedCommand(s.id, { type: "reset" });
+    }
+    this.phase = "armed";
+    this.outcome = null;
+  }
+
+  step(traffic: StagedTrafficPort, input: DirectorInput, _out: SimTickEvent[]): StagedEventOutcome | null {
+    const s = this.spec;
+    if (this.phase === "resolved") return null;
+    const actor = traffic.staged(s.id);
+    if (!actor) return null;
+
+    if (this.phase === "armed") {
+      const d = dist(input.x, input.y, s.crossing.x, s.crossing.y);
+      if (d <= s.triggerPlayerDistM && approaching(input, s.crossing.x, s.crossing.y)) {
+        traffic.stagedCommand(s.id, { type: "cruise" }); // commit — no sync, no guard
+        this.phase = "triggered";
+      }
+      return null;
+    }
+
+    // triggered — the train runs its line to the far side; no events emitted.
+    if (actor.finished) {
+      this.phase = "resolved";
+      this.outcome = outcomeOf(s, input, true, "clear");
+      return this.outcome;
+    }
+    return null;
+  }
+}
+
+// ---------------------------------------------------------------------------
 
 export function createRunner(
   spec: StagedEventSpec,
@@ -2411,5 +2483,7 @@ export function createRunner(
       return new TelltaleStimulusRunner(spec);
     case "oncomingStream":
       return new OncomingStreamRunner(spec);
+    case "trainPass":
+      return new TrainPassRunner(spec);
   }
 }

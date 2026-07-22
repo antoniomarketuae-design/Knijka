@@ -39,7 +39,7 @@
  * fault, and nothing else.
  */
 
-import type { StagedEventSpec } from "../contracts";
+import type { RoundaboutEntrySpec, StagedEventSpec } from "../contracts";
 import { SC_ROUNDABOUT_ENTRY } from "../lessons/scenario/templates-flow";
 import {
   recordScriptedDrive,
@@ -266,6 +266,33 @@ const SCRIPTS: Record<ScRoundaboutEntryTraceName, { kind: "shadow" | "mistake"; 
   "mistake-barge-entry": { kind: "mistake", script: scRoundaboutEntryMistakeBargeScript },
   "mistake-exit-no-signal": { kind: "mistake", script: scRoundaboutEntryMistakeNoSignalScript },
 };
+
+/**
+ * CLIP staged override (doc 66 R1 — produced-media honesty), the roundabout
+ * twin of scFollowDistanceClipStaged. The barge demo's FAILED_TO_YIELD was
+ * graded against the circulator RB_CIRCULATING.conflictLeadM = 14 m UPSTREAM of
+ * the south node — on the SW arc, ~54° to the LEFT of the entry heading, so the
+ * chase camera's forward cone (CHASE_FOV 44° → ~71° horizontal) never contains
+ * it at the fault and R1 fails ("липсва vehicle": the viewer never sees WHICH
+ * car the ego cut off). Pull the circulator DOWNSTREAM to ~the south node for
+ * the CLIP ONLY: it then sits ahead-left of the barging car — the very car it
+ * cut in front of — inside the frame. The barging ego (~6 m/s) far outruns the
+ * crawling circulator (2.9 m/s), so no contact fires. Clip-scoped: the recorder
+ * and the trace-gate keep the graded 14 m (SC_ROUNDABOUT_ENTRY.staged is read
+ * unchanged), so grading is untouched. Only the barge demo (m0) needs it; the
+ * exit demo (m1) frames its own circulator, so it keeps the drill default.
+ */
+export const RB_CLIP_CONFLICT_LEAD_M = 3;
+
+export function scRoundaboutEntryClipStaged(mistakeIndex: number): StagedEventSpec[] | null {
+  if (mistakeIndex !== 0) return null;
+  const base = (SC_ROUNDABOUT_ENTRY.staged ?? []) as StagedEventSpec[];
+  return base.map((spec) =>
+    spec.kind === "roundaboutEntry" && spec.id === "sc-rb-circulating"
+      ? ({ ...(spec as RoundaboutEntrySpec), conflictLeadM: RB_CLIP_CONFLICT_LEAD_M } as StagedEventSpec)
+      : spec,
+  );
+}
 
 /**
  * Record one of the three drives against a loaded rb-mini-v1 document — the

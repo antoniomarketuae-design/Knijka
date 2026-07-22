@@ -89,13 +89,14 @@ import type { LessonSpec } from "@/modules/sim/lessons";
 import { lessonDistrictId } from "@/modules/sim/contracts";
 import {
   QUALITY_PRESETS,
+  RAIN_IBL_DIM,
   resetWeather,
   setWeatherTarget,
   SimEnvironment,
   stepWeather,
   type QualityLevel,
 } from "@/modules/sim/environment";
-import { DistrictWorld } from "@/modules/sim/world";
+import { DistrictWorld, LaneSignalGantry } from "@/modules/sim/world";
 import {
   createTracePoint,
   sampleAt,
@@ -132,7 +133,6 @@ import {
   faultMarkerPose,
   gearLabelFor,
   GHOST_CHASSIS_REST_Y,
-  laneHighlightAlphaAt,
   plannedChasePose,
   plannedCockpitPose,
   plannedRearAwarePose,
@@ -464,7 +464,7 @@ export function CaptureScene({
           <Environment
             files={isNight ? "/sim/env/sky_urban_1k.hdr" : "/sim/env/shanghai_riverside_1k.hdr"}
             background={false}
-            environmentIntensity={isNight ? 0.12 : 0.5}
+            environmentIntensity={isNight ? 0.12 : rain ? 0.5 * (1 - RAIN_IBL_DIM) : 0.5}
             environmentRotation={isNight ? NIGHT_ENV_ROTATION : DAY_ENV_ROTATION}
           />
           {/* Physics context for the world/obstacle colliders; paused — the
@@ -479,6 +479,9 @@ export function CaptureScene({
               getRailBarrierDown={(x, y) => core.runtime.railBarrierDownAt(x, y)}
               signSvgBaseUrl={null}
             />
+            {/* LC gantry — render-only, inert unless the district authors
+                meta.scenario.laneGantry (the WRONG_WAY lane-control drill). */}
+            <LaneSignalGantry district={core.district} />
             {core.scenarioObstacles.length > 0 ? (
               <ScenarioObstacles obstacles={core.scenarioObstacles} clearcoat={level === "high"} />
             ) : null}
@@ -533,8 +536,9 @@ export function CaptureScene({
           {laneHighlight && !isCockpit ? (
             <LaneHighlightBand
               highlight={laneHighlight}
-              faultTimeSec={faultTimeSec}
+              startSec={startSec}
               clockRef={clockRef}
+              trace={trace}
             />
           ) : null}
           {groundMarker && !isCockpit ? (
@@ -545,7 +549,13 @@ export function CaptureScene({
             />
           ) : null}
           {withDashStrip ? (
-            <DashStripOverlay trace={trace} clockRef={clockRef} cabin={cabin} viewFov={viewFov} />
+            <DashStripOverlay
+              trace={trace}
+              clockRef={clockRef}
+              cabin={cabin}
+              viewFov={viewFov}
+              director={director}
+            />
           ) : null}
           <ReadyProbe onReady={onReady} />
         </Suspense>
@@ -743,30 +753,49 @@ function PlannedCameraRig({
 const LANE_BAND_LENGTH_M = 46;
 const LANE_BAND_COLOR = "#35c07e";
 const LANE_BAND_MAX_OPACITY = 0.3;
+/** Fade-in of the required-lane band at the window start (s), then it HOLDS for
+ *  the whole clip — a sustained wrong-lane fault (e.g. motorway keep-right) is
+ *  wrong the entire drive, so the "this is your lane" rail must stay visible
+ *  (founder: the green band "should be there during the whole video"). */
+const LANE_BAND_FADE_S = 0.5;
 
 /** The PLAN card's positional highlight: the REQUIRED lane tints green for
  *  ~2 s at the fault (laneHighlightAlphaAt) — flat quad just above the road,
  *  additive-free, toneMapped off so the green stays literal. */
 function LaneHighlightBand({
   highlight,
-  faultTimeSec,
+  startSec,
   clockRef,
+  trace,
 }: {
   highlight: CaptureLaneHighlight;
-  faultTimeSec: number;
+  startSec: number;
   clockRef: RefObject<TraceClock>;
+  trace: ScenarioTrace;
 }) {
+  const meshRef = useRef<Mesh>(null);
   const materialRef = useRef<MeshBasicMaterial>(null);
+  const ptRef = useRef(createTracePoint());
   useFrame(() => {
     const clock = clockRef.current;
     const material = materialRef.current;
-    if (!clock || !material) return;
-    const alpha = laneHighlightAlphaAt(clock.tSec, faultTimeSec) * LANE_BAND_MAX_OPACITY;
+    const mesh = meshRef.current;
+    if (!clock || !material || !mesh) return;
+    // Persistent: fade in over LANE_BAND_FADE_S then HOLD for the whole clip.
+    const alpha =
+      Math.min(1, Math.max(0, (clock.tSec - startSec) / LANE_BAND_FADE_S)) * LANE_BAND_MAX_OPACITY;
     material.opacity = alpha;
     material.visible = alpha > 0.001;
+    // Follow the car longitudinally so the "this is your lane" rail stays beside
+    // it the whole clip — the old static patch fell out of frame as the ghost
+    // drove on. x stays highlight.xM (the correct lane); only z tracks the car.
+    const pt = ptRef.current;
+    sampleAt(trace, clock.tSec, pt);
+    mesh.position.set(highlight.xM, 0.05, -pt.y);
   });
   return (
     <mesh
+      ref={meshRef}
       position={[highlight.xM, 0.05, -highlight.yM]}
       rotation={[-Math.PI / 2, 0, 0]}
       renderOrder={18}
@@ -1004,6 +1033,44 @@ function drawBelt(ctx: CanvasRenderingContext2D, cx: number, on: boolean) {
   ctx.stroke();
 }
 
+/** N11 (VP-06): the red engine-temperature telltale — a glowing thermometer
+ *  over two coolant waves (the cockpit cluster's icon), drawn on the strip ONLY
+ *  while the director's telltaleLit channel is up. Non-telltale clips never
+ *  light it (director.telltaleLit stays false), so their strip is unchanged. */
+function drawTempWarn(ctx: CanvasRenderingContext2D, cx: number) {
+  const cy = 50;
+  ctx.save();
+  ctx.strokeStyle = STRIP_DANGER;
+  ctx.fillStyle = "rgba(229,72,77,0.18)";
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  ctx.roundRect(cx - 30, cy - 26, 60, 52, 10);
+  ctx.fill();
+  ctx.stroke();
+  ctx.shadowColor = STRIP_DANGER;
+  ctx.shadowBlur = 14;
+  // Thermometer stem + bulb.
+  ctx.beginPath();
+  ctx.moveTo(cx, cy - 16);
+  ctx.lineTo(cx, cy);
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.arc(cx, cy + 5, 5, 0, Math.PI * 2);
+  ctx.stroke();
+  // Two coolant waves under it.
+  for (let row = 0; row < 2; row++) {
+    const wy = cy + 13 + row * 6;
+    ctx.beginPath();
+    ctx.moveTo(cx - 18, wy);
+    for (let i = 0; i < 4; i++) {
+      const x0 = cx - 18 + i * 9;
+      ctx.quadraticCurveTo(x0 + 4.5, wy + (i % 2 === 0 ? -4 : 4), x0 + 9, wy);
+    }
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
 /** Simplified HeadlightIcon: lamp housing + three beams (tilt = къси). */
 function drawHeadlight(
   ctx: CanvasRenderingContext2D,
@@ -1070,6 +1137,15 @@ function drawDashStrip(
   drawStripLabel(ctx, "КОЛАН", 660);
   drawHeadlight(ctx, 800, m.headlights);
   drawStripLabel(ctx, HEADLIGHT_WORD[m.headlights], 806);
+
+  // Engine-temperature telltale (VP-06) — red glow + label ONLY while lit.
+  if (m.tempWarnOn) {
+    drawTempWarn(ctx, 575);
+    ctx.fillStyle = STRIP_DANGER;
+    ctx.font = "bold 17px system-ui, sans-serif";
+    ctx.textAlign = "center";
+    ctx.fillText("ТЕМПЕРАТУРА", 575, 112);
+  }
 }
 
 /** Per-frame strip runtime — lazily built on the first frame and owned by a
@@ -1085,11 +1161,15 @@ function DashStripOverlay({
   clockRef,
   cabin,
   viewFov,
+  director,
 }: {
   trace: ScenarioTrace;
   clockRef: RefObject<TraceClock>;
   cabin: CaptureCabinChannels;
   viewFov: number;
+  /** The staged director — its telltaleLit channel lights the strip's red
+   *  temperature lamp (VP-06). Null when the clip has no staged events. */
+  director: ScenarioDirector | null;
 }) {
   const meshRef = useRef<Mesh>(null);
   const materialRef = useRef<MeshBasicMaterial>(null);
@@ -1133,7 +1213,9 @@ function DashStripOverlay({
     }
     const s = scratch.current;
     sampleAt(trace, clock.tSec, s.pt);
-    dashModelFor(s.pt, cabin, clock.tSec, s.model);
+    // The staged director (stepped by GhostWorldDriver just before this frame)
+    // owns the telltale: light the strip's red temperature lamp off it (VP-06).
+    dashModelFor(s.pt, cabin, clock.tSec, s.model, director?.telltaleLit ?? false);
     const hash = dashModelHash(s.model);
     if (rt.ctx && hash !== rt.lastHash) {
       rt.lastHash = hash;

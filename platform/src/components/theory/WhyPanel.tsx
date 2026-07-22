@@ -21,6 +21,7 @@ import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useState } from "react";
 import { IconArrowRight } from "@/components/icons";
+import { QuestionMediaView, SignFace } from "./QuestionMedia";
 import type { WhyPanelModel } from "./whyPanelModel";
 
 const MistakeMedia = dynamic(() => import("./MistakeMedia"), {
@@ -62,6 +63,31 @@ export function WhyPanel({
       >
         {model.headerBg}
       </h3>
+
+      {/* THEO Half A picture card (doc 64): the sign face / top-down diagram
+          that ANSWERS a sign/priority/marking question, drawn from the SAME
+          data-driven components as the question card (no new artwork). Shown
+          only when no scenario reel owns the visual (model.picture is built
+          for sim===null); the sim!==null reel path below is untouched. */}
+      {model.picture !== null ? (
+        <div className="mt-3 flex flex-col gap-2">
+          {model.picture.media !== null ? (
+            <QuestionMediaView media={model.picture.media} />
+          ) : null}
+          {model.picture.correctSign !== null ? (
+            <figure className="flex flex-col items-center gap-1.5 rounded-xl border border-success/40 bg-success/10 p-3">
+              <SignFace
+                signRef={model.picture.correctSign.signRef}
+                altBg={model.picture.correctSign.labelBg}
+                className="h-24 w-24 sm:h-28 sm:w-28"
+              />
+              <figcaption className="text-center text-xs font-bold text-success">
+                {model.picture.correctSign.labelBg}
+              </figcaption>
+            </figure>
+          ) : null}
+        </div>
+      ) : null}
 
       {model.leadInBg !== null ? (
         <p className="mt-2 text-xs font-bold text-success">{model.leadInBg}</p>

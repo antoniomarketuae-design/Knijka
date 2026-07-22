@@ -46,18 +46,20 @@ import { useGLTF } from "@react-three/drei";
 import { CuboidCollider, RigidBody } from "@react-three/rapier";
 import {
   CanvasTexture,
+  Color,
   Group,
   InstancedMesh,
+  Mesh,
   Object3D,
   Quaternion,
   Vector3,
   type BufferGeometry,
   type Material,
-  type Mesh,
   type Object3D as AnyObject3D,
 } from "three";
 import {
   assignCivilianModel,
+  buildAnimalRig,
   buildTrafficFleet,
   disposeTrafficFleet,
   DRACO_DECODER_PATH,
@@ -103,6 +105,14 @@ export interface ScenarioVehicleObstacle extends ObstaclePose {
    * (scenarioSceneryProps.ts). Absent = hittable (the S0 default).
    */
   visual?: boolean;
+  /**
+   * HERO TINT (scene-still only): a fixed CSS colour written straight into the
+   * parked paint shell's per-instance colour, overriding the seed→palette pick,
+   * so the learner's own car reads as a distinct saturated body colour. Only
+   * applies to palette-tinted models (the parked pool is all paintable). Absent
+   * = ordinary palette tint (every sim caller leaves this unset).
+   */
+  heroColor?: string;
 }
 
 export type ScenarioPropKind = "cone" | "pole";
@@ -124,10 +134,26 @@ export interface ScenarioWallObstacle extends ObstaclePose {
   thicknessM?: number;
 }
 
+/**
+ * A quadruped hazard body standing in the road (doc 72 §HZ „животно на пътя").
+ * Mounts the SAME buildAnimalRig geometry TrafficLayer draws on the dart path,
+ * but as HELD scenery — always rendered, no `hazardActive` trigger (the trace
+ * recorder has no hazard channel, so reel clips never fire the dart). Visual
+ * dressing ONLY: no collider (the grading lives in the authored trace), like a
+ * `visual: true` vehicle — an animal must not add an unauthored crash surface.
+ * `visual` is accepted for parity with vehicles/props and documents the intent;
+ * animals are never hittable regardless of its value.
+ */
+export interface ScenarioAnimalObstacle extends ObstaclePose {
+  kind: "animal";
+  visual?: boolean;
+}
+
 export type ScenarioObstacleSpec =
   | ScenarioVehicleObstacle
   | ScenarioPropObstacle
-  | ScenarioWallObstacle;
+  | ScenarioWallObstacle
+  | ScenarioAnimalObstacle;
 
 // ---------------------------------------------------------------------------
 // Contact-grading constants (the VehicleRig `collisionMinKmh` seam)
@@ -285,6 +311,10 @@ export function ScenarioObstacles({ obstacles, clearcoat = true }: ScenarioObsta
     () => obstacles.filter((o): o is ScenarioWallObstacle => o.kind === "wall"),
     [obstacles],
   );
+  const animals = useMemo(
+    () => obstacles.filter((o): o is ScenarioAnimalObstacle => o.kind === "animal"),
+    [obstacles],
+  );
 
   return (
     <group name="scenario-obstacles">
@@ -296,6 +326,7 @@ export function ScenarioObstacles({ obstacles, clearcoat = true }: ScenarioObsta
       {walls.map((w, i) => (
         <ObstacleWall key={`wall-${i}`} spec={w} />
       ))}
+      {animals.length > 0 ? <ObstacleAnimals animals={animals} /> : null}
     </group>
   );
 }
@@ -423,6 +454,23 @@ function ObstacleVehicles({
     if (wheel) wheel.instanceMatrix.needsUpdate = true;
     blob.instanceMatrix.needsUpdate = true;
   }, [fleet, resolved, blob]);
+
+  // Hero tint (scene-still): override the seed→palette pick for any vehicle
+  // that carries `heroColor`, writing a fixed colour straight into its parked
+  // paint-shell instance. Runs after buildTrafficFleet has laid down the palette
+  // colours, so it's a clean per-instance override (civilians untouched).
+  const heroColor = useMemo(() => new Color(), []);
+  useLayoutEffect(() => {
+    for (let i = 0; i < vehicles.length; i++) {
+      const hex = vehicles[i].heroColor;
+      if (!hex) continue;
+      const pm = fleet.parkedPaintMeshes[fleet.parkedAssign[i]];
+      if (!pm) continue; // un-paintable model (police / hero SUV) — no shell
+      heroColor.set(hex);
+      pm.setColorAt(fleet.parkedSlot[i], heroColor);
+      if (pm.instanceColor) pm.instanceColor.needsUpdate = true;
+    }
+  }, [fleet, vehicles, heroColor]);
 
   return (
     <>
@@ -568,6 +616,49 @@ function ObstacleWall({ spec }: { spec: ScenarioWallObstacle }) {
         <meshStandardMaterial color="#8d8a83" roughness={0.9} />
       </mesh>
     </RigidBody>
+  );
+}
+
+// --- Animals: held quadruped bodies (visual dressing, no collider) ----------
+
+/**
+ * Quadruped hazard bodies standing in the road. Each spec builds its OWN
+ * buildAnimalRig (fresh geometry + materials) and mounts a single
+ * Mesh(rig.bodyGeometry, rig.bodyMaterials) — verbatim the TrafficLayer
+ * hazard-animal mount (Y = 0 = hooves on the tarmac, yaw via obstacleYawRad,
+ * cast shadow). NO collider: the drill grades the swerve/collision in the
+ * authored trace, so the animal is pure scenery (a live crash surface would be
+ * an unauthored grading path). On unmount each rig disposes its bodyGeometry
+ * and every ownedMaterial (TrafficLayer's cleanup, verbatim).
+ */
+function ObstacleAnimals({ animals }: { animals: ScenarioAnimalObstacle[] }) {
+  const built = useMemo(
+    () =>
+      animals.map((spec) => {
+        const rig = buildAnimalRig();
+        const mesh = new Mesh(rig.bodyGeometry, rig.bodyMaterials);
+        mesh.castShadow = true;
+        mesh.position.set(spec.x, 0, -spec.y); // Y = 0 = hooves on the tarmac
+        mesh.rotation.y = obstacleYawRad(spec.headingDeg);
+        return { mesh, rig };
+      }),
+    [animals],
+  );
+  useEffect(
+    () => () => {
+      for (const { rig } of built) {
+        rig.bodyGeometry.dispose();
+        for (const m of rig.ownedMaterials) m.dispose();
+      }
+    },
+    [built],
+  );
+  return (
+    <>
+      {built.map(({ mesh }, i) => (
+        <primitive key={`sc-animal-${i}`} object={mesh} />
+      ))}
+    </>
   );
 }
 

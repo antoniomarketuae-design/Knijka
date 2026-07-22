@@ -28,6 +28,8 @@ export {
 
 export { DistrictWorld } from "./components/DistrictWorld";
 export type { DistrictWorldProps } from "./components/DistrictWorld";
+export { LaneSignalGantry, laneGantryOf } from "./components/LaneSignalGantry";
+export type { LaneGantrySpec } from "./components/LaneSignalGantry";
 export { WorldColliders } from "./components/WorldColliders";
 export { OsmAttribution } from "./components/OsmAttribution";
 export { QUALITY_PRESETS } from "./components/quality";

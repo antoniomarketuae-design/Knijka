@@ -96,7 +96,7 @@
       { "act": "ЗДвП", "ref": "чл. 20" },
       { "act": "ЗДвП", "ref": "чл. 117" }
     ],
-    "media": null,
+    "media": {"kind":"sign","signRef":"А19"},
     "status": "draft"
   },
   {
@@ -414,7 +414,7 @@
       { "act": "Наредба № РД-02-21-1/2023", "ref": "зона на действие?" },
       { "act": "ЗДвП", "ref": "чл. 6" }
     ],
-    "media": null,
+    "media": {"kind":"sign","signRef":"В24"},
     "status": "needs-review"
   },
   {
@@ -614,7 +614,7 @@
       { "act": "ЗДвП", "ref": "чл. 93" },
       { "act": "Наредба № РД-02-21-1/2023", "ref": "група В?" }
     ],
-    "media": null,
+    "media": {"kind":"sign","signRef":"В28"},
     "status": "draft"
   },
   {
@@ -654,7 +654,7 @@
       { "act": "ЗДвП", "ref": "чл. 21" },
       { "act": "Наредба № РД-02-21-1/2023", "ref": "зона на действие?" }
     ],
-    "media": null,
+    "media": {"kind":"sign","signRef":"В34"},
     "status": "draft"
   },
   {
@@ -754,7 +754,7 @@
       { "act": "ЗДвП", "ref": "чл. 20" },
       { "act": "Наредба № РД-02-21-1/2023", "ref": "група А?" }
     ],
-    "media": null,
+    "media": {"kind":"sign","signRef":"А15"},
     "status": "draft"
   },
   {
@@ -876,7 +876,7 @@
       { "act": "ЗДвП", "ref": "чл. 20" },
       { "act": "Наредба № РД-02-21-1/2023", "ref": "група А?" }
     ],
-    "media": null,
+    "media": {"kind":"sign","signRef":"А12"},
     "status": "draft"
   },
   {
@@ -1159,7 +1159,7 @@
       { "act": "ЗДвП", "ref": "чл. 20" },
       { "act": "Наредба № РД-02-21-1/2023", "ref": "група А?" }
     ],
-    "media": null,
+    "media": {"kind":"sign","signRef":"А5"},
     "status": "draft"
   },
   {

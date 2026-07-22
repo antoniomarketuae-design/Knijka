@@ -48,6 +48,7 @@ import { SCENARIO_TEMPLATES_JUNCTIONS4 } from "./templates-junctions4";
 import { SCENARIO_TEMPLATES_MERGING2 } from "./templates-merging2";
 import { SCENARIO_TEMPLATES_ROUNDABOUT2 } from "./templates-roundabout2";
 import { SCENARIO_TEMPLATES_LANES3 } from "./templates-lanes3";
+import { SCENARIO_TEMPLATES_REELS } from "./templates-reels";
 
 /**
  * The TARGET bay of content/world/lot-perp-v1.json — meta.scenario bay
@@ -296,6 +297,11 @@ export const SCENARIO_TEMPLATES: readonly ScenarioSpec[] = [
   // above (signals2, vru2, rail2, hazards2, following2, exam); lanes3 is the
   // wave's one new family (sc-ln-decisive-change, deepening sc-lane-change).
   ...SCENARIO_TEMPLATES_LANES3,
+  // Half-B reel wave — the 5 new theory-reel drills (doc 72 fidelity): the ice
+  // slippery-sign warning, the distracted late reaction, own-ПТП conduct (NEW
+  // event), the animal-hazard solid-line swerve (code-built animal rig) and the
+  // lane-control gantry WRONG_WAY (code-built overhead gantry, new lc-gantry-v1).
+  ...SCENARIO_TEMPLATES_REELS,
 ];
 
 /** Lookup by template id; undefined for unknown ids. */

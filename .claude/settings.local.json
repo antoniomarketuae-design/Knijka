@@ -43,5 +43,55 @@
       "Bash(pdftotext -enc UTF-8 iaaa2024.pdf iaaa2024.txt)",
       "WebFetch(domain:markoza.bg)"
     ]
+  },
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"E:/AI driver/.claude/hooks-inject-map.js\" SessionStart",
+            "timeout": 15,
+            "statusMessage": "Loading Product Map"
+          }
+        ]
+      }
+    ],
+    "PostCompact": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"E:/AI driver/.claude/hooks-inject-map.js\" PostCompact",
+            "timeout": 15,
+            "statusMessage": "Re-loading Product Map after compaction"
+          }
+        ]
+      }
+    ],
+    "PreCompact": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"E:/AI driver/.claude/hooks-precompact.js\"",
+            "timeout": 10,
+            "statusMessage": "Reminder: persist state before compaction"
+          }
+        ]
+      }
+    ],
+    "SessionEnd": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"E:/AI driver/.claude/hooks-sessionend.js\"",
+            "timeout": 15,
+            "statusMessage": "Snapshotting session transcript"
+          }
+        ]
+      }
+    ]
   }
 }

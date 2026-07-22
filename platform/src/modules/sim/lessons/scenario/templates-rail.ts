@@ -44,7 +44,7 @@
  * ghost narration carry the visual story until an asset drop.
  */
 
-import type { OncomingLeftTurnSpec, PedestrianDartOutSpec } from "../../contracts";
+import type { OncomingLeftTurnSpec, PedestrianDartOutSpec, TrainPassSpec } from "../../contracts";
 import type { ScenarioSpec } from "./types";
 
 // ---------------------------------------------------------------------------
@@ -57,8 +57,45 @@ const RX_LANE = 4.06;
 /** rx-*-v1: the track band along the street (meta.scenario.railCrossing). */
 const RX_BAND_FROM = 150;
 const RX_BAND_TO = 156;
+/** rx-*-v1: the track-band centre (meta.scenario.railCrossing.bandCenterY). */
+const RX_BAND_CENTER_Y = 153;
 /** rx-*-v1: the СТОП-cross / barrier stop line (meta.scenario stopLineY). */
 const RX_STOP_LINE_Y = 145;
+/** rx-*-v1: the perpendicular rail line the staged TRAIN rides — east→west at
+ *  the band centre, reaching well off-frame both ways (meta.scenario
+ *  .railCrossing.railPath; pinned by value, the rail-district battery asserts
+ *  the copy matches the generated map — the L7 pattern). */
+const RX_RAIL_PATH: ReadonlyArray<{ x: number; y: number }> = [
+  { x: -130, y: RX_BAND_CENTER_Y },
+  { x: 130, y: RX_BAND_CENTER_Y },
+];
+
+/**
+ * The staged TRAIN crossing (ADR-006 stage 3c — the RX „жп прелез" gets a real
+ * train). A locomotive + 2 cars ride RX_RAIL_PATH across the carriageway,
+ * released when the player is within 55 m of the crossing so the mandatory
+ * „stop and look" meets an actual train — not empty rails. BYTE-NEUTRAL to
+ * grading: the TrainPassRunner emits ZERO SimTick events, so the existing
+ * world-data rail-crossing detectors alone convict a driver who fails to stop
+ * (guarded maps keep their own barrier timetable unchanged). The train never
+ * brakes for the player — it IS the hazard.
+ */
+function railTrainPassEvent(id: string): TrainPassSpec {
+  return {
+    id,
+    kind: "trainPass",
+    railPath: RX_RAIL_PATH,
+    // Train centre waits ~50 m west of the street axis (off-frame) then runs
+    // east; at 12 m/s it reaches the carriageway ~when the player is at the
+    // СТОП line, so it visibly crosses while the driver stops and looks.
+    holdOffsetM: 80,
+    cruiseSpeedMps: 12,
+    accelMps2: 3.5,
+    triggerPlayerDistM: 55,
+    crossing: { x: RX_LANE, y: RX_BAND_CENTER_Y },
+    colorIndex: 0,
+  };
+}
 /** rx-guarded-v1: the deterministic barrier timetable (down [0, 40) of 90 s). */
 const RXG_BARRIER_CYCLE_SEC = 90;
 const RXG_BARRIER_DOWN_FROM_SEC = 0;
@@ -160,6 +197,10 @@ export const SC_RX_UNGUARDED: ScenarioSpec = {
     { level: 3 },
     { level: 4, vehicleStart: "cold" },
   ],
+  // ADR-006 stage 3c: a real TRAIN crosses as the player approaches — the
+  // hazard the mandatory full stop exists for (unguarded: NO barrier, the
+  // train + the stop duty IS the lesson). Byte-neutral to grading.
+  staged: [railTrainPassEvent("sc-rxu-train")],
   conditions: { weather: "dry" },
   localeBg: "bg-BG",
 };
@@ -260,6 +301,10 @@ export const SC_RX_GUARDED: ScenarioSpec = {
     { level: 3 },
     { level: 4, vehicleStart: "cold" },
   ],
+  // ADR-006 stage 3c: the TRAIN whose approach the barrier guards — it crosses
+  // while the arm is down. The barrier timetable is unchanged; the train adds
+  // no grading (world-data detectors alone convict).
+  staged: [railTrainPassEvent("sc-rxg-train")],
   conditions: { weather: "dry" },
   localeBg: "bg-BG",
 };
@@ -371,6 +416,9 @@ export const SC_RX_BARRIER_DROP: ScenarioSpec = {
     { level: 4, vehicleStart: "cold" },
     { level: 5 },
   ],
+  // ADR-006 stage 3c: the descending barrier drops BECAUSE this train is
+  // coming — it crosses in front of the waiting player. Grading unchanged.
+  staged: [railTrainPassEvent("sc-rxd-train")],
   conditions: { weather: "dry" },
   localeBg: "bg-BG",
 };

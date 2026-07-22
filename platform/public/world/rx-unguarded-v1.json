@@ -50,7 +50,18 @@
     "fromM": 150,
     "toM": 156,
     "guarded": false,
-    "stopLineY": 145
+    "stopLineY": 145,
+    "bandCenterY": 153,
+    "railPath": [
+     [
+      -130,
+      153
+     ],
+     [
+      130,
+      153
+     ]
+    ]
    }
   }
  },

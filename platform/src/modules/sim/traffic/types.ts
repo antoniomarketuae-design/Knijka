@@ -79,7 +79,11 @@ export interface TrafficDistrict {
  * two-segment articulated tram rig (~14 m, pantograph hint) — a tram is a
  * PATH-LOCKED staged vehicle like every other actor; its "track" IS its
  * authored polyline (street-running rails share the traffic lane — no
- * separate rail physics exists, honestly); "cyclist" / "childCyclist" render
+ * separate rail physics exists, honestly); "train" (RX-02/RX-01 „жп прелез")
+ * renders the procedural MULTI-UNIT train rig (a locomotive + 2 cars, ~34 m)
+ * that CROSSES the carriageway on an authored PERPENDICULAR rail polyline
+ * (StagedVehicleSpec.railPath) over the rendered rail deck — same path-locked
+ * point-geometry honesty; "cyclist" / "childCyclist" render
  * the procedural BICYCLE + RIDER rigs (adult / child size — the „дете с
  * колело" actor), closing audit C3's RENDER half: the v1 cyclist stays a
  * narrow curb-riding vehicle-agent for grading (the extraRightOffsetM tag and
@@ -98,8 +102,10 @@ export type VehicleProfile =
   | "truck"
   | "emergency"
   | "tram"
+  | "train"
   | "cyclist"
-  | "childCyclist";
+  | "childCyclist"
+  | "animal";
 
 export interface TrafficVehicleState {
   id: number;
@@ -336,9 +342,19 @@ export interface StagedVehicleSpec {
   /**
    * District node ids the actor drives through, in order. Every consecutive
    * pair must be connected by a directed lane in the road graph (same lanes
-   * ambient traffic drives), or stage() returns null.
+   * ambient traffic drives), or stage() returns null. Ignored (may be empty)
+   * when `railPath` is supplied.
    */
   pathNodes: string[];
+  /**
+   * Explicit district-space polyline the actor rides, BYPASSING the lane graph
+   * (the pedestrian-path precedent for vehicles — the RX „жп прелез" TRAIN
+   * crosses on an authored rail line that is NOT a road edge). When present it
+   * REPLACES pathNodes for path resolution; the arc of each vertex becomes a
+   * pathNode arc so `hold.nodeIndex` still indexes it. Absent = the ordinary
+   * lane-graph path, byte-identical for every existing staged actor.
+   */
+  railPath?: ReadonlyArray<{ x: number; y: number }>;
   /** Dormant hold pose: arc of pathNodes[nodeIndex] + offsetM (may be
    *  negative = before the node) along the resolved path. */
   hold: { nodeIndex: number; offsetM: number };

@@ -1067,7 +1067,7 @@
     ],
     "explanationBg": "На кръстовище без знаци и светофар важи правилото на дясностоящия: пропускаш всичко, което идва отдясно, независимо кой е пристигнал пръв. Отбелязаната точка е мястото, където траекториите ви се пресичат (ЗДвП, чл. 50).",
     "lawRefs": [{ "act": "ЗДвП", "ref": "чл. 50" }],
-    "media": {"kind":"sceneStill","districtId":"jx-equal-v1","focus":{"x":0,"y":0,"zoomM":60},"poses":[{"kind":"car","x":4.06,"y":-14,"headingDeg":0,"variant":"ego"},{"kind":"car","x":16,"y":4.06,"headingDeg":270}],"marks":[{"kind":"danger","x":4.06,"y":4.06}]},
+    "media": {"kind":"sceneStill","districtId":"jx-equal-v1","focus":{"x":0,"y":0,"zoomM":60},"poses":[{"kind":"car","x":4.06,"y":-14,"headingDeg":0,"variant":"ego"},{"kind":"car","x":16,"y":4.06,"headingDeg":270}],"marks":[{"kind":"danger","x":4.06,"y":4.06},{"kind":"yield","x":4.06,"y":-8}]},
     "status": "draft"
   },
   {
@@ -1084,7 +1084,7 @@
     ],
     "explanationBg": "Колата отляво е длъжна да те пропусне — за нея ти си „дясностоящият“. Имаш предимство, но то се взима с очи, не на доверие: минаваш с готовност да спреш, ако другият сгреши (ЗДвП, чл. 50; чл. 20).",
     "lawRefs": [{ "act": "ЗДвП", "ref": "чл. 50" }, { "act": "ЗДвП", "ref": "чл. 20" }],
-    "media": {"kind":"sceneStill","districtId":"jx-equal-v1","focus":{"x":0,"y":0,"zoomM":60},"poses":[{"kind":"car","x":4.06,"y":-14,"headingDeg":0,"variant":"ego"},{"kind":"car","x":-16,"y":-4.06,"headingDeg":90}],"marks":[]},
+    "media": {"kind":"sceneStill","districtId":"jx-equal-v1","focus":{"x":0,"y":0,"zoomM":60},"poses":[{"kind":"car","x":4.06,"y":-14,"headingDeg":0,"variant":"ego"},{"kind":"car","x":-16,"y":-4.06,"headingDeg":90}],"marks":[{"kind":"proceed","x":4.06,"y":-8}]},
     "status": "draft"
   },
   {
@@ -1101,7 +1101,7 @@
     ],
     "explanationBg": "Завиващият наляво е длъжен да пропусне насрещните, които се движат направо или завиват надясно — предимството е твое. Но правило и реалност не винаги съвпадат: минаваш с крак върху спирачката и следиш дали той наистина изчаква (ЗДвП, чл. 37).",
     "lawRefs": [{ "act": "ЗДвП", "ref": "чл. 37" }],
-    "media": {"kind":"sceneStill","districtId":"jx-equal-v1","focus":{"x":0,"y":0,"zoomM":60},"poses":[{"kind":"car","x":4.06,"y":-16,"headingDeg":0,"variant":"ego"},{"kind":"car","x":-4.06,"y":14,"headingDeg":180}],"marks":[{"kind":"danger","x":4.06,"y":2}]},
+    "media": {"kind":"sceneStill","districtId":"jx-equal-v1","focus":{"x":0,"y":0,"zoomM":60},"poses":[{"kind":"car","x":4.06,"y":-16,"headingDeg":0,"variant":"ego"},{"kind":"car","x":-4.06,"y":14,"headingDeg":180}],"marks":[{"kind":"danger","x":4.06,"y":2},{"kind":"proceed","x":4.06,"y":-10}]},
     "status": "draft"
   },
   {
@@ -1118,7 +1118,7 @@
     ],
     "explanationBg": "При ляв завой пресичаш пътя на насрещното движение, затова законът поставя тежестта върху теб: пропускаш движещите се направо или завиващите надясно и завиваш чак когато пътят им е чист (ЗДвП, чл. 37).",
     "lawRefs": [{ "act": "ЗДвП", "ref": "чл. 37" }],
-    "media": {"kind":"sceneStill","districtId":"jx-equal-v1","focus":{"x":0,"y":0,"zoomM":60},"poses":[{"kind":"car","x":4.06,"y":-14,"headingDeg":0,"variant":"ego"},{"kind":"car","x":-4.06,"y":16,"headingDeg":180}],"marks":[{"kind":"danger","x":-4.06,"y":0}]},
+    "media": {"kind":"sceneStill","districtId":"jx-equal-v1","focus":{"x":0,"y":0,"zoomM":60},"poses":[{"kind":"car","x":4.06,"y":-14,"headingDeg":0,"variant":"ego"},{"kind":"car","x":-4.06,"y":16,"headingDeg":180}],"marks":[{"kind":"danger","x":-4.06,"y":0},{"kind":"yield","x":4.06,"y":-8}]},
     "status": "draft"
   },
   {
@@ -1135,7 +1135,7 @@
     ],
     "explanationBg": "Б1 иска резултат, не ритуал: никой по пътя с предимство да не бъде принуден да намали заради теб. Затова пълното спиране е задължително само когато е нужно — за разлика от Б2, при който спираш винаги (ЗДвП, чл. 50).",
     "lawRefs": [{ "act": "ЗДвП", "ref": "чл. 50" }, { "act": "Наредба № РД-02-21-1/23.11.2023", "ref": "прил. № 2, знак Б1" }],
-    "media": {"kind":"sceneStill","districtId":"jxg-giveway-v1","focus":{"x":0,"y":0,"zoomM":70},"poses":[{"kind":"car","x":4.06,"y":-16,"headingDeg":0,"variant":"ego"},{"kind":"car","x":-22,"y":-4.06,"headingDeg":90},{"kind":"car","x":26,"y":4.06,"headingDeg":270}],"marks":[]},
+    "media": {"kind":"sceneStill","districtId":"jxg-giveway-v1","focus":{"x":0,"y":0,"zoomM":70},"poses":[{"kind":"car","x":4.06,"y":-16,"headingDeg":0,"variant":"ego"},{"kind":"car","x":-22,"y":-4.06,"headingDeg":90},{"kind":"car","x":26,"y":4.06,"headingDeg":270}],"marks":[{"kind":"yield","x":4.06,"y":-10}]},
     "status": "draft"
   },
   {

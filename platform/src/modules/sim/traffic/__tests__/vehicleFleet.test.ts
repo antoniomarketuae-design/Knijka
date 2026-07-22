@@ -16,11 +16,14 @@ import {
 } from "three";
 import type { TrafficVehicleState } from "../types";
 import {
+  ANIMAL_DIMENSIONS,
+  ANIMAL_MODEL_INDEX,
   assignCivilianModel,
   assignModel,
   BICYCLE_DIMENSIONS,
   BOXY_INDEX,
   BOXY_MAX_INSTANCES,
+  buildAnimalRig,
   buildTrafficFleet,
   carPaintMaterial,
   carPaintStandardMaterial,
@@ -36,6 +39,9 @@ import {
   STROBE_HALF_PERIOD_S,
   STROBE_OFF,
   STROBE_ON,
+  TRAIN_DIMENSIONS,
+  TRAIN_LENGTH_M,
+  TRAIN_MODEL_INDEX,
   TRAM_DIMENSIONS,
   TRAM_MODEL_INDEX,
   TRUCK_DIMENSIONS,
@@ -285,6 +291,49 @@ describe("buildTrafficFleet parked pass", () => {
   });
 });
 
+describe("animal-hazard profile (Half-B reels — the code-built quadruped)", () => {
+  it("modelForVehicle maps the 'animal' profile to ANIMAL_MODEL_INDEX", () => {
+    expect(modelForVehicle({ id: 9, profile: "animal" })).toBe(ANIMAL_MODEL_INDEX);
+    // The default MUST be byte-identical to the pre-profile fleet pick.
+    for (let id = 0; id < 100; id++) expect(modelForVehicle({ id })).toBe(assignModel(id));
+  });
+
+  it("buildAnimalRig produces a 2-group quadruped rig with hidden wheels + owned materials", () => {
+    const rig = buildAnimalRig();
+    // Two merged material groups: hide (torso/legs/tail) + head.
+    expect(rig.bodyGeometry.groups.length).toBe(2);
+    expect(rig.bodyMaterials.length).toBe(2);
+    // No paint tint; four wheel offsets; wheels are the hidden-placeholder pair.
+    expect(rig.paint).toBeNull();
+    expect(rig.customWheel).not.toBeNull();
+    expect(rig.wheelOffsets.length).toBe(4);
+    expect(rig.halfLength).toBeCloseTo(ANIMAL_DIMENSIONS.halfLengthM);
+    expect(rig.halfWidth).toBeCloseTo(ANIMAL_DIMENSIONS.halfWidthM);
+    // Materials (hide, head, hidden-wheel) are OWNED — disposed on teardown.
+    expect(rig.ownedMaterials.length).toBe(3);
+    rig.bodyGeometry.dispose();
+    for (const m of rig.ownedMaterials) m.dispose();
+  });
+
+  it("builds an InstancedMesh only when an animal actor is staged (cost discipline)", () => {
+    const animal: TrafficVehicleState = { ...vehicle(1), profile: "animal" };
+    const fleet = buildTrafficFleet(makeScenes(), [animal, vehicle(2)]);
+    expect(fleet.assign[0]).toBe(ANIMAL_MODEL_INDEX);
+    expect(fleet.assign[1]).toBe(assignModel(2)); // ambient neighbor untouched
+    expect(fleet.models[ANIMAL_MODEL_INDEX].count).toBe(1);
+    expect(fleet.models[ANIMAL_MODEL_INDEX].mesh).not.toBeNull();
+    expect(fleet.models[ANIMAL_MODEL_INDEX].mesh?.name).toBe("traffic-body-animal");
+    expect(() => disposeTrafficFleet(fleet)).not.toThrow();
+  });
+
+  it("costs nothing when no animal actor exists (no InstancedMesh)", () => {
+    const fleet = buildTrafficFleet(makeScenes(), [vehicle(3)]);
+    expect(fleet.models[ANIMAL_MODEL_INDEX].count).toBe(0);
+    expect(fleet.models[ANIMAL_MODEL_INDEX].mesh).toBeNull();
+    expect(() => disposeTrafficFleet(fleet)).not.toThrow();
+  });
+});
+
 describe("large-vehicle profile (doc 72 FO-06)", () => {
   const KARGO_V_INDEX = FLEET.indexOf("kargo_v");
 
@@ -425,6 +474,56 @@ describe("large-vehicle profile (doc 72 FO-06)", () => {
     // The unused truck + emergency slots stay free alongside it.
     expect(fleet.models[TRUCK_MODEL_INDEX].mesh).toBeNull();
     expect(fleet.models[EMERGENCY_MODEL_INDEX].mesh).toBeNull();
+    expect(() => disposeTrafficFleet(fleet)).not.toThrow();
+  });
+});
+
+describe("procedural multi-unit TRAIN rig (RX-02/RX-01 — the level-crossing actor)", () => {
+  it("modelForVehicle: the train profile maps to its own slot, one past the child cyclist", () => {
+    expect(modelForVehicle({ id: 9, profile: "train" })).toBe(TRAIN_MODEL_INDEX);
+    expect(TRAIN_MODEL_INDEX).toBe(FLEET.length + 5);
+  });
+
+  it("builds a genuine multi-unit consist: LONGER than the tram, teal + yellow + graphite", () => {
+    const train: TrafficVehicleState = { ...vehicle(9), profile: "train" };
+    const fleet = buildTrafficFleet(makeScenes(), [train, vehicle(10)]);
+    expect(fleet.assign[0]).toBe(TRAIN_MODEL_INDEX);
+    expect(fleet.assign[1]).toBe(assignModel(10)); // ambient neighbour untouched
+    const model = fleet.models[TRAIN_MODEL_INDEX];
+    expect(model.count).toBe(1);
+    expect(model.mesh).not.toBeNull();
+    expect(model.mesh?.name).toBe("traffic-body-train");
+    const rig = model.rig;
+    // A ~34 m consist — longer than the 14 m tram (the perceptual point: a
+    // train can neither stop nor swerve at the crossing).
+    expect(rig.halfLength).toBeCloseTo(TRAIN_LENGTH_M / 2);
+    expect(rig.halfLength).toBeGreaterThan(TRAM_DIMENSIONS.lengthM / 2);
+    expect(rig.halfWidth).toBeCloseTo(TRAIN_DIMENSIONS.widthM / 2);
+    // Wheel track = HALF the rail gauge so the bogies sit on the drawn rails,
+    // and the body is WIDER than the gauge (overhangs the rails).
+    expect(TRAIN_DIMENSIONS.widthM).toBeGreaterThan(TRAIN_DIMENSIONS.railGaugeM);
+    expect(rig.paint).toBeNull(); // no palette tint — the livery IS the identity
+    expect(rig.customWheel).toBeNull(); // shared wheel, scaled to the 0.46 m bogies
+    expect(fleet.wheelScale[0]).toBeCloseTo(TRAIN_DIMENSIONS.wheelRadiusM / 0.32);
+    // Three owned material groups: teal body + yellow accent + graphite kit.
+    expect(rig.ownedMaterials.length).toBe(3);
+    expect(rig.bodyMaterials.length).toBe(3);
+    expect(rig.bodyMaterials.map((m) => m.name).sort()).toEqual([
+      "train_accent",
+      "train_dark",
+      "train_paint",
+    ]);
+    // The unused tram/truck/emergency slots stay free alongside it.
+    expect(fleet.models[TRAM_MODEL_INDEX].mesh).toBeNull();
+    expect(fleet.models[TRUCK_MODEL_INDEX].mesh).toBeNull();
+    expect(fleet.models[EMERGENCY_MODEL_INDEX].mesh).toBeNull();
+    expect(() => disposeTrafficFleet(fleet)).not.toThrow();
+  });
+
+  it("costs nothing when no train actor exists (no InstancedMesh)", () => {
+    const fleet = buildTrafficFleet(makeScenes(), [vehicle(1), vehicle(2)]);
+    expect(fleet.models[TRAIN_MODEL_INDEX].count).toBe(0);
+    expect(fleet.models[TRAIN_MODEL_INDEX].mesh).toBeNull();
     expect(() => disposeTrafficFleet(fleet)).not.toThrow();
   });
 });
