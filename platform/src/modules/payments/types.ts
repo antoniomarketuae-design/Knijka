@@ -3,6 +3,7 @@
 export type PaymentsErrorCode =
   | "STRIPE_NOT_CONFIGURED"
   | "CHECKOUT_NO_URL"
+  | "CHECKOUT_NO_CLIENT_SECRET"
   | "UNKNOWN_PACK";
 
 export class PaymentsError extends Error {

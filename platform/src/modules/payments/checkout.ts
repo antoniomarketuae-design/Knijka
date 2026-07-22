@@ -77,6 +77,56 @@ export async function createCheckoutSession(
 }
 
 /**
+ * PUBLIC API: open an EMBEDDED Checkout session for one pack and return its
+ * client_secret — the on-site /checkout page mounts Stripe's embedded UI with
+ * it. Same money flow + metadata as the hosted session above; only the
+ * surface differs: `ui_mode: "embedded"` and a `return_url` instead of
+ * success/cancel redirects. Card, Apple Pay and Revolut Pay all render INSIDE
+ * the embedded UI (whatever is enabled in the Stripe Dashboard + eligible for
+ * the buyer). Fulfillment is unchanged — webhook (authoritative) + the return
+ * page both call fulfillCheckout(), keyed by the session id.
+ */
+export async function createEmbeddedCheckoutSession(
+  userId: string,
+  pack: PackId,
+): Promise<string> {
+  const def = PACKS[pack];
+  if (!def) throw new PaymentsError("UNKNOWN_PACK", `Unknown pack "${pack}"`);
+
+  const stripe = await getStripeClient();
+  const appUrl = getAppUrl();
+
+  const session = await stripe.checkout.sessions.create({
+    ui_mode: "embedded_page", // this Stripe API pins the renamed value
+    mode: "payment", // one-time — never "subscription" (docs/02)
+    line_items: [
+      {
+        quantity: 1,
+        price_data: {
+          currency: PACK_CURRENCY,
+          unit_amount: def.priceEurCents,
+          product_data: {
+            name: `Книжка.AI — ${def.nameBg}`,
+            description: def.checkoutDescriptionBg,
+          },
+        },
+      },
+    ],
+    metadata: { userId, pack: def.id },
+    client_reference_id: userId,
+    return_url: `${appUrl}/checkout/return?session_id={CHECKOUT_SESSION_ID}`,
+  });
+
+  if (!session.client_secret) {
+    throw new PaymentsError(
+      "CHECKOUT_NO_CLIENT_SECRET",
+      `Stripe embedded session ${session.id} came back without a client_secret`,
+    );
+  }
+  return session.client_secret;
+}
+
+/**
  * The fields fulfillment needs from a Checkout Session — satisfied both by
  * the full Stripe.Checkout.Session (webhook event payload / retrieve) and by
  * plain fakes in tests.

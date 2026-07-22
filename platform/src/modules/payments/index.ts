@@ -45,7 +45,11 @@ export {
 } from "./entitlements";
 
 // Checkout + fulfillment
-export { createCheckoutSession, fulfillCheckout } from "./checkout";
+export {
+  createCheckoutSession,
+  createEmbeddedCheckoutSession,
+  fulfillCheckout,
+} from "./checkout";
 export type { CheckoutSessionLike } from "./checkout";
 
 // Free-tier quota helpers (not wired — see quota.ts header for the
