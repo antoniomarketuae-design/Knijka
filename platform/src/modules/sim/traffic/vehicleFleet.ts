@@ -73,6 +73,7 @@ import {
   Vector3,
 } from "three";
 import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
+import { PERCEPTUAL_ROAD_SCALE } from "../contracts";
 import type { TrafficVehicleState } from "./types";
 import palettesJson from "../../../../public/sim/vehicles-v2/palettes.json";
 
@@ -133,6 +134,16 @@ export const TRAM_MODEL_INDEX = FLEET.length + 2;
 export const CYCLIST_MODEL_INDEX = FLEET.length + 3;
 /** Model slot of the CHILD bicycle + rider rig (VU-03 „дете с колело"). */
 export const CHILD_CYCLIST_MODEL_INDEX = FLEET.length + 4;
+/** Model slot of the procedural multi-unit TRAIN rig (RX-02/RX-01 „жп прелез"
+ *  — the railway-level-crossing actor: a locomotive + 2 cars that CROSSES the
+ *  carriageway on the rendered rail deck). No InstancedMesh unless a train
+ *  actor exists — same cost discipline as the tram. */
+export const TRAIN_MODEL_INDEX = FLEET.length + 5;
+/** Model slot of the procedural low-poly ANIMAL rig (doc 72 §HZ „животно на
+ *  пътя" — the animal-hazard actor: a quadruped that darts across the
+ *  carriageway). Mirrors CYCLIST_MODEL_INDEX: no InstancedMesh unless an
+ *  "animal"-profile actor exists — same cost discipline as the tram/cyclist. */
+export const ANIMAL_MODEL_INDEX = FLEET.length + 6;
 const VAN_MODEL_INDEX = FLEET.indexOf("kargo_v");
 
 /** Box-truck body plan, meters (fictional): ~7.5 × 2.4 × 3.1 — longer, wider
@@ -156,8 +167,10 @@ export function modelForVehicle(v: Pick<TrafficVehicleState, "id" | "profile">):
   if (v.profile === "truck") return TRUCK_MODEL_INDEX;
   if (v.profile === "emergency") return EMERGENCY_MODEL_INDEX;
   if (v.profile === "tram") return TRAM_MODEL_INDEX;
+  if (v.profile === "train") return TRAIN_MODEL_INDEX;
   if (v.profile === "cyclist") return CYCLIST_MODEL_INDEX;
   if (v.profile === "childCyclist") return CHILD_CYCLIST_MODEL_INDEX;
+  if (v.profile === "animal") return ANIMAL_MODEL_INDEX;
   if (v.profile === "van") return VAN_MODEL_INDEX;
   return assignModel(v.id);
 }
@@ -166,8 +179,10 @@ export function modelForVehicle(v: Pick<TrafficVehicleState, "id" | "profile">):
 function modelName(m: number): string {
   if (m === EMERGENCY_MODEL_INDEX) return "emergency";
   if (m === TRAM_MODEL_INDEX) return "tram";
+  if (m === TRAIN_MODEL_INDEX) return "train";
   if (m === CYCLIST_MODEL_INDEX) return "cyclist";
   if (m === CHILD_CYCLIST_MODEL_INDEX) return "cyclist_child";
+  if (m === ANIMAL_MODEL_INDEX) return "animal";
   return FLEET[m] ?? "box_truck";
 }
 
@@ -416,16 +431,19 @@ function buildTramRig(): ModelRig {
   const { lengthM, widthM, bodyHeightM, gapM, wheelRadiusM, pantograph } = TRAM_DIMENSIONS;
   const halfLength = lengthM / 2;
   const paintMat = new MeshStandardMaterial({
-    color: 0x7c1f2d, // deep fictional crimson (ADR-001 — no real livery)
+    color: 0x9a2b33, // fictional Sofia-tram red (ADR-001 — no real livery); a
+    // touch brighter + glossier than the old crimson so it catches light and
+    // reads as a painted vehicle, not a dark box (founder R0: „plain red box").
     metalness: 0.3,
-    roughness: 0.42,
-    envMapIntensity: 1.35,
+    roughness: 0.38,
+    envMapIntensity: 1.4,
   });
   paintMat.name = "tram_paint";
   const darkMat = new MeshStandardMaterial({
-    color: 0x2b2f33, // graphite: bellows + roof kit + pantograph
-    metalness: 0.35,
-    roughness: 0.55,
+    color: 0x1c2024, // near-black graphite: glazing band + cab screens + skirt +
+    // bellows + roof kit + pantograph (dark enough to read as glass/underframe)
+    metalness: 0.4,
+    roughness: 0.45,
   });
   darkMat.name = "tram_dark";
   // Two body segments over a 0.35 m skirt clearance, separated by the gap.
@@ -440,17 +458,21 @@ function buildTramRig(): ModelRig {
     segFront.dispose();
     segRear.dispose();
   }
+  // Segment centres (front at +Z / the nose end) — shared by the roof, the
+  // pantograph and the glazing band below.
+  const segCF = gapM / 2 + segLen / 2;
+  const segCR = -(gapM / 2 + segLen / 2);
   // Dark kit: articulation bellows bridging the gap…
   const bellows = new BoxGeometry(widthM - 0.3, segH - 0.4, gapM + 0.24);
   bellows.translate(0, 0.55 + (segH - 0.4) / 2, 0);
   // …a low roof strip along each segment (equipment boxes)…
   const roofF = new BoxGeometry(widthM - 0.7, 0.16, segLen - 1.2);
-  roofF.translate(0, bodyHeightM + 0.08, gapM / 2 + segLen / 2);
+  roofF.translate(0, bodyHeightM + 0.08, segCF);
   const roofR = new BoxGeometry(widthM - 0.7, 0.16, segLen - 1.2);
-  roofR.translate(0, bodyHeightM + 0.08, -(gapM / 2 + segLen / 2));
-  // …and the pantograph hint on the FRONT segment: two Λ-leaning arms + a
-  // contact bar at the apex (three slim boxes — a silhouette, not a mechanism).
-  const pantoZ = gapM / 2 + segLen / 2;
+  roofR.translate(0, bodyHeightM + 0.08, segCR);
+  // …the pantograph hint on the FRONT segment: two Λ-leaning arms + a contact
+  // bar at the apex (three slim boxes — a silhouette, not a mechanism)…
+  const pantoZ = segCF;
   const armRise = pantograph.apexM - (bodyHeightM + 0.16);
   const armLean = Math.acos(Math.min(1, armRise / pantograph.armLenM));
   const armA = new BoxGeometry(0.06, pantograph.armLenM, 0.06);
@@ -461,7 +483,46 @@ function buildTramRig(): ModelRig {
   armB.translate(0, bodyHeightM + 0.16 + armRise / 2, pantoZ - 0.3);
   const bar = new BoxGeometry(pantograph.barWidthM, 0.05, 0.14);
   bar.translate(0, pantograph.apexM, pantoZ);
-  const darkParts = [bellows, roofF, roofR, armA, armB, bar];
+  // …the GLAZING BAND — the single strongest „this is a tram" cue (founder R0):
+  // a continuous dark window strip flush to each flank at seated-eye height, so
+  // the body reads as a glazed vehicle and not a solid red prism.
+  const winY = 2.15;
+  const winH = 0.85;
+  const winLen = segLen - 0.7;
+  const flankX = widthM / 2 - 0.01; // flush to the flank, protrudes ~0.02 m
+  const glassParts: BufferGeometry[] = [];
+  for (const segZ of [segCF, segCR]) {
+    for (const sx of [flankX, -flankX]) {
+      const w = new BoxGeometry(0.06, winH, winLen);
+      w.translate(sx, winY, segZ);
+      glassParts.push(w);
+    }
+  }
+  // …cab windscreens on the two end faces — the black driver-cab glass that
+  // turns the flat red ends into a front/rear you can read the direction from…
+  const screenF = new BoxGeometry(widthM - 0.34, 1.0, 0.06);
+  screenF.translate(0, 2.2, halfLength - 0.02);
+  const screenR = new BoxGeometry(widthM - 0.34, 1.0, 0.06);
+  screenR.translate(0, 2.2, -halfLength + 0.02);
+  // …and a low underframe skirt along each flank (dark bottom band for contrast
+  // with the red body above the wheels).
+  const skirtL = new BoxGeometry(0.06, 0.32, lengthM - 0.6);
+  skirtL.translate(flankX, 0.55, 0);
+  const skirtR = new BoxGeometry(0.06, 0.32, lengthM - 0.6);
+  skirtR.translate(-flankX, 0.55, 0);
+  const darkParts = [
+    bellows,
+    roofF,
+    roofR,
+    armA,
+    armB,
+    bar,
+    ...glassParts,
+    screenF,
+    screenR,
+    skirtL,
+    skirtR,
+  ];
   const darkMerged = mergeGeometries(darkParts, false) ?? bellows;
   if (darkMerged !== bellows) for (const g of darkParts) g.dispose();
   const bodyGeometry = mergeGeometries([paintMerged, darkMerged], true) ?? paintMerged;
@@ -492,6 +553,159 @@ function buildTramRig(): ModelRig {
     halfLength,
     lampY: 0.9,
     headY: 0.8,
+  };
+}
+
+/** Train body plan, meters (fictional, ADR-001 — no real livery): a MULTI-UNIT
+ *  heavy-rail consist (a locomotive + 2 cars) that actually CROSSES the road at
+ *  a railway level crossing (RX-02/RX-01). Unlike the street-running tram (a
+ *  ~14 m single articulated body sharing the traffic lane), the train is much
+ *  LONGER and rides a PERPENDICULAR rail path over the rendered rail deck
+ *  (world/builders/railTrack.ts): its wheel track equals the deck's rail gauge
+ *  so the wheels sit ON the drawn rails, and it is wide enough to overhang
+ *  them. Still a path-locked staged actor — no free physics, no rail sim; the
+ *  authored polyline IS the track, and every proximity query stays point-based
+ *  at the body centre (the VehicleProfile point-geometry law). */
+export const TRAIN_DIMENSIONS = {
+  /** Units in the consist (1 locomotive + 2 passenger cars). */
+  units: 3,
+  /** Per-unit body length + the coupler gap between units, m. */
+  unitLengthM: 11,
+  couplerGapM: 0.7,
+  /** Body width — overhangs the deck's rail gauge (railTrack RAIL_GAUGE_M ≈
+   *  3.59 m at the perceptual road scale), the real rail silhouette. */
+  widthM: 3.9,
+  bodyHeightM: 3.95,
+  wheelRadiusM: 0.46,
+  /** Wheel track = HALF the rendered rail gauge, so the shared bogie wheels
+   *  land on the two drawn rails. */
+  railGaugeM: 1.435 * PERCEPTUAL_ROAD_SCALE,
+} as const;
+
+/** Total consist length, m (units × unitLen + gaps). */
+export const TRAIN_LENGTH_M =
+  TRAIN_DIMENSIONS.units * TRAIN_DIMENSIONS.unitLengthM +
+  (TRAIN_DIMENSIONS.units - 1) * TRAIN_DIMENSIONS.couplerGapM;
+
+/**
+ * The procedural multi-unit TRAIN ModelRig (the railway-crossing actor). ONE
+ * rigid merged geometry (the whole consist translates/rotates as a unit — a
+ * train is inflexible, so unlike the tram's articulation there is no bend
+ * modelled): a deep fictional-teal body over each unit (one paint draw), a
+ * safety-YELLOW nose band + cab stripe on the leading locomotive (one accent
+ * draw), and a graphite kit — roof equipment strip, low skirt, and coupler
+ * bellows bridging the unit gaps (one dark draw). Ground-relative like the GLB
+ * kit (Y = 0 = tarmac, nose +Z); shared fleet wheels scaled to the 0.46 m
+ * bogie hubs, tracked to the rail gauge. All geometry + materials are OWNED
+ * (disposed via ownedMaterials/geometry).
+ */
+function buildTrainRig(): ModelRig {
+  const { units, unitLengthM, couplerGapM, widthM, bodyHeightM, wheelRadiusM, railGaugeM } =
+    TRAIN_DIMENSIONS;
+  const lengthM = TRAIN_LENGTH_M;
+  const halfLength = lengthM / 2;
+  const paintMat = new MeshStandardMaterial({
+    color: 0x1f5a63, // deep fictional teal (ADR-001 — no real livery)
+    metalness: 0.35,
+    roughness: 0.45,
+    envMapIntensity: 1.35,
+  });
+  paintMat.name = "train_paint";
+  const accentMat = new MeshStandardMaterial({
+    color: 0xf2c14e, // safety yellow: locomotive nose band + cab stripe
+    metalness: 0.1,
+    roughness: 0.5,
+  });
+  accentMat.name = "train_accent";
+  const darkMat = new MeshStandardMaterial({
+    color: 0x24282b, // graphite: roof kit + skirt + coupler bellows
+    metalness: 0.35,
+    roughness: 0.55,
+  });
+  darkMat.name = "train_dark";
+
+  const skirt = 0.4; // ground clearance below the body boxes
+  const bodyH = bodyHeightM - skirt;
+  const pitch = unitLengthM + couplerGapM;
+  // Unit i center Z (i = 0 is the leading locomotive at +Z / the nose end).
+  const unitCenterZ = (i: number) => halfLength - unitLengthM / 2 - i * pitch;
+
+  // -- body units (paint) --------------------------------------------------
+  const bodyParts: BufferGeometry[] = [];
+  for (let i = 0; i < units; i++) {
+    const seg = new BoxGeometry(widthM, bodyH, unitLengthM);
+    seg.translate(0, skirt + bodyH / 2, unitCenterZ(i));
+    bodyParts.push(seg);
+  }
+  const paintMerged = mergeGeometries(bodyParts, false) ?? bodyParts[0];
+  if (paintMerged !== bodyParts[0]) for (const g of bodyParts) g.dispose();
+
+  // -- accent: locomotive nose band (front face) + a cab stripe (accent) ----
+  const locoZ = unitCenterZ(0);
+  const noseBand = new BoxGeometry(widthM + 0.04, 0.9, 0.5);
+  noseBand.translate(0, skirt + 0.45, locoZ + unitLengthM / 2 - 0.25);
+  const cabStripeL = new BoxGeometry(0.06, 0.34, unitLengthM - 1.4);
+  cabStripeL.translate(widthM / 2 + 0.02, skirt + bodyH - 0.6, locoZ);
+  const cabStripeR = new BoxGeometry(0.06, 0.34, unitLengthM - 1.4);
+  cabStripeR.translate(-widthM / 2 - 0.02, skirt + bodyH - 0.6, locoZ);
+  const accentParts = [noseBand, cabStripeL, cabStripeR];
+  const accentMerged = mergeGeometries(accentParts, false) ?? noseBand;
+  if (accentMerged !== noseBand) for (const g of accentParts) g.dispose();
+
+  // -- dark kit: roof strip per unit, a full-length skirt, coupler bellows ---
+  const darkParts: BufferGeometry[] = [];
+  for (let i = 0; i < units; i++) {
+    const roof = new BoxGeometry(widthM - 0.8, 0.22, unitLengthM - 1.4);
+    roof.translate(0, bodyHeightM - 0.11, unitCenterZ(i));
+    darkParts.push(roof);
+  }
+  const skirtBox = new BoxGeometry(widthM - 0.2, skirt, lengthM);
+  skirtBox.translate(0, skirt / 2, 0);
+  darkParts.push(skirtBox);
+  for (let i = 0; i < units - 1; i++) {
+    const gapZ = unitCenterZ(i) - unitLengthM / 2 - couplerGapM / 2;
+    const bellows = new BoxGeometry(widthM - 1.0, bodyH - 0.6, couplerGapM + 0.2);
+    bellows.translate(0, skirt + (bodyH - 0.6) / 2, gapZ);
+    darkParts.push(bellows);
+  }
+  const darkMerged = mergeGeometries(darkParts, false) ?? darkParts[0];
+  if (darkMerged !== darkParts[0]) for (const g of darkParts) g.dispose();
+
+  const bodyGeometry =
+    mergeGeometries([paintMerged, accentMerged, darkMerged], true) ?? paintMerged;
+  if (bodyGeometry !== paintMerged) {
+    paintMerged.dispose();
+    accentMerged.dispose();
+    darkMerged.dispose();
+  }
+
+  // Two bogies under the leading + trailing units, tracked to the rail gauge
+  // (wheels land on the drawn rails). Only 4 shared wheels per vehicle exist —
+  // the honest tram limit; on a 34 m consist they read as bogie hints tucked
+  // under the skirt.
+  const track = railGaugeM / 2;
+  const frontBogieZ = unitCenterZ(0);
+  const rearBogieZ = unitCenterZ(units - 1);
+  return {
+    bodyGeometry,
+    bodyMaterials:
+      bodyGeometry.groups.length === 3 ? [paintMat, accentMat, darkMat] : [paintMat],
+    ownedMaterials: [paintMat, accentMat, darkMat],
+    paint: null, // no palette tint — the teal + yellow IS the profile's identity
+    customWheel: null, // shared fleet wheel, scaled to the 0.46 m bogie hubs
+    wheelOffsets: [
+      new Vector3(track, wheelRadiusM, frontBogieZ), // FL (+X = left)
+      new Vector3(-track, wheelRadiusM, frontBogieZ), // FR
+      new Vector3(track, wheelRadiusM, rearBogieZ), // RL
+      new Vector3(-track, wheelRadiusM, rearBogieZ), // RR
+    ],
+    wheelRadius: wheelRadiusM,
+    rearZ: -halfLength,
+    frontZ: halfLength,
+    halfWidth: widthM / 2,
+    halfLength,
+    lampY: 1.0,
+    headY: 0.9,
   };
 }
 
@@ -672,6 +886,119 @@ function buildBicycleRig(child: boolean): ModelRig {
     halfLength,
     lampY: 0.62 * s, // the tail bar reads as a rear reflector/light
     headY: 0.8 * s,
+  };
+}
+
+/** Animal body plan, meters (fictional, ADR-001): a mid-size deer-ish
+ *  quadruped — torso ~1.2 m long over ~0.6 m legs, a raised head/neck and a
+ *  short tail, so it reads unmistakably as „животно" (four legs, a head that
+ *  is NOT a car) darting across the lane. Ground-relative like the GLB kit
+ *  (Y = 0 = hooves, nose +Z = travel/facing). No wheels — the four legs ARE
+ *  the footprint; the ModelRig wheel channel carries four hidden placeholder
+ *  cubes tucked in the belly (the bicycle rig's hidden-right-wheel trick). */
+export const ANIMAL_DIMENSIONS = {
+  bodyLenM: 1.2,
+  bodyWidthM: 0.5,
+  bodyHeightM: 0.5,
+  legHeightM: 0.62,
+  halfLengthM: 1.1,
+  halfWidthM: 0.28,
+} as const;
+
+/**
+ * The procedural low-poly ANIMAL + legs ModelRig (the animal-hazard actor —
+ * doc 72 §HZ „животно на пътя"; mirrors buildBicycleRig). Two merged material
+ * groups: the hide (torso, neck, four legs, tail) and a darker head group
+ * (head, snout, ears) so the silhouette reads as a facing animal, not a box.
+ * Ground-relative (Y = 0 = hooves, nose +Z); STATIC pose (a galloping cycle is
+ * a TrafficLayer polish pass, like the bicycle rider). Entirely fictional
+ * (ADR-001 — no real species branding); all geometry + materials are OWNED
+ * (disposed via ownedMaterials/geometry). Exported so the hazard-dart visual
+ * (TrafficLayer) can mount the same geometry it renders in the fleet.
+ */
+export function buildAnimalRig(): ModelRig {
+  const { legHeightM, halfLengthM, halfWidthM } = ANIMAL_DIMENSIONS;
+  const hideMat = new MeshStandardMaterial({
+    color: 0x8a6a44, // muted deer-brown hide (fictional, ADR-001)
+    metalness: 0.0,
+    roughness: 0.85,
+    envMapIntensity: 1.1,
+  });
+  hideMat.name = "animal_hide";
+  const headMat = new MeshStandardMaterial({
+    color: 0x6f5236, // darker head/snout tone for silhouette contrast
+    metalness: 0.0,
+    roughness: 0.85,
+  });
+  headMat.name = "animal_head";
+
+  const box = (sx: number, sy: number, sz: number, x: number, y: number, z: number, rotX = 0) => {
+    const g = new BoxGeometry(sx, sy, sz);
+    if (rotX !== 0) g.rotateX(rotX);
+    g.translate(x, y, z);
+    return g;
+  };
+
+  // Hide group: torso over the legs, a forward neck, four legs, a short tail.
+  const torsoY = legHeightM + 0.25;
+  const hideParts = [
+    box(0.5, 0.5, 1.2, 0, torsoY, -0.05), // torso
+    box(0.28, 0.42, 0.34, 0, torsoY + 0.22, 0.55, -0.5), // neck (leaning up-forward)
+    box(0.15, legHeightM, 0.17, 0.17, legHeightM / 2, 0.42), // front-left leg
+    box(0.15, legHeightM, 0.17, -0.17, legHeightM / 2, 0.42), // front-right leg
+    box(0.15, legHeightM, 0.17, 0.17, legHeightM / 2, -0.5), // rear-left leg
+    box(0.15, legHeightM, 0.17, -0.17, legHeightM / 2, -0.5), // rear-right leg
+    box(0.09, 0.09, 0.4, 0, torsoY + 0.12, -0.78, 0.6), // tail (angled down-back)
+  ];
+  const hideMerged = mergeGeometries(hideParts, false) ?? hideParts[0];
+  if (hideMerged !== hideParts[0]) for (const g of hideParts) g.dispose();
+
+  // Head group: head + snout at the neck top, two upright ears.
+  const headY = torsoY + 0.5;
+  const headParts = [
+    box(0.3, 0.32, 0.36, 0, headY, 0.78), // head
+    box(0.17, 0.17, 0.26, 0, headY - 0.06, 0.98), // snout
+    box(0.06, 0.16, 0.05, 0.1, headY + 0.2, 0.72), // left ear
+    box(0.06, 0.16, 0.05, -0.1, headY + 0.2, 0.72), // right ear
+  ];
+  const headMerged = mergeGeometries(headParts, false) ?? headParts[0];
+  if (headMerged !== headParts[0]) for (const g of headParts) g.dispose();
+
+  const bodyGeometry = mergeGeometries([hideMerged, headMerged], true) ?? hideMerged;
+  if (bodyGeometry !== hideMerged) {
+    hideMerged.dispose();
+    headMerged.dispose();
+  }
+
+  // No wheels: the ModelRig wheel channel carries four 1 cm placeholder cubes
+  // hidden inside the torso (the bicycle rig's hidden-wheel precedent), so the
+  // shared/instanced wheel passes draw nothing visible for this model.
+  const hidden = () => new BoxGeometry(0.01, 0.01, 0.01);
+  const hideWheelMat = new MeshStandardMaterial({ color: 0x000000 });
+  hideWheelMat.name = "animal_hidden_wheel";
+  const hy = 0.1;
+  return {
+    bodyGeometry,
+    bodyMaterials: bodyGeometry.groups.length === 2 ? [hideMat, headMat] : [hideMat],
+    ownedMaterials: [hideMat, headMat, hideWheelMat],
+    paint: null, // no palette tint — the hide colour IS the animal's identity
+    customWheel: {
+      left: { geometry: hidden(), materials: [hideWheelMat] },
+      right: { geometry: hidden(), materials: [hideWheelMat] },
+    },
+    wheelOffsets: [
+      new Vector3(0.17, hy, 0.42), // FL — hidden cube at the front-left hoof
+      new Vector3(-0.17, hy, 0.42), // FR
+      new Vector3(0.17, hy, -0.5), // RL
+      new Vector3(-0.17, hy, -0.5), // RR
+    ],
+    wheelRadius: hy,
+    rearZ: -halfLengthM,
+    frontZ: halfLengthM,
+    halfWidth: halfWidthM,
+    halfLength: halfLengthM,
+    lampY: torsoY,
+    headY,
   };
 }
 
@@ -1310,6 +1637,12 @@ export function buildTrafficFleet(
   // discipline: no InstancedMesh unless a cyclist actor exists.
   rigs.push(buildBicycleRig(false));
   rigs.push(buildBicycleRig(true));
+  // RX-02/RX-01 profile slot: the procedural multi-unit train rig
+  // (TRAIN_MODEL_INDEX) — no InstancedMesh unless a train actor exists.
+  rigs.push(buildTrainRig());
+  // HZ profile slot: the procedural quadruped animal rig (ANIMAL_MODEL_INDEX)
+  // — no InstancedMesh unless an "animal"-profile actor exists.
+  rigs.push(buildAnimalRig());
   const sharedWheel = extractSharedWheel(scenes[0]);
   const nVeh = vehicles.length;
   const color = new Color();

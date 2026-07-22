@@ -140,6 +140,8 @@ interface WorldGeometries {
   parkingLanes: THREE.BufferGeometry;
   roadDecals: THREE.BufferGeometry;
   waterDecals: THREE.BufferGeometry;
+  railDeck: THREE.BufferGeometry;
+  railRails: THREE.BufferGeometry;
   terrain: THREE.BufferGeometry;
   terrainPaved: THREE.BufferGeometry;
   walls: THREE.BufferGeometry[];
@@ -156,6 +158,8 @@ function useWorldGeometries(world: WorldGeometry): WorldGeometries {
       parkingLanes: meshDataToGeometry(world.parkingLanes),
       roadDecals: meshDataToGeometry(world.roadDecals),
       waterDecals: meshDataToGeometry(world.waterDecals),
+      railDeck: meshDataToGeometry(world.railTracks.deck),
+      railRails: meshDataToGeometry(world.railTracks.rails),
       terrain: meshDataToGeometry(world.terrain),
       terrainPaved: meshDataToGeometry(world.terrainPaved),
       walls: world.buildingWalls.map(meshDataToGeometry),
@@ -173,6 +177,8 @@ function useWorldGeometries(world: WorldGeometry): WorldGeometries {
         geometries.parkingLanes,
         geometries.roadDecals,
         geometries.waterDecals,
+        geometries.railDeck,
+        geometries.railRails,
         geometries.terrain,
         geometries.terrainPaved,
         ...geometries.walls,
@@ -458,6 +464,29 @@ export function StaticWorld({
       <mesh geometry={geometries.markings}>
         <meshStandardMaterial color={0xe9e7df} roughness={0.85} metalness={0} />
       </mesh>
+      {/* Railway level-crossing track deck over railCrossing zone spans
+          (builders/railTrack.ts): the dark ballast/sleeper band (vertex-coloured
+          matte) plus the two raised steel rails running across the carriageway.
+          Empty on every map without a railCrossing zone — guarded so a rail-free
+          district adds no mesh. Renders for BOTH guarded + unguarded crossings;
+          the barrier arm/lights are separate furniture. */}
+      {geometries.railDeck.getAttribute("position") &&
+      geometries.railDeck.getAttribute("position").count > 0 ? (
+        <mesh geometry={geometries.railDeck} receiveShadow={receive}>
+          <meshStandardMaterial vertexColors roughness={0.95} metalness={0.05} />
+        </mesh>
+      ) : null}
+      {geometries.railRails.getAttribute("position") &&
+      geometries.railRails.getAttribute("position").count > 0 ? (
+        <mesh geometry={geometries.railRails} castShadow={buildingsCast} receiveShadow={receive}>
+          <meshStandardMaterial
+            color={0x82888f}
+            roughness={0.45}
+            metalness={0.7}
+            envMapIntensity={0.55}
+          />
+        </mesh>
+      ) : null}
       {/* Mid-rise facade prisms: real OSM footprints at district-data heights
           (glass towers are a separate instanced pass — CityBuildings). Baked
           bay sets (real recess normals/AO + lit-window emissive, doc 71 §4.5)

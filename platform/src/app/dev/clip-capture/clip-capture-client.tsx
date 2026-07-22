@@ -33,6 +33,7 @@ import {
   type LessonSpec,
 } from "@/modules/sim/lessons";
 import {
+  clipStagedOverrideFor,
   createTraceClock,
   createTracePoint,
   parseScenarioTrace,
@@ -153,7 +154,7 @@ interface BatchResult {
   failed: { id: string; note: string }[];
 }
 
-interface ClipRun {
+export interface ClipRun {
   entry: ClipPilotEntry;
   plan: ClipPlanEntry;
   lesson: LessonSpec;
@@ -238,8 +239,12 @@ function withWallTimeout<T>(p: Promise<T>, ms: number): Promise<T> {
   });
 }
 
-/** Build the run for one pilot entry: plan card + compiled drill + trace. */
-async function loadRun(entry: ClipPilotEntry, plan: ClipPlanEntry | undefined): Promise<ClipRun> {
+/** Build the run for one pilot entry: plan card + compiled drill + trace.
+ *  Exported so the OFFLINE headless renderer (/dev/clip-headless) builds each
+ *  clip through the byte-identical path the real-time rig uses — the window,
+ *  keyframe times, framing, ground marker, cabin channels and signal pins can
+ *  never drift between the two capture front-ends. */
+export async function loadRun(entry: ClipPilotEntry, plan: ClipPlanEntry | undefined): Promise<ClipRun> {
   // Doc 66: the requirements card IS the recording order — no card, no clip.
   if (!plan) throw new Error("липсва в генерирания план (clipPlan)");
   const spec = scenarioById(entry.templateId);
@@ -247,6 +252,15 @@ async function loadRun(entry: ClipPilotEntry, plan: ClipPlanEntry | undefined): 
   const mistake = spec.mistakes[entry.mistakeIndex];
   if (!mistake) throw new Error(`непозната грешка m${entry.mistakeIndex}`);
   const lesson = compileScenario(spec, scenarioEntryLevel(spec));
+  // CLIP staged override (doc 66 / THEO-4): some demos are RECORDED against a
+  // demo-specific staged actor so the fault reads on video — e.g.
+  // sc-follow-distance's „Лепене за предния" ghost was graded against a CLOSER
+  // lead (~half-car gap), but compileScenario hands the clip the 13 m DRILL
+  // lead. Re-enact the GRADED lead here so the produced clip shows the tailgate
+  // the debrief describes. Clip-scoped: the live drill compiles this same
+  // lesson independently and keeps its 13 m default (registry: clipReplay.ts).
+  const clipStaged = clipStagedOverrideFor(entry.templateId, entry.mistakeIndex);
+  if (clipStaged) lesson.stagedEvents = clipStaged;
   const res = await fetch(traceUrlForRepoPath(entry.tracePath));
   if (!res.ok) throw new Error(`trace ${res.status}`);
   const trace = parseScenarioTrace(await res.json());

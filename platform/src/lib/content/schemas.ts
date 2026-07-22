@@ -101,7 +101,7 @@ export const SceneStillPoseSchema = z.strictObject({
 });
 
 export const SceneStillMarkSchema = z.strictObject({
-  kind: z.enum(["danger", "target"]),
+  kind: z.enum(["danger", "target", "proceed", "yield"]),
   x: finite(),
   y: finite(),
 });

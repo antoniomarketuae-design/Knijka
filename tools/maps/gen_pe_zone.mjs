@@ -255,6 +255,31 @@ export function buildPeZoneDistrict(params) {
   // Д15 has no sign asset). Clear of the carriageway, of the dart's walk-out
   // end and of the cross street — enforced below.
   const BUILDINGS = [
+    // Approach blocks flanking BOTH curbs BEFORE the entry — so the drive INTO
+    // the zone reads as entering a built-up quarter (the sc-speed-creep town
+    // context the founder R0 asks for; grading never reads buildings).
+    {
+      id: "pz-b-west-approach",
+      height: 12,
+      heightSource: "default",
+      footprint: [
+        [-36, r2(approachM - 62)],
+        [-20, r2(approachM - 62)],
+        [-20, r2(approachM - 12)],
+        [-36, r2(approachM - 12)],
+      ],
+    },
+    {
+      id: "pz-b-east-approach",
+      height: 12,
+      heightSource: "default",
+      footprint: [
+        [20, r2(approachM - 58)],
+        [36, r2(approachM - 58)],
+        [36, r2(approachM - 10)],
+        [20, r2(approachM - 10)],
+      ],
+    },
     {
       id: "pz-b-west",
       height: 12,
@@ -264,6 +289,20 @@ export function buildPeZoneDistrict(params) {
         [-20, r2(approachM + 15)],
         [-20, r2(approachM + 65)],
         [-36, r2(approachM + 65)],
+      ],
+    },
+    // East block flanking the FAULT window (~y128..185) — mirrors pz-b-west so
+    // the speeding-fault frame has residential blocks on BOTH sides, not an
+    // empty east verge (the R0 „looks like a normal street" defect).
+    {
+      id: "pz-b-east-fault",
+      height: 12,
+      heightSource: "default",
+      footprint: [
+        [20, r2(approachM + 8)],
+        [36, r2(approachM + 8)],
+        [36, r2(approachM + 65)],
+        [20, r2(approachM + 65)],
       ],
     },
     {

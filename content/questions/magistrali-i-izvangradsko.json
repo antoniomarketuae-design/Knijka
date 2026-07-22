@@ -1101,7 +1101,7 @@
     ],
     "explanationBg": "На магистралата се движиш възможно най-вдясно: лявата лента е за изпреварване, не за „круизиране“. Задръстиш ли я, зад теб се събира колона от изнервени водачи — а аварийната лента е само за аварии (ЗДвП, чл. 15).",
     "lawRefs": [{ "act": "ЗДвП", "ref": "чл. 15" }, { "act": "ЗДвП", "ref": "чл. 55" }],
-    "media": {"kind":"sceneStill","districtId":"mw-v1","focus":{"x":-4,"y":310,"zoomM":60},"poses":[{"kind":"car","x":-8.12,"y":300,"headingDeg":0,"variant":"ego"},{"kind":"car","x":0,"y":330,"headingDeg":0}],"marks":[]},
+    "media": {"kind":"sceneStill","districtId":"mw-v1","focus":{"x":-4,"y":310,"zoomM":60},"poses":[{"kind":"car","x":-8.12,"y":300,"headingDeg":0,"variant":"ego"},{"kind":"car","x":0,"y":330,"headingDeg":0}],"marks":[{"kind":"target","x":0,"y":320}]},
     "status": "draft"
   },
   {
@@ -1135,7 +1135,7 @@
     ],
     "explanationBg": "Лентата за ускоряване съществува точно за това — да изравниш скоростта си с потока и да се влееш плавно. Предимството е на движещите се по магистралата; бавното „вмъкване“ или спирането в лентата създава опасност за всички (ЗДвП, чл. 55).",
     "lawRefs": [{ "act": "ЗДвП", "ref": "чл. 55" }, { "act": "ЗДвП", "ref": "чл. 25" }],
-    "media": {"kind":"sceneStill","districtId":"mw-entry-v1","focus":{"x":2,"y":335,"zoomM":80},"poses":[{"kind":"car","x":8.13,"y":330,"headingDeg":0,"variant":"ego"},{"kind":"car","x":0,"y":300,"headingDeg":0},{"kind":"car","x":0,"y":370,"headingDeg":0}],"marks":[]},
+    "media": {"kind":"sceneStill","districtId":"mw-entry-v1","focus":{"x":2,"y":335,"zoomM":80},"poses":[{"kind":"car","x":8.13,"y":330,"headingDeg":0,"variant":"ego"},{"kind":"car","x":0,"y":300,"headingDeg":0},{"kind":"car","x":0,"y":370,"headingDeg":0}],"marks":[{"kind":"target","x":0,"y":355}]},
     "status": "draft"
   },
   {

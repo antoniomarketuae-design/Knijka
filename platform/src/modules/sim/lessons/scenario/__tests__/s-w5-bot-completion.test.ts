@@ -1149,16 +1149,20 @@ describe("wave-5 bot completion — sc-rx-barrier-drop at L3", () => {
     expect(r.objectives.find((o) => o.id === "sc-rxd-wait")!.done).toBe(false);
   });
 
-  it("the barrier is the trap, nothing is staged, and the ladder runs 1→5 with L4 the exam rung", () => {
+  it("the barrier is the GRADING trap, the TRAIN is the staged hazard, and the ladder runs 1→5 with L4 the exam rung", () => {
     for (const level of [1, 2, 3, 4, 5] as const) {
       expect(compileScenario(SC_RX_BARRIER_DROP, level).id).toBe(`sc-rx-barrier-drop@L${level}`);
     }
     expect(compileScenario(SC_RX_BARRIER_DROP, 4).vehicleStart).toBe("cold");
     expect(compileScenario(SC_RX_BARRIER_DROP, 4).examMode).toBe(true);
-    // The descent is WORLD DATA (rx-drop-v1's timetable) — no staged actor on
-    // any rung, and the authored ghost envelope is dry-tuned (no physics seam).
+    // The descent is WORLD DATA (rx-drop-v1's timetable) — grading needs no
+    // staged actor. The only staged event is the TRAIN the barrier guards
+    // (ADR-006 stage 3c): byte-neutral to grading (its runner emits no SimTick
+    // events), on every rung; the authored ghost envelope stays dry (no physics).
     for (const level of [1, 3, 5] as const) {
-      expect(compileScenario(SC_RX_BARRIER_DROP, level).stagedEvents ?? [], `L${level}`).toEqual([]);
+      const staged = compileScenario(SC_RX_BARRIER_DROP, level).stagedEvents ?? [];
+      expect(staged.map((e) => e.kind), `L${level}`).toEqual(["trainPass"]);
+      expect(staged[0].id, `L${level}`).toBe("sc-rxd-train");
       expect(compileScenario(SC_RX_BARRIER_DROP, level).physics, `L${level}`).toBeUndefined();
     }
   });

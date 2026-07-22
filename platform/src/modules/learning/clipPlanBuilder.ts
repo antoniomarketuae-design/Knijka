@@ -253,10 +253,14 @@ function actorForStaged(staged: StagedLike): ClipRequiredActor | null {
       return { kind: "controller", label: "Регулировчик на кръстовището" };
     case "cutInLeadCar":
       return { kind: "vehicle", label: `${veh}, който се вклинява отпред` };
-    case "rearTailgater":
-      return { kind: "vehicle", label: `${veh} плътно отзад` };
     case "oncomingStream":
       return { kind: "vehicle", label: "Насрещен поток автомобили" };
+    // rearTailgater is FO-07 PRESSURE SCENERY (doc 72): the runner emits ZERO
+    // SimTick events — nothing grades from it — and it matchPlayer-paces a gap
+    // that on an open merge (sc-merge-accel-lane) sits ~200 m back at the fault,
+    // so it is not a framable conflict actor. Not an R1-required actor (it is
+    // still staged + rendered as the pressure car behind, just not gated).
+    case "rearTailgater":
     // Signal-phase / dashboard stimuli — no counterpart actor to frame.
     case "amberDilemma":
     case "telltaleStimulus":
@@ -266,20 +270,69 @@ function actorForStaged(staged: StagedLike): ClipRequiredActor | null {
   }
 }
 
+/** Staged kinds that never map to a framable actor — the R1 „required" list
+ *  skips them WITHOUT a „непознат вид" note (signal/dashboard stimuli + the
+ *  FO-07 rearTailgater pressure car, all handled as null in actorForStaged). */
+const NON_ACTOR_KINDS: ReadonlySet<string> = new Set([
+  "amberDilemma",
+  "telltaleStimulus",
+  "rearTailgater",
+]);
+
+/**
+ * Conflict-code families per staged kind — the violation codes the actor's
+ * conflict can produce. Absent = a STIMULUS/SCENERY actor (policeStop,
+ * trafficController): no graded conflict of its own, always kept. Used only to
+ * pick the RELEVANT actor when a template stages MORE THAN ONE conflict actor.
+ */
+const KIND_CONFLICT_CODES: Readonly<Record<string, readonly string[]>> = {
+  pedestrianDartOut: ["PEDESTRIAN_"],
+  priorityFromRight: ["FAILED_TO_YIELD", "COLLISION"],
+  brakingLeadCar: ["FOLLOWING_TOO_CLOSE", "COLLISION"],
+  cyclistRightHook: ["VULNERABLE_PASS_", "CYCLIST", "COLLISION"],
+  roundaboutEntry: ["FAILED_TO_YIELD", "COLLISION"],
+  oncomingLeftTurn: ["FAILED_TO_YIELD", "COLLISION"],
+  narrowMeeting: ["FAILED_TO_YIELD", "ONCOMING", "COLLISION"],
+  oncomingStream: ["FAILED_TO_YIELD", "COLLISION"],
+  cutInLeadCar: ["FOLLOWING_TOO_CLOSE", "COLLISION"],
+  emergencyApproach: ["EMERGENCY", "FAILED_TO_YIELD", "COLLISION"],
+};
+
+/** Does the mistake's fault (its codeRefs) engage a conflict with this staged
+ *  kind? True for stimulus kinds (no family — always relevant). */
+function kindEngagedBy(kind: string, codes: ReadonlySet<string>): boolean {
+  const family = KIND_CONFLICT_CODES[kind];
+  if (family === undefined) return true;
+  for (const code of codes) if (family.some((f) => code.startsWith(f))) return true;
+  return false;
+}
+
 function deriveActors(
   staged: readonly StagedLike[],
   district: DistrictDoc,
+  codes: ReadonlySet<string>,
   notes: string[],
 ): ClipRequiredActor[] {
-  const actors: ClipRequiredActor[] = [];
+  const derived: { kind: string; actor: ClipRequiredActor }[] = [];
   for (const spec of staged) {
     const actor = actorForStaged(spec);
     if (actor !== null) {
-      actors.push(actor);
-    } else if (spec.kind !== "amberDilemma" && spec.kind !== "telltaleStimulus") {
+      derived.push({ kind: spec.kind, actor });
+    } else if (!NON_ACTOR_KINDS.has(spec.kind)) {
       notes.push(`Непознат staged вид „${spec.kind}“ — участникът не е изведен`);
     }
   }
+  // MISTAKE-AWARE R1 (doc 72 rule 4): when a template stages MULTIPLE conflict
+  // actors — each demo engaging a DIFFERENT one (e.g. sc-merge-from-property's
+  // тротоар walker for „изнасяне през тротоара" vs the boulevard flow for
+  // „вливане пред потока") — require ONLY the actor THIS mistake's fault
+  // engages; the other is correctly handled in the demo and is not in the fault
+  // frame. Single-conflict templates are NEVER filtered, so a demo whose fault
+  // is unrelated to its lone staged actor keeps its honest (if unmet) R1 row.
+  const conflictCount = derived.filter((d) => KIND_CONFLICT_CODES[d.kind] !== undefined).length;
+  const kept =
+    conflictCount > 1 ? derived.filter((d) => kindEngagedBy(d.kind, codes)) : derived;
+  const actors = kept.map((d) => d.actor);
   // Occupied bays = the parked cars a lot demo collides with / threads.
   const bays = district.meta?.scenario?.bays;
   if (Array.isArray(bays) && bays.some((b) => (b as { occupied?: boolean }).occupied === true)) {
@@ -407,8 +460,12 @@ function deriveControl(
   //    Pilot-v2 cause 3 lesson (sc-speed-creep): the card pointed at the
   //    zone-transition В26 (y=400) while the ENGINE graded the fault at
   //    y≈100 — still under the APPROACH limit, whose В26 stands at the
-  //    segment entry. The card must cite the limit the fault broke.
-  if (codes.has("SPEEDING_OVER_LIMIT")) {
+  //    segment entry. The card must cite the limit the fault broke. BOTH
+  //    over-limit codes are posted-limit faults governed by that sign: the
+  //    minor SPEEDING_OVER_LIMIT and the dangerous +10 SPEEDING_DANGEROUS
+  //    (the sc-speed-rain founder taste-pass — a ~72 blast past the В26-50
+  //    must cite the 50, not fall through to a bare conditions note).
+  if (codes.has("SPEEDING_OVER_LIMIT") || codes.has("SPEEDING_DANGEROUS")) {
     const transitionY = asNumber(scenario.transitionY);
     const params = (scenario.params ?? {}) as Record<string, unknown>;
     const zoneKmh = asNumber(params.zoneKmh);
@@ -504,13 +561,26 @@ const DASHBOARD_CODE = /^(HEADLIGHTS_|FOG_LIGHTS_|HIGH_BEAM_|WIPERS_)/;
  *  over-limit, too-fast-for-conditions and too-slow all get the strip. */
 const SPEED_CODE = /^(SPEEDING_|SPEED_TOO_FAST|DRIVING_TOO_SLOW)/;
 
-function deriveView(codes: ReadonlySet<string>, notes: string[]): ClipView {
+function deriveView(
+  codes: ReadonlySet<string>,
+  hasTelltaleStimulus: boolean,
+  notes: string[],
+): ClipView {
   if ([...codes].some((c) => COCKPIT_CODE.test(c))) {
     notes.push("Кабинна грешка (R4) — коланът/ръчната/загасването се виждат само отвътре");
     return "cockpit";
   }
   if ([...codes].some((c) => DASHBOARD_CODE.test(c))) {
     notes.push("Светлинна грешка (R4) — фаровете отвън + лентата на таблото");
+    return "exterior+dashboard";
+  }
+  // Telltale stimulus (VP-06 „контролна лампа"): the WHOLE lesson is the
+  // dashboard warning lamp, which a bare exterior chase can never show. The
+  // graded fault codes (COLLISION / HARSH_BRAKING) say nothing about the
+  // cabin, so route off the STAGED stimulus instead — the strip lights its
+  // red telltale off director.telltaleLit at the fault (R4/R7).
+  if (hasTelltaleStimulus) {
+    notes.push("Контролна лампа (R4) — червеният индикатор свети на лентата на таблото при грешката");
     return "exterior+dashboard";
   }
   if ([...codes].some((c) => SPEED_CODE.test(c))) {
@@ -626,7 +696,7 @@ export function buildClipPlan(): ClipPlanEntry[] {
     // --- R1/R2/R4 cards ------------------------------------------------------
     const notes: string[] = [];
     const staged = (spec.staged ?? []) as StagedLike[];
-    const requiredActors = deriveActors(staged, district, notes);
+    const requiredActors = deriveActors(staged, district, codes, notes);
     const posts = renderedSignPosts(spec.map.districtId, district);
     const governingControl = deriveControl(
       codes,
@@ -638,7 +708,8 @@ export function buildClipPlan(): ClipPlanEntry[] {
       posts,
       notes,
     );
-    const view = deriveView(codes, notes);
+    const hasTelltaleStimulus = staged.some((s) => s.kind === "telltaleStimulus");
+    const view = deriveView(codes, hasTelltaleStimulus, notes);
     const camera = deriveCamera(staged, notes);
     const laneHighlight = deriveLaneHighlight(codes, district, faultPos, notes);
 

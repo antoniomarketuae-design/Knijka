@@ -31,7 +31,7 @@ export { parseScenarioTrace, serializeScenarioTrace } from "./parse";
 // Clip-plan replay registry (doc 66 R3) — replays a pilot template's
 // committed mistake demo through the production grading stack so the
 // clip-plan generator reads the ENGINE-computed first-violation time.
-export { clipReplayTemplateIds, replayPilotMistake } from "./clipReplay";
+export { clipReplayTemplateIds, clipStagedOverrideFor, replayPilotMistake } from "./clipReplay";
 
 // Playback queries (zero-alloc hot path) + ribbon-path decimation
 export {

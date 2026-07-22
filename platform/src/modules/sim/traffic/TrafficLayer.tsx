@@ -70,10 +70,10 @@ import {
   DynamicDrawUsage,
   Object3D,
   Quaternion,
+  Mesh,
   SphereGeometry,
   Vector3,
   type InstancedMesh,
-  type Mesh,
   type Object3D as AnyObject3D,
 } from "three";
 import {
@@ -84,6 +84,7 @@ import {
 import type { TrafficDistrict, TrafficSystem, TrafficUpdateContext } from "./types";
 import {
   assignCivilianModel,
+  buildAnimalRig,
   buildTrafficFleet,
   disposeTrafficFleet,
   DRACO_DECODER_PATH,
@@ -467,6 +468,25 @@ export function TrafficLayer({
   // L5 hazard ball (single mesh — one per lesson at most).
   const hazardBallRef = useRef<Mesh>(null);
   const hazardBlobRef = useRef<Mesh>(null);
+  // Animal-hazard variant (hazard.presentation === "animal"): the quadruped
+  // rig mounted on the SAME dart integrator as the ball. Built once per lesson;
+  // owns its geometry + materials (disposed on teardown).
+  const hazardAnimal = useMemo(() => {
+    if (hazard?.presentation !== "animal") return null;
+    const rig = buildAnimalRig();
+    const mesh = new Mesh(rig.bodyGeometry, rig.bodyMaterials);
+    mesh.castShadow = true;
+    mesh.visible = false;
+    return { mesh, rig };
+  }, [hazard?.presentation]);
+  useEffect(
+    () => () => {
+      if (!hazardAnimal) return;
+      hazardAnimal.rig.bodyGeometry.dispose();
+      for (const m of hazardAnimal.rig.ownedMaterials) m.dispose();
+    },
+    [hazardAnimal],
+  );
 
   // Authored GLB fleet: load the kit (Draco), then instance it — moving bodies
   // + wheels AND the static parked pass over the same rigs. Rebuilt only on
@@ -1164,28 +1184,38 @@ export function TrafficLayer({
       pedCane.instanceMatrix.needsUpdate = true;
     }
 
-    // --- L5 hazard ball (render-only; A8 owns the trigger).
+    // --- L5 hazard dart (render-only; A8 owns the trigger). The ball and the
+    // animal variant ride the SAME (x,y,dir,speed,travel) integrator.
     const ball = hazardBallRef.current;
     const ballBlob = hazardBlobRef.current;
-    if (hazard && ball && ballBlob) {
+    const animalMesh = hazardAnimal?.mesh ?? null;
+    if (hazard && (animalMesh || (ball && ballBlob))) {
       if (hazardActiveRef?.current) {
         scratch.hazardT += dtc;
         const travelled = Math.min(hazard.speedMps * scratch.hazardT, hazard.travelM);
         const rolling = travelled < hazard.travelM;
-        const bounce = rolling
-          ? Math.abs(Math.sin((travelled / HAZARD_BOUNCE_WAVELENGTH_M) * Math.PI)) *
-            HAZARD_BOUNCE_HEIGHT_M
-          : 0;
         const bx = hazard.x + hazard.dirX * travelled;
         const by = hazard.y + hazard.dirY * travelled;
-        ball.visible = true;
-        ballBlob.visible = true;
-        ball.position.set(bx, HAZARD_BALL_RADIUS_M + bounce, -by);
-        ballBlob.position.set(bx, BLOB_Y, -by);
+        if (animalMesh) {
+          animalMesh.visible = true;
+          animalMesh.position.set(bx, 0, -by); // Y = 0 = hooves on the tarmac
+          // Nose +Z faces the dart direction (the district→three yaw law).
+          animalMesh.rotation.y = Math.atan2(hazard.dirX, -hazard.dirY);
+        } else if (ball && ballBlob) {
+          const bounce = rolling
+            ? Math.abs(Math.sin((travelled / HAZARD_BOUNCE_WAVELENGTH_M) * Math.PI)) *
+              HAZARD_BOUNCE_HEIGHT_M
+            : 0;
+          ball.visible = true;
+          ballBlob.visible = true;
+          ball.position.set(bx, HAZARD_BALL_RADIUS_M + bounce, -by);
+          ballBlob.position.set(bx, BLOB_Y, -by);
+        }
       } else {
         scratch.hazardT = 0;
-        ball.visible = false;
-        ballBlob.visible = false;
+        if (animalMesh) animalMesh.visible = false;
+        if (ball) ball.visible = false;
+        if (ballBlob) ballBlob.visible = false;
       }
     }
   });
@@ -1313,9 +1343,11 @@ export function TrafficLayer({
         </instancedMesh>
       ) : null}
 
-      {/* L5 sudden-obstacle ball — hidden until the A8 orchestrator flips
-          hazardActiveRef; mounted only when the lesson stages a hazard. */}
-      {hazard ? (
+      {/* L5 sudden-obstacle dart — hidden until the A8 orchestrator flips
+          hazardActiveRef; mounted only when the lesson stages a hazard. The
+          "animal" presentation mounts the quadruped rig on the same path. */}
+      {hazard && hazardAnimal ? <primitive object={hazardAnimal.mesh} /> : null}
+      {hazard && !hazardAnimal ? (
         <>
           <mesh ref={hazardBallRef} visible={false} castShadow>
             <sphereGeometry args={[HAZARD_BALL_RADIUS_M, 16, 12]} />

@@ -79,9 +79,18 @@ export interface SceneStillPose {
   variant?: "ego";
 }
 
-/** Attention mark: danger = conflict point (red), target = look-here (accent). */
+/**
+ * Attention mark on a scene still:
+ *  - danger  = conflict point (red ring),
+ *  - target  = look-here / drive-here (green sweep arrow to the spot),
+ *  - proceed = "you have priority — go" (green forward arrow ahead of the ego),
+ *  - yield    = "you must give way here" (red give-way bar across the road ahead
+ *               of the ego, perpendicular to its heading).
+ * `proceed`/`yield` are oriented by the ego pose's heading; (x, y) is the on-road
+ * anchor a couple metres ahead of the ego.
+ */
 export interface SceneStillMark {
-  kind: "danger" | "target";
+  kind: "danger" | "target" | "proceed" | "yield";
   x: number;
   y: number;
 }

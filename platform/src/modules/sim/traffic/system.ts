@@ -24,6 +24,7 @@ import { buildRoutes, DEFAULT_ROUTE_OPTIONS, type TrafficRoute } from "./routes"
 import {
   applyStagedCommand,
   buildStagedPedPath,
+  buildStagedVehiclePolylinePath,
   createStagedPedestrian,
   createStagedVehicle,
   resolveStagedVehiclePath,
@@ -309,7 +310,12 @@ class TrafficSystemImpl implements TrafficSystem {
     if (this.stagedById.has(spec.id)) return null;
     const stateId = STAGED_STATE_ID_BASE + this.stagedById.size;
     if (spec.kind === "vehicle") {
-      const path = resolveStagedVehiclePath(this.graph, spec.pathNodes, spec.extraRightOffsetM ?? 0);
+      // A railPath (the RX train's authored line) bypasses the road graph;
+      // otherwise resolve the ordinary lane-graph path from pathNodes.
+      const path =
+        spec.railPath && spec.railPath.length >= 2
+          ? buildStagedVehiclePolylinePath(spec.railPath)
+          : resolveStagedVehiclePath(this.graph, spec.pathNodes, spec.extraRightOffsetM ?? 0);
       if (!path) return null;
       const agent = createStagedVehicle(spec, path, stateId);
       this.stagedVehicles.push(agent);

@@ -23,8 +23,12 @@
  *     the 50 approach and the 30 zone of the P5 road);
  *   - SP-02 → SPEEDING_OVER_LIMIT vs SPEEDING_DANGEROUS (the BAND contrast —
  *     pacing the flow at 58 is второстепенна, chasing it at 66 ends the exam);
- *   - SP-04 → SPEED_TOO_FAST_FOR_CONDITIONS (второстепенна: legal but imprudent
- *     for rain/night — the rain factor 0.85 × 50 = 42.5 km/h envelope).
+ *   - SP-04 → SPEEDING_DANGEROUS vs SPEED_TOO_FAST_FOR_CONDITIONS (the founder
+ *     taste-pass contrast: blasting past the В26-50 at ~72 km/h in the rain is
+ *     +22 over the limit → опасна, ends the exam; pacing the „поток" at 48 is
+ *     the legal-but-imprudent wet envelope, the rain factor 0.85 × 50 =
+ *     42.5 km/h. NB the engine's conditions code is capped at the graced limit,
+ *     so the 72 demo grades SPEEDING_DANGEROUS ALONE, not both).
  *
  * Ambient traffic is ZERO in every drive (seed 7). sc-speed-creep and
  * sc-speed-rain carry no actor at all — the only gradable fault is the
@@ -393,10 +397,10 @@ export const SC_SPEED_RAIN: ScenarioSpec = {
   mistakes: [
     {
       traceRef: { path: "content/traces/sc-speed-rain/mistake-dry-speed.trace.json" },
-      titleBg: "„Карам под знака“ — 50 в дъжда",
+      titleBg: "Като на сухо — 72 при знак 50 в дъжда",
       whatWentWrongBg:
-        "Колата държа 50 км/ч, все едно е сух ден — по знака НУЛА нарушение, и точно това е капанът на урока: в дъжд и тъмнина съобразената скорост е чувствително по-ниска (чл. 20) и „законните“ 50 се броят за несъобразена скорост. Знакът дава тавана за идеални условия; условията тази вечер не са идеални.",
-      codeRefs: ["SPEED_TOO_FAST_FOR_CONDITIONS"],
+        "Колата подмина знака В26 „50“ и ускори до около 72 км/ч, все едно е сух, открит път. 72 при ограничение 50 е над +10 км/ч — това е ОПАСНА грешка, която на изпита прекратява явяването на място (Наредба № 38). А тук грешката е двойна: мокрият и тъмен път искат скорост ЧУВСТВИТЕЛНО ПОД знака (около 38 км/ч, чл. 20), не над него. Знакът е таван за идеални условия — не покана да го надскочиш.",
+      codeRefs: ["SPEEDING_DANGEROUS"],
     },
     {
       traceRef: { path: "content/traces/sc-speed-rain/mistake-flow-along.trace.json" },
@@ -956,11 +960,21 @@ export const SC_MW_DISCIPLINE: ScenarioSpec = {
 };
 
 /** The speed-management templates, in catalog order (registered in
- *  templates.ts). */
+ *  templates.ts).
+ *
+ *  sc-speed-rain is registered FIRST on purpose (founder ruling): the why-panel
+ *  rep is derived deterministically as the FIRST mistake in SCENARIO_TEMPLATES
+ *  order whose codeRefs match an event's codes (whyPanel.ts buildSimRefIndex).
+ *  sc-speed-rain__m0 grades SPEEDING_DANGEROUS → ev-speed-limit; placing rain
+ *  ahead of sc-speed-creep (SPEEDING_OVER_LIMIT, also ev-speed-limit) makes the
+ *  founder-locked ~72 km/h rain-night blast the SERVED clip for the
+ *  dangerous-speeding question — and mistake[1] (48 km/h „поток") remains the
+ *  ev-speed-for-conditions rep. Reordering here is the whole mechanism; no
+ *  other event's rep changes (verified in whyPanel/clipPilot gates). */
 export const SCENARIO_TEMPLATES_SP: readonly ScenarioSpec[] = [
+  SC_SPEED_RAIN,
   SC_SPEED_CREEP,
   SC_SPEED_DANGEROUS,
-  SC_SPEED_RAIN,
   SC_SPEED_ZONE,
   SC_SPEED_TRANSITION,
   SC_SP_HARSH_BRAKE,

@@ -9,11 +9,13 @@
  *     keeps the pinned ~13 m gap safely above the 2-second threshold for its
  *     speed);
  *   - „Лепене за предния": eases up behind a CLOSER-pacing clone of the lead
- *     (followGapM 8, hold 27 — demo-only; see scFollowDistanceStaged) and holds
- *     a visually GLUED ~4.5 m bumper gap (one car length, ~0.35 s at 48 km/h)
- *     for a sustained stretch → grades EXACTLY FOLLOWING_TOO_CLOSE. The shared
- *     13 m lead read as a normal follow on video (founder R-media #4); only the
- *     tailgate demo's lead moved — the shadow and gap-melts keep the 13 m lead;
+ *     (followGapM 5.75, hold 24 — demo-only; see scFollowDistanceStaged) and
+ *     holds a visually GLUED ~2.2 m bumper gap (about HALF a car length,
+ *     ~0.17 s at 48 km/h) for a sustained stretch → grades EXACTLY
+ *     FOLLOWING_TOO_CLOSE. The shared 13 m lead read as a normal follow on
+ *     video (founder R-media #4); only the tailgate demo's lead moved — halved
+ *     from the former ~4.5 m, which still read as too far to be unsafe — the
+ *     shadow and gap-melts keep the 13 m lead;
  *   - „Дистанцията се топи": starts safe at 26, accelerates to 48 without
  *     opening the gap → grades EXACTLY FOLLOWING_TOO_CLOSE.
  *
@@ -66,13 +68,13 @@ export function scFollowDistanceShadowScript(): DriveScript {
 export function scFollowDistanceMistakeTailgateScript(): DriveScript {
   return {
     steps: [
-      { kind: "annotation", textBg: "Грешка: залепяне за предния — дистанцията се стопява до една дължина кола." },
+      { kind: "annotation", textBg: "Грешка: залепяне за предния — дистанцията се стопява до половин дължина кола." },
       { kind: "glance", mirror: "rear" },
-      // Ease up behind the closer lead (a smooth close from ~8 m to ~4.5 m of
+      // Ease up behind the closer lead (a smooth close from ~5 m to ~2.2 m of
       // bumpers — never overshooting into it), then GLUE on at 48 km/h.
       { kind: "drive", points: [[X_LANE, 15], [X_LANE, 70]], targetKmh: 30, stopAtEnd: false },
-      { kind: "annotation", textBg: "На 48 км/ч една дължина кола е под секунда — няма никакво време за реакция." },
-      // The sustained tailgate: ~4.5 m bumper gap (~0.35 s) held for ~16 s.
+      { kind: "annotation", textBg: "На 48 км/ч половин дължина кола е под две десети от секундата — няма никакво време за реакция." },
+      // The sustained tailgate: ~2.2 m bumper gap (~0.17 s) held for ~16 s.
       { kind: "drive", points: [[X_LANE, 70], [X_LANE, 300]], targetKmh: 48, stopAtEnd: false },
       { kind: "drive", points: [[X_LANE, 300], [X_LANE, 330]], targetKmh: 48 },
       { kind: "pause", sec: 1.5, brake: true },
@@ -122,10 +124,13 @@ const SCRIPTS: Record<
 /**
  * The staged lead for a given demo. The shadow and gap-melts demos replay the
  * TEMPLATE's single-truth lead (13 m of centers). The „Лепене за предния" demo
- * re-records against a CLOSER-pacing clone (followGapM 8 → a HELD ~4.5 m bumper
- * gap = one car length, ~0.35 s at 48 km/h; hold 27 so the initial gap is ~8 m
- * and the close is smooth, never overshooting into the lead) — the shared 13 m
- * lead read as a normal follow on video, not tailgating (founder R-media #4).
+ * re-records against a CLOSER-pacing clone (followGapM 5.75 → a HELD ~2.2 m
+ * bumper gap = about HALF a car length, ~0.17 s at 48 km/h; hold 24 so the
+ * initial gap is ~5 m and the close is smooth, never overshooting into the
+ * lead) — the shared 13 m lead read as a normal follow on video, and even the
+ * former ~4.5 m tailgate still read as too far apart to be unsafe (founder
+ * R-media #4 + the follow-distance taste-pass): only the tailgate demo's lead
+ * moved, halved to an unmistakable glue.
  * This changes only the DEMO's recording; the live lesson still uses the
  * template's own staged lead, and grading is unchanged (FOLLOWING_TOO_CLOSE).
  */
@@ -134,9 +139,33 @@ function scFollowDistanceStaged(name: ScFollowDistanceTraceName): StagedEventSpe
   if (name !== "mistake-tailgate") return base;
   return base.map((e) =>
     e.kind === "brakingLeadCar" && e.id === "sc-fd-lead"
-      ? { ...e, followGapM: 8, actor: { ...e.actor, hold: { nodeIndex: 0, offsetM: 27 } } }
+      ? { ...e, followGapM: 5.75, actor: { ...e.actor, hold: { nodeIndex: 0, offsetM: 24 } } }
       : e,
   );
+}
+
+/**
+ * The STAGED lead the produced CLIP must re-enact for demo `mistakeIndex`, or
+ * null to keep the compiled DRILL default (the template's FD_LEAD_CAR, 13 m).
+ *
+ * WHY this exists (founder R-media #4 + THEO-4 debrief honesty): the clip
+ * re-simulates the staged lead via matchPlayer against the committed GHOST
+ * (clip-capture's CaptureScene). The „Лепене за предния" ghost (index 0) was
+ * RECORDED and GRADED against the CLOSER-pacing lead above (followGapM 5.75 →
+ * a HELD ~half-car bumper gap), but `compileScenario` hands the clip the 13 m
+ * DRILL lead — so the clip rendered the ghost 13 m behind the lead, a NORMAL
+ * follow the founder rightly rejected, while the debrief said „half a car
+ * length". Re-enacting the 5.75 m lead here makes the clip SHOW exactly the
+ * gap that graded FOLLOWING_TOO_CLOSE and that the copy describes.
+ *
+ * Scope is the clip ONLY: the live DRILL compiles its own lesson (FD_LEAD_CAR
+ * stays 13 m — the pinned metric gap the shadow/gap-melts recordings and the
+ * playable rung all depend on), and index 1 („дистанцията се топи") KEEPS the
+ * 13 m lead on purpose — its lesson is that the SAME metric gap became unsafe
+ * only at speed. Single source of truth with the recorder (scFollowDistanceStaged).
+ */
+export function scFollowDistanceClipStaged(mistakeIndex: number): StagedEventSpec[] | null {
+  return mistakeIndex === 0 ? scFollowDistanceStaged("mistake-tailgate") : null;
 }
 
 /**

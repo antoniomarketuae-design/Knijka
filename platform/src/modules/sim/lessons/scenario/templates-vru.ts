@@ -270,15 +270,37 @@ export const SC_VU_CYCLIST_HOOK: ScenarioSpec = {
 const EM_RIGHT = 12.19;
 
 /**
- * The staged EMERGENCY VEHICLE on ln-v1: holds dormant at the road start
- * (15 m behind the spawn), then runs the boulevard northbound at ~68 km/h
- * (special-regime exemption) offset 6.5 m LEFT of the right-lane center —
- * x ≈ 5.69, straddling the lane divider on the player's left edge, exactly
- * doc 72 VU-09's "closing-from-behind pathing on the player's edge". The
- * EmergencyApproachRunner adjudicates (prioritySituation "emergency"): a
+ * The staged EMERGENCY VEHICLE on ln-v1: holds at the road start (15 m behind
+ * the spawn), RELEASES the moment the ghost pulls its 15 m lead (releaseGapM
+ * 14) and runs the boulevard northbound up to ~68 km/h (special-regime
+ * exemption) DEAD-CENTRE in the LEFT lane — x = 4.06 (right lane − 8.125 m, the
+ * exact one-drawn-lane offset validated by world/__tests__/ln-district.test.ts).
+ * The left lane IS the EV's чл. 91 corridor: the shadow driver keeps to the
+ * RIGHT lane (out of it) and the mistake ghosts sit IN it, so the ambulance is
+ * visibly blocked behind an unyielding car in its OWN lane (founder taste-pass,
+ * doc 66 R0).
+ *
+ * RENDER TASTE-PASS (founder round: „the ambulance is nowhere near the car").
+ * The old releaseGapM 38 held the EV dormant until the ghost was 38 m ahead,
+ * then launched it from a standstill while the ghost was already at cruise — so
+ * the gap BLEW OUT to ~68 m before the EV could close, and the clip opened on a
+ * distant speck that read as an empty road. Two changes pin it to the ghost's
+ * tail for the WHOLE clip instead: (1) release at 14 m (the EV rolls the instant
+ * the ghost takes its lead, never falling back); (2) accelMps2 2.2 — the EV's
+ * ramp is held to the ghost's own launch pace (recorder SCRIPT_ACCEL), so an
+ * early-released EV rides ~15 m off the ghost's bumper through the slow launch
+ * INSTEAD of surging past it. That surge was also a GRADING trap: an EV that
+ * out-accelerates the still-slow ghost arms the yield duty while the ghost is
+ * under the make-way threshold, and the runner reads the slow launch as a yield
+ * (EMERGENCY_NOT_YIELDED never fires). Matching the ramp arms the duty only once
+ * the ghost is at cruise, in the corridor, refusing — so the fault convicts AND
+ * the ambulance is a close, constant tail on screen (playerGuard pins it ~15 m
+ * back against the un-yielding ghost, its own lane, lights on).
+ *
+ * The EmergencyApproachRunner adjudicates (prioritySituation "emergency"): a
  * rightward shift ≥ 0.8 m, slowing to ≤ 38 km/h while keeping right, or
- * standing at the curb inside the generous 7 s window = made way; a window
- * that expires with the car still centered at speed = EMERGENCY_NOT_YIELDED.
+ * standing inside the generous 7 s window = made way; a window that expires
+ * with the car still in the corridor at speed = EMERGENCY_NOT_YIELDED.
  */
 const EM_APPROACH: EmergencyApproachSpec = {
   id: "sc-vue-approach",
@@ -288,11 +310,12 @@ const EM_APPROACH: EmergencyApproachSpec = {
     pathNodes: ["ln-n-start", "ln-n-end"],
     hold: { nodeIndex: 0, offsetM: 0 }, // y = 0 — 15 m behind ln-spawn-start
     cruiseSpeedMps: 19, // ~68 km/h: the EV runs above the 50 limit (чл. 91)
-    extraRightOffsetM: -6.5, // LEFT of the right lane: passes on the player's edge
+    accelMps2: 2.2, // held to the ghost's launch ramp — ride its tail, don't surge past it
+    extraRightOffsetM: -8.125, // dead-centre the LEFT lane (x = 4.06) — the EV's own corridor
     colorIndex: 0,
     profile: "emergency", // white rig + blue light bar (ADR-001 fictional)
   },
-  releaseGapM: 38,
+  releaseGapM: 14, // roll the instant the ghost takes its 15 m lead — no dormant blow-out
   armBehindM: 60,
   responseWindowSec: 7,
   yieldShiftM: 0.8,
@@ -372,14 +395,14 @@ export const SC_VU_EMERGENCY: ScenarioSpec = {
       traceRef: { path: "content/traces/sc-vu-emergency/mistake-block.trace.json" },
       titleBg: "Блокиране на линейката",
       whatWentWrongBg:
-        "Колата продължи по средата на лентата с непроменена скорост, докато линейката висеше зад нея със сирена. Законът е категоричен: при специален режим си длъжен НЕЗАБАВНО да направиш път — отдръпване вдясно и намаляване. Оставането в коридора ѝ е непропускане на автомобил със специален режим (чл. 91).",
+        "Колата остана в лявата лента — точно в коридора на линейката — с непроменена скорост, докато линейката висеше плътно зад нея, в същата лента, със сирена. Законът е категоричен: при специален режим си длъжен НЕЗАБАВНО да направиш път — прибиране вдясно и намаляване. Оставането в коридора ѝ е непропускане на автомобил със специален режим (чл. 91).",
       codeRefs: ["EMERGENCY_NOT_YIELDED"],
     },
     {
       traceRef: { path: "content/traces/sc-vu-emergency/mistake-speed-up.trace.json" },
       titleBg: "Ускоряване пред линейката",
       whatWentWrongBg:
-        "Вместо да се отдръпне, водачът даде газ и се измести наляво — „да не му се пречка“. Точно обратното на дълга: лявата страна Е коридорът на линейката, а надбягването с нея само удължава блокирането. Прави се път вдясно, с намаляване — не се бяга напред (чл. 91).",
+        "Вместо да се прибере вдясно, водачът даде газ и остана в лявата лента — „да избяга напред“ пред линейката. Точно обратното на дълга: лявата лента Е коридорът на линейката, а надбягването с нея само удължава блокирането. Прави се път вдясно, с намаляване — не се бяга напред (чл. 91).",
       codeRefs: ["EMERGENCY_NOT_YIELDED"],
     },
   ],

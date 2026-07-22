@@ -171,13 +171,28 @@ describe("S3-B counter-proofs — speed mistakes grade through the live pipeline
     expect(driveCommendationCodes(outcome)).not.toContain("CLEAN_DRIVING");
   });
 
-  it("rain over-speed: SPEED_TOO_FAST_FOR_CONDITIONS surfaces under rain+night, no speeding code, clean-driving absent", () => {
+  it("rain over-speed to 72: SPEEDING_DANGEROUS grades under rain+night (+22 past the В26-50), no minor or conditions code, clean-driving absent", () => {
     const outcome = driveThroughSession(SC_SPEED_RAIN, (d, onTick) =>
       recordScSpeedRainDrive(d, "mistake-dry-speed", { onTick }),
     );
     const codes = driveViolationCodes(outcome);
+    expect(codes).toContain("SPEEDING_DANGEROUS");
+    expect(codes).not.toContain("SPEEDING_OVER_LIMIT");
+    // 72 > graced 55 puts it out of the conditions code's at/under-graced range —
+    // the wet envelope is proven by the „поток" demo below, not this one.
+    expect(codes).not.toContain("SPEED_TOO_FAST_FOR_CONDITIONS");
+    expect(outcome.result.passed).toBe(false);
+    expect(driveCommendationCodes(outcome)).not.toContain("CLEAN_DRIVING");
+  });
+
+  it("pacing the flow at 48 in the rain: SPEED_TOO_FAST_FOR_CONDITIONS surfaces (legal by the sign, too fast for the wet), no speeding code, clean-driving absent", () => {
+    const outcome = driveThroughSession(SC_SPEED_RAIN, (d, onTick) =>
+      recordScSpeedRainDrive(d, "mistake-flow-along", { onTick }),
+    );
+    const codes = driveViolationCodes(outcome);
     expect(codes).toContain("SPEED_TOO_FAST_FOR_CONDITIONS");
     expect(codes).not.toContain("SPEEDING_OVER_LIMIT");
+    expect(codes).not.toContain("SPEEDING_DANGEROUS");
     expect(driveCommendationCodes(outcome)).not.toContain("CLEAN_DRIVING");
   });
 });

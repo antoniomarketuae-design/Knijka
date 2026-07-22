@@ -19,6 +19,7 @@ import { buildRoadDecals } from "./decals";
 import { buildMarkings } from "./markings";
 import { analyzeNetwork } from "./network";
 import { buildProps } from "./props";
+import { buildRailTracks } from "./railTrack";
 import { buildRoads } from "./roads";
 import { buildTerrain } from "./terrain";
 import { buildWaterDecals } from "./waterDecals";
@@ -36,6 +37,10 @@ export function buildWorldGeometry(
   // Standing-water sheets over waterPatch zone spans (aquaplane visibility
   // slice) — one merged mesh, zero quads on every map without live spans.
   const water = buildWaterDecals(district, network);
+  // Rail-track deck (ballast band + sleepers + steel rails) over every
+  // railCrossing zone span — two merged meshes, zero quads on every map
+  // without a railCrossing zone (the waterDecals additive contract).
+  const rail = buildRailTracks(district, network);
   // Tall, compact buildings become glass-tower instances; every other
   // footprint keeps its facade prism (walls/roofs), so the split below tells
   // the prism builder which ids to leave to the instanced pass (doc 68 QW3).
@@ -102,6 +107,8 @@ export function buildWorldGeometry(
     markings.markings,
     decals.decals,
     water.water,
+    rail.deck,
+    rail.rails,
     terrain.grass,
     terrain.paved,
     ...buildings.walls,
@@ -123,6 +130,7 @@ export function buildWorldGeometry(
     parkingLaneStrips: roads.parkingLaneStripCount,
     roadDecals: decals.count,
     waterDecals: water.count,
+    railTrackQuads: rail.deckQuads + rail.railQuads,
     buildings: buildings.count,
     buildingInstances: buildingInstances.length,
     trafficLights: props.trafficLights.length,
@@ -140,8 +148,15 @@ export function buildWorldGeometry(
     // 4 trees + 4 furniture + 4 billboards + 2 bus stops + 1 parking kit) +
     // zone-sign draws (only on maps whose zones place posts) +
     // the water-sheet mesh (only on maps with live waterPatch spans) +
+    // the rail deck + rails meshes (only on maps with a railCrossing zone) +
     // towers (chunked & frustum-culled at runtime; count ~model-order).
-    drawCallEstimate: 13 + 27 + zoneSignDraws + (water.count > 0 ? 1 : 0) + CITY_MODELS.length,
+    drawCallEstimate:
+      13 +
+      27 +
+      zoneSignDraws +
+      (water.count > 0 ? 1 : 0) +
+      (rail.deckQuads > 0 ? 2 : 0) +
+      CITY_MODELS.length,
   };
 
   return {
@@ -152,6 +167,7 @@ export function buildWorldGeometry(
     parkingLanes: roads.parkingLanes.toMeshData(),
     roadDecals: decals.decals.toMeshData(),
     waterDecals: water.water.toMeshData(),
+    railTracks: { deck: rail.deck.toMeshData(), rails: rail.rails.toMeshData() },
     terrain: terrain.grass.toMeshData(),
     terrainPaved: terrain.paved.toMeshData(),
     buildingWalls: buildings.walls.map((w) => w.toMeshData()),

@@ -1114,7 +1114,7 @@
     ],
     "explanationBg": "Законът иска дистанция, с която да спреш, ако предният рязко намали. Правилото „2 секунди“ я прави измерима: при 50 км/ч това са около 28 метра — горе-долу колкото на картинката. На мокро удвояваш (ЗДвП, чл. 23).",
     "lawRefs": [{ "act": "ЗДвП", "ref": "чл. 23" }, { "act": "ЗДвП", "ref": "чл. 20" }],
-    "media": {"kind":"sceneStill","districtId":"fo-follow-v1","focus":{"x":0,"y":94,"zoomM":60},"poses":[{"kind":"car","x":4.06,"y":80,"headingDeg":0,"variant":"ego"},{"kind":"car","x":4.06,"y":108,"headingDeg":0}],"marks":[]},
+    "media": {"kind":"sceneStill","districtId":"fo-follow-v1","focus":{"x":0,"y":94,"zoomM":60},"poses":[{"kind":"car","x":4.06,"y":80,"headingDeg":0,"variant":"ego"},{"kind":"car","x":4.06,"y":108,"headingDeg":0}],"marks":[{"kind":"target","x":4.06,"y":94}]},
     "status": "draft"
   },
   {
@@ -1131,7 +1131,7 @@
     ],
     "explanationBg": "Зоната „30“ около училищата смъква лимита точно защото деца се появяват внезапно. 30 км/ч ти дава реален шанс да спреш в няколко метра; следенето на тротоара е втората половина от защитата (ЗДвП, чл. 21; чл. 117).",
     "lawRefs": [{ "act": "ЗДвП", "ref": "чл. 21" }, { "act": "ЗДвП", "ref": "чл. 117" }],
-    "media": {"kind":"sceneStill","districtId":"sp-zone30-v1","focus":{"x":0,"y":112,"zoomM":60},"poses":[{"kind":"car","x":4.06,"y":100,"headingDeg":0,"variant":"ego"},{"kind":"ped","x":-10,"y":128,"headingDeg":90},{"kind":"ped","x":-10,"y":136,"headingDeg":0}],"marks":[]},
+    "media": {"kind":"sceneStill","districtId":"sp-zone30-v1","focus":{"x":0,"y":112,"zoomM":60},"poses":[{"kind":"car","x":4.06,"y":100,"headingDeg":0,"variant":"ego"},{"kind":"ped","x":-10,"y":128,"headingDeg":90},{"kind":"ped","x":-10,"y":136,"headingDeg":0}],"marks":[{"kind":"danger","x":-9,"y":132}]},
     "status": "draft"
   },
   {

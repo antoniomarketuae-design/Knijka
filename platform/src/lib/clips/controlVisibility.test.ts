@@ -50,7 +50,7 @@ const GOVERNED_CLIPS: ReadonlyArray<readonly [string, readonly string[]]> = [
   ["sc-ov-ban-overtake__m0", ["noOvertaking"]], // В24
   ["sc-pk-ban-stop__m0", ["noStopping"]], // В27
   ["sc-rx-unguarded__m0", ["railCross", "railUnguarded", "railGuarded"]], // А35 station
-  ["sc-speed-creep__m0", ["limit50"]], // В26-50 (the in-force limit)
+  ["sc-speed-rain__m0", ["limit50"]], // В26-50 (the in-force limit — rain reps ev-speed-limit)
   ["sc-roundabout-entry__m0", ["giveWay"]], // Б1
   ["sc-junction-stop__m0", ["stop"]], // Б2
 ];
@@ -202,11 +202,11 @@ describe("sc-vu-emergency__m0 — the rear-aware frame covers the approach (caus
   });
 
   it("speed cards carry the dashboard strip and mw carries the lane band (cause 5)", () => {
-    const creep = CLIP_PLAN.find((p) => p.id === "sc-speed-creep__m0")!;
-    expect(creep.view).toBe("exterior+dashboard");
-    expect(creep.governingControl.label).toContain("В26 (50");
+    // sc-speed-rain__m0 is the planned ev-speed-limit clip (the founder ~72 km/h
+    // rain-night blast): it cites the В26-50 in force and carries the speed strip.
     const rain = CLIP_PLAN.find((p) => p.id === "sc-speed-rain__m0")!;
     expect(rain.view).toBe("exterior+dashboard");
+    expect(rain.governingControl.label).toContain("В26 (50");
     const mw = CLIP_PLAN.find((p) => p.id === "sc-mw-discipline__m0")!;
     expect(mw.laneHighlight).toBeDefined();
     expect(mw.laneHighlight!.widthM).toBeGreaterThan(3);

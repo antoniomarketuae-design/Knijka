@@ -95,9 +95,15 @@ import {
   SimEnvironment,
   WindshieldDroplets,
   QUALITY_PRESETS,
+  RAIN_IBL_DIM,
   type QualityLevel,
 } from "@/modules/sim/environment";
-import { DistrictWorld, assertDistrict, type WorldGeometry } from "@/modules/sim/world";
+import {
+  DistrictWorld,
+  LaneSignalGantry,
+  assertDistrict,
+  type WorldGeometry,
+} from "@/modules/sim/world";
 import { createWorldRuntime, type SurfaceGripPatch } from "@/modules/sim/runtime";
 import { createTrafficSystem, TrafficLayer, type TrafficDistrict } from "@/modules/sim/traffic";
 import {
@@ -929,7 +935,7 @@ function ReadyScene({
               isNight ? "/sim/env/sky_urban_1k.hdr" : "/sim/env/shanghai_riverside_1k.hdr"
             }
             background={false}
-            environmentIntensity={isNight ? 0.12 : 0.5}
+            environmentIntensity={isNight ? 0.12 : rain ? 0.5 * (1 - RAIN_IBL_DIM) : 0.5}
             environmentRotation={isNight ? NIGHT_ENV_ROTATION : DAY_ENV_ROTATION}
           />
         </Suspense>
@@ -950,6 +956,9 @@ function ReadyScene({
               getRailBarrierDown={getRailBarrierDown}
               signSvgBaseUrl={null}
             />
+            {/* LC gantry — render-only, inert unless the district authors
+                meta.scenario.laneGantry (the WRONG_WAY lane-control drill). */}
+            <LaneSignalGantry district={district} />
             {/* A2: the provider gives VitokCockpit's hotspot layer its
                 enable/highlight state without threading props through
                 VehicleRig (context crosses the R3F tree). */}

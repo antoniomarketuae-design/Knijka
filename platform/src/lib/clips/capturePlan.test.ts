@@ -364,6 +364,16 @@ describe("actorSpawned (the R1 checklist matcher — framed at the fault beat)",
     expect(actorSpawned("police", log)).toBe(true); // emergency covers police
   });
 
+  it("police accepts a framed pedestrian (the officer renders in the ped pool)", () => {
+    // runners.ts policeStop stages the officer as a pedestrian (pose
+    // "stopSignal"), so the frame scan marks it "pedestrian" — the R1 police
+    // row must be satisfied by that framed figure (sc-vp-police-stop).
+    const log = createActorPresenceLog();
+    expect(actorSpawned("police", log)).toBe(false);
+    markFramedKind(log, "pedestrian");
+    expect(actorSpawned("police", log)).toBe(true);
+  });
+
   it("a dormant staged actor (never framed) is honestly ABSENT", () => {
     // sc-ed-d2-city-run m0: the walker stays staged 540 m away for the whole
     // red-light clip — the v2 checklist said present:true; it may not again.

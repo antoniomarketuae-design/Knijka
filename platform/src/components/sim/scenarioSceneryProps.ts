@@ -233,6 +233,31 @@ const HELD_SCENERY: Record<string, readonly ScenarioObstacleSpec[]> = {
   "sc-pe-parked-row-scan": PARKED_ROW,
   "sc-follow-standstill": STANDSTILL_COLUMN,
   "sc-ov-narrow": NARROW_ROWS,
+  // traces/scReels.ts accidentMistake(): the parked car the „собствено ПТП"
+  // demo hits then flees. The demo authors the COLLISION as a recorder beat
+  // (withWhat "staticObject") but hz-obstacle-v1 shows no body there — the clip
+  // read as „a car on an open road" (founder R0). Bodied here at the collision
+  // point: the mistakes drift RIGHT to x=5.7 and clip it (right flank ≈ 6.55 vs
+  // body left flank ≈ 5.5), while the shadow passes LEFT at x=2.2 (≈ 2.5 m
+  // clear). `visual: true` (the stalled/parked-car convention): the graded
+  // COLLISION stays the recorder's authored beat, so no new live grading path.
+  "sc-accident-own-conduct": [
+    { kind: "vehicle", x: 6.4, y: 149, headingDeg: 0, model: "corva_s", seed: 8, visual: true },
+  ],
+  // templates-reels.ts SC_ANIMAL_HAZARD: the „животно на пътя" quadruped. The
+  // template supplies it via hazard.presentation "animal" on the ballDartOut
+  // path — but that only renders while TrafficLayer's hazardActiveRef is true,
+  // and the trace RECORDER has no hazard channel, so recorded reel clips never
+  // trigger the dart and the animal never appeared (the clip read as an empty
+  // road, founder R0). Held here as STATIC scenery instead: an animal standing
+  // in the ego's travel lane (LANE_RIGHT 4.06) at the hazard's own crossing
+  // point (y = 152), broadside (headingDeg 90) so it reads as an animal in the
+  // road the driver must brake straight for — not swerve across the M1 line.
+  // `visual: true` — animals mount NO collider (the swerve/collision is graded
+  // in the authored trace); this is pure dressing, like the stalled vehicles.
+  "sc-animal-hazard": [
+    { kind: "animal", x: 4.06, y: 152, headingDeg: 90, visual: true },
+  ],
 };
 
 // ---------------------------------------------------------------------------

@@ -467,6 +467,16 @@ export interface HazardStimulusSpec {
   dirY: number;
   speedMps: number;
   travelM: number;
+  /**
+   * Dart VISUAL (render-only; TrafficLayer). Default/absent = the bright ball
+   * (doc 68 A5). "animal" mounts the procedural quadruped rig (vehicleFleet
+   * buildAnimalRig) on the SAME (x,y,dir,speed,travel) integrator — the
+   * animal-hazard drill ("животно на пътя") reuses the ballDartOut path
+   * mechanics but renders four legs + a head, not a ball. Grading is
+   * untouched: the stimulus is data-only and the ego's own trace earns the
+   * codes (a panic swerve across the solid line into the oncoming stream).
+   */
+  presentation?: "ball" | "animal";
 }
 
 // ---------------------------------------------------------------------------
@@ -489,6 +499,14 @@ export interface StagedActorPathSpec {
   hold: { nodeIndex: number; offsetM: number };
   /** Default cruise speed, m/s. */
   cruiseSpeedMps: number;
+  /** Acceleration toward cruise on release, m/s² (default the staged 2.6).
+   *  Authored down to ≤ the ghost's own ramp where a rear-approach actor must
+   *  NOT out-accelerate a still-accelerating player off the line (VU-09: an
+   *  ambulance that surges past the player's slow-speed launch arms the yield
+   *  duty while the player is under the make-way threshold and the runner reads
+   *  the slow launch as a yield — hold it to the player's pace so the duty
+   *  arms only once the player is at cruise, in the corridor, refusing). */
+  accelMps2?: number;
   /** Curb-side extra offset, m (cyclist proxy rides right of lane center). */
   extraRightOffsetM?: number;
   /** Closed loop path (roundabout circulation). */
@@ -513,7 +531,16 @@ export interface StagedActorPathSpec {
    * behavior). Visual + data only: the leadGap/conflict queries stay
    * point-based (ADR-001: rigs fictional).
    */
-  profile?: "car" | "van" | "truck" | "emergency" | "tram" | "cyclist" | "childCyclist";
+  profile?:
+    | "car"
+    | "van"
+    | "truck"
+    | "emergency"
+    | "tram"
+    | "train"
+    | "cyclist"
+    | "childCyclist"
+    | "animal";
 }
 
 export type StagedEventKind =
@@ -531,7 +558,8 @@ export type StagedEventKind =
   | "cutInLeadCar"
   | "rearTailgater"
   | "telltaleStimulus"
-  | "oncomingStream";
+  | "oncomingStream"
+  | "trainPass";
 
 interface StagedEventBase {
   /** Unique per lesson, e.g. "l4-dart-out". */
@@ -1099,6 +1127,43 @@ export interface OncomingStreamSpec extends StagedEventBase {
   releaseKmh: number;
 }
 
+/**
+ * RX-02 / RX-01 (doc 72 §12 — „жп прелез"): a real TRAIN crosses the road at a
+ * railway level crossing, timed to the player's approach so „stop and look" is
+ * a genuine hazard, not a ritual against empty rails. The train is a
+ * path-locked staged actor (profile "train") riding an authored PERPENDICULAR
+ * rail polyline (StagedVehicleSpec.railPath, mirrored in the map's
+ * meta.scenario.railCrossing.railPath) over the rendered rail deck.
+ *
+ * PURE CHOREOGRAPHY — the runner emits ZERO SimTick events (the policeStop /
+ * oncomingStream discipline), so grading is BYTE-IDENTICAL: the existing
+ * world-data rail-crossing detectors alone convict a driver who fails to stop.
+ * The train never brakes for the player (playerGuard OFF — it is the hazard);
+ * a driver who blocks the tracks meets it through the ordinary physics shell,
+ * ungraded here. Determinism: release is keyed to the player's own approach
+ * distance, positions then a pure function of the dt sequence.
+ */
+export interface TrainPassSpec extends StagedEventBase {
+  kind: "trainPass";
+  /** The authored rail polyline (district space) — crosses the carriageway at
+   *  the railCrossing band centre. Mirrors the map's
+   *  meta.scenario.railCrossing.railPath (pinned by the template). */
+  railPath: ReadonlyArray<{ x: number; y: number }>;
+  /** Dormant hold: arc offset from the path start (m) where the train waits
+   *  off-frame before release (its centre sits partway down the rail). */
+  holdOffsetM: number;
+  /** Train cruise speed across the crossing, m/s. */
+  cruiseSpeedMps: number;
+  /** Acceleration toward cruise on release, m/s² (default the staged 2.6). */
+  accelMps2?: number;
+  /** Player distance to the crossing point that releases the train, m. */
+  triggerPlayerDistM: number;
+  /** The crossing point on the player's lane (district space) — the approach
+   *  beat the release is timed to. */
+  crossing: { x: number; y: number };
+  colorIndex?: number;
+}
+
 export type StagedEventSpec =
   | PedestrianDartOutSpec
   | PriorityFromRightSpec
@@ -1114,7 +1179,8 @@ export type StagedEventSpec =
   | CutInLeadCarSpec
   | RearTailgaterSpec
   | TelltaleStimulusSpec
-  | OncomingStreamSpec;
+  | OncomingStreamSpec
+  | TrainPassSpec;
 
 /**
  * Resolution record of one staged encounter (A8). The GRADING already

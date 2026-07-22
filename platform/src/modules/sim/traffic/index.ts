@@ -26,6 +26,10 @@ export type { CarPaintOptions, BuildTrafficFleetOptions } from "./vehicleFleet";
 // are cuboids matched to each rig's measured bbox — never a generic shell).
 export {
   assignCivilianModel,
+  // Quadruped hazard rig (doc 72 §HZ „животно на пътя"): ScenarioObstacles
+  // mounts the SAME geometry TrafficLayer renders, so the animal can stand as
+  // held scenery (sc-animal-hazard) instead of a recorder-less dart trigger.
+  buildAnimalRig,
   buildTrafficFleet,
   disposeTrafficFleet,
   DRACO_DECODER_PATH,

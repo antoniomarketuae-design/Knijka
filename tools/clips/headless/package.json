@@ -1,0 +1,13 @@
+{
+  "name": "knijka-clip-headless",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "description": "Offline, deterministic headless renderer for the theory why-panel mistake clips. Not part of the Next app; run by Claude, never shipped.",
+  "scripts": {
+    "smoke": "node webgl-smoke.mjs"
+  },
+  "dependencies": {
+    "playwright": "^1.61.1"
+  }
+}

@@ -28,7 +28,7 @@
    "edges": 4,
    "intersections": 1,
    "crossings": 1,
-   "buildings": 2,
+   "buildings": 5,
    "spawnPoints": 2
   },
   "scenario": {
@@ -210,6 +210,52 @@
  "roundabouts": [],
  "buildings": [
   {
+   "id": "pz-b-west-approach",
+   "height": 12,
+   "heightSource": "default",
+   "footprint": [
+    [
+     -36,
+     58
+    ],
+    [
+     -20,
+     58
+    ],
+    [
+     -20,
+     108
+    ],
+    [
+     -36,
+     108
+    ]
+   ]
+  },
+  {
+   "id": "pz-b-east-approach",
+   "height": 12,
+   "heightSource": "default",
+   "footprint": [
+    [
+     20,
+     62
+    ],
+    [
+     36,
+     62
+    ],
+    [
+     36,
+     110
+    ],
+    [
+     20,
+     110
+    ]
+   ]
+  },
+  {
    "id": "pz-b-west",
    "height": 12,
    "heightSource": "default",
@@ -228,6 +274,29 @@
     ],
     [
      -36,
+     185
+    ]
+   ]
+  },
+  {
+   "id": "pz-b-east-fault",
+   "height": 12,
+   "heightSource": "default",
+   "footprint": [
+    [
+     20,
+     128
+    ],
+    [
+     36,
+     128
+    ],
+    [
+     36,
+     185
+    ],
+    [
+     20,
      185
     ]
    ]

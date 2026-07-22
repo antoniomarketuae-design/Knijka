@@ -182,8 +182,18 @@ export function PracticeSession({
   // for hydration: `result` is always null at SSR, so nothing renders early.
   const isDesktop = useSyncExternalStore(subscribeDesktop, readDesktop, () => false);
   const panelModel = useMemo(
-    () => (result === null ? null : buildWhyPanelModel(result)),
-    [result],
+    () =>
+      result === null || current === null
+        ? null
+        : // THEO Half A: feed the answered question's media + options so the
+          // panel can draw the picture card (correct sign / diagram) beside
+          // the stored explanation. `result` already carries correctOptionIds.
+          buildWhyPanelModel({
+            ...result,
+            media: current.media,
+            options: current.options,
+          }),
+    [result, current],
   );
 
   if (current === null) {

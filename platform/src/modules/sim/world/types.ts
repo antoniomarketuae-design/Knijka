@@ -321,6 +321,9 @@ export interface WorldStats {
   /** Standing-water quads over waterPatch spans (aquaplane visibility slice;
    *  icePatch spans stay invisible BY DESIGN — black ice is the lesson). */
   waterDecals: number;
+  /** Rail-track deck quads over railCrossing spans (ballast band + sleeper
+   *  ties + the two steel rails); 0 on every map without a railCrossing zone. */
+  railTrackQuads: number;
   buildings: number;
   /** Instanced glass towers placed on tall, compact footprints. */
   buildingInstances: number;
@@ -360,6 +363,12 @@ export interface WorldGeometry {
    *  ONE mesh (builders/waterDecals.ts). Empty on every map without live
    *  water spans — the additive/bit-identity contract. */
   waterDecals: MeshData;
+  /** Railway level-crossing track deck over every railCrossing zone span
+   *  (builders/railTrack.ts): `deck` = the dark ballast band + sleeper ties
+   *  (vertex-coloured, matte), `rails` = the two raised steel rails running
+   *  across the carriageway (metallic). BOTH empty on every map without a
+   *  railCrossing zone — the additive/bit-identity contract. */
+  railTracks: { deck: MeshData; rails: MeshData };
   /** Open ground (grass): parks, verges, district edges. Subtle off-road relief. */
   terrain: MeshData;
   /** Paved ground (concrete): courtyards/parking in the built-up fabric.

@@ -201,6 +201,21 @@ export function buildRailCrossingStreet(params) {
     maxY: r2(lengthM + 6),
   };
 
+  // The PERPENDICULAR rail line the staged TRAIN rides (ADR-006 stage 3c —
+  // the RX „жп прелез" gets a real train). The street runs south → north on
+  // x = 0, so the track crosses EAST–WEST at the band centre (y = midpoint of
+  // [fromM, toM]); it reaches far past both kerbs so the ~34 m consist enters
+  // frame, crosses, and exits. Aligned with the rendered rail deck
+  // (world/builders/railTrack.ts stamps the deck at the same band centre), so
+  // the train runs ON the drawn rails. Authored data mirrored into the
+  // template (templates-rail.ts) and pinned by the rail-district battery.
+  const bandCenterY = r2((band.fromM + band.toM) / 2);
+  const RAIL_PATH_HALF_M = 130; // west start → east end, both well off-frame
+  const railPath = [
+    [r2(-RAIL_PATH_HALF_M), bandCenterY],
+    [r2(RAIL_PATH_HALF_M), bandCenterY],
+  ];
+
   const scenario = {
     archetype: "straight-street",
     params: {
@@ -219,6 +234,8 @@ export function buildRailCrossingStreet(params) {
       toM: r2(band.toM),
       guarded,
       stopLineY,
+      bandCenterY,
+      railPath,
       ...(guarded ? { barrier: { ...zone.barrier } } : {}),
     },
   };
@@ -303,6 +320,17 @@ export function buildRailCrossingStreet(params) {
   }
   if (district.meta.zonesVersion !== 1) post.push("meta.zonesVersion must be 1 on a zones-carrying file");
   if (!(stopLineY > 0 && stopLineY < band.fromM)) post.push(`stop line ${stopLineY} must sit before the band start ${band.fromM}`);
+  // Rail path: two endpoints on the band-centre line (y), symmetric across the
+  // axis, reaching well past both kerbs (so a long consist enters + exits).
+  const rp = scenario.railCrossing.railPath;
+  if (!Array.isArray(rp) || rp.length !== 2) {
+    post.push("railPath must be a 2-point [west, east] polyline");
+  } else {
+    if (rp[0][1] !== bandCenterY || rp[1][1] !== bandCenterY) post.push(`railPath endpoints must sit on the band centre y = ${bandCenterY}`);
+    if (!(rp[0][0] < -halfRoadM && rp[1][0] > halfRoadM)) post.push(`railPath must cross the full carriageway (|x| > ${halfRoadM})`);
+    if (rp[0][0] !== -rp[1][0]) post.push("railPath must be symmetric about the street axis");
+    if (bandCenterY <= band.fromM || bandCenterY >= band.toM) post.push(`band centre ${bandCenterY} must lie inside [${band.fromM}, ${band.toM}]`);
+  }
   for (const s of SPAWN_POINTS) {
     if (s.edgeId !== edgeId) post.push(`${s.id}: unknown edgeId ${s.edgeId}`);
     if (Math.abs(s.x) > halfRoadM || s.y < 0 || s.y > lengthM) post.push(`${s.id}: not on the carriageway`);
