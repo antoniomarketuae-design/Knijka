@@ -70,8 +70,6 @@ interface HeadlessApi {
   seek: (t: number) => void;
   /** R1 checklist for the built run — required actors × the presence log. */
   readChecklist: () => ActorCheck[];
-  /** TEMP DEBUG (remove): the raw presence log incl. per-beat car snapshots. */
-  readDebug: () => ActorPresenceLog | null;
 }
 
 declare global {
@@ -125,7 +123,6 @@ export function HeadlessClipClient({
         runRef.current
           ? buildActorChecklist(runRef.current.plan.requiredActors, presenceRef.current)
           : [],
-      readDebug: () => presenceRef.current ?? null,
       ...patch,
     } as HeadlessApi;
     // frameCount is always the live ref value — never a stale snapshot.

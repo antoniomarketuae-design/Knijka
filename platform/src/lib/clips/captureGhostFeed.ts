@@ -105,20 +105,6 @@ export function createCaptureFeedStepper(args: CaptureFeedArgs): CaptureFeedStep
   const noteFramed = () => {
     const log = getLog();
     if (!log) return;
-    // TEMP DEBUG (remove): record every vehicle position + in-frame verdict.
-    if (log.debugFrames) {
-      log.debugFrames.push({
-        t,
-        gx: pt.x,
-        gy: pt.y,
-        gh: pt.headingDeg,
-        cars: traffic.vehicles.map((v) => ({
-          x: v.x,
-          y: v.y,
-          inFrame: actorInPlannedFrameFor(cameraProfile, pt, v.x, v.y),
-        })),
-      });
-    }
     for (const v of traffic.vehicles) {
       if (!actorInPlannedFrameFor(cameraProfile, pt, v.x, v.y)) continue;
       markFramedKind(log, "vehicle");

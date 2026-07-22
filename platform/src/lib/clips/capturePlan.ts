@@ -634,18 +634,10 @@ export interface ActorPresenceLog {
    *  lower-case tokens: "vehicle", "pedestrian", "parkedvehicle", plus any
    *  vehicle profile ("cyclist", "tram", "emergency", …). */
   framedKinds: string[];
-  /** TEMP DEBUG (remove): per-beat snapshots for capture geometry inspection. */
-  debugFrames?: Array<{
-    t: number;
-    gx: number;
-    gy: number;
-    gh: number;
-    cars: Array<{ x: number; y: number; inFrame: boolean }>;
-  }>;
 }
 
 export function createActorPresenceLog(): ActorPresenceLog {
-  return { vehicles: 0, pedestrians: 0, profiles: [], obstacleVehicles: 0, framedKinds: [], debugFrames: [] };
+  return { vehicles: 0, pedestrians: 0, profiles: [], obstacleVehicles: 0, framedKinds: [] };
 }
 
 /** Record a kind as seen in the planned frame (deduped, normalized). */

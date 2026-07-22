@@ -274,15 +274,27 @@ const SCRIPTS: Record<ScRoundaboutEntryTraceName, { kind: "shadow" | "mistake"; 
  * the south node — on the SW arc, ~54° to the LEFT of the entry heading, so the
  * chase camera's forward cone (CHASE_FOV 44° → ~71° horizontal) never contains
  * it at the fault and R1 fails ("липсва vehicle": the viewer never sees WHICH
- * car the ego cut off). Pull the circulator DOWNSTREAM to ~the south node for
- * the CLIP ONLY: it then sits ahead-left of the barging car — the very car it
- * cut in front of — inside the frame. The barging ego (~6 m/s) far outruns the
- * crawling circulator (2.9 m/s), so no contact fires. Clip-scoped: the recorder
- * and the trace-gate keep the graded 14 m (SC_ROUNDABOUT_ENTRY.staged is read
- * unchanged), so grading is untouched. Only the barge demo (m0) needs it; the
- * exit demo (m1) frames its own circulator, so it keeps the drill default.
+ * car the ego cut off). Pull the circulator DOWNSTREAM to ~the south node (the
+ * mouth) for the CLIP ONLY: it then sits ahead-left of the barging car — the
+ * very car it cut in front of — inside the frame (verified: at fault 11.58 s
+ * the car is at (0.2, −18.0), in-frame across the whole presence beat; min
+ * ego↔car gap 5.26 m > VEHICLE_CONTACT_M, so no contact fires — the barging ego
+ * at ~6 m/s outruns the 2.9 m/s crawler).
+ *
+ * WHY a large NEGATIVE lead: the RoundaboutEntryRunner LOCKS the circulation
+ * (drops it to the 2.9 m/s crawl) as the player reaches RB_LOCK_PLAYER_ENTRY_M,
+ * ~1.2 s BEFORE this fast barge's fault — so conflictLeadM only sets where the
+ * car is AT LOCK, and its sync is speed-capped (maxSyncSpeedMps 8.5). Any
+ * sufficiently-downstream target (conflictS = southNodeS − conflictLeadM)
+ * SATURATES that cap: the car runs flat-out from the arm until the lock and
+ * lands at the mouth regardless of the exact magnitude (−30 and −40 land
+ * identically), so this is a robust "sprint to the mouth", not a fragile pin.
+ *
+ * Clip-scoped: the recorder and the trace-gate read SC_ROUNDABOUT_ENTRY.staged
+ * (the graded 14 m) unchanged, so grading is untouched. Only the barge demo
+ * (m0) needs it; the exit demo (m1) frames its own circulator — drill default.
  */
-export const RB_CLIP_CONFLICT_LEAD_M = -40;
+export const RB_CLIP_CONFLICT_LEAD_M = -30;
 
 export function scRoundaboutEntryClipStaged(mistakeIndex: number): StagedEventSpec[] | null {
   if (mistakeIndex !== 0) return null;

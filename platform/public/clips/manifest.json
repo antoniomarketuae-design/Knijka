@@ -648,6 +648,32 @@
       "quality": "high"
     },
     {
+      "id": "sc-roundabout-entry__m0",
+      "templateId": "sc-roundabout-entry",
+      "mistakeIndex": 0,
+      "tracePath": "content/traces/sc-roundabout-entry/mistake-barge-entry.trace.json",
+      "src": "/clips/sc-roundabout-entry__m0.webm",
+      "durationSec": 14,
+      "recordedAt": "2026-07-22T18:35:07.500Z",
+      "titleBg": "Влизане без пропускане",
+      "keyframes": [
+        "/clips/sc-roundabout-entry__m0.k0.png",
+        "/clips/sc-roundabout-entry__m0.k1.png",
+        "/clips/sc-roundabout-entry__m0.k2.png",
+        "/clips/sc-roundabout-entry__m0.k3.png",
+        "/clips/sc-roundabout-entry__m0.k4.png"
+      ],
+      "actors": [
+        {
+          "kind": "vehicle",
+          "label": "Автомобил в кръговото (с предимство)",
+          "present": true
+        }
+      ],
+      "view": "exterior",
+      "quality": "high"
+    },
+    {
       "id": "sc-rx-tram-left__m0",
       "templateId": "sc-rx-tram-left",
       "mistakeIndex": 0,
