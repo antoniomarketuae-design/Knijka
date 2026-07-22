@@ -50,3 +50,6 @@ next-env.d.ts
 # prisma
 !.env.example
 src/generated/
+
+# rig-rendered 3D scene stills (scp'd to staging like /clips)
+/public/scene-stills/

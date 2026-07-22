@@ -32,6 +32,32 @@ function write(id: string, v: Verdict | null): void {
   }
 }
 
+/** Picture for a Half A card. sceneStill questions render the 3D map still
+ *  (public/scene-stills/<id>.png — our real map + arrow, per the founder);
+ *  sign questions keep their sign face. Falls back to the 2D canvas diagram
+ *  if the 3D still is missing (not yet rendered / not deployed). */
+function SceneMedia({ item }: { item: HalfAItem }) {
+  const [use3d, setUse3d] = useState(
+    "kind" in item.media && item.media.kind === "sceneStill",
+  );
+  if (use3d) {
+    return (
+      <div className="overflow-hidden rounded-xl border border-border bg-surface-2/40">
+        {/* Static rig-rendered still next to the app — plain <img> on purpose. */}
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={`/scene-stills/${item.id}.png`}
+          alt={`3D схема: ${item.textBg}`}
+          loading="lazy"
+          onError={() => setUse3d(false)}
+          className="aspect-video w-full object-cover"
+        />
+      </div>
+    );
+  }
+  return <QuestionMediaView media={item.media} />;
+}
+
 function VerdictButtons({
   value,
   onChange,
@@ -86,7 +112,7 @@ function HalfACard({
         : "";
   return (
     <li className={`card flex flex-col gap-2.5 p-3 ${ring}`}>
-      <QuestionMediaView media={item.media} />
+      <SceneMedia item={item} />
 
       <div className="min-w-0">
         <p className="flex flex-wrap items-center gap-x-2 font-mono text-[11px] text-muted">
