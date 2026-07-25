@@ -30,12 +30,20 @@ export function GhostDemoClient() {
   const [ready, setReady] = useState(false);
 
   // The demo flag must be on the URL BEFORE the scene's load effect reads it.
+  //
+  // The extra render is the POINT and cannot be derived away (audit M-21):
+  // effects run child-first, so anything that mounts <LessonScene> in the same
+  // commit lets the scene's loader read the URL before this rewrite lands. The
+  // gate has to hold the child back for one commit. A hydration-flag hook
+  // (lib/hooks/clientEnv) is true on the first client render and would defeat
+  // that ordering. Dev-only route; the cascading render costs nothing here.
   useEffect(() => {
     const url = new URL(window.location.href);
     if (url.searchParams.get("ghost") !== "demo") {
       url.searchParams.set("ghost", "demo");
       window.history.replaceState(null, "", url);
     }
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- see above
     setReady(true);
   }, []);
 

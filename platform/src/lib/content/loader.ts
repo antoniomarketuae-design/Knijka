@@ -16,6 +16,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { z } from "zod";
 import { setContentRepo, type ContentRepo } from "./repo";
+import { sanitizeContentTree } from "./sanitize";
 import {
   ConceptsFileSchema,
   QuestionsFileSchema,
@@ -104,8 +105,20 @@ function findDependencyCycle(concepts: Concept[]): string[] | null {
   return null;
 }
 
+/**
+ * Validate one content file — after stripping internal staff annotations from
+ * every string in it (audit M-6).
+ *
+ * The strip runs BEFORE zod on purpose. The schemas require non-empty prose
+ * (`textBg`, `explanationBg`, …), and what must be non-empty is what the
+ * STUDENT sees: an `explanationBg` consisting only of `[REVIEW: …]` is a blank
+ * explanation dressed up as content, and it fails the build here instead of
+ * shipping an empty why-panel. It also means no code path downstream of the
+ * loader — repo, exam builder, why-panel, tutor grounding — can be handed an
+ * annotation, whatever slips into a JSON file.
+ */
 function parseFile<T>(schema: z.ZodType<T[]>, data: unknown, file: string): T[] {
-  const result = schema.safeParse(data);
+  const result = schema.safeParse(sanitizeContentTree(data));
   if (!result.success) {
     throw new Error(`Content validation failed in ${file}:\n${z.prettifyError(result.error)}`);
   }

@@ -17,7 +17,7 @@ import {
   getRecentAchievements,
   getSimWeakSpots,
   getStudentProfile,
-} from "@/components/dashboard/data";
+} from "@/lib/dashboard/data";
 
 export const metadata: Metadata = {
   title: "Начало · Книжка.AI",

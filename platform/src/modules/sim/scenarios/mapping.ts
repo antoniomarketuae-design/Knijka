@@ -12,6 +12,10 @@ const CODE_TO_SCENARIO: Record<string, string> = {
   RED_LIGHT_CROSSED: "ev-junction-signalized",
   STOP_SIGN_NO_FULL_STOP: "ev-stop-sign",
   TURN_WITHOUT_INDICATOR: "ev-signaling-discipline",
+  // M-17: the observation duty belongs to the manoeuvre, not to the signal;
+  // the arrow offence is a lane-choice fault, which is what the reel teaches.
+  TURN_WITHOUT_OBSERVATION: "ev-lane-change",
+  WRONG_LANE_FOR_DIRECTION: "ev-lane-discipline",
   LANE_CHANGE_WITHOUT_INDICATOR: "ev-lane-change",
   LANE_CHANGE_WITHOUT_MIRROR_CHECK: "ev-lane-change",
   SEATBELT_OFF_WHILE_MOVING: "ev-seatbelt",

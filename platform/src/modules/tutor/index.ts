@@ -23,3 +23,15 @@ export type {
 } from "./service";
 export type { TutorMessage } from "./store";
 export { isTutorEnabled } from "./model";
+
+// Global daily spend ceiling on the Anthropic key (audit H-8). Exported so an
+// ops/admin surface can show today's burn, and so the message the student sees
+// when it trips is testable from outside the module.
+export {
+  checkDailyBudget,
+  sofiaDayKey,
+  tutorDailyBudgetMicroUsd,
+  TUTOR_BUDGET_REPLY_BG,
+  TUTOR_DAILY_BUDGET_USD_DEFAULT,
+} from "./budget";
+export type { TutorBudgetState } from "./budget";

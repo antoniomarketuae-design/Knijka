@@ -74,7 +74,11 @@ import {
   type TeachMoment,
   type TriggeredQuiz,
 } from "@/modules/sim/lessons";
-import { createTraceRecorder, type LiveTraceRecorder } from "@/modules/sim/traces";
+import {
+  compactTraceForStorage,
+  createTraceRecorder,
+  type LiveTraceRecorder,
+} from "@/modules/sim/traces";
 import {
   PRE_DRIVE_STEP_ORDER,
   PRE_DRIVE_STEPS,
@@ -629,13 +633,17 @@ export function LessonPlayShell({
       const r = buildLessonResult(state);
       setResult(r);
 
+      // The recorded attempt, closed ONCE here: finish() rebases and allocates
+      // the whole sample array, and both consumers below (the rubric's glance
+      // mapping and the persisted trace) must read the SAME drive.
+      const trace = attemptRecorderRef.current?.finish() ?? null;
+
       // S1 scenario rubric (doc 76 §6): observation from the recorded
       // attempt's glance events (honest measured:false when no trace), the
       // stars from the pure scorer. Display here; the SERVER recomputes the
       // persisted stars from the same validated wire channels.
       let observedMomentIds: string[] | undefined;
       if (scenarioSpec?.rubric !== undefined) {
-        const trace = attemptRecorderRef.current?.finish() ?? null;
         let observation: RubricObservationInput | undefined;
         const moments = scenarioSpec.rubric.observation?.moments;
         if (trace !== null && moments !== undefined && moments.length > 0) {
@@ -652,6 +660,13 @@ export function LessonPlayShell({
       // (no attempt rows, no stars, no XP; the wire refuses the foreign `~m`
       // id anyway). The graded retry that follows persists normally.
       if (lesson.mistakeExperience !== undefined) return;
+
+      // I-2 „Твоят дубъл": the drive itself rides along, REDUCED here rather
+      // than server-side so a 4G phone uploads ~87 KB of 10 Hz kinematics for a
+      // 60 s drill instead of the 250 KB of raw float64 it recorded. Display
+      // data — the server validates it and drops it silently if it is anything
+      // but this session's own attempt.
+      const storedTrace = trace !== null ? compactTraceForStorage(trace) : null;
 
       void finishLessonAction({
         lessonId: lesson.id,
@@ -679,6 +694,7 @@ export function LessonPlayShell({
         microQuiz: { ...quizStatsRef.current },
         nearMisses: serializeNearMisses(state.nearMisses ?? []),
         ...(observedMomentIds !== undefined ? { observedMomentIds } : {}),
+        ...(storedTrace !== null ? { attemptTrace: storedTrace } : {}),
       }).then(setSaveResult, () => setSaveResult({ ok: false, code: "SAVE_FAILED" }));
     },
     [lesson.id, lesson.mistakeExperience, scenarioSpec],

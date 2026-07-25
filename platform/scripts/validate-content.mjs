@@ -6,13 +6,28 @@
  * (keep the three in lockstep): per-file structure, cross-field question
  * rules, referential integrity, dependency-graph acyclicity, svg assets.
  *
+ * PLUS the answer-leak gate (audit H-1/H-2): a bank can be perfectly valid and
+ * still hand a student the answers through option position or option length.
+ * That defect was hand-fixed twice and regenerated twice, so it is enforced
+ * here — this script is the only content check in CI, which makes it the only
+ * place a guard actually holds.
+ *
  * Usage: node scripts/validate-content.mjs   (from platform/ or repo root)
+ *        CONTENT_DIR=... node scripts/validate-content.mjs   (tests)
  * Exit code: 0 = content valid, 1 = any error.
  */
 import fs from "node:fs";
 import path from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
+import {
+  ALPHA_BLOCK,
+  ALPHA_WARN,
+  MIN_N_FOR_GATE,
+  POOLED_SCOPE,
+  analyzeAnswerBias,
+  describeFinding,
+} from "../../tools/theory/answer_bias.mjs";
 
 const STATUSES = ["draft", "needs-review", "approved"];
 const KEBAB_SLUG = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
@@ -30,6 +45,9 @@ const SCENE_MARK_KINDS = ["danger", "target", "proceed", "yield"];
 // --------------------------------------------------------------------------
 const scriptDir = path.dirname(fileURLToPath(import.meta.url));
 const candidates = [
+  // CONTENT_DIR first: the guard's own tests point this script at a fixture
+  // bank to prove it really exits 1 on a leak. Nothing in the app sets it.
+  ...(process.env.CONTENT_DIR ? [path.resolve(process.env.CONTENT_DIR)] : []),
   path.resolve(scriptDir, "..", "..", "content"), // platform/scripts -> repo root
   path.join(process.cwd(), "content"),
   path.resolve(process.cwd(), "..", "content"),
@@ -554,6 +572,23 @@ if (sections.length > 0) {
 }
 
 // --------------------------------------------------------------------------
+// Answer-leak gate (audit H-1 position bias / H-2 length tell)
+//
+// Structural validity says nothing about whether the bank teaches. A file
+// where the correct answer is at (a) 37 times out of 37 passes every check
+// above and still lets a student drive `dokumenti-i-sanktsii` mastery to 1.0
+// by pressing the first button — which corrupts the adaptive signal and the
+// readiness score the whole product sells. Thresholds and their reasoning live
+// in tools/theory/answer_bias.mjs; they are statistical, not hand-tuned, so a
+// content wave cannot quietly re-fit them.
+// --------------------------------------------------------------------------
+const bias = analyzeAnswerBias(questionFiles);
+for (const finding of bias.blocking) {
+  const where = finding.scope === POOLED_SCOPE ? "content/questions (whole bank)" : `questions/${finding.scope}.json`;
+  errors.push(`${where}: ${describeFinding(finding)}`);
+}
+
+// --------------------------------------------------------------------------
 // Summary
 // --------------------------------------------------------------------------
 const allQuestions = [...questionFiles.values()].flat();
@@ -590,6 +625,18 @@ for (const [name, count, statuses] of rows) {
 }
 const coveredTopics = topics.filter((t) => questionFiles.has(t?.slug)).length;
 console.log(`\n  question files: ${questionFiles.size} (topics covered: ${coveredTopics}/${topics.length})`);
+
+// The sweep reports whether it found anything or not — a silent guard is
+// indistinguishable from a guard someone deleted.
+const gatedFiles = new Set(bias.findings.filter((f) => f.gated).map((f) => f.scope)).size;
+console.log(
+  `  answer-leak sweep: ${gatedFiles} scope(s) gated (n >= ${MIN_N_FOR_GATE}), ` +
+  `${bias.blocking.length} blocking (p < ${ALPHA_BLOCK}), ${bias.warnings.length} warning (p < ${ALPHA_WARN})`,
+);
+for (const finding of bias.warnings) {
+  const where = finding.scope === POOLED_SCOPE ? "whole bank" : `questions/${finding.scope}.json`;
+  console.warn(`  WARN ${where}: ${describeFinding(finding)}`);
+}
 
 if (errors.length > 0) {
   console.error(`\nFAIL — ${errors.length} error${errors.length === 1 ? "" : "s"}:`);

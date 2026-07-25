@@ -57,7 +57,7 @@ import {
   TOUCH_STEER_RANGE_FRACTION,
   type TouchInputSource,
 } from "@/modules/sim/engine";
-import type { CabinControls, HeadlightSetting, IndicatorSetting } from "./cabin";
+import type { CabinControls, HeadlightSetting, IndicatorSetting } from "@/modules/sim/scene/cabin";
 
 // ---------------------------------------------------------------------------
 // Steer-mode setting seam (A/B: slider vs tilt). Only "slider" is

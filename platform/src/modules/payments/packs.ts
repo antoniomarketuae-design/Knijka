@@ -19,6 +19,12 @@
  *
  * Pack ids are a schema contract: Entitlement.pack stores exactly
  * "core" | "premium_sim" (see prisma/schema.prisma comment).
+ *
+ * COPY RULE (audit C-3): every bullet below must name something a FREE
+ * account does not get, and something a gate in modules/payments/quota.ts
+ * actually enforces. A bullet with no gate behind it is a false claim, and a
+ * gate with no bullet is money left on the table — when you edit one, edit
+ * the other in the same change.
  */
 
 /** How long a purchased pack stays active (calendar months). */
@@ -57,7 +63,9 @@ export const PACKS: Record<"core" | "premium_sim", PackDefinition> = {
       "Неограничена практика с обяснения",
       "Неограничени пробни изпити в официалния формат",
       "AI Учител — пълен достъп",
-      "Оценка на готовността за изпит",
+      // NOT „Оценка на готовността за изпит" — тя е безплатна за всеки акаунт
+      // и няма гейт зад нея (C-3: не продаваме нещо, което вече е безплатно).
+      "4 месеца достъп — еднократно плащане, без абонамент",
     ],
   },
   premium_sim: {

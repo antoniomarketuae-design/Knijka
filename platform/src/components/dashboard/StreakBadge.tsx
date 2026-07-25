@@ -1,4 +1,4 @@
-import type { GamificationSummary } from "@/components/dashboard/data";
+import type { GamificationSummary } from "@/lib/dashboard/data";
 import { IconFlame } from "@/components/icons";
 
 /** Streak flame counter. Greys out if today hasn't been counted yet. */

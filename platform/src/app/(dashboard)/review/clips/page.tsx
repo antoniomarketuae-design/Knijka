@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { requireUser } from "@/modules/auth";
-import { CLIP_PLAN } from "@/modules/learning";
+import { CLIP_PLAN } from "@/modules/clips";
 import { ClipsGalleryClient } from "./ClipsGalleryClient";
 
 export const metadata: Metadata = {

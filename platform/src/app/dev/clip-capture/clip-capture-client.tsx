@@ -25,7 +25,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import dynamic from "next/dynamic";
-import type { ClipPilotEntry, ClipPlanEntry } from "@/modules/learning";
+import type { ClipPilotEntry, ClipPlanEntry } from "@/modules/clips";
 import {
   compileScenario,
   scenarioById,
@@ -33,7 +33,6 @@ import {
   type LessonSpec,
 } from "@/modules/sim/lessons";
 import {
-  clipStagedOverrideFor,
   createTraceClock,
   createTracePoint,
   parseScenarioTrace,
@@ -41,19 +40,24 @@ import {
   type ScenarioTrace,
   type TraceClock,
 } from "@/modules/sim/traces";
+// Deep import ON PURPOSE (audit M-26): the staged-override registry lives with
+// the replay recorders, which are off the sim/traces barrel so the theory pages
+// stop parsing the scenario catalogue. This rig already loads the whole
+// simulator, so it is the right place to pay for it.
+import { clipStagedOverrideFor } from "@/modules/sim/traces/clipReplay";
 import { loadQualityPreset } from "@/components/sim/lesson-ui/QualityPresetSelector";
 import { TraceTimeline } from "@/components/sim/lesson-ui/TraceTimeline";
-import { traceUrlForRepoPath } from "@/components/theory/whyPanelModel";
-import { CLIP_MANIFEST_URL, parseClipManifest } from "@/components/theory/clipManifest";
-import type { RecordedClipLike } from "@/lib/clips/batch";
+import { traceUrlForRepoPath } from "@/modules/clips/view";
+import { CLIP_MANIFEST_URL, parseClipManifest } from "@/modules/clips/view";
+import type { RecordedClipLike } from "@/modules/clips/capture/batch";
 import {
   CAPTURE_CHUNK_SIZE,
   missingIdSet,
   nextChunkToRecord,
   parseFromIndex,
   runSummary,
-} from "@/lib/clips/captureChunks";
-import type { RecordingWindow } from "@/lib/clips/trim";
+} from "@/modules/clips/capture/captureChunks";
+import type { RecordingWindow } from "@/modules/clips/capture/trim";
 import {
   buildActorChecklist,
   cabinChannelsFor,
@@ -66,8 +70,8 @@ import {
   type ActorCheck,
   type ActorPresenceLog,
   type CaptureCabinChannels,
-} from "@/lib/clips/capturePlan";
-import { recordedSignalOffsetsFor, type SignalOffsets } from "@/lib/clips/captureSignalDials";
+} from "@/modules/clips/capture/capturePlan";
+import { recordedSignalOffsetsFor, type SignalOffsets } from "@/modules/clips/capture/captureSignalDials";
 import {
   CAPTURE_H,
   CAPTURE_W,

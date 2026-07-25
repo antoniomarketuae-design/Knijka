@@ -304,8 +304,15 @@ describe("mg-busstop-v1 — lane adjudication through the real reducer", () => {
     // The bound the authored drives are tuned under — nothing in this template
     // may be won with throttle, and the „форсиране покрай автобуса" demo has to
     // stay UNDER it so its only code is the contact it earns.
-    expect(violations(drive(X_GENERAL, 58, 15, LENGTH_M - 15))).toEqual(["SPEEDING_OVER_LIMIT"]);
-    expect(violations(drive(X_GENERAL, 75, 15, LENGTH_M - 15))).toEqual(["SPEEDING_DANGEROUS"]);
+    // Distinct codes: M-16 re-bills a long UNBROKEN episode on the repeat
+    // cadence, so a full-length run at 58 is billed more than once — which is
+    // the point (sustained speeding must not stay a one-point flat fee).
+    expect([...new Set(violations(drive(X_GENERAL, 58, 15, LENGTH_M - 15)))]).toEqual([
+      "SPEEDING_OVER_LIMIT",
+    ]);
+    expect([...new Set(violations(drive(X_GENERAL, 75, 15, LENGTH_M - 15)))]).toEqual([
+      "SPEEDING_DANGEROUS",
+    ]);
   });
 });
 

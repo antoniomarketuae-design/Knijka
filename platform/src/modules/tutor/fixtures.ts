@@ -120,6 +120,8 @@ export class FakeTutorStore implements TutorStore {
   private threads = new Map<string, TutorThreadRecord>();
   private nextId = 1;
   readonly saveExchangeCalls: SaveExchangeCall[] = [];
+  /** day ("YYYY-MM-DD") → global micro-USD, mirroring TutorSpendDay. */
+  readonly spendByDay = new Map<string, number>();
 
   seedThread(
     userId: string,
@@ -162,6 +164,19 @@ export class FakeTutorStore implements TutorStore {
         record.costMicroUsd += usage.costMicroUsd;
       }
     }
+  }
+
+  /** Seed a day as already spent, to drive the kill-switch in tests. */
+  seedDaySpend(day: string, costMicroUsd: number): void {
+    this.spendByDay.set(day, costMicroUsd);
+  }
+
+  async spentOnDay(day: string): Promise<number> {
+    return this.spendByDay.get(day) ?? 0;
+  }
+
+  async recordDaySpend(day: string, usage: TutorUsageDelta): Promise<void> {
+    this.spendByDay.set(day, (this.spendByDay.get(day) ?? 0) + usage.costMicroUsd);
   }
 }
 

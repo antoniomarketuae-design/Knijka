@@ -19,11 +19,11 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   clipForTracePath,
+  durationFixStep,
   fetchClipManifest,
   posterFrameFor,
   type MistakeClip,
-} from "./clipManifest";
-import { durationFixStep } from "./webmDuration";
+} from "@/modules/clips/view";
 import MistakeReplay from "./MistakeReplay";
 
 /** The canvas replay's height rule — kept identical to avoid layout jumps. */

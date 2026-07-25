@@ -29,6 +29,11 @@ import {
   type ViolationCode,
 } from "../rules";
 import { PRE_DRIVE_STEPS, type PreDriveStepId } from "../procedures";
+// Deep imports, not the sim/traces barrel: that barrel re-exports 65 scripted-
+// drive recorders (audit M-26), and this file rides the client bundle.
+import { MAX_STORED_EVENTS, MAX_STORED_SAMPLES } from "../traces/compact";
+import { parseScenarioTrace } from "../traces/parse";
+import type { ScenarioTrace } from "../traces/types";
 import {
   applyEscalations,
   isEscalationMultiplier,
@@ -120,6 +125,17 @@ export interface FinishLessonWire {
    * validated; drives the observation stars line, never the official score.
    */
   observedMomentIds?: string[];
+  /**
+   * I-2 „Твоят дубъл" (scenario sessions): the student's OWN recorded drive,
+   * already reduced for storage client-side (traces/compact.ts — 10 Hz, cm
+   * precision, ≤ MAX_STORED_SAMPLES). DISPLAY DATA ONLY, like the A15
+   * positions: the graded truth is the server-rebuilt catalog event log, so a
+   * tampered trace can at worst make the student's own replay lie to the
+   * student. Absent, oversized, foreign-scenario or malformed payloads DROP
+   * SILENTLY — an optional bulky channel must never cost a real session its
+   * save.
+   */
+  attemptTrace?: ScenarioTrace;
 }
 
 /** Hard caps — a session cannot legitimately exceed these. */
@@ -276,7 +292,37 @@ export function parseFinishLessonWire(value: unknown): FinishLessonWire | null {
   if (microQuiz !== null) wire.microQuiz = microQuiz;
   if (nearMisses !== null) wire.nearMisses = nearMisses;
   if (observedMomentIds !== null) wire.observedMomentIds = observedMomentIds;
+
+  const attemptTrace = parseAttemptTrace(o.attemptTrace, o.lessonId);
+  if (attemptTrace !== null) wire.attemptTrace = attemptTrace;
   return wire;
+}
+
+/**
+ * I-2: validate the uploaded attempt trace — null means "no trace on this
+ * session", for every reason (absent, not our shape, not reduced, or not
+ * about this lesson). Never "invalid": dropping a replay is the correct
+ * failure mode, refusing the whole finish payload is not.
+ *
+ * `parseScenarioTrace` already rebuilds a clean object and rejects NaN
+ * positions, unordered timestamps and foreign versions. The three checks on
+ * top of it are the ones only this layer can make:
+ *   • kind must be "attempt" — a client must not be able to file its drive as
+ *     an authored "shadow"/"mistake" demo;
+ *   • scenarioId must be the lesson being finished, or the replay would render
+ *     one drive inside another scenario's world;
+ *   • size must be within the client-side reduction caps, so an unreduced
+ *     (or hostile) payload never reaches the compressor.
+ */
+function parseAttemptTrace(value: unknown, lessonId: unknown): ScenarioTrace | null {
+  if (value === undefined || value === null) return null;
+  const trace = parseScenarioTrace(value);
+  if (trace === null) return null;
+  if (trace.meta.kind !== "attempt") return null;
+  if (trace.meta.scenarioId !== lessonId) return null;
+  if (trace.samples.length > MAX_STORED_SAMPLES) return null;
+  if (trace.events.length > MAX_STORED_EVENTS) return null;
+  return trace;
 }
 
 /** S1: parse the optional observed-moment list — null (absent), the deduped

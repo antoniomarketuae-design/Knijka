@@ -23,6 +23,8 @@ import type {
   LessonEntryView,
   ScenarioCatalogEntry,
 } from "@/components/sim/lesson-ui/types";
+import { canDriveSimulator } from "./access";
+import { SimulatorPaywall } from "./paywall";
 import { resolveScenarioDeepLink } from "./scenarioDeepLink";
 import { SimulatorClient } from "./simulator-client";
 import type {
@@ -56,9 +58,23 @@ interface SimulatorPageProps {
  * THEO-2: `?scenario=<templateId>&level=<n>` deep-links a scenario drill (the
  * theory why-panel's „Опитай в симулатора" seam) — resolved against the same
  * server-computed progression, so the link can never bypass the soft gate.
+ *
+ * C-3: the simulator is what the „Изпит + Симулатор" pack sells, so the very
+ * first thing after authentication is the entitlement gate — before the store
+ * is touched and before a single lesson spec is serialized to the client.
  */
 export default async function SimulatorPage({ searchParams }: SimulatorPageProps) {
   const user = await requireUser();
+
+  if (!(await canDriveSimulator(user))) {
+    // Sizes only, never content — see paywall.tsx.
+    return (
+      <SimulatorPaywall
+        lessonCount={[...LESSONS, ...POLIGON_LESSONS, EXAM_LESSON].length}
+        scenarioCount={SCENARIO_TEMPLATES.length}
+      />
+    );
+  }
 
   let attempts: LessonAttemptRow[] = [];
   let history: SessionHistoryEntry[] = [];

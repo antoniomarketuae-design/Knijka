@@ -70,7 +70,7 @@ export function CoverageTab({ coverage }: { coverage: CoverageSummary }) {
           </button>
         </div>
         <p className="text-xs leading-relaxed text-muted">
-          „Тема" = събитие от разбора (mistake-type). 585 поведенчески въпроса се
+          „Тема&quot; = събитие от разбора (mistake-type). 585 поведенчески въпроса се
           свеждат до тези теми; всяка с ролка → ученикът вижда 3D, иначе 2D
           платно. Целта: всички визуализируеми въпроси → 3D.
         </p>

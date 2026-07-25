@@ -27,14 +27,27 @@ export const LANE_WIDTH_M = 3.25 * PERCEPTUAL_ROAD_SCALE;
  * parking) or driving the outer lane of an arterial would read as off-road. */
 export const OFF_ROAD_DISTANCE_M = 30;
 
-/** Rank used by the stop-sign heuristic and signal grouping. Higher = more arterial. */
+/**
+ * Rank used by the priority-sign heuristic and signal grouping. Higher = more
+ * arterial. MUST equal the world builder's CLASS_RANK exactly (builders/
+ * constants.ts) — the runtime grades the junction the builder painted, and a
+ * class missing here silently falls back to 2 = "minor". That is not academic:
+ * before audit C-4 the `*_link` classes were absent, so d2-v1's primary_link
+ * ramps read as minor roads and collected graded Б2 stop lines at junctions
+ * where the builder — ranking them 5 — correctly painted no sign at all.
+ * runtime/__tests__/priority-sign-agreement.test.ts asserts the two tables
+ * stay identical.
+ */
 export const CLASS_RANK: Record<string, number> = {
   primary: 5,
+  primary_link: 5,
   secondary: 4,
   secondary_link: 4,
   tertiary: 3,
+  tertiary_link: 3,
   unclassified: 2,
   residential: 2,
+  living_street: 1,
   service: 1,
 };
 

@@ -60,8 +60,10 @@ export const L7_PARKING_BAY: ParkingBaySpec = {
 // EXACT same pinned geometry; a district fix lands in both at once).
 // ---------------------------------------------------------------------------
 
-/** L2/exam — priority car from the right at the Б2-guarded junction
- *  n5063751788. See the honest-placement note on the L2 entry. */
+/** L2/exam — priority car from the right at the Б1-guarded junction
+ *  n5063751788 (audit C-4: the sign there is a give-way triangle, and the
+ *  runtime now grades one; the function name is kept for call-site stability).
+ *  See the honest-placement note on the L2 entry. */
 function priorityFromRightAtB2(id: string): PriorityFromRightSpec {
   return {
     id,
@@ -218,11 +220,13 @@ export const LESSONS: readonly LessonSpec[] = [
     preDrive: false,
     // A8 staged encounter — priority from the right. HONEST PLACEMENT NOTE:
     // the L2 route has NO uncontrolled (right-hand-rule) junction — every
-    // junction on it is signalized or stop-guarded — so the scripted car
-    // crosses the player's Б2-guarded junction n5063751788 (the minor-meets-
-    // arterial stop east of the first objective, where the route turns north
-    // onto the secondary). Grading path: the runtime's stop-line give-way
-    // adjudication (conflictNear at line crossing → FAILED_TO_YIELD). The
+    // junction on it is signalized or sign-guarded — so the scripted car
+    // crosses the player's Б1-guarded junction n5063751788 (the minor-meets-
+    // SECONDARY give-way east of the first objective, where the route turns
+    // north onto the secondary; audit C-4 — the Б2 the runtime used to grade
+    // there was never posted). Grading path is unchanged: the runtime's
+    // stop-line give-way adjudication (conflictNear at line crossing →
+    // FAILED_TO_YIELD), which a Б1 line delivers identically. The
     // orchestrator's staging machinery is junction-type agnostic; the
     // conflictFromRight/uncontrolled variant is exercised by the orchestrator
     // integration tests at n348207502.

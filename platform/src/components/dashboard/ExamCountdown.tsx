@@ -5,7 +5,7 @@ import {
   NO_EXAM_DATE,
   readDailyGoalMin,
   readExamDate,
-} from "@/components/onboarding/storage";
+} from "@/lib/onboarding/storage";
 
 /**
  * Makes the onboarding promise true: „ще ти показваме колко дни остават".

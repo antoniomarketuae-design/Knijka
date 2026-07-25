@@ -24,14 +24,14 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import dynamic from "next/dynamic";
-import type { ClipPilotEntry, ClipPlanEntry } from "@/modules/learning";
+import type { ClipPilotEntry, ClipPlanEntry } from "@/modules/clips";
 import { createTraceClock, type TraceClock } from "@/modules/sim/traces";
 import {
   buildActorChecklist,
   createActorPresenceLog,
   type ActorCheck,
   type ActorPresenceLog,
-} from "@/lib/clips/capturePlan";
+} from "@/modules/clips/capture/capturePlan";
 import { loadRun, type ClipRun } from "../clip-capture/clip-capture-client";
 import { CAPTURE_H, CAPTURE_W } from "../clip-capture/CaptureScene";
 

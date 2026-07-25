@@ -377,14 +377,18 @@ export const SC_OV_ONEWAY: ScenarioSpec = {
       titleBg: "Ляв завой срещу еднопосочната",
       whatWentWrongBg:
         "На Т-кръстовището водачът зави наляво — срещу посоката, която стрелките на платното показваха от петдесет метра. Всеки метър по западното рамо е движение срещу насрещните: те карат с очакването, че никой няма да се появи насреща им. Движението срещу еднопосочно е опасна грешка и прекратява изпита.",
-      codeRefs: ["WRONG_WAY"],
+      // M-17: the approach lane's М10 „само надясно" arrows are the visible cue
+      // this scenario is built on — and until the arrow channel existed they
+      // graded nothing. Two laws, two lessons: чл. 6 (маркировката е нареждане,
+      // прочети я) and the опасна за движение срещу еднопосочното.
+      codeRefs: ["WRONG_WAY", "WRONG_LANE_FOR_DIRECTION"],
     },
     {
       traceRef: { path: "content/traces/sc-ov-oneway/mistake-wrong-way-short.trace.json" },
       titleBg: "„Само няколко метра“ в грешната посока",
       whatWentWrongBg:
         "Водачът зави наляво „колкото да спре ей там“ и измина само двайсетина метра срещу посоката, преди да закове. И краткото движение срещу еднопосочното е същата опасна грешка — насрещният, който излиза иззад завоя, не получава нито метър предупреждение. По еднопосочна се влиза единствено по посоката ѝ.",
-      codeRefs: ["WRONG_WAY"],
+      codeRefs: ["WRONG_WAY", "WRONG_LANE_FOR_DIRECTION"],
     },
   ],
   teach: {

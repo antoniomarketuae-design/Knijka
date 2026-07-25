@@ -40,6 +40,7 @@ import {
 } from "./signals";
 import { buildStopLines, type StopLine, type StopLineSet } from "./stoplines";
 import { CrossingZoneTracker, type PedestrianQuery } from "./zones";
+import { buildLaneArrowSpans, laneArrowAt } from "./laneArrows";
 import { JUNCTION_AREA_RADIUS_M, TurnDetector } from "./turns";
 
 /** A stop line can re-fire only after this long (jitter at the line must not
@@ -587,6 +588,11 @@ export function createWorldRuntime(districtJson: District | unknown): DistrictWo
   const nodePos = new Map<string, { x: number; y: number }>();
   for (const n of district.roads.nodes) nodePos.set(n.id, { x: n.x, y: n.y });
 
+  // М10 lane-intent arrows (audit M-17): the SAME authored meta the painter
+  // consumes, indexed for per-frame resolution off the committed lane fix.
+  // Empty on every district without arrows — the tick then gains nothing.
+  const laneArrowsByEdge = buildLaneArrowSpans(district, index);
+
   // ZONE-BAN data layer (ADR-006 stage 2a — doc 72 PK-06/OV-06; stage 2b adds
   // the LINE TYPES + BUS LANES vocabulary — doc 72 OV-04/SN-03/SN-05):
   // authored В24/В27/В28/М1/BUS spans, resolved per frame from the SAME
@@ -900,9 +906,10 @@ export function createWorldRuntime(districtJson: District | unknown): DistrictWo
       // Non-signal line: emit the sign kind the geometry carries. Б2 „Стоп"
       // (stopSign) demands a full stop at the line; Б1 „Пропусни движението"
       // (giveWay) demands only the yield below — no full stop (ЗДвП чл. 50; the
-      // reducer's giveWay branch grades nothing at the line itself). Byte-
-      // identical for every shipped map: no Б1 node is authored, so line.control
-      // is always "stopSign" in this branch.
+      // reducer's giveWay branch grades nothing at the line itself). Which of
+      // the two arrives here is the world builder's own sign rule (audit C-4,
+      // network.junctionPriorityControls), so the grade always matches the
+      // triangle or octagon the student is looking at.
       events.push({ kind: "stopLineCrossed", control: line.control });
       // Give-way / stop: crossing into the junction while conflicting priority
       // traffic is present = failing to yield — graded FAILED_TO_YIELD (detail
@@ -1467,6 +1474,18 @@ export function createWorldRuntime(districtJson: District | unknown): DistrictWo
             Math.abs(signedDeltaDeg(v.headingDeg, bearingDeg(otx, oty))) <= 90 ? 1 : -1;
           if (headingSign !== fix.travelDir) tick.opposingBank = true;
         }
+      }
+      // М10 lane-intent arrow of the lane the car is actually in (M-17) —
+      // resolved from the committed fix like every other authored span, and
+      // set only when a readable glyph governs this lane (absent = innocent).
+      if (fix.edgeIdx >= 0) {
+        const arrow = laneArrowAt(
+          laneArrowsByEdge.get(fix.edgeIdx),
+          fix.sM,
+          fix.laneId,
+          fix.travelDir,
+        );
+        if (arrow !== undefined) tick.laneArrow = arrow;
       }
       // ZONE-BAN membership (ADR-006 stage 2a; stage 2b vocabulary; stage 3a
       // rail): flags flow onto the tick exactly the way maxSpeedKmh does —

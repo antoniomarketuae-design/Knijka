@@ -50,7 +50,7 @@ import {
   type ReplayMarker,
   type ReplayPoint,
   type ReplayView,
-} from "./mistakeReplayCore";
+} from "@/modules/clips/replay/mistakeReplayCore";
 
 interface ReplayData {
   trace: ScenarioTrace;

@@ -1,5 +1,5 @@
 import { notFound } from "next/navigation";
-import { CLIP_PLAN, clipPilotList } from "@/modules/learning";
+import { CLIP_PLAN, clipPilotList } from "@/modules/clips";
 import { HeadlessClipClient } from "./headless-client";
 
 /**

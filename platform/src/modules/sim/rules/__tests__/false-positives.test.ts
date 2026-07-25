@@ -47,6 +47,10 @@ const zonePassed = (ped: boolean, crossingId = "x1"): SimTickEvent => ({
   crossingId,
   pedestrianOnCrossing: ped,
 });
+const zoneExited = (crossingId = "x1"): SimTickEvent => ({
+  kind: "crossingZoneExited",
+  crossingId,
+});
 
 // ---------------------------------------------------------------------------
 // Speeding
@@ -1263,6 +1267,71 @@ describe("FP battery — overtaking at a crossing (OVERTAKING_AT_CROSSING)", () 
       tick(1, { speedKmh: 18, leadGapM: 12, laneOffsetM: 0.5 }),
       tick(2, { speedKmh: 12, leadGapM: 10, laneOffsetM: 0.2 }),
       tick(3, { speedKmh: 12, leadGapM: 10, events: [zonePassed(false)] }),
+    ]);
+    expectInnocent(events);
+  });
+
+  it("regression (H-5): moving RIGHT to line up for a right turn, car queued ahead", () => {
+    // Innocent, and the sharpest case in this describe: чл. 37 REQUIRES you to
+    // be in the rightmost lane before turning right, and a junction's crossing
+    // zone arms ~35 m out — i.e. exactly where that move belongs. Signalled,
+    // mirrored, with a car queued ahead in the lane being joined. Before the
+    // direction gate the engine commended the change AND instant-failed it at
+    // 10 points on the same frame (audit H-5): the lane-id delta was graded in
+    // BOTH directions, and no overtake preceded this one.
+    const { events } = drive([
+      tick(0, {
+        speedKmh: 35,
+        laneId: 1,
+        leadGapM: 25,
+        indicator: "right",
+        events: [glance("right"), zoneEntered(false)],
+      }),
+      tick(1, { speedKmh: 30, laneId: 0, leadGapM: 22, indicator: "right" }),
+      tick(2, { speedKmh: 22, laneId: 0, leadGapM: 20, events: [zonePassed(false)] }),
+    ]);
+    expectInnocent(events);
+    expect(codes(events)).toContain("SAFE_LANE_CHANGE");
+  });
+
+  it("regression (H-5): merging back to the curb after a lawful pass, зебра far behind", () => {
+    // Innocent: the crossing was armed, the driver turned away without ever
+    // crossing it (crossingZoneExited), and only much later tucked back to the
+    // right behind a lead. Before the exit event the zone had no way to close —
+    // s.crossing only cleared on a matching crossingPassed — so the armed zone
+    // followed the car indefinitely and this move graded опасна.
+    const { events } = drive([
+      tick(0, { speedKmh: 40, laneId: 1, leadGapM: 30, events: [zoneEntered(false)] }),
+      tick(1, { speedKmh: 40, laneId: 1, leadGapM: 30, events: [zoneExited()] }),
+      ...cruise(2, 60, { speedKmh: 40, leadGapM: 30, laneId: 1 }),
+      tick(61, {
+        speedKmh: 40,
+        laneId: 1,
+        leadGapM: 30,
+        indicator: "right",
+        events: [glance("right")],
+      }),
+      tick(62, { speedKmh: 40, laneId: 0, leadGapM: 30, indicator: "right" }),
+    ]);
+    expectInnocent(events);
+  });
+
+  it("regression (H-5): a lane change long after an unrelated pull-out is not a return leg", () => {
+    // Innocent: the pull-out happened a full minute and a whole street earlier
+    // (well outside overtakeManeuverWindowSec) and nowhere near this crossing.
+    // The overtake it opened is long over; this tuck-in must stand on its own.
+    const { events } = drive([
+      tick(0, { speedKmh: 45, leadGapM: 20, indicator: "left", events: [glance("left")] }),
+      tick(1, { speedKmh: 45, leadGapM: 20, laneId: 1, indicator: "left" }), // the pull-out
+      ...cruise(2, 60, { speedKmh: 45, laneId: 1 }), // clear road, lead long gone
+      tick(61, {
+        speedKmh: 45,
+        laneId: 1,
+        leadGapM: 25,
+        indicator: "right",
+        events: [glance("right"), zoneEntered(false)],
+      }),
+      tick(62, { speedKmh: 45, laneId: 0, leadGapM: 25, indicator: "right" }),
     ]);
     expectInnocent(events);
   });

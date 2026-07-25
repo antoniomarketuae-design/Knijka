@@ -8,7 +8,8 @@
  * app actually shows. Verdicts persist device-local (`halfa-verdict:<id>`).
  */
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
+import { useIsHydrated } from "@/lib/hooks/clientEnv";
 import { QuestionMediaView } from "@/components/theory/QuestionMedia";
 import type { HalfAItem } from "./halfAData";
 
@@ -152,26 +153,38 @@ function HalfACard({
 }
 
 export function HalfASection({ items }: { items: readonly HalfAItem[] }) {
-  const [verdicts, setVerdicts] = useState<Record<string, Verdict>>({});
+  // The persisted verdicts are DERIVED, not seeded by a setState inside an
+  // effect (audit M-21). `read()` returns null on the server (no `window`), so
+  // the memo is gated on hydration to keep the first client render identical to
+  // the server's; this session's own toggles layer on top.
+  const hydrated = useIsHydrated();
+  const [edits, setEdits] = useState<Record<string, Verdict | null>>({});
   const [group, setGroup] = useState<string | null>(null);
 
-  useEffect(() => {
+  const stored = useMemo(() => {
     const seed: Record<string, Verdict> = {};
+    if (!hydrated) return seed;
     for (const it of items) {
       const v = read(it.id);
       if (v) seed[it.id] = v;
     }
-    setVerdicts(seed);
-  }, [items]);
+    return seed;
+  }, [hydrated, items]);
+
+  const verdicts = useMemo(() => {
+    const merged: Record<string, Verdict> = { ...stored };
+    for (const [id, v] of Object.entries(edits)) {
+      if (v === null) delete merged[id];
+      else merged[id] = v;
+    }
+    return merged;
+  }, [stored, edits]);
 
   const onVerdict = useCallback((id: string, v: Verdict | null) => {
     write(id, v);
-    setVerdicts((prev) => {
-      const next = { ...prev };
-      if (v === null) delete next[id];
-      else next[id] = v;
-      return next;
-    });
+    // `null` is recorded, not deleted: it is this session saying "cleared",
+    // which has to outrank whatever `stored` still remembers.
+    setEdits((prev) => ({ ...prev, [id]: v }));
   }, []);
 
   const groups = useMemo(() => {
@@ -200,7 +213,7 @@ export function HalfASection({ items }: { items: readonly HalfAItem[] }) {
       <div className="rounded-2xl border border-dashed border-border p-6">
         <p className="text-sm font-bold">Няма картинкови въпроси с медия</p>
         <p className="mt-1.5 max-w-xl text-xs leading-relaxed text-muted">
-          Нито един въпрос в content/questions/*.json няма поле „media" (signRef / sceneStill).
+          Нито един въпрос в content/questions/*.json няма поле „media&quot; (signRef / sceneStill).
         </p>
       </div>
     );

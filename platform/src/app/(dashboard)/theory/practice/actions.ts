@@ -13,7 +13,8 @@ import type { PracticeSubmitResult } from "@/components/theory/types";
 import { getContentRepo } from "@/lib/content/repo";
 import { requireUser } from "@/modules/auth";
 import { trackActivity } from "@/modules/gamification";
-import { resolveWhyPanel, submitAnswer } from "@/modules/learning";
+import { resolveWhyPanel } from "@/modules/clips";
+import { submitAnswer } from "@/modules/learning";
 import { checkPracticeQuota } from "@/modules/payments";
 
 const MAX_ID_LENGTH = 120;

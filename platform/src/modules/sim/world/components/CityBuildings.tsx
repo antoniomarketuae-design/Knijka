@@ -27,7 +27,7 @@ import { useThree } from "@react-three/fiber";
 import * as THREE from "three";
 import type { BuildingInstancePlacement, WorldGeometry } from "../types";
 import { useFacadeTextures, type FacadeSetName } from "../textures/facadeTextures";
-import { QUALITY_PRESETS, type FacadeMapsMode } from "@/modules/sim/environment";
+import { TEXTURE_BUDGETS } from "../textures/textureBudget";
 import { preloadCityModels, useCityModels } from "./cityModels";
 import type { QualityPreset } from "./quality";
 
@@ -66,18 +66,6 @@ function facadeSetFor(name: string): FacadeSetName | null {
  *  dielectric facade — glass-pane gloss is a high-tier-only detail. */
 const FACADE_FALLBACK_ROUGHNESS = 0.7;
 const FACADE_FALLBACK_METALNESS = 0.0;
-
-/**
- * Per-fragment facade-map budget for this tier (doc 71 §4.5 / quality-gap/13).
- * The world preset carries no explicit level, so map its tier-monotonic
- * textureSize (256/512/1024) back to the shared quality level and read the
- * budget from the environment presets — the single source of truth (high =
- * full, med = colorNormal, low = colorOnly). Keeps the high look byte-identical.
- */
-function facadeMapsFor(preset: QualityPreset): FacadeMapsMode {
-  const level = preset.textureSize >= 1024 ? "high" : preset.textureSize >= 512 ? "med" : "low";
-  return QUALITY_PRESETS[level].facadeMaps;
-}
 
 const _pos = new THREE.Vector3();
 const _quat = new THREE.Quaternion();
@@ -145,10 +133,11 @@ export function CityBuildings({
   const models = useCityModels();
   const gl = useThree((s) => s.gl);
   // Shared baked facade sets (one GPU copy district-wide — same cache the
-  // facade prisms in StaticWorld consume). The kit GLBs ship image-free.
-  const facadeSets = useFacadeTextures(gl, 8);
-
-  const facadeMaps = facadeMapsFor(preset);
+  // facade prisms in StaticWorld consume, so BOTH must pass the same tier or
+  // whichever mounts first would decide the district's fetch). The kit GLBs
+  // ship image-free.
+  const facadeMaps = TEXTURE_BUDGETS[preset.level].facadeMaps;
+  const facadeSets = useFacadeTextures(gl, 8, facadeMaps);
 
   // Wire the shared textures onto the named kit materials (bay_* / trim),
   // TIER-GATED (doc 71 §4.5). color + emissive are always bound (albedo + the
@@ -181,8 +170,10 @@ export function CityBuildings({
           m.metalness = 1;
         } else {
           // Drop the ORM (both med + low): constant matte response, no per-pixel
-          // ao/rough/metal fetch. colorOnly additionally drops the normal map.
-          m.normalMap = facadeMaps === "colorNormal" ? set.normal : null;
+          // ao/rough/metal fetch. colorOnly additionally drops the normal map —
+          // and since H-11 the tier gates the FETCH, so `set.normal` is already
+          // null there rather than an unbound upload sitting in VRAM.
+          m.normalMap = set.normal;
           m.aoMap = null;
           m.roughnessMap = null;
           m.metalnessMap = null;

@@ -17,12 +17,17 @@ const emailSchema = z
   .toLowerCase()
   .pipe(z.email({ error: "Невалиден имейл адрес." }));
 
+/** Every place the product accepts a NEW password (registration, reset) uses
+ *  exactly this — one definition, so the rules and the Bulgarian wording can
+ *  never drift between the two screens. */
+const passwordSchema = z
+  .string({ error: "Паролата е задължителна." })
+  .min(8, { error: "Паролата трябва да е поне 8 знака." })
+  .max(72, { error: "Паролата е твърде дълга." }); // bcrypt input limit
+
 export const registerInputSchema = z.object({
   email: emailSchema,
-  password: z
-    .string({ error: "Паролата е задължителна." })
-    .min(8, { error: "Паролата трябва да е поне 8 знака." })
-    .max(72, { error: "Паролата е твърде дълга." }), // bcrypt input limit
+  password: passwordSchema,
   name: z
     .string({ error: "Името е задължително." })
     .trim()
@@ -55,3 +60,28 @@ export const loginInputSchema = z.object({
 });
 
 export type LoginInput = z.infer<typeof loginInputSchema>;
+
+/** „Забравена парола?" — only an address is asked for, and the answer is the
+ *  same whether or not it exists (see requestPasswordReset). */
+export const forgotPasswordInputSchema = z.object({
+  email: emailSchema,
+});
+
+export type ForgotPasswordInput = z.infer<typeof forgotPasswordInputSchema>;
+
+/**
+ * The reset itself. `token` is only shape-checked here — whether it is real,
+ * unexpired and unspent is a database question, answered in reset.ts. A length
+ * bound is still worth having: it stops a megabyte of "token" reaching the
+ * hasher, and an empty string can never be treated as a lookup key.
+ */
+export const resetPasswordInputSchema = z.object({
+  token: z
+    .string({ error: "Линкът е невалиден." })
+    .trim()
+    .min(1, { error: "Линкът е невалиден." })
+    .max(200, { error: "Линкът е невалиден." }),
+  password: passwordSchema,
+});
+
+export type ResetPasswordInput = z.infer<typeof resetPasswordInputSchema>;

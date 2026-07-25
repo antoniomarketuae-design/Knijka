@@ -42,8 +42,8 @@ import {
   type DerivedRoute,
   type GuidanceGoal,
   type RouteDistrictLike,
-} from "./guidanceRoute";
-import { createRibbonBuffers, writeRibbonStrip } from "./ribbonStrip";
+} from "@/modules/sim/scene/guidanceRoute";
+import { createRibbonBuffers, writeRibbonStrip } from "@/modules/sim/scene/ribbonStrip";
 
 // World constants (world/builders/constants.ts): ROAD_Y = 0.02, MARKING_Y =
 // 0.032. The ribbon hovers ~2.5 cm over the asphalt — above the paint, no

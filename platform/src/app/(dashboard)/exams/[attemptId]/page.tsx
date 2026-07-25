@@ -1,6 +1,5 @@
 import "@/lib/content/loader";
 import type { Metadata } from "next";
-import { cookies } from "next/headers";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { requireUser } from "@/modules/auth";
@@ -8,14 +7,16 @@ import {
   EXAM_DURATION_SEC,
   EXAM_PASS_POINTS,
   EXAM_QUESTION_COUNT,
-  ExamError,
-  buildExam,
   getExamHistory,
+  getExamReview,
+  getInProgressExam,
   type ExamHistoryEntry,
+  type ExamReview,
+  type ExamTopicResult,
 } from "@/modules/exam";
 import { ExamRunner } from "@/components/exam/ExamRunner";
-import { StoredReview } from "@/components/exam/StoredReview";
-import { formatClock, seedCookieName } from "@/components/exam/types";
+import { ReviewList } from "@/components/exam/ExamResultView";
+import { formatClock } from "@/components/exam/types";
 import { Gauge } from "@/components/hud/Gauge";
 import { Celebration } from "@/components/hud/Celebration";
 
@@ -24,9 +25,10 @@ export const metadata: Metadata = {
 };
 
 /**
- * Attempt route: in-progress -> the runner (questions rebuilt
- * deterministically from the seed cookie, elapsed time from the server
- * clock); completed -> result summary + cached full review.
+ * Attempt route: in-progress -> the runner (the exact questions dealt at start,
+ * read back from the attempt row, elapsed time from the server clock);
+ * completed -> score readout + per-topic breakdown + the full review, all
+ * rebuilt server-side from the attempt row so they work on any device.
  */
 export default async function ExamAttemptPage({
   params,
@@ -41,42 +43,42 @@ export default async function ExamAttemptPage({
   if (!entry) redirect("/exams?msg=not-found");
 
   if (entry.status === "completed") {
-    return <CompletedAttemptView entry={entry} />;
+    // Rebuilt from the attempt row, not from this browser's localStorage: a
+    // failed exam used to become a bare score on any other device (audit M-1),
+    // which is the "verdict without a reason" THEO-4 forbids.
+    const review = await getExamReview(user.id, attemptId);
+    return <CompletedAttemptView entry={entry} review={review} />;
   }
 
-  // In-progress: rebuild the exact same safe question set from the seed.
-  const cookieStore = await cookies();
-  const rawSeed = cookieStore.get(seedCookieName(attemptId))?.value;
-  const seed = rawSeed === undefined ? Number.NaN : Number(rawSeed);
-  if (!Number.isInteger(seed) || seed < 0) {
-    return <CannotRestoreView />;
-  }
-
-  let questions;
-  try {
-    questions = buildExam(seed).questions;
-  } catch (err) {
-    // Content bank changed since the attempt started — cannot rebuild safely.
-    if (err instanceof ExamError) return <CannotRestoreView />;
-    throw err;
-  }
+  // In-progress: render EXACTLY what was dealt. Never re-derive the paper from
+  // the seed — the builder reads the live bank, so one `needs-review →
+  // approved` promotion mid-attempt deals a different paper while grading still
+  // uses the stored ids, silently failing a perfect candidate (audit H-7).
+  const inProgress = await getInProgressExam(user.id, attemptId);
+  if (!inProgress) return <CannotRestoreView />;
 
   const initialElapsedSec = Math.max(
     0,
-    Math.floor((Date.now() - entry.startedAt.getTime()) / 1000),
+    Math.floor((Date.now() - inProgress.startedAt.getTime()) / 1000),
   );
 
   return (
     <ExamRunner
       attemptId={attemptId}
-      questions={questions}
+      questions={inProgress.questions}
       durationSec={EXAM_DURATION_SEC}
       initialElapsedSec={initialElapsedSec}
     />
   );
 }
 
-function CompletedAttemptView({ entry }: { entry: ExamHistoryEntry }) {
+function CompletedAttemptView({
+  entry,
+  review,
+}: {
+  entry: ExamHistoryEntry;
+  review: ExamReview | null;
+}) {
   const timeUsedSec =
     entry.finishedAt !== null
       ? Math.max(
@@ -116,7 +118,104 @@ function CompletedAttemptView({ entry }: { entry: ExamHistoryEntry }) {
         />
       ) : null}
 
-      <StoredReview attemptId={entry.attemptId} />
+      {review === null ? (
+        <p className="card p-5 text-sm leading-relaxed text-muted">
+          Пълният преглед на този опит не е достъпен. Резултатът остава в
+          историята — започни нов пробен изпит, за да видиш подробния разбор.
+        </p>
+      ) : (
+        <>
+          <TopicBreakdown byTopic={review.byTopic} />
+
+          <section
+            aria-labelledby="exam-review-title"
+            className="flex flex-col gap-3"
+          >
+            <h2 id="exam-review-title" className="text-base font-extrabold">
+              Преглед на въпросите
+            </h2>
+            <ReviewList review={review.questions} />
+          </section>
+        </>
+      )}
+    </div>
+  );
+}
+
+/**
+ * Per-topic breakdown — the part that turns 45 verdicts into a plan.
+ *
+ * A score tells a candidate they failed; this tells them which two topics cost
+ * them the exam and takes them straight into practice for those (the same
+ * „Тренирай темата" move the practice summary makes, PracticeSession.tsx).
+ * Topics arrive in curriculum order from the exam module — no ranking logic
+ * here, the view only decides what a row looks like.
+ */
+function TopicBreakdown({ byTopic }: { byTopic: ExamTopicResult[] }) {
+  if (byTopic.length === 0) return null;
+  const lostAnywhere = byTopic.some((t) => t.correct < t.questions);
+
+  return (
+    <section aria-labelledby="exam-topics-title" className="flex flex-col gap-3">
+      <div>
+        <h2 id="exam-topics-title" className="text-base font-extrabold">
+          Резултат по теми
+        </h2>
+        <p className="mt-1 text-sm text-muted">
+          {lostAnywhere
+            ? "Оттук започва следващата тренировка — темите, в които изгуби точки."
+            : "Чисто по всички теми. Точно така изглежда готовността."}
+        </p>
+      </div>
+
+      <ul className="flex flex-col gap-2">
+        {byTopic.map((t) => (
+          <li key={t.topicId}>
+            <TopicRow topic={t} />
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
+function TopicRow({ topic: t }: { topic: ExamTopicResult }) {
+  const clean = t.correct === t.questions;
+  const ratio = t.questions === 0 ? 1 : t.correct / t.questions;
+  const tone = clean
+    ? "text-success"
+    : ratio >= 0.5
+      ? "text-warning"
+      : "text-danger";
+
+  return (
+    <div className="card flex flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3">
+      <div className="min-w-0 flex-1">
+        <p className="truncate text-sm font-semibold" title={t.titleBg}>
+          {t.titleBg}
+        </p>
+        <p className="text-xs text-muted tabular-nums">
+          {t.points} от {t.maxPoints} т.
+        </p>
+      </div>
+
+      <span className={`font-mono text-sm font-bold tabular-nums ${tone}`}>
+        {t.correct}/{t.questions}{" "}
+        <span className="text-xs font-semibold uppercase tracking-wide text-muted">
+          верни
+        </span>
+      </span>
+
+      {/* Only where there is something to fix — a "practise this" button on a
+          topic the candidate aced is noise that devalues the ones that matter. */}
+      {clean ? null : (
+        <Link
+          href={`/theory/practice?topic=${t.slug}`}
+          className="btn-ghost shrink-0 px-4 py-2 text-xs"
+        >
+          Тренирай темата
+        </Link>
+      )}
     </div>
   );
 }
@@ -261,6 +360,12 @@ function ReadoutTile({
   );
 }
 
+/**
+ * Shown only when the dealt paper genuinely cannot be reproduced — i.e. a
+ * question from this attempt has been removed from банката since it started.
+ * Continuing on another device or after clearing cookies is fine now that the
+ * paper and its seed live on the attempt row (audit M-9).
+ */
 function CannotRestoreView() {
   return (
     <div className="flex flex-col gap-6">
@@ -275,13 +380,13 @@ function CannotRestoreView() {
           Този опит не може да бъде продължен
         </h1>
         <p className="text-sm leading-relaxed text-muted">
-          Незавършен изпит може да се продължи само на устройството и в
-          браузъра, в които е започнат. Опитът остава отбелязан като
-          „незавършен“ в историята — започни нов пробен изпит, когато си
-          готов.
+          Един от въпросите в този изпит вече не е част от банката, затова не
+          можем да ти покажем същия лист. Няма да те оценим по въпроси, които
+          не си виждал — опитът остава „незавършен“ в историята. Започни нов
+          пробен изпит; ще получиш пълни 45 въпроса.
         </p>
         <Link href="/exams" className="btn-accent">
-          Към пробните изпити
+          Започни нов пробен изпит
         </Link>
       </section>
     </div>

@@ -43,6 +43,7 @@
 import { makeCommendation, makeViolation } from "./catalog";
 import {
   DEFAULT_RULE_CONFIG,
+  type LaneArrow,
   type MirrorKind,
   type RuleEngineConfig,
   type RuleEvent,
@@ -61,6 +62,13 @@ interface EpisodeState {
   activeSince: number | null;
   /** Whether this episode's violation has already been emitted. */
   emitted: boolean;
+  /**
+   * M-16 (stepSustainedEpisode only): when the driver last came back inside
+   * the reset condition, and when this episode last billed. Untouched — and
+   * therefore always null — for the detectors that use plain `stepEpisode`.
+   */
+  resetSince: number | null;
+  lastEmitAt: number | null;
 }
 
 interface CrossingZoneState {
@@ -91,8 +99,43 @@ export interface RuleEngineState {
   };
   /** Previous frame's speed — lets detectors read braking response (A12). */
   prevSpeedKmh: number | null;
+  /**
+   * Rolling speed window (audit M-18): the samples the acceleration gates are
+   * measured over, oldest first. Trimmed to `accelWindowSec` every frame —
+   * see the ACCEL WINDOW note in reduceTick for why a single frame delta is
+   * not a usable derivative at render rates.
+   */
+  speedWindow: Array<{ t: number; speedKmh: number }>;
   /** Previous frame's lead gap (null = none reported) — cut-in recovery (A12). */
   prevLeadGapM: number | null;
+  /**
+   * OV-07/OV-06 overtake tracker (audit H-5). Overtaking is a two-beat, LEFT-side
+   * manoeuvre (ЗДвП чл. 42, ал. 2) and the two codes must grade the manoeuvre,
+   * not the bare lane-id delta.
+   *  - `lastLeadNearAt`: last moment a vehicle sat inside the overtake corridor
+   *    ahead. The pull-out frame itself routinely loses it (the car is astride
+   *    the boundary, the lead falls out of the ±4 m corridor), so the pull-out is
+   *    recognised from the recent sighting rather than the instantaneous one.
+   *  - `overtakePullOutAt`: when the driver last swung LEFT past such a vehicle.
+   *    A change back to the RIGHT is the manoeuvre's second beat only while this
+   *    is fresh; with no pull-out behind it, moving right is a merge to the curb
+   *    or the required approach to a right turn — innocent, and the exact false
+   *    positive H-5 documents.
+   * Both are direction/manoeuvre bookkeeping only — neither grades anything.
+   */
+  lastLeadNearAt: number | null;
+  overtakePullOutAt: number | null;
+  /**
+   * M-17 lane-intent memory: the last М10 glyph the vehicle stood on, and
+   * when. The arrows are painted on the APPROACH; the turn is adjudicated
+   * inside the junction, by which time the lane fix has long left the painted
+   * span — so the arrow that governed the manoeuvre has to be remembered, the
+   * way the overtake tracker remembers the lead it swung past. Overwritten by
+   * every later span (a driver who re-lines-up is judged by the lane they
+   * ended in) and SPENT by the turn it grades, so one approach can never
+   * convict two junctions.
+   */
+  lastLaneArrow: { arrow: LaneArrow; t: number } | null;
   lastIndicatorOnAt: Record<TurnDirection, number | null>;
   lastGlanceAt: Record<MirrorKind, number | null>;
   /**
@@ -224,7 +267,12 @@ export interface RuleEngineState {
   emergencyLane: EpisodeState;
 }
 
-const IDLE_EPISODE: EpisodeState = { activeSince: null, emitted: false };
+const IDLE_EPISODE: EpisodeState = {
+  activeSince: null,
+  emitted: false,
+  resetSince: null,
+  lastEmitAt: null,
+};
 
 export function createRuleEngine(config?: Partial<RuleEngineConfig>): RuleEngineState {
   return {
@@ -234,7 +282,11 @@ export function createRuleEngine(config?: Partial<RuleEngineConfig>): RuleEngine
     prevEdgeId: undefined,
     laneChange: { pending: [], lastBasisChangeAt: null },
     prevSpeedKmh: null,
+    speedWindow: [],
     prevLeadGapM: null,
+    lastLeadNearAt: null,
+    overtakePullOutAt: null,
+    lastLaneArrow: null,
     lastIndicatorOnAt: { left: null, right: null },
     lastGlanceAt: { left: null, right: null, rear: null },
     scanStopCreditSec: { left: 0, right: 0 },
@@ -280,6 +332,9 @@ export function createRuleEngine(config?: Partial<RuleEngineConfig>): RuleEngine
 function cloneState(s: RuleEngineState): RuleEngineState {
   return {
     ...s,
+    // The samples themselves are never mutated in place (only pushed/shifted),
+    // so a shallow array copy keeps the reducer's no-input-mutation contract.
+    speedWindow: [...s.speedWindow],
     lastIndicatorOnAt: { ...s.lastIndicatorOnAt },
     lastGlanceAt: { ...s.lastGlanceAt },
     scanStopCreditSec: { ...s.scanStopCreditSec },
@@ -351,6 +406,134 @@ function stepEpisode(
   return false;
 }
 
+/**
+ * Speeding-episode variant (audit M-16). Plain `stepEpisode` re-arms on the
+ * FIRST frame the reset condition is seen, which made the fairest-looking
+ * drive the most expensive one: 60 s held at 58 in a 50 zone billed once,
+ * while a saw-tooth that dipped under 50 twelve times billed twelve — the
+ * steadier, more dangerous behaviour graded 12× cheaper, and the student who
+ * kept correcting punished for correcting. Two changes close the gap:
+ *
+ *  - `rearmSec` — a dip back to the limit only re-arms once the driver has
+ *    genuinely HELD it. Anything shorter is one continuing offence, not a new
+ *    one (the hysteresis the episode model already intended, measured in
+ *    seconds instead of frames);
+ *  - `repeatSec` — an episode that never ends re-bills on that cadence, so
+ *    sitting over the limit costs monotonically more the longer it lasts.
+ *    Without it the cooldown alone would make sustained speeding CHEAPER than
+ *    before, which is the same unfairness with the sign flipped.
+ *
+ * `lastEmitAt` carries the episode's last bill; `resetSince` the moment the
+ * driver came back under the limit. Both live on the same EpisodeState so the
+ * 25 detectors that do not opt in are byte-identical (rearm/repeat default 0).
+ */
+function stepSustainedEpisode(
+  e: EpisodeState,
+  cond: boolean,
+  reset: boolean,
+  t: number,
+  sustainSec: number,
+  rearmSec: number,
+  repeatSec: number,
+): boolean {
+  if (reset) {
+    e.activeSince = null;
+    if (e.resetSince === null) e.resetSince = t;
+    if (t - e.resetSince >= rearmSec) {
+      e.emitted = false;
+      e.lastEmitAt = null;
+    }
+    return false;
+  }
+  e.resetSince = null;
+  if (!cond) {
+    // Condition false without a reset (e.g. the minor band vacated because the
+    // episode ESCALATED into the dangerous band) — the episode is still open,
+    // so the sustain clock restarts but the bill is not re-armed.
+    e.activeSince = null;
+    return false;
+  }
+  if (e.activeSince === null) e.activeSince = t;
+  if (!e.emitted) {
+    if (t - e.activeSince < sustainSec) return false;
+    e.emitted = true;
+    e.lastEmitAt = t;
+    return true;
+  }
+  if (repeatSec > 0 && e.lastEmitAt !== null && t - e.lastEmitAt >= repeatSec) {
+    e.lastEmitAt = t;
+    return true;
+  }
+  return false;
+}
+
+/**
+ * Does the lane's М10 glyph permit turning `dir` out of it (audit M-17)?
+ * „Само направо" permits neither; the combined glyphs permit their own half.
+ * Straight-on is never graded here — the arrow says which lane may TURN, and
+ * a driver who goes straight out of a turn-only lane is a different (much
+ * softer) fault the telemetry cannot separate from a wide turn.
+ */
+function arrowPermits(arrow: LaneArrow, dir: TurnDirection): boolean {
+  switch (arrow) {
+    case "left":
+      return dir === "left";
+    case "right":
+    case "throughRight":
+      return dir === "right";
+    case "leftThrough":
+      return dir === "left";
+    case "through":
+      return false;
+  }
+}
+
+/**
+ * The two speeding thresholds for a posted limit, km/h (audit M-14).
+ *
+ * The grace and the опасна threshold used to be expressed in different units —
+ * a 10% RATIO against an absolute +10 км/ч — and the two curves cross at 100:
+ * from there up the "graced limit" sits ABOVE the dangerous threshold and
+ * SPEEDING_OVER_LIMIT is unreachable, so the whole second-degree band silently
+ * disappears on every rural/motorway map. Worse at the shipped default: the
+ * Нормален governor caps at limit + NORMAL_CAP_MARGIN_KMH (10) — exactly the
+ * опасна threshold — so on the 140 km/h motorway maps NEITHER speeding code
+ * could fire at all. A детектор that cannot fire teaches nothing.
+ *
+ * The fix decouples them: the grace stays proportional for the domain it was
+ * researched in (10% of 50 = 5 км/ч, byte-identical on every urban map) but is
+ * CAPPED in absolute km/h, so a gradable second-degree band always exists
+ * under the опасна line. The cap is the honest reading of what grace is for —
+ * speedometer/physics slack, which does not grow because the road is faster;
+ * 14 км/ч over on a motorway is not instrument error.
+ */
+export function speedingBands(
+  limit: number,
+  cfg: RuleEngineConfig,
+): { gradedAbove: number; dangerousAbove: number } {
+  const grace = Math.min(limit * cfg.speedingGraceRatio, cfg.speedingGraceMaxKmh);
+  return { gradedAbove: limit + grace, dangerousAbove: limit + cfg.dangerousSpeedOverKmh };
+}
+
+/**
+ * Advance the rolling speed window and return its ANCHOR — the oldest sample
+ * still spanning `windowSec` (the newest sample that has fallen out of the
+ * window is KEPT as the anchor, so the measured span is at least the window
+ * and never collapses back to one frame at high frame rates). Null on the
+ * first frame. Mutates `w`, which is always a fresh clone inside reduceTick.
+ */
+function stepSpeedWindow(
+  w: Array<{ t: number; speedKmh: number }>,
+  t: number,
+  speedKmh: number,
+  windowSec: number,
+): { t: number; speedKmh: number } | null {
+  while (w.length >= 2 && w[1].t <= t - windowSec) w.shift();
+  const anchor = w.length > 0 ? w[0] : null;
+  w.push({ t, speedKmh });
+  return anchor;
+}
+
 // ---------------------------------------------------------------------------
 // Reducer
 // ---------------------------------------------------------------------------
@@ -376,9 +559,28 @@ export function reduceTick(prev: RuleEngineState, tick: SimTick): ReduceResult {
   // timestamp) or a first frame yields neutral rates — detectors then judge
   // on the raw condition alone.
   const dt = s.prevT !== null ? t - s.prevT : 0;
-  /** Signed acceleration, m/s² (negative = braking). */
+  /**
+   * ACCEL WINDOW (audit M-18). Signed acceleration, m/s² (negative = braking),
+   * measured over `accelWindowSec` rather than over one frame.
+   *
+   * The rate the reducer is fed is the CALLER's, and the live loop feeds a
+   * render frame: at 120 fps a frame lasts ~8 ms, so a 0.06 km/h wobble in the
+   * driveline's reported speed differentiates to ~2.1 m/s² — past
+   * crossingBrakeResponseMps2 and into the emergency-lane brake exemption.
+   * Numerical noise would then read as a braking response, i.e. as innocence
+   * the driver never earned (and, with the sign the other way, as the harsh
+   * braking they never did). Anchoring on the oldest sample inside the window
+   * makes the derivative rate-INDEPENDENT: at the 1 Hz trace/replay rate the
+   * window holds a single prior frame and the value is identical to the old
+   * frame-to-frame delta (every recorded gate unchanged), while at render
+   * rates ~36 frames average the jitter out. Time-based sustains were already
+   * rate-independent; this is the last gate that was not.
+   */
+  const accelAnchor = stepSpeedWindow(s.speedWindow, t, speed, cfg.accelWindowSec);
   const accelMps2 =
-    s.prevSpeedKmh !== null && dt > 0 ? (speed - s.prevSpeedKmh) / 3.6 / dt : 0;
+    accelAnchor !== null && dt > 0 && t > accelAnchor.t
+      ? (speed - accelAnchor.speedKmh) / 3.6 / (t - accelAnchor.t)
+      : 0;
   /** Gap to the lead vehicle, or null when the road ahead is clear/unknown. */
   const leadGapM =
     tick.leadGapM !== undefined && Number.isFinite(tick.leadGapM) ? tick.leadGapM : null;
@@ -393,6 +595,22 @@ export function reduceTick(prev: RuleEngineState, tick: SimTick): ReduceResult {
   // -- 1. observation trackers (indicator history, mirror glances, full stops)
   if (tick.indicator === "left") s.lastIndicatorOnAt.left = t;
   if (tick.indicator === "right") s.lastIndicatorOnAt.right = t;
+
+  // M-17 lane-intent memory (see the state doc): remember the glyph under the
+  // wheels, forward-gear only — backing over an arrow is not lining up for a
+  // turn. Runs before the tick events so a turn adjudicated on THIS frame
+  // still sees this frame's arrow.
+  if (tick.laneArrow !== undefined && forwardGear) {
+    s.lastLaneArrow = { arrow: tick.laneArrow, t };
+  }
+
+  // H-5 overtake bookkeeping: remember when a vehicle was last close enough
+  // ahead to BE the car you would overtake. Both overtake codes share one
+  // corridor (the two gap configs are the same distance expressed per code), so
+  // the wider of the two defines the sighting — a per-lesson override that
+  // widens one must not silently narrow the manoeuvre tracker.
+  const overtakeCorridorM = Math.max(cfg.crossingOvertakeLeadGapM, cfg.banOvertakeLeadGapM);
+  if (leadGapM !== null && leadGapM <= overtakeCorridorM) s.lastLeadNearAt = t;
 
   // JU-23 wait-freeze accrual (founder R3 #13): stopped/creeping time counts
   // toward each side's credit BEFORE this tick's glances reset it — the credit
@@ -521,6 +739,34 @@ export function reduceTick(prev: RuleEngineState, tick: SimTick): ReduceResult {
     }
     // else: renumbering at/near a segment joint — locator artifact, no grade.
 
+    /**
+     * H-5 DIRECTION GATE, shared by OV-07 and OV-06.
+     *
+     * Изпреварване is a two-beat, LEFT-side manoeuvre (ЗДвП чл. 42, ал. 2):
+     * swing out past the vehicle ahead, then return to your own lane. Grading a
+     * bare lane-id delta charges BOTH directions with the same law, and the
+     * rightward half is where correct driving lives: the change that merges you
+     * back to the curb, and above all the чл. 37 duty to be in the rightmost
+     * lane before turning right — with a car queued ahead, at a junction, i.e.
+     * exactly inside the 35 m a crossing zone arms. That drive is textbook and
+     * the engine was instant-failing it at 10 points.
+     *
+     * So: a LEFT change past a lead is the pull-out and grades on its own. A
+     * RIGHT change grades only while it closes a pull-out this engine actually
+     * saw — the return beat of a real overtake, which is how both authored
+     * mistake demos commit the offence (they cut back toward the lead inside
+     * the zone). No pull-out behind it ⇒ the lead was never overtaken ⇒
+     * innocent, whatever the lane-id arithmetic says.
+     */
+    const overtakeBeat = (leadGapLimitM: number): boolean => {
+      if (leadGapM === null || leadGapM > leadGapLimitM) return false; // nobody to pass
+      if (dir === "left") return true;
+      return (
+        s.overtakePullOutAt !== null &&
+        t - s.overtakePullOutAt <= cfg.overtakeManeuverWindowSec
+      );
+    };
+
     // OV-07 (изпреварване на пътека): a REAL lane change (joint artifacts
     // excluded by the branches above) landing inside an armed pedestrian-
     // crossing zone while a lead vehicle is present to overtake is the чл. 119
@@ -531,8 +777,7 @@ export function reduceTick(prev: RuleEngineState, tick: SimTick): ReduceResult {
     if (
       (legacyBasis || gradableWithEdge) &&
       s.crossing !== null &&
-      leadGapM !== null &&
-      leadGapM <= cfg.crossingOvertakeLeadGapM
+      overtakeBeat(cfg.crossingOvertakeLeadGapM)
     ) {
       events.push(makeViolation("OVERTAKING_AT_CROSSING", t));
     }
@@ -545,14 +790,27 @@ export function reduceTick(prev: RuleEngineState, tick: SimTick): ReduceResult {
     // corridor discipline as OV-07 above: a change with no lead is a
     // reposition (innocent), and the FP surface equals the lane-change
     // detector's. Both codes CAN fire on one change when a crossing zone and
-    // a ban zone overlap — two distinct laws, two distinct lessons.
+    // a ban zone overlap — two distinct laws, two distinct lessons. The H-5
+    // direction gate applies verbatim: В24 bans изпреварване, and moving right
+    // to line up for a turn is not изпреварване inside a ban span either.
     if (
       (legacyBasis || gradableWithEdge) &&
       tick.noOvertakeZone === true &&
-      leadGapM !== null &&
-      leadGapM <= cfg.banOvertakeLeadGapM
+      overtakeBeat(cfg.banOvertakeLeadGapM)
     ) {
       events.push(makeViolation("OVERTAKING_IN_BAN_ZONE", t));
+    }
+
+    // Arm/close the manoeuvre AFTER grading, so a pull-out never convicts
+    // itself as its own return. A leftward change past a recently-sighted lead
+    // opens the overtake; the matching rightward change closes it, so a second
+    // tuck-in later on cannot inherit the same pull-out's guilt.
+    if (dir === "left") {
+      const leadSeenRecently =
+        s.lastLeadNearAt !== null && t - s.lastLeadNearAt <= cfg.overtakeManeuverWindowSec;
+      if (leadSeenRecently) s.overtakePullOutAt = t;
+    } else {
+      s.overtakePullOutAt = null;
     }
   }
   s.prevLaneId = tick.laneId;
@@ -560,27 +818,30 @@ export function reduceTick(prev: RuleEngineState, tick: SimTick): ReduceResult {
 
   // -- 4. continuous detectors (sustain + hysteresis)
   const limit = tick.maxSpeedKmh;
-  const gracedLimit = limit * (1 + cfg.speedingGraceRatio);
-  const dangerousAbove = limit + cfg.dangerousSpeedOverKmh;
+  const bands = speedingBands(limit, cfg);
   const speedReset = speed <= limit;
   if (
-    stepEpisode(
+    stepSustainedEpisode(
       s.speedingMinor,
-      speed > gracedLimit && speed <= dangerousAbove,
+      speed > bands.gradedAbove && speed <= bands.dangerousAbove,
       speedReset,
       t,
       cfg.speedingMinorSustainSec,
+      cfg.speedingRearmSec,
+      cfg.speedingRepeatSec,
     )
   ) {
     events.push(makeViolation("SPEEDING_OVER_LIMIT", t));
   }
   if (
-    stepEpisode(
+    stepSustainedEpisode(
       s.speedingDangerous,
-      speed > dangerousAbove,
+      speed > bands.dangerousAbove,
       speedReset,
       t,
       cfg.speedingDangerousSustainSec,
+      cfg.speedingRearmSec,
+      cfg.speedingRepeatSec,
     )
   ) {
     events.push(makeViolation("SPEEDING_DANGEROUS", t));
@@ -703,7 +964,7 @@ export function reduceTick(prev: RuleEngineState, tick: SimTick): ReduceResult {
   const conditionsReduced = conditionFactor < 1;
   const conditionLimit = limit * conditionFactor;
   const tooFastForConditions =
-    conditionsReduced && moving && speed > conditionLimit && speed <= gracedLimit;
+    conditionsReduced && moving && speed > conditionLimit && speed <= bands.gradedAbove;
   if (
     stepEpisode(
       s.conditionsSpeed,
@@ -1395,6 +1656,34 @@ function handleTickEvent(
       const lastOn = s.lastIndicatorOnAt[e.direction];
       const ok = lastOn !== null && t - lastOn <= cfg.indicatorLookbackSec;
       if (!ok) out.push(makeViolation("TURN_WITHOUT_INDICATOR", t));
+      // M-17a — OBSERVATION. A turn carries the same чл. 25, ал. 1 duty as a
+      // lane change (the mirror on the side you are swinging toward), and the
+      // lane-change path has graded it since v1 while the turn path graded
+      // only the signal. Config-gated OFF like every other observation check
+      // (moveOff, junctionScan): the glance channel is authored per lesson,
+      // and a lesson that does not feed it must never be billed for silence.
+      if (cfg.turnObservationEnabled) {
+        const lastGlance = s.lastGlanceAt[e.direction];
+        const observed = lastGlance !== null && t - lastGlance <= cfg.mirrorLookbackSec;
+        if (!observed) out.push(makeViolation("TURN_WITHOUT_OBSERVATION", t));
+      }
+      // M-17b — LANE INTENT. The М10 arrow of the approach lane either permits
+      // this direction or forbids it; no arrow (or one the runtime cannot read
+      // as a direction set) permits everything — absent = no marking =
+      // innocent, the zone-data discipline. Reverse maneuvering is exempt for
+      // the same reason it is exempt from the lane detectors: backing out of a
+      // bay is not a turn out of a lane. The memory is SPENT here either way,
+      // so an approach can convict at most the junction it led into.
+      const arrowSeen = s.lastLaneArrow;
+      s.lastLaneArrow = null;
+      if (
+        tick.gear >= 0 &&
+        arrowSeen !== null &&
+        t - arrowSeen.t <= cfg.laneArrowMemorySec &&
+        !arrowPermits(arrowSeen.arrow, e.direction)
+      ) {
+        out.push(makeViolation("WRONG_LANE_FOR_DIRECTION", t));
+      }
       break;
     }
 
@@ -1416,6 +1705,37 @@ function handleTickEvent(
 
     case "crossingPassed": {
       const z = s.crossing && s.crossing.crossingId === e.crossingId ? s.crossing : null;
+      // HOST-EDGE GATE (audit H-6). The act this case grades is DRIVING OVER
+      // THE PAINT, so the car has to be on the road the paint is on. The zone
+      // that produced this event, though, arms from the host edge AND every
+      // edge sharing a node with it, and the pass test that follows carries a
+      // 22 m lateral budget (the outer lane of a 6-lane arterial) — together
+      // they hand us passes for the SIDE streets' zebras, up to ~20 m away. On
+      // the live lesson/exam preset (20 pedestrians over 51 crossings) one of
+      // those is near-certainly occupied, so the опасна that ENDS the exam
+      // fires for a crossing the student drove correctly past.
+      //
+      // A mismatch between the crossing's host segment and the car's own means
+      // we were near the crossing, not at it: nothing happened here. No опасна,
+      // and no commendation either — you cannot be praised for yielding at a
+      // zebra you never reached. The zone still closes below (it is behind us
+      // geometrically), exactly as a graded pass would close it.
+      //
+      // Only an affirmative, comparable mismatch suppresses: a source that does
+      // not name host edges, or a tick whose road fix is unknown, grades
+      // byte-identically to before. Deliberately strict about WHICH edge —
+      // crossings sit mid-edge, away from the node, so the locator is committed
+      // to the host edge by the time the paint passes under the axle, and the
+      // residual corner case costs a missed conviction. That is the cheap
+      // direction (A12); the expensive one was failing correct driving.
+      const offHostEdge =
+        typeof e.hostEdgeId === "string" &&
+        typeof tick.edgeId === "string" &&
+        tick.edgeId !== e.hostEdgeId;
+      if (offHostEdge) {
+        if (z !== null) s.crossing = null;
+        break;
+      }
       if (e.pedestrianOnCrossing) {
         out.push(makeViolation("PEDESTRIAN_NOT_YIELDED", t));
       } else if (
@@ -1429,6 +1749,18 @@ function handleTickEvent(
         out.push(makeCommendation("PEDESTRIAN_YIELDED", t));
       }
       if (z !== null) s.crossing = null;
+      break;
+    }
+
+    case "crossingZoneExited": {
+      // The zone's OTHER closing bracket (audit H-5): the driver turned away
+      // instead of crossing, so no crossingPassed will ever arrive. Nothing to
+      // grade — declining to cross a zebra is not an act — but the state MUST
+      // close, or the armed zone follows the car for the rest of the session and
+      // the overtake ban keeps grading kilometres from any crossing.
+      // Id-matched: a stale exit for a zone we are no longer tracking must not
+      // clear the one we just entered.
+      if (s.crossing !== null && s.crossing.crossingId === e.crossingId) s.crossing = null;
       break;
     }
 

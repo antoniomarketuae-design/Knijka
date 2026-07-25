@@ -5,6 +5,7 @@
 
 import type { ContentRepo } from "../../../lib/content/repo";
 import type { Concept, Question, Topic } from "../../../lib/content/types";
+import { EXAM_TOPIC_QUOTAS } from "../quotas";
 
 export interface FixtureBank {
   topics: Topic[];
@@ -88,6 +89,61 @@ export function richBank(): FixtureBank {
   return { topics, concepts, questions };
 }
 
+/**
+ * Bank whose topics carry the REAL topics.json slugs, so buildExam takes the
+ * declared-quota path (quotas.ts) instead of the proportional fallback. Every
+ * topic gets a generous, weight-balanced pool: 12 questions per weight, which
+ * is more than any declared quota, so supply never constrains the mix.
+ *
+ * `extraFor`/`extra` grow one topic's pool (audit M-11: authoring volume must
+ * no longer move slots); `starveSlug`/`keepApproved` shrink one topic's
+ * APPROVED pool below its declared quota so the re-flow path is exercised.
+ */
+export function declaredQuotaBank(opts?: {
+  extraFor?: string;
+  extra?: number;
+  starveSlug?: string;
+  keepApproved?: number;
+}): FixtureBank {
+  const topics: Topic[] = EXAM_TOPIC_QUOTAS.map((row, i) => ({
+    id: `t-${row.slug}`,
+    order: i + 1,
+    slug: row.slug,
+    titleBg: `Тема ${row.slug}`,
+    titleEn: `Topic ${row.slug}`,
+    descriptionBg: "",
+  }));
+  const concepts: Concept[] = topics.map((t) => ({
+    id: `c-${t.slug}`,
+    topicId: t.id,
+    titleBg: `Понятие ${t.slug}`,
+    titleEn: `Concept ${t.slug}`,
+    summaryBg: "",
+    dependsOn: [],
+    lawRefs: [],
+    difficulty: 1,
+  }));
+
+  const questions: Question[] = [];
+  for (const t of topics) {
+    const perWeight = t.slug === opts?.extraFor ? 12 + (opts.extra ?? 0) : 12;
+    const keep = t.slug === opts?.starveSlug ? (opts.keepApproved ?? 0) : Infinity;
+    let approvedSoFar = 0;
+    for (let i = 1; i <= perWeight; i++) {
+      for (const points of [1, 2, 3] as const) {
+        const approved = approvedSoFar < keep;
+        if (approved) approvedSoFar++;
+        questions.push(
+          makeQuestion(`q-${t.slug}-${points}p-${i}`, `c-${t.slug}`, points, {
+            status: approved ? "approved" : "needs-review",
+          }),
+        );
+      }
+    }
+  }
+  return { topics, concepts, questions };
+}
+
 /** Bank where every question is worth 1 point — 97 is unreachable (max 45). */
 export function allOnesBank(): FixtureBank {
   const keys = ["a", "b", "c", "d"];
@@ -97,6 +153,49 @@ export function allOnesBank(): FixtureBank {
   for (const k of keys) {
     for (let i = 1; i <= 15; i++) {
       questions.push(makeQuestion(`q-${k}-${i}`, `c-${k}`, 1));
+    }
+  }
+  return { topics, concepts, questions };
+}
+
+/** Bank where every question is worth 3 points — the lightest 45 is already 135. */
+export function allThreesBank(): FixtureBank {
+  const keys = ["a", "b", "c", "d"];
+  const topics = keys.map((k, i) => makeTopic(k, i + 1));
+  const concepts = keys.map((k) => makeConcept(k));
+  const questions: Question[] = [];
+  for (const k of keys) {
+    for (let i = 1; i <= 15; i++) {
+      questions.push(makeQuestion(`q-${k}-${i}`, `c-${k}`, 3));
+    }
+  }
+  return { topics, concepts, questions };
+}
+
+/**
+ * Four equally-authored topics of 45 questions each (15 per weight) — enough
+ * supply for the audit's per-slot bar. `starveTopic` reproduces audit M-8: that
+ * topic keeps only 3 approved questions per weight and the rest sit un-reviewed,
+ * so its exam slots drift to the topics further through review while the paper
+ * still looks perfectly valid. The backlog deliberately mixes `draft` with
+ * `needs-review` — both are un-reviewed, so both must be equally un-examinable.
+ */
+export function supplyBank(opts?: { starveTopic?: string }): FixtureBank {
+  const keys = ["a", "b", "c", "d"];
+  const topics = keys.map((k, i) => makeTopic(k, i + 1));
+  const concepts = keys.map((k) => makeConcept(k));
+  const questions: Question[] = [];
+  for (const k of keys) {
+    const starved = opts?.starveTopic === k;
+    for (const points of [1, 2, 3] as const) {
+      for (let i = 1; i <= 15; i++) {
+        const backlog = i % 2 === 0 ? "draft" : "needs-review";
+        questions.push(
+          makeQuestion(`q-${k}-${points}p-${i}`, `c-${k}`, points, {
+            status: starved && i > 3 ? backlog : "approved",
+          }),
+        );
+      }
     }
   }
   return { topics, concepts, questions };

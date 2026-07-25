@@ -21,6 +21,10 @@ const KIND_LABEL_BG: Record<RetrievedItem["kind"], string> = {
   concept: "понятие",
   question: "изпитен въпрос",
   sign: "пътен знак",
+  // The sim rule catalog (audit I-1) — an authored grading rule, not law
+  // text: the label tells the model what it is looking at so it can frame
+  // the answer as "on the exam this counts as…".
+  rule: "правило от практическия изпит",
 };
 
 /** "[ЗДвП чл. 47]" — the marker format the model is told to emit. */

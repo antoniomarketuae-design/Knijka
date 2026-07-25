@@ -33,9 +33,9 @@ import {
 import type { SimInput } from "@/modules/sim/engine";
 import type { VehicleSample } from "@/modules/sim/contracts";
 import { surfacePatchGripAt, type SurfaceGripPatch } from "@/modules/sim/runtime";
-import type { CabinControls } from "./cabin";
-import type { SimAudio } from "./simAudio";
-import { updateVehicleSample } from "./vehicleSample";
+import type { CabinControls } from "@/modules/sim/scene/cabin";
+import type { SimAudio } from "@/modules/sim/scene/simAudio";
+import { updateVehicleSample } from "@/modules/sim/scene/vehicleSample";
 import { INTERIOR_LAYER, VitokCockpit } from "./vitok/VitokCockpit";
 import { HeroCarBody } from "./HeroCarBody";
 import { readNpcColliderUserData } from "./NpcColliders";

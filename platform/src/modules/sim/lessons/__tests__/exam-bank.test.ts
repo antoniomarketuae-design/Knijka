@@ -120,6 +120,12 @@ const stopLines = (
 const stopGuardedJunctions = new Set(
   stopLines.filter((l) => l.control === "stopSign").map((l) => l.junctionNodeId),
 );
+/** Б2 OR Б1 — both are posted control, both count as a regulated pass (audit
+ *  C-4 split the two; counting only Б2 would undercount the официален protocol
+ *  the moment a junction is correctly demoted to a give-way). */
+const signGuardedJunctions = new Set(
+  stopLines.filter((l) => l.control !== "trafficLight").map((l) => l.junctionNodeId),
+);
 
 interface RouteLeg {
   fromId: string;
@@ -352,7 +358,7 @@ describe("exam bank — route shells vs the real district", () => {
         let regulated = 0;
         for (let i = 1; i < shell.routeNodes.length; i++) {
           const n = shell.routeNodes[i];
-          if (signalizedIds.has(n) || stopGuardedJunctions.has(n)) regulated++;
+          if (signalizedIds.has(n) || signGuardedJunctions.has(n)) regulated++;
           // roundabout entry = a give-way (Б1) regulated mouth
           if (RING_NODES.has(n) && !RING_NODES.has(shell.routeNodes[i - 1])) regulated++;
         }

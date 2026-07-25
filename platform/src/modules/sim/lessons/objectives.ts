@@ -474,7 +474,7 @@ function stepPassSignal(
 
   // Visit-scoped stop memory: leaving the zone forgets the stop, so a halt
   // elsewhere can never certify this junction's red.
-  let stoppedInZoneVisit = inZone
+  const stoppedInZoneVisit = inZone
     ? prev.stoppedInZoneVisit || tick.speedKmh <= STOPPED_SPEED_KMH
     : false;
   let redMet = prev.redMet;

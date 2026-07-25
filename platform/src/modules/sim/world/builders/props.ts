@@ -64,7 +64,7 @@ import {
   type Vec2,
 } from "./math2d";
 import { toWorld, yawFromFacing } from "./mesh";
-import type { Approach, RoadNetwork } from "./network";
+import { junctionPriorityControls, type Approach, type RoadNetwork } from "./network";
 import { buildZoneSigns, scenarioSignScale } from "./zoneSigns";
 
 export interface PropBuildResult {
@@ -179,18 +179,6 @@ export function buildProps(
   const lessonScale = scenarioSignScale(district);
   const lessonSized = lessonScale !== undefined ? { scale: lessonScale } : {};
 
-  // -- roundabout membership --------------------------------------------------
-  const roundaboutNodes = new Set<string>();
-  for (const rb of district.roundabouts) {
-    for (const edgeId of rb.edgeIds) {
-      const eb = network.edgeById.get(edgeId);
-      if (eb) {
-        roundaboutNodes.add(eb.edge.from);
-        roundaboutNodes.add(eb.edge.to);
-      }
-    }
-  }
-
   // -- traffic lights at signalized junctions ---------------------------------
   // Two heads per incoming approach (doc 62 S1/#19 — „green appeared once and
   // never again"): the NEAR head stands right of the driver at the stop line
@@ -248,30 +236,33 @@ export function buildProps(
   }
 
   // -- priority signs at unsignalized junctions -------------------------------
+  // The WHO-YIELDS rule lives in network.junctionPriorityControls — the same
+  // call the runtime's graded stop lines make (audit C-4). Painting from one
+  // table and grading from another is how „Пропусни движението" ended up over
+  // a graded Б2 line on the exam route; there is now nothing left to diverge.
   for (const node of network.nodes.values()) {
-    if (node.degree < 3 || node.signalized) continue;
-    if (roundaboutNodes.has(node.id)) {
-      // Roundabout entries: give way + mandatory roundabout sign (Д11 renders
-      // higher on the shared pole — the component offsets by kind).
-      for (const ap of node.approaches) {
-        if (ap.edge.roundabout || !ap.incoming) continue;
-        const { p, yaw } = approachPropPose(ap, 1.4, 0.8);
-        signs.push({ kind: "giveWay", position: toWorld(p[0], p[1], ROAD_Y), yaw, ...lessonSized });
-        signs.push({ kind: "roundabout", position: toWorld(p[0], p[1], ROAD_Y), yaw, ...lessonSized });
-        giveWayApproaches.add(`${node.id}:${ap.edgeId}`);
-      }
-      continue;
-    }
-    const ranks = node.approaches.map((ap) => CLASS_RANK[ap.edge.class] ?? 2);
-    const maxRank = Math.max(...ranks);
-    const minRank = Math.min(...ranks);
-    if (maxRank - minRank < 1) continue; // equal roads: priority-to-the-right
-    for (let i = 0; i < node.approaches.length; i++) {
-      const ap = node.approaches[i]!;
-      if (ranks[i] !== minRank || !ap.incoming) continue;
-      const kind: SignKind = maxRank >= 5 ? "stop" : "giveWay";
+    if (node.signalized) continue;
+    const controls = junctionPriorityControls(
+      node.approaches.map((ap) => ({
+        edgeId: ap.edgeId,
+        class: ap.edge.class,
+        incoming: ap.incoming,
+        roundabout: ap.edge.roundabout,
+      })),
+    );
+    if (controls.size === 0) continue;
+    const isRoundabout = node.approaches.some((ap) => ap.edge.roundabout);
+    for (const ap of node.approaches) {
+      const control = controls.get(ap.edgeId);
+      if (control === undefined) continue;
+      const kind: SignKind = control === "stopSign" ? "stop" : "giveWay";
       const { p, yaw } = approachPropPose(ap, 1.4, 0.8);
       signs.push({ kind, position: toWorld(p[0], p[1], ROAD_Y), yaw, ...lessonSized });
+      // Roundabout entries also carry the mandatory Д11 (it renders higher on
+      // the shared pole — the component offsets by kind).
+      if (isRoundabout) {
+        signs.push({ kind: "roundabout", position: toWorld(p[0], p[1], ROAD_Y), yaw, ...lessonSized });
+      }
       (kind === "stop" ? stopSignApproaches : giveWayApproaches).add(`${node.id}:${ap.edgeId}`);
     }
   }

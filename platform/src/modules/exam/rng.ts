@@ -29,6 +29,27 @@ export function randomSeed(): number {
   return (Math.floor(Math.random() * 0x100000000) ^ Date.now()) >>> 0;
 }
 
+/**
+ * Derive a stable sub-seed from a base seed and a string key (FNV-1a, salted
+ * with the seed).
+ *
+ * Why a *derived* seed instead of a shared stream: the builder threads one Rng
+ * through the whole selection, so the option order of question #17 depends on
+ * how many draws every earlier step consumed — which depends on the size and
+ * shape of the entire bank. That is unreplayable the moment content changes,
+ * and re-rendering an in-progress exam must survive exactly that (audit H-7).
+ * Keying off (attempt seed, question id) makes one question's option order
+ * independent of everything else, so it is identical on every resume.
+ */
+export function deriveSeed(seed: number, key: string): number {
+  let h = (0x811c9dc5 ^ (seed >>> 0)) >>> 0; // FNV offset basis, salted by seed
+  for (let i = 0; i < key.length; i++) {
+    h = (h ^ key.charCodeAt(i)) >>> 0;
+    h = Math.imul(h, 0x01000193) >>> 0; // FNV prime
+  }
+  return h >>> 0;
+}
+
 /** Fisher–Yates shuffle. Returns a NEW array; input is not mutated. */
 export function shuffle<T>(items: readonly T[], rng: Rng): T[] {
   const out = items.slice();

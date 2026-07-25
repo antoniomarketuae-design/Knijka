@@ -40,7 +40,7 @@ import {
   COCKPIT_SHOULDER_YAW,
   type SimTelemetry,
 } from "@/modules/sim/engine";
-import type { CabinControls, MirrorGlanceKind } from "./cabin";
+import type { CabinControls, MirrorGlanceKind } from "@/modules/sim/scene/cabin";
 
 export type CameraMode = "chase" | "cockpit" | "topdown";
 

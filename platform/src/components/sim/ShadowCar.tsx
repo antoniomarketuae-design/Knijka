@@ -34,7 +34,7 @@ import {
   type ScenarioTrace,
   type TraceClock,
 } from "@/modules/sim/traces";
-import { createRibbonBuffers, writeRibbonStrip } from "./ribbonStrip";
+import { createRibbonBuffers, writeRibbonStrip } from "@/modules/sim/scene/ribbonStrip";
 
 /** Same assets as HeroCarBody (kept in sync — public asset paths). */
 const HERO_URL = "/sim/vehicles/hero_car.glb";

@@ -43,6 +43,24 @@ describe("buildTutorSystemPrompt", () => {
     expect(prompt).toContain("- Пътни знаци");
   });
 
+  it("labels a rule-catalog material as an exam rule, not as law text", () => {
+    const withRule = buildTutorSystemPrompt({
+      materials: [
+        {
+          kind: "rule",
+          id: "rule:PEDESTRIAN_NOT_YIELDED",
+          titleBg: "Непропускане на пешеходец",
+          bodyBg: "Класификация на изпита: опасна грешка — 10 наказателни точки.",
+          lawRefs: [{ act: "ЗДвП", ref: "чл. 119" }],
+          score: 5,
+        },
+      ],
+      weakestConceptTitlesBg: [],
+    });
+    expect(withRule).toContain("(правило от практическия изпит)");
+    expect(withRule).toContain("[ЗДвП чл. 119]");
+  });
+
   it("handles the empty-materials and no-data cases", () => {
     const empty = buildTutorSystemPrompt({
       materials: [],

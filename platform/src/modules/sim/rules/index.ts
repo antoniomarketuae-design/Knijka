@@ -15,6 +15,7 @@ export {
   type CommendationEvent,
   type HeadlightState,
   type IndicatorState,
+  type LaneArrow,
   type MirrorKind,
   type RuleEngineConfig,
   type RuleEvent,

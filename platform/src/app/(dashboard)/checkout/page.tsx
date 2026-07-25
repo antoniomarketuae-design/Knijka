@@ -1,18 +1,23 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { requireUser } from "@/modules/auth";
 import {
   formatPackPrice,
   isPackId,
   isStripeConfigured,
   PACKS,
+  requiredCheckoutConsents,
 } from "@/modules/payments";
-import { EmbeddedCheckoutForm } from "@/components/payments/EmbeddedCheckoutForm";
+import { CheckoutConsentGate } from "./consent-gate";
 
 export const metadata: Metadata = { title: "Плащане | Книжка.AI" };
 
 type Props = { searchParams: Promise<{ pack?: string }> };
 
 export default async function CheckoutPage({ searchParams }: Props) {
+  // This page decides which consent a buyer needs from their stored birthYear,
+  // so it needs a real identity — not the proxy's optimistic redirect.
+  const user = await requireUser();
   const { pack } = await searchParams;
 
   if (!isPackId(pack)) {
@@ -36,6 +41,11 @@ export default async function CheckoutPage({ searchParams }: Props) {
   const canPay =
     isStripeConfigured() &&
     Boolean(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY);
+
+  // Which checkboxes this particular buyer must tick (H-9). Computed here,
+  // server-side, from User.birthYear — the age itself never reaches the
+  // browser, only the resulting list of consents.
+  const required = await requiredCheckoutConsents(user.id);
 
   return (
     <div className="mx-auto grid max-w-5xl gap-8 py-8 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.15fr)]">
@@ -78,7 +88,7 @@ export default async function CheckoutPage({ searchParams }: Props) {
 
       <section className="card min-h-[560px] p-4 sm:p-6">
         {canPay ? (
-          <EmbeddedCheckoutForm pack={pack} />
+          <CheckoutConsentGate pack={pack} required={required} />
         ) : (
           <div className="flex h-full flex-col items-center justify-center gap-3 py-16 text-center">
             <h2 className="text-lg font-black">Плащането е временно недостъпно</h2>

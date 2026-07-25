@@ -17,7 +17,7 @@ import {
   writeDailyGoalMin,
   writeExamDate,
   type DailyGoalMinutes,
-} from "./storage";
+} from "@/lib/onboarding/storage";
 
 const TOTAL_STEPS = 3;
 

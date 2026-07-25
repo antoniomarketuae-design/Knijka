@@ -22,7 +22,7 @@ import Link from "next/link";
 import { useState } from "react";
 import { IconArrowRight } from "@/components/icons";
 import { QuestionMediaView, SignFace } from "./QuestionMedia";
-import type { WhyPanelModel } from "./whyPanelModel";
+import type { WhyPanelModel } from "@/modules/clips/view";
 
 const MistakeMedia = dynamic(() => import("./MistakeMedia"), {
   ssr: false,

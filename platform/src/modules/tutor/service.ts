@@ -2,19 +2,33 @@
  * askTutor / getThread — the tutor module's core flow.
  *
  * askTutor(userId, message):
- *   guard input → daily budget check → retrieve materials from the content
- *   bank → build the grounded system prompt (+ the student's 3 weakest
- *   concepts) → call the model → book tokens/cost (never skipped) →
- *   persist the exchange → return reply + validated citations.
+ *   guard input → per-user burst limit → per-user daily message cap → GLOBAL
+ *   daily spend cap → retrieve materials from the content bank AND the sim
+ *   rule catalog → build the grounded system prompt (+ the student's 3 weakest
+ *   concepts) → call the model → book tokens/cost (never skipped) → persist
+ *   the exchange + the day's global ledger → return reply + citations.
+ *
+ * The three limits stack deliberately (audit 2026-07-24, H-8) and each one
+ * answers a different question: how fast may ONE student ask (burst), how much
+ * may ONE student ask today (message cap), and how much may the PRODUCT spend
+ * today (money). Registration is free, so the first two are per-account
+ * ceilings an attacker multiplies by simply registering again — only the third
+ * one bounds the bill.
  */
 
 import { getContentRepo } from "@/lib/content/repo";
 import type { LawRef } from "@/lib/content/types";
 import { getReadiness } from "@/modules/learning";
+import {
+  consumeRateLimit,
+  RATE_LIMITS,
+  rateLimitMessageBg,
+} from "@/modules/security";
+import { checkDailyBudget, TUTOR_BUDGET_REPLY_BG } from "./budget";
 import { computeCostMicroUsd } from "./cost";
 import { getTutorModel, isTutorEnabled } from "./model";
 import { buildTutorSystemPrompt, extractCitations } from "./prompt";
-import { retrieveMaterials } from "./retrieval";
+import { retrieveGrounding } from "./retrieval";
 import { getTutorStore, type TutorMessage } from "./store";
 
 /** Per-user daily cap on tutor questions — cheap to change, hard to miss. */
@@ -87,7 +101,23 @@ export async function askTutor(
   const thread =
     (await store.getThreadByUser(userId)) ?? (await store.createThread(userId));
 
-  // Daily budget guard — checked BEFORE any API spend.
+  // Burst guard (H-8) — BEFORE the DB-backed ceilings, because it is the one
+  // that costs nothing to evaluate. A server action is a public POST endpoint,
+  // so a scripted client can fire a day's worth of questions in a few seconds;
+  // this keeps the concurrent spend bounded while the counters below catch up.
+  // Keyed on the user id, not the IP: the surface is authenticated, and one
+  // student on shared school wi-fi must not throttle their whole class.
+  const burst = consumeRateLimit(userId, RATE_LIMITS.tutor);
+  if (!burst.allowed) {
+    return {
+      threadId: thread.id,
+      reply: `${rateLimitMessageBg(burst.retryAfterSec)} Пиши ми въпроса спокойно — отговарям по-добре на един ясен въпрос, отколкото на десет бързи.`,
+      citations: [],
+      limited: true,
+    };
+  }
+
+  // Per-user daily message cap — checked BEFORE any API spend.
   const usedToday = countUserMessagesSince(thread.messages, startOfTodayMs());
   if (usedToday >= TUTOR_DAILY_MESSAGE_LIMIT) {
     return {
@@ -98,8 +128,24 @@ export async function askTutor(
     };
   }
 
-  // Grounding: retrieval over OUR content only (ADR-002).
-  const materials = retrieveMaterials(getContentRepo(), question);
+  // GLOBAL daily spend ceiling — the kill-switch on the founder's Anthropic
+  // key (budget.ts explains why the per-user caps above cannot bound the bill:
+  // registration is free, so they multiply by the number of accounts an
+  // attacker cares to create).
+  const budget = await checkDailyBudget();
+  if (!budget.withinBudget) {
+    return {
+      threadId: thread.id,
+      reply: TUTOR_BUDGET_REPLY_BG,
+      citations: [],
+      limited: true,
+    };
+  }
+
+  // Grounding: retrieval over OUR authored corpora only (ADR-002) — the
+  // content bank plus the sim rule catalog, which is the only place that
+  // knows what a mistake costs on the exam and what the right action was.
+  const materials = retrieveGrounding(getContentRepo(), question);
 
   // Weakest concepts for proactive practice suggestions — advisory only,
   // a readiness failure must never block the tutor.
@@ -131,16 +177,28 @@ export async function askTutor(
   );
 
   const now = Date.now();
+  const usage = {
+    tokensIn: result.inputTokens,
+    tokensOut: result.outputTokens,
+    costMicroUsd,
+  };
   const messages: TutorMessage[] = [
     ...thread.messages,
     { role: "user", content: question, ts: now },
     { role: "assistant", content: result.text, ts: now },
   ];
-  await store.saveExchange(thread.id, messages, {
-    tokensIn: result.inputTokens,
-    tokensOut: result.outputTokens,
-    costMicroUsd,
-  });
+  await store.saveExchange(thread.id, messages, usage);
+
+  // The global ledger the kill-switch reads. Booked from the SAME usage
+  // object as the thread's counters, immediately after the call, so the two
+  // can never disagree about what a day cost. A ledger-write failure must not
+  // lose the student the answer they already paid for (it is in hand), so it
+  // is logged rather than thrown — the next call re-reads the ledger anyway.
+  try {
+    await store.recordDaySpend(budget.day, usage);
+  } catch (err) {
+    console.error("[tutor] daily spend ledger write failed:", err);
+  }
 
   // Citations validated against the injected materials — a marker the model
   // invented never becomes a chip.

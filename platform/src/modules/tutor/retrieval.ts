@@ -1,19 +1,25 @@
 /**
  * Retrieval layer for the AI tutor (ADR-002: the LLM NEVER free-recalls law —
- * every answer is grounded in material retrieved from the content bank).
+ * every answer is grounded in material retrieved from OUR authored corpora).
  *
- * v1 is a pure keyword scorer over the ContentRepo: Cyrillic-normalized
- * token overlap between the student's question and concept/question/sign
- * text, with a title boost and a prefix match to absorb Bulgarian
- * inflection ("предимство" ↔ "предимството"). No embeddings, no index —
- * the whole bank is a few hundred items, a linear scan is instant.
+ * v1 is a pure keyword scorer: Cyrillic-normalized token overlap between the
+ * student's question and the material text, with a title boost and a prefix
+ * match to absorb Bulgarian inflection ("предимство" ↔ "предимството"). No
+ * embeddings, no index — both corpora are a few hundred items, a linear scan
+ * is instant.
+ *
+ * TWO corpora feed the same prompt (audit I-1):
+ *  1. the ContentRepo — concepts, exam questions, road signs;
+ *  2. the sim rule catalog — the 46 authored violation specs the rule engine
+ *     grades with (see the second section below).
  */
 
 import type { ContentRepo } from "@/lib/content/repo";
 import type { LawRef } from "@/lib/content/types";
+import { VIOLATIONS, type SeverityClass } from "@/modules/sim/rules";
 
 export interface RetrievedItem {
-  kind: "concept" | "question" | "sign";
+  kind: "concept" | "question" | "sign" | "rule";
   id: string;
   /** Display title used as the material heading in the prompt. */
   titleBg: string;
@@ -158,4 +164,143 @@ export function retrieveMaterials(
       lawRefs,
       score,
     }));
+}
+
+// ---------------------------------------------------------------------------
+// Second corpus: the sim rule catalog (audit I-1)
+// ---------------------------------------------------------------------------
+
+/**
+ * The rule catalog answers a question the content bank structurally cannot:
+ * "what does the examiner count this as, what does it cost me, and what was
+ * the right action?". Every entry is authored by the rule engine — severity
+ * class, official points, explanation, corrective and a law reference — so
+ * it satisfies exactly the same ADR-002 contract as the content bank:
+ * retrieved and cited, never recalled by the model.
+ *
+ * Only VIOLATIONS are grounding material. COMMENDATIONS carry no lawRef and
+ * no corrective, so there is nothing in them the tutor could cite.
+ *
+ * Sim data crosses the module boundary only through the public sub-barrel
+ * (docs/architecture/05) — the tutor never imports catalog.ts directly.
+ */
+
+/** How many catalog entries may join the grounding at most. */
+export const MAX_RETRIEVED_RULES = 2;
+
+/**
+ * A single fuzzy prefix hit (0.7) is not enough evidence here. The catalog is
+ * a small, broad-brush corpus — 46 entries covering the whole of driving — so
+ * a weak match on one inflected word would let almost any question drag in a
+ * rule. One full token's worth of overlap is the floor.
+ */
+const RULE_MIN_SCORE = EXACT_MATCH;
+
+const SEVERITY_LABEL_BG: Record<SeverityClass, string> = {
+  opasna: "опасна",
+  osnovna: "основна",
+  vtorostepenna: "второстепенна",
+};
+
+/**
+ * Split "ЗДвП чл. 21" into the {act, ref} shape the citation whitelist works
+ * on, at the first reference token (чл./ал./т./§/№).
+ *
+ * A trailing gloss in parentheses is dropped: "ППЗДвП чл. 63 (М1 — единична
+ * непрекъсната линия)" is the rule engine's note to itself, not part of the
+ * legal reference. Left in, it would turn a citation chip into a sentence and
+ * make two entries citing the same наредба render as two different sources.
+ *
+ * A string with no reference token yields null — a bare act name is not a
+ * citable reference, and manufacturing one is precisely what ADR-002 forbids.
+ * The entry still grounds the answer; it just contributes no citation.
+ */
+const REF_TOKEN_RE = /\s(?=(?:чл\.|ал\.|т\.|§|№))/;
+
+export function parseCatalogLawRef(raw: string): LawRef | null {
+  const cleaned = raw
+    .replace(/\s*\([^)]*\)\s*$/, "")
+    .replace(/\s+/g, " ")
+    .trim();
+  const at = REF_TOKEN_RE.exec(cleaned);
+  if (!at || at.index <= 0) return null;
+
+  const act = cleaned.slice(0, at.index).trim();
+  const ref = cleaned.slice(at.index + at[0].length).trim();
+  if (act.length === 0 || ref.length === 0) return null;
+  return { act, ref };
+}
+
+interface RuleCandidate extends Candidate {
+  /**
+   * The text the SCORER sees. The severity/points line that heads the display
+   * body is deliberately left out of it: that line is near-identical across
+   * all 46 entries, so scoring it would give every rule a free match on
+   * "грешка"/"точки" and let a vague question pull in two arbitrary rules.
+   */
+  searchBodyBg: string;
+}
+
+/** Built once at module load — the catalog is a compile-time constant. */
+const RULE_CANDIDATES: RuleCandidate[] = Object.entries(VIOLATIONS).map(
+  ([code, spec]) => {
+    const lawRef = parseCatalogLawRef(spec.lawRef);
+    return {
+      kind: "rule" as const,
+      // Namespaced so a catalog id can never collide with a content-bank one.
+      id: `rule:${code}`,
+      titleBg: spec.titleBg,
+      bodyBg: [
+        `Класификация на изпита: ${SEVERITY_LABEL_BG[spec.severityClass]} грешка — ${spec.points} наказателни точки.`,
+        spec.explanationBg,
+        `Правилното действие: ${spec.correctiveBg}`,
+      ].join(" "),
+      searchBodyBg: `${spec.explanationBg} ${spec.correctiveBg}`,
+      lawRefs: lawRef ? [lawRef] : [],
+    };
+  },
+);
+
+/** Rank the rule catalog against the student's question. */
+export function retrieveRuleMaterials(
+  question: string,
+  limit: number = MAX_RETRIEVED_RULES,
+): RetrievedItem[] {
+  const queryTokens = tokenizeBg(question);
+  if (queryTokens.length === 0) return [];
+
+  return RULE_CANDIDATES.map((c) => ({
+    ...c,
+    score: scoreCandidate(queryTokens, { ...c, bodyBg: c.searchBodyBg }),
+  }))
+    .filter((c) => c.score >= RULE_MIN_SCORE)
+    .sort((a, b) => b.score - a.score)
+    .slice(0, limit)
+    .map(({ kind, id, titleBg, bodyBg, lawRefs, score }) => ({
+      kind,
+      id,
+      titleBg,
+      bodyBg,
+      lawRefs,
+      score,
+    }));
+}
+
+/**
+ * The tutor's full grounding: content bank + rule catalog.
+ *
+ * The two corpora are NOT ranked against each other — the rule slots are
+ * reserved. They answer different questions ("what does the law say" vs.
+ * "what does the examiner count it as and what should I have done"), so a
+ * strong concept match must never crowd out the one catalog entry that tells
+ * the student the mistake is опасна and ends the exam, and vice versa.
+ */
+export function retrieveGrounding(
+  repo: ContentRepo,
+  question: string,
+): RetrievedItem[] {
+  return [
+    ...retrieveMaterials(repo, question),
+    ...retrieveRuleMaterials(question),
+  ];
 }

@@ -223,7 +223,9 @@ test("live run: totals are consistent and flags target drafts only", () => {
   const result = runVerification();
   const t = result.totals;
   assert.equal(t.clean + t.flagged, t.draft, "every draft is exactly clean or flagged");
-  assert.ok(t.draft > 0, "there are drafts to review");
+  // Not `t.draft > 0`: the queue legitimately empties as the founder approves,
+  // and it now has. What must always hold is that the bank is non-empty.
+  assert.ok(t.draft + t["needs-review"] + t.approved > 0, "the bank has questions");
 
   const statusById = new Map();
   for (const topic of result.topics) {

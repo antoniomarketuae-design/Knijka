@@ -167,6 +167,9 @@ export const QuestionOptionSchema = z.strictObject({
   textBg: z.string().min(1),
   correct: z.boolean(),
   media: SignMediaRefSchema.optional(),
+  // Per-option rationale (doc 64 THEO-4). Optional while authoring catches up,
+  // but present-and-blank is authoring garbage, so min(1) when it is there.
+  whyWrongBg: z.string().min(1, "whyWrongBg must not be empty when present").optional(),
 });
 
 export const QuestionSchema = z

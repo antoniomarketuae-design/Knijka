@@ -34,6 +34,11 @@ export { WorldColliders } from "./components/WorldColliders";
 export { OsmAttribution } from "./components/OsmAttribution";
 export { QUALITY_PRESETS } from "./components/quality";
 export type { QualityPreset } from "./components/quality";
+// The DOWNLOAD tier (audit H-11): what each quality level actually fetches.
+// Public because the IBL mount lives outside this module (LessonScene) and must
+// read the same ruling the texture loaders do.
+export { TEXTURE_BUDGETS, groundMapsOf, facadeMapsOf } from "./textures/textureBudget";
+export type { TextureBudget, GroundMapsMode } from "./textures/textureBudget";
 
 export { assertDistrict } from "./types";
 export type {

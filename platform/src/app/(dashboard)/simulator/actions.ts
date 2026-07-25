@@ -41,12 +41,29 @@ import {
   type SimSessionEventsJson,
   type SimSessionListRow,
 } from "@/modules/sim/lessons/store";
+// Deep import, like lessons/store above: the attempt-trace store is server-only
+// (node:zlib + Prisma) and is deliberately off the sim/traces barrel, which
+// rides the theory bundle (audit M-26).
+import { getAttemptTraceStore } from "@/modules/sim/traces/attemptStore";
 import type { FinishLessonActionResult } from "@/components/sim/lesson-ui/types";
+import { canDriveSimulator } from "./access";
 
 export async function finishLessonAction(
   input: unknown,
 ): Promise<FinishLessonActionResult> {
   const user = await requireUser();
+
+  // C-3 entitlement gate. The page already refuses unentitled accounts, but a
+  // server action is a public POST endpoint: without this check a free account
+  // could still write SimSessions, feed the learner model and farm sim XP with
+  // a hand-crafted request. Same decision function as the page, so the two can
+  // never drift apart. Thrown rather than returned as a code — no legitimate
+  // client can reach this line (the play shell only mounts behind the gated
+  // page), so it is an abuse signal, not a UI state, exactly like the invalid
+  // payloads askTutorAction throws on.
+  if (!(await canDriveSimulator(user))) {
+    throw new Error("finishLessonAction: no simulator entitlement");
+  }
 
   const graded = gradeFinishWire(input);
   if (graded.status === "invalid") return { ok: false, code: "INVALID_INPUT" };
@@ -187,6 +204,30 @@ export async function finishLessonAction(
   } catch (err) {
     console.warn("simulator: saveSession failed", err);
     return { ok: false, code: "SAVE_FAILED" };
+  }
+
+  // -------------------------------------------------------------------------
+  // I-2 „Твоят дубъл" — persist the student's OWN recorded drive beside the
+  // session it belongs to. Until this existed the 20 Hz recording died with
+  // the browser tab: only the handful of glance-derived rubric moment ids
+  // survived, so the reel renderer (which happily accepts any ScenarioTrace)
+  // had nothing of the student's to film.
+  //
+  // Written AFTER the session row, because the trace is keyed on it, and
+  // swallowed on failure for the same reason the learner-model fold below is:
+  // a display artifact must never cost a graded session its save. Retention
+  // and compression live in the store — this layer only decides WHETHER.
+  // -------------------------------------------------------------------------
+  if (wire.attemptTrace !== undefined) {
+    try {
+      await getAttemptTraceStore().save(user.id, {
+        simSessionId: sessionId,
+        lessonId: lesson.id,
+        trace: wire.attemptTrace,
+      });
+    } catch (err) {
+      console.warn("simulator: attempt-trace save failed (session saved)", err);
+    }
   }
 
   // -------------------------------------------------------------------------

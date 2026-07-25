@@ -2,6 +2,7 @@ import { IconCheck } from "@/components/icons";
 import {
   FREE_DAILY_PRACTICE_LIMIT,
   FREE_MOCK_EXAM_LIMIT,
+  FREE_TUTOR_LIFETIME_MESSAGES,
   PACKS,
 } from "@/modules/payments";
 
@@ -18,7 +19,13 @@ const yes: Cell = { kind: "yes" };
 const no: Cell = { kind: "no" };
 const text = (t: string): Cell => ({ kind: "text", text: t });
 
-/** Честен тон: казваме точно какво има безплатно и какво отключват пакетите. */
+/**
+ * Честен тон: казваме точно какво има безплатно и какво отключват пакетите.
+ *
+ * ПРАВИЛО (одит C-3): всяка платена клетка тук трябва да има гейт зад себе си
+ * в modules/payments/quota.ts. Числата идват от същите константи, които гейтът
+ * прилага — така редът не може да лъже, дори когато лимитът се промени.
+ */
 const ROWS: Row[] = [
   {
     featureBg: "Практика с въпроси и обяснения",
@@ -37,24 +44,28 @@ const ROWS: Row[] = [
     premium: text("неограничени"),
   },
   {
+    // Гейт: checkTutorQuota — доживотен пробен лимит, не дневен (вж. quota.ts).
     featureBg: "AI Учител — лични обяснения на грешките",
-    free: text("кратък пробен достъп"),
+    free: text(
+      FREE_TUTOR_LIFETIME_MESSAGES === 1
+        ? "1 въпрос за проба"
+        : `${FREE_TUTOR_LIFETIME_MESSAGES} въпроса за проба`,
+    ),
     core: yes,
     premium: yes,
   },
   {
     // Реалност днес: пръстенът „Готовност за изпит" се показва на всеки акаунт
-    // без entitlement проверка — таблицата казва същото.
+    // без entitlement проверка — таблицата казва същото. Затова и не стои като
+    // предимство в bullet-ите на пакета (packs.ts).
     featureBg: "Оценка на готовността за изпит",
     free: yes,
     core: yes,
     premium: yes,
   },
   {
-    // TODO(founder): /simulator в момента НЯМА entitlement гейт — и безплатен
-    // акаунт може да кара. Или гейтни го според този ред, или обяви клетките
-    // по-долу за верни (ценово решение, вж. одит B3 → ADR). Текстът тук е
-    // актуализиран само за факта, че симулаторът е пуснат.
+    // Гейт: requireEntitlementForSimulator (hasPremium) — приложен на
+    // /simulator страницата И на двата server action-а (simulator/access.ts).
     featureBg: "Шофьорски симулатор",
     free: no,
     core: no,

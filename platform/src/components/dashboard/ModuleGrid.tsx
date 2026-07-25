@@ -8,7 +8,7 @@ import {
   IconLock,
   IconWheel,
 } from "@/components/icons";
-import { isSoon, statusBadge } from "@/components/dashboard/availability";
+import { isSoon, statusBadge } from "@/lib/routeStatus";
 
 interface ModuleCard {
   href: string;

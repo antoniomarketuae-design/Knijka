@@ -12,9 +12,14 @@
  *     2-second gap — then absorbs the lead's firm 6 m/s² brake and rolls to rest
  *     with metres to spare (stoppedInTime), then resumes to the finish;
  *   - „Една секунда зад водещия": the impatient driver RACES into the gap (a
- *     burst under the 154 km/h speeding grace) and sits ~40 m back at 130 — the
- *     lead has no headroom to escape — grading EXACTLY FOLLOWING_TOO_CLOSE. It
- *     ends BEFORE the slam: the fault is the gap, nothing else;
+ *     burst at 144 — under the 145 km/h grace of the posted 140) and sits ~40 m
+ *     back at 130 — the lead has no headroom to escape — grading EXACTLY
+ *     FOLLOWING_TOO_CLOSE. It ends BEFORE the slam: the fault is the gap,
+ *     nothing else. The burst USED to be authored at 149, which was legal only
+ *     because of the audit's M-14 dead band (a 10% grace of 154 sitting above
+ *     the +10 опасна line made second-degree speeding unreachable on every
+ *     motorway map). With the band restored, 149 is a real second-degree
+ *     mistake — so the demo was slowed to keep its one fault isolated;
  *   - „Каране на бронята": the same race, but onto the bumper (~14 m) — the gap
  *     fires FOLLOWING_TOO_CLOSE, then the slam arrives with no metres left and
  *     the late reaction rear-ends the lead → COLLISION.
@@ -68,10 +73,10 @@ export function scFoMotorwayGapMistakeOneSecondScript(): DriveScript {
     steps: [
       { kind: "annotation", textBg: "Грешка: нетърпение — колата се засилва и се залепва на около 40 метра зад водещия." },
       { kind: "glance", mirror: "rear" },
-      // Race into the pinned gap (a burst under the 150 km/h dangerous line), then
+      // Race into the pinned gap (a burst under the 145 km/h grace line), then
       // sit at ~40 m at flow — one second where two are needed.
-      { kind: "drive", points: [[X, 15], [X, 300]], targetKmh: 149, stopAtEnd: false },
-      { kind: "drive", points: [[X, 300], [X, 500]], targetKmh: 149, stopAtEnd: false },
+      { kind: "drive", points: [[X, 15], [X, 300]], targetKmh: 144, stopAtEnd: false },
+      { kind: "drive", points: [[X, 300], [X, 500]], targetKmh: 144, stopAtEnd: false },
       { kind: "drive", points: [[X, 500], [X, 660]], targetKmh: 122, stopAtEnd: false },
       { kind: "pause", sec: 1, brake: true },
       { kind: "annotation", textBg: "40 метра на тази скорост е под секунда и половина — по-малко от времето дори само да реагираш." },
@@ -89,14 +94,17 @@ export function scFoMotorwayGapMistakeBumperCrashScript(): DriveScript {
       { kind: "annotation", textBg: "Грешка: каране почти на бронята — за да те „тегли“ бързият." },
       { kind: "glance", mirror: "rear" },
       // Race onto the bumper (~14 m), sit there long enough for the gap to fire,
-      // then meet the brake with no metres and a late reaction.
-      { kind: "drive", points: [[X, 15], [X, 300]], targetKmh: 149, stopAtEnd: false },
-      { kind: "drive", points: [[X, 300], [X, 640]], targetKmh: 149, stopAtEnd: false },
+      // then meet the brake with no metres and a late reaction. The run-in
+      // reaches y = 800 rather than 786: at the slowed 144 burst the ego meets
+      // the stopped lead a few metres further along, and the contact — the
+      // whole point of the demo — must still happen inside the script.
+      { kind: "drive", points: [[X, 15], [X, 300]], targetKmh: 144, stopAtEnd: false },
+      { kind: "drive", points: [[X, 300], [X, 640]], targetKmh: 144, stopAtEnd: false },
       { kind: "drive", points: [[X, 640], [X, 712]], targetKmh: 123, stopAtEnd: false },
       { kind: "annotation", textBg: "Водещият спря — а метрите ги нямаше." },
       // No lift: ram the braking lead (stopAtEnd false — the drive holds speed
       // straight into it; the runner grades the contact as COLLISION).
-      { kind: "drive", points: [[X, 712], [X, 786]], targetKmh: 123, stopAtEnd: false },
+      { kind: "drive", points: [[X, 712], [X, 800]], targetKmh: 123, stopAtEnd: false },
       { kind: "pause", sec: 1, brake: true },
       { kind: "annotation", textBg: "Удар отзад: спирачният път от тази скорост е над сто метра, а дистанцията беше нула." },
     ],

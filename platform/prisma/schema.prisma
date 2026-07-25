@@ -22,12 +22,76 @@ model User {
   createdAt    DateTime  @default(now())
 
   progress         Progress[]
+  passwordResets   PasswordResetToken[]
   questionAttempts QuestionAttempt[]
   examAttempts     ExamAttempt[]
   simSessions      SimSession[]
+  simTraces        SimAttemptTrace[]
   entitlements     Entitlement[]
   gamification     GamificationState?
   tutorThreads     TutorThread[]
+  examOutcomes     ExamOutcomeReport[]
+  consentEvents    ConsentEvent[]
+}
+
+// GDPR Art. 7(1) requires a consent to stay DEMONSTRABLE afterwards: who
+// agreed, to what exact wording, of which published version, and when.
+// `User.consentAt` answers only "when, at registration" — once the legal text
+// is reworded there is no way to say what was actually agreed to (audit
+// 2026-07-24, M-24). And Bulgarian ЗЛС needs a separately provable parental
+// approval before a 14–17-year-old may contract at all (H-9).
+//
+// So: one APPEND-ONLY row per act of consent. Never updated, and never reused
+// across purchases — the withdrawal waiver is given per contract, so a tick
+// from last month must not authorise today's payment.
+model ConsentEvent {
+  id         String   @id @default(cuid())
+  userId     String
+  kind       String // terms | privacy | parental_purchase | withdrawal_waiver
+  context    String // register | checkout | settings — where it was given
+  docVersion String // published version of the document agreed to (src/lib/legal/versions.ts)
+  textBg     String // the wording actually shown, verbatim — this is the proof
+  subject    String? // pack id when the consent gated a purchase; null otherwise
+  recordedAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, context, recordedAt])
+}
+
+// Password reset (audit 2026-07-24, H-14: there was no reset at all, so a
+// locked-out student who had paid was an instant refund and a bad review).
+//
+// WHAT IS STORED IS NOT THE TOKEN. `tokenHash` is SHA-256 of the 256-bit
+// random token that went out by e-mail, so a leaked database backup — or a
+// support person reading rows — cannot take over an account. SHA-256 rather
+// than bcrypt on purpose: the input here is 256 bits of CSPRNG output, not a
+// human-chosen password, so there is nothing to brute-force, and an unsalted
+// digest is what allows the single indexed lookup this flow needs.
+//
+// `usedAt` (not a delete) is what makes the token single-use AND auditable:
+// the row survives its own consumption long enough to answer "was this link
+// used, and when" if a student reports something odd. Rows die with the user
+// (ON DELETE CASCADE), so Art. 17 erasure keeps working untouched.
+//
+// GDPR (ADR-004, users are minors): deliberately NO ip address and NO
+// user-agent, which is what most reset tables carry. Neither is needed to
+// restore access, and both are personal data we would then have to explain,
+// retain and erase.
+model PasswordResetToken {
+  id        String    @id @default(cuid())
+  userId    String
+  tokenHash String    @unique // sha256(token), hex
+  expiresAt DateTime
+  usedAt    DateTime? // null = still spendable; set once, never cleared
+  createdAt DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Invalidating every outstanding token for one user (on a successful reset)
+  // is the hot query; the expiry index is for the housekeeping sweep.
+  @@index([userId, createdAt])
+  @@index([expiresAt])
 }
 
 // Per-concept mastery + spaced-repetition state (conceptId → content/concepts.json)
@@ -87,9 +151,43 @@ model SimSession {
   events     Json? // rule-engine event log (drives replay + debrief)
   debrief    String? // AI lesson debrief text
 
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user  User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  trace SimAttemptTrace?
 
   @@index([userId, lessonId])
+}
+
+// The student's OWN recorded drive (audit 2026-07-24, I-2 „Твоят дубъл").
+//
+// Kept OUT of SimSession on purpose: the session row is read on every history
+// screen, progression fold and debrief, and none of them want a kilobyte-heavy
+// blob in the same tuple. Splitting it also lets retention prune the
+// kinematics while the graded record (score, event log, debrief) stays
+// forever.
+//
+// `gz` is gzip(JSON(ScenarioTrace)) of the trace ALREADY reduced by
+// modules/sim/traces/compact.ts (10 Hz, cm precision, ≤1200 samples) — ~15 KB
+// for a full drill. It decodes back into exactly the shape the ghost player,
+// the 2D replay and the headless reel renderer already accept, which is the
+// whole point: one format, four consumers.
+//
+// ADR-004: recorded kinematics of a fictional car carry no PII of their own,
+// but they are keyed to a user — so they die with the user AND with the
+// session (both ON DELETE CASCADE), and only the newest few per user are kept
+// (ATTEMPT_TRACE_RETENTION, enforced on write).
+model SimAttemptTrace {
+  simSessionId String   @id
+  userId       String
+  lessonId     String // <templateId>@L<n> — scenario sessions only, v1
+  recordedAt   DateTime @default(now())
+  durationSec  Float // denormalised so a list never inflates a blob
+  sampleCount  Int
+  gz           Bytes
+
+  session SimSession @relation(fields: [simSessionId], references: [id], onDelete: Cascade)
+  user    User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, recordedAt])
 }
 
 // One-time packs (docs/business/41 pricing): core | premium_sim
@@ -118,6 +216,52 @@ model GamificationState {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
+// Transfer measurement (audit M-4 / I-5; docs/education/28 "Readiness v2").
+//
+// The north star is "safer, more competent real drivers" — and until this
+// table has rows, nothing in the product can tell whether the readiness score
+// predicts anything at all. One row = one student voluntarily telling us how
+// their REAL ДАИ exam went, paired with the prediction we had given them.
+//
+// GDPR (ADR-004, users are minors): this is CONSENT-based processing and the
+// row is deliberately the smallest thing that can answer the question —
+// outcome + day + our own prediction. There is no free-text field (that is
+// where PII leaks), no examiner, no school, no location, no exam-centre id.
+// `examOn` is DAY precision (@db.Date) so the row can never be used to
+// reconstruct where a student was at a given hour. Consent is withdrawable:
+// deleting the row is a first-class product action (Art. 7(3)), and
+// `reportedAt` is the Art. 7(1) record of when consent was given — the only
+// write path is the consented form.
+model ExamOutcomeReport {
+  id     String  @id @default(cuid())
+  userId String
+  kind   String // theory | practical — the two ДАИ exams
+  passed Boolean
+
+  // The day of the real exam. @db.Date, not a timestamp: see header.
+  examOn DateTime @db.Date
+
+  // --- what the product predicted, frozen at report time -------------------
+  // Copied rather than joined on purpose: readiness is a function of CURRENT
+  // progress and keeps moving after the exam, so a join would silently
+  // re-write history and make the calibration meaningless.
+  readinessScore Int // 0..100, the number the readiness ring showed
+  mockAttempts   Int // completed mock exams at report time
+  bestMockScore  Int? // best mock score out of 97; null = never finished one
+
+  // Written together: when the student reported, which is also when they
+  // consented. `reportedAt - examOn` is the staleness of the pairing above.
+  reportedAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // One report per sitting: a re-submit corrects the earlier one instead of
+  // double-counting the same exam in the calibration.
+  @@unique([userId, kind, examOn])
+  @@index([userId, examOn])
+  @@index([kind, examOn])
+}
+
 // Tutor conversations with cost instrumentation from day one (docs/business/60)
 model TutorThread {
   id           String   @id @default(cuid())
@@ -132,4 +276,30 @@ model TutorThread {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId, updatedAt])
+}
+
+// The global daily Anthropic ledger — the thing the kill-switch reads
+// (audit 2026-07-24, H-8: "cost.ts tracks spend but never enforces a ceiling").
+//
+// WHY A SEPARATE TABLE rather than summing TutorThread.costMicroUsd, which the
+// audit suggested: that column is a LIFETIME counter per thread. Summing the
+// threads touched today therefore charges today's budget with every one of
+// those students' historical spend, so a handful of returning heavy users trip
+// a daily cap on their first question of the morning. One row per day is the
+// only shape that answers "what did we spend TODAY" exactly.
+//
+// GDPR (ADR-004, users are minors): deliberately NO userId and no relation.
+// This is an accounting total about US, not personal data about anyone, so it
+// carries nothing an Art. 17 erasure would have to reach into — which is also
+// why erasing an account can never distort the bill.
+model TutorSpendDay {
+  // "YYYY-MM-DD" in Europe/Sofia — the student's wall clock, matching how
+  // every other daily quota in the product resets (payments/quota.ts).
+  day String @id
+
+  calls        Int      @default(0)
+  tokensIn     Int      @default(0)
+  tokensOut    Int      @default(0)
+  costMicroUsd Int      @default(0)
+  updatedAt    DateTime @updatedAt
 }

@@ -121,7 +121,9 @@ function addQuad(
   outward: V3,
   color?: [number, number, number],
 ): void {
-  let [c0, c1, c2, c3] = corners;
+  // c1/c3 swap when the winding faces away from `outward`; c0/c2 never do.
+  const [c0, , c2] = corners;
+  let [, c1, , c3] = corners;
   let n = v3norm(v3cross(v3sub(c1, c0), v3sub(c2, c0)));
   if (v3dot(n, outward) < 0) {
     [c1, c3] = [c3, c1];

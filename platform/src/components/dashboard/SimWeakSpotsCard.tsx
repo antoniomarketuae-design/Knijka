@@ -1,5 +1,5 @@
 import Link from "next/link";
-import type { SimWeakSpotsSnapshot, SimWeakSpotView } from "@/components/dashboard/data";
+import type { SimWeakSpotsSnapshot, SimWeakSpotView } from "@/lib/dashboard/data";
 import { IconCheck, IconWheel } from "@/components/icons";
 
 /**

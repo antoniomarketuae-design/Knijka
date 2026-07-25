@@ -119,6 +119,18 @@ export interface QuestionOption {
   correct: boolean;
   /** Sign-identification questions: the option IS a sign face. */
   media?: SignMediaRef;
+  /**
+   * Requirement-zero at its deepest (doc 64 THEO-4): the rationale for THIS
+   * option, not for the question. On a distractor it says why the option is
+   * wrong; on a correct option of a "multi" it says why the option was
+   * required — the case where a student picks 2 of 3 correct answers, scores
+   * zero and, with only the question-level `explanationBg`, is never told
+   * which one was missed.
+   *
+   * Optional: authoring lands progressively (3-point questions first), and
+   * the why-panel falls back to `explanationBg` wherever it is absent.
+   */
+  whyWrongBg?: string;
 }
 
 export interface Question {

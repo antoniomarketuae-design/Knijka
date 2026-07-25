@@ -149,10 +149,15 @@ describe("teach-first-then-grade coaching", () => {
     expect(hud1.some((e) => e.kind === "violation")).toBe(false);
     expect(s.events.some((e) => e.kind === "violation")).toBe(false);
 
-    // End the episode (back under the limit), then speed again → now graded.
-    s = applyTick(s, makeTick({ t: 4, speedKmh: 40 })).state;
+    // End the episode, then speed again → now graded. M-16: the episode
+    // re-arms only after the limit has been HELD for speedingRearmSec, so the
+    // legal stretch has to be a real one — a one-frame dip is the same
+    // offence being corrected, not a second encounter.
+    for (const t of [4, 4.5, 5, 5.5, 6, 6.5, 7, 7.5, 8]) {
+      s = applyTick(s, makeTick({ t, speedKmh: 40 })).state;
+    }
     const hud2: HudEvent[] = [];
-    for (const t of [5, 6, 7, 8]) {
+    for (const t of [9, 10, 11, 12]) {
       const r = applyTick(s, speeding(t));
       s = r.state;
       hud2.push(...r.hudEvents);

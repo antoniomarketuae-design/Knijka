@@ -10,6 +10,7 @@
  */
 
 import type Stripe from "stripe";
+import { legalIdentityGaps } from "@/lib/legal/identity";
 import { PaymentsError } from "./types";
 
 /** The slice of the Stripe SDK this module actually uses. */
@@ -33,8 +34,36 @@ export interface StripeCheckoutClient {
 
 let client: StripeCheckoutClient | null = null;
 
+/**
+ * True when the product may actually take money.
+ *
+ * TWO conditions, not one (audit 2026-07-24, finding C-1):
+ *  1. Stripe credentials exist, and
+ *  2. the seller/data-controller is a REAL registered entity — no remaining
+ *     "[ИМЕ НА ЮРИДИЧЕСКО ЛИЦЕ]"-style placeholders in the legal identity.
+ *
+ * Condition 2 is the guard. Without it, setting a single environment variable
+ * would start charging customers — many of them minors — under a privacy
+ * policy and refund/GDPR contact that do not exist, silently and with no test
+ * failing. Callers already degrade gracefully on `false` (pricing renders
+ * "скоро", the checkout route and the webhook answer 503), so an unregistered
+ * entity now fails CLOSED: the money path simply stays shut until the five
+ * constants in lib/legal/identity.ts are filled in.
+ */
 export function isStripeConfigured(): boolean {
-  return Boolean(process.env.STRIPE_SECRET_KEY);
+  if (!process.env.STRIPE_SECRET_KEY) return false;
+  const gaps = legalIdentityGaps();
+  if (gaps.length > 0) {
+    // Loud on the server, invisible to the user: this is a launch-checklist
+    // omission, not a runtime fault the customer can do anything about.
+    console.error(
+      "[payments] Checkout is DISABLED: Stripe is configured but the legal " +
+        `identity is still placeholder text (${gaps.join(", ")}). ` +
+        "Fill in platform/src/lib/legal/identity.ts — see docs/80_FULL_AUDIT_2026-07-24.md C-1.",
+    );
+    return false;
+  }
+  return true;
 }
 
 /** Tests inject a fake here (or null to reset back to the real SDK). */

@@ -13,7 +13,7 @@
  *   - the pre-drive procedure (Phase 1 A2) subscribes via `subscribe()` to
  *     observe real state transitions instead of checklist clicks.
  *
- * Plain TS, no DOM, no React — key bindings live in components/sim/cabin.ts
+ * Plain TS, no DOM, no React — key bindings live in sim/scene/cabin.ts
  * (CabinControls owns one DrivelineState); this class is fully unit-testable
  * in Node (driveline.test.ts).
  *

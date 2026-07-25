@@ -14,8 +14,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import "@/lib/content/loader";
-import { QUESTION_EVENT_TYPE } from "@/modules/learning/whyPanelMap.generated";
-import { resolveWhyPanel } from "@/modules/learning/whyPanel";
+import { QUESTION_EVENT_TYPE, resolveWhyPanel } from "@/modules/clips";
 
 export interface CoverageRow {
   /** ev-* event id (the mistake-type). */

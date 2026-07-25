@@ -21,8 +21,8 @@ import {
   replayToCanvas,
   type ReplayPoint,
   type ReplayView,
-} from "./mistakeReplayCore";
-import { fitSceneView, poseSizePx } from "./sceneStillCore";
+} from "@/modules/clips/replay/mistakeReplayCore";
+import { fitSceneView, poseSizePx } from "@/modules/clips/replay/sceneStillCore";
 
 interface DistrictLayers {
   roads: MinimapPolyline[];

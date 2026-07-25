@@ -10,7 +10,7 @@
  *  - sim lesson (A14):         see the SIM constants below
  *
  * Level = 1 + floor(xp / 400) — MUST stay consistent with the dashboard
- * (src/components/dashboard/data.ts uses the same constant via getSummary).
+ * (src/lib/dashboard/data.ts uses the same constant via getSummary).
  */
 
 import type { GamificationEvent } from "./types";

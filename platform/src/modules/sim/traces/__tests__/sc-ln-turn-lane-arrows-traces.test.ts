@@ -91,10 +91,14 @@ describe("sc-ln-turn-lane-arrows — the shadow gate (doc 76 §5)", () => {
 });
 
 describe("sc-ln-turn-lane-arrows — mistake demos grade their exact codes (doc 76 §9 stage 5)", () => {
-  it("„Ляв завой от лента „само направо““: exactly TURN_WITHOUT_INDICATOR + POOR_LANE_KEEPING", () => {
+  it("„Ляв завой от лента „само направо““: exactly WRONG_LANE_FOR_DIRECTION + TURN_WITHOUT_INDICATOR + POOR_LANE_KEEPING", () => {
     const drive = drives.get("mistake-left-from-through")!;
     const codes = [...new Set(violationCodes(drive))].sort();
     expect(codes).toEqual([...SC_LN_TURN_LANE_ARROWS.mistakes[0].codeRefs].sort());
+    // M-17: the whole lesson is the arrow, and until the М10 channel existed
+    // the arrow graded NOTHING — the demo's headline fault reached the student
+    // as "no indicator". This assertion is the regression guard for that.
+    expect(codes).toContain("WRONG_LANE_FOR_DIRECTION");
     // The wide exit drags the CURB side, so the toward-oncoming code can never
     // stand in for the lane-keeping grade (one act, one code).
     expect(codes).not.toContain("CENTER_LINE_TOUCHED");

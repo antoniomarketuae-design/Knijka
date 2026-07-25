@@ -1,12 +1,12 @@
 /**
  * gen_why_panel_map.mjs — THEO-2 Stage 1 (doc 64) build-time artifact:
  * docs/simulation/scenario-engine/scenario-map.json (1,016 rows, docs/ is
- * unreadable at runtime) → platform/src/modules/learning/whyPanelMap.generated.ts
+ * unreadable at runtime) → platform/src/modules/clips/whyPanelMap.generated.ts
  * (the COMPACT question-id → ev-* map, ids only — 585 entries).
  *
  * The district-snapshot mold (tools/maps/gen_parking_lot.mjs): generator +
  * committed output + a freshness test asserting the output still matches the
- * source (platform/src/modules/learning/whyPanel.test.ts). Rerun after any
+ * source (platform/src/modules/clips/whyPanel.test.ts). Rerun after any
  * scenario-map edit:
  *
  *   node tools/theory/gen_why_panel_map.mjs
@@ -29,7 +29,7 @@ const TARGET = path.join(
   "platform",
   "src",
   "modules",
-  "learning",
+  "clips",
   "whyPanelMap.generated.ts",
 );
 

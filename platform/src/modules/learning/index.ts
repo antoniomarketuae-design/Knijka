@@ -14,7 +14,33 @@ export type {
 } from "./session";
 
 export { submitAnswer } from "./submit";
-export type { AnswerContext, SubmitAnswerResult } from "./submit";
+export type {
+  AnswerContext,
+  SubmitAnswerOptions,
+  SubmitAnswerResult,
+} from "./submit";
+
+// Practice-session binding (audit M-10): the practice page signs the questions
+// it just dealt, and submitAnswer only answers for questions on that list.
+export {
+  issuePracticeTicket,
+  isPracticeTicketRequired,
+  PRACTICE_TICKET_TTL_MS,
+  PracticeTicketError,
+  verifyPracticeTicket,
+} from "./practiceTicket";
+export type { PracticeTicketCheck, PracticeTicketFailure } from "./practiceTicket";
+
+// Per-session option shuffle (audit H-1a). buildPracticeSession applies it
+// itself; these are exported for the OTHER surfaces that project a question
+// into a client DTO from stored order — today the simulator's micro-quiz
+// (app/(dashboard)/simulator/micro-quiz-actions.ts).
+export {
+  OPTION_ORDER_WINDOW_MS,
+  optionOrderIsFixed,
+  orderOptionsForPractice,
+  practiceOptionSeed,
+} from "./optionOrder";
 
 export { applyGradedAnswers } from "./examFeed";
 export type { GradedAnswer } from "./examFeed";
@@ -23,32 +49,15 @@ export { recordSimObservations } from "./simFeed";
 export type { SimObservation } from "./simFeed";
 export type { SimSeverity } from "./store";
 
-// THEO-2 Stage 1 (doc 64) — the why-panel resolver: question id → stored
-// explanation + citations (+ the scenario drill demonstrating the fault).
-export { resolveWhyPanel } from "./whyPanel";
-
-// Why-panel VIDEO pilot: the derived clip list the /dev/clip-capture rig
-// records (one clip per resolvable event's representative mistake). Pure
-// static data — needs no content repo.
-export { clipIdFor, clipPilotList } from "./clipPilot";
-export type { ClipPilotEntry } from "./clipPilot";
-
-// Produced-media requirements card (doc 66): the generated per-clip plan —
-// engine-computed fault time + R1/R2/R4 card. PLAN writes it, the RIG
-// consumes it verbatim, /review/clips renders it. Pure static data.
-export { CLIP_PLAN, clipPlanForId } from "./clipPlan.generated";
-export type {
-  ClipGoverningControl,
-  ClipPlanEntry,
-  ClipRequiredActor,
-  ClipView,
-} from "./clipPlan.generated";
-export type {
-  WhyPanelExperienceRef,
-  WhyPanelMistakeRef,
-  WhyPanelPayload,
-  WhyPanelSimRef,
-} from "./whyPanel";
+// MOVED (audit M-20): the why-panel resolver, the clip pilot list and the
+// generated clip plan now live in `@/modules/clips` — the module that owns the
+// mistake-clip pipeline end to end. They were never learning's business: all
+// three answer "which recorded SIMULATOR drive demonstrates this theory
+// mistake?", and keeping them here is what made `learning` reach into
+// sim/lessons, sim/traces, sim/rules, sim/scenarios and sim/world. Import them
+// from `@/modules/clips` (server/build) or `@/modules/clips/view` (browser).
+// Nothing is re-exported through here on purpose — a compatibility shim would
+// leave the boundary violated while looking fixed.
 
 export {
   getReadiness,

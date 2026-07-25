@@ -28,6 +28,25 @@ export interface CreateEntitlementInput {
   providerRef: string;
 }
 
+/** One append-only ConsentEvent row (see prisma/schema.prisma). */
+export interface ConsentEventRecord {
+  id: string;
+  userId: string;
+  /** terms | privacy | parental_purchase | withdrawal_waiver */
+  kind: string;
+  /** register | checkout | settings */
+  context: string;
+  /** Published document version agreed to (src/lib/legal/versions.ts). */
+  docVersion: string;
+  /** The wording actually shown, verbatim. */
+  textBg: string;
+  /** Pack id when the consent gated a purchase; null otherwise. */
+  subject: string | null;
+  recordedAt: Date;
+}
+
+export type CreateConsentEventInput = Omit<ConsentEventRecord, "id">;
+
 export interface PaymentsStore {
   /** All entitlement rows of a user (active and expired). */
   listEntitlements(userId: string): Promise<EntitlementRecord[]>;
@@ -49,6 +68,24 @@ export interface PaymentsStore {
   ): Promise<number>;
   /** ALL exam attempts ever (started counts as used — no restart farming). */
   countExamAttempts(userId: string): Promise<number>;
+  /**
+   * The buyer's birth year, for the ЗЛС minor gate at checkout (H-9).
+   * This is the ONLY read of `User.birthYear` outside registration, and the
+   * value never leaves the server: it decides which checkbox to require and
+   * is then dropped. `null` = never collected (treated as "might be a minor",
+   * see consent.ts).
+   */
+  findUserBirthYear(userId: string): Promise<number | null>;
+  /** Append one consent proof. Rows are never updated afterwards. */
+  createConsentEvent(
+    input: CreateConsentEventInput,
+  ): Promise<ConsentEventRecord>;
+  /** Consent rows of one user in one context, recorded at/after `since`. */
+  listConsentEvents(
+    userId: string,
+    context: string,
+    since: Date,
+  ): Promise<ConsentEventRecord[]>;
 }
 
 // ---------------------------------------------------------------------------
@@ -98,6 +135,36 @@ class PrismaPaymentsStore implements PaymentsStore {
     const db = await this.db();
     return db.examAttempt.count({ where: { userId } });
   }
+
+  async findUserBirthYear(userId: string): Promise<number | null> {
+    const db = await this.db();
+    // Narrow select on purpose (ADR-004): the checkout path has no business
+    // loading the rest of a minor's user row to answer a yes/no question.
+    const row = await db.user.findUnique({
+      where: { id: userId },
+      select: { birthYear: true },
+    });
+    return row?.birthYear ?? null;
+  }
+
+  async createConsentEvent(
+    input: CreateConsentEventInput,
+  ): Promise<ConsentEventRecord> {
+    const db = await this.db();
+    return db.consentEvent.create({ data: input });
+  }
+
+  async listConsentEvents(
+    userId: string,
+    context: string,
+    since: Date,
+  ): Promise<ConsentEventRecord[]> {
+    const db = await this.db();
+    return db.consentEvent.findMany({
+      where: { userId, context, recordedAt: { gte: since } },
+      orderBy: { recordedAt: "desc" },
+    });
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -115,6 +182,9 @@ export class InMemoryPaymentsStore implements PaymentsStore {
   readonly entitlements: EntitlementRecord[] = [];
   readonly questionAttempts: FakeQuestionAttempt[] = [];
   readonly examAttemptUserIds: string[] = [];
+  readonly consentEvents: ConsentEventRecord[] = [];
+  /** userId → birthYear, seeded by tests (absent = never collected). */
+  readonly birthYears = new Map<string, number>();
   private nextId = 1;
 
   async listEntitlements(userId: string): Promise<EntitlementRecord[]> {
@@ -157,6 +227,36 @@ export class InMemoryPaymentsStore implements PaymentsStore {
 
   async countExamAttempts(userId: string): Promise<number> {
     return this.examAttemptUserIds.filter((id) => id === userId).length;
+  }
+
+  async findUserBirthYear(userId: string): Promise<number | null> {
+    return this.birthYears.get(userId) ?? null;
+  }
+
+  async createConsentEvent(
+    input: CreateConsentEventInput,
+  ): Promise<ConsentEventRecord> {
+    const record: ConsentEventRecord = {
+      id: `consent-${this.nextId++}`,
+      ...input,
+    };
+    this.consentEvents.push(record);
+    return record;
+  }
+
+  async listConsentEvents(
+    userId: string,
+    context: string,
+    since: Date,
+  ): Promise<ConsentEventRecord[]> {
+    return this.consentEvents
+      .filter(
+        (c) =>
+          c.userId === userId &&
+          c.context === context &&
+          c.recordedAt.getTime() >= since.getTime(),
+      )
+      .sort((a, b) => b.recordedAt.getTime() - a.recordedAt.getTime());
   }
 }
 

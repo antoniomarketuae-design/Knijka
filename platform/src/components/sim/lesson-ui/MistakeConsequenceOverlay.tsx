@@ -23,7 +23,7 @@
 import dynamic from "next/dynamic";
 import { useEffect } from "react";
 import { IconArrowRight, IconShield } from "@/components/icons";
-import { traceUrlForRepoPath } from "@/components/theory/whyPanelModel";
+import { traceUrlForRepoPath } from "@/modules/clips/view";
 import type { MistakeDemo, TeachMoment } from "@/modules/sim/lessons";
 import { VIOLATIONS, type SeverityClass, type ViolationSpec } from "@/modules/sim/rules";
 

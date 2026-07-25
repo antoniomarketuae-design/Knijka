@@ -83,6 +83,7 @@ export {
   type SignalControllerSchedule,
 } from "./signals";
 export { CROSSING_ZONE_RADIUS_M, type PedestrianQuery } from "./zones";
+export { buildLaneArrowSpans, laneArrowAt, type LaneArrowSpan } from "./laneArrows";
 export { JUNCTION_AREA_RADIUS_M, TURN_THRESHOLD_DEG, TURN_WINDOW_SEC, TurnDetector } from "./turns";
 export type { StopLine } from "./stoplines";
 export {

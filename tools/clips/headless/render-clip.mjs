@@ -3,7 +3,9 @@
 // Drives /dev/clip-headless in HEADLESS Chromium (SwiftShader — no GPU, no
 // visible tab, no human): steps the shared clock start→end at a fixed dt,
 // screenshots each frame, stitches them to a seekable VP9 .webm with ffmpeg,
-// saves the five R0 keyframes, and upserts the clip into public/clips/manifest.json.
+// saves the five R0 keyframes as WebP (webp.mjs — the fault still is what the
+// why-panel ships as its poster), and upserts the clip into
+// public/clips/manifest.json.
 // Enforces the R1 actor gate exactly like the real-time rig (a clip whose
 // required actors never framed FAILS — nothing is written).
 //
@@ -14,9 +16,10 @@
 
 import { chromium } from "./pw.mjs";
 import { spawnSync } from "node:child_process";
-import { existsSync, mkdirSync, readFileSync, writeFileSync, copyFileSync, rmSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync, rmSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join, resolve } from "node:path";
+import { encodeKeyframeWebp, resolveFfmpeg } from "./webp.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const REPO = resolve(__dirname, "../../..");
@@ -39,14 +42,8 @@ const BASE = opt("base", "http://localhost:3000");
 const id = `${templateId}__m${mistakeIndex}`;
 
 // ---- ffmpeg resolution ----------------------------------------------------
-function resolveFfmpeg() {
-  if (process.env.FFMPEG && existsSync(process.env.FFMPEG)) return process.env.FFMPEG;
-  if (spawnSync("ffmpeg", ["-version"]).status === 0) return "ffmpeg";
-  const winget =
-    "C:/Users/Ljh/AppData/Local/Microsoft/WinGet/Packages/Gyan.FFmpeg_Microsoft.Winget.Source_8wekyb3d8bbwe/ffmpeg-8.0.1-full_build/bin/ffmpeg.exe";
-  if (existsSync(winget)) return winget;
-  throw new Error("ffmpeg not found (set $FFMPEG)");
-}
+// Shared with the poster encoder so the two can never resolve different
+// binaries (webp.mjs).
 const FFMPEG = resolveFfmpeg();
 
 // Prefer the real GPU (ANGLE→D3D11) — ~30× faster than software on this box's
@@ -188,11 +185,16 @@ async function main() {
   );
   if (ff.status !== 0) throw new Error(`ffmpeg exit ${ff.status}`);
 
-  // Five R0 keyframes = the frames nearest each planned time.
+  // Five R0 keyframes = the frames nearest each planned time, re-encoded to
+  // WebP at the shared poster contract (webp.mjs) instead of copied out as
+  // 1.1 MB PNGs. The fault still is what every why-panel ships as its <video
+  // poster>, and the browser fetches it eagerly even under preload="none" —
+  // audit 80 H-10. Same pixels, ~1/75th the bytes on a student's phone.
   const keyframes = keyframeAt.map((kt, j) => {
     const idx = Math.max(0, Math.min(N - 1, Math.round((kt - startSec) / dt)));
-    copyFileSync(join(framesDir, `frame_${pad(idx)}.png`), join(CLIPS_DIR, `${id}.k${j}.png`));
-    return `/clips/${id}.k${j}.png`;
+    const src = join(framesDir, `frame_${pad(idx)}.png`);
+    encodeKeyframeWebp(FFMPEG, src, join(CLIPS_DIR, `${id}.k${j}.webp`));
+    return `/clips/${id}.k${j}.webp`;
   });
 
   rmSync(framesDir, { recursive: true, force: true });

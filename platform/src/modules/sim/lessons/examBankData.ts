@@ -457,8 +457,18 @@ const R2_SITE = {
   maxSyncSpeedMps: 9,
 };
 
-/** P1 — priority car from the right at the Б2-guarded n5063751788 [shipped:
- *  the L2/lex-exam-1 builder geometry verbatim]. */
+/** P1 — priority car from the right at the Б1-guarded n5063751788 [shipped:
+ *  the L2/lex-exam-1 builder geometry verbatim].
+ *
+ *  Audit C-4: this comment used to read „Б2-guarded", and the runtime agreed
+ *  with it while the world builder painted a Б1 „Пропусни движението" on the
+ *  approach — an unclassified street meeting a SECONDARY, never a primary. The
+ *  slot id below still says `b2` because ids are frozen bank identity; the
+ *  junction is a give-way. Nothing about THIS encounter changes: the graded
+ *  duty was always the yield (conflictNear at the line → FAILED_TO_YIELD, ЗДвП
+ *  чл. 50), which a Б1 line delivers identically. What went away is the
+ *  phantom full-stop demand that instant-failed a legal rolling entry twice
+ *  per lap on shells A, D and H. */
 const P1_SITE = {
   junction: { nodeId: "n5063751788", x: 434.54, y: 67.2 },
   actor: {

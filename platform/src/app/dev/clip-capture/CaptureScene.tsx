@@ -115,12 +115,12 @@ import {
   buildLessonWorldCore,
   wireTrafficQueries,
   type LessonWorldCore,
-} from "@/components/sim/lessonWorldRecipe";
+} from "@/modules/sim/scene/lessonWorldRecipe";
 import { ScenarioObstacles } from "@/components/sim/ScenarioObstacles";
 import { emojiTexture, ShadowCar } from "@/components/sim/ShadowCar";
 import { VitokCockpit } from "@/components/sim/vitok/VitokCockpit";
-import { CockpitInteractionContext } from "@/components/sim/vitok/hotspots";
-import type { CabinControls } from "@/components/sim/cabin";
+import { CockpitInteractionContext } from "@/modules/sim/scene/vitok/hotspots";
+import type { CabinControls } from "@/modules/sim/scene/cabin";
 import { loadQualityPreset } from "@/components/sim/lesson-ui/QualityPresetSelector";
 import {
   blinkOnAt,
@@ -139,11 +139,11 @@ import {
   type ActorPresenceLog,
   type CameraProfile,
   type CaptureCabinChannels,
-} from "@/lib/clips/capturePlan";
+} from "@/modules/clips/capture/capturePlan";
 import {
   createCaptureFeedStepper,
   type CaptureFeedStepper,
-} from "@/lib/clips/captureGhostFeed";
+} from "@/modules/clips/capture/captureGhostFeed";
 
 /** Fixed capture size — consistent clips across machines/windows. */
 export const CAPTURE_W = 1280;

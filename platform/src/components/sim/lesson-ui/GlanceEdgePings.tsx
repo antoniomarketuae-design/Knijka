@@ -33,7 +33,7 @@ import {
   type LessonSpec,
 } from "@/modules/sim/lessons";
 import type { SimTick } from "@/modules/sim/rules";
-import type { CabinControls, MirrorGlanceKind } from "../cabin";
+import type { CabinControls, MirrorGlanceKind } from "@/modules/sim/scene/cabin";
 
 /** LessonScene's additive tick tap — read-only observer, runs before the shell. */
 export type GlancePingTap = (tick: SimTick) => void;

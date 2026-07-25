@@ -347,6 +347,96 @@ describe("buildContentRepo on fixtures", () => {
 });
 
 // --------------------------------------------------------------------------
+// Staff annotations must not survive the loader boundary (audit M-6)
+// --------------------------------------------------------------------------
+
+describe("buildContentRepo — internal staff annotations", () => {
+  it("strips [REVIEW: …] notes from every student-facing string", () => {
+    const data = fixtureData();
+    const question = data.questionsBySlug.osnovni[0];
+    question.textBg = "[REVIEW: формулировката да се провери] Какво значи знак Б2?";
+    question.explanationBg =
+      "[REVIEW: да се потвърди точният член от ЗДвП — чл. 51–52?] Б2 значи пълно спиране.";
+    question.options[0].textBg = "Спираш винаги [TODO: добави пример]";
+    data.concepts[0].summaryBg = "Основно правило. [CHECK: източник]";
+    data.signs[0].meaningBg = "[FIXME: формулировка] Спираш винаги.";
+    data.topics[0].descriptionBg = "Основи [TBD: описание]";
+
+    const repo = build(data);
+    const loaded = repo.questionById("q-osnovni-001");
+    expect(loaded?.textBg).toBe("Какво значи знак Б2?");
+    expect(loaded?.explanationBg).toBe("Б2 значи пълно спиране.");
+    expect(loaded?.options[0].textBg).toBe("Спираш винаги");
+    expect(repo.conceptById("c-root")?.summaryBg).toBe("Основно правило.");
+    expect(repo.signs()[0].meaningBg).toBe("Спираш винаги.");
+    expect(repo.topicBySlug("osnovni")?.descriptionBg).toBe("Основи");
+
+    // Belt and braces: no string anywhere in the served repo carries a marker.
+    const served = JSON.stringify({
+      topics: repo.topics(),
+      concepts: repo.concepts(),
+      questions: repo.questions(),
+      signs: repo.signs(),
+      sections: repo.sections?.() ?? [],
+    });
+    expect(served).not.toMatch(/\[(REVIEW|TODO|FIXME|TBD|CHECK)/);
+  });
+
+  it("fails the build when an explanation is NOTHING but a staff note", () => {
+    // Stripping runs before zod, so "annotation only" reads as the blank
+    // explanation it actually is and never ships as an empty why-panel.
+    const data = fixtureData();
+    data.questionsBySlug.osnovni[0].explanationBg = "[REVIEW: да се напише]";
+    expect(() => build(data)).toThrow(/questions\/osnovni\.json/);
+  });
+
+  it("leaves ordinary bracketed Bulgarian prose exactly as authored", () => {
+    const data = fixtureData();
+    data.questionsBySlug.osnovni[0].explanationBg = "Спираш [виж чл. 47] преди линията.";
+    const repo = build(data);
+    expect(repo.questionById("q-osnovni-001")?.explanationBg).toBe(
+      "Спираш [виж чл. 47] преди линията.",
+    );
+  });
+
+  it("serves the real /content bank free of staff annotations", () => {
+    for (const question of contentRepo.questions()) {
+      expect(question.textBg).not.toMatch(/\[REVIEW:/);
+      expect(question.explanationBg).not.toMatch(/\[REVIEW:/);
+      for (const option of question.options) {
+        expect(option.textBg).not.toMatch(/\[REVIEW:/);
+      }
+    }
+  });
+});
+
+// --------------------------------------------------------------------------
+// Per-option rationale (M-3 groundwork — schema only, authoring follows)
+// --------------------------------------------------------------------------
+
+describe("buildContentRepo — option whyWrongBg", () => {
+  it("accepts and serves a per-option rationale, and sanitises it too", () => {
+    const data = fixtureData();
+    const options = data.questionsBySlug.osnovni[0].options as Record<string, unknown>[];
+    options[1].whyWrongBg = "[REVIEW: формулировка] Само намаляване не е спиране.";
+
+    const repo = build(data);
+    expect(repo.questionById("q-osnovni-001")?.options[1].whyWrongBg).toBe(
+      "Само намаляване не е спиране.",
+    );
+    // Absent stays absent — the field is optional while authoring catches up.
+    expect(repo.questionById("q-osnovni-001")?.options[0].whyWrongBg).toBeUndefined();
+  });
+
+  it("rejects a present-but-blank whyWrongBg", () => {
+    const data = fixtureData();
+    const options = data.questionsBySlug.osnovni[0].options as Record<string, unknown>[];
+    options[1].whyWrongBg = "";
+    expect(() => build(data)).toThrow(/whyWrongBg must not be empty when present/);
+  });
+});
+
+// --------------------------------------------------------------------------
 // THEO-1 media kinds: sign faces + scene stills
 // --------------------------------------------------------------------------
 

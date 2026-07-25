@@ -22,6 +22,10 @@ const zoneEntered = (ped: boolean, crossingId = "x1"): SimTickEvent => ({
   crossingId,
   pedestrianOnCrossing: ped,
 });
+const zoneExited = (crossingId = "x1"): SimTickEvent => ({
+  kind: "crossingZoneExited",
+  crossingId,
+});
 
 describe("STANDSTILL_GAP_TOO_CLOSE (FO-08 — дистанция при спиране в колона)", () => {
   it("bumper-kissing at a full stop behind a stopped lead grades второстепенна", () => {
@@ -103,6 +107,57 @@ describe("OVERTAKING_AT_CROSSING (OV-07 — изпреварване на път
     const { events } = drive([
       tick(0, { speedKmh: 40, leadGapM: 18, events: [zoneEntered(false)] }),
       tick(1, { speedKmh: 40, leadGapM: 18, laneId: 1 }),
+      tick(2, { speedKmh: 40, leadGapM: 18, laneId: 1 }),
+    ]);
+    expect(violationsOf(events, "OVERTAKING_AT_CROSSING")).toHaveLength(1);
+  });
+
+  it("the RETURN leg grades too — cutting back toward the lead inside the zone", () => {
+    // The shape both authored mistake demos use (sc-ov-crossing-overtake): the
+    // pull-out happens on open road BEFORE the zone arms, and the offence is
+    // completing the pass by tucking back in front of the lead at the зебра.
+    // The H-5 direction gate must keep this guilty — it convicts the RIGHTWARD
+    // beat because a pull-out past this very lead opened the manoeuvre.
+    const { events } = drive([
+      tick(0, { speedKmh: 40, leadGapM: 20, indicator: "left", events: [glance("left")] }),
+      tick(1, { speedKmh: 40, laneId: 1, indicator: "left" }), // pull-out; lead leaves the corridor
+      tick(2, { speedKmh: 40, laneId: 1, events: [zoneEntered(false)] }),
+      tick(3, { speedKmh: 40, laneId: 1, leadGapM: 15, indicator: "right", events: [glance("right")] }),
+      tick(4, { speedKmh: 40, laneId: 0, leadGapM: 15, indicator: "right" }), // the cut-back
+    ]);
+    const v = violationsOf(events, "OVERTAKING_AT_CROSSING");
+    expect(v).toHaveLength(1);
+    expect(v[0].severityClass).toBe("opasna");
+  });
+
+  it("a zone the driver turned away from cannot convict a later lane change", () => {
+    // H-5 stickiness: `s.crossing` used to clear ONLY on a matching
+    // crossingPassed, so a zone armed and then left behind (the driver turned
+    // off) stayed armed for the rest of the session. crossingZoneExited is the
+    // missing closing bracket — the SAME overtake that grades while the zone is
+    // live must be silent once the geometry is gone.
+    const guiltyWhileArmed = drive([
+      tick(0, { speedKmh: 40, leadGapM: 18, events: [zoneEntered(false)] }),
+      tick(1, { speedKmh: 40, leadGapM: 18, laneId: 1 }),
+    ]);
+    expect(violationsOf(guiltyWhileArmed.events, "OVERTAKING_AT_CROSSING")).toHaveLength(1);
+
+    const afterExit = drive([
+      tick(0, { speedKmh: 40, leadGapM: 18, events: [zoneEntered(false)] }),
+      tick(1, { speedKmh: 40, leadGapM: 18, events: [zoneExited()] }),
+      tick(2, { speedKmh: 40, leadGapM: 18, laneId: 1 }),
+    ]);
+    expect(codes(afterExit.events)).not.toContain("OVERTAKING_AT_CROSSING");
+    // and the state machine is genuinely closed, not merely quiet
+    expect(afterExit.state.crossing).toBeNull();
+  });
+
+  it("an exit for a DIFFERENT crossing never clears the zone we are in", () => {
+    // Id discipline: zones can overlap (two zebras at one junction), and a stale
+    // exit for the one we already left must not disarm the live one.
+    const { events } = drive([
+      tick(0, { speedKmh: 40, leadGapM: 18, events: [zoneEntered(false, "x1")] }),
+      tick(1, { speedKmh: 40, leadGapM: 18, events: [zoneExited("x2")] }),
       tick(2, { speedKmh: 40, leadGapM: 18, laneId: 1 }),
     ]);
     expect(violationsOf(events, "OVERTAKING_AT_CROSSING")).toHaveLength(1);

@@ -42,6 +42,11 @@ export default function GlobalError({
             >
               Опитай отново
             </button>
+            {/* A hard <a>, not next/link, on purpose: global-error replaces the
+                root layout because the React tree below it already failed. A
+                client-side navigation would re-mount into that same broken tree;
+                a full document load is the only thing guaranteed to recover. */}
+            {/* eslint-disable-next-line @next/next/no-html-link-for-pages */}
             <a href="/" className="btn-ghost w-full sm:w-auto">
               Начало
             </a>

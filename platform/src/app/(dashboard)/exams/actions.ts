@@ -3,10 +3,12 @@
 /**
  * Server actions for the mock-exam flow (/exams).
  *
- * - startExamAction: opens an attempt via the exam module, stashes the
- *   builder seed in an httpOnly cookie (refresh/restore safety — the runner
- *   page can deterministically rebuild the same safe question set), then
- *   redirects to the runner.
+ * - startExamAction: opens an attempt via the exam module, then redirects to
+ *   the runner. Nothing about the paper is stashed client-side: the dealt
+ *   question ids and the seed live on the attempt row, and the runner page
+ *   reads them back via getInProgressExam (audit H-7/M-9). The old httpOnly
+ *   seed cookie is gone — it made a resume device-bound and, worse, invited
+ *   the page to rebuild the paper from the seed against a bank that had moved.
  * - submitExamAction: grades via submitExam, then — only AFTER the attempt is
  *   closed — enriches every question from the content repo (correct options,
  *   explanationBg, lawRefs) for the review screen. Nothing leaks mid-exam.
@@ -16,7 +18,6 @@
  */
 
 import "@/lib/content/loader";
-import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { getContentRepo } from "@/lib/content/repo";
 import { requireUser } from "@/modules/auth";
@@ -29,12 +30,11 @@ import {
   submitExam,
   type PerQuestionResult,
 } from "@/modules/exam";
-import {
-  seedCookieName,
-  type ResultSummary,
-  type ReviewQuestion,
-  type SubmitExamActionResult,
-  type SubmitExamInput,
+import type {
+  ResultSummary,
+  ReviewQuestion,
+  SubmitExamActionResult,
+  SubmitExamInput,
 } from "@/components/exam/types";
 import { trackActivity } from "@/modules/gamification";
 import { requireEntitlementForExam } from "@/modules/payments";
@@ -65,18 +65,6 @@ export async function startExamAction(): Promise<void> {
   try {
     const started = await startExam(user.id);
     attemptId = started.attemptId;
-
-    const cookieStore = await cookies();
-    cookieStore.set({
-      name: seedCookieName(started.attemptId),
-      value: String(started.seed),
-      httpOnly: true,
-      sameSite: "lax",
-      secure: process.env.NODE_ENV === "production",
-      path: "/",
-      // Exam window + slack: enough to resume/auto-submit, then self-cleans.
-      maxAge: EXAM_DURATION_SEC + EXAM_GRACE_SEC + 60 * 60,
-    });
   } catch (err) {
     // BANK_TOO_SMALL / BANK_OVERWEIGHT — content problem, not the user's.
     if (err instanceof ExamError) redirect("/exams?msg=start-failed");

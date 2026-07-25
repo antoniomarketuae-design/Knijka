@@ -15,18 +15,23 @@
  *    adjudicated per approach axis (N-S / E-W) against the node's signal
  *    cluster.
  *
- * 2. STOP-SIGN HEURISTIC (honest documentation, per doc 17 §6/§8 the real
+ * 2. PRIORITY-SIGN HEURISTIC (honest documentation, per doc 17 §6/§8 the real
  *    signs arrive with the hand-polish overlay): at every UNSIGNALIZED
  *    intersection where a minor road (service / residential / unclassified,
  *    class rank ≤ 2) meets an arterial (primary / secondary / secondary_link,
- *    rank ≥ 4), each MINOR approach gets a stop-sign line at the junction
+ *    rank ≥ 4), each MINOR approach gets a priority line at the junction
  *    mouth (same derivation as source 1, floor STOP_SIGN_SETBACK_M).
  *    - Tertiary meetings are excluded — those are typically yield (Б1), and
  *      modeling yield as stop would grade students unfairly.
  *    - Roundabout nodes are excluded (priority-inside, yield on entry).
- *    - This over-approximates reality (many such junctions carry Б1, not Б2);
- *      we accept it deliberately: it exercises the full-stop pedagogy and is
- *      replaced per-junction by the hand-polish overlay (wave 2).
+ *    - WHICH sign the line carries is NOT decided here: it comes from
+ *      world/builders/network.junctionPriorityControls — the same call that
+ *      paints the sign the student sees (Б2 only against a primary, Б1
+ *      otherwise). Audit C-4: this used to be hardcoded "stopSign", so four
+ *      approaches on the shipped district — one of them crossed twice per lap
+ *      by the practical-exam route — instant-failed a legal rolling entry
+ *      under a visible „Пропусни движението" triangle. An approach the
+ *      painter posts NO sign on is now never graded either.
  *
  * 3. HAND-PLACED OVERRIDES (STOP_LINE_OVERRIDES): junctions the curriculum
  *    depends on that neither source reaches — see the table's comment.
@@ -39,6 +44,7 @@
 import { PERCEPTUAL_ROAD_SCALE } from "../contracts";
 import {
   JUNCTION_TRIM_MAX_FRACTION,
+  junctionPriorityControls,
   nodeOpenRadiusM,
   STOP_LINE_BEYOND_CUT_M,
 } from "../world/builders/network";
@@ -73,10 +79,9 @@ const MINOR_MAX_RANK = 2;
  * per-junction control wholesale.
  *
  * `control` picks the sign: absent/"stopSign" = Б2 „Стоп" (full stop);
- * "giveWay" = Б1 „Пропусни движението" (yield only). Give-way is the authoring
- * hook for a Б1 node — a junction node carrying a Б1 sign resolves to a giveWay
- * line here (the heuristic never manufactures one, and no entry sets it today,
- * so every shipped map is byte-identical).
+ * "giveWay" = Б1 „Пропусни движението" (yield only). It must match what the
+ * world builder paints at that approach, exactly as the derived lines above do
+ * — an override is a HAND-authored junction, so the author owns both halves.
  */
 export interface StopLineOverride {
   nodeId: string;
@@ -108,6 +113,20 @@ export const STOP_LINE_OVERRIDES: readonly StopLineOverride[] = [
   // foreign shipped map (the idempotent-override law, doc 74 §5.6).
   { nodeId: "jxg-n-j1", edgeId: "jxg-e-s", control: "giveWay" }, // mouth 1 (clear — the rolling-pass crux)
   { nodeId: "jxg-n-j2", edgeId: "jxg-e-m", control: "giveWay" }, // mouth 2 (conflicted — the yield)
+
+  // sc-ed-d2-priority-run („Изпитен сегмент „Лозенец" — предимства") hangs its
+  // whole first beat on „n2945503673 — Б2 + stop line (the ONLY stop sign on
+  // the route)" (templates-exam.ts). The heuristic used to hand it that line by
+  // accident: the runtime's rank table was missing `primary_link`, so the 1-lane
+  // slip road e171919146.0 read as a MINOR approach. The world builder ranks it
+  // 5 — equal to the бул. „Пейо К. Яворов" it joins — and therefore painted no
+  // sign at all, so the scenario graded a full stop under bare sky (audit C-4's
+  // sibling: invisible control). With the tables reconciled the accident is
+  // gone, so the Б2 the curriculum needs is AUTHORED here instead, and props.ts
+  // now posts the octagon the drill has always assumed. A slip road entering a
+  // 70 km/h boulevard is a Б2 in Sofia, so the lesson is unchanged — only the
+  // sign is now real.
+  { nodeId: "n2945503673", edgeId: "e171919146.0" },
 ];
 
 export interface StopLine {
@@ -123,10 +142,9 @@ export interface StopLine {
    * „Стоп" (full stop demanded at the line regardless of traffic, ЗДвП чл. 50);
    * "giveWay" = Б1 „Пропусни движението" (yield to priority traffic, NO full
    * stop when the mouth is clear — same чл. 50, „пълно спиране се налага само
-   * когато иначе би ги засякъл", content bank q-krastovishta-006). A giveWay
-   * line appears ONLY where a Б1 node is authored (STOP_LINE_OVERRIDES.control),
-   * of which there are none today — so every shipped map still emits only
-   * stopSign/trafficLight (byte-identical).
+   * когато иначе би ги засякъл", content bank q-krastovishta-006). ALWAYS the
+   * kind of sign the world builder posts on this approach — audit C-4 made
+   * that an invariant instead of a coincidence.
    */
   control: "trafficLight" | "stopSign" | "giveWay";
   /** Intersection node the line guards. */
@@ -226,15 +244,33 @@ export function buildStopLines(
       continue;
     }
 
-    // Stop-sign heuristic.
+    // Priority-sign heuristic.
     if (incident.some((i) => index.edgeRt(i).edge.roundabout)) continue;
+    // Whose obligation, and WHICH one, is the world builder's own rule — the
+    // one that paints the sign the student actually sees (audit C-4). The
+    // gate below then keeps the GRADED subset conservative (minor meets
+    // arterial only); an approach the painter posts nothing on is never
+    // graded, so a line can no longer exist without a sign above it.
+    const controls = junctionPriorityControls(
+      incident.map((i) => {
+        const { edge } = index.edgeRt(i);
+        return {
+          edgeId: edge.id,
+          class: edge.class,
+          incoming: !edge.oneway || edge.to === it.id,
+          roundabout: edge.roundabout,
+        };
+      }),
+    );
     const ranks = incident.map((i) => index.edgeRt(i).classRank);
     if (!ranks.some((r) => r >= ARTERIAL_MIN_RANK)) continue;
     for (const edgeIdx of incident) {
       const rt = index.edgeRt(edgeIdx);
       if (rt.classRank > MINOR_MAX_RANK) continue;
-      if (rt.edge.from === it.id) addApproach(edgeIdx, it.id, true, "stopSign", STOP_SIGN_SETBACK_M);
-      if (rt.edge.to === it.id) addApproach(edgeIdx, it.id, false, "stopSign", STOP_SIGN_SETBACK_M);
+      const control = controls.get(rt.edge.id);
+      if (control === undefined) continue;
+      if (rt.edge.from === it.id) addApproach(edgeIdx, it.id, true, control, STOP_SIGN_SETBACK_M);
+      if (rt.edge.to === it.id) addApproach(edgeIdx, it.id, false, control, STOP_SIGN_SETBACK_M);
     }
   }
 

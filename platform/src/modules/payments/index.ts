@@ -15,9 +15,14 @@
  *                    URL; fulfillCheckout(sessionIdOrObject) → idempotent
  *                    Entitlement creation (webhook + success page both call
  *                    it; providerRef = session id is the dedup key).
- * - Free tier:      checkPracticeQuota / requireEntitlementForExam —
- *                    exported but NOT wired; integration points are
- *                    documented in quota.ts.
+ * - Consent gate:   requiredCheckoutConsents / recordCheckoutConsent — the
+ *                    parental approval (ЗЛС) and withdrawal waiver (ЗЗП) a
+ *                    purchase needs. Neither session-creating function will
+ *                    touch Stripe without them (consent.ts explains why).
+ * - Free tier:      checkPracticeQuota / requireEntitlementForExam /
+ *                    requireEntitlementForSimulator / checkTutorQuota — one
+ *                    gate per paid row of the /pricing table, each wired at a
+ *                    single server-side choke point (listed in quota.ts).
  * - Ops:            isStripeConfigured() — missing STRIPE_SECRET_KEY must
  *                    degrade (disabled buy buttons), never crash.
  *
@@ -52,14 +57,29 @@ export {
 } from "./checkout";
 export type { CheckoutSessionLike } from "./checkout";
 
-// Free-tier quota helpers (not wired — see quota.ts header for the
-// exact integration points in theory practice and startExamAction)
+// Purchase consent (H-9 parental approval + ЗЗП withdrawal waiver, M-24 versioning)
+export {
+  CHECKOUT_CONSENT_TEXTS_BG,
+  CHECKOUT_CONSENT_CONTEXT,
+  CHECKOUT_CONSENT_TTL_MINUTES,
+  mayBeMinor,
+  requiredCheckoutConsents,
+  recordCheckoutConsent,
+  findValidCheckoutConsent,
+  checkoutConsentPath,
+} from "./consent";
+export type { CheckoutConsentKind, CheckoutConsentProof } from "./consent";
+
+// Free-tier gates (see the quota.ts header for the four choke points)
 export {
   checkPracticeQuota,
   requireEntitlementForExam,
+  requireEntitlementForSimulator,
+  checkTutorQuota,
   sofiaDayRange,
   FREE_DAILY_PRACTICE_LIMIT,
   FREE_MOCK_EXAM_LIMIT,
+  FREE_TUTOR_LIFETIME_MESSAGES,
 } from "./quota";
 
 // Stripe wiring
@@ -76,6 +96,8 @@ export type {
   PaymentsStore,
   EntitlementRecord,
   CreateEntitlementInput,
+  ConsentEventRecord,
+  CreateConsentEventInput,
 } from "./store";
 
 // Types + errors
@@ -85,4 +107,5 @@ export type {
   EntitlementSummary,
   FulfillResult,
   PracticeQuota,
+  TutorQuota,
 } from "./types";

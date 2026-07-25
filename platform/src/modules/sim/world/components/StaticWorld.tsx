@@ -31,8 +31,8 @@ import { makeDecalAtlasTexture } from "../textures/decalAtlas";
 import { useFacadeTextures, type FacadeSetName } from "../textures/facadeTextures";
 import { macroOnBeforeCompile, macroProgramCacheKey } from "../textures/macroVariation";
 import { usePbrSet } from "../textures/pbrTextures";
+import { TEXTURE_BUDGETS } from "../textures/textureBudget";
 import { disposeAll, meshDataToGeometry } from "./three-helpers";
-import { QUALITY_PRESETS, type FacadeMapsMode } from "@/modules/sim/environment";
 import type { QualityPreset } from "./quality";
 
 const FACADE_VARIANT_COUNT = 4;
@@ -41,18 +41,6 @@ const FACADE_VARIANT_COUNT = 4;
  *  instanced towers (CityBuildings): matte dielectric, no per-pixel fetch. */
 const FACADE_FALLBACK_ROUGHNESS = 0.7;
 const FACADE_FALLBACK_METALNESS = 0.0;
-
-/**
- * Per-fragment facade-map budget for this tier (shared ruling with the
- * instanced towers). The world preset carries no explicit level, so map its
- * tier-monotonic textureSize back to the shared quality level and read the
- * environment presets (single source of truth). high = full, med = colorNormal,
- * low = colorOnly.
- */
-function facadeMapsFor(preset: QualityPreset): FacadeMapsMode {
-  const level = preset.textureSize >= 1024 ? "high" : preset.textureSize >= 512 ? "med" : "low";
-  return QUALITY_PRESETS[level].facadeMaps;
-}
 
 /**
  * Facade-prism variant -> baked bay system (doc 71 §4.5). Variant 0 is the
@@ -205,16 +193,21 @@ export function StaticWorld({
 
   // Real CC0 PBR sets — shared, cached, loaded once. Until they resolve (or on
   // the server) each mesh falls back to its procedural canvas texture below.
-  const asphalt = usePbrSet("road", preset.anisotropy, gl);
-  const concrete = usePbrSet("sidewalk", preset.anisotropy, gl);
-  const grass = usePbrSet("ground", preset.anisotropy, gl);
+  // `budget` is the DOWNLOAD tier (audit H-11): at low only the albedo is
+  // fetched at all, so normalMap/roughnessMap/aoMap come back null and the
+  // authored material constants below take over.
+  const budget = TEXTURE_BUDGETS[preset.level];
+  const asphalt = usePbrSet("road", budget.groundMaps, preset.anisotropy, gl);
+  const concrete = usePbrSet("sidewalk", budget.groundMaps, preset.anisotropy, gl);
+  const grass = usePbrSet("ground", budget.groundMaps, preset.anisotropy, gl);
   // Baked facade bay sets (facade_atlas.py) — shared with the instanced kit
-  // towers (CityBuildings wires the same cache onto the GLB materials).
-  const facadeSets = useFacadeTextures(gl, preset.anisotropy);
+  // towers (CityBuildings wires the same cache onto the GLB materials, and
+  // MUST pass the same mode: one cache entry, one GPU copy).
+  const facadeMaps = budget.facadeMaps;
+  const facadeSets = useFacadeTextures(gl, preset.anisotropy, facadeMaps);
 
   const receive = preset.receiveShadows;
   const buildingsCast = preset.castShadows !== "none";
-  const facadeMaps = facadeMapsFor(preset);
 
   // Wet-road response: as the shared rain channel soaks the asphalt, drop its
   // roughness (dry matte 1.0 → wet gloss) and darken its albedo. Grass +
@@ -282,8 +275,8 @@ export function StaticWorld({
           <meshStandardMaterial
             {...MACRO_VARIATION}
             map={grass.map}
-            normalMap={grass.normalMap}
-            roughnessMap={grass.roughnessMap}
+            normalMap={grass.normalMap ?? undefined}
+            roughnessMap={grass.roughnessMap ?? undefined}
             aoMap={grass.aoMap ?? undefined}
             roughness={1}
             metalness={0}
@@ -304,8 +297,8 @@ export function StaticWorld({
           <meshStandardMaterial
             {...MACRO_VARIATION}
             map={concrete.map}
-            normalMap={concrete.normalMap}
-            roughnessMap={concrete.roughnessMap}
+            normalMap={concrete.normalMap ?? undefined}
+            roughnessMap={concrete.roughnessMap ?? undefined}
             roughness={1}
             metalness={0}
           />
@@ -325,8 +318,8 @@ export function StaticWorld({
           <meshStandardMaterial
             {...MACRO_VARIATION}
             map={asphalt.map}
-            normalMap={asphalt.normalMap}
-            roughnessMap={asphalt.roughnessMap}
+            normalMap={asphalt.normalMap ?? undefined}
+            roughnessMap={asphalt.roughnessMap ?? undefined}
             aoMap={asphalt.aoMap ?? undefined}
             color={roadTint}
             vertexColors
@@ -351,8 +344,8 @@ export function StaticWorld({
           <meshStandardMaterial
             {...MACRO_VARIATION}
             map={asphalt.map}
-            normalMap={asphalt.normalMap}
-            roughnessMap={asphalt.roughnessMap}
+            normalMap={asphalt.normalMap ?? undefined}
+            roughnessMap={asphalt.roughnessMap ?? undefined}
             aoMap={asphalt.aoMap ?? undefined}
             color={roadTint}
             roughness={wet.roughness}
@@ -376,8 +369,8 @@ export function StaticWorld({
           <meshStandardMaterial
             {...MACRO_VARIATION}
             map={asphalt.map}
-            normalMap={asphalt.normalMap}
-            roughnessMap={asphalt.roughnessMap}
+            normalMap={asphalt.normalMap ?? undefined}
+            roughnessMap={asphalt.roughnessMap ?? undefined}
             color={parkingTint}
             roughness={wet.roughness}
             metalness={0}
@@ -445,8 +438,8 @@ export function StaticWorld({
           <meshStandardMaterial
             {...MACRO_VARIATION}
             map={concrete.map}
-            normalMap={concrete.normalMap}
-            roughnessMap={concrete.roughnessMap}
+            normalMap={concrete.normalMap ?? undefined}
+            roughnessMap={concrete.roughnessMap ?? undefined}
             vertexColors
             roughness={1}
             metalness={0}
@@ -510,13 +503,15 @@ export function StaticWorld({
               // Tier-gated maps (shared ruling with CityBuildings): color +
               // emissive always; normal on full+colorNormal; the ORM (ao/rough/
               // metal) only on full — dropped to a matte constant otherwise.
+              // Since H-11 the tier gates the FETCH, so the dropped maps are
+              // already null here; `?? undefined` is what binds nothing.
               <meshStandardMaterial
                 map={baked.color}
-                normalMap={facadeMaps === "colorOnly" ? undefined : baked.normal}
-                aoMap={facadeMaps === "full" ? baked.orm : undefined}
+                normalMap={baked.normal ?? undefined}
+                aoMap={baked.orm ?? undefined}
                 aoMapIntensity={1.2}
-                roughnessMap={facadeMaps === "full" ? baked.orm : undefined}
-                metalnessMap={facadeMaps === "full" ? baked.orm : undefined}
+                roughnessMap={baked.orm ?? undefined}
+                metalnessMap={baked.orm ?? undefined}
                 emissiveMap={baked.emissive}
                 emissive={0xffffff}
                 emissiveIntensity={night ? FACADE_NIGHT_GLOW : FACADE_DAY_GLOW}

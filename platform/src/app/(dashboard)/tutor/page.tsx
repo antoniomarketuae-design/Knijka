@@ -3,6 +3,8 @@ import Link from "next/link";
 import { TutorChat } from "@/components/tutor/TutorChat";
 import { requireUser } from "@/modules/auth";
 import { getThread, isTutorEnabled } from "@/modules/tutor";
+import { TutorPaywall, TutorTrialNotice } from "./paywall";
+import { getTutorAccess } from "./trial";
 
 export const metadata: Metadata = {
   title: "AI Учител · Книжка.AI",
@@ -14,6 +16,12 @@ export const metadata: Metadata = {
  * AI tutor page. Server component: without an API key it renders a clean
  * "activating soon" state (never a crash); otherwise it loads the user's
  * thread and hands off to the chat client component.
+ *
+ * C-3: full tutor access is what both packs sell, so a free account gets a
+ * lifetime trial — the countdown above the chat while it lasts, the paywall
+ * screen once it is spent. The trial is counted from the persisted thread
+ * (trial.ts) and re-checked inside askTutorAction, so the chat that is already
+ * open on screen cannot outlive the allowance.
  */
 export default async function TutorPage() {
   const user = await requireUser();
@@ -50,6 +58,8 @@ export default async function TutorPage() {
   }
 
   const thread = await getThread(user.id);
+  const trial = await getTutorAccess(user, thread.messages);
+  if (!trial.allowed) return <TutorPaywall />;
 
   return (
     <div className="flex flex-col gap-6">
@@ -60,6 +70,8 @@ export default async function TutorPage() {
           учебната програма и винаги цитира закона.
         </p>
       </header>
+
+      {trial.unlimited ? null : <TutorTrialNotice remaining={trial.remaining} />}
 
       <TutorChat
         initialMessages={thread.messages.map(({ role, content, ts }) => ({

@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { setContentRepo } from "@/lib/content/repo";
 import { getReadiness } from "@/modules/learning";
+import { resetRateLimitState } from "@/modules/security";
 import { computeCostMicroUsd } from "./cost";
 import {
   FakeTutorModel,
@@ -8,6 +9,7 @@ import {
   makeTutorFixtureRepo,
 } from "./fixtures";
 import { setTutorModel } from "./model";
+import { TUTOR_NO_MATERIAL_REPLY_BG } from "./prompt";
 import {
   askTutor,
   countUserMessagesSince,
@@ -41,6 +43,11 @@ let store: FakeTutorStore;
 let model: FakeTutorModel;
 
 beforeEach(() => {
+  // askTutor now consumes a per-user burst budget (H-8). Its counters live in
+  // a module-level Map, so without this every test after the eighth call in a
+  // minute would be answered by the burst guard instead of the code it means
+  // to exercise.
+  resetRateLimitState();
   setContentRepo(makeTutorFixtureRepo());
   store = new FakeTutorStore();
   model = new FakeTutorModel(REPLY_WITH_CITATION);
@@ -138,6 +145,59 @@ describe("askTutor — happy path", () => {
     expect(sent).toHaveLength(TUTOR_HISTORY_MESSAGES + 1);
     expect(sent[0]).toEqual({ role: "user", content: "въпрос 4" });
     expect(sent.at(-1)?.content).toBe("Кога имам предимство?");
+  });
+});
+
+describe("askTutor — rule-catalog grounding (audit I-1)", () => {
+  // The fixture content bank knows nothing about pedestrians on purpose:
+  // everything asserted here can only come from the sim rule catalog.
+  const PEDESTRIAN_QUESTION =
+    "Какво става, ако не пропусна пешеходец на пътеката?";
+
+  it("grounds a driving-behaviour question in the catalog and cites its lawRef", async () => {
+    const ruleModel = new FakeTutorModel(
+      "Спираш пред пътеката и изчакваш [ЗДвП чл. 119].",
+    );
+    setTutorModel(ruleModel);
+
+    const result = await askTutor(USER, PEDESTRIAN_QUESTION);
+
+    const system = ruleModel.completeCalls[0].system;
+    expect(system).toContain("правило от практическия изпит"); // corpus label
+    expect(system).toContain("Непропускане на пешеходец"); // catalog title
+    expect(system).toContain("опасна грешка — 10 наказателни точки"); // official cost
+    expect(system).toContain("Правилното действие:"); // the corrective
+    expect(system).toContain("[ЗДвП чл. 119]"); // citable marker
+
+    expect(result.citations).toEqual([{ act: "ЗДвП", ref: "чл. 119" }]);
+  });
+
+  it("still drops a citation the model invented from the catalog corpus", async () => {
+    const ruleModel = new FakeTutorModel(
+      "Виж [ЗДвП чл. 401] и [Наредба № 99].",
+    );
+    setTutorModel(ruleModel);
+
+    const result = await askTutor(USER, PEDESTRIAN_QUESTION);
+
+    // The catalog IS grounding this answer (its real ref is in the prompt) —
+    // and the whitelist still refuses the two markers the model made up.
+    expect(ruleModel.completeCalls[0].system).toContain("[ЗДвП чл. 119]");
+    expect(result.citations).toEqual([]);
+  });
+
+  it("gives the model no catalog material for a rule it does not contain", async () => {
+    // Fines/insurance: a real driving topic, absent from both corpora. The
+    // catalog must not become a licence to reason about neighbouring law.
+    const ruleModel = new FakeTutorModel(TUTOR_NO_MATERIAL_REPLY_BG);
+    setTutorModel(ruleModel);
+
+    const result = await askTutor(USER, "Каква е глобата за изтекла застраховка?");
+
+    expect(ruleModel.completeCalls[0].system).toContain(
+      "(няма намерени материали по този въпрос)",
+    );
+    expect(result.citations).toEqual([]);
   });
 });
 

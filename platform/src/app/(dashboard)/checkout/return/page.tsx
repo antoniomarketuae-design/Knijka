@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { requireUser } from "@/modules/auth";
 import { fulfillCheckout, isStripeConfigured } from "@/modules/payments";
 
 export const metadata: Metadata = { title: "Плащане · резултат | Книжка.AI" };
@@ -14,6 +15,17 @@ type Props = { searchParams: Promise<{ session_id?: string }> };
  * the async webhook grants access when it lands.
  */
 export default async function CheckoutReturnPage({ searchParams }: Props) {
+  // Audit 2026-07-24, M-23. This page takes an attacker-supplied `session_id`
+  // straight to `checkout.sessions.retrieve` — anonymously, it was an
+  // unmetered proxy onto the founder's Stripe account and a paid/pending
+  // oracle for any session id someone got hold of. It never was privilege
+  // escalation (the entitlement's userId comes from Stripe-verified metadata,
+  // not from the session), so the fix is the cheap one the page was missing:
+  // be signed in. The per-IP budget on /checkout/return in src/proxy.ts caps
+  // what a signed-in caller can do with it; the module boundary keeps the
+  // fulfilment decision where it belongs.
+  await requireUser();
+
   const { session_id } = await searchParams;
 
   let state: "paid" | "pending" | "error" = "error";

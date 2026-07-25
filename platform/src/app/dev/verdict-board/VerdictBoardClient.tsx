@@ -11,7 +11,7 @@
  * This is a DEV route (page 404s in production). It plays the local
  * public/clips/*.webm the headless renderer just produced, so it works in the
  * browser preview without staging. Reuses the shared manifest reader
- * (components/theory/clipManifest) — the SAME contract the app why-panel reads.
+ * (modules/clips/view) — the SAME contract the app why-panel reads.
  *
  * Deliberately a separate client from the admin ClipsGalleryClient: that one
  * is the neutral review grid; this one is opinionated (verdict + my R0 flags +
@@ -26,8 +26,8 @@ import {
   parseClipManifest,
   posterFrameFor,
   type MistakeClip,
-} from "@/components/theory/clipManifest";
-import { durationFixStep } from "@/components/theory/webmDuration";
+} from "@/modules/clips/view";
+import { durationFixStep } from "@/modules/clips/view";
 import { r0StatusFor, type R0Level } from "./r0Status";
 import type { HalfAItem } from "./halfAData";
 import { HalfASection } from "./HalfASection";
@@ -331,7 +331,7 @@ export function VerdictBoardClient({
         </h1>
         <p className="mt-1.5 max-w-2xl text-sm leading-relaxed text-muted">
           Гледай всеки клип/картинка и маркирай ✓ добър или ✗ проблем. Присъдите
-          се пазят само на това устройство. Оранжев/червен знак „R0" = вече съм
+          се пазят само на това устройство. Оранжев/червен знак „R0&quot; = вече съм
           го отбелязал като слаб/дефектен (виж бележката).
         </p>
       </header>

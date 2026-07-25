@@ -90,6 +90,22 @@ export interface StartExamResult {
   durationSec: typeof EXAM_DURATION_SEC;
 }
 
+/**
+ * An attempt that is still running, re-rendered from what was actually dealt.
+ *
+ * `seed` is the attempt row's stored builder seed, not a browser cookie, and
+ * `questions` come from the stored question ids — so a resume works on any
+ * device and survives a content deploy mid-attempt (audit H-7, M-9).
+ */
+export interface InProgressExam {
+  attemptId: string;
+  seed: number;
+  /** Authoritative start time — the runner's clock is derived from it. */
+  startedAt: Date;
+  /** Exactly the questions dealt at start, in the dealt order. */
+  questions: ExamQuestion[];
+}
+
 export interface SubmitExamResult extends GradeResult {
   attemptId: string;
   /**
@@ -99,6 +115,72 @@ export interface SubmitExamResult extends GradeResult {
    * what the candidate answered.
    */
   late: boolean;
+}
+
+// ---------------------------------------------------------------------------
+// Review of a completed attempt (audit M-1 — server-side, any device)
+// ---------------------------------------------------------------------------
+
+export interface ExamReviewOption {
+  id: string;
+  textBg: string;
+  /** Part of the official correct answer set. */
+  correct: boolean;
+  /** Selected by the candidate. */
+  chosen: boolean;
+}
+
+/**
+ * One question of a graded attempt, with everything needed to explain it:
+ * the full option set with correct flags, the explanation and the citations.
+ * Safe by construction — only reachable for an attempt that is already closed.
+ */
+export interface ExamReviewQuestion {
+  questionId: string;
+  textBg: string;
+  type: Question["type"];
+  /** The candidate selected at least one option. */
+  answered: boolean;
+  correct: boolean;
+  /** Points awarded (question weight if correct, else 0). */
+  pointsAwarded: number;
+  /** Question weight (1 | 2 | 3), as graded. */
+  maxPoints: number;
+  options: ExamReviewOption[];
+  explanationBg: string;
+  lawRefs: { act: string; ref: string }[];
+  /** Primary topic — null when the question has left the bank. */
+  topicSlug: string | null;
+  topicTitleBg: string | null;
+}
+
+/** How one topic went in this exam — the row a "practise this" link hangs off. */
+export interface ExamTopicResult {
+  topicId: string;
+  slug: string;
+  titleBg: string;
+  /** Questions from this topic on the paper. */
+  questions: number;
+  correct: number;
+  /** Points scored / available within this topic. */
+  points: number;
+  maxPoints: number;
+}
+
+/** A completed attempt, rebuilt from the attempt row on any device. */
+export interface ExamReview {
+  attemptId: string;
+  startedAt: Date;
+  finishedAt: Date;
+  score: number;
+  maxScore: number;
+  passed: boolean;
+  /** Wall-clock seconds between start and submit. */
+  timeUsedSec: number;
+  /** In the order the candidate sat them. */
+  questions: ExamReviewQuestion[];
+  /** Curriculum order; topics that appeared on this paper only. */
+  byTopic: ExamTopicResult[];
 }
 
 export interface ExamHistoryEntry {
@@ -118,6 +200,7 @@ export interface ExamHistoryEntry {
 export type ExamErrorCode =
   | "BANK_TOO_SMALL" // fewer than 45 eligible questions
   | "BANK_OVERWEIGHT" // no 45-question combination fits within 97 points
+  | "BANK_UNDERWEIGHT" // no 45-question combination reaches exactly 97 points
   | "ATTEMPT_NOT_FOUND" // unknown attempt id OR attempt owned by another user
   | "ALREADY_SUBMITTED"
   | "INVALID_ATTEMPT_STATE"; // stored attempt payload unreadable

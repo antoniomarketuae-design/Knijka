@@ -65,8 +65,8 @@ import type { SimInput } from "@/modules/sim/engine";
 import { carPaintMaterial, carPaintStandardMaterial } from "@/modules/sim/traffic";
 import { QUALITY_PRESETS, type QualityLevel } from "@/modules/sim/environment";
 import { loadQualityPreset } from "./lesson-ui/QualityPresetSelector";
-import type { CabinControls } from "./cabin";
-import { CockpitInteractionContext } from "./vitok/hotspots";
+import type { CabinControls } from "@/modules/sim/scene/cabin";
+import { CockpitInteractionContext } from "@/modules/sim/scene/vitok/hotspots";
 
 const HERO_URL = "/sim/vehicles/hero_car.glb";
 /** Local Draco decoder (CSP-safe, no CDN) — copied to public/draco/. */

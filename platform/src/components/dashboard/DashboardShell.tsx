@@ -17,7 +17,7 @@ import {
   IconWheel,
   IconX,
 } from "@/components/icons";
-import { isSoon, statusBadge } from "@/components/dashboard/availability";
+import { isSoon, statusBadge } from "@/lib/routeStatus";
 
 interface NavItem {
   href: string;

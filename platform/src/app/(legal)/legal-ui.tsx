@@ -15,13 +15,22 @@ import type { ReactNode } from "react";
 
 // ---------------------------------------------------------------------------
 // Founder placeholders — replace before launch (single source for all pages)
+//
+// The values now live in the React-free @/lib/legal/identity module so the
+// PAYMENTS layer can import them without pulling in React: checkout refuses to
+// run while any of them is still a placeholder (audit C-1). Re-exported here so
+// every legal page keeps its existing import.
 // ---------------------------------------------------------------------------
 
-export const ENTITY_NAME = "[ИМЕ НА ЮРИДИЧЕСКО ЛИЦЕ]";
-export const ENTITY_EIK = "[ЕИК]";
-export const ENTITY_ADDRESS = "[АДРЕС]";
-export const CONTACT_EMAIL = "[ИМЕЙЛ ЗА КОНТАКТ]";
-export const LAST_UPDATED = "[ДАТА]";
+import {
+  CONTACT_EMAIL,
+  ENTITY_ADDRESS,
+  ENTITY_EIK,
+  ENTITY_NAME,
+  LAST_UPDATED,
+} from "@/lib/legal/identity";
+
+export { ENTITY_NAME, ENTITY_EIK, ENTITY_ADDRESS, CONTACT_EMAIL, LAST_UPDATED };
 
 // ---------------------------------------------------------------------------
 // Layout pieces

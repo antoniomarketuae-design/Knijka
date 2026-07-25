@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { setContentRepo } from "@/lib/content/repo";
 import { FakeLearningStore, makeFixtureRepo } from "./fixtures";
+import { buildPracticeSession } from "./session";
 import { setLearningStore } from "./store";
 import { submitAnswer } from "./submit";
 
@@ -161,6 +162,38 @@ describe("submitAnswer", () => {
     expect(row.mastery).toBeCloseTo(0.625, 10); // mastery still improves
     expect(row.reps).toBe(2); // schedule untouched
     expect(row.dueAt).toEqual(daysFromNow(3));
+  });
+
+  it("grades a shuffled practice session by option ID, never by position", async () => {
+    // The regression this pins: practice now presents options in a per-session
+    // seeded order (audit H-1a), so an option's slot on screen has nothing to
+    // do with its slot in the bank. A grader that compared POSITIONS would
+    // mark the right answer wrong and the wrong answer right — and mastery,
+    // lapses and dueAt all hang off that single boolean.
+    const session = await buildPracticeSession(USER, { now: NOW, optionSeed: 0 });
+    const presented = session
+      .find((s) => s.question.id === "q-road-1")!
+      .question.options.map((o) => o.id);
+
+    const stored = makeFixtureRepo().questionById("q-road-1")!.options;
+    const correctSlot = stored.findIndex((o) => o.correct); // 0 — the bank's habit
+    const correctId = stored[correctSlot].id;
+    // Precondition: this session really did move the answer off its slot.
+    expect(presented[correctSlot]).not.toBe(correctId);
+
+    const byId = await submitAnswer(USER, "q-road-1", [correctId], "practice", NOW);
+    expect(byId.correct).toBe(true);
+    expect(byId.correctOptionIds).toEqual([correctId]);
+
+    // The option now SITTING in the historically correct slot is a distractor.
+    const byPosition = await submitAnswer(
+      USER,
+      "q-road-1",
+      [presented[correctSlot]],
+      "practice",
+      NOW,
+    );
+    expect(byPosition.correct).toBe(false);
   });
 
   it("rejects unknown questions and foreign option ids without persisting", async () => {

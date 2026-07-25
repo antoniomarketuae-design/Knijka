@@ -2,6 +2,7 @@
 
 import { useEffect, useState, type CSSProperties } from "react";
 import { createPortal } from "react-dom";
+import { useIsHydrated, usePrefersReducedMotion } from "@/lib/hooks/clientEnv";
 
 /**
  * Celebration — the NEON "reward flourish" register (doc 64).
@@ -105,11 +106,11 @@ const CSS = `
 
 export function Celebration({ show, title, subtitle }: CelebrationProps) {
   const [dismissed, setDismissed] = useState(false);
-  const [mounted, setMounted] = useState(false);
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
+  // createPortal needs a real document; there is none on the server (M-21 —
+  // this used to be a setState-in-effect mount flag, one wasted commit per
+  // celebration).
+  const mounted = useIsHydrated();
+  const reduce = usePrefersReducedMotion();
 
   useEffect(() => {
     if (!show || dismissed) return;
@@ -121,16 +122,13 @@ export function Celebration({ show, title, subtitle }: CelebrationProps) {
     // Auto-retire the flourish only when motion is allowed; under reduced
     // motion the calm panel stays until the user dismisses it.
     let timer: ReturnType<typeof setTimeout> | undefined;
-    const reduce =
-      typeof window !== "undefined" &&
-      window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
     if (!reduce) timer = setTimeout(() => setDismissed(true), 6200);
 
     return () => {
       window.removeEventListener("keydown", onKey);
       if (timer) clearTimeout(timer);
     };
-  }, [show, dismissed]);
+  }, [show, dismissed, reduce]);
 
   if (!mounted || !show || dismissed) return null;
 

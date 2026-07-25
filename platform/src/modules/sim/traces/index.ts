@@ -28,10 +28,35 @@ export {
 // Defensive parse/serialize (never trust stored JSON — the store.ts law)
 export { parseScenarioTrace, serializeScenarioTrace } from "./parse";
 
-// Clip-plan replay registry (doc 66 R3) — replays a pilot template's
-// committed mistake demo through the production grading stack so the
-// clip-plan generator reads the ENGINE-computed first-violation time.
-export { clipReplayTemplateIds, clipStagedOverrideFor, replayPilotMistake } from "./clipReplay";
+// I-2 „Твоят дубъл" — the pure storage reduction the CLIENT applies to its own
+// attempt before uploading it (10 Hz, cm precision, capped). Browser-safe by
+// construction. Its persistence counterpart, ./attemptStore, is server-only
+// (node:zlib + Prisma) and stays OFF this barrel for the same reason
+// ./clipReplay does — see the note above.
+export {
+  MAX_STORED_EVENTS,
+  MAX_STORED_SAMPLES,
+  STORED_TRACE_HZ,
+  compactTraceForStorage,
+} from "./compact";
+
+// NOT re-exported: ./clipReplay (audit 2026-07-24 M-26). Its registry
+// statically imports ~40 scripted-drive recorders, each pinning its scenario
+// template module. This barrel is on the THEORY path — /theory/practice, the
+// mock-exam runner /exams/[attemptId] and /review/verdict all reach it via
+// SceneStill → mistakeReplayCore for `sampleAt`/`parseScenarioTrace` — and a
+// barrel re-export is a STATIC edge whether or not the symbol is ever called,
+// so every theory learner was parsing the simulator's clip-production registry
+// to draw a 2D canvas. Measured on the production build: -488 KB raw /
+// -103 KB gz on all three routes. clipReplay's only consumers are build/dev-
+// time (learning/clipPlanBuilder and /dev/clip-capture); they import
+// "./clipReplay" directly, so the cost stays on the tools that pay it.
+//
+// RESIDUAL, deliberately named: the 65 recorder re-exports below still pin 13
+// template modules (~234 KB) onto that same theory chunk, because Turbopack
+// does not shake a re-export chain out on its own. Severing it needs a narrow
+// playback sub-barrel for the theory side; barrel-bundle-weight.test.ts
+// ratchets the count so it cannot grow back while that waits.
 
 // Playback queries (zero-alloc hot path) + ribbon-path decimation
 export {

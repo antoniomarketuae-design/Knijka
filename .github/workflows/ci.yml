@@ -1,17 +1,42 @@
 # The gate, mechanized (doc 61): every PR and every push to an integration
-# branch runs the same four checks each developer runs locally. Nobody merges
-# red. Dummy env values — no test connects to a real database; prisma only
-# needs the vars to exist to generate/config-load.
+# branch runs the same checks each developer runs locally. Nobody merges red.
+# Dummy env values — no test connects to a real database; prisma only needs the
+# vars to exist to generate/config-load.
+#
+# WHY THIS FILE GREW (audit 2026-07-24, findings H-12 + H-17): the gate used to
+# be decorative. It ran, it went red, and nothing downstream cared — staging
+# deployed from branch HEAD on a 5-minute timer that never consulted a check
+# run, so a red commit shipped to students anyway. Two changes fix that:
+#
+#  1. `cancel-in-progress` is now PR-only. On an integration branch every
+#     commit must reach a terminal verdict, because the deploy pointer below is
+#     derived from it — a cancelled run leaves a commit with no verdict at all,
+#     which is indistinguishable from "not green yet", forever.
+#  2. The `deployable` job moves the `staging-green` tag to the commit ONLY
+#     after every gate step passed. The VPS deploys THAT TAG instead of branch
+#     HEAD, so a red commit is structurally undeployable and the last green
+#     commit stays live. Rolling back is `git tag -f staging-green <older sha>`
+#     — plain git, which the deploy script already speaks, and no API token has
+#     to live on the box.
+#
+# Branch discipline (H-12b) cannot be enforced from a workflow file: require
+# `gate` as a status check and forbid direct pushes in the branch-protection
+# settings for `scenario-engine`/`main`. Until that is switched on, the deploy
+# pointer is what actually protects students.
 name: gate
 
 on:
   pull_request:
   push:
     branches: [main, scenario-engine]
+  # Merge queues run the gate on the merged result, not on the PR head.
+  merge_group:
 
 concurrency:
   group: ci-${{ github.ref }}
-  cancel-in-progress: true
+  # Superseding a PR run is free — superseding an integration-branch run
+  # destroys the verdict the deploy pointer depends on.
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   gate:
@@ -39,5 +64,42 @@ jobs:
         run: npx vitest run
       - name: sim harness
         run: node scripts/sim-harness.mjs
+      # The content contract (content/SCHEMA.md): every lawRef resolves, every
+      # media reference exists, every topic is covered. Cheap — and it is the
+      # only check that reads content/, which the app trusts blindly at boot.
+      - name: content contract
+        run: node scripts/validate-content.mjs
       - name: build
         run: npm run build
+
+  # The deploy pointer. Runs only on the integration branches, only after the
+  # gate is green, and does nothing on a PR — so the tag can never name a
+  # commit that has not passed every check above.
+  #
+  # VPS side (founder action, doc 61): the box currently deploys from the `vps`
+  # bare remote, which never sees this tag. Add GitHub as a fetch remote there
+  # and make /opt/knijka/autodeploy.sh resolve `staging-green` instead of
+  # branch HEAD, refusing to deploy when the tag has not moved. Without that
+  # one-line change on the box this job is inert — it records the verdict but
+  # nothing consumes it.
+  deployable:
+    needs: gate
+    if: github.event_name == 'push' && (github.ref_name == 'main' || github.ref_name == 'scenario-engine')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # moving the tag is the only write this repo's CI does
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: move staging-green to this commit
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          # Force-move: the tag is a POINTER to the newest green commit, not a
+          # release marker. Log the previous target so the rollback SHA is one
+          # `git log` away when a deploy has to be undone in a hurry.
+          echo "previous staging-green: $(git rev-list -n 1 staging-green 2>/dev/null || echo none)"
+          git tag -f staging-green "$GITHUB_SHA"
+          git push -f origin refs/tags/staging-green

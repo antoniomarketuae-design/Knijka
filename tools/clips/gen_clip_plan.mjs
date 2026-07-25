@@ -1,6 +1,6 @@
 /**
  * gen_clip_plan.mjs — the produced-media requirements card (doc 66):
- * regenerates platform/src/modules/learning/clipPlan.generated.ts — per pilot
+ * regenerates platform/src/modules/clips/clipPlan.generated.ts — per pilot
  * clip the ENGINE-computed first-violation time (R3) + the machine-derived
  * card (R1 actors / R2 governing control / R4 view).
  *
@@ -20,7 +20,7 @@ import { fileURLToPath } from "node:url";
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const PLATFORM = path.resolve(HERE, "..", "..", "platform");
 
-const result = spawnSync("npx", ["vitest", "run", "src/modules/learning/clipPlan.test.ts"], {
+const result = spawnSync("npx", ["vitest", "run", "src/modules/clips/clipPlan.test.ts"], {
   cwd: PLATFORM,
   env: { ...process.env, GEN_CLIP_PLAN: "1" },
   stdio: "inherit",

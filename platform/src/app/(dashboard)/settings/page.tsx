@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { requireUser } from "@/modules/auth";
+import { PrivacyControls } from "./privacy-controls";
 import { SignOutButton } from "./signout-button";
 
 export const metadata: Metadata = {
@@ -17,8 +18,9 @@ const LEGAL_LINKS = [
 
 /**
  * /settings v1 — deliberately minimal (audit B1 documents the bigger version):
- * who am I, sign out, how to change my password, how to delete my data (GDPR —
- * users are minors, self-service deletion request must be one click away),
+ * who am I, sign out, how to change my password, my GDPR rights (audit C-2:
+ * export + erasure are real self-service actions here, not a mailto — the
+ * users are minors and Art. 15/17 cannot depend on a mailbox someone reads),
  * and the legal documents. Theme toggle + exam-date/goal editing come with
  * the server-side onboarding columns (post-launch path in storage.ts).
  */
@@ -81,22 +83,18 @@ export default async function SettingsPage() {
         </h2>
         <p className="mt-2 text-sm leading-relaxed text-muted">
           Пазим само минимума: имейл, име, година на раждане и учебния ти
-          напредък. Имаш право по всяко време да поискаш копие от данните си
-          или пълно изтриване на акаунта — достатъчно е да ни пишеш със свои
-          думи, отговаряме до един месец. Родител или настойник също може да
-          пише от твое име.
-        </p>
-        <div className="mt-4 flex flex-wrap gap-3">
-          <Link href="/contact" className="btn-ghost text-sm">
-            Изтрий акаунта ми — заявка
-          </Link>
+          напредък. Копие от всичко можеш да свалиш веднага като JSON файл, а
+          изтриването на акаунта става тук и сега — без заявки и без чакане.
+          Ако предпочиташ да ни пишеш (или го прави родител от твое име),{" "}
           <Link
-            href="/privacy#rights"
-            className="btn-ghost text-sm"
+            href="/contact"
+            className="font-semibold text-accent underline-offset-4 hover:underline"
           >
-            Правата ти върху данните
-          </Link>
-        </div>
+            страницата за контакт
+          </Link>{" "}
+          също работи — отговаряме до един месец.
+        </p>
+        <PrivacyControls />
       </section>
 
       {/* Legal */}

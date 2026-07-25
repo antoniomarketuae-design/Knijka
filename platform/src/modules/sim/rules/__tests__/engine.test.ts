@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { createRuleEngine, reduceTick } from "../engine";
-import type { SimTick, SimTickEvent } from "../types";
+import { createRuleEngine, reduceTick, speedingBands } from "../engine";
+import { NORMAL_CAP_MARGIN_KMH } from "../../vehicle";
+import { DEFAULT_RULE_CONFIG, type RuleEvent, type SimTick, type SimTickEvent } from "../types";
 import { codes, cruise, drive, tick } from "./fixtures";
 
 // -- event shorthands --------------------------------------------------------
@@ -57,18 +58,56 @@ describe("speeding detector", () => {
     expect(events).toEqual([]);
   });
 
-  it("fires only once while continuously over", () => {
+  it("fires once per repeat window while continuously over (M-16)", () => {
+    // 30 s at 58 in a 50: billed at t=2 and again a speedingRepeatSec later.
     const { events } = drive(cruise(0, 30, { speedKmh: 58 }));
-    expect(codes(events)).toEqual(["SPEEDING_OVER_LIMIT"]);
+    expect(codes(events)).toEqual(["SPEEDING_OVER_LIMIT", "SPEEDING_OVER_LIMIT"]);
+    expect(events.map((e) => e.t)).toEqual([2, 22]);
   });
 
-  it("re-arms only after speed returns to the limit (full hysteresis)", () => {
+  it("re-arms only after the limit is HELD for the cooldown (M-16)", () => {
     const { events } = drive([
       ...cruise(0, 2, { speedKmh: 56 }), // fires at t=2
-      tick(3, { speedKmh: 50 }), // back to legal => reset
-      ...cruise(4, 6, { speedKmh: 56 }), // fires again at t=6
+      ...cruise(3, 8, { speedKmh: 50 }), // 5 s at the limit >= speedingRearmSec
+      ...cruise(9, 11, { speedKmh: 56 }), // a genuinely separate offence => fires
     ]);
     expect(codes(events)).toEqual(["SPEEDING_OVER_LIMIT", "SPEEDING_OVER_LIMIT"]);
+  });
+
+  it("a one-second dip under the limit does NOT re-arm the bill (M-16)", () => {
+    // The audit's saw-tooth: the driver keeps correcting, and every correction
+    // used to buy a fresh point. Twelve dips must not cost twelve points.
+    const frames: SimTick[] = [];
+    let t = 0;
+    for (let cycle = 0; cycle < 12; cycle++) {
+      frames.push(tick(t++, { speedKmh: 56 }));
+      frames.push(tick(t++, { speedKmh: 56 }));
+      frames.push(tick(t++, { speedKmh: 56 }));
+      frames.push(tick(t++, { speedKmh: 48 })); // dip back under, one frame
+    }
+    const { events } = drive(frames);
+    // 48 s of oscillation: the opening bill plus the repeat cadence (~1 per
+    // 20 s) — not the twelve the old per-dip re-arm produced.
+    const speeding = codes(events).filter((c) => c === "SPEEDING_OVER_LIMIT");
+    expect(speeding.length).toBeGreaterThanOrEqual(1);
+    expect(speeding.length).toBeLessThanOrEqual(3);
+  });
+
+  it("sustained speeding is never cheaper than oscillating around the limit (M-16)", () => {
+    // The finding, stated as an invariant: the steadier — more dangerous —
+    // drive must not be graded below the one that keeps dipping legal.
+    const steady = drive(cruise(0, 60, { speedKmh: 58 }));
+    const sawFrames: SimTick[] = [];
+    let t = 0;
+    for (let cycle = 0; cycle < 20; cycle++) {
+      sawFrames.push(tick(t++, { speedKmh: 58 }));
+      sawFrames.push(tick(t++, { speedKmh: 58 }));
+      sawFrames.push(tick(t++, { speedKmh: 48 }));
+    }
+    const saw = drive(sawFrames);
+    const points = (r: { events: RuleEvent[] }): number =>
+      r.events.reduce((sum, e) => sum + (e.kind === "violation" ? e.points : 0), 0);
+    expect(points(steady)).toBeGreaterThanOrEqual(points(saw));
   });
 
   it("does NOT re-fire when speed only dips into the grace band (52 @ 50)", () => {
@@ -109,9 +148,44 @@ describe("speeding detector", () => {
     expect(codes(events)).toEqual(["SPEEDING_DANGEROUS"]);
   });
 
-  it("high limits: exactly +10 stays silent — grace band is empty above 100 (130 @ 120)", () => {
-    const { events } = drive(cruise(0, 5, { speedKmh: 130, maxSpeedKmh: 120 }));
-    expect(events).toEqual([]);
+  it("high limits: the второстепенна band still EXISTS above 100 (130 @ 120) — M-14", () => {
+    // Was the audit's dead code: a 10% grace (132) sitting above the +10
+    // опасна line (130) made SPEEDING_OVER_LIMIT unreachable on every fast
+    // road. The capped grace puts the graded band back at 125 < v <= 130.
+    const { events } = drive(cruise(0, 3, { speedKmh: 130, maxSpeedKmh: 120 }));
+    expect(codes(events)).toEqual(["SPEEDING_OVER_LIMIT"]);
+  });
+
+  it("high limits: inside the capped grace stays silent (124 @ 120) — M-14", () => {
+    const { events } = drive(cruise(0, 10, { speedKmh: 124, maxSpeedKmh: 120 }));
+    expect(events.filter((e) => e.kind === "violation")).toEqual([]);
+  });
+
+  it("M-14: a gradable второстепенна band exists at every posted limit", () => {
+    // The structural guarantee, not one sampled road: grace must stay strictly
+    // under the опасна threshold so the band can never close again.
+    for (const limit of [20, 30, 40, 50, 60, 70, 80, 90, 100, 110, 120, 130, 140]) {
+      const b = speedingBands(limit, DEFAULT_RULE_CONFIG);
+      expect(b.gradedAbove, `limit ${limit}`).toBeLessThan(b.dangerousAbove);
+    }
+  });
+
+  it("M-14: the Нормален governor can still reach the graded band on a 140 map", () => {
+    // The default difficulty caps the car at limit + NORMAL_CAP_MARGIN_KMH.
+    // Before the fix that cap (150) sat under BOTH thresholds on the motorway
+    // maps, so neither speeding code could fire at the shipped default.
+    const cap = 140 + NORMAL_CAP_MARGIN_KMH;
+    expect(speedingBands(140, DEFAULT_RULE_CONFIG).gradedAbove).toBeLessThan(cap);
+    const { events } = drive(cruise(0, 3, { speedKmh: cap - 2, maxSpeedKmh: 140 }));
+    expect(codes(events)).toEqual(["SPEEDING_OVER_LIMIT"]);
+  });
+
+  it("urban maps grade byte-identically to before the M-14 cap (55/56 @ 50)", () => {
+    // 10% of 50 == the 5 km/h ceiling, so no city drive changes verdict.
+    expect(speedingBands(50, DEFAULT_RULE_CONFIG)).toEqual({
+      gradedAbove: 55,
+      dangerousAbove: 60,
+    });
   });
 
   it("a limit increase mid-episode resets the episode (55 leaving a 50 zone into 90)", () => {

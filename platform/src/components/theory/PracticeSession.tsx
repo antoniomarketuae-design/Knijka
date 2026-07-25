@@ -15,7 +15,7 @@ import { Gauge } from "@/components/hud/Gauge";
 import type { PracticeQuestionDto, PracticeSubmitResult } from "./types";
 import { hasSignOptions, QuestionMediaView, SignFace } from "./QuestionMedia";
 import { WhyPanel, WhyPanelIdle } from "./WhyPanel";
-import { buildWhyPanelModel } from "./whyPanelModel";
+import { buildWhyPanelModel } from "@/modules/clips/view";
 
 /**
  * Client-side practice runner: one question at a time, immediate feedback

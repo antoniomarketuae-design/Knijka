@@ -1,5 +1,6 @@
 import type { LawRef, QuestionMedia, SignMediaRef } from "@/lib/content/types";
-import type { SessionReason, WhyPanelSimRef } from "@/modules/learning";
+import type { WhyPanelSimRef } from "@/modules/clips";
+import type { SessionReason } from "@/modules/learning";
 
 /**
  * Client-safe DTOs for the practice flow. The learning module's

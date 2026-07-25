@@ -28,9 +28,9 @@ import {
   parseClipManifest,
   posterFrameFor,
   type MistakeClip,
-} from "@/components/theory/clipManifest";
-import { durationFixStep } from "@/components/theory/webmDuration";
-import type { ClipPlanEntry } from "@/modules/learning";
+} from "@/modules/clips/view";
+import { durationFixStep } from "@/modules/clips/view";
+import type { ClipPlanEntry } from "@/modules/clips";
 
 const NOTES_KEY_PREFIX = "clip-notes:";
 

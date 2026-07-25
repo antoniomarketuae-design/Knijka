@@ -4,7 +4,9 @@ export type PaymentsErrorCode =
   | "STRIPE_NOT_CONFIGURED"
   | "CHECKOUT_NO_URL"
   | "CHECKOUT_NO_CLIENT_SECRET"
-  | "UNKNOWN_PACK";
+  | "UNKNOWN_PACK"
+  /** No parental approval / withdrawal waiver on file for this purchase (H-9). */
+  | "CONSENT_REQUIRED";
 
 export class PaymentsError extends Error {
   constructor(
@@ -36,6 +38,21 @@ export type FulfillResult =
   | { status: "created"; entitlementId: string }
   | { status: "already-fulfilled"; entitlementId: string }
   | { status: "skipped"; reason: "not-paid" | "missing-metadata" };
+
+/** Lifetime free-tier AI-tutor trial (see quota.ts for the rules). */
+export interface TutorQuota {
+  /** May the user send another question to the tutor right now? */
+  allowed: boolean;
+  /**
+   * Questions left in the lifetime free trial.
+   * `Number.POSITIVE_INFINITY` when `unlimited` is true.
+   */
+  remaining: number;
+  /** The free-tier lifetime trial size (constant, for UI copy: "X от 5"). */
+  limit: number;
+  /** True for users with an active pack — no trial cap applies. */
+  unlimited: boolean;
+}
 
 /** Daily free-tier practice allowance (see quota.ts for the rules). */
 export interface PracticeQuota {

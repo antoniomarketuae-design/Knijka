@@ -360,11 +360,15 @@ describe("d2-v1 through the world runtime", () => {
     for (const c of clusters) expect(Number.isFinite(c.offsetSec)).toBe(true);
   });
 
-  it("derives 19 stop lines: 16 signal approaches + 3 heuristic Б2 lines", () => {
+  it("derives 19 stop lines: 16 signal approaches + 3 Б2 lines", () => {
     const lines = runtime.debugStopLines();
     expect(lines.length).toBe(19);
-    // Record<string, number>: StopLine.control now admits "giveWay" (Б1); this
-    // district authors none, so the tally still resolves to only these two keys.
+    // The three Б2s: two heuristic (service mouths onto the Яворов ramps) and
+    // n2945503673, which audit C-4 turned from an accident of a missing
+    // `primary_link` rank into an authored STOP_LINE_OVERRIDES entry with a
+    // visible octagon — sc-ed-d2-priority-run's first beat.
+    // Record<string, number>: StopLine.control also admits "giveWay" (Б1); this
+    // district derives none, so the tally still resolves to only these two keys.
     const byControl: Record<string, number> = { trafficLight: 0, stopSign: 0 };
     for (const l of lines) byControl[l.control]++;
     expect(byControl).toEqual({ trafficLight: 16, stopSign: 3 });

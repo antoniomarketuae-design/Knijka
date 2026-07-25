@@ -1,5 +1,5 @@
 import Link from "next/link";
-import type { ReadinessSnapshot, TopicMastery } from "@/components/dashboard/data";
+import type { ReadinessSnapshot, TopicMastery } from "@/lib/dashboard/data";
 import { EmptyState } from "@/components/dashboard/EmptyState";
 
 // Kept in sync with TopicCard / TopicSectionGroup. A started-but-low topic reads

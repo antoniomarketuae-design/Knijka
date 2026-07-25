@@ -1,4 +1,4 @@
-import type { GamificationSummary } from "@/components/dashboard/data";
+import type { GamificationSummary } from "@/lib/dashboard/data";
 import { IconBolt } from "@/components/icons";
 
 /** Level badge + XP progress towards the next level. */

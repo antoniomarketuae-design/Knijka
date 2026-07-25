@@ -30,6 +30,14 @@ export type MirrorKind = "left" | "right" | "rear";
 export type IndicatorState = "off" | "left" | "right";
 export type HeadlightState = "off" | "low" | "high";
 export type TurnDirection = "left" | "right";
+/**
+ * The М10 lane-intent glyph painted in a lane (audit M-17). Only the MANDATORY
+ * ones are modelled: a lane whose glyph the runtime cannot read as a direction
+ * set (the roundabout „nearExits"/„farExits" labels, a future glyph) must
+ * resolve to `undefined` on the tick and grade nothing — an unreadable marking
+ * is the author's problem, never the student's.
+ */
+export type LaneArrow = "left" | "through" | "right" | "leftThrough" | "throughRight";
 
 /**
  * Discrete world events that occurred between the previous tick and this one.
@@ -91,8 +99,45 @@ export type SimTickEvent =
    * onto the crossing while the vehicle is already inside the zone).
    */
   | { kind: "crossingZoneEntered"; crossingId: string; pedestrianOnCrossing: boolean }
-  /** Vehicle passed over the pedestrian crossing; flag sampled at that moment. */
-  | { kind: "crossingPassed"; crossingId: string; pedestrianOnCrossing: boolean }
+  /**
+   * Vehicle passed over the pedestrian crossing; flag sampled at that moment.
+   *
+   * HOST-EDGE GATE (audit H-6). A zone arms from the crossing's host edge AND
+   * every edge sharing a node with it — right for the APPROACH duty, wrong for
+   * the pass: the pass test is a plain ahead→behind sweep with a lateral budget
+   * sized for the outer lane of a 6-lane arterial (~22 m), and at a junction
+   * that budget also swallows the SIDE streets' zebras. A full district sweep
+   * produced 36 off-host-edge passes, 25 of them for a zebra the car never came
+   * within 8 m of; with the lesson/exam traffic preset walking 20 pedestrians
+   * over 51 crossings, one of those is near-certainly occupied — i.e. the
+   * 10-point опасна that ends the exam fires for a zebra on another street.
+   *
+   * `hostEdgeId` is the id of the road segment the paint is on, in the SAME id
+   * space as `SimTick.edgeId` (the district edge id). The reducer grades the
+   * pass only when it cannot positively tell the two apart — an affirmative
+   * mismatch means the car was merely NEAR the crossing, never on it. Emitting
+   * it is the runtime's duty; absent = the source does not name host edges and
+   * every existing drive grades byte-identically.
+   */
+  | {
+      kind: "crossingPassed";
+      crossingId: string;
+      pedestrianOnCrossing: boolean;
+      hostEdgeId?: string | null;
+    }
+  /**
+   * Vehicle left the approach zone WITHOUT crossing — it turned away at the
+   * junction, or reversed back out. The zone's closing bracket: `crossingPassed`
+   * is the OTHER way a zone can end, and a driver who turns off never sends one.
+   *
+   * Without this event the armed zone outlives its geometry for the rest of the
+   * session (audit H-5), and every zone-conditioned rule rides along: the
+   * overtake ban keeps grading kilometres away from any zebra, the approach-speed
+   * check keeps watching, and the detectors that stand down near a crossing
+   * (keep-right, motorway-slow, curve speed) stay suppressed forever. Emitting it
+   * is the engine's duty whenever it drops a zone for any reason other than a pass.
+   */
+  | { kind: "crossingZoneExited"; crossingId: string }
   /** Vehicle committed to a turn at an intersection (steering into it). */
   | { kind: "turnStarted"; direction: TurnDirection }
   /** Physical contact with another body. */
@@ -160,6 +205,16 @@ export interface SimTick {
    * means off-road/unknown.
    */
   edgeId?: string | null;
+  /**
+   * Mandatory direction glyph painted in the vehicle's OWN lane (М10 lane-
+   * intent arrows — audit M-17). Authored world data (`meta.scenario
+   * .laneArrows`, resolved by worldRuntime from the committed lane fix), never
+   * a heuristic — and ABSENT means "no arrows here", which is always innocent.
+   * Until this channel existed, no rule read the arrows at all: the whole
+   * SN-04 lesson („ляв завой от лента „само направо") was graded as a missing
+   * indicator, i.e. the debrief explained чл. 25 for an act that broke чл. 6.
+   */
+  laneArrow?: LaneArrow;
   indicator: IndicatorState;
   headlights: HeadlightState;
   seatbeltOn: boolean;
@@ -364,6 +419,8 @@ export type ViolationCode =
   | "RED_LIGHT_CROSSED" // опасна (official list)
   | "STOP_SIGN_NO_FULL_STOP" // опасна: missed stop at Б2 (official list)
   | "TURN_WITHOUT_INDICATOR" // основна
+  | "TURN_WITHOUT_OBSERVATION" // основна: turned without a matching mirror glance (M-17; config-gated, see turnObservationEnabled)
+  | "WRONG_LANE_FOR_DIRECTION" // основна: turned out of a lane whose М10 arrow forbids that direction (M-17; чл. 6)
   | "LANE_CHANGE_WITHOUT_INDICATOR" // основна
   | "LANE_CHANGE_WITHOUT_MIRROR_CHECK" // основна
   | "SEATBELT_OFF_WHILE_MOVING" // основна
@@ -475,19 +532,51 @@ export function isScorableEvent(e: { kind: string }): e is ScorableEvent {
 
 export interface RuleEngineConfig {
   /**
+   * Window the signed acceleration is measured over, seconds (audit M-18).
+   * Every acceleration gate in the engine — braking response on a crossing
+   * approach, the harsh-brake onset, the motorway steady-crawl test, the
+   * emergency-lane pull-off exemption — reads this one derivative, and a
+   * derivative taken across a single RENDER frame is dominated by driveline
+   * noise (see the ACCEL WINDOW note in engine.ts). Must be long enough to
+   * average the jitter and short enough that a real brake application is not
+   * smeared away; at replay/trace rates (≥ 1 s frames) it changes nothing.
+   */
+  accelWindowSec: number;
+  /**
    * Grace above the limit before ANY violation fires, as a ratio (0.10 = 10%).
    * Absorbs speedometer/physics noise the way real enforcement tolerances do.
-   * NOTE: for limits >= 100 km/h the 10% grace exceeds the official +10 km/h
-   * dangerous threshold, so the second-degree band is empty there — the
-   * dangerous rule below always wins.
+   * Capped in absolute km/h by `speedingGraceMaxKmh` — see it and the
+   * `speedingBands()` header for why the two units must not be left to cross.
    */
   speedingGraceRatio: number;
+  /**
+   * Absolute ceiling on the proportional grace, km/h (audit M-14). MUST stay
+   * below `dangerousSpeedOverKmh`, otherwise the second-degree band closes and
+   * SPEEDING_OVER_LIMIT becomes dead code again on fast roads.
+   */
+  speedingGraceMaxKmh: number;
   /** Official (doc 32): опасна when more than this many km/h over the limit. */
   dangerousSpeedOverKmh: number;
   /** Seconds the minor-speeding condition must hold before it fires. */
   speedingMinorSustainSec: number;
   /** Seconds the dangerous-speeding condition must hold before it fires. */
   speedingDangerousSustainSec: number;
+  /**
+   * Seconds the driver must HOLD the limit before a speeding episode re-arms
+   * (audit M-16). A momentary dip under the limit is one continuing offence
+   * being corrected, not a fresh one: without this, a saw-tooth around the
+   * limit billed once per dip while a steady 8 km/h over billed once in a
+   * minute — the more dangerous drive graded an order of magnitude cheaper,
+   * and the student who kept correcting punished for correcting.
+   */
+  speedingRearmSec: number;
+  /**
+   * Seconds after which an UNBROKEN speeding episode bills again (audit M-16;
+   * 0 = never). The other half of the same fairness: with the re-arm cooldown
+   * alone, sitting over the limit indefinitely would cost exactly one point,
+   * so the cost must keep growing while the offence keeps going.
+   */
+  speedingRepeatSec: number;
 
   /**
    * Speed at or under which the vehicle counts as fully stopped, km/h.
@@ -748,6 +837,22 @@ export interface RuleEngineConfig {
    * lead ahead is a reposition, not an overtake, and never fires. */
   crossingOvertakeLeadGapM: number;
 
+  /**
+   * OV-07/OV-06 direction gate (audit H-5) — seconds a pull-out keeps an
+   * overtake "open", i.e. how long the RETURN leg may lag the moment the driver
+   * swung out past the vehicle ahead. Overtaking is a left-side manoeuvre in two
+   * beats (ЗДвП чл. 42, ал. 2): swing out, come back. The beats are told apart
+   * by direction, and the return beat only counts as overtaking when it closes a
+   * pull-out this engine actually saw — otherwise a change to the RIGHT is a
+   * merge back to the curb, or the legally REQUIRED move into the rightmost lane
+   * before a right turn (чл. 37), which is exactly where a crossing zone is
+   * armed. The same window also bounds how stale the lead sighting behind a
+   * pull-out may be: the lead drops out of the ±4 m corridor while the car sits
+   * astride the boundary, so the pull-out frame itself often reports no lead.
+   * Long enough to cover a laboured pass of a crawling truck, short enough that
+   * an overtake finished streets ago cannot convict a later rightward move. */
+  overtakeManeuverWindowSec: number;
+
   // -- B1a Wave-3 detector pack (doc 72 capability 1) — per-lesson DRILLS ------
   // Both ship config-OFF (like moveOffObservation): the innocent-drive
   // contract (the FP battery's whole-commute crosses a Б2 unglanced; the exam
@@ -765,6 +870,28 @@ export interface RuleEngineConfig {
    * per-lesson for the Л-Д-Л observation drill.
    */
   junctionScanObservationEnabled: boolean;
+
+  /**
+   * M-17 „завой без огледало" — the turn's observation duty (config-gated).
+   * A turn is a manoeuvre under чл. 25, ал. 1 exactly as a lane change is, and
+   * TURN_WITHOUT_OBSERVATION fires when `turnStarted` carries no glance to the
+   * turn's side inside `mirrorLookbackSec`. SHIPPED FLAGGED OFF for the reason
+   * every observation check is: the glance channel is authored per lesson, and
+   * the shipped shadow/attempt traces turn without one — a default-on grade
+   * would convict the contract's own correct drives. Lessons that DRILL the
+   * mirror-before-turn habit opt in per-lesson.
+   */
+  turnObservationEnabled: boolean;
+  /**
+   * M-17 — how long an М10 lane arrow keeps governing after the vehicle has
+   * driven off the painted span, seconds. The arrows are painted on the
+   * approach and the turn is adjudicated inside the junction, so without a
+   * memory the arrow would never be in force at the moment it matters; too
+   * long a memory and the NEXT junction inherits it. Sized for one junction
+   * traversal at urban speed (~6 s ≈ 50–80 m), and the memory is spent by the
+   * first turn it sees regardless.
+   */
+  laneArrowMemorySec: number;
   /** A left AND a right glance must each fall within this window before the
    *  Б2 line is crossed (mirror-lookback clone pointed at the stop line). */
   junctionScanLookbackSec: number;
@@ -943,10 +1070,31 @@ export interface RuleEngineConfig {
 }
 
 export const DEFAULT_RULE_CONFIG: RuleEngineConfig = {
+  // M-18: deliberately SHORTER than the 0.05 s trace sample period
+  // (TRACE_SAMPLE_HZ = 20), so on every recorded replay the anchor is exactly
+  // the previous frame and the whole regression corpus grades byte-identically
+  // — while the live render loop, the only place the bug ever lived, spans ~5
+  // frames at 120 fps and drops the noise-derived acceleration from 2.1 m/s²
+  // (above crossingBrakeResponseMps2 — the audit's case) to ~0.42.
+  // Do NOT lengthen it casually: smoothing is LAG, and the harsh-brake
+  // conviction (7 m/s² held 0.4 s) is knife-edge on the authored panic-brake
+  // demos — a 0.15 s window already makes two of them silent, i.e. turns a
+  // graded mistake into a false negative.
+  accelWindowSec: 0.04,
   speedingGraceRatio: 0.1,
+  // M-14: 10% of the urban 50 — so every city map grades exactly as it always
+  // did — and a hard ceiling above it, so the second-degree band survives on
+  // the 90/140 roads instead of being swallowed by the +10 опасна line.
+  speedingGraceMaxKmh: 5,
   dangerousSpeedOverKmh: 10, // official, do not change without an ADR
   speedingMinorSustainSec: 2,
   speedingDangerousSustainSec: 1,
+  // M-16: 4 s genuinely at/under the limit re-arms the bill (long enough that
+  // a saw-tooth reads as one episode, short enough that a real second offence
+  // after a settled stretch is graded on its own); an episode that never
+  // breaks re-bills every 20 s.
+  speedingRearmSec: 4,
+  speedingRepeatSec: 20,
 
   // A12: was 0.5 — physics-solver brake creep reads 0.5-1 km/h on a car that
   // is genuinely stopped, and at 0.5 a real stop could never qualify (FP case:
@@ -1052,10 +1200,16 @@ export const DEFAULT_RULE_CONFIG: RuleEngineConfig = {
   highBeamDipSustainSec: 3,
   // OV-07: a lead within 45 m is the car you are passing at the crossing.
   crossingOvertakeLeadGapM: 45,
+  // H-5 direction gate: 20 s covers the slowest realistic pull-out → tuck-in
+  // (the authored OV-06/OV-07 demos take 3.5–5.5 s), and expires long before a
+  // later, unrelated move to the right could inherit the pull-out's guilt.
+  overtakeManeuverWindowSec: 20,
 
   // B1a Wave-3 (doc 72 capability 1) — per-lesson drills, config-OFF by default.
   junctionScanObservationEnabled: false, // see the interface comment — lessons opt in
   junctionScanLookbackSec: 5, // same window as the lane-change mirror lookback
+  turnObservationEnabled: false, // M-17 — see the interface comment; lessons opt in
+  laneArrowMemorySec: 6,
   followRainAwareEnabled: false, // see the interface comment — lessons opt in
   // 1.6 × 1.8 s = 2.88 s wet-prudent target; fire ratio 0.7 → fires under
   // ~2.0 s of actual gap. The exam-bot holds ~1.9 s in rain, so this is

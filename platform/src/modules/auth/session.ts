@@ -1,7 +1,6 @@
 import { cache } from "react";
 import { redirect } from "next/navigation";
-import { auth } from "@/auth";
-import { db } from "@/lib/db";
+import { getAuthStore } from "./store";
 import type { SessionUser } from "./types";
 
 /**
@@ -13,11 +12,7 @@ import type { SessionUser } from "./types";
  */
 const roleForUser = cache(async (userId: string): Promise<string> => {
   try {
-    const row = await db.user.findUnique({
-      where: { id: userId },
-      select: { role: true },
-    });
-    return row?.role ?? "student";
+    return (await getAuthStore().findRoleById(userId)) ?? "student";
   } catch {
     return "student";
   }
@@ -28,6 +23,13 @@ const roleForUser = cache(async (userId: string): Promise<string> => {
  * Use in Server Components, Server Actions and Route Handlers.
  */
 export async function getSessionUser(): Promise<SessionUser | null> {
+  // Lazy, for the same reason the stores import Prisma lazily: a static
+  // `import { auth } from "@/auth"` makes the whole next-auth runtime a load
+  // -time dependency of this module's public index, which any unit test of a
+  // module that merely *imports* @/modules/auth (e.g. @/modules/privacy) then
+  // has to boot. Deferring it costs one resolved-module lookup per request.
+  const { auth } = await import("@/auth");
+
   const session = await auth();
   const user = session?.user;
   if (!user?.id || !user.email) return null;

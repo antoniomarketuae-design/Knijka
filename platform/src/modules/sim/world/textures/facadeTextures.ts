@@ -25,19 +25,29 @@
  * load + GPU upload shared by every consumer, disposed with the last one.
  * Returns null while loading / on the server / when the manifest is absent —
  * consumers keep their procedural fallback.
+ *
+ * DOWNLOAD TIER (audit H-11 part 2): `FacadeMapsMode` already decided which
+ * maps get BOUND per fragment, but all four were fetched, transcoded and
+ * uploaded regardless — at "colorOnly" the normal and ORM maps went to VRAM
+ * and were never sampled. The mode now gates the fetch too (that is the whole
+ * 111,804 B of it at low), and the maps it omits come back null.
  */
 
 import { useEffect, useState } from "react";
 import * as THREE from "three";
 import { KTX2Loader } from "three/examples/jsm/loaders/KTX2Loader.js";
+import type { FacadeMapsMode } from "@/modules/sim/environment";
+import { facadeFetchPlan, type FacadeMapName } from "./textureBudget";
 
 export type FacadeSetName = "bay_grid" | "bay_strip" | "bay_curtain" | "bay_band" | "trim";
 
 export interface FacadeTextureSet {
   color: THREE.Texture;
-  normal: THREE.Texture;
-  /** R=AO, G=roughness, B=metalness — assign to aoMap+roughnessMap+metalnessMap. */
-  orm: THREE.Texture;
+  /** null below "colorNormal" — the tier drops recess relief. */
+  normal: THREE.Texture | null;
+  /** R=AO, G=roughness, B=metalness — assign to aoMap+roughnessMap+metalnessMap.
+   *  null below "full" — the tier falls back to constant roughness/metalness. */
+  orm: THREE.Texture | null;
   emissive: THREE.Texture;
 }
 
@@ -50,7 +60,6 @@ const BASIS_TRANSCODER_PATH = "/basis/";
 const SET_NAMES: FacadeSetName[] = ["bay_grid", "bay_strip", "bay_curtain", "bay_band", "trim"];
 const MAP_NAMES = ["color", "normal", "orm", "emissive"] as const;
 type MapName = (typeof MAP_NAMES)[number];
-const SRGB_MAPS: ReadonlySet<string> = new Set(["color", "emissive"]);
 
 interface Manifest {
   version: number;
@@ -68,7 +77,11 @@ function configure(tex: THREE.Texture, srgb: boolean, anisotropy: number): THREE
   return tex;
 }
 
-function buildAll(gl: THREE.WebGLRenderer, anisotropy: number): Promise<FacadeTextures | null> {
+function buildAll(
+  gl: THREE.WebGLRenderer,
+  anisotropy: number,
+  maps: FacadeMapsMode,
+): Promise<FacadeTextures | null> {
   return fetch(`${BASE_URL}/manifest.json`)
     .then((res) => (res.ok ? (res.json() as Promise<Manifest>) : null))
     .then((manifest) => {
@@ -84,9 +97,8 @@ function buildAll(gl: THREE.WebGLRenderer, anisotropy: number): Promise<FacadeTe
         texLoader = new THREE.TextureLoader();
       }
 
-      const loadOne = (file: string, srgb: boolean): Promise<THREE.Texture> =>
+      const loadOne = (url: string, srgb: boolean): Promise<THREE.Texture> =>
         new Promise((resolve, reject) => {
-          const url = `${BASE_URL}/${file}`;
           const onLoad = (t: THREE.Texture) => resolve(configure(t, srgb, anisotropy));
           const onErr = (err: unknown) =>
             reject(err instanceof Error ? err : new Error(`load failed: ${url}`));
@@ -98,13 +110,23 @@ function buildAll(gl: THREE.WebGLRenderer, anisotropy: number): Promise<FacadeTe
         SET_NAMES.map((set) => {
           const entry = manifest.sets[set];
           if (!entry) throw new Error(`facade manifest missing set: ${set}`);
+          // The plan IS the tier decision (textureBudget.ts): maps outside it
+          // are never requested and stay null on the set.
+          const plan = facadeFetchPlan({ baseUrl: BASE_URL, setName: set, mode: maps, entry });
+          const out: Partial<Record<FacadeMapName, THREE.Texture>> = {};
           return Promise.all(
-            MAP_NAMES.map((map) => {
-              const file = entry[map];
-              if (!file) throw new Error(`facade manifest missing ${set}.${map}`);
-              return loadOne(file, SRGB_MAPS.has(map));
-            }),
-          ).then(([color, normal, orm, emissive]) => ({ color, normal, orm, emissive }));
+            plan.map((req) =>
+              loadOne(req.url, req.srgb).then((tex) => {
+                out[req.map] = tex;
+              }),
+            ),
+          ).then(() => ({
+            // color + emissive are in every mode (see facadeMapsOf).
+            color: out.color!,
+            normal: out.normal ?? null,
+            orm: out.orm ?? null,
+            emissive: out.emissive!,
+          }));
         }),
       ).then((sets) => {
         ktx2?.dispose();
@@ -127,26 +149,36 @@ interface CacheEntry {
   refs: number;
 }
 
-let entry: CacheEntry | null = null;
+/** Keyed by tier — see the same note on pbrTextures' cache. */
+const cache = new Map<FacadeMapsMode, CacheEntry>();
 
 function texturesOf(sets: FacadeTextures): THREE.Texture[] {
-  return SET_NAMES.flatMap((name) => MAP_NAMES.map((m) => sets[name][m]));
+  return SET_NAMES.flatMap((name) =>
+    MAP_NAMES.map((m) => sets[name][m]).filter((t): t is THREE.Texture => t !== null),
+  );
 }
 
-function acquire(gl: THREE.WebGLRenderer, anisotropy: number): Promise<FacadeTextures | null> {
+function acquire(
+  gl: THREE.WebGLRenderer,
+  anisotropy: number,
+  maps: FacadeMapsMode,
+): Promise<FacadeTextures | null> {
+  let entry = cache.get(maps);
   if (!entry) {
-    entry = { promise: buildAll(gl, anisotropy), refs: 0 };
+    entry = { promise: buildAll(gl, anisotropy, maps), refs: 0 };
+    cache.set(maps, entry);
   }
   entry.refs += 1;
   return entry.promise;
 }
 
-function release(): void {
+function release(maps: FacadeMapsMode): void {
+  const entry = cache.get(maps);
   if (!entry) return;
   entry.refs -= 1;
   if (entry.refs <= 0) {
     const e = entry;
-    entry = null;
+    cache.delete(maps);
     e.promise
       .then((sets) => {
         if (sets) for (const tex of texturesOf(sets)) tex.dispose();
@@ -162,11 +194,14 @@ function release(): void {
  * resolve, on the server, or when the packed textures are not present —
  * callers keep their existing fallback in that case. `gl` is needed for the
  * KTX2 transcoder target detection; `anisotropy` follows the quality preset
- * (clamped 4–8 like the ground PBR sets).
+ * (clamped 4–8 like the ground PBR sets); `maps` is the tier's budget — the
+ * SAME value both consumers (StaticWorld prisms + CityBuildings towers) must
+ * pass, since they share one GPU copy and the first acquirer decides the fetch.
  */
 export function useFacadeTextures(
   gl: THREE.WebGLRenderer,
   anisotropy: number,
+  maps: FacadeMapsMode,
 ): FacadeTextures | null {
   const [sets, setSets] = useState<FacadeTextures | null>(null);
 
@@ -174,17 +209,17 @@ export function useFacadeTextures(
     if (typeof window === "undefined") return;
     let active = true;
     const a = Math.min(8, Math.max(4, anisotropy));
-    acquire(gl, a).then((s) => {
+    acquire(gl, a, maps).then((s) => {
       if (active) setSets(s);
     });
     return () => {
       active = false;
       setSets(null);
-      release();
+      release(maps);
     };
     // anisotropy changes are applied below without a reload
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [gl]);
+  }, [gl, maps]);
 
   useEffect(() => {
     if (!sets) return;

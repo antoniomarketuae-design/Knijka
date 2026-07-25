@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { setContentRepo } from "../../../lib/content/repo";
 import {
   EXAM_DURATION_SEC,
@@ -15,6 +15,16 @@ import { correctIds, makeFixtureRepo, richBank } from "./fixtures";
 
 const bank = richBank();
 let store: InMemoryExamStore;
+
+/**
+ * submitExam() feeds mastery through `await import("@/modules/learning")`. Under
+ * Vitest that graph is transpiled on demand and costs ~5s cold — right on the
+ * default per-test timeout, so whichever test submits first flakes. Pay it once,
+ * outside the tests' budget.
+ */
+beforeAll(async () => {
+  await import("@/modules/learning");
+}, 120_000);
 
 beforeEach(() => {
   setContentRepo(makeFixtureRepo(bank));

@@ -153,6 +153,8 @@ interface StopSignMark {
   arc: number;
   jx: number;
   jy: number;
+  /** Б2 „Стоп" demands a standing halt; Б1 „Пропусни движението" only a yield. */
+  fullStop: boolean;
 }
 interface LightMark {
   arc: number;
@@ -349,12 +351,16 @@ function buildRoutePlan(shell: ExamRouteShell): RoutePlan {
       if (line.dirSign !== travelSign) continue;
       const w = pointAtS(leg.edge.geometry, line.sM);
       const arcAt = leg.startArc + polyArcOf(leg.off, w[0], w[1]);
-      if (line.control === "stopSign") {
+      // Sign lines (Б2 AND Б1, audit C-4) go to the priority planner; only a
+      // signalized line belongs to the lamp planner. Routing a Б1 into `lights`
+      // asked signalPhaseInfo about an unsignalized node, whose default phase
+      // parked the bot short of the mouth until the watchdog gave up.
+      if (line.control === "trafficLight") {
+        lights.push({ arc: arcAt, nodeId: line.junctionNodeId, approachBearingDeg: line.approachBearingDeg });
+      } else {
         const j = nodeXY.get(line.junctionNodeId);
         if (!j) continue;
-        stopSigns.push({ arc: arcAt, jx: j.x, jy: j.y });
-      } else {
-        lights.push({ arc: arcAt, nodeId: line.junctionNodeId, approachBearingDeg: line.approachBearingDeg });
+        stopSigns.push({ arc: arcAt, jx: j.x, jy: j.y, fullStop: line.control === "stopSign" });
       }
     }
   }
@@ -698,6 +704,18 @@ function runBot(
       for (const m of stopSigns) {
         if (m.satisfied || m.arc < s - 4) continue;
         if (m.arc > s + 90) break;
+        if (!m.fullStop) {
+          // Б1: the duty is to yield, not to halt (ЗДвП чл. 50 — „пълно спиране
+          // се налага само когато иначе би ги засякъл"). Hold short of the line
+          // only while the mouth carries conflicting traffic; a clear mouth is
+          // crossed rolling, which is what the engine now grades as innocent.
+          if (stack.traffic.conflictNear(m.jx, m.jy, 26, pose.headingDeg)) {
+            stops.push(m.arc - 3.0);
+          } else if (m.arc - s < 4) {
+            m.satisfied = true;
+          }
+          continue;
+        }
         stops.push(m.arc - 3.0); // margin covers the projection lead through the mouth bend
         const atLine = m.arc - s < 4;
         if (atLine && v <= 0.05) {
@@ -842,7 +860,10 @@ function runBot(
       } else if (burstState === "cooldown") {
         burstTimer += DT;
         target = Math.min(target, (limitKmh * 0.85) / 3.6);
-        if (burstTimer > 2.6) burstState = "idle"; // back under the limit → episode re-arms
+        // M-16: the episode re-arms only after the limit has been HELD for
+        // speedingRearmSec (4 s) — a 2.6 s dip is one continuing offence being
+        // corrected, and the bot needs FOUR separate ones to accumulate.
+        if (burstTimer > 5.0) burstState = "idle";
       }
     }
 

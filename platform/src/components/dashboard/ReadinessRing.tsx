@@ -1,4 +1,4 @@
-import type { ReadinessSnapshot } from "@/components/dashboard/data";
+import type { ReadinessSnapshot } from "@/lib/dashboard/data";
 import { Gauge } from "@/components/hud/Gauge";
 
 /** Band name for the accessible label + the pill under the gauge. */

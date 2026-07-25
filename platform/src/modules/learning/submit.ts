@@ -6,6 +6,12 @@
  * (select ALL correct options, no extras — the official exam format has no
  * partial credit, docs/education/32) with one rule.
  *
+ * By ID, never by index — a load-bearing invariant, not an implementation
+ * detail: practice presents options in a per-session shuffled order
+ * (optionOrder.ts, audit H-1a), so an option's position on screen has no
+ * relationship to its position in the bank. Any grading path that compared
+ * positions would mark the right answer wrong the moment the shuffle moved it.
+ *
  * Persistence: one QuestionAttempt + a Progress upsert per concept the
  * question maps to, in a single transaction (LearningStore.recordAnswer).
  * QuestionAttempt.points stores the question's official weight (1|2|3);
@@ -13,16 +19,33 @@
  *
  * masteryBefore/masteryAfter are averaged over the question's concepts
  * (most questions map to exactly one concept).
+ *
+ * Session binding: a "practice" submission answers with the full key
+ * (correctOptionIds + explanation + citations), so it is only accepted for a
+ * question the practice engine actually dealt to this user — see
+ * practiceTicket.ts and audit M-10.
  */
 
 import { getContentRepo } from "@/lib/content/repo";
 import type { LawRef } from "@/lib/content/types";
 import { applyAnswer } from "./mastery";
+import { assertPracticeTicket } from "./practiceTicket";
 import { schedule } from "./scheduler";
 import { getLearningStore, type ProgressUpdate } from "./store";
 
 /** Contexts this module records. Exams are owned by the exam module. */
 export type AnswerContext = "practice" | "micro";
+
+export interface SubmitAnswerOptions {
+  /**
+   * The practice session this answer belongs to (issuePracticeTicket).
+   * Verified strictly whenever it is present, and REQUIRED for
+   * `context: "practice"` once PRACTICE_TICKET_REQUIRED=1 (practiceTicket.ts).
+   * Ignored for "micro": those questions are chosen by the sim from the
+   * driver's own faults, not from a list of ids the client can see.
+   */
+  ticket?: string | null;
+}
 
 export interface SubmitAnswerResult {
   correct: boolean;
@@ -41,9 +64,17 @@ export async function submitAnswer(
   selectedOptionIds: string[],
   context: AnswerContext,
   now: Date = new Date(),
+  options: SubmitAnswerOptions = {},
 ): Promise<SubmitAnswerResult> {
   const repo = getContentRepo();
   const store = getLearningStore();
+
+  // Session binding BEFORE anything is read, graded or written (audit M-10):
+  // a submission we are not going to honour must not touch mastery, must not
+  // consume quota, and above all must not answer with the key.
+  if (context === "practice") {
+    assertPracticeTicket(userId, questionId, options.ticket, now);
+  }
 
   const question = repo.questionById(questionId);
   if (!question) {

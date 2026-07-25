@@ -9,7 +9,7 @@ compression** in one pass:
 
 ```sh
 # from platform/ (script lives at ../tools/glb/optimize.mjs):
-npm run glb:optimize -- public/sim/city/building-i.glb public/sim/city/building-i.opt.glb
+npm run glb:optimize -- public/sim/city-v3/t_grid_grey_38.glb public/sim/city-v3/t_grid_grey_38.opt.glb
 # or directly:
 node tools/glb/optimize.mjs <input.glb> <output.glb> [--max-texture 1024] [--no-ktx2]
 ```

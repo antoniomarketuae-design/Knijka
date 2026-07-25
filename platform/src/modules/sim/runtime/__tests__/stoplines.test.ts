@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { DistrictWorldRuntime } from "..";
 import { createWorldRuntime } from "..";
 import { LANE_WIDTH_M } from "../spatial";
+import { STOP_LINE_OVERRIDES } from "../stoplines";
 import {
   JUNCTION_TRIM_MAX_FRACTION,
   nodeOpenRadiusM,
@@ -17,9 +18,14 @@ import { drive, edgeById, edgeDrivePath, eventsOf, loadDistrict } from "./helper
  * e672186634.0 (60.3 m) carries a derived stop line at the junction mouth
  * (perceptual road scale: the mouth, not a fixed setback, is authoritative).
  *
- * Stop-sign reference: n316056951 — residential ул. (e1182196532.0) meeting
- * secondary бул. (e718268829.*): the minor approach gets a heuristic Б2 line
- * at its junction mouth; the arterial through-movement gets none.
+ * Priority-sign reference: n316056951 — residential ул. Дъбница (e1182196532.0)
+ * meeting secondary бул. (e718268829.*): the minor approach gets a heuristic
+ * line at its junction mouth; the arterial through-movement gets none. The line
+ * is a Б1 give-way, because a SECONDARY is what it meets — audit C-4 caught it
+ * grading as Б2 „Стоп" under the Б1 triangle the world builder paints there,
+ * i.e. instant-failing the legal rolling entry the product's own
+ * sc-jx-giveway-b1 lesson teaches. Б2 lines live at n331942490 (an override,
+ * below) and at the nine minor×PRIMARY meetings the heuristic still finds.
  */
 const SIGNAL_JUNCTION = "n179974491";
 const APPROACH_EDGE = "e672186634.0"; // southbound; line sM read from the runtime
@@ -114,10 +120,14 @@ describe("stop lines (signalized)", () => {
   });
 });
 
-describe("stop lines (stop-sign heuristic)", () => {
+describe("stop lines (priority-sign heuristic)", () => {
   const district = loadDistrict();
 
-  it("puts a stop-sign line on the minor approach of a minor×arterial junction", () => {
+  it("puts a give-way line on the minor approach of a minor×secondary junction", () => {
+    // Audit C-4 regression: this used to emit control "stopSign" while the
+    // world builder painted a Б1 here, so a student who read the triangle and
+    // rolled through the clear mouth was instant-failed for
+    // STOP_SIGN_NO_FULL_STOP. Б2 is reserved for a minor meeting a PRIMARY.
     const rt = createWorldRuntime(district);
     const minor = edgeById(district, "e1182196532.0"); // residential, from == n316056951
     const s = lineS(rt, district, minor.id, "n316056951"); // line at the junction mouth
@@ -125,7 +135,7 @@ describe("stop lines (stop-sign heuristic)", () => {
     const { ticks } = drive(rt, edgeDrivePath(minor, s + 10, 0.5, 0.5, W / 2));
     const crossed = eventsOf(ticks, "stopLineCrossed");
     expect(crossed).toHaveLength(1);
-    expect(crossed[0]).toEqual({ kind: "stopLineCrossed", control: "stopSign" });
+    expect(crossed[0]).toEqual({ kind: "stopLineCrossed", control: "giveWay" });
   });
 
   it("leaves the arterial through-movement uncontrolled", () => {
@@ -139,19 +149,45 @@ describe("stop lines (stop-sign heuristic)", () => {
     expect(eventsOf(ticks, "stopLineCrossed")).toHaveLength(0);
   });
 
-  it("derives stop signs only at unsignalized minor×arterial meetings (never tertiary, never roundabouts)", () => {
+  it("derives priority lines only at unsignalized minor×arterial meetings (never tertiary, never roundabouts)", () => {
     const rt = createWorldRuntime(district);
     const edgeByIdx = (i: number) => district.roads.edges[i];
     const intersectionById = new Map(district.intersections.map((it) => [it.id, it]));
-    const stopSigns = rt.debugStopLines().filter((l) => l.control === "stopSign");
-    expect(stopSigns.length).toBeGreaterThan(0);
-    for (const line of stopSigns) {
+    const signLines = rt.debugStopLines().filter((l) => l.control !== "trafficLight");
+    expect(signLines.length).toBeGreaterThan(0);
+    for (const line of signLines) {
       const junction = intersectionById.get(line.junctionNodeId);
       expect(junction, line.id).toBeDefined();
       expect(junction?.signalized, line.id).toBe(false);
       const edge = edgeByIdx(line.edgeIdx);
       expect(["service", "residential", "unclassified"], line.id).toContain(edge.class);
       expect(edge.roundabout, line.id).toBe(false);
+    }
+  });
+
+  it("reserves Б2 for a minor meeting a PRIMARY, and posts Б1 against a secondary", () => {
+    // The C-4 invariant, at the level the reducer sees it: `control` is a
+    // function of what the minor road MEETS, never of the fact that it is
+    // minor. Cross-checked against the painted signs, per district, in
+    // priority-sign-agreement.test.ts.
+    const rt = createWorldRuntime(district);
+    const rank: Record<string, number> = {
+      primary: 5, secondary: 4, secondary_link: 4, tertiary: 3,
+      unclassified: 2, residential: 2, service: 1,
+    };
+    const overridden = new Set(STOP_LINE_OVERRIDES.map((o) => `${o.nodeId}:${o.edgeId}`));
+    for (const line of rt.debugStopLines()) {
+      if (line.control === "trafficLight") continue;
+      const edgeId = district.roads.edges[line.edgeIdx].id;
+      if (overridden.has(`${line.junctionNodeId}:${edgeId}`)) continue; // hand-authored
+      const maxRank = Math.max(
+        ...district.roads.edges
+          .filter((e) => e.from === line.junctionNodeId || e.to === line.junctionNodeId)
+          .map((e) => rank[e.class] ?? 2),
+      );
+      expect(line.control, `${line.id} meets maxRank ${maxRank}`).toBe(
+        maxRank >= 5 ? "stopSign" : "giveWay",
+      );
     }
   });
 });

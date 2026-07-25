@@ -106,6 +106,35 @@ export const VIOLATIONS: Record<ViolationCode, ViolationSpec> = {
     lawRef: "ЗДвП чл. 25",
     conceptId: "c-driver-signals",
   },
+  // M-17: the observation half of чл. 25, ал. 1 — the lane-change path has
+  // always graded it, the turn path never did. Config-gated (see
+  // turnObservationEnabled): a turn's blind-spot duty is real, but the glance
+  // channel is only as honest as the lesson that feeds it.
+  TURN_WITHOUT_OBSERVATION: {
+    severityClass: "osnovna",
+    points: SEVERITY_POINTS.osnovna,
+    titleBg: "Завиване без поглед в огледалото",
+    explanationBg:
+      "Зави, без да погледнеш в огледалото от страната на завоя. Мигачът само обявява намерението ти — огледалото проверява дали то е безопасно: точно там, отдясно, минават колела и мотори, а отляво изпреварващият вече е тръгнал.",
+    correctiveBg:
+      "Преди всеки завой: огледало от страната на завоя, после мигач, после къс поглед в мъртвата зона — и чак тогава завърти волана.",
+    lawRef: "ЗДвП чл. 25",
+    conceptId: "c-mirrors-blind-spots",
+  },
+  // M-17: the лентови стрелки were painted, taught and demoed — and graded by
+  // nothing. The act (turning out of a lane the marking forbids it from) is a
+  // marking offence, so the debrief must teach the marking, not the indicator.
+  WRONG_LANE_FOR_DIRECTION: {
+    severityClass: "osnovna",
+    points: SEVERITY_POINTS.osnovna,
+    titleBg: "Завиване от лента с друга стрелка",
+    explanationBg:
+      "Зави в посока, която стрелката на твоята лента забранява. Стрелките на платното разпределят кръстовището предварително — завоят от чужда лента реже пътя на този, който е застанал правилно, и точно там стават страничните удари.",
+    correctiveBg:
+      "Чети стрелките отдалеч и се престрой рано. Ако си в грешната лента на самото кръстовище — продължи по нейната стрелка и се върни по-нататък; никога не завивай „оттук“.",
+    lawRef: "ЗДвП чл. 6",
+    conceptId: "c-lane-choice",
+  },
   LANE_CHANGE_WITHOUT_INDICATOR: {
     severityClass: "osnovna",
     points: SEVERITY_POINTS.osnovna,

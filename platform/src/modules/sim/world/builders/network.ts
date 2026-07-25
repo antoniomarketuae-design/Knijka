@@ -138,6 +138,72 @@ export function nodeOpenRadiusM(touched: readonly JunctionEdgeLike[], degree: nu
   return Math.max(JOINT_SETBACK_M, maxHalf * 0.25);
 }
 
+/** Priority obligation a posted BG sign puts on one approach into a node. */
+export type PriorityControl = "stopSign" | "giveWay";
+
+/**
+ * Structural view of one approach into a node — exactly what the priority rule
+ * needs, so the world builder (which holds `Approach`) and the runtime (which
+ * holds an edge index + the node id) can both feed it without sharing a type.
+ */
+export interface PriorityApproachLike {
+  edgeId: string;
+  /** OSM highway class of the approach edge; keys CLASS_RANK. */
+  class: string;
+  /** Traffic can travel TOWARD the node on this edge (i.e. a real approach). */
+  incoming: boolean;
+  /** The edge is part of a roundabout ring. */
+  roundabout: boolean;
+}
+
+/**
+ * Б1/Б2 priority control per approach at an UNSIGNALIZED node — the SINGLE
+ * definition of who yields here, keyed by edge id.
+ *
+ * Audit C-4: this used to be two heuristics. The world builder painted the
+ * VISIBLE sign with `maxRank >= 5 ? Б2 : Б1`, while the runtime's graded stop
+ * line was hardcoded to Б2 at every minor×arterial meeting — so four approaches
+ * on the shipped district (one of them traversed twice per lap by the practical
+ * exam route) posted „Пропусни движението" and instant-failed the student for
+ * not making the full stop the sign in front of them never demanded. A driving
+ * product may be wrong about a junction; it may never be wrong in TWO
+ * directions at once. Both consumers now read this function, so the painted
+ * sign and the graded obligation cannot drift apart again
+ * (runtime/__tests__/priority-sign-agreement.test.ts locks it per district).
+ *
+ * The rule itself is unchanged from the sign painter's:
+ * - degree < 3 is a bend or a dead end, not a junction — nothing posted;
+ * - a roundabout node yields on every non-ring approach (Б1 + Д11 entry);
+ * - equal ranks = равнозначно кръстовище → priority to the right, no sign;
+ * - otherwise the LOWEST-ranked approaches yield, and only an arterial worth a
+ *   full stop (rank >= 5, i.e. primary) makes that a Б2 rather than a Б1.
+ */
+export function junctionPriorityControls(
+  approaches: readonly PriorityApproachLike[],
+): Map<string, PriorityControl> {
+  const out = new Map<string, PriorityControl>();
+  if (approaches.length < 3) return out;
+
+  if (approaches.some((a) => a.roundabout)) {
+    for (const a of approaches) {
+      if (!a.roundabout && a.incoming) out.set(a.edgeId, "giveWay");
+    }
+    return out;
+  }
+
+  const ranks = approaches.map((a) => CLASS_RANK[a.class] ?? 2);
+  const maxRank = Math.max(...ranks);
+  const minRank = Math.min(...ranks);
+  if (maxRank - minRank < 1) return out;
+  const control: PriorityControl = maxRank >= 5 ? "stopSign" : "giveWay";
+  for (let i = 0; i < approaches.length; i++) {
+    const a = approaches[i]!;
+    if (ranks[i] !== minRank || !a.incoming) continue;
+    out.set(a.edgeId, control);
+  }
+  return out;
+}
+
 /** Direction pointing away from `nodeId` along the edge geometry. */
 function dirAwayFromNode(edge: DistrictEdge, nodeId: string): Vec2 {
   const g = edge.geometry;

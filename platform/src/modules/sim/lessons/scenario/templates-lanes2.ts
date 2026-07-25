@@ -34,11 +34,12 @@
  *   - SUCCESS is objective-gated — a reachZone of radius 4 m (< the 8.125 m
  *     lane pitch) on the LEFT-arrow lane's center is satisfiable ONLY from that
  *     lane, so the graded contract IS „take the lane your arrow commands";
- *   - the MISTAKE demos grade the faults that always travel with an arrow
- *     violation and DO have shipped detectors: turning without the indicator
- *     (TURN_WITHOUT_INDICATOR) and dragging the wrong lane through the exit
- *     (POOR_LANE_KEEPING); the late cross-two-lanes swerve grades the pair the
- *     lane-change tracker exists for (LANE_CHANGE_WITHOUT_INDICATOR /
+ *   - the MISTAKE demos grade the act ITSELF (WRONG_LANE_FOR_DIRECTION — the
+ *     М10 arrow channel added for audit M-17) plus the faults that always
+ *     travel with it and have their own shipped detectors: turning without the
+ *     indicator (TURN_WITHOUT_INDICATOR) and dragging the wrong lane through
+ *     the exit (POOR_LANE_KEEPING); the late cross-two-lanes swerve grades the
+ *     pair the lane-change tracker exists for (LANE_CHANGE_WITHOUT_INDICATOR /
  *     _MIRROR_CHECK).
  * The arrow assignment itself lives in the district's meta.scenario.laneArrows
  * (authored truth the teach cards + instructions read) — when the lane-intent
@@ -148,7 +149,11 @@ export const SC_LN_TURN_LANE_ARROWS: ScenarioSpec = {
       titleBg: "Ляв завой от лента „само направо“",
       whatWentWrongBg:
         "Водачът се престрои една лента и спря дотам: остана в средната лента, чиято стрелка е „само направо“, и въпреки това зави наляво — без мигач и през чуждата лента. Стрелката на платното е нареждане, не съвет: тя е нарисувана, за да знаят и другите откъде ще тръгнеш. Завоят от грешната лента отрязва тези, които законно завиват отляво, и излиза широко в изходната улица — точно както се вижда тук.",
-      codeRefs: ["TURN_WITHOUT_INDICATOR", "POOR_LANE_KEEPING"],
+      // M-17: the act itself now has its own code. Before it, the card cited
+      // only the collateral faults, so the debrief explained чл. 25 (signal)
+      // for a manoeuvre that broke чл. 6 (marking) — the right severity for
+      // the wrong law, which requirement-zero forbids.
+      codeRefs: ["WRONG_LANE_FOR_DIRECTION", "TURN_WITHOUT_INDICATOR", "POOR_LANE_KEEPING"],
     },
     {
       traceRef: { path: "content/traces/sc-ln-turn-lane-arrows/mistake-late-two-lanes.trace.json" },

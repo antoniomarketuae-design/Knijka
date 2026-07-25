@@ -43,6 +43,17 @@ export interface TutorStore {
     messages: TutorMessage[],
     usage: TutorUsageDelta,
   ): Promise<void>;
+
+  /**
+   * Micro-USD spent across ALL users on `day` ("YYYY-MM-DD", Europe/Sofia).
+   * Feeds the daily kill-switch (budget.ts); 0 when the day has no row yet.
+   */
+  spentOnDay(day: string): Promise<number>;
+  /**
+   * Add one call's usage to that day's global total. Written in the same code
+   * path as saveExchange so the ledger cannot drift from what was billed.
+   */
+  recordDaySpend(day: string, usage: TutorUsageDelta): Promise<void>;
 }
 
 /** Defensive parse of the messages Json column — drops malformed entries. */
@@ -103,6 +114,35 @@ function createPrismaStore(): TutorStore {
         data: {
           // Prisma Json column — TutorMessage[] is plain JSON data.
           messages: messages as unknown as object[],
+          tokensIn: { increment: usage.tokensIn },
+          tokensOut: { increment: usage.tokensOut },
+          costMicroUsd: { increment: usage.costMicroUsd },
+        },
+      });
+    },
+
+    async spentOnDay(day) {
+      const db = await getDb();
+      const row = await db.tutorSpendDay.findUnique({ where: { day } });
+      return row?.costMicroUsd ?? 0;
+    },
+
+    async recordDaySpend(day, usage) {
+      const db = await getDb();
+      // Upsert-with-increment, not read-modify-write: two concurrent tutor
+      // replies must not lose one of their costs to a lost update, or the
+      // kill-switch under-counts exactly when traffic is highest.
+      await db.tutorSpendDay.upsert({
+        where: { day },
+        create: {
+          day,
+          calls: 1,
+          tokensIn: usage.tokensIn,
+          tokensOut: usage.tokensOut,
+          costMicroUsd: usage.costMicroUsd,
+        },
+        update: {
+          calls: { increment: 1 },
           tokensIn: { increment: usage.tokensIn },
           tokensOut: { increment: usage.tokensOut },
           costMicroUsd: { increment: usage.costMicroUsd },

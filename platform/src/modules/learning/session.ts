@@ -15,6 +15,12 @@
  * concept per pass, concepts kept in bucket order) so a session covers
  * several concepts instead of exhausting the first one.
  *
+ * Option order: every picked question is handed on with its options in this
+ * SESSION's seeded order, never the stored one (optionOrder.ts, audit H-1a) —
+ * the stored order puts the correct answer first far too often to be a fair
+ * input to mastery. Grading is by option id (submit.ts), so nothing downstream
+ * may key off an option's index.
+ *
  * Filters:
  *  - Questions answered correctly in the last 2 hours are excluded.
  *  - Status "draft" and "approved" are always eligible; "needs-review" only
@@ -27,6 +33,7 @@
 
 import { getContentRepo } from "@/lib/content/repo";
 import type { Concept, ContentStatus, Question } from "@/lib/content/types";
+import { orderOptionsForPractice, practiceOptionSeed } from "./optionOrder";
 import { isDue } from "./scheduler";
 import { getLearningStore, type ProgressRow } from "./store";
 
@@ -42,6 +49,11 @@ export const DEFAULT_SESSION_SIZE = 10;
 export type SessionReason = "due-review" | "weak-concept" | "new-concept";
 
 export interface SessionQuestion {
+  /**
+   * The question AS PRESENTED: `options` is this session's seeded order
+   * (optionOrder.ts), not the stored one. Every other field is the repo's.
+   * Consumers must resolve answers by option id — an index means nothing.
+   */
   question: Question;
   /** The concept this question was selected for. */
   conceptId: string;
@@ -71,6 +83,14 @@ export interface PracticeSessionOptions {
    * SERVER session's isAdmin only, never from client input.
    */
   ignorePrerequisites?: boolean;
+  /**
+   * Seed for this session's option shuffle (audit H-1a). Callers normally omit
+   * it: the default is derived from (userId, current OPTION_ORDER_WINDOW_MS
+   * bucket), which keeps a refresh stable while a later sitting gets a fresh
+   * arrangement. Pass it explicitly to reproduce an exact session — tests and
+   * support replays.
+   */
+  optionSeed?: number;
   /** Injectable clock for tests. Default: new Date(). */
   now?: Date;
 }
@@ -87,6 +107,7 @@ export async function buildPracticeSession(
     ignorePrerequisites = false,
     now = new Date(),
   } = options;
+  const optionSeed = options.optionSeed ?? practiceOptionSeed(userId, now);
 
   const repo = getContentRepo();
   const store = getLearningStore();
@@ -181,7 +202,17 @@ export async function buildPracticeSession(
           .find((q) => eligible(q));
         if (question) {
           usedQuestionIds.add(question.id);
-          picked.push({ question, conceptId: concept.id, reason });
+          // Copy-on-reorder: the repo hands out shared, process-lifetime
+          // objects, so the session gets a shallow clone rather than a
+          // resorted content bank. Order-fixed questions come back unchanged
+          // (same array reference) and are passed straight through.
+          const options = orderOptionsForPractice(question, optionSeed);
+          picked.push({
+            question:
+              options === question.options ? question : { ...question, options },
+            conceptId: concept.id,
+            reason,
+          });
           progressMade = true;
         }
       }

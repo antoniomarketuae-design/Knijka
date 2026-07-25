@@ -26,7 +26,7 @@ import {
 import type { VehicleSim } from "@/modules/sim/vehicle";
 import type { SimInput } from "@/modules/sim/engine";
 import { hotspotsForStep, type CockpitHotspotName } from "@/modules/sim/procedures";
-import type { CabinControls } from "../cabin";
+import type { CabinControls } from "@/modules/sim/scene/cabin";
 import {
   CLUSTER_H,
   CLUSTER_W,
@@ -34,12 +34,12 @@ import {
   drawCluster,
   needleAngleRad,
   type ClusterData,
-} from "./cluster";
+} from "@/modules/sim/scene/vitok/cluster";
 import {
   COCKPIT_HOTSPOTS,
   CockpitInteractionContext,
   type HotspotAction,
-} from "./hotspots";
+} from "@/modules/sim/scene/vitok/hotspots";
 import { MirrorRig, type MirrorMeshes } from "./MirrorRig";
 
 // ---------------------------------------------------------------------------

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { usePrefersReducedMotion } from "@/lib/hooks/clientEnv";
 
 /**
  * Holographic Speedometer — the signature HUD instrument (doc 64).
@@ -74,31 +75,32 @@ export function Gauge({
   format,
 }: GaugeProps) {
   const target = Math.max(0, Math.min(1, max > 0 ? value / max : 0));
-  const [frac, setFrac] = useState(0);
+  const [animated, setAnimated] = useState(0);
   const raf = useRef<number | null>(null);
+  const reduce = usePrefersReducedMotion();
+
+  // Under reduced motion the gauge is simply DRAWN at its value — the sweep is
+  // derived away rather than short-circuited with a setState inside the effect
+  // (audit M-21), which also means the preference can flip mid-session and the
+  // needle follows.
+  const frac = reduce ? target : animated;
 
   useEffect(() => {
-    const reduce =
-      typeof window !== "undefined" &&
-      window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
-    if (reduce) {
-      setFrac(target);
-      return;
-    }
+    if (reduce) return;
     const DURATION = 1300;
     let start: number | null = null;
     const tick = (ts: number) => {
       if (start === null) start = ts;
       const p = Math.min(1, (ts - start) / DURATION);
       const eased = 1 - Math.pow(1 - p, 3); // easeOutCubic
-      setFrac(target * eased);
+      setAnimated(target * eased);
       if (p < 1) raf.current = requestAnimationFrame(tick);
     };
     raf.current = requestAnimationFrame(tick);
     return () => {
       if (raf.current) cancelAnimationFrame(raf.current);
     };
-  }, [target]);
+  }, [target, reduce]);
 
   const cx = 100;
   const cy = 100;

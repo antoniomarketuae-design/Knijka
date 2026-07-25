@@ -1,5 +1,5 @@
 import type { ComponentType, SVGProps } from "react";
-import type { Achievement } from "@/components/dashboard/data";
+import type { Achievement } from "@/lib/dashboard/data";
 import { EmptyState } from "@/components/dashboard/EmptyState";
 import {
   IconBolt,

@@ -1,0 +1,21 @@
+# /etc/cron.d/knijka — Книжка.AI staging schedule (audit 2026-07-24, H-17).
+# Install: copy to /etc/cron.d/knijka, `chown root:root`, `chmod 644`.
+# cron.d files must NOT be executable and must name the user in each line.
+#
+# PATH matters: cron's default PATH has neither node/npm (nvm or /usr/local)
+# nor pm2. A deploy that cannot find pm2 fails at the restart — with the build
+# already swapped in — which is the worst place to fail. Adjust the node path
+# to whatever `dirname "$(command -v node)"` prints on the box.
+SHELL=/bin/bash
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+HOME=/root
+MAILTO=""
+
+# Every 5 minutes: deploy the newest CI-green commit, if there is a new one.
+# Ticks where nothing changed are silent, so the log only ever shows real work.
+*/5 * * * * root /opt/knijka/autodeploy.sh >> /var/log/knijka-autodeploy.log 2>&1
+
+# 03:15 UTC daily: verified database dump. Sunday's is kept for 8 weeks.
+# Deploys also take one immediately before every migration — this is the
+# safety net for the days when nobody deploys at all.
+15 3 * * * root /opt/knijka/backup-db.sh scheduled >> /var/log/knijka-backup.log 2>&1

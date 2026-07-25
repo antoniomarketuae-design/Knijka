@@ -10,6 +10,12 @@
  *      is only inserted if no row with the same providerRef (= session id)
  *      exists yet.
  *
+ * CONSENT GATE (audit 2026-07-24, H-9): no session — hosted or embedded — is
+ * ever created without a recorded parental approval (possible minors) and
+ * withdrawal waiver for THIS pack. See consent.ts for why both are legally
+ * load-bearing. The proof rides along in `metadata`, so acceptance is later
+ * readable from Stripe-verified data and not only from our own database.
+ *
  * Idempotency caveat: Entitlement.providerRef has no DB unique constraint
  * (schema is frozen for this task), so the check-then-insert leaves a tiny
  * race window between truly concurrent retries. Worst case is a duplicate
@@ -17,6 +23,11 @@
  * schema thaws, add @@unique([provider, providerRef]) via ADR.
  */
 
+import {
+  checkoutConsentPath,
+  findValidCheckoutConsent,
+  type CheckoutConsentProof,
+} from "./consent";
 import { addMonths } from "./entitlements";
 import { isPackId, PACK_CURRENCY, PACKS, type PackId } from "./packs";
 import { getStripeClient } from "./stripe";
@@ -30,8 +41,39 @@ function getAppUrl(): string {
 }
 
 /**
- * PUBLIC API: open a Stripe Checkout session for one pack and return the
- * hosted payment page URL (the caller redirect()s to it).
+ * Session metadata: the userId + pack fulfillment reads back, plus the consent
+ * proof. Stripe stores metadata on the session and on the PaymentIntent, so a
+ * later dispute ("my son bought this without me") is answered from Stripe's
+ * own record, not only from a row in our database that we control.
+ *
+ * Values are plain strings (Stripe's metadata is string→string, 500 chars per
+ * value) — three cuids and a date fit with room to spare.
+ */
+function sessionMetadata(
+  userId: string,
+  pack: PackId,
+  consent: CheckoutConsentProof,
+): Record<string, string> {
+  return {
+    userId,
+    pack,
+    consentIds: consent.ids.join(","),
+    consentKinds: consent.kinds.join(","),
+    consentTermsVersion: consent.docVersion,
+    consentAt: consent.recordedAt.toISOString(),
+  };
+}
+
+/**
+ * PUBLIC API: send a buyer to the next step of the purchase and return the URL
+ * to redirect to.
+ *
+ * Normally that is Stripe's hosted payment page. When no valid consent is on
+ * file yet it is our own /checkout step instead — the one screen where the
+ * parental approval and the withdrawal waiver are ticked. Returning a URL
+ * rather than throwing is deliberate: the caller's whole job is "where do I
+ * send this student next?", and answering "to the consent step" keeps the buy
+ * button working while making it impossible to reach Stripe without consent.
  *
  * The userId + pack ride on session.metadata — fulfillment reads them back
  * from Stripe-verified data, never from the browser.
@@ -39,9 +81,13 @@ function getAppUrl(): string {
 export async function createCheckoutSession(
   userId: string,
   pack: PackId,
+  now: Date = new Date(),
 ): Promise<string> {
   const def = PACKS[pack];
   if (!def) throw new PaymentsError("UNKNOWN_PACK", `Unknown pack "${pack}"`);
+
+  const consent = await findValidCheckoutConsent(userId, pack, now);
+  if (!consent) return checkoutConsentPath(pack);
 
   const stripe = await getStripeClient();
   const appUrl = getAppUrl();
@@ -61,7 +107,7 @@ export async function createCheckoutSession(
         },
       },
     ],
-    metadata: { userId, pack: def.id },
+    metadata: sessionMetadata(userId, def.id, consent),
     client_reference_id: userId,
     success_url: `${appUrl}/pricing?status=success&session_id={CHECKOUT_SESSION_ID}`,
     cancel_url: `${appUrl}/pricing?status=cancelled`,
@@ -85,13 +131,27 @@ export async function createCheckoutSession(
  * the embedded UI (whatever is enabled in the Stripe Dashboard + eligible for
  * the buyer). Fulfillment is unchanged — webhook (authoritative) + the return
  * page both call fulfillCheckout(), keyed by the session id.
+ *
+ * Unlike the hosted variant this one THROWS when consent is missing instead of
+ * returning a URL: its caller is a fetch() from a page that has already shown
+ * the checkboxes, so the only way to get here without consent is to skip the
+ * UI. Fail closed and loudly.
  */
 export async function createEmbeddedCheckoutSession(
   userId: string,
   pack: PackId,
+  now: Date = new Date(),
 ): Promise<string> {
   const def = PACKS[pack];
   if (!def) throw new PaymentsError("UNKNOWN_PACK", `Unknown pack "${pack}"`);
+
+  const consent = await findValidCheckoutConsent(userId, pack, now);
+  if (!consent) {
+    throw new PaymentsError(
+      "CONSENT_REQUIRED",
+      `No valid checkout consent on file for user ${userId} / pack ${pack}`,
+    );
+  }
 
   const stripe = await getStripeClient();
   const appUrl = getAppUrl();
@@ -112,7 +172,7 @@ export async function createEmbeddedCheckoutSession(
         },
       },
     ],
-    metadata: { userId, pack: def.id },
+    metadata: sessionMetadata(userId, def.id, consent),
     client_reference_id: userId,
     return_url: `${appUrl}/checkout/return?session_id={CHECKOUT_SESSION_ID}`,
   });

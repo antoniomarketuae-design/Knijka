@@ -26,6 +26,7 @@ import {
   type MicroQuizQuestion,
 } from "@/modules/sim/lessons";
 import type { MicroQuizAnswerResult } from "@/components/sim/lesson-ui/types";
+import { canDriveSimulator } from "./access";
 
 const MAX_ID_LENGTH = 120;
 const MAX_SELECTED_OPTIONS = 12;
@@ -42,7 +43,12 @@ const MAX_BANK = 16;
 export async function loadMicroQuizBank(
   lessonId: string,
 ): Promise<MicroQuizQuestion[]> {
-  await requireUser();
+  const user = await requireUser();
+
+  // C-3: the micro-quiz is part of the drive, so it rides the simulator
+  // entitlement. Degrades to an empty bank rather than throwing — the same
+  // graceful "no quizzes this session" path every other failure takes.
+  if (!(await canDriveSimulator(user))) return [];
 
   if (typeof lessonId !== "string" || lessonId.length === 0 || lessonId.length > MAX_ID_LENGTH) {
     return [];
@@ -88,13 +94,20 @@ export async function loadMicroQuizBank(
  * submitPracticeAnswer: authenticate, validate the wire input, delegate all
  * grading to the learning module, and return only what the overlay renders.
  * NOTE: no practice-quota gate — micro-quizzes are part of the drive, not the
- * metered theory practice budget.
+ * metered theory practice budget. That is only honest because the SIMULATOR
+ * gate below is here: without it this endpoint would be an unmetered way for a
+ * free account to answer graded questions and move mastery, i.e. a hole
+ * straight through the 20/day theory cap.
  */
 export async function submitMicroQuizAnswer(
   questionId: string,
   selectedOptionIds: string[],
 ): Promise<MicroQuizAnswerResult> {
   const user = await requireUser();
+
+  if (!(await canDriveSimulator(user))) {
+    throw new Error("submitMicroQuizAnswer: no simulator entitlement");
+  }
 
   if (typeof questionId !== "string" || questionId.length === 0 || questionId.length > MAX_ID_LENGTH) {
     throw new Error("submitMicroQuizAnswer: invalid questionId");

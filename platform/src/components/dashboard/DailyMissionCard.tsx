@@ -1,5 +1,5 @@
 import Link from "next/link";
-import type { DailyMission } from "@/components/dashboard/data";
+import type { DailyMission } from "@/lib/dashboard/data";
 import { EmptyState } from "@/components/dashboard/EmptyState";
 import { IconBolt, IconCheck, IconTarget } from "@/components/icons";
 

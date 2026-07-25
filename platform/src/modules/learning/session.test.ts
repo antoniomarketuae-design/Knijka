@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { setContentRepo } from "@/lib/content/repo";
 import { FakeLearningStore, makeFixtureRepo } from "./fixtures";
+import { OPTION_ORDER_WINDOW_MS } from "./optionOrder";
 import { buildPracticeSession } from "./session";
 import { setLearningStore } from "./store";
 
@@ -222,5 +223,54 @@ describe("buildPracticeSession", () => {
       conceptIds: [],
     });
     expect(unfiltered.some((s) => s.conceptId !== "c-priority")).toBe(true);
+  });
+
+  // -- option order (audit H-1a) ---------------------------------------------
+
+  describe("option order", () => {
+    /** Stored (bank) order of a fixture question — every correct option is
+     *  authored first, exactly like the real bank's bias. */
+    const storedIds = (questionId: string) =>
+      makeFixtureRepo()
+        .questionById(questionId)!
+        .options.map((o) => o.id);
+
+    it("presents options in the session's seeded order, not the stored one", async () => {
+      // Seed 0 maps q-road-1's stored [a, b, c] to [b, c, a].
+      const session = await buildPracticeSession(USER, { now: NOW, optionSeed: 0 });
+      const roadOne = session.find((s) => s.question.id === "q-road-1")!;
+
+      const presented = roadOne.question.options.map((o) => o.id);
+      expect(presented).not.toEqual(storedIds("q-road-1"));
+      expect([...presented].sort()).toEqual([...storedIds("q-road-1")].sort());
+    });
+
+    it("never reorders the content repo itself", async () => {
+      const before = storedIds("q-road-1");
+
+      await buildPracticeSession(USER, { now: NOW, optionSeed: 0 });
+
+      // The repo is a process-lifetime singleton: an in-place shuffle would
+      // scramble the bank for every other request in the process.
+      expect(storedIds("q-road-1")).toEqual(before);
+    });
+
+    it("re-renders an identical order for the same seed, and a different one for the next sitting", async () => {
+      const order = async (opts: { optionSeed?: number; now?: Date }) =>
+        (await buildPracticeSession(USER, { now: NOW, ...opts }))
+          .find((s) => s.question.id === "q-road-1")!
+          .question.options.map((o) => o.id);
+
+      expect(await order({ optionSeed: 0 })).toEqual(await order({ optionSeed: 0 }));
+
+      // Default seed: derived from (user, clock window). Same window, same
+      // order — a refresh mid-session must not move the answers around.
+      const sameWindow = new Date(NOW.getTime() + 60_000);
+      expect(await order({ now: sameWindow })).toEqual(await order({}));
+
+      // A later sitting is dealt a fresh arrangement.
+      const nextWindow = new Date(NOW.getTime() + OPTION_ORDER_WINDOW_MS);
+      expect(await order({ now: nextWindow })).not.toEqual(await order({}));
+    });
   });
 });

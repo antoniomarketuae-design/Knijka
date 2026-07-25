@@ -5,10 +5,20 @@
  * (docs/education/32): 45 questions / 97 points / pass >= 87 / 40 minutes.
  *
  * Lifecycle: startExam() builds a seeded exam and opens an ExamAttempt;
+ * getInProgressExam() re-renders a running attempt from what was dealt (the
+ * ONLY supported way to show an in-progress paper — see restore.ts);
  * submitExam() grades (exact-set rule for multi), enforces the 40:00 + 30s
  * grace limit (late => auto-fail, but what was answered is still graded and
- * persisted), and records per-question results; getExamHistory() lists a
- * user's attempts.
+ * persisted), and records per-question results; getExamReview() rebuilds a
+ * finished attempt's full review + per-topic breakdown from the attempt row
+ * (server-side, so it survives the device it was taken on — audit M-1);
+ * getExamHistory() lists a user's attempts.
+ *
+ * Content gate: only `approved` questions are exam-eligible (builder.ts,
+ * isExamEligible). Because quotas are proportional to that eligible pool,
+ * auditExamSupply() reports whether review debt has quietly re-weighted which
+ * topics candidates are examined on — run it in CI, not only from an admin
+ * screen (supply.ts).
  *
  * MASTERY COUPLING NOTE: the learning module does not exist yet
  * (src/modules contains no learning/index.ts to import), so instead of
@@ -22,6 +32,8 @@ import { getContentRepo } from "../../lib/content/repo";
 import type { Question } from "../../lib/content/types";
 import { buildExam } from "./builder";
 import { gradeExam } from "./grader";
+import { restorePaper } from "./restore";
+import { parseGradedAnswers, rehydrateReview } from "./review";
 import { getExamStore, type ExamAttemptRecord } from "./store";
 import {
   EXAM_DURATION_SEC,
@@ -29,15 +41,37 @@ import {
   ExamError,
   type ExamAnswer,
   type ExamHistoryEntry,
+  type ExamReview,
+  type InProgressExam,
   type StartExamResult,
   type SubmitExamResult,
 } from "./types";
 
 // -- public re-exports -------------------------------------------------------
 
-export { buildExam } from "./builder";
+export { buildExam, isExamEligible } from "./builder";
 export { gradeExam } from "./grader";
+export {
+  DECLARED_QUOTA_TOTAL,
+  EXAM_TOPIC_QUOTAS,
+  declaredQuotaFor,
+  type TopicQuota,
+} from "./quotas";
+export {
+  auditExamSupply,
+  formatExamSupplyAudit,
+  MIN_SUPPLY_PER_SLOT,
+  MIN_APPROVED_SHARE,
+  MAX_QUOTA_SHORTFALL,
+} from "./supply";
+export type {
+  ExamSupplyAudit,
+  TopicSupply,
+  SupplyProblem,
+  SupplyProblemCode,
+} from "./supply";
 export { setExamStore, InMemoryExamStore, type ExamStore } from "./store";
+export { parseGradedAnswers, rehydrateReview, type GradedAnswerRecord } from "./review";
 export {
   EXAM_QUESTION_COUNT,
   EXAM_MAX_POINTS,
@@ -56,6 +90,11 @@ export type {
   StartExamResult,
   SubmitExamResult,
   ExamHistoryEntry,
+  ExamReview,
+  ExamReviewOption,
+  ExamReviewQuestion,
+  ExamTopicResult,
+  InProgressExam,
 } from "./types";
 
 // -- attempt payload (ExamAttempt.answers JSON) ------------------------------
@@ -94,6 +133,21 @@ export async function startExam(
     seed: exam.seed,
     questionIds: exam.questions.map((q) => q.id),
   };
+
+  // Render the freshly dealt paper through the SAME projection a resume uses,
+  // so the first paint and every later resume are byte-identical (the builder's
+  // own option order comes from its bank-wide RNG stream, which is unreplayable
+  // once content changes). Done before createAttempt so we never open an
+  // attempt we could not render.
+  const paper = restorePaper(payload.questionIds, exam.seed);
+  if (!paper.ok) {
+    // Unreachable: the ids were just read out of the repo we are restoring from.
+    throw new ExamError(
+      "INVALID_ATTEMPT_STATE",
+      `Freshly built exam is unrestorable: ${paper.missingIds.join(", ")}`,
+    );
+  }
+
   const attempt = await getExamStore().createAttempt({
     userId,
     maxScore: exam.totalPoints,
@@ -102,8 +156,49 @@ export async function startExam(
   return {
     attemptId: attempt.id,
     seed: exam.seed,
-    questions: exam.questions,
+    questions: paper.questions,
     durationSec: EXAM_DURATION_SEC,
+  };
+}
+
+/**
+ * Re-render an attempt that is still running — the read path for /exams/[id].
+ *
+ * Returns null when the attempt cannot be faithfully restored: unknown id, an
+ * attempt belonging to someone else (same answer for both — don't leak other
+ * users' ids), an attempt that is already graded, an unreadable payload, or a
+ * dealt question that has since been deleted from the bank.
+ *
+ * Callers must render a "cannot continue" view on null and must NEVER fall back
+ * to `buildExam(seed)`: that deals a different paper and grades the candidate
+ * on questions they never saw (audit H-7).
+ */
+export async function getInProgressExam(
+  userId: string,
+  attemptId: string,
+): Promise<InProgressExam | null> {
+  const attempt = await getExamStore().getAttempt(attemptId);
+  if (!attempt || attempt.userId !== userId) return null;
+  if (attempt.finishedAt !== null) return null;
+
+  const pending = parseInProgress(attempt.answers);
+  if (!pending) return null;
+
+  // The seed comes from the attempt row, not a cookie — cleared cookies, a
+  // 100-minute cookie maxAge or a second device no longer strand the exam (M-9).
+  const paper = restorePaper(pending.questionIds, pending.seed);
+  if (!paper.ok) {
+    console.warn(
+      `exam: attempt ${attemptId} is unrestorable — ${paper.missingIds.length} dealt question(s) no longer in the bank: ${paper.missingIds.join(", ")}`,
+    );
+    return null;
+  }
+
+  return {
+    attemptId,
+    seed: pending.seed,
+    startedAt: attempt.startedAt,
+    questions: paper.questions,
   };
 }
 
@@ -159,13 +254,17 @@ export async function submitExam(
     finishedAt: now,
     score: grade.score,
     passed,
-    // schema contract: answers Json = [{questionId, optionIds, correct, points}]
+    // schema contract: answers Json =
+    //   [{questionId, optionIds, correct, points, maxPoints}]
+    // `maxPoints` is the weight AS GRADED: getExamReview must not let a later
+    // content edit change what the candidate could have scored (audit M-1).
     answers: grade.perQuestion.map((p) => ({
       questionId: p.questionId,
       optionIds:
         cleanAnswers.find((a) => a.questionId === p.questionId)?.optionIds ?? [],
       correct: p.correct,
       points: p.points,
+      maxPoints: p.maxPoints,
     })),
   });
 
@@ -202,6 +301,47 @@ export async function submitExam(
   }
 
   return { attemptId, late, ...grade, passed };
+}
+
+/**
+ * The full review of a COMPLETED attempt — every question with its correct
+ * options, explanation and citations, plus the per-topic breakdown.
+ *
+ * Server-side and device-independent on purpose (audit M-1): this used to be a
+ * localStorage cache, so a failed exam degraded to a bare score anywhere else.
+ * Returns null for an unknown attempt, someone else's attempt (same answer for
+ * both — don't leak other users' ids), an attempt still in progress, or a
+ * grade payload that cannot be read.
+ */
+export async function getExamReview(
+  userId: string,
+  attemptId: string,
+): Promise<ExamReview | null> {
+  const attempt = await getExamStore().getAttempt(attemptId);
+  if (!attempt || attempt.userId !== userId) return null;
+  if (attempt.finishedAt === null) return null;
+
+  const records = parseGradedAnswers(attempt.answers);
+  if (!records) {
+    console.warn(`exam: attempt ${attemptId} has no readable grade payload`);
+    return null;
+  }
+
+  const { questions, byTopic } = rehydrateReview(records);
+  return {
+    attemptId,
+    startedAt: attempt.startedAt,
+    finishedAt: attempt.finishedAt,
+    score: attempt.score ?? 0,
+    maxScore: attempt.maxScore,
+    passed: attempt.passed === true,
+    timeUsedSec: Math.max(
+      0,
+      Math.round((attempt.finishedAt.getTime() - attempt.startedAt.getTime()) / 1000),
+    ),
+    questions,
+    byTopic,
+  };
 }
 
 /** All exam attempts of a user, newest first. */

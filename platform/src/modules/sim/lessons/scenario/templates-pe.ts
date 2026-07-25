@@ -509,7 +509,7 @@ export const SC_CROSSING_DART: ScenarioSpec = {
 //    the driving lane; the shadow drive proves the car never touches it. LIVE
 //    play shows the occluder too (founder R3 #26 „NO BUS AT ALL" ruling): the
 //    procedural BOX TRUCK body stands at the BUS_OBSTACLE rect via the
-//    heldSceneryFor dressing channel (components/sim/scenarioSceneryProps.ts)
+//    heldSceneryFor dressing channel (sim/scene/scenarioSceneryProps.ts)
 //    — the audit's costed stopgap until a real bus rig exists. The COPY is
 //    honest about it („камион", not „автобус"); a future bus rig restores the
 //    original bus-stop framing. Template id stays sc-crossing-bus-shadow

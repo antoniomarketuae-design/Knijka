@@ -101,6 +101,7 @@ import {
 import {
   DistrictWorld,
   LaneSignalGantry,
+  TEXTURE_BUDGETS,
   assertDistrict,
   type WorldGeometry,
 } from "@/modules/sim/world";
@@ -116,28 +117,28 @@ import {
   type ScenarioTrace,
   type TraceClock,
 } from "@/modules/sim/traces";
-import { CabinControls, type MirrorGlanceKind } from "./cabin";
+import { CabinControls, type MirrorGlanceKind } from "@/modules/sim/scene/cabin";
 import { TouchControls } from "./TouchControls";
-import { CockpitInteractionContext } from "./vitok/hotspots";
-import { SimAudio } from "./simAudio";
+import { CockpitInteractionContext } from "@/modules/sim/scene/vitok/hotspots";
+import { SimAudio } from "@/modules/sim/scene/simAudio";
 import { CameraRig, type CameraMode } from "./CameraRig";
 import { VehicleRig, type CollisionWithWhat, type VehicleSpawn } from "./VehicleRig";
 import { NpcColliders } from "./NpcColliders";
-import { createVehicleSample } from "./vehicleSample";
-import { buildMinimapPolylines } from "./lessonMinimap";
+import { createVehicleSample } from "@/modules/sim/scene/vehicleSample";
+import { buildMinimapPolylines } from "@/modules/sim/scene/lessonMinimap";
 import {
   applySignalModes,
   buildLessonWorldCore,
   wireTrafficQueries,
   type LessonWorldCore,
-} from "./lessonWorldRecipe";
+} from "@/modules/sim/scene/lessonWorldRecipe";
 import { RouteGuidance } from "./RouteGuidance";
 import { ScenarioObstacles, type ScenarioObstacleSpec } from "./ScenarioObstacles";
 import { ShadowCar } from "./ShadowCar";
 // [glance-pings] the look-left/right teaching overlay (see the wiring block).
 import { GlanceEdgePings, type GlancePingTap } from "./lesson-ui/GlanceEdgePings";
 import { TraceTimeline } from "./lesson-ui/TraceTimeline";
-import { worldNameBg } from "./worldNames";
+import { worldNameBg } from "@/modules/sim/scene/worldNames";
 import type { QualityPreset } from "./lesson-ui/types";
 
 // Minimal structural mirrors of the district shapes we read here — the runtime
@@ -928,17 +929,26 @@ function ReadyScene({
             PMREM so metal/glass/mirrors sample a faint skyline instead of
             black (a graded mirror feature needs *something* to reflect at
             night). Intensities stay modest so the IBL complements the
-            sun/hemisphere rig rather than flattening it. */}
-        <Suspense fallback={null}>
-          <Environment
-            files={
-              isNight ? "/sim/env/sky_urban_1k.hdr" : "/sim/env/shanghai_riverside_1k.hdr"
-            }
-            background={false}
-            environmentIntensity={isNight ? 0.12 : rain ? 0.5 * (1 - RAIN_IBL_DIM) : 0.5}
-            environmentRotation={isNight ? NIGHT_ENV_ROTATION : DAY_ENV_ROTATION}
-          />
-        </Suspense>
+            sun/hemisphere rig rather than flattening it.
+
+            NOT MOUNTED AT `low` (audit H-11): one 1.5 MB HDR is more than twice
+            the entire low-tier texture budget, and the tier it serves already
+            has no composer, no shadows and no clearcoat — the reflections it
+            feeds are the least visible they will ever be. The ruling lives in
+            TEXTURE_BUDGETS (sim/world), which the texture loaders read too, so
+            the download tier cannot drift from the render tier again. */}
+        {TEXTURE_BUDGETS[level].hdrEnvironment ? (
+          <Suspense fallback={null}>
+            <Environment
+              files={
+                isNight ? "/sim/env/sky_urban_1k.hdr" : "/sim/env/shanghai_riverside_1k.hdr"
+              }
+              background={false}
+              environmentIntensity={isNight ? 0.12 : rain ? 0.5 * (1 - RAIN_IBL_DIM) : 0.5}
+              environmentRotation={isNight ? NIGHT_ENV_ROTATION : DAY_ENV_ROTATION}
+            />
+          </Suspense>
+        ) : null}
         <Suspense fallback={null}>
           <Physics
             gravity={[0, GRAVITY, 0]}

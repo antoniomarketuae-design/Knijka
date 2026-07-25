@@ -9,7 +9,7 @@
 import { makeSceneStillQuestion, makeSignMediaQuestion } from "@/lib/content/mediaFixtures";
 import { QuestionMediaView, SignFace } from "@/components/theory/QuestionMedia";
 import { WhyPanel } from "@/components/theory/WhyPanel";
-import { buildWhyPanelModel } from "@/components/theory/whyPanelModel";
+import { buildWhyPanelModel } from "@/modules/clips/view";
 
 const signQuestion = makeSignMediaQuestion();
 const sceneQuestion = makeSceneStillQuestion();

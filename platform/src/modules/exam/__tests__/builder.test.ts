@@ -1,7 +1,21 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { setContentRepo } from "../../../lib/content/repo";
-import { buildExam, EXAM_MAX_POINTS, EXAM_QUESTION_COUNT, ExamError } from "..";
-import { allOnesBank, makeFixtureRepo, richBank, tinyBank, topicOf } from "./fixtures";
+import {
+  buildExam,
+  EXAM_MAX_POINTS,
+  EXAM_QUESTION_COUNT,
+  EXAM_TOPIC_QUOTAS,
+  ExamError,
+} from "..";
+import {
+  allOnesBank,
+  allThreesBank,
+  declaredQuotaBank,
+  makeFixtureRepo,
+  richBank,
+  tinyBank,
+  topicOf,
+} from "./fixtures";
 
 const SEEDS = Array.from({ length: 25 }, (_, i) => i * 1013 + 1);
 
@@ -28,11 +42,16 @@ describe("buildExam — official format invariants", () => {
     }
   });
 
-  it("never includes needs-review questions", () => {
+  it("never includes anything but approved questions", () => {
+    // content/SCHEMA.md: nothing ships without review. `draft` used to be
+    // eligible, which put un-reviewed items (the ones whose lawRefs may still
+    // carry a "?") in front of an exam candidate — see isExamEligible.
     const banned = new Set(
-      bank.questions.filter((q) => q.status === "needs-review").map((q) => q.id),
+      bank.questions.filter((q) => q.status !== "approved").map((q) => q.id),
     );
-    expect(banned.size).toBeGreaterThan(0);
+    const byStatus = (s: string) => bank.questions.filter((q) => q.status === s).length;
+    expect(byStatus("draft")).toBeGreaterThan(0);
+    expect(byStatus("needs-review")).toBeGreaterThan(0);
     for (const seed of SEEDS) {
       for (const q of buildExam(seed).questions) {
         expect(banned.has(q.id)).toBe(false);
@@ -85,11 +104,30 @@ describe("buildExam — official format invariants", () => {
 });
 
 describe("buildExam — degenerate banks", () => {
-  it("gets as close to 97 as the bank allows when 97 is unreachable", () => {
+  it("refuses to deal a sub-97 exam when 97 is unreachable (M-13)", () => {
+    // The old builder returned 45 x 1pt = 45 points here and said nothing,
+    // while EXAM_PASS_POINTS stayed an absolute 87 — an unpassable paper. The
+    // failure has to be loud because the fix is a content one (approve more
+    // 3-pointers), and nothing about a 45-point exam looks wrong to a student.
     setContentRepo(makeFixtureRepo(allOnesBank()));
-    const exam = buildExam(11);
-    expect(exam.questions).toHaveLength(EXAM_QUESTION_COUNT);
-    expect(exam.totalPoints).toBe(45); // 45 x 1pt is the ceiling of that bank
+    expect(() => buildExam(11)).toThrowError(ExamError);
+    try {
+      buildExam(11);
+    } catch (e) {
+      expect((e as ExamError).code).toBe("BANK_UNDERWEIGHT");
+      expect((e as ExamError).message).toContain("45"); // names the closest total
+    }
+  });
+
+  it("throws BANK_OVERWEIGHT when even the lightest 45 exceed 97", () => {
+    setContentRepo(makeFixtureRepo(allThreesBank()));
+    try {
+      buildExam(11);
+      throw new Error("expected buildExam to throw");
+    } catch (e) {
+      expect(e).toBeInstanceOf(ExamError);
+      expect((e as ExamError).code).toBe("BANK_OVERWEIGHT");
+    }
   });
 
   it("throws BANK_TOO_SMALL below 45 eligible questions", () => {
@@ -102,3 +140,66 @@ describe("buildExam — degenerate banks", () => {
     }
   });
 });
+
+describe("buildExam — declared topic quotas (M-11)", () => {
+  const bank = declaredQuotaBank();
+  beforeEach(() => {
+    setContentRepo(makeFixtureRepo(bank));
+  });
+
+  it("gives every topic exactly the slots the quota table declares", () => {
+    for (const seed of SEEDS) {
+      const perTopic = new Map<string, number>();
+      for (const q of buildExam(seed).questions) {
+        const slug = slugOf(bank, q.id);
+        perTopic.set(slug, (perTopic.get(slug) ?? 0) + 1);
+      }
+      for (const row of EXAM_TOPIC_QUOTAS) {
+        expect(perTopic.get(row.slug), `${row.slug} @ seed ${seed}`).toBe(row.quota);
+      }
+    }
+  });
+
+  it("keeps the mix fixed when a topic's bank grows (the M-11 regression)", () => {
+    // Proportional allocation moved a slot off some other topic the moment an
+    // author added questions. 40 new parking questions must now change nothing.
+    const grown = declaredQuotaBank({ extraFor: "spirane-i-parkirane", extra: 40 });
+    const before = topicCounts(bank, buildExam(31).questions);
+    setContentRepo(makeFixtureRepo(grown));
+    const after = topicCounts(grown, buildExam(31).questions);
+    expect(after).toEqual(before);
+  });
+
+  it("re-flows the slots a review-starved topic cannot fill, still hitting 45/97", () => {
+    // The declared quota is a promise about the mix, not about content that
+    // does not exist: a topic with 2 approved questions contributes 2, and the
+    // paper stays a legal 45/97 rather than failing on someone else's backlog.
+    const starved = declaredQuotaBank({ starveSlug: "patni-znatsi", keepApproved: 2 });
+    setContentRepo(makeFixtureRepo(starved));
+    const exam = buildExam(41);
+    const counts = topicCounts(starved, exam.questions);
+    expect(counts.get("patni-znatsi")).toBe(2); // declared 4, supply 2
+    expect(exam.questions).toHaveLength(EXAM_QUESTION_COUNT);
+    expect(exam.totalPoints).toBe(EXAM_MAX_POINTS);
+  });
+});
+
+/** Primary-topic slug of a dealt question (the builder's own rule). */
+function slugOf(bank: ReturnType<typeof declaredQuotaBank>, questionId: string): string {
+  const topicId = topicOf(bank, questionId);
+  const topic = bank.topics.find((t) => t.id === topicId);
+  if (!topic) throw new Error(`fixture: no topic for ${questionId}`);
+  return topic.slug;
+}
+
+function topicCounts(
+  bank: ReturnType<typeof declaredQuotaBank>,
+  questions: { id: string }[],
+): Map<string, number> {
+  const counts = new Map<string, number>();
+  for (const q of questions) {
+    const slug = slugOf(bank, q.id);
+    counts.set(slug, (counts.get(slug) ?? 0) + 1);
+  }
+  return counts;
+}

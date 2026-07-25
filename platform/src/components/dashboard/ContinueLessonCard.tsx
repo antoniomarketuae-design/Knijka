@@ -1,5 +1,5 @@
 import Link from "next/link";
-import type { ContinueLesson } from "@/components/dashboard/data";
+import type { ContinueLesson } from "@/lib/dashboard/data";
 import { IconPlay } from "@/components/icons";
 
 /**

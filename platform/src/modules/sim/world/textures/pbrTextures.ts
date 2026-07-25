@@ -44,19 +44,30 @@
  * the geometry's `uv` attribute — the SAME UVs the colour/normal/roughness
  * maps use. So the tiling detail-AO needs no separate uv2 set; it just tiles
  * with the surface, which is exactly what a tiling PBR set wants.
+ *
+ * DOWNLOAD TIER (audit H-11 part 2): which of the four maps is fetched at all
+ * is decided by `GroundMapsMode` (textureBudget.ts), NOT by the consumer's
+ * binding. Before this the loader took no quality argument and pulled the same
+ * 4,465,053 B at low, med and high — the phone tier paid for maps it had
+ * already decided not to sample. Every map a mode omits is `null` in the set,
+ * and consumers must fall back to their authored constant (roughness/metalness
+ * are already set explicitly at every call site, so the wet-road lerp survives).
  */
 
 import { useEffect, useState } from "react";
 import * as THREE from "three";
 import { KTX2Loader } from "three/examples/jsm/loaders/KTX2Loader.js";
+import { groundFetchPlan, type GroundMapName, type GroundMapsMode } from "./textureBudget";
 
 export type PbrGroup = "road" | "sidewalk" | "ground";
 
 export interface PbrTextureSet {
   map: THREE.Texture;
-  normalMap: THREE.Texture;
-  roughnessMap: THREE.Texture;
-  /** null for concrete/sidewalk (no AO map shipped — treat AO as 1.0). */
+  /** null when the tier drops it ("colorOnly") — bind nothing, relief is flat. */
+  normalMap: THREE.Texture | null;
+  /** null when the tier drops it ("colorOnly") — the material constant wins. */
+  roughnessMap: THREE.Texture | null;
+  /** null for concrete/sidewalk (no AO map shipped) or when the tier drops it. */
   aoMap: THREE.Texture | null;
 }
 
@@ -206,9 +217,12 @@ function loadManifest(): Promise<Manifest | null> {
   return manifestPromise;
 }
 
-function buildSet(group: PbrGroup, gl: THREE.WebGLRenderer): Promise<PbrTextureSet> {
+function buildSet(
+  group: PbrGroup,
+  mode: GroundMapsMode,
+  gl: THREE.WebGLRenderer,
+): Promise<PbrTextureSet> {
   const cfg = GROUPS[group];
-  const base = `${BASE_URL}/${cfg.dir}`;
   const repeat = repeatOf(cfg);
   const pngLoader = new THREE.TextureLoader();
 
@@ -218,22 +232,35 @@ function buildSet(group: PbrGroup, gl: THREE.WebGLRenderer): Promise<PbrTextureS
       ? new KTX2Loader().setTranscoderPath(BASIS_TRANSCODER_PATH).detectSupport(gl)
       : null;
 
-    const loadMap = (map: MapName, srgb: boolean): Promise<THREE.Texture> => {
-      const pngUrl = `${base}/${map}.png`;
-      const ktx2File = entry?.[map];
-      return ktx2 && ktx2File
-        ? loadKtx2(ktx2, pngLoader, `${BASE_URL}/${ktx2File}`, pngUrl, srgb, repeat)
-        : loadPng(pngLoader, pngUrl, srgb, repeat);
-    };
+    // The plan IS the tier decision (textureBudget.ts) — this loader only
+    // executes it. Maps outside the plan are never requested and stay null.
+    const plan = groundFetchPlan({
+      baseUrl: BASE_URL,
+      dir: cfg.dir,
+      hasAo: cfg.hasAo,
+      mode,
+      entry,
+    });
+    const out: Partial<Record<GroundMapName, THREE.Texture>> = {};
 
-    return Promise.all([
-      loadMap("color", true), // sRGB albedo
-      loadMap("normal", false), // linear
-      loadMap("roughness", false), // linear
-      cfg.hasAo ? loadMap("ao", false) : Promise.resolve<THREE.Texture | null>(null),
-    ]).then(([map, normalMap, roughnessMap, aoMap]) => {
+    return Promise.all(
+      plan.map((req) =>
+        (ktx2 && req.ktx2Url
+          ? loadKtx2(ktx2, pngLoader, req.ktx2Url, req.pngUrl, req.srgb, repeat)
+          : loadPng(pngLoader, req.pngUrl, req.srgb, repeat)
+        ).then((tex) => {
+          out[req.map as GroundMapName] = tex;
+        }),
+      ),
+    ).then(() => {
       ktx2?.dispose();
-      return { map, normalMap, roughnessMap, aoMap };
+      return {
+        // "color" is in every mode (groundMapsOf), so it is always present.
+        map: out.color!,
+        normalMap: out.normal ?? null,
+        roughnessMap: out.roughness ?? null,
+        aoMap: out.ao ?? null,
+      };
     });
   });
 }
@@ -248,35 +275,50 @@ interface CacheEntry {
   refs: number;
 }
 
-const cache = new Map<PbrGroup, CacheEntry>();
+/**
+ * Keyed by group AND tier: two tiers of the same group are different byte sets,
+ * so a runtime quality switch must not hand the new tier the old tier's maps
+ * (nor the reverse — the old cache would have satisfied `low` with high's
+ * 4.47 MB, silently defeating the budget). The refcount then disposes the
+ * outgoing tier as its last consumer unmounts, exactly as before.
+ */
+type CacheKey = `${PbrGroup}:${GroundMapsMode}`;
+
+const cache = new Map<CacheKey, CacheEntry>();
 
 function texturesOf(set: PbrTextureSet): THREE.Texture[] {
-  const list = [set.map, set.normalMap, set.roughnessMap];
-  if (set.aoMap) list.push(set.aoMap);
-  return list;
+  return [set.map, set.normalMap, set.roughnessMap, set.aoMap].filter(
+    (t): t is THREE.Texture => t !== null,
+  );
 }
 
-function acquire(group: PbrGroup, gl: THREE.WebGLRenderer): Promise<PbrTextureSet> {
-  let entry = cache.get(group);
+function acquire(
+  group: PbrGroup,
+  mode: GroundMapsMode,
+  gl: THREE.WebGLRenderer,
+): Promise<PbrTextureSet> {
+  const key: CacheKey = `${group}:${mode}`;
+  let entry = cache.get(key);
   if (!entry) {
-    const promise = buildSet(group, gl).then((set) => {
-      const e = cache.get(group);
+    const promise = buildSet(group, mode, gl).then((set) => {
+      const e = cache.get(key);
       if (e) e.set = set;
       return set;
     });
     entry = { set: null, promise, refs: 0 };
-    cache.set(group, entry);
+    cache.set(key, entry);
   }
   entry.refs += 1;
   return entry.promise;
 }
 
-function release(group: PbrGroup): void {
-  const entry = cache.get(group);
+function release(group: PbrGroup, mode: GroundMapsMode): void {
+  const key: CacheKey = `${group}:${mode}`;
+  const entry = cache.get(key);
   if (!entry) return;
   entry.refs -= 1;
   if (entry.refs <= 0) {
-    cache.delete(group);
+    cache.delete(key);
     // Dispose once the (possibly still in-flight) load settles.
     entry.promise
       .then((set) => {
@@ -295,12 +337,15 @@ function release(group: PbrGroup): void {
 /**
  * Loads (once, cached) the PBR set for `group` and returns it, or null until
  * it resolves / on the server. Callers should fall back to their procedural
- * texture while null. `anisotropy` (from the quality preset) is applied to the
+ * texture while null. `mode` is the tier's download budget (TEXTURE_BUDGETS[
+ * preset.level].groundMaps) — maps outside it are never fetched and come back
+ * null on the set. `anisotropy` (from the quality preset) is applied to the
  * shared textures; the CC0 sets look best at 4-8. `gl` (from `useThree`) is
  * needed to detect the GPU's transcode-target formats for the KTX2 path.
  */
 export function usePbrSet(
   group: PbrGroup,
+  mode: GroundMapsMode,
   anisotropy: number,
   gl: THREE.WebGLRenderer,
 ): PbrTextureSet | null {
@@ -309,15 +354,24 @@ export function usePbrSet(
   useEffect(() => {
     if (typeof window === "undefined") return;
     let active = true;
-    acquire(group, gl).then((s) => {
-      if (active) setSet(s);
-    });
+    acquire(group, mode, gl)
+      .then((s) => {
+        if (active) setSet(s);
+      })
+      // The set is an UPGRADE over the procedural canvas textures, never a
+      // requirement — leaving `set` null keeps those. Swallowing here matters
+      // more since M-28 stopped deploying the source PNGs: on a device where
+      // basis transcoding fails there is now no PNG to fall back to, and
+      // without this the rejection would surface as an unhandled promise.
+      .catch(() => {
+        /* stay on the procedural fallback */
+      });
     return () => {
       active = false;
       setSet(null);
-      release(group);
+      release(group, mode);
     };
-  }, [group, gl]);
+  }, [group, mode, gl]);
 
   useEffect(() => {
     if (!set) return;

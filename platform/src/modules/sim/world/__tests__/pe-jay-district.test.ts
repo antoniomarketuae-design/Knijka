@@ -204,7 +204,7 @@ describe("pe-jay-v1 through the world runtime — cluster, stop lines, limits", 
 describe("pe-jay-v1 through the world runtime — the crossing-zone chain", () => {
   it("arms the pej-x-1 zone on the approach and fires crossingPassed with the ped flag", () => {
     const rt = createWorldRuntime(loadRaw());
-    let onCrossing = true;
+    const onCrossing = true;
     rt.setPedestrianQuery((id) => id === CROSSING_ID && onCrossing);
 
     const entered: boolean[] = [];

@@ -25,14 +25,14 @@
  * re-recording a clip overwrites the binaries and replaces the entry, so the
  * main session re-runs stragglers freely.
  *
- * Contract: src/lib/clips/manifest.ts (writer side) ↔
- * src/components/theory/clipManifest.ts (reader side).
+ * Contract: src/modules/clips/capture/manifest.ts (writer side) ↔
+ * src/modules/clips/view/clipManifest.ts (reader side).
  */
 
 import fs from "node:fs";
 import path from "node:path";
 import { NextResponse } from "next/server";
-import { clipPlanForId } from "@/modules/learning";
+import { clipPlanForId } from "@/modules/clips";
 import {
   CLIP_ID_RE,
   CLIP_KEYFRAME_COUNT,
@@ -42,7 +42,7 @@ import {
   type ClipActorCheck,
   type ClipManifest,
   type ClipManifestEntry,
-} from "@/lib/clips/manifest";
+} from "@/modules/clips/capture/manifest";
 
 // Reads/writes the filesystem — never cache, always run at request time.
 export const dynamic = "force-dynamic";

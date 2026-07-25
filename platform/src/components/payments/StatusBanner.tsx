@@ -1,12 +1,17 @@
 /**
  * Status banner for /pricing (?status=...).
  * Covers both post-checkout returns (success/cancelled/error/unavailable) and
- * free-tier cap landings (quota/exam-limit) — every way a user can be *sent*
- * here must explain itself. Server component; same visual language as the
- * /exams message card.
+ * free-tier cap landings (quota/exam-limit/sim-locked/tutor-limit) — every way
+ * a user can be *sent* here must explain itself. There is one cap landing per
+ * gate in modules/payments/quota.ts; adding a gate means adding a status.
+ * Server component; same visual language as the /exams message card.
  */
 
-import { FREE_DAILY_PRACTICE_LIMIT } from "@/modules/payments";
+import {
+  FREE_DAILY_PRACTICE_LIMIT,
+  FREE_TUTOR_LIFETIME_MESSAGES,
+  PACKS,
+} from "@/modules/payments";
 
 export type PricingStatus =
   | "success"
@@ -14,7 +19,9 @@ export type PricingStatus =
   | "unavailable"
   | "error"
   | "quota"
-  | "exam-limit";
+  | "exam-limit"
+  | "sim-locked"
+  | "tutor-limit";
 
 export function parsePricingStatus(value: unknown): PricingStatus | null {
   return value === "success" ||
@@ -22,7 +29,9 @@ export function parsePricingStatus(value: unknown): PricingStatus | null {
     value === "unavailable" ||
     value === "error" ||
     value === "quota" ||
-    value === "exam-limit"
+    value === "exam-limit" ||
+    value === "sim-locked" ||
+    value === "tutor-limit"
     ? value
     : null;
 }
@@ -35,6 +44,23 @@ const STYLES: Record<PricingStatus, string> = {
   // Cap landings are an invitation, not an error — accent, never red.
   quota: "border-accent/50 text-accent",
   "exam-limit": "border-accent/50 text-accent",
+  "sim-locked": "border-accent/50 text-accent",
+  "tutor-limit": "border-accent/50 text-accent",
+};
+
+/** Every landing except "success", whose copy depends on `accessActive`. */
+const MESSAGES: Record<Exclude<PricingStatus, "success">, string> = {
+  cancelled:
+    "Плащането беше прекъснато. Нищо не е таксувано — можеш да опиташ отново, когато решиш.",
+  unavailable:
+    "Онлайн плащанията още не са активни. Пакетите ще бъдат достъпни съвсем скоро.",
+  error:
+    "Нещо се обърка при започването на плащането. Опитай отново — нищо не е таксувано.",
+  quota: `Дневната безплатна порция от ${FREE_DAILY_PRACTICE_LIMIT} въпроса свърши. Утре има нова — или продължи без лимит с пакет.`,
+  "exam-limit":
+    "Безплатният пробен изпит е използван. Пакетите дават неограничени изпити в официалния формат.",
+  "sim-locked": `Шофьорският симулатор влиза в пакет „${PACKS.premium_sim.nameBg}“. Теорията остава безплатна — симулаторът е отделният, по-голям пакет.`,
+  "tutor-limit": `Безплатните ${FREE_TUTOR_LIFETIME_MESSAGES} въпроса към AI Учителя са използвани. И двата пакета му махат лимита.`,
 };
 
 export function StatusBanner({
@@ -50,15 +76,7 @@ export function StatusBanner({
       ? accessActive
         ? "Плащането е прието — достъпът ти е активен. Успех на изпита!"
         : "Плащането е прието! Достъпът се активира до няколко минути — презареди страницата."
-      : status === "cancelled"
-        ? "Плащането беше прекъснато. Нищо не е таксувано — можеш да опиташ отново, когато решиш."
-        : status === "unavailable"
-          ? "Онлайн плащанията още не са активни. Пакетите ще бъдат достъпни съвсем скоро."
-          : status === "quota"
-            ? `Дневната безплатна порция от ${FREE_DAILY_PRACTICE_LIMIT} въпроса свърши. Утре има нова — или продължи без лимит с пакет.`
-            : status === "exam-limit"
-              ? "Безплатният пробен изпит е използван. Пакетите дават неограничени изпити в официалния формат."
-              : "Нещо се обърка при започването на плащането. Опитай отново — нищо не е таксувано.";
+      : MESSAGES[status];
 
   return (
     <p
