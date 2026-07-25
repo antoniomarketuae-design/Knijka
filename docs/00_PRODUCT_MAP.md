@@ -36,4 +36,6 @@
 - Hook scripts: `.claude/hooks-inject-map.js`, `-precompact.js`, `-sessionend.js`. Task-memory keeps the ACTIVE thread; this Map = the whole vision.
 
 ---
-*Last updated: 2026-07-21. When you touch a component, update its checkbox + status here.*
+*Last updated: 2026-07-25 — FULL AUDIT (docs/80_FULL_AUDIT_2026-07-24.md) executed in full at commit 165a58b: 1005/1089 questions approved, answer-leak + 4 rule-engine false-fails + GDPR + entitlements + perf + ops + 2 innovations shipped. Gate: tsc 0 / 7281 tests / build OK.*
+
+*Previously updated: 2026-07-21. When you touch a component, update its checkbox + status here.*

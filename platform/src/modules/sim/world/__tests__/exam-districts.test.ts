@@ -461,18 +461,25 @@ describe("d2-v1 carries the sc-ed-d2-stop-address block (Незабравка)",
     ).toEqual([SA_EDGE]);
   });
 
-  it("d2-v1 carries NO ban-zone layer — the drill's HONEST LIMIT, pinned", () => {
-    // The backlog wanted ILLEGAL_STOP_IN_BAN_ZONE here. That detector reads
-    // tick.noStopZone, which comes ONLY from an authored В27 span in the
-    // district's `zones` array (engine.ts: „the zone is AUTHORED data — no
-    // heuristic zone inference, ever"). d2-v1 is an OSM cut and
-    // build_district_d2.mjs emits no zone pass, so the code is unreachable in
-    // Лозенец and the template gate-grades site selection instead. This assert
-    // is the tripwire: the day a zone pass DOES land on d2, it fails, and
+  it("Незабравка carries NO ban span — the drill still gate-grades its site", () => {
+    // HISTORY: this assert used to pin „d2-v1 carries no zones at all", the
+    // drill's HONEST LIMIT. Audit M-15 removed that limit at the district level
+    // — Лозенец now carries a В27 layer (tools/maps/gen_exam_district_zones.mjs)
+    // on the two roads whose OSM tags earn it: the бул. „Пейо К. Яворов" viaduct
+    // and бул. „Никола Й. Вапцаров", both 70 km/h with no shoulder.
+    //
+    // What still holds, and is what this drill actually depends on: „Незабравка"
+    // itself carries NO span, so the site-selection lesson stays gate-graded
+    // exactly as authored and the „wrong place" demo keeps earning
+    // HARSH_BRAKING_NO_CAUSE rather than a ban-zone code it did not commit.
+    // The tripwire now reads: the day a span DOES land on this block,
     // sc-ed-d2-stop-address should be revisited to grade the ban properly.
-    const raw = loadD2Raw() as { zones?: unknown; meta: { zonesVersion?: number } };
-    expect(raw.zones).toBeUndefined();
-    expect(raw.meta.zonesVersion).toBeUndefined();
+    const raw = loadD2Raw() as {
+      zones?: Array<{ edgeId: string; kind: string }>;
+      meta: { zonesVersion?: number };
+    };
+    expect(raw.meta.zonesVersion).toBe(1);
+    expect((raw.zones ?? []).filter((z) => z.edgeId === SA_EDGE)).toEqual([]);
   });
 
   it("the block is untouched by the two sibling d2 drills", () => {

@@ -62,7 +62,8 @@
       "maxspeedTagCoveragePctEdges": 30.7,
       "connectedComponents": 1,
       "largestComponentNodesPct": 100
-    }
+    },
+    "zonesVersion": 1
   },
   "roads": {
     "nodes": [
@@ -770,5 +771,14 @@
     {"id":"spawn-3","x":821.57,"y":313.86,"heading":228.3,"edgeId":"e516021915.0","name":"Незабравка"},
     {"id":"spawn-4","x":-752.04,"y":601.93,"heading":340.4,"edgeId":"e1056871739.1","name":"Архитект Йордан Миланов"},
     {"id":"spawn-5","x":-820.16,"y":-182.14,"heading":94.8,"edgeId":"e157686323.0","name":"Галичица"}
+  ],
+  "zones": [
+    {"id":"d2-v24-baucher-3","kind":"noOvertaking","edgeId":"e1056871742.0","fromM":0,"toM":14.11,"signRef":"В24"},
+    {"id":"d2-v24-baucher-2","kind":"noOvertaking","edgeId":"e1115502712.0","fromM":0,"toM":48.98,"signRef":"В24"},
+    {"id":"d2-v24-baucher-1","kind":"noOvertaking","edgeId":"e1459492610.0","fromM":0,"toM":18.57,"signRef":"В24"},
+    {"id":"d2-m1-tsankov","kind":"solidCenterLine","edgeId":"e193362542.0","fromM":25,"toM":610.85,"signRef":"М1"},
+    {"id":"d2-v27-vaptsarov","kind":"noStopping","edgeId":"e248750628.0","fromM":25,"toM":241.52,"signRef":"В27"},
+    {"id":"d2-v27-yavorov-viaduct","kind":"noStopping","edgeId":"e286852750.0","fromM":25,"toM":135.9,"signRef":"В27"},
+    {"id":"d2-a1-8590274380","kind":"curveAdvisory","edgeId":"e859027438.0","fromM":7,"toM":86.69,"signRef":"А1","advisoryKmh":30}
   ]
 }

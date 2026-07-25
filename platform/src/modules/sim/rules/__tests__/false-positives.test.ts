@@ -1759,6 +1759,116 @@ describe("FP battery — motorway", () => {
   });
 });
 
+// ---------------------------------------------------------------------------
+// The shipped Sofia zone layer (audit M-15)
+// ---------------------------------------------------------------------------
+
+describe("FP battery — the shipped Sofia zone layer (M-15)", () => {
+  // Until M-15, every zone kind was exercised only against hand-authored micro-
+  // maps, where the span is the whole lesson and nothing else is going on.
+  // district-v1 and d2-v1 now carry an authored layer over REAL topology, so
+  // the spans sit on roads students drive for other reasons — and each shape
+  // below is a legal manoeuvre those particular spans newly make possible.
+  // The map-level counterparts (same cases, real cuts, full runtime) live in
+  // runtime/__tests__/exam-district-zones.test.ts §3.
+
+  it("В27 on a 70 km/h viaduct: stopping just AFTER the span ends is innocent", () => {
+    // The Яворов span keeps a 25 m junction margin at each end precisely so a
+    // legal rest exists past it. The zone flag is data, so once the car is out
+    // of the span the ban is simply gone — and the rest must not be billed
+    // retroactively by an episode that started inside.
+    const { events } = drive([
+      ...cruise(0, 3, { speedKmh: 60, maxSpeedKmh: 70, noStopZone: true }),
+      ...cruise(4, 6, { speedKmh: 25, maxSpeedKmh: 70 }),
+      ...cruise(7, 20, { speedKmh: 0, maxSpeedKmh: 70 }),
+    ]);
+    expectInnocent(events);
+  });
+
+  it("BUS on a 3-lane one-way: the middle lane is the rightmost lane the car MAY use", () => {
+    // The бул. „Свети Климент Охридски" spans sit on a 3-lane one-way
+    // carriageway, not on the 2-lane boulevard the stage-2b micro-map used —
+    // so laneId 1 of THREE must be as innocent as laneId 1 of two. Long enough
+    // (16 s) to mature the 12 s keep-right duty.
+    const { events } = drive(
+      cruise(0, 16, { speedKmh: 45, laneId: 1, laneCount: 3, busLaneRight: true }),
+    );
+    expectInnocent(events);
+  });
+
+  it("М1 on a 2+2 arterial: changing lanes WITHIN the own bank never touches the осева", () => {
+    // New with the authored spans: the micro-map М1 lives on a 1+1 street where
+    // the only lane change is across the осева. On бул. „Драган Цанков" there
+    // are two lanes per bank, so a signalled 0 → 1 change happens entirely on
+    // the driver's own side of a solid line.
+    const { events } = drive([
+      tick(0, {
+        speedKmh: 45,
+        oneway: false,
+        solidCenterLine: true,
+        laneCount: 2,
+        indicator: "left",
+        events: [glance("left")],
+      }),
+      tick(1, {
+        speedKmh: 45,
+        oneway: false,
+        solidCenterLine: true,
+        laneCount: 2,
+        laneId: 1,
+        indicator: "left",
+      }),
+      ...cruise(2, 8, {
+        speedKmh: 45,
+        oneway: false,
+        solidCenterLine: true,
+        laneCount: 2,
+        laneId: 1,
+        indicator: "left",
+      }),
+    ]);
+    expectInnocent(events);
+  });
+
+  it("В24 on a tram-bedded street: a lead 60 m ahead is nobody to overtake", () => {
+    // The бул. „Джеймс Баучер" spans are short (14–49 m), so a car will often
+    // change lanes inside one with traffic somewhere ahead. „Somewhere ahead"
+    // is not изпреварване: the ban grades a pass, and a lead beyond the
+    // overtake corridor (45 m) is not being passed.
+    const { events } = drive([
+      tick(0, {
+        speedKmh: 35,
+        laneCount: 2,
+        noOvertakeZone: true,
+        leadGapM: 60,
+        indicator: "left",
+        events: [glance("left")],
+      }),
+      tick(1, {
+        speedKmh: 35,
+        laneCount: 2,
+        noOvertakeZone: true,
+        leadGapM: 60,
+        laneId: 1,
+        indicator: "left",
+      }),
+      ...cruise(2, 8, { speedKmh: 35, laneCount: 2, noOvertakeZone: true, leadGapM: 58, laneId: 1 }),
+    ]);
+    expectInnocent(events);
+  });
+
+  it("А1 in a 50 zone: riding the advisory's grace band (44 under an advisory 40)", () => {
+    // The measured Sofia bends produce advisories only 10 km/h under the posted
+    // limit, so the grace band (5 km/h) now sits INSIDE normal urban driving —
+    // a place it never sat on the rural micro-map. Holding 44 through the whole
+    // arc must stay clean, or the layer taxes speedometer noise.
+    const { events } = drive(
+      cruise(0, 20, { speedKmh: 44, maxSpeedKmh: 50, curveAdvisoryKmh: 40 }),
+    );
+    expectInnocent(events);
+  });
+});
+
 describe("FP battery — whole innocent commute", () => {
   it("a full mixed urban drive with zero mistakes produces zero violations", () => {
     // Innocent end-to-end: spawn with handbrake on, pull away, cruise at the

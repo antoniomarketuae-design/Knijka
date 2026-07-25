@@ -62,7 +62,8 @@
       "maxspeedTagCoveragePctEdges": 7.7,
       "connectedComponents": 6,
       "largestComponentNodesPct": 96
-    }
+    },
+    "zonesVersion": 1
   },
   "roads": {
     "nodes": [
@@ -1120,5 +1121,14 @@
     {"id":"spawn-4","x":388.51,"y":-88.07,"heading":357.9,"edgeId":"e226063192.0","name":null},
     {"id":"spawn-5","x":-463.42,"y":160.45,"heading":242.9,"edgeId":"e28780082.0","name":"Крум Кюлявков"},
     {"id":"spawn-6","x":-39.12,"y":537.6,"heading":240.5,"edgeId":"e28780128.0","name":"Проф. Константин Чилов"}
+  ],
+  "zones": [
+    {"id":"dv1-a1-287801280","kind":"curveAdvisory","edgeId":"e28780128.0","fromM":16.21,"toM":153.94,"signRef":"А1","advisoryKmh":40},
+    {"id":"dv1-bus-ohridski-4","kind":"busLane","edgeId":"e672166607.0","fromM":0,"toM":40.99,"signRef":"BUS"},
+    {"id":"dv1-bus-ohridski-3","kind":"busLane","edgeId":"e672169336.0","fromM":0,"toM":75.71,"signRef":"BUS"},
+    {"id":"dv1-bus-ohridski-1","kind":"busLane","edgeId":"e672169337.0","fromM":0,"toM":63.5,"signRef":"BUS"},
+    {"id":"dv1-bus-ohridski-2","kind":"busLane","edgeId":"e672169337.1","fromM":0,"toM":29.38,"signRef":"BUS"},
+    {"id":"dv1-m1-ohridski","kind":"solidCenterLine","edgeId":"e718268829.0","fromM":25,"toM":102.1,"signRef":"М1"},
+    {"id":"dv1-a1-8926586550","kind":"curveAdvisory","edgeId":"e892658655.0","fromM":0,"toM":89.34,"signRef":"А1","advisoryKmh":40}
   ]
 }

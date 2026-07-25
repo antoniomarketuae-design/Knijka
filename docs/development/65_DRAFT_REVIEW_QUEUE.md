@@ -147,12 +147,12 @@ statistics. Per-file numbers:
 | file | singles | correct at (a…) | longest-correct | expected |
 |---|---|---|---|---|
 | `osnovni-ponyatia` | 40 | 10 / 10 / 10 / 10 | 10 (25.0%) | 22.5% |
-| `prevozno-sredstvo` | 39 | 10 / 10 / 10 / 9 | 9 (23.1%) | 24.4% |
+| `prevozno-sredstvo` | 39 | 10 / 10 / 10 / 9 | 8 (20.5%) | 24.4% |
 | `patni-znatsi` | 64 | 16 / 17 / 16 / 15 | 17 (26.6%) | 18.8% |
 | `signali-i-markirovka` | 41 | 11 / 10 / 11 / 9 | 9 (22.0%) | 22.6% |
 | `predimstvo` | 48 | 12 / 12 / 12 / 12 | 11 (22.9%) | 22.4% |
 | `krastovishta` | 45 | 11 / 11 / 12 / 11 | 10 (22.2%) | 23.9% |
-| `skorost-i-distantsia` | 43 | 11 / 11 / 11 / 10 | 7 (16.3%) | 20.3% |
+| `skorost-i-distantsia` | 43 | 11 / 12 / 11 / 9 | 7 (16.3%) | 20.3% |
 | `manevri-i-izprevarvane` | 47 | 12 / 11 / 12 / 12 | 12 (25.5%) | 23.9% |
 | `uyazvimi-uchastnitsi` | 47 | 12 / 13 / 12 / 10 | 12 (25.5%) | 21.8% |
 | `magistrali-i-izvangradsko` | 44 | 11 / 12 / 11 / 10 | 11 (25.0%) | 22.2% |
@@ -162,7 +162,7 @@ statistics. Per-file numbers:
 | `dokumenti-i-sanktsii` | 37 | 9 / 11 / 9 / 8 | 9 (24.3%) | 25.0% |
 | `ptp-i-parva-pomosht` | 40 | 10 / 10 / 10 / 10 | 9 (22.5%) | 24.4% |
 | `eko-i-zashtitno-shofirane` | 39 | 10 / 10 / 10 / 9 | 7 (17.9%) | 21.2% |
-| **whole bank** | 698 | 176 / 179 / 177 / 166 | 163 (23.4%) | 22.5% |
+| **whole bank** | 698 | 176 / 180 / 177 / 165 | 162 (23.2%) | 22.5% |
 
 ## 6. Duplicates and near-duplicates (whole bank — pairs, no judgment)
 

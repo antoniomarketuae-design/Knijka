@@ -547,9 +547,12 @@ export const SC_ED_D2_PRIORITY_RUN: ScenarioSpec = {
  * backlog asked for ILLEGAL_STOP_IN_BAN_ZONE on the „first, forbidden place".
  * That detector reads tick.noStopZone, which comes from an AUTHORED В27 span in
  * the district's `zones` layer (engine.ts: „the zone is AUTHORED data — no
- * heuristic zone inference, ever"). d2-v1 carries no `zones` array at all: it is
- * an OSM cut (ADR-007) and build_district_d2.mjs emits no zone pass, so no ban
- * span exists anywhere in Лозенец. Nothing here fakes one. Site selection is
+ * heuristic zone inference, ever"). Audit M-15 gave d2-v1 a zone layer
+ * (tools/maps/gen_exam_district_zones.mjs), but every В27 span in it sits where
+ * the OSM cut EARNS one — the бул. „Пейо К. Яворов" viaduct and бул. „Никола Й.
+ * Вапцаров", both 70 km/h with no shoulder. „Незабравка" is a quiet residential
+ * block with no such evidence, so it carries no ban span and nothing here fakes
+ * one (the exam-districts battery pins that). Site selection is
  * therefore carried by the OBJECTIVE GATES (the sc-ln-turn-lane-arrows
  * precedent: gate the correct choice, and script the mistake demo to trip a code
  * it genuinely earns), and the „wrong place" demo grades the fault that a dive
@@ -671,7 +674,7 @@ export const SC_ED_D2_STOP_ADDRESS: ScenarioSpec = {
       titleBg: "Спри на легалната отсечка до бордюра",
       // The chosen stretch: mid-block, 121 m clear of the junction at the
       // street's end (чл. 98). Completable only at rest — the site-selection
-      // gate (HONEST LIMIT 1: no ban-zone detector exists on d2-v1).
+      // gate (HONEST LIMIT 1: „Незабравка" carries no authored ban span).
       params: { kind: "reachZone", x: 173.85, y: -313.6, radiusM: 12, maxSpeedKmh: 3 },
     },
   ],

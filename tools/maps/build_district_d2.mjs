@@ -32,6 +32,13 @@
 //   roundabout clustering, same stable serialization. Deterministic: same
 //   snapshot → byte-identical output. Exits non-zero on any validation error.
 //
+// ⚠ RE-RUN THE ZONE POST-PASS AFTER THIS SCRIPT. This builder emits no `zones`
+//   key, so it DROPS the M-15 zone layer (В27/В24/М1/А1 spans + zonesVersion)
+//   that d2-v1 ships with. Restore it with:
+//       node tools/maps/gen_exam_district_zones.mjs
+//   That generator is deterministic and re-derives every span from this output
+//   plus the committed snapshot, so the round trip is byte-identical.
+//
 // Window (candidate evaluation 2026-07-17, scores in the D2 build report):
 //   Лозенец beat Дружба-2 and Слатина/Гео Милев-изток — both have ZERO
 //   mapped traffic_signals in their ~1.5×1 km windows (the no-signal

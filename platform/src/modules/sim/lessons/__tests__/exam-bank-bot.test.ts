@@ -88,14 +88,34 @@ for (const e of district.roads.edges) {
 
 const LANE_W = 3.25 * 2.5;
 
-/** Right-lane-center offset from the OSM centerline for the travel direction. */
+/**
+ * Edges whose CURB lane is not a general travel lane (audit M-15): district-v1
+ * now carries the authored BUS spans of бул. „Свети Климент Охридски" (OSM
+ * `bus:lanes=||designated`). ЗДвП чл. 25's keep-right duty points at the
+ * rightmost lane the car MAY use, so a correct drive holds laneId 1 there —
+ * the rule the reducer already encodes as `rightmostRequiredLane` (engine.ts).
+ * The bot models a PERFECT student, so it has to know it too; without this it
+ * cruised the corridor in the bus lane and earned a real DRIVING_IN_BUS_LANE.
+ * Every authored bus span covers its whole edge (the generator's authoring
+ * law — a bus lane does not stop at a junction mouth), so a per-edge set is
+ * exact; a partial span would need arclength math here.
+ */
+const CURB_LANE_RESERVED = new Set(
+  ((district as { zones?: Array<{ kind: string; edgeId: string }> }).zones ?? [])
+    .filter((z) => z.kind === "busLane" || z.kind === "emergencyLane")
+    .map((z) => z.edgeId),
+);
+
+/** Rightmost REQUIRED lane center, offset from the OSM centerline, for the
+ *  travel direction (чл. 25: the rightmost lane the car may legally use). */
 function rightLaneOffset(edge: REdge): number {
+  const reserved = CURB_LANE_RESERVED.has(edge.id) ? 1 : 0;
   if (edge.oneway) {
     const L = Math.max(1, edge.lanes);
-    return ((L - 1) / 2) * LANE_W;
+    return ((L - 1) / 2 - reserved) * LANE_W;
   }
   const L = Math.max(1, Math.floor(edge.lanes / 2));
-  return (L - 0.5) * LANE_W;
+  return (L - 0.5 - reserved) * LANE_W;
 }
 
 function polyLen(g: ReadonlyArray<readonly [number, number]>): number {

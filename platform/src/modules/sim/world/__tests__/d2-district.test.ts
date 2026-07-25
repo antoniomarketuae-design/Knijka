@@ -145,8 +145,17 @@ describe("d2-v1 is a structurally valid district-v1 document (ADR-007 contract)"
     expect(district.spawnPoints.length).toBe(5);
     // ADR-007 descope: drivable-first, the visual pass owns footprints.
     expect(district.buildings.length).toBe(0);
-    // No zones layer — plain v1 semantics (surface-patch FP sweep stays clean).
-    expect(district.zones).toBeUndefined();
+    // The M-15 zone layer (tools/maps/gen_exam_district_zones.mjs) — a POST-PASS
+    // over this build, so re-running build_district_d2.mjs alone drops it and
+    // this pin catches that. Kinds, not spans: the spans belong to the M-15
+    // battery (runtime/__tests__/exam-district-zones.test.ts).
+    expect((district.meta as { zonesVersion?: number }).zonesVersion).toBe(1);
+    expect([...new Set((district.zones ?? []).map((z) => z.kind))].sort()).toEqual([
+      "curveAdvisory",
+      "noOvertaking",
+      "noStopping",
+      "solidCenterLine",
+    ]);
     const stats = (district.meta as { stats?: { roadKm?: number } }).stats;
     expect(stats?.roadKm).toBe(21.7);
   });

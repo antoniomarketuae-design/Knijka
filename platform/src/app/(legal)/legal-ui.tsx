@@ -20,17 +20,31 @@ import type { ReactNode } from "react";
 // PAYMENTS layer can import them without pulling in React: checkout refuses to
 // run while any of them is still a placeholder (audit C-1). Re-exported here so
 // every legal page keeps its existing import.
+//
+// The seller may be a natural person rather than a company, in which case
+// ENTITY_EIK is null — see <OperatorCard/> for how that is rendered.
 // ---------------------------------------------------------------------------
 
+import type { SellerKind } from "@/lib/legal/identity";
 import {
   CONTACT_EMAIL,
   ENTITY_ADDRESS,
   ENTITY_EIK,
+  ENTITY_ID_LABEL,
   ENTITY_NAME,
   LAST_UPDATED,
+  SELLER_KIND,
 } from "@/lib/legal/identity";
 
-export { ENTITY_NAME, ENTITY_EIK, ENTITY_ADDRESS, CONTACT_EMAIL, LAST_UPDATED };
+export {
+  ENTITY_NAME,
+  ENTITY_EIK,
+  ENTITY_ID_LABEL,
+  ENTITY_ADDRESS,
+  CONTACT_EMAIL,
+  LAST_UPDATED,
+  SELLER_KIND,
+};
 
 // ---------------------------------------------------------------------------
 // Layout pieces
@@ -194,14 +208,33 @@ export function KzldCard() {
   );
 }
 
+/**
+ * How the seller's legal form is named next to the name itself. A company's
+ * form is already part of its firm ("… ЕООД"), a person's is not.
+ */
+const SELLER_FORM_NOTE: Record<SellerKind, string | null> = {
+  naturalPerson: "физическо лице",
+  soleTrader: "едноличен търговец",
+  company: null,
+};
+
 /** „Кой стои зад платформата“ block — reused on /terms, /privacy, /contact. */
 export function OperatorCard() {
+  const formNote = SELLER_FORM_NOTE[SELLER_KIND];
   return (
     <div className="card p-5 text-sm leading-relaxed">
       <p className="font-bold">Книжка.AI се управлява от:</p>
       <ul className="mt-2 space-y-1 text-muted">
-        <li>{ENTITY_NAME}</li>
-        <li>ЕИК: {ENTITY_EIK}</li>
+        <li>
+          {ENTITY_NAME}
+          {formNote ? ` (${formNote})` : ""}
+        </li>
+        {/* A natural person has no trade-register number — no empty line. */}
+        {ENTITY_EIK !== null && (
+          <li>
+            {ENTITY_ID_LABEL}: {ENTITY_EIK}
+          </li>
+        )}
         <li>Адрес: {ENTITY_ADDRESS}</li>
         <li>
           Имейл: <span className="font-semibold text-foreground">{CONTACT_EMAIL}</span>

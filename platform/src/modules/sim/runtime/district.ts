@@ -293,7 +293,13 @@ export interface District {
    *    existed (the runtime adds nothing to the tick).
    *  - a file that DOES carry zones also sets `meta.zonesVersion: 1` so the
    *    data generation lineage is explicit; parsers must not require it.
-   *  - shipped v1 files are NEVER regenerated for this field.
+   *  - a shipped v1 file gains the layer only through a POST-PASS that leaves
+   *    the rest of the document byte-identical, never through a re-cut. The two
+   *    OSM districts took that route in audit M-15
+   *    (tools/maps/gen_exam_district_zones.mjs, which re-serializes the base
+   *    builder's own layout and appends `zones` + `meta.zonesVersion`); the
+   *    base builders still emit no zone key, so the generator has to be re-run
+   *    after any rebuild of district-v1 / d2-v1.
    */
   zones?: DistrictZone[];
 }
