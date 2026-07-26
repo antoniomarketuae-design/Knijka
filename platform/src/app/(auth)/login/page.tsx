@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { AuthFooterNote, AuthHeading } from "../auth-ui";
 import { LoginForm } from "./login-form";
 
 export const metadata: Metadata = {
@@ -25,38 +26,43 @@ export default async function LoginPage({ searchParams }: Props) {
 
   return (
     <div>
-      <h1 className="mb-1 font-display text-2xl font-black">Вход</h1>
-      <p className="mb-6 text-sm text-muted">
-        Влез в акаунта си, за да продължиш обучението.
-      </p>
+      <AuthHeading
+        eyebrow="Достъп"
+        title="Вход"
+        lead="Влез в акаунта си, за да продължиш обучението."
+      />
+
       {resetDone && (
         <p
           role="status"
-          className="mb-4 rounded-lg border border-border bg-surface-2/50 px-3 py-2 text-sm"
+          className="mb-5 rounded-lg border border-success/50 bg-success/10 px-3 py-2.5 text-sm font-semibold text-success"
         >
           Паролата ти е сменена. Влез с новата.
         </p>
       )}
+
       <LoginForm callbackUrl={callbackUrl} />
+
       {/* Was a link to /contact + a promise of manual recovery — against an
           inbox that does not exist (audit H-14). Now it is the real flow. */}
-      <p className="mt-4 text-center text-xs text-muted">
+      <p className="mt-4 text-center text-xs">
         <Link
           href="/forgot"
-          className="font-semibold text-accent underline-offset-4 hover:underline"
+          className="rounded font-semibold text-accent underline-offset-4 hover:underline"
         >
           Забравена парола?
         </Link>
       </p>
-      <p className="mt-4 text-center text-sm text-muted">
+
+      <AuthFooterNote>
         Нямаш акаунт?{" "}
         <Link
           href="/register"
-          className="font-semibold text-accent underline-offset-4 hover:underline"
+          className="rounded font-semibold text-accent underline-offset-4 hover:underline"
         >
           Регистрирай се
         </Link>
-      </p>
+      </AuthFooterNote>
     </div>
   );
 }

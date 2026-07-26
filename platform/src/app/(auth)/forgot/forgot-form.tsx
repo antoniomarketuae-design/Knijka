@@ -2,24 +2,24 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { FormError, SubmitButton, TextField } from "../auth-fields";
 import { requestPasswordResetAction } from "./actions";
-
-const inputClass =
-  "w-full rounded-lg border border-border bg-surface-2/50 px-3 py-2 text-sm text-foreground outline-none transition placeholder:text-muted focus:border-accent focus:shadow-glow-sm motion-reduce:transition-none";
 
 export function ForgotForm({ expiresInMinutes }: { expiresInMinutes: number }) {
   const [email, setEmail] = useState("");
   const [sent, setSent] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [fieldError, setFieldError] = useState<string | null>(null);
+  const [formError, setFormError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    setError(null);
+    setFormError(null);
+    setFieldError(null);
 
     // Client-side shape check only; the server re-validates everything.
     if (!email.trim() || !/^\S+@\S+\.\S+$/.test(email.trim())) {
-      setError("Въведи валиден имейл адрес.");
+      setFieldError("Въведи валиден имейл адрес.");
       return;
     }
 
@@ -30,9 +30,9 @@ export function ForgotForm({ expiresInMinutes }: { expiresInMinutes: number }) {
         setSent(true);
         return;
       }
-      setError(result.message);
+      setFormError(result.message);
     } catch {
-      setError("Нещо се обърка. Опитай отново.");
+      setFormError("Нещо се обърка. Опитай отново.");
     } finally {
       setPending(false);
     }
@@ -45,11 +45,13 @@ export function ForgotForm({ expiresInMinutes }: { expiresInMinutes: number }) {
   if (sent) {
     return (
       <div className="space-y-4" role="status">
-        <p className="text-sm">
-          Ако има акаунт с <strong>{email.trim()}</strong>, изпратихме имейл с
-          линк за нова парола.
-        </p>
-        <p className="text-sm text-muted">
+        <div className="panel-inset px-4 py-3.5">
+          <p className="text-sm leading-relaxed">
+            Ако има акаунт с <strong className="font-bold">{email.trim()}</strong>,
+            изпратихме имейл с линк за нова парола.
+          </p>
+        </div>
+        <p className="text-sm leading-relaxed text-muted">
           Линкът важи {expiresInMinutes} минути и работи само веднъж. Ако не го
           виждаш до минута-две, провери и папка „Спам“.
         </p>
@@ -62,36 +64,24 @@ export function ForgotForm({ expiresInMinutes }: { expiresInMinutes: number }) {
 
   return (
     <form onSubmit={handleSubmit} noValidate className="space-y-4">
-      <div>
-        <label htmlFor="email" className="mb-1 block text-sm font-medium">
-          Имейл
-        </label>
-        <input
-          id="email"
-          name="email"
-          type="email"
-          autoComplete="email"
-          required
-          autoFocus
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          className={inputClass}
-        />
-      </div>
-
-      {error && (
-        <p role="alert" className="text-sm font-medium text-danger">
-          {error}
-        </p>
-      )}
-
-      <button
-        type="submit"
+      <TextField
+        id="email"
+        label="Имейл"
+        type="email"
+        autoComplete="email"
+        required
+        autoFocus
+        value={email}
+        onChange={setEmail}
+        error={fieldError ?? undefined}
         disabled={pending}
-        className="btn-accent w-full disabled:opacity-50"
-      >
-        {pending ? "Изпращаме…" : "Изпрати линк за нова парола"}
-      </button>
+      />
+
+      {formError && <FormError>{formError}</FormError>}
+
+      <SubmitButton pending={pending} pendingLabel="Изпращаме…">
+        Изпрати линк за нова парола
+      </SubmitButton>
     </form>
   );
 }

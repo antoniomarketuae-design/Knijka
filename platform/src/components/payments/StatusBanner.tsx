@@ -36,16 +36,18 @@ export function parsePricingStatus(value: unknown): PricingStatus | null {
     : null;
 }
 
+/** Border + ink + a faint wash of the same hue, so the banner reads as a lit
+ *  panel rather than an outlined box on the near-black band. */
 const STYLES: Record<PricingStatus, string> = {
-  success: "border-success/50 text-success",
-  cancelled: "border-warning/50 text-warning",
-  unavailable: "border-warning/50 text-warning",
-  error: "border-danger/50 text-danger",
+  success: "border-success/50 bg-success/10 text-success",
+  cancelled: "border-warning/50 bg-warning/10 text-warning",
+  unavailable: "border-warning/50 bg-warning/10 text-warning",
+  error: "border-danger/50 bg-danger/10 text-danger",
   // Cap landings are an invitation, not an error — accent, never red.
-  quota: "border-accent/50 text-accent",
-  "exam-limit": "border-accent/50 text-accent",
-  "sim-locked": "border-accent/50 text-accent",
-  "tutor-limit": "border-accent/50 text-accent",
+  quota: "border-accent/50 bg-accent/10 text-accent",
+  "exam-limit": "border-accent/50 bg-accent/10 text-accent",
+  "sim-locked": "border-accent/50 bg-accent/10 text-accent",
+  "tutor-limit": "border-accent/50 bg-accent/10 text-accent",
 };
 
 /** Every landing except "success", whose copy depends on `accessActive`. */
@@ -81,7 +83,7 @@ export function StatusBanner({
   return (
     <p
       role="status"
-      className={`card px-4 py-3 text-sm font-semibold ${STYLES[status]}`}
+      className={`rounded-xl border px-4 py-3 text-sm font-semibold leading-relaxed ${STYLES[status]}`}
     >
       {message}
     </p>

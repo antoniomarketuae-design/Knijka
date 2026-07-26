@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { AuthFooterNote, AuthHeading } from "../auth-ui";
 import { RegisterForm } from "./register-form";
 
 export const metadata: Metadata = {
@@ -9,20 +10,21 @@ export const metadata: Metadata = {
 export default function RegisterPage() {
   return (
     <div>
-      <h1 className="mb-1 font-display text-2xl font-black">Регистрация</h1>
-      <p className="mb-6 text-sm text-muted">
-        Създай акаунт и започни подготовката за изпита.
-      </p>
+      <AuthHeading
+        eyebrow="Нов акаунт"
+        title="Регистрация"
+        lead="Създай акаунт и започни подготовката за изпита. Безплатно, без карта."
+      />
       <RegisterForm />
-      <p className="mt-6 text-center text-sm text-muted">
+      <AuthFooterNote>
         Вече имаш акаунт?{" "}
         <Link
           href="/login"
-          className="font-semibold text-accent underline-offset-4 hover:underline"
+          className="rounded font-semibold text-accent underline-offset-4 hover:underline"
         >
           Влез
         </Link>
-      </p>
+      </AuthFooterNote>
     </div>
   );
 }

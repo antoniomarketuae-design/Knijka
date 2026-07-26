@@ -32,7 +32,14 @@ const FAQ_ITEMS: FaqItem[] = [
   },
 ];
 
-/** Кратки, честни отговори — без дребен шрифт. */
+/**
+ * Кратки, честни отговори — без дребен шрифт.
+ *
+ * Deliberately NOT an accordion. Five short answers about money are the part a
+ * paying parent came to read, and hiding them behind five clicks is how a
+ * pricing page looks like it has something to hide. They are all open, and the
+ * numbered index is what makes the block scannable instead.
+ */
 export function FaqSection() {
   return (
     <section aria-labelledby="pricing-faq-title" className="flex flex-col gap-3">
@@ -40,10 +47,17 @@ export function FaqSection() {
         Чести въпроси
       </h2>
       <dl className="flex flex-col gap-2">
-        {FAQ_ITEMS.map((item) => (
-          <div key={item.questionBg} className="card px-4 py-3 sm:px-5 sm:py-4">
-            <dt className="text-sm font-bold">{item.questionBg}</dt>
-            <dd className="mt-1 text-sm leading-relaxed text-muted">
+        {/* `dl > div` may contain only dt/dd, so the index lives INSIDE the dt
+            (aria-hidden — "01" is a visual anchor, not part of the question). */}
+        {FAQ_ITEMS.map((item, i) => (
+          <div key={item.questionBg} className="panel px-4 py-3.5 sm:px-5 sm:py-4">
+            <dt className="flex items-baseline gap-3 text-sm font-bold">
+              <span aria-hidden className="hud-label tabular-nums">
+                {String(i + 1).padStart(2, "0")}
+              </span>
+              <span>{item.questionBg}</span>
+            </dt>
+            <dd className="mt-1.5 text-sm leading-relaxed text-muted">
               {item.answerBg}
             </dd>
           </div>

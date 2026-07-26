@@ -45,6 +45,12 @@
   --danger: #ff5b49;
   --flame: #ff6b4a;
   --gold: #ffcb57;
+
+  /* Interactive boundary. WCAG 1.4.11 wants ≥3:1 for the edge that IDENTIFIES
+     a control; --border is a decorative hairline and measures ~1.2:1, so a
+     ghost button outlined with it is a control the standard says isn't there.
+     This is the one edge that must be seen — everything decorative stays quiet. */
+  --control-edge: #5a6b88; /* 3.65:1 on --background, 3.30:1 on --surface */
 }
 
 @media (prefers-color-scheme: light) {
@@ -76,6 +82,8 @@
     --danger: #dc2626;
     --flame: #ea580c;
     --gold: #b47d10;
+
+    --control-edge: #6f86a4; /* 3.35:1 on --background, 3.74:1 on --surface */
   }
 }
 
@@ -102,6 +110,7 @@
   --danger: #dc2626;
   --flame: #ea580c;
   --gold: #b47d10;
+  --control-edge: #6f86a4;
 }
 
 :root[data-theme="dark"] {
@@ -126,6 +135,131 @@
   --danger: #ff5b49;
   --flame: #ff6b4a;
   --gold: #ffcb57;
+  --control-edge: #5a6b88;
+}
+
+/* ============================================================
+   THE CLUSTER SCOPE — the committed dark identity (marketing).
+
+   WHY A SCOPE AND NOT A GLOBAL RE-THEME. The app already ships a dark
+   theme, and it is the :root default — but `prefers-color-scheme: light`
+   overrides it, so on a light-mode OS the public page renders as the pale
+   SaaS template nobody designed. Marketing cannot be at the mercy of a
+   visitor's OS setting: the instrument cluster IS the brand. So the
+   identity is PINNED here rather than negotiated.
+
+   HOW IT KEEPS 538 `card` USAGES ALIVE. This block re-binds the same
+   semantic token NAMES to cluster values. Custom properties inherit, and a
+   closer ancestor always wins over :root regardless of which media query
+   set it — so every existing utility (bg-surface, border-border, .card,
+   .btn-accent, .hud-label) renders in cluster colours inside the scope and
+   is untouched outside it. Token names are the interface; this swaps the
+   implementation. Nothing in the authenticated app changes.
+
+   WHY THESE VALUES AND NOT THE :root DARK ONES. The :root dark theme is a
+   navy theme — surfaces at #0f1826/#16233b read as "blue cards". A real
+   night instrument cluster is nearly black with tiny elevation steps,
+   because separation comes from a LIT TOP EDGE and a hairline, not from
+   fill contrast. Inverting a light theme gives you the opposite instinct
+   (bigger fill steps, drop shadows) and that is the tell. Ground is
+   #05070c and not #000 on purpose: an occlusion shadow needs somewhere
+   darker than the panel to go, and pure black leaves none.
+
+   Every text pair below was measured, not guessed (see §Contrast in
+   docs/platform/83): foreground 16.6:1 on surface, muted 7.3:1,
+   accent 7.7:1 — AA everywhere, AAA on body text.
+
+   TWO SCOPE VALUES, ONE PALETTE. "cluster" is a scope that OWNS the viewport
+   (the public shell: landing, auth) — it also claims the root's colour-scheme
+   below, because scrollbars and the overscroll canvas live outside every
+   scope. "cluster-band" is a BOUNDED band inside an otherwise app-themed page
+   (/pricing's showroom, which sits in the dashboard chrome): identical
+   palette, but it must not repaint the scrollbars of a page it does not own —
+   a light dashboard with a dark scrollbar gutter is the tell that a band
+   escaped its box.
+   ============================================================ */
+[data-surface="cluster"],
+[data-surface="cluster-band"] {
+  color-scheme: dark;
+
+  /* Ground ramp — cockpit black, cool cast, deliberately shallow steps */
+  --background: #05070c;
+  --surface: #0a0e16;
+  --surface-2: #111724;
+  --border: #1a2130;
+  --border-strong: #2b3547;
+  --control-edge: #5b6d84; /* 3.81:1 on --background — the one loud edge */
+  --hair: rgba(125, 205, 255, 0.11);
+
+  --foreground: #e8eef8;
+  --muted: #8fa0b8;
+
+  /* Accent as EMISSION. Nudged brighter than the app's #3fa1ff because on a
+     deeper ground the same blue reads as a flat fill rather than as light
+     coming off a surface. */
+  --accent: #48a9ff;
+  --accent-soft: #8ecbff;
+  --accent-foreground: #04070e;
+  --glow: rgba(72, 169, 255, 0.38);
+  --glow-soft: rgba(72, 169, 255, 0.14);
+
+  --accent-2: #17e1c4;
+  --glow-2: rgba(23, 225, 196, 0.28);
+
+  --success: #3ee095;
+  --warning: #ffc24b;
+  --danger: #ff6a58;
+  --flame: #ff7a5c;
+  --gold: #ffcb57;
+
+  /* --- Cluster-only additive tokens (depth) ------------------------- */
+
+  /* The bezel catching light. This single line does the work a drop shadow
+     does in a light theme — on black, a shadow is invisible; an edge is not. */
+  --lit-edge: rgba(255, 255, 255, 0.07);
+  --lit-edge-strong: rgba(255, 255, 255, 0.12);
+
+  /* Atmospheric haze — the reason a night scene has a horizon at all. */
+  --haze-warm: rgba(72, 169, 255, 0.1);
+  --haze-cool: rgba(23, 225, 196, 0.055);
+
+  /* Elevation ladder. Inset lit edge first (it defines the plane), then
+     occlusion darker than the ground, then an optional hairline ring. */
+  --depth-1: inset 0 1px 0 0 var(--lit-edge), 0 2px 10px -4px rgba(0, 0, 0, 0.8);
+  --depth-2: inset 0 1px 0 0 var(--lit-edge), 0 14px 36px -12px rgba(0, 0, 0, 0.9),
+    0 0 0 1px var(--hair);
+  --depth-3: inset 0 1px 0 0 var(--lit-edge-strong),
+    0 28px 64px -20px rgba(0, 0, 0, 0.95), 0 0 0 1px var(--hair);
+}
+
+/* Native scrollbars and the overscroll canvas live on the root, outside any
+   scope — without this the page paints a light gutter beside a black hero on
+   a light-mode OS. */
+:root:has([data-surface="cluster"]) {
+  color-scheme: dark;
+}
+
+/* ============================================================
+   MOTION & DEPTH SCALARS — theme-independent, so they sit outside every
+   colour block. Consumers reference these instead of inventing timings;
+   one clock is what makes separate elements read as one choreography.
+   ============================================================ */
+:root {
+  /* Expo-out: leaves fast, settles long. The settle is what reads expensive —
+     a linear or ease-in-out move of the same distance reads like a template. */
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+  /* Needle settle — slight overshoot damping, borrowed from the Gauge sweep. */
+  --ease-hud: cubic-bezier(0.2, 0.8, 0.2, 1);
+
+  --dur-fast: 140ms; /* press / state flip — must feel instant */
+  --dur-base: 260ms; /* hover, colour, small transform */
+  --dur-slow: 520ms; /* entrance of a single element */
+  --dur-cinematic: 900ms; /* hero-scale reveal, landing only */
+
+  /* One stagger step. Doc 64 caps in-app motion at ~500ms total, so a
+     choreography of more than ~6 steps needs a smaller step, not more time. */
+  --stagger: 70ms;
 }
 
 @theme inline {
@@ -134,6 +268,7 @@
   --color-surface-2: var(--surface-2);
   --color-border: var(--border);
   --color-border-strong: var(--border-strong);
+  --color-control-edge: var(--control-edge);
   --color-hair: var(--hair);
 
   --color-foreground: var(--foreground);
@@ -163,6 +298,20 @@
   --shadow-glow: 0 0 24px 0 var(--glow);
   --shadow-glow-sm: 0 0 12px 0 var(--glow-soft);
   --shadow-glow-2: 0 0 20px 0 var(--glow-2);
+
+  /* Cluster elevation, as Tailwind shadow utilities (shadow-depth-1 …).
+     Outside the cluster scope --depth-* is unset and these collapse to
+     nothing, which is the correct behaviour: the ladder is designed for a
+     near-black ground and means nothing on white. */
+  --shadow-depth-1: var(--depth-1);
+  --shadow-depth-2: var(--depth-2);
+  --shadow-depth-3: var(--depth-3);
+
+  /* Easing utilities (ease-out-expo, ease-hud-settle) so a consumer reaching
+     for Tailwind lands on the system rather than on a magic cubic-bezier.
+     Durations have no Tailwind namespace — use duration-[var(--dur-base)]. */
+  --ease-out-expo: var(--ease-out);
+  --ease-hud-settle: var(--ease-hud);
 }
 
 body {
@@ -216,6 +365,121 @@ body {
     color: var(--muted);
   }
 
+  /* ==========================================================
+     DEPTH PRIMITIVES (cluster scope)
+
+     The organising idea: in a light theme elevation is a shadow; on a
+     near-black ground a shadow is invisible, so elevation is a LIT TOP
+     EDGE plus a hairline, and the shadow only supplies occlusion. Every
+     class below is that one idea at a different strength.
+     ========================================================== */
+
+  /* A panel that sits ON the ground. The default instrument surface —
+     opaque, so it costs nothing and can be used any number of times. */
+  .panel {
+    border-radius: 1rem;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    box-shadow: var(--depth-1);
+  }
+
+  /* Glass, 2026 rather than 2021: 14px of blur with a touch of saturation
+     lift, ONE hairline, and a lit edge — no 40px frosted slab, no white
+     10% fill. Doc 64 §7 caps this at 1–2 layers per screen and forbids
+     animating it; heavy glass costs 15–30% FPS on the mid-range Androids
+     our students actually own. */
+  .panel-glass {
+    border-radius: 1rem;
+    border: 1px solid var(--hair);
+    background: color-mix(in srgb, var(--surface) 68%, transparent);
+    backdrop-filter: blur(14px) saturate(115%);
+    box-shadow: var(--depth-2);
+  }
+
+  /* Where backdrop-filter is unavailable (or disabled for power saving) the
+     glass must not become an unreadable transparent hole. */
+  @supports not (backdrop-filter: blur(1px)) {
+    .panel-glass {
+      background: var(--surface);
+    }
+  }
+
+  /* An inset well — a gauge track, a code block, anything RECESSED. The lit
+     edge moves to the bottom, which is the whole trick: light still comes
+     from above, so a dent catches it on the far lip. */
+  .panel-inset {
+    border-radius: 0.75rem;
+    background: color-mix(in srgb, var(--background) 70%, var(--surface));
+    box-shadow: inset 0 2px 8px -2px rgba(0, 0, 0, 0.85),
+      inset 0 -1px 0 0 var(--lit-edge);
+  }
+
+  /* The lit edge on its own, for elements that bring their own background. */
+  .edge-lit {
+    box-shadow: inset 0 1px 0 0 var(--lit-edge);
+  }
+
+  /* A precise hairline rule that fades at both ends — a full-width 1px line
+     at constant opacity is the single most template-looking element on any
+     page. Decorative; give it role="presentation" or use it on a <div>. */
+  .rule {
+    height: 1px;
+    border: 0;
+    background: linear-gradient(
+      90deg,
+      transparent,
+      var(--border-strong) 18%,
+      var(--border-strong) 82%,
+      transparent
+    );
+  }
+
+  /* ATMOSPHERIC HAZE — the layer that makes a dark page read as a SPACE
+     rather than a black rectangle. A dark scene has a horizon; without one
+     the eye has no depth cue at all and "dark theme" collapses to "grey
+     text on black". Static gradients only: no repaint on scroll.
+
+     Apply to an aria-hidden, absolutely-positioned, inset-0 element. */
+  .haze {
+    pointer-events: none;
+    background:
+      /* the road ahead — a low, wide glow at the horizon line */
+      radial-gradient(
+        120% 60% at 50% 104%,
+        var(--haze-warm) 0%,
+        transparent 62%
+      ),
+      /* cabin overhead light — cool, off-centre so it isn't symmetrical */
+        radial-gradient(
+          70% 45% at 72% -8%,
+          var(--haze-cool) 0%,
+          transparent 70%
+        ),
+      /* vignette — pulls the eye to the centre and hides the edges */
+        radial-gradient(
+          140% 110% at 50% 45%,
+          transparent 45%,
+          rgba(0, 0, 0, 0.55) 100%
+        );
+  }
+
+  /* The instrument grid, faded out at the edges. `.hud-grid` (kept, 8 uses)
+     tiles edge to edge; a grid that stops at a hard boundary announces the
+     div it lives in. This one dissolves. */
+  .hud-grid-fade {
+    pointer-events: none;
+    background-image: linear-gradient(var(--hair) 1px, transparent 1px),
+      linear-gradient(90deg, var(--hair) 1px, transparent 1px);
+    background-size: 56px 56px;
+    background-position: center;
+    -webkit-mask-image: radial-gradient(
+      100% 70% at 50% 30%,
+      #000 0%,
+      transparent 72%
+    );
+    mask-image: radial-gradient(100% 70% at 50% 30%, #000 0%, transparent 72%);
+  }
+
   /* Primary action: bright accent, dark text, glow on hover/focus.
      State rules below are authored as plain CSS (not @apply variants): press
      physics (motion-safe) dip the button and drop the glow; disabled dims it and
@@ -235,15 +499,24 @@ body {
     box-shadow: none;
   }
 
+  /* Secondary action. The resting border is --control-edge, not --border:
+     the outline is the only thing that identifies this as a control, and
+     WCAG 1.4.11 wants ≥3:1 for exactly that. Hover LIGHTS the edge (mixes
+     the accent in) instead of merely darkening it — same gesture the whole
+     cluster language uses for "this surface is active". */
   .btn-ghost {
-    @apply inline-flex items-center justify-center gap-2 rounded-xl border border-border px-5 py-3 text-sm font-semibold text-foreground transition hover:border-border-strong hover:bg-surface-2 motion-reduce:transition-none;
+    @apply inline-flex items-center justify-center gap-2 rounded-xl border px-5 py-3 text-sm font-semibold text-foreground transition hover:bg-surface-2 motion-reduce:transition-none;
+    border-color: var(--control-edge);
+  }
+  .btn-ghost:hover {
+    border-color: color-mix(in srgb, var(--accent) 55%, var(--control-edge));
   }
   .btn-ghost:disabled {
     cursor: not-allowed;
     opacity: 0.5;
   }
   .btn-ghost:disabled:hover {
-    border-color: var(--border);
+    border-color: var(--control-edge);
     background-color: transparent;
   }
 
@@ -253,6 +526,49 @@ body {
     .btn-ghost:active {
       transform: translateY(1px);
     }
+  }
+
+  /* TEXT INPUT — the counterpart to .btn-ghost, and it rests on
+     --control-edge for exactly the same reason: the box IS the affordance, and
+     WCAG 1.4.11 asks ≥3:1 of the boundary that IDENTIFIES a control. The
+     auth forms outlined their inputs with --border (1.9:1 on the dark ground,
+     1.55:1 on the light one) — the same defect doc 83 fixed on the ghost
+     button, in the one place where losing the box means losing the form.
+
+     RECESSED, not raised. A panel sits on the ground; an input is a slot you
+     put something INTO, so the fill is darker than its surface and the lit
+     edge belongs on the bottom lip (.panel-inset's trick). Focus LIGHTS the
+     rim rather than thickening it — a border-width change reflows the text
+     inside on the exact keystroke the user is watching.
+
+     No `outline` rule here, deliberately: the global :focus-visible ring is
+     the keyboard signal and this must not compete with it. */
+  .field {
+    @apply w-full rounded-lg px-3 py-2.5 text-sm text-foreground transition placeholder:text-muted motion-reduce:transition-none;
+    border: 1px solid var(--control-edge);
+    background: color-mix(in srgb, var(--background) 55%, var(--surface));
+    box-shadow: inset 0 1px 3px -1px rgba(0, 0, 0, 0.45);
+  }
+  .field:hover:not(:disabled):not([aria-invalid="true"]) {
+    border-color: color-mix(in srgb, var(--accent) 45%, var(--control-edge));
+  }
+  .field:focus {
+    border-color: var(--accent);
+    box-shadow: inset 0 1px 3px -1px rgba(0, 0, 0, 0.45), var(--shadow-glow-sm);
+  }
+  .field:disabled {
+    cursor: not-allowed;
+    opacity: 0.55;
+  }
+  /* Driven by aria-invalid so the visual state and the announced state can
+     never disagree — there is no way to paint the box red without also
+     telling a screen reader the field is invalid. */
+  .field[aria-invalid="true"] {
+    border-color: var(--danger);
+  }
+  .field[aria-invalid="true"]:focus {
+    box-shadow: inset 0 1px 3px -1px rgba(0, 0, 0, 0.45),
+      0 0 12px 0 color-mix(in srgb, var(--danger) 32%, transparent);
   }
 
   /* Screen-reader-only helper for labels */
@@ -266,6 +582,200 @@ body {
     clip: rect(0, 0, 0, 0);
     white-space: nowrap;
     border: 0;
+  }
+}
+
+/* ============================================================
+   MOTION PRIMITIVES
+
+   THE RULE THAT SHAPES THIS WHOLE SECTION: every motion below is defined
+   INSIDE `@media (prefers-reduced-motion: no-preference)`. Motion is
+   opt-in-by-capability, not opt-out. The resting state — the one that
+   exists when the media query does not match — is always the FINAL,
+   VISIBLE, correct state.
+
+   That inversion is the point. The usual shape (animate by default, then
+   remember to add a motion-reduce: escape hatch at every call site) fails
+   open: one forgotten override and a reduced-motion user gets the motion
+   anyway, or worse, gets content stuck at opacity 0. Here, forgetting
+   produces no motion — never broken content. No consumer CAN get it wrong.
+
+   Only `transform` and `opacity` are animated anywhere (doc 64 §7): they
+   are the two properties that never trigger layout or paint, which is what
+   keeps INP under 200ms on a mid-range Android.
+   ============================================================ */
+
+/* --- 1. ENTRANCE CHOREOGRAPHY -------------------------------------
+   For content present at first paint (a hero). Set --enter-i on each
+   sibling to place it in the sequence; one shared --stagger keeps the
+   group reading as a single move rather than N unrelated animations. */
+@keyframes enter-rise {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 16px, 0);
+  }
+}
+
+/* The HUD alternative: no travel, just a widening band of light. Use for
+   rules, gauges and anything that should feel POWERED ON rather than
+   moved in. */
+@keyframes enter-power {
+  from {
+    opacity: 0;
+    transform: scale3d(0.94, 0.94, 1);
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .enter,
+  .enter-power {
+    /* `both` matters: it holds the from-state through the stagger delay,
+       otherwise every element flashes in at full opacity and then jumps
+       back to hidden when its turn arrives. */
+    animation-duration: var(--dur-slow);
+    animation-timing-function: var(--ease-out);
+    animation-fill-mode: both;
+    animation-delay: calc(var(--enter-i, 0) * var(--stagger));
+  }
+  .enter {
+    animation-name: enter-rise;
+  }
+  .enter-power {
+    animation-name: enter-power;
+    animation-timing-function: var(--ease-hud);
+  }
+}
+
+/* --- 2. SCROLL-LINKED REVEAL --------------------------------------
+   Driven by <Reveal> (src/components/ui/Reveal.tsx), which flips
+   data-reveal from "hidden" to "shown" via IntersectionObserver.
+
+   The attribute is only ever written by the client, so server-rendered
+   HTML carries no data-reveal at all and is therefore visible. If JS
+   never runs, hydration fails, or the observer is unsupported, the
+   content is simply THERE — the failure mode of a scroll reveal must
+   never be an invisible page. */
+@media (prefers-reduced-motion: no-preference) {
+  /* The transition lives on the DESTINATION state, not on the element.
+     A transition declared on `[data-reveal]` would also animate the
+     idle→hidden step that happens at mount — the block would visibly fade
+     OUT before it ever faded in. Because CSS reads the transition from the
+     after-change style, declaring it only on "shown" makes hiding instant
+     and revealing animated, which is the only combination that is correct
+     in both directions. */
+  [data-reveal="hidden"] {
+    opacity: 0;
+    transform: translate3d(0, 18px, 0);
+    /* Promoted only while it is about to move; the hint disappears with the
+       attribute, so nothing stays layer-promoted for the sim to fight over. */
+    will-change: opacity, transform;
+  }
+  [data-reveal="shown"] {
+    transition: opacity var(--dur-slow) var(--ease-out),
+      transform var(--dur-slow) var(--ease-out);
+    transition-delay: var(--reveal-delay, 0ms);
+  }
+}
+
+/* --- 3. HOVER PHYSICS ---------------------------------------------
+   Gated on a real pointer as well as on motion preference. On touch,
+   :hover latches after a tap and the card stays lifted until you touch
+   something else — which is most of our audience, on Android. */
+@media (prefers-reduced-motion: no-preference) and (hover: hover) and (pointer: fine) {
+  .lift {
+    transition: transform var(--dur-base) var(--ease-out),
+      box-shadow var(--dur-base) var(--ease-out),
+      border-color var(--dur-base) var(--ease-out);
+  }
+  .lift:hover {
+    transform: translate3d(0, -3px, 0);
+  }
+  /* Press beats hover: the dip has to feel immediate or the control feels
+     laggy, so it also runs at the fast duration. */
+  .lift:active {
+    transform: translate3d(0, 0, 0);
+    transition-duration: var(--dur-fast);
+  }
+}
+
+/* Colour/edge response to hover is NOT motion — a reduced-motion user
+   still needs to see which card is under the cursor, so this half is
+   unconditional. It is also what makes .lift legible on touch, where the
+   transform half above never applies. */
+@media (hover: hover) {
+  .lift:hover {
+    border-color: color-mix(in srgb, var(--accent) 40%, var(--border));
+    box-shadow: var(--depth-2), 0 0 28px -8px var(--glow);
+  }
+}
+
+/* --- 4. AMBIENT ----------------------------------------------------
+   A single slow pulse for "this is live" affordances (a recording dot, a
+   telemetry heartbeat). Opacity only, 3.2s so it reads as breathing
+   rather than blinking, and never used on more than one element per view. */
+@keyframes pulse-soft {
+  50% {
+    opacity: 0.45;
+  }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .pulse-soft {
+    animation: pulse-soft 3.2s var(--ease-in-out) infinite;
+  }
+}
+
+/* --- 5. STOP-MOTION REEL -------------------------------------------
+   Plays a real captured mistake as its five rig keyframes (window start,
+   fault−2, FAULT, fault+2, window end) instead of the .webm. The clips
+   average 2.5 MB each; their WebP stills average 17 KB, so the whole reel
+   is ~85 KB — an order of magnitude cheaper than one video, with no
+   decoder, no autoplay policy and no MediaRecorder duration bug.
+
+   THE FAULT FRAME IS THE BASE LAYER, NOT A SLOT. It is painted by the
+   element itself and is always opaque; only the other four frames are
+   overlays that fade over it. That arrangement does three jobs at once:
+
+     - the resting state (reduced motion, or the animation not yet started)
+       is the FAULT frame — the one that carries the teaching, so the
+       still version of this component is still the correct image;
+     - leaving slot 2 empty makes the base show through in the middle of
+       the cycle, so the sequence still reads k0 → k1 → k2 → k3 → k4 in
+       order, and the fault gets the longest dwell of the five;
+     - a frame that fails to load (the .webp binaries are gitignored — a
+       fresh clone has none) paints nothing rather than a broken-image
+       icon, because these are background-images, not <img>.
+
+   The overlay URLs are handed in as a custom property and only USED
+   inside the no-preference query. A custom property alone fetches
+   nothing, so a reduced-motion visitor never downloads the four frames
+   they would never see — the gate saves bytes, not just movement. */
+@keyframes reel-slot {
+  0% {
+    opacity: 0;
+  }
+  6%,
+  17% {
+    opacity: 1;
+  }
+  20%,
+  100% {
+    opacity: 0;
+  }
+}
+
+/* The width gate is a DATA gate, not a layout one, and it is the same policy
+   heroCapability.ts applies to the live 3D: motion is a desktop affordance.
+   Chrome does not defer background-images for off-screen elements, so without
+   this every phone downloaded all five frames on load whether or not the
+   visitor ever scrolled to them — four of them to play an animation on a
+   screen where the still already tells the whole story. Below 64rem the reel
+   costs exactly one 17 KB frame: the fault. Measured with reel-probe.mjs. */
+@media (prefers-reduced-motion: no-preference) and (min-width: 64rem) {
+  .reel-frame {
+    background-image: var(--reel-src);
+    /* One cycle divided into five equal slots; --reel-slot places the frame. */
+    animation: reel-slot var(--reel-cycle, 10s) linear infinite;
+    animation-delay: calc(var(--reel-slot, 0) * var(--reel-cycle, 10s) / 5);
   }
 }
 

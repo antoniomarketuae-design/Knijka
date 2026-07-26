@@ -1,38 +1,60 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { signIn } from "next-auth/react";
+import {
+  FormError,
+  SubmitButton,
+  TextField,
+  focusFirstError,
+} from "../auth-fields";
 import { resetPasswordAction } from "./actions";
-
-const inputClass =
-  "w-full rounded-lg border border-border bg-surface-2/50 px-3 py-2 text-sm text-foreground outline-none transition placeholder:text-muted focus:border-accent focus:shadow-glow-sm motion-reduce:transition-none";
 
 /** Keep in sync with modules/auth schemas.ts — the server is what decides. */
 const MIN_PASSWORD_LENGTH = 8;
 
+type FieldErrors = Partial<Record<"password" | "confirm", string>>;
+
 export function ResetForm({ token }: { token: string }) {
   const router = useRouter();
+  const formRef = useRef<HTMLFormElement>(null);
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
-  const [error, setError] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
+  const [formError, setFormError] = useState<string | null>(null);
   const [needsNewLink, setNeedsNewLink] = useState(false);
+  const [submitted, setSubmitted] = useState(false);
   const [pending, setPending] = useState(false);
 
-  async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    setError(null);
-
+  function validate(): FieldErrors {
+    const errors: FieldErrors = {};
     if (password.length < MIN_PASSWORD_LENGTH) {
-      setError(`Паролата трябва да е поне ${MIN_PASSWORD_LENGTH} знака.`);
-      return;
+      errors.password = `Паролата трябва да е поне ${MIN_PASSWORD_LENGTH} знака.`;
     }
     // Confirmation is a client-side concern only: the server has no business
     // knowing the student typed it twice, and a mismatch is not a security
     // event — it is a typo we should catch before spending the single-use token.
     if (password !== confirm) {
-      setError("Двете пароли не съвпадат.");
+      errors.confirm = "Двете пароли не съвпадат.";
+    }
+    return errors;
+  }
+
+  function revalidate() {
+    if (submitted) setFieldErrors(validate());
+  }
+
+  async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setFormError(null);
+    setSubmitted(true);
+
+    const errors = validate();
+    setFieldErrors(errors);
+    if (Object.keys(errors).length > 0) {
+      requestAnimationFrame(() => focusFirstError(formRef.current));
       return;
     }
 
@@ -41,7 +63,7 @@ export function ResetForm({ token }: { token: string }) {
       const result = await resetPasswordAction(token, password);
 
       if (result.status === "error") {
-        setError(result.message);
+        setFormError(result.message);
         setNeedsNewLink(result.needsNewLink);
         return;
       }
@@ -66,72 +88,60 @@ export function ResetForm({ token }: { token: string }) {
       router.push("/dashboard");
       router.refresh();
     } catch {
-      setError("Нещо се обърка. Опитай отново.");
+      setFormError("Нещо се обърка. Опитай отново.");
     } finally {
       setPending(false);
     }
   }
 
   return (
-    <form onSubmit={handleSubmit} noValidate className="space-y-4">
-      <div>
-        <label htmlFor="password" className="mb-1 block text-sm font-medium">
-          Нова парола
-        </label>
-        <input
-          id="password"
-          name="password"
-          type="password"
-          autoComplete="new-password"
-          required
-          autoFocus
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          className={inputClass}
-        />
-        <p className="mt-1 text-xs text-muted">
-          Поне {MIN_PASSWORD_LENGTH} знака. Избери нещо, което не използваш
-          другаде.
-        </p>
-      </div>
+    <form ref={formRef} onSubmit={handleSubmit} noValidate className="space-y-4">
+      <TextField
+        id="password"
+        label="Нова парола"
+        type="password"
+        autoComplete="new-password"
+        required
+        autoFocus
+        minLength={MIN_PASSWORD_LENGTH}
+        value={password}
+        onChange={setPassword}
+        onBlur={revalidate}
+        hint={`Поне ${MIN_PASSWORD_LENGTH} знака. Избери нещо, което не използваш другаде.`}
+        error={fieldErrors.password}
+        disabled={pending}
+      />
 
-      <div>
-        <label htmlFor="confirm" className="mb-1 block text-sm font-medium">
-          Повтори паролата
-        </label>
-        <input
-          id="confirm"
-          name="confirm"
-          type="password"
-          autoComplete="new-password"
-          required
-          value={confirm}
-          onChange={(e) => setConfirm(e.target.value)}
-          className={inputClass}
-        />
-      </div>
+      <TextField
+        id="confirm"
+        label="Повтори паролата"
+        type="password"
+        autoComplete="new-password"
+        required
+        value={confirm}
+        onChange={setConfirm}
+        onBlur={revalidate}
+        error={fieldErrors.confirm}
+        disabled={pending}
+      />
 
-      {error && (
-        <div role="alert" className="space-y-2">
-          <p className="text-sm font-medium text-danger">{error}</p>
+      {formError && (
+        <FormError>
+          <p>{formError}</p>
           {needsNewLink && (
             <Link
               href="/forgot"
-              className="inline-block text-sm font-semibold text-accent underline-offset-4 hover:underline"
+              className="mt-1.5 inline-block rounded font-semibold text-accent underline-offset-4 hover:underline"
             >
               Поискай нов линк →
             </Link>
           )}
-        </div>
+        </FormError>
       )}
 
-      <button
-        type="submit"
-        disabled={pending}
-        className="btn-accent w-full disabled:opacity-50"
-      >
-        {pending ? "Запазваме…" : "Запази новата парола"}
-      </button>
+      <SubmitButton pending={pending} pendingLabel="Запазваме…">
+        Запази новата парола
+      </SubmitButton>
     </form>
   );
 }

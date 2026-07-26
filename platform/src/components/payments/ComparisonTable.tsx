@@ -95,26 +95,44 @@ function CellContent({ cell }: { cell: Cell }) {
   return <span className="text-sm font-semibold">{cell.text}</span>;
 }
 
-/** Free vs packs — the honest overview above the FAQ. */
+/**
+ * Free vs packs — the honest overview above the FAQ.
+ *
+ * The column heads are `.hud-label` (dim, tracked-out mono) rather than bold
+ * body text: they are captions, and letting them shout puts the contrast in
+ * the header row instead of in the answers, which is the row a reader is
+ * actually scanning. Same ratio the cluster's readouts use.
+ *
+ * The table scrolls inside its own box (`overflow-x-auto` + a min width) so
+ * four columns on a 375px Android never make the PAGE scroll sideways.
+ *
+ * `relative` is load-bearing, not decoration. The cells contain
+ * `.visually-hidden` spans ("включено" / "не е включено") and that class is
+ * `position: absolute` — with no positioned ancestor they resolved against the
+ * initial containing block, i.e. at their unscrolled x of ~525px, which made
+ * the whole /pricing DOCUMENT 150px wider than a phone screen. The table was
+ * scrolling correctly the entire time; it was the screen-reader text that
+ * escaped the box. Containing block here, and the overflow goes back inside.
+ */
 export function ComparisonTable() {
   return (
-    <div className="card overflow-x-auto">
+    <div className="panel relative overflow-x-auto">
       <table className="w-full min-w-[36rem] border-collapse text-left">
         <caption className="visually-hidden">
           Сравнение между безплатния достъп и платените пакети
         </caption>
         <thead>
-          <tr className="border-b border-border">
-            <th scope="col" className="px-4 py-3 text-sm font-extrabold">
+          <tr className="border-b border-border-strong">
+            <th scope="col" className="hud-label px-4 py-3 text-left">
               Какво получаваш
             </th>
-            <th scope="col" className="px-4 py-3 text-center text-sm font-extrabold">
+            <th scope="col" className="hud-label px-4 py-3 text-center">
               Безплатно
             </th>
-            <th scope="col" className="px-4 py-3 text-center text-sm font-extrabold">
+            <th scope="col" className="hud-label px-4 py-3 text-center">
               {PACKS.core.nameBg}
             </th>
-            <th scope="col" className="px-4 py-3 text-center text-sm font-extrabold text-accent">
+            <th scope="col" className="hud-label px-4 py-3 text-center !text-accent">
               {PACKS.premium_sim.nameBg}
             </th>
           </tr>
@@ -125,16 +143,16 @@ export function ComparisonTable() {
               key={row.featureBg}
               className={i < ROWS.length - 1 ? "border-b border-border" : ""}
             >
-              <th scope="row" className="px-4 py-3 text-sm font-semibold">
+              <th scope="row" className="px-4 py-3.5 text-sm font-semibold leading-snug">
                 {row.featureBg}
               </th>
-              <td className="px-4 py-3 text-center text-muted">
+              <td className="px-4 py-3.5 text-center text-muted">
                 <CellContent cell={row.free} />
               </td>
-              <td className="px-4 py-3 text-center">
+              <td className="px-4 py-3.5 text-center">
                 <CellContent cell={row.core} />
               </td>
-              <td className="px-4 py-3 text-center">
+              <td className="px-4 py-3.5 text-center">
                 <CellContent cell={row.premium} />
               </td>
             </tr>

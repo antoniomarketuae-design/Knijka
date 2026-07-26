@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { verifyPasswordResetToken } from "@/modules/auth";
+import { AuthFooterNote, AuthHeading } from "../auth-ui";
 import { RESET_TOKEN_PROBLEM_BG } from "./reset-contract";
 import { ResetForm } from "./reset-form";
 
@@ -29,32 +30,34 @@ export default async function ResetPasswordPage({ searchParams }: Props) {
   if (!verdict.ok) {
     return (
       <div>
-        <h1 className="mb-1 font-display text-2xl font-black">Линкът не работи</h1>
-        <p className="mb-6 text-sm text-muted">
-          {RESET_TOKEN_PROBLEM_BG[verdict.error]}
-        </p>
+        <AuthHeading
+          eyebrow="Възстановяване"
+          title="Линкът не работи"
+          lead={RESET_TOKEN_PROBLEM_BG[verdict.error]}
+        />
         <Link href="/forgot" className="btn-accent inline-flex w-full justify-center">
           Поискай нов линк
         </Link>
-        <p className="mt-4 text-center text-sm text-muted">
+        <AuthFooterNote>
           Сети се паролата?{" "}
           <Link
             href="/login"
-            className="font-semibold text-accent underline-offset-4 hover:underline"
+            className="rounded font-semibold text-accent underline-offset-4 hover:underline"
           >
             Влез
           </Link>
-        </p>
+        </AuthFooterNote>
       </div>
     );
   }
 
   return (
     <div>
-      <h1 className="mb-1 font-display text-2xl font-black">Нова парола</h1>
-      <p className="mb-6 text-sm text-muted">
-        Избери нова парола за акаунта си. След това те пускаме направо вътре.
-      </p>
+      <AuthHeading
+        eyebrow="Възстановяване"
+        title="Нова парола"
+        lead="Избери нова парола за акаунта си. След това те пускаме направо вътре."
+      />
       <ResetForm token={token} />
     </div>
   );

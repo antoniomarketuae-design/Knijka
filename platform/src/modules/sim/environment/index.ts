@@ -19,6 +19,19 @@ export { WindshieldDroplets } from "./WindshieldDroplets";
 // mirror frustum during RTT passes — name lookup only, no component export.
 export { SKY_DOME_NAME } from "./SkyDome";
 
+// The two horizon halves, exported INDIVIDUALLY as well as through
+// SimEnvironment. The marketing hero (components/marketing/hero) draws a
+// minimal dusk scene that must NOT pull the simulator — no rule engine, no
+// physics, no traffic, no composer — but must share this project's one sky
+// and one horizon, so the landing page and the product cannot drift apart.
+// Consumers outside the sim get the pieces, never the rig.
+export { SkyDome } from "./SkyDome";
+export { GroundBackdrop, GROUND_BACKDROP_NAME } from "./GroundBackdrop";
+// …and the grade they were tuned under. Any scene that mounts them outside
+// SimEnvironment must apply the same operator or the sky renders in a
+// different colour space than the one its presets were authored against.
+export { SIM_TONE_MAPPING, TONE_MAPPING_THREE } from "./toneMapping";
+
 export {
   ENVIRONMENT_PRESETS,
   sunDirection,

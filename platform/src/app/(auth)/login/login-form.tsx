@@ -1,30 +1,62 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { signIn } from "next-auth/react";
+import {
+  FormError,
+  SubmitButton,
+  TextField,
+  focusFirstError,
+} from "../auth-fields";
 
-const inputClass =
-  "w-full rounded-lg border border-border bg-surface-2/50 px-3 py-2 text-sm text-foreground outline-none transition placeholder:text-muted focus:border-accent focus:shadow-glow-sm motion-reduce:transition-none";
+type FieldErrors = Partial<Record<"email" | "password", string>>;
 
+/**
+ * VALIDATION TIMING. Nothing is marked wrong until the user has tried to
+ * submit once ("submitted" below). Validating on the first blur means telling
+ * a student their e-mail is invalid while they are still typing it — the field
+ * is empty-then-partial for the whole time they are in it. After a failed
+ * submit the rules flip on: from then on blur re-checks and typing clears,
+ * so the form corrects itself as it is fixed rather than scolding ahead of it.
+ */
 export function LoginForm({ callbackUrl }: { callbackUrl: string }) {
   const router = useRouter();
+  const formRef = useRef<HTMLFormElement>(null);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [error, setError] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
+  const [formError, setFormError] = useState<string | null>(null);
+  const [submitted, setSubmitted] = useState(false);
   const [pending, setPending] = useState(false);
+
+  // Client-side shape checks only; the server re-validates everything.
+  function validate(): FieldErrors {
+    const errors: FieldErrors = {};
+    if (!email.trim() || !/^\S+@\S+\.\S+$/.test(email.trim())) {
+      errors.email = "Въведи валиден имейл адрес.";
+    }
+    if (!password) {
+      errors.password = "Въведи парола.";
+    }
+    return errors;
+  }
+
+  /** Re-check on leave, but only once the user has already tried to submit. */
+  function revalidate() {
+    if (submitted) setFieldErrors(validate());
+  }
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    setError(null);
+    setFormError(null);
+    setSubmitted(true);
 
-    // Client-side validation (server re-validates everything).
-    if (!email.trim() || !/^\S+@\S+\.\S+$/.test(email.trim())) {
-      setError("Въведи валиден имейл адрес.");
-      return;
-    }
-    if (!password) {
-      setError("Въведи парола.");
+    const errors = validate();
+    setFieldErrors(errors);
+    if (Object.keys(errors).length > 0) {
+      // The attributes land with this render, so the focus move waits a frame.
+      requestAnimationFrame(() => focusFirstError(formRef.current));
       return;
     }
 
@@ -38,66 +70,52 @@ export function LoginForm({ callbackUrl }: { callbackUrl: string }) {
 
       if (!res || res.error) {
         // Always generic — must not reveal whether the e-mail exists.
-        setError("Грешен имейл или парола.");
+        setFormError("Грешен имейл или парола.");
         return;
       }
 
       router.push(callbackUrl);
       router.refresh();
     } catch {
-      setError("Нещо се обърка. Опитай отново.");
+      setFormError("Нещо се обърка. Опитай отново.");
     } finally {
       setPending(false);
     }
   }
 
   return (
-    <form onSubmit={handleSubmit} noValidate className="space-y-4">
-      <div>
-        <label htmlFor="email" className="mb-1 block text-sm font-medium">
-          Имейл
-        </label>
-        <input
-          id="email"
-          name="email"
-          type="email"
-          autoComplete="email"
-          required
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          className={inputClass}
-        />
-      </div>
-
-      <div>
-        <label htmlFor="password" className="mb-1 block text-sm font-medium">
-          Парола
-        </label>
-        <input
-          id="password"
-          name="password"
-          type="password"
-          autoComplete="current-password"
-          required
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          className={inputClass}
-        />
-      </div>
-
-      {error && (
-        <p role="alert" className="text-sm font-medium text-danger">
-          {error}
-        </p>
-      )}
-
-      <button
-        type="submit"
+    <form ref={formRef} onSubmit={handleSubmit} noValidate className="space-y-4">
+      <TextField
+        id="email"
+        label="Имейл"
+        type="email"
+        autoComplete="email"
+        required
+        value={email}
+        onChange={setEmail}
+        onBlur={revalidate}
+        error={fieldErrors.email}
         disabled={pending}
-        className="btn-accent w-full disabled:opacity-50"
-      >
-        {pending ? "Моля, изчакай…" : "Влез"}
-      </button>
+      />
+
+      <TextField
+        id="password"
+        label="Парола"
+        type="password"
+        autoComplete="current-password"
+        required
+        value={password}
+        onChange={setPassword}
+        onBlur={revalidate}
+        error={fieldErrors.password}
+        disabled={pending}
+      />
+
+      {formError && <FormError>{formError}</FormError>}
+
+      <SubmitButton pending={pending} pendingLabel="Моля, изчакай…">
+        Влез
+      </SubmitButton>
     </form>
   );
 }
