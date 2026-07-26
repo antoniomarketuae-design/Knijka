@@ -57,6 +57,26 @@ export const SIREN_TONE_S = 0.62;
 /** Full wiper cycle (out + back) in seconds — two swishes per cycle. */
 export const WIPER_PERIOD_S = 1.35;
 
+// --- Tyre protest (doc 82 §4.2 F1) ------------------------------------------
+// The sim grades students on grip-limited driving and, until this layer, gave
+// them NO sensory evidence that grip was running out — on the ice/aquaplane
+// lessons the car simply stopped answering. `simAudio.ts` documented the
+// brake layer as explicitly "NOT a squeal" precisely because a squeal at that
+// seam would have been a lie; THIS is the honest place for one, driven by
+// vehicle/gripSignal.ts's utilisation rather than by pedal position.
+/** Utilisation at which the tyre first starts to scrub audibly. */
+export const SCRUB_START_UTIL = 0.85;
+/** Utilisation at which the layer is at full screech. Above 1 the driver is
+ *  asking for grip that does not exist (gripSignal.ts) — the gap 0.85→1.15
+ *  therefore spans "working hard" → "past the limit". */
+export const SCRUB_FULL_UTIL = 1.15;
+/** Bandpass sweep: a dull rubber scrub opens into a bright screech. */
+export const SCRUB_LP_MIN_HZ = 900;
+export const SCRUB_LP_MAX_HZ = 2400;
+/** Below this speed (km/h) the layer is muted — a parking manoeuvre must be
+ *  silent, and the measured accelerations are raycast noise down there. */
+export const SCRUB_MIN_KMH = 8;
+
 /**
  * Per-layer gain caps — the whole mix's volume discipline lives here.
  * Worst-case sum stays well under 1.0 before the (default 0.5) master gain.
@@ -75,6 +95,9 @@ export const LAYER_GAIN = {
   wind: 0.07,
   /** Brake friction hiss cap (full pedal at speed). */
   brake: 0.045,
+  /** Tyre-protest scrub/screech cap. Below the tyre bed (0.085) on purpose:
+   *  this is a driving SCHOOL — the tyre complains, it does not perform. */
+  scrub: 0.055,
   /** Ambient city bed base (the swell LFO modulates ±55% around it). */
   ambient: 0.016,
   /** NPC engine hum at point-blank range. */
@@ -122,6 +145,22 @@ export function brakeHissLevel(brake: number, speedKmh: number): number {
   const v = Math.abs(speedKmh);
   if (v < 3) return 0;
   return clamp01(brake) * Math.min(v / 60, 1);
+}
+
+/**
+ * Tyre-protest level 0..1 from the grip utilisation (vehicle/gripSignal.ts).
+ * Silent below SCRUB_START_UTIL — most driving must make no tyre noise at all
+ * or the cue stops meaning anything. Silent below SCRUB_MIN_KMH.
+ */
+export function tyreScrubLevel(gripUtil: number, speedKmh: number): number {
+  if (!Number.isFinite(gripUtil)) return 0;
+  if (Math.abs(speedKmh) < SCRUB_MIN_KMH) return 0;
+  return clamp01((gripUtil - SCRUB_START_UTIL) / (SCRUB_FULL_UTIL - SCRUB_START_UTIL));
+}
+
+/** Bandpass centre (Hz) for the scrub layer — dull rubber → bright screech. */
+export function tyreScrubCutoffHz(level: number): number {
+  return SCRUB_LP_MIN_HZ + (SCRUB_LP_MAX_HZ - SCRUB_LP_MIN_HZ) * clamp01(level);
 }
 
 /** NPC proximity hum 0..1 vs distance (m); Infinity/far ⇒ 0, ≤2 m ⇒ 1. */
@@ -177,6 +216,10 @@ export interface EngineFrame {
   paused: boolean;
   /** 0..1 brake pedal — drives the friction hiss (default 0). */
   brake?: number;
+  /** Tyre grip utilisation from VehicleSim.gripUtilisation (doc 82 F1).
+   *  Default 0 ⇒ the scrub layer is silent, so callers that never pass it
+   *  (tests, legacy rigs) hear exactly the pre-F1 mix. */
+  gripUtil?: number;
   /** Raining — enables the rain-patter layer (default false). */
   rain?: boolean;
   /** Wipers sweeping — rhythmic swish (default false; A1 wires real state). */
@@ -219,6 +262,8 @@ interface LayerNodes {
   tyreFilter: BiquadFilterNode;
   windGain: GainNode;
   brakeGain: GainNode;
+  scrubGain: GainNode;
+  scrubFilter: BiquadFilterNode;
   ambientGain: GainNode;
   npcGain: GainNode;
   npcOsc: OscillatorNode;
@@ -357,6 +402,12 @@ export class SimAudio {
     // --- Brake friction hiss. -----------------------------------------------
     const brake = layer(noiseSource(0.93), "bandpass", 2600, 1.2);
 
+    // --- Tyre protest (F1): narrow-Q bandpass noise swept 900 Hz → 2.4 kHz.
+    // A high Q is what turns filtered noise into a *tonal* scrub instead of
+    // one more hiss layer — it must be distinguishable from the brake hiss
+    // and the wind, which are the two sounds already living around it.
+    const scrub = layer(noiseSource(1.07), "bandpass", SCRUB_LP_MIN_HZ, 4.5);
+
     // --- Ambient city bed: dark murmur + slow distant-traffic swell. --------
     // LFO adds ±(swellDepth) around the swell bus's base gain of 1, so the bed
     // breathes every ~16 s; ambientGain stays the on/off + level control.
@@ -469,6 +520,8 @@ export class SimAudio {
       tyreFilter: tyre.filter,
       windGain: wind.gain,
       brakeGain: brake.gain,
+      scrubGain: scrub.gain,
+      scrubFilter: scrub.filter,
       ambientGain,
       npcGain,
       npcOsc,
@@ -522,6 +575,7 @@ export class SimAudio {
     const nearestNpcM = f.nearestNpcM ?? this.env.nearestNpcM ?? Infinity;
     const sirenM = f.sirenM ?? this.env.sirenM ?? Infinity;
     const brake = f.brake ?? 0;
+    const gripUtil = f.gripUtil ?? 0;
     const live = !f.paused;
     const v = Math.abs(f.speedKmh);
 
@@ -585,6 +639,15 @@ export class SimAudio {
       t,
       0.06,
     );
+
+    // --- Tyre protest (F1): the ONLY evidence a muted-eyed student gets that
+    // grip is running out. Fast attack (0.05) so the scrub arrives with the
+    // slide, not a beat after it; the filter sweep carries the severity.
+    const scrubLevel = tyreScrubLevel(gripUtil, v);
+    n.scrubGain.gain.setTargetAtTime(live ? LAYER_GAIN.scrub * scrubLevel : 0, t, 0.05);
+    if (scrubLevel > 0) {
+      n.scrubFilter.frequency.setTargetAtTime(tyreScrubCutoffHz(scrubLevel), t, 0.08);
+    }
 
     // --- Ambient city bed: standing still isn't dead silence. ---------------
     n.ambientGain.gain.setTargetAtTime(live ? LAYER_GAIN.ambient : 0, t, 0.4);

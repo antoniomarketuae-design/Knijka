@@ -23,6 +23,7 @@ import {
   BICYCLE_DIMENSIONS,
   BOXY_INDEX,
   BOXY_MAX_INSTANCES,
+  BOXY_MAX_INSTANCES_LOW,
   buildAnimalRig,
   buildTrafficFleet,
   carPaintMaterial,
@@ -187,6 +188,31 @@ describe("buildTrafficFleet", () => {
     const rawKolos = vehicles.filter((v) => assignModel(v.id) === KOLOS_INDEX).length;
     expect(fleet.models[KOLOS_INDEX].count).toBe(rawKolos + raw - BOXY_MAX_INSTANCES);
     expect(() => disposeTrafficFleet(fleet)).not.toThrow();
+  });
+
+  it("drops the hero SUV entirely at the tier-low cap, without moving a vehicle", () => {
+    // doc 82 §2.3: 22,672 tris / 16 materials at ~1-in-21 against a ≤250k-tri,
+    // ≤70-draw phone budget. The point of the fix is that it is FREE: every
+    // pick falls back to the kolos, so the traffic population is untouched.
+    const vehicles = Array.from({ length: 400 }, (_, i) => vehicle(i));
+    const scenes = makeScenes();
+    const shipped = buildTrafficFleet(scenes, vehicles);
+    const low = buildTrafficFleet(scenes, vehicles, [], {
+      boxyMaxInstances: BOXY_MAX_INSTANCES_LOW,
+    });
+
+    expect(low.models[BOXY_INDEX].count).toBe(0);
+    expect(low.models[BOXY_INDEX].mesh).toBeNull(); // no InstancedMesh, no draws
+    // The kolos absorbs exactly the two instances the shipped cap allowed.
+    expect(low.models[KOLOS_INDEX].count).toBe(
+      shipped.models[KOLOS_INDEX].count + BOXY_MAX_INSTANCES,
+    );
+    // Same number of cars, every one of them still assigned a model.
+    expect(low.assign.length).toBe(shipped.assign.length);
+    const total = (f: typeof low) => f.models.reduce((n, m) => n + m.count, 0);
+    expect(total(low)).toBe(total(shipped));
+    expect(() => disposeTrafficFleet(shipped)).not.toThrow();
+    expect(() => disposeTrafficFleet(low)).not.toThrow();
   });
 
   it("splits palette paint, folds plate into trim, tints per instance", () => {

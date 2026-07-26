@@ -29,6 +29,12 @@
  *    the pricing table promises); any active pack lifts the cap to the
  *    module's own daily cost guard.
  *
+ *    4b. What the PACK buys is bounded too — checkTutorPackAllowance(), wired
+ *    inside @/modules/tutor askTutor(), which is the single point where model
+ *    tokens are spent. It is a separate function from checkTutorQuota because
+ *    it answers a separate question ("has this BUYER used up the pack?" vs
+ *    "has this non-buyer used up the trial?") at a separate choke point.
+ *
  * All four read entitlements from the DB through the store — never from a
  * cookie, a prop or anything else the browser can write. A server action is a
  * public POST endpoint, so the gate lives in the action, not in the component
@@ -38,9 +44,9 @@
  * NOT UTC — resetting the counter at 02:00/03:00 local would feel broken.
  */
 
-import { getEntitlements } from "./entitlements";
+import { getEntitlements, isEntitlementActive } from "./entitlements";
 import { getPaymentsStore } from "./store";
-import type { PracticeQuota, TutorQuota } from "./types";
+import type { PracticeQuota, TutorPackAllowance, TutorQuota } from "./types";
 
 /** Free practice questions per Sofia day. Founder-adjustable. */
 export const FREE_DAILY_PRACTICE_LIMIT = 20;
@@ -62,6 +68,30 @@ export const FREE_MOCK_EXAM_LIMIT = 1;
  * after the founder edits the value.
  */
 export const FREE_TUTOR_LIFETIME_MESSAGES: number = 5;
+
+/**
+ * Tutor questions ONE purchased pack buys, across its whole
+ * PACK_ACCESS_MONTHS window. Founder-adjustable.
+ *
+ * A CAP, not a currency (doc 81 §5.3). Before it existed, `hasCore` meant
+ * „unlimited" for four months, and the arithmetic was ugly: 30 questions/day ×
+ * ~122 days = 3,660 questions = $41.72 of model spend (up to $111 at the worst
+ * per-call size) against €12.55 of net revenue. Worse, the only HARD backstop
+ * was the global daily ceiling in @/modules/tutor budget.ts — so the single
+ * student who ran that script did not just cost more than they paid, they took
+ * the tutor offline for every other paying student that day.
+ *
+ * 300 across four months is ~2.5 questions a day, which no real student
+ * reaches: the median for a whole pack is 60–100. It bounds the worst case at
+ * $3.42 (73% gross margin, 91% on a small model) while leaving 95% of students
+ * without a number on screen at all — see @/modules/tutor allowance.ts for
+ * what the other 5% are told, and doc 81 §5.4 for why this is not a credit
+ * ledger.
+ *
+ * Typed `number` rather than left as a literal so the Bulgarian copy that
+ * quotes it still type-checks after the founder edits the value.
+ */
+export const TUTOR_PACK_QUESTION_ALLOWANCE: number = 300;
 
 const SOFIA_TZ = "Europe/Sofia";
 
@@ -262,4 +292,74 @@ export async function checkTutorQuota(
     limit: FREE_TUTOR_LIFETIME_MESSAGES,
     unlimited: false,
   };
+}
+
+/** The answer for an account this rule has nothing to say about. */
+function allowanceNotApplicable(): TutorPackAllowance {
+  return {
+    applies: false,
+    allowed: true,
+    used: 0,
+    remaining: Number.POSITIVE_INFINITY,
+    limit: TUTOR_PACK_QUESTION_ALLOWANCE,
+    since: null,
+  };
+}
+
+/**
+ * Paid-tutor gate: has this pack holder used up what their pack buys?
+ *
+ * `askedAtMs` is the timestamp of every question the student has EVER sent,
+ * taken from the persisted thread (@/modules/tutor getThread) — never from the
+ * wire. It is passed in for the same reason checkTutorQuota takes
+ * `usedLifetime`: the payments module keeps no dependency on the tutor's
+ * storage, while the rule itself still lives in exactly one place, here.
+ *
+ * The window opens at the EARLIEST active purchase and the allowance is
+ * multiplied by the number of active packs, so both things a student can
+ * legitimately do come out right: renewing after expiry starts a fresh 300
+ * (the lapsed row is no longer active, so its purchase date no longer opens
+ * the window), and upgrading core → premium while core still runs buys a
+ * second 300 rather than nothing. Questions asked BEFORE the earliest active
+ * purchase — the free trial — are not charged to the pack: the student paid to
+ * stop being metered, not to have their trial retro-billed.
+ *
+ * FAILS OPEN, unlike its neighbours in this file, and deliberately: this gate
+ * protects MARGIN, not access. Every other quota here decides whether someone
+ * who has not paid may proceed, so refusing on a database error is the safe
+ * direction; this one decides how much someone who HAS paid may still use, so
+ * a store hiccup that blocked it would take the tutor away from exactly the
+ * people who bought it. The bill stays bounded meanwhile by the global daily
+ * ceiling in @/modules/tutor budget.ts, which is the backstop this allowance
+ * was added to stop being the ONLY brake on — never the other way round.
+ *
+ * `now` is injectable for tests.
+ */
+export async function checkTutorPackAllowance(
+  userId: string,
+  askedAtMs: readonly number[],
+  now: Date = new Date(),
+): Promise<TutorPackAllowance> {
+  let active;
+  try {
+    const rows = await getPaymentsStore().listEntitlements(userId);
+    active = rows.filter((row) => isEntitlementActive(row, now));
+  } catch (err) {
+    console.error("[payments] tutor allowance read failed, failing open:", err);
+    return allowanceNotApplicable();
+  }
+
+  // No pack → the lifetime free trial governs this account, not this rule.
+  if (active.length === 0) return allowanceNotApplicable();
+
+  let since = active[0].purchasedAt;
+  for (const row of active) {
+    if (row.purchasedAt.getTime() < since.getTime()) since = row.purchasedAt;
+  }
+
+  const sinceMs = since.getTime();
+  const limit = TUTOR_PACK_QUESTION_ALLOWANCE * active.length;
+  const used = askedAtMs.filter((ts) => ts >= sinceMs).length;
+  const remaining = Math.max(0, limit - used);
+  return { applies: true, allowed: remaining > 0, used, remaining, limit, since };
 }

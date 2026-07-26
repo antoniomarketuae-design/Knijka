@@ -30,7 +30,18 @@ import {
 import { makeDecalAtlasTexture } from "../textures/decalAtlas";
 import { useFacadeTextures, type FacadeSetName } from "../textures/facadeTextures";
 import { macroOnBeforeCompile, macroProgramCacheKey } from "../textures/macroVariation";
+import {
+  markingWearOnBeforeCompile,
+  markingWearProgramCacheKey,
+  PAINT_ALPHA_TEST,
+  PAINT_NORMAL_SCALE,
+} from "../textures/markingWear";
 import { usePbrSet } from "../textures/pbrTextures";
+import {
+  ROAD_ALBEDO_TINT,
+  roadSurfaceOnBeforeCompile,
+  roadSurfaceProgramCacheKey,
+} from "../textures/roadSurface";
 import { TEXTURE_BUDGETS } from "../textures/textureBudget";
 import { disposeAll, meshDataToGeometry } from "./three-helpers";
 import type { QualityPreset } from "./quality";
@@ -66,6 +77,33 @@ const MACRO_VARIATION = {
   onBeforeCompile: macroOnBeforeCompile,
   customProgramCacheKey: macroProgramCacheKey,
 } as const;
+
+/**
+ * Spread onto the three ASPHALT materials (road ribbons, junction patches,
+ * parking bands) INSTEAD of MACRO_VARIATION (doc 82 V5). It is a superset:
+ * the same shared macro field at the same 80 m scale, plus the 2-tap rotated
+ * detile and the UDN detail normal. Its own cache key, so the asphalt program
+ * and the plain ground program each compile exactly once.
+ */
+const ROAD_SURFACE = {
+  onBeforeCompile: roadSurfaceOnBeforeCompile,
+  customProgramCacheKey: roadSurfaceProgramCacheKey,
+} as const;
+
+/**
+ * Spread onto the MARKINGS material only (doc 82 V1): world-XZ map UVs at the
+ * road's tile scale + macro-noise grime + alpha-eroded edges. Deliberately
+ * NOT the ground hook — paint needs the noise at a ~3 m wear scale, not the
+ * 80 m ground scale, and it is the only material that touches `diffuseColor.a`.
+ */
+const PAINT_WEAR = {
+  onBeforeCompile: markingWearOnBeforeCompile,
+  customProgramCacheKey: markingWearProgramCacheKey,
+} as const;
+
+/** normalScale is a Vector2 on the material; R3F's `set` shortcut takes the
+ *  tuple. Hoisted so the array identity is stable across re-renders. */
+const PAINT_NORMAL_SCALE_V2: [number, number] = [PAINT_NORMAL_SCALE, PAINT_NORMAL_SCALE];
 
 interface WorldTextures {
   asphalt: THREE.Texture;
@@ -234,7 +272,14 @@ export function StaticWorld({
     () => wetnessToRoadParams(wetness, { dryRoughness: 1.0, wetRoughness: 0.5, wetDarken: 0.6 }),
     [wetness],
   );
-  const roadTint = useMemo(() => new Color(wet.darken, wet.darken, wet.darken), [wet.darken]);
+  // ROAD_ALBEDO_TINT (doc 82 V5) multiplies the wetness darken rather than
+  // replacing it: the wet response, its ordering against the decals and the
+  // whole R5 retune above are preserved, the asphalt simply starts darker so
+  // it separates from the concrete pavement instead of merging with it.
+  const roadTint = useMemo(() => {
+    const d = wet.darken * ROAD_ALBEDO_TINT;
+    return new Color(d, d, d);
+  }, [wet.darken]);
   // Decals share the road's wetness response (doc 71 §4.4) with a slightly
   // glossier wet floor — oil/tar stains go reflective FIRST in rain (the
   // ordering survives the retune: 0.45 < 0.5).
@@ -242,9 +287,30 @@ export function StaticWorld({
     () => wetnessToRoadParams(wetness, { dryRoughness: 0.95, wetRoughness: 0.45, wetDarken: 0.6 }),
     [wetness],
   );
-  const decalTint = useMemo(
-    () => new Color(decalWet.darken, decalWet.darken, decalWet.darken),
-    [decalWet.darken],
+  // Decals carry the road's albedo tint too — they are wear ON the asphalt,
+  // and left at full value they would read as marks painted BRIGHTER than the
+  // surface they sit in.
+  const decalTint = useMemo(() => {
+    const d = decalWet.darken * ROAD_ALBEDO_TINT;
+    return new Color(d, d, d);
+  }, [decalWet.darken]);
+  // Paint's own wetness response (doc 82 V1). Wet thermoplastic goes slicker
+  // than wet asphalt — that is the real-world reason „не спирай върху
+  // маркировката" is taught — so its wet endpoint sits below the road's 0.5.
+  // It darkens FAR less than the road (0.78 vs 0.6): markings must stay
+  // legible in rain, because the rule engine grades stop-line and lane
+  // discipline in exactly those conditions. dryRoughness is the shipped
+  // authored 0.85 and darken lands at 1.0, so every DRY scene is
+  // byte-identical to before this change.
+  const paintWet = useMemo(
+    () => wetnessToRoadParams(wetness, { dryRoughness: 0.85, wetRoughness: 0.4, wetDarken: 0.78 }),
+    [wetness],
+  );
+  // The shipped paint albedo (#e9e7df — worn white, never pure) times the
+  // wetness darken.
+  const paintTint = useMemo(
+    () => new Color(0xe9e7df).multiplyScalar(paintWet.darken),
+    [paintWet.darken],
   );
   // Asphalt env response (doc 71 §4.4, retuned by the doc 66 R5 measurements):
   // WETNESS-LERPED 1.5 dry → 0.55 soaked. The wet endpoint is the sky-glare
@@ -263,10 +329,10 @@ export function StaticWorld({
   const ROAD_ENV_INTENSITY = 1.5 + (0.55 - 1.5) * wetness;
   // Parking bands read a touch lighter/cooler than the travel lanes so the
   // extra width reads as parking, not as another lane (doc 68 QW3).
-  const parkingTint = useMemo(
-    () => new Color(wet.darken * 1.18, wet.darken * 1.18, wet.darken * 1.22),
-    [wet.darken],
-  );
+  const parkingTint = useMemo(() => {
+    const d = wet.darken * ROAD_ALBEDO_TINT;
+    return new Color(d * 1.18, d * 1.18, d * 1.22);
+  }, [wet.darken]);
 
   return (
     <group name="world-static">
@@ -316,7 +382,7 @@ export function StaticWorld({
       <mesh geometry={geometries.road} receiveShadow={receive}>
         {asphalt ? (
           <meshStandardMaterial
-            {...MACRO_VARIATION}
+            {...ROAD_SURFACE}
             map={asphalt.map}
             normalMap={asphalt.normalMap ?? undefined}
             roughnessMap={asphalt.roughnessMap ?? undefined}
@@ -329,7 +395,7 @@ export function StaticWorld({
           />
         ) : (
           <meshStandardMaterial
-            {...MACRO_VARIATION}
+            {...ROAD_SURFACE}
             map={textures.asphalt}
             color={roadTint}
             vertexColors
@@ -342,7 +408,7 @@ export function StaticWorld({
       <mesh geometry={geometries.junctions} receiveShadow={receive}>
         {asphalt ? (
           <meshStandardMaterial
-            {...MACRO_VARIATION}
+            {...ROAD_SURFACE}
             map={asphalt.map}
             normalMap={asphalt.normalMap ?? undefined}
             roughnessMap={asphalt.roughnessMap ?? undefined}
@@ -354,7 +420,7 @@ export function StaticWorld({
           />
         ) : (
           <meshStandardMaterial
-            {...MACRO_VARIATION}
+            {...ROAD_SURFACE}
             map={textures.asphalt}
             color={roadTint}
             roughness={wet.roughness}
@@ -367,7 +433,7 @@ export function StaticWorld({
       <mesh geometry={geometries.parkingLanes} receiveShadow={receive}>
         {asphalt ? (
           <meshStandardMaterial
-            {...MACRO_VARIATION}
+            {...ROAD_SURFACE}
             map={asphalt.map}
             normalMap={asphalt.normalMap ?? undefined}
             roughnessMap={asphalt.roughnessMap ?? undefined}
@@ -378,7 +444,7 @@ export function StaticWorld({
           />
         ) : (
           <meshStandardMaterial
-            {...MACRO_VARIATION}
+            {...ROAD_SURFACE}
             map={textures.asphalt}
             color={parkingTint}
             roughness={wet.roughness}
@@ -454,8 +520,27 @@ export function StaticWorld({
           />
         )}
       </mesh>
-      <mesh geometry={geometries.markings}>
-        <meshStandardMaterial color={0xe9e7df} roughness={0.85} metalness={0} />
+      {/* Lane markings (doc 82 V1). This mesh was the ONE ground mesh in the
+          scene without `receiveShadow`, so painted lines glowed at full value
+          straight through building and car shadows — the single loudest
+          „test level" tell in the shipped frames. It now takes shadow like
+          every surface above, borrows the ROAD's own normal/roughness maps at
+          the road's world tile scale (PAINT_WEAR rewrites the map UVs — the
+          markings' per-quad 0..1 UVs cannot tile), and erodes its edges with
+          the shared macro noise, so paint reads as a film ON the aggregate
+          rather than as a decal floating over it. */}
+      <mesh geometry={geometries.markings} receiveShadow={receive}>
+        <meshStandardMaterial
+          {...PAINT_WEAR}
+          color={paintTint}
+          normalMap={asphalt?.normalMap ?? undefined}
+          normalScale={PAINT_NORMAL_SCALE_V2}
+          roughnessMap={asphalt?.roughnessMap ?? undefined}
+          roughness={paintWet.roughness}
+          metalness={0}
+          envMapIntensity={ROAD_ENV_INTENSITY}
+          alphaTest={PAINT_ALPHA_TEST}
+        />
       </mesh>
       {/* Railway level-crossing track deck over railCrossing zone spans
           (builders/railTrack.ts): the dark ballast/sleeper band (vertex-coloured

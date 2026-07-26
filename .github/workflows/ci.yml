@@ -62,6 +62,14 @@ jobs:
         run: npx tsc --noEmit
       - name: tests
         run: npx vitest run
+      # The repo's OTHER runner. tools/theory and tools/deploy are tested with
+      # node:test, which `npx vitest run` cannot see, so until this step existed
+      # 92 tests — the content-authoring guards and the whole H-17 deploy-order
+      # battery — ran only when a developer typed the per-file command in their
+      # header. scripts/tools-tests.mjs discovers them by which runner they
+      # import, so a new tools/ test is covered without touching this file.
+      - name: tools tests
+        run: npm run test:tools
       - name: sim harness
         run: node scripts/sim-harness.mjs
       # The content contract (content/SCHEMA.md): every lawRef resolves, every

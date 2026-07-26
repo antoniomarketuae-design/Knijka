@@ -30,13 +30,31 @@ import { getTutorStore } from "./store";
 /**
  * Daily ceiling in whole US dollars, overridable with TUTOR_DAILY_BUDGET_USD.
  *
- * $5/day ≈ 600 grounded answers at the measured average (~100 in / ~350 out
- * tokens), which is far more tutoring than a Bulgarian launch cohort produces
- * in a day and still a bill the founder can absorb if it is ever hit by abuse.
- * Raise it when real usage says so — that is a one-env-var change, and the
- * number it protects is a real credit card.
+ * $40/day ≈ 3,500 grounded answers on Sonnet 5: a steady-state turn is ~2,800
+ * in / ~200 out ≈ $0.0114, because the system prompt is rebuilt on every call
+ * (~1,860 tokens of instructions + 6 materials + 2 rule specs) and up to
+ * TUTOR_HISTORY_MESSAGES prior messages are replayed.
+ *
+ * It was $5 — 438 answers, which is LESS than 500 active students asking three
+ * questions each (doc 81 §5.2). A ceiling sized to survive abuse would
+ * therefore have tripped mid-morning on the product's best real traffic day
+ * and shown every student TUTOR_BUDGET_REPLY_BG until midnight. That is a
+ * brownout dressed as a safety feature.
+ *
+ * RAISING IT IS ONLY SAFE BECAUSE THE PER-PACK ALLOWANCE EXISTS
+ * (payments/quota.ts TUTOR_PACK_QUESTION_ALLOWANCE). Doc 81 §5.3 is emphatic
+ * that the two ship together and never separately, and the reason is exactly
+ * this file's own argument: before the allowance, this global number was the
+ * only HARD brake on a single determined user, so loosening it eightfold on
+ * its own would have removed the only brake there was. If the allowance is
+ * ever taken out, put this back to 5 in the same commit.
+ *
+ * The figure this comment used to quote — „600 answers at ~100 in / ~350 out" —
+ * was the TEST FIXTURE's usage numbers (fixtures.ts), not a measurement: 100
+ * input tokens is less than the fixed instruction block alone. Sizing decisions
+ * were being made against a number the product cannot produce.
  */
-export const TUTOR_DAILY_BUDGET_USD_DEFAULT = 5;
+export const TUTOR_DAILY_BUDGET_USD_DEFAULT = 40;
 
 const MICRO_USD_PER_USD = 1_000_000;
 
@@ -59,7 +77,20 @@ export const TUTOR_BUDGET_REPLY_BG =
   "Днес Учителят изчерпа дневния си лимит за разговори (той важи за целия сайт, не само за теб). Утре сутрин съм отново на линия. Дотогава упражненията и обяснението към всеки въпрос работят напълно — точно там се учи най-много.";
 
 /**
- * The Europe/Sofia calendar day as "YYYY-MM-DD" — the ledger's primary key.
+ * Built once. sofiaDayKey is now called per MESSAGE by the per-user daily cap
+ * (service.ts), not once per request, and constructing an Intl formatter is by
+ * far the expensive half of the call.
+ */
+const SOFIA_DAY_FORMAT = new Intl.DateTimeFormat("en-CA", {
+  timeZone: "Europe/Sofia",
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit",
+});
+
+/**
+ * The Europe/Sofia calendar day as "YYYY-MM-DD" — the ledger's primary key,
+ * and the window both daily tutor limits are counted in.
  *
  * Sofia rather than UTC for the same reason payments/quota.ts uses it: a
  * budget that resets at 02:00 or 03:00 local looks broken to the student who
@@ -67,12 +98,7 @@ export const TUTOR_BUDGET_REPLY_BG =
  * IS ISO order, so no manual zero-padding is needed.
  */
 export function sofiaDayKey(now: Date = new Date()): string {
-  return new Intl.DateTimeFormat("en-CA", {
-    timeZone: "Europe/Sofia",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).format(now);
+  return SOFIA_DAY_FORMAT.format(now);
 }
 
 export interface TutorBudgetState {

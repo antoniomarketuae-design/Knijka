@@ -93,7 +93,12 @@ import {
   loadMicroQuizBank,
   submitMicroQuizAnswer,
 } from "@/app/(dashboard)/simulator/micro-quiz-actions";
+import { recordSelfPredictionAction } from "@/app/(dashboard)/simulator/calibration-actions";
+// Deep import, like CalibrationGate's: the learning barrel carries the module's
+// server half, and this is a client bundle (audit M-26).
+import { isResultScreenHeld } from "@/modules/learning/calibration";
 import { AdvisorCard } from "./AdvisorCard";
+import { CalibrationGate, CalibrationPendingCard } from "./CalibrationGate";
 import { MicroQuizOverlay } from "./MicroQuizOverlay";
 import { MistakeConsequenceOverlay } from "./MistakeConsequenceOverlay";
 import { SceneSlot } from "./SceneSlot";
@@ -417,6 +422,13 @@ export function LessonPlayShell({
   const [minimapFrame, setMinimapFrame] = useState<MinimapFrame | null>(null);
   const [result, setResult] = useState<LessonResult | null>(null);
   const [saveResult, setSaveResult] = useState<FinishLessonActionResult | null>(null);
+  // I1 „Позна ли се?" (doc 82 §5.3): null = the gate has not resolved yet and
+  // the end screen stays hidden behind it. Reset on every retry with the rest
+  // of the end-screen state, so a second run asks again.
+  const [calibrationDone, setCalibrationDone] = useState(false);
+  // I2 „Твоят дубъл": did this attempt actually upload a trace? Only then does
+  // the replay route have something to load.
+  const [traceUploaded, setTraceUploaded] = useState(false);
   const { toasts, push, clear } = useHudToastQueue();
 
   // -- S1: scenario sessions (<templateId>@L<n>) --------------------------------
@@ -667,6 +679,11 @@ export function LessonPlayShell({
       // data — the server validates it and drops it silently if it is anything
       // but this session's own attempt.
       const storedTrace = trace !== null ? compactTraceForStorage(trace) : null;
+      // …and whether it did decides whether the result screen may offer
+      // „Виж своя дубъл". A curriculum lesson records no attempt trace, so the
+      // link must not appear there — a dead link on the result screen is worse
+      // than no link.
+      setTraceUploaded(storedTrace !== null);
 
       void finishLessonAction({
         lessonId: lesson.id,
@@ -880,6 +897,9 @@ export function LessonPlayShell({
     mountedAtRef.current = performance.now();
     setResult(null);
     setSaveResult(null);
+    // I1: a fresh attempt is a fresh prediction — the gate asks again.
+    setCalibrationDone(false);
+    setTraceUploaded(false);
     setFlash(null);
     clear();
     // S1: a fresh attempt records a fresh trace + rubric.
@@ -933,6 +953,52 @@ export function LessonPlayShell({
       ? saveResult.debriefText
       : buildDebrief(lesson, result).text
     : null;
+
+  // I1 „Позна ли се?" (doc 82 §5.3) — the self-assessment calibration gate.
+  //
+  // It exists only when there is something to be wrong ABOUT: a session that
+  // actually persisted (so the SERVER owns the official score it will reveal —
+  // the client's own number is never the one being predicted) and that was not
+  // aborted (guessing the points of a drive you quit measures nothing). On a
+  // failed save the student goes straight to the result, because the trend has
+  // nowhere to be written anyway.
+  const savedSessionId = ended && saveResult?.ok ? saveResult.sessionId : null;
+  const calibrationGate =
+    savedSessionId !== null && result !== null && !result.aborted ? (
+      <CalibrationGate
+        lessonTitleBg={lesson.titleBg}
+        onSubmit={async (predictedPoints, predictedPass) => {
+          const answer = await recordSelfPredictionAction(savedSessionId, {
+            predictedPoints,
+            predictedPass,
+          });
+          return answer.ok ? answer : null;
+        }}
+        onResolved={() => setCalibrationDone(true)}
+      />
+    ) : null;
+
+  // …and it has to be up BEFORE the score is. `result` lands synchronously
+  // when the drive ends; `saveResult` lands one POST later. Rendering the end
+  // screen in between would show the student „7 точки" and then ask them to
+  // predict it — the mechanic would measure reading, not judgement. So the
+  // hold starts with the drive and ends with the answer (isResultScreenHeld),
+  // and the waiting card carries its own skip so a hung save cannot trap
+  // anyone behind a mechanic.
+  const resultHeld = isResultScreenHeld({
+    ended,
+    aborted: result?.aborted ?? false,
+    // THEO-3 sandbox runs never persist, so they would wait for a save that
+    // is never made.
+    persists: lesson.mistakeExperience === undefined,
+    saved: saveResult === null ? null : saveResult.ok,
+    resolved: calibrationDone,
+  });
+  const calibrationSlot =
+    calibrationGate ??
+    (resultHeld ? (
+      <CalibrationPendingCard onSkip={() => setCalibrationDone(true)} />
+    ) : null);
 
   // S1 (founder 2026-07-17: „the button for next lesson goes to stage 2 of
   // the same lesson — we also have to add a button that switches to the NEXT
@@ -1317,7 +1383,11 @@ export function LessonPlayShell({
         {ended && result ? (
           <div className="absolute inset-0 z-20 flex items-start justify-center overflow-y-auto bg-background/85 p-4 backdrop-blur-sm sm:p-6">
             <div className="flex w-full max-w-2xl flex-col gap-3">
-              {examMode ? (
+              {/* I1: the protocol card states the verdict in words, so it is
+                  part of what the calibration gate holds back — otherwise the
+                  student reads „Маршрутът е завършен в допустимите граници"
+                  and then „predicts" that they passed. */}
+              {examMode && !resultHeld ? (
                 <section
                   aria-label="Протокол на изпитващия"
                   className={`card border p-4 ${
@@ -1358,6 +1428,17 @@ export function LessonPlayShell({
                 // official points stay the primary verdict).
                 rubric={rubric}
                 debriefText={debriefText}
+                // I1: while the gate is unresolved the end screen renders ONLY
+                // it — the score must not leak into a prediction about itself.
+                calibrationGate={calibrationSlot}
+                calibrationLocked={resultHeld}
+                // I2: the drive is already stored — this is the only place a
+                // student would think to look for it.
+                myDriveHref={
+                  savedSessionId !== null && traceUploaded
+                    ? `/review/my-drive/${savedSessionId}`
+                    : null
+                }
                 concepts={saveResult?.ok ? saveResult.concepts : []}
                 xpEarned={saveResult?.ok ? saveResult.xpEarned : null}
                 onRetry={retry}

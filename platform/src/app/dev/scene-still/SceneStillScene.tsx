@@ -31,6 +31,7 @@ import { Canvas, useFrame } from "@react-three/fiber";
 import { Environment } from "@react-three/drei";
 import { DoubleSide, Euler, Quaternion, Vector3 } from "three";
 import {
+  mapKindHasSkyline,
   QUALITY_PRESETS,
   resetWeather,
   setWeatherTarget,
@@ -459,7 +460,15 @@ export function SceneStillScene({
           preserveDrawingBuffer: true,
         }}
       >
-        <SimEnvironment timeOfDay="day" rain={false} quality={LEVEL} />
+        {/* The still is a review frame of the committed district, so it takes
+            that district's own skyline verdict (doc 82 §3.2 V3) — a lot still
+            that grew a mountain would be reviewing the wrong scene. */}
+        <SimEnvironment
+          timeOfDay="day"
+          rain={false}
+          skyline={mapKindHasSkyline(district.meta.mapKind)}
+          quality={LEVEL}
+        />
         <Suspense fallback={null}>
           <Environment
             files="/sim/env/shanghai_riverside_1k.hdr"

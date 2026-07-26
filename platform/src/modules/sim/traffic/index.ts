@@ -26,6 +26,10 @@ export type { CarPaintOptions, BuildTrafficFleetOptions } from "./vehicleFleet";
 // are cuboids matched to each rig's measured bbox — never a generic shell).
 export {
   assignCivilianModel,
+  // Hero boxy-SUV population caps — the shipped ≤2 and the tier-`low` 0
+  // (doc 82 §2.3). TrafficLayer picks between them from the render tier.
+  BOXY_MAX_INSTANCES,
+  BOXY_MAX_INSTANCES_LOW,
   // Quadruped hazard rig (doc 72 §HZ „животно на пътя"): ScenarioObstacles
   // mounts the SAME geometry TrafficLayer renders, so the animal can stand as
   // held scenery (sc-animal-hazard) instead of a recorder-less dart trigger.

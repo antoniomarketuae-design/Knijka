@@ -39,6 +39,9 @@
  * the metres one UV unit spans on the consuming meshes (`uvMetresPerUnit`) —
  * the repeat is COMPUTED, so swapping textures can never silently break
  * world scale again (the old hand-tuned repeats had grass ~2x stretched).
+ * The road group is the one deliberate exception and says so at its entry: it
+ * declares ROAD_TILE_SPAN_M, the metres a tile is SAMPLED at, because doc 82
+ * F4 halves that below the (itself assumed) photo size to buy optic flow.
  *
  * aoMap channel: in three r0.185 Texture.channel defaults to 0, which maps to
  * the geometry's `uv` attribute — the SAME UVs the colour/normal/roughness
@@ -57,6 +60,7 @@
 import { useEffect, useState } from "react";
 import * as THREE from "three";
 import { KTX2Loader } from "three/examples/jsm/loaders/KTX2Loader.js";
+import { ROAD_TILE_SPAN_M } from "./groundScale";
 import { groundFetchPlan, type GroundMapName, type GroundMapsMode } from "./textureBudget";
 
 export type PbrGroup = "road" | "sidewalk" | "ground";
@@ -84,14 +88,18 @@ interface GroupConfig {
 
 const GROUPS: Record<PbrGroup, GroupConfig> = {
   // Asphalt031 (ambientCG) publishes NO physical size (API dimension 0) —
-  // adopt doc 71 §4.4's ruling for road-asphalt photo tiles: 3 m. Road and
-  // junction UVs are planar metres/7, so repeat = 7/3 ≈ 2.33 (a full tile
-  // every 3 m of road). Was hand-tuned [2,2] = tiles every 3.5 m (~17%
-  // oversized aggregate).
+  // doc 71 §4.4 ruled 3 m for road-asphalt photo tiles, and doc 82 F4 halves
+  // that to ROAD_TILE_SPAN_M = 1.5 m to double the near-field optic flow.
+  // Road and junction UVs are planar metres/7, so repeat = 7/1.5 ≈ 4.67 (a
+  // full tile every 1.5 m of road). Nothing about the swap is hand-tuned —
+  // the whole point of the computed repeat is that the density lives in ONE
+  // number and the builders never have to know.
   road: {
     dir: "road",
     hasAo: true,
-    realWorldSizeM: [3, 3],
+    // Shared with markingWear.ts through groundScale.ts — the paint borrows
+    // these maps and tiles them in world XZ, so the two must never drift.
+    realWorldSizeM: [ROAD_TILE_SPAN_M, ROAD_TILE_SPAN_M],
     uvMetresPerUnit: [7, 7],
   },
   // Concrete034 (ambientCG API): the photographed patch is 1.10 x 0.55 m.

@@ -238,7 +238,7 @@
       "tracePath": "content/traces/sc-junction-stop/mistake-rolling-stop.trace.json",
       "src": "/clips/sc-junction-stop__m0.webm",
       "durationSec": 14,
-      "recordedAt": "2026-07-21T11:38:53.777Z",
+      "recordedAt": "2026-07-26T04:59:38.493Z",
       "titleBg": "Търкалящо спиране",
       "keyframes": [
         "/clips/sc-junction-stop__m0.k0.webp",
@@ -289,7 +289,7 @@
       "tracePath": "content/traces/sc-lane-control-signal/mistake-closed-lane.trace.json",
       "src": "/clips/sc-lane-control-signal__m0.webm",
       "durationSec": 10,
-      "recordedAt": "2026-07-22T09:51:24.461Z",
+      "recordedAt": "2026-07-26T04:09:42.615Z",
       "titleBg": "Навлизане в затворената лента (червен X)",
       "keyframes": [
         "/clips/sc-lane-control-signal__m0.k0.webp",
@@ -981,7 +981,7 @@
       "tracePath": "content/traces/sc-zebra-approach/mistake-too-fast.trace.json",
       "src": "/clips/sc-zebra-approach__m0.webm",
       "durationSec": 11.07,
-      "recordedAt": "2026-07-21T11:56:31.305Z",
+      "recordedAt": "2026-07-26T05:00:46.863Z",
       "titleBg": "Твърде бързо приближаване",
       "keyframes": [
         "/clips/sc-zebra-approach__m0.k0.webp",

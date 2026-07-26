@@ -94,11 +94,23 @@ export const PARKING_LANE_Y = ROAD_Y + 0.006;
 export const WHEEL_TRACK_OFFSET_M = 0.9;
 /** Half-width of one darkened wheel band (full band ~1.1 m, soft edges). */
 export const WHEEL_TRACK_BAND_HALF_M = 0.55;
-/** Luminance multiplier at the centre of a wheel band (subtle: ×0.82). */
-export const WHEEL_TRACK_TINT = 0.82;
+/**
+ * Luminance multiplier at the centre of a wheel band. 0.82 → 0.72 (doc 82
+ * V4 „lift the baked wheel-track wear"): at ×0.82 the groove was ~1.5 sRGB
+ * steps of separation once the asphalt map, the macro noise and AgX had all
+ * had their say — measurable in the buffer, invisible on screen. ×0.72 is
+ * still well short of a painted stripe (a real polished wheel track runs
+ * ×0.6–0.75 against fresh asphalt) but finally reads as a groove at the
+ * 20–60 m the cockpit camera actually looks at, which is what tells the eye
+ * where the lane's traffic runs. Free: it is a vertex colour on geometry
+ * that already carries the attribute.
+ */
+export const WHEEL_TRACK_TINT = 0.72;
 /** Gutter grime band against the outer ribbon edges (dirt collects there). */
 export const GUTTER_BAND_M = 0.45;
-export const GUTTER_TINT = 0.86;
+/** Lifted with the wheel tracks (0.86 → 0.80) so the carriageway edge keeps
+ *  reading dirtier than the lane it borders after the track dips deepened. */
+export const GUTTER_TINT = 0.8;
 /** AO-ish tint at the curb-face foot (grime shadow where asphalt meets curb). */
 export const CURB_FOOT_TINT = 0.78;
 /** Slight grime on the sidewalk's outer skirt (grounds it against terrain). */
@@ -106,14 +118,80 @@ export const SIDEWALK_SKIRT_TINT = 0.9;
 
 // --- batched road decals (doc 71 §4.4 — ONE quad batch, ONE draw call) ------
 
-/** Average spacing: ~one decal per 40 m of ribbon centreline. */
-export const ROAD_DECAL_SPACING_M = 40;
-/** Decals keep clear of ribbon ends (junction paint: stop lines sit at the
- *  cut + 0.6 m, zebras hug the mouth — doc 71 "avoid junction paint"). */
-export const ROAD_DECAL_END_INSET_M = 6;
+/**
+ * Average spacing: ~one decal per 10 m of ribbon centreline (doc 82 V4, was
+ * 40 m). On a perceptually-scaled 8.125 m lane, 40 m spacing is one blob per
+ * ~325 m² — the six authored atlas cells were statistically invisible and the
+ * carriageway read as a clean slab. 10 m lands ~one per 80 m², which is what
+ * a real Sofia street carries. It costs nothing in draws: every decal is a
+ * quad in the SAME batch sharing the SAME atlas, so this trades ~6 k
+ * triangles on the city map for the whole surface-wear system actually being
+ * seen.
+ */
+export const ROAD_DECAL_SPACING_M = 10;
+/**
+ * Decals keep clear of ribbon ends (junction paint: stop lines sit at the
+ * cut + 0.6 m, zebras hug the mouth — doc 71 "avoid junction paint").
+ *
+ * 6 m → 1.5 m (doc 82 V4). The 6 m skirt was a full car length at both ends
+ * of every ribbon AND the junction patches got nothing at all, so the most
+ * driven, most worn part of the network — a 2.5×-scaled 4-way is ~1,600 m²
+ * of asphalt — was the cleanest surface in the world. Junction interiors are
+ * now dressed by their own pass (buildJunctionDecals below); this inset only
+ * has to keep the mouth PAINT legible, and 1.5 m does that.
+ *
+ * It is a clearance for the decal's EDGE, not its centre. Applying 1.5 m to
+ * the centre was the P2 defect: the biggest atlas cells are 5.0 m across
+ * (half-extent 2.5 m) and `patch` is rotated to the ribbon axis, so a centre
+ * at s = 1.5 m spanned −1.0…+4.0 m — over the approach cut, over the stop
+ * line at cut + STOP_LINE_BEYOND_CUT_M, and with the overhang 3 mm ABOVE the
+ * junction patch it lands on. decals.ts therefore adds each cell's own
+ * along-ribbon half-extent to this constant (`alongRibbonHalf`).
+ */
+export const ROAD_DECAL_END_INSET_M = 1.5;
+/**
+ * Clearance kept between ANY decal quad and ANY painted marking polygon
+ * (decals.ts MarkingKeepOut). Grime on asphalt is the point of the wear
+ * system; grime UNDER a zebra bar, a stop line or a lane dash reads as a bug
+ * and costs marking legibility — and the rule engine grades the student on
+ * seeing exactly those markings, so paint wins every tie.
+ *
+ * 0.25 m is one dash-width of breathing room: enough that the paint edge stays
+ * crisp at the 20–60 m the cockpit camera reads, small enough that wear still
+ * runs right up beside the lane lines where real traffic polishes it.
+ */
+export const DECAL_MARKING_CLEARANCE_M = 0.25;
+/**
+ * How many times a decal slot re-draws (cell, size, position, rotation) before
+ * it is abandoned. Without retries the marking keep-out would simply delete
+ * every decal near paint, which on a 4-lane arterial is most of the
+ * carriageway — the density doc 82 V4 exists to deliver. With retries the slot
+ * usually resolves to a smaller cell tucked between the dashes instead, so the
+ * keep-out costs coverage only where the paint really is that dense.
+ */
+export const DECAL_PLACEMENT_ATTEMPTS = 6;
 /** Decals are EXACTLY co-planar with the asphalt (polygonOffset resolves the
  *  depth tie at render time — never Y-lift, doc 71 §4.4). */
 export const ROAD_DECAL_Y = ROAD_Y;
+/**
+ * Junction decals are co-planar with the JUNCTION patch, which sits 3 mm
+ * BELOW the ribbons (JUNCTION_Y) — same rule, different plane. Lifting them
+ * to ROAD_DECAL_Y instead would put a 3 mm quad over a 4 m footprint, and at
+ * the ~1.4° elevation a cockpit camera sees 50 m of road at, 3 mm of lift
+ * shears the decal ~12 cm off the crack it is drawn on.
+ */
+export const JUNCTION_DECAL_Y = JUNCTION_Y;
+/**
+ * Junction wear budget: ~one decal per this many m² of approach-mouth area.
+ * Deliberately denser than the ribbons' ~80 m² — junctions ARE more worn
+ * (braking, turning scrub, utility trench cuts, ironwork, idling drips) —
+ * but not so dense that a 2-lane residential T turns into a rubbish tip: at
+ * 120 m² a small T mouth earns one decal and a 4-lane arterial mouth four.
+ */
+export const JUNCTION_DECAL_AREA_M2 = 120;
+/** Hard cap per approach mouth, so an oversized `radius` cannot flood one
+ *  junction with quads. 4 × 4 approaches = 16 decals in the worst case. */
+export const JUNCTION_DECAL_MAX_PER_APPROACH = 4;
 
 /** Marking paint dimensions (М-series, stylized). Scaled with the road —
  * textbook paint on an 8 m lane reads like thread (perceptual road scale). */
@@ -186,7 +264,7 @@ export const FACADE_VARIANTS = 4;
 /** Road classes that receive painted lane lines. `motorway`/`trunk` are marked
  *  (lane dividers on a motorway carriageway) but deliberately absent from
  *  ARTERIAL_CLASSES, PARKING_LANE_CLASSES and SIDEWALK_CLASSES below — a
- *  motorway carries no arterial parking band, palms, streetlights or sidewalks
+ *  motorway carries no arterial parking band, street trees, streetlights or sidewalks
  *  (gen_motorway.mjs mw-v1; founder R-media #7/#8). */
 export const MARKED_CLASSES: ReadonlySet<string> = new Set([
   "motorway",
@@ -261,9 +339,13 @@ export const PARK_TREE_GRID_M = 18;
 
 /** Leafy-tree row spacing along arterial streets (REF 3's tree-lined roads). */
 export const ARTERIAL_TREE_SPACING_M = 26;
-/** How many primary-class streets (grouped by name, longest first) get palms
- *  instead of leafy rows — the premium/waterfront-flavored boulevards. */
-export const PALM_STREET_COUNT = 2;
+/** How many primary-class streets (grouped by name, longest first) are planted
+ *  as LINDEN BOULEVARDS — one uniform species end to end instead of the mixed
+ *  leafy row. That is exactly how Sofia's main streets read (a boulevard is
+ *  planted as a single-species avenue: липа, кестен, топола), and it keeps the
+ *  "the big boulevard looks deliberately landscaped" flourish this constant was
+ *  introduced for — with a tree that survives a Sofia winter. */
+export const LINDEN_BOULEVARD_COUNT = 2;
 /** Minimum distance between roadside billboards (sparse: one per ~150–200 m). */
 export const BILLBOARD_MIN_SPACING_M = 150;
 /** Billboards keep clear of the junction mouth by at least this much. */

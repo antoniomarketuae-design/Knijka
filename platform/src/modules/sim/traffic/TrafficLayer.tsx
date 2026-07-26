@@ -84,6 +84,8 @@ import {
 import type { TrafficDistrict, TrafficSystem, TrafficUpdateContext } from "./types";
 import {
   assignCivilianModel,
+  BOXY_MAX_INSTANCES,
+  BOXY_MAX_INSTANCES_LOW,
   buildAnimalRig,
   buildTrafficFleet,
   disposeTrafficFleet,
@@ -408,6 +410,13 @@ export interface TrafficLayerProps {
    *  full look; LessonScene passes `level === "high"`. */
   clearcoat?: boolean;
   /**
+   * Drop the 22,672-triangle / 16-material hero boxy SUV from the moving pool
+   * entirely (doc 82 §2.3). LessonScene passes `level === "low"`. Default
+   * false = the shipped ≤2-instance cap. Overflow already becomes a kolos, so
+   * the vehicle population, ids, lanes and speeds are byte-identical either
+   * way — only the GLB drawn for those picks changes. */
+  dropHeavyFleetModels?: boolean;
+  /**
    * JU-18 officer-figure schedule channel — pass the world runtime (its
    * `signalControllerFigure` is the SAME schedule + clock the stop-line
    * adjudication reads, so the figure never runs a second clock). With a
@@ -433,6 +442,7 @@ export function TrafficLayer({
   hazard = null,
   hazardActiveRef,
   clearcoat = true,
+  dropHeavyFleetModels = false,
   controllerFigure = null,
 }: TrafficLayerProps) {
   const nVeh = system.vehicles.length;
@@ -501,9 +511,14 @@ export function TrafficLayer({
         gltfs.map((g) => g.scene),
         system.vehicles,
         parked.map((p) => ({ model: p.model, seed: p.seed })),
-        { clearcoat },
+        {
+          clearcoat,
+          boxyMaxInstances: dropHeavyFleetModels
+            ? BOXY_MAX_INSTANCES_LOW
+            : BOXY_MAX_INSTANCES,
+        },
       ),
-    [gltfs, system, parked, clearcoat],
+    [gltfs, system, parked, clearcoat, dropHeavyFleetModels],
   );
   useEffect(() => () => disposeTrafficFleet(fleet), [fleet]);
   // Parked-car blob shadows (static, placed with the parked pass).

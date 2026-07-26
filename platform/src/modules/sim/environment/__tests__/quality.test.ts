@@ -4,6 +4,9 @@ import {
   QUALITY_PRESETS,
   medianFpsFromDeltas,
   recommendQuality,
+  seedQualityFromSignals,
+  unknownDeviceSignals,
+  type DeviceSignals,
 } from "../quality";
 
 describe("QUALITY_PRESETS", () => {
@@ -118,6 +121,80 @@ describe("medianFpsFromDeltas", () => {
   });
 });
 
+/** A mid-range Android as the browser reports it: touch-only, HiDPI, 4 GB. */
+function phone(over: Partial<DeviceSignals> = {}): DeviceSignals {
+  return {
+    coarsePointer: true,
+    anyFinePointer: false,
+    deviceMemoryGb: 4,
+    hardwareConcurrency: 8, // the A16's Helio G99 is 2×A76 + 6×A55
+    dpr: 2.625,
+    ...over,
+  };
+}
+
+/** A laptop as the browser reports it: fine pointer, 8 GB (Chrome's cap). */
+function laptop(over: Partial<DeviceSignals> = {}): DeviceSignals {
+  return {
+    coarsePointer: false,
+    anyFinePointer: true,
+    deviceMemoryGb: 8,
+    hardwareConcurrency: 8,
+    dpr: 1,
+    ...over,
+  };
+}
+
+describe("seedQualityFromSignals", () => {
+  it("seeds the Galaxy A16 reference device to low", () => {
+    // The whole point of doc 82 §2.3 fix 2: this decision has to be reachable
+    // BEFORE the first fetch, because `low` is a download tier (725,950 B)
+    // and `med` is a 5,950,303 B one.
+    expect(seedQualityFromSignals(phone())).toBe("low");
+  });
+
+  it("catches a phone even when only ONE phone signal is legible", () => {
+    // Firefox Android: no deviceMemory. Still a phone.
+    expect(seedQualityFromSignals(phone({ deviceMemoryGb: null }))).toBe("low");
+    // A dpr-1.5 tablet with 4 GB — the panel alone would not convict it.
+    expect(seedQualityFromSignals(phone({ dpr: 1.5, hardwareConcurrency: null }))).toBe("low");
+    // Two big cores, whatever else it claims.
+    expect(
+      seedQualityFromSignals(phone({ dpr: 1, deviceMemoryGb: null, hardwareConcurrency: 4 })),
+    ).toBe("low");
+  });
+
+  it("never seeds a pointing device down — a wrong low does not self-correct", () => {
+    expect(seedQualityFromSignals(laptop())).toBe("med");
+    // A 4 GB / 4-thread laptop is weak, but it has a trackpad and the FPS
+    // probe is not mounted on the shipped path, so a `low` seed would stick
+    // forever. The graphics selector is the remedy there, not a guess.
+    expect(
+      seedQualityFromSignals(laptop({ deviceMemoryGb: 4, hardwareConcurrency: 4 })),
+    ).toBe("med");
+    // A touch laptop still reports a fine pointer somewhere.
+    expect(seedQualityFromSignals(laptop({ coarsePointer: true }))).toBe("med");
+  });
+
+  it("still refuses ultra-dense panels and 2 GB devices outright", () => {
+    expect(seedQualityFromSignals(laptop({ dpr: 3 }))).toBe("low");
+    // 2 GB total: Chromium on Android caps a WASM heap at 256 MB (§2.1), so
+    // this is not a tier choice, it is a context-loss forecast.
+    expect(seedQualityFromSignals(laptop({ deviceMemoryGb: 2 }))).toBe("low");
+  });
+
+  it("falls back to med when the browser exposes nothing", () => {
+    expect(seedQualityFromSignals(unknownDeviceSignals(1))).toBe("med");
+    expect(seedQualityFromSignals(unknownDeviceSignals(1.5))).toBe("med");
+    expect(seedQualityFromSignals(unknownDeviceSignals(3))).toBe("low");
+  });
+
+  it("never seeds high — a cold start has no evidence of headroom", () => {
+    const beefy = laptop({ deviceMemoryGb: 8, hardwareConcurrency: 32, dpr: 1 });
+    expect(seedQualityFromSignals(beefy)).toBe("med");
+  });
+});
+
 describe("recommendQuality", () => {
   it("keeps the current level when the probe produced no evidence", () => {
     for (const level of ["low", "med", "high"] as const) {
@@ -126,9 +203,29 @@ describe("recommendQuality", () => {
   });
 
   it("cold-start guess is med, or low on ultra-dense screens", () => {
+    // Unchanged with no device evidence: dpr alone still decides. doc 82 §8
+    // expected this row to need updating — it does not, because the seed
+    // reduces to exactly the shipped rule when every other signal is unknown.
     expect(recommendQuality({ dpr: 1, fpsMedian: null })).toBe("med");
     expect(recommendQuality({ dpr: 2, fpsMedian: null })).toBe("med");
     expect(recommendQuality({ dpr: 3, fpsMedian: null })).toBe("low");
+  });
+
+  it("defers the cold start to the device seed when signals are supplied", () => {
+    // A dpr-2 panel that is ALSO touch-only is a phone, and now reads as one —
+    // the case the dpr-only rule above got wrong.
+    expect(
+      recommendQuality({ dpr: 2, fpsMedian: null, signals: phone({ dpr: 2 }) }),
+    ).toBe("low");
+    // With an fps median the signals are irrelevant: measurement beats guess.
+    expect(
+      recommendQuality({
+        dpr: 2,
+        fpsMedian: 60,
+        currentLevel: "low",
+        signals: phone({ dpr: 2 }),
+      }),
+    ).toBe("med");
   });
 
   it("steps up exactly one level with clear headroom", () => {

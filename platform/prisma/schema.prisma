@@ -27,6 +27,7 @@ model User {
   examAttempts     ExamAttempt[]
   simSessions      SimSession[]
   simTraces        SimAttemptTrace[]
+  simPredictions   SimSelfPrediction[]
   entitlements     Entitlement[]
   gamification     GamificationState?
   tutorThreads     TutorThread[]
@@ -151,8 +152,9 @@ model SimSession {
   events     Json? // rule-engine event log (drives replay + debrief)
   debrief    String? // AI lesson debrief text
 
-  user  User             @relation(fields: [userId], references: [id], onDelete: Cascade)
-  trace SimAttemptTrace?
+  user       User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  trace      SimAttemptTrace?
+  prediction SimSelfPrediction?
 
   @@index([userId, lessonId])
 }
@@ -183,6 +185,43 @@ model SimAttemptTrace {
   durationSec  Float // denormalised so a list never inflates a blob
   sampleCount  Int
   gz           Bytes
+
+  session SimSession @relation(fields: [simSessionId], references: [id], onDelete: Cascade)
+  user    User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, recordedAt])
+}
+
+// „Позна ли се?" — the self-assessment calibration gate (doc 82 §5.3 I1).
+//
+// Before the debrief unlocks, the student predicts their own official result;
+// this row is that prediction paired with what the rule engine actually
+// scored. Novice overestimation is a documented crash mechanism and only
+// 25–50% of licence candidates self-assess realistically — and this product is
+// one of the very few that CAN measure it, because it owns an objective
+// official-format score for the student to be wrong about.
+//
+// Its own table rather than two columns on SimSession, for the same reason
+// SimAttemptTrace is one: SimSession is read on every history screen and
+// progression fold, and none of them care about calibration. It also keeps the
+// write path out of the sim module — the graded row is never touched again.
+//
+// The ACTUALS are copied in, not joined. A calibration record is evidence of
+// what a student believed at a moment; a later detector fix or catalog
+// re-point must not silently rewrite history they already read. Same reasoning
+// as ExamOutcomeReport's frozen readinessScore.
+//
+// ADR-004: two small integers and two booleans about a fictional drive — no
+// PII. Dies with the session AND with the user (both ON DELETE CASCADE).
+model SimSelfPrediction {
+  simSessionId    String   @id
+  userId          String
+  lessonId        String
+  predictedPoints Int // official penalty points the student expected
+  predictedPass   Boolean
+  actualPoints    Int // what the engine scored, frozen at prediction time
+  actualPass      Boolean
+  recordedAt      DateTime @default(now())
 
   session SimSession @relation(fields: [simSessionId], references: [id], onDelete: Cascade)
   user    User       @relation(fields: [userId], references: [id], onDelete: Cascade)

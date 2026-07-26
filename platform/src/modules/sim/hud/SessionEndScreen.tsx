@@ -25,7 +25,7 @@
  */
 
 import Link from "next/link";
-import { useMemo, useRef, useState } from "react";
+import { useMemo, useRef, useState, type ReactNode } from "react";
 import { VIOLATIONS, type FailReason, type ViolationCode } from "../rules";
 import {
   REACTION_BAND_LABELS_BG,
@@ -173,6 +173,9 @@ export function SessionEndScreen({
   nextScenarioLevel = null,
   nextScenarioTemplate = null,
   catalogCompleteBg = null,
+  calibrationGate = null,
+  calibrationLocked = false,
+  myDriveHref = null,
 }: {
   lessonTitleBg: string;
   result: LessonResult;
@@ -221,6 +224,27 @@ export function SessionEndScreen({
   nextScenarioTemplate?: SessionEndScenarioTarget | null;
   /** End of the scenario library: a closing line instead of a dead button. */
   catalogCompleteBg?: string | null;
+  /**
+   * I1 „Позна ли се?" (doc 82 §5.3): the self-assessment calibration gate,
+   * passed in as an opaque slot. A SLOT and not a prop bundle on purpose —
+   * the gate talks to the learning module and a server action, and this screen
+   * is the sim module's; keeping it a ReactNode means no new cross-module edge
+   * for a widget the owner already renders.
+   */
+  calibrationGate?: ReactNode;
+  /**
+   * While true this screen renders ONLY the gate. The score, the mistake map,
+   * the mistake list and the debrief must all stay UNMOUNTED — a student who
+   * can already read „0 точки" is not predicting anything, and the calibration
+   * error would measure nothing at all.
+   */
+  calibrationLocked?: boolean;
+  /**
+   * I2 „Твоят дубъл" (doc 82 §5.3): deep link to the replay of THIS drive.
+   * null when the session did not persist a trace — there is nothing to watch,
+   * and a dead link on the result screen is worse than no link.
+   */
+  myDriveHref?: string | null;
 }) {
   const { summary } = result;
   const score = summary.score;
@@ -273,6 +297,16 @@ export function SessionEndScreen({
     { label: "Основни грешки", per: "3 т.", count: score.osnovniCount, points: score.osnovniPoints, tone: "var(--warning)" },
     { label: "Второстепенни грешки", per: "1 т.", count: score.vtorostepenniCount, points: score.vtorostepenniPoints, tone: "var(--accent-soft)" },
   ];
+
+  // I1: the gate holds the whole screen back. Nothing below this line renders
+  // until the student has predicted (or skipped) — see calibrationLocked.
+  if (calibrationLocked && calibrationGate !== null) {
+    return (
+      <div className="flex max-h-full w-full max-w-2xl flex-col gap-4 overflow-y-auto p-1">
+        {calibrationGate}
+      </div>
+    );
+  }
 
   return (
     <div className="flex max-h-full w-full max-w-2xl flex-col gap-4 overflow-y-auto p-1">
@@ -691,6 +725,13 @@ export function SessionEndScreen({
               Следващ урок: заключен
             </span>
           )
+        ) : null}
+        {/* I2: the drive is already recorded and stored — this is the only
+            place a student would think to look for it. */}
+        {myDriveHref !== null ? (
+          <Link href={myDriveHref} className="btn-ghost">
+            Виж своя дубъл
+          </Link>
         ) : null}
         <button type="button" className="btn-ghost ml-auto" onClick={onExit}>
           Назад към таблото

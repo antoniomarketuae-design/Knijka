@@ -14,8 +14,16 @@ import {
   sirenLevel,
   tyreCutoffHz,
   tyreLevel,
+  tyreScrubCutoffHz,
+  tyreScrubLevel,
   windLevel,
   wiperEnvelope,
+  LAYER_GAIN,
+  SCRUB_FULL_UTIL,
+  SCRUB_LP_MAX_HZ,
+  SCRUB_LP_MIN_HZ,
+  SCRUB_MIN_KMH,
+  SCRUB_START_UTIL,
 } from "./simAudio";
 
 describe("tyreLevel (the #1 speed cue)", () => {
@@ -81,6 +89,51 @@ describe("brakeHissLevel", () => {
 
   it("clamps a wild pedal value", () => {
     expect(brakeHissLevel(3, 60)).toBe(1);
+  });
+});
+
+describe("tyreScrubLevel (F1 — the grip-loss cue)", () => {
+  it("is silent through all ordinary driving", () => {
+    // If the tyres complain at 0.6 utilisation the cue means nothing, which
+    // is worse than having no cue at all.
+    expect(tyreScrubLevel(0, 60)).toBe(0);
+    expect(tyreScrubLevel(0.6, 60)).toBe(0);
+    expect(tyreScrubLevel(SCRUB_START_UTIL, 60)).toBe(0);
+  });
+
+  it("rises from the scrub threshold to full screech past the limit", () => {
+    expect(tyreScrubLevel(0.95, 60)).toBeGreaterThan(0);
+    expect(tyreScrubLevel(1.05, 60)).toBeGreaterThan(tyreScrubLevel(0.95, 60));
+    expect(tyreScrubLevel(SCRUB_FULL_UTIL, 60)).toBe(1);
+    expect(tyreScrubLevel(2, 60)).toBe(1);
+  });
+
+  it("is silent in the parking band however the utilisation reads", () => {
+    // Below walking pace the measured accelerations are raycast noise, and a
+    // squealing parking manoeuvre would be a lie.
+    expect(tyreScrubLevel(1.5, 0)).toBe(0);
+    expect(tyreScrubLevel(1.5, SCRUB_MIN_KMH - 1)).toBe(0);
+    expect(tyreScrubLevel(1.5, SCRUB_MIN_KMH + 1)).toBeGreaterThan(0);
+  });
+
+  it("uses absolute speed (reversing into a slide still protests)", () => {
+    expect(tyreScrubLevel(1, -40)).toBe(tyreScrubLevel(1, 40));
+  });
+
+  it("survives a non-finite utilisation", () => {
+    expect(tyreScrubLevel(Number.NaN, 60)).toBe(0);
+  });
+
+  it("stays quieter than the tyre bed — a school, not a racing game", () => {
+    expect(LAYER_GAIN.scrub).toBeLessThan(LAYER_GAIN.tyre);
+  });
+});
+
+describe("tyreScrubCutoffHz", () => {
+  it("opens a dull rubber scrub into a bright screech", () => {
+    expect(tyreScrubCutoffHz(0)).toBe(SCRUB_LP_MIN_HZ);
+    expect(tyreScrubCutoffHz(1)).toBe(SCRUB_LP_MAX_HZ);
+    expect(tyreScrubCutoffHz(0.5)).toBeCloseTo((SCRUB_LP_MIN_HZ + SCRUB_LP_MAX_HZ) / 2);
   });
 });
 

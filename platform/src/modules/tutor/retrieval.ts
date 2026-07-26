@@ -10,7 +10,7 @@
  *
  * TWO corpora feed the same prompt (audit I-1):
  *  1. the ContentRepo — concepts, exam questions, road signs;
- *  2. the sim rule catalog — the 46 authored violation specs the rule engine
+ *  2. the sim rule catalog — the 52 authored violation specs the rule engine
  *     grades with (see the second section below).
  */
 
@@ -190,9 +190,9 @@ export const MAX_RETRIEVED_RULES = 2;
 
 /**
  * A single fuzzy prefix hit (0.7) is not enough evidence here. The catalog is
- * a small, broad-brush corpus — 46 entries covering the whole of driving — so
- * a weak match on one inflected word would let almost any question drag in a
- * rule. One full token's worth of overlap is the floor.
+ * a small, broad-brush corpus — 52 violation entries covering the whole of
+ * driving — so a weak match on one inflected word would let almost any
+ * question drag in a rule. One full token's worth of overlap is the floor.
  */
 const RULE_MIN_SCORE = EXACT_MATCH;
 
@@ -235,7 +235,7 @@ interface RuleCandidate extends Candidate {
   /**
    * The text the SCORER sees. The severity/points line that heads the display
    * body is deliberately left out of it: that line is near-identical across
-   * all 46 entries, so scoring it would give every rule a free match on
+   * every entry, so scoring it would give every rule a free match on
    * "грешка"/"точки" and let a vague question pull in two arbitrary rules.
    */
   searchBodyBg: string;
@@ -303,4 +303,40 @@ export function retrieveGrounding(
     ...retrieveMaterials(repo, question),
     ...retrieveRuleMaterials(question),
   ];
+}
+
+/**
+ * Grounding for one turn OF A CONVERSATION (doc 81 §1.4, D2).
+ *
+ * „А защо?" — the second thing a Bulgarian teenager says in almost every
+ * exchange — tokenizes to NOTHING: „а" and „защо" are both function words in
+ * STOPWORDS_BG. Retrieval returned [], the prompt said „(няма намерени
+ * материали по този въпрос)", and rule 2 of the system prompt then FORCED the
+ * refusal „Нямам материал за това". The tutor refused the most natural
+ * follow-up there is, deterministically, on nearly every conversation.
+ *
+ * The repair is deliberately narrow. The previous question is folded in ONLY
+ * when the current one carries no retrievable token at all — i.e. when it is
+ * pure conversational glue that can only mean „about what we were just
+ * discussing". A question that HAS content tokens and still matches nothing is
+ * a genuinely new topic our corpora do not cover, and it must keep refusing:
+ * widening the fallback there would let the previous topic's materials sit
+ * under an answer they do not support, which is exactly the ADR-002 failure
+ * this whole layer exists to prevent.
+ *
+ * Only the student's own previous QUESTION is reused, never the tutor's
+ * answer. Model output must never get a vote in what counts as grounding.
+ */
+export function retrieveGroundingForTurn(
+  repo: ContentRepo,
+  question: string,
+  previousQuestionBg?: string | null,
+): RetrievedItem[] {
+  if (tokenizeBg(question).length > 0 || !previousQuestionBg) {
+    return retrieveGrounding(repo, question);
+  }
+  // The follow-up still joins the query: it contributes no tokens today, but
+  // it is what the student actually asked, and a future stopword edit must not
+  // silently turn this into "retrieve the previous question" instead.
+  return retrieveGrounding(repo, `${previousQuestionBg} ${question}`);
 }

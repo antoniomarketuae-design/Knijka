@@ -203,14 +203,103 @@ function stepDown(level: QualityLevel): QualityLevel {
   return ORDER[Math.max(ORDER.indexOf(level) - 1, 0)];
 }
 
+// ---------------------------------------------------------------------------
+// Cold-start device seeding (doc 82 §2.3 fix 2)
+// ---------------------------------------------------------------------------
+
+/**
+ * The device facts a cold start can read SYNCHRONOUSLY, before a single byte
+ * of the simulator is requested. Collected by the DOM side
+ * (qualityStore.readDeviceSignals); kept as a plain record so the ruling below
+ * is a pure function unit-tested in Node.
+ *
+ * `null` means "this browser does not expose it" — never a guessed value. The
+ * ruling must degrade to the shipped "med" cold start when nothing is known,
+ * or a Firefox user (no `deviceMemory`) would be graded by absence.
+ */
+export interface DeviceSignals {
+  /** `matchMedia("(pointer: coarse)")` — the PRIMARY pointer is a fingertip. */
+  coarsePointer: boolean | null;
+  /** `matchMedia("(any-pointer: fine)")` — a mouse/trackpad/stylus exists at all. */
+  anyFinePointer: boolean | null;
+  /** `navigator.deviceMemory`, GiB. Chromium-only, clamped to 0.25–8. */
+  deviceMemoryGb: number | null;
+  /** `navigator.hardwareConcurrency` — logical cores. */
+  hardwareConcurrency: number | null;
+  /** `window.devicePixelRatio`. */
+  dpr: number;
+}
+
+/** Signals with nothing known but the pixel ratio — the pre-seeding behaviour. */
+export function unknownDeviceSignals(dpr: number): DeviceSignals {
+  return {
+    coarsePointer: null,
+    anyFinePointer: null,
+    deviceMemoryGb: null,
+    hardwareConcurrency: null,
+    dpr,
+  };
+}
+
+/**
+ * The COLD-START tier, decided from device signals before the first fetch.
+ *
+ * Why this exists at all (doc 82 §2.3): the `low` preset is not only a render
+ * tier — `TEXTURE_BUDGETS` (sim/world) makes it a DOWNLOAD tier that fetches
+ * 725,950 B instead of the med plan's 5,950,303 B (incl. a 1,596,163 B HDR).
+ * That 5.4 MB saving is worth nothing if the tier is decided after the fetch
+ * has already been issued, so this ruling has to be synchronous and has to run
+ * before anything mounts.
+ *
+ * WHY IT IS DELIBERATELY NARROW. The doc asks to "bias toward low on
+ * disagreement", and inside the touch-only family it does. But a seed that
+ * guesses `low` for a desktop is not self-correcting today: `useAutoQualityProbe`
+ * is exported and never mounted (grep: no call site outside this module), so a
+ * wrong `low` sticks until the student opens the graphics selector. So the
+ * phone-class rules are all gated behind "touch-only" — a device whose primary
+ * pointer is coarse AND which reports no fine pointer anywhere. Every shipping
+ * phone matches that; a touch laptop with a trackpad does not.
+ *
+ * Rules, first match wins:
+ *  1. `dpr ≥ 3` → low. Unchanged from the shipped cold start: 9× the fill of
+ *     dpr 1, and the maxDpr cap cannot claw all of that back.
+ *  2. `deviceMemoryGb ≤ 2` → low, pointer irrespective. Chromium on Android
+ *     cannot grow a WASM heap past 256 MB (§2.1); at 2 GB total the med plan's
+ *     5.9 MB of maps plus Rapier is not a tier, it is a context-loss.
+ *  3. touch-only AND any one of: `dpr ≥ 2` (every modern phone panel),
+ *     `deviceMemoryGb ≤ 4` (the Galaxy A16 / Redmi Note reference device),
+ *     `hardwareConcurrency ≤ 4` → low.
+ *  4. otherwise → med, exactly as before.
+ *
+ * Never returns "high": a cold start has no evidence of headroom, only of its
+ * absence. Promotion stays the FPS probe's job.
+ */
+export function seedQualityFromSignals(signals: DeviceSignals): QualityLevel {
+  const { coarsePointer, anyFinePointer, deviceMemoryGb, hardwareConcurrency, dpr } = signals;
+  if (dpr >= 3) return "low";
+  if (deviceMemoryGb !== null && deviceMemoryGb <= 2) return "low";
+  const touchOnly = coarsePointer === true && anyFinePointer !== true;
+  if (
+    touchOnly &&
+    (dpr >= 2 ||
+      (deviceMemoryGb !== null && deviceMemoryGb <= 4) ||
+      (hardwareConcurrency !== null && hardwareConcurrency <= 4))
+  ) {
+    return "low";
+  }
+  return "med";
+}
+
 /**
  * The "auto" heuristic.
  *
  * - No fps evidence (`fpsMedian` null):
  *   - with a `currentLevel` (probe ran but collected too few frames — hidden
  *     tab etc.): keep the current level, change nothing;
- *   - without one (cold start): guess "med", except ultra-dense screens
- *     (dpr ≥ 3, phone-class panels paying 9× the fill of dpr 1) start "low".
+ *   - without one (cold start): defer to `seedQualityFromSignals`. Pass
+ *     `signals` to give it the pointer/memory/core evidence; with only a `dpr`
+ *     the seed reduces to the shipped rule (med, or low at dpr ≥ 3), which is
+ *     why every existing caller keeps its answer.
  * - With an fps median measured *at* `currentLevel`:
  *   - ≥ 57 fps: headroom → step up one level (never more than one per probe);
  *   - ≥ 48 fps: holding target → stay;
@@ -221,11 +310,13 @@ export function recommendQuality(input: {
   dpr: number;
   fpsMedian: number | null;
   currentLevel?: QualityLevel;
+  /** Cold-start device evidence (doc 82 §2.3). Omit → dpr-only, as shipped. */
+  signals?: DeviceSignals;
 }): QualityLevel {
-  const { dpr, fpsMedian, currentLevel } = input;
+  const { dpr, fpsMedian, currentLevel, signals } = input;
   if (fpsMedian === null) {
     if (currentLevel) return currentLevel;
-    return dpr >= 3 ? "low" : "med";
+    return seedQualityFromSignals(signals ?? unknownDeviceSignals(dpr));
   }
   const current = currentLevel ?? "med";
   if (fpsMedian >= 57) return stepUp(current);

@@ -23,6 +23,9 @@
  *                    requireEntitlementForSimulator / checkTutorQuota — one
  *                    gate per paid row of the /pricing table, each wired at a
  *                    single server-side choke point (listed in quota.ts).
+ * - Paid tutor cap: checkTutorPackAllowance — what a pack buys in tutor
+ *                    questions (300), enforced inside askTutor. The one gate
+ *                    here that limits a PAYING user; doc 81 §5.3.
  * - Ops:            isStripeConfigured() — missing STRIPE_SECRET_KEY must
  *                    degrade (disabled buy buttons), never crash.
  *
@@ -76,10 +79,12 @@ export {
   requireEntitlementForExam,
   requireEntitlementForSimulator,
   checkTutorQuota,
+  checkTutorPackAllowance,
   sofiaDayRange,
   FREE_DAILY_PRACTICE_LIMIT,
   FREE_MOCK_EXAM_LIMIT,
   FREE_TUTOR_LIFETIME_MESSAGES,
+  TUTOR_PACK_QUESTION_ALLOWANCE,
 } from "./quota";
 
 // Stripe wiring
@@ -107,5 +112,6 @@ export type {
   EntitlementSummary,
   FulfillResult,
   PracticeQuota,
+  TutorPackAllowance,
   TutorQuota,
 } from "./types";

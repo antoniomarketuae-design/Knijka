@@ -19,7 +19,7 @@ import {
   TERRAIN_MAX_RELIEF_M,
   TERRAIN_PAVE_NEAR_BUILDING_M,
 } from "./constants";
-import { SegmentGrid, valueNoise2D, type Vec2 } from "./math2d";
+import { AabbGrid, SegmentGrid, valueNoise2D, type Vec2 } from "./math2d";
 import { MeshAccumulator } from "./mesh";
 import type { RoadNetwork } from "./network";
 
@@ -53,11 +53,12 @@ export function buildTerrain(
   const roadGrid = new SegmentGrid(24);
   for (const eb of network.edges) roadGrid.addPolyline(eb.edge.geometry as Vec2[]);
 
-  const nearBuilding = (p: Vec2, pad: number) =>
-    buildingAabbs.some(
-      ([x0, y0, x1, y1]) =>
-        p[0] > x0 - pad && p[0] < x1 + pad && p[1] > y0 - pad && p[1] < y1 + pad,
-    );
+  // Same predicate, bucketed: `segments²` cells × every footprint was linear,
+  // and doc 82 V7 multiplied the footprint count by ~380 on the city map
+  // (AabbGrid's header carries the measurement).
+  const buildingGrid = new AabbGrid(24);
+  for (const box of buildingAabbs) buildingGrid.add(box);
+  const nearBuilding = (p: Vec2, pad: number) => buildingGrid.hits(p, pad);
 
   const heightAt = (x: number, y: number): number => {
     const p: Vec2 = [x, y];

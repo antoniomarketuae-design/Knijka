@@ -1,13 +1,19 @@
 "use client";
 
-// Gradient sky dome + sun/moon disc + procedural stars. One draw call, a few
-// dozen ALU ops per sky pixel — cheaper and far more art-directable across
-// day/dusk/night than drei's <Sky> (a daytime scattering model). The dome
-// follows the camera so it can never be approached or clipped.
+// Gradient sky dome + sun/moon disc + procedural stars + an FBM cloud deck +
+// the Vitosha ridge. STILL one draw call and zero textures — cheaper and far
+// more art-directable across day/dusk/night than drei's <Sky> (a daytime
+// scattering model). The dome follows the camera so it can never be
+// approached or clipped.
 //
 // All uniforms are damped toward the active preset every frame (first frame
 // snaps), so time-of-day switches crossfade instead of popping; rain
-// desaturates the gradient and hides the stars via the shared weather channel.
+// desaturates the gradient, thickens the deck and hides the stars via the
+// shared weather channel.
+//
+// The shader source and the numbers it is generated from live in
+// ./skyShader.ts (three-free, so vitest checks the silhouette geometry and
+// the weather response in plain Node).
 
 import { useMemo, useRef } from "react";
 import { useFrame } from "@react-three/fiber";
@@ -21,6 +27,14 @@ import {
   type ShaderMaterialParameters,
 } from "three";
 import { ENVIRONMENT_PRESETS, sunDirection, type TimeOfDay } from "./presets";
+import {
+  cloudCoverGoal,
+  cloudDensityGoal,
+  ridgeStrengthGoal,
+  SKY_DOME_RADIUS_M,
+  SKY_FRAGMENT_SHADER,
+  SKY_VERTEX_SHADER,
+} from "./skyShader";
 import { getFogIntensity, getRainIntensity, getSnowIntensity } from "./weather";
 
 /** How far the FOG weather pulls the whole sky gradient toward the fog color
@@ -67,71 +81,26 @@ const RAIN_SUN_GLOW_DIM = 0.88;
  *  normalized unit-sphere position; nothing samples world distance). */
 export const SKY_DOME_NAME = "sim-sky-dome";
 
-const VERTEX = /* glsl */ `
-varying vec3 vDir;
-void main() {
-  vDir = position; // unit sphere in object space = view direction
-  gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-}
-`;
-
-const FRAGMENT = /* glsl */ `
-uniform vec3 uZenith;
-uniform vec3 uHorizon;
-uniform float uHorizonCurve;
-uniform vec3 uSunDir;
-uniform vec3 uSunColor;
-uniform float uSunDiscCos;
-uniform float uSunDiscIntensity;
-uniform float uGlow;
-uniform float uGlowPower;
-uniform float uStars;
-uniform float uTime;
-varying vec3 vDir;
-
-float hash13(vec3 p) {
-  p = fract(p * 0.1031);
-  p += dot(p, p.zyx + 31.32);
-  return fract((p.x + p.y) * p.z);
-}
-
-void main() {
-  vec3 dir = normalize(vDir);
-  float up = clamp(dir.y, 0.0, 1.0);
-  vec3 col = mix(uZenith, uHorizon, pow(1.0 - up, uHorizonCurve));
-
-  // Wide glow + hard disc around the sun/moon.
-  float cosA = clamp(dot(dir, uSunDir), 0.0, 1.0);
-  col += uSunColor * (uGlow * pow(cosA, uGlowPower));
-  col += uSunColor * (uSunDiscIntensity *
-    smoothstep(uSunDiscCos - 0.00012, uSunDiscCos + 0.00006, cosA));
-
-  // Procedural stars: sparse 3D-cell hash, soft dots, slow twinkle.
-  // uStars is a uniform, so this branch is coherent (free when 0).
-  if (uStars > 0.001) {
-    vec3 sp = dir * 90.0;
-    vec3 cell = floor(sp);
-    float h = hash13(cell);
-    float star = step(0.9955, h);
-    float d = length(fract(sp) - 0.5);
-    float twinkle = 0.75 + 0.25 * sin(uTime * (1.5 + 4.0 * fract(h * 91.7)) + h * 40.0);
-    star *= smoothstep(0.45, 0.05, d) * twinkle * smoothstep(0.03, 0.22, dir.y);
-    col += vec3(0.9, 0.95, 1.0) * (star * uStars * (0.35 + 0.65 * fract(h * 57.3)));
-  }
-
-  gl_FragColor = vec4(col, 1.0);
-  #include <tonemapping_fragment>
-  #include <colorspace_fragment>
-}
-`;
-
 function dampColor(cur: Color, goal: Color, lambda: number, dt: number): void {
   cur.r = MathUtils.damp(cur.r, goal.r, lambda, dt);
   cur.g = MathUtils.damp(cur.g, goal.g, lambda, dt);
   cur.b = MathUtils.damp(cur.b, goal.b, lambda, dt);
 }
 
-export function SkyDome({ timeOfDay, radius = 520 }: { timeOfDay: TimeOfDay; radius?: number }) {
+export function SkyDome({
+  timeOfDay,
+  radius = SKY_DOME_RADIUS_M,
+  skyline = true,
+}: {
+  timeOfDay: TimeOfDay;
+  radius?: number;
+  /** V3's gate. The Vitosha ridge belongs on every Sofia street map; the
+   *  enclosed poligon and parking-lot maps have no far horizon to put it on,
+   *  so those scenes pass `false`. Default ON — a missing skyline is the
+   *  „flat-earth test level" tell doc 82 §1.2 named, and it should take a
+   *  deliberate act to turn it off. */
+  skyline?: boolean;
+}) {
   const groupRef = useRef<Group>(null);
   const materialRef = useRef<ShaderMaterial>(null);
   const initialized = useRef(false);
@@ -141,8 +110,8 @@ export function SkyDome({ timeOfDay, radius = 520 }: { timeOfDay: TimeOfDay; rad
   const materialArgs = useMemo<[ShaderMaterialParameters]>(
     () => [
       {
-        vertexShader: VERTEX,
-        fragmentShader: FRAGMENT,
+        vertexShader: SKY_VERTEX_SHADER,
+        fragmentShader: SKY_FRAGMENT_SHADER,
         uniforms: {
           uZenith: { value: new Color("#000000") },
           uHorizon: { value: new Color("#000000") },
@@ -154,6 +123,14 @@ export function SkyDome({ timeOfDay, radius = 520 }: { timeOfDay: TimeOfDay; rad
           uGlow: { value: 0 },
           uGlowPower: { value: 16 },
           uStars: { value: 0 },
+          // Clouds and ridge both start at zero strength: the first frame
+          // snaps them to the preset (damp with dt→∞), and until then the
+          // uniform branches in the shader are skipped entirely.
+          uCloudCover: { value: 0 },
+          uCloudDensity: { value: 0 },
+          uCloudColor: { value: new Color("#000000") },
+          uRidge: { value: 0 },
+          uRidgeColor: { value: new Color("#000000") },
           uTime: { value: 0 },
         },
         side: BackSide,
@@ -170,6 +147,8 @@ export function SkyDome({ timeOfDay, radius = 520 }: { timeOfDay: TimeOfDay; rad
     zenith: new Color("#000000"),
     horizon: new Color("#000000"),
     sun: new Color("#000000"),
+    cloud: new Color("#000000"),
+    ridge: new Color("#000000"),
     sunDir: new Vector3(0, 1, 0),
     gray: new Color(),
     fogWash: new Color(),
@@ -184,6 +163,8 @@ export function SkyDome({ timeOfDay, radius = 520 }: { timeOfDay: TimeOfDay; rad
       zenith: new Color(p.sky.zenith),
       horizon: new Color(p.sky.horizon),
       sun: new Color(p.sky.sunTint),
+      cloud: new Color(p.sky.cloudColor),
+      ridge: new Color(p.sky.ridgeColor),
       fogWeather: new Color(p.fogWeather.color),
       snowWeather: new Color(p.snowWeather.color),
       sunDir: new Vector3(s.x, s.y, s.z),
@@ -193,6 +174,9 @@ export function SkyDome({ timeOfDay, radius = 520 }: { timeOfDay: TimeOfDay; rad
       glow: p.sky.sunGlowIntensity,
       glowPower: p.sky.sunGlowPower,
       stars: p.sky.starsIntensity,
+      cloudCover: p.sky.cloudCover,
+      cloudDensity: p.sky.cloudDensity,
+      ridgeStrength: p.sky.ridgeStrength,
     };
   }, [timeOfDay]);
 
@@ -214,6 +198,8 @@ export function SkyDome({ timeOfDay, radius = 520 }: { timeOfDay: TimeOfDay; rad
     dampColor(base.zenith, goal.zenith, FADE_LAMBDA, dt);
     dampColor(base.horizon, goal.horizon, FADE_LAMBDA, dt);
     dampColor(base.sun, goal.sun, FADE_LAMBDA, dt);
+    dampColor(base.cloud, goal.cloud, FADE_LAMBDA, dt);
+    dampColor(base.ridge, goal.ridge, FADE_LAMBDA, dt);
     base.sunDir.x = MathUtils.damp(base.sunDir.x, goal.sunDir.x, FADE_LAMBDA, dt);
     base.sunDir.y = MathUtils.damp(base.sunDir.y, goal.sunDir.y, FADE_LAMBDA, dt);
     base.sunDir.z = MathUtils.damp(base.sunDir.z, goal.sunDir.z, FADE_LAMBDA, dt);
@@ -232,6 +218,12 @@ export function SkyDome({ timeOfDay, radius = 520 }: { timeOfDay: TimeOfDay; rad
     };
     grayOut(u.uZenith.value as Color, base.zenith, RAIN_SKY_GRAY);
     grayOut(u.uHorizon.value as Color, base.horizon, RAIN_SKY_GRAY);
+    // The deck greys with the gradient (a rain cloud IS the dark grey the
+    // sky went), and the ridge greys with it too — the massif is 15 km of the
+    // same air. Both then take the snow/fog washes inside grayOut, which is
+    // what „layered UNDER the fog wash" means in practice.
+    grayOut(u.uCloudColor.value as Color, base.cloud, RAIN_SKY_GRAY);
+    grayOut(u.uRidgeColor.value as Color, base.ridge, RAIN_SKY_GRAY);
     (u.uSunColor.value as Color).copy(base.sun);
     (u.uSunDir.value as Vector3).copy(base.sunDir).normalize();
 
@@ -253,6 +245,24 @@ export function SkyDome({ timeOfDay, radius = 520 }: { timeOfDay: TimeOfDay; rad
     u.uStars.value = MathUtils.damp(
       u.uStars.value as number,
       goal.stars * (1 - rain) * (1 - fog) * (1 - snow),
+      FADE_LAMBDA,
+      dt,
+    );
+    u.uCloudCover.value = MathUtils.damp(
+      u.uCloudCover.value as number,
+      cloudCoverGoal(goal.cloudCover, rain),
+      FADE_LAMBDA,
+      dt,
+    );
+    u.uCloudDensity.value = MathUtils.damp(
+      u.uCloudDensity.value as number,
+      cloudDensityGoal(goal.cloudDensity, fog, snow),
+      FADE_LAMBDA,
+      dt,
+    );
+    u.uRidge.value = MathUtils.damp(
+      u.uRidge.value as number,
+      skyline ? ridgeStrengthGoal(goal.ridgeStrength, rain, fog, snow) : 0,
       FADE_LAMBDA,
       dt,
     );

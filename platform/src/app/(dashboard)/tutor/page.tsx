@@ -73,12 +73,19 @@ export default async function TutorPage() {
 
       {trial.unlimited ? null : <TutorTrialNotice remaining={trial.remaining} />}
 
+      {/* `citations` comes along deliberately: it is the server-validated
+          allow-list the chat renders law chips from (ADR-002), so dropping it
+          here would silently demote every verified citation in the student's
+          history to plain text on reload. */}
       <TutorChat
-        initialMessages={thread.messages.map(({ role, content, ts }) => ({
-          role,
-          content,
-          ts,
-        }))}
+        initialMessages={thread.messages.map(
+          ({ role, content, ts, citations }) => ({
+            role,
+            content,
+            ts,
+            citations,
+          }),
+        )}
       />
     </div>
   );

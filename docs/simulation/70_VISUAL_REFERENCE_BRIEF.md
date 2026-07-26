@@ -1,5 +1,12 @@
 # Visual Reference Brief — founder-supplied targets (2026-07-10)
 
+> **CLIMATE CORRECTION (2026-07-26).** This brief was written from a Gulf/waterfront reference image
+> and originally specified **palms**. Sofia has a humid continental climate with snowy winters — palms
+> do not grow there, and a palm on a Sofia boulevard instantly reads as fake to the exact 17-year-old
+> audience this product is for. A palm species was actually shipped, and was only caught by looking at
+> a rendered frame. Use the street trees Sofia actually has: **липа (linden), кестен (horse chestnut),
+> топола (poplar), явор (maple)**. The species set is now enforced by tests in the world builders.
+
 The founder supplied 4 reference images. Agents cannot see them; this document is the
 authoritative transcription of every observable detail, written by the session that viewed
 them. All replication is **de-badged and fictional** (ADR-001): shapes/proportions/materials
@@ -16,12 +23,12 @@ with sun reflections.
 **Foreground / promenade:** dark calm water (canal) → concrete embankment wall → wide paved
 promenade (large rectangular pavers, two tone bands) → continuous **black metal railing**
 along the water. Sparse individual pedestrians (business/casual). Modern **street lamps**
-(dark pole, single lantern head) every ~20 m. **Palm trees** in ground grates + low planters;
+(dark pole, single lantern head) every ~20 m. **Linden/chestnut street trees** in ground grates + low planters;
 benches; small utility boxes.
 
 **Midground:** a large **surface parking lot**: clean asphalt, white painted stall lines in
 rows, ~15–25 parked cars (sedans/SUVs, varied dark/light), low yellow-black barrier posts at
-entrances, thin curb islands with palms. One/two **low retail pavilions** (1–2 floors, dark
+entrances, thin curb islands with linden/chestnut street trees. One/two **low retail pavilions** (1–2 floors, dark
 stone + bronze glass, thin roof slab). Wide boulevard beyond with sparse traffic.
 
 **Towers (the building kit target — VARIETY is the point, 25–80 floors):**
@@ -41,7 +48,7 @@ Ground floors everywhere: retail glazing bands, occasional red signage strips, a
 recesses, stone podiums 2–3 floors.
 
 **Palette:** beige/cream/white-grey concrete, bronze + blue-grey glass, warm golden sun,
-dark asphalt, green palm accents. NOT the current uniform blue-glass towers — the kit needs
+dark asphalt, green linden/chestnut accents. NOT the current uniform blue-glass towers — the kit needs
 **at least 4 distinct facade SYSTEMS** (concrete grid / vertical strips / dark curtain twin /
 horizontal bands) with lit-window variation.
 
@@ -108,7 +115,7 @@ wet asphalt — strong reflections (our env-map handles this).
 
 1. **Cockpit camera** per REF 2/3 contract above (40–50% interior visible).
 2. **Environment kit v3** per REF 1 (4+ facade systems, podiums, retail bands, parking lots
-   with stalls + parked cars, promenade/railing/palm dressing) — replaces the uniform glass kit.
+   with stalls + parked cars, promenade/railing/street-tree dressing) — replaces the uniform glass kit.
 3. **Traffic fleet v2** — MANY more distinct models (sedan, hatch, wagon, crossover, boxy SUV,
    pickup, delivery van, YELLOW MINIBUS, taxi variant, luxury sedan), all self-authored in
    Blender, better silhouettes than v1 (~1–3k tris each is acceptable).
@@ -127,7 +134,7 @@ barely readable; one saturated flat-green lawn patch (no texture). Sky: flat pal
 no gradient interest. Lighting: flat ambient, weak shadows, no warm sun direction, no
 atmosphere/fog depth. Traffic: recognizable low-poly cars but toy-like — flat paint, no
 material response visible at distance, simple boxes with wheels (one police car with
-lightbar reads well). Palms/trees read OK but saturated flat green. The hero car (player)
+lightbar reads well). Street trees read OK but saturated flat green. The hero car (player)
 looks good — glossy dark paint with sun highlight + full-width tail light bar. Street
 lamps/bench present. Overall verdict: geometry/layout is there; MATERIALS, TEXTURES,
 LIGHTING/ATMOSPHERE and GROUND VARIETY are missing — that's the gap.

@@ -21,6 +21,34 @@ export type {
 
 export * from "./tuning";
 
+// doc 82 §4.2 F1 — the grip-loss read channel (pure; no physics effect).
+export {
+  combinedGripUtilisation,
+  deliveredGripUtilisation,
+  demandedGripUtilisation,
+  gripCeilingMs2,
+  GRIP_SIGNAL_LP,
+  GRIP_SIGNAL_MAX_ACCEL_MS2,
+  GRIP_SIGNAL_MIN_KMH,
+  GRIP_SIGNAL_MU,
+  GRIP_SIGNAL_WHEELBASE_M,
+  GRIP_UTILISATION_MAX,
+} from "./gripSignal";
+
+// doc 82 §4.2 F2 — deterministic road-surface excitation (opt-in).
+export {
+  roadNoiseAt,
+  roadRoughnessForceN,
+  roadRoughnessSpeedScale,
+  ROAD_NOISE_OCTAVE2_GAIN,
+  ROAD_NOISE_OCTAVE2_SCALE,
+  ROAD_NOISE_WAVELENGTH_M,
+  ROAD_ROUGHNESS_FORCE_N,
+  ROAD_ROUGHNESS_FULL_KMH,
+  ROAD_ROUGHNESS_MAX,
+  ROAD_ROUGHNESS_MIN_KMH,
+} from "./roadNoise";
+
 export {
   DrivelineState,
   READY_DRIVELINE,
@@ -28,6 +56,11 @@ export {
   hasDriveTraction,
   forwardForceScale,
   gearForSpeedKmh,
+  // doc 82 §4.2 F3 — engine braking (opt-in via VehicleSimOptions).
+  engineBrakeDecelMs2,
+  ENGINE_BRAKE_DECEL_MS2,
+  ENGINE_BRAKE_FULL_KMH,
+  ENGINE_BRAKE_MIN_KMH,
   MANUAL_GEAR_COUNT,
   MANUAL_GEAR_MAX_KMH,
   PARKING_BRAKE_FORCE_N,

@@ -70,6 +70,27 @@ export {
   TOUCH_STEER_RANGE_FRACTION,
 } from "./touch";
 
+// doc 82 §4.3 F5 — three discrete haptic events, always redundant with a
+// visual or audio cue (a quarter of the phone audience is on iOS Safari,
+// where navigator.vibrate does not exist at any version).
+export {
+  SimHaptics,
+  collisionVibrationPattern,
+  loadHapticsEnabled,
+  supportsVibration,
+  BRAKE_ONSET_MIN_KMH,
+  BRAKE_ONSET_PEDAL,
+  BRAKE_ONSET_RELEASE_PEDAL,
+  BRAKE_ONSET_VIBRATION_MS,
+  COLLISION_GAP_MS,
+  COLLISION_MAX_MS,
+  COLLISION_MIN_MS,
+  CURB_VIBRATION_MS,
+  HAPTICS_STORAGE_KEY,
+  HAPTIC_MIN_GAP_MS,
+} from "./haptics";
+export type { SimHapticsDeps } from "./haptics";
+
 export { createTelemetry, FpsMeter } from "./telemetry";
 export type { SimTelemetry } from "./telemetry";
 

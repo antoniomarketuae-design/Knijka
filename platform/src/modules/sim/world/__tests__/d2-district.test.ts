@@ -143,8 +143,17 @@ describe("d2-v1 is a structurally valid district-v1 document (ADR-007 contract)"
     expect(district.crossings.length).toBe(52);
     expect(district.roundabouts.length).toBe(1);
     expect(district.spawnPoints.length).toBe(5);
-    // ADR-007 descope: drivable-first, the visual pass owns footprints.
-    expect(district.buildings.length).toBe(0);
+    // BUILDINGS — the pin here used to be `toBe(0)`, the ADR-007 „drivable
+    // first" descope. Doc 82 §1.2 item 1 named that zero as the single largest
+    // cause of the „roads floating on an infinite lawn" read, and doc 82 P5/V7
+    // is the pass that closed it: `tools/maps/gen_streetwall.mjs` stamps a
+    // deterministic street wall of `sw-` prefixed footprints as a POST-PASS
+    // over this build (same shape as the M-15 zone layer below — re-running
+    // build_district_d2.mjs alone drops both, and these two pins catch it).
+    // The AUTHORED count is still zero: every footprint on d2 is generated,
+    // and stripping the `sw-` prefix must return the file to the ADR-007 state.
+    expect(district.buildings.length).toBe(380);
+    expect(district.buildings.filter((b) => !b.id.startsWith("sw-")).length).toBe(0);
     // The M-15 zone layer (tools/maps/gen_exam_district_zones.mjs) — a POST-PASS
     // over this build, so re-running build_district_d2.mjs alone drops it and
     // this pin catches that. Kinds, not spans: the spans belong to the M-15
@@ -276,10 +285,28 @@ describe("d2-v1 through the world builder", () => {
   it("derives city furniture from the data alone: lights, zebras, signs", () => {
     expect(world.trafficLights.length).toBeGreaterThan(0);
     expect(world.stats.zebraCrossings).toBeGreaterThan(0);
-    // Buildings are descoped — nothing building-shaped may appear.
-    expect(world.stats.buildings).toBe(0);
+    expect(world.stats.buildings).toBe(380);
+  });
+
+  it("the street wall costs FOUR draw calls, not 380 (doc 82 V7 / §2.2)", () => {
+    // The whole reason V7 could be a data-only pass: buildings.ts merges every
+    // prism into ONE mesh per facade palette variant, so the draw cost of a
+    // populated district is the same four meshes an empty one would have paid
+    // for a single block. Nothing here may quietly promote a plot to the
+    // 16-model instanced kit either — `buildBuildingInstances` charges its
+    // draw calls unconditionally, and gen_streetwall keeps every generated
+    // height inside (PAVILION_MAX_HEIGHT_M, TOWER_MIN_HEIGHT_M) for exactly
+    // this reason.
+    expect(world.buildingWalls.length).toBe(4);
+    expect(world.buildingWalls.some((m) => m.positions.length > 0)).toBe(true);
     expect(world.stats.buildingInstances).toBe(0);
-    expect(world.buildingWalls.every((m) => m.positions.length === 0)).toBe(true);
+    // 380 four-sided prisms ≈ 6.8 k triangles of wall + roof against the §2.2
+    // phone budget of 250 k/frame — the street wall is ~3 % of it.
+    const prismTris =
+      world.buildingWalls.reduce((n, m) => n + m.indices.length / 3, 0) +
+      world.buildingRoofs.indices.length / 3;
+    expect(prismTris).toBeGreaterThan(0);
+    expect(prismTris).toBeLessThan(12_000);
   });
 
   it("produces no NaN/infinite coordinates in any buffer or placement", () => {

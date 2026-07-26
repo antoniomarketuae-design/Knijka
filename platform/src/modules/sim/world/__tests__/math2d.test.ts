@@ -12,6 +12,7 @@ import {
   mulberry32,
   valueNoise2D,
   SegmentGrid,
+  AabbGrid,
   type Vec2,
 } from "../builders/math2d";
 
@@ -174,5 +175,42 @@ describe("SegmentGrid", () => {
     ]);
     expect(grid.distanceTo([50, 7], 30)).toBeCloseTo(7);
     expect(grid.distanceTo([50, 500], 30)).toBe(30);
+  });
+});
+
+describe("AabbGrid", () => {
+  /**
+   * The grid replaced a linear `buildingAabbs.some(...)` in terrain.ts and
+   * props.ts when doc 82 V7 put 380 footprints on one map. Its only job is to
+   * answer the SAME predicate faster, so the test that matters is agreement
+   * with the brute-force scan — including the cases a cell-radius bug would
+   * miss: a box straddling several cells, and a query whose pad reaches across
+   * a cell boundary into a box that touches none of the query's own cells.
+   */
+  const brute = (boxes: [number, number, number, number][], p: Vec2, pad: number) =>
+    boxes.some(
+      ([x0, y0, x1, y1]) => p[0] > x0 - pad && p[0] < x1 + pad && p[1] > y0 - pad && p[1] < y1 + pad,
+    );
+
+  it("agrees with the linear scan everywhere, at every pad", () => {
+    const boxes: [number, number, number, number][] = [
+      [-5, -5, 12, 3], // straddles the origin and several 10 m cells
+      [40, 40, 44, 44], // smaller than one cell
+      [-120, 60, 90, 66], // long and thin, spans many cells
+    ];
+    const grid = new AabbGrid(10);
+    for (const b of boxes) grid.add(b);
+    for (let x = -140; x <= 110; x += 3.5) {
+      for (let y = -20; y <= 80; y += 3.5) {
+        for (const pad of [0.5, 6, 20]) {
+          expect(grid.hits([x, y], pad), `(${x}, ${y}) pad ${pad}`).toBe(brute(boxes, [x, y], pad));
+        }
+      }
+    }
+  });
+
+  it("an empty grid never hits (the district-with-no-buildings path)", () => {
+    const grid = new AabbGrid(24);
+    expect(grid.hits([0, 0], 100)).toBe(false);
   });
 });

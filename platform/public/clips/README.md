@@ -67,6 +67,16 @@ stills are frames of has supported WebP since 2020. Clips rendered before the
 change were converted in place with `node keyframes-to-webp.mjs`, which also
 rewrites the manifest URLs; re-running it is a no-op.
 
+**The local PNG masters are gone (2026-07-26, doc 82 §8):** all 210, 247.3 MB,
+pruned with `npm run clips:prune-png -- --apply` after verifying that the
+manifest named none of them and that every one had a manifest-referenced WebP
+sibling. They were gitignored, so this is not revertible — a frame you now want
+at full resolution has to come from a re-render (`render-clip.mjs`), which is
+also the only way to get one that is not a 854 px re-encode. `render-clip.mjs`
+has not written a `.k*.png` since the poster contract landed; the real-time dev
+capture route still does, which is why `publicBudget.mjs` keeps the
+`clips-keyframes` bucket.
+
 ## Deploying the binaries to staging
 
 The `.webm` files never travel through git. After a capture batch:

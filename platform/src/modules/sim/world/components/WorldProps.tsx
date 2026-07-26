@@ -36,7 +36,7 @@
  * Draw calls (WorldProps only; CityBuildings is separate + chunked):
  *   signals 2 (housing + lamps) + signs 8 (4 kinds × body+face)
  *   + streetlights 2 (housing + glow)
- *   + trees 4 (palm + ornamental + leafy_a + leafy_b)
+ *   + trees 4 (boulevard linden + ornamental + leafy_a + leafy_b)
  *   + furniture 4 (bench + bollard + trash_bin + planter)
  *   + billboards 4 (large/small × body+face) + bus stops 2 (body + face)
  *   + parking kit 1 (merged cluster) = 27  (was 18).
@@ -55,13 +55,14 @@ import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
 import type { GLTF } from "three/examples/jsm/loaders/GLTFLoader.js";
 import type { SignalLampState } from "../../contracts";
-import type {
-  BillboardSize,
-  SignKind,
-  StaticTransform,
-  TreeKind,
-  TreePlacement,
-  WorldGeometry,
+import {
+  TREE_KINDS,
+  type BillboardSize,
+  type SignKind,
+  type StaticTransform,
+  type TreeKind,
+  type TreePlacement,
+  type WorldGeometry,
 } from "../types";
 import { createGltfLoader } from "./gltfLoader";
 import {
@@ -270,7 +271,23 @@ interface PropAssets {
   };
 }
 
-const TREE_KINDS: TreeKind[] = ["palm", "ornamental", "leafyA", "leafyB"];
+/**
+ * Boulevard linden (липа): the uniform species the builder plants along the
+ * picked boulevards. There is no dedicated linden GLB yet, so it is derived
+ * from leafy_tree_b — the tall OVAL deciduous silhouette, the closest of the
+ * authored trees — narrowed and lifted into the clear-trunk avenue profile a
+ * pruned Sofia boulevard linden carries. That keeps the boulevard row visually
+ * distinct from the mixed street trees (which use leafy_tree_b unstretched)
+ * without shipping another asset, and it still costs ONE instanced draw.
+ * Narrowing (never widening) also guarantees the canopy cannot start
+ * overhanging the carriageway that leafy_tree_b already clears.
+ * `geometry.scale()` routes through applyMatrix4, which applies the normal
+ * matrix and refreshes the bounds, so shading and frustum culling stay correct.
+ * TODO(assets): author a real linden/кестен GLB in streetscape_v2.py.
+ */
+function bakeBoulevardLinden(scene: THREE.Object3D): THREE.BufferGeometry {
+  return bakeVertexColored(scene, { centerXZ: true }).scale(0.76, 1.1, 0.76);
+}
 
 // rail_barrier GLB frame (tools/blender/signs_v2.py build_rail_barrier): the
 // pivot hub sits at Blender (0.09, 0, arm_z=1.0) → after the π yaw bake the
@@ -368,7 +385,6 @@ async function buildPropAssets(): Promise<PropAssets> {
     roundabout,
     signal,
     lamp,
-    palm,
     ornamental,
     bench,
     bollard,
@@ -390,7 +406,6 @@ async function buildPropAssets(): Promise<PropAssets> {
     load(SIGN_BASE, SIGN_GLB.roundabout),
     load(SIGN_BASE, "signal_head_3"),
     load(STREET_BASE, "street_lamp"),
-    load(STREET_BASE, "palm_tree"),
     load(STREET_BASE, "ornamental_tree"),
     load(STREET_BASE, "bench"),
     load(STREET_BASE, "bollard"),
@@ -517,7 +532,7 @@ async function buildPropAssets(): Promise<PropAssets> {
     streetlightHousing,
     streetlightGlow,
     trees: {
-      palm: bakeVertexColored(palm.scene, { centerXZ: true }),
+      linden: bakeBoulevardLinden(leafyB.scene),
       ornamental: bakeVertexColored(ornamental.scene, { centerXZ: true }),
       leafyA: bakeVertexColored(leafyA.scene, { centerXZ: true }),
       leafyB: bakeVertexColored(leafyB.scene, { centerXZ: true }),
@@ -987,7 +1002,7 @@ function Streetlights({
 }
 
 // ---------------------------------------------------------------------------
-// Trees (palm + ornamental + leafy_a/b GLBs, bucketed by builder-decided kind)
+// Trees (boulevard linden + ornamental + leafy_a/b, bucketed by builder kind)
 // ---------------------------------------------------------------------------
 
 function Trees({
@@ -1009,7 +1024,7 @@ function Trees({
   const meshes = useMemo(() => {
     const castShadow = preset.castShadows === "full";
     const buckets: Record<TreeKind, TreePlacement[]> = {
-      palm: [],
+      linden: [],
       ornamental: [],
       leafyA: [],
       leafyB: [],

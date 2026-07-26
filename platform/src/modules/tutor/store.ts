@@ -9,11 +9,30 @@
  * Json array); token/cost counters accumulate on the same row.
  */
 
+/** A law reference the citation whitelist accepted (prompt.ts extractCitations). */
+export interface TutorCitation {
+  act: string;
+  ref: string;
+}
+
 export interface TutorMessage {
   role: "user" | "assistant";
   content: string;
   /** Epoch ms — also drives the daily budget window. */
   ts: number;
+  /**
+   * ADR-002: the law references this reply is ALLOWED to display as citations —
+   * the output of the server-side whitelist, persisted with the message.
+   *
+   * It lives here rather than being re-derived on read because the whitelist
+   * can only be evaluated against the materials that were retrieved for THAT
+   * turn; a later read has no way to reconstruct them, and re-validating
+   * against a fresh retrieval would quietly approve a different set. Absent on
+   * user messages, and on assistant messages written before the UI learned to
+   * read it — both render with no citation chips at all, which is the safe
+   * direction to fail.
+   */
+  citations?: TutorCitation[];
 }
 
 export interface TutorThreadRecord {
@@ -56,6 +75,25 @@ export interface TutorStore {
   recordDaySpend(day: string, usage: TutorUsageDelta): Promise<void>;
 }
 
+/**
+ * Defensive parse of the citations field. Anything that is not a well-formed
+ * {act, ref} pair is dropped rather than coerced: this array is the UI's
+ * permission to render a law-citation chip, so a half-readable row must
+ * produce no citation, never a plausible-looking one.
+ */
+function parseTutorCitations(value: unknown): TutorCitation[] | undefined {
+  if (!Array.isArray(value)) return undefined;
+  const out: TutorCitation[] = [];
+  for (const item of value) {
+    if (typeof item !== "object" || item === null) continue;
+    const c = item as Record<string, unknown>;
+    if (typeof c.act === "string" && typeof c.ref === "string") {
+      out.push({ act: c.act, ref: c.ref });
+    }
+  }
+  return out;
+}
+
 /** Defensive parse of the messages Json column — drops malformed entries. */
 export function parseTutorMessages(value: unknown): TutorMessage[] {
   if (!Array.isArray(value)) return [];
@@ -68,7 +106,13 @@ export function parseTutorMessages(value: unknown): TutorMessage[] {
       typeof m.content === "string" &&
       typeof m.ts === "number"
     ) {
-      out.push({ role: m.role, content: m.content, ts: m.ts });
+      const citations = parseTutorCitations(m.citations);
+      out.push({
+        role: m.role,
+        content: m.content,
+        ts: m.ts,
+        ...(citations ? { citations } : {}),
+      });
     }
   }
   return out;

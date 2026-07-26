@@ -88,6 +88,7 @@ import type { SimInput } from "@/modules/sim/engine";
 import type { LessonSpec } from "@/modules/sim/lessons";
 import { lessonDistrictId } from "@/modules/sim/contracts";
 import {
+  mapKindHasSkyline,
   QUALITY_PRESETS,
   RAIN_IBL_DIM,
   resetWeather,
@@ -459,7 +460,16 @@ export function CaptureScene({
       >
         {/* The founder's OWN drill preset (loadQualityPreset) — same
             exposure/tone-mapping/composer chain as the drills (R5). */}
-        <SimEnvironment timeOfDay={timeOfDay} rain={rain} fog={fog} snow={snow} quality={level} />
+        {/* …including the skyline gate: a lot/полигон clip must not show a
+            ridge the drill it re-enacts does not (R5 parity, doc 82 §3.2 V3). */}
+        <SimEnvironment
+          timeOfDay={timeOfDay}
+          rain={rain}
+          fog={fog}
+          snow={snow}
+          skyline={mapKindHasSkyline(core.district.meta.mapKind)}
+          quality={level}
+        />
         <Suspense fallback={null}>
           <Environment
             files={isNight ? "/sim/env/sky_urban_1k.hdr" : "/sim/env/shanghai_riverside_1k.hdr"}

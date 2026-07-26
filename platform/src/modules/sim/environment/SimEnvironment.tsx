@@ -16,16 +16,17 @@
 //    snapped to shadow-texel increments so edges don't shimmer as you drive.
 //  - Quality changes remount the light (key) — a deliberate, rare hitch.
 //
-// Tone mapping: AgX by default (SIM_TONE_MAPPING) — doc 71 §4.3: hue
-// preservation under the warm low sun (no orange→yellow skew) and it matches
-// Blender 4/5's default view transform, so authored materials read the same
-// in-browser. ACES stays one constant away as the A/B fallback. BOTH paths
+// Tone mapping: AgX by default (SIM_TONE_MAPPING, ./toneMapping) — doc 71
+// §4.3: hue preservation under the warm low sun (no orange→yellow skew) and it
+// matches Blender 4/5's default view transform, so authored materials read the
+// same in-browser. ACES stays one constant away as the A/B fallback. BOTH paths
 // stay in sync: the renderer applies it directly while the composer is not
 // in charge, and the composer re-applies the same operator as the LAST
 // effect in its chain. Exposure is per-preset (presets.ts `exposure`) —
 // three feeds gl.toneMappingExposure into the composer's tone-map shader too.
 //
-// Composer structure by quality level:
+// Composer structure by quality level (the chain itself lives in
+// ./SimComposer, loaded on demand — see the next/dynamic note below):
 //   low  — none (renderer AgX + canvas MSAA)
 //   med  — N8AO (half-res) → Bloom → SMAA → AgX ToneMapping →
 //          HueSaturation + BrightnessContrast + Vignette (grade effects merge
@@ -34,22 +35,10 @@
 //          NaN note at the chain builder, doc 62 #4/#24)
 //   high — same chain, more AO samples
 
-import { useEffect, useMemo, useRef, type JSX } from "react";
+import { useEffect, useMemo, useRef } from "react";
+import dynamic from "next/dynamic";
 import { useFrame, useThree } from "@react-three/fiber";
 import {
-  Bloom,
-  BrightnessContrast,
-  EffectComposer,
-  HueSaturation,
-  N8AO,
-  SMAA,
-  ToneMapping,
-  Vignette,
-} from "@react-three/postprocessing";
-import { ToneMappingMode } from "postprocessing";
-import {
-  ACESFilmicToneMapping,
-  AgXToneMapping,
   Color,
   MathUtils,
   Vector3,
@@ -74,6 +63,7 @@ import {
 } from "./presets";
 import { QUALITY_PRESETS, type QualityLevel } from "./quality";
 import { useQuality } from "./qualityStore";
+import { TONE_MAPPING_THREE } from "./toneMapping";
 import {
   setWeatherTarget,
   stepWeather,
@@ -83,6 +73,7 @@ import {
   useRainIntensity,
   useSnowIntensity,
 } from "./weather";
+import { GroundBackdrop } from "./GroundBackdrop";
 import { SkyDome } from "./SkyDome";
 import { RainStreaks } from "./RainStreaks";
 import { SnowFlakes } from "./SnowFlakes";
@@ -100,45 +91,35 @@ export interface SimEnvironmentProps {
    *  remain world-module asset work. Additive; absent/false = the shipped
    *  behavior. */
   snow?: boolean;
+  /** V3's skyline gate (doc 82 §3.2) — forwarded verbatim to the sky dome.
+   *  `false` damps the Vitosha ridge uniform to 0, for the enclosed maps that
+   *  have no far horizon to put it on. Scenes that mount a district decide
+   *  this from the map itself: `mapKindHasSkyline(district.meta.mapKind)`
+   *  (./skyline). Omitted = on, because a missing skyline is the „flat-earth
+   *  test level" tell doc 82 §1.2 named. */
+  skyline?: boolean;
   /** Explicit quality level; omit to follow the quality store ("auto"). */
   quality?: QualityLevel;
 }
 
 /**
- * The tone-mapping operator, ONE switch for both paths (renderer fallback +
- * composer ToneMapping effect — the file header documents that contract).
- * "agx" is the doc 71 §4.3 ruling (A/B winner over ACES: hue preservation +
- * Blender-parity); flip to "aces" to compare — nothing else needs touching.
+ * The composer, in its OWN CHUNK (doc 82 §2.3 fix 3).
+ *
+ * `@react-three/postprocessing` + `postprocessing` are 330,491 B of minified
+ * JS. This module is statically imported by LessonScene, so before the split a
+ * phone at tier `low` — where `postprocessing` is false and the composer never
+ * mounts — still paid ≈400–660 ms of Android parse time for it. §2.1: the
+ * phone's deficit is CPU, not fill rate, so parse cost on the critical path to
+ * the first frame is the expensive kind of byte.
+ *
+ * `ssr: false` because the chain only ever exists inside a live <Canvas>;
+ * `loading` stays the default (null), which is exactly what `low` should
+ * render. next/dynamic caches the resolved module, so the quality-switch
+ * remount below re-mounts the component without re-fetching the chunk.
  */
-const SIM_TONE_MAPPING = "agx" as "agx" | "aces";
-const TONE_MAPPING_THREE =
-  SIM_TONE_MAPPING === "aces" ? ACESFilmicToneMapping : AgXToneMapping;
-const TONE_MAPPING_MODE =
-  SIM_TONE_MAPPING === "aces" ? ToneMappingMode.ACES_FILMIC : ToneMappingMode.AGX;
-
-/**
- * Color grade riding in the composer's final effect pass (med + high) —
- * counters the tone mapper's flattening (AgX lifts mid-contrast, ACES
- * desaturates). Doc 71 §4.3 bands: saturation 0.12–0.2, contrast 0.07–0.1.
- */
-const GRADE_SATURATION = 0.15;
-const GRADE_CONTRAST = 0.08;
-
-/**
- * N8AO tuning (med + high). World-space radius, so contact darkening stays a
- * fixed physical size regardless of distance. Library guidance: intensity 2 =
- * subtle, 5 = heavy — the old 1.5/1.5 sat below the visibility floor on a
- * bright scene (part of "everything floats"). Radius 2.5 m reaches curb
- * bases, window recesses and street-canyon corners; half-res cost is
- * unchanged (samples don't scale with radius). If curb bases read "dirty",
- * drop intensity toward 1.9 before touching radius (doc 71 §4.3; retune DOWN
- * once baked AO lands in Phase 4 to avoid double-darkening).
- */
-const AO_RADIUS_M = 2.5;
-/** How quickly AO fades with world distance between occluder and receiver. */
-const AO_DISTANCE_FALLOFF = 1.0;
-/** AO strength (higher = darker crevices). */
-const AO_INTENSITY = 2.2;
+const SimComposer = dynamic(() => import("./SimComposer").then((m) => m.SimComposer), {
+  ssr: false,
+});
 
 /** Damping stiffness for time-of-day crossfades (≈2 s to settle). */
 const FADE_LAMBDA = 2.2;
@@ -153,7 +134,14 @@ function dampColor(cur: Color, goal: Color, lambda: number, dt: number): void {
   cur.b = MathUtils.damp(cur.b, goal.b, lambda, dt);
 }
 
-export function SimEnvironment({ timeOfDay, rain, fog = false, snow = false, quality }: SimEnvironmentProps) {
+export function SimEnvironment({
+  timeOfDay,
+  rain,
+  fog = false,
+  snow = false,
+  skyline = true,
+  quality,
+}: SimEnvironmentProps) {
   const store = useQuality();
   const level = quality ?? store.level;
   const qp = QUALITY_PRESETS[level];
@@ -173,6 +161,22 @@ export function SimEnvironment({ timeOfDay, rain, fog = false, snow = false, qua
     const target = targetRef.current;
     if (light && target) light.target = target;
   }, [level]);
+
+  // Assert the operator on the renderer once, at EVERY tier.
+  //
+  // At `low` the per-frame guard below owns it, as before. At med/high the
+  // composer owns the final image — but it now arrives one or two frames late
+  // (its chunk is fetched on demand), and until it mounts the renderer would
+  // tone-map with R3F's own default rather than ours: a brief ACES-vs-AgX
+  // flash at scene start that did not exist while the import was static.
+  // Setting it here also means the value @react-three/postprocessing SAVES on
+  // mount — and restores when a quality switch unmounts it — is the right one.
+  useEffect(() => {
+    /* eslint-disable-next-line react-hooks/immutability -- the renderer's tone
+       mapper is a mutable field on the three.js renderer; there is no other API
+       for it, and the useFrame path below already writes it at `low`. */
+    gl.toneMapping = TONE_MAPPING_THREE;
+  }, [gl]);
 
   useEffect(() => {
     if (process.env.NODE_ENV !== "production" && qp.shadows && !gl.shadowMap.enabled) {
@@ -367,80 +371,15 @@ export function SimEnvironment({ timeOfDay, rain, fog = false, snow = false, qua
     sun.position.copy(scratch.anchor).addScaledVector(dir, SUN_DISTANCE);
   });
 
-  // The composer's effect chain for this quality level, memoized on the level
-  // flags so it stays a stable array across the frequent rain-fade re-renders
-  // — otherwise the EffectComposer would tear down and rebuild every pass on
-  // each one. Order is load-bearing: N8AO (a Pass) runs first; ToneMapping
-  // maps the fully-composited HDR image; the color grade runs LAST, on the
-  // tone-mapped output (the doc 62 #4/#24 NaN fix — see below).
-  const composerChildren = useMemo<JSX.Element[]>(() => {
-    const chain: JSX.Element[] = [];
-    if (qp.aoEnabled) {
-      // Half-res ambient occlusion — the single biggest "flatness" fix. Runs
-      // its own depth pass (no composer normal pass needed).
-      chain.push(
-        <N8AO
-          key="ao"
-          halfRes={qp.aoHalfRes}
-          quality={qp.aoQuality}
-          aoRadius={AO_RADIUS_M}
-          distanceFalloff={AO_DISTANCE_FALLOFF}
-          intensity={AO_INTENSITY}
-          screenSpaceRadius={false}
-        />,
-      );
-    }
-    if (qp.bloom) {
-      // Tight HDR bloom on the sun disc / bright speculars / lit windows
-      // (med + high). mipmapBlur with a small radius keeps the glow contained
-      // (not "blobby") and cheap on a weak GPU. Threshold 0.9 (doc 71 §4.3):
-      // with the low golden sun + exposure 1.15, paint speculars and DAY_GLOW
-      // 2.0 window emissives sit just above it while lit facades stay clean.
-      // Its convolution makes it its own pass, before tone mapping.
-      chain.push(
-        <Bloom
-          key="bloom"
-          mipmapBlur
-          radius={0.6}
-          intensity={0.75}
-          luminanceThreshold={0.9}
-          luminanceSmoothing={0.2}
-        />,
-      );
-    }
-    // SMAA (the AA that replaces canvas MSAA) then the tone map: ToneMapping
-    // maps the fully-composited HDR image with the SAME operator as the
-    // non-composer renderer path.
-    chain.push(<SMAA key="smaa" />);
-    chain.push(<ToneMapping key="tonemap" mode={TONE_MAPPING_MODE} />);
-    if (qp.colorGrade) {
-      // Finishing grade (med + high — doc 71 §4.3: pmndrs merges consecutive
-      // effects into ONE fullscreen pass with SMAA + ToneMapping, ~free):
-      // saturation + contrast counter the tone mapper's flattening, plus a
-      // soft vignette.
-      //
-      // ORDER IS LOAD-BEARING — the grade must run AFTER ToneMapping (founder
-      // review doc 62 #4/#24 "dark spots"): HueSaturation's boost is
-      // mix(luminance, color, 1 + s), which drives the weakest channel of any
-      // saturated bright pixel NEGATIVE in HDR (amber indicator glow, the
-      // cyan objective pillar, fleet blinker lamps). The merged EffectPass
-      // then feeds that negative value through a pow() colorspace conversion
-      // → NaN → the pixel renders BLACK. Post-AgX the input is display-
-      // referred [0,1] and never saturated enough to go negative, so the
-      // same grade is NaN-safe (verified pixel-exact in the doc 62 S5 wave:
-      // pre-fix lamp pixel (0,0,0), post-fix (224,178,89)).
-      chain.push(<HueSaturation key="grade" hue={0} saturation={GRADE_SATURATION} />);
-      chain.push(
-        <BrightnessContrast key="contrast" brightness={0} contrast={GRADE_CONTRAST} />,
-      );
-      chain.push(<Vignette key="vignette" eskil={false} offset={0.28} darkness={0.45} />);
-    }
-    return chain;
-  }, [qp.aoEnabled, qp.aoHalfRes, qp.aoQuality, qp.bloom, qp.colorGrade]);
-
   return (
     <>
-      <SkyDome timeOfDay={timeOfDay} />
+      <SkyDome timeOfDay={timeOfDay} skyline={skyline} />
+      {/* …and the GROUND half of the same horizon. Ungated on purpose: the
+          `skyline` flag asks whether the scene has somewhere to hang Vitosha,
+          while this asks whether the world continues past the edge of the map —
+          and it does on the полигон and the parking lots too (./GroundBackdrop
+          carries the measurement from sc-junction-stop__m0.k2.webp). */}
+      <GroundBackdrop />
       <fogExp2 ref={fogRef} attach="fog" args={fogArgs} />
       <hemisphereLight ref={hemiRef} intensity={0} />
       {/* Shadow bias: a small depth bias kills acne while a low normalBias
@@ -477,14 +416,10 @@ export function SimEnvironment({ timeOfDay, rain, fog = false, snow = false, qua
         <SnowFlakes count={qp.snowParticles} timeOfDay={timeOfDay} />
       )}
       {qp.postprocessing && (
-        // SMAA (not canvas MSAA) antialiases here: the composer renders
-        // offscreen, so the Canvas `antialias` flag can't reach scene edges.
-        // multisampling=0 for that reason; frameBufferType defaults to
-        // HalfFloat (HDR) which bloom + tone mapping need. Keyed by level so a
-        // rare quality switch rebuilds the pass chain cleanly.
-        <EffectComposer key={`fx-${level}`} multisampling={0} enableNormalPass={false}>
-          {composerChildren}
-        </EffectComposer>
+        // The chain lives in ./SimComposer (its own chunk). It still carries
+        // the `key={`fx-${level}`}` remount on its EffectComposer, so a rare
+        // quality switch rebuilds the pass chain exactly as before.
+        <SimComposer level={level} />
       )}
     </>
   );

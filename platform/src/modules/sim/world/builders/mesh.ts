@@ -44,6 +44,22 @@ export class MeshAccumulator {
     return this.idx.length / 3;
   }
 
+  /**
+   * Read-only views of the raw buffers, so a LATER builder pass can test
+   * against geometry an EARLIER pass already emitted — road decals keep out of
+   * the painted markings (decals.ts MarkingKeepOut) instead of re-deriving
+   * where the paint went. Re-derivation is exactly what drifts: a new marking
+   * kind (lane arrows, speed glyphs, zone solids…) lands in the mesh and a
+   * hand-written keep-out silently misses it.
+   */
+  get positionsView(): readonly number[] {
+    return this.pos;
+  }
+
+  get indicesView(): readonly number[] {
+    return this.idx;
+  }
+
   /** Push one vertex (world space); returns its index. */
   vertex(p: Vec3Tuple, n: Vec3Tuple, uvv: [number, number], c?: [number, number, number]): number {
     const i = this.pos.length / 3;

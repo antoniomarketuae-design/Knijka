@@ -43,6 +43,22 @@ describe("buildTutorSystemPrompt", () => {
     expect(prompt).toContain("- Пътни знаци");
   });
 
+  it("lists what the student got wrong in the simulator, as its own block", () => {
+    // Doc 81 D4: theory readiness and sim evidence are two pictures of the
+    // same student, and the tutor only ever saw the first one.
+    const withSim = buildTutorSystemPrompt({
+      materials: [MATERIAL],
+      weakestConceptTitlesBg: ["Ограничения на скоростта"],
+      simWeakSpotsBg: ["Предимство на кръстовище — 3 пъти"],
+    });
+    expect(withSim).toContain("ГРЕШКИ НА УЧЕНИКА В СИМУЛАТОРА");
+    expect(withSim).toContain("- Предимство на кръстовище — 3 пъти");
+    // Kept apart from the theory block so the tutor can say „в симулатора".
+    expect(withSim.indexOf("- Ограничения на скоростта")).toBeLessThan(
+      withSim.indexOf("ГРЕШКИ НА УЧЕНИКА В СИМУЛАТОРА"),
+    );
+  });
+
   it("labels a rule-catalog material as an exam rule, not as law text", () => {
     const withRule = buildTutorSystemPrompt({
       materials: [
@@ -68,6 +84,7 @@ describe("buildTutorSystemPrompt", () => {
     });
     expect(empty).toContain("(няма намерени материали по този въпрос)");
     expect(empty).toContain("(няма данни — ученикът тепърва започва)");
+    expect(empty).toContain("(няма скорошни карания в симулатора)");
   });
 });
 

@@ -4,22 +4,50 @@ All assets in `public/sim/` are **CC0 1.0 (public domain)**. No attribution is
 legally required, but sources and authors are credited below as good practice.
 No CC-BY assets were used, so there are no mandatory-attribution obligations.
 
-Last updated: 2026-07-08
+Last updated: 2026-07-26
 
 ## Environment maps (`env/`)
 
 | File | Source | Asset | License | Author |
 |------|--------|-------|---------|--------|
-| `env/sky_clear_1k.hdr` | [Poly Haven](https://polyhaven.com/a/kloofendal_43d_clear) | Kloofendal 43d Clear (1K HDR) | CC0 1.0 | Greg Zaal |
 | `env/sky_urban_1k.hdr` | [Poly Haven](https://polyhaven.com/a/potsdamer_platz) | Potsdamer Platz (1K HDR) | CC0 1.0 | Greg Zaal |
+| `env/shanghai_riverside_1k.hdr` | [Poly Haven](https://polyhaven.com/a/shanghai_riverside) | Shanghai Riverside (1K HDR) | CC0 1.0 | Greg Zaal |
 
 Direct file URLs:
-- `sky_clear_1k.hdr` → https://dl.polyhaven.org/file/ph-assets/HDRIs/hdr/1k/kloofendal_43d_clear_1k.hdr
 - `sky_urban_1k.hdr` → https://dl.polyhaven.org/file/ph-assets/HDRIs/hdr/1k/potsdamer_platz_1k.hdr
+- `shanghai_riverside_1k.hdr` → https://dl.polyhaven.org/file/ph-assets/HDRIs/hdr/1k/shanghai_riverside_1k.hdr
 
-`sky_clear_1k.hdr` is a clear blue-sky HDRI. `sky_urban_1k.hdr` is a partly-cloudy
-urban plaza (Potsdamer Platz, Berlin) — chosen to give realistic building
-reflections and daytime lighting for a city-driving scene.
+`sky_urban_1k.hdr` is a partly-cloudy urban plaza (Potsdamer Platz, Berlin) —
+chosen to give realistic building reflections and daytime lighting for a
+city-driving scene.
+
+**Which of the two the product actually loads** (doc 82 §8 bookkeeping):
+
+| File | Loaded by |
+|------|-----------|
+| `shanghai_riverside_1k.hdr` | **DAY IBL** — `LessonScene.tsx`, `CaptureScene.tsx`, `SceneStillScene.tsx`. Rotated (`DAY_ENV_ROTATION`) so its baked sun matches the preset sun azimuth; otherwise glass towers show a double sun. |
+| `sky_urban_1k.hdr` | **NIGHT IBL** — the same three, plus every Blender authoring rig in `tools/blender/`. |
+
+**Removed 2026-07-26: `sky_clear_1k.hdr`** (Kloofendal 43d Clear, Poly Haven,
+CC0 1.0, Greg Zaal —
+https://dl.polyhaven.org/file/ph-assets/HDRIs/hdr/1k/kloofendal_43d_clear_1k.hdr).
+It was 1,522,032 B bucketed `ship: "prod"` (`tools/assets/publicBudget.mjs` →
+`sim-env`) and referenced by **nothing** — no runtime code, no authoring
+script, re-verified by grep across `src/`, `tools/`, `scripts/` and
+`tools/blender/` before the delete. It was ~11% of the sim's runtime payload
+shipping on every deploy for zero pixels. The provenance row stays here rather
+than being deleted with the file: a licence register that forgets what was once
+shipped cannot answer a later question about what was once shipped. Re-adding
+it is a one-line curl from the URL above.
+
+`shanghai_riverside_1k.hdr` was shipping **undocumented** until doc 82 §3.2
+caught it. It is genuine Poly Haven CC0, so there was never legal exposure —
+but an incomplete register is the exact bookkeeping failure that saved this
+project from the Marlin Studios pack (see the Buildings notes below).
+
+Neither of the two is fetched at the `low` tier at all:
+`TEXTURE_BUDGETS.low.hdrEnvironment` is false (audit H-11) — one 1.5 MB HDR is
+more than twice the entire low-tier texture budget.
 
 ## Textures (`textures/`)
 

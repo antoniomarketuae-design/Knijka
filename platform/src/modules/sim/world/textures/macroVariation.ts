@@ -130,6 +130,26 @@ function getMacroUniforms() {
 }
 
 /**
+ * The shared noise field itself, for hooks that want the SAME texture at a
+ * DIFFERENT frequency (markingWear.ts samples it at a ~3 m paint-wear scale
+ * instead of the 80 m ground scale). Reusing it keeps the world on exactly
+ * one 64 KB noise upload no matter how many surfaces read it, and — because
+ * it is the same field — paint grime lands where the asphalt is already dark.
+ */
+export function getMacroNoiseTexture(): THREE.DataTexture {
+  return getMacroUniforms().uMacro.value;
+}
+
+/**
+ * The last line this hook emits into the fragment shader. Exported as the
+ * ANCHOR that road-surface layers on top of (roadSurface.ts calls this hook
+ * first, then splices its detile in after this line) — a shared constant so
+ * the two can never drift apart the way a duplicated string literal would.
+ */
+export const MACRO_HOOK_FRAGMENT_ANCHOR =
+  "diffuseColor.rgb *= mix( 1.0 - uMacroStrength, 1.0 + uMacroStrength, groundMacro );";
+
+/**
  * onBeforeCompile hook — pass to `<meshStandardMaterial onBeforeCompile=...>`
  * together with `customProgramCacheKey={macroProgramCacheKey}` (all ground
  * materials share ONE program cache key -> one compile, no per-instance
@@ -155,7 +175,7 @@ export function macroOnBeforeCompile(shader: THREE.WebGLProgramParametersWithUni
       "#include <map_fragment>",
       `#include <map_fragment>
       float groundMacro = texture2D( uMacro, vGroundMacroXZ * uMacroScale ).r;
-      diffuseColor.rgb *= mix( 1.0 - uMacroStrength, 1.0 + uMacroStrength, groundMacro );`,
+      ${MACRO_HOOK_FRAGMENT_ANCHOR}`,
     );
 }
 

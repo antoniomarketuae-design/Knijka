@@ -42,7 +42,7 @@ So the gap is what the renderer is being asked to draw.
 
 ### 1.2 The seven specific content failures
 
-Open `platform/public/clips/sc-pe-zone-living__m0.k1.png` and `platform/public/clips/sc-junction-rhr__m1.k2.png` while reading this list. Every item is visible in those two frames.
+Open `platform/public/clips/sc-pe-zone-living__m0.k1.webp` and `platform/public/clips/sc-junction-rhr__m1.k2.webp` while reading this list. Every item is visible in those two frames. (These were `.png` when the document was written; the PNG masters were pruned on 2026-07-26 per §8 — the WebP siblings are the same frames at the poster contract's 854 px, which is still ample to read every failure below.)
 
 **1. The flagship city world has zero buildings — and a test asserts it.**
 `d2-v1.json` is 1.93 × 1.63 km, **21.7 km of road, 102 intersections, 283 edges, `"buildings": 0`** (verified directly from `platform/public/world/d2-v1.json` meta.stats; the buildings array is empty). `platform/src/modules/sim/world/__tests__/d2-district.test.ts:280` pins it: `expect(world.stats.buildings).toBe(0)`.
@@ -136,6 +136,11 @@ Android 13+ covers 76.7% of Bulgarian devices, so `KTX2Loader.detectSupport(gl)`
 
 ### 2.3 Four cheap structural fixes the envelope demands
 
+> **Status 2026-07-26 — all four landed, measured on desktop.** Details and the
+> measured before/after are in §2.5 below. The phone half of P1 is still open:
+> every number in §2.2 remains a prediction until an A16 log lands in
+> [`perf/`](perf/README.md).
+
 | Fix | Why | h |
 | --- | --- | --- |
 | **Seed the quality tier from device signals BEFORE the first fetch** | The download tier already exists (`textureBudget.ts`, shipped in 165a58b) but the store cold-starts `recommendation: "med"` and only decides inside the 2.5 s rAF probe (`environment/qualityStore.ts:31`, `:118-157`) — by which time the med plan (5,950,303 B incl. a 1,596,163 B HDR) is already requested. **The 5.4 MB saving currently helps only on the second visit.** Seed synchronously from `hardwareConcurrency` / `deviceMemory` / `(pointer: coarse)`; bias toward `low` on disagreement. Note `quality.test.ts:130` asserts `dpr 2 → "med"` and needs updating. | 4 |
@@ -152,6 +157,64 @@ A **Samsung Galaxy A16** (Helio G99, Mali-G57 MP2, 4 GB, 1080×2340) is **244.48
 The instrumentation already exists — `PerfProbe` at `LessonScene.tsx:1312-1365` disables `gl.info.autoReset`, accumulates whole-frame draws/triangles across the mirror and composer passes, and logs fps/draws/tris/programs once per second, with the budget lines already in a comment at `:1321-1322`.
 
 **€125 + 4 hours over `chrome://inspect` closes this permanently. Every number in §2.2 is a prediction until that log is committed. DevTools device emulation and Android emulators do not emulate the GPU and will give a false green.**
+
+> **Update 2026-07-26.** The instrument is built and the procedure is written
+> down: [`perf/README.md`](perf/README.md). `PerfProbe` now accumulates
+> per-second windows, scores them against `PERF_BUDGETS` (§2.2 transcribed into
+> `environment/perfBudget.ts` and unit-tested against it), and prints a
+> self-contained markdown artifact; `platform/scripts/perf-report.mjs` files it
+> under `docs/simulation/perf/<date>-<tier>.md`.
+> Two things changed relative to the description above, both deliberate:
+> - **`?simPerf=1` now works in production builds.** A dev build is unminified,
+>   unsplit React — its load time and parse cost describe no student's session,
+>   so instrumenting only dev would have made the gate impossible to close
+>   honestly. `localStorage["sim.perfLog"]` stays dev-only.
+> - **The table gained a thermal-decay line** (`fps last third ÷ first third`).
+>   §7.3 #13 is explicitly about the difference between a locked 30 and a 45→25
+>   decay — and those two runs have the same median *and* the same minimum, so
+>   nothing else in the table can tell them apart. It is also why an unattended
+>   run is 60 s rather than 10 s.
+
+---
+
+### 2.5 What P1 actually changed, measured
+
+Desktop measurements, Next 16.2.10 / Turbopack production build
+(`npx next build`), same machine, same commit apart from the change under test.
+
+**Composer code-split** — eager client chunks for the `/simulator` route, i.e.
+the JavaScript that must be downloaded *and executed* before the first frame:
+
+| | Eager chunks | Eager bytes | postprocessing |
+| --- | --- | --- | --- |
+| Static import (before) | 16 | **2,943,644 B** | inside a 1,321,458 B **eager** chunk |
+| `next/dynamic` (after) | 16 | **2,512,646 B** | a 385,879 B **lazy** chunk (169 KB gz) |
+
+**−430,998 B (−14.6%) of must-execute JavaScript**, and at tier `low` the
+composer module is now never *evaluated* at all.
+
+One honest correction to the estimate above: §2.3 predicted "≈400–660 ms of
+Android CPU" by applying §2.1's *compressed* parse rate (0.5–0.8 KB/ms) to
+`postprocessing.min.js`'s *raw* 330,491 B. Against the measured **169 KB
+gzipped** chunk the same rate gives **≈210–340 ms**. Still the largest
+single parse saving available on the route, but half the headline figure.
+
+**Tier seeding** — `loadQualityPreset()` (`lesson-ui/QualityPresetSelector`) is
+the simulator's only tier decision: it feeds `<SceneSlot quality>`, and
+HeroCarBody / VehicleRig / MirrorRig each call it directly. It cold-started on
+a flat `"medium"`, so a phone requested the med plan — **5,950,303 B including a
+1,596,163 B HDR** — instead of low's **725,950 B**. It now defers to
+`seedQualityFromSignals` when nothing is stored: **−5.22 MB on a phone's first
+visit**, which is when it matters.
+
+**Fleet** — `suv_boxy_lux` (22,672 tris / 16 materials) leaves the tier-`low`
+moving pool: **−~54k triangles and −16 draw calls** against budgets of 250k and
+70. Picks fall back to the kolos, so the traffic population, ids, lanes and
+speeds are unchanged and no bot-completion test moves.
+
+**Phone numbers remain predictions.** Nothing above was measured on an A16;
+these are desktop build-graph and byte measurements, which is all that can be
+measured without the device.
 
 ---
 
@@ -184,8 +247,8 @@ Ranked by **visual impact per hour**. Everything here is €0 in licences, CC0-o
 | V10 | **Hero car rebuild** — abandon the voxel remesh; loft from profile curves per `67_HERO_VEHICLE_SPEC`. Three tells to fix: panel gaps (door shutlines, hood, trunk, filler), a real wheel (sidewall + shoulder radius, rim barrel and dish, brake disc + caliper *behind* the spokes rather than a red box at 12 o'clock), and separate single-sided glass shells with pillar geometry + an inner wheelhouse so the arches stop being zero-thickness holes. Preserve the `wheel_FL/FR/RL/RR` rig contract and the 120–150k LOD2 ceiling. | 20 | ★★★☆☆ | post-launch |
 | V11 | **Offline baked AO + sun-shadow lightmaps, generated in Node at build time** — your unusual advantage: `buildWorldGeometry.ts` is a **pure deterministic Node function** ("no three.js, no DOM: runs identically in the browser and in vitest/node"), so you can bake all ~90 districts in CI with **no .blend file**. xatlas-web for UV2, three-mesh-bvh for the raycast, KTX2 out, bound as `lightMap` on the merged static meshes. Keep dynamic shadows for car + traffic only. Lets you turn N8AO **off** at `med` — ~1 ms/frame back on exactly the hardware you target. Keep atlases at 256²–512² per district or it eats the download tier. | 45 | ★★★☆☆ | post-launch |
 | V12 | **Sofia landmark backdrops** — a handful of hard-decimated photogrammetry meshes as far-field skyline dressing only. Cheap emotional hit ("that's my city"). Watch signage/faces for ADR-001/004. Texture budget is already at 86% of its 5.2 MB ceiling. | 30 | ★★☆☆☆ | optional |
-| — | **Bug: the rear-view mirror is a solid black rectangle** in the only shipped cockpit clip (`public/clips/sc-vp-readiness__m0.k2.png`), despite `MirrorRig.tsx` having a real 256×96 render target. A black mirror in the driver's eyeline is the most "unfinished" thing in the product. | 0.5 | — | **fix immediately** |
-| — | **Bookkeeping: `shanghai_riverside_1k.hdr` is shipping undocumented.** `LessonScene.tsx:944` loads it; `public/sim/LICENSES.md:13-18` lists only `sky_clear_1k.hdr` (unused) and `sky_urban_1k.hdr`. It *is* genuine Poly Haven CC0 — no legal exposure — but the licence register being wrong is exactly the bookkeeping that saved you from the Marlin pack. | 0.25 | — | do it |
+| — | **Bug: the rear-view mirror is a solid black rectangle** in the only shipped cockpit clip (`public/clips/sc-vp-readiness__m0.k2.webp`), despite `MirrorRig.tsx` having a real 256×96 render target. A black mirror in the driver's eyeline is the most "unfinished" thing in the product. **Re-verified 2026-07-26** against the WebP (the PNG master was pruned per §8): still black. | 0.5 | — | **fix immediately** |
+| — | **Bookkeeping: `shanghai_riverside_1k.hdr` is shipping undocumented.** `LessonScene.tsx:944` loads it; `public/sim/LICENSES.md:13-18` lists only `sky_clear_1k.hdr` (unused) and `sky_urban_1k.hdr`. It *is* genuine Poly Haven CC0 — no legal exposure — but the licence register being wrong is exactly the bookkeeping that saved you from the Marlin pack. **2026-07-26: done** — register rewritten, and the unused HDRI is gone (§8). | 0.25 | — | **done** |
 
 ### 3.3 The one dial to leave alone (for now)
 
@@ -317,7 +380,7 @@ Why these three, specifically:
 | Phase | Contents | Hours | Gate to exit |
 | --- | --- | --- | --- |
 | **P0 — Afternoon** | V1 markings · V2 clouds · V3 Vitosha · mirror bug · HDR licence line | **14.75** | Look at the new frames. Do they still read as a test level? |
-| **P1 — Envelope** | Buy the A16 and run `PerfProbe` over `chrome://inspect`; commit the log + a `.har` to `docs/` · drop `suv_boxy_lux` at `low` · seed the quality tier before first fetch · `next/dynamic` the composer · `webglcontextlost` telemetry | **13** + €125 | `68_ALPHA_RECONSTRUCTION_PLAN.md:191` finally ticked with a real artifact. **Every number in §2.2 is a prediction until this exists.** |
+| **P1 — Envelope** | Buy the A16 and run `PerfProbe` over `chrome://inspect`; commit the log + a `.har` to `docs/` · drop `suv_boxy_lux` at `low` · seed the quality tier before first fetch · `next/dynamic` the composer · `webglcontextlost` telemetry | **13** + €125 | `68_ALPHA_RECONSTRUCTION_PLAN.md:191` finally ticked with a real artifact. **Every number in §2.2 is a prediction until this exists.** — *2026-07-26: the four code fixes are done and measured on desktop (§2.5); the harness + procedure are at [`perf/README.md`](perf/README.md). The gate stays OPEN until an A16 log is committed.* |
 | **P2 — Turn the world on** | V4 decal density + junction wear + traffic/pedestrian defaults · V5 road surface pass (asphalt swap, darken, detail normal, UV density + 2-tap rotated blend) · F4 optic flow (inside V5) | **17** | Re-measure on the A16. Draws ≤70, tris ≤250k, 30 fps flat. Raise traffic **per-template**, not globally — ~90 bot-completion tests grade against gaps and conflicts. |
 | **P3 — Feel** | F1 grip-loss channel · F3 engine braking · F2 road vertical motion · audio-on prompt · F5 haptics | **26** | Re-baseline `sim-harness.mjs` + `harness.test.ts`. Ship every slice additive/gated so defaults stay bit-identical, then re-baseline deliberately. |
 | **P4 — Innovation core** | I1 calibration gate (**after** audit H-5/H-6 are closed) · I2 „Твоят дубъл" · I3 dual ghost · tutor `getSimWeakSpots` one-liner | **27** | A student can watch their own drive against the correct line and see how wrong their self-prediction was. **This is the point where the product becomes uncopyable.** |
@@ -388,13 +451,19 @@ Roughly **95 h of visual/feel work** (P0, P2, P3, P5) against **~87 h of mechani
 
 ## 8. Small corrections to make while you are in there
 
-| File | Issue |
-| --- | --- |
-| `platform/src/modules/tutor/retrieval.ts:20` | Comment says "46 authored violation specs". Real count is **52 violations + 6 commendations**. |
-| `platform/public/sim/LICENSES.md` | `shanghai_riverside_1k.hdr` is loaded (`LessonScene.tsx:944`) but undocumented; `sky_clear_1k.hdr` is documented but appears unused. |
-| `platform/public/clips/*.png` | **237 MB of PNG keyframes that no runtime code references** — the manifest references only the 4 MB WebP set. Delete before expanding the clip library. |
-| `platform/src/modules/sim/environment/__tests__/quality.test.ts:130` | Asserts `dpr 2 → "med"`; will need updating when the tier is seeded from device signals. |
-| `platform/src/components/sim/vitok/MirrorRig.tsx` | Mirror renders as a solid black rectangle in `public/clips/sc-vp-readiness__m0.k2.png` despite a real 256×96 render target. |
+**Status 2026-07-26: six of the seven are closed.** The one open item is the
+black mirror, which is a rendering bug and belongs to the §6.1 P0 visual bundle,
+not to this list.
+
+| File | Issue | Status |
+| --- | --- | --- |
+| `platform/src/modules/tutor/retrieval.ts:20` | Comment says "46 authored violation specs". Real count is **52 violations + 6 commendations**. | **done.** Both the header (`:12-13`) and the corpus note (`:193`) now say 52, and `:181` records *why* the six commendations are excluded rather than added: they carry no `lawRef`, so under ADR-002 they are not grounding material. Re-counted from `sim/rules/catalog.ts` on 2026-07-26 — 52 and 6 exactly. |
+| `platform/public/sim/LICENSES.md` | `shanghai_riverside_1k.hdr` is loaded (`LessonScene.tsx:944`) but undocumented; `sky_clear_1k.hdr` is documented but appears unused. | **done.** The register now carries a *loaded-by* table (day IBL / night IBL) rather than a bare inventory, because "we own a licence for it" and "we ship it" turned out to be different questions and only the second one has a byte cost. |
+| `platform/public/clips/*.png` | **237 MB of PNG keyframes that no runtime code references** — the manifest references only the 4 MB WebP set. Delete before expanding the clip library. | **done 2026-07-26 — 210 files, 247,317,007 B reclaimed.** Verified before the delete, not assumed: `manifest.json` resolves to 42 `.webm` + 210 `.webp` and **zero** `.png`; every `.webp` it names exists on disk and every `.webp` on disk is named by it; the only `.png`-shaped code left in the clip path is the dev capture route (`api/dev/clips/route.ts`), which *writes* new keyframes, and `clipKeyframeSrc()` (`clips/capture/manifest.ts:76`), which has **no call site** outside that route. Every consumer that reads keyframes — `clipManifest.ts`, `contact-sheet.mjs`, `keyframes-to-webp.mjs` — resolves them through the manifest, so all three followed the WebP. Deleted with the verified tool (`npm run clips:prune-png -- --apply` — the `--` matters, without it npm swallows the flag and the script only dry-runs), which independently refuses any PNG lacking a manifest-referenced WebP sibling; it reported 210 safe / 0 must-keep. `clips-keyframes` in `publicBudget.mjs` stays as a bucket — the capture route still produces PNGs, so the tripwire is still needed. **These were gitignored, so the delete is not revertible**; re-deriving them is the ~4.3 h GPU batch in §6.2 P7. |
+| `platform/src/modules/sim/environment/__tests__/quality.test.ts:130` | Asserts `dpr 2 → "med"`; will need updating when the tier is seeded from device signals. | **done — it did not need updating.** `recommendQuality`'s cold-start branch now delegates to `seedQualityFromSignals`, which reduces to exactly the shipped dpr-only rule when no other signal is known — so a bare `dpr: 2` still answers `"med"`, and a `dpr: 2` panel that is *also* touch-only now answers `"low"`. Both are asserted. |
+| `platform/src/modules/sim/environment/qualityStore.ts` | **`useAutoQualityProbe` is exported and never mounted** — no call site anywhere outside its own module. The simulator's real tier comes from `loadQualityPreset()` (`lesson-ui/QualityPresetSelector`), which had no probe and no seed at all. Found while implementing §2.3 fix 2. Consequence: **a wrong tier does not self-correct**, which is why the device seed is deliberately narrow (it only ever demotes a device with no fine pointer). | **recorded, deliberately not actioned.** Wiring the probe would change render tier mid-drive for an existing user, which is a product decision and not a correction. Left as a standing entry so the next reader finds the reasoning instead of rediscovering the dead export. |
+| `platform/public/sim/env/sky_clear_1k.hdr` | 1,522,032 B, `ship: "prod"`, referenced by **no runtime code and no authoring script** — ~11% of the sim's ~13.8 MB runtime payload shipping for nothing. | **deleted 2026-07-26 — 1,522,032 B off every deploy.** Re-verified by grep across `src/`, `scripts/`, `tools/` (including the Blender rigs, which load `sky_urban_1k.hdr`) before removing: the only mentions anywhere were this document and the licence register. Unlike the clip PNGs this file **is** tracked, so the removal is one `git checkout` away from being undone; its Poly Haven provenance stays in `public/sim/LICENSES.md` under a "Removed" heading, because a register that forgets what was once shipped cannot answer a later question about what was once shipped. The `sim-env` bucket ceiling in `publicBudget.mjs` was left at 6 MB rather than re-tightened around the two survivors — that is a tripwire calibration, and calibrating it against a payload that is still mid-change would just have to be redone. |
+| `platform/src/components/sim/vitok/MirrorRig.tsx` | Mirror renders as a solid black rectangle in `public/clips/sc-vp-readiness__m0.k2.webp` despite a real 256×96 render target. | **open.** Re-confirmed against the frame on 2026-07-26 — still a pure black rectangle in the driver's eyeline. Owned by the §6.1 P0 visual bundle (`| — | Bug: …` in §3.2), not by an asset pass. |
 
 ---
 

@@ -23,6 +23,17 @@
 - [ ] Founder visual audit of all 150 scenarios (the review-reel; the Half-B reels double as this)
 - [ ] 2 pilot taste-pass fixes still open: emergency-lane hard-block, overtake-ban reframe
 
+### 2a. Quality & Innovation program — `docs/simulation/82` (opened 2026-07-25)
+The founder's verdict was *"a very basic Minecraft server with a car"*. Doc 82's finding: the renderer is the **strongest** part of the product; the worlds are empty. Four parallel workstreams:
+- [x] **§2 Performance envelope (desktop half)** — the three budgets (phone/laptop/desktop) are transcribed into `environment/perfBudget.ts` and unit-tested; `PerfProbe` scores real per-second windows against them and emits a markdown artifact via `platform/scripts/perf-report.mjs`. §2.3's four structural fixes landed and are measured in §2.5: composer code-split (**−431 KB** of must-execute JS), device-signal tier seed (**−5.22 MB** on a phone's first visit), `suv_boxy_lux` out of the tier-`low` pool (−54k tris / −16 draws), `webglcontextlost` telemetry.
+- [ ] **§2.4 THE PHONE GATE — still open, and every §2.2 number is a prediction until it closes.** A €125 Galaxy A16 over `chrome://inspect`, one 60-second `?simPerf=1` run, artifact committed to `docs/simulation/perf/`. Also unchecks `docs/simulation/68:191`. **Emulators do not emulate the GPU and will give a false green.**
+- [~] **§3 Visual plan / §4 Feel plan** — the ~14 h P0 bundle (V1 lane markings · V2 cloud layer · V3 Vitosha ridge) and the feel work. In flight; the lanes tick their own items.
+- [~] **§5 Genuine innovation** — the section that answers *"innovative"* (prettier is only §3). In flight.
+- [ ] **Black rear-view mirror** (§3.2, §8) — `MirrorRig.tsx` has a real 256×96 render target but the glass renders solid black in the driver's eyeline. Re-confirmed 2026-07-26. 0.5 h, "fix immediately".
+- [x] **§8 small corrections — 6 of 7 closed** (2026-07-26). Rule-catalog count in the tutor's retrieval header, the `public/sim/` licence register (now a *loaded-by* table, not an inventory), the tier-seed test, the dead `useAutoQualityProbe` export (recorded, deliberately not wired — it would change tier mid-drive). Remaining: the mirror, above.
+- [x] **Asset hygiene** — 210 clip PNG keyframes (**247.3 MB**) pruned after verifying the manifest names only the WebP set, and `sky_clear_1k.hdr` (**1.5 MB**, referenced by nothing) removed from the deploy. `public/` fell 492.5 MB → 255.2 MB; the *deployed* half 181.0 → 179.6 MB.
+- Not to be done: **§7** is a list of expensive things that would not help — `PERCEPTUAL_ROAD_SCALE` in particular (§3.3) is pinned by dozens of absolute-coordinate tests and would misfire the rule engine.
+
 ## 3. Infra / ops
 - [x] Staging (VPS `knijka` :3100 + rotating cloudflare quick-tunnel), two-dev protocol, CI gate
 - [ ] Stable NAMED staging tunnel (fixed domain — the quick-tunnel URL keeps rotating/lost)
@@ -36,6 +47,8 @@
 - Hook scripts: `.claude/hooks-inject-map.js`, `-precompact.js`, `-sessionend.js`. Task-memory keeps the ACTIVE thread; this Map = the whole vision.
 
 ---
-*Last updated: 2026-07-25 — FULL AUDIT (docs/80_FULL_AUDIT_2026-07-24.md) executed in full at commit 165a58b: 1005/1089 questions approved, answer-leak + 4 rule-engine false-fails + GDPR + entitlements + perf + ops + 2 innovations shipped. Gate: tsc 0 / 7281 tests / build OK.*
+*Last updated: 2026-07-26 — the **Simulator Quality & Innovation program** (docs/simulation/82) opened §2a above. Landed so far: the §2 performance envelope's desktop half + its four structural fixes, and 6 of the 7 §8 corrections including 248.8 MB of verified-unreferenced assets pruned. The one thing that would change the founder's verdict and has NOT happened is **§2.4, the phone measurement** — nothing in §2.2 is evidence until an A16 log is committed.*
+
+*Previously updated: 2026-07-25 — FULL AUDIT (docs/80_FULL_AUDIT_2026-07-24.md) executed in full at commit 165a58b: 1005/1089 questions approved, answer-leak + 4 rule-engine false-fails + GDPR + entitlements + perf + ops + 2 innovations shipped. Gate: tsc 0 / 7281 tests / build OK.*
 
 *Previously updated: 2026-07-21. When you touch a component, update its checkbox + status here.*

@@ -50,8 +50,44 @@ export interface TutorQuota {
   remaining: number;
   /** The free-tier lifetime trial size (constant, for UI copy: "X от 5"). */
   limit: number;
-  /** True for users with an active pack — no trial cap applies. */
+  /**
+   * True for users with an active pack — no TRIAL cap applies to them.
+   *
+   * Not the same as "no cap at all": what a pack buys is bounded by
+   * TutorPackAllowance below, which is a different question asked at a
+   * different choke point (askTutor, not the page's trial gate).
+   */
   unlimited: boolean;
+}
+
+/**
+ * What a PURCHASED pack buys in tutor questions (quota.ts
+ * checkTutorPackAllowance; doc 81 §5.3 for the economics behind the number).
+ *
+ * Deliberately not a credit balance: it is counted from questions already
+ * asked, never spent from a stored total, and it is only ever rendered as
+ * questions — never as money (doc 81 §5.4).
+ */
+export interface TutorPackAllowance {
+  /**
+   * False when the account has NO active pack. Read this before `allowed`:
+   * free accounts are governed by the lifetime trial (TutorQuota) instead, so
+   * this rule has no opinion about them and says so rather than voting.
+   */
+  applies: boolean;
+  /** May the user spend another question against the pack's allowance? */
+  allowed: boolean;
+  /** Questions asked inside the counted window. 0 when `applies` is false. */
+  used: number;
+  /**
+   * Questions left in the pack. `Number.POSITIVE_INFINITY` when `applies` is
+   * false — again, "this rule is not the one limiting you", not "unlimited".
+   */
+  remaining: number;
+  /** The allowance this account has (TUTOR_PACK_QUESTION_ALLOWANCE per pack). */
+  limit: number;
+  /** Start of the counted window: the earliest ACTIVE purchase, else null. */
+  since: Date | null;
 }
 
 /** Daily free-tier practice allowance (see quota.ts for the rules). */

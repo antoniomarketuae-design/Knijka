@@ -22,7 +22,7 @@ import {
   useState,
 } from "react";
 import Link from "next/link";
-import { Canvas, useFrame, useThree } from "@react-three/fiber";
+import { Canvas, useFrame } from "@react-three/fiber";
 import { Environment } from "@react-three/drei";
 import { Physics } from "@react-three/rapier";
 import { Euler, type Group } from "three";
@@ -94,9 +94,11 @@ import {
 import {
   SimEnvironment,
   WindshieldDroplets,
+  mapKindHasSkyline,
   QUALITY_PRESETS,
   RAIN_IBL_DIM,
-  type QualityLevel,
+  PerfProbe,
+  GlContextGuard,
 } from "@/modules/sim/environment";
 import {
   DistrictWorld,
@@ -121,6 +123,7 @@ import { CabinControls, type MirrorGlanceKind } from "@/modules/sim/scene/cabin"
 import { TouchControls } from "./TouchControls";
 import { CockpitInteractionContext } from "@/modules/sim/scene/vitok/hotspots";
 import { SimAudio } from "@/modules/sim/scene/simAudio";
+import { AudioLessonPrompt } from "./AudioLessonPrompt";
 import { CameraRig, type CameraMode } from "./CameraRig";
 import { VehicleRig, type CollisionWithWhat, type VehicleSpawn } from "./VehicleRig";
 import { NpcColliders } from "./NpcColliders";
@@ -180,12 +183,27 @@ const NIGHT_ENV_ROTATION = new Euler(0, 0, 0);
 /** P1: localStorage key marking the one-time touch orientation hint as seen. */
 const TOUCH_HINT_STORAGE_KEY = "sim.touchHintSeen";
 
-/** Dev perf readout opt-in (never in production builds): `?simPerf=1` on the
- *  URL or `localStorage["sim.perfLog"]="1"`. Read once at scene mount. */
+/**
+ * Perf readout opt-in: `?simPerf=1` on the URL, or `localStorage["sim.perfLog"]
+ * ="1"` in a dev build. Read once at scene mount.
+ *
+ * THE URL FLAG WORKS IN PRODUCTION, ON PURPOSE (doc 82 §6.2). The A16
+ * measurement that gates every later phase has to be taken on a PRODUCTION
+ * build — a dev build runs unminified React with no chunk splitting, so it
+ * would report a load time and a parse cost that describe no student's
+ * session. Refusing to instrument production would mean the gate could only
+ * ever be closed with a number that is wrong in the pessimistic direction,
+ * which is not honest either.
+ *
+ * What it costs a real user who never types the flag: nothing — the probe is
+ * not mounted. What it costs one who does: console output only. Nothing is
+ * transmitted (ADR-004); see PerfProbe's header. The localStorage path stays
+ * dev-only so a stray key cannot make a student's session log forever.
+ */
 function shouldLogPerf(): boolean {
-  if (process.env.NODE_ENV === "production") return false;
   try {
     if (new URLSearchParams(window.location.search).has("simPerf")) return true;
+    if (process.env.NODE_ENV === "production") return false;
     return window.localStorage.getItem("sim.perfLog") === "1";
   } catch {
     return false;
@@ -920,7 +938,22 @@ function ReadyScene({
         }}
       >
         {perfLog ? <PerfProbe level={level} /> : null}
-        <SimEnvironment timeOfDay={timeOfDay} rain={rain} fog={fogWeather} snow={snowWeather} quality={level} />
+        {/* Always on (doc 82 §2.3 fix 4): on a 4 GB phone an OOM presents as a
+            silent black canvas. Costs two DOM listeners and renders nothing;
+            everything it records stays on the device (ADR-004). */}
+        <GlContextGuard level={level} />
+        {/* `skyline` comes from the MAP, not from this component: the fenced
+            полигон and the parking lots have no far horizon, so the Vitosha
+            ridge is gated off there (doc 82 §3.2 V3). Everything else is a
+            Sofia street and keeps it. */}
+        <SimEnvironment
+          timeOfDay={timeOfDay}
+          rain={rain}
+          fog={fogWeather}
+          snow={snowWeather}
+          skyline={mapKindHasSkyline(district.meta.mapKind)}
+          quality={level}
+        />
         {/* HDRI image-based lighting — real sky reflections/ambient for PBR
             materials, glass, mirrors and car paint. background=false keeps
             SimEnvironment's animated sky dome. Day uses the golden-hour
@@ -1102,6 +1135,11 @@ function ReadyScene({
               hazardActiveRef={hazardActiveRef}
               // Perf tier (doc 71): SUV clearcoat on the high tier only.
               clearcoat={level === "high"}
+              // Perf tier (doc 82 §2.3): at `low` the 22,672-tri / 16-material
+              // hero SUV leaves the pool entirely — ~54k triangles and 16 draw
+              // calls against a ≤250k / ≤70 phone budget. The picks fall back
+              // to the kolos, so the traffic population is unchanged.
+              dropHeavyFleetModels={level === "low"}
               // JU-18: the officer FIGURE reads the controller schedule
               // through the runtime — the same channel + clock the stop-line
               // adjudication uses — so the posture turns exactly when the
@@ -1175,6 +1213,14 @@ function ReadyScene({
           frame-loop wiring, no grading read/write). hidden while any pause/
           quiz/teach/end overlay is up (physicsPaused ∪ shell paused). */}
       <RearProximityCue traffic={traffic} sampleRef={sampleRef} hidden={physicsPaused} />
+
+      {/* „Звукът е част от урока" (doc 82 §4.4, isolated additive block).
+          A muted session teaches a systematically FASTER car than the student
+          will really drive (~3.2 km/h over-production without audio, ~10% in
+          visual-only sims) — so audio is stated as pedagogy, once, at the
+          same gesture that unlocks the AudioContext above. Self-polling off
+          audioRef; dismissible and then permanently silent. */}
+      <AudioLessonPrompt audioRef={audioRef} hidden={physicsPaused} />
 
       {/* S0-View ?ghost=demo: playback deck for the Shadow Car — scrub bar,
           speeds, annotation ticks, step-by-step, loop-section. */}
@@ -1307,61 +1353,6 @@ function ReadyScene({
       ) : null}
     </div>
   );
-}
-
-/**
- * Dev-only whole-frame renderer stats (opt-in via shouldLogPerf), logged to
- * the console once per second: fps, draw calls and triangles PER FRAME —
- * including the A4 mirror RTT passes and the composer's internal passes.
- * That's why `gl.info.autoReset` is turned off (three would otherwise zero
- * the counters after EVERY gl.render, leaving only the last pass visible)
- * and the counters are read + reset manually at the START of each frame
- * (useFrame priority -100 — before MirrorRig's pass at 0 and the composer's
- * render at 1), so each read captures the full previous frame.
- * Budget lines to compare against: doc quality-gap/13 §1 — ≤150 draws
- * (laptop iGPU) / ≤75 (phone), ≤750k/300k tris.
- */
-function PerfProbe({ level }: { level: QualityLevel }) {
-  const gl = useThree((s) => s.gl);
-  useEffect(() => {
-    gl.info.autoReset = false;
-    return () => {
-      gl.info.autoReset = true;
-      gl.info.reset();
-    };
-  }, [gl]);
-  // One-line readout of the active tier + the feature gates it selected, so the
-  // founder's probe shows which facade/clearcoat path this run is on.
-  useEffect(() => {
-    const p = QUALITY_PRESETS[level];
-    console.info(
-      `[sim-perf] tier=${level} facadeMaps=${p.facadeMaps} clearcoat=${p.clearcoat}`,
-    );
-  }, [level]);
-  const accRef = useRef({ frames: 0, calls: 0, tris: 0, windowStart: -1 });
-  useFrame((state) => {
-    const acc = accRef.current;
-    acc.frames += 1;
-    acc.calls += gl.info.render.calls;
-    acc.tris += gl.info.render.triangles;
-    gl.info.reset();
-    const now = state.clock.elapsedTime;
-    if (acc.windowStart < 0) acc.windowStart = now;
-    const span = now - acc.windowStart;
-    if (span >= 1) {
-      console.info(
-        `[sim-perf] fps=${(acc.frames / span).toFixed(0)}` +
-          ` draws/frame=${Math.round(acc.calls / acc.frames)}` +
-          ` tris/frame=${Math.round(acc.tris / acc.frames / 1000)}k` +
-          ` programs=${gl.info.programs?.length ?? 0}`,
-      );
-      acc.frames = 0;
-      acc.calls = 0;
-      acc.tris = 0;
-      acc.windowStart = now;
-    }
-  }, -100);
-  return null;
 }
 
 /**

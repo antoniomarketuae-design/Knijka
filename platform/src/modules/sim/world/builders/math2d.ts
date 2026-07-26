@@ -352,3 +352,63 @@ export class SegmentGrid {
     return best;
   }
 }
+
+// ---------------------------------------------------------------------------
+// Spatial hash over building AABBs (near-a-building queries)
+// ---------------------------------------------------------------------------
+
+/**
+ * The same trick as SegmentGrid, for the „is this point near a building"
+ * predicate that terrain.ts (paved-vs-grass zoning, relief masking) and
+ * props.ts (tree/prop rejection) each ran as a LINEAR scan over every footprint
+ * AABB — once per terrain cell and once per prop candidate.
+ *
+ * That was fine at 248 footprints. Doc 82 V7 puts 380 on `d2-v1` alone, and the
+ * cost is a product: 112 × 112 terrain cells × N buildings. Measured on d2, the
+ * scan took `buildWorldGeometry` from 204 ms to 345 ms — a load-time cost paid
+ * on the main thread by exactly the mid-range phone §2.2 is written for.
+ *
+ * The predicate is UNCHANGED, so the classification of every cell and every
+ * prop is bit-identical: a box is inserted into the cells it covers, and a
+ * query at `pad` only has to look `ceil(pad / cellSize)` cells out, because a
+ * box within `pad` of `p` must cover a cell that close.
+ */
+export class AabbGrid {
+  private cells = new Map<string, [number, number, number, number][]>();
+  private empty = true;
+  constructor(private cellSize: number) {}
+
+  add(box: [number, number, number, number]): void {
+    this.empty = false;
+    const minX = Math.floor(box[0] / this.cellSize);
+    const maxX = Math.floor(box[2] / this.cellSize);
+    const minY = Math.floor(box[1] / this.cellSize);
+    const maxY = Math.floor(box[3] / this.cellSize);
+    for (let cx = minX; cx <= maxX; cx++) {
+      for (let cy = minY; cy <= maxY; cy++) {
+        const key = `${cx},${cy}`;
+        let bucket = this.cells.get(key);
+        if (!bucket) this.cells.set(key, (bucket = []));
+        bucket.push(box);
+      }
+    }
+  }
+
+  /** True when `p` is strictly inside some stored box expanded by `pad`. */
+  hits(p: Vec2, pad: number): boolean {
+    if (this.empty) return false;
+    const r = Math.ceil(pad / this.cellSize);
+    const cx = Math.floor(p[0] / this.cellSize);
+    const cy = Math.floor(p[1] / this.cellSize);
+    for (let dx = -r; dx <= r; dx++) {
+      for (let dy = -r; dy <= r; dy++) {
+        const bucket = this.cells.get(`${cx + dx},${cy + dy}`);
+        if (!bucket) continue;
+        for (const [x0, y0, x1, y1] of bucket) {
+          if (p[0] > x0 - pad && p[0] < x1 + pad && p[1] > y0 - pad && p[1] < y1 + pad) return true;
+        }
+      }
+    }
+    return false;
+  }
+}

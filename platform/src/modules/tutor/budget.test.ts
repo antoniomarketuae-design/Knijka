@@ -12,6 +12,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { setContentRepo } from "@/lib/content/repo";
 import { getReadiness } from "@/modules/learning";
+import {
+  InMemoryPaymentsStore,
+  setPaymentsStore,
+  TUTOR_PACK_QUESTION_ALLOWANCE,
+} from "@/modules/payments";
 import { resetRateLimitState } from "@/modules/security";
 import {
   checkDailyBudget,
@@ -30,13 +35,17 @@ import { setTutorModel } from "./model";
 import { askTutor } from "./service";
 import { setTutorStore } from "./store";
 
-vi.mock("@/modules/learning", () => ({ getReadiness: vi.fn() }));
+vi.mock("@/modules/learning", () => ({
+  getReadiness: vi.fn(),
+  getSimWeakSpots: vi.fn(),
+}));
 
 const USER = "user-1";
 const REPLY = "Пропускаш идващите по пътя с предимство [ЗДвП чл. 47].";
 
 let store: FakeTutorStore;
 let model: FakeTutorModel;
+let payments: InMemoryPaymentsStore;
 
 beforeEach(() => {
   resetRateLimitState();
@@ -45,6 +54,10 @@ beforeEach(() => {
   model = new FakeTutorModel(REPLY);
   setTutorStore(store);
   setTutorModel(model);
+  // askTutor reads the per-pack allowance before the ceiling (doc 81 §5.3);
+  // injected empty, so nothing in this file is a pack holder unless it says so.
+  payments = new InMemoryPaymentsStore();
+  setPaymentsStore(payments);
   vi.stubEnv("ANTHROPIC_API_KEY", "sk-test-not-real");
   vi.mocked(getReadiness).mockResolvedValue({
     score: 40,
@@ -56,6 +69,7 @@ beforeEach(() => {
 afterEach(() => {
   setTutorStore(null);
   setTutorModel(null);
+  setPaymentsStore(null);
   vi.unstubAllEnvs();
   vi.clearAllMocks();
 });
@@ -77,6 +91,29 @@ describe("the configured ceiling", () => {
 
     vi.stubEnv("TUTOR_DAILY_BUDGET_USD", "12.5");
     expect(tutorDailyBudgetMicroUsd()).toBe(12_500_000);
+  });
+
+  it("is sized for a launch cohort, not against a single abuser (doc 81 §5.2)", () => {
+    // $5 bought 438 answers/day — fewer than 500 active students asking three
+    // questions each. This ceiling is a SITE-WIDE brownout switch, so sizing
+    // it to survive abuse meant it would trip mid-morning on the best real
+    // traffic day and show every student TUTOR_BUDGET_REPLY_BG until midnight.
+    expect(TUTOR_DAILY_BUDGET_USD_DEFAULT).toBe(40);
+  });
+
+  it("is only safe because the per-pack allowance exists — they ship together", () => {
+    // Doc 81 §5.3: „never separately". Before the allowance, this global
+    // number was the only HARD brake on one determined user, so raising it
+    // eightfold alone would have removed the only brake there was.
+    //
+    // The invariant that says the pairing is sound: ONE student burning their
+    // ENTIRE pack allowance in a single day still cannot spend the day's
+    // ceiling, so no individual can brown out the class. If the allowance is
+    // ever deleted or inflated, this fails and points here.
+    const answersPerDay =
+      tutorDailyBudgetMicroUsd() / computeCostMicroUsd(2800, 200);
+    expect(TUTOR_PACK_QUESTION_ALLOWANCE).toBeGreaterThan(0);
+    expect(TUTOR_PACK_QUESTION_ALLOWANCE).toBeLessThan(answersPerDay);
   });
 
   it("ignores nonsense rather than degrading to a zero budget", () => {
@@ -119,6 +156,28 @@ describe("askTutor under the kill-switch", () => {
     // Nothing was persisted as an exchange, so the student's own daily
     // allowance is not burned by a question that was never answered.
     expect(store.saveExchangeCalls).toHaveLength(0);
+  });
+
+  it("still stops a PACK HOLDER with allowance to spare", async () => {
+    // The ceiling outranks the allowance: it protects the founder's card, and
+    // the allowance protects the margin on one sale. A student with 300
+    // untouched questions must still be told the site is out for today —
+    // otherwise the raise from $5 to $40 has no floor under it at all.
+    await payments.createEntitlement({
+      userId: USER,
+      pack: "core",
+      purchasedAt: new Date(Date.now() - 24 * 60 * 60 * 1000),
+      expiresAt: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000),
+      provider: "stripe",
+      providerRef: "cs_test_core",
+    });
+    vi.stubEnv("TUTOR_DAILY_BUDGET_USD", "1");
+    store.seedDaySpend(sofiaDayKey(), 1_000_000);
+
+    const result = await askTutor(USER, "Кога имам предимство?");
+
+    expect(model.completeCalls).toHaveLength(0);
+    expect(result.reply).toBe(TUTOR_BUDGET_REPLY_BG);
   });
 
   it("keeps answering while the budget still has room", async () => {

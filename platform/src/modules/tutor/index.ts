@@ -12,6 +12,7 @@
 export {
   askTutor,
   getThread,
+  getTutorAllowance,
   TUTOR_DAILY_MESSAGE_LIMIT,
   TUTOR_LIMIT_REPLY_BG,
   TUTOR_MAX_INPUT_LENGTH,
@@ -35,3 +36,43 @@ export {
   TUTOR_DAILY_BUDGET_USD_DEFAULT,
 } from "./budget";
 export type { TutorBudgetState } from "./budget";
+
+// What a pack buys in tutor questions, in the Учител's own words. The RULE is
+// payments' (checkTutorPackAllowance); getTutorAllowance above answers it for
+// a given student, and these two turn that answer into something a
+// 17-year-old reads without feeling metered (doc 81 §5.3).
+export {
+  tutorAllowanceNoticeBg,
+  tutorAllowanceSpentReplyBg,
+  TUTOR_ALLOWANCE_NOTICE_FRACTION,
+} from "./allowance";
+
+// WHEN the tutor is allowed to speak in the driving loop (doc 81 §4.3). Pure
+// and dependency-free, so the sim shell adapts its SimTick into SpeakGateTick
+// and consumes the decision through this barrel — the tutor's speaking policy
+// stays in one place, and the sim never reaches into the tutor's internals.
+//
+// The audio it names is PRE-RENDERED (tools/theory/synthesize_bg.mjs): the gate
+// carries an utteranceId, never a sentence, so nothing unauthored can reach a
+// student's ears in the fast lane. No LLM, no network, no ADR-002 surface.
+export {
+  createSpeakGateState,
+  isSafeToInterrupt,
+  observeSpeakTick,
+  SPEAK_CODE_LOCKOUT_SEC,
+  SPEAK_COOLDOWN_SEC,
+  SPEAK_MAX_PER_SESSION,
+  SPEAK_QUEUE_MAX_WAIT_SEC,
+  SPEAK_SAFE_LEAD_GAP_M,
+  SPEAK_SAFE_SPEED_KMH,
+  SPEAK_MANOEUVRE_QUIET_SEC,
+  SPEAK_TOAST_QUIET_SEC,
+  SPEAK_TRIGGER_PRIORITY,
+} from "./speakGate";
+export type {
+  SpeakGateResult,
+  SpeakGateState,
+  SpeakGateTick,
+  SpeakRequest,
+  SpeakTrigger,
+} from "./speakGate";

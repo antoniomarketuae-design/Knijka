@@ -110,6 +110,17 @@ export const BOXY_INDEX = FLEET.length - 2;
 /** Max simultaneous hero-SUV instances (heavier: 14 body groups + 6 wheel
  *  draws). Overflow reassigns to the kolos (same boxy-SUV archetype). */
 export const BOXY_MAX_INSTANCES = 2;
+/**
+ * The tier-`low` cap: ZERO (doc 82 §2.3, "best effort-to-win ratio in the
+ * entire codebase"). The model is 22,672 triangles across 16 materials against
+ * 180–280 triangles for every other fleet car, and it spawns ~1 in 21 — at the
+ * phone tier's ≤70 draws / ≤250k triangles per frame (§2.2) two of them are
+ * ~54k triangles and 16 draw calls spent on one constant-coloured background
+ * car. Overflow already falls back to the kolos, the ambient boxy-SUV
+ * archetype, so the street still reads the same; the silhouette a student
+ * needs for a right-of-way judgement is unchanged.
+ */
+export const BOXY_MAX_INSTANCES_LOW = 0;
 const BOXY_FALLBACK_INDEX = FLEET.indexOf("kolos");
 
 // ---------------------------------------------------------------------------
@@ -1555,6 +1566,15 @@ export interface BuildTrafficFleetOptions {
    * affected; the rest of the fleet is MeshStandard regardless.
    */
   clearcoat?: boolean;
+  /**
+   * Max simultaneous hero boxy-SUV instances. Defaults to BOXY_MAX_INSTANCES
+   * (2) so every existing caller and every headless test keeps its exact
+   * population; TrafficLayer passes BOXY_MAX_INSTANCES_LOW (0) at tier `low`
+   * to drop it entirely (doc 82 §2.3). Overflow becomes a kolos either way, so
+   * the vehicle COUNT, its id, lane, speed and every conflict the rule engine
+   * grades are untouched — this changes which GLB is drawn, nothing else.
+   */
+  boxyMaxInstances?: number;
 }
 
 export interface TrafficFleet {
@@ -1621,6 +1641,9 @@ export function buildTrafficFleet(
   // full look (and the existing headless tests) are preserved when a caller
   // does not opt in.
   const clearcoat = opts.clearcoat ?? true;
+  // Tier gate for the hero boxy SUV POPULATION (doc 82 §2.3). Defaults to the
+  // shipped cap so nothing changes unless a caller opts in.
+  const boxyMax = opts.boxyMaxInstances ?? BOXY_MAX_INSTANCES;
   const rigs = scenes.map((s, m) => extractModelRig(s, m, clearcoat));
   // FO-06 profile slot: the procedural box truck rides AFTER the GLB models
   // (TRUCK_MODEL_INDEX). Costs nothing unless a truck-profile vehicle exists
@@ -1656,8 +1679,9 @@ export function buildTrafficFleet(
   for (let i = 0; i < nVeh; i++) {
     // Profile override (staged large vehicles) → deterministic fleet pick.
     let m = modelForVehicle(vehicles[i]);
-    // Hero-SUV cap: it costs ~4× a fleet car; overflow becomes a kolos.
-    if (m === BOXY_INDEX && counts[m] >= BOXY_MAX_INSTANCES) m = BOXY_FALLBACK_INDEX;
+    // Hero-SUV cap: it costs ~4× a fleet car; overflow becomes a kolos. At
+    // `boxyMax` 0 (tier low) every pick falls back — the model never spawns.
+    if (m === BOXY_INDEX && counts[m] >= boxyMax) m = BOXY_FALLBACK_INDEX;
     assign[i] = m;
     slot[i] = counts[m]++;
   }

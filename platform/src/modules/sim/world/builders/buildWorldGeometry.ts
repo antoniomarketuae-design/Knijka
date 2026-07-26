@@ -32,8 +32,6 @@ export function buildWorldGeometry(
 ): WorldGeometry {
   const network = analyzeNetwork(district, options.junctionRadiusOverrides);
   const roads = buildRoads(network);
-  // Seeded street-wear decal batch (cracks/patches/manholes) — one draw call.
-  const decals = buildRoadDecals(network, options.seed ?? DEFAULT_SEED);
   // Standing-water sheets over waterPatch zone spans (aquaplane visibility
   // slice) — one merged mesh, zero quads on every map without live spans.
   const water = buildWaterDecals(district, network);
@@ -60,6 +58,14 @@ export function buildWorldGeometry(
     props.giveWayApproaches,
     options.parkingBays ?? LESSON_PARKING_BAYS,
   );
+  // Seeded street-wear decal batch (cracks/patches/manholes) — one draw call.
+  // Covers ribbons AND junction interiors since doc 82 V4; still one mesh.
+  // Runs AFTER buildMarkings on purpose: every decal is vetted against the
+  // painted markings mesh so no wear lands under a stop line, a zebra bar or
+  // a lane line (decals.ts MarkingKeepOut). The markings themselves are
+  // untouched by this — buildMarkings reads nothing the decal pass writes, so
+  // the paint buffers stay byte-identical to the old build order.
+  const decals = buildRoadDecals(network, options.seed ?? DEFAULT_SEED, markings.markings);
   // Terrain resolution is fixed in the pure layer; the renderer decimates by
   // quality via the `terrainSegments` option of its own rebuild if needed.
   const terrain = buildTerrain(district, network, buildings.aabbs, 112);
@@ -129,6 +135,7 @@ export function buildWorldGeometry(
     parkingBays: markings.parkingBays,
     parkingLaneStrips: roads.parkingLaneStripCount,
     roadDecals: decals.count,
+    junctionDecals: decals.junctionCount,
     waterDecals: water.count,
     railTrackQuads: rail.deckQuads + rail.railQuads,
     buildings: buildings.count,

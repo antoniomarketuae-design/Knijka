@@ -36,10 +36,22 @@ export interface TutorPromptInput {
   materials: RetrievedItem[];
   /** titleBg of the student's weakest concepts (from learning readiness). */
   weakestConceptTitlesBg: string[];
+  /**
+   * What the student actually got wrong BEHIND THE WHEEL recently — one line
+   * per concept, already rendered by the caller (doc 81 §1.4, D4).
+   *
+   * Theory readiness and sim evidence are two different pictures of the same
+   * student, and the tutor knew only the first: it had no idea you failed to
+   * yield three times in the simulator last week. Kept as a separate block
+   * rather than merged into the weak concepts, because the student recognises
+   * „в симулатора" and it is the difference between a generic nudge and the
+   * tutor sounding like it was in the car.
+   */
+  simWeakSpotsBg?: string[];
 }
 
 export function buildTutorSystemPrompt(input: TutorPromptInput): string {
-  const { materials, weakestConceptTitlesBg } = input;
+  const { materials, weakestConceptTitlesBg, simWeakSpotsBg = [] } = input;
 
   const materialsBlock =
     materials.length === 0
@@ -65,6 +77,11 @@ export function buildTutorSystemPrompt(input: TutorPromptInput): string {
       ? "(няма данни — ученикът тепърва започва)"
       : weakestConceptTitlesBg.map((t) => `- ${t}`).join("\n");
 
+  const simBlock =
+    simWeakSpotsBg.length === 0
+      ? "(няма скорошни карания в симулатора)"
+      : simWeakSpotsBg.map((t) => `- ${t}`).join("\n");
+
   return [
     "Ти си „Учителят“ — личният AI инструктор по теория за шофьорския изпит в Книжка.AI.",
     "",
@@ -81,6 +98,9 @@ export function buildTutorSystemPrompt(input: TutorPromptInput): string {
     "",
     "СЛАБИ МЕСТА НА УЧЕНИКА (най-слаби понятия, най-слабото първо):",
     weakBlock,
+    "",
+    "ГРЕШКИ НА УЧЕНИКА В СИМУЛАТОРА (последните дни, най-тежката първа):",
+    simBlock,
   ].join("\n");
 }
 

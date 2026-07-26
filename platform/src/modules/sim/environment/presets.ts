@@ -55,6 +55,22 @@ export interface SkySpec {
   sunGlowPower: number;
   /** 0..1 procedural starfield strength (night only). */
   starsIntensity: number;
+  /**
+   * 0..1 fraction of the dome the two-octave FBM cloud deck covers
+   * (doc 82 V2 — the shipped sky was mix(zenith, horizon) + a sun disc over
+   * 35–45 % of every frame). Rain lerps this toward RAIN_CLOUD_COVER.
+   */
+  cloudCover: number;
+  /** Opacity of the deck where it covers. 0 disables the whole branch. */
+  cloudDensity: number;
+  /** Top-side cloud colour. The sun-facing rim adds `sunTint` on top of it,
+   *  so this is the SHADED value, not the lit one. */
+  cloudColor: string;
+  /** 0..1 strength of the Vitosha ridge silhouette (doc 82 V3). */
+  ridgeStrength: number;
+  /** Ridge colour at the crest. Already haze-lifted per preset — the shader
+   *  blends the massif's feet into `horizon` on top of this. */
+  ridgeColor: string;
 }
 
 /** The two-light rig: one hemisphere fill + one directional key (sun or moon). */
@@ -203,6 +219,18 @@ export const ENVIRONMENT_PRESETS: Record<TimeOfDay, EnvironmentPreset> = {
       sunGlowIntensity: 0.35, // visible warm glow
       sunGlowPower: 14, // wider falloff
       starsIntensity: 0,
+      // Broken afternoon cumulus — enough sky left for the blue zenith to
+      // still read, enough deck that the frame is no longer an empty
+      // gradient. Warm near-white: at 22° the sun is already lighting the
+      // cloud tops from the side.
+      cloudCover: 0.42,
+      cloudDensity: 0.85,
+      cloudColor: "#fdf6ea",
+      // Vitosha in full daylight haze: a desaturated blue-grey that is
+      // COOLER than the warm #f4c78e horizon. That hue split is what sells
+      // 15 km of air between the city and the massif.
+      ridgeStrength: 1,
+      ridgeColor: "#8a9ab4",
     },
     light: {
       sun: { azimuthDeg: 245, elevationDeg: 22, color: "#ffd9a0", intensity: 1.9 },
@@ -239,6 +267,15 @@ export const ENVIRONMENT_PRESETS: Record<TimeOfDay, EnvironmentPreset> = {
       sunGlowIntensity: 0.55,
       sunGlowPower: 7,
       starsIntensity: 0.12,
+      // An 8° sun underlights the deck from below — the cloud base goes warm
+      // and the cover thickens as the evening inversion sets in.
+      cloudCover: 0.5,
+      cloudDensity: 0.9,
+      cloudColor: "#ffcfa4",
+      // The massif goes violet-grey against the orange band well before the
+      // city does.
+      ridgeStrength: 1,
+      ridgeColor: "#6b6a86",
     },
     light: {
       sun: { azimuthDeg: 262, elevationDeg: 8, color: "#ff9e54", intensity: 0.85 },
@@ -273,6 +310,16 @@ export const ENVIRONMENT_PRESETS: Record<TimeOfDay, EnvironmentPreset> = {
       sunGlowIntensity: 0.05,
       sunGlowPower: 20,
       starsIntensity: 1,
+      // Thinner and darker than day: the deck's job at night is to OCCLUDE
+      // stars in patches, which is what stops the starfield reading as a
+      // uniform decal. Never brighter than the zenith or it glows.
+      cloudCover: 0.35,
+      cloudDensity: 0.7,
+      cloudColor: "#1d2740",
+      // Near-black against the city's sky glow — the ridge at night is a hole
+      // in the stars, not a painted shape.
+      ridgeStrength: 1,
+      ridgeColor: "#0c1322",
     },
     light: {
       sun: { azimuthDeg: 300, elevationDeg: 42, color: "#b9ccf2", intensity: 0.16 },

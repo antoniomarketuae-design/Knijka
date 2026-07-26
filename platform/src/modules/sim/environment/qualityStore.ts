@@ -5,7 +5,8 @@
 //
 //   setting        — what the user chose: "auto" (default) | "low"|"med"|"high"
 //   recommendation — what the auto heuristic currently believes this device
-//                    can hold (seeded "med", refined by the 2 s FPS probe,
+//                    can hold (SEEDED SYNCHRONOUSLY from device signals on a
+//                    cold start — doc 82 §2.3 — refined by the 2 s FPS probe,
 //                    persisted so the next visit starts from evidence).
 //   effective      — setting, unless "auto", then recommendation.
 //
@@ -17,6 +18,9 @@ import {
   MIN_PROBE_SAMPLES,
   medianFpsFromDeltas,
   recommendQuality,
+  seedQualityFromSignals,
+  unknownDeviceSignals,
+  type DeviceSignals,
   type QualityLevel,
   type QualitySetting,
 } from "./quality";
@@ -28,7 +32,62 @@ export interface QualityState {
 
 const STORAGE_KEY = "aidrive.sim.quality.v1";
 
+/** The SSR snapshot — no device to read, so the shipped neutral guess. */
 const DEFAULT_STATE: QualityState = { setting: "auto", recommendation: "med" };
+
+/**
+ * The device facts `seedQualityFromSignals` rules on, read straight off the
+ * browser. Synchronous and side-effect-free by design (doc 82 §2.3): the whole
+ * point is to answer "which tier?" before the first texture request, so this
+ * cannot wait for a frame, a fetch or an effect.
+ *
+ * Every read is individually guarded. `deviceMemory` is Chromium-only and
+ * `matchMedia` is absent in jsdom/SSR; an absent signal must stay `null`
+ * (unknown) rather than collapse to a default, or a Firefox desktop would be
+ * graded on the same evidence as a phone.
+ *
+ * ADR-004: nothing here is stored, transmitted or joined to a user — these are
+ * capability bits read and discarded inside one render.
+ */
+export function readDeviceSignals(): DeviceSignals {
+  // SSR / jsdom: nothing is knowable, and "unknown" must not read as "phone".
+  if (typeof window === "undefined") return unknownDeviceSignals(1);
+  const mq = (query: string): boolean | null => {
+    try {
+      return typeof window.matchMedia === "function" ? window.matchMedia(query).matches : null;
+    } catch {
+      return null;
+    }
+  };
+  const nav = navigator as Navigator & { deviceMemory?: number };
+  const memory = typeof nav.deviceMemory === "number" ? nav.deviceMemory : null;
+  const cores =
+    typeof nav.hardwareConcurrency === "number" && nav.hardwareConcurrency > 0
+      ? nav.hardwareConcurrency
+      : null;
+  return {
+    coarsePointer: mq("(pointer: coarse)"),
+    anyFinePointer: mq("(any-pointer: fine)"),
+    deviceMemoryGb: memory,
+    hardwareConcurrency: cores,
+    dpr: window.devicePixelRatio || 1,
+  };
+}
+
+/**
+ * The cold-start tier for THIS device, computed once per page load.
+ *
+ * Memoized because it is read on every `loadQualityPreset()` call — and that
+ * runs inside `useSyncExternalStore`'s snapshot, which React may call several
+ * times per render. `matchMedia` is deterministic for a given device, so a
+ * cached answer is also what keeps the snapshot referentially stable.
+ */
+let seededLevel: QualityLevel | null = null;
+
+export function seedQualityLevel(): QualityLevel {
+  if (seededLevel === null) seededLevel = seedQualityFromSignals(readDeviceSignals());
+  return seededLevel;
+}
 
 const LEVELS: readonly QualityLevel[] = ["low", "med", "high"];
 
@@ -38,18 +97,22 @@ function isLevel(v: unknown): v is QualityLevel {
 
 function loadStored(): QualityState {
   if (typeof window === "undefined") return DEFAULT_STATE;
+  // No stored evidence yet → seed from the device rather than cold-starting on
+  // "med" and letting the med FETCH plan go out before the probe ever runs
+  // (doc 82 §2.3). A stored recommendation always wins: it is measured.
+  const cold: QualityState = { setting: "auto", recommendation: seedQualityLevel() };
   try {
     const raw = window.localStorage.getItem(STORAGE_KEY);
-    if (!raw) return DEFAULT_STATE;
+    if (!raw) return cold;
     const parsed: unknown = JSON.parse(raw);
-    if (typeof parsed !== "object" || parsed === null) return DEFAULT_STATE;
+    if (typeof parsed !== "object" || parsed === null) return cold;
     const p = parsed as Partial<QualityState>;
     return {
-      setting: p.setting === "auto" || isLevel(p.setting) ? p.setting : DEFAULT_STATE.setting,
-      recommendation: isLevel(p.recommendation) ? p.recommendation : DEFAULT_STATE.recommendation,
+      setting: p.setting === "auto" || isLevel(p.setting) ? p.setting : cold.setting,
+      recommendation: isLevel(p.recommendation) ? p.recommendation : cold.recommendation,
     };
   } catch {
-    return DEFAULT_STATE;
+    return cold;
   }
 }
 
@@ -143,11 +206,13 @@ export function useAutoQualityProbe(options?: {
         return;
       }
       const fpsMedian = deltas.length >= MIN_PROBE_SAMPLES ? medianFpsFromDeltas(deltas) : null;
+      const signals = readDeviceSignals();
       setQualityRecommendation(
         recommendQuality({
-          dpr: window.devicePixelRatio || 1,
+          dpr: signals.dpr,
           fpsMedian,
           currentLevel: levelAtStart,
+          signals,
         }),
       );
     };

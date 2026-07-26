@@ -51,10 +51,30 @@ describe("public/ budget declaration", () => {
 
   it("splits the deployed weight from the working-copy weight", () => {
     const result = scanPublic(REAL_PUBLIC);
-    // M-28's number: ~310 MB of the ~494 MB is founder/dev-only. If this ever
-    // inverts, something dev-only has been marked shippable.
-    expect(result.devBytes).toBeGreaterThan(250_000_000);
-    expect(result.prodBytes).toBeLessThan(result.devBytes);
+    // Every byte lands on exactly one side of the deploy line, or in
+    // `unclassified` — which the first test already treats as a failure.
+    const accounted = result.prodBytes + result.devBytes;
+    const stray = result.unclassified.reduce((n, f) => n + f.bytes, 0);
+    expect(accounted + stray).toBe(result.totalBytes);
+  });
+
+  it("keeps the founder-only buckets off the deploy, by name", () => {
+    // WHAT THIS REPLACED, AND WHY. This used to assert `devBytes > 250 MB`
+    // and `prodBytes < devBytes` — M-28's measured snapshot, ~310 MB dev of
+    // ~494 MB total. The failure mode it was aiming at is real (a dev-only
+    // bucket quietly re-flagged `ship: "prod"` balloons every deploy), but a
+    // byte total is the wrong instrument for it: doc 82 §8 pruned 247.3 MB of
+    // unreferenced clip PNG masters — exactly the housekeeping this file is
+    // supposed to encourage — and that alone flipped both inequalities while
+    // nothing about the deploy line changed.
+    //
+    // So pin the line itself. A bucket changing sides now fails by NAME,
+    // whatever anyone's disk weighs.
+    const dev = BUCKETS.filter((b) => b.ship === "dev").map((b) => b.id);
+    expect(dev.sort()).toEqual(
+      ["clips-docs", "clips-keyframes", "scene-stills", "sim-textures-src"].sort(),
+    );
+    for (const b of BUCKETS) expect(b.ship, b.id).toMatch(/^(prod|dev)$/);
   });
 
   it("routes the superseded and the scaffold assets nowhere", () => {

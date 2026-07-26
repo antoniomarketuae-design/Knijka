@@ -143,6 +143,68 @@ export const PARKING_BRAKE_FORCE_N = 13000;
 /** Manual "rev-out" ceiling per gear (km/h): above it the gear pulls nothing. */
 export const MANUAL_GEAR_MAX_KMH: readonly number[] = [30, 55, 85, 115, 150];
 
+// --- Engine braking (doc 82 §4.2 F3) ---------------------------------------
+// Today lifting off applies only ROLLING_RESISTANCE_N (0.23 m/s²) + aero ≈
+// 0.30–0.45 m/s² total, so COASTING IN N AND LIFTING OFF IN D DECELERATE
+// IDENTICALLY. "Lift off and the car slows", gear choice on a descent and
+// clutch-down coasting are theory-only in a product whose whole claim is that
+// it teaches real driving.
+//
+// These constants live HERE, not in tuning.ts, for the same reason
+// PARKING_BRAKE_FORCE_N does: engine braking is a property of how the car is
+// OPERATED (which gear, clutch up or down), and keeping tuning.ts untouched
+// is the visible proof that the harness envelope is unchanged.
+
+/**
+ * Coast deceleration (m/s²) available from the engine per gear, index =
+ * gear − 1. Real lift-off-in-gear is 0–1 m/s²: strong in a low gear where the
+ * engine spins fast for the road speed, tapering in the tall gears.
+ *
+ * The ceiling is DELIBERATELY ~9% of the service brake (BRAKE_FORCE_N /
+ * CHASSIS_MASS ≈ 9.0 m/s²). Doc 82: "Keep it well below the service brake so
+ * it never masks a graded braking mistake" — a student who fails to brake
+ * must still fail to stop.
+ */
+export const ENGINE_BRAKE_DECEL_MS2: readonly number[] = [1.0, 0.75, 0.55, 0.42, 0.3];
+
+/** Below this speed (km/h) there is no engine braking: a torque converter
+ *  unlocks and a real clutch would be slipping toward the stall the driveline
+ *  models above. Also keeps the effect entirely out of the S0 parking band. */
+export const ENGINE_BRAKE_MIN_KMH = 8;
+/** Speed (km/h) at which the per-gear figure is reached in full — a ramp, not
+ *  a step, so nothing bites at the moment the car crosses a threshold. */
+export const ENGINE_BRAKE_FULL_KMH = 16;
+
+/**
+ * Coast deceleration (m/s²) for the current driveline state and speed.
+ * Zero — with no branch taken in the caller — whenever the drivetrain is not
+ * transmitting: engine off, P, N, or the clutch pedal down. That is exactly
+ * `hasDriveTraction`, so "clutch in and the car freewheels" is the SAME rule
+ * that already gates tractive force; the two can never disagree.
+ *
+ * Gear source: an explicit manual gear in M, the speed-matched cosmetic gear
+ * in D (there is no real automatic gearbox to ask), first gear in R.
+ */
+export function engineBrakeDecelMs2(
+  d: DrivelinePhysicsInput,
+  absSpeedKmh: number,
+): number {
+  if (!hasDriveTraction(d)) return 0;
+  if (absSpeedKmh <= ENGINE_BRAKE_MIN_KMH) return 0;
+  const gear =
+    d.selector === "M"
+      ? Math.min(Math.max(d.manualGear, 1), MANUAL_GEAR_COUNT)
+      : d.selector === "R"
+        ? 1
+        : gearForSpeedKmh(absSpeedKmh);
+  const base = ENGINE_BRAKE_DECEL_MS2[gear - 1] ?? 0;
+  const ramp = Math.min(
+    (absSpeedKmh - ENGINE_BRAKE_MIN_KMH) / (ENGINE_BRAKE_FULL_KMH - ENGINE_BRAKE_MIN_KMH),
+    1,
+  );
+  return base * ramp;
+}
+
 /** Below this speed (km/h) a clutch-up gear can stall (see header). */
 export const STALL_BELOW_KMH = 6;
 /** Minimum throttle that keeps M1/R alive when moving off. */

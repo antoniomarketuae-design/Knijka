@@ -30,12 +30,22 @@ import type {
 import type RAPIER_API from "@dimforge/rapier3d-compat";
 import * as T from "./tuning";
 import {
+  engineBrakeDecelMs2,
   forwardForceScale,
   hasDriveTraction,
   PARKING_BRAKE_FORCE_N,
   READY_DRIVELINE,
   type DrivelinePhysicsInput,
 } from "./driveline";
+import {
+  combinedGripUtilisation,
+  deliveredGripUtilisation,
+  demandedGripUtilisation,
+  GRIP_SIGNAL_LP,
+  GRIP_SIGNAL_MAX_ACCEL_MS2,
+  GRIP_SIGNAL_MIN_KMH,
+} from "./gripSignal";
+import { ROAD_ROUGHNESS_MAX, roadRoughnessForceN } from "./roadNoise";
 import { approach, clamp, dot, lerp, rotateInto, yawQuat, type Quat, type Vec3 } from "./math";
 
 /** The rapier module object (default export of @dimforge/rapier3d-compat). */
@@ -106,6 +116,33 @@ export interface VehicleSimOptions {
    * amplitude 0) with windLateralN 0 = no wind code path at all.
    */
   windGust?: { periodSec: number; amplitudeN: number };
+  /**
+   * ENGINE BRAKING (doc 82 §4.2 F3) — OPT-IN. Absent/false (every existing
+   * caller, the CI harness included) means the coast branch below is exactly
+   * the pre-F3 rolling-resistance-only code and no engine-brake arithmetic
+   * runs at all: bit-identical dynamics.
+   *
+   * True adds a selector- and gear-dependent coast decel through the DRIVEN
+   * axle (driveline.engineBrakeDecelMs2 — ~1.0 m/s² in a low gear tapering to
+   * 0.3 in top, zero in N/P and zero with the clutch down). This is a
+   * BEHAVIOURAL change: lifting off in D no longer coasts like N, which is
+   * the point, and which is why it may not be switched on globally without a
+   * deliberate re-baseline of every recorded trace that depends on coast
+   * distance.
+   */
+  engineBraking?: boolean;
+  /**
+   * ROAD-SURFACE VERTICAL MOTION (doc 82 §4.2 F2) — OPT-IN, 0..1. 0
+   * (the default, every existing caller) means the excitation branch is never
+   * entered and zero extra rapier calls are made: bit-identical dynamics.
+   *
+   * Above 0 each grounded wheel receives a small vertical impulse sampled
+   * from deterministic 2-octave value noise AT ITS WORLD POSITION
+   * (roadNoise.ts) — sub-centimetre travel at city speed, which is what makes
+   * the suspension move in a straight line at all. Deterministic from
+   * position, so replays and CI baselines stay reproducible.
+   */
+  roadRoughness?: number;
 }
 
 const FL = 0;
@@ -201,6 +238,16 @@ export class VehicleSim {
   private windClockSec = 0;
   /** Low-passed lateral acceleration (m/s², car-local, + = left). */
   private aLatSmooth = 0;
+  /** F3 gate: true only when a caller opted into engine braking. */
+  private readonly engineBraking: boolean;
+  /** F2 gate: 0 (every default caller) = the road-excitation branch is dead. */
+  private readonly roadRoughness: number;
+  /** GRIP-LOSS READ CHANNEL (F1) — the same measured acceleration as
+   *  aLatSmooth but clamped an order higher (the roll clamp sits BELOW the
+   *  grip ceiling and would cap utilisation at 0.87). Written every step,
+   *  read by nothing that touches rapier. */
+  private aLatGripSmooth = 0;
+  private aLongGripSmooth = 0;
   private readonly prevVel: Vec3 = { x: 0, y: 0, z: 0 };
   private readonly spawnRotation: Quat;
   private readonly spawnTranslation: Vec3;
@@ -209,6 +256,9 @@ export class VehicleSim {
   // Scratch objects (no per-frame allocation).
   private readonly tmpV: Vec3 = { x: 0, y: 0, z: 0 };
   private readonly tmpV2: Vec3 = { x: 0, y: 0, z: 0 };
+  /** Third scratch — the grip channel needs the car's forward axis while
+   *  tmpV still holds the measured acceleration vector. */
+  private readonly tmpV3: Vec3 = { x: 0, y: 0, z: 0 };
 
   /**
    * @param world The rapier world (raw `World` — from `useRapier()` in R3F).
@@ -236,6 +286,12 @@ export class VehicleSim {
     this.windGustAmplitudeN = gust !== undefined && gust.periodSec > 0 ? gust.amplitudeN : 0;
     this.windGustPeriodSec = gust !== undefined && gust.periodSec > 0 ? gust.periodSec : 1;
     this.windActive = this.windLateralN !== 0 || this.windGustAmplitudeN !== 0;
+    // F2/F3 (doc 82 §4.2): both default to "no code path", the same additive
+    // law as gripFactor and the wind above — an omitted option constructs
+    // EXACTLY the pre-F car, which is what keeps every committed trace and
+    // every graded verdict valid.
+    this.engineBraking = options?.engineBraking === true;
+    this.roadRoughness = clamp(options?.roadRoughness ?? 0, 0, ROAD_ROUGHNESS_MAX);
     this.spawnRotation = yawQuat(spawn.yawRad);
     this.spawnTranslation = { x: spawn.x, y: spawn.y, z: spawn.z };
     this.chassisColliderHandle = body.collider(0).handle;
@@ -389,10 +445,33 @@ export class VehicleSim {
     const brakeForceN = T.BRAKE_FORCE_N * this.gripFactor;
     let frontBrakeN = (brakePedal * brakeForceN * T.BRAKE_BIAS_FRONT) / 2;
     let rearBrakeN = (brakePedal * brakeForceN * (1 - T.BRAKE_BIAS_FRONT)) / 2;
-    if (engineTotal === 0 && brakePedal === 0) {
-      // Coast-down rolling resistance.
-      frontBrakeN = Math.max(frontBrakeN, T.ROLLING_RESISTANCE_N / 4);
-      rearBrakeN = Math.max(rearBrakeN, T.ROLLING_RESISTANCE_N / 4);
+    if (engineTotal === 0) {
+      if (brakePedal === 0) {
+        // Coast-down rolling resistance.
+        frontBrakeN = Math.max(frontBrakeN, T.ROLLING_RESISTANCE_N / 4);
+        rearBrakeN = Math.max(rearBrakeN, T.ROLLING_RESISTANCE_N / 4);
+      }
+      // ENGINE BRAKING (F3, opt-in): compression drag arrives through the
+      // DRIVEN axle, so it rides the front wheels on this FWD car. Safe next
+      // to the engine force above only because we are inside the branch where
+      // engineTotal is 0 — rapier ignores brake on a wheel that also carries
+      // engine force (tuning.ts cheat-sheet point 4). Gate off (the default)
+      // = not even the decel lookup runs.
+      //
+      // It sits OUTSIDE the `brakePedal === 0` test on purpose. A closed
+      // throttle keeps the engine on the overrun whether or not the foot has
+      // moved to the brake, so a floor that vanished the instant the pedal was
+      // BRUSHED would make a 0.05 pedal decelerate LESS than lifting off
+      // (measured: 0.59 vs 1.00 m/s² in gear 1) — the car surging forward as
+      // the learner first touches the brake. `Math.max` keeps it a floor, so
+      // once the pedal outranks it the service brake alone decides the stop
+      // and F3 still cannot mask a graded braking mistake.
+      if (this.engineBraking) {
+        const decel = engineBrakeDecelMs2(dl, absKmh);
+        if (decel > 0) {
+          frontBrakeN = Math.max(frontBrakeN, (decel * T.CHASSIS_MASS) / 2);
+        }
+      }
     }
     let rearGrip = T.SIDE_FRICTION_STIFFNESS;
     if (input.handbrake) {
@@ -447,6 +526,11 @@ export class VehicleSim {
     this.applyAntiRollAxle(FL, FR, T.ANTI_ROLL_FRONT, dt);
     this.applyAntiRollAxle(RL, RR, T.ANTI_ROLL_REAR, dt);
 
+    // --- Road-surface vertical motion (F2, opt-in) ---------------------------
+    // roadRoughness 0 on every default construction, so this is one numeric
+    // compare on the shipped path and the branch below never runs.
+    if (this.roadRoughness > 0) this.applyRoadRoughness(speedKmh, dt);
+
     // --- Suspension raycasts + wheel impulses (skip our own chassis) --------
     c.updateVehicle(dt, undefined, undefined, (col) => col.handle !== this.chassisColliderHandle);
   }
@@ -493,6 +577,38 @@ export class VehicleSim {
     return this.gripFactor;
   }
 
+  // --- GRIP-LOSS READ CHANNEL (doc 82 §4.2 F1) -------------------------------
+  // Read once per RENDER frame by the rig (audio + haptics + HUD), never by
+  // the physics. See gripSignal.ts for why there are two halves.
+
+  /** Friction-circle magnitude of the acceleration the tyres DELIVERED, over
+   *  the current surface's grip ceiling. Saturates just below 1. */
+  get deliveredGripUtilisation(): number {
+    if (Math.abs(this.speedKmh) < GRIP_SIGNAL_MIN_KMH) return 0;
+    return deliveredGripUtilisation(
+      this.aLatGripSmooth,
+      this.aLongGripSmooth,
+      this.gripFactor,
+    );
+  }
+
+  /** Lateral acceleration the steering angle is ASKING for at this speed,
+   *  over the same ceiling. This is the half that exceeds 1 in a slide. */
+  get demandedGripUtilisation(): number {
+    const speedMs = this.forwardSpeedMs();
+    if (Math.abs(speedMs) * 3.6 < GRIP_SIGNAL_MIN_KMH) return 0;
+    return demandedGripUtilisation(speedMs, this.steer, this.gripFactor);
+  }
+
+  /** The single number the tyre-protest audio layer and the debrief read:
+   *  the worse of delivered and demanded. 0.85 ≈ scrub, > 1 ≈ real screech. */
+  get gripUtilisation(): number {
+    return combinedGripUtilisation(
+      this.deliveredGripUtilisation,
+      this.demandedGripUtilisation,
+    );
+  }
+
   /** Re-apply tyre μ for a grip factor — the constructor's exact per-wheel
    *  frictionSlip term (surface-patch slice; see setSurfaceGripFactor). */
   private applyWheelGrip(f: number): void {
@@ -524,6 +640,8 @@ export class VehicleSim {
     this.body.resetTorques(true);
     this.steer = 0;
     this.aLatSmooth = 0;
+    this.aLatGripSmooth = 0; // F1: the tyre stops protesting on a restart
+    this.aLongGripSmooth = 0;
     this.windClockSec = 0; // gust sine restarts with the attempt (determinism)
     this.prevVel.x = 0;
     this.prevVel.y = 0;
@@ -629,9 +747,26 @@ export class VehicleSim {
     this.prevVel.y = vel.y;
     this.prevVel.z = vel.z;
     const left = rotateInto(r, 1, 0, 0, this.tmpV2);
-    let aLat = dot(this.tmpV, left);
-    aLat = clamp(aLat, -T.ROLL_COUPLING_MAX_LAT, T.ROLL_COUPLING_MAX_LAT);
+    const aLatRaw = dot(this.tmpV, left);
+    const aLat = clamp(aLatRaw, -T.ROLL_COUPLING_MAX_LAT, T.ROLL_COUPLING_MAX_LAT);
     this.aLatSmooth += (aLat - this.aLatSmooth) * Math.min(1, T.ROLL_COUPLING_LP * dt);
+
+    // GRIP-LOSS READ CHANNEL (F1) — the SAME acceleration vector, taken here
+    // because tmpV still holds it and tmpV2 still holds the left axis. Two
+    // separate smoothed fields rather than reusing aLatSmooth: the roll
+    // clamp (12 m/s²) sits BELOW the ~14 m/s² grip ceiling, so utilisation
+    // read off aLatSmooth could never reach 1. Pure read — no force, no
+    // torque, no impulse follows from either field (gripSignal.ts header).
+    const fwdAxis = rotateInto(r, 0, 0, 1, this.tmpV3);
+    const gripLp = Math.min(1, GRIP_SIGNAL_LP * dt);
+    this.aLatGripSmooth +=
+      (clamp(aLatRaw, -GRIP_SIGNAL_MAX_ACCEL_MS2, GRIP_SIGNAL_MAX_ACCEL_MS2) -
+        this.aLatGripSmooth) *
+      gripLp;
+    this.aLongGripSmooth +=
+      (clamp(dot(this.tmpV, fwdAxis), -GRIP_SIGNAL_MAX_ACCEL_MS2, GRIP_SIGNAL_MAX_ACCEL_MS2) -
+        this.aLongGripSmooth) *
+      gripLp;
 
     // Torque about the forward axis: accel to the left (+) → lean right (out).
     const magnitude = T.CHASSIS_MASS * this.aLatSmooth * T.ROLL_COUPLING_ARM * dt;
@@ -640,6 +775,43 @@ export class VehicleSim {
       { x: fwd.x * magnitude, y: fwd.y * magnitude, z: fwd.z * magnitude },
       true,
     );
+  }
+
+  /**
+   * ROAD-SURFACE VERTICAL MOTION (doc 82 §4.2 F2, opt-in via roadRoughness).
+   *
+   * NOT displaced geometry — that would break colliders, markings, decals and
+   * every world builder. Instead each GROUNDED wheel gets a small vertical
+   * impulse at its own world position, sampled from deterministic 2-octave
+   * value noise (roadNoise.ts). Applying it at the wheel point, exactly like
+   * the anti-roll bar below, is what makes it read as a road: uncorrelated
+   * corners produce the small roll/pitch tremble of a real surface rather
+   * than a lift of the whole car.
+   *
+   * DETERMINISM: the noise is a function of world XZ only — no clock, no RNG,
+   * no accumulated state — so a replayed trace re-drives the same bumps and
+   * the CI baselines stay reproducible. AMPLITUDE: ~5 mm of travel at city
+   * speed (roadNoise.ts header). Anything bigger is sim sickness, not feel.
+   */
+  private applyRoadRoughness(speedKmh: number, dt: number): void {
+    const c = this.controller;
+    const t = this.body.translation();
+    const r = this.body.rotation();
+    for (let i = 0; i < WHEEL_COUNT; i++) {
+      if (!c.wheelIsInContact(i)) continue; // an airborne wheel rides nothing
+      const p = T.WHEEL_POSITIONS[i];
+      if (!p) continue;
+      const w = rotateInto(r, p.x, p.y, p.z, this.tmpV);
+      const wx = t.x + w.x;
+      const wz = t.z + w.z;
+      const forceN = roadRoughnessForceN(wx, wz, speedKmh, this.roadRoughness);
+      if (forceN === 0) continue;
+      this.body.applyImpulseAtPoint(
+        { x: 0, y: forceN * dt, z: 0 },
+        { x: wx, y: t.y + w.y, z: wz },
+        true,
+      );
+    }
   }
 
   /**

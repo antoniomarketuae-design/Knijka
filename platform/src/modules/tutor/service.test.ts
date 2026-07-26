@@ -1,24 +1,33 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { setContentRepo } from "@/lib/content/repo";
-import { getReadiness } from "@/modules/learning";
+import { getReadiness, getSimWeakSpots } from "@/modules/learning";
+import {
+  InMemoryPaymentsStore,
+  setPaymentsStore,
+  TUTOR_PACK_QUESTION_ALLOWANCE,
+} from "@/modules/payments";
 import { resetRateLimitState } from "@/modules/security";
+import { tutorAllowanceSpentReplyBg } from "./allowance";
+import { sofiaDayKey } from "./budget";
 import { computeCostMicroUsd } from "./cost";
 import {
   FakeTutorModel,
   FakeTutorStore,
   makeTutorFixtureRepo,
 } from "./fixtures";
-import { setTutorModel } from "./model";
+import { setTutorModel, type TutorModel } from "./model";
 import { TUTOR_NO_MATERIAL_REPLY_BG } from "./prompt";
 import {
   askTutor,
-  countUserMessagesSince,
+  countUserMessagesOnDay,
   getThread,
-  startOfTodayMs,
+  getTutorAllowance,
+  previousUserQuestion,
   TUTOR_DAILY_MESSAGE_LIMIT,
   TUTOR_HISTORY_MESSAGES,
   TUTOR_LIMIT_REPLY_BG,
   TUTOR_MAX_INPUT_LENGTH,
+  userQuestionTimestamps,
 } from "./service";
 import { setTutorStore, type TutorMessage } from "./store";
 
@@ -26,6 +35,7 @@ import { setTutorStore, type TutorMessage } from "./store";
 // tests never touch the learning store (which would need a database).
 vi.mock("@/modules/learning", () => ({
   getReadiness: vi.fn(),
+  getSimWeakSpots: vi.fn(),
 }));
 
 const USER = "user-1";
@@ -41,6 +51,23 @@ function assistantMsg(content: string, ts: number): TutorMessage {
 
 let store: FakeTutorStore;
 let model: FakeTutorModel;
+let payments: InMemoryPaymentsStore;
+
+/**
+ * An active pack bought a month ago, so the per-pack allowance applies AND the
+ * seeded history below falls inside its window (questions asked before the
+ * purchase are the free trial's, not the pack's).
+ */
+async function grantPack(userId = USER): Promise<void> {
+  await payments.createEntitlement({
+    userId,
+    pack: "core",
+    purchasedAt: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000),
+    expiresAt: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000),
+    provider: "stripe",
+    providerRef: `cs_test_${userId}`,
+  });
+}
 
 beforeEach(() => {
   // askTutor now consumes a per-user burst budget (H-8). Its counters live in
@@ -53,6 +80,11 @@ beforeEach(() => {
   model = new FakeTutorModel(REPLY_WITH_CITATION);
   setTutorStore(store);
   setTutorModel(model);
+  // askTutor also reads the per-pack tutor allowance (doc 81 §5.3). Injected
+  // empty, so the default account in these tests is a free one and every test
+  // written before the allowance existed still exercises the same path.
+  payments = new InMemoryPaymentsStore();
+  setPaymentsStore(payments);
   vi.stubEnv("ANTHROPIC_API_KEY", "sk-test-not-real");
   vi.mocked(getReadiness).mockResolvedValue({
     score: 40,
@@ -64,11 +96,16 @@ beforeEach(() => {
       { conceptId: "c4", topicId: "t1", titleBg: "Слабо 4", effectiveMastery: 0.4 },
     ],
   });
+  vi.mocked(getSimWeakSpots).mockResolvedValue({
+    hasRecentEvidence: false,
+    spots: [],
+  });
 });
 
 afterEach(() => {
   setTutorStore(null);
   setTutorModel(null);
+  setPaymentsStore(null);
   vi.unstubAllEnvs();
   vi.clearAllMocks();
 });
@@ -130,6 +167,27 @@ describe("askTutor — happy path", () => {
     expect(result.citations).toEqual([]);
   });
 
+  it("persists the validated citations onto the assistant message (D1)", async () => {
+    // The UI renders law chips strictly from this stored list, so it has to
+    // survive the write — otherwise every verified citation in the student's
+    // history silently demotes to plain text on the next page load.
+    await askTutor(USER, "Кога имам предимство?");
+    const saved = store.saveExchangeCalls[0].messages;
+    expect(saved[1].citations).toEqual([{ act: "ЗДвП", ref: "чл. 47" }]);
+    // The student's own message is never a source of citations.
+    expect(saved[0].citations).toBeUndefined();
+  });
+
+  it("persists an EMPTY list when every marker was invented (D1)", async () => {
+    setTutorModel(new FakeTutorModel("Виж [ЗДвП чл. 999]."));
+    await askTutor(USER, "Кога имам предимство?");
+    const saved = store.saveExchangeCalls[0].messages;
+    expect(saved[1].content).toContain("[ЗДвП чл. 999]");
+    // Present and empty, not absent: the reply WAS validated, and it earned
+    // nothing. The chip the old UI drew from this text was never legitimate.
+    expect(saved[1].citations).toEqual([]);
+  });
+
   it("replays only the most recent history to the model", async () => {
     const base = Date.now() - 60_000;
     const seeded: TutorMessage[] = [];
@@ -145,6 +203,81 @@ describe("askTutor — happy path", () => {
     expect(sent).toHaveLength(TUTOR_HISTORY_MESSAGES + 1);
     expect(sent[0]).toEqual({ role: "user", content: "въпрос 4" });
     expect(sent.at(-1)?.content).toBe("Кога имам предимство?");
+  });
+});
+
+describe("askTutor — follow-up grounding (doc 81 D2)", () => {
+  it("grounds „А защо?“ in the question it follows up on", async () => {
+    // The second message of a normal Bulgarian conversation. Both its words
+    // are stopwords, so before the fix retrieval returned nothing, the prompt
+    // said „(няма намерени материали)" and rule 2 FORCED the refusal — the
+    // tutor refused nearly every follow-up, deterministically.
+    const now = Date.now();
+    store.seedThread(USER, {
+      messages: [
+        userMsg("Кой има предимство на кръстовище?", now),
+        assistantMsg("Пропускаш идващите отдясно.", now),
+      ],
+    });
+
+    const result = await askTutor(USER, "А защо?");
+
+    const system = model.completeCalls[0].system;
+    expect(system).not.toContain("(няма намерени материали по този въпрос)");
+    expect(system).toContain("Предимство на кръстовище");
+    expect(result.limited).toBe(false);
+  });
+
+  it("refuses a follow-up on a brand-new topic the corpora do not cover", async () => {
+    // The fallback is narrow on purpose: a question with real content tokens
+    // is a NEW topic, and stale materials must not be allowed to sit under an
+    // answer they do not support (ADR-002).
+    const now = Date.now();
+    store.seedThread(USER, {
+      messages: [
+        userMsg("Кой има предимство на кръстовище?", now),
+        assistantMsg("Пропускаш идващите отдясно.", now),
+      ],
+    });
+
+    await askTutor(USER, "Каква е глобата за изтекла застраховка?");
+
+    expect(model.completeCalls[0].system).toContain(
+      "(няма намерени материали по този въпрос)",
+    );
+  });
+});
+
+describe("askTutor — the student's simulator mistakes (doc 81 D4)", () => {
+  it("injects recent sim weak spots alongside the theory ones", async () => {
+    vi.mocked(getSimWeakSpots).mockResolvedValue({
+      hasRecentEvidence: true,
+      spots: [
+        {
+          conceptId: "c-predimstvo",
+          titleBg: "Предимство на кръстовище",
+          topicId: "t-priority",
+          topicSlug: "predimstvo",
+          violationCount: 3,
+          worstSeverity: "opasna",
+        },
+      ],
+    });
+
+    await askTutor(USER, "Кога имам предимство?");
+
+    const system = model.completeCalls[0].system;
+    expect(system).toContain("ГРЕШКИ НА УЧЕНИКА В СИМУЛАТОРА");
+    expect(system).toContain("- Предимство на кръстовище — 3 пъти");
+  });
+
+  it("survives a sim-evidence failure (it is advisory, like readiness)", async () => {
+    vi.mocked(getSimWeakSpots).mockRejectedValue(new Error("no db"));
+    const result = await askTutor(USER, "Кога имам предимство?");
+    expect(result.limited).toBe(false);
+    expect(model.completeCalls[0].system).toContain(
+      "(няма скорошни карания в симулатора)",
+    );
   });
 });
 
@@ -220,7 +353,9 @@ describe("askTutor — daily budget guard", () => {
   });
 
   it("does not count yesterday's questions", async () => {
-    const yesterday = startOfTodayMs() - 60_000;
+    // 36h back is a different Europe/Sofia calendar day whatever the host
+    // clock says, which is the point — see countUserMessagesOnDay below.
+    const yesterday = Date.now() - 36 * 60 * 60 * 1000;
     const messages: TutorMessage[] = [];
     for (let i = 0; i < TUTOR_DAILY_MESSAGE_LIMIT; i++) {
       messages.push(userMsg(`в${i}`, yesterday), assistantMsg(`о${i}`, yesterday));
@@ -233,17 +368,219 @@ describe("askTutor — daily budget guard", () => {
   });
 });
 
-describe("countUserMessagesSince", () => {
-  it("counts only user messages at/after the boundary", () => {
+describe("askTutor — the per-pack allowance (doc 81 §5.3)", () => {
+  /**
+   * A thread in which the pack holder has already asked `count` questions —
+   * dated 36h back, i.e. on an earlier Europe/Sofia day but well inside the
+   * pack's window. That is the only shape 300 questions can have: the 30/day
+   * cap makes them impossible to ask today, and dating them today would mean
+   * every assertion below was really testing the daily cap.
+   */
+  function seedAsked(count: number): void {
+    const earlier = Date.now() - 36 * 60 * 60 * 1000;
+    const messages: TutorMessage[] = [];
+    for (let i = 0; i < count; i++) {
+      messages.push(userMsg(`в${i}`, earlier), assistantMsg(`о${i}`, earlier));
+    }
+    store.seedThread(USER, { messages });
+  }
+
+  it("decrements by exactly one per answered question", async () => {
+    await grantPack();
+    const before = await getTutorAllowance(USER, []);
+    expect(before.remaining).toBe(TUTOR_PACK_QUESTION_ALLOWANCE);
+
+    await askTutor(USER, "Кога имам предимство?");
+    await askTutor(USER, "А на кръгово?");
+
+    const after = await getTutorAllowance(
+      USER,
+      (await getThread(USER)).messages,
+    );
+    expect(after.used).toBe(2);
+    expect(after.remaining).toBe(TUTOR_PACK_QUESTION_ALLOWANCE - 2);
+  });
+
+  it("stops the 301st question of the pack without calling Anthropic", async () => {
+    // The finding this closes: a pack used to mean „unlimited for 4 months",
+    // i.e. 30/day × ~122 days = 3,660 questions = $41.72 against €12.55.
+    await grantPack();
+    seedAsked(TUTOR_PACK_QUESTION_ALLOWANCE);
+
+    const result = await askTutor(USER, "Още един въпрос?");
+
+    expect(model.completeCalls).toHaveLength(0);
+    expect(result.limited).toBe(true);
+    expect(store.saveExchangeCalls).toHaveLength(0);
+  });
+
+  it("explains itself in Bulgarian instead of erroring", async () => {
+    await grantPack();
+    seedAsked(TUTOR_PACK_QUESTION_ALLOWANCE);
+
+    const result = await askTutor(USER, "Още един въпрос?");
+
+    expect(result.reply).toBe(
+      tutorAllowanceSpentReplyBg(TUTOR_PACK_QUESTION_ALLOWANCE),
+    );
+    // Requirement-zero (doc 64 THEO-4): names what still works, and the
+    // student is never shown a raw failure.
+    expect(result.reply).toContain("упражненията");
+    expect(result.citations).toEqual([]);
+  });
+
+  it("does NOT reset overnight — the daily cap resets, this one does not", async () => {
+    // The control: one question short of the allowance, same dates, and the
+    // student is answered. So the 30/day cap is demonstrably NOT what stops
+    // the seed above — this rule is, and it is the only reason a four-month
+    // tail is bounded at all.
+    await grantPack();
+    seedAsked(TUTOR_PACK_QUESTION_ALLOWANCE - 1);
+    expect((await askTutor(USER, "Днешен въпрос?")).limited).toBe(false);
+
+    // That answer was the 300th. The next one is not.
+    const spent = await askTutor(USER, "И още един?");
+    expect(spent.limited).toBe(true);
+    expect(model.completeCalls).toHaveLength(1);
+  });
+
+  it("leaves a FREE account to the lifetime trial, not to this rule", async () => {
+    // No entitlement granted. 300+ questions on a free account is impossible
+    // (the trial stops it at 5, in the action layer), but if this gate ever
+    // starts voting on free users it would be enforcing a paid cap on people
+    // who never bought a pack.
+    seedAsked(TUTOR_PACK_QUESTION_ALLOWANCE + 10);
+    const allowance = await getTutorAllowance(
+      USER,
+      (await getThread(USER)).messages,
+    );
+    expect(allowance.applies).toBe(false);
+    expect(allowance.allowed).toBe(true);
+  });
+
+  it("is per student — a classmate's spent pack costs this one nothing", async () => {
+    await grantPack();
+    await grantPack("user-2");
+    seedAsked(TUTOR_PACK_QUESTION_ALLOWANCE);
+    // user-2 has their own (empty) thread.
+    const result = await askTutor("user-2", "Кога имам предимство?");
+    expect(result.limited).toBe(false);
+    expect(model.completeCalls).toHaveLength(1);
+  });
+});
+
+describe("askTutor — a question that was never answered is free", () => {
+  /** A model that fails the way a real provider outage does. */
+  class FailingTutorModel implements TutorModel {
+    calls = 0;
+    async complete(): Promise<never> {
+      this.calls++;
+      throw new Error("529 overloaded");
+    }
+  }
+
+  it("does not consume the pack allowance when the model call fails", async () => {
+    // The allowance is counted from PERSISTED user messages and saveExchange
+    // only runs after a successful completion, so a failed call leaves no row
+    // to count. Pre-debiting a credit balance is the design that gets this
+    // wrong (doc 81 §5.5) — and it is why the balance is derived, not stored.
+    await grantPack();
+    const failing = new FailingTutorModel();
+    setTutorModel(failing);
+
+    await expect(askTutor(USER, "Кога имам предимство?")).rejects.toThrow(
+      "529 overloaded",
+    );
+
+    expect(failing.calls).toBe(1);
+    expect(store.saveExchangeCalls).toHaveLength(0);
+    const allowance = await getTutorAllowance(
+      USER,
+      (await getThread(USER)).messages,
+    );
+    expect(allowance.used).toBe(0);
+    expect(allowance.remaining).toBe(TUTOR_PACK_QUESTION_ALLOWANCE);
+  });
+
+  it("does not consume it when a guard refuses before the call", async () => {
+    // askTutor can return `limited: true` from three guards without ever
+    // reaching Anthropic. None of them may cost the student a question.
+    await grantPack();
+    vi.stubEnv("TUTOR_DAILY_BUDGET_USD", "1");
+    store.seedDaySpend(sofiaDayKey(), 5_000_000);
+
+    const result = await askTutor(USER, "Кога имам предимство?");
+    expect(result.limited).toBe(true);
+    expect(model.completeCalls).toHaveLength(0);
+
+    const allowance = await getTutorAllowance(
+      USER,
+      (await getThread(USER)).messages,
+    );
+    expect(allowance.used).toBe(0);
+  });
+});
+
+describe("userQuestionTimestamps", () => {
+  it("returns only the student's own messages, in order", () => {
+    expect(
+      userQuestionTimestamps([
+        userMsg("първи", 10),
+        assistantMsg("отговор", 11),
+        userMsg("втори", 20),
+      ]),
+    ).toEqual([10, 20]);
+  });
+
+  it("counts nothing for a thread the student has not written in", () => {
+    expect(userQuestionTimestamps([])).toEqual([]);
+    expect(userQuestionTimestamps([assistantMsg("здравей", 1)])).toEqual([]);
+  });
+});
+
+describe("countUserMessagesOnDay (doc 81 D5)", () => {
+  // 00:30 on 26 July in Sofia (UTC+3 in summer) — 21:30 UTC on the 25th.
+  const JUST_AFTER_SOFIA_MIDNIGHT = Date.parse("2026-07-25T21:30:00Z");
+
+  it("counts only user messages, and only on that Sofia day", () => {
     const messages = [
-      userMsg("стар", 10),
-      assistantMsg("стар отговор", 10),
-      userMsg("нов", 100),
-      assistantMsg("нов отговор", 100),
+      userMsg("вчера", Date.parse("2026-07-25T10:00:00Z")),
+      assistantMsg("отговор", Date.parse("2026-07-25T10:00:00Z")),
+      userMsg("днес", JUST_AFTER_SOFIA_MIDNIGHT),
+      assistantMsg("отговор", JUST_AFTER_SOFIA_MIDNIGHT),
+      userMsg("пак днес", Date.parse("2026-07-26T09:00:00Z")),
     ];
-    expect(countUserMessagesSince(messages, 50)).toBe(1);
-    expect(countUserMessagesSince(messages, 0)).toBe(2);
-    expect(countUserMessagesSince(messages, 200)).toBe(0);
+    expect(countUserMessagesOnDay(messages, "2026-07-26")).toBe(2);
+    expect(countUserMessagesOnDay(messages, "2026-07-25")).toBe(1);
+    expect(countUserMessagesOnDay(messages, "2026-07-27")).toBe(0);
+  });
+
+  it("puts a question asked at 00:30 in Sofia on the day that just started", () => {
+    // The defect this replaces: the cap counted from server-local midnight, so
+    // on the UTC VPS this instant fell into the PREVIOUS day and the student's
+    // 30 questions rolled over at 03:00 Bulgarian time instead of at midnight.
+    const at = new Date(JUST_AFTER_SOFIA_MIDNIGHT);
+    expect(at.toISOString().slice(0, 10)).toBe("2026-07-25"); // UTC says the 25th
+    expect(sofiaDayKey(at)).toBe("2026-07-26"); // the student's clock says the 26th
+    expect(countUserMessagesOnDay([userMsg("х", +at)], sofiaDayKey(at))).toBe(1);
+  });
+});
+
+describe("previousUserQuestion", () => {
+  it("returns the most recent student question", () => {
+    expect(
+      previousUserQuestion([
+        userMsg("първи", 1),
+        assistantMsg("отговор", 2),
+        userMsg("втори", 3),
+        assistantMsg("отговор", 4),
+      ]),
+    ).toBe("втори");
+  });
+
+  it("returns null when the student has not asked anything yet", () => {
+    expect(previousUserQuestion([])).toBeNull();
+    expect(previousUserQuestion([assistantMsg("здравей", 1)])).toBeNull();
   });
 });
 

@@ -4,6 +4,7 @@
  */
 import fs from "node:fs";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { beforeAll, describe, expect, it } from "vitest";
 import { LESSON_PARKING_BAYS } from "../../lessons/specs";
 import { buildWorldGeometry } from "../builders/buildWorldGeometry";
@@ -11,6 +12,7 @@ import {
   CURB_CHAMFER_M,
   CURB_HEIGHT_M,
   GUTTER_TINT,
+  JUNCTION_DECAL_Y,
   LANE_WIDTH_M,
   PARKING_LANE_WIDTH_M,
   PARKING_LANE_Y,
@@ -20,7 +22,9 @@ import {
   WHEEL_TRACK_TINT,
 } from "../builders/constants";
 import { ribbonCrossSection } from "../builders/roads";
-import { assertDistrict, type District, type WorldGeometry } from "../types";
+import { assertDistrict, TREE_KINDS, type District, type WorldGeometry } from "../types";
+
+const HERE = path.dirname(fileURLToPath(import.meta.url));
 
 // ---------------------------------------------------------------------------
 // Synthetic micro-district: a signalized + crossing X-junction, one entry.
@@ -170,14 +174,30 @@ describe("buildWorldGeometry on a synthetic X-junction", () => {
   });
 
   it("scatters seeded road decals as one co-planar quad batch", () => {
-    // 4 ribbons x ~85 m usable at 1/40 m -> a couple of quads each.
-    expect(world.stats.roadDecals).toBeGreaterThanOrEqual(4);
-    expect(world.stats.roadDecals).toBeLessThanOrEqual(12);
+    // doc 82 V4: 4 ribbons x ~95 m usable at 1/10 m -> ~9 quads each, plus
+    // the junction pass. The lower bound is deliberately above the pre-V4
+    // ceiling of 12 — at 1/40 m this test passed with as few as 4 decals for
+    // the whole map, which is the "statistically invisible" density V4 exists
+    // to end.
+    //
+    // Re-baselined after the P2 fixes (per-cell end inset + the marking
+    // keep-out, decals.ts): measured 44 total / 12 junction at seed 7, the
+    // SAME as before them. Both fixes reshuffle the seeded stream, but the
+    // re-draw loop refills the slots they would otherwise have emptied, so on
+    // this map the density is unchanged.
+    expect(world.stats.roadDecals).toBeGreaterThanOrEqual(30);
+    expect(world.stats.roadDecals).toBeLessThanOrEqual(80);
     const { positions, uvs, indices } = world.roadDecals;
     expect(positions.length / 3).toBe(world.stats.roadDecals * 4);
     expect(indices.length / 3).toBe(world.stats.roadDecals * 2);
     for (let i = 1; i < positions.length; i += 3) {
-      expect(positions[i]!).toBeCloseTo(ROAD_DECAL_Y); // EXACTLY co-planar
+      // EXACTLY co-planar with the surface underneath — the ribbons for the
+      // road pass, the (3 mm lower) junction patch for the junction pass.
+      // Never in between: a lifted quad shears at grazing cockpit angles.
+      const y = positions[i]!;
+      expect(
+        Math.abs(y - ROAD_DECAL_Y) < 1e-6 || Math.abs(y - JUNCTION_DECAL_Y) < 1e-6,
+      ).toBe(true);
     }
     // Atlas UVs stay inside the texture.
     for (let i = 0; i < uvs.length; i++) {
@@ -193,6 +213,54 @@ describe("buildWorldGeometry on a synthetic X-junction", () => {
       const acz = positions[c + 2]! - positions[a + 2]!;
       expect(abz * acx - abx * acz).toBeGreaterThan(0);
     }
+  });
+
+  it("wears the junction interior, and never off the asphalt (doc 82 V4)", () => {
+    // The X-junction is the one node with a patch, so all junction wear
+    // belongs to it. Before V4 this count was structurally 0: ribbons are
+    // trimmed back to the approach cuts, so nothing could reach the ~1,600 m²
+    // of open slab a 2.5×-scaled 4-way carries.
+    expect(world.stats.junctionDecals).toBeGreaterThan(0);
+    expect(world.stats.junctionDecals).toBeLessThan(world.stats.roadDecals);
+
+    // EXACT containment, not a radius guess: every junction-plane decal vertex
+    // must land inside a triangle of the junction patch mesh itself. A
+    // T-junction patch is not a disc, and a decal sampled from one would float
+    // on the grass of the open side.
+    const patch = world.junctionSurface;
+    const tris: [number, number, number, number, number, number][] = [];
+    for (let t = 0; t < patch.indices.length; t += 3) {
+      const [a, b, c] = [patch.indices[t]! * 3, patch.indices[t + 1]! * 3, patch.indices[t + 2]! * 3];
+      tris.push([
+        patch.positions[a]!,
+        patch.positions[a + 2]!,
+        patch.positions[b]!,
+        patch.positions[b + 2]!,
+        patch.positions[c]!,
+        patch.positions[c + 2]!,
+      ]);
+    }
+    expect(tris.length).toBeGreaterThan(0);
+    const inside = (px: number, pz: number): boolean =>
+      tris.some(([ax, az, bx, bz, cx, cz]) => {
+        const d1 = (px - bx) * (az - bz) - (ax - bx) * (pz - bz);
+        const d2 = (px - cx) * (bz - cz) - (bx - cx) * (pz - cz);
+        const d3 = (px - ax) * (cz - az) - (cx - ax) * (pz - az);
+        const neg = d1 < -1e-9 || d2 < -1e-9 || d3 < -1e-9;
+        const pos = d1 > 1e-9 || d2 > 1e-9 || d3 > 1e-9;
+        return !(neg && pos);
+      });
+
+    const pos = world.roadDecals.positions;
+    let checked = 0;
+    let escaped = 0;
+    for (let i = 0; i < pos.length; i += 3) {
+      if (Math.abs(pos[i + 1]! - JUNCTION_DECAL_Y) > 1e-6) continue; // ribbon pass
+      checked++;
+      if (!inside(pos[i]!, pos[i + 2]!)) escaped++;
+    }
+    expect(checked).toBe(world.stats.junctionDecals * 4);
+    expect(escaped).toBe(0);
   });
 
   it("chamfers the curb top without changing the drivable curb height", () => {
@@ -285,10 +353,10 @@ describe("buildWorldGeometry on a synthetic X-junction", () => {
     expect(world.stats.signs.limit50).toBeGreaterThanOrEqual(1);
   });
 
-  it("streetscape v2: no palms/billboards without primary streets, no kits off-district", () => {
-    // Palm streets and billboards are primary-class only; this district has
-    // secondary + residential edges.
-    expect(world.trees.every((t) => t.kind !== "palm")).toBe(true);
+  it("streetscape v2: no boulevard row/billboards without primary streets, no kits off-district", () => {
+    // Linden boulevards and billboards are primary-class only; this district
+    // has secondary + residential edges.
+    expect(world.trees.every((t) => t.kind !== "linden")).toBe(true);
     expect(world.stats.billboards).toBe(0);
     // Hand-anchored parking sites lie outside these bounds -> skipped.
     expect(world.stats.parkingKits).toBe(0);
@@ -524,14 +592,45 @@ describe("buildWorldGeometry on the real district (Студентски град
     expect(world.attribution.copyrightUrl).toContain("openstreetmap.org/copyright");
   });
 
-  it("mixes the streetscape-v2 trees: palm streets + leafy rows (doc 70 REF 3)", () => {
-    const kinds = { palm: 0, ornamental: 0, leafyA: 0, leafyB: 0 };
+  it("mixes the streetscape-v2 trees: linden boulevards + leafy rows (doc 70 REF 3)", () => {
+    const kinds = { linden: 0, ornamental: 0, leafyA: 0, leafyB: 0 };
     for (const t of world.trees) kinds[t.kind]++;
-    // Exactly the palm-street boulevards carry palms; leafy rows dominate.
-    expect(kinds.palm).toBeGreaterThan(20);
-    expect(kinds.leafyA + kinds.leafyB).toBeGreaterThan(kinds.palm);
+    // Exactly the picked boulevards carry the uniform linden row; the mixed
+    // leafy rows dominate everywhere else.
+    expect(kinds.linden).toBeGreaterThan(20);
+    expect(kinds.leafyA + kinds.leafyB).toBeGreaterThan(kinds.linden);
     expect(kinds.leafyA + kinds.leafyB).toBeGreaterThan(kinds.ornamental);
-    expect(kinds.palm + kinds.ornamental + kinds.leafyA + kinds.leafyB).toBe(world.trees.length);
+    expect(kinds.linden + kinds.ornamental + kinds.leafyA + kinds.leafyB).toBe(world.trees.length);
+  });
+
+  /**
+   * Regression guard for a defect caught in a RENDERED FRAME
+   * (public/clips/sc-junction-stop__m0.k2.webp): the boulevards were planted
+   * with palms. Sofia is humid-continental with snowy winters — a palm on a
+   * Sofia boulevard reads as fake to the exact 17-year-old this product is
+   * for, and every species below is one that actually lines Sofia's streets
+   * (липа / кестен / топола / явор). Both halves matter: the CONTRACT must not
+   * offer a tropical species, and the builder must not plant anything outside
+   * the contract.
+   */
+  it("plants only species that survive a Sofia winter — never a palm", () => {
+    expect(TREE_KINDS.some((k) => /palm|tropic/i.test(k))).toBe(false);
+    const planted = new Set<string>(world.trees.map((t) => t.kind));
+    expect(planted.size).toBeGreaterThan(0);
+    for (const kind of planted) expect(TREE_KINDS).toContain(kind);
+  });
+
+  /**
+   * ...and the RENDERER must not resolve a kind to a tropical GLB — the type
+   * rename alone would not have stopped `linden: bake(palm.scene)`. The frame
+   * defect lived in this file, so the guard reads it.
+   */
+  it("never loads a palm asset in the prop renderer", () => {
+    const src = fs.readFileSync(path.join(HERE, "..", "components", "WorldProps.tsx"), "utf8");
+    // Comments explaining WHY palms are banned are fine; asset loads are not.
+    const loads = src.match(/load\((?:[^)]*)\)/g) ?? [];
+    expect(loads.length).toBeGreaterThan(0);
+    expect(loads.filter((l) => /palm/i.test(l))).toEqual([]);
   });
 
   it("places sparse billboards along the primary street (doc 70 REF 3)", () => {
@@ -582,13 +681,29 @@ describe("buildWorldGeometry on the real district (Студентски град
     }
   });
 
-  it("scatters street-wear decals at ~1 per 40 m of ribbon (doc 71 §4.4)", () => {
-    // 320 ribbons, mostly 40–200 m -> a few hundred decals, all one batch.
-    expect(world.stats.roadDecals).toBeGreaterThan(150);
-    expect(world.stats.roadDecals).toBeLessThan(1500);
+  it("scatters street-wear decals at ~1 per 10 m of ribbon (doc 82 V4)", () => {
+    // 320 ribbons, mostly 40–200 m, at 1/10 m plus the junction pass -> ~1.7 k
+    // quads, still ONE batch and ONE draw call. The floor is set ABOVE the
+    // pre-V4 ceiling of 1,500 on purpose: this is the whole content of V4 and
+    // reverting the spacing must fail here.
+    //
+    // Re-baselined after the P2 fixes (per-cell end inset + the marking
+    // keep-out, decals.ts): measured 1,739 total / 431 junction, against
+    // 1,760 / 447 before them. The keep-out costs 1.2% of the ribbon wear and
+    // 3.6% of the junction wear — the re-draw loop resolves nearly every
+    // rejected slot to a smaller cell instead of losing it — so the V4 floor
+    // still has real headroom and paint legibility is bought almost free.
+    expect(world.stats.roadDecals).toBeGreaterThan(1500);
+    expect(world.stats.roadDecals).toBeLessThan(4000);
+    // …and a real share of it now sits INSIDE the junctions, which carried
+    // none at all before (ribbons are trimmed back to the approach cuts).
+    expect(world.stats.junctionDecals).toBeGreaterThan(50);
     expect(world.roadDecals.positions.length / 3).toBe(world.stats.roadDecals * 4);
     for (let i = 1; i < world.roadDecals.positions.length; i += 3) {
-      expect(world.roadDecals.positions[i]!).toBeCloseTo(ROAD_DECAL_Y);
+      const y = world.roadDecals.positions[i]!;
+      expect(
+        Math.abs(y - ROAD_DECAL_Y) < 1e-6 || Math.abs(y - JUNCTION_DECAL_Y) < 1e-6,
+      ).toBe(true);
     }
   });
 

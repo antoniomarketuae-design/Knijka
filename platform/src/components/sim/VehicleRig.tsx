@@ -30,7 +30,7 @@ import {
   transmissionModeFor,
   type DifficultyMode,
 } from "@/modules/sim/vehicle";
-import type { SimInput } from "@/modules/sim/engine";
+import { SimHaptics, type SimInput } from "@/modules/sim/engine";
 import type { VehicleSample } from "@/modules/sim/contracts";
 import { surfacePatchGripAt, type SurfaceGripPatch } from "@/modules/sim/runtime";
 import type { CabinControls } from "@/modules/sim/scene/cabin";
@@ -180,6 +180,8 @@ export function VehicleRig({
   windLateralN = 0,
   windGustAmplitudeN = 0,
   windGustPeriodSec = 0,
+  engineBraking = false,
+  roadRoughness = 0,
   telltaleLitRef,
 }: {
   simRef: RefObject<VehicleSim | null>;
@@ -257,6 +259,22 @@ export function VehicleRig({
   windGustAmplitudeN?: number;
   /** Gust sine period, s (must be > 0 for the gust to arm). */
   windGustPeriodSec?: number;
+  /** ENGINE BRAKING (doc 82 §4.2 F3) — OPT-IN. false (default, every shipped
+   *  lesson) constructs the pre-F3 car and no engine-brake code runs at all:
+   *  lifting off in D still coasts exactly as it does today, so no committed
+   *  trace and no graded verdict moves. True gives the honest gear-dependent
+   *  coast decel (~1.0 m/s² low gear → 0.3 top, zero in N/P and clutch-down).
+   *  Deliberately NOT derived from anything: like wetGrip and crosswind it is
+   *  authored per lesson, and turning it on globally is a decision that owes
+   *  a deliberate re-baseline. */
+  engineBraking?: boolean;
+  /** ROAD-SURFACE VERTICAL MOTION (doc 82 §4.2 F2) — OPT-IN 0..1. 0 (default,
+   *  every shipped lesson) never enters the excitation branch: bit-identical
+   *  dynamics. Above 0 each grounded wheel rides deterministic 2-octave value
+   *  noise sampled at its WORLD position (~5 mm at city speed), so the tuned
+   *  suspension finally moves in a straight line — and replays stay
+   *  reproducible because the bumps are a function of place, not of time. */
+  roadRoughness?: number;
   /** N11 (VP-06): director→cluster warning-lamp channel, threaded to
    *  VitokCockpit (the hazardActiveRef pattern — render-free ref, read per
    *  frame). Absent = the temperature telltale never lights. */
@@ -265,6 +283,16 @@ export function VehicleRig({
   const { world } = useRapier();
   const bodyRef = useRef<RapierRigidBody>(null);
   const assistRef = useRef(createDriveAssistState());
+  // F5 haptics (doc 82 §4.3) — one instance per session. Inert by
+  // construction on any device without navigator.vibrate (all of iOS Safari)
+  // and behind the persisted opt-out, which is why every event it fires is
+  // also carried by an audio or visual cue.
+  const hapticsRef = useRef<SimHaptics | null>(null);
+  if (hapticsRef.current === null) hapticsRef.current = new SimHaptics();
+  useEffect(() => {
+    const haptics = hapticsRef.current;
+    return () => haptics?.cancel(); // never leave a motor running on unmount
+  }, []);
   // Interior fill light — driven per frame (never re-renders).
   const fillRef = useRef<PointLight>(null);
   // Night/rain headlight throw (see the module header block above).
@@ -310,9 +338,13 @@ export function VehicleRig({
       // pre-4a car — the options object with gripFactor 1 is the identity.
       // AC-12: per-lesson crosswind. The defaults (0) keep the wind branch
       // dormant — same identity discipline as gripFactor.
+      // F2/F3 (doc 82 §4.2): the same identity discipline again — false / 0
+      // are the pre-F defaults and construct the pre-F car exactly.
       {
         gripFactor,
         windLateralN,
+        engineBraking,
+        roadRoughness,
         ...(windGustAmplitudeN !== 0 && windGustPeriodSec > 0
           ? { windGust: { periodSec: windGustPeriodSec, amplitudeN: windGustAmplitudeN } }
           : {}),
@@ -323,7 +355,17 @@ export function VehicleRig({
       if (simRef.current === sim) simRef.current = null;
       sim.dispose();
     };
-  }, [world, simRef, spawn, gripFactor, windLateralN, windGustAmplitudeN, windGustPeriodSec]);
+  }, [
+    world,
+    simRef,
+    spawn,
+    gripFactor,
+    windLateralN,
+    windGustAmplitudeN,
+    windGustPeriodSec,
+    engineBraking,
+    roadRoughness,
+  ]);
 
   // Runs once per fixed 60 Hz substep, right before world.step() — exactly
   // the contract VehicleSim.update() requires. Always the fixed dt.
@@ -449,10 +491,19 @@ export function VehicleRig({
         }
       }
     }
+    // F1 (doc 82 §4.2): the grip-loss channel — the ONE quantity the sim was
+    // already computing every physics step and throwing away. Read once here
+    // and spent twice: the tyre-protest audio layer (the cue that carries it)
+    // and the threshold-braking haptic tap (redundant with the brake hiss).
+    // Pure read — VehicleSim applies no force from either getter.
+    const gripUtil = sim.gripUtilisation;
+    if (!paused) hapticsRef.current?.brakePedal(input?.brake ?? 0, sim.speedKmh);
+
     audioRef.current?.update({
       speedKmh: sim.speedKmh,
       throttle: input?.throttle ?? 0,
       brake: input?.brake ?? 0,
+      gripUtil,
       indicatorActive:
         (cabin?.indicator ?? "off") !== "off" || (cabin?.driveline.hazardsOn ?? false),
       blinkOn: (cabin?.blinkOn ?? false) || (cabin?.hazardBlinkOn ?? false),
@@ -497,6 +548,14 @@ export function VehicleRig({
         audioRef.current?.thump(Math.min(1, impactKmh / 50 + 0.15));
         if (impactKmh >= collisionMinKmh) {
           onCollision?.(impactKmh, tag?.kind ?? "staticObject");
+          // F5: the graded-collision pattern, redundant with the thump above
+          // and with the terminating „опасна" verdict on screen.
+          hapticsRef.current?.collision(impactKmh);
+        } else {
+          // Sub-threshold contact — a kerb scuff or a bumper nudge. One short
+          // tap, redundant with the same thump. NOT graded, and this call
+          // cannot make it graded: nothing here feeds the rule engine.
+          hapticsRef.current?.curb();
         }
       }}
     >

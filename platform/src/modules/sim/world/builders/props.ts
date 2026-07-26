@@ -8,8 +8,9 @@
  *   hand-placed Б2 overrides mirrored from runtime STOP_LINE_OVERRIDES (QW4).
  * - Streetlights along arterials, alternating sides.
  * - Trees v2 (doc 70 REF 3): leafy rows along arterial + residential streets,
- *   palms reserved for the deterministically-picked "palm streets" (the
- *   longest primary-class boulevards), ornamental accents + park fill.
+ *   a single uniform linden species on the deterministically-picked "linden
+ *   boulevards" (the longest primary-class streets), ornamental accents + park
+ *   fill. Species are Sofia species — see TreeKind on why never a palm.
  * - Billboards on poles along primary roadsides (sparse, deterministic).
  * - Bus-stop shelters on primary/secondary sidewalks, >= 25 m past a junction
  *   mouth, capped district-wide.
@@ -40,7 +41,7 @@ import {
   BUS_STOP_MAX_COUNT,
   BUS_STOP_MIN_SEPARATION_M,
   CLASS_RANK,
-  PALM_STREET_COUNT,
+  LINDEN_BOULEVARD_COUNT,
   PARK_TREE_GRID_M,
   ROAD_Y,
   SIDEWALK_TOP_Y,
@@ -52,6 +53,7 @@ import {
   add,
   dist,
   hashString,
+  AabbGrid,
   mul,
   mulberry32,
   perpRight,
@@ -114,12 +116,14 @@ function approachPropPose(ap: Approach, alongExtra: number, lateralExtra: number
 }
 
 /**
- * "Palm streets": the PALM_STREET_COUNT longest primary-class streets (edges
- * grouped by name; unnamed edges group alone). Deterministic — total length
- * ranks, name breaks ties. Their street trees are palms (the premium
- * boulevard flavor); every other arterial gets leafy rows (REF 3).
+ * "Linden boulevards": the LINDEN_BOULEVARD_COUNT longest primary-class streets
+ * (edges grouped by name; unnamed edges group alone). Deterministic — total
+ * length ranks, name breaks ties. Every tree on them is the SAME species, which
+ * is what makes a Sofia boulevard read as a planted avenue rather than a street
+ * that happens to have trees; every other arterial gets the mixed leafy row
+ * (REF 3).
  */
-function pickPalmStreetEdges(network: RoadNetwork): Set<string> {
+function pickLindenBoulevardEdges(network: RoadNetwork): Set<string> {
   const groups = new Map<string, { len: number; edgeIds: string[] }>();
   for (const eb of network.edges) {
     const cls = eb.edge.class;
@@ -133,11 +137,11 @@ function pickPalmStreetEdges(network: RoadNetwork): Set<string> {
   const ranked = [...groups.entries()].sort(
     (a, b) => b[1].len - a[1].len || (a[0] < b[0] ? -1 : 1),
   );
-  const palmEdges = new Set<string>();
-  for (const [, g] of ranked.slice(0, PALM_STREET_COUNT)) {
-    for (const id of g.edgeIds) palmEdges.add(id);
+  const boulevardEdges = new Set<string>();
+  for (const [, g] of ranked.slice(0, LINDEN_BOULEVARD_COUNT)) {
+    for (const id of g.edgeIds) boulevardEdges.add(id);
   }
-  return palmEdges;
+  return boulevardEdges;
 }
 
 /**
@@ -371,11 +375,13 @@ export function buildProps(
   const roadGrid = new SegmentGrid(24);
   for (const eb of network.edges) roadGrid.addPolyline(eb.edge.geometry as Vec2[]);
 
-  const insideBuilding = (p: Vec2, pad: number) =>
-    buildingAabbs.some(
-      ([minX, minY, maxX, maxY]) =>
-        p[0] > minX - pad && p[0] < maxX + pad && p[1] > minY - pad && p[1] < maxY + pad,
-    );
+  // Bucketed, not scanned — see terrain.ts and AabbGrid's header: doc 82 V7's
+  // street wall turns every prop candidate's linear footprint scan into a
+  // 380-box one on the city map. The predicate itself is unchanged, so every
+  // prop lands exactly where it did.
+  const buildingGrid = new AabbGrid(24);
+  for (const box of buildingAabbs) buildingGrid.add(box);
+  const insideBuilding = (p: Vec2, pad: number) => buildingGrid.hits(p, pad);
 
   const pushTree = (p: Vec2, kind: TreeKind) => {
     trees.push({
@@ -387,15 +393,15 @@ export function buildProps(
     });
   };
 
-  const palmStreetEdges = pickPalmStreetEdges(network);
+  const lindenBoulevardEdges = pickLindenBoulevardEdges(network);
 
   // Arterial rows: regularly-spaced leafy trees both sides (REF 3's tree-lined
-  // boulevards); the palm streets keep their palms. Per-edge dominant leafy
-  // species so a street reads as one planted row, not confetti.
+  // boulevards); the linden boulevards are planted single-species. Per-edge
+  // dominant leafy species so a street reads as one planted row, not confetti.
   if (placeTrees)
     for (const eb of network.edges) {
     if (!eb.line || eb.edge.roundabout || !ARTERIAL_CLASSES.has(eb.edge.class)) continue;
-    const palmStreet = palmStreetEdges.has(eb.edge.id);
+    const lindenBoulevard = lindenBoulevardEdges.has(eb.edge.id);
     const dominant: TreeKind = hashString(eb.edge.id) % 2 === 0 ? "leafyA" : "leafyB";
     const other: TreeKind = dominant === "leafyA" ? "leafyB" : "leafyA";
     const total = polylineLength(eb.line);
@@ -407,8 +413,8 @@ export function buildProps(
         const p = add(point, mul(r, side * (eb.halfWidth + SIDEWALK_WIDTH_M + 1.4 + rng() * 0.8)));
         if (insideBuilding(p, 1.8)) continue;
         const pick = rng();
-        const kind: TreeKind = palmStreet
-          ? "palm"
+        const kind: TreeKind = lindenBoulevard
+          ? "linden"
           : pick < 0.8
             ? dominant
             : pick < 0.92
@@ -420,7 +426,8 @@ export function buildProps(
   }
 
   // Street trees on residential-ish streets, outside the sidewalk — leafy mix
-  // with ornamental accents (palms are reserved for the palm streets).
+  // with ornamental accents (the linden row is reserved for the boulevards, so
+  // a side street never reads as a planted avenue).
   if (placeTrees)
     for (const eb of network.edges) {
     if (!eb.line) continue;

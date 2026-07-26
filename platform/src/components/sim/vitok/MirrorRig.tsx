@@ -53,6 +53,7 @@ import {
   type Object3D,
 } from "three";
 import { SKY_DOME_NAME } from "@/modules/sim/environment";
+import { renderMirrorPass } from "@/modules/sim/scene/vitok/mirrorPass";
 import { loadQualityPreset } from "../lesson-ui/QualityPresetSelector";
 
 export interface MirrorMeshes {
@@ -101,7 +102,12 @@ interface MirrorDef {
 //     HDR >1 clipped and linear quantisation crushed the dark asphalt into
 //     the "dark smear" (HalfFloatType fixes this — see below);
 //  3. the old ∓0.14 outward yaw aimed the left glass ~8° into the roadside
-//     lawn — with the black sky that read as "solid green".
+//     lawn — with the black sky that read as "solid green";
+//  4. (doc 82) the composer sets renderer.autoClear = false for its own
+//     ClearPass, so the raw gl.render below never cleared the mirror target's
+//     colour OR DEPTH — a fresh depth buffer reads 0 (the near plane), every
+//     fragment failed the LESS test, and the glass was a solid black
+//     rectangle on med/high forever. mirrorPass.ts owns autoClear now.
 const MIRROR_DEFS: Record<MirrorKind, MirrorDef> = {
   rear: { width: 256, height: 96, fovDeg: 14, pos: [0, 0.687, 0.575], yaw: 0, pitch: 0 },
   left: { width: 160, height: 96, fovDeg: 18, pos: [0.905, 0.455, 0.592], yaw: 0, pitch: -0.08 },
@@ -270,21 +276,20 @@ export function MirrorRig({ mirrors, active }: { mirrors: MirrorMeshes; active: 
 
     // Reduced-scene render (see MIRROR_FAR/MIRROR_FOG_MIN_DENSITY): freeze
     // shadows (reuse the main pass's maps), floor the fog so the short far
-    // plane never pops, shrink the sky dome into the frustum — then restore
-    // every piece of mutated global state before the main render.
-    const previousTarget = gl.getRenderTarget();
-    const previousShadowAutoUpdate = gl.shadowMap.autoUpdate;
-    const previousFogDensity = fog ? fog.density : 0;
-    const previousSkyScale = sky ? sky.scale.x : 1;
-    gl.shadowMap.autoUpdate = false;
-    if (fog) fog.density = Math.max(fog.density, MIRROR_FOG_MIN_DENSITY);
-    if (sky) sky.scale.setScalar(MIRROR_SKY_RADIUS);
-    gl.setRenderTarget(entry.target);
-    gl.render(scene, entry.camera);
-    gl.setRenderTarget(previousTarget);
-    gl.shadowMap.autoUpdate = previousShadowAutoUpdate;
-    if (fog) fog.density = previousFogDensity;
-    if (sky) sky.scale.setScalar(previousSkyScale);
+    // plane never pops, shrink the sky dome into the frustum, and — the
+    // black-mirror fix, doc 82 §3.2 — force `autoClear` back on for the pass,
+    // because the composer switched it off globally and a raw gl.render into
+    // an unclear'd depth buffer draws nothing at all. renderMirrorPass owns
+    // saving and restoring all four.
+    renderMirrorPass(gl, {
+      target: entry.target,
+      scene: scene as never,
+      camera: entry.camera as never,
+      fog,
+      fogMinDensity: MIRROR_FOG_MIN_DENSITY,
+      sky,
+      skyRadius: MIRROR_SKY_RADIUS,
+    });
   });
 
   // The cameras join the chassis-local tree so they inherit the interpolated

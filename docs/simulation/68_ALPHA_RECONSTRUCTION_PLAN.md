@@ -189,6 +189,13 @@ Concretely, ALL of the following:
 
 ### The platform promise holds
 - [ ] Runs on a mid-range Android phone: touch controls, 30+ fps median at tier-low, <10 s load. **Alpha does not ship while ADR-005 is a refusal screen.**
+  - *Still unchecked, and it stays unchecked until a real device produces a real
+    log.* The instrument now exists: `PerfProbe` scores a drive against the doc 82
+    §2.2 envelope and emits a committable artifact, `platform/scripts/perf-report.mjs`
+    files it, and [`perf/README.md`](perf/README.md) has the chrome://inspect
+    procedure. Reference device: Galaxy A16, ~€125. **DevTools device emulation
+    does not emulate the GPU and gives a false green** — an emulated run is not
+    evidence and the artifact records the unmasked renderer string to prove it.
 
 Explicitly NOT required for Alpha: voice TTS, motorway/tram content, multiplayer, damage modeling, wheel hardware, more districts, AI-LLM debrief live.
 

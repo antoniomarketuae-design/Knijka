@@ -7,6 +7,7 @@
  */
 
 import { useCallback, useSyncExternalStore } from "react";
+import { seedQualityLevel } from "@/modules/sim/environment";
 import { QUALITY_PRESETS, QUALITY_STORAGE_KEY, type QualityPreset } from "./types";
 
 function isPreset(v: unknown): v is QualityPreset {
@@ -15,13 +16,38 @@ function isPreset(v: unknown): v is QualityPreset {
 
 const DEFAULT_PRESET: QualityPreset = "medium";
 
-/** Read the persisted preset (client only); defaults to "medium". */
+/**
+ * The cold start when nothing is stored — doc 82 §2.3 fix 2, "seed the quality
+ * tier from device signals BEFORE the first fetch".
+ *
+ * This function is the simulator's ONLY tier decision. `useQualityPreset`
+ * feeds it into <SceneSlot quality>, and HeroCarBody / VehicleRig / MirrorRig
+ * each call `loadQualityPreset()` directly to gate their own cost, so all four
+ * must resolve identically or the hero car renders clearcoat inside a `low`
+ * environment. LessonScene then derives the DOWNLOAD plan from the same value
+ * (`TEXTURE_BUDGETS[level]`, sim/world) — which is why the seed has to happen
+ * here, synchronously, rather than in a probe that runs 2.5 s after the med
+ * plan's 5.9 MB (incl. a 1.5 MB HDR) has already been requested.
+ *
+ * `seedQualityLevel()` returns the environment module's "low" | "med" | never
+ * "high"; this store speaks "low" | "medium" | "high".
+ */
+function seededPreset(): QualityPreset {
+  return seedQualityLevel() === "low" ? "low" : DEFAULT_PRESET;
+}
+
+/**
+ * Read the persisted preset (client only). With nothing stored, falls back to
+ * the device seed rather than a flat "medium" — see `seededPreset`. An
+ * explicit stored choice always wins; the seed is a guess, the storage key is
+ * a decision.
+ */
 export function loadQualityPreset(): QualityPreset {
   try {
     const stored = window.localStorage.getItem(QUALITY_STORAGE_KEY);
-    return isPreset(stored) ? stored : DEFAULT_PRESET;
+    return isPreset(stored) ? stored : seededPreset();
   } catch {
-    return DEFAULT_PRESET;
+    return seededPreset();
   }
 }
 
@@ -66,8 +92,10 @@ export function useQualityPreset(): [QualityPreset, (q: QualityPreset) => void] 
   const quality = useSyncExternalStore(
     subscribeQuality,
     qualitySnapshot,
-    // Server snapshot: "medium" is what SSR renders, and what a client with no
-    // stored preference resolves to anyway.
+    // Server snapshot: "medium". There is no device to read on the server, and
+    // React re-renders with the client snapshot right after hydration — which
+    // is where the device seed lands. The canvas itself mounts ssr:false, so it
+    // only ever sees the seeded value.
     () => DEFAULT_PRESET,
   );
 

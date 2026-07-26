@@ -59,6 +59,39 @@ export type { SimSeverity } from "./store";
 // Nothing is re-exported through here on purpose — a compatibility shim would
 // leave the boundary violated while looking fixed.
 
+// „Позна ли се?" — the self-assessment calibration gate (doc 82 §5.3 I1).
+// The PURE half only: classification, the trend fold and the authored copy.
+// ./calibrationStore stays off this barrel on purpose — it is the server half
+// (Prisma), and this file is imported by client-reachable code, so a re-export
+// would be a static edge to the database client (audit M-26). The gate widget
+// deep-imports `@/modules/learning/calibration`; the server action and the
+// trend page deep-import `@/modules/learning/calibrationStore`.
+export {
+  ACCURATE_BAND_POINTS,
+  CALIBRATION_MIN_SAMPLES,
+  CALIBRATION_PENDING_BODY_BG,
+  CALIBRATION_PENDING_TITLE_BG,
+  CALIBRATION_TREND_BG,
+  CALIBRATION_VERDICT_BODY_BG,
+  CALIBRATION_VERDICT_TITLE_BG,
+  MAX_PREDICTED_POINTS,
+  calibrationError,
+  classifyCalibration,
+  formatCalibrationError,
+  isResultScreenHeld,
+  parsePredictionInput,
+  summarizeCalibration,
+  verdictAgrees,
+} from "./calibration";
+export type {
+  CalibrationPoint,
+  CalibrationRecord,
+  CalibrationSummary,
+  CalibrationVerdict,
+  GateSequenceState,
+  PredictionInput,
+} from "./calibration";
+
 export {
   getReadiness,
   getSectionOverview,

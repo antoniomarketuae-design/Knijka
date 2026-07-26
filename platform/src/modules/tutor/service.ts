@@ -2,34 +2,45 @@
  * askTutor / getThread — the tutor module's core flow.
  *
  * askTutor(userId, message):
- *   guard input → per-user burst limit → per-user daily message cap → GLOBAL
- *   daily spend cap → retrieve materials from the content bank AND the sim
- *   rule catalog → build the grounded system prompt (+ the student's 3 weakest
- *   concepts) → call the model → book tokens/cost (never skipped) → persist
- *   the exchange + the day's global ledger → return reply + citations.
+ *   guard input → per-user burst limit → per-user daily message cap → per-PACK
+ *   allowance → GLOBAL daily spend cap → retrieve materials from the content
+ *   bank AND the sim rule catalog → build the grounded system prompt (+ the
+ *   student's weakest theory concepts AND their recent simulator mistakes) →
+ *   call the model → book tokens/cost (never skipped) → validate the citations
+ *   against this turn's materials → persist the exchange (citations included)
+ *   + the day's global ledger → return reply + citations.
  *
- * The three limits stack deliberately (audit 2026-07-24, H-8) and each one
- * answers a different question: how fast may ONE student ask (burst), how much
- * may ONE student ask today (message cap), and how much may the PRODUCT spend
- * today (money). Registration is free, so the first two are per-account
- * ceilings an attacker multiplies by simply registering again — only the third
- * one bounds the bill.
+ * The four limits stack deliberately (audit 2026-07-24 H-8; doc 81 §5.3) and
+ * each one answers a different question: how fast may ONE student ask (burst),
+ * how much may ONE student ask today (message cap), how much does their PACK
+ * buy in total (allowance), and how much may the PRODUCT spend today (money).
+ * Registration is free, so the first two are per-account ceilings an attacker
+ * multiplies by simply registering again; the allowance is the one that bounds
+ * a single PAYING student's four-month tail, and the global one bounds the
+ * bill in every other case.
  */
 
 import { getContentRepo } from "@/lib/content/repo";
 import type { LawRef } from "@/lib/content/types";
-import { getReadiness } from "@/modules/learning";
+import { getReadiness, getSimWeakSpots } from "@/modules/learning";
+import { checkTutorPackAllowance } from "@/modules/payments";
+import type { TutorPackAllowance } from "@/modules/payments";
 import {
   consumeRateLimit,
   RATE_LIMITS,
   rateLimitMessageBg,
 } from "@/modules/security";
-import { checkDailyBudget, TUTOR_BUDGET_REPLY_BG } from "./budget";
+import { tutorAllowanceSpentReplyBg } from "./allowance";
+import { checkDailyBudget, sofiaDayKey, TUTOR_BUDGET_REPLY_BG } from "./budget";
 import { computeCostMicroUsd } from "./cost";
 import { getTutorModel, isTutorEnabled } from "./model";
 import { buildTutorSystemPrompt, extractCitations } from "./prompt";
-import { retrieveGrounding } from "./retrieval";
-import { getTutorStore, type TutorMessage } from "./store";
+import { retrieveGroundingForTurn } from "./retrieval";
+import {
+  getTutorStore,
+  type TutorCitation,
+  type TutorMessage,
+} from "./store";
 
 /** Per-user daily cap on tutor questions — cheap to change, hard to miss. */
 export const TUTOR_DAILY_MESSAGE_LIMIT = 30;
@@ -41,13 +52,12 @@ export const TUTOR_HISTORY_MESSAGES = 12;
 export const TUTOR_MAX_REPLY_TOKENS = 1024;
 /** How many weakest concepts are injected for proactive suggestions. */
 export const TUTOR_WEAKEST_CONCEPTS = 3;
+/** How many recent simulator weak spots are injected alongside them (D4). */
+export const TUTOR_SIM_WEAK_SPOTS = 3;
 
 export const TUTOR_LIMIT_REPLY_BG = `Стигна дневния лимит от ${TUTOR_DAILY_MESSAGE_LIMIT} въпроса към Учителя за днес. Ела пак утре — а дотогава най-полезното е една умна тренировка.`;
 
-export interface TutorCitation {
-  act: string;
-  ref: string;
-}
+export type { TutorCitation };
 
 export interface AskTutorResult {
   threadId: string;
@@ -62,19 +72,78 @@ export interface TutorThreadView {
   messages: TutorMessage[];
 }
 
-/** Local-server midnight — the daily budget window boundary. */
-export function startOfTodayMs(now: Date = new Date()): number {
-  const d = new Date(now);
-  d.setHours(0, 0, 0, 0);
-  return d.getTime();
+/**
+ * Pure budget primitive: student questions sent on the Europe/Sofia calendar
+ * day `day` ("YYYY-MM-DD", from sofiaDayKey).
+ *
+ * Sofia, not server-local (doc 81 §1.4, D5). This used to count „since
+ * `d.setHours(0,0,0,0)`" — midnight on whatever clock the box happens to run.
+ * The staging VPS is UTC, so a student's 30-question day rolled over at 02:00
+ * or 03:00 Bulgarian time: ask at 00:30, and it came out of yesterday's
+ * allowance. budget.ts and payments/quota.ts had both already settled on the
+ * student's wall clock for exactly this reason; this counter was the one that
+ * did not, and it is the one the student actually feels.
+ */
+export function countUserMessagesOnDay(
+  messages: TutorMessage[],
+  day: string,
+): number {
+  return messages.filter(
+    (m) => m.role === "user" && sofiaDayKey(new Date(m.ts)) === day,
+  ).length;
 }
 
-/** Pure budget primitive: student questions sent since `sinceMs`. */
-export function countUserMessagesSince(
+/**
+ * When every question the student has ever asked was sent, oldest first.
+ *
+ * This is what the per-pack allowance is counted from (payments/quota.ts
+ * checkTutorPackAllowance): only `role: "user"` rows, because the allowance
+ * buys QUESTIONS, and only rows the tutor itself wrote through saveExchange —
+ * which is what makes a failed or refused call free. A reply that never
+ * happened leaves no user row behind, so it can never cost the student one of
+ * their 300.
+ */
+export function userQuestionTimestamps(messages: TutorMessage[]): number[] {
+  return messages.filter((m) => m.role === "user").map((m) => m.ts);
+}
+
+/**
+ * How much of the pack's tutor allowance this student has left.
+ *
+ * Exported for the page, which renders the „остават ти N от 300" counter above
+ * the chat (allowance.ts tutorAllowanceNoticeBg decides whether it appears at
+ * all). `messages` comes from getThread, so a caller that already loaded the
+ * thread does not read it twice.
+ */
+export async function getTutorAllowance(
+  userId: string,
   messages: TutorMessage[],
-  sinceMs: number,
-): number {
-  return messages.filter((m) => m.role === "user" && m.ts >= sinceMs).length;
+): Promise<TutorPackAllowance> {
+  return checkTutorPackAllowance(userId, userQuestionTimestamps(messages));
+}
+
+/**
+ * Run a personalization read that the tutor can do without. Anything it throws
+ * — a database hiccup, an uninitialized repo, a shape that changed — costs the
+ * student a hint, never the answer they came for.
+ */
+async function advisory(read: () => Promise<string[]>): Promise<string[]> {
+  try {
+    return await read();
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * The student's previous question in this thread, for follow-up grounding
+ * (retrieval.ts retrieveGroundingForTurn). Null when this is the first one.
+ */
+export function previousUserQuestion(messages: TutorMessage[]): string | null {
+  for (let i = messages.length - 1; i >= 0; i--) {
+    if (messages[i].role === "user") return messages[i].content;
+  }
+  return null;
 }
 
 export async function getThread(userId: string): Promise<TutorThreadView> {
@@ -118,11 +187,27 @@ export async function askTutor(
   }
 
   // Per-user daily message cap — checked BEFORE any API spend.
-  const usedToday = countUserMessagesSince(thread.messages, startOfTodayMs());
+  const usedToday = countUserMessagesOnDay(thread.messages, sofiaDayKey());
   if (usedToday >= TUTOR_DAILY_MESSAGE_LIMIT) {
     return {
       threadId: thread.id,
       reply: TUTOR_LIMIT_REPLY_BG,
+      citations: [],
+      limited: true,
+    };
+  }
+
+  // What the PACK bought (doc 81 §5.3). The daily cap above says how much a
+  // student may ask TODAY; this says how much their €12.99 buys in total, and
+  // it is the only ceiling here that a paying student can reach. It has to be
+  // enforced at this line rather than at the page's trial gate, because this
+  // is the one place model tokens are actually spent — every future tutor
+  // surface (why-panel, debrief) arrives through here too.
+  const allowance = await getTutorAllowance(userId, thread.messages);
+  if (!allowance.allowed) {
+    return {
+      threadId: thread.id,
+      reply: tutorAllowanceSpentReplyBg(allowance.limit),
       citations: [],
       limited: true,
     };
@@ -145,21 +230,37 @@ export async function askTutor(
   // Grounding: retrieval over OUR authored corpora only (ADR-002) — the
   // content bank plus the sim rule catalog, which is the only place that
   // knows what a mistake costs on the exam and what the right action was.
-  const materials = retrieveGrounding(getContentRepo(), question);
+  // The previous question rides along so a bare „А защо?“ still lands on the
+  // topic it is asking about instead of forcing a refusal (D2).
+  const materials = retrieveGroundingForTurn(
+    getContentRepo(),
+    question,
+    previousUserQuestion(thread.messages),
+  );
 
-  // Weakest concepts for proactive practice suggestions — advisory only,
-  // a readiness failure must never block the tutor.
-  let weakestConceptTitlesBg: string[] = [];
-  try {
-    const readiness = await getReadiness(userId);
-    weakestConceptTitlesBg = readiness.weakestConcepts
-      .slice(0, TUTOR_WEAKEST_CONCEPTS)
-      .map((c) => c.titleBg);
-  } catch {
-    weakestConceptTitlesBg = [];
-  }
+  // What the student is weak at — in theory AND behind the wheel. Advisory
+  // only: neither read may block the tutor, so each degrades to an empty list.
+  // They are fetched together because they answer the same question about the
+  // same student, and asking only the first is what made this "the theory
+  // tutor" rather than "the tutor" (D4).
+  const [weakestConceptTitlesBg, simWeakSpotsBg] = await Promise.all([
+    advisory(async () =>
+      (await getReadiness(userId)).weakestConcepts
+        .slice(0, TUTOR_WEAKEST_CONCEPTS)
+        .map((c) => c.titleBg),
+    ),
+    advisory(async () =>
+      (await getSimWeakSpots(userId, TUTOR_SIM_WEAK_SPOTS)).spots.map(
+        (s) => `${s.titleBg} — ${s.violationCount} пъти`,
+      ),
+    ),
+  ]);
 
-  const system = buildTutorSystemPrompt({ materials, weakestConceptTitlesBg });
+  const system = buildTutorSystemPrompt({
+    materials,
+    weakestConceptTitlesBg,
+    simWeakSpotsBg,
+  });
   const history = thread.messages
     .slice(-TUTOR_HISTORY_MESSAGES)
     .map(({ role, content }) => ({ role, content }));
@@ -176,6 +277,18 @@ export async function askTutor(
     result.outputTokens,
   );
 
+  // Citations validated against the injected materials — a marker the model
+  // invented never becomes a chip. Computed BEFORE the write, because the
+  // whitelist is only meaningful against THIS turn's materials and the UI now
+  // renders chips strictly from the stored list (D1): re-deriving it on a
+  // later read would score a hallucinated marker against a different
+  // retrieval, which is how an invented reference gets approved by accident.
+  const knownRefs: LawRef[] = materials.flatMap((m) => m.lawRefs);
+  const citations: TutorCitation[] = extractCitations(
+    result.text,
+    knownRefs,
+  ).map(({ act, ref }) => ({ act, ref }));
+
   const now = Date.now();
   const usage = {
     tokensIn: result.inputTokens,
@@ -185,7 +298,7 @@ export async function askTutor(
   const messages: TutorMessage[] = [
     ...thread.messages,
     { role: "user", content: question, ts: now },
-    { role: "assistant", content: result.text, ts: now },
+    { role: "assistant", content: result.text, ts: now, citations },
   ];
   await store.saveExchange(thread.id, messages, usage);
 
@@ -199,13 +312,6 @@ export async function askTutor(
   } catch (err) {
     console.error("[tutor] daily spend ledger write failed:", err);
   }
-
-  // Citations validated against the injected materials — a marker the model
-  // invented never becomes a chip.
-  const knownRefs: LawRef[] = materials.flatMap((m) => m.lawRefs);
-  const citations = extractCitations(result.text, knownRefs).map(
-    ({ act, ref }) => ({ act, ref }),
-  );
 
   return { threadId: thread.id, reply: result.text, citations, limited: false };
 }

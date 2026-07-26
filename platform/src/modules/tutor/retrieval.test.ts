@@ -12,6 +12,7 @@ import {
   normalizeBg,
   parseCatalogLawRef,
   retrieveGrounding,
+  retrieveGroundingForTurn,
   retrieveMaterials,
   retrieveRuleMaterials,
   tokenizeBg,
@@ -190,5 +191,53 @@ describe("retrieveGrounding", () => {
     expect(retrieveGrounding(repo, "Каква е глобата за изтекла застраховка?")).toEqual(
       [],
     );
+  });
+});
+
+describe("retrieveGroundingForTurn (follow-ups, doc 81 D2)", () => {
+  const PRIOR = "Кой има предимство на кръстовище?";
+
+  it("grounds a bare „А защо?“ in the question it follows up on", () => {
+    // Both words are stopwords, so on its own this retrieves NOTHING and the
+    // system prompt forces the refusal — the second message of nearly every
+    // conversation. This is the defect, asserted.
+    expect(retrieveGrounding(repo, "А защо?")).toEqual([]);
+
+    const items = retrieveGroundingForTurn(repo, "А защо?", PRIOR);
+    expect(items.map((i) => i.id)).toContain(CONCEPT_PRIORITY.id);
+  });
+
+  it("still refuses a follow-up when there is no previous question", () => {
+    expect(retrieveGroundingForTurn(repo, "А защо?", null)).toEqual([]);
+    expect(retrieveGroundingForTurn(repo, "А защо?")).toEqual([]);
+  });
+
+  it("leaves a question that stands on its own bit-identical", () => {
+    // The fallback must not perturb any question that already worked: a new
+    // topic mid-conversation gets exactly the materials it would have got as
+    // the first message, in the same order.
+    const alone = retrieveGrounding(repo, "Каква е скоростта в града?");
+    const inThread = retrieveGroundingForTurn(
+      repo,
+      "Каква е скоростта в града?",
+      PRIOR,
+    );
+    expect(inThread).toEqual(alone);
+    expect(inThread.map((i) => i.id)).toContain(CONCEPT_SPEED.id);
+    expect(inThread.map((i) => i.id)).not.toContain(CONCEPT_PRIORITY.id);
+  });
+
+  it("does not let the previous topic answer a new off-curriculum question", () => {
+    // "глоба"/"застраховка" ARE content tokens — this is a genuinely new topic
+    // our corpora do not cover, so it must keep refusing. Dragging the
+    // previous question's materials under it is the ADR-002 failure the narrow
+    // fallback exists to avoid.
+    expect(
+      retrieveGroundingForTurn(
+        repo,
+        "Каква е глобата за изтекла застраховка?",
+        PRIOR,
+      ),
+    ).toEqual([]);
   });
 });

@@ -261,8 +261,21 @@ export interface SignPlacement extends StaticTransform {
   kind: SignKind;
 }
 
-/** Which authored tree model renders a placement (streetscape v2 mix). */
-export type TreeKind = "palm" | "ornamental" | "leafyA" | "leafyB";
+/**
+ * Which authored tree model renders a placement (streetscape v2 mix).
+ *
+ * Species must be ones that ACTUALLY grow on a Sofia street: `linden` (липа —
+ * the uniform boulevard row) plus the ordinary leafy/ornamental mix. Never a
+ * palm: Sofia is humid-continental with snowy winters, so a palm on a Sofia
+ * boulevard instantly reads as fake to the 17-year-old this product is for and
+ * spends the credibility the whole visual program is buying. `TREE_KINDS`
+ * below is the render order and is asserted palm-free by the builder tests.
+ */
+export type TreeKind = "linden" | "ornamental" | "leafyA" | "leafyB";
+
+/** Every TreeKind, in render order (one instanced draw each). Single source of
+ *  truth for the renderer's per-kind buckets and the builder tests. */
+export const TREE_KINDS: readonly TreeKind[] = ["linden", "ornamental", "leafyA", "leafyB"];
 
 export interface TreePlacement extends StaticTransform {
   variant: 0 | 1 | 2;
@@ -316,8 +329,14 @@ export interface WorldStats {
   parkingBays: number;
   /** Curbside parking bands on arterial edges (two per qualifying ribbon). */
   parkingLaneStrips: number;
-  /** Batched road decals (one quad each; the whole batch is ONE draw call). */
+  /** Batched road decals (one quad each; the whole batch is ONE draw call).
+   *  Ribbon pass + junction pass — `roadDecals * 4` is the batch's vertex
+   *  count, which several district suites assert against the buffer. */
   roadDecals: number;
+  /** How many of `roadDecals` sit INSIDE junction patches (doc 82 V4). Before
+   *  V4 this was structurally 0: ribbons are trimmed to the approach cuts, so
+   *  the busiest asphalt in the world carried no wear at all. */
+  junctionDecals: number;
   /** Standing-water quads over waterPatch spans (aquaplane visibility slice;
    *  icePatch spans stay invisible BY DESIGN — black ice is the lesson). */
   waterDecals: number;

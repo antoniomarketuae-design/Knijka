@@ -2,12 +2,17 @@
 
 import { useEffect, useRef, useState, useTransition } from "react";
 import { askTutorAction } from "@/app/(dashboard)/tutor/actions";
+import { splitTutorMessage, type TutorCitationRef } from "./TutorChatCitations";
 import type { TutorChatMessage } from "./types";
 
 /**
- * Chat UI for „Учителят": message bubbles, law-citation chips parsed from
- * [ЗДвП чл. X] markers, starter questions, Enter-to-send input and a typing
- * indicator while the (non-streaming) server action runs.
+ * Chat UI for „Учителят": message bubbles, law-citation chips, starter
+ * questions, Enter-to-send input and a typing indicator while the
+ * (non-streaming) server action runs.
+ *
+ * A chip is rendered ONLY for a reference the server validated against the
+ * materials it retrieved (ADR-002 — see TutorChatCitations.ts for why that
+ * matters and what happens to every other bracketed marker).
  */
 
 /** Keep in sync with TUTOR_MAX_INPUT_LENGTH in @/modules/tutor. */
@@ -20,23 +25,25 @@ const STARTER_QUESTIONS = [
   "Кога е забранено изпреварването?",
 ];
 
-/** Splits "[ЗДвП чл. 47]" markers out of the text; markers become chips. */
-const MARKER_SPLIT_RE = /(\[[^\][]+\])/g;
-
-function MessageContent({ content }: { content: string }) {
-  const parts = content.split(MARKER_SPLIT_RE);
+function MessageContent({
+  content,
+  citations,
+}: {
+  content: string;
+  citations?: TutorCitationRef[];
+}) {
   return (
     <>
-      {parts.map((part, i) =>
-        part.startsWith("[") && part.endsWith("]") ? (
+      {splitTutorMessage(content, citations).map((part, i) =>
+        part.kind === "citation" ? (
           <span
             key={i}
             className="mx-0.5 inline-flex items-center whitespace-nowrap rounded-full border border-accent/40 bg-accent/10 px-2 py-0.5 align-middle text-xs font-semibold text-accent"
           >
-            {part.slice(1, -1)}
+            {part.label}
           </span>
         ) : (
-          <span key={i}>{part}</span>
+          <span key={i}>{part.text}</span>
         ),
       )}
     </>
@@ -101,7 +108,12 @@ export function TutorChat({
         const result = await askTutorAction(question);
         setMessages((prev) => [
           ...prev,
-          { role: "assistant", content: result.reply, ts: Date.now() },
+          {
+            role: "assistant",
+            content: result.reply,
+            ts: Date.now(),
+            citations: result.citations,
+          },
         ]);
         if (result.limited) setLimited(true);
       } catch {
@@ -163,7 +175,13 @@ export function TutorChat({
                     <p className="mb-1 text-xs font-bold text-accent">Учителят</p>
                   )}
                   <p className="whitespace-pre-wrap">
-                    <MessageContent content={m.content} />
+                    {/* The student's own text is never a source of citations —
+                        typing „[ЗДвП чл. 999]" into the composer must not mint
+                        a law chip in their own bubble. */}
+                    <MessageContent
+                      content={m.content}
+                      citations={m.role === "assistant" ? m.citations : undefined}
+                    />
                   </p>
                 </div>
               </li>
@@ -186,9 +204,17 @@ export function TutorChat({
             {error}
           </p>
         )}
+        {/* Deliberately says NOTHING about why. `limited` is the module's one
+            wire flag for five different ceilings — the burst guard, the daily
+            cap, the pack's question allowance, the site-wide budget and the
+            free trial — and each of them has already answered in full, in the
+            Учител's own voice, in the bubble directly above. This line used to
+            claim „дневният лимит… пак утре", which is a lie for three of the
+            five: waiting until tomorrow does nothing for a spent pack
+            allowance or a spent trial. */}
         {limited && (
           <p className="mb-2 text-sm font-semibold text-warning">
-            Дневният лимит е изчерпан — Учителят те чака пак утре.
+            Виж съобщението на Учителя горе ☝️
           </p>
         )}
         <form
@@ -209,7 +235,9 @@ export function TutorChat({
             onChange={(e) => setInput(e.target.value)}
             maxLength={INPUT_MAX_LENGTH}
             placeholder={
-              limited ? "До утре! 👋" : "Питай за правило, знак или ситуация…"
+              limited
+                ? "Учителят обясни горе 👆"
+                : "Питай за правило, знак или ситуация…"
             }
             disabled={isAsking || limited}
             autoComplete="off"
