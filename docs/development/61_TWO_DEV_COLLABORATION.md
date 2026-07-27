@@ -14,7 +14,10 @@ collision — both people building the same item, or stepping on the same files.
   (later: `main`), pm2 app `knijka` on :3100, pm2 quick tunnel `knijka-tunnel`.
   Redeploy: `ssh <vps> /opt/knijka/deploy.sh`. The trycloudflare URL **rotates
   every tunnel restart** — current one:
-  `grep -ohE "https://[a-z0-9-]+\.trycloudflare\.com" /root/.pm2/logs/knijka-tunnel-out.log | tail -1`.
+  `grep -ohE "https://[a-z0-9-]+\.trycloudflare\.com" /root/.pm2/logs/knijka-tunnel-*.log | tail -1`.
+  Note the `*`: **cloudflared prints its URL on stderr**, so it lands in
+  `knijka-tunnel-error.log` and `-out.log` stays 0 bytes. Globbing both is the
+  difference between finding the URL and concluding the tunnel is down.
 - Each developer runs their **own local dev server + own local DB**
   (`npx prisma dev`). Nobody develops on the VPS.
 
