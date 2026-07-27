@@ -157,6 +157,21 @@ export const BUCKETS = [
     why: "Non-district GLB used outside the simulator canvas.",
   },
   {
+    id: "hero-loop",
+    match: (rel) => rel.startsWith("hero/"),
+    ship: "prod",
+    maxBytes: 1_500_000,
+    // THE TRIPWIRE THAT MATTERS HERE. This is the only asset in the tree that
+    // a visitor fetches before they have read a word, on a phone, on mobile
+    // data — it is the still plate's replacement, and the moment it stops
+    // being cheap it stops being worth having (the plate is 0 requests). Two
+    // sources are declared, ONE is fetched: the browser picks the first
+    // <source> it can decode, so the per-file ceiling is the real budget and
+    // the bucket ceiling only stops a third rendition creeping in.
+    maxFileBytes: 700_000,
+    why: "The pre-rendered marketing hero loop (VP9 + H.264) every phone gets instead of a still plate — see components/marketing/hero/HeroLoopVideo.tsx.",
+  },
+  {
     id: "brand",
     match: (rel) => rel.startsWith("icons/") || rel === "og.png",
     ship: "prod",

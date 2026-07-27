@@ -1,5 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" role="img" aria-labelledby="t">
 <title id="t">Д19 — Паркинг</title>
-<rect x="8" y="8" width="184" height="184" rx="18" fill="#0057a8"/>
+<rect x="8" y="8" width="184" height="184" rx="18" fill="#0057a8" data-plate="true"/>
 <text x="100" y="146" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-weight="bold" font-size="124" fill="#fff">P</text>
 </svg>

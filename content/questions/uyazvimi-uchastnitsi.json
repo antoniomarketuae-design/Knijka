@@ -2939,14 +2939,14 @@
       "poses": [
         {
           "kind": "car",
-          "x": -16,
+          "x": -25,
           "y": -4.06,
           "headingDeg": 90,
           "variant": "ego"
         },
         {
           "kind": "bike",
-          "x": -9,
+          "x": -17,
           "y": -7,
           "headingDeg": 90
         }
@@ -2959,7 +2959,7 @@
         },
         {
           "kind": "yield",
-          "x": -10,
+          "x": -20,
           "y": -4.06
         }
       ]

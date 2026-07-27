@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" role="img" aria-labelledby="t">
 <title id="t">Д15 — Начало на жилищна зона</title>
-<rect x="8" y="8" width="184" height="184" rx="18" fill="#0057a8"/>
+<rect x="8" y="8" width="184" height="184" rx="18" fill="#0057a8" data-plate="true"/>
 <g fill="#fff">
 <polygon points="36,74 66,48 96,74 88,74 88,98 44,98 44,74"/>
 <path d="M 118,150 q0,-6 5,-7 l4,-8 q2,-3 6,-3 h22 q4,0 6,3 l4,8 q5,1 5,7 v8 h-7 a6,6 0 0 1 -12,0 h-14 a6,6 0 0 1 -12,0 h-7 z"/>

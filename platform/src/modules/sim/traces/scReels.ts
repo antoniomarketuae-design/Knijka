@@ -106,14 +106,26 @@ function signWarningMistakeNoSlow(): DriveScript {
 // 2. sc-driver-distraction — hz-obstacle-v1. Ped darts at y=140, finish 225.
 // ===========================================================================
 
+// The walker is released ~78 m out (DISTRACTION_PED.triggerDistM) and needs
+// 5.65 s to walk into the travel lane at x = 4.06. Every drive below is timed
+// against THAT clock: the shadow must be at rest with her ON the carriageway in
+// front of it, and the mistakes must arrive at y = 140 while she stands there —
+// which is what makes the staged runner's own contact check fire (a real
+// meeting, not an authored beat over an empty road; founder R0).
+
 function distractionShadow(): DriveScript {
   return {
     steps: [
       { kind: "annotation", textBg: "Гледаме пътя напред. Отляво може да излезе пешеходец — кракът е готов над спирачката." },
-      { kind: "drive", points: [[LANE, 15], [LANE, 108]], targetKmh: 45, stopAtEnd: false },
+      // She steps off the kerb at y ≈ 62 — early, in plain sight. The attentive
+      // driver lifts THERE, not 20 m from her.
+      { kind: "drive", points: [[LANE, 15], [LANE, 92]], targetKmh: 45, stopAtEnd: false },
       { kind: "annotation", textBg: "Пешеходецът тръгва да пресича — виждаме го навреме и спираме преди него." },
-      { kind: "drive", points: [[LANE, 108], [LANE, 131]], targetKmh: 10, stopAtEnd: true },
-      { kind: "pause", sec: 2.2, brake: true },
+      // Brake to a full stop 9 m short of her line: at rest ≈ t 12.8, while she
+      // is still on the carriageway (she clears it ≈ t 13.2) — the car waits
+      // FOR SOMEONE, which is the whole point of the correct demonstration.
+      { kind: "drive", points: [[LANE, 92], [LANE, 131]], targetKmh: 45, stopAtEnd: true },
+      { kind: "pause", sec: 4, brake: true },
       { kind: "annotation", textBg: "Пропуснахме го и продължаваме спокойно." },
       { kind: "drive", points: [[LANE, 131], [LANE, 225]], targetKmh: 40 },
       { kind: "pause", sec: 1, brake: true },
@@ -127,9 +139,9 @@ function distractionMistake(): DriveScript {
       { kind: "annotation", textBg: "Грешка: погледът на водача е настрани — към телефона." },
       { kind: "drive", points: [[LANE, 15], [LANE, 128]], targetKmh: 50, stopAtEnd: false },
       { kind: "annotation", textBg: "Пешеходецът вече е на платното — а водачът още гледа встрани." },
-      // No lift: the distracted driver reaches the walker at full speed.
+      // No lift: the distracted driver reaches the walker at full speed, and she
+      // is standing IN this lane by then — the runner's contact check convicts.
       { kind: "drive", points: [[LANE, 128], [LANE, 140]], targetKmh: 50, stopAtEnd: false },
-      { kind: "collision", withWhat: "pedestrian" },
       { kind: "pause", sec: 2, brake: true },
       { kind: "annotation", textBg: "Един поглед встрани при 50 км/ч е около 14 метра слепешком — точно колкото да не спреш навреме." },
     ],
@@ -142,7 +154,6 @@ function distractionMistakeNoBrake(): DriveScript {
       { kind: "annotation", textBg: "Грешка: погледът изобщо не се вдига — водачът не докосва спирачката." },
       { kind: "drive", points: [[LANE, 15], [LANE, 132]], targetKmh: 50, stopAtEnd: false },
       { kind: "drive", points: [[LANE, 132], [LANE, 140]], targetKmh: 50, stopAtEnd: false },
-      { kind: "collision", withWhat: "pedestrian" },
       { kind: "pause", sec: 2, brake: true },
       { kind: "annotation", textBg: "Пълна скорост право в пешеходеца — нула реакция." },
     ],
@@ -167,20 +178,38 @@ function accidentShadow(): DriveScript {
   };
 }
 
+// THE IMPACT LINE (founder R0: „the shadow car is moving going through some
+// stopped car and continuing"). The parked body sits at x = 6.4 (scenery props
+// „sc-accident-own-conduct"), so its LEFT flank is ≈ 5.5; the hero's right flank
+// is x + 0.85. The old scripts drove to x = 5.7 — right flank 6.55, i.e. a metre
+// INSIDE the other car's body, which renders as driving THROUGH it. x = 5.0
+// puts the flanks ≈ 0.35 m into each other: a sideswipe you can see, not a
+// ghost pass. And after the beat the car actually STOPS — a hit that costs no
+// time reads as no hit at all.
+const IMPACT_X = 5.0;
+
 function accidentMistake(): DriveScript {
   return {
     steps: [
       { kind: "annotation", textBg: "Грешка: водачът не следи вдясно и закача паркирания автомобил." },
       { kind: "drive", points: [[LANE, 15], [LANE, 120]], targetKmh: 40, stopAtEnd: false },
-      { kind: "drive", points: [[LANE, 120], [5.7, 148]], targetKmh: 38, stopAtEnd: false },
+      { kind: "drive", points: [[LANE, 120], [IMPACT_X, 146]], targetKmh: 38, stopAtEnd: false },
       { kind: "collision", withWhat: "staticObject" },
-      { kind: "annotation", textBg: "Има удар — това е ПТП с негово участие. Дългът е да спре, обезопаси и остане." },
-      // The fault: instead of stopping, he drives on (fled scene — a debrief
+      // The stoppage the impact really costs — the car sits against the body it
+      // struck long enough for the viewer to read the contact.
+      { kind: "pause", sec: 5, brake: true },
+      { kind: "annotation", textBg: "Има удар — това е ПТП с негово участие. Дългът е да спре, да включи аварийни, да обезопаси и да остане." },
+      // The fault: instead of staying, he drives on (fled scene — a debrief
       // teach-beat, not a live detector; the COLLISION is the graded code).
-      { kind: "drive", points: [[5.7, 148], [LANE, 185]], targetKmh: 40, stopAtEnd: false },
+      { kind: "annotation", textBg: "Вместо това потегля и напуска мястото." },
+      { kind: "drive", points: [[IMPACT_X, 146], [LANE, 185]], targetKmh: 40, stopAtEnd: false },
       { kind: "drive", points: [[LANE, 185], [LANE, 225]], targetKmh: 42 },
       { kind: "pause", sec: 1, brake: true },
-      { kind: "annotation", textBg: "Продължаването след удар е напускане на място на ПТП — тежко нарушение. След удар се спира винаги." },
+      {
+        kind: "annotation",
+        textBg:
+          "Последиците: напускането на място на ПТП отнема книжката за години и се разследва като престъпление, ако има пострадал; застраховката не плаща и щетата остава лична. След удар се спира винаги.",
+      },
     ],
   };
 }
@@ -190,12 +219,20 @@ function accidentMistakeClipContinue(): DriveScript {
     steps: [
       { kind: "annotation", textBg: "Грешка: леко закачане на паркирания автомобил — а водачът решава, че „няма нищо“." },
       { kind: "drive", points: [[LANE, 15], [LANE, 122]], targetKmh: 38, stopAtEnd: false },
-      { kind: "drive", points: [[LANE, 122], [5.7, 150]], targetKmh: 36, stopAtEnd: false },
+      { kind: "drive", points: [[LANE, 122], [IMPACT_X, 148]], targetKmh: 36, stopAtEnd: false },
       { kind: "collision", withWhat: "staticObject" },
-      { kind: "drive", points: [[5.7, 150], [LANE, 185]], targetKmh: 38, stopAtEnd: false },
+      // A shorter halt: he DOES feel it and stops — and then talks himself out
+      // of it. That hesitation is the beat the lesson needs to be visible.
+      { kind: "pause", sec: 3, brake: true },
+      { kind: "annotation", textBg: "Усети допира, спря за миг… и реши, че „няма нищо“." },
+      { kind: "drive", points: [[IMPACT_X, 148], [LANE, 185]], targetKmh: 38, stopAtEnd: false },
       { kind: "drive", points: [[LANE, 185], [LANE, 225]], targetKmh: 40 },
       { kind: "pause", sec: 1, brake: true },
-      { kind: "annotation", textBg: "Дори одраскване е ПТП — задължението да спреш не зависи от силата на удара." },
+      {
+        kind: "annotation",
+        textBg:
+          "Дори одраскване е ПТП: задължението да спреш не зависи от силата на удара, а последицата от бягството е същата — отнета книжка и лично платена щета.",
+      },
     ],
   };
 }

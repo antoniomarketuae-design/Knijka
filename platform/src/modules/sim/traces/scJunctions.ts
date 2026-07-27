@@ -169,20 +169,23 @@ function scJunctionRhrMistakeNoLookScript(): DriveScript {
       { kind: "indicator", setting: "left" },
       { kind: "annotation", textBg: "Никакво оглеждане — колата се вмъква направо в кръстовището." },
       {
-        // Roll into the core blind; the unseen car from the right is inbound.
+        // INTO THE MIDDLE OF THE BOX, not to its edge (founder R0: „the shadow
+        // car is just stopping and the traffic car passes normally with
+        // enormous distance between them"). The priority car runs the east→west
+        // lane at y = +4.06; halting at y = −15 left ~19 m of air between them,
+        // so the demo showed a car braking at nothing. Rolling blind to y = +1.5
+        // parks the ego's body ACROSS that lane — 2.6 m of centres at the pass,
+        // inside the runner's own 3 m contact test, so the strike is a real
+        // meeting of two bodies instead of an authored beat over an empty box.
         kind: "drive",
         points: [
           [LANE, -34],
-          [LANE, -15],
+          [LANE, 1.5],
         ],
         targetKmh: 15,
-        stopAtEnd: false,
+        stopAtEnd: true,
       },
-      { kind: "pause", sec: 1.2, brake: true },
-      // The authored consequence: the unseen priority car strikes the nose
-      // poking into its path (the P0 „пешеходец зад колата" pattern).
-      { kind: "collision", withWhat: "vehicle" },
-      { kind: "pause", sec: 2.2, brake: true },
+      { kind: "pause", sec: 3.4, brake: true },
       {
         kind: "annotation",
         textBg: "Колата отдясно остана невидима до удара. Наляво, НАДЯСНО — и чак тогава напред.",

@@ -113,7 +113,19 @@ export const SC_SIGN_WARNING: ScenarioSpec = {
 
 /** The staged walker (PE-04 dart-out mold; synthetic crossing id — no district
  *  crossing zone, so PEDESTRIAN_NOT_YIELDED never arms and the demo grades the
- *  late reaction as COLLISION, cf. sc-hz-emergency-stop). */
+ *  late reaction as COLLISION, cf. sc-hz-emergency-stop).
+ *
+ *  triggerDistM 78 IS THE LESSON (founder R0: „the driver and the car are
+ *  nowhere near colliding — the pedestrian moves on top of it 4–5 s after").
+ *  The walker needs 13.6 m of walk (2.4 m/s ⇒ 5.65 s) to reach the travel lane
+ *  at x = 4.06. At the mistake's 50 km/h (13.9 m/s) the old 34 m trigger gave
+ *  her 2.45 s — she was still 8 m short of the car when the „collision" beat
+ *  fired, i.e. the demo showed a car stopping at nothing. Releasing her ~78 m
+ *  out (≈ 5.6 s at 50) puts her IN THE EGO'S LANE exactly as the distracted
+ *  driver arrives, so the staged runner's own contact check convicts — the
+ *  COLLISION is a real meeting, not an authored beat over an empty road.
+ *  It is also the honest pedagogy: the walker was visible for five full
+ *  seconds, which is precisely why the attentive shadow stops in time. */
 const DISTRACTION_PED: PedestrianDartOutSpec = {
   id: "sc-distraction-ped",
   kind: "pedestrianDartOut",
@@ -125,7 +137,7 @@ const DISTRACTION_PED: PedestrianDartOutSpec = {
   travelM: 20,
   roadFromM: 1.6,
   roadToM: 16,
-  triggerDistM: 34,
+  triggerDistM: 78,
   minTriggerSpeedKmh: 10,
 };
 

@@ -66,7 +66,12 @@ import {
   type Vec2,
 } from "./math2d";
 import { toWorld, yawFromFacing } from "./mesh";
-import { junctionPriorityControls, type Approach, type RoadNetwork } from "./network";
+import {
+  junctionPriorityControls,
+  onewayNoEntryArms,
+  type Approach,
+  type RoadNetwork,
+} from "./network";
 import { buildZoneSigns, scenarioSignScale } from "./zoneSigns";
 
 export interface PropBuildResult {
@@ -101,6 +106,11 @@ const PARKING_KIT_SITES: readonly Vec2[] = [
   [-558.8, 235.2], // NW quarter: 16.2 m off a building, 26 m off the road
   [149.2, 307.2], // NE quarter: 14.7 m off a building, 25 m off the road
 ];
+
+/** В1 stands just past the mouth of the arm it closes… */
+const NO_ENTRY_ALONG_M = 1.4;
+/** …at the same curb offset as the priority posts. */
+const NO_ENTRY_LATERAL_M = 0.8;
 
 /** Prop standing right of the incoming traffic at a junction approach. */
 function approachPropPose(ap: Approach, alongExtra: number, lateralExtra: number) {
@@ -288,6 +298,51 @@ export function buildProps(
     const { p, yaw } = approachPropPose(ap, 1.4, 0.8);
     signs.push({ kind, position: toWorld(p[0], p[1], ROAD_Y), yaw, ...lessonSized });
     (kind === "giveWay" ? giveWayApproaches : stopSignApproaches).add(key);
+  }
+
+  // -- В1 „Забранено е влизането" at one-way mouths ----------------------------
+  // WHICH mouths lives in network.onewayNoEntryArms — the same one-way tag the
+  // runtime's wrongWay surface grades WRONG_WAY from, so the sign a student is
+  // failed for ignoring is now the sign he was shown (the junctionPriorityControls
+  // discipline). Founder verdict-board note on sc-ov-oneway: the one-way street
+  // was stated by lane arrows and nothing else, while the В1 GLB shipped unused.
+  //
+  // Gated to scenario micro-maps, and deliberately: the OSM city districts carry
+  // ~150 one-way mouths whose REAL signage the source data never recorded, so
+  // posting there would trade a missing sign for an invented one. The gate is
+  // the lesson-scale gate (scenarioSignScale), reused rather than re-derived.
+  if (lessonScale !== undefined) {
+    for (const node of network.nodes.values()) {
+      const banned = onewayNoEntryArms(
+        node.approaches.map((ap) => ({
+          edgeId: ap.edgeId,
+          oneway: ap.edge.oneway,
+          roundabout: ap.edge.roundabout,
+          incoming: ap.incoming,
+          outgoing: ap.outgoing,
+        })),
+      );
+      if (banned.size === 0) continue;
+      for (const ap of node.approaches) {
+        if (!banned.has(ap.edgeId)) continue;
+        // The MIRROR of approachPropPose: this post addresses the driver who
+        // would turn INTO the arm, so it stands on THAT driver's right (right
+        // of `away`, not of the incoming direction) and its face looks back at
+        // the junction he is leaving — the same 1.4 m / 0.8 m curb pose the
+        // priority posts use, so a mouth reads as one signed station.
+        const away = ap.cutTangentAway;
+        const p = add(
+          add(ap.cut, mul(away, NO_ENTRY_ALONG_M)),
+          mul(perpRight(away), ap.halfWidth + NO_ENTRY_LATERAL_M),
+        );
+        signs.push({
+          kind: "noEntry",
+          position: toWorld(p[0], p[1], ROAD_Y),
+          yaw: yawFromFacing(mul(away, -1)),
+          ...lessonSized,
+        });
+      }
+    }
   }
 
   // -- speed limit 50 at district entries -------------------------------------

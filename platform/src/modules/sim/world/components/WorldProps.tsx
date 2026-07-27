@@ -95,6 +95,7 @@ const SIGN_GLB: Record<SignKind, string> = {
   railUnguarded: "sign_rail_unguarded",
   railCross: "sign_rail_cross", // geometry-only crossbuck (no face_* prim)
   barrier: "rail_barrier", // striped arm — ANIMATED (RailBarriers), never instanced
+  noEntry: "sign_no_entry", // В1 — the v1 kit asset (tools/blender/signs.py)
 };
 const SIGN_KINDS = Object.keys(SIGN_GLB) as SignKind[];
 /** The v1 four load strictly (as always); everything after them is tolerant. */
@@ -449,6 +450,7 @@ async function buildPropAssets(): Promise<PropAssets> {
     railUnguarded: null,
     railCross: null,
     barrier: null,
+    noEntry: null,
   };
   let railBarrier: PropAssets["railBarrier"] = null;
   ZONE_SIGN_KINDS.forEach((kind, i) => {

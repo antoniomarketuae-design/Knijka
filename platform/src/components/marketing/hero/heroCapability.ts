@@ -181,6 +181,86 @@ export function decideHeroStage(signals: HeroSignals): HeroStageDecision {
 }
 
 // ---------------------------------------------------------------------------
+// The second door: does the FALLBACK move?
+// ---------------------------------------------------------------------------
+
+/**
+ * What the fallback layer is doing while the live 3D is off.
+ *
+ * The founder opened the landing page on his phone and reported it as broken:
+ * "the car and the road dont move at all so this dont work". The plate was
+ * behaving exactly as designed — and that is the problem. A perfectly still
+ * dusk photograph at the top of a page whose whole promise is a DRIVING
+ * simulator reads as a failed asset, not as a design decision. Motion is the
+ * proof that the product runs.
+ *
+ * So there is a middle rung between the still plate and the live scene: a
+ * short, silent, pre-rendered loop of the SAME shot (heroScene.ts's
+ * `heroLoopVideoTime`), decoded by the platform's video pipeline instead of by
+ * three.js.
+ */
+export type HeroLoopMode =
+  /** Nothing moves. The still plate is final. */
+  | "still"
+  /** The pre-rendered dusk loop plays over the plate. */
+  | "loop";
+
+export interface HeroLoopDecision {
+  mode: HeroLoopMode;
+  /** `null` exactly when mode is "loop". */
+  reason: HeroDeclineReason | null;
+}
+
+/**
+ * The fallback door — and it is a DIFFERENT door from `decideHeroStage`,
+ * because it is answering a different question.
+ *
+ * `decideHeroStage` is about a WebGL runtime: megabytes of JavaScript, a Draco
+ * decoder, a GLB, a live GPU context and a render loop that keeps costing
+ * battery for as long as the section is on screen. Every hardware doubt
+ * resolves against it.
+ *
+ * This one is about ONE cacheable video file of a few hundred KB that a phone
+ * decodes in fixed-function silicon — cheaper than the scroll animations
+ * already on this page. Hardware cannot sensibly veto it: a machine too weak
+ * to play a 1200×480 loop is too weak to render the page. So only the three
+ * signals about COST OR CONSENT can, and they are checked in the same order
+ * and reported with the same vocabulary as the stage decision, so
+ * `data-hero-decline` means one thing wherever it appears.
+ *
+ *   reduced-motion  the visitor asked for less motion — a looping video is
+ *                   exactly what they asked us not to autoplay,
+ *   save-data       they asked the browser to spend fewer bytes,
+ *   slow-network    2g/3g, where the file would arrive after they have gone,
+ *   server          no signals read yet; the still plate is the SSR answer and
+ *                   the loop is an upgrade applied at idle, never at hydration.
+ *
+ * Note what is NOT here: `no-webgl`, `low-memory`, `few-cores`,
+ * `narrow-viewport` and `touch-primary` all send a visitor to the plate and
+ * then straight on to the loop. That is the whole point — the phone is the
+ * device the founder was holding.
+ */
+export function decideHeroLoop(signals: HeroSignals): HeroLoopDecision {
+  const decline = (reason: HeroDeclineReason): HeroLoopDecision => ({
+    mode: "still",
+    reason,
+  });
+
+  if (signals.reducedMotion === true) return decline("reduced-motion");
+  if (signals.saveData === true) return decline("save-data");
+
+  const ect = signals.effectiveConnectionType;
+  if (ect !== null && HERO_SLOW_CONNECTIONS.includes(ect)) return decline("slow-network");
+
+  // The same "are we in a browser yet" proxy `decideHeroStage` uses. Without
+  // it the server would render a <video> the client might immediately have to
+  // take away, and the plate is the honest pre-hydration answer.
+  if (signals.viewportWidthPx === null) return decline("server");
+
+  return { mode: "loop", reason: null };
+}
+
+// ---------------------------------------------------------------------------
 // The DOM side — reads only, decides nothing.
 // ---------------------------------------------------------------------------
 

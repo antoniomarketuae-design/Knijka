@@ -204,6 +204,53 @@ export function junctionPriorityControls(
   return out;
 }
 
+/**
+ * Structural view of one arm at a node for the В1 rule — the same "feed it
+ * without sharing a type" shape as PriorityApproachLike above.
+ */
+export interface OneWayApproachLike {
+  edgeId: string;
+  /** The arm is tagged one-way. */
+  oneway: boolean;
+  /** The arm is part of a roundabout ring. */
+  roundabout: boolean;
+  /** Traffic can travel TOWARD the node on this arm. */
+  incoming: boolean;
+  /** Traffic can leave the node via this arm. */
+  outgoing: boolean;
+}
+
+/**
+ * В1 „Забранено е влизането" per arm at a node — the SINGLE definition of
+ * which mouths a driver may not enter, keyed by edge id.
+ *
+ * The junctionPriorityControls failure mode (audit C-4) one layer over: the
+ * runtime already grades WRONG_WAY from the edge's `oneway` tag against the
+ * driver's heading, but the world posted NOTHING at the forbidden mouth. On
+ * ov-oneway-v1 that left the one-way street stated by lane arrows on the
+ * approach and by nothing else — the founder's verdict-board note („there is
+ * no signal showing that this is 1 way lane — only road marking; there are
+ * specific signs stating entering forbidden"). Grading a driver against a
+ * control the world never showed him is the same divergence as painting Б1
+ * over a graded Б2 line, so both sides now read this one function.
+ *
+ * The rule: an arm you can only travel TOWARD the node on (incoming, never
+ * outgoing) is a one-way street whose flow points back at you — entering it
+ * from this node is движение в забранена посока, which is exactly what В1
+ * forbids. Roundabout rings are excluded: every ring arm is one-way by
+ * construction and its entries carry Б1 + Д11 (props.ts), never В1. Below
+ * degree 3 there is no entry CHOICE to sign — that is a bend or a joint.
+ */
+export function onewayNoEntryArms(approaches: readonly OneWayApproachLike[]): Set<string> {
+  const out = new Set<string>();
+  if (approaches.length < 3) return out;
+  if (approaches.some((a) => a.roundabout)) return out;
+  for (const a of approaches) {
+    if (a.oneway && a.incoming && !a.outgoing) out.add(a.edgeId);
+  }
+  return out;
+}
+
 /** Direction pointing away from `nodeId` along the edge geometry. */
 function dirAwayFromNode(edge: DistrictEdge, nodeId: string): Vec2 {
   const g = edge.geometry;

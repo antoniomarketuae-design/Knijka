@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" role="img" aria-labelledby="t">
 <title id="t">А1 — Опасен завой надясно</title>
-<polygon points="100,22 186,170 14,170" fill="#fff" stroke="#c1121f" stroke-width="16" stroke-linejoin="round"/>
+<polygon points="100,22 186,170 14,170" fill="#fff" stroke="#c1121f" stroke-width="16" stroke-linejoin="round" data-plate="true"/>
 <g fill="#1d1d1b"><path d="M 90,155 V 122 Q 90,104 108,104 H 114" fill="none" stroke="#1d1d1b" stroke-width="13"/>
 <polygon points="112,91 140,104 112,117"/></g>
 </svg>

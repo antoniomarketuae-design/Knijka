@@ -78,6 +78,8 @@ import {
   HERO_ROAD_VERTEX_UV,
   HERO_ROAD_VERTEX_UV_ANCHOR,
 } from "./heroRoadShader";
+import type { HeroClockProps } from "./heroCapture";
+import { sceneTime } from "./heroCapture";
 import {
   HERO_CAM_FAR_M,
   HERO_CAM_FOV_DEG,
@@ -286,7 +288,7 @@ function DuskRig() {
 // Road
 // ---------------------------------------------------------------------------
 
-function HeroRoad() {
+function HeroRoad({ timeSec }: HeroClockProps) {
   const uniforms = useMemo(
     () => ({
       uScrollM: { value: 0 },
@@ -336,7 +338,7 @@ function HeroRoad() {
   // The pattern scrolls; the mesh never moves. One uniform write per frame,
   // zero allocations, and `roadScrollM` wraps so the float cannot drift.
   useFrame((state) => {
-    uniforms.uScrollM.value = roadScrollM(state.clock.elapsedTime);
+    uniforms.uScrollM.value = roadScrollM(sceneTime(timeSec, state.clock.elapsedTime));
   });
 
   return (
@@ -387,7 +389,7 @@ function HeroRoad() {
 /** The four rigged wheel nodes, in GLB naming order. */
 const WHEEL_NAMES = ["wheel_FL", "wheel_FR", "wheel_RL", "wheel_RR"] as const;
 
-function HeroCar() {
+function HeroCar({ timeSec }: HeroClockProps) {
   const { scene: source } = useGLTF(HERO_CAR_URL, HERO_DRACO_PATH);
 
   // Clone before touching anything: drei caches the loaded scene and the
@@ -439,7 +441,7 @@ function HeroCar() {
   );
 
   useFrame((state) => {
-    const spin = wheelSpinRad(state.clock.elapsedTime);
+    const spin = wheelSpinRad(sceneTime(timeSec, state.clock.elapsedTime));
     for (const wheel of wheels) wheel.rotation.x = spin;
   });
 
@@ -545,12 +547,12 @@ function HeadlightPool() {
 // Camera + readiness
 // ---------------------------------------------------------------------------
 
-function CameraRig() {
+function CameraRig({ timeSec }: HeroClockProps) {
   const camera = useThree((state) => state.camera);
   const target = useRef(new Vector3());
 
   useFrame((state) => {
-    const pose = heroCameraPose(state.clock.elapsedTime);
+    const pose = heroCameraPose(sceneTime(timeSec, state.clock.elapsedTime));
     camera.position.set(pose.position[0], pose.position[1], pose.position[2]);
     target.current.set(pose.target[0], pose.target[1], pose.target[2]);
     camera.lookAt(target.current);
@@ -578,7 +580,7 @@ function FirstFrame({ onReady }: { onReady?: () => void }) {
   return null;
 }
 
-export interface HeroScene3DProps {
+export interface HeroScene3DProps extends HeroClockProps {
   /** Called after the first frame that includes the car. */
   onReady?: () => void;
   /**
@@ -590,7 +592,11 @@ export interface HeroScene3DProps {
   paused?: boolean;
 }
 
-export default function HeroScene3D({ onReady, paused = false }: HeroScene3DProps) {
+export default function HeroScene3D({
+  onReady,
+  paused = false,
+  timeSec = null,
+}: HeroScene3DProps) {
   return (
     <Canvas
       // The desktop tier of doc 82 §2.2. The gate (heroCapability.ts) has
@@ -641,11 +647,15 @@ export default function HeroScene3D({ onReady, paused = false }: HeroScene3DProp
       <GroundBackdrop />
       <DuskRig />
       <DuskEnvironment />
-      <CameraRig />
-      <HeroRoad />
+      {/* The three animated parts, and the only three that read a clock. In
+          the live hero `timeSec` is null and they run on R3F's own; the
+          offline loop renderer hands them a fixed second so the frame it
+          screenshots is the frame it asked for (heroCapture.ts). */}
+      <CameraRig timeSec={timeSec} />
+      <HeroRoad timeSec={timeSec} />
       <HeadlightPool />
       <Suspense fallback={null}>
-        <HeroCar />
+        <HeroCar timeSec={timeSec} />
         <ContactPatch />
         <FirstFrame onReady={onReady} />
       </Suspense>

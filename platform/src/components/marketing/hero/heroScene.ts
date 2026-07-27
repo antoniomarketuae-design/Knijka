@@ -204,6 +204,95 @@ export function heroCameraPose(tSec: number): HeroCameraPose {
   };
 }
 
+// ---------------------------------------------------------------------------
+// The pre-rendered loop — the same shot, for devices that never get the 3D
+// ---------------------------------------------------------------------------
+
+/**
+ * THE WINDOW OF THE SHOT THAT BECOMES A VIDEO.
+ *
+ * A phone gets the plate (heroCapability.ts) and the plate is still, which the
+ * founder read as broken. The fix is a few seconds of this exact scene,
+ * rendered offline at real GPU quality by tools/clips/headless/
+ * render-hero-loop.mjs and shipped as one small file. Everything below picks
+ * WHICH seconds, and the choice is entirely about making the seam invisible —
+ * a hero loop is watched for a minute, so a visible cut every few seconds is
+ * worse than no motion at all.
+ *
+ * Two things have to line up at the seam, and they have incommensurable
+ * periods:
+ *
+ *   the ROAD repeats every dash period — 12 m at 48 km/h = 0.9 s,
+ *   the CAMERA repeats every HERO_LOOP_S = 26 s.
+ *
+ * 26 and 0.9 have a least common multiple of 234 s, so "render one full cycle
+ * of both" is not an option at any sane file size. Instead:
+ *
+ *   LENGTH — an exact whole number of dash periods, so the painted lines land
+ *   in the same place on the last frame as on the first. This is the one that
+ *   would be unmissable: the dashes are the only hard-edged high-contrast
+ *   thing in the frame, and a fractional-period loop makes them jump.
+ *
+ *   POSITION — centred on the camera move's turning point (phase 0.5, where
+ *   `pingPong` peaks). `pingPong` is symmetric about its extremum, so
+ *   pose(centre − x) === pose(centre + x) EXACTLY: the last frame's camera is
+ *   the first frame's camera, to the bit. What the seam does NOT preserve is
+ *   the camera's VELOCITY, which reverses there — but inside this window the
+ *   dolly runs at ~0.28 m/s against an 11 m subject distance, so the reversal
+ *   reads as the second half of a breath rather than as a bounce. Widening the
+ *   window would make that reversal faster, not slower; shortening it costs
+ *   dash periods. Eight is the balance point.
+ *
+ * The wheels are the one thing left over: their period is 2πr/v ≈ 0.16 s,
+ * irrational against the dash period, so the seam pops the tyres by ~23°. At
+ * 6.2 revolutions per second sampled at 25 fps they are already an aliased
+ * blur 10 m from the camera, and 23° is under a third of a frame's worth of
+ * apparent motion. It is not visible and it is not fixable — see the header of
+ * render-hero-loop.mjs for the arithmetic.
+ */
+export const HERO_LOOP_VIDEO_DASH_PERIODS = 8;
+
+/**
+ * Frame rate of the pre-rendered loop.
+ *
+ * 25 rather than 30 because it divides the length into a whole number of
+ * frames (7.2 s × 25 = 180) — a fractional frame count would either drop the
+ * seam frame or duplicate it, and either one is a stutter once a second. It is
+ * also 17 % fewer frames to encode, which is 17 % fewer bytes on a phone.
+ */
+export const HERO_LOOP_VIDEO_FPS = 25;
+
+/** Length of the loop, s — a whole number of dash periods, by construction. */
+export const HERO_LOOP_VIDEO_SECONDS =
+  (HERO_LOOP_VIDEO_DASH_PERIODS * HERO_DASH_PERIOD_M) / kmhToMps(HERO_SPEED_KMH);
+
+/**
+ * Frames in the loop.
+ *
+ * Frame `HERO_LOOP_VIDEO_FRAMES` is deliberately NOT rendered: it is frame 0
+ * again (that is what "seamless" means), and encoding it would hold the same
+ * image for two frame slots once per cycle — a hitch the eye reads as a
+ * dropped frame.
+ */
+export const HERO_LOOP_VIDEO_FRAMES = Math.round(
+  HERO_LOOP_VIDEO_SECONDS * HERO_LOOP_VIDEO_FPS,
+);
+
+/** Scene time the window is centred on — the camera move's turning point. */
+export const HERO_LOOP_VIDEO_CENTRE_S = HERO_LOOP_S / 2;
+
+/**
+ * Scene time to render frame `index` at, s.
+ *
+ * Pure, so the offline renderer never has to reimplement the window: the dev
+ * capture route publishes `heroLoopVideoTime(i)` for every i and the Playwright
+ * driver just seeks to the numbers it is handed. One definition, one shot.
+ */
+export function heroLoopVideoTime(index: number): number {
+  const start = HERO_LOOP_VIDEO_CENTRE_S - HERO_LOOP_VIDEO_SECONDS / 2;
+  return start + (index * HERO_LOOP_VIDEO_SECONDS) / HERO_LOOP_VIDEO_FRAMES;
+}
+
 /**
  * Field of view, degrees. Wider than the simulator's chase camera: a long
  * lens on an empty road flattens into a poster, and the whole point of paying

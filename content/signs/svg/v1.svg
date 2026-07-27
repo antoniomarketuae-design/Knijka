@@ -1,5 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" role="img" aria-labelledby="t">
 <title id="t">В1 — Забранено е влизането на пътни превозни средства</title>
-<circle cx="100" cy="100" r="90" fill="#c1121f"/><circle cx="100" cy="100" r="90" fill="none" stroke="#e6e6e6" stroke-width="2"/>
+<circle cx="100" cy="100" r="90" fill="#c1121f" data-plate="true"/><circle cx="100" cy="100" r="90" fill="none" stroke="#e6e6e6" stroke-width="2" data-plate="true"/>
 <rect x="32" y="86" width="136" height="28" rx="6" fill="#fff"/>
 </svg>

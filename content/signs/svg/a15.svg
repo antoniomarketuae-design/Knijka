@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" role="img" aria-labelledby="t">
 <title id="t">А15 — Опасност от хлъзгане</title>
-<polygon points="100,22 186,170 14,170" fill="#fff" stroke="#c1121f" stroke-width="16" stroke-linejoin="round"/>
+<polygon points="100,22 186,170 14,170" fill="#fff" stroke="#c1121f" stroke-width="16" stroke-linejoin="round" data-plate="true"/>
 <g fill="#1d1d1b"><g transform="translate(104,112) rotate(-24)"><rect x="-16" y="-28" width="32" height="56" rx="10"/></g>
 <path d="M 52,150 q 10,-16 22,-8 q 12,8 22,-8" fill="none" stroke="#1d1d1b" stroke-width="6"/>
 <path d="M 84,158 q 10,-16 22,-8 q 12,8 22,-8" fill="none" stroke="#1d1d1b" stroke-width="6"/></g>

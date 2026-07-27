@@ -1,9 +1,9 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" role="img" aria-labelledby="t">
 <title id="t">В33 — Край на забраната за движение със скорост, по-висока от означената</title>
 <defs><clipPath id="cc"><circle cx="100" cy="100" r="82"/></clipPath></defs>
-<circle cx="100" cy="100" r="88" fill="#fff" stroke="#b3b3b3" stroke-width="8"/>
+<circle cx="100" cy="100" r="88" fill="#fff" stroke="#b3b3b3" stroke-width="8" data-plate="true"/>
 <text x="100" y="126" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-weight="bold" font-size="72" fill="#8a8a8a">60</text>
-<g clip-path="url(#cc)" stroke="#1d1d1b" stroke-width="6">
+<g clip-path="url(#cc)" data-span="face" stroke="#1d1d1b" stroke-width="6">
 <line x1="10" y1="130" x2="130" y2="10"/><line x1="30" y1="170" x2="170" y2="30"/><line x1="70" y1="190" x2="190" y2="70"/>
 </g>
 </svg>

@@ -54,29 +54,30 @@
  * framing. Continuous by construction — no cuts.
  *
  * R4 (view per card): "exterior" = chase; "exterior+dashboard" = chase + the
- * canvas dashboard strip (a CanvasTexture quad INSIDE the WebGL frame — DOM
- * never reaches captureStream, so the strip is drawn into the recording
- * honestly); "cockpit" = the drill's interior GLB (VitokCockpit — wheel,
- * cluster, RTT mirrors) mounted on the ghost pose, driven by trace channels
- * (steer/speed/gear/indicator) + the mistake's graded cabin channels
- * (capturePlan.cabinChannelsFor — the honest belt/lights derivation), plus
- * the dashboard strip.
+ * 3D INSTRUMENT CLUSTER pinned in front of the capture camera (real geometry
+ * INSIDE the WebGL frame — DOM never reaches captureStream, so the instrument
+ * is recorded honestly); "cockpit" = the drill's interior GLB (VitokCockpit —
+ * wheel, cluster, RTT mirrors) mounted on the ghost pose, driven by trace
+ * channels (steer/speed/gear/indicator) + the mistake's graded cabin channels
+ * (capturePlan.cabinChannelsFor — the honest belt/lights derivation), plus the
+ * pinned cluster.
+ *
+ * R4 CLUSTER REBUILD (founder verdict on the whole reel board, 2026-07-27):
+ * the „exterior+dashboard" view used to draw a flat 1024×128 canvas STRIP —
+ * a footer bar with the word „КОЛАН" beside a red icon. His ruling was that a
+ * label is not a telltale, and that the speed/gear reels were unreadable
+ * because an exterior clip carried no instrument at all. Both views now mount
+ * the SAME components/sim/cockpit/InstrumentCluster the drill's cockpit uses:
+ * a bezel with depth, a sweeping needle over an exact mono readout, a big gear
+ * glyph and a telltale rail whose lit lamps throw a halo. Same instrument in
+ * the reel and in the car — which is the only way a reel can teach the car.
  */
 
 import { Suspense, useEffect, useMemo, useRef, useState, type RefObject } from "react";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { Environment } from "@react-three/drei";
 import { Physics } from "@react-three/rapier";
-import {
-  CanvasTexture,
-  Euler,
-  Quaternion,
-  SRGBColorSpace,
-  Vector3,
-  type Group,
-  type Mesh,
-  type MeshBasicMaterial,
-} from "three";
+import { Euler, Quaternion, Vector3, type Group, type Mesh, type MeshBasicMaterial } from "three";
 import {
   CHASE_FOV,
   cockpitVFovForAspect,
@@ -120,6 +121,8 @@ import {
 import { ScenarioObstacles } from "@/components/sim/ScenarioObstacles";
 import { emojiTexture, ShadowCar } from "@/components/sim/ShadowCar";
 import { VitokCockpit } from "@/components/sim/vitok/VitokCockpit";
+import { InstrumentCluster } from "@/components/sim/cockpit/InstrumentCluster";
+import { BEZEL_W, FACE_H, FACE_W, type ClusterInputs } from "@/modules/sim/cockpit";
 import { CockpitInteractionContext } from "@/modules/sim/scene/vitok/hotspots";
 import type { CabinControls } from "@/modules/sim/scene/cabin";
 import { loadQualityPreset } from "@/components/sim/lesson-ui/QualityPresetSelector";
@@ -559,7 +562,7 @@ export function CaptureScene({
             />
           ) : null}
           {withDashStrip ? (
-            <DashStripOverlay
+            <PinnedClusterOverlay
               trace={trace}
               clockRef={clockRef}
               cabin={cabin}
@@ -995,178 +998,42 @@ function GhostCabin({
 }
 
 // ---------------------------------------------------------------------------
-// Canvas dashboard strip (R4) — the DOM StatusDashboard's essential telltales
-// drawn INTO the WebGL frame (captureStream never sees DOM overlays)
+// Pinned 3D instrument cluster (R4) — the reel's instrument, INSIDE the frame
 // ---------------------------------------------------------------------------
+//
+// This replaces the flat canvas dashboard strip. The founder reviewed every
+// reel and ruled that the strip's red belt icon beside the word „КОЛАН" was
+// „unacceptable" as a warning, and that a speed/gear lesson filmed from outside
+// the car had no instrument to read at all. So the „exterior+dashboard" view
+// now pins the real cluster — the SAME component the cockpit mounts — a couple
+// of metres in front of the capture camera.
+//
+// It is chrome (depth-test off, pinned to the camera) but it is not a sticker:
+// real geometry, a bezel with depth, a needle that sweeps in 3D, and lamps that
+// throw light onto their housing. The slight tilt is what sells it — the
+// binnacle is seen from very slightly above, the way a driver sees their own.
 
-const STRIP_PX_W = 1024;
-const STRIP_PX_H = 128;
-/** Quad distance from the camera + width as a fraction of the frame. */
-const STRIP_DIST_M = 2;
-const STRIP_FRAME_FRACTION = 0.56;
+/** Quad distance from the camera; the cluster face width as a fraction of the
+ *  frame width at that distance. 0.42 of a 1280 px frame ≈ 540 px of face —
+ *  wide enough that the three-cell speed readout is unambiguous on a phone. */
+const CLUSTER_DIST_M = 2;
+const CLUSTER_FRAME_FRACTION = 0.42;
 /** Bottom margin as a fraction of the frame height. */
-const STRIP_MARGIN_FRACTION = 0.05;
+const CLUSTER_MARGIN_FRACTION = 0.045;
+/** Tilt the top away from the camera — the parallax that reads as an object. */
+const CLUSTER_TILT_DEG = 11;
+/** renderOrder base: above the lane band (18) and the ground ❌ (20), matching
+ *  the strip it replaces (40) so nothing else in the scene changes order. */
+const CLUSTER_RENDER_ORDER = 40;
 
-/** StatusDashboard's palette, resolved to literals (canvas has no CSS vars). */
-const STRIP_BG = "rgba(13, 18, 26, 0.86)";
-const STRIP_BORDER = "#33415a";
-const STRIP_DIM = "#3a4556";
-const STRIP_TEXT = "#e8eef7";
-const STRIP_MUTED = "#8b98ab";
-const STRIP_SUCCESS = "#35c07e";
-const STRIP_DANGER = "#e5484d";
-const STRIP_HIGH_BEAM = "#7db8ff";
-
-const HEADLIGHT_WORD: Record<CaptureCabinChannels["headlights"], string> = {
-  off: "СВЕТЛИНИ",
-  low: "КЪСИ",
-  high: "ДЪЛГИ",
-};
-
-function drawStripLabel(ctx: CanvasRenderingContext2D, text: string, cx: number) {
-  ctx.font = "bold 17px system-ui, sans-serif";
-  ctx.fillStyle = STRIP_MUTED;
-  ctx.textAlign = "center";
-  ctx.fillText(text, cx, 112);
-}
-
-/** Simplified BeltIcon: head circle + diagonal strap (green on / red off). */
-function drawBelt(ctx: CanvasRenderingContext2D, cx: number, on: boolean) {
-  ctx.strokeStyle = on ? STRIP_SUCCESS : STRIP_DANGER;
-  ctx.lineWidth = 6;
-  ctx.beginPath();
-  ctx.arc(cx, 34, 11, 0, Math.PI * 2);
-  ctx.stroke();
-  ctx.beginPath();
-  ctx.moveTo(cx - 18, 88);
-  ctx.lineTo(cx + 18, 54);
-  ctx.stroke();
-}
-
-/** N11 (VP-06): the red engine-temperature telltale — a glowing thermometer
- *  over two coolant waves (the cockpit cluster's icon), drawn on the strip ONLY
- *  while the director's telltaleLit channel is up. Non-telltale clips never
- *  light it (director.telltaleLit stays false), so their strip is unchanged. */
-function drawTempWarn(ctx: CanvasRenderingContext2D, cx: number) {
-  const cy = 50;
-  ctx.save();
-  ctx.strokeStyle = STRIP_DANGER;
-  ctx.fillStyle = "rgba(229,72,77,0.18)";
-  ctx.lineWidth = 3;
-  ctx.beginPath();
-  ctx.roundRect(cx - 30, cy - 26, 60, 52, 10);
-  ctx.fill();
-  ctx.stroke();
-  ctx.shadowColor = STRIP_DANGER;
-  ctx.shadowBlur = 14;
-  // Thermometer stem + bulb.
-  ctx.beginPath();
-  ctx.moveTo(cx, cy - 16);
-  ctx.lineTo(cx, cy);
-  ctx.stroke();
-  ctx.beginPath();
-  ctx.arc(cx, cy + 5, 5, 0, Math.PI * 2);
-  ctx.stroke();
-  // Two coolant waves under it.
-  for (let row = 0; row < 2; row++) {
-    const wy = cy + 13 + row * 6;
-    ctx.beginPath();
-    ctx.moveTo(cx - 18, wy);
-    for (let i = 0; i < 4; i++) {
-      const x0 = cx - 18 + i * 9;
-      ctx.quadraticCurveTo(x0 + 4.5, wy + (i % 2 === 0 ? -4 : 4), x0 + 9, wy);
-    }
-    ctx.stroke();
-  }
-  ctx.restore();
-}
-
-/** Simplified HeadlightIcon: lamp housing + three beams (tilt = къси). */
-function drawHeadlight(
-  ctx: CanvasRenderingContext2D,
-  cx: number,
-  state: CaptureCabinChannels["headlights"],
-) {
-  const color = state === "off" ? STRIP_DIM : state === "high" ? STRIP_HIGH_BEAM : STRIP_SUCCESS;
-  const tilt = state === "high" ? 0 : 5;
-  ctx.strokeStyle = color;
-  ctx.lineWidth = 5;
-  ctx.beginPath();
-  ctx.arc(cx - 6, 58, 24, Math.PI * 0.5, Math.PI * 1.5);
-  ctx.closePath();
-  ctx.stroke();
-  for (let i = -1; i <= 1; i++) {
-    ctx.beginPath();
-    ctx.moveTo(cx + 4, 58 + i * 16 + tilt);
-    ctx.lineTo(cx + 30, 58 + i * 16 - tilt);
-    ctx.stroke();
-  }
-}
-
-function drawDashStrip(
-  ctx: CanvasRenderingContext2D,
-  m: ReturnType<typeof createCaptureDashModel>,
-) {
-  ctx.clearRect(0, 0, STRIP_PX_W, STRIP_PX_H);
-  // Bar
-  ctx.beginPath();
-  ctx.roundRect(3, 3, STRIP_PX_W - 6, STRIP_PX_H - 6, 26);
-  ctx.fillStyle = STRIP_BG;
-  ctx.fill();
-  ctx.lineWidth = 2;
-  ctx.strokeStyle = STRIP_BORDER;
-  ctx.stroke();
-  ctx.textBaseline = "middle";
-
-  // Blinker arrows — lit green on the trace blink clock (ShadowCar parity).
-  ctx.textAlign = "center";
-  ctx.font = "900 60px system-ui, sans-serif";
-  ctx.fillStyle = m.leftLampLit ? STRIP_SUCCESS : STRIP_DIM;
-  ctx.fillText("◀", 70, 62);
-  ctx.fillStyle = m.rightLampLit ? STRIP_SUCCESS : STRIP_DIM;
-  ctx.fillText("▶", STRIP_PX_W - 70, 62);
-
-  // Gear letter (driveline truth: R/N/D from the trace gear channel).
-  ctx.font = "900 54px system-ui, sans-serif";
-  ctx.fillStyle = STRIP_TEXT;
-  ctx.fillText(m.gearLabel, 210, 52);
-  drawStripLabel(ctx, "ПРЕДАВКА", 210);
-
-  // Speed — THE readout.
-  ctx.font = "900 72px system-ui, sans-serif";
-  ctx.fillStyle = STRIP_TEXT;
-  ctx.textAlign = "right";
-  ctx.fillText(String(Math.max(0, Math.round(Math.abs(m.speedKmh)))), 480, 58);
-  ctx.font = "bold 22px system-ui, sans-serif";
-  ctx.fillStyle = STRIP_MUTED;
-  ctx.textAlign = "left";
-  ctx.fillText("км/ч", 494, 66);
-
-  // Belt + headlights (the honest cabin channels).
-  drawBelt(ctx, 660, m.seatbeltOn);
-  drawStripLabel(ctx, "КОЛАН", 660);
-  drawHeadlight(ctx, 800, m.headlights);
-  drawStripLabel(ctx, HEADLIGHT_WORD[m.headlights], 806);
-
-  // Engine-temperature telltale (VP-06) — red glow + label ONLY while lit.
-  if (m.tempWarnOn) {
-    drawTempWarn(ctx, 575);
-    ctx.fillStyle = STRIP_DANGER;
-    ctx.font = "bold 17px system-ui, sans-serif";
-    ctx.textAlign = "center";
-    ctx.fillText("ТЕМПЕРАТУРА", 575, 112);
-  }
-}
-
-/** Per-frame strip runtime — lazily built on the first frame and owned by a
- *  ref (the cluster-runtime pattern: mutation is only legal on ref contents). */
-interface StripRuntime {
-  canvas: HTMLCanvasElement;
-  ctx: CanvasRenderingContext2D | null;
-  lastHash: string;
-}
-
-function DashStripOverlay({
+/**
+ * The clip's cluster feed. `dashModelFor` stays the source of the trace-derived
+ * channels (blink clock, gear letter, speed, and the graded belt/lights) — the
+ * rebuild is presentation, so the honest data path is untouched. The three
+ * channels the strip never carried are constants of the situation: the ghost is
+ * a car being driven, so the engine is running and the parking brake is off.
+ */
+function PinnedClusterOverlay({
   trace,
   clockRef,
   cabin,
@@ -1177,90 +1044,73 @@ function DashStripOverlay({
   clockRef: RefObject<TraceClock>;
   cabin: CaptureCabinChannels;
   viewFov: number;
-  /** The staged director — its telltaleLit channel lights the strip's red
+  /** The staged director — its telltaleLit channel lights the cluster's red
    *  temperature lamp (VP-06). Null when the clip has no staged events. */
   director: ScenarioDirector | null;
 }) {
-  const meshRef = useRef<Mesh>(null);
-  const materialRef = useRef<MeshBasicMaterial>(null);
-  const runtimeRef = useRef<StripRuntime | null>(null);
-  const textureRef = useRef<CanvasTexture | null>(null);
+  const groupRef = useRef<Group>(null);
 
-  // Quad size/offset from the view frustum at STRIP_DIST_M (constant per fov).
+  // Face width + vertical offset from the view frustum at CLUSTER_DIST_M.
   const layout = useMemo(() => {
-    const frameH = 2 * STRIP_DIST_M * Math.tan((viewFov * Math.PI) / 360);
+    const frameH = 2 * CLUSTER_DIST_M * Math.tan((viewFov * Math.PI) / 360);
     const frameW = frameH * (CAPTURE_W / CAPTURE_H);
-    const w = frameW * STRIP_FRAME_FRACTION;
-    const h = w * (STRIP_PX_H / STRIP_PX_W);
-    const yOff = -frameH / 2 + frameH * STRIP_MARGIN_FRACTION + h / 2;
-    return { w, h, yOff };
+    const widthM = frameW * CLUSTER_FRAME_FRACTION;
+    // Total height includes the bezel standing proud of the face on both sides.
+    const totalH = (widthM / FACE_W) * (FACE_H + 2 * BEZEL_W);
+    const yOff = -frameH / 2 + frameH * CLUSTER_MARGIN_FRACTION + totalH / 2;
+    return { widthM, yOff };
   }, [viewFov]);
 
   const scratch = useRef({
     pt: createTracePoint(),
     model: createCaptureDashModel(),
     offset: new Vector3(),
+    tilt: new Quaternion().setFromEuler(new Euler(-CLUSTER_TILT_DEG * DEG2RAD, 0, 0)),
   });
 
-  useFrame((state) => {
-    const clock = clockRef.current;
-    const mesh = meshRef.current;
-    const material = materialRef.current;
-    if (!clock || !mesh || !material) return;
-    // Lazy strip runtime + texture, wired into the material once.
-    let rt = runtimeRef.current;
-    if (!rt) {
-      const canvas = document.createElement("canvas");
-      canvas.width = STRIP_PX_W;
-      canvas.height = STRIP_PX_H;
-      rt = { canvas, ctx: canvas.getContext("2d"), lastHash: "" };
-      runtimeRef.current = rt;
-      const texture = new CanvasTexture(canvas);
-      texture.colorSpace = SRGBColorSpace;
-      textureRef.current = texture;
-      material.map = texture;
-      material.needsUpdate = true;
-    }
-    const s = scratch.current;
-    sampleAt(trace, clock.tSec, s.pt);
-    // The staged director (stepped by GhostWorldDriver just before this frame)
-    // owns the telltale: light the strip's red temperature lamp off it (VP-06).
-    dashModelFor(s.pt, cabin, clock.tSec, s.model, director?.telltaleLit ?? false);
-    const hash = dashModelHash(s.model);
-    if (rt.ctx && hash !== rt.lastHash) {
-      rt.lastHash = hash;
-      drawDashStrip(rt.ctx, s.model);
-      const texture = textureRef.current;
-      if (texture) texture.needsUpdate = true;
-    }
-    // Pin the quad to the camera (pure follow — the camera itself is pure).
-    const cam = state.camera;
-    s.offset.set(0, layout.yOff, -STRIP_DIST_M).applyQuaternion(cam.quaternion);
-    mesh.position.copy(cam.position).add(s.offset);
-    mesh.quaternion.copy(cam.quaternion);
-  });
-
-  // Dispose the lazily created texture with the overlay.
-  useEffect(
-    () => () => {
-      textureRef.current?.dispose();
-      textureRef.current = null;
+  const sample = useCallback(
+    (out: ClusterInputs) => {
+      const clock = clockRef.current;
+      const s = scratch.current;
+      if (!clock) return;
+      sampleAt(trace, clock.tSec, s.pt);
+      // The staged director (stepped by GhostWorldDriver just before this frame)
+      // owns the telltale: light the red temperature lamp off it (VP-06).
+      dashModelFor(s.pt, cabin, clock.tSec, s.model, director?.telltaleLit ?? false);
+      out.speedKmh = s.model.speedKmh;
+      out.gearLabel = s.model.gearLabel;
+      out.seatbeltOn = s.model.seatbeltOn;
+      out.indicatorLeftLit = s.model.leftLampLit;
+      out.indicatorRightLit = s.model.rightLampLit;
+      out.tempWarnOn = s.model.tempWarnOn;
+      out.engineOn = true;
+      out.stalled = false;
+      out.parkingBrakeOn = false;
     },
-    [],
+    [trace, clockRef, cabin, director],
   );
 
+  // Pin to the camera (pure follow — the camera itself is a pure function of
+  // playback time, so the cluster inherits the R5 no-hop guarantee).
+  useFrame((state) => {
+    const group = groupRef.current;
+    if (!group) return;
+    const s = scratch.current;
+    const cam = state.camera;
+    s.offset.set(0, layout.yOff, -CLUSTER_DIST_M).applyQuaternion(cam.quaternion);
+    group.position.copy(cam.position).add(s.offset);
+    group.quaternion.copy(cam.quaternion).multiply(s.tilt);
+  });
+
   return (
-    <mesh ref={meshRef} frustumCulled={false} renderOrder={40}>
-      <planeGeometry args={[layout.w, layout.h]} />
-      {/* toneMapped=false: UI colors stay literal through AgX/composer. */}
-      <meshBasicMaterial
-        ref={materialRef}
-        transparent
-        depthTest={false}
-        depthWrite={false}
-        toneMapped={false}
+    <group ref={groupRef}>
+      <InstrumentCluster
+        widthM={layout.widthM}
+        sample={sample}
+        overlay
+        renderOrder={CLUSTER_RENDER_ORDER}
       />
-    </mesh>
+    </group>
   );
 }
 

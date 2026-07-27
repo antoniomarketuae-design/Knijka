@@ -263,11 +263,21 @@ describe("ov-ban-v1 — a В24 span paints the solid осева and suppresses t
     expect(dashes(zonedCenter).length).toBeGreaterThan(0);
   });
 
-  it("leaves the same-direction lane dividers (±W) dashed — В24 bans overtaking, not lane paint", () => {
+  it("makes the SAME-DIRECTION dividers (±W) solid too — the line the ban actually grades", () => {
+    // The founder's verdict-board note: the ban zone painted an unbroken осева
+    // the driver never touches, while the divider he DOES cross to pass the
+    // slow lead stayed broken. OVERTAKING_IN_BAN_ZONE grades a laneId change,
+    // and on this 2+2 that change crosses ±W — so ±W must be М1 inside the span.
     for (const side of [W, -W]) {
       const divider = lineQuadsAtX(zoned, side);
-      expect(solids(divider)).toHaveLength(0);
-      expect(dashes(divider).some((d) => d.cy > 100 && d.cy < 200)).toBe(true);
+      const strip = solids(divider);
+      expect(strip).toHaveLength(1);
+      expect(strip[0].minY).toBeCloseTo(90, 1);
+      expect(strip[0].maxY).toBeCloseTo(210, 1);
+      // ...and no dash survives inside the span on that divider,
+      for (const d of dashes(divider)) expect(d.cy > 90 && d.cy < 210).toBe(false);
+      // ...while outside it the road is still ordinary dashed 2+2.
+      expect(dashes(divider).some((d) => d.cy < 85 || d.cy > 215)).toBe(true);
     }
   });
 

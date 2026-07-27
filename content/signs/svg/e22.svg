@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" role="img" aria-labelledby="t">
 <title id="t">Е22 — Допустими максимални скорости на движение</title>
-<rect x="22" y="8" width="156" height="184" rx="10" fill="#fff" stroke="#1d1d1b" stroke-width="4"/>
+<rect x="22" y="8" width="156" height="184" rx="10" fill="#fff" stroke="#1d1d1b" stroke-width="4" data-plate="true"/>
 <text x="100" y="34" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-weight="bold" font-size="22" fill="#1d1d1b">BG · BULGARIA</text>
 <line x1="30" y1="42" x2="170" y2="42" stroke="#1d1d1b" stroke-width="3"/>
 <g font-family="Arial, Helvetica, sans-serif" font-weight="bold" font-size="26" fill="#1d1d1b">

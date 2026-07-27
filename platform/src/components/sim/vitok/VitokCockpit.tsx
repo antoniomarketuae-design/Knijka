@@ -9,16 +9,13 @@ import {
   useState,
   type RefObject,
 } from "react";
-import { useFrame, useThree, type ThreeEvent } from "@react-three/fiber";
+import { createPortal, useFrame, useThree, type ThreeEvent } from "@react-three/fiber";
 import { Html, useGLTF } from "@react-three/drei";
 import {
-  BoxGeometry,
   BufferAttribute,
-  CanvasTexture,
   Mesh,
   MeshBasicMaterial,
   MeshStandardMaterial,
-  SRGBColorSpace,
   type BufferGeometry,
   type Material,
   type Object3D,
@@ -27,14 +24,8 @@ import type { VehicleSim } from "@/modules/sim/vehicle";
 import type { SimInput } from "@/modules/sim/engine";
 import { hotspotsForStep, type CockpitHotspotName } from "@/modules/sim/procedures";
 import type { CabinControls } from "@/modules/sim/scene/cabin";
-import {
-  CLUSTER_H,
-  CLUSTER_W,
-  clusterHash,
-  drawCluster,
-  needleAngleRad,
-  type ClusterData,
-} from "@/modules/sim/scene/vitok/cluster";
+import type { ClusterInputs } from "@/modules/sim/cockpit";
+import { InstrumentCluster } from "@/components/sim/cockpit/InstrumentCluster";
 import {
   COCKPIT_HOTSPOTS,
   CockpitInteractionContext,
@@ -96,36 +87,19 @@ export const INTERIOR_LAYER = 2;
  */
 const WHEEL_VISUAL_RATIO = 3.5;
 
-// Cluster quad: 0.30 x 0.15 m mapping the 512x256 canvas -> 0.000586 m/px.
-const PX = 0.3 / CLUSTER_W;
-const NEEDLE_PIVOT_X = (140 - CLUSTER_W / 2) * PX; // dial centre (140,132)
-const NEEDLE_PIVOT_Y = (CLUSTER_H / 2 - 132) * PX;
-
-/** Mutable cluster redraw state, created lazily on first frame and owned by
- * a plain ref (per-frame mutation is only legal on ref contents). */
-interface ClusterRuntime {
-  ctx: CanvasRenderingContext2D | null;
-  lastHash: string;
-  cooldown: number;
-  data: ClusterData;
-}
-
-function makeClusterRuntime(canvas: HTMLCanvasElement): ClusterRuntime {
-  return {
-    ctx: canvas.getContext("2d"),
-    lastHash: "",
-    cooldown: 0,
-    data: {
-      gear: "N",
-      indicatorLeftLit: false,
-      indicatorRightLit: false,
-      seatbeltOn: false,
-      handbrakeOn: false,
-      headlights: "off",
-      tempWarnOn: false,
-    },
-  };
-}
+/**
+ * FACE width of the 3D cluster, metres. The authored `screen_cluster` quad is
+ * 0.30 × 0.15 m; the cluster's bezel stands proud of its face by BEZEL_W on
+ * each side, so the FACE is sized so the whole binnacle lands on the quad
+ * rather than overhanging into the dash moulding.
+ */
+const CLUSTER_FACE_W_M = 0.285;
+/** Cluster origin off the GLB quad's glass, metres — enough that the bezel
+ *  reads as a housing sitting on the dash, not as a decal on it. */
+const CLUSTER_Z_OFFSET_M = 0.002;
+/** What the authored quad shows once the 3D cluster covers it: the cluster
+ *  ground (doc 83 `--background`), so any sliver around the bezel is black. */
+const CLUSTER_BACKING_COLOR = "#05070c";
 
 /**
  * The A3 GLB ships no UVs (solid-color PBR materials). The screen and mirror
@@ -195,9 +169,6 @@ export function VitokCockpit({
   const raycaster = useThree((s) => s.raycaster);
   const { scene } = useGLTF(INTERIOR_URL, DRACO_PATH);
 
-  const needleRef = useRef<Object3D | null>(null);
-  const runtimeRef = useRef<ClusterRuntime | null>(null);
-  const textureRef = useRef<CanvasTexture | null>(null);
 
   // Main camera renders the cabin layer; the default raycaster must also test
   // it or the layer-2 hotspot proxies would be unclickable (three's Raycaster
@@ -252,100 +223,57 @@ export function VitokCockpit({
     return { model: root, wheelNode, clusterMesh, mirrorMeshes };
   }, [scene]);
 
-  const clusterCanvas = useMemo(() => {
-    const canvas = document.createElement("canvas");
-    canvas.width = CLUSTER_W;
-    canvas.height = CLUSTER_H;
-    return canvas;
-  }, []);
-
-  // Project the live cluster canvas onto the GLB screen quad and hang the 3D
-  // speedo needle off it (frame-rate sweep over the 10 Hz canvas face). All
-  // resources created here are owned here and disposed on unmount; the quad's
-  // authored material is restored so the cached GLTF scene stays pristine.
+  // The authored quad becomes the cluster's dark backing: the 3D cluster
+  // (portalled onto it below) covers it, and this stops any authored screen
+  // material bleeding around the bezel. Owned + restored here so the cached
+  // GLTF scene stays pristine across remounts.
   useEffect(() => {
     const cluster = clusterMesh;
     if (!cluster) return;
-    const texture = new CanvasTexture(clusterCanvas);
-    texture.colorSpace = SRGBColorSpace;
-    texture.anisotropy = 4;
-    const material = new MeshBasicMaterial({ map: texture, toneMapped: false });
+    const material = new MeshBasicMaterial({ color: CLUSTER_BACKING_COLOR, toneMapped: false });
     const previousMaterial = cluster.material;
     cluster.material = material;
-    textureRef.current = texture;
-    // Force a first draw (runtime hash starts empty, but make the texture
-    // upload once even before the first state change).
-    runtimeRef.current = null;
-
-    const needleGeometry = new BoxGeometry(0.066, 0.006, 0.003);
-    needleGeometry.translate(0.025, 0, 0);
-    const needleMaterial = new MeshBasicMaterial({ color: "#ff5533", toneMapped: false });
-    const needle = new Mesh(needleGeometry, needleMaterial);
-    // Dial centre in quad-local metres, floated 4 mm off the glass.
-    needle.position.set(NEEDLE_PIVOT_X, NEEDLE_PIVOT_Y, 0.004);
-    needle.layers.set(INTERIOR_LAYER);
-    cluster.add(needle);
-    needleRef.current = needle;
-
     return () => {
-      cluster.remove(needle);
       cluster.material = previousMaterial;
-      needleRef.current = null;
-      textureRef.current = null;
-      texture.dispose();
       material.dispose();
-      needleGeometry.dispose();
-      needleMaterial.dispose();
     };
-  }, [clusterMesh, clusterCanvas]);
+  }, [clusterMesh]);
 
-  useFrame((_, delta) => {
-    const sim = simRef.current;
-    const cabin = cabinRef.current;
-    if (!sim) return;
-
-    if (wheelNode) {
-      // Spin about the authored column axis (node-local +Y, see doc above).
-      wheelNode.rotation.y = -sim.steerRad * WHEEL_VISUAL_RATIO;
-    }
-    const needle = needleRef.current;
-    if (needle) {
-      needle.rotation.z = needleAngleRad(sim.speedKmh);
-    }
-
-    // Cluster face: redrawn only when a telltale changes (blink edges /
-    // gear / lamp toggles — capped at 10 Hz). Runtime state lives in a ref.
-    let rt = runtimeRef.current;
-    if (!rt) {
-      rt = makeClusterRuntime(clusterCanvas);
-      runtimeRef.current = rt;
-    }
-    rt.cooldown -= delta;
-    if (rt.ctx && rt.cooldown <= 0) {
-      rt.cooldown = 0.1;
+  /**
+   * The cluster's per-frame feed. Reads exactly what the canvas cluster read
+   * (A1: the REAL driveline — selector letter P R N D / M2, stateful parking
+   * brake, hazard relay on both arrows, the director's staged telltale), so
+   * this rebuild changed the presentation and nothing else.
+   */
+  const sampleCluster = useCallback(
+    (out: ClusterInputs) => {
+      const sim = simRef.current;
+      const cabin = cabinRef.current;
       const input = inputRef.current?.read() ?? null;
       const blink = cabin?.blinkOn ?? false;
       const hazardBlink = cabin?.hazardBlinkOn ?? false;
-      const d = rt.data;
-      // A1: the cluster reads the REAL driveline — selector letter (P R N D /
-      // M2), stateful parking-brake lamp, hazard flashers on both arrows.
-      d.gear = cabin ? cabin.driveline.gearLabel : sim.gear;
-      d.indicatorLeftLit = (blink && cabin?.indicator === "left") || hazardBlink;
-      d.indicatorRightLit = (blink && cabin?.indicator === "right") || hazardBlink;
-      d.seatbeltOn = cabin?.seatbeltOn ?? false;
-      d.handbrakeOn =
+      out.speedKmh = sim?.speedKmh ?? 0;
+      out.gearLabel = cabin ? cabin.driveline.gearLabel : String(sim?.gear ?? "N");
+      out.seatbeltOn = cabin?.seatbeltOn ?? false;
+      out.parkingBrakeOn =
         (cabin?.driveline.parkingBrakeOn ?? false) || (input?.handbrake ?? false);
-      d.headlights = cabin?.headlights ?? "off";
+      out.engineOn = cabin?.driveline.engineOn ?? true;
+      out.stalled = cabin?.driveline.stalled ?? false;
+      out.indicatorLeftLit = (blink && cabin?.indicator === "left") || hazardBlink;
+      out.indicatorRightLit = (blink && cabin?.indicator === "right") || hazardBlink;
       // N11 (VP-06): the staged cockpit stimulus — a director-lit red
       // temperature telltale (LessonScene copies director.telltaleLit here).
-      d.tempWarnOn = telltaleLitRef?.current ?? false;
-      const hash = clusterHash(d);
-      if (hash !== rt.lastHash) {
-        rt.lastHash = hash;
-        drawCluster(rt.ctx, d);
-        const texture = textureRef.current;
-        if (texture) texture.needsUpdate = true;
-      }
+      out.tempWarnOn = telltaleLitRef?.current ?? false;
+    },
+    [simRef, cabinRef, inputRef, telltaleLitRef],
+  );
+
+  useFrame(() => {
+    const sim = simRef.current;
+    if (!sim) return;
+    if (wheelNode) {
+      // Spin about the authored column axis (node-local +Y, see doc above).
+      wheelNode.rotation.y = -sim.steerRad * WHEEL_VISUAL_RATIO;
     }
   });
 
@@ -360,6 +288,23 @@ export function VitokCockpit({
         rotation={[0, INTERIOR_YAW, 0]}
         dispose={null}
       />
+
+      {/* The 3D instrument cluster, portalled ONTO the authored cluster quad
+          so it inherits the dash's exact position/orientation — no second set
+          of mount numbers to drift. Same component the reels pin in front of
+          the capture camera, so cockpit and clip show one instrument. */}
+      {clusterMesh
+        ? createPortal(
+            <group position={[0, 0, CLUSTER_Z_OFFSET_M]}>
+              <InstrumentCluster
+                widthM={CLUSTER_FACE_W_M}
+                sample={sampleCluster}
+                layer={INTERIOR_LAYER}
+              />
+            </group>,
+            clusterMesh,
+          )
+        : null}
 
       {/* A4: functional render-to-texture mirrors on the GLB mirror glass. */}
       <MirrorRig mirrors={mirrorMeshes} active={cockpitView} />

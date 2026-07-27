@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" role="img" aria-labelledby="t">
 <title id="t">Г4 — Движение само направо или надясно след знака</title>
-<circle cx="100" cy="100" r="90" fill="#0057a8"/><circle cx="100" cy="100" r="84" fill="none" stroke="#fff" stroke-width="5"/>
+<circle cx="100" cy="100" r="90" fill="#0057a8" data-plate="true"/><circle cx="100" cy="100" r="84" fill="none" stroke="#fff" stroke-width="5" data-plate="true"/>
 <g transform="translate(-26,4) scale(0.9)"><polygon points="100,40 74,92 89,92 89,156 111,156 111,92 126,92" fill="#fff"/></g>
 <path d="M 112,160 V 126 Q 112,108 130,108 H 136" fill="none" stroke="#fff" stroke-width="13"/>
 <polygon points="134,95 162,108 134,121" fill="#fff"/>
