@@ -139,12 +139,12 @@
 }
 
 /* ============================================================
-   THE CLUSTER SCOPE — the committed dark identity (marketing).
+   THE CLUSTER SCOPE — the committed dark identity (whole product).
 
    WHY A SCOPE AND NOT A GLOBAL RE-THEME. The app already ships a dark
    theme, and it is the :root default — but `prefers-color-scheme: light`
-   overrides it, so on a light-mode OS the public page renders as the pale
-   SaaS template nobody designed. Marketing cannot be at the mercy of a
+   overrides it, so on a light-mode OS the page renders as the pale
+   SaaS template nobody designed. The product cannot be at the mercy of a
    visitor's OS setting: the instrument cluster IS the brand. So the
    identity is PINNED here rather than negotiated.
 
@@ -154,7 +154,42 @@
    set it — so every existing utility (bg-surface, border-border, .card,
    .btn-accent, .hud-label) renders in cluster colours inside the scope and
    is untouched outside it. Token names are the interface; this swaps the
-   implementation. Nothing in the authenticated app changes.
+   implementation.
+
+   WHY THE (dashboard) GROUP IS NOW IN HERE TOO. Founder review, verbatim:
+   „yes about that loging page and landing are new but dashboard and all the
+   rest are OLD" — „If we take this Design, we must from dark landing
+   futuristic 3d page go into same futuristic dashboard". Landing and auth
+   were pinned; the login button then dropped the student back onto whatever
+   their OS had decided. Extending the scope — one attribute on the
+   (dashboard) layout — moves ~90% of the product's surface area onto this
+   palette without touching one of those 538 call sites.
+
+   And it is not only a brand move: the app's LIGHT theme is the one that
+   fails WCAG. Measured (clusterScope.test.ts computes all of these from this
+   very block, so they cannot drift from the comment):
+
+     ink            light-on-surface   cluster-on-surface
+     --success            3.39 ✗            11.31 ✓
+     --accent-2           3.34 ✗            11.59 ✓
+     --flame              3.56 ✗             7.53 ✓
+     --gold               3.57 ✗            12.81 ✓
+
+   The practice reader paints „Верен отговор" in --success on a success/10
+   tile: 3.02 : 1 in light, 9.57 : 1 here. So every light-mode student has
+   been reading the single most important label in the theory module below
+   AA. Pinning is what fixes that, and it is why this extension is a
+   correction rather than a taste change.
+
+   Long-form reading was the specific risk flagged for the theory reader, and
+   it is measured rather than eyeballed: --foreground on --surface is
+   16.6 : 1 here against the light theme's 18.3 : 1, i.e. the dark ground is
+   the GENTLER of the two on a page of body text. Neither ink nor ground is
+   clipped (#e8eef8, not #fff; #0a0e16, not #000), which is what keeps
+   halation off a paragraph. No separate "reading panel" is introduced: at
+   these numbers one would be a taste change wearing an accessibility
+   costume, and a second surface ladder is exactly how a design system
+   starts to drift.
 
    WHY THESE VALUES AND NOT THE :root DARK ONES. The :root dark theme is a
    navy theme — surfaces at #0f1826/#16233b read as "blue cards". A real
@@ -170,16 +205,38 @@
    accent 7.7:1 — AA everywhere, AAA on body text.
 
    TWO SCOPE VALUES, ONE PALETTE. "cluster" is a scope that OWNS the viewport
-   (the public shell: landing, auth) — it also claims the root's colour-scheme
-   below, because scrollbars and the overscroll canvas live outside every
-   scope. "cluster-band" is a BOUNDED band inside an otherwise app-themed page
-   (/pricing's showroom, which sits in the dashboard chrome): identical
-   palette, but it must not repaint the scrollbars of a page it does not own —
-   a light dashboard with a dark scrollbar gutter is the tell that a band
-   escaped its box.
+   (landing, auth, and now the authenticated shell). "cluster-band" is a
+   BOUNDED band inside a page the band does not own (/pricing's showroom):
+   identical palette, but it must never reach past its own box.
+
+   WHY THE THIRD SELECTOR, `:root:has([data-surface="cluster"])`. A scope can
+   only reach what it contains, and three things on every page live outside
+   every scope:
+
+     - the scrollbars and the overscroll canvas, which read `color-scheme`
+       off the ROOT element (this rule already existed, for exactly that);
+     - anything React portals to `document.body` — Celebration.tsx does, and
+       doc 83 predicted this: "when one appears, the portal target gets the
+       attribute too". Painting the root is the version of that which cannot
+       be forgotten at the next portal;
+     - code that reads a token off `document.documentElement` to feed a
+       canvas (RouteGuidance.tsx does, for the sim's guidance colour). With
+       the root left on the OS theme, a light-mode student would have gotten
+       the light theme's dark teal drawn into a black cockpit.
+
+   So a scope that OWNS the viewport promotes its palette to the root. A
+   BOUNDED band deliberately does not — which is why `cluster-band` is
+   absent from the :has() and /pricing's showroom still cannot repaint the
+   scrollbars of the page around it.
+
+   The attribute is the belt and `:has()` is the braces, in that order: the
+   scope stays on the shell, so a browser without :has() support still renders
+   the whole app in cluster colours and merely keeps an OS-coloured scrollbar
+   gutter — the same degradation this rule already accepted.
    ============================================================ */
 [data-surface="cluster"],
-[data-surface="cluster-band"] {
+[data-surface="cluster-band"],
+:root:has([data-surface="cluster"]) {
   color-scheme: dark;
 
   /* Ground ramp — cockpit black, cool cast, deliberately shallow steps */
@@ -230,13 +287,6 @@
     0 0 0 1px var(--hair);
   --depth-3: inset 0 1px 0 0 var(--lit-edge-strong),
     0 28px 64px -20px rgba(0, 0, 0, 0.95), 0 0 0 1px var(--hair);
-}
-
-/* Native scrollbars and the overscroll canvas live on the root, outside any
-   scope — without this the page paints a light gutter beside a black hero on
-   a light-mode OS. */
-:root:has([data-surface="cluster"]) {
-  color-scheme: dark;
 }
 
 /* ============================================================
@@ -326,6 +376,120 @@ body {
 :focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
+}
+
+/* ============================================================
+   FORCED COLORS — the tick box under Windows High Contrast.
+
+   `appearance: none` (components/ui/CheckControl.tsx) is what let us draw a
+   box a student can actually see on the cluster palette. It also opts the
+   control out of the one painting that is forced-colors aware: the user
+   agent's. In forced colors mode the UA rewrites author colours to the OS
+   palette; with none of the UA's painting left to rewrite, this is what a
+   headless capture under `forced-colors: active` measured BEFORE this block:
+
+     - every RADIO pixel-identical checked and unchecked — 0 % of the box's
+       pixels differed, at all five radio sites. Its only checked indicator
+       was `box-shadow: inset …`, and forced colors paints no box-shadow;
+       checked:bg-accent and checked:border-accent were both rewritten to the
+       same Canvas / CanvasText pair as an empty box.
+     - every CHECKBOX 2–6 % different. The tick is a background-image, which
+       forced colors deliberately leaves alone — so it survived with its ink
+       frozen at #04070e, near-black, on a Canvas that is also black.
+     - a DISABLED control identical to a live one, 0 % different.
+
+   Two of those ten boxes are the GDPR consent gate at registration and the
+   14-day withdrawal waiver at checkout, and by ADR-004 the students are
+   minors. A consent box whose ticked state cannot be seen is not a polish
+   defect, it is a consent-integrity defect.
+
+   So in this mode the control stops leaving the palette to chance and names
+   it. `forced-color-adjust: none` is what makes the declarations below the
+   used values — and every colour in them is a SYSTEM colour, so the OS theme
+   still decides the actual pixels. This takes the palette, not control of it.
+
+   UNLAYERED, DELIBERATELY. Tailwind's utilities live in `@layer utilities`,
+   which outranks `@layer components`, so a checked-state rule written down
+   there would lose to `checked:bg-accent` and this whole block would be
+   decorative. Unlayered CSS outranks every layer — the only way a media
+   query can override a utility without an `!important` on every line. The
+   `:focus-visible` rule above is unlayered for exactly the same reason.
+
+   THE MARK IS A PSEUDO-ELEMENT, and only here. A background-image cannot be
+   recoloured by the palette (that is the checkbox defect above) and a
+   box-shadow is not painted at all (the radio one), so the only thing left
+   that both takes a colour and survives is a generated box with borders.
+   This costs the component nothing it promised: `::before` is CSS, not a
+   second React element, and the rule is unreachable outside forced colors —
+   every engine that implements `forced-colors: active` renders pseudo-
+   elements on an `appearance: none` input.
+   ============================================================ */
+@media (forced-colors: active) {
+  .check-control {
+    forced-color-adjust: none;
+    display: grid;
+    place-content: center;
+    background-color: Canvas;
+    /* The frozen-ink tick. It is replaced below, not merely hidden. */
+    background-image: none;
+    border-color: CanvasText;
+    /* The radio's inset dot ring, which this mode would not have painted. */
+    box-shadow: none;
+  }
+
+  /* CHECKED is the OS's own selected pair, the one a native control uses:
+     Highlight for the fill, HighlightText for the mark on it. Those two
+     contrast by definition in every theme — a hard-coded ink cannot promise
+     that, which is how the tick ended up near-black on black. */
+  .check-control:checked {
+    background-color: Highlight;
+    border-color: Highlight;
+  }
+  .check-control:checked::before {
+    content: "";
+    display: block;
+    box-sizing: border-box;
+  }
+  /* Arity still reads: a tick for "as many as apply", a dot for "one of
+     these" — the same split CONTROL_SHAPE draws in normal mode. */
+  .check-control[type="checkbox"]:checked::before {
+    width: 5px;
+    height: 9px;
+    border: 2px solid HighlightText;
+    border-top-width: 0;
+    border-left-width: 0;
+    transform: translateY(-1px) rotate(42deg);
+  }
+  .check-control[type="radio"]:checked::before {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background-color: HighlightText;
+  }
+
+  /* DISABLED is GrayText, the palette's one "not for you" colour. The
+     checked/unchecked difference has to survive INSIDE it: the practice and
+     micro-quiz runners disable their options the moment an answer is
+     submitted, and the student is still reading which one they picked. */
+  .check-control:disabled {
+    border-color: GrayText;
+  }
+  .check-control:disabled:checked {
+    background-color: GrayText;
+    border-color: GrayText;
+  }
+  .check-control[type="checkbox"]:disabled:checked::before {
+    border-color: Canvas;
+  }
+  .check-control[type="radio"]:disabled:checked::before {
+    background-color: Canvas;
+  }
+
+  /* forced-color-adjust: none also stops the keyboard ring being rewritten,
+     and the rule above paints it in --accent. Put it back on the palette. */
+  .check-control:focus-visible {
+    outline-color: Highlight;
+  }
 }
 
 @layer components {

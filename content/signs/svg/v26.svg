@@ -1,5 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" role="img" aria-labelledby="t">
 <title id="t">В26 — Забранено е движението със скорост, по-висока от означената</title>
-<circle cx="100" cy="100" r="88" fill="#fff" stroke="#c1121f" stroke-width="20"/>
+<circle cx="100" cy="100" r="88" fill="#fff" stroke="#c1121f" stroke-width="20" data-plate="true"/>
 <text x="100" y="126" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-weight="bold" font-size="72" fill="#1d1d1b">60</text>
 </svg>

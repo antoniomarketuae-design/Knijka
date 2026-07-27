@@ -138,7 +138,14 @@ describe("verifyCredentials — the login boundary", () => {
     expect(user?.isAdmin).toBe(true);
   });
 
-  it("returns null — identically — for wrong password, unknown e-mail and OAuth-only accounts", async () => {
+  // The heaviest case in this describe: the beforeEach registration hashes at
+  // BCRYPT_ROUNDS = 12, and two of the three probes below run a full bcrypt
+  // COMPARE at that cost (only the null-hash account short-circuits). That is
+  // ~4 cost-12 operations in one test — comfortably under a second alone, well
+  // past vitest's 5 s default when the whole suite's workers are competing for
+  // the CPU. The budget is for that contention, not for slow code, and it
+  // relaxes no assertion: the identical-null property below is the point.
+  it("returns null — identically — for wrong password, unknown e-mail and OAuth-only accounts", { timeout: 30_000 }, async () => {
     expect(await verifyCredentials("ivan@mail.bg", "greshna1234")).toBeNull();
     expect(await verifyCredentials("nikoi@mail.bg", "parola1234")).toBeNull();
     users[0].passwordHash = null; // OAuth-created account, no password set

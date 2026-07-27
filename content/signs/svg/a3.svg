@@ -1,5 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" role="img" aria-labelledby="t">
 <title id="t">А3 — Последователни опасни завои, първият от които е надясно</title>
-<polygon points="100,22 186,170 14,170" fill="#fff" stroke="#c1121f" stroke-width="16" stroke-linejoin="round"/>
-<g fill="#1d1d1b"><path d="M 88,157 L 116,136 L 88,114 L 116,92" fill="none" stroke="#1d1d1b" stroke-width="13"/></g>
+<polygon points="100,22 186,170 14,170" fill="#fff" stroke="#c1121f" stroke-width="16" stroke-linejoin="round" data-plate="true"/>
+<g fill="#1d1d1b"><path d="M 90,152 V 138 C 90,128 110,128 110,118 C 110,108 90,108 90,98" fill="none" stroke="#1d1d1b" stroke-width="12"/>
+<polygon points="90,80 103,100 77,100"/></g>
 </svg>

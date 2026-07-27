@@ -15,8 +15,12 @@
  *     dangerous band; the zone is then driven correctly;
  *   - „Пълзене в зоната 30": a correct zone entry at ~27 creeping up to ~37
  *     grades EXACTLY SPEEDING_OVER_LIMIT against the LOCAL 30 (31–40 band),
- *     never SPEEDING_DANGEROUS (> 40). The demo starts mid-approach (y = 280)
- *     so its clean prefix stays under the 250 m CLEAN_DRIVING streak.
+ *     never SPEEDING_DANGEROUS (> 40). The demo starts mid-approach (y = 330)
+ *     so its clean prefix stays under the 250 m CLEAN_DRIVING streak, and its
+ *     conviction is authored ONTO a painted „30" road numeral — this is the
+ *     demo the clip pilot renders for ev-speed-limit, and the numeral is the
+ *     only cap the chase camera can keep in the fault frame (see
+ *     SC_SPEED_CREEP_ZONE_GLYPH_Y and the templates-sp.ts ordering note).
  *
  * Geometry pinned to content/world/sp-creep2-v1.json:
  *   street on x = 0, right-lane center x = 4.06, spawn sp-tr-spawn-approach
@@ -40,6 +44,22 @@ export const SC_SPEED_CREEP_ID = "sc-speed-creep";
 const X_LANE = 4.06;
 /** The 50→30 transition line (sp-creep2-v1 meta.scenario.transitionY). */
 const ZONE_Y = 400;
+
+/**
+ * WHERE THE PAINTED „30" NUMERALS LAND — the only rendered statement of the
+ * zone cap on this map (props.ts posts no В26-30 face: the sign kit ships the
+ * 50 disc only, and posting a 50 over a 30 edge would lie).
+ *
+ * markings.ts paints one numeral station per SPEED_GLYPH_PITCH_M (120 m) along
+ * the zone edge, starting SPEED_GLYPH_INSET_M (20 m) in, each glyph
+ * SPEED_GLYPH_DIGIT_H_M (6 m) long in the driver's own lane; the edge is
+ * trimmed 0.8 m at each end first. On sp-creep2-v1's zone edge (y ∈ [400, 680])
+ * that puts the station BASES at y ≈ 420.8, 540.8, 660.8 — pinned by value
+ * here, re-asserted against the committed map + constants by the gate test.
+ */
+export const SC_SPEED_CREEP_ZONE_GLYPH_Y = [420.8, 540.8, 660.8] as const;
+/** Length of one painted numeral along the road (SPEED_GLYPH_DIGIT_H_M), m. */
+export const SC_SPEED_CREEP_ZONE_GLYPH_LEN_M = 6;
 
 // ---------------------------------------------------------------------------
 // The correct demonstration (shadow)
@@ -106,17 +126,30 @@ export function scSpeedCreepMistakeZoneCreepScript(): DriveScript {
         textBg: "Грешка: правилно влизане в зоната 30 — и после стрелката пълзи, без поглед към нея.",
       },
       { kind: "glance", mirror: "rear" },
-      // Mid-approach start (y = 280): the clean prefix to the first violation
-      // stays under the 250 m CLEAN_DRIVING streak — this demo must not earn
-      // the shadow's positive.
-      { kind: "drive", points: [[X_LANE, 280], [X_LANE, 330]], targetKmh: 46, stopAtEnd: false },
-      // Correct early lift and a correct zone entry at ~27.
-      { kind: "drive", points: [[X_LANE, 330], [X_LANE, 405]], targetKmh: 27, stopAtEnd: false },
-      { kind: "drive", points: [[X_LANE, 405], [X_LANE, 465]], targetKmh: 27, stopAtEnd: false },
+      // FOUNDER R0 („a car driving forward in a city street, nothing else"):
+      // this demo is the one the why-panel serves for ev-speed-limit, and a
+      // speeding clip is unreadable unless the CAP is in the same frame as the
+      // needle. sp-creep2-v1 posts no В26 face at the zone entry (the kit ships
+      // only the 50 disc), so the cap that CAN be framed is the painted „30"
+      // on the tarmac — 6 m tall, in the driver's own lane, at the glyph
+      // stations SPEED_GLYPH_* place along the zone edge (see SC_SPEED_CREEP_ZONE_GLYPH_Y).
+      // The whole drive is authored to put the ❌ ON one of them.
+      //
+      // The start is at y = 330, not 280: the first violation now lands ~213 m
+      // in, which keeps the clean prefix under the 250 m CLEAN_DRIVING streak
+      // (this demo must not earn the shadow's positive) while still showing the
+      // 50 → 30 transition and the first painted numeral before the fault.
+      { kind: "drive", points: [[X_LANE, 330], [X_LANE, 398]], targetKmh: 44, stopAtEnd: false },
+      // Correct early lift and a correct zone entry at ~27 — over the first
+      // painted „30" station (y ≈ 421) at a speed that respects it.
+      { kind: "drive", points: [[X_LANE, 398], [X_LANE, 470]], targetKmh: 27, stopAtEnd: false },
+      { kind: "drive", points: [[X_LANE, 470], [X_LANE, 517]], targetKmh: 27, stopAtEnd: false },
       { kind: "annotation", textBg: "Усещането при 37 в зона 30 е „бавно“ — но таванът тук е 30, не 50." },
       // The creep: 27 → 37 and hold — the 31–40 minor band of the LOCAL 30,
-      // never the > 40 dangerous band.
-      { kind: "drive", points: [[X_LANE, 465], [X_LANE, 610]], targetKmh: 37 },
+      // never the > 40 dangerous band. Opening the throttle at y = 517 puts the
+      // conviction ~26 m later (33 km/h crossed after ~6 m, then the 2 s
+      // speedingMinorSustainSec at ~10 m/s) — i.e. on the SECOND painted „30".
+      { kind: "drive", points: [[X_LANE, 517], [X_LANE, 640]], targetKmh: 37 },
       { kind: "pause", sec: 1.5, brake: true },
       { kind: "annotation", textBg: "37 в зона 30 е същата второстепенна грешка като 57 в зона 50 — проверявай стрелката, особено при нисък таван." },
     ],

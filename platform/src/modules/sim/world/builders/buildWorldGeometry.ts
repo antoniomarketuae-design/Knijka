@@ -91,6 +91,8 @@ export function buildWorldGeometry(
     railUnguarded: 0,
     railCross: 0,
     barrier: 0,
+    // Junction-derived В1 post — 0 on every district without a one-way mouth.
+    noEntry: 0,
   };
   for (const s of props.signs) signCounts[s.kind]++;
 

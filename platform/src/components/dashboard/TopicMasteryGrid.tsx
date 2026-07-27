@@ -1,21 +1,12 @@
 import Link from "next/link";
 import type { ReadinessSnapshot, TopicMastery } from "@/lib/dashboard/data";
 import { EmptyState } from "@/components/dashboard/EmptyState";
-
-// Kept in sync with TopicCard / TopicSectionGroup. A started-but-low topic reads
-// neutral/accent ("just getting going"), never danger-red — red is for genuine
-// answer-level errors, not an early learner's progress bar.
-function masteryColor(m: number): string {
-  if (m >= 0.75) return "var(--success)";
-  if (m >= 0.45) return "var(--warning)";
-  if (m > 0) return "var(--accent)";
-  return "var(--border-strong)";
-}
+import { masteryBarColor, masteryInkColor } from "@/components/ui/mastery";
 
 function Bar({ item }: { item: TopicMastery }) {
   const pct = Math.round(item.mastery * 100);
   const started = item.questionsSeen > 0;
-  const color = masteryColor(item.mastery);
+  const color = masteryBarColor(item.mastery);
 
   return (
     <li className="flex items-center gap-3">
@@ -29,7 +20,7 @@ function Bar({ item }: { item: TopicMastery }) {
           </span>
           <span
             className="shrink-0 font-mono text-xs font-bold tabular-nums"
-            style={{ color: started ? color : "var(--muted)" }}
+            style={{ color: masteryInkColor(item.mastery, started) }}
           >
             {started ? `${pct}%` : "—"}
           </span>
@@ -104,7 +95,7 @@ export function TopicMasteryGrid({ readiness }: { readiness: ReadinessSnapshot }
                   <span
                     aria-hidden
                     className="h-1.5 w-1.5 rounded-full"
-                    style={{ backgroundColor: masteryColor(c.mastery) }}
+                    style={{ backgroundColor: masteryBarColor(c.mastery) }}
                   />
                   {c.titleBg}
                 </Link>

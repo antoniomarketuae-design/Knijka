@@ -169,23 +169,49 @@ function scJunctionRhrMistakeNoLookScript(): DriveScript {
       { kind: "indicator", setting: "left" },
       { kind: "annotation", textBg: "Никакво оглеждане — колата се вмъква направо в кръстовището." },
       {
-        // Roll into the core blind; the unseen car from the right is inbound.
+        // INTO THE MIDDLE OF THE BOX, AND ON THE PRIORITY CAR'S CLOCK (founder
+        // R0: „the car actually must enter the junction to the middle of it so
+        // it creates disturbance for the traffic car which almost collides with
+        // it; currently the shadow car is just stopping and the traffic car
+        // passes normally with enormous distance between them").
+        //
+        // The priority car runs the east→west lane at y = +4.06 and is released
+        // when the ego reaches y = −40 (PRIORITY_COMMIT_PLAYER_M), crossing our
+        // lane ~7.5 s later. The old demo halted at y = −15 and let it go by
+        // with ~19 m of air; even rolling to y = +1.5 at 15 km/h arrived a full
+        // 2.7 s late — the car had cleared the box before the ego got there.
+        // 24 km/h over the same 36 m lands the ego's body ACROSS that lane just
+        // as the car closes: playerGuard (lateral < 3 m of the ego's centre)
+        // forces it into an 8 m/s² emergency stop, and it still arrives inside
+        // the runner's own 3 m contact test at t ≈ 20.4 while the ego is
+        // rolling to its halt. So the COLLISION this demo has always DECLARED
+        // is now a real meeting of two bodies — the authored beat is gone, the
+        // code comes from the encounter itself, and the priority car is visibly
+        // standing on its brakes when it lands.
+        //
+        // The RHR tracker does NOT double-bill: the ego is braking hard (>=
+        // 2.5 m/s², stopAtEnd) from before the conflict enters the 26 m
+        // conviction radius, which is exactly the C1/D1 braking-response
+        // immunity — so the drive still grades EXACTLY [COLLISION], the
+        // template's codeRefs, unchanged.
         kind: "drive",
         points: [
           [LANE, -34],
-          [LANE, -15],
+          [LANE, 2],
         ],
-        targetKmh: 15,
-        stopAtEnd: false,
+        targetKmh: 24,
+        stopAtEnd: true,
       },
+      // Short on purpose: the two bodies end 2.3 m apart, which the lead-gap
+      // query publishes as a 0 m standstill gap — under standstillMinGapM
+      // (1.5 m). Holding that pose past standstillGapSustainSec (1.5 s) piles
+      // STANDSTILL_GAP_TOO_CLOSE on top of the collision and breaks the
+      // exact-code gate, so the aftermath is 1.2 s here; the clip window
+      // (fault + 4 s, clamped to the trace) carries the rest.
       { kind: "pause", sec: 1.2, brake: true },
-      // The authored consequence: the unseen priority car strikes the nose
-      // poking into its path (the P0 „пешеходец зад колата" pattern).
-      { kind: "collision", withWhat: "vehicle" },
-      { kind: "pause", sec: 2.2, brake: true },
       {
         kind: "annotation",
-        textBg: "Колата отдясно остана невидима до удара. Наляво, НАДЯСНО — и чак тогава напред.",
+        textBg: "Колата отдясно закова спирачки на метри от вратата. Наляво, НАДЯСНО — и чак тогава напред.",
       },
     ],
   };

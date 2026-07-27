@@ -154,8 +154,13 @@ describe("trafficController (integration, sx-v1)", () => {
     // The figure: pose "directTraffic", standing at the junction post.
     const figure = stack.traffic.pedestrians.find((p) => p.pose === "directTraffic")!;
     expect(figure).toBeDefined();
-    expect(figure.x).toBeCloseTo(0, 3);
-    expect(figure.y).toBeCloseTo(0, 3);
+    // Standing exactly where the template posts him — on the centre line of the
+    // approach he halts, 11 m south of the node (the "visible from the driver's
+    // seat" post; see SC_SIGNAL_CONTROLLER_EVENT.officer), not at the junction's
+    // geometric centre. Read from the spec so a future re-post moves one number.
+    expect(figure.x).toBeCloseTo(SC_SIGNAL_CONTROLLER_EVENT.officer.x, 3);
+    expect(figure.y).toBeCloseTo(SC_SIGNAL_CONTROLLER_EVENT.officer.y, 3);
+    expect(SC_SIGNAL_CONTROLLER_EVENT.officer.y).toBeLessThan(0); // ahead of the line, not past it
     // Drive the clock into the authored green window: lamps GREEN for the
     // approach the controller HALTS — the misleading-but-visible staging —
     // and the surfaced context reads the EFFECTIVE signal (red).

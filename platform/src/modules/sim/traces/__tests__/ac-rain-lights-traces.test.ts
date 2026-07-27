@@ -18,7 +18,9 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
+import type { OncomingStreamSpec } from "../../contracts";
 import { SC_AC_RAIN_LIGHTS } from "../../lessons/scenario/templates-conditions";
+import { clipStagedOverrideFor } from "../clipReplay";
 import { parseScenarioTrace, serializeScenarioTrace } from "../parse";
 import { recordScAcRainLightsDrive, type ScAcRainLightsTraceName } from "../scAcRainLights";
 import type { RecordedDrive } from "../recorder";
@@ -78,6 +80,43 @@ describe("sc-ac-rain-lights — mistake demos grade their exact codes (doc 76 §
     expect(codes).toEqual([...SC_AC_RAIN_LIGHTS.mistakes[1].codeRefs].sort());
     expect(codes).not.toContain("SPEED_TOO_FAST_FOR_CONDITIONS");
     expect(codes).not.toContain("HEADLIGHTS_OFF_AT_NIGHT");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Founder R0 — „the road is completely visible and this contradicts the
+// question itself"
+// ---------------------------------------------------------------------------
+
+describe("sc-ac-rain-lights — the clip has somebody the unlit car is invisible TO", () => {
+  // The lesson's own teach copy: the lights in rain „не са за да виждаш, а за да
+  // те виждат другите". The recording drives an empty street, so the produced
+  // clip could only make the claim the founder rejected — that the road is
+  // perfectly visible. The CLIP (never the recording, never the grading) gets
+  // an oncoming stream on the far bank.
+  it("registers a clip-only oncoming stream for both mistakes", () => {
+    for (const mi of [0, 1]) {
+      const staged = clipStagedOverrideFor(SCENARIO_ID, mi);
+      expect(staged, `mistake ${mi}`).not.toBeNull();
+      const stream = staged!.find((e) => e.kind === "oncomingStream");
+      expect(stream, `mistake ${mi} oncoming`).toBeDefined();
+    }
+  });
+
+  it("the stream rides the OTHER carriageway — nothing the centred ghost can meet", () => {
+    const stream = clipStagedOverrideFor(SCENARIO_ID, 0)!.find(
+      (e) => e.kind === "oncomingStream",
+    ) as OncomingStreamSpec;
+    // Southbound node order = the opposite bank (the narrowMeeting-actor recipe).
+    expect(stream.actor.pathNodes).toEqual(["ac-rain-n-end", "ac-rain-n-start"]);
+    expect(stream.count).toBeGreaterThanOrEqual(2);
+  });
+
+  it("the RECORDING is untouched by it — grading stays byte-identical", () => {
+    // The clip override is applied by the capture rig, not by the recorder:
+    // the committed trace must be recordable from the template's own staged
+    // list alone (which is empty for this drill).
+    expect(SC_AC_RAIN_LIGHTS.staged ?? []).toEqual([]);
   });
 });
 

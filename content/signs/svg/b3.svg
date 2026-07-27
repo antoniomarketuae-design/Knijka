@@ -1,5 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" role="img" aria-labelledby="t">
 <title id="t">Б3 — Път с предимство</title>
-<polygon points="100,8 192,100 100,192 8,100" fill="#fff" stroke="#c8c8c8" stroke-width="2" stroke-linejoin="round"/>
+<polygon points="100,8 192,100 100,192 8,100" fill="#fff" stroke="#c8c8c8" stroke-width="2" stroke-linejoin="round" data-plate="true"/>
 <polygon points="100,40 160,100 100,160 40,100" fill="#ffd320"/>
 </svg>

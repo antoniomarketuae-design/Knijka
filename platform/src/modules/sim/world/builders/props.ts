@@ -66,7 +66,13 @@ import {
   type Vec2,
 } from "./math2d";
 import { toWorld, yawFromFacing } from "./mesh";
-import { junctionPriorityControls, type Approach, type RoadNetwork } from "./network";
+import {
+  isBareVergeSide,
+  junctionPriorityControls,
+  onewayNoEntryArms,
+  type Approach,
+  type RoadNetwork,
+} from "./network";
 import { buildZoneSigns, scenarioSignScale } from "./zoneSigns";
 
 export interface PropBuildResult {
@@ -101,6 +107,23 @@ const PARKING_KIT_SITES: readonly Vec2[] = [
   [-558.8, 235.2], // NW quarter: 16.2 m off a building, 26 m off the road
   [149.2, 307.2], // NE quarter: 14.7 m off a building, 25 m off the road
 ];
+
+/**
+ * Г12 „Кръгово движение" stands this far BEHIND the Б1 it accompanies at a
+ * roundabout entry (further from the junction = read first by the approaching
+ * driver, which is the order the two signs teach: „ahead is a roundabout",
+ * then „give way at the line").
+ */
+const ROUNDABOUT_SIGN_BACK_M = 3;
+/** …and this much further off the curb, so the two posts never line up into
+ *  one silhouette on the straight approach (same trick as the В26 advisory
+ *  plate behind its А1 — zoneSigns CURVE_ADVISORY_PLATE_OUT_M). */
+const ROUNDABOUT_SIGN_OUT_M = 1.2;
+
+/** В1 stands just past the mouth of the arm it closes… */
+const NO_ENTRY_ALONG_M = 1.4;
+/** …at the same curb offset as the priority posts. */
+const NO_ENTRY_LATERAL_M = 0.8;
 
 /** Prop standing right of the incoming traffic at a junction approach. */
 function approachPropPose(ap: Approach, alongExtra: number, lateralExtra: number) {
@@ -262,10 +285,23 @@ export function buildProps(
       const kind: SignKind = control === "stopSign" ? "stop" : "giveWay";
       const { p, yaw } = approachPropPose(ap, 1.4, 0.8);
       signs.push({ kind, position: toWorld(p[0], p[1], ROAD_Y), yaw, ...lessonSized });
-      // Roundabout entries also carry the mandatory Д11 (it renders higher on
-      // the shared pole — the component offsets by kind).
+      // Roundabout entries also carry the mandatory Г12 „Кръгово движение".
+      // It gets its OWN post: the note that used to sit here claimed the
+      // renderer offsets the plate by kind, and it never did — WorldProps
+      // instances every kind at the placement transform verbatim, so pushing
+      // Г12 at the Б1 pose stacked two whole sign models (pole and all) in the
+      // same cubic metre. The founder read the result off the verdict board as
+      // one plate carrying two signs. Two posts, two poses, the second set
+      // back and further out exactly like the В26 advisory plate does behind
+      // its А1 (ZONE constants below).
       if (isRoundabout) {
-        signs.push({ kind: "roundabout", position: toWorld(p[0], p[1], ROAD_Y), yaw, ...lessonSized });
+        const pose = approachPropPose(ap, 1.4 + ROUNDABOUT_SIGN_BACK_M, 0.8 + ROUNDABOUT_SIGN_OUT_M);
+        signs.push({
+          kind: "roundabout",
+          position: toWorld(pose.p[0], pose.p[1], ROAD_Y),
+          yaw: pose.yaw,
+          ...lessonSized,
+        });
       }
       (kind === "stop" ? stopSignApproaches : giveWayApproaches).add(`${node.id}:${ap.edgeId}`);
     }
@@ -288,6 +324,51 @@ export function buildProps(
     const { p, yaw } = approachPropPose(ap, 1.4, 0.8);
     signs.push({ kind, position: toWorld(p[0], p[1], ROAD_Y), yaw, ...lessonSized });
     (kind === "giveWay" ? giveWayApproaches : stopSignApproaches).add(key);
+  }
+
+  // -- В1 „Забранено е влизането" at one-way mouths ----------------------------
+  // WHICH mouths lives in network.onewayNoEntryArms — the same one-way tag the
+  // runtime's wrongWay surface grades WRONG_WAY from, so the sign a student is
+  // failed for ignoring is now the sign he was shown (the junctionPriorityControls
+  // discipline). Founder verdict-board note on sc-ov-oneway: the one-way street
+  // was stated by lane arrows and nothing else, while the В1 GLB shipped unused.
+  //
+  // Gated to scenario micro-maps, and deliberately: the OSM city districts carry
+  // ~150 one-way mouths whose REAL signage the source data never recorded, so
+  // posting there would trade a missing sign for an invented one. The gate is
+  // the lesson-scale gate (scenarioSignScale), reused rather than re-derived.
+  if (lessonScale !== undefined) {
+    for (const node of network.nodes.values()) {
+      const banned = onewayNoEntryArms(
+        node.approaches.map((ap) => ({
+          edgeId: ap.edgeId,
+          oneway: ap.edge.oneway,
+          roundabout: ap.edge.roundabout,
+          incoming: ap.incoming,
+          outgoing: ap.outgoing,
+        })),
+      );
+      if (banned.size === 0) continue;
+      for (const ap of node.approaches) {
+        if (!banned.has(ap.edgeId)) continue;
+        // The MIRROR of approachPropPose: this post addresses the driver who
+        // would turn INTO the arm, so it stands on THAT driver's right (right
+        // of `away`, not of the incoming direction) and its face looks back at
+        // the junction he is leaving — the same 1.4 m / 0.8 m curb pose the
+        // priority posts use, so a mouth reads as one signed station.
+        const away = ap.cutTangentAway;
+        const p = add(
+          add(ap.cut, mul(away, NO_ENTRY_ALONG_M)),
+          mul(perpRight(away), ap.halfWidth + NO_ENTRY_LATERAL_M),
+        );
+        signs.push({
+          kind: "noEntry",
+          position: toWorld(p[0], p[1], ROAD_Y),
+          yaw: yawFromFacing(mul(away, -1)),
+          ...lessonSized,
+        });
+      }
+    }
   }
 
   // -- speed limit 50 at district entries -------------------------------------
@@ -351,8 +432,18 @@ export function buildProps(
   // -- streetlights along arterials --------------------------------------------
   for (const eb of network.edges) {
     if (!eb.line || !ARTERIAL_CLASSES.has(eb.edge.class)) continue;
+    // Lamp columns stand on the verge — so a BARE verge (network.ts
+    // BareVergeSide) never gets one. On a divided street that verge is the
+    // median, whose columns belong to the OTHER carriageway's row; a column
+    // planted for both halves stood one pole-width off the far carriageway's
+    // kerb, i.e. in its travel lane. "both" (a motorway връзка) has no row.
+    if (eb.bareVerge === "both") continue;
     const total = polylineLength(eb.line);
-    let side = 1;
+    // Alternating sides is the city look; with one verge bare the whole row
+    // moves to the side that has one.
+    const onlySide: 1 | -1 | null =
+      eb.bareVerge === "left" ? 1 : eb.bareVerge === "right" ? -1 : null;
+    let side: 1 | -1 = onlySide ?? 1;
     for (let s = STREETLIGHT_SPACING_M / 2; s < total; s += STREETLIGHT_SPACING_M) {
       const { point, tangent } = pointAlong(eb.line, s);
       const r = perpRight(tangent);
@@ -363,7 +454,7 @@ export function buildProps(
         position: toWorld(p[0], p[1], SIDEWALK_TOP_Y),
         yaw: yawFromFacing(facing),
       });
-      side = -side;
+      if (onlySide === null) side = (-side) as 1 | -1;
     }
   }
 
@@ -408,9 +499,12 @@ export function buildProps(
     for (let s = ARTERIAL_TREE_SPACING_M / 2; s < total; s += ARTERIAL_TREE_SPACING_M) {
       const { point, tangent } = pointAlong(eb.line, s);
       const r = perpRight(tangent);
-      for (const side of [1, -1]) {
+      for (const side of [1, -1] as const) {
         if (rng() > 0.9 * options.treeDensity) continue;
         const p = add(point, mul(r, side * (eb.halfWidth + SIDEWALK_WIDTH_M + 1.4 + rng() * 0.8)));
+        // Bare verge (median kerb / motorway връзка) — tested AFTER both draws
+        // so the shared per-district rng stream is untouched by the tag.
+        if (isBareVergeSide(eb.bareVerge, side)) continue;
         if (insideBuilding(p, 1.8)) continue;
         const pick = rng();
         const kind: TreeKind = lindenBoulevard
@@ -440,6 +534,7 @@ export function buildProps(
       const r = perpRight(tangent);
       const side = rng() < 0.5 ? 1 : -1;
       const p = add(point, mul(r, side * (eb.halfWidth + SIDEWALK_WIDTH_M + 1.6 + rng() * 1.5)));
+      if (isBareVergeSide(eb.bareVerge, side)) continue; // after the draws — see above
       if (insideBuilding(p, 1.8)) continue;
       const pick = rng();
       pushTree(p, pick < 0.4 ? "leafyA" : pick < 0.75 ? "leafyB" : "ornamental");
@@ -481,7 +576,14 @@ export function buildProps(
     ) {
       const { point, tangent } = pointAlong(eb.line, s);
       if (billboardAnchors.some((q) => dist(q, point) < BILLBOARD_MIN_SPACING_M)) continue;
-      const side = billboardCounter % 2 === 0 ? 1 : -1;
+      // Alternate sides, but never plant on a bare verge: fall back to the
+      // other side (and skip the station outright when both are bare) rather
+      // than `continue`, which would stall the alternation on one side.
+      let side: 1 | -1 = billboardCounter % 2 === 0 ? 1 : -1;
+      if (isBareVergeSide(eb.bareVerge, side)) {
+        side = (-side) as 1 | -1;
+        if (isBareVergeSide(eb.bareVerge, side)) continue;
+      }
       const r = perpRight(tangent);
       const p = add(point, mul(r, side * (eb.halfWidth + SIDEWALK_WIDTH_M + 2.4)));
       if (insideBuilding(p, 2.5)) continue;
@@ -511,6 +613,9 @@ export function buildProps(
     if (!eb.line || eb.edge.roundabout) continue;
     const cls = eb.edge.class;
     if (cls !== "primary" && cls !== "secondary") continue;
+    // The shelter is parked at the back of the RIGHT-of-travel sidewalk — a
+    // bare right verge has no sidewalk to park it on.
+    if (isBareVergeSide(eb.bareVerge, 1)) continue;
     const total = polylineLength(eb.line);
     if (total < BUS_STOP_FROM_MOUTH_M + 15) continue;
     // Anchor to whichever edge end is a real junction (degree >= 3).

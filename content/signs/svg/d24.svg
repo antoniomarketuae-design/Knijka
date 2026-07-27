@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" role="img" aria-labelledby="t">
 <title id="t">Д24 — Автобусна спирка</title>
-<rect x="8" y="8" width="184" height="184" rx="18" fill="#0057a8"/>
+<rect x="8" y="8" width="184" height="184" rx="18" fill="#0057a8" data-plate="true"/>
 <g fill="#fff">
 <rect x="28" y="66" width="144" height="58" rx="12"/>
 <circle cx="60" cy="132" r="12"/><circle cx="140" cy="132" r="12"/>

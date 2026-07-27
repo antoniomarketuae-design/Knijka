@@ -6,9 +6,9 @@
   "mapKind": "scenario-street",
   "generator": "tools/maps/gen_lc_gantry.mjs",
   "boundsLocalMeters": {
-   "minX": -14,
+   "minX": -30.41,
    "minY": -6,
-   "maxX": 14,
+   "maxX": 30.41,
    "maxY": 366
   },
   "attribution": {
@@ -28,7 +28,7 @@
    "edges": 2,
    "intersections": 0,
    "crossings": 0,
-   "buildings": 1,
+   "buildings": 2,
    "spawnPoints": 2
   },
   "scenario": {
@@ -43,7 +43,7 @@
    "laneGantry": {
     "y": 48,
     "x": 0,
-    "halfSpanM": 9,
+    "halfSpanM": 11.8,
     "heightM": 5.6,
     "openLaneX": 6,
     "closedLaneX": -6
@@ -78,7 +78,7 @@
     "id": "lcg-e-open",
     "from": "lcg-n-open-s",
     "to": "lcg-n-open-n",
-    "class": "secondary",
+    "class": "secondary_link",
     "name": "Булевард — отворено платно (север)",
     "oneway": true,
     "roundabout": false,
@@ -86,6 +86,7 @@
     "lanesSource": "tag",
     "maxspeed": 50,
     "maxspeedSource": "tag",
+    "bareVerge": "left",
     "length": 360,
     "geometry": [
      [
@@ -102,7 +103,7 @@
     "id": "lcg-e-closed",
     "from": "lcg-n-closed-n",
     "to": "lcg-n-closed-s",
-    "class": "secondary",
+    "class": "secondary_link",
     "name": "Булевард — затворено платно (юг, насрещно)",
     "oneway": true,
     "roundabout": false,
@@ -110,6 +111,7 @@
     "lanesSource": "tag",
     "maxspeed": 50,
     "maxspeedSource": "tag",
+    "bareVerge": "left",
     "length": 360,
     "geometry": [
      [
@@ -134,20 +136,43 @@
    "heightSource": "default",
    "footprint": [
     [
-     -13.5,
+     -24.41,
      120
     ],
     [
-     -9.5,
+     -16.41,
      120
     ],
     [
-     -9.5,
+     -16.41,
      150
     ],
     [
-     -13.5,
+     -24.41,
      150
+    ]
+   ]
+  },
+  {
+   "id": "lcg-b-block",
+   "height": 12,
+   "heightSource": "default",
+   "footprint": [
+    [
+     16.41,
+     210
+    ],
+    [
+     24.41,
+     210
+    ],
+    [
+     24.41,
+     248
+    ],
+    [
+     16.41,
+     248
     ]
    ]
   }

@@ -865,12 +865,27 @@ const MFP_STREAM: OncomingStreamSpec = {
   kind: "oncomingStream",
   actor: {
     pathNodes: ["mgp-n-s", "mgp-n-c", "mgp-n-n"],
-    hold: { nodeIndex: 0, offsetM: 0 }, // dormant at the south end — 260 m of run-up
+    // Dormant at the south end with 52 m of arc BEHIND the head, so the two
+    // followers have somewhere to sit. Authored at exactly gapsM[0] + gapsM[1]
+    // (founder review 2026-07-27, „the other cars waiting … get in the lane
+    // infront"): at offsetM 0 the runner clamps every follower's negative arc to
+    // the path start, so all three bodies were staged in the SAME metre —
+    // „три коли минаха" rendered as one car, and the drill's whole premise (a
+    // COLUMN with no gap in it) was invisible. The 52 m puts the HEAD 3.7 s
+    // earlier; the TAIL keeps its original arc (0) and therefore its original
+    // clock, which is the number both the shadow's 9 s wait and the mistake's
+    // conviction hang on — see traces/scMergeFromProperty.ts.
+    hold: { nodeIndex: 0, offsetM: 52 },
     cruiseSpeedMps: 14, // 50 km/h — the posted limit, driven at the posted limit
     colorIndex: 2,
   },
   count: 3,
-  gapsM: [26, 26], // ~1.9 s headway at 50 — a real Sofia boulevard column
+  // CUMULATIVE arcs behind the head (the runner reads gapsM[i-1] as car i's own
+  // offset from car 0, not as a per-pair headway): 26 and 52 ⇒ a 26 m headway,
+  // ~1.9 s at 50 — a real Sofia boulevard column. The shipped [26, 26] put cars
+  // 1 and 2 on the same arc, which is why spacing the head alone still rendered
+  // a two-car pile.
+  gapsM: [26, 52],
   releaseKmh: 15, // the player's own roll-off starts the clock
 };
 

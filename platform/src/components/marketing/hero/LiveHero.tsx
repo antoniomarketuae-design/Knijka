@@ -14,11 +14,17 @@
  * room to spare. That headroom is the reason the copy column belongs on the
  * left; a caller who moves it right must re-check, because the sun band and
  * the tail lamps live over there.
+ *
+ * ...and that whole paragraph is a DESKTOP statement. Below `lg` the shot is
+ * not a left-copy/right-car composition at all — both visual layers crop to
+ * their right edge and go full-bleed under copy that spans the screen — so
+ * the scrim needed a second shape. See SCRIM_WIDE / SCRIM_NARROW.
  */
 
 import type { CSSProperties, ReactNode } from "react";
 import { HeroPlate } from "./HeroPlate";
 import { HeroStage } from "./HeroStage";
+import { HERO_SCRIM_NARROW, HERO_SCRIM_WIDE } from "./heroContrast";
 
 /**
  * The dark marketing scope.
@@ -43,6 +49,63 @@ import { HeroStage } from "./HeroStage";
  * inherited colour does not re-resolve.
  */
 const SCOPE_TEXT = { color: "var(--foreground)" } as CSSProperties;
+
+/**
+ * THE READING SCRIM COMES IN TWO SHAPES, BECAUSE THE COMPOSITION DOES.
+ *
+ * The scrim's job is stated below at layer 2 and it is absolute: the copy's
+ * contrast must not depend on which image happens to be underneath. There is
+ * one scrim over the plate, the loop and the live scene, so it can be reasoned
+ * about once.
+ *
+ * It was written weighted HORIZONTALLY, and on a desktop that is exactly
+ * right: the copy column is `max-w-2xl` on the left, the sun band and the tail
+ * lamps are on the right, so darkening left-to-right buys the text its
+ * contrast and costs the picture nothing.
+ *
+ * On a phone that weighting is meaningless. `HERO_BAND_CLASS` and the plate's
+ * `xMaxYMax slice` (and `object-cover object-right-bottom` on the loop) crop
+ * both layers to their right-hand slice and stretch it across the full width,
+ * while the copy also spans the full width — so the horizontal gradient's dark
+ * end lands on the left margin and its transparent end lands on the right half
+ * of every line of body text. Measured on a 390 × 844 capture, the loop's sky
+ * band sits at 0.16 relative luminance behind the subhead, where `--muted`
+ * scores 1.96 : 1. WCAG AA wants 4.5. The still plate scored 5.74 in the same
+ * place and only because the drawing happens to be near-black there — which is
+ * the invariant failing quietly rather than holding.
+ *
+ * So below `lg` the weighting turns VERTICAL, which is where this shot's
+ * luminance actually varies: sky at the top, road at the bottom.
+ *
+ *   0 → 62 %   0.78 flat. The copy block (eyebrow, headline, subhead) lives
+ *              here and so does the entire bright sky band. 0.78 takes the
+ *              sky's 0.32 down to ~0.015 — the plate's own level, so the
+ *              crossfade from plate to loop stops being a cut — and leaves
+ *              `--muted` at 6.9 : 1.
+ *   62 → 84 %  released to 0.16. This is the ROAD, and releasing it is not a
+ *              concession to the picture, it is the point: the streaming lane
+ *              dashes are the only thing in the mobile crop with real local
+ *              contrast, i.e. the only thing a phone can actually see MOVING.
+ *              The old bottom-up 0.75 band crushed them to black, which is how
+ *              a moving hero still managed to read as a photograph. Nothing
+ *              needs the scrim down here — the CTAs at this height carry their
+ *              own opaque fills.
+ *   84 → 100 % back up to 0.5, so the section still resolves into the page.
+ *
+ * `lg` (1024 px) is the switch because it is already the line this product
+ * draws between the two compositions: `HERO_MIN_VIEWPORT_PX` is 1024, so above
+ * it a visitor may get the live scene and the desktop framing, and below it
+ * everyone gets the cropped one.
+ *
+ * BOTH GRADIENTS ARE BUILT IN heroContrast.ts, not here, and that is the part
+ * worth keeping. The old scrim was a template literal in this file and its
+ * WCAG claim was a sentence in the docblock above it — which is precisely why
+ * a second visual layer could break the claim without breaking anything a
+ * reviewer or a test could see. Over there the stop tables are data, the
+ * compositing is arithmetic, and heroContrast.test.ts checks the ratios that
+ * this comment asserts. The wide table is byte-for-byte the gradient that
+ * shipped; only the phone's is new.
+ */
 
 export interface LiveHeroProps {
   /** The headline, subhead and CTAs. Rendered above both visual layers. */
@@ -73,19 +136,22 @@ export function LiveHero({ children, className = "" }: LiveHeroProps) {
           contrast must not depend on which image happens to be underneath.
           The live scene renders a golden dusk sky whose luminance the plate
           cannot predict, so one scrim over both is the only version of this
-          that can be reasoned about. Left-weighted because the headline
-          column is on the left; the top band exists because the sky is the
-          brightest thing in either layer. */}
+          that can be reasoned about.
+
+          Two elements rather than one CSS variable swap: a `background` set
+          from a media query needs either a stylesheet or a duplicated custom
+          property, and a pair of siblings that each own one composition is the
+          version a reader can check against the numbers in SCRIM_NARROW. Only
+          one is ever painted. */}
       <div
         aria-hidden
-        className="pointer-events-none absolute inset-0 z-10"
-        style={{
-          background: [
-            "linear-gradient(90deg, rgba(4,6,11,0.9) 0%, rgba(4,6,11,0.62) 34%, rgba(4,6,11,0.12) 64%, rgba(4,6,11,0) 82%)",
-            "linear-gradient(0deg, rgba(4,6,11,0.75) 0%, rgba(4,6,11,0) 38%)",
-            "linear-gradient(180deg, rgba(4,6,11,0.62) 0%, rgba(4,6,11,0) 26%)",
-          ].join(", "),
-        }}
+        className="pointer-events-none absolute inset-0 z-10 lg:hidden"
+        style={{ background: HERO_SCRIM_NARROW }}
+      />
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-0 z-10 hidden lg:block"
+        style={{ background: HERO_SCRIM_WIDE }}
       />
 
       {/* Layer 2b — the joins. The hero has to end INTO the page rather than at

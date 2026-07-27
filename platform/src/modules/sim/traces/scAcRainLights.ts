@@ -21,7 +21,7 @@
  * the headlight channel is gradable.
  */
 
-import type { StagedEventSpec } from "../contracts";
+import type { OncomingStreamSpec, StagedEventSpec } from "../contracts";
 import { SC_AC_RAIN_LIGHTS } from "../lessons/scenario/templates-conditions";
 import {
   recordScriptedDrive,
@@ -118,6 +118,68 @@ const SCRIPTS: Record<
   "mistake-never-on": { kind: "mistake", script: scAcRainLightsMistakeNeverOnScript },
   "mistake-wipers-only": { kind: "mistake", script: scAcRainLightsMistakeWipersOnlyScript },
 };
+
+// ---------------------------------------------------------------------------
+// CLIP-only staging: somebody who has to SEE the unlit car
+// ---------------------------------------------------------------------------
+
+/**
+ * FOUNDER R0 on the produced clip („…the road is completely and finely visible
+ * and this contradicts the question itself"). He is reading the frame exactly
+ * right, and the frame was wrong twice over:
+ *
+ *  1. This lesson's own teach copy says the lights in rain „не са за да виждаш,
+ *     а за да те виждат другите" — and the recorded demo drives an EMPTY road.
+ *     There was nobody in the picture for whom the unlit car was invisible, so
+ *     the only claim the clip could make was the one the founder rejected:
+ *     „the road is perfectly visible". The lesson is about being SEEN, so the
+ *     frame must contain someone doing the seeing.
+ *  2. The weather itself: day rain is a RENDER concern (sky/exposure), reported
+ *     separately — staging cannot make a bright sky grey.
+ *
+ * So the CLIP — and only the clip — gets a stream of oncoming cars on the far
+ * bank, closing on the ghost through the whole [0, 10 s] window. `oncomingStream`
+ * is the learn-only carrier: its runner emits ZERO SimTick events except a
+ * contact check, and the stream rides the OTHER carriageway (southbound path
+ * order) which the centred ghost never enters — so nothing it can touch, and
+ * nothing it can grade.
+ *
+ * Arc arithmetic (release is keyed to the ghost's own move-off, ~0.8 s at
+ * releaseKmh 6; positions are a pure function of time from there): car 0 holds
+ * 270 m along the southbound path = district y ≈ 90, the next two 30 m further
+ * back up the path (y ≈ 120 / 150). At the ENGINE fault (t = 3.63 s, ghost at
+ * y ≈ 30) car 0 is ~30 m ahead and closing at ~21 m/s; the three pass the ghost
+ * across the rest of the window.
+ *
+ * THIS CHANGES NO GRADING — clip-scoped exactly like scSpeedRainClipStaged and
+ * reelClipStaged: the recorder still runs SC_AC_RAIN_LIGHTS.staged, the
+ * committed trace bytes are untouched, and the live drill compiles its lesson
+ * independently. Promoting the stream into the DRILL is a separate change (an
+ * oncoming bank on a rain street feeds the overtake-corridor tracker and would
+ * need a re-record plus a fresh exact-code gate).
+ */
+const RAIN_LIGHTS_CLIP_ONCOMING: OncomingStreamSpec = {
+  id: "sc-acr-clip-oncoming",
+  kind: "oncomingStream",
+  libraryEventId: "ev-adverse-weather",
+  actor: {
+    pathNodes: ["ac-rain-n-end", "ac-rain-n-start"], // SOUTHBOUND — the far bank
+    hold: { nodeIndex: 0, offsetM: 270 }, // district y ≈ 90
+    cruiseSpeedMps: 10.6, // ~38 km/h — the same rain-adapted pace the shadow holds
+    colorIndex: 4,
+  },
+  count: 3,
+  gapsM: [30, 60],
+  releaseKmh: 6,
+};
+
+/** CLIP staged override for sc-ac-rain-lights (both mistakes share the stream —
+ *  both are „driving unlit in rain", and both need someone to be unseen BY).
+ *  Registered in clipReplay's CLIP_STAGED_OVERRIDES; null anywhere else. */
+export function scAcRainLightsClipStaged(mistakeIndex: number): StagedEventSpec[] | null {
+  if (mistakeIndex !== 0 && mistakeIndex !== 1) return null;
+  return [...(SC_AC_RAIN_LIGHTS.staged ?? []), RAIN_LIGHTS_CLIP_ONCOMING] as StagedEventSpec[];
+}
 
 /**
  * Record one of the three drives against a loaded ac-rain-v1 document — in DAY

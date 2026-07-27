@@ -38,10 +38,38 @@ Resolve by checking Приложение № 1/№ 3 of the ordinance PDF (sars.
 - **Д**: Д1–Д3, Д7/Д7а/Д8/Д8а (автомобилен/скоростен път), Д10, Д13, Д14, Д18, Д20–Д23, Д25/Д25.1/Д25.2 (винетка/ТОЛ), Д26–Д28
 - **Е**: Е2–Е6, Е8–Е20, Е23
 - **Entire groups**: Ж (направления/указателни табели), Т (допълнителни табели — needed soon: Т1/Т2 distance/length modify А- and В-signs in exam questions), road markings (маркировка), variable-message signs (ПЗПС)
-- SVG polish pass: review Б5/Б6 arrow layout and Е22 board against official annex drawings before "approved"
+- SVG polish pass: review Б5/Б6 arrow layout against official annex drawings before "approved"
+
+## The geometry gate — read this before editing any face
+
+`platform/src/lib/content/signFaces.test.ts` renders every catalogue entry and
+fails the build if any glyph ink lands within 4 viewBox units of the plate
+border. It exists because hand-authored vector art has exactly one failure mode
+that human review keeps missing, and the founder caught it off the verdict board
+twice: the symbol spilling over the edge (а triangle's black figure poking
+through the red border, a roundabout ring overrunning the apex, a pedestrian
+whose legs hang below the base, a board whose rows run off the bottom).
+
+Two things the gate needs from the artwork, so state them in the file:
+
+- **`data-plate="true"` on every plate primitive** (the coloured disc / triangle
+  / board, and any inner ring drawn as part of it). The gate derives the safe
+  area from these — a face without one is reported as an unguarded hole, not a
+  pass. It is declared rather than inferred because inference mistook Г19's
+  chain circle and Б4's yellow inner diamond for plate layers.
+- **`data-span="face"` on the cancellation / prohibition bar** of Б4, В21–В23,
+  В27, В28, В31, В33, В34, Г18, Д6, Д12, Д16 — the one element whose official
+  design crosses the whole face. Those are measured against the plate silhouette
+  instead: the bar may touch the border (it must) but may never leave it.
+
+`<text>` is bounded ANALYTICALLY against a pessimistic wide-bold-sans envelope,
+not from the raster, because "Arial, Helvetica, sans-serif" resolves to whatever
+the student's device has. A `font-size` that passes here is safe everywhere; one
+that fails is not safe just because it looks fine on this machine.
 
 ## Notes for reviewers
 
 - Artwork is original geometric interpretation in Vienna-Convention style, not traced from the ordinance annexes (copyright posture per docs/education/31, ЗАПСП чл. 4, т. 1).
+- **А5 depicts a DESCENT** (tall side of the black wedge on the left, slope falling to the right). It used to rise to the right, i.e. it drew the ascent sign while q-signs-067 keyed „Стръмен наклон при спускане" against a „Стръмно изкачване напред" distractor — the picture argued for the wrong answer.
 - Д11/Д12 use a placeholder town name („СОФИЯ") — the sign class is what matters for teaching.
 - В26/Г17/Г18/В33 use placeholder values (60/50 km/h); the platform may later parametrize speed-sign values.

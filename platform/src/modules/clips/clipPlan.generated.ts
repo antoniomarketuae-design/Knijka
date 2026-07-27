@@ -76,7 +76,7 @@ export const CLIP_PLAN: readonly ClipPlanEntry[] = [
     "templateId": "sc-ac-crosswind",
     "mistakeIndex": 1,
     "tracePath": "content/traces/sc-ac-crosswind/mistake-overcorrect.trace.json",
-    "faultTimeSec": 21.23,
+    "faultTimeSec": 20.57,
     "requiredActors": [],
     "governingControl": {
       "kind": "none",
@@ -121,7 +121,7 @@ export const CLIP_PLAN: readonly ClipPlanEntry[] = [
     "templateId": "sc-accident-own-conduct",
     "mistakeIndex": 0,
     "tracePath": "content/traces/sc-accident-own-conduct/mistake-hit-and-flee.trace.json",
-    "faultTimeSec": 14.67,
+    "faultTimeSec": 14.75,
     "requiredActors": [],
     "governingControl": {
       "kind": "none",
@@ -160,7 +160,7 @@ export const CLIP_PLAN: readonly ClipPlanEntry[] = [
     "templateId": "sc-driver-distraction",
     "mistakeIndex": 0,
     "tracePath": "content/traces/sc-driver-distraction/mistake-late-react.trace.json",
-    "faultTimeSec": 12.17,
+    "faultTimeSec": 12.07,
     "requiredActors": [
       {
         "kind": "pedestrian",
@@ -235,7 +235,7 @@ export const CLIP_PLAN: readonly ClipPlanEntry[] = [
     "templateId": "sc-junction-rhr",
     "mistakeIndex": 1,
     "tracePath": "content/traces/sc-junction-rhr/mistake-no-look.trace.json",
-    "faultTimeSec": 19.93,
+    "faultTimeSec": 20.37,
     "requiredActors": [
       {
         "kind": "vehicle",
@@ -314,7 +314,7 @@ export const CLIP_PLAN: readonly ClipPlanEntry[] = [
     "templateId": "sc-ln-obstacle-meeting",
     "mistakeIndex": 0,
     "tracePath": "content/traces/sc-ln-obstacle-meeting/mistake-pull-out.trace.json",
-    "faultTimeSec": 17.48,
+    "faultTimeSec": 16.43,
     "requiredActors": [
       {
         "kind": "vehicle",
@@ -536,7 +536,7 @@ export const CLIP_PLAN: readonly ClipPlanEntry[] = [
     "templateId": "sc-pk-ban-stop",
     "mistakeIndex": 0,
     "tracePath": "content/traces/sc-pk-ban-stop/mistake-stop-in-zone.trace.json",
-    "faultTimeSec": 21.65,
+    "faultTimeSec": 21.93,
     "requiredActors": [],
     "governingControl": {
       "kind": "sign",
@@ -579,7 +579,7 @@ export const CLIP_PLAN: readonly ClipPlanEntry[] = [
     "templateId": "sc-rx-tram-left",
     "mistakeIndex": 0,
     "tracePath": "content/traces/sc-rx-tram-left/mistake-cut-tram.trace.json",
-    "faultTimeSec": 17.5,
+    "faultTimeSec": 16.55,
     "requiredActors": [
       {
         "kind": "tram",
@@ -618,7 +618,7 @@ export const CLIP_PLAN: readonly ClipPlanEntry[] = [
     "templateId": "sc-sign-warning",
     "mistakeIndex": 0,
     "tracePath": "content/traces/sc-sign-warning/mistake-hold-speed.trace.json",
-    "faultTimeSec": 22.15,
+    "faultTimeSec": 18.88,
     "requiredActors": [],
     "governingControl": {
       "kind": "none",
@@ -656,20 +656,20 @@ export const CLIP_PLAN: readonly ClipPlanEntry[] = [
     "id": "sc-speed-creep__m0",
     "templateId": "sc-speed-creep",
     "mistakeIndex": 0,
-    "tracePath": "content/traces/sc-speed-creep/mistake-flow-along.trace.json",
-    "faultTimeSec": 8.93,
+    "tracePath": "content/traces/sc-speed-creep/mistake-zone-creep.trace.json",
+    "faultTimeSec": 26.67,
     "requiredActors": [],
     "governingControl": {
       "kind": "sign",
-      "label": "Знак В26 (50 км/ч)",
+      "label": "Знак В26 (30 км/ч)",
       "approxPos": {
-        "x": 8.93,
-        "y": 14
+        "x": 4.06,
+        "y": 400
       }
     },
     "view": "exterior+dashboard",
     "camera": "chase",
-    "notes": "Грешката е ПРЕДИ прехода на ограничението (y≈99 < 400) — важи В26 (50) от входа на отсечката; Скоростна грешка (R4/5) — километражът на лентата на таблото я показва"
+    "notes": "СЪДЪРЖАНИЕ: „Знак В26 (30 км/ч)“ няма рендиран стълб (limit30) до очакваната позиция — камерата няма какво да покаже; Скоростна грешка (R4/5) — километражът на лентата на таблото я показва"
   },
   {
     "id": "sc-speed-rain__m0",
@@ -719,7 +719,7 @@ export const CLIP_PLAN: readonly ClipPlanEntry[] = [
     "templateId": "sc-vp-police-stop",
     "mistakeIndex": 1,
     "tracePath": "content/traces/sc-vp-police-stop/mistake-panic-stop.trace.json",
-    "faultTimeSec": 15.75,
+    "faultTimeSec": 16.78,
     "requiredActors": [
       {
         "kind": "police",

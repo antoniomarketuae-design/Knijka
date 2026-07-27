@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" role="img" aria-labelledby="t">
 <title id="t">В23 — Забранено е завиването в обратна посока</title>
-<circle cx="100" cy="100" r="88" fill="#fff" stroke="#c1121f" stroke-width="20"/>
+<circle cx="100" cy="100" r="88" fill="#fff" stroke="#c1121f" stroke-width="20" data-plate="true"/>
 <path d="M 72,152 V 100 A 28,28 0 0 1 128,100 V 116" fill="none" stroke="#1d1d1b" stroke-width="14"/>
-<polygon points="114,114 128,144 142,114" fill="#1d1d1b"/><line x1="46" y1="46" x2="154" y2="154" stroke="#c1121f" stroke-width="14"/>
+<polygon points="114,114 128,144 142,114" fill="#1d1d1b"/><line x1="46" y1="46" x2="154" y2="154" stroke="#c1121f" stroke-width="14" data-span="face"/>
 </svg>

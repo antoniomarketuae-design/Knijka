@@ -3,9 +3,21 @@
  * TWO mistake demos for „Неохраняем жп прелез" (RX-02, ADR-006 stage 3a) on
  * the committed rx-unguarded-v1 district (the first map carrying a
  * `railCrossing` zone span: track band @ y ∈ [150, 156], unguarded — А35 +
- * СТОП cross, stop line y = 145). No staged actor: the trap is the CROSSING
- * itself — ambient zero, so the only gradable act is the driver's own
- * crossing discipline.
+ * СТОП cross, stop line y = 145). No staged actor IN THE RECORDER: the trap is
+ * the CROSSING itself — ambient zero, so the only gradable act is the driver's
+ * own crossing discipline.
+ *
+ * THE TRAIN IS CHOREOGRAPHY, NOT GRADING. The TEMPLATE stages one
+ * (templates-rail railTrainPassEvent, released 55 m out) and the clip rig
+ * re-enacts it over these committed traces, so the pacing below is authored
+ * against the consist even though the recorder never sees it: 34.4 m of train
+ * at 43 km/h sweeps the carriageway t ≈ 20.5–23.8 s on every one of the three
+ * drives (the release is keyed to the player's own approach, which is identical
+ * up to the СТОП line in all three). The two WAITING drives hold at the line
+ * until it has gone; the roll-through crosses in FRONT of it with ~1.4 s to
+ * spare — founder review 2026-07-27: „the car must … see in distance that the
+ * train is coming but deciding not to stop and going infront of the train and
+ * passing normaly, without collision".
  *
  * The trace gate replays exactly these through the production stack:
  *   - shadow: full stop at the СТОП-cross line, scans BOTH ways (glances),
@@ -45,12 +57,18 @@ export function scRxUnguardedShadowScript(): DriveScript {
       { kind: "annotation", textBg: "Напред е неохраняем жп прелез (А35): без бариери, без светлини — ти си бариерата." },
       { kind: "glance", mirror: "rear" },
       { kind: "drive", points: [[X_LANE, 15], [X_LANE, 100], [X_LANE, 146]], targetKmh: 30 },
-      // The mandatory FULL STOP at the СТОП-cross line (y = 145 ± the nose).
-      { kind: "pause", sec: 2.5, brake: true },
+      // The mandatory FULL STOP at the СТОП-cross line (y = 145 ± the nose) —
+      // and it lasts as long as the TRAIN needs. The staged consist (34.4 m,
+      // 43 km/h) sweeps the carriageway t ≈ 20.5–23.8 s; this pause puts the
+      // move-off at t ≈ 24 and the band entry at t ≈ 25.3, so the ritual is
+      // performed AGAINST a train instead of against empty rails. Trim it and
+      // the shadow drives into the consist's tail (templates-rail
+      // RXU_TRAIN_HOLD_M carries the other half of this number).
+      { kind: "pause", sec: 5.0, brake: true },
       { kind: "annotation", textBg: "Пълно спиране на линията. Сега огледай ДВЕТЕ посоки по релсите — докъдето стига погледът." },
       { kind: "glance", mirror: "left" },
       { kind: "glance", mirror: "right" },
-      { kind: "annotation", textBg: "Чисто и в двете посоки — премини решително, без спиране върху коловоза." },
+      { kind: "annotation", textBg: "Влакът мина изцяло — чак сега премини решително, без спиране върху коловоза." },
       { kind: "drive", points: [[X_LANE, 146], [X_LANE, 190]], targetKmh: 25, stopAtEnd: false },
       { kind: "drive", points: [[X_LANE, 190], [X_LANE, 283]], targetKmh: 35 },
       { kind: "pause", sec: 1.5, brake: true },
@@ -89,8 +107,12 @@ export function scRxUnguardedMistakeStopOnTrackScript(): DriveScript {
       { kind: "annotation", textBg: "Грешка: спира правилно на линията… но след потеглянето се поколебава по средата на коловоза." },
       { kind: "glance", mirror: "rear" },
       { kind: "drive", points: [[X_LANE, 15], [X_LANE, 100], [X_LANE, 146]], targetKmh: 30 },
-      // The stop itself is CORRECT (innocent band entry — the ledger holds)…
-      { kind: "pause", sec: 2, brake: true },
+      // The stop itself is CORRECT (innocent band entry — the ledger holds;
+      // lastQualifyingStopAt refreshes every frame at rest, so a LONGER wait
+      // never spends the 6 s stopRecency window) and it outlasts the staged
+      // train exactly like the shadow's — the hesitation this demo grades must
+      // happen on rails the consist has already left, not through its flank.
+      { kind: "pause", sec: 5.0, brake: true },
       { kind: "glance", mirror: "left" },
       { kind: "glance", mirror: "right" },
       // …but the crossing stalls MID-BAND (y = 153 ∈ [150, 156]): a 3 s

@@ -27,6 +27,7 @@
 import { useActionState, useState } from "react";
 import Link from "next/link";
 import { EmbeddedCheckoutForm } from "@/components/payments/EmbeddedCheckoutForm";
+import { CheckControl } from "@/components/ui/CheckControl";
 import {
   CHECKOUT_CONSENT_TEXTS_BG,
   type CheckoutConsentKind,
@@ -82,14 +83,21 @@ export function CheckoutConsentGate({
         {required.map((kind) => (
           <li key={kind}>
             <label className="flex cursor-pointer gap-3 rounded-xl border border-border bg-surface-2/40 p-4 transition hover:border-accent/60 motion-reduce:transition-none">
-              <input
+              {/* Appearance only. The name, the checked state and the default
+                  (unticked — a pre-ticked consent is not consent) are exactly
+                  what they were; only the box the student looks at changed,
+                  from one the browser drew at 1.66 : 1 to one we draw. Kept at
+                  20px rather than the 16px default because this is the legal
+                  gate, not an option in a list. */}
+              <CheckControl
                 type="checkbox"
                 name={consentFieldName(kind)}
                 checked={ticked[kind] ?? false}
                 onChange={(e) =>
                   setTicked((prev) => ({ ...prev, [kind]: e.target.checked }))
                 }
-                className="mt-0.5 size-5 shrink-0 accent-[var(--accent)]"
+                size="size-5"
+                className="mt-0.5"
               />
               <span className="text-sm">
                 <span className="block font-bold">{CONSENT_TITLES_BG[kind]}</span>

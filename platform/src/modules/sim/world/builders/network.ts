@@ -63,6 +63,8 @@ export interface EdgeBuild {
   halfWidth: number;
   /** Parking band width inside halfWidth on each side (0 = no band). */
   parkingM: number;
+  /** Sides with no pavement/street furniture (null = the full city section). */
+  bareVerge: BareVergeSide | null;
   /** Junction-trimmed centerline (null when the whole edge is junction area). */
   line: Vec2[] | null;
   trimFrom: number;
@@ -89,6 +91,44 @@ export interface JunctionEdgeLike {
   class: string;
   lanes: number;
   roundabout: boolean;
+}
+
+/**
+ * Sides of an edge whose verge is BARE: no pavement, no street furniture
+ * (streetlights, roadside trees, billboards, bus shelters). "left"/"right" are
+ * relative to the edge's travel direction (`right` = perpRight of from→to).
+ *
+ * Two real cross-sections need it, and the shipped class sets cannot express
+ * either — they are per-CLASS, and both of these are per-SIDE facts about one
+ * particular carriageway:
+ *   - a DIVIDED street's median kerb (lc-gantry-v1's two one-way carriageways
+ *     are the two halves of ONE boulevard): the median carries lamp columns
+ *     for BOTH halves, not a pavement for each — and at any realistic
+ *     carriageway pitch, per-edge sidewalks both sides put the pavement of one
+ *     carriageway on the asphalt of the other, and its lamp columns in the
+ *     other's travel lane;
+ *   - a motorway връзка's grass verge (mw-entry-v1's on-ramp): a `_link` road
+ *     is arterial-classed, so it grew a city pavement and lamp arm that swept
+ *     across the carriageway it merges into.
+ *
+ * The curbside PARKING band is deliberately NOT touched: it is symmetric by
+ * construction (`ribbonCrossSection` mirrors it about the centreline), so it
+ * stays a class decision (PARKING_LANE_CLASSES).
+ */
+export type BareVergeSide = "left" | "right" | "both";
+
+/** Read the (optional) bare-verge tag off a district edge. Absent ⇒ the full
+ *  city cross-section, i.e. every existing map builds byte-identically. */
+export function edgeBareVerge(edge: object): BareVergeSide | null {
+  const v = (edge as { bareVerge?: unknown }).bareVerge;
+  return v === "left" || v === "right" || v === "both" ? v : null;
+}
+
+/** True when `side` (+1 right of travel, −1 left) is a bare verge on `edge`. */
+export function isBareVergeSide(bare: BareVergeSide | null, side: 1 | -1): boolean {
+  if (bare === null) return false;
+  if (bare === "both") return true;
+  return bare === (side === 1 ? "right" : "left");
 }
 
 /** Parking band width per side of an edge (0 for non-arterial/roundabout). */
@@ -204,6 +244,53 @@ export function junctionPriorityControls(
   return out;
 }
 
+/**
+ * Structural view of one arm at a node for the В1 rule — the same "feed it
+ * without sharing a type" shape as PriorityApproachLike above.
+ */
+export interface OneWayApproachLike {
+  edgeId: string;
+  /** The arm is tagged one-way. */
+  oneway: boolean;
+  /** The arm is part of a roundabout ring. */
+  roundabout: boolean;
+  /** Traffic can travel TOWARD the node on this arm. */
+  incoming: boolean;
+  /** Traffic can leave the node via this arm. */
+  outgoing: boolean;
+}
+
+/**
+ * В1 „Забранено е влизането" per arm at a node — the SINGLE definition of
+ * which mouths a driver may not enter, keyed by edge id.
+ *
+ * The junctionPriorityControls failure mode (audit C-4) one layer over: the
+ * runtime already grades WRONG_WAY from the edge's `oneway` tag against the
+ * driver's heading, but the world posted NOTHING at the forbidden mouth. On
+ * ov-oneway-v1 that left the one-way street stated by lane arrows on the
+ * approach and by nothing else — the founder's verdict-board note („there is
+ * no signal showing that this is 1 way lane — only road marking; there are
+ * specific signs stating entering forbidden"). Grading a driver against a
+ * control the world never showed him is the same divergence as painting Б1
+ * over a graded Б2 line, so both sides now read this one function.
+ *
+ * The rule: an arm you can only travel TOWARD the node on (incoming, never
+ * outgoing) is a one-way street whose flow points back at you — entering it
+ * from this node is движение в забранена посока, which is exactly what В1
+ * forbids. Roundabout rings are excluded: every ring arm is one-way by
+ * construction and its entries carry Б1 + Д11 (props.ts), never В1. Below
+ * degree 3 there is no entry CHOICE to sign — that is a bend or a joint.
+ */
+export function onewayNoEntryArms(approaches: readonly OneWayApproachLike[]): Set<string> {
+  const out = new Set<string>();
+  if (approaches.length < 3) return out;
+  if (approaches.some((a) => a.roundabout)) return out;
+  for (const a of approaches) {
+    if (a.oneway && a.incoming && !a.outgoing) out.add(a.edgeId);
+  }
+  return out;
+}
+
 /** Direction pointing away from `nodeId` along the edge geometry. */
 function dirAwayFromNode(edge: DistrictEdge, nodeId: string): Vec2 {
   const g = edge.geometry;
@@ -284,6 +371,7 @@ export function analyzeNetwork(
       edge,
       halfWidth: edgeHalfWidth(edge),
       parkingM: edgeParkingWidthM(edge),
+      bareVerge: edgeBareVerge(edge),
       line,
       trimFrom: sFrom,
       trimTo: sTo,

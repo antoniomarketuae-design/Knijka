@@ -16,6 +16,7 @@
 
 import { useEffect, useState, useTransition } from "react";
 import { IconBook, IconCheck, IconX } from "@/components/icons";
+import { CheckControl } from "@/components/ui/CheckControl";
 import type { TriggeredQuiz } from "@/modules/sim/lessons";
 import type { MicroQuizAnswerResult } from "./types";
 
@@ -139,14 +140,18 @@ export function MicroQuizOverlay({
                       result === null ? "cursor-pointer" : "cursor-default"
                     }`}
                   >
-                    <input
+                    {/* Same control as the theory runners — a micro-quiz IS a
+                        theory question, asked mid-drive, and the student who
+                        has ten seconds of paused physics to answer it is the
+                        one who can least afford to hunt for the box. */}
+                    <CheckControl
                       type={quiz.type === "single" ? "radio" : "checkbox"}
                       name={`micro-quiz-${quiz.id}`}
                       value={option.id}
                       checked={isSelected}
                       onChange={() => toggleOption(option.id)}
                       disabled={result !== null}
-                      className="mt-1 h-4 w-4 shrink-0 accent-accent"
+                      className="mt-1"
                     />
                     <span
                       aria-hidden

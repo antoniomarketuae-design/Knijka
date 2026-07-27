@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, type ReactNode } from "react";
+import { CheckControl } from "@/components/ui/CheckControl";
 
 /**
  * Form controls for the (auth) route group — the one place login, register,
@@ -159,7 +160,11 @@ export function CheckboxField({
         htmlFor={id}
         className="flex cursor-pointer items-start gap-2.5 text-xs leading-relaxed text-muted"
       >
-        <input
+        {/* (auth) pins data-surface="cluster" on its own <main>, so this box
+            sits on the same dark palette as the dashboard's and had the same
+            invisible-empty-state problem. Slightly larger than the 16px
+            default: it is the only control on a screen of small print. */}
+        <CheckControl
           id={id}
           name={id}
           type="checkbox"
@@ -167,7 +172,8 @@ export function CheckboxField({
           onChange={(e) => onChange(e.target.checked)}
           aria-invalid={error ? true : undefined}
           aria-describedby={errorId}
-          className="mt-0.5 h-[1.1rem] w-[1.1rem] shrink-0 accent-accent"
+          size="h-[1.1rem] w-[1.1rem]"
+          className="mt-0.5"
         />
         <span>{children}</span>
       </label>

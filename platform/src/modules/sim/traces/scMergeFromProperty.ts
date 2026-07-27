@@ -27,7 +27,19 @@
  *   - „Вливане „с мигача“ пред потока" grades EXACTLY FAILED_TO_YIELD (it does
  *     the walker beat correctly AND makes a real full stop at the Б2 AND
  *     indicates — its only fault is rolling over the line with the поток
- *     inside the runtime's 26 m conflict radius).
+ *     inside the runtime's 26 m conflict radius) — and it then CARRIES THE
+ *     MERGE THROUGH at 28 km/h round the opened-out TURN_ARC, so the clip's
+ *     four post-fault seconds show the car taking the boulevard rather than
+ *     crawling down the exit lane (founder review 2026-07-27).
+ *
+ * THE COLUMN IS NOW A COLUMN. templates-merging MFP_STREAM was staging its
+ * three cars on the SAME path arc (the runner clamps a follower's negative arc
+ * to the path start), so „Три коли минаха" rendered as one car and the drill's
+ * premise — a boulevard with no gap in it — was invisible. Its hold arc and
+ * cumulative gaps now put 26 m between them. The number that carries the
+ * grading is the TAIL's arc (0), which is unchanged: it is the car inside the
+ * 26 m radius when this demo crosses the line at t = 23.48, and the car whose
+ * exit at t ≈ 25.9 the shadow's 9 s wait is measured against.
  *
  * WHY THE TWO CARDS CANNOT BLUR (the tuning, stated so a script edit that
  * breaks it fails loudly rather than silently): the тротоар is 6.3 m OUTSIDE
@@ -61,16 +73,32 @@ const X_WALK_REST = 37.5;
 /** …and where it rests for the поток: nose ON the Б2, never over it. */
 const X_LINE_REST = 29;
 
-/** The right-turn arc off the exit into the northbound lane. Authored as a
- *  polyline (the recorder does not lane-offset): west along y = 4.06, then a
- *  ~9 m corner sweeping 270° → 0°, which is the +90° the TurnDetector's 3 s
- *  window reads as a right turn well inside the 40 m junction radius. */
+/**
+ * The right-turn arc off the exit into the northbound lane. Authored as a
+ * polyline (the recorder does not lane-offset): west along y = 4.06, then a
+ * corner sweeping 270° → 0°, which is the +90° the TurnDetector's 3 s window
+ * reads as a right turn well inside the 40 m junction radius.
+ *
+ * OPENED OUT from the shipped ~9 m corner (founder review 2026-07-27, on the
+ * „Вливане „с мигача“" reel: „this question must be completed because it is
+ * stopping … the shadow car must continue … trying to get in the lane
+ * infront"). The clip window is [fault − 8 s, fault + 4 s] and the fault is the
+ * line crossing itself, so everything the student sees of the MERGE has to
+ * happen in those four seconds. The recorder's curve cap ties speed to radius
+ * (v ≤ √(2.4 r)), so the tight corner pinned the manoeuvre at ~13 km/h and the
+ * clip ended with the car still crawling down the exit lane — the merge it was
+ * being convicted for never appeared. At ~15 m of radius the same 90° is
+ * drivable at ~20 km/h and the car is committed INTO the boulevard, in front of
+ * the column, before the window closes. Geometry only: the graded act is the
+ * line crossing, which happens 12 m earlier and is untouched.
+ */
 const TURN_ARC: ReadonlyArray<readonly [number, number]> = [
-  [10, Y_EXIT],
-  [6.6, 4.7],
-  [4.9, 7.2],
-  [X_LANE, 11],
-  [X_LANE, 20],
+  [16, Y_EXIT],
+  [11.4, 4.7],
+  [7.7, 6.6],
+  [5.3, 9.8],
+  [X_LANE, 14],
+  [X_LANE, 22],
 ];
 
 // ---------------------------------------------------------------------------
@@ -145,7 +173,7 @@ export function scMergeFromPropertyShadowScript(): DriveScript {
       {
         kind: "drive",
         points: [
-          [X_LANE, 20],
+          [X_LANE, 22],
           [X_LANE, 70],
           [X_LANE, Y_FINISH],
         ],
@@ -263,7 +291,15 @@ export function scMergeFromPropertyMistakeSignalAndGoScript(): DriveScript {
       { kind: "glance", mirror: "left" },
       { kind: "indicator", setting: "right" },
       { kind: "annotation", textBg: "Мигачът светва — и колата тръгва в същата секунда. Но потокът е там." },
-      // …and straight over the line into the поток's 26 m conflict radius.
+      // …and straight over the line into the поток's 26 m conflict radius —
+      // and THROUGH, not half-way. 28 km/h is the „вече съм част от движението"
+      // pace this driver believes his indicator bought him; the curve cap holds
+      // the corner itself to ~20 km/h, so the four seconds the clip has after
+      // the fault carry the car off the exit and into the boulevard IN FRONT of
+      // the column (founder review: the manoeuvre has to be completed, not
+      // abandoned mid-exit). Speed changes nothing about the verdict — the
+      // crossing-approach cap is 30 km/h and the give-way adjudication reads the
+      // conflict, not the pace.
       {
         kind: "drive",
         points: [
@@ -271,14 +307,14 @@ export function scMergeFromPropertyMistakeSignalAndGoScript(): DriveScript {
           [X_LINE, Y_EXIT],
           ...TURN_ARC,
         ],
-        targetKmh: 14,
+        targetKmh: 28,
         stopAtEnd: false,
       },
       { kind: "indicator", setting: "off" },
       {
         kind: "drive",
         points: [
-          [X_LANE, 20],
+          [X_LANE, 22],
           [X_LANE, 70],
           [X_LANE, Y_FINISH],
         ],

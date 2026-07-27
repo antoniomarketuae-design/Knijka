@@ -1,7 +1,7 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" role="img" aria-labelledby="t">
 <title id="t">А23 — Участък от пътя в ремонт</title>
-<polygon points="100,22 186,170 14,170" fill="#fff" stroke="#c1121f" stroke-width="16" stroke-linejoin="round"/>
-<g fill="#1d1d1b"><g fill="#1d1d1b">
+<polygon points="100,22 186,170 14,170" fill="#fff" stroke="#c1121f" stroke-width="16" stroke-linejoin="round" data-plate="true"/>
+<g fill="#1d1d1b"><g transform="translate(100,132) scale(0.8) translate(-100,-132)" fill="#1d1d1b">
 <circle cx="88" cy="96" r="9"/>
 <path d="M 82,108 l 16,2 20,22 -6,7 -18,-18 -4,14 -14,26 -10,-4 12,-26 -6,-16 z"/>
 <line x1="120" y1="112" x2="146" y2="152" stroke="#1d1d1b" stroke-width="7"/>

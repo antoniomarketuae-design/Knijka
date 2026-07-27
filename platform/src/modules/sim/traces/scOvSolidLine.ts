@@ -25,6 +25,7 @@
  * the осева (tick.opposingBank — the runtime's committed bank fix).
  */
 
+import type { OncomingStreamSpec, StagedEventSpec } from "../contracts";
 import { SC_OV_SOLID_LINE } from "../lessons/scenario/templates-lanes";
 import {
   recordScriptedDrive,
@@ -121,6 +122,60 @@ const SCRIPTS: Record<
   "mistake-pullout": { kind: "mistake", script: scOvSolidLineMistakePulloutScript },
   "mistake-drift": { kind: "mistake", script: scOvSolidLineMistakeDriftScript },
 };
+
+// ---------------------------------------------------------------------------
+// CLIP-only staging: the SLOW VEHICLE the driver crosses the line to get past
+// ---------------------------------------------------------------------------
+
+/**
+ * Founder R0 on the produced clip: „overall good, the road marking is good, but
+ * there is not car in front of the shadow car which we overtake — just the car
+ * moving left wrongly." The fault this template grades (CROSSED_SOLID_LINE) is
+ * EGO-ONLY, so the recording has never needed another actor — and the clip
+ * therefore showed a car swinging into the oncoming lane for no visible reason.
+ * A mistake nobody can see a MOTIVE for teaches nothing.
+ *
+ * So the clip — and ONLY the clip — gets the vehicle the manoeuvre is aimed at:
+ * a slow truck crawling the own lane at 12 km/h from y ≈ 105, released as soon
+ * as the ghost is rolling. Timing against the committed drives (both mistakes
+ * pull out at y ≈ 120–125 and ride the wrong side to y ≈ 200):
+ *   - „Изпреварващо излизане" (fault 18.3 s): the truck is ~15 m ahead as the
+ *     ghost's centre crosses the М1, the ghost draws level with it at ~21 s out
+ *     in the oncoming lane, and is past it by the window's end — 6.5 m of
+ *     lateral separation the whole way, so the ghost never intersects it.
+ *   - „Отнасяне" (fault 20.0 s): the same truck sits ~10 m ahead at the drift.
+ *
+ * THIS CHANGES NO GRADING. It is clip-scoped exactly like the doc 66 R1
+ * precedents (scFollowDistanceClipStaged, scRoundaboutEntryClipStaged,
+ * reelClipStaged): the recorder still runs SC_OV_SOLID_LINE.staged, the
+ * committed trace bytes are untouched, and the live drill compiles the lesson
+ * independently. The honest follow-up — promoting the truck into the DRILL, so
+ * the student meets the same temptation — is a separate change: it needs a full
+ * re-record plus a fresh exact-code gate (a lead in the lane arms the following
+ * chain), which is precisely what must not be smuggled in behind a visual fix.
+ */
+const OV_SOLID_CLIP_LEAD: OncomingStreamSpec = {
+  id: "sc-ovs-clip-lead",
+  kind: "oncomingStream", // a path-locked column that emits ZERO grading events
+  libraryEventId: "ev-ov-solid-line",
+  actor: {
+    pathNodes: ["ovs-n-start", "ovs-n-end"], // NORTHBOUND — the player's own bank
+    hold: { nodeIndex: 0, offsetM: 105 },
+    cruiseSpeedMps: 3.33, // ~12 km/h — the crawl that tempts the crossing
+    colorIndex: 2,
+    profile: "truck",
+  },
+  count: 1,
+  gapsM: [],
+  releaseKmh: 8,
+};
+
+/** CLIP staged override for sc-ov-solid-line (both mistakes share the truck).
+ *  Registered in clipReplay's CLIP_STAGED_OVERRIDES; null anywhere else. */
+export function scOvSolidLineClipStaged(mistakeIndex: number): StagedEventSpec[] | null {
+  if (mistakeIndex !== 0 && mistakeIndex !== 1) return null;
+  return [...((SC_OV_SOLID_LINE.staged ?? []) as StagedEventSpec[]), OV_SOLID_CLIP_LEAD];
+}
 
 /**
  * Record one of the three drives against a loaded ov-solid-v1 document — no

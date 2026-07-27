@@ -17,6 +17,7 @@ import {
   DASH_WIDTH_M,
   EDGE_LINE_INSET_M,
   EDGE_LINE_WIDTH_M,
+  EMERGENCY_LANE_SEAM_WIDTH_M,
   MARKED_CLASSES,
   MARKING_Y,
   SOLID_CENTER_LINE_WIDTH_M,
@@ -131,9 +132,12 @@ function paintDashedLine(
 // Zone-authored SOLID markings (ADR-006 stage 2b — the world SHOWS what
 // District.zones GRADE). Until this pass markings.ts never read district.zones,
 // so an authored М1 осева was invisible AND, worse, a DASHED "overtaking OK"
-// line was painted over a span the engine grades as CROSSED_SOLID_LINE. Two
-// kinds render here: solidCenterLine (a continuous осева over its span) and
-// busLane/emergencyLane (a solid seam on the laneId-0 curb-lane boundary).
+// line was painted over a span the engine grades as CROSSED_SOLID_LINE. Three
+// kinds render here: solidCenterLine (a continuous осева over its span),
+// noOvertaking (the осева PLUS every same-direction divider — В24 must be
+// unbroken on whichever line the graded overtake crosses) and
+// busLane/emergencyLane (a seam on the laneId-0 curb-lane boundary, plus the
+// outer edge line that makes an emergency lane read as a lane you may not use).
 //
 // Arclength frame: zone fromM/toM are arclength along the FULL edge geometry
 // (the same s-measure the runtime + zoneSigns.ts use). The painted lane lines
@@ -148,7 +152,8 @@ function paintDashedLine(
 interface SolidBoundary {
   /** Dashed-lane-loop boundary index (1..lanes-1) this solid replaces, or -1
    *  when the host paints no dashes there (residential centre line, odd-lane
-   *  centre) — then nothing is suppressed, only the solid is added. */
+   *  centre, the emergency lane's outer carriageway edge) — then nothing is
+   *  suppressed, only the solid is added. */
   k: number;
   /** Lateral offset from the centreline, offsetPolyline convention (+ = right
    *  of geometry-forward). Kept identical to the loop's `-travelHalf + k*W` so
@@ -200,22 +205,65 @@ function authoredSolidBoundaries(
       //
       // noOvertaking (В24) paints the SAME solid М1 over its span (founder R3
       // doc 62 #50): a dashed centre line over the ban span visually PERMITS
-      // exactly what the zone grades as OVERTAKING_IN_BAN_ZONE — В24 on a
-      // two-way road means the centre line is not to be crossed, so the paint
-      // must say so. Same-direction lane dividers (k != centre) keep their
-      // dashes: В24 bans overtaking, not lane discipline paint.
+      // exactly what the zone grades as OVERTAKING_IN_BAN_ZONE.
       addSeg(lanes % 2 === 0 ? lanes / 2 : -1, 0, SOLID_CENTER_LINE_WIDTH_M, z.fromM, z.toM);
+      if (z.kind === "noOvertaking") {
+        // …and on a multi-lane carriageway, EVERY divider inside the span, not
+        // only the осева. The R3 fix stopped at the centre line on the theory
+        // that В24 „bans overtaking, not lane discipline paint" — but the
+        // detector it has to agree with grades a laneId CHANGE (engine.ts
+        // OVERTAKING_IN_BAN_ZONE reads the denoised lane-change signal), and on
+        // ov-ban-v1's 2+2 boulevard that change crosses the SAME-DIRECTION
+        // divider at ±W, which stayed dashed. So the ban was posted on a road
+        // whose paint invited the exact manoeuvre it grades — the founder's
+        // verdict-board note verbatim („it must be unbroken line and currently
+        // is broken line which is allowing overtake"). The line a driver
+        // crosses to изпревари inside a В24 span is М1, whichever line it is;
+        // this is the junctionPriorityControls lesson applied to paint: the
+        // grader and the painter must name the SAME boundary.
+        for (let k = 1; k < lanes; k++) {
+          const off = -travelHalf + k * W;
+          if (Math.abs(off) < 1e-6) continue; // the осева, added above
+          if (Math.abs(off) > travelHalf - 0.4) continue; // the dash loop's own skip
+          addSeg(k, off, SOLID_CENTER_LINE_WIDTH_M, z.fromM, z.toM);
+        }
+      }
     } else if (z.kind === "busLane" || z.kind === "emergencyLane") {
+      const emergency = z.kind === "emergencyLane";
+      // The аварийна лента is bounded by the WIDE continuous line, the bus lane
+      // by the ordinary seam — same boundary, different marking (Наредба № 2).
+      const seamW = emergency ? EMERGENCY_LANE_SEAM_WIDTH_M : BUS_LANE_SEAM_WIDTH_M;
       const lanesPerDir = eb.edge.oneway ? Math.max(1, lanes) : Math.max(1, Math.floor(lanes / 2));
       if (lanesPerDir < 2) continue; // no boundary between laneId 0 and 1 to seam
+      // An emergency lane needs BOTH of its edges painted or it reads as one
+      // more travel lane: the wide inner line AND the carriageway edge line on
+      // its curb side. Only on hosts that paint no edge line of their own —
+      // mw-v1 is `motorway`, deliberately outside ARTERIAL_CLASSES (no street
+      // furniture on a motorway), so it had literally nothing on the outside.
+      // On the `primary` motorway maps (mw-entry/mw-exit) the arterial pass
+      // already draws that line, and a second one would just double it.
+      const outerW = emergency && !ARTERIAL_CLASSES.has(eb.edge.class) ? EDGE_LINE_WIDTH_M : 0;
+      // …and it sits INSET from the carriageway edge, on the arterial pass's own
+      // terms (`travelHalf - EDGE_LINE_INSET_M` below, „so paint never underlaps
+      // it"): a 0.3 m strip centred exactly on travelHalf hangs half its width
+      // off the asphalt ribbon — halfWidth IS travelHalf on a motorway, which
+      // carries no parking band — and reads at cockpit height as paint peeling
+      // into the verge. The lane it bounds is unchanged: the emergency lane
+      // still runs seam → carriageway edge, the line just lies inside it.
+      const outerOff = travelHalf - EDGE_LINE_INSET_M;
       if (eb.edge.oneway) {
         const k = lanesPerDir - 1;
-        addSeg(k, -travelHalf + k * W, BUS_LANE_SEAM_WIDTH_M, z.fromM, z.toM);
+        addSeg(k, -travelHalf + k * W, seamW, z.fromM, z.toM);
+        if (outerW) addSeg(-1, outerOff, outerW, z.fromM, z.toM);
       } else {
         // Right bank (k = lanes-1, off = +(lanesPerDir-1)*W) and left bank
         // (k = 1, off = -(lanesPerDir-1)*W): both curb-lane-0 boundaries.
-        addSeg(lanes - 1, -travelHalf + (lanes - 1) * W, BUS_LANE_SEAM_WIDTH_M, z.fromM, z.toM);
-        addSeg(1, -travelHalf + W, BUS_LANE_SEAM_WIDTH_M, z.fromM, z.toM);
+        addSeg(lanes - 1, -travelHalf + (lanes - 1) * W, seamW, z.fromM, z.toM);
+        addSeg(1, -travelHalf + W, seamW, z.fromM, z.toM);
+        if (outerW) {
+          addSeg(-1, outerOff, outerW, z.fromM, z.toM);
+          addSeg(-1, -outerOff, outerW, z.fromM, z.toM);
+        }
       }
     }
   }

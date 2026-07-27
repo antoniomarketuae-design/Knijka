@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" role="img" aria-labelledby="t">
 <title id="t">А30 — Двупосочно движение</title>
-<polygon points="100,22 186,170 14,170" fill="#fff" stroke="#c1121f" stroke-width="16" stroke-linejoin="round"/>
-<g fill="#1d1d1b"><polygon points="82,86 62,124 74,124 74,158 90,158 90,124 102,124" />
-<polygon points="118,158 138,120 126,120 126,86 110,86 110,120 98,120" /></g>
+<polygon points="100,22 186,170 14,170" fill="#fff" stroke="#c1121f" stroke-width="16" stroke-linejoin="round" data-plate="true"/>
+<g fill="#1d1d1b"><polygon points="84,152 70,124 78,124 78,88 90,88 90,124 98,124"/>
+<polygon points="116,88 130,116 122,116 122,152 110,152 110,116 102,116"/></g>
 </svg>

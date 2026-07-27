@@ -1,5 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" role="img" aria-labelledby="t">
 <title id="t">Г9 — Преминаване отдясно на знака</title>
-<circle cx="100" cy="100" r="90" fill="#0057a8"/><circle cx="100" cy="100" r="84" fill="none" stroke="#fff" stroke-width="5"/>
+<circle cx="100" cy="100" r="90" fill="#0057a8" data-plate="true"/><circle cx="100" cy="100" r="84" fill="none" stroke="#fff" stroke-width="5" data-plate="true"/>
 <polygon points="100,40 74,92 89,92 89,156 111,156 111,92 126,92" fill="#fff" transform="rotate(135,100,100)"/>
 </svg>

@@ -1,10 +1,10 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" role="img" aria-labelledby="t">
 <title id="t">В24 — Забранено е изпреварването на моторни превозни средства</title>
-<circle cx="100" cy="100" r="88" fill="#fff" stroke="#c1121f" stroke-width="20"/>
-<g transform="translate(62,102) scale(0.95)" fill="#c1121f">
+<circle cx="100" cy="100" r="88" fill="#fff" stroke="#c1121f" stroke-width="20" data-plate="true"/>
+<g transform="translate(68,104) scale(0.72)" fill="#c1121f">
 <path d="M -40,8 q0,-8 8,-10 l10,-2 8,-9 q2,-3 7,-3 h16 q5,0 7,3 l8,9 12,3 q6,2 6,9 v6 h-8 a9,9 0 0 0 -18,0 h-30 a9,9 0 0 0 -18,0 h-8 z"/>
 <circle cx="-22" cy="14" r="7"/><circle cx="26" cy="14" r="7"/>
-</g><g transform="translate(138,102) scale(0.95)" fill="#1d1d1b">
+</g><g transform="translate(132,104) scale(0.72)" fill="#1d1d1b">
 <path d="M -40,8 q0,-8 8,-10 l10,-2 8,-9 q2,-3 7,-3 h16 q5,0 7,3 l8,9 12,3 q6,2 6,9 v6 h-8 a9,9 0 0 0 -18,0 h-30 a9,9 0 0 0 -18,0 h-8 z"/>
 <circle cx="-22" cy="14" r="7"/><circle cx="26" cy="14" r="7"/>
 </g>

@@ -71,7 +71,12 @@ describe("POST /api/register", () => {
     expect(users).toHaveLength(0);
   });
 
-  it("409s on a taken e-mail without creating a second account", async () => {
+  // The only case here that registers TWICE, so the only one paying two
+  // cost-12 bcrypt hashes (BCRYPT_ROUNDS in modules/auth/service.ts). Same
+  // contention budget as the auth-service login test for the same reason:
+  // under a full-suite worker wave this overruns vitest's 5 s default on
+  // hashing alone. Nothing about the 409 mapping is relaxed by it.
+  it("409s on a taken e-mail without creating a second account", { timeout: 30_000 }, async () => {
     await post(body());
     const res = await post(body({ name: "Друг" }));
     expect(res.status).toBe(409);

@@ -27,14 +27,22 @@
  * meta.zonesVersion = 1. NO shipped v1 file is regenerated, and the stage-2a
  * instances above regenerate byte-identically (the 2b support is additive).
  *
- * KNOWN VISUAL GAP (honest): the district renderer instances authored GLB
- * sign models keyed by SignKind (stop/giveWay/limit50/roundabout —
- * WorldProps.tsx + platform/public/sim/signs). No В24/В27 sign assets exist
- * yet, so these zones GRADE correctly but render no sign post; the scenario
- * copy carries the sign teaching until a sign-asset drop extends SignKind.
- * Likewise the markings builder does not yet paint a SOLID осева / the BUS
- * inscription along a span — the scenario copy carries that teaching; the
- * grading is exact regardless (authored spans, not paint reads).
+ * WHAT THE WORLD NOW SHOWS (the gap this header used to record is closed):
+ * the SIGN-ASSET drop gave SignKind В24/В27 faces (sign_no_overtaking.glb /
+ * sign_no_stopping.glb) and builders/zoneSigns.ts posts them at the span
+ * start, so a graded ban is a POSTED ban. The markings builder paints the
+ * span too — and, since the founder's verdict-board note on sc-ov-ban-overtake
+ * („it must be unbroken line and currently is broken line which is allowing
+ * overtake"), it paints EVERY lane boundary of a noOvertaking span unbroken,
+ * not just the осева: OVERTAKING_IN_BAN_ZONE grades a laneId CHANGE, and on
+ * ov-ban-v1's 2+2 that change crosses the same-direction divider at ±W, which
+ * used to stay dashed and so invited the very manoeuvre the В24 span fails.
+ * Agreement battery: sim/world/__tests__/sign-marking-agreement.test.ts.
+ *
+ * REMAINING VISUAL GAP (honest): no BUS inscription is painted inside an
+ * ov-bus-v1 бус-лента span — the seam line is there, the word is not. The
+ * scenario copy carries that teaching; the grading is exact regardless
+ * (authored spans, not paint reads).
  *
  * Deterministic: same params → byte-identical JSON. No randomness, no OSM.
  * Run:  node tools/maps/gen_ban_zones.mjs

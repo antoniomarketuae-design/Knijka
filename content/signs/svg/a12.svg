@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" role="img" aria-labelledby="t">
 <title id="t">А12 — Неравности по платното за движение</title>
-<polygon points="100,22 186,170 14,170" fill="#fff" stroke="#c1121f" stroke-width="16" stroke-linejoin="round"/>
+<polygon points="100,22 186,170 14,170" fill="#fff" stroke="#c1121f" stroke-width="16" stroke-linejoin="round" data-plate="true"/>
 <g fill="#1d1d1b"><rect x="46" y="148" width="108" height="9"/>
 <path d="M 62,148 a 15,15 0 0 1 30,0 z"/><path d="M 108,148 a 15,15 0 0 1 30,0 z"/></g>
 </svg>

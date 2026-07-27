@@ -17,6 +17,12 @@ export const ROUTE_STATUS: Record<string, RouteStatus> = {
   // Shipped: lesson ladder + exam mode on the real Студентски град street
   // topology. Flipped from "dev" once the sim left the in-progress phase.
   "/simulator": "live",
+  // Hazard-perception training, the standalone (paid) door. "live" the moment
+  // the route exists, because the page itself is honest about the state behind
+  // it: no item engine wired ⇒ it renders „подготвя се" rather than a broken
+  // run. Marking it "soon" instead would make the nav non-navigating and hide
+  // the entitlement gate — the one thing that must be observable on staging.
+  "/hazard": "live",
   "/tutor": "live",
   // No page yet — must stay non-navigating so nav never 404s.
   "/leaderboard": "soon",

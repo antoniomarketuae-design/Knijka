@@ -6,6 +6,7 @@ import {
   IconBot,
   IconClipboardCheck,
   IconLock,
+  IconShield,
   IconWheel,
 } from "@/components/icons";
 import { isSoon, statusBadge } from "@/lib/routeStatus";
@@ -38,6 +39,13 @@ const MODULES: ModuleCard[] = [
     icon: IconWheel,
   },
   {
+    href: "/hazard",
+    titleBg: "Опасности",
+    descriptionBg:
+      "Реагирай, докато опасността още се задава. Не е на изпита — пази те на пътя.",
+    icon: IconShield,
+  },
+  {
     href: "/tutor",
     titleBg: "AI Учител",
     descriptionBg: "Питай защо — отговаря с цитат от закона, не по памет.",
@@ -45,14 +53,18 @@ const MODULES: ModuleCard[] = [
   },
 ];
 
-/** The four core module cards of the hub. */
+/** The core module cards of the hub. */
 export function ModuleGrid() {
   return (
     <section aria-labelledby="modules-title">
       <h2 id="modules-title" className="visually-hidden">
         Модули
       </h2>
-      <ul className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      {/* Three across rather than four: with „Опасности" added the hub holds
+          five cards, and a 4-wide grid would strand the fifth alone on its own
+          row — which reads as an afterthought, the one thing this card must
+          not look like. 3 + 2 balances. */}
+      <ul className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {MODULES.map(({ href, titleBg, descriptionBg, icon: Icon }) => {
           const soon = isSoon(href);
           const badge = statusBadge(href);

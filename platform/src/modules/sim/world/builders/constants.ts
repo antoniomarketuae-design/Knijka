@@ -213,6 +213,15 @@ export const ZEBRA_LENGTH_M = 6.0; // extent along the road axis
  */
 export const SOLID_CENTER_LINE_WIDTH_M = DASH_WIDTH_M;
 export const BUS_LANE_SEAM_WIDTH_M = EDGE_LINE_WIDTH_M;
+/**
+ * The лента за принудително спиране is bounded by the WIDE continuous line —
+ * gen_motorway.mjs has documented that intent since mw-v1 was authored, and
+ * has equally documented that nothing rendered it, so the shoulder read as a
+ * third travel lane (founder verdict-board note on sc-hz-breakdown-pulloff:
+ * „the marking on the road is not showing it either"). Wide enough to be
+ * unmistakably not a lane divider at cockpit height: 2× the dash stroke.
+ */
+export const EMERGENCY_LANE_SEAM_WIDTH_M = 0.5;
 
 /**
  * Lesson-critical sign prominence (founder review R3 doc 62 S4/#6: „those

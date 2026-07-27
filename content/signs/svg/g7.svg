@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" role="img" aria-labelledby="t">
 <title id="t">Г7 — Движение само надясно пред знака</title>
-<circle cx="100" cy="100" r="90" fill="#0057a8"/><circle cx="100" cy="100" r="84" fill="none" stroke="#fff" stroke-width="5"/>
+<circle cx="100" cy="100" r="90" fill="#0057a8" data-plate="true"/><circle cx="100" cy="100" r="84" fill="none" stroke="#fff" stroke-width="5" data-plate="true"/>
 <path d="M 84,156 V 112 Q 84,92 104,92 H 114" fill="none" stroke="#fff" stroke-width="15"/>
 <polygon points="112,77 146,92 112,107" fill="#fff"/>
 </svg>

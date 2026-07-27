@@ -1,21 +1,13 @@
 import Link from "next/link";
 import { IconArrowRight } from "@/components/icons";
+import { masteryBarColor, masteryInkColor } from "@/components/ui/mastery";
 import type { TopicOverview } from "@/modules/learning";
-
-/** Same thresholds as the dashboard's TopicMasteryGrid — keep them in sync.
- *  Started-but-low is neutral accent, not danger-red. */
-function masteryColor(mastery: number): string {
-  if (mastery >= 0.75) return "var(--success)";
-  if (mastery >= 0.45) return "var(--warning)";
-  if (mastery > 0) return "var(--accent)";
-  return "var(--border-strong)";
-}
 
 /** One curriculum topic as a clickable card that starts topic practice. */
 export function TopicCard({ topic }: { topic: TopicOverview }) {
   const pct = Math.round(topic.avgMastery * 100);
   const started = topic.seenConceptCount > 0;
-  const barColor = masteryColor(topic.avgMastery);
+  const barColor = masteryBarColor(topic.avgMastery);
 
   return (
     <Link
@@ -45,7 +37,7 @@ export function TopicCard({ topic }: { topic: TopicOverview }) {
           <span className="hud-label">Усвояване</span>
           <span
             className="font-mono text-xs font-bold tabular-nums"
-            style={{ color: started ? barColor : "var(--muted)" }}
+            style={{ color: masteryInkColor(topic.avgMastery, started) }}
           >
             {started ? `${pct}%` : "—"}
           </span>

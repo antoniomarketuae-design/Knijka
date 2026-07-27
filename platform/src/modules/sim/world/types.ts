@@ -255,7 +255,11 @@ export type SignKind =
   | "railGuarded" // А32-style guarded rail warning (railCrossing + guarded)
   | "railUnguarded" // А33-style unguarded rail warning (railCrossing)
   | "railCross" // Андреевски кръст crossbuck at the line
-  | "barrier"; // striped barrier arm, static down (railCrossing + guarded)
+  | "barrier" // striped barrier arm, static down (railCrossing + guarded)
+  // -- junction-derived post: the one-way mouth a driver may not enter. NOT
+  //    zone-driven — the rule lives in builders/network.onewayNoEntryArms,
+  //    the same derivation the runtime's wrongWay grading follows.
+  | "noEntry"; // В1 „Забранено е влизането"
 
 export interface SignPlacement extends StaticTransform {
   kind: SignKind;

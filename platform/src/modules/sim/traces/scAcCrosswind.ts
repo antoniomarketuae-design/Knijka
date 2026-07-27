@@ -130,25 +130,60 @@ export function scAcCrosswindMistakeFullSpeedScript(): DriveScript {
 // ---------------------------------------------------------------------------
 
 export function scAcCrosswindMistakeOvercorrectScript(): DriveScript {
+  // FOUNDER R0 („the car moves straight than right close to the side cars than
+  // left center of the lane again"): this is the demo the clip pilot renders,
+  // and his description IS the old polyline — three shapeless bends with no
+  // beat that reads as a mistake. Restaged so the four beats are separated far
+  // enough in TIME to be legible at 25 fps, and so the ❌ lands on the WORST
+  // pose rather than halfway back to the lane:
+  //   1. a long dead-straight, dead-centre cruise (the "normal" the viewer
+  //      needs before anything can look wrong);
+  //   2. ONE push left — held, not swept through, so the viewer sees the car
+  //      SITTING off-centre toward the осева rather than passing through it;
+  //   3. the panic yank right: 6.4 m of lateral in 30 m of road (0.21 m per
+  //      metre travelled, ~1.7× the old rate) — a snap, not a drift;
+  //   4. the wrong pose HELD along the curb side for ~5 s, so the fault frame
+  //      and both keyframe neighbours (fault ± 2 s) show the same wrong thing.
+  // The graded channel is unchanged: offset < −3.25 m (x > 7.3125) sustained
+  // past cfg.laneKeepSustainSec = 3 s → EXACTLY POOR_LANE_KEEPING.
+  //
+  // WHAT THIS STILL CANNOT SHOW is the CAUSE. Wind has no renderer cue on this
+  // map (no bent trees, no blown debris, no slanted rain, no windsock) and
+  // fo-follow-v1 has no exposed span — see the module report; a lateral drift
+  // on a flat street is indistinguishable from bad steering until one of those
+  // lands.
   return {
     steps: [
       { kind: "annotation", textBg: "Грешката: поривът бута наляво — и водачът отговаря с рязко завъртане, вместо с лека корекция." },
       { kind: "glance", mirror: "rear" },
-      { kind: "drive", points: [[LANE_X, 15], [LANE_X, 80], [LANE_X, 150]], targetKmh: 48, stopAtEnd: false },
+      // 1. The straight, centred "normal".
+      { kind: "drive", points: [[LANE_X, 15], [LANE_X, 80], [LANE_X, 135]], targetKmh: 48, stopAtEnd: false },
       { kind: "annotation", textBg: "Поривът мести колата наляво… дотук нищо страшно — лека корекция би стигнала." },
-      // The gust push itself: ~1.5 m left — visible, still safely in-band.
-      { kind: "drive", points: [[LANE_X, 150], [2.6, 180]], targetKmh: 48, stopAtEnd: false },
-      { kind: "annotation", textBg: "Но ръцете дръпват волана РЯЗКО надясно — вторият замах, истинският убиец при вятър." },
-      // The panic yank: overshoots the whole lane to x ≈ 7.7 and wobbles
-      // along the curb side (offset < −3.25 from y ≈ 217 to 280 — ~4.7 s,
-      // past the 3 s POOR_LANE_KEEPING sustain).
+      // 2. The push left, then HELD for ~22 m so it reads as a state, not a
+      //    wobble. x = 1.4 is 2.66 m off centre — the car is visibly being
+      //    carried at the осева, yet still inside the 3.25 m band (edge x =
+      //    0.8125), so CENTER_LINE_TOUCHED cannot leak into this demo's codes.
+      //    The size matters for READABILITY: the founder read the old version
+      //    as „straight, then right, then back" because the leftward beat was
+      //    only 1.5 m and the rightward one 3.7 — the shape has to be
+      //    left-THEN-over-hard-right, or the over-correction is invisible.
       {
         kind: "drive",
-        points: [[2.6, 180], [7.7, 220], [7.7, 280]],
+        points: [[LANE_X, 135], [1.4, 158], [1.4, 180]],
         targetKmh: 48,
         stopAtEnd: false,
       },
-      { kind: "drive", points: [[7.7, 280], [LANE_X, 310], [LANE_X, 345]], targetKmh: 45 },
+      { kind: "annotation", textBg: "Но ръцете дръпват волана РЯЗКО надясно — вторият замах, истинският убиец при вятър." },
+      // 3. The yank: 6.4 m of lateral in 30 m of road (0.21 m per metre — the
+      //    band edge x = 7.3125 is crossed at y ≈ 208).
+      { kind: "drive", points: [[1.4, 180], [7.8, 210]], targetKmh: 48, stopAtEnd: false },
+      // 4. …and HELD out there, wrong, for ~5 s (offset −3.74 m, past the
+      //    3.25 m band) — the fault and its ±2 s keyframes all show the car
+      //    riding the curb side. The whole story sits inside the first 250 m
+      //    of the drive ON PURPOSE: past that the cleanDrivingDistanceM streak
+      //    would hand this MISTAKE demo the shadow's CLEAN_DRIVING.
+      { kind: "drive", points: [[7.8, 210], [7.8, 280]], targetKmh: 48, stopAtEnd: false },
+      { kind: "drive", points: [[7.8, 280], [LANE_X, 308], [LANE_X, 345]], targetKmh: 45 },
       { kind: "pause", sec: 1, brake: true },
       { kind: "annotation", textBg: "Свръхкорекцията изхвърли колата чак до бордюра — срещу порив се стои с меки, постоянни корекции, не с резки движения." },
     ],

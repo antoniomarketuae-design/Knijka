@@ -11,6 +11,11 @@
  *     the scene needs no <Physics> parent),
  *   - the ego car carries a distinct HERO tint (a saturated azure-teal body)
  *     on top of its cyan ground ring, so "your car" reads at a glance,
+ *   - VULNERABLE road users (bike / ped) as small code-mesh figures — the
+ *     instanced fleet has no rig for them and TrafficLayer's articulated
+ *     pedestrians need a live TrafficSystem, which a still has no business
+ *     spinning up. Without these a cyclist question renders an empty road
+ *     (founder review 2026-07-27: the picture must show what the text asks),
  *   - code-mesh attention marks:
  *       target  → a bright GREEN arrow diving from the ego toward the spot,
  *       danger  → a RED ring on the road,
@@ -39,7 +44,7 @@ import {
   stepWeather,
   type QualityLevel,
 } from "@/modules/sim/environment";
-import { assertDistrict, DistrictWorld, type District } from "@/modules/sim/world";
+import { assertDistrict, DistrictWorld, SIDEWALK_TOP_Y, type District } from "@/modules/sim/world";
 import {
   obstacleYawRad,
   ScenarioObstacles,
@@ -51,7 +56,9 @@ import type {
   SceneStillMedia,
   SceneStillPose,
 } from "@/lib/content/types";
+import { roundaboutIslands } from "./roundaboutIsland";
 import { STILL_H, STILL_W } from "./scene-still-client";
+import { isVulnerablePoseKind } from "./stillActors";
 
 /** Render quality — "high" for a crisp still (matches the clip rig's preset). */
 const LEVEL: QualityLevel = "high";
@@ -122,7 +129,8 @@ function StillCamera({ cam }: { cam: StillCam }) {
 // --- Poses → fleet obstacles -------------------------------------------------
 
 /** Map a still pose to a fleet obstacle (visual-only — no collider, no physics).
- *  Non-vehicle poses (ped/bike) return null for the pilot. */
+ *  Vulnerable users (ped/bike) have no fleet rig and are drawn as code meshes
+ *  further down (VulnerableFigure), so they return null here. */
 function poseToObstacle(pose: SceneStillPose, index: number): ScenarioObstacleSpec | null {
   const base = { x: pose.x, y: pose.y, headingDeg: pose.headingDeg };
   switch (pose.kind) {
@@ -141,8 +149,141 @@ function poseToObstacle(pose: SceneStillPose, index: number): ScenarioObstacleSp
     case "tram":
       return { kind: "vehicle", ...base, visual: true, model: "box_truck", seed: index + 2 };
     default:
-      return null; // ped/bike — not needed for the pilot
+      return null; // ped/bike — drawn as code meshes, see VulnerableFigure
   }
+}
+
+// --- Vulnerable road users (code meshes) -------------------------------------
+
+/**
+ * A cyclist or a pedestrian, built from primitives right here.
+ *
+ * The instanced fleet only knows vehicles, and TrafficLayer's articulated
+ * pedestrians are driven by a live TrafficSystem (agent states, gait phase) —
+ * a still has no clock and no system, so borrowing them would mean standing up
+ * the whole traffic runtime to draw one motionless figure. These are therefore
+ * deliberately small, dumb primitives: the still only has to say "there is a
+ * cyclist here, riding that way".
+ *
+ * They read in HI-VIS YELLOW on purpose. Every other colour in the frame is
+ * already spoken for — red = danger/give-way, green = proceed, teal = you —
+ * so a vulnerable user needs a fourth channel, and hi-vis is what the real
+ * ones wear. Nothing here is graded: these meshes exist only in the dev
+ * still route.
+ */
+const VU_HIVIS = "#e8d93a";
+const VU_DARK = "#2b3240"; // trousers / frame / wheels — reads as shadow mass
+const VU_SKIN = "#c98d63";
+
+const BIKE_WHEEL_R = 0.34;
+const BIKE_WHEELBASE = 1.05; // front/rear hub separation, m
+const RIDER_HIP_Y = 0.86;
+const RIDER_HEAD_Y = 1.58;
+
+/** District heading (0 = north, cw) → three.js yaw (the obstacle mapping), so
+ *  local +Z is the figure's forward and local +X its right. */
+function VulnerableFigure({ pose }: { pose: SceneStillPose }) {
+  const yaw = obstacleYawRad(pose.headingDeg);
+  const isBike = pose.kind === "bike";
+  return (
+    <group position={[pose.x, 0, -pose.y]} rotation={[0, yaw, 0]}>
+      {isBike ? (
+        <>
+          {/* Two wheels + a frame bar between them — enough silhouette from
+              46° above to read as a bicycle rather than a bollard. */}
+          {[BIKE_WHEELBASE / 2, -BIKE_WHEELBASE / 2].map((z) => (
+            <mesh
+              key={z}
+              position={[0, BIKE_WHEEL_R, z]}
+              rotation={[0, Math.PI / 2, Math.PI / 2]}
+              castShadow
+            >
+              <torusGeometry args={[BIKE_WHEEL_R, 0.05, 8, 20]} />
+              <meshStandardMaterial color={VU_DARK} roughness={0.6} metalness={0.1} />
+            </mesh>
+          ))}
+          <mesh position={[0, BIKE_WHEEL_R + 0.24, 0]} castShadow>
+            <boxGeometry args={[0.08, 0.08, BIKE_WHEELBASE]} />
+            <meshStandardMaterial color={VU_DARK} roughness={0.6} />
+          </mesh>
+        </>
+      ) : null}
+      {/* Legs — one dark block; a still has no gait to show, so splitting them
+          would only add triangles for nothing at this camera distance. */}
+      <mesh position={[0, isBike ? RIDER_HIP_Y - 0.28 : 0.42, 0]} castShadow>
+        <boxGeometry args={[0.32, isBike ? 0.56 : 0.84, 0.26]} />
+        <meshStandardMaterial color={VU_DARK} roughness={0.85} />
+      </mesh>
+      {/* Torso — the hi-vis mass that actually carries the read. A rider leans
+          forward over the bars, a pedestrian stands upright. */}
+      <mesh
+        position={[0, isBike ? RIDER_HIP_Y + 0.26 : 1.06, isBike ? 0.12 : 0]}
+        rotation={[isBike ? 0.55 : 0, 0, 0]}
+        castShadow
+      >
+        <boxGeometry args={[0.42, 0.66, 0.28]} />
+        <meshStandardMaterial
+          color={VU_HIVIS}
+          emissive={VU_HIVIS}
+          emissiveIntensity={0.18}
+          roughness={0.75}
+        />
+      </mesh>
+      <mesh position={[0, isBike ? RIDER_HEAD_Y - 0.18 : RIDER_HEAD_Y, isBike ? 0.3 : 0]} castShadow>
+        <sphereGeometry args={[0.13, 14, 10]} />
+        <meshStandardMaterial color={VU_SKIN} roughness={0.9} />
+      </mesh>
+    </group>
+  );
+}
+
+// --- Roundabout central island (code mesh) -----------------------------------
+
+/** Concrete rim of the island — matches the sidewalk curb read at this light. */
+const ISLAND_KERB_COLOR = "#c6c4bd";
+/** Planted centre — the district's own grass terrain reads olive at day HDRI. */
+const ISLAND_GRASS_COLOR = "#6e7838";
+/** Width of the concrete rim between the curb face and the planting, m. */
+const ISLAND_KERB_BAND_M = 1.1;
+/**
+ * Island top, m. A hair PROUD of SIDEWALK_TOP_Y so the disc wins the depth test
+ * against the junction corner aprons it covers (they share the curb height, and
+ * a tie z-fights); the 2 cm is invisible from the still's 46° camera.
+ */
+const ISLAND_TOP_Y = SIDEWALK_TOP_Y + 0.02;
+
+/**
+ * The kerbed central island of every roundabout the district registers.
+ *
+ * See roundaboutIsland.ts for WHY the still draws this and the world builder
+ * does not. Geometrically it is the simplest honest thing: a disc standing on
+ * the ground plane, its outer radius equal to the inner edge of the circulatory
+ * carriageway, with the curb-height rim reading as concrete and the inside as
+ * planting. It occupies the middle the junction pads would otherwise leave
+ * bare, which is what turns four pads into one roundabout.
+ */
+function RoundaboutIslands({ district }: { district: District }) {
+  const islands = useMemo(() => roundaboutIslands(district), [district]);
+  return (
+    <>
+      {islands.map((isle) => (
+        <group key={isle.id} position={[isle.x, 0, -isle.y]}>
+          <mesh position={[0, ISLAND_TOP_Y / 2, 0]} receiveShadow castShadow>
+            <cylinderGeometry args={[isle.radiusM, isle.radiusM, ISLAND_TOP_Y, 96]} />
+            <meshStandardMaterial color={ISLAND_KERB_COLOR} roughness={0.95} metalness={0} />
+          </mesh>
+          <mesh
+            position={[0, ISLAND_TOP_Y + 0.005, 0]}
+            rotation={[-Math.PI / 2, 0, 0]}
+            receiveShadow
+          >
+            <circleGeometry args={[Math.max(0.5, isle.radiusM - ISLAND_KERB_BAND_M), 96]} />
+            <meshStandardMaterial color={ISLAND_GRASS_COLOR} roughness={1} metalness={0} />
+          </mesh>
+        </group>
+      ))}
+    </>
+  );
 }
 
 // --- Attention marks (code meshes) ------------------------------------------
@@ -378,6 +519,10 @@ export function SceneStillScene({
     () => spec.poses.find((p) => p.variant === "ego") ?? null,
     [spec.poses],
   );
+  const vulnerable = useMemo(
+    () => spec.poses.filter((p) => isVulnerablePoseKind(p.kind)),
+    [spec.poses],
+  );
   const marks = spec.marks ?? [];
   const cam = useMemo(() => stillCamera(spec.focus), [spec.focus]);
 
@@ -483,9 +628,13 @@ export function SceneStillScene({
             physics={false}
             signSvgBaseUrl={null}
           />
+          <RoundaboutIslands district={district} />
           {obstacles.length > 0 ? (
             <ScenarioObstacles obstacles={obstacles} clearcoat={LEVEL === "high"} />
           ) : null}
+          {vulnerable.map((p, i) => (
+            <VulnerableFigure key={`vu-${i}`} pose={p} />
+          ))}
           {egoPose ? <EgoRing pose={egoPose} /> : null}
           {targetArrows.map((a, i) => (
             <TargetArrow key={`target-${i}`} from={a.from} to={a.to} />

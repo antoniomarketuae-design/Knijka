@@ -1,15 +1,6 @@
+import { masteryBarColor, masteryInkColor } from "@/components/ui/mastery";
 import type { SectionOverview, TopicOverview } from "@/modules/learning";
 import { SectionCard } from "./SectionCard";
-
-/** Same mastery thresholds as TopicCard / the dashboard — keep them in sync.
- *  Started-but-low is neutral accent, not danger-red (a beginner's progress bar
- *  should encourage, not read like an error). */
-function masteryColor(mastery: number): string {
-  if (mastery >= 0.75) return "var(--success)";
-  if (mastery >= 0.45) return "var(--warning)";
-  if (mastery > 0) return "var(--accent)";
-  return "var(--border-strong)";
-}
 
 /**
  * One curriculum topic rendered as a collapsible group of its sections. Native
@@ -26,7 +17,7 @@ export function TopicSectionGroup({
 }) {
   const pct = Math.round(topic.avgMastery * 100);
   const started = topic.seenConceptCount > 0;
-  const barColor = masteryColor(topic.avgMastery);
+  const barColor = masteryBarColor(topic.avgMastery);
 
   return (
     <details
@@ -75,7 +66,7 @@ export function TopicSectionGroup({
               <span aria-hidden> · </span>
               <span
                 className="font-mono font-bold tabular-nums"
-                style={{ color: started ? barColor : "var(--muted)" }}
+                style={{ color: masteryInkColor(topic.avgMastery, started) }}
               >
                 {started ? `${pct}%` : "—"}
               </span>

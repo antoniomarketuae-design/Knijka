@@ -24,11 +24,16 @@
  *    then rounds the parked row at 12 km/h with the left indicator lit and comes
  *    home → ZERO violations + YIELDED_TO_PRIORITY (the narrowMeeting runner's
  *    own reserved vocabulary for the wait);
- *  - „Изнасяне в насрещното пред идваща кола": swings onto the oncoming bank at
- *    16 km/h in front of car #1 and keeps rolling. The staged car's playerGuard
- *    brakes it to a standstill ~6 m short — and the demo drives into it anyway →
- *    EXACTLY COLLISION, through the shipped OncomingStreamRunner contact check.
- *    No scripted collision beat: the contact is physical and geometric;
+ *  - „Изнасяне в насрещното пред идваща кола": holds its OWN lane right up to
+ *    the parked row (y = 114 — the obstacle filling the windscreen IS the
+ *    motive), then swings onto the oncoming bank at 16 km/h in front of car #1
+ *    and keeps rolling. The staged car's playerGuard brakes it to a standstill
+ *    ~6 m short — and the demo drives into it anyway → EXACTLY COLLISION,
+ *    through the shipped OncomingStreamRunner contact check. No scripted
+ *    collision beat: the contact is physical and geometric. The post-impact
+ *    rest is 1.3 s on purpose: a crashed car sits ~2 m off the one it hit, and
+ *    STANDSTILL_GAP_TOO_CLOSE's own sustain is 1.5 s — a longer hold would bill
+ *    the wreck a second, unrelated code;
  *  - „Провиране с настъпване на осевата под насрещен": rides x = 0.4
  *    (laneOffsetM ≈ 3.66 > the 3.25 m laneKeepMaxOffsetM, indicator dark, own
  *    bank) for ~5 s → CENTER_LINE_TOUCHED (3.5 s sustain), then leans out to
@@ -40,10 +45,10 @@
  * WHY NEITHER MISTAKE LEAKS FAILED_TO_YIELD (the OV-14 runner's narrow-passage
  * bill, which sc-ov-narrow's demos exist to grade): the barge condition needs
  * the player INSIDE the section (playerAlong ≥ −2 ⇒ y ≥ 138) for 0.9 s. Both
- * demos are stopped by the crash at y ≈ 126-131, short of it — they never reach
- * the стеснение, because the car with the right of way was already there. The
- * runner's own contact check cannot fire either: its actor (car #2) is still
- * north of y = 160 when both demos end.
+ * demos are stopped by the crash short of it (y ≈ 131 and 137.4) — they never
+ * reach the стеснение, because the car with the right of way was already there.
+ * The runner's own contact check cannot fire either: its actor (car #2) is
+ * still north of y = 170 when both demos end.
  *
  * Geometry pinned to content/world/ov-narrow-v1.json: street on x = 0, player
  * (northbound) lane center x = +4.06, oncoming (southbound) center x = −4.06,
@@ -123,24 +128,38 @@ export function scLnObstacleMeetingShadowScript(): DriveScript {
 export function scLnObstacleMeetingMistakePullOutScript(): DriveScript {
   return {
     steps: [
-      { kind: "annotation", textBg: "Грешка: колата не спира, а се изнася в насрещната лента пред приближаващия автомобил." },
+      { kind: "annotation", textBg: "Грешка: колата не спира пред паркирания ред, а се изнася в насрещната лента пред приближаващия автомобил." },
       { kind: "glance", mirror: "rear" },
-      { kind: "drive", points: [[X_OWN, 15], [X_OWN, 95]], targetKmh: 38, stopAtEnd: false },
-      { kind: "annotation", textBg: "„Ще успея преди него“ — мигач, и направо в чуждата лента." },
+      // Hold the OWN lane all the way up to the parked row. This is the whole
+      // difference from the shipped demo (founder review 2026-07-27: „it cant
+      // be simply … just left signl and going there and stopping" — the old
+      // script peeled out at y = 95, fifty metres short of the obstacle, so the
+      // clip window showed a car swerving into the oncoming lane of an empty
+      // street for no reason a student could see). The заобикаляне now starts
+      // where a заобикаляне starts: with the closed half filling the windscreen.
+      { kind: "drive", points: [[X_OWN, 15], [X_OWN, 114]], targetKmh: 38, stopAtEnd: false },
+      { kind: "annotation", textBg: "Паркираният ред затваря твоята половина, а насрещният вече е до него — „ще успея преди него“." },
       { kind: "indicator", setting: "left" },
-      // Onto the oncoming bank at 16 km/h and straight on: car #1 is inbound,
-      // its playerGuard stops it dead — and this drive keeps going.
+      // Out onto the oncoming bank at 16 km/h to round the row: car #1 is
+      // inbound alongside the parked cars, its playerGuard stops it dead — and
+      // this drive keeps going into it. It runs at a FLAT 16 km/h to the end
+      // (stopAtEnd false — a crash is not a planned stop) and rests at y = 137.4,
+      // still SHORT of the стеснение's own barge window (playerAlong ≥ −2 ⇒
+      // y ≥ 138 held for 0.9 s at > 6 km/h): FAILED_TO_YIELD — sc-ov-narrow's
+      // code for a different act — still cannot leak. The trace gate re-proves
+      // EXACTLY COLLISION.
       {
         kind: "drive",
         points: [
-          [X_OWN, 95],
-          [2, 102],
-          [X_ONC, 112],
-          [X_ONC, 136],
+          [X_OWN, 114],
+          [2, 122],
+          [X_ONC, 130],
+          [X_ONC, 137.4],
         ],
         targetKmh: 16,
+        stopAtEnd: false,
       },
-      { kind: "pause", sec: 2, brake: true },
+      { kind: "pause", sec: 1.3, brake: true },
       {
         kind: "annotation",
         textBg: "Насрещният спря напълно — и пак се удариха. Препятствието е в твоята половина: чака се, не се дели платното.",

@@ -13,8 +13,15 @@
  * The flow direction is world truth, not copy: the approach lane carries
  * painted М10 „right-only" arrows (meta.scenario.laneArrows — the SN-04
  * machinery, markings.ts), so the legal entry is readable from the road
- * itself. (No В2/Д-face ships in the sign kit yet — the honest render is the
- * arrow markings; the sign post joins when the face set grows.)
+ * itself — AND the forbidden mouth is now SIGNED. The founder's verdict-board
+ * note („there is no signal showing that this is 1 way lane — only road
+ * marking; there are specific signs stating entering forbidden") named the
+ * gap this header used to record as unfixable: В1 „Забранено е влизането"
+ * ships in the kit (sign_no_entry.glb) and builders/props.ts posts it at the
+ * west arm, the arm builders/network.onewayNoEntryArms derives from THE SAME
+ * `oneway` tag the runtime grades WRONG_WAY on. Nothing here changed to earn
+ * that post: the map already stated the ban in its edge tags, and the world
+ * builder had simply never shown it.
  *
  * The exact district-v1 shape buildWorldGeometry (world), createWorldRuntime
  * (runtime — oneway edges make tick.oneway=true and the tangent-vs-heading

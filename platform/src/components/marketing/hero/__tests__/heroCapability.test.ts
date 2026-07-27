@@ -12,6 +12,7 @@
 
 import { describe, expect, it } from "vitest";
 import {
+  decideHeroLoop,
   decideHeroStage,
   HERO_MIN_CORES,
   HERO_MIN_DEVICE_MEMORY_GB,
@@ -205,5 +206,105 @@ describe("the contract the stage relies on", () => {
     const once = decideHeroStage(DESKTOP);
     const twice = decideHeroStage({ ...DESKTOP });
     expect(twice).toEqual(once);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// The second door: does the FALLBACK move?
+// ---------------------------------------------------------------------------
+
+/**
+ * `decideHeroLoop` exists because of one founder report — the landing page on
+ * a phone, "the car and the road dont move at all so this dont work" — and it
+ * is the fix for it, so the thing these tests have to pin is the ASYMMETRY:
+ * a device that `decideHeroStage` sends to the plate for a HARDWARE reason
+ * must still be shown moving pixels, and a visitor who asked for less motion
+ * or fewer bytes must still not be.
+ *
+ * Getting that backwards is invisible in review (both doors return a plausible
+ * decision either way) and only shows up as either a dead hero on every phone,
+ * which is the bug we started from, or as an autoplaying video pushed at
+ * someone with reduced motion switched on.
+ */
+describe("the fallback door — decideHeroLoop", () => {
+  it("plays on the phone the stage refuses — the whole reason it exists", () => {
+    // The one case that must never regress: identical signals, opposite answers.
+    expect(decideHeroStage(MID_RANGE_ANDROID).mode).toBe("plate");
+    expect(decideHeroLoop(MID_RANGE_ANDROID)).toEqual({ mode: "loop", reason: null });
+  });
+
+  it("plays on every device the stage rejects for a hardware reason", () => {
+    // A video is fixed-function silicon, not a WebGL runtime. None of these
+    // may veto it, and each is a live rejection reason on the other door.
+    const hardware: Partial<HeroSignals>[] = [
+      { webgl: false },
+      { deviceMemoryGb: HERO_MIN_DEVICE_MEMORY_GB - 1 },
+      { hardwareConcurrency: HERO_MIN_CORES - 1 },
+      { viewportWidthPx: HERO_MIN_VIEWPORT_PX - 1 },
+      { coarsePointer: true, anyFinePointer: false },
+    ];
+    for (const patch of hardware) {
+      const signals = withSignals(patch);
+      expect(decideHeroStage(signals).mode, JSON.stringify(patch)).toBe("plate");
+      expect(decideHeroLoop(signals), JSON.stringify(patch)).toEqual({
+        mode: "loop",
+        reason: null,
+      });
+    }
+  });
+
+  it("refuses when the visitor asked for less motion", () => {
+    expect(decideHeroLoop(withSignals({ reducedMotion: true }))).toEqual({
+      mode: "still",
+      reason: "reduced-motion",
+    });
+  });
+
+  it("refuses when the visitor asked to save data", () => {
+    expect(decideHeroLoop(withSignals({ saveData: false, reducedMotion: false }))).toEqual({
+      mode: "loop",
+      reason: null,
+    });
+    expect(decideHeroLoop(withSignals({ saveData: true }))).toEqual({
+      mode: "still",
+      reason: "save-data",
+    });
+  });
+
+  it("refuses on every connection class the stage calls slow", () => {
+    for (const effectiveConnectionType of HERO_SLOW_CONNECTIONS) {
+      expect(decideHeroLoop(withSignals({ effectiveConnectionType }))).toEqual({
+        mode: "still",
+        reason: "slow-network",
+      });
+    }
+  });
+
+  it("reports the visitor's own choice ahead of anything we inferred", () => {
+    // Reduced motion AND a 2g cell: the reason surfaced on `data-hero-loop-
+    // decline` should be the one they would recognise as theirs.
+    expect(
+      decideHeroLoop(withSignals({ reducedMotion: true, effectiveConnectionType: "2g" })).reason,
+    ).toBe("reduced-motion");
+  });
+
+  it("is still on the server — the plate is the pre-hydration answer", () => {
+    // A <video autoplay preload="auto"> in the server HTML would be fetched by
+    // the preload scanner before a single signal had been read.
+    expect(decideHeroLoop(HERO_UNKNOWN_SIGNALS)).toEqual({ mode: "still", reason: "server" });
+  });
+
+  it("reports a reason exactly when it refuses", () => {
+    const cases: HeroSignals[] = [
+      DESKTOP,
+      MID_RANGE_ANDROID,
+      HERO_UNKNOWN_SIGNALS,
+      withSignals({ saveData: true }),
+      withSignals({ webgl: false }),
+    ];
+    for (const signals of cases) {
+      const decision = decideHeroLoop(signals);
+      expect(decision.reason === null).toBe(decision.mode === "loop");
+    }
   });
 });

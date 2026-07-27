@@ -1,8 +1,11 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" role="img" aria-labelledby="t">
 <title id="t">А29 — Кръстовище с кръгово движение</title>
-<polygon points="100,22 186,170 14,170" fill="#fff" stroke="#c1121f" stroke-width="16" stroke-linejoin="round"/>
-<g fill="#1d1d1b"><g transform="translate(0,14) scale(0.82) translate(22,10)"><g><path d="M 154.2,90.5 A 55,55 0 0 0 81.2,48.3" fill="none" stroke="#1d1d1b" stroke-width="12"/>
-<polygon points="0,-13 20,0 0,13" fill="#1d1d1b" transform="translate(81.2,48.3) rotate(160)"/></g><g transform="rotate(120,100,100)"><path d="M 154.2,90.5 A 55,55 0 0 0 81.2,48.3" fill="none" stroke="#1d1d1b" stroke-width="12"/>
-<polygon points="0,-13 20,0 0,13" fill="#1d1d1b" transform="translate(81.2,48.3) rotate(160)"/></g><g transform="rotate(240,100,100)"><path d="M 154.2,90.5 A 55,55 0 0 0 81.2,48.3" fill="none" stroke="#1d1d1b" stroke-width="12"/>
-<polygon points="0,-13 20,0 0,13" fill="#1d1d1b" transform="translate(81.2,48.3) rotate(160)"/></g></g></g>
+<polygon points="100,22 186,170 14,170" fill="#fff" stroke="#c1121f" stroke-width="16" stroke-linejoin="round" data-plate="true"/>
+<g fill="#1d1d1b" transform="translate(100,120)">
+<g><path d="M 25.75,-3.62 A 26,26 0 0 0 5.41,-25.43" fill="none" stroke="#1d1d1b" stroke-width="9"/>
+<polygon points="0,-9 16,0 0,9" transform="translate(5.41,-25.43) rotate(192)"/></g>
+<g transform="rotate(120)"><path d="M 25.75,-3.62 A 26,26 0 0 0 5.41,-25.43" fill="none" stroke="#1d1d1b" stroke-width="9"/>
+<polygon points="0,-9 16,0 0,9" transform="translate(5.41,-25.43) rotate(192)"/></g>
+<g transform="rotate(240)"><path d="M 25.75,-3.62 A 26,26 0 0 0 5.41,-25.43" fill="none" stroke="#1d1d1b" stroke-width="9"/>
+<polygon points="0,-9 16,0 0,9" transform="translate(5.41,-25.43) rotate(192)"/></g></g>
 </svg>

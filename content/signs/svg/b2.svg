@@ -1,5 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" role="img" aria-labelledby="t">
 <title id="t">Б2 — Спри! Пропусни движещите се по пътя с предимство!</title>
-<polygon points="183,134 134,183 66,183 17,134 17,66 66,17 134,17 183,66" fill="#c1121f" stroke="#fff" stroke-width="7" stroke-linejoin="round"/>
-<text x="100" y="118" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-weight="bold" font-size="52" letter-spacing="2" fill="#fff">STOP</text>
+<polygon points="183,134 134,183 66,183 17,134 17,66 66,17 134,17 183,66" fill="#c1121f" stroke="#fff" stroke-width="7" stroke-linejoin="round" data-plate="true"/>
+<text x="100" y="115" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-weight="bold" font-size="42" letter-spacing="1" fill="#fff">STOP</text>
 </svg>

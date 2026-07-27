@@ -20,16 +20,29 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
+import {
+  SPEED_GLYPH_DIGIT_H_M,
+  SPEED_GLYPH_INSET_M,
+  SPEED_GLYPH_PITCH_M,
+} from "../../world/builders/constants";
 import { SC_SPEED_CREEP } from "../../lessons/scenario/templates-sp";
 import { parseScenarioTrace, serializeScenarioTrace } from "../parse";
-import { recordScSpeedCreepDrive, type ScSpeedCreepTraceName } from "../scSpeedCreep";
+import {
+  recordScSpeedCreepDrive,
+  SC_SPEED_CREEP_ZONE_GLYPH_LEN_M,
+  SC_SPEED_CREEP_ZONE_GLYPH_Y,
+  type ScSpeedCreepTraceName,
+} from "../scSpeedCreep";
 import type { RecordedDrive } from "../recorder";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(HERE, "../../../../../..");
 const RECORD = process.env.RECORD_TRACES === "1";
 const SCENARIO_ID = "sc-speed-creep";
-const NAMES: ScSpeedCreepTraceName[] = ["shadow-correct", "mistake-flow-along", "mistake-zone-creep"];
+// ORDER IS THE TEMPLATE'S ORDER (templates-sp.ts): the zone-30 demo leads
+// because the clip pilot renders mistake index 0 and only the zone demo has a
+// rendered cap (the painted „30") it can keep in the fault frame.
+const NAMES: ScSpeedCreepTraceName[] = ["shadow-correct", "mistake-zone-creep", "mistake-flow-along"];
 
 function loadDistrict(id: string): unknown {
   return JSON.parse(readFileSync(path.join(REPO_ROOT, "content", "world", `${id}.json`), "utf-8"));
@@ -72,17 +85,10 @@ describe("sc-speed-creep — the shadow gate (doc 76 §5)", () => {
 });
 
 describe("sc-speed-creep — mistake demos grade their exact codes (doc 76 §9 stage 5)", () => {
-  it("„Носене с потока по подхода“: exactly SPEEDING_OVER_LIMIT against the 50, never the dangerous band", () => {
-    const drive = drives.get("mistake-flow-along")!;
-    const codes = [...new Set(violationCodes(drive))].sort();
-    expect(codes).toEqual([...SC_SPEED_CREEP.mistakes[0].codeRefs].sort());
-    expect(codes).not.toContain("SPEEDING_DANGEROUS");
-  });
-
   it("„Пълзене в зоната 30“: exactly SPEEDING_OVER_LIMIT against the LOCAL 30, never dangerous, no CLEAN_DRIVING", () => {
     const drive = drives.get("mistake-zone-creep")!;
     const codes = [...new Set(violationCodes(drive))].sort();
-    expect(codes).toEqual([...SC_SPEED_CREEP.mistakes[1].codeRefs].sort());
+    expect(codes).toEqual([...SC_SPEED_CREEP.mistakes[0].codeRefs].sort());
     expect(codes).not.toContain("SPEEDING_DANGEROUS");
     // The demo's creep tops out at ~37 — a fault ONLY against the zone's 30.
     const zoneMax = Math.max(
@@ -91,6 +97,59 @@ describe("sc-speed-creep — mistake demos grade their exact codes (doc 76 §9 s
     expect(zoneMax).toBeGreaterThan(33); // over the graced 30…
     expect(zoneMax).toBeLessThanOrEqual(40); // …never into the dangerous band
     expect(commendationCodes(drive)).not.toContain("CLEAN_DRIVING");
+  });
+
+  it("„Носене с потока по подхода“: exactly SPEEDING_OVER_LIMIT against the 50, never the dangerous band", () => {
+    const drive = drives.get("mistake-flow-along")!;
+    const codes = [...new Set(violationCodes(drive))].sort();
+    expect(codes).toEqual([...SC_SPEED_CREEP.mistakes[1].codeRefs].sort());
+    expect(codes).not.toContain("SPEEDING_DANGEROUS");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Founder R0 — „a car driving forward in a city street, nothing else"
+// ---------------------------------------------------------------------------
+
+describe("sc-speed-creep — the zone demo's fault is framed by a painted „30“", () => {
+  // The clip window is [fault−8, fault+4] around the ENGINE fault time and the
+  // camera is a chase cam, so the only cap a speeding clip can SHOW is one that
+  // is under the car at the conviction. sp-creep2-v1 posts no В26-30 face; the
+  // painted road numerals are it. This test is the reason the demo exists in
+  // its current shape — it fails on any restaging that lets the ❌ drift off
+  // the paint.
+  const ZONE_FROM_Y = 400; // meta.scenario.transitionY (asserted below)
+  const ZONE_TO_Y = 680;
+
+  it("the pinned glyph stations are exactly what markings.ts paints on this map", () => {
+    const raw = district as { meta: { scenario: { transitionY: number } } };
+    expect(raw.meta.scenario.transitionY).toBe(ZONE_FROM_Y);
+    // markings.ts: the zone edge is trimmed 0.8 m at each end, stations start
+    // SPEED_GLYPH_INSET_M in and repeat every SPEED_GLYPH_PITCH_M while the
+    // glyph still fits (station + length <= lineLen − 2).
+    const lineLen = ZONE_TO_Y - ZONE_FROM_Y - 1.6;
+    const expected: number[] = [];
+    for (let s = SPEED_GLYPH_INSET_M; s + SPEED_GLYPH_DIGIT_H_M <= lineLen - 2; s += SPEED_GLYPH_PITCH_M) {
+      expected.push(Number((ZONE_FROM_Y + 0.8 + s).toFixed(1)));
+    }
+    expect([...SC_SPEED_CREEP_ZONE_GLYPH_Y]).toEqual(expected);
+    expect(SC_SPEED_CREEP_ZONE_GLYPH_LEN_M).toBe(SPEED_GLYPH_DIGIT_H_M);
+  });
+
+  it("the first SPEEDING_OVER_LIMIT lands ON one of those numerals", () => {
+    const drive = drives.get("mistake-zone-creep")!;
+    const fault = drive.ruleEvents.find(
+      (e) => e.kind === "violation" && e.code === "SPEEDING_OVER_LIMIT",
+    )!;
+    expect(fault).toBeDefined();
+    // Ghost pose at the conviction.
+    const pose = drive.trace.samples.reduce((best, s) =>
+      Math.abs(s.tSec - fault.t) < Math.abs(best.tSec - fault.t) ? s : best,
+    );
+    const onGlyph = SC_SPEED_CREEP_ZONE_GLYPH_Y.some(
+      (y0) => pose.y >= y0 && pose.y <= y0 + SC_SPEED_CREEP_ZONE_GLYPH_LEN_M,
+    );
+    expect(onGlyph, `fault at y=${pose.y.toFixed(1)} is off every painted „30“`).toBe(true);
   });
 });
 

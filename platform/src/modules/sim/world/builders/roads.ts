@@ -43,7 +43,7 @@ import {
   type Vec2,
 } from "./math2d";
 import { MeshAccumulator, toWorld, UP } from "./mesh";
-import type { NodeInfo, RoadNetwork } from "./network";
+import { isBareVergeSide, type NodeInfo, type RoadNetwork } from "./network";
 
 const ASPHALT_UV_SCALE = 1 / 7; // planar meters -> uv
 const SIDEWALK_UV_SCALE = 1 / 2;
@@ -459,9 +459,15 @@ export function buildRoads(network: RoadNetwork): RoadBuildResult {
       if (lineLen > 6) {
         const inset = Math.min(1.2, lineLen * 0.08);
         const walkLine = trimPolyline(eb.line, inset, inset, 1.5) ?? eb.line;
-        buildSidewalkStrip(sidewalks, walkLine, eb.halfWidth, 1);
-        buildSidewalkStrip(sidewalks, walkLine, eb.halfWidth, -1);
-        sidewalkStripCount += 2;
+        // A bare verge (a divided street's median kerb, a motorway връзка's
+        // grass verge — network.ts BareVergeSide) carries no pavement: the
+        // strip that used to be built there landed on the OTHER carriageway's
+        // asphalt, which is what put ambient traffic on the pavement.
+        for (const side of [1, -1] as const) {
+          if (isBareVergeSide(eb.bareVerge, side)) continue;
+          buildSidewalkStrip(sidewalks, walkLine, eb.halfWidth, side);
+          sidewalkStripCount++;
+        }
       }
     }
   }

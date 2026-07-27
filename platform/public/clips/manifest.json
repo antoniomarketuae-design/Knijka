@@ -706,7 +706,7 @@
       "tracePath": "content/traces/sc-rx-unguarded/mistake-roll-through.trace.json",
       "src": "/clips/sc-rx-unguarded__m0.webm",
       "durationSec": 14,
-      "recordedAt": "2026-07-21T15:50:38.917Z",
+      "recordedAt": "2026-07-27T10:44:00.723Z",
       "titleBg": "Преминаване без спиране",
       "keyframes": [
         "/clips/sc-rx-unguarded__m0.k0.webp",
@@ -726,7 +726,7 @@
       "tracePath": "content/traces/sc-sign-warning/mistake-hold-speed.trace.json",
       "src": "/clips/sc-sign-warning__m0.webm",
       "durationSec": 12,
-      "recordedAt": "2026-07-22T09:12:17.940Z",
+      "recordedAt": "2026-07-27T10:32:55.269Z",
       "titleBg": "Задържана скорост през хлъзгавия участък",
       "keyframes": [
         "/clips/sc-sign-warning__m0.k0.webp",

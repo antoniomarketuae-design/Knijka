@@ -25,7 +25,7 @@
  *   (4.06, 15) heading north, 360 m long, limit 50 km/h.
  */
 
-import type { StagedEventSpec } from "../contracts";
+import type { OncomingStreamSpec, StagedEventSpec } from "../contracts";
 import { SC_SPEED_RAIN } from "../lessons/scenario/templates-sp";
 import {
   recordScriptedDrive,
@@ -128,6 +128,63 @@ const SCRIPTS: Record<
   "mistake-dry-speed": { kind: "mistake", script: scSpeedRainMistakeDrySpeedScript },
   "mistake-flow-along": { kind: "mistake", script: scSpeedRainMistakeFlowAlongScript },
 };
+
+// ---------------------------------------------------------------------------
+// CLIP-only staging: the traffic that makes the speed READ as wrong
+// ---------------------------------------------------------------------------
+
+/**
+ * Founder R0 on the produced clip: „again nothing — a car moving forward, no
+ * cars in front of it; this is not showing anything to the user, needs complete
+ * re-design." He is right, and the reason is structural: SPEEDING_DANGEROUS and
+ * SPEED_TOO_FAST_FOR_CONDITIONS are graded off the ego's own speedometer
+ * against an empty 360 m straight, so the frame has nothing to measure the
+ * speed AGAINST. A number on a HUD is not a hazard.
+ *
+ * The clip — and ONLY the clip — gets a column of two cars running the ego's
+ * own lane at 38 km/h, which is the CORRECT wet-night pace this lesson teaches.
+ * Now the frame carries the whole argument: the ghost reels them in at a rate
+ * no wet road forgives.
+ *   - „Като на сухо" (m0, fault 8.57 s, window ends 12.57 s): the ghost is doing
+ *     72 to the column's 38, i.e. closing at 9.4 m/s. The tail car is ~57 m
+ *     ahead at the fault and ~23 m ahead when the window closes — over half the
+ *     gap eaten in four seconds. It is never REACHED, which matters: the ghost
+ *     rides its recorded rails and cannot brake, so anything it caught it would
+ *     drive through (the founder's other R0 complaint, on the accident reel).
+ *   - „Каране с потока" (m1, fault 8.35 s): the same column sits ~60 m ahead
+ *     and barely closes at 48 — „потокът" the demo is named after, made literal.
+ *
+ * THIS CHANGES NO GRADING. Clip-scoped exactly like the doc 66 R1 precedents
+ * (scFollowDistanceClipStaged, reelClipStaged): the recorder still runs
+ * SC_SPEED_RAIN.staged (empty), the committed trace bytes are untouched, and
+ * the live drill compiles the lesson independently. Promoting the column into
+ * the DRILL is a separate change — a lead car in the lane arms the following
+ * chain, so it needs a re-record and a fresh exact-code gate.
+ */
+const SPEED_RAIN_CLIP_TRAFFIC: OncomingStreamSpec = {
+  id: "sc-rn-clip-ahead",
+  kind: "oncomingStream", // a path-locked column that emits ZERO grading events
+  libraryEventId: "ev-speed-rain",
+  actor: {
+    pathNodes: ["sp-n-start", "sp-n-end"], // NORTHBOUND — the player's own bank
+    // 95 m up the street with the tail car 25 m behind it (hold 70). Those two
+    // numbers are the no-overlap guarantee: released at ~0.8 s, the tail car is
+    // at y ≈ 194 when m0's window closes while the ghost is only at y ≈ 171.
+    hold: { nodeIndex: 0, offsetM: 95 },
+    cruiseSpeedMps: 10.56, // 38 km/h — the wet-night pace the shadow holds
+    colorIndex: 3,
+  },
+  count: 2,
+  gapsM: [25],
+  releaseKmh: 6,
+};
+
+/** CLIP staged override for sc-speed-rain (both mistakes share the column).
+ *  Registered in clipReplay's CLIP_STAGED_OVERRIDES; null anywhere else. */
+export function scSpeedRainClipStaged(mistakeIndex: number): StagedEventSpec[] | null {
+  if (mistakeIndex !== 0 && mistakeIndex !== 1) return null;
+  return [...((SC_SPEED_RAIN.staged ?? []) as StagedEventSpec[]), SPEED_RAIN_CLIP_TRAFFIC];
+}
 
 /**
  * Record one of the three drives against a loaded sp-rain-v1 document — at

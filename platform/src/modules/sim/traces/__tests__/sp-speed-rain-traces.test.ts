@@ -21,8 +21,13 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { SC_SPEED_RAIN } from "../../lessons/scenario/templates-sp";
+import { clipStagedOverrideFor } from "../clipReplay";
 import { parseScenarioTrace, serializeScenarioTrace } from "../parse";
-import { recordScSpeedRainDrive, type ScSpeedRainTraceName } from "../scSpeedRain";
+import {
+  recordScSpeedRainDrive,
+  scSpeedRainClipStaged,
+  type ScSpeedRainTraceName,
+} from "../scSpeedRain";
 import type { RecordedDrive } from "../recorder";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -122,5 +127,48 @@ describe("committed trace files — the determinism law", () => {
     }
     const expected = NAMES.map((n) => `content/traces/${SCENARIO_ID}/${n}.trace.json`);
     expect([SC_SPEED_RAIN.shadow.path, ...SC_SPEED_RAIN.mistakes.map((m) => m.traceRef.path)]).toEqual(expected);
+  });
+});
+
+describe("the CLIP staging — the speed gets something to be wrong AGAINST", () => {
+  // Founder R0: „again nothing, a car moving forward, no cars infront of it,
+  // this is not showing anything to the user, needs complete re design." Both
+  // faults are graded off the ego's own speedometer on an empty 360 m straight,
+  // so the frame carried no measure of the speed at all. The wet-pace column is
+  // added FOR THE CLIP ONLY.
+  it("the recorded, GRADED run still stages nothing (grading untouched)", () => {
+    expect(SC_SPEED_RAIN.staged ?? []).toEqual([]);
+    for (const name of NAMES) expect(drives.get(name)!.outcomes).toEqual([]);
+  });
+
+  it("both mistakes get traffic AHEAD on the player's own bank, at the correct wet pace", () => {
+    /** The rain envelope this lesson teaches: 0.85 × 50 = 42.5 km/h. */
+    const WET_CAP_KMH = 0.85 * 50;
+    for (const mi of [0, 1]) {
+      const staged = scSpeedRainClipStaged(mi);
+      expect(staged, `mistake ${mi}`).not.toBeNull();
+      expect(staged!.length).toBe((SC_SPEED_RAIN.staged ?? []).length + 1);
+      const ahead = staged![staged!.length - 1];
+      expect(ahead.kind).toBe("oncomingStream"); // path-locked, emits no events
+      if (ahead.kind !== "oncomingStream") throw new Error("unreachable");
+      // Northbound = the ego's own direction, so the column renders IN FRONT.
+      expect(ahead.actor.pathNodes).toEqual(["sp-n-start", "sp-n-end"]);
+      // Running the pace the SHADOW holds — that contrast is the whole point:
+      // lawful-for-the-weather traffic the speeder is reeling in.
+      expect(ahead.actor.cruiseSpeedMps * 3.6).toBeLessThanOrEqual(WET_CAP_KMH);
+      expect(ahead.actor.cruiseSpeedMps * 3.6).toBeGreaterThan(30);
+      expect(ahead.count).toBeGreaterThanOrEqual(2);
+      // Held far enough up the street that the ghost — which rides its recorded
+      // rails and cannot brake — never reaches it inside the clip window
+      // (fault + CLIP_POST_FAULT_S): at 72 km/h the m0 ghost is at y ≈ 171 when
+      // the window closes, and the head car is past 185 by then.
+      expect(ahead.actor.hold.offsetM).toBeGreaterThanOrEqual(50);
+    }
+    expect(scSpeedRainClipStaged(2)).toBeNull();
+  });
+
+  it("is registered on the clip-capture path (otherwise the clip renders the empty road again)", () => {
+    expect(clipStagedOverrideFor(SCENARIO_ID, 0)).not.toBeNull();
+    expect(clipStagedOverrideFor(SCENARIO_ID, 1)).not.toBeNull();
   });
 });

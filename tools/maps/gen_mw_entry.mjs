@@ -52,14 +52,68 @@
  *   - 140 на АМ за категория B: ЗДвП чл. 21;
  *   - аварийна лента: ЗДвП чл. 58, т. 3 (the resumed span past the taper).
  *
+ * ---------------------------------------------------------------------------
+ * FOUNDER REVIEW 2026-07-27 — THE CROSS-SECTION REDESIGN
+ * ---------------------------------------------------------------------------
+ * Verbatim: „the shadow car is moving on top of other cars - the road is going
+ * on top of some other road … the shadow car stopps on the right lane where it
+ * can actually stop … if the lane is the speed lane it must be the most left
+ * lane". Every one of those is the same root cause: the carriageways were
+ * tagged `class: "primary"` (only `motorway: true` marked them as АМ), so the
+ * CITY cross-section was drawn over a motorway:
+ *   - PARKING_LANE_CLASSES has `primary`, so each bank grew a 4 m curbside
+ *     parking band per side: halfWidth 12.19 → 16.19 m. The northbound bank
+ *     [−16.19, 16.19] then OVERLAPPED the southbound one [−46.56, −14.19] by
+ *     2 m — literally road on top of road;
+ *   - TrafficLayer's PARK_CLASSES has `primary` too, so a row of PARKED CARS
+ *     stood in that band at x = ±14.19 the whole length of the map. The ramp
+ *     centreline crosses x = 14.19 at y ≈ 233 — the ego drove through them.
+ *     That is „moving on top of other cars";
+ *   - SIDEWALK_CLASSES/ARTERIAL_CLASSES have `primary` AND `secondary_link`,
+ *     so the motorway grew pavements, 185 street trees, 6 billboards and a lamp
+ *     row whose columns landed at x = −10.28 (inside the overtaking lane) and,
+ *     off the RAMP's own row, at x = 10.48 (inside the acceleration lane);
+ *   - and the аварийна лента read as an ordinary third travel lane, because
+ *     markings.ts suppresses the emergency lane's OUTER edge line on arterial
+ *     classes (the arterial pass is supposed to draw it — but at `halfWidth`,
+ *     i.e. 4 m out at the back of the parking band, not at the carriageway
+ *     edge). With no wide М2 line to bound it, the shoulder looked like a lane
+ *     you may stop in — exactly the founder's read of the mistake reel.
+ *
+ * The fix is one honest tag change per edge, and it settles all of it:
+ *   - the carriageways carry `class: "motorway"` (as gen_motorway.mjs mw-v1
+ *     always has). No parking band (halfWidth back to the 3 marked lanes,
+ *     12.19 m → the banks clear the 6 m median), no parked-car row, no
+ *     pavements, no trees, no billboards, no lamp columns — and, because
+ *     `motorway` is outside ARTERIAL_CLASSES, the emergencyLane span now paints
+ *     BOTH of its edges: the wide continuous М2 line at the laneId 0/1 seam and
+ *     the carriageway edge line outside it. THAT is the lane semantics the
+ *     founder asked for: past the taper the curb lane is visibly bounded as
+ *     аварийна лента, so the mainline reads as exactly two travel lanes — the
+ *     RIGHT one the merge target, the LEFT one the overtaking lane — and the
+ *     mistake reel's stop happens in a lane that is visibly not for stopping.
+ *     Between nose and taper that wide line is absent, which is what makes the
+ *     acceleration lane read as the legal travel lane it is;
+ *   - the RAMP keeps `class: "secondary_link"` (deliberately NOT motorway —
+ *     see below) and gains `bareVerge: "both"`: a връзка has grass verges, not
+ *     city pavements. Its pavement strip used to sweep across the carriageway
+ *     it merges into, and its lamp row stood in the acceleration lane.
+ *
+ * GRADING IS UNTOUCHED: `lanes`, `motorway: true`, the maxspeeds, the zone
+ * spans, every node/edge/spawn id and every lane centre (x = 8.13 / 0 / −8.13)
+ * are unchanged, and the Locator's lane math reads `lanes` × LANE_WIDTH_M, not
+ * the ribbon's dressed halfWidth. Only what is DRAWN moved.
+ *
  * KNOWN VISUAL GAPS (honest, the gen_motorway М2 precedent):
  *   - no taper WEDGE geometry exists: the acceleration lane and the emergency
- *     lane render as the same third marked lane, and the taper is a data
- *     boundary (the zone span's start) rather than painted paint. It GRADES
- *     correctly; the scenario copy + the trace annotations carry the teaching.
+ *     lane occupy the same third marked lane, and the taper is a data boundary
+ *     (the zone span's start) rather than a painted wedge. Since the span now
+ *     paints the wide М2 seam + the outer edge line, the boundary IS visible as
+ *     the point where the shoulder markings begin; the wedge itself is not.
  *   - the ramp centerline crosses into the carriageway bank over its last
  *     ~18 m (the merge nose) — the surfaces overlap there, exactly as a real
- *     nose does; asserted below so it can never creep further back.
+ *     nose does; asserted below (both the centreline and the ribbon edge) so it
+ *     can never creep further back.
  *
  * Version contract (runtime/district.ts): format stays "district-v1"; `zones`
  * is additive and reuses the shipped "emergencyLane" kind; meta.zonesVersion
@@ -98,6 +152,11 @@ const EDGE_SWITCH_MARGIN_M = 4.0;
 const AUTHORED_MERGE_RUN_M = 62;
 /** The ramp nose may overlap the carriageway bank at most this far back, m. */
 const RAMP_NOSE_OVERLAP_MAX_M = 25;
+/** …and the ramp RIBBON's inner edge (halfWidth out from the centreline), which
+ *  is the surface a viewer actually sees merge, at most this far back. A real
+ *  merge gore runs 30–50 m; beyond that the two asphalt sheets read as one road
+ *  laid over another, which is the defect the founder called out. */
+const RAMP_RIBBON_OVERLAP_MAX_M = 45;
 
 const r2 = (v) => Math.round(v * 100) / 100;
 
@@ -201,7 +260,12 @@ export function buildMotorwayEntry(params) {
     id,
     from,
     to,
-    class: "primary",
+    // `motorway`, not `primary` (founder review 2026-07-27 — see the header):
+    // the class is what the WORLD BUILDER dresses off, and a motorway carries
+    // no parking band, no parked-car row, no pavement, no trees, no billboards
+    // and no lamp columns. It also puts the emergencyLane span outside
+    // ARTERIAL_CLASSES, so the shoulder finally paints its own outer edge line.
+    class: "motorway",
     name,
     oneway: true,
     roundabout: false,
@@ -251,6 +315,11 @@ export function buildMotorwayEntry(params) {
       lanesSource: "tag",
       maxspeed: rampKmh,
       maxspeedSource: "default",
+      // A motorway връзка runs between grass verges, not city pavements: the
+      // `_link` class is arterial, so without this the ramp grew a 3.5 m
+      // pavement strip that swept ACROSS the carriageway it merges into, and a
+      // lamp row whose column at (10.48, 213.8) stood in the acceleration lane.
+      bareVerge: "both",
       length: polylineLength(rampGeom),
       geometry: rampGeom,
     },
@@ -430,6 +499,13 @@ export function buildMotorwayEntry(params) {
     if (e.lanes !== markedLanes) post.push(`${e.id}: lanes must be ${markedLanes} (curb + ${lanesPerDirection} travel)`);
     if (e.motorway !== true) post.push(`${e.id}: must carry the motorway tag (arms the SP-10 detectors)`);
     if (e.maxspeed !== maxspeedKmh) post.push(`${e.id}: maxspeed mismatch`);
+    // The founder-review invariant: the CLASS is what the world builder dresses
+    // off. `primary` here put a 4 m parking band, a parked-car row, pavements,
+    // trees and lamp columns on an автомагистрала — and hid the shoulder's
+    // outer edge line. Only `motorway` draws a motorway.
+    if (e.class !== "motorway") {
+      post.push(`${e.id}: class must be "motorway" — the city cross-section does not belong on an АМ`);
+    }
   }
   const ramp = EDGES.find((e) => e.id === `${idPrefix}-e-ramp`);
   if (ramp.motorway !== undefined) {
@@ -437,6 +513,9 @@ export function buildMotorwayEntry(params) {
   }
   if (ramp.lanes !== 1) post.push(`${ramp.id}: the ramp is a single-lane връзка`);
   if (ramp.maxspeed !== rampKmh) post.push(`${ramp.id}: maxspeed mismatch`);
+  if (ramp.bareVerge !== "both") {
+    post.push(`${ramp.id}: a връзка runs between grass verges — bareVerge must be "both" (no pavement/lamp row)`);
+  }
   if (INTERSECTIONS.length !== 0) post.push("merge-lane must carry ZERO intersections (no stop line, no junction tracker)");
   if (CROSSINGS.length !== 0) post.push("merge-lane must carry ZERO crossings");
   // The nb split nodes join exactly two collinear segments each (the
@@ -488,6 +567,37 @@ export function buildMotorwayEntry(params) {
     post.push(
       `the ramp centerline enters the carriageway bank ${r2(overlapBackM)} m before the nose — keep it within ${RAMP_NOSE_OVERLAP_MAX_M} m (move rampStartX/rampStartY)`,
     );
+  }
+  // …and the same for the ramp RIBBON's west edge (halfWidth = SCALED_LANE_W/2
+  // out from the centreline, since a 1-lane link carries no parking band): that
+  // is the asphalt a viewer sees, and it reaches the bank earlier than the
+  // centreline does. Beyond RAMP_RIBBON_OVERLAP_MAX_M the gore stops reading as
+  // a merge nose and starts reading as one road laid over another.
+  {
+    const rampHalfW = SCALED_LANE_W / 2;
+    const dx = laneCurbX - rampStartX; // < 0 — the ramp closes from the east
+    const dy = noseY - rampStartY;
+    const len = Math.hypot(dx, dy);
+    // West-facing unit normal of the ramp direction, then its x/y components.
+    const nx = -dy / len;
+    const ny = dx / len;
+    const westX = (t) => rampStartX + dx * t + nx * rampHalfW;
+    const westY = (t) => rampStartY + dy * t + ny * rampHalfW;
+    // t where the west edge reaches x = halfBankM (the carriageway bank).
+    const tHit = (halfBankM - rampStartX - nx * rampHalfW) / dx;
+    const ribbonOverlapM = tHit >= 0 && tHit <= 1 ? Math.hypot(laneCurbX - westX(tHit), noseY - westY(tHit)) : Infinity;
+    if (!(ribbonOverlapM > 0 && ribbonOverlapM <= RAMP_RIBBON_OVERLAP_MAX_M)) {
+      post.push(
+        `the ramp ribbon's west edge overlaps the carriageway ${r2(ribbonOverlapM)} m before the nose — keep it within ${RAMP_RIBBON_OVERLAP_MAX_M} m`,
+      );
+    }
+  }
+  // The dressed bank must BE the marked lanes: a class that carries a curbside
+  // parking band (PARKING_LANE_CLASSES: primary/secondary/tertiary) widens the
+  // drawn ribbon by 4 m per side beyond halfBankM, which is what made the two
+  // carriageways overlap and put parked cars in the ramp's path.
+  if (["primary", "secondary", "tertiary"].includes(EDGES[0].class)) {
+    post.push("the carriageway class carries a curbside parking band — the drawn bank would exceed halfBankM");
   }
   // Recorder-envelope honesty (traces/recorder.ts) — the authored drives must
   // be physically reachable on this geometry:

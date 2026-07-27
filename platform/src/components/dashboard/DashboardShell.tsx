@@ -12,6 +12,7 @@ import {
   IconHome,
   IconLogout,
   IconMenu,
+  IconShield,
   IconStar,
   IconTrophy,
   IconWheel,
@@ -30,6 +31,11 @@ const NAV_ITEMS: NavItem[] = [
   { href: "/theory", labelBg: "Теория", icon: IconBook },
   { href: "/exams", labelBg: "Изпити", icon: IconClipboardCheck },
   { href: "/simulator", labelBg: "Симулатор", icon: IconWheel },
+  // The third pillar. It sits directly under the simulator on purpose: hazard
+  // perception is the safety half of the same promise, and burying it under
+  // „AI Учител" would make the founder's differentiator look like a sub-feature
+  // of exam prep — which is exactly what it is not.
+  { href: "/hazard", labelBg: "Опасности", icon: IconShield },
   { href: "/tutor", labelBg: "AI Учител", icon: IconBot },
   { href: "/leaderboard", labelBg: "Класация", icon: IconTrophy },
   { href: "/pricing", labelBg: "Планове", icon: IconStar },

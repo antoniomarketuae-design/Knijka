@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" role="img" aria-labelledby="t">
 <title id="t">Е21 — Пешеходен подлез или надлез</title>
-<rect x="8" y="8" width="184" height="184" rx="18" fill="#0057a8"/>
+<rect x="8" y="8" width="184" height="184" rx="18" fill="#0057a8" data-plate="true"/>
 <g fill="#fff">
 <polygon points="52,88 84,88 84,110 108,110 108,132 132,132 132,154 164,154 164,166 52,166"/>
 <g transform="translate(76,62) scale(0.8)" fill="#fff">

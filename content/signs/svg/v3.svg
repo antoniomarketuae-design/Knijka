@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" role="img" aria-labelledby="t">
 <title id="t">В3 — Забранено е влизането на моторни превозни средства</title>
-<circle cx="100" cy="100" r="88" fill="#fff" stroke="#c1121f" stroke-width="20"/>
+<circle cx="100" cy="100" r="88" fill="#fff" stroke="#c1121f" stroke-width="20" data-plate="true"/>
 <g transform="translate(100,100) scale(1.7)" fill="#1d1d1b">
 <path d="M -34,20 v-16 q0,-7 6,-9 l5,-12 q2,-5 8,-5 h30 q6,0 8,5 l5,12 q6,2 6,9 v16 z"/>
 <rect x="-30" y="20" width="12" height="7" rx="2"/><rect x="18" y="20" width="12" height="7" rx="2"/>

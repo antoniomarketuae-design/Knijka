@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" role="img" aria-labelledby="t">
 <title id="t">А5 — Стръмен наклон при спускане</title>
-<polygon points="100,22 186,170 14,170" fill="#fff" stroke="#c1121f" stroke-width="16" stroke-linejoin="round"/>
-<g fill="#1d1d1b"><polygon points="48,156 152,156 152,114"/>
-<text x="64" y="140" font-family="Arial, Helvetica, sans-serif" font-weight="bold" font-size="26" fill="#1d1d1b">10%</text></g>
+<polygon points="100,22 186,170 14,170" fill="#fff" stroke="#c1121f" stroke-width="16" stroke-linejoin="round" data-plate="true"/>
+<g fill="#1d1d1b"><text x="100" y="106" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-weight="bold" font-size="20" fill="#1d1d1b">10%</text>
+<polygon points="62,116 62,152 138,152"/></g>
 </svg>

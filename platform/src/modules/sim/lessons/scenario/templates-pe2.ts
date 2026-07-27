@@ -508,17 +508,33 @@ const ZL_HALT_Y = ZL_CROSSING_Y - 6;
 const CURB_X_EAST = 9.73;
 
 /**
- * THE WEST WALKER at pz-x-1 (0, 215): steps off the west curb at 1.1 m/s — an
- * unhurried residential shuffle, not a dart — once the player closes within
- * ~30 m. She is not crossing anything: in a жилищна зона the carriageway IS
- * the pedestrian's, and she is simply walking on it (чл. 62–63). The engine
- * still grades her through the crossing vocabulary, which is why pz-x-1 exists
- * at all (see the header).
+ * THE WEST WALKER at pz-x-1 (0, 215): steps off the west curb once the player
+ * closes within ~30 m. She is not crossing anything: in a жилищна зона the
+ * carriageway IS the pedestrian's, and she is simply walking on it
+ * (чл. 62–63). The engine still grades her through the crossing vocabulary,
+ * which is why pz-x-1 exists at all (see the header).
+ *
+ * HER PACE IS THE STAGING (founder R0: „the car and the pedestrian are very
+ * very very far away from each other … the pedestrian is not on the road at
+ * all, he is just standing there on the side"). At the old 1.1 m/s shuffle she
+ * needed 12.5 s to walk the 13.8 m from the west curb to the player's lane —
+ * far longer than the ~5.5 s the player takes to cover the last 30 m of the
+ * trigger. So at BOTH decisive moments — the shadow's halt and the
+ * push-through's pass — she was still ~7 m away on the FAR half of the road,
+ * a distant figure off to the left rather than a person in the way, and the
+ * demos read as „the car stopped for nothing" / „the car passed nobody".
+ * 1.9 m/s (a purposeful walk, still not a dart) puts her ~3 m in front of the
+ * halted shadow and ~2.5 m off the push-through's flank — the squeeze the
+ * lesson is named after. It stays UNDER the pace that would make the
+ * push-through a contact (PEDESTRIAN_CONTACT_M is 1.5 m), so the demo keeps
+ * grading непропускане and never COLLISION.
  *
  * triggerDistM 30 sits just INSIDE the ~35 m crossing zone and well past the
  * map's SPEED-ONLY WINDOW (y 120..180): that is what lets „квартална улица с
  * 50" grade EXACTLY SPEEDING_DANGEROUS — the speeding episode completes and
- * resets before anyone is on the road, so no crossing code can pile on.
+ * resets before anyone is on the road, so no crossing code can pile on. The
+ * pace change deliberately leaves that trigger alone, so the window invariant
+ * (pe-zone-districts.test) is untouched.
  * minTriggerSpeedKmh 6 is deliberately BELOW the zone's own 20 cap: at
  * walking-pace-plus a 10 km/h threshold would let a correct driver creep under
  * the trigger and the encounter would never happen.
@@ -530,7 +546,7 @@ const ZONE_WALKER_WEST: PedestrianDartOutSpec = {
   crossing: { x: 0, y: ZL_CROSSING_Y },
   start: { x: CURB_X, y: ZL_CROSSING_Y },
   dir: { x: 1, y: 0 },
-  speedMps: 1.1,
+  speedMps: 1.9,
   travelM: TRAVEL_M,
   roadFromM: ROAD_FROM_M,
   roadToM: ROAD_TO_M,

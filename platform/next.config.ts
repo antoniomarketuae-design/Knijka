@@ -144,7 +144,29 @@ const CACHE_MEDIA = `public, max-age=${DAY}, stale-while-revalidate=${7 * DAY}`;
 /** The indexes that name the files above — must never outlive them. */
 const CACHE_MANIFEST = "public, max-age=300, stale-while-revalidate=3600";
 
+/**
+ * Build/serve directory — overridable, default unchanged.
+ *
+ * WHY (2026-07-27, clip-rig I/O investigation): Turbopack keeps a persistent
+ * dev cache under `<distDir>/dev/cache/turbopack`. On this box `.next` lives on
+ * E:, a 7200 rpm MECHANICAL disk (random 4 KB read ≈ 79 ms vs 0.33 ms on C:),
+ * and that cache had grown to 12.4 GB / 19,447 files unpruned since 2026-07-10.
+ * The result was not a compiler problem — the dev server sat at ~0% CPU with a
+ * request pending, blocked on seeks — but /dev/clip-headless still never
+ * finished compiling, so mistake reels were being shipped unverified.
+ *
+ * The clip rig (tools/clips/headless/clip-rig.mjs) therefore runs its OWN
+ * server against its OWN distDir, so the render path can never inherit — or
+ * poison — the cache the shared :3000 dev server is using, and the rig can
+ * prune its cache on a schedule it controls.
+ *
+ * Unset (every normal `npm run dev` / `npm run build` / the VPS deploy) this is
+ * exactly `.next`, i.e. no behaviour change at all.
+ */
+const distDir = process.env.KNIJKA_DIST_DIR || ".next";
+
 const nextConfig: NextConfig = {
+  distDir,
   async headers() {
     return [
       { source: "/:path*", headers: securityHeaders },

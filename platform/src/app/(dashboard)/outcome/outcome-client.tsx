@@ -19,6 +19,7 @@
 
 import { useActionState, useState } from "react";
 import { IconCheck, IconShield, IconX } from "@/components/icons";
+import { CheckControl } from "@/components/ui/CheckControl";
 import { reportOutcome, withdrawOutcome } from "./actions";
 import {
   CONSENT_FIELD,
@@ -71,13 +72,17 @@ function ReportForm({ todayIso }: { todayIso: string }) {
     <form action={formAction} className="card flex flex-col gap-5 p-5 sm:p-6">
       <fieldset className="flex flex-col gap-2">
         <legend className="hud-label mb-2">Кой изпит?</legend>
+        {/* The pill around each radio already flips to accent when it is
+            picked, but that is the SELECTED state; the box is what says
+            "there is a control here" before anything is chosen, and on this
+            palette the browser's own was drawing it at 1.66 : 1. */}
         <div className="flex gap-2">
           <label className={radioClass}>
-            <input type="radio" name="kind" value="theory" defaultChecked className="accent-accent" />
+            <CheckControl type="radio" name="kind" value="theory" defaultChecked />
             Теория
           </label>
           <label className={radioClass}>
-            <input type="radio" name="kind" value="practical" className="accent-accent" />
+            <CheckControl type="radio" name="kind" value="practical" />
             Кормуване
           </label>
         </div>
@@ -87,11 +92,11 @@ function ReportForm({ todayIso }: { todayIso: string }) {
         <legend className="hud-label mb-2">Как мина?</legend>
         <div className="flex gap-2">
           <label className={radioClass}>
-            <input type="radio" name="outcome" value="passed" className="accent-accent" />
+            <CheckControl type="radio" name="outcome" value="passed" />
             Взех го
           </label>
           <label className={radioClass}>
-            <input type="radio" name="outcome" value="failed" className="accent-accent" />
+            <CheckControl type="radio" name="outcome" value="failed" />
             Не го взех
           </label>
         </div>
@@ -116,12 +121,14 @@ function ReportForm({ todayIso }: { todayIso: string }) {
       </div>
 
       <label className="flex cursor-pointer items-start gap-3 rounded-lg border border-hair bg-surface-2/30 p-3">
-        <input
+        {/* Appearance only — the field name, the unticked default and the
+            button that stays disabled until it is ticked are untouched. */}
+        <CheckControl
           type="checkbox"
           name={CONSENT_FIELD}
           checked={consented}
           onChange={(e) => setConsented(e.target.checked)}
-          className="mt-0.5 accent-accent"
+          className="mt-0.5"
         />
         <span className="text-sm leading-relaxed text-muted">
           {CONSENT_LABEL_BG}

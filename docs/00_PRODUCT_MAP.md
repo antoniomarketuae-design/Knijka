@@ -47,6 +47,18 @@ The founder's verdict was *"a very basic Minecraft server with a car"*. Doc 82's
 - Hook scripts: `.claude/hooks-inject-map.js`, `-precompact.js`, `-sessionend.js`. Task-memory keeps the ACTIVE thread; this Map = the whole vision.
 
 ---
+*Last updated: 2026-07-27 — **SESSION STATE AT COMPACTION.** Two workflows RUNNING (resumed after a
+desktop-app crash): `wf_179dd1f4-1e7` = the founder verdict-board fixes (42 items -> 9 root causes: signs
+drawn by code overflow their borders / car inside the junction / 4-mini-roundabouts / conflicts that do not
+conflict / sign-vs-marking contradictions / broken geometry / no motive / collisions that should be
+near-misses / **the founder ruled: COMPLETE 3D INSTRUMENT CLUSTER**), and `wf_e825fca9-32d` = the P7 hazard
+engine. CRASH RECOVERY VERIFIED: backup branch `claude/crash-recovery-2026-07-26` (3,082 files, pushed),
+git fsck clean, 64 sign SVGs valid, 592 content JSON valid, tsc 0 before resume. **Read the curated recap
+`~/.claude/recaps/AI driver/2026-07-27.md` — it holds the full state, the deferred list and the founder-only
+actions.** DEFERRED: hero car (needs a FRESH session + live Blender — proven that blind headless sculpting
+fails; capital-B mcp__Blender__* does NOT speak this addon protocol), P8 (all 4 parts, founder approved),
+the P7 clip batch, the tutor voice (blocked on the founder audition).*
+
 *Last updated: 2026-07-26 — the **Simulator Quality & Innovation program** (docs/simulation/82) opened §2a above. Landed so far: the §2 performance envelope's desktop half + its four structural fixes, and 6 of the 7 §8 corrections including 248.8 MB of verified-unreferenced assets pruned. The one thing that would change the founder's verdict and has NOT happened is **§2.4, the phone measurement** — nothing in §2.2 is evidence until an A16 log is committed.*
 
 *Previously updated: 2026-07-25 — FULL AUDIT (docs/80_FULL_AUDIT_2026-07-24.md) executed in full at commit 165a58b: 1005/1089 questions approved, answer-leak + 4 rule-engine false-fails + GDPR + entitlements + perf + ops + 2 innovations shipped. Gate: tsc 0 / 7281 tests / build OK.*

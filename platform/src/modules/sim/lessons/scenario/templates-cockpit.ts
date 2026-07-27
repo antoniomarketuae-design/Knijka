@@ -332,8 +332,20 @@ export const SC_VP_STALL: ScenarioSpec = {
 /** ln-v1 northbound lane centers (meta.scenario; pinned by value — L7). */
 const PS_RIGHT = 12.19;
 const PS_LEFT = 4.06;
-/** The officer's post on the RIGHT sidewalk (curb line x = 16.25). */
-const PS_OFFICER = { x: 17.0, y: 210 };
+/**
+ * The officer's post, m. Founder review 2026-07-27: „the police officer is not
+ * visible at all". At x = 17.0 he stood BEYOND the curb line (16.25), inside
+ * the TrafficLayer's curb-parked decoration — a small figure occluded by a
+ * bumper-to-bumper row of cars, in a reel whose entire premise is that a
+ * driver reacted to him. He now stands ON the carriageway edge, ~1.7 m off the
+ * halt point, which is where an officer with a стоп-палка actually stands and
+ * which puts him clear of the parked row and squarely in the chase frame.
+ * VISUAL ONLY: PoliceStopRunner reads `officer` for the figure's standing path
+ * and for the „passed him by passBeyondM" OUTCOME; the runner emits no SimTick
+ * events at all, so nothing here can grade (A12). The graded contract is `stop`
+ * + the curb-side reachZone objective, both untouched.
+ */
+const PS_OFFICER = { x: 15.6, y: 208 };
 /** The curb-side halt point: right edge of the right lane, just short of the
  *  officer — the driver stops with the window at the officer's level. */
 const PS_STOP = { x: 13.9, y: 206 };

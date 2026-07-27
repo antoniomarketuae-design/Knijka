@@ -6,9 +6,11 @@
 // PerspectiveCameras parented to the chassis at the GLB mirror-glass
 // positions, all looking BACKWARD (chassis -Z; the cars' forward is +Z, so an
 // unrotated camera already faces the rear). The horizontal mirror-image flip
-// is baked into the glass quads' synthesized UVs (VitokCockpit.ensureQuadUVs
-// mirrorU) — a raw rear camera shows car-left on image-right; flipping U puts
-// it on the mirror's left, like real glass.
+// and the vertical orientation are applied HERE, as a uv transform on the
+// render target's own texture (`center`/`repeat` below) — they used to rely on
+// VitokCockpit.ensureQuadUVs(mirrorU), which only fires when the geometry
+// ships no UVs, and the interior GLB now ships them. See the REF 7 block above
+// MIRROR_DEFS.
 //
 // RECURSION / SELF-VIEW GUARD: the mirror cameras keep the default layer-0
 // mask while the whole cabin (interior GLB, mirror quads, hotspot proxies,
@@ -48,13 +50,36 @@ import {
   HalfFloatType,
   MeshBasicMaterial,
   PerspectiveCamera,
+  Vector3,
   WebGLRenderTarget,
   type Mesh,
   type Object3D,
 } from "three";
 import { SKY_DOME_NAME } from "@/modules/sim/environment";
+import { COCKPIT_EYE } from "@/modules/sim/vehicle";
 import { renderMirrorPass } from "@/modules/sim/scene/vitok/mirrorPass";
 import { loadQualityPreset } from "../lesson-ui/QualityPresetSelector";
+
+/**
+ * The interior GLB's mount offset along +Y, i.e. `-VitokCockpit.INTERIOR_Y_OFFSET`
+ * (chassis y = authored y − 0.55). Duplicated as a literal rather than imported
+ * because VitokCockpit imports THIS module — the pair would be a cycle. The
+ * mount also carries yaw π, which is why x and z flip sign below.
+ */
+const INTERIOR_MOUNT_Y_OFFSET = 0.55;
+
+/**
+ * Extra drop of the rear-mirror assembly, metres (REF 8, second half). The
+ * authored stalk approaches the mirror from above and its underside projects
+ * BELOW the glass's top edge over the last ~120 mm — which is why, in every
+ * frame from round 1 onward, the arm appeared to end INSIDE the reflection.
+ * Nothing can hide the arm there (it is nearer the eye than the housing), so
+ * the glass moves instead: 14 mm down is ~19 px at 1440×900, enough that the
+ * arm meets the housing's top rim with clearance and the reflection is a clean
+ * rectangle. The cockpit-camera contract asserts only that the mirror's fy
+ * stays ≤ 0.97 (it is 0.745, so the drop is well inside the band).
+ */
+const MIRROR_DROP_M = 0.014;
 
 export interface MirrorMeshes {
   left: Mesh | null;
@@ -77,6 +102,13 @@ interface MirrorDef {
    *  touch of down-pitch to keep road in frame. YXZ, radians. */
   yaw: number;
   pitch: number;
+  /**
+   * How far to lift the GLB glass quad TOWARD THE DRIVER'S EYE so it sits
+   * proud of the authored mirror casing instead of being buried inside it.
+   * See the REF 8 block under MIRROR_DEFS for why the direction is the eye
+   * ray and not the glass normal. 0 = leave the authored position alone.
+   */
+  glassLiftM: number;
 }
 
 // AIM TABLE (doc 71 §4.9 / lane 12 §7 — explicit, NOT derived from the GLB
@@ -108,10 +140,93 @@ interface MirrorDef {
 //     colour OR DEPTH — a fresh depth buffer reads 0 (the near plane), every
 //     fragment failed the LESS test, and the glass was a solid black
 //     rectangle on med/high forever. mirrorPass.ts owns autoClear now.
+//
+// NOTE ON `rear.pos` (it is NOT the glass centre, on purpose): the GLB glass
+// sits at chassis (0, 0.803, 0.50) — the header-mounted housing of the
+// 2026-07-11 black-mass fix — but the rear RTT vantage stays at eye height
+// (0, 0.687, 0.575), which is the ruling pinned by
+// vehicle/cockpit-camera-contract.test.ts („sample point ≠ glass"): a rear
+// mirror reflects the DRIVER'S eye line, not the glass's own position, so the
+// horizon lands centred in the strip. `left`/`right` do coincide with their
+// GLB glass nodes.
+//
+// REF 7 — „the rear-view mirror is a flat dead rectangle" (2026-07-27), the
+// `glassLiftM` column. The PASS was already healthy after the doc-82 autoClear
+// fix: reading the rear target back on a live /dev/ghost-demo frame gives a
+// real linear-HDR image (dark road at v≈0, bright dusk sky at v≈1). What the
+// driver saw instead was the AUTHORED MIRROR CASING — in hero_interior.glb the
+// `hotspot_mirror_rear` quad is modelled INSIDE its housing, and interior_shell
+// carries geometry from 4 mm to ~50 mm in FRONT of the glass plane, covering
+// it. Ray-casting the shell from COCKPIT_EYE over a 17×11 grid on each glass
+// measured how much of the glass the driver can actually see, against a lift
+// along the glass's own normal:
+//
+//   lift (m)  0.00  0.01  0.02  0.03  0.04  0.05  0.06  0.08  0.12
+//   rear       16%   49%   61%   71%   85%   94%   94%   95%   96%
+//   left       34%   41%   48%   47%   47%   47%   45%   45%   44%
+//   right      14%   18%   21%   23%   22%   22%   21%   21%   19%
+//
+// 0.05 m clears the rear casing (16% → 94%) and then plateaus — pushing the
+// glass further only shoves it into the cabin for nothing. The DOOR mirrors do
+// not respond at all: what hides them is the door/window frame from a centred
+// eye point, an aim/authoring problem no depth nudge can fix, so they keep
+// their authored position (`glassLiftM: 0`) and are left honestly as they are.
+// The lift is applied and reverted by this rig, never baked into the cached
+// GLTF — `scene.clone(true)` gives every mount its own node transforms, so
+// writing `mesh.position` only affects this cockpit instance.
+//
+// REF 8 — „the bezel does not enclose the glass" (2026-07-27 R0 round 2). The
+// REF 7 lift was applied along the glass's OWN NORMAL. Measured on the shipped
+// GLB, that normal — quaternion (−0.0346, −0.1391, −0.0049, 0.98966) applied
+// to +Z — is (−0.275, +0.070, +0.959) in GLB space, while the direction from
+// the glass centre (GLB (0, 1.353, −0.5)) to the cockpit eye (COCKPIT_EYE
+// through the yaw-π / y−0.55 mount → GLB (−0.24, 1.26, 0.255)) is
+// (−0.301, −0.117, +0.947). Those differ by 10.8°, so a 50 mm normal-lift
+// slid the glass 9.4 mm SIDEWAYS across the driver's sightline, and being
+// 50 mm nearer also magnified it 6.7 %. Result in a rendered 1100×900 frame:
+// the glass sat ~13 px up-and-right of the authored bezel it is supposed to
+// live in, overhanging the frame with the bezel's top strip left showing as a
+// loose flap — and its lower-left corner covered the root of the authored
+// mirror stalk, so the stalk read as a black arm ending inside the reflection.
+//
+// FIX: lift along the EYE RAY and shrink by the same ratio ((d − lift) / d).
+// Moving a plane along the ray to the eye and scaling it by the distance ratio
+// leaves its projection from that eye EXACTLY unchanged — so the glass now
+// covers precisely the pixels the authored quad covered (the cockpit-camera
+// contract's `interiorMirror` landmark is untouched), it is simply 60 mm
+// nearer than the casing that used to bury it. Head-sway parallax against the
+// fixed COCKPIT_EYE is ~1 mm of apparent shift and invisible.
 const MIRROR_DEFS: Record<MirrorKind, MirrorDef> = {
-  rear: { width: 256, height: 96, fovDeg: 14, pos: [0, 0.687, 0.575], yaw: 0, pitch: 0 },
-  left: { width: 160, height: 96, fovDeg: 18, pos: [0.905, 0.455, 0.592], yaw: 0, pitch: -0.08 },
-  right: { width: 160, height: 96, fovDeg: 18, pos: [-0.905, 0.455, 0.592], yaw: 0, pitch: -0.08 },
+  rear: {
+    width: 256,
+    height: 96,
+    fovDeg: 14,
+    pos: [0, 0.687, 0.575],
+    yaw: 0,
+    pitch: 0,
+    // 60 mm clears the authored casing, whose driver-facing face was measured
+    // (raycast on the shipped GLB) at chassis z 0.467 — 33 mm in front of the
+    // glass plane — with the dress reaching chassis x ±0.096 / y 0.759–0.850.
+    glassLiftM: 0.06,
+  },
+  left: {
+    width: 160,
+    height: 96,
+    fovDeg: 18,
+    pos: [0.905, 0.455, 0.592],
+    yaw: 0,
+    pitch: -0.08,
+    glassLiftM: 0,
+  },
+  right: {
+    width: 160,
+    height: 96,
+    fovDeg: 18,
+    pos: [-0.905, 0.455, 0.592],
+    yaw: 0,
+    pitch: -0.08,
+    glassLiftM: 0,
+  },
 };
 
 /** Mirror-camera near plane (m) — glass positions sit just outside the
@@ -211,6 +326,25 @@ export function MirrorRig({ mirrors, active }: { mirrors: MirrorMeshes; active: 
         stencilBuffer: false,
         type: HalfFloatType,
       });
+      // ORIENTATION (REF 7, second half). The rig's mirror-image flip used to
+      // live in VitokCockpit.ensureQuadUVs(mirrorU), which SYNTHESIZES UVs —
+      // and only "if the geometry has none". hero_interior.glb now ships
+      // TEXCOORD_0 on all three glass quads, so that helper has been a silent
+      // no-op and the authored UVs went straight through untouched. Those
+      // authored UVs are (verified by decoding the Draco buffers):
+      //     local +Y (quad top)   → v = 0
+      //     local +X              → u = 1
+      // while the target holds a plain rear-facing camera image: sky at v = 1,
+      // and — the camera keeps chassis +X as image-right — CAR-LEFT at u = 1.
+      // Rendered as-is that is upside down AND left-right unreversed, which is
+      // exactly what a live frame showed (road above sky, the building we had
+      // just passed on our left sitting on the mirror's right).
+      // Both corrections are one transform on the texture WE own, so nothing
+      // touches the shared GLTF geometry: centre (0.5, 0.5) with repeat
+      // (-1, -1) maps uv → 1 - uv on both axes. u flip = real glass (car-left
+      // reads on the mirror's left); v flip = right way up.
+      target.texture.center.set(0.5, 0.5);
+      target.texture.repeat.set(-1, -1);
       const camera = new PerspectiveCamera(
         def.fovDeg,
         def.width / def.height,
@@ -227,14 +361,39 @@ export function MirrorRig({ mirrors, active }: { mirrors: MirrorMeshes; active: 
     // `mirrors` is a new object per GLB (re)clone; preset is mount-constant.
   }, [mirrors, preset]);
 
-  // Swap the RTT material onto the glass; restore the authored material and
-  // dispose everything we created when the rig (or the GLB) goes away.
+  // Swap the RTT material onto the glass and lift the quad clear of its
+  // authored casing (see MIRROR_DEFS / REF 8); restore the authored material,
+  // position AND scale, and dispose everything we created, when the rig (or
+  // the GLB) goes away.
   useEffect(() => {
     const restores = entries.map((e) => {
       const previous = e.mesh.material;
+      const previousPosition = new Vector3().copy(e.mesh.position);
+      const previousScale = new Vector3().copy(e.mesh.scale);
       e.mesh.material = e.material;
+      // REF 8: slide the quad along the ray to the driver's eye and shrink it
+      // by the distance ratio — same pixels, 60 mm nearer than the casing.
+      // Both vectors are in the mesh's parent (GLB) frame, which the cabin
+      // mount reaches from chassis space by (−x, y + 0.55, −z).
+      const lift = MIRROR_DEFS[e.kind].glassLiftM;
+      if (lift !== 0) {
+        const toEye = new Vector3(
+          -COCKPIT_EYE.x,
+          COCKPIT_EYE.y + INTERIOR_MOUNT_Y_OFFSET,
+          -COCKPIT_EYE.z,
+        ).sub(e.mesh.position);
+        const distance = toEye.length();
+        if (distance > lift * 2) {
+          e.mesh.position.addScaledVector(toEye.divideScalar(distance), lift);
+          e.mesh.scale.multiplyScalar((distance - lift) / distance);
+          // Chassis +Y is GLB +Y (the mount's yaw-π only flips x and z).
+          if (e.kind === "rear") e.mesh.position.y -= MIRROR_DROP_M;
+        }
+      }
       return () => {
         e.mesh.material = previous;
+        e.mesh.position.copy(previousPosition);
+        e.mesh.scale.copy(previousScale);
       };
     });
     return () => {

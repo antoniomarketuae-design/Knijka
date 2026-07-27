@@ -18,7 +18,11 @@
 import type { StagedEventSpec } from "../contracts";
 import type { RecordedDrive } from "./recorder";
 import { recordScAcNightLightsDrive, type ScAcNightLightsTraceName } from "./scAcNightLights";
-import { recordScAcRainLightsDrive, type ScAcRainLightsTraceName } from "./scAcRainLights";
+import {
+  recordScAcRainLightsDrive,
+  scAcRainLightsClipStaged,
+  type ScAcRainLightsTraceName,
+} from "./scAcRainLights";
 import { recordScEdD2CityRunDrive, type ScEdD2CityRunTraceName } from "./scEdD2CityRun";
 import {
   recordScFollowDistanceDrive,
@@ -35,7 +39,11 @@ import { recordScLaneChangeDrive, type ScLaneChangeTraceName } from "./scLaneCha
 import { recordScMwDisciplineDrive, type ScMwDisciplineTraceName } from "./scMwDiscipline";
 import { recordScOvBanOvertakeDrive, type ScOvBanOvertakeTraceName } from "./scOvBanOvertake";
 import { recordScOvOneWayDrive, type ScOvOneWayTraceName } from "./scOvOneWay";
-import { recordScOvSolidLineDrive, type ScOvSolidLineTraceName } from "./scOvSolidLine";
+import {
+  recordScOvSolidLineDrive,
+  scOvSolidLineClipStaged,
+  type ScOvSolidLineTraceName,
+} from "./scOvSolidLine";
 import { recordScParkPerpRevDrive, type ScParkPerpRevTraceName } from "./scParkPerpRev";
 import { recordScPkBanStopDrive, type ScPkBanStopTraceName } from "./scPkBanStop";
 import {
@@ -45,7 +53,11 @@ import {
 } from "./scRoundaboutEntry";
 import { recordScRxUnguardedDrive, type ScRxUnguardedTraceName } from "./scRxUnguarded";
 import { recordScSpeedCreepDrive, type ScSpeedCreepTraceName } from "./scSpeedCreep";
-import { recordScSpeedRainDrive, type ScSpeedRainTraceName } from "./scSpeedRain";
+import {
+  recordScSpeedRainDrive,
+  scSpeedRainClipStaged,
+  type ScSpeedRainTraceName,
+} from "./scSpeedRain";
 import { recordScVpReadinessDrive, type ScVpReadinessTraceName } from "./scVpReadiness";
 import { recordScVuEmergencyDrive, type ScVuEmergencyTraceName } from "./scVuEmergency";
 import { recordScZebraApproachDrive, type ScZebraApproachTraceName } from "./scZebraApproach";
@@ -149,6 +161,19 @@ const CLIP_STAGED_OVERRIDES: Readonly<
   // for the CLIP only (the recording keeps the far stream; see reelClipStaged).
   "sc-animal-hazard": (mi) => reelClipStaged("sc-animal-hazard", mi),
   "sc-lane-control-signal": (mi) => reelClipStaged("sc-lane-control-signal", mi),
+  // Founder R0 „nothing is happening": two EGO-ONLY faults whose recordings
+  // legitimately stage no actor, so the clip framed an empty road and the
+  // student saw no reason for the manoeuvre / no measure of the speed. Both get
+  // the missing conflict actor FOR THE CLIP ONLY — the slow truck the solid
+  // line is crossed to get past, and the wet-pace traffic the rain speeder
+  // reels in. Grading is byte-identical (see each recorder's comment).
+  "sc-ov-solid-line": scOvSolidLineClipStaged,
+  "sc-speed-rain": scSpeedRainClipStaged,
+  // Founder R0 „the road is completely visible, this contradicts the question":
+  // the AC-02 lesson is „лампите са за да те ВИЖДАТ", and the recording drives
+  // an empty street — nobody in frame for whom the unlit car is invisible. The
+  // clip gets an oncoming stream on the far bank (see scAcRainLightsClipStaged).
+  "sc-ac-rain-lights": scAcRainLightsClipStaged,
 };
 
 /**

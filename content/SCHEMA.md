@@ -137,6 +137,57 @@ unused — prefer the data-driven kinds.
 }]
 ```
 
+## hazard/items.json
+
+Hazard-perception items. **Not part of the theory content graph** — it is not
+read by `lib/content/loader` and has no topic/concept keys of its own; it is
+loaded and validated by `@/modules/hazard` (`bank.ts`), which is why it is a
+versioned object rather than a bare array.
+
+```json
+{
+  "version": 1,
+  "items": [{
+    "id": "hz-zebra-hot-approach",        // "hz-" prefix, kebab-case
+    "status": "needs-review",             // only "approved" is ever dealt
+    "clip": {
+      "id": "sc-zebra-approach__m0",      // "<templateId>__m<mistakeIndex>"
+      "templateId": "sc-zebra-approach",
+      "mistakeIndex": 0,
+      "tracePath": "content/traces/sc-zebra-approach/mistake-too-fast.trace.json"
+    },
+    "clipStartSec": 0,                    // TRACE s — the rig's trim origin
+    "faultSec": 7.07,                     // TRACE s — frozen from CLIP_PLAN
+    "windowOpenSec": 3.07,                // CLIP s — scoring opens
+    "cutSec": 7.07,                       // CLIP s — playback + scoring stop
+    "difficulty": 1,
+    "titleBg": "…", "briefBg": "…",       // read BEFORE play — never name the hazard
+    "hazardBg": "…", "developingBg": "…", // the reveal, after grading only
+    "violationCode": "PEDESTRIAN_CROSSING_TOO_FAST",  // sim rule catalog
+    "lawRefEcho": "ЗДвП чл. 119",         // review-only echo; must match the catalog
+    "notesBg": "R0: what a reviewer must confirm"
+  }]
+}
+```
+
+Rules, all enforced at load (`buildHazardBank`) and gated by
+`modules/hazard/__tests__/items.test.ts`:
+
+1. **Two time bases.** `clipStartSec`/`faultSec` are TRACE seconds;
+   `windowOpenSec`/`cutSec` are CLIP seconds (`trace − clipStartSec`). The
+   student's presses are always CLIP seconds — that is the only clock a browser
+   has.
+2. `windowOpenSec ≥ 1` (a real run-up), `cutSec − windowOpenSec ≥ 1.5`, and
+   `cutSec ≤ faultSec − clipStartSec`. **The clip must stop at or before the
+   fault** — a clip that runs on measures reaction time, not perception.
+3. `faultSec` is COPIED from `platform/src/modules/clips/clipPlan.generated.ts`
+   and frozen; regenerating the plan must never silently re-grade past attempts.
+   Drift fails the test — re-author the item, do not edit the expectation.
+4. The corrective and the citation are **retrieved** from the rule catalog at
+   read time (ADR-002). `lawRefEcho` is a review convenience and must match it.
+5. `status` stays `needs-review` until a human has WATCHED the cut and confirmed
+   `windowOpenSec` is where the cue actually becomes visible.
+
 ## Hard rules for generators
 
 1. **ORIGINAL questions only.** Never copy or closely paraphrase official listovki items (copyright risk R5). Same concepts, fresh wording and scenarios.

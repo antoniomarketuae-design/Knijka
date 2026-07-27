@@ -26,6 +26,7 @@
 
 import Link from "next/link";
 import { useMemo, useRef, useState, type ReactNode } from "react";
+import { CheckControl } from "@/components/ui/CheckControl";
 import { VIOLATIONS, type FailReason, type ViolationCode } from "../rules";
 import {
   REACTION_BAND_LABELS_BG,
@@ -462,7 +463,11 @@ export function SessionEndScreen({
             <h3 className="text-sm font-extrabold">Къде се случи</h3>
             {commendationMarkers.length > 0 ? (
               <label className="ml-auto flex cursor-pointer items-center gap-1.5 text-xs font-semibold text-muted">
-                <input
+                {/* This one shipped with no class at all — a raw UA control on
+                    the cluster palette, i.e. the worst case of the whole bug
+                    class. It is also the only interactive thing in this header
+                    row, so a box that reads as empty is a toggle nobody finds. */}
+                <CheckControl
                   type="checkbox"
                   checked={showGood}
                   onChange={(e) => setShowGood(e.target.checked)}

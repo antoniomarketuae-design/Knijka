@@ -160,6 +160,52 @@ describe("sc-ac-crosswind — mistake demos grade their exact codes (doc 76 §9 
     const codes = [...new Set(violationCodes(drive))].sort();
     expect(codes).toEqual([...SC_AC_CROSSWIND.mistakes[1].codeRefs].sort());
     expect(codes).not.toContain("CENTER_LINE_TOUCHED"); // the gust push stays in-band
+    // A MISTAKE demo must never collect the shadow's positive: the old staging
+    // ran its wrong pose past the 250 m cleanDrivingDistanceM streak and earned
+    // CLEAN_DRIVING two tenths before the fault.
+    expect(commendationCodes(drive)).not.toContain("CLEAN_DRIVING");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Founder R0 — „the car moves straight than right close to the side cars than
+// left center of the lane again"
+// ---------------------------------------------------------------------------
+
+describe("sc-ac-crosswind — the over-correction reads as ONE held wrong pose", () => {
+  // This is the demo the clip pilot renders (ev-loss-of-control-recovery). The
+  // founder read it as aimless wandering, and the polyline was: the car passed
+  // THROUGH each pose instead of sitting in one. The clip's keyframes are
+  // [start, fault−2, fault, fault+2, end] — so the fault beat only reads if the
+  // car is still out of its lane 2 s either side of the conviction.
+  const drive = drives.get("mistake-overcorrect")!;
+  const CURB_SIDE_X = LANE_CENTER_X + DEFAULT_RULE_CONFIG.laneKeepMaxOffsetM;
+
+  it("holds the curb-side pose across the whole fault beat (fault ± 2 s)", () => {
+    const fault = drive.ruleEvents.find(
+      (e) => e.kind === "violation" && e.code === "POOR_LANE_KEEPING",
+    )!;
+    expect(fault).toBeDefined();
+    // FAULT_BEAT_SPAN_S in clips/capture/capturePlan.ts — the keyframe half-width.
+    const beat = drive.trace.samples.filter(
+      (s) => s.tSec >= fault.t - 2 && s.tSec <= fault.t + 2,
+    );
+    expect(beat.length).toBeGreaterThan(20); // a real band of samples, not an edge
+    expect(Math.min(...beat.map((s) => s.x))).toBeGreaterThan(CURB_SIDE_X);
+  });
+
+  it("the yank is a SNAP, not a drift — ≥ 0.15 m of lateral per metre of road", () => {
+    // The push-left and the yank-right have to be distinguishable at 25 fps.
+    // The old polyline moved 5.1 m sideways over 40 m of road (0.13 m/m) and
+    // read as a lazy curve; the yank is authored steeper than the gust push.
+    const s = drive.trace.samples;
+    let maxRate = 0;
+    for (let i = 1; i < s.length; i++) {
+      const dy = s[i]!.y - s[i - 1]!.y;
+      if (dy <= 0.05) continue;
+      maxRate = Math.max(maxRate, (s[i]!.x - s[i - 1]!.x) / dy);
+    }
+    expect(maxRate).toBeGreaterThan(0.15);
   });
 });
 

@@ -120,18 +120,71 @@ const RAIN_DAY_BEAM_SCALE = 0.45;
 // sees them on the car (the exterior shell hides in cockpit view, but these —
 // like the windshield plane and the beam spots — live on the chassis group).
 // Parked they rest near-horizontal at the cowl; while
-// CabinControls.driveline.wipersOn they sweep a ~70° arc; switched off they
+// CabinControls.driveline.wipersOn they sweep a ~97° arc; switched off they
 // finish the stroke and ease back to park (a real wiper relay). Render-only,
 // zero-allocation: two rotation.z writes per frame, and only while the blades
 // are away from park.
+//
+// REF 7 PARK POSE (2026-07-27) — „a dark bar floats over the road ahead,
+// detached from the car". The parenting was never wrong: both blades are in
+// the windshield plane's own frame on the chassis group. The PARK ANGLE was.
+// Projecting the parked blade from COCKPIT_EYE (windshield frame pos
+// (0, 0.66, 0.76), rot x −0.62; visible glass runs from sightline v −0.233 at
+// the base to +0.203 at the header, horizon at 0):
+//
+//   park (rad)  1.15 (was)   1.30    1.38    1.44    1.50 (now)
+//   blade tip        27.5%   18.1%   13.8%   10.6%    7.5%   up the visible glass
+//   tilt above horiz  24.1°   15.5°   10.9°    7.5°     4.1°
+//
+// At 1.15 the parked blade stood a quarter of the way up the windshield, dead
+// in the road sightline with the cowl far below it — hence "floating bar". At
+// 1.50 it lies 4° off horizontal and hugs the glass base, where a parked wiper
+// belongs. The pivots also drop 8 mm to the glass base (−0.268 of the plane's
+// ±0.275 half-height). WIPER_TOP_RAD is unchanged, so the wiped arc still ends
+// just past vertical — the sweep gets WIDER (77° → 97°, a normal car wiper
+// arc), which only helps doc 62 #24's "make it visible".
+//
+// REF 8 PARK POSE (2026-07-27, R0 round 2) — REF 7 measured the blade against
+// the WINDSHIELD PLANE and got the right answer to the wrong question. What
+// actually decides whether a parked blade looks attached is the COWL
+// SIGHTLINE: the ray from COCKPIT_EYE (0.24, 0.71, −0.255) over the dash top
+// (chassis y 0.48 at z 0.70), i.e. y = 0.71 − 0.2408·(z + 0.255) — the same
+// `cowl_ray` the interior author script uses. Anything ABOVE that ray is
+// silhouetted against road and sky no matter how flat it lies.
+//
+// At REF 7's park the driver blade sat at chassis (x +0.30…−0.08, y 0.464,
+// z 0.90). The ray allows y ≤ 0.432 there, so the blade cleared the dash by
+// 32 mm and drew a hard black bar across the road — verified by projection
+// (it lands at px 507…783, y 554 in a 1100×900 frame) and by eye in the
+// rendered frame. Because the blade sits 200 mm FORWARD of the visible cowl
+// edge and the cowl falls away with distance, a flatter angle could never fix
+// it: only dropping the pivot can.
+//
+//   pivot y (plane-local)  −0.268 (REF 7)   −0.300   −0.322 (now)
+//   blade chassis y             0.464        0.438     0.420
+//   cowl-ray ceiling there      0.432        0.421     0.415
+//   verdict                  32 mm PROUD    17 mm     flush with the cowl
+//
+// −0.322 with the park angle at a true π/2 puts the whole blade — top edge
+// included — on the cowl line, where a parked wiper belongs: a hint of blade
+// against the dash lip, nothing crossing the road. WIPER_TOP_RAD is untouched,
+// so the wiped arc and doc 62 #24's visible sweep are unchanged; the blades
+// still rise fully into the glass the moment the wipers run.
 // ---------------------------------------------------------------------------
 /** Full wipe cycle (park → up → park), seconds — the audio swish cadence. */
 const WIPER_PERIOD_S = 1.3;
 /** Blade angle at park (rad about the glass normal; +Z rotation maps blade-Y
- *  toward −X = the passenger side on this LHD car — lying along the cowl). */
-const WIPER_PARK_RAD = 1.15;
+ *  toward −X = the passenger side on this LHD car — lying along the cowl).
+ *  π/2 = exactly horizontal in the glass plane, so the blade holds ONE height
+ *  along its whole length and the REF 8 table above applies end to end. */
+const WIPER_PARK_RAD = Math.PI / 2;
 /** Blade angle at the top of the sweep (just past vertical, driver side). */
 const WIPER_TOP_RAD = -0.2;
+/** Blade pivot height in the windshield plane's local frame (m) — REF 8: low
+ *  enough that the parked blade lies ON the cowl sightline instead of above
+ *  it. Below the plane's own −0.275 bottom edge on purpose: wipers park on the
+ *  cowl, under the glass, not on it. */
+const WIPER_PIVOT_Y = -0.322;
 /** Return-to-park rate when switched off mid-stroke (sweep fraction /s). */
 const WIPER_PARK_RETURN_PER_S = 1.4;
 /** Wiped-arc droplet clearing: ramp-in while wiping / creep-back after (1/s). */
@@ -640,23 +693,68 @@ export function VehicleRig({
           />
         </mesh>
 
-        {/* Wiper blades (doc 62 #24) — two thin dark blades in the windshield
-            plane's own frame (same pose as the glass above, nudged outward),
-            parked at the cowl and swept by useFrame while the wipers run.
-            Chassis-mounted, so the chase view sees them on the car and the
-            cockpit sees them through the glass. Default layer 0: the A4 mirror
-            cameras look backward and never frame the windshield. */}
+        {/* Wiper blades (doc 62 #24) — in the windshield plane's own frame
+            (same pose as the glass above, nudged 20 mm along its +Z, i.e.
+            OUTSIDE the glass, where a wiper lives), parked on the cowl line
+            (REF 8) and swept by useFrame while the wipers run. Chassis-
+            mounted, so the chase view sees them on the car and the cockpit
+            sees them through the glass. Default layer 0: the A4 mirror cameras
+            look backward and never frame the windshield.
+
+            GEOMETRY (REF 8): each blade is now an ARM plus a BLADE rather than
+            one 380 mm slab. The slab was what made the parked wiper read as an
+            abstract bar: a real wiper is a slim tapered arm that only becomes
+            a rubber blade past its knuckle. Same pivot, same angles, same
+            reach — the arc, the sweep phase and the droplet-clearing channel
+            are untouched.
+
+            R0 ROUND 3 — MASS AND TONE ONLY. The round-2 review called two
+            near-black girders across the mirror "the ugliest thing in the
+            frame" and read them as these wipers. They are not: raycasting
+            those exact pixels put both bars on the interior GLB's mirror stalk
+            and on the cockpit's own mirror fairing, ~400 px away from here
+            (see VitokCockpit's MIRROR POD block), and in the same rendered
+            frames the PARKED blades are invisible — the cowl hides them
+            completely at 1100×900 and at 1440×900, which is the REF 8 park
+            working as intended and must stay.
+            What is fair in that complaint is the RUNNING sweep: mid-stroke a
+            blade does cross sky, and at #191c21/#23262b it was the darkest
+            thing in the upper frame. So the sections come down ~20 % (arm
+            14 → 11 mm, blade 19 → 16 mm wide / 7 → 6 mm thick) and the albedos
+            move off near-black to satin-graphite arm + dark-rubber blade. The
+            blade still measures ~10 px across at 1440×900 mid-sweep, so doc 62
+            #24 ("the wiper button does nothing visible") stays fixed. PIVOTS,
+            REACH, WIPER_PARK_RAD, WIPER_TOP_RAD, the period and the phase are
+            all untouched. */}
         <group position={[0, 0.66, 0.76]} rotation={[-0.62, 0, 0]}>
-          <group ref={wiperLRef} position={[0.3, -0.26, 0.02]} rotation={[0, 0, WIPER_PARK_RAD]}>
-            <mesh position={[0, 0.19, 0]}>
-              <boxGeometry args={[0.022, 0.38, 0.008]} />
-              <meshStandardMaterial color="#23262b" roughness={0.7} metalness={0.25} />
+          <group
+            ref={wiperLRef}
+            position={[0.3, WIPER_PIVOT_Y, 0.02]}
+            rotation={[0, 0, WIPER_PARK_RAD]}
+          >
+            {/* arm: pivot → knuckle */}
+            <mesh position={[0, 0.085, 0.004]}>
+              <boxGeometry args={[0.011, 0.17, 0.011]} />
+              <meshStandardMaterial color="#23272d" roughness={0.5} metalness={0.55} />
+            </mesh>
+            {/* blade: knuckle → tip (reach unchanged at 0.38) */}
+            <mesh position={[0, 0.275, 0]}>
+              <boxGeometry args={[0.016, 0.21, 0.006]} />
+              <meshStandardMaterial color="#2d3138" roughness={0.85} metalness={0.05} />
             </mesh>
           </group>
-          <group ref={wiperRRef} position={[-0.34, -0.26, 0.02]} rotation={[0, 0, WIPER_PARK_RAD]}>
-            <mesh position={[0, 0.17, 0]}>
-              <boxGeometry args={[0.022, 0.34, 0.008]} />
-              <meshStandardMaterial color="#23262b" roughness={0.7} metalness={0.25} />
+          <group
+            ref={wiperRRef}
+            position={[-0.34, WIPER_PIVOT_Y, 0.02]}
+            rotation={[0, 0, WIPER_PARK_RAD]}
+          >
+            <mesh position={[0, 0.075, 0.004]}>
+              <boxGeometry args={[0.011, 0.15, 0.011]} />
+              <meshStandardMaterial color="#23272d" roughness={0.5} metalness={0.55} />
+            </mesh>
+            <mesh position={[0, 0.245, 0]}>
+              <boxGeometry args={[0.016, 0.19, 0.006]} />
+              <meshStandardMaterial color="#2d3138" roughness={0.85} metalness={0.05} />
             </mesh>
           </group>
         </group>

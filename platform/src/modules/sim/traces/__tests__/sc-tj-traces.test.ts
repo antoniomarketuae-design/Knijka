@@ -145,7 +145,7 @@ describe("sc-junction-rhr — mistake demos grade their exact codes (doc 76 §9 
     expect(drive.outcomes.find((o) => o.eventId === "sc-jrhr-conflict")?.detail).toBe("violation");
   });
 
-  it("„Навлизане без оглеждане“: the authored consequence — exactly COLLISION (vehicle)", () => {
+  it("„Навлизане без оглеждане“: the consequence — exactly COLLISION (vehicle)", () => {
     const drive = rhr.get("mistake-no-look")!.drive;
     const codes = [...new Set(violationCodes(drive))].sort();
     expect(codes).toEqual([...SC_JUNCTION_RHR.mistakes[1].codeRefs].sort());
@@ -154,6 +154,30 @@ describe("sc-junction-rhr — mistake demos grade their exact codes (doc 76 §9 
     // And the demo really shows NO observation: zero glances after the spawn.
     const glances = drive.trace.events.filter((e) => e.kind.startsWith("glance-"));
     expect(glances).toEqual([]);
+  });
+
+  it("„Навлизане без оглеждане“: the car reaches the MIDDLE of the box, across the priority lane", () => {
+    // Founder R0: „the car actually must enter the junction to the middle of it
+    // so it creates disturbance for the traffic car which almost colides with
+    // it, currently the shadow car is just stopping and the traffic car passes
+    // normally with enourmous distance between them." The earlier demo halted
+    // at y = −15 — 19 m of empty asphalt from the priority car's east→west lane
+    // at y = +4.06 — so the strike had to be authored over an empty box.
+    const drive = rhr.get("mistake-no-look")!.drive;
+    const collision = drive.ruleEvents.find((e) => e.kind === "violation" && e.code === "COLLISION")!;
+    const at = createTracePoint();
+    sampleAt(drive.trace, collision.t, at);
+    // The ego's body is ON the crossing lane when it is struck: inside the
+    // junction core AND within a lane-width of the priority car's own line.
+    expect(Math.hypot(at.x, at.y)).toBeLessThan(6);
+    expect(Math.abs(at.y - 4.0625)).toBeLessThan(3);
+    // …and it is still rolling into it (the guard on the priority car cannot
+    // stop in time, which is exactly why the meeting is real).
+    expect(Math.abs(at.speedKmh)).toBeGreaterThan(2);
+    // It ends stalled there, not tucked back on the stem.
+    const last = drive.trace.samples[drive.trace.samples.length - 1];
+    expect(Math.hypot(last.x, last.y)).toBeLessThan(6);
+    expect(Math.abs(last.speedKmh)).toBeLessThan(0.5);
   });
 });
 

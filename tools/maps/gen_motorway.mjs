@@ -41,10 +41,25 @@
  *     detector grades the SP-10 flow-differential fault against that 50 line
  *     as второстепенна, not a phantom absolute limit.
  *
- * KNOWN VISUAL GAP (honest, the gen_rural_curve А1 precedent): the emergency
- * lane renders as a third marked lane (no dedicated М2 wide-edge-line asset
- * yet) and no Д1 „Автомагистрала" sign asset exists — the zone GRADES
- * correctly; the scenario copy carries the sign teaching until an asset drop.
+ * THE М2 LINE, no longer a gap: this header used to record that the emergency
+ * lane „renders as a third marked lane", and the founder's verdict-board note
+ * on sc-hz-breakdown-pulloff said the same in his words („the marking on the
+ * road is not showing it either"). builders/markings.ts now paints the span's
+ * inner boundary with EMERGENCY_LANE_SEAM_WIDTH_M — the wide continuous М2 —
+ * and, because `motorway` is deliberately outside ARTERIAL_CLASSES (no street
+ * furniture on a motorway) so nothing drew the outside either, the carriageway
+ * EDGE line on the curb side as well. The shoulder is therefore bounded on both
+ * sides by paint that is not a lane divider, which is what makes it read as the
+ * лента за принудително спиране rather than a lane you may use. The zone data
+ * did not move, so no verdict moved: EMERGENCY_LANE_DRIVING still grades laneId
+ * 0 ∈ span. Agreement battery: sim/world/__tests__/sign-marking-agreement.test.ts.
+ *
+ * KNOWN VISUAL GAP (honest, the gen_rural_curve А1 precedent): no Д5
+ * „Автомагистрала" sign asset exists — content/signs/svg/d5.svg is authored but
+ * tools/blender/signs.py never bakes it into a GLB, and world/types.ts has no
+ * matching SignKind. Posting a face the kit does not ship would be the same
+ * class of lie the М2 fix above exists to remove, so the scenario copy carries
+ * the sign teaching until that asset drop.
  *
  * Deterministic: same params → byte-identical JSON. No randomness, no OSM.
  * Run:  node tools/maps/gen_motorway.mjs

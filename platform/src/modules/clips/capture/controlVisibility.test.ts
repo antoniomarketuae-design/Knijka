@@ -58,6 +58,12 @@ const GOVERNED_CLIPS: ReadonlyArray<readonly [string, readonly string[]]> = [
   ["sc-speed-rain__m0", ["limit50"]], // В26-50 (the in-force limit — rain reps ev-speed-limit)
   ["sc-roundabout-entry__m0", ["giveWay"]], // Б1
   ["sc-junction-stop__m0", ["stop"]], // Б2
+  // В1 — graduated out of the exception list on 2026-07-27. The founder's
+  // verdict-board note ("the one-way street is stated by lane arrows and
+  // nothing else") was fixed at the world-build level: props.ts now places the
+  // В1 post at the mouths network.onewayNoEntryArms tags, so the sign this clip
+  // teaches finally exists and must clear the same bar as every other control.
+  ["sc-ov-oneway__m0", ["noEntry"]],
 ];
 
 interface Loaded {
@@ -190,12 +196,22 @@ describe.each(GOVERNED_CLIPS)("%s — the governing control passes through frame
   });
 });
 
-describe("sc-ov-oneway__m0 — the missing В1 is a declared CONTENT gap", () => {
-  it("the card says СЪДЪРЖАНИЕ instead of faking a visible sign", () => {
+describe("sc-ov-oneway__m0 — the В1 content gap is CLOSED", () => {
+  it("the world places the В1 post the card names", () => {
     const { plan, posts } = load("sc-ov-oneway__m0");
-    expect(posts.some((p) => p.kind === "noEntry")).toBe(false); // world truth today
-    expect(plan.notes).toContain("СЪДЪРЖАНИЕ");
+    // This asserted `false` until 2026-07-27: the В1 GLB shipped unused, so the
+    // card could only apologise for a sign that was not there. The clip is now
+    // held to the real bar by GOVERNED_CLIPS above — this case just pins the
+    // direction of travel, so nobody "fixes" a future failure by unwiring it.
+    expect(posts.some((p) => p.kind === "noEntry")).toBe(true);
     expect(plan.governingControl.label).toContain("В1");
+  });
+
+  it("the card no longer apologises for a sign the student can now see", () => {
+    const { plan } = load("sc-ov-oneway__m0");
+    // A СЪДЪРЖАНИЕ note beside a rendered sign is worse than no note: it tells
+    // the student the picture is incomplete when it is not.
+    expect(plan.notes ?? "").not.toContain("СЪДЪРЖАНИЕ");
   });
 });
 

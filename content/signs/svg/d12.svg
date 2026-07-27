@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" role="img" aria-labelledby="t">
 <title id="t">Д12 — Край на населено място</title>
-<rect x="6" y="58" width="188" height="84" rx="8" fill="#fff" stroke="#1d1d1b" stroke-width="5"/>
+<rect x="6" y="58" width="188" height="84" rx="8" fill="#fff" stroke="#1d1d1b" stroke-width="5" data-plate="true"/>
 <text x="100" y="113" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-weight="bold" font-size="36" fill="#1d1d1b">СОФИЯ</text>
-<line x1="14" y1="134" x2="186" y2="66" stroke="#c1121f" stroke-width="12"/>
+<line x1="14" y1="134" x2="186" y2="66" stroke="#c1121f" stroke-width="12" data-span="face"/>
 </svg>

@@ -11,3 +11,15 @@ build/
 coverage/
 *.tsbuildinfo
 .mcp.json
+
+# clip rig server state (pid + log) — tools/clips/headless/clip-rig.mjs
+tools/clips/headless/.rig/
+
+# R0 review frames — captured to LOOK at (doc 66: look before you ship), then
+# thrown away. They are evidence for one review, not product: the pipeline's
+# real outputs are the .webm + WebP keyframes under platform/public/clips/.
+# NOTE: tools/clips/headless/sheets/ IS tracked — those contact sheets are
+# referenced from the docs, so the rule below deliberately does not reach them.
+tools/clips/headless/*.png
+tools/clips/headless/r0*/
+tools/clips/headless/cluster/

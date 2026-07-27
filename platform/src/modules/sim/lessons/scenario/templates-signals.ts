@@ -455,9 +455,28 @@ export const SC_SIGNAL_CONTROLLER_EVENT: TrafficControllerSpec = {
   libraryEventId: "JU-18",
   signalNodeId: "sx-n-c",
   junction: { x: 0, y: 0 },
-  // The junction-center post: 4 m left of the player's northbound lane center
-  // (drawn lane at x = 4.0625), facing the halted south approach.
-  officer: { x: 0, y: 0 },
+  /**
+   * The post: ON the centre line of the approach he is halting, 11 m south of
+   * the node — not at the junction's geometric centre.
+   *
+   * Founder review 2026-07-27: „the officer that is regulating the traffic is
+   * small not well visible from user POV". At (0, 0) he stood 28 m beyond the
+   * south stop line, so at the DECISION moment — the frame where the demo
+   * crosses that line against him — he was a ~30-pixel figure lost against the
+   * far kerb. At (0, −11) he is 16 m from the stop line and 3–4 m off the
+   * player's lane: roughly twice the apparent height, dead centre of the chase
+   * frame, and (which matters more) unmistakably addressing THIS approach —
+   * which is where a real регулировчик stands when he stops an axis.
+   *
+   * PURELY VISUAL, by construction: TrafficControllerRunner uses `officer` only
+   * to stage the figure's standing path (speed 0, pose "directTraffic"). Every
+   * graded quantity comes from `signalNodeId` / `junction` / `lineDistM` and the
+   * cluster's controller schedule, none of which moved. The one thing to keep an
+   * eye on is that he is a staged PEDESTRIAN: the runtime's pedestrian duty
+   * reads pedestrianOnCrossing only, and sx-v1's south arm carries no crossing
+   * here — the trace gate re-proves all three drives' exact codes.
+   */
+  officer: { x: 0, y: -11 },
   facing: { x: 0, y: -1 },
   haltedGroup: "ns",
   flipAtSec: 30,

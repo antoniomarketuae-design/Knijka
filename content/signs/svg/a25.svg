@@ -1,5 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" role="img" aria-labelledby="t">
 <title id="t">А25 — Кръстовище на равнозначни пътища</title>
-<polygon points="100,22 186,170 14,170" fill="#fff" stroke="#c1121f" stroke-width="16" stroke-linejoin="round"/>
-<g fill="#1d1d1b"><rect x="91" y="76" width="18" height="82"/><rect x="59" y="108" width="82" height="18"/></g>
+<polygon points="100,22 186,170 14,170" fill="#fff" stroke="#c1121f" stroke-width="16" stroke-linejoin="round" data-plate="true"/>
+<g fill="#1d1d1b"><rect x="92" y="74" width="16" height="82"/><rect x="66" y="110" width="68" height="16"/></g>
 </svg>

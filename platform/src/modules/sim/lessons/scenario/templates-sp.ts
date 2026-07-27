@@ -139,19 +139,35 @@ export const SC_SPEED_CREEP: ScenarioSpec = {
   ],
   rubric: { parTimeSec: 90 },
   shadow: { path: "content/traces/sc-speed-creep/shadow-correct.trace.json" },
+  // MISTAKE ORDER IS A FRAMING DECISION (founder R0 on the produced clip:
+  // „here totally not understandable … a car driving forward in a city street
+  // nothing else"). The why-panel serves ev-speed-limit with mistake INDEX 0
+  // (whyPanel DIRECT_SIM_REFS), and the clip rig frames a window around the
+  // engine fault. A speeding clip only reads if the CAP is in the same frame
+  // as the needle:
+  //   - the APPROACH demo breaks the 50, whose only rendered face is the В26
+  //     disc props.ts posts at the segment entry (y ≈ 14). The fault cannot be
+  //     dragged back to it — the car starts at rest and needs ~85 m just to
+  //     reach a sustained 57 — so that clip is structurally sign-less.
+  //   - the ZONE demo breaks the 30, and the 30 is painted ON THE ROAD every
+  //     120 m (markings.ts SPEED_GLYPH_* — 6 m numerals in the driver's own
+  //     lane). The recorder authors the conviction ONTO one of those numerals,
+  //     so the cap is under the ❌ and cannot leave the chase frame.
+  // So the ZONE demo leads. Both are still shipped and still graded the same;
+  // only the order (and therefore which one the clip pilot renders) changed.
   mistakes: [
-    {
-      traceRef: { path: "content/traces/sc-speed-creep/mistake-flow-along.trace.json" },
-      titleBg: "Носене с потока по подхода",
-      whatWentWrongBg:
-        "По дългия подход колата задържа около 57 км/ч, защото „всички карат така“ — но 51–60 км/ч в зона 50 е второстепенна грешка. В зоната водачът намали правилно; грешката вече беше отбелязана: ограничението е таван за всеки поотделно, потокът не го вдига.",
-      codeRefs: ["SPEEDING_OVER_LIMIT"],
-    },
     {
       traceRef: { path: "content/traces/sc-speed-creep/mistake-zone-creep.trace.json" },
       titleBg: "Пълзене в зоната 30",
       whatWentWrongBg:
         "Подходът беше дисциплиниран и колата влезе в зоната правилно, с 27 км/ч — но без поглед към скоростомера стрелката изпълзя до 37. Усещането при 37 в зона 30 е „бавно“; присъдата е същата второстепенна грешка като 57 в зона 50. Навикът да проверяваш стрелката важи двойно там, където таванът е нисък.",
+      codeRefs: ["SPEEDING_OVER_LIMIT"],
+    },
+    {
+      traceRef: { path: "content/traces/sc-speed-creep/mistake-flow-along.trace.json" },
+      titleBg: "Носене с потока по подхода",
+      whatWentWrongBg:
+        "По дългия подход колата задържа около 57 км/ч, защото „всички карат така“ — но 51–60 км/ч в зона 50 е второстепенна грешка. В зоната водачът намали правилно; грешката вече беше отбелязана: ограничението е таван за всеки поотделно, потокът не го вдига.",
       codeRefs: ["SPEEDING_OVER_LIMIT"],
     },
   ],

@@ -1844,9 +1844,45 @@ function RuntimeDriver({
   return null;
 }
 
-/** Collapsible key legend, top-left of the canvas — clear of the bottom HUD
- *  cards and the minimap. Default open so the keys are visible (collapsed on
- *  touch-only devices, where the touch overlay is the primary input). */
+/**
+ * One row of the key legend. `essential` marks the short default set — the
+ * keys a student needs to get the car moving and look around; everything else
+ * is reference material behind „Всички клавиши".
+ */
+interface ControlsHelpRow {
+  keys: string;
+  what: string;
+  essential?: boolean;
+}
+
+/**
+ * Bottom inset the legend must never cross: the glance-button cluster
+ * (GlanceEdgePings) is pinned at `bottom-3` and stands 50 px tall, so the
+ * legend's scroll box stops 4.5 rem above the scene floor. Anything shorter
+ * and the two overlap — which is exactly what happened before: in the shell
+ * the scene box is `aspect-video`, so at a 1100 px column it is only ~619 px
+ * tall and the 20-row sheet ran straight through the Л / З / Д chips and off
+ * the bottom edge.
+ */
+const CONTROLS_HELP_BOTTOM_INSET = "4.5rem";
+
+/**
+ * Collapsible key legend, top-left of the canvas.
+ *
+ * Layout law (do not regress): the root is a bounded flex column pinned
+ * top-3 → bottom-[4.5rem], and the row list is a `min-h-0 overflow-y-auto`
+ * flex child. The default flex-shrink then clamps the list to whatever height
+ * the scene box actually has, at EVERY viewport — a short scene scrolls the
+ * list instead of spilling it over the HUD below. The root is
+ * pointer-events-none so the reserved column never swallows canvas drags.
+ *
+ * Default state (considered, founder-facing): open, but showing the ~10
+ * ESSENTIAL rows only. Collapsing it outright would hide the keyboard from a
+ * first-time student who has no other way to discover the controls; showing
+ * all 20 rows ate ~22 % of the windscreen. The full sheet is one click away
+ * and stays open for the rest of the session. Touch-only devices still start
+ * fully collapsed — the touch overlay is the primary input there.
+ */
 function ControlsHelp({
   defaultOpen = true,
   topdownAllowed = true,
@@ -1857,63 +1893,99 @@ function ControlsHelp({
   topdownAllowed?: boolean;
 }) {
   const [open, setOpen] = useState(defaultOpen);
+  const [showAll, setShowAll] = useState(false);
   // The reversing-POV setting is persisted and toggled by K inside the canvas
   // (CameraRig owns the key, with G/N) — the row shows its live state so the
   // legend never lies about which way the view will turn.
   const reverseViewOn = useReverseViewEnabled();
-  const rows: Array<[string, string]> = [
-    ["W A S D", "кормуване (или стрелки)"],
-    ["I", "двигател: старт / стоп"],
-    ["[ ]", "скорости: към P / към D"],
-    ["S / ↓", "задръж на място → задна / напред"],
-    ["Space", "ръчна спирачка"],
-    ["Z", "съединител — задръж („Напреднал“)"],
-    ["B", "предпазен колан"],
-    [", .", "мигач ляво / дясно"],
-    ["L", "светлини"],
-    ["V", "фарове за мъгла"],
-    ["J", "аварийни светлини"],
-    ["T", "чистачки"],
-    ["H", "клаксон — задръж"],
-    ["Q E F", "огледала — задръж (ляво / дясно / назад)"],
-    ["Клик", "контролите в кабината (изглед кокпит)"],
-    ["C", topdownAllowed ? "изглед: кокпит / отвън / отгоре" : "изглед: кокпит / отвън"],
-    [
-      "K",
-      `автоматичен поглед назад при заден ход: ${reverseViewOn ? "вкл." : "изкл."}`,
-    ],
+  const rows: ControlsHelpRow[] = [
+    { keys: "W A S D", what: "кормуване (или стрелки)", essential: true },
+    { keys: "I", what: "двигател: старт / стоп", essential: true },
+    { keys: "[ ]", what: "скорости: към P / към D", essential: true },
+    { keys: "S / ↓", what: "задръж на място → задна / напред" },
+    { keys: "Space", what: "ръчна спирачка", essential: true },
+    { keys: "Z", what: "съединител — задръж („Напреднал“)" },
+    { keys: "B", what: "предпазен колан", essential: true },
+    { keys: ", .", what: "мигач ляво / дясно", essential: true },
+    { keys: "L", what: "светлини" },
+    { keys: "V", what: "фарове за мъгла" },
+    { keys: "J", what: "аварийни светлини" },
+    { keys: "T", what: "чистачки" },
+    { keys: "H", what: "клаксон — задръж" },
+    {
+      keys: "Q E F",
+      what: "огледала — задръж (ляво / дясно / назад)",
+      essential: true,
+    },
+    { keys: "Клик", what: "контролите в кабината (изглед кокпит)", essential: true },
+    {
+      keys: "C",
+      what: topdownAllowed ? "изглед: кокпит / отвън / отгоре" : "изглед: кокпит / отвън",
+      essential: true,
+    },
+    {
+      keys: "K",
+      what: `автоматичен поглед назад при заден ход: ${reverseViewOn ? "вкл." : "изкл."}`,
+    },
     ...(topdownAllowed
-      ? ([
-          ["G", "мащаб отгоре: 20 / 40 / 80 м (влиза в изглед отгоре)"],
-          ["N", "отгоре: север горе / посока горе"],
-        ] as Array<[string, string]>)
+      ? [
+          { keys: "G", what: "мащаб отгоре: 20 / 40 / 80 м (влиза в изглед отгоре)" },
+          { keys: "N", what: "отгоре: север горе / посока горе" },
+        ]
       : []),
-    ["X", "цял екран"],
-    ["R  ·  Esc", "рестарт · пауза"],
+    { keys: "X", what: "цял екран" },
+    { keys: "R  ·  Esc", what: "рестарт · пауза", essential: true },
   ];
+  const essentials = rows.filter((r) => r.essential);
+  const visible = showAll ? rows : essentials;
+  const hiddenCount = rows.length - essentials.length;
   return (
-    <div className="absolute left-3 top-3 z-10 max-w-[15rem]">
+    <div
+      data-hud="controls-help"
+      className="pointer-events-none absolute left-3 top-3 z-10 flex w-[min(15rem,45%)] flex-col items-start"
+      style={{ bottom: CONTROLS_HELP_BOTTOM_INSET }}
+    >
       <button
         type="button"
         tabIndex={-1}
         onMouseDown={(e) => e.preventDefault()}
         onClick={() => setOpen((o) => !o)}
         aria-expanded={open}
-        className="flex items-center gap-1.5 rounded-lg border border-border bg-background/80 px-2.5 py-1 text-[11px] font-semibold text-muted backdrop-blur transition hover:text-foreground"
+        className="pointer-events-auto flex shrink-0 items-center gap-1.5 rounded-lg border border-border bg-background/80 px-2.5 py-1 text-[11px] font-semibold text-muted backdrop-blur transition hover:text-foreground"
       >
         <span aria-hidden>⌨</span>
         Клавиши {open ? "▾" : "▸"}
       </button>
       {open ? (
-        <div className="mt-1 flex flex-col gap-1 rounded-xl border border-border bg-background/80 p-2.5 backdrop-blur">
-          {rows.map(([k, d]) => (
-            <div key={k} className="flex items-center gap-2 text-[11px]">
-              <kbd className="min-w-[3.75rem] rounded bg-surface px-1.5 py-0.5 text-center font-mono text-[10px] font-bold text-accent">
-                {k}
-              </kbd>
-              <span className="text-muted">{d}</span>
-            </div>
-          ))}
+        <div className="pointer-events-auto mt-1 flex min-h-0 w-full flex-col rounded-xl border border-border bg-background/80 backdrop-blur">
+          {/* Only the ROW LIST scrolls; the expander below stays pinned, so
+              the way back to the short list is never scrolled out of reach.
+              `scrollbar-width: thin` matters: on a short scene box a classic
+              17 px Windows scrollbar would eat 7 % of the 15 rem panel and
+              reflow every row. */}
+          <div className="flex min-h-0 flex-col gap-1 overflow-y-auto p-2.5 pb-1 [scrollbar-color:var(--border-strong)_transparent] [scrollbar-width:thin]">
+            {visible.map((row) => (
+              <div key={row.keys} className="flex shrink-0 items-center gap-2 text-[11px]">
+                <kbd className="min-w-[3.75rem] shrink-0 rounded bg-surface px-1.5 py-0.5 text-center font-mono text-[10px] font-bold text-accent">
+                  {row.keys}
+                </kbd>
+                <span className="text-muted">{row.what}</span>
+              </div>
+            ))}
+          </div>
+          {/* Reversible on purpose: the full sheet has to scroll on a short
+              scene box, and a student who opened it must be able to get the
+              short list back without collapsing the whole legend. */}
+          <button
+            type="button"
+            tabIndex={-1}
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={() => setShowAll((v) => !v)}
+            aria-expanded={showAll}
+            className="shrink-0 self-start rounded px-2.5 pb-2 pt-1 text-[11px] font-semibold text-accent transition hover:text-foreground"
+          >
+            {showAll ? "Само основните ▴" : `Всички клавиши (+${hiddenCount}) ▾`}
+          </button>
         </div>
       ) : null}
     </div>

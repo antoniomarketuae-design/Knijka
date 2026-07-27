@@ -14,12 +14,13 @@
  * sc-rx-tram-left is sc-turn-left-oncoming's site and machinery with a
  * RAIL-BOUND actor (the scJunctions scLtap* scripts are the mold): the same
  * sx-v1 spawn (105, 0) heading west, the same EW-green signal pin
- * (SX_PIN_EW_GREEN_WINDOW), the same R15 left-turn arc — but ONE oncoming
- * actor, the 14 m tram (profile "tram", cruise 8 m/s, gapSec 1.6 → inside
- * the ≤ 2 s conviction band). The shadow's wait is LONGER than the car
- * scenario's (9.5 s vs 7.5): the tram cruises slower (8 vs 8.5 m/s), clears
- * slower (11 vs 12.5) and its 14 m must pass IN FULL — the pedagogy is the
- * patience.
+ * (SX_PIN_EW_GREEN_WINDOW), the same R15 left-turn arc for the two drives that
+ * turn PROPERLY — but ONE oncoming actor, the 14 m tram (profile "tram",
+ * cruise 10.5 m/s, gapSec 1.6 → inside the ≤ 2 s conviction band). The shadow's
+ * wait is LONGER than the car scenario's (9.5 s vs 7.5) because its 14 m must
+ * pass IN FULL — the pedagogy is the patience. The MISTAKE takes its own
+ * corner-cut line (SX_LEFT_CUT) so the near miss is a near miss and not a
+ * crash; see that constant and the template's cruise-speed note.
  *
  * sc-rx-tram-island is the scCrossingBusShadow mold pointed at a tram stop:
  * the halted tram is a staged PROP on the dart-out spec itself (visible in
@@ -80,6 +81,41 @@ const SX_LEFT_TURN: Array<[number, number]> = [
   ...arcPts(10.9375, -10.9375, 15, 90, 180),
 ];
 
+/**
+ * „РЯЗАНЕ" — the corner-CUT line the mistake demo takes (founder review
+ * 2026-07-27: „the tram and the car actually colide … in real life scenarios
+ * the cars go infront of the trams and do not colide, just make it very hard
+ * for the tram to stop").
+ *
+ * The textbook SX_LEFT_TURN above is tangent to both lane centres, so it meets
+ * the tram's rail lane (y = −LANE) at x ≈ −2.4 — WEST of the junction node,
+ * where a tram held at a 1.6 s gap physically is. The consist's own speed
+ * (templates-rail) buys the metres; this line buys the rest by being the
+ * manoeuvre an impatient driver actually makes: he does not arc politely round
+ * the junction centre, he CUTS, peeling into the oncoming half early. It meets
+ * the rail lane at x ≈ +2.3 — ~4.7 m east of the arc and, more importantly,
+ * ~0.9 s SOONER after the node, so the car is already past the consist's line
+ * of travel while the tram is still hauling itself down (the staged
+ * playerGuard's 8 m/s²) 12 m short of it. Measured minimum clearance
+ * car-body → tram-nose: ~5 m.
+ *
+ * The graded act is UNCHANGED: the same left turn, committed inside the same
+ * authored 1.6 s gap (LEFT_TURN_CONVICT_GAP_SEC = 2.0), read by the same
+ * runtime N1 tracker — FAILED_TO_YIELD, left-turn-oncoming. The corner is kept
+ * to ≈ 15 m of effective radius so the TurnDetector's 55°/3 s window still arms
+ * (the recorder's curve cap ties speed to radius — rate ≈ √(2.4/r) rad/s — so a
+ * lazier corner turns too slowly to register at all, and the demo would grade
+ * NOTHING; the trace gate is what proves it did not).
+ */
+const SX_LEFT_CUT: Array<[number, number]> = [
+  [14, LANE],
+  [7.0, 1.0],
+  [1.6, -4.6],
+  [-2.0, -11.5],
+  [-3.4, -20],
+  [-LANE, -32],
+];
+
 function scRxTramLeftShadowScript(): DriveScript {
   return {
     steps: [
@@ -126,18 +162,18 @@ function scRxTramLeftMistakeCutScript(): DriveScript {
       { kind: "glance", mirror: "rear" },
       { kind: "drive", points: [[105, 0], [103, 0], [92, LANE], [40, LANE]], targetKmh: 26 },
       {
-        // The cut: constant speed through the mouth and across the tram's
-        // lane while it is ~1.6 s from the junction — the N1 tracker convicts
-        // (FAILED_TO_YIELD, left-turn-oncoming); the tram CANNOT brake like
-        // a car and cannot swerve at all.
+        // The cut: no lift, peel early across the tram's lane while it is
+        // ~1.6 s from the junction — the N1 tracker convicts (FAILED_TO_YIELD,
+        // left-turn-oncoming). The tram cannot swerve at all and stops in
+        // multiples of a car's distance: it stands on its brakes and the car
+        // scrapes through in front of it (see SX_LEFT_CUT).
         kind: "drive",
         points: [
           [40, LANE],
-          ...SX_LEFT_TURN,
-          [-LANE, -30],
+          ...SX_LEFT_CUT,
           [-LANE, -52],
         ],
-        targetKmh: 24,
+        targetKmh: 26,
       },
       { kind: "pause", sec: 1.8, brake: true },
       {

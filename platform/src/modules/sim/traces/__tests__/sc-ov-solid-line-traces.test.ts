@@ -19,8 +19,13 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { SC_OV_SOLID_LINE } from "../../lessons/scenario/templates-lanes";
+import { clipStagedOverrideFor } from "../clipReplay";
 import { parseScenarioTrace, serializeScenarioTrace } from "../parse";
-import { recordScOvSolidLineDrive, type ScOvSolidLineTraceName } from "../scOvSolidLine";
+import {
+  recordScOvSolidLineDrive,
+  scOvSolidLineClipStaged,
+  type ScOvSolidLineTraceName,
+} from "../scOvSolidLine";
 import type { RecordedDrive } from "../recorder";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -135,5 +140,49 @@ describe("pinned geometry — the template copies match the committed map", () =
     expect(d.meta.scenario?.banZone?.toM).toBe(SC_OV_SOLID_LINE.map.params.banToM);
     expect(d.zones?.[0]?.fromM).toBe(90);
     expect(d.zones?.[0]?.toM).toBe(230);
+  });
+});
+
+describe("the CLIP staging — the fault gets a MOTIVE without moving the verdict", () => {
+  // Founder R0: „overall good, the road marking is good, but there is not car
+  // infront of the shadow car which we overtake — just the car moving left
+  // wrongly." CROSSED_SOLID_LINE is an EGO-ONLY fault, so the graded run
+  // legitimately stages nobody; the produced clip then showed a swerve with no
+  // reason for it. The slow truck is added FOR THE CLIP ONLY.
+  it("the recorded, GRADED run still stages nothing (grading untouched)", () => {
+    expect(SC_OV_SOLID_LINE.staged ?? []).toEqual([]);
+    for (const name of NAMES) {
+      const ids = drives
+        .get(name)!
+        .outcomes.map((o) => o.eventId);
+      expect(ids).toEqual([]);
+    }
+  });
+
+  it("both mistakes get a slow vehicle on the PLAYER'S OWN bank, ahead of the pull-out", () => {
+    for (const mi of [0, 1]) {
+      const staged = scOvSolidLineClipStaged(mi);
+      expect(staged, `mistake ${mi}`).not.toBeNull();
+      expect(staged!.length).toBe((SC_OV_SOLID_LINE.staged ?? []).length + 1);
+      const lead = staged![staged!.length - 1];
+      expect(lead.kind).toBe("oncomingStream"); // path-locked, emits no events
+      if (lead.kind !== "oncomingStream") throw new Error("unreachable");
+      // Northbound = the ego's own direction, so it renders IN FRONT, not
+      // head-on: ovs-n-start → ovs-n-end is the map's south→north order.
+      expect(lead.actor.pathNodes).toEqual(["ovs-n-start", "ovs-n-end"]);
+      // Slow enough to be worth crossing a solid line for (both mistakes run
+      // 25–30 km/h through the span), and held inside the М1 span so it is in
+      // frame at the fault.
+      expect(lead.actor.cruiseSpeedMps * 3.6).toBeLessThan(20);
+      expect(lead.actor.hold.offsetM).toBeGreaterThan(Number(SC_OV_SOLID_LINE.map.params.banFromM));
+      expect(lead.actor.hold.offsetM).toBeLessThan(Number(SC_OV_SOLID_LINE.map.params.banToM));
+    }
+    // The shadow is never a clip subject — no override for anything else.
+    expect(scOvSolidLineClipStaged(2)).toBeNull();
+  });
+
+  it("is registered on the clip-capture path (otherwise the clip renders the empty road again)", () => {
+    expect(clipStagedOverrideFor(SCENARIO_ID, 0)).not.toBeNull();
+    expect(clipStagedOverrideFor(SCENARIO_ID, 1)).not.toBeNull();
   });
 });

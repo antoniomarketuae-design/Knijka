@@ -15,16 +15,19 @@
  *     then hogging the left lane past him — grades EXACTLY NOT_KEEPING_RIGHT
  *     (the 12 s keep-right sustain; the ignored signal itself shows as the
  *     unreached stop zone + the "passedWithoutStopping" outcome);
- *   - „Паника в лентата": the doc-72 mistake verbatim — a 12 m/s²-envelope
- *     slam from 46 km/h to a dead stop mid-lane, far short of the officer —
+ *   - „Паника в лентата": the doc-72 mistake verbatim — a startled ±0.7 m
+ *     weave and then a 12 m/s²-envelope slam from 46 km/h to a dead stop
+ *     mid-lane at y = 196, ten metres short of the halt zone at the officer —
  *     grades EXACTLY HARSH_BRAKING_NO_CAUSE (no cause exists on the empty
  *     street; a routine stop signal wants a PLANNED pull-over, not a slam).
  *
  * Geometry pinned to content/world/ln-v1.json: northbound right-lane center
  * x = 12.19, left-lane center x = 4.06, divider x = 8.125, curb x = 16.25;
  * spawn ln-spawn-start (12.19, 15, heading 0 = north), limit 50. The officer
- * stands at (17.0, 210); the halt zone centers (13.9, 206) r 3 — offsets stay
- * under the 3.25 m lane-keeping threshold and inside the right lane.
+ * stands at (15.6, 208) — ON the carriageway edge, clear of the curb-parked
+ * decoration he used to be buried in (templates-cockpit PS_OFFICER carries the
+ * founder note); the halt zone centers (13.9, 206) r 3 — offsets stay under the
+ * 3.25 m lane-keeping threshold and inside the right lane.
  *
  * Rule envelope the scripts respect: NOT_KEEPING_RIGHT needs laneId > 0 for
  * 12 s sustained with the left indicator OFF (the demo turns it off right
@@ -141,10 +144,43 @@ export function scVpPoliceStopMistakePanicScript(): DriveScript {
       { kind: "annotation", textBg: "Грешката: сигналът стряска — и кракът се забива в спирачката още в лентата." },
       { kind: "glance", mirror: "rear" },
       { kind: "drive", points: [[RIGHT, 15], [RIGHT, 100]], targetKmh: 46, stopAtEnd: false },
-      { kind: "annotation", textBg: "Полицаят е още далече напред, а колата спира аварийно насред платното." },
-      // The panic slam: a 12 m/s² envelope from 46 km/h to a dead stop at
-      // y ≈ 183 — mid-lane, ~23 m short of the halt point at the officer.
-      { kind: "drive", points: [[RIGHT, 100], [RIGHT, 183]], targetKmh: 46, maxDecelMps2: 12 },
+      { kind: "annotation", textBg: "Полицаят вдига палката — а колата не отбива: кормилото трепва и спирачката се забива насред платното." },
+      // The panic slam, now with the PANIC IN IT (founder review 2026-07-27:
+      // „it says panic in the lane but panic about what … there is no panic
+      // just a car driving straight"). Two changes, both purely in the ghost's
+      // own path, neither touching the graded envelope:
+      //   - the polyline carries a damped ±0.7 m weave over the last 60 m: the
+      //     startled hands. It is authored as many SHORT segments on purpose —
+      //     the recorder's pose heading is piecewise constant per segment, so
+      //     few long legs would snap the body between angles instead of rocking
+      //     it; these keep every step under ~5° and the car visibly squirms.
+      //     It stays FAR inside laneKeepMaxOffsetM (3.25) and never leaves
+      //     lane 0, so no lane code can arm;
+      //   - the rest is at y = 196, not 183 — still ~10 m short of the halt
+      //     zone (r = 3 at (13.9, 206)), so the stop objective is still unmet
+      //     and the outcome is still the failed pull-over, but the officer is
+      //     now ~13 m ahead instead of ~27 and reads at full size in the frame
+      //     the fault marker lands on.
+      // The 12 m/s² envelope from 46 km/h is unchanged — that is what
+      // HARSH_BRAKING_NO_CAUSE grades (onset ≥ 35 km/h, ≥ 7 m/s² for 0.4 s).
+      {
+        kind: "drive",
+        points: [
+          [RIGHT, 100],
+          [12.35, 138],
+          [12.75, 147],
+          [12.7, 155],
+          [12.1, 162],
+          [11.55, 169],
+          [11.5, 175],
+          [11.9, 181],
+          [12.35, 186],
+          [12.4, 191],
+          [RIGHT, 196],
+        ],
+        targetKmh: 46,
+        maxDecelMps2: 12,
+      },
       { kind: "pause", sec: 2.5, brake: true },
       {
         kind: "annotation",

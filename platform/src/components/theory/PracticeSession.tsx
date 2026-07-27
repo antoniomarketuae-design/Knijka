@@ -11,6 +11,7 @@ import {
 } from "react";
 import { submitPracticeAnswer } from "@/app/(dashboard)/theory/practice/actions";
 import { IconArrowRight, IconCheck, IconTarget, IconX } from "@/components/icons";
+import { CheckControl } from "@/components/ui/CheckControl";
 import { Gauge } from "@/components/hud/Gauge";
 import type { PracticeQuestionDto, PracticeSubmitResult } from "./types";
 import { hasSignOptions, QuestionMediaView, SignFace } from "./QuestionMedia";
@@ -53,6 +54,19 @@ const REASON_BADGES: Record<
   "weak-concept": { labelBg: "Слабо място", className: "bg-accent-2/15 text-accent-2" },
   "new-concept": { labelBg: "Ново", className: "bg-accent/15 text-accent" },
 };
+
+/**
+ * THE ANSWER BOX lives in components/ui/CheckControl — drawn by us, not by the
+ * user agent, because `accent-color` on a bare native control tints only the
+ * CHECKED fill and the cluster scope's `color-scheme: dark` had Chromium
+ * painting the empty one at 1.66 : 1. That file carries the measurements, the
+ * two Tailwind scanner traps, and the reason it must stay a real <input>.
+ *
+ * It is imported rather than copied now that eight screens mount the same box.
+ * The import is safe in the direction that used to worry us — CheckControl is a
+ * leaf with no dependency of its own, so the exam route can take it without
+ * dragging the why-panel or the clip replay along.
+ */
 
 function toPct(value: number): number {
   return Math.round(value * 100);
@@ -366,14 +380,14 @@ export function PracticeSession({
                     result === null ? "cursor-pointer" : "cursor-default"
                   }`}
                 >
-                  <input
+                  <CheckControl
                     type={current.type === "single" ? "radio" : "checkbox"}
                     name={`practice-${current.id}`}
                     value={option.id}
                     checked={isSelected}
                     onChange={() => toggleOption(option.id)}
                     disabled={result !== null}
-                    className="mt-1 h-4 w-4 shrink-0 accent-accent"
+                    className="mt-1"
                   />
                   <span
                     aria-hidden

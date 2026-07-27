@@ -79,16 +79,24 @@ const RX_RAIL_PATH: ReadonlyArray<{ x: number; y: number }> = [
  * world-data rail-crossing detectors alone convict a driver who fails to stop
  * (guarded maps keep their own barrier timetable unchanged). The train never
  * brakes for the player — it IS the hazard.
+ *
+ * `holdOffsetM` is the ONE per-map dial (founder review 2026-07-27, „the car
+ * colides in the train that is already moving — this is not good overview"):
+ * the arc the consist waits at before release sets WHEN its 34.4 m body sweeps
+ * the carriageway relative to the driver's own approach. The GUARDED maps keep
+ * the original 80 (the barrier, not the timing, is their story); the UNGUARDED
+ * map pulls the train back to RXU_TRAIN_HOLD_M so the „преминаване без спиране"
+ * demo passes IN FRONT of a train that is visibly bearing down instead of
+ * driving into its flank — see the constant.
  */
-function railTrainPassEvent(id: string): TrainPassSpec {
+function railTrainPassEvent(id: string, holdOffsetM = 80): TrainPassSpec {
   return {
     id,
     kind: "trainPass",
     railPath: RX_RAIL_PATH,
-    // Train centre waits ~50 m west of the street axis (off-frame) then runs
-    // east; at 12 m/s it reaches the carriageway ~when the player is at the
-    // СТОП line, so it visibly crosses while the driver stops and looks.
-    holdOffsetM: 80,
+    // Train centre waits off-frame west of the street axis, then runs east at
+    // 12 m/s so it visibly crosses around the driver's own crossing beat.
+    holdOffsetM,
     cruiseSpeedMps: 12,
     accelMps2: 3.5,
     triggerPlayerDistM: 55,
@@ -96,6 +104,29 @@ function railTrainPassEvent(id: string): TrainPassSpec {
     colorIndex: 0,
   };
 }
+
+/**
+ * rx-unguarded-v1's train hold arc, m along RX_RAIL_PATH (consist CENTRE; the
+ * nose sits TRAIN_LENGTH_M/2 ≈ 17.2 m further east). 32 ⇒ centre at x = −98,
+ * nose at x ≈ −81 — released (like every map) when the player is 55 m from the
+ * band, i.e. ~2.5 s LATER at the carriageway than the shipped 80.
+ *
+ * WHY THE NUMBER IS WHAT IT IS (the three recorded drives, measured):
+ *   - „Преминаване без спиране" is on the band t ≈ 18.2–19.2 s and the train's
+ *     nose reaches the player's lane at t ≈ 20.5 — a ~1.4 s NEAR MISS with a
+ *     34 m consist 26 m away at 43 km/h while the wheels are on the rails.
+ *     Before: nose and car occupied the same metre of track (a crash rendered
+ *     as a lesson about not stopping);
+ *   - the SHADOW and „Спиране върху релсите" both hold at the СТОП line long
+ *     enough for the whole consist to pass (their line pauses were lengthened
+ *     with this number — see traces/scRxUnguarded.ts), so the ritual is now
+ *     performed AGAINST a train instead of after one.
+ * GRADING IS UNTOUCHED BY CONSTRUCTION: the recorder stages no events for this
+ * template at all (the crossing zone is the trap), and the TrainPassRunner
+ * emits zero SimTick events even where it IS staged — the train is choreography
+ * the clip rig re-enacts over the committed trace.
+ */
+const RXU_TRAIN_HOLD_M = 32;
 /** rx-guarded-v1: the deterministic barrier timetable (down [0, 40) of 90 s). */
 const RXG_BARRIER_CYCLE_SEC = 90;
 const RXG_BARRIER_DOWN_FROM_SEC = 0;
@@ -200,7 +231,7 @@ export const SC_RX_UNGUARDED: ScenarioSpec = {
   // ADR-006 stage 3c: a real TRAIN crosses as the player approaches — the
   // hazard the mandatory full stop exists for (unguarded: NO barrier, the
   // train + the stop duty IS the lesson). Byte-neutral to grading.
-  staged: [railTrainPassEvent("sc-rxu-train")],
+  staged: [railTrainPassEvent("sc-rxu-train", RXU_TRAIN_HOLD_M)],
   conditions: { weather: "dry" },
   localeBg: "bg-BG",
 };
@@ -444,12 +475,28 @@ export const SC_RX_BARRIER_DROP: ScenarioSpec = {
 
 /**
  * The oncoming TRAM straight through sx-n-c from the west (the SC_LTAP_TIGHT
- * recipe with a rail-bound actor): cruise 8 m/s (~29 km/h — tram pace),
- * gapSec 1.6 — inside the LEFT_TURN_CONVICT_GAP_SEC = 2.0 band, so cutting
- * across it grades EXACTLY FAILED_TO_YIELD (left-turn-oncoming) through the
- * runtime's own N1 tracker, while the shadow waits it out and turns clean.
- * ONE actor (no follow car): after the tram clears, the street is empty —
- * the RX-05 decision is binary (the tram, or the wait).
+ * recipe with a rail-bound actor): cruise 10.5 m/s (~38 km/h — a tram running
+ * its own reserved lane on a green), gapSec 1.6 — inside the
+ * LEFT_TURN_CONVICT_GAP_SEC = 2.0 band, so cutting across it grades EXACTLY
+ * FAILED_TO_YIELD (left-turn-oncoming) through the runtime's own N1 tracker,
+ * while the shadow waits it out and turns clean. ONE actor (no follow car):
+ * after the tram clears, the street is empty — the RX-05 decision is binary
+ * (the tram, or the wait).
+ *
+ * WHY 10.5 AND NOT THE SHIPPED 8 (founder review 2026-07-27: „the tram and the
+ * car actually colide … in real life the cars go infront of the trams and do
+ * not colide, just make it very hard for the tram to stop"). The runner's
+ * arrival sync and the runtime's conviction are both denominated in SECONDS —
+ * the tram is held (gapSec + the player's node ETA) × cruise from the node, and
+ * the tracker convicts on distM / closingMps. So cruise speed is the one dial
+ * that changes the METRES of the encounter WITHOUT touching the graded gap: at
+ * 8 m/s the 14 m tram's NOSE was 5.8 m short of the node when the player got
+ * there (a body already in the box — the reported crash); at 10.5 it is 10.6 m
+ * short, and the corner-cut demo scrapes through with ~5 m of daylight while
+ * the tram stands on its brakes. The verdict is byte-identical
+ * (traces/__tests__/sc-rx-tram-traces.test.ts re-proves EXACTLY
+ * FAILED_TO_YIELD, and the shadow's YIELDED_TO_PRIORITY). clearSpeedMps rises
+ * with it (13) so the „sprint clear of the 36 m radius" beat stays one beat.
  */
 export const SC_RX_TRAM_LEFT_EVENT: OncomingLeftTurnSpec = {
   id: "sc-rxtl-tram",
@@ -458,14 +505,14 @@ export const SC_RX_TRAM_LEFT_EVENT: OncomingLeftTurnSpec = {
   actor: {
     pathNodes: ["sx-n-w", "sx-n-c", "sx-n-e"],
     hold: { nodeIndex: 1, offsetM: -80 },
-    cruiseSpeedMps: 8,
+    cruiseSpeedMps: 10.5,
     colorIndex: 0,
     profile: "tram", // the articulated rig (ADR-001 fictional livery)
   },
   junctionNodeIndex: 1,
   armDistM: 65,
   gapSec: 1.6,
-  clearSpeedMps: 11,
+  clearSpeedMps: 13,
 };
 
 /** RX-05 — релси в платното (ЗДвП чл. 8, ал. 2: при разрешено едновременно

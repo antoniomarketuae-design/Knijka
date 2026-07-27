@@ -145,6 +145,18 @@ const RIDGE_PATH = [
   "Z",
 ].join(" ");
 
+/**
+ * The box the drawn image is cropped into, exported because a SECOND layer now
+ * has to occupy exactly the same rectangle.
+ *
+ * HeroLoopVideo plays a raster of this very composition over the plate, and if
+ * the two boxes disagree by so much as the `top-[34%]` band the crossfade
+ * becomes a jump-cut on precisely the phones the loop exists for. One string,
+ * two consumers — the alternative is two hand-kept copies of a magic number
+ * that only ever get compared by eye on a device neither of us is holding.
+ */
+export const HERO_BAND_CLASS = "absolute inset-x-0 bottom-0 top-[34%] sm:top-0";
+
 export interface HeroPlateProps {
   /** Extra classes on the wrapper (positioning is the caller's business). */
   className?: string;
@@ -188,7 +200,7 @@ export function HeroPlate({ className = "" }: HeroPlateProps) {
        * warm sun band and the vanishing point. Centring it would cut the car
        * in half on exactly the devices that only ever see this layer.
        */}
-      <div className="absolute inset-x-0 bottom-0 top-[34%] sm:top-0">
+      <div className={HERO_BAND_CLASS}>
         <svg
           aria-hidden
           focusable="false"

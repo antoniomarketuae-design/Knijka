@@ -123,13 +123,28 @@ describe("model assignment", () => {
   it("is deterministic, covers the fleet, and follows the research mix", () => {
     const N = 30000;
     const counts = new Array(FLEET.length).fill(0);
+    // The per-id properties are compared plainly and reported ONCE below.
+    // Calling expect() three times per id built 90 000 assertion objects and
+    // cost ~9 s — past vitest's 5 s default on its own, so this test failed on
+    // a loaded box for reasons that had nothing to do with assignModel. Same
+    // three properties, same 30 000 ids, first offender still stops the loop
+    // exactly as a throwing expect() did; only the overhead is gone.
+    let nonDeterministicId = -1;
+    let outOfRangeId = -1;
     for (let id = 0; id < N; id++) {
       const m = assignModel(id);
-      expect(m).toBe(assignModel(id));
-      expect(m).toBeGreaterThanOrEqual(0);
-      expect(m).toBeLessThan(FLEET.length);
+      if (m !== assignModel(id)) {
+        nonDeterministicId = id;
+        break;
+      }
+      if (m < 0 || m >= FLEET.length) {
+        outOfRangeId = id;
+        break;
+      }
       counts[m]++;
     }
+    expect(nonDeterministicId, "assignModel gave two answers for this id").toBe(-1);
+    expect(outOfRangeId, "assignModel returned a model outside FLEET for this id").toBe(-1);
     // Every model spawns (variety is the point of fleet v2).
     for (let m = 0; m < FLEET.length; m++) expect(counts[m]).toBeGreaterThan(0);
     // Police ~1 in 15 (carve-out preserved from v1).

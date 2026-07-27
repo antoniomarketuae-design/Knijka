@@ -1067,7 +1067,7 @@
     ],
     "explanationBg": "На кръстовище без знаци и светофар важи правилото на дясностоящия: пропускаш всичко, което се намира или приближава отдясно, независимо кой е пристигнал пръв (чл. 48 ЗДвП). Отбелязаната точка е мястото, където траекториите ви се пресичат — гледай нея, не самата кола. „Движа се направо“ не е привилегия: посоката на движение не влиза в правилото.",
     "lawRefs": [{ "act": "ЗДвП", "ref": "чл. 48" }],
-    "media": {"kind":"sceneStill","districtId":"jx-equal-v1","focus":{"x":0,"y":0,"zoomM":60},"poses":[{"kind":"car","x":4.06,"y":-14,"headingDeg":0,"variant":"ego"},{"kind":"car","x":16,"y":4.06,"headingDeg":270}],"marks":[{"kind":"danger","x":4.06,"y":4.06},{"kind":"yield","x":4.06,"y":-8}]},
+    "media": {"kind":"sceneStill","districtId":"jx-equal-v1","focus":{"x":0,"y":0,"zoomM":60},"poses":[{"kind":"car","x":4.06,"y":-23,"headingDeg":0,"variant":"ego"},{"kind":"car","x":23,"y":4.06,"headingDeg":270}],"marks":[{"kind":"danger","x":4.06,"y":4.06},{"kind":"yield","x":4.06,"y":-13}]},
     "status": "approved"
   },
   {
@@ -1084,7 +1084,7 @@
     ],
     "explanationBg": "Колата отляво е длъжна да те пропусне — за нея ти си „дясностоящият“ по чл. 48 ЗДвП, а знаци за главен път тук няма. Имаш предимство, но то се взима с очи, не на доверие: чл. 20, ал. 2 те задължава да намалиш и при нужда да спреш, ако другият сгреши. Излишното изчакване също е грешка — то обърква насрещните и запушва кръстовището.",
     "lawRefs": [{ "act": "ЗДвП", "ref": "чл. 48" }, { "act": "ЗДвП", "ref": "чл. 20, ал. 2" }],
-    "media": {"kind":"sceneStill","districtId":"jx-equal-v1","focus":{"x":0,"y":0,"zoomM":60},"poses":[{"kind":"car","x":4.06,"y":-14,"headingDeg":0,"variant":"ego"},{"kind":"car","x":-16,"y":-4.06,"headingDeg":90}],"marks":[{"kind":"proceed","x":4.06,"y":-8}]},
+    "media": {"kind":"sceneStill","districtId":"jx-equal-v1","focus":{"x":0,"y":0,"zoomM":60},"poses":[{"kind":"car","x":4.06,"y":-23,"headingDeg":0,"variant":"ego"},{"kind":"car","x":-23,"y":-4.06,"headingDeg":90}],"marks":[{"kind":"proceed","x":4.06,"y":-15}]},
     "status": "approved"
   },
   {
@@ -1101,7 +1101,7 @@
     ],
     "explanationBg": "Завиващият наляво е длъжен да пропусне насрещно движещите се (чл. 37, ал. 1 ЗДвП) — предимството е твое. Но правило и реалност не винаги съвпадат, а чл. 20, ал. 1 иска непрекъснат контрол над колата: минаваш с крак върху спирачката и следиш дали той наистина изчаква. Ускоряването отнема точно секундата, която ти трябва, ако той тръгне.",
     "lawRefs": [{ "act": "ЗДвП", "ref": "чл. 37, ал. 1" }, { "act": "ЗДвП", "ref": "чл. 20, ал. 1" }],
-    "media": {"kind":"sceneStill","districtId":"jx-equal-v1","focus":{"x":0,"y":0,"zoomM":60},"poses":[{"kind":"car","x":4.06,"y":-16,"headingDeg":0,"variant":"ego"},{"kind":"car","x":-4.06,"y":14,"headingDeg":180}],"marks":[{"kind":"danger","x":4.06,"y":2},{"kind":"proceed","x":4.06,"y":-10}]},
+    "media": {"kind":"sceneStill","districtId":"jx-equal-v1","focus":{"x":0,"y":0,"zoomM":60},"poses":[{"kind":"car","x":4.06,"y":-23,"headingDeg":0,"variant":"ego"},{"kind":"car","x":-2.4,"y":2,"headingDeg":150}],"marks":[{"kind":"danger","x":4.06,"y":2},{"kind":"proceed","x":4.06,"y":-15}]},
     "status": "approved"
   },
   {
@@ -1118,7 +1118,7 @@
     ],
     "explanationBg": "При ляв завой пресичаш пътя на насрещното движение, затова законът поставя тежестта върху теб: пропускаш движещите се направо и завиващите надясно и завиваш чак когато пътят им е чист (чл. 37, ал. 1 ЗДвП). Навлизането пръв не създава право — то е нормалната поза на чакащия за ляв завой. И „едновременно“ не работи, когато траекториите се пресичат в една и съща точка.",
     "lawRefs": [{ "act": "ЗДвП", "ref": "чл. 37, ал. 1" }],
-    "media": {"kind":"sceneStill","districtId":"jx-equal-v1","focus":{"x":0,"y":0,"zoomM":60},"poses":[{"kind":"car","x":4.06,"y":-14,"headingDeg":0,"variant":"ego"},{"kind":"car","x":-4.06,"y":16,"headingDeg":180}],"marks":[{"kind":"danger","x":-4.06,"y":0},{"kind":"yield","x":4.06,"y":-8}]},
+    "media": {"kind":"sceneStill","districtId":"jx-equal-v1","focus":{"x":0,"y":0,"zoomM":60},"poses":[{"kind":"car","x":4.06,"y":-23,"headingDeg":0,"variant":"ego"},{"kind":"car","x":-4.06,"y":23,"headingDeg":180}],"marks":[{"kind":"danger","x":-4.06,"y":0},{"kind":"yield","x":4.06,"y":-13}]},
     "status": "approved"
   },
   {
@@ -1135,7 +1135,7 @@
     ],
     "explanationBg": "Б1 иска резултат, не ритуал: никой по пътя с предимство да не бъде принуден да намали заради теб (чл. 50, ал. 1 ЗДвП). Затова пълното спиране е задължително само когато е нужно — знакът изрично позволява пропускането да стане и без спиране (ППЗДвП чл. 46, ал. 1). И понеже булевардът е двупосочен, „само отдясно“ е половин оглед: колата отляво ще те удари точно толкова силно.",
     "lawRefs": [{ "act": "ЗДвП", "ref": "чл. 50, ал. 1" }, { "act": "ППЗДвП", "ref": "чл. 46, ал. 1" }],
-    "media": {"kind":"sceneStill","districtId":"jxg-giveway-v1","focus":{"x":0,"y":0,"zoomM":70},"poses":[{"kind":"car","x":4.06,"y":-16,"headingDeg":0,"variant":"ego"},{"kind":"car","x":-22,"y":-4.06,"headingDeg":90},{"kind":"car","x":26,"y":4.06,"headingDeg":270}],"marks":[{"kind":"yield","x":4.06,"y":-10}]},
+    "media": {"kind":"sceneStill","districtId":"jxg-giveway-v1","focus":{"x":0,"y":-12,"zoomM":76},"poses":[{"kind":"car","x":4.06,"y":-34,"headingDeg":0,"variant":"ego"},{"kind":"car","x":-32,"y":-4.06,"headingDeg":90},{"kind":"car","x":36,"y":4.06,"headingDeg":270}],"marks":[{"kind":"yield","x":4.06,"y":-29}]},
     "status": "approved"
   },
   {

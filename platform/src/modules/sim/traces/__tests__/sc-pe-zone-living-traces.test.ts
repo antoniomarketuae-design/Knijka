@@ -23,6 +23,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
+import type { PedestrianDartOutSpec } from "../../contracts";
 import { SC_PE_ZONE_LIVING } from "../../lessons/scenario/templates-pe2";
 import { parseScenarioTrace, serializeScenarioTrace } from "../parse";
 import { recordScPeZoneLivingDrive, type ScPeZoneLivingTraceName } from "../scPeZoneLiving";
@@ -164,6 +165,54 @@ describe("sc-pe-zone-living — mistake demos grade their exact codes (doc 76 §
     // …and it never stopped for anyone: no rest anywhere near the people.
     const rested = inZone.filter((s) => Math.abs(s.speedKmh) < 0.5);
     expect(rested.length).toBe(0);
+  });
+});
+
+describe("sc-pe-zone-living — the walker is IN FRONT of the car, not a figure on the far kerb", () => {
+  // Founder R0: „something very wrong — the car and the zebra and the
+  // pedestreian are very very very far away from each other so basically the
+  // car stopped normaly … the pedestrian is not on the road at all he is just
+  // standing there on the side." (There is no zebra by design: inside a Д15
+  // жилищна зона the whole carriageway is the pedestrian's — чл. 62–63 — which
+  // is why pz-x-1 is an UNMARKED crossing. The staging is what was wrong.)
+  //
+  // The encounter is timed by exactly two numbers — how far out she is released
+  // and how fast she walks — so the invariant is asserted on those directly.
+  const walker = (SC_PE_ZONE_LIVING.staged ?? []).find(
+    (s) => s.id === "sc-pzl-walker-w",
+  ) as PedestrianDartOutSpec;
+  /** The street's travel-lane centre — the x both demos occupy. */
+  const LANE_X = 4.06;
+  /** The зона pace both the shadow and the push-through hold, m/s. */
+  const ZONE_MPS = 18 / 3.6;
+  /** PEDESTRIAN_CONTACT_M in the staged runner — past this it is a COLLISION. */
+  const CONTACT_M = 1.5;
+
+  it("her pace lands her on the DRIVER'S half of the road as he arrives", () => {
+    const arriveSec = walker.triggerDistM / ZONE_MPS;
+    const xOnArrival = walker.start.x + walker.dir.x * walker.speedMps * arriveSec;
+    const lateral = Math.abs(LANE_X - xOnArrival);
+    // Close enough that stopping for her (shadow) / squeezing past her
+    // (push-through) is visibly ABOUT HER. At the old 1.1 m/s shuffle this was
+    // ~7 m — a figure off to the left, and both demos read as "for nothing".
+    expect(lateral).toBeLessThan(3.5);
+    // …but never inside the contact radius: the push-through must keep grading
+    // непропускане, never COLLISION.
+    expect(lateral).toBeGreaterThan(CONTACT_M);
+  });
+
+  it("she is on the carriageway across the whole halt-and-wait, and off it before the car moves", () => {
+    // The shadow's wait must be spent on someone actually crossing.
+    const shadow = drives.get("shadow-correct")!;
+    const samples = shadow.trace.samples;
+    const releaseT = samples.find((s) => Y_CROSSING - s.y <= walker.triggerDistM)!.tSec;
+    const haltT = samples.find((s) => s.y > 200 && Math.abs(s.speedKmh) < 0.5)!.tSec;
+    const moveOffT = samples.findLast((s) => s.y < 220 && Math.abs(s.speedKmh) < 0.5)!.tSec;
+    const walkedAtHalt = walker.speedMps * (haltT - releaseT);
+    expect(walkedAtHalt).toBeGreaterThan(walker.roadFromM); // already on the road
+    expect(walkedAtHalt).toBeLessThan(LANE_X - walker.start.x); // not past his lane yet
+    const walkedAtMoveOff = walker.speedMps * (moveOffT - releaseT);
+    expect(walkedAtMoveOff).toBeGreaterThan(walker.roadToM); // road clear before he goes
   });
 });
 

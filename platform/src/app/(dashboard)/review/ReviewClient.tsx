@@ -10,6 +10,7 @@ import {
   useTransition,
 } from "react";
 import { IconCheck, IconX } from "@/components/icons";
+import { CheckControl } from "@/components/ui/CheckControl";
 import type { FlaggedQuestionDto, QuestionPatch } from "@/modules/content-admin/types";
 
 /**
@@ -680,12 +681,15 @@ function EditForm({
         {options.map((o) => (
           <div key={o.id} className="flex items-center gap-2">
             <label className="flex shrink-0 items-center gap-2 rounded-lg border border-border bg-surface px-2 py-2">
-              <input
+              {/* Marks which option is the CORRECT one — the reviewer's most
+                  consequential click on this screen, and the one that most
+                  needs a box you can see is empty. Shape still carries arity,
+                  so flipping the question type visibly reshapes these. */}
+              <CheckControl
                 type={type === "single" ? "radio" : "checkbox"}
                 name={`correct-${q.id}`}
                 checked={o.correct}
                 onChange={() => toggleCorrect(o.id)}
-                className="h-4 w-4 accent-accent"
               />
               <span className="font-mono text-[11px] font-bold text-muted">{o.id}</span>
             </label>

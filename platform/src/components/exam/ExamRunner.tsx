@@ -18,6 +18,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { ExamQuestion } from "@/modules/exam";
 import { submitExamAction } from "@/app/(dashboard)/exams/actions";
 import { QuestionMediaView, SignFace } from "@/components/theory/QuestionMedia";
+import { CheckControl } from "@/components/ui/CheckControl";
 import { ExamResultView } from "./ExamResultView";
 import {
   answersStorageKey,
@@ -35,6 +36,19 @@ interface ExamRunnerProps {
   /** Seconds already elapsed (server clock) — nonzero after a reload. */
   initialElapsedSec: number;
 }
+
+/**
+ * THE ANSWER BOX comes from components/ui/CheckControl — the same element the
+ * practice runner mounts, and now the other six tick boxes in the app. It used
+ * to be copied into this file to keep the exam route free of PracticeSession's
+ * why-panel and clip replay; the shared module has no dependencies at all, so
+ * the import costs this route nothing it did not already pay.
+ *
+ * Why it is not the browser's box (measurements and the two Tailwind scanner
+ * traps live in that file): `accent-color` tints only the CHECKED fill, so an
+ * empty control was painted entirely from `color-scheme` — pinned dark here —
+ * at 1.72 : 1 against this runner's card, against WCAG 1.4.11's 3 : 1.
+ */
 
 /** Remaining-time checkpoints (sec) announced via aria-live. */
 const ANNOUNCE_AT = [1200, 600, 300, 120, 60, 30];
@@ -417,7 +431,7 @@ export function ExamRunner({
                         : "border-border hover:border-border-strong hover:bg-surface-2"
                     }`}
                   >
-                    <input
+                    <CheckControl
                       type={q.type === "single" ? "radio" : "checkbox"}
                       name={`question-${q.id}`}
                       value={option.id}
@@ -425,7 +439,7 @@ export function ExamRunner({
                       onChange={() =>
                         selectOption(q.id, option.id, q.type === "multi")
                       }
-                      className="mt-0.5 h-4 w-4 shrink-0 accent-accent"
+                      className="mt-0.5"
                     />
                     {option.media != null ? (
                       // THEO-1 sign-face option (same <SignFace> as practice);

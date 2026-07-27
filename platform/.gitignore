@@ -23,6 +23,10 @@
 # next.js
 /.next/
 /out/
+# The clip rig's private build dir (tools/clips/headless/clip-rig.mjs). Same
+# contents as .next, just for the render server so it can never share — or
+# poison — the Turbopack cache the shared dev server is using.
+/.next-rig/
 
 # production
 /build

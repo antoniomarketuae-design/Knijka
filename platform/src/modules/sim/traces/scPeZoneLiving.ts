@@ -38,10 +38,14 @@
  * on the way down the 4.6 m/s² shed spends only ~0.5 s between 30 and 22 before
  * `speed <= 20` resets the episode outright.
  *
- * Walker timing (speedMps 1.1 from the west curb at x = −9.72, released at
- * y ≈ 185): on the carriageway ~1.45 s later, reaches the player's lane
- * (x ≈ 4.06) ~12.5 s after release, off the road at ~16.2 s, walk finished at
- * ~21.3 s.
+ * Walker timing (speedMps 1.9 from the west curb at x = −9.72, released at
+ * y ≈ 185): on the carriageway ~0.85 s later, reaches the player's lane
+ * (x ≈ 4.06) ~7.3 s after release, off the road at ~9.4 s, walk finished at
+ * ~12.3 s. That pace is what puts her IN FRONT OF THE CAR at both decisive
+ * moments (founder R0 — see ZONE_WALKER_WEST in templates-pe2): the shadow
+ * comes to rest with her 6 m ahead and only 3.4 m off its own lane (she then
+ * walks straight across its bonnet), and the push-through's closest approach is
+ * 2.3 m instead of the old 7.4 m of empty asphalt.
  */
 
 import type { StagedEventSpec } from "../contracts";
@@ -75,8 +79,11 @@ const ZONE_KMH = 18;
 const APPROACH_KMH = 46;
 /** The crawl at the exit mouth — the sc-pzl-exit gate wants <= 10. */
 const MOUTH_KMH = 8;
-/** Long enough to wait the walker off the carriageway (~16.2 s from release). */
-const WAIT_SEC = 14;
+/** Long enough to wait the walker off the carriageway (~9.4 s from release, and
+ *  the halt lands ~5.5 s into her walk) — with a beat to spare, and never so
+ *  long that the car sits at rest on an empty road (the founder's „stopped for
+ *  nothing" read). The gate wants >= 8 s of rest inside y 203..215. */
+const WAIT_SEC = 9;
 
 // ---------------------------------------------------------------------------
 // The correct demonstration (shadow)

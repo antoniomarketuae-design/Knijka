@@ -23,10 +23,26 @@
  */
 
 export { LiveHero, type LiveHeroProps } from "./hero/LiveHero";
-export { HeroPlate, type HeroPlateProps } from "./hero/HeroPlate";
+export {
+  HERO_SCRIM_NARROW,
+  HERO_SCRIM_WIDE,
+  contrastRatio,
+  relativeLuminance,
+  scrimAlphaAt,
+  scrimmedLuminance,
+  type ScrimStop,
+} from "./hero/heroContrast";
+export { HeroPlate, HERO_BAND_CLASS, type HeroPlateProps } from "./hero/HeroPlate";
 export { HeroStage, type HeroStageProps } from "./hero/HeroStage";
+export {
+  HeroLoopVideo,
+  HERO_LOOP_MP4,
+  HERO_LOOP_WEBM,
+  type HeroLoopVideoProps,
+} from "./hero/HeroLoopVideo";
 
 export {
+  decideHeroLoop,
   decideHeroStage,
   readHeroSignals,
   probeWebgl,
@@ -35,6 +51,8 @@ export {
   HERO_MIN_CORES,
   HERO_SLOW_CONNECTIONS,
   HERO_UNKNOWN_SIGNALS,
+  type HeroLoopDecision,
+  type HeroLoopMode,
   type HeroSignals,
   type HeroStageDecision,
   type HeroStageMode,
