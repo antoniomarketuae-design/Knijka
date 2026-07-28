@@ -31,3 +31,9 @@ tools/clips/headless/.r0look/
 tools/clips/headless/*.png
 tools/clips/headless/r0*/
 tools/clips/headless/cluster/
+
+# R0 review captures at repo root. Same rule as tools/clips/headless/r0*/ — these
+# are frames captured to LOOK at (doc 66) for ONE review, then thrown away. A
+# phone-reclaim run left 37 MB of them here and `git add -A` swept them in.
+.r0phone/
+.sim-shots/
