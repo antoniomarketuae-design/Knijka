@@ -15,6 +15,12 @@
 //   cowl ≤ 0.33 (world ≥ ~67% of frame height), horizon 0.55–0.62,
 //   header ≥ 0.97 / out of frame.
 //
+// FOUNDER REVISION 2026-07-28 („the cockpit can be shrinked with few % down so
+// the Front Window is bigger"): the PITCH BAND alone moved to −4…−7° and the
+// shipped value to −4°, taking the cowl from 0.327 to 0.307 (window 67% → 69%).
+// Every composition band above is UNCHANGED and green at the new pitch; the
+// rationale for the band change sits with the pitch assertion below.
+//
 // This test IS the contract. It rebuilds the shipped cockpit camera pose
 // (CameraRig's exact quaternion composition: FLIP_Y · pitch) as pure
 // projection math — no WebGL, no R3F — and projects the known interior-GLB
@@ -119,10 +125,25 @@ describe("cockpit camera pose (founder world-first revision of doc 71 §4.9)", (
     expect((COCKPIT_HFOV_RAD * 180) / Math.PI).toBeCloseTo(75.41, 1);
   });
 
-  it("pitches 5° down, inside the founder band (5–7°)", () => {
+  // BAND CHANGED CONSCIOUSLY, 2026-07-28 (this file's own header requires the
+  // rationale to live in the same commit as the change).
+  //
+  // Founder review, verbatim: „the cockpit can be shrinked with few % down so
+  // the Front Window is bigger, and yes currently can read the speedometer."
+  // The band's LOWER edge moves 5° → 4°; the upper edge and every composition
+  // band below are untouched, and all of them stay green at the new value.
+  //
+  // Why the band and not something else: the two levers that would grow the
+  // road band without panning are both pinned by the v2 asset — raising the eye
+  // drops the header (y 0.850, z 0.16) into frame faster than it drops the cowl
+  // out, and narrowing vFOV pushes the left door-mirror glass (already at
+  // fx ≈ 0.003) off the picture. Pitch is what is left, and 4° is its floor:
+  // at 3.5° the header edge projects to fy 0.968, inside the frame and under
+  // the ≥0.97 band asserted below. See tuning.ts COCKPIT_PITCH_BASE.
+  it("pitches 4° down, inside the founder band (4–7°)", () => {
     const pitchDeg = (-COCKPIT_PITCH_BASE * 180) / Math.PI;
-    expect(pitchDeg).toBeCloseTo(5, 6);
-    expect(pitchDeg).toBeGreaterThanOrEqual(5);
+    expect(pitchDeg).toBeCloseTo(4, 6);
+    expect(pitchDeg).toBeGreaterThanOrEqual(4);
     expect(pitchDeg).toBeLessThanOrEqual(7);
   });
 
@@ -179,9 +200,12 @@ describe("frame composition bands at 16:9 (founder contract: world ≥65%)", () 
   });
 
   it("glass-top / header edge is at ≥0.97 — out of frame at rest", () => {
-    // Founder band: header ≥0.97 or out of frame. The v2 header sits above
-    // the frame-top ray (fy ≈ 1.003); transient G-pitch (≤~2°) may dip it to
-    // ~0.98 under hard acceleration, never into a letterbox.
+    // Founder band: header ≥0.97 or out of frame. At the 2026-07-28 pitch of
+    // 4° the v2 header sits at fy ≈ 0.980 — still out of the picture at rest,
+    // and THE reason the pitch floor is 4° and not lower (3.5° → 0.968).
+    // Transient nose-lift G-pitch (≤~2°, COCKPIT_PITCH_GAIN) can dip it into
+    // the top of the frame under hard acceleration; that is a moving sliver of
+    // headliner, never a letterbox.
     expect(f.header.y).toBeGreaterThanOrEqual(0.97);
   });
 

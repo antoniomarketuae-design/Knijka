@@ -212,6 +212,37 @@ export type ObjectiveParams =
   | ManeuverParams;
 
 // ---------------------------------------------------------------------------
+// Route finish (founder 2026-07-28 — see finish.ts for the full rationale)
+// ---------------------------------------------------------------------------
+
+/** Circular arrival zone marking where a lesson route ENDS, district meters. */
+export interface RouteFinishZone {
+  x: number;
+  y: number;
+  radiusM: number;
+  /** Continuous seconds the arrival must hold before the finish trips. */
+  dwellSec: number;
+  /**
+   * When set, only frames at/below this speed count toward `dwellSec` — the
+   * difference between a finish you CROSS (a waypoint) and one you ARRIVE AT
+   * (a parking bay, which every parallel-park route drives past on its way to
+   * the pull-up pose). |speed| is compared, so reversing in counts.
+   */
+  maxSpeedKmh?: number;
+}
+
+/** Per-session memory of the route-finish gate (finish.ts `stepFinishGate`). */
+export interface FinishGateState {
+  /** The vehicle has been observed OUTSIDE the zone at least once — you
+   *  cannot arrive somewhere you never left (a lesson may spawn in its bay). */
+  armed: boolean;
+  /** Start of the current continuous stay inside the zone; null = outside. */
+  insideSinceSec: number | null;
+  /** Session time the finish tripped; null = the end is still ahead. */
+  reachedAtSec: number | null;
+}
+
+// ---------------------------------------------------------------------------
 // Objective runtime state
 // ---------------------------------------------------------------------------
 
@@ -530,6 +561,16 @@ export interface LessonSessionState {
    * Absent on every other session and until the mistake happens.
    */
   mistakeExperienceHitAtSec?: number;
+  /**
+   * Route-finish gate (founder 2026-07-28; additive — absent until the first
+   * tick that consults it, and never present on routes with no locatable end).
+   * Tracked ONLY while the sequential chain has not yet reached the final
+   * objective: it is the escape hatch that lets a student who skipped a task
+   * still END the drive by reaching the end of the route, instead of being
+   * made to re-drive it correctly before he may see what he did wrong. See
+   * finish.ts — it changes WHEN a session stops, never WHAT is graded.
+   */
+  finishGate?: FinishGateState;
 }
 
 // ---------------------------------------------------------------------------

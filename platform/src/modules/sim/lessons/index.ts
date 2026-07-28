@@ -70,6 +70,18 @@ export {
   type LessonStepResult,
 } from "./engine";
 
+// Route finish gate (founder 2026-07-28 — the end of the route ends the drive)
+export {
+  createFinishGate,
+  routeFinishZone,
+  stepFinishGate,
+  FINISH_BAY_RADIUS_M,
+  FINISH_DWELL_S,
+  FINISH_MIN_RADIUS_M,
+  FINISH_REST_KMH,
+  FINISH_REST_S,
+} from "./finish";
+
 // Repeat-penalty escalation (A9 — pure, shared by client fold + server grading)
 export {
   ESCALATION_MULTIPLIERS,
@@ -251,6 +263,7 @@ export type {
   EventPosition,
   ExamTermination,
   ExamTerminationReason,
+  FinishGateState,
   LessonPhase,
   LessonResult,
   LessonSessionState,
@@ -261,6 +274,7 @@ export type {
   ObjectiveStatus,
   ParkAlignment,
   ReactionBand,
+  RouteFinishZone,
   SessionNearMiss,
   SimLessonGamificationEvent,
   TeachMoment,

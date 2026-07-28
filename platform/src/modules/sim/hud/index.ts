@@ -15,6 +15,15 @@ export {
   speedTone,
   type DashboardStatus,
 } from "./dashboardStatus";
+// Founder 2026-07-28: armed cabin faults surfaced at the screen edges in the
+// views where the instrument panel is out of frame (chase / top-down).
+export { TelltaleEdgePings } from "./TelltaleEdgePings";
+export {
+  armedTelltaleWarnings,
+  telltaleWarningsKey,
+  type TelltaleWarning,
+  type TelltaleWarningId,
+} from "./telltaleWarnings";
 export { ObjectiveBanner, type ObjectiveFlash } from "./ObjectiveBanner";
 export { HudToasts, useHudToastQueue, type HudToast } from "./HudToasts";
 export {

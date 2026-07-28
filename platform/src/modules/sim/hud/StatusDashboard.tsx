@@ -13,6 +13,15 @@
  * re-renders only when dashboardHash changes — so the ◀ ▶ arrows flash on
  * the REAL 600 ms CabinControls blink clock (like the 3D cluster), never a
  * free-running CSS animation. No 60 Hz React state anywhere.
+ *
+ * NARROW SCREENS (fixed 2026-07-28). Measured on the founder's review profile
+ * (390×844): the bar laid out 549 px wide inside a 374 px scene box and SIX of
+ * its thirteen instruments were clipped away — the left blinker, the selector
+ * letter, part of the speed block, the parking brake, the hazards and the right
+ * blinker. „He only sees in the dashboard" was, on a phone, not even true. So
+ * below `sm` the bar WRAPS instead of overflowing and the 8 px captions drop
+ * out (the icons keep their aria-labels); the speed readout — the one thing the
+ * founder confirmed is finally legible — is not shrunk.
  */
 
 import { useEffect, useState, type ReactNode, type RefObject } from "react";
@@ -28,6 +37,11 @@ import {
 const DASHBOARD_POLL_MS = 100;
 
 const DIM = "var(--border-strong)";
+
+/** Caption under a telltale: hidden below `sm` so the bar fits a phone (the
+ *  aria-label and the title keep naming the instrument). */
+const CAPTION =
+  "hidden text-[8px] font-bold uppercase tracking-wider text-muted sm:block md:text-[9px]";
 
 /** Small labeled telltale column: icon/value on top, BG caption under it. */
 function Telltale({
@@ -47,16 +61,14 @@ function Telltale({
 }) {
   return (
     <div
-      className="flex min-w-9 flex-col items-center gap-0.5 md:min-w-11"
+      className="flex min-w-7 flex-col items-center gap-0.5 sm:min-w-9 md:min-w-11"
       aria-label={ariaLabel}
       title={titleBg}
     >
       <span className={`flex h-6 items-center justify-center md:h-7 ${blink ? "hud-blink" : ""}`}>
         {children}
       </span>
-      <span className="text-[8px] font-bold uppercase tracking-wider text-muted md:text-[9px]">
-        {labelBg}
-      </span>
+      <span className={CAPTION}>{labelBg}</span>
     </div>
   );
 }
@@ -207,7 +219,7 @@ export function StatusDashboard({
   return (
     <div
       aria-label="Табло на автомобила"
-      className="pointer-events-none flex select-none items-center gap-2 rounded-2xl border border-border bg-surface/85 px-3 py-2 shadow-glow-sm backdrop-blur-md md:gap-3.5 md:px-5 md:py-2.5"
+      className="pointer-events-none flex max-w-full select-none flex-wrap items-center justify-center gap-x-2 gap-y-1 rounded-2xl border border-border bg-surface/85 px-3 py-2 shadow-glow-sm backdrop-blur-md sm:flex-nowrap md:gap-x-3.5 md:px-5 md:py-2.5"
     >
       <BlinkerArrow dir="left" lit={snap.leftLampLit} />
 
@@ -229,9 +241,7 @@ export function StatusDashboard({
         >
           {snap.gearLabel}
         </span>
-        <span className="text-[8px] font-bold uppercase tracking-wider text-muted md:text-[9px]">
-          Предавка
-        </span>
+        <span className={CAPTION}>Предавка</span>
       </div>
 
       {/* Speed — THE readout (large), with the legal-limit disc beside it. */}
@@ -265,7 +275,7 @@ export function StatusDashboard({
 
       {/* Engine — text state (Вкл./Изкл./Угасна) reads clearer than a glyph. */}
       <div
-        className="flex min-w-9 flex-col items-center gap-0.5 md:min-w-11"
+        className="flex min-w-7 flex-col items-center gap-0.5 sm:min-w-9 md:min-w-11"
         aria-label={
           snap.stalled
             ? "Двигателят угасна — рестартирай (Z + I)"
@@ -283,9 +293,7 @@ export function StatusDashboard({
         >
           {snap.stalled ? "Угасна" : snap.engineOn ? "Вкл." : "Изкл. I"}
         </span>
-        <span className="text-[8px] font-bold uppercase tracking-wider text-muted md:text-[9px]">
-          Двигател
-        </span>
+        <span className={CAPTION}>Двигател</span>
       </div>
 
       {/* Seatbelt — red + blink until buckled (the real telltale grammar). */}
@@ -300,7 +308,7 @@ export function StatusDashboard({
 
       {/* Headlights — distinct icon per state + the BG word under it. */}
       <div
-        className="flex min-w-9 flex-col items-center gap-0.5 md:min-w-11"
+        className="flex min-w-7 flex-col items-center gap-0.5 sm:min-w-9 md:min-w-11"
         aria-label={`Светлини: ${snap.headlights === "off" ? "изключени" : HEADLIGHT_LABEL_BG[snap.headlights]}`}
         title="Светлини (L): изкл. → къси → дълги"
       >
@@ -308,7 +316,7 @@ export function StatusDashboard({
           <HeadlightIcon state={snap.headlights} />
         </span>
         <span
-          className="text-[8px] font-bold uppercase tracking-wider md:text-[9px]"
+          className="hidden text-[8px] font-bold uppercase tracking-wider sm:block md:text-[9px]"
           style={{
             color:
               snap.headlights === "off"

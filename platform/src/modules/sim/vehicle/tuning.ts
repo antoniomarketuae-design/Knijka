@@ -500,9 +500,31 @@ export function cockpitVFovForAspect(aspect: number): number {
   return Math.min(vfovDeg, COCKPIT_FOV_MAX);
 }
 /**
- * Constant downward camera pitch (rad, negative = look down): 5° (founder
- * world-first directive, 2026-07-10, band −5…−7°; −5 keeps the horizon at
- * 0.60, mid-band). History: −8° was tuned against the v1 interior whose
+ * Constant downward camera pitch (rad, negative = look down): 4°.
+ *
+ * FOUNDER REVISION 2026-07-28, verbatim: „the cockpit can be shrinked with few
+ * % down so the Front Window is bigger, and yes currently can read the
+ * speedometer". Band re-ruled −4…−7° (was −5…−7°) and the value moved to the
+ * new floor. WHY PITCH AND NOTHING ELSE — the other two levers are both jammed
+ * against the v2 asset, measured through the acceptance test's own projection:
+ *   · RAISING THE EYE is the lever that would genuinely grow the road band, but
+ *     the v2 header edge (chassis y 0.850, z 0.16) sits only 0.14 m above the
+ *     eye at 0.415 m — every centimetre up drops the header INTO frame faster
+ *     than it drops the cowl out of it (up +0.05 → header would need ≥10° of
+ *     down-pitch to stay clear, which puts the cowl back ABOVE where it is
+ *     now). The founder's own „no letterbox" ruling wins.
+ *   · NARROWING vFOV lowers the cowl too, but the left door-mirror glass
+ *     already projects at fx ≈ 0.003 — it is ON the frame edge, and any hFOV
+ *     loss pushes a graded mirror out of the picture.
+ * So pitch it is, and 4° is the FLOOR the asset allows: at 3.5° the header edge
+ * lands at fy 0.968, inside the frame and under the ≥0.97 band.
+ * Measured effect at 16:9: cowl 0.327 → 0.307, i.e. interior 32.7 % → 30.7 % of
+ * frame height and window 67.3 % → 69.3 %. Every other composition band in
+ * cockpit-camera-contract.test.ts stays green unchanged.
+ *
+ * History: −5° was the founder world-first directive of 2026-07-10 (band
+ * −5…−7°, horizon 0.60 mid-band). Before that, −8° was tuned against the v1
+ * interior whose
  * headliner sat at chassis y 0.77 and whose visor/header line (y 0.71,
  * z 0.46) capped the windshield at ~21% of frame height from the shipped
  * camera — an ASSET fault, not a camera fault. The v2 interior
@@ -510,29 +532,29 @@ export function cockpitVFovForAspect(aspect: number): number {
  * y 0.857–0.885, glass-top/header edge (y 0.850, z 0.16) — above the
  * frame-top ray at rest — long slim A-pillars, shaved cowl/binnacle. With
  * the opening fixed, less down-pitch is needed and the window spans ≥65%.
- * Frame-fraction table at the shipped pose (COCKPIT_EYE (0.24, 0.71,
- * −0.255), vFOV 47, 16:9; fractions from bottom-left, computed through
- * three's projection in the acceptance test — landmarks chassis-local from
- * the v2 GLB/hotspots):
- *   wheel top      (0.34, 0.484, 0.431): fy 0.23        (rim in frame) ✓
- *   cluster centre (0.34, 0.399, 0.711): fy 0.24        (readable) ✓
- *   dash top/cowl  (y 0.48, z 0.70):     fy 0.327       → world = top ~67% ✓
+ * Frame-fraction table at the SHIPPED pose (COCKPIT_EYE (0.24, 0.71,
+ * −0.255), vFOV 47, pitch −4°, 16:9; fractions from bottom-left, computed
+ * through three's projection in the acceptance test — landmarks chassis-local
+ * from the v2 GLB/hotspots; the −5° value each line replaced is in brackets):
+ *   wheel top      (0.34, 0.484, 0.431): fy 0.208 [0.230] (rim in frame) ✓
+ *   cluster centre (0.34, 0.399, 0.711): fy 0.216 [0.238] (readable) ✓
+ *   dash top/cowl  (y 0.48, z 0.70):     fy 0.307 [0.327] → world = top ~69% ✓
  *     (the windshield GLASS base (0.436, 0.92) projects 0.009 above it —
  *      the shaved cowl still slopes away along the sightline)
- *   10 m road pt   (y −0.49, z 10):      fy 0.466       (10–100 m band clear) ✓
- *   horizon:                             fy 0.60 ✓
- *   int. mirror    (0.00, 0.803, 0.50): fx 0.71 fy 0.745 (upper-right, ABOVE
+ *   10 m road pt   (y −0.49, z 10):      fy 0.446 [0.466] (10–100 m band clear) ✓
+ *   horizon:                             fy 0.580 [0.601] ✓ (band 0.55–0.62)
+ *   int. mirror    (0.00, 0.803, 0.50): fx 0.708 fy 0.724 (upper-right, ABOVE
  *      the horizon and clear of the graded road band — RAISED from the old
  *      eye-level (0, 0.687, 0.575) in the 2026-07-11 black-mass fix: that
  *      block dropped into the sightline under the v2 camera, so the mirror
  *      was rebuilt small on a header-mounted stalk, hero_interior_v2.py)
- *   door mirror L  (0.905, 0.455, 0.592): fx 0.003 fy 0.26 (glass at the left
+ *   door mirror L  (0.905, 0.455, 0.592): fx 0.001 fy 0.240 (glass at the left
  *      frame edge — lane 12: "~37° left from the aft camera") ✓
- *   glass top/header (y 0.850, z 0.16):  fy 1.003 → header OUT of frame at
- *      rest (founder band: ≥0.97/out of frame); the old REF 6 letterbox and
- *      the v1 visor line are gone with the v1 low header ✓
+ *   glass top/header (y 0.850, z 0.16):  fy 0.980 [1.003] → header still out
+ *      of the picture at rest (founder band: ≥0.97); this is the binding
+ *      constraint on the pitch floor — 3.5° would put it at 0.968, in frame ✗
  */
-export const COCKPIT_PITCH_BASE = -(5 * Math.PI) / 180;
+export const COCKPIT_PITCH_BASE = -(4 * Math.PI) / 180;
 /** Cockpit eye-position smoothing rate (1/s) — damps suspension tick. */
 export const COCKPIT_DAMPING = 25;
 

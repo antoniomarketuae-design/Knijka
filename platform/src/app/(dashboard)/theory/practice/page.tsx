@@ -96,23 +96,44 @@ export default async function PracticePage({ searchParams }: PracticePageProps) 
     },
   );
 
+  const introBg = section
+    ? "Тренировка по раздела — понятията в него, преговори и нов материал."
+    : topic
+      ? "Тренировка по темата — преговори, слаби места и нови понятия."
+      : "Двигателят подбра преговорите на падеж и най-слабите ти места.";
+
   return (
-    <div className="flex flex-col gap-8">
-      <AuroraHeader intensity="soft">
-        <Link href="/theory" className="text-xs font-bold text-accent hover:underline">
-          ← Всички теми
+    <div className="flex flex-col gap-4 sm:gap-8">
+      {/* MOBILE HEADER (founder review, 390x844): the aurora band is 181px of
+          title and blurb — 21% of a phone screen — repeated above all ten
+          questions of a session, and it was the single biggest reason the
+          answers started below the fold. Below `sm` it collapses to one line:
+          the back link and the scope title, nothing else. The blurb is
+          orientation for a first visit, not something a student re-reads on
+          every question, so it is the right thing to drop on a phone.
+          From `sm` up the full band is unchanged. */}
+      <header className="flex items-baseline gap-3 sm:hidden">
+        <Link href="/theory" className="shrink-0 text-xs font-bold text-accent">
+          ← Теми
         </Link>
-        <h1 className="mt-3 font-display text-2xl font-black tracking-tight sm:text-3xl">
+        <h1 className="min-w-0 truncate font-display text-lg font-black tracking-tight">
           {scopeTitleBg ?? "Умна тренировка"}
         </h1>
-        <p className="mt-2 max-w-[60ch] text-sm leading-relaxed text-muted">
-          {section
-            ? "Тренировка по раздела — понятията в него, преговори и нов материал."
-            : topic
-              ? "Тренировка по темата — преговори, слаби места и нови понятия."
-              : "Двигателят подбра преговорите на падеж и най-слабите ти места."}
-        </p>
-      </AuroraHeader>
+      </header>
+
+      <div className="hidden sm:block">
+        <AuroraHeader intensity="soft">
+          <Link href="/theory" className="text-xs font-bold text-accent hover:underline">
+            ← Всички теми
+          </Link>
+          <h1 className="mt-3 font-display text-2xl font-black tracking-tight sm:text-3xl">
+            {scopeTitleBg ?? "Умна тренировка"}
+          </h1>
+          <p className="mt-2 max-w-[60ch] text-sm leading-relaxed text-muted">
+            {introBg}
+          </p>
+        </AuroraHeader>
+      </div>
 
       {questions.length === 0 ? (
         <EmptySession topicTitleBg={scopeTitleBg} />

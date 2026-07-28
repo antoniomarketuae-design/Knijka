@@ -75,11 +75,30 @@ export const metadata: Metadata = {
   formatDetection: { telephone: false },
 };
 
+/**
+ * ONE theme colour, and it is the cockpit floor.
+ *
+ * `theme-color` is what the phone paints in the strip the page does not own:
+ * Android Chrome's URL bar and the band it flashes during a pull-to-refresh,
+ * iOS Safari's status/tab area. It is the other half of the founder's „black
+ * sides" report — the part of the frame that is not the CSS canvas.
+ *
+ * The pair this replaces predates the cluster scope, and both halves were
+ * wrong once the scope shipped. `#eef3fb` is a colour no pinned surface paints:
+ * marketing, auth and the whole authenticated shell force the dark instrument
+ * palette regardless of `prefers-color-scheme` (globals.css §CLUSTER), so a
+ * student whose phone is in light mode got a WHITE browser bar hard against a
+ * near-black page. And the dark half, `#070b14`, is the app's old navy ground,
+ * not the cluster's `#05070c` — close enough to look like a seam rather than a
+ * choice.
+ *
+ * `#05070c` is `--background` inside the cluster scope, so the browser chrome
+ * and the page now meet at the same value. The one surface this is not pinned
+ * to is the (legal) group, which still follows the OS: four static documents
+ * with a dark bar is a better trade than every other screen with a light one.
+ */
 export const viewport: Viewport = {
-  themeColor: [
-    { media: "(prefers-color-scheme: dark)", color: "#070b14" },
-    { media: "(prefers-color-scheme: light)", color: "#eef3fb" },
-  ],
+  themeColor: "#05070c",
 };
 
 export default function RootLayout({

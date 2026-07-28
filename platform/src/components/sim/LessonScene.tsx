@@ -88,6 +88,7 @@ import type { SimTick } from "@/modules/sim/rules";
 import {
   createDashboardStatus,
   RearProximityCue,
+  TelltaleEdgePings,
   type DashboardStatus,
   type MinimapFrame,
 } from "@/modules/sim/hud";
@@ -1263,6 +1264,21 @@ function ReadyScene({
         showButtons={!touchCapable}
       />
 
+      {/* [telltale-pings] founder 2026-07-28: „from the POV behind the car …
+          Belt is not on and for example if needed Lights are not on, a ping
+          where the user can see what is missing, currently he only sees in the
+          dashboard." Outside the cockpit the 3D cluster is not in frame at
+          all, so the armed cabin faults get quiet chips on the left/right
+          rails. Cockpit view is exempt — the real cluster lights them there.
+          Purely a consumer of the status channel the bar already polls. */}
+      {dashboardStatusRef ? (
+        <TelltaleEdgePings
+          statusRef={dashboardStatusRef}
+          active={!cockpit && !physicsPaused}
+          showKeyHints={!touchCapable}
+        />
+      ) : null}
+
       {/* P1: touch input overlay — mounts on any touch-capable device, hides
           itself during keyboard use and while paused/quiz/teach/end overlays
           are up (physicsPaused covers menu pause; props.paused covers the
@@ -1600,6 +1616,12 @@ function RuntimeDriver({
       dash.fogLightsOn = dl.fogLightsOn;
       dash.wipersOn = dl.wipersOn;
       dash.speedKmh = sampleRef.current.speedKmh;
+      // Founder 2026-07-28 (chase-view telltales): whether the CONDITIONS
+      // demand the lamps, mirrored from the same weather/time flags the rule
+      // engine grades on (HEADLIGHTS_OFF_AT_NIGHT / _IN_RAIN, чл. 74 fog) —
+      // so an edge ping can only ever name a real, gradeable fault.
+      dash.headlightsRequired = isNight || rain;
+      dash.fogLightsRequired = fog;
       dashboardStatusRef.current = dash;
     }
 
@@ -1927,6 +1949,9 @@ function ControlsHelp({
       keys: "K",
       what: `автоматичен поглед назад при заден ход: ${reverseViewOn ? "вкл." : "изкл."}`,
     },
+    // Founder 2026-07-28: the minimap is off by default and comes back on
+    // demand — the key has to be discoverable or the map is simply gone.
+    { keys: "P", what: "мини карта (вкл./изкл.)", essential: true },
     ...(topdownAllowed
       ? [
           { keys: "G", what: "мащаб отгоре: 20 / 40 / 80 м (влиза в изглед отгоре)" },

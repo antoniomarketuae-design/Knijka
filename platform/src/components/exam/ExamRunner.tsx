@@ -313,20 +313,31 @@ export function ExamRunner({
   }
 
   return (
-    <div className="flex flex-col gap-4">
-      {/* Top bar: progress + timer + submit */}
-      <header className="card flex flex-wrap items-center gap-x-5 gap-y-3 px-4 py-3 sm:px-5">
-        <p className="text-sm font-bold">
-          Въпрос {idx + 1} <span className="text-muted">от {questions.length}</span>
+    <div className="flex flex-col gap-3 sm:gap-4">
+      {/* Top bar: progress + timer + submit.
+          MOBILE FOLD (founder review, 390x844): this bar wrapped to two rows
+          because the 2xl clock and „Предай изпита" could not share a line with
+          the counters — ~94px of chrome before the question. Below `sm` the
+          clock moves to the sticky footer (where it is visible ALL the time
+          instead of scrolling away, which is strictly better for a scored
+          40-minute paper) and the labels shorten, so this is one 24px row. */}
+      <header className="card flex flex-wrap items-center gap-x-4 gap-y-2 px-4 py-2.5 sm:gap-x-5 sm:px-5 sm:py-3">
+        <p className="text-sm font-bold tabular-nums">
+          Въпрос {idx + 1}
+          <span className="text-muted">
+            <span className="sm:hidden">/{questions.length}</span>
+            <span className="hidden sm:inline"> от {questions.length}</span>
+          </span>
         </p>
         <p className="text-sm tabular-nums text-muted">
-          Отговорени: {answeredCount}/{questions.length}
+          Отговорени: {answeredCount}
+          <span className="hidden sm:inline">/{questions.length}</span>
         </p>
 
         <div className="ml-auto flex items-center gap-4">
           <p
             aria-hidden="true"
-            className={`font-mono text-2xl font-black tabular-nums ${
+            className={`hidden font-mono text-2xl font-black tabular-nums sm:block ${
               timeLow ? "text-danger" : "text-foreground"
             }`}
           >
@@ -339,9 +350,18 @@ export function ExamRunner({
             type="button"
             onClick={() => setConfirmOpen(true)}
             disabled={submitting}
-            className="btn-accent px-4 py-2 disabled:cursor-not-allowed disabled:opacity-60"
+            className="btn-accent px-4 py-1.5 disabled:cursor-not-allowed disabled:opacity-60 sm:py-2"
           >
-            {submitting ? "Предаване…" : "Предай изпита"}
+            {submitting ? (
+              "Предаване…"
+            ) : (
+              <>
+                {/* One text node at a time — two flex children would pick up
+                    the button's own `gap-2` as a double word space. */}
+                <span className="sm:hidden">Предай</span>
+                <span className="hidden sm:inline">Предай изпита</span>
+              </>
+            )}
           </button>
         </div>
       </header>
@@ -349,7 +369,7 @@ export function ExamRunner({
       {timeLow ? (
         <p
           role="status"
-          className="card border-danger/50 px-4 py-2.5 text-sm font-bold text-danger"
+          className="card border-danger/50 px-4 py-2 text-xs font-bold text-danger sm:py-2.5 sm:text-sm"
         >
           Остават по-малко от 5 минути. При изтичане на времето изпитът се
           предава автоматично.
@@ -378,7 +398,7 @@ export function ExamRunner({
           ref={questionBoxRef}
           tabIndex={-1}
           aria-label={`Въпрос ${idx + 1} от ${questions.length}`}
-          className="card flex flex-col gap-4 p-5 outline-none sm:p-6"
+          className="card flex flex-col gap-3 p-4 outline-none sm:gap-4 sm:p-6"
         >
           <div className="flex flex-wrap items-center gap-2">
             <span className="rounded-full bg-surface-2 px-2.5 py-0.5 text-xs font-black tabular-nums text-muted">
@@ -404,13 +424,20 @@ export function ExamRunner({
             </button>
           </div>
 
-          <fieldset className="flex flex-col gap-4">
-            <legend className="text-lg font-bold leading-snug">{q.textBg}</legend>
+          <fieldset className="flex flex-col gap-3 sm:gap-4">
+            {/* mb-1: a <legend> is laid out outside the fieldset's flex
+                formatting context, so the fieldset's `gap` never separated the
+                question from the first option — they touched. */}
+            <legend className="mb-1 text-lg font-bold leading-snug">
+              {q.textBg}
+            </legend>
 
             {q.media !== null && "kind" in q.media ? (
               // THEO-1 data-driven media — the exact components the practice
-              // runner mounts, so exam and practice can never diverge.
-              <QuestionMediaView media={q.media} />
+              // runner mounts, so exam and practice can never diverge. The
+              // artwork keeps its size on phones (the sign IS the question);
+              // only the decorative frame padding gives ground.
+              <QuestionMediaView media={q.media} className="max-sm:p-2.5" />
             ) : q.media !== null ? (
               <p className="rounded-xl border border-dashed border-border px-4 py-6 text-center text-sm text-muted">
                 Към този въпрос има{" "}
@@ -425,7 +452,7 @@ export function ExamRunner({
                 return (
                   <label
                     key={option.id}
-                    className={`flex cursor-pointer items-start gap-3 rounded-xl border p-3.5 transition motion-reduce:transition-none ${
+                    className={`flex cursor-pointer items-start gap-3 rounded-xl border px-3.5 py-3 transition motion-reduce:transition-none sm:p-3.5 ${
                       checked
                         ? "border-accent bg-accent/10"
                         : "border-border hover:border-border-strong hover:bg-surface-2"
@@ -459,20 +486,36 @@ export function ExamRunner({
             </div>
           </fieldset>
 
-          <div className="mt-auto flex items-center justify-between gap-3 border-t border-border pt-4">
+          {/* Paper navigation.
+              On phones this is a STICKY footer inside the card and it carries
+              the countdown. Two things the founder hit on a real phone are
+              fixed by that: „Следващ" sat below the fold on most questions (a
+              scroll per question, 45 times, on a clock they are scored
+              against), and the timer — the one number a candidate checks
+              constantly — scrolled off the top the moment they reached the
+              answers. Desktop keeps the plain in-flow row. */}
+          <div className="mt-auto flex items-center justify-between gap-3 border-t border-border pt-4 max-sm:sticky max-sm:bottom-0 max-sm:z-20 max-sm:-mx-4 max-sm:-mb-4 max-sm:rounded-b-xl max-sm:border-border max-sm:bg-surface/95 max-sm:px-4 max-sm:py-2 max-sm:backdrop-blur max-sm:[padding-bottom:calc(0.5rem+env(safe-area-inset-bottom))]">
             <button
               type="button"
               onClick={() => setIdx((i) => Math.max(0, i - 1))}
               disabled={idx === 0}
-              className="btn-ghost px-4 py-2 disabled:cursor-not-allowed disabled:opacity-40"
+              className="btn-ghost px-3 py-2 disabled:cursor-not-allowed disabled:opacity-40 sm:px-4"
             >
               ← Предишен
             </button>
+            <p
+              aria-hidden="true"
+              className={`font-mono text-lg font-black tabular-nums sm:hidden ${
+                timeLow ? "text-danger" : "text-foreground"
+              }`}
+            >
+              {formatClock(remainingSec)}
+            </p>
             <button
               type="button"
               onClick={() => setIdx((i) => Math.min(questions.length - 1, i + 1))}
               disabled={idx === questions.length - 1}
-              className="btn-ghost px-4 py-2 disabled:cursor-not-allowed disabled:opacity-40"
+              className="btn-ghost px-3 py-2 disabled:cursor-not-allowed disabled:opacity-40 sm:px-4"
             >
               Следващ →
             </button>

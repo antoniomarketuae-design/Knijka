@@ -77,6 +77,15 @@ const CLUSTER_RULE = ruleBody('[data-surface="cluster"],');
 const CLUSTER = tokens(CLUSTER_RULE);
 const APP_LIGHT = tokens(ruleBody(':root[data-theme="light"] {'));
 
+/** The cluster rule's selector list, i.e. everything before its `{`. */
+const CLUSTER_SELECTORS = (() => {
+  const at = CSS.indexOf('\n[data-surface="cluster"],');
+  return CSS.slice(at, CSS.indexOf("{", at));
+})();
+
+/** The declaration body of the bare `html { … }` rule. */
+const ROOT_RULE = ruleBody("html {");
+
 // ---------------------------------------------------------------------------
 // WCAG 2.x
 // ---------------------------------------------------------------------------
@@ -140,11 +149,20 @@ describe("cluster scope — application", () => {
     // selector list they fall back to whatever the OS asked for, which on a
     // light-mode machine means an OS-coloured hole in a black app.
     expect(CLUSTER_RULE.length).toBeGreaterThan(0);
-    const selectors = CSS.slice(
-      CSS.indexOf('\n[data-surface="cluster"],'),
-      CSS.indexOf("{", CSS.indexOf('\n[data-surface="cluster"],')),
+    expect(CLUSTER_SELECTORS).toContain(':root:has([data-surface="cluster"])');
+  });
+
+  it("the :has() half is forgiving, so an engine without it loses only that half", () => {
+    // A selector list is all-or-nothing: one member the engine cannot parse
+    // invalidates the WHOLE rule. Written bare, `:root:has(…)` therefore took
+    // `[data-surface="cluster"]` down with it on any engine without `:has()`,
+    // and the product fell back to the pale :root light theme this block exists
+    // to overrule — the opposite of the graceful degradation the comment beside
+    // it promises. `:is()` has a FORGIVING argument list: the unparseable
+    // argument is dropped and the other two selectors survive.
+    expect(CLUSTER_SELECTORS).toContain(
+      ':is(:root:has([data-surface="cluster"]))',
     );
-    expect(selectors).toContain(':root:has([data-surface="cluster"])');
   });
 
   it("a bounded band never claims the root", () => {
@@ -156,6 +174,48 @@ describe("cluster scope — application", () => {
 
   it("the scope pins colour-scheme so native controls follow", () => {
     expect(CLUSTER_RULE).toContain("color-scheme: dark");
+  });
+});
+
+describe("the canvas — window minus document", () => {
+  /**
+   * Founder review, verbatim: „it is going beyond the borders and a black sides
+   * start to appear / this is for the whole platform/web page".
+   *
+   * That region — exposed by a rubber-band bounce, a pinch-zoom-out or a
+   * notched phone's letterbox — is painted from the ROOT element's background.
+   * The app painted its ground on <body> and on the scope <div>s and left `html`
+   * transparent, so the canvas was correct only via the body→canvas propagation
+   * rule. Remove just that (measured: `body { background-color: transparent }`,
+   * nothing else touched) and the canvas returns rgb(18, 18, 18) — the UA's
+   * default under the `color-scheme: dark` this file pins. Near-black bands at
+   * the edge of a near-black page.
+   *
+   * These two lines are the whole fix, they are one deletion away from
+   * regressing, and the regression is invisible on a desktop browser — which is
+   * exactly the shape of bug a test has to hold.
+   */
+  it("the root paints the ground, so the canvas cannot be UA black", () => {
+    expect(ROOT_RULE).toContain("background-color: var(--background)");
+  });
+
+  it("the horizontal axis cannot rubber-band", () => {
+    // No route can scroll horizontally (verified at 390×844, 360×780 and
+    // 844×390 with isMobile: documentElement.scrollWidth === clientWidth on all
+    // of them), so a horizontal bounce shows a gutter and nothing else. The Y
+    // axis is deliberately NOT pinned — vertical scrolling is real content.
+    expect(ROOT_RULE).toContain("overscroll-behavior-x: none");
+    expect(ROOT_RULE).not.toContain("overscroll-behavior-y");
+  });
+
+  it("the browser chrome meets the page at the same colour", () => {
+    // `theme-color` is the frame the CSS canvas does not reach: Android
+    // Chrome's URL bar, iOS Safari's status area. The pre-cluster pair
+    // advertised #eef3fb to a light-mode phone — a colour no pinned surface
+    // paints — putting a white bar hard against a black page.
+    const ROOT_LAYOUT = readFileSync(resolve(__dirname, "layout.tsx"), "utf8");
+    const themeColor = /themeColor:\s*("#[0-9a-f]{6}")/i.exec(ROOT_LAYOUT)?.[1];
+    expect(themeColor).toBe(`"${CLUSTER["--background"]}"`);
   });
 });
 

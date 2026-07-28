@@ -9,7 +9,24 @@
  * freezes physics (the proven MicroQuizOverlay mechanism) and this card shows
  * the violation title, the catalog's authored law-cited WHY (ADR-002 — no
  * free-form AI text), a category pictogram, and what a repeat would cost.
- * „Разбрах — продължи" (or Enter) resumes the drive.
+ *
+ * DISMISSAL (founder review 2026-07-28 — „everytime a mistake when driving
+ * pops up that the belt is not on … it only makes the user nervous because most
+ * of the times he forgets and than he has to click on the screen"):
+ *
+ *  - SPACE resumes, and so does Enter. Space is the thumb key every driver
+ *    already rests on; Enter was the only binding and it was printed in 11 px
+ *    grey under the button, below the fold on a phone. The listener runs in the
+ *    WINDOW CAPTURE phase and stops propagation, because Space is also the
+ *    parking-brake toggle (CabinControls listens on window, bubble phase, and
+ *    is NOT muted during a pause) — dismissing a warning must never yank the
+ *    handbrake as a side effect.
+ *  - The affordance is VISIBLE: a key hint sits inside the button itself, not
+ *    as a footnote that scrolls away.
+ *  - On a phone there is no Space at all, so the acknowledge control is a
+ *    full-width, thumb-height button PINNED to the bottom of the card (sticky)
+ *    — reachable without scrolling the modal, which is what actually happened
+ *    on a 390 px screen before this.
  *
  * A mistake cluster merges into ONE pause: the shell queues the moments and
  * this card pages through them (`remaining` shows the queue depth).
@@ -18,7 +35,7 @@
  * modal never interrupts evasive handling (see lessons/engine.ts applyTick).
  */
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import {
   IconBolt,
   IconBook,
@@ -28,6 +45,12 @@ import {
   IconWheel,
 } from "@/components/icons";
 import type { TeachMoment } from "@/modules/sim/lessons";
+
+/** No Space bar, no hover: the card shows a big tap target instead of a key. */
+function isTouchDevice(): boolean {
+  if (typeof window === "undefined") return false;
+  return window.matchMedia?.("(hover: none)").matches === true || navigator.maxTouchPoints > 0;
+}
 
 const SEVERITY_LABEL: Record<TeachMoment["severity"], string> = {
   opasna: "опасна грешка",
@@ -78,19 +101,31 @@ export function TeachMomentOverlay({
   /** Advance to the next queued card, or resume the drive when none remain. */
   onAcknowledge: () => void;
 }) {
-  // Enter acknowledges (same convention as MicroQuizOverlay's resume).
+  // Space (and Enter) acknowledges. CAPTURE phase + stopPropagation: Space is
+  // the parking-brake toggle on CabinControls' own window listener (bubble
+  // phase, live even while paused), so without this a student dismissing the
+  // belt warning would also release/engage the handbrake. Capture on `window`
+  // runs before the target and before every bubble listener.
   useEffect(() => {
     const onKey = (e: KeyboardEvent): void => {
       if (e.metaKey || e.ctrlKey || e.altKey) return;
-      if (e.key !== "Enter") return;
+      if (e.code !== "Space" && e.key !== "Enter") return;
+      // Enter on a focused button/link is that control's own activation.
       const tag = e.target instanceof HTMLElement ? e.target.tagName : "";
-      if (tag === "BUTTON" || tag === "A") return;
+      if (e.key === "Enter" && (tag === "BUTTON" || tag === "A")) return;
       e.preventDefault();
-      onAcknowledge();
+      e.stopPropagation();
+      if (!e.repeat) onAcknowledge();
     };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
+    window.addEventListener("keydown", onKey, true);
+    return () => window.removeEventListener("keydown", onKey, true);
   }, [onAcknowledge]);
+
+  // Touch devices have no Space bar; they get the big button instead of a key
+  // hint. Safe as a lazy initializer (the LessonPlayShell grammar): this
+  // overlay only ever mounts inside a client-only play session, so there is no
+  // SSR pass to mismatch.
+  const [touch] = useState(isTouchDevice);
 
   const CategoryIcon = CATEGORY_ICONS[moment.code] ?? IconBook;
 
@@ -153,12 +188,30 @@ export function TeachMomentOverlay({
           </p>
         </div>
 
-        {/* Acknowledge → resume */}
-        <div className="flex flex-wrap items-center gap-3">
-          <button type="button" onClick={onAcknowledge} className="btn-accent">
+        {/* Acknowledge → resume. STICKY: on a 390 px phone this card is taller
+            than the scene box and the button used to sit below the fold — the
+            student had to scroll a modal that had just interrupted their drive.
+            Pinned to the bottom of the scroll container it is always one thumb
+            away, and the key hint rides INSIDE the label so the affordance
+            cannot scroll out of sight. */}
+        <div className="sticky bottom-0 -mx-5 -mb-5 flex flex-wrap items-center gap-3 rounded-b-xl bg-surface/95 px-5 pb-5 pt-3 backdrop-blur sm:-mx-6 sm:-mb-6 sm:px-6 sm:pb-6">
+          <button
+            type="button"
+            onClick={onAcknowledge}
+            className="btn-accent w-full justify-center py-3 text-base sm:w-auto sm:py-2 sm:text-sm"
+          >
             Разбрах — продължи
+            {!touch ? (
+              <kbd className="rounded bg-background/30 px-1.5 py-0.5 font-mono text-[11px] font-bold">
+                Space
+              </kbd>
+            ) : null}
           </button>
-          <span className="text-xs text-muted">или натисни Enter</span>
+          {!touch ? (
+            <span className="text-xs text-muted">или натисни Space / Enter</span>
+          ) : (
+            <span className="text-xs text-muted">Докосни, за да продължиш</span>
+          )}
         </div>
       </section>
     </div>

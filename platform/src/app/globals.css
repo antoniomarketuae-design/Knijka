@@ -233,10 +233,23 @@
    scope stays on the shell, so a browser without :has() support still renders
    the whole app in cluster colours and merely keeps an OS-coloured scrollbar
    gutter — the same degradation this rule already accepted.
+
+   WHY THE `:has()` IS WRAPPED IN `:is()`. The paragraph above was the intent,
+   but it was not what the CSS did. A selector list is all-or-nothing: one
+   member the engine cannot parse invalidates the WHOLE rule, not just that
+   member. So on an engine without `:has()` this block did not degrade to "the
+   app in cluster colours with an OS scrollbar" — it vanished, taking all three
+   selectors with it, and the product fell back to the pale :root light theme
+   the scope exists to overrule. `:is()` is the fix because its argument list is
+   FORGIVING: an unparseable argument is dropped and the rule survives. It also
+   keeps the specificity — `:is()` takes the weight of its most specific
+   argument, so this is still (0,2,0) and still beats
+   `@media (prefers-color-scheme: light) :root`, which was the entire point of
+   writing `:root:has(…)` rather than `:has(…)`.
    ============================================================ */
 [data-surface="cluster"],
 [data-surface="cluster-band"],
-:root:has([data-surface="cluster"]) {
+:is(:root:has([data-surface="cluster"])) {
   color-scheme: dark;
 
   /* Ground ramp — cockpit black, cool cast, deliberately shallow steps */
@@ -362,6 +375,61 @@
      Durations have no Tailwind namespace — use duration-[var(--dur-base)]. */
   --ease-out-expo: var(--ease-out);
   --ease-hud-settle: var(--ease-hud);
+}
+
+/* ============================================================
+   THE CANVAS — the part of the window the document does not lay out on.
+
+   FOUNDER REPORT, verbatim: „It is not stable when I slide my fingers right or
+   left or up and than ofcourse at the bottom down / it is going beyond the
+   borders and a black sides start to appear / this is for the whole
+   platform/web page."
+
+   IT IS NOT OVERFLOW. Measured on a real phone profile (390×844, 360×780 and
+   844×390 landscape, isMobile, dSF 3) across every route the student walks —
+   landing, login, register, /za-avtoshkoli, dashboard, theory, practice, exams,
+   simulator, hazard, tutor, settings, pricing, review, outcome:
+   `documentElement.scrollWidth === clientWidth` on all of them, and no element
+   box escapes `clientWidth` in either direction. Nothing on this site is wider
+   than the viewport. An `overflow-x: hidden` on the shell would therefore have
+   hidden nothing at all, while quietly turning every wide table, code block and
+   carousel into a dead end.
+
+   IT IS THE CANVAS. The canvas is what a rubber-band bounce, a pinch-zoom-out
+   and a notched phone's letterbox all expose: window, minus document. CSS
+   paints it from the ROOT element's background — and `html` here painted
+   `rgba(0, 0, 0, 0)`. The cockpit ground lived on <body> and on the two scope
+   <div>s, so the canvas was only ever the right colour thanks to the
+   body→canvas propagation rule, i.e. one fallback deep, on the one element
+   whose height is pinned to the viewport (`h-full` in layout.tsx) while the
+   documents behind it run 925–91,091 px.
+
+   How black gets in, measured rather than argued: suppress ONLY that
+   propagation (`body { background-color: transparent }`, everything else
+   untouched — the page itself renders pixel-identically because the scope divs
+   still paint) and the canvas comes back rgb(18, 18, 18) on every route. Not
+   white: `color-scheme: dark` is pinned above, so the UA's canvas default is
+   black. A flat near-black band at the edge of a near-black page is precisely
+   „black sides".
+
+   So the root paints the ground itself. Now the canvas is the cockpit floor by
+   construction and no bounce, zoom level or notch can find a colour nobody
+   chose — including on engines that extend only the root's own background box.
+   `background-color`, not the `background` shorthand: this must add a ground
+   under everything and never reset a background-image a page has set.
+
+   overscroll-behavior-x, because the horizontal axis has nothing to show. No
+   route can scroll horizontally (measured above), so a horizontal rubber-band
+   is pure noise — it is the „not stable when I slide my fingers right or left"
+   half of the report. The cost is Chrome's overscroll-to-navigate gesture, and
+   that is a deliberate trade rather than an oversight: the back button and
+   Android's own edge-swipe are system-level and untouched. The Y axis is left
+   `auto` on purpose — vertical scrolling is real content, and with the canvas
+   painted its bounce now shows the page instead of a hole.
+   ============================================================ */
+html {
+  background-color: var(--background);
+  overscroll-behavior-x: none;
 }
 
 body {

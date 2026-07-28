@@ -3,8 +3,14 @@
  *
  *   create → [preDrive machine, if the spec enables it] → driving
  *          → objectives complete in order → completed
+ *          → OR the end of the route is reached → completed (finish.ts)
  *   (finishSession = manual end for free drive / early exit;
  *    abortSession   = student quit, graded as not passed)
+ *
+ * FINISHING ≠ PASSING. Every path above only sets `phase`. The verdict is
+ * folded separately by buildLessonResult: `passed` still demands the official
+ * score AND every objective done AND not aborted, so a drive that ended at
+ * the finish with tasks skipped ends REPORTED AS FAILED — it just ends.
  *
  * It owns NOTHING the lower layers already own: law adjudication lives in
  * rules/ (reduceTick), the pre-drive choreography in procedures/ — this file
@@ -46,6 +52,7 @@ import {
 } from "./objectives";
 import { applyEscalations, type PenaltyEscalation } from "./escalation";
 import { examTerminationFor } from "./exam";
+import { createFinishGate, routeFinishZone, stepFinishGate } from "./finish";
 import type {
   EventPosition,
   LessonPhase,
@@ -530,6 +537,46 @@ export function applyTick(prev: LessonSessionState, tick: SimTick): LessonStepRe
     }
   }
 
+  // ROUTE FINISH (founder 2026-07-28 — „стигнах до края, а изпитът не спира"):
+  // reaching the end of the route ENDS the drive, driven well or driven badly.
+  // Until this gate existed the ONLY route termination was "every objective
+  // satisfied", so an objective the student drove past stalled the sequential
+  // chain forever: the ribbon pointed back, the drive never ended, and the
+  // debrief — the entire teaching payload — was reachable only by re-driving
+  // the route CORRECTLY first. A student who must perform perfectly to learn
+  // what he did imperfectly quits.
+  //
+  // Consulted ONLY while the chain has not yet reached the final objective
+  // (the stalled case). A healthy run terminates through the branch above,
+  // bit-identically to before — L7 still has to park, L3 still has to come
+  // out of the roundabout, a clean exam still ends on its own last objective.
+  // Nothing here is graded: `objectives` keep their honest status, so
+  // buildLessonResult reports this as finished-and-failed, never as passed.
+  let finishGate = prev.finishGate;
+  if (prev.phase === "driving" && phase === "driving" && currentIndex < objectives.length - 1) {
+    const zone = routeFinishZone(objectives.map((o) => o.params));
+    if (zone !== null) {
+      finishGate = stepFinishGate(finishGate ?? createFinishGate(), zone, tick);
+      if (finishGate.reachedAtSec !== null) {
+        phase = "completed";
+        endedAtSec = tick.t;
+        // THEO-4: never a bare verdict. Say WHAT stopped the drive and WHY
+        // stopping is the right thing here — the debrief then walks every
+        // skipped task and every mistake, which is what the student came for.
+        // Kept inside the violation catalog's own length band (median 186
+        // chars, max 319): this is a HUD toast on a 390 px phone, and the
+        // detail belongs in the debrief that opens a second later.
+        hudEvents.push({
+          kind: "lesson",
+          titleBg: examMode ? "Край на изпитния маршрут" : "Край на маршрута",
+          explanationBg: examMode
+            ? "Стигна края на маршрута, затова изпитът приключва тук. Част от задачите останаха неизпълнени и изпитът не е издържан — разборът показва всяка от тях и всяка допусната грешка."
+            : "Стигна края на маршрута, затова урокът приключва тук. Част от задачите останаха неизпълнени — разборът показва всяка от тях и всяка грешка, вместо да те връща да караш маршрута отново.",
+        });
+      }
+    }
+  }
+
   // A13: exam sessions TERMINATE the moment the official limits are crossed
   // (any опасна / collision / > 9 total / > 6 from основни) — the fold runs
   // only on frames that scored a violation, and it wins over a same-frame
@@ -581,6 +628,7 @@ export function applyTick(prev: LessonSessionState, tick: SimTick): LessonStepRe
       lastT: Math.max(prev.lastT, tick.t),
       ...(eventPositions !== undefined ? { eventPositions } : {}),
       ...(examTermination !== undefined ? { examTermination } : {}),
+      ...(finishGate !== undefined ? { finishGate } : {}),
       ...(mistakeHitAt !== undefined ? { mistakeExperienceHitAtSec: mistakeHitAt } : {}),
     },
     hudEvents,

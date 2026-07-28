@@ -99,6 +99,13 @@ import { recordSelfPredictionAction } from "@/app/(dashboard)/simulator/calibrat
 import { isResultScreenHeld } from "@/modules/learning/calibration";
 import { AdvisorCard } from "./AdvisorCard";
 import { CalibrationGate, CalibrationPendingCard } from "./CalibrationGate";
+import {
+  exitFullscreen,
+  FULLSCREEN_CHANGE_EVENTS,
+  fullscreenElementOf,
+  requestFullscreen,
+  supportsFullscreen,
+} from "./fullscreen";
 import { MicroQuizOverlay } from "./MicroQuizOverlay";
 import { MistakeConsequenceOverlay } from "./MistakeConsequenceOverlay";
 import { SceneSlot } from "./SceneSlot";
@@ -181,6 +188,31 @@ function rejectionHint(
         titleBg: "Лостът вече е в P",
         explanationBg: "Назад няма повече позиции — с ] тръгваш към R, N и D.",
       };
+  }
+}
+
+// -- Minimap visibility (founder review 2026-07-28) ---------------------------
+// Verbatim: „this minimap of the town is not needed to be on all the time it
+// can be used or turned on by pressing a button because currently its eating
+// space of the whole view that is not needed."
+//
+// DEFAULT: OFF. Measured on the founder's device profile (390×844, the review
+// device): the 168 px disc is 45 % of the scene's width and sits bottom-right —
+// over the road corridor in chase view and over the instrument cluster in
+// cockpit view, i.e. exactly on top of the speedometer whose legibility cost
+// four review rounds. Nothing depends on it: route guidance is IN THE WORLD
+// (ghost ribbon, turn chevrons, objective marker — LessonScene RouteGuidance)
+// and the top-down camera (key C) is the real map when one is wanted. So the
+// map becomes an on-demand instrument, and the choice is remembered per
+// browser: a student who wants it never has to ask twice.
+const MINIMAP_STORAGE_KEY = "aidrive.sim.minimap.v1";
+
+function readStoredMinimapOn(): boolean {
+  if (typeof window === "undefined") return false;
+  try {
+    return window.localStorage.getItem(MINIMAP_STORAGE_KEY) === "on";
+  } catch {
+    return false;
   }
 }
 
@@ -475,26 +507,36 @@ export function LessonPlayShell({
   // slim top bar (abort/finish, quiz frequency) stays reachable inside.
   const rootRef = useRef<HTMLDivElement | null>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  // Does this browser have the Fullscreen API for a non-<video> element?
+  // iPhone Safari does NOT (see fullscreen.ts) — there the shell has to make
+  // itself immersive with CSS instead. Resolved in an effect, never during
+  // render: the server cannot know, and a guessed class here would be a
+  // hydration mismatch.
+  const [fullscreenAvailable, setFullscreenAvailable] = useState(true);
 
   useEffect(() => {
     const onChange = () => {
-      const fs = document.fullscreenElement;
-      setIsFullscreen(fs !== null && fs === rootRef.current);
+      setIsFullscreen(fullscreenElementOf(document) === rootRef.current);
     };
-    document.addEventListener("fullscreenchange", onChange);
-    return () => document.removeEventListener("fullscreenchange", onChange);
+    for (const name of FULLSCREEN_CHANGE_EVENTS) {
+      document.addEventListener(name, onChange);
+    }
+    return () => {
+      for (const name of FULLSCREEN_CHANGE_EVENTS) {
+        document.removeEventListener(name, onChange);
+      }
+    };
   }, []);
 
   const toggleFullscreen = useCallback(() => {
     const el = rootRef.current;
     if (!el) return;
-    if (document.fullscreenElement) {
-      void document.exitFullscreen().catch(() => {});
+    if (fullscreenElementOf(document) !== null) {
+      exitFullscreen(document);
     } else {
-      void el.requestFullscreen({ navigationUI: "hide" }).catch(() => {
-        // Denied (permissions policy / lost activation) — letterboxed play
-        // still works; the ⛶ button and X remain available.
-      });
+      // Denied (permissions policy / lost activation) — letterboxed play
+      // still works; the ⛶ button and X remain available.
+      requestFullscreen(el, document);
     }
   }, []);
 
@@ -503,21 +545,50 @@ export function LessonPlayShell({
   // window of that gesture is still open when this mount effect runs
   // (Chrome/Firefox). Stricter browsers reject → we stay letterboxed,
   // no error surfaced (Esc always exits; fullscreenchange syncs state).
+  // A browser with NO Fullscreen API at all (iPhone Safari) is not an error
+  // either — it switches the shell to the CSS immersive layout below.
   useEffect(() => {
     const el = rootRef.current;
-    if (!el || document.fullscreenElement) return;
-    void el.requestFullscreen({ navigationUI: "hide" }).catch(() => {});
+    const available = supportsFullscreen(el);
+    setFullscreenAvailable(available);
+    if (!available || fullscreenElementOf(document) !== null) return;
+    requestFullscreen(el, document);
   }, []);
 
-  // X toggles fullscreen (F is taken by the rear-mirror glance). Listed in
-  // the controls legend (LessonScene ControlsHelp).
+  // CSS stand-in for fullscreen: pin the shell to the dynamic viewport so the
+  // scene still gets the whole screen on a browser that will not grant a real
+  // fullscreen element. Without it an iPhone plays a 16:9 letterbox inside a
+  // padded dashboard column — about 200 px of 3D on a 390 px-wide phone.
+  const immersive = isFullscreen || !fullscreenAvailable;
+
+  // -- Minimap: on demand, not always-on (founder 2026-07-28) ------------------
+  const [minimapOn, setMinimapOn] = useState<boolean>(readStoredMinimapOn);
+  const toggleMinimap = useCallback(() => {
+    setMinimapOn((on) => {
+      const next = !on;
+      try {
+        window.localStorage.setItem(MINIMAP_STORAGE_KEY, next ? "on" : "off");
+      } catch {
+        // Private mode etc. — the in-memory value still applies this session.
+      }
+      return next;
+    });
+  }, []);
+
+  // X toggles fullscreen (F is taken by the rear-mirror glance), P toggles the
+  // minimap. Both are listed in the controls legend (LessonScene ControlsHelp).
+  // P and not M: M is already the audio-mute key (scene/cabin.ts CABIN_KEYS),
+  // and every other map-ish letter is taken too (K = auto rear view, G/N =
+  // top-down zoom/orientation, C = camera cycle).
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.code === "KeyX" && !e.repeat) toggleFullscreen();
+      if (e.repeat || e.metaKey || e.ctrlKey || e.altKey) return;
+      if (e.code === "KeyX") toggleFullscreen();
+      else if (e.code === "KeyP") toggleMinimap();
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [toggleFullscreen]);
+  }, [toggleFullscreen, toggleMinimap]);
 
   // A13: exam session — teach/quiz/guidance machinery OFF, examiner framing
   // ON. The always-grade + termination behavior lives in the engine (it reads
@@ -1044,9 +1115,13 @@ export function LessonPlayShell({
       className={
         // Fullscreen: the UA sizes this element to the viewport — become a
         // padded column so the scene (flex-1) absorbs all remaining height.
+        // No Fullscreen API (iPhone Safari): do the UA's job ourselves with
+        // `fixed inset-0` + `h-dvh`, same column, same scene sizing.
         isFullscreen
           ? "flex h-full flex-col gap-2 overflow-hidden bg-background p-2"
-          : "flex flex-col gap-3"
+          : immersive
+            ? "fixed inset-0 z-40 flex h-dvh flex-col gap-2 overflow-hidden bg-background p-2"
+            : "flex flex-col gap-3"
       }
     >
       <HudStyles />
@@ -1109,28 +1184,31 @@ export function LessonPlayShell({
               )}
             </>
           ) : null}
-          {/* QW1: fullscreen toggle — the same control exits (Esc works too). */}
-          <button
-            type="button"
-            className="btn-ghost px-3 py-1.5 text-xs"
-            onClick={toggleFullscreen}
-            aria-pressed={isFullscreen}
-            title={isFullscreen ? "Изход от цял екран (X или Esc)" : "Цял екран (X)"}
-          >
-            <span aria-hidden>⛶</span> {isFullscreen ? "Изход" : "Цял екран"}
-          </button>
+          {/* QW1: fullscreen toggle — the same control exits (Esc works too).
+              Hidden where the API does not exist: a button that cannot do its
+              one job is worse than no button, and the CSS immersive layout has
+              already given the scene the whole screen there. */}
+          {fullscreenAvailable ? (
+            <button
+              type="button"
+              className="btn-ghost px-3 py-1.5 text-xs"
+              onClick={toggleFullscreen}
+              aria-pressed={isFullscreen}
+              title={isFullscreen ? "Изход от цял екран (X или Esc)" : "Цял екран (X)"}
+            >
+              <span aria-hidden>⛶</span> {isFullscreen ? "Изход" : "Цял екран"}
+            </button>
+          ) : null}
         </div>
       </div>
 
       {/* Scene + HUD overlays */}
       <div
         className={`relative w-full overflow-hidden bg-surface ${
-          isFullscreen
-            ? "min-h-0 flex-1 rounded-lg"
-            : "rounded-xl border border-border"
+          immersive ? "min-h-0 flex-1 rounded-lg" : "rounded-xl border border-border"
         }`}
       >
-        <div className={isFullscreen ? "h-full w-full" : "aspect-video w-full"}>
+        <div className={immersive ? "h-full w-full" : "aspect-video w-full"}>
           <SceneSlot
             key={sceneEpoch}
             lesson={lesson}
@@ -1159,7 +1237,9 @@ export function LessonPlayShell({
             onDriveline={handleDriveline}
             onDrivelineRejection={handleDrivelineRejection}
             // P1: the touch overlay's ⛶ button — same QW1 toggle as key X.
-            onToggleFullscreen={toggleFullscreen}
+            // Omitted where the API does not exist (iPhone Safari): the
+            // overlay drops the button rather than offering a no-op.
+            onToggleFullscreen={fullscreenAvailable ? toggleFullscreen : undefined}
             // A8/A15: measurement channels (staged outcomes + near-misses).
             onStagedOutcome={handleStagedOutcome}
             onNearMiss={handleNearMiss}
@@ -1229,8 +1309,16 @@ export function LessonPlayShell({
             status channel so the ◀ ▶ arrows blink on the real cabin clock.
             Stays up in exam mode — it is the car's own instrument panel,
             not a training aid. */}
+        {/* `pointer-events-none` on the WRAPPER, not just on StatusDashboard.
+            The bar itself is already inert (StatusDashboard.tsx:222) precisely
+            "so the scene stays clickable underneath", but this positioning div
+            was not, and on a landscape phone it spans 785 px at the bottom of
+            the viewport — straight across the lower 52% of the touch throttle
+            and brake (measured 844×390: pedals y 242–370, bar y 304–374). A
+            thumb resting where a thumb rests hit the bar and the car did not
+            move. It is a readout; nothing inside it is interactive. */}
         {!ended ? (
-          <div className="absolute bottom-2 left-1/2 z-10 flex w-max max-w-[calc(100%-1rem)] -translate-x-1/2 justify-center">
+          <div className="pointer-events-none absolute bottom-2 left-1/2 z-10 flex w-max max-w-[calc(100%-1rem)] -translate-x-1/2 justify-center">
             <StatusDashboard
               statusRef={dashboardStatusRef}
               limitKmh={snap.limitKmh}
@@ -1272,20 +1360,43 @@ export function LessonPlayShell({
         ) : null}
 
         {/* Minimap — bottom right, RAISED above the status-bar strip (the
-            centered bar can reach the right edge on laptop widths). */}
+            centered bar can reach the right edge on laptop widths).
+            ON DEMAND since the 2026-07-28 founder review: the disc is hidden by
+            default and the small ⛶-style chip under it is the toggle, so the
+            control exists on a phone too (key P alone would make this a
+            desktop-only feature, and the audience is on phones). The chip is
+            the only pointer-events-auto thing in this corner. */}
         {!ended ? (
-          <div className="absolute bottom-[6.75rem] right-3">
-            <Minimap
-              polylines={minimapFrame?.polylines ?? []}
-              transform={
-                minimapFrame?.transform ?? {
-                  centerX: snap.vehicle?.x ?? 0,
-                  centerY: snap.vehicle?.y ?? 0,
-                  pxPerMeter: 1.1,
+          <div className="absolute bottom-[6.75rem] right-3 flex flex-col items-end gap-1.5">
+            {minimapOn ? (
+              <Minimap
+                polylines={minimapFrame?.polylines ?? []}
+                transform={
+                  minimapFrame?.transform ?? {
+                    centerX: snap.vehicle?.x ?? 0,
+                    centerY: snap.vehicle?.y ?? 0,
+                    pxPerMeter: 1.1,
+                  }
                 }
-              }
-              vehicle={snap.vehicle}
-            />
+                vehicle={snap.vehicle}
+              />
+            ) : null}
+            <button
+              type="button"
+              onClick={toggleMinimap}
+              aria-pressed={minimapOn}
+              title={minimapOn ? "Скрий картата (P)" : "Покажи картата (P)"}
+              className={`pointer-events-auto flex h-10 w-10 items-center justify-center rounded-full border text-[15px] backdrop-blur transition motion-reduce:transition-none ${
+                minimapOn
+                  ? "border-accent/60 bg-accent/20 text-accent"
+                  : "border-border bg-background/60 text-muted opacity-70 hover:opacity-100"
+              }`}
+            >
+              <span aria-hidden>🗺</span>
+              <span className="sr-only">
+                {minimapOn ? "Скрий мини картата" : "Покажи мини картата"}
+              </span>
+            </button>
           </div>
         ) : null}
 
@@ -1480,7 +1591,7 @@ export function LessonPlayShell({
           remains visible in every letterboxed state around the session. */}
       <div
         className={`flex flex-wrap items-center gap-3 text-xs text-muted ${
-          isFullscreen && !(ended && saveResult && !saveResult.ok) ? "hidden" : ""
+          immersive && !(ended && saveResult && !saveResult.ok) ? "hidden" : ""
         }`}
       >
         {ended && saveResult && !saveResult.ok ? (

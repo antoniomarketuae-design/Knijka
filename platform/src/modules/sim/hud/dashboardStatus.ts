@@ -32,6 +32,13 @@ export interface DashboardStatus {
   fogLightsOn: boolean;
   wipersOn: boolean;
   speedKmh: number;
+  /** Do the CONDITIONS require the headlights right now (night, or rain by
+   *  day)? Written by the scene from the same weather/time flags the rule
+   *  engine grades on. Consumed by telltaleWarnings.ts — the bar itself still
+   *  only shows the lamp state. */
+  headlightsRequired: boolean;
+  /** …and the fog-lamp twin (чл. 74 — significantly reduced visibility). */
+  fogLightsRequired: boolean;
 }
 
 /** Cold-car defaults (engine off, P, parking brake on — the A1 spawn policy):
@@ -51,6 +58,8 @@ export function createDashboardStatus(): DashboardStatus {
     fogLightsOn: false,
     wipersOn: false,
     speedKmh: 0,
+    headlightsRequired: false,
+    fogLightsRequired: false,
   };
 }
 
@@ -88,6 +97,7 @@ export function dashboardHash(s: DashboardStatus): string {
     `${s.hazardsOn ? 1 : 0}${s.engineOn ? 1 : 0}${s.stalled ? 1 : 0}|` +
     `${s.gearLabel}|${s.parkingBrakeOn ? 1 : 0}${s.seatbeltOn ? 1 : 0}|` +
     `${s.headlights}|${s.fogLightsOn ? 1 : 0}${s.wipersOn ? 1 : 0}|` +
+    `${s.headlightsRequired ? 1 : 0}${s.fogLightsRequired ? 1 : 0}|` +
     `${displaySpeedKmh(s.speedKmh)}`
   );
 }
