@@ -33,8 +33,22 @@ import { assertPracticeTicket } from "./practiceTicket";
 import { schedule } from "./scheduler";
 import { getLearningStore, type ProgressUpdate } from "./store";
 
-/** Contexts this module records. Exams are owned by the exam module. */
-export type AnswerContext = "practice" | "micro";
+/**
+ * Contexts this module records. Exams are owned by the exam module.
+ *
+ * "lesson" is the classroom's mini-quiz (modules/lesson). It is a THIRD
+ * context rather than a reuse of "practice" for two reasons: the practice
+ * ticket (audit M-10) binds a submission to a list of ids the practice engine
+ * dealt, and a lesson deals its own — deterministically, from the beat, so the
+ * lesson module verifies membership itself; and the founder will want to know
+ * whether classroom answers behave differently from practice answers, which is
+ * unanswerable if they are recorded as the same thing.
+ *
+ * What is deliberately NOT different: grading, mastery, scheduling. A lesson
+ * answer moves exactly the same needle a practice answer does. The classroom
+ * is an input to the learning engine, not a parallel one.
+ */
+export type AnswerContext = "practice" | "micro" | "lesson";
 
 export interface SubmitAnswerOptions {
   /**

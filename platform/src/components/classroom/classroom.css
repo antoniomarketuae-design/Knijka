@@ -1,0 +1,139 @@
+/*
+ * The room, in three gradients.
+ *
+ * This is what makes the classroom a place rather than a page: a lit wall, the
+ * line where the wall meets the floor, and a floor for the teacher to stand
+ * on. Nothing here animates and nothing here blurs — the simulator owns the
+ * GPU budget and this screen has to open fast on a mid-range Android. Depth
+ * comes from OVERLAP (the teacher stands in front of the board plane), which
+ * costs nothing at all.
+ *
+ * Every colour is a semantic token, so the room re-inks itself with the rest
+ * of the app in the light theme and inside the cluster scope.
+ */
+
+.cl-room {
+  background: var(--background);
+}
+
+/* The lit wall: one overhead pool of light, one vertical falloff. */
+.cl-room-wall {
+  background:
+    radial-gradient(
+      120% 62% at 50% -12%,
+      color-mix(in srgb, var(--accent) 12%, transparent),
+      transparent 60%
+    ),
+    linear-gradient(180deg, var(--surface-2) 0%, var(--surface) 58%, var(--background) 100%);
+}
+
+/*
+ * The board itself — a panel MOUNTED on the wall, whose left edge runs on
+ * behind the teacher. This element is the entire reason the composition reads
+ * as „a board behind a person" instead of „a card next to an avatar": the
+ * teacher is positioned over its bottom-left corner, and one overlap is worth
+ * more than any amount of shading.
+ */
+.cl-board-plane {
+  inset: 8px 8px 40px 8px;
+  border-radius: 14px;
+  border: 1px solid var(--border-strong);
+  background: color-mix(in srgb, var(--background) 62%, var(--surface));
+  box-shadow:
+    inset 0 1px 0 color-mix(in srgb, var(--foreground) 8%, transparent),
+    0 12px 26px -18px rgba(0, 0, 0, 0.9);
+}
+
+/* The wall/floor junction — one hairline, and the whole box reads as a room. */
+.cl-room-rail {
+  bottom: 34px;
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    var(--border-strong) 12%,
+    var(--border-strong) 88%,
+    transparent
+  );
+}
+
+.cl-room-floor {
+  height: 34px;
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--background) 55%, var(--surface-2)),
+    var(--background)
+  );
+}
+
+/*
+ * The board caption: exactly three lines, always. `BOARD_CHROME_PX` in
+ * boardFit.ts budgets for this height, so it may not be allowed to vary.
+ */
+.cl-clamp-3 {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  line-clamp: 3;
+  overflow: hidden;
+  min-height: 3.9em;
+}
+
+/*
+ * A scrollable text column that ends in a hard edge looks like a column that
+ * ended. The fade says „there is more" without spending a row on a control.
+ */
+.cl-fade-b {
+  mask-image: linear-gradient(to bottom, #000 calc(100% - 18px), transparent 100%);
+}
+
+/*
+ * The mouth meter under the teacher. Three bars, ~1 KB of CSS, and the only
+ * moving thing on the screen apart from the board itself — it is the "is this
+ * talking?" cue for a phone on mute.
+ */
+.cl-speech-bar {
+  animation: cl-speak 900ms ease-in-out infinite alternate;
+}
+
+.cl-speech-bar:nth-child(2) {
+  animation-duration: 700ms;
+}
+
+.cl-speech-bar:nth-child(3) {
+  animation-duration: 1100ms;
+}
+
+@keyframes cl-speak {
+  from {
+    height: 3px;
+  }
+  to {
+    height: 12px;
+  }
+}
+
+.cl-dots {
+  animation: cl-dots 1200ms ease-in-out infinite;
+}
+
+@keyframes cl-dots {
+  0%,
+  100% {
+    opacity: 0.35;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cl-speech-bar,
+  .cl-dots {
+    animation: none;
+  }
+
+  .cl-speech-bar {
+    height: 8px;
+  }
+}

@@ -1,0 +1,210 @@
+<!doctype html>
+<html lang="bg">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#05070c" />
+    <meta name="robots" content="noindex" />
+    <title>Няма връзка · Книжка.AI</title>
+    <!--
+      THE OFFLINE SHELL. Served by sw.js when a navigation cannot reach the
+      network at all.
+
+      IT IS SELF-CONTAINED ON PURPOSE: inline CSS, inline SVG, system fonts, no
+      script, no image file, no web font. A page shown precisely when the
+      network is gone must not depend on a single sub-resource — a cached HTML
+      file whose stylesheet was never cached renders as unstyled black text on
+      white, which is worse than the browser's own error page.
+
+      That constraint is also why this is a static file rather than a Next.js
+      route: an app-router page references hashed JS chunks, and caching one
+      build's HTML next to another build's chunks is the classic service-worker
+      failure. Nothing here can go stale except the wording.
+
+      The colours are the cluster palette, written literally (globals.css
+      §CLUSTER: --background #05070c, --surface #0a0e16, --foreground #e8eef8,
+      --muted #8fa0b8, --accent #48a9ff). They cannot use the tokens — there is
+      no stylesheet here — so if the palette ever moves, this file moves with it.
+
+      THE COPY IS HONEST. It does not promise cached lessons, because none are
+      cached: the service worker stores this page and nothing else. Telling a
+      student "работи офлайн" and then showing them an empty question bank is
+      the kind of lie that costs the trust the whole product runs on.
+    -->
+    <style>
+      :root {
+        color-scheme: dark;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        margin: 0;
+        min-height: 100%;
+      }
+      body {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: max(24px, env(safe-area-inset-top)) 20px
+          max(24px, env(safe-area-inset-bottom));
+        background: radial-gradient(
+            120% 80% at 50% -10%,
+            rgba(72, 169, 255, 0.1) 0%,
+            transparent 60%
+          ),
+          #05070c;
+        color: #e8eef8;
+        font-family:
+          "Segoe UI", system-ui, -apple-system, "Helvetica Neue", Arial, sans-serif;
+        line-height: 1.55;
+        -webkit-font-smoothing: antialiased;
+      }
+      main {
+        width: 100%;
+        max-width: 30rem;
+        border: 1px solid #1a2130;
+        border-radius: 20px;
+        background: #0a0e16;
+        box-shadow:
+          inset 0 1px 0 0 rgba(255, 255, 255, 0.07),
+          0 14px 36px -12px rgba(0, 0, 0, 0.9);
+        padding: 28px 24px;
+      }
+      .brand {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        font-weight: 800;
+        font-size: 1.05rem;
+        letter-spacing: -0.01em;
+      }
+      .brand span {
+        color: #48a9ff;
+      }
+      .label {
+        margin: 22px 0 0;
+        font-size: 0.7rem;
+        font-weight: 700;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        color: #8fa0b8;
+      }
+      h1 {
+        margin: 6px 0 0;
+        font-size: 1.6rem;
+        line-height: 1.2;
+        font-weight: 900;
+        letter-spacing: -0.02em;
+      }
+      p {
+        margin: 12px 0 0;
+        color: #8fa0b8;
+        font-size: 0.95rem;
+      }
+      ul {
+        margin: 14px 0 0;
+        padding-left: 1.1rem;
+        color: #8fa0b8;
+        font-size: 0.9rem;
+      }
+      li + li {
+        margin-top: 6px;
+      }
+      .actions {
+        margin-top: 22px;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+      }
+      a {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 12px;
+        padding: 12px 20px;
+        font-size: 0.875rem;
+        font-weight: 700;
+        text-decoration: none;
+      }
+      a.primary {
+        background: #48a9ff;
+        color: #04070e;
+      }
+      a.ghost {
+        border: 1px solid #5b6d84;
+        color: #e8eef8;
+      }
+      @media (max-height: 460px) {
+        /* Landscape on a phone — the state the founder actually reports from.
+           Trim the vertical rhythm so the action stays on screen without
+           scrolling. */
+        main {
+          padding: 18px 20px;
+        }
+        h1 {
+          font-size: 1.25rem;
+        }
+        .label {
+          margin-top: 14px;
+        }
+        ul {
+          display: none;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <div class="brand">
+        <svg
+          width="30"
+          height="30"
+          viewBox="0 0 512 512"
+          role="img"
+          aria-label="Книжка.AI"
+        >
+          <defs>
+            <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0" stop-color="#5cb2ff" />
+              <stop offset="1" stop-color="#2384e8" />
+            </linearGradient>
+          </defs>
+          <rect width="512" height="512" rx="116" fill="url(#bg)" />
+          <g
+            stroke="#06122a"
+            stroke-width="58"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            fill="none"
+          >
+            <path d="M186 142 V 370" />
+            <path d="M330 142 L 212 256 L 330 370" />
+          </g>
+        </svg>
+        Книжка<span>.AI</span>
+      </div>
+
+      <p class="label">Връзка · прекъсната</p>
+      <h1>Телефонът ти е офлайн</h1>
+      <p>
+        Не успяхме да заредим страницата, защото в момента няма връзка с
+        интернет. Нищо от работата ти не е загубено — последният ти отговор е
+        записан преди прекъсването.
+      </p>
+      <ul>
+        <li>Провери мобилните данни или Wi-Fi.</li>
+        <li>В асансьор, метро или подлез изчакай няколко секунди.</li>
+        <li>
+          Въпросите, изпитите и симулаторът се зареждат от сървъра, затова не
+          могат да работят без връзка.
+        </li>
+      </ul>
+      <div class="actions">
+        <a class="primary" href="/dashboard">Опитай отново</a>
+        <a class="ghost" href="/">Начална страница</a>
+      </div>
+    </main>
+  </body>
+</html>

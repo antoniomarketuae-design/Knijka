@@ -28,6 +28,8 @@
 ## platform/
 34 User Platform · 35 Profile & Progress · 36 Gamification · 37 Multiplayer · 38 Marketplace · 39 Mobile Companion — all ⚪ (37/38 are H3)
 
+**UI/design surface (implemented):** [64 UI Visual Direction](platform/64_UI_VISUAL_DIRECTION.md) ✅ · [65 UI/UX Upgrade Plan](platform/65_UI_UX_UPGRADE_PLAN.md) ✅ · [75 Platform Audit V2](platform/75_PLATFORM_AUDIT_V2.md) ✅ · [83 Cluster Design Foundation](platform/83_CLUSTER_DESIGN_FOUNDATION.md) — the dark token ramp + depth/motion primitives ✅ · [84 Interior Class Layer](platform/84_INTERIOR_CLASS_LAYER.md) — the same lever one level up: rebinding `.card`/`.btn-*`/`.hud-panel` inside the cluster scope ✅
+
 ## business/
 40 Business Model · 41 Competitor Analysis · 42 Market Expansion · 43 Customer Segments · 44 Monetization — ⚪ · [58 Validation & Experiment Plan](business/58_VALIDATION_AND_EXPERIMENT_PLAN.md) 🟡 · [59 Go-To-Market](business/59_GO_TO_MARKET_STRATEGY.md) 🟡 · [60 Unit Economics & AI Cost Model](business/60_UNIT_ECONOMICS_AND_AI_COST_MODEL.md) 🟡
 

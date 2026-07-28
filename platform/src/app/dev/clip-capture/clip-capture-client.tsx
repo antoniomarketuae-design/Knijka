@@ -830,6 +830,9 @@ export function ClipCaptureClient({
       tracePath: mistake.traceRef.path,
       titleBg: mistake.titleBg,
       eventTypes: [],
+      // Hand-driven single capture: whatever the pilot calls this clip, the
+      // recording is the same — the origin label is only a provenance note.
+      origin: "authored",
     };
     const status = statuses[entry.id];
     return (

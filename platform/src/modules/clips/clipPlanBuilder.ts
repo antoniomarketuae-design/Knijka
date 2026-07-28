@@ -230,6 +230,37 @@ const PROFILE_BG: Readonly<Record<string, string>> = {
 interface StagedLike {
   kind: string;
   actor?: { profile?: string };
+  /** brakingLeadCar only: the pace offset the runner holds relative to the
+   *  player. POSITIVE = ahead (the lead-car case the kind is named for),
+   *  NEGATIVE = behind. See `pacesBehind`. */
+  followGapM?: number;
+}
+
+/**
+ * Does this staged actor pace BEHIND the ghost?
+ *
+ * `brakingLeadCar` is the only staged kind that can hold a lane-locked pace
+ * relative to the player, so the catalogue also uses it for actors that are
+ * not leads at all — sc-lane-change's `sc-lc-blindspot` sits at
+ * `followGapM: -24`, i.e. 24 m BEHIND, in the target lane, precisely because
+ * the blind spot is what the mirror check exists for. The sign of the gap is
+ * the whole difference and it was being ignored twice over:
+ *
+ *  - `actorForStaged` labelled it „Автомобил отпред в лентата (води)" — a
+ *    checklist that told the R0 reviewer to look forward for a car that is
+ *    behind;
+ *  - `deriveCamera` left the clip on `chase`, whose cone points ahead, so
+ *    `render-clip` refused „Престрояване без мигач" with „липсва vehicle"
+ *    and the clip could not be produced at all.
+ *
+ * Derived from the spec rather than listed per clip (the TURN_ACROSS_CLIPS
+ * judgement call does not apply here — „a negative follow gap means behind" is
+ * arithmetic, not taste). Verified: `followGapM: -24` is the ONLY negative
+ * follow gap in the whole scenario catalogue, so this moves exactly one plan
+ * entry.
+ */
+function pacesBehind(staged: StagedLike): boolean {
+  return staged.kind === "brakingLeadCar" && (staged.followGapM ?? 0) < 0;
 }
 
 /** Staged spec → the actor the clip must show; null = not an actor (a
@@ -243,7 +274,9 @@ function actorForStaged(staged: StagedLike): ClipRequiredActor | null {
     case "priorityFromRight":
       return { kind: "vehicle", label: `${veh} отдясно с предимство` };
     case "brakingLeadCar":
-      return { kind: "vehicle", label: `${veh} отпред в лентата (води)` };
+      return pacesBehind(staged)
+        ? { kind: "vehicle", label: `${veh} ОТЗАД в съседната лента (мъртва зона)` }
+        : { kind: "vehicle", label: `${veh} отпред в лентата (води)` };
     case "cyclistRightHook":
       return { kind: "cyclist", label: "Велосипедист отдясно" };
     case "roundaboutEntry":
@@ -433,7 +466,21 @@ function deriveControl(
   }
 
   // 3. Signal-governed codes — the signalized node nearest the fault moment.
-  if ([...codes].some((c) => /RED_LIGHT|AMBER_|SIGNAL_/.test(c))) {
+  //
+  // `YELLOW_LIGHT` is here because of a naming drift, not a design choice: the
+  // rules catalogue names the amber fault YELLOW_LIGHT_NOT_STOPPED (rules/
+  // types.ts) while this matcher was written against an `AMBER_` prefix that
+  // no violation code actually uses. The consequence was measured on
+  // 2026-07-28: sc-signal-response m0 („Жълтото като зелено") — a drill whose
+  // WHOLE subject is a traffic signal — derived governingControl „няма", so
+  // `loadRun` built it with framing = null and the camera never oriented on
+  // the mast. In the rendered fault keyframe the only signal head in shot was
+  // a cross-street mast; the amber the clip is named for was never legible,
+  // which is doc 66 R2 failing silently. Adding the real code name is the
+  // whole fix; it moves exactly one plan entry (verified by regenerating and
+  // diffing — YELLOW_LIGHT_NOT_STOPPED is the only YELLOW_* code in the
+  // catalogue and sc-signal-response m0 is its only pilot clip).
+  if ([...codes].some((c) => /RED_LIGHT|AMBER_|YELLOW_LIGHT|SIGNAL_/.test(c))) {
     const signalized = (district.intersections ?? []).filter((i) => i.signalized === true);
     const node = nearest(signalized, faultPos);
     if (node) {
@@ -609,8 +656,45 @@ const REAR_APPROACH_KINDS: ReadonlySet<string> = new Set([
   "rearTailgater",
 ]);
 
-function deriveCamera(staged: readonly StagedLike[], notes: string[]): "chase" | "rearAware" {
-  if (staged.some((s) => REAR_APPROACH_KINDS.has(s.kind))) {
+/**
+ * TURN-ACROSS clips — the second way the chase cone loses the key actor, found
+ * by measurement on 2026-07-28 rather than by argument.
+ *
+ * REAR_APPROACH_KINDS covers actors that CLOSE from behind. This is the mirror
+ * case: the actor is ahead-right, the ghost TURNS ACROSS it, and by the
+ * engine's fault instant the ghost has swung ~40-90° away — so the actor that
+ * the manoeuvre victimised is now behind and beside the lens. Measured on
+ * sc-vu-cyclist-hook m2 („Отрязване на велосипедиста в завоя"), replaying the
+ * committed ego trace through a fresh traffic+director and testing
+ * actorInPlannedFrame every step of the R1 beat: the rider sits 3.7-5.6 m
+ * BEHIND and 5.4-6.7 m to the side of the ghost — about 54° off the chase axis,
+ * against a 50° chase FOV — so `framedKinds` comes back EMPTY and render-clip
+ * refuses the clip, although the rider is physically forced from 3.00 m/s to a
+ * standstill 4.26 m away. Under plannedRearAwarePose the same rider is ~18° off
+ * axis at the same instant, with the ghost still in frame.
+ *
+ * Authored per (template, mistake) rather than derived, deliberately: deriving
+ * it from the trace's heading change would silently reframe several already
+ * recorded clips, and the doc 66 contract is that the card is reviewed, not
+ * guessed. Each entry names the demo whose picture was measured.
+ */
+const TURN_ACROSS_CLIPS: ReadonlySet<string> = new Set([
+  "sc-vu-cyclist-hook__m2",
+]);
+
+function deriveCamera(
+  clipId: string,
+  staged: readonly StagedLike[],
+  notes: string[],
+): "chase" | "rearAware" {
+  if (TURN_ACROSS_CLIPS.has(clipId)) {
+    notes.push(
+      "Призракът ЗАВИВА ПРЕЗ ключовия участник — при грешката той остава зад и встрани " +
+        "от обектива (извън конуса на преследващата камера), затова страничен три-четвърти кадър (rearAware)",
+    );
+    return "rearAware";
+  }
+  if (staged.some((s) => REAR_APPROACH_KINDS.has(s.kind) || pacesBehind(s))) {
     notes.push(
       "Ключовият участник идва ОТЗАД — страничен три-четвърти кадър (rearAware), " +
         "който държи и призрака, и приближаващия отзад в рамката",
@@ -740,7 +824,7 @@ export function buildClipPlan(
     );
     const hasTelltaleStimulus = staged.some((s) => s.kind === "telltaleStimulus");
     const view = deriveView(codes, hasTelltaleStimulus, notes);
-    const camera = deriveCamera(staged, notes);
+    const camera = deriveCamera(pilot.id, staged, notes);
     const laneHighlight = deriveLaneHighlight(codes, district, faultPos, notes);
 
     entries.push({

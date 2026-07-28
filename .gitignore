@@ -21,6 +21,7 @@ coverage/
 
 # clip rig server state (pid + log) — tools/clips/headless/clip-rig.mjs
 tools/clips/headless/.rig/
+tools/clips/headless/.r0look/
 
 # R0 review frames — captured to LOOK at (doc 66: look before you ship), then
 # thrown away. They are evidence for one review, not product: the pipeline's

@@ -106,6 +106,13 @@ import {
   requestFullscreen,
   supportsFullscreen,
 } from "./fullscreen";
+import {
+  COMPACT_DASH_HEIGHT_PX,
+  isCompactViewport,
+  minimapClearancePx,
+  ROOMY_HUD_FLOOR_PX,
+  shouldGoImmersive,
+} from "./immersive";
 import { MicroQuizOverlay } from "./MicroQuizOverlay";
 import { MistakeConsequenceOverlay } from "./MistakeConsequenceOverlay";
 import {
@@ -361,6 +368,101 @@ function readStoredAdvisorOn(lesson: LessonSpec): boolean {
   }
 }
 
+// ---------------------------------------------------------------------------
+// Viewport hooks — all effect-resolved, never guessed during render.
+//
+// Every one of these is a browser fact the server cannot know. Guessing one in
+// render would be a hydration mismatch; this shell mounts client-side only
+// (after a start click), so an effect is both correct and immediate.
+// ---------------------------------------------------------------------------
+
+/** Phone-shaped viewport with a thumb on it → the compact, in-canvas HUD. */
+function useCompactHud(): boolean {
+  const [compact, setCompact] = useState(false);
+  useEffect(() => {
+    const read = () =>
+      setCompact(
+        isCompactViewport(
+          window.innerWidth,
+          window.innerHeight,
+          window.matchMedia?.("(pointer: coarse)").matches === true,
+        ),
+      );
+    read();
+    window.addEventListener("resize", read);
+    window.addEventListener("orientationchange", read);
+    return () => {
+      window.removeEventListener("resize", read);
+      window.removeEventListener("orientationchange", read);
+    };
+  }, []);
+  return compact;
+}
+
+/**
+ * Installed-app mode. Both spellings on purpose: `display-mode: standalone` is
+ * the standard one, `navigator.standalone` is the ONLY one iOS Safari has
+ * reported truthfully for a Home-Screen launch for a decade. The parallel
+ * installability lane is what removes the founder's ~19 % of Safari chrome;
+ * this is how this screen finds out that it happened.
+ */
+function useStandaloneDisplay(): boolean {
+  const [standalone, setStandalone] = useState(false);
+  useEffect(() => {
+    const mq = window.matchMedia?.("(display-mode: standalone)") ?? null;
+    const legacy = (window.navigator as { standalone?: boolean }).standalone === true;
+    const read = () => setStandalone((mq?.matches ?? false) || legacy);
+    read();
+    mq?.addEventListener?.("change", read);
+    return () => mq?.removeEventListener?.("change", read);
+  }, []);
+  return standalone;
+}
+
+/**
+ * The height the shell may actually use, in px — and why `100dvh` is not it.
+ *
+ * FOUNDER FRAME #3, verbatim reading of the pixels: something is cut off BELOW
+ * the fold — the gear/pedal UI runs past the visible area. That is the classic
+ * iOS Safari trap. A `position: fixed; inset: 0` element resolves against the
+ * LAYOUT viewport, which on iOS is the *large* viewport (toolbars retracted);
+ * with the toolbars actually on screen, the bottom of that element is behind
+ * them. `dvh` is better but still a resolved-at-layout-time number that lags
+ * the toolbar animation, and Safari has shipped several versions where it
+ * simply disagrees with what the user can see.
+ *
+ * `visualViewport.height` is the one number that is always exactly what the
+ * student can see, updated during the toolbar animation itself. The shell
+ * publishes it as `--sim-vh` and uses it for its own height, so nothing it
+ * lays out can ever be under browser chrome. `null` until measured (and on
+ * engines without the API) → the CSS `100dvh` fallback stands.
+ */
+function useVisualViewportHeight(active: boolean): number | null {
+  const [px, setPx] = useState<number | null>(null);
+  useEffect(() => {
+    if (!active) return;
+    const read = () => {
+      const vv = window.visualViewport;
+      // Round DOWN: half a pixel of overshoot is a scrollbar or a 1 px sliver
+      // of the page showing under the shell.
+      setPx(Math.floor(vv?.height ?? window.innerHeight));
+    };
+    read();
+    const vv = window.visualViewport;
+    vv?.addEventListener("resize", read);
+    vv?.addEventListener("scroll", read);
+    window.addEventListener("resize", read);
+    window.addEventListener("orientationchange", read);
+    return () => {
+      vv?.removeEventListener("resize", read);
+      vv?.removeEventListener("scroll", read);
+      window.removeEventListener("resize", read);
+      window.removeEventListener("orientationchange", read);
+    };
+  }, [active]);
+  return px;
+}
+
 function QuizFrequencySelector({
   value,
   onChange,
@@ -397,6 +499,118 @@ function QuizFrequencySelector({
           </button>
         );
       })}
+    </div>
+  );
+}
+
+/**
+ * THE „MICRO MAJOR BUTTON WITH SUB MENU" (founder's own words, 2026-07-28).
+ *
+ * It replaces two full-width chrome rows — „← Всички уроци" + the lesson title,
+ * and „Съветник / ВЪПРОСИ / Завърши сесията" — which together measured 93 px of
+ * a 390 px landscape viewport. Twenty-four per cent of the screen, spent before
+ * the simulator started, on a back link and a heading the student had just read
+ * on the card they tapped.
+ *
+ * Everything those rows carried is here, plus the lesson title as the sheet's
+ * own header, plus the map toggle that used to be a floating chip. Nothing was
+ * dropped; it stopped being permanently on screen.
+ *
+ * It sits at the TOP-LEFT rail and it is 44 px — Apple's own minimum touch
+ * target — because in landscape that corner is under a thumb and not under the
+ * road. The insets are real `env(safe-area-inset-*)` values: with the app now
+ * shipping `viewport-fit=cover`, that corner is exactly where the notch is.
+ */
+function PlayMenu({
+  titleBg,
+  badgeBg,
+  items,
+}: {
+  titleBg: string;
+  /** „Изпит" / „Пясъчник" framing, or null. */
+  badgeBg: { textBg: string } | null;
+  items: {
+    key: string;
+    labelBg: string;
+    /** Right-hand state word („вкл." / „Често"), or null for a plain action. */
+    valueBg?: string | null;
+    tone?: "default" | "danger";
+    onSelect: () => void;
+    /** Keep the sheet open (a toggle the student may flip twice). */
+    keepOpen?: boolean;
+  }[];
+}) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div
+      className="pointer-events-none absolute z-20 flex flex-col items-start gap-1.5"
+      style={{
+        left: "calc(0.5rem + env(safe-area-inset-left, 0px))",
+        top: "calc(0.5rem + env(safe-area-inset-top, 0px))",
+        maxHeight: "calc(100% - 1rem)",
+      }}
+    >
+      <div className="flex items-center gap-1.5">
+        <button
+          type="button"
+          onClick={() => setOpen((o) => !o)}
+          aria-expanded={open}
+          aria-label={open ? "Затвори менюто на урока" : "Меню на урока"}
+          title={titleBg}
+          className={`pointer-events-auto flex h-11 w-11 shrink-0 touch-manipulation items-center justify-center rounded-full border text-lg backdrop-blur transition motion-reduce:transition-none ${
+            open
+              ? "border-accent bg-accent/25 text-foreground"
+              : "border-border bg-background/60 text-muted active:bg-surface"
+          }`}
+        >
+          <span aria-hidden>{open ? "✕" : "☰"}</span>
+        </button>
+        {/* A13 / THEO-3: the framing badge is a product requirement — it stays
+            on screen, at chip size, because „this is an exam" must never be
+            something a student has to open a menu to find out. */}
+        {badgeBg !== null ? (
+          <span className="rounded-full border border-danger/60 bg-danger/15 px-2 py-1 text-[9px] font-black uppercase tracking-wider text-danger backdrop-blur">
+            {badgeBg.textBg}
+          </span>
+        ) : null}
+      </div>
+
+      {open ? (
+        <div
+          role="menu"
+          aria-label="Меню на урока"
+          className="pointer-events-auto flex min-h-0 w-60 max-w-[70vw] flex-col overflow-y-auto rounded-2xl border border-border bg-background/95 p-1.5 backdrop-blur"
+        >
+          <p className="truncate px-2 py-1 text-[11px] font-bold text-muted">{titleBg}</p>
+          {items.map((item) => (
+            <button
+              key={item.key}
+              type="button"
+              role="menuitem"
+              onClick={() => {
+                item.onSelect();
+                if (item.keepOpen !== true) setOpen(false);
+              }}
+              className={`flex items-center gap-2 rounded-xl px-2.5 py-2.5 text-left text-[13px] font-bold transition active:bg-surface ${
+                item.tone === "danger" ? "text-danger" : "text-foreground"
+              }`}
+            >
+              <span className="min-w-0 flex-1 truncate">{item.labelBg}</span>
+              {item.valueBg ? (
+                <span className="shrink-0 text-[11px] font-bold text-accent">{item.valueBg}</span>
+              ) : null}
+            </button>
+          ))}
+          {/* ODbL. The shell's attribution footer is hidden in every immersive
+              layout, and compact is now ALWAYS immersive — so on a phone this
+              menu is the only place the district's source can be credited. It
+              is required (district-v1.json meta), so it goes where the student
+              can actually reach it rather than nowhere. */}
+          <p className="px-2 pb-0.5 pt-1.5 text-[10px] text-muted">
+            © OpenStreetMap contributors
+          </p>
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -566,7 +780,21 @@ export function LessonPlayShell({
   // scene still gets the whole screen on a browser that will not grant a real
   // fullscreen element. Without it an iPhone plays a 16:9 letterbox inside a
   // padded dashboard column — about 200 px of 3D on a 390 px-wide phone.
-  const immersive = isFullscreen || !fullscreenAvailable;
+  //
+  // COMPACT is the 2026-07-28 second-pass addition (see immersive.ts for the
+  // measured why): a phone-shaped viewport is immersive whether or not the
+  // Fullscreen API exists, and it also switches the HUD to its in-canvas
+  // grammar — no chrome rows, an edge-to-edge instrument band, a teach sheet
+  // instead of a teach modal.
+  const compact = useCompactHud();
+  const standalone = useStandaloneDisplay();
+  const immersive = shouldGoImmersive({
+    isFullscreen,
+    fullscreenAvailable,
+    compact,
+    standalone,
+  });
+  const viewportH = useVisualViewportHeight(immersive && !isFullscreen);
 
   // -- The LETTERBOXED play area (founder 2026-07-28) --------------------------
   // „when not full screen in simulator mode … there is alot of dark space that
@@ -1168,6 +1396,68 @@ export function LessonPlayShell({
     [onStartScenario],
   );
 
+  // The bottom instrument band's height, and the floor every other in-canvas
+  // overlay measures from. Published as CSS custom properties on the root so
+  // the teach sheet, the ribbon legend, the minimap column and the TOUCH
+  // CONTROLS (a different component tree entirely — TouchControls lives inside
+  // the scene) all read ONE number instead of each hard-coding a guess. That
+  // is what made the dashboard and the teach card overlap in the first place.
+  const dashHeightPx = ended ? 0 : compact ? COMPACT_DASH_HEIGHT_PX : 0;
+  const hudFloorPx = compact ? dashHeightPx + 8 : ROOMY_HUD_FLOOR_PX;
+
+  const menuItems = ended
+    ? [{ key: "exit", labelBg: "← Всички уроци", onSelect: onExitToSelect }]
+    : [
+        ...(!examMode && !mistakeMode
+          ? [
+              {
+                key: "advisor",
+                labelBg: "Съветник",
+                valueBg: advisorOn ? "вкл." : "изкл.",
+                onSelect: toggleAdvisor,
+                keepOpen: true,
+              },
+              {
+                key: "quiz",
+                labelBg: "Въпроси",
+                valueBg: MICRO_QUIZ_FREQUENCIES.find((f) => f.id === quizFreq)?.labelBg ?? "",
+                // Cycles the three frequencies: a radio group is four controls
+                // wide, and this sheet is 240 px on a phone.
+                onSelect: () => {
+                  const i = MICRO_QUIZ_FREQUENCIES.findIndex((f) => f.id === quizFreq);
+                  setQuizFreq(MICRO_QUIZ_FREQUENCIES[(i + 1) % MICRO_QUIZ_FREQUENCIES.length].id);
+                },
+                keepOpen: true,
+              },
+            ]
+          : []),
+        {
+          key: "minimap",
+          labelBg: "Карта",
+          valueBg: minimapOn ? "вкл." : "изкл.",
+          onSelect: toggleMinimap,
+          keepOpen: true,
+        },
+        ...(fullscreenAvailable
+          ? [
+              {
+                key: "fullscreen",
+                labelBg: isFullscreen ? "Изход от цял екран" : "Цял екран",
+                onSelect: toggleFullscreen,
+              },
+            ]
+          : []),
+        lesson.objectives.length === 0
+          ? { key: "finish", labelBg: "Завърши сесията", onSelect: finishNow }
+          : {
+              key: "abort",
+              labelBg: examMode ? "Прекрати изпита" : "Прекрати урока",
+              tone: "danger" as const,
+              onSelect: abortNow,
+            },
+        { key: "exit", labelBg: "← Всички уроци", onSelect: onExitToSelect },
+      ];
+
   return (
     <div
       ref={rootRef}
@@ -1175,22 +1465,47 @@ export function LessonPlayShell({
       // the letterboxed state, so the prose width cap is lifted exactly while a
       // session is on screen and nowhere else.
       data-sim-play={immersive ? undefined : "letterbox"}
+      // …and this one is what PlayAreaStyles uses to fold the scene's own
+      // desktop chrome away on a phone.
+      data-sim-compact={compact ? "on" : undefined}
       className={
         // Fullscreen: the UA sizes this element to the viewport — become a
         // padded column so the scene (flex-1) absorbs all remaining height.
-        // No Fullscreen API (iPhone Safari): do the UA's job ourselves with
-        // `fixed inset-0` + `h-dvh`, same column, same scene sizing.
+        // No Fullscreen API (iPhone Safari) or a phone-shaped viewport: do the
+        // UA's job ourselves. NOT `inset-0` — see useVisualViewportHeight for
+        // why a fixed `bottom: 0` is exactly how the founder's third frame ended
+        // up with its pedal UI below the fold. Top-anchored + an explicit
+        // measured height cannot do that.
         isFullscreen
           ? "flex h-full flex-col gap-2 overflow-hidden bg-background p-2"
           : immersive
-            ? "fixed inset-0 z-40 flex h-dvh flex-col gap-2 overflow-hidden bg-background p-2"
+            ? `fixed left-0 top-0 z-40 flex w-full flex-col overflow-hidden bg-background ${
+                // Compact: no padding at all. Eight pixels of page gutter on
+                // each side of a driving simulator is eight pixels of road.
+                compact ? "" : "gap-2 p-2"
+              }`
             : "flex flex-col gap-3"
       }
+      style={{
+        ...(immersive && !isFullscreen
+          ? { height: viewportH !== null ? `${viewportH}px` : "100dvh" }
+          : null),
+        // Published for the whole subtree (incl. the scene's TouchControls).
+        ["--sim-vh" as string]: viewportH !== null ? `${viewportH}px` : "100dvh",
+        ["--sim-dash-h" as string]: `${dashHeightPx}px`,
+        ["--sim-hud-floor" as string]: `${hudFloorPx}px`,
+        ["--sim-minimap-clearance" as string]: `${minimapClearancePx(minimapOn)}px`,
+      }}
     >
       <HudStyles />
       <PlayAreaStyles />
 
-      {/* Top bar */}
+      {/* Top bar — ROOMY LAYOUTS ONLY.
+          On a phone these two rows measured 93 px of a 390 px viewport (24 %)
+          and the founder's ruling on them was „absolutely no needed". Compact
+          renders <PlayMenu/> inside the canvas instead: same actions, 44 px,
+          one corner. */}
+      {compact ? null : (
       <div className="flex flex-wrap items-center gap-3">
         <button type="button" className="btn-ghost px-3 py-1.5 text-xs" onClick={onExitToSelect}>
           ← Всички уроци
@@ -1265,18 +1580,23 @@ export function LessonPlayShell({
           ) : null}
         </div>
       </div>
+      )}
 
       {/* Scene + HUD overlays.
           Letterboxed: 16:9 (the frame the cockpit-camera contract is authored
           at — playArea.ts), centred, and never wider than the height left under
           it allows. The inline max-width is the MEASURED cap; the calc() is the
           server-rendered fallback so the first paint is already close instead
-          of flashing full-width and snapping back. */}
+          of flashing full-width and snapping back.
+          Compact: no rounding and no border — the picture IS the screen, and a
+          12 px radius on a full-bleed frame is a 12 px hole in the road. */}
       <div
         ref={sceneBoxRef}
         className={`relative mx-auto w-full overflow-hidden bg-surface ${
           immersive
-            ? "min-h-0 flex-1 rounded-lg"
+            ? compact
+              ? "min-h-0 flex-1"
+              : "min-h-0 flex-1 rounded-lg"
             : "aspect-video rounded-xl border border-border"
         }`}
         style={
@@ -1385,6 +1705,22 @@ export function LessonPlayShell({
           <HudToasts toasts={toasts} />
         </div>
 
+        {/* THE MICRO MAJOR BUTTON — compact layouts only; on a roomy screen
+            everything it holds is already in the top bar above. */}
+        {compact ? (
+          <PlayMenu
+            titleBg={lesson.titleBg}
+            badgeBg={
+              examMode
+                ? { textBg: "Изпит" }
+                : mistakeMode
+                  ? { textBg: "Пясъчник" }
+                  : null
+            }
+            items={menuItems}
+          />
+        ) : null}
+
         {/* Car status dashboard — bottom center, THE visual anchor (founder
             2026-07-17: „табло като на кола"). Replaces the old bottom-left
             SpeedCard + GearIndicatorCard pair; reads the scene's per-frame
@@ -1399,14 +1735,34 @@ export function LessonPlayShell({
             and brake (measured 844×390: pedals y 242–370, bar y 304–374). A
             thumb resting where a thumb rests hit the bar and the car did not
             move. It is a readout; nothing inside it is interactive. */}
+        {/* COMPACT (2026-07-28 second pass): edge to edge, pinned to the floor,
+            40 px. „It is a car instrument binnacle, not a toolbar" — so it has
+            no margins to float in and no radius to float with. The bottom
+            safe-area inset is padding INSIDE the band, not a gap under it: a
+            strip with a black gap beneath it reads as a broken layout, and the
+            home indicator would still cross the instruments. */}
         {!ended ? (
-          <div className="pointer-events-none absolute bottom-2 left-1/2 z-10 flex w-max max-w-[calc(100%-1rem)] -translate-x-1/2 justify-center">
-            <StatusDashboard
-              statusRef={dashboardStatusRef}
-              limitKmh={snap.limitKmh}
-              rejectFlashKey={gearRejectFlash}
-            />
-          </div>
+          compact ? (
+            <div
+              className="pointer-events-none absolute inset-x-0 bottom-0 z-10 flex justify-center"
+              style={{ paddingBottom: "env(safe-area-inset-bottom, 0px)" }}
+            >
+              <StatusDashboard
+                statusRef={dashboardStatusRef}
+                limitKmh={snap.limitKmh}
+                rejectFlashKey={gearRejectFlash}
+                compact
+              />
+            </div>
+          ) : (
+            <div className="pointer-events-none absolute bottom-2 left-1/2 z-10 flex w-max max-w-[calc(100%-1rem)] -translate-x-1/2 justify-center">
+              <StatusDashboard
+                statusRef={dashboardStatusRef}
+                limitKmh={snap.limitKmh}
+                rejectFlashKey={gearRejectFlash}
+              />
+            </div>
+          )
         ) : null}
 
         {/* R3 #15: the two in-world lines finally get names. On L1/L2 scenario
@@ -1421,7 +1777,13 @@ export function LessonPlayShell({
         {!ended &&
         (lesson.aids?.shadowCar === true || lesson.aids?.pathRibbon === true) &&
         lesson.objectives.length > 0 ? (
-          <div className="absolute bottom-[6.75rem] left-3 flex flex-col gap-0.5 rounded-lg border border-border bg-surface/80 px-2 py-1.5 text-[10px] font-semibold leading-tight text-muted backdrop-blur">
+          <div
+            className="absolute left-3 flex flex-col gap-0.5 rounded-lg border border-border bg-surface/80 px-2 py-1.5 text-[10px] font-semibold leading-tight text-muted backdrop-blur"
+            // …and not `bottom-[6.75rem]`: 108 px was the floating pill's band,
+            // hard-coded here and in the minimap column. Both now read the
+            // shell's published floor, so shrinking the band moves them.
+            style={{ bottom: "var(--sim-hud-floor, 6.75rem)" }}
+          >
             <span>
               <span
                 aria-hidden
@@ -1449,7 +1811,13 @@ export function LessonPlayShell({
             desktop-only feature, and the audience is on phones). The chip is
             the only pointer-events-auto thing in this corner. */}
         {!ended ? (
-          <div className="absolute bottom-[6.75rem] right-3 flex flex-col items-end gap-1.5">
+          <div
+            className="absolute flex flex-col items-end gap-1.5"
+            style={{
+              bottom: "var(--sim-hud-floor, 6.75rem)",
+              right: "calc(0.75rem + env(safe-area-inset-right, 0px))",
+            }}
+          >
             {minimapOn ? (
               <Minimap
                 polylines={minimapFrame?.polylines ?? []}
@@ -1463,22 +1831,27 @@ export function LessonPlayShell({
                 vehicle={snap.vehicle}
               />
             ) : null}
-            <button
-              type="button"
-              onClick={toggleMinimap}
-              aria-pressed={minimapOn}
-              title={minimapOn ? "Скрий картата (P)" : "Покажи картата (P)"}
-              className={`pointer-events-auto flex h-10 w-10 items-center justify-center rounded-full border text-[15px] backdrop-blur transition motion-reduce:transition-none ${
-                minimapOn
-                  ? "border-accent/60 bg-accent/20 text-accent"
-                  : "border-border bg-background/60 text-muted opacity-70 hover:opacity-100"
-              }`}
-            >
-              <span aria-hidden>🗺</span>
-              <span className="sr-only">
-                {minimapOn ? "Скрий мини картата" : "Покажи мини картата"}
-              </span>
-            </button>
+            {/* Compact layouts reach this from „Карта" in the micro menu —
+                one floating chip fewer on a screen the founder is measuring in
+                percentages. Key P still toggles it everywhere. */}
+            {compact ? null : (
+              <button
+                type="button"
+                onClick={toggleMinimap}
+                aria-pressed={minimapOn}
+                title={minimapOn ? "Скрий картата (P)" : "Покажи картата (P)"}
+                className={`pointer-events-auto flex h-10 w-10 items-center justify-center rounded-full border text-[15px] backdrop-blur transition motion-reduce:transition-none ${
+                  minimapOn
+                    ? "border-accent/60 bg-accent/20 text-accent"
+                    : "border-border bg-background/60 text-muted opacity-70 hover:opacity-100"
+                }`}
+              >
+                <span aria-hidden>🗺</span>
+                <span className="sr-only">
+                  {minimapOn ? "Скрий мини картата" : "Покажи мини картата"}
+                </span>
+              </button>
+            )}
           </div>
         ) : null}
 
@@ -1545,6 +1918,9 @@ export function LessonPlayShell({
             moment={teachQueue[0]}
             remaining={teachQueue.length - 1}
             onAcknowledge={handleTeachAcknowledged}
+            // Compact: a bottom sheet that stops above the instrument band
+            // instead of a modal that covered the whole picture AND the band.
+            compact={compact}
           />
         ) : null}
 

@@ -239,6 +239,22 @@ export const SC_VU_CYCLIST_HOOK: ScenarioSpec = {
         "Водачът зави надясно само с поглед в огледалото за обратно виждане — дясната мъртва зона остана непроверена, а точно там се движеше велосипедистът, и колата му отряза пътя. Велосипедистът направо има предимство; един поглед през дясното рамо преди завоя предотвратява десния капан.",
       codeRefs: ["FAILED_TO_YIELD"],
     },
+    {
+      // THE PICTURE-TRUE right hook (founder brief, 2026-07-28). Demos 0 and 1
+      // grade the fault correctly but, measured against the staged rider, pass
+      // BEHIND it: the cyclist is 5–7 m ahead through the whole turn and holds a
+      // flat 3.00 m/s from release to the last frame — nothing on screen argues
+      // the lesson. This demo cuts ACROSS the rider's line and lands in front of
+      // it, so playerGuard brakes the cyclist from 3.00 m/s to a standstill with
+      // 4.26 m of clearance still between them (no contact — the founder's
+      // near-miss-over-crash ruling, the train-reel precedent). Same single
+      // graded code as its siblings; the trace gate pins the braking.
+      traceRef: { path: "content/traces/sc-vu-cyclist-hook/mistake-forced-brake.trace.json" },
+      titleBg: "Отрязване на велосипедиста в завоя",
+      whatWentWrongBg:
+        "Колата застигна велосипедиста и вместо да го изчака, зави надясно пред него — отряза пътя му точно преди устието на кръстовището. Велосипедистът, който се движи направо, трябваше да спре рязко, за да не се удари в завиващата кола. Праволинейно движещият се велосипедист има предимство: десният завой се прави чак след като той премине.",
+      codeRefs: ["FAILED_TO_YIELD"],
+    },
   ],
   teach: {
     whenBg:

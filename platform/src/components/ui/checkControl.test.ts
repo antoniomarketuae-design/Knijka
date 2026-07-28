@@ -151,6 +151,12 @@ const CALL_SITES = [
   ["question review", "app/(dashboard)/review/ReviewClient.tsx"],
   ["sim micro-quiz", "components/sim/lesson-ui/MicroQuizOverlay.tsx"],
   ["sim session end", "modules/sim/hud/SessionEndScreen.tsx"],
+  // The AI-teacher classroom's mid-lesson check (2026-07-28). It arrived from a
+  // different run and reached for CheckControl on its own — which is the guard
+  // below working in the direction that matters: the ninth tick box in the
+  // product was built right without anyone being told to, and the only thing
+  // missing was this line.
+  ["classroom check", "components/lesson/LessonRunner.tsx"],
 ] as const;
 
 // ---------------------------------------------------------------------------

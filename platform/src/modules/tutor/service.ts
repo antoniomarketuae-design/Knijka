@@ -35,7 +35,12 @@ import { checkDailyBudget, sofiaDayKey, TUTOR_BUDGET_REPLY_BG } from "./budget";
 import { computeCostMicroUsd } from "./cost";
 import { getTutorModel, isTutorEnabled } from "./model";
 import { buildTutorSystemPrompt, extractCitations } from "./prompt";
-import { retrieveGroundingForTurn } from "./retrieval";
+import {
+  MAX_RETRIEVED_ITEMS,
+  retrieveGroundingForTurn,
+  retrieveMaterialsInTopic,
+  type RetrievedItem,
+} from "./retrieval";
 import {
   getTutorStore,
   type TutorCitation,
@@ -70,6 +75,38 @@ export interface AskTutorResult {
 export interface TutorThreadView {
   threadId: string | null;
   messages: TutorMessage[];
+}
+
+/**
+ * A question asked FROM INSIDE A LESSON (doc 84 §2.2) — the founder's „the
+ * student can interrupt the teacher and ask questions".
+ *
+ * A lesson beat is the best-specified context this product will ever have: it
+ * names a concept, a rule code, a scenario and a set of questions all at once,
+ * and it names them because an author wrote them down, not because a scorer
+ * ranked them. So an interruption gets a STRICTER grounding contract than free
+ * chat, and a cheaper one:
+ *
+ *   Tier 1  `materials` — the beat's own concepts/questions/rules/signs,
+ *           INJECTED, not retrieved. No scoring, no ranking, no threshold.
+ *   Tier 2  the remaining slots, ranked but scoped to `topicId`
+ *           (retrieveMaterialsInTopic) — never widened to the whole bank.
+ *   Tier 3  nothing above the floor ⇒ the caller refuses. The refusal is the
+ *           feature; the lesson layer makes it constructive rather than bare.
+ *
+ * The thread's history is NOT replayed for a lesson turn: a beat is a bounded
+ * topic, and doc 81's 12-message replay is what makes the free-chat prompt
+ * grow. All four spending ceilings still apply, unchanged — there is exactly
+ * one budgeted model path in this product and this is it.
+ */
+export interface TutorLessonContext {
+  kind: "lesson";
+  lessonId: string;
+  beatId: string;
+  /** Content-bank topic id ("t-…") the lesson belongs to. Scopes Tier 2. */
+  topicId: string;
+  /** Tier-1 materials, injected verbatim. */
+  materials: RetrievedItem[];
 }
 
 /**
@@ -146,6 +183,32 @@ export function previousUserQuestion(messages: TutorMessage[]): string | null {
   return null;
 }
 
+/**
+ * Tier 1 (injected) then Tier 2 (topic-scoped, ranked), deduplicated by id and
+ * capped at the same MAX_RETRIEVED_ITEMS the free-chat path uses. Tier 1 keeps
+ * its slots: an authored material a human attached to this beat outranks
+ * anything a keyword scorer found, always.
+ */
+function lessonGrounding(
+  context: TutorLessonContext,
+  question: string,
+): RetrievedItem[] {
+  const seen = new Set(context.materials.map((m) => m.id));
+  const room = Math.max(0, MAX_RETRIEVED_ITEMS - context.materials.length);
+  const tier2 =
+    room === 0
+      ? []
+      : retrieveMaterialsInTopic(
+          getContentRepo(),
+          question,
+          context.topicId,
+          MAX_RETRIEVED_ITEMS,
+        )
+          .filter((m) => !seen.has(m.id))
+          .slice(0, room);
+  return [...context.materials, ...tier2];
+}
+
 export async function getThread(userId: string): Promise<TutorThreadView> {
   const thread = await getTutorStore().getThreadByUser(userId);
   if (!thread) return { threadId: null, messages: [] };
@@ -155,6 +218,7 @@ export async function getThread(userId: string): Promise<TutorThreadView> {
 export async function askTutor(
   userId: string,
   message: string,
+  context?: TutorLessonContext,
 ): Promise<AskTutorResult> {
   const question = message.trim();
   if (question.length === 0 || question.length > TUTOR_MAX_INPUT_LENGTH) {
@@ -232,11 +296,14 @@ export async function askTutor(
   // knows what a mistake costs on the exam and what the right action was.
   // The previous question rides along so a bare „А защо?“ still lands on the
   // topic it is asking about instead of forcing a refusal (D2).
-  const materials = retrieveGroundingForTurn(
-    getContentRepo(),
-    question,
-    previousUserQuestion(thread.messages),
-  );
+  const materials =
+    context === undefined
+      ? retrieveGroundingForTurn(
+          getContentRepo(),
+          question,
+          previousUserQuestion(thread.messages),
+        )
+      : lessonGrounding(context, question);
 
   // What the student is weak at — in theory AND behind the wheel. Advisory
   // only: neither read may block the tutor, so each degrades to an empty list.
@@ -261,9 +328,15 @@ export async function askTutor(
     weakestConceptTitlesBg,
     simWeakSpotsBg,
   });
-  const history = thread.messages
-    .slice(-TUTOR_HISTORY_MESSAGES)
-    .map(({ role, content }) => ({ role, content }));
+  // A lesson turn replays no history: the beat IS the context, and it is a
+  // better one than twelve messages of chat. This is most of why an
+  // interruption is ~2.3× cheaper per turn than a free-chat turn.
+  const history =
+    context === undefined
+      ? thread.messages
+          .slice(-TUTOR_HISTORY_MESSAGES)
+          .map(({ role, content }) => ({ role, content }))
+      : [];
 
   const result = await getTutorModel().complete({
     system,

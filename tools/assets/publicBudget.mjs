@@ -185,6 +185,32 @@ export const BUCKETS = [
     why: "The pre-rendered marketing hero loop (VP9 + H.264) every phone gets instead of a still plate — see components/marketing/hero/HeroLoopVideo.tsx.",
   },
   {
+    // Before `brand`, because it lives inside icons/ — the header's "narrow
+    // rules come before the directory they live in" rule.
+    id: "pwa-splash",
+    match: (rel) => rel.startsWith("icons/splash/"),
+    ship: "prod",
+    // 18 plates (9 iPhone form factors x 2 orientations) measure 228 KB total,
+    // ~13 KB each: they are a flat #05070c ground with the mark on it, so an
+    // 8-bit palette PNG is effectively lossless. The ceiling is ~3x that, which
+    // leaves room for iPads later and still fails loudly if someone re-renders
+    // them in truecolour — that alone would be ~4.5 MB.
+    maxBytes: 700_000,
+    // A single plate over 60 KB means the flat ground grew a gradient and the
+    // palette started dithering. See scripts/generate-icons.mjs.
+    maxFileBytes: 60_000,
+    why: "iOS launch images (apple-touch-startup-image). Without them a standalone launch flashes WHITE before the cockpit paints.",
+  },
+  {
+    id: "app-shell",
+    match: (rel) => rel === "sw.js" || rel === "offline.html",
+    ship: "prod",
+    // Two hand-written text files. The ceiling is here to make it obvious if
+    // someone ever bundles a framework into the service worker.
+    maxBytes: 60_000,
+    why: "The service worker and the self-contained offline page it serves when the network is gone.",
+  },
+  {
     id: "brand",
     match: (rel) => rel.startsWith("icons/") || rel === "og.png",
     ship: "prod",

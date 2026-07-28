@@ -33,7 +33,8 @@ export interface ProgressUpdate {
 
 export interface AttemptRecord {
   questionId: string;
-  context: "practice" | "micro";
+  /** Mirrors submit.ts AnswerContext — "lesson" is the classroom mini-quiz. */
+  context: "practice" | "micro" | "lesson";
   correct: boolean;
   /** Official point weight of the question (1|2|3), not points earned. */
   points: number;

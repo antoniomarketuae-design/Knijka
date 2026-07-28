@@ -21,12 +21,22 @@ import { SC_VU_CYCLIST_HOOK } from "../../lessons/scenario/templates-vru";
 import { parseScenarioTrace, serializeScenarioTrace } from "../parse";
 import { recordScVuCyclistDrive, type ScVuCyclistTraceName } from "../scVuCyclist";
 import type { RecordedDrive } from "../recorder";
+import { createTracePoint, sampleAt, type ScenarioTrace } from "../index";
+import { createTrafficSystem } from "../../traffic/system";
+import type { TrafficDistrict } from "../../traffic/types";
+import { createScenarioDirector } from "../../orchestrator/director";
+import type { StagedEventSpec } from "../../contracts";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(HERE, "../../../../../..");
 const RECORD = process.env.RECORD_TRACES === "1";
 const SCENARIO_ID = "sc-vu-cyclist-hook";
-const NAMES: ScVuCyclistTraceName[] = ["shadow-correct", "mistake-hook", "mistake-no-look"];
+const NAMES: ScVuCyclistTraceName[] = [
+  "shadow-correct",
+  "mistake-hook",
+  "mistake-no-look",
+  "mistake-forced-brake",
+];
 
 function loadDistrict(id: string): unknown {
   return JSON.parse(readFileSync(path.join(REPO_ROOT, "content", "world", `${id}.json`), "utf-8"));
@@ -42,6 +52,67 @@ const district = loadDistrict("vu-cyclist-v1");
 const drives = new Map<ScVuCyclistTraceName, RecordedDrive>(
   NAMES.map((n) => [n, recordScVuCyclistDrive(district, n)]),
 );
+
+/**
+ * What the STAGED CYCLIST did while the ghost drove — the founder's own test of
+ * this reel ("the bicyclist will have to slow down"), which the trace format
+ * cannot answer on its own: a ScenarioTrace v1 stores the EGO only, so a demo
+ * can grade FAILED_TO_YIELD while, on screen, the rider is never touched by the
+ * manoeuvre. Replays the recorded ego pose through a fresh traffic system +
+ * director (the same wiring the recorder runs; the pipeline is deterministic
+ * and driven by the player pose alone) and reads the staged rider back.
+ */
+/** The staged rider's authored cruise, m/s (templates-vru VU_CYCLIST). */
+const CYCLIST_CRUISE_MPS = 3.0;
+
+function riderUnder(trace: ScenarioTrace): {
+  peakSpeedMps: number;
+  minSpeedAfterPeakMps: number;
+  minSeparationM: number;
+} {
+  const traffic = createTrafficSystem(district as TrafficDistrict, {
+    seed: 7,
+    vehicleCount: 0,
+    pedestrianCount: 0,
+  });
+  const staged = [...(SC_VU_CYCLIST_HOOK.staged ?? [])] as StagedEventSpec[];
+  const director = createScenarioDirector(staged, traffic, { seed: 7 });
+  const dt = 1 / 60;
+  const pt = createTracePoint();
+  let peakSpeedMps = 0;
+  let minSpeedAfterPeakMps = Infinity;
+  let minSeparationM = Infinity;
+  for (let t = 0; t <= trace.meta.durationSec; t += dt) {
+    sampleAt(trace, t, pt);
+    traffic.update(dt, {
+      signalPhase: () => "green",
+      playerPos: { x: pt.x, y: pt.y },
+      playerSpeedKmh: Math.abs(pt.speedKmh),
+      playerHeadingDeg: pt.headingDeg,
+    });
+    director.step({
+      tSec: t,
+      dtSec: dt,
+      x: pt.x,
+      y: pt.y,
+      speedKmh: Math.abs(pt.speedKmh),
+      headingDeg: pt.headingDeg,
+      brakePedal: pt.brakeOn ? 1 : 0,
+      tickEvents: [],
+    });
+    const rider = traffic.staged("sc-vu-cyclist");
+    if (!rider) continue;
+    if (rider.speedMps > peakSpeedMps) peakSpeedMps = rider.speedMps;
+    // Only meaningful once the rider has REACHED cruise: the post-release ramp
+    // climbs through every lower speed and would otherwise read as a slowdown.
+    if (peakSpeedMps >= CYCLIST_CRUISE_MPS && rider.speedMps < minSpeedAfterPeakMps) {
+      minSpeedAfterPeakMps = rider.speedMps;
+    }
+    const d = Math.hypot(pt.x - rider.x, pt.y - rider.y);
+    if (d < minSeparationM) minSeparationM = d;
+  }
+  return { peakSpeedMps, minSpeedAfterPeakMps, minSeparationM };
+}
 
 describe("sc-vu-cyclist-hook — the shadow gate (doc 76 §5)", () => {
   const shadow = drives.get("shadow-correct")!;
@@ -77,6 +148,45 @@ describe("sc-vu-cyclist-hook — mistake demos grade their exact codes (doc 76 �
     expect(codes).toEqual([...SC_VU_CYCLIST_HOOK.mistakes[1].codeRefs].sort());
     expect(codes).not.toContain("TURN_WITHOUT_INDICATOR");
     expect(codes).not.toContain("FOLLOWING_TOO_CLOSE");
+  });
+
+  it("„Отрязване на велосипедиста в завоя“: exactly FAILED_TO_YIELD, never a turn/follow code", () => {
+    const drive = drives.get("mistake-forced-brake")!;
+    const codes = [...new Set(violationCodes(drive))].sort();
+    expect(codes).toEqual([...SC_VU_CYCLIST_HOOK.mistakes[2].codeRefs].sort());
+    // The left-biased overtaking line exists to keep the rider outside
+    // leadGapFor's 4 m corridor: if it ever drifts back in-lane this fires.
+    expect(codes).not.toContain("FOLLOWING_TOO_CLOSE");
+    expect(codes).not.toContain("TURN_WITHOUT_INDICATOR");
+    // The right indicator is lit before the turn and never a left one — the
+    // founder's other complaint about the mis-mapped clip was a car showing a
+    // LEFT signal under a right-turn question.
+    const signals = drive.trace.events.filter((e) => e.kind === "signal-on");
+    expect(signals.map((e) => e.detail)).toEqual(["right"]);
+  });
+});
+
+/**
+ * THE PICTURE GATE (founder brief, 2026-07-28) — a right-hook reel has to SHOW
+ * the right hook, not merely grade it. THEO-4: the visual IS the explanation.
+ */
+describe("sc-vu-cyclist-hook — the rider is really cut off (the picture gate)", () => {
+  it("„Отрязване на велосипедиста“ forces the cyclist to brake hard — without ever touching him", () => {
+    const rider = riderUnder(drives.get("mistake-forced-brake")!.trace);
+    // He was cruising…
+    expect(rider.peakSpeedMps).toBeGreaterThan(2.9);
+    // …and the turn across his line made him stop. (Measured: 3.00 → 0.00 m/s.)
+    expect(rider.minSpeedAfterPeakMps).toBeLessThan(0.5);
+    // A NEAR-MISS, not a crash — the founder's ruling on the train reel. The
+    // runner's contact radius is 2.2 m; measured closest approach ≈ 4.26 m.
+    expect(rider.minSeparationM).toBeGreaterThan(3.5);
+  });
+
+  it("the shadow never disturbs the rider — it waits, so he keeps his speed", () => {
+    const rider = riderUnder(drives.get("shadow-correct")!.trace);
+    expect(rider.peakSpeedMps).toBeGreaterThan(2.9);
+    expect(rider.minSpeedAfterPeakMps).toBeGreaterThan(2.9);
+    expect(rider.minSeparationM).toBeGreaterThan(3.5);
   });
 });
 

@@ -22,7 +22,7 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import "@/lib/content/loader";
 import { getContentRepo } from "@/lib/content/repo";
-import { resolveWhyPanel } from "./whyPanel";
+import { resolveWhyPanel, whyPanelSimRefIndex } from "./whyPanel";
 import { QUESTION_EVENT_TYPE } from "./whyPanelMap.generated";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -110,14 +110,21 @@ describe("resolveWhyPanel — the question → drill chain (pinned picks)", () =
     });
   });
 
-  it("q-krastovishta-005 (ev-junction-priority-sign) → sc-jx-priority-confidence (coverage batch wiring)", () => {
-    // ev-junction-priority-sign was UNWIRED: the code-match (FAILED_TO_YIELD)
-    // fell through to sc-roundabout-entry — a ROUNDABOUT (wrong topic) with no
-    // rendered reel, so the panel showed the 2D fallback. The 2026-07-22
-    // coverage batch wires the event straight at the priority-junction reel.
+  it("q-krastovishta-005 (ev-junction-priority-sign) → NO drill: the pairing guard refuses it", () => {
+    // History: ev-junction-priority-sign was UNWIRED, so the code-match
+    // (FAILED_TO_YIELD) fell through to sc-roundabout-entry — a ROUNDABOUT.
+    // The 2026-07-22 coverage batch wired the event at sc-jx-priority-confidence
+    // („По пътя с предимство — без излишни спирания") instead, which is closer
+    // but still the OTHER ROLE: the drill's fault is braking needlessly WHILE
+    // ON the priority road, and this question is a Б1 secondary-road yield
+    // (чл. 50) — it never cites the drill's чл. 48/20. The pairing guard
+    // (whyPanelPairing.ts) refuses it and the panel falls back to the stored
+    // explanation, which is already correct and already cited.
     const payload = resolveWhyPanel("q-krastovishta-005");
-    expect(payload?.sim?.templateId).toBe("sc-jx-priority-confidence");
-    expect(payload?.sim?.mistake.tracePath).toContain("sc-jx-priority-confidence");
+    expect(payload).not.toBeNull();
+    expect(payload!.sim).toBeUndefined();
+    expect(payload!.explanationBg.length).toBeGreaterThan(0);
+    expect(payload!.lawRefs.length).toBeGreaterThan(0);
   });
 
   it("returns the STORED explanation + citations verbatim (ADR-002)", () => {
@@ -182,17 +189,12 @@ describe("resolveWhyPanel — fallbacks", () => {
 });
 
 describe("resolveWhyPanel — every resolvable drill ref is playable", () => {
-  it("trace + district files exist for one question per mapped event", () => {
-    // First question id per distinct event (keys are sorted — deterministic).
-    const firstByEvent = new Map<string, string>();
-    for (const [id, event] of Object.entries(QUESTION_EVENT_TYPE)) {
-      if (!firstByEvent.has(event)) firstByEvent.set(event, id);
-    }
-    let resolved = 0;
-    for (const [event, id] of firstByEvent) {
-      const sim = resolveWhyPanel(id)?.sim;
-      if (!sim) continue; // events without codes/demos degrade to text-only
-      resolved++;
+  it("trace + district files exist for every event the index resolves", () => {
+    // The EVENT index, not the per-question payload: this is the "the replay
+    // has files to play" invariant, and it must stay tight even for events the
+    // pairing guard now withholds from some of their questions.
+    const index = whyPanelSimRefIndex();
+    for (const [event, sim] of index) {
       expect(existsSync(path.join(REPO_ROOT, sim.mistake.tracePath)), `${event}: ${sim.mistake.tracePath}`).toBe(true);
       expect(
         existsSync(path.join(REPO_ROOT, "content/world", `${sim.mistake.districtId}.json`)),
@@ -201,11 +203,40 @@ describe("resolveWhyPanel — every resolvable drill ref is playable", () => {
       expect(sim.titleBg.length).toBeGreaterThan(0);
       expect(sim.mistake.whatWentWrongBg.length).toBeGreaterThan(0);
     }
-    // After the 2026-07-22 coverage batch (EVENT_TO_SCENARIO now wires every
-    // question-event to the reel that depicts it), all 45 distinct mapped
-    // events resolve to a playable drill — no behavior question falls through
-    // to a code-match-roulette scenario. (ev-accident-own-conduct is wired but
-    // has no question mapping yet, so it is not among these 45.)
-    expect(resolved).toBe(45);
+    // After the 2026-07-22 coverage batch (EVENT_TO_SCENARIO wires every
+    // question-event to a reel), all 45 distinct mapped events resolve to a
+    // playable drill, plus ev-accident-own-conduct, which is wired but has no
+    // question mapping yet.
+    expect(index.size).toBe(46);
+  });
+
+  it("the same holds for what questions are actually served (post-guard)", () => {
+    // Per-question now, because the pairing guard can withhold a drill the
+    // event index still resolves. Whatever DOES ship must be playable.
+    let shipped = 0;
+    for (const id of Object.keys(QUESTION_EVENT_TYPE)) {
+      const sim = resolveWhyPanel(id)?.sim;
+      if (!sim) continue;
+      shipped++;
+      expect(existsSync(path.join(REPO_ROOT, sim.mistake.tracePath)), `${id}: ${sim.mistake.tracePath}`).toBe(true);
+      expect(
+        existsSync(path.join(REPO_ROOT, "content/world", `${sim.mistake.districtId}.json`)),
+        `${id}: ${sim.mistake.districtId}`,
+      ).toBe(true);
+    }
+    // 532 of the 585 event-mapped questions are served a drill; the other 53
+    // are the pairings the guard refuses (whyPanelPairing.ts
+    // PAIRINGS_DELIBERATELY_DENIED) and fall back to text + citations. Raising
+    // this number means a new pairing was allowed — check it was reviewed.
+    //
+    // 527 → 532 on 2026-07-28: five ev-junction-priority-sign questions whose
+    // student is WAITING AT a Б1 (q-krastovishta-006, q-krastovishta-048,
+    // q-signali-i-markirovka-008, q-signs-009, q-signs-064) were corrected from
+    // sc-jx-priority-confidence — the priority-road seat, which the guard
+    // rightly refused them — to sc-jx-giveway-b1, the secondary-road seat, which
+    // they law-match on ЗДвП чл. 50. The other nine of that event's Б1/priority
+    // split stay refused ON PURPOSE; whyPanelPairing.ts
+    // PAIRINGS_DELIBERATELY_DENIED names each one and why.
+    expect(shipped).toBe(532);
   });
 });

@@ -923,6 +923,52 @@
       "quality": "high"
     },
     {
+      "id": "sc-vu-bikelane-turn__m1",
+      "templateId": "sc-vu-bikelane-turn",
+      "mistakeIndex": 1,
+      "tracePath": "content/traces/sc-vu-bikelane-turn/mistake-cut-path.trace.json",
+      "src": "/clips/sc-vu-bikelane-turn__m1.webm",
+      "durationSec": 12,
+      "recordedAt": "2026-07-28T19:57:48.291Z",
+      "titleBg": "Отрязване на колелото по алеята",
+      "keyframes": [
+        "/clips/sc-vu-bikelane-turn__m1.k0.webp",
+        "/clips/sc-vu-bikelane-turn__m1.k1.webp",
+        "/clips/sc-vu-bikelane-turn__m1.k2.webp",
+        "/clips/sc-vu-bikelane-turn__m1.k3.webp",
+        "/clips/sc-vu-bikelane-turn__m1.k4.webp"
+      ],
+      "actors": [],
+      "view": "exterior",
+      "quality": "high"
+    },
+    {
+      "id": "sc-vu-cyclist-hook__m2",
+      "templateId": "sc-vu-cyclist-hook",
+      "mistakeIndex": 2,
+      "tracePath": "content/traces/sc-vu-cyclist-hook/mistake-forced-brake.trace.json",
+      "src": "/clips/sc-vu-cyclist-hook__m2.webm",
+      "durationSec": 12.000000000000002,
+      "recordedAt": "2026-07-28T20:05:23.822Z",
+      "titleBg": "Отрязване на велосипедиста в завоя",
+      "keyframes": [
+        "/clips/sc-vu-cyclist-hook__m2.k0.webp",
+        "/clips/sc-vu-cyclist-hook__m2.k1.webp",
+        "/clips/sc-vu-cyclist-hook__m2.k2.webp",
+        "/clips/sc-vu-cyclist-hook__m2.k3.webp",
+        "/clips/sc-vu-cyclist-hook__m2.k4.webp"
+      ],
+      "actors": [
+        {
+          "kind": "cyclist",
+          "label": "Велосипедист отдясно",
+          "present": true
+        }
+      ],
+      "view": "exterior",
+      "quality": "high"
+    },
+    {
       "id": "sc-vu-emergency__m0",
       "templateId": "sc-vu-emergency",
       "mistakeIndex": 0,

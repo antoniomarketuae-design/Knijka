@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { InstallPanel } from "@/components/pwa/InstallHint";
 import { requireUser } from "@/modules/auth";
 import { PrivacyControls } from "./privacy-controls";
 import { SignOutButton } from "./signout-button";
@@ -90,6 +91,26 @@ export default async function SettingsPage() {
           </Link>{" "}
           от имейла на акаунта — възстановяваме достъпа ръчно.
         </p>
+      </section>
+
+      {/* Install to the home screen.
+
+          THIS IS THE WAY BACK. The install bar (components/pwa/InstallHint.tsx)
+          is dismissed PERMANENTLY — that is what „не, благодаря" has to mean if
+          it is not going to be a nag — so the offer needs a place a student can
+          walk to on purpose. Unlike the bar, this panel renders in every state,
+          including „вече е инсталирано" and „ти отказа". */}
+      <section
+        aria-labelledby="settings-install-title"
+        className="card p-5 [--panel-pad:1.25rem] sm:p-6 sm:[--panel-pad:1.5rem]"
+      >
+        <div className="panel-head panel-head-bleed">
+          <h2 id="settings-install-title" className="font-display text-base font-extrabold">
+            Приложение
+          </h2>
+          <span className="hud-label">Начален екран</span>
+        </div>
+        <InstallPanel />
       </section>
 
       {/* GDPR: data + deletion */}

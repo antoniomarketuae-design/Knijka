@@ -148,7 +148,7 @@
    visitor's OS setting: the instrument cluster IS the brand. So the
    identity is PINNED here rather than negotiated.
 
-   HOW IT KEEPS 538 `card` USAGES ALIVE. This block re-binds the same
+   HOW IT KEEPS EVERY EXISTING CALL SITE ALIVE. This block re-binds the same
    semantic token NAMES to cluster values. Custom properties inherit, and a
    closer ancestor always wins over :root regardless of which media query
    set it — so every existing utility (bg-surface, border-border, .card,
@@ -163,7 +163,11 @@
    were pinned; the login button then dropped the student back onto whatever
    their OS had decided. Extending the scope — one attribute on the
    (dashboard) layout — moves ~90% of the product's surface area onto this
-   palette without touching one of those 538 call sites.
+   palette without touching one of those call sites. (Counted as class tokens
+   inside className values: 79 `.card`, 445 `text-muted`, 171 `border-border`.
+   Earlier comments here said 538 `card`; that was a `\bcard\b` word sweep,
+   which in this repo also counts scenario templates, trace fixtures, prop
+   names and prose. Method: doc 84 §2.)
 
    And it is not only a brand move: the app's LIGHT theme is the one that
    fails WCAG. Measured (clusterScope.test.ts computes all of these from this
@@ -436,6 +440,26 @@ body {
   background: var(--background);
   color: var(--foreground);
   font-family: var(--font-sans);
+
+  /* THE SAFE AREA, PAID BACK. The root layout ships `viewport-fit=cover` so
+     the immersive simulator can use the full display width on a landscape
+     iPhone (the ~10 % of screen that used to be black bars). `cover` also
+     stops the browser insetting the layout for the notch and the home
+     indicator, so we restore exactly that inset here, on the ONE element every
+     in-flow page inherits its box from. Result: normal pages lay out as they
+     always did; `position: fixed` surfaces (which resolve against the viewport,
+     not this padded box) get the whole display and manage their own insets.
+
+     Left/right/bottom only. `safe-area-inset-top` is 0 in a Safari tab (the
+     browser chrome already owns that strip) and 0 in standalone with our
+     opaque `black` status-bar style — adding it would be dead weight in the
+     one orientation that has the least height to spare.
+
+     env() falls back to 0px on engines without it, so this is inert on
+     desktop and on every phone without a cutout. */
+  padding-left: env(safe-area-inset-left, 0px);
+  padding-right: env(safe-area-inset-right, 0px);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
 }
 
 /* Keyboard accessibility: a single, loud focus signal everywhere. The ring
@@ -827,17 +851,23 @@ body {
      HE IS RIGHT, AND THE REASON IS SPECIFIC. Doc 83 rebound the token VALUES
      inside `[data-surface="cluster"]` — which is why the app went black — and
      it built a whole depth layer (.panel, .panel-inset, .edge-lit, --depth-1..3)
-     to spend them on. Nothing behind the login ever consumed it. The
-     authenticated surfaces are made of `.card` (266 call sites), `.hud-panel`,
-     `.btn-accent`, `.btn-ghost` and `.field`, and those five classes were never
-     taught the cluster's SHAPES. A dark palette on admin-panel geometry is
-     precisely „dark but nothing much changes": only the colour moved.
+     to spend them on. Almost nothing behind the login consumed it: no
+     authenticated route mounted <Panel>, and .panel-inset had exactly one
+     consumer, the hazard route (HazardClipStage / HazardHistory / HazardReveal).
+     The authenticated surfaces are made of `.card` (79 call sites), `.hud-panel`
+     (16), `.btn-accent` (64), `.btn-ghost` (86) and `.field` (1) — 245 sites in
+     74 files — and those classes were never taught the cluster's SHAPES. A dark
+     palette on admin-panel geometry is precisely „dark but nothing much
+     changes": only the colour moved.
 
      SO THIS BLOCK APPLIES DOC 83'S TRICK ONE LEVEL UP. Instead of rebinding
      token values inside the scope it rebinds the CLASS IMPLEMENTATIONS, so
      every existing call site inherits the instrument language with no markup
-     edit — the same reason the palette could move 538 usages at once. Names
+     edit — the same reason the palette could move every usage at once. Names
      are the interface; the scope swaps the implementation.
+     (Counts are class tokens inside className values, method in doc 84 §2.
+     Earlier revisions of this comment said 266 / 538; both were `\bcard\b`
+     word sweeps and overcounted by ~3x and ~7x.)
 
      THE VOCABULARY IS A CAR'S PANEL, not a generic sci-fi one, because that is
      the product's own metaphor:
@@ -869,7 +899,7 @@ body {
      `.card` was `rounded-xl border border-border bg-surface` — a rectangle. On
      a near-black ground a 1px border at uniform opacity around all four sides
      is the flattest thing you can draw: it describes an OUTLINE, not an object,
-     and 266 outlines stacked down a page is the „generic admin panel" the
+     and a grid of those stacked down a page is the „generic admin panel" the
      founder is looking at.
 
      A real moulded rim is not one colour. Light arrives from above, so the top
@@ -895,9 +925,14 @@ body {
       0 0 22px -8px var(--glow);
   }
 
-  /* Hover/active response for a card that is a real destination. Replaces the
-     `hover:shadow-glow-sm` utility at the five call sites that used it: same
-     glow, but composed ON TOP of the bezel rather than instead of it. */
+  /* Hover/active response for a card that is a real destination: same glow, but
+     composed ON TOP of the bezel rather than instead of it.
+     OPEN ITEM — it has NOT replaced the raw utility everywhere. Six .card sites
+     carried `hover:shadow-glow-sm`; two moved here (exams/page, ModuleGrid), one
+     (theory/TopicCard) was deleted, and THREE still carry it and therefore still
+     flatten on hover: sim/lesson-ui/ScenarioCatalog, ExamModeCard and LessonCard,
+     all rendered from (dashboard)/simulator, i.e. inside this scope. Utilities
+     outrank @layer components, so the raw utility wins. Doc 84 §4. */
   .card-live {
     transition: box-shadow var(--dur-base) var(--ease-out),
       border-color var(--dur-base) var(--ease-out);
@@ -972,7 +1007,7 @@ body {
 
   /* --- 4. FRAMING CORNERS, AS A CLASS -----------------------------
      components/ui/Panel.tsx can already draw four L-shaped brackets, but only
-     for consumers that mount a <Panel>. This is the same signal for the 266
+     for consumers that mount a <Panel>. This is the same signal for the
      call sites that will never be rewritten — the cheapest mark that says a
      rectangle is a readout and not a content box.
 

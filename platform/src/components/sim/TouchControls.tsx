@@ -113,9 +113,26 @@ const INSET_L = "env(safe-area-inset-left, 0px)";
 const INSET_R = "env(safe-area-inset-right, 0px)";
 const INSET_B = "env(safe-area-inset-bottom, 0px)";
 
-/** The minimap is 168 px at bottom-right (hud/Minimap.tsx) — the pedal
- *  cluster sits inboard of it so no HUD card is ever covered. */
-const MINIMAP_CLEARANCE = "180px";
+/**
+ * Right-edge clearance for the minimap disc, and the floor everything sits on.
+ *
+ * BOTH ARE NOW PUBLISHED BY THE PLAY SHELL, not decided here (see
+ * lesson-ui/immersive.ts + LessonPlayShell's root `style`), and the fallbacks
+ * below are exactly the old hard-coded values so a TouchControls mounted
+ * outside a shell behaves as it always did.
+ *
+ * `--sim-minimap-clearance` — the minimap is 168 px and the pedal cluster sat
+ * inboard of a fixed 180 px reservation. But the minimap has been DEFAULT-OFF
+ * since the 2026-07-28 review, so on virtually every phone this was 180 px of
+ * screen held for a widget that was not on it. It follows the toggle now.
+ *
+ * `--sim-hud-floor` — the height of the instrument band plus its gutter. The
+ * pedals used to start 12 px off the bottom, which put their lower half behind
+ * the (inert) status bar: measured 844×390, pedals y 242–370 against a bar at
+ * y 304–374. Reading the band's real height means the two cannot overlap.
+ */
+const MINIMAP_CLEARANCE = "var(--sim-minimap-clearance, 180px)";
+const HUD_FLOOR = "var(--sim-hud-floor, 0.75rem)";
 
 /** Below this overlay width (px) the inboard pedal position would collide
  *  with the steer zone (portrait phones / small letterboxes). Narrow mode
@@ -329,13 +346,17 @@ export function TouchControls({
   if (!visible) return null;
 
   return (
-    <div ref={rootRef} className="pointer-events-none absolute inset-0 z-10 select-none">
+    <div
+      ref={rootRef}
+      data-hud="touch-controls"
+      className="pointer-events-none absolute inset-0 z-10 select-none"
+    >
       {/* -- LEFT: indicators + graded mirror glances, above the steer zone -- */}
       <div
         className="absolute flex items-center gap-2"
         style={{
           left: `calc(0.75rem + ${INSET_L})`,
-          bottom: `calc(12.5rem + ${INSET_B})`,
+          bottom: `calc(11.75rem + ${HUD_FLOOR} + ${INSET_B})`,
         }}
       >
         <RoundButton
@@ -381,7 +402,7 @@ export function TouchControls({
         className="pointer-events-auto absolute touch-none rounded-2xl border border-border bg-background/40 backdrop-blur-sm"
         style={{
           left: `calc(0.75rem + ${INSET_L})`,
-          bottom: `calc(6.75rem + ${INSET_B})`,
+          bottom: `calc(6rem + ${HUD_FLOOR} + ${INSET_B})`,
           width: "clamp(11rem, 34vw, 20rem)",
           height: "5rem",
         }}
@@ -407,7 +428,7 @@ export function TouchControls({
           right: narrow
             ? `calc(0.75rem + ${INSET_R})`
             : `calc(1.25rem + ${MINIMAP_CLEARANCE} + ${INSET_R})`,
-          bottom: `calc(0.75rem + ${INSET_B})`,
+          bottom: `calc(${HUD_FLOOR} + ${INSET_B})`,
         }}
       >
         <div className="flex flex-col items-center gap-2">
@@ -442,6 +463,7 @@ export function TouchControls({
       <div
         className="absolute top-1/2 flex -translate-y-1/2 flex-col gap-2"
         style={{ right: `calc(0.5rem + ${INSET_R})` }}
+        data-hud="touch-utility"
       >
         {onToggleFullscreen ? (
           <RoundButton labelBg="Цял екран" onClick={onToggleFullscreen}>

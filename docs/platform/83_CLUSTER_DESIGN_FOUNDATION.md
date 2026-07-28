@@ -36,9 +36,22 @@ fixing that specific thing.
 
 ## 2. Decision: a pinned scope, not a global re-theme
 
-The app has 538 `card` usages, 407 `text-muted`, 171 `border-border` across the
+The app has 79 `.card` usages, 445 `text-muted` and 171 `border-border` across the
 authenticated surfaces. Re-theming globally to get a good marketing page is how you
 break a dashboard you weren't looking at.
+
+> **Correction, 2026-07-28.** This paragraph originally read "538 `card` usages". That
+> figure was a word-boundary sweep (`grep -roE '\bcard\b' src`), which in this repo
+> counts scenario templates, trace fixtures, prop names, `HazardCard` and prose as well
+> as class tokens — it returns 542 at this doc's own commit. Counted as **class tokens
+> inside `className` values** (the method is written out in
+> [84 §2](84_INTERIOR_CLASS_LAYER.md)) it is **79**, in 38 `.tsx` files and 0 `.ts`. The
+> other two figures survive that method: `border-border` comes out at exactly 171, and
+> `text-muted` at 445 rather than 407. Doc 84 §1 and the `THE INTERIOR` comment in
+> `globals.css` carried the same bad number and are corrected too.
+>
+> **The argument is unaffected.** It never depended on the magnitude: one call site you
+> would have to hand-edit is one too many if the point is that names are the interface.
 
 **The mechanism: `[data-surface="cluster"]` re-binds the same semantic token NAMES to
 a different set of values.**
@@ -54,7 +67,7 @@ cluster colours with no markup change, and outside it nothing moves at all.
 
 Token names are the interface; the scope swaps the implementation. That is the whole
 trick, and it is why this task could redesign the dark identity without touching a
-single one of those 538 call sites.
+single one of those call sites.
 
 One companion rule handles what scopes cannot reach:
 

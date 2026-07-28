@@ -124,31 +124,88 @@ export function retrieveMaterials(
   question: string,
   limit: number = MAX_RETRIEVED_ITEMS,
 ): RetrievedItem[] {
+  return rankMaterials(repo, question, limit, null);
+}
+
+/**
+ * The same ranking, RESTRICTED TO ONE TOPIC — the lesson classroom's Tier-2
+ * (doc 84 §2.2).
+ *
+ * A lesson creates a failure mode free chat does not have: a WARM question
+ * with strong context. The student has just watched the right-of-way board and
+ * asks „а ако другият е трамвай?" — the model then has six retrieved
+ * materials, a plausible topic and conversational momentum, which is the exact
+ * situation in which a model invents an article number. Not when it knows
+ * nothing; when it NEARLY knows.
+ *
+ * So a lesson's retrieval is narrower than free chat's, not wider. If the
+ * student is in the pedestrians lesson and asks about motorway lane
+ * discipline, the honest answer is „different lesson" — not a confident
+ * paragraph assembled from the far side of the bank. Narrow retrieval produces
+ * more refusals and fewer inventions, and in a product for minors that is the
+ * correct trade.
+ *
+ * Signs are topic-less in the bank, so they are excluded here rather than
+ * guessed at: a sign that matters to a lesson is already named in the beat's
+ * Tier-1 `signIds`.
+ */
+export function retrieveMaterialsInTopic(
+  repo: ContentRepo,
+  question: string,
+  topicId: string,
+  limit: number = MAX_RETRIEVED_ITEMS,
+): RetrievedItem[] {
+  return rankMaterials(repo, question, limit, topicId);
+}
+
+function rankMaterials(
+  repo: ContentRepo,
+  question: string,
+  limit: number,
+  topicId: string | null,
+): RetrievedItem[] {
   const queryTokens = tokenizeBg(question);
   if (queryTokens.length === 0) return [];
 
+  const inTopic = new Set<string>(
+    topicId === null
+      ? []
+      : repo
+          .concepts()
+          .filter((c) => c.topicId === topicId)
+          .map((c) => c.id),
+  );
+
   const candidates: Candidate[] = [
-    ...repo.concepts().map((c) => ({
-      kind: "concept" as const,
-      id: c.id,
-      titleBg: c.titleBg,
-      bodyBg: c.summaryBg,
-      lawRefs: c.lawRefs,
-    })),
-    ...repo.questions().map((q) => ({
-      kind: "question" as const,
-      id: q.id,
-      titleBg: q.textBg,
-      bodyBg: q.explanationBg,
-      lawRefs: q.lawRefs,
-    })),
-    ...repo.signs().map((s) => ({
-      kind: "sign" as const,
-      id: s.id,
-      titleBg: `Знак ${s.code} „${s.nameBg}“`,
-      bodyBg: s.meaningBg,
-      lawRefs: s.lawRefs,
-    })),
+    ...repo
+      .concepts()
+      .filter((c) => topicId === null || c.topicId === topicId)
+      .map((c) => ({
+        kind: "concept" as const,
+        id: c.id,
+        titleBg: c.titleBg,
+        bodyBg: c.summaryBg,
+        lawRefs: c.lawRefs,
+      })),
+    ...repo
+      .questions()
+      .filter((q) => topicId === null || q.conceptIds.some((id) => inTopic.has(id)))
+      .map((q) => ({
+        kind: "question" as const,
+        id: q.id,
+        titleBg: q.textBg,
+        bodyBg: q.explanationBg,
+        lawRefs: q.lawRefs,
+      })),
+    ...(topicId === null
+      ? repo.signs().map((s) => ({
+          kind: "sign" as const,
+          id: s.id,
+          titleBg: `Знак ${s.code} „${s.nameBg}“`,
+          bodyBg: s.meaningBg,
+          lawRefs: s.lawRefs,
+        }))
+      : []),
   ];
 
   return candidates
@@ -260,6 +317,25 @@ const RULE_CANDIDATES: RuleCandidate[] = Object.entries(VIOLATIONS).map(
     };
   },
 );
+
+/**
+ * ONE catalogue entry as a grounding material, by code — the injected (Tier-1)
+ * counterpart of the ranked lookup below.
+ *
+ * A lesson beat names its rule codes, so it does not need to search for them;
+ * it needs them shaped exactly the way the ranked path shapes them, so that a
+ * lesson answer and a chat answer about the same fault quote the same
+ * classification line, the same corrective and the same citation. Building
+ * that body in a second place is how those two drift apart.
+ *
+ * `score` is 0: nothing ranked it, an author named it.
+ */
+export function ruleMaterial(code: string): RetrievedItem | null {
+  const candidate = RULE_CANDIDATES.find((c) => c.id === `rule:${code}`);
+  if (candidate === undefined) return null;
+  const { kind, id, titleBg, bodyBg, lawRefs } = candidate;
+  return { kind, id, titleBg, bodyBg, lawRefs, score: 0 };
+}
 
 /** Rank the rule catalog against the student's question. */
 export function retrieveRuleMaterials(

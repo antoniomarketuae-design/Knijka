@@ -33,6 +33,34 @@
  * Safety note: опасна/terminating mistakes never reach this overlay — the
  * engine grades them from the first encounter with a non-blocking toast, so a
  * modal never interrupts evasive handling (see lessons/engine.ts applyTick).
+ *
+ * ---------------------------------------------------------------------------
+ * `compact` — THE BOTTOM SHEET (founder review 2026-07-28, second pass).
+ *
+ * Verbatim: the teach hints are „each almost 50% of the screen when popped
+ * which is also unacceptable". Measured on the 844×390 landscape profile it was
+ * worse than he thought: `absolute inset-0` meant 100 % of the scene box —
+ * 72.8 % of the entire viewport — and the card was laid straight over the
+ * status dashboard, which is founder complaint #3 („two overlays fighting for
+ * one strip"). A student who had just been interrupted mid-drive could see
+ * neither the road nor their own speed.
+ *
+ * Compact keeps every word and throws away the furniture:
+ *   · a SHEET, not a modal. It rises from the bottom edge and stops ABOVE the
+ *     instrument band (`bottom: var(--sim-dash-h)`), so the two can never
+ *     overlap again — the offset is the band's own height, not a guess.
+ *   · NO full-screen scrim. The drive is frozen by the shell already; dimming
+ *     the road as well just hides the situation being explained.
+ *   · the 96 px pictogram STAGE is dropped (the pictogram itself survives as a
+ *     20 px glyph in the header) and the explanation is clamped to two lines
+ *     with „Повече" opening the rest in place.
+ *
+ * THEO-4 („no bare correct/wrong, ever") is the reason for the exact split.
+ * What is on screen WITHOUT any tap: the mistake's title, the authored
+ * law-cited WHY (two lines of it), the lawRef chip, and the severity. What
+ * „Повече" adds: the remainder of the explanation and the repeat-cost stake.
+ * The card never degrades to a verdict — it degrades to a shorter explanation
+ * with the rest one thumb away.
  */
 
 import { useEffect, useState } from "react";
@@ -94,12 +122,15 @@ export function TeachMomentOverlay({
   moment,
   remaining,
   onAcknowledge,
+  compact = false,
 }: {
   moment: TeachMoment;
   /** Queued teach moments behind this one (a mistake cluster in one pause). */
   remaining: number;
   /** Advance to the next queued card, or resume the drive when none remain. */
   onAcknowledge: () => void;
+  /** Phone-shaped viewport: the bottom sheet above the instrument band. */
+  compact?: boolean;
 }) {
   // Space (and Enter) acknowledges. CAPTURE phase + stopPropagation: Space is
   // the parking-brake toggle on CabinControls' own window listener (bubble
@@ -126,8 +157,116 @@ export function TeachMomentOverlay({
   // overlay only ever mounts inside a client-only play session, so there is no
   // SSR pass to mismatch.
   const [touch] = useState(isTouchDevice);
+  // Compact only: „Повече" opens the rest of the authored text in place.
+  //
+  // The open state stores WHICH moment is expanded rather than a boolean, so
+  // paging to the next card in a cluster folds back with no effect and no reset
+  // render — an expanded sheet inherited by the next mistake would be the
+  // half-screen card the founder rejected, arriving by accident.
+  const [expandedFor, setExpandedFor] = useState<string | null>(null);
+  const momentKey = `${moment.code}|${moment.titleBg}`;
+  const expanded = expandedFor === momentKey;
 
   const CategoryIcon = CATEGORY_ICONS[moment.code] ?? IconBook;
+
+  if (compact) {
+    return (
+      <div
+        // Positioned, not covering: the sheet's own box IS the dialog, and it
+        // stops at the top of the instrument band. `--sim-dash-h` is written by
+        // the play shell from the SAME constant the band is sized with, so the
+        // two cannot drift apart.
+        className="pointer-events-none absolute inset-x-0 bottom-0 z-30 flex justify-center"
+        style={{ bottom: "var(--sim-dash-h, 0px)" }}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="teach-moment-title"
+      >
+        <section
+          className="pointer-events-auto flex w-full max-w-2xl flex-col gap-1.5 rounded-t-2xl border-x border-t border-accent-2/45 bg-background/95 px-3 pb-2 pt-2 backdrop-blur"
+          // TEACH_SHEET_MAX_FRACTION of the live viewport height. `--sim-vh` is
+          // the play shell's measured `visualViewport.height` (see its header
+          // on why 100dvh alone is not trustworthy inside iOS Safari), so a
+          // fully expanded sheet still cannot reach the half-screen the founder
+          // rejected — it scrolls inside itself instead.
+          style={{ maxHeight: "calc(var(--sim-vh, 100dvh) * 0.62)" }}
+        >
+          {/* Header — one line: what this is, how bad, how many are queued. */}
+          <div className="flex shrink-0 items-center gap-2">
+            <span
+              aria-hidden
+              className="flex h-5 w-5 shrink-0 items-center justify-center rounded-md bg-accent-2/15 text-accent-2"
+            >
+              <CategoryIcon className="h-3.5 w-3.5" />
+            </span>
+            <p className="text-[10px] font-black uppercase tracking-wider text-accent-2">
+              Учебен момент
+            </p>
+            <span className="text-[10px] font-semibold text-muted">
+              · {SEVERITY_LABEL[moment.severity]}
+            </span>
+            {remaining > 0 ? (
+              <span className="ml-auto shrink-0 rounded-full border border-border px-2 py-0.5 text-[10px] font-bold text-muted">
+                още {remaining}
+              </span>
+            ) : null}
+          </div>
+
+          {/* The mistake + the authored law-cited WHY. Two lines by default —
+              never zero, because a verdict without a reason is the one thing
+              THEO-4 forbids. */}
+          <div className="min-w-0 shrink overflow-y-auto">
+            <h2 id="teach-moment-title" className="text-sm font-extrabold leading-tight">
+              {moment.titleBg}
+            </h2>
+            <p
+              className={`mt-0.5 text-xs leading-snug text-foreground ${
+                expanded ? "" : "line-clamp-2"
+              }`}
+            >
+              {moment.explanationBg}
+            </p>
+            {expanded ? (
+              <p className="mt-1.5 text-[11px] leading-snug text-muted">
+                Първа среща — <strong className="text-foreground">не се брои в резултата</strong>.
+                При повторение: <strong className="text-foreground">−{moment.points} т.</strong>, а
+                повторните грешки тежат още повече (×1.5 / ×2.0).
+              </p>
+            ) : null}
+          </div>
+
+          {/* Law ref + the expander + the thumb-sized acknowledge. */}
+          <div className="flex shrink-0 items-center gap-2">
+            {moment.lawRef ? (
+              <span className="shrink-0 rounded-full border border-border bg-surface px-2 py-0.5 text-[10px] font-bold text-muted">
+                {moment.lawRef}
+              </span>
+            ) : null}
+            <button
+              type="button"
+              onClick={() => setExpandedFor(expanded ? null : momentKey)}
+              aria-expanded={expanded}
+              className="shrink-0 rounded-full border border-border px-2 py-0.5 text-[10px] font-bold text-muted transition hover:text-foreground"
+            >
+              {expanded ? "По-малко ▴" : "Повече ▾"}
+            </button>
+            <button
+              type="button"
+              onClick={onAcknowledge}
+              className="btn-accent ml-auto shrink-0 justify-center px-4 py-2 text-xs"
+            >
+              Разбрах
+              {!touch ? (
+                <kbd className="rounded bg-background/30 px-1 py-0.5 font-mono text-[10px] font-bold">
+                  Space
+                </kbd>
+              ) : null}
+            </button>
+          </div>
+        </section>
+      </div>
+    );
+  }
 
   return (
     <div

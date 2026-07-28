@@ -1295,8 +1295,13 @@ function ReadyScene({
         />
       ) : null}
 
-      {/* Difficulty selector — top right */}
-      <div className="absolute right-3 top-3 flex items-center gap-1 rounded-full border border-border bg-background/70 p-1 backdrop-blur">
+      {/* Difficulty selector — top right. `data-hud` so the play shell's
+          compact layout can move it clear of a landscape notch without this
+          file knowing anything about phones (PlayAreaStyles). */}
+      <div
+        data-hud="difficulty"
+        className="absolute right-3 top-3 flex items-center gap-1 rounded-full border border-border bg-background/70 p-1 backdrop-blur"
+      >
         {DIFFICULTY_ORDER.map((mode) => {
           const active = mode === difficulty;
           return (

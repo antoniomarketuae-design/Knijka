@@ -270,6 +270,46 @@ export const CLIP_PLAN: readonly ClipPlanEntry[] = [
     "notes": ""
   },
   {
+    "id": "sc-jx-giveway-b1__m0",
+    "templateId": "sc-jx-giveway-b1",
+    "mistakeIndex": 0,
+    "tracePath": "content/traces/sc-jx-giveway-b1/mistake-barge-priority.trace.json",
+    "faultTimeSec": 45.5,
+    "requiredActors": [
+      {
+        "kind": "vehicle",
+        "label": "Автомобил отдясно с предимство"
+      }
+    ],
+    "governingControl": {
+      "kind": "none",
+      "label": "Няма"
+    },
+    "view": "exterior",
+    "camera": "rearAware",
+    "notes": "Управляващ елемент: няма — правило за поведение (без знак/сигнал); Ключовият участник идва ОТЗАД — страничен три-четвърти кадър (rearAware), който държи и призрака, и приближаващия отзад в рамката"
+  },
+  {
+    "id": "sc-jx-giveway-b1__m1",
+    "templateId": "sc-jx-giveway-b1",
+    "mistakeIndex": 1,
+    "tracePath": "content/traces/sc-jx-giveway-b1/mistake-no-scan.trace.json",
+    "faultTimeSec": 17.22,
+    "requiredActors": [
+      {
+        "kind": "vehicle",
+        "label": "Автомобил отдясно с предимство"
+      }
+    ],
+    "governingControl": {
+      "kind": "none",
+      "label": "Няма"
+    },
+    "view": "exterior",
+    "camera": "rearAware",
+    "notes": "Управляващ елемент: няма — правило за поведение (без знак/сигнал); Ключовият участник идва ОТЗАД — страничен три-четвърти кадър (rearAware), който държи и призрака, и приближаващия отзад в рамката"
+  },
+  {
     "id": "sc-jx-priority-confidence__m0",
     "templateId": "sc-jx-priority-confidence",
     "mistakeIndex": 0,
@@ -279,6 +319,26 @@ export const CLIP_PLAN: readonly ClipPlanEntry[] = [
       {
         "kind": "vehicle",
         "label": "Автомобил отдясно с предимство"
+      }
+    ],
+    "governingControl": {
+      "kind": "none",
+      "label": "Няма"
+    },
+    "view": "exterior",
+    "camera": "rearAware",
+    "notes": "Управляващ елемент: няма — правило за поведение (без знак/сигнал); Ключовият участник идва ОТЗАД — страничен три-четвърти кадър (rearAware), който държи и призрака, и приближаващия отзад в рамката"
+  },
+  {
+    "id": "sc-lane-change__m0",
+    "templateId": "sc-lane-change",
+    "mistakeIndex": 0,
+    "tracePath": "content/traces/sc-lane-change/mistake-no-indicator.trace.json",
+    "faultTimeSec": 17.67,
+    "requiredActors": [
+      {
+        "kind": "vehicle",
+        "label": "Автомобил ОТЗАД в съседната лента (мъртва зона)"
       }
     ],
     "governingControl": {
@@ -653,6 +713,25 @@ export const CLIP_PLAN: readonly ClipPlanEntry[] = [
     "notes": ""
   },
   {
+    "id": "sc-signal-response__m0",
+    "templateId": "sc-signal-response",
+    "mistakeIndex": 0,
+    "tracePath": "content/traces/sc-signal-response/mistake-amber-gamble.trace.json",
+    "faultTimeSec": 13.77,
+    "requiredActors": [],
+    "governingControl": {
+      "kind": "signal",
+      "label": "Светофар на кръстовището",
+      "approxPos": {
+        "x": 0,
+        "y": 0
+      }
+    },
+    "view": "exterior",
+    "camera": "chase",
+    "notes": ""
+  },
+  {
     "id": "sc-speed-creep__m0",
     "templateId": "sc-speed-creep",
     "mistakeIndex": 0,
@@ -763,6 +842,65 @@ export const CLIP_PLAN: readonly ClipPlanEntry[] = [
     "view": "exterior+dashboard",
     "camera": "chase",
     "notes": "Управляващ елемент: няма — правило за поведение (без знак/сигнал); Контролна лампа (R4) — червеният индикатор свети на лентата на таблото при грешката"
+  },
+  {
+    "id": "sc-vu-bikelane-turn__m0",
+    "templateId": "sc-vu-bikelane-turn",
+    "mistakeIndex": 0,
+    "tracePath": "content/traces/sc-vu-bikelane-turn/mistake-only-behind.trace.json",
+    "faultTimeSec": 17.15,
+    "requiredActors": [
+      {
+        "kind": "cyclist",
+        "label": "Велосипедист отдясно"
+      },
+      {
+        "kind": "cyclist",
+        "label": "Велосипедист отдясно"
+      }
+    ],
+    "governingControl": {
+      "kind": "none",
+      "label": "Няма"
+    },
+    "view": "exterior",
+    "camera": "chase",
+    "notes": "Управляващ елемент: няма — правило за поведение (без знак/сигнал)"
+  },
+  {
+    "id": "sc-vu-bikelane-turn__m1",
+    "templateId": "sc-vu-bikelane-turn",
+    "mistakeIndex": 1,
+    "tracePath": "content/traces/sc-vu-bikelane-turn/mistake-cut-path.trace.json",
+    "faultTimeSec": 15.55,
+    "requiredActors": [],
+    "governingControl": {
+      "kind": "none",
+      "label": "Няма"
+    },
+    "view": "exterior",
+    "camera": "chase",
+    "notes": "Управляващ елемент: няма — правило за поведение (без знак/сигнал)"
+  },
+  {
+    "id": "sc-vu-cyclist-hook__m2",
+    "templateId": "sc-vu-cyclist-hook",
+    "mistakeIndex": 2,
+    "tracePath": "content/traces/sc-vu-cyclist-hook/mistake-forced-brake.trace.json",
+    "faultTimeSec": 12.88,
+    "requiredActors": [
+      {
+        "kind": "cyclist",
+        "label": "Велосипедист отдясно"
+      }
+    ],
+    "governingControl": {
+      "kind": "none",
+      "label": "Няма"
+    },
+    "view": "exterior",
+    "camera": "rearAware",
+    "notes": "Управляващ елемент: няма — правило за поведение (без знак/сигнал); Призракът ЗАВИВА ПРЕЗ ключовия участник — при грешката той остава зад и встрани от обектива (извън конуса на преследващата камера), затова страничен три-четвърти кадър (rearAware)"
   },
   {
     "id": "sc-vu-emergency__m0",

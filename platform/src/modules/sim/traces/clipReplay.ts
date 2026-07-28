@@ -31,6 +31,7 @@ import {
 } from "./scFollowDistance";
 import {
   SC_JUNCTION_RHR_ID,
+  SC_SIGNAL_RESPONSE_ID,
   SC_TURN_LEFT_ONCOMING_ID,
   recordScJunctionDrive,
   type ScJunctionTraceName,
@@ -82,6 +83,13 @@ import { recordScVpTelltaleRedDrive, type ScVpTelltaleRedTraceName } from "./scV
 import { recordScVuPassDrive, type ScVuPassTraceName } from "./scVuPass";
 // Half-B reel wave — the 5 new theory-reel drills share one recorder module.
 import { recordReelDrive, reelClipStaged } from "./scReels";
+// THEO-4 pairing targets (2026-07-28): the drills the why-panel PAIRING layer
+// re-points questions at, plus the picture-true right hook. They entered the
+// clip pilot when the pilot learned to fold in correction targets
+// (clips/clipPilot.ts) — before that they could never be rendered at all.
+import { recordScJxGivewayB1Drive, type ScJxGivewayB1TraceName } from "./scJxGivewayB1";
+import { recordScVuBikelaneTurnDrive, type ScVuBikelaneTurnTraceName } from "./scVuBikelaneTurn";
+import { recordScVuCyclistDrive, type ScVuCyclistTraceName } from "./scVuCyclist";
 
 type Replayer = (districtRaw: unknown, traceName: string) => RecordedDrive;
 
@@ -132,6 +140,11 @@ const REGISTRY: Readonly<Record<string, Replayer>> = {
   "sc-accident-own-conduct": (d, n) => recordReelDrive("sc-accident-own-conduct", n, d),
   "sc-animal-hazard": (d, n) => recordReelDrive("sc-animal-hazard", n, d),
   "sc-lane-control-signal": (d, n) => recordReelDrive("sc-lane-control-signal", n, d),
+  // THEO-4 pairing targets — see the import block.
+  "sc-jx-giveway-b1": (d, n) => recordScJxGivewayB1Drive(d, n as ScJxGivewayB1TraceName),
+  "sc-signal-response": (d, n) => recordScJunctionDrive(d, SC_SIGNAL_RESPONSE_ID, n as ScJunctionTraceName),
+  "sc-vu-bikelane-turn": (d, n) => recordScVuBikelaneTurnDrive(d, n as ScVuBikelaneTurnTraceName),
+  "sc-vu-cyclist-hook": (d, n) => recordScVuCyclistDrive(d, n as ScVuCyclistTraceName),
 };
 
 /** The templates this registry can replay, sorted (introspection/tests). */

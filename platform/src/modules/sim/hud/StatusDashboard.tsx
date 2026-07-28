@@ -22,6 +22,22 @@
  * below `sm` the bar WRAPS instead of overflowing and the 8 px captions drop
  * out (the icons keep their aria-labels); the speed readout — the one thing the
  * founder confirmed is finally legible — is not shrunk.
+ *
+ * `compact` — THE BINNACLE (founder review 2026-07-28, second pass). Verbatim:
+ * the dashboard „eats almost 30% … 3 times less visible should be enough".
+ * Measured on the same landscape profile: the floating pill was 785 × 70 inside
+ * an 844 × 390 viewport — 18 % of the height, with 30 px of dead margin either
+ * side and 70 px of DEAD STRIP under it that nothing could use, because a
+ * centred pill still costs its full band. Compact turns it into what it always
+ * claimed to be: an instrument binnacle. Edge to edge, one row, hairline on
+ * top, 40 px tall — 10 % of the same screen.
+ *
+ * What compact does NOT do is shrink the speed readout out of legibility. It
+ * goes 36 px → 30 px and keeps `tabular-nums` + `font-black`; the captions
+ * (already hidden below `sm`) are hidden at every width, because a phone HUD
+ * that spells out „ЧИСТАЧКИ" under a wiper pictogram is spending road on a
+ * label the icon already carries — and every one of them keeps its aria-label
+ * and its tooltip, so nothing is lost for a screen reader.
  */
 
 import { useEffect, useState, type ReactNode, type RefObject } from "react";
@@ -38,10 +54,19 @@ const DASHBOARD_POLL_MS = 100;
 
 const DIM = "var(--border-strong)";
 
-/** Caption under a telltale: hidden below `sm` so the bar fits a phone (the
- *  aria-label and the title keep naming the instrument). */
+/** Caption under a telltale: hidden below `sm` so the bar fits a phone, and
+ *  hidden at every width in the compact binnacle (the aria-label and the title
+ *  keep naming the instrument either way). */
 const CAPTION =
   "hidden text-[8px] font-bold uppercase tracking-wider text-muted sm:block md:text-[9px]";
+const CAPTION_COMPACT = "hidden";
+
+/** Telltale glyph box: one row tall in compact, two-line column otherwise. */
+const GLYPH = "flex h-6 items-center justify-center md:h-7";
+const GLYPH_COMPACT = "flex h-5 items-center justify-center";
+/** Icon size, the compact/roomy pair every pictogram below takes. */
+const ICON = "h-6 w-6 md:h-7 md:w-7";
+const ICON_COMPACT = "h-5 w-5";
 
 /** Small labeled telltale column: icon/value on top, BG caption under it. */
 function Telltale({
@@ -49,6 +74,7 @@ function Telltale({
   ariaLabel,
   titleBg,
   blink = false,
+  compact = false,
   children,
 }: {
   labelBg: string;
@@ -57,33 +83,53 @@ function Telltale({
    *  is pointer-events-none so the scene stays clickable underneath. */
   titleBg: string;
   blink?: boolean;
+  compact?: boolean;
   children: ReactNode;
 }) {
   return (
     <div
-      className="flex min-w-7 flex-col items-center gap-0.5 sm:min-w-9 md:min-w-11"
+      className={
+        compact
+          ? "flex min-w-6 flex-col items-center"
+          : "flex min-w-7 flex-col items-center gap-0.5 sm:min-w-9 md:min-w-11"
+      }
       aria-label={ariaLabel}
       title={titleBg}
     >
-      <span className={`flex h-6 items-center justify-center md:h-7 ${blink ? "hud-blink" : ""}`}>
+      <span
+        className={`${compact ? GLYPH_COMPACT : GLYPH} ${blink ? "hud-blink" : ""}`}
+      >
         {children}
       </span>
-      <span className={CAPTION}>{labelBg}</span>
+      <span className={compact ? CAPTION_COMPACT : CAPTION}>{labelBg}</span>
     </div>
   );
 }
 
-function Divider() {
-  return <span aria-hidden className="h-9 w-px shrink-0 bg-border md:h-11" />;
+function Divider({ compact = false }: { compact?: boolean }) {
+  return (
+    <span
+      aria-hidden
+      className={`w-px shrink-0 bg-border ${compact ? "h-5" : "h-9 md:h-11"}`}
+    />
+  );
 }
 
 /** Turn-signal arrow — lit green on the real blink clock (or hazard relay). */
-function BlinkerArrow({ dir, lit }: { dir: "left" | "right"; lit: boolean }) {
+function BlinkerArrow({
+  dir,
+  lit,
+  compact = false,
+}: {
+  dir: "left" | "right";
+  lit: boolean;
+  compact?: boolean;
+}) {
   return (
     <span
       aria-label={`${dir === "left" ? "Ляв" : "Десен"} мигач: ${lit ? "свети" : "не свети"}`}
       title={dir === "left" ? "Ляв мигач (клавиш ,)" : "Десен мигач (клавиш .)"}
-      className="text-3xl font-black leading-none md:text-4xl"
+      className={`font-black leading-none ${compact ? "text-2xl" : "text-3xl md:text-4xl"}`}
       style={{
         color: lit ? "var(--success)" : DIM,
         opacity: lit ? 1 : 0.55,
@@ -98,10 +144,10 @@ function BlinkerArrow({ dir, lit }: { dir: "left" | "right"; lit: boolean }) {
 
 // -- Telltale icons (inline SVG, currentColor via style.color) ----------------
 
-function BeltIcon({ on }: { on: boolean }) {
+function BeltIcon({ on, cls = ICON }: { on: boolean; cls?: string }) {
   const c = on ? "var(--success)" : "var(--danger)";
   return (
-    <svg viewBox="0 0 24 24" className="h-6 w-6 md:h-7 md:w-7" style={{ color: c }} aria-hidden>
+    <svg viewBox="0 0 24 24" className={cls} style={{ color: c }} aria-hidden>
       <circle cx="12" cy="6" r="3" fill="none" stroke="currentColor" strokeWidth="2" />
       <path d="M6 20 L18 10" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" />
       <path d="M5.5 13.5 h4 M14.5 16.5 h4" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
@@ -111,11 +157,17 @@ function BeltIcon({ on }: { on: boolean }) {
 
 /** Headlight lamp: slanted-down beams = къси (green), level beams = дълги
  *  (blue — the cluster's real color code); dim housing when off. */
-function HeadlightIcon({ state }: { state: DashboardStatus["headlights"] }) {
+function HeadlightIcon({
+  state,
+  cls = ICON,
+}: {
+  state: DashboardStatus["headlights"];
+  cls?: string;
+}) {
   const c = state === "off" ? DIM : state === "high" ? "var(--accent-soft)" : "var(--success)";
   const tilt = state === "high" ? 0 : 1.8;
   return (
-    <svg viewBox="0 0 24 24" className="h-6 w-6 md:h-7 md:w-7" style={{ color: c }} aria-hidden>
+    <svg viewBox="0 0 24 24" className={cls} style={{ color: c }} aria-hidden>
       <path
         d="M13 5 a7 7 0 0 0 0 14 z"
         fill="none"
@@ -138,11 +190,11 @@ function HeadlightIcon({ state }: { state: DashboardStatus["headlights"] }) {
 }
 
 /** Fog lamp: beams cut by the vertical „fog" wave. */
-function FogIcon({ on }: { on: boolean }) {
+function FogIcon({ on, cls = ICON }: { on: boolean; cls?: string }) {
   return (
     <svg
       viewBox="0 0 24 24"
-      className="h-6 w-6 md:h-7 md:w-7"
+      className={cls}
       style={{ color: on ? "var(--success)" : DIM }}
       aria-hidden
     >
@@ -169,11 +221,11 @@ function FogIcon({ on }: { on: boolean }) {
 }
 
 /** Windscreen arc + wiper blade. */
-function WiperIcon({ on }: { on: boolean }) {
+function WiperIcon({ on, cls = ICON }: { on: boolean; cls?: string }) {
   return (
     <svg
       viewBox="0 0 24 24"
-      className="h-6 w-6 md:h-7 md:w-7"
+      className={cls}
       style={{ color: on ? "var(--accent)" : DIM }}
       aria-hidden
     >
@@ -188,6 +240,7 @@ export function StatusDashboard({
   statusRef,
   limitKmh,
   rejectFlashKey = 0,
+  compact = false,
 }: {
   /** Scene-written per-frame status (see dashboardStatus.ts header). */
   statusRef: RefObject<DashboardStatus>;
@@ -196,6 +249,8 @@ export function StatusDashboard({
   /** Increments on every REJECTED shift — the gear letter flashes red once
    *  (founder bug 2026-07-10: refusals must never be silent). */
   rejectFlashKey?: number;
+  /** Phone-shaped viewport: the edge-to-edge 40 px binnacle (see header). */
+  compact?: boolean;
 }) {
   const [snap, setSnap] = useState<DashboardStatus>(createDashboardStatus);
 
@@ -216,14 +271,26 @@ export function StatusDashboard({
   const speedColor =
     tone === "danger" ? "var(--danger)" : tone === "over" ? "var(--warning)" : "var(--foreground)";
 
+  const icon = compact ? ICON_COMPACT : ICON;
+
   return (
     <div
       aria-label="Табло на автомобила"
-      className="pointer-events-none flex max-w-full select-none flex-wrap items-center justify-center gap-x-2 gap-y-1 rounded-2xl border border-border bg-surface/85 px-3 py-2 shadow-glow-sm backdrop-blur-md sm:flex-nowrap md:gap-x-3.5 md:px-5 md:py-2.5"
+      data-hud="status-dashboard"
+      className={
+        compact
+          ? // THE BINNACLE: full width, hairline on top, one row, no rounding
+            // and no margins — a car's instrument panel meets the body, it does
+            // not float inside it. `min-w-0` + `justify-between` spread the
+            // thirteen instruments across whatever width the phone has instead
+            // of wrapping into a second 40 px band.
+            "pointer-events-none flex w-full min-w-0 select-none flex-nowrap items-center justify-between gap-x-1 overflow-hidden border-t border-border bg-surface/85 px-2 py-1 backdrop-blur-md"
+          : "pointer-events-none flex max-w-full select-none flex-wrap items-center justify-center gap-x-2 gap-y-1 rounded-2xl border border-border bg-surface/85 px-3 py-2 shadow-glow-sm backdrop-blur-md sm:flex-nowrap md:gap-x-3.5 md:px-5 md:py-2.5"
+      }
     >
-      <BlinkerArrow dir="left" lit={snap.leftLampLit} />
+      <BlinkerArrow dir="left" lit={snap.leftLampLit} compact={compact} />
 
-      <Divider />
+      <Divider compact={compact} />
 
       {/* Selector letter + gear — the driveline truth (P R N D / M2). */}
       <div
@@ -234,48 +301,64 @@ export function StatusDashboard({
         {/* key remount retriggers the one-shot flash on every new rejection */}
         <span
           key={`reject-${rejectFlashKey}`}
-          className={`text-2xl font-black leading-none tabular-nums md:text-3xl ${
-            rejectFlashKey > 0 ? "hud-gear-reject" : ""
-          }`}
+          className={`font-black leading-none tabular-nums ${
+            compact ? "text-xl" : "text-2xl md:text-3xl"
+          } ${rejectFlashKey > 0 ? "hud-gear-reject" : ""}`}
           style={{ color: snap.engineOn ? "var(--accent)" : DIM }}
         >
           {snap.gearLabel}
         </span>
-        <span className={CAPTION}>Предавка</span>
+        <span className={compact ? CAPTION_COMPACT : CAPTION}>Предавка</span>
       </div>
 
       {/* Speed — THE readout (large), with the legal-limit disc beside it. */}
-      <div className="flex items-center gap-2 px-1 md:gap-2.5">
+      <div className={compact ? "flex items-center gap-1.5" : "flex items-center gap-2 px-1 md:gap-2.5"}>
         <div
           className="flex items-baseline gap-1"
           aria-label={`Скорост ${speed} километра в час`}
           title="Скорост"
         >
+          {/* 30 px in compact, not 36 — still `font-black tabular-nums`, still
+              the readout the founder signed off as legible at 0 / 58 / 132. */}
           <span
-            className="text-4xl font-black leading-none tabular-nums md:text-5xl"
+            className={`font-black leading-none tabular-nums ${
+              compact ? "text-3xl" : "text-4xl md:text-5xl"
+            }`}
             style={{ color: speedColor }}
           >
             {speed}
           </span>
-          <span className="text-[9px] font-bold uppercase tracking-wider text-muted md:text-[10px]">
+          <span
+            className={`font-bold uppercase tracking-wider text-muted ${
+              compact ? "text-[8px]" : "text-[9px] md:text-[10px]"
+            }`}
+          >
             км/ч
           </span>
         </div>
         <span
           aria-label={`Ограничение ${limit} км/ч`}
           title="Ограничение на скоростта"
-          className="flex h-8 w-8 items-center justify-center rounded-full border-[3px] bg-surface text-xs font-black tabular-nums text-foreground md:h-9 md:w-9 md:text-sm"
+          className={`flex items-center justify-center rounded-full bg-surface font-black tabular-nums text-foreground ${
+            compact
+              ? "h-7 w-7 border-[2.5px] text-[11px]"
+              : "h-8 w-8 border-[3px] text-xs md:h-9 md:w-9 md:text-sm"
+          }`}
           style={{ borderColor: "var(--danger)" }}
         >
           {limit}
         </span>
       </div>
 
-      <Divider />
+      <Divider compact={compact} />
 
       {/* Engine — text state (Вкл./Изкл./Угасна) reads clearer than a glyph. */}
       <div
-        className="flex min-w-7 flex-col items-center gap-0.5 sm:min-w-9 md:min-w-11"
+        className={
+          compact
+            ? "flex min-w-6 flex-col items-center"
+            : "flex min-w-7 flex-col items-center gap-0.5 sm:min-w-9 md:min-w-11"
+        }
         aria-label={
           snap.stalled
             ? "Двигателят угасна — рестартирай (Z + I)"
@@ -286,14 +369,14 @@ export function StatusDashboard({
         title="Двигател (I)"
       >
         <span
-          className={`flex h-6 items-center text-sm font-black leading-none md:h-7 md:text-base ${
-            snap.stalled || !snap.engineOn ? "hud-blink" : ""
-          }`}
+          className={`flex items-center font-black leading-none ${
+            compact ? "h-5 text-xs" : "h-6 text-sm md:h-7 md:text-base"
+          } ${snap.stalled || !snap.engineOn ? "hud-blink" : ""}`}
           style={{ color: snap.engineOn && !snap.stalled ? "var(--success)" : "var(--danger)" }}
         >
           {snap.stalled ? "Угасна" : snap.engineOn ? "Вкл." : "Изкл. I"}
         </span>
-        <span className={CAPTION}>Двигател</span>
+        <span className={compact ? CAPTION_COMPACT : CAPTION}>Двигател</span>
       </div>
 
       {/* Seatbelt — red + blink until buckled (the real telltale grammar). */}
@@ -302,21 +385,30 @@ export function StatusDashboard({
         ariaLabel={snap.seatbeltOn ? "Коланът е поставен" : "Коланът не е поставен"}
         titleBg="Предпазен колан (B)"
         blink={!snap.seatbeltOn}
+        compact={compact}
       >
-        <BeltIcon on={snap.seatbeltOn} />
+        <BeltIcon on={snap.seatbeltOn} cls={icon} />
       </Telltale>
 
       {/* Headlights — distinct icon per state + the BG word under it. */}
       <div
-        className="flex min-w-7 flex-col items-center gap-0.5 sm:min-w-9 md:min-w-11"
+        className={
+          compact
+            ? "flex min-w-6 flex-col items-center"
+            : "flex min-w-7 flex-col items-center gap-0.5 sm:min-w-9 md:min-w-11"
+        }
         aria-label={`Светлини: ${snap.headlights === "off" ? "изключени" : HEADLIGHT_LABEL_BG[snap.headlights]}`}
         title="Светлини (L): изкл. → къси → дълги"
       >
-        <span className="flex h-6 items-center justify-center md:h-7">
-          <HeadlightIcon state={snap.headlights} />
+        <span className={compact ? GLYPH_COMPACT : GLYPH}>
+          <HeadlightIcon state={snap.headlights} cls={icon} />
         </span>
         <span
-          className="hidden text-[8px] font-bold uppercase tracking-wider sm:block md:text-[9px]"
+          className={
+            compact
+              ? CAPTION_COMPACT
+              : "hidden text-[8px] font-bold uppercase tracking-wider sm:block md:text-[9px]"
+          }
           style={{
             color:
               snap.headlights === "off"
@@ -334,16 +426,18 @@ export function StatusDashboard({
         labelBg="Мъгла"
         ariaLabel={snap.fogLightsOn ? "Фаровете за мъгла светят" : "Фарове за мъгла — изключени"}
         titleBg="Фарове за мъгла (V)"
+        compact={compact}
       >
-        <FogIcon on={snap.fogLightsOn} />
+        <FogIcon on={snap.fogLightsOn} cls={icon} />
       </Telltale>
 
       <Telltale
         labelBg="Чистачки"
         ariaLabel={snap.wipersOn ? "Чистачките работят" : "Чистачки — изключени"}
         titleBg="Чистачки (T)"
+        compact={compact}
       >
-        <WiperIcon on={snap.wipersOn} />
+        <WiperIcon on={snap.wipersOn} cls={icon} />
       </Telltale>
 
       {/* Parking brake — the round (P) lamp, red while engaged. */}
@@ -353,9 +447,12 @@ export function StatusDashboard({
           snap.parkingBrakeOn ? "Ръчната спирачка е вдигната" : "Ръчната спирачка е освободена"
         }
         titleBg="Ръчна спирачка (Space)"
+        compact={compact}
       >
         <span
-          className="flex h-6 w-6 items-center justify-center rounded-full border-[2.5px] text-xs font-black leading-none md:h-7 md:w-7 md:text-sm"
+          className={`flex items-center justify-center rounded-full border-[2.5px] font-black leading-none ${
+            compact ? "h-5 w-5 text-[10px]" : "h-6 w-6 text-xs md:h-7 md:w-7 md:text-sm"
+          }`}
           style={{
             color: snap.parkingBrakeOn ? "var(--danger)" : DIM,
             borderColor: snap.parkingBrakeOn ? "var(--danger)" : DIM,
@@ -370,18 +467,19 @@ export function StatusDashboard({
         labelBg="Авар."
         ariaLabel={snap.hazardsOn ? "Аварийните светлини са включени" : "Аварийни светлини — изключени"}
         titleBg="Аварийни светлини (J)"
+        compact={compact}
       >
         <span
-          className="text-xl font-black leading-none md:text-2xl"
+          className={`font-black leading-none ${compact ? "text-lg" : "text-xl md:text-2xl"}`}
           style={{ color: snap.hazardsOn ? "var(--warning)" : DIM }}
         >
           ▲
         </span>
       </Telltale>
 
-      <Divider />
+      <Divider compact={compact} />
 
-      <BlinkerArrow dir="right" lit={snap.rightLampLit} />
+      <BlinkerArrow dir="right" lit={snap.rightLampLit} compact={compact} />
     </div>
   );
 }

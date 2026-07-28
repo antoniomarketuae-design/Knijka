@@ -20,6 +20,18 @@
  * recorded demo grades yet — yield a payload WITHOUT `sim`: the panel shows
  * text + citations only. Unknown question id → null.
  *
+ * THE PAIRING LAYER (whyPanelPairing.ts) sits between that chain and the
+ * payload, because an ev-* event is a TOPIC and a question is a MANOEUVRE, and
+ * one bucket serves both. `ev-cyclist` covers overtaking a rider, a right hook
+ * across a cycleway and a child wobbling; wired to a single template it showed
+ * `q-predimstvo-062` — a right-turn-yield question — a car signalling LEFT and
+ * overtaking. So before `sim` ships, the question is re-pointed at the drill
+ * that depicts ITS manoeuvre where an authored correction says so, and the
+ * pairing must then survive the law guard: share an article with the drill's
+ * `teach.lawRef`, or be an allow-listed pair with a written reason. Anything
+ * else ships WITHOUT `sim` — showing nothing beats showing the wrong manoeuvre,
+ * because the stored explanation is already correct and already cited.
+ *
  * Sim data crosses the module boundary ONLY through the public barrels
  * (sim/lessons, sim/rules, sim/scenarios — docs/architecture/05).
  */
@@ -36,6 +48,11 @@ import {
 import { VIOLATIONS } from "@/modules/sim/rules";
 import { scenarioForCode } from "@/modules/sim/scenarios";
 import { QUESTION_EVENT_TYPE } from "./whyPanelMap.generated";
+import {
+  EVENT_SCENARIO_CORRECTION,
+  QUESTION_SCENARIO_CORRECTION,
+  pairingVerdict,
+} from "./whyPanelPairing";
 
 /** The demonstrated wrong way the panel offers to replay. */
 export interface WhyPanelMistakeRef {
@@ -261,35 +278,47 @@ function buildSimRefIndex(): ReadonlyMap<string, WhyPanelSimRef> {
     // DIRECT wiring wins over the shared code; else the pinned code-match pick.
     const best = directPick(event) ?? codeMatchPick(codes);
     if (best === null) continue;
-    const mistake = best.spec.mistakes[best.mistakeIndex];
-    // THEO-3: the wired „Преживей грешката" seed for this event's codes —
-    // resolved from the founder seed list (sim/lessons), stored refs only.
-    // Directly-wired events carry no codes, so no founder class matches (null).
-    const seed = mistakeExperienceSeedForEvent(codes);
-    index.set(
-      event,
-      Object.freeze<WhyPanelSimRef>({
-        templateId: best.spec.id,
-        level: entryLevel(best.spec),
-        titleBg: best.spec.titleBg,
-        mistake: Object.freeze<WhyPanelMistakeRef>({
-          titleBg: mistake.titleBg,
-          whatWentWrongBg: mistake.whatWentWrongBg,
-          tracePath: mistake.traceRef.path,
-          districtId: best.spec.map.districtId,
-        }),
-        experience:
-          seed === null
-            ? null
-            : Object.freeze<WhyPanelExperienceRef>({
-                templateId: seed.templateId,
-                mistakeIndex: seed.mistakeIndex,
-                titleBg: seed.titleBg,
-              }),
-      }),
-    );
+    index.set(event, makeSimRef(best.spec, best.mistakeIndex, codes));
   }
   return index;
+}
+
+/**
+ * Freeze one drill reference. Shared by the event index and the pairing
+ * corrections (whyPanelPairing.ts) so a corrected question gets a payload
+ * indistinguishable from a natively-wired one.
+ *
+ * THEO-3: `codes` are the EVENT's rule codes — the „Преживей грешката" seed is
+ * a property of the fault class, not of the template that demonstrates it, so a
+ * correction keeps whatever experience the event had (events with no codes have
+ * no founder class, hence null).
+ */
+function makeSimRef(
+  spec: ScenarioSpec,
+  mistakeIndex: number,
+  codes: ReadonlySet<string>,
+): WhyPanelSimRef {
+  const mistake = spec.mistakes[mistakeIndex];
+  const seed = mistakeExperienceSeedForEvent(codes);
+  return Object.freeze<WhyPanelSimRef>({
+    templateId: spec.id,
+    level: entryLevel(spec),
+    titleBg: spec.titleBg,
+    mistake: Object.freeze<WhyPanelMistakeRef>({
+      titleBg: mistake.titleBg,
+      whatWentWrongBg: mistake.whatWentWrongBg,
+      tracePath: mistake.traceRef.path,
+      districtId: spec.map.districtId,
+    }),
+    experience:
+      seed === null
+        ? null
+        : Object.freeze<WhyPanelExperienceRef>({
+            templateId: seed.templateId,
+            mistakeIndex: seed.mistakeIndex,
+            titleBg: seed.titleBg,
+          }),
+  });
 }
 
 let simRefIndexCache: ReadonlyMap<string, WhyPanelSimRef> | null = null;
@@ -297,6 +326,59 @@ let simRefIndexCache: ReadonlyMap<string, WhyPanelSimRef> | null = null;
 function simRefIndex(): ReadonlyMap<string, WhyPanelSimRef> {
   simRefIndexCache ??= buildSimRefIndex();
   return simRefIndexCache;
+}
+
+let codesByEventCache: Map<string, Set<string>> | null = null;
+
+function eventCodes(event: string): ReadonlySet<string> {
+  codesByEventCache ??= codesByEvent();
+  return codesByEventCache.get(event) ?? NO_CODES;
+}
+
+const correctionRefCache = new Map<string, WhyPanelSimRef | null>();
+
+/**
+ * The drill a pairing CORRECTION names (whyPanelPairing.ts), built exactly like
+ * an event-index entry. Null when the named template or mistake is missing, or
+ * its trace is still pending — an authored correction that cannot resolve
+ * degrades to text-only and NEVER falls back to the pick it was written to
+ * replace, because that pick is the wrong manoeuvre.
+ */
+function correctedSimRef(
+  event: string,
+  correction: { templateId: string; mistakeIndex: number },
+): WhyPanelSimRef | null {
+  const key = `${event}|${correction.templateId}|${correction.mistakeIndex}`;
+  const cached = correctionRefCache.get(key);
+  if (cached !== undefined) return cached;
+  const spec = scenarioById(correction.templateId);
+  const mistake = spec?.mistakes[correction.mistakeIndex];
+  const ref =
+    spec === undefined || mistake === undefined || mistake.traceRef.pending === true
+      ? null
+      : makeSimRef(spec, correction.mistakeIndex, eventCodes(event));
+  correctionRefCache.set(key, ref);
+  return ref;
+}
+
+/**
+ * MODULE-INTERNAL (whyPanelPairing.test.ts): the drill a question would be
+ * offered BEFORE the law guard runs — i.e. the correction layer's output, or
+ * the event index's pick. The guard test needs this to prove that a suspect
+ * pairing is the reason a question has no clip (rather than a missing demo).
+ */
+export function whyPanelCandidateSimRef(questionId: string): WhyPanelSimRef | null {
+  const eventType = Object.hasOwn(QUESTION_EVENT_TYPE, questionId)
+    ? QUESTION_EVENT_TYPE[questionId]
+    : undefined;
+  if (eventType === undefined) return null;
+  const correction = Object.hasOwn(QUESTION_SCENARIO_CORRECTION, questionId)
+    ? QUESTION_SCENARIO_CORRECTION[questionId]
+    : Object.hasOwn(EVENT_SCENARIO_CORRECTION, eventType)
+      ? EVENT_SCENARIO_CORRECTION[eventType]
+      : undefined;
+  if (correction !== undefined) return correctedSimRef(eventType, correction);
+  return simRefIndex().get(eventType) ?? null;
 }
 
 /**
@@ -319,15 +401,35 @@ export function resolveWhyPanel(questionId: string): WhyPanelPayload | null {
   const question = getContentRepo().questionById(questionId);
   if (!question) return null;
 
-  const eventType = Object.hasOwn(QUESTION_EVENT_TYPE, questionId)
-    ? QUESTION_EVENT_TYPE[questionId]
-    : undefined;
-  const sim = eventType === undefined ? undefined : simRefIndex().get(eventType);
-
   const payload: WhyPanelPayload = {
     explanationBg: question.explanationBg,
     lawRefs: [...question.lawRefs],
   };
-  if (sim !== undefined) payload.sim = sim;
+
+  const eventType = Object.hasOwn(QUESTION_EVENT_TYPE, questionId)
+    ? QUESTION_EVENT_TYPE[questionId]
+    : undefined;
+  const candidate = whyPanelCandidateSimRef(questionId);
+  if (eventType === undefined || candidate === null) return payload;
+
+  // THE PAIRING GUARD (whyPanelPairing.ts). A drill whose STORED teach.lawRef
+  // shares no article with the question's STORED lawRefs argues from a
+  // different rule than the question — the q-predimstvo-062 defect, where a
+  // right-turn-across-a-cycle-lane question (чл. 25/35/5) was illustrated by an
+  // overtake (чл. 42). Unless a reviewer allow-listed the pair with a reason,
+  // the payload ships WITHOUT `sim`: the stored explanation + citations, which
+  // are already correct, instead of a clip of the wrong manoeuvre.
+  const spec = scenarioById(candidate.templateId);
+  if (spec === undefined) return payload;
+  const check = pairingVerdict({
+    questionId,
+    event: eventType,
+    templateId: candidate.templateId,
+    questionLawRefs: question.lawRefs,
+    scenarioLawRef: spec.teach.lawRef,
+  });
+  if (check.verdict === "suspect") return payload;
+
+  payload.sim = candidate;
   return payload;
 }

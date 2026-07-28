@@ -1,0 +1,142 @@
+{
+  "landscape_teach": {
+    "h": 134,
+    "w": 844,
+    "pctOfViewport": 34.2
+  },
+  "landscape": {
+    "vw": 844,
+    "vh": 390,
+    "canvas": {
+      "x": 0,
+      "y": 0,
+      "w": 844,
+      "h": 390
+    },
+    "canvasPct": 100,
+    "roadPct": 87,
+    "roadPctExclControls": 70.3,
+    "chrome": [
+      {
+        "tag": "DIV",
+        "cls": "pointer-events-none flex w-full min-w-0 select-none flex-now",
+        "label": "Табло на автомобила",
+        "x": 0,
+        "y": 351,
+        "w": 844,
+        "h": 39,
+        "alpha": 0
+      },
+      {
+        "tag": "DIV",
+        "cls": "absolute right-3 top-3 flex items-center gap-1 rounded-full ",
+        "label": "",
+        "x": 586,
+        "y": 8,
+        "w": 246,
+        "h": 35,
+        "alpha": 0
+      },
+      {
+        "tag": "BUTTON",
+        "cls": "pointer-events-auto flex h-11 w-11 shrink-0 touch-manipulati",
+        "label": "Меню на урока",
+        "x": 8,
+        "y": 8,
+        "w": 44,
+        "h": 44,
+        "alpha": 0
+      },
+      {
+        "tag": "BUTTON",
+        "cls": "rounded-full px-2.5 py-1 text-[11px] font-semibold transitio",
+        "label": "",
+        "x": 671,
+        "y": 13,
+        "w": 74,
+        "h": 25,
+        "alpha": 1
+      },
+      {
+        "tag": "SPAN",
+        "cls": "flex items-center justify-center rounded-full bg-surface fon",
+        "label": "Ограничение 30 км/ч",
+        "x": 215,
+        "y": 357,
+        "w": 28,
+        "h": 28,
+        "alpha": 1
+      }
+    ]
+  },
+  "portrait_teach": {
+    "h": 134,
+    "w": 390,
+    "pctOfViewport": 15.8
+  },
+  "portrait": {
+    "vw": 390,
+    "vh": 844,
+    "canvas": {
+      "x": 0,
+      "y": 0,
+      "w": 390,
+      "h": 844
+    },
+    "canvasPct": 100,
+    "roadPct": 92.2,
+    "roadPctExclControls": 76.3,
+    "chrome": [
+      {
+        "tag": "DIV",
+        "cls": "pointer-events-none flex w-full min-w-0 select-none flex-now",
+        "label": "Табло на автомобила",
+        "x": 0,
+        "y": 805,
+        "w": 390,
+        "h": 39,
+        "alpha": 0
+      },
+      {
+        "tag": "DIV",
+        "cls": "absolute right-3 top-3 flex items-center gap-1 rounded-full ",
+        "label": "",
+        "x": 132,
+        "y": 8,
+        "w": 246,
+        "h": 35,
+        "alpha": 0
+      },
+      {
+        "tag": "BUTTON",
+        "cls": "pointer-events-auto flex h-11 w-11 shrink-0 touch-manipulati",
+        "label": "Меню на урока",
+        "x": 8,
+        "y": 8,
+        "w": 44,
+        "h": 44,
+        "alpha": 0
+      },
+      {
+        "tag": "BUTTON",
+        "cls": "rounded-full px-2.5 py-1 text-[11px] font-semibold transitio",
+        "label": "",
+        "x": 217,
+        "y": 13,
+        "w": 74,
+        "h": 25,
+        "alpha": 1
+      },
+      {
+        "tag": "SPAN",
+        "cls": "flex items-center justify-center rounded-full bg-surface fon",
+        "label": "Ограничение 30 км/ч",
+        "x": 110,
+        "y": 811,
+        "w": 28,
+        "h": 28,
+        "alpha": 1
+      }
+    ]
+  }
+}

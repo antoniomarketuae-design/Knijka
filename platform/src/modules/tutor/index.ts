@@ -20,10 +20,27 @@ export {
 export type {
   AskTutorResult,
   TutorCitation,
+  TutorLessonContext,
   TutorThreadView,
 } from "./service";
 export type { TutorMessage } from "./store";
 export { isTutorEnabled } from "./model";
+
+// The classroom's interruption path (doc 84 §2.2). A lesson beat names its own
+// materials, so it INJECTS them as Tier 1 rather than retrieving them; these
+// three are what a caller needs to build that injection and to keep its
+// citations on the same whitelist as every other tutor answer.
+//
+// `parseCatalogLawRef` is here rather than duplicated in the lesson module on
+// purpose: „ЗДвП чл. 21" must split into {act, ref} the SAME way everywhere,
+// or a lesson citation chip and a chat citation chip render as two different
+// sources for one article.
+export {
+  MAX_RETRIEVED_ITEMS,
+  parseCatalogLawRef,
+  ruleMaterial,
+} from "./retrieval";
+export type { RetrievedItem } from "./retrieval";
 
 // Global daily spend ceiling on the Anthropic key (audit H-8). Exported so an
 // ops/admin surface can show today's burn, and so the message the student sees

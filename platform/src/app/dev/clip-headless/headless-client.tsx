@@ -70,6 +70,14 @@ interface HeadlessApi {
   seek: (t: number) => void;
   /** R1 checklist for the built run — required actors × the presence log. */
   readChecklist: () => ActorCheck[];
+  /**
+   * The RAW presence log behind that checklist (R0 forensics). A failed
+   * checklist row says only „липсва cyclist"; this says whether the actor was
+   * never staged, staged but never inside the planned frame at the fault beat,
+   * or in frame under a different kind — which are three different defects with
+   * three different fixes. Read-only view; the renderer never uses it.
+   */
+  readPresence: () => ActorPresenceLog;
 }
 
 declare global {
@@ -123,6 +131,7 @@ export function HeadlessClipClient({
         runRef.current
           ? buildActorChecklist(runRef.current.plan.requiredActors, presenceRef.current)
           : [],
+      readPresence: () => ({ ...presenceRef.current }),
       ...patch,
     } as HeadlessApi;
     // frameCount is always the live ref value — never a stale snapshot.

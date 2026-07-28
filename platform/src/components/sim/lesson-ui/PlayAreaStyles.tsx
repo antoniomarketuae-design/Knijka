@@ -44,6 +44,35 @@ export function PlayAreaStyles() {
         max-width: none;
         padding: 0.5rem;
       }
+
+      /* ------------------------------------------------------------------
+         COMPACT (phone-shaped viewport, 2026-07-28 second pass).
+
+         Two pieces of DESKTOP chrome are rendered by the scene itself, not by
+         this shell, and both land in the corner the micro menu needs:
+
+           [data-hud="controls-help"]  the „⌨ Клавиши" keyboard legend, at
+             left-3 top-3 — a list of key bindings on a device with no keys.
+             It is already collapsed on touch, but the chip still sits exactly
+             where the one control a phone DOES need has to go.
+           [data-hud="difficulty"]     the Начинаещ/Нормален/Напреднал picker
+             at right-3 top-3. It stays (difficulty is a real choice), it just
+             moves clear of the notch now that the app ships viewport-fit=cover
+             and that corner can be under a cutout.
+
+         A CSS rule and not a prop, deliberately: LessonScene belongs to the
+         scene lane, both elements already carry stable data-hud names, and a
+         media-query-free rule driven by the shell's own attribute keeps ONE
+         definition of "compact" in the codebase (immersive.ts) instead of a
+         second one written in @media that would drift from it.
+         ------------------------------------------------------------------ */
+      [data-sim-compact="on"] [data-hud="controls-help"] {
+        display: none;
+      }
+      [data-sim-compact="on"] [data-hud="difficulty"] {
+        right: calc(0.75rem + env(safe-area-inset-right, 0px));
+        top: calc(0.5rem + env(safe-area-inset-top, 0px));
+      }
     `}</style>
   );
 }

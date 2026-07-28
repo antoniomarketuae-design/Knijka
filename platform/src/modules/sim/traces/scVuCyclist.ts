@@ -159,15 +159,102 @@ export function scVuCyclistMistakeNoLookScript(): DriveScript {
 }
 
 // ---------------------------------------------------------------------------
+// Mistake demo 3 — „Отрязване на велосипедиста" (FAILED_TO_YIELD)
+//
+// THE FOUNDER'S RIGHT HOOK, verbatim: „a bicyclist on a road riding straight,
+// and we behind him with the car … the driver takes the right road and does not
+// let the bicyclist pass, which means the bicyclist will have to slow down."
+//
+// Why a THIRD demo and not a retune of demo 1: both existing demos start the
+// right turn while the rider is still inside the runner's danger radius, so
+// they grade FAILED_TO_YIELD correctly — but MEASURED against the staged
+// cyclist they pass BEHIND it. The rider is 5–7 m ahead of the ghost at every
+// frame of the turn, never enters playerGuard's window (along > 0, lateral
+// < 3 m), and holds a flat 3.00 m/s from release to the end of the trace. The
+// verdict is right; the PICTURE argues nothing. A student watching it sees a
+// car tuck in behind a cyclist who is never affected.
+//
+// This demo puts the cut where the founder put it. The ghost:
+//  1. rides its own lane while the rider is far ahead;
+//  2. eases LEFT to y ≈ −2.2 to close the gap. That is not decoration — at the
+//     2.6 m curb offset the rider sits INSIDE leadGapFor's 4.0 m corridor, so
+//     closing on it in-lane at speed grades FOLLOWING_TOO_CLOSE and buries the
+//     lesson under a second code. 4.46 m of lateral separation keeps the ONE
+//     graded fault the refused priority (the same single-code discipline demos
+//     1 and 2 keep);
+//  3. draws level and cuts right ACROSS the rider's line while it is still
+//     short of the mouth — inside dangerRadiusM (9 m), so the runner emits
+//     prioritySituation "cyclist-right-hook" → FAILED_TO_YIELD;
+//  4. lands ahead of the rider inside playerGuard's window, which brakes the
+//     staged cyclist toward a standstill. That braking IS the founder's ruling
+//     (the train-reel precedent): a near-miss that forces the vulnerable road
+//     user to save himself teaches better than a crash, and no contact ever
+//     occurs (measured closest approach stays clear of CYCLIST_CONTACT_M).
+//
+// Right indicator ON throughout — the founder's other complaint about the
+// mis-mapped clip was a car showing a LEFT signal while a right turn was the
+// subject. Here the signal and the manoeuvre agree; the fault is the priority.
+// ---------------------------------------------------------------------------
+
+/** The overtaking line, m: left-biased inside the eastbound lane so the rider
+ *  clears leadGapFor's 4.0 m lead corridor (|−2.2 − (−6.66)| = 4.46 m). */
+const CUT_PASS_Y = -2.2;
+
+export function scVuCyclistMistakeForcedBrakeScript(): DriveScript {
+  return {
+    steps: [
+      {
+        kind: "annotation",
+        textBg: "Грешката: колата отрязва велосипедиста в десния завой и той трябва да спира.",
+      },
+      { kind: "glance", mirror: "right" },
+      // Signalled correctly — the ONLY graded fault is the refused priority.
+      { kind: "indicator", setting: "right" },
+      { kind: "drive", points: [[-115, THROUGH_Y], [-80, THROUGH_Y]], targetKmh: 44, stopAtEnd: false },
+      {
+        kind: "annotation",
+        textBg: "Пред теб, покрай бордюра, велосипедист се движи направо — ти си зад него.",
+      },
+      // Ease left INSIDE the lane and close the gap: the rider must stay outside
+      // the lead corridor or the demo picks up a following code.
+      { kind: "drive", points: [[-80, THROUGH_Y], [-68, CUT_PASS_Y]], targetKmh: 44, stopAtEnd: false },
+      { kind: "drive", points: [[-68, CUT_PASS_Y], [-24, CUT_PASS_Y]], targetKmh: 44, stopAtEnd: false },
+      { kind: "annotation", textBg: "Колата го застига и вместо да го пропусне, се готви да завие пред него." },
+      { kind: "glance", mirror: "right" },
+      { kind: "drive", points: [[-24, CUT_PASS_Y], [-13, -2.6]], targetKmh: 24, stopAtEnd: false },
+      // THE CUT: right turn started with the rider still short of the mouth and
+      // inside the danger radius — and the ghost lands in front of it.
+      {
+        kind: "drive",
+        points: [[-13, -2.6], [-9, -4.2], [-6.5, -6.3], [-4.6, -9.5], [STEM_X, -14], [STEM_X, -30], [STEM_X, -48]],
+        targetKmh: 18,
+      },
+      { kind: "indicator", setting: "off" },
+      { kind: "pause", sec: 2.0, brake: true },
+      {
+        kind: "annotation",
+        textBg:
+          "Велосипедистът направо има предимство — колата му отряза пътя и той трябваше да спира, за да не се удари (чл. 25).",
+      },
+    ],
+  };
+}
+
+// ---------------------------------------------------------------------------
 // Recording assembly (the tool/test entry)
 // ---------------------------------------------------------------------------
 
-export type ScVuCyclistTraceName = "shadow-correct" | "mistake-hook" | "mistake-no-look";
+export type ScVuCyclistTraceName =
+  | "shadow-correct"
+  | "mistake-hook"
+  | "mistake-no-look"
+  | "mistake-forced-brake";
 
 const SCRIPTS: Record<ScVuCyclistTraceName, { kind: "shadow" | "mistake"; script: () => DriveScript }> = {
   "shadow-correct": { kind: "shadow", script: scVuCyclistShadowScript },
   "mistake-hook": { kind: "mistake", script: scVuCyclistMistakeHookScript },
   "mistake-no-look": { kind: "mistake", script: scVuCyclistMistakeNoLookScript },
+  "mistake-forced-brake": { kind: "mistake", script: scVuCyclistMistakeForcedBrakeScript },
 };
 
 /**
