@@ -10,7 +10,7 @@ function Bar({ item }: { item: TopicMastery }) {
 
   return (
     <li className="flex items-center gap-3">
-      <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-surface-2 font-mono text-[11px] font-bold tabular-nums text-muted">
+      <span className="panel-inset metric flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-[11px] text-muted">
         {item.topic.order}
       </span>
       <div className="min-w-0 flex-1">
@@ -19,7 +19,7 @@ function Bar({ item }: { item: TopicMastery }) {
             {item.topic.titleBg}
           </span>
           <span
-            className="shrink-0 font-mono text-xs font-bold tabular-nums"
+            className="metric shrink-0 text-xs"
             style={{ color: masteryInkColor(item.mastery, started) }}
           >
             {started ? `${pct}%` : "—"}
@@ -32,7 +32,7 @@ function Bar({ item }: { item: TopicMastery }) {
           aria-valuemin={0}
           aria-valuemax={100}
           aria-valuetext={started ? `${pct}%` : "все още не е започната"}
-          className="h-1.5 overflow-hidden rounded-full bg-surface-2"
+          className="track h-1.5 overflow-hidden rounded-full"
         >
           <div
             className="h-full rounded-full"
@@ -56,8 +56,11 @@ export function TopicMasteryGrid({ readiness }: { readiness: ReadinessSnapshot }
   const { perTopic, weakestConcepts } = readiness;
 
   return (
-    <section aria-labelledby="mastery-title" className="hud-panel p-5 sm:p-6">
-      <div className="mb-4 flex items-baseline justify-between gap-2">
+    <section
+      aria-labelledby="mastery-title"
+      className="hud-panel p-5 [--panel-pad:1.25rem] sm:p-6 sm:[--panel-pad:1.5rem]"
+    >
+      <div className="panel-head panel-head-bleed">
         <h2 id="mastery-title" className="font-display text-base font-extrabold">
           Усвояване по теми
         </h2>
@@ -83,7 +86,7 @@ export function TopicMasteryGrid({ readiness }: { readiness: ReadinessSnapshot }
       )}
 
       {weakestConcepts.length > 0 ? (
-        <div className="mt-5 border-t border-hair pt-4">
+        <div className="mt-5 border-t border-border pt-4">
           <h3 className="hud-label">Препоръчано за упражнение</h3>
           <ul className="mt-2 flex flex-wrap gap-2">
             {weakestConcepts.map((c) => (

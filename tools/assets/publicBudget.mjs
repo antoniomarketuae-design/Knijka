@@ -97,6 +97,19 @@ export const BUCKETS = [
     why: "Consumed only by /dev/verdict-board and /dev/scene-still, which do not exist in production.",
   },
   {
+    id: "gallery-stills",
+    match: (rel) => rel.startsWith("gallery-stills/"),
+    // SHIPS, unlike scene-stills: /review/gallery is an admin route on the
+    // real app (the founder reviews on staging, on his phone), not a /dev one.
+    ship: "prod",
+    // 155 stills at the 854 px / q78 poster contract measure 2.2 MB total,
+    // ~14 KB each. The ceiling is ~3× that so the catalogue can keep growing;
+    // a single still over 200 KB means the WebP encode step was skipped.
+    maxBytes: 7_000_000,
+    maxFileBytes: 200_000,
+    why: "One review still per scenario template — the founder's visual verdict surface (/review/gallery).",
+  },
+  {
     id: "sim-textures-ktx2",
     match: (rel) => rel.startsWith("sim/textures/") && !rel.endsWith(".png"),
     ship: "prod",

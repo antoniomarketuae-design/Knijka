@@ -186,9 +186,14 @@ describe("mastery bar keeps its graphic token", () => {
 describe("the call sites use the shared helper", () => {
   // Three copies of this table with "keep them in sync" comments is how the
   // bug survived; re-triplicating it is how it comes back.
+  // The theory hub's two entries changed name when the accordion became the
+  // instrument deck (TopicSectionGroup/TopicCard → TopicGauge/TopicSheet), but
+  // the invariant is the file's, not the filename's: whatever paints a mastery
+  // colour imports the table instead of copying it.
   const CALL_SITES = [
-    "../theory/TopicSectionGroup.tsx",
-    "../theory/TopicCard.tsx",
+    "../theory/TopicGauge.tsx",
+    "../theory/TopicSheet.tsx",
+    "../theory/TheoryFocus.tsx",
     "../dashboard/TopicMasteryGrid.tsx",
   ] as const;
 

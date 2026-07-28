@@ -815,6 +815,503 @@ body {
     white-space: nowrap;
     border: 0;
   }
+
+  /* ==========================================================
+     THE INTERIOR — the app as an instrument panel, not a page.
+
+     FOUNDER REPORT, verbatim: „The whole inside of the platform, we made it
+     dark but nothing much changes. We need 3d futuristric design inside
+     aswell, have to see where the text we are using the buttons we have, the
+     flow we use inside the platform and all the inside of the platform."
+
+     HE IS RIGHT, AND THE REASON IS SPECIFIC. Doc 83 rebound the token VALUES
+     inside `[data-surface="cluster"]` — which is why the app went black — and
+     it built a whole depth layer (.panel, .panel-inset, .edge-lit, --depth-1..3)
+     to spend them on. Nothing behind the login ever consumed it. The
+     authenticated surfaces are made of `.card` (266 call sites), `.hud-panel`,
+     `.btn-accent`, `.btn-ghost` and `.field`, and those five classes were never
+     taught the cluster's SHAPES. A dark palette on admin-panel geometry is
+     precisely „dark but nothing much changes": only the colour moved.
+
+     SO THIS BLOCK APPLIES DOC 83'S TRICK ONE LEVEL UP. Instead of rebinding
+     token values inside the scope it rebinds the CLASS IMPLEMENTATIONS, so
+     every existing call site inherits the instrument language with no markup
+     edit — the same reason the palette could move 538 usages at once. Names
+     are the interface; the scope swaps the implementation.
+
+     THE VOCABULARY IS A CAR'S PANEL, not a generic sci-fi one, because that is
+     the product's own metaphor:
+
+       · a BEZEL — light along the top lip, occlusion along the bottom, because
+         that is what a moulded rim does under an overhead cabin light. It is
+         also the only elevation cue that survives on a near-black ground:
+         doc 83 §3 — a drop shadow there is invisible, an edge is not;
+       · a GRATICULE — the machined tick strip printed on a real gauge face;
+       · READOUTS — tabular figures with a dim tracked-out mono caption, which
+         is what makes a number read as an instrument rather than as a heading;
+       · MOTION that settles like a needle instead of easing like a template.
+
+     COST DISCIPLINE, because the binding constraint is a Mali-G57 and not a
+     desktop. Everything below is a static box-shadow, a static gradient, or a
+     transform/opacity transition. NO new backdrop-filter, no animated blur, no
+     full-screen animated layer, and no shadow with more than 24px of blur —
+     large shadows are a per-paint cost on exactly the phones our students own.
+
+     CONTRAST IS UNTOUCHED BY CONSTRUCTION. Every ratio the guard tests pin
+     (mastery ink 7.25 : 1, the answer controls at 3.51–3.66 : 1 across 99–100 %
+     of their outline, forced-colors in .check-control) is INK against a FILL.
+     Nothing here changes a fill a glyph sits on: the bezel is three 1px edges
+     and a shadow outside the box. The one deliberate exception is .btn-accent,
+     whose top-light gradient makes its own ink pair BRIGHTER, never dimmer.
+     ========================================================== */
+
+  /* --- 1. THE CARD IS A BEZELLED SURFACE ---------------------------
+     `.card` was `rounded-xl border border-border bg-surface` — a rectangle. On
+     a near-black ground a 1px border at uniform opacity around all four sides
+     is the flattest thing you can draw: it describes an OUTLINE, not an object,
+     and 266 outlines stacked down a page is the „generic admin panel" the
+     founder is looking at.
+
+     A real moulded rim is not one colour. Light arrives from above, so the top
+     lip is the brightest thing on the part and the bottom lip is the darkest —
+     darker than the panel it sits on, which is why `--background` was chosen
+     over #000 in the first place (doc 83 §3: an occlusion shadow needs
+     somewhere darker to go). Three declarations, no extra element, no blur. */
+  [data-surface="cluster"] .card {
+    border-top-color: color-mix(in srgb, #ffffff 13%, var(--border));
+    border-bottom-color: color-mix(in srgb, #000000 55%, var(--border));
+    box-shadow: var(--bezel);
+  }
+
+  /* The lit inner lip + the contact shadow, as one token so a call site that
+     needs to COMPOSE with it (a hover glow) can, instead of replacing it. A
+     Tailwind `hover:shadow-glow-sm` overwrites `box-shadow` wholesale and would
+     flatten the card on hover — the one state where it must look MORE solid. */
+  [data-surface="cluster"] {
+    --bezel: inset 0 1px 0 0 var(--lit-edge),
+      inset 0 -1px 0 0 rgba(0, 0, 0, 0.55), 0 10px 20px -16px rgba(0, 0, 0, 0.95);
+    --bezel-lit: inset 0 1px 0 0 var(--lit-edge-strong),
+      inset 0 -1px 0 0 rgba(0, 0, 0, 0.55), 0 10px 22px -14px rgba(0, 0, 0, 0.95),
+      0 0 22px -8px var(--glow);
+  }
+
+  /* Hover/active response for a card that is a real destination. Replaces the
+     `hover:shadow-glow-sm` utility at the five call sites that used it: same
+     glow, but composed ON TOP of the bezel rather than instead of it. */
+  .card-live {
+    transition: box-shadow var(--dur-base) var(--ease-out),
+      border-color var(--dur-base) var(--ease-out);
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .card-live {
+      transition: none;
+    }
+  }
+  [data-surface="cluster"] .card-live:hover,
+  [data-surface="cluster"] .card-live:focus-visible {
+    border-top-color: color-mix(in srgb, var(--accent) 45%, var(--border));
+    box-shadow: var(--bezel-lit);
+  }
+
+  /* --- 2. THE GLASS INSTRUMENT ------------------------------------
+     `.hud-panel` is the hero surface on the hub and the exam rules card. It had
+     a blur and a soft glow but no rim, so it read as a slightly lighter blob.
+     Same bezel logic, one step brighter, and the existing 10px blur is KEPT
+     rather than raised — glass is capped at 1–2 layers per screen (doc 64 §7)
+     and this is already one of them. */
+  [data-surface="cluster"] .hud-panel {
+    border-top-color: color-mix(in srgb, #ffffff 17%, var(--hair));
+    border-bottom-color: rgba(0, 0, 0, 0.5);
+    box-shadow: inset 0 1px 0 0 var(--lit-edge-strong),
+      inset 0 -1px 0 0 rgba(0, 0, 0, 0.5), 0 14px 24px -18px rgba(0, 0, 0, 0.95),
+      var(--shadow-glow-sm);
+  }
+
+  /* --- 3. THE PANEL HEAD -----------------------------------------
+     The single most template-looking thing in the before/after: every section
+     opened with a bold sentence and then just… content. An instrument names its
+     channel on a labelled band, so a panel gets a head — title left, telemetry
+     caption right, a hairline across the full width of the panel and a short
+     LIT tick where the label starts. The tick is what stops the rule reading as
+     a horizontal border: it says the line is a scale, and the scale starts here.
+
+     Full-bleed is deliberate. A rule inset by the panel's own padding announces
+     the padding; a rule that runs to both walls announces the PANEL. */
+  .panel-head {
+    position: relative;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 0.5rem 1rem;
+    padding-bottom: 0.75rem;
+    margin-bottom: 1rem;
+    border-bottom: 1px solid var(--border);
+  }
+  .panel-head::after {
+    content: "";
+    position: absolute;
+    left: 0;
+    bottom: -1px;
+    width: 2.75rem;
+    height: 1px;
+    background: var(--accent);
+    box-shadow: 0 0 6px 0 var(--glow);
+  }
+  /* Full-bleed variant: cancels the parent's horizontal padding so the rule
+     touches both walls. The custom property is the panel's own padding. */
+  .panel-head-bleed {
+    margin-left: calc(var(--panel-pad, 1.25rem) * -1);
+    margin-right: calc(var(--panel-pad, 1.25rem) * -1);
+    padding-left: var(--panel-pad, 1.25rem);
+    padding-right: var(--panel-pad, 1.25rem);
+  }
+  .panel-head-bleed::after {
+    left: var(--panel-pad, 1.25rem);
+  }
+
+  /* --- 4. FRAMING CORNERS, AS A CLASS -----------------------------
+     components/ui/Panel.tsx can already draw four L-shaped brackets, but only
+     for consumers that mount a <Panel>. This is the same signal for the 266
+     call sites that will never be rewritten — the cheapest mark that says a
+     rectangle is a readout and not a content box.
+
+     TWO corners, diagonally opposite, not four: one pseudo-element each, no
+     extra DOM, and the diagonal is what reads as a frame rather than as
+     decoration on a corner. */
+  .framed {
+    position: relative;
+  }
+  .framed::before,
+  .framed::after {
+    content: "";
+    position: absolute;
+    width: 0.85rem;
+    height: 0.85rem;
+    pointer-events: none;
+    border: 1px solid color-mix(in srgb, var(--accent-2) 50%, transparent);
+  }
+  .framed::before {
+    top: 0.55rem;
+    left: 0.55rem;
+    border-right-color: transparent;
+    border-bottom-color: transparent;
+  }
+  .framed::after {
+    right: 0.55rem;
+    bottom: 0.55rem;
+    border-left-color: transparent;
+    border-top-color: transparent;
+  }
+
+  /* --- 5. THE GRATICULE ------------------------------------------
+     The tick strip printed on a gauge face. Decorative, aria-hidden at every
+     call site, and one repeating gradient — no elements, no image, no request.
+     It fades out at the right so it never announces the box it lives in (the
+     same reason `.hud-grid-fade` exists next to `.hud-grid`). */
+  .graticule {
+    height: 0.375rem;
+    pointer-events: none;
+    background-image: repeating-linear-gradient(
+      90deg,
+      var(--border-strong) 0 1px,
+      transparent 1px 0.5rem
+    );
+    /* Fades from the first tick, not from halfway: a strip at constant opacity
+       reads as a dashed border, which is the one thing it must not look like. */
+    -webkit-mask-image: linear-gradient(90deg, #000 0%, #000 25%, transparent 100%);
+    mask-image: linear-gradient(90deg, #000 0%, #000 25%, transparent 100%);
+  }
+
+  /* --- 6. THE NUMERAL VOICE --------------------------------------
+     Anything that COUNTS is set in tabular mono. This is functional, not
+     decorative: proportional figures change width as a value ticks, and the
+     resulting shimmer is the one thing a real instrument never does
+     (components/ui/Readout.tsx makes the same argument for the same reason).
+     `.metric` is that voice as a class, for the markup that will never become
+     a <Readout>. */
+  .metric {
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+    font-weight: 700;
+    line-height: 1;
+    letter-spacing: -0.01em;
+  }
+  /* The caption above a figure is already `.hud-label`; give it the same
+     figure treatment so a label like „45 · 97 · 40" does not shimmer either. */
+  .hud-label {
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* --- 7. THE INSET TRACK ----------------------------------------
+     Progress bars were `bg-surface-2` — a lighter rectangle, i.e. a RAISED
+     element used to mean a recessed one. A track is a channel cut into the
+     panel, so it takes `.panel-inset`'s trick: darker than its surface, and the
+     lit edge on the BOTTOM lip because light still comes from above. */
+  .track {
+    background: color-mix(in srgb, var(--background) 72%, var(--surface));
+    box-shadow: inset 0 1px 3px -1px rgba(0, 0, 0, 0.9),
+      inset 0 -1px 0 0 var(--lit-edge);
+  }
+
+  /* --- 8. BUTTONS THAT READ MACHINED -----------------------------
+     „the buttons we have" was named in the report. `.btn-accent` was a flat
+     blue pill: one fill, one radius, and a glow that only appeared on hover —
+     nothing about it suggested a physical control.
+
+     A moulded key catches the cabin light on its crown and holds a dark line
+     where it meets the panel. The gradient only LIGHTENS, and only the top
+     half; the ink is near-black `--accent-foreground`, so the pair the guard
+     tests care about (8.1 : 1) can only improve where the gradient lands and is
+     untouched where it does not. */
+  [data-surface="cluster"] .btn-accent {
+    background-image: linear-gradient(
+      180deg,
+      rgba(255, 255, 255, 0.17) 0%,
+      rgba(255, 255, 255, 0) 58%
+    );
+    box-shadow: inset 0 1px 0 0 rgba(255, 255, 255, 0.38),
+      inset 0 -1px 0 0 rgba(0, 0, 0, 0.22), 0 6px 14px -10px var(--glow);
+  }
+  [data-surface="cluster"] .btn-accent:hover:not(:disabled) {
+    box-shadow: inset 0 1px 0 0 rgba(255, 255, 255, 0.5),
+      inset 0 -1px 0 0 rgba(0, 0, 0, 0.22), var(--shadow-glow);
+  }
+  /* Press puts the crown light OUT. That is the whole physics of a key going
+     down — the highlight is the first thing to go, before any travel. */
+  [data-surface="cluster"] .btn-accent:active:not(:disabled) {
+    background-image: none;
+    box-shadow: inset 0 2px 5px -1px rgba(0, 0, 0, 0.35);
+  }
+  [data-surface="cluster"] .btn-accent:disabled {
+    background-image: none;
+    box-shadow: none;
+  }
+
+  /* The secondary key is RECESSED rather than raised — it is the one you have
+     to look for. Fill stays between `--background` and `--surface` so the
+     `--control-edge` rim WCAG 1.4.11 needs (≥3 : 1) is measured against a
+     ground no lighter than the one it was verified on. */
+  [data-surface="cluster"] .btn-ghost {
+    background-color: color-mix(in srgb, var(--background) 55%, var(--surface));
+    box-shadow: inset 0 1px 0 0 var(--lit-edge),
+      0 6px 12px -12px rgba(0, 0, 0, 0.9);
+  }
+  [data-surface="cluster"] .btn-ghost:active:not(:disabled) {
+    box-shadow: inset 0 2px 5px -2px rgba(0, 0, 0, 0.6);
+  }
+
+  /* --- 9. THE CONSOLE --------------------------------------------
+     The shell's sidebar and mobile topbar are the frame the whole app sits in,
+     and they were a flat column with a 1px right border. A console is a slab:
+     it catches light on the edge that faces the cabin and drops a short shadow
+     onto the deck beside it. `--console-edge-x` picks which side. */
+  .console {
+    background: linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--surface-2) 55%, var(--surface)) 0%,
+      var(--surface) 30%
+    );
+  }
+  .console-right {
+    box-shadow: inset -1px 0 0 0 var(--lit-edge),
+      6px 0 18px -14px rgba(0, 0, 0, 1);
+  }
+  .console-bottom {
+    box-shadow: inset 0 -1px 0 0 var(--lit-edge),
+      0 8px 18px -14px rgba(0, 0, 0, 1);
+  }
+
+  /* The active navigation channel. It was `bg-accent/10` — a tinted rectangle.
+     A lit channel on an instrument has a floor that glows and walls that do
+     not, so the fill is a left-anchored gradient that dies before the far wall
+     rather than a flat tint that stops at a hard edge. */
+  [data-surface="cluster"] .nav-live {
+    background-image: linear-gradient(
+      90deg,
+      color-mix(in srgb, var(--accent) 22%, transparent) 0%,
+      transparent 78%
+    );
+    box-shadow: inset 0 1px 0 0 var(--lit-edge);
+  }
+
+  /* A dial: ring layer + a flat readout on top. The two are SIBLINGS on
+     purpose — the ring is carved out of a disc with a mask, and a mask applies
+     to descendants, so a percentage nested inside the ring would be erased
+     along with the middle of the disc. */
+  .gauge {
+    position: relative;
+    display: grid;
+    place-items: center;
+    flex: none;
+  }
+
+  .gauge-ring {
+    position: absolute;
+    inset: 0;
+    border-radius: 50%;
+    /* No `from` angle: a conic-gradient already begins at twelve o'clock and
+       runs clockwise, which is where a dial's needle starts. `from -90deg`
+       (the reflex borrowed from SVG stroke-dashoffset, where 0 IS three
+       o'clock) rotates the start to NINE o'clock, and the first render of this
+       board showed exactly that — every arc a quarter-turn early. */
+    background: conic-gradient(
+      var(--gauge-color, var(--accent)) 0 var(--gauge-arc),
+      var(--gauge-track, var(--border-strong)) var(--gauge-arc) 100%
+    );
+    -webkit-mask: radial-gradient(
+      farthest-side,
+      transparent calc(100% - var(--gauge-thickness, 4px)),
+      #000 calc(100% - var(--gauge-thickness, 4px) + 0.5px)
+    );
+    mask: radial-gradient(
+      farthest-side,
+      transparent calc(100% - var(--gauge-thickness, 4px)),
+      #000 calc(100% - var(--gauge-thickness, 4px) + 0.5px)
+    );
+  }
+
+  /* The lit rim a real gauge picks up from the glass above it. Kept off the
+     untouched state (--gauge-lit: none) so an empty dial reads as dark. */
+  .gauge-ring::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: 50%;
+    box-shadow: var(--gauge-lit, none);
+  }
+
+  /* THE BOARD. `perspective` here rather than on each tile so all sixteen
+     share ONE vanishing point — per-element perspective gives every tile its
+     own camera, which is the tell that a grid was faked rather than placed. */
+  .deck {
+    perspective: 1100px;
+    perspective-origin: 50% 40%;
+  }
+
+  /* The receding floor the board sits above. Decorative and text-free, which
+     is the whole licence for rotating it away from the reader.
+
+     IT IS A BAND AT THE BOTTOM, NOT A FULL-SIZE LAYER. The first version made
+     the plane the size of its container and it disappeared: `perspective` is
+     an absolute distance in px, so a 1 000px-tall plane tipped 74° behind a
+     240px camera projects into a sliver a few pixels high — and that sliver
+     sat behind opaque tiles. Fixing the height fixes the projection, and the
+     strip of floor left visible under the board is what makes the perspective
+     something the eye can actually check. */
+  .deck-floor {
+    pointer-events: none;
+    position: absolute;
+    inset: auto 0 0 0;
+    height: var(--floor-height, 8rem);
+    overflow: hidden;
+    perspective: 110px;
+    /* The camera sits ON the horizon, and the horizon is the top of the band. */
+    perspective-origin: 50% 0%;
+    /* Brighter than --hair, because the projection is doing the opposite of a
+       favour: a 1px line laid almost flat is sampled to a fraction of its
+       opacity, and --hair (11% alpha) survives it as nothing at all. */
+    --floor-line: color-mix(in srgb, var(--accent) 26%, transparent);
+  }
+
+  /* Hinged along its own TOP edge, so the plane swings toward the reader and
+     what you see is ground running from the horizon down to your feet. Hinging
+     at the bottom instead builds a ceiling — which is what the first two
+     attempts drew, invisibly, above the fold. It is deliberately wider and
+     taller than the band so no cut edge is ever in frame. */
+  .deck-floor::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    bottom: -160%;
+    left: -80%;
+    right: -80%;
+    transform: rotateX(76deg);
+    transform-origin: 50% 0%;
+    background-image: linear-gradient(var(--floor-line) 1px, transparent 1px),
+      linear-gradient(90deg, var(--floor-line) 1px, transparent 1px);
+    background-size: 46px 46px;
+    -webkit-mask-image: linear-gradient(
+      to bottom,
+      transparent 0%,
+      rgba(0, 0, 0, 0.85) 22%,
+      #000 100%
+    );
+    mask-image: linear-gradient(
+      to bottom,
+      transparent 0%,
+      rgba(0, 0, 0, 0.85) 22%,
+      #000 100%
+    );
+  }
+
+  /* One instrument. The resting look is a panel; the motion is added below,
+     inside the reduced-motion guard, so a tile with motion off is still a
+     correctly-lit, correctly-bordered button. */
+  .gauge-tile {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    padding: 0.7rem;
+    border-radius: 0.875rem;
+    border: 1px solid var(--border);
+    background: color-mix(in srgb, var(--surface) 92%, transparent);
+    box-shadow: var(--depth-1);
+    text-align: left;
+    transform-style: preserve-3d;
+  }
+
+  /* State is carried by an attribute so the tile's LOOK and its announced
+     label come from one source (see TopicGauge.tsx) and cannot disagree. */
+  .gauge-tile[data-state="mastered"] {
+    border-color: color-mix(in srgb, var(--success) 34%, var(--border));
+  }
+  .gauge-tile[data-due="1"] {
+    border-color: color-mix(in srgb, var(--warning) 42%, var(--border));
+  }
+
+  /* The focus ring must survive the 3D transform, so it is a box-shadow ring
+     rather than an outline: an outline on a translated-in-Z element is drawn
+     by some engines at the untransformed rect. */
+  .gauge-tile:focus-visible {
+    outline: none;
+    box-shadow: var(--depth-2), 0 0 0 2px var(--accent);
+  }
+
+  /* THE SHEET. Sections used to expand INLINE, which is the specific thing
+     the founder called old: choosing a topic moved everything below it. A
+     modal <dialog> overlays instead, so the board never reflows, and it brings
+     Esc, the top layer and a real focus trap with it for free. */
+  .deck-sheet {
+    width: min(34rem, 100vw);
+    max-height: 86dvh;
+    margin: auto auto 0;
+    padding: 0;
+    border: 1px solid var(--hair);
+    border-bottom: 0;
+    border-radius: 1.25rem 1.25rem 0 0;
+    background: var(--surface);
+    color: var(--foreground);
+    box-shadow: var(--depth-3), 0 -1px 0 0 var(--lit-edge-strong);
+    overflow: hidden;
+  }
+
+  .deck-sheet::backdrop {
+    background: rgba(2, 4, 8, 0.72);
+    backdrop-filter: blur(3px);
+  }
+
+  /* Above the phone breakpoint it stops being a thumb-anchored sheet and
+     becomes a centred instrument panel. */
+  @media (min-width: 40rem) {
+    .deck-sheet {
+      margin: auto;
+      border-bottom: 1px solid var(--hair);
+      border-radius: 1.25rem;
+      max-height: 82dvh;
+    }
+  }
 }
 
 /* ============================================================
@@ -1061,3 +1558,130 @@ body {
     animation: none !important;
   }
 }
+
+/* ============================================================
+   THE INSTRUMENT DECK — the theory hub's topic chooser.
+
+   Founder review, verbatim: „The Theory page - it is very old style just
+   Theory and below user can chooses 1 than sub page goes down and he
+   chooses […] this choose scroll down is very old and unsatisfying."
+
+   WHAT REPLACED WHAT. Sixteen `<details>` rows that grew the page downward
+   became sixteen gauges on a board, and the sections moved into a sheet that
+   overlays instead of a block that pushes. Measured on the device profile the
+   students actually use (390 x 844, dpr 3, isMobile) the page went from
+   5 066px to ~1 700px and from 1 topic above the fold to 5.
+
+   WHY NONE OF THIS IS WEBGL. „Futuristic 3D" is the brief and a <Canvas> is
+   the obvious way to read it — and it would be the wrong one here. This is a
+   screen a student opens many times a day, on a mid-range Android, and it must
+   be interactive the instant it paints; a WebGL context costs a compile, a
+   first-frame stall and a permanent GPU allocation to draw sixteen rectangles
+   that are, in the end, TEXT. Every effect below is `transform`, `opacity`,
+   one registered custom property and two static gradients — the compositor-only
+   set doc 64 §7 restricts animation to. The depth is real (a perspective
+   projection with a vanishing point, parallax between the board and its floor);
+   only the renderer is cheap.
+
+   THE ONE IDEA. A cluster is instruments floating above a receding plane. So:
+   the FLOOR is drawn in perspective and never carries text; the READOUTS stay
+   flat and face the reader. Nothing legible is ever rotated in Z — a title set
+   at 13px in Cyrillic loses more to a 6° yaw than the yaw buys back.
+
+   WHERE THE PIECES LIVE. The component rules (.gauge, .deck, .gauge-tile,
+   .deck-sheet) are in the single `@layer components` block above, with
+   everything else — this file has exactly ONE layer block, and
+   components/ui/checkControl.test.ts asserts that, because the forced-colors
+   block below it is only correct while it is the thing OUTSIDE the layer.
+   A second components-layer block down here would have quietly falsified that
+   test's premise — and note that the test counts layer OPENINGS by scanning
+   this file as text, so even writing one inside a comment trips it. What is
+   left in this section is the parts that cannot
+   be layered: a registered property, the keyframes, and the motion guard.
+   ============================================================ */
+
+/* The animatable ring fill. Registering the property is what lets a
+   conic-gradient stop be interpolated at all — an unregistered custom property
+   is a string to the animation engine and would snap from 0 to its value.
+
+   `inherits: true` is load-bearing, not a default left alone. The call sites
+   set --gauge-arc on the .gauge WRAPPER, next to the colour and the thickness,
+   because those belong together; the gradient that consumes it is on the
+   .gauge-ring child. Registered properties do NOT inherit unless told to, so
+   with `inherits: false` every ring computed the initial 0% and the board
+   rendered sixteen empty dials — which is exactly what the first frame showed. */
+@property --gauge-arc {
+  syntax: "<percentage>";
+  inherits: true;
+  initial-value: 0%;
+}
+
+@keyframes gauge-sweep {
+  from {
+    --gauge-arc: 0%;
+  }
+}
+
+
+/* --- deck motion ---------------------------------------------------------
+   Same inversion as the rest of this file: everything here lives inside the
+   no-preference guard, so the resting state (no media match) is the finished,
+   readable one. With motion off the rings are simply already full. */
+@media (prefers-reduced-motion: no-preference) {
+  .gauge-ring {
+    animation: gauge-sweep var(--dur-slow) var(--ease-hud) both;
+    animation-delay: calc(var(--enter-i, 0) * 45ms);
+  }
+
+  .gauge-tile {
+    transition: transform var(--dur-base) var(--ease-out),
+      border-color var(--dur-base) var(--ease-out),
+      box-shadow var(--dur-base) var(--ease-out);
+  }
+
+  /* Press pushes the tile INTO the board. On a phone this is the only depth
+     cue the student ever feels, and it is the one that makes the grid read as
+     hardware rather than as cards. */
+  .gauge-tile:active {
+    transform: translate3d(0, 0, -16px) scale(0.985);
+    transition-duration: var(--dur-fast);
+  }
+
+  /* Pointer devices additionally get the tile tipping toward the viewer. The
+     yaw stays off: the title is the thing being rotated and Cyrillic at 13px
+     cannot afford it. */
+  @media (hover: hover) and (pointer: fine) {
+    .gauge-tile:hover {
+      transform: translate3d(0, -3px, 26px) rotateX(5deg);
+      box-shadow: var(--depth-2);
+      border-color: var(--border-strong);
+    }
+  }
+
+  /* The sheet comes UP from where the thumb is. Entrance only — there is no
+     exit animation, because `close()` removes the element from the top layer
+     immediately and faking the way back out means keeping a dead dialog on
+     screen while it plays. */
+  .deck-sheet[open] {
+    animation: sheet-rise var(--dur-base) var(--ease-out);
+  }
+  .deck-sheet[open]::backdrop {
+    animation: sheet-fade var(--dur-base) ease-out;
+  }
+}
+
+@keyframes sheet-rise {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 28px, 0);
+  }
+}
+
+@keyframes sheet-fade {
+  from {
+    opacity: 0;
+  }
+}
+
+
+

@@ -108,6 +108,13 @@ import {
 } from "./fullscreen";
 import { MicroQuizOverlay } from "./MicroQuizOverlay";
 import { MistakeConsequenceOverlay } from "./MistakeConsequenceOverlay";
+import {
+  PLAY_ASPECT,
+  PLAY_BOTTOM_GUTTER_PX,
+  PLAY_CHROME_FALLBACK_PX,
+  playMaxWidthPx,
+} from "./playArea";
+import { PlayAreaStyles } from "./PlayAreaStyles";
 import { SceneSlot } from "./SceneSlot";
 import { TeachMomentOverlay } from "./TeachMomentOverlay";
 import {
@@ -560,6 +567,58 @@ export function LessonPlayShell({
   // fullscreen element. Without it an iPhone plays a 16:9 letterbox inside a
   // padded dashboard column — about 200 px of 3D on a 390 px-wide phone.
   const immersive = isFullscreen || !fullscreenAvailable;
+
+  // -- The LETTERBOXED play area (founder 2026-07-28) --------------------------
+  // „when not full screen in simulator mode … there is alot of dark space that
+  // we can use to make the screen bigger, thats before pushing full screen."
+  //
+  // The scene box used to be `aspect-video w-full`, which consults exactly one
+  // axis: it took the reading column's width and derived a height, so the
+  // window's HEIGHT was never spent. Measured at 1920×1080 (dev harness
+  // `?chrome=dashboard`, the real dashboard column): 1088×612 = 32 % of the
+  // window, ~390 px of dead height under the picture.
+  //
+  // Two halves, and neither touches the aspect ratio — see playArea.ts for why
+  // 16:9 is a measured constraint (below ~1.75 the headliner enters the frame
+  // and the cockpit-camera contract's header band breaks):
+  //   1. WIDTH — PlayAreaStyles lifts the prose `max-w-6xl` off the <main> that
+  //      contains a letterboxed session, so the picture may use the whole
+  //      content column instead of a 72 rem reading measure.
+  //   2. HEIGHT — this measurement caps the picture's width at
+  //      (height left under it) × 16/9, so growing sideways can never push the
+  //      dashboard or the attribution footer off the bottom of the window.
+  // `topInDocument` is the box's absolute document offset (rect + scrollY), so
+  // a scrolled page measures the same as an unscrolled one.
+  const sceneBoxRef = useRef<HTMLDivElement | null>(null);
+  const [playMaxWidth, setPlayMaxWidth] = useState<number | null>(null);
+  useEffect(() => {
+    // Immersive sizes itself from the viewport and ignores this value — no need
+    // to clear it, and KEEPING the last measurement means leaving fullscreen
+    // paints the right size immediately instead of flashing the CSS fallback.
+    if (immersive) return;
+    const measure = () => {
+      const box = sceneBoxRef.current;
+      if (box === null) return;
+      const topInDocument = box.getBoundingClientRect().top + window.scrollY;
+      setPlayMaxWidth(
+        playMaxWidthPx(window.innerHeight - topInDocument - PLAY_BOTTOM_GUTTER_PX),
+      );
+    };
+    measure();
+    window.addEventListener("resize", measure);
+    window.addEventListener("orientationchange", measure);
+    // The top bar rewraps (narrow window, exam badge, a font landing) and moves
+    // the box's top without any window resize. The measurement does not depend
+    // on the box's own size, so re-running it on our own reflow converges
+    // instead of looping.
+    const observer = new ResizeObserver(measure);
+    if (rootRef.current !== null) observer.observe(rootRef.current);
+    return () => {
+      window.removeEventListener("resize", measure);
+      window.removeEventListener("orientationchange", measure);
+      observer.disconnect();
+    };
+  }, [immersive]);
 
   // -- Minimap: on demand, not always-on (founder 2026-07-28) ------------------
   const [minimapOn, setMinimapOn] = useState<boolean>(readStoredMinimapOn);
@@ -1112,6 +1171,10 @@ export function LessonPlayShell({
   return (
     <div
       ref={rootRef}
+      // The hook PlayAreaStyles' `main:has(…)` rule keys off: present ONLY in
+      // the letterboxed state, so the prose width cap is lifted exactly while a
+      // session is on screen and nowhere else.
+      data-sim-play={immersive ? undefined : "letterbox"}
       className={
         // Fullscreen: the UA sizes this element to the viewport — become a
         // padded column so the scene (flex-1) absorbs all remaining height.
@@ -1125,6 +1188,7 @@ export function LessonPlayShell({
       }
     >
       <HudStyles />
+      <PlayAreaStyles />
 
       {/* Top bar */}
       <div className="flex flex-wrap items-center gap-3">
@@ -1202,13 +1266,31 @@ export function LessonPlayShell({
         </div>
       </div>
 
-      {/* Scene + HUD overlays */}
+      {/* Scene + HUD overlays.
+          Letterboxed: 16:9 (the frame the cockpit-camera contract is authored
+          at — playArea.ts), centred, and never wider than the height left under
+          it allows. The inline max-width is the MEASURED cap; the calc() is the
+          server-rendered fallback so the first paint is already close instead
+          of flashing full-width and snapping back. */}
       <div
-        className={`relative w-full overflow-hidden bg-surface ${
-          immersive ? "min-h-0 flex-1 rounded-lg" : "rounded-xl border border-border"
+        ref={sceneBoxRef}
+        className={`relative mx-auto w-full overflow-hidden bg-surface ${
+          immersive
+            ? "min-h-0 flex-1 rounded-lg"
+            : "aspect-video rounded-xl border border-border"
         }`}
+        style={
+          immersive
+            ? undefined
+            : {
+                maxWidth:
+                  playMaxWidth !== null
+                    ? `${playMaxWidth}px`
+                    : `calc((100dvh - ${PLAY_CHROME_FALLBACK_PX}px) * ${PLAY_ASPECT})`,
+              }
+        }
       >
-        <div className={immersive ? "h-full w-full" : "aspect-video w-full"}>
+        <div className="h-full w-full">
           <SceneSlot
             key={sceneEpoch}
             lesson={lesson}

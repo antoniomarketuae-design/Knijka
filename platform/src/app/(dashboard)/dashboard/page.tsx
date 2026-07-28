@@ -71,6 +71,7 @@ export default async function DashboardPage() {
           <p className="mt-1 text-sm text-muted">
             Днес е добър ден да станеш по-добър шофьор.
           </p>
+          <div aria-hidden className="graticule mt-3 max-w-56" />
           {/* Onboarding answers, finally surfaced (exam date + daily goal). */}
           <ExamCountdown />
         </div>
@@ -92,9 +93,9 @@ export default async function DashboardPage() {
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
         <section
           aria-labelledby="readiness-title"
-          className="hud-panel flex flex-col items-center gap-3 p-5 sm:p-6"
+          className="hud-panel framed flex flex-col items-center gap-3 p-5 [--panel-pad:1.25rem] sm:p-6 sm:[--panel-pad:1.5rem]"
         >
-          <div className="flex w-full items-center justify-between gap-2">
+          <div className="panel-head panel-head-bleed w-full">
             <h2 id="readiness-title" className="font-display text-base font-extrabold">
               Готовност за изпит
             </h2>
@@ -104,11 +105,8 @@ export default async function DashboardPage() {
           <p className="text-center text-xs leading-relaxed text-muted">
             Прогноза на база твоите отговори и карането ти в симулатора.
             Официалният изпит изисква{" "}
-            <span className="font-mono font-bold tabular-nums text-foreground">
-              ≥87
-            </span>{" "}
-            от{" "}
-            <span className="font-mono tabular-nums">97</span> точки.
+            <span className="metric text-foreground">≥87</span> от{" "}
+            <span className="metric font-normal">97</span> точки.
           </p>
         </section>
 

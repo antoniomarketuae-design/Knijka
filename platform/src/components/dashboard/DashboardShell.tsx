@@ -114,7 +114,7 @@ function NavLinks({ onNavigate }: { onNavigate?: () => void }) {
               aria-current={active ? "page" : undefined}
               className={`group relative flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold transition duration-200 motion-reduce:transition-none ${
                 active
-                  ? "bg-accent/10 text-accent shadow-glow-sm"
+                  ? "nav-live text-accent"
                   : "text-muted hover:bg-surface-2 hover:text-foreground"
               }`}
             >
@@ -173,27 +173,37 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="min-h-dvh lg:grid lg:grid-cols-[16rem_1fr]">
-      {/* Desktop sidebar — cockpit console: hairline edge, glass-black ground */}
-      <aside className="sticky top-0 hidden h-dvh flex-col gap-5 border-r border-hair bg-surface p-4 lg:flex">
+      {/* Desktop sidebar — a console SLAB, not a column with a border on it:
+          it catches the cabin light down the edge that faces the deck and drops
+          a short shadow onto it (`.console` + `.console-right`, globals.css §9).
+          The nav itself sits in a recessed channel so the lit active row reads
+          as something switched ON inside a housing. */}
+      <aside className="console console-right sticky top-0 hidden h-dvh flex-col gap-5 p-4 lg:flex">
         <Logo />
         <nav aria-label="Основна навигация" className="flex flex-1 flex-col">
-          <p className="hud-label mb-2 px-3">Навигация</p>
+          <div className="panel-head mb-3 pb-2">
+            <p className="hud-label">Навигация</p>
+            <span aria-hidden className="graticule w-16 self-center" />
+          </div>
           <NavLinks />
         </nav>
-        <div className="rounded-xl border border-hair bg-surface-2/40 px-3 py-2.5">
+        <div className="panel-inset px-3 py-2.5">
           <p className="hud-label">Обучение</p>
           <p className="mt-1 text-xs text-muted">
-            Категория <strong className="font-mono font-bold text-foreground">B</strong>{" "}
-            · България
+            Категория{" "}
+            <strong className="metric text-sm text-foreground">B</strong> ·
+            България
           </p>
         </div>
-        <div className="border-t border-hair pt-2">
+        <div className="border-t border-border pt-2">
           <SignOutButton />
         </div>
       </aside>
 
-      {/* Mobile topbar — glass HUD strip */}
-      <header className="sticky top-0 z-40 flex items-center justify-between border-b border-hair bg-surface/80 px-4 py-3 backdrop-blur lg:hidden">
+      {/* Mobile topbar — the same console, laid flat. This is the ONE glass
+          layer on a phone screen (doc 64 §7 budget), so the blur stays where it
+          was and the identity comes from the lit bottom lip instead. */}
+      <header className="console console-bottom sticky top-0 z-40 flex items-center justify-between px-4 py-3 backdrop-blur lg:hidden">
         <Logo />
         <button
           ref={openButtonRef}
@@ -201,7 +211,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
           onClick={() => setOpen(true)}
           aria-expanded={open}
           aria-controls="mobile-nav"
-          className="rounded-xl border border-hair p-2 text-foreground transition hover:bg-surface-2 motion-reduce:transition-none"
+          className="btn-ghost rounded-xl p-2"
         >
           <IconMenu className="h-5 w-5" />
           <span className="visually-hidden">Отвори менюто</span>
@@ -221,7 +231,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
             id="mobile-nav"
             ref={drawerRef}
             tabIndex={-1}
-            className="absolute inset-y-0 left-0 flex w-72 max-w-[85vw] flex-col gap-6 border-r border-hair bg-surface p-4 outline-none"
+            className="console console-right absolute inset-y-0 left-0 flex w-72 max-w-[85vw] flex-col gap-6 p-4 outline-none"
           >
             <div className="flex items-center justify-between">
               <Logo />
@@ -231,7 +241,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
                   setOpen(false);
                   openButtonRef.current?.focus();
                 }}
-                className="rounded-xl border border-hair p-2 text-foreground transition hover:bg-surface-2 motion-reduce:transition-none"
+                className="btn-ghost rounded-xl p-2"
               >
                 <IconX className="h-5 w-5" />
                 <span className="visually-hidden">Затвори менюто</span>
@@ -240,7 +250,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
             <nav aria-label="Основна навигация">
               <NavLinks onNavigate={() => setOpen(false)} />
             </nav>
-            <div className="mt-auto border-t border-hair pt-2">
+            <div className="mt-auto border-t border-border pt-2">
               <SignOutButton />
             </div>
           </div>

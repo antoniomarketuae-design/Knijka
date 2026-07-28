@@ -39,6 +39,48 @@ local X, parented to the body node (body node name = model key).
 Also writes <out_dir>/palettes.json — per-model weighted spawn palettes derived
 from Axalta 2025 EU data adjusted for the aged Bulgarian fleet (achromatic ~70%,
 silver bumped, brights desaturated), for the sim's instanced-color spawner.
+
+-----------------------------------------------------------------------------
+V6 SILHOUETTE PASS (2026-07-28, docs/simulation/82 §3 V6)
+-----------------------------------------------------------------------------
+The founder's "the cars look too simple, let's buy better models" was measured
+first: these are 136–328-triangle bodies, and the problem was never the budget.
+It was that the hull was ONE prism extruded the full width, so the flank ran
+straight past the wheels and buried them (`floor` sits BELOW the wheel radius
+on every model), the greenhouse was a single opaque wedge with no pillars, and
+the wheel was a 12-sided disc. Nothing on the car had an edge to catch light.
+
+What changed — geometry only, and NO new material on any model:
+
+  * wheel arches — hull built as core + arched outer skin + a 3 cm chamfer
+    (see hull_g); the tyre now stands in a real recess with a dark wheelhouse
+    behind it, and the shoulder/sill get a highlight line
+  * a real wheel — 16 radial segments, a tyre section with a sidewall bulge
+    and a rounded tread shoulder, and a rim face dished into it (build_wheel)
+  * A/B/C pillars in body paint (add_pillars) — the glasshouse reads as a
+    windscreen, side glass and a backlight instead of one black visor
+  * door / bonnet / boot cut lines (add_shutlines) in `trim`
+
+Cost, measured with tools/glb/fleet_report.mjs (which applies vehicleFleet.ts's
+real grouping rules) before → after:
+    draw calls   41 → 41   (unchanged, the V6 requirement)
+    triangles    4,388 → 16,544 authored across the 12 models
+    payload      117,796 B → 231,688 B  (sim-models bucket 53% → 57% of 3 MB)
+Draw calls hold because every new part reuses a material the model already
+draws: pillars are `paint_*` (which vehicleFleet splits into the one
+per-instance-tinted group), shutlines are `trim`, and the wheelhouse panels are
+`cladding`, which FOLD_BODY_MATERIALS folds into `trim` at extraction.
+
+NOT DONE — the shared texture atlas half of V6, and why. V6 asks for "ONE
+shared 1024² colour+normal+ORM atlas across the fleet … zero extra draw calls".
+Draw calls would indeed hold, but SHARING would not: the runtime loads twelve
+separate GLB documents (FLEET_URLS), and three.js allocates one GPU texture per
+Texture object per document — it does not dedupe images across GLTF documents.
+An atlas referenced by all twelve is therefore uploaded twelve times: ~25 MB of
+phone VRAM at 512², ~100 MB at 1024², for background traffic. Making it
+genuinely shared needs the runtime hook the district kit already has
+(facadeTextures.ts wires one shared texture set onto image-free materials BY
+NAME) applied in vehicleFleet.ts — a src/ change, not an asset change.
 """
 
 import bpy
@@ -187,17 +229,27 @@ class Builder:
     def box_g(self, cx, cy, cz, sx, sy, sz, material):
         self._bbox(cx, -cz, cy, sx, sz, sy, self._mi(material))
 
-    def prism_g(self, profile, x0, x1, material):
-        """Extrude a closed side-profile (list of (gz, gy)) along X from x0..x1."""
+    def loft_g(self, prof_a, x0, prof_b, x1, material, cap_a=True, cap_b=True):
+        """Loft between two same-length side-profiles at x0 and x1.
+
+        A profile is a closed loop of (gz, gy). `cap_a`/`cap_b` drop the end
+        n-gon when another span already seals that plane — the wheel-arch skin
+        stacks three spans and only the outermost needs a cap."""
         mi = self._mi(material)
-        A = [self.bm.verts.new((x0, -gz, gy)) for (gz, gy) in profile]
-        B = [self.bm.verts.new((x1, -gz, gy)) for (gz, gy) in profile]
-        n = len(profile)
-        self.bm.faces.new(A).material_index = mi
-        self.bm.faces.new(list(reversed(B))).material_index = mi
+        A = [self.bm.verts.new((x0, -gz, gy)) for (gz, gy) in prof_a]
+        B = [self.bm.verts.new((x1, -gz, gy)) for (gz, gy) in prof_b]
+        n = len(prof_a)
+        if cap_a:
+            self.bm.faces.new(A).material_index = mi
+        if cap_b:
+            self.bm.faces.new(list(reversed(B))).material_index = mi
         for i in range(n):
             j = (i + 1) % n
             self.bm.faces.new([A[i], A[j], B[j], B[i]]).material_index = mi
+
+    def prism_g(self, profile, x0, x1, material, cap_a=True, cap_b=True):
+        """Extrude a closed side-profile (list of (gz, gy)) along X from x0..x1."""
+        self.loft_g(profile, x0, profile, x1, material, cap_a=cap_a, cap_b=cap_b)
 
     def cyl_z(self, cx, cy, cz, r, depth, material, seg=12):
         """Cylinder with spin axis along glTF Z (e.g. tailgate spare wheel)."""
@@ -228,20 +280,68 @@ class Builder:
         return obj
 
 
-def build_wheel(name, R, thick, hub=HUB, seg=12):
-    """Tire cylinder, spin axis local X, hub-coloured caps, origin at hub."""
+#: Wheel radial segments. 12 read as a dodecagon at 5 m — the single most
+#: visible "this is a toy" tell on a car (doc 82 §3 V6). 16 is round enough at
+#: the distances a student actually judges a gap from, and the wheel is ONE
+#: shared InstancedMesh for the whole fleet, so the cost is paid once.
+WHEEL_SEG = 16
+
+
+def build_wheel(name, R, thick, hub=HUB, seg=WHEEL_SEG):
+    """A real tyre section, spin axis local X, origin at the hub.
+
+    Cross-section rings (x, radius), outboard-symmetric — this is what turns a
+    flat black disc into a wheel (doc 82 §3 V6 "real tyre sidewall … recessed
+    rim face"):
+
+        rim face  (recessed inboard)   x = ±(t/2 − recess),  r = 0.60 R
+        sidewall  (the widest point)   x = ±t/2,             r = 0.92 R
+        tread shoulder                 x = ±0.86 t/2,        r = R
+
+    The tread crown is narrower than the sidewall bulge, so the shoulder
+    catches a highlight and the tyre stops reading as a cylinder. Tread and
+    sidewall are `tire`; the two recess bands + the end discs are the hub
+    material, so the rim reads as a dish set into the tyre. Materials and
+    their names are UNCHANGED (`tire` / `hubcap*`) — vehicleFleet.ts extracts
+    the shared wheel by material name and merges it into exactly two groups.
+    """
+    ht = thick / 2
+    r_rim = R * 0.66
+    r_side = R * 0.92
+    x_rim = ht - thick * 0.11   # rim face sits INSIDE the tyre — the dish
+    x_tread = ht * 0.86
+    # (x, radius, material_slot_of_the_band_that_ENDS_here)
+    rings = [
+        (-x_rim, r_rim),
+        (-ht, r_side),
+        (-x_tread, R),
+        (x_tread, R),
+        (ht, r_side),
+        (x_rim, r_rim),
+    ]
+    # Band k joins rings[k]..rings[k+1]; the two rim bands are hub-coloured.
+    band_slot = [1, 0, 0, 0, 1]
+
     bm = bmesh.new()
-    ring_n, ring_p = [], []
-    for k in range(seg):
-        a = 2 * math.pi * k / seg
-        y, z = R * math.cos(a), R * math.sin(a)
-        ring_n.append(bm.verts.new((-thick / 2, y, z)))
-        ring_p.append(bm.verts.new((thick / 2, y, z)))
-    for k in range(seg):
-        j = (k + 1) % seg
-        bm.faces.new([ring_n[k], ring_n[j], ring_p[j], ring_p[k]])
-    bm.faces.new(list(reversed(ring_n)))
-    bm.faces.new(ring_p)
+    loops = []
+    for (x, r) in rings:
+        loop = []
+        for k in range(seg):
+            a = 2 * math.pi * k / seg
+            loop.append(bm.verts.new((x, r * math.cos(a), r * math.sin(a))))
+        loops.append(loop)
+    faces = []   # (bmface, slot)
+    for b in range(len(loops) - 1):
+        lo, hi = loops[b], loops[b + 1]
+        for k in range(seg):
+            j = (k + 1) % seg
+            faces.append((bm.faces.new([lo[k], lo[j], hi[j], hi[k]]), band_slot[b]))
+    # Rim discs close the dish at both ends (hub).
+    faces.append((bm.faces.new(list(reversed(loops[0]))), 1))
+    faces.append((bm.faces.new(loops[-1]), 1))
+    for (f, slot) in faces:
+        f.material_index = slot
+
     mesh = bpy.data.meshes.new(name)
     bm.normal_update()
     bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
@@ -250,8 +350,6 @@ def build_wheel(name, R, thick, hub=HUB, seg=12):
     obj = bpy.data.objects.new(name, mesh)
     obj.data.materials.append(TIRE)   # slot 0
     obj.data.materials.append(hub)    # slot 1
-    for poly in obj.data.polygons:
-        poly.material_index = 1 if len(poly.vertices) > 4 else 0
     bpy.context.collection.objects.link(obj)
     return obj
 
@@ -273,8 +371,179 @@ def attach_wheels(body, spec):
 
 
 # ---------------------------------------------------------------------------
+# WHEEL ARCHES — the reason the v1 fleet read as painted bricks
+#
+# Every hull was ONE prism extruded the full width, so the flank was a flat
+# slab that ran past the wheels and buried them: `floor` (0.24–0.48 m) sits
+# BELOW the wheel radius on every car, and the flank reached ±W/2 while the
+# tyre's outer face is only ~5 cm further out. From the sim's camera the wheels
+# were invisible and the car had no waist.
+#
+# The hull is now built in three spans per side:
+#   core  (|x| ≤ hw − skin)   the full authored profile — the body's guts
+#   skin  (hw − skin … hw)    the SAME profile with wheel-arch cutouts, so the
+#                             arch is a real opening with the wheel standing in
+#                             a recess and the core's flank as the wheelhouse
+#   chamfer (last ~3 cm)      the outer plane pulled in ~2 cm, a bevel that
+#                             gives the shoulder and the sill a highlight line
+# `skin` is derived per model as hw − (wheel_x − wheel_t/2), i.e. exactly deep
+# enough that the tyre's inboard face clears the core. No spec dimension moves.
+# ---------------------------------------------------------------------------
+
+#: Radial clearance of the arch over the tyre, m.
+ARCH_GAP = 0.055
+#: Points per arch. 7 is a readable curve at the cost of 6 profile segments.
+ARCH_SEG = 7
+#: Outer-plane bevel: how wide the chamfer band is and how far it pulls in.
+BODY_CHAMFER_W = 0.032
+BODY_CHAMFER_D = 0.022
+
+
+def wheel_centers(spec):
+    """(front, rear) wheel centre z in glTF space, from either spec form."""
+    zf = spec.get("wheel_zf", spec.get("wheel_z"))
+    zr = -spec.get("wheel_zr", spec.get("wheel_z"))
+    return zf, zr
+
+
+def _arch_points(zc, R, floor, seg=ARCH_SEG, gap=ARCH_GAP):
+    """The arch cutout over a wheel at zc, as (gz, gy) walking rear → front.
+
+    A circle of radius R+gap about the hub, clipped at y = floor. Returns []
+    when the hull already sits clear of the tyre (nothing to cut)."""
+    ra = R + gap
+    dy = floor - R
+    if abs(dy) >= ra:
+        return []
+    dz = math.sqrt(ra * ra - dy * dy)
+    a0 = math.atan2(dy, -dz)
+    if a0 < 0:
+        a0 += 2 * math.pi          # entry on the rear side, above the x-axis
+    a1 = math.atan2(dy, dz)        # exit on the front side; a1 < a0, apex between
+    return [
+        (zc + ra * math.cos(a0 + (a1 - a0) * k / seg),
+         R + ra * math.sin(a0 + (a1 - a0) * k / seg))
+        for k in range(seg + 1)
+    ]
+
+
+def arch_profile(lower, spec):
+    """`lower` with both wheel arches cut into its bottom edge.
+
+    Every authored hull profile starts (rear-bottom, front-bottom) at y=floor,
+    so the arches splice in between points 0 and 1. Falls back to the untouched
+    profile if an arch would run past a bottom corner or the two would overlap
+    (a spec change should degrade to today's look, not to a broken mesh)."""
+    floor = spec["floor"]
+    R = spec["wheel_r"]
+    zf, zr = wheel_centers(spec)
+    rear = _arch_points(zr, R, floor)
+    front = _arch_points(zf, R, floor)
+    if not rear or not front:
+        return list(lower)
+    z_back, z_nose = lower[0][0], lower[1][0]
+    if not (z_back < rear[0][0] and rear[-1][0] < front[0][0] and front[-1][0] < z_nose):
+        return list(lower)
+    return [lower[0]] + rear + front + list(lower[1:])
+
+
+def _chamfered(profile, dy=BODY_CHAMFER_D, dz=BODY_CHAMFER_D):
+    """The profile scaled toward its own centre — the outer bevel plane."""
+    ys = [y for (_, y) in profile]
+    zs = [z for (z, _) in profile]
+    ymid, zmid = (min(ys) + max(ys)) / 2, (min(zs) + max(zs)) / 2
+    ky = max(0.0, 1 - 2 * dy / max(1e-6, max(ys) - min(ys)))
+    kz = max(0.0, 1 - 2 * dz / max(1e-6, max(zs) - min(zs)))
+    return [(zmid + (z - zmid) * kz, ymid + (y - ymid) * ky) for (z, y) in profile]
+
+
+def hull_g(b, lower, spec, W, material):
+    """Build the lower hull as core + arched skin + chamfer, both sides."""
+    hw = W / 2
+    skin = hw - (spec["wheel_x"] - spec["wheel_t"] / 2)
+    skin = min(0.26, max(0.09, skin))
+    hc = hw - skin
+    arched = arch_profile(lower, spec)
+    cham = _chamfered(arched)
+    b.prism_g(lower, -hc, hc, material)
+    for s in (1, -1):
+        x_in, x_mid, x_out = s * hc, s * (hw - BODY_CHAMFER_W), s * hw
+        if s > 0:
+            b.loft_g(arched, x_in, arched, x_mid, material, cap_b=False)
+            b.loft_g(arched, x_mid, cham, x_out, material, cap_a=False)
+        else:
+            b.loft_g(cham, x_out, arched, x_mid, material, cap_b=False)
+            b.loft_g(arched, x_mid, arched, x_in, material, cap_a=False)
+    # Dark wheelhouse behind each tyre so the arch reads as an OPENING rather
+    # than a paint-coloured hole. `cladding` folds into `trim` at runtime
+    # (vehicleFleet FOLD_BODY_MATERIALS) — zero extra draw calls.
+    zf, zr = wheel_centers(spec)
+    R = spec["wheel_r"]
+    for gz in (zf, zr):
+        for s in (1, -1):
+            b.box_g(s * (hc + 0.008), R * 0.95, gz, 0.016, 1.7 * R, 1.7 * R, CLAD)
+
+
+# ---------------------------------------------------------------------------
 # shared detail helpers (all author into an open Builder)
 # ---------------------------------------------------------------------------
+def add_pillars(b, cab, cw, material, thick=0.055, out=0.012):
+    """A/B/C pillars in BODY PAINT across the greenhouse.
+
+    The greenhouse was one opaque near-black wedge, so every car wore a
+    featureless visor. Pillars split it into a windscreen, side glass and a
+    backlight — the strongest cheap "this is a car" cue there is. They are
+    authored in the paint material, so they ride the per-instance palette tint
+    and add NO draw call (vehicleFleet splits `paint_*` into one instanced
+    group per model)."""
+    if len(cab) < 4:
+        return
+    (z0, y0), (z1, y1), (z2, y2), (z3, y3) = cab[0], cab[1], cab[2], cab[3]
+    zb = (z1 + z2) / 2
+    struts = [
+        ((z0, y0), (z1, y1)),          # A — up the windscreen rake
+        ((zb, min(y1, y2)), (zb, y0)),  # B — vertical at the door split
+        ((z2, y2), (z3, y3)),          # C — down the backlight
+    ]
+    for (a, c) in struts:
+        dz, dy = c[0] - a[0], c[1] - a[1]
+        ln = math.hypot(dz, dy)
+        if ln < 1e-4:
+            continue
+        nz, ny = -dy / ln * thick / 2, dz / ln * thick / 2
+        prof = [
+            (a[0] - nz, a[1] - ny), (c[0] - nz, c[1] - ny),
+            (c[0] + nz, c[1] + ny), (a[0] + nz, a[1] + ny),
+        ]
+        for s in (1, -1):
+            x0, x1 = sorted((s * (cw - 0.035), s * (cw + out)))
+            b.prism_g(prof, x0, x1, material)
+
+
+def add_shutlines(b, hw, spec, cab, material=TRIM):
+    """Door / bonnet / boot cut lines — 2 mm proud dark strips.
+
+    A body with no panel gaps is the other half of the "plain" read. `trim`
+    already exists on every model (bumpers + grille), so these fold into a
+    group that is already being drawn."""
+    floor = spec["floor"]
+    belt = cab[0][1]
+    zf, zr = wheel_centers(spec)
+    R = spec["wheel_r"]
+    # Flank door cuts: just behind the front arch and at the B-pillar.
+    z_front_cut = zf - R - ARCH_GAP - 0.09
+    z_rear_cut = (cab[1][0] + cab[2][0]) / 2
+    y0, y1 = floor + 0.10, belt - 0.02
+    for gz in (z_front_cut, z_rear_cut):
+        if not (zr + R < gz < zf - R + 0.6):
+            continue
+        for s in (1, -1):
+            b.box_g(s * (hw + 0.002), (y0 + y1) / 2, gz, 0.012, y1 - y0, 0.016, material)
+    # Bonnet + boot cut across the deck, level with the cowl / rear glass base.
+    for gz in (cab[0][0] + 0.03, cab[3][0] - 0.03):
+        b.box_g(0, belt - 0.012, gz, hw * 1.72, 0.05, 0.016, material)
+
+
 def add_mirrors(b, hw, cowl_z, belt):
     for s in (1, -1):
         b.box_g(s * (hw + 0.09), belt + 0.17, cowl_z + 0.02, 0.14, 0.10, 0.07, TRIM)
@@ -329,11 +598,13 @@ def build_car(name, paint_mat, spec):
     hw = W / 2
     b = Builder()
 
-    b.prism_g(spec["lower"], -hw, hw, paint_mat)
+    hull_g(b, spec["lower"], spec, W, paint_mat)
 
     cab = spec["cab"]
     cw = spec["cab_w"] / 2
     b.prism_g(cab, -cw, cw, GLASS)
+    add_pillars(b, cab, cw, paint_mat)
+    add_shutlines(b, hw, spec, cab)
 
     # roof cap over the flat top of the greenhouse
     roof = max(y for (_, y) in cab)
@@ -407,11 +678,12 @@ def build_pickup(name, paint_mat, spec):
         (zr + 0.03, belt),
         (zr, floor + 0.28),
     ]
-    b.prism_g(lower, -hw, hw, paint_mat)
+    hull_g(b, lower, spec, W, paint_mat)
 
     cab = spec["cab"]
     cw = spec["cab_w"] / 2
     b.prism_g(cab, -cw, cw, GLASS)
+    add_pillars(b, cab, cw, paint_mat)
     roof = max(y for (_, y) in cab)
     zs = [z for (z, y) in cab if abs(y - roof) < 1e-6]
     z0, z1 = min(zs), max(zs)
@@ -455,7 +727,7 @@ def build_van(name, paint_mat, spec):
         (zr + 0.02, belt),
         (zr, floor + 0.32),
     ]
-    b.prism_g(lower, -hw, hw, paint_mat)
+    hull_g(b, lower, spec, W, paint_mat)
 
     # cargo box from belt to roof, front face begins behind the windshield top
     b.box_g(0, (belt + roof) / 2, (zr + ws_top) / 2,
@@ -508,7 +780,7 @@ def build_minibus(name, paint_mat, spec):
         (zr + 0.02, belt),
         (zr, floor + 0.30),
     ]
-    b.prism_g(lower, -hw, hw, paint_mat)
+    hull_g(b, lower, spec, W, paint_mat)
 
     # box body from belt to roof
     b.box_g(0, (belt + roof) / 2, (zr + ws_top) / 2,

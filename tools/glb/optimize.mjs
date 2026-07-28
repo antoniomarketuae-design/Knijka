@@ -49,12 +49,25 @@ const requireFromPlatform = createRequire(pathToFileURL(joinPath(platformDir, "p
 const importFromPlatform = (spec) =>
   import(pathToFileURL(requireFromPlatform.resolve(spec)).href);
 
+// LOAD ORDER IS LOAD-BEARING. `sharp` MUST be required before
+// @gltf-transform/functions. Importing the functions bundle first leaves the
+// process unable to dlopen sharp's native addon at all:
+//
+//   Error: Could not load the "sharp" module using the win32-x64 runtime
+//   ERR_DLOPEN_FAILED: The specified procedure could not be found.
+//   …\@img\sharp-win32-x64\lib\sharp-win32-x64-0.35.3.node
+//
+// (functions pulls in native/wasm deps that publish a conflicting symbol into
+// the process; sharp on its own, and after core/extensions/draco3dgltf, loads
+// fine — bisected 2026-07-28.) The failure is at import time, so it took the
+// WHOLE script down even for texture-free GLBs where the sharp path is a
+// no-op: nothing in tools/blender/ could be re-optimized until this moved.
+const sharp = requireFromPlatform("sharp"); // CJS — keep first, see above
 const { NodeIO } = await importFromPlatform("@gltf-transform/core");
 const { ALL_EXTENSIONS } = await importFromPlatform("@gltf-transform/extensions");
 const { dedup, prune, weld, resample, textureCompress, draco } =
   await importFromPlatform("@gltf-transform/functions");
 const draco3d = requireFromPlatform("draco3dgltf"); // CJS
-const sharp = requireFromPlatform("sharp"); // CJS
 
 // ---- args ------------------------------------------------------------------
 

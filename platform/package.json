@@ -14,6 +14,7 @@
     "validate:content": "node scripts/validate-content.mjs",
     "perf:report": "node scripts/perf-report.mjs",
     "clips:prune-png": "node scripts/clips-prune-png.mjs",
+    "gallery:stills": "node ../tools/gallery/build-gallery-stills.mjs",
     "seed:founder": "node scripts/seed-founder.mjs",
     "glb:optimize": "node ../tools/glb/optimize.mjs",
     "assets:budget": "node ../tools/assets/check-asset-budget.mjs",

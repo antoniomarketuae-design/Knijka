@@ -23,9 +23,7 @@ export function StreakBadge({
         className={`h-6 w-6 ${lit ? "text-flame" : "text-muted"}`}
         style={lit ? { filter: "drop-shadow(0 0 6px var(--flame))" } : undefined}
       />
-      <span className="font-mono text-xl font-black tabular-nums leading-none">
-        {streakDays}
-      </span>
+      <span className="metric text-xl font-black">{streakDays}</span>
       <span className="hud-label leading-tight">
         дни
         <br />

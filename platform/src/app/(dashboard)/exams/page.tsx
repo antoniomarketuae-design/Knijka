@@ -62,6 +62,7 @@ export default async function ExamsPage({
         <p className="mt-1 text-sm text-muted">
           Същият формат, същата строгост — без изненади в изпитния ден.
         </p>
+        <div aria-hidden className="graticule mt-3 max-w-56" />
       </header>
 
       {message ? (
@@ -76,21 +77,21 @@ export default async function ExamsPage({
       {/* Rules card */}
       <section
         aria-labelledby="exam-rules-title"
-        className="hud-panel relative overflow-hidden p-5 sm:p-6"
+        className="hud-panel framed relative overflow-hidden p-5 [--panel-pad:1.25rem] sm:p-6 sm:[--panel-pad:1.5rem]"
       >
         <div aria-hidden className="hud-grid pointer-events-none absolute inset-0 opacity-[0.1]" />
 
-        <div className="relative flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+        <div className="panel-head panel-head-bleed relative">
           <h2 id="exam-rules-title" className="font-display text-lg font-extrabold">
             Официалният формат, едно към едно
           </h2>
-          <span className="hud-label tabular-nums">
+          <span className="hud-label">
             {EXAM_QUESTION_COUNT} · {EXAM_MAX_POINTS} · {EXAM_PASS_POINTS} ·{" "}
             {formatClock(EXAM_DURATION_SEC)}
           </span>
         </div>
 
-        <dl className="relative mt-4 grid grid-cols-2 gap-3 sm:grid-cols-5">
+        <dl className="relative grid grid-cols-2 gap-3 sm:grid-cols-5">
           <RuleStat value={String(EXAM_QUESTION_COUNT)} label="въпроса на изпит" />
           <RuleStat value={String(EXAM_MAX_POINTS)} label="точки максимум" />
           <RuleStat value={`≥ ${EXAM_PASS_POINTS}`} label="точки за успех" accent />
@@ -116,9 +117,12 @@ export default async function ExamsPage({
 
       {/* History */}
       <section aria-labelledby="exam-history-title" className="flex flex-col gap-3">
-        <h2 id="exam-history-title" className="text-base font-extrabold">
-          История на опитите
-        </h2>
+        <div className="panel-head mb-0">
+          <h2 id="exam-history-title" className="font-display text-base font-extrabold">
+            История на опитите
+          </h2>
+          <span className="hud-label">{history.length} опита</span>
+        </div>
 
         {history.length === 0 ? (
           <p className="card p-5 text-sm text-muted">
@@ -148,13 +152,15 @@ function RuleStat({
   label: string;
   accent?: boolean;
 }) {
+  // A gauge face, not a tile: recessed into the panel (`.panel-inset` — the lit
+  // edge moves to the BOTTOM lip because light still comes from above), the
+  // figure in the tabular numeral voice, the caption dim beneath it. The ratio
+  // between the two is what makes it read as an instrument (Readout.tsx §).
   return (
-    <div className="flex flex-col-reverse gap-1 rounded-xl border border-hair bg-surface-2/60 px-3 py-4 text-center">
+    <div className="panel-inset flex flex-col-reverse gap-1 px-3 py-4 text-center">
       <dt className="hud-label">{label}</dt>
       <dd
-        className={`font-mono text-2xl font-bold tabular-nums ${
-          accent ? "text-accent-2" : "text-accent"
-        }`}
+        className={`metric text-2xl ${accent ? "text-accent-2" : "text-accent"}`}
       >
         {value}
       </dd>
@@ -167,13 +173,13 @@ function HistoryRow({ entry }: { entry: ExamHistoryEntry }) {
   return (
     <Link
       href={`/exams/${entry.attemptId}`}
-      className="card flex flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3 transition hover:border-border-strong hover:bg-surface-2 hover:shadow-glow-sm motion-reduce:transition-none"
+      className="card card-live flex flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3 transition hover:bg-surface-2 motion-reduce:transition-none"
     >
       <span className="min-w-36 text-sm font-semibold">
         {dateFmt.format(entry.startedAt)}
       </span>
 
-      <span className="font-mono text-sm tabular-nums text-muted">
+      <span className="metric text-sm font-normal text-muted">
         {entry.score !== null ? (
           <>
             <strong className="font-bold text-foreground">{entry.score}</strong>/

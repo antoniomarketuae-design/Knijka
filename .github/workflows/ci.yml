@@ -50,8 +50,13 @@ jobs:
       SHADOW_DATABASE_URL: "postgresql://ci:ci@localhost:5432/ci_shadow"
       AUTH_SECRET: "ci-dummy-secret"
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      # Action majors are pinned to v6, not the newest v7. v6 is where both
+      # actions moved off the deprecated node20 runtime (node24 since v5.0.0),
+      # which is the whole point of this pin; v7 (checkout 2026-06-18,
+      # setup-node 2026-07-14) is a fresh ESM rewrite of both and has barely
+      # soaked. `node-version: 22` below is the APP's node and is unrelated.
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
         with:
           node-version: 22
           cache: npm
@@ -97,7 +102,12 @@ jobs:
     permissions:
       contents: write # moving the tag is the only write this repo's CI does
     steps:
-      - uses: actions/checkout@v4
+      # checkout v6 stores the pushed-back credential in a file under
+      # $RUNNER_TEMP instead of .git/config, so the `git push` below still
+      # authenticates with no change here (the known exceptions — Docker
+      # container actions, worktrees, self-hosted symlinked _work — are all
+      # things this job does not do).
+      - uses: actions/checkout@v6
         with:
           fetch-depth: 0
       - name: move staging-green to this commit

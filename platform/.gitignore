@@ -57,3 +57,10 @@ src/generated/
 
 # rig-rendered 3D scene stills (scp'd to staging like /clips)
 /public/scene-stills/
+
+# founder review gallery: one rendered still per scenario template, produced by
+# tools/gallery/build-gallery-stills.mjs. Binaries, so same rule as /clips and
+# /scene-stills — scp to staging, never git. /review/gallery degrades to
+# „не е рендиран още" for anything absent. Only the README is tracked.
+/public/gallery-stills/*
+!/public/gallery-stills/README.md

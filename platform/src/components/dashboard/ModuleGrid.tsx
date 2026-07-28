@@ -71,7 +71,10 @@ export function ModuleGrid() {
           const inner = (
             <>
               <div className="flex items-center justify-between">
-                <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-accent/15 text-accent transition group-hover:shadow-glow-sm motion-reduce:transition-none">
+                {/* The icon sits on a KEY, not on a tinted square: a lit top lip
+                    (`.edge-lit`) is what makes a 44px tile read as something
+                    moulded into the panel rather than as a coloured rectangle. */}
+                <span className="edge-lit flex h-11 w-11 items-center justify-center rounded-xl bg-accent/15 text-accent transition group-hover:shadow-glow-sm motion-reduce:transition-none">
                   <Icon className="h-6 w-6" />
                 </span>
                 <span className="flex items-center gap-2">
@@ -90,6 +93,7 @@ export function ModuleGrid() {
                 </span>
               </div>
               <h3 className="font-display text-base font-extrabold">{titleBg}</h3>
+              <span aria-hidden className="graticule -mt-1 block w-20" />
               <p className="text-sm leading-relaxed text-muted">{descriptionBg}</p>
             </>
           );
@@ -109,7 +113,7 @@ export function ModuleGrid() {
               ) : (
                 <Link
                   href={href}
-                  className="card group flex h-full flex-col gap-3 p-5 transition duration-200 hover:-translate-y-0.5 hover:border-border-strong hover:shadow-glow-sm motion-reduce:transition-none motion-reduce:hover:translate-y-0"
+                  className="card card-live framed group flex h-full flex-col gap-3 p-5 transition duration-200 hover:-translate-y-0.5 motion-reduce:transition-none motion-reduce:hover:translate-y-0"
                 >
                   {inner}
                 </Link>

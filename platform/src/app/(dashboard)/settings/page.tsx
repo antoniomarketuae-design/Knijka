@@ -29,19 +29,29 @@ export default async function SettingsPage() {
 
   return (
     <div className="mx-auto flex w-full max-w-2xl flex-col gap-6">
+      {/* Page header, in the cluster's voice: dim tracked-out mono channel name,
+          bright title, then a graticule instead of a bare gap — the tick strip
+          is what tells the eye this is a panel face and not a document. */}
       <header>
         <span className="hud-label">Акаунт · управление</span>
         <h1 className="mt-1 font-display text-3xl font-black sm:text-4xl">
           Настройки
         </h1>
+        <div aria-hidden className="graticule mt-3 max-w-56" />
       </header>
 
       {/* Account identity */}
-      <section aria-labelledby="settings-account-title" className="card p-5 sm:p-6">
-        <h2 id="settings-account-title" className="font-display text-base font-extrabold">
-          Акаунт
-        </h2>
-        <dl className="mt-4 flex flex-col gap-3">
+      <section
+        aria-labelledby="settings-account-title"
+        className="card framed p-5 [--panel-pad:1.25rem] sm:p-6 sm:[--panel-pad:1.5rem]"
+      >
+        <div className="panel-head panel-head-bleed">
+          <h2 id="settings-account-title" className="font-display text-base font-extrabold">
+            Акаунт
+          </h2>
+          <span className="hud-label">Идентичност</span>
+        </div>
+        <dl className="flex flex-col gap-3">
           {user.name ? (
             <div className="flex flex-col gap-0.5 sm:flex-row sm:items-baseline sm:gap-4">
               <dt className="hud-label w-28 shrink-0">Име</dt>
@@ -53,17 +63,23 @@ export default async function SettingsPage() {
             <dd className="font-mono text-sm font-semibold">{user.email}</dd>
           </div>
         </dl>
-        <div className="mt-5 border-t border-hair pt-4">
+        <div className="mt-5 border-t border-border pt-4">
           <SignOutButton />
         </div>
       </section>
 
       {/* Password */}
-      <section aria-labelledby="settings-password-title" className="card p-5 sm:p-6">
-        <h2 id="settings-password-title" className="font-display text-base font-extrabold">
-          Парола
-        </h2>
-        <p className="mt-2 text-sm leading-relaxed text-muted">
+      <section
+        aria-labelledby="settings-password-title"
+        className="card p-5 [--panel-pad:1.25rem] sm:p-6 sm:[--panel-pad:1.5rem]"
+      >
+        <div className="panel-head panel-head-bleed">
+          <h2 id="settings-password-title" className="font-display text-base font-extrabold">
+            Парола
+          </h2>
+          <span className="hud-label">Достъп</span>
+        </div>
+        <p className="text-sm leading-relaxed text-muted">
           Автоматичната смяна на парола още не е готова. Ако си забравил
           паролата си или искаш да я смениш, пиши ни през{" "}
           <Link
@@ -77,11 +93,17 @@ export default async function SettingsPage() {
       </section>
 
       {/* GDPR: data + deletion */}
-      <section aria-labelledby="settings-privacy-title" className="card p-5 sm:p-6">
-        <h2 id="settings-privacy-title" className="font-display text-base font-extrabold">
-          Лични данни
-        </h2>
-        <p className="mt-2 text-sm leading-relaxed text-muted">
+      <section
+        aria-labelledby="settings-privacy-title"
+        className="card framed p-5 [--panel-pad:1.25rem] sm:p-6 sm:[--panel-pad:1.5rem]"
+      >
+        <div className="panel-head panel-head-bleed">
+          <h2 id="settings-privacy-title" className="font-display text-base font-extrabold">
+            Лични данни
+          </h2>
+          <span className="hud-label">GDPR</span>
+        </div>
+        <p className="text-sm leading-relaxed text-muted">
           Пазим само минимума: имейл, име, година на раждане и учебния ти
           напредък. Копие от всичко можеш да свалиш веднага като JSON файл, а
           изтриването на акаунта става тук и сега — без заявки и без чакане.
@@ -98,11 +120,17 @@ export default async function SettingsPage() {
       </section>
 
       {/* Legal */}
-      <section aria-labelledby="settings-legal-title" className="card p-5 sm:p-6">
-        <h2 id="settings-legal-title" className="font-display text-base font-extrabold">
-          Правна информация
-        </h2>
-        <ul className="mt-3 flex flex-wrap gap-x-5 gap-y-2">
+      <section
+        aria-labelledby="settings-legal-title"
+        className="card p-5 [--panel-pad:1.25rem] sm:p-6 sm:[--panel-pad:1.5rem]"
+      >
+        <div className="panel-head panel-head-bleed">
+          <h2 id="settings-legal-title" className="font-display text-base font-extrabold">
+            Правна информация
+          </h2>
+          <span className="hud-label">Документи</span>
+        </div>
+        <ul className="flex flex-wrap gap-x-5 gap-y-2">
           {LEGAL_LINKS.map(({ href, labelBg }) => (
             <li key={href}>
               <Link

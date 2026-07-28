@@ -16,11 +16,15 @@
 import { useEffect, useRef, useSyncExternalStore } from "react";
 import {
   MIN_PROBE_SAMPLES,
+  autoQualityCeiling,
+  ledgerFromSample,
+  levelFromLedger,
   medianFpsFromDeltas,
   recommendQuality,
   seedQualityFromSignals,
   unknownDeviceSignals,
   type DeviceSignals,
+  type QualityLedger,
   type QualityLevel,
   type QualitySetting,
 } from "./quality";

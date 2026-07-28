@@ -28,10 +28,11 @@ const DATE_FMT = new Intl.DateTimeFormat("bg-BG", {
 export function AchievementsRow({ achievements }: { achievements: Achievement[] }) {
   return (
     <section aria-labelledby="achievements-title">
-      <div className="mb-3 flex items-baseline justify-between gap-2">
+      <div className="panel-head">
         <h2 id="achievements-title" className="font-display text-base font-extrabold">
           Последни постижения
         </h2>
+        <span className="hud-label">Архив</span>
         {/* „Виж всички" се връща, когато /leaderboard получи страница
             (availability.ts все още я държи „Скоро"). */}
       </div>
@@ -48,18 +49,18 @@ export function AchievementsRow({ achievements }: { achievements: Achievement[] 
             return (
               <li
                 key={a.id}
-                className="card flex w-56 shrink-0 flex-col gap-2 p-4"
+                className="card framed flex w-56 shrink-0 flex-col gap-2 p-4"
               >
                 <div className="flex items-center justify-between">
                   <span
-                    className="flex h-10 w-10 items-center justify-center rounded-xl bg-gold/15 text-gold"
+                    className="edge-lit flex h-10 w-10 items-center justify-center rounded-xl bg-gold/15 text-gold"
                     style={{ boxShadow: "0 0 12px color-mix(in srgb, var(--gold) 30%, transparent)" }}
                   >
                     <Icon className="h-5 w-5" />
                   </span>
                   <time
                     dateTime={a.earnedAt}
-                    className="font-mono text-[11px] tabular-nums text-muted"
+                    className="metric text-[11px] font-normal text-muted"
                   >
                     {DATE_FMT.format(new Date(a.earnedAt))}
                   </time>

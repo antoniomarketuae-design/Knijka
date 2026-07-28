@@ -56,6 +56,14 @@ export default function DashboardGroupLayout({
       >
         Към съдържанието
       </a>
+      {/* THE DECK FLOOR. A dark theme without a horizon is not a space, it is a
+          black rectangle — doc 83 §6 calls `.haze` the load-bearing primitive
+          for exactly this and then never applied it behind the login, which is
+          a large part of why the authenticated app read as „dark" rather than
+          as a cockpit. One element, three STATIC gradients, `fixed` so scrolling
+          never repaints it, and `-z-10` so it is behind every panel. It cannot
+          cost a frame: nothing here animates and nothing here blurs. */}
+      <div aria-hidden className="haze pointer-events-none fixed inset-0 -z-10" />
       <DashboardShell>
         <main id="main-content" className="mx-auto w-full max-w-6xl px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
           {children}

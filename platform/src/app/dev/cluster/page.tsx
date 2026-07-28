@@ -84,6 +84,119 @@ export default function ClusterFoundationPage() {
           приложението трябва да изглеждат така вътре в обхвата.
         </div>
 
+        {/* ------------------------------------------------------------------
+            THE INTERIOR LAYER (globals.css §THE INTERIOR).
+
+            Doc 83 §10's rule, applied to the second half of the system: the
+            elevation ladder and the stagger were judgements a screenshot
+            settles and a diff does not, and so are a bezel, a head rule and a
+            tick strip. Everything the authenticated app now leans on appears
+            here once, at the size it is actually used, so a change to the
+            class layer can be LOOKED at instead of reasoned about.
+            ------------------------------------------------------------------ */}
+        <div className="rule my-10" />
+
+        <header className="mb-5">
+          <p className="hud-label">Интериор · класове</p>
+          <h2 className="mt-2 font-display text-2xl font-extrabold">
+            Слоят, който носи приложението
+          </h2>
+          <div aria-hidden className="graticule mt-3 max-w-64" />
+        </header>
+
+        <div className="grid gap-4 sm:grid-cols-2">
+          {/* The head + bezel + framing corners, at panel scale. */}
+          <section className="card framed p-5 [--panel-pad:1.25rem]">
+            <div className="panel-head panel-head-bleed">
+              <h3 className="font-display text-base font-extrabold">.panel-head</h3>
+              <span className="hud-label">Канал</span>
+            </div>
+            <p className="text-sm text-muted">
+              Заглавие вляво, телеметричен надпис вдясно, косъм през цялата
+              ширина на панела и къс светнат щрих там, където започва скалата.
+            </p>
+          </section>
+
+          {/* The recessed well + the numeral voice. */}
+          <section className="card p-5">
+            <div className="panel-head">
+              <h3 className="font-display text-base font-extrabold">.panel-inset · .metric</h3>
+              <span className="hud-label">Скала</span>
+            </div>
+            <dl className="grid grid-cols-3 gap-3">
+              {[
+                ["45", "въпроса"],
+                ["97", "точки"],
+                ["40:00", "време"],
+              ].map(([v, l]) => (
+                <div key={l} className="panel-inset flex flex-col-reverse gap-1 px-2 py-3 text-center">
+                  <dt className="hud-label">{l}</dt>
+                  <dd className="metric text-xl text-accent">{v}</dd>
+                </div>
+              ))}
+            </dl>
+          </section>
+        </div>
+
+        {/* Tracks: a channel cut INTO the panel, never a lighter rectangle. */}
+        <section className="card mt-4 p-5">
+          <div className="panel-head">
+            <h3 className="font-display text-base font-extrabold">.track</h3>
+            <span className="hud-label">Напредък</span>
+          </div>
+          <div className="flex flex-col gap-3">
+            {[18, 54, 92].map((pct) => (
+              <div key={pct} className="flex items-center gap-3">
+                <span className="metric w-10 shrink-0 text-xs text-muted">{pct}%</span>
+                <div className="track h-2.5 flex-1 overflow-hidden rounded-full">
+                  <div
+                    className="h-full rounded-full bg-gradient-to-r from-accent to-accent-2 shadow-glow-sm"
+                    style={{ width: `${pct}%` }}
+                  />
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        {/* Buttons, in every state that has its own physics. */}
+        <section className="card mt-4 p-5">
+          <div className="panel-head">
+            <h3 className="font-display text-base font-extrabold">Клавиши</h3>
+            <span className="hud-label">Състояния</span>
+          </div>
+          <div className="flex flex-wrap items-center gap-3">
+            <button className="btn-accent">Основен</button>
+            <button className="btn-accent" disabled>
+              Изключен
+            </button>
+            <button className="btn-ghost">Вторичен</button>
+            <button className="btn-ghost" disabled>
+              Изключен
+            </button>
+            <span className="nav-live inline-flex items-center gap-2 rounded-xl px-3 py-2.5 text-sm font-semibold text-accent">
+              .nav-live
+            </span>
+          </div>
+          <p className="mt-3 text-xs text-muted">
+            Основният клавиш лови светлината по короната си; натискането я
+            ГАСИ, преди каквото и да е движение. Вторичният е хлътнал — той е
+            този, който трябва да потърсиш.
+          </p>
+        </section>
+
+        {/* The console slab the shell is built from. */}
+        <section className="console console-bottom mt-4 rounded-xl p-5">
+          <div className="panel-head">
+            <h3 className="font-display text-base font-extrabold">.console</h3>
+            <span className="hud-label">Шаси</span>
+          </div>
+          <p className="text-sm text-muted">
+            Плочата, от която е направен страничният панел: светлина по ръба,
+            обърнат към купето, и къса сянка върху палубата до него.
+          </p>
+        </section>
+
         {/* Scroll-linked reveal — deliberately far down the page. */}
         <div style={{ height: "70vh" }} />
         <Reveal className="mt-6">

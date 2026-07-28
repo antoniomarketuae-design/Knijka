@@ -29,22 +29,27 @@ export default async function TutorPage() {
   if (!isTutorEnabled()) {
     return (
       <div className="mx-auto max-w-xl px-4 py-16 text-center">
-        <div className="card p-10">
-          <p className="text-4xl" aria-hidden>
+        {/* A dormant channel on the panel, rather than an empty content box:
+            framing corners, the status named in the mono caption voice, and a
+            graticule under the title so the card has a face. */}
+        <div className="card framed p-8 sm:p-10">
+          <p className="hud-label">Канал · AI Учител</p>
+          <p className="mt-4 text-4xl" aria-hidden>
             🤖
           </p>
-          <h1 className="mt-4 text-2xl font-bold">
+          <h1 className="mt-4 font-display text-2xl font-black">
             AI Учителят се активира скоро
           </h1>
-          <p className="mt-3 text-sm opacity-80">
+          <div aria-hidden className="graticule mx-auto mt-4 w-40" />
+          <p className="mt-4 text-sm text-muted">
             Съвсем скоро ще можеш да го питаш „Защо това е грешно?“ и „Покажи
             ми закона“ — и той ще отговаря с цитат от правилника.
           </p>
-          <p className="mt-2 text-sm opacity-80">
+          <p className="mt-2 text-sm text-muted">
             Дотогава: всяко упражнение вече ти обяснява грешките с точния член
             от закона.
           </p>
-          <div className="mt-6 flex justify-center gap-3">
+          <div className="mt-6 flex flex-wrap justify-center gap-3">
             <Link href="/theory" className="btn-accent">
               Към упражненията
             </Link>

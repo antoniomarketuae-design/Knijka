@@ -44,6 +44,7 @@ export function ContinueLessonCard({ lesson }: { lesson: ContinueLesson | null }
       <div className="relative flex flex-col gap-6 sm:flex-row sm:items-end sm:justify-between">
         <div className="min-w-0">
           <p className="hud-label text-accent">Продължи урока</p>
+          <span aria-hidden className="graticule mt-2 block w-24" />
           <h2
             id="continue-title"
             className="mt-2 font-display text-2xl font-black sm:text-3xl"
@@ -51,14 +52,13 @@ export function ContinueLessonCard({ lesson }: { lesson: ContinueLesson | null }
             {lesson.conceptTitleBg}
           </h2>
           <p className="mt-1 text-sm text-muted">
-            Тема{" "}
-            <span className="font-mono tabular-nums">{lesson.topic.order}</span>:{" "}
+            Тема <span className="metric font-normal">{lesson.topic.order}</span>:{" "}
             {lesson.topic.titleBg}
           </p>
           <div className="mt-4 max-w-sm">
             <div className="mb-1 flex items-baseline justify-between gap-2">
               <span className="hud-label">Напредък по темата</span>
-              <span className="font-mono text-xs font-bold tabular-nums text-accent">
+              <span className="metric text-xs text-accent">
                 {lesson.progressPct}%
               </span>
             </div>
@@ -68,7 +68,7 @@ export function ContinueLessonCard({ lesson }: { lesson: ContinueLesson | null }
               aria-valuenow={lesson.progressPct}
               aria-valuemin={0}
               aria-valuemax={100}
-              className="h-2.5 overflow-hidden rounded-full bg-surface-2"
+              className="track h-2.5 overflow-hidden rounded-full"
             >
               <div
                 className="h-full rounded-full bg-gradient-to-r from-accent to-accent-2 shadow-glow-sm"

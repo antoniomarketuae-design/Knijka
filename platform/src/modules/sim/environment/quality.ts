@@ -242,6 +242,32 @@ export function unknownDeviceSignals(dpr: number): DeviceSignals {
 }
 
 /**
+ * A device whose PRIMARY pointer is a fingertip and which reports no fine
+ * pointer anywhere — every shipping phone and tablet matches, a touch laptop
+ * with a trackpad does not. The one signal in the set that describes a device
+ * CLASS rather than a component, which is why every phone-budget rule below is
+ * gated behind it.
+ */
+export function isTouchOnlyDevice(signals: DeviceSignals): boolean {
+  return signals.coarsePointer === true && signals.anyFinePointer !== true;
+}
+
+/**
+ * The highest tier `auto` may ever reach on this device, measurement or not.
+ *
+ * Touch-only → `med`, hard. Not a performance guess: doc 82 §2.2 states the
+ * phone rule outright — *"Do not raise the phone dpr cap. dpr 1.5 is 2.25× the
+ * fill and destroys the parity the whole budget rests on."* `high` IS a
+ * maxDpr-1.5 tier (plus a 2048² shadow map), so no amount of measured headroom
+ * entitles a handset to it. A phone that measures beautifully gets `med` — the
+ * full facade/ground map set, the HDR IBL, shadows, AO, bloom, grade — and
+ * stops there.
+ */
+export function autoQualityCeiling(signals: DeviceSignals): QualityLevel {
+  return isTouchOnlyDevice(signals) ? "med" : "high";
+}
+
+/**
  * The COLD-START tier, decided from device signals before the first fetch.
  *
  * Why this exists at all (doc 82 §2.3): the `low` preset is not only a render
@@ -252,33 +278,60 @@ export function unknownDeviceSignals(dpr: number): DeviceSignals {
  * before anything mounts.
  *
  * WHY IT IS DELIBERATELY NARROW. The doc asks to "bias toward low on
- * disagreement", and inside the touch-only family it does. But a seed that
- * guesses `low` for a desktop is not self-correcting today: `useAutoQualityProbe`
- * is exported and never mounted (grep: no call site outside this module), so a
- * wrong `low` sticks until the student opens the graphics selector. So the
- * phone-class rules are all gated behind "touch-only" — a device whose primary
- * pointer is coarse AND which reports no fine pointer anywhere. Every shipping
- * phone matches that; a touch laptop with a trackpad does not.
+ * disagreement", and inside the touch-only family it still does. The phone-class
+ * rules are all gated behind `isTouchOnlyDevice`.
+ *
+ * WHAT CHANGED, AND WHY (the iPhone-16 bug). The first rule used to be a bare
+ * `dpr >= 3 → low`, justified as "9× the fill of dpr 1". That justification does
+ * not survive reading QUALITY_PRESETS: the Canvas is wired `dpr={[1, maxDpr]}`,
+ * so fill cost is bounded by `maxDpr` (1.0 / 1.25 / 1.5) and NOT by the panel's
+ * devicePixelRatio. A dpr-3 device renders at exactly the same buffer size as a
+ * dpr-1 device at the same tier. `devicePixelRatio` describes a good SCREEN; it
+ * is not evidence about a GPU, and it never separated the two devices it was
+ * being asked to separate — an A18 (iPhone 16) and a Mali-G57 MP2 (€125 Galaxy
+ * A16) both report 3 and 2.625 respectively. What it DID do was condemn every
+ * high-DPI pointing device — a Windows laptop at 300% display scaling reports
+ * dpr 3 and was being served the 725 KB texture set on a discrete GPU.
+ *
+ * So dpr is demoted from "proof of weakness" to "one of the touch-family cues"
+ * (rule 3, where it always belonged), and the standalone rule is gone.
+ *
+ * WHAT STILL SEPARATES AN iPHONE FROM AN A16, honestly: nothing synchronous and
+ * reliable. `hardwareConcurrency` is worse than useless here — the A16's Helio
+ * G99 reports 8 logical cores and iOS Safari reports 4, so the cheap phone looks
+ * like the strong one. `deviceMemory` is Chromium-only, so every Apple device
+ * reports `null` and promoting on that absence would also promote Firefox
+ * Android on a 4 GB handset straight into a 5.9 MB fetch and a 256 MB WASM heap
+ * cap (§2.1) — an OOM black canvas, the single worst failure mode in the doc.
+ * The one thing that genuinely separates them is a frame time, so the seed stays
+ * conservative for the whole touch family and MEASUREMENT does the promoting
+ * (`ledgerFromSample` below). An iPhone therefore pays the `low` tier for its
+ * first session only, then climbs; the A16 measures ~30 fps against a 57 fps
+ * promotion bar and stays exactly where it is.
+ *
+ * The one touch-family relaxation that cannot hurt the reference device:
+ * Chromium clamps `deviceMemory` to 8, so a touch-only device REPORTING 8 has
+ * ≥8 GB of RAM — a flagship Android, not a €125 handset (the A16 reports 4).
  *
  * Rules, first match wins:
- *  1. `dpr ≥ 3` → low. Unchanged from the shipped cold start: 9× the fill of
- *     dpr 1, and the maxDpr cap cannot claw all of that back.
- *  2. `deviceMemoryGb ≤ 2` → low, pointer irrespective. Chromium on Android
+ *  1. `deviceMemoryGb ≤ 2` → low, pointer irrespective. Chromium on Android
  *     cannot grow a WASM heap past 256 MB (§2.1); at 2 GB total the med plan's
  *     5.9 MB of maps plus Rapier is not a tier, it is a context-loss.
+ *  2. touch-only AND `deviceMemoryGb ≥ 8` → med (the flagship-Android carve-out
+ *     above). Still capped at med for life by `autoQualityCeiling`.
  *  3. touch-only AND any one of: `dpr ≥ 2` (every modern phone panel),
  *     `deviceMemoryGb ≤ 4` (the Galaxy A16 / Redmi Note reference device),
  *     `hardwareConcurrency ≤ 4` → low.
  *  4. otherwise → med, exactly as before.
  *
  * Never returns "high": a cold start has no evidence of headroom, only of its
- * absence. Promotion stays the FPS probe's job.
+ * absence. Promotion stays measurement's job.
  */
 export function seedQualityFromSignals(signals: DeviceSignals): QualityLevel {
-  const { coarsePointer, anyFinePointer, deviceMemoryGb, hardwareConcurrency, dpr } = signals;
-  if (dpr >= 3) return "low";
+  const { deviceMemoryGb, hardwareConcurrency, dpr } = signals;
   if (deviceMemoryGb !== null && deviceMemoryGb <= 2) return "low";
-  const touchOnly = coarsePointer === true && anyFinePointer !== true;
+  const touchOnly = isTouchOnlyDevice(signals);
+  if (touchOnly && deviceMemoryGb !== null && deviceMemoryGb >= 8) return "med";
   if (
     touchOnly &&
     (dpr >= 2 ||
@@ -288,6 +341,131 @@ export function seedQualityFromSignals(signals: DeviceSignals): QualityLevel {
     return "low";
   }
   return "med";
+}
+
+// ---------------------------------------------------------------------------
+// Cross-session promotion (doc 82 §8, the "recorded, deliberately not actioned"
+// row) — the other half of the iPhone-16 bug.
+// ---------------------------------------------------------------------------
+
+/** Median fps at or above which a tier is judged to have headroom to spare. */
+export const PROMOTE_FPS = 57;
+/** Median fps at or above which a tier is judged to be holding its target. */
+export const HOLD_FPS = 48;
+/** Below this the tier is not merely missing its target, it is failing. */
+export const STRUGGLE_FPS = 34;
+/**
+ * Clean frame samples a PROMOTION requires — twice `MIN_PROBE_SAMPLES`.
+ * Demotion may act on the smaller sample (a device that is drowning should not
+ * have to prove it twice); climbing has to earn a fuller window.
+ */
+export const MIN_PROMOTION_SAMPLES = 60;
+
+/**
+ * One measurement window, and the tier that was actually on screen for it.
+ * `level` is load-bearing: an fps number means nothing without the tier it was
+ * paid at, and the whole ledger below is "what did this device do at X".
+ */
+export interface QualitySample {
+  /** The tier that was rendering while the window was collected. */
+  level: QualityLevel;
+  /** `medianFpsFromDeltas` over that window. */
+  fpsMedian: number;
+  /** Clean frame deltas behind the median (stalls already discarded). */
+  samples: number;
+}
+
+/**
+ * The persisted verdict about THIS device. Small on purpose — it is written to
+ * localStorage and read synchronously on every cold start.
+ *
+ * ADR-004: two enum-ish fields describing a GPU's behaviour. No identifier, no
+ * timestamp, nothing joinable to a person, never transmitted.
+ */
+export interface QualityLedger {
+  /** The tier this device has EARNED. The cold start for the next session. */
+  earned: QualityLevel;
+  /**
+   * The LOWEST tier ever measured as not holding up here. `auto` never seeds at
+   * or above it again — the hysteresis that stops a borderline device flipping
+   * low→med→low every session. The graphics selector remains the manual
+   * override; this only binds `auto`.
+   */
+  failedAt: QualityLevel | null;
+}
+
+function minLevel(a: QualityLevel, b: QualityLevel): QualityLevel {
+  return ORDER.indexOf(a) <= ORDER.indexOf(b) ? a : b;
+}
+
+/** Clamp to strictly below a tier already proven too heavy here. */
+function clampBelowFailure(level: QualityLevel, failedAt: QualityLevel | null): QualityLevel {
+  return failedAt === null ? level : minLevel(level, stepDown(failedAt));
+}
+
+/**
+ * Fold one measurement into the persisted verdict.
+ *
+ * Deliberately NOT a live tier change. Doc 82 §8 records why the probe was left
+ * unmounted: *"Wiring the probe would change render tier mid-drive for an
+ * existing user"* — and at `low`→`med` that is not just a visual pop, it is a
+ * 5.2 MB texture fetch and an HDR decode starting under the student's wheels.
+ * So a sample only ever updates this record; the tier it implies is applied at
+ * the next cold start, before a single byte is requested (`levelFromLedger`).
+ * Promotion is therefore paid for exactly once, at the one moment in the
+ * session where changing tiers costs nothing.
+ *
+ * Bands mirror `recommendQuality`, with two differences that matter on a phone:
+ * promotion needs the fuller sample window, and `ceiling` is applied on the way
+ * out so a handset can never be promoted into `high`'s dpr-1.5 buffer.
+ *
+ * Note what the 57 fps promotion bar means at tier `low` on the reference
+ * device: doc 82 §2.2 sets the phone target at *"30 flat (floor 24) — do not
+ * chase 60"*. A Galaxy A16 meeting its own budget scores ~30 and is nowhere
+ * near 57, so it is never promoted. The bar is only cleared by a device sitting
+ * on its vsync ceiling with frames to spare — which is precisely the reported
+ * iPhone-16 symptom ("the FPS works perfectly flawlessly").
+ */
+export function ledgerFromSample(
+  prev: QualityLedger | null,
+  sample: QualitySample,
+  ceiling: QualityLevel,
+): QualityLedger {
+  const at = sample.level;
+  let failedAt = prev?.failedAt ?? null;
+  let earned: QualityLevel;
+
+  if (sample.fpsMedian >= PROMOTE_FPS && sample.samples >= MIN_PROMOTION_SAMPLES) {
+    earned = stepUp(at);
+  } else if (sample.fpsMedian >= HOLD_FPS) {
+    earned = at;
+  } else {
+    // This tier did not hold up here. Record it so `auto` stops trying —
+    // except at `low`, which is the floor: there is nothing under it to fall
+    // back to, and marking it failed would say "this device cannot run the
+    // simulator at all", which is not a claim a 4 s window can make.
+    if (at !== "low") failedAt = failedAt === null ? at : minLevel(failedAt, at);
+    earned = sample.fpsMedian >= STRUGGLE_FPS ? stepDown(at) : "low";
+  }
+
+  return { earned: clampBelowFailure(minLevel(earned, ceiling), failedAt), failedAt };
+}
+
+/**
+ * The cold-start tier once measurement is taken into account: the seed's guess,
+ * overruled in BOTH directions by anything this device has actually done, and
+ * clamped by the ceiling and by any tier already proven too heavy.
+ *
+ * With no ledger this reduces to the seed, so a first visit behaves exactly as
+ * documented above.
+ */
+export function levelFromLedger(
+  seed: QualityLevel,
+  ledger: QualityLedger | null,
+  ceiling: QualityLevel,
+): QualityLevel {
+  if (ledger === null) return minLevel(seed, ceiling);
+  return clampBelowFailure(minLevel(ledger.earned, ceiling), ledger.failedAt);
 }
 
 /**
