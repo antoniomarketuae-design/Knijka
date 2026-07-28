@@ -1,5 +1,12 @@
 node_modules/
 .next/
+# Alternate build dirs. next.config.ts reads KNIJKA_DIST_DIR so the clip rig —
+# and any agent that needs a server of its own — can build somewhere the shared
+# :3000 server will not fight over. Each one is GIGABYTES: three parallel agents
+# left 12.3 GB across .next-overflow / .next-hud-ux / .next-answers-above-fold,
+# which showed up as 621 untracked files one `git add -A` away from being
+# committed. The default stays plain `.next`, so this ignores only the opt-ins.
+.next-*/
 dist/
 build/
 .env

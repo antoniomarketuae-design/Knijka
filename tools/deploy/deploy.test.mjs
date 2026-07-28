@@ -536,3 +536,46 @@ test("backup-db.sh: the label is sanitised before it reaches a filename", (t) =>
   assert.equal(s.dumps().length, 1);
   assert.match(s.dumps()[0], /^knijka-[0-9TZ]+-daily-[A-Za-z0-9._-]+\.dump$/);
 });
+
+// ---------------------------------------------------------------------------
+// The bit that is invisible from Windows
+// ---------------------------------------------------------------------------
+
+test("every shell script is committed executable", () => {
+  // 2026-07-28: the gate had been red since 2026-07-25 and nobody could see why,
+  // because on Windows it is GREEN. All five .sh files were committed as 100644.
+  // Windows does not enforce the mode — bash happily runs a non-executable file
+  // — and `core.filemode=false` there means git never notices the local rwxr-xr-x
+  // and never records it. On Linux the same checkout gives autodeploy.sh an
+  // unrunnable deploy.sh: `Permission denied`, exit 126.
+  //
+  // That is not merely a CI failure. autodeploy.sh runs on the VPS from a git
+  // checkout, so a fresh clone there produces a deploy pipeline that cannot
+  // deploy — the failure mode is "staging silently stops updating", which is
+  // exactly the class of bug the H-17 battery above exists to prevent.
+  //
+  // The mode is the thing under test, so read it from the INDEX, not from the
+  // filesystem: on Windows the filesystem always claims 0755 and would pass.
+  const repoRoot = path.resolve(HERE, "..", "..");
+  const listed = execFileSync("git", ["ls-files", "-s", "--", "*.sh"], {
+    cwd: repoRoot,
+    encoding: "utf8",
+  }).trim();
+
+  assert.ok(listed.length > 0, "no .sh files found — the guard would pass vacuously");
+
+  const notExecutable = listed
+    .split("\n")
+    .map((line) => {
+      const [mode, , , file] = line.split(/\s+/);
+      return { mode, file };
+    })
+    .filter((e) => e.mode !== "100755");
+
+  assert.deepEqual(
+    notExecutable,
+    [],
+    `committed non-executable:\n${notExecutable.map((e) => `  ${e.mode} ${e.file}`).join("\n")}\n` +
+      `Fix with: git update-index --chmod=+x <file>`,
+  );
+});
