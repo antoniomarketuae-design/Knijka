@@ -182,6 +182,38 @@ const DRIVE_PAD_H = "min(52%, 11rem)"; // ≤ 176 px
 /** Glyph-row height (px) — one 44 px touch row plus nothing else. */
 const ROW_H = "2.75rem";
 
+/**
+ * THE TOP OF THE WHOLE CONTROL BAND, as a CSS length, for anything that has to
+ * sit ABOVE the thumbs.
+ *
+ * `--sim-hud-floor` is not this number and cannot be: that one is where the
+ * INSTRUMENT band ends (40px of dash + 8, i.e. 48px on every phone in the
+ * ladder), and this band reaches 224px higher. A widget that clears the dash
+ * can still land squarely on the steering pad.
+ *
+ * Measured, WebKit, iPhone 16 PORTRAIT 393x852, in two passes — the second one
+ * is why this is the band and not just the pads:
+ *
+ *   at 108px (bottom-[6.75rem], the roomy floor)  wheel 981px², throttle 363px²
+ *   at 184px (drive pad + inset + gap)            wheel 0, throttle 0, but a
+ *                                                 6px-wide sliver of the mirror
+ *                                                 glance (24px²) and the horn
+ *                                                 (164px²) — the glyph ROWS,
+ *                                                 which stack above the pads
+ *   at this value                                 0
+ *
+ * The band is the tallest stack in this file: the drive pad, plus the two glyph
+ * rows that measure from it (see the `bottom:` calcs below), plus the home
+ * indicator, plus a small gap so nothing is flush. The steering side is
+ * shorter, so the drive side decides.
+ *
+ * EXPORTED RATHER THAN RESTATED. These pads are the one thing on this screen
+ * whose geometry is actively being reshaped; anything that reads this follows
+ * the band wherever it goes instead of pinning a copy of today's number.
+ */
+export const TOUCH_CONTROLS_FLOOR =
+  `calc(${DRIVE_PAD_H} + ${ROW_H} + ${ROW_H} + ${INSET_B} + 0.5rem)`;
+
 interface CabinSnap {
   gearLabel: string;
   engineOn: boolean;

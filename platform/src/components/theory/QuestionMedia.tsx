@@ -158,10 +158,16 @@ export function useArtworkBudget(
   enabled: boolean,
 ): number {
   const [px, setPx] = useState(ARTWORK_MAX_PX);
+  const [seenKey, setSeenKey] = useState(resetKey);
 
-  useEffect(() => {
+  // Reset DURING RENDER, not in an effect: React's documented way to adjust
+  // state when a prop changes. In an effect it costs an extra commit and one
+  // painted frame of the previous question's artwork size — visible as a jump
+  // on exactly the questions this hook exists for.
+  if (seenKey !== resetKey) {
+    setSeenKey(resetKey);
     setPx(ARTWORK_MAX_PX);
-  }, [resetKey]);
+  }
 
   useEffect(() => {
     if (!enabled) return;
@@ -295,7 +301,11 @@ export function QuestionArtwork({
           role="dialog"
           aria-modal="true"
           aria-label={labelBg}
-          className="fixed inset-0 z-50 flex flex-col justify-center bg-background/95 p-4 backdrop-blur sm:hidden"
+          /* OPAQUE, not a 95 % wash. Captured at 393x852 the translucent
+             version let the question text and four option rows read straight
+             through the diagram — on the one screen whose entire job is to
+             show the diagram clearly. */
+          className="fixed inset-0 z-50 flex flex-col justify-center bg-background p-4 sm:hidden"
         >
           <QuestionMediaView media={media} />
           <button

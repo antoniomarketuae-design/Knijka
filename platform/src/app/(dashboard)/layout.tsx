@@ -69,9 +69,21 @@ export default function DashboardGroupLayout({
       style={SCOPE_TEXT}
       className="isolate flex flex-1 flex-col bg-background"
     >
+      {/* The skip link is `focus:fixed`, so — like every fixed surface in this
+          app — it resolves against the viewport and <body>'s safe-area padding
+          never reaches it. `left-4` alone puts it 16px from the physical edge,
+          which on a landscape iPhone is 43px inside the notch band. It is only
+          on screen while focused, and only for a keyboard or switch user, which
+          is precisely why it must not be the one control that lands under the
+          camera housing. Left AND top: the fallbacks make this inert on every
+          device without a cutout. */}
       <a
         href="#main-content"
-        className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-50 focus:rounded-xl focus:bg-accent focus:px-4 focus:py-2 focus:text-sm focus:font-bold focus:text-accent-foreground"
+        style={{
+          ["--skip-left" as string]: "calc(1rem + env(safe-area-inset-left, 0px))",
+          ["--skip-top" as string]: "calc(1rem + env(safe-area-inset-top, 0px))",
+        }}
+        className="sr-only focus:not-sr-only focus:fixed focus:left-[var(--skip-left)] focus:top-[var(--skip-top)] focus:z-50 focus:rounded-xl focus:bg-accent focus:px-4 focus:py-2 focus:text-sm focus:font-bold focus:text-accent-foreground"
       >
         Към съдържанието
       </a>

@@ -39,18 +39,35 @@ import { describe, expect, it } from "vitest";
  *
  *   practice   40/40 questions fully above the fold      worst overflow 0px
  *   exam       40/40 questions fully above the fold      worst overflow 0px
- *   practice   document overflow 0px on 39 of 40 (6px on q-signs-044)
- *   exam       document overflow 0px on 39 of 40 (2px on q-signs-044)
- *   tightest margin practice 15px, exam 7px — both on q-signs-044
+ *   practice   document overflow 0px on all 40 — the page does not scroll
+ *   exam       document overflow 0px on all 40 — the page does not scroll
+ *   tightest margin practice 20px, exam 8px — both on q-krastovishta-063
+ *
+ *   HYDRATION IS PART OF THE MEASUREMENT. The artwork budget is a client
+ *   effect, so a page whose dev chunk timed out renders from the server and
+ *   hands back plausible, wrong geometry. That happened, for a whole sweep.
+ *   The rig now sets `data-hydrated` from an effect and the script refuses to
+ *   measure a page without it.
  *
  *   The worst ORDINARY TEXT question in the bank is q-vehicle-032: a 123-char
  *   question with four options totalling 478 characters (the heaviest of the
  *   1 008 items that carry no artwork). Practice lands its last option at
- *   y=662 and the exam at y=668, of 852. The runner-up set — q-vehicle-061,
+ *   y=654 and the exam at y=668, of 852. The runner-up set — q-vehicle-061,
  *   q-eco-062, q-predimstvo-042 (the longest question text in the bank at 284
  *   chars), q-predimstvo-056 — all land between 640 and 702.
  *
  *   The worst SIX-option question, q-vehicle-063, lands at 698 / 719.
+ *
+ *   The worst ARTWORK question, q-krastovishta-029 (a top-down scene under the
+ *   longest question text in the bank), lands at 755 / 767 — with the artwork
+ *   budget having given the answers 100+ px back on its own.
+ *
+ *   The same sweep at 393x745 — the height a real iPhone 16 has with Safari's
+ *   toolbars up — is NOT clean: the heaviest text items overhang by 4–14px and
+ *   the heaviest scene items by more. That is reported rather than hidden. The
+ *   brief's acceptance is 852; 745 is the next thing to buy, and the two levers
+ *   left are <main>'s 24px top padding (owned by the dashboard layout) and the
+ *   ~40px app topbar, neither of which is this lane's to move.
  *
  * WHERE THE PIXELS CAME FROM, in order of size. None of them came from text.
  *

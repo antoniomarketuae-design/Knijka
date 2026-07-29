@@ -131,6 +131,46 @@ repo). Failures are captured too, named `FAILED__*`.
 
 ---
 
+## The stability probe
+
+`cli.mjs` answers "how much of the screen is left". `stability-probe.mjs`
+answers a different question — **does any of it move, and does any of it sit
+where the phone will not let you touch it.**
+
+```bash
+node tools/mobile/stability-probe.mjs --base-url http://localhost:3520
+node tools/mobile/stability-probe.mjs -r theory -d iphone16-landscape
+```
+
+Same engine rule, same auth, same device profiles, six surfaces
+(`/dashboard` is added — it is pure app shell, so a shell regression shows
+there first), four profiles: **both orientations of both phone sizes**. Each
+surface is measured three times — resting, with an overlay open, and after it
+closes — and again with the viewport 90px shorter, which is the honest stand-in
+for iOS's collapsing toolbar (Playwright cannot hide a real one).
+
+| column | the founder's words | what it counts |
+| --- | --- | --- |
+| `edge!` / `+ovl!` | "controls not respecting safe areas", "controls touching screen edges" | elements inside the real device inset, resting and with the popup open |
+| `margins L/R` | "uneven margins" | narrowest gap to the left edge vs to the right |
+| `ovlp` / `occl` | "overlapping components" | interactive pairs whose hit areas intersect; and `elementFromPoint` at a control's own centre returning something else |
+| `open` / `close` | "elements moving when popups appear" | max positional shift of everything outside the overlay |
+| `bar` / `clip` | "the left and right sides are not stabalized" | shift after the toolbar takes 90px and gives it back; pinned controls cut off |
+
+Two accounting rules it took a wrong answer to learn, both documented at their
+call site:
+
+* **A finding is classified from the authored CSS, not from the computed
+  pixel.** Playwright's WebKit is the desktop port, so `env(safe-area-inset-*)`
+  is 0 and an element that handles the home indicator *correctly* measures as
+  22px inside it. Each finding is therefore labelled `envSelf` / `envBody` /
+  `escapesBody`, and only "a `fixed` surface with no inset of its own" is
+  BLOCKING. Getting the CSSOM walk wrong (`if (rule.cssRules) { recurse;
+  continue; }` skips every style rule now that nesting gave them all an empty
+  `cssRules`) reported the entire landscape column of the app as unprotected.
+* **Position is the verdict; size is reported beside it.** A menu that grows
+  because it just opened has not moved, and nothing moved with it.
+
 ## Devices
 
 | id | size | dpr | safe area |

@@ -42,7 +42,11 @@
     ".next-practice-exam/types/**/*.ts",
     ".next-practice-exam/dev/types/**/*.ts",
     ".next-overlays/types/**/*.ts",
-    ".next-overlays/dev/types/**/*.ts"
+    ".next-overlays/dev/types/**/*.ts",
+    ".next-stability/types/**/*.ts",
+    ".next-stability/dev/types/**/*.ts",
+    ".next-r0final/types/**/*.ts",
+    ".next-r0final/dev/types/**/*.ts"
   ],
   "exclude": [
     "node_modules"

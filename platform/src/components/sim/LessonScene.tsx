@@ -1519,7 +1519,16 @@ function DemoDeck({
       !(window.innerHeight <= 560 || window.innerWidth <= 640),
   );
   return (
-    <div className="absolute bottom-[6.75rem] left-1/2 z-10 flex w-[min(88%,26rem)] -translate-x-1/2 flex-col items-center gap-1">
+    // `bottom-[6.75rem]` is ROOMY_HUD_FLOOR_PX and it is the ROOMY number. On a
+    // phone this deck has to clear the touch pads instead, which reach 68px
+    // higher — PlayAreaStyles moves it, keyed on the shell's own compact
+    // attribute, for the same reason it moves the difficulty picker: one
+    // definition of "compact" in the codebase, and the scene keeps its desktop
+    // layout in its own file. `data-hud` is the stable handle that rule needs.
+    <div
+      data-hud="demo-deck"
+      className="absolute bottom-[6.75rem] left-1/2 z-10 flex w-[min(88%,26rem)] -translate-x-1/2 flex-col items-center gap-1"
+    >
       <button
         type="button"
         tabIndex={-1}

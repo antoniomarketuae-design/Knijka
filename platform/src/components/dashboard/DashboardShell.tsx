@@ -203,7 +203,10 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
       {/* Mobile topbar — the same console, laid flat. This is the ONE glass
           layer on a phone screen (doc 64 §7 budget), so the blur stays where it
           was and the identity comes from the lit bottom lip instead. */}
-      <header className="console console-bottom sticky top-0 z-40 flex items-center justify-between px-4 py-3 backdrop-blur lg:hidden">
+      <header
+        data-app-topbar
+        className="console console-bottom sticky top-0 z-40 flex items-center justify-between px-4 py-3 backdrop-blur lg:hidden"
+      >
         <Logo />
         <button
           ref={openButtonRef}
@@ -218,7 +221,45 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
         </button>
       </header>
 
-      {/* Mobile slide-over */}
+      {/* Mobile slide-over.
+
+          IT PAYS ITS OWN SAFE-AREA INSETS, and it is the one surface in the app
+          shell that has to. globals.css gives <body> exactly the left/right/
+          bottom padding that `viewport-fit=cover` took away — but this panel is
+          `absolute` inside a `fixed` parent, so its containing block is the
+          VIEWPORT, not that padded box, and none of it reaches here.
+
+          Measured before this, WebKit, tools/mobile/stability-probe.mjs, on all
+          five dashboard surfaces (the drawer is shell chrome, so every one of
+          them had it):
+
+            iPhone 16 landscape  every nav row 43px inside the 59px notch band;
+                                 the panel's own bottom edge 21px into the home
+                                 indicator
+            iPhone 16 portrait   „Изход" 18px inside the 34px home-indicator band
+
+          In landscape the notch is on the LEFT in one of the two rotations —
+          which is the side this drawer opens from — so „Начало", „Теория" and
+          „Изпити" were being drawn under the camera housing.
+
+          The WIDTH grows by the inset rather than the content shrinking: the
+          panel extends under the notch (where it is only background) and the
+          18rem reading column stays 18rem. `max-w-[85vw]` still caps it.
+
+          The top inset is included for completeness even though layout.tsx's
+          `statusBarStyle: "black"` makes it 0 on this app today — if that ever
+          becomes "black-translucent", this surface is already correct.
+
+          AND IT SCROLLS, which is a separate defect the same capture exposed.
+          The panel is `inset-y-0`, so it is exactly as tall as the viewport —
+          393px on a landscape iPhone — and nine nav rows, a logo and „Изход"
+          do not fit in it. They were not clipped, which would at least have
+          looked wrong; they were simply rendered below the screen with no way
+          to reach them. Measured (tools/mobile/notch-shot.mjs, iPhone 16
+          landscape): „Настройки" 100px past the bottom edge and „Изход" 173px
+          past it — the sign-out control, on the shared and school phones ADR-004
+          is written about. `overscroll-contain` keeps the page underneath from
+          taking over the gesture once the list hits its end. */}
       {open ? (
         <div className="fixed inset-0 z-50 lg:hidden" role="dialog" aria-modal="true" aria-label="Меню">
           <button
@@ -231,7 +272,13 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
             id="mobile-nav"
             ref={drawerRef}
             tabIndex={-1}
-            className="console console-right absolute inset-y-0 left-0 flex w-72 max-w-[85vw] flex-col gap-6 p-4 outline-none"
+            className="console console-right absolute inset-y-0 left-0 flex max-w-[85vw] flex-col gap-6 overflow-y-auto overscroll-contain pr-4 outline-none"
+            style={{
+              width: "calc(18rem + env(safe-area-inset-left, 0px))",
+              paddingLeft: "calc(1rem + env(safe-area-inset-left, 0px))",
+              paddingTop: "calc(1rem + env(safe-area-inset-top, 0px))",
+              paddingBottom: "calc(1rem + env(safe-area-inset-bottom, 0px))",
+            }}
           >
             <div className="flex items-center justify-between">
               <Logo />

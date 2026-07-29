@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect } from "react";
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
 import { ExamRunner } from "@/components/exam/ExamRunner";
 import { PracticeSession } from "@/components/theory/PracticeSession";
@@ -30,6 +31,21 @@ export function FoldRigClient({
   exam: ExamQuestion;
   meta: { id: string; family: string; rank: number; poolSize: number; ink: number };
 }) {
+  /**
+   * THE HYDRATION FLAG, and it is the whole reason this rig can be trusted.
+   * The artwork budget is a client effect. When a dev chunk times out under
+   * load React never hydrates, the page still renders from the server, and a
+   * measurement script happily reports that geometry as the product's. That
+   * happened here and produced a full sweep of plausible, wrong numbers. The
+   * sweep now refuses to measure a page without this attribute.
+   */
+  useEffect(() => {
+    document.documentElement.dataset.hydrated = "1";
+    return () => {
+      delete document.documentElement.dataset.hydrated;
+    };
+  }, []);
+
   return (
     <div
       data-surface="cluster"

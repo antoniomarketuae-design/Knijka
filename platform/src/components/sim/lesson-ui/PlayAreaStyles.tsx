@@ -1,5 +1,7 @@
 "use client";
 
+import { TOUCH_CONTROLS_FLOOR } from "../TouchControls";
+
 /**
  * One CSS rule, mounted by the play shell: while a LETTERBOXED session is on
  * screen, the page's prose width cap does not apply to it.
@@ -72,6 +74,33 @@ export function PlayAreaStyles() {
       [data-sim-compact="on"] [data-hud="difficulty"] {
         right: calc(0.75rem + env(safe-area-inset-right, 0px));
         top: calc(0.5rem + env(safe-area-inset-top, 0px));
+      }
+
+      /* ------------------------------------------------------------------
+         …and the same treatment for the demonstration deck, which is the
+         third piece of scene-owned chrome tuned on a roomy screen.
+
+         It sits at bottom-[6.75rem] — 108px, ROOMY_HUD_FLOOR_PX — and on a
+         phone that is inside the control band. So is --sim-hud-floor, which
+         resolves to 48px on every phone in the ladder (40px of instrument band
+         plus 8): that variable is where the DASH ends, and the touch pads reach
+         176px above the bottom, 68px higher than this deck was sitting.
+
+         Measured in WebKit (tools/mobile/stability-probe.mjs) on iPhone 16
+         PORTRAIT 393x852 and on a 360x780 Android: the deck is
+         min(88%, 26rem) = 346px wide, the steering pad occupies x 0-165 and
+         the drive pad x 252-393, so there is no horizontal gap for it to sit
+         in — it overlapped the wheel by 981px² and the throttle by 363px².
+         Landscape was clean at the same 108px only because the two pads are
+         644px apart there. That is how a constant tuned in landscape survived
+         a portrait review.
+
+         TOUCH_CONTROLS_FLOOR is interpolated from TouchControls rather than
+         written out here: the pads are the one thing on this screen actively
+         being reshaped, and whatever the band becomes, this follows it.
+         ------------------------------------------------------------------ */
+      [data-sim-compact="on"] [data-hud="demo-deck"] {
+        bottom: ${TOUCH_CONTROLS_FLOOR};
       }
     `}</style>
   );

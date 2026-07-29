@@ -462,6 +462,53 @@ body {
   padding-bottom: env(safe-area-inset-bottom, 0px);
 }
 
+/* ============================================================
+   THE APP TOPBAR STANDS DOWN INSIDE THE IMMERSIVE SIMULATOR.
+
+   On a phone-shaped viewport the play shell stops being a page with a picture
+   on it and becomes the picture: LessonPlayShell renders itself
+   `fixed left-0 top-0 z-40 w-full` at the measured visual-viewport height and
+   marks that root `data-sim-compact="on"` (components/sim/lesson-ui/immersive.ts
+   has the founder's own measurements behind that decision).
+
+   What it does NOT do — could not do, from inside the page — is take the
+   dashboard shell's own mobile topbar out of the document. That topbar is
+   `sticky top-0 z-40`, i.e. the same layer, and it stayed mounted UNDER the
+   simulator for the whole lesson. Measured, WebKit, tools/mobile/stability-probe.mjs,
+   on all four device profiles:
+
+     „Книжка.AI" (a link to /dashboard)  overlapped „Меню на урока" by 1440px²
+     „Отвори менюто" (the hamburger)     overlapped the difficulty chip by 907px²
+     document.elementFromPoint at the centre of both returned something else
+       — the canvas, and a quality-tier pill
+
+   That is the founder's „overlapping components", exactly: two menu buttons on
+   the same pixels, one of them invisible. Invisible is not harmless. The
+   controls stayed in the tab order and in the accessibility tree, so a keyboard
+   or VoiceOver user walked into a navigation bar that is not on screen; and any
+   frame in which the fixed layer has not yet been sized (it is measured in an
+   effect) is a frame where a thumb aimed at the lesson menu lands on a link out
+   of the lesson.
+
+   `display: none` is the whole fix: it removes the row from layout, from
+   hit-testing and from the accessibility tree at once. It costs zero visible
+   pixels, because nothing here was ever visible during a lesson.
+
+   WHY :has() AND NOT A PROP. The two components are in different trees — the
+   shell is the (dashboard) layout, the play shell is several levels inside
+   <main> — and the shell has, correctly, no knowledge of the simulator. A
+   selector is the only thing that spans that boundary without inventing a
+   context for one screen. On an engine without `:has()` this rule simply never
+   matches and the behaviour is exactly what it is today, so it degrades to the
+   status quo rather than to a broken layout.
+
+   Scoped to the cluster wrapper (not `body:has(…)`) to keep the match cheap,
+   and to `[data-app-topbar]` so a class rename cannot silently unhook it.
+   ============================================================ */
+[data-surface="cluster"]:has([data-sim-compact="on"]) [data-app-topbar] {
+  display: none;
+}
+
 /* Keyboard accessibility: a single, loud focus signal everywhere. The ring
    follows each control's own border-radius (modern browsers do this), so we
    never override it — a hard 4px snapped rounded-xl corners into a glitch. */
