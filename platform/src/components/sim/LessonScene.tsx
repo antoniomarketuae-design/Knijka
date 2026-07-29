@@ -828,10 +828,24 @@ function ReadyScene({
         // procedure observer — the same event the rule engine already grades.
         onGlance: (mirror) => glanceQueueRef.current.push(mirror),
       },
-      // A1 spawn policy: cold start (engine off, P, parking brake on) unless
-      // the lesson opts into ready-to-drive (L0). Read once at mount — the
-      // lesson identity is fixed for the life of this scene.
-      lesson.vehicleStart ?? "cold",
+      // Spawn policy. An explicit `vehicleStart` always wins. Otherwise the
+      // question is whether THIS lesson is teaching the pre-drive or merely
+      // requiring it before the real lesson can begin.
+      //
+      // It used to default to "cold" everywhere (A1 policy), which meant every
+      // one of the 150 scenarios opened with the engine off in P. The founder
+      // reviewing them hit ignition + selector on all 150 before reaching the
+      // thing he wanted to look at, and asked for exactly one item left
+      // outstanding at spawn: the seatbelt. That is the right call — an unbelted
+      // start still teaches the habit that matters, because the belt is the one
+      // pre-drive step whose omission the rule engine goes on grading for the
+      // whole session.
+      //
+      // `preDriveMode: "assess"` is the marker for a lesson that is GRADING the
+      // pre-drive — the exams. Those keep the cold start, because performing it
+      // is the thing being measured; handing them a running engine would delete
+      // the assessment. Everything else spawns ready-to-drive.
+      lesson.vehicleStart ?? (lesson.preDriveMode === "assess" ? "cold" : "ready"),
     );
     cabinRef.current = cabin;
     // A2: observe every driveline transition (ignition/selector/parking
