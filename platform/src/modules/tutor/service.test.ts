@@ -15,7 +15,11 @@ import {
   FakeTutorStore,
   makeTutorFixtureRepo,
 } from "./fixtures";
-import { setTutorModel, type TutorModel } from "./model";
+import {
+  setTutorModel,
+  TutorProviderError,
+  type TutorModel,
+} from "./model";
 import { TUTOR_NO_MATERIAL_REPLY_BG } from "./prompt";
 import {
   askTutor,
@@ -27,6 +31,7 @@ import {
   TUTOR_HISTORY_MESSAGES,
   TUTOR_LIMIT_REPLY_BG,
   TUTOR_MAX_INPUT_LENGTH,
+  TUTOR_UNAVAILABLE_REPLY_BG,
   userQuestionTimestamps,
 } from "./service";
 import { setTutorStore, type TutorMessage } from "./store";
@@ -601,6 +606,109 @@ describe("askTutor — guards", () => {
       "not enabled",
     );
     expect(model.completeCalls).toHaveLength(0);
+  });
+});
+
+describe("a provider fault never reaches the student as a crash", () => {
+  /** A model that fails the way an unfunded gateway actually fails. */
+  function failingModel(message: string, status?: number): TutorModel {
+    return {
+      async complete() {
+        throw new TutorProviderError(message, status);
+      },
+    };
+  }
+
+  beforeEach(() => {
+    // The provider's own words are logged, not shown; keep the run quiet.
+    vi.spyOn(console, "error").mockImplementation(() => {});
+  });
+
+  it("answers a 402 „insufficient balance“ with the honest Bulgarian sentence", async () => {
+    setTutorModel(
+      failingModel("tutor provider returned 402 — insufficient balance", 402),
+    );
+    const res = await askTutor(USER, "Кой има предимство на кръстовището?");
+
+    expect(res.reply).toBe(TUTOR_UNAVAILABLE_REPLY_BG);
+    expect(res.limited).toBe(true);
+    expect(res.citations).toEqual([]);
+    // Marks it as the kind of `limited` that clears by itself, so the chat
+    // leaves the composer live instead of contradicting the reply.
+    expect(res.retryable).toBe(true);
+  });
+
+  it("does not mark a TERMINAL ceiling as retryable", async () => {
+    // Contrast case: the daily cap must NOT set retryable, or the composer
+    // would stay live against a wall the student cannot get past today.
+    const day = sofiaDayKey();
+    store.seedThread(USER, {
+      messages: Array.from({ length: TUTOR_DAILY_MESSAGE_LIMIT }, (_, i) =>
+        userMsg(`въпрос ${i}`, Date.now()),
+      ),
+    });
+    const res = await askTutor(USER, "още един въпрос?");
+    expect(res.limited).toBe(true);
+    expect(res.retryable).toBeUndefined();
+    expect(res.reply).toBe(TUTOR_LIMIT_REPLY_BG);
+    expect(day).toBe(sofiaDayKey());
+  });
+
+  it("charges the student nothing — no turn stored, no day spend booked", async () => {
+    const before = await store.spentOnDay(sofiaDayKey());
+    setTutorModel(failingModel("tutor provider returned 402", 402));
+
+    await askTutor(USER, "Кой има предимство на кръстовището?");
+
+    // The question is not persisted: it was never answered, and storing it
+    // would both consume the pack allowance (counted from persisted user
+    // messages) and make the thread look like the tutor ignored them.
+    expect(store.saveExchangeCalls).toHaveLength(0);
+    expect(await store.spentOnDay(sofiaDayKey())).toBe(before);
+  });
+
+  it("leaves the daily message cap untouched, so retrying is free", async () => {
+    setTutorModel(failingModel("tutor provider returned 402", 402));
+    await askTutor(USER, "Въпрос един?");
+
+    // Nothing persisted ⇒ nothing counted against the 30/day cap.
+    const thread = await getThread(USER);
+    expect(countUserMessagesOnDay(thread.messages, sofiaDayKey())).toBe(0);
+  });
+
+  it.each([
+    ["a locked account", 403],
+    ["a rate limit", 429],
+    ["a gateway 5xx", 502],
+    ["a timeout with no status", undefined],
+  ])("handles %s the same way", async (_label, status) => {
+    setTutorModel(failingModel("provider unreachable", status));
+    const res = await askTutor(USER, "Кой има предимство?");
+    expect(res.reply).toBe(TUTOR_UNAVAILABLE_REPLY_BG);
+    expect(res.limited).toBe(true);
+    expect(store.saveExchangeCalls).toHaveLength(0);
+  });
+
+  it("does NOT swallow an ordinary bug — a non-provider throw still surfaces", async () => {
+    setTutorModel({
+      async complete() {
+        throw new TypeError("cannot read properties of undefined");
+      },
+    });
+    await expect(askTutor(USER, "Кой има предимство?")).rejects.toThrow(
+      TypeError,
+    );
+  });
+
+  it("never puts the provider's raw message in front of the student", async () => {
+    setTutorModel(
+      failingModel(
+        "tutor provider returned 402 — insufficient balance, top up at example.com/billing",
+        402,
+      ),
+    );
+    const res = await askTutor(USER, "Кой има предимство?");
+    expect(res.reply).not.toMatch(/402|balance|billing|provider/i);
   });
 });
 

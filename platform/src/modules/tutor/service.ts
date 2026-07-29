@@ -33,7 +33,12 @@ import {
 import { tutorAllowanceSpentReplyBg } from "./allowance";
 import { checkDailyBudget, sofiaDayKey, TUTOR_BUDGET_REPLY_BG } from "./budget";
 import { computeCostMicroUsd, rateForModel } from "./cost";
-import { getTutorModel, isTutorEnabled } from "./model";
+import {
+  getTutorModel,
+  isTutorEnabled,
+  TutorProviderError,
+  type TutorModel,
+} from "./model";
 import { buildTutorSystemPrompt, extractCitations } from "./prompt";
 import {
   MAX_RETRIEVED_ITEMS,
@@ -62,14 +67,44 @@ export const TUTOR_SIM_WEAK_SPOTS = 3;
 
 export const TUTOR_LIMIT_REPLY_BG = `Стигна дневния лимит от ${TUTOR_DAILY_MESSAGE_LIMIT} въпроса към Учителя за днес. Ела пак утре — а дотогава най-полезното е една умна тренировка.`;
 
+/**
+ * The provider could not be reached, or refused us — a 402 „insufficient
+ * balance", a locked account, a timeout, a 5xx.
+ *
+ * WHY THIS EXISTS. Every other ceiling in this file returns a sentence a
+ * 17-year-old can act on; a provider fault was the one path that threw, so an
+ * exhausted account surfaced to a student as a crashed page. That is the worst
+ * of the options: it reads as "this product is broken" when the truth is "the
+ * operator has to top up an account", and the student cannot tell the
+ * difference. It is OUR fault, so the copy neither blames them nor spends their
+ * allowance — the turn is not stored and nothing is booked, so retrying later
+ * costs them nothing.
+ */
+export const TUTOR_UNAVAILABLE_REPLY_BG =
+  "Учителят не е на линия в момента — това е проблем при нас, не при теб. Въпросът ти не е изразходвал нищо от лимита, така че опитай пак след малко. Дотогава една тренировка по темата е най-полезното нещо.";
+
 export type { TutorCitation };
 
 export interface AskTutorResult {
   threadId: string;
   reply: string;
   citations: TutorCitation[];
-  /** True when the daily budget blocked the call (no API call was made). */
+  /**
+   * True when the turn produced no model answer — a cap, the budget
+   * kill-switch, or a provider fault. Nothing was charged in any of those
+   * cases, and the UI must not render the reply as a tutor utterance with
+   * citations.
+   */
   limited: boolean;
+  /**
+   * True when `limited` was set by something that WILL clear on its own — today
+   * only a provider fault. The five ceilings (burst guard, daily cap, pack
+   * allowance, site budget, free trial) are terminal for now and leave this
+   * unset, which is why the chat locks its composer on `limited`. Locking it
+   * here instead would contradict the reply, which tells the student to try
+   * again in a moment.
+   */
+  retryable?: boolean;
 }
 
 export interface TutorThreadView {
@@ -340,11 +375,37 @@ export async function askTutor(
           .map(({ role, content }) => ({ role, content }))
       : [];
 
-  const result = await getTutorModel().complete({
-    system,
-    messages: [...history, { role: "user", content: question }],
-    maxTokens: TUTOR_MAX_REPLY_TOKENS,
-  });
+  // A provider fault is an OPERATIONAL problem, never a student-facing crash.
+  // The four ceilings above all return a sentence; this makes the fifth failure
+  // mode behave like its siblings. Deliberately caught here rather than in the
+  // action layer, because this is the only line that knows the turn produced no
+  // answer and therefore that nothing below it must run: no saveExchange, no
+  // ledger write, no allowance consumed. The real cause (with its status) goes
+  // to the server log — model.ts has already redacted the key from it.
+  let result: Awaited<ReturnType<TutorModel["complete"]>>;
+  try {
+    result = await getTutorModel().complete({
+      system,
+      messages: [...history, { role: "user", content: question }],
+      maxTokens: TUTOR_MAX_REPLY_TOKENS,
+    });
+  } catch (err) {
+    if (err instanceof TutorProviderError) {
+      console.error(
+        `[tutor] provider unavailable${
+          err.status === undefined ? "" : ` (status ${err.status})`
+        }: ${err.message}`,
+      );
+      return {
+        threadId: thread.id,
+        reply: TUTOR_UNAVAILABLE_REPLY_BG,
+        citations: [],
+        limited: true,
+        retryable: true,
+      };
+    }
+    throw err;
+  }
 
   // Cost accounting from the API usage block — NEVER skipped, and priced at
   // the rate of the model the PROVIDER says it billed (cost.ts rateForModel).

@@ -25,4 +25,11 @@ export interface TutorAskDto {
   citations: TutorCitationRef[];
   /** True when the daily question budget was reached (reply is the notice). */
   limited: boolean;
+  /**
+   * True when `limited` came from a fault that clears on its own (the provider
+   * being unreachable), rather than from a ceiling the student has genuinely
+   * reached. The composer stays live for these — the reply tells them to try
+   * again, so disabling the input would contradict it.
+   */
+  retryable?: boolean;
 }

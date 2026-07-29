@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState, useTransition } from "react";
 import { askTutorAction } from "@/app/(dashboard)/tutor/actions";
+import { shouldLockComposer } from "./composerLock";
 import { splitTutorMessage, type TutorCitationRef } from "./TutorChatCitations";
 import type { TutorChatMessage } from "./types";
 
@@ -115,7 +116,11 @@ export function TutorChat({
             citations: result.citations,
           },
         ]);
-        if (result.limited) setLimited(true);
+        // A ceiling the student has actually reached locks the composer; a
+        // provider fault must not, because the reply above tells them to try
+        // again in a moment and a dead input would make that a lie. The rule
+        // itself lives in composerLock.ts, where it is unit-tested.
+        if (shouldLockComposer(result)) setLimited(true);
       } catch {
         setError("Учителят не отговори. Провери връзката и опитай пак.");
       }

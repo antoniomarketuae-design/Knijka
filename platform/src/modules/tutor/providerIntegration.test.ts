@@ -28,7 +28,7 @@ import "@/lib/content/loader";
 import { sofiaDayKey } from "./budget";
 import { FakeTutorStore } from "./fixtures";
 import { isTutorEnabled, setTutorModel } from "./model";
-import { askTutor } from "./service";
+import { askTutor, TUTOR_UNAVAILABLE_REPLY_BG } from "./service";
 import { setTutorStore } from "./store";
 
 /** A real question a Bulgarian learner would ask, in Bulgarian. */
@@ -43,6 +43,19 @@ let server: http.Server;
 let systemPromptSeen = "";
 let requestBodySeen: Record<string, unknown> = {};
 
+/**
+ * Flips the stand-in gateway between answering and refusing. "unfunded"
+ * reproduces the body Atlas Cloud actually returns when the account is out of
+ * credit, observed on the wire 2026-07-29:
+ *
+ *   HTTP 402  {"code":402,"msg":"insufficient balance"}
+ *
+ * Note the field is `msg`, not `error.message` — the shape a naive client would
+ * miss. This is the real reason the tutor could not answer on the founder's own
+ * account, so it is worth a committed test rather than a memory of a curl.
+ */
+let responseMode: "ok" | "unfunded" = "ok";
+
 beforeAll(async () => {
   server = http.createServer((req, res) => {
     let body = "";
@@ -51,6 +64,12 @@ beforeAll(async () => {
       requestBodySeen = JSON.parse(body) as Record<string, unknown>;
       const messages = requestBodySeen.messages as { content: string }[];
       systemPromptSeen = messages[0].content;
+
+      if (responseMode === "unfunded") {
+        res.writeHead(402, { "content-type": "application/json" });
+        res.end(JSON.stringify({ code: 402, msg: "insufficient balance" }));
+        return;
+      }
 
       // Stand in for the model's judgement, not for its plumbing: answer from
       // the injected MATERIALS and cite the first lawRef that actually appears
@@ -138,5 +157,51 @@ describe("tutor over an OpenAI-compatible gateway", () => {
     expect(thread?.tokensOut).toBe(USAGE.completion_tokens);
     expect(thread?.costMicroUsd).toBe(expectedMicroUsd);
     expect(await store.spentOnDay(sofiaDayKey())).toBe(expectedMicroUsd);
+  });
+
+  it("turns a real 402 „insufficient balance“ into an honest sentence, not a crash", async () => {
+    const errors: unknown[] = [];
+    const spy = vi
+      .spyOn(console, "error")
+      .mockImplementation((...args) => void errors.push(args));
+
+    responseMode = "unfunded";
+    const store = new FakeTutorStore();
+    setTutorStore(store);
+
+    try {
+      const result = await askTutor("student-unfunded", QUESTION);
+
+      // The student gets a sentence, through the SHIPPED transport, on a real
+      // socket, from the real 402 body — not a thrown exception.
+      expect(result.limited).toBe(true);
+      expect(result.reply).toBe(TUTOR_UNAVAILABLE_REPLY_BG);
+      expect(result.citations).toEqual([]);
+
+      // And it does not leak the operational detail to a 17-year-old.
+      expect(result.reply).not.toMatch(/402|balance|insufficient/i);
+
+      // Nothing booked on either ledger, nothing persisted: an answer that
+      // never arrived must not spend the pack allowance or the day budget.
+      // The thread record itself DOES exist — askTutor opens it before it
+      // reaches the provider — so the assertion that matters is that the
+      // failed turn left no trace INSIDE it.
+      const thread = store.threadFor("student-unfunded");
+      expect(thread).toBeDefined();
+      expect(thread?.messages).toEqual([]);
+      expect(thread?.tokensIn).toBe(0);
+      expect(thread?.tokensOut).toBe(0);
+      expect(thread?.costMicroUsd).toBe(0);
+      expect(store.saveExchangeCalls).toHaveLength(0);
+      expect(await store.spentOnDay(sofiaDayKey())).toBe(0);
+
+      // The operator, unlike the student, DOES get the cause and the status.
+      const logged = errors.flat().join(" ");
+      expect(logged).toContain("402");
+      expect(logged).toContain("insufficient balance");
+    } finally {
+      responseMode = "ok";
+      spy.mockRestore();
+    }
   });
 });

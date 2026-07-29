@@ -61,5 +61,6 @@ export async function askTutorAction(message: string): Promise<TutorAskDto> {
     reply: result.reply,
     citations: result.citations.map(({ act, ref }) => ({ act, ref })),
     limited: result.limited,
+    retryable: result.retryable,
   };
 }
