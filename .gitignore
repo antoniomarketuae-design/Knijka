@@ -45,3 +45,8 @@ tools/clips/headless/cluster/
 # harness's own durable artefact is tools/mobile/baseline.json, which IS
 # tracked, because later phases are measured against it.
 tools/mobile/.out/
+
+# agent rig output (screenshots + row dumps) — never committed
+.fold-rig/
+.deck-rig/
+.mobile-rig/

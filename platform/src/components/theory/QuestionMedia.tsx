@@ -81,17 +81,19 @@ export function QuestionMediaView({
   if (media === null || !("kind" in media)) return null;
 
   if (media.kind === "sign") {
+    // The frame padding is chosen HERE, not appended by the caller: `p-4` and
+    // a caller's `p-2` are the same Tailwind property, so which one wins is
+    // decided by stylesheet order rather than by the markup — a coin flip that
+    // moves the block by 16px and, on a phone, moves the last answer with it.
     return (
       <div
-        className={`flex justify-center rounded-xl border border-border bg-surface-2/40 p-4 ${className ?? ""}`}
+        className={`flex justify-center rounded-xl border border-border bg-surface-2/40 ${
+          maxHeightPx === undefined ? "p-4" : "p-2"
+        } ${className ?? ""}`}
       >
         <SignFace
           signRef={media.signRef}
-          className={
-            maxHeightPx === undefined
-              ? "h-28 w-28 sm:h-32 sm:w-32"
-              : "aspect-square h-auto w-auto"
-          }
+          className={maxHeightPx === undefined ? "h-28 w-28 sm:h-32 sm:w-32" : ""}
           style={
             maxHeightPx === undefined
               ? undefined
@@ -193,8 +195,22 @@ export function useArtworkBudget(
     const ro = new ResizeObserver(measure);
     ro.observe(el);
     window.visualViewport?.addEventListener("resize", measure);
-    measure();
+
+    // A short frame chain on top of the observer. The observer catches size
+    // CHANGES; this catches the frames where the size was already right but
+    // the value React had not yet committed — measured as a stubborn 2–9px of
+    // residual scroll on sign questions that the observer never re-fired for.
+    let frames = 0;
+    let raf = 0;
+    const tick = (): void => {
+      measure();
+      frames += 1;
+      if (frames < 8) raf = requestAnimationFrame(tick);
+    };
+    tick();
+
     return () => {
+      cancelAnimationFrame(raf);
       ro.disconnect();
       window.visualViewport?.removeEventListener("resize", measure);
     };
@@ -242,6 +258,10 @@ export function QuestionArtwork({
         type="button"
         onClick={() => setOpen(true)}
         aria-label={labelBg}
+        /* The budget the artwork actually settled on. It is here so the fold
+           rig can read it out of the DOM instead of inferring it from a box
+           height — see src/app/dev/fold-rig. */
+        data-artwork-px={heightPx}
         className="relative block w-full rounded-xl text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent sm:hidden"
       >
         {asStrip ? (
@@ -254,7 +274,7 @@ export function QuestionArtwork({
           </span>
         ) : (
           <>
-            <QuestionMediaView media={media} className="p-2" maxHeightPx={heightPx} />
+            <QuestionMediaView media={media} maxHeightPx={heightPx} />
             <span
               aria-hidden
               className="absolute bottom-1.5 right-1.5 rounded-md border border-hair bg-surface/90 px-1.5 py-0.5 font-mono text-[10px] font-bold text-muted"

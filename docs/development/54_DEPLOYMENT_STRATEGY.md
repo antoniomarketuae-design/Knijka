@@ -154,3 +154,51 @@ Onboarding answers (exam date, daily-minutes goal) live in **versioned localStor
 ## 12. Post-launch (first month)
 
 Watch: Vercel analytics (traffic), Anthropic token spend per tutor thread (`TutorThread.costMicroUsd` is already instrumented), Stripe disputes, Neon storage. Automate `migrate deploy` in CI once releases are weekly. Revisit hosting cost at ~€100/mo (§4 exit hatch). Add service worker + offline theory (§9) as the first PWA upgrade.
+
+## 13. Local dev box maintenance — the prisma-dev journal
+
+**Symptom to recognise:** MCP servers start failing with `UtilityProcess spawn
+timeout after 5000ms`, tools get slow, builds fail in odd ways. Check free disk
+**before** debugging any of it.
+
+On 2026-07-29 `C:` fell to **1.58 GB free of 118.6 GB**. One file was responsible:
+
+```
+%LOCALAPPDATA%\prisma-dev-nodejs\Data\durable-streams\default\durable-streams.sqlite
+   25.61 GB
+```
+
+`prisma dev` records every database mutation in a `wal` table inside that
+sqlite file. A compaction job is supposed to roll those rows into a `segments`
+table and truncate the WAL. **It has never run on this machine** — `wal` held
+24,761,558 rows, `segments` held 0. `freelist_count` was 13 pages, so the rows
+were live: `VACUUM` would have reclaimed nothing, and could not have run anyway
+(it needs free space equal to the database size — the exact thing we had run
+out of).
+
+The database being journalled is **8.4 MB / 9 tables / 557 rows**. The journal
+was ~3,000× the size of its own subject. It is derived state — the Postgres
+data lives in `Data\<namespace>\.pglite` — so deleting it is safe, and was
+verified so: every table's row count identical before and after, admin accounts
+intact.
+
+**This recurs.** Within minutes of a fresh start the new journal had already
+logged 1,013 rows with `segments` still at 0. Check it periodically:
+
+```bash
+node tools/ops/disk-guard.mjs
+```
+
+Reports every namespace's journal size, WAL row count and the journal-to-data
+ratio. Warns at 2 GB, fails at 8 GB. To reclaim:
+
+```bash
+node tools/ops/disk-guard.mjs --purge
+```
+
+`--purge` refuses to run while anything holds a connection to the dev database,
+copies every namespace's `.pglite` to `E:\ai-driver-backups\` first, stops the
+daemon, deletes only the three `durable-streams.sqlite*` files (leaving
+`server.json` / `server.lock`), and restarts. Take a logical dump too if the dev
+data matters to you — the schema rebuilds from 8 migrations plus
+`node scripts/seed-founder.mjs`.
