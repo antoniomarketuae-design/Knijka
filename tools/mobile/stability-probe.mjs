@@ -38,8 +38,8 @@
 //    Anything that fails to come back to where it started would jump on a real
 //    phone the moment the student scrolls.
 // =============================================================================
-import { mkdirSync, writeFileSync } from "node:fs";
-import { dirname, join } from "node:path";
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { basename, dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { engineByName } from "./lib/pw.mjs";
@@ -57,6 +57,14 @@ const SHIFT_TOLERANCE_PX = 0.5;
 const EDGE_MARGIN_PX = 8;
 /** iOS Safari's collapsing toolbar, portrait. The visual viewport grows by this. */
 const TOOLBAR_PX = 90;
+/**
+ * How long a surface may take to stop moving after a state change before the
+ * student sees it as a lurch rather than a transition. iOS animates the toolbar
+ * over roughly 250ms, so a layout that is still settling well past that is
+ * visibly chasing the viewport. Reported for every phase; only exceeding this
+ * counts against the row.
+ */
+const SETTLE_BUDGET_MS = 1200;
 
 // -----------------------------------------------------------------------------
 // The surfaces. ROUTES is the phase-0 list; /dashboard is added here because it
@@ -79,6 +87,13 @@ function parseArgs(argv) {
     const a = argv[i];
     if (a === "--base-url") out.baseUrl = argv[++i];
     else if (a === "--engine") out.engine = argv[++i];
+    // A NEGATIVE CONTROL, because a zero from a check nobody has ever seen fire
+    // is not evidence. `--inject-css` puts a stylesheet into every measured page
+    // after it loads, which lets a suspected regression be reproduced without
+    // editing the app — and, the reason it exists, lets each finding class be
+    // proven to still be detectable. See tools/mobile/regressions/ for the ones
+    // used to verify this probe.
+    else if (a === "--inject-css") out.injectCss = argv[++i];
     else if (a === "--device" || a === "-d") out.devices.push(argv[++i]);
     else if (a === "--route" || a === "-r") out.routes.push(argv[++i]);
     else if (a.startsWith("--")) out.flags.add(a.slice(2));
@@ -130,8 +145,7 @@ function stabilityBody(config) {
    * an element whose classes CHANGE (a toggled state) simply drops out of the
    * intersection rather than being reported as a phantom move.
    */
-  const keyCounts = new Map();
-  function keyFor(el) {
+  function keyBase(el) {
     const parts = [];
     let node = el;
     for (let d = 0; node && node.nodeType === 1 && d < 4; d += 1) {
@@ -152,7 +166,19 @@ function stabilityBody(config) {
       parts.unshift(p);
       node = node.parentElement;
     }
-    const base = parts.join(">").slice(0, 200);
+    return parts.join(">").slice(0, 200);
+  }
+
+  /**
+   * Only elements that enter the snapshot may consume an ordinal. The
+   * reachability audit below deliberately looks at elements OUTSIDE the viewport,
+   * and if those took numbers from this counter, an element scrolling into view
+   * between two phases would renumber its siblings and the diff would report a
+   * row of phantom moves that describe the bookkeeping rather than the layout.
+   */
+  const keyCounts = new Map();
+  function keyFor(el) {
+    const base = keyBase(el);
     const n = (keyCounts.get(base) || 0) + 1;
     keyCounts.set(base, n);
     return n === 1 ? base : `${base}#${n}`;
@@ -302,7 +328,16 @@ function stabilityBody(config) {
   const interactiveSet = new Set(document.querySelectorAll(INTERACTIVE));
 
   // ------------------------------------------------------------- inventory
+  //
+  // `items` is CLIPPED TO THE VIEWPORT, which is right for every question about
+  // ink — an element off screen paints on no edge, crowds no margin and overlaps
+  // no thumb. It is wrong for exactly one question: whether a control can be
+  // REACHED. The severe cases there are the ones entirely off screen (the drawer
+  // shipped with „Изход" 173px below a panel that could not scroll), and this
+  // filter dropped them before anything could look. So they are collected here
+  // instead of discarded, and audited separately below.
   const items = [];
+  const offscreenInteractive = [];
   for (const el of document.querySelectorAll("*")) {
     const tag = el.tagName;
     if (
@@ -315,7 +350,19 @@ function stabilityBody(config) {
     if (isClippedAway(cs)) continue;
     const r = el.getBoundingClientRect();
     if (r.width <= 0 || r.height <= 0) continue;
-    if (r.bottom <= 0 || r.top >= VH || r.right <= 0 || r.left >= VW) continue;
+    if (r.bottom <= 0 || r.top >= VH || r.right <= 0 || r.left >= VW) {
+      if (interactiveSet.has(el)) {
+        offscreenInteractive.push({
+          key: keyBase(el),
+          x: Math.round(r.left * 10) / 10, y: Math.round(r.top * 10) / 10,
+          w: Math.round(r.width * 10) / 10, h: Math.round(r.height * 10) / 10,
+          interactive: true,
+          label: (el.getAttribute("aria-label") || el.textContent || "").trim().replace(/\s+/g, " ").slice(0, 40),
+          el,
+        });
+      }
+      continue;
+    }
 
     // Inside a dialog / overlay? Such elements are EXPECTED to appear and
     // vanish; they are excluded from the shift comparison (which is about the
@@ -487,12 +534,22 @@ function stabilityBody(config) {
   // so it is 393px tall on a landscape iPhone, and nine nav rows plus „Изход"
   // do not fit. „Настройки" rendered 100px past the bottom edge and „Изход"
   // 173px past it, with nothing to scroll.
+  // SCROLLING THE DOCUMENT DOES NOT MOVE A FIXED LAYER, and treating it as if it
+  // did made this check unable to report the one defect it was written for. The
+  // clause below used to be unconditional: `if (documentScrolls) scrollable =
+  // true`. Every dashboard surface scrolls its document, so the nav drawer's
+  // „Изход" — 173px below the bottom of a `fixed inset-0` layer, which no gesture
+  // on earth brings back — was laundered into "reachable" on exactly the screens
+  // it was broken on. A `position: fixed` ancestor pins the element to the
+  // viewport, so once the walk crosses one, only scrollers AT OR BELOW that layer
+  // can still save it; the page behind it is irrelevant.
   const unreachable = [];
-  for (const it of items) {
+  for (const it of [...items, ...offscreenInteractive]) {
     if (!it.interactive) continue;
     const past = Math.round(Math.max(it.y + it.h - VH, -it.y, it.x + it.w - VW, -it.x));
     if (past <= 1) continue;
     let scrollable = false;
+    let pinnedToViewport = getComputedStyle(it.el).position === "fixed";
     for (let n = it.el.parentElement; n; n = n.parentElement) {
       const cs = getComputedStyle(n);
       if (
@@ -501,12 +558,18 @@ function stabilityBody(config) {
       if (
         /(auto|scroll)/.test(cs.overflowX) && n.scrollWidth > n.clientWidth + 1
       ) { scrollable = true; break; }
+      if (cs.position === "fixed") pinnedToViewport = true;
       if (n === document.body) break;
     }
-    // The document itself scrolling counts too.
-    const se = document.scrollingElement || document.documentElement;
-    if (se.scrollHeight > se.clientHeight + 1) scrollable = true;
-    if (!scrollable) unreachable.push({ key: it.key, label: it.label, pastPx: past });
+    // The document itself scrolling counts too — but only for content the
+    // document actually carries.
+    if (!scrollable && !pinnedToViewport) {
+      const se = document.scrollingElement || document.documentElement;
+      if (se.scrollHeight > se.clientHeight + 1) scrollable = true;
+    }
+    if (!scrollable) {
+      unreachable.push({ key: it.key, label: it.label, pastPx: past, pinnedToViewport });
+    }
   }
 
   // ----------------------------------------------------------- 4. OVERLAPS
@@ -547,7 +610,7 @@ function stabilityBody(config) {
     });
   }
 
-  // ------------------------------------------------------------- 4. SCROLL
+  // ------------------------------------------------------------- 5. SCROLL
   const se = document.scrollingElement || document.documentElement;
 
   return {
@@ -567,12 +630,76 @@ function stabilityBody(config) {
     edge,
     edgeBlocking,
     margins,
+    // REPORT WHAT YOU MEASURE. `unreachable` was computed here and then left out
+    // of this object, so the one defect it exists to catch — a control rendered
+    // outside a container that cannot scroll — was calculated on every surface,
+    // on every device, and thrown away. It is the exact failure mode the README
+    // says this harness exists to end ("a check that silently measures nothing"),
+    // and it hid a real one: the nav drawer is `inset-y-0`, i.e. 393px tall in
+    // landscape, and „Настройки" and „Изход" rendered 100px and 173px past its
+    // bottom edge with nothing to scroll. That was found by LOOKING at a capture,
+    // which is not a thing a sweep is allowed to depend on.
+    unreachable,
     overlaps,
     occluded,
     // The snapshot itself, for the before/after diff. `el` cannot cross the
     // bridge, so it is stripped here rather than in every caller.
     snapshot: items.map(({ el, ...rest }) => rest),
   };
+}
+
+// =============================================================================
+// SETTLING — because a fixed sleep against an async re-render measures the sleep.
+//
+// The portrait driving shell publishes its own height from `visualViewport`
+// through React state (LessonPlayShell's useVisualViewportHeight), so after the
+// viewport changes there is a window in which the DOM knows the new size and the
+// shell has not re-rendered at it yet. Traced on this box with
+// tools/mobile/toolbar-trace.mjs: at +100ms after the restore, --sim-vh was still
+// 762px against a 852px viewport; by +700ms it was 852px and correct.
+//
+// The probe waited exactly 700ms. So the same code, the same app and the same
+// device reported `shift(toolbar) = 0` on one run and `90` on the next — a 90px
+// displacement of the cluster, the speedometer and the menu buttons that existed
+// only inside the measuring instrument's own timing. Raising the sleep to 2s
+// would have "fixed" it and would have been laundering: the honest instrument
+// waits for the layout to STOP MOVING, and then reports how long that took, so a
+// genuinely slow reflow shows up as the number it is instead of hiding under a
+// longer sleep.
+// =============================================================================
+
+/** A cheap whole-page geometry hash. Two equal consecutive reads = at rest. */
+function geometryFingerprint() {
+  let acc = 0;
+  let n = 0;
+  for (const el of document.querySelectorAll("*")) {
+    const r = el.getBoundingClientRect();
+    if (r.width <= 0 && r.height <= 0) continue;
+    acc += r.left * 31 + r.top * 17 + r.width * 7 + r.height * 3;
+    n += 1;
+  }
+  return `${n}:${Math.round(acc * 10)}`;
+}
+
+/**
+ * Wait until the page's geometry stops changing.
+ * @returns {Promise<{ms:number, settled:boolean, samples:number}>}
+ */
+async function settle(page, { minMs = 150, pollMs = 100, timeoutMs = 6000 } = {}) {
+  const started = Date.now();
+  await page.waitForTimeout(minMs);
+  let previous = await page.evaluate(geometryFingerprint).catch(() => null);
+  let samples = 1;
+  while (Date.now() - started < timeoutMs) {
+    await page.waitForTimeout(pollMs);
+    const current = await page.evaluate(geometryFingerprint).catch(() => null);
+    samples += 1;
+    if (current !== null && current === previous) {
+      return { ms: Date.now() - started, settled: true, samples };
+    }
+    previous = current;
+  }
+  return { ms: Date.now() - started, settled: false, samples };
 }
 
 // =============================================================================
@@ -638,6 +765,14 @@ const surfaces =
 
 mkdirSync(OUT_DIR, { recursive: true });
 
+const injectedCss = args.injectCss ? readFileSync(args.injectCss, "utf8") : null;
+if (injectedCss) {
+  console.log(
+    `[stability] INJECTING ${args.injectCss} into every page — this is a NEGATIVE CONTROL run. ` +
+      `Findings below describe the injected regression, not the shipped app.`,
+  );
+}
+
 const credentials =
   process.env.KNIJKA_MOBILE_EMAIL && process.env.KNIJKA_MOBILE_PASSWORD
     ? { email: process.env.KNIJKA_MOBILE_EMAIL, password: process.env.KNIJKA_MOBILE_PASSWORD }
@@ -694,8 +829,10 @@ try {
           if (surface.waitFor) {
             await page.waitForSelector(surface.waitFor, { timeout: 180_000, state: "attached" });
           }
+          if (injectedCss) await page.addStyleTag({ content: injectedCss });
           if (surface.prepare) await surface.prepare(page);
           await page.waitForTimeout(surface.settleMs ?? 1200);
+          row.settle = { base: await settle(page) };
 
           // REFUSE TO MEASURE AN ERROR BOUNDARY. app/error.tsx renders a
           // perfectly well-behaved little panel — correct margins, no overflow,
@@ -721,6 +858,7 @@ try {
             viewport: base.viewport, insets: base.insets, document: base.document,
             counts: base.counts, edge: base.edge, edgeBlocking: base.edgeBlocking,
             margins: base.margins, overlaps: base.overlaps, occluded: base.occluded,
+            unreachable: base.unreachable,
           });
 
           // ---- THE POPUP TEST -------------------------------------------
@@ -758,16 +896,21 @@ try {
             row.overlayTriggerMissing = true;
           }
           if (opened) {
-            await page.waitForTimeout(900);
+            row.settle.overlayOpen = await settle(page);
             const open = await page.evaluate(stabilityBody, probeArgs(device, "overlay-open"));
             row.overlayEdge = open.edge;
             row.overlayEdgeBlocking = open.edgeBlocking;
             row.overlayOverlaps = open.overlaps;
             row.overlayOccluded = open.occluded;
+            // The drawer's own rows only exist in THIS phase, so the base
+            // measurement can never see them. Measuring reachability only at
+            // rest is why the „Изход" that fell off the landscape drawer had to
+            // be found by eye.
+            row.overlayUnreachable = open.unreachable;
             row.shiftOnOpen = diff(base.snapshot, open.snapshot);
 
             await page.keyboard.press("Escape").catch(() => {});
-            await page.waitForTimeout(900);
+            row.settle.overlayClose = await settle(page);
             const closed = await page.evaluate(stabilityBody, probeArgs(device, "overlay-closed"));
             row.shiftOnClose = diff(base.snapshot, closed.snapshot);
             row.overlayTested = true;
@@ -780,7 +923,7 @@ try {
           // the layout viewport by the same amount, snapshot, restore.
           const vp = page.viewportSize();
           await page.setViewportSize({ width: vp.width, height: Math.max(240, vp.height - TOOLBAR_PX) });
-          await page.waitForTimeout(700);
+          row.settle.toolbarShown = await settle(page);
           const shrunk = await page.evaluate(stabilityBody, probeArgs(device, "toolbar-shown"));
           // WHAT COUNTS AS "CLIPPED BY THE TOOLBAR". Content that runs past the
           // fold on a scrolling page is not clipped, it is below the fold — the
@@ -798,7 +941,7 @@ try {
             docScrollY: shrunk.document.scrollY,
           };
           await page.setViewportSize(vp);
-          await page.waitForTimeout(700);
+          row.settle.toolbarHidden = await settle(page);
           const restored = await page.evaluate(stabilityBody, probeArgs(device, "toolbar-hidden"));
           row.shiftOnToolbar = diff(base.snapshot, restored.snapshot);
 
@@ -815,6 +958,7 @@ try {
               `edge=${row.edgeBlocking.length}/${row.edge.length} ` +
               `+overlay=${row.overlayEdgeBlocking ? row.overlayEdgeBlocking.length : "-"} ` +
               `margins=${row.margins.minLeftPx}/${row.margins.minRightPx} ` +
+              `unreach=${row.unreachable.length}/${row.overlayUnreachable ? row.overlayUnreachable.length : "-"} ` +
               `overlap=${row.overlaps.length} occl=${row.occluded.length} ` +
               `shift(open)=${row.shiftOnOpen ? row.shiftOnOpen.worstPx : "-"} ` +
               `shift(close)=${row.shiftOnClose ? row.shiftOnClose.worstPx : "-"} ` +
@@ -855,41 +999,92 @@ for (const [p, l] of orientationPairs) {
   }
 }
 
-const report = { engine: engine.name, baseUrl: url, at: new Date().toISOString(), rows, orientation };
-writeFileSync(join(OUT_DIR, "stability.json"), JSON.stringify(report, null, 2));
+// A NEGATIVE-CONTROL RUN MUST NOT BE ABLE TO POSE AS THE REPORT. `--inject-css`
+// deliberately breaks the app, and writing that to `stability.json` puts a file
+// full of real-looking findings exactly where anything reading this harness looks
+// for the verdict — the same "it looks like data" failure the auth and offline
+// refusals exist to prevent. It has already happened once: two fixture runs
+// overwrote a clean 24-row sweep with one injected row.
+const report = {
+  engine: engine.name,
+  baseUrl: url,
+  at: new Date().toISOString(),
+  injectedCss: args.injectCss ?? null,
+  rows,
+  orientation,
+};
+const reportName = args.injectCss
+  ? `stability-INJECTED-${basename(args.injectCss).replace(/\.css$/, "")}.json`
+  : "stability.json";
+writeFileSync(join(OUT_DIR, reportName), JSON.stringify(report, null, 2));
 
 // ----------------------------------------------------------------- the table
 console.log(`\nSTABILITY — ${engine.name} @ ${url}\n`);
-const H = ["route", "device", "edge!", "+ovl!", "margins L/R", "ovlp", "occl", "open", "close", "bar", "clip"];
+const H = ["route", "device", "edge!", "+ovl!", "margins L/R", "unreach", "ovlp", "occl", "open", "close", "bar", "clip", "settle"];
 console.log(
   `  ${H[0].padEnd(18)}${H[1].padEnd(20)}${H[2].padEnd(7)}${H[3].padEnd(7)}${H[4].padEnd(14)}` +
-  `${H[5].padEnd(6)}${H[6].padEnd(6)}${H[7].padEnd(7)}${H[8].padEnd(7)}${H[9].padEnd(6)}${H[10]}`,
+  `${H[5].padEnd(9)}${H[6].padEnd(6)}${H[7].padEnd(6)}${H[8].padEnd(7)}${H[9].padEnd(7)}${H[10].padEnd(6)}${H[11].padEnd(6)}${H[12]}`,
 );
 let failed = false;
 for (const r of rows) {
   if (!r.ok) { failed = true; console.log(`  ${r.route.padEnd(18)}${r.device.padEnd(20)}ERROR ${r.error}`); continue; }
   const overlayEdge = r.overlayEdgeBlocking ? r.overlayEdgeBlocking.length : 0;
+  const unreach = r.unreachable.length + (r.overlayUnreachable?.length ?? 0);
+  const settles = Object.values(r.settle ?? {});
+  const worstSettle = settles.reduce((m, s) => Math.max(m, s.ms), 0);
+  const neverSettled = settles.some((s) => !s.settled);
   const bad =
     r.edgeBlocking.length > 0 || overlayEdge > 0 ||
-    r.overlaps.length > 0 || r.occluded.length > 0 ||
+    r.overlaps.length > 0 || r.occluded.length > 0 || unreach > 0 ||
     (r.shiftOnOpen?.worstPx ?? 0) > 0 || (r.shiftOnClose?.worstPx ?? 0) > 0 ||
     r.shiftOnToolbar.worstPx > 0 || r.toolbar.clippedPinned > 0 ||
-    (r.margins.deltaPx ?? 0) > 2;
+    (r.margins.deltaPx ?? 0) > 2 ||
+    neverSettled || worstSettle > SETTLE_BUDGET_MS;
   if (bad) failed = true;
+  r.worstSettleMs = worstSettle;
+  r.neverSettled = neverSettled;
   console.log(
     `  ${r.route.padEnd(18)}${r.device.padEnd(20)}` +
     `${String(r.edgeBlocking.length).padEnd(7)}` +
     `${String(r.overlayEdgeBlocking ? overlayEdge : "-").padEnd(7)}` +
     `${`${r.margins.minLeftPx}/${r.margins.minRightPx}`.padEnd(14)}` +
+    `${`${r.unreachable.length}/${r.overlayUnreachable ? r.overlayUnreachable.length : "-"}`.padEnd(9)}` +
     `${String(r.overlaps.length).padEnd(6)}${String(r.occluded.length).padEnd(6)}` +
     `${String(r.shiftOnOpen ? r.shiftOnOpen.worstPx : "-").padEnd(7)}` +
     `${String(r.shiftOnClose ? r.shiftOnClose.worstPx : "-").padEnd(7)}` +
-    `${String(r.shiftOnToolbar.worstPx).padEnd(6)}${r.toolbar.clippedPinned}` +
+    `${String(r.shiftOnToolbar.worstPx).padEnd(6)}${String(r.toolbar.clippedPinned).padEnd(6)}` +
+    `${worstSettle}${neverSettled ? "!" : ""}` +
     (bad ? "   <--" : ""),
   );
 }
-console.log("\n  edge! = BLOCKING safe-area findings (nothing in the CSS pays that inset).");
-console.log("  +ovl! = the same, measured with the popup open. Advisory findings are below.");
+console.log("\n  edge!   = BLOCKING safe-area findings (nothing in the CSS pays that inset).");
+console.log("  +ovl!   = the same, measured with the popup open. Advisory findings are below.");
+console.log("  unreach = controls outside the viewport with NOTHING that scrolls (resting / popup open).");
+console.log(
+  `  settle  = worst ms for the layout to STOP MOVING after a state change ` +
+    `(budget ${SETTLE_BUDGET_MS}ms; "!" = never settled). Every shift above is measured AFTER this.`,
+);
+
+console.log("\nSETTLE DETAIL (ms to come to rest, per phase)");
+for (const r of rows) {
+  if (!r.ok || !r.settle) continue;
+  const parts = Object.entries(r.settle).map(
+    ([phase, s]) => `${phase} ${s.ms}${s.settled ? "" : "!"}`,
+  );
+  console.log(`  ${r.route.padEnd(18)}${r.device.padEnd(20)}${parts.join("  ")}`);
+}
+
+console.log("\nUNREACHABLE DETAIL — a control off-screen that no gesture brings back");
+for (const r of rows) {
+  if (!r.ok) continue;
+  for (const [when, list] of [["base", r.unreachable], ["popup", r.overlayUnreachable || []]]) {
+    if (list.length === 0) continue;
+    console.log(`  ${r.route} · ${r.device} · ${when}`);
+    for (const u of list.slice(0, 8)) {
+      console.log(`      ${String(u.pastPx).padStart(5)}px past the edge, no scroller  ${(u.label || u.key).slice(0, 60)}`);
+    }
+  }
+}
 
 console.log("\nEDGE / SAFE-AREA DETAIL — BLOCKING ONLY");
 for (const r of rows) {
@@ -946,5 +1141,5 @@ for (const o of orientation) {
   );
 }
 
-console.log(`\n  captures + json: ${OUT_DIR}`);
+console.log(`\n  captures + json: ${join(OUT_DIR, reportName)}`);
 process.exit(failed ? 1 : 0);

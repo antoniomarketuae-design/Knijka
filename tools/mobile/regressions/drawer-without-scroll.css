@@ -1,0 +1,25 @@
+/* -----------------------------------------------------------------------------
+ * A NEGATIVE CONTROL for stability-probe.mjs's `unreach` column.
+ *
+ *   node tools/mobile/stability-probe.mjs --base-url http://localhost:3520 \
+ *     -r dashboard -d iphone16-landscape \
+ *     --inject-css tools/mobile/regressions/drawer-without-scroll.css
+ *
+ * This reproduces the nav drawer EXACTLY as it shipped before phase 7: a panel
+ * pinned to the viewport by `fixed inset-0`, `inset-y-0` tall, with no scroller,
+ * holding nine nav rows plus „Изход". On a 393px-tall landscape iPhone the last
+ * two rows render below the panel's bottom edge and no gesture brings them back.
+ *
+ * WHY THIS FILE EXISTS. `unreach` reported 0/0 on all 24 rows the first time it
+ * was ever printed, which is the shape of both a fix that works and a check that
+ * cannot fire. It was the second: the reachability walk trusted the DOCUMENT's
+ * scrollbar, and every dashboard surface has one, so an element pinned inside a
+ * `fixed` layer was always called reachable. Running the probe with this file
+ * must produce a non-empty UNREACHABLE DETAIL section and exit 1. If it ever
+ * exits 0 again, the instrument has gone blind, not the app healthy.
+ * ---------------------------------------------------------------------------*/
+
+#mobile-nav {
+  overflow-y: visible !important;
+  overscroll-behavior: auto !important;
+}

@@ -153,9 +153,11 @@ for iOS's collapsing toolbar (Playwright cannot hide a real one).
 | --- | --- | --- |
 | `edge!` / `+ovl!` | "controls not respecting safe areas", "controls touching screen edges" | elements inside the real device inset, resting and with the popup open |
 | `margins L/R` | "uneven margins" | narrowest gap to the left edge vs to the right |
+| `unreach` | — | controls outside the viewport with **nothing that can scroll** (resting / popup open) |
 | `ovlp` / `occl` | "overlapping components" | interactive pairs whose hit areas intersect; and `elementFromPoint` at a control's own centre returning something else |
 | `open` / `close` | "elements moving when popups appear" | max positional shift of everything outside the overlay |
 | `bar` / `clip` | "the left and right sides are not stabalized" | shift after the toolbar takes 90px and gives it back; pinned controls cut off |
+| `settle` | "elements shifting position" | ms for the layout to stop moving after each state change |
 
 Two accounting rules it took a wrong answer to learn, both documented at their
 call site:
@@ -170,6 +172,62 @@ call site:
   `cssRules`) reported the entire landscape column of the app as unprotected.
 * **Position is the verdict; size is reported beside it.** A menu that grows
   because it just opened has not moved, and nothing moved with it.
+
+* **Report what you measure.** `unreachable` was computed on every surface and
+  every device from the day it was written and left out of the returned object,
+  so the one defect it exists to catch was calculated and thrown away — and that
+  defect was live: the nav drawer's „Изход" sat 173px below a panel that could
+  not scroll. It had to be found by looking at a capture.
+
+* **Wait for rest; never sleep at a state change.** The probe used to sleep 700ms
+  after resizing the viewport. The portrait driving shell publishes its height
+  from `visualViewport` through React state, and on this box it needs ~900ms to
+  re-render — so the same code, app and device reported `bar = 0` on one run and
+  `90` on the next, a 90px displacement of the cluster and speedometer that
+  existed only in the instrument's timing. Every phase now polls a whole-page
+  geometry fingerprint until two consecutive reads agree, and **reports how long
+  that took** (`settle`), because raising the sleep would have hidden the one
+  number worth having. `tools/mobile/toolbar-trace.mjs` is the diagnostic that
+  established the mechanism.
+
+---
+
+## Negative controls — the sweep must be able to fail
+
+A column that has only ever printed `0` is indistinguishable from a column that
+cannot fire. Two of these were found the same day they were first printed:
+`unreach` reported `0/0` on all 24 rows because its reachability walk trusted the
+**document's** scrollbar, and every dashboard surface has one — so a control
+pinned inside a `position: fixed` layer was always called reachable. It also only
+looked at elements intersecting the viewport, which discards the severe cases by
+construction.
+
+So each finding class has a fixture that reproduces the defect it is meant to
+catch, and `--inject-css` applies it to the live app without editing source:
+
+```bash
+# `unreach` — the drawer as it shipped, with no scroller. Expect 3 findings, exit 1.
+node tools/mobile/stability-probe.mjs --base-url http://localhost:3520 \
+  -r dashboard -d iphone16-landscape \
+  --inject-css tools/mobile/regressions/drawer-without-scroll.css
+
+# `edge!` — the driving controls with their env() offsets replaced by bare px.
+#           Expect 6 BLOCKING findings, exit 1.
+node tools/mobile/stability-probe.mjs --base-url http://localhost:3520 \
+  -r simulator-drive -d iphone16-landscape \
+  --inject-css tools/mobile/regressions/controls-without-insets.css
+```
+
+The second one matters more than it looks. **Every** control on the landscape
+driving screen sits physically inside the iPhone's 59px notch band — the turn
+signals at x=2, the mirror glances at x=46, the lesson menu at x=8 — and every
+one is cleared as `ok:handled`. That verdict cannot be a pixel measurement:
+desktop WebKit resolves `env(safe-area-inset-*)` to 0, so a control that handles
+the notch correctly renders at exactly the same x as one that ignores it. It is
+read from the authored CSS instead, which is only trustworthy for as long as
+removing that authoring still turns the column red.
+
+If either fixture exits 0, the instrument has gone blind — not the app healthy.
 
 ## Devices
 

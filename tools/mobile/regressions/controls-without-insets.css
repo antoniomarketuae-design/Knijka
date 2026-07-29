@@ -1,0 +1,44 @@
+/* -----------------------------------------------------------------------------
+ * A NEGATIVE CONTROL for stability-probe.mjs's `edge!` column.
+ *
+ *   node tools/mobile/stability-probe.mjs --base-url http://localhost:3520 \
+ *     -r simulator-drive -d iphone16-landscape \
+ *     --inject-css tools/mobile/regressions/controls-without-insets.css
+ *
+ * WHY THIS FILE EXISTS. Every control on the landscape driving screen sits
+ * physically inside the iPhone's 59px notch band — the turn signals at x=2, the
+ * mirror glances at x=46, the lesson menu at x=8 — and every one of them is
+ * cleared as `ok:handled`. That verdict is not a pixel measurement and cannot be:
+ * Playwright's WebKit is the desktop port, so env(safe-area-inset-*) resolves to
+ * 0 and a control that handles the notch CORRECTLY renders at exactly the same
+ * x as one that ignores it (see the long note in stability-probe.mjs). The
+ * verdict is read from the AUTHORED CSS instead.
+ *
+ * Which means the `edge!` column is only trustworthy if it still goes red when
+ * that authoring is taken away. This file takes it away: it replaces
+ * TouchControls' `left: calc(0.125rem + env(safe-area-inset-left, 0px))` with a
+ * bare pixel offset, which is precisely the mistake the classifier exists to
+ * catch. `!important` because the app sets these inline, and inline wins.
+ *
+ * Expected: BLOCKING findings on the left/right edges for the signal rows, the
+ * utility row and both pads, and exit 1. If this ever exits 0, the classifier has
+ * stopped being able to see an unprotected control.
+ * ---------------------------------------------------------------------------*/
+
+/* The two pads (steering, throttle) — they normally GROW by the inset. */
+[aria-label^="Волан"] {
+  left: 0 !important;
+  width: 13rem !important;
+  height: 9rem !important;
+}
+[aria-label^="Ход —"] {
+  right: 0 !important;
+  width: 11rem !important;
+  height: 11rem !important;
+}
+
+/* The signal / glance / utility rows and the lesson menu. */
+[data-sim-compact="on"] .absolute.flex.items-center {
+  left: 2px !important;
+  right: auto !important;
+}

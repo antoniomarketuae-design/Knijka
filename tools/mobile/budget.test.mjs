@@ -17,6 +17,8 @@
 // The unit tests below are NOT skippable: they check the harness's own
 // arithmetic and its refusals, and they run everywhere, every time.
 // -----------------------------------------------------------------------------
+import { readFileSync } from "node:fs";
+
 import { describe, expect, it } from "vitest";
 
 import { evaluate } from "./lib/budget.mjs";
@@ -132,6 +134,71 @@ describe("the harness itself", () => {
       expect(route.contentSelectors.length).toBeGreaterThan(0);
       expect(route.budget.contentMin).toBeGreaterThan(0);
     }
+  });
+});
+
+/**
+ * THE STABILITY PROBE MUST STAY ABLE TO FAIL.
+ *
+ * Two of its columns were found to be structurally incapable of reporting the
+ * defect they exist for, on the day they first printed a zero: `unreachable` was
+ * computed and left out of the returned object, and the reachability walk trusted
+ * the DOCUMENT's scrollbar — which every dashboard surface has — so a control
+ * pinned inside a `position: fixed` layer was always called reachable. Both
+ * printed a clean 0/0 across all 24 rows while the nav drawer's „Изход" sat 173px
+ * below a panel that could not scroll.
+ *
+ * The answer is the fixtures under `regressions/`, applied to the live app with
+ * `--inject-css` (see README, "Negative controls"). They need a server, a
+ * database and WebKit, so they cannot run here — but the machinery they depend on
+ * is cheap to guard, and this is what says so if it is ever refactored away.
+ */
+describe("the stability probe's negative controls", () => {
+  const PROBE = readFileSync(new URL("./stability-probe.mjs", import.meta.url), "utf8");
+
+  it("still accepts --inject-css and applies it to every measured page", () => {
+    expect(PROBE).toContain('a === "--inject-css"');
+    expect(PROBE).toContain("page.addStyleTag({ content: injectedCss })");
+  });
+
+  it.each([
+    ["drawer-without-scroll.css", "#mobile-nav"],
+    ["controls-without-insets.css", 'aria-label^="Волан"'],
+  ])("ships the %s fixture, and it still targets the real element", (file, needle) => {
+    const css = readFileSync(new URL(`./regressions/${file}`, import.meta.url), "utf8");
+    expect(css).toContain(needle);
+  });
+
+  /**
+   * The two rules that made `unreach` real. A `fixed` ancestor has to defeat the
+   * document's own scrollbar, and elements entirely outside the viewport have to
+   * be audited — they are where the severe cases live, and the inventory clips
+   * them away for every other question on purpose.
+   */
+  it("does not let the document's scrollbar excuse a viewport-pinned control", () => {
+    expect(PROBE).toContain("if (!scrollable && !pinnedToViewport) {");
+    expect(PROBE).toContain('if (cs.position === "fixed") pinnedToViewport = true;');
+  });
+
+  it("audits reachability for controls outside the viewport too", () => {
+    expect(PROBE).toContain("const unreachable = [];");
+    expect(PROBE).toContain("for (const it of [...items, ...offscreenInteractive]) {");
+    // …and the finding actually leaves the page. This is the exact line whose
+    // absence made the whole check invisible.
+    expect(PROBE).toMatch(/\n\s*unreachable,\n/);
+  });
+
+  /**
+   * No fixed sleep at a state change. The 700ms one produced a phantom 90px
+   * shift of the driving cluster on alternate runs.
+   */
+  it("waits for the layout to come to rest instead of sleeping", () => {
+    expect(PROBE).toContain("function geometryFingerprint()");
+    for (const phase of ["toolbarShown", "toolbarHidden", "overlayOpen", "overlayClose"]) {
+      expect(PROBE).toContain(`row.settle.${phase} = await settle(page)`);
+    }
+    expect(PROBE).not.toContain("await page.waitForTimeout(700)");
+    expect(PROBE).not.toContain("await page.waitForTimeout(900)");
   });
 });
 
