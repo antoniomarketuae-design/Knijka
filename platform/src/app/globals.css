@@ -719,6 +719,129 @@ body {
         );
   }
 
+  /* ==========================================================
+     THE DECK — the room the instruments sit in.
+
+     `.haze` above is the primitive doc 83 §6 introduced, and it is still the
+     right answer for a BOUNDED panel (the auth card, /pricing's showroom band,
+     the hazard stage). What it could not be is a WORLD: three gradients have no
+     horizon line, no distance and nothing in them that could only belong to
+     this product. Founder review, verbatim: „currently this dark background is
+     purely old and not futuristic".
+
+     So the (dashboard) group's viewport plane gets the deck instead —
+     components/deck, which draws the landing page's own road at dusk from the
+     driver's seat. The classes here are only the parts that must be
+     VIEWPORT-relative rather than scene-relative; everything with geometry in
+     it is SVG, generated from @/lib/visual/roadPlate.
+
+     CONTRAST IS UNTOUCHED BY CONSTRUCTION, and this is the load-bearing claim.
+     Every colour the deck paints is at or under `--haze-warm` over
+     `--background` (#0c1724, relative luminance 0.008183) — the brightest pixel
+     `.haze` ALREADY painted on this same plane. sRGB compositing and gradient
+     interpolation are per-channel linear blends and luminance is a
+     positive-weighted sum of a monotonic transfer, so no blend of ingredients
+     under the ceiling can exceed it. deckScene.ts states the argument;
+     deckScene.test.ts checks every ingredient. Nothing here uses
+     `mix-blend-mode`, a filter, or an additive layer — the only three ways out
+     of that proof.
+     ========================================================== */
+  .deck {
+    pointer-events: none;
+    /* The ground under the drawing, so a sub-pixel gap at any aspect ratio can
+       never show the UA canvas through. */
+    background-color: var(--background);
+    /* `isolate` keeps the drift's compositing to this subtree. */
+    isolation: isolate;
+  }
+
+  /* The cabin: the frame you are looking THROUGH. Viewport-relative on purpose
+     — a vignette belongs to the windscreen, not to the scene, so it must not
+     scale or crop with the drawing behind it.
+
+     Pure darkening. Every stop is black at some alpha, so this layer can only
+     ever IMPROVE the contrast of anything drawn over the deck; it is the one
+     part of the composition that needs no ceiling argument at all. */
+  .deck-cabin {
+    pointer-events: none;
+    background:
+      /* the A-pillars and the roof lip — the frame closing in at the edges */
+      radial-gradient(
+        135% 105% at 50% 46%,
+        transparent 42%,
+        rgba(0, 0, 0, 0.62) 100%
+      ),
+      /* the header band. The topbar sits here and its own surface is opaque,
+         so this is about the strip either side of it reading as moulding. */
+        linear-gradient(
+          to bottom,
+          rgba(0, 0, 0, 0.55) 0%,
+          transparent 16%
+        ),
+      /* and the footer lip, so the plane resolves rather than being cut off */
+        linear-gradient(to top, rgba(0, 0, 0, 0.4) 0%, transparent 12%);
+  }
+
+  /* THE ONE MOVING THING, and only on a machine that asked for it
+     (components/deck/deckCapability.ts).
+
+     240 s for one traverse. That is ~0.4 % of the screen width per second: you
+     cannot watch it move, and you can tell it moved if you look away and back.
+     That is the entire brief for motion behind text — a hero is watched, a deck
+     is inhabited, and anything faster reads as a screensaver rather than as
+     atmosphere.
+
+     TRANSFORM ONLY. No repaint, no layout, no main-thread work; the compositor
+     moves one already-rasterised quad. `will-change: transform` promotes it
+     once rather than on every frame. It is also the ONLY animated thing on the
+     plane, so a machine that cannot afford it is one attribute away from
+     stillness — and `prefers-reduced-motion` shuts it off here as a backstop
+     even if the JS door somehow said yes. */
+  .deck-drift {
+    pointer-events: none;
+    position: absolute;
+    /* A band around the horizon. The drawn horizon sits at 56 % of the plate,
+       and `slice` keeps it near that fraction at any aspect, so a 26 %-tall
+       band centred there covers it at every viewport this app supports. */
+    top: 43%;
+    height: 26%;
+    left: 0;
+    width: 44%;
+    /* Warm, wide and edgeless: `DECK_SUN_WARM` at the alpha the plate's own sun
+       uses. Soft enough that there is no boundary to track with the eye. */
+    background: radial-gradient(
+      closest-side,
+      rgba(24, 19, 16, 0.7) 0%,
+      rgba(24, 19, 16, 0.32) 45%,
+      transparent 100%
+    );
+    will-change: transform;
+    transform: translate3d(-30%, 0, 0);
+    animation: deck-drift 240s linear infinite alternate;
+  }
+
+  /* Paused, not unmounted: dropping the element makes the compositor rebuild
+     the layer on every tab switch, which is more work than the animation it
+     was saving. DeckMotion sets the attribute from `document.hidden`. */
+  .deck-drift[data-deck-paused] {
+    animation-play-state: paused;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .deck-drift {
+      animation: none;
+    }
+  }
+
+  @keyframes deck-drift {
+    from {
+      transform: translate3d(-30%, 0, 0);
+    }
+    to {
+      transform: translate3d(112%, 0, 0);
+    }
+  }
+
   /* The instrument grid, faded out at the edges. `.hud-grid` (kept, 8 uses)
      tiles edge to edge; a grid that stops at a hard boundary announces the
      div it lives in. This one dissolves. */
@@ -1218,8 +1341,19 @@ body {
 
   /* THE BOARD. `perspective` here rather than on each tile so all sixteen
      share ONE vanishing point — per-element perspective gives every tile its
-     own camera, which is the tell that a grid was faked rather than placed. */
-  .deck {
+     own camera, which is the tell that a grid was faked rather than placed.
+
+     NAMED `.topic-deck`, NOT `.deck`, AND THAT IS NOT COSMETIC. The 3D backdrop
+     added higher up this file also claims `.deck`, and its first declaration is
+     `pointer-events: none` — which this rule, 600 lines later, does not
+     override. The sixteen topic tiles inherited it and STOPPED BEING TAPPABLE:
+     WebKit at 393x852 refused every click on the theory hub with
+     „<div class="relative isolate pb-16"> intercepts pointer events", because
+     the hit test fell straight through the grid to its wrapper. The backdrop's
+     `background-color: var(--background)` came along too and painted over the
+     floor plane below. Two generic names in one global sheet is the whole bug;
+     the surface-specific one is the fix. */
+  .topic-deck {
     perspective: 1100px;
     perspective-origin: 50% 40%;
   }
@@ -1320,6 +1454,14 @@ body {
      Esc, the top layer and a real focus trap with it for free. */
   .deck-sheet {
     width: min(34rem, 100vw);
+    /* THE UA CAPS DIALOGS AND IT WAS COSTING 38 PIXELS OF PHONE.
+       Every engine ships `dialog { max-width: calc(100% - 6px - 2em) }`, so
+       `width: 100vw` on a 393px screen resolved to a 355px sheet with a 19px
+       strip of dead backdrop down each side — measured in WebKit at 393x852.
+       On a bottom sheet that is exactly the „smaller copy of the desktop
+       version" the founder rejected. Above the phone breakpoint the panel is
+       centred and 34rem, so the cap never applied there anyway. */
+    max-width: 100vw;
     max-height: 86dvh;
     margin: auto auto 0;
     padding: 0;
@@ -1623,7 +1765,7 @@ body {
    flat and face the reader. Nothing legible is ever rotated in Z — a title set
    at 13px in Cyrillic loses more to a 6° yaw than the yaw buys back.
 
-   WHERE THE PIECES LIVE. The component rules (.gauge, .deck, .gauge-tile,
+   WHERE THE PIECES LIVE. The component rules (.gauge, .topic-deck, .gauge-tile,
    .deck-sheet) are in the single `@layer components` block above, with
    everything else — this file has exactly ONE layer block, and
    components/ui/checkControl.test.ts asserts that, because the forced-colors

@@ -193,6 +193,12 @@ describe("the call sites use the shared helper", () => {
   const CALL_SITES = [
     "../theory/TopicGauge.tsx",
     "../theory/TopicSheet.tsx",
+    // The fourth copy, and the one this list missed: SectionCard paints a
+    // mastery figure for every section row in the topic sheet, and it carried
+    // its OWN `masteryColor()` — including the bug this module was written to
+    // end, a `--border-strong` hairline used as ink at 11px. Listed now, so the
+    // next copy cannot hide behind "the table only had three entries".
+    "../theory/SectionCard.tsx",
     "../theory/TheoryFocus.tsx",
     "../dashboard/TopicMasteryGrid.tsx",
   ] as const;

@@ -32,7 +32,7 @@ import {
 } from "@/modules/security";
 import { tutorAllowanceSpentReplyBg } from "./allowance";
 import { checkDailyBudget, sofiaDayKey, TUTOR_BUDGET_REPLY_BG } from "./budget";
-import { computeCostMicroUsd } from "./cost";
+import { computeCostMicroUsd, rateForModel } from "./cost";
 import { getTutorModel, isTutorEnabled } from "./model";
 import { buildTutorSystemPrompt, extractCitations } from "./prompt";
 import {
@@ -227,7 +227,9 @@ export async function askTutor(
   if (!isTutorEnabled()) {
     // The page/action layer gates on isTutorEnabled() and shows the
     // "активира скоро" state — reaching this is a programming error.
-    throw new Error("askTutor: tutor is not enabled (missing ANTHROPIC_API_KEY)");
+    throw new Error(
+      "askTutor: tutor is not enabled (no provider configured — set ANTHROPIC_API_KEY, or TUTOR_OPENAI_API_KEY + TUTOR_OPENAI_BASE_URL)",
+    );
   }
 
   const store = getTutorStore();
@@ -344,10 +346,15 @@ export async function askTutor(
     maxTokens: TUTOR_MAX_REPLY_TOKENS,
   });
 
-  // Cost accounting from the API usage block — NEVER skipped.
+  // Cost accounting from the API usage block — NEVER skipped, and priced at
+  // the rate of the model the PROVIDER says it billed (cost.ts rateForModel).
+  // The tutor can now reach a model through either the Anthropic API or an
+  // OpenAI-compatible gateway, and the money ceiling below is only real if the
+  // gateway's own price sheet is what feeds it.
   const costMicroUsd = computeCostMicroUsd(
     result.inputTokens,
     result.outputTokens,
+    rateForModel(result.model),
   );
 
   // Citations validated against the injected materials — a marker the model

@@ -17,25 +17,52 @@
  * simulator: no physics, no world streaming, no rule engine, and float
  * precision that cannot degrade because nothing accumulates (both scroll
  * functions wrap).
+ *
+ * WHERE THE ROAD ITSELF NOW LIVES. The lane widths, the dash cadence, the
+ * pinhole projection and the Vitosha crest moved to `@/lib/visual/roadPlate`
+ * when the authenticated app asked for the SAME road from the driver's seat
+ * (components/deck). Nothing about the hero changed: every name this module
+ * used to own is re-exported below with the identical value, and the plate's
+ * camera is one of that module's `PlateCamera`s. What changed is that there is
+ * now exactly one definition of where a Bulgarian lane line goes, instead of
+ * one per surface that draws one.
  */
+
+import {
+  dashesOnPlate,
+  HERO_PLATE_CAMERA,
+  ROAD_DASH_GAP_M,
+  ROAD_DASH_MARK_M,
+  ROAD_DASH_PERIOD_M,
+  ROAD_LANE_WIDTH_M,
+  ROAD_MARK_WIDTH_M,
+  ROAD_WIDTH_M,
+  azimuthXOnPlate,
+  elevationYOnPlate,
+  projectOnPlate,
+  type PlateDash,
+} from "@/lib/visual/roadPlate";
+
+export {
+  PLATE_RIDGE_AZ_FROM,
+  PLATE_RIDGE_AZ_STEP,
+  PLATE_RIDGE_AZ_TO,
+  PLATE_RIDGE_POINTS,
+} from "@/lib/visual/roadPlate";
+export type { PlateDash } from "@/lib/visual/roadPlate";
 
 // ---------------------------------------------------------------------------
 // Road geometry — real Bulgarian dimensions, not the simulator's
 // ---------------------------------------------------------------------------
 
 /**
- * Lane width, m. The simulator multiplies its 3.25 m base by
- * PERCEPTUAL_ROAD_SCALE = 2.5 (a founder call, `sim/contracts.ts`), which
- * docs/simulation/82 §1.2 item 3 names as the single biggest reason the sim
- * reads as an oversized toy world: 8.125 m lanes beside a real-size car with
- * no human-scale reference. The marketing shot has no lane-discipline
- * grading to satisfy, so it uses the REAL number and gets the human scale
- * the audit says is missing.
+ * Lane width, m. See `ROAD_LANE_WIDTH_M` for why the marketing shot uses the
+ * real 3.25 m rather than the simulator's perceptually-scaled 8.125 m.
  */
-export const HERO_LANE_WIDTH_M = 3.25;
+export const HERO_LANE_WIDTH_M = ROAD_LANE_WIDTH_M;
 
 /** Two lanes plus a shoulder each side — as wide as the shot ever needs. */
-export const HERO_ROAD_WIDTH_M = HERO_LANE_WIDTH_M * 2 + 2.4;
+export const HERO_ROAD_WIDTH_M = ROAD_WIDTH_M;
 
 /**
  * Road length, m. Long enough that its far end is buried in the dusk fog
@@ -44,11 +71,11 @@ export const HERO_ROAD_WIDTH_M = HERO_LANE_WIDTH_M * 2 + 2.4;
 export const HERO_ROAD_LENGTH_M = 320;
 
 /** Broken centre line: 3 m of paint, 9 m of gap — the real urban cadence. */
-export const HERO_DASH_MARK_M = 3;
-export const HERO_DASH_GAP_M = 9;
-export const HERO_DASH_PERIOD_M = HERO_DASH_MARK_M + HERO_DASH_GAP_M;
+export const HERO_DASH_MARK_M = ROAD_DASH_MARK_M;
+export const HERO_DASH_GAP_M = ROAD_DASH_GAP_M;
+export const HERO_DASH_PERIOD_M = ROAD_DASH_PERIOD_M;
 /** Painted line width, m. */
-export const HERO_MARK_WIDTH_M = 0.15;
+export const HERO_MARK_WIDTH_M = ROAD_MARK_WIDTH_M;
 
 // ---------------------------------------------------------------------------
 // Motion
@@ -328,16 +355,16 @@ export const HERO_CAM_FAR_M = 900;
 export const PLATE_VIEWBOX_W = 1600;
 export const PLATE_VIEWBOX_H = 640;
 /** Horizon height in viewBox units — 39 % down, leaving sky for the ridge. */
-export const PLATE_HORIZON_Y = 250;
+export const PLATE_HORIZON_Y = HERO_PLATE_CAMERA.horizonY;
 /** Where the centre line converges: dead ahead, which is due south. */
-export const PLATE_VANISHING_X = 1000;
+export const PLATE_VANISHING_X = HERO_PLATE_CAMERA.vanishingX;
 /** Eye height of the plate's virtual camera, m — mid-way through the 3D move. */
-export const PLATE_CAM_HEIGHT_M = 1.6;
+export const PLATE_CAM_HEIGHT_M = HERO_PLATE_CAMERA.eyeHeightM;
 /**
  * Focal length in viewBox units. Chosen so the road reaches the bottom edge
  * at ~4 m: `PLATE_HORIZON_Y + f·h/z = PLATE_VIEWBOX_H` at z = 4.
  */
-export const PLATE_FOCAL_PX = 975;
+export const PLATE_FOCAL_PX = HERO_PLATE_CAMERA.focalPx;
 
 /**
  * Vertical half-angle the plate's pinhole subtends, degrees — everything a
@@ -346,49 +373,13 @@ export const PLATE_FOCAL_PX = 975;
  * which is how the Vitosha crest lands at its true 6.6°.
  */
 export function plateElevationY(elevationDeg: number): number {
-  return PLATE_HORIZON_Y - PLATE_FOCAL_PX * Math.tan((elevationDeg * Math.PI) / 180);
+  return elevationYOnPlate(HERO_PLATE_CAMERA, elevationDeg);
 }
 
 /** …and the same for azimuth, degrees from dead ahead, positive toward +X. */
 export function plateAzimuthX(azimuthDeg: number): number {
-  return PLATE_VANISHING_X + PLATE_FOCAL_PX * Math.tan((azimuthDeg * Math.PI) / 180);
+  return azimuthXOnPlate(HERO_PLATE_CAMERA, azimuthDeg);
 }
-
-/**
- * The Vitosha crest, in plate coordinates.
- *
- * GENERATED, not drawn: each point is `ridgeElevationDeg()` from
- * sim/environment/skyShader.ts — the exact function the sky dome's fragment
- * shader evaluates — sampled every 2° of azimuth from 34° east of south to
- * 48° west of it, and projected through `plateAzimuthX`/`plateElevationY`.
- * The shader measures azimuth positive toward the WEST while the plate
- * measures x positive toward +X (east), hence the sign flip in the generator.
- *
- * It is inlined rather than computed because HeroPlate is a Server Component
- * whose entire value is costing the client zero JavaScript, and importing the
- * sim's public barrel from it would drag that module's client boundaries into
- * the landing page's manifest for four dozen numbers.
- *
- * Drift is impossible anyway: `__tests__/heroScene.test.ts` recomputes the
- * whole list from `ridgeElevationDeg` and fails if a single point moves. To
- * regenerate, read that test — it contains the generator.
- */
-export const PLATE_RIDGE_POINTS: readonly (readonly [number, number])[] = [
-  [-82.8, 240.7], [-9.6, 237.7], [58.5, 233.1], [122.1, 226.7], [181.9, 218.7],
-  [238.2, 209], [291.6, 198], [342.4, 186.2], [390.8, 174.3], [437.1, 163],
-  [481.6, 152.9], [524.5, 144.5], [565.9, 138], [606.1, 133.5], [645.1, 130.6],
-  [683.2, 128.9], [720.4, 128], [756.9, 127.5], [792.8, 127.2], [828.1, 127.1],
-  [863, 127.3], [897.5, 128.1], [931.8, 129.6], [966, 131.9], [1000, 135],
-  [1034, 138.7], [1068.2, 142.6], [1102.5, 146.4], [1137, 149.8], [1171.9, 152.4],
-  [1207.2, 154.5], [1243.1, 156.4], [1279.6, 158.4], [1316.8, 161.3], [1354.9, 165.6],
-  [1393.9, 171.5], [1434.1, 179.1], [1475.5, 188], [1518.4, 197.8], [1562.9, 207.7],
-  [1609.2, 217.1], [1657.6, 225.4],
-];
-
-/** Azimuth sampling the ridge points were generated at (degrees, west-positive). */
-export const PLATE_RIDGE_AZ_FROM = -34;
-export const PLATE_RIDGE_AZ_TO = 48;
-export const PLATE_RIDGE_AZ_STEP = 2;
 
 /**
  * Project a point on (or above) the road into plate coordinates.
@@ -402,54 +393,13 @@ export function plateProject(
   heightM: number,
   distanceM: number,
 ): readonly [number, number] {
-  const z = Math.max(distanceM, 0.01);
-  return [
-    PLATE_VANISHING_X + (PLATE_FOCAL_PX * lateralM) / z,
-    PLATE_HORIZON_Y + (PLATE_FOCAL_PX * (PLATE_CAM_HEIGHT_M - heightM)) / z,
-  ];
-}
-
-/** One painted dash of the broken centre line, already projected. */
-export interface PlateDash {
-  /** Screen y of the near (bottom) end and the far (top) end. */
-  yNear: number;
-  yFar: number;
-  /** Half-width in viewBox units at each end — the taper that IS perspective. */
-  halfNear: number;
-  halfFar: number;
-  /** Centre x at each end (the centre line is at lateral 0, so both = VP x). */
-  x: number;
+  return projectOnPlate(HERO_PLATE_CAMERA, lateralM, heightM, distanceM);
 }
 
 /**
- * The visible run of centre-line dashes, nearest first.
- *
- * Stops when a dash is shorter than `minPx` viewBox units. The default is
- * deliberately small: the plate is vector, so a quarter-unit sliver still
- * resolves on a 4K panel and it is what makes the last stretch of road read
- * as a converging line rather than as six dashes and then nothing. The
- * plate's paint gradient has already faded that far run to near-zero opacity,
- * so the cost is a few hundred bytes of path data and no visual noise.
- *
- * Nothing here depends on time — the plate is deliberately still, because it
- * is what a reduced-motion visitor sees.
+ * The visible run of centre-line dashes, nearest first. See `dashesOnPlate`
+ * for why the sliver cut-off is as small as it is.
  */
 export function plateDashes(startM = 3.2, minPx = 0.25): PlateDash[] {
-  const out: PlateDash[] = [];
-  const halfMark = HERO_MARK_WIDTH_M / 2;
-  for (let i = 0; i < 64; i += 1) {
-    const near = startM + i * HERO_DASH_PERIOD_M;
-    const far = near + HERO_DASH_MARK_M;
-    const [, yNear] = plateProject(0, 0, near);
-    const [, yFar] = plateProject(0, 0, far);
-    if (yNear - yFar < minPx) break;
-    out.push({
-      yNear,
-      yFar,
-      halfNear: (PLATE_FOCAL_PX * halfMark) / near,
-      halfFar: (PLATE_FOCAL_PX * halfMark) / far,
-      x: PLATE_VANISHING_X,
-    });
-  }
-  return out;
+  return dashesOnPlate(HERO_PLATE_CAMERA, startM, minPx);
 }

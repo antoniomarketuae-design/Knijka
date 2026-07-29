@@ -1,5 +1,6 @@
 import type { CSSProperties } from "react";
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
+import { DeckBackdrop } from "@/components/deck/DeckBackdrop";
 
 /**
  * `color` has to be restated on the scope element for the same reason the
@@ -38,6 +39,24 @@ const SCOPE_TEXT = { color: "var(--foreground)" } as CSSProperties;
  * The wrapper is a flex column rather than a bare <div>: <body> is
  * `min-h-full flex flex-col`, so an inert wrapper here would collapse the
  * shell's `min-h-dvh` child out of the column it was sized against.
+ *
+ * WHY IT IS ALSO `isolate`, WHICH IS NOT HYGIENE — IT IS A BUG FIX.
+ * The backdrop below is `fixed … -z-10`. A negative-z child paints in step 3 of
+ * its stacking context; a non-positioned block's own background paints in step
+ * 4. This wrapper carries `bg-background` and formed NO stacking context, so
+ * the nearest one was the root — which put the wrapper's opaque fill ON TOP of
+ * the layer that was supposed to sit behind everything. `.haze` shipped in
+ * exactly this position and was never once visible on an authenticated page:
+ * captured at 1440×900 and 390×844, the plane is flat #05070c edge to edge, so
+ * the depth primitive doc 83 §6 calls load-bearing was doing nothing at all
+ * here. That is a large part of why the founder's verdict on the whole app was
+ * „we made it dark but nothing much changes".
+ *
+ * `isolation: isolate` makes this element the stacking context, so its own
+ * background paints FIRST and the backdrop lands above it and below every
+ * panel — the order the markup always implied. Nothing inside needs to escape
+ * it: the only portalled surface (Celebration) mounts on document.body, which
+ * is outside this element entirely.
  */
 export default function DashboardGroupLayout({
   children,
@@ -48,7 +67,7 @@ export default function DashboardGroupLayout({
     <div
       data-surface="cluster"
       style={SCOPE_TEXT}
-      className="flex flex-1 flex-col bg-background"
+      className="isolate flex flex-1 flex-col bg-background"
     >
       <a
         href="#main-content"
@@ -56,14 +75,29 @@ export default function DashboardGroupLayout({
       >
         Към съдържанието
       </a>
-      {/* THE DECK FLOOR. A dark theme without a horizon is not a space, it is a
-          black rectangle — doc 83 §6 calls `.haze` the load-bearing primitive
-          for exactly this and then never applied it behind the login, which is
-          a large part of why the authenticated app read as „dark" rather than
-          as a cockpit. One element, three STATIC gradients, `fixed` so scrolling
-          never repaints it, and `-z-10` so it is behind every panel. It cannot
-          cost a frame: nothing here animates and nothing here blurs. */}
-      <div aria-hidden className="haze pointer-events-none fixed inset-0 -z-10" />
+      {/* THE DECK. A dark theme without a horizon is not a space, it is a black
+          rectangle — doc 83 §6 calls `.haze` the load-bearing primitive for
+          exactly this. It was mounted here, in this position, and (see the
+          `isolate` note above) it never painted a single visible pixel on an
+          authenticated page.
+
+          And even had it painted, three gradients are not enough. Founder
+          review, verbatim: „here in the background of this page, I want
+          futuristic 3d background like we did in the landing page, currently
+          this dark background is purely old and not futuristic". A glow is not
+          a SPACE: there is no horizon in it, no distance, and nothing that
+          could only be this product.
+
+          So this plane now holds the landing page's own road at dusk, under
+          Vitosha, from the driver's seat — the same geometry, out of the same
+          module (@/lib/visual/roadPlate), so logging in moves the student from
+          behind the car to inside it instead of into a different product.
+          components/deck/DeckBackdrop has the composition and the cost; the
+          short version is that it is still a `fixed` element that never
+          repaints on scroll, and every colour in it is at or under the
+          brightest pixel `.haze` was already painting — which is why not one of
+          the contrast ratios clusterScope.test.ts pins can move. */}
+      <DeckBackdrop className="fixed inset-0 -z-10" />
       <DashboardShell>
         <main id="main-content" className="mx-auto w-full max-w-6xl px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
           {children}

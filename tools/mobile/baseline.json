@@ -1,0 +1,210 @@
+{
+  "capturedAt": "2026-07-29T12:19:40.501Z",
+  "engine": "webkit",
+  "routes": [
+    {
+      "route": "exams",
+      "device": "iphone16-landscape",
+      "ok": true,
+      "contentPct": 83.7,
+      "chromePct": 16.3,
+      "foldPass": false,
+      "documentOverflowPx": 185,
+      "touchUnder44": 2,
+      "safeAreaViolations": 2
+    },
+    {
+      "route": "simulator",
+      "device": "iphone16-landscape",
+      "ok": true,
+      "contentPct": 83.7,
+      "chromePct": 16.3,
+      "foldPass": false,
+      "documentOverflowPx": 529,
+      "touchUnder44": 2,
+      "safeAreaViolations": 2
+    },
+    {
+      "route": "simulator-drive",
+      "device": "iphone16-landscape",
+      "capturedAt": "2026-07-29T12:06:30.037Z",
+      "ok": true,
+      "contentPct": 31.7,
+      "chromePct": 68.3,
+      "foldPass": true,
+      "documentOverflowPx": 0,
+      "touchUnder44": 19,
+      "safeAreaViolations": 10
+    },
+    {
+      "route": "simulator-drive-intro",
+      "device": "iphone16-landscape",
+      "ok": true,
+      "contentPct": 0,
+      "chromePct": 100,
+      "foldPass": true,
+      "documentOverflowPx": 0,
+      "touchUnder44": 20,
+      "safeAreaViolations": 10
+    },
+    {
+      "route": "theory",
+      "device": "iphone16-landscape",
+      "ok": true,
+      "contentPct": 83.7,
+      "chromePct": 16.3,
+      "foldPass": false,
+      "documentOverflowPx": 185,
+      "touchUnder44": 2,
+      "safeAreaViolations": 2
+    },
+    {
+      "route": "theory-practice",
+      "device": "iphone16-landscape",
+      "capturedAt": "2026-07-29T12:06:30.037Z",
+      "ok": true,
+      "contentPct": 83.7,
+      "chromePct": 16.3,
+      "foldPass": false,
+      "documentOverflowPx": 479,
+      "touchUnder44": 3,
+      "safeAreaViolations": 3
+    },
+    {
+      "route": "exams",
+      "device": "iphone16-portrait",
+      "ok": true,
+      "contentPct": 92.5,
+      "chromePct": 7.5,
+      "foldPass": false,
+      "documentOverflowPx": 336,
+      "touchUnder44": 2,
+      "safeAreaViolations": 2
+    },
+    {
+      "route": "simulator",
+      "device": "iphone16-portrait",
+      "ok": true,
+      "contentPct": 92.5,
+      "chromePct": 7.5,
+      "foldPass": false,
+      "documentOverflowPx": 57638,
+      "touchUnder44": 5,
+      "safeAreaViolations": 2
+    },
+    {
+      "route": "simulator-drive",
+      "device": "iphone16-portrait",
+      "capturedAt": "2026-07-29T12:06:30.037Z",
+      "ok": true,
+      "contentPct": 54.1,
+      "chromePct": 45.9,
+      "foldPass": true,
+      "documentOverflowPx": 0,
+      "touchUnder44": 19,
+      "safeAreaViolations": 6
+    },
+    {
+      "route": "simulator-drive-intro",
+      "device": "iphone16-portrait",
+      "ok": true,
+      "contentPct": 0,
+      "chromePct": 100,
+      "foldPass": true,
+      "documentOverflowPx": 0,
+      "touchUnder44": 20,
+      "safeAreaViolations": 7
+    },
+    {
+      "route": "theory",
+      "device": "iphone16-portrait",
+      "ok": true,
+      "contentPct": 92.5,
+      "chromePct": 7.5,
+      "foldPass": false,
+      "documentOverflowPx": 845,
+      "touchUnder44": 6,
+      "safeAreaViolations": 4
+    },
+    {
+      "route": "theory-practice",
+      "device": "iphone16-portrait",
+      "capturedAt": "2026-07-29T12:19:40.501Z",
+      "ok": true,
+      "contentPct": 73.4,
+      "chromePct": 7.5,
+      "foldPass": true,
+      "documentOverflowPx": 0,
+      "touchUnder44": 7,
+      "safeAreaViolations": 2
+    },
+    {
+      "route": "exams",
+      "device": "small-portrait",
+      "ok": true,
+      "contentPct": 91.8,
+      "chromePct": 8.2,
+      "foldPass": false,
+      "documentOverflowPx": 500,
+      "touchUnder44": 2,
+      "safeAreaViolations": 0
+    },
+    {
+      "route": "simulator",
+      "device": "small-portrait",
+      "ok": true,
+      "contentPct": 91.8,
+      "chromePct": 8.2,
+      "foldPass": false,
+      "documentOverflowPx": 61965,
+      "touchUnder44": 5,
+      "safeAreaViolations": 0
+    },
+    {
+      "route": "simulator-drive",
+      "device": "small-portrait",
+      "capturedAt": "2026-07-29T12:06:30.037Z",
+      "ok": true,
+      "contentPct": 47.5,
+      "chromePct": 52.5,
+      "foldPass": true,
+      "documentOverflowPx": 0,
+      "touchUnder44": 19,
+      "safeAreaViolations": 0
+    },
+    {
+      "route": "simulator-drive-intro",
+      "device": "small-portrait",
+      "ok": true,
+      "contentPct": 0,
+      "chromePct": 100,
+      "foldPass": true,
+      "documentOverflowPx": 0,
+      "touchUnder44": 20,
+      "safeAreaViolations": 0
+    },
+    {
+      "route": "theory",
+      "device": "small-portrait",
+      "ok": true,
+      "contentPct": 73.5,
+      "chromePct": 8.2,
+      "foldPass": false,
+      "documentOverflowPx": 0,
+      "touchUnder44": 2,
+      "safeAreaViolations": 0
+    },
+    {
+      "route": "theory-practice",
+      "device": "small-portrait",
+      "capturedAt": "2026-07-29T12:06:30.037Z",
+      "ok": true,
+      "contentPct": 82.7,
+      "chromePct": 8.2,
+      "foldPass": true,
+      "documentOverflowPx": 0,
+      "touchUnder44": 7,
+      "safeAreaViolations": 0
+    }
+  ]
+}

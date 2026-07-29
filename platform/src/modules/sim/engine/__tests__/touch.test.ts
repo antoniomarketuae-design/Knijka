@@ -9,8 +9,17 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { SimInput } from "../input";
 import {
+  applyReversePedalRemap,
+  ReverseAssist,
+  shouldRemapReversePedals,
+  type ReverseAssistCommand,
+} from "../reverseAssist";
+import {
+  driveAxisFromDrag,
   pedalFromPointerY,
   steerFromDrag,
+  TOUCH_DRIVE_DEADZONE_PX,
+  TOUCH_DRIVE_RANGE_PX,
   TOUCH_STEER_EXPO,
   TouchInputSource,
 } from "../touch";
@@ -99,6 +108,45 @@ describe("steerFromDrag (pure)", () => {
   });
 });
 
+describe("driveAxisFromDrag (pure) — the ONE drivetrain slider", () => {
+  const R = TOUCH_DRIVE_RANGE_PX;
+  const D = TOUCH_DRIVE_DEADZONE_PX;
+
+  it("centres at zero and holds zero across the whole dead zone", () => {
+    expect(driveAxisFromDrag(0, R)).toBe(0);
+    expect(driveAxisFromDrag(D, R)).toBe(0);
+    expect(driveAxisFromDrag(-D, R)).toBe(0);
+  });
+
+  it("up is forward (positive = throttle), down is backwards (negative = brake)", () => {
+    expect(driveAxisFromDrag(-R, R)).toBe(1);
+    expect(driveAxisFromDrag(R, R)).toBe(-1);
+  });
+
+  it("clamps past the range instead of overshooting", () => {
+    expect(driveAxisFromDrag(-500, R)).toBe(1);
+    expect(driveAxisFromDrag(500, R)).toBe(-1);
+  });
+
+  it("re-normalizes past the dead zone so full travel still reaches full pedal", () => {
+    // Without re-normalization the dead zone would eat the top of the range.
+    expect(driveAxisFromDrag(-R, R, D)).toBe(1);
+    expect(driveAxisFromDrag(-R, R, 0)).toBe(1);
+  });
+
+  it("expo softens the middle: half the usable throw gives LESS than half pedal", () => {
+    const half = driveAxisFromDrag(-(D + (R - D) / 2), R, D);
+    expect(half).toBeCloseTo(Math.pow(0.5, TOUCH_STEER_EXPO), 5);
+    expect(half).toBeGreaterThan(0);
+    expect(half).toBeLessThan(0.5);
+  });
+
+  it("is symmetric about centre and safe on a degenerate range", () => {
+    expect(driveAxisFromDrag(40, R)).toBeCloseTo(-driveAxisFromDrag(-40, R), 10);
+    expect(driveAxisFromDrag(40, 0)).toBe(0);
+  });
+});
+
 describe("pedalFromPointerY (pure)", () => {
   // Strip: top at y=100, height 200 → bottom edge at y=300.
   it("maps strip bottom → 0, top → 1, middle → 0.5", () => {
@@ -169,6 +217,100 @@ describe("TouchInputSource priority merge", () => {
     const out = baseInput({ throttle: 0.1, brake: 0.2, steer: 0.3 });
     src.mergeInto(out);
     expect(out).toEqual(baseInput({ throttle: 0.1, brake: 0.2, steer: 0.3 }));
+  });
+});
+
+describe("ONE THUMB, ONE AXIS, AND REVERSE — the founder's sentence, end to end", () => {
+  // „there can be only 1 slider — up is forward middle is stop down is
+  // backwards … very hard to switch to reverse".
+  //
+  // The overlay itself is a DOM component and cannot run in this node harness,
+  // so this walks the exact chain it walks: a vertical drag on the drivetrain
+  // pad → driveAxisFromDrag → TouchInputSource → SimInput.read() → the raw
+  // pedals the scene feeds ReverseAssist → the pedal remap that makes "down"
+  // keep meaning backwards once the selector is in R. No gear control is
+  // touched anywhere in it — that is the whole point.
+  const RANGE = TOUCH_DRIVE_RANGE_PX;
+
+  /** What TouchControls' driveApply does, in one place. */
+  function thumb(src: TouchInputSource, dyPx: number) {
+    const axis = driveAxisFromDrag(dyPx, RANGE);
+    if (axis > 0) {
+      src.releaseBrake();
+      src.setThrottle(axis);
+    } else if (axis < 0) {
+      src.releaseThrottle();
+      src.setBrake(-axis);
+    } else {
+      src.releaseThrottle();
+      src.releaseBrake();
+    }
+  }
+
+  it("holding the thumb DOWN at a standstill puts the car in R, with no gear input", () => {
+    const h = harness();
+    const src = new TouchInputSource();
+    h.input.attachTouch(src);
+    const assist = new ReverseAssist();
+
+    thumb(src, RANGE); // full down = full brake
+    const held = h.input.read();
+    expect(held.brake).toBe(1);
+    expect(held.throttle).toBe(0);
+
+    // The scene steps the assist once per frame with the RAW pedals.
+    let command: ReverseAssistCommand | null = null;
+    for (let t = 0; t < 0.5; t += 1 / 60) {
+      command =
+        assist.update({
+          speedKmh: 0,
+          selector: "D",
+          brakePedal: held.brake,
+          throttlePedal: held.throttle,
+          dtSec: 1 / 60,
+        }) ?? command;
+    }
+    expect(command).toBe("shiftToR");
+    h.input.dispose();
+  });
+
+  it("once in R the remap makes DOWN accelerate backwards and UP brake", () => {
+    const src = new TouchInputSource();
+
+    thumb(src, RANGE); // thumb down
+    const down = baseInput();
+    src.mergeInto(down);
+    expect(shouldRemapReversePedals("R", "automatic")).toBe(true);
+    applyReversePedalRemap(down);
+    expect(down.throttle).toBe(1); // …is now the REVERSE accelerator
+    expect(down.brake).toBe(0);
+
+    thumb(src, -RANGE); // thumb up
+    const up = baseInput();
+    src.mergeInto(up);
+    applyReversePedalRemap(up);
+    expect(up.brake).toBe(1); // …is now the brake
+    expect(up.throttle).toBe(0);
+  });
+
+  it("letting go returns to neutral — a spring-centred axis holds nothing", () => {
+    const src = new TouchInputSource();
+    thumb(src, RANGE);
+    src.releaseThrottle();
+    src.releaseBrake();
+    const out = baseInput();
+    src.mergeInto(out);
+    expect(out).toEqual(baseInput());
+  });
+
+  it("the axis can never hold both pedals — which is what lets the assist see the hold", () => {
+    const src = new TouchInputSource();
+    for (const dy of [-RANGE, -20, -7, 0, 7, 20, RANGE]) {
+      thumb(src, dy);
+      const out = baseInput();
+      src.mergeInto(out);
+      expect(Math.min(out.throttle, out.brake)).toBe(0);
+    }
   });
 });
 

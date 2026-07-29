@@ -103,20 +103,26 @@ export default async function PracticePage({ searchParams }: PracticePageProps) 
       : "Двигателят подбра преговорите на падеж и най-слабите ти места.";
 
   return (
-    <div className="flex flex-col gap-4 sm:gap-8">
-      {/* MOBILE HEADER (founder review, 390x844): the aurora band is 181px of
+    <div className="flex flex-col gap-2 sm:gap-8">
+      {/* MOBILE HEADER (founder review, 393x852): the aurora band is 181px of
           title and blurb — 21% of a phone screen — repeated above all ten
           questions of a session, and it was the single biggest reason the
           answers started below the fold. Below `sm` it collapses to one line:
           the back link and the scope title, nothing else. The blurb is
           orientation for a first visit, not something a student re-reads on
           every question, so it is the right thing to drop on a phone.
-          From `sm` up the full band is unchanged. */}
-      <header className="flex items-baseline gap-3 sm:hidden">
+          From `sm` up the full band is unchanged.
+
+          THAT LINE IS NOW A LABEL, NOT A TITLE (phase 5). At `text-lg` it and
+          its gap were 44px of the 852 the answers have to fit inside, spent
+          re-stating the topic the student picked one tap ago. `text-sm` keeps
+          it readable and truthful at 28px. Everything gained here goes to the
+          option list, which is what the founder is scrolling. */}
+      <header className="flex items-baseline gap-2 sm:hidden">
         <Link href="/theory" className="shrink-0 text-xs font-bold text-accent">
           ← Теми
         </Link>
-        <h1 className="min-w-0 truncate font-display text-lg font-black tracking-tight">
+        <h1 className="min-w-0 truncate font-display text-sm font-black tracking-tight">
           {scopeTitleBg ?? "Умна тренировка"}
         </h1>
       </header>

@@ -109,7 +109,10 @@ export function TopicDeck({
             this page that is rotated in 3D. */}
         <div aria-hidden className="deck-floor -z-10 rounded-2xl" />
 
-        <ul className="deck grid grid-cols-2 gap-2.5 sm:grid-cols-3 sm:gap-3 lg:grid-cols-4">
+        {/* `topic-deck`, not `deck`: the 3D backdrop component owns the generic
+            name in globals.css and its rule starts with `pointer-events: none`,
+            which made every tile on this grid untappable in WebKit. */}
+        <ul className="topic-deck grid grid-cols-2 gap-2.5 sm:grid-cols-3 sm:gap-3 lg:grid-cols-4">
           {visible.map((topic, i) => (
             <li key={topic.topicId} className="flex">
               <TopicGauge topic={topic} index={i} onOpen={setOpenId} />

@@ -1,0 +1,125 @@
+# The mobile screen budget, mechanized.
+#
+# WHY THIS IS A SEPARATE WORKFLOW AND NOT A STEP IN `gate`
+# -----------------------------------------------------------------------------
+# The measurement needs three things the unit gate deliberately does not have: a
+# real database (every route worth measuring is behind auth, and /simulator is
+# behind an entitlement), a production build of the app, and a WebKit browser
+# download. That is ~10 minutes on every PR, for a check that only changes when
+# mobile layout changes. Bolting it onto `gate` would make the fast gate slow,
+# and a slow gate is one people start bypassing — which is exactly the disease
+# ci.yml's own header describes.
+#
+# So: it runs on demand, on a schedule, and automatically on any PR that touches
+# something that could move a pixel on a phone.
+#
+# WHY IT MEASURES A PRODUCTION BUILD
+# -----------------------------------------------------------------------------
+# `next dev` compiles on first request. On the founder's machine that took 60 s
+# for a single route, long enough for WebKit to abandon the navigation and for
+# the service worker to answer with the offline page. `next start` against a
+# real build has no such cliff, and it is also what a student's phone actually
+# talks to.
+#
+# WHY THE ASSERTION IS A SECOND STEP
+# -----------------------------------------------------------------------------
+# The sweep writes tools/mobile/.out/latest.json; vitest asserts against it. One
+# browser run, one database, and the failure arrives as the full report table
+# rather than as "expected true to be false". `CI` is set by Actions, so
+# budget.test.mjs enforces rather than skips (see its header for why that
+# asymmetry exists).
+name: mobile budget
+
+on:
+  workflow_dispatch:
+  schedule:
+    # Monday 05:00 UTC — a weekly regression tripwire, so a budget that drifts
+    # is caught by the calendar and not by the founder on his own phone.
+    - cron: "0 5 * * 1"
+  pull_request:
+    paths:
+      - "platform/src/app/**"
+      - "platform/src/components/**"
+      - "platform/src/app/globals.css"
+      - "tools/mobile/**"
+      - ".github/workflows/mobile-budget.yml"
+
+concurrency:
+  group: mobile-budget-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  measure:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    defaults:
+      run:
+        working-directory: platform
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: ci
+          POSTGRES_PASSWORD: ci
+          POSTGRES_DB: ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U ci"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    env:
+      DATABASE_URL: "postgresql://ci:ci@localhost:5432/ci"
+      SHADOW_DATABASE_URL: "postgresql://ci:ci@localhost:5432/ci_shadow"
+      AUTH_SECRET: "ci-dummy-secret"
+      # Measure the built app, not a dev server compiling under the browser.
+      KNIJKA_MOBILE_BASE_URL: "http://localhost:3460"
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: platform/package-lock.json
+      - run: npm ci --no-audit --no-fund
+      - run: npx prisma generate
+      - name: migrate
+        run: npx prisma migrate deploy
+
+      # The harness resolves Playwright from tools/clips/headless on the dev
+      # box; in CI it needs its own copy. `--no-save` keeps package.json clean —
+      # this is a CI-only dependency of a tool, not of the product.
+      - name: install playwright + webkit
+        run: |
+          npm i --no-save playwright@1.61.1
+          npx playwright install --with-deps webkit
+
+      - name: build
+        run: npm run build
+
+      - name: start the app
+        run: |
+          npx next start --port 3460 --hostname localhost &
+          for i in $(seq 1 60); do
+            curl -sf http://localhost:3460/login > /dev/null && exit 0
+            sleep 2
+          done
+          echo "app did not come up"; exit 1
+
+      # `--keep-server` because the server above is ours, not the harness's, and
+      # `|| true` because the sweep's own exit code is not the verdict — the
+      # vitest step is, and it prints the whole table when it fails.
+      - name: sweep (WebKit, iPhone 16 + a smaller phone)
+        run: node ../tools/mobile/cli.mjs --keep-server || true
+
+      - name: enforce the budget
+        run: npx vitest run ../tools/mobile/budget.test.mjs
+
+      - name: upload screenshots and report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mobile-budget-${{ github.run_id }}
+          path: tools/mobile/.out/
+          retention-days: 14

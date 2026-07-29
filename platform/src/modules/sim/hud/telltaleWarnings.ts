@@ -41,6 +41,20 @@ export interface TelltaleWarning {
   tone: "danger" | "warn";
   /** Screen edge. Left = "the car is not safe to move", right = "lights/signals". */
   side: "left" | "right";
+  /**
+   * THE RULE THIS FAULT IS ABOUT — the key into the violation catalog, so a
+   * warning can always show its authored, law-cited WHY (THEO-4: no bare
+   * verdicts, ever). Carried as a CODE rather than as prose because the prose
+   * has exactly one home (rules/catalog.ts, ADR-002) and a second copy here
+   * would be a second thing to keep true. `null` for the ungraded courtesy
+   * ping (hazards left on), which is not a mistake and states no verdict.
+   */
+  code:
+    | "SEATBELT_OFF_WHILE_MOVING"
+    | "HANDBRAKE_LEFT_ON"
+    | "HEADLIGHTS_OFF_AT_NIGHT"
+    | "FOG_LIGHTS_OFF_IN_FOG"
+    | null;
 }
 
 /** Speed (km/h) above which the car counts as moving — the rule engine's own
@@ -63,7 +77,14 @@ export function armedTelltaleWarnings(s: DashboardStatus): TelltaleWarning[] {
   const out: TelltaleWarning[] = [];
 
   if (live && !s.seatbeltOn) {
-    out.push({ id: "belt", labelBg: "Коланът не е поставен", keyHint: "B", tone: "danger", side: "left" });
+    out.push({
+      id: "belt",
+      labelBg: "Коланът не е поставен",
+      keyHint: "B",
+      tone: "danger",
+      side: "left",
+      code: "SEATBELT_OFF_WHILE_MOVING",
+    });
   }
   if (moving && s.parkingBrakeOn) {
     out.push({
@@ -72,16 +93,38 @@ export function armedTelltaleWarnings(s: DashboardStatus): TelltaleWarning[] {
       keyHint: "Space",
       tone: "danger",
       side: "left",
+      code: "HANDBRAKE_LEFT_ON",
     });
   }
   if (live && s.headlightsRequired && s.headlights === "off") {
-    out.push({ id: "lights", labelBg: "Светлините не са включени", keyHint: "L", tone: "danger", side: "right" });
+    out.push({
+      id: "lights",
+      labelBg: "Светлините не са включени",
+      keyHint: "L",
+      tone: "danger",
+      side: "right",
+      code: "HEADLIGHTS_OFF_AT_NIGHT",
+    });
   }
   if (live && s.fogLightsRequired && !s.fogLightsOn) {
-    out.push({ id: "fog", labelBg: "Фаровете за мъгла не светят", keyHint: "V", tone: "warn", side: "right" });
+    out.push({
+      id: "fog",
+      labelBg: "Фаровете за мъгла не светят",
+      keyHint: "V",
+      tone: "warn",
+      side: "right",
+      code: "FOG_LIGHTS_OFF_IN_FOG",
+    });
   }
   if (s.hazardsOn && speed >= HAZARDS_CRUISE_KMH) {
-    out.push({ id: "hazards", labelBg: "Аварийните светлини са включени", keyHint: "J", tone: "warn", side: "right" });
+    out.push({
+      id: "hazards",
+      labelBg: "Аварийните светлини са включени",
+      keyHint: "J",
+      tone: "warn",
+      side: "right",
+      code: null,
+    });
   }
   return out;
 }

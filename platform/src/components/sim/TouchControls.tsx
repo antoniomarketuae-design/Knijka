@@ -1,45 +1,91 @@
 "use client";
 
 /**
- * TouchControls — the P1 touch input overlay (plan doc 68 row P1; audit E1:
- * ADR-005 was violated by the old refusal screen).
+ * TouchControls — the phone driving controls.
  *
- * Layout (landscape phone, thumbs at the screen edges):
- *   LEFT  — steer slider (drag = proportional steer via steerFromDrag's expo
- *           curve; springs back to centre on release) with the indicator and
- *           mirror-glance buttons in a row above it (glances are GRADED —
- *           phones must be able to earn them).
- *   RIGHT — vertical pedal strips (brake | throttle): position on the strip
- *           IS the pedal value (pedalFromPointerY), the analog counterpart of
- *           the QW8 keyboard ramps. Placed inboard of the minimap so the HUD
- *           corners stay untouched; horn + camera ride to their left.
- *   EDGE  — utility column (fullscreen / pause / „controls" sheet). The sheet
- *           is the reliable driveline fallback (engine, P↔D stepper, parking
- *           brake, lights, belt, hazards, wipers, fog, restart); the cockpit
- *           hotspots (doc 69, touch-sized) remain the primary in-world way.
+ * ─────────────────────────────────────────────────────────────────────────────
+ * FOUNDER REVIEW 2026-07-28, iPhone 16, LANDSCAPE. HIS WORDS.
  *
- * WHY A SLIDER AND NOT TILT (the P1 A/B question): iOS gates
- * DeviceOrientation behind a permission prompt (HTTPS-only) that would
- * interrupt the first drive; tilt misbehaves under landscape orientation
- * lock and on flat-propped tablets; and a slider is deterministic for the
- * rule engine. The seam stays open: TOUCH_STEER_MODE_STORAGE_KEY defaults to
- * "slider", and a future tilt source is just another setSteer() caller.
+ *   „approximately half of the screen is occupied by controls, information
+ *    panels, popups"
+ *   „the gas forward this slider must also allow backwards … very hard to
+ *    switch to reverse"
+ *   „there can be only 1 slider — up is forward middle is stop down is
+ *    backwards … same goes for left and right"
+ *   „it must be absolutely invisible and small"
+ *   „the mobile interface needs a complete redesign rather than only reducing
+ *    the size of the existing elements"
  *
- * Input path: every gesture writes into the shared TouchInputSource, which
- * SimInput.read() merges by priority (touch active → touch wins). Steering,
- * pedals, gate, difficulty shaping — all downstream code is unchanged.
- * Cabin buttons call the SAME CabinControls/DrivelineState methods the keys
- * and cockpit hotspots use — one code path, so the A2 procedure observer
+ * AND THE NUMBER BEHIND IT, read straight out of the file this one replaces:
+ * the steer zone sat at `bottom: calc(11.75rem + …)` = 188 px and was
+ * `clamp(11rem, 34vw, 20rem)` wide; the pedal strips were 2 × 56 × 152. On an
+ * 852 × 393 landscape iPhone that control band was 188 of 393 px — 48 % of the
+ * screen. And because the width was 34vw, A PROPORTION OF THE SCREEN, a bigger
+ * phone bought a bigger obstruction.
+ *
+ * ─────────────────────────────────────────────────────────────────────────────
+ * WHAT THIS IS NOW. Gran Turismo's screen budget, not its art: instruments and
+ * furniture are tiny and hard against the edges, and THE CENTRE OF THE SCREEN
+ * IS ROAD. Two thumb pads in the two bottom corners, where thumbs already rest:
+ *
+ *   BOTTOM-LEFT   ONE STEERING AXIS. Drag left / right anywhere in the corner;
+ *                 springs back to centre on release.
+ *   BOTTOM-RIGHT  ONE DRIVETRAIN AXIS. Up = forward, centre = neutral, down =
+ *                 brake and then REVERSE (see below). Springs back too.
+ *
+ * THE TRICK THAT MAKES A CONTROL BOTH TINY AND EASY TO HIT: the thing you touch
+ * and the thing you see are different sizes. Every pad and every button here is
+ * a transparent hit area of at least 44 × 44 px — the pads are 176–208 px wide
+ * — that paints NOTHING, with a small mark drawn in the middle of it. The
+ * project's own measuring rule ("any pixel a control paints on is NOT road,
+ * translucent or not") is what makes this the honest way to buy back the
+ * screen: an element with no background, no border, no shadow and no
+ * backdrop-filter costs zero road, so the hit area can be generous while the
+ * ink stays under half a percent of the viewport.
+ *
+ * REVERSE, WITH NO GEAR CHANGE IN IT. „Very hard to switch to reverse" was
+ * true: it took a pedal AND a selector — two hands of input for one intention.
+ * Down on this axis is the brake; ReverseAssist (engine/reverseAssist.ts, which
+ * has existed and been unit-tested since 2026-07-17) watches for a brake held
+ * at a standstill and steps the REAL selector D→N→R through the same
+ * DrivelineState API the [ / ] keys use, after which `applyReversePedalRemap`
+ * swaps the two channels — so down keeps meaning "backwards" and up becomes the
+ * brake. One axis, one thumb, and the rule engine, the A2 procedure observer
+ * and the trace recorder see the identical canonical events they always did.
+ * Nothing about grading, scenario timing or recording was touched to get here.
+ *
+ * WHY A THUMB PAD AND NOT A WHEEL, A TILT SENSOR OR THE OLD LONG SLIDER:
+ *  - a wheel wants two thumbs and a fixed pivot the hand has to find; the
+ *    corner a thumb already rests in has neither;
+ *  - iOS gates DeviceOrientation behind a permission prompt (HTTPS only) that
+ *    would interrupt the first drive, tilt misbehaves under a landscape
+ *    orientation lock and on a flat-propped tablet, and it is not deterministic
+ *    for the rule engine — same three reasons the previous author rejected it,
+ *    still true. TOUCH_STEER_MODE_STORAGE_KEY keeps the A/B seam open;
+ *  - the old slider's travel was a FRACTION OF THE ZONE, so the same thumb
+ *    movement steered differently on different phones. Full lock is now a fixed
+ *    TOUCH_STEER_RANGE_PX (engine/touch.ts), which is the only version of this
+ *    control that feels the same on a 360 px Android and a 430 px iPhone.
+ *
+ * Everything else — the graded mirror glances, the indicators, the horn, the
+ * camera, pause, fullscreen and the driveline sheet — became glyph-only buttons
+ * in two small rows hard against the corners, directly above the pads, so
+ * nothing at all sits in the middle of the picture.
+ *
+ * Input path is unchanged: every gesture writes into the shared
+ * TouchInputSource, which SimInput.read() merges by priority (touch active →
+ * touch wins). Cabin buttons call the SAME CabinControls/DrivelineState methods
+ * the keys and the cockpit hotspots use — one code path, so the A2 observer
  * cannot tell the devices apart.
  *
- * Perf: gesture handlers write into refs/DOM styles directly (no React state
- * at gesture rate, zero per-frame allocations); the only poll is a low-Hz
+ * Perf: gesture handlers write into refs and DOM styles directly (no React
+ * state at gesture rate, zero per-frame allocations); the only poll is a low-Hz
  * cabin snapshot that early-outs when nothing changed.
  *
  * Visibility: mounts only on touch-capable devices (hasTouchScreen), hides
- * while the sim is paused (menu/quiz/teach/end — the `hidden` prop) and
- * while the keyboard is in recent use (hybrid laptops); a screen touch
- * brings it back. Every hide releases all held axes.
+ * while the sim is paused (menu/quiz/teach/end — the `hidden` prop) and while
+ * the keyboard is in recent use (hybrid laptops); a screen touch brings it
+ * back. Every hide releases all held axes.
  */
 
 import {
@@ -47,23 +93,25 @@ import {
   useEffect,
   useRef,
   useState,
+  type CSSProperties,
   type PointerEvent as ReactPointerEvent,
   type ReactNode,
   type RefObject,
 } from "react";
 import {
-  pedalFromPointerY,
+  driveAxisFromDrag,
   steerFromDrag,
-  TOUCH_STEER_RANGE_FRACTION,
+  TOUCH_DRIVE_RANGE_PX,
+  TOUCH_STEER_RANGE_PX,
   type TouchInputSource,
 } from "@/modules/sim/engine";
 import type { CabinControls, HeadlightSetting, IndicatorSetting } from "@/modules/sim/scene/cabin";
 
 // ---------------------------------------------------------------------------
-// Steer-mode setting seam (A/B: slider vs tilt). Only "slider" is
-// implemented; "tilt" intentionally falls back to the slider until a tilt
-// source lands (see the header rationale) — the flag exists so an A/B test
-// can flip cohorts without a schema change.
+// Steer-mode setting seam (A/B: slider vs tilt). Only the thumb pad is
+// implemented; "tilt" intentionally falls back to it until a tilt source lands
+// (see the header rationale) — the flag exists so an A/B test can flip cohorts
+// without a schema change.
 // ---------------------------------------------------------------------------
 
 export type TouchSteerMode = "slider" | "tilt";
@@ -114,33 +162,25 @@ const INSET_R = "env(safe-area-inset-right, 0px)";
 const INSET_B = "env(safe-area-inset-bottom, 0px)";
 
 /**
- * Right-edge clearance for the minimap disc, and the floor everything sits on.
+ * THE PAD BOXES — the hit areas, which paint nothing.
  *
- * BOTH ARE NOW PUBLISHED BY THE PLAY SHELL, not decided here (see
- * lesson-ui/immersive.ts + LessonPlayShell's root `style`), and the fallbacks
- * below are exactly the old hard-coded values so a TouchControls mounted
- * outside a shell behaves as it always did.
+ * Each is `min(percentage, ceiling)`: the percentage keeps a thumb's reach
+ * proportional on a small phone, the ceiling stops a tablet from handing a
+ * quarter of the screen to a control that only ever needs a thumb's worth of
+ * travel. They are also what the two glyph rows above them measure from, so the
+ * rows can never land on top of a pad on any device in the ladder (checked at
+ * 852×393, 780×360, 393×852 and 360×780).
  *
- * `--sim-minimap-clearance` — the minimap is 168 px and the pedal cluster sat
- * inboard of a fixed 180 px reservation. But the minimap has been DEFAULT-OFF
- * since the 2026-07-28 review, so on virtually every phone this was 180 px of
- * screen held for a widget that was not on it. It follows the toggle now.
- *
- * `--sim-hud-floor` — the height of the instrument band plus its gutter. The
- * pedals used to start 12 px off the bottom, which put their lower half behind
- * the (inert) status bar: measured 844×390, pedals y 242–370 against a bar at
- * y 304–374. Reading the band's real height means the two cannot overlap.
+ * These are HIT sizes, not ink: the steering pad is 208 px wide and paints
+ * roughly 900 px² — 0.27 % of a landscape iPhone.
  */
-const MINIMAP_CLEARANCE = "var(--sim-minimap-clearance, 180px)";
-const HUD_FLOOR = "var(--sim-hud-floor, 0.75rem)";
+const STEER_PAD_W = "min(42%, 13rem)"; // ≤ 208 px
+const STEER_PAD_H = "min(46%, 9rem)"; //  ≤ 144 px
+const DRIVE_PAD_W = "min(36%, 11rem)"; // ≤ 176 px
+const DRIVE_PAD_H = "min(52%, 11rem)"; // ≤ 176 px
 
-/** Below this overlay width (px) the inboard pedal position would collide
- *  with the steer zone (portrait phones / small letterboxes). Narrow mode
- *  moves the pedals to the right edge instead — over the minimap, which is
- *  pointer-events-none (hud/Minimap.tsx), so the overlap is visual only and
- *  every interactive zone stays clear. Landscape (the recommended
- *  orientation, ≥ this width) keeps the clean inboard layout. */
-const NARROW_LAYOUT_MAX_PX = 640;
+/** Glyph-row height (px) — one 44 px touch row plus nothing else. */
+const ROW_H = "2.75rem";
 
 interface CabinSnap {
   gearLabel: string;
@@ -237,31 +277,6 @@ export function TouchControls({
   const [sheetOpen, setSheetOpen] = useState(false);
   const [snap, setSnap] = useState<CabinSnap | null>(null);
 
-  // Narrow-container fallback (see NARROW_LAYOUT_MAX_PX): measured on the
-  // overlay ROOT (it may live in a letterboxed aspect-video box, so window
-  // width alone would lie). The container only changes size with the window,
-  // fullscreen or orientation — all of which fire these events; plain
-  // listeners beat ResizeObserver here (embedded webviews deliver them more
-  // reliably, and there is nothing container-query-ish to miss).
-  const rootRef = useRef<HTMLDivElement | null>(null);
-  const [narrow, setNarrow] = useState(false);
-  useEffect(() => {
-    if (!visible) return;
-    const measure = () => {
-      const w = rootRef.current?.getBoundingClientRect().width ?? 0;
-      setNarrow(w > 0 && w < NARROW_LAYOUT_MAX_PX);
-    };
-    measure();
-    window.addEventListener("resize", measure);
-    window.addEventListener("orientationchange", measure);
-    document.addEventListener("fullscreenchange", measure);
-    return () => {
-      window.removeEventListener("resize", measure);
-      window.removeEventListener("orientationchange", measure);
-      document.removeEventListener("fullscreenchange", measure);
-    };
-  }, [visible]);
-
   // Low-Hz cabin poll for button active-states (skips setState when equal —
   // steady-state renders are zero).
   useEffect(() => {
@@ -275,26 +290,26 @@ export function TouchControls({
     return () => window.clearInterval(id);
   }, [visible, cabinRef]);
 
-  // ---- steer slider gesture (direct DOM writes, no state) -------------------
-  const steerZoneRef = useRef<HTMLDivElement | null>(null);
+  // ---- steering pad (direct DOM writes, no state) ---------------------------
   const steerKnobRef = useRef<HTMLDivElement | null>(null);
-  const steerGesture = useRef<{
-    pointerId: number;
-    startX: number;
-    rangePx: number;
-    travelPx: number;
-  } | null>(null);
+  const steerPointer = useRef<number | null>(null);
+  const steerStartX = useRef(0);
+
+  /** Knob travel, px — the mark's own half-width, NOT the drag range: the
+   *  ink is a state indicator for an 84 px gesture, not a scale model of it. */
+  const STEER_KNOB_TRAVEL = 27;
 
   const steerApply = useCallback(
     (clientX: number) => {
-      const g = steerGesture.current;
-      if (!g) return;
-      const dx = clientX - g.startX;
-      touch.setSteer(steerFromDrag(dx, g.rangePx));
+      const dx = clientX - steerStartX.current;
+      touch.setSteer(steerFromDrag(dx, TOUCH_STEER_RANGE_PX));
       const knob = steerKnobRef.current;
       if (knob) {
-        const t = Math.min(g.travelPx, Math.max(-g.travelPx, dx));
-        knob.style.transform = `translateX(${t}px)`;
+        const t = Math.max(
+          -STEER_KNOB_TRAVEL,
+          Math.min(STEER_KNOB_TRAVEL, (dx / TOUCH_STEER_RANGE_PX) * STEER_KNOB_TRAVEL),
+        );
+        knob.style.transform = `translateX(${t.toFixed(1)}px)`;
       }
     },
     [touch],
@@ -302,17 +317,12 @@ export function TouchControls({
 
   const onSteerDown = useCallback(
     (e: ReactPointerEvent<HTMLDivElement>) => {
-      if (steerGesture.current !== null) return; // one finger owns the wheel
-      const zone = steerZoneRef.current;
-      if (!zone) return;
-      const rect = zone.getBoundingClientRect();
-      steerGesture.current = {
-        pointerId: e.pointerId,
-        startX: e.clientX,
-        rangePx: rect.width * TOUCH_STEER_RANGE_FRACTION,
-        travelPx: Math.max(24, rect.width / 2 - 36),
-      };
-      capturePointer(zone, e.pointerId);
+      if (steerPointer.current !== null) return; // one finger owns the wheel
+      steerPointer.current = e.pointerId;
+      // RELATIVE, not absolute: the gesture starts wherever the thumb landed,
+      // so the student never has to find a 26 px dot before they can steer.
+      steerStartX.current = e.clientX;
+      capturePointer(e.currentTarget, e.pointerId);
       const knob = steerKnobRef.current;
       if (knob) knob.style.transition = "none";
       steerApply(e.clientX);
@@ -322,15 +332,15 @@ export function TouchControls({
 
   const onSteerMove = useCallback(
     (e: ReactPointerEvent<HTMLDivElement>) => {
-      if (steerGesture.current?.pointerId === e.pointerId) steerApply(e.clientX);
+      if (steerPointer.current === e.pointerId) steerApply(e.clientX);
     },
     [steerApply],
   );
 
   const onSteerEnd = useCallback(
     (e: ReactPointerEvent<HTMLDivElement>) => {
-      if (steerGesture.current?.pointerId !== e.pointerId) return;
-      steerGesture.current = null;
+      if (steerPointer.current !== e.pointerId) return;
+      steerPointer.current = null;
       touch.releaseSteer(); // springs back: keyboard/gamepad regain the axis
       const knob = steerKnobRef.current;
       if (knob) {
@@ -341,55 +351,95 @@ export function TouchControls({
     [touch],
   );
 
+  // ---- drivetrain pad: ONE axis, throttle above centre, brake below --------
+  const driveKnobRef = useRef<HTMLDivElement | null>(null);
+  const drivePointer = useRef<number | null>(null);
+  const driveStartY = useRef(0);
+
+  const DRIVE_KNOB_TRAVEL = 30;
+
+  const driveApply = useCallback(
+    (clientY: number) => {
+      const dy = clientY - driveStartY.current;
+      const axis = driveAxisFromDrag(dy, TOUCH_DRIVE_RANGE_PX);
+      // Exactly one channel is ever held: both pedals down is ambiguous input
+      // and would also veto ReverseAssist's standstill hold.
+      if (axis > 0) {
+        touch.releaseBrake();
+        touch.setThrottle(axis);
+      } else if (axis < 0) {
+        touch.releaseThrottle();
+        touch.setBrake(-axis);
+      } else {
+        touch.releaseThrottle();
+        touch.releaseBrake();
+      }
+      const knob = driveKnobRef.current;
+      if (knob) {
+        const t = Math.max(
+          -DRIVE_KNOB_TRAVEL,
+          Math.min(DRIVE_KNOB_TRAVEL, (dy / TOUCH_DRIVE_RANGE_PX) * DRIVE_KNOB_TRAVEL),
+        );
+        knob.style.transform = `translateY(${t.toFixed(1)}px)`;
+        knob.style.borderColor =
+          axis > 0 ? "var(--success)" : axis < 0 ? "var(--danger)" : "var(--accent)";
+      }
+    },
+    [touch],
+  );
+
+  const onDriveDown = useCallback(
+    (e: ReactPointerEvent<HTMLDivElement>) => {
+      if (drivePointer.current !== null) return;
+      drivePointer.current = e.pointerId;
+      driveStartY.current = e.clientY;
+      capturePointer(e.currentTarget, e.pointerId);
+      const knob = driveKnobRef.current;
+      if (knob) knob.style.transition = "none";
+      driveApply(e.clientY);
+    },
+    [driveApply],
+  );
+
+  const onDriveMove = useCallback(
+    (e: ReactPointerEvent<HTMLDivElement>) => {
+      if (drivePointer.current === e.pointerId) driveApply(e.clientY);
+    },
+    [driveApply],
+  );
+
+  const onDriveEnd = useCallback(
+    (e: ReactPointerEvent<HTMLDivElement>) => {
+      if (drivePointer.current !== e.pointerId) return;
+      drivePointer.current = null;
+      touch.releaseThrottle();
+      touch.releaseBrake();
+      const knob = driveKnobRef.current;
+      if (knob) {
+        knob.style.transition = "transform 140ms ease-out, border-color 140ms linear";
+        knob.style.transform = "translateY(0px)";
+        knob.style.borderColor = "var(--accent)";
+      }
+    },
+    [touch],
+  );
+
   const cabin = () => cabinRef.current;
 
   if (!visible) return null;
 
+  const gearLabel = snap?.gearLabel ?? "—";
+  const inReverse = gearLabel === "R";
+
   return (
     <div
-      ref={rootRef}
       data-hud="touch-controls"
       className="pointer-events-none absolute inset-0 z-10 select-none"
     >
-      {/* -- LEFT: indicators + graded mirror glances, above the steer zone -- */}
+      {/* ══ BOTTOM-LEFT ═ steering ═══════════════════════════════════════════
+          The box is the hit area and paints nothing at all; the mark inside is
+          a 62 px rule and a 22 px knob. */}
       <div
-        className="absolute flex items-center gap-2"
-        style={{
-          left: `calc(0.75rem + ${INSET_L})`,
-          bottom: `calc(11.75rem + ${HUD_FLOOR} + ${INSET_B})`,
-        }}
-      >
-        <RoundButton
-          labelBg="Мигач наляво"
-          active={snap?.indicator === "left"}
-          onClick={() => cabin()?.indicateLeft()}
-        >
-          ⇦
-        </RoundButton>
-        <RoundButton labelBg="Поглед в лявото огледало" onClick={() => cabin()?.glance("left")}>
-          <MirrorGlyph sideBg="Л" />
-        </RoundButton>
-        <RoundButton
-          labelBg="Поглед в огледалото за задно виждане"
-          onClick={() => cabin()?.glance("rear")}
-        >
-          <MirrorGlyph sideBg="З" />
-        </RoundButton>
-        <RoundButton labelBg="Поглед в дясното огледало" onClick={() => cabin()?.glance("right")}>
-          <MirrorGlyph sideBg="Д" />
-        </RoundButton>
-        <RoundButton
-          labelBg="Мигач надясно"
-          active={snap?.indicator === "right"}
-          onClick={() => cabin()?.indicateRight()}
-        >
-          ⇨
-        </RoundButton>
-      </div>
-
-      {/* -- LEFT: steer slider (drag; springs back on release) -------------- */}
-      <div
-        ref={steerZoneRef}
         role="slider"
         aria-label="Волан — плъзни наляво или надясно"
         aria-valuemin={-100}
@@ -399,181 +449,295 @@ export function TouchControls({
         onPointerMove={onSteerMove}
         onPointerUp={onSteerEnd}
         onPointerCancel={onSteerEnd}
-        className="pointer-events-auto absolute touch-none rounded-2xl border border-border bg-background/40 backdrop-blur-sm"
+        className="pointer-events-auto absolute touch-none"
         style={{
-          left: `calc(0.75rem + ${INSET_L})`,
-          bottom: `calc(6rem + ${HUD_FLOOR} + ${INSET_B})`,
-          width: "clamp(11rem, 34vw, 20rem)",
-          height: "5rem",
+          left: 0,
+          bottom: 0,
+          width: `calc(${STEER_PAD_W} + ${INSET_L})`,
+          height: `calc(${STEER_PAD_H} + ${INSET_B})`,
         }}
       >
-        <div className="absolute bottom-2 left-1/2 top-2 w-px -translate-x-1/2 bg-border" aria-hidden />
-        <div className="absolute inset-0 flex items-center justify-center">
+        <div
+          className="absolute flex items-center justify-center"
+          style={{
+            left: `calc(1.25rem + ${INSET_L})`,
+            bottom: `calc(1.1rem + ${INSET_B})`,
+            width: "3.875rem",
+            height: "1.5rem",
+          }}
+          aria-hidden
+        >
+          <span className="absolute inset-x-0 top-1/2 h-px -translate-y-1/2 bg-accent/45" />
+          <span className="absolute left-0 top-1/2 h-2 w-px -translate-y-1/2 bg-accent/45" />
+          <span className="absolute right-0 top-1/2 h-2 w-px -translate-y-1/2 bg-accent/45" />
           <div
             ref={steerKnobRef}
-            className="flex h-14 w-14 items-center justify-center rounded-full border-2 border-accent bg-background/85 text-2xl text-accent shadow-lg"
-            aria-hidden
-          >
-            ⎈
-          </div>
+            className="h-[22px] w-[22px] rounded-full border-2 border-accent bg-background/70"
+          />
         </div>
       </div>
 
-      {/* -- RIGHT: horn + camera + pedals. Landscape: inboard of the minimap
-             (no HUD overlap at all); narrow/portrait: at the right edge, over
-             the pointer-events-none minimap (interactive zones stay clear). */}
+      {/* ══ BOTTOM-RIGHT ═ ONE drivetrain axis ═══════════════════════════════
+          Up = forward · centre = neutral · down = brake, then reverse (the
+          standstill hold hands over to ReverseAssist — see the header). */}
       <div
-        className="absolute flex items-end gap-2"
+        role="slider"
+        aria-label={
+          inReverse
+            ? "Ход — назад: надолу назад, нагоре спирачка"
+            : "Ход — нагоре напред, в средата спиране, задръж надолу за назад"
+        }
+        aria-valuemin={-100}
+        aria-valuemax={100}
+        aria-valuenow={0}
+        onPointerDown={onDriveDown}
+        onPointerMove={onDriveMove}
+        onPointerUp={onDriveEnd}
+        onPointerCancel={onDriveEnd}
+        className="pointer-events-auto absolute touch-none"
         style={{
-          right: narrow
-            ? `calc(0.75rem + ${INSET_R})`
-            : `calc(1.25rem + ${MINIMAP_CLEARANCE} + ${INSET_R})`,
-          bottom: `calc(${HUD_FLOOR} + ${INSET_B})`,
+          right: 0,
+          bottom: 0,
+          width: `calc(${DRIVE_PAD_W} + ${INSET_R})`,
+          height: `calc(${DRIVE_PAD_H} + ${INSET_B})`,
         }}
       >
-        <div className="flex flex-col items-center gap-2">
-          <RoundButton labelBg="Смяна на изглед (камера)" onClick={onToggleCamera}>
-            <span aria-hidden className="text-base">🎥</span>
-          </RoundButton>
-          <HoldButton
-            labelBg="Клаксон — задръж"
-            onHold={(on) => cabin()?.driveline.setHorn(on)}
-            className="h-14 w-14 text-base"
-          >
-            <span aria-hidden>📢</span>
-          </HoldButton>
+        <div
+          className="absolute flex flex-col items-center justify-center"
+          style={{
+            right: `calc(1.25rem + ${INSET_R})`,
+            bottom: `calc(1.1rem + ${INSET_B})`,
+            width: "1.5rem",
+            height: "4.25rem",
+          }}
+          aria-hidden
+        >
+          <span className="absolute inset-y-0 left-1/2 w-px -translate-x-1/2 bg-accent/45" />
+          <span className="absolute left-1/2 top-0 h-px w-2 -translate-x-1/2 bg-accent/45" />
+          <span className="absolute bottom-0 left-1/2 h-px w-2 -translate-x-1/2 bg-accent/45" />
+          <div
+            ref={driveKnobRef}
+            className="h-[22px] w-[22px] rounded-full border-2 bg-background/70"
+            style={{ borderColor: "var(--accent)" }}
+          />
         </div>
-        <PedalStrip
-          labelBg="Спирачка"
-          shortBg="СПИР"
-          fillClassName="bg-red-500/45"
-          set={(v) => touch.setBrake(v)}
-          release={() => touch.releaseBrake()}
-        />
-        <PedalStrip
-          labelBg="Газ"
-          shortBg="ГАЗ"
-          fillClassName="bg-emerald-500/45"
-          set={(v) => touch.setThrottle(v)}
-          release={() => touch.releaseThrottle()}
-        />
+        {/* The selector letter, 11 px, directly ABOVE the axis mark — not in
+            the corner beside it, which is precisely where the thumb sits. Shown
+            only when it is NOT the everyday D: „am I in reverse?" is a real
+            question, „am I in drive?" is not. */}
+        {gearLabel !== "D" ? (
+          <span
+            className="absolute text-[11px] font-black leading-none"
+            style={{
+              right: `calc(1.6rem + ${INSET_R})`,
+              bottom: `calc(5.6rem + ${INSET_B})`,
+              color: inReverse ? "var(--warning)" : "var(--muted)",
+              textShadow: "0 1px 3px rgba(0,0,0,0.9)",
+            }}
+            aria-hidden
+          >
+            {gearLabel}
+          </span>
+        ) : null}
       </div>
 
-      {/* -- EDGE: utility column (fullscreen / pause / controls sheet) ------ */}
+      {/* ══ LEFT ROW ═ signal + the two graded glances on that side ══════════
+          Sits directly on top of the steering pad, hard against the edge, so
+          it can never cover the middle of the picture and never steal a
+          thumb-down from the pad. */}
       <div
-        className="absolute top-1/2 flex -translate-y-1/2 flex-col gap-2"
-        style={{ right: `calc(0.5rem + ${INSET_R})` }}
-        data-hud="touch-utility"
+        className="absolute flex items-center"
+        style={{
+          left: `calc(0.125rem + ${INSET_L})`,
+          bottom: `calc(${STEER_PAD_H} + ${INSET_B})`,
+          height: ROW_H,
+        }}
+      >
+        <GlyphButton
+          labelBg="Мигач наляво"
+          active={snap?.indicator === "left"}
+          onClick={() => cabin()?.indicateLeft()}
+        >
+          ⇦
+        </GlyphButton>
+        <GlyphButton labelBg="Поглед в лявото огледало" onClick={() => cabin()?.glance("left")}>
+          Л
+        </GlyphButton>
+        <GlyphButton
+          labelBg="Поглед в огледалото за задно виждане"
+          onClick={() => cabin()?.glance("rear")}
+        >
+          З
+        </GlyphButton>
+      </div>
+
+      {/* ══ RIGHT ROWS ═ glance + signal + horn, and the utility row above ══ */}
+      <div
+        className="absolute flex items-center"
+        style={{
+          right: `calc(0.125rem + ${INSET_R})`,
+          bottom: `calc(${DRIVE_PAD_H} + ${INSET_B})`,
+          height: ROW_H,
+        }}
+      >
+        <HoldGlyphButton labelBg="Клаксон — задръж" onHold={(on) => cabin()?.driveline.setHorn(on)}>
+          📢
+        </HoldGlyphButton>
+        <GlyphButton labelBg="Поглед в дясното огледало" onClick={() => cabin()?.glance("right")}>
+          Д
+        </GlyphButton>
+        <GlyphButton
+          labelBg="Мигач надясно"
+          active={snap?.indicator === "right"}
+          onClick={() => cabin()?.indicateRight()}
+        >
+          ⇨
+        </GlyphButton>
+      </div>
+
+      <div
+        className="absolute flex items-center"
+        style={{
+          right: `calc(0.125rem + ${INSET_R})`,
+          bottom: `calc(${DRIVE_PAD_H} + ${ROW_H} + ${INSET_B})`,
+          height: ROW_H,
+        }}
       >
         {onToggleFullscreen ? (
-          <RoundButton labelBg="Цял екран" onClick={onToggleFullscreen}>
+          <GlyphButton labelBg="Цял екран" onClick={onToggleFullscreen}>
             ⛶
-          </RoundButton>
+          </GlyphButton>
         ) : null}
-        <RoundButton labelBg="Пауза" onClick={onPause}>
-          ⏸
-        </RoundButton>
-        <RoundButton
+        <GlyphButton labelBg="Пауза" onClick={onPause}>
+          ‖
+        </GlyphButton>
+        <GlyphButton labelBg="Смяна на изглед (камера)" onClick={onToggleCamera}>
+          🎥
+        </GlyphButton>
+        <GlyphButton
           labelBg="Контроли на автомобила"
           active={sheetOpen}
           onClick={() => setSheetOpen((o) => !o)}
         >
           ⚙
-        </RoundButton>
+        </GlyphButton>
       </div>
 
-      {/* -- Driveline sheet: reliable fallback for every cabin control ------ */}
+      {/* ══ DRIVELINE SHEET ══════════════════════════════════════════════════
+          „the popups continue to eat almost the full screen and must be
+          completely redesigned". The old one was a 256 px column up to 78 % of
+          the height — 23 % of a landscape iPhone, straight down the middle of
+          the road, on a screen the founder is measuring in percentages.
+
+          This is a wrapping strip of 44 px transparent cells that starts at the
+          left edge, stops 176 px short of the right one (so it can never share
+          a pixel with the right-hand rails) and floats above the drivetrain pad
+          and both of its rows. One row on a landscape phone, three on a
+          portrait one, and its whole ink is twelve short words — about 2 % of
+          the screen while it is open, against 23 %.
+
+          Same controls, same CabinControls / DrivelineState calls, same single
+          code path as the keys and the cockpit hotspots. */}
       {sheetOpen ? (
         <div
-          className="pointer-events-auto absolute top-1/2 w-64 max-w-[70vw] -translate-y-1/2 overflow-y-auto rounded-2xl border border-border bg-background/90 p-3 backdrop-blur"
-          style={{ right: `calc(3.75rem + ${INSET_R})`, maxHeight: "78%" }}
-          role="dialog"
+          role="toolbar"
           aria-label="Контроли на автомобила"
+          className="pointer-events-auto absolute flex flex-wrap items-end justify-start gap-x-0.5 gap-y-0.5"
+          style={{
+            // Stops short of the right rail's 176 px column so the two can
+            // never share a pixel on any device in the ladder, and sits above
+            // the drivetrain pad and both of its glyph rows.
+            left: `calc(0.125rem + ${INSET_L})`,
+            right: `calc(11rem + ${INSET_R})`,
+            bottom: `calc(${DRIVE_PAD_H} + ${ROW_H} + ${ROW_H} + ${INSET_B})`,
+          }}
         >
-          <div className="mb-2 flex items-center justify-between">
-            <span className="text-[11px] font-bold uppercase tracking-wide text-muted">
-              Контроли
-            </span>
-            <button
-              type="button"
-              aria-label="Затвори"
-              onClick={() => setSheetOpen(false)}
-              className="rounded-full px-2 py-0.5 text-sm text-muted transition hover:text-foreground"
-            >
-              ✕
-            </button>
-          </div>
-
-          {/* Selector stepper: [ ← към P | current | към D → ] */}
-          <div className="mb-2 flex items-center justify-between gap-2 rounded-xl border border-border bg-surface/70 p-2">
-            <button
-              type="button"
-              className="rounded-lg border border-border bg-background/70 px-3 py-2 text-xs font-bold text-foreground transition active:bg-surface"
-              onClick={() => cabin()?.driveline.gearDown()}
-            >
-              ← към P
-            </button>
-            <span className="min-w-10 text-center text-xl font-extrabold text-accent">
-              {snap?.gearLabel ?? "—"}
-            </span>
-            <button
-              type="button"
-              className="rounded-lg border border-border bg-background/70 px-3 py-2 text-xs font-bold text-foreground transition active:bg-surface"
-              onClick={() => cabin()?.driveline.gearUp()}
-            >
-              към D →
-            </button>
-          </div>
-
-          <div className="grid grid-cols-2 gap-2">
-            <SheetToggle
-              labelBg="Двигател"
-              active={snap?.engineOn ?? false}
-              onClick={() => cabin()?.driveline.toggleEngine()}
-            />
-            <SheetToggle
-              labelBg="Ръчна спирачка"
-              active={snap?.parkingBrakeOn ?? false}
-              onClick={() => cabin()?.toggleParkingBrake()}
-            />
-            <SheetToggle
-              labelBg="Колан"
-              active={snap?.seatbeltOn ?? false}
-              onClick={() => cabin()?.toggleSeatbelt()}
-            />
-            <SheetToggle
-              labelBg={
-                snap?.headlights === "high"
-                  ? "Светлини: дълги"
-                  : snap?.headlights === "low"
-                    ? "Светлини: къси"
-                    : "Светлини: изкл."
-              }
-              active={(snap?.headlights ?? "off") !== "off"}
-              onClick={() => cabin()?.cycleHeadlights()}
-            />
-            <SheetToggle
-              labelBg="Аварийни"
-              active={snap?.hazardsOn ?? false}
-              onClick={() => cabin()?.driveline.toggleHazards()}
-            />
-            <SheetToggle
-              labelBg="Чистачки"
-              active={snap?.wipersOn ?? false}
-              onClick={() => cabin()?.driveline.toggleWipers()}
-            />
-            <SheetToggle
-              labelBg="Фарове за мъгла"
-              active={snap?.fogLightsOn ?? false}
-              onClick={() => cabin()?.driveline.toggleFogLights()}
-            />
-            <SheetToggle labelBg="Рестарт на колата" active={false} onClick={onReset} />
-          </div>
-
-          <p className="mt-2 text-[10px] leading-snug text-muted">
-            Съвет: в изглед „кокпит“ можеш да докосваш контролите направо в
-            кабината.
-          </p>
+          <SheetCell
+            textBg="ДВИГ"
+            labelBg="Двигател"
+            active={snap?.engineOn ?? false}
+            onClick={() => cabin()?.driveline.toggleEngine()}
+          />
+          <SheetCell
+            textBg="РЪЧНА"
+            labelBg="Ръчна спирачка"
+            tone="danger"
+            active={snap?.parkingBrakeOn ?? false}
+            onClick={() => cabin()?.toggleParkingBrake()}
+          />
+          <SheetCell
+            textBg="КОЛАН"
+            labelBg="Предпазен колан"
+            tone="danger"
+            active={snap?.seatbeltOn ?? false}
+            onClick={() => cabin()?.toggleSeatbelt()}
+          />
+          <SheetCell
+            textBg={
+              snap?.headlights === "high"
+                ? "ДЪЛГИ"
+                : snap?.headlights === "low"
+                  ? "КЪСИ"
+                  : "СВЕТЛ"
+            }
+            labelBg={
+              snap?.headlights === "high"
+                ? "Светлини: дълги"
+                : snap?.headlights === "low"
+                  ? "Светлини: къси"
+                  : "Светлини: изключени"
+            }
+            active={(snap?.headlights ?? "off") !== "off"}
+            onClick={() => cabin()?.cycleHeadlights()}
+          />
+          <SheetCell
+            textBg="АВАР"
+            labelBg="Аварийни светлини"
+            tone="warning"
+            active={snap?.hazardsOn ?? false}
+            onClick={() => cabin()?.driveline.toggleHazards()}
+          />
+          <SheetCell
+            textBg="ЧИСТ"
+            labelBg="Чистачки"
+            active={snap?.wipersOn ?? false}
+            onClick={() => cabin()?.driveline.toggleWipers()}
+          />
+          <SheetCell
+            textBg="МЪГЛА"
+            labelBg="Фарове за мъгла"
+            active={snap?.fogLightsOn ?? false}
+            onClick={() => cabin()?.driveline.toggleFogLights()}
+          />
+          {/* Selector stepper. The drivetrain axis handles D↔R on its own (the
+              standstill hold), so this is the explicit lever for P and N and
+              for the manual box — kept because a student must always be able
+              to reach the real control, not only the assist. */}
+          <SheetCell
+            textBg="◄P"
+            labelBg="Скоростен лост — стъпка към P"
+            active={false}
+            onClick={() => cabin()?.driveline.gearDown()}
+          />
+          <SheetCell textBg={gearLabel} labelBg={`Скоростен лост: ${gearLabel}`} readOnly />
+          <SheetCell
+            textBg="D►"
+            labelBg="Скоростен лост — стъпка към D"
+            active={false}
+            onClick={() => cabin()?.driveline.gearUp()}
+          />
+          <SheetCell
+            textBg="РЕСТ"
+            labelBg="Рестарт на колата"
+            active={false}
+            onClick={onReset}
+          />
+          <SheetCell
+            textBg="✕"
+            labelBg="Затвори контролите"
+            active={false}
+            onClick={() => setSheetOpen(false)}
+          />
         </div>
       ) : null}
     </div>
@@ -582,18 +746,32 @@ export function TouchControls({
 
 // ---------------------------------------------------------------------------
 // Small building blocks
+//
+// EVERY ONE OF THESE IS A 44 × 44 TRANSPARENT HIT AREA WITH A SMALL GLYPH IN
+// IT. No background, no border, no shadow, no backdrop-filter — so the button
+// costs the screen exactly its glyph and nothing else, while a thumb still has
+// the full 44 px target the WCAG/HIG floor asks for. The `text-shadow` is what
+// keeps a 15 px glyph legible over bright tarmac; it is drawn on the glyph, not
+// on a box, so it buys contrast without buying pixels.
 // ---------------------------------------------------------------------------
 
-/** Mirror glyph: a framed side letter (Л/З/Д) reading as a mirror check. */
-function MirrorGlyph({ sideBg }: { sideBg: string }) {
-  return (
-    <span className="flex h-6 w-7 items-center justify-center rounded-[4px] border border-current text-[11px] font-extrabold">
-      {sideBg}
-    </span>
-  );
+const GLYPH_SHADOW = "0 1px 3px rgba(0,0,0,0.95), 0 0 8px rgba(0,0,0,0.6)";
+
+function glyphStyle(active: boolean, tone?: "danger" | "warning"): CSSProperties {
+  return {
+    color: active
+      ? tone === "danger"
+        ? "var(--danger)"
+        : tone === "warning"
+          ? "var(--warning)"
+          : "var(--accent)"
+      : "var(--foreground)",
+    opacity: active ? 1 : 0.82,
+    textShadow: GLYPH_SHADOW,
+  };
 }
 
-function RoundButton({
+function GlyphButton({
   labelBg,
   active = false,
   onClick,
@@ -611,11 +789,8 @@ function RoundButton({
       title={labelBg}
       aria-pressed={active}
       onClick={onClick}
-      className={`pointer-events-auto flex h-11 w-11 touch-manipulation select-none items-center justify-center rounded-full border text-sm font-bold backdrop-blur transition ${
-        active
-          ? "border-accent bg-accent/25 text-foreground"
-          : "border-border bg-background/60 text-muted active:bg-surface"
-      }`}
+      className="pointer-events-auto flex h-11 w-11 touch-manipulation select-none items-center justify-center text-[15px] font-black leading-none"
+      style={glyphStyle(active)}
     >
       {children}
     </button>
@@ -623,26 +798,27 @@ function RoundButton({
 }
 
 /** Momentary control (horn): down = on, any release path = off. */
-function HoldButton({
+function HoldGlyphButton({
   labelBg,
   onHold,
-  className = "",
   children,
 }: {
   labelBg: string;
   onHold: (on: boolean) => void;
-  className?: string;
   children: ReactNode;
 }) {
   const downRef = useRef(false);
+  const [held, setHeld] = useState(false);
   const start = (e: ReactPointerEvent<HTMLButtonElement>) => {
     capturePointer(e.currentTarget, e.pointerId);
     downRef.current = true;
+    setHeld(true);
     onHold(true);
   };
   const end = () => {
     if (!downRef.current) return;
     downRef.current = false;
+    setHeld(false);
     onHold(false);
   };
   // Release on unmount too — a quiz pause mid-honk must not latch the horn.
@@ -657,7 +833,8 @@ function HoldButton({
       onPointerCancel={end}
       onLostPointerCapture={end}
       onContextMenu={(e) => e.preventDefault()}
-      className={`pointer-events-auto flex touch-none select-none items-center justify-center rounded-full border border-border bg-background/60 font-bold text-muted backdrop-blur transition active:border-accent active:bg-accent/25 active:text-foreground ${className}`}
+      className="pointer-events-auto flex h-11 w-11 touch-none select-none items-center justify-center text-[17px] font-black leading-none"
+      style={glyphStyle(held)}
     >
       {children}
     </button>
@@ -665,116 +842,54 @@ function HoldButton({
 }
 
 /**
- * Vertical pedal strip: pointer position on the strip is the pedal value
- * (bottom 0 → top 1). The fill bar mirrors the value via a direct style
- * write — no React state at gesture rate.
+ * Driveline-sheet cell: the same 44 × 44 transparent target, lit when the
+ * control is engaged.
+ *
+ * A WORD, NOT A PICTOGRAM. These are the controls a learner is least likely to
+ * recognise — „ЧИСТ" is unambiguous where a wiper glyph at 11 px is a smudge,
+ * and this product's whole reason to exist is that the student understands what
+ * they just did. A five-letter 10 px word costs about 370 px² — less than the
+ * emoji it replaces, and it teaches. `readOnly` is the selector letter: a
+ * readout sitting in the row, not a button.
  */
-function PedalStrip({
+function SheetCell({
   labelBg,
-  shortBg,
-  fillClassName,
-  set,
-  release,
-}: {
-  labelBg: string;
-  shortBg: string;
-  fillClassName: string;
-  set: (v: number) => void;
-  release: () => void;
-}) {
-  const zoneRef = useRef<HTMLDivElement | null>(null);
-  const fillRef = useRef<HTMLDivElement | null>(null);
-  const gesture = useRef<{ pointerId: number; top: number; height: number } | null>(null);
-
-  const apply = (clientY: number) => {
-    const g = gesture.current;
-    if (!g) return;
-    const v = pedalFromPointerY(clientY, g.top, g.height);
-    set(v);
-    const fill = fillRef.current;
-    if (fill) fill.style.height = `${Math.round(v * 100)}%`;
-  };
-
-  const onDown = (e: ReactPointerEvent<HTMLDivElement>) => {
-    if (gesture.current !== null) return; // one finger per pedal
-    const zone = zoneRef.current;
-    if (!zone) return;
-    const rect = zone.getBoundingClientRect(); // cached per gesture
-    gesture.current = { pointerId: e.pointerId, top: rect.top, height: rect.height };
-    capturePointer(zone, e.pointerId);
-    apply(e.clientY);
-  };
-  const onMove = (e: ReactPointerEvent<HTMLDivElement>) => {
-    if (gesture.current?.pointerId === e.pointerId) apply(e.clientY);
-  };
-  const onEnd = (e: ReactPointerEvent<HTMLDivElement>) => {
-    if (gesture.current?.pointerId !== e.pointerId) return;
-    gesture.current = null;
-    release();
-    const fill = fillRef.current;
-    if (fill) fill.style.height = "0%";
-  };
-  // Unmount safety: the axis is also released by the overlay's releaseAll.
-  useEffect(
-    () => () => {
-      gesture.current = null;
-    },
-    [],
-  );
-
-  return (
-    <div
-      ref={zoneRef}
-      role="slider"
-      aria-label={labelBg}
-      aria-valuemin={0}
-      aria-valuemax={100}
-      aria-valuenow={0}
-      onPointerDown={onDown}
-      onPointerMove={onMove}
-      onPointerUp={onEnd}
-      onPointerCancel={onEnd}
-      className="pointer-events-auto relative flex touch-none select-none flex-col items-center justify-end overflow-hidden rounded-2xl border border-border bg-background/40 backdrop-blur-sm"
-      style={{ width: "3.5rem", height: "clamp(8rem, 30vh, 11rem)" }}
-    >
-      <div
-        ref={fillRef}
-        className={`absolute bottom-0 left-0 right-0 ${fillClassName}`}
-        style={{ height: "0%" }}
-        aria-hidden
-      />
-      <span className="relative z-10 mb-2 text-[10px] font-extrabold tracking-wide text-foreground/80">
-        {shortBg}
-      </span>
-    </div>
-  );
-}
-
-function SheetToggle({
-  labelBg,
-  active,
+  textBg,
+  active = false,
+  tone,
   onClick,
+  readOnly = false,
 }: {
   labelBg: string;
-  active: boolean;
-  onClick: () => void;
+  textBg: string;
+  active?: boolean;
+  tone?: "danger" | "warning";
+  onClick?: () => void;
+  readOnly?: boolean;
 }) {
+  if (readOnly) {
+    return (
+      <span
+        aria-label={labelBg}
+        title={labelBg}
+        className="flex h-11 w-11 items-center justify-center text-[15px] font-black leading-none"
+        style={glyphStyle(true)}
+      >
+        {textBg}
+      </span>
+    );
+  }
   return (
     <button
       type="button"
+      aria-label={labelBg}
+      title={labelBg}
       aria-pressed={active}
       onClick={onClick}
-      className={`flex items-center gap-2 rounded-xl border px-2.5 py-2 text-left text-[11px] font-bold transition ${
-        active
-          ? "border-accent bg-accent/20 text-foreground"
-          : "border-border bg-surface/60 text-muted active:bg-surface"
-      }`}
+      className="pointer-events-auto flex h-11 w-11 touch-manipulation select-none items-center justify-center text-[10px] font-black uppercase leading-none tracking-tight"
+      style={glyphStyle(active, tone)}
     >
-      <span
-        aria-hidden
-        className={`h-2 w-2 shrink-0 rounded-full ${active ? "bg-accent" : "bg-border"}`}
-      />
-      {labelBg}
+      {textBg}
     </button>
   );
 }

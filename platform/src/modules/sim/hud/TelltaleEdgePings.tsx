@@ -116,6 +116,11 @@ function EdgeColumn({
       //        anchor at 30 % height, on the verge beside the road.
       // Either way: never over the road corridor, and chase/top-down have no
       // mirrors to cover. The glance pings own the exact vertical centre.
+      // Named so the compact overlay layer can stand it down while it is
+      // speaking (SimOverlay's style block): a quiet chip is right when it is
+      // the ONLY thing on screen, and a second panel the moment anything else
+      // appears — which is the stacking the founder rejected.
+      data-hud="telltale-pings"
       className={`pointer-events-none absolute top-[30%] z-10 flex max-w-[42%] flex-col gap-1.5 sm:top-auto sm:bottom-[8.75rem] ${
         side === "left" ? "left-2 items-start" : "right-2 items-end"
       }`}

@@ -37,3 +37,11 @@ tools/clips/headless/cluster/
 # phone-reclaim run left 37 MB of them here and `git add -A` swept them in.
 .r0phone/
 .sim-shots/
+
+# Mobile harness output — tools/mobile/cli.mjs. Screenshots, per-run reports,
+# the dev-server log and the PGlite daemon log. Every sweep writes a fresh
+# run-<timestamp>/ directory of full-resolution PNGs (dpr 3, so ~1 MB each);
+# they exist to be LOOKED at next to a number and then thrown away. The
+# harness's own durable artefact is tools/mobile/baseline.json, which IS
+# tracked, because later phases are measured against it.
+tools/mobile/.out/

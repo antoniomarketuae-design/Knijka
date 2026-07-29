@@ -17,7 +17,11 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { ExamQuestion } from "@/modules/exam";
 import { submitExamAction } from "@/app/(dashboard)/exams/actions";
-import { QuestionMediaView, SignFace } from "@/components/theory/QuestionMedia";
+import {
+  QuestionArtwork,
+  SignFace,
+  useArtworkBudget,
+} from "@/components/theory/QuestionMedia";
 import { CheckControl } from "@/components/ui/CheckControl";
 import { ExamResultView } from "./ExamResultView";
 import {
@@ -99,6 +103,8 @@ export function ExamRunner({
   );
   const [announcement, setAnnouncement] = useState("");
   const [confirmOpen, setConfirmOpen] = useState(false);
+  /** Phone-only: the paper navigator as a sheet (see the <nav> below). */
+  const [navOpen, setNavOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [outcome, setOutcome] = useState<{
@@ -278,6 +284,10 @@ export function ExamRunner({
   const unansweredCount = questions.length - answeredCount;
   const timeLow = remainingSec < WARN_UNDER_SEC;
 
+  // Phase 5: the artwork gives back whatever the question card is over the
+  // phone fold by — same hook, same floor, same reasoning as practice.
+  const artworkPx = useArtworkBudget(questionBoxRef, q.id, q.media != null);
+
   const selectOption = (questionId: string, optionId: string, multi: boolean) => {
     setAnswers((prev) => {
       const current = prev[questionId] ?? [];
@@ -313,15 +323,27 @@ export function ExamRunner({
   }
 
   return (
-    <div className="flex flex-col gap-3 sm:gap-4">
+    // `max-sm:-mb-6` cancels <main>'s bottom padding on phones — see the same
+    // note in PracticeSession: with a pinned action bar, that padding only
+    // ever bought the document enough extra height to scroll.
+    <div className="flex flex-col gap-2 max-sm:-mb-6 sm:gap-4">
       {/* Top bar: progress + timer + submit.
-          MOBILE FOLD (founder review, 390x844): this bar wrapped to two rows
+          MOBILE FOLD (founder review, 393x852): this bar wrapped to two rows
           because the 2xl clock and „Предай изпита" could not share a line with
           the counters — ~94px of chrome before the question. Below `sm` the
           clock moves to the sticky footer (where it is visible ALL the time
           instead of scrolling away, which is strictly better for a scored
-          40-minute paper) and the labels shorten, so this is one 24px row. */}
-      <header className="card flex flex-wrap items-center gap-x-4 gap-y-2 px-4 py-2.5 sm:gap-x-5 sm:px-5 sm:py-3">
+          40-minute paper) and the labels shorten, so this is one 24px row.
+
+          PHASE 5 folds the question card's OWN meta row into this one on
+          phones: the weight („3 т.") and the multi-answer warning used to sit
+          on a 42px row of their own directly below, and „Отбележи за преглед"
+          — a spelled-out button for a feature a candidate uses a handful of
+          times in 45 questions — sat there with them. The weight and the
+          warning are two pills that fit here with room to spare; the flag
+          moves into the sticky bar, where it is one thumb-reach away at every
+          scroll position instead of scrolling off with the question. */}
+      <header className="card flex flex-wrap items-center gap-x-3 gap-y-1.5 px-3 py-1.5 sm:gap-x-5 sm:px-5 sm:py-3">
         <p className="text-sm font-bold tabular-nums">
           Въпрос {idx + 1}
           <span className="text-muted">
@@ -330,9 +352,19 @@ export function ExamRunner({
           </span>
         </p>
         <p className="text-sm tabular-nums text-muted">
-          Отговорени: {answeredCount}
-          <span className="hidden sm:inline">/{questions.length}</span>
+          <span className="sm:hidden">отг. {answeredCount}</span>
+          <span className="hidden sm:inline">
+            Отговорени: {answeredCount}/{questions.length}
+          </span>
         </p>
+        <span className="rounded-full bg-surface-2 px-2 py-0.5 text-[11px] font-black tabular-nums text-muted sm:hidden">
+          {q.points} т.
+        </span>
+        {q.type === "multi" ? (
+          <span className="rounded-full border border-warning/50 px-2 py-0.5 text-[11px] font-bold text-warning sm:hidden">
+            Всички верни
+          </span>
+        ) : null}
 
         <div className="ml-auto flex items-center gap-4">
           <p
@@ -350,7 +382,7 @@ export function ExamRunner({
             type="button"
             onClick={() => setConfirmOpen(true)}
             disabled={submitting}
-            className="btn-accent px-4 py-1.5 disabled:cursor-not-allowed disabled:opacity-60 sm:py-2"
+            className="btn-accent px-3 py-1.5 disabled:cursor-not-allowed disabled:opacity-60 sm:px-4 sm:py-2"
           >
             {submitting ? (
               "Предаване…"
@@ -366,13 +398,23 @@ export function ExamRunner({
         </div>
       </header>
 
+      {/* Under five minutes. The wording is short on a phone because this is
+          the state the fold has LEAST room in and the sentence is the one
+          thing on screen that is also being shouted by a red countdown pinned
+          in the action bar. The full sentence stays for `sm` up and for the
+          screen reader, which reads the live region either way. */}
       {timeLow ? (
         <p
           role="status"
-          className="card border-danger/50 px-4 py-2 text-xs font-bold text-danger sm:py-2.5 sm:text-sm"
+          className="card border-danger/50 px-3 py-1.5 text-xs font-bold text-danger sm:px-4 sm:py-2.5 sm:text-sm"
         >
-          Остават по-малко от 5 минути. При изтичане на времето изпитът се
-          предава автоматично.
+          <span className="sm:hidden">
+            Под 5 минути — при изтичане изпитът се предава автоматично.
+          </span>
+          <span className="hidden sm:inline">
+            Остават по-малко от 5 минути. При изтичане на времето изпитът се
+            предава автоматично.
+          </span>
         </p>
       ) : null}
 
@@ -398,9 +440,12 @@ export function ExamRunner({
           ref={questionBoxRef}
           tabIndex={-1}
           aria-label={`Въпрос ${idx + 1} от ${questions.length}`}
-          className="card flex flex-col gap-3 p-4 outline-none sm:gap-4 sm:p-6"
+          className="card flex flex-col gap-2 p-3 outline-none sm:gap-4 sm:p-6"
         >
-          <div className="flex flex-wrap items-center gap-2">
+          {/* Meta row — `sm` and up only. On phones the weight and the
+              multi-answer pill live in the top bar and the flag lives in the
+              action bar; see the header comment. */}
+          <div className="hidden flex-wrap items-center gap-2 sm:flex">
             <span className="rounded-full bg-surface-2 px-2.5 py-0.5 text-xs font-black tabular-nums text-muted">
               {q.points} {q.points === 1 ? "точка" : "точки"}
             </span>
@@ -424,7 +469,7 @@ export function ExamRunner({
             </button>
           </div>
 
-          <fieldset className="flex flex-col gap-3 sm:gap-4">
+          <fieldset className="flex flex-col gap-2 sm:gap-4">
             {/* mb-1: a <legend> is laid out outside the fieldset's flex
                 formatting context, so the fieldset's `gap` never separated the
                 question from the first option — they touched. */}
@@ -433,11 +478,12 @@ export function ExamRunner({
             </legend>
 
             {q.media !== null && "kind" in q.media ? (
-              // THEO-1 data-driven media — the exact components the practice
-              // runner mounts, so exam and practice can never diverge. The
-              // artwork keeps its size on phones (the sign IS the question);
-              // only the decorative frame padding gives ground.
-              <QuestionMediaView media={q.media} className="max-sm:p-2.5" />
+              // THEO-1 data-driven media — the exact component the practice
+              // runner mounts, so exam and practice can never diverge. On a
+              // phone it is drawn to a height budget and opens full screen on
+              // tap (QuestionMedia.tsx explains the reversal); from `sm` up it
+              // is unchanged. 96px here for the same reason as practice.
+              <QuestionArtwork media={q.media} heightPx={artworkPx} />
             ) : q.media !== null ? (
               <p className="rounded-xl border border-dashed border-border px-4 py-6 text-center text-sm text-muted">
                 Към този въпрос има{" "}
@@ -446,13 +492,18 @@ export function ExamRunner({
               </p>
             ) : null}
 
-            <div className="flex flex-col gap-2">
+            <div className="flex flex-col gap-1.5 sm:gap-2">
               {q.options.map((option) => {
                 const checked = (answers[q.id] ?? []).includes(option.id);
                 return (
+                  // Same phone geometry as the practice row and for the same
+                  // reason (PracticeSession.tsx has the arithmetic): the answer
+                  // text column is what buys lines back, and `min-h-11` is the
+                  // 44px thumb guarantee stated directly instead of inferred
+                  // from padding.
                   <label
                     key={option.id}
-                    className={`flex cursor-pointer items-start gap-3 rounded-xl border px-3.5 py-3 transition motion-reduce:transition-none sm:p-3.5 ${
+                    className={`flex min-h-11 cursor-pointer items-start gap-2.5 rounded-xl border px-3 py-2.5 transition motion-reduce:transition-none sm:gap-3 sm:p-3.5 ${
                       checked
                         ? "border-accent bg-accent/10"
                         : "border-border hover:border-border-strong hover:bg-surface-2"
@@ -477,7 +528,7 @@ export function ExamRunner({
                         className="h-16 w-16 shrink-0"
                       />
                     ) : null}
-                    <span className="text-sm leading-relaxed">
+                    <span className="min-w-0 flex-1 text-sm leading-[1.45] sm:leading-relaxed">
                       {option.textBg}
                     </span>
                   </label>
@@ -494,14 +545,48 @@ export function ExamRunner({
               against), and the timer — the one number a candidate checks
               constantly — scrolled off the top the moment they reached the
               answers. Desktop keeps the plain in-flow row. */}
-          <div className="mt-auto flex items-center justify-between gap-3 border-t border-border pt-4 max-sm:sticky max-sm:bottom-0 max-sm:z-20 max-sm:-mx-4 max-sm:-mb-4 max-sm:rounded-b-xl max-sm:border-border max-sm:bg-surface/95 max-sm:px-4 max-sm:py-2 max-sm:backdrop-blur max-sm:[padding-bottom:calc(0.5rem+env(safe-area-inset-bottom))]">
+          <div className="mt-auto flex items-center justify-between gap-2 border-t border-border pt-4 max-sm:sticky max-sm:bottom-0 max-sm:z-20 max-sm:-mx-3 max-sm:-mb-3 max-sm:rounded-b-xl max-sm:border-border max-sm:bg-surface/95 max-sm:px-3 max-sm:py-1.5 max-sm:backdrop-blur max-sm:[padding-bottom:calc(0.375rem+env(safe-area-inset-bottom))]">
             <button
               type="button"
               onClick={() => setIdx((i) => Math.max(0, i - 1))}
               disabled={idx === 0}
               className="btn-ghost px-3 py-2 disabled:cursor-not-allowed disabled:opacity-40 sm:px-4"
             >
-              ← Предишен
+              <span aria-hidden className="sm:hidden">
+                ←
+              </span>
+              <span className="hidden sm:inline">← Предишен</span>
+              <span className="visually-hidden sm:hidden">Предишен въпрос</span>
+            </button>
+
+            {/* Phone-only controls, in the one strip that never scrolls away:
+                the flag, the paper navigator and the countdown. */}
+            <button
+              type="button"
+              onClick={() => toggleFlag(q.id)}
+              aria-pressed={!!flags[q.id]}
+              className={`inline-flex h-11 w-11 items-center justify-center rounded-xl border transition motion-reduce:transition-none sm:hidden ${
+                flags[q.id]
+                  ? "border-warning/60 bg-warning/10 text-warning"
+                  : "border-border text-muted"
+              }`}
+            >
+              <FlagIcon />
+              <span className="visually-hidden">
+                {flags[q.id] ? "Отбелязан за преглед" : "Отбележи за преглед"}
+              </span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setNavOpen(true)}
+              aria-haspopup="dialog"
+              className="inline-flex h-11 items-center gap-1.5 rounded-xl border border-border px-2.5 font-mono text-xs font-bold tabular-nums text-muted sm:hidden"
+            >
+              <GridIcon />
+              {answeredCount}/{questions.length}
+              <span className="visually-hidden">
+                Отвори навигацията по въпросите
+              </span>
             </button>
             <p
               aria-hidden="true"
@@ -517,64 +602,73 @@ export function ExamRunner({
               disabled={idx === questions.length - 1}
               className="btn-ghost px-3 py-2 disabled:cursor-not-allowed disabled:opacity-40 sm:px-4"
             >
-              Следващ →
+              <span aria-hidden className="sm:hidden">
+                →
+              </span>
+              <span className="hidden sm:inline">Следващ →</span>
+              <span className="visually-hidden sm:hidden">Следващ въпрос</span>
             </button>
           </div>
         </section>
 
-        {/* Navigator */}
-        <nav aria-label="Навигация по въпросите" className="card h-fit p-4">
-          <ol className="grid grid-cols-9 gap-1.5 sm:grid-cols-9 lg:grid-cols-5">
-            {questions.map((question, i) => {
-              const isAnswered = (answers[question.id] ?? []).length > 0;
-              const isFlagged = !!flags[question.id];
-              const isCurrent = i === idx;
-              return (
-                <li key={question.id} className="relative">
-                  <button
-                    type="button"
-                    onClick={() => setIdx(i)}
-                    aria-current={isCurrent ? "true" : undefined}
-                    aria-label={`Въпрос ${i + 1}${
-                      isAnswered ? ", отговорен" : ", без отговор"
-                    }${isFlagged ? ", отбелязан за преглед" : ""}`}
-                    className={`flex h-9 w-full items-center justify-center rounded-lg border text-xs font-bold tabular-nums transition motion-reduce:transition-none ${
-                      isCurrent
-                        ? "border-accent bg-accent text-accent-foreground shadow-glow-sm"
-                        : isAnswered
-                          ? "border-accent/40 bg-accent/15 text-accent"
-                          : "border-border text-muted hover:border-border-strong hover:bg-surface-2"
-                    }`}
-                  >
-                    {i + 1}
-                  </button>
-                  {isFlagged ? (
-                    <span
-                      aria-hidden="true"
-                      className="absolute -right-0.5 -top-0.5 h-2.5 w-2.5 rounded-full border border-background bg-warning"
-                    />
-                  ) : null}
-                </li>
-              );
-            })}
-          </ol>
-
-          <ul className="mt-4 flex flex-col gap-1.5 text-xs text-muted">
-            <li className="flex items-center gap-2">
-              <span aria-hidden="true" className="h-3 w-3 rounded bg-accent/15 outline outline-1 outline-accent/40" />
-              отговорен
-            </li>
-            <li className="flex items-center gap-2">
-              <span aria-hidden="true" className="h-3 w-3 rounded bg-accent" />
-              текущ въпрос
-            </li>
-            <li className="flex items-center gap-2">
-              <span aria-hidden="true" className="h-3 w-3 rounded-full bg-warning" />
-              за преглед
-            </li>
-          </ul>
+        {/* Navigator.
+            PHONE (phase 5): 45 buttons in a 9-column grid plus its legend is
+            ~300px of DOCUMENT hanging below the question card — on a 852px
+            screen that alone guarantees the page scrolls, and it is exactly the
+            „information panel" the founder says is eating his screen. It is a
+            jump table, not part of answering, so on a phone it becomes a sheet
+            opened from the action bar and the page stops scrolling at all.
+            From `sm` up it is the same panel in the same place as before. */}
+        <nav
+          aria-label="Навигация по въпросите"
+          className="card hidden h-fit p-4 sm:block"
+        >
+          <NavigatorGrid
+            questions={questions}
+            answers={answers}
+            flags={flags}
+            idx={idx}
+            onPick={setIdx}
+          />
+          <NavigatorLegend />
         </nav>
       </div>
+
+      {navOpen ? (
+        <div className="fixed inset-0 z-50 flex flex-col justify-end sm:hidden">
+          <button
+            type="button"
+            aria-label="Затвори навигацията"
+            onClick={() => setNavOpen(false)}
+            className="absolute inset-0 bg-black/60"
+          />
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-label="Навигация по въпросите"
+            className="card relative z-10 max-h-[80dvh] overflow-y-auto rounded-b-none p-4 [padding-bottom:calc(1rem+env(safe-area-inset-bottom))]"
+          >
+            <NavigatorGrid
+              questions={questions}
+              answers={answers}
+              flags={flags}
+              idx={idx}
+              onPick={(i) => {
+                setIdx(i);
+                setNavOpen(false);
+              }}
+            />
+            <NavigatorLegend />
+            <button
+              type="button"
+              onClick={() => setNavOpen(false)}
+              className="btn-ghost mt-4 w-full"
+            >
+              Затвори
+            </button>
+          </div>
+        </div>
+      ) : null}
 
       {/* Submit confirmation dialog */}
       {confirmOpen ? (
@@ -631,6 +725,96 @@ export function ExamRunner({
         </div>
       ) : null}
     </div>
+  );
+}
+
+/**
+ * The 45-cell jump table. Extracted so the desktop panel and the phone sheet
+ * are literally the same control — a second copy is how the two drift.
+ */
+function NavigatorGrid({
+  questions,
+  answers,
+  flags,
+  idx,
+  onPick,
+}: {
+  questions: ExamQuestion[];
+  answers: Record<string, string[]>;
+  flags: Record<string, boolean>;
+  idx: number;
+  onPick: (i: number) => void;
+}) {
+  return (
+    <ol className="grid grid-cols-9 gap-1.5 lg:grid-cols-5">
+      {questions.map((question, i) => {
+        const isAnswered = (answers[question.id] ?? []).length > 0;
+        const isFlagged = !!flags[question.id];
+        const isCurrent = i === idx;
+        return (
+          <li key={question.id} className="relative">
+            <button
+              type="button"
+              onClick={() => onPick(i)}
+              aria-current={isCurrent ? "true" : undefined}
+              aria-label={`Въпрос ${i + 1}${
+                isAnswered ? ", отговорен" : ", без отговор"
+              }${isFlagged ? ", отбелязан за преглед" : ""}`}
+              className={`flex h-9 w-full items-center justify-center rounded-lg border text-xs font-bold tabular-nums transition motion-reduce:transition-none ${
+                isCurrent
+                  ? "border-accent bg-accent text-accent-foreground shadow-glow-sm"
+                  : isAnswered
+                    ? "border-accent/40 bg-accent/15 text-accent"
+                    : "border-border text-muted hover:border-border-strong hover:bg-surface-2"
+              }`}
+            >
+              {i + 1}
+            </button>
+            {isFlagged ? (
+              <span
+                aria-hidden="true"
+                className="absolute -right-0.5 -top-0.5 h-2.5 w-2.5 rounded-full border border-background bg-warning"
+              />
+            ) : null}
+          </li>
+        );
+      })}
+    </ol>
+  );
+}
+
+function NavigatorLegend() {
+  return (
+    <ul className="mt-4 flex flex-col gap-1.5 text-xs text-muted">
+      <li className="flex items-center gap-2">
+        <span
+          aria-hidden="true"
+          className="h-3 w-3 rounded bg-accent/15 outline outline-1 outline-accent/40"
+        />
+        отговорен
+      </li>
+      <li className="flex items-center gap-2">
+        <span aria-hidden="true" className="h-3 w-3 rounded bg-accent" />
+        текущ въпрос
+      </li>
+      <li className="flex items-center gap-2">
+        <span aria-hidden="true" className="h-3 w-3 rounded-full bg-warning" />
+        за преглед
+      </li>
+    </ul>
+  );
+}
+
+function GridIcon() {
+  return (
+    <svg
+      aria-hidden="true"
+      viewBox="0 0 16 16"
+      fill="currentColor"
+      className="h-3.5 w-3.5"
+    >
+      <path d="M2 2h4v4H2V2Zm5 0h4v4H7V2Zm5 0h2v4h-2V2ZM2 7h4v4H2V7Zm5 0h4v4H7V7Zm5 0h2v4h-2V7ZM2 12h4v2H2v-2Zm5 0h4v2H7v-2Zm5 0h2v2h-2v-2Z" />
+    </svg>
   );
 }
 

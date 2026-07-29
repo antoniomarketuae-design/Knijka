@@ -18,7 +18,9 @@
     "seed:founder": "node scripts/seed-founder.mjs",
     "glb:optimize": "node ../tools/glb/optimize.mjs",
     "assets:budget": "node ../tools/assets/check-asset-budget.mjs",
-    "assets:prune": "node ../tools/assets/prune-public.mjs --public public"
+    "assets:prune": "node ../tools/assets/prune-public.mjs --public public",
+    "mobile:sweep": "node ../tools/mobile/cli.mjs",
+    "mobile:budget": "vitest run ../tools/mobile/budget.test.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.110.0",

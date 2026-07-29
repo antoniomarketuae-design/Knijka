@@ -1356,11 +1356,18 @@ function ReadyScene({
               📱
             </p>
             <h2 className="text-lg font-bold">Караш направо от телефона</h2>
+            {/* The ONE thing this card has to teach, because it is the founder's
+                own complaint („very hard to switch to reverse") and because the
+                gesture is invisible by design: down is the brake, and holding it
+                at a standstill puts the car in R — after which down keeps
+                meaning backwards. Everything else on this screen can be found by
+                touching it; that cannot. */}
             <p className="text-sm text-muted">
-              Завърти телефона хоризонтално за най-добър изглед. Управлявай с
-              плъзгачите: воланът е вляво, газта и спирачката — вдясно.
-              Контролите в кабината се докосват направо, а „⚙“ отваря
-              останалите (двигател, скорости, светлини…).
+              Завърти телефона хоризонтално. Палецът вляво завърта волана,
+              палецът вдясно кара: нагоре — газ, в средата — нищо, надолу —
+              спирачка. Задръж надолу, докато колата стои — тя минава на заден
+              ход и надолу вече е назад. „⚙“ отваря двигател, скорости и
+              светлини; в кабината можеш да докосваш контролите направо.
             </p>
             <button type="button" autoFocus className="btn-accent" onClick={dismissTouchHint}>
               Разбрах
@@ -1478,6 +1485,26 @@ function cabinPollBaseline(cabin: CabinControls | null, rawBrake: number): Cabin
  * (26 rem vs 36 rem width + TraceTimeline `compact` controls), sits ABOVE
  * the status bar (bottom-[6.75rem] clears the bar's ~100 px strip), and
  * collapses to a small pill via the toggle.
+ *
+ * ON A PHONE IT STARTS COLLAPSED (2026-07-29, measured). The same ruling read
+ * on the founder's own device: open, this deck laid out 21.5 % of an 852 × 393
+ * landscape iPhone — a caption card, a scrub bar and a transport row parked
+ * dead centre, on the screen where he said „approximately half … is occupied by
+ * controls, information panels, popups". After the touch controls and the
+ * instrument band were cut to 1.7 % and 0.9 %, this ONE panel was over half of
+ * all remaining chrome, and twelve of the nineteen sub-44 px touch targets on
+ * the screen were its 20 × 28 annotation ticks and 32 × 32 transport buttons.
+ *
+ * Nothing is removed: the pill is still there, one tap opens it, the shadow
+ * car's blue ribbon still draws in the world, and on any roomy screen the deck
+ * opens exactly as it always did. What changes is which one the phone starts
+ * on — and on a phone the demonstration is the thing happening on the ROAD, not
+ * the scrub bar in front of it.
+ *
+ * The threshold is immersive.ts's compact test, inlined rather than imported:
+ * this file is the scene, that one belongs to the play shell, and the number is
+ * a device fact (every phone in landscape is under 560 px tall; every tablet is
+ * over) rather than a shared decision.
  */
 function DemoDeck({
   trace,
@@ -1486,7 +1513,11 @@ function DemoDeck({
   trace: ScenarioTrace;
   clockRef: React.RefObject<TraceClock>;
 }) {
-  const [open, setOpen] = useState(true);
+  const [open, setOpen] = useState(
+    () =>
+      typeof window === "undefined" ||
+      !(window.innerHeight <= 560 || window.innerWidth <= 640),
+  );
   return (
     <div className="absolute bottom-[6.75rem] left-1/2 z-10 flex w-[min(88%,26rem)] -translate-x-1/2 flex-col items-center gap-1">
       <button

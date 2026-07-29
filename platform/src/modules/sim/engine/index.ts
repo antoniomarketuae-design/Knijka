@@ -65,9 +65,13 @@ export {
 export {
   TouchInputSource,
   steerFromDrag,
+  driveAxisFromDrag,
   pedalFromPointerY,
   TOUCH_STEER_EXPO,
   TOUCH_STEER_RANGE_FRACTION,
+  TOUCH_STEER_RANGE_PX,
+  TOUCH_DRIVE_RANGE_PX,
+  TOUCH_DRIVE_DEADZONE_PX,
 } from "./touch";
 
 // doc 82 §4.3 F5 — three discrete haptic events, always redundant with a

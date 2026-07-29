@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import {
   useEffect,
   useMemo,
+  useRef,
   useState,
   useSyncExternalStore,
   useTransition,
@@ -14,7 +15,12 @@ import { IconArrowRight, IconCheck, IconTarget, IconX } from "@/components/icons
 import { CheckControl } from "@/components/ui/CheckControl";
 import { Gauge } from "@/components/hud/Gauge";
 import type { PracticeQuestionDto, PracticeSubmitResult } from "./types";
-import { hasSignOptions, QuestionMediaView, SignFace } from "./QuestionMedia";
+import {
+  hasSignOptions,
+  QuestionArtwork,
+  SignFace,
+  useArtworkBudget,
+} from "./QuestionMedia";
 import { WhyPanel, WhyPanelIdle } from "./WhyPanel";
 import { buildWhyPanelModel } from "@/modules/clips/view";
 
@@ -195,6 +201,14 @@ export function PracticeSession({
   // the in-card mobile section — so MistakeReplay never fetches twice. Safe
   // for hydration: `result` is always null at SSR, so nothing renders early.
   const isDesktop = useSyncExternalStore(subscribeDesktop, readDesktop, () => false);
+
+  // Phase 5: the artwork gives back whatever this card is over the fold by.
+  const cardRef = useRef<HTMLElement>(null);
+  const artworkPx = useArtworkBudget(
+    cardRef,
+    current?.id ?? "",
+    current?.media != null && result === null,
+  );
   const panelModel = useMemo(
     () =>
       result === null || current === null
@@ -221,57 +235,55 @@ export function PracticeSession({
   const signGrid = hasSignOptions(current.options);
 
   return (
-    <div className="mx-auto flex w-full max-w-2xl flex-col gap-4 lg:max-w-none lg:flex-row lg:items-start lg:justify-center lg:gap-6">
+    // `max-sm:-mb-6` cancels <main>'s bottom padding on phones. That padding
+    // is breathing room under a page you scroll; here the card ends in an
+    // action bar that is already pinned to the bottom of the screen, so all it
+    // did was make the document 24px taller than the viewport — which is
+    // enough, on its own, to pin the bar over the last answer.
+    <div className="mx-auto flex w-full max-w-2xl flex-col gap-4 max-sm:-mb-6 lg:max-w-none lg:flex-row lg:items-start lg:justify-center lg:gap-6">
     <section
+      ref={cardRef}
       aria-label={`Въпрос ${index + 1} от ${questions.length}`}
-      className="card flex w-full min-w-0 flex-col gap-4 p-4 sm:gap-6 sm:p-7 lg:max-w-2xl"
+      className="card flex w-full min-w-0 flex-col gap-2.5 p-3 sm:gap-6 sm:p-7 lg:max-w-2xl"
     >
-      {/* Progress.
-          MOBILE FOLD (founder review): every row of chrome here is 390x844
+      {/* Progress — `sm` and up.
+          MOBILE FOLD (founder review): every row of chrome here is 393x852
           real estate stolen from the answers. The counter, the streak, the
           reason badge and the points used to occupy three stacked rows —
-          ~90px before the question even starts. Below `sm` they collapse into
-          ONE row of short forms; the long wording returns from `sm` up, and
-          the section's aria-label („Въпрос N от M") carries the full sentence
-          for screen readers either way. */}
-      <div className="flex flex-col gap-2 sm:gap-2.5">
+          ~90px before the question even starts.
+
+          PHASE 5 takes the last of it. Below `sm` this whole block moves into
+          the sticky action bar at the bottom of the card — the strip that was
+          already pinned there for „Провери" and was two thirds empty. That is
+          the Gran Turismo lesson the founder sent as a reference: the readouts
+          live hard against an edge and the middle of the screen is the thing
+          you are actually doing. It buys 38px directly above the question,
+          which is the row a long answer needs, and the counters end up MORE
+          visible than they were — they no longer scroll away.
+
+          The screen reader is not paying for it: the section's aria-label
+          („Въпрос N от M") carries the sentence, and exactly one of the two
+          progressbars is in the tree at any width (the other is display:none). */}
+      <div className="hidden flex-col gap-1 sm:flex sm:gap-2.5">
         <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1.5">
           <p className="flex flex-wrap items-baseline gap-x-2 text-sm font-semibold tabular-nums text-muted">
             <span>
-              <span className="sm:hidden" aria-hidden>
-                <span className="font-bold text-foreground">{index + 1}</span>/
-                {questions.length}
-              </span>
-              <span className="hidden sm:inline">
-                Въпрос <span className="font-bold text-foreground">{index + 1}</span>{" "}
-                от {questions.length}
-              </span>
+              Въпрос <span className="font-bold text-foreground">{index + 1}</span>{" "}
+              от {questions.length}
             </span>
             {answeredCount > 0 ? (
               <span className="text-xs font-semibold text-accent-2">
-                <span className="sm:hidden">· {correctCount} верни</span>
-                <span className="hidden sm:inline">
-                  ({correctCount} верни досега)
-                </span>
+                ({correctCount} верни досега)
               </span>
             ) : null}
             {quota !== null ? (
               // Live free-tier meter: answers in this session count toward today.
               <span className="font-mono text-[11px] font-bold text-muted">
-                <span className="sm:hidden">
-                  ·{" "}
-                  <span className="text-accent">
-                    {Math.min(quota.limit, quota.usedToday + answeredCount)}
-                  </span>
-                  /{quota.limit} днес
-                </span>
-                <span className="hidden sm:inline">
-                  · Днес:{" "}
-                  <span className="text-accent">
-                    {Math.min(quota.limit, quota.usedToday + answeredCount)}
-                  </span>{" "}
-                  от {quota.limit} безплатни въпроса
-                </span>
+                · Днес:{" "}
+                <span className="text-accent">
+                  {Math.min(quota.limit, quota.usedToday + answeredCount)}
+                </span>{" "}
+                от {quota.limit} безплатни въпроса
               </span>
             ) : null}
           </p>
@@ -304,28 +316,32 @@ export function PracticeSession({
       {/* THEO-1: visual media renders ABOVE the question text. Sign codes
           and scene data describe the situation, never the answer.
 
-          The ARTWORK keeps its size on phones — the sign IS the question, and
-          a shrunken pictogram is a harder question, not a smaller one. What
-          goes is the FRAME: 16px of decorative padding either side of it. */}
+          On a phone the artwork is drawn to a HEIGHT BUDGET and the block is a
+          button that opens it full screen — see QuestionArtwork for why that
+          reverses the previous pass's „the artwork never shrinks" rule. 96px
+          is what is left here once the progress strip, a two-line question,
+          four answers and the action bar have taken theirs; the viewer then
+          gives 361px, three times what the inline block ever showed. From
+          `sm` up this is the same component at the same size as before. */}
       {current.media !== null ? (
-        <QuestionMediaView media={current.media} className="max-sm:p-2.5" />
+        <QuestionArtwork media={current.media} heightPx={artworkPx} />
       ) : null}
 
       {/* Question + options */}
       <fieldset className="min-w-0" disabled={isChecking}>
-        <legend className="max-w-[62ch] text-lg font-bold leading-relaxed text-foreground sm:text-xl">
+        <legend className="max-w-[62ch] text-lg font-bold leading-snug text-foreground sm:text-xl sm:leading-relaxed">
           {current.textBg}
         </legend>
         {current.type === "multi" ? (
-          <p className="mt-2 text-xs font-bold text-accent">
+          <p className="mt-1.5 text-xs font-bold text-accent sm:mt-2">
             Избери всички верни отговори.
           </p>
         ) : null}
         <ul
           className={
             signGrid
-              ? "mt-3 grid grid-cols-2 gap-2 sm:mt-4 sm:grid-cols-3 sm:gap-2.5"
-              : "mt-3 flex flex-col gap-2 sm:mt-4 sm:gap-2.5"
+              ? "mt-2 grid grid-cols-2 gap-1.5 sm:mt-4 sm:grid-cols-3 sm:gap-2.5"
+              : "mt-2 flex flex-col gap-1.5 sm:mt-4 sm:gap-2.5"
           }
         >
           {current.options.map((option, optionIndex) => {
@@ -408,8 +424,29 @@ export function PracticeSession({
 
             return (
               <li key={option.id}>
+                {/* THE OPTION ROW, AND WHERE ITS PIXELS ACTUALLY WENT.
+                    Every previous pass at the fold traded VERTICAL padding and
+                    ran out of room. The real cost is HORIZONTAL: at 393px the
+                    card column is 337px and this row spent 64 of them — 19 % —
+                    on furniture before a single character of the answer
+                    (px-4 = 32, the tick box 16, two gap-3 = 24, the ordinal
+                    badge 24). A narrower text column is more wrapped lines, and
+                    a line costs 23px four times over.
+
+                    So on phones the ordinal badge is gone and the paddings
+                    tighten: the answer text column goes 233px -> 285px, +22 %,
+                    which is roughly one line back on any option that wrapped to
+                    four — WITHOUT touching the 14px the seventeen-year-old is
+                    reading. The badge is not a loss: it exists to label the
+                    1–9 keyboard shortcuts, and the line that explains those is
+                    itself `md:block`. It returns from `sm` up with the
+                    keyboard.
+
+                    `min-h-11` (44px) replaces py-3 as the guarantee that the
+                    row is thumb-sized — it is the property that actually
+                    matters, stated directly instead of inferred from padding. */}
                 <label
-                  className={`flex items-start gap-3 rounded-xl border px-4 py-3 text-sm transition duration-200 ease-out focus-within:ring-2 focus-within:ring-accent/50 motion-reduce:transition-none motion-reduce:transform-none sm:py-3.5 ${stateClasses} ${
+                  className={`flex min-h-11 items-start gap-2.5 rounded-xl border px-3 py-2.5 text-sm transition duration-200 ease-out focus-within:ring-2 focus-within:ring-accent/50 motion-reduce:transition-none motion-reduce:transform-none sm:gap-3 sm:px-4 sm:py-3.5 ${stateClasses} ${
                     result === null ? "cursor-pointer" : "cursor-default"
                   }`}
                 >
@@ -424,11 +461,11 @@ export function PracticeSession({
                   />
                   <span
                     aria-hidden
-                    className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-md border border-hair bg-surface font-mono text-[11px] font-bold text-muted"
+                    className="mt-0.5 hidden h-6 w-6 shrink-0 items-center justify-center rounded-md border border-hair bg-surface font-mono text-[11px] font-bold text-muted sm:flex"
                   >
                     {optionIndex + 1}
                   </span>
-                  <span className="min-w-0 flex-1 leading-relaxed">
+                  <span className="min-w-0 flex-1 leading-[1.45] sm:leading-relaxed">
                     {option.textBg}
                   </span>
                   {isCorrectOption ? (
@@ -472,7 +509,22 @@ export function PracticeSession({
           question, so confirming an answer cost a scroll — and after answering
           the why-panel pushed „Напред" further still. Sticky, it is always one
           tap. Desktop keeps the plain in-flow row. */}
-      <div className="flex flex-wrap items-center gap-3 max-sm:sticky max-sm:bottom-0 max-sm:z-20 max-sm:-mx-4 max-sm:-mb-4 max-sm:rounded-b-xl max-sm:border-t max-sm:border-hair max-sm:bg-surface/95 max-sm:px-4 max-sm:py-2.5 max-sm:backdrop-blur max-sm:[padding-bottom:calc(0.625rem+env(safe-area-inset-bottom))]">
+      <div className="relative flex flex-wrap items-center gap-3 max-sm:sticky max-sm:bottom-0 max-sm:z-20 max-sm:-mx-3 max-sm:-mb-3 max-sm:rounded-b-xl max-sm:border-t max-sm:border-hair max-sm:bg-surface/95 max-sm:px-3 max-sm:py-2 max-sm:backdrop-blur max-sm:[padding-bottom:calc(0.5rem+env(safe-area-inset-bottom))]">
+        {/* The phone instrument strip: the session's progress as a 2px rule
+            along the bar's lit top edge, and the readouts beside the button. */}
+        <div
+          role="progressbar"
+          aria-label="Напредък в тренировката"
+          aria-valuemin={0}
+          aria-valuemax={questions.length}
+          aria-valuenow={answeredCount}
+          className="absolute inset-x-0 top-0 h-[2px] overflow-hidden bg-surface-2 sm:hidden"
+        >
+          <div
+            className="h-full bg-accent transition-[width] duration-500 ease-out motion-reduce:transition-none"
+            style={{ width: `${(answeredCount / questions.length) * 100}%` }}
+          />
+        </div>
         {result === null ? (
           <button
             type="button"
@@ -493,6 +545,31 @@ export function PracticeSession({
             {error}
           </p>
         ) : null}
+
+        {/* Phone readouts, right of the button: which question, how many right,
+            what today's free quota is at, and what this one is worth. */}
+        <p
+          aria-hidden
+          className="ml-auto flex items-center gap-1.5 font-mono text-[11px] font-bold tabular-nums text-muted sm:hidden"
+        >
+          <span className="text-foreground">{index + 1}</span>/{questions.length}
+          {answeredCount > 0 ? (
+            <span className="text-accent-2">· {correctCount}✓</span>
+          ) : null}
+          {quota !== null ? (
+            <span>
+              ·{" "}
+              <span className="text-accent">
+                {Math.min(quota.limit, quota.usedToday + answeredCount)}
+              </span>
+              /{quota.limit}
+            </span>
+          ) : null}
+          <span className={`rounded-full px-1.5 py-0.5 ${badge.className}`}>
+            {current.points} т.
+          </span>
+        </p>
+
         <p className="ml-auto hidden font-mono text-[11px] text-muted md:block">
           Клавиши 1–{Math.min(current.options.length, 9)} избират отговор ·
           Enter потвърждава
@@ -541,7 +618,7 @@ function VerdictStrip({
 
   return (
     <div
-      className={`rounded-xl border p-4 ${
+      className={`rounded-xl border p-3 sm:p-4 ${
         result.correct
           ? "border-success/40 bg-success/10"
           : "border-danger/40 bg-danger/10"

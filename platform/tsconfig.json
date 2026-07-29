@@ -36,7 +36,13 @@
     ".next/dev/types/**/*.ts",
     "**/*.mts",
     ".next-immersive/types/**/*.ts",
-    ".next-immersive/dev/types/**/*.ts"
+    ".next-immersive/dev/types/**/*.ts",
+    ".next-harness/types/**/*.ts",
+    ".next-harness/dev/types/**/*.ts",
+    ".next-practice-exam/types/**/*.ts",
+    ".next-practice-exam/dev/types/**/*.ts",
+    ".next-overlays/types/**/*.ts",
+    ".next-overlays/dev/types/**/*.ts"
   ],
   "exclude": [
     "node_modules"

@@ -16,18 +16,24 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
+  armedTelltaleWarnings,
   createDashboardStatus,
   HudStyles,
   HudToasts,
   Minimap,
   ObjectiveBanner,
   PreDriveChecklist,
+  selectOverlay,
   SessionEndScreen,
+  SimOverlay,
   StatusDashboard,
+  telltaleWarningsKey,
   useHudToastQueue,
   type DashboardStatus,
   type MinimapFrame,
   type ObjectiveFlash,
+  type SimOverlayItem,
+  type TelltaleWarning,
 } from "@/modules/sim/hud";
 import {
   abortSession,
@@ -86,7 +92,7 @@ import {
   type PreDriveMode,
   type PreDriveStepId,
 } from "@/modules/sim/procedures";
-import { accumulateScore, type SimTick } from "@/modules/sim/rules";
+import { accumulateScore, VIOLATIONS, type SimTick } from "@/modules/sim/rules";
 import type { DrivelineRejection, DrivelineSnapshot } from "@/modules/sim/vehicle";
 import { finishLessonAction } from "@/app/(dashboard)/simulator/actions";
 import {
@@ -228,6 +234,52 @@ function readStoredMinimapOn(): boolean {
   } catch {
     return false;
   }
+}
+
+// -- The overlay budget (founder review 2026-07-29) ---------------------------
+// „not acceptable it is not playable at all" — his screenshots show a „ЗАДАЧА"
+// card, a teach card and a red belt warning stacked down the screen before the
+// road gets a pixel. modules/sim/hud/overlayQueue.ts holds the rules; these are
+// the clocks this shell runs them on.
+//
+// ANNOUNCE, THEN GET OUT OF THE WAY. The task line is the clearest case: the
+// route is already drawn IN THE WORLD (ghost ribbon, turn chevrons, objective
+// marker — LessonScene RouteGuidance), so a banner restating it forever is
+// furniture. It speaks when the objective changes and retires; „Задача" in the
+// micro menu brings it back on demand, for free, whenever the student wants it.
+const TASK_ANNOUNCE_MS = 7000;
+/** The advisor's next-action prompt — long enough to read and act on. */
+const ADVISOR_ANNOUNCE_MS = 6000;
+/** „✓ Задача 2 изпълнена" — a beat of praise, not a panel. */
+const PRAISE_ANNOUNCE_MS = 2600;
+/** An armed cabin fault gets ONE full line with its WHY when it arms; after
+ *  that it is the quiet edge chip again (founder: a warning that keeps popping
+ *  „only makes the user nervous"). */
+const WARNING_ANNOUNCE_MS = 5000;
+/** The two-ribbon colour legend: said once at the start of a guided rung. */
+const LEGEND_ANNOUNCE_MS = 8000;
+
+/**
+ * Is `key` still within its announcement window?
+ *
+ * The KEY is the identity of what is being said (objective index + title,
+ * warning set, prompt text). A new key restarts the clock; the same key
+ * re-rendered fifty times by the 150 ms HUD poll does not. That is the whole
+ * mechanism behind „one line, then the road" — no timers scattered through the
+ * component, and nothing that can leave a line stuck on screen.
+ */
+function useFreshKey(key: string | null, ttlMs: number): boolean {
+  const [freshKey, setFreshKey] = useState<string | null>(null);
+  useEffect(() => {
+    if (key === null) {
+      setFreshKey(null);
+      return;
+    }
+    setFreshKey(key);
+    const id = window.setTimeout(() => setFreshKey(null), ttlMs);
+    return () => window.clearTimeout(id);
+  }, [key, ttlMs]);
+  return key !== null && freshKey === key;
 }
 
 /** A2 practice mode: seconds of pre-drive idling before a gentle hint. */
@@ -796,6 +848,41 @@ export function LessonPlayShell({
   });
   const viewportH = useVisualViewportHeight(immersive && !isFullscreen);
 
+  // -- The single overlay layer (compact only) ---------------------------------
+  // ROOMY LAYOUTS ARE UNTOUCHED. A 1440 px window has room for a banner, a
+  // toast column and a teach modal, the desktop Space-to-acknowledge is already
+  // wired through TeachMomentOverlay, and the founder's complaint is about a
+  // 393 px phone. So the queue replaces the racing panels on `compact` and
+  // nowhere else — one grammar per device class, neither one a shrunken copy
+  // of the other („Everything cant be like the web version").
+  //
+  // `taskPing` re-announces the task line from the micro menu: the price of
+  // making the banner transient is that it must be recallable in one tap.
+  const [taskPing, setTaskPing] = useState(0);
+  // The end-of-session verdict opens as a LINE, not as a full-frame modal
+  // („the crash debrief covers the entire frame including the controls").
+  // Tapping it is the explicit pause that earns the whole screen.
+  const [endExpanded, setEndExpanded] = useState(false);
+  // A detail sheet is open → the scene's own corner chrome stands down too.
+  const [overlaySheetOpen, setOverlaySheetOpen] = useState(false);
+  // Armed cabin faults, sampled at the status bar's own cadence. Only the
+  // ARMED SET matters, so the key comparison keeps this from re-rendering the
+  // shell every 150 ms (the TelltaleEdgePings precedent).
+  const [warnings, setWarnings] = useState<TelltaleWarning[]>([]);
+  useEffect(() => {
+    if (!compact) return;
+    const id = window.setInterval(() => {
+      const next = armedTelltaleWarnings(dashboardStatusRef.current ?? createDashboardStatus());
+      setWarnings((prev) =>
+        telltaleWarningsKey(prev) === telltaleWarningsKey(next) ? prev : next,
+      );
+    }, HUD_POLL_MS);
+    return () => {
+      window.clearInterval(id);
+      setWarnings((prev) => (prev.length === 0 ? prev : []));
+    };
+  }, [compact]);
+
   // -- The LETTERBOXED play area (founder 2026-07-28) --------------------------
   // „when not full screen in simulator mode … there is alot of dark space that
   // we can use to make the screen bigger, thats before pushing full screen."
@@ -1255,6 +1342,9 @@ export function LessonPlayShell({
     mountedAtRef.current = performance.now();
     setResult(null);
     setSaveResult(null);
+    // A fresh run starts with a clean rail: no end line, no debrief left open
+    // from the previous attempt.
+    setEndExpanded(false);
     // I1: a fresh attempt is a fresh prediction — the gate asks again.
     setCalibrationDone(false);
     setTraceUploaded(false);
@@ -1405,6 +1495,244 @@ export function LessonPlayShell({
   const dashHeightPx = ended ? 0 : compact ? COMPACT_DASH_HEIGHT_PX : 0;
   const hudFloorPx = compact ? dashHeightPx + 8 : ROOMY_HUD_FLOOR_PX;
 
+  // ===========================================================================
+  // THE OVERLAY QUEUE — compact only. One item speaks; the rest are counted.
+  //
+  // Everything below used to be an independently positioned panel: the
+  // objective banner, the advisor card, the toast column, the pre-drive
+  // checklist, the ribbon legend, the teach modal, the exam tally and the
+  // end-of-session screen. They are now CANDIDATES. `selectOverlay` picks one
+  // by priority; the rest wait, and the „+N" badge is the honest statement that
+  // they exist. Nothing here changes when a mistake is graded, what it costs,
+  // or when a teach moment fires — only how many of them may be on the glass
+  // at once.
+  // ===========================================================================
+
+  // The task line, as the student would say it: what to do, and where in the
+  // route. `taskPing` is the micro-menu recall.
+  const taskLineBg = mistakeMode ? lesson.descriptionBg : snap.objectiveTitle;
+  const taskKey =
+    compact && !ended && taskLineBg !== null && taskLineBg !== ""
+      ? `task:${snap.objectiveIndex}/${snap.objectiveTotal}:${taskLineBg}:${taskPing}`
+      : null;
+  const taskFresh = useFreshKey(taskKey, TASK_ANNOUNCE_MS);
+
+  const advisorVisible =
+    compact && advisorOn && !examMode && !mistakeMode && !ended && snap.advisorPrompt !== null;
+  const advisorKey = advisorVisible ? `advisor:${snap.advisorPrompt?.textBg ?? ""}` : null;
+  const advisorFresh = useFreshKey(advisorKey, ADVISOR_ANNOUNCE_MS);
+
+  const praiseKey = compact && flash !== null && !ended ? `praise:${flash.key}` : null;
+  const praiseFresh = useFreshKey(praiseKey, PRAISE_ANNOUNCE_MS);
+
+  const warningKey =
+    compact && !ended && warnings.length > 0 ? `warn:${telltaleWarningsKey(warnings)}` : null;
+  const warningFresh = useFreshKey(warningKey, WARNING_ANNOUNCE_MS);
+
+  const legendApplies =
+    compact &&
+    !ended &&
+    (lesson.aids?.shadowCar === true || lesson.aids?.pathRibbon === true) &&
+    lesson.objectives.length > 0;
+  const legendKey = legendApplies ? `legend:${sceneEpoch}` : null;
+  const legendFresh = useFreshKey(legendKey, LEGEND_ANNOUNCE_MS);
+
+  // A micro-quiz and the THEO-3 consequence card are INTERACTIVE PAUSES: they
+  // ask a question and wait for the answer, so they are modals by nature and
+  // they are the „explicit pause" the budget carves out. While one is up the
+  // queue says nothing at all — „one overlay at a time" has to mean across the
+  // whole layer, not just within it.
+  const pauseModalUp = activeQuiz !== null || (mistakeMode && consequence !== null);
+
+  const overlayCandidates: (SimOverlayItem | null)[] = !compact || pauseModalUp
+    ? []
+    : [
+        // 1. The session is over. A LINE with the verdict; the whole debrief is
+        //    one tap behind it, and that tap is the explicit pause that earns
+        //    the full frame. I1: while the calibration gate holds the result,
+        //    the line must not leak the score it is about to ask you to predict.
+        ended && result !== null
+          ? {
+              id: "end",
+              kind: "end" as const,
+              tone: resultHeld
+                ? ("neutral" as const)
+                : result.aborted
+                  ? ("warn" as const)
+                  : result.passed
+                    ? ("good" as const)
+                    : ("warn" as const),
+              chipBg: resultHeld ? null : `${result.score} т.`,
+              lineBg: resultHeld
+                ? "Сесията завърши — първо се самооцени"
+                : result.aborted
+                  ? "Прекратена сесия"
+                  : result.passed
+                    ? "Издържан — виж разбора"
+                    : "Неиздържан — виж разбора",
+              blocking: true,
+              ackLabelBg: "Резултат",
+              onAck: () => setEndExpanded(true),
+            }
+          : null,
+
+        // 2. A teach moment freezes the drive (doc 65 §5 — unchanged). What
+        //    changed is the size: the title on the line, the authored law-cited
+        //    WHY plus the repeat-cost stake behind „Защо". THEO-4 intact.
+        teachQueue.length > 0 && activeQuiz === null && !ended
+          ? {
+              id: `teach:${teachQueue[0].code}:${teachQueue[0].t}`,
+              kind: "teach" as const,
+              tone: "teach" as const,
+              chipBg: "Учебен момент",
+              lineBg: teachQueue[0].titleBg,
+              detailBg: `${teachQueue[0].explanationBg}\n\nПърва среща — не се брои в резултата. При повторение: −${teachQueue[0].points} т., а повторните грешки тежат още повече (×1.5 / ×2.0).`,
+              lawRef: teachQueue[0].lawRef ?? null,
+              blocking: true,
+              onAck: handleTeachAcknowledged,
+            }
+          : null,
+
+        // 3. Graded mistakes, coached hints and praise — the toast column,
+        //    single file. Newest first (the queue unshifts), so the priority
+        //    tie-break inside selectOverlay keeps the most recent one talking.
+        ...(!ended
+          ? toasts.map((t): SimOverlayItem | null => {
+              if (t.event.kind === "violation") {
+                return {
+                  id: `toast:${t.id}`,
+                  kind: "violation",
+                  tone: t.event.severity === "vtorostepenna" ? "warn" : "danger",
+                  chipBg: `−${t.event.points} т.`,
+                  lineBg: t.event.titleBg,
+                  detailBg: t.event.explanationBg,
+                  lawRef: t.event.lawRef ?? null,
+                };
+              }
+              if (t.event.kind === "lesson") {
+                return {
+                  id: `toast:${t.id}`,
+                  kind: "hint",
+                  tone: "teach",
+                  lineBg: t.event.titleBg,
+                  detailBg: t.event.explanationBg,
+                  lawRef: t.event.lawRef ?? null,
+                };
+              }
+              if (t.event.kind === "commendation") {
+                return {
+                  id: `toast:${t.id}`,
+                  kind: "praise",
+                  tone: "good",
+                  chipBg: "Браво",
+                  lineBg: t.event.titleBg,
+                };
+              }
+              return null;
+            })
+          : []),
+
+        // 4. An armed cabin fault, once, with its rule's own words. „Everytime a
+        //    mistake … pops up that the belt is not on … it only makes the user
+        //    nervous" — so this speaks on the rising edge and then hands back to
+        //    the quiet edge chip, which SimOverlay stands down while it talks.
+        warningFresh && warnings.length > 0
+          ? (() => {
+              const w = warnings[0];
+              const spec = w.code !== null ? VIOLATIONS[w.code] : null;
+              return {
+                id: `warning:${w.id}`,
+                kind: "warning" as const,
+                tone: w.tone === "danger" ? ("danger" as const) : ("warn" as const),
+                lineBg: w.labelBg,
+                // THEO-4: never a bare „коланът не е поставен". The catalog's
+                // authored explanation and its citation, one tap away.
+                detailBg:
+                  spec !== null
+                    ? `${spec.explanationBg}\n\n${spec.correctiveBg}`
+                    : "Аварийните светлини казват на другите, че си опасност на пътя. При нормално движение ги изключи — иначе подвеждаш всички зад теб.",
+                lawRef: spec?.lawRef ?? null,
+              };
+            })()
+          : null,
+
+        // 4b. THEO-3 sandbox: „Не се получава? Виж демонстрацията" lived inside
+        //     the objective banner, which compact no longer renders — a dead
+        //     end on a phone is worse than a panel. It rides the line instead.
+        mistakeMode && demoOffered && consequence === null && !ended
+          ? {
+              id: "mistake-demo",
+              kind: "hint" as const,
+              tone: "teach" as const,
+              lineBg: "Не се получава? Виж демонстрацията",
+              detailBg: lesson.descriptionBg,
+              blocking: true,
+              ackLabelBg: "Покажи",
+              onAck: () => setConsequence({ moment: null }),
+            }
+          : null,
+
+        // 5. Pre-drive: the next step on the line, the whole checklist behind
+        //    one tap. It stays up because during the pre-drive it IS the task.
+        snap.phase === "preDrive" && !ended && snap.preDriveNextStepId !== null
+          ? {
+              id: `predrive:${snap.preDriveNextStepId}`,
+              kind: "predrive" as const,
+              tone: "neutral" as const,
+              chipBg: "Подготовка",
+              lineBg: PRE_DRIVE_STEPS[snap.preDriveNextStepId].titleBg,
+              detailBg: PRE_DRIVE_STEPS[snap.preDriveNextStepId].instructionBg,
+              hasRichDetail: true,
+              openLabelBg: "Списък",
+            }
+          : null,
+
+        // 6. „Съветник" — the next expected action, when it changes.
+        advisorFresh && snap.advisorPrompt !== null
+          ? {
+              id: `advisor:${snap.advisorPrompt.textBg}`,
+              kind: "advisor" as const,
+              tone: "neutral" as const,
+              lineBg:
+                snap.advisorPrompt.keys.length > 0
+                  ? `${snap.advisorPrompt.textBg} (${snap.advisorPrompt.keys.join(" ")})`
+                  : snap.advisorPrompt.textBg,
+            }
+          : null,
+
+        // 7. The objective, announced and then retired to the micro menu.
+        praiseFresh && flash !== null
+          ? {
+              id: `praise:${flash.key}`,
+              kind: "praise" as const,
+              tone: "good" as const,
+              lineBg: flash.titleBg,
+            }
+          : taskFresh && taskLineBg !== null
+            ? {
+                id: taskKey ?? "task",
+                kind: "task" as const,
+                tone: mistakeMode ? ("danger" as const) : ("neutral" as const),
+                chipBg: mistakeMode
+                  ? "Преживей грешката"
+                  : `Задача ${Math.min(snap.objectiveIndex, Math.max(1, snap.objectiveTotal))}/${snap.objectiveTotal}`,
+                lineBg: taskLineBg,
+              }
+            : null,
+
+        // 8. Which coloured line is which — said once, at the start.
+        legendFresh
+          ? {
+              id: "legend",
+              kind: "legend" as const,
+              tone: "neutral" as const,
+              lineBg: "Синя линия — колата-сянка · зелена — маршрутът до целта",
+            }
+          : null,
+      ];
+
+  const overlay = selectOverlay(overlayCandidates);
+
   const menuItems = ended
     ? [{ key: "exit", labelBg: "← Всички уроци", onSelect: onExitToSelect }]
     : [
@@ -1428,6 +1756,19 @@ export function LessonPlayShell({
                   setQuizFreq(MICRO_QUIZ_FREQUENCIES[(i + 1) % MICRO_QUIZ_FREQUENCIES.length].id);
                 },
                 keepOpen: true,
+              },
+            ]
+          : []),
+        // The price of a task line that retires after seven seconds is that it
+        // must come back in one tap. This is that tap — and it is why making the
+        // banner transient is a redesign rather than a deletion.
+        ...(compact && taskLineBg !== null && taskLineBg !== ""
+          ? [
+              {
+                key: "task",
+                labelBg: "Задача",
+                valueBg: mistakeMode ? null : `${snap.objectiveIndex}/${snap.objectiveTotal}`,
+                onSelect: () => setTaskPing((n) => n + 1),
               },
             ]
           : []),
@@ -1468,6 +1809,15 @@ export function LessonPlayShell({
       // …and this one is what PlayAreaStyles uses to fold the scene's own
       // desktop chrome away on a phone.
       data-sim-compact={compact ? "on" : undefined}
+      // ONE OVERLAY AT A TIME, ENFORCED ACROSS COMPONENT TREES. While the
+      // queue is speaking, the two scene-owned corner widgets (difficulty
+      // picker, telltale edge chips) stand down — otherwise the „one line"
+      // system would put a second panel back on the glass the instant it
+      // appeared, which is exactly the stacking being fixed. The rule lives in
+      // SimOverlay's style block; this attribute is its switch.
+      data-sim-overlay-active={
+        compact && (overlay.active !== null || overlaySheetOpen) ? "on" : undefined
+      }
       className={
         // Fullscreen: the UA sizes this element to the viewport — become a
         // padded column so the scene (flex-1) absorbs all remaining height.
@@ -1654,11 +2004,45 @@ export function LessonPlayShell({
           />
         </div>
 
+        {/* THE ONE OVERLAY — compact layouts. Task, advisor, teach moment,
+            violation, cabin warning, pre-drive step, ribbon legend and the
+            end-of-session verdict all arrive through here, one at a time, as a
+            single line in the top rail with their authored WHY one tap behind
+            it (THEO-4). The roomy renderings below are unchanged and still
+            carry the desktop Space-to-acknowledge. */}
+        {compact ? (
+          <SimOverlay
+            item={overlay.active}
+            queued={overlay.queued}
+            frozen={teachQueue.length > 0 || activeQuiz !== null || ended}
+            onOpenChange={setOverlaySheetOpen}
+            renderDetail={(item) =>
+              item.kind === "predrive" ? (
+                <PreDriveChecklist
+                  completedStepIds={snap.preDriveCompleted}
+                  wrongOrderStepIds={snap.preDriveWrongOrder}
+                  mode={preDriveMode}
+                  onConfirmStep={(stepId) => {
+                    if (preDriveStepKind(stepId) === "info") handlePreDriveStep(stepId);
+                  }}
+                />
+              ) : null
+            }
+          />
+        ) : null}
+
         {/* Objective banner — top center; the advisor prompt stacks under it
             (during pre-drive the banner is empty, so the advisor card stands
             alone). The advisor hides while a pause overlay (quiz/teach) is up
-            — it must never compete with a modal card. */}
-        <div className="absolute left-1/2 top-3 flex -translate-x-1/2 flex-col items-center gap-1.5">
+            — it must never compete with a modal card.
+            ROOMY ONLY: on a phone this stack is the founder's „ЗАДАЧА" card
+            plus the card under it — two of the three panels in his screenshot.
+            Compact renders them through the queue above. */}
+        <div
+          className={`absolute left-1/2 top-3 flex -translate-x-1/2 flex-col items-center gap-1.5 ${
+            compact ? "hidden" : ""
+          }`}
+        >
           {mistakeMode ? (
             // THEO-3: the sandbox's ONE instruction replaces the objective
             // banner — the assignment is the mistake (fixed lead-in + the
@@ -1700,10 +2084,14 @@ export function LessonPlayShell({
           ) : null}
         </div>
 
-        {/* Toasts — right side */}
-        <div className="absolute right-3 top-3">
-          <HudToasts toasts={toasts} />
-        </div>
+        {/* Toasts — right side. ROOMY ONLY: four stacked 288 px cards is a
+            column, not a hint, and on a 393 px phone it is most of the screen.
+            Compact feeds the same events into the queue, one line at a time. */}
+        {compact ? null : (
+          <div className="absolute right-3 top-3">
+            <HudToasts toasts={toasts} />
+          </div>
+        )}
 
         {/* THE MICRO MAJOR BUTTON — compact layouts only; on a roomy screen
             everything it holds is already in the top bar above. */}
@@ -1712,7 +2100,18 @@ export function LessonPlayShell({
             titleBg={lesson.titleBg}
             badgeBg={
               examMode
-                ? { textBg: "Изпит" }
+                ? {
+                    // A13's live protocol tally used to be its own panel at
+                    // top-left, under the menu button. It is three numbers —
+                    // it belongs ON the framing chip that is already there,
+                    // not in a second box next to it.
+                    textBg:
+                      snap.examTally !== null && snap.phase === "driving" && !ended
+                        ? `Изпит ${snap.examTally.totalPoints}/9${
+                            snap.examTally.opasniCount > 0 ? " ⚠" : ""
+                          }`
+                        : "Изпит",
+                  }
                 : mistakeMode
                   ? { textBg: "Пясъчник" }
                   : null
@@ -1774,7 +2173,11 @@ export function LessonPlayShell({
             colors visibly hand over with zero explanation — this small legend
             is the honest fix (unifying the colors would hide WHICH line is
             teachware and which is wayfinding). */}
-        {!ended &&
+        {/* ROOMY ONLY: compact says this once, as a line, at the start of the
+            rung (the `legend` overlay candidate) instead of parking a panel on
+            the left rail for the whole drive. */}
+        {!compact &&
+        !ended &&
         (lesson.aids?.shadowCar === true || lesson.aids?.pathRibbon === true) &&
         lesson.objectives.length > 0 ? (
           <div
@@ -1857,7 +2260,7 @@ export function LessonPlayShell({
 
         {/* A13: live protocol tally — the exam's honest scoreboard (official
             taxonomy: total / основни / опасни against the doc-32 limits). */}
-        {examMode && snap.examTally !== null && snap.phase === "driving" && !ended ? (
+        {!compact && examMode && snap.examTally !== null && snap.phase === "driving" && !ended ? (
           <div className="absolute left-3 top-3">
             <div
               aria-label="Протокол — наказателни точки"
@@ -1886,7 +2289,11 @@ export function LessonPlayShell({
 
         {/* Pre-drive progress — READ-ONLY panel (A2): rows tick as the student
             performs the steps on real controls; only info steps confirm here. */}
-        {snap.phase === "preDrive" && !ended ? (
+        {/* ROOMY ONLY: on a phone this panel is a tall list pinned over the
+            road for the whole pre-drive. Compact puts the NEXT step on the
+            line and the identical checklist inside its detail sheet — the same
+            component, rendered on demand instead of permanently. */}
+        {!compact && snap.phase === "preDrive" && !ended ? (
           <div className="absolute left-3 top-3 max-h-[calc(100%-1.5rem)] overflow-y-auto">
             <PreDriveChecklist
               completedStepIds={snap.preDriveCompleted}
@@ -1913,14 +2320,19 @@ export function LessonPlayShell({
         {/* A9 teach moment — pause + mini-lesson card. A quiz that fired first
             keeps priority; the teach card shows right after it closes (both
             hold `paused`, so no drive time passes in between). */}
-        {teachQueue.length > 0 && !activeQuiz && !ended ? (
+        {/* ROOMY ONLY since 2026-07-29: the compact bottom sheet this card grew
+            last review was still a card — a header, a title, two clamped lines,
+            a law chip, an expander and a button, ~30 % of a landscape phone,
+            and it was the second of the three panels in the founder's frame.
+            Compact now routes the SAME TeachMoment through the queue as one
+            line with „Защо" behind it. Desktop keeps this card, its pictogram
+            and its Space/Enter acknowledgement exactly as they were. */}
+        {!compact && teachQueue.length > 0 && !activeQuiz && !ended ? (
           <TeachMomentOverlay
             moment={teachQueue[0]}
             remaining={teachQueue.length - 1}
             onAcknowledge={handleTeachAcknowledged}
-            // Compact: a bottom sheet that stops above the instrument band
-            // instead of a modal that covered the whole picture AND the band.
-            compact={compact}
+            compact={false}
           />
         ) : null}
 
@@ -1949,9 +2361,27 @@ export function LessonPlayShell({
             with the reason when the limits ended it mid-route; the A15
             mistake map + correctives below stay (learning continues after
             the verdict). */}
-        {ended && result ? (
-          <div className="absolute inset-0 z-20 flex items-start justify-center overflow-y-auto bg-background/85 p-4 backdrop-blur-sm sm:p-6">
+        {/* COMPACT: this whole screen is behind ONE TAP („Резултат" on the end
+            line). Founder 2026-07-29: „the crash debrief covers the entire
+            frame including the controls" — it did, the moment the drive ended,
+            without being asked. Now the verdict arrives as a line and the
+            debrief is an EXPLICIT pause, which is the one thing the budget
+            lets be full-bleed. Nothing was removed: the protocol card, the
+            calibration gate, the mistake map, the concepts and every CTA are
+            all still here, in the same order, one tap in.
+            Roomy layouts open it directly, as before. */}
+        {ended && result && (!compact || endExpanded) ? (
+          <div className="absolute inset-0 z-40 flex items-start justify-center overflow-y-auto bg-background/85 p-4 backdrop-blur-sm sm:p-6">
             <div className="flex w-full max-w-2xl flex-col gap-3">
+              {compact ? (
+                <button
+                  type="button"
+                  onClick={() => setEndExpanded(false)}
+                  className="btn-ghost h-11 w-full shrink-0 justify-center text-xs"
+                >
+                  ▾ Скрий разбора
+                </button>
+              ) : null}
               {/* I1: the protocol card states the verdict in words, so it is
                   part of what the calibration gate holds back — otherwise the
                   student reads „Маршрутът е завършен в допустимите граници"

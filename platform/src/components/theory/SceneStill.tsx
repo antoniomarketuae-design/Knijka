@@ -178,9 +178,21 @@ function drawPose(
 export function SceneStill({
   media,
   className,
+  maxHeightPx,
 }: {
   media: SceneStillMedia;
   className?: string;
+  /**
+   * Optional CAP on the drawn height. Omitted, the still is exactly what it
+   * always was: 0.72 × the column width, clamped to 160–300px. Passed, the
+   * scene is drawn smaller (fitSceneView scales by min(w,h), so nothing is
+   * cropped — the whole focus window still reads, just at a smaller scale).
+   *
+   * Its only caller is QuestionArtwork's phone branch: at a 329px column this
+   * still is 237px tall, 28 % of an iPhone 16, and that is what pushed the
+   * answers of every scene question below the fold. See QuestionMedia.tsx.
+   */
+  maxHeightPx?: number;
 }) {
   const wrapRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -224,7 +236,13 @@ export function SceneStill({
     return () => ro.disconnect();
   }, [layers, failed]);
 
-  const heightPx = Math.max(160, Math.min(300, Math.round(widthPx * 0.72)));
+  // The cap wins over the 160px floor when it is smaller — a floor that
+  // overrides the caller's budget is not a budget.
+  const capPx = maxHeightPx ?? 300;
+  const heightPx = Math.max(
+    Math.min(160, capPx),
+    Math.min(capPx, Math.round(widthPx * 0.72)),
+  );
 
   const view = useMemo(
     () => (layers && widthPx > 0 ? fitSceneView(media.focus, widthPx, heightPx) : null),
@@ -267,18 +285,39 @@ export function SceneStill({
     );
   }
 
+  const egoCount = media.poses.filter((p) => p.variant === "ego").length;
+  const caption =
+    egoCount > 0 ? (
+      <figcaption className="text-[11px] font-semibold text-muted">
+        Оцветеният автомобил с ореол си ти. Север е нагоре.
+      </figcaption>
+    ) : null;
+
+  /* THE PLACEHOLDER IS THE SAME BOX AS THE DRAWN SCENE, caption included.
+     It used to be a bare `h-40` div, so the block grew by the canvas delta
+     PLUS 21px of caption the moment the district json landed. On a phone that
+     is a jump under the reader's thumb, and it is also how a fold measurement
+     taken during the fetch comes back clean and wrong: three scene questions
+     ended up 22px past the fold with the artwork budget still reporting room,
+     because the budget had measured a box that was about to grow. Everything
+     the caption depends on (`media.poses`) is known before the fetch starts,
+     so there is no reason to render a different shape. */
   if (!layers) {
     return (
-      <div ref={wrapRef} className={className}>
+      <figure
+        ref={wrapRef}
+        className={`flex w-full flex-col gap-1.5 ${className ?? ""}`}
+      >
         <div
           aria-hidden
-          className="h-40 w-full animate-pulse rounded-xl border border-border bg-surface-2/50 motion-reduce:animate-none"
+          style={{ height: heightPx }}
+          className="w-full animate-pulse rounded-xl border border-border bg-surface-2/50 motion-reduce:animate-none"
         />
-      </div>
+        {caption}
+      </figure>
     );
   }
 
-  const egoCount = media.poses.filter((p) => p.variant === "ego").length;
   return (
     <figure ref={wrapRef} className={`flex w-full flex-col gap-1.5 ${className ?? ""}`}>
       <canvas
@@ -290,11 +329,7 @@ export function SceneStill({
         className="w-full rounded-xl border border-border bg-surface-2/60"
         style={{ height: heightPx }}
       />
-      {egoCount > 0 ? (
-        <figcaption className="text-[11px] font-semibold text-muted">
-          Оцветеният автомобил с ореол си ти. Север е нагоре.
-        </figcaption>
-      ) : null}
+      {caption}
     </figure>
   );
 }
