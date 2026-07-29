@@ -274,15 +274,23 @@ export class DrivelineState {
   private readonly physics: DrivelinePhysicsInput = { ...READY_DRIVELINE };
 
   /**
-   * @param start "cold" (default): engine OFF, selector P, parking brake ON —
-   *   the pre-drive reality every lesson should begin from. "ready": engine
-   *   running in D with the brake released (L0 acclimatization free-drive).
+   * @param start "cold": engine OFF, selector P, parking brake ON — the
+   *   pre-drive reality the exams assess. "ready": engine running, brake
+   *   released, ready to pull away.
+   *
+   *   MANUAL "ready" IS NEUTRAL, NOT FIRST GEAR. It used to be `M`, i.e. gear 1
+   *   with the clutch up — which is a stall the instant the sim ticks, because
+   *   that is exactly what a real car does. Spawning that way fired the
+   *   engine-stall teaching moment before the student had touched anything.
+   *   Neutral with the engine running is how you find a car you are about to
+   *   drive, and it costs the driver one keystroke to select a gear — which is
+   *   the clutch discipline the manual tier exists to teach anyway.
    */
   constructor(start: VehicleStartState = "cold", transmission: TransmissionMode = "automatic") {
     this.transmission = transmission;
     if (start === "ready") {
       this.engineOn = true;
-      this.selector = transmission === "manual" ? "M" : "D";
+      this.selector = transmission === "manual" ? "N" : "D";
       this.parkingBrakeOn = false;
     } else {
       this.engineOn = false;
