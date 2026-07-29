@@ -47,7 +47,7 @@ import {
   CHASE_FOV,
   DIFFICULTY_ORDER,
   DIFFICULTY_PRESETS,
-  loadDifficulty,
+  DEFAULT_DIFFICULTY,
   storeDifficulty,
   SNOW_GRIP_FACTOR,
   WET_GRIP_FACTOR,
@@ -674,12 +674,18 @@ function ReadyScene({
   const audioRef = useRef<SimAudio | null>(null);
   const sampleRef = useRef<VehicleSample>(createVehicleSample());
   const [cockpit, setCockpit] = useState(true);
-  // Difficulty: an explicit selector click is authoritative (persisted);
-  // otherwise DEFAULT_DIFFICULTY — "normal" since the 2026-07-19 founder
-  // ruling (beginner's 40 km/h governor made speeding mistakes impossible to
-  // commit, see vehicle/difficulty.ts). Lazy init is safe: SceneSlot mounts
-  // this scene with ssr:false, so localStorage exists on first render.
-  const [difficulty, setDifficultyState] = useState<DifficultyMode>(loadDifficulty);
+  // Difficulty: EVERY SCENE OPENS AT DEFAULT_DIFFICULTY ("normal" since the
+  // 2026-07-19 founder ruling — beginner's 40 km/h governor made speeding
+  // mistakes impossible to commit; see vehicle/difficulty.ts).
+  //
+  // It used to restore the last persisted click, which meant one press of
+  // „Напреднал" silently pinned every subsequent scenario to the manual tier —
+  // the founder hit that reviewing the 150 and could not tell why every scene
+  // behaved differently from the one before. A tier is a choice about THIS
+  // drive, not a setting that follows you around; the picker still switches it
+  // mid-scene, and storeDifficulty still records the click for anything that
+  // wants to know the preference.
+  const [difficulty, setDifficultyState] = useState<DifficultyMode>(DEFAULT_DIFFICULTY);
   const difficultyRef = useRef<DifficultyMode>(difficulty);
   useEffect(() => {
     difficultyRef.current = difficulty;
