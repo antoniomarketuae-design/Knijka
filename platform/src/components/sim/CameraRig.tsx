@@ -58,6 +58,7 @@ import type { CabinControls, MirrorGlanceKind } from "@/modules/sim/scene/cabin"
 import { SKY_DOME_NAME } from "@/modules/sim/environment";
 import { renderMirrorPass } from "@/modules/sim/scene/vitok/mirrorPass";
 import {
+  rearViewBottomFraction,
   rearViewQuadHalfSize,
   rearViewQuadOffset,
   REAR_VIEW_CADENCE,
@@ -65,6 +66,9 @@ import {
   REAR_VIEW_FAR_M,
   REAR_VIEW_FOG_MIN_DENSITY,
   REAR_VIEW_FOV_DEG,
+  REAR_VIEW_IDLE_CADENCE,
+  REAR_VIEW_IDLE_OPACITY,
+  REAR_VIEW_IDLE_SCALE,
   REAR_VIEW_NEAR_M,
   REAR_VIEW_SKY_RADIUS_M,
   REAR_VIEW_TARGET_HEIGHT,
@@ -119,6 +123,82 @@ const UP_AXIS = new Vector3(0, 1, 0);
  *  Sits with G/N (the view keys the rig owns), clear of every binding in
  *  cabin.ts CABIN_KEYS / DRIVELINE_KEYS and engine/input.ts. */
 const REVERSE_VIEW_KEY = "KeyK";
+
+// ---------------------------------------------------------------------------
+// THE ONE THING THE DOM HAS TO KNOW ABOUT THE CAMERA (rows B74 / B76 / C7).
+//
+// Everything the rig draws is inside the WebGL canvas, and every HUD card is a
+// DOM element painted over that canvas. No renderOrder can change that, so a
+// scene instrument and a DOM panel cannot negotiate — one of them simply
+// covers the other. Three register rows are that collision:
+//
+//   B76  the „Клавиши" legend over 60 % of the Q window; the toast card over
+//        half of the E one; the objective chips over the top 40 % of F.
+//   B74  the mirror has nowhere to hang, because the top rail is occupied.
+//   C7   the compact speed readout draws a SECOND speedometer over the 3D
+//        cluster, because it cannot tell which camera is live.
+//
+// So the rig publishes three facts on <html> and the shell's stylesheet reads
+// them (PlayAreaStyles): which camera, whether a glance is held and on which
+// side, and how tall the persistent mirror is in CSS pixels. Attributes and a
+// custom property rather than React state on purpose — this runs in useFrame,
+// and a 60 Hz setState would be a rendering bug, not a feature. Writes happen
+// only on CHANGE, so a steady drive touches the DOM zero times per frame.
+// ---------------------------------------------------------------------------
+const VIEW_ATTR = "simCamera";
+const GLANCE_ATTR = "simGlance";
+/** Lower edge of the PERSISTENT mirror, px from the top of the play area. */
+const MIRROR_VAR = "--sim-mirror-h";
+/** …and of the OPEN window, which is the one a held glance has to clear. */
+const GLANCE_VAR = "--sim-glance-h";
+
+/** Last published values — module-scope so the writes are change-only. */
+const published: {
+  camera: string | null;
+  glance: string | null;
+  mirrorPx: number;
+  glancePx: number;
+} = { camera: null, glance: null, mirrorPx: -1, glancePx: -1 };
+
+function publishCameraMode(mode: CameraMode | null) {
+  if (typeof document === "undefined" || published.camera === mode) return;
+  published.camera = mode;
+  const root = document.documentElement;
+  if (mode === null) delete root.dataset[VIEW_ATTR];
+  else root.dataset[VIEW_ATTR] = mode;
+}
+
+/**
+ * @param side  the glance being HELD, or null (idle mirror / no mirror)
+ * @param mirrorPx  the persistent mirror's lower edge, in CSS px from the top
+ *                  of the play area — 0 when there is no mirror at all.
+ * @param glancePx  the same edge for the fully OPEN window.
+ */
+function publishRearView(side: MirrorGlanceKind | null, mirrorPx: number, glancePx: number) {
+  if (typeof document === "undefined") return;
+  const root = document.documentElement;
+  if (published.glance !== side) {
+    published.glance = side;
+    if (side === null) delete root.dataset[GLANCE_ATTR];
+    else root.dataset[GLANCE_ATTR] = side;
+  }
+  const setPx = (name: string, value: number, key: "mirrorPx" | "glancePx") => {
+    const px = Math.round(value);
+    if (published[key] === px) return;
+    published[key] = px;
+    if (px <= 0) root.style.removeProperty(name);
+    else root.style.setProperty(name, `${px}px`);
+  };
+  setPx(MIRROR_VAR, mirrorPx, "mirrorPx");
+  setPx(GLANCE_VAR, glancePx, "glancePx");
+}
+
+/** Leave no attribute behind: the lesson-select screen and the theory reader
+ *  must not inherit a camera that is no longer on the page. */
+function clearPublishedViewState() {
+  publishCameraMode(null);
+  publishRearView(null, 0, 0);
+}
 
 /** Cockpit orientation damping (1/s) — softer than the eye position so the
  * view leans gently instead of transmitting every suspension tick. */
@@ -334,6 +414,11 @@ export function CameraRig({
     };
   }, [scene, rearView]);
 
+  // The published view state is global (on <html>), so it must be withdrawn
+  // when the rig leaves — otherwise /simulator's lesson shelf would still be
+  // told it is sitting in a cockpit.
+  useEffect(() => clearPublishedViewState, []);
+
   /** Frame counter for REAR_VIEW_CADENCE. */
   const rearViewFrameRef = useRef(0);
   /** The SkyDome, resolved lazily by name (it mounts in a sibling tree). */
@@ -381,6 +466,7 @@ export function CameraRig({
     if (!chassis) return;
     const cam = state.camera as PerspectiveCamera;
     const mode = cameraModeRef.current ?? "chase";
+    publishCameraMode(mode);
 
     const switched = mode !== lastMode.current;
     if (switched) {
@@ -618,22 +704,41 @@ export function CameraRig({
       }
     }
 
-    // --- Chase rear-view window (doc 86 L16). Runs LAST, so the quad is
-    // parked against the pose this frame actually renders with. -------------
+    // --- Chase rear-view window (doc 86 L16; second pass = rows B74/B76).
+    // Runs LAST, so the quad is parked against the pose this frame actually
+    // renders with.
+    //
+    // B74: the window is no longer bound to the glance HOLD. In the chase POV
+    // it is ALWAYS there — a small interior mirror at REAR_VIEW_IDLE_SCALE —
+    // because that is what „put Rear Mirror … in the POV after pressing C"
+    // asks for, and because the drill this failed on (sc-follow-tailgater) is
+    // played blind if you have to know a key to see behind you. A held glance
+    // then GROWS it to full size, swings the pass camera into that quarter and
+    // slides it to that side of the screen (item 45, unchanged) — one
+    // continuous instrument leaning toward the glass, not two widgets.
+    // -----------------------------------------------------------------------
     const rv = rearView;
-    const rvSide = mode === "chase" && glanceS > 0 ? (cabin?.glanceMirror ?? null) : null;
+    const heldSide = glanceS > 0 ? (cabin?.glanceMirror ?? null) : null;
+    const rvSide: MirrorGlanceKind | null =
+      mode === "chase" ? (heldSide ?? "rear") : null;
     if (rvSide === null) {
       rv.glass.visible = false;
       rv.bezel.visible = false;
       rearViewFrameRef.current = 0;
+      publishRearView(null, 0, 0);
     } else {
       // Smoothstepped with the same envelope the head turn uses, so the window
-      // opens and closes on exactly the glance's rhythm.
-      const env = glanceS * glanceS * (3 - 2 * glanceS);
+      // opens and closes on exactly the glance's rhythm. `env` is 0 for the
+      // idle mirror and 1 at a full hold; everything below interpolates on it.
+      const env = heldSide === null ? 0 : glanceS * glanceS * (3 - 2 * glanceS);
+      const scale = REAR_VIEW_IDLE_SCALE + (1 - REAR_VIEW_IDLE_SCALE) * env;
 
       // 1. Aim the pass camera from the CAR (not from the chase vantage 8 m
       //    behind it — from there the car's own boot would fill the window).
-      const fovDeg = REAR_VIEW_FOV_DEG[rvSide];
+      //    Idle it looks straight back through the interior mirror's narrow
+      //    FOV; the glance widens it and yaws it into the quarter.
+      const fovDeg =
+        REAR_VIEW_FOV_DEG.rear + (REAR_VIEW_FOV_DEG[rvSide] - REAR_VIEW_FOV_DEG.rear) * env;
       if (rv.camera.fov !== fovDeg) {
         rv.camera.fov = fovDeg;
         rv.camera.updateProjectionMatrix();
@@ -646,13 +751,15 @@ export function CameraRig({
       // A camera carrying the chassis quaternion looks down chassis −Z, i.e.
       // straight back (the car drives +Z); the per-side yaw swings it into the
       // glanced quarter. See REAR_VIEW_YAW_RAD for the sign derivation.
-      rvYaw.setFromAxisAngle(UP_AXIS, REAR_VIEW_YAW_RAD[rvSide]);
+      rvYaw.setFromAxisAngle(UP_AXIS, REAR_VIEW_YAW_RAD[rvSide] * env);
       rv.camera.quaternion.copy(quat).multiply(rvYaw);
 
-      // 2. The RTT pass, on cadence. The quad is hidden for the duration — it
-      //    is in the same scene, and a window that can see itself is a
-      //    feedback loop.
-      if (rearViewFrameRef.current++ % REAR_VIEW_CADENCE === 0) {
+      // 2. The RTT pass, on cadence — a quarter-rate one while nobody is
+      //    looking (REAR_VIEW_IDLE_CADENCE). The quad is hidden for the
+      //    duration: it is in the same scene, and a window that can see itself
+      //    is a feedback loop.
+      const cadence = env > 0 ? REAR_VIEW_CADENCE : REAR_VIEW_IDLE_CADENCE;
+      if (rearViewFrameRef.current++ % cadence === 0) {
         rv.glass.visible = false;
         rv.bezel.visible = false;
         let sky = skyRef.current;
@@ -673,29 +780,45 @@ export function CameraRig({
 
       // 3. Park the quad in front of the main camera, sized from the LIVE fov
       //    and aspect so the on-screen fraction holds through the speed-widen
-      //    and through any window shape.
+      //    and through any window shape. The horizontal offset rides `env`
+      //    too: at rest the mirror hangs in the middle where a real interior
+      //    one does, and it SLIDES to the glanced side as the hold eases in.
       const vFov = (cam.fov * Math.PI) / 180;
       const { halfWidth, halfHeight } = rearViewQuadHalfSize(
         REAR_VIEW_QUAD_DISTANCE_M,
         vFov,
         cam.aspect,
+        scale,
       );
-      const off = rearViewQuadOffset(rvSide, REAR_VIEW_QUAD_DISTANCE_M, vFov, cam.aspect);
+      const off = rearViewQuadOffset(rvSide, REAR_VIEW_QUAD_DISTANCE_M, vFov, cam.aspect, scale);
       const bezel = halfHeight * 2 * REAR_VIEW_BEZEL_FRACTION;
       rv.glass.scale.set(halfWidth * 2, halfHeight * 2, 1);
       rv.bezel.scale.set(halfWidth * 2 + bezel, halfHeight * 2 + bezel, 1);
       rvQuad
-        .set(off.x, off.y, -REAR_VIEW_QUAD_DISTANCE_M)
+        .set(off.x * env, off.y, -REAR_VIEW_QUAD_DISTANCE_M)
         .applyQuaternion(cam.quaternion)
         .add(cam.position);
       rv.glass.position.copy(rvQuad);
       rv.bezel.position.copy(rvQuad);
       rv.glass.quaternion.copy(cam.quaternion);
       rv.bezel.quaternion.copy(cam.quaternion);
-      rv.material.opacity = env;
-      rv.bezelMaterial.opacity = env * 0.9;
-      rv.glass.visible = env > 0.01;
-      rv.bezel.visible = rv.glass.visible;
+      const opacity = REAR_VIEW_IDLE_OPACITY + (1 - REAR_VIEW_IDLE_OPACITY) * env;
+      rv.material.opacity = opacity;
+      rv.bezelMaterial.opacity = opacity * 0.9;
+      rv.glass.visible = true;
+      rv.bezel.visible = true;
+
+      // 4. Tell the DOM. The quad lives INSIDE the scene, so no renderOrder can
+      //    lift it above a HUD card — B76's frames have the „Клавиши" legend
+      //    over 60 % of the Q window and the objective chips over the top 40 %
+      //    of the F one. The shell reads these two attributes and the published
+      //    height (see PlayAreaStyles) to step its top rail below the mirror and
+      //    to stand its side panels down for the second a glance is held.
+      publishRearView(
+        heldSide,
+        rearViewBottomFraction(cam.aspect, REAR_VIEW_IDLE_SCALE) * state.size.height,
+        rearViewBottomFraction(cam.aspect) * state.size.height,
+      );
     }
   });
 

@@ -334,8 +334,15 @@ describe("junction-interior stand-down (doc 86 T1(d)) — derived from the build
 // 4 · no paint, no conviction (the reducer half)
 // ---------------------------------------------------------------------------
 
-/** 20 s of forward driving straddling the road axis on a two-way edge. */
-function straddleDrive(over: Partial<SimTick>): RuleEvent[] {
+/**
+ * 20 s of forward driving straddling the road axis on a two-way edge.
+ *
+ * `fromLane` (default true) opens with 1 s inside the driver's own lane — the
+ * DEPARTURE these codes grade, and what every real drive does. Pass false to
+ * reproduce doc 86 T2's compiled spawn pose verbatim: handed the car already
+ * astride the осева, having done nothing (doc 87 B23/B26/B33).
+ */
+function straddleDrive(over: Partial<SimTick>, fromLane = true): RuleEvent[] {
   let state = createRuleEngine();
   const events: RuleEvent[] = [];
   for (let t = 0; t <= 20; t += 0.5) {
@@ -345,7 +352,8 @@ function straddleDrive(over: Partial<SimTick>): RuleEvent[] {
       maxSpeedKmh: 50,
       position: { x: 0, y: t },
       headingDeg: 0,
-      laneOffsetM: 4.0625, // exactly on the осева — doc 86 T2's spawn pose
+      // 4.0625 = exactly on the осева (doc 86 T2's spawn pose); 0 = the lane.
+      laneOffsetM: fromLane && t < 1 ? 0 : 4.0625,
       laneId: 0,
       laneCount: 1,
       oneway: false,
@@ -379,6 +387,21 @@ describe("no paint, no conviction", () => {
       .filter((e) => e.kind === "violation")
       .map((e) => e.code);
     expect(painted).toContain("CENTER_LINE_TOUCHED");
+  });
+
+  // -- doc 87 B23/B26/B33: paint is necessary, not sufficient ----------------
+  it("…but PAINT ALONE never convicts a car that was SPAWNED on the line", () => {
+    // The four-of-four founder case, at the reducer. tj-rhr-v1 / tj-stop-v1 /
+    // tj-occluded-v1 / sx-v1 all compile a spawn at x = 0 — the centreline —
+    // and these maps ARE painted, so the T1 paint referent does not save them.
+    // What is missing is not the line: it is the act. He drove dead straight at
+    // the speed the objective taught, for 32 s, and DEFAULT_LEVEL_AIDS[1]
+    // .pauseOnError froze the lesson on a второстепенна he could not have
+    // avoided without disobeying the instruction.
+    const codes = straddleDrive({ centreLinePainted: true, laneLinesPainted: true }, false)
+      .filter((e) => e.kind === "violation")
+      .map((e) => e.code);
+    expect(codes.filter((c) => LANE_CODES.includes(c))).toEqual([]);
   });
 
   it("…and an ABSENT field is byte-identical to the pre-slice behaviour", () => {
@@ -432,29 +455,31 @@ describe("no paint, no conviction", () => {
 
 describe("T2 spawn legality — measured, not assumed", () => {
   /**
-   * Doc 86 T2 says Lane 1 „closes half of T2". IT DOES NOT, and this test is
-   * the evidence rather than the claim.
+   * THE DAY LANDED. This block used to read „41 spawns still straddle a PAINTED
+   * осева — the half of T2 Lane 1 cannot reach", and it named its own successor:
+   * „the remaining fix is to place the car in its lane, and it is not in this
+   * lane's files: `content/world/*.json` spawnPoints … the ratchet below fails
+   * the day that lands, which is the point — it must be lowered deliberately,
+   * never drift." Doc 87's founder wave landed it: 42 poses across 18 districts
+   * moved from the road axis to the curb lane, and every generator in
+   * tools/maps now ends its spawn list with `lib/lane.mjs toCurbLane()`, so the
+   * convention cannot come back by regeneration.
    *
-   * 48 shipped spawn points put the car more than `laneKeepMaxOffsetM` off its
-   * lane centre — all 48 at exactly 4.06 m, i.e. dead on the road axis, because
-   * the T/X-junction and VRU generators write arm spawns at `x = 0` or `y = 0`.
-   * The paint referent rescues exactly 7 of them (the four lot FINISH spawns on
-   * `service` aisles and three полигон apron spawns, where the world genuinely
-   * draws no line). The other 41 — the number doc 86 T2 publishes — sit on
-   * `residential`/`secondary`/`primary` two-way edges that DO carry an осева,
-   * and extending MARKED_CLASSES only makes the conviction TRUTHFUL: the car
-   * really is parked on the centre line before the student touches anything.
+   * ON PAINT IS NOW ZERO — not "convicts truthfully", but "there is nothing to
+   * convict": no student is handed a car straddling an осева he never steered
+   * onto. Six poses remain more than `laneKeepMaxOffsetM` off a two-way lane
+   * centre, and all six are on BARE ASPHALT by construction: the four lot
+   * FINISH aisles and the two полигон aprons are `service` class, where the
+   * world draws no line, there is no lane to be in, and the pose is the lot's
+   * own geometry rather than a street convention. `poligon-v1/pg-spawn-1` left
+   * that list too — its host `pg-e-s3` is `unclassified`, a MARKED class, so it
+   * was moved with the streets.
    *
-   * The remaining fix is to place the car in its lane, and it is not in this
-   * lane's files: `content/world/*.json` spawnPoints (or a lane snap in
-   * `LessonScene.tsx:305-311`) against the `meta.scenario.laneCenterRightM`
-   * convention every straight-street district already follows. The ratchet
-   * below fails the day that lands, which is the point — it must be lowered
-   * deliberately, never drift.
+   * Keep the ratchet: it must only ever fall, and only deliberately.
    */
   const LANE_KEEP_MAX_OFFSET_M = 3.25; // RuleEngineConfig default
 
-  it("41 spawns still straddle a PAINTED осева — the half of T2 Lane 1 cannot reach", () => {
+  it("ZERO spawns straddle a PAINTED осева — the data half of T2 is closed (doc 87)", () => {
     const onPaint: string[] = [];
     const onBareAsphalt: string[] = [];
     for (const id of DISTRICT_IDS) {
@@ -471,13 +496,12 @@ describe("T2 spawn legality — measured, not assumed", () => {
         (fix.centreLinePainted ? onPaint : onBareAsphalt).push(`${id}/${sp.id}`);
       }
     }
-    expect(onPaint.length, onPaint.join(", ")).toBe(41);
+    expect(onPaint.length, onPaint.join(", ")).toBe(0);
     expect(onBareAsphalt.sort()).toEqual([
       "lot-45-v1/lot-spawn-finish",
       "lot-narrow-v1/lot-spawn-finish",
       "lot-par-v1/lot-spawn-finish",
       "lot-perp-v1/lot-spawn-finish",
-      "poligon-v1/pg-spawn-1",
       "poligon-v1/pg-spawn-2",
       "poligon-v1/pg-spawn-3",
     ]);

@@ -200,11 +200,15 @@ describe("ov-lane-v1 through the world runtime — the laneOffset surface ON THE
       let t = 0;
       // Curve-following forward cruise at 30 km/h at the given lane offset —
       // long enough to clear both the 3 s lane-keep and 3.5 s center-line
-      // sustains.
-      for (let y = y0; y < y1; y += (30 / 3.6) * dt) {
+      // sustains. The first 15 m are driven CENTRED, then the offset is taken:
+      // both codes grade a DEPARTURE from the lane, and doc 87 B23's spawn-pose
+      // latch will not convict a car that was placed off-centre. Same shape as
+      // a real drive — you arrive in your lane and then wander out of it.
+      const ENTRY_M = 15;
+      for (let y = y0 - ENTRY_M; y < y1; y += (30 / 3.6) * dt) {
         t += dt;
         rt.update(dt);
-        const p = offsetPoint(y, offsetM);
+        const p = offsetPoint(y, y < y0 ? O_CENTER : offsetM);
         const tick = rt.sample(sample(p.x, p.y, p.headingDeg, 30), t, false);
         const r = reduceTick(rules, tick);
         rules = r.state;

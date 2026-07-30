@@ -142,8 +142,8 @@
         "mistakeIndex": 0,
         "tracePath": "content/traces/sc-rx-tram-left/mistake-cut-tram.trace.json"
       },
-      "clipStartSec": 8.55,
-      "faultSec": 16.55,
+      "clipStartSec": 8.45,
+      "faultSec": 16.45,
       "windowOpenSec": 4,
       "cutSec": 8,
       "difficulty": 3,

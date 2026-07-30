@@ -41,6 +41,27 @@ export function evaluate(report) {
       }
     }
 
+    // A LONG LIST IS NOT AN EXCUSE FOR AN UNREACHABLE FIRST ROW.
+    //
+    // `foldMustPass` is all-or-nothing: it also requires a document that does
+    // not scroll, which is the wrong demand on a sixteen-topic hub — so that
+    // route had the whole fold check off, and the day its selector rotted
+    // nothing failed. `foldItemsMustFit` is the half that always applies: the
+    // elements the route NAMED as its primary interaction have to be on the
+    // screen the student lands on, however long the page below them is.
+    if (budget.foldItemsMustFit && !budget.foldMustPass) {
+      const missed = (r.fold?.items || []).filter((i) => i.found > 0 && !i.fits);
+      if (missed.length > 0) {
+        failures.push({
+          route: r.route,
+          device: r.device,
+          reason:
+            `the primary interaction is below the fold on the screen the student lands on; ` +
+            missed.map((m) => `${m.selector} overflows by ${m.overflowPx}px`).join(", "),
+        });
+      }
+    }
+
     if (typeof budget.contentMin === "number" && r.coverage.contentFraction < budget.contentMin) {
       failures.push({
         route: r.route,

@@ -50,6 +50,7 @@
 import { mkdirSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { curbLaneOffsetM, toCurbLane } from "./lib/lane.mjs";
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 
@@ -142,32 +143,40 @@ export function buildVuBikelaneDistrict(params) {
   ];
 
   // Spawns: 15 m inside each arm end, on the road centerline, facing the node.
-  const SPAWN_POINTS = [
-    {
-      id: "vu-spawn-west",
-      x: r2(-(throughArmM - 15)),
-      y: 0,
-      heading: 90,
-      edgeId: "vu-e-w",
-      name: "Улица с велоалея — подход от запад",
-    },
-    {
-      id: "vu-spawn-east",
-      x: r2(throughArmM - 15),
-      y: 0,
-      heading: 270,
-      edgeId: "vu-e-e",
-      name: "Улица с велоалея — подход от изток",
-    },
-    {
-      id: "vu-spawn-south",
-      x: 0,
-      y: r2(-(stemArmM - 15)),
-      heading: 0,
-      edgeId: "vu-e-s",
-      name: "Странична улица — подход към кръстовището",
-    },
-  ];
+  // doc 87 T2 — a spawn pose belongs in the CURB LANE of the edge it faces
+  // along, not on its centreline: the old convention handed the student a car
+  // already straddling the осева and the rule engine convicted him of
+  // «Настъпване на осевата линия» seconds later, for a pose he never chose.
+  // toCurbLane() leaves a deliberately off-centre pose exactly where it is.
+  const SPAWN_POINTS = toCurbLane(
+    [
+      {
+        id: "vu-spawn-west",
+        x: r2(-(throughArmM - 15)),
+        y: 0,
+        heading: 90,
+        edgeId: "vu-e-w",
+        name: "Улица с велоалея — подход от запад",
+      },
+      {
+        id: "vu-spawn-east",
+        x: r2(throughArmM - 15),
+        y: 0,
+        heading: 270,
+        edgeId: "vu-e-e",
+        name: "Улица с велоалея — подход от изток",
+      },
+      {
+        id: "vu-spawn-south",
+        x: 0,
+        y: r2(-(stemArmM - 15)),
+        heading: 0,
+        edgeId: "vu-e-s",
+        name: "Странична улица — подход към кръстовището",
+      },
+    ],
+    EDGES,
+  );
 
   // Bounds.
   const bounds = { minX: Infinity, minY: Infinity, maxX: -Infinity, maxY: -Infinity };
@@ -299,7 +308,10 @@ export function buildVuBikelaneDistrict(params) {
   for (const s of SPAWN_POINTS) {
     const host = EDGES.find((e) => e.id === s.edgeId);
     if (!host) post.push(`${s.id}: unknown edgeId ${s.edgeId}`);
-    else if (distToEdge(host, s.x, s.y) > 1) post.push(`${s.id}: not on its edge`);
+    // doc 87 T2: "on its edge" used to mean "within a metre of its CENTRELINE",
+    // i.e. the invariant enforced the defect it was supposed to catch.
+    else if (Math.abs(distToEdge(host, s.x, s.y) - curbLaneOffsetM(host.lanes, host.oneway)) > 1)
+      post.push(`${s.id}: not in its edge's curb lane`);
   }
   // Uncontrolled precondition: no arterial-class edge (heuristic would derive a line).
   const RANK = { primary: 5, secondary: 4, tertiary: 3, unclassified: 2, residential: 2, service: 1 };

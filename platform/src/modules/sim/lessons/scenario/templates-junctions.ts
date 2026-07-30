@@ -739,6 +739,20 @@ export const SC_JUNCTION_SCAN: ScenarioSpec = {
   // T9: the car the whole lesson talks about. Until now this array did not
   // exist — see SC_JUNCTION_SCAN_CONFLICT above.
   staged: [SC_JUNCTION_SCAN_CONFLICT],
+  // B28 (founder, doc 87): „it is asking the user to look left and right to see
+  // if there are traffic cars, but in fact the road is empty and there are no
+  // traffic cars moving at all on the map EVER". The staged conflict car is
+  // held 95 m west and only released once the player is at the line, which is
+  // correct for the ENCOUNTER — and it left the entire graded approach on a
+  // dead street, so the ляво-дясно-ляво ritual was a ritual about nothing.
+  //
+  // A template BASELINE, so the §7 ladder does the rest: L1 gets 2 cars (a
+  // beginner is not made to read a boulevard), L2 3, L3/L4 4. Never an
+  // absolute rung count — the same shape sc-junction-rhr's L5 already proves
+  // this map family hosts (vehicleCount 8 on the sibling tj-rhr-v1). The trace
+  // recorder reads `staged` only (traces/scJunctionScan.ts:188), so every
+  // committed ghost stays byte-identical.
+  traffic: { vehicleCount: 4 },
   conditions: { weather: "dry" },
   // The junction-scan detector is default-OFF (it would false-fire the exam
   // bank's unglanced Б2 crossings); this drill opts it in so the LIVE session

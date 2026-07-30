@@ -60,7 +60,15 @@ const ZEBRA_PED: PedestrianDartOutSpec = {
   start: { x: -9.73, y: 90 },
   dir: { x: 1, y: 0 },
   speedMps: 1.4,
-  travelM: 23.45, // curb → across the 16.25 m carriageway → 5.6 m walk-out
+  // 20.0 m, not 23.45 (doc 87 B14 — the residual doc 86 L9 noted and never
+  // actioned). zb-v1's pavement spans x ∈ [8.53, 12.03] (half-carriageway 8.125
+  // + 0.4 curb + SIDEWALK_WIDTH_M 3.5), and the old walk-out rested her at
+  // x = +13.72 — 1.7 m PAST the back of the pavement, standing on bare verge at
+  // the end of every run. 20.0 m lands her at x = +10.27, mid-pavement: clearly
+  // off the carriageway, clearly ON the footway. The road span is untouched
+  // (roadFromM/roadToM below still govern when she is clear of the road), so the
+  // graded encounter and every committed recording are identical.
+  travelM: 20.0, // curb → across the 16.25 m carriageway → 2.15 m onto the pavement
   roadFromM: 1.6,
   roadToM: 17.85,
   triggerDistM: 55,
@@ -269,6 +277,16 @@ export const SC_ROUNDABOUT_ENTRY: ScenarioSpec = {
       titleBg: "Приближи кръга с готовност за спиране",
       // The yield-line checkpoint just outside the decision zone (ring 18 m +
       // 12 m entry margin): arriving slowly is the RB-01 setup skill.
+      //
+      // doc 87 B18 („the green circle is put AFTER the give-way line") is fixed
+      // in scene/guidanceRoute.ts, not here: the DRAWN marker is clamped to a
+      // gate bar 0.80 m on the approach side of the М8 bars at y = −35.725, and
+      // guidance-geometry.test.ts pins that. This anchor deliberately stays at
+      // y = −34 r 9 — the clamp only moves the marker when the lawful aim point
+      // still fits inside the acceptance circle, and a tighter zone here would
+      // push the aim point outside it and DISABLE the clamp. RESIDUAL, for the
+      // lane that owns guidanceRoute.ts: the drawn bar is now honest, but the
+      // ACCEPTANCE zone still admits a car stopped 1.7 m past the paint.
       params: { kind: "reachZone", x: LANE_2, y: -34, radiusM: 9, maxSpeedKmh: 25 },
     },
     {

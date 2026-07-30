@@ -82,11 +82,19 @@ import {
   type SignalPhase,
 } from "../contracts";
 import { edgeTravelHalfWidth, nodeOpenRadiusM } from "../world/builders/network";
+import {
+  BUBBLE_ARM_RAISED,
+  BUBBLE_CHEST_OR_BACK,
+  BUBBLE_SIDE_PROFILE,
+  CONTROLLER_BUBBLES,
+  type ControllerBubbleCopy,
+} from "./controllerGestures";
 import type {
   DistrictEdge,
   TrafficDistrict,
   TrafficSystem,
   TrafficUpdateContext,
+  VehicleIndicator,
 } from "./types";
 import {
   assignCivilianModel,
@@ -150,6 +158,23 @@ const PED_POSE_ARM_EXTEND_RAD = Math.PI / 2;
 // flip the right arm goes straight up — „внимание, сменям посоките", the
 // raised-arm phase both templates warn about — then the figure turns smoothly
 // (~1 s damp, no teleport) onto the new halted axis.
+/**
+ * B41 / ledger L4 — „we spoke as well that we will make them bigger but I now
+ * see you have not done that".
+ *
+ * The officer used to take the ordinary walker's hashed height
+ * (0.9–1.12 of a ~1.73 m skeleton), so on the controller drills he was one
+ * more pedestrian standing in a junction whose apron is drawn at
+ * PERCEPTUAL_ROAD_SCALE 2.5 — and `sc-sig-controller-postures`, whose whole
+ * teach goal is «разчети позата», asked the student to resolve a gesture on a
+ * 1.7 m figure 27 m away. These are PINNED (no hash jitter, the child/elder
+ * precedent) so the same figure reads identically on every attempt: a
+ * deliberately imposing ~2.1 m officer with a heavier build, which is the
+ * silhouette a регулировчик has to have to be found at all in a busy junction.
+ * The caption bubble above him does the rest of the work at distance.
+ */
+const PED_OFFICER_HEIGHT = 1.22;
+const PED_OFFICER_BUILD = 1.18;
 const OFC_ARM_OUT_RAD = 1.47; // both-arms-out sideways raise (about local Z)
 /** „Внимание" window before the flip, s — sized to the recorded narrations:
  *  the postures shadow's „ръката му се вдига" lands ≈ t 19 on the flip-30
@@ -209,6 +234,32 @@ const BLINK_DUTY = 0.55; // fraction "on"
 const UP = new Vector3(0, 1, 0);
 const AXIS_X = new Vector3(1, 0, 0); // wheel spin axis (GLB wheels are X-axial)
 const AXIS_Z = new Vector3(0, 0, 1); // officer lateral arm-raise axis
+
+/**
+ * Which turn-signal lamps are armed this frame (ledger L6/L8/L11, founder items
+ * 43/44). Exported so the handoff is unit-testable without a renderer.
+ *
+ * `indicator` is the PUBLISHED command from the traffic system — present and
+ * meaningful only on staged actors, which are the only cars a lesson scripts a
+ * manoeuvre for. It wins outright: a commanded lamp is a fact about what that
+ * driver has announced, and no geometric guess may override or suppress it.
+ *
+ * `steer` is the old yaw-rate inference, kept as the FALLBACK for cars nobody
+ * commands. It stays because an ambient NPC physically turning a corner should
+ * still blink — a student reads the traffic around him off exactly these lamps.
+ * What it can no longer do is stand in for a commanded signal: a lateral lane
+ * change never reaches the arming threshold (the shipped cut-in peaks at 0.0624
+ * against 0.07), which is why the founder saw no blinker at all on lesson 43.
+ */
+export function blinkerSides(
+  indicator: VehicleIndicator | undefined,
+  steer: number,
+): { left: boolean; right: boolean } {
+  return {
+    left: indicator === "left" || (indicator !== "right" && steer > BLINK_STEER_THRESH),
+    right: indicator === "right" || (indicator !== "left" && steer < -BLINK_STEER_THRESH),
+  };
+}
 
 /** Shortest-signed angular difference a-b wrapped to (-pi, pi]. */
 function wrapPi(a: number): number {
@@ -558,6 +609,94 @@ function makeBlobTexture(): CanvasTexture {
   return new CanvasTexture(c);
 }
 
+// ---------------------------------------------------------------------------
+// B42 / ledger L4 — the gesture bubble above the регулировчик's head.
+//
+// Founder item 20, twice: „each position the traffic officers shows on top of
+// his head some bubble must appear stating what exactly he is pointing, who is
+// he letting go, whos turn its to pass." A world-anchored caption, not a HUD
+// card: it belongs ON the thing he is being asked to read, and the register's
+// other rows show what happens to DOM overlays here — they land on top of each
+// other. This is a billboarded plane painted from a canvas, so it costs one
+// draw, obeys occlusion, and cannot collide with any HUD layer.
+//
+// Sized to stay LEGIBLE, which is the whole point of the ask: at
+// BUBBLE_REF_DIST_M and closer it is its natural size; beyond that it grows
+// with distance up to BUBBLE_MAX_SCALE so its apparent size stays roughly
+// constant — the student can read the posture's meaning from the approach, at
+// the distance where he still has time to act on it, which is exactly where
+// `sc-sig-controller-postures` grades him.
+// ---------------------------------------------------------------------------
+const BUBBLE_W_M = 3.6;
+const BUBBLE_H_M = 1.9;
+const BUBBLE_TEX_W = 1024;
+const BUBBLE_TEX_H = 540;
+/** Bubble base sits this far above the figure's head. */
+const BUBBLE_GAP_M = 0.42;
+/** Distance at which the bubble is drawn at 1:1 world size, m. */
+const BUBBLE_REF_DIST_M = 16;
+const BUBBLE_MAX_SCALE = 3.4;
+/** |cos| between the officer's facing and the direction to the camera above
+ *  which the student is seeing him ANFAS (chest or back). Two thresholds =
+ *  hysteresis, so the caption cannot flicker while he turns at a phase flip.
+ *  0.5 is 60° either side of head-on — the band in which a human silhouette
+ *  genuinely stops reading as a profile. */
+const BUBBLE_ANFAS_ENTER = 0.55;
+const BUBBLE_ANFAS_EXIT = 0.45;
+
+/** Paint one posture's caption into the bubble canvas (called only when the
+ *  posture actually changes — never per frame). */
+function drawControllerBubble(c: HTMLCanvasElement, copy: ControllerBubbleCopy): void {
+  const g = c.getContext("2d");
+  if (!g) return;
+  const W = c.width;
+  const H = c.height;
+  const tail = 34; // pointer height, reserved at the bottom
+  const bodyH = H - tail;
+  const r = 34;
+  g.clearRect(0, 0, W, H);
+  // Card + accent border.
+  g.beginPath();
+  g.moveTo(r, 0);
+  g.lineTo(W - r, 0);
+  g.quadraticCurveTo(W, 0, W, r);
+  g.lineTo(W, bodyH - r);
+  g.quadraticCurveTo(W, bodyH, W - r, bodyH);
+  g.lineTo(W / 2 + 40, bodyH);
+  g.lineTo(W / 2, H);
+  g.lineTo(W / 2 - 40, bodyH);
+  g.lineTo(r, bodyH);
+  g.quadraticCurveTo(0, bodyH, 0, bodyH - r);
+  g.lineTo(0, r);
+  g.quadraticCurveTo(0, 0, r, 0);
+  g.closePath();
+  // Near-opaque: rendered against a bright dawn sky at 0.93 the card washed
+  // out and the grey law line stopped reading (frame ZOOM-OFC-bubble.png).
+  g.fillStyle = "rgba(9,14,25,0.97)";
+  g.fill();
+  g.lineWidth = 7;
+  g.strokeStyle = copy.accent;
+  g.stroke();
+
+  const FONT = '"Segoe UI", system-ui, "Noto Sans", sans-serif';
+  g.textAlign = "center";
+  g.textBaseline = "alphabetic";
+  g.fillStyle = copy.accent;
+  g.font = `700 116px ${FONT}`;
+  g.fillText(copy.headlineBg, W / 2, 122);
+  g.fillStyle = "#dbe5f2";
+  g.font = `600 44px ${FONT}`;
+  g.fillText(copy.poseBg, W / 2, 190);
+  g.fillStyle = "#9ff0c4";
+  g.font = `500 46px ${FONT}`;
+  g.fillText(copy.goBg, W / 2, 268);
+  g.fillStyle = "#ffc9c2";
+  g.fillText(copy.stopBg, W / 2, 334);
+  g.fillStyle = "#8ea3bd";
+  g.font = `500 38px ${FONT}`;
+  g.fillText(copy.lawRef, W / 2, 404);
+}
+
 /** Structural slice of the runtime's JU-18 read model (module boundary: the
  *  presentation depends on the shape, not the runtime barrel — the same
  *  pattern as the `runtime` prop). `signalControllerFigure` writes the posted
@@ -685,6 +824,16 @@ export function TrafficLayer({
   const pedLegRef = useRef<InstancedMesh>(null);
   // PE-14 white cane (1 instance per agent; zero-scaled unless variant elder).
   const pedCaneRef = useRef<InstancedMesh>(null);
+  // B42 — the officer's gesture caption. One billboarded plane; the lessons
+  // that stage a регулировчик stage exactly one figure, so one is enough.
+  const bubbleRef = useRef<Mesh>(null);
+  const bubbleTex = useMemo(() => {
+    const c = document.createElement("canvas");
+    c.width = BUBBLE_TEX_W;
+    c.height = BUBBLE_TEX_H;
+    return new CanvasTexture(c);
+  }, []);
+  useEffect(() => () => bubbleTex.dispose(), [bubbleTex]);
   // L5 hazard ball (single mesh — one per lesson at most).
   const hazardBallRef = useRef<Mesh>(null);
   const hazardBlobRef = useRef<Mesh>(null);
@@ -792,6 +941,9 @@ export function TrafficLayer({
     ofcArmSag: Float32Array; // nPed*2 — damped sagittal arm raise (local X)
     /** Reused out-record for the once-per-frame signalControllerFigure read. */
     figure: { halted: "ns" | "ew"; secToFlip: number };
+    /** B42 caption: index into CONTROLLER_BUBBLES currently painted into the
+     *  canvas (-1 = never painted). Repaint only on a real posture change. */
+    bubblePosture: number;
     // L5 hazard animation clock (seconds since hazardActiveRef went true).
     hazardT: number;
     // Reused rotation scratch.
@@ -837,6 +989,7 @@ export function TrafficLayer({
       ofcArmLat: new Float32Array(nPed * 2),
       ofcArmSag: new Float32Array(nPed * 2),
       figure: { halted: "ns", secToFlip: Infinity },
+      bubblePosture: -1,
       hazardT: 0,
       qYaw: new Quaternion(),
       qRoll: new Quaternion(),
@@ -877,9 +1030,14 @@ export function TrafficLayer({
       scratch.pedHeadScale[i] = 1;
       scratch.pedStoop[i] = 0;
       scratch.pedCaneOn[i] = 0;
-      // R3 #25–28 body variants: PINNED factors override the hashed jitter so
-      // the child silhouette / cane geometry read identically every attempt.
-      if (p.variant === "child") {
+      // B41: an officer figure is PINNED bigger than any walker — see
+      // PED_OFFICER_HEIGHT. Checked before the body variants because no
+      // shipped actor authors both, and the uniform already wins the same way.
+      if (p.pose !== undefined) {
+        scratch.pedHeight[i] = PED_OFFICER_HEIGHT;
+        scratch.pedBuild[i] = PED_OFFICER_BUILD;
+        scratch.pedHeadScale[i] = PED_OFFICER_HEIGHT;
+      } else if (p.variant === "child") {
         scratch.pedHeight[i] = PED_CHILD_HEIGHT;
         scratch.pedBuild[i] = PED_CHILD_BUILD;
         scratch.pedHeadScale[i] = PED_CHILD_HEAD_SCALE;
@@ -1177,9 +1335,29 @@ export function TrafficLayer({
           if (brake.instanceColor) brake.instanceColor.needsUpdate = true;
         }
 
-        // Blinkers: |steer| over threshold arms the side; sign picks left/right.
-        const turnLeft = steer > BLINK_STEER_THRESH;
-        const turnRight = steer < -BLINK_STEER_THRESH;
+        // Blinkers — the PUBLISHED indicator wins; the yaw guess is only the
+        // fallback for cars nobody commands (ledger L6/L8/L11, founder items
+        // 43/44: „it is turning on the right signal very very very late").
+        //
+        // Why the guess alone was not late but ABSENT: a staged laneShift is a
+        // lateral GLIDE. The shipped cut-in moves 8.125 m over 1.5 s at 11 m/s,
+        // so the smoothed steer peaks at 0.0624 against this file's own 0.07
+        // arming threshold — the lamp never lit at all, at any point, and the
+        // student could not anticipate a merge the car never announced. The
+        // engine now publishes what the actor is ACTUALLY indicating
+        // (TrafficVehicleState.indicator, armed INDICATOR_LEAD_SEC ahead of the
+        // wheel by the cut-in runner), so the renderer reads it instead of
+        // inferring it.
+        //
+        // A commanded lamp can never be suppressed by the guess, and an
+        // uncommanded actor keeps the guess: an ambient NPC physically turning
+        // a corner still blinks, which is what a real driver does and what a
+        // student must be able to read off the traffic around him. `indicator`
+        // is absent on every ambient agent and "off" on an unarmed staged one —
+        // both fall through to the geometry. See blinkerSides().
+        const sides = blinkerSides(v.indicator, steer);
+        const turnLeft = sides.left;
+        const turnRight = sides.right;
         const leftLit = turnLeft && blinkOn ? 1 : 0;
         const rightLit = turnRight && blinkOn ? 1 : 0;
         if (scratch.blinkState[i * 2] !== leftLit) {
@@ -1229,6 +1407,10 @@ export function TrafficLayer({
       const figOn = controllerFigure !== null && controllerFigure.signalControllerFigure(fig);
       const ofcTurnT = 1 - Math.exp(-OFC_TURN_RATE * dtc);
       const ofcArmT = 1 - Math.exp(-OFC_ARM_RATE * dtc);
+      // B42: the caption follows whichever officer figure is on the map. Reset
+      // each frame; the loop claims it when it renders one.
+      let bubbleOwner = -1;
+      let bubblePosture = -1;
       for (let i = 0; i < nPed; i++) {
         const p = system.pedestrians[i];
         const tx = p.x;
@@ -1283,6 +1465,30 @@ export function TrafficLayer({
         }
         const cos = Math.cos(yaw);
         const sin = Math.sin(yaw);
+        // B42 — which posture is this student looking at RIGHT NOW? Read off
+        // the rendered pose, not off the schedule: the caption must describe
+        // the figure in front of the windscreen, and "chest-on" or "profile"
+        // is a fact about the angle between his facing and the eye, which is
+        // exactly what the driver has to learn to read. `stopSignal` is the
+        // raised-arm gesture by definition; the scheduled officer's „внимание"
+        // window is the same gesture; everything else is геометрия.
+        if (p.pose !== undefined && bubbleOwner < 0) {
+          bubbleOwner = i;
+          if (attention || p.pose === "stopSignal") {
+            bubblePosture = BUBBLE_ARM_RAISED;
+          } else {
+            // Officer forward in three-space is (sin yaw, −cos yaw).
+            const toEyeX = cam.x - tx;
+            const toEyeZ = cam.z - tz;
+            const inv = 1 / Math.max(1e-3, Math.hypot(toEyeX, toEyeZ));
+            const facing = Math.abs((toEyeX * sin + toEyeZ * -cos) * inv);
+            const was = scratch.bubblePosture === BUBBLE_CHEST_OR_BACK;
+            bubblePosture =
+              facing >= (was ? BUBBLE_ANFAS_EXIT : BUBBLE_ANFAS_ENTER)
+                ? BUBBLE_CHEST_OR_BACK
+                : BUBBLE_SIDE_PROFILE;
+          }
+        }
         // Counter-phase swing from the accumulated walk phase, damped to zero
         // as the agent slows (standing pedestrians hold their limbs still).
         const swing =
@@ -1407,6 +1613,41 @@ export function TrafficLayer({
       pedArm.instanceMatrix.needsUpdate = true;
       pedLeg.instanceMatrix.needsUpdate = true;
       pedCane.instanceMatrix.needsUpdate = true;
+
+      // --- B42 gesture caption. Hidden on every lesson with no officer, so
+      // this whole block is a single boolean for the other ~150 scenarios.
+      const bubble = bubbleRef.current;
+      if (bubble) {
+        if (bubbleOwner < 0 || bubblePosture < 0) {
+          bubble.visible = false;
+        } else {
+          const owner = system.pedestrians[bubbleOwner];
+          if (bubblePosture !== scratch.bubblePosture) {
+            scratch.bubblePosture = bubblePosture;
+            drawControllerBubble(
+              bubbleTex.image as HTMLCanvasElement,
+              CONTROLLER_BUBBLES[bubblePosture],
+            );
+            bubbleTex.needsUpdate = true;
+          }
+          const ox = owner.x;
+          const oz = -owner.y;
+          const eyeD = Math.hypot(ox - cam.x, oz - cam.z);
+          // Constant APPARENT size past the reference distance: the whole
+          // point of the ask is that he can read it while there is still road
+          // left to act on it.
+          const s = Math.min(BUBBLE_MAX_SCALE, Math.max(1, eyeD / BUBBLE_REF_DIST_M));
+          const headY = PED_HEAD_Y * PED_OFFICER_HEIGHT;
+          bubble.position.set(
+            ox,
+            headY + BUBBLE_GAP_M + (BUBBLE_H_M * s) / 2,
+            oz,
+          );
+          bubble.scale.set(s, s, 1);
+          bubble.quaternion.copy(frame.camera.quaternion); // billboard
+          bubble.visible = true;
+        }
+      }
     }
 
     // --- L5 hazard dart (render-only; A8 owns the trigger). The ball and the
@@ -1550,6 +1791,16 @@ export function TrafficLayer({
       >
         <meshStandardMaterial color="#f4f2ec" roughness={0.35} />
       </instancedMesh>
+
+      {/* B42 — the регулировчик's gesture caption, billboarded above his head.
+          Mounted always, `visible` only while an officer figure is on the map
+          (one boolean per frame on every other lesson). depthWrite off so it
+          never carves a hole in what is behind it; it still depth-TESTS, so a
+          bus between you and him hides it exactly like it hides him. */}
+      <mesh ref={bubbleRef} visible={false} renderOrder={7} frustumCulled={false}>
+        <planeGeometry args={[BUBBLE_W_M, BUBBLE_H_M]} />
+        <meshBasicMaterial map={bubbleTex} transparent depthWrite={false} toneMapped={false} />
+      </mesh>
 
       {/* Parked-car blob shadows — the GLB bodies + wheels themselves live in
           fleet.group (static per-model InstancedMeshes, placed once above). */}

@@ -152,24 +152,49 @@ describe("CENTER_LINE_TOUCHED (SN-03 — настъпване на осева л
     laneId: 0,
     laneOffsetM: 3.5,
   };
+  /** In his own lane — the frame every real drive starts from, and the one the
+   *  spawn-pose latch (doc 87 B23) needs before a DEPARTURE can be graded. */
+  const inLane = (t: number, over: Partial<SimTick> = {}) =>
+    tick(t, { speedKmh: 40, oneway: false, laneCount: 1, laneId: 0, laneOffsetM: 0, ...over });
 
   it("sustained unsignalled ride on the center line fires второстепенна", () => {
-    const { events } = drive(cruise(0, 4, riding));
+    const { events } = drive([inLane(0), ...cruise(1, 5, riding)]);
     const v = violationsOf(events, "CENTER_LINE_TOUCHED");
     expect(v).toHaveLength(1);
     expect(v[0].severityClass).toBe("vtorostepenna");
   });
 
   it("the specific code SUPPRESSES generic POOR_LANE_KEEPING (no double bill)", () => {
-    const { events } = drive(cruise(0, 8, riding));
+    const { events } = drive([inLane(0), ...cruise(1, 9, riding)]);
     expect(codes(events)).toContain("CENTER_LINE_TOUCHED");
     expect(codes(events)).not.toContain("POOR_LANE_KEEPING");
   });
 
   it("the generic lane-keeping code still owns one-way / rightward drifts", () => {
-    const { events } = drive(cruise(0, 5, { speedKmh: 40, oneway: true, laneCount: 2, laneId: 1, laneOffsetM: 3.5 }));
+    const drift: Partial<SimTick> = {
+      speedKmh: 40,
+      oneway: true,
+      laneCount: 2,
+      laneId: 1,
+      laneOffsetM: 3.5,
+    };
+    const { events } = drive([
+      inLane(0, { oneway: true, laneCount: 2, laneId: 1 }),
+      ...cruise(1, 6, drift),
+    ]);
     expect(codes(events)).toContain("POOR_LANE_KEEPING");
     expect(codes(events)).not.toContain("CENTER_LINE_TOUCHED");
+  });
+
+  // -- doc 87 B23/B26/B33: the four-of-four false pause -----------------------
+  it("a car SPAWNED on the осева, driven dead straight, is never convicted", () => {
+    // sc-junction-rhr / -scan / -blind / -stop all compile a spawn at x = 0,
+    // the road centreline, 4.06 m off the lane centre the objective is authored
+    // on. The founder held the taught speed for 32 s and got a graded pause for
+    // driving straight. There is no act here to grade: he was placed there.
+    const { events } = drive(cruise(0, 12, riding));
+    expect(codes(events)).not.toContain("CENTER_LINE_TOUCHED");
+    expect(codes(events)).not.toContain("POOR_LANE_KEEPING");
   });
 });
 

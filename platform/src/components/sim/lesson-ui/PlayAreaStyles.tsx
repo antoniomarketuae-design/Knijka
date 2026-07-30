@@ -102,6 +102,140 @@ export function PlayAreaStyles() {
       [data-sim-compact="on"] [data-hud="demo-deck"] {
         bottom: ${TOUCH_CONTROLS_FLOOR};
       }
+
+      /* ------------------------------------------------------------------
+         THE MIRROR AND THE HUD — rows B74 / B76.
+
+         The chase view now carries a PERSISTENT rear-view window and Q/E/F
+         open it to full size on the glanced side (CameraRig +
+         scene/chaseRearView.ts). That window is a quad INSIDE the WebGL
+         canvas, so every DOM card painted over the canvas covers it, whatever
+         renderOrder it carries — which is exactly what the audit photographed:
+         the „Клавиши" legend over ~60 % of the Q window, the toast card over
+         half of the E one, the objective chips over the top 40 % of F.
+
+         An instrument you cannot see is not an instrument, so the HUD moves,
+         not the mirror. CameraRig publishes on the document root which camera
+         is live, whether a glance is held and on which side, and the two window
+         edges in CSS pixels; these rules step each panel below whichever edge
+         concerns it. Nothing is hidden — a teaching card that arrives
+         mid-glance is still on screen, one window-height lower, and it slides
+         back the moment the key is released.
+
+         Written here, in the shell's own stylesheet, for the same reason the
+         two rules above are: the panels belong to three different components in
+         two different lanes, and their only shared vocabulary is data-hud.
+         ------------------------------------------------------------------ */
+      [data-hud="controls-help"],
+      [data-hud="follow-hint"],
+      [data-hud="objective-stack"] {
+        transition: top 180ms ease-out;
+      }
+      [data-hud="toasts"] {
+        transition: margin-top 180ms ease-out;
+      }
+      [data-hud="difficulty"] {
+        transition: opacity 140ms ease-out;
+      }
+      @media (prefers-reduced-motion: reduce) {
+        [data-hud="controls-help"],
+        [data-hud="follow-hint"],
+        [data-hud="objective-stack"],
+        [data-hud="difficulty"],
+        [data-hud="toasts"] {
+          transition: none;
+        }
+      }
+
+      /* The interior mirror hangs where the objective banner used to start, so
+         the banner starts under it — for the whole time the chase camera is
+         live, because the mirror is permanent. The „follow the blue line" chip
+         sits at top-16, i.e. inside the same glass, and goes with it. */
+      html[data-sim-camera="chase"] [data-hud="objective-stack"] {
+        top: calc(0.75rem + var(--sim-mirror-h, 0px));
+      }
+      html[data-sim-camera="chase"] [data-hud="follow-hint"] {
+        top: calc(4rem + var(--sim-mirror-h, 0px));
+      }
+
+      /* …and while a glance is HELD the window is full size and on that side. */
+      html[data-sim-glance="left"] [data-hud="controls-help"] {
+        top: calc(0.75rem + var(--sim-glance-h, 0px));
+      }
+      html[data-sim-glance="rear"] [data-hud="objective-stack"] {
+        top: calc(0.75rem + var(--sim-glance-h, 0px));
+      }
+      html[data-sim-glance="rear"] [data-hud="follow-hint"] {
+        top: calc(4rem + var(--sim-glance-h, 0px));
+      }
+      html[data-sim-glance="right"] [data-hud="toasts"] {
+        margin-top: var(--sim-glance-h, 0px);
+      }
+
+      /* The tier picker shares the top-right corner with the E window and with
+         the toast column, and three things do not fit in one corner. It is the
+         only one of the three that carries no information — Начинаещ /
+         Нормален / Напреднал is a SETTING, and a setting you are not touching
+         while your head is turned. So it stands down for the second the glance
+         lasts, instead of being stepped into the toasts' new place. A teaching
+         card is never treated this way: it moves, it does not disappear. */
+      html[data-sim-glance="right"] [data-hud="difficulty"] {
+        opacity: 0;
+        pointer-events: none;
+      }
+
+      /* ------------------------------------------------------------------
+         ROW C7 — one speedometer per screen.
+
+         In the cockpit camera the „Виток" 3D cluster draws speed and the
+         selector letter inside the cabin, at the resolution four review rounds
+         were spent on. The compact readout was drawing both AGAIN, 40 px lower,
+         because it had no way to know which camera was live; the audit frame has
+         the analogue dial, its digital „0 км/ч" and its „D" in the same picture
+         as a DOM „D 0 км/ч". Two speedometers do not make a student faster at
+         reading one.
+
+         What does NOT go away is the limit disc: the cluster shows what the car
+         is doing, never what the law allows, and speed discipline is the whole
+         claim of this product. So in the cockpit the readout is exactly the one
+         number the instrument panel cannot give you.
+
+         Chase and top-down are untouched — there the cluster is not in frame at
+         all, which is why this readout was kept in the first place.
+         ------------------------------------------------------------------ */
+      html[data-sim-camera="cockpit"] [data-hud="speed-block"] {
+        display: none;
+      }
+
+      /* ------------------------------------------------------------------
+         ROW C2 — 44 px under the thumb, 0 px more paint.
+
+         Measured in WebKit on iPhone 16: „Начинаещ" 75.6×24.5, „Нормален"
+         73.5×24.5, „Напреднал" 78.8×24.5 and „🎬 Демонстрация ▸" 137.2×26.5.
+         Wide enough, half as tall as a thumb needs.
+
+         Growing the buttons would have grown the chrome with them — the tier
+         group alone is already 2.6 % of a landscape phone, and this is the
+         screen the founder measured as „half furniture". So the TAP AREA grows
+         and the pill does not: an absolutely positioned ::before at −0.75 rem
+         top and bottom puts the hit rect at 24.5 + 24 ≈ 48 px. A pseudo-element
+         paints nothing and is in no DOM, so it is charged nothing — and the
+         mobile probe unions exactly these insets into the measured hit rect
+         (tools/mobile/lib/probe.mjs, „a common and legitimate trick").
+         ------------------------------------------------------------------ */
+      [data-sim-compact="on"] [data-hud="difficulty"] button,
+      [data-sim-compact="on"] [data-hud="demo-deck"] > button {
+        position: relative;
+      }
+      [data-sim-compact="on"] [data-hud="difficulty"] button::before,
+      [data-sim-compact="on"] [data-hud="demo-deck"] > button::before {
+        content: "";
+        position: absolute;
+        top: -0.75rem;
+        bottom: -0.75rem;
+        left: 0;
+        right: 0;
+      }
     `}</style>
   );
 }

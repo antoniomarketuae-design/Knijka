@@ -277,11 +277,13 @@ describe("DEFAULT_LEVEL_TOLERANCE", () => {
   it("gives a silent rung a real waypoint delta", () => {
     const s = clone();
     for (const l of s.levels) delete l.toleranceScale;
+    // The P0's pull-past gate is r = 5 since doc 87 B3/B10 turned it from a
+    // 14 m drive-by window into the at-rest gate its instructions describe.
     const r = (lv: ScenarioLevel) => compileScenario(s, lv).objectives[0].params.radiusM;
-    expect(r(1)).toBe(10.5); // 7 × 1.5
-    expect(r(2)).toBe(8.75); // 7 × 1.25
-    expect(r(3)).toBe(7);
-    expect(r(4)).toBe(7);
+    expect(r(1)).toBe(7.5); // 5 × 1.5
+    expect(r(2)).toBe(6.25); // 5 × 1.25
+    expect(r(3)).toBe(5);
+    expect(r(4)).toBe(5);
   });
 
   it("a maneuver tolerance still scales BOTH ways — that is real difficulty", () => {
@@ -289,7 +291,7 @@ describe("DEFAULT_LEVEL_TOLERANCE", () => {
     s.levels[3].toleranceScale = 0.6;
     expect(compileScenario(s, 4).objectives[1].params.centerTolM).toBe(0.3);
     // …while the waypoint on the same rung refuses to shrink.
-    expect(compileScenario(s, 4).objectives[0].params.radiusM).toBe(7);
+    expect(compileScenario(s, 4).objectives[0].params.radiusM).toBe(5);
   });
 });
 
@@ -311,7 +313,9 @@ describe("DEFAULT_LEVEL_TRAFFIC_SCALE", () => {
     expect(DEFAULT_LEVEL_TRAFFIC_SCALE).toEqual({ 1: 0.5, 2: 0.75, 3: 1, 4: 1, 5: 1.5 });
     const s = clone();
     s.traffic = { vehicleCount: 4, pedestrianCount: 6, anchorRadiusM: 250 };
-    s.levels.push({ level: 5 });
+    // The P0 ships its own L5 now (doc 87 B2), so REPLACE it with a silent
+    // rung — this test is about what the ladder derives when nothing is said.
+    s.levels = [...s.levels.filter((l) => l.level !== 5), { level: 5 }];
     const v = (lv: ScenarioLevel) => compileScenario(s, lv).traffic!;
     expect(v(1)).toEqual({ vehicleCount: 2, pedestrianCount: 3, anchorRadiusM: 250 });
     expect(v(2)).toEqual({ vehicleCount: 3, pedestrianCount: 5, anchorRadiusM: 250 });
@@ -391,7 +395,11 @@ describe("resolveScenarioRubric (doc 86 D7)", () => {
   });
 
   it("refuses a level the template does not author, exactly like compileScenario", () => {
-    expect(() => resolveScenarioRubric(SC_PARK_PERP_REV, 5)).toThrow(ScenarioCompileError);
+    // The P0 authors L1..L5 since doc 87 B2, so the unauthored rung has to be
+    // made rather than borrowed.
+    const noL5 = clone();
+    noL5.levels = noL5.levels.filter((l) => l.level !== 5);
+    expect(() => resolveScenarioRubric(noL5, 5)).toThrow(ScenarioCompileError);
   });
 
   it("a rubric pointing at a missing objective is a loud compile error, not a silent 0", () => {

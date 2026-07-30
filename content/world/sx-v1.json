@@ -605,7 +605,7 @@
  "spawnPoints": [
   {
    "id": "sx-spawn-south",
-   "x": 0,
+   "x": 4.06,
    "y": -105,
    "heading": 0,
    "edgeId": "sx-e-s",
@@ -614,7 +614,7 @@
   {
    "id": "sx-spawn-east",
    "x": 105,
-   "y": 0,
+   "y": 4.06,
    "heading": 270,
    "edgeId": "sx-e-e",
    "name": "Източен подход към светофара"
@@ -622,7 +622,7 @@
   {
    "id": "sx-spawn-west",
    "x": -155,
-   "y": 0,
+   "y": -4.06,
    "heading": 90,
    "edgeId": "sx-e-w",
    "name": "Западен подход към светофара"

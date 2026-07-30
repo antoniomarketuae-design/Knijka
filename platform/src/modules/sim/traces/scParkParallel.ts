@@ -12,7 +12,7 @@
  *   parked-car flank (west) at x = 5.38;
  *   target bay lot-bay-3 center (6.28, 0), axis north (headingDeg 0);
  *   lead car (bay-4) y ∈ [4.25, 8.75], rear car (bay-2) y ∈ [−8.75, −4.25];
- *   spawn lot-spawn-approach (0, −105) heading north.
+ *   spawn lot-spawn-approach (4.06, −105) heading north.
  *
  * The correct maneuver is the textbook reverse S with a forward finish (the
  * ~45° entry, three reference points): pull up beside the lead car (~0.85 m
@@ -80,9 +80,7 @@ function reverseSPoints(startX: number, startY: number): Array<[number, number]>
 
 /** Approach: spawn → right-lane cruise up the approach road. */
 const APPROACH: Array<[number, number]> = [
-  [0, -105],
-  [0, -103],
-  [X_LANE, -92],
+  [X_LANE, -105],
   [X_LANE, -24],
 ];
 

@@ -496,9 +496,38 @@ export function probeBody(config) {
     if (r.width === 0 || r.height === 0) continue;
     if (r.bottom <= 0 || r.top >= VH || r.right <= 0 || r.left >= VW) continue;
 
-    // A common (and legitimate) trick is an absolutely-positioned ::before /
-    // ::after with negative insets that enlarges the hit area. Honour it.
+    // THE THING A THUMB AIMS AT IS THE LABEL, NOT THE BOX INSIDE IT.
+    //
+    // The practice runner draws a real 16x16 <input> inside a `min-h-11` label
+    // that spans the option row, and clicking ANYWHERE in that label activates
+    // the input — that is the browser's behaviour, not a convention. The probe
+    // was reporting four "16x16 violations" per question that describe nothing
+    // a thumb can miss, and they sorted to the top of the list and buried the
+    // 38x38 hamburger that was real.
+    //
+    // So a form control wrapped by its own <label> inherits that label's hit
+    // box. Strictly the WRAPPING case: a `for=`-linked
+    // label somewhere else on the page does NOT make a small control reachable
+    // at the control's own position, and must keep failing. The label is
+    // audited on its own, so nothing is being excused — the audit just happens
+    // once, against the box that actually receives the tap.
     let hit = { left: r.left, top: r.top, right: r.right, bottom: r.bottom };
+    const wrappingLabel =
+      typeof el.closest === "function" ? el.closest("label") : null;
+    // `label.control === el` is the exact test: this label labels THIS control.
+    // A stray small button that merely happens to sit inside a label keeps
+    // failing, because tapping the label would not activate it.
+    if (wrappingLabel && wrappingLabel !== el && wrappingLabel.control === el) {
+      const lr = wrappingLabel.getBoundingClientRect();
+      if (lr.width > 0 && lr.height > 0) {
+        hit = {
+          left: Math.min(hit.left, lr.left),
+          top: Math.min(hit.top, lr.top),
+          right: Math.max(hit.right, lr.right),
+          bottom: Math.max(hit.bottom, lr.bottom),
+        };
+      }
+    }
     for (const pseudo of ["::before", "::after"]) {
       const ps = getComputedStyle(el, pseudo);
       if (!ps || ps.content === "none" || ps.position !== "absolute") continue;

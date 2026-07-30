@@ -22,6 +22,13 @@ export const REPO = resolve(HERE, "..", "..", "..");
 export const PLATFORM = join(REPO, "platform");
 const STATE_DIR = join(HERE, "..", ".out", ".server");
 
+// AND THE PORT NUMBER IS NOT FREE TO CHANGE. next-auth v5 resolves its route
+// against AUTH_URL from platform/.env, which names this port — a dev server on
+// any other one answers /api/auth/providers with 404, sign-in silently fails,
+// and the harness reports „no session cookie after sign-in" with an EMPTY form
+// error, which reads exactly like a broken login page. Measured the hard way on
+// :3461. If you need a second server for another lane, give it its own
+// KNIJKA_DIST_DIR and its own AUTH_URL, not just its own port.
 export const DEFAULT_PORT = 3460;
 export const DIST_DIR = ".next-harness";
 

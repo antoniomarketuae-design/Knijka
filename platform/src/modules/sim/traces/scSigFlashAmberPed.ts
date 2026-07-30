@@ -30,7 +30,7 @@
  * Geometry pinned to content/world/pe-jay-v1.json: ns road on x = 0 (right lane
  * 4.06, limit 50 → the 55 km/h graced band no drive here reaches), junction
  * stop lines at ±27.7, the crossing pej-x-1 at y = 34 on the north exit arm,
- * spawn sx-spawn-south (0, −105) heading north. The 35 m crossing zone arms at
+ * spawn sx-spawn-south (4.06, −105) heading north. The 35 m crossing zone arms at
  * y ≈ −0.76. Walker timing: released at trigger 55 m (player y ≈ −20.85), on the
  * carriageway from ~1.1 s, reaches the player's lane (x ≈ 4.06) ~9.2 s after
  * release, clear of the roadway at ~11.9 s.
@@ -81,7 +81,7 @@ export function scSigFlashAmberPedShadowScript(): DriveScript {
       // itself is never the fault; the duty of care is what gets demonstrated.
       {
         kind: "drive",
-        points: [[0, -105], [0, -103], [X_LANE, -92], [X_LANE, -40]],
+        points: [[X_LANE, -105], [X_LANE, -40]],
         targetKmh: 28,
         stopAtEnd: false,
       },
@@ -135,7 +135,7 @@ export function scSigFlashAmberPedMistakeHotApproachScript(): DriveScript {
       // but half again over the 30 km/h cap that a busy crossing demands.
       {
         kind: "drive",
-        points: [[0, -105], [0, -103], [X_LANE, -92], [X_LANE, -20]],
+        points: [[X_LANE, -105], [X_LANE, -20]],
         targetKmh: 45,
         stopAtEnd: false,
       },
@@ -190,7 +190,7 @@ export function scSigFlashAmberPedMistakeNoYieldScript(): DriveScript {
       // demo shows is the refusal to yield to the person on the carriageway.
       {
         kind: "drive",
-        points: [[0, -105], [0, -103], [X_LANE, -92], [X_LANE, -40]],
+        points: [[X_LANE, -105], [X_LANE, -40]],
         targetKmh: 28,
         stopAtEnd: false,
       },

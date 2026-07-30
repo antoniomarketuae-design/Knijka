@@ -24,7 +24,7 @@
  *   aisle centerline x = 0 (northbound), drawn lane center x = +4.0625;
  *   bay row on the EAST side; target bay lot-bay-3 centre (5.03, 0), axis
  *   east-west (headingDeg 90); occupied neighbours at y = ∓2.7 / ∓5.4;
- *   spawn lot-spawn-approach (0, −105) heading north.
+ *   spawn lot-spawn-approach (4.06, −105) heading north.
  *
  * Rule-engine safety envelope (why the numbers are what they are — the P0's
  * header note applies unchanged): the lane detectors arm at |laneOffset| >

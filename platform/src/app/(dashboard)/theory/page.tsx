@@ -53,7 +53,10 @@ export default async function TheoryPage() {
     questionsRounded >= 100 ? `над ${questionsRounded}` : `${questionCount}`;
 
   return (
-    <div className="flex flex-col gap-4 sm:gap-6">
+    // `short:gap-2` — on a landscape phone every gap between the head and the
+    // board is height the board does not get. See TheoryFocus for the measured
+    // reason this screen needed a landscape pass at all.
+    <div className="flex flex-col gap-4 short:gap-2 sm:gap-6">
       <TheoryFocus
         topics={topics}
         sectionCount={sections.length}

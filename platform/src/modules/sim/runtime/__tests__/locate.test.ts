@@ -24,17 +24,28 @@ describe("locate() on district-v1", () => {
   it("computes lane 0 and near-zero offset in the middle of the right lane (2-lane residential)", () => {
     // spawn-1 sits at s≈176 of e519275131.0 (ул. Трайко Станоев, 2 lanes
     // two-way ⇒ 1 lane per direction, lane center W/2 right of centerline).
+    //
+    // doc 87 T2: this test used to ADD W/2 to the right of the pose, because the
+    // pose was authored on the road centreline. It is now authored on the lane
+    // centre itself (tools/maps/lib/lane.mjs toCurbLane), so the spawn point IS
+    // the point this test is about — and the W/2 nudge below now checks the
+    // OTHER thing worth checking: half a lane to the right of centre is still
+    // lane 0, just off-centre, not a lane change.
     const rt = createWorldRuntime(district);
     const sp = district.spawnPoints.find((s) => s.id === "spawn-1");
     expect(sp).toBeDefined();
     if (!sp) return;
-    const h = (sp.heading * Math.PI) / 180;
-    // Right of heading = (cos h, -sin h) in (east, north).
-    const pos = { x: sp.x + (W / 2) * Math.cos(h), y: sp.y - (W / 2) * Math.sin(h) };
-    const fix = rt.locate(pos);
+    const fix = rt.locate({ x: sp.x, y: sp.y });
     expect(fix.edgeId).toBe(sp.edgeId);
     expect(fix.laneId).toBe(0);
     expect(Math.abs(fix.laneOffsetM)).toBeLessThan(0.4);
+
+    // Right of heading = (cos h, -sin h) in (east, north).
+    const h = (sp.heading * Math.PI) / 180;
+    const nudged = rt.locate({ x: sp.x + (W / 4) * Math.cos(h), y: sp.y - (W / 4) * Math.sin(h) });
+    expect(nudged.edgeId).toBe(sp.edgeId);
+    expect(nudged.laneId).toBe(0);
+    expect(Math.abs(nudged.laneOffsetM)).toBeGreaterThan(1.5);
   });
 
   it("numbers lanes 0 = rightmost across a 6-lane arterial (3 per direction)", () => {

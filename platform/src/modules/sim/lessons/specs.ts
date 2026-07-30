@@ -539,8 +539,25 @@ export const LESSONS: readonly LessonSpec[] = [
       {
         id: "l7-approach",
         titleBg: "Придвижи се към мястото за паркиране",
-        kind: "driveDistance",
-        params: { meters: 50 },
+        // B1 (founder, doc 87): „a huge green arrow pointing straight to the
+        // end of the street — I start to accelerate and suddenly it
+        // disappears and asks me to go back and park". It was a
+        // `driveDistance 50`, and a distance objective has no PLACE: the
+        // guidance route answers `{kind:"ahead", 50 + 30 m}` and draws the
+        // ribbon 80 m down the road, past the bay at 62 m, with no waypoint
+        // to look ahead FROM (scene/guidanceRoute.ts). The moment the 50 m
+        // ticked over, the ribbon's goal became the bay BEHIND the car.
+        //
+        // The pull-past pose is the real first act of a parallel park, so
+        // author it as the place it is: 6 m beyond the bay, on the travel
+        // lane (bay centre + 6 m along the 67.3° road axis, 2.34 m back
+        // toward the centreline = 4.06 m lane centre — the same single-truth
+        // L7_PARKING_BAY geometry every other L7 coordinate is derived from).
+        // The ribbon now ends AT the parking place and the bay marker takes
+        // over six metres behind it, which is the transition the founder
+        // expected to see.
+        kind: "reachZone",
+        params: { x: 685.9, y: -195.07, radiusM: 7, maxSpeedKmh: 20 },
       },
       {
         id: "l7-park",

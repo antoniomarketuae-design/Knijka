@@ -58,16 +58,21 @@ export function FoldRigClient({
       <DashboardShell>
         <main
           id="main-content"
-          className="mx-auto w-full max-w-6xl px-4 py-6 sm:px-6 lg:px-8 lg:py-8"
+          className="mx-auto flex w-full max-w-6xl flex-1 flex-col px-4 py-6 short:py-2 sm:px-6 lg:px-8 lg:py-8"
         >
           {mode === "practice" ? (
-            // The practice route wraps the runner in a `flex flex-col gap-4`
-            // with a phone-only header above it. Reproduced verbatim so the
-            // rig's card sits at the same y as the real one.
-            <div className="flex flex-col gap-2 sm:gap-8">
-              <header className="flex items-baseline gap-3 sm:hidden">
+            // The practice route wraps the runner in a flex column with a
+            // phone-only header above it. Reproduced verbatim so the rig's card
+            // sits at the same y as the real one — including `flex-1`, without
+            // which the rig would measure a content-height card and the real
+            // page a full-height one.
+            <div className="flex flex-1 flex-col gap-2 short:gap-0 sm:gap-8">
+              <header className="hidden items-baseline gap-2 narrow-tall:flex">
                 <span className="shrink-0 text-xs font-bold text-accent">← Теми</span>
-                <h1 className="min-w-0 truncate font-display text-lg font-black tracking-tight">
+                {/* `text-sm`, matching the real page. It was `text-lg` here,
+                    which put the rig's card 16px lower than the product's and
+                    made every fold measurement pessimistic by that much. */}
+                <h1 className="min-w-0 truncate font-display text-sm font-black tracking-tight">
                   Умна тренировка
                 </h1>
               </header>

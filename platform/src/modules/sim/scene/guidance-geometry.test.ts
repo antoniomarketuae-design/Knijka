@@ -11,8 +11,12 @@
  * scenario × every authored rung and asserts three things about what the
  * student actually SEES:
  *
- *   G1  No marker stands past a graded stop line its own route drives across
- *       within the marker's acceptance radius. („спри ТУК", never mid-box.)
+ *   G1  No marker stands past a stop line its own route drives across within
+ *       the marker's acceptance radius — GRADED or merely PAINTED. („спри
+ *       ТУК", never mid-box.) The painted half arrived with register B18: the
+ *       runtime grades nothing at a roundabout mouth, but the world paints an
+ *       М8 give-way line at every one of them and the student cannot tell the
+ *       difference from the driving seat.
  *   G2  The rendered ring radius IS the objective's acceptance radius — the
  *       fixed 1.85 m decoration is gone, so „стоях точно на кръга и нищо не
  *       стана" can only ever mean the speed cap, never the geometry.
@@ -40,7 +44,9 @@ import {
 } from "@/modules/sim/lessons";
 import { parseDistrict, type District } from "@/modules/sim/runtime";
 import {
+  AHEAD_OVERRUN_M,
   GATE_HALF_WIDTH_M,
+  MARKER_INSIDE_FRACTION,
   STOP_BAR_BEFORE_LINE_M,
   THROUGH_GATE_BEFORE_LINE_M,
   buildRouteGraph,
@@ -144,6 +150,15 @@ interface Finding {
 
 const cases: MarkerCase[] = [];
 const findings: Finding[] = [];
+/**
+ * Markers still standing past a line because the OBJECTIVE is authored inside
+ * the junction: the lawful aim point does not fit in its acceptance circle, so
+ * pulling the marker back would trade „it points past the line" for „I stopped
+ * on it and nothing happened" (doc 86 §7 R6). Guidance cannot fix these; the
+ * template that authored the zone has to move it. Pinned below with the exact
+ * overshoot so the list can only shrink.
+ */
+const authoredInsideJunction: { key: string; pastM: number; radiusM: number }[] = [];
 const compileFailures: string[] = [];
 const missingWorlds = new Set<string>();
 let rungCount = 0;
@@ -249,15 +264,43 @@ beforeAll(() => {
               if (gap > near) continue;
               if (!routeCrosses(route, line)) continue;
               const past = (goal.x - line.x) * line.dirX + (goal.y - line.y) * line.dirY;
-              if (past > PAST_TOLERANCE_M) {
-                findings.push({
-                  where: `${spec.id}@L${rung.level} obj${i} ${lesson.objectives[i]!.id}`,
-                  detail:
-                    `marker (${goal.x.toFixed(2)}, ${goal.y.toFixed(2)}) is ${past.toFixed(2)} m ` +
-                    `PAST graded line ${line.id} at (${line.x.toFixed(2)}, ${line.y.toFixed(2)}) ` +
-                    `— on the far side of the cut this lesson grades`,
-                });
+              if (past <= PAST_TOLERANCE_M) continue;
+              const where = `${spec.id}@L${rung.level} obj${i} ${lesson.objectives[i]!.id}`;
+              // Could the guidance layer have pulled this marker back onto the
+              // lawful side and still have landed inside the gate the engine
+              // tests? If yes, it should have (that is the B18 clamp) and this
+              // is a guidance defect. If no, the zone itself is inside the
+              // junction and only its template can move it.
+              const back =
+                goal.affordance === "halt" ? STOP_BAR_BEFORE_LINE_M : THROUGH_GATE_BEFORE_LINE_M;
+              let reachable = false;
+              if (params.kind === "reachZone") {
+                // The clamp's own arithmetic: slide into the marker's lane,
+                // then step back off the paint.
+                const lat =
+                  (params.x - line.x) * -line.dirY + (params.y - line.y) * line.dirX;
+                const px = line.x - line.dirX * back - line.dirY * lat;
+                const py = line.y - line.dirY * back + line.dirX * lat;
+                reachable =
+                  Math.hypot(px - params.x, py - params.y) <=
+                  params.radiusM * MARKER_INSIDE_FRACTION;
               }
+              if (!reachable && params.kind === "reachZone") {
+                authoredInsideJunction.push({
+                  key: `${spec.id}#${lesson.objectives[i]!.id}`,
+                  pastM: past,
+                  radiusM: params.radiusM,
+                });
+                continue;
+              }
+              findings.push({
+                where,
+                detail:
+                  `marker (${goal.x.toFixed(2)}, ${goal.y.toFixed(2)}) is ${past.toFixed(2)} m ` +
+                  `PAST ${line.graded ? "graded" : "painted"} line ${line.id} at ` +
+                  `(${line.x.toFixed(2)}, ${line.y.toFixed(2)}) — on the far side of a cut ` +
+                  `this lesson's own route drives across`,
+              });
             }
           }
         }
@@ -283,8 +326,80 @@ describe("guidance geometry — the sweep is real", () => {
 });
 
 describe("G1 — no marker teaches the student to stop inside a junction", () => {
-  it("every marker is on the APPROACH side of every graded stop line its route crosses", () => {
+  it("every marker is on the APPROACH side of every line its route crosses", () => {
     expect(findings.map((f) => `${f.where} — ${f.detail}`)).toEqual([]);
+  });
+
+  it("sc-roundabout-entry's waypoint moved from 1.72 m PAST the М8 give-way line to 0.80 m before it", () => {
+    // Register B18, the founder's own лesson («Кръгово движение», catalog 6):
+    // „the green circle is actually put AFTER the stop marked line — I know I
+    // have to stop BEFORE the line". The line is real paint (markings.ts
+    // paints an М8 give-way bar at every roundabout mouth) but it is NOT a
+    // graded line — runtime/stoplines.ts:248 skips roundabout nodes — so the
+    // T3 fix, which only ever looked at graded lines, could not see it.
+    const spec = SCENARIO_TEMPLATES.find((s) => s.id === "sc-roundabout-entry")!;
+    const lesson = compileScenario(spec, 3);
+    const world = worldFor(lesson.world!.districtId)!;
+    const spawn = world.spawns.get(lesson.spawn.pointId!)!;
+    const line = world.stopLines.find((l) => l.edgeId === "rbm-e-arm-s")!;
+    expect(line.control).toBe("giveWay");
+    expect(line.graded).toBe(false); // painted, never convicted on
+    expect({ x: +line.x.toFixed(2), y: +line.y.toFixed(2) }).toEqual({ x: 0, y: -35.72 });
+
+    const params = parseObjectiveParams(lesson.objectives[0]!);
+    if (params.kind !== "reachZone") throw new Error("unreachable");
+    // BEFORE: the authored anchor, 1.72 m inside the mouth.
+    const authoredPast =
+      (params.x - line.x) * line.dirX + (params.y - line.y) * line.dirY;
+    expect(authoredPast).toBeCloseTo(1.72, 2);
+
+    // AFTER: a gate bar across the lane, 0.80 m on the approach side.
+    const goal = guidanceGoalFor(lesson, 0, {
+      stopLines: world.stopLines,
+      from: spawn,
+    })!;
+    if (goal.kind !== "point") throw new Error("unreachable");
+    const past = (goal.x - line.x) * line.dirX + (goal.y - line.y) * line.dirY;
+    expect(past).toBeCloseTo(-THROUGH_GATE_BEFORE_LINE_M, 6);
+    expect(goal.shape.kind).toBe("gate");
+    expect(goal.labelBg).toBe("Карай до линията за пропускане");
+    expect(goal.stopLineId).toBe(line.id);
+    // …and the cap the objective hides is still published on it (T8).
+    expect(goal.maxSpeedKmh).toBe(params.maxSpeedKmh);
+    // The move can never cost the student the objective: the bar he stops on
+    // is 2.52 m from the zone centre, well inside the radius the engine tests.
+    expect(Math.hypot(goal.x - params.x, goal.y - params.y)).toBeCloseTo(2.52, 2);
+    expect(Math.hypot(goal.x - params.x, goal.y - params.y)).toBeLessThan(
+      params.radiusM * MARKER_INSIDE_FRACTION,
+    );
+  });
+
+  it("the marker is never pulled onto a line the student has no way to satisfy", () => {
+    // The other face of the clamp. Where the lawful aim point does NOT fit
+    // inside the objective's acceptance circle the marker stays put, because
+    // moving it would produce doc 86 §7 R6's worse failure — „стоях точно на
+    // маркера и нищо не стана". Those objectives are authored inside the
+    // junction and belong to the template that wrote them.
+    //
+    // OPEN, REPORTED, NOT FIXED HERE — owner:
+    //   platform/src/modules/sim/lessons/scenario/templates-roundabout.ts
+    //   · sc-rbg-yield-line  says «Спри на линията за пропускане» and puts its
+    //     3 m zone at y −26, i.e. 9.72 m INSIDE the ring (the М8 bar is at
+    //     y −35.72). It grades a stop 9.7 m past the line it names.
+    //   · sc-rb2-inner-lane puts its 3.5 m zone 5.85 m past the rb-2lane mouth.
+    // Both need their `y` moved back onto the approach; then this pin fails
+    // and whoever fixed them deletes it.
+    const keys = [...new Set(authoredInsideJunction.map((f) => f.key))].sort();
+    expect(keys).toEqual([
+      "sc-rb-busy-gap#sc-rbg-yield-line",
+      "sc-rb-lane-choice#sc-rb2-inner-lane",
+    ]);
+    const worst = new Map<string, number>();
+    for (const f of authoredInsideJunction) {
+      worst.set(f.key, Math.max(worst.get(f.key) ?? 0, f.pastM));
+    }
+    expect(worst.get("sc-rb-busy-gap#sc-rbg-yield-line")).toBeCloseTo(9.72, 2);
+    expect(worst.get("sc-rb-lane-choice#sc-rb2-inner-lane")).toBeCloseTo(5.85, 2);
   });
 
   it("sc-junction-stop's Б2 marker moved from 27.72 m PAST the line to 2 m BEFORE it", () => {
@@ -438,7 +553,14 @@ describe("G3 — the marker publishes its contract", () => {
   });
 
   it("a halt cap reads as «Спри тук», a cruise cap as «Карай дотук»", () => {
-    const halts = cases.filter((c) => c.paramKind === "reachZone" && c.goal.affordance === "halt");
+    // …unless the waypoint was resolved onto a line (B18), in which case the
+    // marker names the line it now stands on instead — an instructor says
+    // «спри на линията за пропускане», never «спри тук» while pointing at a
+    // give-way bar.
+    const onALine = (c: MarkerCase) => c.goal.shape.kind === "gate";
+    const halts = cases.filter(
+      (c) => c.paramKind === "reachZone" && c.goal.affordance === "halt" && !onALine(c),
+    );
     expect(halts.length).toBeGreaterThan(0);
     for (const c of halts) {
       expect(c.maxSpeedKmh).toBeDefined();
@@ -446,9 +568,46 @@ describe("G3 — the marker publishes its contract", () => {
       expect(c.goal.labelBg).toBe("Спри тук");
     }
     const cruise = cases.filter(
-      (c) => c.paramKind === "reachZone" && c.goal.affordance === "through",
+      (c) => c.paramKind === "reachZone" && c.goal.affordance === "through" && !onALine(c),
     );
     for (const c of cruise) expect(c.goal.labelBg).toBe("Карай дотук");
+
+    // Every clamped one names its own line, carries its cap, and is a bar.
+    const clamped = cases.filter((c) => c.paramKind === "reachZone" && onALine(c));
+    expect(clamped.length).toBeGreaterThan(0);
+    for (const c of clamped) {
+      expect(c.goal.stopLineId).toBeTruthy();
+      expect([
+        "Спри на линията за пропускане",
+        "Карай до линията за пропускане",
+        "Спри на стоп-линията",
+        "Карай до стоп-линията",
+      ]).toContain(c.goal.labelBg);
+      if (c.goal.shape.kind !== "gate") throw new Error("unreachable");
+      expect(c.goal.shape.halfWidthM).toBeCloseTo(GATE_HALF_WIDTH_M, 6);
+    }
+  });
+
+  it("a clamped waypoint still satisfies the gate it was clamped away from", () => {
+    // The invariant that makes B18's fix safe: wherever the marker moved, a
+    // student who stops ON it is inside the acceptance circle the engine
+    // tests. Without this the fix would swap one lie for a worse one.
+    const clamped = cases.filter(
+      (c) => c.paramKind === "reachZone" && c.goal.shape.kind === "gate",
+    );
+    expect(clamped.length).toBeGreaterThan(0);
+    for (const c of clamped) {
+      const spec = SCENARIO_TEMPLATES.find((s) => s.id === c.scenarioId)!;
+      const rung = spec.levels.find((l) => l.level === c.level)!;
+      const lesson = compileScenario(spec, rung.level);
+      const params = parseObjectiveParams(lesson.objectives[c.objectiveIndex]!);
+      if (params.kind !== "reachZone") throw new Error("unreachable");
+      const off = Math.hypot(c.goal.x - params.x, c.goal.y - params.y);
+      expect(
+        off,
+        `${c.scenarioId}@L${c.level} obj${c.objectiveIndex} clamped ${off.toFixed(2)} m off a radius-${params.radiusM} gate`,
+      ).toBeLessThanOrEqual(params.radiusM * MARKER_INSIDE_FRACTION);
+    }
   });
 });
 
@@ -490,6 +649,98 @@ describe("L5 — guidance looks ahead", () => {
     expect(turn.s - withLookahead.goalS).toBeLessThan(40);
     expect(withLookahead.goalS).toBeGreaterThan(0);
     expect(withLookahead.goalS).toBeLessThan(withLookahead.totalLen);
+  });
+
+  it("the right turn is on the ribbon from the SPAWN, on the approach objective", () => {
+    // Register B24/B6, and the half doc 86 L5 did not close. The catalog chain
+    // is approach → stop line → exit-east. While the APPROACH is active,
+    // objective n+1 is the stop line, which is dead ahead — so a one-deep
+    // look-ahead announced nothing at all, and the turn appeared only when the
+    // nose crossed the Б2 paint and objective 2 went active. That is the
+    // founder's sentence: „the green line changes to right only after I cross
+    // the marking". The chain now carries the ribbon through the stop line
+    // into the exit, so the arrow exists while the car is still 105 m out.
+    const spec = SCENARIO_TEMPLATES.find((s) => s.id === "sc-junction-stop")!;
+    const lesson = compileScenario(spec, 1);
+    const world = worldFor(lesson.world!.districtId)!;
+    const spawn = world.spawns.get(lesson.spawn.pointId!)!;
+    const ctx = { stopLines: world.stopLines, from: { x: spawn.x, y: spawn.y } };
+
+    const g0 = guidanceGoalFor(lesson, 0, ctx)!;
+    const g1 = guidanceGoalFor(lesson, 1, ctx)!;
+    const g2 = guidanceGoalFor(lesson, 2, ctx)!;
+    if (g0.kind !== "point" || g1.kind !== "point" || g2.kind !== "point") {
+      throw new Error("unreachable");
+    }
+    const target = { kind: "point" as const, x: g0.x, y: g0.y };
+
+    // ONE objective of look-ahead: still nothing to signal for.
+    const oneDeep = deriveGuidanceRoute(world.graph, spawn, target, {
+      lookahead: { kind: "point", x: g1.x, y: g1.y },
+    })!;
+    expect(oneDeep.turns).toHaveLength(0);
+
+    // The chain: the right turn is there, past the active waypoint, and the
+    // student is still on the stem (goalS is the marker, 60 m out).
+    const chained = deriveGuidanceRoute(world.graph, spawn, target, {
+      lookahead: [
+        { kind: "point", x: g1.x, y: g1.y },
+        { kind: "point", x: g2.x, y: g2.y },
+      ],
+    })!;
+    expect(chained.turns.length).toBeGreaterThanOrEqual(1);
+    expect(chained.turns[0]!.side).toBe("right");
+    expect(chained.turns[0]!.s).toBeGreaterThan(chained.goalS);
+    // Inside the chevron horizon (RouteGuidance ARROW_VISIBLE_AHEAD_M = 140)
+    // measured from the CAR at the spawn, which is where the ribbon starts.
+    expect(chained.turns[0]!.s).toBeLessThan(140);
+    expect(chained.goalS).toBeCloseTo(oneDeep.goalS, 0);
+  });
+
+  it("the chain stops as soon as a turn is found — it does not run the whole lesson", () => {
+    const spec = SCENARIO_TEMPLATES.find((s) => s.id === "sc-junction-stop")!;
+    const lesson = compileScenario(spec, 1);
+    const world = worldFor(lesson.world!.districtId)!;
+    const spawn = world.spawns.get(lesson.spawn.pointId!)!;
+    const ctx = { stopLines: world.stopLines, from: { x: spawn.x, y: spawn.y } };
+    const g0 = guidanceGoalFor(lesson, 0, ctx)!;
+    const g1 = guidanceGoalFor(lesson, 1, ctx)!;
+    const g2 = guidanceGoalFor(lesson, 2, ctx)!;
+    if (g0.kind !== "point" || g1.kind !== "point" || g2.kind !== "point") {
+      throw new Error("unreachable");
+    }
+    const chain = [
+      { kind: "point" as const, x: g1.x, y: g1.y },
+      { kind: "point" as const, x: g2.x, y: g2.y },
+    ];
+    const two = deriveGuidanceRoute(world.graph, spawn, { kind: "point", x: g0.x, y: g0.y }, {
+      lookahead: chain,
+    })!;
+    // Repeating the last target a third time adds nothing: the loop broke on
+    // the turn, so the ribbon is the same length either way.
+    const three = deriveGuidanceRoute(world.graph, spawn, { kind: "point", x: g0.x, y: g0.y }, {
+      lookahead: [...chain, { kind: "point" as const, x: 55, y: -4.06 }],
+    })!;
+    expect(three.totalLen).toBeCloseTo(two.totalLen, 1);
+  });
+
+  it("an „ahead\" corridor is worth the distance it asked for, not the length of its edge", () => {
+    // Register B1: Урок 7's 80 m request came back as 176 m of green ribbon
+    // running past the parking bay to the end of the street. The walk appends
+    // whole edges; it is now trimmed to what was asked plus two densify steps.
+    const world = worldFor(DEFAULT_DISTRICT_ID)!;
+    const spawn = world.spawns.get("spawn-1")!;
+    for (const meters of [40, 60, 80, 120]) {
+      const route = deriveGuidanceRoute(world.graph, spawn, { kind: "ahead", meters })!;
+      expect(route.totalLen).toBeGreaterThanOrEqual(meters);
+      expect(
+        route.totalLen,
+        `ahead ${meters} m overran to ${route.totalLen.toFixed(1)} m`,
+      ).toBeLessThanOrEqual(meters + AHEAD_OVERRUN_M + 0.01);
+    }
+    // The untrimmed walk is what it used to draw, and it is 176 m.
+    const walked = deriveGuidanceRoute(world.graph, spawn, { kind: "ahead", meters: 1e6 })!;
+    expect(walked.totalLen).toBeGreaterThan(170);
   });
 
   it("the look-ahead leg is capped and never replaces the active waypoint", () => {

@@ -50,9 +50,7 @@ function arcPts(cx: number, cy: number, r: number, a0: number, a1: number): Arra
 
 /** Stem approach: spawn → right-lane cruise toward the Б2 line. */
 const LEFT_APPROACH: Array<[number, number]> = [
-  [0, -85],
-  [0, -83],
-  [LANE, -75],
+  [LANE, -85],
   [LANE, -45],
 ];
 

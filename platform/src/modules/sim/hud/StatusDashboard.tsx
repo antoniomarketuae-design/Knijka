@@ -289,28 +289,47 @@ export function StatusDashboard({
         className="pointer-events-none flex select-none items-baseline gap-1.5 px-1"
         style={{ textShadow: "0 1px 4px rgba(0,0,0,0.95), 0 0 10px rgba(0,0,0,0.65)" }}
       >
-        {/* Selector letter — the driveline truth, and on a phone the answer to
-            „am I about to reverse into something?". Flashes red on a REJECTED
-            shift exactly as it does on the roomy bar. */}
-        <span
-          key={`reject-${rejectFlashKey}`}
-          className={`text-xl font-black leading-none tabular-nums ${
-            rejectFlashKey > 0 ? "hud-gear-reject" : ""
-          }`}
-          style={{ color: snap.engineOn ? "var(--accent)" : DIM }}
-          aria-label={`Скоростен лост: ${snap.gearLabel}`}
-          title="Скоростен лост"
-        >
-          {snap.gearLabel}
+        {/* ── ROW C7, 2026-07-30. THE CLUSTER IS ALSO A SPEEDOMETER. ───────
+            The paragraph above argues this readout must survive because the
+            3D cluster „is only in frame in the COCKPIT camera". True — and the
+            conclusion drawn from it was not. In the cockpit camera, which is
+            the one a lesson OPENS in, the audit frame has the cabin's analogue
+            dial, its digital „0 км/ч" and its selector „D" in the same picture
+            as this line's „D 0 км/ч". The trade was recorded and then never
+            conditioned on anything.
+
+            The selector letter, the number and its unit are therefore grouped
+            under one handle and folded away when the cockpit is live
+            (PlayAreaStyles: html[data-sim-camera="cockpit"]); chase and
+            top-down keep every one of them, which is the case that argument was
+            actually about. CSS and not a prop because the camera lives in a
+            per-frame ref inside the scene — a React state for it would be a
+            60 Hz re-render of the HUD to answer a question that changes when
+            somebody presses C.
+
+            The LIMIT DISC below is deliberately outside the group: the cluster
+            shows what the car is doing and never what the law allows. */}
+        <span data-hud="speed-block" className="flex items-baseline gap-1.5">
+          <span
+            key={`reject-${rejectFlashKey}`}
+            className={`text-xl font-black leading-none tabular-nums ${
+              rejectFlashKey > 0 ? "hud-gear-reject" : ""
+            }`}
+            style={{ color: snap.engineOn ? "var(--accent)" : DIM }}
+            aria-label={`Скоростен лост: ${snap.gearLabel}`}
+            title="Скоростен лост"
+          >
+            {snap.gearLabel}
+          </span>
+          <span
+            className="text-3xl font-black leading-none tabular-nums"
+            style={{ color: speedColor }}
+            aria-label={`Скорост ${speed} километра в час`}
+          >
+            {speed}
+          </span>
+          <span className="text-[8px] font-bold uppercase tracking-wider text-muted">км/ч</span>
         </span>
-        <span
-          className="text-3xl font-black leading-none tabular-nums"
-          style={{ color: speedColor }}
-          aria-label={`Скорост ${speed} километра в час`}
-        >
-          {speed}
-        </span>
-        <span className="text-[8px] font-bold uppercase tracking-wider text-muted">км/ч</span>
         <span
           aria-label={`Ограничение ${limit} км/ч`}
           title="Ограничение на скоростта"

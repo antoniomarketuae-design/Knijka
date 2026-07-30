@@ -69,6 +69,34 @@ import { describe, expect, it } from "vitest";
  *   left are <main>'s 24px top padding (owned by the dashboard layout) and the
  *   ~40px app topbar, neither of which is this lane's to move.
  *
+ * THE PHONE HELD SIDEWAYS — 852 x 393, re-measured, and NOT clean either.
+ *
+ *   Every `max-sm:` above is a WIDTH test, and a landscape iPhone is 852px wide,
+ *   so it was being served the DESKTOP layout into 393px of height. Founder
+ *   review row C5: 479px of scroll, options overflowing by 334px, not one answer
+ *   on the screen. Four separate places read „wide" as „roomy" and all four are
+ *   fixed: the page's header swap, the card's own paddings and option list, the
+ *   app topbar's height, and — one level down — <QuestionArtwork>, whose height
+ *   budget switched itself OFF at `(min-width: 640px)` and so drew the full
+ *   150px cap on the shortest screen the product has.
+ *
+ *   Where that leaves it (fold rig, WebKit, 852x393, fold = top of the pinned
+ *   bar). An ordinary dealt question: 0px of scroll, every option and „Провери"
+ *   on screen. The eighteen HEAVIEST items in the bank: six are clean, twelve
+ *   need 22–104px of document scroll and on six of those an option sits 4–79px
+ *   under the action bar. Worst: q-krastovishta-029 (the longest question text
+ *   in the bank under a scene still) at 79px, and q-vehicle-063 (six options) at
+ *   67px.
+ *
+ *   That residual is a real limit, not an oversight. 393px of height minus a
+ *   48px app topbar leaves 345px for a 284-character question, six answers and a
+ *   44px action bar, and the only things left to trade are the 18px question and
+ *   the 14px answers — the two things this file exists to say were not traded.
+ *   The next lever, measured, is the app topbar: hiding it on the runner in
+ *   landscape returns 48px and would clear nine of the twelve. It also removes
+ *   the only navigation on the screen, so it is a product decision, not a
+ *   layout one.
+ *
  * WHERE THE PIXELS CAME FROM, in order of size. None of them came from text.
  *
  *   1. THE OPTION ROW WAS 19 % FURNITURE, HORIZONTALLY. Every previous pass
@@ -193,10 +221,36 @@ describe("sticky action bars (the founder's scroll-per-answer)", () => {
     expect(bar).toContain("env(safe-area-inset-bottom)");
     // Desktop keeps the plain in-flow row — no unconditional `sticky`.
     expect(bar).not.toMatch(/(^|\s)sticky(\s|$)/);
-    // The negative margins have to match the card's phone padding (p-3), or
-    // the bar stops reaching the card's edges and grows a seam.
-    expect(bar).toContain("max-sm:-mx-3");
+    // The negative margins have to match the card's phone padding, or the bar
+    // stops reaching the card's edges and grows a seam. That padding is now
+    // `p-3 px-4` on a phone — the card went full bleed, so the horizontal half
+    // is 16px and the vertical half is still 12px.
+    expect(bar).toContain("max-sm:-mx-4");
     expect(bar).toContain("max-sm:-mb-3");
+    // And it sits at the BOTTOM of a card that now reaches the bottom of the
+    // screen: `mt-auto` in a flex column is what puts „Провери" in the thumb
+    // zone instead of halfway up the phone.
+    expect(bar).toContain("max-sm:mt-auto");
+  });
+
+  it("pins the same bar on a phone held SIDEWAYS", () => {
+    // 852 x 393 is not a desktop. Every `max-sm:` above is a WIDTH test and
+    // matches nothing in landscape, which is how the runner ended up serving
+    // its desktop layout into 393px of height: 520px of scroll and not one
+    // answer option on the screen (measured, WebKit).
+    const bar = classListWith(PRACTICE, "short:sticky");
+    expect(bar).not.toBe("");
+    for (const utility of [
+      "short:bottom-0",
+      "short:-mx-4",
+      "short:-mb-3",
+      "short:mt-auto",
+      "short:border-t",
+      "short:bg-surface/95",
+      "env(safe-area-inset-bottom)",
+    ]) {
+      expect(bar).toContain(utility);
+    }
   });
 
   it("exam pins its paper navigation to the phone viewport", () => {
@@ -297,13 +351,22 @@ describe("what must not be traded for pixels", () => {
 describe("the reclaimed chrome stays reclaimed", () => {
   it("the practice ordinal badge is a keyboard affordance, `sm` and up", () => {
     // It labels the 1–9 shortcuts; the line that explains them is md:block.
-    expect(PRACTICE).toMatch(/aria-hidden\s*\n?\s*className="mt-0\.5 hidden h-6 w-6[^"]*sm:flex"/);
+    const badge = classListWith(PRACTICE, "mt-0.5 hidden h-6 w-6");
+    expect(badge).toContain("sm:flex");
+    // …and OFF on a landscape phone, which is wide enough to trip `sm` and has
+    // no keyboard either. It is 24px of horizontal furniture in the orientation
+    // where the option list runs two columns wide.
+    expect(badge).toContain("short:hidden");
     expect(PRACTICE).toContain("Клавиши 1–");
   });
 
   it("the practice progress strip lives in the action bar on phones", () => {
-    // The block above the question is `sm`-up only...
-    expect(PRACTICE).toContain('className="hidden flex-col gap-1 sm:flex sm:gap-2.5"');
+    // The block above the question is `sm`-up only, and `short:hidden` sends it
+    // back into the bar on a landscape phone, which `sm:` alone reads as a
+    // desktop.
+    expect(PRACTICE).toContain(
+      'className="hidden flex-col gap-1 short:hidden sm:flex sm:gap-2.5"',
+    );
     // ...and exactly two progressbars exist, one per breakpoint, so only one
     // is ever in the accessibility tree.
     const bars = [...PRACTICE.matchAll(/role="progressbar"/g)];
@@ -344,9 +407,21 @@ describe("the reclaimed chrome stays reclaimed", () => {
 });
 
 describe("the practice route's phone header", () => {
-  it("ships a compact header below `sm` and the full band above it", () => {
-    expect(PRACTICE_PAGE).toMatch(/<header className="[^"]*\bsm:hidden\b/);
-    expect(PRACTICE_PAGE).toMatch(/<div className="hidden sm:block">\s*<AuroraHeader/);
+  it("picks its header by BOTH dimensions, not by width alone", () => {
+    // THE DEFECT THIS REPLACED. The swap used to be `sm:hidden` / `hidden
+    // sm:block`, which is a WIDTH test — and an iPhone 16 held sideways is
+    // 852 x 393, so it passed for „desktop" and got the full aurora band:
+    // measured in WebKit, the band filled the entire 393px screen on its own
+    // and the question card started below the bottom edge. 520px of scroll.
+    //
+    // Each variant is ONE media query carrying both conditions. The obvious
+    // spelling, `max-sm:tall:`, compiled to no rule at all in this Tailwind and
+    // the header silently vanished on a portrait phone — so the composed form
+    // is the thing under test, not an implementation detail.
+    expect(PRACTICE_PAGE).toMatch(/<header className="[^"]*\bnarrow-tall:flex\b/);
+    expect(PRACTICE_PAGE).toMatch(
+      /<div className="hidden wide-tall:block">\s*<AuroraHeader/,
+    );
     // The phone line is a LABEL, not a title: at `text-lg` it and its gap were
     // 44px spent re-stating the topic the student picked one tap ago.
     expect(PRACTICE_PAGE).toMatch(
@@ -354,13 +429,20 @@ describe("the practice route's phone header", () => {
     );
   });
 
-  it("exposes exactly one <h1> at a time", () => {
+  it("never exposes two <h1>s, and gives a landscape phone neither header", () => {
     const h1s = [...PRACTICE_PAGE.matchAll(/<h1\b/g)];
     expect(h1s).toHaveLength(2);
-    // Each lives under a display:none-at-the-other-breakpoint wrapper, so the
-    // accessibility tree only ever holds one of them.
-    expect(PRACTICE_PAGE).toMatch(/sm:hidden[\s\S]{0,400}?<h1/);
-    expect(PRACTICE_PAGE).toMatch(/hidden sm:block[\s\S]{0,400}?<h1/);
+    // Each lives under a wrapper that is display:none for the other viewport,
+    // and the two conditions are mutually exclusive by construction (narrow vs
+    // wide), so the accessibility tree never holds both.
+    expect(PRACTICE_PAGE).toMatch(/narrow-tall:flex[\s\S]{0,700}?<h1/);
+    expect(PRACTICE_PAGE).toMatch(/hidden wide-tall:block[\s\S]{0,400}?<h1/);
+    // A landscape phone matches NEITHER, deliberately: the app topbar is
+    // already 12.2% of that screen and a 28px title row on top of it puts the
+    // question card under the founder's 85%. The way back is not dropped with
+    // it — the runner puts a 44px „← Теми" in the action bar for exactly that
+    // viewport, and this is the pin that keeps the two edits together.
+    expect(PRACTICE).toMatch(/short:inline-flex[\s\S]{0,80}?← Теми/);
   });
 });
 
@@ -369,16 +451,25 @@ describe("Tailwind's scanner can see the classes", () => {
     const needles = [
       "max-sm:sticky",
       "max-sm:bottom-0",
-      "max-sm:-mx-3",
+      "max-sm:-mx-4",
       "max-sm:-mb-3",
       "max-sm:-mb-6",
-      "max-sm:rounded-b-xl",
+      "max-sm:mt-auto",
       "max-sm:backdrop-blur",
       "min-h-11",
       "leading-[1.45]",
       "h-[2px]",
+      // The landscape set. These are the ones a „tidy the classes" pass is
+      // most likely to eat, and losing any of them puts the answers back
+      // under the fold on a phone held sideways with everything still green.
+      "short:sticky",
+      "short:mt-auto",
+      "short:flex-1",
+      "short:sm:grid-cols-2",
+      "narrow-tall:flex",
+      "wide-tall:block",
     ];
-    const all = `${PRACTICE}\n${EXAM}\n${MEDIA}`;
+    const all = `${PRACTICE}\n${EXAM}\n${MEDIA}\n${PRACTICE_PAGE}`;
     for (const n of needles) {
       // Present, and not split across a `" + "` / `${...}` seam — the scanner
       // reads text, so a seam means the rule is never generated.

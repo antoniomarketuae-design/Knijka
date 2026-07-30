@@ -189,8 +189,53 @@ describe("ov-oneway-v1: the one-way street is SIGNED, not just painted", () => {
     expect(x).toBeGreaterThan(-40);
     expect(y).toBeGreaterThan(200); // right of a WESTBOUND driver = north side
     expect(y).toBeLessThan(212);
-    // …facing EAST, back at the junction it closes (yawFromFacing([1, 0])).
-    expect(post.yaw).toBeCloseTo(Math.PI / 2, 3);
+  });
+
+  it("the В1 face is READABLE from the stem the student actually approaches on", () => {
+    // This replaces a pin on the raw yaw (π/2 — „facing east, straight back
+    // down its own arm"). That pin described a plate the student never saw: the
+    // only driver who can enter this mouth comes up the STEM, and against his
+    // line of sight the face measured 70.8° off-axis, i.e. 0.29 m of projected
+    // plate at 69 m. Founder item 47, verbatim: „no sign post of ANY kind".
+    //
+    // The invariant that matters is not a yaw, it is an ANGLE TO THE READER, so
+    // that is what is asserted. A future change may move the post anywhere it
+    // likes as long as the driver who is graded for ignoring it can see it.
+    const post = posts[0]!;
+    const sx = post.position[0];
+    const sy = -post.position[2];
+    // yaw θ turns model +Z (world +X·sinθ, +Z·cosθ); world +Z is district −y.
+    const face: [number, number] = [Math.sin(post.yaw), -Math.cos(post.yaw)];
+    // The student, stopped short of the T on the northbound stem lane.
+    for (const eyeY of [120, 150, 175]) {
+      const dx = 4.06 - sx;
+      const dy = eyeY - sy;
+      const len = Math.hypot(dx, dy);
+      const offAxisDeg = (Math.acos((face[0] * dx + face[1] * dy) / len) * 180) / Math.PI;
+      expect(offAxisDeg).toBeLessThan(40);
+    }
+    // …and it must still address the driver entering the arm illegally: the
+    // face may never swing PAST the cross street into the far verge.
+    expect(face[0]).toBeGreaterThan(0.3); // still looking east, at the junction
+  });
+
+  it("posts Г2 «само надясно» on the stem — the sign that states the manoeuvre", () => {
+    // Founder item 47's first clause („there must be sign stating to go left or
+    // right"). Derived: the stem's only legal exit at this T is the east arm,
+    // because the west arm is one-way INTO the junction. Nothing is authored.
+    const g2 = world.signs.filter((s) => s.kind === "mandatoryRight");
+    expect(g2).toHaveLength(1);
+    const post = g2[0]!;
+    const x = post.position[0];
+    const y = -post.position[2];
+    expect(x).toBeGreaterThan(0); // right-hand kerb of the northbound stem
+    expect(y).toBeGreaterThan(160); // before the mouth…
+    expect(y).toBeLessThan(200); // …and never inside the junction
+    // Square to the approaching driver: face points SOUTH (yaw 0).
+    const face: [number, number] = [Math.sin(post.yaw), -Math.cos(post.yaw)];
+    expect(face[1]).toBeLessThan(-0.9);
+    // Never Г3: turning left here is the movement В1 forbids.
+    expect(world.signs.some((s) => s.kind === "mandatoryLeft")).toBe(false);
   });
 
   it("closes the SAME arm the runtime grades WRONG_WAY on (sign ↔ grading)", () => {

@@ -33,6 +33,10 @@
 import { mkdirSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { curbLaneOffsetM, toCurbLane } from "./lib/lane.mjs";
+
+/** The painted classes this pad uses (world/builders/constants MARKED_CLASSES). */
+const MARKED_POLIGON_CLASSES = new Set(["unclassified", "tertiary"]);
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 const OUT_FILE = path.join(REPO_ROOT, "content", "world", "poligon-v1.json");
@@ -231,14 +235,23 @@ const BUILDINGS = [
   },
 ];
 
-const SPAWN_POINTS = [
-  // Start/stop grid on the south straight, facing east.
-  { id: "pg-spawn-1", x: 20, y: -130, heading: 90, edgeId: "pg-e-s3", name: "Старт-стоп права" },
-  // Slalom corridor, facing north (cones are a lesson-layer prop, not map data).
-  { id: "pg-spawn-2", x: -95, y: -105, heading: 0, edgeId: "pg-e-apron-slalom", name: "Слаломен коридор" },
-  // Parking apron, facing north (perpendicular bays painted lesson-side).
-  { id: "pg-spawn-3", x: 95, y: -105, heading: 0, edgeId: "pg-e-apron-bays", name: "Коридор за паркиране" },
-];
+// doc 87 T2 — a spawn pose belongs in the CURB LANE of the edge it faces
+// along, not on its centreline. pg-e-s3 is `unclassified`, i.e. a PAINTED
+// class, so the old centreline pose put Урок 0/8's car astride the осева of
+// the start-stop straight before the student had touched anything. The two
+// apron corridors are `service` (no paint, no lane), so toCurbLane leaves
+// them where the pad's own geometry wants them.
+const SPAWN_POINTS = toCurbLane(
+  [
+    // Start/stop grid on the south straight, facing east.
+    { id: "pg-spawn-1", x: 20, y: -130, heading: 90, edgeId: "pg-e-s3", name: "Старт-стоп права" },
+    // Slalom corridor, facing north (cones are a lesson-layer prop, not map data).
+    { id: "pg-spawn-2", x: -95, y: -105, heading: 0, edgeId: "pg-e-apron-slalom", name: "Слаломен коридор" },
+    // Parking apron, facing north (perpendicular bays painted lesson-side).
+    { id: "pg-spawn-3", x: 95, y: -105, heading: 0, edgeId: "pg-e-apron-bays", name: "Коридор за паркиране" },
+  ],
+  EDGES,
+);
 
 // ---------------------------------------------------------------------------
 // Meta + assembly
@@ -355,8 +368,13 @@ for (const c of CROSSINGS) {
 }
 for (const s of SPAWN_POINTS) {
   const host = EDGES.find((e) => e.id === s.edgeId);
+  // doc 87 T2: "on its edge" used to mean "within a metre of its CENTRELINE",
+  // i.e. the invariant enforced the defect it was supposed to catch. The
+  // painted classes must be in their curb lane; the service aprons have no
+  // lane to be in, so they stay on the corridor's own line.
+  const want = MARKED_POLIGON_CLASSES.has(host?.class) ? curbLaneOffsetM(host.lanes, host.oneway) : 0;
   if (!host) errors.push(`${s.id}: unknown edgeId ${s.edgeId}`);
-  else if (distToEdge(host, s.x, s.y) > 1) errors.push(`${s.id}: not on its edge`);
+  else if (Math.abs(distToEdge(host, s.x, s.y) - want) > 1) errors.push(`${s.id}: not in its edge's driving lane`);
 }
 
 // Bounds cover all geometry (exactly — they were derived from it).

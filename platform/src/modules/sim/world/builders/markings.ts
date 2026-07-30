@@ -21,6 +21,7 @@ import {
   EMERGENCY_LANE_SEAM_WIDTH_M,
   MARKED_CLASSES,
   MARKING_Y,
+  paintsZebra,
   SOLID_CENTER_LINE_WIDTH_M,
   SOLID_LANE_DIVIDER_WIDTH_M,
   SPEED_GLYPH_DIGIT_GAP_M,
@@ -789,9 +790,11 @@ export function buildMarkings(
   }
 
   // -- zebra crossings ---------------------------------------------------------
+  // `paintsZebra` is this loop's own condition, lifted into constants.ts so the
+  // grader (runtime/zones.ts) asks the painter instead of guessing (doc 86 T1).
   for (const crossing of district.crossings) {
     if (!crossing.edgeId) continue;
-    if (crossing.kind !== "marked" && crossing.kind !== "signals") continue;
+    if (!paintsZebra(crossing)) continue;
     const eb = network.edgeById.get(crossing.edgeId);
     if (!eb) continue;
     const proj = projectOntoPolyline(eb.edge.geometry as Vec2[], [crossing.x, crossing.y]);

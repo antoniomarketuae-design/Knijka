@@ -37,8 +37,13 @@ const FACE_BASE = "/sim/signs/faces";
 /** Rasterised face resolution. Matches tools/blender/signs.py FACE_PX. */
 const FACE_PX = 512;
 
-/** Which SVG carries each parametrised face. */
-export type SignFaceArt = "v26" | "v33" | "d4";
+/** Which SVG carries each parametrised face.
+ *
+ *  `g2` / `g3` (Г2 „Движение само надясно" / Г3 „…наляво") ride the SAME round
+ *  blue plate the Г12 roundabout sign is baked on — identical plate geometry in
+ *  the source art (circle r=90 + white ring r=84), so the face swaps cleanly and
+ *  no new GLB is needed. Doc 86 L3 / founder item 47. */
+export type SignFaceArt = "v26" | "v33" | "d4" | "g2" | "g3";
 
 const svgSource = new Map<SignFaceArt, Promise<string | null>>();
 

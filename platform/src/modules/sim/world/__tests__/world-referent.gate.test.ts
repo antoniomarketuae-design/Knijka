@@ -367,9 +367,12 @@ describe("scenario-world-referent gate", () => {
     }
     // The corpus itself has not moved under us.
     expect(RESULT.districtFiles).toBe(90);
-    // T2's district count is the one figure of the four still at its wave-0
-    // value; nothing in this wave touched the compiled spawn pose.
-    expect(RESULT.t2Districts).toBe(15);
+    // T2's district count was the one figure of the four still at its wave-0
+    // value (15) — the spawn poses themselves. Doc 87's founder wave moved them:
+    // every generator now ends its spawn list with tools/maps/lib/lane.mjs
+    // toCurbLane(), so a pose authored on the road CENTRELINE lands in the curb
+    // lane instead, and no scenario begins astride the осева it is graded on.
+    expect(RESULT.t2Districts).toBe(0);
   });
 
   it("the census is a ratchet: equal to the committed number, and no silent rise", () => {

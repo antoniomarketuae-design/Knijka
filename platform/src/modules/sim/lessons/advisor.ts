@@ -151,9 +151,16 @@ export function advisorPromptForObjective(
           // instruction; the key chip names the brake.
           return { textBg: titleBg, keys: ["S"] };
         case "parkInBay":
+          // A1 (founder, doc 87): „push the R reverse gear … although we are
+          // on automatic mode". The PROMPT is right — the sim's automatic is a
+          // real P-R-N-D selector and a reverse park needs R — but „включи
+          // задна предавка" is gearbox-and-clutch language a learner reads as
+          // „shift down into reverse". An instructor sitting beside an
+          // automatic says what the hand does: move the lever to R. The chip
+          // still names the key that really moves it (advisor honesty rule).
           return params.entry === "forward"
-            ? { textBg: "Влез в клетката на предна предавка и спри напълно", keys: ["]"] }
-            : { textBg: "Включи задна предавка (R) и паркирай в клетката", keys: ["["] };
+            ? { textBg: "Остави лоста на D — влез напред в клетката и спри напълно", keys: ["]"] }
+            : { textBg: "Премести лоста на R и паркирай на заден ход в клетката", keys: ["["] };
         case "roundabout": {
           const entered = evalState?.type === "roundabout" && evalState.entered;
           return entered

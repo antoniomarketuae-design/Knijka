@@ -235,7 +235,7 @@ export const CLIP_PLAN: readonly ClipPlanEntry[] = [
     "templateId": "sc-junction-rhr",
     "mistakeIndex": 1,
     "tracePath": "content/traces/sc-junction-rhr/mistake-no-look.trace.json",
-    "faultTimeSec": 20.37,
+    "faultTimeSec": 20.23,
     "requiredActors": [
       {
         "kind": "vehicle",
@@ -255,7 +255,7 @@ export const CLIP_PLAN: readonly ClipPlanEntry[] = [
     "templateId": "sc-junction-stop",
     "mistakeIndex": 0,
     "tracePath": "content/traces/sc-junction-stop/mistake-rolling-stop.trace.json",
-    "faultTimeSec": 16.82,
+    "faultTimeSec": 16.72,
     "requiredActors": [],
     "governingControl": {
       "kind": "sign",
@@ -274,7 +274,7 @@ export const CLIP_PLAN: readonly ClipPlanEntry[] = [
     "templateId": "sc-jx-giveway-b1",
     "mistakeIndex": 0,
     "tracePath": "content/traces/sc-jx-giveway-b1/mistake-barge-priority.trace.json",
-    "faultTimeSec": 45.5,
+    "faultTimeSec": 45.4,
     "requiredActors": [
       {
         "kind": "vehicle",
@@ -294,7 +294,7 @@ export const CLIP_PLAN: readonly ClipPlanEntry[] = [
     "templateId": "sc-jx-giveway-b1",
     "mistakeIndex": 1,
     "tracePath": "content/traces/sc-jx-giveway-b1/mistake-no-scan.trace.json",
-    "faultTimeSec": 17.22,
+    "faultTimeSec": 17.12,
     "requiredActors": [
       {
         "kind": "vehicle",
@@ -314,7 +314,7 @@ export const CLIP_PLAN: readonly ClipPlanEntry[] = [
     "templateId": "sc-jx-priority-confidence",
     "mistakeIndex": 0,
     "tracePath": "content/traces/sc-jx-priority-confidence/mistake-phantom-brake.trace.json",
-    "faultTimeSec": 9.3,
+    "faultTimeSec": 8.07,
     "requiredActors": [
       {
         "kind": "vehicle",
@@ -453,7 +453,7 @@ export const CLIP_PLAN: readonly ClipPlanEntry[] = [
     "templateId": "sc-mv-uturn-ban",
     "mistakeIndex": 1,
     "tracePath": "content/traces/sc-mv-uturn-ban/mistake-into-stream.trace.json",
-    "faultTimeSec": 33.22,
+    "faultTimeSec": 33.65,
     "requiredActors": [
       {
         "kind": "vehicle",
@@ -536,7 +536,7 @@ export const CLIP_PLAN: readonly ClipPlanEntry[] = [
     "templateId": "sc-park-parallel",
     "mistakeIndex": 0,
     "tracePath": "content/traces/sc-park-parallel/mistake-far-from-lead.trace.json",
-    "faultTimeSec": 39.03,
+    "faultTimeSec": 38.88,
     "requiredActors": [
       {
         "kind": "parkedVehicle",
@@ -638,7 +638,7 @@ export const CLIP_PLAN: readonly ClipPlanEntry[] = [
     "templateId": "sc-rx-tram-left",
     "mistakeIndex": 0,
     "tracePath": "content/traces/sc-rx-tram-left/mistake-cut-tram.trace.json",
-    "faultTimeSec": 16.55,
+    "faultTimeSec": 16.45,
     "requiredActors": [
       {
         "kind": "tram",
@@ -692,7 +692,7 @@ export const CLIP_PLAN: readonly ClipPlanEntry[] = [
     "templateId": "sc-signal-controller",
     "mistakeIndex": 0,
     "tracePath": "content/traces/sc-signal-controller/mistake-run.trace.json",
-    "faultTimeSec": 14.33,
+    "faultTimeSec": 14.22,
     "requiredActors": [
       {
         "kind": "controller",
@@ -716,7 +716,7 @@ export const CLIP_PLAN: readonly ClipPlanEntry[] = [
     "templateId": "sc-signal-response",
     "mistakeIndex": 0,
     "tracePath": "content/traces/sc-signal-response/mistake-amber-gamble.trace.json",
-    "faultTimeSec": 13.77,
+    "faultTimeSec": 13.67,
     "requiredActors": [],
     "governingControl": {
       "kind": "signal",
@@ -773,7 +773,7 @@ export const CLIP_PLAN: readonly ClipPlanEntry[] = [
     "templateId": "sc-turn-left-oncoming",
     "mistakeIndex": 0,
     "tracePath": "content/traces/sc-turn-left-oncoming/mistake-cut-gap.trace.json",
-    "faultTimeSec": 17.5,
+    "faultTimeSec": 17.4,
     "requiredActors": [
       {
         "kind": "vehicle",

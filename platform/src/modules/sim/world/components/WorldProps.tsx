@@ -75,6 +75,7 @@ import {
   type SignKind,
   type SignPlacement,
   type StaticTransform,
+  type TrafficLightPlacement,
   type TreeKind,
   type TreePlacement,
   type WorldGeometry,
@@ -86,6 +87,7 @@ import {
   createOffsetInstancedMesh,
   disposeAll,
   mergeSafe,
+  paintGeometry,
 } from "./three-helpers";
 import { CityBuildings } from "./CityBuildings";
 import type { QualityPreset } from "./quality";
@@ -132,6 +134,12 @@ const SIGN_GLB: Record<SignKind, string> = {
   barrier: "rail_barrier", // striped arm — ANIMATED (RailBarriers), never instanced
   noEntry: "sign_no_entry", // В1 — the v1 kit asset (tools/blender/signs.py)
   oneWay: "sign_service_fuel", // Д4 — the square info plate, d4.svg face
+  // Г2/Г3 ride the ROUND BLUE plate the Г12 roundabout sign is baked on: the
+  // source art is the same disc (circle r=90 + white ring r=84), so only the
+  // face texture differs. No new GLB, and the plate a student meets here is
+  // pixel-identical to the Г2 in his theory question.
+  mandatoryRight: "sign_roundabout", // Г2 — g2.svg face
+  mandatoryLeft: "sign_roundabout", // Г3 — g3.svg face
   // Doc 86 D5 — four finished GLBs that shipped with no SignKind at all, so no
   // pass could reach them. They are now placeable kinds.
   pedestrianCrossing: "sign_pedestrian", // А18
@@ -160,6 +168,8 @@ const SIGN_FACE_OVERRIDE: Partial<Record<SignKind, { art: SignFaceArt; numeral?:
   limit130: { art: "v26", numeral: 130 },
   limit140: { art: "v26", numeral: 140 },
   oneWay: { art: "d4" },
+  mandatoryRight: { art: "g2" },
+  mandatoryLeft: { art: "g3" },
 };
 /** В33 numerals are per-placement, so its faces are built on demand (below). */
 const LIMIT_END_ART: SignFaceArt = "v33";
@@ -317,6 +327,11 @@ interface PropAssets {
    *  (tolerated — the crossing shows no arm, exactly like a missing kind). */
   railBarrier: { post: THREE.BufferGeometry; arm: THREE.BufferGeometry } | null;
   signalHousing: THREE.BufferGeometry;
+  /** Two-lens pedestrian head (doc 86 L3) — pole + housing, code geometry.
+   *  There is no pedestrian GLB in the kit and a three-lens vehicle head with a
+   *  dead middle lamp is not a pedestrian signal, so the housing is built here
+   *  from primitives and shares the signal-housing material. */
+  pedSignalHousing: THREE.BufferGeometry;
   streetlightHousing: THREE.BufferGeometry;
   streetlightGlow: THREE.BufferGeometry;
   trees: Record<TreeKind, THREE.BufferGeometry>;
@@ -584,6 +599,7 @@ async function buildPropAssets(): Promise<PropAssets> {
     include: (n) => !n.startsWith("lamp_"),
     rotateY: Math.PI,
   });
+  const pedSignalHousing = buildPedSignalHousing();
 
   const streetlightHousing = bakeVertexColored(lamp.scene, {
     include: (n) => n !== "lamp_lit",
@@ -628,6 +644,7 @@ async function buildPropAssets(): Promise<PropAssets> {
     signs,
     railBarrier,
     signalHousing,
+    pedSignalHousing,
     streetlightHousing,
     streetlightGlow,
     trees: {
@@ -673,6 +690,7 @@ function disposePropAssets(a: PropAssets): void {
   if (a.railBarrier) disposeAll([a.railBarrier.post, a.railBarrier.arm]);
   disposeAll([
     a.signalHousing,
+    a.pedSignalHousing,
     a.streetlightHousing,
     a.streetlightGlow,
     ...Object.values(a.trees),
@@ -761,6 +779,37 @@ const LAMP_OFFSETS: [number, number, number][] = [
   [0, 2.25, 0.15],
 ];
 
+/**
+ * Pedestrian head (doc 86 L3): TWO lenses, red over green, on a shorter pole —
+ * the silhouette that tells a driver at a glance that this lamp is not his.
+ * Mounted lower than the vehicle head (lenses at 2.30 / 2.00 m vs 2.85–2.25) so
+ * the two never read as one signal on the same kerb.
+ */
+const PED_LAMP_OFFSETS: [number, number, number][] = [
+  [0, 2.3, 0.12],
+  [0, 2.0, 0.12],
+];
+const PED_POLE_TOP_M = 2.5;
+const PED_HOUSING_MID_M = 2.15;
+
+/**
+ * Pole + lamp box for a pedestrian head, merged into ONE geometry so the pass
+ * costs a single instanced draw. Vertex-coloured to ride the shared
+ * `signalHousing` material (dark galvanised body), exactly like the GLB head it
+ * stands beside.
+ */
+function buildPedSignalHousing(): THREE.BufferGeometry {
+  const pole = new THREE.CylinderGeometry(0.055, 0.065, PED_POLE_TOP_M, 8);
+  pole.translate(0, PED_POLE_TOP_M / 2, 0);
+  const box = new THREE.BoxGeometry(0.34, 0.72, 0.2);
+  box.translate(0, PED_HOUSING_MID_M, 0.09);
+  const merged = mergeSafe([paintGeometry(pole, 0x2b2f33), paintGeometry(box, 0x1f2226)], false);
+  pole.dispose();
+  box.dispose();
+  merged.computeBoundingSphere();
+  return merged;
+}
+
 const LAMP_ON = {
   red: new THREE.Color(0xff3b30),
   yellow: new THREE.Color(0xffb300),
@@ -822,7 +871,16 @@ function TrafficLights({
   preset: QualityPreset;
   getSignalPhase?: (signalNodeId: string, approachBearingDeg: number) => SignalLampState;
 }) {
-  const lights = world.trafficLights;
+  // A pedestrian head is a different object with a different lamp count and a
+  // different phase, so the two never share an instanced pass (doc 86 L3).
+  const lights = useMemo(
+    () => world.trafficLights.filter((l) => l.head !== "pedestrian"),
+    [world.trafficLights],
+  );
+  const pedLights = useMemo(
+    () => world.trafficLights.filter((l) => l.head === "pedestrian"),
+    [world.trafficLights],
+  );
 
   const housing = useMemo(() => {
     const mesh = createInstancedMesh(assets.signalHousing, assets.materials.signalHousing, lights, {
@@ -885,6 +943,109 @@ function TrafficLights({
 
   return (
     <group name="traffic-lights">
+      <primitive object={housing} />
+      <primitive object={lamps.mesh} ref={lampsRef} />
+      {pedLights.length > 0 ? (
+        <PedestrianSignals
+          lights={pedLights}
+          assets={assets}
+          preset={preset}
+          getSignalPhase={getSignalPhase}
+        />
+      ) : null}
+    </group>
+  );
+}
+
+/**
+ * Pedestrian heads at signalized crossings (doc 86 L3, founder item 29).
+ *
+ * THE PHASE IS NOT ITS OWN CLOCK. `getSignalPhase` is called with the CROSSING
+ * id — a real signal node in runtime/signals.ts — and returns the VEHICLE state
+ * there; the walker's green is the vehicle's red, which is verbatim the
+ * predicate `traffic/pedestrians.crossingGateOpen` uses to release the figure.
+ * So the lamp a student reads and the walker he is watching can never disagree,
+ * and no new timer exists to drift.
+ *
+ * Amber has no pedestrian lens: a Bulgarian pedestrian head is red over green.
+ * `redYellow` and the amber-flash pair therefore fall back to the pedestrian
+ * RED — during a vehicle amber the crossing is closing, and „still red for you"
+ * is the honest read. A dark junction (загаснал светофар) leaves both lenses
+ * unlit, which is exactly what the crossing then is: uncontrolled.
+ */
+function pedLampColors(state: SignalLampState): [THREE.Color, THREE.Color] {
+  if (state === "dark") return [LAMP_OFF.red, LAMP_OFF.green];
+  // Vehicles stopped ⇒ the walker has his green.
+  const walkerGo = state === "red";
+  return walkerGo ? [LAMP_OFF.red, LAMP_ON.green] : [LAMP_ON.red, LAMP_OFF.green];
+}
+
+function PedestrianSignals({
+  lights,
+  assets,
+  preset,
+  getSignalPhase,
+}: {
+  lights: readonly TrafficLightPlacement[];
+  assets: PropAssets;
+  preset: QualityPreset;
+  getSignalPhase?: (signalNodeId: string, approachBearingDeg: number) => SignalLampState;
+}) {
+  const housing = useMemo(
+    () =>
+      createInstancedMesh(assets.pedSignalHousing, assets.materials.signalHousing, lights, {
+        castShadow: preset.castShadows === "full",
+        name: "pedestrian-signal-housings",
+      }),
+    [assets, lights, preset.castShadows],
+  );
+  useEffect(() => () => housing.dispose(), [housing]);
+
+  const lamps = useMemo(() => {
+    const geometry = new THREE.SphereGeometry(0.105, 10, 8);
+    const material = new THREE.MeshBasicMaterial({ toneMapped: false });
+    const mesh = createOffsetInstancedMesh(geometry, material, lights, PED_LAMP_OFFSETS);
+    mesh.name = "pedestrian-signal-lamps";
+    for (let i = 0; i < lights.length; i++) {
+      mesh.setColorAt(i * 2, LAMP_OFF.red);
+      mesh.setColorAt(i * 2 + 1, LAMP_OFF.green);
+    }
+    return { geometry, material, mesh };
+  }, [lights]);
+  useEffect(
+    () => () => {
+      disposeAll([lamps.geometry, lamps.material]);
+      lamps.mesh.dispose();
+    },
+    [lamps],
+  );
+
+  const lampsRef = useRef<THREE.InstancedMesh | null>(null);
+  const lastPhases = useRef<(SignalLampState | null)[]>([]);
+  useEffect(() => {
+    lastPhases.current = new Array<SignalLampState | null>(lights.length).fill(null);
+  }, [lights, lamps]);
+
+  useFrame(() => {
+    const mesh = lampsRef.current;
+    if (!mesh) return;
+    let dirty = false;
+    for (let i = 0; i < lights.length; i++) {
+      const light = lights[i]!;
+      const state: SignalLampState =
+        getSignalPhase?.(light.nodeId, light.approachBearingDeg) ?? "dark";
+      if (lastPhases.current[i] === state) continue;
+      lastPhases.current[i] = state;
+      const colors = pedLampColors(state);
+      mesh.setColorAt(i * 2, colors[0]);
+      mesh.setColorAt(i * 2 + 1, colors[1]);
+      dirty = true;
+    }
+    if (dirty && mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
+  });
+
+  return (
+    <group name="pedestrian-signals">
       <primitive object={housing} />
       <primitive object={lamps.mesh} ref={lampsRef} />
     </group>

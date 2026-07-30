@@ -51,7 +51,7 @@ export function TopicDeck({
   const open = openId ? (topics.find((t) => t.topicId === openId) ?? null) : null;
 
   return (
-    <section aria-labelledby="deck-title" className="flex flex-col gap-4">
+    <section aria-labelledby="deck-title" className="flex flex-col gap-4 short:gap-2">
       <h2 id="deck-title" className="visually-hidden">
         Всички теми
       </h2>
@@ -74,10 +74,14 @@ export function TopicDeck({
               aria-pressed={active}
               disabled={n === 0 && option !== "all"}
               className={[
-                // 38px tall, not the 30px the type alone would give: these are
-                // the board's navigation on a touch screen, and a filter a
-                // thumb misses is a filter that does not exist.
-                "inline-flex min-h-[38px] items-center gap-1.5 rounded-full border px-3.5 text-[12px] font-bold transition disabled:cursor-not-allowed disabled:opacity-40 motion-reduce:transition-none",
+                // 44px, not the 30px the type alone would give: these are the
+                // board's navigation on a touch screen, and a filter a thumb
+                // misses is a filter that does not exist. It was 38 — which is
+                // the same argument stopping 6px short of the number every
+                // published guideline actually names, and the harness caught
+                // all three chips (WebKit, iPhone 16 and the 360px Android
+                // floor, both orientations).
+                "inline-flex min-h-11 items-center gap-1.5 rounded-full border px-3.5 text-[12px] font-bold transition disabled:cursor-not-allowed disabled:opacity-40 motion-reduce:transition-none",
                 active
                   ? "border-accent/60 bg-accent/15 text-accent"
                   : "border-hair bg-surface text-muted hover:border-border-strong hover:text-foreground",
@@ -112,9 +116,19 @@ export function TopicDeck({
         {/* `topic-deck`, not `deck`: the 3D backdrop component owns the generic
             name in globals.css and its rule starts with `pointer-events: none`,
             which made every tile on this grid untappable in WebKit. */}
+        {/* `data-topic-card` IS A CONTRACT WITH THE MOBILE HARNESS, not a
+            styling hook. tools/mobile/lib/routes.mjs asks „is the first topic
+            card reachable without a scroll" — the founder's „only 20% visible
+            to choose the topic" — and it used to ask it with the selector
+            `#main-content article`. This deck has never rendered an <article>,
+            so the check matched nothing and reported a pass on a test that did
+            not run, from phase 6 until it was caught. A class can be renamed by
+            a styling pass without anyone noticing; an attribute that exists for
+            no other reason cannot be removed by accident, and
+            tools/mobile/selectors.test.mjs fails the build if it is. */}
         <ul className="topic-deck grid grid-cols-2 gap-2.5 sm:grid-cols-3 sm:gap-3 lg:grid-cols-4">
           {visible.map((topic, i) => (
-            <li key={topic.topicId} className="flex">
+            <li key={topic.topicId} data-topic-card className="flex">
               <TopicGauge topic={topic} index={i} onOpen={setOpenId} />
             </li>
           ))}

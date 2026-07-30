@@ -38,7 +38,7 @@
  * Geometry pinned to content/world/sig-wave-v1.json (battery
  * sig-wave-districts.test.ts): avenue on x = 0, northbound right-lane center
  * 4.0625, limit 50; signals at y = 0 / 264 / 528; their northbound stop lines
- * at y = −27.725 / 236.275 / 500.275; spawn sw-spawn-south (0, −289) heading
+ * at y = −27.725 / 236.275 / 500.275; spawn sw-spawn-south (4.06, −289) heading
  * north. No staged actors, ambient traffic zero, dry day: the ONLY thing the
  * stack grades is how the driver spends the avenue.
  */
@@ -65,9 +65,7 @@ const REST_3 = LINE_3 - 3.3;
 
 /** Spawn → lane-center merge, shared by all three drives (sw-spawn-south). */
 const LEAD_IN: ReadonlyArray<readonly [number, number]> = [
-  [0, -289],
-  [0, -287],
-  [LANE, -270],
+  [LANE, -289],
   [LANE, -30],
 ];
 

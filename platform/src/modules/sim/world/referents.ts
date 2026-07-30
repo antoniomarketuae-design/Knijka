@@ -49,6 +49,7 @@ import { buildWorldGeometry } from "./builders/buildWorldGeometry";
 import {
   DASH_GAP_M,
   DASH_LENGTH_M,
+  gradesCrossingDuty,
   LANE_WIDTH_M,
   MARKED_CLASSES,
   SCENARIO_SIGN_SCALE,
@@ -827,15 +828,31 @@ function signalHeadRule(): ReferentRule {
 
 function crossingRule(): ReferentRule {
   return {
-    requires: ">=1 district.crossings inside the route corridor",
+    requires: ">=1 GRADEABLE district.crossing inside the route corridor",
     fixIn: "the template's map choice, or tools/maps (Lane 10)",
     check(f) {
+      // Asks the SAME predicate the CrossingZoneTracker arms on (doc 87
+      // A13/A16). A crossing the painter draws nothing at, on a street that is
+      // not a жилищна зона, is not a пешеходна пътека — the runtime no longer
+      // builds a zone for it, so it is not a referent for these codes either.
+      // Counting it would make the gate certify a duty the product cannot arm.
+      const byId = new Map(f.world.district.roads.edges.map((e) => [e.id, e]));
       const on = f.world.district.crossings.filter(
-        (c) => c.edgeId !== null && f.routeEdgeIds.has(c.edgeId),
+        (c) =>
+          c.edgeId !== null &&
+          f.routeEdgeIds.has(c.edgeId) &&
+          gradesCrossingDuty(c, byId.get(c.edgeId)),
       );
       return on.length > 0
-        ? ok(`crossings on the route = ${on.length}`)
-        : inert(`crossings on the route = 0 (district has ${f.world.district.crossings.length})`);
+        ? ok(`gradeable crossings on the route = ${on.length}`)
+        : inert(
+            `gradeable crossings on the route = 0 (district has ${f.world.district.crossings.length}, ` +
+              `of which paint/зона-backed: ${
+                f.world.district.crossings.filter((c) =>
+                  gradesCrossingDuty(c, c.edgeId ? byId.get(c.edgeId) : null),
+                ).length
+              })`,
+          );
     },
   };
 }

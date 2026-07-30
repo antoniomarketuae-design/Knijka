@@ -46,7 +46,12 @@ function Logo() {
   return (
     <Link
       href="/dashboard"
-      className="flex items-center gap-2 rounded-lg px-2 py-1 text-lg font-extrabold tracking-tight"
+      // `min-h-11` — 44px, the same guarantee the option rows carry. Measured
+      // before this (WebKit, tools/mobile/cli.mjs): 147.1 x 40 on every
+      // dashboard surface, in both orientations, on both phone sizes. It is the
+      // control a student uses to get back to Начало from anywhere, and 40px is
+      // under every published thumb minimum. The WIDTH was never the problem.
+      className="flex min-h-11 items-center gap-2 rounded-lg px-2 py-1 text-lg font-extrabold tracking-tight"
     >
       <span
         aria-hidden
@@ -172,7 +177,23 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
   }, [open]);
 
   return (
-    <div className="min-h-dvh lg:grid lg:grid-cols-[16rem_1fr]">
+    // A FLEX COLUMN BELOW `lg`, WHICH IS WHAT LETS A PAGE OWN THE SCREEN.
+    //
+    // It was a plain block, so <main> was exactly as tall as whatever the page
+    // put in it and nothing could ask for the rest. Measured on the practice
+    // runner (WebKit, iPhone 16 portrait): the question card ended at 55% of
+    // the screen and the remaining 37.7% was bare backdrop — the founder's
+    // „approximately half of the screen" with the halves swapped. A card cannot
+    // reach the bottom of a screen its own container never reached.
+    //
+    // Nothing else moves: on every hub in this app the content is already
+    // taller than the viewport (measured: /exams overflows 336px, /simulator
+    // 58,719px), so `flex-1` on <main> is a no-op there. It only ever gives
+    // room to a page that is SHORTER than the screen, which is the one case
+    // that was broken.
+    //
+    // At `lg` the display becomes grid and the flex direction is inert.
+    <div className="flex min-h-dvh flex-col lg:grid lg:grid-cols-[16rem_1fr]">
       {/* Desktop sidebar — a console SLAB, not a column with a border on it:
           it catches the cabin light down the edge that faces the deck and drops
           a short shadow onto it (`.console` + `.console-right`, globals.css §9).
@@ -202,10 +223,19 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
 
       {/* Mobile topbar — the same console, laid flat. This is the ONE glass
           layer on a phone screen (doc 64 §7 budget), so the blur stays where it
-          was and the identity comes from the lit bottom lip instead. */}
+          was and the identity comes from the lit bottom lip instead.
+
+          THE HEIGHT IS NOW STATED, AND IT SHRINKS WHEN THE SCREEN IS SHORT.
+          It used to be whatever its contents came to (64px), which is 7.5% of a
+          portrait phone and 16.3% of the same phone turned sideways — and on
+          the landscape screens this bar was the ENTIRE gap between /exams and
+          /simulator and the founder's 85% (measured 83.7%). `short:h-12`
+          spends 48px there instead of 64, which is still 4px of clearance
+          around a 44px control, and hands 4.1% of the screen back to the
+          product on every landscape route at once. */}
       <header
         data-app-topbar
-        className="console console-bottom sticky top-0 z-40 flex items-center justify-between px-4 py-3 backdrop-blur lg:hidden"
+        className="console console-bottom sticky top-0 z-40 flex h-16 items-center justify-between px-4 backdrop-blur short:h-12 lg:hidden"
       >
         <Logo />
         <button
@@ -214,7 +244,12 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
           onClick={() => setOpen(true)}
           aria-expanded={open}
           aria-controls="mobile-nav"
-          className="btn-ghost rounded-xl p-2"
+          // 38 x 38 BEFORE THIS (20px icon + 8px padding a side + 1px border),
+          // on every dashboard route, in both orientations, on both phone
+          // sizes — the smallest violation the harness found anywhere in the
+          // app and the one control every screen carries. `min-h-11 min-w-11`
+          // states the 44px directly instead of hoping padding adds up to it.
+          className="btn-ghost min-h-11 min-w-11 rounded-xl p-2"
         >
           <IconMenu className="h-5 w-5" />
           <span className="visually-hidden">Отвори менюто</span>
@@ -288,7 +323,9 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
                   setOpen(false);
                   openButtonRef.current?.focus();
                 }}
-                className="btn-ghost rounded-xl p-2"
+                // Same 38x38 as the opener it mirrors, same 44px fix. It is the
+                // only way out of a modal drawer on a touch screen.
+                className="btn-ghost min-h-11 min-w-11 rounded-xl p-2"
               >
                 <IconX className="h-5 w-5" />
                 <span className="visually-hidden">Затвори менюто</span>
@@ -304,7 +341,17 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
         </div>
       ) : null}
 
-      <div className="min-w-0">{children}</div>
+      {/* `flex-1` + `flex flex-col` so <main> inside can stretch to the bottom
+          of the screen.
+
+          DELIBERATELY NO `min-h-0`. A flex item's `min-height: auto` resolves
+          to its CONTENT size, which is the property that keeps a page taller
+          than the phone (every hub in this app) from being squeezed into the
+          viewport and overflowing its own box. With `min-h-0` the column would
+          size to the screen and a 58,719px catalogue would hang out of it. So:
+          this box is `max(content, the rest of the screen)`, which is both
+          cases at once. */}
+      <div className="flex min-w-0 flex-1 flex-col">{children}</div>
     </div>
   );
 }

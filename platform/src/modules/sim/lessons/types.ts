@@ -311,6 +311,15 @@ export type ObjectiveEvalState =
       approachFrom: Vec2 | null;
       /** Previous frame's position — only used to derive `approachFrom`. */
       prevPos: Vec2 | null;
+      /**
+       * The car has been OUTSIDE this zone's grace ring at least once while
+       * the objective was live — i.e. there was a real arrival to concede.
+       * Latched, never cleared. Guards the halt arm of the grace only (doc 87
+       * B3/B10/B11: „it states 2 tasks and it is only 1"): a drill that spawns
+       * you three metres from its own halt mark ticked task 1 off at t = 0,
+       * at rest, for having done nothing.
+       */
+      everOutside: boolean;
     }
   | {
       type: "passSignal";
@@ -594,6 +603,31 @@ export interface LessonSessionState {
   lastTeachMomentAtSec: number | null;
   /** Session time of the last processed tick, seconds. */
   lastT: number;
+  /**
+   * FRAME-ZERO POSE GUARD (doc 87 B3/B10/B11 — „it states 2 tasks and it is
+   * only 1 task"). Session time of the first tick that DESCRIBED THE VEHICLE:
+   * the first one carrying motion, or a position different from the one the
+   * session opened on. Undefined until then, and while it is undefined the
+   * objective chain does not advance.
+   *
+   * The scene mounts its pose buffer at the DISTRICT ORIGIN
+   * (scene/vehicleSample.ts `createVehicleSample` → position {0, 0}) and ticks
+   * this engine with it for the frames before the chassis writes its first
+   * pose. Four shipped drills author their first waypoint within one car
+   * length of that origin — sc-park-perp-rev (6.07 m), sc-park-parallel
+   * (7.30), sc-park-narrow (5.87), sc-park-bay-exit-rev (3.19) — so their
+   * „ЗАДАЧА 1/2" was ticked off by a car that did not exist yet, at a place
+   * 111 m from where the student was actually sitting. sc-park-45, whose gate
+   * is authored away from the origin, was the one bay drill the founder found
+   * honest; that is the same fact from the other side.
+   *
+   * Held in the LESSON engine rather than patched in the scene because the
+   * rule is a grading rule and belongs where grading lives: an objective is
+   * earned by driving, and nothing has been driven while the car has not
+   * moved. When the scene stops publishing the placeholder pose this guard
+   * costs exactly one frame and changes nothing.
+   */
+  posedAtSec?: number;
   endedAtSec: number | null;
   /**
    * A8 (additive): resolved staged-encounter outcomes, in resolution order.

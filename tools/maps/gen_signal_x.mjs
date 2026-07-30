@@ -36,6 +36,7 @@
 import { mkdirSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { curbLaneOffsetM, toCurbLane } from "./lib/lane.mjs";
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 
@@ -177,32 +178,40 @@ export function buildSignalXDistrict(params) {
     },
   ];
 
-  const SPAWN_POINTS = [
-    {
-      id: "sx-spawn-south",
-      x: 0,
-      y: r2(-(armSouthM - 15)),
-      heading: 0,
-      edgeId: "sx-e-s",
-      name: "Южен подход към светофара",
-    },
-    {
-      id: "sx-spawn-east",
-      x: r2(armEastM - 15),
-      y: 0,
-      heading: 270,
-      edgeId: "sx-e-e",
-      name: "Източен подход към светофара",
-    },
-    {
-      id: "sx-spawn-west",
-      x: r2(-(armWestM - 15)),
-      y: 0,
-      heading: 90,
-      edgeId: "sx-e-w",
-      name: "Западен подход към светофара",
-    },
-  ];
+  // doc 87 T2 — a spawn pose belongs in the CURB LANE of the edge it faces
+  // along, not on its centreline: the old convention handed the student a car
+  // already straddling the осева and the rule engine convicted him of
+  // «Настъпване на осевата линия» seconds later, for a pose he never chose.
+  // toCurbLane() leaves a deliberately off-centre pose exactly where it is.
+  const SPAWN_POINTS = toCurbLane(
+    [
+      {
+        id: "sx-spawn-south",
+        x: 0,
+        y: r2(-(armSouthM - 15)),
+        heading: 0,
+        edgeId: "sx-e-s",
+        name: "Южен подход към светофара",
+      },
+      {
+        id: "sx-spawn-east",
+        x: r2(armEastM - 15),
+        y: 0,
+        heading: 270,
+        edgeId: "sx-e-e",
+        name: "Източен подход към светофара",
+      },
+      {
+        id: "sx-spawn-west",
+        x: r2(-(armWestM - 15)),
+        y: 0,
+        heading: 90,
+        edgeId: "sx-e-w",
+        name: "Западен подход към светофара",
+      },
+    ],
+    EDGES,
+  );
 
   const bounds = { minX: Infinity, minY: Infinity, maxX: -Infinity, maxY: -Infinity };
   for (const e of EDGES) {
@@ -326,7 +335,10 @@ export function buildSignalXDistrict(params) {
   for (const s of SPAWN_POINTS) {
     const host = EDGES.find((e) => e.id === s.edgeId);
     if (!host) post.push(`${s.id}: unknown edgeId ${s.edgeId}`);
-    else if (distToEdge(host, s.x, s.y) > 1) post.push(`${s.id}: not on its edge`);
+    // doc 87 T2: "on its edge" used to mean "within a metre of its CENTRELINE",
+    // i.e. the invariant enforced the defect it was supposed to catch.
+    else if (Math.abs(distToEdge(host, s.x, s.y) - curbLaneOffsetM(host.lanes, host.oneway)) > 1)
+      post.push(`${s.id}: not in its edge's curb lane`);
   }
   // Routable connectivity: one component.
   {

@@ -13,7 +13,7 @@
  *
  * sc-rx-tram-left is sc-turn-left-oncoming's site and machinery with a
  * RAIL-BOUND actor (the scJunctions scLtap* scripts are the mold): the same
- * sx-v1 spawn (105, 0) heading west, the same EW-green signal pin
+ * sx-v1 spawn (105, 4.06) heading west, the same EW-green signal pin
  * (SX_PIN_EW_GREEN_WINDOW), the same R15 left-turn arc for the two drives that
  * turn PROPERLY — but ONE oncoming actor, the 14 m tram (profile "tram",
  * cruise 10.5 m/s, gapSec 1.6 → inside the ≤ 2 s conviction band). The shadow's
@@ -63,14 +63,12 @@ function arcPts(cx: number, cy: number, r: number, a0: number, a1: number): Arra
 }
 
 // ---------------------------------------------------------------------------
-// sc-rx-tram-left — sx-v1 (spawn (105, 0) heading west; EW green pinned;
+// sc-rx-tram-left — sx-v1 (spawn (105, 4.06) heading west; EW green pinned;
 // ONE staged oncoming TRAM from the west)
 // ---------------------------------------------------------------------------
 
 const SX_EAST_APPROACH: Array<[number, number]> = [
-  [105, 0],
-  [103, 0],
-  [92, LANE],
+  [105, LANE],
   [52, LANE],
 ];
 
@@ -160,7 +158,7 @@ function scRxTramLeftMistakeCutScript(): DriveScript {
       { kind: "annotation", textBg: "Грешката „той ще спре“: ляв завой през релсите пред идващия трамвай." },
       { kind: "indicator", setting: "left" },
       { kind: "glance", mirror: "rear" },
-      { kind: "drive", points: [[105, 0], [103, 0], [92, LANE], [40, LANE]], targetKmh: 26 },
+      { kind: "drive", points: [[105, LANE], [40, LANE]], targetKmh: 26 },
       {
         // The cut: no lift, peel early across the tram's lane while it is
         // ~1.6 s from the junction — the N1 tracker convicts (FAILED_TO_YIELD,

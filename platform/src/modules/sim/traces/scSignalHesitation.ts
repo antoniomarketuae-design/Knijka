@@ -21,7 +21,7 @@
  *
  * Geometry pinned to content/world/sx-v1.json (battery sx-district.test.ts):
  *   south stem, ns stop line at y = −27.725, drawn lane center x = 4.0625,
- *   spawn sx-spawn-south (0, −105) heading north. No staged conflict — the ONLY
+ *   spawn sx-spawn-south (4.06, −105) heading north. No staged conflict — the ONLY
  *   thing the stack grades is the hesitation (the drives cross straight through
  *   on green, so no priority/turn code arms).
  */
@@ -55,7 +55,7 @@ function scSignalHesitationShadowScript(): DriveScript {
     steps: [
       { kind: "annotation", textBg: "Светофарът напред свети ЗЕЛЕНО и кутията е чиста — на зелено се тръгва без бавене." },
       { kind: "glance", mirror: "rear" },
-      { kind: "drive", points: [[0, -105], [0, -103], [LANE, -92], [LANE, -45]], targetKmh: 28 },
+      { kind: "drive", points: [[LANE, -105], [LANE, -45]], targetKmh: 28 },
       { kind: "annotation", textBg: "Готовност: намали леко, увери се, че напред е чисто — и премини, без да спираш излишно." },
       { kind: "glance", mirror: "left" },
       { kind: "glance", mirror: "right" },
@@ -81,7 +81,7 @@ function scSignalHesitationMistakeFreezeScript(): DriveScript {
     steps: [
       { kind: "annotation", textBg: "Грешката: светофарът е зелен и напред е чисто, но колата спира и не тръгва." },
       { kind: "glance", mirror: "rear" },
-      { kind: "drive", points: [[0, -105], [0, -103], [LANE, -92], [LANE, -40]], targetKmh: 25 },
+      { kind: "drive", points: [[LANE, -105], [LANE, -40]], targetKmh: 25 },
       { kind: "drive", points: [[LANE, -40], [LANE, -28.6]], targetKmh: 12 },
       { kind: "annotation", textBg: "Зелено е, чисто е — а колата стои. Всяка секунда бавене блокира кръстовището и колоната отзад." },
       // A full freeze on green with a clear box → HESITATION_AT_GREEN (> 5 s).
@@ -102,7 +102,7 @@ function scSignalHesitationMistakeFilterScript(): DriveScript {
     steps: [
       { kind: "annotation", textBg: "Грешката „изпуснато зелено“: колата спира преди линията и се колебае цяла вечност на зелено." },
       { kind: "glance", mirror: "rear" },
-      { kind: "drive", points: [[0, -105], [0, -103], [LANE, -92], [LANE, -40]], targetKmh: 25 },
+      { kind: "drive", points: [[LANE, -105], [LANE, -40]], targetKmh: 25 },
       // Stops short of the line (still inside the 12 m watch window) and dithers.
       { kind: "drive", points: [[LANE, -40], [LANE, -30.0]], targetKmh: 12 },
       { kind: "annotation", textBg: "Зелено, чисто — но колата чака „за всеки случай“ и държи цялото кръстовище блокирано." },

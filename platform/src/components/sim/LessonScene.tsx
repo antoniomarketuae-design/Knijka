@@ -1297,9 +1297,15 @@ function ReadyScene({
         <DemoDeck trace={shadowTrace} clockRef={aidClockRef} />
       ) : null}
 
-      {/* S1 followHints chip — „you are off the demonstrated line". */}
+      {/* S1 followHints chip — „you are off the demonstrated line".
+          `data-hud` because `top-16` is inside the chase view's rear-view
+          mirror band (rows B74/B76) — PlayAreaStyles steps it below the glass,
+          the same way it steps the objective stack. */}
       {followHintOn && aids?.followHints ? (
-        <div className="pointer-events-none absolute left-1/2 top-16 z-10 -translate-x-1/2">
+        <div
+          data-hud="follow-hint"
+          className="pointer-events-none absolute left-1/2 top-16 z-10 -translate-x-1/2"
+        >
           <div className="rounded-full border border-accent/60 bg-background/85 px-3.5 py-1.5 text-xs font-bold text-accent shadow-glow-sm backdrop-blur">
             Следвай синята линия
           </div>
@@ -1406,36 +1412,69 @@ function ReadyScene({
       </div>
 
       {/* P1: one-time touch expectation hint — the refusal GateCard's
-          replacement. Landscape + slider guidance, then never again. */}
+          replacement. Landscape + slider guidance, then never again.
+
+          ── ROW C1, 2026-07-30. THE FIRST FRAME OF A LESSON. ────────────────
+          This block used to be `absolute inset-0 z-30 … bg-background/80
+          backdrop-blur-sm` with a `max-w-sm` card on it, and the harness put a
+          number on what that meant: on the state a lesson OPENS in, iPhone 16
+          in both orientations, content 0.0 %, chrome 100.0 %. Not one pixel of
+          road. Behind it sat a redesign measured at 93.9 % road that the
+          founder could not see, because he never got past the popup — his own
+          words are „the popups continue to eat almost the full screen and must
+          be completely redesigned".
+
+          So it is not a popup any more. It is what an instructor in the
+          passenger seat is: a voice over the scene. No scrim (the road is
+          visible the whole time — that IS the reassurance that there is a game
+          here), no card, no border, no backdrop-filter — every one of those is
+          a painted rectangle and the screen budget charges each one. What is
+          left is type with a shadow, the same technique the compact instrument
+          readout already uses over a bright road, plus ONE real button.
+
+          The copy is cut to what cannot be discovered by touching the screen.
+          The reverse gesture stays, verbatim in intent, because it is the
+          founder's own complaint („very hard to switch to reverse") and because
+          holding the brake at a standstill is invisible by design. The „⚙"
+          sentence is gone: that button is on screen, it has a label, and a
+          student who taps it learns more than a student who reads about it. */}
       {showTouchHint ? (
         <div
-          className="absolute inset-0 z-30 flex items-center justify-center bg-background/80 p-4 backdrop-blur-sm"
-          role="dialog"
-          aria-modal="true"
+          data-hud="touch-hint"
+          className="pointer-events-none absolute inset-x-0 top-1/2 z-30 flex -translate-y-1/2 flex-col items-center gap-2.5 px-5 text-center"
+          role="note"
           aria-label="Съвети за игра на телефон"
+          style={{ textShadow: "0 1px 4px rgba(0,0,0,0.96), 0 0 14px rgba(0,0,0,0.8)" }}
         >
-          <div className="card flex max-w-sm flex-col gap-3 p-6 text-center">
-            <p className="text-3xl" aria-hidden>
-              📱
-            </p>
-            <h2 className="text-lg font-bold">Караш направо от телефона</h2>
-            {/* The ONE thing this card has to teach, because it is the founder's
-                own complaint („very hard to switch to reverse") and because the
-                gesture is invisible by design: down is the brake, and holding it
-                at a standstill puts the car in R — after which down keeps
-                meaning backwards. Everything else on this screen can be found by
-                touching it; that cannot. */}
-            <p className="text-sm text-muted">
-              Завърти телефона хоризонтално. Палецът вляво завърта волана,
-              палецът вдясно кара: нагоре — газ, в средата — нищо, надолу —
-              спирачка. Задръж надолу, докато колата стои — тя минава на заден
-              ход и надолу вече е назад. „⚙“ отваря двигател, скорости и
-              светлини; в кабината можеш да докосваш контролите направо.
-            </p>
-            <button type="button" autoFocus className="btn-accent" onClick={dismissTouchHint}>
-              Разбрах
-            </button>
-          </div>
+          {/* PORTRAIT SAYS ONE THING. Measured on iPhone 16: the two thumb
+              lines below wrap to four in portrait and the whole hint costs
+              16.6 % of the screen — on an orientation where the thumb layout
+              cannot be used yet anyway. So portrait carries the one instruction
+              that is actionable right now, and the gesture teaching arrives in
+              landscape, where the thumbs are. */}
+          <p className="hidden text-base font-black [@media(orientation:portrait)]:block">
+            Завърти телефона хоризонтално
+          </p>
+          {/* `max-w-2xl`, not `max-w-md`: the screen budget charges TEXT over
+              its real glyph line boxes, so the same sentence costs twice as
+              much wrapped as it does on one line. At 448 px each of these
+              wrapped to two lines on a landscape iPhone — four line boxes of
+              chrome for two sentences. One line each, and nothing is cut. */}
+          <p className="max-w-2xl text-sm font-bold leading-snug [@media(orientation:portrait)]:hidden">
+            Ляв палец — волан. Десен палец — нагоре газ, надолу спирачка.
+          </p>
+          <p className="max-w-2xl text-sm font-bold leading-snug text-accent-2 [@media(orientation:portrait)]:hidden">
+            Задръж надолу, докато колата стои — минава на заден ход.
+          </p>
+          <button
+            type="button"
+            autoFocus
+            onClick={dismissTouchHint}
+            // 44 px of thumb, and the only thing here that paints a box.
+            className="pointer-events-auto mt-0.5 flex min-h-11 items-center rounded-full bg-accent px-6 text-sm font-bold text-background"
+          >
+            Разбрах
+          </button>
         </div>
       ) : null}
 

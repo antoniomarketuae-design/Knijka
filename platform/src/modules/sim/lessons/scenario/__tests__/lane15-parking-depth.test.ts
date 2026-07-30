@@ -92,8 +92,12 @@ const MANEUVER_DRILLS = [
   "sc-maneuver-uturn",
 ] as const;
 
-/** The ones this lane owns and repaired (templates.ts is not lane 15's file). */
-const LANE15_MANEUVER_DRILLS = MANEUVER_DRILLS.filter((id) => id !== "sc-park-perp-rev");
+/**
+ * All ten now. `sc-park-perp-rev` was excluded because templates.ts belonged to
+ * no lane; the lessons-progression wave (doc 87 B3/B10) owns that file and took
+ * the fix, so the drill joins the set it was always supposed to be measured by.
+ */
+const LANE15_MANEUVER_DRILLS = MANEUVER_DRILLS;
 
 // ---------------------------------------------------------------------------
 // §1 — the two tasks are two tasks (doc 86 D11)
@@ -150,18 +154,16 @@ describe("D11 — „it states 2 tasks and delivers 1“", () => {
     }
   });
 
-  it("the P0 in templates.ts is the ONE drill still carrying the phantom — named, not silently skipped", () => {
-    // sc-park-perp-rev is catalog position 1 — the first parking lesson the
-    // founder played — and it has exactly the same 14 m/≤15 km/h drive-by first
-    // objective. templates.ts is NOT lane 15's file (doc 86 §9), so the fix is
-    // reported instead of taken. This assertion FAILS THE DAY SOMEBODY FIXES IT,
-    // which is the point: it is a live reminder, not a comment.
+  it("the P0 in templates.ts carries the same halt gate as its repaired siblings", () => {
+    // The reminder this assertion used to be ("FAILS THE DAY SOMEBODY FIXES
+    // IT") did its job: catalog position 1 held a 14 m / ≤ 15 km/h drive-by
+    // first objective a student satisfied at fourteen km/h without stopping.
+    // It is now the same at-rest pull-past gate sc-park-narrow uses, on the
+    // pose the committed shadow actually stops at.
     const p0 = byId("sc-park-perp-rev").success[0].params;
     if (p0.kind !== "reachZone") return expect.unreachable("P0 first objective kind");
-    expect(
-      p0.maxSpeedKmh,
-      "sc-park-perp-rev has been repaired — delete this test and add it to LANE15_MANEUVER_DRILLS",
-    ).toBe(15);
+    expect(p0.maxSpeedKmh).toBe(6);
+    expect(Math.hypot(p0.x - 0.9, p0.y - 6)).toBeLessThan(0.5);
   });
 });
 
@@ -206,10 +208,10 @@ describe("L13 — „L2 L3 L4 L5 They have Nothing More“, for this family", ()
    * templates' own comments and the in-tree pins named here.
    */
   const NO_L5_BY_DESIGN = new Map<string, string>([
-    [
-      "sc-park-perp-rev",
-      "templates.ts — doc 86 §9 gives that file to no lane; reported, not taken",
-    ],
+    // sc-park-perp-rev is GONE from this list: the lessons-progression wave
+    // owns templates.ts and gave catalog position 1 the night+rain rung its
+    // repaired sibling sc-park-narrow ships (doc 87 B2 — every parking card
+    // beside it read „L1–L5" while the first one read „L1–L4").
     [
       "sc-pk-busstop-ban",
       "s-w2-bot-completion.ts:304 — „the fault is a DECISION, not a condition; " +
@@ -279,7 +281,6 @@ describe("L13 — „L2 L3 L4 L5 They have Nothing More“, for this family", ()
     // the complaint, not the answer.
     const soft: string[] = [];
     for (const spec of PARKING) {
-      if (spec.id === "sc-park-perp-rev") continue; // templates.ts — not this lane's file
       const base = spec.rubric?.economy;
       if (!base) continue;
       const l4 = spec.levels.find((l) => l.level === 4);

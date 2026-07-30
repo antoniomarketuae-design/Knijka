@@ -176,6 +176,23 @@ function probeLateral(
     /** Player start offset ALONG the road from the actor's hold, m
      *  (negative = behind the actor). */
     startAlongM: number;
+    /**
+     * Player start offset ACROSS the road from the actor's path, m (positive =
+     * to the RIGHT of the actor's travel direction). Default 0.
+     *
+     * B73 — why this exists. The probe used to put the player in the actor's
+     * OWN lane for every kind. For a cut-in that is not the drill: the whole
+     * encounter is a car in the ADJACENT lane moving into yours. Worse, it is
+     * not even physical — `staged.ts`'s playerGuard clamps an actor whose
+     * player is within GUARD_AHEAD_M 16 and GUARD_LATERAL_M 3.0, so a
+     * same-lane probe pins the cutter ~16 m BEHIND the player forever and the
+     * "lane change" it then measures is a sideways glide into empty road,
+     * behind the driver's shoulder, which is exactly the defect the founder
+     * reported in lesson 43. Offsetting the player by the cut distance
+     * reproduces the real geometry: two lanes, the cutter pacing ahead-left,
+     * the merge landing in front of the windscreen where it can be seen.
+     */
+    startAcrossM?: number;
     speedKmh: number;
     /** Seconds of authored choreography before the lateral move fires. */
     choreographySec: number;
@@ -188,8 +205,10 @@ function probeLateral(
   const hold = tr.staged(built.id);
   if (!hold) throw new Error(`${e.scenarioId}/${built.id}: failed to stage`);
 
-  let px = hold.x + hold.dirX * built.startAlongM;
-  let py = hold.y + hold.dirY * built.startAlongM;
+  // Right normal of the actor's travel direction is (dirY, −dirX).
+  const across = built.startAcrossM ?? 0;
+  let px = hold.x + hold.dirX * built.startAlongM + hold.dirY * across;
+  let py = hold.y + hold.dirY * built.startAlongM - hold.dirX * across;
   const mps = speedKmh / 3.6;
   const out: SimTickEvent[] = [];
   let t = 0;
@@ -277,6 +296,8 @@ describe("encounter battery · SIGNALLING — no silent lane change (ledger L6)"
           id: c.id,
           shiftM: c.cutShiftM,
           startAlongM: -c.paceAheadM,
+          // The player is one lane over — the lane the cutter cuts INTO.
+          startAcrossM: c.cutShiftM,
           speedKmh: Math.max(c.minCutSpeedKmh + 8, 30),
           // The cut is distance-triggered, not clocked: a few seconds of
           // approach is all the budget it needs.

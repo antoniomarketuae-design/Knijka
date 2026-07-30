@@ -20,6 +20,10 @@
  *       · a bar across the lane at the graded stop line for a `passSignal` —
  *         resolved from `worldRuntime.debugStopLines()`, so it can no longer
  *         stand 27.7 m inside the junction the lesson grades;
+ *       · the same bar for a `reachZone` whose authored centre lies past paint
+ *         the student can see — the М8 give-way line at a roundabout mouth is
+ *         not graded by anything, and the waypoint of «Кръгово движение» stood
+ *         1.7 m beyond it (register B18);
  *       · a «спри тук» / «премини» label plus the objective's hidden speed cap,
  *         and a live amber tint the moment the student is above that cap.
  *  4. Label chip — a canvas-textured billboard so the marker says what it
@@ -42,6 +46,7 @@ import * as THREE from "three";
 import type { VehicleSample } from "@/modules/sim/contracts";
 import type { LessonSpec } from "@/modules/sim/lessons";
 import {
+  LOOKAHEAD_MAX_LEGS,
   ROUTE_MAX_SAMPLES,
   buildRouteGraph,
   deriveGuidanceRoute,
@@ -266,6 +271,15 @@ export function RouteGuidance({
 
   const firstBuildRef = useRef(true);
 
+  /** The pose every goal in the chain is resolved FROM: the spawn on the first
+   *  build (the physics sample is not live yet), the car itself after that. */
+  const derivedFrom = (): { x: number; y: number } => {
+    const sample = sampleRef.current;
+    return firstBuildRef.current || !sample
+      ? { x: spawnStart.x, y: spawnStart.y }
+      : { x: sample.position.x, y: sample.position.y };
+  };
+
   /**
    * The active objective's marker contract. Resolved in render scope (not the
    * layout effect) because the ring geometry is sized from it declaratively —
@@ -273,23 +287,36 @@ export function RouteGuidance({
    * below (same task), so both see the same pose.
    */
   const goal = useMemo<GuidanceGoal | null>(() => {
-    const sample = sampleRef.current;
-    const from =
-      firstBuildRef.current || !sample
-        ? { x: spawnStart.x, y: spawnStart.y }
-        : { x: sample.position.x, y: sample.position.y };
-    return guidanceGoalFor(lesson, activeObjectiveIndex, { stopLines, from });
+    return guidanceGoalFor(lesson, activeObjectiveIndex, { stopLines, from: derivedFrom() });
     // eslint-disable-next-line react-hooks/exhaustive-deps -- refs are stable
   }, [lesson, activeObjectiveIndex, stopLines, spawnStart, sampleRef]);
 
-  /** Objective n+1 — the ribbon runs into it so the turn is announced early. */
-  const lookahead = useMemo<GuidanceGoal | null>(() => {
-    if (!goal || goal.kind !== "point") return null;
-    return guidanceGoalFor(lesson, activeObjectiveIndex + 1, {
-      stopLines,
-      from: { x: goal.x, y: goal.y },
-    });
-  }, [lesson, activeObjectiveIndex, stopLines, goal]);
+  /**
+   * Objectives n+1, n+2, … — the ribbon runs into them so the turn is
+   * announced early. It is a CHAIN, not a single step: on «Знак Стоп» the next
+   * objective IS the stop line (dead ahead), and the right turn the student
+   * must signal for lives one objective further, so a one-deep look-ahead
+   * showed no turn at all until the nose had crossed the Б2 paint (doc 86 L5,
+   * register B24/B6). `deriveGuidanceRoute` stops appending the moment a turn
+   * is on the ribbon, so the extra depth costs nothing when it is not needed.
+   */
+  const lookahead = useMemo<GuidanceGoal[]>(() => {
+    if (!goal) return [];
+    const out: GuidanceGoal[] = [];
+    // An "ahead" objective has no waypoint of its own, so the chain resolves
+    // from the driver — which is exactly what picks the right arm's stop line.
+    let from = goal.kind === "point" ? { x: goal.x, y: goal.y } : derivedFrom();
+    for (let k = 1; k <= LOOKAHEAD_MAX_LEGS; k += 1) {
+      const next = guidanceGoalFor(lesson, activeObjectiveIndex + k, { stopLines, from });
+      // A null goal (smoothStop) or a target-less one ends the chain: there is
+      // no coordinate to carry the ribbon toward.
+      if (!next || next.kind !== "point") break;
+      out.push(next);
+      from = { x: next.x, y: next.y };
+    }
+    return out;
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- refs are stable
+  }, [lesson, activeObjectiveIndex, stopLines, goal, spawnStart, sampleRef]);
 
   const pointGoal = goal && goal.kind === "point" ? goal : null;
   const ringRadii = useMemo(

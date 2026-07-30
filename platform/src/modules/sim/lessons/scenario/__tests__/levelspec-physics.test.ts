@@ -62,7 +62,13 @@ describe("LevelSpec.physics — rung-level live-physics deltas", () => {
     // want of it): L5 runs wet, L1..L4 keep the dry physics their committed
     // ghosts were tuned against.
     const s = dryClone();
-    s.levels.push({ level: 5, conditions: { weather: "rain" }, physics: { wetGrip: true } });
+    // The P0 ships its own night+rain L5 since doc 87 B2 — REPLACE it, so the
+    // clone still has exactly one L5 and this test still reasons about a rung
+    // that carries physics of its own.
+    s.levels = [
+      ...s.levels.filter((l) => l.level !== 5),
+      { level: 5, conditions: { weather: "rain" }, physics: { wetGrip: true } },
+    ];
     const l5 = compileScenario(s, 5);
     expect(l5.physics).toEqual({ wetGrip: true });
     expect(l5.environment).toEqual({ rain: true }); // render AND dynamics now agree

@@ -24,7 +24,7 @@
  * Geometry pinned to content/world/jxg-giveway-v1.json (the district battery
  * proves the numbers): drawn lane center x = +4.0625 (northbound), mouth-1 Б1
  * line at y = −27.725 (jxg-n-j1 at y = 0), mouth-2 Б1 line at y = +122.275
- * (jxg-n-j2 at y = 150); spawn jxg-spawn-south at (0, −115) heading north.
+ * (jxg-n-j2 at y = 150); spawn jxg-spawn-south at (4.06, −115) heading north.
  */
 
 import type { StagedEventSpec } from "../contracts";
@@ -55,7 +55,7 @@ export function scJxGivewayB1ShadowScript(): DriveScript {
       },
       { kind: "glance", mirror: "rear" },
       // Approach mouth 1, easing onto the lane center.
-      { kind: "drive", points: [[0, -115], [0, -113], [LANE, -100], [LANE, -42]], targetKmh: 22 },
+      { kind: "drive", points: [[LANE, -115], [LANE, -42]], targetKmh: 22 },
       {
         kind: "annotation",
         textBg: "Първо кръстовище: по главния няма никого. Оглеждам се наляво-надясно и минавам ПЛАВНО, без да спирам.",
@@ -112,7 +112,7 @@ export function scJxGivewayB1MistakeBargeScript(): DriveScript {
         textBg: "Грешка: на второто кръстовище водачът се оглежда, ВИЖДА колата с предимство — и въпреки това влиза пред нея.",
       },
       { kind: "glance", mirror: "rear" },
-      { kind: "drive", points: [[0, -115], [0, -113], [LANE, -100], [LANE, -42]], targetKmh: 24 },
+      { kind: "drive", points: [[LANE, -115], [LANE, -42]], targetKmh: 24 },
       // Mouth 1 clean: a proper rolling scan (so the ONLY graded fault is at
       // mouth 2 — the demo isolates the yield failure).
       { kind: "glance", mirror: "left" },
@@ -158,7 +158,7 @@ export function scJxGivewayB1MistakeNoScanScript(): DriveScript {
         textBg: "Грешка: влиза през първия Б1, без да се огледа наляво-надясно. Не спираш винаги — но ОГЛЕЖДАШ винаги.",
       },
       { kind: "glance", mirror: "rear" },
-      { kind: "drive", points: [[0, -115], [0, -113], [LANE, -100], [LANE, -42]], targetKmh: 22 },
+      { kind: "drive", points: [[LANE, -115], [LANE, -42]], targetKmh: 22 },
       { kind: "annotation", textBg: "Минава през кръстовището, без нито един поглед към пътя с предимство." },
       // Roll through the mouth-1 Б1 line (y = −27.725) with NO left/right glance
       // → JUNCTION_SCAN_INCOMPLETE. No full stop, so no full-stop demand fires.

@@ -17,6 +17,21 @@ import { parseObjectiveParams } from "../objectives";
 import { LESSONS, lessonById } from "../specs";
 import type { LessonSessionState } from "../types";
 import { makeTick, tickWithEvents } from "./fixtures";
+import { readFileSync, existsSync } from "node:fs";
+import { join } from "node:path";
+import { SCENARIO_TEMPLATES } from "../scenario/templates";
+import { compileScenario } from "../scenario/compile";
+
+/** district/spawn-id -> pose, read from the committed world files (the same
+ *  resolution LessonScene.spawnPose performs at runtime). */
+const SCENARIO_SPAWNS = new Map<string, { x: number; y: number }>();
+for (const spec of SCENARIO_TEMPLATES) {
+  const f = join(process.cwd(), "..", "content", "world", `${spec.map.districtId}.json`);
+  if (!existsSync(f)) continue;
+  const d = JSON.parse(readFileSync(f, "utf8")) as { spawnPoints?: Array<{ id: string; x: number; y: number }> };
+  for (const sp of d.spawnPoints ?? []) SCENARIO_SPAWNS.set(`${spec.map.districtId}/${sp.id}`, { x: sp.x, y: sp.y });
+}
+
 
 // ---------------------------------------------------------------------------
 // Shipped-spec invariants
@@ -130,7 +145,11 @@ describe("stimulus-locked emergency stop through the engine (A10)", () => {
   it("a failed outcome (hitLeadCar) keeps the objective open and cites the failure", () => {
     let s = createLessonSession(stopLesson);
     s = applyStagedOutcome(s, leadOutcome({ success: false, detail: "hitLeadCar", stopGapM: 0 }));
-    s = applyTick(s, makeTick({ t: 10, speedKmh: 0 })).state;
+    // A position, not the fixture's (0, 0) default: since doc 87 B3/B10/B11 a
+    // standstill at exactly the district origin is the SCENE'S PLACEHOLDER
+    // pose and the chain does not advance on it (engine.ts posedAtSec). Every
+    // real drill spawns somewhere; so does this one.
+    s = applyTick(s, makeTick({ t: 10, speedKmh: 0, position: { x: 0, y: -40 } })).state;
     expect(s.phase).toBe("driving");
     expect(s.objectives[0].detail).toMatchObject({ kind: "emergencyStop", outcome: "hitLeadCar" });
 
@@ -301,5 +320,125 @@ describe("park attempts/alignment surface in progress and result (A10)", () => {
       inBay: true,
       alignment: "centered",
     });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// B3 / B10 / B11 (doc 87) — „it states 2 tasks and it is only 1 task"
+// ---------------------------------------------------------------------------
+
+describe("a conceded arrival needs an arrival to concede", () => {
+  /** A one-objective lesson whose halt gate sits `d` metres from the spawn. */
+  const haltGateLesson = (x: number, y: number, radiusM: number, maxSpeedKmh: number): LessonSpec => ({
+    id: "test-halt-gate",
+    order: 1000,
+    titleBg: "тест",
+    descriptionBg: "тест",
+    conceptIds: [],
+    spawn: { position: { x: 0, y: 0 }, headingDeg: 0 },
+    preDrive: false,
+    objectives: [
+      { id: "gate", titleBg: "спри тук", kind: "reachZone", params: { x, y, radiusM, maxSpeedKmh } },
+    ],
+  });
+
+  it("a halt gate the car is PARKED INSIDE at t = 0 does not tick itself off", () => {
+    // The shipped shape of the defect: sc-park-parallel-exit spawns 3.20 m
+    // from a 2.85 m gate capped at 5 km/h — inside the approach-grace capsule,
+    // at rest, on frame zero. Before the latch, „ЗАДАЧА 1/2" was already green
+    // before the student touched anything.
+    let s = createLessonSession(haltGateLesson(0, 3.2, 2.85, 5));
+    for (let t = 0; t < 5; t += 1) {
+      s = applyTick(s, makeTick({ t, position: { x: 0, y: 0 }, speedKmh: 0 })).state;
+    }
+    expect(s.objectives[0].status).toBe("active");
+    expect(s.phase).toBe("driving");
+  });
+
+  it("…and it still completes the moment the car actually gets there", () => {
+    let s = createLessonSession(haltGateLesson(0, 3.2, 2.85, 5));
+    s = applyTick(s, makeTick({ t: 0, position: { x: 0, y: 0 }, speedKmh: 0 })).state;
+    s = applyTick(s, makeTick({ t: 1, position: { x: 0, y: 1.5 }, speedKmh: 4 })).state;
+    s = applyTick(s, makeTick({ t: 2, position: { x: 0, y: 3.1 }, speedKmh: 3 })).state;
+    expect(s.objectives[0].status).toBe("done");
+  });
+
+  it("a real approach still gets the full B5 capsule — stopping SHORT of the mark counts", () => {
+    // The concession this latch must not break: 40 m out, driven in, stopped
+    // 4 m short of a halt mark. That is stopping there, done earlier.
+    let s = createLessonSession(haltGateLesson(0, 60, 6, 6));
+    s = applyTick(s, makeTick({ t: 0, position: { x: 0, y: 0 }, speedKmh: 30 })).state;
+    s = applyTick(s, makeTick({ t: 1, position: { x: 0, y: 30 }, speedKmh: 25 })).state;
+    s = applyTick(s, makeTick({ t: 2, position: { x: 0, y: 50 }, speedKmh: 12 })).state;
+    s = applyTick(s, makeTick({ t: 3, position: { x: 0, y: 54 }, speedKmh: 0 })).state;
+    expect(s.objectives[0].status).toBe("done");
+  });
+
+  it("no shipped scenario rung opens with its first objective already satisfied", () => {
+    // The census that found the two exit drills. Runs over the compiled
+    // catalog so a future template cannot re-introduce the phantom silently.
+    const offenders: string[] = [];
+    for (const spec of SCENARIO_TEMPLATES) {
+      for (const rung of spec.levels) {
+        const lesson = compileScenario(spec, rung.level);
+        const spawn = lesson.spawn.pointId
+          ? SCENARIO_SPAWNS.get(`${spec.map.districtId}/${lesson.spawn.pointId}`)
+          : lesson.spawn.position;
+        if (!spawn) continue;
+        let s = createLessonSession(lesson);
+        for (let t = 0; t < 4; t += 1) {
+          s = applyTick(
+            s,
+            makeTick({ t, position: { x: spawn.x, y: spawn.y }, speedKmh: 0, gear: 0 }),
+          ).state;
+        }
+        if (s.objectives[0].status === "done") {
+          offenders.push(`${spec.id}@L${rung.level}: first task completed at rest, at the spawn`);
+        }
+      }
+    }
+    expect(offenders, offenders.join("\n")).toEqual([]);
+  });
+});
+
+describe("the frame-zero placeholder pose grades nothing (doc 87 B3/B10/B11)", () => {
+  /** sc-park-perp-rev's shape: a halt gate one car length from the origin. */
+  const originGateLesson = (): LessonSpec => ({
+    id: "test-origin-gate",
+    order: 1000,
+    titleBg: "тест",
+    descriptionBg: "тест",
+    conceptIds: [],
+    spawn: { position: { x: 0, y: -105 }, headingDeg: 0 },
+    preDrive: false,
+    objectives: [
+      {
+        id: "pull-past",
+        titleBg: "спри до мястото",
+        kind: "reachZone",
+        params: { x: 0.9, y: 6, radiusM: 7.5, maxSpeedKmh: 6 },
+      },
+    ],
+  });
+
+  it("ticks at the district origin, at rest, do not complete the first task", () => {
+    // What the scene really sends: createVehicleSample() publishes {0, 0} and
+    // the loop ticks with it until the chassis writes its pose. Four shipped
+    // drills author their first waypoint inside that circle.
+    let s = createLessonSession(originGateLesson());
+    for (let t = 0; t < 6; t += 1) {
+      s = applyTick(s, makeTick({ t: t * 0.1, position: { x: 0, y: 0 }, speedKmh: 0 })).state;
+    }
+    expect(s.objectives[0].status).toBe("active");
+    expect(s.currentObjectiveIndex).toBe(0);
+  });
+
+  it("…and the chain runs normally from the moment the real pose arrives", () => {
+    let s = createLessonSession(originGateLesson());
+    s = applyTick(s, makeTick({ t: 0, position: { x: 0, y: 0 }, speedKmh: 0 })).state;
+    s = applyTick(s, makeTick({ t: 0.1, position: { x: 0, y: -105 }, speedKmh: 0 })).state;
+    expect(s.objectives[0].status).toBe("active");
+    s = applyTick(s, makeTick({ t: 10, position: { x: 0.9, y: 3 }, speedKmh: 5 })).state;
+    expect(s.objectives[0].status).toBe("done");
   });
 });

@@ -135,6 +135,82 @@ describe("the harness itself", () => {
       expect(route.budget.contentMin).toBeGreaterThan(0);
     }
   });
+
+  it("fails a route whose named interaction is below the fold on a scrolling page", () => {
+    // The gap this closes: `foldMustPass` also demands a document that does not
+    // scroll, so a long list (the sixteen-topic hub) could only ever have the
+    // whole fold check switched OFF — and with it off, the day that route's
+    // selector stopped matching anything, nothing failed. `foldItemsMustFit` is
+    // the half that always applies: the page may be longer than the phone, but
+    // the first card may not start below it.
+    const report = sample({});
+    report.results[0].budget = {
+      contentMin: 0.85,
+      foldMustPass: false,
+      foldItemsMustFit: true,
+      touchMustPass: false,
+    };
+    report.results[0].fold = {
+      pass: false,
+      documentOverflowPx: 1021,
+      items: [{ selector: "first:#main-content [data-topic-card]", found: 1, fits: false, overflowPx: 199 }],
+    };
+    const verdict = evaluate(report);
+    expect(verdict.pass).toBe(false);
+    expect(verdict.failures[0].reason).toMatch(/below the fold.*overflows by 199px/);
+  });
+
+  it("does not fail that route merely because the page is long", () => {
+    const report = sample({});
+    report.results[0].budget = {
+      contentMin: 0.85,
+      foldMustPass: false,
+      foldItemsMustFit: true,
+      touchMustPass: false,
+    };
+    report.results[0].fold = {
+      pass: false, // the document scrolls — sixteen topics, by design
+      documentOverflowPx: 1021,
+      items: [{ selector: "first:#main-content [data-topic-card]", found: 1, fits: true, overflowPx: 0 }],
+    };
+    expect(evaluate(report).pass).toBe(true);
+  });
+});
+
+/**
+ * THE TOUCH AUDIT HAS TO POINT AT THE BOX THAT RECEIVES THE TAP.
+ *
+ * The probe runs inside WebKit via page.evaluate, so it cannot be exercised from
+ * a node test environment — but the rule below is one a „simplify the loop" pass
+ * would delete without noticing, and deleting it puts four phantom 16x16
+ * violations back on every practice question, sorted above the real ones.
+ */
+describe("the touch audit", () => {
+  const PROBE = readFileSync(new URL("./lib/probe.mjs", import.meta.url), "utf8");
+
+  it("credits a wrapped form control with its label's hit box", () => {
+    // The practice runner draws a 16x16 <input> inside a `min-h-11` label that
+    // spans the whole option row; clicking anywhere in that label activates the
+    // input. That is the browser's behaviour, so it is the geometry the audit
+    // has to measure.
+    expect(PROBE).toContain('el.closest("label")');
+    expect(PROBE).toContain("wrappingLabel.control === el");
+  });
+
+  it("does not credit a control that a label merely contains", () => {
+    // `label.control === el` and not `label.contains(el)`: a small button that
+    // happens to sit inside a label is NOT activated by tapping the label, and
+    // has to keep failing.
+    expect(PROBE).not.toContain("wrappingLabel.contains(el)");
+  });
+
+  it("still honours the ::before hit-area trick it always did", () => {
+    // Two of the theory back-links are 15-16px of text and take their 44px from
+    // an absolutely-positioned pseudo-element with negative insets. That is a
+    // real hit box in a real browser, and the audit reads it.
+    expect(PROBE).toContain('for (const pseudo of ["::before", "::after"])');
+    expect(PROBE).toContain('ps.pointerEvents === "none"');
+  });
 });
 
 /**

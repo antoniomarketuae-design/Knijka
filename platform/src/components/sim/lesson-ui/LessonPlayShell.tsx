@@ -2132,7 +2132,13 @@ export function LessonPlayShell({
             ROOMY ONLY: on a phone this stack is the founder's „ЗАДАЧА" card
             plus the card under it — two of the three panels in his screenshot.
             Compact renders them through the queue above. */}
+        {/* `data-hud` because this stack shares the top rail with the chase
+            view's rear-view mirror (rows B74/B76). The mirror is a quad inside
+            the canvas and can never paint over a DOM card, so the card steps
+            below it instead — PlayAreaStyles owns that rule and this attribute
+            is the handle it needs. */}
         <div
+          data-hud="objective-stack"
           className={`absolute left-1/2 top-3 flex -translate-x-1/2 flex-col items-center gap-1.5 ${
             compact ? "hidden" : ""
           }`}

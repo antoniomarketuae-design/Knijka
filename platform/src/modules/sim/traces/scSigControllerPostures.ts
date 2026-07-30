@@ -47,9 +47,7 @@ const LANE = 4.0625;
 
 /** Stem approach shared by every drive: south spawn → right-lane cruise. */
 const APPROACH: Array<[number, number]> = [
-  [0, -105],
-  [0, -103],
-  [LANE, -92],
+  [LANE, -105],
   [LANE, -38],
 ];
 

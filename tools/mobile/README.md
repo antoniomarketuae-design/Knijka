@@ -48,7 +48,15 @@ his screen and said half of it was information.
 * **content mask** — the union of the route's declared content surfaces
   (`lib/routes.mjs`), clipped to the viewport. On a reading screen that is
   `#main-content`; on the driving screen it is the `<canvas>`, because there the
-  content is the road.
+  content is the road; on the practice runner it is the **question card**, not
+  the column around it.
+
+  That last one is the rule, not an exception: **a budget you can satisfy by
+  growing a `<div>` is not a budget.** `#main-content` is a wrapper, and the app
+  shell now lets a page stretch it to the bottom of the screen — so measuring it
+  on the runner would have turned "half the screen is empty" into a 92% pass
+  without one pixel changing for a student. Whenever `#main-content` stops being
+  the thing the student is looking at, the route names the thing.
 * **chrome mask** — the union of every *painting* element that is not the
   content, not one of its layout ancestors, and not behind it.
 
@@ -100,22 +108,51 @@ Reports the overflow in pixels and how far a containing scroller would have to
 move. This is the founder's "I have to scroll down to see all the answers … it
 all have to be on the screen without scrolling".
 
-Prefix a selector with `first:` to check only the first match — `first:#main-content article`
-asks "is the first topic card reachable without scrolling", which is the useful
-question on a long list; without the prefix the same selector asks whether *all
-sixteen* fit, which is true only of an empty page. Everything without the prefix
-is all-or-nothing on purpose: on the practice runner every answer must be on
-screen.
+Prefix a selector with `first:` to check only the first match —
+`first:#main-content [data-topic-card]` asks "is the first topic card reachable
+without scrolling", which is the useful question on a long list; without the
+prefix the same selector asks whether *all sixteen* fit, which is true only of an
+empty page. Everything without the prefix is all-or-nothing on purpose: on the
+practice runner every answer must be on screen.
 
-A `mustFit` selector that matches **nothing** fails the route unconditionally,
-even where `foldMustPass` is off. A check that silently measures nothing is the
-exact failure mode this harness exists to end — and it caught itself doing it:
-`label:has(input[type="radio"])` matched no element on multi-answer questions
-(they render checkboxes) and reported that as a non-answer.
+### The three ways a fold check can be a lie, and what stops each
+
+**It matches nothing.** A `mustFit` selector that matches zero elements fails the
+route unconditionally, even where `foldMustPass` is off. The harness caught
+itself doing this twice: `label:has(input[type="radio"])` matched nothing on
+multi-answer questions (they render checkboxes), and — for four months —
+`first:#main-content article` matched nothing on `/theory`, because the topic hub
+renders `<li><button>` and has never contained an `<article>`. Every mobile
+report in that window vouched for a screen it had not looked at.
+`tools/mobile/selectors.test.mjs` is the cheap second net: it runs in the
+ordinary vitest gate, with no browser and no server, and fails in the same commit
+that removes the markup handle a route depends on.
+
+**It is switched off because the page legitimately scrolls.** `foldMustPass`
+demands BOTH that the named elements fit and that the document does not scroll —
+which is the wrong demand on a sixteen-topic hub, so that route had the whole
+check off, and that is why the dead selector above went unnoticed.
+`foldItemsMustFit: true` is the half that always applies: the page may be longer
+than the phone, the *first topic card* may not start below it. On an iPhone 16 in
+landscape it was starting 199px below the fold — the founder's "only 20% visible
+to choose the topic", except it was 0%.
+
+**It measures against the wrong line.** The fold is the top of a pinned action
+bar, not the viewport edge: an answer painted under an opaque sticky strip is
+neither readable nor tappable. `src/components/mobileFold.test.ts` states this
+and the fold-rig measurements honour it.
 
 **Touch targets** — every visible, enabled interactive element in the viewport
-whose hit area is under 44×44 CSS px. Hit area honours the common
-absolutely-positioned `::before`/`::after` enlargement trick.
+whose hit area is under 44×44 CSS px. Two things are *not* violations, because
+neither is a box a thumb can miss:
+
+* a control wrapped by its own `<label>` inherits the label's hit box (the tick
+  box in a practice option is a real 16×16 `<input>` inside a `min-h-11` row, and
+  clicking anywhere in that row activates it — that is the browser's behaviour,
+  not a convention). The test is `label.control === el`, so a small button that
+  merely *sits* inside a label keeps failing;
+* the absolutely-positioned `::before`/`::after` enlargement trick, which is a
+  real hit box with real pointer events.
 
 **Safe areas** — elements within 8px of an unsafe edge. Note carefully:
 Playwright's WebKit is the *desktop* port, so `env(safe-area-inset-*)` resolves

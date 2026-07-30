@@ -74,16 +74,21 @@ function arcPts(cx: number, cy: number, r: number, a0: number, a1: number): Arra
 }
 
 // ---------------------------------------------------------------------------
-// sc-junction-rhr — tj-rhr-v1 (spawn (0, −105) heading north up the stem)
+// sc-junction-rhr — tj-rhr-v1 (spawn (4.06, −105) heading north up the stem)
 // ---------------------------------------------------------------------------
 
 export const SC_JUNCTION_RHR_ID = "sc-junction-rhr";
 
-/** Stem approach: spawn → right-lane cruise toward the junction. */
+/**
+ * Stem approach: spawn → cruise toward the junction, IN THE RIGHT LANE the
+ * whole way. It used to open `[0, −105] [0, −103] [LANE, −92]` — a 13 m merge
+ * out of the осева — because the district's spawn pose WAS the осева (doc 87
+ * T2). The pose is now the lane centre in content/world/tj-*.json, so the
+ * demonstrated-correct drive no longer begins by leaving a line no driver
+ * should have been on. Same geometry from y = −92 onward.
+ */
 const TJ_APPROACH: Array<[number, number]> = [
-  [0, -105],
-  [0, -103],
-  [LANE, -92],
+  [LANE, -105],
   [LANE, -34],
 ];
 
@@ -234,7 +239,7 @@ function scJunctionStopShadowScript(): DriveScript {
     steps: [
       { kind: "annotation", textBg: "Напред е път с предимство и знак Б2 „Спри!“ — тук се спира винаги." },
       { kind: "glance", mirror: "rear" },
-      { kind: "drive", points: [[0, -105], [0, -103], [LANE, -92], [LANE, -45]], targetKmh: 25 },
+      { kind: "drive", points: [[LANE, -105], [LANE, -45]], targetKmh: 25 },
       { kind: "annotation", textBg: "Десен мигач и плавно към стоп-линията." },
       { kind: "indicator", setting: "right" },
       {
@@ -272,7 +277,7 @@ function scJunctionStopMistakeRollingScript(): DriveScript {
     steps: [
       { kind: "annotation", textBg: "Грешката „почти спрях“: скоростта пада, но колелата не спират." },
       { kind: "glance", mirror: "rear" },
-      { kind: "drive", points: [[0, -105], [0, -103], [LANE, -92], [LANE, -45]], targetKmh: 25 },
+      { kind: "drive", points: [[LANE, -105], [LANE, -45]], targetKmh: 25 },
       { kind: "indicator", setting: "right" },
       { kind: "drive", points: [[LANE, -45], [LANE, -34]], targetKmh: 14 },
       {
@@ -307,7 +312,7 @@ function scJunctionStopMistakePastLineScript(): DriveScript {
     steps: [
       { kind: "annotation", textBg: "Грешката „спрях след линията“: спирачката идва твърде късно." },
       { kind: "glance", mirror: "rear" },
-      { kind: "drive", points: [[0, -105], [0, -103], [LANE, -92], [LANE, -45]], targetKmh: 25 },
+      { kind: "drive", points: [[LANE, -105], [LANE, -45]], targetKmh: 25 },
       {
         // Late braking: the smooth stop lands 3.2 m PAST the line — the
         // crossing itself happens at ~16 km/h, so the Б2 offence is already
@@ -342,7 +347,7 @@ function scSignalShadowScript(): DriveScript {
     steps: [
       { kind: "annotation", textBg: "Светофарът напред свети червено — решението за спиране се взима отрано." },
       { kind: "glance", mirror: "rear" },
-      { kind: "drive", points: [[0, -105], [0, -103], [LANE, -92], [LANE, -78]], targetKmh: 30 },
+      { kind: "drive", points: [[LANE, -105], [LANE, -78]], targetKmh: 30 },
       { kind: "annotation", textBg: "Плавно спиране: без резки движения, целим 1–2 метра преди линията." },
       {
         // 17 km/h from 78 m out: comfortably under the amberDilemma arm
@@ -392,7 +397,7 @@ function scSignalMistakeAmberScript(): DriveScript {
     steps: [
       { kind: "annotation", textBg: "Грешката „жълтото е още зелено“: газта остава натисната." },
       { kind: "glance", mirror: "rear" },
-      { kind: "drive", points: [[0, -105], [0, -103], [LANE, -92], [LANE, -86]], targetKmh: 28 },
+      { kind: "drive", points: [[LANE, -105], [LANE, -86]], targetKmh: 28 },
       {
         // Constant 22 km/h through the arm: the template's amberDilemma
         // runner arms at 60 m (≥ 21 km/h) and pins the green→yellow flip
@@ -420,7 +425,7 @@ function scSignalMistakeRedCreepScript(): DriveScript {
     steps: [
       { kind: "annotation", textBg: "Грешката „пропълзяване“: спирачката идва късно и колата спира върху линията." },
       { kind: "glance", mirror: "rear" },
-      { kind: "drive", points: [[0, -105], [0, -103], [LANE, -92], [LANE, -78]], targetKmh: 30 },
+      { kind: "drive", points: [[LANE, -105], [LANE, -78]], targetKmh: 30 },
       {
         // Late, lazy braking on the red: rest lands 0.78 m short of the
         // line — the nose (≈ 2.15 m overhang) hangs over it, on the
@@ -444,16 +449,14 @@ function scSignalMistakeRedCreepScript(): DriveScript {
 }
 
 // ---------------------------------------------------------------------------
-// sc-turn-left-oncoming — sx-v1 (spawn (105, 0) heading west; EW green
+// sc-turn-left-oncoming — sx-v1 (spawn (105, 4.06) heading west; EW green
 // pinned over the encounter window; two staged oncoming cars from the west)
 // ---------------------------------------------------------------------------
 
 export const SC_TURN_LEFT_ONCOMING_ID = "sc-turn-left-oncoming";
 
 const SX_EAST_APPROACH: Array<[number, number]> = [
-  [105, 0],
-  [103, 0],
-  [92, LANE],
+  [105, LANE],
   [52, LANE],
 ];
 
@@ -513,7 +516,7 @@ function scLtapMistakeCutScript(): DriveScript {
       { kind: "annotation", textBg: "Грешката „ще успея“: завой пред насрещен на секунда и половина." },
       { kind: "indicator", setting: "left" },
       { kind: "glance", mirror: "rear" },
-      { kind: "drive", points: [[105, 0], [103, 0], [92, LANE], [40, LANE]], targetKmh: 26 },
+      { kind: "drive", points: [[105, LANE], [40, LANE]], targetKmh: 26 },
       {
         // The cut: constant speed through the mouth and across the oncoming's
         // lane while it is ~1.4 s from the junction — the N1 tracker convicts

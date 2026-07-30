@@ -80,7 +80,7 @@ export const SC_PARK_PERP_REV: ScenarioSpec = {
   tagsBg: ["паркиране", "заден ход", "перпендикулярно", "изпитни упражнения"],
   titleBg: "Перпендикулярно паркиране на заден ход",
   objectiveBg:
-    "Паркирай на заден ход в свободното перпендикулярно място между паркирани коли — с оглеждане преди и по време на маневрата, точно в очертанията и с възможно най-малко корекции.",
+    "Две задачи, в този ред: първо спри в изходната позиция покрай свободното място — подминал го, на около метър и половина странично; после паркирай на заден ход точно в очертанията, с оглеждане преди и по време на маневрата и с възможно най-малко корекции.",
   // Doc-72 provenance: PK-02 IS this maneuver (перпендикулярно паркиране на
   // заден ход, supermarket-lot geometry, swing-out awareness).
   archetypeIds: ["PK-02"],
@@ -109,11 +109,15 @@ export const SC_PARK_PERP_REV: ScenarioSpec = {
     vehicleStart: "ready",
   },
   instructionsBg: [
-    { n: 1, textBg: "Влез в паркинга по алеята и карай бавно — не повече от 10 км/ч." },
+    {
+      n: 1,
+      textBg:
+        "Задачите са две и се броят поотделно: първо изходната позиция, после самото паркиране. Влез в паркинга по алеята и карай бавно — не повече от 10 км/ч.",
+    },
     {
       n: 2,
       textBg:
-        "Подмини свободното място и спри, когато задната броня подмине съседната кола — дръж около метър и половина странично разстояние от реда.",
+        "Задача 1: подмини свободното място и спри — под 6 км/ч, практически в покой — когато задната броня подмине съседната кола; дръж около метър и половина странично разстояние от реда. От тази позиция зависи целият замах.",
     },
     {
       n: 3,
@@ -128,22 +132,28 @@ export const SC_PARK_PERP_REV: ScenarioSpec = {
     {
       n: 5,
       textBg:
-        "Спри напълно вътре в очертанията — центрирано и успоредно на линиите — и задръж колата в покой.",
+        "Спри напълно вътре в очертанията — центрирано и успоредно на линиите — и задръж колата в покой. Ако е тъмно или вали, включи късите светлини преди маневрата.",
     },
   ],
   success: [
     {
       id: "sc-ppr-position",
-      titleBg: "Заеми изходна позиция покрай свободното място",
-      // The pull-past pose on the aisle just north of the target bay
-      // (lot-perp-v1: aisle centerline x = 0, bay row center y = 0): reaching
-      // it slowly is the setup the instructions teach. Coordinates pinned to
-      // content/world/lot-perp-v1.json like every lesson pins its district.
-      params: { kind: "reachZone", x: 0, y: 6, radiusM: 7, maxSpeedKmh: 15 },
+      titleBg: "Задача 1: спри в изходната позиция покрай свободното място",
+      // DOC 86 D11 / doc 87 B3+B10 — catalog position 1, the first parking
+      // lesson the founder ever played, and the one drill lane 15 had to leave
+      // carrying the phantom because templates.ts belonged to no lane. It was
+      // (0, 6) r 7 ≤ 15 km/h: a 14 m window a student SATISFIES BY DRIVING
+      // PAST IT at fourteen km/h, so the banner promised „ЗАДАЧА 1/2" and the
+      // student performed one act. Now it is what the instruction has always
+      // said it was — AT REST at the pull-past pose, on the same geometry its
+      // repaired sibling sc-park-narrow uses, pinned to the committed shadow
+      // (traces/scParkPerpRev: the ghost creeps to (0.9, 6.2) and swaps to
+      // reverse there, so ≤ 6 km/h inside 5 m is the demonstrated drive).
+      params: { kind: "reachZone", x: 0.9, y: 6, radiusM: 5, maxSpeedKmh: 6 },
     },
     {
       id: "sc-ppr-park",
-      titleBg: "Паркирай на заден ход в очертаното място и спри напълно",
+      titleBg: "Задача 2: паркирай на заден ход в очертаното място и спри напълно",
       // Bay-locked parkInBay (A10): at rest INSIDE the free bay, aligned,
       // via reverse, held 1.5 s. Tolerances are the evaluator defaults at
       // L3/L4; L1/L2 widen them via toleranceScale (compile).
@@ -223,8 +233,26 @@ export const SC_PARK_PERP_REV: ScenarioSpec = {
     },
     {
       level: 4,
-      // Изпитни условия: examMode (ladder), full cold-start protocol.
+      // Изпитни условия: examMode (ladder), full cold-start protocol — and a
+      // rubric that actually grades tighter (doc 86 D7): on the exam rung a
+      // second correction pull no longer buys two stars. „Изпитни условия"
+      // that only removes the aids was the founder's complaint, not the answer.
       vehicleStart: "cold",
+      rubric: { economy: { objectiveId: "sc-ppr-park", attemptsFor3Stars: 1, attemptsFor2Stars: 1 } },
+    },
+    // L5 „Усложнени" (doc 76 §7; founder A8/B2 „L5 is not working at all" —
+    // on THIS card there was no L5 tile to click at all, while every parking
+    // card beside it read L1–L5). The same bay at night in the rain: a
+    // condition delta, no new geometry, exactly the rung its repaired sibling
+    // sc-park-narrow ships. The lights duty is stated in the copy below
+    // (doc 86 L10: a rung may not bill HEADLIGHTS_OFF_AT_NIGHT / _IN_RAIN for
+    // a duty the lesson's own instructions never state), and the economy
+    // rubric tightens with the conditions — one clean entry at night, in the
+    // rain, on a wet lot, is the whole point of the rung.
+    {
+      level: 5,
+      conditions: { weather: "rain", night: true },
+      rubric: { economy: { objectiveId: "sc-ppr-park", attemptsFor3Stars: 1, attemptsFor2Stars: 1 } },
     },
   ],
   conditions: { weather: "dry" },

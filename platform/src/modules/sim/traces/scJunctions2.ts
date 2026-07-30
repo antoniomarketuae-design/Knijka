@@ -55,16 +55,14 @@ function arcPts(cx: number, cy: number, r: number, a0: number, a1: number): Arra
 }
 
 // ---------------------------------------------------------------------------
-// sc-junction-gap — tj-emerge-v1 (Б2 line at y = −27.725; spawn (0, −85))
+// sc-junction-gap — tj-emerge-v1 (Б2 line at y = −27.725; spawn (4.06, −85))
 // ---------------------------------------------------------------------------
 
 export const SC_JUNCTION_GAP_ID = "sc-junction-gap";
 
 /** Stem approach: spawn → right-lane cruise toward the Б2 line. */
 const GAP_APPROACH: Array<[number, number]> = [
-  [0, -85],
-  [0, -83],
-  [LANE, -75],
+  [LANE, -85],
   [LANE, -45],
 ];
 
@@ -196,7 +194,7 @@ function scJunctionGapMistakeCreepScript(): DriveScript {
 }
 
 // ---------------------------------------------------------------------------
-// sc-junction-blind — tj-occluded-v1 (uncontrolled; spawn (0, −115))
+// sc-junction-blind — tj-occluded-v1 (uncontrolled; spawn (4.06, −115))
 // mirrors sc-junction-rhr: the 18 m core dynamics are arm-independent.
 // ---------------------------------------------------------------------------
 
@@ -204,9 +202,7 @@ export const SC_JUNCTION_BLIND_ID = "sc-junction-blind";
 
 /** Stem approach: spawn → right-lane cruise toward the junction. */
 const BLIND_APPROACH: Array<[number, number]> = [
-  [0, -115],
-  [0, -113],
-  [LANE, -100],
+  [LANE, -115],
   [LANE, -34],
 ];
 

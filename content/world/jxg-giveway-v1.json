@@ -342,7 +342,7 @@
  "spawnPoints": [
   {
    "id": "jxg-spawn-south",
-   "x": 0,
+   "x": 4.06,
    "y": -115,
    "heading": 0,
    "edgeId": "jxg-e-s",
@@ -351,7 +351,7 @@
   {
    "id": "jxg-spawn-e2",
    "x": 105,
-   "y": 150,
+   "y": 154.06,
    "heading": 270,
    "edgeId": "jxg-e-e2",
    "name": "Булевард с предимство — подход от изток"

@@ -35,6 +35,7 @@
 import { mkdirSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { curbLaneOffsetM, toCurbLane } from "./lib/lane.mjs";
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 
@@ -223,24 +224,32 @@ export function buildParkingLotDistrict(params) {
   // finish-check reference point past the bay row on the aisle.
   const spawnApproachCanon = [0, aisleSouthY - approachM + 15];
   const finishCanon = [0, rowSpanM / 2 + 12];
-  const SPAWN_POINTS = [
-    {
-      id: "lot-spawn-approach",
-      x: rot(spawnApproachCanon)[0],
-      y: rot(spawnApproachCanon)[1],
-      heading: rotHeading(0),
-      edgeId: "lot-e-approach",
-      name: "Подход към паркинга",
-    },
-    {
-      id: "lot-spawn-finish",
-      x: rot(finishCanon)[0],
-      y: rot(finishCanon)[1],
-      heading: rotHeading(0),
-      edgeId: "lot-e-aisle",
-      name: "Контролна точка — след маневрата",
-    },
-  ];
+  // doc 87 T2 — a spawn pose belongs in the CURB LANE of the edge it faces
+  // along, not on its centreline: the old convention handed the student a car
+  // already straddling the осева and the rule engine convicted him of
+  // «Настъпване на осевата линия» seconds later, for a pose he never chose.
+  // toCurbLane() leaves a deliberately off-centre pose exactly where it is.
+  const SPAWN_POINTS = toCurbLane(
+    [
+      {
+        id: "lot-spawn-approach",
+        x: rot(spawnApproachCanon)[0],
+        y: rot(spawnApproachCanon)[1],
+        heading: rotHeading(0),
+        edgeId: "lot-e-approach",
+        name: "Подход към паркинга",
+      },
+      {
+        id: "lot-spawn-finish",
+        x: rot(finishCanon)[0],
+        y: rot(finishCanon)[1],
+        heading: rotHeading(0),
+        edgeId: "lot-e-aisle",
+        name: "Контролна точка — след маневрата",
+      },
+    ],
+    EDGES,
+  );
 
   // -- One attendant kiosk west of the approach mouth (visual anchor, clear of
   // the carriageway + sidewalk: |x| > halfRoad + ~4 m sidewalk).
@@ -395,7 +404,10 @@ export function buildParkingLotDistrict(params) {
   for (const s of SPAWN_POINTS) {
     const host = EDGES.find((e) => e.id === s.edgeId);
     if (!host) post.push(`${s.id}: unknown edgeId ${s.edgeId}`);
-    else if (distToEdge(host, s.x, s.y) > 1) post.push(`${s.id}: not on its edge`);
+    // doc 87 T2: "on its edge" used to mean "within a metre of its CENTRELINE",
+    // i.e. the invariant enforced the defect it was supposed to catch.
+    else if (Math.abs(distToEdge(host, s.x, s.y) - curbLaneOffsetM(host.lanes, host.oneway)) > 1)
+      post.push(`${s.id}: not in its edge's curb lane`);
   }
   // Every bay rect must hug the AISLE (its center within a drawn half-width +
   // depth of the aisle line) and never cross the centerline.

@@ -244,6 +244,35 @@ describe("sp-creep2-v1 — the P5 long creep road (doc 62 #30)", () => {
     expect(world.stats.markingQuads).toBeGreaterThan(bare.stats.markingQuads);
   });
 
+  it("RESTATES the 30 through the zone, so the graded tail is not signed by paint alone", () => {
+    // Founder item 31, measured: the зона-30 carried posts at y=406 and y=450
+    // and then nothing for 230 m, of which the last 190 m are graded. What was
+    // still telling him the number over that stretch was the tarmac glyph —
+    // „just written with numbers on the road 30 which is not existing in the
+    // world almost anywhere". props.ts now repeats В26 at the same pitch
+    // markings paints the glyph, so post and paint say it together.
+    const world = buildWorldGeometry(assertDistrict(loadRaw(CREEP2)), { seed: 7 });
+    const northbound = world.signs
+      .filter((s) => s.kind === "limit30" && s.position[0] > 0)
+      .map((s) => -s.position[2])
+      .sort((a, b) => a - b);
+    // Every plate really is inside the зона-30 span (400 → 680).
+    expect(northbound.every((y) => y > CREEP2_TRANSITION_Y && y < 680)).toBe(true);
+    // The longest unsigned run a northbound student drives inside the graded
+    // zone, from the transition to the graded finish at y = 650.
+    const stations = [CREEP2_TRANSITION_Y, ...northbound, 650];
+    let worstGap = 0;
+    for (let i = 1; i < stations.length; i++) {
+      worstGap = Math.max(worstGap, stations[i]! - stations[i - 1]!);
+    }
+    expect(worstGap).toBeLessThanOrEqual(120);
+    // …and the repeats still state the number the reducer grades, never a
+    // rounded or inherited one (the T4 rule, kept by construction).
+    for (const s of world.signs.filter((x) => x.kind === "limit30")) {
+      expect(s.speedKmh).toBe(30);
+    }
+  });
+
   it("the published copy is byte-identical to the content source", () => {
     const srcCandidates = [
       path.join(process.cwd(), "content", "world", `${CREEP2}.json`),

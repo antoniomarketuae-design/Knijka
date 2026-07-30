@@ -10,7 +10,7 @@
  *   target bay lot-bay-3 center (5.03, 0), axis east-west (headingDeg 90);
  *   BOTH direct neighbors occupied (bay-2/4 at y = ∓2.5 — car flanks at
  *   |y| = 1.6, i.e. 0.75 m clearance for the 1.7 m hero at rest);
- *   spawn lot-spawn-approach (0, −105) heading north.
+ *   spawn lot-spawn-approach (4.06, −105) heading north.
  *
  * The teaching point vs the P0 lot: the SAME full-lock swing that clears a
  * 2.7 m row (arc radius 4) CLIPS a 2.5 m row — the corridor is 0.2 m tighter
@@ -56,9 +56,7 @@ function reverseArc(startX: number, startY: number, r: number): Array<[number, n
 
 /** Approach: spawn → right-lane cruise up the approach road. */
 const APPROACH: Array<[number, number]> = [
-  [0, -105],
-  [0, -103],
-  [X_LANE, -92],
+  [X_LANE, -105],
   [X_LANE, -24],
 ];
 

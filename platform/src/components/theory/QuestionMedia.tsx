@@ -173,7 +173,18 @@ export function useArtworkBudget(
     if (!enabled) return;
     const el = ref.current;
     if (!el) return;
-    if (window.matchMedia("(min-width: 640px)").matches) return;
+    // A LANDSCAPE PHONE IS NOT A DESKTOP, AND THIS LINE SAID IT WAS.
+    // `(min-width: 640px)` alone switched the budget OFF on an iPhone 16 held
+    // sideways (852 x 393), so the artwork was drawn at the full 150px cap on
+    // the shortest screen the product has. Measured on the fold rig, WebKit,
+    // landscape: the six heaviest artwork questions pushed their answer options
+    // 92–304px below the bottom of the glass, with the budget that exists to
+    // prevent exactly that sitting disabled. Both dimensions, so the guard now
+    // means what it always meant — „there is room" — instead of „it is wide".
+    // Same pair of conditions as the `wide-tall:` variant in globals.css.
+    if (window.matchMedia("(min-width: 640px) and (min-height: 521px)").matches) {
+      return;
+    }
 
     const measure = (): void => {
       const vh = window.visualViewport?.height ?? window.innerHeight;
@@ -268,7 +279,7 @@ export function QuestionArtwork({
            rig can read it out of the DOM instead of inferring it from a box
            height — see src/app/dev/fold-rig. */
         data-artwork-px={heightPx}
-        className="relative block w-full rounded-xl text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent sm:hidden"
+        className="relative block w-full rounded-xl text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent wide-tall:hidden"
       >
         {asStrip ? (
           <span className="flex h-11 items-center gap-2 rounded-xl border border-border bg-surface-2/40 px-3 text-xs font-bold text-muted">
@@ -291,8 +302,10 @@ export function QuestionArtwork({
         )}
       </button>
 
-      {/* From `sm` up: exactly the block this component replaced. */}
-      <div className="hidden sm:block">
+      {/* From `sm` up AND with vertical room: exactly the block this
+          component replaced.  and not  — a landscape phone is
+          852px WIDE and 393px tall, and it was taking the uncapped picture. */}
+      <div className="hidden wide-tall:block">
         <QuestionMediaView media={media} />
       </div>
 
@@ -305,7 +318,7 @@ export function QuestionArtwork({
              version let the question text and four option rows read straight
              through the diagram — on the one screen whose entire job is to
              show the diagram clearly. */
-          className="fixed inset-0 z-50 flex flex-col justify-center bg-background p-4 sm:hidden"
+          className="fixed inset-0 z-50 flex flex-col justify-center bg-background p-4 wide-tall:hidden"
         >
           <QuestionMediaView media={media} />
           <button

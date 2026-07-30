@@ -415,7 +415,16 @@ describe("hz-roadworks-v1 — the closure adjudicated through the real reducer",
     // The cones supply the COLLISION; the line supplies this. Proving it here
     // — with no obstacle rects in play at all — is what makes the trace gate's
     // two-code assert honest rather than a coincidence of the demo's pacing.
-    const events = drive(() => ({ x: -0.25, kmh: 28 }), WORKS_FROM_Y + 2, WORKS_TO_Y - 2);
+    //
+    // He arrives in the OPEN lane and then threads the line: POOR_LANE_KEEPING
+    // grades a departure, and doc 87 B23's spawn-pose latch will not convict a
+    // car that was placed on the paint (which is also what a real drive does —
+    // nobody teleports onto a lane boundary).
+    const events = drive(
+      (y) => ({ x: y < WORKS_FROM_Y ? X_OPEN : -0.25, kmh: 28 }),
+      WORKS_FROM_Y - 20,
+      WORKS_TO_Y - 2,
+    );
     expect(violations(events)).toContain("POOR_LANE_KEEPING");
     // A one-way street can never grade the two-way center-line codes.
     expect(violations(events)).not.toContain("CENTER_LINE_TOUCHED");

@@ -103,7 +103,10 @@ export default async function PracticePage({ searchParams }: PracticePageProps) 
       : "Двигателят подбра преговорите на падеж и най-слабите ти места.";
 
   return (
-    <div className="flex flex-col gap-2 sm:gap-8">
+    // `flex-1`: the runner claims the screen. See the layout's <main> note —
+    // this column used to stop wherever the card stopped and leave 37.7% of an
+    // iPhone as dead backdrop under it.
+    <div className="flex flex-1 flex-col gap-2 short:gap-0 sm:gap-8">
       {/* MOBILE HEADER (founder review, 393x852): the aurora band is 181px of
           title and blurb — 21% of a phone screen — repeated above all ten
           questions of a session, and it was the single biggest reason the
@@ -118,8 +121,35 @@ export default async function PracticePage({ searchParams }: PracticePageProps) 
           re-stating the topic the student picked one tap ago. `text-sm` keeps
           it readable and truthful at 28px. Everything gained here goes to the
           option list, which is what the founder is scrolling. */}
-      <header className="flex items-baseline gap-2 sm:hidden">
-        <Link href="/theory" className="shrink-0 text-xs font-bold text-accent">
+      {/* AND `narrow-tall:` — THE PHONE HELD SIDEWAYS.
+          This swap was keyed to WIDTH alone, so a landscape iPhone (852 x 393)
+          got the DESKTOP band: measured in WebKit, the aurora header filled the
+          whole 393px screen on its own and the question card began below the
+          bottom edge — 520px of scroll, not one answer option on the screen.
+
+          A landscape phone gets NEITHER header. It is the one viewport where
+          the app topbar (12.2% of it) plus a 28px title row leaves the question
+          card under the founder's 85%, and both of the things in this row are
+          already answered elsewhere on that screen: the card names itself
+          („Въпрос N от M") and the way back is a 44px „← Теми" in the action
+          bar, where a thumb already is. The title is re-stating the topic the
+          student picked one tap ago — the same argument that shrank it to a
+          label on a portrait phone, applied to a screen with 393px of height.
+
+          Written as ONE variant, `narrow-tall:` — one media query with both
+          conditions in it — rather than as an override race between `sm:` and
+          `short:`. globals.css says why that distinction is not pedantry, and
+          what the obvious spelling of it did instead. */}
+      <header className="hidden items-baseline gap-2 narrow-tall:flex">
+        <Link
+          href="/theory"
+          // 43.7 x 16 measured. The pseudo-element is a REAL hit box —
+          // absolutely positioned, pointer-events on — so the link answers a
+          // 44px thumb without the header row growing 28px to say so. The probe
+          // honours the same trick (tools/mobile/lib/probe.mjs) because the
+          // browser does.
+          className="relative shrink-0 text-xs font-bold text-accent before:absolute before:-inset-x-2 before:-inset-y-3.5 before:content-['']"
+        >
           ← Теми
         </Link>
         <h1 className="min-w-0 truncate font-display text-sm font-black tracking-tight">
@@ -127,9 +157,15 @@ export default async function PracticePage({ searchParams }: PracticePageProps) 
         </h1>
       </header>
 
-      <div className="hidden sm:block">
+      {/* Wide AND tall. See the note above: a landscape phone is wide, and this
+          band on its own is more than the whole screen it has to fit in. */}
+      <div className="hidden wide-tall:block">
         <AuroraHeader intensity="soft">
-          <Link href="/theory" className="text-xs font-bold text-accent hover:underline">
+          <Link
+            href="/theory"
+            // 93.4 x 15 measured. Same real hit box as the phone line above.
+            className="relative text-xs font-bold text-accent before:absolute before:-inset-x-2 before:-inset-y-3.5 before:content-[''] hover:underline"
+          >
             ← Всички теми
           </Link>
           <h1 className="mt-3 font-display text-2xl font-black tracking-tight sm:text-3xl">

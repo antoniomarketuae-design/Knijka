@@ -187,6 +187,20 @@ export interface RuleEngineState {
    * Cleared only on physical departure from the line window.
    */
   stopOvershootGreenSeen: boolean;
+  /**
+   * SPAWN-POSE LATCH (doc 87 B23/B26/B33). False until the vehicle has been
+   * observed INSIDE its own lane at least once this session. A student cannot
+   * be convicted of moving onto a line he was placed on: four of four
+   * straight-line drives in the founder review ended in a graded
+   * «Настъпване на осевата линия» pause because the compiled spawn puts the car
+   * astride the dashed осева (tj-*-v1 spawnPoints author x = 0, the road
+   * CENTRELINE, while the lane centre is 4.06 m off it) and the driver simply
+   * drove forward, straight, at the speed the objective taught. Once he has
+   * once been where the lesson meant him to be, the positional detectors grade
+   * exactly as shipped — this latch removes only the frame-zero falsehood, and
+   * it disarms itself the moment a lane fixes its spawn data.
+   */
+  inLaneSeen: boolean;
   /** Sustained ride on the осева линия toward oncoming (SN-03). */
   centerLine: EpisodeState;
   /** Stationary at a green light with a clear box (JU-09). */
@@ -310,6 +324,7 @@ export function createRuleEngine(config?: Partial<RuleEngineConfig>): RuleEngine
     stall: { ...IDLE_EPISODE },
     stopOvershoot: { ...IDLE_EPISODE },
     stopOvershootGreenSeen: false,
+    inLaneSeen: false,
     centerLine: { ...IDLE_EPISODE },
     hesitation: { ...IDLE_EPISODE },
     harshBrake: { activeSince: null, emitted: false, onsetKmh: 0, causeSeen: false },
@@ -913,6 +928,18 @@ export function reduceTick(prev: RuleEngineState, tick: SimTick): ReduceResult {
   const centreLinePainted = tick.centreLinePainted !== false;
   const laneLinesPainted = tick.laneLinesPainted !== false;
 
+  // SPAWN-POSE LATCH (doc 87 B23/B26/B33 — the four-of-four false pause).
+  // The two positional codes below grade a DEPARTURE from the lane. A car the
+  // lesson placed astride the осева never departed from anything: it was put
+  // there, and driving straight ahead at the taught speed is the only thing the
+  // student did. So they arm from the first frame he is actually inside his
+  // lane, and until then this piece of road is ungraded. Everything else about
+  // the drive still grades — speed, signals, priority, the crossing chain —
+  // and the moment the compiled spawn moves to the lane centre (the data half
+  // of the same defect, another lane's file) the latch is satisfied on frame 0
+  // and these detectors are byte-identical to shipped.
+  if (Math.abs(tick.laneOffsetM) <= cfg.laneKeepMaxOffsetM) s.inLaneSeen = true;
+
   // Center-line touch (SN-03/OV-04 — „настъпване на осева линия"): sustained
   // ride on/over the center line toward ONCOMING traffic. Armed only on
   // POSITIVE evidence: the world PAINTS an осева here, the runtime says the
@@ -924,6 +951,7 @@ export function reduceTick(prev: RuleEngineState, tick: SimTick): ReduceResult {
   // double-billing.
   const centerLineCond =
     centreLinePainted &&
+    s.inLaneSeen &&
     tick.oneway === false &&
     tick.laneId === (tick.laneCount ?? 1) - 1 &&
     tick.laneOffsetM > cfg.laneKeepMaxOffsetM &&
@@ -954,6 +982,7 @@ export function reduceTick(prev: RuleEngineState, tick: SimTick): ReduceResult {
     stepEpisode(
       s.laneKeeping,
       laneLinesPainted &&
+        s.inLaneSeen &&
         offCentre &&
         moving &&
         forwardGear &&

@@ -37,6 +37,7 @@
 import { mkdirSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { curbLaneOffsetM, toCurbLane } from "./lib/lane.mjs";
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 
@@ -155,32 +156,40 @@ export function buildJunction2District(params) {
 
   // Spawns: 15 m inside each arm end (the gen_t_junction convention — on the
   // road centerline of the host edge, facing the junction).
-  const SPAWN_POINTS = [
-    {
-      id: "tj-spawn-south",
-      x: 0,
-      y: r2(-(minorArmM - 15)),
-      heading: 0,
-      edgeId: "tj-e-s",
-      name: "Странична улица — подход към кръстовището",
-    },
-    {
-      id: "tj-spawn-east",
-      x: r2(priorityArmM - 15),
-      y: 0,
-      heading: 270,
-      edgeId: "tj-e-e",
-      name: "Главна улица — подход от изток",
-    },
-    {
-      id: "tj-spawn-west",
-      x: r2(-(priorityArmM - 15)),
-      y: 0,
-      heading: 90,
-      edgeId: "tj-e-w",
-      name: "Главна улица — подход от запад",
-    },
-  ];
+  // doc 87 T2 — a spawn pose belongs in the CURB LANE of the edge it faces
+  // along, not on its centreline: the old convention handed the student a car
+  // already straddling the осева and the rule engine convicted him of
+  // «Настъпване на осевата линия» seconds later, for a pose he never chose.
+  // toCurbLane() leaves a deliberately off-centre pose exactly where it is.
+  const SPAWN_POINTS = toCurbLane(
+    [
+      {
+        id: "tj-spawn-south",
+        x: 0,
+        y: r2(-(minorArmM - 15)),
+        heading: 0,
+        edgeId: "tj-e-s",
+        name: "Странична улица — подход към кръстовището",
+      },
+      {
+        id: "tj-spawn-east",
+        x: r2(priorityArmM - 15),
+        y: 0,
+        heading: 270,
+        edgeId: "tj-e-e",
+        name: "Главна улица — подход от изток",
+      },
+      {
+        id: "tj-spawn-west",
+        x: r2(-(priorityArmM - 15)),
+        y: 0,
+        heading: 90,
+        edgeId: "tj-e-w",
+        name: "Главна улица — подход от запад",
+      },
+    ],
+    EDGES,
+  );
 
   // -- Bounds + stats.
   const bounds = { minX: Infinity, minY: Infinity, maxX: -Infinity, maxY: -Infinity };
@@ -300,7 +309,10 @@ export function buildJunction2District(params) {
   for (const s of SPAWN_POINTS) {
     const host = EDGES.find((e) => e.id === s.edgeId);
     if (!host) post.push(`${s.id}: unknown edgeId ${s.edgeId}`);
-    else if (distToEdge(host, s.x, s.y) > 1) post.push(`${s.id}: not on its edge`);
+    // doc 87 T2: "on its edge" used to mean "within a metre of its CENTRELINE",
+    // i.e. the invariant enforced the defect it was supposed to catch.
+    else if (Math.abs(distToEdge(host, s.x, s.y) - curbLaneOffsetM(host.lanes, host.oneway)) > 1)
+      post.push(`${s.id}: not in its edge's curb lane`);
   }
   // Control derivation preconditions (mirrors runtime/stoplines.ts ranks).
   const RANK = { primary: 5, secondary: 4, tertiary: 3, unclassified: 2, residential: 2, service: 1 };

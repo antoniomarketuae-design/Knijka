@@ -55,7 +55,7 @@
  *
  * Geometry pinned to content/world/sx-v1.json: ns right lane x = 4.06, south
  * stop line y = −27.73, junction node sx-n-c at the origin, mouths at ±27.7 m,
- * spawn sx-spawn-south (0, −105) heading north, ns limit 50, north arm to
+ * spawn sx-spawn-south (4.06, −105) heading north, ns limit 50, north arm to
  * y = 90. The standstill detector reads the RECORDER's leadGapM (bumper gap =
  * 16 − playerY − 4.1 m), so the hold rests at y = −29.5 (~41.4 m — inside the
  * 48 m flag, far outside the 1.5 m floor) and the kiss at y = 10.8 (~1.1 m).
@@ -105,7 +105,7 @@ export function scJxBlockedExitShadowScript(): DriveScript {
       // and the column beyond the far mouth is already standing at y = 16.
       {
         kind: "drive",
-        points: [[0, -105], [0, -103], [X_LANE, -92], [X_LANE, -50], [X_LANE, Y_HOLD]],
+        points: [[X_LANE, -105], [X_LANE, -50], [X_LANE, Y_HOLD]],
         targetKmh: 28,
       },
       {
@@ -158,7 +158,7 @@ export function scJxBlockedExitMistakeEnterFullBoxScript(): DriveScript {
       // 19.8 km/h, lawfully GREEN (the entry is innocent; the exit is not).
       {
         kind: "drive",
-        points: [[0, -105], [0, -103], [X_LANE, -92], [X_LANE, -50], [X_LANE, -30]],
+        points: [[X_LANE, -105], [X_LANE, -50], [X_LANE, -30]],
         targetKmh: 26,
         stopAtEnd: false,
       },
@@ -200,7 +200,7 @@ export function scJxBlockedExitMistakeImpatientRedScript(): DriveScript {
         textBg: "Грешката: изчакването беше правилно — но тръгването стана по колоната, не по светофара.",
       },
       { kind: "glance", mirror: "rear" },
-      { kind: "drive", points: [[0, -105], [0, -103], [X_LANE, -92], [X_LANE, -50], [X_LANE, Y_HOLD]], targetKmh: 28 },
+      { kind: "drive", points: [[X_LANE, -105], [X_LANE, -50], [X_LANE, Y_HOLD]], targetKmh: 28 },
       {
         kind: "annotation",
         textBg: "Дотук всичко е наред: цяло зелено е изтърпяно пред зает изход.",

@@ -1117,7 +1117,7 @@ export function createWorldRuntime(districtJson: District | unknown): DistrictWo
         JUNCTION_AREA_RADIUS_M,
       );
       const beforeTurns = events.length;
-      turns.update(tSec, v.headingDeg, nearestIx !== null, events);
+      turns.update(tSec, v.headingDeg, nearestIx !== null, events, v.speedKmh);
       // Left-turn commit this frame? Adjudicated by the N1 tracker below
       // (after the braking-response band is known — see 4a').
       let leftTurnCommitted = false;

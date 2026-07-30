@@ -132,6 +132,39 @@ const NO_ENTRY_ALONG_M = 1.4;
 const NO_ENTRY_LATERAL_M = 0.8;
 
 /**
+ * How far back along an approaching arm the driver who must READ a mouth sign
+ * is standing when he commits to the turn.
+ *
+ * Doc 86 / founder item 47, measured on ov-oneway-v1: В1 and Д4 both stand ON
+ * the one-way cross street, so their faces point along it — 70.8° and 85.9° off
+ * the line of sight of the student coming up the stem. At that angle a 0.9 m
+ * plate projects to 0.29 m and 0.06 m: he sees a hairline post and nothing
+ * else, which is exactly what he reported („no sign post of ANY kind"). Real
+ * mouth signs are TOED IN toward the traffic that has to obey them; that is the
+ * whole reason they are mounted on a swivel bracket. This is where „the traffic
+ * that has to obey them" is assumed to be — one junction sight-distance back on
+ * every OTHER arm that can turn into the mouth.
+ */
+const MOUTH_SIGN_READER_BACK_M = 35;
+/**
+ * …and the face is never swung more than this off the arm's own axis, so the
+ * driver who IS entering the arm (the one the sign legally addresses) keeps a
+ * square read. The bisector geometry lands around 33-38° on a right-angle T,
+ * comfortably inside it.
+ */
+const MOUTH_SIGN_MAX_TOE_IN_DEG = 55;
+
+/**
+ * Г2/Г3 stand on the approach they instruct, a little further back than the
+ * priority posts so the manoeuvre is read BEFORE the mouth rather than at it.
+ */
+const MANDATORY_DIR_ALONG_M = 1.4;
+const MANDATORY_DIR_LATERAL_M = 0.8;
+/** Below this |turn| the forced movement is „straight ahead" — Г1, which the
+ *  kit has no face for. Place nothing rather than sign the wrong manoeuvre. */
+const MANDATORY_DIR_MIN_TURN_DEG = 40;
+
+/**
  * Б3 „Път с предимство" (жълт ромб) stands on the arm that HAS priority, at
  * the same station the yielding arms carry their Б1/Б2 — the pairing a driver
  * reads as one junction. Only ever placed where junctionPriorityControls
@@ -141,6 +174,11 @@ const NO_ENTRY_LATERAL_M = 0.8;
  */
 const PRIORITY_DIAMOND_ALONG_M = 1.4;
 const PRIORITY_DIAMOND_LATERAL_M = 0.8;
+
+/** A pedestrian head stands just off the kerb line, at the crossing's own
+ *  station — close enough that the walker under it is unmistakably the walker
+ *  it governs. */
+const PED_SIGNAL_LATERAL_M = 0.7;
 
 /**
  * A18 „Пешеходна пътека" warns the driver BEFORE the zebra, never at it.
@@ -168,6 +206,24 @@ const ENTRY_POST_END_CLEAR_M = 25;
 /** How far ahead of a spawn its context plate goes, when nothing else on that
  *  edge already states the limit ahead of him. */
 const SPAWN_CONTEXT_AHEAD_M = 30;
+
+/** В26 restate cadence through a long limited stretch — the same discipline
+ *  zoneSigns applies to В24, at the pitch markings.ts paints the road glyph, so
+ *  post and paint say the number together instead of the paint saying it alone. */
+const LIMIT_REPEAT_M = 120;
+/** …but never inside this of the segment end: a plate at the mouth reads as the
+ *  NEXT road's limit, which is the exact lie the numeral rules exist to stop. */
+const LIMIT_REPEAT_END_CLEAR_M = 40;
+/**
+ * …and ONLY on a reduced-speed stretch. This is deliberately the same threshold
+ * markings.ts paints its tarmac numeral at (SPEED_GLYPH_MAX_KMH), because the
+ * complaint being answered is precisely „30 is written on the road and nowhere
+ * else": wherever the paint states the limit alone, a post now states it too.
+ * Above it, repeating would be wrong signing rather than missing signing — a
+ * 140 motorway is signed at its entry and after its junctions, and studding a
+ * kilometre of it with plates every 120 m teaches a street that does not exist.
+ */
+const LIMIT_REPEAT_MAX_KMH = 30;
 
 /** A В26 at a mid-route limit change stands just past the transition node, so
  *  the first metre it governs is the first metre it is visible on. */
@@ -199,6 +255,60 @@ const MIN_POST_SEPARATION_M = 0.75;
 function speedPlate(kmh: number | undefined): { kind: SignKind; speedKmh: number } | null {
   const kind = speedLimitSignKind(kmh);
   return kind === null ? null : { kind, speedKmh: kmh as number };
+}
+
+/**
+ * Swing a MOUTH sign's face from the direction it legally addresses (`base` —
+ * back along the arm it governs) toward the drivers who can actually turn into
+ * that mouth, capped at MOUTH_SIGN_MAX_TOE_IN_DEG.
+ *
+ * Deterministic and geometry-only: the "readers" are the other incoming arms'
+ * own centrelines, MOUTH_SIGN_READER_BACK_M back from the node — no RNG, no
+ * authored hint. With no other incoming arm (a bare stub) the base facing is
+ * returned unchanged, so nothing about a non-junction placement moves.
+ */
+function toeInMouthFacing(
+  base: Vec2,
+  signPos: Vec2,
+  node: { pos: Vec2; approaches: Approach[] },
+  ownEdgeId: string,
+): Vec2 {
+  let sx = 0;
+  let sy = 0;
+  let n = 0;
+  const ownAway = node.approaches.find((a) => a.edgeId === ownEdgeId)?.cutTangentAway ?? null;
+  for (const other of node.approaches) {
+    if (other.edgeId === ownEdgeId || !other.incoming) continue;
+    // A driver coming STRAIGHT THROUGH into this arm is already aimed at the
+    // plate's base facing and reads it best there; counting him would drag the
+    // face away from the driver who has to TURN, which is the whole reason a
+    // mouth sign is toed in. (On ov-oneway-v1 that one filter is the difference
+    // between 52° and 31° off the stem driver's line of sight.)
+    if (ownAway) {
+      // His travel INTO the node vs the direction our arm leads away from it.
+      const into = mul(other.cutTangentAway, -1);
+      const straight = into[0] * ownAway[0] + into[1] * ownAway[1];
+      if (straight > Math.cos((MANDATORY_DIR_MIN_TURN_DEG * Math.PI) / 180)) continue;
+    }
+    const eye = add(node.pos, mul(other.cutTangentAway, MOUTH_SIGN_READER_BACK_M));
+    const d = sub(eye, signPos);
+    const len = Math.hypot(d[0], d[1]);
+    if (len < 1) continue;
+    sx += d[0] / len;
+    sy += d[1] / len;
+    n++;
+  }
+  if (n === 0 || (sx === 0 && sy === 0)) return base;
+  const mean = norm([sx, sy]);
+  const cos = Math.max(-1, Math.min(1, base[0] * mean[0] + base[1] * mean[1]));
+  const angle = Math.acos(cos);
+  const maxRad = (MOUTH_SIGN_MAX_TOE_IN_DEG * Math.PI) / 180;
+  if (angle <= maxRad) return mean;
+  // Rotate `base` toward `mean` by exactly the cap (sign from the cross product).
+  const turn = base[0] * mean[1] - base[1] * mean[0] >= 0 ? maxRad : -maxRad;
+  const c = Math.cos(turn);
+  const s = Math.sin(turn);
+  return [base[0] * c - base[1] * s, base[0] * s + base[1] * c];
 }
 
 /** Prop standing right of the incoming traffic at a junction approach. */
@@ -355,6 +465,50 @@ export function buildProps(
     }
   }
 
+  // -- pedestrian signal heads at signalized CROSSINGS (doc 86 L3) --------------
+  // The loop above places heads at signalized JUNCTION NODES and nothing else,
+  // so `District.crossings[].signalized` was a flag the builder never read: the
+  // runtime registered it as a real signal node (runtime/signals.ts) and the
+  // staged walker's own gate consulted it (traffic/pedestrians.crossingGateOpen
+  // — „vehicle red = pedestrian green"), while the world drew no lamp at all.
+  //
+  // `sc-pe-jaywalker` is the lesson that breaks on: its whole subject is that
+  // the woman steps out on HER red, and the student was asked to read a red
+  // that existed only in the tick stream. Founder item 29 — „there must be
+  // traffic light for us to follow, but also a traffic light that the
+  // pedestrian follows". The driver's half was already built; this is his.
+  //
+  // ONE head per kerb, facing ACROSS the carriageway — a pedestrian head
+  // addresses the walker waiting on the opposite pavement, which is also the
+  // only pose that makes it legible from a car on the approach. nodeId is the
+  // crossing id (the runtime's own key), never a road node, so nothing that
+  // counts vehicle heads at a junction can pick these up.
+  for (const crossing of district.crossings) {
+    if (!crossing.signalized || !crossing.edgeId) continue;
+    const eb = network.edgeById.get(crossing.edgeId);
+    if (!eb) continue;
+    const g = eb.edge.geometry as Vec2[];
+    const at = projectOntoPolyline(g, [crossing.x, crossing.y]);
+    const along = at.tangent;
+    const across = perpRight(along);
+    // Bearing of the vehicle travel this crossing interrupts: the axis whose
+    // red is the walker's green (SignalController groups the crossing node on
+    // exactly this axis).
+    const approachBearingDeg = bearingDeg(along[0], along[1]);
+    for (const side of [1, -1] as const) {
+      const p = add(at.point, mul(across, side * (eb.halfWidth + PED_SIGNAL_LATERAL_M)));
+      trafficLights.push({
+        nodeId: crossing.id,
+        position: toWorld(p[0], p[1], SIDEWALK_TOP_Y),
+        // Face across the road, at the pavement it serves.
+        yaw: yawFromFacing(mul(across, -side)),
+        approachBearingDeg,
+        head: "pedestrian",
+        ...signalSized, // same L2 reasoning: a lens at 1x is unreadable
+      });
+    }
+  }
+
   // -- priority signs at unsignalized junctions -------------------------------
   // The WHO-YIELDS rule lives in network.junctionPriorityControls — the same
   // call the runtime's graded stop lines make (audit C-4). Painting from one
@@ -483,12 +637,67 @@ export function buildProps(
           add(ap.cut, mul(away, NO_ENTRY_ALONG_M)),
           mul(perpRight(away), ap.halfWidth + NO_ENTRY_LATERAL_M),
         );
+        // …and TOED IN toward the arms that can turn into this mouth. Measured
+        // on ov-oneway-v1 before this line existed: the В1 face pointed straight
+        // back down its own arm, i.e. 70.8° off the stem driver's line of sight,
+        // so all he ever saw was the edge of the plate on a hairline post.
         signs.push({
           kind: "noEntry",
           position: toWorld(p[0], p[1], ROAD_Y),
-          yaw: yawFromFacing(mul(away, -1)),
+          yaw: yawFromFacing(toeInMouthFacing(mul(away, -1), p, node, ap.edgeId)),
           ...lessonSized,
         });
+      }
+    }
+  }
+
+  // -- Г2 / Г3 „Движение само надясно / наляво след знака" ----------------------
+  // The POSITIVE half of the one-way mouth, and the sign the founder asked for
+  // by name on item 47: „there must be sign stating to go left or right".
+  //
+  // В1 and Д4 both live on the CROSS street and so, however well they are toed
+  // in, they are plates read at an angle while turning. The mandatory-direction
+  // plate stands on the student's OWN arm, square to him, and states the
+  // manoeuvre rather than the prohibition — which is what an instructor says at
+  // that junction and what makes the movement decidable before the mouth.
+  //
+  // Derived, never authored: posted only where a node's own tags leave an
+  // incoming arm exactly ONE legal exit. That is the same one-way fact
+  // network.onewayNoEntryArms feeds WRONG_WAY grading from, so the sign a
+  // student is failed for ignoring is a sign the world showed him. A junction
+  // that leaves two choices stays correctly bare, exactly as an equal junction
+  // stays bare of priority plates (doc 86 R1).
+  //
+  // Scenario micro-maps only, on the В1 pass's reasoning: an OSM district's
+  // turn restrictions were never recorded in the source, so posting there would
+  // invent signage.
+  if (lessonScale !== undefined) {
+    for (const node of network.nodes.values()) {
+      if (node.degree < 3) continue;
+      // A ROUNDABOUT entry is already signed Б1 + Г12, and Г12 IS the mandatory
+      // sign there. „Движение само надясно" at a ring mouth would be a third
+      // plate on the same post saying something subtly false — you circulate,
+      // you do not simply turn right. Same exclusion, same reasoning, as the Б3
+      // priority-diamond pass above.
+      if (node.approaches.some((ap) => ap.edge.roundabout)) continue;
+      for (const ap of node.approaches) {
+        if (!ap.incoming) continue;
+        const exits = node.approaches.filter((o) => o.edgeId !== ap.edgeId && o.outgoing);
+        if (exits.length !== 1) continue; // free choice — nothing to mandate
+        const exit = exits[0]!;
+        // Signed turn from „travel INTO the node on ap" to „travel AWAY on the
+        // exit". +ve = to the driver's right.
+        const inDir = mul(ap.cutTangentAway, -1);
+        const outDir = exit.cutTangentAway;
+        const cross = inDir[0] * outDir[1] - inDir[1] * outDir[0];
+        const dot = inDir[0] * outDir[0] + inDir[1] * outDir[1];
+        const turnDeg = (Math.atan2(cross, dot) * 180) / Math.PI;
+        if (Math.abs(turnDeg) < MANDATORY_DIR_MIN_TURN_DEG) continue; // Г1 — no face
+        // District space is x-east / y-north, so a RIGHT turn is a CLOCKWISE
+        // rotation, i.e. a negative atan2 cross term.
+        const kind: SignKind = turnDeg < 0 ? "mandatoryRight" : "mandatoryLeft";
+        const { p, yaw } = approachPropPose(ap, MANDATORY_DIR_ALONG_M, MANDATORY_DIR_LATERAL_M);
+        signs.push({ kind, position: toWorld(p[0], p[1], ROAD_Y), yaw, ...lessonSized });
       }
     }
   }
@@ -773,6 +982,58 @@ export function buildProps(
     }
   }
 
+  // -- В26 RESTATED through a long limited stretch (founder items 31/33/34) ------
+  // Every pass above states the limit at an EVENT — a district entry, a
+  // transition node, a spawn. None of them states it again, so a long graded
+  // segment goes quiet: measured on sp-creep2-v1, the 280 m зона-30 carries
+  // posts at 6 m and 50 m and then NOTHING for the remaining 230 m, of which
+  // 190 m are graded. The founder read that street and reported it as „just
+  // written with numbers on the road 30" — the tarmac glyph was the only thing
+  // still telling him the number he was being billed against.
+  //
+  // Bulgarian practice repeats В26 through a restricted stretch, and this file's
+  // sibling already does exactly this for В24 (zoneSigns ZONE_SIGN_REPEAT_M, doc
+  // 66 R2: „the governing control must be IN FRAME at the fault, not only at the
+  // kerb entry"). The cadence here matches the painted road glyph's own pitch
+  // (markings SPEED_GLYPH_PITCH_M), so post and paint restate the limit together
+  // instead of the paint carrying it alone.
+  //
+  // It can only ever RESTATE: a direction with no plate already posted gets
+  // nothing, and the numeral is copied from the plate being repeated. So this
+  // pass cannot introduce a limit the road does not carry — the T4 rule holds by
+  // construction, not by review.
+  if (lessonScale !== undefined) {
+    const seeds = [...platesAhead];
+    for (const eb of network.edges) {
+      if ((eb.edge.maxspeed ?? Infinity) > LIMIT_REPEAT_MAX_KMH) continue;
+      const g = eb.edge.geometry as Vec2[];
+      const len = polylineLength(g);
+      for (const dirSign of [1, -1] as const) {
+        if (dirSign === -1 && eb.edge.oneway) continue; // nobody drives this way
+        const posted = seeds
+          .filter((pl) => pl.edgeId === eb.edge.id && pl.dirSign === dirSign)
+          .sort((a, b) => a.sAlongTravel - b.sAlongTravel);
+        const last = posted[posted.length - 1];
+        if (!last) continue; // never announced here — that is another pass's call
+        for (
+          let s = last.sAlongTravel + LIMIT_REPEAT_M;
+          s <= len - LIMIT_REPEAT_END_CLEAR_M;
+          s += LIMIT_REPEAT_M
+        ) {
+          const geomS = dirSign === 1 ? s : len - s;
+          const { point, tangent } = pointAlong(g, geomS);
+          const travel = dirSign === 1 ? tangent : mul(tangent, -1);
+          const p = add(point, mul(perpRight(travel), eb.halfWidth + 0.8));
+          const kind = speedLimitSignKind(last.kmh);
+          if (kind === null) break;
+          if (pushSignAt(p, yawFromFacing(mul(travel, -1)), kind, { speedKmh: last.kmh })) {
+            recordPlate(eb.edge.id, geomS, dirSign, last.kmh);
+          }
+        }
+      }
+    }
+  }
+
   // -- Д4 „Еднопосочно движение" at the LEGAL mouth of a one-way arm ------------
   // The В1 pass above closes the mouth a driver may not enter; Д4 is its twin
   // and the founder named it directly (item 47 — „the blue one way sign is
@@ -811,7 +1072,9 @@ export function buildProps(
       if (!mouth || (mouth.degree === 2 && !network.deadEnds.has(eb.edge.from))) continue;
       const { point, tangent } = pointAlong(g, Math.min(8, len * 0.2));
       const p = add(point, mul(perpRight(tangent), eb.halfWidth + 0.8));
-      pushSignAt(p, yawFromFacing(mul(tangent, -1)), "oneWay");
+      // Toed in like the В1 it twins (measured 85.9° off the ov-oneway stem
+      // driver before this: 0.06 m of projected plate at 55 m — invisible).
+      pushSignAt(p, yawFromFacing(toeInMouthFacing(mul(tangent, -1), p, mouth, eb.edge.id)), "oneWay");
     }
   }
 

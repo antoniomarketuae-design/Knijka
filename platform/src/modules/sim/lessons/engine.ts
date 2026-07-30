@@ -155,6 +155,19 @@ export interface LessonStepResult {
 export const TEACH_PAUSE_MIN_GAP_S = 15;
 
 /**
+ * Frame-zero pose guard (doc 87 B3/B10/B11 — see
+ * LessonSessionState.posedAtSec). A tick "describes the vehicle" unless it is
+ * the scene's placeholder: `scene/vehicleSample.ts createVehicleSample()`
+ * publishes EXACTLY the district origin at EXACTLY zero speed, and the scene
+ * ticks this engine with it for the frames before the chassis writes its first
+ * pose. Not one of the 90 committed districts places a spawn point at (0, 0)
+ * — measured over content/world/*.json — so the origin at a standstill is the
+ * placeholder and nothing else. A drill that ever did spawn there would simply
+ * start grading on its first metre of movement.
+ */
+export const POSE_MOTION_KMH = 0.5;
+
+/**
  * SPD (founder review R3 #39/#48 — „distance warnings while visibly far"):
  * the FOLLOWING_TOO_CLOSE family is TIME-GAP math (the 2-second rule), and at
  * street speed its fire threshold is 14–17 METERS — a gap that genuinely
@@ -555,7 +568,21 @@ export function applyTick(prev: LessonSessionState, tick: SimTick): LessonStepRe
   let phase: LessonPhase = prev.phase;
   let endedAtSec = prev.endedAtSec;
 
-  if (prev.phase === "driving" && currentIndex < objectives.length) {
+  // FRAME-ZERO POSE GUARD (doc 87 B3/B10/B11). The chain does not advance
+  // until a tick has described the vehicle: motion, or a position other than
+  // the one the session opened on. The scene ticks this engine with a
+  // placeholder pose at the district ORIGIN for the frames before the chassis
+  // publishes (scene/vehicleSample.ts), and four drills author their first
+  // waypoint within a car length of that origin — so their first task was
+  // credited to a car that was not there. An objective is earned by driving;
+  // nothing has been driven yet. See LessonSessionState.posedAtSec.
+  let posedAtSec = prev.posedAtSec;
+  if (posedAtSec === undefined) {
+    const atOrigin = tick.position.x === 0 && tick.position.y === 0;
+    if (!atOrigin || Math.abs(tick.speedKmh) > POSE_MOTION_KMH) posedAtSec = tick.t;
+  }
+
+  if (prev.phase === "driving" && posedAtSec !== undefined && currentIndex < objectives.length) {
     objectives = [...objectives];
     evalStates = [...evalStates];
 
@@ -751,6 +778,7 @@ export function applyTick(prev: LessonSessionState, tick: SimTick): LessonStepRe
       penaltyEscalations: escalations,
       lastTeachMomentAtSec: lastTeachAt,
       lastT: Math.max(prev.lastT, tick.t),
+      ...(posedAtSec !== undefined ? { posedAtSec } : {}),
       ...(eventPositions !== undefined ? { eventPositions } : {}),
       ...(examTermination !== undefined ? { examTermination } : {}),
       ...(finishGate !== undefined ? { finishGate } : {}),

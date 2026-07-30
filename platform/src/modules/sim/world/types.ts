@@ -227,8 +227,35 @@ export interface StaticTransform {
   scale?: number;
 }
 
+/**
+ * Which kind of signal head stands at a placement.
+ *
+ * `"vehicle"` (the default, and the only value any placement carried before
+ * doc 86 L3) is the three-lens head at a junction approach.
+ *
+ * `"pedestrian"` is the TWO-lens head that stands at the kerb of a signalized
+ * `District.crossings` entry and shows the WALKER his phase. It is not a
+ * decoration: `sc-pe-jaywalker` teaches „тя пресича на ЧЕРВЕНО за нея", and
+ * until this variant existed the student was asked to read a red he could not
+ * see anywhere on the map (founder item 29 / ledger L3). The lamp is driven off
+ * the SAME signal node the walker's own gate reads — pedestrian green ⇔ vehicle
+ * red at that node (traffic/pedestrians.crossingGateOpen) — so the head and the
+ * figure crossing under it can never disagree.
+ */
+export type SignalHeadKind = "vehicle" | "pedestrian";
+
 export interface TrafficLightPlacement extends StaticTransform {
-  /** Signal node id — key for WorldRuntime.signalLampState(). */
+  /**
+   * Signal node id — key for WorldRuntime.signalLampState().
+   *
+   * For a `"pedestrian"` head this is the CROSSING id, which the runtime's
+   * SignalController already registers as a signal node of its own
+   * (runtime/signals.ts: `district.crossings` with `signalized: true`), grouped
+   * on the axis of the edge the crossing sits on. It is deliberately NOT a road
+   * node id, so no consumer that reasons about junction nodes (the
+   * world-referent signal rule keys on route edge endpoints) can mistake a
+   * pedestrian head for the vehicle heads a lesson is graded against.
+   */
   nodeId: string;
   /**
    * Compass bearing (district space, 0 = north, clockwise) of travel INTO the
@@ -237,8 +264,14 @@ export interface TrafficLightPlacement extends StaticTransform {
    * axis-group — the phase the stop line on that arm grades — instead of the
    * node's single assigned group (doc 62 S1: heads on the cross street showed
    * the player's phase, and pinned rebases lit the wrong arm).
+   *
+   * On a pedestrian head this is the bearing of the VEHICLE travel the crossing
+   * interrupts — the axis whose red is the walker's green.
    */
   approachBearingDeg: number;
+  /** Absent = "vehicle", so every placement written before the pedestrian head
+   *  existed stays byte-identical (no new key on a junction head). */
+  head?: SignalHeadKind;
 }
 
 export type SignKind =
@@ -284,6 +317,19 @@ export type SignKind =
   //    wrongWay grading follows.
   | "noEntry" // В1 „Забранено е влизането на пътни превозни средства"
   | "oneWay" // Д4 „Еднопосочно движение" (the legal mouth of the same arm)
+  // -- Г2/Г3 „Движение само надясно / наляво след знака": the POSITIVE half of
+  //    the same junction fact. В1 and Д4 both stand ON the cross street and
+  //    therefore face along it, so a driver coming up the stem of a T reads
+  //    them at 70–86° — a hairline (founder item 47: „there must be sign
+  //    stating to go left or right, so we have missing Sign"). The mandatory
+  //    plate stands on HIS arm, facing HIM, and states the manoeuvre instead of
+  //    the prohibition. Derived, never authored: posted only where the node's
+  //    one-way tags leave an incoming arm exactly one legal exit, which is the
+  //    same derivation network.onewayNoEntryArms feeds the WRONG_WAY grading
+  //    from. Г1 „само направо" has no face in the kit and no map that would
+  //    place it, so a forced-straight arm places NOTHING rather than guess.
+  | "mandatoryRight" // Г2
+  | "mandatoryLeft" // Г3
   // -- previously orphaned kit faces (doc 86 D5): finished GLBs that shipped
   //    with no SignKind, so nothing could ever place them.
   | "pedestrianCrossing" // А18 „Пешеходна пътека" (warning, ahead of a zebra)
@@ -324,6 +370,8 @@ export const SIGN_KINDS: readonly SignKind[] = [
   "barrier",
   "noEntry",
   "oneWay",
+  "mandatoryRight",
+  "mandatoryLeft",
   "pedestrianCrossing",
   "priorityRoad",
   "settlement",

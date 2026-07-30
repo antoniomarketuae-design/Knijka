@@ -134,7 +134,17 @@ export function QualityPresetSelector({
             role="radio"
             aria-checked={active}
             onClick={() => onChange(p.id)}
-            className={`rounded-lg px-3 py-1.5 text-xs font-bold transition motion-reduce:transition-none ${
+            // ROW C2, the hit-target half. Measured on iPhone 16 in WebKit
+            // these three pills are 60×28, 66×28 and 67×28 — 16 px short of
+            // the 44 px a thumb needs, on the screen a student picks a lesson
+            // from. The BOX is not grown: the tap area is, with an absolutely
+            // positioned ::before at −10 px top and bottom (28 + 20 = 48).
+            // That is the enlargement the mobile probe explicitly honours
+            // (tools/mobile/lib/probe.mjs — it unions ::before/::after insets
+            // into the hit rect), and it costs zero painted pixels, which
+            // matters because every pixel of chrome is charged against the
+            // screen budget on the same sweep.
+            className={`relative rounded-lg px-3 py-1.5 text-xs font-bold transition before:absolute before:-inset-y-2.5 before:left-0 before:right-0 before:content-[''] motion-reduce:transition-none ${
               active
                 ? "bg-accent text-accent-foreground"
                 : "text-muted hover:bg-surface-2 hover:text-foreground"

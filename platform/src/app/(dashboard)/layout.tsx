@@ -111,7 +111,21 @@ export default function DashboardGroupLayout({
           the contrast ratios clusterScope.test.ts pins can move. */}
       <DeckBackdrop className="fixed inset-0 -z-10" />
       <DashboardShell>
-        <main id="main-content" className="mx-auto w-full max-w-6xl px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
+        {/* `flex flex-1 flex-col` — THE CONTENT REGION IS THE SCREEN.
+            <main> used to be exactly as tall as the page inside it, so a page
+            shorter than the phone left a band of bare backdrop under itself
+            that nothing could reach: 37.7% of an iPhone 16 on the practice
+            runner, measured. It is a no-op on every screen that already
+            overflows (all of them but the runners), and it is what lets the
+            practice card put „Провери" where a thumb is instead of halfway up
+            the screen.
+
+            `short:py-2` — 24px of top and bottom padding is breathing room on
+            a portrait phone and 12% of the whole screen on a landscape one. */}
+        <main
+          id="main-content"
+          className="mx-auto flex w-full max-w-6xl flex-1 flex-col px-4 py-6 short:py-1 sm:px-6 lg:px-8 lg:py-8"
+        >
           {children}
         </main>
       </DashboardShell>

@@ -398,13 +398,18 @@ describe("tj-stop-v1 from the priority arm (sc-jx-priority-confidence)", () => {
    *  Derived above from the line's sM 92.275 on the 120 m stem. */
   const B2_LINE_M = 27.725;
 
-  it("the west spawn is the eastbound approach the template starts from", () => {
+  it("the west spawn is the eastbound approach the template starts from — IN ITS LANE", () => {
     const district = assertDistrict(loadRaw(id));
     const west = district.spawnPoints.find((s) => s.id === "tj-spawn-west")!;
     expect(west).toBeDefined();
-    // start.spawnPointId "tj-spawn-west": (−135, 0) facing east (heading 90).
+    // start.spawnPointId "tj-spawn-west": (−135, −4.06) facing east (heading 90).
+    // doc 87 T2: this pose used to be (−135, 0) — the road CENTRELINE — so
+    // sc-jx-priority-confidence handed the student a car straddling the осева
+    // and «Настъпване на осевата линия» fired 3.5 s into a straight drive.
+    // Eastbound means the right-hand lane is the SOUTH one: y = −LANE_Y.
     expect(west.x).toBe(-135);
-    expect(west.y).toBe(0);
+    expect(west.y).toBe(-4.06);
+    expect(west.y).toBeCloseTo(LANE_Y, 2);
     expect(west.heading).toBe(90);
     expect(west.edgeId).toBe("tj-e-w");
   });

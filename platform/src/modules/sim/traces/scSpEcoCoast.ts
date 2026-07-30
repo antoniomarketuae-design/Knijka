@@ -27,7 +27,7 @@
  *
  * Geometry pinned to content/world/sx-v1.json (battery sx-district.test.ts): ns
  * south approach on x = 0 (right lane 4.06, limit 50), the northbound stop line
- * at y = −27.73, junction centre (0, 0), spawn sx-spawn-south (0, −105) heading
+ * at y = −27.73, junction centre (0, 0), spawn sx-spawn-south (4.06, −105) heading
  * north. No staged actors, ambient traffic zero, dry day.
  */
 
@@ -48,9 +48,7 @@ const SIGNAL_OFFSETS = { "sx-n-c": 30 } as const;
 
 /** Spawn → right-lane merge, shared by all three drives (sx-spawn-south). */
 const LEAD_IN: ReadonlyArray<readonly [number, number]> = [
-  [0, -105],
-  [0, -103],
-  [X_LANE, -92],
+  [X_LANE, -105],
   [X_LANE, -70],
 ];
 

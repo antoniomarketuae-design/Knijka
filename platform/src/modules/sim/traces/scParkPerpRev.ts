@@ -15,7 +15,7 @@
  *   bay row on the EAST side, bay rects x ∈ [2.53, 7.53];
  *   target bay lot-bay-3 center (5.03, 0), axis east-west (headingDeg 90);
  *   occupied neighbors lot-bay-1/2/4/5 at y = ∓5.4 / ∓2.7;
- *   spawn lot-spawn-approach (0, −105) heading north.
+ *   spawn lot-spawn-approach (4.06, −105) heading north.
  *
  * Rule-engine safety envelope the paths respect (why the numbers are what
  * they are): lane detectors arm at |laneOffset| > 3.25 m ⇔ |x| < 0.81 on
@@ -94,9 +94,7 @@ export function lotObstacleRects(districtRaw: unknown): ObstacleRect2D[] {
 
 /** Approach: spawn → right-lane cruise up the approach road. */
 const APPROACH: Array<[number, number]> = [
-  [0, -105],
-  [0, -103],
-  [X_LANE, -92],
+  [X_LANE, -105],
   [X_LANE, -24],
 ];
 

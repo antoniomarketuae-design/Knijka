@@ -1,6 +1,47 @@
 @import "tailwindcss";
 
 /* ============================================================
+   `short:` — THE VARIANT THIS APP WAS MISSING, AND THE BUG IT FIXES.
+
+   Every breakpoint in Tailwind is a WIDTH. On a phone held sideways that is
+   a lie: an iPhone 16 in landscape is 852 x 393, so `sm:` (>=640px) fires and
+   the app serves its desktop layout into 393 pixels of height. Measured, WebKit,
+   tools/mobile: /theory/practice in landscape put the full aurora header —
+   „← Всички теми", a 30px title and a subtitle — across the ENTIRE screen and
+   started the question card below the bottom edge. 520px of scroll; not one
+   answer option on screen; the founder's „it all have to be on the screen
+   without scrolling" failing on the exact axis nobody was checking.
+
+   `short:` is „there is no vertical room" — the missing half of `sm:`. It is
+   deliberately height-only, so it composes: `short:sm:` is „sideways phone"
+   (short AND wide) and `short:` alone is any cramped viewport, including a
+   half-height desktop window.
+
+   520px is the cut because every phone in landscape is under it (iPhone 16 is
+   393, the Android floor 360) and every phone in PORTRAIT is over it (the
+   smallest we test is 780, and an iPhone with Safari's toolbars up is 745).
+   ============================================================ */
+@custom-variant short (@media (max-height: 520px));
+@custom-variant narrow-tall (@media (max-width: 639px) and (min-height: 521px));
+@custom-variant wide-tall (@media (min-width: 640px) and (min-height: 521px));
+
+/* THE OTHER TWO ARE ONE CONDITION EACH, ON PURPOSE, AND THEY ARE NOT SUGAR.
+   Most `short:` utilities merely OVERRIDE an `sm:` one, and which of the two
+   wins is decided by emission order (custom variants sort after the built-in
+   breakpoints, so `short:` wins — verified in the built CSS, and the mobile
+   harness fails loudly if that ever stops being true). A display TOGGLE must
+   not be left to that: if the order flipped, `hidden short:hidden sm:block`
+   would put the desktop header back on a landscape phone and re-open the exact
+   defect these variants were added for.
+
+   The obvious spelling of that guard, `max-sm:tall:flex`, COMPILED TO NOTHING —
+   a stacked breakpoint plus custom variant emitted no rule at all in this
+   Tailwind, so the header simply vanished on the phone it was written for. It
+   was caught by looking at the screenshot. Hence one media query per variant,
+   written out: `narrow-tall:` is a phone in portrait and `wide-tall:` is a
+   screen with room in both directions. */
+
+/* ============================================================
    Design tokens — "Cockpit / Holographic HUD" system (doc 64).
    The product as a car's instrument cluster: cockpit-black ground,
    the kept electric blue promoted to the HUD projection colour,

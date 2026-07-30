@@ -369,6 +369,82 @@ export function paintsLaneLines(edge: MarkedEdgeLike): boolean {
   return Math.max(1, edge.lanes) >= 2;
 }
 
+// --- pedestrian crossings: paint, and the duty that needs no paint ----------
+
+/** Just the shape the crossing predicates need, so neither the builder nor the
+ *  runtime has to import the other's types (the `paintsCentreLine` pattern). */
+export interface CrossingLike {
+  kind: string;
+}
+/** The host carriageway of a crossing, as much of it as the predicates read. */
+export interface CrossingHostEdgeLike {
+  class: string;
+  zone?: string;
+}
+
+/**
+ * Does the zebra pass draw М8.1 paint at this crossing?
+ *
+ * markings.ts's own predicate, exported so `runtime/zones.ts` can ask the SAME
+ * question the painter answers (doc 86 T1's discipline, applied to crossings).
+ *
+ * The three yes-kinds and the one no-kind (doc 87 A13):
+ *  - `marked` / `signals` — OSM says there IS marking. Painted, as shipped.
+ *  - `unknown` — the node is a crossing and the mapper tagged no type. In a
+ *    Bulgarian city a designated пешеходна пътека carries М8.1 by Наредба № 2,
+ *    so an untagged urban crossing node is a MARKED one whose tag is missing,
+ *    not an unmarked one. Painting it is what makes the world state what the
+ *    grader already assumed — and it is the referent Урок 4 („пешеходни
+ *    пътеки", specs.ts l4-crossings) was missing: its staged dart-out declares
+ *    `libraryEventId: "ev-ped-crossing-marked"` and stands on n12324499587,
+ *    which the painter drew nothing at.
+ *  - `unmarked` — OSM saying affirmatively that there is NO marking. §1 т.53
+ *    ДР ЗДвП: a пешеходна пътека is a part of the carriageway *обозначена с
+ *    пътна маркировка или знаци*. No paint, no пътека, no absolute duty — so
+ *    the world draws nothing AND the grader stands down (see
+ *    `gradesCrossingDuty` for the one lawful exception).
+ */
+export function paintsZebra(crossing: CrossingLike): boolean {
+  return (
+    crossing.kind === "marked" || crossing.kind === "signals" || crossing.kind === "unknown"
+  );
+}
+
+/**
+ * Living-zone streets (Д15/Д16, ЗДвП чл. 62–63): пешеходците ползват цялото
+ * платно и са с предимство. There the duty is owed with NO paint at all — a
+ * zebra inside a жилищна зона would teach the opposite of the law — so the
+ * crossing referent is the STREET, not a marking.
+ */
+export function livingZoneCarriageway(edge: CrossingHostEdgeLike): boolean {
+  return edge.class === "living_street" || edge.zone === "residential";
+}
+
+/**
+ * May the crossing duties (чл. 119 approach speed, the yield, the overtake
+ * ban) be GRADED at this crossing — i.e. does the world put something in front
+ * of the student that justifies convicting him?
+ *
+ * Two, and only two, referents:
+ *  1. the world paints the zebra (`paintsZebra`) — he can see the пътека;
+ *  2. the host edge is a жилищна зона — чл. 62–63 gives pedestrians the whole
+ *     carriageway there, so the duty is real with no paint (pe-zone-v1's
+ *     pz-x-1 is authored `unmarked` for exactly this reason, and its battery
+ *     pins both halves: zebraCrossings = 0 AND the pass event still fires).
+ *
+ * Everything else — the 17 `unmarked` nodes the OSM cuts carry on ordinary
+ * 50 km/h streets — is a place where somebody once crossed, with no paint, no
+ * sign and no zone. Arming a 10-point опасна there taught a seventeen-year-old
+ * a law that does not exist (doc 87 A13/A16).
+ */
+export function gradesCrossingDuty(
+  crossing: CrossingLike,
+  hostEdge: CrossingHostEdgeLike | null | undefined,
+): boolean {
+  if (paintsZebra(crossing)) return true;
+  return hostEdge != null && livingZoneCarriageway(hostEdge);
+}
+
 /** Road classes that get sidewalks. */
 export const SIDEWALK_CLASSES: ReadonlySet<string> = new Set([
   "primary",

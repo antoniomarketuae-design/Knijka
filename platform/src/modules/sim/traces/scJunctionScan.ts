@@ -27,7 +27,7 @@
  *
  * Geometry pinned to content/world/tj-stop-v1.json: the minor (stem) approach
  * on x = 0 with the Б2 line at y = −27.725, right-lane center x = 4.0625, spawn
- * tj-spawn-south (0, −105) heading north; the drive stops before the line and
+ * tj-spawn-south (4.06, −105) heading north; the drive stops before the line and
  * turns right onto the east priority arm (the sc-junction-stop path).
  */
 
@@ -70,7 +70,7 @@ export function scJunctionScanShadowScript(): DriveScript {
     steps: [
       { kind: "annotation", textBg: "Напред е знак Б2 „Спри!“ — спираш напълно и оглеждаш наляво-надясно-наляво." },
       { kind: "glance", mirror: "rear" },
-      { kind: "drive", points: [[0, -105], [0, -103], [LANE, -92], [LANE, -45]], targetKmh: 25 },
+      { kind: "drive", points: [[LANE, -105], [LANE, -45]], targetKmh: 25 },
       { kind: "annotation", textBg: "Десен мигач и плавно към стоп-линията." },
       { kind: "indicator", setting: "right" },
       { kind: "drive", points: [[LANE, -45], [LANE, -29.2]], targetKmh: 12 },
@@ -119,7 +119,7 @@ export function scJunctionScanMistakeNoScanScript(): DriveScript {
     steps: [
       { kind: "annotation", textBg: "Грешка: спира напълно на Б2, но потегля БЕЗ да се огледа." },
       { kind: "glance", mirror: "rear" },
-      { kind: "drive", points: [[0, -105], [0, -103], [LANE, -92], [LANE, -45]], targetKmh: 25 },
+      { kind: "drive", points: [[LANE, -105], [LANE, -45]], targetKmh: 25 },
       { kind: "indicator", setting: "right" },
       { kind: "drive", points: [[LANE, -45], [LANE, -29.2]], targetKmh: 12 },
       { kind: "annotation", textBg: "Спира докрай — но потегля, без да погледне нито наляво, нито надясно." },
@@ -142,7 +142,7 @@ export function scJunctionScanMistakeSingleGlanceScript(): DriveScript {
     steps: [
       { kind: "annotation", textBg: "Грешка: поглежда само веднъж наляво и потегля — един поглед не стига." },
       { kind: "glance", mirror: "rear" },
-      { kind: "drive", points: [[0, -105], [0, -103], [LANE, -92], [LANE, -45]], targetKmh: 25 },
+      { kind: "drive", points: [[LANE, -105], [LANE, -45]], targetKmh: 25 },
       { kind: "indicator", setting: "right" },
       { kind: "drive", points: [[LANE, -45], [LANE, -29.2]], targetKmh: 12 },
       { kind: "annotation", textBg: "Един поглед наляво — но не и надясно, откъдето идват колите с предимство." },

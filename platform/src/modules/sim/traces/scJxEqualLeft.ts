@@ -52,16 +52,14 @@ function arcPts(cx: number, cy: number, r: number, a0: number, a1: number): Arra
 }
 
 // ---------------------------------------------------------------------------
-// sc-jx-equal-left — jx-equal-v1 (uncontrolled X; spawn (0, −115))
+// sc-jx-equal-left — jx-equal-v1 (uncontrolled X; spawn (4.06, −115))
 // ---------------------------------------------------------------------------
 
 export const SC_JX_EQUAL_LEFT_ID = "sc-jx-equal-left";
 
 /** South-arm approach: spawn → right-lane cruise toward the junction. */
 const EQ_APPROACH: Array<[number, number]> = [
-  [0, -115],
-  [0, -113],
-  [LANE, -100],
+  [LANE, -115],
   [LANE, -34],
 ];
 

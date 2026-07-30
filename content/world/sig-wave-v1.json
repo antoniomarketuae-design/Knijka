@@ -531,7 +531,7 @@
  "spawnPoints": [
   {
    "id": "sw-spawn-south",
-   "x": 0,
+   "x": 4.06,
    "y": -289,
    "heading": 0,
    "edgeId": "sw-e-a0",
@@ -540,7 +540,7 @@
   {
    "id": "sw-spawn-cross2-west",
    "x": -75,
-   "y": 264,
+   "y": 259.94,
    "heading": 90,
    "edgeId": "sw-e-w2",
    "name": "Западен подход към средния светофар"

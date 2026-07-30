@@ -234,17 +234,63 @@ export function PracticeSession({
   // Any sign-face option switches the whole list to the picture grid.
   const signGrid = hasSignOptions(current.options);
 
+  // THREE columns once there are more than four options, on a phone held
+  // sideways only. Measured on the worst six-option item in the bank
+  // (q-vehicle-063) at 852x393: three 264px columns give two rows of 109px =
+  // 224px, against 240px for three rows of two. A real but MODEST win, not the
+  // halving the row count suggests, because a narrower column wraps each option
+  // to more lines — recorded because the obvious reading overstates it 5x.
+  //
+  // Hoisted out of the JSX deliberately: inline, the ternary defeated BOTH
+  // source scanners that guard this file (checkControl.test.ts mis-parsed the
+  // element's props and mobileFold.test.ts read the closing brace as a
+  // concatenation seam). A class string a scanner cannot read is a class string
+  // Tailwind might not emit, which is the failure those tests exist to catch.
+  const shortOptionColumns =
+    current.options.length > 4 ? "short:sm:grid-cols-3" : "short:sm:grid-cols-2";
+
   return (
     // `max-sm:-mb-6` cancels <main>'s bottom padding on phones. That padding
     // is breathing room under a page you scroll; here the card ends in an
     // action bar that is already pinned to the bottom of the screen, so all it
     // did was make the document 24px taller than the viewport — which is
-    // enough, on its own, to pin the bar over the last answer.
-    <div className="mx-auto flex w-full max-w-2xl flex-col gap-4 max-sm:-mb-6 lg:max-w-none lg:flex-row lg:items-start lg:justify-center lg:gap-6">
+    // enough, on its own, to pin the bar over the last answer. `short:-mb-2`
+    // is the same cancellation against the layout's landscape `short:py-2`.
+    //
+    // `max-sm:flex-1 short:flex-1` — THE CARD IS THE SCREEN ON A PHONE.
+    // Measured before this (WebKit, iPhone 16 portrait, a four-option item):
+    // the card ended at 55% of the screen and 37.7% below it was bare backdrop.
+    // The card now reaches the bottom, which buys three things and no pixels of
+    // new furniture: „Провери" sits in the thumb zone at the bottom edge
+    // instead of floating halfway up; the artwork budget has room to draw a
+    // sign a student can actually read; and the space the why-panel needs after
+    // answering is ALREADY CLAIMED, so the verdict no longer shoves the layout
+    // down the moment it appears. Tablets and desktops keep the content-height
+    // card — this is a phone problem and it is fixed at phone sizes only.
+    // `short:max-w-none`: the 2xl reading cap is right for a desktop column and
+    // wrong for a phone held sideways, where it left 180px of bare backdrop
+    // down each side — 21% of the screen, measured, doing nothing.
+    <div className="mx-auto flex w-full max-w-2xl flex-col gap-4 max-sm:-mb-6 max-sm:flex-1 short:-mb-1 short:max-w-none short:flex-1 lg:max-w-none lg:flex-row lg:items-start lg:justify-center lg:gap-6">
     <section
       ref={cardRef}
       aria-label={`Въпрос ${index + 1} от ${questions.length}`}
-      className="card flex w-full min-w-0 flex-col gap-2.5 p-3 sm:gap-6 sm:p-7 lg:max-w-2xl"
+      // FULL BLEED ON A PHONE, AND THE READING MARGIN IS UNCHANGED.
+      // <main> gives every dashboard page a 16px gutter; on this screen that
+      // gutter was 8.1% of an iPhone spent on bare backdrop beside a card that
+      // is the only thing on the page. `-mx-4` gives it back and `px-4` puts
+      // the same 16px INSIDE the card instead — so the distance from the screen
+      // edge to the question text goes 28px -> 16px (the iOS body margin) and
+      // the ANSWER text column goes 287px -> 311px, which is one fewer wrapped
+      // line on the long options. `rounded-none border-x-0` because a rounded
+      // corner and a hairline at the physical edge of the glass read as a
+      // rendering fault, not as a card.
+      // `w-auto` is load-bearing next to `-mx-4`, and it is a mistake worth
+      // recording: with `w-full` the card's width is 100% of the container, so
+      // the negative margin MOVED it 16px left instead of widening it — a card
+      // bleeding off one edge with a 32px gutter on the other. Captured, seen,
+      // fixed. Width auto lets the flex cross-axis stretch do the work, which
+      // is container + both margins = the full screen.
+      className="card flex w-full min-w-0 flex-col gap-2.5 p-3 max-sm:-mx-4 max-sm:w-auto max-sm:flex-1 max-sm:rounded-none max-sm:border-x-0 max-sm:px-4 short:-mx-4 short:w-auto short:flex-1 short:gap-2.5 short:rounded-none short:border-x-0 short:p-3 short:px-4 sm:gap-6 sm:p-7 lg:max-w-2xl"
     >
       {/* Progress — `sm` and up.
           MOBILE FOLD (founder review): every row of chrome here is 393x852
@@ -264,7 +310,11 @@ export function PracticeSession({
           The screen reader is not paying for it: the section's aria-label
           („Въпрос N от M") carries the sentence, and exactly one of the two
           progressbars is in the tree at any width (the other is display:none). */}
-      <div className="hidden flex-col gap-1 sm:flex sm:gap-2.5">
+      {/* `short:hidden` sends this whole strip back into the action bar on a
+          phone held SIDEWAYS too — same reason as below `sm`, against 393px of
+          height instead of 852. The action-bar readouts carry `short:flex`, so
+          exactly one of the pair is on screen at any viewport. */}
+      <div className="hidden flex-col gap-1 short:hidden sm:flex sm:gap-2.5">
         <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1.5">
           <p className="flex flex-wrap items-baseline gap-x-2 text-sm font-semibold tabular-nums text-muted">
             <span>
@@ -329,7 +379,11 @@ export function PracticeSession({
 
       {/* Question + options */}
       <fieldset className="min-w-0" disabled={isChecking}>
-        <legend className="max-w-[62ch] text-lg font-bold leading-snug text-foreground sm:text-xl sm:leading-relaxed">
+        {/* `short:` holds the phone sizes on a landscape phone: 20px glyphs on
+            1.625 leading are a desktop's, and this screen has 393px of height.
+            The GLYPHS are not shrunk below the phone size — `text-lg` is the
+            same 18px a portrait phone gets. */}
+        <legend className="max-w-[62ch] text-lg font-bold leading-snug text-foreground short:text-lg short:leading-snug sm:text-xl sm:leading-relaxed">
           {current.textBg}
         </legend>
         {current.type === "multi" ? (
@@ -337,11 +391,19 @@ export function PracticeSession({
             Избери всички верни отговори.
           </p>
         ) : null}
+        {/* TWO COLUMNS WHEN THE SCREEN IS WIDE AND SHORT, i.e. a phone held
+            sideways. `short:sm:` is exactly that pair of conditions and nothing
+            else: a portrait phone (narrow) keeps one column, a desktop (tall)
+            keeps one column. Four options stop being four 44px rows and become
+            two, which is 50px back out of 393 — the difference between the
+            answers being on the screen and being under it. There is room for it
+            horizontally: the card is ~820px wide in landscape and an option
+            row's text column was measured at 285px on a portrait phone. */}
         <ul
           className={
             signGrid
-              ? "mt-2 grid grid-cols-2 gap-1.5 sm:mt-4 sm:grid-cols-3 sm:gap-2.5"
-              : "mt-2 flex flex-col gap-1.5 sm:mt-4 sm:gap-2.5"
+              ? "mt-2 grid grid-cols-2 gap-1.5 short:mt-2 short:gap-1.5 sm:mt-4 sm:grid-cols-3 sm:gap-2.5"
+              : `mt-2 flex flex-col gap-1.5 short:mt-2 short:gap-1.5 short:sm:grid sm:mt-4 sm:gap-2.5 ${shortOptionColumns}`
           }
         >
           {current.options.map((option, optionIndex) => {
@@ -446,7 +508,7 @@ export function PracticeSession({
                     row is thumb-sized — it is the property that actually
                     matters, stated directly instead of inferred from padding. */}
                 <label
-                  className={`flex min-h-11 items-start gap-2.5 rounded-xl border px-3 py-2.5 text-sm transition duration-200 ease-out focus-within:ring-2 focus-within:ring-accent/50 motion-reduce:transition-none motion-reduce:transform-none sm:gap-3 sm:px-4 sm:py-3.5 ${stateClasses} ${
+                  className={`flex min-h-11 items-start gap-2.5 rounded-xl border px-3 py-2.5 text-sm transition duration-200 ease-out focus-within:ring-2 focus-within:ring-accent/50 motion-reduce:transition-none motion-reduce:transform-none short:gap-2.5 short:px-3 short:py-2 sm:gap-3 sm:px-4 sm:py-3.5 ${stateClasses} ${
                     result === null ? "cursor-pointer" : "cursor-default"
                   }`}
                 >
@@ -461,7 +523,11 @@ export function PracticeSession({
                   />
                   <span
                     aria-hidden
-                    className="mt-0.5 hidden h-6 w-6 shrink-0 items-center justify-center rounded-md border border-hair bg-surface font-mono text-[11px] font-bold text-muted sm:flex"
+                    // `short:hidden`: it labels the 1–9 keyboard shortcuts, and
+                    // a phone held sideways has no keyboard either. 24px of
+                    // horizontal furniture back, in the orientation where the
+                    // option list is two columns wide.
+                    className="mt-0.5 hidden h-6 w-6 shrink-0 items-center justify-center rounded-md border border-hair bg-surface font-mono text-[11px] font-bold text-muted short:hidden sm:flex"
                   >
                     {optionIndex + 1}
                   </span>
@@ -509,7 +575,18 @@ export function PracticeSession({
           question, so confirming an answer cost a scroll — and after answering
           the why-panel pushed „Напред" further still. Sticky, it is always one
           tap. Desktop keeps the plain in-flow row. */}
-      <div className="relative flex flex-wrap items-center gap-3 max-sm:sticky max-sm:bottom-0 max-sm:z-20 max-sm:-mx-3 max-sm:-mb-3 max-sm:rounded-b-xl max-sm:border-t max-sm:border-hair max-sm:bg-surface/95 max-sm:px-3 max-sm:py-2 max-sm:backdrop-blur max-sm:[padding-bottom:calc(0.5rem+env(safe-area-inset-bottom))]">
+      {/* `max-sm:mt-auto short:mt-auto` — WHAT THE RECLAIMED 37.7% IS FOR.
+          Now that the card reaches the bottom of the phone, `margin-top: auto`
+          in a flex column puts this bar hard against that edge and leaves the
+          slack ABOVE it, between the last answer and the bar. That slack is not
+          waste: it is exactly the room the why-panel needs, so answering fills
+          it instead of shoving the whole layout down. And the primary control
+          of the most repeated action in the product ends up where a thumb
+          already is rather than floating in the middle of the screen.
+
+          The `short:` copies of the pin are the same bar on a phone held
+          sideways, where 393px of height makes it matter more, not less. */}
+      <div className="relative flex flex-wrap items-center gap-3 max-sm:sticky max-sm:bottom-0 max-sm:z-20 max-sm:-mx-4 max-sm:-mb-3 max-sm:mt-auto max-sm:rounded-b-none max-sm:border-t max-sm:border-hair max-sm:bg-surface/95 max-sm:px-4 max-sm:py-2 max-sm:backdrop-blur max-sm:[padding-bottom:calc(0.5rem+env(safe-area-inset-bottom))] short:sticky short:bottom-0 short:z-20 short:-mx-4 short:-mb-3 short:mt-auto short:rounded-b-none short:border-t short:border-hair short:bg-surface/95 short:px-4 short:py-2 short:backdrop-blur short:[padding-bottom:calc(0.5rem+env(safe-area-inset-bottom))]">
         {/* The phone instrument strip: the session's progress as a 2px rule
             along the bar's lit top edge, and the readouts beside the button. */}
         <div
@@ -518,13 +595,28 @@ export function PracticeSession({
           aria-valuemin={0}
           aria-valuemax={questions.length}
           aria-valuenow={answeredCount}
-          className="absolute inset-x-0 top-0 h-[2px] overflow-hidden bg-surface-2 sm:hidden"
+          className="absolute inset-x-0 top-0 h-[2px] overflow-hidden bg-surface-2 short:block sm:hidden"
         >
           <div
             className="h-full bg-accent transition-[width] duration-500 ease-out motion-reduce:transition-none"
             style={{ width: `${(answeredCount / questions.length) * 100}%` }}
           />
         </div>
+        {/* THE WAY OUT, ON A PHONE HELD SIDEWAYS.
+            A landscape phone drops the page's header row entirely — it is the
+            one viewport where a 44px title band costs more than the founder's
+            85% budget has to give (the app topbar is already 12.2% of it). The
+            link it carried does NOT get dropped with it: it moves here, into
+            the bar the thumb is already on, and grows from a 16px-tall line of
+            text into a 44px control on the way. `short:` only, so a portrait
+            phone still gets it in the header where it belongs and nobody sees
+            it twice. */}
+        <Link
+          href="/theory"
+          className="btn-ghost hidden min-h-11 px-3 py-2 text-[13px] short:inline-flex"
+        >
+          ← Теми
+        </Link>
         {result === null ? (
           <button
             type="button"
@@ -550,7 +642,7 @@ export function PracticeSession({
             what today's free quota is at, and what this one is worth. */}
         <p
           aria-hidden
-          className="ml-auto flex items-center gap-1.5 font-mono text-[11px] font-bold tabular-nums text-muted sm:hidden"
+          className="ml-auto flex items-center gap-1.5 font-mono text-[11px] font-bold tabular-nums text-muted short:flex sm:hidden"
         >
           <span className="text-foreground">{index + 1}</span>/{questions.length}
           {answeredCount > 0 ? (
@@ -570,7 +662,10 @@ export function PracticeSession({
           </span>
         </p>
 
-        <p className="ml-auto hidden font-mono text-[11px] text-muted md:block">
+        {/* `short:hidden`: a phone held sideways is wide enough to trip `md`
+            and has no keyboard to shortcut with. Telling a student to press
+            „1" on a touch screen is a lie, and it costs a row. */}
+        <p className="ml-auto hidden font-mono text-[11px] text-muted short:hidden md:block">
           Клавиши 1–{Math.min(current.options.length, 9)} избират отговор ·
           Enter потвърждава
         </p>

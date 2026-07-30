@@ -18,7 +18,7 @@
  * it degrades to the plain low-contrast label he described.
  */
 
-import { useEffect, useRef, useState, type RefObject } from "react";
+import { useCallback, useEffect, useRef, useState, type RefObject } from "react";
 import {
   createCameraAidHintState,
   observeCameraAidHint,
@@ -28,6 +28,40 @@ import type { DashboardStatus } from "./dashboardStatus";
 
 /** Poll period (ms). The cue reacts to a gear selection, not to a frame. */
 const POLL_MS = 200;
+
+/**
+ * ── ROW B13, 2026-07-30. THE CUE LANDED ON THE DEMONSTRATION DECK. ──────────
+ *
+ * The cue itself works — the auditor found it on „Тясно гнездо" L1, on screen
+ * the moment R is selected, exactly as asked. Where it landed is the defect:
+ * `bottom-[11rem]` is 176 px, and the L1 demonstration player occupies that
+ * band, so «ДЕМОНСТРАЦИЯ — СЛЕДВАЙ СЯНКАТА» and «Тясно е — виж мястото отгоре
+ * G» were printed on top of each other, character for character, at the cue's
+ * 0.62 opacity. Neither was readable. And the cue is only ALLOWED on rungs ≤ 3
+ * (overheadHint.ts) — precisely the rungs that carry the demo player, so this
+ * was not an unlucky combination, it was the normal case.
+ *
+ * 176 px is also inside the touch band on a phone: TouchControls' drive pad
+ * reaches 176 px + the bottom inset, so the same constant put a `pointer-
+ * events-auto` button on the throttle.
+ *
+ * So the cue stops guessing and measures. Every frame it might collide with,
+ * it asks for: the demonstration deck (`data-hud="demo-deck"`, the handle
+ * PlayAreaStyles already steers by) and the two touch sliders. It parks itself
+ * a gap above the HIGHEST of them, or at 176 px when the screen below it is
+ * empty. Measuring beats another hard-coded rem: the deck's own floor already
+ * differs between roomy and compact, and a third copy of that number here would
+ * be the fourth place it is written down.
+ */
+const CUE_FALLBACK_BOTTOM_PX = 176;
+/** Breathing room between the cue and whatever it is standing on. */
+const CUE_GAP_PX = 10;
+/** Never climb past this share of the play area — a cue at the horizon is a
+ *  different kind of wrong from a cue on the deck. */
+const CUE_MAX_BOTTOM_FRACTION = 0.55;
+
+/** Elements this cue must not sit on top of. */
+const CUE_OBSTACLES = '[data-hud="demo-deck"], [data-hud="touch-controls"] [role="slider"]';
 
 export function CameraAidHint({
   statusRef,
@@ -72,12 +106,47 @@ export function CameraAidHint({
     return () => window.clearInterval(id);
   }, [eligible, statusRef]);
 
-  if (hidden || phase === "off") return null;
+  // ── B13: park above whatever is already in the bottom band. ───────────────
+  const hostRef = useRef<HTMLDivElement | null>(null);
+  const [bottomPx, setBottomPx] = useState(CUE_FALLBACK_BOTTOM_PX);
+  const measure = useCallback(() => {
+    const host = hostRef.current;
+    const parent = host?.offsetParent as HTMLElement | null;
+    if (!host || !parent) return;
+    const area = parent.getBoundingClientRect();
+    if (area.height <= 0) return;
+    let want = CUE_FALLBACK_BOTTOM_PX;
+    for (const el of Array.from(parent.querySelectorAll(CUE_OBSTACLES))) {
+      const r = el.getBoundingClientRect();
+      if (r.height <= 0 || r.width <= 0) continue;
+      want = Math.max(want, area.bottom - r.top + CUE_GAP_PX);
+    }
+    const next = Math.round(Math.min(want, area.height * CUE_MAX_BOTTOM_FRACTION));
+    setBottomPx((prev) => (prev === next ? prev : next));
+  }, []);
+
+  const visible = !hidden && phase !== "off";
+  useEffect(() => {
+    if (!visible) return;
+    measure();
+    // The deck opens, closes and changes floor between roomy and compact, and
+    // the pads resize with the viewport. Cheap poll, transitions only.
+    const id = window.setInterval(measure, 400);
+    window.addEventListener("resize", measure);
+    return () => {
+      window.clearInterval(id);
+      window.removeEventListener("resize", measure);
+    };
+  }, [visible, measure]);
+
+  if (!visible) return null;
   const done = phase === "done";
 
   return (
     <div
-      className="pointer-events-none absolute bottom-[11rem] left-1/2 z-10 -translate-x-1/2 select-none"
+      ref={hostRef}
+      style={{ bottom: `${bottomPx}px` }}
+      className="pointer-events-none absolute left-1/2 z-10 -translate-x-1/2 select-none"
       role="status"
       aria-label={
         done

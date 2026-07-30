@@ -377,6 +377,30 @@ const FS_LEAD_CAR: BrakingLeadCarSpec = {
   resumeAfterSec: 3,
 };
 
+/**
+ * B70 (founder, doc 87): „the column is waiting at the end of the road". He was
+ * describing ONE car. The drill is called «Дистанция при спиране в КОЛОНА», its
+ * objective names a колона and its instructions say the traffic ahead has
+ * stopped in one — and the map staged a single vehicle standing by itself, so
+ * the word „колона" was a claim the world did not keep. A queue of one is a
+ * parked car.
+ *
+ * Two more standing vehicles ahead of the tail, at the 7 m centres a real
+ * stopped queue keeps (≈ 3 m of clear tarmac between bumpers). They are inert
+ * by exactly the mechanism the tail uses — armDistM 3 m means they would only
+ * begin to pace on bumper contact — so the graded standstill gap is still
+ * measured against the y = 290 tail and stays fully deterministic.
+ *
+ * Mounted through `LevelSpec.stagedAdd`, never `ScenarioSpec.staged`: the
+ * recorder reads `spec.staged` (traces/scFollowStandstill.ts), so the three
+ * committed recordings and their §5/§9 gate are byte-identical.
+ */
+const FS_QUEUE_AHEAD: BrakingLeadCarSpec[] = [297, 304].map((y, i) => ({
+  ...FS_LEAD_CAR,
+  id: `sc-fs-queue-${i + 1}`,
+  actor: { ...FS_LEAD_CAR.actor, hold: { nodeIndex: 0, offsetM: y }, colorIndex: 3 + i },
+}));
+
 /** FO-08 — дистанция при пълно спиране в колона (ЗДвП чл. 23: дори при спиране
  *  се държи достатъчно разстояние до движещото се/спрялото пред теб ППС). */
 export const SC_FOLLOW_STANDSTILL: ScenarioSpec = {
@@ -399,8 +423,11 @@ export const SC_FOLLOW_STANDSTILL: ScenarioSpec = {
     vehicleStart: "ready",
   },
   instructionsBg: [
-    { n: 1, textBg: "Потегли по правата улица — пред теб се движи друга кола в твоята лента." },
-    { n: 2, textBg: "Предният спира в колона. Намали плавно и спри зад него, без да залепваш за бронята му." },
+    // B70: say what is actually on the road. The column is ALREADY standing —
+    // it does not stop in front of you — and pretending otherwise made the
+    // student watch for a braking car that never brakes.
+    { n: 1, textBg: "Потегли по правата улица. Напред в твоята лента вече стои спряла колона — виждаш я отдалеч." },
+    { n: 2, textBg: "Намали плавно още отдалеч и спри зад последната кола, без да залепваш за бронята ѝ." },
     { n: 3, textBg: "Остави разумно разстояние: колкото да виждаш къде задните гуми на предната кола опират в асфалта — около два метра." },
     { n: 4, textBg: "Това разстояние ти дава място да заобиколиш при нужда и резерв, ако предният се върне назад по наклон." },
     { n: 5, textBg: "Изчакай спокойно зад него на тази дистанция до края на упражнението." },
@@ -446,11 +473,14 @@ export const SC_FOLLOW_STANDSTILL: ScenarioSpec = {
     examinerBg:
       "Изпитващият следи разстоянието и при спиране: спиране прекалено близо до предната кола е второстепенна грешка. Спри така, че да виждаш къде задните ѝ гуми опират в пътя — това е достатъчно разстояние за маневра и за наклона.",
   },
+  // B70: the rest of the column rides on every played rung (stagedAdd), so the
+  // student meets a queue instead of one parked car, while `staged` — the only
+  // field the trace recorder reads — stays exactly as recorded.
   levels: [
-    { level: 1 },
-    { level: 2 },
-    { level: 3 },
-    { level: 4, vehicleStart: "cold" },
+    { level: 1, stagedAdd: FS_QUEUE_AHEAD },
+    { level: 2, stagedAdd: FS_QUEUE_AHEAD },
+    { level: 3, stagedAdd: FS_QUEUE_AHEAD },
+    { level: 4, vehicleStart: "cold", stagedAdd: FS_QUEUE_AHEAD },
   ],
   staged: [FS_LEAD_CAR],
   conditions: { weather: "dry" },

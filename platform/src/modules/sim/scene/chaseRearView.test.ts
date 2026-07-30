@@ -8,11 +8,16 @@
 
 import { describe, expect, it } from "vitest";
 import {
+  rearViewBottomFraction,
   rearViewCenterNdc,
   rearViewQuadHalfSize,
   rearViewQuadOffset,
   rearViewRect,
   REAR_VIEW_FOV_DEG,
+  REAR_VIEW_IDLE_CADENCE,
+  REAR_VIEW_IDLE_OPACITY,
+  REAR_VIEW_IDLE_SCALE,
+  REAR_VIEW_CADENCE,
   REAR_VIEW_MAX_SCREEN_FRACTION,
   REAR_VIEW_YAW_RAD,
   type RearViewSide,
@@ -130,6 +135,105 @@ describe("REAR_VIEW_YAW_RAD — which way the camera actually looks", () => {
   it("the quarters are wider than the straight-back look", () => {
     expect(REAR_VIEW_FOV_DEG.left).toBeGreaterThan(REAR_VIEW_FOV_DEG.rear);
     expect(REAR_VIEW_FOV_DEG.left).toBe(REAR_VIEW_FOV_DEG.right);
+  });
+});
+
+/**
+ * ROW B74 — the mirror that is there when nobody presses anything.
+ *
+ * The first pass shipped this window bound to the glance HOLD, and the audit
+ * frame of `sc-follow-tailgater` (chase POV, no key down) had no mirror on it
+ * at all. „Put Rear Mirror some small window in the POV after pressing C" is
+ * about the VIEW, not about a key: the mirror is now permanent in chase at
+ * REAR_VIEW_IDLE_SCALE, and a glance grows it. These pin the properties the
+ * rig relies on when it interpolates between the two.
+ */
+describe("REAR_VIEW_IDLE_SCALE — the persistent interior mirror", () => {
+  it("is smaller than the glanced window, and never zero", () => {
+    expect(REAR_VIEW_IDLE_SCALE).toBeGreaterThan(0.4);
+    expect(REAR_VIEW_IDLE_SCALE).toBeLessThan(1);
+  });
+
+  it("shrinks about its centre: strictly less screen at every aspect", () => {
+    for (const a of ASPECTS) {
+      const open = rearViewRect(a);
+      const idle = rearViewRect(a, REAR_VIEW_IDLE_SCALE);
+      expect(idle.heightFraction, `aspect ${a}`).toBeLessThan(open.heightFraction);
+      expect(idle.screenAreaFraction, `aspect ${a}`).toBeLessThan(open.screenAreaFraction);
+      // The founder's ceiling is a ceiling at EVERY rung, not just at full size.
+      expect(idle.screenAreaFraction).toBeLessThanOrEqual(REAR_VIEW_MAX_SCREEN_FRACTION);
+    }
+  });
+
+  it("keeps the same 2.4:1 pixel shape as the open window", () => {
+    for (const a of [4 / 3, 1.6, 16 / 9, 21 / 9]) {
+      const r = rearViewRect(a, REAR_VIEW_IDLE_SCALE);
+      expect((r.widthFraction * a) / r.heightFraction).toBeCloseTo(2.4, 5);
+    }
+  });
+
+  it("hangs from the same top edge, so growing it does not make it jump", () => {
+    // Both rungs share the top margin; only the lower edge moves. That is what
+    // lets the rig interpolate size on the glance envelope without the window
+    // sliding vertically under the student's eye.
+    for (const a of ASPECTS) {
+      for (const side of SIDES) {
+        const open = rearViewCenterNdc(side, a);
+        const idle = rearViewCenterNdc(side, a, REAR_VIEW_IDLE_SCALE);
+        const topOf = (c: { y: number }, hf: number) => c.y + hf;
+        expect(topOf(idle, rearViewRect(a, REAR_VIEW_IDLE_SCALE).heightFraction)).toBeCloseTo(
+          topOf(open, rearViewRect(a).heightFraction),
+          9,
+        );
+      }
+    }
+  });
+
+  it("stays fully on screen at the idle rung too", () => {
+    for (const a of ASPECTS) {
+      const r = rearViewRect(a, REAR_VIEW_IDLE_SCALE);
+      for (const side of SIDES) {
+        const c = rearViewCenterNdc(side, a, REAR_VIEW_IDLE_SCALE);
+        expect(Math.abs(c.x) + r.widthFraction, `x, aspect ${a}, ${side}`).toBeLessThanOrEqual(1);
+        expect(c.y + r.heightFraction, `y, aspect ${a}, ${side}`).toBeLessThanOrEqual(1);
+      }
+    }
+  });
+
+  it("costs less per frame than a glance, and is visible without being loud", () => {
+    expect(REAR_VIEW_IDLE_CADENCE).toBeGreaterThan(REAR_VIEW_CADENCE);
+    expect(REAR_VIEW_IDLE_OPACITY).toBeGreaterThan(0.5);
+    expect(REAR_VIEW_IDLE_OPACITY).toBeLessThan(1);
+  });
+});
+
+/**
+ * ROW B76 — the number the DOM needs.
+ *
+ * The window is a quad inside the canvas; every HUD card is DOM painted over
+ * that canvas. No renderOrder can reorder those two, so the HUD steps below the
+ * window and needs to know where its lower edge is.
+ */
+describe("rearViewBottomFraction — where the HUD has to start", () => {
+  it("is the window's lower edge as a share of viewport height", () => {
+    for (const a of ASPECTS) {
+      for (const scale of [1, REAR_VIEW_IDLE_SCALE]) {
+        const c = rearViewCenterNdc("rear", a, scale);
+        const hf = rearViewRect(a, scale).heightFraction;
+        // NDC y → fraction from the top is (1 − y) / 2; the lower edge is
+        // centre − halfHeight, and halfHeight in NDC is heightFraction.
+        expect(rearViewBottomFraction(a, scale)).toBeCloseTo((1 - (c.y - hf)) / 2, 9);
+      }
+    }
+  });
+
+  it("leaves the bottom two thirds of the screen alone", () => {
+    for (const a of ASPECTS) {
+      expect(rearViewBottomFraction(a), `aspect ${a}`).toBeLessThan(0.34);
+      expect(rearViewBottomFraction(a, REAR_VIEW_IDLE_SCALE)).toBeLessThan(
+        rearViewBottomFraction(a),
+      );
+    }
   });
 });
 

@@ -19,7 +19,9 @@ import type { ScenarioLevel, ScenarioSpec } from "../types";
 const clone = (): ScenarioSpec => JSON.parse(JSON.stringify(SC_PARK_PERP_REV)) as ScenarioSpec;
 
 describe("compileScenario — sc-park-perp-rev", () => {
-  const LEVELS: ScenarioLevel[] = [1, 2, 3, 4];
+  // L5 joined the P0's ladder with doc 87 B2 — night + rain on the same bay,
+  // the rung its repaired sibling sc-park-narrow already shipped.
+  const LEVELS: ScenarioLevel[] = [1, 2, 3, 4, 5];
 
   it("compiles every authored rung into a parse-clean, session-startable lesson", () => {
     for (const level of LEVELS) {
@@ -94,8 +96,13 @@ describe("compileScenario — sc-park-perp-rev", () => {
   });
 
   it("refuses a level the template does not author", () => {
-    expect(() => compileScenario(SC_PARK_PERP_REV, 5)).toThrow(ScenarioCompileError);
-    expect(() => compileScenario(SC_PARK_PERP_REV, 5)).toThrow(/does not author L5.*L1, L2, L3, L4/);
+    // The P0 authors L1..L5 since doc 87 B2 (catalog position 1 was the one
+    // parking card in the family with no L5 tile to click), so the unauthored
+    // rung is made here rather than borrowed from the shipped template.
+    const noL5 = clone();
+    noL5.levels = noL5.levels.filter((l) => l.level !== 5);
+    expect(() => compileScenario(noL5, 5)).toThrow(ScenarioCompileError);
+    expect(() => compileScenario(noL5, 5)).toThrow(/does not author L5.*L1, L2, L3, L4/);
   });
 
   it("compiles SNOW rungs into the lesson environment (the AC-08 unlock — the last weather ungated)", () => {

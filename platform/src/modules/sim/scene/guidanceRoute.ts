@@ -31,6 +31,22 @@
  *     runtime's own `debugStopLines()` — the same lines the rule engine
  *     convicts on — so the class of defect is unauthorable rather than fixed
  *     nine times.
+ *
+ *     1b (register B18, 2026-07-30). „Спри преди линията, не след нея" is a
+ *     rule about PAINT, not about grading. `debugStopLines()` deliberately
+ *     skips roundabout mouths (runtime/stoplines.ts:248 — priority-inside,
+ *     yield on entry), yet the world PAINTS an М8 give-way line at every one
+ *     of them, and `sc-roundabout-entry`'s own waypoint stands 1.72 m past it
+ *     on the lesson the founder played. So the guidance layer now knows both
+ *     kinds of line: the GRADED set (`graded: true`, the only set a
+ *     `passSignal` may resolve against — T3's contract is untouched) and the
+ *     PAINTED set derived from the builder's own predicate, which a `reachZone`
+ *     marker may not stand past. Where the lawful aim point still lies inside
+ *     the objective's acceptance circle the marker is pulled back onto it and
+ *     drawn as a gate; where it does not, the objective ITSELF is authored
+ *     inside the junction and only its template can fix that — moving the
+ *     marker there would trade „it points past the line" for „I stopped on it
+ *     and nothing happened", which is the worse lie (doc 86 §7 R6).
  *  2. The marker states its own contract. It carries the objective's
  *     acceptance radius and its speed cap, and it says whether the student
  *     drives THROUGH it or STOPS on it. A ring drawn at a fixed 1.85 m over a
@@ -40,11 +56,34 @@
  *     active waypoint into objective n+1, so „надясно на следващото
  *     кръстовище" is announced before the junction — not after the nose has
  *     already committed and TURN_WITHOUT_INDICATOR has been billed.
+ *
+ *     3b (register B24/B6, 2026-07-30). ONE objective of look-ahead is not
+ *     enough. `sc-junction-stop` is approach → stop line → exit-east: while
+ *     the approach is active, objective n+1 is the stop line itself, which is
+ *     straight ahead, so the ribbon showed no turn at all for the whole
+ *     approach and the right turn appeared only when the nose crossed the Б2
+ *     paint — the founder's item 9, verbatim. The look-ahead is therefore a
+ *     CHAIN: legs are appended, objective by objective, until a turn appears
+ *     beyond the active waypoint or the 170 m budget runs out.
+ *
+ *     3c (register B1, 2026-07-30). A `driveDistance` objective walks „ahead",
+ *     and that walk used to append whole edges — 176 m of green ribbon for an
+ *     80 m request on Урок 7, running past the parking bay and out to the end
+ *     of the street, „and then it disappears and asks me to go back and park".
+ *     The walk is now trimmed to the distance it was asked for, and trimmed
+ *     again at the place the NEXT objective happens when that place is on the
+ *     same corridor — so the ribbon ends where the task ends.
  */
 
 import { parseObjectiveParams, type LessonSpec } from "@/modules/sim/lessons";
 import { LANE_WIDTH_M, createWorldRuntime } from "@/modules/sim/runtime";
 import { DistrictIndex } from "@/modules/sim/runtime/spatial";
+import {
+  JUNCTION_TRIM_MAX_FRACTION,
+  STOP_LINE_BEYOND_CUT_M,
+  junctionPriorityControls,
+  nodeOpenRadiusM,
+} from "@/modules/sim/world/builders/network";
 
 // ---------------------------------------------------------------------------
 // Tuning
@@ -99,8 +138,62 @@ export const GATE_LATERAL_MAX_M = LANE_WIDTH_M * 0.75;
  * objectives in the catalog author 5 or 6 km/h (doc 86 B5).
  */
 export const HALT_CAP_KMH = 6;
-/** Hard cap on the look-ahead leg appended for objective n+1. */
+/** Hard cap on the look-ahead legs appended for objectives n+1, n+2, … */
 export const LOOKAHEAD_MAX_M = 170;
+/**
+ * How far the look-ahead chain may reach in OBJECTIVES. Three is the deepest
+ * chain in the catalog that still describes one junction (approach → line →
+ * exit); past that the leg is a different beat of the lesson and the ribbon's
+ * 120 m ahead-fade has swallowed it anyway.
+ */
+export const LOOKAHEAD_MAX_LEGS = 3;
+
+/**
+ * Paint has width and the marker sits on a densified polyline: half a metre
+ * past a line is still inside the painted band. Same number as
+ * guidance-geometry.test.ts's PAST_TOLERANCE_M, and it means the same thing.
+ */
+const PAST_LINE_TOLERANCE_M = 0.5;
+/**
+ * A line only governs a marker that is NEAR it — beyond this the marker is a
+ * different beat of the lesson (`sc-junction-stop`'s exit waypoint is 57 m
+ * past the Б2 line and is supposed to be). 12 m = a junction mouth plus a car,
+ * so a waypoint parked just inside the box is still caught when the objective's
+ * own radius is small.
+ */
+const MARKER_GOVERNING_NEAR_M = 12;
+/**
+ * …and never further than this, however big the objective's radius is. Some
+ * waypoints are 60 m proximity blobs (`l3-approach` is „be somewhere near the
+ * roundabout"); at that range „which line governs this marker" stops being a
+ * measurement and becomes a guess, and a marker moved 30 m onto the wrong arm
+ * would be a far worse lie than the 1.7 m one this clamp exists to fix. 20 m
+ * is a perceptually-scaled junction mouth (≈17 m) plus a car.
+ */
+const MARKER_GOVERNING_MAX_M = 20;
+/**
+ * How deep inside the acceptance circle the clamped aim point must land before
+ * the clamp is allowed. Three quarters of the radius: a student who stops on
+ * the bar is unambiguously inside the gate the engine tests, so moving the
+ * marker can never produce „стоях точно на маркера и нищо не стана".
+ */
+export const MARKER_INSIDE_FRACTION = 0.75;
+/** Direction agreement required between „driver → marker" and a line's own
+ *  travel direction before that line is treated as being on this approach. */
+const APPROACH_ALIGN_DOT = 0.5;
+
+/**
+ * An „ahead" walk may overrun the distance it was asked for by this much and
+ * no more — two densify steps, so the ribbon never ends exactly on the
+ * odometer mark, and never runs to the end of whatever edge it happens to be
+ * on either (register B1: 176 m of ribbon for an 80 m request).
+ */
+export const AHEAD_OVERRUN_M = 5;
+/** An „ahead" corridor is cut short at the next objective only when that
+ *  objective is genuinely beside the corridor, not merely somewhere nearby. */
+const AHEAD_NEXT_LATERAL_M = 30;
+/** …and never cut shorter than this, whatever the next objective's distance. */
+const AHEAD_TRIM_FLOOR_M = 25;
 
 // ---------------------------------------------------------------------------
 // Types
@@ -121,9 +214,16 @@ export interface RouteDistrictLike {
 }
 
 /**
- * A graded stop line flattened into the plane guidance reasons in. Built from
- * `worldRuntime.debugStopLines()` — the SAME lines `rules/engine.ts` convicts
- * `STOP_LINE_OVERSHOOT` / `RED_LIGHT_CROSSED` on, never a second derivation.
+ * A stop line flattened into the plane guidance reasons in.
+ *
+ *  - `graded: true`  — from `worldRuntime.debugStopLines()`, the SAME lines
+ *    `rules/engine.ts` convicts `STOP_LINE_OVERSHOOT` / `RED_LIGHT_CROSSED`
+ *    on, never a second derivation. Only these may anchor a `passSignal`.
+ *  - `graded: false` — PAINTED but not graded: the world builder draws a line
+ *    here (`world/builders/markings.ts` stop/give-way pass) while the runtime
+ *    deliberately grades nothing, the roundabout mouths being the whole class.
+ *    A student cannot tell the difference from the driving seat, so guidance
+ *    must not send him past one either.
  */
 export interface GuidanceStopLine {
   id: string;
@@ -136,6 +236,8 @@ export interface GuidanceStopLine {
   control: "trafficLight" | "stopSign" | "giveWay";
   junctionNodeId: string;
   edgeId: string;
+  /** The rule engine convicts on this line (vs. paint-only — see above). */
+  graded: boolean;
 }
 
 /** Does the student drive THROUGH this marker, or come to rest ON it? */
@@ -240,7 +342,10 @@ function approachStopLine(
 ): GuidanceStopLine | null {
   const lines = ctx?.stopLines;
   if (!lines || lines.length === 0) return null;
-  const atNode = lines.filter((l) => l.junctionNodeId === nodeId);
+  // GRADED lines only. T3's whole point is that the gate stands on the cut the
+  // rule engine convicts at; anchoring it to paint the engine ignores would
+  // reopen exactly the gap that fix closed.
+  const atNode = lines.filter((l) => l.junctionNodeId === nodeId && l.graded);
   // Exact control first. A Б1 „Пропусни движението" line is accepted for a
   // stopSign objective only as a last resort: the paint the student can SEE
   // beats a marker floating at the node, even though `stepPassSignal` then
@@ -266,6 +371,79 @@ function approachStopLine(
     }
   }
   return best;
+}
+
+/**
+ * The line a `reachZone` marker is standing PAST — the one whose paint the
+ * student must not be told to cross to reach his own waypoint (register B18).
+ *
+ * Four conditions, and every one of them exists to stop the clamp from lying
+ * in some new direction:
+ *
+ *  · the line is near enough to govern this marker at all;
+ *  · the marker really is on the far side of it (paint tolerance aside);
+ *  · the driver is travelling ACROSS it on his way to the marker — the give-way
+ *    line on the opposite arm of the same roundabout is not his obligation;
+ *  · and the lawful aim point still lands well inside the objective's own
+ *    acceptance circle. If it does not, the OBJECTIVE is authored inside the
+ *    junction and no marker placement can rescue it: pulling the marker back
+ *    would replace „it points past the line" with „I stopped on it and nothing
+ *    happened" (doc 86 §7 R6). Those are reported by guidance-geometry.test.ts
+ *    against the template that owns them, never papered over here.
+ */
+function governingPaintLine(
+  ctx: GuidanceContext | undefined,
+  x: number,
+  y: number,
+  radiusM: number,
+  backM: number,
+): { line: GuidanceStopLine; x: number; y: number } | null {
+  const lines = ctx?.stopLines;
+  if (!lines || lines.length === 0) return null;
+  const near = Math.min(
+    Math.max(radiusM, MARKER_GOVERNING_NEAR_M),
+    MARKER_GOVERNING_MAX_M,
+  );
+  let best: { line: GuidanceStopLine; x: number; y: number } | null = null;
+  let bestPast = PAST_LINE_TOLERANCE_M;
+  for (const line of lines) {
+    const dx = x - line.x;
+    const dy = y - line.y;
+    if (Math.hypot(dx, dy) > near) continue;
+    const past = dx * line.dirX + dy * line.dirY;
+    if (past <= bestPast) continue;
+    const from = ctx?.from;
+    if (from) {
+      const ax = x - from.x;
+      const ay = y - from.y;
+      const len = Math.hypot(ax, ay);
+      if (len > EPS && (ax * line.dirX + ay * line.dirY) / len < APPROACH_ALIGN_DOT) continue;
+      // The line comes FIRST: the student meets the paint, then the waypoint.
+      if (Math.hypot(line.x - from.x, line.y - from.y) > len) continue;
+    }
+    // Slide the bar into the marker's own lane: the line is anchored on the
+    // edge centreline, and a «спри тук» bar straddling the осева would be its
+    // own small lie (the same correction the passSignal gate makes).
+    const lat = clamp(
+      dx * -line.dirY + dy * line.dirX,
+      -GATE_LATERAL_MAX_M,
+      GATE_LATERAL_MAX_M,
+    );
+    const px = line.x - line.dirX * backM - line.dirY * lat;
+    const py = line.y - line.dirY * backM + line.dirX * lat;
+    if (Math.hypot(px - x, py - y) > radiusM * MARKER_INSIDE_FRACTION) continue;
+    best = { line, x: px, y: py };
+    bestPast = past;
+  }
+  return best;
+}
+
+/** «Спри на …» / «Карай до …» for a marker resolved onto a line, named by the
+ *  sign that governs it — a Б1 give-way line is not a стоп-линия and an
+ *  instructor never calls it one. */
+function lineLabelBg(control: GuidanceStopLine["control"], halt: boolean): string {
+  const what = control === "giveWay" ? "линията за пропускане" : "стоп-линията";
+  return halt ? `Спри на ${what}` : `Карай до ${what}`;
 }
 
 /** Ring radii the renderer draws for a zone marker: the OUTER radius is the
@@ -294,6 +472,31 @@ export function guidanceGoalFor(
   switch (params.kind) {
     case "reachZone": {
       const halt = params.maxSpeedKmh !== undefined && params.maxSpeedKmh <= HALT_CAP_KMH;
+      const back = halt ? STOP_BAR_BEFORE_LINE_M : THROUGH_GATE_BEFORE_LINE_M;
+      // B18. A waypoint authored past a line the student can SEE is pulled
+      // back onto the lawful side of it and drawn as the bar it now is; the
+      // acceptance radius it still grades on rides along untouched.
+      const clamped = governingPaintLine(ctx, params.x, params.y, params.radiusM, back);
+      if (clamped) {
+        const goal: GuidancePointGoal = {
+          kind: "point",
+          x: clamped.x,
+          y: clamped.y,
+          marker: true,
+          affordance: halt ? "halt" : "through",
+          shape: {
+            kind: "gate",
+            halfWidthM: GATE_HALF_WIDTH_M,
+            dirX: clamped.line.dirX,
+            dirY: clamped.line.dirY,
+          },
+          acceptRadiusM: params.radiusM,
+          labelBg: lineLabelBg(clamped.line.control, halt),
+          stopLineId: clamped.line.id,
+        };
+        if (params.maxSpeedKmh !== undefined) goal.maxSpeedKmh = params.maxSpeedKmh;
+        return goal;
+      }
       const goal: GuidancePointGoal = {
         kind: "point",
         x: params.x,
@@ -410,11 +613,86 @@ export function guidanceGoalFor(
 const stopLineCache = new WeakMap<object, readonly GuidanceStopLine[]>();
 
 /**
- * Flatten `worldRuntime.debugStopLines()` for the guidance layer. Memoized per
- * district OBJECT, so a scene mount pays it once. A district the runtime
- * refuses to parse (the synthetic fixtures in the unit tests, a partial
- * document) yields an empty list and guidance falls back to authored anchors —
- * it degrades, it never throws inside a render.
+ * Every line the world PAINTS at a junction mouth, graded or not.
+ *
+ * The predicate is the world builder's own, term for term: `markings.ts`'s
+ * stop/give-way pass paints at a node of degree ≥ 3, on each INCOMING
+ * approach, when the node is signalized or `junctionPriorityControls` names
+ * that approach — and it puts the paint at the junction cut plus
+ * `STOP_LINE_BEYOND_CUT_M`, which is the same arithmetic
+ * `runtime/stoplines.ts` uses for the graded lines. Deriving it here instead
+ * of calling `analyzeNetwork` keeps the guidance layer off the geometry
+ * builders while landing on the identical coordinates (verified to 3 dp
+ * against `analyzeNetwork` on rb-mini-v1, district-v1, d2-v1, sx-v1).
+ *
+ * A district the index refuses to build yields nothing and guidance falls back
+ * to the graded set — it degrades, it never throws inside a render.
+ */
+function paintedLinesFor(index: DistrictIndex): GuidanceStopLine[] {
+  const out: GuidanceStopLine[] = [];
+  const signalized = new Set(
+    index.district.intersections.filter((i) => i.signalized).map((i) => i.id),
+  );
+  for (const [nodeId, incident] of index.edgesAtNode) {
+    if (incident.length < 3) continue; // markings.ts: `if (node.degree < 3) continue;`
+    const touched = incident.map((i) => index.edgeRt(i).edge);
+    const radius = nodeOpenRadiusM(touched, touched.length);
+    if (radius <= 0) continue;
+    const isSignal = signalized.has(nodeId);
+    const controls = isSignal
+      ? null
+      : junctionPriorityControls(
+          incident.map((i) => {
+            const { edge } = index.edgeRt(i);
+            return {
+              edgeId: edge.id,
+              class: edge.class,
+              incoming: !edge.oneway || edge.to === nodeId,
+              roundabout: edge.roundabout,
+            };
+          }),
+        );
+    for (const edgeIdx of incident) {
+      const rt = index.edgeRt(edgeIdx);
+      const control: GuidanceStopLine["control"] | undefined = isSignal
+        ? "trafficLight"
+        : controls!.get(rt.edge.id);
+      if (control === undefined) continue;
+      const sb = Math.min(
+        Math.min(radius, rt.totalLen * JUNCTION_TRIM_MAX_FRACTION) + STOP_LINE_BEYOND_CUT_M,
+        rt.totalLen / 2,
+      );
+      for (const atFromEnd of [true, false] as const) {
+        if (atFromEnd && rt.edge.oneway) continue; // flow leaves the junction here
+        if (atFromEnd ? rt.edge.from !== nodeId : rt.edge.to !== nodeId) continue;
+        const sM = atFromEnd ? sb : rt.totalLen - sb;
+        const dirSign = atFromEnd ? -1 : 1;
+        const [x, y] = index.pointAt(edgeIdx, sM);
+        const [tx, ty] = index.tangentAt(edgeIdx, sM);
+        out.push({
+          id: `${rt.edge.id}@${sM.toFixed(1)}:${control}:paint`,
+          x,
+          y,
+          dirX: tx * dirSign,
+          dirY: ty * dirSign,
+          control,
+          junctionNodeId: nodeId,
+          edgeId: rt.edge.id,
+          graded: false,
+        });
+      }
+    }
+  }
+  return out;
+}
+
+/**
+ * Flatten `worldRuntime.debugStopLines()` for the guidance layer, then add the
+ * lines the world paints but does not grade (see `paintedLinesFor` and the
+ * header note 1b). Memoized per district OBJECT, so a scene mount pays it
+ * once. A district the runtime refuses to parse (the synthetic fixtures in the
+ * unit tests, a partial document) yields an empty list and guidance falls back
+ * to authored anchors — it degrades, it never throws inside a render.
  */
 export function stopLinesForGuidance(district: unknown): readonly GuidanceStopLine[] {
   if (typeof district !== "object" || district === null) return [];
@@ -436,8 +714,17 @@ export function stopLinesForGuidance(district: unknown): readonly GuidanceStopLi
         control: l.control,
         junctionNodeId: l.junctionNodeId,
         edgeId: index.edges[l.edgeIdx]!.edge.id,
+        graded: true,
       };
     });
+    // Paint-only: same edge + within a metre of a graded line ⇒ it IS that
+    // line, already present. Everything else is paint nothing convicts on.
+    for (const p of paintedLinesFor(index)) {
+      const dup = out.some(
+        (g) => g.edgeId === p.edgeId && Math.hypot(g.x - p.x, g.y - p.y) < 1,
+      );
+      if (!dup) out.push(p);
+    }
   } catch {
     out = [];
   }
@@ -911,6 +1198,55 @@ function trimRawTo(raw: RawRoute, maxM: number): RawRoute {
   return { points, jointIdx: raw.jointIdx.filter((j) => j < cut) };
 }
 
+/** Polyline arclength of a raw route. */
+function rawLength(raw: RawRoute): number {
+  let acc = 0;
+  for (let i = 1; i < raw.points.length; i++) {
+    acc += Math.hypot(
+      raw.points[i][0] - raw.points[i - 1][0],
+      raw.points[i][1] - raw.points[i - 1][1],
+    );
+  }
+  return acc;
+}
+
+/**
+ * Where along a raw route it comes nearest to (x, y) — the cut point for an
+ * „ahead" corridor whose next objective sits beside it (register B1: Урок 7's
+ * bay is 6.4 m off the corridor, 62 m out, and the ribbon used to run 176 m).
+ */
+function nearestOnRaw(raw: RawRoute, x: number, y: number): { s: number; latM: number } {
+  let acc = 0;
+  let bestS = 0;
+  let bestD = Infinity;
+  for (let i = 0; i < raw.points.length; i++) {
+    if (i > 0) {
+      acc += Math.hypot(
+        raw.points[i][0] - raw.points[i - 1][0],
+        raw.points[i][1] - raw.points[i - 1][1],
+      );
+    }
+    const d = Math.hypot(raw.points[i][0] - x, raw.points[i][1] - y);
+    if (d < bestD) {
+      bestD = d;
+      bestS = acc;
+    }
+  }
+  return { s: bestS, latM: bestD };
+}
+
+/** Does the route turn ≥ TURN_MIN_RAD at a junction PAST `splitIdx` — i.e. is
+ *  the next turn already announced beyond the active waypoint? */
+function hasTurnBeyond(raw: RawRoute, splitIdx: number): boolean {
+  for (const j of raw.jointIdx) {
+    if (j <= splitIdx || j <= 0 || j >= raw.points.length - 1) continue;
+    const inDir = dirOverWindow(raw.points, j, -1, TURN_DIR_WINDOW_M);
+    const outDir = dirOverWindow(raw.points, j, 1, TURN_DIR_WINDOW_M);
+    if (Math.abs(signedAngle(inDir, outDir)) >= TURN_MIN_RAD) return true;
+  }
+  return false;
+}
+
 /** Append the look-ahead leg. Returns the joined route and the index of the
  *  ACTIVE objective's marker inside it. */
 function concatRaw(a: RawRoute, b: RawRoute): { raw: RawRoute; splitIdx: number } {
@@ -1039,15 +1375,37 @@ function finalizeRoute(raw: RawRoute, splitIdx?: number): DerivedRoute | null {
 
 export interface DeriveRouteOptions {
   /**
-   * Objective n+1's target. The ribbon and its turn chevrons run THROUGH the
-   * active waypoint into it, so the turn at the junction is announced while
-   * the student is still approaching — doc 86 L5, the founder's item 9
-   * („зелената линия става надясно чак след като пресека маркировката").
-   * Null / absent = the old behaviour, route ends at the active waypoint.
+   * The targets of objective n+1, n+2, … in order. The ribbon and its turn
+   * chevrons run THROUGH the active waypoint into them, so the turn at the
+   * junction is announced while the student is still approaching — doc 86 L5,
+   * the founder's item 9 („зелената линия става надясно чак след като пресека
+   * маркировката"). Legs are appended until a turn appears beyond the active
+   * waypoint, or the chain / the metre budget runs out: ONE objective was not
+   * enough, because on `sc-junction-stop` objective n+1 IS the stop line and
+   * the turn lives one objective further (register B24/B6).
+   *
+   * A single target is accepted for the one-deep case. Null / absent = the old
+   * behaviour, route ends at the active waypoint.
    */
-  lookahead?: RouteTarget | null;
-  /** Hard cap on the appended leg, meters (default LOOKAHEAD_MAX_M). */
+  lookahead?: RouteTarget | readonly RouteTarget[] | null;
+  /** Hard cap on the appended legs together, meters (default LOOKAHEAD_MAX_M). */
   lookaheadMaxM?: number;
+}
+
+/** The look-ahead chain as points, stopping at the first entry that has no
+ *  coordinate to route to (an "ahead" objective ends the chain). */
+function lookaheadPoints(
+  spec: DeriveRouteOptions["lookahead"],
+): { x: number; y: number }[] {
+  if (!spec) return [];
+  const list = Array.isArray(spec) ? spec : [spec as RouteTarget];
+  const out: { x: number; y: number }[] = [];
+  for (const t of list) {
+    if (t.kind !== "point") break;
+    out.push({ x: t.x, y: t.y });
+    if (out.length >= LOOKAHEAD_MAX_LEGS) break;
+  }
+  return out;
 }
 
 /**
@@ -1063,34 +1421,68 @@ export function deriveGuidanceRoute(
   if (!goal || graph.edges.length === 0) return null;
   const snap = snapToRoad(graph, start.x, start.y);
   if (!snap) return null;
+  const chain = lookaheadPoints(opts?.lookahead);
+
   let raw: RawRoute | null;
   if (goal.kind === "ahead") {
-    raw = walkAheadRaw(graph, snap, start.headingDeg, goal.meters);
+    const walk = walkAheadRaw(graph, snap, start.headingDeg, goal.meters);
+    // B1. The walk appends WHOLE edges, so an 80 m request came back as 176 m
+    // of ribbon pointing at the end of the street. It is worth exactly the
+    // distance it was asked for, plus two densify steps so it never ends on
+    // the odometer mark itself.
+    raw = walk ? trimRawTo(walk, goal.meters + AHEAD_OVERRUN_M) : null;
+    // …and shorter still when the NEXT objective happens beside this corridor:
+    // the ribbon must end where the task ends, not run past the parking bay.
+    if (raw && chain.length > 0) {
+      const hit = nearestOnRaw(raw, chain[0].x, chain[0].y);
+      const floor = Math.max(AHEAD_TRIM_FLOOR_M, goal.meters - AHEAD_BUFFER_M);
+      if (
+        hit.latM <= AHEAD_NEXT_LATERAL_M &&
+        hit.s >= floor &&
+        hit.s < rawLength(raw) - DENSIFY_STEP_M
+      ) {
+        raw = trimRawTo(raw, hit.s);
+      }
+    }
+    if (raw && raw.points.length < 2) raw = null;
   } else {
     const targetSnap = snapToRoad(graph, goal.x, goal.y);
     raw = targetSnap ? shortestPathRaw(graph, snap, targetSnap) : null;
   }
   if (!raw) return null;
 
-  // Look-ahead leg: only for point goals (an "ahead" walk has no waypoint to
-  // continue FROM), and only when it actually adds road.
-  const next = opts?.lookahead;
-  if (goal.kind === "point" && next && next.kind === "point") {
-    const fromSnap = snapToRoad(graph, goal.x, goal.y);
+  // Look-ahead legs. They continue from the active waypoint (a point goal) or
+  // from wherever the "ahead" corridor now ends, and stop as soon as the turn
+  // the student has to signal for is on the ribbon.
+  let budget = opts?.lookaheadMaxM ?? LOOKAHEAD_MAX_M;
+  let acc = raw;
+  let splitIdx: number | undefined;
+  let from =
+    goal.kind === "point"
+      ? { x: goal.x, y: goal.y }
+      : { x: raw.points[raw.points.length - 1][0], y: raw.points[raw.points.length - 1][1] };
+  for (const next of chain) {
+    if (budget <= DENSIFY_STEP_M) break;
+    const fromSnap = snapToRoad(graph, from.x, from.y);
     const toSnap = snapToRoad(graph, next.x, next.y);
-    const cont =
-      fromSnap && toSnap && !(fromSnap.edgeIdx === toSnap.edgeIdx && Math.abs(fromSnap.sM - toSnap.sM) < 1)
-        ? shortestPathRaw(graph, fromSnap, toSnap)
-        : null;
-    if (cont) {
-      const trimmed = trimRawTo(cont, opts?.lookaheadMaxM ?? LOOKAHEAD_MAX_M);
-      if (trimmed.points.length >= 2) {
-        const joined = concatRaw(raw, trimmed);
-        return finalizeRoute(joined.raw, joined.splitIdx);
-      }
+    if (!fromSnap || !toSnap) break;
+    // Same place — nothing to add, but the chain continues past it.
+    if (fromSnap.edgeIdx === toSnap.edgeIdx && Math.abs(fromSnap.sM - toSnap.sM) < 1) {
+      from = next;
+      continue;
     }
+    const cont = shortestPathRaw(graph, fromSnap, toSnap);
+    if (!cont) break;
+    const trimmed = trimRawTo(cont, budget);
+    if (trimmed.points.length < 2) break;
+    const joined = concatRaw(acc, trimmed);
+    if (splitIdx === undefined) splitIdx = joined.splitIdx;
+    budget -= rawLength(trimmed);
+    acc = joined.raw;
+    from = next;
+    if (hasTurnBeyond(acc, splitIdx)) break;
   }
-  return finalizeRoute(raw);
+  return finalizeRoute(acc, splitIdx);
 }
 
 // ---------------------------------------------------------------------------

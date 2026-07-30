@@ -19,7 +19,7 @@
  * forever — the byte-identity gate is the fragility-proofing.
  *
  * Geometry pinned to sx-v1: ns right lane x = 4.06, stop line y = −27.73,
- * spawn sx-spawn-south (0, −105) heading north, ns limit 50.
+ * spawn sx-spawn-south (4.06, −105) heading north, ns limit 50.
  */
 
 import type { StagedEventSpec } from "../contracts";
@@ -49,7 +49,7 @@ export function scSignalRedYellowShadowScript(): DriveScript {
       {
         // Ease to a stop just short of the line (y = −27.73) on red.
         kind: "drive",
-        points: [[0, -105], [0, -103], [X_LANE, -92], [X_LANE, -50], [X_LANE, -29.5]],
+        points: [[X_LANE, -105], [X_LANE, -50], [X_LANE, -29.5]],
         targetKmh: 28,
       },
       {
@@ -80,7 +80,7 @@ export function scSignalRedYellowMistakeCreepScript(): DriveScript {
       { kind: "glance", mirror: "rear" },
       {
         kind: "drive",
-        points: [[0, -105], [0, -103], [X_LANE, -92], [X_LANE, -50], [X_LANE, -29.5]],
+        points: [[X_LANE, -105], [X_LANE, -50], [X_LANE, -29.5]],
         targetKmh: 28,
       },
       // Wait most of the red out, then creep off just as the red+yellow shows —
@@ -110,7 +110,7 @@ export function scSignalRedYellowMistakeJumpScript(): DriveScript {
       { kind: "glance", mirror: "rear" },
       {
         kind: "drive",
-        points: [[0, -105], [0, -103], [X_LANE, -92], [X_LANE, -50], [X_LANE, -29.5]],
+        points: [[X_LANE, -105], [X_LANE, -50], [X_LANE, -29.5]],
         targetKmh: 28,
       },
       // A shorter wait, then a hard launch — the line falls inside the window

@@ -13,6 +13,15 @@
 //                    complaint: "approximately half of the screen is occupied
 //                    by controls, information panels, popups".
 //
+//   a named surface — where #main-content is a WRAPPER rather than the thing a
+//                    student is looking at, the route names the thing instead.
+//                    theory-practice is that case: its content is the question
+//                    CARD. Once the shell lets a page fill the screen (it now
+//                    does), measuring the wrapper would report 92% while the
+//                    card the founder is complaining about still ended halfway
+//                    down the phone. A budget you can satisfy by growing a
+//                    <div> is not a budget.
+//
 //   canvas         — on the driving screen the content is the ROAD. Gran
 //                    Turismo puts its instruments inside the 3D image and
 //                    leaves the centre of the frame empty; anything DOM painted
@@ -37,13 +46,26 @@
  *   waitFor?: string,
  *   settleMs?: number,
  *   prepare?: (page: import("playwright").Page) => Promise<void>,
- *   budget: { contentMin: number, foldMustPass: boolean, touchMustPass: boolean },
+ *   budget: {
+ *     contentMin: number,
+ *     foldMustPass: boolean,
+ *     foldItemsMustFit?: boolean,
+ *     touchMustPass: boolean,
+ *   },
  *   note?: string,
  * }} RouteSpec
  */
 
 /** The app shell's content region — declared once, used by the DOM routes. */
 const MAIN = "#main-content";
+
+/**
+ * The practice runner's question card. Its aria-label is „Въпрос N от M", which
+ * is the only stable, semantic handle the card has — and it is one the runner
+ * cannot drop without breaking the screen reader, which is exactly the property
+ * a measurement handle needs.
+ */
+const PRACTICE_CARD = `${MAIN} section[aria-label^="Въпрос"]`;
 
 /** @type {RouteSpec[]} */
 export const ROUTES = [
@@ -56,18 +78,45 @@ export const ROUTES = [
     // The founder: "In theory ... only 20% visible to choose the topic". The
     // primary interaction is choosing a topic, so the FIRST topic card is what
     // has to be reachable without a scroll.
-    mustFit: [`first:${MAIN} article`],
+    //
+    // THIS SELECTOR WAS `first:#main-content article` AND MATCHED NOTHING —
+    // from phase 6 until the 107-row review caught it. The topic hub renders
+    // its cards as <li><button>, and there is not one <article> on the page, so
+    // the fold test measured NO ELEMENT and the sweep printed a fold result
+    // that was pure shape. `[data-topic-card]` is an attribute the deck carries
+    // for this check and for nothing else (components/theory/TopicDeck.tsx), so
+    // it cannot be renamed by a styling pass; selectors.test.mjs fails the
+    // build if the two ever come apart again.
+    mustFit: [`first:${MAIN} [data-topic-card]`],
     waitFor: MAIN,
     settleMs: 1200,
-    budget: { contentMin: 0.85, foldMustPass: false, touchMustPass: true },
-    note: "Long list by design — foldMustPass is false; the budget here is screen share, not zero-scroll.",
+    // `foldItemsMustFit` and NOT `foldMustPass`: sixteen topics are longer than
+    // a phone by design, so demanding a document that does not scroll here
+    // would be demanding the wrong thing and the check would be turned off
+    // again within a week. What the founder actually said is that he lands on
+    // this screen and cannot see the topics — so the gate is on the ITEM: the
+    // first topic card has to be on the screen he lands on. That is a
+    // condition this route can fail, which is the whole point of the row.
+    budget: {
+      contentMin: 0.85,
+      foldMustPass: false,
+      foldItemsMustFit: true,
+      touchMustPass: true,
+    },
+    note: "Long list by design — the document may scroll; the FIRST topic card may not be below the fold.",
   },
   {
     id: "theory-practice",
     path: "/theory/practice",
     label: "Тренировка — practice runner",
     expectPath: "/theory/practice",
-    contentSelectors: [MAIN],
+    // THE CARD, NOT THE WRAPPER. #main-content on this route is a column that
+    // holds a one-line header and the card; now that the app shell lets a page
+    // reach the bottom of the screen, that column is the screen whether or not
+    // the card is. Measuring it would have turned the founder's „half the
+    // screen" into a 92% pass without a single pixel changing for a student.
+    // The card is what he is looking at, so the card is what is measured.
+    contentSelectors: [PRACTICE_CARD],
     // Verbatim: "I have to scroll down to see all the answers ... it all have
     // to be on the screen without scrolling". So: the question, EVERY answer,
     // and the primary button.

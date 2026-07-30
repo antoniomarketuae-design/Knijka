@@ -70,6 +70,58 @@ const LET_PASS_PED: PedestrianDartOutSpec = {
   minTriggerSpeedKmh: 10,
 };
 
+/**
+ * B45 (founder, doc 87 — „we must maybe add 1-2 more pedestrians"): the SECOND
+ * crosser. One human being on the whole map is not a crossing; it is a prop.
+ *
+ * She steps off the SAME (west) curb on the same release, half a metre up the
+ * zebra and a good deal slower — an older companion trailing the first. That
+ * is the ordinary way a zebra is used, and it is also the harder lesson: the
+ * driver who correctly waits out the first one and moves the instant her heel
+ * leaves the tarmac finds the second one still on the carriageway. „Изчакай
+ * пътеката да се освободи" means the CROSSING, not the person you were
+ * watching.
+ *
+ * Deliberately NOT a near-side (east-curb) walker: `lane10-pe-vru-truth`'s G2
+ * gate measured that version colliding at 1.38 m with a driver holding a
+ * lawful 37 km/h — a dart across the driving line leaves no braking defence,
+ * so staging one would have taught a 17-year-old that obeying the cap is not
+ * enough. Same curb keeps her behind five seconds of visible warning, exactly
+ * like the first.
+ *
+ * Mounted through `LevelSpec.stagedAdd`, not `ScenarioSpec.staged`, on purpose:
+ * the trace recorder reads `spec.staged` (traces/scCrossingLetPass.ts:176), so
+ * every committed recording stays byte-identical and the §5/§9 trace gate does
+ * not have to be re-recorded from a lane that does not own it.
+ */
+const LET_PASS_PED_COMPANION: PedestrianDartOutSpec = {
+  id: "sc-clp-ped-2",
+  kind: "pedestrianDartOut",
+  crossingId: "pe-x-1",
+  crossing: { x: 0, y: 90 },
+  start: { x: CURB_X, y: 91.5 },
+  dir: { x: 1, y: 0 },
+  speedMps: 1.15,
+  // 21.7 m, not the 23.45 m the first walk uses: pe-clear-v1's pavement outer
+  // edge is 12 m out, so the longer walk rests 1.7 m past the back of the
+  // pavement on bare verge (doc 87 B14, the same residual on this family).
+  travelM: 21.7,
+  roadFromM: ROAD_FROM_M,
+  roadToM: ROAD_TO_M,
+  triggerDistM: 55,
+  minTriggerSpeedKmh: 10,
+  // NO `variant`. The B45 fix ("we must maybe add 1-2 more pedestrians") first
+  // shipped this companion as `variant: "elder"`, and TrafficLayer maps elder →
+  // `pedCaneOn = 1` (TrafficLayer.tsx:1044-1048) — i.e. it put a WHITE CANE on
+  // PE-03's second crosser. That is precisely what this file's own white-cane
+  // rule forbids twenty lines further down: PE-08 "deliberately stays
+  // variant-less: a white cane there would dilute PE-14's unique признак".
+  // PE-14 (sc-crossing-white-cane, catalog 30) is a whole lesson whose only
+  // признак is the cane, and the founder already complained that these drills
+  // repeat each other. A second ordinary pedestrian is the ask; a second blind
+  // pedestrian is a third lesson's content leaking into this one.
+};
+
 /** PE-03 — не заобикаляй пешеходеца на пътеката (ЗДвП чл. 119: пропусни
  *  стъпилите на пътеката пешеходци; изчакай, докато освободят платното). */
 export const SC_CROSSING_LET_PASS: ScenarioSpec = {
@@ -149,11 +201,14 @@ export const SC_CROSSING_LET_PASS: ScenarioSpec = {
     examinerBg:
       "Изпитващият очаква отчетливо намаляване при приближаване, пълно спиране преди пътеката и потегляне едва след като пешеходецът е освободил цялото платно. Разминаване с пешеходец на пътеката е опасна грешка и прекратява изпита.",
   },
+  // B45: the second crosser rides on EVERY played rung (stagedAdd), so the
+  // student always meets the two-body trap the teach text describes, while
+  // `staged` — the only field the trace recorder reads — stays as recorded.
   levels: [
-    { level: 1 },
-    { level: 2 },
-    { level: 3 },
-    { level: 4, vehicleStart: "cold" },
+    { level: 1, stagedAdd: [LET_PASS_PED_COMPANION] },
+    { level: 2, stagedAdd: [LET_PASS_PED_COMPANION] },
+    { level: 3, stagedAdd: [LET_PASS_PED_COMPANION] },
+    { level: 4, vehicleStart: "cold", stagedAdd: [LET_PASS_PED_COMPANION] },
   ],
   staged: [LET_PASS_PED],
   conditions: { weather: "dry" },
@@ -891,15 +946,38 @@ export const SC_CROSSING_WHITE_CANE: ScenarioSpec = {
     { n: 4, textBg: "Изчакай търпеливо да измине ЦЯЛОТО платно; движи се бавно и има нужда от много време." },
     { n: 5, textBg: "Потегли едва когато е слязъл напълно от пътеката, и премини спокойно." },
   ],
+  // B54 (founder, doc 87): „absolutely same as question 23 — slow pedestrian,
+  // just … changed the visualisation". He was right about the DRILL: PE-08 and
+  // PE-14 both asked for one capped approach and one clear-the-crossing
+  // waypoint, so the only difference a student could feel was the mesh.
+  //
+  // The two lessons are not the same lesson and the tasks now say so. PE-08
+  // grades PATIENCE with someone who is slow: approach, then wait them out.
+  // PE-14 grades the ABSOLUTE yield to the white cane, and its middle act is
+  // the one PE-08 never demands — a FULL STOP, wheels stationary, before the
+  // zebra. A blind pedestrian navigates by the sound of a stopped engine and
+  // cannot read a rolling creep as „he is letting me go", so „почти спрях" is
+  // not a smaller version of the right thing here; it is the wrong thing.
+  // Three tasks, and the middle one is the лесson.
+  //
+  // Geometry pinned to the committed shadow (content/traces/…/shadow-correct):
+  // it holds 26 km/h through y = 62 and comes to a complete stop at y = 85.45
+  // where it waits 22 s — so the recognition gate and the halt gate are the
+  // demonstrated drive, measured, not invented.
   success: [
     {
       id: "sc-wcn-approach",
-      titleBg: "Приближи пътеката с готовност за пълно спиране",
-      params: { kind: "reachZone", x: LANE_2, y: 80, radiusM: 10, maxSpeedKmh: 40 },
+      titleBg: "Разпознай белия бастун отдалеч и намали още преди пътеката",
+      params: { kind: "reachZone", x: LANE_2, y: 62, radiusM: 10, maxSpeedKmh: 40 },
+    },
+    {
+      id: "sc-wcn-halt",
+      titleBg: "Спри НАПЪЛНО преди зебрата — не настъпвай, той се ориентира по слуха",
+      params: { kind: "reachZone", x: LANE_2, y: 85.5, radiusM: 6, maxSpeedKmh: 6 },
     },
     {
       id: "sc-wcn-clear",
-      titleBg: "Премини пътеката, след като е свободна",
+      titleBg: "Потегли чак когато е слязъл от цялото платно",
       params: { kind: "reachZone", x: LANE_2, y: 130, radiusM: 12 },
     },
   ],

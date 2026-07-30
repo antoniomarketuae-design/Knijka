@@ -8,7 +8,7 @@
  *   aisle centerline x = 0 (northbound), drawn lane center x = +4.0625;
  *   echelon row on the EAST side: bays at x = 4.8, axis 45°, pitch 3.82;
  *   target bay lot-bay-3 center (4.8, 0); occupied neighbors at y ∓3.82/∓7.64;
- *   spawn lot-spawn-approach (0, −105) heading north.
+ *   spawn lot-spawn-approach (4.06, −105) heading north.
  *
  * FORWARD entry (doc-72 PK-02 echelon variant; the spec's parkInBay carries
  * entry "forward"): swing slightly LEFT on the aisle (x ≈ 1.0 — laneOffset
@@ -53,9 +53,7 @@ function turnInArc(x0: number, b: number): Array<[number, number]> {
 
 /** Approach: spawn → right-lane cruise, stopping short of the echelon row. */
 const APPROACH: Array<[number, number]> = [
-  [0, -105],
-  [0, -103],
-  [X_LANE, -92],
+  [X_LANE, -105],
   [X_LANE, -30],
 ];
 

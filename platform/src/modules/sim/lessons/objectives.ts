@@ -270,6 +270,7 @@ export function createEvalState(params: ObjectiveParams): ObjectiveEvalState {
         overCapNoted: false,
         approachFrom: null,
         prevPos: null,
+        everOutside: false,
       };
     case "passSignal":
       return { type: "passSignal", crossed: false, stoppedInZoneVisit: false, redMet: false };
@@ -557,6 +558,7 @@ function stepReachZone(
           overCapNoted: false,
           approachFrom: null,
           prevPos: null,
+          everOutside: false,
         };
 
   const d = dist(tick.position.x, tick.position.y, params.x, params.y);
@@ -599,11 +601,26 @@ function stepReachZone(
   const halted = speedKmh <= STOPPED_SPEED_KMH;
   const isHaltDemand = cap !== undefined && cap <= REACH_ZONE_HALT_CAP_KMH;
 
-  const reached = st.reached || inZone || (inApproachGrace && halted && isHaltDemand);
+  // A conceded arrival needs an arrival to concede (doc 87 B3/B10/B11). The
+  // grace capsule exists so that stopping four metres SHORT of a halt mark
+  // still counts as stopping there — it was never meant to credit a student
+  // who was parked inside it before the objective opened and never moved.
+  // Two exit drills shipped exactly that: sc-park-parallel-exit spawns 3.20 m
+  // from its own 2.85 m halt gate and sc-park-bay-exit-rev 5.04 m from its
+  // 3.75 m one, so „ЗАДАЧА 1/2" ticked itself off at t = 0, at rest, and the
+  // student performed one task out of the two the banner promised him.
+  // `everOutside` latches the moment the car is seen beyond the grace ring,
+  // so a real approach behaves exactly as before and a standing start does
+  // not. The AUTHORED radius is untouched: a zone the template really does
+  // draw around the spawn still completes on presence, as it always did.
+  const everOutside = st.everOutside || !inGraceRing;
+  const graceArmed = everOutside && inApproachGrace;
+
+  const reached = st.reached || inZone || (graceArmed && halted && isHaltDemand);
   const capMet =
     cap === undefined
       ? true
-      : st.capMet || (speedKmh <= cap && (inZone || inApproachGrace));
+      : st.capMet || (speedKmh <= cap && (inZone || graceArmed));
   const done = reached && capMet;
   // „You are ON the mark and still too fast" — the one state the student
   // reads as „nothing happened". Latched so it is said once, not every frame.
@@ -616,6 +633,7 @@ function stepReachZone(
     overCapNoted,
     approachFrom,
     prevPos: here,
+    everOutside,
   };
   return {
     done,

@@ -53,6 +53,7 @@
 import { mkdirSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { curbLaneOffsetM, toCurbLane } from "./lib/lane.mjs";
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 
@@ -204,24 +205,32 @@ export function buildGiveWayDistrict(params) {
 
   // Spawns: 15 m inside the arm end (the gen_t_junction convention — on the
   // road centerline of the host edge, facing the junction).
-  const SPAWN_POINTS = [
-    {
-      id: "jxg-spawn-south",
-      x: 0,
-      y: r2(-(southArmM - 15)),
-      heading: 0,
-      edgeId: "jxg-e-s",
-      name: "Второстепенна улица — подход към първото кръстовище",
-    },
-    {
-      id: "jxg-spawn-e2",
-      x: r2(ewArmM - 15),
-      y: y2,
-      heading: 270,
-      edgeId: "jxg-e-e2",
-      name: "Булевард с предимство — подход от изток",
-    },
-  ];
+  // doc 87 T2 — a spawn pose belongs in the CURB LANE of the edge it faces
+  // along, not on its centreline: the old convention handed the student a car
+  // already straddling the осева and the rule engine convicted him of
+  // «Настъпване на осевата линия» seconds later, for a pose he never chose.
+  // toCurbLane() leaves a deliberately off-centre pose exactly where it is.
+  const SPAWN_POINTS = toCurbLane(
+    [
+      {
+        id: "jxg-spawn-south",
+        x: 0,
+        y: r2(-(southArmM - 15)),
+        heading: 0,
+        edgeId: "jxg-e-s",
+        name: "Второстепенна улица — подход към първото кръстовище",
+      },
+      {
+        id: "jxg-spawn-e2",
+        x: r2(ewArmM - 15),
+        y: y2,
+        heading: 270,
+        edgeId: "jxg-e-e2",
+        name: "Булевард с предимство — подход от изток",
+      },
+    ],
+    EDGES,
+  );
 
   // -- Bounds + stats.
   const bounds = { minX: Infinity, minY: Infinity, maxX: -Infinity, maxY: -Infinity };
@@ -365,7 +374,10 @@ export function buildGiveWayDistrict(params) {
   for (const s of SPAWN_POINTS) {
     const host = EDGES.find((e) => e.id === s.edgeId);
     if (!host) post.push(`${s.id}: unknown edgeId ${s.edgeId}`);
-    else if (distToEdge(host, s.x, s.y) > 1) post.push(`${s.id}: not on its edge`);
+    // doc 87 T2: "on its edge" used to mean "within a metre of its CENTRELINE",
+    // i.e. the invariant enforced the defect it was supposed to catch.
+    else if (Math.abs(distToEdge(host, s.x, s.y) - curbLaneOffsetM(host.lanes, host.oneway)) > 1)
+      post.push(`${s.id}: not in its edge's curb lane`);
   }
   // Control-derivation preconditions (mirrors runtime/stoplines.ts +
   // world/builders/props.ts ranks — the whole reason this topology yields a

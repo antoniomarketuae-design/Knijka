@@ -16,6 +16,7 @@ import {
   LANE_WIDTH_M,
   PARKING_LANE_WIDTH_M,
   PARKING_LANE_Y,
+  paintsZebra,
   ROAD_DECAL_Y,
   ROAD_Y,
   SIDEWALK_TOP_Y,
@@ -500,14 +501,33 @@ describe("buildWorldGeometry on the real district (Студентски град
     expect(nonFinite).toBe(0);
   });
 
-  it("places traffic lights only at signalized intersections", () => {
+  it("places every signal head at a signalized node — vehicle heads at intersections, pedestrian heads at crossings", () => {
     expect(world.trafficLights.length).toBeGreaterThan(10);
-    const signalized = new Set(
+    const signalizedJunctions = new Set(
       district.intersections.filter((i) => i.signalized).map((i) => i.id),
     );
+    // Doc 86 L3: a pedestrian head's nodeId is the CROSSING id (the runtime's
+    // own signal-node key), never a junction. Both families are checked here so
+    // the invariant is strictly stronger than the „only at signalized
+    // intersections" it replaces — a head keyed to nothing still fails.
+    const signalizedCrossings = new Set(
+      district.crossings.filter((c) => c.signalized).map((c) => c.id),
+    );
+    expect(signalizedCrossings.size).toBeGreaterThan(0);
+    let vehicle = 0;
+    let pedestrian = 0;
     for (const tl of world.trafficLights) {
-      expect(signalized.has(tl.nodeId)).toBe(true);
+      if (tl.head === "pedestrian") {
+        expect(signalizedCrossings.has(tl.nodeId)).toBe(true);
+        pedestrian++;
+      } else {
+        expect(signalizedJunctions.has(tl.nodeId)).toBe(true);
+        vehicle++;
+      }
     }
+    expect(vehicle).toBeGreaterThan(10);
+    // One head per kerb of every signalized crossing.
+    expect(pedestrian).toBe(signalizedCrossings.size * 2);
   });
 
   it("places the BG sign set (give-way, stop, limit-50, roundabout)", () => {
@@ -517,10 +537,13 @@ describe("buildWorldGeometry on the real district (Студентски град
     expect(world.stats.signs.roundabout).toBeGreaterThanOrEqual(2);
   });
 
-  it("paints zebras for marked/signal crossings that sit on drivable edges", () => {
-    const paintable = district.crossings.filter(
-      (c) => c.edgeId && (c.kind === "marked" || c.kind === "signals"),
-    ).length;
+  it("paints zebras for every crossing kind the painter claims, on drivable edges", () => {
+    // Asks the painter's own predicate rather than restating its condition, so
+    // the count cannot drift from the paint (doc 86 T1's discipline; doc 87
+    // A13 added `unknown` — an untagged urban crossing node is a marked
+    // пешеходна пътека whose tag is missing, and it is the referent Урок 4's
+    // dart-out stands on). `unmarked` still paints nothing, by law.
+    const paintable = district.crossings.filter((c) => c.edgeId && paintsZebra(c)).length;
     expect(world.stats.zebraCrossings).toBeGreaterThan(paintable * 0.8);
     expect(world.stats.zebraCrossings).toBeLessThanOrEqual(paintable);
   });

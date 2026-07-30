@@ -19,7 +19,7 @@
  *
  * Geometry pinned to content/world/pe-jay-v1.json: ns road on x = 0 (right
  * lane 4.06, limit 50), junction stop lines at ±27.73, the crossing pej-x-1
- * at y = 34 on the north exit arm, spawn sx-spawn-south (0, −105) heading
+ * at y = 34 on the north exit arm, spawn sx-spawn-south (4.06, −105) heading
  * north. Walker timing: released at trigger 55 m (player y ≈ −21, just
  * before the line), on the carriageway ~1.1 s later, reaches the player's
  * lane (x ≈ 4) ~9.2 s after release, off the road at ~10.8 s.
@@ -57,7 +57,7 @@ export function scPeJaywalkerShadowScript(): DriveScript {
       { kind: "glance", mirror: "rear" },
       // ~28 km/h — under the 30 km/h crossing-approach cap, green over the
       // whole transit (the pinned window).
-      { kind: "drive", points: [[0, -105], [0, -103], [X_LANE, -92], [X_LANE, -40]], targetKmh: 28, stopAtEnd: false },
+      { kind: "drive", points: [[X_LANE, -105], [X_LANE, -40]], targetKmh: 28, stopAtEnd: false },
       { kind: "annotation", textBg: "Пешеходец слиза на платното на своето червено! Зеленото не отменя грижата." },
       { kind: "glance", mirror: "left" },
       {
@@ -95,7 +95,7 @@ export function scPeJaywalkerMistakeMyGreenScript(): DriveScript {
       { kind: "glance", mirror: "rear" },
       // Same lawful 28 km/h approach — the ONLY fault this demo shows is the
       // refusal to yield to the person on the carriageway.
-      { kind: "drive", points: [[0, -105], [0, -103], [X_LANE, -92], [X_LANE, -40]], targetKmh: 28, stopAtEnd: false },
+      { kind: "drive", points: [[X_LANE, -105], [X_LANE, -40]], targetKmh: 28, stopAtEnd: false },
       { kind: "annotation", textBg: "Пешеходецът е на платното, но колата продължава — „нали съм на зелено“…" },
       {
         // Straight over the occupied crossing (she is on the western half —
@@ -126,7 +126,7 @@ export function scPeJaywalkerMistakeCollisionScript(): DriveScript {
         textBg: "Грешката: погледът е върху зеления светофар, не върху пътеката зад него.",
       },
       { kind: "glance", mirror: "rear" },
-      { kind: "drive", points: [[0, -105], [0, -103], [X_LANE, -92], [X_LANE, -40]], targetKmh: 28, stopAtEnd: false },
+      { kind: "drive", points: [[X_LANE, -105], [X_LANE, -40]], targetKmh: 28, stopAtEnd: false },
       {
         // Slow through the box (a distracted crawl) so the arrival at the
         // crossing meets the jaywalker IN the player's lane.

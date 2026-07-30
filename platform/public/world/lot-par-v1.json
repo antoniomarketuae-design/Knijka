@@ -193,7 +193,7 @@
  "spawnPoints": [
   {
    "id": "lot-spawn-approach",
-   "x": 0,
+   "x": 4.06,
    "y": -105,
    "heading": 0,
    "edgeId": "lot-e-approach",

@@ -174,6 +174,38 @@ function outcomeOf(
  */
 export const DART_CREEP_RELEASE_M = 8;
 
+/**
+ * L9 second-order (register rows B14 / B46 / B47 / B49) — where the walk ENDS.
+ *
+ * The founder reported the same thing four times, in four lessons: *„the
+ * Pedestrian at the end when he leaves the Zebra, he goes trough a car which
+ * is standing on the sidewalk"*, *„he passes like a ghost trough some car"*.
+ * The parked-car half was closed by the crossing clear zones. This is the
+ * other half, which doc 86 wrote down under L9 as „second-order" and nobody
+ * actioned: the walk simply does not stop at the pavement.
+ *
+ * Census of all 27 staged `pedestrianDartOut` specs: 22 of them share one
+ * generated geometry — `travelM 23.45` against `roadToM 17.85`, so the walker
+ * carries on **5.6 m past the edge of the carriageway**. The pavement is
+ * `SIDEWALK_WIDTH_M` 3.5 m deep (world/builders/constants), so she crosses the
+ * whole pavement, crosses the kerbside parking band whose bodies sit 2.0 m out
+ * (`PARK_BAND_CENTER_M`), and comes to permanent rest ~2 m beyond the back of
+ * the pavement, standing in the grass verge — which is exactly the picture he
+ * kept describing.
+ *
+ * So the walk now stops ONE PACE onto the pavement, measured from the same
+ * `roadToM` the drill already grades the crossing against: clear of the
+ * carriageway, comfortably inside a 3.5 m pavement, and short of the parking
+ * band centre so a walker can never finish inside a parked body even where no
+ * clear zone was authored. It is a MINIMUM — a spec that already ends sooner
+ * (the reversing-bay aisle walker at +1.2 m, the tram-door passenger at +1.67)
+ * is untouched, byte for byte.
+ *
+ * It cannot change grading: `onRoad` is `roadFromM..roadToM` and the encounter
+ * resolves at `roadToM + 0.5`, both of which the clamped walk still reaches.
+ */
+export const PED_REST_PAST_ROAD_M = 1.8;
+
 export class PedestrianDartOutRunner implements EventRunner {
   phase: StagedEventPhase = "idle";
   outcome: StagedEventOutcome | null = null;
@@ -192,9 +224,13 @@ export class PedestrianDartOutRunner implements EventRunner {
   stage(traffic: StagedTrafficPort, rng: Rng, firstTime: boolean): void {
     const s = this.spec;
     if (firstTime) {
+      // L9: never walk further than one pace past the carriageway (see
+      // PED_REST_PAST_ROAD_M) — the walker steps up onto the pavement and
+      // stops there, instead of marching on through the parked row.
+      const travelM = Math.min(s.travelM, s.roadToM + PED_REST_PAST_ROAD_M);
       const end = {
-        x: s.start.x + s.dir.x * s.travelM,
-        y: s.start.y + s.dir.y * s.travelM,
+        x: s.start.x + s.dir.x * travelM,
+        y: s.start.y + s.dir.y * travelM,
       };
       const view = traffic.stage({
         kind: "pedestrian",
@@ -2078,6 +2114,81 @@ const INDICATOR_OFF_AFTER_GLIDE_SEC = 0.4;
  *  lamp (a signal that never becomes a manoeuvre is its own lie), m. */
 const INDICATOR_ABANDON_M = 12;
 
+/**
+ * B73 — „the car on the right … does not have Right signal turned on".
+ *
+ * MEASURED, on the shipped `sc-follow-cutin` at three player speeds (probe:
+ * real ln-v1 geometry, a 2.5 m/s² throttle ramp, the real spec):
+ *
+ *   40 km/h — actor holds 12.3 m ahead, blinker at t 10, cut at t 13. Correct.
+ *   47 km/h — holds, cuts, but the player has closed to 4 m by t 16.
+ *   59 km/h — `maxMatchSpeedMps 15` is 54 km/h, BELOW the player. The gap
+ *             collapses 15 m → 1.6 m, and at t 12 the actor lane-shifts while
+ *             it is 1.5 m BEHIND the bumper, ending 36 m back by t 16.
+ *
+ * At the third speed — an ordinary drive on a 50 boulevard, and exactly the
+ * drive captured for this row — the cut-in happens BEHIND the driver. The HUD
+ * still ticks «Възстанови дистанцията след вклиняването» and the lesson still
+ * teaches, over an empty road. No indicator fix can be seen through that: the
+ * car itself is not in the picture.
+ *
+ * Two guards, both here in the runner because both are timing, not content:
+ *
+ *  1. The pacing cap is lifted to whatever it takes to KEEP STATION with this
+ *     player, floored at the authored value so nothing changes for a drive the
+ *     authored number already covered (40 km/h above is byte-identical). A car
+ *     pacing you in the next lane at your speed is the ordinary thing; the
+ *     authored 15 m/s only ever described one particular drive.
+ *  2. The cut cannot fire while the actor is not genuinely in front of the
+ *     player. A merge you cannot see is not a merge — it is a scoreboard event.
+ *     If the actor reaches its cut point from behind it keeps pacing and cuts
+ *     as soon as it is ahead again; if the player is simply gone, the encounter
+ *     resolves `notEncountered` (L8's rule: a lesson that did not happen must
+ *     say so, not award itself).
+ */
+const CUTIN_PACE_HEADROOM_MPS = 3.0;
+/** Ceiling over the authored cap, m/s — past this the student is not driving
+ *  the lesson any more and the encounter is allowed to miss (≈ +29 km/h). */
+const CUTIN_PACE_MAX_OVER_MPS = 8.0;
+/** The actor must be at least this far in front of the player's own bumper
+ *  line before the glide is allowed to start, m. One car length: the cut has
+ *  to land in front of the windscreen, not beside the door. */
+const CUTIN_MIN_AHEAD_M = 6;
+/** Player this far past the cut point with no cut executed = the encounter
+ *  did not happen (measured from the cut point, m). */
+const CUTIN_MISSED_PAST_M = 70;
+/**
+ * B73, the half the guards above do not reach: **the approach has to be in the
+ * windscreen.**
+ *
+ * Rendered and looked at (scratchpad/lane4t/frames/TOP-B73__02-pre-KeyG.png is
+ * the top-down proof the actor exists; POSTC-B73__t010.png is the chase view in
+ * which it does not appear). The cutter paces `paceAheadM` 12 m ahead in a lane
+ * 8.125 m over, which puts it at atan(8.125/12) = **34° off the driver's axis**
+ * — against a cockpit half-hFOV of 37.7° (vehicle/tuning COCKPIT_HFOV_RAD, a
+ * ceiling lane 12 fixed on research grounds and which must never be raised). It
+ * is technically inside the frustum and practically behind the A-pillar and the
+ * door mirror for the whole approach. That is why he never saw the car: not a
+ * bug in the encounter, a car parked in his blind spot by arithmetic.
+ *
+ * So the actor now PACES where it can be read — inside this cone — and drops
+ * back to the authored gap only once its blinker is lit, which is also what a
+ * real merge looks like: the car ahead-left signals, eases back alongside your
+ * bonnet and slides in. The graded half of the drill (where the merge lands,
+ * how much cushion it steals) is the authored `paceAheadM` exactly as before;
+ * only the approach moves, and it moves into view.
+ *
+ * 20°, and the number is MEASURED, not reasoned. In the rendered cockpit at
+ * 1440×900 the windscreen's left edge (the A-pillar) sits at screen x ≈ 255 of
+ * 1440, i.e. 24.3° off the axis — so the frustum's 37.7° is a lie about what
+ * the driver can actually see, and a first pass at 26° was still behind the
+ * pillar (frames: scratchpad/lane4t/frames/SEE-B73__t010.png). 20° clears it
+ * with margin and still reads unambiguously as "the next lane over" rather than
+ * "a car far up the road": 8.125 m of lane over 20° is 22 m ahead.
+ */
+const CUTIN_VISIBLE_CONE_DEG = 20;
+const CUTIN_VISIBLE_CONE_TAN = Math.tan((CUTIN_VISIBLE_CONE_DEG * Math.PI) / 180);
+
 export class CutInLeadCarRunner implements EventRunner {
   phase: StagedEventPhase = "idle";
   outcome: StagedEventOutcome | null = null;
@@ -2098,8 +2209,58 @@ export class CutInLeadCarRunner implements EventRunner {
 
   constructor(readonly spec: CutInLeadCarSpec) {}
 
+  /**
+   * Where the actor rides while it is still only pacing, m of centres ahead.
+   *
+   * Before the blinker: far enough ahead that a lane `extraRightOffsetM` over
+   * sits inside the driver's cone (see CUTIN_VISIBLE_CONE_DEG) — never nearer
+   * than the authored gap. After it: the authored gap, so the merge itself is
+   * exactly the encounter the drill was written around.
+   */
+  /**
+   * Is this actor a PACING MERGER — the only shape the three B73 guards below
+   * were measured against and the only shape they may touch?
+   *
+   * Two conditions, both read off the spec the author wrote:
+   *
+   *  1. `cutShiftM !== 0` — it genuinely changes lane. An in-lane speed event
+   *     (a lead that brakes) is straight ahead, already in view, and its
+   *     authored gap IS the lesson.
+   *  2. `maxMatchSpeedMps > actor.cruiseSpeedMps` — the author explicitly gave
+   *     it headroom to keep station with the player. When the two are EQUAL the
+   *     author said the opposite: *this actor never speeds up.*
+   *
+   * Condition 2 is the one this close-out had to add, and it is not
+   * hypothetical. `VUCC_CHILD` (sc-vu-child-cyclist) is a ten-km/h child on a
+   * bicycle: `cruiseSpeedMps === maxMatchSpeedMps === VUCC_CHILD_MPS`, and
+   * `paceAheadM: 400` is commented "unreachable by design". It also swerves, so
+   * `cutShiftM !== 0` alone let the B73 pace-lift raise its cap to
+   * `player + 3 m/s` — a child pedalling at 31 km/h beside a student doing 20,
+   * and at 39 km/h against a student doing 30. The drill is *hold back behind
+   * the child*; the child ran away from it, and three graded demo traces across
+   * two other scenarios changed verdict.
+   *
+   * The escort in sc-hz-brake-dont-swerve is the mirror case: `paceAheadM: 1`,
+   * ABREAST beside your door BY DESIGN, so the unguarded `CUTIN_MIN_AHEAD_M`
+   * six-metre gate meant its cut could never fire at all.
+   *
+   * `FC_CUTTER`, the actor B73 was actually about, satisfies both (shift = one
+   * lane, 15 > 11), so every number that lane measured is preserved verbatim.
+   */
+  private pacesIntoView(): boolean {
+    return this.spec.cutShiftM !== 0 && this.spec.maxMatchSpeedMps > this.spec.actor.cruiseSpeedMps;
+  }
+
+  private paceGapM(): number {
+    // Only a real pacing merge has an off-axis approach to solve — see
+    // pacesIntoView(). Everything else rides exactly where it was authored.
+    if (this.indicatorOn || !this.pacesIntoView()) return this.paceAheadM;
+    const lateral = Math.abs(this.spec.cutShiftM);
+    return Math.max(this.paceAheadM, lateral / CUTIN_VISIBLE_CONE_TAN);
+  }
+
   /** The pacing command — the rubber band, or T17's scheduled cruise. */
-  private commandPace(traffic: StagedTrafficPort): void {
+  private commandPace(traffic: StagedTrafficPort, playerSpeedKmh: number): void {
     const s = this.spec;
     if (s.paceMode === "scheduledCruise") {
       traffic.stagedCommand(s.id, {
@@ -2108,10 +2269,25 @@ export class CutInLeadCarRunner implements EventRunner {
       });
       return;
     }
+    // B73 guard 1: the cap must let the actor hold station with THIS player,
+    // or the "car pacing you in the next lane" is a car you leave behind.
+    // Floored at the authored value (never slower than authored), ceilinged so
+    // a student doing 90 on a boulevard does not conjure a 90 km/h NPC.
+    //
+    // ONLY for a real lane change. On an in-lane lead (`cutShiftM === 0`) the
+    // authored cap is deliberate content: sc-fo-motorway-gap pins 34 m/s so a
+    // student who RACES into the 76 m cushion finds the lead has no headroom to
+    // escape and genuinely earns FOLLOWING_TOO_CLOSE. Handing that lead extra
+    // speed would let it run away from the fault, and the drill would teach
+    // that tailgating at 150 is fine.
+    const need = playerSpeedKmh * KMH_TO_MPS + CUTIN_PACE_HEADROOM_MPS;
+    const maxSpeedMps = !this.pacesIntoView()
+      ? s.maxMatchSpeedMps
+      : Math.min(s.maxMatchSpeedMps + CUTIN_PACE_MAX_OVER_MPS, Math.max(s.maxMatchSpeedMps, need));
     traffic.stagedCommand(s.id, {
       type: "matchPlayer",
-      gapM: this.paceAheadM,
-      maxSpeedMps: s.maxMatchSpeedMps,
+      gapM: this.paceGapM(),
+      maxSpeedMps,
     });
   }
 
@@ -2168,7 +2344,7 @@ export class CutInLeadCarRunner implements EventRunner {
           ? dist(input.x, input.y, actor.x, actor.y) <= this.paceAheadM
           : true;
       if (ready && input.speedKmh > 4) {
-        this.commandPace(traffic);
+        this.commandPace(traffic, input.speedKmh);
         this.phase = "triggered";
       }
       return null;
@@ -2176,18 +2352,39 @@ export class CutInLeadCarRunner implements EventRunner {
 
     // triggered — pacing alongside until the staged cut, then adjudicating.
     if (this.cutAtSec === null) {
+      // Keep the pacing cap tracking the player's CURRENT speed (B73 guard 1 —
+      // he does not hold the speed he had when the encounter armed).
+      if (s.paceMode !== "scheduledCruise") this.commandPace(traffic, input.speedKmh);
       const distToCut = dist(actor.x, actor.y, s.cutAt.x, s.cutAt.y);
       if (distToCut < this.minDistToCutM) this.minDistToCutM = distToCut;
-      const atCutPoint = distToCut <= s.cutRadiusM;
+      // B73 guard 2: the actor must be IN FRONT of the player before it may
+      // glide across. Signed distances along the player's own heading, so
+      // "ahead" means ahead of this driver, not ahead on some map axis.
+      const rad = (input.headingDeg * Math.PI) / 180;
+      const hx = Math.sin(rad);
+      const hy = Math.cos(rad);
+      const aheadM = (actor.x - input.x) * hx + (actor.y - input.y) * hy;
+      const actorPastCutM = (actor.x - s.cutAt.x) * hx + (actor.y - s.cutAt.y) * hy;
+      const playerPastCutM = (input.x - s.cutAt.x) * hx + (input.y - s.cutAt.y) * hy;
+      // The manoeuvre is DUE: geometry says now (at the point, or already past
+      // it because the actor had to claw its way back in front) and the player
+      // is up to the speed the drill needs.
+      const cutDue =
+        (distToCut <= s.cutRadiusM || actorPastCutM > 0) &&
+        input.speedKmh >= s.minCutSpeedKmh;
       // L6 «своевременно»: light the blinker INDICATOR_LEAD_SEC of the actor's
       // own travel before it reaches the cut point. Prediction, not delay —
-      // the glide below still fires on its original frame.
+      // the glide below still fires on its original frame. Once the cut is due
+      // the lamp stays lit while the ahead-gate holds the glide: the driver's
+      // intention has not changed, only his position, and a blinker that
+      // blinked off and on again would teach the wrong thing.
       if (
         !this.indicatorOn &&
         s.cutShiftM !== 0 &&
         actor.speedMps > 0.5 &&
         input.speedKmh >= s.minCutSpeedKmh &&
-        Math.max(0, distToCut - s.cutRadiusM) / actor.speedMps <= INDICATOR_LEAD_SEC
+        (cutDue ||
+          Math.max(0, distToCut - s.cutRadiusM) / actor.speedMps <= INDICATOR_LEAD_SEC)
       ) {
         traffic.stagedCommand(s.id, {
           type: "setIndicator",
@@ -2195,12 +2392,27 @@ export class CutInLeadCarRunner implements EventRunner {
         });
         this.indicatorOn = true;
       }
-      // …and cancel it if the actor drifts past its own cut without cutting.
-      if (this.indicatorOn && distToCut > this.minDistToCutM + INDICATOR_ABANDON_M) {
+      // …and cancel it if the actor drifts past its own cut and the cut is no
+      // longer coming (a signal that never becomes a manoeuvre is its own lie).
+      if (
+        this.indicatorOn &&
+        !cutDue &&
+        distToCut > this.minDistToCutM + INDICATOR_ABANDON_M
+      ) {
         traffic.stagedCommand(s.id, { type: "setIndicator", indicator: "off" });
         this.indicatorOn = false;
       }
-      if (atCutPoint && input.speedKmh >= s.minCutSpeedKmh) {
+      // The player is long past the cut point and no merge ever landed in
+      // front of him: say so instead of grading a lesson that did not happen
+      // (L8's rule, applied to this family).
+      if (this.pacesIntoView() && playerPastCutM > CUTIN_MISSED_PAST_M) {
+        if (this.indicatorOn) {
+          traffic.stagedCommand(s.id, { type: "setIndicator", indicator: "off" });
+          this.indicatorOn = false;
+        }
+        return this.resolve(input, false, "notEncountered");
+      }
+      if (cutDue && (!this.pacesIntoView() || aheadM >= CUTIN_MIN_AHEAD_M)) {
         // The cut: lock a PLAIN cruise (the player's lift must genuinely
         // re-open the gap — matchPlayer would keep stealing it) and glide
         // into the player's lane over the authored ramp.

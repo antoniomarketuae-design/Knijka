@@ -190,7 +190,7 @@
   {
    "id": "vu-spawn-west",
    "x": -135,
-   "y": 0,
+   "y": -4.06,
    "heading": 90,
    "edgeId": "vu-e-w",
    "name": "Улица с велоалея — подход от запад"
@@ -198,14 +198,14 @@
   {
    "id": "vu-spawn-east",
    "x": 135,
-   "y": 0,
+   "y": 4.06,
    "heading": 270,
    "edgeId": "vu-e-e",
    "name": "Улица с велоалея — подход от изток"
   },
   {
    "id": "vu-spawn-south",
-   "x": 0,
+   "x": 4.06,
    "y": -75,
    "heading": 0,
    "edgeId": "vu-e-s",

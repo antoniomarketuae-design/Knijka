@@ -550,7 +550,7 @@
  "spawnPoints": [
   {
    "id": "tj-spawn-south",
-   "x": 0,
+   "x": 4.06,
    "y": -105,
    "heading": 0,
    "edgeId": "tj-e-s",
@@ -559,7 +559,7 @@
   {
    "id": "tj-spawn-east",
    "x": 135,
-   "y": 0,
+   "y": 4.06,
    "heading": 270,
    "edgeId": "tj-e-e",
    "name": "Главна улица — подход от изток"
@@ -567,7 +567,7 @@
   {
    "id": "tj-spawn-west",
    "x": -135,
-   "y": 0,
+   "y": -4.06,
    "heading": 90,
    "edgeId": "tj-e-w",
    "name": "Главна улица — подход от запад"

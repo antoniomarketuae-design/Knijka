@@ -27,7 +27,7 @@
  *     They now yield at y = −29.5 — 1.78 m short of the line (the proven
  *     sc-signal-redyellow hold pose), still outside the 18 m core and inside
  *     the 40 m junction area where the right-hand-rule tracker latches;
- *   - drawn lane centers at ±4.0625 m; south spawn at (0, −105).
+ *   - drawn lane centers at ±4.0625 m; south spawn at (4.06, −105).
  */
 
 import type { StagedEventSpec } from "../contracts";
@@ -55,9 +55,7 @@ function arcPts(cx: number, cy: number, r: number, a0: number, a1: number): Arra
 
 /** Stem approach shared by every drive: south spawn → right-lane cruise. */
 const APPROACH: Array<[number, number]> = [
-  [0, -105],
-  [0, -103],
-  [LANE, -92],
+  [LANE, -105],
   [LANE, -34],
 ];
 
@@ -94,7 +92,7 @@ function scSignalDeadShadowScript(): DriveScript {
     steps: [
       { kind: "annotation", textBg: "Светофарът напред е ЗАГАСНАЛ — кръстовището става равнозначно, важи правилото на дясното." },
       { kind: "glance", mirror: "rear" },
-      { kind: "drive", points: [[0, -105], [0, -103], [LANE, -92], [LANE, EASE_FROM_Y]], targetKmh: 20 },
+      { kind: "drive", points: [[LANE, -105], [LANE, EASE_FROM_Y]], targetKmh: 20 },
       { kind: "annotation", textBg: "Намали, пусни ляв мигач и се огледай: първо наляво, после НАДЯСНО." },
       { kind: "indicator", setting: "left" },
       { kind: "glance", mirror: "left" },
@@ -206,7 +204,7 @@ function scSignalFlashingShadowScript(): DriveScript {
     steps: [
       { kind: "annotation", textBg: "Светофарът напред мига в ЖЪЛТО — премини с повишено внимание и пропусни предимството." },
       { kind: "glance", mirror: "rear" },
-      { kind: "drive", points: [[0, -105], [0, -103], [LANE, -92], [LANE, EASE_FROM_Y]], targetKmh: 20 },
+      { kind: "drive", points: [[LANE, -105], [LANE, EASE_FROM_Y]], targetKmh: 20 },
       { kind: "annotation", textBg: "Мигащото жълто не е зелено: намаляваме и се оглеждаме — наляво и НАДЯСНО." },
       { kind: "glance", mirror: "left" },
       { kind: "glance", mirror: "right" },

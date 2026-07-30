@@ -75,14 +75,14 @@
   },
   "census": {
     "T1": 0,
-    "T2": 31,
+    "T2": 0,
     "T3": 9,
     "T3b": 0,
     "T4": 0,
     "T4raw": 85,
     "T6": 0,
     "T8": 0,
-    "T8raw": 181,
+    "T8raw": 182,
     "T13": 0,
     "T14": 4,
     "L2": 0,
@@ -94,14 +94,14 @@
     "B4": 0,
     "B4raw": 139,
     "S1": 2,
-    "S2": 31,
+    "S2": 0,
     "S3": 13,
     "S4": 1,
     "S5": 6
   },
   "raised": {
     "T4raw": "155 -> 157 templates. Lane 15's sc-park-perp-forward and sc-park-parallel-exit sit on lot-* districts whose aisles post 20, so the wave-0 proxy ('some edge is not 50') counts two more scenarios. Two new drills, not two new defects — the defect row T4 is 0. Wave-0 T4raw = 83.",
-    "T8raw": "the same two templates add 3 capped reachZones (181 = 178 + 3). Every one of them states its cap on the marker, which is why the defect row T8 is 0.",
+    "T8raw": "the same two templates add 3 capped reachZones (181 = 178 + 3), and the lessons-progression wave adds one more (182): sc-crossing-white-cane grew a third task — the FULL STOP before the zebra that PE-14 grades and PE-08 does not (doc 87 B54). Every one of them states its cap on the marker, which is why the defect row T8 is 0.",
     "B4raw": "the same two templates each carry a capped reachZone (139 = 137 + 2). The evaluator probe passes, which is why the defect row B4 is 0."
   },
   "falsehoodBudget": {
@@ -110,7 +110,7 @@
       "rungs": 88,
       "ledger": "T4/D5 (sign kit)",
       "owner": "Lane 3 — world/builders/props.ts:329-372",
-      "reason": "a oneway route edge with no В1 „Влизането забранено\" face built at its illegal mouth: the code convicts a wrong-way entry the world never forbade in paint. Lane 3 built the В26 numerals and the В33 kit; the В1 mouth pass is the piece it did not reach."
+      "reason": "a oneway route edge with no В1 „Влизането забранено\" face built at its illegal mouth: the code convicts a wrong-way entry the world never forbade in paint. Lane 3 built the В26 numerals and the В33 kit; the В1 mouth pass is the piece it did not reach. NOTE for whoever moves a roundabout waypoint next: the route corridor is a straight-line sampler at 8 m pitch (referents.ts ROUTE_SAMPLE_M), so shifting a leg's start shifts the lattice — moving sc-rb-approach back by 8 m makes it land on rb-mini-v1's one-way RING and adds that lesson's five rungs to this row. It is a sampling artefact of a real, already-known gap (the ring has always been on that route), not a new falsehood."
     },
     "HEADLIGHTS_OFF_IN_RAIN": {
       "scenarios": 12,

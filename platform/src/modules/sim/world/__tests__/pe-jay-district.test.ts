@@ -109,16 +109,80 @@ describe("pe-jay-v1 through the world builder", () => {
   });
 
   it("hosts a signalized junction: near + far-side lamp heads per incoming approach, no signs", () => {
-    // Doc 62 S1/#19: 4 approaches × (near head + far-side companion). The
-    // signalized CROSSING pej-x-1 gets no head of its own (builder gap —
-    // heads are junction-node only), so the junction pair is what renders.
-    expect(world.trafficLights.length).toBe(8);
-    for (const tl of world.trafficLights) {
+    // Doc 62 S1/#19: 4 approaches × (near head + far-side companion).
+    const vehicle = world.trafficLights.filter((tl) => tl.head !== "pedestrian");
+    expect(vehicle.length).toBe(8);
+    for (const tl of vehicle) {
       expect(tl.nodeId).toBe("sx-n-c");
       expect(Number.isFinite(tl.approachBearingDeg)).toBe(true);
     }
     expect(world.stats.signs.stop).toBe(0);
     expect(world.stats.signs.giveWay).toBe(0);
+  });
+
+  it("gives the signalized CROSSING its own pedestrian heads — the red the drill is ABOUT", () => {
+    // Doc 86 L3 / founder item 29. Before this the builder read only
+    // `intersections[].signalized`, so `pej-x-1.signalized: true` drew nothing:
+    // the whole lesson („тя пресича на ЧЕРВЕНО за нея") turned on a phase the
+    // student could not see anywhere in the world. The runtime already knew —
+    // it registers the crossing as a signal node and the staged walker's gate
+    // reads it — so the head is a render of an existing truth, not a new clock.
+    const ped = world.trafficLights.filter((tl) => tl.head === "pedestrian");
+    expect(ped.length).toBe(2); // one per kerb
+    for (const tl of ped) {
+      // Keyed to the CROSSING, so nothing that counts junction heads sees it.
+      expect(tl.nodeId).toBe("pej-x-1");
+      // At the crossing's own station (y = 34), off opposite kerbs.
+      expect(-tl.position[2]).toBeCloseTo(34, 1);
+      expect(Math.abs(tl.position[0])).toBeGreaterThan(10);
+      // Standing on the pavement, not the carriageway.
+      expect(tl.position[1]).toBeGreaterThan(0.1);
+    }
+    expect(Math.sign(ped[0]!.position[0])).toBe(-Math.sign(ped[1]!.position[0]));
+    // The bearing is the VEHICLE axis the crossing interrupts (sx-e-n runs
+    // north), which is the axis whose red is the walker's green.
+    for (const tl of ped) expect(tl.approachBearingDeg).toBeCloseTo(0, 3);
+  });
+
+  it("the pedestrian head is driven by the SAME node the walker's own gate reads", () => {
+    // The head cannot drift from the figure crossing under it: both resolve
+    // through WorldRuntime's signal node for `pej-x-1`, and the render simply
+    // inverts it (vehicle red ⇒ walker green, traffic/pedestrians.ts).
+    const rt = createWorldRuntime(loadRaw());
+    const clusters = rt.debugSignalClusters();
+    expect(clusters.some((c) => c.memberNodeIds.includes("pej-x-1"))).toBe(true);
+    const seen = new Set<string>();
+    for (let i = 0; i < 1200; i++) {
+      rt.update(0.1);
+      rt.sample(sample(X_LANE, -60, 0, 0), i * 0.1, false);
+      seen.add(rt.signalLampState("pej-x-1", 0));
+    }
+    // Over a full cycle the crossing really does go red for vehicles — i.e. the
+    // walker really does get a green — so the head has both states to show.
+    expect(seen.has("red")).toBe(true);
+    expect(seen.has("green")).toBe(true);
+  });
+
+  it("the crossing shares the junction's cluster, so the driver's green IS the walker's red", () => {
+    // This is why sc-pe-jaywalker works at all: the two signal nodes are 34 m
+    // apart, inside CLUSTER_LINK_M, so they merge into one cluster, and the
+    // crossing's group is the axis of sx-e-n — the same NS axis the drill pins
+    // to a fresh green (templates-pe.ts signalPlan). The head therefore shows
+    // RED to the walker at exactly the moment the copy says «Светофарът за теб
+    // е зелен» and she steps out anyway. Structural, not a coincidence of
+    // timing — assert it as structure.
+    const rt = createWorldRuntime(loadRaw());
+    const cluster = rt
+      .debugSignalClusters()
+      .find((c) => c.memberNodeIds.includes(CROSSING_ID));
+    expect(cluster?.memberNodeIds).toContain("sx-n-c");
+    for (let i = 0; i < 900; i++) {
+      rt.update(0.1);
+      rt.sample(sample(X_LANE, -60, 0, 0), i * 0.1, false);
+      // Same axis, same cluster ⇒ the crossing's lamp and the northbound
+      // driver's lamp are the same state, every tick.
+      expect(rt.signalLampState(CROSSING_ID, 0)).toBe(rt.signalLampState("sx-n-c", 0));
+    }
   });
 
   it("produces no NaN/infinite coordinates in any buffer or placement", () => {

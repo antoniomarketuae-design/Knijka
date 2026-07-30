@@ -54,7 +54,10 @@ describe("scenario id resolution (resolve.ts)", () => {
         compileScenario(SC_PARK_PERP_REV, rung.level),
       );
     }
-    expect(scenarioLessonById("sc-park-perp-rev@L5")).toBeUndefined(); // unauthored rung
+    // The P0 authors all five rungs since doc 87 B2; sc-pk-busstop-ban is one
+    // of the three parking templates with a REVIEWED reason to stop at L4
+    // (lane15-parking-depth NO_L5_BY_DESIGN), so it is the honest unauthored rung.
+    expect(scenarioLessonById("sc-pk-busstop-ban@L5")).toBeUndefined(); // unauthored rung
     expect(scenarioLessonById("sc-unknown-template@L1")).toBeUndefined();
     expect(scenarioLessonById("l7-parking")).toBeUndefined();
   });
@@ -77,6 +80,7 @@ describe("scenario level progression (progress.ts)", () => {
       [2, false],
       [3, false],
       [4, false],
+      [5, false],
     ]);
   });
 
@@ -89,7 +93,9 @@ describe("scenario level progression (progress.ts)", () => {
     expect(twoStars.find((l) => l.level === 3)!.unlocked).toBe(false);
 
     const ladder = scenarioLevelProgress(SC_PARK_PERP_REV, [row(1, 3), row(2, 2), row(3, 3)]);
-    expect(ladder.map((l) => l.unlocked)).toEqual([true, true, true, true]);
+    // L5 exists now (doc 87 B2) and stays shut until L4 is passed — the ladder
+    // still opens one step at a time.
+    expect(ladder.map((l) => l.unlocked)).toEqual([true, true, true, true, false]);
   });
 
   /**
@@ -291,7 +297,9 @@ describe("wire — scenario ids + S1 metadata validation", () => {
   });
 
   it("an unauthored rung is an unknown lesson", () => {
-    expect(gradeFinishWire({ ...baseWire, lessonId: "sc-park-perp-rev@L5" }).status).toBe(
+    // sc-pk-busstop-ban stops at L4 with a reviewed reason (doc 86 L13 /
+    // lane15-parking-depth NO_L5_BY_DESIGN); the P0 grew its L5 in doc 87 B2.
+    expect(gradeFinishWire({ ...baseWire, lessonId: "sc-pk-busstop-ban@L5" }).status).toBe(
       "unknown-lesson",
     );
   });

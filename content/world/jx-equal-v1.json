@@ -280,7 +280,7 @@
  "spawnPoints": [
   {
    "id": "jx-spawn-south",
-   "x": 0,
+   "x": 4.06,
    "y": -115,
    "heading": 0,
    "edgeId": "jx-e-s",
@@ -288,7 +288,7 @@
   },
   {
    "id": "jx-spawn-north",
-   "x": 0,
+   "x": -4.06,
    "y": 115,
    "heading": 180,
    "edgeId": "jx-e-n",
@@ -297,7 +297,7 @@
   {
    "id": "jx-spawn-east",
    "x": 115,
-   "y": 0,
+   "y": 4.06,
    "heading": 270,
    "edgeId": "jx-e-e",
    "name": "Източна улица — подход към кръстовището"
@@ -305,7 +305,7 @@
   {
    "id": "jx-spawn-west",
    "x": -115,
-   "y": 0,
+   "y": -4.06,
    "heading": 90,
    "edgeId": "jx-e-w",
    "name": "Западна улица — подход към кръстовището"

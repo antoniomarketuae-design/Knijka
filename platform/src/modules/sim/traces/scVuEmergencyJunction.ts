@@ -22,7 +22,7 @@
  *     accelerated to beat it — same code, distinct coaching story).
  *
  * Geometry pinned to content/world/tj-rhr-v1.json (the sc-junction-rhr
- * numbers): drawn lane centers ±4.0625 m, spawn tj-spawn-south (0, −105)
+ * numbers): drawn lane centers ±4.0625 m, spawn tj-spawn-south (4.06, −105)
  * heading north, junction node (0, 0), RHR conviction core 18 m, junction
  * area 40 m — the shadow yields at y = −19.5 (outside the core, inside the
  * area where the tracker latches the yield).
@@ -54,9 +54,7 @@ function arcPts(cx: number, cy: number, r: number, a0: number, a1: number): Arra
 
 /** Stem approach: spawn → right-lane cruise toward the junction. */
 const APPROACH: Array<[number, number]> = [
-  [0, -105],
-  [0, -103],
-  [LANE, -92],
+  [LANE, -105],
   [LANE, -34],
 ];
 

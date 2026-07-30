@@ -49,8 +49,12 @@ describe("CROSSED_SOLID_LINE (OV-04/SN-03 — пресичане на непре
   });
 
   it("a MERE touch (own bank, riding the line band) stays CENTER_LINE_TOUCHED — never the опасна", () => {
-    const { events } = drive(
-      cruise(0, 6, {
+    const { events } = drive([
+      // One frame inside his own lane first: CENTER_LINE_TOUCHED grades the
+      // DEPARTURE onto the paint, and doc 87 B23's spawn-pose latch needs to
+      // see where he started. This is also what a real drive looks like.
+      tick(0, { speedKmh: 30, oneway: false, solidCenterLine: true, laneId: 0, laneCount: 1 }),
+      ...cruise(1, 7, {
         speedKmh: 30,
         oneway: false,
         solidCenterLine: true,
@@ -58,7 +62,7 @@ describe("CROSSED_SOLID_LINE (OV-04/SN-03 — пресичане на непре
         laneCount: 1,
         laneOffsetM: 3.6,
       }),
-    );
+    ]);
     expect(codes(events)).toContain("CENTER_LINE_TOUCHED");
     expect(codes(events)).not.toContain("CROSSED_SOLID_LINE");
   });

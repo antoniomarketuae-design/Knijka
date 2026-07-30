@@ -48,21 +48,19 @@ const LANE = 4.0625;
 const Y = -LANE;
 
 // ---------------------------------------------------------------------------
-// sc-jx-priority-confidence — tj-stop-v1 (T with Б2 on the stem; spawn (−135, 0))
+// sc-jx-priority-confidence — tj-stop-v1 (T with Б2 on the stem; spawn (−135, −4.06))
 // ---------------------------------------------------------------------------
 
 export const SC_JX_PRIORITY_CONFIDENCE_ID = "sc-jx-priority-confidence";
 export const SC_JX_PRIORITY_CONFIDENCE_DISTRICT_ID = "tj-stop-v1";
 
 /**
- * Spawn → eastbound lane center. tj-spawn-west sits ON the centerline (−135, 0),
+ * Spawn → eastbound lane center. tj-spawn-west sits ON the centerline (−135, −4.06),
  * so every drive opens with the same 15 m settle into the right-hand lane; the
  * recorder does not lane-offset, the author does.
  */
 const APPROACH_SETTLE: Array<[number, number]> = [
-  [-135, 0],
-  [-131, -2],
-  [-120, Y],
+  [-135, Y],
 ];
 
 /**
