@@ -32,21 +32,9 @@
     "next-env.d.ts",
     "**/*.ts",
     "**/*.tsx",
-    ".next/types/**/*.ts",
-    ".next/dev/types/**/*.ts",
     "**/*.mts",
-    ".next-immersive/types/**/*.ts",
-    ".next-immersive/dev/types/**/*.ts",
-    ".next-harness/types/**/*.ts",
-    ".next-harness/dev/types/**/*.ts",
-    ".next-practice-exam/types/**/*.ts",
-    ".next-practice-exam/dev/types/**/*.ts",
-    ".next-overlays/types/**/*.ts",
-    ".next-overlays/dev/types/**/*.ts",
-    ".next-stability/types/**/*.ts",
-    ".next-stability/dev/types/**/*.ts",
-    ".next-r0final/types/**/*.ts",
-    ".next-r0final/dev/types/**/*.ts"
+    ".next/types/**/*.ts",
+    ".next/dev/types/**/*.ts"
   ],
   "exclude": [
     "node_modules"
