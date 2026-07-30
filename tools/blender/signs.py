@@ -61,6 +61,23 @@ FACE_PX = 512  # rasterised face texture resolution (square)
 # ---------------------------------------------------------------------------
 # Face catalog — reuse the project's own Bulgarian sign SVGs (never fabricate).
 #   face_id -> (svg file, optional value swap for parametrised signs)
+#
+# ONE BODY, MANY NUMERALS (doc 86 T4 — READ THIS BEFORE ADDING A GLB).
+# The kit used to ship exactly one speed face, and props.ts hard-coded it, so
+# 82 of the 211 shipped plates stated „50" on a road the reducer grades at
+# 20/30/40/70/90/140. The fix did NOT bake twelve more GLBs. `sign_speed_limit_50`
+# below is now the SHARED В26 body: at load time the renderer
+# (platform/src/modules/sim/world/components/signFaces.ts) re-rasterises v26.svg
+# with the numeral swapped and replaces the face texture on a clone of this
+# asset's material — the same SVG, the same swap, the same 512 px, just done in
+# the browser instead of here. В33 (v33.svg) and Д4 (d4.svg) ride the same path;
+# byte-copies of those three SVGs live in platform/public/sim/signs/faces/.
+#
+# So: do NOT add sign_speed_limit_30 / _40 / _90 GLBs. If you ever want them
+# baked (e.g. for an offline render), add the numeral to KIT and to
+# SPEED_LIMIT_FACES_KMH in world/types.ts, and drop the override in
+# WorldProps.SIGN_FACE_OVERRIDE for that kind — but the shipped path is the
+# runtime swap, and it costs one 512 px texture per numeral actually placed.
 # ---------------------------------------------------------------------------
 
 FACES = {
@@ -69,7 +86,10 @@ FACES = {
     "b1": ("b1.svg", None),      # Б1  пропусни (give way)
     "b2": ("b2.svg", None),      # Б2  спри (STOP octagon)
     "b3": ("b3.svg", None),      # Б3  път с предимство (priority diamond)
-    "v26": ("v26.svg", ("60", "50")),  # В26 speed limit -> 50 (matches sim limit50)
+    # В26 speed limit. The baked numeral is 50 (the commonest urban limit and
+    # the one `SignKind: "limit50"` renders straight from this GLB); every OTHER
+    # numeral is produced at load time from this same SVG — see the note above.
+    "v26": ("v26.svg", ("60", "50")),
     "v1": ("v1.svg", None),      # В1  забранено влизане (no entry)
     "g12": ("g12.svg", None),    # Г12 кръгово движение (roundabout, mandatory)
     "d11": ("d11.svg", None),    # Д11 начало на населено място (info rectangle)
@@ -79,6 +99,12 @@ FACES = {
 # name, shape, face_id, plate_size(m for full 200-viewBox), plate-centre height z
 KIT = [
     ("sign_warning_bend",   "triangle",     "a1",  0.95, 2.05),
+    # А18 / Б3 / Д11 / Е7 shipped finished but had no SignKind for years, so
+    # nothing could place them (doc 86 D5). They are placeable kinds now:
+    # А18 goes in advance of an authored crossing, Б3 on the priority arm of a
+    # controlled junction; Д11 and Е7 are mapped but not auto-placed (see the
+    # lane-3 note in props.ts). Е7's square info plate also carries the Д4
+    # one-way face at runtime.
     ("sign_pedestrian",     "triangle",     "a18", 0.95, 2.05),
     ("sign_give_way",       "inv_triangle", "b1",  0.95, 2.05),
     ("sign_stop",           "octagon",      "b2",  0.78, 2.12),

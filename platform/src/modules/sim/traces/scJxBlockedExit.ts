@@ -62,7 +62,7 @@
  */
 
 import type { StagedEventSpec } from "../contracts";
-import { SC_JX_BLOCKED_EXIT } from "../lessons/scenario/templates-junctions4";
+import { JXB_HOLD_Y, JXB_KISS_Y, SC_JX_BLOCKED_EXIT } from "../lessons/scenario/templates-junctions4";
 import {
   recordScriptedDrive,
   type DriveScript,
@@ -75,10 +75,17 @@ export const SC_JX_BLOCKED_EXIT_ID = "sc-jx-blocked-exit";
 /** Northbound right-lane center of sx-v1's ns road. */
 const X_LANE = 4.06;
 /** The rest pose at the line: center 1.8 m short of y = −27.73 (the proven
- *  sc-signal-redyellow pose — the JU-15 overshoot window at 1.2 m never arms). */
-const Y_HOLD = -29.5;
-/** The bumper-kiss rest: 1.1 m off the tail standing at y = 16, car mid-box. */
-const Y_KISS = 10.8;
+ *  sc-signal-redyellow pose — the JU-15 overshoot window at 1.2 m never arms).
+ *  Imported from the template so the pose, the objective band and the pinned
+ *  lead gap can never drift apart. */
+const Y_HOLD = JXB_HOLD_Y;
+/** The bumper-kiss rest, 1.1 m off the tail — DERIVED from the template's tail
+ *  position (T12 moved it 16 → 31, so this moves 10.8 → 25.8 with it). At 25.8
+ *  the car spans 23.75 … 27.85: 3.38 m of its 4.1 m inside the 27.125 m
+ *  junction square, nose over the far mouth. Stranded, with no exit. */
+const Y_KISS = JXB_KISS_Y;
+/** The north-arm exit pose the drives finish on (the „sc-jxb-exit" gate). */
+const Y_EXIT = 62;
 /** The JU-16 dial: ns green on the arrival (~t 11), next green at t 50 (header). */
 const SIGNAL_OFFSETS = { "sx-n-c": 0 } as const;
 
@@ -103,7 +110,7 @@ export function scJxBlockedExitShadowScript(): DriveScript {
       },
       {
         kind: "annotation",
-        textBg: "Опашката на колоната е спряла веднага след кръстовището — място за мен там няма. Спирам пред линията, макар да е зелено.",
+        textBg: "Опашката на колоната е спряла на метър след отсрещното устие — място за мен там няма. Спирам пред линията, макар да е зелено.",
       },
       { kind: "glance", mirror: "left" },
       {
@@ -124,7 +131,7 @@ export function scJxBlockedExitShadowScript(): DriveScript {
         kind: "annotation",
         textBg: "Зелено И празен изход — сега тръгвам веднага и минавам на едно движение.",
       },
-      { kind: "drive", points: [[X_LANE, Y_HOLD], [X_LANE, 10], [X_LANE, 47]], targetKmh: 30 },
+      { kind: "drive", points: [[X_LANE, Y_HOLD], [X_LANE, 10], [X_LANE, Y_EXIT]], targetKmh: 30 },
       { kind: "pause", sec: 1.5, brake: true },
       {
         kind: "annotation",
@@ -165,7 +172,7 @@ export function scJxBlockedExitMistakeEnterFullBoxScript(): DriveScript {
       { kind: "drive", points: [[X_LANE, -30], [X_LANE, Y_KISS]], targetKmh: 12 },
       {
         kind: "annotation",
-        textBg: "…и спира там, където никога не се спира: насред кръстовището, опряна в предната кола, без изход напред.",
+        textBg: "…и спира там, където никога не се спира: вътре в кръстовището, опряна в предната кола, без изход напред.",
       },
       // The glue outlasts the 1.5 s standstill sustain (bills ~t 25.7); the demo
       // ends at t = 30.2, well before this drive's own tail-roll at t = 48.2
@@ -207,7 +214,7 @@ export function scJxBlockedExitMistakeImpatientRedScript(): DriveScript {
         kind: "annotation",
         textBg: "Колоната се отлепи — и кракът тръгва с нея, без да провери лампата…",
       },
-      { kind: "drive", points: [[X_LANE, Y_HOLD], [X_LANE, 10], [X_LANE, 47]], targetKmh: 30 },
+      { kind: "drive", points: [[X_LANE, Y_HOLD], [X_LANE, 10], [X_LANE, Y_EXIT]], targetKmh: 30 },
       { kind: "pause", sec: 1.5, brake: true },
       {
         kind: "annotation",

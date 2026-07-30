@@ -11,7 +11,9 @@ import {
   governorCapKmh,
   loadDifficulty,
   parseDifficultyMode,
+  REQUIRED_SPEED_HEADROOM_KMH,
   storeDifficulty,
+  THROTTLE_AUTHORITY_FADE_FROM_KMH,
 } from "./difficulty";
 import type { VehicleInput } from "./VehicleSim";
 
@@ -167,9 +169,22 @@ describe("domain-scaled governor (founder review R3 #37 — the motorway drill)"
   it("Нормален on the АМ-140 map reaches the flow: full throttle at 140, cut by 150", () => {
     expect(governorCapKmh("normal", 140)).toBe(150);
     // At the drill's own ceiling (140) the governor band (144–150) is not yet
-    // entered — the shaped 0.75 throttle survives untouched.
+    // entered, so the governor takes nothing.
+    //
+    // RE-BASELINED 2026-07-30 (doc 86 L17): 0.75 → 1. This line used to assert
+    // that the Нормален multiplier still bit at 140 km/h, which was precisely
+    // the defect — `throttleMul` scales TRACTIVE FORCE, so at 0.75 the car's
+    // equilibrium was 124.9 km/h and „full throttle at 140" was never a state
+    // the student could actually be in. The multiplier now fades to 1 across
+    // 100–118 km/h (THROTTLE_AUTHORITY_FADE_*), leaving the governor as the
+    // only top-speed authority, so at 140 the pedal really is full. The two
+    // things this test exists to protect are unchanged and still asserted: the
+    // cap is 150, and the throttle is cut to zero there.
     const at140 = applyDifficulty(FULL, "normal", 140, DT, createDriveAssistState(), 140);
-    expect(at140.throttle).toBeCloseTo(0.75, 5);
+    expect(at140.throttle).toBeCloseTo(1, 5);
+    // …and BELOW the fade band nothing moved: the authored 0.75 still applies.
+    const at99 = applyDifficulty(FULL, "normal", 99, DT, createDriveAssistState(), 140);
+    expect(at99.throttle).toBeCloseTo(0.75, 5);
     const at150 = applyDifficulty(FULL, "normal", 150, DT, createDriveAssistState(), 140);
     expect(at150.throttle).toBe(0);
   });
@@ -194,7 +209,77 @@ describe("domain-scaled governor (founder review R3 #37 — the motorway drill)"
 
   it("полигон floor: the 20–30 domain never squeezes a cap below 30", () => {
     expect(governorCapKmh("beginner", 30)).toBe(30);
-    expect(governorCapKmh("normal", 30)).toBe(40);
+    // RE-BASELINED 2026-07-30 (doc 86 L17, founder item 5 „в Нормален мога да
+    // карам само до 30 км/ч"). The four `lot-*` districts publish a 20 km/h
+    // domain, so `20 + 10` collapsed onto DOMAIN_CAP_FLOOR_KMH and Нормален
+    // governed at exactly the same 30 as Начинаещ — the tier selector was
+    // inert there, and a 30 km/h ceiling reads as a broken car. Нормален now
+    // has its own floor at the national in-town limit (NORMAL_CAP_FLOOR_KMH,
+    // ЗДвП чл. 21): the default tier never governs below the speed the law
+    // itself permits in a settlement. Only the 8 districts whose domain is
+    // 20 or 30 move; 40 and above already cleared 50 by the formula.
+    expect(governorCapKmh("normal", 30)).toBe(50);
+    expect(governorCapKmh("normal", 20)).toBe(50);
+    expect(governorCapKmh("beginner", 20)).toBe(30);
+    // The tiers must be distinguishable again on the low-limit maps.
+    expect(governorCapKmh("normal", 20)!).toBeGreaterThan(governorCapKmh("beginner", 20)!);
+  });
+
+  it("B7: a speed the LESSON requires floors the tier cap", () => {
+    // sig-wave-v1: domain 50, `meta.scenario.wave.speedKmh` 50. Начинаещ's
+    // 40 km/h cap (sustainable 39.1) made a 264 m block take 23.8 s against
+    // the 19.01 s the lamp offsets are solved for — the phase slipped ~4.8 s
+    // per block and the 2nd/3rd greens were unreachable on EVERY rung.
+    expect(governorCapKmh("beginner", 50)).toBe(40);
+    expect(governorCapKmh("beginner", 50, 50)).toBe(50 + REQUIRED_SPEED_HEADROOM_KMH);
+    // One full governor band of headroom = undiminished throttle AT 50, not a
+    // pedal already ramping to zero there.
+    const at50 = applyDifficulty(FULL, "beginner", 50, DT, createDriveAssistState(), 50, 50);
+    expect(at50.throttle).toBeCloseTo(DIFFICULTY_PRESETS.beginner.throttleMul, 5);
+    // It is a FLOOR, never a ceiling: a required speed below the tier's own
+    // cap changes nothing at all.
+    expect(governorCapKmh("normal", 140, 50)).toBe(governorCapKmh("normal", 140));
+    // …and garbage is ignored rather than governed to.
+    expect(governorCapKmh("beginner", 50, Number.NaN)).toBe(40);
+    expect(governorCapKmh("beginner", 50, 0)).toBe(40);
+    expect(governorCapKmh("advanced", 50, 200)).toBeNull();
+  });
+
+  it("the throttle-authority fade cannot reach any non-motorway lesson", () => {
+    // Every district domain in content/world is one of 20/30/40/50/70/90/140.
+    // For all but 140 the Нормален cap is ≤ 100 = the fade's first km/h, and
+    // the governor has already zeroed the throttle by then.
+    for (const domain of [20, 30, 40, 50, 70, 90]) {
+      const cap = governorCapKmh("normal", domain)!;
+      expect(cap).toBeLessThanOrEqual(THROTTLE_AUTHORITY_FADE_FROM_KMH);
+      for (const mode of ["beginner", "normal"] as const) {
+        for (const kmh of [0, 10, 25, 40, 55, 75, 95]) {
+          const withFade = applyDifficulty(
+            FULL,
+            mode,
+            kmh,
+            DT,
+            createDriveAssistState(),
+            domain,
+          ).throttle;
+          // Below 100 km/h the multiplier is the authored one, so the shaped
+          // throttle is exactly preset.throttleMul × the governor's scale.
+          const p = DIFFICULTY_PRESETS[mode];
+          const capM = governorCapKmh(mode, domain)!;
+          const over = kmh - (capM - 6);
+          const gov = over > 0 ? Math.max(0, 1 - over / 6) : 1;
+          const creep =
+            kmh >= CREEP_CAP_END_KMH
+              ? 1
+              : p.creepThrottleCap +
+                (1 - p.creepThrottleCap) * Math.max(0, (kmh - 4) / (CREEP_CAP_END_KMH - 4));
+          expect(withFade, `${mode} @ ${kmh} on domain ${domain}`).toBeCloseTo(
+            Math.min(p.throttleMul * gov, creep),
+            5,
+          );
+        }
+      }
+    }
   });
 
   it("Напреднал stays uncapped in every domain", () => {

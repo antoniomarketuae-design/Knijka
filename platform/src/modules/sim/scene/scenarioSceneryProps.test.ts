@@ -226,7 +226,7 @@ describe("heldSceneryFor — per-template dressing", () => {
   });
 });
 
-describe("parkedClearZonesFor — the curb-decoration clear zones (doc 66 R5, v1 №9)", () => {
+describe("parkedClearZonesFor — the curb-decoration clear zones (doc 66 R5, v1 №9; re-derived, doc 86 L9/D10)", () => {
   // The three committed sc-junction-stop drives — the mistake the pilot clip
   // replays, the second mistake, and the shadow (BOTH ghost lines per the R0
   // ruling; m1 stops short of the junction but is pinned along for free).
@@ -241,44 +241,60 @@ describe("parkedClearZonesFor — the curb-decoration clear zones (doc 66 R5, v1
   const CAR_HALF_LEN = 2.25;
   const HERO_HALF_W = 0.85;
 
-  it("pins the sc-junction-stop zone: the tj-n-c corner, radius 16", () => {
-    // 16 = the priority arm's carriageway half-width (8.125) + чл. 98's 5 m
-    // no-parking band before a junction + ~2.5 m half body, rounded.
-    expect(parkedClearZonesFor("sc-junction-stop@L1")).toEqual([{ x: 0, y: 0, radiusM: 16 }]);
+  it("no longer authors a junction zone — the curb pass itself is now чл. 98-legal", () => {
+    // Was: a one-entry allowlist, `sc-junction-stop: [{0, 0, 16}]`, put there
+    // because edge tj-e-e's first slot landed at (11, −10.125), 15.0 m from
+    // tj-n-c, and both committed ghost lines cut the corner through it (0.84 /
+    // 0.85 m). computeParkedCars now measures the walk against the junction
+    // mouth nodeOpenRadiusM opens plus чл. 98's 5 m, so no template needs the
+    // entry and its two silent siblings (sc-junction-scan, sc-junction-gap)
+    // are covered by construction.
+    expect(parkedClearZonesFor("sc-junction-stop@L1")).toEqual([]);
+    expect(parkedClearZonesFor("sc-junction-scan@L1")).toEqual([]);
     expect(parkedClearZonesFor("sc-follow-distance@L2")).toEqual([]);
     expect(parkedClearZonesFor("not-a-scenario-id")).toEqual([]);
   });
 
-  it("WITHOUT the zone the curb pass seats the corner car both ghost lines cut through", () => {
-    // The regression the R0 inspection caught (pilot v2 k3): edge tj-e-e's
-    // first slot lands at (11, −10.125), 15.0 m from the node, and the
-    // corner-cut turn arcs pass INSIDE its footprint.
-    const district = loadDistrict("tj-stop-v1") as TrafficDistrict;
-    const bare = computeParkedCars(district, LANE_W);
-    const corner = bare.find((c) => Math.hypot(c.x - 11, c.y + 10.125) < 0.01);
-    expect(corner).toBeDefined();
-    const mistake = loadTraceSamples(JSTOP_TRACES[0]);
-    const shadow = loadTraceSamples(JSTOP_TRACES[2]);
-    for (const samples of [mistake, shadow]) {
-      const nearest = Math.min(...samples.map((s) => Math.hypot(s.x - 11, s.y + 10.125)));
-      expect(nearest).toBeLessThan(1); // measured: 0.84 m / 0.85 m — inside the body
+  it("derives a walk corridor for every staged pedestrian, from the spec itself", () => {
+    // sc-hz-emergency-stop's child walks (9.5, 150) → (−9.5, 150) and the curb
+    // pass seated a body at (10.13, 149.60): the walker STARTED inside it
+    // (0.00 m clearance, no pathfinding anywhere in staged.ts). The zones are
+    // circles covering that authored line — no allowlist, no per-template
+    // authoring.
+    const zones = parkedClearZonesFor("sc-hz-emergency-stop@L1");
+    expect(zones.length).toBeGreaterThan(3);
+    for (const z of zones) {
+      expect(z.y).toBeCloseTo(150, 6);
+      expect(z.x).toBeGreaterThanOrEqual(-9.5 - 1e-6);
+      expect(z.x).toBeLessThanOrEqual(9.5 + 1e-6);
+      // walker half-shoulder 0.35 + the body half-diagonal hypot(2.25, 0.95).
+      expect(z.radiusM).toBeCloseTo(0.35 + Math.hypot(2.25, 0.95), 6);
     }
+    // Consecutive circles overlap, so the union has no gap for a body to hide
+    // in — the whole point of a corridor rather than two end circles.
+    for (let i = 1; i < zones.length; i++) {
+      expect(Math.hypot(zones[i].x - zones[i - 1].x, zones[i].y - zones[i - 1].y))
+        .toBeLessThanOrEqual(zones[i].radiusM + 1e-6);
+    }
+    // A template with no walking pedestrian gets nothing.
+    expect(parkedClearZonesFor("sc-park-perp-rev@L1")).toEqual([]);
   });
 
-  it("WITH the zone every remaining parked body clears every committed ghost line", () => {
+  it("the corner car both sc-junction-stop ghost lines cut through is gone, zone or no zone", () => {
     const district = loadDistrict("tj-stop-v1") as TrafficDistrict;
-    const zones = parkedClearZonesFor("sc-junction-stop@L1");
-    const parked = computeParkedCars(district, LANE_W, zones);
-    // Exactly one slot is removed — the corner offender; the rest of the
-    // deterministic pass is untouched (positions never shift, only filter).
-    const bare = computeParkedCars(district, LANE_W);
-    expect(bare.length - parked.length).toBe(1);
+    const parked = computeParkedCars(district, LANE_W);
+    // The offender: edge tj-e-e slot 0 at (11, −10.125), 14.95 m from tj-n-c —
+    // inside the 27.125 m junction mouth, i.e. parked in the intersection.
+    expect(parked.find((c) => Math.hypot(c.x - 11, c.y + 10.125) < 0.01)).toBeUndefined();
+    // Its two neighbours at arc 17.6 and 24.2 are gone with it: the lawful
+    // band on that arm starts at 27.125 + 5 + 2.25 = 34.375 m.
     for (const c of parked) {
-      expect(Math.hypot(c.x, c.y)).toBeGreaterThanOrEqual(16);
+      expect(Math.hypot(c.x, c.y), `(${c.x.toFixed(2)}, ${c.y.toFixed(2)})`)
+        .toBeGreaterThan(27.125);
     }
-    // The R0 geometric check: no ghost sample comes within a car's worst-case
-    // half-length + the hero's half-width of any remaining body center
-    // (nearest survivor (17.6, −10.125) measures 4.57 m — daylight ≥ 1.4 m).
+    // The R0 geometric check, now over every survivor: no committed ghost
+    // sample comes within a body's worst-case half-length + the hero's
+    // half-width of any body centre.
     for (const tracePath of JSTOP_TRACES) {
       const samples = loadTraceSamples(tracePath);
       for (const c of parked) {

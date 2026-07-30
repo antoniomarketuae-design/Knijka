@@ -25,7 +25,7 @@ import { describe, expect, it } from "vitest";
 import { analyzeNetwork } from "../builders/network";
 import { buildMarkings } from "../builders/markings";
 import { buildWorldGeometry } from "../builders/buildWorldGeometry";
-import { LANE_WIDTH_M } from "../builders/constants";
+import { CENTER_LINE_WIDTH_M, DASH_WIDTH_M, LANE_WIDTH_M } from "../builders/constants";
 import { assertDistrict, type District, type MeshData } from "../types";
 
 const EMPTY: ReadonlySet<string> = new Set();
@@ -298,26 +298,54 @@ describe("ov-ban-v1 — a В24 span paints the solid осева and suppresses t
   });
 });
 
-describe("ov-crest-v1 — the unmarked-class В24 host still shows the solid осева", () => {
-  // unclassified 1+1 (not in MARKED_CLASSES → paints NO lane lines at all);
-  // В24 span [150, 452.04] runs over the straight [150, 240] then follows the
-  // arc — the residential-осева precedent: the solid still renders. The road
-  // bends past y=240, so assertions stay in the straight stretch.
+describe("ov-crest-v1 — the В24 host shows the solid осева, dashed either side", () => {
+  // unclassified 1+1; В24 span [150, 452.04] runs over the straight [150, 240]
+  // then follows the arc. The road bends past y=240, so assertions stay in the
+  // straight stretch.
+  //
+  // RE-BASELINED (doc 86 T1, Lane 1). This block used to assert
+  // `expect(stripped).toHaveLength(0)` — "an unmarked class paints zero
+  // markings" — because `unclassified` was outside MARKED_CLASSES. That was the
+  // defect, not the contract: the approach the student drives BEFORE the ban
+  // had no осева at all, while CENTER_LINE_TOUCHED graded him on it the whole
+  // way in. `unclassified` is now marked, so the zone-stripped build paints the
+  // ordinary dashed осева and the zoned build replaces it with М1 over exactly
+  // the ban span. What the block was really protecting — the solid lands on the
+  // span, and the span is where the paint CHANGES — is asserted below and is
+  // now stronger, because there is a dashed line to contrast against.
   const district = loadDistrict("ov-crest-v1");
   const zoned = quads(markingsOf(district));
   const stripped = quads(markingsOf({ ...district, zones: undefined }));
 
-  it("paints centre paint over the ban span where there was NONE before", () => {
-    // Zone-stripped: an unmarked class paints zero markings.
-    expect(stripped).toHaveLength(0);
-    expect(zoned.length).toBeGreaterThan(0);
-    // The straight stretch of the span carries centreline paint at x ≈ 0.
+  it("the zone-stripped build is an ordinary dashed осева, start to end", () => {
+    expect(stripped.length).toBeGreaterThan(0);
+    const straight = stripped.filter((q) => Math.abs(q.cx) < 0.4 && q.cy > 150 && q.cy < 240);
+    expect(dashes(straight).length).toBeGreaterThan(0);
+    expect(solids(straight)).toHaveLength(0);
+    // …and it runs the APPROACH too — the stretch that used to be bare asphalt.
+    expect(stripped.some((q) => Math.abs(q.cx) < 0.4 && q.cy < 140)).toBe(true);
+  });
+
+  it("the zoned build turns exactly the ban span solid", () => {
     const straightPart = zoned.filter((q) => Math.abs(q.cx) < 0.4 && q.cy > 150 && q.cy < 240);
     expect(straightPart.length).toBeGreaterThan(0);
-    const minY = Math.min(...straightPart.map((q) => q.minY));
-    expect(minY).toBeCloseTo(150, 0);
-    // ...and nothing paints before the span starts.
-    expect(zoned.some((q) => q.maxY < 149)).toBe(false);
+    const solid = solids(straightPart);
+    expect(solid).toHaveLength(1);
+    expect(solid[0].minY).toBeCloseTo(150, 0);
+    // No dash survives inside the span…
+    for (const d of dashes(straightPart)) expect(d.cy > 150 && d.cy < 240).toBe(false);
+    // …while the approach BEFORE the ban keeps its dashes (overtaking is legal
+    // there, and the paint must say so).
+    expect(dashes(zoned).some((q) => Math.abs(q.cx) < 0.4 && q.cy < 145)).toBe(true);
+  });
+
+  it("the осева carries the wide centre stroke (T16)", () => {
+    // Measured on the STRAIGHT approach only (the road bends past y = 240, and
+    // a curved quad's axis-aligned bounding box is wider than its stroke).
+    const centre = dashes(lineQuadsAtX(zoned, 0)).filter((q) => q.cy < 140);
+    expect(centre.length).toBeGreaterThan(0);
+    for (const q of centre) expect(q.wx).toBeCloseTo(CENTER_LINE_WIDTH_M, 3);
+    expect(CENTER_LINE_WIDTH_M).toBeGreaterThan(DASH_WIDTH_M);
   });
 });
 
@@ -326,18 +354,30 @@ describe("ov-crest-v1 — the unmarked-class В24 host still shows the solid о�
 // ---------------------------------------------------------------------------
 
 describe("ov-solid-v1 — a residential solidCenterLine host renders the solid span", () => {
-  // residential 1+1 (NOT in MARKED_CLASSES → paints no lane lines); М1 [90,230].
+  // residential 1+1; М1 [90, 230] on a 320 m street.
   const district = loadDistrict("ov-solid-v1");
   const zoned = quads(markingsOf(district));
 
-  it("paints the solid осева over [90, 230] even though the host paints no dashes", () => {
+  it("paints the solid осева over exactly [90, 230]", () => {
     const center = lineQuadsAtX(zoned, 0);
     const strip = solids(center);
     expect(strip).toHaveLength(1);
     expect(strip[0].minY).toBeCloseTo(90, 0);
     expect(strip[0].maxY).toBeCloseTo(230, 0);
-    // Residential paints no dashed lane lines at all — only the authored solid.
-    expect(dashes(center)).toHaveLength(0);
+  });
+
+  it("…and dashes the осева either side of it — RE-BASELINED (doc 86 T1)", () => {
+    // Was `expect(dashes(center)).toHaveLength(0)`: `residential` sat outside
+    // MARKED_CLASSES, so the 90 m approach and the 90 m run-out carried no
+    // осева at all — yet sc-ov-solid-line grades CENTER_LINE_TOUCHED over the
+    // whole drive. The line now exists everywhere the road does, and only the
+    // authored span is М1. That is the contrast the lesson teaches.
+    const center = lineQuadsAtX(zoned, 0);
+    const d = dashes(center);
+    expect(d.length).toBeGreaterThan(0);
+    expect(d.some((q) => q.cy < 88)).toBe(true); // the approach
+    expect(d.some((q) => q.cy > 232)).toBe(true); // the run-out
+    for (const q of d) expect(q.cy > 89 && q.cy < 231).toBe(false); // never inside
   });
 });
 

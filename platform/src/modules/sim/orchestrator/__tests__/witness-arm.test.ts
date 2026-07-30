@@ -24,7 +24,7 @@ import { describe, expect, it } from "vitest";
 import type { PriorityFromRightSpec } from "../../contracts";
 import type { SimTickEvent } from "../../rules";
 import type { StagedActorSpec, StagedActorView, StagedCommand } from "../../traffic";
-import { PriorityFromRightRunner } from "../runners";
+import { PriorityFromRightRunner, WITNESS_STOPPED_NEAR_M } from "../runners";
 import type { DirectorInput, StagedTrafficPort } from "../types";
 
 const DT = 1 / 30;
@@ -170,24 +170,74 @@ function driveHesitant(spec: PriorityFromRightSpec): HesitantResult {
 }
 
 describe("PriorityFromRightRunner — the S2 witness gate (doc 62)", () => {
-  it("LEGACY (no witnessArm): the hesitant player's car crosses UNWITNESSED, far from the line", () => {
-    const r = driveHesitant(makeSpec(false));
-    // The distance commit released the car while the player stood 12 m short
-    // of the line; it crossed the node with the player still far away — the
-    // founder's "waits at the mouth for a car that already passed".
-    expect(r.lineDistAtCrossing).not.toBeNull();
-    expect(r.lineDistAtCrossing!).toBeGreaterThan(10);
+  /**
+   * L7 (ledger §4) — RE-BASELINED. This case used to be titled "LEGACY (no
+   * witnessArm): the car crosses UNWITNESSED, far from the line" and pinned
+   * `lineDistAtCrossing > 10` as CORRECT. That pinned the defect: the gate was
+   * opt-in and eight of thirteen `priorityFromRight` specs never opted in
+   * (SC_JUNCTION_RHR_CONFLICT, SC_JX_GIVEWAY_CONFLICT,
+   * SC_JX_EQUAL_RIGHT_CONFLICT among them), so a student obeying the
+   * objective's own «приближи бавно» reached an empty junction — the lesson
+   * deleted itself for doing what it asked. The gate is now the default and an
+   * unwitnessed release is no longer expressible.
+   */
+  it("L7: the gate is DEFAULT-ON — an unauthored spec behaves like an authored one", () => {
+    const withoutArm = driveHesitant(makeSpec(false));
+    const withArm = driveHesitant(makeSpec(true));
+    expect(withoutArm.lineDistAtCrossing).not.toBeNull();
+    expect(withoutArm.lineDistAtCrossing).toBeCloseTo(withArm.lineDistAtCrossing!, 6);
+    expect(withoutArm.lineDistAtCommit).toBeCloseTo(withArm.lineDistAtCommit!, 6);
   });
 
-  it("witnessArm: the same hesitant player MEETS the car at the mouth", () => {
+  it("witnessArm: the hesitant player is STOPPED AND WATCHING when the car crosses", () => {
     const r = driveHesitant(makeSpec(true));
-    // The release waited for the player's true arrival: when the car crossed
-    // the node the player was at/near their line, watching it.
+    // The release waited for the player's true arrival. He halts 12 m short of
+    // his line and sits there; the car takes its priority in front of a
+    // stationary observer instead of freezing indefinitely (see the
+    // stopped-witness note in runners.ts). 12.27 m from the line = 30.3 m from
+    // the node — he is looking straight at the box.
     expect(r.lineDistAtCrossing).not.toBeNull();
-    expect(r.lineDistAtCrossing!).toBeLessThan(8);
+    expect(r.lineDistAtCrossing!).toBeLessThanOrEqual(WITNESS_STOPPED_NEAR_M);
     // And the commit itself only fired once the player was genuinely close.
     expect(r.lineDistAtCommit).not.toBeNull();
-    expect(r.lineDistAtCommit!).toBeLessThanOrEqual(10);
+    expect(r.lineDistAtCommit!).toBeLessThanOrEqual(WITNESS_STOPPED_NEAR_M);
+  });
+
+  /**
+   * T7's second harm (ledger §2): `lineDistM 18` on sc-signal-dead /
+   * sc-signal-flashing is the engine's RHR core radius, not the world's stop
+   * line at 27.7 m. A student who obeys instruction 4 and stops AT the painted
+   * line therefore reads as playerLineDist ≈ 10–12 m: `nearLineM 6` fails, and
+   * at 0 km/h the raw ETA floors to 12/0.5 = 24 s so `etaSec 8` fails too. The
+   * runner used to fall through to `cruise 0` and the car waited FOREVER —
+   * "I let everybody pass … but Error appeared that I made error". The
+   * stopped-witness release ends the deadlock without needing the data fix.
+   */
+  it("T7: a player STOPPED at the real line (12 m out) still gets the release", () => {
+    const spec = makeSpec(true);
+    const port = new FakePriorityPort(spec.actor.cruiseSpeedMps);
+    const runner = new PriorityFromRightRunner(spec);
+    runner.stage(port, rng, true);
+    const out: SimTickEvent[] = [];
+    // Roll up at 20 km/h and come to a full stop 12 m short of lineDistM —
+    // i.e. exactly on the world's real stop line, 9.7 m beyond the authored one.
+    const restY = -(LINE_DIST_M + 12);
+    let y = -69;
+    let t = 0;
+    let speedMps = 20 / 3.6;
+    let frames = 0;
+    for (; frames < 30 * 60; frames++) {
+      if (y >= restY) speedMps = 0;
+      y = Math.min(restY, y + speedMps * DT);
+      t += DT;
+      runner.step(port, input(t, y, speedMps * 3.6), out);
+      port.tick(DT);
+      if (port.s >= NODE_S) break;
+    }
+    expect(runner.phase).toBe("triggered");
+    expect(port.s).toBeGreaterThanOrEqual(NODE_S);
+    // The player never moved off the line — the car came to HIM.
+    expect(y).toBeCloseTo(restY, 6);
   });
 
   it("witnessArm: a stopped-at-the-line player still gets the release (nearLineM)", () => {

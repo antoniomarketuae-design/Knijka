@@ -21,8 +21,10 @@ import { getContentRepo } from "@/lib/content/repo";
 import { requireUser } from "@/modules/auth";
 import { submitAnswer } from "@/modules/learning";
 import {
+  isQuizMediaRenderable,
   lessonById,
   QUIZ_TARGET_CONCEPT_IDS,
+  toMicroQuizMedia,
   type MicroQuizQuestion,
 } from "@/modules/sim/lessons";
 import type { MicroQuizAnswerResult } from "@/components/sim/lesson-ui/types";
@@ -68,16 +70,34 @@ export async function loadMicroQuizBank(
         if (bank.length >= MAX_BANK) break;
         if (takenForConcept >= MAX_PER_CONCEPT) break;
         if (seen.has(q.id)) continue;
+        // L1 GUARD — before `seen`/`taken`, so refusing an undrawable item
+        // costs the concept nothing: it simply takes the next question instead.
+        //
+        // This sanitizer used to drop `q.media` and `o.media` silently, which
+        // is how a sign-identification question reached the founder as four
+        // captions reading „Знак 1 / Знак 2 / Знак 3 / Знак 4". Media now
+        // travels (below) for every kind the overlay draws, and a question
+        // carrying a kind it does NOT draw is not served at all. Never both:
+        // either the picture is on the screen or the question is not.
+        if (!isQuizMediaRenderable(q)) continue;
         seen.add(q.id);
         takenForConcept += 1;
         // Sanitize: strip the `correct` flag — grading is server-side only.
+        // `media` carries no answer: on an identification question every
+        // option is a sign face, and which one is right stays server-side.
         bank.push({
           id: q.id,
           conceptIds: q.conceptIds,
           type: q.type,
           textBg: q.textBg,
           points: q.points,
-          options: q.options.map((o) => ({ id: o.id, textBg: o.textBg })),
+          media: toMicroQuizMedia(q.media),
+          options: q.options.map((o) => {
+            const media = toMicroQuizMedia(o.media);
+            return media === null
+              ? { id: o.id, textBg: o.textBg }
+              : { id: o.id, textBg: o.textBg, media };
+          }),
         });
       }
       if (bank.length >= MAX_BANK) break;

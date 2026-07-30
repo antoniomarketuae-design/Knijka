@@ -201,12 +201,45 @@ export interface ScenarioTraffic {
  * One difficulty rung — a PARAMETER DELTA over the template (doc 76 §7).
  * Aids default from DEFAULT_LEVEL_AIDS (the §7 table); everything here is an
  * override/addition for this template's rung.
+ *
+ * THE LEVEL SEAM (doc 86 L13/D7). The founder played 50 scenarios and wrote
+ * „L2 L3 L4 L5 They have Nothing More". Measured on 2026-07-30 he was right
+ * about the compiler: 146 of 155 templates compiled two rungs to a
+ * byte-identical LessonSpec — L1≡L2 on 146, L2≡L3 on 145 — because an empty
+ * rung `{ level: n }` contributed NOTHING but the aid table, and the aid table
+ * is the one thing a difficulty ladder must not be made of.
+ *
+ * Two halves fix that, and both live here:
+ *  - EXPRESSIVENESS — a rung can now override the rubric and the rule-engine
+ *    config, not just tolerance/traffic/conditions/physics/staged. „L3 grades
+ *    tighter than L1" is finally sayable in the type system (doc 86 D7).
+ *  - A LADDER WITH A DEFAULT — compileScenario no longer treats a silent rung
+ *    as „same as every other rung": DEFAULT_LEVEL_TOLERANCE,
+ *    DEFAULT_LEVEL_TRAFFIC_SCALE and DEFAULT_LEVEL_PAR_TIME_SCALE derive a
+ *    real delta from `level` alone (compile.ts). An authored value always
+ *    wins — the ladder only speaks where the template said nothing.
+ *
+ * What the ladder deliberately does NOT do is invent per-family content: a
+ * staged conflict car, a night rung, a second pedestrian are AUTHORED, never
+ * synthesised, because the compiler cannot know whether a boulevard drill's
+ * map even has a second lane to put a car in.
  */
 export interface LevelSpec {
   level: ScenarioLevel;
   /**
-   * Multiplier on maneuver tolerances (parkInBay centerTolM/headingTolDeg).
-   * > 1 = more forgiving (L1/L2), 1 = evaluator defaults. Range (0, 3].
+   * Multiplier on the rung's tolerances. > 1 = more forgiving (L1/L2), 1 =
+   * evaluator defaults. Range (0, 3]. Absent = DEFAULT_LEVEL_TOLERANCE[level].
+   *
+   * It reaches two different kinds of gate, on purpose, and the difference is
+   * a safety decision (doc 86 B3/B5):
+   *  - MANEUVER tolerances (parkInBay centreTol/headingTol, threePointTurn
+   *    headingTol) scale BOTH ways — a tighter rung there asks for a more
+   *    precise maneuver, which is real difficulty and always still achievable;
+   *  - WAYPOINT gates (reachZone / passSignal radius, reachZone speed cap)
+   *    only ever WIDEN. A smaller radius is not difficulty, it is a
+   *    completability hazard — 50 of 154 terminal radii already sit below the
+   *    8.125 m lane pitch and wall the student. A harder rung must be harder
+   *    to drive WELL, never harder to FINISH.
    */
   toleranceScale?: number;
   /** Aid overrides merged over the DEFAULT_LEVEL_AIDS ladder entry. */
@@ -233,6 +266,33 @@ export interface LevelSpec {
   examMode?: boolean;
   /** Staged encounters ADDED at this rung (L5 complications). */
   stagedAdd?: StagedEventSpec[];
+  /**
+   * Rubric override for this rung, merged PER KEY over the template's
+   * `ScenarioSpec.rubric` (the conditions/physics precedent) — doc 86 D7:
+   * „Rubric cannot vary by rung; 128 of 154 have parTimeSec-only rubrics, so
+   * scoreRubric has no measured component anywhere."
+   *
+   * A rung may therefore ADD a measured component the template does not carry
+   * (an L4 that scores placement where L1 only reported par time), TIGHTEN an
+   * existing one (economy `attemptsFor3Stars` 3 → 1 at L4/L5) or REPLACE the
+   * par time. Absent keys inherit; an authored key wins outright.
+   *
+   * Read it through `resolveScenarioRubric(spec, level)` — never
+   * `spec.rubric` — or the rung's override is silently discarded at scoring
+   * time. `placement`/`economy` objectiveIds are checked against the
+   * template's own success objectives by compileScenario, so a typo throws a
+   * ScenarioCompileError instead of scoring a silent „не се измерва".
+   */
+  rubric?: RubricSpec;
+  /**
+   * Rule-engine override for this rung, merged PER KEY over the template's
+   * `ScenarioSpec.ruleConfig` (the same shape, the same opt-in discipline).
+   * This is the OTHER half of doc 86 D7's „L3 grades tighter than L1": a
+   * config-gated detector can now be armed at the unaided rungs and left off
+   * where the drill has not taught it yet, and a threshold can move by rung.
+   * Absent on both = no `ruleConfig` key on the lesson, bit-identical.
+   */
+  ruleConfig?: Partial<RuleEngineConfig>;
 }
 
 // ---------------------------------------------------------------------------
@@ -330,6 +390,22 @@ export interface ScenarioSpec {
   staged?: StagedEventSpec[];
   /** Template-wide base conditions (levels may override). */
   conditions?: ConditionAxis;
+  /**
+   * Template-wide ambient-traffic BASELINE — the density this street carries
+   * at the unaided rung (L3). Every rung derives its own count from it via
+   * DEFAULT_LEVEL_TRAFFIC_SCALE (compile.ts): quieter while the aids are on,
+   * busier at L5. A `LevelSpec.traffic` still overrides outright.
+   *
+   * This exists because doc 86 L12 („the empty world": 57 of 154 stage
+   * nothing, ambient traffic is 0 on all 660 rungs) and L13 („no rung delta")
+   * are the same authoring problem seen twice — traffic was per-rung only, so
+   * populating a street meant hand-writing a count on four rungs, and nobody
+   * did it 148 times. Author the street ONCE here and the ladder is free.
+   *
+   * Absent = zero, exactly as before: the compiler never conjures cars onto a
+   * map it cannot see. A parking lot stays a parking lot.
+   */
+  traffic?: ScenarioTraffic;
   /**
    * Per-drill rule-engine config, propagated by compileScenario to the
    * LessonSpec so the LIVE student session grades this drill's taught fault.

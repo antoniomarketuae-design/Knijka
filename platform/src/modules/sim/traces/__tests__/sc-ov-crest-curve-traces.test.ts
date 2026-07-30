@@ -316,9 +316,18 @@ describe("pinned geometry + the staged hinge — the template copies match the c
     // curve-speed demo would satisfy the objective it is supposed to fail.
     expect(patience.maxSpeedKmh).toBeGreaterThan(ADVISORY_GRACE_KMH);
     expect(patience.maxSpeedKmh).toBeLessThan(facts.get("mistake-curve-speed")!.peakInArcKmh);
-    const pass = SC_OV_CREST_CURVE.success[1].params as { y: number };
+    const pass = SC_OV_CREST_CURVE.success[1].params as { y: number; radiusM: number };
     const finish = SC_OV_CREST_CURVE.success[2].params as { y: number };
-    expect(pass.y).toBeCloseTo(sc.exitOncomingLaneY!, 2);
+    // RE-BASELINED for ledger B8 (doc 86 §3). `pass.y` used to be pinned to
+    // exitOncomingLaneY, i.e. the gate lived on the oncoming bank ALONE — which
+    // is what made a non-overtaking (always lawful) drive score
+    // `completedAll: false` and lock the next rung. The new law is stronger than
+    // the old pin and is asserted as such: the gate is centred between the two
+    // exit-leg lane centres and its radius admits BOTH, so the student who reads
+    // the straight and decides «не сега» finishes the lesson.
+    expect(pass.y).toBeCloseTo((sc.exitLaneY! + sc.exitOncomingLaneY!) / 2, 2);
+    expect(Math.abs(pass.y - sc.exitLaneY!)).toBeLessThan(pass.radiusM);
+    expect(Math.abs(pass.y - sc.exitOncomingLaneY!)).toBeLessThan(pass.radiusM);
     expect(finish.y).toBeCloseTo(sc.exitLaneY!, 2);
   });
   it("the truck's cap IS the hinge — above the guilty curve speed, far under the limit", () => {

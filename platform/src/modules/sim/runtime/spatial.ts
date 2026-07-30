@@ -12,6 +12,12 @@
  */
 
 import { PERCEPTUAL_ROAD_SCALE } from "../contracts";
+import {
+  MIN_DASHED_LINE_M,
+  paintsCentreLine,
+  paintsLaneLines,
+} from "../world/builders/constants";
+import { JUNCTION_TRIM_MAX_FRACTION, nodeOpenRadiusM } from "../world/builders/network";
 import type { District, DistrictEdge, DistrictIntersection, DistrictNode } from "./district";
 import { projectOnSegment, type SegProjection } from "./geometry";
 
@@ -69,6 +75,52 @@ export interface EdgeRt {
   /** Half of the full carriageway width, meters (used to rank candidates). */
   halfWidthM: number;
   classRank: number;
+  // -- PAINTED LANE MARKINGS (doc 86 T1). The rule engine's three lane codes —
+  // CENTER_LINE_TOUCHED, POOR_LANE_KEEPING, NOT_KEEPING_RIGHT — used to convict
+  // on geometry alone, on 90 of 155 scenarios whose district draws no lane line
+  // at all. These four fields are the world builder's OWN answer, resolved from
+  // the same class/parity predicate (`paintsCentreLine`/`paintsLaneLines`) and
+  // the same junction trim (`nodeOpenRadiusM`) markings.ts paints from, so the
+  // grader and the painter cannot drift apart — the discipline `stoplines.ts`
+  // already runs for the stop line, applied to the осева.
+  /** The class + lane parity draws a line exactly on the road axis (осева). */
+  centreLinePaintedClass: boolean;
+  /** The class draws at least one internal lane boundary. */
+  laneLinePaintedClass: boolean;
+  /**
+   * Arclength window in which the lane-line pass actually draws: the ribbon is
+   * trimmed at every junction mouth and the paint is inset 0.8 m more at each
+   * end, so the junction INTERIOR — where the student swings wide on a turn —
+   * carries no lane paint whatsoever. Outside [paintFromM, paintToM] the
+   * answer is "no line here", which is the junction-interior stand-down doc 86
+   * asks for, derived rather than dialled in as a radius.
+   */
+  paintFromM: number;
+  paintToM: number;
+  /** Authored solid spans that paint an осева on ANY class (`paintZoneSolids`
+   *  runs before the MARKED_CLASSES gate is ever consulted). */
+  solidCentreSpans: ReadonlyArray<{ fromM: number; toM: number }>;
+  /** Authored spans that paint a lane boundary of any kind (the above, plus
+   *  the bus-/emergency-lane curb seams and В24's same-direction solids). */
+  solidLaneSpans: ReadonlyArray<{ fromM: number; toM: number }>;
+}
+
+/** What the world PAINTS at one point of one edge — the referent the lane
+ *  codes need before they may convict (doc 86 T1). */
+export interface LaneMarkingFacts {
+  /** A line separating OPPOSING streams is painted here (the осева). */
+  centreLine: boolean;
+  /** Any lane boundary is painted here. */
+  laneLines: boolean;
+}
+
+const NO_MARKINGS: LaneMarkingFacts = { centreLine: false, laneLines: false };
+
+function inAnySpan(spans: ReadonlyArray<{ fromM: number; toM: number }>, sM: number): boolean {
+  for (let i = 0; i < spans.length; i++) {
+    if (sM >= spans[i].fromM && sM <= spans[i].toM) return true;
+  }
+  return false;
 }
 
 /** Caller-owned nearest/projection result slot. */
@@ -105,6 +157,19 @@ const CELL_M = 32;
 /** Max polyline segments per edge supported by the packed segment refs. */
 const SEG_PACK = 64;
 
+// -- painter mirrors (markings.ts buildMarkings / analyzeNetwork) ------------
+// The three literals the marking pass trims with. They live here rather than
+// being imported because they are inline arguments to trimPolyline in the
+// builder, not named constants; `lane-paint-referent.test.ts` pins the runtime's
+// answer against the BUILT marking mesh on every district, so a drift in either
+// direction fails a test instead of quietly re-arming a false осева.
+/** analyzeNetwork drops a ribbon whose trimmed length falls under this. */
+const RIBBON_MIN_M = 0.5;
+/** buildMarkings insets the ribbon this much more at each end before painting. */
+const PAINT_END_INSET_M = 0.8;
+/** …and paints nothing at all if less than this survives. */
+const PAINT_MIN_LINE_M = 2.5;
+
 export class DistrictIndex {
   readonly district: District;
   readonly edges: EdgeRt[];
@@ -134,7 +199,18 @@ export class DistrictIndex {
     this.intersections = district.intersections;
     this.edgeIdxById = new Map();
     this.edgesAtNode = new Map();
-    this.edges = district.roads.edges.map((edge, idx) => this.buildEdge(edge, idx));
+
+    // Node degree + incident cross-sections, exactly as analyzeNetwork derives
+    // them (both walk district.roads.edges, so the two agree by construction).
+    const touching = new Map<string, DistrictEdge[]>();
+    for (const e of district.roads.edges) {
+      for (const id of [e.from, e.to]) {
+        let bucket = touching.get(id);
+        if (!bucket) touching.set(id, (bucket = []));
+        bucket.push(e);
+      }
+    }
+    this.edges = district.roads.edges.map((edge, idx) => this.buildEdge(edge, idx, touching));
 
     for (const rt of this.edges) {
       this.edgeIdxById.set(rt.edge.id, rt.idx);
@@ -147,7 +223,11 @@ export class DistrictIndex {
     }
   }
 
-  private buildEdge(edge: DistrictEdge, idx: number): EdgeRt {
+  private buildEdge(
+    edge: DistrictEdge,
+    idx: number,
+    touching: ReadonlyMap<string, DistrictEdge[]>,
+  ): EdgeRt {
     const n = edge.geometry.length;
     const pts = new Float64Array(n * 2);
     const cum = new Float64Array(n);
@@ -160,15 +240,93 @@ export class DistrictIndex {
     }
     const lanesPerDir = edge.oneway ? Math.max(1, edge.lanes) : Math.max(1, Math.floor(edge.lanes / 2));
     const fullWidth = (edge.oneway ? Math.max(1, edge.lanes) : lanesPerDir * 2) * LANE_WIDTH_M;
+    const totalLen = cum[n - 1];
+
+    // -- the painter's drawn extent (see EdgeRt.paintFromM) -------------------
+    // analyzeNetwork: sFrom/sTo = the node open radius, clamped per edge; then
+    // buildMarkings insets `line` a further PAINT_END_INSET_M at each end and
+    // requires >= PAINT_MIN_LINE_M of line to survive. Junction interiors and
+    // stub ribbons therefore carry no lane paint — which is precisely the
+    // stand-down the three lane codes need.
+    const trimFor = (nodeId: string): number => {
+      const touched = touching.get(nodeId);
+      if (!touched || touched.length === 0) return 0;
+      return Math.min(nodeOpenRadiusM(touched, touched.length), totalLen * JUNCTION_TRIM_MAX_FRACTION);
+    };
+    const sFrom = trimFor(edge.from);
+    const sTo = trimFor(edge.to);
+    const ribbon = totalLen - sFrom - sTo;
+    // trimPolyline(g, sFrom, sTo, 0.5) -> null, then (…, 0.8, 0.8, 2.5) -> null.
+    const drawn = ribbon >= RIBBON_MIN_M && ribbon - 2 * PAINT_END_INSET_M >= PAINT_MIN_LINE_M;
+    const paintFromM = drawn ? sFrom + PAINT_END_INSET_M : 0;
+    const paintToM = drawn ? totalLen - sTo - PAINT_END_INSET_M : -1;
+    const lineLen = paintToM - paintFromM;
+    // paintDashedLine emits its first quad only past gap/2 + a whole dash.
+    const longEnoughForDashes = drawn && lineLen > MIN_DASHED_LINE_M;
+
+    const solidCentreSpans: Array<{ fromM: number; toM: number }> = [];
+    const solidLaneSpans: Array<{ fromM: number; toM: number }> = [];
+    for (const z of this.district.zones ?? []) {
+      if (z.edgeId !== edge.id) continue;
+      if (!(Number.isFinite(z.fromM) && Number.isFinite(z.toM) && z.fromM < z.toM)) continue;
+      if (z.kind === "solidCenterLine" || z.kind === "noOvertaking") {
+        solidCentreSpans.push({ fromM: z.fromM, toM: z.toM });
+        solidLaneSpans.push({ fromM: z.fromM, toM: z.toM });
+      } else if (z.kind === "busLane" || z.kind === "emergencyLane") {
+        if (lanesPerDir >= 2) solidLaneSpans.push({ fromM: z.fromM, toM: z.toM });
+      }
+    }
+
     return {
       idx,
       edge,
       pts,
       cum,
-      totalLen: cum[n - 1],
+      totalLen,
       lanesPerDir,
       halfWidthM: fullWidth / 2,
       classRank: CLASS_RANK[edge.class] ?? 2,
+      centreLinePaintedClass: longEnoughForDashes && paintsCentreLine(edge),
+      laneLinePaintedClass: longEnoughForDashes && paintsLaneLines(edge),
+      paintFromM,
+      paintToM,
+      solidCentreSpans,
+      solidLaneSpans,
+    };
+  }
+
+  /**
+   * What the world PAINTS at arclength `sM` of an edge — the world referent the
+   * lane codes must have before they may convict (doc 86 T1). Off-road, or
+   * inside a junction where no line is drawn, both answers are false.
+   */
+  laneMarkingAt(edgeIdx: number, sM: number): LaneMarkingFacts {
+    if (edgeIdx < 0 || edgeIdx >= this.edges.length) return NO_MARKINGS;
+    const rt = this.edges[edgeIdx];
+    // REVIEWED EXEMPTION — the roundabout ring. Ring segments are 28–60 m long
+    // and every one of them is swallowed whole by the open radius of the mouths
+    // at both its ends, so the painter draws nothing on the ring: it is
+    // rendered as junction apron. That is NOT the T1 defect, because the lane a
+    // driver must hold in a ring is delimited by two objects the world does
+    // build and the student cannot miss — the CENTRAL ISLAND on one side and the
+    // outer kerb on the other. The referent question is "can he see what he is
+    // graded against"; inside a ring the answer is yes, answered by geometry
+    // instead of by paint (Наредба № 2 paints no divider in a single-lane ring
+    // either). Narrow by construction: 6 rings in 90 districts, `roundabout`
+    // is authored data, and the осева answer stays false — a ring is one-way,
+    // so there are no opposing streams to separate.
+    //
+    // The honest residual, for the lane that owns the ring geometry: on
+    // rb-2lane-v1 the ring really is `lanes: 2` and sc-rb-lane-choice's whole
+    // subject is WHICH of them to take, so that divider ought to be painted.
+    // It needs the ring to paint off its raw geometry rather than off a ribbon
+    // it never gets — a builder change, not a grading one.
+    if (rt.edge.roundabout) return { centreLine: false, laneLines: rt.lanesPerDir >= 1 };
+    if (sM < rt.paintFromM || sM > rt.paintToM) return NO_MARKINGS;
+    const centreLine = rt.centreLinePaintedClass || inAnySpan(rt.solidCentreSpans, sM);
+    return {
+      centreLine,
+      laneLines: centreLine || rt.laneLinePaintedClass || inAnySpan(rt.solidLaneSpans, sM),
     };
   }
 

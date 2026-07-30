@@ -92,6 +92,12 @@ import {
   type DashboardStatus,
   type MinimapFrame,
 } from "@/modules/sim/hud";
+// D11 (founder 2026-07-30, ledger 86): the „Поглед отгоре" discoverability
+// cue. Imported from its own modules rather than through the hud barrel —
+// the barrel belongs to the HUD/UX lane this wave, so this file does not add
+// a line to it.
+import { CameraAidHint } from "@/modules/sim/hud/CameraAidHint";
+import { cameraAidHintEligible } from "@/modules/sim/hud/overheadHint";
 import {
   SimEnvironment,
   WindshieldDroplets,
@@ -120,7 +126,12 @@ import {
   type ScenarioTrace,
   type TraceClock,
 } from "@/modules/sim/traces";
-import { CabinControls, type MirrorGlanceKind } from "@/modules/sim/scene/cabin";
+import {
+  CabinControls,
+  initialHeadlightsFor,
+  type MirrorGlanceKind,
+} from "@/modules/sim/scene/cabin";
+import { lessonRequiredSpeedKmh } from "@/modules/sim/scene/lessonSpeedContract";
 import { TouchControls } from "./TouchControls";
 import { CockpitInteractionContext } from "@/modules/sim/scene/vitok/hotspots";
 import { SimAudio } from "@/modules/sim/scene/simAudio";
@@ -351,6 +362,11 @@ interface Built {
    *  (VehicleRig → applyDifficulty). undefined = no edges (never in
    *  practice) → the legacy static caps. */
   lessonMaxLegalKmh: number | undefined;
+  /** doc 86 B7: a speed the LESSON declares the student must hold
+   *  (`meta.scenario.wave.speedKmh`) — floors the tier governor so a rung can
+   *  never be structurally unwinnable. undefined on every map that declares
+   *  none, which today is 89 of 90. */
+  lessonRequiredKmh: number | undefined;
 }
 
 /** Max legal speed anywhere on the loaded map (km/h); undefined = unknown. */
@@ -539,6 +555,8 @@ export default function LessonScene(props: LessonSceneProps) {
             // АМ-140 map lets Нормален reach the flow, the 50-city keeps
             // governing just above the limit.
             lessonMaxLegalKmh: maxLegalSpeedOf(district),
+            // B7: и скоростта, която самият урок ИЗИСКВА (зелената вълна).
+            lessonRequiredKmh: lessonRequiredSpeedKmh(district),
           });
         }
       } catch (err) {
@@ -758,6 +776,15 @@ function ReadyScene({
     setCockpit(false);
   }, []);
 
+  // D11: is the „виж мястото отгоре" cue allowed on this lesson at all? Pure
+  // spec read (bay/turn maneuver + beginner rung + top-down reachable + not an
+  // exam) — the cue's own state machine decides the MOMENT.
+  const cameraHintEligible = useMemo(
+    () => cameraAidHintEligible(lesson, topdownInCycle),
+    [lesson, topdownInCycle],
+  );
+  const readIsTopdown = useCallback(() => cameraModeRef.current === "topdown", []);
+
   // Mirror of the driveLocked prop so the input lifecycle effect (which runs
   // once) can seed a freshly created input with the current gate state.
   const driveLockedRef = useRef(driveLocked);
@@ -825,6 +852,9 @@ function ReadyScene({
     inputRef.current = input;
     const audio = new SimAudio();
     audioRef.current = audio;
+    // Spawn policy, resolved once — the lamp rule below needs the same answer.
+    const vehicleStart =
+      lesson.vehicleStart ?? (lesson.preDriveMode === "assess" ? "cold" : "ready");
     const cabin = new CabinControls(
       {
         onSeatbeltToggle: () => audio.click(),
@@ -851,7 +881,20 @@ function ReadyScene({
       // pre-drive — the exams. Those keep the cold start, because performing it
       // is the thing being measured; handing them a running engine would delete
       // the assessment. Everything else spawns ready-to-drive.
-      lesson.vehicleStart ?? (lesson.preDriveMode === "assess" ? "cold" : "ready"),
+      vehicleStart,
+      // doc 86 L10: a car handed over „ready" into night/rain/fog is handed
+      // over with the low beams ON — otherwise the student collects an
+      // основна HEADLIGHTS_OFF_AT_NIGHT before touching a control, on 34 of
+      // 154 scenarios. The three lessons whose subject IS the switch are
+      // excluded inside initialHeadlightsFor().
+      initialHeadlightsFor({
+        vehicleStart,
+        night: isNight,
+        rain,
+        fog: fogWeather,
+        preDrive: lesson.preDrive,
+        lessonId: lesson.id,
+      }),
     );
     cabinRef.current = cabin;
     // A2: observe every driveline transition (ignition/selector/parking
@@ -1039,6 +1082,8 @@ function ReadyScene({
                 difficultyRef={difficultyRef}
                 // #37: the loaded map's speed domain scales the governor.
                 lessonMaxLegalKmh={built.lessonMaxLegalKmh}
+                // B7: the lesson's own required speed floors the tier cap.
+                lessonRequiredKmh={built.lessonRequiredKmh}
                 onCollision={handleCollision}
                 // S1: scenario drills grade ANY contact (compile writes 0);
                 // absent = the street nudge tolerance (default 10).
@@ -1296,6 +1341,24 @@ function ReadyScene({
           statusRef={dashboardStatusRef}
           active={!cockpit && !physicsPaused}
           showKeyHints={!touchCapable}
+        />
+      ) : null}
+
+      {/* [camera-aid] founder 2026-07-30 (Тясно гнездо): „we can Ping
+          somewhere on the screen with low brightness/contrast Press G for
+          Eagle View, because the user may not know of existing G option".
+          Fires the moment reverse is engaged on a bay/turn drill and the
+          student is NOT already looking from above; one appearance per
+          session, self-retiring. Isolated additive block — polls the same
+          DashboardStatus channel the bar reads, touches no grading. */}
+      {dashboardStatusRef ? (
+        <CameraAidHint
+          statusRef={dashboardStatusRef}
+          eligible={cameraHintEligible}
+          readIsTopdown={readIsTopdown}
+          hidden={physicsPaused}
+          onEnterTopdown={enterTopdown}
+          showKeyHint={!touchOnly}
         />
       ) : null}
 

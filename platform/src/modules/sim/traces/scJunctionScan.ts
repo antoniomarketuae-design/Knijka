@@ -6,14 +6,24 @@
  * unglanced by default), so this DRILL enables it via the recorder's ruleConfig
  * override — exactly the per-lesson opt-in the config comment describes.
  *
+ * T9 (ledger §2): the template now stages the car all of this copy talks about
+ * (SC_JUNCTION_SCAN_CONFLICT — the priority car from the LEFT, west → east, in
+ * the very lane the right turn merges into). The recorder forwards
+ * `SC_JUNCTION_SCAN.staged`, so every drive below meets it. That changes what
+ * the two mistakes grade, and the change is the lesson: a driver who does not
+ * look does not merely fail an observation checkbox, he takes somebody's right
+ * of way.
+ *
  * The trace gate replays exactly these through the production stack, with the
  * junction-scan drill ENABLED:
- *   - shadow: full stop before the line + ляво-дясно-ляво scan → ZERO
- *     violations (FULL_STOP_AT_STOP_SIGN + a clean right turn);
- *   - „Без оглеждане": a full stop but NO scan → grades EXACTLY
- *     JUNCTION_SCAN_INCOMPLETE (never STOP_SIGN_NO_FULL_STOP — it stops fully);
+ *   - shadow: full stop before the line + ляво-дясно-ляво scan + a real WAIT
+ *     for the priority car → ZERO violations (FULL_STOP_AT_STOP_SIGN + a clean
+ *     right turn), conflict resolved „yielded";
+ *   - „Без оглеждане": a full stop but NO scan → JUNCTION_SCAN_INCOMPLETE +
+ *     FAILED_TO_YIELD (never STOP_SIGN_NO_FULL_STOP — it stops fully);
  *   - „Само един поглед": a full stop + a single LEFT glance (no right) →
- *     EXACTLY JUNCTION_SCAN_INCOMPLETE (one look is not the Л-Д-Л scan).
+ *     the same pair (one look is not the Л-Д-Л scan, and the car it missed is
+ *     the one the SECOND left glance exists for).
  *
  * Geometry pinned to content/world/tj-stop-v1.json: the minor (stem) approach
  * on x = 0 with the Б2 line at y = −27.725, right-lane center x = 4.0625, spawn
@@ -74,8 +84,24 @@ export function scJunctionScanShadowScript(): DriveScript {
       { kind: "glance", mirror: "right" },
       { kind: "pause", sec: 0.5, brake: true },
       { kind: "glance", mirror: "left" },
+      {
+        // T9: the second look left is the one that CATCHES something now —
+        // SC_JUNCTION_SCAN_CONFLICT is held ~25 m west and released the moment
+        // the player is at the line. The demonstration waits it out; pulling
+        // away on the third glance would take its right of way. 8 s covers the
+        // held car's ramp to the node (~4.7 s) plus its clear-out sprint past
+        // PRIORITY_CLEAR_ARC_M (~2.2 s), with margin.
+        kind: "pause",
+        sec: 8,
+        brake: true,
+      },
+      {
+        kind: "annotation",
+        textBg: "Вторият поглед наляво я хвана: кола по главния, отляво. Изчакваме я да премине изцяло.",
+      },
+      { kind: "glance", mirror: "left" },
       { kind: "pause", sec: 0.5, brake: true },
-      { kind: "annotation", textBg: "Наляво, надясно и пак наляво — чисто е. Потегляме." },
+      { kind: "annotation", textBg: "Мина — сега вече е чисто. Потегляме." },
       { kind: "drive", points: [[LANE, -29.2], ...TJ_RIGHT_TURN, [58, -LANE]], targetKmh: 15 },
       { kind: "indicator", setting: "off" },
       { kind: "pause", sec: 1.5, brake: true },

@@ -321,17 +321,22 @@ export const SC_CROSSING_RAIN_SPRINT: ScenarioSpec = {
     vehicleStart: "ready",
   },
   instructionsBg: [
-    { n: 1, textBg: "Движи се със съобразена скорост — в дъжд и тъмнина спирачният път е около 1,4 пъти по-дълъг." },
     {
-      n: 2,
+      n: 1,
+      textBg:
+        "Нощ е и вали. Провери, че късите светлини са включени, ПРЕДИ да потеглиш — в дъжд през нощта те не са само за да виждаш ти, а за да те види мокрият, забързан пешеходец иззад чадъра си.",
+    },
+    { n: 2, textBg: "Движи се със съобразена скорост — в дъжд и тъмнина спирачният път е около 1,4 пъти по-дълъг." },
+    {
+      n: 3,
       textBg: "Пред пътеката намали още повече от обичайното — фаровете осветяват само няколко метра напред.",
     },
     {
-      n: 3,
+      n: 4,
       textBg: "Появи ли се пешеходец, който тича към отсрещния тротоар, спри плавно и напълно преди зебрата.",
     },
-    { n: 4, textBg: "Изчакай го да освободи цялото платно — при дъжд той бърза и вижда по-трудно." },
-    { n: 5, textBg: "Премини спокойно, след като пътеката е свободна." },
+    { n: 5, textBg: "Изчакай го да освободи цялото платно — при дъжд той бърза и вижда по-трудно." },
+    { n: 6, textBg: "Премини спокойно, след като пътеката е свободна." },
   ],
   success: [
     {
@@ -361,6 +366,18 @@ export const SC_CROSSING_RAIN_SPRINT: ScenarioSpec = {
       whatWentWrongBg:
         "Водачът мина през пътеката, докато пешеходецът още пресичаше в дъжда. Дори когато пешеходецът бърза непредпазливо, предимството е негово — задължението за спиране остава на водача.",
       codeRefs: ["PEDESTRIAN_NOT_YIELDED"],
+    },
+    {
+      // doc 86 L10: this drill compiles NIGHT + RAIN on all four rungs, so both
+      // headlight faults are armed against it unconditionally — and until this
+      // demo it had five instruction steps, none of which told the student to
+      // switch the lamps on, and no lights code in mistakes[]. The student
+      // could collect an основна fault for a duty the lesson never stated.
+      traceRef: { path: "content/traces/sc-crossing-rain-sprint/mistake-lights-off.trace.json" },
+      titleBg: "Дъждовна нощ без светлини",
+      whatWentWrongBg:
+        "Скоростта беше премерена, но колата пое по мократа тъмна улица с изгасени светлини. Отсъжда се като „късите светлини не са включени по тъмно“ — по-тежкото от двете задължения, което поглъща дъждовното (в дъжд светлините са задължителни и през деня; нощем те така или иначе трябва да светят). Двете причини обаче са различни и двете важат тук: без къси светлини ТИ не виждаш пътеката на 40 метра, а мокрият асфалт отразява толкова, че тъмна кола без светлини изчезва и за пешеходеца иззад чадъра му. Затова редът е: първо светлините при запалването, чак после разговорът за скорост.",
+      codeRefs: ["HEADLIGHTS_OFF_AT_NIGHT"],
     },
   ],
   teach: {
@@ -540,8 +557,40 @@ const BUS_SHADOW_PED: PedestrianDartOutSpec = {
   travelM: TRAVEL_M,
   roadFromM: ROAD_FROM_M,
   roadToM: ROAD_TO_M,
-  triggerDistM: 44,
+  // ⚠ 44 → 48 (doc 86, the T11 inversion found in this family by the lane-10
+  // gradient sweep — NOT in the ledger's list). This is the family's only
+  // NEAR-SIDE adult crosser: 5.67 m from the east curb to the driving line, so
+  // at 1.4 m/s she needs 5.12 s to clear the 1.5 m contact band. With the old
+  // 40 km/h approach gate a driver holding EXACTLY the graded cap arrived after
+  // 3.94 s — measured closest approach 0.16–0.53 m across the trigger jitter,
+  // i.e. a COLLISION for obeying the objective — while 60 km/h cleared at
+  // 1.73–2.24 m. The approach gate below drops to 30 km/h (which is what the
+  // copy has always said and what all three recorded drives already do) and the
+  // release moves out to 48: closest approach at the cap is now 1.83–2.83 m and
+  // contact starts at 32–36 km/h, i.e. only ABOVE the cap.
+  triggerDistM: 48,
   minTriggerSpeedKmh: 10,
+};
+
+/**
+ * THE SECOND FIGURE (doc 86 D2 — „plural copy against a singular staged
+ * actor"). The lesson is titled «ПешеходцИ иззад спрял камион» and its teach
+ * card describes „бързащите хора" in the plural, but the drill staged exactly
+ * one walker. A second passenger steps out of the same shadow a stride further
+ * north (the zebra is 6 m long, y ∈ [85, 91] — 89.6 is on the paint) at a
+ * slightly quicker pace, so what the student sees behind the truck is a small
+ * knot of people, not a single figure.
+ *
+ * The northward offset is the SAFE one: measured constant-speed closest
+ * approach at the 30 km/h cap is 2.10–3.10 m across the jitter (the lead
+ * walker's own is 1.83–2.83), so the not-yielded demo at 24 km/h and the
+ * collision demo at 28 km/h keep grading exactly their authored codes.
+ */
+const BUS_SHADOW_PED_2: PedestrianDartOutSpec = {
+  ...BUS_SHADOW_PED,
+  id: "sc-bsh-ped2",
+  start: { x: EAST_CURB_X, y: 89.6 },
+  speedMps: 1.5,
 };
 
 /** PE-10 — пешеходци иззад спряло голямо превозно средство (ЗДвП чл. 119 +
@@ -569,17 +618,22 @@ export const SC_CROSSING_BUS_SHADOW: ScenarioSpec = {
     vehicleStart: "ready",
   },
   instructionsBg: [
-    { n: 1, textBg: "Потегли по улицата и приближавай спрелия вдясно камион с готовност за спиране — кракът над спирачката." },
+    { n: 1, textBg: "Потегли по улицата и приближавай спрелия вдясно камион с готовност за спиране — под 30 км/ч, кракът над спирачката." },
     { n: 2, textBg: "Камионът крие тротоара пред себе си — не разчитай, че щом не виждаш никого, няма никой." },
-    { n: 3, textBg: "Пешеходец излиза иззад камиона на пътеката. Реагирай веднага: спирачка, без да завиваш встрани." },
-    { n: 4, textBg: "Спри напълно преди зебрата и го изчакай да освободи цялото платно." },
+    { n: 3, textBg: "Иззад камиона на пътеката излизат ДВАМА пешеходци, един след друг. Реагирай веднага: спирачка, без да завиваш встрани." },
+    { n: 4, textBg: "Спри напълно преди зебрата и ги изчакай да освободят цялото платно — вторият винаги е този, когото не си видял." },
     { n: 5, textBg: "Премини спокойно едва когато пътеката е свободна." },
   ],
   success: [
     {
       id: "sc-bsh-approach",
       titleBg: "Приближи камиона и пътеката с готовност за спиране",
-      params: { kind: "reachZone", x: LANE_2, y: 76, radiusM: 10, maxSpeedKmh: 40 },
+      // 40 → 30 (doc 86, the near-side inversion above): 40 km/h past a large
+      // vehicle stopped AT a zebra is not «готовност за спиране» in any reading
+      // of чл. 119, all three recorded drives already hold 24–28, and the
+      // trace scripts themselves call 30 „the approach cap". The gate now says
+      // what the lesson has always taught.
+      params: { kind: "reachZone", x: LANE_2, y: 76, radiusM: 10, maxSpeedKmh: 30 },
     },
     {
       id: "sc-bsh-clear",
@@ -620,7 +674,7 @@ export const SC_CROSSING_BUS_SHADOW: ScenarioSpec = {
     { level: 3 },
     { level: 4, vehicleStart: "cold" },
   ],
-  staged: [BUS_SHADOW_PED],
+  staged: [BUS_SHADOW_PED, BUS_SHADOW_PED_2],
   conditions: { weather: "dry" },
   localeBg: "bg-BG",
 };
@@ -1013,6 +1067,34 @@ export const SC_PE_JAYWALKER: ScenarioSpec = {
     { level: 4, vehicleStart: "cold" },
   ],
   staged: [JAY_PED],
+  /**
+   * ⚠ doc 86 T10 — THE PROMISED GREEN WAS DELIVERED AS RED. Instruction 2 says
+   * «Светофарът за теб е зелен», but the drill authored neither `signalPlan`
+   * nor `signalModes`, so the lamp ran on the wall clock. On pe-jay-v1 the
+   * junction node sx-n-c (0, 0) and the signalized crossing pej-x-1 (0, 34) are
+   * 34 m apart — inside `CLUSTER_LINK_M` 40 — so they merge into ONE cluster
+   * keyed „pej-x-1", whose deterministic offset is `fnv1a("pej-x-1") % 50` =
+   * 27 s. With SIGNAL_TIMING = 20 green / 3 yellow / 26 red / 1 redYellow that
+   * puts the NS axis on RED for t = 0 … 21.9 s. The player spawns at
+   * sx-spawn-south (0, −105), 77.3 m short of the derived stop line at
+   * y = −27.7, and reaches it at t ≈ 6.2 s (45 km/h) to 13.9 s (20 km/h) —
+   * the WHOLE plausible arrival window sits inside the red. `RED_LIGHT_CROSSED`
+   * (опасна, session-terminating at L4) was fully armed against a lesson whose
+   * own copy told the student the light was green, and the red stall then held
+   * the driver until the staged walker had finished crossing, so the jaywalk
+   * encounter never happened either.
+   *
+   * `greenFresh` pins a full 20 s green the first frame the player enters the
+   * ring. triggerM 90 puts that ring boundary at y = −73 (the cluster centroid
+   * is (0, 17), the midpoint of the junction node and the crossing): 32 m past
+   * the spawn — so the pin is an approach-relative arrival, not a session-start
+   * dial — and 45.3 m short of the stop line, which even a 15 km/h crawl covers
+   * in 10.9 s of the 20 s green. clusterId names the junction node explicitly
+   * rather than relying on the cluster's id being the alphabetically-first
+   * member. The trace recorder never reads signalPlan, so the committed ghosts
+   * keep their authored signalOffsets byte-identically (contracts.ts:223).
+   */
+  signalPlan: { arm: "greenFresh", triggerM: 90, clusterId: "sx-n-c" },
   conditions: { weather: "dry" },
   localeBg: "bg-BG",
 };

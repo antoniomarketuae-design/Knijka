@@ -107,6 +107,20 @@ export type VehicleProfile =
   | "childCyclist"
   | "animal";
 
+/**
+ * Turn-indicator state of a vehicle (founder review item 43/44, ledger L6).
+ *
+ * Before this channel existed the renderer INFERRED the blinker from yaw rate
+ * (`|steer| > 0.07`), and a staged `laneShift` is a lateral GLIDE whose heading
+ * barely turns: an 8.125 m shift over 1.5 s at 11 m/s peaks the smoothed steer
+ * at 0.0624 — under the arming threshold — so a cut-in NEVER signalled. The
+ * founder could not anticipate the merge because the car genuinely never
+ * signalled. This is now an explicit, commanded channel: staged actors publish
+ * what they are ACTUALLY indicating, and the renderer reads it instead of
+ * guessing. Ambient agents never set it (they never change lanes).
+ */
+export type VehicleIndicator = "left" | "right" | "off";
+
 export interface TrafficVehicleState {
   id: number;
   /** Rear-to-front center of the car, district space. */
@@ -122,6 +136,44 @@ export interface TrafficVehicleState {
   colorIndex: number;
   /** Size/type profile (staged actors only today). Absent = "car". */
   profile?: VehicleProfile;
+  /**
+   * Commanded turn indicator (staged actors only — see VehicleIndicator).
+   * Absent on every ambient agent, so the pre-indicator published shape is
+   * byte-identical for them; staged vehicles always publish it (default
+   * "off"). The presentation layer MUST prefer this over any yaw-rate guess.
+   */
+  indicator?: VehicleIndicator;
+}
+
+/**
+ * Body length of each vehicle profile, m — the SAME numbers the rigs are
+ * modelled at (vehicleFleet.ts: TRUCK_DIMENSIONS 7.5, EMERGENCY 5.6, TRAM 14,
+ * TRAIN_LENGTH_M 34.4). "car" keeps the historical 4.1 m fleet approximation
+ * so every car-lead gap is byte-identical to the pre-profile constant.
+ *
+ * Used by the lead/rear gap queries: a following gap is bumper-to-bumper, so
+ * the metres between two CENTRES must lose half of each body. Grading a 14 m
+ * tram or a 34 m train as if it were a 4.1 m hatchback told the student they
+ * had 10 more metres of road than exist — the ledger's T17(e).
+ */
+export const VEHICLE_PROFILE_LENGTH_M: Readonly<Record<VehicleProfile, number>> = {
+  car: 4.1,
+  van: 5.2,
+  truck: 7.5,
+  emergency: 5.6,
+  tram: 14,
+  train: 34.4,
+  cyclist: 1.8,
+  childCyclist: 1.5,
+  animal: 1.4,
+};
+
+/** Half-length of the player's own car, m (half the 4.1 m fleet length). */
+export const PLAYER_HALF_LENGTH_M = VEHICLE_PROFILE_LENGTH_M.car / 2;
+
+/** Half-length of a published vehicle state, m. Absent profile = "car". */
+export function vehicleHalfLengthM(profile?: VehicleProfile): number {
+  return (VEHICLE_PROFILE_LENGTH_M[profile ?? "car"] ?? VEHICLE_PROFILE_LENGTH_M.car) / 2;
 }
 
 /**
@@ -435,6 +487,16 @@ export type StagedCommand =
    * it (like matchPlayer/brake).
    */
   | { type: "laneShift"; toOffsetM: number; rampSec?: number }
+  /**
+   * Vehicles only: set the actor's TURN INDICATOR (ledger L6). A separate
+   * channel from `laneShift` on purpose — the exam's own «своевременно»
+   * requires the lamp to be ON *before* the wheel moves, so the runner arms
+   * this ≥ 3 s ahead of the glide and the two commands are never coincident.
+   * The published `TrafficVehicleState.indicator` is what the renderer must
+   * read; deriving a blinker from yaw rate provably never armed for a lateral
+   * glide. Pedestrians ignore it. `reset` returns it to "off".
+   */
+  | { type: "setIndicator"; indicator: VehicleIndicator }
   /** Teleport back to the dormant hold pose (re-stage on retry). */
   | { type: "reset" };
 
@@ -456,6 +518,19 @@ export interface StagedActorView {
   readonly nodeS: readonly number[];
   /** True once a non-loop path is fully traversed (actor parked at its end). */
   readonly finished: boolean;
+  /**
+   * Commanded turn indicator, mirroring the published state (ledger L6).
+   * Optional so pre-indicator fake ports in tests stay structurally valid;
+   * the real TrafficSystem always publishes it for vehicles.
+   */
+  readonly indicator?: VehicleIndicator;
+  /**
+   * Published lateral offset right of the resolved path, m — the live
+   * `laneShift` channel (0 = on the path). The encounter battery reads it to
+   * time "the first lateral metre" against the indicator. Optional for the
+   * same fake-port reason.
+   */
+  readonly lateralOffsetM?: number;
 }
 
 // ---------------------------------------------------------------------------

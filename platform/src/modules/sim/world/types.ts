@@ -244,8 +244,30 @@ export interface TrafficLightPlacement extends StaticTransform {
 export type SignKind =
   | "stop"
   | "giveWay"
-  | "limit50"
   | "roundabout"
+  // -- В26 „Забранено е движението със скорост, по-висока от означената".
+  //    ONE face per numeral, because a speed plate that does not state the
+  //    limit the reducer grades is worse than no plate at all (doc 86 T4: 83
+  //    of 154 scenarios wore a „50" on a 30/40/90/140 street). The faces are
+  //    rasterised from content/signs/svg/v26.svg — the SAME law-cited artwork
+  //    the theory question shows — with only the numeral swapped, so the В26
+  //    in the simulator is the В26 in the exam.
+  | "limit20"
+  | "limit30"
+  | "limit40"
+  | "limit50"
+  | "limit60"
+  | "limit70"
+  | "limit80"
+  | "limit90"
+  | "limit100"
+  | "limit110"
+  | "limit120"
+  | "limit130"
+  | "limit140"
+  /** В33 „Край на забраната…" — the numeral it LIFTS lives in
+   *  SignPlacement.speedKmh (one face per number, bucketed at render time). */
+  | "limitEnd"
   // -- SIGN-ASSET drop: zone-driven posts (render-only — grading reads the
   //    District.zones spans, never these placements; builders/zoneSigns.ts).
   | "noOvertaking" // В24 (zones kind noOvertaking)
@@ -256,13 +278,91 @@ export type SignKind =
   | "railUnguarded" // А33-style unguarded rail warning (railCrossing)
   | "railCross" // Андреевски кръст crossbuck at the line
   | "barrier" // striped barrier arm, static down (railCrossing + guarded)
-  // -- junction-derived post: the one-way mouth a driver may not enter. NOT
-  //    zone-driven — the rule lives in builders/network.onewayNoEntryArms,
-  //    the same derivation the runtime's wrongWay grading follows.
-  | "noEntry"; // В1 „Забранено е влизането"
+  // -- junction-derived posts: the one-way mouth a driver may not enter, and
+  //    its legal twin. NOT zone-driven — the rule lives in
+  //    builders/network.onewayNoEntryArms, the same derivation the runtime's
+  //    wrongWay grading follows.
+  | "noEntry" // В1 „Забранено е влизането на пътни превозни средства"
+  | "oneWay" // Д4 „Еднопосочно движение" (the legal mouth of the same arm)
+  // -- previously orphaned kit faces (doc 86 D5): finished GLBs that shipped
+  //    with no SignKind, so nothing could ever place them.
+  | "pedestrianCrossing" // А18 „Пешеходна пътека" (warning, ahead of a zebra)
+  | "priorityRoad" // Б3 „Път с предимство" (the жълт ромб on the major arm)
+  | "settlement" // Д11 „Начало на населено място"
+  | "fuel"; // Е7 „Бензиностанция"
+
+/**
+ * Every SignKind, in a fixed order. Single source of truth for the stats
+ * record, the renderer's per-kind instanced buckets and the sign batteries —
+ * adding a kind must never again require hand-editing a Record literal.
+ */
+export const SIGN_KINDS: readonly SignKind[] = [
+  "stop",
+  "giveWay",
+  "roundabout",
+  "limit20",
+  "limit30",
+  "limit40",
+  "limit50",
+  "limit60",
+  "limit70",
+  "limit80",
+  "limit90",
+  "limit100",
+  "limit110",
+  "limit120",
+  "limit130",
+  "limit140",
+  "limitEnd",
+  "noOvertaking",
+  "noStopping",
+  "slippery",
+  "curve",
+  "railGuarded",
+  "railUnguarded",
+  "railCross",
+  "barrier",
+  "noEntry",
+  "oneWay",
+  "pedestrianCrossing",
+  "priorityRoad",
+  "settlement",
+  "fuel",
+];
+
+/** Numerals the В26 face set can state. A limit outside this list has NO
+ *  truthful face, and the builders must place nothing rather than round it. */
+export const SPEED_LIMIT_FACES_KMH: readonly number[] = [
+  20, 30, 40, 50, 60, 70, 80, 90, 100, 110, 120, 130, 140,
+];
+
+const SPEED_LIMIT_KIND_BY_KMH = new Map<number, SignKind>(
+  SPEED_LIMIT_FACES_KMH.map((v) => [v, `limit${v}` as SignKind]),
+);
+const SPEED_LIMIT_KMH_BY_KIND = new Map<SignKind, number>(
+  SPEED_LIMIT_FACES_KMH.map((v) => [`limit${v}` as SignKind, v]),
+);
+
+/** The В26 kind that STATES `kmh`, or null when the kit has no such face. */
+export function speedLimitSignKind(kmh: number | undefined): SignKind | null {
+  if (kmh === undefined || !Number.isFinite(kmh)) return null;
+  return SPEED_LIMIT_KIND_BY_KMH.get(kmh) ?? null;
+}
+
+/** The number a В26 kind states, or null for every non-В26 kind (В33 included
+ *  — its numeral is per-placement, in SignPlacement.speedKmh). */
+export function signKindSpeedKmh(kind: SignKind): number | null {
+  return SPEED_LIMIT_KMH_BY_KIND.get(kind) ?? null;
+}
 
 export interface SignPlacement extends StaticTransform {
   kind: SignKind;
+  /**
+   * The number the face states, when the face has one: the limit for a В26
+   * plate (mirrors the kind — carried explicitly so a reader never parses a
+   * kind string), and for В33 the limit whose restriction ENDS here.
+   */
+  speedKmh?: number;
 }
 
 /**

@@ -5,6 +5,7 @@
  */
 
 import { LESSON_PARKING_BAYS } from "../../lessons/specs";
+import { SIGN_KINDS } from "../types";
 import type {
   BuildWorldOptions,
   District,
@@ -77,33 +78,22 @@ export function buildWorldGeometry(
   const centerY = (b.minY + b.maxY) / 2;
   const groundThickness = 1;
 
-  const signCounts: Record<SignKind, number> = {
-    stop: 0,
-    giveWay: 0,
-    limit50: 0,
-    roundabout: 0,
-    // Zone-driven posts (SIGN-ASSET drop) — 0 on every zones-less district.
-    noOvertaking: 0,
-    noStopping: 0,
-    slippery: 0,
-    curve: 0,
-    railGuarded: 0,
-    railUnguarded: 0,
-    railCross: 0,
-    barrier: 0,
-    // Junction-derived В1 post — 0 on every district without a one-way mouth.
-    noEntry: 0,
-  };
+  // Built from SIGN_KINDS, not a hand-written literal: the В26 numeral set
+  // (doc 86 T4) turned one speed kind into thirteen, and a Record literal is
+  // exactly the thing that goes stale when a kind is added.
+  const signCounts = Object.fromEntries(SIGN_KINDS.map((k) => [k, 0])) as Record<SignKind, number>;
   for (const s of props.signs) signCounts[s.kind]++;
 
   // Zone-sign draws: +2 per placed textured kind (body + face), +1 for the
   // geometry-only crossbuck/barrier. Zero on zones-less districts, so their
-  // estimate is untouched.
+  // estimate is untouched. The v1 four (stop/giveWay/В26-50/roundabout) are
+  // already inside the fixed 27 below; every OTHER В26 numeral is a real extra
+  // pair of draws, because each numeral is its own instanced face.
+  const FIXED_SIGN_KINDS: readonly SignKind[] = ["stop", "giveWay", "limit50", "roundabout"];
   let zoneSignDraws = 0;
   for (const [kind, count] of Object.entries(signCounts) as [SignKind, number][]) {
     if (count === 0) continue;
-    if (kind === "stop" || kind === "giveWay" || kind === "limit50" || kind === "roundabout")
-      continue; // inside the fixed 27 below
+    if (FIXED_SIGN_KINDS.includes(kind)) continue;
     zoneSignDraws += kind === "railCross" || kind === "barrier" ? 1 : 2;
   }
 

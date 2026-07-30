@@ -32,7 +32,13 @@ const REPO_ROOT = path.resolve(HERE, "../../../../../..");
 const RECORD = process.env.RECORD_TRACES === "1";
 const SCENARIO_ID = "sc-crossing-rain-sprint";
 const Y_ZEBRA = 95;
-const NAMES: ScCrossingRainSprintTraceName[] = ["shadow-correct", "mistake-too-fast", "mistake-not-yielded"];
+const NAMES: ScCrossingRainSprintTraceName[] = [
+  "shadow-correct",
+  "mistake-too-fast",
+  "mistake-not-yielded",
+  // doc 86 L10 — the missing lights demo (see the template's mistakes[2]).
+  "mistake-lights-off",
+];
 
 function loadDistrict(id: string): unknown {
   return JSON.parse(readFileSync(path.join(REPO_ROOT, "content", "world", `${id}.json`), "utf-8"));
@@ -93,6 +99,22 @@ describe("sc-crossing-rain-sprint — mistake demos grade their exact codes (doc
     expect(codes).toEqual([...SC_CROSSING_RAIN_SPRINT.mistakes[1].codeRefs].sort());
     expect(codes).not.toContain("COLLISION");
     expect(drive.outcomes.find((o) => o.eventId === "sc-crs-ped")?.detail).toBe("violation");
+  });
+
+  it("„Дъждовна нощ без светлини“: exactly HEADLIGHTS_OFF_AT_NIGHT, nothing else (doc 86 L10)", () => {
+    const drive = drives.get("mistake-lights-off")!;
+    const codes = [...new Set(violationCodes(drive))].sort();
+    expect(codes).toEqual([...SC_CROSSING_RAIN_SPRINT.mistakes[2].codeRefs].sort());
+    // rules/engine.ts:1038 arms HEADLIGHTS_OFF_IN_RAIN only `!tick.isNight` —
+    // the rain code is the DAYTIME duty, deliberately not double-billed on a
+    // night drive. The copy says so instead of the demo pretending otherwise.
+    expect(codes).not.toContain("HEADLIGHTS_OFF_IN_RAIN");
+    // The drive stops 43 m short — outside the ~35 m crossing zone and outside
+    // the sprinter's 40 m release ring — so nothing about the pedestrian can
+    // pile on and the lamps are the whole lesson of this demo.
+    expect(codes).not.toContain("PEDESTRIAN_CROSSING_TOO_FAST");
+    expect(codes).not.toContain("PEDESTRIAN_NOT_YIELDED");
+    expect(codes).not.toContain("SPEED_TOO_FAST_FOR_CONDITIONS");
   });
 });
 

@@ -78,20 +78,27 @@ export interface AdvisorPrompt {
  * Short imperative action per pre-drive step (the checklist's titleBg is a
  * noun phrase; the advisor speaks in commands). Info steps (no real control
  * yet — performedSteps.ts) point at the read-only checklist's confirm button.
+ *
+ * MOUSE-FIRST (founder 2026-07-30, ledger 86 D9): the sentence now names the
+ * gesture on the CONTROL — „щракни стартера", not „press I". The key caps
+ * still ride along in `keys` (AdvisorCard renders them as small chips), so
+ * nothing is taken away; the keyboard simply stopped being the instruction.
+ * „Огледай трите огледала — задръж Q, E и F" was the worst offender: it spelt
+ * three key names inside the sentence itself.
  */
 const PRE_DRIVE_ACTION_TEXT_BG: Record<PreDriveStepId, string> = {
   "adjust-seat": "Нагласи седалката и потвърди в списъка вляво",
-  "adjust-mirrors": "Огледай трите огледала — задръж Q, E и F",
+  "adjust-mirrors": "Задръж с мишката трите огледала в кабината",
   "check-surroundings": "Огледай се около колата и потвърди в списъка вляво",
-  "fasten-seatbelt": "Постави предпазния колан",
+  "fasten-seatbelt": "Щракни предпазния колан до седалката",
   "check-dashboard": "Провери таблото и потвърди в списъка вляво",
-  "headlights-on": "Включи късите светлини",
-  "start-engine": "Запали двигателя",
-  "press-brake": "Натисни спирачката и задръж",
-  "select-gear": "Премести скоростния лост в D",
-  "release-handbrake": "Освободи ръчната спирачка",
-  "final-mirror-check": "Провери огледалата непосредствено преди потегляне",
-  signal: "Подай ляв мигач",
+  "headlights-on": "Щракни ключа за светлините на таблото",
+  "start-engine": "Щракни стартера на конзолата",
+  "press-brake": "Натисни спирачния педал и задръж",
+  "select-gear": "Щракни скоростния лост към D",
+  "release-handbrake": "Щракни ключа на ръчната спирачка",
+  "final-mirror-check": "Задръж лявото и вътрешното огледало преди потегляне",
+  signal: "Щракни лоста за мигачи наляво",
   "move-off": "Потегли плавно с газта",
 };
 
@@ -235,19 +242,47 @@ export function resetGlancePings(s: GlancePingsState): void {
   s.right = "off";
 }
 
+/** Highest rung the glance pings render on (L1–L3). L4 is the exam rung and
+ *  L5 is „Усложнени" — by then the scan is the student's own habit. */
+export const GLANCE_PING_MAX_LEVEL = 3;
+
 /**
- * Founder-ratified gate (2026-07-20): pings exist only where the drill really
- * GRADES the junction scan (the JU-23 per-lesson opt-in), at the beginner
- * rungs L1–L2, never on exams. The rung/exam half IS defaultAdvisorEnabled —
- * the advisor's one gate, deliberately not a second one. The live „Съветник"
- * on/off toggle stacks on top at the caller (the overlay reads the same
- * persisted setting the shell writes).
+ * WIDENED 2026-07-30 (founder review, ledger 86 D9 / §6 „ALREADY BUILT").
+ *
+ * The gate used to be `ruleConfig.junctionScanObservationEnabled === true &&
+ * defaultAdvisorEnabled(lesson)` — the JU-23 per-lesson opt-in AND rungs
+ * L1–L2. Exactly **three** of the 154 templates ever set that flag
+ * (`templates-junctions.ts:746`, `:936`, `templates-exam.ts:505`, and the exam
+ * one is disqualified by `examMode`), so the cue the founder asked for three
+ * times was live on two scenarios and no curriculum lesson. He played Урок 2
+ * „Кръстовища и предимство" — which grades the junction but never sets the
+ * flag — and wrote: „here we can Ping somewhere on the screen with low
+ * brightness/contrast Press Q for Left View". He was looking straight at the
+ * lesson the gate excluded.
+ *
+ * The new gate is rung + exam only. That is honest rather than lax, because
+ * the pings are **armed by the world, not by the lesson**:
+ * `observeGlancePingsTick` raises them ONLY inside 45 m of a stop line whose
+ * control is a Б2 „Спри! Пропусни движението" or a Б1 „Пропусни движението"
+ * (`tick.nextStopLineControl`) — never at a traffic light, never on open road.
+ * At such a mouth ЗДвП requires the driver to give way, which cannot be done
+ * without looking both ways, so „огледай" is correct instruction on ANY
+ * lesson that drives one. Nothing here grades: satisfying a ping consumes the
+ * already-graded `mirrorGlance` event and the ✓ states a fact („погледна"),
+ * never a verdict.
+ *
+ * Two stacked gates remain: `examMode` (a training aid is not part of the
+ * exam) and the live „Съветник" toggle, applied by the overlay at the caller.
  */
 export function glancePingsEligible(lesson: LessonSpec): boolean {
-  return (
-    lesson.ruleConfig?.junctionScanObservationEnabled === true &&
-    defaultAdvisorEnabled(lesson)
-  );
+  if (lesson.examMode === true) return false;
+  const scenario = parseScenarioLessonId(lesson.id);
+  // A curriculum lesson has no difficulty rung — `order` is a syllabus
+  // position, not a level, and Урок 5 is not „harder mode", it is a later
+  // subject. Reading it as a rung (the advisor's own shortcut) would strip the
+  // cue from Уроци 4–7 exactly as the streets get harder. Scenario rungs DO
+  // carry a level, and there L4 is the exam rung and L5 is „Усложнени".
+  return scenario === null || scenario.level <= GLANCE_PING_MAX_LEVEL;
 }
 
 /**

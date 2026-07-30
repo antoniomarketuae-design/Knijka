@@ -116,16 +116,52 @@ describe("L4 pedestrian dart-out (integration)", () => {
     expect(violationCodes(stack.ruleEvents)).not.toContain("COLLISION");
   });
 
-  it("never fires for a slow local-street crawl (arm condition holds)", () => {
+  /**
+   * L8 (ledger §4) — RE-BASELINED, and the old value was the defect.
+   *
+   * This test used to assert `outcomes.toHaveLength(0)` and
+   * `staged(id).s === 0` under the title "never fires for a slow crawl". That
+   * IS the bug: `minTriggerSpeedKmh` (20 here) was the only release gate while
+   * the crossing objectives carry an UPPER speed bound and no lower one, so a
+   * student who tiptoed under the floor got a чл. 119 pedestrian drill in
+   * which no pedestrian ever stepped onto the carriageway — and completed it
+   * clean. The pinned zero was pinning "the lesson silently deletes itself".
+   *
+   * The new contract: below the floor the walker still releases once the
+   * player is inside DART_CREEP_RELEASE_M (8 m) of the crossing — later and
+   * closer than the authored trigger, which is a HARDER read, never an easier
+   * one — and a crawler who never yields is still convicted.
+   */
+  it("L8: a crawl under the trigger speed still MEETS the pedestrian", () => {
     const stack = makeStack([spec]);
     const driver = new PolyDriver(path(), 60);
     for (let i = 0; i < 90 * 30; i++) {
-      stepFrame(stack, driver.advance(DT, 4)); // ~14 km/h, under the trigger
+      stepFrame(stack, driver.advance(DT, 2.5)); // 9 km/h — under the 20 floor
       if (driver.s >= driver.length) break;
     }
-    expect(stack.outcomes).toHaveLength(0);
-    // Pedestrian never released — still standing at the curb.
-    expect(stack.traffic.staged(spec.id)!.s).toBe(0);
+    // The encounter happened: she left the curb and it adjudicated.
+    expect(stack.traffic.staged(spec.id)!.s).toBeGreaterThan(0);
+    expect(stack.outcomes).toHaveLength(1);
+    // …and this crawler never touched the brake, so it is a conviction, not
+    // a free pass — the exact inversion of the old golden.
+    expect(stack.outcomes[0].success).toBe(false);
+    expect(violationCodes(stack.ruleEvents).length).toBeGreaterThan(0);
+  });
+
+  it("L8: the same crawl, yielding, resolves the encounter without a violation", () => {
+    const stack = makeStack([spec]);
+    const driver = new PolyDriver(path(), 60);
+    for (let i = 0; i < 90 * 30 && stack.outcomes.length === 0; i++) {
+      const released = stack.traffic.staged(spec.id)!.s > 0;
+      const pose = driver.advance(DT, released ? 0 : 2.5);
+      pose.brakePedal = released ? 1 : 0;
+      stepFrame(stack, pose);
+      if (driver.s >= driver.length) break;
+    }
+    expect(stack.outcomes).toHaveLength(1);
+    expect(stack.outcomes[0].success).toBe(true);
+    expect(violationCodes(stack.ruleEvents)).not.toContain("PEDESTRIAN_NOT_YIELDED");
+    expect(violationCodes(stack.ruleEvents)).not.toContain("COLLISION");
   });
 });
 

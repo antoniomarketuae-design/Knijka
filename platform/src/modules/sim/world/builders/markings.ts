@@ -12,6 +12,7 @@ import type { District, DistrictZone } from "../types";
 import {
   ARTERIAL_CLASSES,
   BUS_LANE_SEAM_WIDTH_M,
+  CENTER_LINE_WIDTH_M,
   DASH_GAP_M,
   DASH_LENGTH_M,
   DASH_WIDTH_M,
@@ -21,6 +22,7 @@ import {
   MARKED_CLASSES,
   MARKING_Y,
   SOLID_CENTER_LINE_WIDTH_M,
+  SOLID_LANE_DIVIDER_WIDTH_M,
   SPEED_GLYPH_DIGIT_GAP_M,
   SPEED_GLYPH_DIGIT_H_M,
   SPEED_GLYPH_DIGIT_W_M,
@@ -225,7 +227,7 @@ function authoredSolidBoundaries(
           const off = -travelHalf + k * W;
           if (Math.abs(off) < 1e-6) continue; // the осева, added above
           if (Math.abs(off) > travelHalf - 0.4) continue; // the dash loop's own skip
-          addSeg(k, off, SOLID_CENTER_LINE_WIDTH_M, z.fromM, z.toM);
+          addSeg(k, off, SOLID_LANE_DIVIDER_WIDTH_M, z.fromM, z.toM);
         }
       }
     } else if (z.kind === "busLane" || z.kind === "emergencyLane") {
@@ -740,14 +742,23 @@ export function buildMarkings(
     }
     // Lane boundaries at every internal multiple of LANE_WIDTH from the left
     // edge. For two-way edges the middle boundary is the center line.
+    //
+    // T16 (founder item 46): the осева is the boundary at off ≈ 0 on a TWO-WAY
+    // edge — the one line on the carriageway with oncoming traffic behind it —
+    // and it is painted at CENTER_LINE_WIDTH_M so the student can tell it from
+    // the same-direction dividers he may legally cross. Dash rhythm is
+    // untouched, so the quad COUNT of every already-marked district is
+    // unchanged: only the stroke of the middle line moves.
     for (let k = 1; k < lanes; k++) {
       const off = -travelHalf + k * LANE_WIDTH_M;
       if (Math.abs(off) > travelHalf - 0.4) continue;
+      const isCentreLine = !eb.edge.oneway && Math.abs(off) < 1e-6;
+      const width = isCentreLine ? CENTER_LINE_WIDTH_M : DASH_WIDTH_M;
       const offLine = offsetPolyline(line, off);
       const ex = suppress.get(k);
       markingQuads += ex
-        ? paintDashedLineExcluding(acc, offLine, DASH_WIDTH_M, ex)
-        : paintDashedLine(acc, offLine, DASH_WIDTH_M);
+        ? paintDashedLineExcluding(acc, offLine, width, ex)
+        : paintDashedLine(acc, offLine, width);
     }
     if (ARTERIAL_CLASSES.has(eb.edge.class)) {
       // With a parking band the edge line sits ON the travel/parking boundary;

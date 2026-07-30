@@ -115,6 +115,7 @@ export {
   createGlancePingsState,
   defaultAdvisorEnabled,
   GLANCE_PING_APPROACH_M,
+  GLANCE_PING_MAX_LEVEL,
   GLANCE_PING_MIN_ARM_KMH,
   glancePingsEligible,
   observeGlancePingsTick,
@@ -131,14 +132,20 @@ export { buildDebrief, type DebriefContext, type DebriefOutput } from "./debrief
 
 // In-sim micro-quiz trigger (pure — the theory↔driving closed loop)
 export {
+  QUIZ_RENDERABLE_MEDIA_KINDS,
   QUIZ_TARGET_CONCEPT_IDS,
   QUIZ_TUNING,
   conceptForEvent,
   createQuizTriggerState,
+  isQuizMediaRenderable,
   observeQuizTick,
+  toMicroQuizMedia,
+  type MicroQuizMedia,
   type MicroQuizOption,
   type MicroQuizQuestion,
+  type MicroQuizSignMedia,
   type QuizFrequency,
+  type QuizMediaBearer,
   type QuizTriggerResult,
   type QuizTriggerState,
   type QuizTuning,

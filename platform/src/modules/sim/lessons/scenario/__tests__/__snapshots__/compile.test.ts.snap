@@ -22,8 +22,8 @@ exports[`compileScenario — sc-park-perp-rev > golden compile snapshot per leve
       "id": "sc-ppr-position",
       "kind": "reachZone",
       "params": {
-        "maxSpeedKmh": 15,
-        "radiusM": 7,
+        "maxSpeedKmh": 20,
+        "radiusM": 10.5,
         "x": 0,
         "y": 6,
       },
@@ -93,8 +93,8 @@ exports[`compileScenario — sc-park-perp-rev > golden compile snapshot per leve
       "id": "sc-ppr-position",
       "kind": "reachZone",
       "params": {
-        "maxSpeedKmh": 15,
-        "radiusM": 7,
+        "maxSpeedKmh": 17.5,
+        "radiusM": 8.75,
         "x": 0,
         "y": 6,
       },

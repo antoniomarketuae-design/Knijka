@@ -16,9 +16,71 @@
 
 import { useEffect, useState, useTransition } from "react";
 import { IconBook, IconCheck, IconX } from "@/components/icons";
+import { QuestionMediaView, SignFace, hasSignOptions } from "@/components/theory/QuestionMedia";
 import { CheckControl } from "@/components/ui/CheckControl";
 import type { TriggeredQuiz } from "@/modules/sim/lessons";
+import { COMPACT_MAX_HEIGHT_PX, isCompactViewport } from "./immersive";
 import type { MicroQuizAnswerResult } from "./types";
+
+/**
+ * WHICH VIEWPORT IS ASKING — and why this is not a `sm:` breakpoint.
+ *
+ * The artwork sizing here is a HEIGHT problem, not a width one, and the
+ * Tailwind `sm:` breakpoint reads width. Captured at 852x393 (iPhone 16 in
+ * landscape, which is how the simulator is actually held): 852 is above `sm`,
+ * so every width-based rule served the DESKTOP sizes, and the card ran two of
+ * its four sign tiles below the fold — a picture question with half its
+ * pictures off screen, while the drive is paused waiting for an answer.
+ *
+ * So it reuses the product's own definition (`immersive.ts`, the one the play
+ * shell already uses for its compact HUD) rather than inventing a second one.
+ * `short` is the landscape-phone case that needs everything on ONE row;
+ * `compact` also covers portrait phones, where two columns are still right.
+ */
+function useQuizViewport(): { compact: boolean; short: boolean } {
+  const [v, setV] = useState({ compact: false, short: false });
+  useEffect(() => {
+    const read = (): void => {
+      const coarse = window.matchMedia?.("(pointer: coarse)").matches === true;
+      setV({
+        compact: isCompactViewport(window.innerWidth, window.innerHeight, coarse),
+        short: coarse && window.innerHeight <= COMPACT_MAX_HEIGHT_PX,
+      });
+    };
+    read();
+    window.addEventListener("resize", read);
+    window.addEventListener("orientationchange", read);
+    return () => {
+      window.removeEventListener("resize", read);
+      window.removeEventListener("orientationchange", read);
+    };
+  }, []);
+  return v;
+}
+
+/**
+ * THE ARTWORK, IN A PAUSED DRIVE (L1).
+ *
+ * The same component the theory practice runner mounts — deliberately, because
+ * a micro-quiz IS a theory question asked mid-drive and the student must not
+ * have to learn a second visual language for it. Only the height budget
+ * differs: the runner owns a whole page and measures the fold; this card
+ * floats over a frozen 3D scene and must not push its own answers away.
+ */
+function QuizArtwork({
+  quiz,
+  compact,
+  short,
+}: {
+  quiz: TriggeredQuiz;
+  compact: boolean;
+  short: boolean;
+}) {
+  const media = quiz.media ?? null;
+  if (media === null) return null;
+  const cap = short ? 64 : compact ? 80 : undefined;
+  return <QuestionMediaView media={media} maxHeightPx={cap} />;
+}
 
 export function MicroQuizOverlay({
   quiz,
@@ -57,6 +119,16 @@ export function MicroQuizOverlay({
       }
     });
   };
+
+  // Any sign-face option switches the whole list to the picture grid — the
+  // same rule the practice runner uses, so the two surfaces cannot diverge.
+  const signGrid = hasSignOptions(quiz.options);
+  const { compact, short } = useQuizViewport();
+  /* Measured at 852x393 / 393x852 / 1280x800: 64 / 80 / 96 px faces are the
+     largest that keep all four tiles and the „Провери" button on screen at
+     once. The student must never scroll to see an option they are being asked
+     to choose between. */
+  const faceClass = short ? "h-16 w-16" : compact ? "h-20 w-20" : "h-24 w-24";
 
   // Keyboard: 1–9 pick, Enter checks / resumes. Registered fresh each render.
   useEffect(() => {
@@ -110,13 +182,30 @@ export function MicroQuizOverlay({
           </span>
         </div>
 
+        {/* The artwork the question is ABOUT — above the text, as in theory. */}
+        <QuizArtwork quiz={quiz} compact={compact} short={short} />
+
         {/* Question + options */}
         <fieldset className="min-w-0" disabled={isChecking}>
           <legend className="text-base font-extrabold leading-snug">{quiz.textBg}</legend>
           {quiz.type === "multi" ? (
             <p className="mt-1.5 text-xs font-bold text-accent">Избери всички верни отговори.</p>
           ) : null}
-          <ul className="mt-3 flex flex-col gap-2">
+          {/* THE PICTURE GRID's SHAPE.
+              Two columns, not the three the practice runner uses: that runner
+              owns a max-w-2xl page, this card is max-w-lg, and three columns
+              leave a fourth sign alone on a second row — which reads as three
+              options and an afterthought. On a LANDSCAPE phone all four go in
+              ONE row instead, because there a second row is below the fold and
+              a picture question with half its pictures off screen is the same
+              defect L1 was, wearing a different costume. */}
+          <ul
+            className={
+              signGrid
+                ? `mt-3 grid gap-2 ${short ? "grid-cols-4" : "grid-cols-2"}`
+                : "mt-3 flex flex-col gap-2"
+            }
+          >
             {quiz.options.map((option, i) => {
               const isSelected = selected.includes(option.id);
               const isCorrectOption = result !== null && result.correctOptionIds.includes(option.id);
@@ -131,6 +220,66 @@ export function MicroQuizOverlay({
                 stateClasses = "border-danger bg-danger/10";
               } else {
                 stateClasses = "border-border opacity-60";
+              }
+
+              if (signGrid) {
+                // SIGN IDENTIFICATION — the option IS the picture (L1).
+                // `textBg` here is only the accessible name („Знак 3"), which
+                // is exactly why the text-only rendering was unanswerable: the
+                // four captions are interchangeable. Same tile as the practice
+                // runner, including the sr-only control (the whole picture is
+                // the label; a tick box in a sign grid is a stray square) —
+                // the one exception checkControl.test.ts sanctions.
+                return (
+                  <li key={option.id} className="min-w-0">
+                    <label
+                      className={`flex h-full flex-col items-center gap-1.5 rounded-xl border p-2 transition focus-within:ring-2 focus-within:ring-accent/50 motion-reduce:transition-none ${stateClasses} ${
+                        result === null ? "cursor-pointer" : "cursor-default"
+                      }`}
+                    >
+                      <input
+                        type={quiz.type === "single" ? "radio" : "checkbox"}
+                        name={`micro-quiz-${quiz.id}`}
+                        value={option.id}
+                        checked={isSelected}
+                        onChange={() => toggleOption(option.id)}
+                        disabled={result !== null}
+                        className="sr-only"
+                      />
+                      <span className="flex w-full items-center justify-between">
+                        <span
+                          aria-hidden
+                          className="flex h-6 w-6 items-center justify-center rounded-md border border-border bg-surface font-mono text-[11px] font-bold text-muted"
+                        >
+                          {i + 1}
+                        </span>
+                        {isCorrectOption ? (
+                          <IconCheck aria-hidden className="h-4 w-4 text-success" />
+                        ) : isWrongPick ? (
+                          <IconX aria-hidden className="h-4 w-4 text-danger" />
+                        ) : null}
+                      </span>
+                      {option.media !== undefined ? (
+                        <SignFace
+                          signRef={option.media.signRef}
+                          /* Neutral by design: the label must never name the
+                             sign on an identification question. */
+                          altBg={option.textBg}
+                          className={faceClass}
+                        />
+                      ) : (
+                        <span className="flex min-h-16 items-center text-center text-sm leading-relaxed">
+                          {option.textBg}
+                        </span>
+                      )}
+                      {isCorrectOption ? (
+                        <span className="text-[11px] font-bold text-success">Верен отговор</span>
+                      ) : isWrongPick ? (
+                        <span className="text-[11px] font-bold text-danger">Твоят избор</span>
+                      ) : null}
+                    </label>
+                  </li>
+                );
               }
 
               return (

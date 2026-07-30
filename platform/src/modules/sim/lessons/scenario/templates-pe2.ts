@@ -127,6 +127,35 @@ const SCHOOL_CHILDREN: PedestrianDartOutSpec = {
   variant: "child", // R3 P6: the school figure RENDERS as the child rig
 };
 
+/**
+ * THE REST OF THE GROUP (doc 86 D2 — „plural copy against a singular staged
+ * actor"). Instruction 5 says «Изчакай ЦЯЛАТА група… Децата не вървят в права
+ * линия — едно може да се върне» and the mistake copy says «децата вече бяха
+ * стъпили на платното», while the drill staged exactly ONE child. Two
+ * companions now walk it with her, offset along the zebra (which is 6 m long,
+ * y ∈ [247, 253] — both stay on the paint) and at their own paces, so the group
+ * strings out across the carriageway the way a real school group does and
+ * „ЦЯЛАТА група" is a thing the student can actually see and count.
+ *
+ * Both are FASTER than the lead (1.2 / 1.15 vs 1.1 m/s), so the group clears
+ * the carriageway no later than the single child did — the shadow's 13 s wait
+ * is unchanged and the recorded demos keep grading exactly their own codes.
+ * Same crossing id, so `pedestrianOnCrossing` simply counts three
+ * (the sc-pe-zone-living precedent).
+ */
+const SCHOOL_CHILD_2: PedestrianDartOutSpec = {
+  ...SCHOOL_CHILDREN,
+  id: "sc-pesp-child2",
+  start: { x: CURB_X, y: CROSSING_Y + 1.5 },
+  speedMps: 1.2,
+};
+const SCHOOL_CHILD_3: PedestrianDartOutSpec = {
+  ...SCHOOL_CHILDREN,
+  id: "sc-pesp-child3",
+  start: { x: CURB_X, y: CROSSING_Y - 1.4 },
+  speedMps: 1.15,
+};
+
 /** PE-07 + PE-02 — училищна зона със стоп-палка (ЗДвП чл. 119: пропусни
  *  стъпилите на пътеката пешеходци; чл. 62–63: режимът на зоната — в
  *  училищната зона ограничението е 30 и се кара с готовност за спиране). */
@@ -161,23 +190,28 @@ export const SC_PE_SCHOOL_PATROL: ScenarioSpec = {
     {
       n: 2,
       textBg:
-        "Улицата минава край училище и ограничението пада на 30. Свали скоростта отрано — още щом видиш училищната сграда — и в зоната дръж 25–28 км/ч.",
+        "Вали ли (ниво 5), включи късите светлини още преди да тръгнеш: в дъжд те не са за да виждаш ти, а за да те видят децата от бордюра — и спирачният път пред училището е с около 40% по-дълъг.",
     },
     {
       n: 3,
       textBg:
-        "Виж отговорника на пътеката до бордюра. Вдигне ли стоп-палката, тя е разпореждане — не е молба.",
+        "Улицата минава край училище и ограничението пада на 30. Свали скоростта отрано — още щом видиш училищната сграда — и в зоната дръж 25–28 км/ч.",
     },
     {
       n: 4,
-      textBg: "Спри напълно на няколко метра преди пътеката — не навлизай в нея и не пълзи напред.",
+      textBg:
+        "Виж отговорника на пътеката до бордюра. Вдигне ли стоп-палката, тя е разпореждане — не е молба.",
     },
     {
       n: 5,
-      textBg:
-        "Изчакай ЦЯЛАТА група да освободи платното, включително твоята лента. Децата не вървят в права линия — едно може да се върне.",
+      textBg: "Спри напълно на няколко метра преди пътеката — не навлизай в нея и не пълзи напред.",
     },
-    { n: 6, textBg: "Огледай се и потегли плавно едва когато пътеката е напълно чиста." },
+    {
+      n: 6,
+      textBg:
+        "Изчакай ЦЯЛАТА група да освободи платното, включително твоята лента. Децата са три и не вървят в права линия — едно изостава, друго може да се върне.",
+    },
+    { n: 7, textBg: "Огледай се и потегли плавно едва когато пътеката е напълно чиста." },
   ],
   success: [
     {
@@ -236,7 +270,7 @@ export const SC_PE_SCHOOL_PATROL: ScenarioSpec = {
     // gets reduced grip).
     { level: 5, conditions: { weather: "rain" } },
   ],
-  staged: [SCHOOL_WARDEN, SCHOOL_CHILDREN],
+  staged: [SCHOOL_WARDEN, SCHOOL_CHILDREN, SCHOOL_CHILD_2, SCHOOL_CHILD_3],
   conditions: { weather: "dry" },
   localeBg: "bg-BG",
 };
@@ -555,12 +589,51 @@ const ZONE_WALKER_WEST: PedestrianDartOutSpec = {
 };
 
 /**
+ * THE SECOND WEST WALKER — template-wide (doc 86 D2). The halt objective is
+ * titled «Спри пред ХОРАТА на платното» and the teach card describes „хора с
+ * чанти" between the parked cars, but the drill staged exactly one figure. A
+ * companion walks with her, three metres SOUTH (nearer the approaching car) so
+ * the pair reads as two people crossing together rather than one figure with a
+ * clone. A living zone has NO zebra — чл. 62–63 gives the whole carriageway to
+ * pedestrians — so an off-centre companion is the legally correct picture, not
+ * a paint violation.
+ *
+ * The southward offset is the SAFE one: measured constant-speed closest
+ * approach at the 20 km/h zone cap is 3.02–4.98 m across the trigger jitter
+ * (the lead walker's own is 2.44–4.40), so the push-through demo keeps grading
+ * непропускане and never COLLISION.
+ */
+const ZONE_WALKER_WEST_2: PedestrianDartOutSpec = {
+  id: "sc-pzl-walker-w2",
+  kind: "pedestrianDartOut",
+  crossingId: "pz-x-1",
+  crossing: { x: 0, y: ZL_CROSSING_Y },
+  start: { x: CURB_X, y: ZL_CROSSING_Y - 3 },
+  dir: { x: 1, y: 0 },
+  speedMps: 1.9,
+  travelM: TRAVEL_M,
+  roadFromM: ROAD_FROM_M,
+  roadToM: ROAD_TO_M,
+  triggerDistM: 30,
+  minTriggerSpeedKmh: 6,
+};
+
+/**
  * THE EAST WALKER — L5 only (`stagedAdd`). The mirror image: off the east curb,
- * westbound across the same shared carriageway, a touch slower (1.0 m/s) so the
- * road stays occupied longer and the two figures overlap in the middle. The
- * occupancy span is the PE family's shared symmetric road window measured from
- * the east curb, so grading (which reads roadFromM/roadToM along the walk, not
- * the curb x) is identical to the west walker's.
+ * westbound across the same shared carriageway, so the driver is threading
+ * people from both sides at once.
+ *
+ * ⚠ doc 86 S5 (found by the lane-10 gradient sweep, NOT in the ledger's list):
+ * this actor shipped at 1.0 m/s / triggerDistM 26 and carried the same inverted
+ * fault surface as T11. It is a NEAR-SIDE dart — 5.67 m from the east curb to
+ * the driving line — so at 1.0 m/s it needed 7.17 s to clear the 1.5 m contact
+ * band while a driver holding the zone's own 20 km/h cap arrived after only
+ * 4.63 s: measured closest approach 0.49–1.57 m, i.e. a COLLISION for obeying
+ * the cap, while 30 km/h cleared at 2.21–2.93 m. 1.9 m/s (the west walker's own
+ * purposeful pace) + triggerDistM 28 inverts it back: 2.62–4.58 m at the cap,
+ * contact from 24 km/h upwards. The trigger stays past the map's SPEED-ONLY
+ * window (release at y ≈ 187, the window ends at 180 — pe-zone-districts.test).
+ * NOT recorded (L5-only stagedAdd), so no trace moves.
  */
 const ZONE_WALKER_EAST: PedestrianDartOutSpec = {
   id: "sc-pzl-walker-e",
@@ -569,11 +642,11 @@ const ZONE_WALKER_EAST: PedestrianDartOutSpec = {
   crossing: { x: 0, y: ZL_CROSSING_Y },
   start: { x: CURB_X_EAST, y: ZL_CROSSING_Y },
   dir: { x: -1, y: 0 },
-  speedMps: 1.0,
+  speedMps: 1.9,
   travelM: TRAVEL_M,
   roadFromM: ROAD_FROM_M,
   roadToM: ROAD_TO_M,
-  triggerDistM: 26,
+  triggerDistM: 28,
   minTriggerSpeedKmh: 6,
 };
 
@@ -704,7 +777,7 @@ export const SC_PE_ZONE_LIVING: ScenarioSpec = {
     // rule — only a template that AUTHORS `physics` gets reduced grip).
     { level: 5, stagedAdd: [ZONE_WALKER_EAST] },
   ],
-  staged: [ZONE_WALKER_WEST],
+  staged: [ZONE_WALKER_WEST, ZONE_WALKER_WEST_2],
   conditions: { weather: "dry" },
   localeBg: "bg-BG",
 };
@@ -731,19 +804,38 @@ export const SC_PE_ZONE_LIVING: ScenarioSpec = {
  *     driver's side, which is why the objective is „премести се леко наляво": you
  *     move away from the cars for the sight line. (The live child-ball dart is
  *     the west-curb convention; the two cannot play identically.)
- *  2. A LATE, OCCLUDED OCCUPANCY WINDOW: ROW_ROAD_FROM_M 4.0 (against the
- *     family's 1.6 west-edge convention) models „hidden BEHIND the parked cars
- *     until it clears them" — the child does not count as on-the-driving-surface
- *     until it is past the right-side row. That late window is exactly what lets
- *     the fast-row demo grade EXACTLY SPEEDING_OVER_LIMIT + COLLISION with no
- *     crossing code piling on (the strike lands before the figure is „seen").
+ *  2. A NEAR-SIDE dart has no crossing time to warn you. The west-curb siblings
+ *     give the driver the whole oncoming lane (13.8 m ≈ 5 s at 2.6 m/s) before
+ *     the figure reaches the driving line; this one gives 5.67 m ≈ 2.2 s. That
+ *     is the whole difficulty of the archetype, and it is why the release
+ *     distance has to be LARGER here, not smaller (see the T11 note below).
+ *
+ * ⚠ DOC 86 T11 — THE INVERTED FAULT SURFACE, FIXED HERE (read before re-tuning).
+ * The drill shipped with `triggerDistM 14` and `roadFromM 4.0`, and the two
+ * numbers together inverted the whole lesson:
+ *   - 14 m of release against a reaction-plus-braking distance of 14.5 m at the
+ *     objective's own 32 km/h cap: the taught corrective action („спирачка,
+ *     право напред") was physically impossible;
+ *   - a constant-speed closest-approach sweep hit at 18–32 km/h (the OBEDIENT
+ *     band, worst clearance 0.14 m) and CLEARED at 34–50 km/h;
+ *   - `roadFromM 4.0` — 2.4 m past the true carriageway edge at 9.73 − 8.125 =
+ *     1.605 — held `pedestrianOnCrossing` false until the child was 0.8 m off
+ *     the bumper, so the speeding driver who cleared could not be billed
+ *     PEDESTRIAN_NOT_YIELDED either. Driving correctly was punished and driving
+ *     illegally graded nothing.
+ * The fix is the two honest numbers: the family's real occupancy window (1.6 /
+ * 17.85 — the geometry, not a grading dial) and a release far enough out that
+ * the cap can stop inside it. Pinned by
+ * __tests__/lane10-pe-vru-truth.test.ts (G1 gradient, G2 stoppability,
+ * G3 occupancy honesty).
  *
  * WHAT GRADES, HONESTLY (the A12 discipline): the SUSTAINED row-scan discipline
  * is TAUGHT (instructions + teach card) and gated by the reachZone objectives'
  * speed caps across the row's length; the covered brake and the half-metre left
  * offset are the shadow's demonstration, not a detector. The graded contract is
  * PE-04's crossing vocabulary — the posted 40-limit speeding detectors on the
- * run past the cars, and the strike. THE PARKED ROW IS DRESSING, not props:
+ * run past the cars, the чл. 119 yield once the child is on the carriageway,
+ * and the strike. THE PARKED ROW IS DRESSING, not props:
  * parked-car obstacles would need a bays layer + trace obstacles (the
  * sc-pe-zone-living honest gap); the row lives in the copy and the corner-shop
  * occluder pe-child-v1 already ships, exactly as child-ball treats it.
@@ -767,21 +859,35 @@ const ROW_CROSSING_Y = 78;
 const ROW_CURB_EAST = 9.73;
 /** West curb — the L5 second dart's side. */
 const ROW_CURB_WEST = -9.73;
-/** LATE occupancy window: 4.0 (NOT the family's 1.6) is the „behind the parked
- *  row" delay — the child counts as on the driving surface only past the cars. */
-const ROW_ROAD_FROM_M = 4.0;
-const ROW_ROAD_TO_M = 18.0;
+/**
+ * The TRUE occupancy window, identical to every other PE crossing (doc 86 T11):
+ * the curb stand-back is 9.73 m and the carriageway half-width 8.125 m, so the
+ * walker is on the driving surface from arc 1.6 m to arc 17.85 m. This is
+ * GEOMETRY, not a grading dial — the previous 4.0 hid the child from
+ * `pedestrianOnCrossing` for the 2.4 m in which it was already on the tarmac
+ * and inside the driver's lane.
+ */
+const ROW_ROAD_FROM_M = 1.6;
+const ROW_ROAD_TO_M = 17.85;
 /** Curb → across the 16.25 m carriageway → a few metres of walk-out. */
 const ROW_TRAVEL_M = 23.45;
 
 /**
  * THE PARKED-ROW CHILD at pe-x-1 (0, 78): steps off the EAST curb (x = +9.73)
- * WESTBOUND at 2.6 m/s — a small child bolting from between the parked cars into
- * the driver's lane, the child-ball dart profile — only when the player closes
- * within ~14 m (LATE: „невидимо до последно"). ROW_ROAD_FROM_M 4.0 keeps it
- * hidden behind the row until it clears the cars, so a driver who relaxed and
- * carried speed strikes it as it emerges — before the occupancy flag ever flips,
- * which is why the fast-row demo grades no crossing code.
+ * WESTBOUND at 2.6 m/s — a small child bolting out of the row's last gap into
+ * the driver's own lane, the child-ball dart profile.
+ *
+ * `triggerDistM 30` (was 14 — doc 86 T11) is DERIVED, not chosen. For a
+ * near-side dart the compliant driver has to reach the crossing AFTER the child
+ * has crossed the driving line, because the near side gives no crossing time as
+ * warning. The child leaves the 1.5 m contact band at arc (5.67 + 1.5) / 2.6 =
+ * 2.76 s, so the release has to sit further back than 2.76 s × 8.89 m/s
+ * (the 32 km/h objective cap) = 24.5 m. With the director's ± 3 m seeded
+ * jitter the worst case is 30 − 3 = 27 → 26.7 m of longitudinal release: 2.2 m
+ * of margin on the sweep, and 12.2 m of margin on reaction-plus-braking
+ * (14.5 m at 32 km/h). Measured closest approach at the cap is now 2.05–3.75 m
+ * across the jitter band; the collision band starts at 36 km/h and runs to
+ * 50 — ABOVE the cap, which is the point.
  */
 const PARKED_ROW_CHILD: PedestrianDartOutSpec = {
   id: "sc-prs-child",
@@ -794,18 +900,27 @@ const PARKED_ROW_CHILD: PedestrianDartOutSpec = {
   travelM: ROW_TRAVEL_M,
   roadFromM: ROW_ROAD_FROM_M,
   roadToM: ROW_ROAD_TO_M,
-  triggerDistM: 14,
+  triggerDistM: 30,
   minTriggerSpeedKmh: 10,
   variant: "child", // R3 P6: renders as the small child rig
 };
 
 /**
  * THE SECOND CHILD — L5 only (`stagedAdd`). The mirror image: off the WEST curb,
- * eastbound across the same pe-x-1, released a beat later (triggerDistM 10) so it
- * steps out just as the driver relaxes after the first — „no let-up". A touch
- * lower trigger speed (6 km/h) so it still fires if the driver crawls out of the
- * first stop. Occupancy span measured from the west curb, so grading (which
- * reads roadFromM/roadToM along the walk, not the curb x) is identical.
+ * eastbound across the same pe-x-1, released only once the driver is right at
+ * the crossing (triggerDistM 14, ± 3 m jitter) — so it steps out while the
+ * driver is still stopped for the FIRST one and has to be waited out too:
+ * „no let-up". A touch lower trigger speed (6 km/h) so it still fires if the
+ * driver crawls out of the first stop, and the runner's 8 m creep-release
+ * backstop covers a driver who is fully stationary. 14 (was 10) is what makes
+ * the release reliable now that the first child releases 30 m out and the
+ * compliant stop rests ~8 m short of the zebra.
+ *
+ * It is a FAR-side dart (13.79 m from the west curb to the driving line, 5.3 s
+ * at 2.6 m/s), so it can never be a contact for a driver still rolling at the
+ * cap: measured closest approach 9.9 m. It is a WAIT, not a trap.
+ * Occupancy span measured from the west curb, so grading (which reads
+ * roadFromM/roadToM along the walk, not the curb x) is identical.
  */
 const ROW_SECOND_CHILD: PedestrianDartOutSpec = {
   id: "sc-prs-child2",
@@ -818,7 +933,7 @@ const ROW_SECOND_CHILD: PedestrianDartOutSpec = {
   travelM: ROW_TRAVEL_M,
   roadFromM: ROW_ROAD_FROM_M,
   roadToM: ROW_ROAD_TO_M,
-  triggerDistM: 10,
+  triggerDistM: 14,
   minTriggerSpeedKmh: 6,
   variant: "child", // R3 P6: renders as the small child rig
 };
@@ -850,19 +965,25 @@ export const SC_PE_PARKED_ROW_SCAN: ScenarioSpec = {
     {
       n: 1,
       textBg:
-        "Отдясно започва дълга редица паркирани коли. Тя крие крака, отварящи се врати и деца — свали скоростта и премести колата леко наляво за по-добра видимост.",
+        "Преди да потеглиш провери светлините: в здрач и нощем (ниво 5) късите светлини се включват ПРЕДИ да ти потрябват — покрай редица паркирани коли те са единственото, което прави детето видимо навреме.",
     },
     {
       n: 2,
       textBg:
-        "Дръж спирачката покрита по ЦЯЛАТА дължина на редицата: дете може да изскочи между две коли във всеки момент, не само пред зебрата.",
+        "Отдясно започва дълга редица паркирани коли. Тя крие крака, отварящи се врати и деца — свали скоростта и премести колата леко наляво за по-добра видимост.",
     },
     {
       n: 3,
-      textBg: "Изскочи ли дете иззад колите, реагирай веднага — спирачка, право напред, без да завиваш встрани.",
+      textBg:
+        "Дръж спирачката покрита по ЦЯЛАТА дължина на редицата: дете може да изскочи между две коли във всеки момент, не само пред зебрата.",
     },
-    { n: 4, textBg: "Спри напълно преди пешеходната пътека и изчакай детето да освободи цялото платно." },
-    { n: 5, textBg: "Продължи спокойно едва когато платното пред теб е чисто." },
+    {
+      n: 4,
+      textBg:
+        "В края на редицата, на самата пешеходна пътека, изскача дете от твоята страна на платното. Реагирай веднага — спирачка, право напред, без да завиваш встрани.",
+    },
+    { n: 5, textBg: "Спри напълно преди пешеходната пътека и изчакай детето да освободи цялото платно." },
+    { n: 6, textBg: "Продължи спокойно едва когато платното пред теб е чисто — включително иззад отсрещния бордюр." },
   ],
   success: [
     {
@@ -889,8 +1010,14 @@ export const SC_PE_PARKED_ROW_SCAN: ScenarioSpec = {
       traceRef: { path: "content/traces/sc-pe-parked-row-scan/mistake-fast-row.trace.json" },
       titleBg: "50 покрай редицата — детето е невидимо до последно",
       whatWentWrongBg:
-        "Колата държеше близо 50 покрай паркираните коли — законно на открито, но не и покрай редица, която крие деца. Детето изскочи между две коли в последния момент и при тази скорост нямаше нито метри, нито секунда за реакция. Превишаването покрай редицата се отсъжда самостоятелно (чл. 21), а ударът прекратява изпита: покрай паркирани коли таванът ти е видимостта, не табелата (чл. 20).",
-      codeRefs: ["SPEEDING_OVER_LIMIT", "COLLISION"],
+        "Колата държеше близо 50 покрай паркираните коли — законно на открито, но не и покрай редица, която крие деца. Три отделни неща се отсъждат тук и всяко има свое основание. Първо, превишаването в зона 40 се брои самостоятелно (чл. 21) — то е причината, не обстоятелството. Второ, детето вече беше стъпило на платното, а колата продължи към пътеката с непроменена скорост: чл. 119 иска скорост, ПОЗВОЛЯВАЩА спиране пред стъпил пешеходец, затова се отсъжда и „приближаване без готовност“. Трето, ударът прекратява изпита. Покрай паркирани коли таванът ти е видимостта, не табелата (чл. 20).",
+      // doc 86 T11: the third code is NEW and it is the point of the fix. The
+      // drill used to author `roadFromM 4.0` — 2.4 m past the real carriageway
+      // edge — so a child already on the tarmac and inside the driver's lane
+      // did not count as „on the crossing" and the speeding driver could not be
+      // billed the чл. 119 approach code at all. With the honest 1.6 the
+      // demo grades what actually happened.
+      codeRefs: ["SPEEDING_OVER_LIMIT", "PEDESTRIAN_CROSSING_TOO_FAST", "COLLISION"],
     },
     {
       traceRef: { path: "content/traces/sc-pe-parked-row-scan/mistake-hug-row.trace.json" },

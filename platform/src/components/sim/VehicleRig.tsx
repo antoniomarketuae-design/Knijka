@@ -223,6 +223,7 @@ export function VehicleRig({
   spawn = SPAWN,
   difficultyRef,
   lessonMaxLegalKmh,
+  lessonRequiredKmh,
   onCollision,
   collisionMinKmh = COLLISION_MIN_KMH,
   night = false,
@@ -253,6 +254,14 @@ export function VehicleRig({
    *  vehicle/difficulty.ts governorCapKmh). Absent = the preset's researched
    *  static caps, byte-identical legacy behavior. */
   lessonMaxLegalKmh?: number;
+  /** A speed the LESSON ITSELF requires the student to drive (km/h) — today
+   *  the district's `meta.scenario.wave.speedKmh` (doc 86 B7). It FLOORS the
+   *  tier's governor cap at `required + REQUIRED_SPEED_HEADROOM_KMH`, because
+   *  a tier may be slower than the road but never slower than the lesson:
+   *  `sc-sig-green-wave` on Начинаещ governed at 40 km/h against a wave tuned
+   *  to 50 and was unwinnable on every rung. Absent = the domain rule alone,
+   *  byte-identical behaviour. */
+  lessonRequiredKmh?: number;
   /** Fired on a real (fast-enough) impact so the rule engine can grade it.
    *  A11: `withWhat` classifies the contact from the other body's NPC-shell
    *  userData tag — untagged bodies (world meshes) are static objects. */
@@ -444,7 +453,8 @@ export function VehicleRig({
     const mode = difficultyRef?.current ?? DEFAULT_DIFFICULTY;
     // Shape input for the learner mode (throttle/governor/steer smoothing) —
     // physics constants untouched, so the CI harness stays valid. The lesson
-    // speed domain (when threaded) scales the governor cap (#37).
+    // speed domain (when threaded) scales the governor cap (#37), and a speed
+    // the lesson REQUIRES floors it (doc 86 B7).
     const shaped = applyDifficulty(
       raw,
       mode,
@@ -452,6 +462,7 @@ export function VehicleRig({
       FIXED_DT,
       assistRef.current,
       lessonMaxLegalKmh,
+      lessonRequiredKmh,
     );
     // A1: the driveline gates traction (ignition/selector/clutch/parking
     // brake). Without a cabin (headless/legacy) the default keeps the car

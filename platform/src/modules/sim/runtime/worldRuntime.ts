@@ -1450,6 +1450,12 @@ export function createWorldRuntime(districtJson: District | unknown): DistrictWo
       if (v.stalled !== undefined) tick.stalled = v.stalled;
       if (edgeRt !== null) {
         tick.oneway = edgeRt.edge.oneway;
+        // PAINTED LANE MARKINGS (doc 86 T1) — the world builder's own answer,
+        // resolved by the committed lane fix exactly the way maxSpeedKmh is.
+        // Published ONLY in the disarming direction (see SimTick.centreLinePainted):
+        // a road that IS painted leaves the tick byte-identical to before.
+        if (!fix.centreLinePainted) tick.centreLinePainted = false;
+        if (!fix.laneLinesPainted) tick.laneLinesPainted = false;
         if (edgeRt.edge.zone !== undefined) tick.zone = edgeRt.edge.zone;
         if (edgeRt.edge.noOvertake !== undefined) tick.noOvertake = edgeRt.edge.noOvertake;
         if (edgeRt.edge.noUTurn !== undefined) tick.noUTurn = edgeRt.edge.noUTurn;

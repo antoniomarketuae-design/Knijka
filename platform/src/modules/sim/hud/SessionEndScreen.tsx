@@ -22,10 +22,39 @@
  *
  * XP chip: renders only when `xpEarned` is a number — sim lessons award no XP
  * until the gamification event union accepts sim_lesson (see lessons/types.ts).
+ *
+ * ---------------------------------------------------------------------------
+ * DOC 86 · L15 — SKIPPABLE, AND SKIPPABLE FOR GOOD
+ *
+ * Founder, global item 2: „at the end of each lesson a popup window pops, which
+ * is kind of annoying, we should allow users to skip it with space, so when
+ * they push space to click Skip, also note them below … that it's skippable
+ * with space, and also there must a button at this note to allow user to choose
+ * if he wants to turn this off."
+ *
+ * Three things, all three here:
+ *  1. SPACE (and Enter) activates Skip. Bound on the WINDOW in the CAPTURE
+ *     phase with `stopPropagation`, exactly as `TeachMomentOverlay` does it and
+ *     for the same reason — Space is the cabin's parking-brake toggle
+ *     (`engine/input.ts:223`) and the cabin listens on the bubble phase. Safe
+ *     here in a way it is not on a live toast: the shell pauses the scene the
+ *     moment the session ends (`LessonPlayShell` `paused={ended || …}`).
+ *  2. THE NOTE. „Space = пропусни" is rendered, right under the Skip control,
+ *     not left as folklore. `SESSION_END_SKIP_HINT_BG` is its single source.
+ *  3. THE SETTING, in that same note: „Не показвай автоматично" persists, and
+ *     the next lesson ends with a one-line verdict bar instead of a popup.
+ *
+ * THEO-4 HOLDS THROUGH ALL OF IT. Skipping hides the debrief; it never
+ * replaces it with a bare verdict. The bar the shell renders instead always
+ * carries „Виж разбора", and this screen — the mistake list with every
+ * authored `correctiveBg` and law chip — is one click behind it, unchanged.
+ * Both controls are omitted entirely (`onSkip == null`) while the I1
+ * calibration gate holds the result: there is nothing to skip yet.
+ * ---------------------------------------------------------------------------
  */
 
 import Link from "next/link";
-import { useMemo, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { CheckControl } from "@/components/ui/CheckControl";
 import { VIOLATIONS, type FailReason, type ViolationCode } from "../rules";
 import {
@@ -45,6 +74,7 @@ import {
   scenarioCtaRow,
   type SessionEndScenarioTarget,
 } from "./sessionEndCtas";
+import { SESSION_END_SKIP_HINT_BG } from "./hudPreferences";
 
 export interface SessionEndConcept {
   id: string;
@@ -177,6 +207,9 @@ export function SessionEndScreen({
   calibrationGate = null,
   calibrationLocked = false,
   myDriveHref = null,
+  onSkip = null,
+  autoOpen = true,
+  onAutoOpenChange = null,
 }: {
   lessonTitleBg: string;
   result: LessonResult;
@@ -246,6 +279,16 @@ export function SessionEndScreen({
    * and a dead link on the result screen is worse than no link.
    */
   myDriveHref?: string | null;
+  /**
+   * L15: close this screen without leaving the session. null → no Skip control
+   * and no key binding (compact, where the debrief is already tap-to-open, and
+   * while the calibration gate holds the result).
+   */
+  onSkip?: (() => void) | null;
+  /** L15: the persisted „Показвай разбора автоматично" state. */
+  autoOpen?: boolean;
+  /** L15: null → the setting is not offered (same cases as `onSkip`). */
+  onAutoOpenChange?: ((next: boolean) => void) | null;
 }) {
   const { summary } = result;
   const score = summary.score;
@@ -293,6 +336,37 @@ export function SessionEndScreen({
       ? { className: "sim-end-row-flash", key: `${key}:${selected.pulse}` }
       : { className: "", key };
 
+  // -- L15: Space/Enter = Skip ------------------------------------------------
+  //
+  // The handler behind a ref so the window listener has a stable identity and
+  // is not torn down and re-registered by the shell's 150 ms HUD poll — the
+  // same shape SimOverlay uses (`ackRef`).
+  const skipRef = useRef<(() => void) | null>(null);
+  useEffect(() => {
+    skipRef.current = onSkip;
+  });
+  const skipEnabled = onSkip !== null && !calibrationLocked;
+  const skip = useCallback(() => skipRef.current?.(), []);
+  useEffect(() => {
+    if (!skipEnabled) return;
+    const onKey = (e: KeyboardEvent): void => {
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+      if (e.code !== "Space" && e.key !== "Enter") return;
+      // Enter on a focused control is that control's own activation — Space on
+      // one is too, and this screen is full of them (Повтори, Следващ урок…).
+      const tag = e.target instanceof HTMLElement ? e.target.tagName : "";
+      if (tag === "BUTTON" || tag === "A" || tag === "INPUT" || tag === "TEXTAREA") return;
+      // CAPTURE + stopPropagation: the cabin's own window listener reads Space
+      // as the parking brake on the bubble phase (engine/input.ts:223).
+      e.preventDefault();
+      e.stopPropagation();
+      if (e.repeat) return;
+      skip();
+    };
+    window.addEventListener("keydown", onKey, true);
+    return () => window.removeEventListener("keydown", onKey, true);
+  }, [skipEnabled, skip]);
+
   const rows = [
     { label: "Опасни грешки", per: "10 т.", count: score.opasniCount, points: score.opasniPoints, tone: "var(--danger)" },
     { label: "Основни грешки", per: "3 т.", count: score.osnovniCount, points: score.osnovniPoints, tone: "var(--warning)" },
@@ -325,6 +399,59 @@ export function SessionEndScreen({
           .sim-end-row-flash { animation: none; }
         }
       `}</style>
+
+      {/* L15 — the skip control, and DIRECTLY BELOW IT the note the founder
+          asked for („note them below … that it's skippable with space") with
+          the opt-out button in that same note.
+
+          At the TOP rather than under the CTAs: the debrief scrolls, and a
+          „press Space" hint the student can only find after reading the thing
+          they wanted to skip is not a hint. The Skip button is right-aligned
+          and ghost-weight so it never competes with „Повтори" / „Следващо
+          ниво" — leaving is the cheap action, not the recommended one. */}
+      {skipEnabled ? (
+        <div className="flex flex-col items-end gap-1">
+          <button
+            type="button"
+            onClick={skip}
+            className="btn-ghost px-4 py-1.5 text-xs"
+            aria-keyshortcuts="Space"
+          >
+            Пропусни разбора
+          </button>
+          <p className="flex flex-wrap items-center justify-end gap-x-2 gap-y-1 text-[11px] text-muted">
+            <span>
+              <kbd className="rounded border border-border bg-surface px-1.5 py-0.5 font-mono text-[10px] font-bold">
+                Space
+              </kbd>{" "}
+              {/* SESSION_END_SKIP_HINT_BG is „Space = пропусни"; the kbd chip
+                  already says „Space", so only the tail is spelled out here. */}
+              {SESSION_END_SKIP_HINT_BG.replace("Space = ", "")} разбора
+            </span>
+            {onAutoOpenChange !== null ? (
+              <>
+                <span aria-hidden>·</span>
+                <button
+                  type="button"
+                  onClick={() => onAutoOpenChange(!autoOpen)}
+                  aria-pressed={!autoOpen}
+                  className="rounded-full border border-border px-2 py-0.5 font-semibold transition hover:text-foreground motion-reduce:transition-none"
+                >
+                  {autoOpen ? "Не показвай автоматично" : "Показвай автоматично"}
+                </button>
+              </>
+            ) : null}
+          </p>
+          {onAutoOpenChange !== null && !autoOpen ? (
+            // THEO-4: switching the popup off must never cost the student the
+            // explanation. Say where it went.
+            <p className="text-right text-[11px] font-semibold text-muted">
+              Разборът вече няма да се отваря сам — ще го намираш с „Виж разбора“
+              в лентата след урока.
+            </p>
+          ) : null}
+        </div>
+      ) : null}
 
       {/* Verdict card */}
       <section

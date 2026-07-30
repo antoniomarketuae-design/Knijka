@@ -61,10 +61,33 @@ export interface LocateFix {
    * (Which BANK the vehicle occupies — actual motion may oppose it.)
    */
   travelDir: 1 | -1;
+  /**
+   * Is an ОСЕВА — a line separating opposing streams — actually painted where
+   * the fix sits (doc 86 T1)? Resolved from the world builder's own predicate
+   * and its own junction trim (`DistrictIndex.laneMarkingAt`), never from the
+   * lane arithmetic: on a two-way `lanes: 2` edge `laneId 0 === laneCount - 1`
+   * is ALWAYS true, so the reducer's "leftmost lane" guard is vacuous and the
+   * only thing standing between a 3.3 m drift and «Настъпване на осевата линия»
+   * is whether the line exists. False off-road and inside every junction.
+   */
+  centreLinePainted: boolean;
+  /** Is ANY lane boundary painted here? The referent POOR_LANE_KEEPING and
+   *  NOT_KEEPING_RIGHT need — there is no lane to keep without a line. */
+  laneLinesPainted: boolean;
 }
 
 export function makeLocateFix(): LocateFix {
-  return { edgeIdx: -1, edgeId: null, laneId: 0, laneOffsetM: 0, sM: 0, distM: Infinity, travelDir: 1 };
+  return {
+    edgeIdx: -1,
+    edgeId: null,
+    laneId: 0,
+    laneOffsetM: 0,
+    sM: 0,
+    distM: Infinity,
+    travelDir: 1,
+    centreLinePainted: false,
+    laneLinesPainted: false,
+  };
 }
 
 interface LaneCalc {
@@ -164,6 +187,8 @@ export class Locator {
       fix.sM = 0;
       fix.distM = Infinity;
       fix.travelDir = 1;
+      fix.centreLinePainted = false;
+      fix.laneLinesPainted = false;
       if (commit) {
         this.lockedEdgeIdx = -1;
         this.lockedLaneId = -1;
@@ -184,6 +209,9 @@ export class Locator {
     fix.sM = hit.sM;
     fix.distM = hit.distM;
     fix.travelDir = this.laneCalc.travelDir;
+    const paint = this.index.laneMarkingAt(hit.edgeIdx, hit.sM);
+    fix.centreLinePainted = paint.centreLine;
+    fix.laneLinesPainted = paint.laneLines;
 
     if (commit) {
       this.lockedEdgeIdx = hit.edgeIdx;

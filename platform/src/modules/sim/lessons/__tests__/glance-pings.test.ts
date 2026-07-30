@@ -56,27 +56,39 @@ function approachTick(
 // ---------------------------------------------------------------------------
 
 describe("glancePingsEligible", () => {
-  it("requires the lesson to GRADE the junction scan (JU-23 opt-in)", () => {
+  // RE-BASELINED 2026-07-30 (ledger 86 D9). The old contract additionally
+  // required `ruleConfig.junctionScanObservationEnabled`, which exactly three
+  // of 154 templates set — so the founder played Урок 2 „Кръстовища и
+  // предимство" and asked for a cue that the gate was excluding. The flag is
+  // no longer part of the gate: arming is world-driven (Б1/Б2 stop line
+  // within 45 m), which the derivation tests below still pin.
+  it("no longer requires the JU-23 opt-in — a Б1/Б2 lesson is enough", () => {
     expect(glancePingsEligible(scanLesson())).toBe(true);
-    expect(glancePingsEligible(scanLesson({ ruleConfig: {} }))).toBe(false);
-    expect(glancePingsEligible(scanLesson({ ruleConfig: undefined }))).toBe(false);
+    expect(glancePingsEligible(scanLesson({ ruleConfig: {} }))).toBe(true);
+    expect(glancePingsEligible(scanLesson({ ruleConfig: undefined }))).toBe(true);
   });
 
-  it("follows the advisor's ONE rung gate: scenario L1–L2 on, L3+ off", () => {
+  it("renders on the beginner rungs L1–L3, off from L4 (exam) up", () => {
     const base = scanLesson({ order: 99 });
     expect(glancePingsEligible({ ...base, id: "sc-jx-giveway@L1" })).toBe(true);
     expect(glancePingsEligible({ ...base, id: "sc-jx-giveway@L2" })).toBe(true);
-    expect(glancePingsEligible({ ...base, id: "sc-jx-giveway@L3" })).toBe(false);
+    expect(glancePingsEligible({ ...base, id: "sc-jx-giveway@L3" })).toBe(true);
+    expect(glancePingsEligible({ ...base, id: "sc-jx-giveway@L4" })).toBe(false);
     expect(glancePingsEligible({ ...base, id: "sc-jx-giveway@L5" })).toBe(false);
   });
 
-  it("curriculum lessons follow the same gate via order", () => {
+  it("covers every curriculum lesson — an order is not a difficulty rung", () => {
+    // Урок 2 „Кръстовища и предимство" (order 2) is the exact lesson of his
+    // report; Урок 5 is a later SUBJECT, not a harder mode, so reading the
+    // order as a level would strip the cue exactly as the streets get harder.
     expect(glancePingsEligible(scanLesson({ order: 2 }))).toBe(true);
-    expect(glancePingsEligible(scanLesson({ order: 3 }))).toBe(false);
+    expect(glancePingsEligible(scanLesson({ order: 5 }))).toBe(true);
+    expect(glancePingsEligible(scanLesson({ order: 7 }))).toBe(true);
   });
 
   it("is ALWAYS off on exam sessions, drill flag or not", () => {
     expect(glancePingsEligible(scanLesson({ examMode: true }))).toBe(false);
+    expect(glancePingsEligible(scanLesson({ examMode: true, order: 1 }))).toBe(false);
   });
 });
 

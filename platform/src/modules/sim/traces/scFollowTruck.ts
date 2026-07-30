@@ -119,9 +119,38 @@ const SCRIPTS: Record<
 };
 
 /**
+ * The staged rig for a given demo (the scFollowDistanceStaged pattern).
+ *
+ * LEDGER T17/T18: the DRILL's truck is now a scheduled cruise — it drives its
+ * own arc at 5.6 m/s from 30 m of centres, so the live student can genuinely
+ * open the gap and is not convicted at the 30 km/h his own success gate caps
+ * him to. A RECORDED demo is a fixed input tape, though: replayed against a
+ * lead that no longer holds station, „залепен зад камиона" (48 km/h against a
+ * 20 km/h truck) ends in a rear-end and grades COLLISION instead of the
+ * FOLLOWING_TOO_CLOSE it is authored to teach. So both mistakes keep a PINNED
+ * clone of the historical rig, and only the shadow — the drive whose whole job
+ * is to demonstrate the drill as it now plays — sees the new one.
+ */
+function scFollowTruckStaged(name: ScFollowTruckTraceName): StagedEventSpec[] {
+  const base = [...(SC_FOLLOW_TRUCK.staged ?? [])] as StagedEventSpec[];
+  if (name === "shadow-correct") return base;
+  return base.map((e) =>
+    e.kind === "brakingLeadCar" && e.id === "sc-ft-lead"
+      ? {
+          ...e,
+          paceMode: "matchPlayer" as const,
+          followGapM: 17, // the historical pin the two demo tapes were authored against
+          maxMatchSpeedMps: 15,
+          actor: { ...e.actor, cruiseSpeedMps: 8, hold: { nodeIndex: 0, offsetM: 35 } },
+        }
+      : e,
+  );
+}
+
+/**
  * Record one of the three drives against a loaded fo-follow-v1 document — the
- * TEMPLATE's staged lead truck armed (single truth), ambient traffic zero (the
- * harness law). Deterministic: same district → same trace.
+ * demo's staged lead truck armed (see scFollowTruckStaged), ambient traffic
+ * zero (the harness law). Deterministic: same district → same trace.
  */
 export function recordScFollowTruckDrive(
   districtRaw: unknown,
@@ -133,7 +162,7 @@ export function recordScFollowTruckDrive(
     scenarioId: SC_FOLLOW_TRUCK_ID,
     kind,
     seed: 7,
-    stagedEvents: [...(SC_FOLLOW_TRUCK.staged ?? [])] as StagedEventSpec[],
+    stagedEvents: scFollowTruckStaged(name),
     ...(extra?.onTick ? { onTick: extra.onTick } : {}),
   });
 }

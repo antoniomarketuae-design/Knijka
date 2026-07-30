@@ -431,19 +431,27 @@ describe(`${ID} — marking furniture (М1 осева now RENDERED)`, () => {
     expect(world.markings.positions.length).not.toBe(zoneless.markings.positions.length);
   });
 
-  it("posts the generic edge-limit plates and nothing else — the SHIPPED quirk, not this map's", () => {
-    // props.ts posts one speed plate per edge end, and its only limit face is
-    // `limit50` — so a 90 km/h road gets two „50" plates it should not have.
-    // That is inherited, not introduced: the shipped ov-oncoming-v1 (the rural
-    // 1+1 four live overtake templates ride) renders exactly the same pair, as
-    // asserted below. Recorded here so a future reader does not mistake it for
-    // this template's own bug and „fix" it in the wrong place. Render-only: the
-    // limit the reducer grades is the edge's maxspeed (90), which the reducer
-    // reads from the tick, never from a post.
+  it("posts the edge's OWN limit — the 50-plate-on-a-90-road quirk this test recorded is gone", () => {
+    // WAS: „props.ts posts one speed plate per edge end, and its only limit
+    // face is `limit50` — so a 90 km/h road gets two „50" plates it should not
+    // have." That inherited quirk is doc 86 T4, and it was the single most
+    // legible falsehood in the simulator: 82 of the 211 shipped plates, across
+    // 37 districts, stated 50 on a road the reducer grades at 20/30/40/70/90/140.
+    // A student who reads the plate and holds 50 on this road is not speeding —
+    // but on a 40 street the same plate convicts him at 44.
+    //
+    // The face set is now one per numeral (types.ts SPEED_LIMIT_FACES_KMH,
+    // rasterised from content/signs/svg/v26.svg), and props.ts derives the face
+    // from ap.edge.maxspeed. So this map states 90, and NOTHING states 50.
     const world = buildWorldGeometry(assertDistrict(loadRaw(ID)), { seed: 7 });
-    expect(world.stats.signs.limit50).toBe(2);
+    expect(world.stats.signs.limit50).toBe(0);
+    expect(world.stats.signs.limit90).toBe(3); // 2 entry ends + the mid-route
+    expect(world.signs.filter((s) => s.speedKmh !== undefined).every((s) => s.speedKmh === 90)).toBe(
+      true,
+    );
     const shipped = buildWorldGeometry(assertDistrict(loadRaw("ov-oncoming-v1")), { seed: 7 });
-    expect(shipped.stats.signs.limit50).toBe(2);
+    expect(shipped.stats.signs.limit50).toBe(0);
+    expect(shipped.stats.signs.limit90).toBeGreaterThanOrEqual(2);
   });
 });
 

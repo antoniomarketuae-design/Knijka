@@ -27,6 +27,7 @@
  */
 
 import type { VehicleInput } from "./VehicleSim";
+import { AERO_DRAG, engineForceAt, ROLLING_RESISTANCE_N } from "./tuning";
 
 export type DifficultyMode = "beginner" | "normal" | "advanced";
 
@@ -191,32 +192,79 @@ export const NORMAL_CAP_MARGIN_KMH = 10;
 export const BEGINNER_CAP_UNDER_KMH = 10;
 /** Floor for any domain-scaled cap (km/h) — the полигон's 20–30 domain must
  *  still allow maneuvering pace (a 20 km/h beginner cap would fight the
- *  crawl bands this same layer exists to serve). */
+ *  crawl bands this same layer exists to serve). Начинаещ's floor. */
 export const DOMAIN_CAP_FLOOR_KMH = 30;
+/**
+ * НОРМАЛЕН'S OWN FLOOR (doc 86 L17, founder item 5: *„в Нормален режим мога да
+ * карам само до 30 км/ч"*). Measured: the four `lot-*` districts publish a
+ * 20 km/h domain, so `20 + NORMAL_CAP_MARGIN_KMH = 30` collapsed onto
+ * DOMAIN_CAP_FLOOR_KMH and Нормален governed at **exactly the same 30 km/h as
+ * Начинаещ** — the tier selector did nothing on those maps, and a 30 km/h
+ * ceiling on a car reads as a broken engine, which is what he reported.
+ * `poligon-v1`/`pk-drive-v1`/`sp-zone30-v1`/`vu-child-v1` (domain 30) sat one
+ * notch up at 40.
+ *
+ * Нормален is the DEFAULT tier and the tier that must keep every mistake
+ * committable, so its floor is the national in-town limit (ЗДвП чл. 21 — 50
+ * км/ч): whatever micro-map is loaded, the default tier never governs a
+ * student below the speed the law itself permits in a settlement. Above a
+ * 40 km/h domain the formula already clears 50 on its own, so this touches
+ * exactly the 8 districts whose domain is 20 or 30 and nothing else.
+ */
+export const NORMAL_CAP_FLOOR_KMH = 50;
+/**
+ * Headroom (km/h) a tier's cap must keep ABOVE a speed the lesson itself
+ * REQUIRES (doc 86 B7). The governor starts easing the throttle one full
+ * GOVERNOR_BAND_KMH below the cap, so a cap sitting exactly on the required
+ * speed already has the throttle at zero there: the student can approach the
+ * number and never hold it. One band of headroom is the minimum that leaves
+ * undiminished throttle authority AT the required speed.
+ */
+export const REQUIRED_SPEED_HEADROOM_KMH = GOVERNOR_BAND_KMH;
 
 /**
  * The effective governor cap (km/h) for a mode, or null (uncapped).
+ *
  * `lessonMaxLegalKmh` = the lesson's speed domain (max legal speed anywhere
  * on the loaded map); absent/invalid = the preset's static researched cap.
+ *
+ * `lessonRequiredKmh` = a speed the LESSON ITSELF declares the student must
+ * drive (doc 86 B7 — `sig-wave-v1`'s `meta.scenario.wave.speedKmh = 50`
+ * against `governorCapKmh("beginner", 50) = 40`: at 40 km/h a wave block takes
+ * 23.8 s against the 19.01 s the lamps are tuned to, the phase slipped ~4.8 s
+ * per block, and the second and third greens were **unreachable on every
+ * rung**). A tier may be slower than the road; it may never be slower than the
+ * lesson. The floor is applied last and wins over the tier's own formula.
  */
 export function governorCapKmh(
   mode: DifficultyMode,
   lessonMaxLegalKmh?: number,
+  lessonRequiredKmh?: number,
 ): number | null {
   const preset = DIFFICULTY_PRESETS[mode];
   if (preset.speedCapKmh === null) return null; // advanced: never capped
-  if (
-    lessonMaxLegalKmh === undefined ||
-    !Number.isFinite(lessonMaxLegalKmh) ||
-    lessonMaxLegalKmh <= 0
-  ) {
-    return preset.speedCapKmh;
+  const domainKnown =
+    lessonMaxLegalKmh !== undefined &&
+    Number.isFinite(lessonMaxLegalKmh) &&
+    lessonMaxLegalKmh > 0;
+  let cap: number;
+  if (!domainKnown) {
+    cap = preset.speedCapKmh;
+  } else {
+    const domain = lessonMaxLegalKmh as number;
+    cap =
+      mode === "beginner"
+        ? Math.max(domain - BEGINNER_CAP_UNDER_KMH, DOMAIN_CAP_FLOOR_KMH)
+        : Math.max(domain + NORMAL_CAP_MARGIN_KMH, NORMAL_CAP_FLOOR_KMH);
   }
-  const cap =
-    mode === "beginner"
-      ? lessonMaxLegalKmh - BEGINNER_CAP_UNDER_KMH
-      : lessonMaxLegalKmh + NORMAL_CAP_MARGIN_KMH;
-  return Math.max(cap, DOMAIN_CAP_FLOOR_KMH);
+  if (
+    lessonRequiredKmh !== undefined &&
+    Number.isFinite(lessonRequiredKmh) &&
+    lessonRequiredKmh > 0
+  ) {
+    cap = Math.max(cap, lessonRequiredKmh + REQUIRED_SPEED_HEADROOM_KMH);
+  }
+  return cap;
 }
 
 // ---------------------------------------------------------------------------
@@ -248,9 +296,71 @@ export const FULL_LOCK_FADE_END_KMH = 24;
  */
 export const PARKING_STEER_TAU_S = 0.08;
 
+// ---------------------------------------------------------------------------
+// MOTORWAY THROTTLE AUTHORITY (doc 86 L17, founder item 37: „Дисциплина на
+// магистралата" — „no matter how fast I want to go … I can't go more than
+// 100–105 km/h and the theory question already ends before I can accelerate").
+//
+// The ledger blamed the governor and prescribed „raise the motorway domain".
+// THE LEDGER IS WRONG ABOUT THE CAUSE, measured: `mw-v1` already publishes a
+// 140 km/h domain, so the governor cap on that map is Нормален 150 /
+// Начинаещ 130 — neither binds. What binds is `throttleMul`, which scales the
+// TRACTIVE FORCE and therefore silently acts as a SECOND, hidden top-speed
+// governor: solving engineForceAt(v)·mul = AERO_DRAG·v² + ROLLING_RESISTANCE_N
+// gives a terminal speed of
+//     Начинаещ (0.50)  116.7 km/h   ← the lesson instructs 120–130. IMPOSSIBLE.
+//     Нормален  (0.75)  124.9 km/h
+//     Напреднал (1.00)  129.2 km/h
+// so the tier the student is actually on could not reach the band its own
+// instruction 2 demands, and no cap change could ever have fixed it.
+//
+// The preset comment has always said what the multiplier is FOR: „softer
+// throttle, a speed governor" — two separate levers. `throttleMul` exists to
+// calm the response OFF THE LINE; the governor is the top-speed authority.
+// So the multiplier fades back to neutral across a high-speed band and the
+// governor is left as the only ceiling.
+//
+// THE BAND IS CHOSEN TO CHANGE NOTHING ELSE. Census of all 90 districts: the
+// domains are 20 (4), 30 (4), 40 (13), 50 (60), 70 (1), 90 (5), 140 (3). The
+// highest non-motorway domain is 90, whose Нормален cap is 100 — and the
+// governor has already ramped that throttle to zero by 100. So a fade that
+// starts at 100 km/h is a mathematical no-op on 87 of 90 districts and on
+// every urban, парking, полигон and rural lesson in the catalog; it moves only
+// the three motorway maps, only above 100 km/h. Parking/creep/crawl (0–14 km/h)
+// are untouched by construction.
+//
+// `throttleExp` is deliberately NOT faded: it only shapes a PARTIAL pedal, and
+// a car being held at 110 km/h is at full pedal, where 1^exp = 1 regardless.
+// ---------------------------------------------------------------------------
+/** Below this speed (km/h) the preset's authored throttle multiplier applies
+ *  in full — every urban lesson lives entirely under it. */
+export const THROTTLE_AUTHORITY_FADE_FROM_KMH = 100;
+/** …and at/above this speed the multiplier is 1: the tier's governor cap is
+ *  the only remaining top-speed authority. */
+export const THROTTLE_AUTHORITY_FADE_TO_KMH = 118;
+
 /** 0 at/below `from`, 1 at/above `to`, linear between (|speed| ramps). */
 function rampUp(absKmh: number, from: number, to: number): number {
   return clamp01((absKmh - from) / (to - from));
+}
+
+/** The preset's throttle multiplier at this speed — authored value below the
+ *  fade band, 1 above it (see THROTTLE_AUTHORITY_FADE_*). */
+function throttleAuthority(mul: number, absKmh: number): number {
+  if (mul >= 1) return 1;
+  const fade = rampUp(
+    absKmh,
+    THROTTLE_AUTHORITY_FADE_FROM_KMH,
+    THROTTLE_AUTHORITY_FADE_TO_KMH,
+  );
+  return mul + (1 - mul) * fade;
+}
+
+/** The governor's throttle scale at this speed (1 = untouched, 0 = cut). */
+function governorScale(capKmh: number | null, absKmh: number): number {
+  if (capKmh === null) return 1;
+  const over = absKmh - (capKmh - GOVERNOR_BAND_KMH);
+  return over > 0 ? clamp01(1 - over / GOVERNOR_BAND_KMH) : 1;
 }
 
 /**
@@ -267,24 +377,24 @@ export function applyDifficulty(
   dt: number,
   state: DriveAssistState,
   lessonMaxLegalKmh?: number,
+  lessonRequiredKmh?: number,
 ): VehicleInput {
   const p = DIFFICULTY_PRESETS[mode];
   const out = state.out;
   const absKmh = Math.abs(speedKmh);
 
-  // Throttle: eased curve × multiplier.
-  let throttle = Math.pow(clamp01(input.throttle), p.throttleExp) * p.throttleMul;
+  // Throttle: eased curve × multiplier. The multiplier fades to 1 above the
+  // motorway band so it can never act as a second, hidden top-speed governor
+  // (doc 86 L17 — see THROTTLE_AUTHORITY_FADE_*).
+  let throttle =
+    Math.pow(clamp01(input.throttle), p.throttleExp) *
+    throttleAuthority(p.throttleMul, absKmh);
 
   // Speed governor: ramp throttle down as we approach the cap; 0 at/over it.
-  // The cap follows the LESSON's speed domain when one is threaded (#37).
-  const capKmh = governorCapKmh(mode, lessonMaxLegalKmh);
-  if (capKmh !== null) {
-    const over = absKmh - (capKmh - GOVERNOR_BAND_KMH);
-    if (over > 0) {
-      const scale = clamp01(1 - over / GOVERNOR_BAND_KMH);
-      throttle *= scale;
-    }
-  }
+  // The cap follows the LESSON's speed domain when one is threaded (#37) and
+  // is floored at any speed the lesson itself REQUIRES (doc 86 B7).
+  const capKmh = governorCapKmh(mode, lessonMaxLegalKmh, lessonRequiredKmh);
+  throttle *= governorScale(capKmh, absKmh);
 
   // S0 creep control: ceiling on the shaped throttle at crawl (both
   // directions — reverse parking creeps too). A ceiling, not a scale, so the
@@ -322,6 +432,93 @@ export function applyDifficulty(
   out.handbrake = input.handbrake;
 
   return out;
+}
+
+// ---------------------------------------------------------------------------
+// TIER FEASIBILITY (doc 86 B7 + L17 — the lane gate).
+//
+// „No lesson may declare a required speed its own tier forbids." Two things
+// can forbid it and both must be measured, because for eight months only one
+// of them was: the GOVERNOR CAP (an input-layer number) and the TRACTIVE
+// FORCE the tier's throttle multiplier leaves on the table (a physics
+// equilibrium). The founder's item 37 was the second one wearing the first
+// one's clothes.
+//
+// The equilibrium below is the steady-state force balance of the same model
+// VehicleSim integrates on flat ground at full pedal:
+//     engineForceAt(v)·shapedThrottle(v) = AERO_DRAG·v² + ROLLING_RESISTANCE_N
+// (VehicleSim applies ROLLING_RESISTANCE_N as a per-wheel brake floor of
+// N/4 on four wheels — the totals match.) It ignores gradient and grip, which
+// is right for a feasibility floor: it is the OPTIMISTIC number, so anything
+// it calls unreachable is unreachable for certain.
+// ---------------------------------------------------------------------------
+
+/** Search resolution (km/h) of the terminal-speed solver. */
+const TOP_SPEED_STEP_KMH = 0.1;
+/** Hard search ceiling (km/h) — above the tractive curve's own zero (145). */
+const TOP_SPEED_SEARCH_MAX_KMH = 200;
+
+/**
+ * The highest speed (km/h) this tier can actually SUSTAIN on this lesson at
+ * full pedal on the flat — the lower of the governor cap and the tractive
+ * equilibrium. This is the number a lesson's declared required speed must
+ * clear, not the cap alone.
+ */
+export function tierTopSpeedKmh(
+  mode: DifficultyMode,
+  lessonMaxLegalKmh?: number,
+  lessonRequiredKmh?: number,
+): number {
+  const p = DIFFICULTY_PRESETS[mode];
+  const cap = governorCapKmh(mode, lessonMaxLegalKmh, lessonRequiredKmh);
+  const ceiling = cap === null ? TOP_SPEED_SEARCH_MAX_KMH : Math.min(cap, TOP_SPEED_SEARCH_MAX_KMH);
+  let top = 0;
+  for (let kmh = TOP_SPEED_STEP_KMH; kmh <= ceiling; kmh += TOP_SPEED_STEP_KMH) {
+    const thrust =
+      engineForceAt(kmh) * throttleAuthority(p.throttleMul, kmh) * governorScale(cap, kmh);
+    const resistance = AERO_DRAG * (kmh / 3.6) ** 2 + ROLLING_RESISTANCE_N;
+    if (thrust <= resistance) break;
+    top = kmh;
+  }
+  return Math.round(top * 10) / 10;
+}
+
+/** Verdict for one (tier × lesson × declared required speed) triple. */
+export interface TierFeasibility {
+  mode: DifficultyMode;
+  /** The lesson's declared required speed (km/h). */
+  requiredKmh: number;
+  /** Governor cap in force for this tier on this lesson (null = uncapped). */
+  capKmh: number | null;
+  /** Highest sustainable speed — min(cap, tractive equilibrium). */
+  topSpeedKmh: number;
+  /** True when the tier can hold the declared speed. */
+  feasible: boolean;
+  /** Which authority is short when it is not: the cap, or the engine. */
+  blockedBy: "none" | "governor" | "traction";
+}
+
+/**
+ * Can this tier drive a lesson that requires `requiredKmh`? `requiredKmh` is
+ * passed to `governorCapKmh` as well, so the B7 floor is part of the answer:
+ * the check is „after the floor has been applied, is the number reachable".
+ */
+export function tierFeasibility(
+  mode: DifficultyMode,
+  requiredKmh: number,
+  lessonMaxLegalKmh?: number,
+): TierFeasibility {
+  const capKmh = governorCapKmh(mode, lessonMaxLegalKmh, requiredKmh);
+  const topSpeedKmh = tierTopSpeedKmh(mode, lessonMaxLegalKmh, requiredKmh);
+  const feasible = topSpeedKmh >= requiredKmh;
+  return {
+    mode,
+    requiredKmh,
+    capKmh,
+    topSpeedKmh,
+    feasible,
+    blockedBy: feasible ? "none" : capKmh !== null && capKmh <= requiredKmh ? "governor" : "traction",
+  };
 }
 
 function clamp01(v: number): number {

@@ -111,6 +111,136 @@ describe("reachZone", () => {
     expect(run(slowZone, [makeTick({ t: 1, speedKmh: 30 })]).done).toBe(false);
     expect(run(slowZone, [makeTick({ t: 2, speedKmh: 8 })]).done).toBe(true);
   });
+
+  // -------------------------------------------------------------------------
+  // B4 / B5 (doc 86 §3, 2026-07-30) — the two latches
+  // -------------------------------------------------------------------------
+
+  describe("B5 — stopping SHORT of a halt mark counts; overshooting it does not", () => {
+    // sc-jxgb-yield's shape: radius 4 at ≤6 km/h. The lawful stopping band is
+    // metres long; the circle admitted the last 8 m of it, and doc 86 T6 shows
+    // the conflict car is occluded from exactly that forced pose. The founder:
+    // „if I don't stop on the green circle I can't do anything, I must do a
+    // violation and go back to the green circle."
+    const halt = parsed("reachZone", { x: 4.06, y: 118, radiusM: 4, maxSpeedKmh: 6 });
+
+    it("a full stop 6 m short of the mark completes it", () => {
+      const r = run(halt, [
+        makeTick({ t: 0, position: { x: 4.06, y: 100 }, speedKmh: 25 }),
+        makeTick({ t: 1, position: { x: 4.06, y: 112 }, speedKmh: 0 }), // 6 m short, stopped
+      ]);
+      expect(r.done).toBe(true);
+    });
+
+    it("…but a stop 12 m short is a different place, not an early one", () => {
+      // The capsule reaches radius + REACH_ZONE_GRACE_M behind the mark and no
+      // further. `sc-vp-police-stop`'s panic slam rests 10.1 m short of a
+      // radius-3 kerbside mark: that is the failed pull-over the drill grades,
+      // not „a shade early", and a grace wide enough to swallow it swallows
+      // the lesson with it.
+      const r = run(halt, [
+        makeTick({ t: 0, position: { x: 4.06, y: 95 }, speedKmh: 25 }),
+        makeTick({ t: 1, position: { x: 4.06, y: 106 }, speedKmh: 0 }), // 12 m short
+      ]);
+      expect(r.done).toBe(false);
+    });
+
+    it("slowing to the cap on the APPROACH counts — the discipline was shown", () => {
+      const r = run(halt, [
+        makeTick({ t: 0, position: { x: 4.06, y: 100 }, speedKmh: 25 }),
+        makeTick({ t: 1, position: { x: 4.06, y: 113 }, speedKmh: 5 }), // 5 m short, at the cap
+        makeTick({ t: 2, position: { x: 4.06, y: 117 }, speedKmh: 9 }), // in the zone, a shade over
+      ]);
+      expect(r.done).toBe(true);
+    });
+
+    it("a FLOW envelope is not a stop demand — resting near it credits nothing", () => {
+      // sc-rb-busy-gap's east-mouth waypoint caps at 20 km/h and says so in
+      // its own comment: „the ring's own envelope, not a slow-down demand."
+      // Its counter-proof drive crashes on the chord and comes to rest short
+      // of the mouth; that is not „reached the mouth carefully".
+      const envelope = parsed("reachZone", { x: 18, y: 0, radiusM: 6, maxSpeedKmh: 20 });
+      const r = run(envelope, [
+        makeTick({ t: 0, position: { x: 6, y: 0 }, speedKmh: 18 }),
+        makeTick({ t: 1, position: { x: 10, y: 0 }, speedKmh: 0 }), // 8 m short, stopped
+      ]);
+      expect(r.done).toBe(false);
+    });
+
+    /**
+     * THE COUNTER-PROOF, and the reason the grace is half a ring. On a „спри
+     * на маркировката" drill the overshoot IS the graded failure:
+     * sc-ac-wet-braking's whole subject is that wet grip needs an earlier
+     * braking point, and its mistake demo slides past the mark into a
+     * collision. A symmetric grace credited that — three shipped counter-proof
+     * suites caught it — and it would have taught, at scale, that stopping
+     * past the line is stopping at it.
+     */
+    it("sliding THROUGH the mark and stopping 5 m past it does NOT complete it", () => {
+      const r = run(halt, [
+        makeTick({ t: 0, position: { x: 4.06, y: 100 }, speedKmh: 40 }),
+        makeTick({ t: 1, position: { x: 4.06, y: 118 }, speedKmh: 30 }), // through it, fast
+        makeTick({ t: 2, position: { x: 4.06, y: 123 }, speedKmh: 0 }), // 5 m past, stopped
+      ]);
+      expect(r.done).toBe(false);
+      // Reached, yes — the discipline the cap names is what was not performed.
+      expect(r.evalState).toMatchObject({ reached: true, capMet: false });
+    });
+
+    it("stopping in the NEXT LANE does not count — the capsule has no width", () => {
+      // The grace stretches back down the approach, never sideways: the
+      // authored radius is the whole of the lateral tolerance. One lane over
+      // is a different place, and on `sc-vp-police-stop` it is the difference
+      // between pulling over for the officer and stopping dead in traffic.
+      const r = run(halt, [
+        makeTick({ t: 0, position: { x: 12.19, y: 100 }, speedKmh: 25 }),
+        makeTick({ t: 1, position: { x: 12.19, y: 116 }, speedKmh: 0 }), // 8.13 m to the side
+      ]);
+      expect(r.done).toBe(false);
+    });
+
+    it("the arrived-but-too-fast state is latched for the engine to explain", () => {
+      const r = run(halt, [
+        makeTick({ t: 0, position: { x: 4.06, y: 90 }, speedKmh: 35 }),
+        makeTick({ t: 1, position: { x: 4.06, y: 118 }, speedKmh: 35 }),
+      ]);
+      expect(r.evalState).toMatchObject({
+        type: "reachZone",
+        reached: true,
+        capMet: false,
+        overCapNoted: true,
+      });
+    });
+
+    it("an UNCAPPED waypoint keeps the old strict radius exactly", () => {
+      // No grace arm at all: the pre-B4 behaviour, byte for byte.
+      const plain = parsed("reachZone", { x: 0, y: 0, radiusM: 4 });
+      expect(run(plain, [makeTick({ t: 0, position: { x: 0, y: 5 }, speedKmh: 0 })]).done).toBe(false);
+      expect(run(plain, [makeTick({ t: 0, position: { x: 0, y: 3.9 }, speedKmh: 40 })]).done).toBe(true);
+    });
+  });
+
+  describe("B4 — the latches survive the whole visit, not one frame", () => {
+    const capped = parsed("reachZone", { x: 0, y: 100, radiusM: 4, maxSpeedKmh: 6 });
+
+    it("the cap met on the approach still counts after a fast frame in the zone", () => {
+      const r = run(capped, [
+        makeTick({ t: 0, position: { x: 0, y: 88 }, speedKmh: 20 }),
+        makeTick({ t: 1, position: { x: 0, y: 94 }, speedKmh: 4 }), // 6 m short, at the cap
+        makeTick({ t: 2, position: { x: 0, y: 100 }, speedKmh: 22 }), // a spike, inside the zone
+      ]);
+      expect(r.done).toBe(true);
+    });
+
+    it("blowing through and never slowing near it does not", () => {
+      const r = run(capped, [
+        makeTick({ t: 0, position: { x: 0, y: 80 }, speedKmh: 35 }),
+        makeTick({ t: 1, position: { x: 0, y: 100 }, speedKmh: 35 }),
+        makeTick({ t: 2, position: { x: 0, y: 160 }, speedKmh: 4 }), // slow, but long gone
+      ]);
+      expect(r.done).toBe(false);
+    });
+  });
 });
 
 describe("passSignal", () => {

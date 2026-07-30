@@ -258,6 +258,34 @@ export interface SimTick {
   /** True/false when the runtime knows the current edge's directionality;
    * absent = unknown (center-line grading stays silent). */
   oneway?: boolean;
+  // -- PAINTED LANE MARKINGS (doc 86 T1 — the world referent the three lane
+  // codes were missing). `CROSSED_SOLID_LINE` has always been gated on
+  // `solidCenterLine`, and `WRONG_LANE_FOR_DIRECTION` on `meta.scenario
+  // .laneArrows`; these two generalise that precedent to the осева and the lane
+  // dividers, so a scenario can no longer grade paint its district never draws.
+  //
+  // POLARITY, deliberately asymmetric: an explicit **false** is the world
+  // builder's own statement that it painted NOTHING here, and only that
+  // disarms a detector. ABSENT means the caller cannot answer — a hand-built
+  // tick in a unit test, a recorded trace, a clip plan — and leaves every
+  // detector armed exactly as it shipped, so no existing drive changes shape.
+  // (The runtime sets them only in the disarming direction for the same
+  // reason: a painted road produces a byte-identical tick.)
+  /**
+   * An ОСЕВА is painted where the vehicle is — a line with oncoming traffic
+   * behind it. `false` = the world draws none (an unmarked `service` aisle, an
+   * odd-lane carriageway, a junction interior), and CENTER_LINE_TOUCHED cannot
+   * fire: 90 of 155 scenarios used to bill «Настъпване на осевата линия» on
+   * roads with no paint at all, which is the single widest defect in doc 86.
+   */
+  centreLinePainted?: boolean;
+  /**
+   * ANY lane boundary is painted where the vehicle is. `false` = there is no
+   * painted lane to keep, and POOR_LANE_KEEPING / NOT_KEEPING_RIGHT cannot
+   * fire — founder item 46: «there are no lanes on the roads I only know them
+   * in my head» while the HUD congratulated him on keeping one.
+   */
+  laneLinesPainted?: boolean;
   /** Legality-zone tag of the current edge (doc 72 N3; district data). */
   zone?: EdgeZoneTag;
   /** Overtaking banned on the current edge (В24-class zone; surface-only

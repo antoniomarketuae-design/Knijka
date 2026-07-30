@@ -22,6 +22,7 @@ import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { analyzeNetwork } from "../builders/network";
 import { buildMarkings, type MarkingBuildResult } from "../builders/markings";
+import { CENTER_LINE_WIDTH_M, DASH_WIDTH_M, LANE_WIDTH_M } from "../builders/constants";
 import { assertDistrict, type District, type MeshData } from "../types";
 
 const EMPTY: ReadonlySet<string> = new Set();
@@ -177,10 +178,45 @@ describe("rb-2lane-v1 — laneArrows paints every arm's approach glyphs, rotated
     expect(arrows).toHaveLength(28);
   });
 
-  it("the arrows are the ONLY paint on this map (unclassified arms draw no lane lines)", () => {
-    expect(base.markingQuads).toBe(0);
+  it("the arms now carry lane lines UNDER the arrows — RE-BASELINED (doc 86 T1)", () => {
+    // Was `expect(base.markingQuads).toBe(0)` under the title "the arrows are
+    // the ONLY paint on this map (unclassified arms draw no lane lines)". Doc
+    // 86 quotes that assertion as the tree's own pinned proof of T1: rb-2lane's
+    // four `unclassified` 2+2 arms drew no осева and no divider, while
+    // sc-rb-lane-choice grades CENTER_LINE_TOUCHED, POOR_LANE_KEEPING and
+    // NOT_KEEPING_RIGHT on them — and the lesson's whole subject is WHICH LANE
+    // to take into the ring. `unclassified` is now marked, so the base build
+    // paints 60 quads: per arm, an осева plus one same-direction divider on
+    // each bank. The property the assertion actually protected — the arrow pass
+    // APPENDS and changes nothing before it — is the byte-identical-prefix test
+    // above, which still holds exactly.
+    expect(base.markingQuads).toBe(60);
     expect(base.laneArrowQuads).toBe(0);
-    expect(builtMesh.indices.length).toBe(28 * 6);
+    expect(builtMesh.indices.length).toBe((60 + 28) * 6);
+  });
+
+  it("…and the осева of every arm is the widest line on it (T16)", () => {
+    // South/north arms run along y, so their осева is the x ≈ 0 line; east/west
+    // arms run along x. Every centre quad is CENTER_LINE_WIDTH_M across its
+    // road, every divider is DASH_WIDTH_M — the cue that tells a student which
+    // of the three lines on his 2+2 has oncoming traffic behind it.
+    const all = quads(base.markings.toMeshData(), 0);
+    const ns = all.filter((q) => Math.abs(q.cy) > 26 && q.wx < 0.6);
+    const ew = all.filter((q) => Math.abs(q.cx) > 26 && q.wy < 0.6);
+    const centre = [
+      ...ns.filter((q) => Math.abs(q.cx) < 0.5),
+      ...ew.filter((q) => Math.abs(q.cy) < 0.5),
+    ];
+    const dividers = [
+      ...ns.filter((q) => Math.abs(Math.abs(q.cx) - LANE_WIDTH_M) < 0.5),
+      ...ew.filter((q) => Math.abs(Math.abs(q.cy) - LANE_WIDTH_M) < 0.5),
+    ];
+    expect(centre.length).toBeGreaterThan(0);
+    expect(dividers.length).toBeGreaterThan(0);
+    // A dash quad is DASH_LENGTH_M along the road and one stroke across it —
+    // the stroke is always the smaller extent.
+    for (const q of centre) expect(Math.min(q.wx, q.wy)).toBeCloseTo(CENTER_LINE_WIDTH_M, 3);
+    for (const q of dividers) expect(Math.min(q.wx, q.wy)).toBeCloseTo(DASH_WIDTH_M, 3);
   });
 
   it("each arm carries 7 quads at its own rotated lane centres", () => {

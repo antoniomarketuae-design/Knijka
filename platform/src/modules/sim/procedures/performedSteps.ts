@@ -121,11 +121,32 @@ export function preDriveStepKind(stepId: PreDriveStepId): PreDriveStepKind {
 }
 
 export interface PreDriveStepControl {
-  /** Keyboard hint shown in instruction mode (the keys are REAL — honesty
-   *  rule: a hint may only promise a control that works). */
+  /** Keyboard hint (the keys are REAL — honesty rule: a hint may only promise
+   *  a control that works). DEMOTED since 2026-07-30: the mouse is the taught
+   *  path and the key caps render behind „за напреднали". */
   keys: string;
   /** Cockpit hotspots that perform the step (instruction-mode highlight). */
   hotspots: readonly CockpitHotspotName[];
+  /**
+   * MOUSE-FIRST (founder 2026-07-30, ledger 86 D9 — „the entire onboarding
+   * sequence should primarily be mouse-driven rather than keyboard-driven …
+   * users should also be able to click the seat belt icon directly on the
+   * dashboard"): the Bulgarian imperative naming the DASHBOARD control the
+   * student clicks in the cockpit view.
+   *
+   * Same honesty rule as `keys`: authored ONLY where a real doc-69 hotspot
+   * performs the step, and asserted against `COCKPIT_HOTSPOTS` in
+   * `predrive-mouse-first.test.ts` — a click hint may never name a control
+   * the raycast layer does not carry.
+   */
+  clickBg?: string;
+  /**
+   * True when the ONLY real control is a foot pedal, so no dashboard click
+   * exists to offer. The UI must say so plainly instead of pretending the
+   * mouse path is universal (this is the honest residue of D9: 2 of the 13
+   * steps are pedals, the other 11 are mouse-reachable).
+   */
+  pedal?: boolean;
 }
 
 /** Control metadata for every PERFORMED step (info steps have no entry). */
@@ -133,24 +154,66 @@ export const PRE_DRIVE_STEP_CONTROLS: Partial<Record<PreDriveStepId, PreDriveSte
   "adjust-mirrors": {
     keys: "Q E F",
     hotspots: ["hotspot_mirror_left", "hotspot_mirror_right", "hotspot_mirror_rear"],
+    clickBg: "Задръж с мишката всяко от трите огледала в кабината",
   },
-  "fasten-seatbelt": { keys: "B", hotspots: ["hotspot_belt"] },
-  "headlights-on": { keys: "L", hotspots: ["hotspot_headlights"] },
-  "start-engine": { keys: "I", hotspots: ["hotspot_engine_start"] },
-  "press-brake": { keys: "S", hotspots: [] }, // pedal — no cockpit hotspot
-  "select-gear": { keys: "]", hotspots: ["hotspot_gear_selector"] },
-  "release-handbrake": { keys: "Space", hotspots: ["hotspot_parking_brake"] },
+  "fasten-seatbelt": {
+    keys: "B",
+    hotspots: ["hotspot_belt"],
+    clickBg: "Щракни предпазния колан до седалката",
+  },
+  "headlights-on": {
+    keys: "L",
+    hotspots: ["hotspot_headlights"],
+    clickBg: "Щракни ключа за светлините на таблото",
+  },
+  "start-engine": {
+    keys: "I",
+    hotspots: ["hotspot_engine_start"],
+    clickBg: "Щракни стартера на централната конзола",
+  },
+  "press-brake": { keys: "S", hotspots: [], pedal: true }, // pedal — no cockpit hotspot
+  "select-gear": {
+    keys: "]",
+    hotspots: ["hotspot_gear_selector"],
+    clickBg: "Щракни скоростния лост към D (десен бутон: назад към P)",
+  },
+  "release-handbrake": {
+    keys: "Space",
+    hotspots: ["hotspot_parking_brake"],
+    clickBg: "Щракни ключа на ръчната спирачка",
+  },
   "final-mirror-check": {
     keys: "Q E F",
     hotspots: ["hotspot_mirror_left", "hotspot_mirror_right", "hotspot_mirror_rear"],
+    clickBg: "Задръж с мишката лявото и вътрешното огледало",
   },
-  signal: { keys: ",", hotspots: ["hotspot_indicator_stalk"] },
-  "move-off": { keys: "W", hotspots: [] }, // the throttle pedal itself
+  signal: {
+    keys: ",",
+    hotspots: ["hotspot_indicator_stalk"],
+    clickBg: "Щракни лоста за мигачи",
+  },
+  "move-off": { keys: "W", hotspots: [], pedal: true }, // the throttle pedal itself
 };
 
 /** Hotspots to highlight for a step in instruction mode ([] for info steps). */
 export function hotspotsForStep(stepId: PreDriveStepId): readonly CockpitHotspotName[] {
   return PRE_DRIVE_STEP_CONTROLS[stepId]?.hotspots ?? [];
+}
+
+/**
+ * How a step is PRIMARILY performed, for a UI that must lead with the mouse:
+ *  - "click" — a dashboard control does it (11 of 13 steps);
+ *  - "pedal" — only a foot pedal does it (brake, throttle);
+ *  - "confirm" — an info step, confirmed in the checklist.
+ * The keyboard is never the answer here: it is the advanced alternative that
+ * exists for every one of them.
+ */
+export type PreDrivePrimaryInput = "click" | "pedal" | "confirm";
+
+export function preDrivePrimaryInput(stepId: PreDriveStepId): PreDrivePrimaryInput {
+  const control = PRE_DRIVE_STEP_CONTROLS[stepId];
+  if (control === undefined) return "confirm";
+  return control.pedal === true ? "pedal" : "click";
 }
 
 // ---------------------------------------------------------------------------

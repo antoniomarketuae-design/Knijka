@@ -19,9 +19,14 @@
  * these same scripts would face live lamps; the mode is what makes the fallback.
  *
  * Geometry pinned to sx-v1 (battery sx-district.test.ts):
- *   - sx-n-c is ONE single-node cluster at the origin; the 18 m RHR conviction
- *     core matches tj-rhr/tj-occluded — the shadows yield at y = −19.5, outside
- *     the core, inside the 40 m junction area where the tracker latches;
+ *   - sx-n-c is ONE single-node cluster at the origin; the derived stop line on
+ *     the south approach is at y = −27.725 (sx-e-s@92.3). T7 (ledger §2): the
+ *     shadows USED to yield at y = −19.5 — chosen to clear the engine's 18 m
+ *     RHR core, but 8.17 m PAST the paint, so the demonstrated-correct ghost
+ *     stopped inside the junction mouth and the L1 student followed it there.
+ *     They now yield at y = −29.5 — 1.78 m short of the line (the proven
+ *     sc-signal-redyellow hold pose), still outside the 18 m core and inside
+ *     the 40 m junction area where the right-hand-rule tracker latches;
  *   - drawn lane centers at ±4.0625 m; south spawn at (0, −105).
  */
 
@@ -56,6 +61,21 @@ const APPROACH: Array<[number, number]> = [
   [LANE, -34],
 ];
 
+/**
+ * The lawful yield pose on sx-v1's south approach, m (= y) — T7.
+ *
+ * Centre 1.78 m short of the derived line at −27.725, i.e. the whole car short
+ * of the paint (nose at −27.45 against a 1.2 m `stopOvershootCenterM` window
+ * that therefore never arms). It is the pose sc-signal-redyellow and
+ * sc-jx-blocked-exit already prove on this exact map, and it is 29.78 m from
+ * the node — outside the 18 m right-hand-rule core the shadows must clear.
+ */
+const YIELD_Y = -29.5;
+/** Lift-off point for the ease down to YIELD_Y: 20.5 m of gentle deceleration,
+ *  so «намали отрано» is demonstrated rather than merely instructed (and no
+ *  brake stab ever approaches a harsh-braking read). */
+const EASE_FROM_Y = -50;
+
 // ---------------------------------------------------------------------------
 // sc-signal-dead — sx-v1 DARK; left turn stem → west arm (R = 18 quarter arc,
 // center (−13.94, −13.94)), gives way to the car from the right (east).
@@ -74,28 +94,29 @@ function scSignalDeadShadowScript(): DriveScript {
     steps: [
       { kind: "annotation", textBg: "Светофарът напред е ЗАГАСНАЛ — кръстовището става равнозначно, важи правилото на дясното." },
       { kind: "glance", mirror: "rear" },
-      { kind: "drive", points: APPROACH, targetKmh: 20 },
+      { kind: "drive", points: [[0, -105], [0, -103], [LANE, -92], [LANE, EASE_FROM_Y]], targetKmh: 20 },
       { kind: "annotation", textBg: "Намали, пусни ляв мигач и се огледай: първо наляво, после НАДЯСНО." },
       { kind: "indicator", setting: "left" },
       { kind: "glance", mirror: "left" },
       { kind: "glance", mirror: "right" },
       {
-        // Ease to the yield point OUTSIDE the 18 m conviction core.
+        // T7: ease to the lawful yield pose — SHORT of the painted stop line,
+        // not 8 m beyond it. Still outside the 18 m conviction core.
         kind: "drive",
         points: [
-          [LANE, -34],
-          [LANE, -19.5],
+          [LANE, EASE_FROM_Y],
+          [LANE, YIELD_Y],
         ],
         targetKmh: 9,
       },
-      { kind: "annotation", textBg: "Кола отдясно — тя има предимство. Спираме и я пропускаме изцяло." },
+      { kind: "annotation", textBg: "Спираме ПРЕД стоп-линията — кола отдясно има предимство и я пропускаме изцяло." },
       { kind: "pause", sec: 8.0, brake: true },
       { kind: "glance", mirror: "right" },
       { kind: "annotation", textBg: "Пътят е чист — завиваме наляво уверено." },
       {
         kind: "drive",
         points: [
-          [LANE, -19.5],
+          [LANE, YIELD_Y],
           ...DEAD_LEFT_TURN,
           [-30, LANE],
           [-55, LANE],
@@ -185,26 +206,27 @@ function scSignalFlashingShadowScript(): DriveScript {
     steps: [
       { kind: "annotation", textBg: "Светофарът напред мига в ЖЪЛТО — премини с повишено внимание и пропусни предимството." },
       { kind: "glance", mirror: "rear" },
-      { kind: "drive", points: APPROACH, targetKmh: 20 },
+      { kind: "drive", points: [[0, -105], [0, -103], [LANE, -92], [LANE, EASE_FROM_Y]], targetKmh: 20 },
       { kind: "annotation", textBg: "Мигащото жълто не е зелено: намаляваме и се оглеждаме — наляво и НАДЯСНО." },
       { kind: "glance", mirror: "left" },
       { kind: "glance", mirror: "right" },
       {
+        // T7: the halt lands SHORT of the painted line (see YIELD_Y).
         kind: "drive",
         points: [
-          [LANE, -34],
-          [LANE, -19.5],
+          [LANE, EASE_FROM_Y],
+          [LANE, YIELD_Y],
         ],
         targetKmh: 9,
       },
-      { kind: "annotation", textBg: "Кола отдясно има предимство — спираме и я пропускаме изцяло." },
+      { kind: "annotation", textBg: "Спираме ПРЕД стоп-линията — кола отдясно има предимство и я пропускаме изцяло." },
       { kind: "pause", sec: 8.0, brake: true },
       { kind: "glance", mirror: "right" },
       { kind: "annotation", textBg: "Пътят е чист — преминаваме правó напред." },
       {
         kind: "drive",
         points: [
-          [LANE, -19.5],
+          [LANE, YIELD_Y],
           ...FLASH_STRAIGHT,
         ],
         targetKmh: 18,

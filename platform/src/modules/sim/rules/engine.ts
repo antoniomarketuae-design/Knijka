@@ -901,15 +901,29 @@ export function reduceTick(prev: RuleEngineState, tick: SimTick): ReduceResult {
   const solidCrossExcursion =
     tick.solidCenterLine === true && (solidCrossCond || s.solidCross.emitted);
 
+  // PAINT REFERENT (doc 86 T1 — the fix that repairs 90 scenarios at once).
+  // `CROSSED_SOLID_LINE` above is gated on `tick.solidCenterLine` because a
+  // solid осева is authored data; these three codes graded the SAME piece of
+  // road with no such question, so a district whose class the marking pass
+  // skips convicted a student of stepping on a line the world never drew, and
+  // of failing to keep a lane it never painted. The runtime answers from the
+  // builder's own predicate + its own junction trim (runtime/spatial.ts
+  // laneMarkingAt), so paint and grading cannot drift; an ABSENT field is
+  // "caller cannot answer" and leaves the detector armed exactly as shipped.
+  const centreLinePainted = tick.centreLinePainted !== false;
+  const laneLinesPainted = tick.laneLinesPainted !== false;
+
   // Center-line touch (SN-03/OV-04 — „настъпване на осева линия"): sustained
   // ride on/over the center line toward ONCOMING traffic. Armed only on
-  // POSITIVE evidence: the runtime says the edge is two-way (oneway === false)
-  // and the vehicle is in the leftmost lane of its direction with the offset
-  // toward the center. A declared maneuver (any indicator — announced
-  // overtake/dodge or return) is exempt, as is reverse maneuvering (A12).
-  // When this specific condition is armed the GENERIC lane-keeping episode is
-  // suppressed — one act, one code, no double-billing.
+  // POSITIVE evidence: the world PAINTS an осева here, the runtime says the
+  // edge is two-way (oneway === false) and the vehicle is in the leftmost lane
+  // of its direction with the offset toward the center. A declared maneuver
+  // (any indicator — announced overtake/dodge or return) is exempt, as is
+  // reverse maneuvering (A12). When this specific condition is armed the
+  // GENERIC lane-keeping episode is suppressed — one act, one code, no
+  // double-billing.
   const centerLineCond =
+    centreLinePainted &&
     tick.oneway === false &&
     tick.laneId === (tick.laneCount ?? 1) - 1 &&
     tick.laneOffsetM > cfg.laneKeepMaxOffsetM &&
@@ -930,13 +944,21 @@ export function reduceTick(prev: RuleEngineState, tick: SimTick): ReduceResult {
   }
 
   // Lane-keeping: sustained off-centre / straddling positioning while moving
-  // forward. Reverse maneuvering (bay/parallel parking) is legitimately
-  // off-centre and exempt (A12).
+  // forward, ON A ROAD THAT HAS A PAINTED LANE. Reverse maneuvering
+  // (bay/parallel parking) is legitimately off-centre and exempt (A12). The
+  // paint gate arms the episode only; the RESET stays purely positional, so an
+  // excursion that began on marked asphalt still clears the moment the car is
+  // back inside its lane.
   const offCentre = Math.abs(tick.laneOffsetM) > cfg.laneKeepMaxOffsetM;
   if (
     stepEpisode(
       s.laneKeeping,
-      offCentre && moving && forwardGear && !centerLineCond && !solidCrossExcursion,
+      laneLinesPainted &&
+        offCentre &&
+        moving &&
+        forwardGear &&
+        !centerLineCond &&
+        !solidCrossExcursion,
       !offCentre,
       t,
       cfg.laneKeepSustainSec,
@@ -1095,9 +1117,14 @@ export function reduceTick(prev: RuleEngineState, tick: SimTick): ReduceResult {
   // cruising the rightmost TRAVEL lane (laneId 1) stays innocent; on a 2+2
   // motorway the keep-right story then works at any speed with zero new code
   // (the ln-v1 precedent, doc 72 OV-11 on the SP-10 map).
+  // PAINT REFERENT (doc 86 T1): «дясната пътна лента» is a painted object. On a
+  // carriageway the world draws no divider on, there is no rightmost lane to be
+  // out of — the lane id is a procedural band, not something the student can
+  // see — so the code stands down exactly as CENTER_LINE_TOUCHED does above.
   const rightmostRequiredLane =
     tick.busLaneRight === true || tick.emergencyLaneRight === true ? 1 : 0;
   const hoggingLeft =
+    laneLinesPainted &&
     tick.laneId > rightmostRequiredLane &&
     (tick.laneCount ?? 1) > 1 &&
     moving &&

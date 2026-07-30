@@ -2,13 +2,13 @@
  "format": "district-v1",
  "meta": {
   "district": "pe-dart",
-  "label": "Учебна улица — внезапен пешеходец на пътеката (сценарий PE-02/PE-04)",
+  "label": "Улица със закрит ъгъл преди пътеката (сценарий PE-02/PE-09)",
   "mapKind": "scenario-street",
   "generator": "tools/maps/gen_pe_crossings.mjs",
   "boundsLocalMeters": {
-   "minX": -26,
+   "minX": -28,
    "minY": 0,
-   "maxX": 14.125,
+   "maxX": 26,
    "maxY": 140
   },
   "attribution": {
@@ -28,7 +28,7 @@
    "edges": 1,
    "intersections": 0,
    "crossings": 1,
-   "buildings": 1,
+   "buildings": 4,
    "spawnPoints": 2
   },
   "scenario": {
@@ -38,6 +38,8 @@
     "signalized": "no",
     "approachM": 80
    },
+   "streetscape": "blind-corner-kiosk",
+   "streetscapeNoteBg": "Ъглова сграда, изнесена до самия бордюр 1,5 м преди зебрата: западният тротоар е невидим до последния метър — оттам излиза пешеходецът.",
    "primaryCrossingId": "pe-x-1",
    "laneCenterRightM": 4.06,
    "crossings": [
@@ -104,94 +106,94 @@
  "roundabouts": [],
  "buildings": [
   {
-   "id": "pe-b-shop",
-   "height": 4.5,
+   "id": "pe-b-corner",
+   "height": 9,
    "heightSource": "default",
    "footprint": [
     [
-     -26,
-     46
+     -28,
+     50
     ],
     [
-     -16,
-     46
+     -12.6,
+     50
     ],
     [
-     -16,
-     58
+     -12.6,
+     78.5
     ],
     [
-     -26,
-     58
+     -28,
+     78.5
     ]
    ]
   },
   {
-   "id": "sw-pe-e-street-r0",
-   "height": 17,
-   "heightSource": "levels",
+   "id": "pe-b-kiosk",
+   "height": 3,
+   "heightSource": "default",
    "footprint": [
     [
-     16.64,
-     20.14
+     -16.5,
+     40
     ],
     [
-     16.64,
-     47.86
+     -12.6,
+     40
     ],
     [
-     37.74,
-     47.86
+     -12.6,
+     47
     ],
     [
-     37.74,
-     20.14
+     -16.5,
+     47
     ]
    ]
   },
   {
-   "id": "sw-pe-e-street-r1",
-   "height": 20.4,
-   "heightSource": "levels",
+   "id": "pe-b-east-row",
+   "height": 7,
+   "heightSource": "default",
    "footprint": [
     [
-     18.97,
-     55.02
+     12.6,
+     34
     ],
     [
-     18.97,
-     84.98
+     26,
+     34
     ],
     [
-     41.86,
-     84.98
+     26,
+     70
     ],
     [
-     41.86,
-     55.02
+     12.6,
+     70
     ]
    ]
   },
   {
-   "id": "sw-pe-e-street-r2",
-   "height": 27.2,
-   "heightSource": "levels",
+   "id": "pe-b-east-row2",
+   "height": 7,
+   "heightSource": "default",
    "footprint": [
     [
-     18.3,
-     89.37
+     12.6,
+     84
     ],
     [
-     18.3,
-     122.63
+     26,
+     84
     ],
     [
-     34.98,
-     122.63
+     26,
+     110
     ],
     [
-     34.98,
-     89.37
+     12.6,
+     110
     ]
    ]
   },

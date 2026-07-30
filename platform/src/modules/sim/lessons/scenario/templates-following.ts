@@ -69,44 +69,76 @@ const LANE_X = 4.06;
 // ---------------------------------------------------------------------------
 
 /**
- * The staged LEAD CAR on fo-follow-v1: paces the player's own northbound lane
- * (x = 4.06, extraRightOffsetM 0) at a fixed ~13 m ahead (positive followGapM,
- * matchPlayer). The gap is PINNED by the runner, so the shadow (calm ~26 km/h,
- * ~1.8 s of gap) and the mistakes (~48 km/h, ~1.0 s of the SAME 13 m) differ
- * only in SPEED — which is exactly FO-01's lesson: distance is measured in
- * SECONDS, not metres; the faster you go the more metres two seconds buys, and
- * the mistake is not extending the metric gap as the speed rises.
+ * The staged LEAD CAR on fo-follow-v1: drives the player's own northbound lane
+ * (x = 4.06, extraRightOffsetM 0) at its own steady 7.2 m/s ≈ 26 km/h.
  *
- * The slam tier is authored OUT of the play corridor (slamAt at y = 520, well
- * past the 360 m road; minSlamSpeedKmh 250; proximityFallbackM 0.3), so the
- * lead never brakes — it is deterministic moving traffic, not a braking drill.
+ * LEDGER T17 + T18 (doc 86 §2) — WHAT CHANGED AND WHY IT HAD TO.
  *
- * DO NOT lower followGapM to make the tailgate CLIP read closer: this 13 m is
- * the DRILL's pinned gap AND the gap the shadow/gap-melts recordings are graded
- * against (the shadow sits ~8.7 m of leadGap at 26 km/h, barely above the fire
- * threshold — dropping it fires FOLLOWING_TOO_CLOSE on the shadow and fails the
- * trace gate; matchPlayer would also pin the LIVE player into a permanent
- * tailgate). The „Лепене за предния" CLIP re-enacts a CLOSER lead scoped to the
- * clip build only — see scFollowDistanceClipStaged (traces/scFollowDistance.ts)
- * and clipStagedOverrideFor (traces/clipReplay.ts).
+ * This lead used to be `matchPlayer` with `followGapM: 13`. That command is a
+ * rubber band — `target = playerSpeed + 0.55 × (gapM − gap)` has `gap = gapM`
+ * as its stable fixed point — so the METRES between the two cars were frozen at
+ * 13 whatever the student did. Two consequences, both fatal to the lesson:
+ *
+ *  T17. `FOLLOWING_TOO_CLOSE` is a TIME gap, so with the metres frozen the
+ *  fault was a pure function of the speedometer, and the corrective action this
+ *  drill exists to teach — ease off and let the gap grow — was PHYSICALLY
+ *  IMPOSSIBLE: the lead slowed to close it again. The founder read this exactly
+ *  right from the cockpit ("the truck is seeing what the user car km/h is and
+ *  is accelerating proportionally… this is making the truck follow the user
+ *  car"). A drill whose taught remedy does not work teaches helplessness.
+ *
+ *  T18. With `leadGapM = 13 − 4.1 = 8.9` frozen, the fire threshold was
+ *  `8.9 / (0.7 × 1.8 / 3.6) = 25.4 km/h` on a street posted 50, under
+ *  instructions that say «Карай спокойно». The shipped shadow drove 26 km/h —
+ *  0.6 km/h of margin. Founder item 48: „I received an error I have been
+ *  tailing him too close and in fact I wasn't". He was not.
+ *
+ * THE REPAIR, in three numbers:
+ *  - `paceMode: "scheduledCruise"` + `paceSpeedMps: 7.2` (Lane 7's seam): the
+ *    lead waits at its hold until the player closes to `followGapM + 12` m and
+ *    then drives ITS OWN arc at a constant, lawful 25.9 km/h. Back off and the
+ *    gap genuinely opens; close in and it genuinely shrinks. The student is now
+ *    graded on a quantity they control.
+ *  - `hold.offsetM: 40` — the spawn is (4.06, 15) and the edge arc is y, so the
+ *    handover gap is 25 m of centres = 20.9 m of bumpers. At the lead's own
+ *    26 km/h that is 2.9 s: comfortably over the taught two, which is what the
+ *    shadow must be able to demonstrate.
+ *  - the fire threshold at that handover gap is `20.9 / 0.35 = 59.7 km/h`,
+ *    ABOVE the street's posted 50. So no lawful drive that simply follows can
+ *    be convicted; only a driver who chooses to close on the lead can be, which
+ *    is precisely чл. 23.
+ *  - `followGapM: 22` is now only the release distance (22 + 12 = 34 m ≥ the
+ *    25 m handover gap, so the lead pulls away on the player's first movement).
+ *
+ * The slam tier stays authored OUT of the play corridor (slamAt y = 520 on a
+ * 360 m road; minSlamSpeedKmh 250): deterministic moving traffic, not a braking
+ * drill.
+ *
+ * THE TWO MISTAKE DEMOS keep their own pinned clones (scFollowDistanceStaged in
+ * traces/scFollowDistance.ts) — a recorded demo is a fixed input tape, and a
+ * live lead that reacts to it would turn „лепене" into a rear-end. The clip
+ * re-enactment uses the same hook (scFollowDistanceClipStaged +
+ * clipStagedOverrideFor in traces/clipReplay.ts).
  */
 const FD_LEAD_CAR: BrakingLeadCarSpec = {
   id: "sc-fd-lead",
   kind: "brakingLeadCar",
   actor: {
     pathNodes: ["fo-n-start", "fo-n-end"],
-    hold: { nodeIndex: 0, offsetM: 35 }, // dormant ~20 m ahead of the spawn
-    cruiseSpeedMps: 9,
+    hold: { nodeIndex: 0, offsetM: 48 }, // (4.06, 48) — 33 m of centres ahead of the spawn
+    cruiseSpeedMps: 7.2, // 25.9 km/h — a lawful urban pace under the posted 50
     extraRightOffsetM: 0, // the player's OWN lane (northbound, x = 4.06)
     colorIndex: 2,
   },
-  followGapM: 13, // pace ~13 m AHEAD of the player, matchPlayer
-  maxMatchSpeedMps: 15, // 54 km/h — holds 13 m at any legal player speed
+  paceMode: "scheduledCruise", // T17 — the lead drives its own arc, not the player's
+  paceSpeedMps: 7.2,
+  followGapM: 26, // scheduledCruise: the RELEASE distance is this + 12 = 38 m ≥ the 33 m handover
+  maxMatchSpeedMps: 15, // unused under scheduledCruise; kept for the demo clones
   slamAt: { x: 4.06, y: 520 }, // far past the 360 m road — never reached
   slamRadiusM: 2,
   slamDecelMps2: 6,
   minSlamSpeedKmh: 250, // the slam tier is authored out of reach…
-  proximityFallbackM: 0.3, // …and the proximity fallback cannot occur (gap pinned at 13 m)
+  proximityFallbackM: 0.3, // …and the proximity fallback cannot occur
   triggersHazard: false,
   resumeAfterSec: 3,
 };
@@ -134,7 +166,9 @@ export const SC_FOLLOW_DISTANCE: ScenarioSpec = {
     vehicleStart: "ready",
   },
   instructionsBg: [
-    { n: 1, textBg: "Потегли по правата улица — пред теб се движи друга кола в твоята лента." },
+    // Ledger L10: L5 compiles rain and HEADLIGHTS_OFF_IN_RAIN grades with no
+    // config gate, so the lamps belong in the copy (ЗДвП чл. 70).
+    { n: 1, textBg: "Потегли по правата улица — пред теб се движи друга кола в твоята лента. Вали ли, включи първо късите светлини (чл. 70): мокрото платно гълта светлина, а предният те чете само по фаровете ти в огледалото си." },
     { n: 2, textBg: "Измери дистанцията в секунди: когато предният подмине някой ориентир, преброй „едно-и-две“ — стигнеш ли ориентира преди „две“, си твърде близо." },
     { n: 3, textBg: "Карай спокойно и остави поне 2 секунди до предния — това е около една дължина на колата на всеки 15 км/ч скорост." },
     { n: 4, textBg: "Не се изкушавай да залепиш, за да „не те засичат“ — колкото по-бързо караш, толкова по-голяма дистанция ти трябва." },
@@ -168,7 +202,7 @@ export const SC_FOLLOW_DISTANCE: ScenarioSpec = {
       traceRef: { path: "content/traces/sc-follow-distance/mistake-gap-melts.trace.json" },
       titleBg: "Дистанцията се топи с ускоряването",
       whatWentWrongBg:
-        "Дистанцията беше добра на спокойни 26 км/ч, но с ускоряването до 48 км/ч същите метри вече значеха под секунда — метрите останаха същите, а нужната дистанция се удвои. Дистанцията се държи в секунди: ускоряваш ли, изостани още.",
+        "Дистанцията беше добра на спокойни 26 км/ч, но с ускоряването до 48 км/ч същите метри вече значеха под секунда — метрите останаха същите, а нужната дистанция се удвои. Дистанцията се държи в секунди: ускоряваш ли, изостани още. На пътя това се случва точно така: предният си кара с неговата скорост, ти ускоряваш — и разстоянието, което не си пипнал, вече е недостатъчно.",
       codeRefs: ["FOLLOWING_TOO_CLOSE"],
     },
   ],
@@ -429,31 +463,53 @@ export const SC_FOLLOW_STANDSTILL: ScenarioSpec = {
 // ---------------------------------------------------------------------------
 
 /**
- * The staged LEAD CAR for sc-follow-rain-gap: paces the player's lane at a fixed
- * ~18 m (matchPlayer), so the ONLY variable is the player's SPEED — exactly
- * FO-04's lesson. 18 m is a prudent ~2.6 s at the shadow's calm 25 km/h, but an
- * imprudent ~1.6 s at the mistakes' 40 km/h, where wet braking needs ~2.9 s. Its
- * slam tier is authored out of reach — it is deterministic moving traffic, not a
- * braking drill. Rides the config-gated FOLLOWING_TOO_CLOSE_FOR_RAIN detector
- * (enabled per-lesson via the recorder's ruleConfig; see rules/types.ts).
+ * The staged LEAD CAR for sc-follow-rain-gap: drives the player's lane at its
+ * own steady 7 m/s ≈ 25 km/h from 33 m of centres ahead of the spawn.
+ *
+ * LEDGER T17 + T18 (doc 86 §2) — THE WORST MEASURED CASE IN THIS FILE, and it
+ * is not one the ledger listed.
+ *
+ * The rig used to be `matchPlayer` with `followGapM: 23` from a hold only 15 m
+ * ahead of the spawn. The band opens the gap toward 23 m, but the player's car
+ * out-accelerates the staged actor, so the gap DIPS on the way there. Measured
+ * on the committed shadow through the production stack, the minimum time gap
+ * was **1.30 s** — against a base fire line of 1.26 s (followSafeSeconds 1.8 ×
+ * followFireRatio 0.7) and a WET fire line of 2.02 s (× followRainSecondsFactor
+ * 1.6, which THIS template opts into). The demonstrated-correct drive of a
+ * lesson that teaches «дръж поне 3 секунди при мокър път» was holding 1.30 s and
+ * escaping conviction only because the dip was shorter than followSustainSec.
+ * A student who reproduced the shadow a beat less tidily was billed for it —
+ * founder item 48, in the drill least able to afford it.
+ *
+ * THE REPAIR: `paceMode: "scheduledCruise"` + `paceSpeedMps: 7` (25.2 km/h, the
+ * pace the shadow drives) and `hold.offsetM: 48` — 33 m of centres = 28.9 m of
+ * bumpers at handover, 4.1 s at 25 km/h. Both fire lines are cleared with room,
+ * the taught 3 s is something the shadow can actually SHOW, and easing off now
+ * opens the gap instead of dragging the lead back.
+ *
+ * Rides the config-gated FOLLOWING_TOO_CLOSE_FOR_RAIN detector (enabled
+ * per-lesson; see rules/types.ts). Both mistake demos keep PINNED clones of the
+ * historical 23 m rig (scFollowRainGapStaged) — they are recorded tapes.
  */
 const FR_LEAD_CAR: BrakingLeadCarSpec = {
   id: "sc-fr-lead",
   kind: "brakingLeadCar",
   actor: {
     pathNodes: ["fo-n-start", "fo-n-end"],
-    hold: { nodeIndex: 0, offsetM: 30 }, // dormant ~15 m ahead of the spawn
-    cruiseSpeedMps: 7,
+    hold: { nodeIndex: 0, offsetM: 48 }, // (4.06, 48) — 33 m of centres ahead of the spawn
+    cruiseSpeedMps: 7, // 25.2 km/h — the calm wet pace the shadow drives
     extraRightOffsetM: 0, // the player's OWN lane (northbound, x = 4.06)
     colorIndex: 2,
   },
-  followGapM: 23, // pace ~23 m AHEAD (bumper gap ~19 m) — prudent at 25 km/h, imprudent for rain at 40 km/h
-  maxMatchSpeedMps: 13, // 47 km/h — holds the gap at the 40 km/h mistakes
+  paceMode: "scheduledCruise", // T17 — the lead drives its own arc, not the player's
+  paceSpeedMps: 7,
+  followGapM: 26, // scheduledCruise: the RELEASE distance is this + 12 = 38 m ≥ the 33 m handover
+  maxMatchSpeedMps: 13, // unused under scheduledCruise; kept for the demo clones
   slamAt: { x: 4.06, y: 520 }, // far past the 360 m road — never reached
   slamRadiusM: 2,
   slamDecelMps2: 6,
   minSlamSpeedKmh: 250, // the slam tier is authored out of reach…
-  proximityFallbackM: 0.3, // …and the proximity fallback cannot occur (gap pinned at 18 m)
+  proximityFallbackM: 0.3, // …and the proximity fallback cannot occur
   triggersHazard: false,
   resumeAfterSec: 3,
 };
@@ -481,7 +537,12 @@ export const SC_FOLLOW_RAIN_GAP: ScenarioSpec = {
     vehicleStart: "ready",
   },
   instructionsBg: [
-    { n: 1, textBg: "Вали, а пред теб в твоята лента се движи друга кола — потегли спокойно." },
+    // Ledger L10: this drill is WET on all four rungs, HEADLIGHTS_OFF_IN_RAIN is
+    // armed unconditionally, and L4 hands the student a cold car — so the lamps
+    // are step one or the exam rung bills an основна fault for a duty the lesson
+    // never stated. Grounded by retrieval, not recall: ЗДвП чл. 70 (content bank
+    // q-nosht-023 — „при намалена видимост се минава ръчно на къси").
+    { n: 1, textBg: "Вали. Първо светлините: при дъжд късите се включват РЪЧНО, преди да потеглиш (чл. 70) — дневните светят само напред и оставят задните ти габарити тъмни точно в пръските, където те са единственото, което те прави видим отзад. После потегли спокойно след колата пред теб." },
     { n: 2, textBg: "В дъжд дистанцията се увеличава: същите метри при по-висока скорост значат по-малко време за спиране." },
     { n: 3, textBg: "Дръж поне 3 секунди до предния при мокър път — брой „едно-и-две-и-три“, докато той подмине ориентир." },
     { n: 4, textBg: "Не карай бързо на къса дистанция „както при сухо“ — на мокро спирачният път е с около половина по-дълъг." },
@@ -551,37 +612,56 @@ export const SC_FOLLOW_RAIN_GAP: ScenarioSpec = {
 /**
  * The staged LEAD TRUCK for sc-follow-truck: the SAME brakingLeadCar staged
  * kind as FO-01, with `profile: "truck"` — the doc 72 FO-06 unlock ("box
- * truck visual on the vehicle actor; leadGap detector unchanged"). It paces
- * the player's own lane at a fixed ~17 m (matchPlayer), so the ONLY variable
- * is the player's SPEED — but unlike FO-01 the lead is a 7.5 × 2.4 × 3.1 m
- * box truck that blocks ALL forward vision: the gap must buy the sight line
- * you lost. 17 m is ~3 seconds at the shadow's calm 20 km/h and a sub-second
- * ~1.0 s at the mistakes' 48 km/h, where FOLLOWING_TOO_CLOSE grades. The slam
- * tier is authored out of reach (slamAt past the road end, minSlamSpeedKmh
- * 250) — deterministic moving traffic, not a braking drill. HONEST LIMIT:
- * the leadGap query stays point-based around the truck's CENTER with the
- * fixed car-length constant, so the graded gap ignores the longer tail — the
- * scenario numbers are tuned to the detector, and the profile changes zero
- * grading geometry (exactly the FO-06 promise).
+ * truck visual on the vehicle actor; leadGap detector unchanged"). Unlike
+ * FO-01's car the lead is a 7.5 × 2.4 × 3.1 m box truck that blocks ALL
+ * forward vision: the gap must buy the sight line you lost.
+ *
+ * LEDGER T17 + T18 (doc 86 §2), with an arithmetic CORRECTION to the ledger.
+ *
+ * The ledger's T18 table put this drill's graded gap at 12.9 m (fires above
+ * 36.9 km/h), computed with the legacy flat 4.1 m subtrahend. That is no longer
+ * the arithmetic: `bumperSubtrahendM` (traffic/system.ts, landed with T17(e))
+ * now charges a truck its real half-length, `max(4.1, 2.05 + 3.75) = 5.8`. So
+ * the pinned 17 m of centres was **11.2 m of bumpers, firing above 32.0 km/h** —
+ * and this drill's own success gate caps the approach at **30 km/h**. The
+ * obedient student drove 1.4 m from a conviction that the instructions
+ * («дръж поне 3 секунди») say he is nowhere near. Meanwhile the copy asks for
+ * 3 s, which at 20 km/h is 16.7 m — the drill was handing him 11.2.
+ *
+ * THE REPAIR mirrors sc-follow-distance:
+ *  - `paceMode: "scheduledCruise"` + `paceSpeedMps: 5.6` (20.2 km/h): the truck
+ *    drives its own arc at the pace the shadow demonstrates, so easing off
+ *    genuinely opens the gap instead of making the truck ease off too;
+ *  - `hold.offsetM: 45` — 30 m of centres from the (4.06, 15) spawn = 24.2 m of
+ *    bumpers at handover, which is 4.4 s at 20 km/h (the copy asks 3) and puts
+ *    the fire threshold at 69.1 km/h, above the street's posted 50;
+ *  - `followGapM: 26` is now only the release distance (26 + 12 = 38 ≥ 30).
+ *
+ * The slam tier stays out of reach (slamAt past the road end, minSlamSpeedKmh
+ * 250) — deterministic moving traffic, not a braking drill. The two mistake
+ * demos keep PINNED clones of the historical 17 m rig (scFollowTruckStaged in
+ * traces/scFollowTruck.ts): a recorded tape needs a lead that holds station.
  */
 const FT_LEAD_TRUCK: BrakingLeadCarSpec = {
   id: "sc-ft-lead",
   kind: "brakingLeadCar",
   actor: {
     pathNodes: ["fo-n-start", "fo-n-end"],
-    hold: { nodeIndex: 0, offsetM: 35 }, // dormant ~20 m ahead of the spawn
-    cruiseSpeedMps: 8,
+    hold: { nodeIndex: 0, offsetM: 45 }, // (4.06, 45) — 30 m of centres ahead of the spawn
+    cruiseSpeedMps: 5.6, // 20.2 km/h — the calm blocked-vision pace the shadow drives
     extraRightOffsetM: 0, // the player's OWN lane (northbound, x = 4.06)
     colorIndex: 2,
     profile: "truck", // FO-06: the box-truck rig — vision blocked
   },
-  followGapM: 17, // pace ~17 m AHEAD — ~3 s at 20 km/h, ~1 s at 48 km/h
-  maxMatchSpeedMps: 15, // 54 km/h — holds 17 m at any legal player speed
+  paceMode: "scheduledCruise", // T17 — the truck drives its own arc, not the player's
+  paceSpeedMps: 5.6,
+  followGapM: 26, // scheduledCruise: the RELEASE distance is this + 12 = 38 m ≥ the 30 m handover
+  maxMatchSpeedMps: 15, // unused under scheduledCruise; kept for the demo clones
   slamAt: { x: 4.06, y: 520 }, // far past the 360 m road — never reached
   slamRadiusM: 2,
   slamDecelMps2: 6,
   minSlamSpeedKmh: 250, // the slam tier is authored out of reach…
-  proximityFallbackM: 0.3, // …and the proximity fallback cannot occur (gap pinned at 17 m)
+  proximityFallbackM: 0.3, // …and the proximity fallback cannot occur
   triggersHazard: false,
   resumeAfterSec: 3,
 };
@@ -642,7 +722,9 @@ export const SC_FOLLOW_TRUCK: ScenarioSpec = {
     vehicleStart: "ready",
   },
   instructionsBg: [
-    { n: 1, textBg: "Пред теб в твоята лента се движи камион — потегли спокойно след него." },
+    // Ledger L10: the L5 rung is камион + дъжд and the rain-lights fault grades
+    // unconditionally, so the duty is stated here (ЗДвП чл. 70).
+    { n: 1, textBg: "Пред теб в твоята лента се движи камион — потегли спокойно след него. Вали ли, включи късите светлини още преди да тръгнеш (чл. 70): зад висок камион си в облак пръски, където габаритите ти са единственото, което те показва на идващия отзад." },
     { n: 2, textBg: "Зад камион не виждаш нищо от пътя напред: нито пешеходци, нито спрели коли, нито какво го кара да натисне спирачката." },
     { n: 3, textBg: "Затова дистанцията расте: дръж поне 3 секунди до камиона — брой „едно-и-две-и-три“, докато той подмине ориентир." },
     {

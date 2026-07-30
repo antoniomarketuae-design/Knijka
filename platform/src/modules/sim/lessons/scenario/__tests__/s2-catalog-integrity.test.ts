@@ -16,7 +16,7 @@ const HERE = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(HERE, "../../../../../../..");
 
 describe("S2 catalog integrity", () => {
-  it("registers the full S1+S2+S3+S4+unit-2+breadth+signals+maneuver+hazards+final-harvest+cap-2+FO-06+VU-09+stage-1c+stage-1d+stage-2a+stage-2b+stage-3a+stage-3b+stage-4a+FO-pair+fog+curve+motorway+N11-telltale+OV-corridor+snow+N8-vru+OV-return+AC-12-crosswind+surface-patch+w1+w2+w3+w4+w5+w6+w7+w8+w9+reissue+giveway wave (155 templates across the families)", () => {
+  it("registers the full S1+S2+S3+S4+unit-2+breadth+signals+maneuver+hazards+final-harvest+cap-2+FO-06+VU-09+stage-1c+stage-1d+stage-2a+stage-2b+stage-3a+stage-3b+stage-4a+FO-pair+fog+curve+motorway+N11-telltale+OV-corridor+snow+N8-vru+OV-return+AC-12-crosswind+surface-patch+w1+w2+w3+w4+w5+w6+w7+w8+w9+reissue+giveway+parking-depth wave (157 templates across the families)", () => {
     const ids = SCENARIO_TEMPLATES.map((s) => s.id).sort();
     expect(ids).toEqual(
       [
@@ -28,6 +28,11 @@ describe("S2 catalog integrity", () => {
         "sc-park-parallel",
         "sc-park-45",
         "sc-park-narrow",
+        // Lane 15 (doc 86 D11, the parking deepening): two NEW acts on
+        // COMMITTED maps — the nose-in entry into the P0's own bay and leaving
+        // a kerbside slot. Both in templates-parking.ts, both fully traced.
+        "sc-park-perp-forward",
+        "sc-park-parallel-exit",
         "sc-junction-rhr",
         "sc-junction-stop",
         "sc-signal-response",

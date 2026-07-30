@@ -157,6 +157,11 @@ const CALL_SITES = [
   // product was built right without anyone being told to, and the only thing
   // missing was this line.
   ["classroom check", "components/lesson/LessonRunner.tsx"],
+  // The pre-drive tutorial's „не отваряй обясненията сами" (2026-07-30, ledger
+  // 86 D9). It shipped with a bare 14 px <input> and the sweep below caught it
+  // before a student did — which is the tenth box arriving the way the ninth
+  // did not.
+  ["pre-drive tutorial", "modules/sim/hud/PreDriveTutorial.tsx"],
 ] as const;
 
 // ---------------------------------------------------------------------------

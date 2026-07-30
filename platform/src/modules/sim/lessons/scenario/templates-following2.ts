@@ -67,15 +67,31 @@ const FBC_MID: CutInLeadCarSpec = {
   kind: "cutInLeadCar",
   actor: {
     pathNodes: ["fo-n-start", "fo-n-end"],
-    hold: { nodeIndex: 0, offsetM: 34 }, // dormant ~19 m ahead of the spawn — the matchPlayer target
+    hold: { nodeIndex: 0, offsetM: 41 }, // dormant ~26 m ahead of the spawn — the matchPlayer target
+    // (the HOLD has to track paceAheadM or the band spends the first seconds
+    // closing a 19 m handover gap toward 26 — measured, that dip put the shadow
+    // at 12.99 m of bumpers, i.e. 1.81 s, which is the T18 defect all over again)
     cruiseSpeedMps: 8,
     extraRightOffsetM: 0, // the player's OWN lane (northbound, x = 4.06) — the middle of the chain,
     // not an adjacent-lane cutter: the "cut" below is a pure speed event (cutShiftM 0)
     colorIndex: 1,
   },
-  paceAheadM: 19, // ~19 m of centers ≈ 14.9 m of bumpers: 2.1 s at the shadow's 26 km/h,
-  // 1.1 s at the mistake's 48 km/h — the FO-01 lesson, one car further back
-  maxMatchSpeedMps: 15, // 54 km/h — holds 19 m at any legal player speed
+  // LEDGER T18 (doc 86 §2): this was 19 m of centres ≈ 14.9 m of bumpers, i.e.
+  // FOLLOWING_TOO_CLOSE above 42.6 km/h on a street posted 50 whose finish leg
+  // carries no speed cap at all. Measured through the recorder, the shadow held
+  // 1.81 s and the „bumper stare" demo 1.07 s against a 1.26 s fire line — the
+  // shadow and the convicted demo were riding the SAME frozen 13.0 m, separated
+  // only by the speedometer. That is founder item 48 in one number. 26 m of
+  // centres = 20.9 m of bumpers at the seeded worst case moves the threshold to
+  // 59.7 km/h, above the posted 50, so only a driver who CLOSES is billed.
+  //
+  // The chain deliberately keeps `matchPlayer` (contrast sc-follow-distance):
+  // the drill's stimulus is a brake-slam two cars ahead arriving at a scripted
+  // moment, so the queue has to hold its shape relative to the player or the
+  // whole „stoppove dva avtomobila napred" choreography dissolves. T17's
+  // scheduled cruise is for drills that grade a GAP; this one grades a LOOK.
+  paceAheadM: 26, // ~26 m of centers ≈ 20.9 m of bumpers: 2.9 s at the shadow's 26 km/h
+  maxMatchSpeedMps: 15, // 54 km/h — holds 26 m at any legal player speed
   cutAt: { x: LANE_X, y: 244 }, // the middle car's OWN reaction point: it reaches y = 244 when the
   // player is at ~225, i.e. ~12 m (~1 s at 40 km/h) AFTER the head's brake lights lit at player ~212
   cutRadiusM: 3,
@@ -102,12 +118,14 @@ const FBC_HEAD: BrakingLeadCarSpec = {
   kind: "brakingLeadCar",
   actor: {
     pathNodes: ["fo-n-start", "fo-n-end"],
-    hold: { nodeIndex: 0, offsetM: 61 }, // dormant ~46 m ahead of the spawn — the matchPlayer target
+    hold: { nodeIndex: 0, offsetM: 68 }, // dormant ~53 m ahead of the spawn — the matchPlayer target
     cruiseSpeedMps: 11,
     extraRightOffsetM: 0, // the player's OWN lane (northbound, x = 4.06)
     colorIndex: 2,
   },
-  followGapM: 46, // ~27 m AHEAD of the middle car — the „две коли напред" sight line
+  // Tracks the middle car's T18 move (19 → 26) so the chain's own spacing is
+  // unchanged at ~27 m — the „две коли напред" sight line is the whole drill.
+  followGapM: 53, // ~27 m AHEAD of the middle car — the „две коли напред" sight line
   maxMatchSpeedMps: 15,
   slamAt: { x: LANE_X, y: 258 }, // the staged brake-slam, mid-street (player at ~212)
   slamRadiusM: 3,
@@ -141,7 +159,9 @@ export const SC_FO_BRAKELIGHT_CHAIN: ScenarioSpec = {
     vehicleStart: "ready",
   },
   instructionsBg: [
-    { n: 1, textBg: "Потегли спокойно — пред теб в твоята лента се движи колона от две коли." },
+    // Ledger L10: the L5 rung is a wet column and HEADLIGHTS_OFF_IN_RAIN grades
+    // with no config gate (ЗДвП чл. 70).
+    { n: 1, textBg: "Потегли спокойно — пред теб в твоята лента се движи колона от две коли. Вали ли, първо късите светлини (чл. 70): в колона под дъжд стоповете и габаритите напред са цялата информация, която имаш — и твоите са цялата, която има човекът зад теб." },
     { n: 2, textBg: "Не залепвай поглед в бронята на предния. Гледай през стъклата му и покрай него — стоповете на ПЪРВАТА кола са твоето предупреждение." },
     { n: 3, textBg: "Дръж поне 2 секунди дистанция: на спокойна скорост това са около петнайсет метра — метрите, в които ще спреш." },
     { n: 4, textBg: "Светнат ли стопове по-напред в колоната, вдигни крака от газта ВЕДНАГА — още преди твоят преден да е реагирал." },
@@ -292,7 +312,9 @@ export const SC_FO_MOTORWAY_GAP: ScenarioSpec = {
     vehicleStart: "ready",
   },
   instructionsBg: [
-    { n: 1, textBg: "Магистрала, ограничение 140 — установи се в дясната лента за движение зад колата пред теб, със скоростта на потока." },
+    // Ledger L10: the L5 rung is a wet motorway (rain + wetGrip) and the
+    // rain-lights fault is unconditional (ЗДвП чл. 70).
+    { n: 1, textBg: "Магистрала, ограничение 140 — установи се в дясната лента за движение зад колата пред теб, със скоростта на потока. Вали ли, включи късите светлини преди да ускориш (чл. 70): при 130 км/ч влизаш в чуждия воден облак за части от секундата и те виждат само по светлините ти." },
     { n: 2, textBg: "На 130 км/ч изминаваш 36 метра всяка секунда: правилото за 2 секунди тук значи цели 72 метра дистанция." },
     { n: 3, textBg: "Избери си ориентир (табела, стълб): предният го подмине — брой „двадесет и едно, двадесет и две“. Стигнеш ли го преди „две“, изостани." },
     { n: 4, textBg: "Не залепвай зад по-бързия „да те тегли“: при тази скорост, светне ли стоп отпред, метрите свършват за части от секундата." },

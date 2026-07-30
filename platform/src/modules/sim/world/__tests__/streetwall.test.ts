@@ -67,8 +67,16 @@ const POPULATED: ReadonlyArray<readonly [string, number]> = [
   ["vu-pass-v1", 19],
   ["sp-rain-v1", 18],
   ["pe-jay-v1", 12],
-  ["pe-dart-v1", 4],
-  ["pe-child-v1", 4],
+  // doc 86 D1 — these two now carry an AUTHORED streetscape
+  // (tools/maps/gen_pe_crossings.mjs STREETSCAPES: "blind-corner-kiosk" and
+  // "courtyard-blocks"), placed to teach — a corner pushed onto the kerb line
+  // 1.5 m before the zebra, a courtyard mouth aimed at it. The procedural pass
+  // still runs and still has to clear every corridor and splay; it simply finds
+  // almost nowhere left to stand (5 and 6 plots rejected as neighbours). Total
+  // buildings per map is unchanged at 5 — what changed is that they mean
+  // something. If these numbers ever RISE, an authored volume was deleted.
+  ["pe-dart-v1", 1],
+  ["pe-child-v1", 0],
   ["fo-brake-v1", 19],
   ["pe-zone-v1", 5],
   ["zb-v1", 10],
@@ -207,7 +215,9 @@ describe("street wall — the populate pass is pinned", () => {
       expect(generated(loadDistrict(id)).length, `${id}`).toBe(count);
     }
     const total = POPULATED.reduce((n, [, c]) => n + c, 0);
-    expect(total).toBe(658);
+    // 658 → 651: doc 86 D1 replaced 8 procedural prisms on pe-dart-v1 /
+    // pe-child-v1 with 9 authored, lesson-bearing volumes (see the table).
+    expect(total).toBe(651);
   });
 
   it("leaves the maps whose buildings ARE the lesson completely alone", () => {

@@ -2,13 +2,13 @@
  "format": "district-v1",
  "meta": {
   "district": "pe-bus",
-  "label": "Учебна улица — пешеходци иззад спрял автобус (сценарий PE-10)",
+  "label": "Улица с товарен вход на складова база (сценарий PE-10)",
   "mapKind": "scenario-street",
   "generator": "tools/maps/gen_pe_crossings.mjs",
   "boundsLocalMeters": {
-   "minX": -26,
+   "minX": -32,
    "minY": 0,
-   "maxX": 14.125,
+   "maxX": 46,
    "maxY": 148
   },
   "attribution": {
@@ -28,7 +28,7 @@
    "edges": 1,
    "intersections": 0,
    "crossings": 1,
-   "buildings": 1,
+   "buildings": 4,
    "spawnPoints": 2
   },
   "scenario": {
@@ -38,6 +38,8 @@
     "signalized": "no",
     "approachM": 88
    },
+   "streetscape": "depot-gate",
+   "streetscapeNoteBg": "Складова база с товарен вход точно преди пътеката: затова тук ВИНАГИ стои спряло голямо превозно средство, а хората излизат иззад него.",
    "primaryCrossingId": "pe-x-1",
    "laneCenterRightM": 4.06,
    "crossings": [
@@ -104,25 +106,94 @@
  "roundabouts": [],
  "buildings": [
   {
-   "id": "pe-b-shop",
-   "height": 4.5,
+   "id": "pe-b-depot-s",
+   "height": 8,
    "heightSource": "default",
    "footprint": [
     [
-     -26,
-     54
+     12.6,
+     30
     ],
     [
-     -16,
-     54
+     46,
+     30
     ],
     [
-     -16,
-     66
+     46,
+     68
     ],
     [
-     -26,
-     66
+     12.6,
+     68
+    ]
+   ]
+  },
+  {
+   "id": "pe-b-gatehouse",
+   "height": 3.2,
+   "heightSource": "default",
+   "footprint": [
+    [
+     12.6,
+     68.5
+    ],
+    [
+     17,
+     68.5
+    ],
+    [
+     17,
+     73
+    ],
+    [
+     12.6,
+     73
+    ]
+   ]
+  },
+  {
+   "id": "pe-b-depot-n",
+   "height": 8,
+   "heightSource": "default",
+   "footprint": [
+    [
+     12.6,
+     82
+    ],
+    [
+     46,
+     82
+    ],
+    [
+     46,
+     122
+    ],
+    [
+     12.6,
+     122
+    ]
+   ]
+  },
+  {
+   "id": "pe-b-flats-w",
+   "height": 14,
+   "heightSource": "default",
+   "footprint": [
+    [
+     -32,
+     52
+    ],
+    [
+     -13,
+     52
+    ],
+    [
+     -13,
+     100
+    ],
+    [
+     -32,
+     100
     ]
    ]
   }

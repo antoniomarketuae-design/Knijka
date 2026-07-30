@@ -94,11 +94,25 @@ describe("admin unlockAll — scenario levels (scenario/progress)", () => {
     );
   });
 
-  it("non-admin behavior unchanged: star ladder still gates L2+", () => {
+  /**
+   * B9 (doc 86 §3) — RE-BASELINED 2026-07-30. This used to read „star ladder
+   * still gates L2+" and check that 1★ leaves L2 shut. Since B9 the ladder
+   * gates on an ATTEMPT (progress.ts carries the reasoning and the founder
+   * ruling), so the thing worth pinning here is the ONE claim admin-unlock
+   * makes: that the override changes nothing a normal student would not
+   * already have. The unplayed ladder is still shut without it.
+   */
+  it("non-admin behavior unchanged: an UNPLAYED ladder is still shut", () => {
     for (const opts of [undefined, {}, { unlockAll: false }]) {
-      const p = scenarioLevelProgress(SC_PARK_PERP_REV, [row(1, 1)], opts);
+      const p = scenarioLevelProgress(SC_PARK_PERP_REV, [], opts);
       expect(p.find((l) => l.level === 1)!.unlocked).toBe(true);
       expect(p.find((l) => l.level === 2)!.unlocked).toBe(false);
+      expect(p.find((l) => l.level === 3)!.unlocked).toBe(false);
+      // An attempt opens exactly ONE rung, never the whole ladder — that stays
+      // the admin override's job.
+      const played = scenarioLevelProgress(SC_PARK_PERP_REV, [row(1, 1)], opts);
+      expect(played.find((l) => l.level === 2)!.unlocked).toBe(true);
+      expect(played.find((l) => l.level === 3)!.unlocked).toBe(false);
     }
     expect(isScenarioLevelUnlocked(SC_PARK_PERP_REV, 2, [row(1, 2)])).toBe(true);
   });

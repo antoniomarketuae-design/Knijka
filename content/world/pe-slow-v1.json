@@ -2,13 +2,13 @@
  "format": "district-v1",
  "meta": {
   "district": "pe-slow",
-  "label": "Учебна улица — бавен пешеходец (сценарий PE-08)",
+  "label": "Улица пред поликлиника (сценарий PE-08)",
   "mapKind": "scenario-street",
   "generator": "tools/maps/gen_pe_crossings.mjs",
   "boundsLocalMeters": {
-   "minX": -26,
+   "minX": -34,
    "minY": 0,
-   "maxX": 14.125,
+   "maxX": 30,
    "maxY": 145
   },
   "attribution": {
@@ -28,7 +28,7 @@
    "edges": 1,
    "intersections": 0,
    "crossings": 1,
-   "buildings": 1,
+   "buildings": 4,
    "spawnPoints": 2
   },
   "scenario": {
@@ -38,6 +38,8 @@
     "signalized": "no",
     "approachM": 85
    },
+   "streetscape": "clinic-and-park",
+   "streetscapeNoteBg": "Поликлиника точно срещу пътеката и парк отсреща: тук пресичат възрастни хора и хора с намалена подвижност — бавно и по всяко време.",
    "primaryCrossingId": "pe-x-1",
    "laneCenterRightM": 4.06,
    "crossings": [
@@ -104,25 +106,94 @@
  "roundabouts": [],
  "buildings": [
   {
-   "id": "pe-b-shop",
-   "height": 4.5,
+   "id": "pe-b-clinic",
+   "height": 5.5,
    "heightSource": "default",
    "footprint": [
     [
-     -26,
-     51
+     12.8,
+     87
     ],
     [
-     -16,
-     51
+     30,
+     87
     ],
     [
-     -16,
-     63
+     30,
+     111
     ],
     [
-     -26,
-     63
+     12.8,
+     111
+    ]
+   ]
+  },
+  {
+   "id": "pe-b-clinic-annex",
+   "height": 4,
+   "heightSource": "default",
+   "footprint": [
+    [
+     12.8,
+     65
+    ],
+    [
+     21,
+     65
+    ],
+    [
+     21,
+     81
+    ],
+    [
+     12.8,
+     81
+    ]
+   ]
+  },
+  {
+   "id": "pe-b-park-wall",
+   "height": 1.8,
+   "heightSource": "default",
+   "footprint": [
+    [
+     -15.5,
+     39
+    ],
+    [
+     -12.8,
+     39
+    ],
+    [
+     -12.8,
+     115
+    ],
+    [
+     -15.5,
+     115
+    ]
+   ]
+  },
+  {
+   "id": "pe-b-pavilion",
+   "height": 4.2,
+   "heightSource": "default",
+   "footprint": [
+    [
+     -34,
+     77
+    ],
+    [
+     -22,
+     77
+    ],
+    [
+     -22,
+     93
+    ],
+    [
+     -34,
+     93
     ]
    ]
   }

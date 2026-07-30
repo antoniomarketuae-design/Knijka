@@ -35,10 +35,16 @@ import {
   createFinishGate,
   routeFinishZone,
   stepFinishGate,
+  terminalRescueZone,
   FINISH_BAY_RADIUS_M,
+  FINISH_BAY_STUCK_S,
   FINISH_DWELL_S,
+  FINISH_LANE_FLOOR_M,
+  FINISH_LEAVE_S,
   FINISH_REST_KMH,
   FINISH_REST_S,
+  FINISH_STANDSTILL_KMH,
+  FINISH_STUCK_S,
 } from "../finish";
 import { parseObjectiveParams } from "../objectives";
 import { EXAM_LESSON, L7_PARKING_BAY, lessonById, lessonsInOrder } from "../specs";
@@ -359,6 +365,299 @@ describe("the gate never fires on a run that is progressing", () => {
 });
 
 // ---------------------------------------------------------------------------
+// 3b. B2 — the rescue on the FINAL objective, and the two runs it must NOT eat
+// ---------------------------------------------------------------------------
+
+describe("B2 — a student stuck ON the last gate can get out", () => {
+  /** A route whose last gate is a lane-exclusive radius-4 circle: the shape
+   *  50 of 154 templates ship, and the one the founder's left-lane hog lands
+   *  8.13 m away from after performing the mistake the lesson taught him. */
+  const tightFinal: LessonSpec = {
+    ...baseLesson,
+    id: "t-route-tight-final",
+    objectives: [
+      WAYPOINT_1,
+      { id: "t-final", titleBg: "Спри в дясната лента", kind: "reachZone", params: { x: 0, y: 500, radiusM: 4 } },
+    ],
+  };
+
+  it("the rescue exists on the terminal objective and is floored to a lane", () => {
+    const rescue = terminalRescueZone(tightFinal.objectives.map(parseObjectiveParams))!;
+    expect(rescue.radiusM).toBe(FINISH_LANE_FLOOR_M);
+    // Standstill-gated, unlike the stalled-chain zone.
+    expect(rescue.maxSpeedKmh).toBe(FINISH_STANDSTILL_KMH);
+    expect(rescue.dwellSec).toBe(FINISH_STUCK_S);
+  });
+
+  it("a car stopped ONE LANE OVER at the route's end is released", () => {
+    const ticks: SimTick[] = [];
+    let t = 0;
+    // Complete waypoint 1 so the chain really is on the terminal objective.
+    for (let i = 0; i <= 30; i++) {
+      ticks.push(makeTick({ t: t++, speedKmh: 30, position: { x: 120 * (i / 30), y: 150 * (i / 30) } }));
+    }
+    // Drive to the end of the route but in the ADJACENT lane — 8.13 m from
+    // the radius-4 gate, the exact offset doc 86 B3 measures — and stop.
+    for (let i = 0; i <= 40; i++) {
+      ticks.push(makeTick({ t: t++, speedKmh: 30, position: { x: 120 - 112 * (i / 40), y: 150 + 350 * (i / 40) } }));
+    }
+    for (let i = 0; i < 40; i++) {
+      ticks.push(makeTick({ t: t++, speedKmh: 0, position: { x: 8.13, y: 500 } }));
+    }
+
+    const r = run(createLessonSession(tightFinal), ticks);
+    expect(r.state.currentObjectiveIndex).toBe(1); // on the last gate, stuck
+    expect(r.state.phase).toBe("completed");
+    const result = buildLessonResult(r.state);
+    expect(result.completedAll).toBe(false); // released, never faked
+    expect(result.objectives[1].done).toBe(false);
+    // …and it said why, at the moment it happened.
+    expect(
+      r.hud.some((e) => e.kind === "lesson" && e.titleBg === "Край на маршрута"),
+    ).toBe(true);
+  });
+
+  /**
+   * doc 86's own prescription for B2 reads: „drop the `currentIndex <
+   * objectives.length - 1` guard … safe by construction, because
+   * stepFinishGate refuses to trip until the car has been observed OUTSIDE the
+   * zone once and then dwells." Measured against the shipped exam, it is not
+   * safe by construction, and this is the counter-example.
+   *
+   * EXAM_LESSON's terminal objective is the park. Its stalled-chain zone is a
+   * 14 m circle at ≤3 km/h held 3 s. A candidate who rolls up 10 m short of
+   * the bay at walking pace to plan the reverse — the correct thing to do — is
+   * inside that circle, under that cap, for far longer than that dwell. The
+   * naive fix would have ended his exam, unparked, while he was doing it
+   * right: a worse bug than the one being fixed.
+   *
+   * Hence the separate `terminalRescueZone`, and hence FINISH_BAY_STUCK_S.
+   */
+  it("COUNTER-PROOF: it does NOT eat the exam candidate lining up for the bay", () => {
+    const params = EXAM_LESSON.objectives.map(parseObjectiveParams);
+    const stalled = routeFinishZone(params)!;
+    const rescue = terminalRescueZone(params)!;
+
+    // What the naive fix would have used, and what it would have done.
+    expect(stalled.maxSpeedKmh).toBe(FINISH_REST_KMH);
+    expect(stalled.dwellSec).toBe(FINISH_REST_S);
+
+    const lineUp: SimTick[] = [];
+    // Approach from far away (arms the gate), then creep the last stretch at
+    // 2 km/h for twenty seconds — inside the 14 m circle the whole time.
+    lineUp.push(makeTick({ t: 0, speedKmh: 30, position: { x: stalled.x + 200, y: stalled.y } }));
+    for (let i = 1; i <= 80; i++) {
+      lineUp.push(
+        makeTick({ t: i * 0.25, speedKmh: 2, position: { x: stalled.x + 10, y: stalled.y } }),
+      );
+    }
+    let naive = createFinishGate();
+    for (const tick of lineUp) naive = stepFinishGate(naive, stalled, tick);
+    expect(naive.reachedAtSec, "the stalled-chain zone WOULD have ended it").not.toBeNull();
+
+    // The rescue that actually ships does not: it wants a full standstill.
+    let real = createFinishGate();
+    for (const tick of lineUp) real = stepFinishGate(real, rescue, tick);
+    expect(real.reachedAtSec).toBeNull();
+    expect(rescue.maxSpeedKmh).toBe(FINISH_STANDSTILL_KMH);
+    expect(rescue.dwellSec).toBe(FINISH_BAY_STUCK_S);
+  });
+
+  it("…but a candidate who has genuinely stopped trying IS released", () => {
+    const params = EXAM_LESSON.objectives.map(parseObjectiveParams);
+    const rescue = terminalRescueZone(params)!;
+    let gate = createFinishGate();
+    gate = stepFinishGate(
+      gate,
+      rescue,
+      makeTick({ t: 0, speedKmh: 30, position: { x: rescue.x + 200, y: rescue.y } }),
+    );
+    for (let i = 1; i <= 4 * (FINISH_BAY_STUCK_S + 2); i++) {
+      gate = stepFinishGate(
+        gate,
+        rescue,
+        makeTick({ t: i * 0.25, speedKmh: 0, position: { x: rescue.x + 10, y: rescue.y } }),
+      );
+    }
+    // The dwell starts on the first standstill frame (t = 0.25), not at t = 0.
+    expect(gate.reachedAtSec).toBe(0.25 + FINISH_BAY_STUCK_S);
+  });
+
+  it("COUNTER-PROOF: it does NOT eat a driver waiting out a red he must wait out", () => {
+    // l2-intersections ends on a requireRedMet junction whose retry is
+    // designed and feasible (every light shows red 26 s of every 50 s). An
+    // inside-zone rescue there would close the lesson on a stationary car
+    // doing exactly the right thing.
+    const l2 = lessonById("l2-intersections")!;
+    const params = l2.objectives.map(parseObjectiveParams);
+    expect(terminalRescueZone(params)).toBeNull();
+    // The stalled-chain anchor is an "outside" zone for the same reason: a
+    // junction is passed THROUGH, so the end of the route is its far side.
+    expect(routeFinishZone(params)!.mode).toBe("outside");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 3c. The two silences (B4 / B6) — states that used to produce NOTHING
+// ---------------------------------------------------------------------------
+
+describe("a task that will not complete says why, once", () => {
+  it("B4: on the mark and over the cap → one card naming both numbers", () => {
+    const capped: LessonSpec = {
+      ...baseLesson,
+      id: "t-route-capped",
+      objectives: [
+        {
+          id: "t-slow",
+          titleBg: "Мини бавно през стеснението",
+          kind: "reachZone",
+          params: { x: 0, y: 100, radiusM: 6, maxSpeedKmh: 20 },
+        },
+        FINISH_WAYPOINT,
+      ],
+    };
+    const ticks: SimTick[] = [];
+    for (let y = 0; y <= 130; y++) {
+      ticks.push(makeTick({ t: y, speedKmh: 34, position: { x: 0, y } }));
+    }
+    const r = run(createLessonSession(capped), ticks);
+    const cards = r.hud.filter(
+      (e) => e.kind === "lesson" && e.titleBg === "Стигна точката, но твърде бързо",
+    ) as Array<Extract<HudEvent, { kind: "lesson" }>>;
+
+    // Said once — not on all eleven frames inside the zone.
+    expect(cards).toHaveLength(1);
+    // THEO-4: the measured number, the required number, and what to do.
+    expect(cards[0].explanationBg).toContain("20 км/ч");
+    expect(cards[0].explanationBg).toContain("34 км/ч");
+    expect(cards[0].explanationBg).toContain("Намали");
+  });
+
+  it("B4: the blown waypoint no longer HANGS the lesson — the drive still ends", () => {
+    // The overshoot is not forgiven (see objectives.test.ts for why: on a stop
+    // drill the overshoot IS the graded failure). What changes is that it is
+    // no longer a dead end: the chain stalls on task 1, the student drives on,
+    // and the route-finish gate delivers him to the debrief.
+    const capped: LessonSpec = {
+      ...baseLesson,
+      id: "t-route-capped-recover",
+      objectives: [
+        {
+          id: "t-slow",
+          titleBg: "Мини бавно през стеснението",
+          kind: "reachZone",
+          params: { x: 0, y: 100, radiusM: 6, maxSpeedKmh: 20 },
+        },
+        FINISH_WAYPOINT,
+      ],
+    };
+    const ticks: SimTick[] = [];
+    for (let y = 0; y <= 510; y++) ticks.push(makeTick({ t: y, speedKmh: 34, position: { x: 0, y } }));
+
+    const r = run(createLessonSession(capped), ticks);
+    expect(r.state.objectives[0].status).toBe("active"); // still stalled on task 1
+    expect(r.state.phase).toBe("completed"); // …and the drive still ended
+    const result = buildLessonResult(r.state);
+    expect(result.completedAll).toBe(false);
+  });
+
+  it("B4: and slowing down on the APPROACH is credited, so the discipline pays", () => {
+    const capped: LessonSpec = {
+      ...baseLesson,
+      id: "t-route-capped-approach",
+      objectives: [
+        {
+          id: "t-slow",
+          titleBg: "Мини бавно през стеснението",
+          kind: "reachZone",
+          params: { x: 0, y: 100, radiusM: 6, maxSpeedKmh: 20 },
+        },
+        FINISH_WAYPOINT,
+      ],
+    };
+    const ticks: SimTick[] = [];
+    for (let y = 0; y <= 90; y++) ticks.push(makeTick({ t: y, speedKmh: 34, position: { x: 0, y } }));
+    // Brakes to 16 km/h 6 m BEFORE the circle, then rolls through a shade over.
+    ticks.push(makeTick({ t: 91, speedKmh: 16, position: { x: 0, y: 94 } }));
+    ticks.push(makeTick({ t: 92, speedKmh: 24, position: { x: 0, y: 100 } }));
+
+    const r = run(createLessonSession(capped), ticks);
+    expect(r.state.objectives[0].status).toBe("done");
+    expect(r.state.currentObjectiveIndex).toBe(1);
+  });
+
+  it("B6: an unsignalled roundabout exit explains itself and cites the article", () => {
+    const rbLesson: LessonSpec = {
+      ...baseLesson,
+      id: "t-route-rb",
+      objectives: [
+        WAYPOINT_1,
+        {
+          id: "t-rb",
+          titleBg: "Излез от кръговото с десен мигач",
+          kind: "completeManeuver",
+          params: {
+            maneuver: "roundabout",
+            x: 0,
+            y: 400,
+            enterRadiusM: 24,
+            exitRadiusM: 34,
+          },
+        },
+      ],
+    };
+    const ticks: SimTick[] = [
+      makeTick({ t: 0, speedKmh: 30, position: { x: 120, y: 150 } }), // waypoint 1
+      makeTick({ t: 1, speedKmh: 30, position: { x: 0, y: 340 } }), // approaching
+      makeTick({ t: 2, speedKmh: 20, position: { x: 0, y: 395 } }), // on the ring
+      makeTick({ t: 3, speedKmh: 25, position: { x: 0, y: 440 } }), // out, no indicator
+    ];
+    const r = run(createLessonSession(rbLesson), ticks);
+    const cards = r.hud.filter(
+      (e) => e.kind === "lesson" && e.titleBg === "Излезе от кръговото без десен мигач",
+    ) as Array<Extract<HudEvent, { kind: "lesson" }>>;
+    expect(cards).toHaveLength(1);
+    expect(cards[0].lawRef).toBe("ЗДвП чл. 25");
+    // …and it says what to do next, not just what went wrong.
+    expect(cards[0].explanationBg).toContain("върни се в кръговото");
+  });
+
+  it("B6: and driving on from there ENDS the lesson instead of hanging it", () => {
+    const rbLesson: LessonSpec = {
+      ...baseLesson,
+      id: "t-route-rb-leave",
+      objectives: [
+        WAYPOINT_1,
+        {
+          id: "t-rb",
+          titleBg: "Излез от кръговото с десен мигач",
+          kind: "completeManeuver",
+          params: {
+            maneuver: "roundabout",
+            x: 0,
+            y: 400,
+            enterRadiusM: 24,
+            exitRadiusM: 34,
+          },
+        },
+      ],
+    };
+    const ticks: SimTick[] = [
+      makeTick({ t: 0, speedKmh: 30, position: { x: 120, y: 150 } }),
+      makeTick({ t: 1, speedKmh: 30, position: { x: 0, y: 390 } }), // enters the ring
+    ];
+    for (let t = 2; t <= 2 + FINISH_LEAVE_S + 2; t++) {
+      ticks.push(makeTick({ t, speedKmh: 30, position: { x: 0, y: 500 } })); // 100 m out
+    }
+    const r = run(createLessonSession(rbLesson), ticks);
+    expect(r.state.phase).toBe("completed");
+    const result = buildLessonResult(r.state);
+    expect(result.completedAll).toBe(false);
+    expect(result.objectives[1].done).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
 // 4. The derivation itself
 // ---------------------------------------------------------------------------
 
@@ -376,6 +675,9 @@ describe("routeFinishZone", () => {
 
   it("terminal objectives with nowhere to arrive get no finish", () => {
     const first = zone(0, 0, 10);
+    // „Drive 300 m" and „stop smoothly" happen wherever the road puts them —
+    // there is no coordinate to end at, and inventing one would end drives at
+    // an arbitrary point.
     expect(
       routeFinishZone([first, { kind: "driveDistance", meters: 300 }]),
     ).toBeNull();
@@ -385,20 +687,94 @@ describe("routeFinishZone", () => {
         { kind: "completeManeuver", maneuver: "smoothStop", minApproachKmh: 20, maxDecelMs2: 3.5 },
       ]),
     ).toBeNull();
-    // The roundabout island is where the WORK is, not where the route ends.
-    expect(
-      routeFinishZone([
-        first,
-        {
-          kind: "completeManeuver",
-          maneuver: "roundabout",
-          x: 200,
-          y: 0,
-          enterRadiusM: 26,
-          exitRadiusM: 45,
-        },
-      ]),
-    ).toBeNull();
+  });
+
+  /**
+   * B1 (doc 86 §3) — RE-BASELINED 2026-07-30. This block used to assert that a
+   * terminal roundabout yields NO finish zone, on the reasoning that „the
+   * island is where the WORK is, not where the route ends". The premise is
+   * right and the conclusion was wrong: ten routes (six roundabout drills,
+   * four turn drills) consequently had no termination path AT ALL, and the
+   * founder's most repeated complaint — «the only solution was refreshing the
+   * entire webpage» — is exactly this.
+   *
+   * The route does not end at the island. It ends when the island is BEHIND
+   * you. That is an "outside" zone: armed by entering, tripped by leaving.
+   */
+  it("B1: a maneuver worked THROUGH anchors on LEAVING it, not on arriving", () => {
+    const rb = routeFinishZone([
+      zone(0, 0, 10),
+      {
+        kind: "completeManeuver",
+        maneuver: "roundabout",
+        x: 200,
+        y: 0,
+        enterRadiusM: 26,
+        exitRadiusM: 45,
+      },
+    ]);
+    expect(rb).not.toBeNull();
+    expect(rb!.mode).toBe("outside");
+    // Armed by the objective's own entry threshold; tripped clear of its exit.
+    expect(rb!.armWithinM).toBe(26);
+    expect(rb!.radiusM).toBe(45);
+    expect(rb!.dwellSec).toBe(FINISH_LEAVE_S);
+
+    const turn = routeFinishZone([
+      zone(0, 0, 10),
+      {
+        kind: "completeManeuver",
+        maneuver: "threePointTurn",
+        corridor: { x: 0, y: 60, halfWidthM: 8, halfLengthM: 12 },
+        startHeadingDeg: 0,
+        toleranceDeg: 20,
+        holdSec: 0.6,
+      },
+    ]);
+    expect(turn).not.toBeNull();
+    expect(turn!.mode).toBe("outside");
+    // Circumradius of the box + the corner margin: leaving in ANY direction.
+    expect(turn!.radiusM).toBeCloseTo(Math.hypot(8, 12) + 8, 6);
+    expect(turn!.armWithinM).toBe(8);
+  });
+
+  it("an outside finish is NOT tripped by standing still in the middle of the work", () => {
+    const rb = routeFinishZone([
+      zone(0, 0, 10),
+      {
+        kind: "completeManeuver",
+        maneuver: "roundabout",
+        x: 200,
+        y: 0,
+        enterRadiusM: 26,
+        exitRadiusM: 45,
+      },
+    ])!;
+    let gate = createFinishGate();
+    // Approach from 200 m out (in the finish region — but not armed: the ring
+    // has never been reached, so there is nothing to have left).
+    for (let t = 0; t < 60; t++) {
+      gate = stepFinishGate(gate, rb, makeTick({ t, speedKmh: 30, position: { x: 0, y: 0 } }));
+    }
+    expect(gate.armed).toBe(false);
+    expect(gate.reachedAtSec).toBeNull();
+
+    // Enter the ring and sit on it, stalled, for two minutes.
+    for (let t = 60; t < 180; t++) {
+      gate = stepFinishGate(gate, rb, makeTick({ t, speedKmh: 0, position: { x: 200, y: 0 } }));
+    }
+    expect(gate.armed).toBe(true);
+    expect(gate.reachedAtSec).toBeNull();
+
+    // Drive away: the finish trips after the leave window, and not before it.
+    for (let t = 180; t < 180 + FINISH_LEAVE_S - 1; t++) {
+      gate = stepFinishGate(gate, rb, makeTick({ t, speedKmh: 30, position: { x: 300, y: 0 } }));
+    }
+    expect(gate.reachedAtSec).toBeNull();
+    for (let t = 180 + FINISH_LEAVE_S - 1; t <= 180 + FINISH_LEAVE_S + 1; t++) {
+      gate = stepFinishGate(gate, rb, makeTick({ t, speedKmh: 30, position: { x: 300, y: 0 } }));
+    }
+    expect(gate.reachedAtSec).toBe(180 + FINISH_LEAVE_S);
   });
 
   it("clamps to half the gap so a finish can never swallow the leg before it", () => {
@@ -408,6 +784,7 @@ describe("routeFinishZone", () => {
       y: 0,
       radiusM: 30,
       dwellSec: FINISH_DWELL_S,
+      terminalRescue: true,
     });
     // Comfortably spaced → the authored radius survives untouched.
     expect(routeFinishZone([zone(0, 0, 10), zone(400, 0, 20)])).toEqual({
@@ -415,7 +792,27 @@ describe("routeFinishZone", () => {
       y: 0,
       radiusM: 20,
       dwellSec: FINISH_DWELL_S,
+      terminalRescue: true,
     });
+  });
+
+  /**
+   * B3 (doc 86 §3) — the rescue used to copy the terminal objective's
+   * deliberately lane-exclusive radius. Templates author 4–6 m precisely so
+   * the gate is satisfiable only from the correct lane; the escape inherited
+   * that exclusivity, so a car ONE LANE OVER at the end of the route (8.13 m
+   * on every shipped map) missed the way out by centimetres.
+   */
+  it("B3: the rescue radius is floored at a lane pitch — before the clamp", () => {
+    // Room to spare: a radius-4 terminal gate yields a 9 m escape.
+    const roomy = routeFinishZone([zone(0, 0, 10), zone(400, 0, 4)])!;
+    expect(roomy.radiusM).toBe(FINISH_LANE_FLOOR_M);
+    expect(roomy.radiusM).toBeGreaterThan(8.125); // the shipped lane pitch
+
+    // The clamp still wins where the previous leg is genuinely close — the
+    // floor may never let a finish swallow the waypoint before it.
+    const tight = routeFinishZone([zone(0, 0, 10), zone(12, 0, 4)])!;
+    expect(tight.radiusM).toBe(6);
   });
 
   it("a route too compact to hold a finish zone simply has none", () => {
@@ -442,6 +839,12 @@ describe("every shipped lesson keeps a workable finish", () => {
       const params = lesson.objectives.map(parseObjectiveParams);
       const finish = routeFinishZone(params);
       if (finish === null) continue;
+      // The invariant is about ARRIVAL zones swallowing an earlier leg. An
+      // "outside" zone is the opposite shape — it is satisfied by being AWAY
+      // from the route's end, so an earlier waypoint sitting inside the ring
+      // (l3-roundabout's approach is 0 m from the island centre) is not
+      // swallowed by anything: the car has to leave to trip it.
+      if (finish.mode === "outside") continue;
       for (let i = 0; i < params.length - 1; i++) {
         const p = params[i];
         const point =

@@ -44,6 +44,8 @@ import {
 } from "./vehicles";
 import {
   DEFAULT_TRAFFIC_CONFIG,
+  PLAYER_HALF_LENGTH_M,
+  vehicleHalfLengthM,
   type CyclistApproach,
   type OncomingApproach,
   type StagedActorSpec,
@@ -56,6 +58,7 @@ import {
   type TrafficSystemStats,
   type TrafficUpdateContext,
   type TrafficVehicleState,
+  type VehicleProfile,
 } from "./types";
 
 const MAX_DT_SEC = 0.1;
@@ -65,8 +68,43 @@ const PED_COLOR_VARIANTS = 4;
  * ~Half the scaled lane: same-lane leaders register even off-center, while an
  * adjacent-lane car (one lane ≈ 8.1 m over) never does (perceptual scale). */
 const LEAD_CORRIDOR_M = 4.0;
-/** Approx sum of the two half-lengths, for a bumper-to-bumper gap, meters. */
+/**
+ * Sum of the two half-lengths for a bumper-to-bumper gap, meters — the
+ * CAR-vs-CAR case (2.05 + 2.05). Kept as the named legacy constant because
+ * every car lead must stay byte-identical; a lead that publishes a bigger
+ * profile now loses ITS OWN half-length instead (ledger T17(e)):
+ * `gap = centres − (PLAYER_HALF_LENGTH_M + vehicleHalfLengthM(profile))`.
+ * Grading a 14 m tram as a 4.1 m hatchback handed the student 5 m of road
+ * that does not exist.
+ */
 const VEHICLE_LENGTH_M = 4.1;
+
+/**
+ * Bumper-to-bumper subtrahend for one published lead/follower, m.
+ *
+ * MONOTONE BY DESIGN — floored at the legacy car constant, so a profile can
+ * only ever SHRINK the reported gap, never grow it. Two reasons, and the
+ * second is a real bug this floor prevents:
+ *
+ *  1. Safety direction. A 7.5 m truck / 14 m tram / 34.4 m train really does
+ *     put its rear bumper closer than a hatchback would, and the student must
+ *     be graded against the metal that is actually there.
+ *  2. A SHORT body must not buy slack. Unfloored, a 1.8 m cyclist proxy
+ *     subtracted only 2.95 m instead of 4.1 and the reported gap GREW by
+ *     1.15 m — which measurably stopped FOLLOWING_TOO_CLOSE firing on
+ *     `sc-vu-cyclist-group`'s cut-in (s-w4-bot-completion.test.ts:447 caught
+ *     it: the taught code flipped to VULNERABLE_PASS_TOO_CLOSE). Being more
+ *     permissive about tailgating a cyclist is the opposite of the north
+ *     star; a vulnerable road user earns a bigger buffer, never a smaller one.
+ *
+ * Invariant (asserted in lead-gap.test.ts): a car, a profile-less agent and
+ * every sub-car body all return exactly VEHICLE_LENGTH_M, so nothing about the
+ * pre-profile world moves.
+ */
+function bumperSubtrahendM(profile?: VehicleProfile): number {
+  if (profile === undefined || profile === "car") return VEHICLE_LENGTH_M;
+  return Math.max(VEHICLE_LENGTH_M, PLAYER_HALF_LENGTH_M + vehicleHalfLengthM(profile));
+}
 /** Below this speed a vehicle is stopped/parked and makes no priority claim, m/s. */
 const CONFLICT_MIN_SPEED_MPS = 1;
 /** Heading within this of your approach = same-direction traffic (not a conflict), deg. */
@@ -646,9 +684,15 @@ export function conflictNearFor(
  * Pure gap-to-nearest-vehicle-ahead helper (district space; headingDeg 0 = north,
  * clockwise). A vehicle counts only when ahead and within a lane-width corridor;
  * returns bumper-to-bumper metres, or Infinity when the road ahead is clear.
+ *
+ * T17(e): the subtrahend is now the LEAD'S OWN profile length, not one fixed
+ * car constant. A `car` (or a profile-less ambient agent) subtracts exactly the
+ * historical 4.1 m, so every pre-profile gap is unchanged to the bit; a truck
+ * loses 3.75 m of its own half instead of 2.05, a tram 7, a train 17.2 — which
+ * is the honest bumper the student is actually approaching.
  */
 export function leadGapFor(
-  vehicles: readonly { x: number; y: number }[],
+  vehicles: readonly { x: number; y: number; profile?: VehicleProfile }[],
   px: number,
   py: number,
   headingDeg: number,
@@ -664,7 +708,7 @@ export function leadGapFor(
     if (fwd <= 0) continue; // not ahead
     const lat = Math.abs(rx * -fy + ry * fx); // perpendicular offset
     if (lat > LEAD_CORRIDOR_M) continue; // not in my lane/path
-    const gap = fwd - VEHICLE_LENGTH_M;
+    const gap = fwd - bumperSubtrahendM(v.profile);
     if (gap < best) best = gap;
   }
   return best === Infinity ? Infinity : Math.max(0, best);
@@ -678,7 +722,7 @@ export function leadGapFor(
  * the cue's honesty contract (no vehicle ⇒ no badge) rests on that.
  */
 export function rearGapFor(
-  vehicles: readonly { x: number; y: number }[],
+  vehicles: readonly { x: number; y: number; profile?: VehicleProfile }[],
   px: number,
   py: number,
   headingDeg: number,
@@ -694,7 +738,7 @@ export function rearGapFor(
     if (fwd >= 0) continue; // not behind
     const lat = Math.abs(rx * -fy + ry * fx); // perpendicular offset
     if (lat > LEAD_CORRIDOR_M) continue; // not in my lane/path
-    const gap = -fwd - VEHICLE_LENGTH_M;
+    const gap = -fwd - bumperSubtrahendM(v.profile);
     if (gap < best) best = gap;
   }
   return best === Infinity ? Infinity : Math.max(0, best);

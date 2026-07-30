@@ -229,6 +229,37 @@ export interface RouteFinishZone {
    * the pull-up pose). |speed| is compared, so reversing in counts.
    */
   maxSpeedKmh?: number;
+  /**
+   * WHICH SIDE of `radiusM` is the finish (B1, 2026-07-30).
+   *
+   * "inside" (the default, and every zone that shipped before this) — the
+   * route ends AT a place: a waypoint, a junction, a painted bay. You arrive.
+   *
+   * "outside" — the route ends when you have LEFT a place. This is the only
+   * honest shape for a maneuver whose target is where the WORK happens: the
+   * roundabout island and the three-point-turn corridor are arrived at to
+   * BEGIN the task, so an inside-zone there would trip while the student is
+   * still working it. Standing still inside the ring can never end a drive;
+   * driving away from it always can.
+   */
+  mode?: "inside" | "outside";
+  /**
+   * "outside" zones only: the vehicle must be observed WITHIN this radius
+   * before leaving can count (you cannot leave somewhere you never reached).
+   * Defaults to `radiusM`; always ≤ `radiusM`. For a roundabout this is the
+   * ring's own `enterRadiusM`, so a car that merely passed nearby and turned
+   * back has not "left the roundabout" — it never entered it.
+   */
+  armWithinM?: number;
+  /**
+   * May this zone be consulted while the chain is ALREADY ON the terminal
+   * objective (the B2 rescue)? False for anchors where being inside the zone
+   * is the normal, correct state of a student still working: a parking bay
+   * (mid-shuffle pauses), a red light held at a `requireRedMet` junction.
+   * Those keep the stalled-chain rescue and get a standstill-gated rescue of
+   * their own (finish.ts `terminalRescueZone`) or none at all.
+   */
+  terminalRescue?: boolean;
 }
 
 /** Per-session memory of the route-finish gate (finish.ts `stepFinishGate`). */
@@ -250,7 +281,37 @@ export type ObjectiveStatus = "pending" | "active" | "done";
 
 /** Per-objective evaluator memory (discriminated by evaluator, not by kind). */
 export type ObjectiveEvalState =
-  | { type: "stateless" } // reachZone
+  | {
+      /**
+       * reachZone. Stateless until B4/B5 (2026-07-30): the evaluator used to
+       * demand `inZone && slowEnough` on the SAME frame, so one fast pass
+       * through an 8 m window permanently voided a gate that could then only
+       * be satisfied by physically driving back — 178 capped waypoints across
+       * 137 templates, and the sequential chain locks behind every one of
+       * them. Both halves now LATCH, independently and monotonically.
+       */
+      type: "reachZone";
+      /** The zone itself has been reached (see objectives.ts for the terms). */
+      reached: boolean;
+      /** The arrival speed cap has been honoured at least once at the zone;
+       *  always true for an uncapped zone. */
+      capMet: boolean;
+      /** The „arrived, but too fast" HUD notice has been shown once (engine). */
+      overCapNoted: boolean;
+      /**
+       * Where the vehicle was on the frame BEFORE it first entered the grace
+       * ring of a capped zone — the only thing in a position-and-speed tick
+       * that says which way the student was coming from, and therefore which
+       * side of the mark is „short of it" and which is „past it". Taken from
+       * the previous frame rather than the first inside one so a coarse tick
+       * step (or a replayed trace) cannot latch it on top of the mark itself
+       * and flatten the direction to nothing. Null until the ring is entered,
+       * and on uncapped zones, which have no grace ring at all.
+       */
+      approachFrom: Vec2 | null;
+      /** Previous frame's position — only used to derive `approachFrom`. */
+      prevPos: Vec2 | null;
+    }
   | {
       type: "passSignal";
       /** The matching stop line has been crossed (near the node). */
@@ -284,6 +345,15 @@ export type ObjectiveEvalState =
       entered: boolean;
       /** Right indicator observed in the exit window after entering (A10). */
       exitSignaled: boolean;
+      /**
+       * B6 (2026-07-30): ring exits taken WITHOUT the right indicator. The
+       * traversal still resets (the skill has to be performed, not banked),
+       * but the reset is no longer SILENT — the engine turns each increment
+       * into an explaining HUD card, and finish.ts gives the maneuver a
+       * leave-the-ring finish so „redo it" is a choice instead of the only
+       * way out of a lesson that could not otherwise end.
+       */
+      voidedExits: number;
     }
   | {
       type: "parkInBay";
@@ -571,6 +641,22 @@ export interface LessonSessionState {
    * finish.ts — it changes WHEN a session stops, never WHAT is graded.
    */
   finishGate?: FinishGateState;
+  /**
+   * B2/B3 (2026-07-30) — the STANDSTILL rescue, tracked independently and on
+   * every frame, whichever objective is active. It answers one question the
+   * gate above deliberately cannot: „is this car simply stuck?" The evidence
+   * is a full standstill held at the end of the route (finish.ts
+   * `terminalRescueZone`), which no approach, creep, park shuffle or
+   * red-light wait produces, and it needs its own dwell memory because the
+   * two gates watch different zones with different criteria.
+   *
+   * It runs alongside the stalled-chain gate rather than only in its place
+   * because a compact route (a parking lot, where the pull-up pose is 10 m
+   * from the bay) clamps that gate below one lane wide — so a car parked at
+   * the end of the route, three metres off, satisfied neither of them and had
+   * no way out at all.
+   */
+  finishRescueGate?: FinishGateState;
 }
 
 // ---------------------------------------------------------------------------

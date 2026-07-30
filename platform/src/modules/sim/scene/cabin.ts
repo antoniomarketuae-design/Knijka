@@ -40,6 +40,81 @@ export const GLANCE_TAP_HOLD_S = 0.9;
  *  events sparse. */
 export const GLANCE_REFRESH_S = 1.0;
 
+// ---------------------------------------------------------------------------
+// SPAWN LAMP STATE (doc 86 L10, founder items 24 + 41).
+//
+// The cabin used to initialise `headlights: "off"` unconditionally, and
+// `LessonScene` spawns most scenarios `vehicleStart: "ready"` without touching
+// the lamps. Meanwhile `rules/engine.ts:857-866` arms HEADLIGHTS_OFF_AT_NIGHT
+// (**основна**) and HEADLIGHTS_OFF_IN_RAIN with no config gate. Net effect:
+// **34 of 154 scenarios compile a night / rain / fog condition and hand the
+// student a car that is already in violation at t = 0** — the same shape as
+// T2's centre-line spawn, and just as unteachable.
+//
+// The worst case is a lesson that ASSERTS the state it does not create:
+// `sc-ac-night-overdrive` instruction 1 reads «Късите светлини са включени» —
+// a false claim about the cockpit — and the student then collects an основна
+// fault that at L4 can end the exam. A simulator that lies about its own
+// switches is the exact failure mode the north-star test exists to catch.
+//
+// THE RULE. A car handed over "ready to drive" is handed over the way an
+// instructor hands one over: correctly set up for the conditions outside. So
+// when the compiled environment carries night, rain or fog AND the lesson
+// spawns `ready`, the low beams start ON.
+//
+// THE THREE EXCEPTIONS, and why they are named rather than derived: for
+// `sc-ac-night-lights`, `sc-ac-rain-lights` and `sc-ac-fog` the SUBJECT of the
+// lesson is reaching for the switch. Pre-arming those would delete the drill —
+// the same reasoning that keeps `preDriveMode: "assess"` on a cold start.
+// A fourth, structural exception is any lesson that actually runs the 13-step
+// pre-drive procedure, because `headlights-on` is a coached/graded step there
+// (procedures/steps.ts) and a pre-lit car would auto-satisfy it.
+// ---------------------------------------------------------------------------
+
+/** Scenario template ids whose whole subject is switching the lamps ON — they
+ *  must be handed over dark or there is no lesson left (doc 86 L10). */
+export const HEADLIGHT_DRILL_TEMPLATE_IDS: ReadonlySet<string> = new Set([
+  "sc-ac-night-lights",
+  "sc-ac-rain-lights",
+  "sc-ac-fog",
+]);
+
+/** The inputs the spawn-lamp decision reads. Deliberately primitives: this is
+ *  a pure rule, unit-tested without a DOM or a compiled lesson. */
+export interface SpawnHeadlightContext {
+  /** LessonSpec.vehicleStart as resolved by the caller ("cold" | "ready"). */
+  vehicleStart: VehicleStartState;
+  /** Compiled environment: timeOfDay === "night". */
+  night: boolean;
+  /** Compiled environment: rain. */
+  rain: boolean;
+  /** Compiled environment: dense fog (ЗДвП чл. 74 — lamps regardless of hour). */
+  fog: boolean;
+  /** True when this lesson runs the 13-step pre-drive procedure. */
+  preDrive: boolean;
+  /** Compiled lesson id, e.g. `sc-ac-fog@L2`, or the raw template id. */
+  lessonId: string;
+}
+
+/** The template id inside a compiled scenario lesson id (`sc-x@L2` → `sc-x`). */
+export function templateIdOfLessonId(lessonId: string): string {
+  const at = lessonId.indexOf("@");
+  return at === -1 ? lessonId : lessonId.slice(0, at);
+}
+
+/**
+ * The headlight setting a lesson's car should be handed over in.
+ * `"low"` only when the conditions demand lights AND the car is handed over
+ * ready AND the lesson is not itself about the switch. Everything else is
+ * `"off"` — byte-identical to the pre-doc-86 behaviour.
+ */
+export function initialHeadlightsFor(ctx: SpawnHeadlightContext): HeadlightSetting {
+  if (ctx.vehicleStart !== "ready") return "off"; // a cold start is a pre-drive
+  if (ctx.preDrive) return "off"; // `headlights-on` is a graded step there
+  if (HEADLIGHT_DRILL_TEMPLATE_IDS.has(templateIdOfLessonId(ctx.lessonId))) return "off";
+  return ctx.night || ctx.rain || ctx.fog ? "low" : "off";
+}
+
 /**
  * Pure hold-to-glance state machine (extracted so it is unit-testable in
  * Node — CabinControls binds window listeners and cannot be constructed
@@ -180,7 +255,9 @@ const AUTOCANCEL_RELEASE_RAD = 0.05;
 
 export class CabinControls {
   indicator: IndicatorSetting = "off";
-  headlights: HeadlightSetting = "off";
+  /** Set from the constructor's `initialHeadlights` — "low" when the lesson
+   *  hands over a ready car into night/rain/fog (doc 86 L10). */
+  headlights: HeadlightSetting;
   seatbeltOn = false;
   nightPreview = false;
 
@@ -209,7 +286,12 @@ export class CabinControls {
     /** Lesson spawn policy (LessonSpec.vehicleStart) — default cold start:
      *  engine OFF, selector P, parking brake ON (the pre-drive reality). */
     vehicleStart: VehicleStartState = "cold",
+    /** Lamp state at hand-over (doc 86 L10) — resolve it with
+     *  `initialHeadlightsFor()`. Default "off" = the pre-doc-86 behaviour, so
+     *  every headless/legacy construction is byte-identical. */
+    initialHeadlights: HeadlightSetting = "off",
   ) {
+    this.headlights = initialHeadlights;
     this.driveline = new DrivelineState(vehicleStart);
     window.addEventListener("keydown", this.onKeyDown);
     window.addEventListener("keyup", this.onKeyUp);

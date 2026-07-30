@@ -198,6 +198,25 @@ export const JUNCTION_DECAL_MAX_PER_APPROACH = 4;
 export const DASH_LENGTH_M = 5.0;
 export const DASH_GAP_M = 8.0;
 export const DASH_WIDTH_M = 0.25;
+/**
+ * ОСЕВА stroke — the line that separates OPPOSING streams — is painted 1.5×
+ * the same-direction divider (doc 86 T16, founder item 46: „no actual marking
+ * on the road showing which lane is which"). On a 2+2 the painter used to emit
+ * three visually identical dashed lines at −8.13 / 0.00 / +8.13, and the middle
+ * one is the only one with oncoming traffic behind it.
+ *
+ * Width is the ONE cue that carries no legal claim: a broken line stays broken
+ * and a continuous line stays continuous, so nothing a student may or may not
+ * do changes — only which line his eye lands on. Deliberately NOT the ledger's
+ * „paint the centre boundary as solid/double М1": «непрекъсната» means
+ * пресичането и застъпването са забранени (ППЗДвП чл. 63, ал. 2, т. 1–2), and
+ * asserting that on every multi-lane two-way road would ban crossings the
+ * district's OWN data permits — `mvu-e-beyond` (mv-uturn-v1, 4 lanes two-way,
+ * no zone) is precisely where sc-mv-uturn-ban sends the student to make a
+ * LEGAL U-turn. Where crossing really is banned the data already says so, and
+ * `paintZoneSolids` already draws the М1 (see SOLID_CENTER_LINE_WIDTH_M).
+ */
+export const CENTER_LINE_WIDTH_M = DASH_WIDTH_M * 1.5;
 export const EDGE_LINE_WIDTH_M = 0.3;
 export const EDGE_LINE_INSET_M = 0.5;
 export const STOP_LINE_WIDTH_M = 0.8;
@@ -211,7 +230,11 @@ export const ZEBRA_LENGTH_M = 6.0; // extent along the road axis
  * span reads as one filled line; the bus-/emergency-lane curb seam (М8.1/М2
  * continuous edge of laneId 0) is a hair bolder so the restricted lane reads.
  */
-export const SOLID_CENTER_LINE_WIDTH_M = DASH_WIDTH_M;
+export const SOLID_CENTER_LINE_WIDTH_M = CENTER_LINE_WIDTH_M;
+/** …and a В24 span's SAME-DIRECTION dividers keep the divider stroke they
+ *  replace, so the осева stays the widest line on the carriageway inside a ban
+ *  span too (T16 must not stop working where a zone starts). */
+export const SOLID_LANE_DIVIDER_WIDTH_M = DASH_WIDTH_M;
 export const BUS_LANE_SEAM_WIDTH_M = EDGE_LINE_WIDTH_M;
 /**
  * The лента за принудително спиране is bounded by the WIDE continuous line —
@@ -274,7 +297,22 @@ export const FACADE_VARIANTS = 4;
  *  (lane dividers on a motorway carriageway) but deliberately absent from
  *  ARTERIAL_CLASSES, PARKING_LANE_CLASSES and SIDEWALK_CLASSES below — a
  *  motorway carries no arterial parking band, street trees, streetlights or sidewalks
- *  (gen_motorway.mjs mw-v1; founder R-media #7/#8). */
+ *  (gen_motorway.mjs mw-v1; founder R-media #7/#8).
+ *
+ *  `residential` / `unclassified` / `living_street` joined the set (doc 86 T1):
+ *  every catalogued street map is built from those three classes, so the pass
+ *  skipped them wholesale — 90 of 155 scenarios graded CENTER_LINE_TOUCHED,
+ *  POOR_LANE_KEEPING and NOT_KEEPING_RIGHT against an осева the world never
+ *  drew (founder: «Настъпване на осевата линия … it say we step on some line
+ *  that doesnt exist at all», and item 46 «there are no lanes on the roads I
+ *  only know them in my head»). A 6.5 m two-way Sofia street IS marked; the
+ *  bare-asphalt classes are the ones that follow.
+ *
+ *  `service` stays OUT on purpose and is not an oversight: a car-park aisle, a
+ *  driveway and a delivery lane carry bay paint, not lane lines. The lot maps
+ *  (lot-45/narrow/par/perp-v1) are the reason — painting an осева down a
+ *  parking aisle would be the same defect pointed the other way. Their
+ *  approach edges are `residential` and DO get the line. */
 export const MARKED_CLASSES: ReadonlySet<string> = new Set([
   "motorway",
   "trunk",
@@ -284,7 +322,52 @@ export const MARKED_CLASSES: ReadonlySet<string> = new Set([
   "secondary_link",
   "tertiary",
   "tertiary_link",
+  "unclassified",
+  "residential",
+  "living_street",
 ]);
+
+/** The minimum an offset line must measure before `paintDashedLine` emits its
+ *  first quad (it starts the walk at gap/2 and needs a whole dash to fit). A
+ *  boundary shorter than this is a boundary the world does NOT draw. */
+export const MIN_DASHED_LINE_M = DASH_GAP_M / 2 + DASH_LENGTH_M;
+
+/** Just the shape `paintsCentreLine`/`paintsLaneLines` need — so the runtime
+ *  can ask the question with a `DistrictEdge` and the builder with an
+ *  `EdgeBuild.edge`, without either importing the other's types. */
+export interface MarkedEdgeLike {
+  class: string;
+  oneway: boolean;
+  lanes: number;
+}
+
+/**
+ * Does the lane-line pass draw a boundary EXACTLY on the road axis — the осева,
+ * the only painted line with oncoming traffic behind it?
+ *
+ * This is the painter's own arithmetic, not a second opinion: markings.ts walks
+ * `k = 1..lanes-1` at `off = -travelHalf + k·LANE_WIDTH_M`, and `off` lands on 0
+ * only for an EVEN lane count on a two-way edge (a 3- or 5-lane two-way road
+ * gets its boundaries at ±0.5·W / ±1.5·W and NO centre line at all). Exported
+ * so `runtime/spatial.ts` publishes the same answer the painter acts on —
+ * the single decision doc 86 T1 says was never shared.
+ */
+export function paintsCentreLine(edge: MarkedEdgeLike): boolean {
+  if (!MARKED_CLASSES.has(edge.class)) return false;
+  if (edge.oneway) return false;
+  const lanes = Math.max(1, edge.lanes);
+  return lanes >= 2 && lanes % 2 === 0;
+}
+
+/**
+ * Does the lane-line pass draw ANY internal lane boundary on this edge? False
+ * means there is no painted lane to keep — the referent POOR_LANE_KEEPING and
+ * NOT_KEEPING_RIGHT need before either may convict.
+ */
+export function paintsLaneLines(edge: MarkedEdgeLike): boolean {
+  if (!MARKED_CLASSES.has(edge.class)) return false;
+  return Math.max(1, edge.lanes) >= 2;
+}
 
 /** Road classes that get sidewalks. */
 export const SIDEWALK_CLASSES: ReadonlySet<string> = new Set([

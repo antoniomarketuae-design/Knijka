@@ -754,9 +754,21 @@ describe("wave-1 bot completion — sc-pe-school-patrol at L3", () => {
     // is exactly why the лesson is honest: the paddle is up BECAUSE they are
     // crossing, and the law that bites is чл. 119, not the paddle.
     const paddleOnly = createLessonSession(compileScenario(SC_PE_SCHOOL_PATROL, 3));
+    // doc 86 D2 — the group is now three children, not one: the copy says
+    // «Изчакай ЦЯЛАТА група» and «децата вече бяха стъпили на платното», so the
+    // world has to contain a group. The warden is still the only non-pedestrian
+    // actor and still grades nothing.
     expect(paddleOnly.lesson.stagedEvents?.map((e) => e.kind)).toEqual([
       "policeStop",
       "pedestrianDartOut",
+      "pedestrianDartOut",
+      "pedestrianDartOut",
+    ]);
+    expect(paddleOnly.lesson.stagedEvents?.map((e) => e.id)).toEqual([
+      "sc-pesp-warden",
+      "sc-pesp-children",
+      "sc-pesp-child2",
+      "sc-pesp-child3",
     ]);
   });
 
@@ -768,8 +780,14 @@ describe("wave-1 bot completion — sc-pe-school-patrol at L3", () => {
     // never silently reduces the live car's grip (only a template that AUTHORS
     // `physics` gets that, and this one's envelopes are dry-tuned).
     expect(l5.physics).toBeUndefined();
-    // Both staged actors ride every rung: the paddle and the group are the drill.
-    expect(l5.stagedEvents?.map((e) => e.kind)).toEqual(["policeStop", "pedestrianDartOut"]);
+    // Every staged actor rides every rung: the paddle and the three-child group
+    // are the drill (doc 86 D2 — the plural copy now has a plural world).
+    expect(l5.stagedEvents?.map((e) => e.kind)).toEqual([
+      "policeStop",
+      "pedestrianDartOut",
+      "pedestrianDartOut",
+      "pedestrianDartOut",
+    ]);
   });
 });
 

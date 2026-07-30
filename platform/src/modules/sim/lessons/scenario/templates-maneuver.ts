@@ -38,7 +38,7 @@ export const SC_MANEUVER_3POINT: ScenarioSpec = {
   tagsBg: ["обратен завой", "в три точки", "заден ход", "тясна улица", "изпитни упражнения"],
   titleBg: "Обратен завой в три точки",
   objectiveBg:
-    "Обърни посоката на 180° на тясната двупосочна улица в три контролирани движения — напред-наляво към отсрещния бордюр, назад-надясно към близкия, после напред по обратната посока — с оглеждане преди всяко движение и без да опреш бордюра.",
+    "Две задачи, в този ред: първо спри в изходната позиция на мястото за обръщане — обратният завой започва от покой, не в движение; после обърни посоката на 180° в три контролирани движения (напред-наляво към отсрещния бордюр, назад-надясно към близкия, после напред по обратната посока), с оглеждане преди всяко движение и без да опреш бордюра.",
   // Doc-72 provenance: PK-12 IS this maneuver (Обръщане в три хода / three-point
   // turn — Н38 обратен завой when no junction/roundabout serves).
   archetypeIds: ["PK-12"],
@@ -54,7 +54,11 @@ export const SC_MANEUVER_3POINT: ScenarioSpec = {
     vehicleStart: "ready",
   },
   instructionsBg: [
-    { n: 1, textBg: "Приближи мястото за обръщане в дясната лента и спри плътно, спокойно и без бързане." },
+    {
+      n: 1,
+      textBg:
+        "Задачите са две и се броят поотделно: първо изходната позиция, после самото обръщане. Приближи мястото за обръщане в дясната лента и СПРИ плътно, спокойно и без бързане.",
+    },
     {
       n: 2,
       textBg:
@@ -79,14 +83,18 @@ export const SC_MANEUVER_3POINT: ScenarioSpec = {
   success: [
     {
       id: "sc-m3p-approach",
-      titleBg: "Приближи мястото за обръщане и спри",
-      // The pull-up pose in the right lane at the turn corridor (ov-narrow-v1:
-      // right-lane center x = 4.06). Pinned to content/world/ov-narrow-v1.json.
-      params: { kind: "reachZone", x: LANE_X, y: 52, radiusM: 8, maxSpeedKmh: 20 },
+      titleBg: "Задача 1: спри в изходната позиция за обръщането",
+      // DOC 86 D11 („two tasks promised, one delivered"). The title already
+      // said „и спри" while the gate accepted 20 km/h — so the HUD counted
+      // „Задача 1/2" for a drive-by and the drill read as ONE task. The cap is
+      // now what the title and instruction 1 have always claimed: AT REST.
+      // The pull-up pose the recorded shadow stops on is (4.06, 54)
+      // (traces/scManeuver3Point.ts), 2 m inside this radius-8 zone.
+      params: { kind: "reachZone", x: LANE_X, y: 52, radiusM: 8, maxSpeedKmh: 6 },
     },
     {
       id: "sc-m3p-turn",
-      titleBg: "Обърни посоката на 180° в три движения",
+      titleBg: "Задача 2: обърни посоката на 180° в три движения",
       // Corridor-locked threePointTurn (Наредба-38): reversed travel direction,
       // at rest inside the turn box facing back, in as few movements as possible.
       // Tolerances are evaluator defaults at L3/L4; L1/L2 widen via toleranceScale.
@@ -143,8 +151,19 @@ export const SC_MANEUVER_3POINT: ScenarioSpec = {
     { level: 1, toleranceScale: 1.5 },
     { level: 2, toleranceScale: 1.25 },
     { level: 3 },
-    { level: 4, vehicleStart: "cold" },
-      { level: 5, toleranceScale: 0.8 }, // L5: по-тесен коридор — прецизност
+    {
+      level: 4,
+      vehicleStart: "cold",
+      // Doc 86 D7: the exam rung grades the movement count tighter — on the
+      // изпит „три хода" is the specification, not the budget.
+      rubric: { economy: { objectiveId: "sc-m3p-turn", attemptsFor3Stars: 3, attemptsFor2Stars: 4 } },
+    },
+    {
+      // L5: по-тесен коридор — прецизност, and the same three-move ceiling.
+      level: 5,
+      toleranceScale: 0.8,
+      rubric: { economy: { objectiveId: "sc-m3p-turn", attemptsFor3Stars: 3, attemptsFor2Stars: 4 } },
+    },
   ],
   conditions: { weather: "dry" },
   localeBg: "bg-BG",
@@ -175,7 +194,7 @@ export const SC_MANEUVER_UTURN: ScenarioSpec = {
   tagsBg: ["обръщане", "в едно движение", "широк булевард", "обратен завой", "изпитни упражнения"],
   titleBg: "Обръщане в едно движение на широк булевард",
   objectiveBg:
-    "Обърни посоката на 180° на широкия булевард в ЕДНА плавна дъга — без връщане назад: широкото платно позволява завоят да се направи наведнъж, с оглеждане преди започване и без да опреш бордюра.",
+    "Две задачи, в този ред: първо спри в изходната позиция в дясната лента — обръщането започва от покой, за да можеш да прецениш насрещните; после обърни посоката на 180° в ЕДНА плавна дъга, без връщане назад и без да опреш бордюра.",
   // Doc-72 provenance: OV-17 „Обратен завой" (the U-turn maneuver itself; чл. 38
   // legal execution). PK-12 „Обръщане в три хода" dropped — that is the THREE-
   // move turn, whereas this is a single forward-arc U-turn on a wide street.
@@ -192,7 +211,11 @@ export const SC_MANEUVER_UTURN: ScenarioSpec = {
     vehicleStart: "ready",
   },
   instructionsBg: [
-    { n: 1, textBg: "Приближи мястото за обръщане в дясната лента и спри спокойно, без бързане." },
+    {
+      n: 1,
+      textBg:
+        "Задачите са две и се броят поотделно: първо изходната позиция, после самото обръщане. Приближи мястото за обръщане в дясната лента и СПРИ спокойно, без бързане. Ако е тъмно, включи късите светлини — насрещните се преценяват само ако ги виждаш.",
+    },
     {
       n: 2,
       textBg:
@@ -216,13 +239,16 @@ export const SC_MANEUVER_UTURN: ScenarioSpec = {
   success: [
     {
       id: "sc-utn-approach",
-      titleBg: "Приближи мястото за обръщане и спри",
-      // Pull-up pose in the right (outer) lane at the turn corridor.
-      params: { kind: "reachZone", x: BLVD_LANE_OUT, y: 64, radiusM: 9, maxSpeedKmh: 20 },
+      titleBg: "Задача 1: спри в изходната позиция за обръщането",
+      // DOC 86 D11 — the title said „и спри" while the gate accepted 20 km/h.
+      // The recorded shadow stops at (12.19, 68) (traces/scManeuverUturn.ts),
+      // 4 m inside this radius-9 zone, so the cap costs the correct drive
+      // nothing and costs the drive-by the tick it never earned.
+      params: { kind: "reachZone", x: BLVD_LANE_OUT, y: 64, radiusM: 9, maxSpeedKmh: 6 },
     },
     {
       id: "sc-utn-turn",
-      titleBg: "Обърни посоката на 180° в едно движение",
+      titleBg: "Задача 2: обърни посоката на 180° в едно движение",
       // Corridor-locked threePointTurn (Наредба-38): reversed travel direction,
       // at rest inside the turn box facing back. On this WIDE boulevard the
       // reversal is a single forward arc — the evaluator reports movements = 1.
@@ -277,7 +303,22 @@ export const SC_MANEUVER_UTURN: ScenarioSpec = {
     { level: 1, toleranceScale: 1.5 },
     { level: 2, toleranceScale: 1.25 },
     { level: 3 },
-    { level: 4, vehicleStart: "cold" },
+    {
+      level: 4,
+      vehicleStart: "cold",
+      rubric: { economy: { objectiveId: "sc-utn-turn", attemptsFor3Stars: 1, attemptsFor2Stars: 1 } },
+    },
+    {
+      // L5 „Усложнени" (doc 86 L13 — this template had NO L5): the same
+      // boulevard at night. The single-arc U-turn crosses BOTH oncoming lanes
+      // and its whole safety case is „убеди се, че платното е чисто в двете
+      // посоки" — after dark that judgement is made on headlamps alone, from
+      // much further out. Lights duty stated in instruction 1 (doc 86 L10).
+      level: 5,
+      conditions: { night: true },
+      toleranceScale: 0.85,
+      rubric: { economy: { objectiveId: "sc-utn-turn", attemptsFor3Stars: 1, attemptsFor2Stars: 1 } },
+    },
   ],
   conditions: { weather: "dry" },
   localeBg: "bg-BG",

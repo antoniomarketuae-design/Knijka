@@ -1135,6 +1135,13 @@ gets Space-to-skip, a visible «Space = пропусни» hint, and a "don't sh
 
 ## 10. The invariant — `scenario-world-referent`, the CI gate
 
+> **STATUS, 2026-07-30: this gate is LIVE and ENFORCING.** Section 10 is the design as written
+> before the wave; **§12 is what it measured and what it now fails on.** Four predicates were
+> sharpened between wave 0 and wave 1 (T1, T4, T3b/S1, T8/B4) — each because a lane repaired the
+> defect at a layer the wave-0 predicate was not looking at. Every wave-0 predicate is retained
+> alongside as a `*raw` census row, and the reasoning is in `referents.ts` and in
+> `expected-failures.json`'s header. Read §12.2 before trusting any number in this section.
+
 This is the part that matters more than any single fix. It is what stops the next 150 from drifting
 the same way.
 
@@ -1260,6 +1267,9 @@ copy of the one before it.**
 | 4 | 12, 13, 14, 15 | L13, L14, L15, D7, D9, D11 + all content deepening | Lane 12 first, then 13/14 |
 | final | 0 | flip the gate from report-only to enforcing | after wave 3 |
 
+> **All six rows have run. See §12 for what actually closed (45 of 58), what did not (13), and the
+> twelve drives that demonstrate the difference.**
+
 **Total distinct defects: 58.** Twenty are a single line or number. Thirteen are one change in one
 engine or builder file that repairs 10–127 scenarios each. The remaining twenty-five are per-family
 authoring that the fix wave does alongside the content deepening the founder has already approved.
@@ -1269,3 +1279,161 @@ half of everything he reported: *grading without a world referent* (T1, T2, T4, 
 83, 12 and 12 scenarios) and *a guidance marker that does not know where the law is* (T3, T8, L5 —
 9, 154 and 8). Wave 1 lanes 1, 2 and 3 close both. **If nothing else in this plan ships, ship those
 three lanes and the gate.**
+
+---
+
+## 12. CLOSE-OUT — the wave, measured (2026-07-30)
+
+Fifteen lanes ran against the ledger. **The gate is now ENFORCING** (`WORLD_REFERENT_GATE=report`
+restores the wave-0 narration for a bisect). This section is the arbiter's report, not the lanes':
+where a lane said "done" and the gate disagreed, the gate is quoted.
+
+**Full gate, this tree:** `npx tsc --noEmit` exits **0**. `npx vitest run --maxWorkers=4` —
+**628 files passed, 9,479 tests passed, 165 skipped, 0 failed.**
+
+### 12.1 The headline
+
+| | wave 0 | now |
+|---|---|---|
+| **teaches-falsehood** (a code that CONVICTS on a world with no referent) | **1,090 rung-codes across 88 scenarios** | **113 across 29** |
+| codes that produce any falsehood at all | 10 of 45 | **5 of 45** |
+| S-class (structural) total | 63 | **53** |
+| catalog | 155 templates / 669 rungs | 157 / 687 |
+
+**89.6 % of the convicting falsehoods are gone.** The other 10.4 % are five codes, each named in
+`expected-failures.json` with an owner and a ledger id, each pinned so it can only fall.
+
+### 12.2 Per-class, wave-0 baseline vs now
+
+Measured by `world-referent.gate.test.ts` both times, same harness.
+
+| class | what it counts | wave 0 | now | |
+|---|---|---|---|---|
+| **T1** | district runs no lane-line pass at all | 90 | **0** | closed |
+| **T2** | compiled spawn already outside the lane-keep envelope | 31 | **31** | **not touched** |
+| **T3** | passSignal marker AUTHORED at (0,0) | 9 | **9** | see note |
+| **T3b** | marker the student SEES, past the graded stop line | 10 | **0** | closed |
+| **T4** | a route limit the world cannot state, or a plate that contradicts its road | 83 | **0** | closed |
+| T4raw | *wave-0 proxy: "some edge is not 50"* | 83 | 85 | no longer a defect |
+| **T6** | parked bodies inside a junction mouth | 58 bodies / 7 districts | **0** | closed (Lane 4's battery: 194 to 0 across 90 districts) |
+| **T8** | a speed cap the marker never states | 177 (all caps) | **0** | closed |
+| T8raw | *wave-0 proxy: capped reachZones* | 178 | 181 | a feature, once stated |
+| **T14** | warning post standing at the hazard instead of before it | 10 | **4** | partial |
+| **L2** | signal head below scenario scale on a graded route | 18 | **0** | closed |
+| **L3** | signalized crossing with no buildable pedestrian head | 5 | **5** | **not touched** |
+| **L10** | night/rain/fog graded with no lights instruction in the copy | 38 | **16** | partial |
+| **L12** | stages nothing at all, yet carries conflict codes | 56 | **56** | **not touched** |
+| **B1** | no automatic finish at all | 16 | **5** | closed (the 5 are single-objective routes, all rescued by Lane 6's terminal path) |
+| **B3** | finish radius below the lane pitch | 57 | **8** | closed |
+| **B4** | capped waypoint with no memory of a cap already honoured | 137 | **0** | closed |
+| B4raw | *wave-0 proxy: scenarios carrying a capped zone* | 137 | 139 | a feature |
+| **S1** | guidance marker past the line the same lesson grades | 12 | **2** | partial |
+| **S2** | spawns already in violation | 31 | **31** | **not touched** |
+| **S3** | terminability, static half | 73 | **13** | closed |
+| **S4** | two identical rungs | 146 | **1** | closed |
+| **S5** | obeying the objective's own cap still hits the walker | 8 | **6** | partial |
+
+Three notes the numbers need:
+
+- **T3 sits at 9 on purpose.** It reproduces this ledger's literal criterion — the *authored*
+  coordinate — and is the gate's proof that it agrees with the document rather than with itself.
+  Lane 2 did not re-author nine templates; it made the class **unauthorable**, resolving every
+  `passSignal` against the runtime's own stop lines. What ships is T3b, and T3b is 0. Expect this
+  row at 9 forever.
+- **T4raw / T8raw / B4raw rose by 2, 3 and 2.** That is exactly Lane 15's two new parking drills
+  (`sc-park-perp-forward`, `sc-park-parallel-exit`). Two new lessons, not two new defects — the
+  reason is written into `expected-failures.json` under `raised`, which the gate now requires
+  before it will accept a class that grew.
+- **Four predicates were sharpened, and each is argued in the code.** Wave 0 measured the template
+  where wave 1 measures the product: the lane-paint codes now read `tick.centreLinePainted` and are
+  *disarmed* by unpainted road instead of convicting on geometry; the speed rule finally implements
+  the sentence it always printed ("a face whose NUMBER equals `edge.maxspeed`") now that the kit has
+  thirteen numerals instead of one; guidance is queried with the context the scene actually passes;
+  and B4 probes the evaluator once, because one stateless `stepReachZone` broke all 137 at once and
+  one latch repaired all 137 at once. Every wave-0 predicate is retained as a `*raw` row — nothing
+  was deleted to make a number fall.
+
+### 12.3 Closed: 45 of 58
+
+**teaches-falsehood — 16 of 18.** T1, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T15, T16,
+T17, T18.
+
+**blocks-student — 9 of 9.** B1, B2, B3, B4, B5, B6, B7, B8, B9. *The only class closed outright.*
+
+**breaks-lesson — 11 of 17.** L1, L2, L5, L6, L7, L9, L13, L14, L15, L16, L17.
+
+**degrades / cosmetic — 9 of 14.** D1, D2, D3, D4, D5, D6, D9, D10, D11.
+
+### 12.4 Still open: 13 of 58 — with the reason, not an excuse
+
+| id | state | why it is still open |
+|---|---|---|
+| **T2** | **untouched, 31 scenarios / 15 districts** | The compiled spawn pose is 4.06 m off the lane centre against a 3.25 m envelope. Lane 1's brief called this "half of T2" and it built the paint half; nobody moved a spawn. This is the largest single unrepaired class in the document, and it fires 3.5 s into every one of those 31 drives. |
+| **T14** | partial, 10 to 4 | `zoneSigns.ts` gained the advance offset for water / ice / curve, but `sc-merge-motorway-exit`'s А1 still stands 1.0 m *past* the arc it warns about. Budgeted under `SPEED_TOO_FAST_FOR_CURVE`. |
+| **L3** | untouched, 5 | Structural, not per-district: neither `SignKind` nor `TrafficLightPlacement` has a pedestrian variant, and heads are synthesised from road nodes only. Every signalized crossing in the catalog is an unlit one. It needs a new sign kind, and no lane owned one. |
+| **L4** | partial, 2 of 3 | The регулировчик is scaled and re-posted; the **gesture-explanation bubble is not on screen**. It needs `traffic/TrafficLayer.tsx` (Lane 4's file) and Lane 9 correctly refused to cross the boundary. This is his third-most-repeated ask. |
+| **L8** | engine half only | Actor behaviour landed; the renderer must prefer the published `TrafficVehicleState.indicator` over its yaw-rate guess (`TrafficLayer.tsx:881-887`). One file, two lanes. |
+| **L10** | partial, 38 to 16 | 16 scenarios still grade a lights duty the copy never states. Budgeted across three codes. |
+| **L11** | engine seam only | The same cross-lane handoff as L8. |
+| **L12** | untouched, 56 | 56 scenarios stage nothing on any rung while carrying conflict codes. This is the INERT band's centre of gravity and no lane owned it. |
+| **D7** | authorable, not read | Lane 12 made `LevelSpec.rubric` and the par-time ladder authorable; two call sites still read `spec.rubric` directly and discard the override — `simulator/actions.ts` and its sibling. Neither file was Lane 12's. |
+| **D8** | untouched | `sc-sp-wet-limit-plate` still has nothing to fail at L1 / L2. |
+| **D12** | **UNVERIFIED** | `sc-ov-narrow`'s two escape paths were never swept. Do not tune blind — that is what this ledger said in July and it is still true. |
+| **C1** | **UNVERIFIED** | Rain still needs an R0 look-before-ship capture. Nobody rendered it. |
+| **C2** | untouched | Placeholder child and officer meshes. Art, not engineering — but it is one of the 58 and it is not done. |
+
+Two further honesty items the lanes declared themselves:
+
+- **No R0 look-before-ship capture was taken for the guidance renderer.** Lane 2's stop-line bar,
+  the radius-sized ring, the cap chip and the dimmed look-ahead ribbon are asserted by unit tests
+  and have **not been seen by a human**. Doc 66 R0 says look before shipping. Do that before the
+  founder replays 12.5.
+- **The INERT band (22,485 rung-codes) is NOT enforced.** An inert code is a declared surface the
+  world can never arm — a broken lesson, not a lie — and it is L12's mass. Enforcing it today would
+  mean allowlisting the catalog, which is not an escape hatch; it is a padlock on an open door.
+
+### 12.5 What to re-play first — 12 drives, not 154
+
+**Read this before you open the list.** Lane 15 inserted two new parking drills at positions 5 and
+6, so **every catalog position after 4 has shifted by +2**. Your #9 `sc-junction-stop` is now #11;
+your #29 `sc-pe-jaywalker` is #31; your #37 `sc-mw-discipline` is #39; your #50 `sc-ov-ban-overtake`
+is #52. The positions below are the NEW ones.
+
+One drive per repaired class, chosen so each shows a *different* fix. Nine of the twelve are
+scenarios you already played.
+
+| # | drive | the class it proves | what to look for |
+|---|---|---|---|
+| **11** | `sc-junction-stop` — **L1, then L2, then L3** | **S4 · a rung is now a different lesson** (146 to 1) and **T3b · the marker moved** | The green marker used to sit 27.7 m *inside* the box. It is now a bar across your lane at the stop line, 1–2 m before the paint. Then play L2 and L3 back to back: at wave 0, all three rungs were byte-identical on 146 of 155 templates. |
+| **12** | `sc-signal-response` | **L2 · signal heads** and **T8 · the cap is visible** | The lamp is no longer 1× on a 2.5× street. The marker now says «не по-бързо от N км/ч» out loud — that hidden number is what «стоях точно на кръга и нищо не стана» actually was. |
+| **19–20** | `sc-signal-dead` / `sc-signal-flashing` | **T7 · the stop line is where the paint is** | The demonstrated-correct ghost used to stop 8.2 m *past* the line. It now stops 1.8 m before it, and the witness release can fire from a lawful stop. A 10.0 m correction on both. |
+| **10** | `sc-junction-rhr` | **T4 · the signs stopped lying** and **T6 · you can see the conflict car** | This map wore three «50» plates on a 40 street; it now wears three В26-40. Six parked bodies came out of the junction mouth — 10 of 19 junction conflicts were *fully blocked* at 0.00 m before this wave. |
+| **39** | `sc-mw-discipline` | **T4 on a motorway** and **T16 · the осева reads differently from a lane divider** | Two «50» plates on a 140 road, now В26-140. |
+| **1** | `sc-park-perp-rev` | **T1 · lane paint** — your catalog position 1 | The parking aisles carry no осева, and the engine now *refuses* to convict there instead of billing you for crossing a line nobody drew. 90 scenarios were graded against invisible paint; the number is 0. |
+| **5–6** | `sc-park-perp-forward`, `sc-park-parallel-exit` | **D11 · parking depth** | Two drills that did not exist. Every maneuver drill's first task used to be satisfiable at 15 km/h; now none is. |
+| **112** | `sc-pe-parked-row-scan` | **T11 · the inverted fault surface** | At the taught speed you used to *hit* the child; at an illegal speed you cleared him and were billed nothing. The collision band now starts at 36 km/h, and the release gives 12.2 m of margin instead of −1.1 m. |
+| **40 + 43** | `sc-follow-distance`, `sc-follow-rain-gap` | **T18 · the following gap** | The shipped "correct" shadow was driving at 1.23 s and 1.30 s — *inside* the fire line. They now hold 2.60 s and 3.35 s. `sc-follow-rain-gap` is the worse of the two and is not in this ledger's body: a lesson teaching "at least 3 s in the wet" was demonstrating 1.30 s. |
+| **92** | `sc-sig-green-wave` on **Начинаещ** | **B7 · structurally unwinnable** | The tier cap was 40 km/h against a wave solved for 50. The second and third greens were unreachable on every rung. |
+| — | **Урок 1** (the pre-drive) | **D9 · thirteen shortcuts become a mouse** | The tutorial popup: an illustration, the WHY, the law, and one button. Your first instinct was to skip the lesson; this is the redesign. |
+| — | **Урок 2 «Кръстовища и предимство»** | **D9 · the «огледай» cue** | You asked for it three times and it already existed — gated to 6 rungs of 679. It is now on 465 rungs and all 8 curriculum lessons. |
+
+If you have half an hour: **11 (all three rungs), 12, 112, 40, and Урок 1.** Those five cover rung
+distinctness, the marker, the sign kit, the inverted fault surface, the following gap and the
+pre-drive — six of the eight classes behind more than half of everything you reported.
+
+### 12.6 The wave is PARTIAL, and this is the tail
+
+Nine of the fifteen lanes reported partial. **Forty-five defects are closed and thirteen are not.**
+One severity class is finished outright — every blocks-student defect, B1 through B9. Ranked by what
+a student actually feels, here is the rest:
+
+1. **T2** — 31 scenarios convict 3.5 s after first movement. Move the spawns.
+2. **L12** — 56 scenarios stage nothing while grading conflict.
+3. **L10** — 16 scenarios bill an основна fault for a duty the copy never states.
+4. **L4 bubble + L8 / L11 indicator** — three items, one file (`TrafficLayer.tsx`), one lane.
+5. **D7 read side** — two call sites, and the rung rubric starts working.
+6. **L3** — one new `SignKind`, and every signalized crossing stops lying.
+7. **T14 / D8 / D12 / C1 / C2** — one scenario each, or a capture nobody has taken.
+
+Nothing on that list is a research problem. The gate now fails on all of it, which is the only
+reason it will get done.

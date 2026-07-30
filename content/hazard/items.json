@@ -55,9 +55,9 @@
         "tracePath": "content/traces/sc-pe-parked-row-scan/mistake-fast-row.trace.json"
       },
       "clipStartSec": 0,
-      "faultSec": 7.57,
-      "windowOpenSec": 3.57,
-      "cutSec": 7.57,
+      "faultSec": 7.53,
+      "windowOpenSec": 3.53,
+      "cutSec": 7.53,
       "difficulty": 2,
       "titleBg": "Улица с непрекъсната редица паркирани коли",
       "briefBg": "Квартална улица, отдясно има плътна редица паркирани коли. Караш в дясната лента, около 50.",

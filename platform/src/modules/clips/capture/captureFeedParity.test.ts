@@ -143,6 +143,15 @@ function buildCaptureStack(clipId: string): CaptureStack {
   runtime.setCyclistQuery((px, py, h, r) => traffic.cyclistNear(px, py, h, r));
   runtime.setOvertakenQuery((px, py, h, r) => traffic.overtakenNear(px, py, h, r));
 
+  // KNOWN DIVERGENCE, left deliberately (ledger T17 surfaced it; it is not this
+  // lane's to close). The capture CLIENT re-enacts a clip against
+  // `clipStagedOverrideFor` when the demo was recorded on a demo-only rig
+  // (clip-capture-client.tsx:266); this harness stages the compiled DRILL rig
+  // instead. The two used to agree by coincidence. Wiring the override in here
+  // was tried and it flips `sc-roundabout-entry__m1`'s checklist from
+  // present:false to present:true — an R0 EVIDENCE assertion owned by the
+  // roundabout family — so the harness keeps the drill rig and the divergence is
+  // recorded rather than papered over.
   const stagedEvents = lesson.stagedEvents ?? [];
   const director =
     stagedEvents.length > 0
@@ -257,8 +266,17 @@ describe("sc-follow-distance__m0 (R0 PASS reference)", () => {
     const lead = walk.tracks.get("sc-fd-lead")!;
     expect(lead.firstMoveSec).not.toBeNull();
     expect(lead.firstMoveSec!).toBeLessThan(4);
+    // RE-BASELINED for ledger T17 (doc 86 §2), measured 29.89 m (was ~13).
+    // The drill's lead is no longer a matchPlayer rubber band pinned 13 m ahead
+    // — it is a scheduled cruise handed over 33 m ahead at 7.2 m/s, which is
+    // what lets a live student open the gap by lifting off. This harness stages
+    // that DRILL rig (see the divergence note in buildCaptureStack); the shipped
+    // clip re-enacts the 5.75 m demo rig instead, so the frame the founder
+    // reviews is unchanged. The band still proves the thing it exists to prove:
+    // the lead ARMED, MOVED, and is ahead of the ghost at the fault rather than
+    // parked at its hold pose 45 m up the road.
     expect(lead.distToGhostAtFault).toBeGreaterThan(4);
-    expect(lead.distToGhostAtFault).toBeLessThan(20);
+    expect(lead.distToGhostAtFault).toBeLessThan(35);
   });
 
   it("the honest checklist marks the lead PRESENT (in frame at the beat)", () => {

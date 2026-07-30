@@ -23,12 +23,20 @@ import {
   Minimap,
   ObjectiveBanner,
   PreDriveChecklist,
+  readStoredFlag,
   selectOverlay,
   SessionEndScreen,
+  SESSION_END_AUTO_DEFAULT,
+  SESSION_END_AUTO_STORAGE_KEY,
+  shouldShowDebrief,
+  shouldShowEndBar,
   SimOverlay,
   StatusDashboard,
   telltaleWarningsKey,
+  TOAST_QUIET_DEFAULT,
+  TOAST_QUIET_STORAGE_KEY,
   useHudToastQueue,
+  writeStoredFlag,
   type DashboardStatus,
   type MinimapFrame,
   type ObjectiveFlash,
@@ -734,7 +742,7 @@ export function LessonPlayShell({
   // I2 „Твоят дубъл": did this attempt actually upload a trace? Only then does
   // the replay route have something to load.
   const [traceUploaded, setTraceUploaded] = useState(false);
-  const { toasts, push, clear } = useHudToastQueue();
+  const { toasts, push, dismiss, clear } = useHudToastQueue();
 
   // -- S1: scenario sessions (<templateId>@L<n>) --------------------------------
   // The template (rubric + teach copy), a live ATTEMPT recorder the scene
@@ -865,6 +873,41 @@ export function LessonPlayShell({
   const [endExpanded, setEndExpanded] = useState(false);
   // A detail sheet is open → the scene's own corner chrome stands down too.
   const [overlaySheetOpen, setOverlaySheetOpen] = useState(false);
+
+  // -- Doc 86 L14/L15: the ROOMY notification settings -------------------------
+  //
+  // The comment above ("ROOMY LAYOUTS ARE UNTOUCHED") described the mobile
+  // wave's scope, and doc 86 L14 is what that scope cost: desktop is the
+  // surface the founder actually reviewed on, and there the four-card,
+  // click-proof toast column and the self-opening debrief were still exactly as
+  // he found them. These two settings are the roomy answer — the queue grammar
+  // stays a phone thing, but „dismissible", „fewer", „smaller" and „let me turn
+  // it off" now apply to both device classes.
+  //
+  // Both are lazy `useState` initializers reading localStorage, which is safe
+  // for the same reason `readStoredQuizFrequency` is: this shell only ever
+  // mounts client-side, after the student picks a lesson.
+  const [toastsQuiet, setToastsQuiet] = useState<boolean>(() =>
+    readStoredFlag(TOAST_QUIET_STORAGE_KEY, TOAST_QUIET_DEFAULT),
+  );
+  const toggleToastsQuiet = useCallback(() => {
+    setToastsQuiet((on) => {
+      const next = !on;
+      writeStoredFlag(TOAST_QUIET_STORAGE_KEY, next);
+      return next;
+    });
+  }, []);
+  const [endAutoOpen, setEndAutoOpen] = useState<boolean>(() =>
+    readStoredFlag(SESSION_END_AUTO_STORAGE_KEY, SESSION_END_AUTO_DEFAULT),
+  );
+  const setEndAutoOpenPersisted = useCallback((next: boolean) => {
+    setEndAutoOpen(next);
+    writeStoredFlag(SESSION_END_AUTO_STORAGE_KEY, next);
+  }, []);
+  // Session-local: „I skipped the debrief for THIS run." Distinct from the
+  // persisted setting on purpose — skipping once must not silently rewrite a
+  // preference, and re-opening once must not silently restore one.
+  const [endSkipped, setEndSkipped] = useState(false);
   // Armed cabin faults, sampled at the status bar's own cadence. Only the
   // ARMED SET matters, so the key comparison keeps this from re-rendering the
   // shell every 150 ms (the TelltaleEdgePings precedent).
@@ -1345,6 +1388,10 @@ export function LessonPlayShell({
     // A fresh run starts with a clean rail: no end line, no debrief left open
     // from the previous attempt.
     setEndExpanded(false);
+    // …and no skip carried over from it either (L15): the next result is a new
+    // result, and the persisted setting is the only thing allowed to outlive a
+    // run.
+    setEndSkipped(false);
     // I1: a fresh attempt is a fresh prediction — the gate asks again.
     setCalibrationDone(false);
     setTraceUploaded(false);
@@ -1733,6 +1780,33 @@ export function LessonPlayShell({
 
   const overlay = selectOverlay(overlayCandidates);
 
+  // -- L15: is the full-frame debrief on screen? --------------------------------
+  //
+  // One pure predicate, two call sites, and a complement that guarantees the
+  // student always has a route back to the explanation. `resultHeld` is folded
+  // in deliberately: the I1 calibration gate is a REQUIRED step, so it outranks
+  // „не показвай автоматично" — without that, a student who once turned the
+  // popup off would silently never be asked to self-assess again, and the end
+  // bar would summarise a verdict the gate exists to hide.
+  const debriefVisibility = {
+    ended: ended && result !== null,
+    compact,
+    expanded: endExpanded,
+    skipped: endSkipped,
+    autoOpen: endAutoOpen,
+    held: resultHeld,
+  };
+  const debriefOpen = shouldShowDebrief(debriefVisibility);
+  const endBarVisible = shouldShowEndBar(debriefVisibility);
+  const skipDebrief = useCallback(() => {
+    setEndExpanded(false);
+    setEndSkipped(true);
+  }, []);
+  const openDebrief = useCallback(() => {
+    setEndExpanded(true);
+    setEndSkipped(false);
+  }, []);
+
   const menuItems = ended
     ? [{ key: "exit", labelBg: "← Всички уроци", onSelect: onExitToSelect }]
     : [
@@ -1900,6 +1974,26 @@ export function LessonPlayShell({
               {!examMode && !mistakeMode ? (
                 <QuizFrequencySelector value={quizFreq} onChange={setQuizFreq} />
               ) : null}
+              {/* Doc 86 L14 — „По-тихи известия". Not gated on examMode or the
+                  sandbox: the toast column runs in both, and the founder's
+                  complaint („much much annoying") was about the column, not
+                  about a mode. Quiet drops the „Браво" cards and shows one at a
+                  time; a graded mistake keeps its title, its authored WHY and
+                  its law chip in every mode, which is why this is a noise
+                  control and not a teaching control. */}
+              <button
+                type="button"
+                aria-pressed={toastsQuiet}
+                onClick={toggleToastsQuiet}
+                title="По-тихи известия: едно по едно, без похвалите. Грешките и обясненията към тях остават."
+                className={`rounded-xl border px-3 py-1.5 text-xs font-bold transition motion-reduce:transition-none ${
+                  toastsQuiet
+                    ? "border-accent/60 bg-accent/15 text-accent"
+                    : "border-border bg-surface text-muted hover:text-foreground"
+                }`}
+              >
+                Известия {toastsQuiet ? "тихо" : "нормално"}
+              </button>
               {lesson.objectives.length === 0 ? (
                 <button type="button" className="btn-accent px-4 py-1.5 text-xs" onClick={finishNow}>
                   Завърши сесията
@@ -2084,12 +2178,24 @@ export function LessonPlayShell({
           ) : null}
         </div>
 
-        {/* Toasts — right side. ROOMY ONLY: four stacked 288 px cards is a
-            column, not a hint, and on a 393 px phone it is most of the screen.
-            Compact feeds the same events into the queue, one line at a time. */}
+        {/* Toasts — right side. ROOMY ONLY; compact feeds the same events into
+            the queue, one line at a time.
+
+            Doc 86 L14: what used to stand here was four stacked 288 px cards
+            that no click could touch — „much much annoying". Now: at most two
+            240 px cards (one in „по-тихи известия"), each a button that removes
+            itself, plus a „изчисти" control once there is more than one. The
+            authored explanation and the law chip ride in every card in every
+            mode — that is the whole product (THEO-4), and it is praise, never
+            teaching, that quiet mode drops. */}
         {compact ? null : (
           <div className="absolute right-3 top-3">
-            <HudToasts toasts={toasts} />
+            <HudToasts
+              toasts={toasts}
+              quiet={toastsQuiet}
+              onDismiss={dismiss}
+              onDismissAll={clear}
+            />
           </div>
         )}
 
@@ -2370,7 +2476,12 @@ export function LessonPlayShell({
             calibration gate, the mistake map, the concepts and every CTA are
             all still here, in the same order, one tap in.
             Roomy layouts open it directly, as before. */}
-        {ended && result && (!compact || endExpanded) ? (
+        {/* L15 — ROOMY: the popup is no longer unconditional. `shouldShowDebrief`
+            (pure, hud/hudPreferences.ts) folds four facts into one answer:
+            ended, compact, „I opened it", „I skipped it", and the persisted
+            „Показвай разбора автоматично". Compact behaviour is byte-for-byte
+            what it was — tap-to-open only. */}
+        {debriefOpen && result ? (
           <div className="absolute inset-0 z-40 flex items-start justify-center overflow-y-auto bg-background/85 p-4 backdrop-blur-sm sm:p-6">
             <div className="flex w-full max-w-2xl flex-col gap-3">
               {compact ? (
@@ -2467,7 +2578,80 @@ export function LessonPlayShell({
                 // district polylines (LessonScene builds them once) — a static
                 // fit-to-route view needs nothing else.
                 mapPolylines={minimapFrame?.polylines ?? null}
+                // L15: Space skips, the note says so, and the setting in that
+                // note stops the popup opening itself from the next lesson on.
+                // Roomy only — compact already reaches this screen by an
+                // explicit tap, so there is nothing there to skip (the „▾ Скрий
+                // разбора" button above IS its close control) — and never while
+                // the calibration gate holds the result.
+                onSkip={!compact && !resultHeld ? skipDebrief : null}
+                autoOpen={endAutoOpen}
+                onAutoOpenChange={
+                  !compact && !resultHeld ? setEndAutoOpenPersisted : null
+                }
               />
+            </div>
+          </div>
+        ) : null}
+
+        {/* L15 — WHAT REPLACES THE POPUP.
+            A roomy student who pressed Space, or who turned the popup off for
+            good, still has to be able to (a) see that the session ended and how
+            it went, (b) reach the law-cited explanation, and (c) act.
+            THEO-4 is why (b) is not optional: „Неиздържан" on its own is a bare
+            verdict, which requirement zero forbids anywhere, ever — so „Виж
+            разбора" is the accented button on this bar, and it is the same
+            screen, unchanged, one click away.
+
+            Bottom-centred, above the instrument band, so it never covers the
+            dashboard the founder asked to be the anchor. */}
+        {endBarVisible && result ? (
+          <div
+            data-hud="end-bar"
+            className="pointer-events-none absolute inset-x-0 z-30 flex justify-center px-4"
+            style={{ bottom: "calc(var(--sim-dash-h, 0px) + 0.75rem)" }}
+          >
+            <div
+              className="pointer-events-auto flex flex-wrap items-center gap-3 rounded-2xl border bg-background/90 px-4 py-2.5 backdrop-blur"
+              style={{
+                borderColor: `color-mix(in srgb, ${
+                  result.aborted
+                    ? "var(--warning)"
+                    : result.passed
+                      ? "var(--success)"
+                      : "var(--warning)"
+                } 55%, transparent)`,
+              }}
+              role="status"
+            >
+              <span
+                className="text-sm font-black"
+                style={{
+                  color: result.passed && !result.aborted ? "var(--success)" : "var(--warning)",
+                }}
+              >
+                {result.aborted
+                  ? "Прекратена сесия"
+                  : result.passed
+                    ? "Издържан"
+                    : "Неиздържан"}
+              </span>
+              <span className="text-xs font-bold tabular-nums text-muted">
+                {result.score} нак. точки
+              </span>
+              <button type="button" className="btn-accent px-4 py-1.5 text-xs" onClick={openDebrief}>
+                Виж разбора
+              </button>
+              <button type="button" className="btn-ghost px-3 py-1.5 text-xs" onClick={retry}>
+                Повтори
+              </button>
+              <button
+                type="button"
+                className="btn-ghost px-3 py-1.5 text-xs"
+                onClick={onExitToSelect}
+              >
+                Всички уроци
+              </button>
             </div>
           </div>
         ) : null}

@@ -313,13 +313,22 @@ export const SC_OV_LANE_KEEPING: ScenarioSpec = {
 // live session exactly as in the demos. The flow direction is world truth:
 // М10 „right-only" arrows are painted in the approach lane before the mouth
 // (meta.scenario.laneArrows — the SN-04 machinery). The sign kit ships no
-// В2/Д face yet, so the arrows are the honest visible cue; the copy teaches
-// reading them (and the В2 rule in the teach block for the real street).
+// В1/Д4 face yet, so the arrows are the honest visible cue; the copy teaches
+// reading them (and the В1 rule in the teach block for the real street).
+//
+// LEDGER T13 (doc 86 §2): the copy used to cite В2 for what is В1.
+// content/signs/signs.json is authoritative — В1 = „Забранено е влизането на
+// пътни превозни средства" (the ONE-WAY MOUTH sign, the exit of a one-way
+// street), В2 = „…в двете посоки" (a road closed to everyone, both ways).
+// The world was already right: props.ts posts `noEntry` at the illegal west
+// mouth. Only the two strings were wrong, and a student who memorised them
+// would answer the листовка question wrong.
 // ---------------------------------------------------------------------------
 
 /** OV-13 — влизане в еднопосочна улица само по посока на движението (ЗДвП
- *  чл. 6; знак В2 „Влизането забранено" / стрелките на платното) — на
- *  Т-кръстовище, където грешният вход е напълно възможен и затова е урок. */
+ *  чл. 6; знак В1 „Забранено е влизането на пътни превозни средства" /
+ *  стрелките на платното) — на Т-кръстовище, където грешният вход е напълно
+ *  възможен и затова е урок. */
 export const SC_OV_ONEWAY: ScenarioSpec = {
   id: "sc-ov-oneway",
   family: "lanes",
@@ -344,7 +353,7 @@ export const SC_OV_ONEWAY: ScenarioSpec = {
     { n: 1, textBg: "Потегли по подхода — напред улицата свършва в Т-кръстовище с еднопосочна улица." },
     { n: 2, textBg: "Чети платното отдалеч: стрелките „само надясно“ в твоята лента казват, че напречната улица се движи само на изток." },
     { n: 3, textBg: "Намали преди кръстовището, десен мигач и завий НАДЯСНО — по посоката на движението." },
-    { n: 4, textBg: "Наляво НЕ се влиза: там щеше да си срещу насрещните, които нямат как да те очакват. На реалната улица този вход носи знак В2 „Влизането забранено“." },
+    { n: 4, textBg: "Наляво НЕ се влиза: там щеше да си срещу насрещните, които нямат как да те очакват. На реалната улица този вход носи знак В1 „Забранено е влизането на пътни превозни средства“ — знакът, който стои на изхода на еднопосочната." },
     { n: 5, textBg: "Продължи по еднопосочната до края — движението по нея е само в разрешената посока." },
   ],
   success: [
@@ -393,7 +402,7 @@ export const SC_OV_ONEWAY: ScenarioSpec = {
   ],
   teach: {
     whenBg:
-      "На всеки вход на улица — особено в центъра и кварталите, където еднопосочните са гъсти. Преди да завиеш, прочети входа: знак В2 „Влизането забранено“, знак Д за посоката или стрелките на платното казват откъде се влиза и откъде — никога.",
+      "На всеки вход на улица — особено в центъра и кварталите, където еднопосочните са гъсти. Преди да завиеш, прочети входа: знак В1 „Забранено е влизането на пътни превозни средства“ на изхода ѝ, знак Д4 „Еднопосочно движение“ на входа ѝ или стрелките на платното казват откъде се влиза и откъде — никога. (В2 е друг знак: той затваря пътя в ДВЕТЕ посоки, не само срещу теб.)",
     whyBg:
       "Движението срещу еднопосочното е особено опасно, защото водачите насреща карат с очакването, че никой няма да се появи насреща им — реакцията им закъснява фатално. Затова законът го нарежда сред грешките, които прекратяват изпита начаса: изборът на вход е избор преди маневрата, не поправка след нея.",
     lawRef: "ЗДвП чл. 6",
@@ -439,7 +448,31 @@ const OVC_LEAD_CAR: BrakingLeadCarSpec = {
     extraRightOffsetM: 0, // right-lane center (the lead being cut back in front of)
     colorIndex: 2,
   },
-  followGapM: 16, // pace ~16 m AHEAD, matchPlayer — safe from FOLLOWING_TOO_CLOSE, inside the crossing-overtake gate
+  // LEDGER T18 (doc 86 §2). This was 16 m of centres = 11.9 m of bumpers, i.e.
+  // FOLLOWING_TOO_CLOSE above 34.0 km/h — on a street posted 50, in a lesson
+  // whose OWN approach gate authorised 55. Measured through the recorder, the
+  // shipped shadow held 1.86 s and the two mistake demos 1.42 / 1.62 s against
+  // the 1.26 s fire line: a following bill was one hesitant beat from leaking
+  // into demos that must grade OVERTAKING_AT_CROSSING and nothing else.
+  //
+  // 20 m of centres = 13.9 m of bumpers at the seeded worst case → the
+  // threshold moves to 39.7 km/h, and sc-ovc-approach's cap drops 55 → 30 (see
+  // there), so the fastest speed this lesson AUTHORISES is now 9.7 km/h below
+  // the slowest speed at which it can bill a following fault. Measured after:
+  // shadow 2.37 s, demos 1.93 / 2.13 s, both still grading their exact code.
+  //
+  // 20 IS THE CEILING, and it was found by bisection, not taste: at 22 the
+  // „Изпреварване в последния момент" demo stops grading OVERTAKING_AT_CROSSING
+  // and at 26 both demos do — push the lead further out and the cut-back the
+  // чл. 119 detector reads is no longer a cut-back in front of anything. The
+  // residual (39.7 km/h < the posted 50) is recorded rather than hidden: it
+  // cannot be closed from this file without re-choreographing both demos.
+  //
+  // The rubber band stays. This lead is not a gap drill's lead, it is the car
+  // being illegally passed, and the demos' cut-back needs it where the tape
+  // expects it (Lane 7's own contract note: scheduledCruise is for drills that
+  // grade a GAP).
+  followGapM: 20,
   maxMatchSpeedMps: 12, // 43 km/h — holds the gap at the ~35 km/h approach
   slamAt: { x: 12.19, y: 520 }, // far past the 320 m road — never reached
   slamRadiusM: 2,
@@ -482,8 +515,16 @@ export const SC_OV_CROSSING_OVERTAKE: ScenarioSpec = {
   success: [
     {
       id: "sc-ovc-approach",
-      titleBg: "Приближи пътеката в дясната лента зад предния",
-      params: { kind: "reachZone", x: OVC_RIGHT, y: 170, radiusM: 6, maxSpeedKmh: 55 },
+      titleBg: "Приближи пътеката в дясната лента зад предния — под 30 км/ч",
+      // LEDGER T18 / north star: the cap was 55 km/h. On a street posted 50,
+      // fifty metres before a pedestrian crossing, that gate was telling the
+      // student that 55 is an acceptable approach speed — a falsehood in its
+      // own right, and it sat ABOVE the speed at which the drill's own lead
+      // billed FOLLOWING_TOO_CLOSE (34.0 km/h then, 39.7 now). 30 km/h is what
+      // instruction 3 already asks for («намали и остани зад него»), it is what
+      // the shipped shadow drives (26 km/h at this gate), and it puts the
+      // lesson's authorised speed safely below its own fault threshold.
+      params: { kind: "reachZone", x: OVC_RIGHT, y: 170, radiusM: 6, maxSpeedKmh: 30 },
     },
     {
       id: "sc-ovc-finish",
@@ -604,8 +645,16 @@ export const SC_OV_NARROW: ScenarioSpec = {
   success: [
     {
       id: "sc-ovn-wait",
-      titleBg: "Изчакай на разширението преди стеснението",
-      params: { kind: "reachZone", x: 4.06, y: 100, radiusM: 10, maxSpeedKmh: 30 },
+      titleBg: "Спри и изчакай на разширението (под 6 км/ч)",
+      // LEDGER D3 (doc 86 §5): the cap was 30 km/h under a title that says
+      // «Изчакай» and an instruction that says «Спри». 30 km/h is not waiting —
+      // it is rolling through the passing place at the exact speed that makes
+      // the narrow meeting a head-on. The gate now measures the act it names:
+      // ≤ 6 km/h is a stop (the same halt band sc-jxb-hold / sc-pesp-halt use).
+      // The shipped shadow already comes to a full 0.00 km/h inside this zone
+      // (content/traces/sc-ov-narrow/shadow-correct.trace.json — 317 samples in
+      // radius, minimum 0.00), so the tightening costs no re-record.
+      params: { kind: "reachZone", x: 4.06, y: 100, radiusM: 10, maxSpeedKmh: 6 },
     },
     {
       id: "sc-ovn-finish",
@@ -978,14 +1027,87 @@ export const SC_OV_BUS_LANE: ScenarioSpec = {
 // (the busLane data seam, mirrored): sustained DRIVING in it grades the
 // опасна EMERGENCY_LANE_DRIVING (ЗДвП чл. 58, т. 3 — VERIFIED against the
 // content bank), with NO indicator exemption (a signalled undertake is still
-// the fault; contrast the bus lane's legal right-turn transit). The
-// breakdown SCENE the demos pass (a stalled car ON the emergency lane) is a
-// recorder obstacle rect — trace/demo data, NOT map data (the
-// sc-hazard-obstacle precedent; the live map hosts only the road).
+// the fault; contrast the bus lane's legal right-turn transit).
+//
+// LEDGER T15 (doc 86 §2) — THE BROKEN-DOWN CAR NOW EXISTS.
+// This template used to have no `staged` field at all. The stalled car lived
+// ONLY as a recorder obstacle rect (traces/scMwEmergencyLane.ts), i.e. in the
+// two demo recordings — while instruction 3 and the objective title told the
+// LIVE student to «подмини авариралата кола», and the mistake copy told him
+// «точно там може да стои аварирала кола с хора около нея». A 17-year-old
+// cannot tell the simulator is lying to him; he learns that the emergency lane
+// is an empty strip of tarmac with a rule attached, which is the opposite of
+// why the rule exists. MWE_BREAKDOWN below puts a real body at the coordinate
+// the demos already used, so the sentence the lesson says is true.
 // ---------------------------------------------------------------------------
 
 /** mw-v1 northbound cruise-lane center (meta.scenario — the L7 copy truth). */
 const MW_X_CRUISE = 0;
+/** mw-v1 EMERGENCY-lane center (meta.scenario.laneEmergencyX) — where the
+ *  stalled car stands, and the default lane the mw-n-nb-* path resolves to
+ *  (sc-fo-motorway-gap shifts −8.13 off it to reach the cruise lane). */
+const MW_X_EMERG = 8.13;
+/** Arc offset of the breakdown along mw-n-nb-start → mw-n-nb-end. The edge
+ *  runs (0,0) → (0,1000), so arc = y: 780 is the coordinate the recorder's
+ *  `mwBreakdownRects()` has always used. */
+const MWE_BREAKDOWN_Y = 780;
+
+/**
+ * THE STALLED CAR — a staged actor that is never commanded and therefore never
+ * moves: the doc 72 OV-18 „stage() with a hold pose" prop pattern that
+ * `narrowMeeting.props` uses for its parked row, expressed on the one staged
+ * kind a template can author standalone.
+ *
+ * HOW IT STAYS PUT, spelled out because it is the whole trick:
+ *  - `armDistM: 0` — `BrakingLeadCarRunner.step()` releases only when
+ *    `dist(player, actor) <= releaseDistM`, and `s.armDistM ?? …` keeps the
+ *    authored 0 (nullish coalescing, not `||`). A distance is never ≤ 0, so the
+ *    runner sits in `phase: "armed"` for the whole drive, issues NO command and
+ *    emits NO SimTickEvent. Nothing can grade off it except physical contact.
+ *  - belt and braces, in case a future runner change ever releases it:
+ *    `paceMode: "scheduledCruise"` with `paceSpeedMps: 0` and
+ *    `actor.cruiseSpeedMps: 0` mean every command path it could take —
+ *    `commandPace`, and the post-resolution `{type:"cruise"}` with no argument —
+ *    resolves to a target speed of 0.
+ *  - the slam tier is authored out of the map (y = 1400 on a 1000 m road,
+ *    `minSlamSpeedKmh` 250), the same OVC/FD mold every non-braking lead uses.
+ *
+ * WHY IT IS SAFE FOR THE THREE COMMITTED DRIVES: it stands at x = 8.13 while
+ * the shadow runs x = 0 — 8.13 m of lateral separation, far outside both the
+ * contact envelope and `LEAD_CORRIDOR_M` 1.8, so it opens no lead-gap channel
+ * and no following code. Both mistake demos leave the emergency lane by
+ * y ≈ 700/730, i.e. ≥ 50 m short of it, exactly as their scripts were written.
+ * The recorder keeps its ObstacleRect2D twin at the same coordinate (the
+ * sc-ed-poligon-chain „headless twin" pattern) so the trace channel is
+ * unchanged.
+ *
+ * WHY IT IS THE RIGHT FIX AND NOT DRESSING: it is a hittable body. A live
+ * student who undertakes down the shoulder at 100 km/h now meets the thing the
+ * ban exists for, instead of gliding through the story of it.
+ */
+const MWE_BREAKDOWN: BrakingLeadCarSpec = {
+  id: "sc-mwe-breakdown",
+  kind: "brakingLeadCar",
+  actor: {
+    pathNodes: ["mw-n-nb-start", "mw-n-nb-end"],
+    hold: { nodeIndex: 0, offsetM: MWE_BREAKDOWN_Y }, // (8.13, 780) — the emergency lane
+    cruiseSpeedMps: 0, // it is broken down; it has no cruise
+    extraRightOffsetM: 0, // the path's own default lane IS the emergency lane
+    colorIndex: 4,
+  },
+  followGapM: 0,
+  maxMatchSpeedMps: 0,
+  armDistM: 0, // never arms — see the header
+  paceMode: "scheduledCruise",
+  paceSpeedMps: 0,
+  slamAt: { x: MW_X_EMERG, y: 1400 }, // far past the 1000 m segment — never reached
+  slamRadiusM: 2,
+  slamDecelMps2: 6,
+  minSlamSpeedKmh: 250,
+  proximityFallbackM: 0.3,
+  triggersHazard: false,
+  resumeAfterSec: 3,
+};
 
 /**
  * Чл. 58, т. 3 — движение по лентата за принудително спиране е забранено
@@ -1026,9 +1148,10 @@ export const SC_MW_EMERGENCY_LANE: ScenarioSpec = {
     {
       id: "sc-mwe-pass",
       titleBg: "Подмини авариралата кола в лентата за движение",
-      // Just past the breakdown scene (the demos stage it at y = 780 on the
-      // emergency lane, x = 8.13): radius 6 pins the CRUISE lane — a car
-      // riding the emergency lane misses it.
+      // Just past the breakdown scene (MWE_BREAKDOWN stands at y = 780 on the
+      // emergency lane, x = 8.13 — live since ledger T15, and the recorder's
+      // rect twin sits on the same coordinate): radius 6 pins the CRUISE lane —
+      // a car riding the emergency lane misses it.
       params: { kind: "reachZone", x: MW_X_CRUISE, y: 830, radiusM: 6 },
     },
     {
@@ -1073,6 +1196,7 @@ export const SC_MW_EMERGENCY_LANE: ScenarioSpec = {
     { level: 3 },
     { level: 4, vehicleStart: "cold" },
   ],
+  staged: [MWE_BREAKDOWN], // ledger T15 — the car the copy has always narrated
   conditions: { weather: "dry" },
   localeBg: "bg-BG",
 };

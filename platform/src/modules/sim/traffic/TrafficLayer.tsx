@@ -81,7 +81,13 @@ import {
   type HazardStimulusSpec,
   type SignalPhase,
 } from "../contracts";
-import type { TrafficDistrict, TrafficSystem, TrafficUpdateContext } from "./types";
+import { edgeTravelHalfWidth, nodeOpenRadiusM } from "../world/builders/network";
+import type {
+  DistrictEdge,
+  TrafficDistrict,
+  TrafficSystem,
+  TrafficUpdateContext,
+} from "./types";
 import {
   assignCivilianModel,
   BOXY_MAX_INSTANCES,
@@ -241,6 +247,173 @@ const PARK_CAP = 150;
 /** Stable default for the optional clear-zone prop (memo identity). */
 const EMPTY_CLEAR_ZONES: readonly ParkedClearZoneLike[] = [];
 
+// --- ЗДвП чл. 98 legality of the curb pass (doc 86 T6 / L9 / D10) -----------
+//
+// The curb walk used to measure from the RAW edge polyline: it started
+// slotting bodies PARK_END_MARGIN_M = 11 m from the node while the road
+// ribbon is trimmed at the junction mouth `nodeOpenRadiusM` (up to 27.125 m
+// on an arterial X). Slots at arc 11 / 17.6 / 24.2 therefore landed on the
+// junction APRON — no carriageway drawn under them, sitting straight across
+// the give-way sightline every junction lesson grades, and modelling parking
+// INSIDE an intersection as ordinary street scenery. Census on the seven
+// junction districts: 45 such bodies (doc 86 §2 T6 says 58 because it applied
+// the arterial 27.125 m mouth to all seven; three of them are residential-
+// cornered and trim at 17.125 m).
+//
+// The two frames are now the SAME frame. The lawful band on an edge starts at
+// the junction mouth `nodeOpenRadiusM` opens — the SAME call analyzeNetwork
+// trims ribbons with and buildLaneGraph stops NPCs at — minus чл. 98's two
+// no-parking bands:
+//   • within 5 m of a junction  (ЗДвП чл. 98 ал. 1 т. 2) — the same 5 m the
+//     world builder already insets the painted parking band by
+//     (world/builders/constants PARKING_LANE_END_INSET_M), so the bodies now
+//     stand exactly where the paint says they may. Tested twice: along the
+//     edge's own arclength from each of its two end nodes, AND radially
+//     against every degree >= 3 node in the district — чл. 98 measures from
+//     the corner of the intersecting roads, so a body on an edge that merely
+//     PASSES a junction (real-OSM district-v1 has three such nodes) is just
+//     as illegal as one on an arm of it;
+//   • on a pedestrian crossing or within 5 m of one (чл. 98 ал. 1 т. 1) —
+//     applied SYMMETRICALLY, because a two-way street parks cars facing both
+//     ways and the occlusion harm the rule exists to prevent is symmetric.
+// Both bands are widened by the body's own half-length so a FOOTPRINT, not a
+// centre, stays out of them.
+//
+// A third rule closes the case the first two cannot see: a body must not sit
+// on ANY edge's travel carriageway, not merely off its own. The curb offset is
+// computed per edge, so where two carriageways run close (mw-exit-v1's exit
+// ramp leaves the 3-lane motorway at the gore and passes straight under the
+// motorway's own curb band) the pass seated bodies in the neighbouring road.
+// Measured: `content/traces/sc-merge-motorway-exit/shadow-correct.trace.json`
+// — the DEMONSTRATED-CORRECT drive — put 15 samples inside the footprint of
+// the body at (14.19, 850.60), driving the ghost through a parked car.
+//
+// All three run AFTER the deterministic hash walk (the same law the
+// clearZones filter follows): slot indices, hashes, models and every
+// surviving body's coordinates are byte-identical. Total across the 90
+// committed districts: 4011 bodies before, 3723 after.
+//
+// ONE honest exception to "it can only remove": PARK_CAP truncates the walk
+// at 150 bodies, so on a district that hits the cap a removal earlier in the
+// walk lets a later, LAWFUL slot through that the cap used to cut off. Four
+// districts are affected — `poligon-v1` (150 -> 134) and `sig-wave-v1`
+// (150 -> 119) now fall under the cap; `d2-v1` and `district-v1` still cap at
+// 150 with 33 and 48 of those bodies newly reached. The cap is arbitrary
+// truncation, so trading a body inside a junction for a body further down a
+// legal curb is the right trade; it is recorded here because it is the only
+// place the surviving SET is not a strict subset.
+
+/** Worst-case parked-body half-length of the civilian kit, m. */
+const PARKED_HALF_LEN_M = 2.25;
+/** Parked-body half-width, m (world/builders/constants sizes the parking band
+ *  against this same 0.95). */
+const PARKED_HALF_W_M = 0.95;
+/** ЗДвП чл. 98 no-parking band before a junction / a pedestrian crossing, m.
+ *  Same value as world/builders/constants PARKING_LANE_END_INSET_M. */
+const PARK_LEGAL_CLEAR_M = 5;
+/** Half the zebra's extent along the road (world ZEBRA_LENGTH_M / 2), m. */
+const ZEBRA_HALF_LEN_M = 3;
+/** A crossing's own footprint + чл. 98's 5 m + the body half-length. */
+export const PARK_CROSSING_CLEAR_M =
+  ZEBRA_HALF_LEN_M + PARK_LEGAL_CLEAR_M + PARKED_HALF_LEN_M;
+/** A junction mouth's чл. 98 band + the body half-length. */
+export const PARK_JUNCTION_CLEAR_M = PARK_LEGAL_CLEAR_M + PARKED_HALF_LEN_M;
+
+/** Arclength of `p` projected onto a polyline, plus its perpendicular miss. */
+function projectArc(geo: readonly number[][], px: number, py: number): {
+  s: number;
+  dist: number;
+} {
+  let bestS = 0;
+  let bestD2 = Infinity;
+  let arc = 0;
+  for (let i = 0; i < geo.length - 1; i++) {
+    const ax = geo[i][0];
+    const ay = geo[i][1];
+    const bx = geo[i + 1][0] - ax;
+    const by = geo[i + 1][1] - ay;
+    const len2 = bx * bx + by * by;
+    let t = len2 > 0 ? ((px - ax) * bx + (py - ay) * by) / len2 : 0;
+    t = t < 0 ? 0 : t > 1 ? 1 : t;
+    const qx = ax + bx * t;
+    const qy = ay + by * t;
+    const d2 = (px - qx) * (px - qx) + (py - qy) * (py - qy);
+    if (d2 < bestD2) {
+      bestD2 = d2;
+      bestS = arc + Math.sqrt(len2) * t;
+    }
+    arc += Math.sqrt(len2);
+  }
+  return { s: bestS, dist: Math.sqrt(bestD2) };
+}
+
+/**
+ * Per-node drawn junction open radius — `nodeOpenRadiusM` over the edges that
+ * actually touch each node. The SAME call `analyzeNetwork` trims ribbons with
+ * and `buildLaneGraph` stops NPCs at, so decoration, asphalt and traffic all
+ * read one junction mouth.
+ */
+function junctionRadiiOf(district: TrafficDistrict): {
+  byNode: Map<string, number>;
+  /** Degree >= 3 nodes only, with their чл. 98 keep-out circle. */
+  keepOut: Array<{ x: number; y: number; r: number }>;
+} {
+  const touching = new Map<string, DistrictEdge[]>();
+  for (const edge of district.roads?.edges ?? []) {
+    for (const id of [edge.from, edge.to]) {
+      let bucket = touching.get(id);
+      if (!bucket) touching.set(id, (bucket = []));
+      bucket.push(edge);
+    }
+  }
+  const byNode = new Map<string, number>();
+  const pos = new Map((district.roads?.nodes ?? []).map((n) => [n.id, n]));
+  const keepOut: Array<{ x: number; y: number; r: number }> = [];
+  for (const [id, touched] of touching) {
+    const r = nodeOpenRadiusM(touched, touched.length);
+    byNode.set(id, r);
+    const p = pos.get(id);
+    if (touched.length >= 3 && p) {
+      keepOut.push({ x: p.x, y: p.y, r: r + PARK_JUNCTION_CLEAR_M });
+    }
+  }
+  return { byNode, keepOut };
+}
+
+/**
+ * True when a body centred at (px, py) would overlap the DRIVEN carriageway of
+ * any edge — its own included. Travel half-width only (`edgeTravelHalfWidth`):
+ * the curbside parking band is exactly where a parked car belongs, so a body
+ * inside its own band must stay.
+ */
+function onAnyCarriageway(
+  edges: readonly DistrictEdge[],
+  px: number,
+  py: number,
+): boolean {
+  for (const other of edges) {
+    const geo = other.geometry;
+    if (!geo || geo.length < 2) continue;
+    const limit = edgeTravelHalfWidth(other) + PARKED_HALF_W_M;
+    // Cheap reject on the polyline's bounding box before the segment walk.
+    let minX = Infinity;
+    let maxX = -Infinity;
+    let minY = Infinity;
+    let maxY = -Infinity;
+    for (const p of geo) {
+      if (p[0] < minX) minX = p[0];
+      if (p[0] > maxX) maxX = p[0];
+      if (p[1] < minY) minY = p[1];
+      if (p[1] > maxY) maxY = p[1];
+    }
+    if (px < minX - limit || px > maxX + limit || py < minY - limit || py > maxY + limit) {
+      continue;
+    }
+    if (projectArc(geo, px, py).dist < limit) return true;
+  }
+  return false;
+}
+
 export interface ParkedCar {
   x: number;
   y: number;
@@ -261,11 +434,19 @@ export interface ParkedClearZoneLike {
 }
 
 /**
- * The deterministic curb pass. `clearZones` (doc 66 R5, founder v1 №9 — the
- * junction-corner car both sc-junction-stop ghost lines drove through) drops
- * any slot whose center falls inside a zone AFTER the hash walk, so every
- * other body keeps its exact position — templates without zones render
- * byte-identically.
+ * The deterministic curb pass.
+ *
+ * Placement is a pure hash walk along each parkable edge — unchanged since
+ * the pass shipped. Everything else is a FILTER applied after the walk, so
+ * slot indices, model picks and every surviving body's coordinates are
+ * byte-identical to the unfiltered pass; a filter can only remove:
+ *
+ *  1. the ЗДвП чл. 98 legality bands (doc 86 T6/L9/D10 — see the block
+ *     comment above): every junction mouth, every authored pedestrian
+ *     crossing, and every other edge's travel carriageway;
+ *  2. `clearZones` — the SCENARIO-side corridors the district cannot know
+ *     about (scene/scenarioSceneryProps.parkedClearZonesFor derives one per
+ *     staged pedestrian's authored walk line). `[]` = today's placement.
  */
 export function computeParkedCars(
   district: TrafficDistrict,
@@ -274,6 +455,7 @@ export function computeParkedCars(
 ): ParkedCar[] {
   const out: ParkedCar[] = [];
   const edges = district.roads?.edges ?? [];
+  const junctionRadii = junctionRadiiOf(district);
   for (let e = 0; e < edges.length; e++) {
     const edge = edges[e];
     if (edge.roundabout) continue;
@@ -287,6 +469,26 @@ export function computeParkedCars(
       total += Math.hypot(geo[s + 1][0] - geo[s][0], geo[s + 1][1] - geo[s][1]);
     }
     if (total < 2 * PARK_END_MARGIN_M + PARK_SPACING_M) continue;
+
+    // The junction mouths this edge runs between (the SAME nodeOpenRadiusM
+    // the ribbon is trimmed at and NPCs stop at), pulled in by чл. 98's 5 m
+    // junction band and the body's own half-length. Deliberately the
+    // UNCLAMPED radius, not analyzeNetwork's `JUNCTION_TRIM_MAX_FRACTION`
+    // clamp: on a short stub the ribbon is drawn further in than the mouth,
+    // but чл. 98 measures from the corner of the intersecting roads, not from
+    // wherever the asphalt happened to be cut.
+    const lawfulFrom = (junctionRadii.byNode.get(edge.from) ?? 0) + PARK_JUNCTION_CLEAR_M;
+    const lawfulTo = total - (junctionRadii.byNode.get(edge.to) ?? 0) - PARK_JUNCTION_CLEAR_M;
+
+    // Arclengths of this edge's authored pedestrian crossings (the 25 m miss
+    // guard is markings.ts's own data-glitch guard, same frame, same rule).
+    const crossingArcs: number[] = [];
+    for (const crossing of district.crossings ?? []) {
+      if (crossing.edgeId !== edge.id) continue;
+      const proj = projectArc(geo, crossing.x, crossing.y);
+      if (proj.dist > 25) continue;
+      crossingArcs.push(proj.s);
+    }
 
     const offset = laneWidthM * Math.max(1, edge.lanes) * 0.5 + PARK_BAND_CENTER_M;
     const stop = total - PARK_END_MARGIN_M;
@@ -308,10 +510,18 @@ export function computeParkedCars(
         const t = nextAt - arc;
         // Deterministic hash: skip ~1 in 5 slots for natural gaps + pick model.
         const h = ((e * 73856093) ^ (slot * 19349663)) >>> 0;
-        if (h % 5 !== 0) {
+        const lawful =
+          nextAt >= lawfulFrom &&
+          nextAt <= lawfulTo &&
+          !crossingArcs.some((cs) => Math.abs(nextAt - cs) < PARK_CROSSING_CLEAR_M);
+        if (h % 5 !== 0 && lawful) {
           const px = ax + dx * t + nx * offset;
           const py = ay + dy * t + ny * offset;
-          if (!clearZones.some((z) => Math.hypot(px - z.x, py - z.y) < z.radiusM)) {
+          if (
+            !junctionRadii.keepOut.some((j) => Math.hypot(px - j.x, py - j.y) < j.r) &&
+            !onAnyCarriageway(edges, px, py) &&
+            !clearZones.some((z) => Math.hypot(px - z.x, py - z.y) < z.radiusM)
+          ) {
             out.push({
               x: px,
               y: py,

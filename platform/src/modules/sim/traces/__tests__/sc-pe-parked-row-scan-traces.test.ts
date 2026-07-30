@@ -63,11 +63,20 @@ describe("sc-pe-parked-row-scan — the shadow gate (doc 76 §5)", () => {
 });
 
 describe("sc-pe-parked-row-scan — mistake demos grade their exact codes (doc 76 §9 stage 5)", () => {
-  it("„50 покрай редицата“: exactly SPEEDING_OVER_LIMIT + COLLISION, no too-fast, no not-yielded", () => {
+  // doc 86 T11 — RE-BASELINED, deliberately. This assertion used to demand
+  // `not.toContain("PEDESTRIAN_CROSSING_TOO_FAST")`, and the only reason the
+  // demo satisfied it was the template's `roadFromM 4.0`: 2.4 m past the real
+  // carriageway edge (9.73 − 8.125 = 1.605), which kept `pedestrianOnCrossing`
+  // false while the child was already on the tarmac inside the driver's lane.
+  // That same lie is what made the drill's fault surface run backwards — the
+  // obedient 32 km/h driver collided and the 40–50 km/h driver was billed
+  // nothing. With the honest occupancy window the fast-row demo now grades the
+  // чл. 119 approach code as well, which is what the drive actually did.
+  it("„50 покрай редицата“: exactly SPEEDING_OVER_LIMIT + PEDESTRIAN_CROSSING_TOO_FAST + COLLISION, никога dangerous/not-yielded", () => {
     const drive = drives.get("mistake-fast-row")!;
     const codes = [...new Set(violationCodes(drive))].sort();
     expect(codes).toEqual([...SC_PE_PARKED_ROW_SCAN.mistakes[0].codeRefs].sort());
-    expect(codes).not.toContain("PEDESTRIAN_CROSSING_TOO_FAST");
+    expect(codes).toContain("PEDESTRIAN_CROSSING_TOO_FAST");
     expect(codes).not.toContain("PEDESTRIAN_NOT_YIELDED");
     expect(codes).not.toContain("SPEEDING_DANGEROUS");
   });

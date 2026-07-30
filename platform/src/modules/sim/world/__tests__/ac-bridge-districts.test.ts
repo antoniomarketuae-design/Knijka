@@ -159,16 +159,24 @@ describe(`${ID} through the world builder`, () => {
     expect(west).toHaveLength(2);
   });
 
-  it("THE POST: the А15 „Опасност от хлъзгане“ stands at the NEAR abutment", () => {
-    // Placed by the shipped zone-sign pass (builders/zoneSigns.ts: icePatch →
+  it("THE POST: the А15 „Опасност от хлъзгане“ stands 60 m BEFORE the near abutment", () => {
+    // Placed by the zone-sign pass (builders/zoneSigns.ts: icePatch →
     // "slippery") from the SAME span that drives the physics rig — the approach
     // warning and the ice are one authored fact, so they cannot drift apart.
+    //
+    // RE-BASELINED (doc 86 T14): the post used to stand AT `DECK_FROM`, i.e. on
+    // the deck's first metre. A warning whose only job is „намали ПРЕДИ" is
+    // worthless at the hazard, and the graded slow-down gate (sc-acbi-before,
+    // y=235) sits UPSTREAM of the deck at 250 — so the world's only cue arrived
+    // after the grading window closed. It now leads the ice by
+    // HAZARD_WARNING_AHEAD_M, which puts it 45 m before that gate.
     expect(world.stats.signs.slippery).toBe(1);
     const post = world.signs.find((s) => s.kind === "slippery")!;
     expect(post).toBeDefined();
     expect(post.position[0]).toBeGreaterThan(0); // right of travel
     // District arclength s maps to world z = -s (the zone-signs convention).
-    expect(post.position[2]).toBeCloseTo(-DECK_FROM, 1);
+    expect(post.position[2]).toBeCloseTo(-(DECK_FROM - 60), 1);
+    expect(post.position[2]).toBeGreaterThan(-235); // ahead of the graded gate
   });
 
   it("pins the scenario payload the template denormalizes", () => {

@@ -50,6 +50,36 @@ export {
 } from "./overlayQueue";
 export { ObjectiveBanner, type ObjectiveFlash } from "./ObjectiveBanner";
 export { HudToasts, useHudToastQueue, type HudToast } from "./HudToasts";
+// Doc 86 L14/L15 — the DESKTOP half of the notification rework: a dismissible,
+// two-card, 240 px toast column with a „по-тихи известия" setting, and an
+// end-of-lesson debrief that Space skips and a setting can stop auto-opening.
+export {
+  hudToastCarriesWhy,
+  parseStoredFlag,
+  quietSuppresses,
+  readStoredFlag,
+  serializeFlag,
+  shouldShowDebrief,
+  shouldShowEndBar,
+  toastCapacity,
+  toastColumnFraction,
+  visibleToasts,
+  writeStoredFlag,
+  QUIET_SUPPRESSED_KINDS,
+  ROOMY_MIN_WIDTH_PX,
+  SESSION_END_AUTO_DEFAULT,
+  SESSION_END_AUTO_STORAGE_KEY,
+  SESSION_END_SKIP_HINT_BG,
+  TOAST_CARD_WIDTH_CLASS,
+  TOAST_CARD_WIDTH_PX,
+  TOAST_COLUMN_MAX_FRACTION,
+  TOAST_MAX_VISIBLE,
+  TOAST_QUIET_DEFAULT,
+  TOAST_QUIET_MAX_VISIBLE,
+  TOAST_QUIET_STORAGE_KEY,
+  type DebriefVisibility,
+  type HudToastKind,
+} from "./hudPreferences";
 export {
   Minimap,
   MistakeMap,

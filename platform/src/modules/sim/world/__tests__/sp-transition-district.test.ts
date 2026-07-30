@@ -211,12 +211,20 @@ describe("sp-creep2-v1 — the P5 long creep road (doc 62 #30)", () => {
     const district = assertDistrict(loadRaw(CREEP2));
     const world = buildWorldGeometry(district, { seed: 7 });
     const plates = world.signs.filter((s) => s.kind === "limit50");
-    // The В26-50 posts ONCE, at the south entry where the creep begins — and at
-    // scenario prominence (lessonSized) so it reads against the 2.5× road, not
-    // miniature at the spawn as it shipped.
-    expect(plates.length).toBe(1);
-    expect(world.stats.signs.limit50).toBe(1);
+    // RE-BASELINED 1 -> 2 by doc 86 D6. The В26-50 still posts at the south
+    // entry where the creep begins, at scenario prominence (lessonSized) so it
+    // reads against the 2.5× road. The SECOND is the mid-route transition
+    // plate for the opposite direction of travel: a driver leaving the зона-30
+    // northbound— sorry, southbound — is back on a 50 road and the world now
+    // says so. Both state a limit their own edge really carries, which is the
+    // whole point of the lane (sign-truth.test.ts proves it over all 90 maps).
+    expect(plates.length).toBe(2);
+    expect(world.stats.signs.limit50).toBe(2);
     expect(plates.every((s) => s.scale === SCENARIO_SIGN_SCALE)).toBe(true);
+    // …and the зона-30 is finally signed as 30 instead of being graded silently
+    // (props.ts iterated deadEnds only, so a degree-2 limit change was
+    // structurally unreachable — doc 86 D6).
+    expect(world.stats.signs.limit30).toBeGreaterThanOrEqual(1);
     // NONE rides the 30 zone: local y > transitionY maps to world z < -400
     // (toWorld: y → -z). The reduced-zone tail no longer wears a 50 it would
     // overstate — the scenario audit the clip doubles as.

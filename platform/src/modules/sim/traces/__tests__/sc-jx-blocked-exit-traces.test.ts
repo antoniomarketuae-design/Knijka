@@ -50,9 +50,20 @@ const NAMES: ScJxBlockedExitTraceName[] = [
 
 /** sx-v1: the ns south-approach stop line and the staged column's rest pose. */
 const STOP_LINE_Y = -27.73;
-const QUEUE_TAIL_Y = 16;
+/**
+ * T12 (ledger §2): 16 → 31. Both ribbons on sx-v1 are cut 27.125 m from
+ * sx-n-c, so the junction is a 54.25 m open square and a car resting at y = 16
+ * spanned 13.95 … 18.05 — 9.1 m SHORT of the far mouth, i.e. parked in the
+ * middle of the intersection, in the lesson about not standing in one. At 31
+ * the column spans 28.95 … 33.05: 1.23 m clear of the paint at 27.725.
+ */
+const QUEUE_TAIL_Y = 31;
+/** Bumper-kiss rest = tail − (4.1 m of car + the 1.1 m standstill gap). */
+const KISS_Y = QUEUE_TAIL_Y - 5.2;
 /** The far mouth of the junction on the ns axis (stop lines sit ±27.725 m). */
 const FAR_MOUTH_Y = 27.725;
+/** Half a car, m — the free space test below is „less than one car fits". */
+const CAR_HALF_M = 2.05;
 
 type LineCrossing = Extract<SimTickEvent, { kind: "stopLineCrossed" }>;
 
@@ -249,11 +260,22 @@ describe("pinned geometry — the template copies match the committed map", () =
     expect(tail.kind).toBe("brakingLeadCar");
     if (tail.kind !== "brakingLeadCar") return;
     expect(tail.actor.hold.offsetM).toBe(QUEUE_TAIL_Y);
-    // The whole design in one assertion: the column stands PAST the crossing
-    // roadway (so the exit is what is full, not the junction) but SHORT of the
-    // far stop line (so following it in strands you inside the box).
-    expect(tail.actor.hold.offsetM).toBeGreaterThan(0);
-    expect(tail.actor.hold.offsetM).toBeLessThan(FAR_MOUTH_Y);
+    /**
+     * T12 — the whole design in three assertions, and the one that used to be
+     * INVERTED. The old test demanded `offsetM < FAR_MOUTH_Y`, i.e. it pinned
+     * the column INSIDE the junction square and called that „past the crossing
+     * roadway". It is the opposite:
+     *   1. the column's whole body must be PAST the far paint — it is the
+     *      queue beyond the junction, not scenery parked in one (чл. 98);
+     *   2. but the free space between the mouth and its bumper must be under
+     *      one car length, or a driver who enters simply fits and the drill
+     *      has no premise;
+     *   3. so the follower's bumper-kiss rest lands INSIDE the square.
+     */
+    expect(tail.actor.hold.offsetM - CAR_HALF_M).toBeGreaterThan(FAR_MOUTH_Y);
+    expect(tail.actor.hold.offsetM - CAR_HALF_M - FAR_MOUTH_Y).toBeLessThan(4.1);
+    expect(KISS_Y + CAR_HALF_M).toBeLessThan(FAR_MOUTH_Y + CAR_HALF_M);
+    expect(KISS_Y - CAR_HALF_M).toBeGreaterThan(0);
     // The "slam" IS the hold pose — the column is already stopped on arrival.
     expect(tail.slamAt).toEqual({ x: 4.06, y: tail.actor.hold.offsetM });
     // …and its path is the district's own northbound ns road, through the node.
@@ -280,13 +302,16 @@ describe("pinned geometry — the template copies match the committed map", () =
 
   it("the ruleConfig widens JU-09's flag past the pinned wait geometry, and nothing else", () => {
     // The override is scenario-scoped and single-purpose. It must cover the
-    // measured 41.44 m the column stands at when the player waits at the line
-    // (mouth 27.725 m + 16 m tail − the 1.8 m hold setback − 4.1 m of car), and
-    // it must NOT reach the 115 m the column is gone to by the next green — the
-    // release that re-arms the detector.
-    expect(SC_JX_BLOCKED_EXIT.ruleConfig).toEqual({ hesitationClearGapM: 48 });
+    // bumper gap the column stands at while the player waits at the line
+    // (tail − hold pose − 4.1 m of car), and it must NOT reach the ~130 m the
+    // column is gone to by the next green — the release that re-arms JU-09.
+    // T12 moved the tail 16 → 31, so the covered gap moves 41.44 → 56.4 and
+    // the flag moves 48 → 63, keeping the same ~6.6 m of margin.
+    const waitGapM = QUEUE_TAIL_Y - -29.5 - 4.1;
+    expect(waitGapM).toBeCloseTo(56.4, 2);
+    expect(SC_JX_BLOCKED_EXIT.ruleConfig).toEqual({ hesitationClearGapM: 63 });
     const flag = SC_JX_BLOCKED_EXIT.ruleConfig!.hesitationClearGapM!;
-    expect(flag).toBeGreaterThan(41.44);
-    expect(flag).toBeLessThan(115.4);
+    expect(flag).toBeGreaterThan(waitGapM);
+    expect(flag).toBeLessThan(waitGapM + 12);
   });
 });

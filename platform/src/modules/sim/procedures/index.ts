@@ -19,16 +19,30 @@ export {
   observeControlSignal,
   PRE_DRIVE_INFO_STEPS,
   PRE_DRIVE_STEP_CONTROLS,
+  preDrivePrimaryInput,
   preDriveStepKind,
   readyToMoveOff,
   resolveHotspotName,
   type CockpitHotspotName,
   type NamedNode,
   type PreDriveControlSignal,
+  type PreDrivePrimaryInput,
   type PreDriveSignalTracker,
   type PreDriveStepControl,
   type PreDriveStepKind,
 } from "./performedSteps";
+
+// D9 (founder 2026-07-30): the per-step tutorial — why / how / remember, a
+// still illustration today and a 10–15 s clip the day one is generated.
+export {
+  PRE_DRIVE_TUTORIAL_CLIPS,
+  PRE_DRIVE_TUTORIALS,
+  preDriveTutorialLaw,
+  preDriveTutorialMedia,
+  type PreDriveTutorial,
+  type PreDriveTutorialClip,
+  type PreDriveTutorialMedia,
+} from "./tutorial";
 
 export {
   applyPreDriveAction,

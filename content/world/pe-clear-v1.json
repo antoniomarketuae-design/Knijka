@@ -2,13 +2,13 @@
  "format": "district-v1",
  "meta": {
   "district": "pe-clear",
-  "label": "Учебна улица — изчакай пътеката (сценарий PE-03)",
+  "label": "Търговска отсечка с пешеходна пътека (сценарий PE-03)",
   "mapKind": "scenario-street",
   "generator": "tools/maps/gen_pe_crossings.mjs",
   "boundsLocalMeters": {
-   "minX": -26,
+   "minX": -30,
    "minY": 0,
-   "maxX": 14.125,
+   "maxX": 24,
    "maxY": 150
   },
   "attribution": {
@@ -28,7 +28,7 @@
    "edges": 1,
    "intersections": 0,
    "crossings": 1,
-   "buildings": 1,
+   "buildings": 4,
    "spawnPoints": 2
   },
   "scenario": {
@@ -38,6 +38,8 @@
     "signalized": "no",
     "approachM": 90
    },
+   "streetscape": "corner-shop-terrace",
+   "streetscapeNoteBg": "Търговска отсечка: магазини от двете страни, затова на пътеката ПОСТОЯННО има хора — изчакването е нормата, не изключението.",
    "primaryCrossingId": "pe-x-1",
    "laneCenterRightM": 4.06,
    "crossings": [
@@ -123,6 +125,75 @@
     [
      -26,
      68
+    ]
+   ]
+  },
+  {
+   "id": "pe-b-terrace-w",
+   "height": 11,
+   "heightSource": "default",
+   "footprint": [
+    [
+     -30,
+     72
+    ],
+    [
+     -13,
+     72
+    ],
+    [
+     -13,
+     106
+    ],
+    [
+     -30,
+     106
+    ]
+   ]
+  },
+  {
+   "id": "pe-b-kiosk-e",
+   "height": 3,
+   "heightSource": "default",
+   "footprint": [
+    [
+     13,
+     76
+    ],
+    [
+     17.5,
+     76
+    ],
+    [
+     17.5,
+     82
+    ],
+    [
+     13,
+     82
+    ]
+   ]
+  },
+  {
+   "id": "pe-b-arcade-e",
+   "height": 8,
+   "heightSource": "default",
+   "footprint": [
+    [
+     13,
+     96
+    ],
+    [
+     24,
+     96
+    ],
+    [
+     24,
+     124
+    ],
+    [
+     13,
+     124
     ]
    ]
   }

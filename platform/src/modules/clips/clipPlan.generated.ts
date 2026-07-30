@@ -556,7 +556,7 @@ export const CLIP_PLAN: readonly ClipPlanEntry[] = [
     "templateId": "sc-pe-parked-row-scan",
     "mistakeIndex": 0,
     "tracePath": "content/traces/sc-pe-parked-row-scan/mistake-fast-row.trace.json",
-    "faultTimeSec": 7.57,
+    "faultTimeSec": 7.53,
     "requiredActors": [
       {
         "kind": "pedestrian",
@@ -564,12 +564,16 @@ export const CLIP_PLAN: readonly ClipPlanEntry[] = [
       }
     ],
     "governingControl": {
-      "kind": "none",
-      "label": "Няма"
+      "kind": "marking",
+      "label": "Пешеходна пътека тип „зебра“",
+      "approxPos": {
+        "x": 0,
+        "y": 78
+      }
     },
     "view": "exterior+dashboard",
     "camera": "chase",
-    "notes": "Превишена скорост без изводимо ограничение от картата — знакът не е изведен; Управляващ елемент: няма — правило за поведение (без знак/сигнал); Скоростна грешка (R4/5) — километражът на лентата на таблото я показва"
+    "notes": "Превишена скорост без изводимо ограничение от картата — знакът не е изведен; Скоростна грешка (R4/5) — километражът на лентата на таблото я показва"
   },
   {
     "id": "sc-pe-zone-living__m0",
@@ -577,12 +581,7 @@ export const CLIP_PLAN: readonly ClipPlanEntry[] = [
     "mistakeIndex": 0,
     "tracePath": "content/traces/sc-pe-zone-living/mistake-city-speed.trace.json",
     "faultTimeSec": 12.22,
-    "requiredActors": [
-      {
-        "kind": "pedestrian",
-        "label": "Пешеходец, който стъпва на пътеката"
-      }
-    ],
+    "requiredActors": [],
     "governingControl": {
       "kind": "none",
       "label": "Няма"
@@ -742,13 +741,13 @@ export const CLIP_PLAN: readonly ClipPlanEntry[] = [
       "kind": "sign",
       "label": "Знак В26 (30 км/ч)",
       "approxPos": {
-        "x": 4.06,
-        "y": 400
+        "x": 8.93,
+        "y": 406
       }
     },
     "view": "exterior+dashboard",
     "camera": "chase",
-    "notes": "СЪДЪРЖАНИЕ: „Знак В26 (30 км/ч)“ няма рендиран стълб (limit30) до очакваната позиция — камерата няма какво да покаже; Скоростна грешка (R4/5) — километражът на лентата на таблото я показва"
+    "notes": "Скоростна грешка (R4/5) — километражът на лентата на таблото я показва"
   },
   {
     "id": "sc-speed-rain__m0",
@@ -762,7 +761,7 @@ export const CLIP_PLAN: readonly ClipPlanEntry[] = [
       "label": "Знак В26 (50 км/ч)",
       "approxPos": {
         "x": 8.93,
-        "y": 14
+        "y": 45
       }
     },
     "view": "exterior+dashboard",

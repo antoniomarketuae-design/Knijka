@@ -311,8 +311,20 @@ export const SC_SIG_GREEN_WAVE: ScenarioSpec = {
   ],
   success: [
     {
+      /**
+       * D3 (ledger §5) — the title said «на зелено» and the gate cannot see a
+       * lamp. `passSignal` tracks PROGRESSION only: objectives.ts explicitly
+       * documents that „running the red still COMPLETES a plain passSignal",
+       * so a driver who crossed this line on red got a green tick reading
+       * „Премини първия светофар НА ЗЕЛЕНО" — the checklist certifying the
+       * exact thing he did not do. `requireRedMet` is the wrong tool here (it
+       * demands a red be MET, which is the opposite of a wave) and there is no
+       * `requireGreen`, so the honest fix is the title: it now names the act
+       * the gate measures, and the conditional fact that makes the drill work.
+       * The lamp is still graded — by RED_LIGHT_CROSSED, where it belongs.
+       */
       id: "sc-sgw-tl1",
-      titleBg: "Премини първия светофар на зелено",
+      titleBg: "Премини първия светофар — при равномерни 50 той те посреща зелен",
       params: { kind: "passSignal", nodeId: "sw-n-tl1", x: 0, y: 0, radiusM: 40, control: "trafficLight" },
     },
     {
@@ -325,8 +337,10 @@ export const SC_SIG_GREEN_WAVE: ScenarioSpec = {
       params: { kind: "reachZone", x: WAVE_LANE, y: 132, radiusM: 10, maxSpeedKmh: 53 },
     },
     {
+      // D3: same correction as sc-sgw-tl1 — the gate measures the crossing,
+      // not the colour it happened under.
       id: "sc-sgw-tl3",
-      titleBg: "Излез и от третия светофар на зелено",
+      titleBg: "Излез и от третия светофар — вълната свършва тук",
       params: { kind: "passSignal", nodeId: "sw-n-tl3", x: 0, y: 528, radiusM: 40, control: "trafficLight" },
     },
   ],
@@ -435,9 +449,27 @@ export const SC_SIG_CONTROLLER_LIVE_EVENT: TrafficControllerSpec = {
   libraryEventId: "JU-18",
   signalNodeId: "sx-n-c",
   junction: { x: 0, y: 0 },
-  // The junction-center post, facing the south approach the officer talks to
-  // for the whole drill — first waving it through, then stopping it.
-  officer: { x: 0, y: 0 },
+  /**
+   * L4 (ledger §4) — (0, 0) → (0, −11), the fix sc-signal-controller already
+   * carries and this spec never received.
+   *
+   * At the junction CENTRE the officer stood 27.7 m beyond the south stop
+   * line, i.e. 27.7 m past the point at which the student has to read him. At
+   * the decision frame he was a ~30-pixel figure against the far kerb — and
+   * this drill's whole subject is a permission that contradicts the lamp, so
+   * the one thing the student must be able to see is the man. At (0, −11) he
+   * is 16.7 m from the line, 4 m off the player's lane centre, roughly twice
+   * the apparent height and dead centre of the chase frame — and, which
+   * matters more, unmistakably addressing THIS approach, which is where a real
+   * регулировчик stands when he holds an axis.
+   *
+   * PURELY VISUAL by construction: TrafficControllerRunner uses `officer` only
+   * to stage the figure's standing path (speed 0, pose "directTraffic"). Every
+   * graded quantity comes from `signalNodeId` / `junction` / `lineDistM` and
+   * the cluster's controller schedule, none of which moved — the trace gate
+   * re-proves all three drives' exact codes.
+   */
+  officer: { x: 0, y: -11 },
   facing: { x: 0, y: -1 },
   haltedGroup: "ew",
   flipAtSec: 26,
@@ -489,16 +521,17 @@ export const SC_SIG_CONTROLLER_LIVE: ScenarioSpec = {
     {
       n: 3,
       textBg:
-        "Твоята лампа свети ЧЕРВЕНО, а регулировчикът е отворил твоята посока. Приближи с намалена скорост, огледай се и премини — червеното не е забрана срещу неговото разрешение.",
+        "Твоята лампа свети ЧЕРВЕНО, а регулировчикът стои със СТРАНИЧЕН ПРОФИЛ към теб: минаваш ти и всички по твоята посока, а напречното направление — онова, което вижда гърдите му — спира. Предимството е твое. Приближи с намалена скорост, огледай се и премини.",
     },
     {
       n: 4,
       textBg:
-        "Не чакай „своето“ зелено. Регулировчикът пуска посоките една по една: докато гледаш лампата, той вече е отворил напречното направление — и тогава зеленото пред теб не разрешава нищо.",
+        "Не чакай „своето“ зелено. Регулировчикът пуска посоките една по една: вдигне ли РЪКА нагоре, спират всички — това е смяна на фазите, не покана; после се обръща с гърди към теб и от този момент спираш ти, колкото и зелено да светне пред теб.",
     },
     {
       n: 5,
-      textBg: "Премини кръстовището спокойно и продължи на север.",
+      textBg:
+        "Премини кръстовището спокойно и продължи на север. Правилото под всичко това е едно: регулировчик → светофар → знаци → маркировка (ЗДвП чл. 7).",
     },
   ],
   success: [
@@ -641,9 +674,17 @@ export const SC_SIG_CONTROLLER_POSTURES_EVENT: TrafficControllerSpec = {
   libraryEventId: "JU-18",
   signalNodeId: "sx-n-c",
   junction: { x: 0, y: 0 },
-  // Junction-center post, turned toward the south approach it halts, then
-  // turns side-on at the flip to wave it through.
-  officer: { x: 0, y: 0 },
+  /**
+   * L4 (ledger §4) — (0, 0) → (0, −11). The worst of the three: this drill's
+   * stated teach goal is «разчети позата», and it asked the student to resolve
+   * an arm angle on a ~1.7 m figure standing 27.7 m past the stop line, on a
+   * carriageway drawn at 2.5× scale. Posted on the approach he addresses, 16.7 m
+   * from the line, the posture is at least legible. Purely visual — see the
+   * long note on SC_SIG_CONTROLLER_LIVE_EVENT above; the graded quantities are
+   * `signalNodeId` / `junction` / `lineDistM` and the schedule, none of which
+   * moved, and the trace gate re-proves every drive's exact codes.
+   */
+  officer: { x: 0, y: -11 },
   facing: { x: 0, y: -1 },
   haltedGroup: "ns",
   flipAtSec: 30,
@@ -690,22 +731,22 @@ export const SC_SIG_CONTROLLER_POSTURES: ScenarioSpec = {
     {
       n: 2,
       textBg:
-        "Научи езика на тялото му: страничен профил с отпуснати ръце = свободно, премини; гърди или гръб към теб = спри; вдигната нагоре ръка = „внимание“ — смяна на посоките за всички.",
+        "Езикът му е от три думи и всяка отговаря на три въпроса — кой минава, кой спира, чие е предимството. СТРАНИЧЕН ПРОФИЛ с отпуснати ръце: минаваш ти и цялата твоя посока, напречното спира, предимството е твое. ГЪРДИ ИЛИ ГРЪБ: минава напречното, ти спираш, предимството не е твое. РЪКА НАГОРЕ: не минава никой — той сменя фазите.",
     },
     {
       n: 3,
       textBg:
-        "В момента регулировчикът е с лице/гръб към теб — твоята посока е спряна. Приближи бавно, огледай се и спри ПРЕДИ стоп-линията. Няма лампа за четене — четеш човека.",
+        "В момента е с ГЪРДИ/ГРЪБ към теб: през кръстовището минава напречното направление, а ти спираш ПРЕДИ стоп-линията и чакаш там. Няма лампа за четене — четеш човека.",
     },
     {
       n: 4,
       textBg:
-        "Вдигнатата ръка НЕ е „тръгвай“ — тя значи „внимание, сменям посоките“. Изчакай спокойно; той разпределя кръстовището и ще пусне теб, когато е готов.",
+        "Ако вдигне ръка нагоре, това НЕ е „тръгвай“: спират всички посоки, а който е вътре в кръстовището — излиза. Предимството в този миг не е на никого; той просто прибира едното направление, за да пусне другото.",
     },
     {
       n: 5,
       textBg:
-        "Щом се обърне със страничен профил към теб и отпусне ръце, посоката ти е свободна — премини решително и спокойно на север.",
+        "Щом се обърне със СТРАНИЧЕН ПРОФИЛ и отпусне ръце, посоката ти е отворена, напречната е спряна и предимството е твое — премини решително и спокойно на север (ППЗДвП чл. 66).",
     },
   ],
   success: [

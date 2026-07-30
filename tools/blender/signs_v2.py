@@ -62,6 +62,13 @@ FACE_PX = 512  # rasterised face texture resolution (square)
 
 # ---------------------------------------------------------------------------
 # Face catalog — the project's own Bulgarian sign SVGs (never fabricate).
+#
+# NOTE (doc 86 T4): a PARAMETRISED face — one whose art is fixed but whose
+# numeral varies (В26 „скорост", В33 „край на забраната") — does NOT get one
+# GLB per value. The renderer re-rasterises the same SVG at load time with the
+# numeral swapped and swaps the texture on a clone of the body's face material
+# (world/components/signFaces.ts). Bake a new GLB here only for a face whose
+# GEOMETRY or artwork differs; a different number is not a different sign.
 # ---------------------------------------------------------------------------
 
 FACES = {

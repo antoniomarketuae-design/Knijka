@@ -297,8 +297,15 @@ describe("wave-7 bot completion — sc-pe-zone-living at L3", () => {
     expect(lesson.ruleConfig).toBeUndefined();
     expect(lesson.physics).toBeUndefined();
     expect(lesson.signalPlan).toBeUndefined();
-    // ONE staged walker below L5 — the encounter is a person, not a set piece.
-    expect((lesson.stagedEvents ?? []).map((e) => e.id)).toEqual(["sc-pzl-walker-w"]);
+    // TWO staged walkers below L5 (doc 86 D2 — was one): the halt objective is
+    // titled «Спри пред ХОРАТА на платното» and чл. 62–63 is about people using
+    // the carriageway, so a single figure made the copy a promise the world did
+    // not keep. The companion walks 3 m south of the lead, both off the west
+    // curb at 1.9 m/s.
+    expect((lesson.stagedEvents ?? []).map((e) => e.id)).toEqual([
+      "sc-pzl-walker-w",
+      "sc-pzl-walker-w2",
+    ]);
   });
 
   it("the LIVE session bills no phantom for the lawful transit itself", () => {
@@ -420,6 +427,7 @@ describe("wave-7 bot completion — sc-pe-zone-living at L3", () => {
     expect(SC_PE_ZONE_LIVING.levels.map((l) => l.level)).toEqual([1, 2, 3, 4, 5]);
     expect((compileScenario(SC_PE_ZONE_LIVING, 5).stagedEvents ?? []).map((e) => e.id)).toEqual([
       "sc-pzl-walker-w",
+      "sc-pzl-walker-w2",
       "sc-pzl-walker-e",
     ]);
     expect(compileScenario(SC_PE_ZONE_LIVING, 5).physics).toBeUndefined();

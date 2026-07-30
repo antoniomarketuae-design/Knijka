@@ -18,6 +18,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { beforeAll, describe, expect, it } from "vitest";
 import type { VehicleSample } from "../../contracts";
+import { SC_JX_BLOCKED_EXIT } from "../../lessons/scenario/templates-junctions4";
 import { createWorldRuntime, type DistrictWorldRuntime } from "../../runtime";
 import { SIGNAL_TIMING } from "../../runtime/signals";
 import { STOP_LINE_OVERRIDES } from "../../runtime/stoplines";
@@ -379,43 +380,57 @@ describe("sx-v1 as the JU-16 block-the-box host", () => {
     expect(lineY).toBeGreaterThan(-29.5); // the pose really is BEHIND the paint
   });
 
-  it("stages the queue tail on the northbound ns road, past the node and short of the far mouth", () => {
+  it("stages the queue tail on the northbound ns road, CLEAR of the far mouth", () => {
     const traffic = createTrafficSystem(raw, { seed: 7, vehicleCount: 0, pedestrianCount: 0 });
-    // The template's OWN actor geometry (templates-junctions4 JXB_QUEUE_TAIL).
+    // The template's OWN actor geometry, imported so the two cannot drift.
+    const tail = SC_JX_BLOCKED_EXIT.staged![0];
+    expect(tail.kind).toBe("brakingLeadCar");
+    if (tail.kind !== "brakingLeadCar") return;
     const staged = traffic.stage({
       kind: "vehicle",
       id: "sx-jxb-tail",
-      pathNodes: ["sx-n-s", "sx-n-c", "sx-n-n"],
-      hold: { nodeIndex: 1, offsetM: 16 },
-      cruiseSpeedMps: 8,
+      pathNodes: tail.actor.pathNodes,
+      hold: tail.actor.hold,
+      cruiseSpeedMps: tail.actor.cruiseSpeedMps,
     });
     expect(staged).not.toBeNull();
     expect(staged!.nodeS.length).toBe(3);
-    // It rests 16 m PAST the junction node — beyond the crossing roadway (so
-    // the EXIT is what is full) but short of the far stop line at 27.725 (so a
-    // driver who follows it in strands INSIDE the box). This is the template's
-    // whole geometric premise.
-    expect(staged!.y).toBeCloseTo(16, 1);
-    expect(staged!.y).toBeGreaterThan(0);
-    expect(staged!.y).toBeLessThan(27.725);
+    /**
+     * T12 (ledger §2). This assertion used to demand `y < 27.725` and call it
+     * „beyond the crossing roadway". It was backwards: both ribbons on sx-v1
+     * are cut 27.125 m from sx-n-c (secondary half-width 12.125 + the arterial
+     * corner 15), so the junction is a 54.25 m open square and everything
+     * inside ±27.725 is IN the intersection. The shipped tail at y = 16 was
+     * therefore parked in the middle of it — in the lesson about not standing
+     * in one. It now rests at 31: whole body (28.95 … 33.05) past the paint,
+     * with under half a car of free space between the mouth and its bumper, so
+     * a driver who follows it in still cannot fit and strands inside the box.
+     */
+    const FAR_MOUTH_Y = 27.725;
+    const CAR_HALF_M = 2.05;
+    expect(staged!.y).toBeCloseTo(31, 1);
+    expect(staged!.y - CAR_HALF_M).toBeGreaterThan(FAR_MOUTH_Y);
+    expect(staged!.y - CAR_HALF_M - FAR_MOUTH_Y).toBeLessThan(4.1);
     // …in the player's OWN lane: within the 4 m lead corridor of a northbound
     // car on the drawn lane center, so leadGapMeters reports it as the lead.
     expect(Math.abs(staged!.x - 4.06)).toBeLessThan(4);
     const gap = traffic.leadGapMeters(4.06, -29.5, 0);
     expect(Number.isFinite(gap)).toBe(true);
-    // The measured 41.44 m the trace gate and the ruleConfig flag are pinned to
-    // (bumper gap = 16 − (−29.5) − 4.1 m of car).
-    expect(gap).toBeCloseTo(41.4, 0);
+    // The measured 56.4 m the trace gate and the ruleConfig flag are pinned to
+    // (bumper gap = 31 − (−29.5) − 4.1 m of car).
+    expect(gap).toBeCloseTo(56.4, 0);
   });
 
   it("the staged column can clear the junction northward — the 'exit freed' half of the drill", () => {
     const traffic = createTrafficSystem(raw, { seed: 7, vehicleCount: 0, pedestrianCount: 0 });
+    const tail = SC_JX_BLOCKED_EXIT.staged![0];
+    if (tail.kind !== "brakingLeadCar") return;
     traffic.stage({
       kind: "vehicle",
       id: "sx-jxb-tail",
-      pathNodes: ["sx-n-s", "sx-n-c", "sx-n-n"],
-      hold: { nodeIndex: 1, offsetM: 16 },
-      cruiseSpeedMps: 8,
+      pathNodes: tail.actor.pathNodes,
+      hold: tail.actor.hold,
+      cruiseSpeedMps: tail.actor.cruiseSpeedMps,
     });
     traffic.stagedCommand("sx-jxb-tail", { type: "cruise" });
     for (let i = 0; i < 60 * 8; i++) {
@@ -424,8 +439,10 @@ describe("sx-v1 as the JU-16 block-the-box host", () => {
     // After 8 s at 8 m/s it is far up the north arm — so the waiting player's
     // lead gap really does open, which is what releases JU-09's clear-ahead
     // flag and re-arms the hesitation detector for the prompt-start half.
-    expect(traffic.staged("sx-jxb-tail")!.y).toBeGreaterThan(60);
-    expect(traffic.leadGapMeters(4.06, -29.5, 0)).toBeGreaterThan(48);
+    expect(traffic.staged("sx-jxb-tail")!.y).toBeGreaterThan(75);
+    expect(traffic.leadGapMeters(4.06, -29.5, 0)).toBeGreaterThan(
+      SC_JX_BLOCKED_EXIT.ruleConfig!.hesitationClearGapM!,
+    );
   });
 
   it("the ns green is a full 20 s — refusing one is a real, teachable cost", () => {

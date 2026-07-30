@@ -1,8 +1,22 @@
 "use client";
 
-import { useEffect, useRef, type RefObject } from "react";
-import { useFrame } from "@react-three/fiber";
-import { Euler, Quaternion, Vector3, type Group, type PerspectiveCamera } from "three";
+import { useEffect, useMemo, useRef, type RefObject } from "react";
+import { useFrame, useThree } from "@react-three/fiber";
+import {
+  Euler,
+  FogExp2,
+  HalfFloatType,
+  Mesh,
+  MeshBasicMaterial,
+  PerspectiveCamera as PerspectiveCameraImpl,
+  PlaneGeometry,
+  Quaternion,
+  Vector3,
+  WebGLRenderTarget,
+  type Group,
+  type Object3D,
+  type PerspectiveCamera,
+} from "three";
 import {
   CHASE_DISTANCE,
   CHASE_FOV,
@@ -41,6 +55,22 @@ import {
   type SimTelemetry,
 } from "@/modules/sim/engine";
 import type { CabinControls, MirrorGlanceKind } from "@/modules/sim/scene/cabin";
+import { SKY_DOME_NAME } from "@/modules/sim/environment";
+import { renderMirrorPass } from "@/modules/sim/scene/vitok/mirrorPass";
+import {
+  rearViewQuadHalfSize,
+  rearViewQuadOffset,
+  REAR_VIEW_CADENCE,
+  REAR_VIEW_EYE,
+  REAR_VIEW_FAR_M,
+  REAR_VIEW_FOG_MIN_DENSITY,
+  REAR_VIEW_FOV_DEG,
+  REAR_VIEW_NEAR_M,
+  REAR_VIEW_SKY_RADIUS_M,
+  REAR_VIEW_TARGET_HEIGHT,
+  REAR_VIEW_TARGET_WIDTH,
+  REAR_VIEW_YAW_RAD,
+} from "@/modules/sim/scene/chaseRearView";
 
 export type CameraMode = "chase" | "cockpit" | "topdown";
 
@@ -118,6 +148,16 @@ const GLANCE_OFFSETS: Record<MirrorGlanceKind, { yaw: number; pitch: number }> =
   right: { yaw: -0.93, pitch: -0.09 },
   rear: { yaw: -0.28, pitch: 0.06 },
 };
+
+/** Distance (m) the rear-view quad is parked in front of the main camera. Any
+ *  value clear of the 0.1 m near plane works — the quad is sized from the live
+ *  FOV at this distance, so the on-screen fraction is distance-independent. */
+const REAR_VIEW_QUAD_DISTANCE_M = 0.5;
+/** Bezel thickness as a fraction of the window's height — a dark surround so
+ *  the inset reads as an instrument instead of a hole punched in the sky. */
+const REAR_VIEW_BEZEL_FRACTION = 0.08;
+/** Bezel colour (near-black, matches the cockpit mirror housing). */
+const REAR_VIEW_BEZEL_COLOR = 0x0a0c0f;
 
 /**
  * Chase / cockpit camera driving the default R3F camera, plus the per-frame
@@ -214,6 +254,91 @@ export function CameraRig({
     return () => window.removeEventListener("keydown", onKey);
   }, []);
 
+  // -------------------------------------------------------------------------
+  // CHASE REAR-VIEW WINDOW (doc 86 L16 — founder items 44/45). The cockpit's
+  // MirrorRig is mounted `active={cockpitView}`, so the chase POV — the one he
+  // plays in — has never had a mirror of any kind, and Q/E only nudged the
+  // camera a few degrees (chaseGlanceOrbit). One shared 384×160 render target
+  // is aimed backward from the car and shown as a small camera-locked quad:
+  // left on Q, right on E, centred on F, ≤10 % of the screen (the geometry and
+  // that contract live in scene/chaseRearView.ts, unit-tested there).
+  //
+  // Everything here mirrors MirrorRig's proven budget: HalfFloat target so the
+  // composer tone-maps it identically to the direct view, a 200 m far plane so
+  // the CityBuildings chunk grid culls, a floored fog density so nothing pops
+  // at that boundary, the sky dome shrunk inside the frustum, frozen shadow
+  // maps, and `renderMirrorPass` owning `autoClear` — without which the raw
+  // gl.render draws into an uncleared depth buffer and the window is a solid
+  // black rectangle (doc 82 §3.2, fixed in 8442b91 and reused here rather than
+  // re-derived). Only one glance is held at a time, so one target serves all
+  // three sides.
+  //
+  // GRADING IS UNTOUCHED: the graded signal is still the Q/E/F press latched by
+  // CabinControls.glance(). This only makes the graded press honest.
+  // -------------------------------------------------------------------------
+  const scene = useThree((s) => s.scene);
+  const rearView = useMemo(() => {
+    const target = new WebGLRenderTarget(REAR_VIEW_TARGET_WIDTH, REAR_VIEW_TARGET_HEIGHT, {
+      stencilBuffer: false,
+      type: HalfFloatType,
+    });
+    // MIRROR-IMAGE FLIP. The pass camera keeps chassis +X — which is car-LEFT —
+    // as image-right, so an unflipped window would show the car we just passed
+    // on our left sitting on the window's right. Real glass reverses it, and a
+    // student who learns to read this window must be learning to read a mirror.
+    // u → 1 − u on the texture we own; the geometry is untouched.
+    target.texture.center.set(0.5, 0.5);
+    target.texture.repeat.set(-1, 1);
+    const camera = new PerspectiveCameraImpl(
+      REAR_VIEW_FOV_DEG.rear,
+      REAR_VIEW_TARGET_WIDTH / REAR_VIEW_TARGET_HEIGHT,
+      REAR_VIEW_NEAR_M,
+      REAR_VIEW_FAR_M,
+    );
+    const material = new MeshBasicMaterial({
+      map: target.texture,
+      toneMapped: false,
+      transparent: true,
+      depthTest: false,
+      depthWrite: false,
+    });
+    const bezelMaterial = new MeshBasicMaterial({
+      color: REAR_VIEW_BEZEL_COLOR,
+      toneMapped: false,
+      transparent: true,
+      depthTest: false,
+      depthWrite: false,
+    });
+    const geometry = new PlaneGeometry(1, 1);
+    const glass = new Mesh(geometry, material);
+    const bezel = new Mesh(geometry, bezelMaterial);
+    for (const m of [glass, bezel]) {
+      m.frustumCulled = false;
+      m.visible = false;
+      m.matrixAutoUpdate = true;
+    }
+    // depthTest is off, so paint order is renderOrder alone: bezel first.
+    bezel.renderOrder = 9_998;
+    glass.renderOrder = 9_999;
+    return { target, camera, material, bezelMaterial, geometry, glass, bezel };
+  }, []);
+
+  useEffect(() => {
+    scene.add(rearView.bezel, rearView.glass);
+    return () => {
+      scene.remove(rearView.bezel, rearView.glass);
+      rearView.target.dispose();
+      rearView.material.dispose();
+      rearView.bezelMaterial.dispose();
+      rearView.geometry.dispose();
+    };
+  }, [scene, rearView]);
+
+  /** Frame counter for REAR_VIEW_CADENCE. */
+  const rearViewFrameRef = useRef(0);
+  /** The SkyDome, resolved lazily by name (it mounts in a sibling tree). */
+  const skyRef = useRef<Object3D | null>(null);
+
   // Scratch objects — never allocate in useFrame.
   const scratchRef = useRef({
     pos: new Vector3(),
@@ -236,6 +361,10 @@ export function CameraRig({
     prevPos: new Vector3(),
     // Top-down screen-up vector, damped (north-up ↔ heading-up transitions).
     upSmooth: new Vector3(0, 0, -1),
+    // Rear-view window: pass-camera eye, its yaw, and the quad's world pose.
+    rvEye: new Vector3(),
+    rvYaw: new Quaternion(),
+    rvQuad: new Vector3(),
   });
   const prevPosValid = useRef(false);
 
@@ -286,7 +415,7 @@ export function CameraRig({
     // Smoothstepped so the swing eases in as well as out (the glance's easing).
     const swing = reverseSwingEnvelope(swingRef.current);
 
-    const { pos, quat, fwd, fwdFlat, desired, look, lookSmooth, eye, rotSmooth, glanceQuat, glanceEuler, sway, leanQuat, leanEuler, prevPos, upSmooth } =
+    const { pos, quat, fwd, fwdFlat, desired, look, lookSmooth, eye, rotSmooth, glanceQuat, glanceEuler, sway, leanQuat, leanEuler, prevPos, upSmooth, rvEye, rvYaw, rvQuad } =
       scratchRef.current;
     chassis.getWorldPosition(pos);
     chassis.getWorldQuaternion(quat);
@@ -487,6 +616,86 @@ export function CameraRig({
         glanceQuat.setFromEuler(glanceEuler);
         cam.quaternion.multiply(glanceQuat);
       }
+    }
+
+    // --- Chase rear-view window (doc 86 L16). Runs LAST, so the quad is
+    // parked against the pose this frame actually renders with. -------------
+    const rv = rearView;
+    const rvSide = mode === "chase" && glanceS > 0 ? (cabin?.glanceMirror ?? null) : null;
+    if (rvSide === null) {
+      rv.glass.visible = false;
+      rv.bezel.visible = false;
+      rearViewFrameRef.current = 0;
+    } else {
+      // Smoothstepped with the same envelope the head turn uses, so the window
+      // opens and closes on exactly the glance's rhythm.
+      const env = glanceS * glanceS * (3 - 2 * glanceS);
+
+      // 1. Aim the pass camera from the CAR (not from the chase vantage 8 m
+      //    behind it — from there the car's own boot would fill the window).
+      const fovDeg = REAR_VIEW_FOV_DEG[rvSide];
+      if (rv.camera.fov !== fovDeg) {
+        rv.camera.fov = fovDeg;
+        rv.camera.updateProjectionMatrix();
+      }
+      rvEye
+        .set(REAR_VIEW_EYE.x, REAR_VIEW_EYE.y, REAR_VIEW_EYE.z)
+        .applyQuaternion(quat)
+        .add(pos);
+      rv.camera.position.copy(rvEye);
+      // A camera carrying the chassis quaternion looks down chassis −Z, i.e.
+      // straight back (the car drives +Z); the per-side yaw swings it into the
+      // glanced quarter. See REAR_VIEW_YAW_RAD for the sign derivation.
+      rvYaw.setFromAxisAngle(UP_AXIS, REAR_VIEW_YAW_RAD[rvSide]);
+      rv.camera.quaternion.copy(quat).multiply(rvYaw);
+
+      // 2. The RTT pass, on cadence. The quad is hidden for the duration — it
+      //    is in the same scene, and a window that can see itself is a
+      //    feedback loop.
+      if (rearViewFrameRef.current++ % REAR_VIEW_CADENCE === 0) {
+        rv.glass.visible = false;
+        rv.bezel.visible = false;
+        let sky = skyRef.current;
+        if (!sky || !sky.parent) {
+          sky = state.scene.getObjectByName(SKY_DOME_NAME) ?? null;
+          skyRef.current = sky;
+        }
+        renderMirrorPass(state.gl, {
+          target: rv.target,
+          scene: state.scene as never,
+          camera: rv.camera as never,
+          fog: state.scene.fog instanceof FogExp2 ? state.scene.fog : null,
+          fogMinDensity: REAR_VIEW_FOG_MIN_DENSITY,
+          sky,
+          skyRadius: REAR_VIEW_SKY_RADIUS_M,
+        });
+      }
+
+      // 3. Park the quad in front of the main camera, sized from the LIVE fov
+      //    and aspect so the on-screen fraction holds through the speed-widen
+      //    and through any window shape.
+      const vFov = (cam.fov * Math.PI) / 180;
+      const { halfWidth, halfHeight } = rearViewQuadHalfSize(
+        REAR_VIEW_QUAD_DISTANCE_M,
+        vFov,
+        cam.aspect,
+      );
+      const off = rearViewQuadOffset(rvSide, REAR_VIEW_QUAD_DISTANCE_M, vFov, cam.aspect);
+      const bezel = halfHeight * 2 * REAR_VIEW_BEZEL_FRACTION;
+      rv.glass.scale.set(halfWidth * 2, halfHeight * 2, 1);
+      rv.bezel.scale.set(halfWidth * 2 + bezel, halfHeight * 2 + bezel, 1);
+      rvQuad
+        .set(off.x, off.y, -REAR_VIEW_QUAD_DISTANCE_M)
+        .applyQuaternion(cam.quaternion)
+        .add(cam.position);
+      rv.glass.position.copy(rvQuad);
+      rv.bezel.position.copy(rvQuad);
+      rv.glass.quaternion.copy(cam.quaternion);
+      rv.bezel.quaternion.copy(cam.quaternion);
+      rv.material.opacity = env;
+      rv.bezelMaterial.opacity = env * 0.9;
+      rv.glass.visible = env > 0.01;
+      rv.bezel.visible = rv.glass.visible;
     }
   });
 

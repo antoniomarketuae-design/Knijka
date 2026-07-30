@@ -93,4 +93,14 @@ export type {
   TrafficSystemStats,
   TrafficUpdateContext,
   TrafficVehicleState,
+  VehicleIndicator,
+  VehicleProfile,
+} from "./types";
+// L6 / T17(e): the indicator channel's vocabulary + the profile body lengths
+// the lead/rear gap queries subtract (TrafficLayer reads the first, the rule
+// engine's follow channel the second).
+export {
+  PLAYER_HALF_LENGTH_M,
+  VEHICLE_PROFILE_LENGTH_M,
+  vehicleHalfLengthM,
 } from "./types";

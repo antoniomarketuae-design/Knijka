@@ -8,13 +8,17 @@
  *      start x = +9.73 (mirror of the family's −9.73), inside the map bounds,
  *      westbound INTO the driver's lane. This battery proves the reused map
  *      admits that staged geometry.
- *   2. THE LATE OCCUPANCY WINDOW. roadFromM 4.0 (against the family's 1.6) keeps
- *      the child OFF the driving-surface flag until it clears the parked row:
- *      the battery drives the exact template spans through the traffic system
- *      and asserts pedestrianOnCrossing goes off → on → off, AND that the flag
- *      is still FALSE once the walker has passed the west-edge 1.6 m mark a
- *      whole family-window earlier would have flipped it (the delta that lets
- *      the fast-row demo strike before occupancy).
+ *   2. THE OCCUPANCY WINDOW IS THE CARRIAGEWAY — doc 86 T11, RE-BASELINED.
+ *      This battery used to pin `roadFromM 4.0` and to assert that the flag
+ *      stayed FALSE while the walker was between arc 1.6 and arc 4.0. That was
+ *      the defect, written down as a contract: the kerb stand-back is 9.73 m
+ *      and the carriageway half-width 8.125 m, so the child is physically on
+ *      the tarmac from arc 1.605 — and 4.0 put the flag 2.4 m late, i.e. only
+ *      once the child was 0.8 m off the bumper. A driver who blew the 32 km/h
+ *      cap therefore passed an OCCUPIED crossing while `pedestrianOnCrossing`
+ *      read false and was billed nothing, while the obedient driver collided.
+ *      The window is now the family's real geometry (1.6 / 17.85) and the
+ *      battery asserts the flag flips AT the carriageway edge.
  *
  * Shape copied from pe-districts.test.ts (the traffic-lane-graph section).
  */
@@ -71,9 +75,12 @@ describe("pe-child-v1 hosts the sc-pe-parked-row-scan reuse", () => {
     const b = district.meta.boundsLocalMeters;
     expect(child.start.x).toBeLessThanOrEqual(b.maxX);
     expect(child.start.x - child.travelM).toBeGreaterThanOrEqual(b.minX);
-    // The delta that defines the scenario: the LATE occupancy window.
-    expect(child.roadFromM).toBe(4.0);
-    expect(child.roadToM).toBe(18.0);
+    // doc 86 T11: the occupancy window is the CARRIAGEWAY, not a grading dial.
+    // 9.73 kerb stand-back − 8.125 half-carriageway = 1.605 in, + 8.125 = 17.855 out.
+    expect(child.roadFromM).toBeCloseTo(Math.abs(child.start.x) - 8.125, 1);
+    expect(child.roadToM).toBeCloseTo(Math.abs(child.start.x) + 8.125, 1);
+    expect(child.roadFromM).toBe(1.6);
+    expect(child.roadToM).toBe(17.85);
   });
 
   it("the east-curb span drives pedestrianOnCrossing off → on → off (the dart chain)", () => {
@@ -114,18 +121,21 @@ describe("pe-child-v1 hosts the sc-pe-parked-row-scan reuse", () => {
         if (st) flagAtTravel.push({ s: st.s, on: traffic.pedestrianOnCrossing("pe-x-1") });
       }
     }
-    // Off at the start, ON while walking the (late) span, off after the walk-out.
+    // Off at the start, ON while walking the carriageway, off after the walk-out.
     expect(onFlags[0]).toBe(false);
     expect(onFlags).toContain(true);
     expect(onFlags[onFlags.length - 1]).toBe(false);
     expect(traffic.staged("prs-test-ped")!.finished).toBe(true);
 
-    // The roadFromM 4.0 delta: at any sampled point where the walker has entered
-    // the carriageway (travel > 1.6, the family's OLD west-edge window) but not
-    // yet cleared the parked row (travel < 4.0), the flag is still FALSE — this
-    // is why a fast car strikes before occupancy ever flips.
-    for (const f of flagAtTravel) {
-      if (f.s > 1.6 && f.s < 4.0) expect(f.on).toBe(false);
+    // doc 86 T11 — the assertion INVERTED. It used to demand `on === false`
+    // while the walker was between arc 1.6 and arc 4.0. Every one of those
+    // sample points has the child standing on the tarmac inside the driving
+    // lane, so the flag must be TRUE: that is the whole difference between a
+    // speeding driver being convicted of чл. 119 and being convicted of nothing.
+    const insideCarriageway = flagAtTravel.filter((f) => f.s > 1.8 && f.s < 17.6);
+    expect(insideCarriageway.length).toBeGreaterThan(4);
+    for (const f of insideCarriageway) {
+      expect(f.on, `walker at arc ${f.s.toFixed(2)} m is on the carriageway`).toBe(true);
     }
   });
 });

@@ -243,7 +243,10 @@ describe("wave-5 bot completion — sc-jx-blocked-exit at L3", () => {
     // with the 12 m default, and a student who correctly refuses a blocked
     // green gets billed HESITATION_AT_GREEN for it. Prove the wiring, not just
     // the recorder's copy of it.
-    expect(lesson.ruleConfig).toMatchObject({ hesitationClearGapM: 48 });
+    // T12 (doc 86 §2) moved the staged column from y = 16 (parked inside the
+    // 54.25 m junction square) to y = 31 (clear of the far paint), so the gap
+    // the flag must cover went 41.4 → 56.4 m and the flag went 48 → 63.
+    expect(lesson.ruleConfig).toMatchObject({ hesitationClearGapM: 63 });
     expect(
       session.events.some((e) => e.kind === "violation" && e.code === "HESITATION_AT_GREEN"),
     ).toBe(false);
@@ -561,9 +564,10 @@ describe("wave-5 bot completion — sc-ov-solid-return at L3", () => {
   });
 
   it("the drill is won in the taught ORDER: out early, home before the wall, then through it", () => {
-    // The sequence IS the lesson, and it is not decoration. sc-ovsr-pass sits on
-    // the oncoming bank at y = 180 (radius 5, and the own lane is 6.56 m away):
-    // it grades the COMMITMENT — the maneuver had to start where it still fits.
+    // The sequence IS the lesson, and it is not decoration. sc-ovsr-pass sits at
+    // y = 180 (post-B8: centred between the lanes, radius 6, satisfiable from
+    // either): it grades REACHING the last mark from which the whole maneuver
+    // still fits — the decision point, not the excursion.
     // sc-ovsr-home sits on the own-lane center at the map's own returnByY = 270
     // (radius 4 < the 8.125 m lane pitch): it grades being HOME, 30 m of dashes
     // before the М1 span. A drive that reached „home" before „pass" would be a
@@ -632,11 +636,22 @@ describe("wave-5 bot completion — sc-ov-solid-return at L3", () => {
     ]);
     expect(r.score).toBe(10);
     expect(r.passed).toBe(false);
-    // …and the objectives say the same thing the code does, independently: this
-    // driver pulled out at y = 190, so he is never within 5 m of the commitment
-    // gate at y = 180, and objectives advance SEQUENTIALLY — nothing else arms.
-    // „Щях да успея" is measurably false: he completes NOTHING.
-    expect(r.objectives.every((o) => !o.done)).toBe(true);
+    // …and the objectives say the same thing the code does, independently: he
+    // is never fully home in his own lane before the М1 span, so sc-ovsr-home
+    // never arms and — objectives being SEQUENTIAL — neither does the finish.
+    // „Щях да успея" is measurably false.
+    //
+    // RE-BASELINED for ledger B8 (doc 86 §3). This used to assert that NOTHING
+    // completed, which was true only because sc-ovsr-pass was authored radius 5
+    // on the oncoming bank alone — the same lane exclusivity that made a
+    // NON-overtaking (always lawful) drive score `completedAll: false` and lock
+    // the next rung. The gate is now lane-agnostic ("you reached the last mark
+    // from which a whole pass still fits"), so this driver legitimately ticks it
+    // and then fails the drill's real gate. The verdict is unchanged where it
+    // matters and is asserted right here: home false, completedAll false,
+    // passed false, score 10.
+    expect(r.objectives.find((o) => o.id === "sc-ovsr-home")!.done).toBe(false);
+    expect(r.objectives.find((o) => o.id === "sc-ovsr-finish")!.done).toBe(false);
     expect(r.completedAll).toBe(false);
   });
 
@@ -662,7 +677,11 @@ describe("wave-5 bot completion — sc-ov-solid-return at L3", () => {
     expect(taught).toEqual(["OVERTAKE_RETURN_TOO_EARLY"]);
     expect(s.events.filter((e) => e.kind === "violation")).toEqual([]);
     expect(r.score).toBe(0);
-    expect(r.objectives.every((o) => !o.done)).toBe(true);
+    // RE-BASELINED for ledger B8, exactly as one block up: the commitment gate
+    // is no longer lane-exclusive, so both late drives tick it and both still
+    // miss the gate the drill is actually about.
+    expect(r.objectives.find((o) => o.id === "sc-ovsr-home")!.done).toBe(false);
+    expect(r.objectives.find((o) => o.id === "sc-ovsr-finish")!.done).toBe(false);
     expect(r.completedAll).toBe(false);
   });
 

@@ -108,8 +108,15 @@ export const SC_SP_ECO_COAST: ScenarioSpec = {
       params: { kind: "reachZone", x: SX_LANE, y: -45, radiusM: 7, maxSpeedKmh: 36 },
     },
     {
+      // D3 (ledger §5), same class as sc-sgw-tl1/tl3: `passSignal` tracks
+      // PROGRESSION only — objectives.ts documents that a crossing on red still
+      // completes it — so «на зелено» was a tick the gate could not verify. The
+      // colour is graded where it belongs, by RED_LIGHT_CROSSED; the title now
+      // names the act that is actually measured, plus the thing this drill is
+      // about (arriving already slowed, so the wait is short and the start
+      // prompt).
       id: "sc-ecoc-pass",
-      titleBg: "Премини светофара на зелено",
+      titleBg: "Изчакай червеното пред линията и премини светофара",
       params: {
         kind: "passSignal",
         nodeId: "sx-n-c",

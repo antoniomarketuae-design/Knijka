@@ -22,6 +22,7 @@
 
 import { bearingDeg } from "../../runtime/geometry";
 import { STOP_LINE_OVERRIDES } from "../../runtime/stoplines";
+import { speedLimitSignKind } from "../types";
 import type {
   BillboardPlacement,
   District,
@@ -74,6 +75,11 @@ import {
   type RoadNetwork,
 } from "./network";
 import { buildZoneSigns, scenarioSignScale } from "./zoneSigns";
+import { SCENARIO_SIGN_SCALE } from "./constants";
+
+/** Every signal head, on every map, renders at this scale (doc 86 L2 — see
+ *  `signalSized` in buildProps for why the head is not gated like the plates). */
+const SIGNAL_HEAD_SCALE = SCENARIO_SIGN_SCALE;
 
 export interface PropBuildResult {
   trafficLights: TrafficLightPlacement[];
@@ -124,6 +130,76 @@ const ROUNDABOUT_SIGN_OUT_M = 1.2;
 const NO_ENTRY_ALONG_M = 1.4;
 /** …at the same curb offset as the priority posts. */
 const NO_ENTRY_LATERAL_M = 0.8;
+
+/**
+ * Б3 „Път с предимство" (жълт ромб) stands on the arm that HAS priority, at
+ * the same station the yielding arms carry their Б1/Б2 — the pairing a driver
+ * reads as one junction. Only ever placed where junctionPriorityControls
+ * actually assigned a control, so an equal junction (tj-rhr / jx-equal) stays
+ * correctly bare (doc 86 R1: „every district correctly has ZERO signs where
+ * the lesson says the junction is equal" — that must not change).
+ */
+const PRIORITY_DIAMOND_ALONG_M = 1.4;
+const PRIORITY_DIAMOND_LATERAL_M = 0.8;
+
+/**
+ * A18 „Пешеходна пътека" warns the driver BEFORE the zebra, never at it.
+ * Same discipline as the rail warning triangle in zoneSigns (doc 86 T14): the
+ * cue has to arrive while there is still road left to slow down on.
+ */
+const CROSSING_WARNING_AHEAD_M = 35;
+/** …and it is pointless when the zebra is within this of the road's start —
+ *  a post at metre 1 is behind the driver's spawn on every micro-map. */
+const CROSSING_WARNING_MIN_ROOM_M = 20;
+
+/**
+ * Doc 86 T5 — „the only speed post on every junction micro-map stands 1 m
+ * BEHIND the spawn, facing away". A district-entry plate is worth nothing if
+ * the driver starts past it, so a post that would land closer than this AHEAD
+ * of a spawn on its own edge is moved forward instead of being posted blind.
+ */
+const ENTRY_POST_MIN_AHEAD_OF_SPAWN_M = 25;
+/** Where it is moved TO: far enough to be read, close enough to still be the
+ *  entry statement rather than a mid-block plate. */
+const ENTRY_POST_RELOCATE_AHEAD_M = 30;
+/** …but never inside this of the far end of the arm (the junction mouth). */
+const ENTRY_POST_END_CLEAR_M = 25;
+
+/** How far ahead of a spawn its context plate goes, when nothing else on that
+ *  edge already states the limit ahead of him. */
+const SPAWN_CONTEXT_AHEAD_M = 30;
+
+/** A В26 at a mid-route limit change stands just past the transition node, so
+ *  the first metre it governs is the first metre it is visible on. */
+const TRANSITION_POST_ALONG_M = 6;
+/** The В33 „край на забраната" that accompanies a limit RISE gets its own
+ *  post, set back like the Г12 does behind its Б1 (never two plates on one
+ *  pole — sign-post-distinct.test.ts). */
+const TRANSITION_END_BACK_M = 4.5;
+const TRANSITION_END_OUT_M = 1.2;
+
+/** Road classes that are never a „one-way street" in the Д4 sense, however
+ *  the one-way tag reads: a motorway/trunk carriageway is signed Д5/Д6. */
+const ONEWAY_STREET_EXCLUDED_CLASSES = new Set([
+  "motorway",
+  "motorway_link",
+  "trunk",
+  "trunk_link",
+]);
+/** Two anti-parallel one-way edges closer than this are the two halves of a
+ *  DIVIDED road (how mw-v1 models its carriageways), not two one-way streets. */
+const DIVIDED_TWIN_MAX_LATERAL_M = 60;
+
+/** No two sign models may stand closer than this (sign-post-distinct.test.ts:33
+ *  states the same number as a gate; the new passes enforce it by construction
+ *  rather than hoping). */
+const MIN_POST_SEPARATION_M = 0.75;
+
+/** Numeral face for a limit, or null when the kit cannot state it truthfully. */
+function speedPlate(kmh: number | undefined): { kind: SignKind; speedKmh: number } | null {
+  const kind = speedLimitSignKind(kmh);
+  return kind === null ? null : { kind, speedKmh: kmh as number };
+}
 
 /** Prop standing right of the incoming traffic at a junction approach. */
 function approachPropPose(ap: Approach, alongExtra: number, lateralExtra: number) {
@@ -205,6 +281,15 @@ export function buildProps(
   // byte-identical (no `scale` key) on city/exam/полигон maps.
   const lessonScale = scenarioSignScale(district);
   const lessonSized = lessonScale !== undefined ? { scale: lessonScale } : {};
+  // …but the SIGNAL HEAD is scaled on EVERY map, city included (doc 86 L2).
+  // The scale rule above exists so city sign PLACEMENTS stay byte-identical,
+  // and that is right for a plate: a Б1 at 1x on a city street still reads.
+  // A signal lens does not — it is a SphereGeometry(0.13) that subtends ~0.1°
+  // from 76 m, and the 2.5x road exaggeration is global, not scenario-only. So
+  // the one prop that is unreadable at 1x on ANY of these roads is the one
+  // prop that always gets the lift; the exam routes run on district-v1 and
+  // d2-v1, whose 90 heads were the worst instance of the defect.
+  const signalSized = { scale: SIGNAL_HEAD_SCALE };
 
   // -- traffic lights at signalized junctions ---------------------------------
   // Two heads per incoming approach (doc 62 S1/#19 — „green appeared once and
@@ -231,6 +316,13 @@ export function buildProps(
         position: toWorld(p[0], p[1], ROAD_Y),
         yaw,
         approachBearingDeg,
+        // Doc 86 L2 — the ONE-WORD cause of „no traffic light exists at all"
+        // on lessons 17/18/19/21/29: every signs.push in this file carried a
+        // scale spread and these two calls did not, so a 0.13 m lens stood at
+        // 1x on a 2.5x-exaggerated world while the В26 beside it got 1.5x.
+        // StaticTransform.scale and createOffsetInstancedMesh's scaled lamp
+        // offsets were built for exactly this and were never wired.
+        ...signalSized,
       });
       // Far-side companion: the mirror of the near head through the node.
       // Clearance check: must sit outside every arm's carriageway corridor
@@ -256,6 +348,7 @@ export function buildProps(
           position: toWorld(m[0], m[1], ROAD_Y),
           yaw, // same facing: it addresses the same incoming driver
           approachBearingDeg,
+          ...signalSized, // see the near head above (doc 86 L2)
         });
       }
       approachesLit++;
@@ -304,6 +397,35 @@ export function buildProps(
         });
       }
       (kind === "stop" ? stopSignApproaches : giveWayApproaches).add(`${node.id}:${ap.edgeId}`);
+    }
+
+    // Doc 86 D5 — sign_priority_road.glb (Б3, the жълт ромб) shipped finished
+    // and unreachable: no SignKind, so no pass could place it. Its correct
+    // home is the arm that HAS priority at a junction where somebody yields,
+    // which is precisely the arms junctionPriorityControls left uncontrolled.
+    // Roundabouts are excluded — a ring entry is signed Б1 + Г12, never Б3.
+    //
+    // Scenario micro-maps only, on the В1 pass's reasoning: the OSM city
+    // districts would grow 120 diamonds between them (one per uncontrolled arm
+    // of every controlled junction), which is both invented signage the source
+    // never recorded and a wildly over-signed street — Б3 is posted once at the
+    // head of a priority road, not on every approach of every junction.
+    if (!isRoundabout && lessonScale !== undefined) {
+      for (const ap of node.approaches) {
+        if (!ap.incoming) continue;
+        if (controls.get(ap.edgeId) !== undefined) continue; // this arm yields
+        const { p, yaw } = approachPropPose(
+          ap,
+          PRIORITY_DIAMOND_ALONG_M,
+          PRIORITY_DIAMOND_LATERAL_M,
+        );
+        signs.push({
+          kind: "priorityRoad",
+          position: toWorld(p[0], p[1], ROAD_Y),
+          yaw,
+          ...lessonSized,
+        });
+      }
     }
   }
 
@@ -371,7 +493,118 @@ export function buildProps(
     }
   }
 
-  // -- speed limit 50 at district entries -------------------------------------
+  // ---------------------------------------------------------------------------
+  // Speed plates — В26 by NUMERAL, and never a numeral the road does not carry
+  // ---------------------------------------------------------------------------
+  // Doc 86 T4: the kit had exactly one speed face, so `kind: "limit50"` was
+  // hard-coded here and 83 of 154 scenarios sat on a 30/40/90/140 street
+  // wearing a „50" plate — at SCENARIO_SIGN_SCALE, i.e. the most legible object
+  // on the map, contradicting the very number the reducer grades
+  // (tick.maxSpeedKmh comes off the edge tag). The face set is now one per
+  // numeral (types.ts SPEED_LIMIT_FACES_KMH, rasterised from the law-cited
+  // content/signs/svg/v26.svg), so the plate simply STATES the edge tag.
+  //
+  // Two rules make the class of defect unauthorable rather than merely fixed:
+  //   1. the numeral is derived from ap.edge.maxspeed — there is no literal to
+  //      go stale;
+  //   2. a limit the kit cannot state truthfully places NOTHING. The old
+  //      `isDropTail` hack — which only ever fired on a collinear zone tail
+  //      (`touchingFar.length === 2`), a condition a single-edge street can
+  //      never satisfy — is deleted: it was a special case for the one lie the
+  //      author happened to notice, and the general rule subsumes it.
+
+  /** Posts that must keep their distance from each other (doc 62 #—, pinned by
+   *  sign-post-distinct.test.ts). Seeded with everything placed so far. */
+  const postAnchors: Vec2[] = signs.map((s) => [s.position[0], -s.position[2]] as Vec2);
+  const pushSignAt = (
+    p: Vec2,
+    yaw: number,
+    kind: SignKind,
+    extra: { speedKmh?: number } = {},
+  ): boolean => {
+    if (postAnchors.some((q) => dist(q, p) < MIN_POST_SEPARATION_M)) return false;
+    postAnchors.push(p);
+    signs.push({ kind, position: toWorld(p[0], p[1], ROAD_Y), yaw, ...extra, ...lessonSized });
+    return true;
+  };
+
+  /**
+   * Every В26 this build has posted, as (edge, arclength ALONG THE TRAVEL it
+   * addresses, numeral). The spawn-context pass below reads it to answer one
+   * question: "does the driver who starts HERE have his limit posted ahead of
+   * him?" — which is the founder's complaint (items 31/33/34/36, „no speed sign
+   * anywhere") stated as an invariant instead of a symptom.
+   */
+  const platesAhead: { edgeId: string; sAlongTravel: number; dirSign: 1 | -1; kmh: number }[] = [];
+  const recordPlate = (edgeId: string, sFromGeomStart: number, dirSign: 1 | -1, kmh: number) => {
+    const eb = network.edgeById.get(edgeId);
+    if (!eb) return;
+    const len = polylineLength(eb.edge.geometry as Vec2[]);
+    platesAhead.push({
+      edgeId,
+      sAlongTravel: dirSign === 1 ? sFromGeomStart : len - sFromGeomStart,
+      dirSign,
+      kmh,
+    });
+  };
+
+  /**
+   * Spawns that travel ALONG a given edge, as arclengths measured from the
+   * edge's geometry start, tagged with whether they run with (+1) or against
+   * (-1) the geometry. `heading` is a compass bearing (0 = +y, clockwise), the
+   * same convention bearingDeg produces.
+   */
+  const spawnsByEdge = new Map<string, { s: number; dirSign: 1 | -1 }[]>();
+  for (const sp of district.spawnPoints) {
+    const eb = network.edgeById.get(sp.edgeId);
+    if (!eb) continue;
+    const g = eb.edge.geometry as Vec2[];
+    const proj = projectOntoPolyline(g, [sp.x, sp.y]);
+    const rad = (sp.heading * Math.PI) / 180;
+    const heading: Vec2 = [Math.sin(rad), Math.cos(rad)];
+    const dirSign: 1 | -1 =
+      heading[0] * proj.tangent[0] + heading[1] * proj.tangent[1] >= 0 ? 1 : -1;
+    const bucket = spawnsByEdge.get(sp.edgeId) ?? [];
+    bucket.push({ s: proj.s, dirSign });
+    spawnsByEdge.set(sp.edgeId, bucket);
+  }
+
+  /**
+   * Where an entry post addressing a driver who enters `edge` at `fromNodeId`
+   * should stand, as an arclength measured FROM that node along travel.
+   *
+   * Doc 86 T5: the shipped station (min(14, len·0.35)) put every junction
+   * micro-map's only speed plate 1 m BEHIND the spawn, facing away — the
+   * founder's „no speed sign anywhere" on items 31/33/34/36 is a sign standing
+   * physically behind his head. A station that a spawn on the same edge has
+   * already passed (or is about to, inside 25 m) is moved 30 m AHEAD of that
+   * spawn instead. Returns null when the arm has no room left before its far
+   * mouth — better no plate than one inside the junction.
+   */
+  const entryStationFromNode = (
+    edge: { id: string; from: string; geometry: readonly Vec2[] },
+    fromNodeId: string,
+    len: number,
+  ): number | null => {
+    const base = Math.min(14, len * 0.35);
+    const forward = edge.from === fromNodeId;
+    let sFromNode = base;
+    for (const sp of spawnsByEdge.get(edge.id) ?? []) {
+      // Only a spawn DRIVING AWAY from this node can ever pass this post.
+      if ((sp.dirSign === 1) !== forward) continue;
+      const spawnFromNode = forward ? sp.s : len - sp.s;
+      // A spawn DEFEATS the post only when it starts level with it: within one
+      // reading distance either side. A spawn 400 m down the same street is a
+      // different drill starting elsewhere and must not drag the entry plate
+      // along with it (that emptied ac-aqua-v1's entry when the finish spawn
+      // was counted).
+      if (Math.abs(spawnFromNode - base) > ENTRY_POST_MIN_AHEAD_OF_SPAWN_M) continue;
+      sFromNode = Math.max(sFromNode, spawnFromNode + ENTRY_POST_RELOCATE_AHEAD_M);
+    }
+    if (sFromNode > len - ENTRY_POST_END_CLEAR_M) return null;
+    return sFromNode;
+  };
+
   const bounds = district.meta.boundsLocalMeters;
   const margin = 40;
   const nearBoundary = (p: Vec2) =>
@@ -389,44 +622,225 @@ export function buildProps(
     // Entering traffic flows AWAY from the boundary node; needs `outgoing`.
     if (ap.edge.oneway && ap.edge.to === nodeId) continue;
     if ((CLASS_RANK[ap.edge.class] ?? 2) < 2) continue; // skip service stubs
-    // Derive the plate from the LOCAL limit instead of hard-coding 50. The kit
-    // ships only the В26-50 face, so it stays honest on a >=50 edge (the
-    // documented ov-* understating quirk is preserved). But on the LOW-SPEED
-    // TAIL of a collinear zone transition — a reduced segment (e.g. the зона-30
-    // end of a 50→30 creep/school street) whose far end is a plain degree-2
-    // limit change back UP to a faster segment — a 50 face would OVERSTATE the
-    // graded cap, so suppress it there rather than post a sign that lies.
-    const localLimit = ap.edge.maxspeed;
-    if (typeof localLimit === "number" && localLimit < 50) {
-      const farId = ap.edge.from === nodeId ? ap.edge.to : ap.edge.from;
-      const touchingFar = network.edges.filter(
-        (eb) => eb.edge.from === farId || eb.edge.to === farId,
-      );
-      const continuation = touchingFar.filter((eb) => eb.edge.id !== ap.edge.id);
-      const isDropTail =
-        touchingFar.length === 2 &&
-        continuation.length === 1 &&
-        (continuation[0]!.edge.maxspeed ?? Infinity) > localLimit;
-      if (isDropTail) continue;
-    }
+    const plate = speedPlate(ap.edge.maxspeed);
+    if (!plate) continue; // no truthful face for this limit — post nothing
     const g = ap.edge.geometry as Vec2[];
     const len = polylineLength(g);
-    const sFromNode = Math.min(14, len * 0.35);
+    const sFromNode = entryStationFromNode(ap.edge, nodeId, len);
+    if (sFromNode === null) continue;
     const s = ap.edge.from === nodeId ? sFromNode : len - sFromNode;
     const { point, tangent } = pointAlong(g, s);
     const travel = ap.edge.from === nodeId ? tangent : mul(tangent, -1); // into district
     const r = perpRight(travel);
     const p = add(point, mul(r, ap.halfWidth + 0.8));
     // Lesson-critical prominence on scenario micro-maps (doc 62 S4/#6): the
-    // entry В26-50 IS the speed context, so it renders at scenario scale like
+    // entry В26 IS the speed context, so it renders at scenario scale like
     // every other lesson sign — undefined elsewhere keeps city/exam placements
     // byte-identical.
-    signs.push({
-      kind: "limit50",
-      position: toWorld(p[0], p[1], ROAD_Y),
-      yaw: yawFromFacing(mul(travel, -1)),
-      ...lessonSized,
-    });
+    if (pushSignAt(p, yawFromFacing(mul(travel, -1)), plate.kind, { speedKmh: plate.speedKmh })) {
+      recordPlate(ap.edge.id, s, ap.edge.from === nodeId ? 1 : -1, plate.speedKmh);
+    }
+  }
+
+  // -- В26 / В33 at mid-route limit changes (doc 86 D6) -------------------------
+  // props.ts iterated network.deadEnds ONLY, so a degree-2 transition node — the
+  // whole subject of sc-sp-limit-end, sc-speed-zone, the school and живущи zones
+  // — was structurally unreachable and shipped with zero plates: the student was
+  // graded against a limit that changed under him with nothing in the world to
+  // announce it.
+  //
+  // Scenario micro-maps only, on the same reasoning as the В1 pass above: every
+  // edge tag on a micro-map is authored BY US and is the lesson, while an OSM
+  // city district's degree-2 tag boundaries are mostly way-splitting artefacts
+  // whose real signage the source never recorded (d2-v1 and district-v1 carry 19
+  // between them). Posting there would trade a missing sign for an invented one.
+  if (lessonScale !== undefined) {
+    const touchingByNode = new Map<string, typeof network.edges>();
+    for (const eb of network.edges) {
+      for (const id of [eb.edge.from, eb.edge.to]) {
+        const bucket = touchingByNode.get(id) ?? [];
+        bucket.push(eb);
+        touchingByNode.set(id, bucket);
+      }
+    }
+    for (const [nodeId, touching] of [...touchingByNode.entries()].sort((a, b) =>
+      a[0] < b[0] ? -1 : 1,
+    )) {
+      if (touching.length !== 2) continue;
+      const [a, b] = touching as [(typeof network.edges)[number], (typeof network.edges)[number]];
+      if (a.edge.roundabout || b.edge.roundabout) continue;
+      const la = a.edge.maxspeed;
+      const lb = b.edge.maxspeed;
+      if (typeof la !== "number" || typeof lb !== "number" || la === lb) continue;
+      // One plate per DIRECTION of travel through the node: a driver arriving
+      // on `from` gets the plate that states `into`'s limit.
+      for (const [from, into] of [
+        [a, b],
+        [b, a],
+      ] as const) {
+        const intoLimit = into.edge.maxspeed as number;
+        const fromLimit = from.edge.maxspeed as number;
+        const plate = speedPlate(intoLimit);
+        if (!plate) continue;
+        const g = into.edge.geometry as Vec2[];
+        const len = polylineLength(g);
+        if (len < TRANSITION_POST_ALONG_M + 2) continue;
+        const forward = into.edge.from === nodeId;
+        // Nobody drives this way on a one-way segment, so nobody would ever
+        // see the plate — and a plate facing traffic that cannot legally exist
+        // is scenery, not signing.
+        if (into.edge.oneway && !forward) continue;
+        if (from.edge.oneway && from.edge.from === nodeId) continue;
+        const sFromNode = TRANSITION_POST_ALONG_M;
+        const { point, tangent } = pointAlong(g, forward ? sFromNode : len - sFromNode);
+        const travel = forward ? tangent : mul(tangent, -1);
+        const r = perpRight(travel);
+        const yaw = yawFromFacing(mul(travel, -1));
+        if (
+          pushSignAt(add(point, mul(r, into.halfWidth + 0.8)), yaw, plate.kind, {
+            speedKmh: plate.speedKmh,
+          })
+        ) {
+          recordPlate(
+            into.edge.id,
+            forward ? sFromNode : len - sFromNode,
+            forward ? 1 : -1,
+            plate.speedKmh,
+          );
+        }
+        // A limit that RISES is a restriction LIFTING, and В33 „Край на
+        // забраната…" is the sign whose entire subject is that scope — the one
+        // sc-sp-limit-end is about. Its own post, set back like the Г12 behind
+        // its Б1, so the pair never merges into one silhouette.
+        if (intoLimit > fromLimit && speedLimitSignKind(fromLimit) !== null) {
+          const back = pointAlong(
+            g,
+            forward
+              ? sFromNode + TRANSITION_END_BACK_M
+              : len - sFromNode - TRANSITION_END_BACK_M,
+          );
+          const backTravel = forward ? back.tangent : mul(back.tangent, -1);
+          pushSignAt(
+            add(back.point, mul(perpRight(backTravel), into.halfWidth + 0.8 + TRANSITION_END_OUT_M)),
+            yawFromFacing(mul(backTravel, -1)),
+            "limitEnd",
+            { speedKmh: fromLimit },
+          );
+        }
+      }
+    }
+  }
+
+  // -- В26 repeated ahead of a spawn that starts inside a limited segment -------
+  // Doc 86 T4/T5 stated as a POSITIVE invariant: a driver must be able to read
+  // the limit he is graded on. A rung that spawns 20 m inside a зона-30 (
+  // sp-sg-spawn-limit1/limit2, sp-tr-spawn-zone, sp-creep2) started PAST the
+  // only В26 on its edge, so the founder's «Ограничението тук е 30 км/ч, не 50»
+  // arrived with nothing in the world to back it. Bulgarian practice repeats
+  // В26 through a long restricted stretch anyway (the same reasoning as
+  // zoneSigns' ZONE_SIGN_REPEAT_M for В24), so the repeat is correct signing,
+  // not a crutch. Truthful by construction: it states the spawn edge's own tag.
+  if (lessonScale !== undefined) {
+    for (const sp of district.spawnPoints) {
+      const eb = network.edgeById.get(sp.edgeId);
+      if (!eb) continue;
+      const plate = speedPlate(eb.edge.maxspeed);
+      if (!plate) continue;
+      const g = eb.edge.geometry as Vec2[];
+      const len = polylineLength(g);
+      const proj = projectOntoPolyline(g, [sp.x, sp.y]);
+      const rad = (sp.heading * Math.PI) / 180;
+      const head: Vec2 = [Math.sin(rad), Math.cos(rad)];
+      const dirSign: 1 | -1 = head[0] * proj.tangent[0] + head[1] * proj.tangent[1] >= 0 ? 1 : -1;
+      const sSpawn = dirSign === 1 ? proj.s : len - proj.s;
+      const alreadyAnnounced = platesAhead.some(
+        (pl) =>
+          pl.edgeId === sp.edgeId &&
+          pl.dirSign === dirSign &&
+          pl.kmh === plate.speedKmh &&
+          pl.sAlongTravel > sSpawn + 3,
+      );
+      if (alreadyAnnounced) continue;
+      const sPost = sSpawn + SPAWN_CONTEXT_AHEAD_M;
+      if (sPost > len - ENTRY_POST_END_CLEAR_M) continue; // no room before the mouth
+      const geomS = dirSign === 1 ? sPost : len - sPost;
+      const { point, tangent } = pointAlong(g, geomS);
+      const travel = dirSign === 1 ? tangent : mul(tangent, -1);
+      const p = add(point, mul(perpRight(travel), eb.halfWidth + 0.8));
+      if (pushSignAt(p, yawFromFacing(mul(travel, -1)), plate.kind, { speedKmh: plate.speedKmh })) {
+        recordPlate(sp.edgeId, geomS, dirSign, plate.speedKmh);
+      }
+    }
+  }
+
+  // -- Д4 „Еднопосочно движение" at the LEGAL mouth of a one-way arm ------------
+  // The В1 pass above closes the mouth a driver may not enter; Д4 is its twin
+  // and the founder named it directly (item 47 — „the blue one way sign is
+  // straight forward"). It shipped as neither a GLB nor a SignKind; the face is
+  // now rasterised from content/signs/svg/d4.svg onto the square info plate.
+  // Same scenario-map gate and same reasoning as В1.
+  if (lessonScale !== undefined) {
+    const onewayEdges = network.edges.filter((eb) => eb.edge.oneway && !eb.edge.roundabout);
+    for (const eb of onewayEdges) {
+      // Д4 means „this STREET is one-way", never „this is one carriageway of a
+      // divided road" (that is Д5/Д6 territory) and never a motorway. Three
+      // filters, in order of how wrong the sign would be:
+      //  1. class — a motorway/trunk carriageway or a slip road is not a
+      //     one-way street;
+      if (ONEWAY_STREET_EXCLUDED_CLASSES.has(eb.edge.class) || eb.edge.class.endsWith("_link")) {
+        continue;
+      }
+      const g = eb.edge.geometry as Vec2[];
+      const len = polylineLength(g);
+      if (len < 12) continue;
+      const mid = pointAlong(g, len / 2);
+      //  2. an ANTI-PARALLEL one-way twin running alongside = a divided road,
+      //     which is how mw-v1's two carriageways are modelled;
+      const hasTwin = onewayEdges.some((other) => {
+        if (other.edge.id === eb.edge.id) return false;
+        const proj = projectOntoPolyline(other.edge.geometry as Vec2[], mid.point);
+        if (proj.distance > DIVIDED_TWIN_MAX_LATERAL_M) return false;
+        return mid.tangent[0] * proj.tangent[0] + mid.tangent[1] * proj.tangent[1] < -0.8;
+      });
+      if (hasTwin) continue;
+      //  3. the post belongs at the street's MOUTH — the `from` node of a
+      //     one-way edge — and only where that node really is a mouth (a
+      //     junction or a district boundary), never at the degree-2 seam
+      //     between two collinear segments of the same street.
+      const mouth = network.nodes.get(eb.edge.from);
+      if (!mouth || (mouth.degree === 2 && !network.deadEnds.has(eb.edge.from))) continue;
+      const { point, tangent } = pointAlong(g, Math.min(8, len * 0.2));
+      const p = add(point, mul(perpRight(tangent), eb.halfWidth + 0.8));
+      pushSignAt(p, yawFromFacing(mul(tangent, -1)), "oneWay");
+    }
+  }
+
+  // -- А18 „Пешеходна пътека" in ADVANCE of an authored zebra --------------------
+  // Doc 86 D5: sign_pedestrian.glb shipped finished with no SignKind. Placed on
+  // the approach side, CROSSING_WARNING_AHEAD_M before the crossing — the same
+  // discipline the rail warning already had and the hazard posts did not (T14).
+  // Scenario maps only: an OSM district's crossings are data, not authored
+  // teaching objects, and 90 city zebras would each grow a triangle the real
+  // street does not have.
+  if (lessonScale !== undefined) {
+    for (const crossing of district.crossings) {
+      if (!crossing.edgeId) continue;
+      const eb = network.edgeById.get(crossing.edgeId);
+      if (!eb) continue;
+      const g = eb.edge.geometry as Vec2[];
+      const len = polylineLength(g);
+      const at = projectOntoPolyline(g, [crossing.x, crossing.y]);
+      // One post per direction that has room to read it.
+      for (const forward of [true, false] as const) {
+        const sPost = forward ? at.s - CROSSING_WARNING_AHEAD_M : at.s + CROSSING_WARNING_AHEAD_M;
+        if (forward && sPost < CROSSING_WARNING_MIN_ROOM_M) continue;
+        if (!forward && sPost > len - CROSSING_WARNING_MIN_ROOM_M) continue;
+        const { point, tangent } = pointAlong(g, sPost);
+        const travel = forward ? tangent : mul(tangent, -1);
+        const p = add(point, mul(perpRight(travel), eb.halfWidth + 0.8));
+        pushSignAt(p, yawFromFacing(mul(travel, -1)), "pedestrianCrossing");
+      }
+    }
   }
 
   // -- streetlights along arterials --------------------------------------------

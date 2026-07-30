@@ -2,13 +2,13 @@
  "format": "district-v1",
  "meta": {
   "district": "pe-child",
-  "label": "Учебна улица — дете тича след топка (сценарий PE-04)",
+  "label": "Междублоково пространство с редица гаражи (сценарий PE-04)",
   "mapKind": "scenario-street",
   "generator": "tools/maps/gen_pe_crossings.mjs",
   "boundsLocalMeters": {
-   "minX": -26,
+   "minX": -44,
    "minY": 0,
-   "maxX": 14.125,
+   "maxX": 19,
    "maxY": 138
   },
   "attribution": {
@@ -28,7 +28,7 @@
    "edges": 1,
    "intersections": 0,
    "crossings": 1,
-   "buildings": 1,
+   "buildings": 5,
    "spawnPoints": 2
   },
   "scenario": {
@@ -38,6 +38,8 @@
     "signalized": "no",
     "approachM": 78
    },
+   "streetscape": "courtyard-blocks",
+   "streetscapeNoteBg": "Два панелни блока с междублоково пространство, чието устие гледа право към пътеката: децата излизат от двора, а редицата гаражи отдясно крие погледа.",
    "primaryCrossingId": "pe-x-1",
    "laneCenterRightM": 4.06,
    "crossings": [
@@ -104,117 +106,117 @@
  "roundabouts": [],
  "buildings": [
   {
-   "id": "pe-b-shop",
-   "height": 4.5,
+   "id": "pe-b-slab-s",
+   "height": 17,
+   "heightSource": "default",
+   "footprint": [
+    [
+     -44,
+     18
+    ],
+    [
+     -13.2,
+     18
+    ],
+    [
+     -13.2,
+     65
+    ],
+    [
+     -44,
+     65
+    ]
+   ]
+  },
+  {
+   "id": "pe-b-slab-n",
+   "height": 17,
+   "heightSource": "default",
+   "footprint": [
+    [
+     -44,
+     85
+    ],
+    [
+     -13.2,
+     85
+    ],
+    [
+     -13.2,
+     124
+    ],
+    [
+     -44,
+     124
+    ]
+   ]
+  },
+  {
+   "id": "pe-b-playhouse",
+   "height": 3,
    "heightSource": "default",
    "footprint": [
     [
      -26,
-     44
+     70
     ],
     [
-     -16,
-     44
+     -17,
+     70
     ],
     [
-     -16,
-     56
+     -17,
+     80
     ],
     [
      -26,
-     56
+     80
     ]
    ]
   },
   {
-   "id": "sw-pe-e-street-r0",
-   "height": 17,
-   "heightSource": "levels",
+   "id": "pe-b-garages",
+   "height": 2.8,
+   "heightSource": "default",
    "footprint": [
     [
-     16.64,
-     19.14
+     12.7,
+     26
     ],
     [
-     16.64,
-     46.86
+     19,
+     26
     ],
     [
-     37.74,
-     46.86
+     19,
+     66
     ],
     [
-     37.74,
-     19.14
+     12.7,
+     66
     ]
    ]
   },
   {
-   "id": "sw-pe-e-street-r1",
-   "height": 20.4,
-   "heightSource": "levels",
+   "id": "pe-b-garages-n",
+   "height": 2.8,
+   "heightSource": "default",
    "footprint": [
     [
-     18.97,
-     54.02
+     12.7,
+     84
     ],
     [
-     18.97,
-     83.98
+     19,
+     84
     ],
     [
-     41.86,
-     83.98
+     19,
+     108
     ],
     [
-     41.86,
-     54.02
-    ]
-   ]
-  },
-  {
-   "id": "sw-pe-e-street-r2",
-   "height": 27.2,
-   "heightSource": "levels",
-   "footprint": [
-    [
-     18.3,
-     88.37
-    ],
-    [
-     18.3,
-     121.63
-    ],
-    [
-     34.98,
-     121.63
-    ],
-    [
-     34.98,
-     88.37
-    ]
-   ]
-  },
-  {
-   "id": "sw-pe-e-street-l2",
-   "height": 17,
-   "heightSource": "levels",
-   "footprint": [
-    [
-     -17.32,
-     90.05
-    ],
-    [
-     -17.32,
-     119.95
-    ],
-    [
-     -35.89,
-     119.95
-    ],
-    [
-     -35.89,
-     90.05
+     12.7,
+     108
     ]
    ]
   }

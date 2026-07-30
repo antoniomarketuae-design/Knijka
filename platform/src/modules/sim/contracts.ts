@@ -658,15 +658,20 @@ export interface PriorityFromRightSpec extends StagedEventBase {
   clearSpeedMps: number;
   /**
    * S2 witness gate (doc 62 founder R3 — staged-car timing vs live pacing):
-   * when set, reaching the near-line commit distance alone does NOT release
-   * the held car through the box. The release additionally waits until the
-   * player is genuinely about to arrive: raw (unfloored) ETA to their own
-   * stop line at/under `etaSec`, OR within `nearLineM` of the line (a
-   * stopped/creeping student at the mouth). This guarantees the conflict is
-   * PRESENT when a slow live player reaches the junction, at any pace —
-   * while a scripted-pace approach (≳ 10 km/h at the commit gate) commits on
-   * the same frame as the legacy rule, keeping recorded choreography
-   * identical. Absent = the legacy distance-only commit, byte-identical.
+   * reaching the near-line commit distance alone does NOT release the held car
+   * through the box. The release additionally waits until the player is
+   * genuinely about to arrive: raw (unfloored) ETA to their own stop line
+   * at/under `etaSec`, OR within `nearLineM` of the line, OR stopped at the
+   * mouth. This guarantees the conflict is PRESENT when a slow live player
+   * reaches the junction, at any pace — while a scripted-pace approach
+   * (≳ 10 km/h at the commit gate) commits on the same frame as the legacy
+   * rule, keeping recorded choreography identical.
+   *
+   * ABSENT = the DEFAULT gate `{ etaSec: 8, nearLineM: 6 }` (ledger L7 — it
+   * was opt-in and eight of thirteen specs never opted in, so a student
+   * obeying «приближи бавно» reached an empty junction). Author it only to
+   * TIGHTEN or LOOSEN those numbers; there is no way to ask for an
+   * unwitnessed release, because there is no lesson in one.
    */
   witnessArm?: { etaSec: number; nearLineM: number };
 }
@@ -697,6 +702,26 @@ export interface BrakingLeadCarSpec extends StagedEventBase {
   triggersHazard: boolean;
   /** Seconds after resolution before the lead car drives on. */
   resumeAfterSec: number;
+  /**
+   * How the lead PACES before the slam (ledger T17). Default "matchPlayer" —
+   * the historical rubber band `target = playerSpeed + 0.55 × (gapM − gap)`,
+   * whose fixed point is `gap = gapM`: the metric distance is frozen, so a
+   * TIME-gap fault like FOLLOWING_TOO_CLOSE becomes a pure function of the
+   * speedometer and the taught corrective action (ease off, let the gap grow)
+   * is physically impossible — the lead slows to close it again.
+   *
+   * "scheduledCruise" drives a fixed speed along the actor's OWN arc instead,
+   * with `playerGuard` as the only remaining coupling: the lead waits at its
+   * hold pose until the player closes to `armDistM` (or, absent that, the
+   * follow gap + 12 m), then cruises `paceSpeedMps`. Backing off then really
+   * does open the gap. Following drills that grade a GAP want this; drills
+   * that need the actor pinned alongside the player (blind-spot pace cars)
+   * want the band.
+   */
+  paceMode?: "matchPlayer" | "scheduledCruise";
+  /** Scheduled-cruise speed, m/s. Default `actor.cruiseSpeedMps`. Ignored
+   *  under "matchPlayer". */
+  paceSpeedMps?: number;
 }
 
 /** A slow "cyclist" (narrow scripted vehicle-agent — honest v1 actor-model
@@ -1052,6 +1077,23 @@ export interface CutInLeadCarSpec extends StagedEventBase {
   cutSpeedMps: number;
   /** Actor this far ahead of the player (player frame) = encounter over, m. */
   clearAheadM: number;
+  /**
+   * How the actor PACES before the cut (ledger T17/L11). Default
+   * "matchPlayer" — the rubber band, correct for a true cut-in where the
+   * cutter must stay abeam until it dives in.
+   *
+   * "scheduledCruise" makes the actor a plain slow vehicle driving its own
+   * fixed profile: it holds until the player closes to `paceAheadM`, then
+   * cruises `paceSpeedMps` (default `actor.cruiseSpeedMps`) and can be
+   * genuinely OVERTAKEN in world space. This is what an "overtake the slow
+   * truck" lesson needs: under the band the rig paced the player forever and
+   * the pass was never completed in world space, yet both success gates
+   * ticked — the lesson scored a pass for an overtake that never happened.
+   */
+  paceMode?: "matchPlayer" | "scheduledCruise";
+  /** Scheduled-cruise speed, m/s. Default `actor.cruiseSpeedMps`. Ignored
+   *  under "matchPlayer". */
+  paceSpeedMps?: number;
 }
 
 /**
@@ -1200,7 +1242,16 @@ export interface StagedEventOutcome {
     | "collision" // physical contact with the staged actor
     | "stoppedInTime" // brakingLeadCar: full stop with gap left
     | "hitLeadCar" // brakingLeadCar: rear-ended the lead
-    | "passedWithoutStopping"; // brakingLeadCar: swerved past the stimulus
+    | "passedWithoutStopping" // brakingLeadCar: swerved past the stimulus
+    /**
+     * The encounter never happened — the player drove past the site without
+     * the actor ever being released (ledger L8). Always `success: false`: a
+     * pedestrian drill in which no pedestrian stepped onto the carriageway is
+     * not a pass, and the debrief must say «тази ситуация не се случи» rather
+     * than award the lesson. Consumers that switch on `detail` should treat it
+     * as "not measured", never as a clean run.
+     */
+    | "notEncountered";
   /** Session time of resolution, s. */
   tSec: number;
   /** Stimulus onset → first brake application, s (dart-out + lead car). */

@@ -143,13 +143,22 @@ describe("ex-ped-dart-out (crossing n11364730203, westbound straight)", () => {
     ).toBe(true);
   });
 
-  it("never fires for a slow crawl (exam arming holds)", () => {
+  /**
+   * L8 (ledger §4) — RE-BASELINED; see the twin note in
+   * events-integration.test.ts. The old `toHaveLength(0)` under "never fires
+   * for a slow crawl" pinned the defect: an exam candidate could crawl the
+   * whole leg under `minTriggerSpeedKmh` (20) and be marked as having handled
+   * a pedestrian encounter that never occurred. The crawl now meets her.
+   */
+  it("L8: a crawl under the trigger speed still MEETS the pedestrian", () => {
     const stack = makeStack([spec]);
     const driver = new PolyDriver(path(), 0);
-    for (let i = 0; i < 90 * 30; i++) {
-      stepFrame(stack, driver.advance(DT, 4)); // ~14 km/h, under the trigger
+    for (let i = 0; i < 90 * 30 && stack.outcomes.length === 0; i++) {
+      stepFrame(stack, driver.advance(DT, 2.5)); // 9 km/h — under the 20 floor
       if (driver.s >= driver.length) break;
     }
-    expect(stack.outcomes).toHaveLength(0);
+    expect(stack.outcomes).toHaveLength(1);
+    expect(stack.outcomes[0].eventId).toBe("ex-ped-dart-out");
+    expect(stack.outcomes[0].detail).not.toBe("notEncountered");
   });
 });

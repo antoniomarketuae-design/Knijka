@@ -80,16 +80,54 @@ describe("scenario level progression (progress.ts)", () => {
     ]);
   });
 
-  it(`≥ ${SCENARIO_UNLOCK_MIN_STARS}★ on a level opens the NEXT one; 1★ does not`, () => {
-    const oneStar = scenarioLevelProgress(SC_PARK_PERP_REV, [row(1, 1)]);
-    expect(oneStar.find((l) => l.level === 2)!.unlocked).toBe(false);
-
+  it(`≥ ${SCENARIO_UNLOCK_MIN_STARS}★ marks a level PASSED and opens the next`, () => {
     const twoStars = scenarioLevelProgress(SC_PARK_PERP_REV, [row(1, 2)]);
+    expect(twoStars.find((l) => l.level === 1)!.passed).toBe(true);
     expect(twoStars.find((l) => l.level === 2)!.unlocked).toBe(true);
+    expect(twoStars.find((l) => l.level === 2)!.unlockedBy).toBe("stars");
+    // Two rungs ahead is still shut — the ladder opens one step at a time.
     expect(twoStars.find((l) => l.level === 3)!.unlocked).toBe(false);
 
     const ladder = scenarioLevelProgress(SC_PARK_PERP_REV, [row(1, 3), row(2, 2), row(3, 3)]);
     expect(ladder.map((l) => l.unlocked)).toEqual([true, true, true, true]);
+  });
+
+  /**
+   * B9 (doc 86 §3) — RE-BASELINED 2026-07-30. This assertion used to read
+   * „1★ does not open the next level", and that was the defect, not the rule.
+   *
+   * `scoreRubric` pins a run at 1★ whenever `completedAll` is false, and 128
+   * of 154 templates carry a `parTimeSec`-only rubric with no measured
+   * component — so a single unfinished objective locked the whole rest of the
+   * template, including the eighteen ways doc 86 §2 shows the SIMULATOR
+   * produced that unfinished objective (a fault fired where the world had no
+   * referent, a marker stood past the line it graded, a car had already gone).
+   * Founder ruling, verbatim: «Users should always have the option to continue
+   * to the next lesson immediately and return later.»
+   *
+   * So an ATTEMPT opens the next rung and the star bar keeps its real job:
+   * saying whether this one was passed. Both facts ship, so nothing is hidden.
+   */
+  it("B9: one ATTEMPT opens the next rung — 1★ advances but stays unpassed", () => {
+    const oneStar = scenarioLevelProgress(SC_PARK_PERP_REV, [row(1, 1)]);
+    const l1 = oneStar.find((l) => l.level === 1)!;
+    const l2 = oneStar.find((l) => l.level === 2)!;
+
+    expect(l2.unlocked).toBe(true);
+    expect(l2.unlockedBy).toBe("attempt");
+    // …and the rung he moved past is still visibly owed.
+    expect(l1.passed).toBe(false);
+    expect(l1.bestStars).toBe(1);
+    // The wall never extends past the rung actually attempted.
+    expect(oneStar.find((l) => l.level === 3)!.unlocked).toBe(false);
+  });
+
+  it("B9: an attempt with NO stars recorded at all still opens the next rung", () => {
+    // A session that never produced a rubric row (aborted, or an older row)
+    // is still evidence the student was here — the wall was the bug.
+    const p = scenarioLevelProgress(SC_PARK_PERP_REV, [row(1, null)]);
+    expect(p.find((l) => l.level === 2)!.unlocked).toBe(true);
+    expect(p.find((l) => l.level === 1)!.passed).toBe(false);
   });
 
   it("tracks attempts + best stars per level; foreign rows are ignored", () => {
@@ -110,6 +148,8 @@ describe("scenario level progression (progress.ts)", () => {
     expect(isScenarioLevelUnlocked(SC_PARK_PERP_REV, 1, [])).toBe(true);
     expect(isScenarioLevelUnlocked(SC_PARK_PERP_REV, 2, [])).toBe(false);
     expect(isScenarioLevelUnlocked(SC_PARK_PERP_REV, 2, [row(1, 2)])).toBe(true);
+    // B9: and on an attempt alone, exactly like the fold above.
+    expect(isScenarioLevelUnlocked(SC_PARK_PERP_REV, 2, [row(1, 1)])).toBe(true);
   });
 });
 

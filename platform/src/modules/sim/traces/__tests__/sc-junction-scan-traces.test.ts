@@ -3,10 +3,13 @@
  * JU-23), doc 76 §5/§9 stages 3+5. The junction-scan detector ships config-OFF;
  * the recorder enables it via ruleConfig (the per-lesson drill opt-in), so the
  * gate replays with the drill ON:
- *   1. SHADOW: full stop + ляво-дясно-ляво scan → ZERO violations
- *      (FULL_STOP_AT_STOP_SIGN, no JUNCTION_SCAN_INCOMPLETE).
- *   2. MISTAKE DEMOS grade EXACTLY JUNCTION_SCAN_INCOMPLETE (no-scan and
- *      single-glance), never STOP_SIGN_NO_FULL_STOP (they stop fully).
+ *   1. SHADOW: full stop + ляво-дясно-ляво scan + a real WAIT for the staged
+ *      priority car → ZERO violations (FULL_STOP_AT_STOP_SIGN, no
+ *      JUNCTION_SCAN_INCOMPLETE), and the conflict resolves as "yielded".
+ *   2. MISTAKE DEMOS grade exactly their authored codeRefs — since T9 staged
+ *      the car the lesson always talked about, that is JUNCTION_SCAN_INCOMPLETE
+ *      *and* FAILED_TO_YIELD: not looking and not yielding are the same event.
+ *      Never STOP_SIGN_NO_FULL_STOP (they stop fully).
  *   3. COMMITTED FILES under content/traces/sc-junction-scan/ ARE the
  *      recordings, byte-for-byte, with identical public copies.
  *
@@ -50,13 +53,30 @@ describe("sc-junction-scan — the shadow gate (doc 76 §5)", () => {
     expect(violationCodes(shadow)).toEqual([]);
     expect(commendationCodes(shadow)).toContain("FULL_STOP_AT_STOP_SIGN");
   });
+
+  /**
+   * T9 (ledger §2): the drill graded a scan against an empty map for its whole
+   * life — the objective, instruction 4, the teach copy and both mistake
+   * narrations all asserted a car that did not exist. This pins the car so it
+   * cannot be dropped again: the template must stage it, and the correct
+   * demonstration must actually wait for it.
+   */
+  it("stages the priority car its copy promises, and the shadow yields to it", () => {
+    expect(SC_JUNCTION_SCAN.staged ?? []).toHaveLength(1);
+    const outcome = shadow.outcomes.find((o) => o.eventId === "sc-jscan-conflict");
+    expect(outcome, "the staged conflict never resolved — the car was not met").toBeDefined();
+    expect(outcome!.success).toBe(true);
+    expect(outcome!.detail).toBe("yielded");
+  });
 });
 
 describe("sc-junction-scan — mistakes grade their exact codes (doc 76 §9 stage 5)", () => {
   for (const [i, name] of (["mistake-no-scan", "mistake-single-glance"] as const).entries()) {
-    it(`${name}: exactly JUNCTION_SCAN_INCOMPLETE, no STOP_SIGN_NO_FULL_STOP`, () => {
+    it(`${name}: exactly its authored codeRefs, no STOP_SIGN_NO_FULL_STOP`, () => {
       const codes = [...new Set(violationCodes(drives.get(name)!))].sort();
       expect(codes).toEqual([...SC_JUNCTION_SCAN.mistakes[i].codeRefs].sort());
+      // T9: the unlooked-at car is now real, so the demo takes its priority.
+      expect(codes).toContain("FAILED_TO_YIELD");
       expect(codes).not.toContain("STOP_SIGN_NO_FULL_STOP");
       expect(codes).not.toContain("TURN_WITHOUT_INDICATOR");
     });

@@ -182,3 +182,85 @@ describe("staged laneShift", () => {
     expect(view.speedMps).toBeLessThan(13);
   });
 });
+
+/**
+ * L6 — the INDICATOR CHANNEL (ledger §4).
+ *
+ * The renderer used to derive the blinker from yaw rate: `TrafficLayer`
+ * smoothed a steer signal and armed the lamp only above |steer| > 0.07. A
+ * `laneShift` is a lateral GLIDE, and the arithmetic is decisive — 8.125 m
+ * over 1.5 s at 11 m/s turns the heading by 0.457 rad in ONE step, whose
+ * smoothed steer peaks at 0.0624, under the threshold, and decays. The lamp
+ * provably never armed for a lane change. Founder lesson 43: he could not
+ * anticipate the merge because the car genuinely never signalled.
+ *
+ * The channel is now explicit, commanded, and published on both the agent
+ * state (what the renderer reads) and the staged view (what the orchestrator
+ * and the encounter battery read).
+ */
+describe("staged indicator (ledger L6)", () => {
+  it("a staged vehicle is born with the lamp off and publishes it", () => {
+    const traffic = sys();
+    const view = stageCar(traffic);
+    expect(view.indicator).toBe("off");
+    const state = traffic.vehicles.find((v) => v.id >= 1000);
+    expect(state?.indicator).toBe("off");
+  });
+
+  it("setIndicator publishes immediately — the lead time is measured from here", () => {
+    const traffic = sys();
+    const view = stageCar(traffic);
+    traffic.stagedCommand("car", { type: "setIndicator", indicator: "left" });
+    // No update() in between: the lamp is on THIS frame, not the next one.
+    expect(view.indicator).toBe("left");
+    expect(traffic.vehicles.find((v) => v.id >= 1000)?.indicator).toBe("left");
+  });
+
+  it("survives motion, and reset returns it to off", () => {
+    const traffic = sys();
+    const view = stageCar(traffic);
+    traffic.stagedCommand("car", { type: "setIndicator", indicator: "right" });
+    traffic.stagedCommand("car", { type: "cruise" });
+    for (let i = 0; i < 60; i++) traffic.update(DT, CTX);
+    expect(view.indicator).toBe("right");
+    expect(view.speedMps).toBeGreaterThan(0);
+    traffic.stagedCommand("car", { type: "reset" });
+    expect(view.indicator).toBe("off");
+  });
+
+  it("the view exposes the live lateral offset, so 'the first lateral metre' is measurable", () => {
+    const traffic = sys();
+    const view = stageCar(traffic);
+    expect(view.lateralOffsetM).toBe(0);
+    traffic.stagedCommand("car", { type: "cruise" });
+    traffic.stagedCommand("car", { type: "laneShift", toOffsetM: -LANE_SHIFT, rampSec: 1.5 });
+    let firstMetreSec: number | null = null;
+    for (let i = 0; i < 60 * 3; i++) {
+      traffic.update(DT, CTX);
+      if (firstMetreSec === null && Math.abs(view.lateralOffsetM ?? 0) >= 1) {
+        firstMetreSec = (i + 1) * DT;
+      }
+    }
+    // 1 m of an 8.125 m shift over a 1.5 s ramp = 0.185 s. THIS is why a
+    // 2.5 s warning has to be armed by prediction, never by the glide itself.
+    expect(firstMetreSec).not.toBeNull();
+    expect(firstMetreSec!).toBeCloseTo(0.185, 1);
+    expect(Math.abs(view.lateralOffsetM ?? 0)).toBeCloseTo(LANE_SHIFT, 6);
+  });
+
+  it("pedestrians ignore setIndicator (vehicle-only, like laneShift)", () => {
+    const traffic = sys();
+    const view = traffic.stage({
+      kind: "pedestrian",
+      id: "ped",
+      path: [
+        { x: -5, y: 100 },
+        { x: 15, y: 100 },
+      ],
+      speedMps: 1.3,
+    })!;
+    expect(view).not.toBeNull();
+    traffic.stagedCommand("ped", { type: "setIndicator", indicator: "left" });
+    expect(view.indicator).toBe("off");
+  });
+});

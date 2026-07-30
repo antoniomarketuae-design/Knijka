@@ -119,6 +119,33 @@ const SCRIPTS: Record<ScFollowRainGapTraceName, { kind: "shadow" | "mistake"; sc
  * detector's per-lesson opt-in), ambient traffic zero. Deterministic: same
  * district → same trace (rule config does not affect the serialized trace bytes).
  */
+/**
+ * The staged rig for a given demo (the scFollowDistanceStaged pattern).
+ *
+ * LEDGER T17/T18: the DRILL's lead is now a scheduled cruise from 33 m of
+ * centres, because measured through this very recorder the old matchPlayer rig
+ * put the SHADOW's minimum time gap at 1.30 s — against a base fire line of
+ * 1.26 s and this template's own WET fire line of 2.02 s. The two mistake
+ * demos keep PINNED clones of the historical 23 m rig: their whole job is to
+ * hold a dry-habit gap at 40 km/h in the rain, which needs a lead that stays
+ * where the tape expects it.
+ */
+function scFollowRainGapStaged(name: ScFollowRainGapTraceName): StagedEventSpec[] {
+  const base = [...(SC_FOLLOW_RAIN_GAP.staged ?? [])] as StagedEventSpec[];
+  if (name === "shadow-correct") return base;
+  return base.map((e) =>
+    e.kind === "brakingLeadCar" && e.id === "sc-fr-lead"
+      ? {
+          ...e,
+          paceMode: "matchPlayer" as const,
+          followGapM: 23, // the historical pin the two demo tapes were authored against
+          maxMatchSpeedMps: 13,
+          actor: { ...e.actor, cruiseSpeedMps: 7, hold: { nodeIndex: 0, offsetM: 30 } },
+        }
+      : e,
+  );
+}
+
 export function recordScFollowRainGapDrive(
   districtRaw: unknown,
   name: ScFollowRainGapTraceName,
@@ -130,7 +157,7 @@ export function recordScFollowRainGapDrive(
     kind,
     seed: 7,
     rain: true,
-    stagedEvents: [...(SC_FOLLOW_RAIN_GAP.staged ?? [])] as StagedEventSpec[],
+    stagedEvents: scFollowRainGapStaged(name),
     ruleConfig: { followRainAwareEnabled: true },
     ...(extra?.onTick ? { onTick: extra.onTick } : {}),
   });

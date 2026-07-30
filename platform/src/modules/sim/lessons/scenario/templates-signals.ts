@@ -30,8 +30,14 @@
  * Geometry pinned to sx-v1 (battery sx-district.test.ts):
  *   - sx-n-c is ONE single-node signal cluster at the origin (degree 4);
  *   - drawn lane centers sit ±4.0625 m off the road centerline;
- *   - the 18 m right-hand-rule conviction core around the node is identical to
- *     tj-rhr/tj-occluded; the shadows yield at y = −19.5 — outside the core.
+ *   - the derived stop line on every arm is 27.725 m from the node (mouth
+ *     27.125 + 0.6 paint inset), NOT the 17 m of tj-rhr/tj-occluded — sx-v1's
+ *     ns road is `secondary`, so its half-width carries a parking band and its
+ *     corner radius is the arterial 15 m. T7 (ledger §2) was exactly this
+ *     confusion: `lineDistM 18` copied tj-rhr's mouth onto a map whose paint is
+ *     9.7 m further out. Both shadows now yield at y = −29.5 — 1.78 m SHORT of
+ *     the line, the proven sc-signal-redyellow / sc-jx-blocked-exit hold pose —
+ *     and still well outside the engine's 18 m right-hand-rule core.
  */
 
 import type { ScenarioSpec } from "./types";
@@ -39,6 +45,91 @@ import type { PriorityFromRightSpec, TrafficControllerSpec } from "../../contrac
 
 /** Drawn lane-center offset from the road centerline on sx-v1, m. */
 export const SIGNAL_LANE_CENTER_M = 4.0625;
+
+// ---------------------------------------------------------------------------
+// L4 (ledger §4) — the регулировчик's gestures, and what each one MEANS
+// ---------------------------------------------------------------------------
+
+/** A posture the JU-18 officer can hold (ППЗДвП чл. 66). */
+export type ControllerPosture = "sideProfile" | "chestOrBack" | "armRaised";
+
+/**
+ * One gesture, explained the way the founder asked for it: not „that is the
+ * side profile" but **who may go, who must stop, and whose priority it is.**
+ *
+ * THEO-4: a student watching a figure change pose learns nothing from the pose
+ * alone — the simulator has to say what it MEANS, in the same breath, or it is
+ * a bare correct/wrong verdict wearing a costume. `lawRef` is retrieval, not
+ * recall (ADR-002): ППЗДвП чл. 66 defines these three postures and ЗДвП чл. 7
+ * puts them above the lamps and the signs.
+ */
+export interface ControllerGesture {
+  posture: ControllerPosture;
+  /** What the student is looking at — the physical read. */
+  poseBg: string;
+  /** Who may go. */
+  goBg: string;
+  /** Who must stop. */
+  stopBg: string;
+  /** Whose priority it is, and why it beats what the lamp says. */
+  priorityBg: string;
+  lawRef: string;
+}
+
+/**
+ * The three postures, in the order the drills teach them.
+ *
+ * WHERE THIS IS CONSUMED, and the honest gap. The founder asked twice for a
+ * BUBBLE ABOVE THE OFFICER carrying these sentences while he holds each pose,
+ * and that is the right place for them — a caption on the thing you are being
+ * asked to read. Rendering it needs `traffic/TrafficLayer.tsx` (an `Html`
+ * label anchored to the staged `directTraffic` figure, which already knows the
+ * live posture from the cluster's controller schedule) and a carrier field on
+ * `TrafficControllerSpec` in `contracts.ts`. Both files belong to other lanes
+ * in this wave, so this lane authors the CONTENT — typed, exported, pinned by
+ * controller-gestures.test.ts, and ready for a one-line import — and ships the
+ * same three questions today through the copy channel it does own: every
+ * posture named in the three controller drills' `instructionsBg` and `teach`
+ * now answers go / stop / priority explicitly, instead of naming the pose.
+ */
+export const CONTROLLER_GESTURES: readonly ControllerGesture[] = [
+  {
+    posture: "sideProfile",
+    poseBg: "Страничен профил към теб, ръцете отпуснати надолу",
+    goBg: "Минаваш ТИ и всички по твоята посока — направо, надясно и наляво.",
+    stopBg: "Спира напречното направление, което гледа гърдите или гърба му.",
+    priorityBg:
+      "Предимството е твое, дори лампата да свети червено: сигналът на регулировчика е над светофара, над знаците и над маркировката. Изчакваш само пешеходците, които вече са стъпили на платното.",
+    lawRef: "ППЗДвП чл. 66; ЗДвП чл. 7",
+  },
+  {
+    posture: "chestOrBack",
+    poseBg: "Обърнат е с ГЪРДИ или с ГРЪБ към теб — виждаш го анфас, не отстрани",
+    goBg: "Минава напречното направление — това, което вижда профила му.",
+    stopBg: "Спираш ТИ, преди стоп-линията, и чакаш там.",
+    priorityBg:
+      "Предимството не е твое, дори лампата да свети зелено. Зеленото не отменя регулировчика — той го отменя. Тръгването срещу гърдите му е опасна грешка и прекратява изпита.",
+    lawRef: "ППЗДвП чл. 66; ЗДвП чл. 7",
+  },
+  {
+    posture: "armRaised",
+    poseBg: "Едната ръка вдигната вертикално нагоре",
+    goBg: "Никой. Вдигнатата ръка не пуска никого — тя е „внимание“.",
+    stopBg:
+      "Спират ВСИЧКИ посоки. Който вече е навлязъл в кръстовището, го освобождава и излиза.",
+    priorityBg:
+      "Това е смяна на фазите: регулировчикът прибира едното направление, за да пусне другото. Най-скъпата грешка тук е да я прочетеш като „тръгвай“ — потегляш точно в секундата, в която напречното платно се освобождава за някой друг.",
+    lawRef: "ППЗДвП чл. 66",
+  },
+];
+
+/** The three staged JU-18 controller events these gestures explain — the ids a
+ *  renderer keys the bubble off. Pinned by controller-gestures.test.ts. */
+export const CONTROLLER_GESTURE_EVENT_IDS: readonly string[] = [
+  "sc-sctrl-controller", // sc-signal-controller
+  "sc-sctl-officer", // sc-sig-controller-live
+  "sc-sctp-officer", // sc-sig-controller-postures
+];
 
 // ---------------------------------------------------------------------------
 // sc-signal-dead — „Загаснал светофар" (JU-20) on sx-v1
@@ -69,7 +160,31 @@ export const SC_SIGNAL_DEAD_CONFLICT: PriorityFromRightSpec = {
   junctionNodeIndex: 1,
   armDistM: 70,
   leadSec: -3.5,
-  lineDistM: 18,
+  /**
+   * T7 (ledger §2) — this used to read 18, which is not a stop line on sx-v1:
+   * it is `RHR_CORE_RADIUS_M` (runtime/worldRuntime.ts), the engine's
+   * right-hand-rule conviction core, borrowed as if it were the paint. sx-v1's
+   * derived line sits at 27.725 m (secondary half-width 12.125 + arterial
+   * corner 15 + paint inset 0.6 — battery sx-district.test.ts pins
+   * `sx-e-s@92.3` at y = −27.725), so `lineDistM 18` under-measured the whole
+   * approach by 9.7 m and did two separate harms:
+   *
+   *   1. the DEMONSTRATED-CORRECT ghost was authored to yield "outside the
+   *      core" at y = −19.55 — 8.17 m PAST the painted line the same session
+   *      grades. At L1 the shadow car is on, so the student follows a
+   *      ghost over the line and is then graded against it;
+   *   2. the witness release could never fire from a LAWFUL stop. Stopped at
+   *      the paint the player sits at d ≈ 29.8, so with lineDistM 18
+   *      `playerLineDist ≈ 11.8` — outside `nearLineM 6` — and at 0 km/h the
+   *      raw ETA floors to 11.8/0.5 = 23.6 s, outside `etaSec 8`. Both witness
+   *      tests failed forever and the staged car waited for a student who had
+   *      already arrived («I let everybody pass … but Error appeared»).
+   *
+   * At the true 27.7 a lawful stop reads `playerLineDist ≈ 2.1` and clears
+   * `nearLineM` on the same frame. The sibling specs in this file (`:486`) and
+   * in templates-signals2.ts already carry 27.7 — this is the value, not a tune.
+   */
+  lineDistM: 27.7,
   clearSpeedMps: 11.5,
   // Doc 62 S2 (founder R3 #17 „колата минава много рано"): the release is
   // gated on the player's true arrival at the mouth, so the dead-signal
@@ -208,7 +323,10 @@ export const SC_SIGNAL_FLASHING_CONFLICT: PriorityFromRightSpec = {
   junctionNodeIndex: 1,
   armDistM: 70,
   leadSec: -3.5,
-  lineDistM: 18,
+  // T7 (ledger §2): 18 was the RHR conviction-core radius, not sx-v1's stop
+  // line — see the long note on SC_SIGNAL_DEAD_CONFLICT above. 27.7 m is the
+  // paint the world draws and the runtime grades on this map.
+  lineDistM: 27.7,
   clearSpeedMps: 11.5,
   // Doc 62 S2 (founder R3 #18): same witness release as sc-signal-dead —
   // the flashing-amber caution is graded against a present car, any pace.
@@ -530,16 +648,17 @@ export const SC_SIGNAL_CONTROLLER: ScenarioSpec = {
     {
       n: 3,
       textBg:
-        "Светофарът за теб свети ЗЕЛЕНО, но регулировчикът спира твоето направление — зеленото НЕ разрешава. Спри преди стоп-линията.",
+        "Той е с ГЪРДИ към теб. Това значи: минава напречното направление, а ти спираш преди стоп-линията. Предимството не е твое, колкото и зелено да свети лампата — зеленото не отменя регулировчика, той отменя зеленото.",
     },
     {
       n: 4,
-      textBg: "Изчакай спокойно пред линията, докато регулировчикът държи посоката ти спряна.",
+      textBg:
+        "Ако вдигне ръка нагоре, това НЕ е „тръгвай“: вдигнатата ръка спира всички посоки, за да смени фазите. Който вече е в кръстовището, го освобождава; който чака — продължава да чака.",
     },
     {
       n: 5,
       textBg:
-        "Щом регулировчикът разреши твоята посока, премини правó напред — дори светофарът междувременно да е станал червен: неговият сигнал е по-силен.",
+        "Щом се обърне със СТРАНИЧЕН ПРОФИЛ към теб и отпусне ръце, минаваш ти и всички по твоята посока, а напречното спира. Тогава преминаваш правó напред — дори светофарът междувременно да е станал червен: неговият сигнал е по-силен (ППЗДвП чл. 66; ЗДвП чл. 7).",
     },
   ],
   success: [

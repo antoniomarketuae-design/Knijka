@@ -89,45 +89,63 @@ describe("zone-driven sign posts (SIGN-ASSET drop)", () => {
     expectPost(zonePosts(world), "noStopping", 70);
   });
 
-  it("sp-curve-v1: one А1 post at the arc start (220 m) — the shipped warning-bend face", () => {
+  it("sp-curve-v1: one А1 post 60 m BEFORE the arc (doc 86 T14) — the shipped warning-bend face", () => {
+    // RE-BASELINED 220 -> 160 by doc 86 T14. The post used to stand at the
+    // span START, i.e. at the first metre of the corner it warns about, while
+    // the graded „slow down BEFORE" gate (sc-acq-before y=225 and friends) sits
+    // UPSTREAM of it — so the only cue the world offered arrived after the
+    // grading window had closed. That is why item 36 reads as „no signs on the
+    // map at all" even though the А1 does build. railCrossing already had the
+    // advance (RAIL_WARNING_AHEAD_M); water, ice and curve did not.
     const world = loadWorld("sp-curve-v1");
     expect(world.stats.signs.curve).toBe(1);
-    expectPost(zonePosts(world), "curve", 220);
+    expectPost(zonePosts(world), "curve", 160);
   });
 
   it("sp-curve-v1: the В26-50 companion plate the copy promises stands beside the А1 (doc 62 #36)", () => {
-    // „знак А1 с табела „50"" — the advisory 50 pairs the shipped limit50
-    // face with the warning: 2 m before it, staggered further off the curb so
-    // neither occludes the other on the straight approach. Placed ONLY when
-    // the authored advisory matches the shipped face (50) — mw-exit-v1's
-    // advisory-60 ramp stays А1-only (the В26-60 face is a reported asset
-    // need, and a „50" post there would lie).
+    // „знак А1 с табела „50"" — the advisory pairs a В26 face with the warning:
+    // 2 m before it, staggered further off the curb so neither occludes the
+    // other on the straight approach. It states `advisoryKmh`, which is exactly
+    // the number rules/engine.ts:997 grades SPEED_TOO_FAST_FOR_CURVE against
+    // inside the span (tick.curveAdvisoryKmh) — a referent, not a second limit.
+    // Doc 86 T4 grew the face set from one numeral to thirteen, so an advisory
+    // of 30/40/60 is now signed too instead of being silently dropped.
     const world = loadWorld("sp-curve-v1");
     const a1 = world.signs.find((s) => s.kind === "curve")!;
     const plates = world.signs.filter(
-      (s) => s.kind === "limit50" && Math.abs(s.position[2] - -218) < 0.5,
+      (s) => s.kind === "limit50" && Math.abs(s.position[2] - -158) < 0.5,
     );
     expect(plates).toHaveLength(1);
     const plate = plates[0]!;
+    expect(plate.speedKmh).toBe(50);
     expect(plate.position[0]).toBeGreaterThan(a1.position[0]); // staggered outward
     expect(plate.scale).toBe(a1.scale); // one signed station, one prominence
-    // District-entry plates (the shipped generic pass) + the companion.
-    expect(world.stats.signs.limit50).toBe(3);
+    // The road itself is 90, so its two entry plates are В26-90 now — the
+    // „50" on a 90 km/h road was doc 86 T4's headline lie. Only the curve
+    // companion states 50, and only inside the span that grades 50.
+    expect(world.stats.signs.limit50).toBe(1);
+    expect(world.stats.signs.limit90).toBe(2);
 
     const mwExit = loadWorld("mw-exit-v1");
     expect(mwExit.stats.signs.curve).toBe(1);
-    // No companion on the advisory-60 ramp: only the two generic entry plates.
-    expect(mwExit.stats.signs.limit50).toBe(2);
+    // The ramp's advisory-60 curve starts at metre 0 of its own edge, so there
+    // is no road left to stand an ADVANCE plate on; a plate clamped to metre 1
+    // would sit in the junction mouth beside a different road with a different
+    // limit — T4's failure mode re-created by a warning sign. А1-only.
+    expect(mwExit.stats.signs.limit60).toBe(0);
   });
 
-  it("ac-aqua-v1 + ac-ice-v1: one А15 post each at the patch start", () => {
+  it("ac-aqua-v1 + ac-ice-v1: one А15 post each, 60 m BEFORE the patch (doc 86 T14)", () => {
+    // RE-BASELINED 240 -> 180 and 210 -> 150: see the sp-curve note above. The
+    // graded gates sit at y=225 (aqua) and y=190 (ice), so the warning now
+    // arrives while the student still has road to slow down on.
     const aqua = loadWorld("ac-aqua-v1");
     expect(aqua.stats.signs.slippery).toBe(1);
-    expectPost(zonePosts(aqua), "slippery", 240);
+    expectPost(zonePosts(aqua), "slippery", 180);
 
     const ice = loadWorld("ac-ice-v1");
     expect(ice.stats.signs.slippery).toBe(1);
-    expectPost(zonePosts(ice), "slippery", 210);
+    expectPost(zonePosts(ice), "slippery", 150);
   });
 
   it("rx-unguarded-v1: А33-style warning 50 m ahead + the crossbuck at the line, NO barrier", () => {

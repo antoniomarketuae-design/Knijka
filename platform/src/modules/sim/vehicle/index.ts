@@ -95,6 +95,15 @@ export {
   NORMAL_CAP_MARGIN_KMH,
   BEGINNER_CAP_UNDER_KMH,
   DOMAIN_CAP_FLOOR_KMH,
+  // Tier feasibility (doc 86 B7 + L17) — the cap floors at a speed the lesson
+  // itself requires, and `tierFeasibility` answers „can this tier drive this
+  // lesson at all" against BOTH the cap and the tractive equilibrium.
+  NORMAL_CAP_FLOOR_KMH,
+  REQUIRED_SPEED_HEADROOM_KMH,
+  THROTTLE_AUTHORITY_FADE_FROM_KMH,
+  THROTTLE_AUTHORITY_FADE_TO_KMH,
+  tierTopSpeedKmh,
+  tierFeasibility,
   // S0 low-speed maneuvering bands (parking envelope, doc 76 §0/§12).
   CREEP_CAP_FULL_KMH,
   CREEP_CAP_END_KMH,
@@ -108,6 +117,7 @@ export type {
   DifficultyMode,
   DifficultyPreset,
   DriveAssistState,
+  TierFeasibility,
 } from "./difficulty";
 
 export { clamp, lerp, approach, yawQuat, rotateInto, dot } from "./math";

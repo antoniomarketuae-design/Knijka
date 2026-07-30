@@ -34,7 +34,7 @@
  * trace exports where they exist (scenarioSceneryProps.test.ts).
  */
 
-import { parseScenarioLessonId } from "@/modules/sim/lessons";
+import { parseScenarioLessonId, scenarioById } from "@/modules/sim/lessons";
 import type {
   ScenarioObstacleSpec,
   ScenarioPropObstacle,
@@ -261,7 +261,8 @@ const HELD_SCENERY: Record<string, readonly ScenarioObstacleSpec[]> = {
 };
 
 // ---------------------------------------------------------------------------
-// Source 3 — parked-decoration CLEAR ZONES (doc 66 R5, founder v1 №9)
+// Source 3 — parked-decoration CLEAR ZONES (doc 66 R5, founder v1 №9;
+// re-derived for doc 86 L9/D10)
 // ---------------------------------------------------------------------------
 
 /** A circle (district space) inside which the TrafficLayer parked-car curb
@@ -275,36 +276,104 @@ export interface ParkedClearZone {
 }
 
 /**
- * Template id → junction-corner clear zones for the deterministic parked-car
- * curb pass (TrafficLayer.computeParkedCars — NOT the held dressing above:
- * the audit that landed here first looked for a held-scenery body, but the
- * corner car is the curb pass's slot 0 of the priority arm).
+ * The zones are DERIVED, never authored (doc 86 L9/D10).
  *
- * sc-junction-stop (founder v1 №9 + pilot-v2 R0 k3): on tj-stop-v1 the curb
- * pass seats a body at (11, −10.125) — edge tj-e-e (east arm), first slot at
- * arc 11 m, offset 8.125 · 2 · 0.5 + 2.0 south of the centerline — only
- * 15.0 m from the junction node tj-n-c (0, 0). BOTH committed ghost lines cut
- * the corner straight through its footprint: min sample distance 0.84 m
- * (mistake-rolling-stop, t ≈ 22.9) and 0.85 m (shadow-correct, t ≈ 23.65)
- * against a ~2.25 m half-length body. The zone radius pins the lawful corner
- * daylight: the priority arm's carriageway half-width 8.125 m + чл. 98's 5 m
- * no-parking band before a junction + ~2.5 m half body ≈ 15.6 → 16. Radius 16
- * removes exactly that one slot; the survivors stay ≥ 17.0 m out and the
- * nearest of them clears both ghost lines by ≥ 4.57 m center-to-path
- * (pinned in scenarioSceneryProps.test.ts against the committed traces).
+ * This used to be a hand-written allowlist with exactly one entry —
+ * `sc-junction-stop: [{0, 0, 16}]` — put there because the curb pass seated a
+ * body at (11, −10.125), 15.0 m from the junction node, and both committed
+ * ghost lines cut the corner through its footprint at 0.84 / 0.85 m. Two
+ * sibling drills on the same map (`sc-junction-scan`, `sc-junction-gap`) had
+ * the identical body and no entry, because an allowlist only covers what
+ * somebody remembered to list.
+ *
+ * The junction case is now structural: `TrafficLayer.computeParkedCars`
+ * measures the curb walk against the junction mouth `nodeOpenRadiusM` opens
+ * plus ЗДвП чл. 98's 5 m, so no body can stand in a junction on ANY of the 90
+ * districts and the allowlist entry is dead. What is left here is the one
+ * class the district alone cannot know: a STAGED PEDESTRIAN's authored walk
+ * line, which is scenario content, not map content.
+ *
+ * A `pedestrianDartOut` walks a 2-point polyline (orchestrator/runners.ts
+ * stages `[start, start + dir·travelM]`) with no obstacle query of any kind —
+ * so wherever that line runs through a curb slot, the walker crossed inside a
+ * parked car. Measured on the shipped specs: `sc-hz-emergency-stop`'s child
+ * STARTS inside the body at (10.13, 149.60) — clearance 0.00 m — and
+ * `sc-driver-distraction` (1.35 m) and `sc-hz-accident-scene` (1.38 m) pass
+ * within a shoulder of one. Their maps have no authored `crossings[]` entry
+ * at the walk (they are mid-block walks), so the district-side crossing rule
+ * cannot see them.
+ *
+ * One rule, no list: cover the walk polyline in overlapping circles wide
+ * enough that a body centre inside one cannot reach the line.
  */
-const PARKED_CLEAR_ZONES: Record<string, readonly ParkedClearZone[]> = {
-  "sc-junction-stop": [{ x: 0, y: 0, radiusM: 16 }],
-};
+
+/** Half the walker's shoulder width, m — the body the line represents. */
+const WALKER_HALF_W_M = 0.35;
+/** Worst-case parked-body half-diagonal (2.25 × 0.95 footprint), m. */
+const PARKED_HALF_DIAG_M = Math.hypot(2.25, 0.95);
+/** Radius of each corridor circle: a body whose centre is outside every
+ *  circle cannot overlap the walk line. */
+const WALK_CLEAR_RADIUS_M = WALKER_HALF_W_M + PARKED_HALF_DIAG_M;
+/** Circle pitch along the walk — ≤ radius, so the union has no gaps. */
+const WALK_CLEAR_PITCH_M = WALK_CLEAR_RADIUS_M;
+
+/** Circles covering the segment (ax,ay)→(bx,by) at WALK_CLEAR_RADIUS_M. */
+function corridorZones(
+  ax: number,
+  ay: number,
+  bx: number,
+  by: number,
+): ParkedClearZone[] {
+  const len = Math.hypot(bx - ax, by - ay);
+  const steps = Math.max(1, Math.ceil(len / WALK_CLEAR_PITCH_M));
+  const out: ParkedClearZone[] = [];
+  for (let i = 0; i <= steps; i++) {
+    const t = i / steps;
+    out.push({
+      x: ax + (bx - ax) * t,
+      y: ay + (by - ay) * t,
+      radiusM: WALK_CLEAR_RADIUS_M,
+    });
+  }
+  return out;
+}
+
+const walkZoneCache = new Map<string, readonly ParkedClearZone[]>();
 
 /**
- * Clear zones for one lesson's parked-car curb pass ([] for templates without
- * an authored zone). Flows through LessonWorldCore so the drill and the
- * capture rig mount the SAME filtered decoration (doc 66 R5 — one recipe).
+ * Clear zones for one lesson's parked-car curb pass ([] when the template
+ * stages no walking pedestrian). Flows through LessonWorldCore so the drill
+ * and the capture rig mount the SAME filtered decoration (doc 66 R5 — one
+ * recipe). Purely visual: the curb pass has no colliders and feeds no
+ * proximity query, so removing a body changes zero grading.
  */
 export function parkedClearZonesFor(lessonId: string): readonly ParkedClearZone[] {
   const parsed = parseScenarioLessonId(lessonId);
-  return (parsed && PARKED_CLEAR_ZONES[parsed.templateId]) || [];
+  if (!parsed) return [];
+  const cached = walkZoneCache.get(parsed.templateId);
+  if (cached) return cached;
+  const spec = scenarioById(parsed.templateId);
+  const zones: ParkedClearZone[] = [];
+  if (spec) {
+    const staged = [
+      ...(spec.staged ?? []),
+      ...spec.levels.flatMap((level) => level.stagedAdd ?? []),
+    ];
+    for (const event of staged) {
+      if (event.kind !== "pedestrianDartOut") continue;
+      zones.push(
+        ...corridorZones(
+          event.start.x,
+          event.start.y,
+          event.start.x + event.dir.x * event.travelM,
+          event.start.y + event.dir.y * event.travelM,
+        ),
+      );
+    }
+  }
+  const frozen: readonly ParkedClearZone[] = zones;
+  walkZoneCache.set(parsed.templateId, frozen);
+  return frozen;
 }
 
 // ---------------------------------------------------------------------------

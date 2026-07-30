@@ -52,13 +52,19 @@ import {
 } from "./objectives";
 import { applyEscalations, type PenaltyEscalation } from "./escalation";
 import { examTerminationFor } from "./exam";
-import { createFinishGate, routeFinishZone, stepFinishGate } from "./finish";
+import {
+  createFinishGate,
+  routeFinishZone,
+  stepFinishGate,
+  terminalRescueZone,
+} from "./finish";
 import type {
   EventPosition,
   LessonPhase,
   LessonResult,
   LessonSessionState,
   ObjectiveEvalState,
+  ObjectiveParams,
   ObjectiveProgress,
   ObjectiveOutcome,
   SessionNearMiss,
@@ -181,6 +187,69 @@ function withFollowingGapDetail(
   );
   const gapTxt = gapSec.toFixed(1).replace(".", ",");
   return `${e.explanationBg} Дистанция в момента: ${gapTxt} с (${Math.round(gapM)} м) — дръж поне ${targetSec} с.`;
+}
+
+/**
+ * THE TWO SILENCES (doc 86 B4/B5/B6 — founder, 2026-07-30).
+ *
+ * Two objective states used to produce NOTHING on screen, and both read to the
+ * student as a broken simulator rather than as feedback:
+ *
+ *  1. «Another Major error I am stopping on top of the green cyrcle and
+ *     nothing happens.» He was on the mark. The objective carried an
+ *     unpublished arrival speed cap and he was over it, so the gate stayed
+ *     shut and said nothing. 178 waypoints across 137 templates carry one.
+ *  2. An unsignalled roundabout exit voided the traversal invisibly: the ring
+ *     drill simply stopped responding, with no way to know a rule had been
+ *     applied, let alone which.
+ *
+ * Both now speak, once each, at the moment they happen. THEO-4: never a bare
+ * verdict — each card says what the simulator observed, what the task wants
+ * instead, and what to do about it; the roundabout one cites the article the
+ * catalog cites for the same duty (ADR-002: retrieved, never free-recalled).
+ * Neither touches scoring: these are `lesson` toasts, the coach's channel for
+ * things that are taught and not billed.
+ */
+function objectiveNotice(
+  params: ObjectiveParams,
+  before: ObjectiveEvalState,
+  after: ObjectiveEvalState,
+  tick: SimTick,
+): HudEvent | null {
+  if (
+    params.kind === "reachZone" &&
+    after.type === "reachZone" &&
+    (before.type !== "reachZone" || !before.overCapNoted) &&
+    after.overCapNoted &&
+    params.maxSpeedKmh !== undefined
+  ) {
+    return {
+      kind: "lesson",
+      titleBg: "Стигна точката, но твърде бързо",
+      // Accurate about the mechanism, deliberately: slowing down WHILE still
+      // on the mark completes it, slowing down after passing it does not (see
+      // REACH_ZONE_GRACE_M — the grace reaches back toward the driver, never
+      // forward past the mark, because on a stop drill the overshoot is the
+      // graded failure). Telling him otherwise would be its own falsehood.
+      explanationBg: `Задачата иска да си тук с не повече от ${params.maxSpeedKmh} км/ч, а в момента караш ${Math.round(Math.abs(tick.speedKmh))} км/ч — затова още не се отчита. Намали СЕГА, докато си върху точката. Ако я подминеш с тази скорост, задачата остава неизпълнена, но урокът продължава и разборът я показва накрая.`,
+    };
+  }
+  if (
+    params.kind === "completeManeuver" &&
+    params.maneuver === "roundabout" &&
+    after.type === "roundabout" &&
+    before.type === "roundabout" &&
+    after.voidedExits > before.voidedExits
+  ) {
+    return {
+      kind: "lesson",
+      titleBg: "Излезе от кръговото без десен мигач",
+      explanationBg:
+        "Излизането от кръгово е маневра надясно и се сигнализира — мигачът казва на колите зад теб и на чакащите на изхода, че напускаш кръга. Задачата остава отворена: върни се в кръговото и излез с пуснат десен мигач. Ако продължиш напред, урокът приключва и разборът показва точно това място.",
+      lawRef: "ЗДвП чл. 25",
+    };
+  }
+  return null;
 }
 
 /**
@@ -503,8 +572,11 @@ export function applyTick(prev: LessonSessionState, tick: SimTick): LessonStepRe
         stagedOutcomes: prev.stagedOutcomes ?? [],
         redsMetInRun: countRedsMet(evalStates),
       };
-      const step = stepObjective(current.params, evalStates[currentIndex], tick, ctx);
+      const before = evalStates[currentIndex];
+      const step = stepObjective(current.params, before, tick, ctx);
       evalStates[currentIndex] = step.evalState;
+      const notice = objectiveNotice(current.params, before, step.evalState, tick);
+      if (notice !== null) hudEvents.push(notice);
 
       if (!step.done) {
         objectives[currentIndex] = {
@@ -546,34 +618,87 @@ export function applyTick(prev: LessonSessionState, tick: SimTick): LessonStepRe
   // the route CORRECTLY first. A student who must perform perfectly to learn
   // what he did imperfectly quits.
   //
-  // Consulted ONLY while the chain has not yet reached the final objective
-  // (the stalled case). A healthy run terminates through the branch above,
-  // bit-identically to before — L7 still has to park, L3 still has to come
-  // out of the roundabout, a clean exam still ends on its own last objective.
-  // Nothing here is graded: `objectives` keep their honest status, so
-  // buildLessonResult reports this as finished-and-failed, never as passed.
+  // B2 (doc 86 §3, 2026-07-30): the gate used to be consulted ONLY while the
+  // chain had not yet reached the final objective — i.e. everywhere except the
+  // one place with nothing after it to walk to. It is armed on the terminal
+  // objective now, but through a DIFFERENT derivation, because the two
+  // situations are proven by different evidence:
+  //
+  //   stalled chain  → routeFinishZone: the car is where the route ends. The
+  //                    tasks it skipped are behind it and cannot be redone by
+  //                    standing here, so arriving is enough.
+  //   stuck terminal → terminalRescueZone: the car is where the route ends AND
+  //                    standing completely still for twelve seconds with the
+  //                    task still open. Nothing a student legitimately does at
+  //                    the end of a route looks like that — an approach moves,
+  //                    a creep moves, a park shuffle moves, and a red-light
+  //                    wait ends. Using the stalled-chain zone here instead
+  //                    would close the exam on a candidate lining up for the
+  //                    bay, which is a worse bug than the one being fixed.
+  //
+  // A healthy run still terminates through the objective branch above,
+  // bit-identically — L7 still has to park, L3 still has to come out of the
+  // roundabout, a clean exam still ends on its own last objective. Nothing
+  // here is graded: `objectives` keep their honest status, so buildLessonResult
+  // reports this as finished-and-failed, never as passed.
   let finishGate = prev.finishGate;
-  if (prev.phase === "driving" && phase === "driving" && currentIndex < objectives.length - 1) {
-    const zone = routeFinishZone(objectives.map((o) => o.params));
-    if (zone !== null) {
-      finishGate = stepFinishGate(finishGate ?? createFinishGate(), zone, tick);
-      if (finishGate.reachedAtSec !== null) {
-        phase = "completed";
-        endedAtSec = tick.t;
-        // THEO-4: never a bare verdict. Say WHAT stopped the drive and WHY
-        // stopping is the right thing here — the debrief then walks every
-        // skipped task and every mistake, which is what the student came for.
-        // Kept inside the violation catalog's own length band (median 186
-        // chars, max 319): this is a HUD toast on a 390 px phone, and the
-        // detail belongs in the debrief that opens a second later.
-        hudEvents.push({
-          kind: "lesson",
-          titleBg: examMode ? "Край на изпитния маршрут" : "Край на маршрута",
-          explanationBg: examMode
-            ? "Стигна края на маршрута, затова изпитът приключва тук. Част от задачите останаха неизпълнени и изпитът не е издържан — разборът показва всяка от тях и всяка допусната грешка."
-            : "Стигна края на маршрута, затова урокът приключва тук. Част от задачите останаха неизпълнени — разборът показва всяка от тях и всяка грешка, вместо да те връща да караш маршрута отново.",
-        });
+  let finishRescueGate = prev.finishRescueGate;
+  let stoppedStuck = false;
+  if (
+    prev.phase === "driving" &&
+    phase === "driving" &&
+    objectives.length > 0 &&
+    currentIndex < objectives.length
+  ) {
+    const params = objectives.map((o) => o.params);
+    const onTerminal = currentIndex === objectives.length - 1;
+
+    // Gate 1 — the stalled chain. Unchanged in its arming condition: it is
+    // presence-based and generous, and it must stay off the terminal
+    // objective, where every correct final approach would satisfy it.
+    if (!onTerminal) {
+      const zone = routeFinishZone(params);
+      if (zone !== null) {
+        finishGate = stepFinishGate(finishGate ?? createFinishGate(), zone, tick);
       }
+    }
+    // Gate 2 — simply stuck. Runs on EVERY frame regardless of which objective
+    // is active, because the state it detects does not care: a car standing
+    // completely motionless at the end of the route, for twelve seconds at a
+    // waypoint or twenty-five beside a bay, with the route unfinished, is not
+    // going anywhere on its own. Gate 1 cannot cover it — on a compact route
+    // (a lot where the pull-up pose is 10 m from the bay) its half-distance
+    // clamp shrinks the zone below one lane, so a car parked three metres off
+    // the end satisfied neither gate and had no way out at all.
+    const rescue = terminalRescueZone(params);
+    if (rescue !== null) {
+      finishRescueGate = stepFinishGate(finishRescueGate ?? createFinishGate(), rescue, tick);
+    }
+
+    stoppedStuck =
+      finishGate?.reachedAtSec == null && finishRescueGate?.reachedAtSec != null;
+    if (finishGate?.reachedAtSec != null || stoppedStuck) {
+      phase = "completed";
+      endedAtSec = tick.t;
+      // THEO-4: never a bare verdict. Say WHAT stopped the drive and WHY
+      // stopping is the right thing here — the debrief then walks every
+      // skipped task and every mistake, which is what the student came for.
+      // Kept inside the violation catalog's own length band (median 186
+      // chars, max 319): this is a HUD toast on a 390 px phone, and the
+      // detail belongs in the debrief that opens a second later.
+      hudEvents.push({
+        kind: "lesson",
+        titleBg: examMode ? "Край на изпитния маршрут" : "Край на маршрута",
+        explanationBg: examMode
+          ? "Стигна края на маршрута, затова изпитът приключва тук. Част от задачите останаха неизпълнени и изпитът не е издържан — разборът показва всяка от тях и всяка допусната грешка."
+          : stoppedStuck
+            // B2/B3: the car has been standing still at the end of the route
+            // with the task open. Say that plainly — the student has been
+            // sitting there wondering what the simulator wants, and the honest
+            // answer is that it did not register and he is not trapped here.
+            ? "Спря в края на маршрута, но задачата тук не се отчете — затова урокът приключва, вместо да те държи на място. Разборът показва какво точно остана неизпълнено и как да го направиш следващия път."
+            : "Стигна края на маршрута, затова урокът приключва тук. Част от задачите останаха неизпълнени — разборът показва всяка от тях и всяка грешка, вместо да те връща да караш маршрута отново.",
+      });
     }
   }
 
@@ -629,6 +754,7 @@ export function applyTick(prev: LessonSessionState, tick: SimTick): LessonStepRe
       ...(eventPositions !== undefined ? { eventPositions } : {}),
       ...(examTermination !== undefined ? { examTermination } : {}),
       ...(finishGate !== undefined ? { finishGate } : {}),
+      ...(finishRescueGate !== undefined ? { finishRescueGate } : {}),
       ...(mistakeHitAt !== undefined ? { mistakeExperienceHitAtSec: mistakeHitAt } : {}),
     },
     hudEvents,

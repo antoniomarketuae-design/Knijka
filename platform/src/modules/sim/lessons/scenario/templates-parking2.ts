@@ -97,7 +97,7 @@ export const SC_PK_CROSSING_BAN: ScenarioSpec = {
     vehicleStart: "ready",
   },
   instructionsBg: [
-    { n: 1, textBg: "Потегли по улицата. Задачата е „спри някъде тук за малко“ — но къде точно е позволено, решаваш ти." },
+    { n: 1, textBg: "Потегли по улицата. Задачата е „спри някъде тук за малко“ — но къде точно е позволено, решаваш ти. Ако е тъмно, включи късите светлини: и кръстовището, и пътеката се разпознават само осветени." },
     { n: 2, textBg: "Напред има кръстовище. На него и на по-малко от 5 метра от него престоят е забранен от самия закон (чл. 98) — важи и без табела." },
     { n: 3, textBg: "Подмини кръстовището, без да спираш на ъгъла — там спрялата кола крие идващите по напречната улица." },
     { n: 4, textBg: "След това идва пешеходна пътека. Пред нея не се спира: твоята кола е стената, зад която пешеходецът не се вижда." },
@@ -159,6 +159,20 @@ export const SC_PK_CROSSING_BAN: ScenarioSpec = {
     { level: 2 },
     { level: 3 },
     { level: 4, vehicleStart: "cold" },
+    {
+      // L5 „Усложнени" (doc 86 L13 — this template shipped no L5 at all).
+      // The rung is the lesson's own argument made visible: чл. 98 т. 1 exists
+      // because a car standing at the zebra IS the wall the pedestrian steps
+      // out from, and at night with people actually on the pavement that stops
+      // being a sentence and becomes the drive. pk-banx-v1 is the ONE district
+      // in this file with a `crossings` entry (the others have zero), so it is
+      // the only one where an ambient pedestrian count anchors to anything —
+      // authored here and nowhere else on purpose (doc 86 L12).
+      // The lights duty is stated in instruction 1 (doc 86 L10).
+      level: 5,
+      conditions: { night: true },
+      traffic: { pedestrianCount: 6 },
+    },
   ],
   conditions: { weather: "dry" },
   localeBg: "bg-BG",
@@ -300,6 +314,15 @@ export const SC_PK_BUSSTOP_BAN: ScenarioSpec = {
     { level: 2 },
     { level: 3 },
     { level: 4, vehicleStart: "cold" },
+    // NO L5, ON PURPOSE — and lane 15 tried to add one and took it back. The
+    // author of this template pinned the reason in s-w2-bot-completion.ts:304:
+    // „the fault is a DECISION, not a condition — rain and night would decorate
+    // it without teaching it", and he is right. The skill here is recognising
+    // that the zigzag zone is bigger than the shelter and that an EMPTY pocket
+    // is still occupied; no amount of weather makes that recognition harder in
+    // a way the student can act on. Doc 86 L13 asks for rungs that MEAN
+    // something, not for five rungs everywhere — a decorative L5 is the dead L5
+    // the founder complained about, just with rain on it.
   ],
   conditions: { weather: "dry" },
   localeBg: "bg-BG",
@@ -476,6 +499,20 @@ export const SC_PK_STOP_VS_PARK: ScenarioSpec = {
     { level: 2 },
     { level: 3 },
     { level: 4, vehicleStart: "cold" },
+    {
+      // L5 „Усложнени" (doc 86 L13 — no L5 shipped before; and doc 86 L12, „the
+      // empty world"). NOT a weather re-skin: the difference between В28 and
+      // В27 is what the driver may do with the LANE, and on an empty street
+      // that difference costs nothing either way. With traffic actually using
+      // the road, the престой under В28 is a lane taken from somebody for the
+      // seconds the passenger needs — which is exactly the distinction чл. 93
+      // draws and the only thing that makes „престой, не паркиране" feel like a
+      // rule rather than a definition. pk-ban2-v1's single edge is class
+      // `residential`, so it IS in the lane graph (the `service` lot aisles are
+      // not) and ambient vehicles can actually be placed here.
+      level: 5,
+      traffic: { vehicleCount: 4 },
+    },
   ],
   conditions: { weather: "dry" },
   localeBg: "bg-BG",
@@ -703,6 +740,19 @@ export const SC_PK_DOUBLE_PARK: ScenarioSpec = {
     { level: 2 },
     { level: 3 },
     { level: 4, vehicleStart: "cold" },
+    {
+      // L5 „Усложнени" (doc 86 L13 — no L5 shipped before; and doc 86 L12,
+      // „the empty world"). This drill's entire claim is „спреш ли, улицата не
+      // се стеснява — тя се затваря", and until now the only vehicle that ever
+      // proved it was the single staged oncoming stream. At L5 the street is
+      // actually used: ambient cars in both directions, so the one-car gap
+      // between the two parked rows is a queue the student is standing in
+      // rather than a sentence in the briefing. pk-double-v1's edge is class
+      // `residential` — in the lane graph, unlike the `service` lot aisles —
+      // so this is the one complication this map can honestly carry.
+      level: 5,
+      traffic: { vehicleCount: 4 },
+    },
   ],
   conditions: { weather: "dry" },
   localeBg: "bg-BG",
@@ -858,7 +908,7 @@ export const SC_PARK_BAY_EXIT_REV: ScenarioSpec = {
   tagsBg: ["паркиране", "заден ход", "излизане от място", "перпендикулярно", "чл. 40", "изпитни упражнения"],
   titleBg: "Излизане на заден от перпендикулярно място",
   objectiveBg:
-    "Излез на заден ход от заето отвсякъде място: оглед през рамо ПРЕДИ включване, пешеходна скорост и спиране при всяко движение зад теб.",
+    "Две задачи, в този ред: първо излез на заден ход от заетото отвсякъде място с пешеходна скорост — оглед през рамо ПРЕДИ включване и спиране при всяко движение зад теб; после се подравни по алеята и я напусни напред, пропускайки всеки пешеходец.",
   // Doc-72 provenance: PK-02 owns the bay geometry and the swing-out, PK-11 the
   // reverse-with-observation discipline, PK-05 the „потеглянето е маневра" duty.
   archetypeIds: ["PK-02", "PK-11", "PK-05"],
@@ -891,7 +941,7 @@ export const SC_PARK_BAY_EXIT_REV: ScenarioSpec = {
   },
   staged: [PBE_WALKER],
   instructionsBg: [
-    { n: 1, textBg: "Колата е паркирана с предницата навътре, а вляво и вдясно има коли. Нищо зад теб не се вижда от седалката — затова оглеждането е ПРЕДИ включването на задната, не след него." },
+    { n: 1, textBg: "Колата е паркирана с предницата навътре, а вляво и вдясно има коли. Нищо зад теб не се вижда от седалката — затова оглеждането е ПРЕДИ включването на задната, не след него. Ако паркингът е тъмен, първо включи късите светлини: те не ти показват какво е зад теб, но показват теб на всеки, който минава по алеята." },
     { n: 2, textBg: "Двете огледала, после поглед през ДЯСНОТО рамо и през задното стъкло. Чак когато си сигурен, че алеята зад теб е чиста, включи задна." },
     { n: 3, textBg: "Излез бавно НАЗАД около метър, без да завърташ волана — така предницата още не подрязва съседа." },
     { n: 4, textBg: "Чак когато задницата е в алеята, завърти волана и изнеси плавно, с пешеходна скорост — не повече от 4-5 км/ч." },
@@ -901,7 +951,7 @@ export const SC_PARK_BAY_EXIT_REV: ScenarioSpec = {
   success: [
     {
       id: "sc-pbe-out",
-      titleBg: "Излез от мястото на заден ход, с пешеходна скорост",
+      titleBg: "Задача 1: излез от мястото на заден ход, с пешеходна скорост",
       // The corridor gate (NOT parkInBay — see the header): the aisle exit
       // point the arc lands on, armed at walking speed. Coordinates pinned to
       // content/world/lot-perp-v1.json like every lesson pins its district.
@@ -909,7 +959,7 @@ export const SC_PARK_BAY_EXIT_REV: ScenarioSpec = {
     },
     {
       id: "sc-pbe-away",
-      titleBg: "Подравни се по алеята и напусни зоната напред",
+      titleBg: "Задача 2: подравни се по алеята и напусни зоната напред",
       // Past the whole bay row (bays span y ∈ [−5.4, 5.4]) and past the staged
       // walker's crossing (y = 10) — the checkpoint completes at y ≈ 14, so the
       // encounter can never be skipped by finishing early.
@@ -1211,7 +1261,14 @@ export const SC_MV_UTURN_BAN: ScenarioSpec = {
     { level: 1, toleranceScale: 1.5 },
     { level: 2, toleranceScale: 1.25 },
     { level: 3 },
-    { level: 4, vehicleStart: "cold" },
+    {
+      level: 4,
+      vehicleStart: "cold",
+      // Doc 86 D7 — the exam rung grades the movement count tighter: on a road
+      // this wide „в едно движение" is the specification, and a shunt across
+      // the oncoming lanes is the thing the ban exists to prevent.
+      rubric: { economy: { objectiveId: "sc-mvu-turn", attemptsFor3Stars: 1, attemptsFor2Stars: 1 } },
+    },
     {
       level: 5,
       // DENSER oncoming — the backlog's own L5 dial. A second stream INTERLEAVED
@@ -1437,6 +1494,13 @@ export const SC_PK_RAIL_BAN: ScenarioSpec = {
     { level: 2 },
     { level: 3 },
     { level: 4, vehicleStart: "cold" },
+    // NO L5, ON PURPOSE — and lane 15 tried to add a fog rung and took it back.
+    // The author pinned the reason in s-w7-bot-completion.ts:213: „the
+    // difficulty axis here is KNOWING an unmarked zone, not grip or light …
+    // night would only hide a crossing whose А34 post does not render yet
+    // anyway". Fog would have hidden a sign that is not built — the exact
+    // teaches-falsehood shape doc 86 T13/T15 is about. The rung is a capability
+    // need (the А34 post), not an authoring gap.
   ],
   conditions: { weather: "dry" },
   localeBg: "bg-BG",

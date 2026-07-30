@@ -67,7 +67,11 @@ export const SC_PK_SMOOTH_STOP: ScenarioSpec = {
     vehicleStart: "ready",
   },
   instructionsBg: [
-    { n: 1, textBg: "Потегли по правата улица и се движи спокойно в дясната лента." },
+    {
+      n: 1,
+      textBg:
+        "Потегли по правата улица и се движи спокойно в дясната лента. Ако вали, включи късите светлини — мократа настилка удължава спирачния път близо двойно.",
+    },
     {
       n: 2,
       textBg:
@@ -76,7 +80,7 @@ export const SC_PK_SMOOTH_STOP: ScenarioSpec = {
     {
       n: 3,
       textBg:
-        "Вдигни газта рано — още отдалеч — и остави колата да намали. Не изчаквай последния момент.",
+        "Вдигни газта рано — още отдалеч — и остави колата да намали. Не изчаквай последния момент: до средата на правата вече трябва да си под 30 км/ч.",
     },
     {
       n: 4,
@@ -88,8 +92,17 @@ export const SC_PK_SMOOTH_STOP: ScenarioSpec = {
   success: [
     {
       id: "sc-pk-approach",
-      titleBg: "Приближи позицията с готовност за спиране",
-      // A mid-street progress checkpoint the calm approach passes through.
+      titleBg: "Междинна точка: приближи позицията с готовност за спиране",
+      // A mid-street progress checkpoint the calm approach passes through, and
+      // it stays UNCAPPED on purpose. Lane 15 authored a ≤34 km/h cap here to
+      // make it a real second task (doc 86 D11) and then took it back, because
+      // this road is posted 50: any cap low enough to grade „твърде бърз
+      // подход" is also low enough to convict a driver doing a lawful 50, and a
+      // blown capped waypoint is unrecoverable (doc 86 B4/B9 — 127 scenarios
+      // already carry one, and unlike a parking lot the recovery here is
+      // reversing 50 m up a 50 km/h street). The blocks-student band outranks
+      // the counted-task band. The „под 30 км/ч до средата" coaching stays in
+      // instruction 3, where it belongs: advice, not a hidden gate (D4).
       params: { kind: "reachZone", x: LANE_X, y: 60, radiusM: 12 },
     },
     {
@@ -143,6 +156,16 @@ export const SC_PK_SMOOTH_STOP: ScenarioSpec = {
     { level: 2 },
     { level: 3 },
     { level: 4, vehicleStart: "cold" },
+    {
+      // L5 „Усложнени" (doc 86 L13 — this template had NO L5): the same
+      // stopping problem on WET tarmac, with the physics actually changed
+      // (ADR-006 4a wetGrip ≈ 1.4× braking distance). „Вдигни газта рано" stops
+      // being advice and becomes the only way the car fits in the distance.
+      // The lights duty for rain is stated in instruction 1 below (doc 86 L10).
+      level: 5,
+      conditions: { weather: "rain" },
+      physics: { wetGrip: true },
+    },
   ],
   conditions: { weather: "dry" },
   localeBg: "bg-BG",
@@ -178,7 +201,7 @@ export const SC_PK_DRIVEWAY: ScenarioSpec = {
   tagsBg: ["паркиране", "заден ход", "алея", "двор", "изпитни упражнения"],
   titleBg: "Заден ход в алея",
   objectiveBg:
-    "Влез на заден ход в алея вдясно: подмини входа, огледай се преди и по време на маневрата и вкарай колата точно в очертанията между стените, с нос към улицата и без да ги докоснеш.",
+    "Две задачи, в този ред: първо подмини входа на алеята и спри в изходната позиция; после влез на заден ход между стените — с оглед преди и по време на маневрата, точно в очертанията, с нос към улицата и без да ги докоснеш.",
   // Doc-72 provenance: PK-11 IS this maneuver (reverse around a corner / into a
   // driveway — the German Grundfahraufgabe reverse, full observation).
   archetypeIds: ["PK-11"],
@@ -195,10 +218,14 @@ export const SC_PK_DRIVEWAY: ScenarioSpec = {
     vehicleStart: "ready",
   },
   instructionsBg: [
-    { n: 1, textBg: "Приближи бавно по улицата — не повече от 15 км/ч — и намери алеята вдясно." },
+    {
+      n: 1,
+      textBg:
+        "Задачите са две и се броят поотделно: първо изходната позиция, после самото влизане на заден. Приближи бавно по улицата — не повече от 15 км/ч — и намери алеята вдясно. Ако е тъмно, включи късите светлини: стените на алеята се виждат само на светло.",
+    },
     {
       n: 2,
-      textBg: "Подмини входа на алеята и спри, когато задната ти броня подмине входа ѝ.",
+      textBg: "Задача 1: подмини входа на алеята и СПРИ, когато задната ти броня подмине входа ѝ. Оттук започва замахът.",
     },
     {
       n: 3,
@@ -216,13 +243,17 @@ export const SC_PK_DRIVEWAY: ScenarioSpec = {
   success: [
     {
       id: "sc-pkd-position",
-      titleBg: "Заеми изходна позиция покрай входа на алеята",
-      // The pull-past pose in the lane just north of the driveway mouth.
-      params: { kind: "reachZone", x: LANE_X, y: 50, radiusM: 7, maxSpeedKmh: 15 },
+      titleBg: "Задача 1: спри в изходната позиция покрай входа на алеята",
+      // DOC 86 D11 — see the sc-park-parallel note in templates-parking.ts.
+      // Was (4.06, 50) r 7 ≤15 km/h: a drive-by that ticked „Задача 1/2"
+      // without the student doing anything. Now AT REST at the pose the
+      // recorded shadow stops on (traces/scPkDriveway.ts X_SETUP 3.87 /
+      // Y_SETUP 51.3), radius 5.
+      params: { kind: "reachZone", x: 3.87, y: 51.3, radiusM: 5, maxSpeedKmh: 6 },
     },
     {
       id: "sc-pkd-park",
-      titleBg: "Влез на заден ход в алеята и спри напълно",
+      titleBg: "Задача 2: влез на заден ход в алеята и спри напълно",
       // Bay-locked parkInBay (A10): at rest INSIDE the driveway, aligned, via
       // reverse, held 1.5 s. Tolerances are evaluator defaults at L3/L4; L1/L2
       // widen them via toleranceScale (compile).
@@ -284,7 +315,22 @@ export const SC_PK_DRIVEWAY: ScenarioSpec = {
     { level: 1, toleranceScale: 1.5 },
     { level: 2, toleranceScale: 1.25 },
     { level: 3 },
-    { level: 4, vehicleStart: "cold" },
+    {
+      level: 4,
+      vehicleStart: "cold",
+      rubric: { economy: { objectiveId: "sc-pkd-park", attemptsFor3Stars: 1, attemptsFor2Stars: 1 } },
+    },
+    {
+      // L5 „Усложнени" (doc 86 L13 — this template had NO L5): the same
+      // driveway after dark. This is the rung where the drill's own premise
+      // bites hardest — the walls are invisible except in the mirrors and the
+      // reversing lamps, so „спираш на мястото, не когато стената те спре"
+      // stops being a slogan. Lights duty stated in instruction 1 (doc 86 L10).
+      level: 5,
+      conditions: { night: true },
+      toleranceScale: 0.85,
+      rubric: { economy: { objectiveId: "sc-pkd-park", attemptsFor3Stars: 1, attemptsFor2Stars: 1 } },
+    },
   ],
   conditions: { weather: "dry" },
   localeBg: "bg-BG",
@@ -331,7 +377,7 @@ export const SC_PK_BAN_STOP: ScenarioSpec = {
     vehicleStart: "ready",
   },
   instructionsBg: [
-    { n: 1, textBg: "Потегли по улицата — задачата е да спреш за кратко, но само където е позволено." },
+    { n: 1, textBg: "Потегли по улицата — задачата е да спреш за кратко, но само където е позволено. Ако е тъмно, включи късите светлини: знакът се чете само осветен." },
     { n: 2, textBg: "Напред започва участък със знак В27 „Забранени са престоят и паркирането“ — в него не се спира изобщо, дори „само за минутка“." },
     { n: 3, textBg: "Премини през зоната с равномерна скорост, без да спираш и без да се колебаеш." },
     { n: 4, textBg: "След края на зоната намали плавно и спри на разрешеното място." },
@@ -387,6 +433,15 @@ export const SC_PK_BAN_STOP: ScenarioSpec = {
     { level: 2 },
     { level: 3 },
     { level: 4, vehicleStart: "cold" },
+    {
+      // L5 „Усложнени" (doc 86 L13 — this template had NO L5): the same В27
+      // span at night. The whole drill is READING the plate before you decide
+      // to stop; in the dark that decision has to be made from further out,
+      // which is exactly the real-street version of the skill. The lights duty
+      // is stated in instruction 1 (doc 86 L10).
+      level: 5,
+      conditions: { night: true },
+    },
   ],
   conditions: { weather: "dry" },
   localeBg: "bg-BG",

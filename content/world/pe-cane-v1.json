@@ -2,13 +2,13 @@
  "format": "district-v1",
  "meta": {
   "district": "pe-cane",
-  "label": "Учебна улица — пешеходец с бял бастун (сценарий PE-14)",
+  "label": "Улица пред институт за незрящи (сценарий PE-14)",
   "mapKind": "scenario-street",
   "generator": "tools/maps/gen_pe_crossings.mjs",
   "boundsLocalMeters": {
-   "minX": -26,
+   "minX": -38,
    "minY": 0,
-   "maxX": 14.125,
+   "maxX": 30,
    "maxY": 152
   },
   "attribution": {
@@ -28,7 +28,7 @@
    "edges": 1,
    "intersections": 0,
    "crossings": 1,
-   "buildings": 1,
+   "buildings": 4,
    "spawnPoints": 2
   },
   "scenario": {
@@ -38,6 +38,8 @@
     "signalized": "no",
     "approachM": 92
    },
+   "streetscape": "institute-and-transit",
+   "streetscapeNoteBg": "Обществена сграда за хора с увредено зрение, чийто вход е насочен към пътеката, и спирка отсреща: белият бастун тук е ежедневие, а не изключение.",
    "primaryCrossingId": "pe-x-1",
    "laneCenterRightM": 4.06,
    "crossings": [
@@ -104,25 +106,94 @@
  "roundabouts": [],
  "buildings": [
   {
-   "id": "pe-b-shop",
-   "height": 4.5,
+   "id": "pe-b-institute",
+   "height": 10,
    "heightSource": "default",
    "footprint": [
     [
-     -26,
-     58
+     -38,
+     66
     ],
     [
-     -16,
-     58
+     -12.9,
+     66
     ],
     [
-     -16,
-     70
+     -12.9,
+     110
     ],
     [
-     -26,
-     70
+     -38,
+     110
+    ]
+   ]
+  },
+  {
+   "id": "pe-b-institute-wing",
+   "height": 10,
+   "heightSource": "default",
+   "footprint": [
+    [
+     -38,
+     110
+    ],
+    [
+     -25,
+     110
+    ],
+    [
+     -25,
+     132
+    ],
+    [
+     -38,
+     132
+    ]
+   ]
+  },
+  {
+   "id": "pe-b-shelter",
+   "height": 2.8,
+   "heightSource": "default",
+   "footprint": [
+    [
+     12.9,
+     83
+    ],
+    [
+     16.4,
+     83
+    ],
+    [
+     16.4,
+     89
+    ],
+    [
+     12.9,
+     89
+    ]
+   ]
+  },
+  {
+   "id": "pe-b-offices-e",
+   "height": 12,
+   "heightSource": "default",
+   "footprint": [
+    [
+     12.9,
+     100
+    ],
+    [
+     30,
+     100
+    ],
+    [
+     30,
+     132
+    ],
+    [
+     12.9,
+     132
     ]
    ]
   }

@@ -531,14 +531,19 @@ export const SC_OV_BEING_OVERTAKEN: ScenarioSpec = {
     { n: 1, textBg: "Извънградски път, по една лента в посока, ограничение 90. Карай спокойно около 70 км/ч в своята лента." },
     { n: 2, textBg: "Погледни в огледалото: колата зад теб се приближава и излиза наляво — започва да те изпреварва." },
     { n: 3, textBg: "От този момент маневрата е негова, но безопасността е обща. Твоята работа е пасивна: НЕ ускорявай (чл. 42, ал. 2) и се дръж вдясно в лентата (чл. 15)." },
-    { n: 4, textBg: "Ако можеш, свали 5 км/ч — така съкращаваш времето, което той прекарва в насрещното платно." },
+    { n: 4, textBg: "Ако можеш, свали 5 км/ч — така съкращаваш времето, което той прекарва в насрещното платно. Практическото мерило през цялата маневра: стрелката НЕ минава 75 км/ч, макар пътят да е ограничен на 90 — важи скоростта, с която караше, а не разрешената." },
     { n: 5, textBg: "Не се дърпай наляво „да го погледнеш“ и не настъпвай осевата — там е точно колата, която те изпреварва." },
     { n: 6, textBg: "Изчакай го да те подмине и чак тогава се върни в средата на лентата и към нормалната си скорост." },
   ],
   success: [
     {
       id: "sc-ovbo-hold",
-      titleBg: "Не ускорявай, докато те изпреварват",
+      // LEDGER D4 (doc 86 §5): the 75 km/h ceiling was a HIDDEN contract — the
+      // road is posted 90, nothing on screen said 75, and a student holding a
+      // perfectly lawful 80 failed a gate whose title only said „не ускорявай".
+      // A speed contract the student cannot see is not a lesson, it is a trap;
+      // the number now lives in the title and in instruction 4.
+      titleBg: "Не ускорявай, докато те изпреварват — задръж под 75 км/ч",
       // THE speed-band gate. y = 380 is the ALONGSIDE point, measured not
       // guessed: the overtaker resolves passAheadM at t ≈ 28.1 with the shadow
       // at y ≈ 459, and closes the 42 m from −12 m at ~6.9 m/s, so actorAheadM
@@ -771,12 +776,15 @@ export const SC_OV_CREST_CURVE: ScenarioSpec = {
     vehicleStart: "ready",
   },
   instructionsBg: [
-    { n: 1, textBg: "Извънградски път, по една лента в посока, ограничение 90. Пред теб пълзи бавен камион и ти се иска да го подминеш." },
+    // Ledger L10: the L5 rung compiles rain and HEADLIGHTS_OFF_IN_RAIN grades
+    // unconditionally (ЗДвП чл. 70).
+    { n: 1, textBg: "Извънградски път, по една лента в посока, ограничение 90. Пред теб пълзи бавен камион и ти се иска да го подминеш. Вали ли, включи късите светлини още сега (чл. 70) — в закрит завой те не са, за да виждаш ти, а за да те види насрещният секунда по-рано." },
     { n: 2, textBg: "Отдалеч се появява знак В24 „Забранено е изпреварването“, а след него знак А1 с табела 40 — напред пътят завива надясно и се скрива зад склона." },
     { n: 3, textBg: "Не започвай нищо. Забраната важи от знака, а не от завоя: маневра, започната „на ръба“, ЗАВЪРШВА вътре в слепия участък." },
     { n: 4, textBg: "Свали скоростта още на правата — в дъгата дръж около 40 и остани зад камиона, дори да ти се струва, че насреща е чисто. Празното платно, което виждаш, свършва там, където свършва и погледът ти." },
     { n: 5, textBg: "Изчакай завоя да те изведе на дългата права. Чак когато видиш свободен насрещен участък за ЦЯЛАТА маневра: огледало, ляв мигач, решително изпреварване." },
-    { n: 6, textBg: "Прибери се вдясно с мигач, щом видиш камиона в огледалото, и завърши в своята лента." },
+    { n: 6, textBg: "А ако правата не ти покаже такъв участък — остани зад камиона до края. Това НЕ е провален урок: чл. 42 разрешава изпреварването само при свободна насрещна лента, така че „не сега“ е също толкова правилен отговор, колкото и чистото изпреварване." },
+    { n: 7, textBg: "Изпревариш ли, прибери се вдясно с мигач, щом видиш камиона в огледалото, и завърши в своята лента." },
   ],
   success: [
     {
@@ -792,12 +800,27 @@ export const SC_OV_CREST_CURVE: ScenarioSpec = {
     },
     {
       id: "sc-ovcc-pass",
-      titleBg: "Изпревари в правата след завоя",
-      // The other half of чл. 43: the ban is not „никога", it is „не ТУК". This
-      // gate sits on the oncoming bank of the LEGAL straight — reachable only by
-      // actually committing the pass where the law allows it, 100+ m past the
-      // end of the В24 span. Radius 4 again: the own lane is a full pitch away.
-      params: { kind: "reachZone", x: 300, y: OVCC_EXIT_ONCOMING_Y, radiusM: 4 },
+      titleBg: "Излез на правата — изпревари САМО ако видиш свободен насрещен участък",
+      // LEDGER B8 (doc 86 §3) — THE NORTH-STAR INVERSION, REPAIRED.
+      //
+      // This gate used to sit at (300, OVCC_EXIT_ONCOMING_Y) with radius 4, i.e.
+      // ONLY on the oncoming bank, 8.12 m from the own-lane centre. It was a
+      // MANDATORY success objective, so the drive could not be completed unless
+      // the student committed the overtake — and a student who chose to stay
+      // behind the truck (always legal, and here the safer read of чл. 42, since
+      // he cannot know the straight is clear until he is on it) finished with
+      // `completedAll: false` → stars 1 → SCENARIO_UNLOCK_MIN_STARS 2 → the next
+      // rung locked. The simulator scored the safest lawful choice as a failure.
+      // CLAUDE.md's north-star test forbids exactly that.
+      //
+      // The repair keeps the gate WHERE it is (the ribbon still leads the student
+      // down the legal straight, and the taught order wait → straight → settle is
+      // unchanged) and makes it satisfiable from EITHER lane: centre y = 375.00 is
+      // the midpoint of own 370.94 and oncoming 379.06, radius 8 admits both lane
+      // centres with 3.9 m of slack and, on this 1+1, no third lane exists to
+      // admit falsely. The pass is now a taught OPTION with a stated precondition
+      // — which is what чл. 42 actually says — instead of a toll gate.
+      params: { kind: "reachZone", x: 300, y: (OVCC_EXIT_Y + OVCC_EXIT_ONCOMING_Y) / 2, radiusM: 8 },
     },
     {
       id: "sc-ovcc-finish",
@@ -1044,20 +1067,31 @@ export const SC_OV_SOLID_RETURN: ScenarioSpec = {
     { n: 4, textBg: "Щом насрещното платно се изчисти, ЗАПОЧНИ ВЕДНАГА: огледало, ляв мигач, решително излизане. Всяка изчакана секунда е метри, отнети от връщането ти." },
     { n: 5, textBg: "Виж ли, че прекъсванията се удължават — това е предупреждението: плътната линия е на 60 метра. Оттам вече не се започва нищо." },
     { n: 6, textBg: "Прибери се вдясно с мигач, щом видиш ЦЯЛАТА изпреварена кола в огледалото — и бъди изцяло в своята лента най-късно на 270-ия метър." },
-    { n: 7, textBg: "Продължи в своята лента през целия участък с непрекъсната линия до края на отсечката." },
+    { n: 7, textBg: "Прецениш ли, че прозорецът вече не стига — не започвай. Оставането зад бавната кола до края на участъка е пълноценно изпълнение на този урок: маневра без изход не се прави, а решението „не сега“ е самото умение, което се учи тук." },
+    { n: 8, textBg: "Продължи в своята лента през целия участък с непрекъсната линия до края на отсечката." },
   ],
   success: [
     {
       id: "sc-ovsr-pass",
-      titleBg: "Започни изпреварването рано, в отворения прозорец",
-      // The commitment gate, and the half of the drill nobody grades: the
-      // maneuver has to START where it still fits. x = −2.5 is 6.56 m from the
-      // own-lane center, so radius 5 is satisfiable ONLY from a genuine
-      // excursion; y = 180 is 120 m of dashes before the wall — the last mark
-      // from which a whole pass and a 30 m landing margin still fit. The two
-      // late demos both pull out past it and complete NOTHING, which is the
-      // honest verdict on „щях да успея".
-      params: { kind: "reachZone", x: OVS2_OUT, y: 180, radiusM: 5 },
+      titleBg: "Стигни последната точка, от която пасът още се побира (м. 180)",
+      // LEDGER B8 (doc 86 §3) — the second of the two coerced overtakes.
+      //
+      // This gate was x = OVS2_OUT (−2.5) radius 5: 6.56 m off the own-lane
+      // centre, so it was satisfiable ONLY from a committed excursion into the
+      // oncoming lane. As a MANDATORY objective it meant the drill could not be
+      // finished without overtaking — the student who read «прекъсната линия, но
+      // насреща идва кола, ще изчакам» made the choice чл. 42 wants and was
+      // scored `completedAll: false`, one star, next rung locked.
+      //
+      // Repaired the same way as sc-ovcc-pass: the gate keeps its POSITION on the
+      // road (y = 180 is still the last mark from which a whole pass plus the
+      // 30 m landing margin fits, and it still fires BEFORE sc-ovsr-home, so the
+      // taught order is intact) and becomes lane-agnostic — centre x = 0.78 is
+      // the midpoint of own 4.06 and the committed-pass line −2.50, radius 6
+      // admits both with ~2.7 m of slack. What the drill grades is unchanged and
+      // undiluted: CROSSED_SOLID_LINE and OVERTAKE_RETURN_TOO_EARLY still bill
+      // the late pass, and sc-ovsr-home still demands being fully home by 270.
+      params: { kind: "reachZone", x: (OVS2_OWN + OVS2_OUT) / 2, y: 180, radiusM: 6 },
     },
     {
       id: "sc-ovsr-home",
@@ -1499,7 +1533,9 @@ export const SC_LN_OBSTACLE_MEETING: ScenarioSpec = {
     vehicleStart: "ready",
   },
   instructionsBg: [
-    { n: 1, textBg: "Тясна двупосочна улица, ограничение 40. Напред в ТВОЯТА лента е паркиран ред — половината ти платно е затворено и заобикалянето минава през насрещната лента." },
+    // Ledger L10: the L5 rung compiles night and HEADLIGHTS_OFF_AT_NIGHT is an
+    // основна fault that grades unconditionally (ЗДвП чл. 70).
+    { n: 1, textBg: "Тясна двупосочна улица, ограничение 40. Напред в ТВОЯТА лента е паркиран ред — половината ти платно е затворено и заобикалянето минава през насрещната лента. По тъмно провери първо късите светлини (чл. 70): в стеснение насрещният решава дали да тръгне по това дали те вижда." },
     { n: 2, textBg: "Точно това решава спора: препятствието е от твоята страна, значи предимството е на насрещния. Ти изчакваш, той минава (чл. 44)." },
     { n: 3, textBg: "Намали навреме и спри в СВОЯТА лента на няколко метра пред препятствието — оттам виждаш насрещното платно и не пречиш на никого." },
     { n: 4, textBg: "Насреща идват ДВЕ коли. Първата ще мине бързо — не тръгвай след нея: втората вече е зад завоя на вниманието ти." },

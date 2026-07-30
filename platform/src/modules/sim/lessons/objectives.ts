@@ -260,7 +260,17 @@ export function parseObjectiveParams(objective: LessonObjective): ObjectiveParam
 export function createEvalState(params: ObjectiveParams): ObjectiveEvalState {
   switch (params.kind) {
     case "reachZone":
-      return { type: "stateless" };
+      return {
+        type: "reachZone",
+        reached: false,
+        // An uncapped zone has no speed half to satisfy — start it met so the
+        // fold below stays one expression and an uncapped zone behaves
+        // EXACTLY as it did before B4 (done ⇔ inside the authored radius).
+        capMet: params.maxSpeedKmh === undefined,
+        overCapNoted: false,
+        approachFrom: null,
+        prevPos: null,
+      };
     case "passSignal":
       return { type: "passSignal", crossed: false, stoppedInZoneVisit: false, redMet: false };
     case "driveDistance":
@@ -287,7 +297,7 @@ export function createEvalState(params: ObjectiveParams): ObjectiveEvalState {
             attempts: 0,
           };
         case "roundabout":
-          return { type: "roundabout", entered: false, exitSignaled: false };
+          return { type: "roundabout", entered: false, exitSignaled: false, voidedExits: 0 };
         case "threePointTurn":
           return {
             type: "threePointTurn",
@@ -336,6 +346,76 @@ const DEG_TO_RAD = Math.PI / 180;
 const TELEPORT_JUMP_M = 50;
 /** At/below this speed the vehicle counts as stopped for maneuvers, km/h. */
 const STOPPED_SPEED_KMH = 1;
+
+/**
+ * B4/B5 (doc 86 §3, 2026-07-30) — the reach-zone GRACE ring, meters, and it
+ * only ever extends the mark BACKWARD, toward the driver. That asymmetry is
+ * the whole design; the rest is arithmetic.
+ *
+ * WHAT WAS BROKEN. The evaluator demanded `inZone && slowEnough` on the same
+ * frame, against a circle of radius 3.5–6 m. Two students were trapped by it
+ * and neither was driving badly:
+ *
+ *  - B5, the forced pose. Founder, verbatim: „if I don't stop on the green
+ *    circle I can't do anything, I must do a violation and go back to the
+ *    green circle." He had stopped SHORT of a give-way mark — the pose with
+ *    the better sightline, the pose an instructor asks for — and the drill
+ *    refused it, then demanded he creep forward into the one position that
+ *    cannot see. `sc-jxgb-yield` is the case: a radius-4 circle admitting the
+ *    last 8 m of a lawful stopping band metres long, and doc 86 T6 shows the
+ *    conflict car is occluded from exactly that spot.
+ *  - B4, the discipline shown early. Braking to the cap on the approach and
+ *    coasting through a shade above it read as failure, though the taught
+ *    behaviour — slow down BEFORE the hazard — had been performed.
+ *
+ * WHY IT DOES NOT EXTEND FORWARD, which the first draft of this fix got wrong
+ * and three counter-proof suites caught: on a „спри на маркировката" drill the
+ * OVERSHOOT IS THE GRADED FAILURE. `sc-ac-wet-braking`'s whole subject is that
+ * wet grip needs an earlier braking point, and its mistake demo slides past
+ * the mark into a collision; `sc-pk-ban-stop`'s mistake demo rests five metres
+ * beyond the legal spot. Crediting either would have taught, at scale, that
+ * stopping past the line is stopping at it. Short of the mark is better
+ * driving and counts; past the mark is the mistake and does not.
+ *
+ * WHY IT DOES NOT EXTEND SIDEWAYS either. finish.ts treats a car standing one
+ * lane over (8.13 m) at the end of the route as STUCK — that is the entire B3
+ * fix — so an evaluator that called the same car ARRIVED would have the module
+ * arguing with itself. The grace is therefore a CAPSULE along the approach
+ * axis: extra length behind the mark, the authored radius and no more across
+ * it.
+ *
+ * 5 m is a car length and a bit — the amount by which a learner misjudges
+ * „here", and no more. It was 8 m in the first draft and that was measurably
+ * too much: `sc-vp-police-stop`'s panic slam rests 10.1 m short of a radius-3
+ * kerbside mark, which is not „a shade early", it is the failed pull-over the
+ * drill is about. A grace big enough to swallow that is a grace big enough to
+ * swallow the lesson.
+ *
+ * The standstill arm additionally requires the cap to be a genuine STOP
+ * demand (REACH_ZONE_HALT_CAP_KMH). A cap of 20 km/h on a roundabout chord is
+ * a flow envelope, not „stop here" — `sc-rb-busy-gap` says so in its own
+ * comment — so a car that came to rest near it (in that drill, by crashing)
+ * has demonstrated nothing about reaching the mouth.
+ *
+ * A student who DOES overshoot is still not trapped — he is simply not
+ * credited. finish.ts ends the drive at the route's end (B1/B2/B3) and
+ * progress.ts lets him take the next rung anyway (B9), so the cost of the
+ * mistake is the mistake, not the afternoon.
+ *
+ * This LOOSENS PROGRESSION ONLY. Not one line of law moves: the rule engine
+ * still grades speed, overshoot and yield exactly as before — the
+ * progression/correctness split documented at the top of this file.
+ */
+export const REACH_ZONE_GRACE_M = 5;
+
+/**
+ * The standstill arm of the grace only applies to a zone whose cap is a STOP
+ * demand. At or below walking-plus pace the objective is „спри тук" and
+ * stopping short of it is the same act done earlier; above it the cap is a
+ * flow envelope (a ring chord at 20, a rain approach at 42) and coming to
+ * rest nearby proves nothing about having reached the place.
+ */
+export const REACH_ZONE_HALT_CAP_KMH = 8;
 
 /** Default max distance of the car centre from the bay centre at rest, m. */
 export const PARK_CENTER_TOL_M = 0.5;
@@ -386,13 +466,8 @@ export function stepObjective(
   ctx: ObjectiveContext = EMPTY_CONTEXT,
 ): ObjectiveStepResult {
   switch (params.kind) {
-    case "reachZone": {
-      const inZone = dist(tick.position.x, tick.position.y, params.x, params.y) <= params.radiusM;
-      const slowEnough =
-        params.maxSpeedKmh === undefined || tick.speedKmh <= params.maxSpeedKmh;
-      const done = inZone && slowEnough;
-      return { done, progress: done ? 1 : 0, evalState: prev };
-    }
+    case "reachZone":
+      return stepReachZone(params, prev, tick);
 
     case "passSignal":
       return stepPassSignal(params, prev, tick, ctx);
@@ -437,6 +512,118 @@ export function stepObjective(
           return stepThreePointTurn(params, prev, tick);
       }
   }
+}
+
+/**
+ * Reach a waypoint (B4/B5-hardened, 2026-07-30) — two INDEPENDENT, MONOTONIC
+ * latches instead of one same-frame conjunction:
+ *
+ *   reached — the car was inside the authored radius, OR (on a zone whose cap
+ *             is a genuine stop demand) came to a FULL STOP inside the
+ *             approach capsule. The second arm is what lets a student stop
+ *             SHORT of a halt mark with the better sightline and still be
+ *             credited: the drill is „stop here", and stopping four metres
+ *             earlier is stopping here, done better.
+ *   capMet  — the arrival speed cap was honoured at least once inside the
+ *             authored radius, or on the approach to it. Uncapped zones start
+ *             met (see createEvalState), so an uncapped waypoint is
+ *             bit-identical to the pre-B4 evaluator: done exactly when the car
+ *             is inside the authored radius, at any speed, on any frame.
+ *
+ * The grace is not a ring but a CAPSULE: the authored circle stretched back
+ * down the approach and not one centimetre sideways (see REACH_ZONE_GRACE_M
+ * for why, and for the four counter-proof drills that would otherwise have
+ * been taught backwards). Inside the AUTHORED radius nothing changes at all —
+ * that acceptance is the template's own and is untouched.
+ *
+ * `overCapNoted` latches the first frame the car is genuinely AT the mark and
+ * still over the cap. The engine turns that transition into one explaining
+ * card (THEO-4): the founder's «I am stopping on top of the green circle and
+ * nothing happens» was never a tolerance problem — it was an invisible speed
+ * contract, and the silence is the part that has to go.
+ */
+function stepReachZone(
+  params: ReachZoneParams,
+  prev: ObjectiveEvalState,
+  tick: SimTick,
+): ObjectiveStepResult {
+  const st: Extract<ObjectiveEvalState, { type: "reachZone" }> =
+    prev.type === "reachZone"
+      ? prev
+      : {
+          type: "reachZone",
+          reached: false,
+          capMet: params.maxSpeedKmh === undefined,
+          overCapNoted: false,
+          approachFrom: null,
+          prevPos: null,
+        };
+
+  const d = dist(tick.position.x, tick.position.y, params.x, params.y);
+  const speedKmh = Math.abs(tick.speedKmh); // reverse reads negative
+  const inZone = d <= params.radiusM;
+  const cap = params.maxSpeedKmh;
+  const inGraceRing = cap !== undefined && d <= params.radiusM + REACH_ZONE_GRACE_M;
+
+  // Which way the student came from: where he was on the frame before he
+  // entered the proximity ring. That direction turns the grace from a CIRCLE
+  // into a CAPSULE stretched back down the approach — extra room along the
+  // road, none at all across it.
+  //
+  // The lateral bound is not a detail: it is what keeps this evaluator from
+  // contradicting the B3 rescue next door. finish.ts treats a car standing one
+  // lane over (8.13 m) at the end of the route as STUCK and lets it out with
+  // the objective marked undone. A circular grace on a radius-6 waypoint would
+  // have reached 11 m and called that same car ARRIVED. Stopping short of a
+  // mark on the same line is stopping there, done earlier; stopping in a
+  // different lane is a different place, and both halves of the module have to
+  // say so with one voice.
+  const here = { x: tick.position.x, y: tick.position.y };
+  const approachFrom = st.approachFrom ?? (inGraceRing ? (st.prevPos ?? here) : null);
+  let inApproachGrace = false;
+  if (approachFrom !== null) {
+    const ax = params.x - approachFrom.x;
+    const ay = params.y - approachFrom.y;
+    const m = Math.hypot(ax, ay);
+    if (m >= 1e-6) {
+      const ux = ax / m;
+      const uy = ay / m;
+      const rx = tick.position.x - params.x;
+      const ry = tick.position.y - params.y;
+      const along = rx * ux + ry * uy; // + = beyond the mark
+      const lateral = Math.abs(rx * uy - ry * ux); // across the approach
+      inApproachGrace =
+        lateral <= params.radiusM && along <= 0 && along >= -(params.radiusM + REACH_ZONE_GRACE_M);
+    }
+  }
+  const halted = speedKmh <= STOPPED_SPEED_KMH;
+  const isHaltDemand = cap !== undefined && cap <= REACH_ZONE_HALT_CAP_KMH;
+
+  const reached = st.reached || inZone || (inApproachGrace && halted && isHaltDemand);
+  const capMet =
+    cap === undefined
+      ? true
+      : st.capMet || (speedKmh <= cap && (inZone || inApproachGrace));
+  const done = reached && capMet;
+  // „You are ON the mark and still too fast" — the one state the student
+  // reads as „nothing happened". Latched so it is said once, not every frame.
+  const overCapNoted = st.overCapNoted || (!done && inZone && cap !== undefined && speedKmh > cap);
+
+  const evalState: ObjectiveEvalState = {
+    type: "reachZone",
+    reached,
+    capMet,
+    overCapNoted,
+    approachFrom,
+    prevPos: here,
+  };
+  return {
+    done,
+    // Half progress once the place is reached but the speed contract is not
+    // yet met — the banner stops looking inert while the student slows down.
+    progress: done ? 1 : reached ? 0.5 : 0,
+    evalState,
+  };
 }
 
 /**
@@ -739,6 +926,20 @@ function axisAngleDiffDeg(aDeg: number, bDeg: number): number {
  * RESETS the traversal: the objective stays open and the student re-enters
  * the ring to exit properly, so signaling during the initial approach can
  * never be banked for a later silent exit.
+ *
+ * B6 (doc 86 §3, 2026-07-30). The reset is kept — it is the only thing that
+ * stops „signal on after you are already out" from buying the objective, and
+ * the skill this drill exists for is the signal, so it has to be performed
+ * rather than banked. What is fixed is that the reset was SILENT and INESCAPABLE:
+ *
+ *  - silent: nothing on screen said the traversal had been voided or why, so
+ *    the drill simply stopped responding. `voidedExits` now counts each one
+ *    and the engine turns the increment into an explaining card (THEO-4);
+ *  - inescapable: combined with B1 (no finish anchor for a roundabout) there
+ *    was no termination path AT ALL — re-enter and redo it, or reload the
+ *    browser. finish.ts now anchors the route on LEAVING the ring, with a
+ *    twenty-second window so an immediate second attempt still wins the rung
+ *    and a student who drives on gets the debrief instead of a dead lesson.
  */
 function stepRoundabout(
   x: number,
@@ -753,6 +954,7 @@ function stepRoundabout(
   const d = dist(tick.position.x, tick.position.y, x, y);
   let entered = prev.entered || d <= enterRadiusM;
   let exitSignaled = prev.exitSignaled;
+  let voidedExits = prev.voidedExits;
 
   // Exit window: only ticks AFTER entering, outward of the ring radius.
   if (entered && d > enterRadiusM && tick.indicator === "right") exitSignaled = true;
@@ -763,6 +965,10 @@ function stepRoundabout(
       done = true;
     } else {
       // Left the roundabout without the exit signal — traversal void, redo.
+      // Counted, so the student is TOLD rather than left guessing. The reset
+      // of `entered` also stops this branch from re-firing every frame while
+      // the car drives away: one departure, one count.
+      voidedExits += 1;
       entered = false;
       exitSignaled = false;
     }
@@ -771,7 +977,7 @@ function stepRoundabout(
   return {
     done,
     progress: done ? 1 : entered ? (exitSignaled ? 0.75 : 0.5) : 0,
-    evalState: { type: "roundabout", entered, exitSignaled },
+    evalState: { type: "roundabout", entered, exitSignaled, voidedExits },
     detail: { kind: "roundabout", entered, exitSignaled },
   };
 }

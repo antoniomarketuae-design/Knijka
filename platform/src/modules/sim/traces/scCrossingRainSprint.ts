@@ -14,7 +14,15 @@
  *   - „Суха скорост в дъжд" grades EXACTLY PEDESTRIAN_CROSSING_TOO_FAST (40 km/h
  *     is over the 30 km/h crossing max but under the rain-conditions envelope,
  *     so it is the crossing fault ALONE, not SPEED_TOO_FAST_FOR_CONDITIONS);
- *   - „Непропускане" grades EXACTLY PEDESTRIAN_NOT_YIELDED.
+ *   - „Непропускане" grades EXACTLY PEDESTRIAN_NOT_YIELDED;
+ *   - „Без светлини в дъжда" (doc 86 L10) grades EXACTLY the two lights codes.
+ *     The drill compiles night + rain on all four rungs, so
+ *     HEADLIGHTS_OFF_AT_NIGHT (основна) and HEADLIGHTS_OFF_IN_RAIN are armed
+ *     unconditionally against it — and until this demo landed, the lesson
+ *     neither told the student to switch the lamps on nor showed them what
+ *     happens if they do not. The sc-pe-night-unlit „mistake-lights-off"
+ *     recipe verbatim: stop OUTSIDE the crossing zone so the lights channel is
+ *     the only thing graded.
  *
  * Geometry pinned to content/world/pe-rain-v1.json:
  *   street on x = 0, right-lane center x = 4.06, zebra at y = 95, spawn
@@ -143,13 +151,48 @@ export function scCrossingRainSprintMistakeNotYieldedScript(): DriveScript {
 }
 
 // ---------------------------------------------------------------------------
+// Mistake demo 3 — „Без светлини в дъжда" (doc 86 L10: HEADLIGHTS_OFF_AT_NIGHT
+// + HEADLIGHTS_OFF_IN_RAIN)
+// ---------------------------------------------------------------------------
+
+export function scCrossingRainSprintMistakeLightsOffScript(): DriveScript {
+  return {
+    steps: [
+      {
+        kind: "annotation",
+        textBg: "Грешката: скоростта е съобразена, но колата пое в дъждовната нощ с изгасени светлини.",
+      },
+      // Headlights OFF, set explicitly: the recorder's NIGHT default is "low",
+      // so the dark drive has to author it. The car rests at y = 52 — 43 m from
+      // the zebra, OUTSIDE both the ~35 m crossing zone and the sprinter's 40 m
+      // release ring — so the lights channel is the only thing this demo grades
+      // and the sprinter never leaves the kerb.
+      { kind: "headlights", setting: "off" },
+      { kind: "glance", mirror: "rear" },
+      { kind: "drive", points: [[X_LANE, 15], [X_LANE, 52]], targetKmh: 30 },
+      { kind: "pause", sec: 1.5, brake: true },
+      {
+        kind: "annotation",
+        textBg:
+          "В дъжд през нощта фаровете не са за да виждаш ти — те са и това, по което мокрият пешеходец иззад чадъра си преценява има ли кола.",
+      },
+      {
+        kind: "annotation",
+        textBg: "Късите се включват със запалването: първо светлините, чак после разговорът за скорост.",
+      },
+    ],
+  };
+}
+
+// ---------------------------------------------------------------------------
 // Recording assembly (the tool/test entry)
 // ---------------------------------------------------------------------------
 
 export type ScCrossingRainSprintTraceName =
   | "shadow-correct"
   | "mistake-too-fast"
-  | "mistake-not-yielded";
+  | "mistake-not-yielded"
+  | "mistake-lights-off";
 
 const SCRIPTS: Record<
   ScCrossingRainSprintTraceName,
@@ -158,6 +201,7 @@ const SCRIPTS: Record<
   "shadow-correct": { kind: "shadow", script: scCrossingRainSprintShadowScript },
   "mistake-too-fast": { kind: "mistake", script: scCrossingRainSprintMistakeTooFastScript },
   "mistake-not-yielded": { kind: "mistake", script: scCrossingRainSprintMistakeNotYieldedScript },
+  "mistake-lights-off": { kind: "mistake", script: scCrossingRainSprintMistakeLightsOffScript },
 };
 
 /**

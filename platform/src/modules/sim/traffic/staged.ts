@@ -25,6 +25,7 @@ import type {
   StagedVehicleSpec,
   TrafficPedestrianState,
   TrafficVehicleState,
+  VehicleIndicator,
 } from "./types";
 
 const DEFAULT_ACCEL_MPS2 = 2.6;
@@ -186,6 +187,8 @@ interface MutableView {
   pathLengthM: number;
   nodeS: readonly number[];
   finished: boolean;
+  indicator: VehicleIndicator;
+  lateralOffsetM: number;
 }
 
 export interface StagedVehicleAgent {
@@ -208,6 +211,8 @@ export interface StagedVehicleAgent {
   latTarget: number;
   /** Signed glide rate toward latTarget, m/s (0 = idle channel). */
   latRate: number;
+  /** Commanded turn indicator (ledger L6) — published, never inferred. */
+  indicator: VehicleIndicator;
 }
 
 export interface StagedPedestrianAgent {
@@ -260,6 +265,9 @@ export function createStagedVehicle(
       // FO-06 size/type profile — only present when the spec authors one, so
       // profile-less staged actors publish the exact pre-profile state shape.
       ...(spec.profile !== undefined ? { profile: spec.profile } : {}),
+      // L6: every staged VEHICLE carries the indicator channel from birth, so
+      // the renderer never has to guess. Ambient agents still publish no key.
+      indicator: "off",
     },
     view: {
       id: spec.id,
@@ -273,6 +281,8 @@ export function createStagedVehicle(
       pathLengthM: path.length,
       nodeS: path.nodeS,
       finished: false,
+      indicator: "off",
+      lateralOffsetM: 0,
     },
     command: { type: "hold", speedMps: 0, gapM: 0, maxSpeedMps: 0, decelMps2: 0 },
     holdS,
@@ -284,6 +294,7 @@ export function createStagedVehicle(
     lat: 0,
     latTarget: 0,
     latRate: 0,
+    indicator: "off",
   };
   publishVehicle(agent);
   return agent;
@@ -327,6 +338,10 @@ export function createStagedPedestrian(
       pathLengthM: path.length,
       nodeS: path.nodeS,
       finished: false,
+      // Pedestrians have no indicator / lateral channel — the view fields
+      // exist only so one MutableView shape backs both actor kinds.
+      indicator: "off",
+      lateralOffsetM: 0,
     },
     walking: false,
     s: 0,
@@ -370,6 +385,14 @@ export function applyStagedCommand(
         if (ramp <= 0) v.lat = v.latTarget; // degenerate ramp = instant
         break;
       }
+      case "setIndicator":
+        // L6: an explicit, commanded lamp. Published immediately (not on the
+        // next integration step) so «мигачът светна» is true from this frame —
+        // the ≥ 3 s lead the runners assert is measured from here.
+        v.indicator = command.indicator;
+        v.state.indicator = command.indicator;
+        v.view.indicator = command.indicator;
+        break;
       case "reset":
         v.command.type = "hold";
         v.s = v.holdS;
@@ -379,6 +402,7 @@ export function applyStagedCommand(
         v.lat = 0;
         v.latTarget = 0;
         v.latRate = 0;
+        v.indicator = "off";
         publishVehicle(v);
         break;
     }
@@ -401,7 +425,7 @@ export function applyStagedCommand(
       publishPedestrian(p, 0);
       break;
     default:
-      break; // matchPlayer / brake / laneShift are vehicle-only — ignore
+      break; // matchPlayer / brake / laneShift / setIndicator are vehicle-only
   }
 }
 
@@ -531,6 +555,7 @@ function publishVehicle(agent: StagedVehicleAgent): void {
     }
   }
   agent.state.speedMps = agent.speed;
+  agent.state.indicator = agent.indicator;
   const view = agent.view;
   view.x = agent.state.x;
   view.y = agent.state.y;
@@ -539,6 +564,8 @@ function publishVehicle(agent: StagedVehicleAgent): void {
   view.speedMps = agent.speed;
   view.s = agent.s;
   view.finished = agent.finished;
+  view.indicator = agent.indicator;
+  view.lateralOffsetM = agent.lat;
 }
 
 function setPedOnRoad(

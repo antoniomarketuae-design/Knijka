@@ -161,9 +161,40 @@ const SCRIPTS: Record<
 };
 
 /**
+ * The staged chain for a given demo (the scFollowDistanceStaged pattern).
+ *
+ * LEDGER T18: the DRILL's chain now runs 26 / 53 m of centres instead of
+ * 19 / 46, which moves FOLLOWING_TOO_CLOSE from „above 42.6 km/h" (below the
+ * street's posted 50, on a finish leg with no cap) to „above 59.7 km/h". The
+ * BOTH mistake tapes keep a PINNED clone of the historical 19 / 46 chain, and
+ * for the same reason in two shapes: „Гледане само в бронята отпред" exists to
+ * grade FOLLOWING_TOO_CLOSE at 48 km/h (measured: it stops grading against the
+ * wider chain), and „Късно пълно спиране до сблъсък" exists to grade COLLISION
+ * (measured: against the wider chain the late braker stops 7 m short and grades
+ * NOTHING). The drill must stop convicting lawful drives; the demos must keep
+ * convicting the two drives they exist to convict. Only the shadow — the drive
+ * that demonstrates the drill as it now plays — sees the new spacing.
+ */
+function scFoBrakelightChainStaged(
+  name: ScFoBrakelightChainTraceName,
+): StagedEventSpec[] {
+  const base = [...(SC_FO_BRAKELIGHT_CHAIN.staged ?? [])] as StagedEventSpec[];
+  if (name === "shadow-correct") return base;
+  return base.map((e) => {
+    if (e.kind === "cutInLeadCar" && e.id === "sc-fbc-mid") {
+      return { ...e, paceAheadM: 19, actor: { ...e.actor, hold: { nodeIndex: 0, offsetM: 34 } } };
+    }
+    if (e.kind === "brakingLeadCar" && e.id === "sc-fbc-head") {
+      return { ...e, followGapM: 46, actor: { ...e.actor, hold: { nodeIndex: 0, offsetM: 61 } } };
+    }
+    return e;
+  });
+}
+
+/**
  * Record one of the three drives against a loaded fo-brake-v1 document — the
- * TEMPLATE's staged chain armed (single truth), ambient traffic zero (the
- * harness law). Deterministic: same district → same trace.
+ * demo's staged chain armed (see scFoBrakelightChainStaged), ambient traffic
+ * zero (the harness law). Deterministic: same district → same trace.
  */
 export function recordScFoBrakelightChainDrive(
   districtRaw: unknown,
@@ -175,7 +206,7 @@ export function recordScFoBrakelightChainDrive(
     scenarioId: SC_FO_BRAKELIGHT_CHAIN_ID,
     kind,
     seed: 7,
-    stagedEvents: [...(SC_FO_BRAKELIGHT_CHAIN.staged ?? [])] as StagedEventSpec[],
+    stagedEvents: scFoBrakelightChainStaged(name),
     ...(extra?.onTick ? { onTick: extra.onTick } : {}),
   });
 }

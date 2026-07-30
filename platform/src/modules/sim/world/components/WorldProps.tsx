@@ -33,8 +33,18 @@
  * podium-facade band with no free-standing support, so it has no standalone
  * streetside reading (buildings are outside this component's scope).
  *
+ * Sign FACES (doc 86 T4): a plate whose art is fixed but whose NUMBER varies —
+ * В26 „скорост", В33 „край на забраната" — is not a new GLB. All thirteen В26
+ * numerals share `sign_speed_limit_50`'s body and face geometry; only the face
+ * TEXTURE is per-numeral, re-rasterised at load time from the project's own
+ * law-cited content/signs/svg/v26.svg (signFaces.ts), so the В26 in the cockpit
+ * is the В26 in the student's theory question. Д4 rides Е7's square plate the
+ * same way. A face that fails to build drops its KIND rather than falling back
+ * to another numeral: doc 86 T4 is the defect where 82 shipped plates stated a
+ * limit the reducer does not grade, and a fallback face would recreate it.
+ *
  * Draw calls (WorldProps only; CityBuildings is separate + chunked):
- *   signals 2 (housing + lamps) + signs 8 (4 kinds × body+face)
+ *   signals 2 (housing + lamps) + signs 8 (the v1 4 kinds × body+face)
  *   + streetlights 2 (housing + glow)
  *   + trees 4 (boulevard linden + ornamental + leafy_a + leafy_b)
  *   + furniture 4 (bench + bollard + trash_bin + planter)
@@ -42,7 +52,10 @@
  *   + parking kit 1 (merged cluster) = 27  (was 18).
  * Zone-sign kinds (SIGN-ASSET drop) add draws ONLY on maps whose zones place
  * them (+2 per textured kind, +1 for the geometry-only crossbuck);
- * zones-less districts render exactly the fixed set above.
+ * zones-less districts render exactly the fixed set above. Each extra В26
+ * NUMERAL is likewise +2 only where it is actually posted (a district carries
+ * one or two limits, so it is +2 or +4 — the „50" plate on a 40 street cost
+ * the same two draws and told the student the wrong number).
  * The guarded-crossing BARRIER is the one ANIMATED world prop: post + arm +
  * blink lamp as plain meshes (+3 draws per guarded map, 1–2 barriers ever),
  * the arm pose driven per frame by the runtime's graded timetable
@@ -56,15 +69,18 @@ import * as THREE from "three";
 import type { GLTF } from "three/examples/jsm/loaders/GLTFLoader.js";
 import type { SignalLampState } from "../../contracts";
 import {
+  SIGN_KINDS,
   TREE_KINDS,
   type BillboardSize,
   type SignKind,
+  type SignPlacement,
   type StaticTransform,
   type TreeKind,
   type TreePlacement,
   type WorldGeometry,
 } from "../types";
 import { createGltfLoader } from "./gltfLoader";
+import { makeSignFaceTexture, type SignFaceArt } from "./signFaces";
 import {
   createInstancedMesh,
   createOffsetInstancedMesh,
@@ -82,8 +98,27 @@ const STREET_V2_BASE = "/sim/streetscape-v2";
 const SIGN_GLB: Record<SignKind, string> = {
   stop: "sign_stop",
   giveWay: "sign_give_way",
-  limit50: "sign_speed_limit_50",
   roundabout: "sign_roundabout",
+  // В26 „…скорост, по-висока от означената" — ONE body, one face texture per
+  // numeral. The kit's single baked face (В26-50) stays exactly as it shipped;
+  // every other numeral rasterises content/signs/svg/v26.svg at load time
+  // (signFaces.ts) onto the same circle_pro plate. Doc 86 T4: a plate that
+  // states a limit the reducer does not grade is worse than no plate, so a
+  // numeral whose face cannot be built is DROPPED, never substituted.
+  limit20: "sign_speed_limit_50",
+  limit30: "sign_speed_limit_50",
+  limit40: "sign_speed_limit_50",
+  limit50: "sign_speed_limit_50",
+  limit60: "sign_speed_limit_50",
+  limit70: "sign_speed_limit_50",
+  limit80: "sign_speed_limit_50",
+  limit90: "sign_speed_limit_50",
+  limit100: "sign_speed_limit_50",
+  limit110: "sign_speed_limit_50",
+  limit120: "sign_speed_limit_50",
+  limit130: "sign_speed_limit_50",
+  limit140: "sign_speed_limit_50",
+  limitEnd: "sign_speed_limit_50", // В33 — same plate, v33.svg face
   // Zone-driven posts (SIGN-ASSET drop, tools/blender/signs_v2.py). Loaded
   // TOLERANTLY: a missing GLB logs once and its kind simply doesn't render,
   // so the sim never hard-fails on a partially shipped kit.
@@ -96,13 +131,46 @@ const SIGN_GLB: Record<SignKind, string> = {
   railCross: "sign_rail_cross", // geometry-only crossbuck (no face_* prim)
   barrier: "rail_barrier", // striped arm — ANIMATED (RailBarriers), never instanced
   noEntry: "sign_no_entry", // В1 — the v1 kit asset (tools/blender/signs.py)
+  oneWay: "sign_service_fuel", // Д4 — the square info plate, d4.svg face
+  // Doc 86 D5 — four finished GLBs that shipped with no SignKind at all, so no
+  // pass could reach them. They are now placeable kinds.
+  pedestrianCrossing: "sign_pedestrian", // А18
+  priorityRoad: "sign_priority_road", // Б3 (the жълт ромб)
+  settlement: "sign_settlement", // Д11
+  fuel: "sign_service_fuel", // Е7
 };
-const SIGN_KINDS = Object.keys(SIGN_GLB) as SignKind[];
+
+/**
+ * Kinds whose face is NOT the one baked into their GLB: the art is rasterised
+ * from the law-cited SVG at load time and the numeral (В26/В33) substituted.
+ * `limit50` is deliberately absent — it keeps its shipped baked face, so the
+ * common plate is byte-identical to what the founder has already reviewed.
+ */
+const SIGN_FACE_OVERRIDE: Partial<Record<SignKind, { art: SignFaceArt; numeral?: number }>> = {
+  limit20: { art: "v26", numeral: 20 },
+  limit30: { art: "v26", numeral: 30 },
+  limit40: { art: "v26", numeral: 40 },
+  limit60: { art: "v26", numeral: 60 },
+  limit70: { art: "v26", numeral: 70 },
+  limit80: { art: "v26", numeral: 80 },
+  limit90: { art: "v26", numeral: 90 },
+  limit100: { art: "v26", numeral: 100 },
+  limit110: { art: "v26", numeral: 110 },
+  limit120: { art: "v26", numeral: 120 },
+  limit130: { art: "v26", numeral: 130 },
+  limit140: { art: "v26", numeral: 140 },
+  oneWay: { art: "d4" },
+};
+/** В33 numerals are per-placement, so its faces are built on demand (below). */
+const LIMIT_END_ART: SignFaceArt = "v33";
+
 /** The v1 four load strictly (as always); everything after them is tolerant. */
-const CORE_SIGN_KINDS: readonly SignKind[] = ["stop", "giveWay", "limit50", "roundabout"];
-const ZONE_SIGN_KINDS: readonly SignKind[] = SIGN_KINDS.filter(
-  (k) => !CORE_SIGN_KINDS.includes(k),
-);
+const CORE_SIGN_GLBS: readonly string[] = [
+  "sign_stop",
+  "sign_give_way",
+  "sign_speed_limit_50",
+  "sign_roundabout",
+];
 
 // ---------------------------------------------------------------------------
 // GLB baking
@@ -375,8 +443,13 @@ async function buildPropAssets(): Promise<PropAssets> {
     }
   };
 
-  const zoneSignsPromise = Promise.all(
-    ZONE_SIGN_KINDS.map((kind) => loadOptional(SIGN_BASE, SIGN_GLB[kind])),
+  // GLBs load ONCE PER FILE, not per kind: the В26 numeral set is thirteen
+  // kinds sharing one body (doc 86 T4), and Д4/Е7 share the square info plate.
+  const optionalGlbFiles = [...new Set(Object.values(SIGN_GLB))].filter(
+    (f) => !CORE_SIGN_GLBS.includes(f),
+  );
+  const optionalGlbsPromise = Promise.all(
+    optionalGlbFiles.map((file) => loadOptional(SIGN_BASE, file)),
   );
 
   const [
@@ -436,27 +509,19 @@ async function buildPropAssets(): Promise<PropAssets> {
     };
   };
 
-  const zoneSignGltfs = await zoneSignsPromise;
-  const signs: Record<SignKind, SignAsset | null> = {
-    stop: bakeSign(stop),
-    giveWay: bakeSign(giveWay),
-    limit50: bakeSign(limit50),
-    roundabout: bakeSign(roundabout),
-    noOvertaking: null,
-    noStopping: null,
-    slippery: null,
-    curve: null,
-    railGuarded: null,
-    railUnguarded: null,
-    railCross: null,
-    barrier: null,
-    noEntry: null,
-  };
+  const optionalGltfs = await optionalGlbsPromise;
+  /** file name → its ONE bake, shared by every kind that names that file. */
+  const bakedByFile = new Map<string, SignAsset>();
+  bakedByFile.set(SIGN_GLB.stop, bakeSign(stop));
+  bakedByFile.set(SIGN_GLB.giveWay, bakeSign(giveWay));
+  bakedByFile.set(SIGN_GLB.limit50, bakeSign(limit50));
+  bakedByFile.set(SIGN_GLB.roundabout, bakeSign(roundabout));
+
   let railBarrier: PropAssets["railBarrier"] = null;
-  ZONE_SIGN_KINDS.forEach((kind, i) => {
-    const gltf = zoneSignGltfs[i];
+  optionalGlbFiles.forEach((file, i) => {
+    const gltf = optionalGltfs[i];
     if (!gltf) return;
-    if (kind === "barrier") {
+    if (file === SIGN_GLB.barrier) {
       // Animated prop: post and arm bake SEPARATELY in the shared authored
       // frame (normalize off — the arm floats at pivot height and must not be
       // dropped to y=0), then the arm re-bases so its pivot is the origin.
@@ -480,8 +545,40 @@ async function buildPropAssets(): Promise<PropAssets> {
       }
       return;
     }
-    signs[kind] = bakeSign(gltf);
+    bakedByFile.set(file, bakeSign(gltf));
   });
+
+  const signs = Object.fromEntries(
+    SIGN_KINDS.map((kind) => [
+      kind,
+      kind === "barrier" ? null : (bakedByFile.get(SIGN_GLB[kind]) ?? null),
+    ]),
+  ) as Record<SignKind, SignAsset | null>;
+
+  // -- swapped faces (doc 86 T4 / D5) -----------------------------------------
+  // A kind whose face is NOT the one baked into its GLB gets a clone of that
+  // GLB's face material carrying a texture rasterised from the law-cited SVG.
+  // Body + face GEOMETRY stay shared with the source kind; only the material is
+  // per-kind, so thirteen В26 numerals cost thirteen small textures and nothing
+  // else. A face that fails to build sets the kind to null — the placement pass
+  // then renders NO post there, which is the whole point: doc 86 T4 is about a
+  // plate that stated the wrong number, and a fallback face would restage it.
+  await Promise.all(
+    (Object.entries(SIGN_FACE_OVERRIDE) as [SignKind, { art: SignFaceArt; numeral?: number }][])
+      .filter(([kind]) => signs[kind] !== null)
+      .map(async ([kind, spec]) => {
+        const base = signs[kind]!;
+        const tex = await makeSignFaceTexture(spec.art, spec.numeral);
+        if (!tex || !base.faceMaterial || !base.faceGeometry) {
+          signs[kind] = null;
+          return;
+        }
+        const material = base.faceMaterial.clone();
+        material.map = tex;
+        material.needsUpdate = true;
+        signs[kind] = { body: base.body, faceGeometry: base.faceGeometry, faceMaterial: material };
+      }),
+  );
 
   const signalHousing = bakeVertexColored(signal.scene, {
     include: (n) => !n.startsWith("lamp_"),
@@ -556,13 +653,22 @@ async function buildPropAssets(): Promise<PropAssets> {
 }
 
 function disposePropAssets(a: PropAssets): void {
+  // Bodies and face GEOMETRIES are shared across kinds now (thirteen В26
+  // numerals on one plate), so dispose by identity — a double dispose is
+  // harmless but a leaked shared geometry is not.
+  const seen = new Set<{ dispose(): void }>();
+  const disposeOnce = (o: { dispose(): void } | null | undefined) => {
+    if (!o || seen.has(o)) return;
+    seen.add(o);
+    o.dispose();
+  };
   for (const kind of SIGN_KINDS) {
     const s = a.signs[kind];
     if (!s) continue; // tolerated missing zone-sign kit
-    s.body.dispose();
-    s.faceGeometry?.dispose();
-    s.faceMaterial?.map?.dispose();
-    s.faceMaterial?.dispose();
+    disposeOnce(s.body);
+    disposeOnce(s.faceGeometry);
+    disposeOnce(s.faceMaterial?.map);
+    disposeOnce(s.faceMaterial);
   }
   if (a.railBarrier) disposeAll([a.railBarrier.post, a.railBarrier.arm]);
   disposeAll([
@@ -660,10 +766,24 @@ const LAMP_ON = {
   yellow: new THREE.Color(0xffb300),
   green: new THREE.Color(0x30d158),
 } as const;
+/**
+ * UNLIT lens read (doc 86 L2, second half). The lamps draw on a
+ * MeshBasicMaterial with toneMapped off, so `on × 0.1` came out at roughly
+ * #19-05-04 — indistinguishable from the black housing at any distance, which
+ * is why a DARK head (загаснал светофар, sc-signal-dead) had no read at all
+ * and the founder reported „no traffic light" on lessons 17/18/19/21/29.
+ *
+ * A real unlit signal lens is dark tinted GLASS, not a hole: it reflects sky
+ * and you can see all three of them. 28 % of the on colour lifted toward a
+ * neutral glass grey gives exactly that — clearly present, clearly not lit
+ * (the lit lens is 3.5× brighter and fully saturated).
+ */
+const LAMP_GLASS = new THREE.Color(0x1a1c20);
+const unlit = (c: THREE.Color) => c.clone().multiplyScalar(0.28).lerp(LAMP_GLASS, 0.35);
 const LAMP_OFF = {
-  red: LAMP_ON.red.clone().multiplyScalar(0.1),
-  yellow: LAMP_ON.yellow.clone().multiplyScalar(0.1),
-  green: LAMP_ON.green.clone().multiplyScalar(0.1),
+  red: unlit(LAMP_ON.red),
+  yellow: unlit(LAMP_ON.yellow),
+  green: unlit(LAMP_ON.green),
 } as const;
 
 /**
@@ -786,31 +906,105 @@ function Signs({
 }) {
   const signs = world.signs;
 
+  // В33 „Край на забраната" states the limit it LIFTS, so its numeral is
+  // per-placement (SignPlacement.speedKmh) rather than per-kind. Its faces are
+  // therefore built lazily, for exactly the numerals this district uses — never
+  // thirteen 512² textures on every map.
+  const endNumerals = useMemo(() => {
+    const set = new Set<number>();
+    for (const s of signs) {
+      if (s.kind === "limitEnd" && typeof s.speedKmh === "number") set.add(s.speedKmh);
+    }
+    return [...set].sort((a, b) => a - b);
+  }, [signs]);
+
+  const [endFaces, setEndFaces] = useState<ReadonlyMap<number, THREE.MeshStandardMaterial>>(
+    () => new Map(),
+  );
+  useEffect(() => {
+    const baseFace = assets.signs.limitEnd?.faceMaterial ?? null;
+    if (endNumerals.length === 0 || baseFace === null) {
+      setEndFaces(new Map());
+      return;
+    }
+    let alive = true;
+    const built = new Map<number, THREE.MeshStandardMaterial>();
+    void (async () => {
+      for (const numeral of endNumerals) {
+        const tex = await makeSignFaceTexture(LIMIT_END_ART, numeral);
+        // No face → no post. A В33 wearing the baked „50" would state that a
+        // 50 restriction ends where a 40 one does (doc 86 T4's failure mode).
+        if (!tex) continue;
+        const material = baseFace.clone();
+        material.map = tex;
+        material.needsUpdate = true;
+        built.set(numeral, material);
+      }
+      if (alive) setEndFaces(built);
+      else for (const m of built.values()) [m.map, m].forEach((o) => o?.dispose());
+    })();
+    return () => {
+      alive = false;
+    };
+  }, [assets, endNumerals]);
+  useEffect(
+    () => () => {
+      for (const m of endFaces.values()) {
+        m.map?.dispose();
+        m.dispose();
+      }
+    },
+    [endFaces],
+  );
+
   const meshes = useMemo(() => {
     const castShadow = preset.castShadows === "full";
     const out: THREE.InstancedMesh[] = [];
-    for (const kind of SIGN_KINDS) {
-      const placements = signs.filter((s) => s.kind === kind);
-      if (placements.length === 0) continue;
+    const emit = (
+      kind: SignKind,
+      suffix: string,
+      placements: SignPlacement[],
+      faceMaterial: THREE.MeshStandardMaterial | null,
+    ) => {
       const a = assets.signs[kind];
-      if (!a) continue; // kit missing (tolerated) — skip the kind's posts
+      if (!a || placements.length === 0) return;
       out.push(
         createInstancedMesh(a.body, assets.materials.signBody, placements, {
           castShadow,
-          name: `signs-${kind}-body`,
+          name: `signs-${kind}${suffix}-body`,
         }),
       );
-      if (a.faceGeometry && a.faceMaterial) {
+      if (a.faceGeometry && faceMaterial) {
         out.push(
-          createInstancedMesh(a.faceGeometry, a.faceMaterial, placements, {
+          createInstancedMesh(a.faceGeometry, faceMaterial, placements, {
             castShadow: false,
-            name: `signs-${kind}-face`,
+            name: `signs-${kind}${suffix}-face`,
           }),
         );
       }
+    };
+    for (const kind of SIGN_KINDS) {
+      const placements = signs.filter((s) => s.kind === kind);
+      if (placements.length === 0) continue;
+      if (kind === "limitEnd") {
+        // One bucket per numeral; a numeral whose face has not built yet (or
+        // failed) renders nothing at all rather than the wrong number.
+        for (const numeral of endNumerals) {
+          const material = endFaces.get(numeral);
+          if (!material) continue;
+          emit(
+            kind,
+            `-${numeral}`,
+            placements.filter((s) => s.speedKmh === numeral),
+            material,
+          );
+        }
+        continue;
+      }
+      emit(kind, "", placements, assets.signs[kind]?.faceMaterial ?? null);
     }
     return out;
-  }, [assets, signs, preset.castShadows]);
+  }, [assets, signs, preset.castShadows, endFaces, endNumerals]);
   useEffect(() => () => disposeAll(meshes), [meshes]);
 
   return (

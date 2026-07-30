@@ -55,7 +55,7 @@ const APPROACH_MAX_DEG = 80;
  * (≈ two half-lengths of the 4.3 m fleet cars, minus overlap slack). */
 const VEHICLE_CONTACT_M = 3.0;
 /** Center-to-center distance treated as running over a pedestrian, m. */
-const PEDESTRIAN_CONTACT_M = 1.5;
+export const PEDESTRIAN_CONTACT_M = 1.5;
 /** Center-to-center distance treated as striking the cyclist proxy, m. */
 const CYCLIST_CONTACT_M = 2.2;
 
@@ -153,6 +153,27 @@ function outcomeOf(
 // 1. Pedestrian dart-out (L4)
 // ---------------------------------------------------------------------------
 
+/**
+ * L8 (ledger §4) — the creep backstop.
+ *
+ * `minTriggerSpeedKmh` (6–10 km/h across the 12 `pedestrianDartOut` drills)
+ * was the ONLY release gate, while the crossing objectives carry an UPPER
+ * speed bound and no lower one. So a student who tiptoed under the floor got
+ * a чл. 119 pedestrian lesson in which no pedestrian ever stepped onto the
+ * carriageway — and passed it clean. Below the floor the walker now still
+ * releases once the player is inside this radius of the crossing and pointed
+ * at it: later and closer than the authored trigger, which is a HARDER read,
+ * never an easier one.
+ *
+ * 8 m is the house "this is our crossing" radius the cancel branch below
+ * already uses. It is deliberately far short of every reversing-manoeuvre
+ * geometry that relies on the speed floor to keep a walker out of the arc
+ * (sc-park-bay-exit-rev's aisle walker is 13.0 m away at the reverse's
+ * closest point, and `approaching()` is false for most of it) — so that
+ * design is untouched.
+ */
+export const DART_CREEP_RELEASE_M = 8;
+
 export class PedestrianDartOutRunner implements EventRunner {
   phase: StagedEventPhase = "idle";
   outcome: StagedEventOutcome | null = null;
@@ -237,13 +258,17 @@ export class PedestrianDartOutRunner implements EventRunner {
       // encounter (the exam bank's C9w/C10e darts died 500 m across town,
       // minutes before the player's actual approach leg).
       if (d > 8 && d < 60 && aheadOfPlayerM(input, s.crossing.x, s.crossing.y) < -5) {
-        this.phase = "resolved";
-        return null;
+        // L8: a cancelled encounter is NOT a pass. It used to resolve
+        // silently with no outcome at all, so the debrief had nothing to say
+        // and the crossing objective's upper-bound-only reachZone still
+        // ticked. Report it so the lesson can say «тази ситуация не се случи»
+        // instead of awarding the drill.
+        return this.resolve(input, false, "notEncountered");
       }
       if (
         d <= this.triggerDistM &&
-        input.speedKmh >= s.minTriggerSpeedKmh &&
-        approaching(input, s.crossing.x, s.crossing.y)
+        approaching(input, s.crossing.x, s.crossing.y) &&
+        (input.speedKmh >= s.minTriggerSpeedKmh || d <= DART_CREEP_RELEASE_M)
       ) {
         // R3 #27 ball cue: with `ballLeadSec` authored, the trigger first
         // rolls the lesson's hazard ball (the WARNING the anticipation
@@ -327,6 +352,78 @@ const PRIORITY_CLEAR_ARC_M = 30;
  * floor): a stopped/creeping student must read as NOT arriving, so the held
  * car keeps waiting for them instead of crossing an empty box (doc 62 S2). */
 const WITNESS_MIN_SPEED_MPS = 0.5;
+/**
+ * L7 (ledger §4): the witness gate is now the DEFAULT, not an opt-in.
+ *
+ * Eight of thirteen `priorityFromRight` specs authored no `witnessArm`, so
+ * their conflict car committed on a pure 22 m distance gate. Worked through
+ * for sc-junction-rhr: the car is fully clear at ~6.1 s while a student
+ * obeying the objective's own «приближи бавно» needs 9.6 s at 15 km/h and
+ * 14.4 s at 10 km/h — he arrives at an empty junction and the lesson teaches
+ * nothing. Obeying the instruction USED to delete the encounter. The values
+ * are the ones `templates-junctions2.ts:74` already ships, verbatim; an
+ * authored `witnessArm` still wins.
+ */
+export const DEFAULT_WITNESS_ARM = { etaSec: 8, nearLineM: 6 } as const;
+/** A player at/under this counts as standing still at the mouth, km/h. */
+const WITNESS_STOPPED_KMH = 2.5;
+/**
+ * …for at least this long, s, …
+ *
+ * T7's second harm: with `lineDistM` authored short of the real stop line
+ * (18 m where the world paints 27.7 m) a LAWFULLY STOPPED student sits at
+ * playerLineDist ≈ 10–12 m, which fails `nearLineM 6`, and at 0 km/h the raw
+ * ETA floors to 10/0.5 = 20 s, which fails `etaSec 8`. Both witness tests
+ * therefore fail forever, the runner falls through to `cruise 0`, and the car
+ * waits for a student who has already arrived. He is marooned at a junction
+ * nothing ever crosses — the founder's «I let everybody pass … but Error
+ * appeared that I made error». A driver stopped at the mouth is the most
+ * attentive witness there is, so he releases the car.
+ *
+ * The dwell (not a single frame) stops a mid-approach brake dab from
+ * releasing early.
+ */
+export const WITNESS_STOPPED_HOLD_SEC = 2.0;
+/**
+ * …and only this close to the line, m. Bounding the stopped-witness release
+ * to the mouth is what keeps the founder's original R3 complaint fixed: a
+ * student who merely pauses 20 m out must NOT release a car that then clears
+ * the box before he arrives. 14 m covers the whole T7 deadlock band (10–12 m)
+ * with margin and nothing beyond it.
+ */
+export const WITNESS_STOPPED_NEAR_M = 14;
+/**
+ * How much later than the CAR the player may arrive and still meet it, s.
+ *
+ * A constant `etaSec` cannot express "the conflict is present when he gets
+ * there", because whether it is depends on how long the CAR needs to reach the
+ * box. Measured on `sc-rb-circulate-priority/sc-rbc-waiter` at 10 km/h: the
+ * flat 8 s gate released at playerLineDist 22 m; the car needed ~5.1 s to
+ * cover its pinned 28 m, the player 7.9 s — so it was **31.3 m past the node**
+ * (outside the runtime's 26 m conflict radius) when he arrived. Empty
+ * junction, again, for a student driving the taught pace.
+ *
+ * So the effective gate is `min(etaSec, carTransitToNode + this)`: release the
+ * car so it enters the box as the student arrives, at ANY pace. It can only
+ * ever DEFER relative to the authored constant, never release earlier, and a
+ * scripted ≳ 15 km/h approach still commits on its original frame (its ETA at
+ * the 22 m gate is already under the car's transit time).
+ */
+const WITNESS_ENTRY_MARGIN_SEC = 1.2;
+
+/**
+ * Seconds for a stationary staged car to cover `distM` of its own path —
+ * `accelMps2` ramp to `cruiseMps`, then cruise. Mirrors updateStagedVehicle's
+ * integration closely enough to time a release by.
+ */
+const DEFAULT_STAGED_ACCEL_MPS2 = 2.6; // mirrors traffic/staged.ts
+function stagedTransitSec(distM: number, cruiseMps: number, accelMps2: number): number {
+  const v = Math.max(cruiseMps, 0.5);
+  const a = Math.max(accelMps2, 0.5);
+  const d = Math.max(distM, 0);
+  const rampM = (v * v) / (2 * a);
+  return d <= rampM ? Math.sqrt((2 * d) / a) : v / a + (d - rampM) / v;
+}
 
 export class PriorityFromRightRunner implements EventRunner {
   phase: StagedEventPhase = "idle";
@@ -335,6 +432,9 @@ export class PriorityFromRightRunner implements EventRunner {
 
   private leadSec = 0;
   private sawYield = false;
+  /** Continuous seconds the player has been stationary inside the commit
+   *  distance — the stopped-witness release (see WITNESS_STOPPED_HOLD_SEC). */
+  private stoppedForSec = 0;
 
   constructor(readonly spec: PriorityFromRightSpec) {}
 
@@ -364,6 +464,7 @@ export class PriorityFromRightRunner implements EventRunner {
     this.phase = "armed";
     this.outcome = null;
     this.sawYield = false;
+    this.stoppedForSec = 0;
   }
 
   step(traffic: StagedTrafficPort, input: DirectorInput, out: SimTickEvent[]): StagedEventOutcome | null {
@@ -383,19 +484,38 @@ export class PriorityFromRightRunner implements EventRunner {
       // sit 50 m euclidean from the junction for the length of a whole
       // corner), so the car never crosses "unwitnessed" on a distance guess.
       if (playerLineDist <= PRIORITY_COMMIT_PLAYER_M) {
-        // S2 witness gate (doc 62 founder R3 #15/#16/#17/#18): the distance
-        // gate alone still lies about ARRIVAL — a hesitant live student 22 m
-        // out can be half a minute from the line, and a car released now has
-        // long cleared the box when they finally arrive ("waits for
-        // nothing"). When the spec opts in, defer the release until the
-        // player is truly about to witness it: raw (unfloored) ETA at/under
-        // etaSec, or physically at the mouth (nearLineM). A scripted-pace
-        // approach passes the ETA test on the same frame the distance gate
-        // fires, so recorded choreography is untouched.
-        const w = s.witnessArm;
+        // S2 witness gate (doc 62 founder R3 #15/#16/#17/#18; ledger L7): the
+        // distance gate alone lies about ARRIVAL — a hesitant live student
+        // 22 m out can be half a minute from the line, and a car released now
+        // has long cleared the box when they finally arrive ("waits for
+        // nothing"). The release therefore waits until the player is truly
+        // about to witness it: raw (unfloored) ETA at/under etaSec, or
+        // physically at the mouth (nearLineM), or STOPPED there. A
+        // scripted-pace approach passes the ETA test on the same frame the
+        // distance gate fires, so recorded choreography is untouched.
+        //
+        // L7: this is now DEFAULT-ON. It was opt-in and eight specs never
+        // opted in, which is exactly why obeying «приближи бавно» produced an
+        // empty junction on sc-junction-rhr / sc-jx-giveway / sc-jx-equal.
+        const w = s.witnessArm ?? DEFAULT_WITNESS_ARM;
         const rawEtaSec =
           playerLineDist / Math.max(input.speedKmh * KMH_TO_MPS, WITNESS_MIN_SPEED_MPS);
-        if (w === undefined || playerLineDist <= w.nearLineM || rawEtaSec <= w.etaSec) {
+        if (input.speedKmh <= WITNESS_STOPPED_KMH && playerLineDist <= WITNESS_STOPPED_NEAR_M) {
+          this.stoppedForSec += input.dtSec;
+        } else {
+          this.stoppedForSec = 0;
+        }
+        const stoppedWitness = this.stoppedForSec >= WITNESS_STOPPED_HOLD_SEC;
+        // …and the ETA the car itself can honour (see WITNESS_ENTRY_MARGIN_SEC).
+        const etaGateSec = Math.min(
+          w.etaSec,
+          stagedTransitSec(
+            Math.max(0, -carArc),
+            s.actor.cruiseSpeedMps,
+            s.actor.accelMps2 ?? DEFAULT_STAGED_ACCEL_MPS2,
+          ) + WITNESS_ENTRY_MARGIN_SEC,
+        );
+        if (playerLineDist <= w.nearLineM || rawEtaSec <= etaGateSec || stoppedWitness) {
           traffic.stagedCommand(s.id, { type: "cruise" }); // through the box
           this.phase = "triggered";
           return null;
@@ -491,6 +611,27 @@ export class PriorityFromRightRunner implements EventRunner {
 const LEAD_STOPPED_KMH = 1.5;
 /** Bumper-to-bumper approximation: two half-lengths of the 4.3 m cars, m. */
 const LEAD_CAR_LENGTH_M = 4.3;
+/**
+ * T17 (ledger §2) — the SCHEDULED-CRUISE release slack, m.
+ *
+ * `matchPlayer` is a rubber band: `target = playerSpeed + 0.55 × (gapM − gap)`
+ * has `gap = gapM` as a stable fixed point, so whatever the student does the
+ * lead mirrors it and the METRES between them return to the authored
+ * constant. `FOLLOWING_TOO_CLOSE` is a TIME gap, so with the metres frozen the
+ * fault became a pure function of the speedometer, and the taught corrective
+ * action — back off and let the gap open — was physically impossible: the lead
+ * slowed to close it again. The founder read this exactly right ("the truck is
+ * following the player rather than the player following the truck").
+ *
+ * `paceMode: "scheduledCruise"` replaces the band with a fixed speed along the
+ * actor's OWN arc: it waits at its hold pose until the player closes to the
+ * release distance (so a slow student still meets it — the encounter battery's
+ * half-speed leg), then drives its own profile with `playerGuard` as the only
+ * remaining coupling. Easing off now genuinely opens the gap. When no
+ * `armDistM` is authored the release distance is the follow gap plus this
+ * slack, so the lead pulls away from a hold the player is already near.
+ */
+const SCHEDULED_RELEASE_SLACK_M = 12;
 
 export class BrakingLeadCarRunner implements EventRunner {
   phase: StagedEventPhase = "idle";
@@ -501,9 +642,32 @@ export class BrakingLeadCarRunner implements EventRunner {
   private approachSpeedKmh = 0;
   private resolvedAtSec: number | null = null;
   private resumed = false;
+  /** Latched once the lead has been inside slamRadiusM of slamAt. Without the
+   *  latch a lead that rolls THROUGH the slam radius while the player is still
+   *  below minSlamSpeedKmh loses the stimulus forever — the L8 failure mode,
+   *  lead-car edition. Under matchPlayer the actor is glued to the player, so
+   *  the first frame both conditions hold is unchanged. */
+  private reachedSlamPoint = false;
   private readonly timer = new ReactionTimer();
 
   constructor(readonly spec: BrakingLeadCarSpec) {}
+
+  /** The pacing command — the rubber band, or T17's scheduled cruise. */
+  private commandPace(traffic: StagedTrafficPort): void {
+    const s = this.spec;
+    if (s.paceMode === "scheduledCruise") {
+      traffic.stagedCommand(s.id, {
+        type: "cruise",
+        speedMps: s.paceSpeedMps ?? s.actor.cruiseSpeedMps,
+      });
+      return;
+    }
+    traffic.stagedCommand(s.id, {
+      type: "matchPlayer",
+      gapM: this.followGapM,
+      maxSpeedMps: s.maxMatchSpeedMps,
+    });
+  }
 
   stage(traffic: StagedTrafficPort, rng: Rng, firstTime: boolean): void {
     const s = this.spec;
@@ -537,6 +701,7 @@ export class BrakingLeadCarRunner implements EventRunner {
     this.approachSpeedKmh = 0;
     this.resolvedAtSec = null;
     this.resumed = false;
+    this.reachedSlamPoint = false;
     this.timer.reset();
   }
 
@@ -568,26 +733,34 @@ export class BrakingLeadCarRunner implements EventRunner {
       // "passedWithoutStopping" against a player minutes behind (exam-bank
       // B4/B6 sites). Spawn corridors (no armDistM) keep the legacy
       // speed-only arming — the player starts right behind the lead there.
+      // T17: a scheduledCruise lead is NOT slaved to the player, so it must
+      // wait for them or the encounter simply never happens for a slow
+      // student. `armDistM` already expresses "wait until the player is near";
+      // when it is absent the follow gap plus a slack metre band is the
+      // release distance.
+      const releaseDistM =
+        s.armDistM ??
+        (s.paceMode === "scheduledCruise"
+          ? this.followGapM + SCHEDULED_RELEASE_SLACK_M
+          : undefined);
       const nearLead =
-        s.armDistM === undefined || dist(input.x, input.y, actor.x, actor.y) <= s.armDistM;
+        releaseDistM === undefined || dist(input.x, input.y, actor.x, actor.y) <= releaseDistM;
       if (nearLead && input.speedKmh > 4) {
-        traffic.stagedCommand(s.id, {
-          type: "matchPlayer",
-          gapM: this.followGapM,
-          maxSpeedMps: s.maxMatchSpeedMps,
-        });
+        this.commandPace(traffic);
         this.phase = "triggered"; // following — the encounter is now live
       }
       return null;
     }
 
     // triggered: following until the staged slam point, then adjudicating.
-    const atSlamPoint = dist(actor.x, actor.y, s.slamAt.x, s.slamAt.y) <= s.slamRadiusM;
+    if (dist(actor.x, actor.y, s.slamAt.x, s.slamAt.y) <= s.slamRadiusM) {
+      this.reachedSlamPoint = true;
+    }
     const playerGap = dist(input.x, input.y, actor.x, actor.y);
     if (this.approachSpeedKmh === 0) {
       // Not slammed yet.
       if (
-        atSlamPoint &&
+        this.reachedSlamPoint &&
         (input.speedKmh >= s.minSlamSpeedKmh || playerGap <= s.proximityFallbackM)
       ) {
         traffic.stagedCommand(s.id, { type: "brake", decelMps2: s.slamDecelMps2 });
@@ -1883,6 +2056,27 @@ const CUTIN_HELD_SEC = 3;
 const CUTIN_RECOVERY_MPS = 0.5;
 /** Player under this speed is not "holding at speed" (engine's follow floor), km/h. */
 const CUTIN_MIN_SPEED_KMH = 20;
+/**
+ * L6 — how long before the glide the actor's blinker must be lit, s.
+ *
+ * ЗДвП чл. 25: the signal is given «своевременно» — in advance of the
+ * manoeuvre, not during it. 3.0 s clears the ledger's own 2.5 s gate with
+ * margin even after the first lateral metre is counted (an 8.125 m shift over
+ * a 1.5 s ramp covers 1 m in 0.185 s).
+ *
+ * Timing discipline: the lamp is armed by PREDICTING the actor's arrival at
+ * the cut point from its own closing speed, so the glide still fires on
+ * exactly the frame it always did — no recorded choreography moves, the car
+ * simply announces itself first. This is founder lesson 43: he could not
+ * anticipate the merge because the car never signalled, and he only learned
+ * what had happened by reading the lesson text afterwards.
+ */
+export const INDICATOR_LEAD_SEC = 3.0;
+/** Blinker cancels this long after the lateral glide completes, s. */
+const INDICATOR_OFF_AFTER_GLIDE_SEC = 0.4;
+/** Actor drifted this far past its own cut point with no cut = cancel the
+ *  lamp (a signal that never becomes a manoeuvre is its own lie), m. */
+const INDICATOR_ABANDON_M = 12;
 
 export class CutInLeadCarRunner implements EventRunner {
   phase: StagedEventPhase = "idle";
@@ -1897,8 +2091,29 @@ export class CutInLeadCarRunner implements EventRunner {
   private heldSince: number | null = null;
   private sawHold = false;
   private sawRecovery = false;
+  /** L6 indicator bookkeeping. */
+  private indicatorOn = false;
+  private indicatorOffAtSec: number | null = null;
+  private minDistToCutM = Infinity;
 
   constructor(readonly spec: CutInLeadCarSpec) {}
+
+  /** The pacing command — the rubber band, or T17's scheduled cruise. */
+  private commandPace(traffic: StagedTrafficPort): void {
+    const s = this.spec;
+    if (s.paceMode === "scheduledCruise") {
+      traffic.stagedCommand(s.id, {
+        type: "cruise",
+        speedMps: s.paceSpeedMps ?? s.actor.cruiseSpeedMps,
+      });
+      return;
+    }
+    traffic.stagedCommand(s.id, {
+      type: "matchPlayer",
+      gapM: this.paceAheadM,
+      maxSpeedMps: s.maxMatchSpeedMps,
+    });
+  }
 
   stage(traffic: StagedTrafficPort, rng: Rng, firstTime: boolean): void {
     const s = this.spec;
@@ -1931,6 +2146,9 @@ export class CutInLeadCarRunner implements EventRunner {
     this.heldSince = null;
     this.sawHold = false;
     this.sawRecovery = false;
+    this.indicatorOn = false;
+    this.indicatorOffAtSec = null;
+    this.minDistToCutM = Infinity;
   }
 
   step(traffic: StagedTrafficPort, input: DirectorInput, out: SimTickEvent[]): StagedEventOutcome | null {
@@ -1942,12 +2160,15 @@ export class CutInLeadCarRunner implements EventRunner {
     if (this.phase === "armed") {
       // First player movement starts the adjacent-lane pacing (the
       // brakingLeadCar spawn-corridor arming — the spawn IS the corridor).
-      if (input.speedKmh > 4) {
-        traffic.stagedCommand(s.id, {
-          type: "matchPlayer",
-          gapM: this.paceAheadM,
-          maxSpeedMps: s.maxMatchSpeedMps,
-        });
+      // T17: a scheduledCruise cutter instead waits until the player has
+      // closed to the authored pacing distance, then drives its own profile —
+      // so it is genuinely overtakable and genuinely met at any player pace.
+      const ready =
+        s.paceMode === "scheduledCruise"
+          ? dist(input.x, input.y, actor.x, actor.y) <= this.paceAheadM
+          : true;
+      if (ready && input.speedKmh > 4) {
+        this.commandPace(traffic);
         this.phase = "triggered";
       }
       return null;
@@ -1955,21 +2176,64 @@ export class CutInLeadCarRunner implements EventRunner {
 
     // triggered — pacing alongside until the staged cut, then adjudicating.
     if (this.cutAtSec === null) {
-      const atCutPoint = dist(actor.x, actor.y, s.cutAt.x, s.cutAt.y) <= s.cutRadiusM;
+      const distToCut = dist(actor.x, actor.y, s.cutAt.x, s.cutAt.y);
+      if (distToCut < this.minDistToCutM) this.minDistToCutM = distToCut;
+      const atCutPoint = distToCut <= s.cutRadiusM;
+      // L6 «своевременно»: light the blinker INDICATOR_LEAD_SEC of the actor's
+      // own travel before it reaches the cut point. Prediction, not delay —
+      // the glide below still fires on its original frame.
+      if (
+        !this.indicatorOn &&
+        s.cutShiftM !== 0 &&
+        actor.speedMps > 0.5 &&
+        input.speedKmh >= s.minCutSpeedKmh &&
+        Math.max(0, distToCut - s.cutRadiusM) / actor.speedMps <= INDICATOR_LEAD_SEC
+      ) {
+        traffic.stagedCommand(s.id, {
+          type: "setIndicator",
+          indicator: s.cutShiftM > 0 ? "right" : "left",
+        });
+        this.indicatorOn = true;
+      }
+      // …and cancel it if the actor drifts past its own cut without cutting.
+      if (this.indicatorOn && distToCut > this.minDistToCutM + INDICATOR_ABANDON_M) {
+        traffic.stagedCommand(s.id, { type: "setIndicator", indicator: "off" });
+        this.indicatorOn = false;
+      }
       if (atCutPoint && input.speedKmh >= s.minCutSpeedKmh) {
         // The cut: lock a PLAIN cruise (the player's lift must genuinely
         // re-open the gap — matchPlayer would keep stealing it) and glide
         // into the player's lane over the authored ramp.
         traffic.stagedCommand(s.id, { type: "cruise", speedMps: s.cutSpeedMps });
+        if (!this.indicatorOn && s.cutShiftM !== 0) {
+          // Degenerate case (the actor was already inside the cut radius when
+          // the player crossed minCutSpeedKmh, so no lead time existed): still
+          // signal — a late blinker beats no blinker, and the encounter
+          // battery reports the shortfall rather than the code hiding it.
+          traffic.stagedCommand(s.id, {
+            type: "setIndicator",
+            indicator: s.cutShiftM > 0 ? "right" : "left",
+          });
+          this.indicatorOn = true;
+        }
         traffic.stagedCommand(s.id, {
           type: "laneShift",
           toOffsetM: s.cutShiftM,
           rampSec: s.cutRampSec,
         });
         this.cutAtSec = input.tSec;
+        this.indicatorOffAtSec = input.tSec + s.cutRampSec + INDICATOR_OFF_AFTER_GLIDE_SEC;
         this.approachSpeedKmh = input.speedKmh;
       }
       return null;
+    }
+
+    // The blinker self-cancels once the lane change is finished — a lamp left
+    // burning is its own false statement.
+    if (this.indicatorOffAtSec !== null && input.tSec >= this.indicatorOffAtSec) {
+      traffic.stagedCommand(s.id, { type: "setIndicator", indicator: "off" });
+      this.indicatorOn = false;
+      this.indicatorOffAtSec = null;
     }
 
     // Cut executed — the production FOLLOWING_TOO_CLOSE pipeline grades; the
@@ -2066,6 +2330,9 @@ export class RearTailgaterRunner implements EventRunner {
   private latchSpeedKmh = 0;
   private passCommanded = false;
   private sawYield = false;
+  /** L6 indicator bookkeeping (the pass is a lane change and owes a lamp). */
+  private indicatorOn = false;
+  private indicatorOffAtSec: number | null = null;
 
   constructor(readonly spec: RearTailgaterSpec) {}
 
@@ -2098,6 +2365,8 @@ export class RearTailgaterRunner implements EventRunner {
     this.latchSpeedKmh = 0;
     this.passCommanded = false;
     this.sawYield = false;
+    this.indicatorOn = false;
+    this.indicatorOffAtSec = null;
   }
 
   step(traffic: StagedTrafficPort, input: DirectorInput, _out: SimTickEvent[]): StagedEventOutcome | null {
@@ -2143,6 +2412,21 @@ export class RearTailgaterRunner implements EventRunner {
       if (!this.passCommanded && input.speedKmh <= this.latchSpeedKmh - s.easeKmh) {
         this.sawYield = true;
       }
+      // L6 «своевременно»: the pass is a lane change, so the blinker comes on
+      // INDICATOR_LEAD_SEC before it — the pass frame itself is unchanged, and
+      // the лепка now telegraphs its move like a real (impatient) driver does.
+      if (
+        !this.indicatorOn &&
+        !this.passCommanded &&
+        s.passShiftM !== 0 &&
+        input.tSec - this.latchedAt >= this.pressureSec - INDICATOR_LEAD_SEC
+      ) {
+        traffic.stagedCommand(s.id, {
+          type: "setIndicator",
+          indicator: s.passShiftM > 0 ? "right" : "left",
+        });
+        this.indicatorOn = true;
+      }
       if (!this.passCommanded && input.tSec - this.latchedAt >= this.pressureSec) {
         traffic.stagedCommand(s.id, { type: "cruise", speedMps: s.passSpeedMps });
         traffic.stagedCommand(s.id, {
@@ -2151,7 +2435,14 @@ export class RearTailgaterRunner implements EventRunner {
           rampSec: 1.5,
         });
         this.passCommanded = true;
+        this.indicatorOffAtSec = input.tSec + 1.5 + INDICATOR_OFF_AFTER_GLIDE_SEC;
       }
+    }
+
+    if (this.indicatorOffAtSec !== null && input.tSec >= this.indicatorOffAtSec) {
+      traffic.stagedCommand(s.id, { type: "setIndicator", indicator: "off" });
+      this.indicatorOn = false;
+      this.indicatorOffAtSec = null;
     }
 
     if ((this.passCommanded && actorAheadM >= s.passAheadM) || actor.finished) {

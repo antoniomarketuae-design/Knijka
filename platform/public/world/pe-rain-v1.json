@@ -2,13 +2,13 @@
  "format": "district-v1",
  "meta": {
   "district": "pe-rain",
-  "label": "Учебна улица — пътека в дъжд през нощта (сценарий PE-16)",
+  "label": "Неосветен складов участък — пътека в дъжд през нощта (сценарий PE-16)",
   "mapKind": "scenario-street",
   "generator": "tools/maps/gen_pe_crossings.mjs",
   "boundsLocalMeters": {
-   "minX": -26,
+   "minX": -40,
    "minY": 0,
-   "maxX": 14.125,
+   "maxX": 42,
    "maxY": 155
   },
   "attribution": {
@@ -28,7 +28,7 @@
    "edges": 1,
    "intersections": 0,
    "crossings": 1,
-   "buildings": 1,
+   "buildings": 4,
    "spawnPoints": 2
   },
   "scenario": {
@@ -38,6 +38,8 @@
     "signalized": "no",
     "approachM": 95
    },
+   "streetscape": "unlit-warehouse-canyon",
+   "streetscapeNoteBg": "Неосветен складов участък: две глухи стени образуват тъмен коридор и единственият процеп в него е точно на пътеката — нощем фаровете са цялата видимост.",
    "primaryCrossingId": "pe-x-1",
    "laneCenterRightM": 4.06,
    "crossings": [
@@ -104,25 +106,94 @@
  "roundabouts": [],
  "buildings": [
   {
-   "id": "pe-b-shop",
-   "height": 4.5,
+   "id": "pe-b-wh-w1",
+   "height": 12,
    "heightSource": "default",
    "footprint": [
     [
-     -26,
-     61
+     -40,
+     25
     ],
     [
-     -16,
-     61
+     -12.6,
+     25
     ],
     [
-     -16,
-     73
+     -12.6,
+     89
     ],
     [
-     -26,
-     73
+     -40,
+     89
+    ]
+   ]
+  },
+  {
+   "id": "pe-b-wh-w2",
+   "height": 12,
+   "heightSource": "default",
+   "footprint": [
+    [
+     -40,
+     101
+    ],
+    [
+     -12.6,
+     101
+    ],
+    [
+     -12.6,
+     143
+    ],
+    [
+     -40,
+     143
+    ]
+   ]
+  },
+  {
+   "id": "pe-b-wh-e1",
+   "height": 12,
+   "heightSource": "default",
+   "footprint": [
+    [
+     12.6,
+     33
+    ],
+    [
+     42,
+     33
+    ],
+    [
+     42,
+     91
+    ],
+    [
+     12.6,
+     91
+    ]
+   ]
+  },
+  {
+   "id": "pe-b-wh-e2",
+   "height": 12,
+   "heightSource": "default",
+   "footprint": [
+    [
+     12.6,
+     103
+    ],
+    [
+     42,
+     103
+    ],
+    [
+     42,
+     139
+    ],
+    [
+     12.6,
+     139
     ]
    ]
   }

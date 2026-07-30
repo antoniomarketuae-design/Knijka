@@ -84,7 +84,7 @@ describe("shortest-path derivation (synthetic)", () => {
     const route = deriveGuidanceRoute(
       graph,
       { x: 10, y: 0, headingDeg: 90 },
-      { kind: "point", x: 100, y: 60, marker: true },
+      { kind: "point", x: 100, y: 60 },
     );
     expect(route).not.toBeNull();
     expect(arcsAreMonotonic(route!)).toBe(true);
@@ -109,7 +109,7 @@ describe("shortest-path derivation (synthetic)", () => {
     const route = deriveGuidanceRoute(
       graph,
       { x: 10, y: 0, headingDeg: 90 },
-      { kind: "point", x: 80, y: 0, marker: false },
+      { kind: "point", x: 80, y: 0 },
     );
     expect(route).not.toBeNull();
     expect(route!.totalLen).toBeCloseTo(70, 0);
@@ -122,7 +122,7 @@ describe("shortest-path derivation (synthetic)", () => {
     const route = deriveGuidanceRoute(
       onewayGraph,
       { x: 50, y: 0, headingDeg: 90 },
-      { kind: "point", x: 10, y: 0, marker: false },
+      { kind: "point", x: 10, y: 0 },
     );
     expect(route).toBeNull();
   });
@@ -156,7 +156,7 @@ describe("shortest-path derivation (synthetic)", () => {
     const route = deriveGuidanceRoute(
       graph,
       { x: 10, y: 0, headingDeg: 90 },
-      { kind: "point", x: 100, y: 60, marker: true },
+      { kind: "point", x: 100, y: 60 },
     )!;
     // Head projection: standing 3 m off the road at x=40 reads arclength ~30.
     const s = nearestArcOnRoute(route, 40, 3);
@@ -204,9 +204,22 @@ describe("guidanceGoalFor (shipped lessons)", () => {
     expect(guidanceGoalFor(l2, l2.objectives.length)).toBeNull();
   });
 
-  it("passSignal objectives become marked point goals at the node", () => {
+  it("passSignal with no world context falls back to the AUTHORED node anchor", () => {
+    // The two-argument form is the pure-data reading — what the author wrote.
+    // With a district's graded stop lines in hand the marker moves onto the
+    // approach's line instead (doc 86 T3; guidance-geometry.test.ts owns that
+    // invariant over all 155 scenarios).
     const goal = guidanceGoalFor(byId("l2-intersections"), 0);
-    expect(goal).toEqual({ kind: "point", x: 383.17, y: 65.76, marker: true });
+    expect(goal).toEqual({
+      kind: "point",
+      x: 383.17,
+      y: 65.76,
+      marker: true,
+      affordance: "halt",
+      shape: { kind: "zone", radiusM: 30 },
+      acceptRadiusM: 30,
+      labelBg: "Спри на стоп-линията",
+    });
   });
 
   it("driveDistance becomes an 'ahead' goal beyond the odometer mark", () => {
@@ -225,14 +238,32 @@ describe("guidanceGoalFor (shipped lessons)", () => {
     expect(goal?.kind).toBe("ahead");
   });
 
-  it("parkInBay targets the authored bay with a marker", () => {
+  it("parkInBay targets the authored bay, ringed at the CENTRE tolerance", () => {
+    // The gate is „centre within centerTolM of the bay centre" — the ring is
+    // that half-metre, not a decorative 1.85 m. The bay rect itself is painted
+    // into the world (lessonWorldRecipe paintBays), so the two read together.
     const goal = guidanceGoalFor(byId("l7-parking"), 1);
-    expect(goal).toEqual({ kind: "point", x: 681.26, y: -199.54, marker: true });
+    expect(goal).toEqual({
+      kind: "point",
+      x: 681.26,
+      y: -199.54,
+      marker: true,
+      affordance: "halt",
+      shape: { kind: "zone", radiusM: 0.5 },
+      acceptRadiusM: 0.5,
+      labelBg: "Паркирай тук",
+    });
   });
 
   it("roundabout maneuver is a ribbon-only point goal (no pillar)", () => {
     const goal = guidanceGoalFor(byId("l3-roundabout"), 1);
-    expect(goal).toEqual({ kind: "point", x: -38.03, y: -342.96, marker: false });
+    expect(goal).toMatchObject({
+      kind: "point",
+      x: -38.03,
+      y: -342.96,
+      marker: false,
+      labelBg: "Влез в кръговото",
+    });
   });
 });
 
@@ -337,7 +368,7 @@ describe("derivation on the полигон (poligon-v1)", () => {
     const ahead = guidanceGoalFor(l8, 0);
     expect(ahead?.kind).toBe("ahead");
     const park = guidanceGoalFor(l8, 1);
-    expect(park).toEqual({ kind: "point", x: 98.5, y: -70, marker: true });
+    expect(park).toMatchObject({ kind: "point", x: 98.5, y: -70, marker: true });
     // The bay snaps onto the parking apron, well inside the полигон bounds.
     const snapped = snapToRoad(graph, 98.5, -70)!;
     expect(snapped.distM).toBeLessThan(8);

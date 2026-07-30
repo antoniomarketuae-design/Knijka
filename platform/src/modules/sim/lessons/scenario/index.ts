@@ -40,18 +40,25 @@ export {
 // Doc-72 provenance registry
 export { DOC72_ARCHETYPE_IDS, isDoc72ArchetypeId } from "./registry";
 
-// Compiler: ScenarioSpec × level → LessonSpec (micro-lesson, no engine fork)
+// Compiler: ScenarioSpec × level → LessonSpec (micro-lesson, no engine fork).
+// DEFAULT_LEVEL_* are the doc 86 L13 level ladder; resolveScenarioRubric is the
+// D7 seam — read a rung's rubric through it, never off `spec.rubric`.
 export {
   DEFAULT_LEVEL_AIDS,
+  DEFAULT_LEVEL_PAR_TIME_SCALE,
+  DEFAULT_LEVEL_TOLERANCE,
+  DEFAULT_LEVEL_TRAFFIC_SCALE,
   MISTAKE_EXPERIENCE_LEAD_IN_BG,
   SCENARIO_DEFAULT_TRAFFIC,
   SCENARIO_LESSON_ORDER,
   ScenarioCompileError,
   compileScenario,
   mistakeExperienceLessonId,
+  resolveScenarioRubric,
   serializeObjectiveParams,
   type ScenarioCompileOptions,
 } from "./compile";
+export { SPEED_CAP_GRACE_KMH_PER_TOLERANCE } from "./params";
 
 // THEO-3 — the mistake-experience mode („Направи грешката", doc 64):
 // `~m<i>` id seam, entry-rung compile, the six founder-seeded classes.

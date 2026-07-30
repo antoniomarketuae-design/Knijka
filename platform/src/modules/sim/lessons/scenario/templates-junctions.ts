@@ -70,8 +70,26 @@ export const SC_JUNCTION_RHR_CONFLICT: PriorityFromRightSpec = {
   junctionNodeIndex: 1,
   armDistM: 70,
   leadSec: -3.5,
+  // tj-rhr-v1 is all-`residential`, so its mouth is 17.125 m (8.125 half-width
+  // + the 9 m minor corner) and there is no paint at all — 18 m IS this map's
+  // line. Not the T7 defect: that one is `lineDistM 18` copied onto sx-v1,
+  // whose secondary mouth is 27.125 m and whose paint is at 27.725 m.
   lineDistM: 18,
   clearSpeedMps: 11.5,
+  /**
+   * L7 (ledger §4) — authored, not inherited.
+   *
+   * This spec was one of the eight `priorityFromRight` specs that opted out, so
+   * its car committed on a pure 22 m distance gate: it was fully clear ~6.1 s
+   * after release, while a student obeying THIS lesson's own objective cap
+   * (`maxSpeedKmh 25`) and its instruction 3 «намали отрано» needs 5.8 s at
+   * 25 km/h, 9.6 s at 15 and 14.4 s at 10. Driving the taught pace deleted the
+   * encounter — the founder's «the traffic car crossed much quicker before I
+   * reach the crossroad». The runner now defaults the gate, but the value
+   * belongs in the data: a spec that stages a conflict states when it is
+   * witnessed. Values copied verbatim from templates-junctions2.ts:74.
+   */
+  witnessArm: { etaSec: 8, nearLineM: 6 },
 };
 
 export const SC_JUNCTION_RHR: ScenarioSpec = {
@@ -571,6 +589,59 @@ export const SC_TURN_LEFT_ONCOMING: ScenarioSpec = {
 // ruleConfig; see rules/types.ts). Reuses the sc-junction-stop map + path.
 // ---------------------------------------------------------------------------
 
+/**
+ * T9 (ledger §2) — THE CAR THE LESSON IS ABOUT, finally staged.
+ *
+ * `SC_JUNCTION_SCAN` shipped with no `staged` array and no `traffic` on any
+ * rung, so `SCENARIO_DEFAULT_TRAFFIC` applied and the map was empty for the
+ * whole drive — while the objective, instruction 4, the teach copy and BOTH
+ * mistake narrations asserted, four times over, a car that approached while the
+ * student was looking the other way. `JUNCTION_SCAN_INCOMPLETE` reads only
+ * glance bookkeeping (rules/engine.ts), so nothing in the world was ever
+ * consulted and nothing contradicted the claim. The founder played it and wrote
+ * exactly that down (item 12): *„it asks the user to look left and right for
+ * traffic cars, but the road is empty and there are no traffic cars moving at
+ * all on the map ever."*
+ *
+ * WHY FROM THE LEFT (west → east), and why that is not a copy of
+ * SC_JUNCTION_RHR_CONFLICT: the player turns RIGHT out of the stem, so the lane
+ * he merges into is the EASTBOUND one at y = −4.06 — the near lane, fed from
+ * the west, i.e. from his LEFT. That is precisely the car the second look left
+ * is for, and the reason the ritual is ляво-дясно-ЛЯВО rather than a single
+ * sweep. A car from the right would cross the far lane and never touch him.
+ *
+ * junctionControl "stopLine": tj-stop-v1 derives a real Б2 line at the stem
+ * mouth (27.725 m — primary priority road, so the arterial mouth), so the
+ * runtime's give-way adjudication grades the crossing and the runner commends
+ * the wait. leadSec −3.2 puts the car at the node ~3.2 s after the player's
+ * projected crossing: it is HELD, visible, ~25 m out through the whole scan,
+ * and it crosses while a student who actually looked is still waiting.
+ */
+export const SC_JUNCTION_SCAN_CONFLICT: PriorityFromRightSpec = {
+  id: "sc-jscan-conflict",
+  kind: "priorityFromRight",
+  libraryEventId: "JU-23",
+  junction: { nodeId: "tj-n-c", x: 0, y: 0 },
+  junctionControl: "stopLine",
+  actor: {
+    // The priority road, west → east: the near (eastbound) lane the right turn
+    // merges into. tj-stop-v1 nodes, pinned by the tj-districts battery.
+    pathNodes: ["tj-n-w", "tj-n-c", "tj-n-e"],
+    hold: { nodeIndex: 1, offsetM: -95 }, // 95 m west of the junction
+    cruiseSpeedMps: 8,
+  },
+  junctionNodeIndex: 1,
+  armDistM: 70,
+  leadSec: -3.2,
+  // tj-stop-v1's Б2 line: primary half-width 12.125 + arterial corner 15 +
+  // 0.6 paint inset (= JUNCTION_STOP_LINE_M above; battery tj-districts).
+  lineDistM: JUNCTION_STOP_LINE_M,
+  clearSpeedMps: 11.5,
+  // L7: the release waits for the student to actually be at the line, so the
+  // «приближи бавно» this drill teaches cannot delete its own encounter.
+  witnessArm: { etaSec: 8, nearLineM: 6 },
+};
+
 /** JU-23 — оглеждане наляво-надясно-наляво преди навлизане на кръстовище с Б2
  *  (ЗДвП чл. 50: на знак „Спри!“ водачът спира и пропуска, като се убеди, че не
  *  идват ППС с предимство — убеждаването изисква пълно оглеждане). */
@@ -604,8 +675,16 @@ export const SC_JUNCTION_SCAN: ScenarioSpec = {
     { n: 1, textBg: "Приближи знака Б2 „Спри!“ по страничната улица с намалена скорост и десен мигач." },
     { n: 2, textBg: "Спри НАПЪЛНО преди стоп-линията — колелата неподвижни." },
     { n: 3, textBg: "Огледай се по реда: наляво, надясно и ПАК наляво. Един поглед не стига." },
-    { n: 4, textBg: "Вторият поглед наляво е за колата, която е приближила, докато си гледал надясно." },
-    { n: 5, textBg: "Потегли и завий надясно чак когато си се убедил, че никой не идва с предимство." },
+    {
+      n: 4,
+      textBg:
+        "Вторият поглед наляво е за колата, която е приближила, докато си гледал надясно — тя идва по главния отляво, точно в лентата, в която ще завиеш.",
+    },
+    {
+      n: 5,
+      textBg:
+        "Изчакай я да премине изцяло покрай теб и чак тогава потегли и завий надясно. „Убедих се“ значи видях я и я пропуснах, не „погледнах натам“.",
+    },
   ],
   success: [
     {
@@ -631,15 +710,15 @@ export const SC_JUNCTION_SCAN: ScenarioSpec = {
       traceRef: { path: "content/traces/sc-junction-scan/mistake-no-scan.trace.json" },
       titleBg: "Потегляне без оглеждане",
       whatWentWrongBg:
-        "Колата спря напълно на Б2, но потегли, без да се огледа нито наляво, нито надясно. Пълното спиране е половината работа — то ти дава секундите, в които главата трябва да се завърти и очите наистина да проверят пътя с предимство. „Гледах, но не видях“ е най-честата причина за удар на кръстовище.",
-      codeRefs: ["JUNCTION_SCAN_INCOMPLETE"],
+        "Колата спря напълно на Б2, но потегли, без да се огледа нито наляво, нито надясно — и точно затова не видя автомобила, който в същите секунди приближаваше по главния път отляво, в лентата, в която тя завива. Пълното спиране е само половината работа: то ти дава секундите, в които главата трябва да се завърти и очите наистина да проверят. Тук се отсъждат две неща наведнъж — непълното наблюдение и отнетото предимство, — защото те са едно и също събитие, видяно отвън и отвътре. „Гледах, но не видях“ е най-честата причина за удар на кръстовище.",
+      codeRefs: ["JUNCTION_SCAN_INCOMPLETE", "FAILED_TO_YIELD"],
     },
     {
       traceRef: { path: "content/traces/sc-junction-scan/mistake-single-glance.trace.json" },
       titleBg: "Само един поглед",
       whatWentWrongBg:
-        "Водачът спря и погледна веднъж наляво, но не и надясно — а после потегли. Един поглед не стига: докато гледаш в едната посока, от другата може да приближи кола. Затова оглеждането е по реда ляво-дясно-ляво, с втори поглед наляво.",
-      codeRefs: ["JUNCTION_SCAN_INCOMPLETE"],
+        "Водачът спря и погледна веднъж наляво, но не и надясно — а после потегли. Един поглед не стига, и ето защо: в мига на този поглед пътят отляво наистина беше чист, а колата с предимство се появи в следващите секунди, докато главата вече беше обърната напред. Точно нея хваща ВТОРИЯТ поглед наляво — той не е повторение, а нова информация. Затова се отсъждат и непълното оглеждане, и отнетото предимство: пропуснатият поглед и пропуснатата кола са едно и също.",
+      codeRefs: ["JUNCTION_SCAN_INCOMPLETE", "FAILED_TO_YIELD"],
     },
   ],
   teach: {
@@ -657,6 +736,9 @@ export const SC_JUNCTION_SCAN: ScenarioSpec = {
     { level: 3 },
     { level: 4, vehicleStart: "cold" },
   ],
+  // T9: the car the whole lesson talks about. Until now this array did not
+  // exist — see SC_JUNCTION_SCAN_CONFLICT above.
+  staged: [SC_JUNCTION_SCAN_CONFLICT],
   conditions: { weather: "dry" },
   // The junction-scan detector is default-OFF (it would false-fire the exam
   // bank's unglanced Б2 crossings); this drill opts it in so the LIVE session
@@ -706,6 +788,10 @@ export const SC_JX_GIVEWAY_CONFLICT: PriorityFromRightSpec = {
   // derivation, proven by the district battery) — its authored stop-line dist.
   lineDistM: 27.725,
   clearSpeedMps: 11.5,
+  // L7 (ledger §4): authored rather than inherited from the runner default —
+  // this drill's own instruction 4 demands a full stop at the Б1 line, and on a
+  // pure distance gate the car it tells you to wait for has already gone.
+  witnessArm: { etaSec: 8, nearLineM: 6 },
 };
 
 /** Learn-only rear pressure (доп. натиск): a car glued behind the player, so
@@ -782,9 +868,25 @@ export const SC_JX_GIVEWAY_B1: ScenarioSpec = {
     {
       id: "sc-jxgb-yield",
       titleBg: "Пропусни колата с предимство на второто кръстовище",
-      // The yield pose before the mouth-2 Б1 line (y = 122.275): a crawl gate
-      // (<= 6 km/h) unsatisfiable by anyone who barges through.
-      params: { kind: "reachZone", x: 4.06, y: 118, radiusM: 4, maxSpeedKmh: 6 },
+      /**
+       * The yield pose before the mouth-2 Б1 line (y = 122.275): a crawl gate
+       * (≤ 6 km/h) unsatisfiable by anyone who barges through. The SPEED cap is
+       * the drill and it stays.
+       *
+       * B5 (ledger §3), data half — the PLACE was the defect. At `y 118 r4` the
+       * gate admitted y ∈ [114, 122]: the last 8 m of an approach on which
+       * every metre below 122.275 is a lawful place to give way. A student who
+       * stopped further back — where, before Lane 4 clears the parked bodies
+       * off this junction's apron, he can actually SEE down the boulevard — was
+       * refused and had to creep forward to the one pose the circle allowed,
+       * which is the pose with the worst sightline. The founder wrote it down as
+       * *„if I don't stop on the green circle I can't do anything."*
+       *
+       * `y 113 r9` → y ∈ [104, 122]: 18 m of admissible band instead of 8, and
+       * the upper edge still lands 0.275 m SHORT of the Б1 line, so no pose
+       * inside the junction can ever satisfy it.
+       */
+      params: { kind: "reachZone", x: 4.06, y: 113, radiusM: 9, maxSpeedKmh: 6 },
     },
     {
       id: "sc-jxgb-exit",

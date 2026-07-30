@@ -49,9 +49,10 @@ export function scFollowDistanceShadowScript(): DriveScript {
     steps: [
       { kind: "annotation", textBg: "Пред теб се движи кола — следвай я спокойно на дистанция от поне 2 секунди." },
       { kind: "glance", mirror: "rear" },
-      // ~26 km/h behind the pinned ~13 m lead: ~1.8 s of gap — comfortably safe.
+      // ~26 km/h behind a lead that drives its OWN steady 25.9 km/h from 25 m of
+      // centres (20.9 m of bumpers) — the gap holds itself and reads ~2.9 s.
       { kind: "drive", points: [[X_LANE, 15], [X_LANE, 110]], targetKmh: 26, stopAtEnd: false },
-      { kind: "annotation", textBg: "На 26 км/ч тези 13 метра са около 1,8 секунди — има време за реакция." },
+      { kind: "annotation", textBg: "На 26 км/ч тези двайсетина метра са близо 3 секунди — има време за реакция." },
       { kind: "drive", points: [[X_LANE, 110], [X_LANE, 230]], targetKmh: 26, stopAtEnd: false },
       { kind: "annotation", textBg: "Дистанцията се държи в секунди, не в метри на око — брой „едно-и-две“." },
       { kind: "drive", points: [[X_LANE, 230], [X_LANE, 345]], targetKmh: 26 },
@@ -136,12 +137,33 @@ const SCRIPTS: Record<
  */
 function scFollowDistanceStaged(name: ScFollowDistanceTraceName): StagedEventSpec[] {
   const base = [...(SC_FOLLOW_DISTANCE.staged ?? [])] as StagedEventSpec[];
-  if (name !== "mistake-tailgate") return base;
-  return base.map((e) =>
-    e.kind === "brakingLeadCar" && e.id === "sc-fd-lead"
-      ? { ...e, followGapM: 5.75, actor: { ...e.actor, hold: { nodeIndex: 0, offsetM: 24 } } }
-      : e,
-  );
+  if (name === "shadow-correct") return base;
+  // LEDGER T17/T18: the DRILL's lead is now a scheduled cruise (it drives its
+  // own arc at 7.2 m/s, so the live student can actually open the gap). A
+  // RECORDED demo is a fixed input tape: replayed against a lead that no longer
+  // holds station, „лепене за предния" ends in a rear-end and „дистанцията се
+  // топи" grades COLLISION instead of the code it is authored to teach. So each
+  // demo keeps its own PINNED clone — the same scoping the tailgate clone has
+  // used since founder R-media #4, now applied to both.
+  const pinned = (followGapM: number, offsetM: number) =>
+    base.map((e) =>
+      e.kind === "brakingLeadCar" && e.id === "sc-fd-lead"
+        ? {
+            ...e,
+            paceMode: "matchPlayer" as const, // the demo tape wants the rubber band
+            followGapM,
+            maxMatchSpeedMps: 15,
+            actor: { ...e.actor, cruiseSpeedMps: 9, hold: { nodeIndex: 0, offsetM } },
+          }
+        : e,
+    );
+  // „Лепене за предния": a HELD ~2.2 m bumper gap (about half a car length,
+  // ~0.17 s at 48 km/h) — the unmistakable glue the founder asked for.
+  if (name === "mistake-tailgate") return pinned(5.75, 24);
+  // „Дистанцията се топи": the drill's HISTORICAL 13 m pin, kept verbatim,
+  // because that demo's whole lesson is that the SAME metres became unsafe at
+  // speed — it needs a lead that holds station while the player accelerates.
+  return pinned(13, 35);
 }
 
 /**
