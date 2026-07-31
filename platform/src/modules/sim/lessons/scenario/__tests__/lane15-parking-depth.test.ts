@@ -61,6 +61,7 @@ import {
 import type { ScenarioSpec } from "../types";
 import { recordScParkParallelExitDrive } from "../../../traces/scParkParallelExit";
 import { recordScParkPerpForwardDrive } from "../../../traces/scParkPerpForward";
+import { recordScParkDepthDrive, type ParkDepthDrillId } from "../../../traces/scParkDepth";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(HERE, "../../../../../../..");
@@ -73,13 +74,20 @@ const byId = (id: string): ScenarioSpec => {
 };
 
 /**
- * The bay/kerb MANOEUVRE drills — the ones the founder means by „parking
- * lessons": a lesson whose graded act is placing or extracting the car, as
- * opposed to the чл. 98 ban-reading drills that share the family chip.
- * sc-park-perp-rev lives in templates.ts (lane 15 does not own that file — see
- * the note on the D11 assertion below).
+ * THE DRILLS THAT TEACH A PARKING MANOEUVRE — a lesson whose graded act is
+ * placing the car into, or extracting it from, a space.
+ *
+ * THIS LIST USED TO BE WRONG, AND IT WAS THE WRONG ANSWER TO THE FOUNDER.
+ * It counted ten by including sc-maneuver-3point and sc-maneuver-uturn, which
+ * are TURNS: nothing in either puts a car in a space. He asked for ten that
+ * teach parking, the previous wave answered NOT-A-DEFECT on a count of ten,
+ * and four of those ten were not parking. The turns are still fine lessons and
+ * still carry the „parking" family chip (they are low-speed manoeuvres) — they
+ * are simply not what he asked to be counted, so they are counted separately
+ * below and never inside this list again.
  */
 const MANEUVER_DRILLS = [
+  // The eight that existed before the parking-depth wave.
   "sc-park-perp-rev",
   "sc-park-parallel",
   "sc-park-45",
@@ -88,15 +96,36 @@ const MANEUVER_DRILLS = [
   "sc-park-parallel-exit",
   "sc-park-bay-exit-rev",
   "sc-pk-driveway",
-  "sc-maneuver-3point",
-  "sc-maneuver-uturn",
+  // The ten the parking-depth wave added, each on its own committed district.
+  "sc-park-gap-short",
+  "sc-park-gap-long",
+  "sc-park-van",
+  "sc-park-45-rev",
+  "sc-park-left",
+  "sc-park-zebra",
+  "sc-park-wall",
+  "sc-park-night",
+  "sc-park-double",
+  "sc-park-judge",
 ] as const;
 
-/**
- * All ten now. `sc-park-perp-rev` was excluded because templates.ts belonged to
- * no lane; the lessons-progression wave (doc 87 B3/B10) owns that file and took
- * the fix, so the drill joins the set it was always supposed to be measured by.
- */
+/** Low-speed manoeuvre drills that are NOT parking: they turn the car around. */
+const TURN_DRILLS = ["sc-maneuver-3point", "sc-maneuver-uturn"] as const;
+
+/** The ten the founder asked for, by name — the wave's own contract. */
+const PARKING_DEPTH_DRILLS = [
+  "sc-park-gap-short",
+  "sc-park-gap-long",
+  "sc-park-van",
+  "sc-park-45-rev",
+  "sc-park-left",
+  "sc-park-zebra",
+  "sc-park-wall",
+  "sc-park-night",
+  "sc-park-double",
+  "sc-park-judge",
+] as const;
+
 const LANE15_MANEUVER_DRILLS = MANEUVER_DRILLS;
 
 // ---------------------------------------------------------------------------
@@ -136,7 +165,13 @@ describe("D11 — „it states 2 tasks and delivers 1“", () => {
   });
 
   it("the REVERSE drills' first task is a halt, and their own copy says „спри“", () => {
-    for (const id of ["sc-park-parallel", "sc-park-narrow", "sc-pk-driveway", "sc-park-parallel-exit"]) {
+    for (const id of [
+      "sc-park-parallel",
+      "sc-park-narrow",
+      "sc-pk-driveway",
+      "sc-park-parallel-exit",
+      ...PARKING_DEPTH_DRILLS,
+    ]) {
       const spec = byId(id);
       const first = spec.success[0].params;
       if (first.kind !== "reachZone") return expect.unreachable(`${id} first objective kind`);
@@ -336,8 +371,70 @@ describe("L12 — an authored ambient count must have somewhere to put the actor
 // ---------------------------------------------------------------------------
 
 describe("„at least 10 genuinely different parking situations“", () => {
-  it("the family teaches ten distinct low-speed manoeuvres, on nine committed maps", () => {
-    expect(MANEUVER_DRILLS.length).toBeGreaterThanOrEqual(10);
+  it("the parking-depth wave alone is TEN drills that put a car in a space", () => {
+    // The literal ask, checked literally — and none of the ten is a turn.
+    expect(PARKING_DEPTH_DRILLS).toHaveLength(10);
+    for (const id of PARKING_DEPTH_DRILLS) {
+      const spec = byId(id);
+      const terminal = spec.success[spec.success.length - 1].params;
+      expect(terminal.kind, id).toBe("completeManeuver");
+      if (terminal.kind !== "completeManeuver") continue;
+      expect(terminal.maneuver, `${id} must GRADE a park, not a turn`).toBe("parkInBay");
+    }
+    for (const id of TURN_DRILLS) {
+      const terminal = byId(id).success[byId(id).success.length - 1].params;
+      expect(
+        terminal.kind === "completeManeuver" && terminal.maneuver === "parkInBay",
+        `${id} is a turn — it may never be counted toward the ten`,
+      ).toBe(false);
+    }
+  });
+
+  it("each of the ten rides its OWN committed district — no recolours", () => {
+    const maps = PARKING_DEPTH_DRILLS.map((id) => byId(id).map.districtId);
+    expect(new Set(maps).size, maps.join(", ")).toBe(10);
+    // …and none of them re-uses a map an older parking drill already teaches on.
+    const older = new Set(
+      PARKING.filter((s) => !PARKING_DEPTH_DRILLS.includes(s.id as never)).map(
+        (s) => s.map.districtId,
+      ),
+    );
+    for (const m of maps) expect(older.has(m), `${m} is an older drill's map`).toBe(false);
+  });
+
+  it("the ten teach ten different things, measured on what each one CHANGES", () => {
+    // A situation is the tuple a learner actually experiences: the geometry of
+    // the space, which side of him it is on, which gear takes him into it, and
+    // what is standing next to it. Two drills that agree on all four are one
+    // drill painted twice.
+    const signatures = PARKING_DEPTH_DRILLS.map((id) => {
+      const spec = byId(id);
+      const terminal = spec.success[spec.success.length - 1].params;
+      if (terminal.kind !== "completeManeuver" || terminal.maneuver !== "parkInBay") return id;
+      const p = spec.map.params;
+      return [
+        p.angle,
+        String(p.pitchesM ?? "uniform"),
+        p.side ?? "east",
+        terminal.entry ?? "reverse",
+        p.occupancy,
+        spec.conditions?.night === true ? "night" : "day",
+      ].join("/");
+    });
+    expect(new Set(signatures).size, signatures.join("\n")).toBe(10);
+  });
+
+  it("the whole parking family is 28 lessons and every one of them is traced", () => {
+    expect(PARKING).toHaveLength(28);
+    for (const spec of PARKING) {
+      const refs = [spec.shadow, ...spec.mistakes.map((m) => m.traceRef)];
+      for (const ref of refs) expect(ref.pending, `${spec.id} ${ref.path}`).not.toBe(true);
+      expect(spec.mistakes.length, spec.id).toBeGreaterThanOrEqual(2);
+    }
+  });
+
+  it("the manoeuvre set is 18 distinct graded acts across 18 committed maps", () => {
+    expect(MANEUVER_DRILLS.length).toBe(18);
     for (const id of MANEUVER_DRILLS) expect(byId(id).id).toBe(id);
     // Distinct graded ACTS, not distinct ids: a lesson that grades the same
     // contract on the same geometry as another is a skin, not a situation.
@@ -353,15 +450,6 @@ describe("„at least 10 genuinely different parking situations“", () => {
       }),
     );
     expect(acts.size, [...acts].join("\n")).toBe(MANEUVER_DRILLS.length);
-  });
-
-  it("the whole parking family is 18 lessons and every one of them is traced", () => {
-    expect(PARKING).toHaveLength(18);
-    for (const spec of PARKING) {
-      const refs = [spec.shadow, ...spec.mistakes.map((m) => m.traceRef)];
-      for (const ref of refs) expect(ref.pending, `${spec.id} ${ref.path}`).not.toBe(true);
-      expect(spec.mistakes.length, spec.id).toBeGreaterThanOrEqual(2);
-    }
   });
 });
 
@@ -432,6 +520,53 @@ describe("the two new drills complete through compileScenario → session → re
       "sc-ppx-out:true",
     ]);
     expect(session.events.filter((e) => e.kind === "violation")).toEqual([]);
+  });
+
+  /**
+   * THE PARKING-DEPTH PROOF. Ten drills is a claim; ten drills a student can
+   * actually finish is the thing. Each of the ten authored shadows is driven
+   * through compileScenario → createLessonSession → applyTick → the real
+   * result, at the unaided rung, and must tick BOTH objectives with no
+   * violation anywhere. This is what „it works" means in this repo — the trace
+   * gate proves the drive is legal, this proves the LESSON accepts it.
+   */
+  it("all ten new drills: the shadow completes both tasks at L3, clean", () => {
+    const failures: string[] = [];
+    for (const id of PARKING_DEPTH_DRILLS) {
+      const spec = byId(id);
+      const session = driveThroughSession(spec, 3, (district, onTick) =>
+        recordScParkDepthDrive(district, id as ParkDepthDrillId, "shadow-correct", { onTick }),
+      );
+      const result = buildLessonResult(session);
+      const done = result.objectives.map((o) => `${o.id}:${o.done}`).join(",");
+      const expected = spec.success.map((o) => `${o.id}:true`).join(",");
+      if (done !== expected) failures.push(`${id}: ${done} (expected ${expected})`);
+      const violations = session.events.filter((e) => e.kind === "violation");
+      if (violations.length > 0) {
+        failures.push(`${id}: ${violations.map((v) => ("code" in v ? v.code : "?")).join(",")}`);
+      }
+    }
+    expect(failures, failures.join("\n")).toEqual([]);
+  });
+
+  it("no new drill hands the student a car already standing inside its own first gate", () => {
+    // The B4 hazard, checked at EVERY rung: a capped waypoint the spawn already
+    // satisfies is a task the HUD counts and the student never performs.
+    for (const id of PARKING_DEPTH_DRILLS) {
+      const spec = byId(id);
+      const raw = loadDistrict(spec.map.districtId) as {
+        spawnPoints: Array<{ id: string; x: number; y: number }>;
+      };
+      const spawn = raw.spawnPoints.find((p) => p.id === spec.start.spawnPointId);
+      expect(spawn, `${id}: unknown spawn ${String(spec.start.spawnPointId)}`).toBeDefined();
+      for (const rung of spec.levels) {
+        const gate = compileScenario(spec, rung.level).objectives[0];
+        const d = Math.hypot(spawn!.x - (gate.params.x as number), spawn!.y - (gate.params.y as number));
+        expect(d, `${id}@L${rung.level} spawns inside its own first gate`).toBeGreaterThan(
+          gate.params.radiusM as number,
+        );
+      }
+    }
   });
 
   it("the L1 ladder never swallows a task: the exit drill's start pose stays OUTSIDE its own first gate", () => {

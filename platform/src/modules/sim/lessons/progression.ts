@@ -2,9 +2,23 @@
  * Lesson unlock & best-result logic (pure).
  *
  * Rule (product decision, /simulator select screen): the curriculum is
- * linear — a lesson unlocks once the lesson with the PREVIOUS order has a
- * passed session. L0 „Свободно каране" (order 0) is always open, so there is
- * always something to drive.
+ * linear — a lesson unlocks once the lesson with the PREVIOUS order has been
+ * DRIVEN TO THE END. L0 „Свободно каране" (order 0) is always open, so there
+ * is always something to drive.
+ *
+ * FR-06 (founder, 2026-07-29): „we should give users an option continue to
+ * next question although you made mistake and come back to this later … we are
+ * blocking them from advancing and sometimes they just want to go trough all
+ * first." The gate used to read `prevPassed`, so a student who failed Урок N
+ * could not open Урок N+1 at all — the wall he hit and reported twice
+ * (FR-06, FR-23). It now reads „has a finished attempt": the curriculum keeps
+ * its ORDER (nobody jumps to the parking exam before meeting a junction), and
+ * losing to one lesson never confiscates the rest of the course.
+ *
+ * `passed` is untouched and still means passed — the select screen keeps
+ * marking which lessons are actually done, the debrief still says a failed run
+ * failed, and nothing here softens a verdict. An unlocked lesson is an open
+ * door, not a grade.
  *
  * "Score" here is the official penalty-point total, so LOWER IS BETTER;
  * bestScore is the minimum across finished attempts.
@@ -55,18 +69,21 @@ export function computeProgression(
   }
 
   const ordered = [...lessons].sort((a, b) => a.order - b.order);
-  const passedByOrder = new Map<number, boolean>();
+  // FR-06: keyed on ATTEMPTED, not passed. Every row in `attempts` is a
+  // finished session (store.ts writes one per completed drive, pass or fail),
+  // so „tried it" is exactly `attempts > 0`.
+  const triedByOrder = new Map<number, boolean>();
   for (const l of ordered) {
-    passedByOrder.set(l.order, byLesson.get(l.id)?.passed ?? false);
+    triedByOrder.set(l.order, (byLesson.get(l.id)?.attempts ?? 0) > 0);
   }
 
   return ordered.map((lesson) => {
     const acc = byLesson.get(lesson.id);
     const isFirst = lesson.order === ordered[0].order;
-    const prevPassed = passedByOrder.get(lesson.order - 1) ?? false;
+    const prevTried = triedByOrder.get(lesson.order - 1) ?? false;
     return {
       lesson,
-      unlocked: unlockAll || isFirst || prevPassed,
+      unlocked: unlockAll || isFirst || prevTried,
       passed: acc?.passed ?? false,
       attempts: acc?.attempts ?? 0,
       bestScore: acc?.best ?? null,

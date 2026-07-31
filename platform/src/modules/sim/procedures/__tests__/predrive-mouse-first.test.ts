@@ -20,6 +20,7 @@ import { COCKPIT_HOTSPOTS } from "../../scene/vitok/hotspots";
 import {
   PRE_DRIVE_INFO_STEPS,
   PRE_DRIVE_STEP_CONTROLS,
+  preDriveMouseActionBg,
   preDrivePrimaryInput,
   preDriveStepKind,
   type CockpitHotspotName,
@@ -48,15 +49,42 @@ describe("D9 · the mouse path exists behind every click hint", () => {
     }
   });
 
-  it("the two pedal steps say so instead of pretending to be clickable", () => {
-    // The honest residue of D9: a brake and a throttle have no dashboard
-    // control, on any car. Everything else does.
+  it("the two pedal steps name a PEDAL PAD, not a missing dashboard control", () => {
+    // A brake and a throttle have no dashboard control, on any car — but since
+    // the 2026-07-30 re-measure a desktop carries the two on-screen pedal pads
+    // (lesson-ui/MousePedals.tsx), so „с педал" stopped meaning „not for you".
+    // The founder's mouse-only run of the lesson died on step 8 for want of
+    // exactly this sentence.
     const pedals = PRE_DRIVE_STEP_ORDER.filter((id) => PRE_DRIVE_STEP_CONTROLS[id]?.pedal === true);
     expect(pedals).toEqual(["press-brake", "move-off"]);
     for (const id of pedals) {
       expect(PRE_DRIVE_STEP_CONTROLS[id]?.clickBg).toBeUndefined();
       expect(PRE_DRIVE_STEP_CONTROLS[id]?.hotspots).toEqual([]);
+      const pedalBg = PRE_DRIVE_STEP_CONTROLS[id]?.pedalBg;
+      expect(pedalBg, `${id} pedal hint`).toBeDefined();
+      expect(pedalBg).toMatch(/мишк/); // it must say the MOUSE does it
     }
+  });
+
+  it("only pedal steps carry a pedal hint (the honesty rule, both ways)", () => {
+    for (const [stepId, control] of Object.entries(PRE_DRIVE_STEP_CONTROLS)) {
+      if (control === undefined) continue;
+      expect(
+        control.pedalBg !== undefined,
+        `${stepId} pedal hint vs pedal flag`,
+      ).toBe(control.pedal === true);
+    }
+  });
+
+  it("ALL THIRTEEN steps have a mouse sentence — his acceptance test, in code", () => {
+    // „complete all 13 steps using only the mouse". Every step must be able to
+    // TELL the student what the mouse does: a dashboard control to click, a
+    // pedal pad to hold, or the checklist's own confirmation.
+    for (const id of PRE_DRIVE_STEP_ORDER) {
+      const sentence = preDriveMouseActionBg(id);
+      expect(sentence.length, `${id} mouse sentence`).toBeGreaterThan(10);
+    }
+    expect(PRE_DRIVE_STEP_ORDER).toHaveLength(13);
   });
 
   it("every one of the SEVEN dashboard controls he named is built", () => {
@@ -85,9 +113,9 @@ describe("D9 · the keyboard is never the primary input", () => {
     for (const id of PRE_DRIVE_STEP_ORDER) tally[preDrivePrimaryInput(id)].push(id);
 
     // The measured shape of the redesigned lesson: 8 dashboard clicks,
-    // 3 walkaround confirmations, 2 pedals = 11 of 13 reachable with a mouse
-    // alone; before this change the checklist offered a mouse affordance on
-    // the 3 info rows only.
+    // 3 walkaround confirmations, 2 pedals. Since the mouse pedal pads landed
+    // that is 13 of 13 reachable with a mouse alone; before D9 the checklist
+    // offered a mouse affordance on the 3 info rows only.
     expect(tally["click"]).toHaveLength(8);
     expect(tally["confirm"]).toHaveLength(3);
     expect(tally["pedal"]).toHaveLength(2);

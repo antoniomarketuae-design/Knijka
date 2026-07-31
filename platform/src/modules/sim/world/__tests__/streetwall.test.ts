@@ -80,7 +80,12 @@ const POPULATED: ReadonlyArray<readonly [string, number]> = [
   ["fo-brake-v1", 19],
   ["pe-zone-v1", 5],
   ["zb-v1", 10],
-  ["sp-zone30-v1", 18],
+  // 18 -> 16: the зона-30 street now AUTHORS a school (`sp-b-school`,
+  // `kind: "school"` — founder item 61), and the pass's own neighbour clearance
+  // parts the generated wall around it. Two generated blocks fewer, one
+  // authored building more, and the same law holds: nothing generated may sit
+  // inside an authored footprint's keep-out.
+  ["sp-zone30-v1", 16],
 ];
 
 /**
@@ -217,7 +222,9 @@ describe("street wall — the populate pass is pinned", () => {
     const total = POPULATED.reduce((n, [, c]) => n + c, 0);
     // 658 → 651: doc 86 D1 replaced 8 procedural prisms on pe-dart-v1 /
     // pe-child-v1 with 9 authored, lesson-bearing volumes (see the table).
-    expect(total).toBe(651);
+    // 651 → 649: the same trade once more, on sp-zone30-v1 — two generated
+    // blocks give way to the AUTHORED school (founder item 61).
+    expect(total).toBe(649);
   });
 
   it("leaves the maps whose buildings ARE the lesson completely alone", () => {

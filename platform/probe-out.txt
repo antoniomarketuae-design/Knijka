@@ -1,0 +1,36 @@
+=== sc-zebra-approach L1 originFrames=0
+    routeFinishZone={"x":4.06,"y":130,"radiusM":17,"dwellSec":0.5,"terminalRescue":true}
+    terminalRescueZone={"x":4.06,"y":130,"radiusM":17,"dwellSec":12,"terminalRescue":true,"maxSpeedKmh":1}
+    survived 120 s (phase=driving)
+=== sc-roundabout-entry L1 originFrames=0
+    routeFinishZone={"x":0,"y":0,"radiusM":34,"armWithinM":24,"dwellSec":20,"mode":"outside","terminalRescue":true}
+    terminalRescueZone={"x":0,"y":0,"radiusM":34,"armWithinM":24,"dwellSec":20,"mode":"outside","terminalRescue":true}
+    survived 120 s (phase=driving)
+=== sc-roundabout-entry L3 originFrames=0
+    routeFinishZone={"x":0,"y":0,"radiusM":34,"armWithinM":24,"dwellSec":20,"mode":"outside","terminalRescue":true}
+    terminalRescueZone={"x":0,"y":0,"radiusM":34,"armWithinM":24,"dwellSec":20,"mode":"outside","terminalRescue":true}
+    survived 120 s (phase=driving)
+=== sc-zebra-approach L1 originFrames=1
+    routeFinishZone={"x":4.06,"y":130,"radiusM":17,"dwellSec":0.5,"terminalRescue":true}
+    terminalRescueZone={"x":4.06,"y":130,"radiusM":17,"dwellSec":12,"terminalRescue":true,"maxSpeedKmh":1}
+    survived 120 s (phase=driving)
+=== sc-roundabout-entry L1 originFrames=1
+    routeFinishZone={"x":0,"y":0,"radiusM":34,"armWithinM":24,"dwellSec":20,"mode":"outside","terminalRescue":true}
+    terminalRescueZone={"x":0,"y":0,"radiusM":34,"armWithinM":24,"dwellSec":20,"mode":"outside","terminalRescue":true}
+    survived 120 s (phase=driving)
+=== sc-roundabout-entry L3 originFrames=1
+    routeFinishZone={"x":0,"y":0,"radiusM":34,"armWithinM":24,"dwellSec":20,"mode":"outside","terminalRescue":true}
+    terminalRescueZone={"x":0,"y":0,"radiusM":34,"armWithinM":24,"dwellSec":20,"mode":"outside","terminalRescue":true}
+    survived 120 s (phase=driving)
+=== sc-zebra-approach L1 originFrames=3
+    routeFinishZone={"x":4.06,"y":130,"radiusM":17,"dwellSec":0.5,"terminalRescue":true}
+    terminalRescueZone={"x":4.06,"y":130,"radiusM":17,"dwellSec":12,"terminalRescue":true,"maxSpeedKmh":1}
+    survived 120 s (phase=driving)
+=== sc-roundabout-entry L1 originFrames=3
+    routeFinishZone={"x":0,"y":0,"radiusM":34,"armWithinM":24,"dwellSec":20,"mode":"outside","terminalRescue":true}
+    terminalRescueZone={"x":0,"y":0,"radiusM":34,"armWithinM":24,"dwellSec":20,"mode":"outside","terminalRescue":true}
+    survived 120 s (phase=driving)
+=== sc-roundabout-entry L3 originFrames=3
+    routeFinishZone={"x":0,"y":0,"radiusM":34,"armWithinM":24,"dwellSec":20,"mode":"outside","terminalRescue":true}
+    terminalRescueZone={"x":0,"y":0,"radiusM":34,"armWithinM":24,"dwellSec":20,"mode":"outside","terminalRescue":true}
+    survived 120 s (phase=driving)

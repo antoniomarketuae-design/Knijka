@@ -71,6 +71,7 @@ import {
   isBareVergeSide,
   junctionPriorityControls,
   onewayNoEntryArms,
+  onewayTerminalNoEntryEdges,
   type Approach,
   type RoadNetwork,
 } from "./network";
@@ -1102,6 +1103,103 @@ export function buildProps(
         const travel = forward ? tangent : mul(tangent, -1);
         const p = add(point, mul(perpRight(travel), eb.halfWidth + 0.8));
         pushSignAt(p, yawFromFacing(mul(travel, -1)), "pedestrianCrossing");
+      }
+    }
+  }
+
+  // -- В1 at the TERMINAL mouth of a one-way edge -------------------------------
+  // The other half of the В1 pass above. That one signs junction arms; this one
+  // signs the shape most of this catalog actually uses — a one-way carriageway
+  // with no junction on the map at all (a motorway, a lane-drop merge, a
+  // roadworks shift, a gantry street). The world-referent gate measured
+  // WRONG_WAY convicting on 19 scenarios / 88 rungs with „В1 faces built = 0",
+  // and thirteen of them are exactly that shape: the runtime grades the
+  // wrong-way movement off the edge's `oneway` tag while the world showed the
+  // student nothing.
+  //
+  // WHICH edges lives in network.onewayTerminalNoEntryEdges (see its header for
+  // the three exclusions). WHERE: at the downstream terminal, on the right of
+  // the flow, FACING BACK along it — so a legal driver reads the back of the
+  // plate on his way out and only a driver pointed the wrong way ever sees the
+  // face. Same 0.8 m curb offset as every other post, and it runs through
+  // pushSignAt so the minimum post separation still holds.
+  //
+  // Same lesson-scale gate and the same reasoning as the junction pass: an OSM
+  // district's real signage was never recorded, so posting there would trade a
+  // missing sign for an invented one.
+  if (lessonScale !== undefined) {
+    const terminalArms = onewayTerminalNoEntryEdges(
+      network.edges.map((eb) => ({
+        id: eb.edge.id,
+        oneway: eb.edge.oneway,
+        roundabout: eb.edge.roundabout,
+        upstreamNodeId: eb.edge.from,
+        downstreamNodeId: eb.edge.to,
+        downstreamDegree: network.nodes.get(eb.edge.to)?.degree ?? 0,
+      })),
+    );
+    for (const eb of network.edges) {
+      if (!terminalArms.has(eb.edge.id)) continue;
+      const g = eb.edge.geometry as Vec2[];
+      const total = polylineLength(g);
+      // A pace INSIDE the mouth, so the plate stands at the kerb of the street
+      // it forbids rather than out in the terminal's apron.
+      const sPost = Math.max(0, total - NO_ENTRY_ALONG_M);
+      const { point, tangent } = pointAlong(g, sPost);
+      // `tangent` runs WITH the one-way flow (geometry from → to).
+      const p = add(point, mul(perpRight(tangent), eb.halfWidth + NO_ENTRY_LATERAL_M));
+      pushSignAt(p, yawFromFacing(mul(tangent, -1)), "noEntry");
+    }
+  }
+
+  // -- А19 „Деца" ahead of every school ----------------------------------------
+  // Founder item 61: „no actual school when the question states there should be
+  // School … either build schools and put and name them school, or find some
+  // solutions", and item 60: „no kids are playing on the sidewalks". A school
+  // building now exists as a district kind (types.DistrictBuilding.kind) and is
+  // dressed by builders/schools.ts — but the thing a DRIVER is supposed to read
+  // is not the building, it is the warning post. In Bulgaria that post is А19,
+  // and it is what makes the зона-30 limit stop being an arbitrary number: the
+  // sign states the reason.
+  //
+  // DERIVED, never authored: one post per direction of travel, A19_LEAD_M
+  // upstream of the school along the nearest edge, on that driver's right,
+  // facing him — the same lead-then-face discipline as the А18 crossing warning
+  // above. A school whose lead falls off the end of its edge simply gets no post
+  // on that side rather than one planted at the school itself, which would warn
+  // a driver who is already level with the gate.
+  {
+    const A19_LEAD_M = 55;
+    const A19_MIN_ROOM_M = 8;
+    for (const b of district.buildings) {
+      if (b.kind !== "school") continue;
+      const ring = b.footprint as Vec2[];
+      if (!ring || ring.length < 3) continue;
+      let cx = 0;
+      let cy = 0;
+      for (const p of ring) {
+        cx += p[0];
+        cy += p[1];
+      }
+      const centre: Vec2 = [cx / ring.length, cy / ring.length];
+      // Nearest edge, and where along its geometry the school stands.
+      let host: { eb: (typeof network.edges)[number]; s: number; d: number } | null = null;
+      for (const eb of network.edges) {
+        const g = eb.edge.geometry as Vec2[];
+        const pr = projectOntoPolyline(g, centre);
+        if (!host || pr.distance < host.d) host = { eb, s: pr.s, d: pr.distance };
+      }
+      if (!host) continue;
+      const g = host.eb.edge.geometry as Vec2[];
+      const len = polylineLength(g);
+      for (const forward of [true, false] as const) {
+        // Upstream of the school FOR THIS DIRECTION of travel.
+        const sPost = forward ? host.s - A19_LEAD_M : host.s + A19_LEAD_M;
+        if (sPost < A19_MIN_ROOM_M || sPost > len - A19_MIN_ROOM_M) continue;
+        const { point, tangent } = pointAlong(g, sPost);
+        const travel = forward ? tangent : mul(tangent, -1);
+        const p = add(point, mul(perpRight(travel), host.eb.halfWidth + 0.8));
+        pushSignAt(p, yawFromFacing(mul(travel, -1)), "children");
       }
     }
   }

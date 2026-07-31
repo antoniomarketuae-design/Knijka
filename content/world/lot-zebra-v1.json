@@ -1,0 +1,242 @@
+{
+ "format": "district-v1",
+ "meta": {
+  "district": "lot-zebra",
+  "label": "Учебен паркинг — паркиране до пешеходна пътека (чл. 98)",
+  "mapKind": "scenario-lot",
+  "generator": "tools/maps/gen_parking_lot.mjs",
+  "boundsLocalMeters": {
+   "minX": -28,
+   "minY": -120,
+   "maxX": 12.280000000000001,
+   "maxY": 40
+  },
+  "attribution": {
+   "text": "Учебен паркинг — оригинален параметричен дизайн (без данни от OpenStreetMap)",
+   "license": "All rights reserved",
+   "licenseUrl": "/",
+   "copyrightUrl": "/",
+   "obligation": "none — original work, no ODbL attribution required for this map"
+  },
+  "defaults": {
+   "maxspeedUrbanKmh": 20,
+   "note": "Паркинг: 20 km/h навсякъде; маневрите се изпълняват с пешеходна скорост."
+  },
+  "stats": {
+   "roadKm": 0.16,
+   "nodes": 3,
+   "edges": 2,
+   "intersections": 0,
+   "crossings": 1,
+   "buildings": 1,
+   "spawnPoints": 2
+  },
+  "scenario": {
+   "archetype": "parking-lot",
+   "params": {
+    "bays": 6,
+    "bayWidthM": 2.5,
+    "bayDepthM": 5.5,
+    "angle": "parallel",
+    "aisleWidthM": 7,
+    "occupancy": "XX___X",
+    "approachM": 90,
+    "entry": "south",
+    "pitchesM": "6.5|6.5|9|8|6.5",
+    "targetIndex": 4
+   },
+   "targetBayId": "lotzb-bay-5",
+   "bays": [
+    {
+     "id": "lotzb-bay-1",
+     "x": 6.28,
+     "y": -18.25,
+     "headingDeg": 0,
+     "widthM": 2.5,
+     "lengthM": 5.5,
+     "occupied": true
+    },
+    {
+     "id": "lotzb-bay-2",
+     "x": 6.28,
+     "y": -11.75,
+     "headingDeg": 0,
+     "widthM": 2.5,
+     "lengthM": 5.5,
+     "occupied": true
+    },
+    {
+     "id": "lotzb-bay-3",
+     "x": 6.28,
+     "y": -5.25,
+     "headingDeg": 0,
+     "widthM": 2.5,
+     "lengthM": 5.5,
+     "occupied": false
+    },
+    {
+     "id": "lotzb-bay-4",
+     "x": 6.28,
+     "y": 3.75,
+     "headingDeg": 0,
+     "widthM": 2.5,
+     "lengthM": 5.5,
+     "occupied": false
+    },
+    {
+     "id": "lotzb-bay-5",
+     "x": 6.28,
+     "y": 11.75,
+     "headingDeg": 0,
+     "widthM": 2.5,
+     "lengthM": 5.5,
+     "occupied": false
+    },
+    {
+     "id": "lotzb-bay-6",
+     "x": 6.28,
+     "y": 18.25,
+     "headingDeg": 0,
+     "widthM": 2.5,
+     "lengthM": 5.5,
+     "occupied": true
+    }
+   ]
+  },
+  "zonesVersion": 1
+ },
+ "roads": {
+  "nodes": [
+   {
+    "id": "lotzb-n-end",
+    "x": 0,
+    "y": 40
+   },
+   {
+    "id": "lotzb-n-gate",
+    "x": 0,
+    "y": -30
+   },
+   {
+    "id": "lotzb-n-start",
+    "x": 0,
+    "y": -120
+   }
+  ],
+  "edges": [
+   {
+    "id": "lotzb-e-approach",
+    "from": "lotzb-n-start",
+    "to": "lotzb-n-gate",
+    "class": "residential",
+    "name": "Подход към паркинга",
+    "oneway": false,
+    "roundabout": false,
+    "lanes": 2,
+    "lanesSource": "tag",
+    "maxspeed": 20,
+    "maxspeedSource": "tag",
+    "length": 90,
+    "geometry": [
+     [
+      0,
+      -120
+     ],
+     [
+      0,
+      -30
+     ]
+    ]
+   },
+   {
+    "id": "lotzb-e-aisle",
+    "from": "lotzb-n-gate",
+    "to": "lotzb-n-end",
+    "class": "service",
+    "name": "Алея на паркинга",
+    "oneway": false,
+    "roundabout": false,
+    "lanes": 2,
+    "lanesSource": "tag",
+    "maxspeed": 20,
+    "maxspeedSource": "tag",
+    "length": 70,
+    "geometry": [
+     [
+      0,
+      -30
+     ],
+     [
+      0,
+      40
+     ]
+    ]
+   }
+  ]
+ },
+ "intersections": [],
+ "crossings": [
+  {
+   "id": "lotzb-x-zebra",
+   "x": 0,
+   "y": 0,
+   "kind": "marked",
+   "signalized": false,
+   "edgeId": "lotzb-e-aisle"
+  }
+ ],
+ "roundabouts": [],
+ "buildings": [
+  {
+   "id": "lotzb-b-kiosk",
+   "height": 3.5,
+   "heightSource": "default",
+   "footprint": [
+    [
+     -28,
+     -54
+    ],
+    [
+     -20,
+     -54
+    ],
+    [
+     -20,
+     -46
+    ],
+    [
+     -28,
+     -46
+    ]
+   ]
+  }
+ ],
+ "spawnPoints": [
+  {
+   "id": "lotzb-spawn-approach",
+   "x": 4.06,
+   "y": -105,
+   "heading": 0,
+   "edgeId": "lotzb-e-approach",
+   "name": "Подход към паркинга"
+  },
+  {
+   "id": "lotzb-spawn-finish",
+   "x": 0,
+   "y": 31.5,
+   "heading": 0,
+   "edgeId": "lotzb-e-aisle",
+   "name": "Контролна точка — след маневрата"
+  }
+ ],
+ "zones": [
+  {
+   "id": "lotzb-z-zebra",
+   "kind": "noStopping",
+   "edgeId": "lotzb-e-aisle",
+   "fromM": 22,
+   "toM": 38,
+   "signRef": "ЗДвП-98-1-1"
+  }
+ ]
+}

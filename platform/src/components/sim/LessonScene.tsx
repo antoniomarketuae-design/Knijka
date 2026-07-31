@@ -134,6 +134,7 @@ import {
 import { lessonRequiredSpeedKmh } from "@/modules/sim/scene/lessonSpeedContract";
 import { TouchControls } from "./TouchControls";
 import { CockpitInteractionContext } from "@/modules/sim/scene/vitok/hotspots";
+import { HUD_LEFT_PANEL_MAX_HEIGHT_FRACTION } from "@/modules/sim/scene/vitok/cabinLook";
 import { SimAudio } from "@/modules/sim/scene/simAudio";
 import { AudioLessonPrompt } from "./AudioLessonPrompt";
 import { CameraRig, type CameraMode } from "./CameraRig";
@@ -152,6 +153,8 @@ import { ScenarioObstacles, type ScenarioObstacleSpec } from "./ScenarioObstacle
 import { ShadowCar } from "./ShadowCar";
 // [glance-pings] the look-left/right teaching overlay (see the wiring block).
 import { GlanceEdgePings, type GlancePingTap } from "./lesson-ui/GlanceEdgePings";
+// The mouse's pedals (founder 2026-07-30) — see the mount below.
+import { MousePedals } from "./lesson-ui/MousePedals";
 import { TraceTimeline } from "./lesson-ui/TraceTimeline";
 import { worldNameBg } from "@/modules/sim/scene/worldNames";
 import type { QualityPreset } from "./lesson-ui/types";
@@ -725,6 +728,10 @@ function ReadyScene({
   const [perfLog] = useState(() => shouldLogPerf());
   const [touchSource] = useState(() => new TouchInputSource());
   const [showTouchHint, setShowTouchHint] = useState(shouldShowTouchHint);
+  /** Was this lesson opened INSIDE the pre-drive procedure? Captured once, at
+   *  mount, because it decides a DEFAULT (the collapsed key legend) and a
+   *  default must not flip halfway through a session. */
+  const [driveLockedAtMount] = useState(() => driveLocked);
 
   // Auto-reverse assist (founder 2026-07-17: „стрелката надолу не кара
   // назад"): the pure timing machine (engine/reverseAssist.ts) plus the flag
@@ -848,13 +855,36 @@ function ReadyScene({
     input.driveLocked = driveLockedRef.current;
     // P1: the touch overlay's axis source joins the SAME read() pipeline
     // (merged before the QW10 gate + difficulty shaping).
-    if (touchCapable) input.attachTouch(touchSource);
+    //
+    // ATTACHED UNCONDITIONALLY since the 2026-07-30 mouse-first review: on a
+    // non-touch device the SAME source now carries the MousePedals pads, which
+    // is what makes pre-drive steps 8 (натисни спирачката) and 13 (потегли)
+    // reachable without a keyboard. The merge is a no-op while no axis is
+    // active, so a keyboard-only session is byte-identical to before.
+    input.attachTouch(touchSource);
     inputRef.current = input;
     const audio = new SimAudio();
     audioRef.current = audio;
     // Spawn policy, resolved once — the lamp rule below needs the same answer.
-    const vehicleStart =
-      lesson.vehicleStart ?? (lesson.preDriveMode === "assess" ? "cold" : "ready");
+    //
+    // 2026-07-31, THE ROOT CAUSE OF „0/13 → 1/13 AND STOPS". The rule below
+    // used to read `preDriveMode === "assess" ? "cold" : "ready"`, i.e. only
+    // the EXAM kept a cold car. Урок 1 „Подготовка и потегляне", whose entire
+    // subject is the thirteen steps, therefore opened with the engine already
+    // running, the selector already in D and the parking brake already off —
+    // and three of its own steps became unperformable, because a performed step
+    // needs a real TRANSITION: `engineStarted`, `selectorChanged→D`,
+    // `parkingBrakeChanged→off`. Clicking the starter on a running engine stops
+    // it. Clicking the selector in D is rejected at the end of the gate.
+    // Clicking the parking brake PULLS it. That is precisely the founder's
+    // measurement — every clickable control clicked, one step ticked.
+    //
+    // So the marker is `preDrive`, not `preDriveMode`: a lesson that TEACHES
+    // the procedure needs the cold car just as much as the one that GRADES it.
+    // Handing Урок 1 a running engine deletes Урок 1. The 150 scenarios — his
+    // „the seatbelt is the only item left" ruling, commit 265629d — declare no
+    // pre-drive at all and are untouched by this: they still spawn ready.
+    const vehicleStart = lesson.vehicleStart ?? (lesson.preDrive ? "cold" : "ready");
     const cabin = new CabinControls(
       {
         onSeatbeltToggle: () => audio.click(),
@@ -1269,8 +1299,16 @@ function ReadyScene({
 
       {/* Controls legend — collapsible, top-left of the canvas (clear of the
           bottom cards + minimap). Collapsed by default on touch-only devices
-          (the keys are real but secondary there). */}
-      <ControlsHelp defaultOpen={!touchOnly} topdownAllowed={topdownInCycle} />
+          (the keys are real but secondary there) AND on any lesson that opens
+          with the pre-drive procedure: the founder's row is literally „the
+          „Клавиши" legend [must not be] opening over the tutorial card by
+          default". It shares the top-left slot with the checklist and the step
+          card, and on a keyboard-first legend the first thing a mouse-first
+          lesson shows is a wall of key caps. One click still opens it. */}
+      <ControlsHelp
+        defaultOpen={!touchOnly && !driveLockedAtMount}
+        topdownAllowed={topdownInCycle}
+      />
 
       {/* PROX rear-proximity cue (isolated additive block): „Кола отзад · X м"
           above the dashboard while a REAL vehicle is within ~15 m behind —
@@ -1366,6 +1404,17 @@ function ReadyScene({
           onEnterTopdown={enterTopdown}
           showKeyHint={!touchOnly}
         />
+      ) : null}
+
+      {/* MOUSE PEDALS (founder 2026-07-30, „first and upmost it must be with
+          the mouse"). Non-touch devices only — a phone already has the
+          drivetrain pad under its thumb. Two press-and-hold pads writing into
+          the SAME TouchInputSource, so pre-drive steps 8 and 13 — the two the
+          tutorial used to describe as „с педал — няма контрола … да щракнеш" —
+          are performable without a keyboard. Pinned open while the pre-drive
+          gate is on; afterwards they yield to a student who drives on W/S. */}
+      {!touchCapable ? (
+        <MousePedals touch={touchSource} hidden={physicsPaused} pinned={driveLocked} />
       ) : null}
 
       {/* P1: touch input overlay — mounts on any touch-capable device, hides
@@ -2135,7 +2184,19 @@ function ControlsHelp({
     <div
       data-hud="controls-help"
       className="pointer-events-none absolute left-3 top-3 z-10 flex w-[min(15rem,45%)] flex-col items-start"
-      style={{ bottom: CONTROLS_HELP_BOTTOM_INSET }}
+      style={{
+        bottom: CONTROLS_HELP_BOTTOM_INSET,
+        // CONTROL-CLEARANCE CAP (founder 2026-07-30, „the light switch falls
+        // under the panel"). The highest cockpit control that reaches into
+        // this left column is the left door mirror, whose visible top edge
+        // projects at 0.65 of the canvas; a top-left panel that ends above
+        // HUD_LEFT_PANEL_MAX_HEIGHT_FRACTION can therefore never cover a
+        // control the student is being told to click. The row list is a
+        // `min-h-0 overflow-y-auto` child, so the cap scrolls it instead of
+        // hiding rows. Derived, not eyeballed — scene/vitok/cabinLook.ts owns
+        // the number and cabin-look.test.ts fails if a hotspot moves above it.
+        maxHeight: `calc(${HUD_LEFT_PANEL_MAX_HEIGHT_FRACTION * 100}% - 0.75rem)`,
+      }}
     >
       <button
         type="button"

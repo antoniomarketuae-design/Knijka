@@ -37,6 +37,40 @@ export interface ReachZoneParams {
   radiusM: number;
   /** When set, the zone only completes at/below this speed (km/h). */
   maxSpeedKmh?: number;
+  /**
+   * B18 residual / FR-24 (founder: „the green circle that is stating where the
+   * car to stop is actually putted AFTER the stop marked line on the road …
+   * I have to stop BEFORE the line not after it").
+   *
+   * THE HALF THAT WAS LEFT. The DRAWN marker was fixed in scene/
+   * guidanceRoute.ts — a waypoint authored past visible paint is pulled back
+   * and drawn as a gate bar on the lawful side. Its own comment says the
+   * acceptance radius „rides along untouched", and that is this row's
+   * residual: the GRADE still came from the full circle, so a car stopped
+   * 1.7 m PAST the give-way bars was credited with having stopped at them.
+   *
+   * A waypoint is a circle and a circle reaches exactly as far past a mark as
+   * it reaches short of it. Where the mark stands for painted line the student
+   * must not cross, that symmetry is a lie the lesson tells — and the aids
+   * make it worse, because the L1/L2 tolerance ladder widens the radius in
+   * BOTH directions.
+   *
+   * Set this to the distance from the authored mark BACK to the paint, in
+   * metres, and the acceptance becomes the part of the disc at least that far
+   * short of the mark along the approach — i.e. the disc cut off exactly at
+   * the line. Stopping earlier still counts (early is the same act done
+   * sooner, and every metre the ladder adds still adds backwards); stopping
+   * past the paint never does, at any rung.
+   *
+   * The mark itself deliberately stays where the template authored it: that
+   * is what keeps the guidance clamp engaged and the gate bar drawn
+   * (governingPaintLine only pulls a marker back when the waypoint is PAST the
+   * line). One anchor, two honest derivations from it.
+   *
+   * Nothing here is a fault: the rule engine's law adjudication is untouched.
+   * This decides only whether the TASK is ticked off.
+   */
+  acceptBeforeMarkM?: number;
 }
 
 /**
@@ -626,6 +660,14 @@ export interface LessonSessionState {
    * earned by driving, and nothing has been driven while the car has not
    * moved. When the scene stops publishing the placeholder pose this guard
    * costs exactly one frame and changes nothing.
+   *
+   * B-NEW-1 (doc 87:229): the ROUTE-FINISH gates obey it too, and that is
+   * what the guard originally missed. `rb-mini-v1` centres its ring on
+   * exactly (0, 0), so the placeholder pose sat inside the roundabout
+   * finish's arming circle and armed „you have left the ring" before the
+   * student had moved a centimetre; the car then dwelt outside it — at its
+   * own spawn — and the drive „finished" FINISH_LEAVE_S later. Same rule,
+   * same reason: a drive that has not begun cannot end.
    */
   posedAtSec?: number;
   endedAtSec: number | null;

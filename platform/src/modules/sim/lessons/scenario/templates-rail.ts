@@ -660,6 +660,39 @@ export const SC_RX_TRAM_ISLAND_EVENT: PedestrianDartOutSpec = {
   ],
 };
 
+/**
+ * THE SECOND PASSENGER (founder: „the question statements says … and in the map
+ * engineering its only 1"). This drill's tags say „пешеходци / пътници", its
+ * teach card says «хората хукват» and «тичащи и в двете посоки», and its last
+ * instruction says «с внимание към СЛЕДВАЩИ слизащи пътници» — three plural
+ * promises against one staged figure. With one walker there is no „следващ",
+ * so the lesson the copy names (the queue does not end with the person you
+ * watched) could never be driven.
+ *
+ * She leaves the SAME east curb a stride north, at a walk rather than a hurry
+ * (1.25 vs 1.8 m/s), on the same release. The driver who correctly stops for
+ * the first and then moves the moment he clears her meets the second still in
+ * his lane — the „следващ" the instruction has always promised.
+ *
+ * Mounted through `LevelSpec.stagedAdd` on every rung, not `ScenarioSpec
+ * .staged`: the trace recorder reads `spec.staged`, so the committed
+ * recordings stay byte-identical (the LET_PASS_PED_COMPANION precedent).
+ */
+const RX_TRAM_ISLAND_SECOND: PedestrianDartOutSpec = {
+  id: "sc-rxti-passenger-2",
+  kind: "pedestrianDartOut",
+  crossingId: "rxt-x-1",
+  crossing: { x: 0, y: 90 },
+  start: { x: 9.73, y: 91.4 },
+  dir: { x: -1, y: 0 },
+  speedMps: 1.25,
+  travelM: 23.45,
+  roadFromM: 1.6,
+  roadToM: 17.85,
+  triggerDistM: 48,
+  minTriggerSpeedKmh: 10,
+};
+
 /** RX-04 — трамвайна спирка с остров (ЗДвП чл. 66, ал. 2: при приближаване
  *  към спирка с остров на платното водачът НАМАЛЯВА и при необходимост СПИРА,
  *  за да преминат пешеходците безопасно между тротоара и острова). */
@@ -733,10 +766,10 @@ export const SC_RX_TRAM_ISLAND: ScenarioSpec = {
       "Изпитващият следи поведението покрай спирката: отчетливо намаляване при спрял трамвай, готовност за спиране, реално пропускане на пресичащите пътници и внимателно преминаване покрай острова. Профучаване покрай отворени врати е опасна грешка, удар — прекратяване.",
   },
   levels: [
-    { level: 1 },
-    { level: 2 },
-    { level: 3 },
-    { level: 4, vehicleStart: "cold" },
+    { level: 1, stagedAdd: [RX_TRAM_ISLAND_SECOND] },
+    { level: 2, stagedAdd: [RX_TRAM_ISLAND_SECOND] },
+    { level: 3, stagedAdd: [RX_TRAM_ISLAND_SECOND] },
+    { level: 4, vehicleStart: "cold", stagedAdd: [RX_TRAM_ISLAND_SECOND] },
   ],
   staged: [SC_RX_TRAM_ISLAND_EVENT],
   conditions: { weather: "dry" },

@@ -15,9 +15,10 @@
  * single deterministic frame the driver screenshots.
  */
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import type { SceneStillMedia } from "@/lib/content/types";
+import { parseEyeCam } from "./eyeCam";
 
 const SceneStillScene = dynamic(
   () => import("./SceneStillScene").then((m) => ({ default: m.SceneStillScene })),
@@ -43,13 +44,17 @@ export const STILL_H = 720;
 export function SceneStillClient({
   id,
   spec,
+  eye,
   loadError,
 }: {
   id: string;
   spec: SceneStillMedia | null;
+  /** Raw `?eye=x,y,height,yawDeg[,fov]` — the dev driver-eye camera override. */
+  eye?: string | null;
   loadError: string | null;
 }) {
   const [ready, setReady] = useState(false);
+  const parsedEye = useMemo(() => parseEyeCam(eye ?? undefined), [eye]);
 
   const publish = useCallback((patch: Partial<SceneStillApi>) => {
     const existing = window.__sceneStill;
@@ -102,7 +107,7 @@ export function SceneStillClient({
       data-ready={ready ? "1" : "0"}
       style={{ width: STILL_W, height: STILL_H }}
     >
-      <SceneStillScene spec={spec} onReady={onReady} onError={onError} />
+      <SceneStillScene spec={spec} eye={parsedEye} onReady={onReady} onError={onError} />
     </main>
   );
 }

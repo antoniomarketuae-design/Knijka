@@ -844,3 +844,102 @@ describe("completeManeuver / threePointTurn (обратен завой — corri
     expect(r.done).toBe(false);
   });
 });
+
+// ---------------------------------------------------------------------------
+// B18 residual / FR-24 — „I have to stop BEFORE the line not after it"
+// ---------------------------------------------------------------------------
+
+/**
+ * The founder, on «Кръгово движение»: „the green cyrcle that is stating where
+ * the car to stop is actually putted after the stop marked line on the road …
+ * I have to stop before the line not after it."
+ *
+ * The DRAWN marker was moved onto the lawful side in scene/guidanceRoute.ts;
+ * the register's residual was that the GRADE was not. A radius-9 circle
+ * centred 1.725 m INSIDE the roundabout mouth accepts the approach task from
+ * anywhere up to 7.3 m past the give-way bars — so a driver who came in too
+ * fast, crossed the paint and only then settled to a legal speed was told he
+ * had „approached ready to stop". He had done the opposite.
+ *
+ * `acceptBeforeMarkM` cuts the acceptance at the paint. Credit can only be
+ * EARNED on the approach side; every metre the L1/L2 tolerance ladder adds is
+ * added backwards, down the road, where being early is the same act done
+ * sooner.
+ */
+describe("reachZone acceptBeforeMarkM — the acceptance stops where the paint does", () => {
+  // The shipped geometry of sc-roundabout-entry's first task.
+  const MARK: ObjectiveParams = {
+    kind: "reachZone",
+    x: 4.06,
+    y: -34,
+    radiusM: 9,
+    maxSpeedKmh: 25,
+    acceptBeforeMarkM: 1.725,
+  };
+  const PAINT_Y = -35.725;
+
+  /**
+   * Drive north up the lane from y = −60 to y = `toY`, at `beforeKmh` until
+   * `slowAtY` and `afterKmh` from there on. Returns whether the task ticked.
+   */
+  function approach(
+    params: ObjectiveParams,
+    opts: { toY: number; beforeKmh: number; afterKmh: number; slowAtY: number },
+  ): boolean {
+    let st = createEvalState(params);
+    let done = false;
+    let t = 0;
+    for (let y = -60; y <= opts.toY + 1e-9; y += 0.25) {
+      t += 0.05;
+      const speedKmh = y < opts.slowAtY ? opts.beforeKmh : opts.afterKmh;
+      const step = stepObjective(params, st, makeTick({ t, speedKmh, position: { x: 4.06, y } }));
+      st = step.evalState;
+      done = done || step.done;
+    }
+    // …and hold there for a second: a driver who has stopped, waits.
+    for (let i = 0; i < 30; i++) {
+      t += 1 / 30;
+      const step = stepObjective(
+        params,
+        st,
+        makeTick({ t, speedKmh: 0, position: { x: 4.06, y: opts.toY } }),
+      );
+      st = step.evalState;
+      done = done || step.done;
+    }
+    return done;
+  }
+
+  /** Slowed down properly, before the bars — the taught approach. */
+  const LAWFUL = { toY: PAINT_Y, beforeKmh: 40, afterKmh: 20, slowAtY: PAINT_Y - 12 };
+  /** Barged the mouth at 40 and only complied INSIDE it — the taught mistake. */
+  const BARGED = { toY: -34.03, beforeKmh: 40, afterKmh: 20, slowAtY: PAINT_Y + 0.5 };
+
+  it("credits the driver who slowed down before the bars", () => {
+    expect(approach(MARK, LAWFUL)).toBe(true);
+    // …and from the far edge of the disc, 7.2 m short of the paint, too.
+    expect(approach(MARK, { ...LAWFUL, toY: PAINT_Y - 7 })).toBe(true);
+  });
+
+  it("refuses the driver who only complied PAST the bars — the whole of B18", () => {
+    expect(approach(MARK, BARGED)).toBe(false);
+    // Deeper into the mouth is no better, though the old circle reached there.
+    expect(approach(MARK, { ...BARGED, toY: -30, slowAtY: -33 })).toBe(false);
+  });
+
+  it("the L1 tolerance ladder widens it BACKWARDS only", () => {
+    // Radius 9 × 1.5 and the cap 25 → 30 (the compiler's aided rung).
+    const aided: ObjectiveParams = { ...MARK, radiusM: 13.5, maxSpeedKmh: 30 };
+    // More room short of the line: a driver who settles 12 m out is credited.
+    expect(approach(aided, { ...LAWFUL, toY: PAINT_Y - 11, slowAtY: PAINT_Y - 20 })).toBe(true);
+    // …and not one centimetre more past it.
+    expect(approach(aided, BARGED)).toBe(false);
+  });
+
+  it("a waypoint WITHOUT the bound is evaluated exactly as before", () => {
+    const plain: ObjectiveParams = { kind: "reachZone", x: 4.06, y: -34, radiusM: 9, maxSpeedKmh: 25 };
+    expect(approach(plain, LAWFUL)).toBe(true);
+    // The before picture: the same barge, credited.
+    expect(approach(plain, BARGED)).toBe(true);
+  });
+});

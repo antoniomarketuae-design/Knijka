@@ -296,10 +296,16 @@ export function SessionEndScreen({
 
   // S1: which forward buttons exist and which one carries the accent is the
   // pure builder's call (sessionEndCtas.ts) — 0, 1 or 2 of them.
-  const scenarioCtas = scenarioCtaRow({
-    level: nextScenarioLevel,
-    template: nextScenarioTemplate,
-  });
+  const scenarioCtas = scenarioCtaRow(
+    {
+      level: nextScenarioLevel,
+      template: nextScenarioTemplate,
+    },
+    // FR-06: a forward button after a FAILED run is an escape, not a reward —
+    // the builder relabels it („Продължи напред"), adds the sentence that says
+    // the lesson stays open, and leaves the accent on „Повтори".
+    { passed: result.passed && result.completedAll },
+  );
 
   // -- A15 mistake map state ---------------------------------------------------
   const [showGood, setShowGood] = useState(false);
@@ -835,6 +841,13 @@ export function SessionEndScreen({
                   →
                 </span>
               </span>
+              {/* FR-06: the one sentence that keeps this from reading as
+                  „you're done here" — present only after a failed run. */}
+              {cta.noteBg !== undefined ? (
+                <span className="w-full text-[11px] font-medium leading-snug opacity-75">
+                  {cta.noteBg}
+                </span>
+              ) : null}
             </button>
           ))}
         </div>

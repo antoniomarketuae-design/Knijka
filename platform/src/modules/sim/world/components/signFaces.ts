@@ -42,8 +42,15 @@ const FACE_PX = 512;
  *  `g2` / `g3` (Г2 „Движение само надясно" / Г3 „…наляво") ride the SAME round
  *  blue plate the Г12 roundabout sign is baked on — identical plate geometry in
  *  the source art (circle r=90 + white ring r=84), so the face swaps cleanly and
- *  no new GLB is needed. Doc 86 L3 / founder item 47. */
-export type SignFaceArt = "v26" | "v33" | "d4" | "g2" | "g3";
+ *  no new GLB is needed. Doc 86 L3 / founder item 47.
+ *
+ *  `a19` (А19 „Деца") rides the A18 „Пешеходна пътека" GLB for the same reason:
+ *  both source files open with the IDENTICAL warning plate
+ *  (`points="100,22 186,170 14,170"`, `stroke-width="16"`, `#c1121f`), so only
+ *  the pictogram inside it differs. Founder items 60/61 (the school zone with
+ *  no school and no children) — a школска зона must carry the sign that names
+ *  the reason for its limit. */
+export type SignFaceArt = "v26" | "v33" | "d4" | "g2" | "g3" | "a19";
 
 const svgSource = new Map<SignFaceArt, Promise<string | null>>();
 

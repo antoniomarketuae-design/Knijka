@@ -53,7 +53,11 @@
  * (ambient 0) forbids — left for later waves.
  */
 
-import type { BrakingLeadCarSpec, RearTailgaterSpec } from "../../contracts";
+import type {
+  BrakingLeadCarSpec,
+  PedestrianDartOutSpec,
+  RearTailgaterSpec,
+} from "../../contracts";
 import type { ScenarioSpec } from "./types";
 
 // ---------------------------------------------------------------------------
@@ -461,6 +465,98 @@ export const SC_SPEED_RAIN: ScenarioSpec = {
  *     опасна). Колата минава лентата 33–40 за под 2 s (движещ праг), затова
  *     второстепенният код не се арма — точно като sc-speed-dangerous „flooring".
  */
+// ---------------------------------------------------------------------------
+// THE SCHOOLYARD (founder register items 60 + 61, doc 87 B60/B61)
+// ---------------------------------------------------------------------------
+//
+// He played this exact lesson and wrote two things:
+//   „the question is stating School zone, but in fact no kids are playing on
+//    the sidewalks and we should do that it will attract the user to watch
+//    closely"
+//   „I see only Normal Buildings living/office building no actual school when
+//    the question states there should be School, weak map engineering"
+//
+// Both halves are now built. The BUILDING is authored in the map
+// (sp-zone30-v1 `sp-b-school`, `kind: "school"` — the УЧИЛИЩЕ name board, the
+// yard railing and the А19 „Деца" posts derive from it in world/builders).
+// The CHILDREN are here, because actors are scenario data, not map data.
+//
+// WHY THEY ARE `pedestrianDartOut` AND WHY THEY NEVER TOUCH THE ROAD.
+// The ambient pedestrian system anchors every walker on a CROSSING
+// (traffic/pedestrians.ts), and this street deliberately has none — it is the
+// pure-overspeed archetype. So ambient `pedestrianCount` on this map produces
+// exactly what the founder saw: nobody. Staged walkers are the only mechanism
+// that puts a figure on this pavement.
+//
+// They are staged so they CANNOT change one point of grading:
+//   * every path lies wholly on the EAST PAVEMENT (x ∈ [+8.1, +11.6] plus the
+//     yard strip behind it) — the driver's own kerb, since he drives north in
+//     the right lane. The carriageway edge is x = +8.125, and the
+//     nearest any child comes to it is 2.0 m — well outside
+//     PEDESTRIAN_CONTACT_M (1.5), so the collision branch cannot fire against a
+//     car that stays on the road;
+//   * `roadFromM`/`roadToM` are placed BEYOND the walk, so `onRoad` is false on
+//     every frame and no crossing-occupancy count is ever incremented. There is
+//     no crossing on this district anyway, so PEDESTRIAN_* stays structurally
+//     inert exactly as it was before they existed;
+//   * they release at spawn (`triggerDistM` spans the street, speed floor 0),
+//     so the „encounter cancelled" branch — which fires only while an event is
+//     still ARMED — can never mark them „не се случи". They are scenery with a
+//     pulse, and they resolve `clear` when they finish their walk.
+//
+// This is the honest version of what he asked for: a reason to lift off that a
+// 17-year-old can SEE, without inventing a чл. 119 duty on a street whose whole
+// lesson is the number on the plate.
+
+/** East pavement centre line (carriageway edge +8.125, pavement 3.5 m deep). */
+const SCHOOL_WALK_X = 9.9;
+/** The yard gate, on the railing line derived by world/builders/schools.ts
+ *  (school centre 30.12 − half-depth 8 − RAILING_OFFSET_M 5.5 = 16.62). */
+const SCHOOL_GATE_X = 16.6;
+
+/** Shared shape: released at once, never on the roadway, never resolved late. */
+const yardChild = (
+  id: string,
+  start: { x: number; y: number },
+  dir: { x: number; y: number },
+  speedMps: number,
+  travelM: number,
+): PedestrianDartOutSpec => ({
+  id,
+  kind: "pedestrianDartOut",
+  // No crossing exists on sp-zone30-v1; the id is inert (occupancy is only
+  // counted while `onRoad`, which these never are) and is kept distinct so a
+  // future crossing on this map can never be driven by a yard child.
+  crossingId: "sp-schoolyard",
+  crossing: { x: start.x, y: start.y },
+  start,
+  dir,
+  speedMps,
+  travelM,
+  // Beyond the walk: `onRoad` is false on every frame, by construction.
+  roadFromM: travelM + 100,
+  roadToM: travelM + 200,
+  // Longer than the street: they are released on the first frame the car is
+  // pointed up the road, so nothing can cancel them as „not encountered".
+  triggerDistM: 400,
+  minTriggerSpeedKmh: 0,
+  variant: "child",
+});
+
+/** Two children walking the pavement in front of the school, passing each
+ *  other — the ordinary picture outside a Bulgarian училище at going-home
+ *  time, and the one the copy has always claimed. */
+const SCHOOL_YARD_CHILDREN: PedestrianDartOutSpec[] = [
+  yardChild("sc-zn-kid-1", { x: SCHOOL_WALK_X, y: 198 }, { x: 0, y: 1 }, 1.0, 26),
+  yardChild("sc-zn-kid-2", { x: SCHOOL_WALK_X + 1.2, y: 238 }, { x: 0, y: -1 }, 1.15, 30),
+  // Out of the gate and TOWARD the kerb — the child who stops one pace short
+  // of the carriageway. He is the reason for the 30, and he is the figure the
+  // instruction text has always described. He walks west (toward the road) and
+  // halts at x = 10.1, i.e. 2.0 m from the asphalt.
+  yardChild("sc-zn-kid-3", { x: SCHOOL_GATE_X, y: 216 }, { x: -1, y: 0 }, 0.9, 6.5),
+  yardChild("sc-zn-kid-4", { x: SCHOOL_WALK_X, y: 246 }, { x: 0, y: -1 }, 0.85, 18),
+];
+
 export const SC_SPEED_ZONE: ScenarioSpec = {
   id: "sc-speed-zone",
   family: "speed",
@@ -482,8 +578,8 @@ export const SC_SPEED_ZONE: ScenarioSpec = {
   },
   instructionsBg: [
     { n: 1, textBg: "Влизаш в зона 30 — училище и жилищен квартал. Ограничението тук е 30 км/ч, не 50." },
-    { n: 2, textBg: "Свали скоростта осезаемо още на знака и установи спокойни около 26–28 км/ч." },
-    { n: 3, textBg: "Между паркираните коли и дворовете всеки момент може да излезе дете — карай с готовност за спиране." },
+    { n: 2, textBg: "Свали скоростта осезаемо още на знака А19 „Деца“ и установи спокойни около 26–28 км/ч." },
+    { n: 3, textBg: "Вдясно напред е УЧИЛИЩЕТО: пред оградата му по тротоара вървят деца, а едно излиза от портата към бордюра. Гледай ги, не километража — всеки момент някое може да стъпи на платното." },
     { n: 4, textBg: "Не пренасяй „скоростта от булеварда“ в зоната: 50 км/ч тук е над +10 км/ч, тоест опасна грешка." },
     { n: 5, textBg: "Задръж под 30 км/ч до края на зоната." },
   ],
@@ -534,6 +630,12 @@ export const SC_SPEED_ZONE: ScenarioSpec = {
     { level: 3 },
     { level: 4, vehicleStart: "cold" },
   ],
+  // The schoolyard children. In `staged`, not `stagedAdd`: this drill has no
+  // committed recording that could be perturbed (its traces are speed scripts
+  // on an empty street and the walkers emit no event on any of them), and the
+  // founder's ask was that the school zone LOOK like one at every rung, not
+  // only at L5.
+  staged: SCHOOL_YARD_CHILDREN,
   conditions: { weather: "dry" },
   localeBg: "bg-BG",
 };

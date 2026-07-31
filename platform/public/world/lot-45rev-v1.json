@@ -1,0 +1,211 @@
+{
+ "format": "district-v1",
+ "meta": {
+  "district": "lot-45rev",
+  "label": "Учебен паркинг — косо място на 45° на заден ход",
+  "mapKind": "scenario-lot",
+  "generator": "tools/maps/gen_parking_lot.mjs",
+  "boundsLocalMeters": {
+   "minX": -28,
+   "minY": -120,
+   "maxX": 10.8,
+   "maxY": 40
+  },
+  "attribution": {
+   "text": "Учебен паркинг — оригинален параметричен дизайн (без данни от OpenStreetMap)",
+   "license": "All rights reserved",
+   "licenseUrl": "/",
+   "copyrightUrl": "/",
+   "obligation": "none — original work, no ODbL attribution required for this map"
+  },
+  "defaults": {
+   "maxspeedUrbanKmh": 20,
+   "note": "Паркинг: 20 km/h навсякъде; маневрите се изпълняват с пешеходна скорост."
+  },
+  "stats": {
+   "roadKm": 0.16,
+   "nodes": 3,
+   "edges": 2,
+   "intersections": 0,
+   "crossings": 0,
+   "buildings": 1,
+   "spawnPoints": 2
+  },
+  "scenario": {
+   "archetype": "parking-lot",
+   "params": {
+    "bays": 5,
+    "bayWidthM": 2.7,
+    "bayDepthM": 5,
+    "angle": "135",
+    "aisleWidthM": 7,
+    "occupancy": "XX_XX",
+    "approachM": 90,
+    "entry": "south"
+   },
+   "targetBayId": "lot45r-bay-3",
+   "bays": [
+    {
+     "id": "lot45r-bay-1",
+     "x": 4.8,
+     "y": -7.64,
+     "headingDeg": 135,
+     "widthM": 2.7,
+     "lengthM": 5,
+     "occupied": true
+    },
+    {
+     "id": "lot45r-bay-2",
+     "x": 4.8,
+     "y": -3.82,
+     "headingDeg": 135,
+     "widthM": 2.7,
+     "lengthM": 5,
+     "occupied": true
+    },
+    {
+     "id": "lot45r-bay-3",
+     "x": 4.8,
+     "y": 0,
+     "headingDeg": 135,
+     "widthM": 2.7,
+     "lengthM": 5,
+     "occupied": false
+    },
+    {
+     "id": "lot45r-bay-4",
+     "x": 4.8,
+     "y": 3.82,
+     "headingDeg": 135,
+     "widthM": 2.7,
+     "lengthM": 5,
+     "occupied": true
+    },
+    {
+     "id": "lot45r-bay-5",
+     "x": 4.8,
+     "y": 7.64,
+     "headingDeg": 135,
+     "widthM": 2.7,
+     "lengthM": 5,
+     "occupied": true
+    }
+   ]
+  }
+ },
+ "roads": {
+  "nodes": [
+   {
+    "id": "lot45r-n-end",
+    "x": 0,
+    "y": 40
+   },
+   {
+    "id": "lot45r-n-gate",
+    "x": 0,
+    "y": -30
+   },
+   {
+    "id": "lot45r-n-start",
+    "x": 0,
+    "y": -120
+   }
+  ],
+  "edges": [
+   {
+    "id": "lot45r-e-approach",
+    "from": "lot45r-n-start",
+    "to": "lot45r-n-gate",
+    "class": "residential",
+    "name": "Подход към паркинга",
+    "oneway": false,
+    "roundabout": false,
+    "lanes": 2,
+    "lanesSource": "tag",
+    "maxspeed": 20,
+    "maxspeedSource": "tag",
+    "length": 90,
+    "geometry": [
+     [
+      0,
+      -120
+     ],
+     [
+      0,
+      -30
+     ]
+    ]
+   },
+   {
+    "id": "lot45r-e-aisle",
+    "from": "lot45r-n-gate",
+    "to": "lot45r-n-end",
+    "class": "service",
+    "name": "Алея на паркинга",
+    "oneway": false,
+    "roundabout": false,
+    "lanes": 2,
+    "lanesSource": "tag",
+    "maxspeed": 20,
+    "maxspeedSource": "tag",
+    "length": 70,
+    "geometry": [
+     [
+      0,
+      -30
+     ],
+     [
+      0,
+      40
+     ]
+    ]
+   }
+  ]
+ },
+ "intersections": [],
+ "crossings": [],
+ "roundabouts": [],
+ "buildings": [
+  {
+   "id": "lot45r-b-kiosk",
+   "height": 3.5,
+   "heightSource": "default",
+   "footprint": [
+    [
+     -28,
+     -54
+    ],
+    [
+     -20,
+     -54
+    ],
+    [
+     -20,
+     -46
+    ],
+    [
+     -28,
+     -46
+    ]
+   ]
+  }
+ ],
+ "spawnPoints": [
+  {
+   "id": "lot45r-spawn-approach",
+   "x": 4.06,
+   "y": -105,
+   "heading": 0,
+   "edgeId": "lot45r-e-approach",
+   "name": "Подход към паркинга"
+  },
+  {
+   "id": "lot45r-spawn-finish",
+   "x": 0,
+   "y": 20.99,
+   "heading": 0,
+   "edgeId": "lot45r-e-aisle",
+   "name": "Контролна точка — след маневрата"
+  }
+ ]
+}

@@ -29,6 +29,7 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { CheckControl } from "@/components/ui/CheckControl";
 import {
   PRE_DRIVE_STEP_CONTROLS,
@@ -102,9 +103,13 @@ export function PreDriveTutorial({
   const primary = preDrivePrimaryInput(stepId);
   const [autoOpen, setAutoOpen] = useState(true);
   const continueRef = useRef<HTMLButtonElement | null>(null);
+  // PORTAL GUARD — see the return statement for why this card must leave the
+  // checklist's DOM subtree entirely.
+  const [portalReady, setPortalReady] = useState(false);
 
   useEffect(() => {
     setAutoOpen(readTutorialAutoOpen());
+    setPortalReady(true);
   }, []);
 
   // The card is the only thing on screen that matters right now — land the
@@ -131,7 +136,28 @@ export function PreDriveTutorial({
     writeTutorialAutoOpen(next);
   };
 
-  return (
+  // ── WHY THIS IS A PORTAL, AND WHY NOT TO <body> ───────────────────────────
+  // Both halves of this were measured in rendered frames, not reasoned.
+  //
+  // 1. It has to LEAVE the checklist. The card is `position: fixed`, and it
+  //    was rendered as a child of PreDriveChecklist — a panel with
+  //    `backdrop-blur-md`. A backdrop-filter makes an element a CONTAINING
+  //    BLOCK for fixed descendants, so `inset-0` resolved to the 320 px panel
+  //    in the top-left corner: `items-center justify-center` centred the card
+  //    inside a sliver, the illustration and the „Защо/Как" section were
+  //    clipped off the top, and it landed exactly where the „Клавиши" legend
+  //    lives. That is the geometry behind the founder's row about the legend
+  //    and the tutorial card sharing a corner.
+  // 2. It must NOT go to <body>. LessonPlayShell puts the lesson in real
+  //    fullscreen, and the browser paints the fullscreen element in the TOP
+  //    LAYER — above every z-index in the page. A card portalled to <body> is
+  //    therefore painted UNDER the canvas: Playwright's own log for the run
+  //    that proved it reads „<canvas …> intercepts pointer events", and the
+  //    „Разбрах" button could not be clicked at all.
+  // So it goes to the shell root (`data-sim-shell`), which is inside the
+  // fullscreen tree and carries no transform/filter/backdrop-filter. Falls
+  // back to <body> for any mount outside the shell (dev harnesses).
+  const card = (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-background/85 p-4 backdrop-blur-sm"
       role="dialog"
@@ -216,11 +242,20 @@ export function PreDriveTutorial({
               </span>
             </p>
           ) : null}
-          {primary === "pedal" ? (
+          {/* PEDAL STEPS. Until 2026-07-30 this branch read „Тази стъпка е с
+              педал — няма контрола на таблото, която да щракнеш." It was true
+              and it is exactly where the founder's mouse-only run of the
+              lesson stopped. A desktop now carries the two on-screen pedal
+              pads (lesson-ui/MousePedals.tsx) writing into the same input
+              source the phone pads use, so the sentence names the pad. */}
+          {primary === "pedal" && control?.pedalBg !== undefined ? (
             <p className="text-xs font-bold leading-snug text-foreground">
-              Тази стъпка е с педал — няма контрола на таблото, която да щракнеш.
+              <span aria-hidden className="mr-1">
+                🖱
+              </span>
+              {control.pedalBg}
               <span className="ml-1 font-semibold text-muted">
-                На компютър натисни клавиша долу; на телефон използвай педала на екрана.
+                — педалът работи като истински: държиш го натиснат, не го щракваш веднъж.
               </span>
             </p>
           ) : null}
@@ -265,4 +300,8 @@ export function PreDriveTutorial({
       </div>
     </div>
   );
+
+  if (!portalReady || typeof document === "undefined") return null;
+  const host = document.querySelector("[data-sim-shell]") ?? document.body;
+  return createPortal(card, host);
 }

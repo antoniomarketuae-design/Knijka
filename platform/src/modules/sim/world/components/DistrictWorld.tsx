@@ -27,6 +27,7 @@ import { QUALITY_PRESETS } from "./quality";
 import { StaticWorld } from "./StaticWorld";
 import { WorldColliders } from "./WorldColliders";
 import { WorldPropsGroup } from "./WorldProps";
+import { WorldSchoolsGroup } from "./WorldSchools";
 
 export interface DistrictWorldProps {
   /** Parsed content/world/district-v1.json (see assertDistrict). */
@@ -84,6 +85,9 @@ export function DistrictWorld({
         getRailBarrierDown={getRailBarrierDown}
         signSvgBaseUrl={signSvgBaseUrl}
       />
+      {/* School name boards + yard railings (founder item 61). Renders nothing
+          at all on the districts that author no `kind: "school"` building. */}
+      <WorldSchoolsGroup schools={world.schools} night={night} />
       {physics ? <WorldColliders colliders={world.colliders} /> : null}
     </group>
   );

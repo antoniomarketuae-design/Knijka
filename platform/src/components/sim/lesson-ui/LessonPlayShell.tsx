@@ -100,6 +100,11 @@ import {
   type PreDriveMode,
   type PreDriveStepId,
 } from "@/modules/sim/procedures";
+import { HUD_LEFT_PANEL_MAX_HEIGHT_FRACTION } from "@/modules/sim/scene/vitok/cabinLook";
+
+/** How long the completed pre-drive checklist stays on screen after the
+ *  thirteenth step rolls the car away — see the state that uses it. */
+const PRE_DRIVE_DONE_HOLD_MS = 7000;
 import { accumulateScore, VIOLATIONS, type SimTick } from "@/modules/sim/rules";
 import type { DrivelineRejection, DrivelineSnapshot } from "@/modules/sim/vehicle";
 import { finishLessonAction } from "@/app/(dashboard)/simulator/actions";
@@ -725,6 +730,24 @@ export function LessonPlayShell({
   }, []);
 
   const [snap, setSnap] = useState<HudSnapshot>(() => snapshotOf(initialSession, null));
+  // THE 13/13 MOMENT (founder acceptance, 2026-07-31). The thirteenth step IS
+  // pulling away, so the instant it completes the phase flips to „driving" and
+  // the checklist unmounted mid-gesture — the student never saw the list he had
+  // just finished, and „photograph the checklist at 13/13" was literally
+  // impossible. The panel now holds for a beat afterwards, showing every row
+  // ticked and „Готово — всичките 13 стъпки са изпълнени", then leaves. It is
+  // capped in height (see the mount below) so it cannot cover a control while
+  // it lingers.
+  const [preDriveJustDone, setPreDriveJustDone] = useState(false);
+  const prevPhaseRef = useRef(snap.phase);
+  useEffect(() => {
+    const was = prevPhaseRef.current;
+    prevPhaseRef.current = snap.phase;
+    if (was !== "preDrive" || snap.phase === "preDrive") return;
+    setPreDriveJustDone(true);
+    const id = window.setTimeout(() => setPreDriveJustDone(false), PRE_DRIVE_DONE_HOLD_MS);
+    return () => window.clearTimeout(id);
+  }, [snap.phase]);
   // R3 #22: the scene's remount key — „Повтори" bumps it so the 3D world
   // restarts from spawn (fresh physics, re-armed staged encounters) exactly
   // like a first mount. The shell itself stays mounted (its owner keys it on
@@ -1503,9 +1526,15 @@ export function LessonPlayShell({
   // pure resolver's call; this component only renders the answer.
   const scenarioGreen =
     scenarioRef !== null && result !== null && result.passed && result.completedAll;
+  // FR-06 („continue to next question although you made mistake and come back
+  // to this later"): the resolver is asked on EVERY finished attempt now, not
+  // only on green ones. It answers differently for the two cases — a failed
+  // run gets the next CARD and never the next RUNG (nextStep.ts) — so the
+  // green pre-gate that used to sit here was doing nothing except making the
+  // failed run's answer unreachable, which is precisely the wall he hit.
   const nextScenario = useMemo(
     () =>
-      scenarioRef !== null && result !== null && scenarioGreen
+      scenarioRef !== null && result !== null
         ? resolveScenarioNextSteps({
             templateId: scenarioRef.templateId,
             level: scenarioRef.level,
@@ -1516,7 +1545,7 @@ export function LessonPlayShell({
             stars: rubric?.stars ?? null,
           })
         : { level: null, template: null },
-    [scenarioRef, result, scenarioGreen, rubric],
+    [scenarioRef, result, rubric],
   );
 
   // Each target → a labelled launcher, or null. Same (templateId, level) seam
@@ -1879,6 +1908,19 @@ export function LessonPlayShell({
       // The hook PlayAreaStyles' `main:has(…)` rule keys off: present ONLY in
       // the letterboxed state, so the prose width cap is lifted exactly while a
       // session is on screen and nowhere else.
+      // THE PORTAL HOST for modal cards owned by panels inside the scene
+      // (today: the pre-drive tutorial). Two constraints made a plain
+      // `document.body` portal wrong, both measured rather than reasoned:
+      //   · this element is the FULLSCREEN element, and the browser paints the
+      //     fullscreen element in the TOP LAYER — a card portalled to <body>
+      //     lands underneath the canvas and cannot be clicked at all;
+      //   · but the card cannot stay where it was rendered either, because the
+      //     checklist panel that owns it has `backdrop-blur`, which makes it a
+      //     containing block for `position: fixed` — the card was resolving
+      //     `inset-0` against a 320 px panel in the top-left corner.
+      // This element is inside the fullscreen tree and carries no transform,
+      // filter or backdrop-filter, so `fixed inset-0` means the screen here.
+      data-sim-shell=""
       data-sim-play={immersive ? undefined : "letterbox"}
       // …and this one is what PlayAreaStyles uses to fold the scene's own
       // desktop chrome away on a phone.
@@ -2405,8 +2447,30 @@ export function LessonPlayShell({
             road for the whole pre-drive. Compact puts the NEXT step on the
             line and the identical checklist inside its detail sheet — the same
             component, rendered on demand instead of permanently. */}
-        {!compact && snap.phase === "preDrive" && !ended ? (
-          <div className="absolute left-3 top-3 max-h-[calc(100%-1.5rem)] overflow-y-auto">
+        {!compact && (snap.phase === "preDrive" || preDriveJustDone) && !ended ? (
+          // CONTROL-CLEARANCE CAP (founder 2026-07-30: the light switch „falls
+          // under the Подготовка преди потегляне panel"). The wrapper is a
+          // flex column with a max-height in PERCENT of the play area — the
+          // one ancestor with a definite height, which is what makes the
+          // percentage resolve at all — so the panel shrinks and its step list
+          // scrolls instead of growing down over the cockpit controls. The
+          // fraction is DERIVED from where the highest control in this column
+          // projects (modules/sim/scene/vitok/cabinLook.ts) and pinned by
+          // cabinLook.test.ts; it is not a chosen pixel value.
+          // `top-12`, not `top-3`: the scene's own „⌨ Клавиши" legend pill is
+          // pinned at left-3 top-3 INSIDE the canvas and was sitting across
+          // this panel's title („Подготовка преди потегляне 1/13") — seen in a
+          // rendered frame, and the same top-left collision the founder logged
+          // about the legend and the tutorial card. The 3 rem drop clears the
+          // pill; the height budget below absorbs it so the panel's BOTTOM
+          // edge lands in exactly the same place and the clearance proof in
+          // cabinLook.test.ts still holds.
+          <div
+            className="absolute left-3 top-12 flex flex-col"
+            style={{
+              maxHeight: `calc(${HUD_LEFT_PANEL_MAX_HEIGHT_FRACTION * 100}% - 3.75rem)`,
+            }}
+          >
             <PreDriveChecklist
               completedStepIds={snap.preDriveCompleted}
               wrongOrderStepIds={snap.preDriveWrongOrder}
@@ -2563,9 +2627,13 @@ export function LessonPlayShell({
                 // template by the owner), never a /dashboard route hop.
                 onExit={onExitToSelect}
                 nextLessonTitleBg={nextLesson?.titleBg ?? null}
-                onNextLesson={
-                  nextLesson && result.passed ? () => onStartLesson(nextLesson.id) : null
-                }
+                // FR-06/FR-23: a finished attempt opens the next curriculum
+                // lesson whether or not it passed. `nextLesson` is already the
+                // progression's answer (progression.ts unlocks on ATTEMPTED),
+                // and re-testing `result.passed` here re-imposed the wall the
+                // gate had just been opened for — the student read „Следващ
+                // урок: заключен" after driving the route to its end.
+                onNextLesson={nextLesson ? () => onStartLesson(nextLesson.id) : null}
                 // S1: the green-run CTAs — „Следващо ниво" (this maneuver, one
                 // rung harder; withheld while star-locked) and „Следващ
                 // сценарий" (the next card). At the end of the library, a

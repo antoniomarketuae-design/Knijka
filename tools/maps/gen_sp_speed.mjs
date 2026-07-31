@@ -68,6 +68,7 @@ function polylineLength(pts) {
  *   label: string,        // human label (meta)
  *   lengthM: number,      // street length (200..1000)
  *   maxspeedKmh: number,  // legal limit on the street (30..90)
+ *   school?: boolean,     // author the УЧИЛИЩЕ building (founder item 61)
  * }} params
  */
 export function buildSpSpeedStreet(params) {
@@ -150,6 +151,58 @@ export function buildSpSpeedStreet(params) {
     },
   ];
 
+  // -- THE SCHOOL (founder register item 61).
+  //
+  // He drove „Зона 30 — училище и жилищен квартал" and wrote: „I see only
+  // Normal Buildings living/office building no actual school when the question
+  // states there should be School … either build schools and put and name them
+  // school, or find some solutions." The street's whole justification for a 30
+  // limit was a number on a plate; the building the copy named did not exist.
+  //
+  // `kind: "school"` is a district-v1 building kind (world/types.ts). It drives
+  // three world passes and NOTHING in grading: the facade prism paints it in
+  // the school palette, builders/schools.ts hangs the «УЧИЛИЩЕ» name board and
+  // the yard railing on its frontage, and the sign pass posts А19 „Деца" 55 m
+  // ahead of it in BOTH directions.
+  //
+  // GEOMETRY. 44 × 16 m — a real Bulgarian училище footprint, four times the
+  // block above and unmistakably not a жилищен блок — set at y ∈ [196, 240],
+  // i.e. straddling the drill's own control zone at y = 180 and comfortably
+  // before its finish gate at y = 330, so the school is in the windscreen for
+  // the whole graded stretch instead of flashing past. WEST side, its long
+  // wall square to the street. `heightSource: "levels"` with 12.6 m = three
+  // storeys + parapet, so resolveBuildingHeightM trusts the number instead of
+  // hashing it into the 15–25 m residential jitter.
+  //
+  // SIDE. EAST — the driver's RIGHT, because he drives north in the right lane
+  // (x = +4.06). A school across the oncoming lane is a school he glances at;
+  // a school on his own kerb is one whose gate, railing and children are in
+  // the near half of the windscreen, which is the whole point of showing it.
+  // The А19 posts derive onto the same side by construction (props.ts places
+  // a warning post on the right of the travel it addresses).
+  //
+  // CLEARANCE. The near wall stands at x = +(halfRoad + 14) = +22.12, i.e.
+  // 13.99 m clear of the carriageway edge: past the 3.5 m pavement and past
+  // the 5.5 m railing offset builders/schools.ts adds, so neither the fence nor
+  // the board can ever reach the asphalt. gen_streetwall's own frontage
+  // clearance (>= 8 m) is satisfied, and its pass keeps its distance from
+  // authored footprints, so the generated street wall parts around it.
+  const SCHOOL = {
+    id: "sp-b-school",
+    kind: "school",
+    height: 12.6,
+    heightSource: "levels",
+    footprint: [
+      [r2(halfRoadM + 14), 196],
+      [r2(halfRoadM + 30), 196],
+      [r2(halfRoadM + 30), 240],
+      [r2(halfRoadM + 14), 240],
+    ],
+  };
+  // Only the зона-30 street is a school street; the other three SP maps are
+  // plain speed streets and stay byte-identical.
+  if (params.school === true) BUILDINGS.push(SCHOOL);
+
   // -- Bounds + stats.
   const bounds = { minX: Infinity, minY: Infinity, maxX: -Infinity, maxY: -Infinity };
   for (const e of EDGES) {
@@ -164,6 +217,15 @@ export function buildSpSpeedStreet(params) {
   bounds.minX = Math.min(bounds.minX, -halfRoadM - 6);
   bounds.maxX = Math.max(bounds.maxX, halfRoadM + 6);
   for (const bl of BUILDINGS) {
+    // THE SCHOOL DOES NOT MOVE THE BOUNDS, and that is deliberate.
+    // `meta.boundsLocalMeters` seeds the Locator's spatial grid origin and
+    // column count (platform/src/modules/sim/runtime/spatial.ts) — rule-engine
+    // machinery. Widening it to fit a set-dressing building would be a grading
+    // change disguised as scenery, which is exactly the law tools/maps/lib/
+    // streetwall.mjs writes down for its own generated footprints. The school
+    // instead lives inside bounds + TERRAIN_MARGIN_M (60 m), the slab of ground
+    // the builder already draws past the bounds, like every `sw-` building.
+    if (bl.kind === "school") continue;
     for (const [x, y] of bl.footprint) {
       bounds.minX = Math.min(bounds.minX, x);
       bounds.minY = Math.min(bounds.minY, y);
@@ -288,6 +350,8 @@ const INSTANCES = [
     label: "Учебна улица — зона 30 (училище/жилищна) (сценарий SP-03/PE-07)",
     lengthM: 360,
     maxspeedKmh: 30,
+    // Founder item 61 — the map's copy says „училище", so the map has one.
+    school: true,
   },
 ];
 

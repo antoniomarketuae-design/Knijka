@@ -109,6 +109,12 @@ export {
   type ScParkParallelTraceName,
 } from "./scParkParallel";
 export { SC_PARK_45_ID, recordScPark45Drive, type ScPark45TraceName } from "./scPark45";
+// PARKING-DEPTH — the ten „how to park" drills. Only the two authored BODIES
+// leave this file on the barrel (the scene mounts the van and the wall from
+// them, and its test pins itself against these exact rects); the recorder
+// itself stays a deep import, so the barrel gains no scenario-template edge
+// (barrel-bundle-weight.test.ts ratchets that count).
+export { PARK_DEPTH_VAN, PARK_DEPTH_WALL } from "./scParkDepth";
 export {
   SC_PARK_NARROW_ID,
   recordScParkNarrowDrive,

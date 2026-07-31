@@ -19,6 +19,7 @@ export {
   observeControlSignal,
   PRE_DRIVE_INFO_STEPS,
   PRE_DRIVE_STEP_CONTROLS,
+  preDriveMouseActionBg,
   preDrivePrimaryInput,
   preDriveStepKind,
   readyToMoveOff,

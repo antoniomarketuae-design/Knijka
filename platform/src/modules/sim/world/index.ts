@@ -18,6 +18,11 @@
 
 export { buildWorldGeometry, DEFAULT_SEED } from "./builders/buildWorldGeometry";
 export { analyzeNetwork } from "./builders/network";
+// The roundabout derivation (doc 87 FR-22): island radius, refusal reason and
+// the ring's own metrics. Public because the dev scene-still route draws the
+// SAME islands the sim does — one derivation, never two that drift.
+export { analyzeRoundabouts } from "./builders/roundabout";
+export type { RoundaboutRing } from "./builders/roundabout";
 export {
   LANE_WIDTH_M,
   ROAD_Y,

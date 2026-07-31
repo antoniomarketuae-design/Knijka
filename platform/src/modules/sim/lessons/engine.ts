@@ -668,12 +668,39 @@ export function applyTick(prev: LessonSessionState, tick: SimTick): LessonStepRe
   // roundabout, a clean exam still ends on its own last objective. Nothing
   // here is graded: `objectives` keep their honest status, so buildLessonResult
   // reports this as finished-and-failed, never as passed.
+  //
+  // ---------------------------------------------------------------------
+  // B-NEW-1 (doc 87:229, 2026-07-30) — „the session ends itself ~40 s after
+  // load while the car is parked at spawn, untouched." REPRODUCED, cause
+  // found, and it is one missing word in the condition below: `posedAtSec`.
+  //
+  // The frame-zero pose guard above already knows that the scene ticks this
+  // engine with a PLACEHOLDER pose — the district origin at zero speed
+  // (scene/vehicleSample.ts `createVehicleSample`) — for the frames before
+  // the chassis publishes. That guard was wired to the objective chain only.
+  // The finish gates were left reading the placeholder, and one frame of it
+  // is all an "outside" gate needs: `rb-mini-v1` puts its ring centre at
+  // EXACTLY (0, 0), the placeholder therefore lands inside `armWithinM` = 24
+  // and ARMS the leave-the-work-site gate. From the next frame on the car —
+  // sitting untouched at its spawn 93 m south — is "away from the ring", the
+  // FINISH_LEAVE_S dwell runs uninterrupted, and 20 s later the engine
+  // declares the route finished. Add the scene's own load time and that is
+  // the founder's ~40 s. Measured in __tests__/route-finish.test.ts: one
+  // placeholder frame ⇒ `completed` at t = 20.07 s on sc-roundabout-entry
+  // L1 and L3; with the guard, 120 s parked and still driving.
+  //
+  // The rule is the same one the objective chain already obeys, and it is a
+  // rule about driving, not about a glitch: A DRIVE THAT HAS NOT BEGUN
+  // CANNOT END. Nothing about a route can be behind you before the first
+  // frame that describes where you are. It costs a real drive exactly one
+  // frame — every gate below arms and trips from the first honest pose.
   let finishGate = prev.finishGate;
   let finishRescueGate = prev.finishRescueGate;
   let stoppedStuck = false;
   if (
     prev.phase === "driving" &&
     phase === "driving" &&
+    posedAtSec !== undefined &&
     objectives.length > 0 &&
     currentIndex < objectives.length
   ) {

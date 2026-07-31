@@ -79,59 +79,39 @@
     "T3": 9,
     "T3b": 0,
     "T4": 0,
-    "T4raw": 85,
+    "T4raw": 95,
     "T6": 0,
     "T8": 0,
-    "T8raw": 182,
+    "T8raw": 192,
     "T13": 0,
     "T14": 4,
     "L2": 0,
     "L3": 5,
-    "L10": 16,
-    "L12": 56,
+    "L10": 0,
+    "L12": 65,
     "B1": 5,
-    "B3": 8,
+    "B3": 18,
     "B4": 0,
-    "B4raw": 139,
+    "B4raw": 149,
     "S1": 2,
     "S2": 0,
-    "S3": 13,
+    "S3": 23,
     "S4": 1,
     "S5": 6
   },
   "raised": {
-    "T4raw": "155 -> 157 templates. Lane 15's sc-park-perp-forward and sc-park-parallel-exit sit on lot-* districts whose aisles post 20, so the wave-0 proxy ('some edge is not 50') counts two more scenarios. Two new drills, not two new defects — the defect row T4 is 0. Wave-0 T4raw = 83.",
-    "T8raw": "the same two templates add 3 capped reachZones (181 = 178 + 3), and the lessons-progression wave adds one more (182): sc-crossing-white-cane grew a third task — the FULL STOP before the zebra that PE-14 grades and PE-08 does not (doc 87 B54). Every one of them states its cap on the marker, which is why the defect row T8 is 0.",
-    "B4raw": "the same two templates each carry a capped reachZone (139 = 137 + 2). The evaluator probe passes, which is why the defect row B4 is 0."
+    "T4raw": "WAVE: 95 on 2026-07-31 (wave-0 83). 155 -> 157 templates. Lane 15's sc-park-perp-forward and sc-park-parallel-exit sit on lot-* districts whose aisles post 20, so the wave-0 proxy ('some edge is not 50') counts two more scenarios. Two new drills, not two new defects — the defect row T4 is 0. Wave-0 T4raw = 83.",
+    "T8raw": "WAVE: 192 on 2026-07-31 (wave-0 178). the same two templates add 3 capped reachZones (181 = 178 + 3), and the lessons-progression wave adds one more (182): sc-crossing-white-cane grew a third task — the FULL STOP before the zebra that PE-14 grades and PE-08 does not (doc 87 B54). Every one of them states its cap on the marker, which is why the defect row T8 is 0.",
+    "B4raw": "WAVE: 149 on 2026-07-31 (wave-0 137). the same two templates each carry a capped reachZone (139 = 137 + 2). The evaluator probe passes, which is why the defect row B4 is 0.",
+    "L12": "WAVE: WORLD-SCHOOL-ACTORS measured 65 on 2026-07-31 (wave-0 56). The delta is +10 -1. +10: the parking-variants lane landed ten new lot-* templates concurrently (content/world/lot-{45rev,double,gap-judge,gap-long,gap-short,left,night,van,wall,zebra}-v1.json), none of which stages an actor yet. -1: sc-speed-zone LEFT the row — it now stages the four schoolyard children founder item 60 asked for. Same cause explains the +10 on T4raw / T8raw / B3 / B4raw / S3 in the same run."
   },
   "falsehoodBudget": {
     "WRONG_WAY": {
-      "scenarios": 19,
-      "rungs": 88,
-      "ledger": "T4/D5 (sign kit)",
-      "owner": "Lane 3 — world/builders/props.ts:329-372",
-      "reason": "a oneway route edge with no В1 „Влизането забранено\" face built at its illegal mouth: the code convicts a wrong-way entry the world never forbade in paint. Lane 3 built the В26 numerals and the В33 kit; the В1 mouth pass is the piece it did not reach. NOTE for whoever moves a roundabout waypoint next: the route corridor is a straight-line sampler at 8 m pitch (referents.ts ROUTE_SAMPLE_M), so shifting a leg's start shifts the lattice — moving sc-rb-approach back by 8 m makes it land on rb-mini-v1's one-way RING and adds that lesson's five rungs to this row. It is a sampling artefact of a real, already-known gap (the ring has always been on that route), not a new falsehood."
-    },
-    "HEADLIGHTS_OFF_IN_RAIN": {
-      "scenarios": 12,
-      "rungs": 14,
-      "ledger": "L10",
-      "owner": "Lanes 10/11 — the templates' instructionsBg",
-      "reason": "rain is compiled on the rung and the copy never says светлини/фарове, so an основна fault is billed for a duty the lesson never stated. THEO-4 forbids the bare verdict; 38 -> 16 scenarios closed, these are the tail."
-    },
-    "HEADLIGHTS_OFF_AT_NIGHT": {
       "scenarios": 6,
-      "rungs": 6,
-      "ledger": "L10",
-      "owner": "Lanes 10/11 — the templates' instructionsBg",
-      "reason": "same defect on the night rungs."
-    },
-    "HIGH_BEAM_NOT_DIPPED": {
-      "scenarios": 1,
-      "rungs": 1,
-      "ledger": "L10",
-      "owner": "Lanes 10/11 — sc-rx-queue-clear staged[] + instructionsBg",
-      "reason": "night plus a lead car to dip for, and no instruction step mentions the lights."
+      "rungs": 29,
+      "ledger": "T4/D5 (sign kit)",
+      "owner": "the roundabout lane (world/builders/props.ts В1 pass) + the d2-v1 OSM gate",
+      "reason": "19 scenarios / 88 rungs -> 6 / 29. The TERMINAL mouth pass (network.onewayTerminalNoEntryEdges + the props.ts В1 terminal pass) closed the thirteen maps whose one-way edge simply has no junction on it — motorway carriageways, the lane-drop merge, the roadworks shift, the gantry street: the В1 now stands at the downstream mouth facing back along the flow, which is how a Bulgarian one-way street is actually signed. What is LEFT is two things, and neither is a sign the founder can be shown today. (a) FIVE ROUNDABOUT scenarios (sc-rb-exit-signal / -circulate-priority / -busy-gap / -lane-choice / -ped-exit): a ring arm is one-way by construction and its ENTRY is legal, so the illegal mouth of a ring is its exit arms — a derivation the roundabout lane owns, and one that must not be guessed while that lane is reshaping the ring geometry. (b) sc-ed-d2-priority-run on d2-v1: the В1 pass is deliberately gated to scenario micro-maps, because OSM never recorded the real signage of the ~150 one-way mouths in that district and posting there would trade a missing sign for an invented one."
     },
     "SPEED_TOO_FAST_FOR_CURVE": {
       "scenarios": 1,

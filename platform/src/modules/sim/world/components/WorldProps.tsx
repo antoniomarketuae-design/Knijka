@@ -140,6 +140,10 @@ const SIGN_GLB: Record<SignKind, string> = {
   // pixel-identical to the Г2 in his theory question.
   mandatoryRight: "sign_roundabout", // Г2 — g2.svg face
   mandatoryLeft: "sign_roundabout", // Г3 — g3.svg face
+  // А19 „Деца" rides the А18 body: identical warning-triangle plate in the
+  // source art, only the pictogram differs (a19.svg face). Founder item 61 —
+  // a училищна зона must carry the sign that states WHY its limit is 30.
+  children: "sign_pedestrian", // А19 — a19.svg face
   // Doc 86 D5 — four finished GLBs that shipped with no SignKind at all, so no
   // pass could reach them. They are now placeable kinds.
   pedestrianCrossing: "sign_pedestrian", // А18
@@ -170,6 +174,7 @@ const SIGN_FACE_OVERRIDE: Partial<Record<SignKind, { art: SignFaceArt; numeral?:
   oneWay: { art: "d4" },
   mandatoryRight: { art: "g2" },
   mandatoryLeft: { art: "g3" },
+  children: { art: "a19" },
 };
 /** В33 numerals are per-placement, so its faces are built on demand (below). */
 const LIMIT_END_ART: SignFaceArt = "v33";

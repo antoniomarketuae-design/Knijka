@@ -141,12 +141,23 @@ export interface PreDriveStepControl {
    */
   clickBg?: string;
   /**
-   * True when the ONLY real control is a foot pedal, so no dashboard click
-   * exists to offer. The UI must say so plainly instead of pretending the
-   * mouse path is universal (this is the honest residue of D9: 2 of the 13
-   * steps are pedals, the other 11 are mouse-reachable).
+   * True when the real control is a foot pedal rather than a dashboard
+   * control. It is NOT a statement that the mouse cannot do it: since the
+   * 2026-07-30 review a desktop carries the two on-screen pedal pads
+   * (components/sim/lesson-ui/MousePedals.tsx, writing into the same
+   * TouchInputSource the phone pads use), so a pedal step is performed by
+   * HOLDING a pad with the mouse. `pedalBg` is the sentence that says which.
    */
   pedal?: boolean;
+  /**
+   * MOUSE-FIRST for the pedal steps: the Bulgarian imperative naming the
+   * on-screen pedal the student holds. Authored ONLY on `pedal` steps, and
+   * `predrive-mouse-first.test.ts` asserts that every pedal step has one — the
+   * same honesty rule as `keys` and `clickBg`. Before this existed the card
+   * read „Тази стъпка е с педал — няма контрола на таблото, която да
+   * щракнеш.", which is where the founder's mouse-only run stopped dead.
+   */
+  pedalBg?: string;
 }
 
 /** Control metadata for every PERFORMED step (info steps have no entry). */
@@ -171,7 +182,12 @@ export const PRE_DRIVE_STEP_CONTROLS: Partial<Record<PreDriveStepId, PreDriveSte
     hotspots: ["hotspot_engine_start"],
     clickBg: "Щракни стартера на централната конзола",
   },
-  "press-brake": { keys: "S", hotspots: [], pedal: true }, // pedal — no cockpit hotspot
+  "press-brake": {
+    keys: "S",
+    hotspots: [],
+    pedal: true,
+    pedalBg: "Задръж с мишката педала „СПИРАЧКА“ долу вдясно",
+  },
   "select-gear": {
     keys: "]",
     hotspots: ["hotspot_gear_selector"],
@@ -192,7 +208,12 @@ export const PRE_DRIVE_STEP_CONTROLS: Partial<Record<PreDriveStepId, PreDriveSte
     hotspots: ["hotspot_indicator_stalk"],
     clickBg: "Щракни лоста за мигачи",
   },
-  "move-off": { keys: "W", hotspots: [], pedal: true }, // the throttle pedal itself
+  "move-off": {
+    keys: "W",
+    hotspots: [],
+    pedal: true,
+    pedalBg: "Задръж плавно с мишката педала „ГАЗ“ долу вдясно",
+  },
 };
 
 /** Hotspots to highlight for a step in instruction mode ([] for info steps). */
@@ -202,8 +223,9 @@ export function hotspotsForStep(stepId: PreDriveStepId): readonly CockpitHotspot
 
 /**
  * How a step is PRIMARILY performed, for a UI that must lead with the mouse:
- *  - "click" — a dashboard control does it (11 of 13 steps);
- *  - "pedal" — only a foot pedal does it (brake, throttle);
+ *  - "click" — a dashboard control does it (8 of 13 steps);
+ *  - "pedal" — a pedal does it (brake, throttle): a foot on a real car, and on
+ *    screen the press-and-hold pad the mouse holds;
  *  - "confirm" — an info step, confirmed in the checklist.
  * The keyboard is never the answer here: it is the advanced alternative that
  * exists for every one of them.
@@ -214,6 +236,22 @@ export function preDrivePrimaryInput(stepId: PreDriveStepId): PreDrivePrimaryInp
   const control = PRE_DRIVE_STEP_CONTROLS[stepId];
   if (control === undefined) return "confirm";
   return control.pedal === true ? "pedal" : "click";
+}
+
+/**
+ * THE ROW THE FOUNDER'S ACCEPTANCE TEST IS ABOUT: the sentence telling the
+ * student what to do with the MOUSE for this step — a dashboard control to
+ * click, a pedal pad to hold, or the checklist confirmation for a walkaround
+ * step. Never null: all thirteen steps are mouse-performable, and
+ * `predrive-mouse-first.test.ts` asserts exactly that over PRE_DRIVE_STEP_ORDER.
+ */
+export function preDriveMouseActionBg(stepId: PreDriveStepId): string {
+  const control = PRE_DRIVE_STEP_CONTROLS[stepId];
+  if (control === undefined) {
+    return "Направи проверката, после потвърди с бутона в списъка";
+  }
+  if (control.pedal === true) return control.pedalBg ?? "";
+  return control.clickBg ?? "";
 }
 
 // ---------------------------------------------------------------------------

@@ -56,6 +56,8 @@ import {
 } from "@/modules/sim/engine";
 import type { CabinControls, MirrorGlanceKind } from "@/modules/sim/scene/cabin";
 import { SKY_DOME_NAME } from "@/modules/sim/environment";
+import { CABIN_LOOK_POSES } from "@/modules/sim/scene/vitok/cabinLook";
+import { getCabinLook, resetCabinLook } from "@/modules/sim/scene/vitok/cabinLookStore";
 import { renderMirrorPass } from "@/modules/sim/scene/vitok/mirrorPass";
 import {
   rearViewBottomFraction,
@@ -75,6 +77,24 @@ import {
   REAR_VIEW_TARGET_WIDTH,
   REAR_VIEW_YAW_RAD,
 } from "@/modules/sim/scene/chaseRearView";
+import {
+  doorMirrorQuadHalfSize,
+  doorMirrorQuadOffset,
+  DOOR_MIRROR_CADENCE,
+  DOOR_MIRROR_CADENCE_PHASE,
+  DOOR_MIRROR_EYE,
+  DOOR_MIRROR_FAR_M,
+  DOOR_MIRROR_FOG_MIN_DENSITY,
+  DOOR_MIRROR_FOV_DEG,
+  DOOR_MIRROR_NEAR_M,
+  DOOR_MIRROR_OPEN_SCALE,
+  DOOR_MIRROR_PITCH_RAD,
+  DOOR_MIRROR_SKY_RADIUS_M,
+  DOOR_MIRROR_TARGET_HEIGHT,
+  DOOR_MIRROR_TARGET_WIDTH,
+  DOOR_MIRROR_YAW_RAD,
+  type DoorMirrorSide,
+} from "@/modules/sim/scene/cockpitDoorMirror";
 
 export type CameraMode = "chase" | "cockpit" | "topdown";
 
@@ -229,6 +249,18 @@ const GLANCE_OFFSETS: Record<MirrorGlanceKind, { yaw: number; pitch: number }> =
   rear: { yaw: -0.28, pitch: 0.06 },
 };
 
+/**
+ * CABIN LOOK smoothing (1/s) — how fast the head eases to (and back from) a
+ * look pose. Slower than the glance's own envelope on purpose: a glance is a
+ * flick, a cabin look is a deliberate turn to find a control, and a student
+ * who cannot see the movement cannot learn where the control WAS.
+ * ~0.35 s to settle at 9/s.
+ */
+const CABIN_LOOK_DAMPING = 9;
+/** Below this the eased look is treated as home (avoids a permanent epsilon
+ *  rotation, and lets the cheap `headYaw === 0` fast path stay reachable). */
+const CABIN_LOOK_EPSILON = 1e-4;
+
 /** Distance (m) the rear-view quad is parked in front of the main camera. Any
  *  value clear of the 0.1 m near plane works — the quad is sized from the live
  *  FOV at this distance, so the on-screen fraction is distance-independent. */
@@ -238,6 +270,23 @@ const REAR_VIEW_QUAD_DISTANCE_M = 0.5;
 const REAR_VIEW_BEZEL_FRACTION = 0.08;
 /** Bezel colour (near-black, matches the cockpit mirror housing). */
 const REAR_VIEW_BEZEL_COLOR = 0x0a0c0f;
+
+/**
+ * Render layer of the cockpit door-mirror windows — `VitokCockpit.INTERIOR_LAYER`,
+ * duplicated as a literal for the same reason MirrorRig duplicates the interior
+ * mount offset: importing it would be a module cycle through a `"use client"`
+ * component this file is mounted alongside.
+ *
+ * THIS IS THE RECURSION GUARD, not decoration. The window quad lives in the
+ * same scene as the world, and MirrorRig's three mirror cameras keep the default
+ * layer-0 mask — so a quad on layer 0 would appear INSIDE the rear-view mirror,
+ * showing the mirror showing the mirror. On the cabin layer no mirror pass can
+ * ever see it (and neither can the window's own pass), so nothing has to be
+ * toggled invisible around a render. The main camera has this layer enabled for
+ * the whole life of the scene (VitokCockpit mounts unconditionally and only
+ * gates its GROUP on `cockpitView`).
+ */
+const COCKPIT_HUD_LAYER = 2;
 
 /**
  * Chase / cockpit camera driving the default R3F camera, plus the per-frame
@@ -293,6 +342,10 @@ export function CameraRig({
   const chasePrevOrbitRef = useRef(0);
   // Smoothed G-force lean state (cockpit head motion).
   const leanRef = useRef({ latG: 0, longG: 0, prevSpeedMps: 0 });
+  /** Eased CABIN LOOK (rows FR-17/FR-25): the head turn a student asks for
+   *  with the mouse to bring an out-of-frame control into the picture. Target
+   *  comes from the module store; this is the smoothed value the camera uses. */
+  const cabinLookRef = useRef({ yaw: 0, pitch: 0 });
   // Top-down state (refs — render-free): zoom preset index + orientation.
   const topdownZoomRef = useRef(TOPDOWN_DEFAULT_ZOOM);
   const topdownHeadingUpRef = useRef(false); // false = north-up
@@ -414,13 +467,123 @@ export function CameraRig({
     };
   }, [scene, rearView]);
 
+  // -------------------------------------------------------------------------
+  // THE COCKPIT DOOR-MIRROR WINDOWS (founder item 45 — the half never built).
+  //
+  // His words: „when the user clicks Q or E … we must pop some Small window on
+  // the screen on the right side if he press right and on the left side if he
+  // press left, which small window will be rear view window showing whats
+  // happening behind … not more than 10% of the screen … because currently I
+  // cant see whats happening behind."
+  //
+  // The block at the bottom of this file built that for the CHASE camera and it
+  // works. It is `null` in every other camera — `mode === "chase" ? … : null` —
+  // so in the COCKPIT, Q and E have only ever turned the head. What the head
+  // turns toward is the GLB door glass, and MirrorRig's `activeKindsFor` gives
+  // the doors an RTT feed ONLY on the `high` preset while the shipped default is
+  // `medium`: on the preset almost everybody plays, a mirror check lands on
+  // authored dark gloss. That is the whole of „I press E but nothing much is
+  // seen", and it is why this window renders its own pass instead of sampling
+  // MirrorRig's glass target — it then behaves identically on low, medium and
+  // high, and it leaves the glass's own budget decision alone.
+  //
+  // The pass camera sits at the GLB DOOR-GLASS position, ±0.905 m outboard.
+  // That vantage is what makes it a door mirror rather than a second rear-view:
+  // the adjacent lane, the blind-spot quarter and the car's own flank as the
+  // reference. Every other constant follows MirrorRig's proven budget — a
+  // HalfFloat target so the composer tone-maps it like the direct view, a 200 m
+  // far plane so the CityBuildings chunk grid culls, a floored fog density so
+  // nothing pops at that boundary, the sky dome shrunk inside the frustum, and
+  // `renderMirrorPass` owning `autoClear`, without which the raw gl.render draws
+  // into an uncleared depth buffer and the window is a black rectangle.
+  //
+  // GRADING IS UNTOUCHED: the graded mirror-check signal is still the Q/E press
+  // latched by CabinControls.glance(). This makes the graded press honest —
+  // a student told to check his mirror and shown dark gloss learns to press a
+  // key; shown the lane beside him, he learns to check his mirror.
+  // -------------------------------------------------------------------------
+  const doorMirror = useMemo(() => {
+    const target = new WebGLRenderTarget(DOOR_MIRROR_TARGET_WIDTH, DOOR_MIRROR_TARGET_HEIGHT, {
+      stencilBuffer: false,
+      type: HalfFloatType,
+    });
+    // MIRROR-IMAGE FLIP. The pass camera keeps chassis +X — car-LEFT, i.e.
+    // OUTBOARD for the left mirror — as image-right, so unflipped the window
+    // would show the adjacent lane on the right and our own flank on the left:
+    // the exact reverse of the glass it is standing in for. Real mirrors
+    // reverse it, and a student learning to read this window must be learning
+    // to read a mirror. u → 1 − u on the texture we own; geometry untouched.
+    target.texture.center.set(0.5, 0.5);
+    target.texture.repeat.set(-1, 1);
+    const camera = new PerspectiveCameraImpl(
+      DOOR_MIRROR_FOV_DEG,
+      DOOR_MIRROR_TARGET_WIDTH / DOOR_MIRROR_TARGET_HEIGHT,
+      DOOR_MIRROR_NEAR_M,
+      DOOR_MIRROR_FAR_M,
+    );
+    const material = new MeshBasicMaterial({
+      map: target.texture,
+      toneMapped: false,
+      transparent: true,
+      depthTest: false,
+      depthWrite: false,
+    });
+    const bezelMaterial = new MeshBasicMaterial({
+      color: REAR_VIEW_BEZEL_COLOR,
+      toneMapped: false,
+      transparent: true,
+      depthTest: false,
+      depthWrite: false,
+    });
+    const geometry = new PlaneGeometry(1, 1);
+    const glass = new Mesh(geometry, material);
+    const bezel = new Mesh(geometry, bezelMaterial);
+    for (const m of [glass, bezel]) {
+      m.frustumCulled = false;
+      m.visible = false;
+      m.matrixAutoUpdate = true;
+      m.layers.set(COCKPIT_HUD_LAYER); // see the constant: recursion guard
+    }
+    // depthTest is off, so paint order is renderOrder alone: bezel first. Above
+    // the chase window's pair, which is never visible at the same time anyway.
+    bezel.renderOrder = 10_000;
+    glass.renderOrder = 10_001;
+    return { target, camera, material, bezelMaterial, geometry, glass, bezel };
+  }, []);
+
+  useEffect(() => {
+    scene.add(doorMirror.bezel, doorMirror.glass);
+    return () => {
+      scene.remove(doorMirror.bezel, doorMirror.glass);
+      doorMirror.target.dispose();
+      doorMirror.material.dispose();
+      doorMirror.bezelMaterial.dispose();
+      doorMirror.geometry.dispose();
+    };
+  }, [scene, doorMirror]);
+
   // The published view state is global (on <html>), so it must be withdrawn
   // when the rig leaves — otherwise /simulator's lesson shelf would still be
-  // told it is sitting in a cockpit.
-  useEffect(() => clearPublishedViewState, []);
+  // told it is sitting in a cockpit. The cabin-look store is module-level for
+  // the same reason and gets the same treatment: a head turned toward the
+  // seat belt must never survive into the next lesson.
+  useEffect(() => {
+    resetCabinLook();
+    return () => {
+      clearPublishedViewState();
+      resetCabinLook();
+    };
+  }, []);
 
   /** Frame counter for REAR_VIEW_CADENCE. */
   const rearViewFrameRef = useRef(0);
+  /** …and for DOOR_MIRROR_CADENCE (counts only while a window is open). */
+  const doorMirrorFrameRef = useRef(0);
+  /** Which side the door-mirror target currently HOLDS. One target serves both
+   *  windows, so a student who releases Q and presses E inside one cadence gap
+   *  would otherwise be shown the LEFT mirror's pixels inside the RIGHT window —
+   *  a mirror that lies about which way you are looking. */
+  const doorMirrorSideRef = useRef<DoorMirrorSide | null>(null);
   /** The SkyDome, resolved lazily by name (it mounts in a sibling tree). */
   const skyRef = useRef<Object3D | null>(null);
 
@@ -450,6 +613,10 @@ export function CameraRig({
     rvEye: new Vector3(),
     rvYaw: new Quaternion(),
     rvQuad: new Vector3(),
+    // Cockpit door-mirror window: the same three, for the outboard pass.
+    dmEye: new Vector3(),
+    dmPitch: new Quaternion(),
+    dmQuad: new Vector3(),
   });
   const prevPosValid = useRef(false);
 
@@ -471,6 +638,10 @@ export function CameraRig({
     const switched = mode !== lastMode.current;
     if (switched) {
       lastMode.current = mode;
+      // A cabin look belongs to the cockpit. Leaving it (C → chase/top-down)
+      // drops the pose, so coming back never snaps the student's head into a
+      // look he asked for two views ago.
+      if (mode !== "cockpit") resetCabinLook();
       cam.fov =
         mode === "chase"
           ? CHASE_FOV
@@ -501,7 +672,7 @@ export function CameraRig({
     // Smoothstepped so the swing eases in as well as out (the glance's easing).
     const swing = reverseSwingEnvelope(swingRef.current);
 
-    const { pos, quat, fwd, fwdFlat, desired, look, lookSmooth, eye, rotSmooth, glanceQuat, glanceEuler, sway, leanQuat, leanEuler, prevPos, upSmooth, rvEye, rvYaw, rvQuad } =
+    const { pos, quat, fwd, fwdFlat, desired, look, lookSmooth, eye, rotSmooth, glanceQuat, glanceEuler, sway, leanQuat, leanEuler, prevPos, upSmooth, rvEye, rvYaw, rvQuad, dmEye, dmPitch, dmQuad } =
       scratchRef.current;
     chassis.getWorldPosition(pos);
     chassis.getWorldQuaternion(quat);
@@ -684,14 +855,35 @@ export function CameraRig({
       // swing TARGET (reverseViewTarget), so the shoulder is easing home over
       // the same ~0.5 s the glance is easing in and the neck reads one
       // continuous motion — no snap at the handover, in either direction.
+      //  · Cabin look: a pose the student ASKED for with the mouse, because
+      //    the control the lesson names is not in the windscreen frame — the
+      //    seat-belt buckle (80° straight down) and the right door mirror
+      //    (a third of a screen off the right edge). See
+      //    scene/vitok/cabinLook.ts for the projection that proves it, and
+      //    cabinLookStore for who sets it. Eased separately and CROSSFADED
+      //    with the glance on the same envelope, so a held mirror always wins
+      //    the neck and, for the right mirror, wins it at the identical angle
+      //    (the pose IS GLANCE_OFFSETS.right) — no jump at the handover.
       const mirror = cabin?.glanceMirror;
+      const lookPose = CABIN_LOOK_POSES[getCabinLook()];
+      const cabinLook = cabinLookRef.current;
+      const kLook = switched ? 1 : 1 - Math.exp(-CABIN_LOOK_DAMPING * delta);
+      cabinLook.yaw += (lookPose.yaw - cabinLook.yaw) * kLook;
+      cabinLook.pitch += (lookPose.pitch - cabinLook.pitch) * kLook;
+      if (Math.abs(cabinLook.yaw) < CABIN_LOOK_EPSILON) cabinLook.yaw = 0;
+      if (Math.abs(cabinLook.pitch) < CABIN_LOOK_EPSILON) cabinLook.pitch = 0;
       let headYaw = 0;
       let headPitch = 0;
-      if (glanceS > 0 && mirror) {
-        const env = glanceS * glanceS * (3 - 2 * glanceS);
+      const glanceEnv =
+        glanceS > 0 && mirror ? glanceS * glanceS * (3 - 2 * glanceS) : 0;
+      if (glanceEnv > 0 && mirror) {
         const o = GLANCE_OFFSETS[mirror];
-        headYaw += o.yaw * env;
-        headPitch += o.pitch * env;
+        headYaw += o.yaw * glanceEnv;
+        headPitch += o.pitch * glanceEnv;
+      }
+      if (cabinLook.yaw !== 0 || cabinLook.pitch !== 0) {
+        headYaw += cabinLook.yaw * (1 - glanceEnv);
+        headPitch += cabinLook.pitch * (1 - glanceEnv);
       }
       if (swing > 0) {
         headYaw += COCKPIT_SHOULDER_YAW * swing;
@@ -819,6 +1011,113 @@ export function CameraRig({
         rearViewBottomFraction(cam.aspect, REAR_VIEW_IDLE_SCALE) * state.size.height,
         rearViewBottomFraction(cam.aspect) * state.size.height,
       );
+    }
+
+    // --- Cockpit door-mirror windows (founder item 45; see the rig above).
+    // Q → a window on the LEFT of the screen, E → on the RIGHT, each showing
+    // what is behind through that door mirror. Runs after the chase block for
+    // the same reason it does: the quad is parked against the pose this frame
+    // actually renders with.
+    //
+    // The head turn STAYS. It is not in the window's way — the quad is
+    // camera-locked, so it holds its side of the frame however far the neck
+    // swings — and the two together are one act: you turn your head toward the
+    // mirror and the mirror is legible when you get there. He asked for the
+    // window, not for the glance to be taken away.
+    //
+    // The permanent centre mirror also stays, untouched: in the cockpit that is
+    // the physical GLB rear-view glass, which MirrorRig feeds on every preset.
+    // Only the two DOOR mirrors were dead, and only they get a window.
+    // -----------------------------------------------------------------------
+    const dm = doorMirror;
+    const dmMirror = cabin?.glanceMirror;
+    const dmSide: DoorMirrorSide | null =
+      mode === "cockpit" && glanceS > 0 && (dmMirror === "left" || dmMirror === "right")
+        ? dmMirror
+        : null;
+    if (dmSide === null) {
+      dm.glass.visible = false;
+      dm.bezel.visible = false;
+      doorMirrorFrameRef.current = 0;
+      doorMirrorSideRef.current = null;
+    } else {
+      // Same smoothstep the head turn runs on, so the window opens and closes
+      // on exactly the glance's rhythm instead of snapping into the frame.
+      const env = glanceS * glanceS * (3 - 2 * glanceS);
+
+      // 1. Aim: the GLB door-glass position (chassis-local, +X is car-LEFT),
+      //    carried into world space by the chassis pose. A camera holding the
+      //    chassis quaternion already looks down chassis −Z — straight back —
+      //    and the authored 4.6° droop keeps road in the lower two thirds.
+      const dmEyeLocal = DOOR_MIRROR_EYE[dmSide];
+      dmEye.set(dmEyeLocal.x, dmEyeLocal.y, dmEyeLocal.z).applyQuaternion(quat).add(pos);
+      dm.camera.position.copy(dmEye);
+      dmPitch.setFromAxisAngle(UP_AXIS, DOOR_MIRROR_YAW_RAD);
+      dm.camera.quaternion.copy(quat).multiply(dmPitch);
+      dm.camera.rotateX(DOOR_MIRROR_PITCH_RAD);
+
+      // 2. The RTT pass, on cadence. No visibility juggling is needed around it:
+      //    the quad is on COCKPIT_HUD_LAYER and every mirror camera in the scene
+      //    (MirrorRig's three, and this one) keeps the default layer-0 mask, so
+      //    no pass can see it and no feedback loop is possible.
+      //    The side change forces a pass off-cadence: one target serves both
+      //    windows, so opening the RIGHT one on a target still holding the LEFT
+      //    view would show a mirror that lies about which way you are looking.
+      const tick = doorMirrorFrameRef.current++;
+      const sideChanged = doorMirrorSideRef.current !== dmSide;
+      if (sideChanged || tick % DOOR_MIRROR_CADENCE === DOOR_MIRROR_CADENCE_PHASE) {
+        doorMirrorSideRef.current = dmSide;
+        let sky = skyRef.current;
+        if (!sky || !sky.parent) {
+          sky = state.scene.getObjectByName(SKY_DOME_NAME) ?? null;
+          skyRef.current = sky;
+        }
+        renderMirrorPass(state.gl, {
+          target: dm.target,
+          scene: state.scene as never,
+          camera: dm.camera as never,
+          fog: state.scene.fog instanceof FogExp2 ? state.scene.fog : null,
+          fogMinDensity: DOOR_MIRROR_FOG_MIN_DENSITY,
+          sky,
+          skyRadius: DOOR_MIRROR_SKY_RADIUS_M,
+        });
+      }
+
+      // 3. Park the quad in front of the main camera, sized from the LIVE fov
+      //    and aspect so the ≤10 % share holds through the cockpit's speed-widen
+      //    and on any window shape. It grows a little as the look settles, so
+      //    the window reads as leaning toward the glass rather than a panel
+      //    being switched on.
+      const scale = DOOR_MIRROR_OPEN_SCALE + (1 - DOOR_MIRROR_OPEN_SCALE) * env;
+      const vFov = (cam.fov * Math.PI) / 180;
+      const { halfWidth, halfHeight } = doorMirrorQuadHalfSize(
+        REAR_VIEW_QUAD_DISTANCE_M,
+        vFov,
+        cam.aspect,
+        scale,
+      );
+      const off = doorMirrorQuadOffset(
+        dmSide,
+        REAR_VIEW_QUAD_DISTANCE_M,
+        vFov,
+        cam.aspect,
+        scale,
+      );
+      const bezel = halfHeight * 2 * REAR_VIEW_BEZEL_FRACTION;
+      dm.glass.scale.set(halfWidth * 2, halfHeight * 2, 1);
+      dm.bezel.scale.set(halfWidth * 2 + bezel, halfHeight * 2 + bezel, 1);
+      dmQuad
+        .set(off.x, off.y, -REAR_VIEW_QUAD_DISTANCE_M)
+        .applyQuaternion(cam.quaternion)
+        .add(cam.position);
+      dm.glass.position.copy(dmQuad);
+      dm.bezel.position.copy(dmQuad);
+      dm.glass.quaternion.copy(cam.quaternion);
+      dm.bezel.quaternion.copy(cam.quaternion);
+      dm.material.opacity = env;
+      dm.bezelMaterial.opacity = env * 0.9;
+      dm.glass.visible = env > 0.01;
+      dm.bezel.visible = dm.glass.visible;
     }
   });
 

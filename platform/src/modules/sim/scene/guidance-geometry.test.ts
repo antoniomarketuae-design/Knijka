@@ -353,6 +353,14 @@ describe("G1 — no marker teaches the student to stop inside a junction", () =>
       (params.x - line.x) * line.dirX + (params.y - line.y) * line.dirY;
     expect(authoredPast).toBeCloseTo(1.72, 2);
 
+    // B18 RESIDUAL, closed (doc 87:164): the drawn bar was honest and the
+    // GRADE was not — a radius-9 circle centred 1.72 m inside the mouth still
+    // credited „stop at the give-way line" to a car sitting past the paint.
+    // The template now cuts its acceptance at the line, and the number it cuts
+    // at is exactly this measured offset — pinned here, against the district's
+    // own М8 bar, so a map edit cannot leave a stale constant behind.
+    expect(params.acceptBeforeMarkM).toBeCloseTo(authoredPast, 2);
+
     // AFTER: a gate bar across the lane, 0.80 m on the approach side.
     const goal = guidanceGoalFor(lesson, 0, {
       stopLines: world.stopLines,

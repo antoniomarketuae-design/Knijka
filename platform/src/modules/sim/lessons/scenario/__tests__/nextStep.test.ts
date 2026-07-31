@@ -97,22 +97,45 @@ describe("resolveScenarioNextStep — the ladder", () => {
 });
 
 describe("resolveScenarioNextStep — the gates", () => {
-  it("offers nothing when the attempt did not pass", () => {
-    expect(
-      resolveScenarioNextStep(
-        { templateId: "sc-park-a", level: 1, passed: false, allObjectivesPassed: true },
-        CATALOG,
-      ),
-    ).toBeNull();
+  /**
+   * FR-06 (founder, 2026-07-29): „we should give users an option continue to
+   * next question although you made mistake and come back to this later …
+   * currently we are blocking them from advancing."
+   *
+   * These two used to assert `toBeNull()` — a failed attempt got NO forward
+   * button of any kind, so the only way out of a card was to drive it clean.
+   * The rule now splits: the next CARD is offered (a different skill at its
+   * easiest rung — failing a roundabout does not make a student unready for a
+   * zebra), the next RUNG is not (one level harder is earned, and the server
+   * refuses a star-locked attempt anyway).
+   */
+  it("FR-06: a failed attempt still leads to the next CARD, never to the next rung", () => {
+    const steps = resolveScenarioNextSteps(
+      { templateId: "sc-park-a", level: 1, passed: false, allObjectivesPassed: true },
+      CATALOG,
+    );
+    expect(steps.level).toBeNull();
+    expect(steps.template).toMatchObject({ kind: "template", templateId: "sc-park-b", level: 1 });
   });
 
-  it("offers nothing when an objective is still red", () => {
+  it("FR-06: the same when an objective is still red", () => {
+    const steps = resolveScenarioNextSteps(
+      { templateId: "sc-park-a", level: 1, passed: true, allObjectivesPassed: false },
+      CATALOG,
+    );
+    expect(steps.level).toBeNull();
+    expect(steps.template).toMatchObject({ kind: "template", templateId: "sc-park-b", level: 1 });
+  });
+
+  it("FR-06: a failed run on the LAST card still offers nothing — honestly", () => {
+    // The catalog is exhausted, so there is genuinely nowhere forward. The end
+    // screen says so rather than dead-ending on a button that does nothing.
     expect(
-      resolveScenarioNextStep(
-        { templateId: "sc-park-a", level: 1, passed: true, allObjectivesPassed: false },
+      resolveScenarioNextSteps(
+        { templateId: "sc-rail-a", level: 4, passed: false, allObjectivesPassed: false },
         CATALOG,
       ),
-    ).toBeNull();
+    ).toEqual({ level: null, template: null });
   });
 
   it("skips a star-locked level step (doc 76 §8) rather than dead-ending on LEVEL_LOCKED", () => {
@@ -218,20 +241,11 @@ describe("resolveScenarioNextSteps — both targets", () => {
     ).toEqual({ level: null, template: null });
   });
 
-  it("offers nothing when the run was not green, foreign, or an unauthored rung", () => {
+  it("offers nothing for a foreign id or an unauthored rung", () => {
+    // Not a gate on the STUDENT — a gate on nonsense input. A card that is not
+    // in the catalog and a rung that never compiled cannot have been played,
+    // so there is no „next" to resolve from either of them.
     const none = { level: null, template: null };
-    expect(
-      resolveScenarioNextSteps(
-        { templateId: "sc-park-a", level: 1, passed: false, allObjectivesPassed: true },
-        CATALOG,
-      ),
-    ).toEqual(none);
-    expect(
-      resolveScenarioNextSteps(
-        { templateId: "sc-park-a", level: 1, passed: true, allObjectivesPassed: false },
-        CATALOG,
-      ),
-    ).toEqual(none);
     expect(
       resolveScenarioNextSteps({ templateId: "sc-nope", level: 1, ...green }, CATALOG),
     ).toEqual(none);

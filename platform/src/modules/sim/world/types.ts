@@ -97,6 +97,25 @@ export interface DistrictBuilding {
   heightSource: "height" | "levels" | "default";
   /** Simplified outer ring, unclosed (renderer closes it). */
   footprint: [number, number][];
+  /**
+   * AUTHORED BUILDING KIND. Absent = an ordinary block, byte-identical to
+   * every footprint written before this key existed.
+   *
+   * `"school"` is the училище a school-zone lesson's copy promises. The
+   * founder's item 61: „I see only Normal Buildings living/office building no
+   * actual school when the question states there should be School … either
+   * build schools and put and name them school, or find some solutions." He
+   * named both halves — BUILD it and NAME it — so the kind drives three
+   * passes: the facade prism paints it in the ochre/cream school palette
+   * (builders/buildings.ts), the school pass hangs a «УЧИЛИЩЕ» name board over
+   * its street frontage (builders/schools.ts), and the sign pass posts the
+   * А19 „Деца" warning triangle on both approaches (builders/props.ts).
+   *
+   * It is NOT a grading input: the reduced limit still comes from the edge's
+   * own `maxspeed` / `zone` tag, exactly as before. A building kind may dress
+   * the world; it may never decide a fault.
+   */
+  kind?: "school";
 }
 
 export interface DistrictSpawnPoint {
@@ -332,6 +351,12 @@ export type SignKind =
   | "mandatoryLeft" // Г3
   // -- previously orphaned kit faces (doc 86 D5): finished GLBs that shipped
   //    with no SignKind, so nothing could ever place them.
+  // -- А19 „Деца": the warning triangle a school frontage MUST carry. Same
+  //    triangular body as А18 (identical plate polygon in the source art), so
+  //    it rides `sign_pedestrian.glb` with the a19.svg face swapped in — the
+  //    Г2/Г3-on-the-Г12-plate precedent. Derived from a `kind: "school"`
+  //    building, never authored per map.
+  | "children" // А19
   | "pedestrianCrossing" // А18 „Пешеходна пътека" (warning, ahead of a zebra)
   | "priorityRoad" // Б3 „Път с предимство" (the жълт ромб on the major arm)
   | "settlement" // Д11 „Начало на населено място"
@@ -372,6 +397,7 @@ export const SIGN_KINDS: readonly SignKind[] = [
   "oneWay",
   "mandatoryRight",
   "mandatoryLeft",
+  "children",
   "pedestrianCrossing",
   "priorityRoad",
   "settlement",
@@ -459,6 +485,35 @@ export interface BuildingInstancePlacement {
   scale: Vec3Tuple;
 }
 
+/**
+ * One school building, resolved to the things that make it READ as a school
+ * from the driving seat (founder item 61 — „either build schools and put and
+ * name them school").
+ *
+ * The BODY is not here: the footprint is already extruded by the ordinary
+ * facade-prism pass, which is what makes this additive. What is here is
+ * everything that says *училище* rather than *блок*:
+ *  - `board` — the name board over the street frontage, carrying `labelBg`;
+ *  - `railing` — the yard fence line along the frontage (a school yard in
+ *    Bulgaria is fenced; the railing is also what tells a driver the children
+ *    beside it are inside a yard and not on his carriageway);
+ *  - `gate` — the centre gap in that railing, i.e. where children come OUT.
+ *
+ * All in world space, base at y = 0.
+ */
+export interface SchoolPlacement {
+  /** District building id this dressing belongs to. */
+  buildingId: string;
+  /** What the board says. Bulgarian, rendered as text (never an icon). */
+  labelBg: string;
+  /** Name board: centre of the panel, its facing yaw and its panel size. */
+  board: { position: Vec3Tuple; yaw: number; widthM: number; heightM: number };
+  /** Yard railing: the frontage line the fence runs along, world space. */
+  railing: { from: Vec3Tuple; to: Vec3Tuple; heightM: number; gateHalfM: number };
+  /** Centre of the gate gap (where the children stand), world space. */
+  gate: Vec3Tuple;
+}
+
 export interface WorldColliderSet {
   /** One flat box under the whole district (roads drive on its top face). */
   ground: { halfExtents: Vec3Tuple; position: Vec3Tuple };
@@ -495,6 +550,16 @@ export interface WorldStats {
   /** Rail-track deck quads over railCrossing spans (ballast band + sleeper
    *  ties + the two steel rails); 0 on every map without a railCrossing zone. */
   railTrackQuads: number;
+  /** Kerbed central islands actually drawn (doc 87 FR-22). Lower than
+   *  `roundabouts` exactly when a registration's interior is not free — see
+   *  builders/roundabout.ts on why a token disc over a live carriageway is a
+   *  worse answer than none. */
+  roundaboutIslands: number;
+  /** Registered roundabouts on this district, drawn or refused. */
+  roundabouts: number;
+  /** Dashes of the circular ring lane divider (0 on single-lane rings — there
+   *  is no boundary there and inventing one would be a new falsehood). */
+  ringDividerQuads: number;
   buildings: number;
   /** Instanced glass towers placed on tall, compact footprints. */
   buildingInstances: number;
@@ -545,6 +610,18 @@ export interface WorldGeometry {
   /** Paved ground (concrete): courtyards/parking in the built-up fabric.
    *  Co-planar with `terrain`, shares its vertex positions so there are no seams. */
   terrainPaved: MeshData;
+  /**
+   * PLANTED CROWNS of the roundabout central islands: the mounded earth inside
+   * the kerb plus its shrubs (builders/roundabout.ts). Empty on every district
+   * without a drawn ring, so those maps add no mesh and no draw call.
+   *
+   * Its OWN mesh rather than part of `terrain`: the terrain contract holds
+   * every ground vertex at or below 0.3 m so relief never pokes through the
+   * flat physics plane you drive on, and a central island is furniture that
+   * must stand ABOVE that. The kerb itself is not here — it lives in
+   * `sidewalks`, which is also the collider, so a car cannot mount the island.
+   */
+  roundaboutIslands: MeshData;
   /** Building walls merged per facade palette variant (index = variant) —
    *  the mid-rise fabric, extruded at the district-data height (doc 68 QW3).
    *  Rendered by StaticWorld; excludes buildings drawn as tower instances. */
@@ -561,6 +638,9 @@ export interface WorldGeometry {
   billboards: BillboardPlacement[];
   /** Bus-stop shelters on primary/secondary sidewalks near junction mouths. */
   busStops: StaticTransform[];
+  /** Name boards + railings of every `kind: "school"` building (schools.ts).
+   *  Empty on every district that authors no school — the additive contract. */
+  schools: SchoolPlacement[];
   /** Surface-parking dressing clusters (one transform per pre-merged kit). */
   parkingKits: StaticTransform[];
   colliders: WorldColliderSet;

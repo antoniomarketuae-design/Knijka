@@ -44,7 +44,7 @@ import {
   stepWeather,
   type QualityLevel,
 } from "@/modules/sim/environment";
-import { assertDistrict, DistrictWorld, SIDEWALK_TOP_Y, type District } from "@/modules/sim/world";
+import { assertDistrict, DistrictWorld, type District } from "@/modules/sim/world";
 import {
   obstacleYawRad,
   ScenarioObstacles,
@@ -56,7 +56,7 @@ import type {
   SceneStillMedia,
   SceneStillPose,
 } from "@/lib/content/types";
-import { roundaboutIslands } from "./roundaboutIsland";
+import type { EyeCam } from "./eyeCam";
 import { STILL_H, STILL_W } from "./scene-still-client";
 import { isVulnerablePoseKind } from "./stillActors";
 
@@ -92,6 +92,21 @@ interface StillCam {
   position: [number, number, number];
   target: [number, number, number];
   fov: number;
+}
+
+/** The dev driver-eye override (eyeCam.ts) as a camera pose. Eye at the given
+ *  district point, looking along the heading with a slight downward tilt — the
+ *  driver's own line of sight onto the carriageway ahead. */
+function eyeCamera(eye: EyeCam): StillCam {
+  const a = (eye.yawDeg * Math.PI) / 180;
+  // heading 0 = north = district +y = three −z; clockwise.
+  const fx = Math.sin(a);
+  const fy = Math.cos(a);
+  return {
+    position: [eye.x, eye.height, -eye.y],
+    target: [eye.x + fx * 50, eye.height - 4, -(eye.y + fy * 50)],
+    fov: eye.fov,
+  };
 }
 
 /** District focus → an above-and-slightly-south camera looking down at it.
@@ -237,54 +252,13 @@ function VulnerableFigure({ pose }: { pose: SceneStillPose }) {
   );
 }
 
-// --- Roundabout central island (code mesh) -----------------------------------
-
-/** Concrete rim of the island — matches the sidewalk curb read at this light. */
-const ISLAND_KERB_COLOR = "#c6c4bd";
-/** Planted centre — the district's own grass terrain reads olive at day HDRI. */
-const ISLAND_GRASS_COLOR = "#6e7838";
-/** Width of the concrete rim between the curb face and the planting, m. */
-const ISLAND_KERB_BAND_M = 1.1;
-/**
- * Island top, m. A hair PROUD of SIDEWALK_TOP_Y so the disc wins the depth test
- * against the junction corner aprons it covers (they share the curb height, and
- * a tie z-fights); the 2 cm is invisible from the still's 46° camera.
- */
-const ISLAND_TOP_Y = SIDEWALK_TOP_Y + 0.02;
-
-/**
- * The kerbed central island of every roundabout the district registers.
- *
- * See roundaboutIsland.ts for WHY the still draws this and the world builder
- * does not. Geometrically it is the simplest honest thing: a disc standing on
- * the ground plane, its outer radius equal to the inner edge of the circulatory
- * carriageway, with the curb-height rim reading as concrete and the inside as
- * planting. It occupies the middle the junction pads would otherwise leave
- * bare, which is what turns four pads into one roundabout.
- */
-function RoundaboutIslands({ district }: { district: District }) {
-  const islands = useMemo(() => roundaboutIslands(district), [district]);
-  return (
-    <>
-      {islands.map((isle) => (
-        <group key={isle.id} position={[isle.x, 0, -isle.y]}>
-          <mesh position={[0, ISLAND_TOP_Y / 2, 0]} receiveShadow castShadow>
-            <cylinderGeometry args={[isle.radiusM, isle.radiusM, ISLAND_TOP_Y, 96]} />
-            <meshStandardMaterial color={ISLAND_KERB_COLOR} roughness={0.95} metalness={0} />
-          </mesh>
-          <mesh
-            position={[0, ISLAND_TOP_Y + 0.005, 0]}
-            rotation={[-Math.PI / 2, 0, 0]}
-            receiveShadow
-          >
-            <circleGeometry args={[Math.max(0.5, isle.radiusM - ISLAND_KERB_BAND_M), 96]} />
-            <meshStandardMaterial color={ISLAND_GRASS_COLOR} roughness={1} metalness={0} />
-          </mesh>
-        </group>
-      ))}
-    </>
-  );
-}
+// The roundabout central island used to be drawn HERE, as a dev-only code mesh
+// over a dev-only copy of the derivation, because — in that file's own words —
+// „the SIM still renders a ring without an island". That gap is closed: the
+// island, the annular carriageway, the outer kerb and the ring divider are all
+// built by sim/world's own builders/roundabout.ts, so <DistrictWorld/> below
+// draws them and the still shows exactly what the driver sees. One derivation,
+// never two that drift.
 
 // --- Attention marks (code meshes) ------------------------------------------
 
@@ -474,10 +448,14 @@ function ReadyProbe({
 
 export function SceneStillScene({
   spec,
+  eye,
   onReady,
   onError,
 }: {
   spec: SceneStillMedia;
+  /** Dev driver-eye camera override (`?eye=` on the route). Absent = the
+   *  committed angled-overhead frame, byte-identical to every rendered still. */
+  eye?: EyeCam | null;
   onReady: () => void;
   onError: (message: string) => void;
 }) {
@@ -524,7 +502,10 @@ export function SceneStillScene({
     [spec.poses],
   );
   const marks = spec.marks ?? [];
-  const cam = useMemo(() => stillCamera(spec.focus), [spec.focus]);
+  const cam = useMemo(
+    () => (eye ? eyeCamera(eye) : stillCamera(spec.focus)),
+    [spec.focus, eye],
+  );
 
   // Arrow tails, computed from the ego toward each target (pure). The arrow
   // sweeps back across most of the ego→target gap so it reads directionally.
@@ -628,7 +609,6 @@ export function SceneStillScene({
             physics={false}
             signSvgBaseUrl={null}
           />
-          <RoundaboutIslands district={district} />
           {obstacles.length > 0 ? (
             <ScenarioObstacles obstacles={obstacles} clearcoat={LEVEL === "high"} />
           ) : null}

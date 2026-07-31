@@ -258,6 +258,36 @@ const HELD_SCENERY: Record<string, readonly ScenarioObstacleSpec[]> = {
   "sc-animal-hazard": [
     { kind: "animal", x: 4.06, y: 152, headingDeg: 90, visual: true },
   ],
+
+  // ---- PARKING-DEPTH: the two neighbours a parking lot cannot express -------
+  //
+  // A gen_parking_lot district says only „bay N is occupied", and the scene
+  // answers that with a deterministic civilian car. Two of the ten new drills
+  // are ABOUT a neighbour that is not a car, so their bodies are authored here
+  // and their headless twins live in traces/scParkDepth.ts (PARK_DEPTH_VAN /
+  // PARK_DEPTH_WALL) — pinned against each other by the unit test below, the
+  // same pairing sc-pk-smooth-stop's van uses.
+  //
+  // Both are HITTABLE, unlike the stalled/wreck dressing above: here the live
+  // student is graded against exactly these surfaces (the drills' own mistake
+  // demos are geometric contacts with them), so a visual-only body would show
+  // him an obstacle the world lets him drive through.
+
+  // sc-park-van: the kargo_v standing in lotvn-bay-2, which the district leaves
+  // FREE on purpose so no civilian car is drawn on top of it. Wider and ~0.45 m
+  // longer than a compact — it protrudes further into the aisle than the parked
+  // cars beside it, which is the sight-line the drill teaches around.
+  "sc-park-van": [
+    { kind: "vehicle", x: 5.03, y: -2.7, headingDeg: 90, model: "kargo_v", seed: 41 },
+  ],
+
+  // sc-park-wall: the garage end wall closing lot-wall-v1's row 1.65 m past the
+  // last bay's line. `wall` renders as code geometry with an exact cuboid
+  // collider and grades as „staticObject" (the untagged fallback) — the code
+  // the drill's own mistake demo cites.
+  "sc-park-wall": [
+    { kind: "wall", x: 5.03, y: 8.6, headingDeg: 90, lengthM: 6.0, heightM: 1.6, thicknessM: 0.4 },
+  ],
 };
 
 // ---------------------------------------------------------------------------

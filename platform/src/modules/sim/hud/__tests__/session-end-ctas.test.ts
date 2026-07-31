@@ -75,3 +75,41 @@ describe("retryCtaClass", () => {
     expect(retryCtaClass(scenarioCtaRow({ level, template }))).toBe("btn-ghost");
   });
 });
+
+/**
+ * FR-06 (founder, 2026-07-29): „we should give users an option continue to
+ * next question although you made mistake and come back to this later if they
+ * want because currently we are blocking them from advancing."
+ *
+ * The forward button after a FAILED run is not the same button as after a
+ * green one, and the difference is the teaching: it says where he is going, it
+ * says the lesson he is leaving stays open, and it does NOT take the accent —
+ * driving it again is still the instructor's recommendation (THEO-4: never a
+ * bare control, and never a verdict dressed up as a reward).
+ */
+describe("FR-06 — the forward button after a run that did not pass", () => {
+  const failed = { passed: false };
+
+  it("relabels the lead and carries the sentence that keeps it honest", () => {
+    const row = scenarioCtaRow({ template }, failed);
+    expect(row).toHaveLength(1);
+    expect(row[0].leadBg).toBe("Продължи напред");
+    expect(row[0].noteBg).toBe(
+      "Този урок не е взет, но остава отворен — върни се към него, когато поискаш.",
+    );
+  });
+
+  it("carries no accent, so Повтори keeps it", () => {
+    const row = scenarioCtaRow({ template }, failed);
+    expect(row.every((c) => c.className === "btn-ghost")).toBe(true);
+    expect(retryCtaClass(row)).toBe("btn-accent");
+  });
+
+  it("a green run is untouched — lead, note and accent all as before", () => {
+    const row = scenarioCtaRow({ level, template });
+    expect(row[0].leadBg).toBe("Следващо ниво");
+    expect(row[0].noteBg).toBeUndefined();
+    expect(row[0].className).toBe("btn-accent");
+    expect(retryCtaClass(row)).toBe("btn-ghost");
+  });
+});

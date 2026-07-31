@@ -110,6 +110,23 @@ const MARKED_CLASSES = new Set([
 ]);
 
 /**
+ * Does the marking pass paint lanes on this road class? A generator that
+ * VALIDATES its spawn poses against `curbLaneOffsetM` has to ask this first:
+ * `toCurbLane` deliberately leaves a pose on an unpainted class exactly where
+ * the author put it (there is no lane to sit in), so a validator that demands
+ * a curb-lane offset anyway rejects the very poses this module just approved.
+ *
+ * That is not hypothetical — gen_parking_lot.mjs could not regenerate its own
+ * four committed districts: its aisle finish pose sits on the `service`
+ * centreline (correctly), and the post-check measured it against a 4.06 m
+ * two-lane curb offset and threw. Exported so the check and the fixer read the
+ * same set.
+ */
+export function isMarkedRoadClass(roadClass) {
+  return MARKED_CLASSES.has(roadClass);
+}
+
+/**
  * THE one-liner every generator ends its spawn list with. A pose that already
  * sits on SOME lane centre is left untouched — those are deliberate, and which
  * lane a drill starts in is the lesson (mw-v1 cruise lane, ov-keepright's left

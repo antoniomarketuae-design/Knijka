@@ -105,6 +105,9 @@ export function parseObjectiveParams(objective: LessonObjective): ObjectiveParam
         radiusM: p.radiusM,
       };
       if (num(p.maxSpeedKmh)) out.maxSpeedKmh = p.maxSpeedKmh;
+      if (num(p.acceptBeforeMarkM) && p.acceptBeforeMarkM >= 0) {
+        out.acceptBeforeMarkM = p.acceptBeforeMarkM;
+      }
       return out;
     }
     case "passSignal": {
@@ -565,7 +568,11 @@ function stepReachZone(
   const speedKmh = Math.abs(tick.speedKmh); // reverse reads negative
   const inZone = d <= params.radiusM;
   const cap = params.maxSpeedKmh;
-  const inGraceRing = cap !== undefined && d <= params.radiusM + REACH_ZONE_GRACE_M;
+  // B18/FR-24: a `stopBeforeMark` zone needs the approach direction too, so
+  // its ring arms on proximity alone rather than on carrying a speed cap.
+  const inGraceRing =
+    (cap !== undefined || params.acceptBeforeMarkM !== undefined) &&
+    d <= params.radiusM + REACH_ZONE_GRACE_M;
 
   // Which way the student came from: where he was on the frame before he
   // entered the proximity ring. That direction turns the grace from a CIRCLE
@@ -583,6 +590,7 @@ function stepReachZone(
   const here = { x: tick.position.x, y: tick.position.y };
   const approachFrom = st.approachFrom ?? (inGraceRing ? (st.prevPos ?? here) : null);
   let inApproachGrace = false;
+  let beyondMark = false;
   if (approachFrom !== null) {
     const ax = params.x - approachFrom.x;
     const ay = params.y - approachFrom.y;
@@ -594,8 +602,26 @@ function stepReachZone(
       const ry = tick.position.y - params.y;
       const along = rx * ux + ry * uy; // + = beyond the mark
       const lateral = Math.abs(rx * uy - ry * ux); // across the approach
+      // B18/FR-24 — where the ACCEPTANCE ends, on this same axis and sign
+      // convention. `acceptBeforeMarkM` is the distance from the authored mark
+      // BACK to the paint, so credit stops at the line instead of at the mark.
+      // Opt-in: absent ⇒ the boundary is the mark itself ⇒ every other
+      // waypoint in the library evaluates bit-identically.
+      const bound = params.acceptBeforeMarkM;
+      const cut = bound ?? 0;
+      // The grace capsule shares the boundary — it is „extra room BEHIND the
+      // acceptance", and behind now begins at the paint. Without this the cut
+      // leaks: a car that barges the mouth at 40 and settles to a legal speed
+      // one metre past the bars is standing inside the capsule, which would
+      // hand it the speed half of the task it just failed.
       inApproachGrace =
-        lateral <= params.radiusM && along <= 0 && along >= -(params.radiusM + REACH_ZONE_GRACE_M);
+        lateral <= params.radiusM &&
+        along <= -cut &&
+        along >= -(cut + params.radiusM + REACH_ZONE_GRACE_M);
+      // Only a waypoint that DECLARED a paint boundary refuses the far side.
+      // Everywhere else `inZone` is the whole acceptance, exactly as shipped —
+      // a plain reachZone is a place you get to, from any direction.
+      beyondMark = bound !== undefined && along > -bound;
     }
   }
   const halted = speedKmh <= STOPPED_SPEED_KMH;
@@ -616,15 +642,23 @@ function stepReachZone(
   const everOutside = st.everOutside || !inGraceRing;
   const graceArmed = everOutside && inApproachGrace;
 
-  const reached = st.reached || inZone || (graceArmed && halted && isHaltDemand);
+  // B18/FR-24 („I have to stop BEFORE the line not after it"). The circle is
+  // cut at the mark along the approach: `inZone` alone no longer credits a car
+  // that has crossed the paint. The grace capsule is unaffected — it was
+  // already approach-side only (`along <= 0`) — so a student who stops SHORT
+  // of the line keeps every metre of forgiveness he had, at every rung, while
+  // one who rolls past it is simply not credited with having stopped at it.
+  const inAcceptance = inZone && !beyondMark;
+  const reached = st.reached || inAcceptance || (graceArmed && halted && isHaltDemand);
   const capMet =
     cap === undefined
       ? true
-      : st.capMet || (speedKmh <= cap && (inZone || graceArmed));
+      : st.capMet || (speedKmh <= cap && (inAcceptance || graceArmed));
   const done = reached && capMet;
   // „You are ON the mark and still too fast" — the one state the student
   // reads as „nothing happened". Latched so it is said once, not every frame.
-  const overCapNoted = st.overCapNoted || (!done && inZone && cap !== undefined && speedKmh > cap);
+  const overCapNoted =
+    st.overCapNoted || (!done && inAcceptance && cap !== undefined && speedKmh > cap);
 
   const evalState: ObjectiveEvalState = {
     type: "reachZone",

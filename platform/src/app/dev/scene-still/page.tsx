@@ -17,6 +17,11 @@ import { decodeSceneStillSpec, loadSceneStill } from "./sceneStillData";
  * Spec source (query, resolved server-side):
  *   ?id=<questionId>       — read the question's sceneStill from the content bank
  *   ?spec=<base64 json>    — an inline SceneStillMedia (headless / ad-hoc)
+ *   ?eye=x,y,h,yaw[,fov]   — swap the overhead camera for a DRIVER-EYE one at
+ *                            that district point (eyeCam.ts). Nothing on the
+ *                            committed-still path passes it; it exists so a
+ *                            geometry change can be judged from the seat, which
+ *                            is the only place a roundabout has to read round.
  *
  * A headless Playwright driver (tools/clips/headless/render-scene-still.mjs)
  * loads this route, waits for window.__sceneStill.state === "ready", and
@@ -26,11 +31,11 @@ import { decodeSceneStillSpec, loadSceneStill } from "./sceneStillData";
 export default async function SceneStillDevPage({
   searchParams,
 }: {
-  searchParams: Promise<{ id?: string; spec?: string }>;
+  searchParams: Promise<{ id?: string; spec?: string; eye?: string }>;
 }) {
   if (process.env.NODE_ENV === "production") notFound();
 
-  const { id, spec: specParam } = await searchParams;
+  const { id, spec: specParam, eye } = await searchParams;
 
   let spec: SceneStillMedia | null = null;
   let error: string | null = null;
@@ -47,5 +52,5 @@ export default async function SceneStillDevPage({
     label = "(none)";
   }
 
-  return <SceneStillClient id={label} spec={spec} loadError={error} />;
+  return <SceneStillClient id={label} spec={spec} eye={eye ?? null} loadError={error} />;
 }

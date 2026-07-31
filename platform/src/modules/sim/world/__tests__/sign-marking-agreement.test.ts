@@ -176,9 +176,32 @@ const sample = (x: number, y: number, headingDeg: number): VehicleSample => ({
 describe("ov-oneway-v1: the one-way street is SIGNED, not just painted", () => {
   const district = loadDistrict("ov-oneway-v1");
   const world = loadWorld("ov-oneway-v1");
-  const posts = world.signs.filter((s) => s.kind === "noEntry");
+  const allPosts = world.signs.filter((s) => s.kind === "noEntry");
+  // The JUNCTION mouth (network.onewayNoEntryArms) — west of the T.
+  const posts = allPosts.filter((s) => s.position[0] < 0);
+  // The TERMINAL mouth (network.onewayTerminalNoEntryEdges) — the far end of
+  // the east one-way arm, where a driver coming from outside the map would
+  // enter against the flow. It did not exist before 2026-07-31: the В1 pass
+  // only signed junction arms, which left thirteen of the catalog's one-way
+  // maps (motorway carriageways, the lane-drop merge, the roadworks shift, the
+  // gantry street) with a graded WRONG_WAY and no plate anywhere. This map has
+  // BOTH illegal mouths, so it now carries both plates — which is what a real
+  // one-way street has.
+  const terminal = allPosts.filter((s) => s.position[0] > 0);
 
-  it("posts exactly one В1 — the west arm, whose flow points back at the junction", () => {
+  it("posts a В1 at BOTH illegal mouths — the junction arm and the far terminal", () => {
+    expect(allPosts).toHaveLength(2);
+    expect(posts).toHaveLength(1);
+    expect(terminal).toHaveLength(1);
+    // The terminal plate stands at the east end of the east one-way arm and
+    // faces BACK along the flow, i.e. WEST — so the legal driver leaving the
+    // map reads its back and only a wrong-way entrant reads its face.
+    const t = terminal[0]!;
+    const tFace: [number, number] = [Math.sin(t.yaw), -Math.cos(t.yaw)];
+    expect(tFace[0]).toBeLessThan(-0.8);
+  });
+
+  it("posts exactly one В1 on the west arm, whose flow points back at the junction", () => {
     expect(posts).toHaveLength(1);
     const post = posts[0]!;
     const x = post.position[0];

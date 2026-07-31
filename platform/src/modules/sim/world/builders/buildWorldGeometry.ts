@@ -22,6 +22,8 @@ import { analyzeNetwork } from "./network";
 import { buildProps } from "./props";
 import { buildRailTracks } from "./railTrack";
 import { buildRoads } from "./roads";
+import { buildSchools } from "./schools";
+import { analyzeRoundabouts, buildRoundabouts } from "./roundabout";
 import { buildTerrain } from "./terrain";
 import { buildWaterDecals } from "./waterDecals";
 
@@ -32,7 +34,14 @@ export function buildWorldGeometry(
   options: BuildWorldOptions = {},
 ): WorldGeometry {
   const network = analyzeNetwork(district, options.junctionRadiusOverrides);
-  const roads = buildRoads(network);
+  // Roundabouts resolve BEFORE the roads: the ring's central island is what
+  // decides how far the four arm↔ring junction pads may reach inward. Without
+  // it each pad opens at the ARM's radius (~17 m against an 18 m ring) and the
+  // four of them union into an open plaza with nothing in the middle — the
+  // „not a proper round-about … a Round a bout is a Cyrcle" defect (doc 87
+  // FR-22). Empty on every district that registers none.
+  const rings = analyzeRoundabouts(district, network);
+  const roads = buildRoads(network, rings);
   // Standing-water sheets over waterPatch zone spans (aquaplane visibility
   // slice) — one merged mesh, zero quads on every map without live spans.
   const water = buildWaterDecals(district, network);
@@ -46,6 +55,10 @@ export function buildWorldGeometry(
   const buildingInstances = buildBuildingInstances(district.buildings);
   const towerIds = new Set(buildingInstances.map((p) => p.buildingId));
   const buildings = buildBuildings(district.buildings, towerIds);
+  // School dressing — name board + yard railing per `kind: "school"` footprint
+  // (founder item 61). Empty on every district that authors none, so this is
+  // additive: no existing map's geometry moves by a vertex.
+  const schools = buildSchools(district.buildings, network);
   const props = buildProps(district, network, buildings.aabbs, {
     treeDensity: options.treeDensity ?? 1,
     seed: options.seed ?? DEFAULT_SEED,
@@ -59,6 +72,15 @@ export function buildWorldGeometry(
     props.giveWayApproaches,
     options.parkingBays ?? LESSON_PARKING_BAYS,
   );
+  // The roundabout pass proper: the kerbed central island (kerb + rim into the
+  // SIDEWALK mesh, so the kerb also becomes a collider a car cannot cross; the
+  // planted crown into its OWN mesh) and the ring's own circular lane divider
+  // (into the PAINT mesh). It runs after markings and before decals so the wear
+  // pass keeps out from under the new paint, exactly as for every other marking.
+  const roundabouts = buildRoundabouts(rings, {
+    sidewalks: roads.sidewalks,
+    markings: markings.markings,
+  });
   // Seeded street-wear decal batch (cracks/patches/manholes) — one draw call.
   // Covers ribbons AND junction interiors since doc 82 V4; still one mesh.
   // Runs AFTER buildMarkings on purpose: every decal is vetted against the
@@ -109,6 +131,7 @@ export function buildWorldGeometry(
     rail.rails,
     terrain.grass,
     terrain.paved,
+    roundabouts.islandPlanting,
     ...buildings.walls,
     buildings.roofs,
   ];
@@ -121,7 +144,7 @@ export function buildWorldGeometry(
     skippedRibbons: roads.skippedRibbonCount,
     junctionPatches: roads.junctionPatchCount,
     sidewalkStrips: roads.sidewalkStripCount,
-    markingQuads: markings.markingQuads,
+    markingQuads: markings.markingQuads + roundabouts.ringDividerQuads,
     stopLines: markings.stopLines,
     zebraCrossings: markings.zebraCrossings,
     parkingBays: markings.parkingBays,
@@ -130,6 +153,9 @@ export function buildWorldGeometry(
     junctionDecals: decals.junctionCount,
     waterDecals: water.count,
     railTrackQuads: rail.deckQuads + rail.railQuads,
+    roundaboutIslands: roundabouts.islands,
+    roundabouts: rings.length,
+    ringDividerQuads: roundabouts.ringDividerQuads,
     buildings: buildings.count,
     buildingInstances: buildingInstances.length,
     trafficLights: props.trafficLights.length,
@@ -148,6 +174,7 @@ export function buildWorldGeometry(
     // zone-sign draws (only on maps whose zones place posts) +
     // the water-sheet mesh (only on maps with live waterPatch spans) +
     // the rail deck + rails meshes (only on maps with a railCrossing zone) +
+    // the roundabout planting mesh (only on maps with a drawn central island) +
     // towers (chunked & frustum-culled at runtime; count ~model-order).
     drawCallEstimate:
       13 +
@@ -155,6 +182,7 @@ export function buildWorldGeometry(
       zoneSignDraws +
       (water.count > 0 ? 1 : 0) +
       (rail.deckQuads > 0 ? 2 : 0) +
+      (roundabouts.islands > 0 ? 1 : 0) +
       CITY_MODELS.length,
   };
 
@@ -169,6 +197,7 @@ export function buildWorldGeometry(
     railTracks: { deck: rail.deck.toMeshData(), rails: rail.rails.toMeshData() },
     terrain: terrain.grass.toMeshData(),
     terrainPaved: terrain.paved.toMeshData(),
+    roundaboutIslands: roundabouts.islandPlanting.toMeshData(),
     buildingWalls: buildings.walls.map((w) => w.toMeshData()),
     buildingRoofs: buildings.roofs.toMeshData(),
     buildingInstances,
@@ -179,6 +208,7 @@ export function buildWorldGeometry(
     billboards: props.billboards,
     busStops: props.busStops,
     parkingKits: props.parkingKits,
+    schools,
     colliders: {
       ground: {
         halfExtents: [spanX / 2, groundThickness / 2, spanY / 2],

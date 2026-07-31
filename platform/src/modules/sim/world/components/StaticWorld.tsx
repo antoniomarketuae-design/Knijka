@@ -48,6 +48,10 @@ import type { QualityPreset } from "./quality";
 
 const FACADE_VARIANT_COUNT = 4;
 
+/** Roundabout island planting: the ground set pushed greener and a shade
+ *  deeper than open verge — a maintained ornamental bed, not a field. */
+const ISLAND_PLANTING_TINT = 0x8fa86a;
+
 /** Constant PBR response when the ORM map is dropped (med/low) — matches the
  *  instanced towers (CityBuildings): matte dielectric, no per-pixel fetch. */
 const FACADE_FALLBACK_ROUGHNESS = 0.7;
@@ -170,6 +174,7 @@ interface WorldGeometries {
   railRails: THREE.BufferGeometry;
   terrain: THREE.BufferGeometry;
   terrainPaved: THREE.BufferGeometry;
+  roundaboutIslands: THREE.BufferGeometry;
   walls: THREE.BufferGeometry[];
   roofs: THREE.BufferGeometry;
 }
@@ -188,6 +193,7 @@ function useWorldGeometries(world: WorldGeometry): WorldGeometries {
       railRails: meshDataToGeometry(world.railTracks.rails),
       terrain: meshDataToGeometry(world.terrain),
       terrainPaved: meshDataToGeometry(world.terrainPaved),
+      roundaboutIslands: meshDataToGeometry(world.roundaboutIslands),
       walls: world.buildingWalls.map(meshDataToGeometry),
       roofs: meshDataToGeometry(world.buildingRoofs),
     }),
@@ -207,6 +213,7 @@ function useWorldGeometries(world: WorldGeometry): WorldGeometries {
         geometries.railRails,
         geometries.terrain,
         geometries.terrainPaved,
+        geometries.roundaboutIslands,
         ...geometries.walls,
         geometries.roofs,
       ]);
@@ -377,6 +384,41 @@ export function StaticWorld({
           />
         )}
       </mesh>
+      {/* ROUNDABOUT CENTRAL ISLANDS — the planted crown + its shrubs
+          (builders/roundabout.ts). Shares the ground PBR set already uploaded
+          for the terrain, tinted a touch deeper and greener so an ornamental
+          island reads as planting rather than as verge, and CASTS SHADOW: the
+          long shadow across the circulatory carriageway is a large part of why
+          the thing reads as a solid object from the driver's seat at 40 m.
+          Guarded, so a district without a drawn ring costs nothing. */}
+      {geometries.roundaboutIslands.getAttribute("position") &&
+      geometries.roundaboutIslands.getAttribute("position").count > 0 ? (
+        <mesh
+          geometry={geometries.roundaboutIslands}
+          castShadow={buildingsCast}
+          receiveShadow={receive}
+        >
+          {grass ? (
+            <meshStandardMaterial
+              {...MACRO_VARIATION}
+              map={grass.map}
+              normalMap={grass.normalMap ?? undefined}
+              roughnessMap={grass.roughnessMap ?? undefined}
+              color={ISLAND_PLANTING_TINT}
+              roughness={1}
+              metalness={0}
+            />
+          ) : (
+            <meshStandardMaterial
+              {...MACRO_VARIATION}
+              map={textures.grass}
+              color={ISLAND_PLANTING_TINT}
+              roughness={1}
+              metalness={0}
+            />
+          )}
+        </mesh>
+      ) : null}
       {/* Road ribbons: vertexColors multiplies in the baked wheel-track wear +
           gutter grime (builders/roads.ts) — composes with the wetness tint. */}
       <mesh geometry={geometries.road} receiveShadow={receive}>

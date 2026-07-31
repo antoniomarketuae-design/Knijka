@@ -106,6 +106,12 @@ export function serializeObjectiveParams(
       if (p.maxSpeedKmh !== undefined) {
         params.maxSpeedKmh = widenSpeedCap(p.maxSpeedKmh, toleranceScale);
       }
+      // B18/FR-24 — carried through untouched by the ladder, and that IS the
+      // point: the widening above stretches the acceptance backwards down the
+      // approach at L1/L2 and this flag stops it stretching forwards over the
+      // paint. An aided rung forgives a student who stops early; no rung
+      // forgives one who stops past the line.
+      if (p.acceptBeforeMarkM !== undefined) params.acceptBeforeMarkM = p.acceptBeforeMarkM;
       return { kind: "reachZone", params };
     }
     case "passSignal": {

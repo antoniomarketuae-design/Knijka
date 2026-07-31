@@ -155,7 +155,7 @@ export const SC_RX_QUEUE_CLEAR: ScenarioSpec = {
     vehicleStart: "ready",
   },
   instructionsBg: [
-    { n: 1, textBg: "Потегли по улицата — напред има охраняем жп прелез (А34), а отвъд релсите е спрял автомобил и мястото след прелеза не стига." },
+    { n: 1, textBg: "Потегли по улицата — напред има охраняем жп прелез (А34), а отвъд релсите е спрял автомобил и мястото след прелеза не стига. По тъмно карай с включени къси светлини (чл. 70), а щом застанеш зад колата пред теб — само КЪСИ, не дълги (чл. 74): дългите в огледалата ѝ заслепяват водача точно там, където той няма къде да се дръпне." },
     { n: 2, textBg: "Намали отрано и спри зад стоп-линията, преди релсите — не плътно до бариерата и никога върху коловоза." },
     {
       n: 3,
@@ -305,8 +305,44 @@ export const SC_RX_TRAM_STOP_EVENT: PedestrianDartOutSpec = {
 };
 
 /**
+ * THE SECOND ALIGHTER (founder: „the question statements says … and in the map
+ * engineering its only 1"). This drill's own objective says the tram „изсипва
+ * пътнициТЕ направо на платното" and instruction 4 says «докато и последният
+ * пътник не се прибере» — a sentence that is a lie against ONE staged figure:
+ * with one walker the last passenger IS the first passenger, and the drill the
+ * copy describes (wait out the whole flow, not the person you were watching)
+ * was never staged.
+ *
+ * He steps off the SAME door a stride behind and slower (1.05 vs 1.2 m/s), so
+ * the driver who moves the instant the first heel touches the kerb finds a
+ * second body still in his lane. Same start x, same direction, same trigger —
+ * the only deltas are +2.2 m north along the door line and the slower pace, so
+ * the pair reads as one knot of people leaving one door.
+ *
+ * Mounted through `LevelSpec.stagedAdd` on EVERY rung, not `ScenarioSpec
+ * .staged`: the trace recorder reads `spec.staged` (traces/scRxTramStopDoors
+ * .ts), so all three committed recordings stay byte-identical and the §5/§9
+ * trace gate does not have to be re-recorded (the SC_CROSSING_LET_PASS /
+ * LET_PASS_PED_COMPANION precedent, templates-pe.ts:92-96).
+ */
+const RTS_SECOND_ALIGHTER: PedestrianDartOutSpec = {
+  id: "sc-rts-passenger-2",
+  kind: "pedestrianDartOut",
+  crossingId: "rts-x-1",
+  crossing: { x: 0, y: RTS_CROSSING_Y },
+  start: { x: -2.9, y: RTS_CROSSING_Y + 2.2 },
+  dir: { x: 1, y: 0 },
+  speedMps: 1.05,
+  travelM: 12.7,
+  roadFromM: 0,
+  roadToM: 11.03,
+  triggerDistM: 25,
+  minTriggerSpeedKmh: 10,
+};
+
+/**
  * L5 complication — a LATE RUNNER chasing the tram (the conditionsNote): a
- * second passenger SPRINTS the other way, from the east kerb toward the closing
+ * third passenger SPRINTS the other way, from the east kerb toward the closing
  * doors, at 2.4 m/s. Added at L5 only (stagedAdd — the LevelSpec seam; the
  * template's own darter is never re-timed, the RXQ precedent) and paired with
  * rain + wet grip so the stop must be read late and braked long.
@@ -351,7 +387,7 @@ export const SC_RX_TRAM_STOP: ScenarioSpec = {
     vehicleStart: "ready",
   },
   instructionsBg: [
-    { n: 1, textBg: "Потегли по улицата — вляво на спирка БЕЗ остров е спрял трамвай." },
+    { n: 1, textBg: "Потегли по улицата — вляво на спирка БЕЗ остров е спрял трамвай. Вали ли, включи късите светлини преди това (чл. 70): слизащите от трамвая пресичат платното ти и в дъжд решават да стъпят по това дали виждат фарове." },
     { n: 2, textBg: "Без остров пътниците слизат право на платното. Спрелият трамвай значи едно: хора пред теб. Вдигни крак от газта." },
     { n: 3, textBg: "Пътник слиза и тръгва през твоята лента към тротоара. Спри напълно зад трамвая — не се провирай покрай него." },
     { n: 4, textBg: "Изчакай платното да се освободи изцяло — платното е на пътниците, докато и последният се прибере на тротоара." },
@@ -400,19 +436,21 @@ export const SC_RX_TRAM_STOP: ScenarioSpec = {
       "Изпитващият следи поведението при спрял трамвай на спирка без остров: отчетливо намаляване, ПЪЛНО спиране зад отворените врати, реално изчакване на всички слизащи пътници и внимателно потегляне едва след като платното е чисто. Провиране покрай отворени врати е опасна грешка, удар — прекратяване.",
   },
   levels: [
-    { level: 1 },
-    { level: 2 },
-    { level: 3 },
-    { level: 4, vehicleStart: "cold" },
+    // The SECOND alighter rides on every played rung — the copy has always
+    // promised пътнициТЕ in the plural (see RTS_SECOND_ALIGHTER).
+    { level: 1, stagedAdd: [RTS_SECOND_ALIGHTER] },
+    { level: 2, stagedAdd: [RTS_SECOND_ALIGHTER] },
+    { level: 3, stagedAdd: [RTS_SECOND_ALIGHTER] },
+    { level: 4, vehicleStart: "cold", stagedAdd: [RTS_SECOND_ALIGHTER] },
     // L5 — дъжд + закъснял пътник: the stop reads late through the rain, the
-    // wet grip stretches the braking, and a second passenger sprints the other
+    // wet grip stretches the braking, and a third passenger sprints the other
     // way for the doors (stagedAdd — the RXQ LevelSpec precedent; the base
     // darter is never re-timed).
     {
       level: 5,
       conditions: { weather: "rain" },
       physics: { wetGrip: true },
-      stagedAdd: [RTS_LATE_RUNNER],
+      stagedAdd: [RTS_SECOND_ALIGHTER, RTS_LATE_RUNNER],
     },
   ],
   staged: [SC_RX_TRAM_STOP_EVENT],

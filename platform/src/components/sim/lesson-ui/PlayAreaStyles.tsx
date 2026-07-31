@@ -224,17 +224,69 @@ export function PlayAreaStyles() {
          (tools/mobile/lib/probe.mjs, „a common and legitimate trick").
          ------------------------------------------------------------------ */
       [data-sim-compact="on"] [data-hud="difficulty"] button,
-      [data-sim-compact="on"] [data-hud="demo-deck"] > button {
+      [data-sim-compact="on"] [data-hud="demo-deck"] > button,
+      /* C2 residual (doc 87:238): the fourth target. «Разбрах» measured
+         62.9 × 24.9 px — and it is the ONE control that clears the popup C1 is
+         about, so leaving it under the thumb minimum meant the student could
+         not dismiss the thing covering his road. Same treatment, same reason:
+         the hit rect grows to ~49 px, the pill paints not one pixel more. */
+      [data-sim-compact="on"] [data-hud="audio-prompt"] button {
         position: relative;
       }
       [data-sim-compact="on"] [data-hud="difficulty"] button::before,
-      [data-sim-compact="on"] [data-hud="demo-deck"] > button::before {
+      [data-sim-compact="on"] [data-hud="demo-deck"] > button::before,
+      [data-sim-compact="on"] [data-hud="audio-prompt"] button::before {
         content: "";
         position: absolute;
         top: -0.75rem;
         bottom: -0.75rem;
         left: 0;
         right: 0;
+      }
+
+      /* ------------------------------------------------------------------
+         ROW C1 — ONE surface in the top band, not four painted on each other.
+
+         The founder's landing frame (doc 87:237) is three surfaces stacked in
+         the same 60 px of screen — the audio card with its own «Разбрах», the
+         red «⚠ Коланът не е поставен» line, and the tier picker bleeding
+         through behind them — plus a fourth full-width «Завърти телефона
+         хоризонтално» note across the road. The harness reached the same
+         verdict from the other side: „«Разбрах» was not tappable (something is
+         painted over it)." A control that cannot be pressed is not a smaller
+         box problem. It is a PRIORITY problem, and priority is what was
+         missing: each of these four decided on its own that it deserved the
+         top of the screen, which is the exact defect hud/overlayQueue.ts was
+         written to end — except that three of the four are mounted in the
+         SCENE tree and never entered the queue.
+
+         They enter it here, by the cascade, because that is the one vocabulary
+         the two trees share (the SimOverlay precedent, hud/SimOverlay.tsx:216:
+         the overlay layer already stands the tier picker and the telltale
+         pings down while it speaks). The order is not a taste call — it is
+         which one the student can act on soonest:
+
+           1. the shell's overlay line (a graded fault, a task, a teach card):
+              it is the lesson talking, and it already owns the rail;
+           2. «Завърти телефона хоризонтално»: on a portrait phone NOTHING
+              else is actionable until it is done;
+           3. the audio chip: real pedagogy, but it keeps until the student
+              is holding the phone the right way round;
+           4. the tier picker: chrome, and the only one of the four that is
+              still one tap away at any time from the ⚙ sheet.
+
+         Nothing is deleted and nothing moves — each surface simply waits for
+         the one above it. All of them come straight back, which on a landing
+         screen is a second or two later.
+         ------------------------------------------------------------------ */
+      [data-sim-compact="on"][data-sim-overlay-active="on"] [data-hud="audio-prompt"],
+      [data-sim-compact="on"][data-sim-overlay-active="on"] [data-hud="touch-hint"] {
+        display: none;
+      }
+      [data-sim-compact="on"]:has([data-hud="touch-hint"]) [data-hud="audio-prompt"],
+      [data-sim-compact="on"]:has([data-hud="touch-hint"]) [data-hud="difficulty"],
+      [data-sim-compact="on"]:has([data-hud="audio-prompt"]) [data-hud="difficulty"] {
+        display: none;
       }
     `}</style>
   );

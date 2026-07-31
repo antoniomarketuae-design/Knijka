@@ -89,7 +89,14 @@ export function AudioLessonPrompt({
 
   const text = audioPromptTextBg(state);
   return (
-    <div className="absolute left-1/2 top-3 z-20 w-[min(30rem,calc(100%-1.5rem))] -translate-x-1/2">
+    // `data-hud` is the one vocabulary the scene tree and the shell's CSS
+    // share (the follow-hint / controls-help precedent). Rows C1+C2 use it to
+    // put this chip in the overlay priority order and to grow its «Разбрах»
+    // to a thumb — see lesson-ui/PlayAreaStyles.tsx.
+    <div
+      data-hud="audio-prompt"
+      className="absolute left-1/2 top-3 z-20 w-[min(30rem,calc(100%-1.5rem))] -translate-x-1/2"
+    >
       <div
         role="status"
         className="flex items-center gap-2.5 rounded-xl border bg-background/90 px-3 py-2 text-xs shadow-glow-sm backdrop-blur"

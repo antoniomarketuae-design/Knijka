@@ -9,7 +9,12 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { PERCEPTUAL_ROAD_SCALE } from "@/modules/sim/contracts";
 import { computeParkedCars, type TrafficDistrict } from "@/modules/sim/traffic";
-import { BUS_OBSTACLE, pkVanObstacle } from "@/modules/sim/traces";
+import {
+  BUS_OBSTACLE,
+  PARK_DEPTH_VAN,
+  PARK_DEPTH_WALL,
+  pkVanObstacle,
+} from "@/modules/sim/traces";
 import {
   heldSceneryFor,
   parkedClearZonesFor,
@@ -223,6 +228,38 @@ describe("heldSceneryFor — per-template dressing", () => {
     expect(heldSceneryFor("sc-ed-reverse-line@L1", loadDistrict("poligon-v1"))).toEqual([]);
     expect(heldSceneryFor("not-a-scenario-id", loadDistrict("hz-roadworks-v1")).length).toBe(10);
     expect(heldSceneryFor("not-a-scenario-id", {})).toEqual([]);
+  });
+
+  it("the parking-depth van and wall stand on their recorder twins, and DO collide", () => {
+    // Both drills are ABOUT the neighbour, and both grade a geometric contact
+    // with it in their own mistake demos — so unlike the wreck dressing above,
+    // these bodies carry colliders. Pinned pose-for-pose against the headless
+    // rects the committed traces were recorded with.
+    const van = heldSceneryFor("sc-park-van@L3", loadDistrict("lot-van-v1"));
+    expect(van).toHaveLength(1);
+    expect(van[0].kind).toBe("vehicle");
+    if (van[0].kind !== "vehicle") return;
+    expect([van[0].x, van[0].y, van[0].headingDeg]).toEqual([
+      PARK_DEPTH_VAN.x,
+      PARK_DEPTH_VAN.y,
+      PARK_DEPTH_VAN.headingDeg,
+    ]);
+    expect(van[0].model).toBe("kargo_v");
+    expect(van[0].visual).toBeUndefined(); // hittable — the drill grades it
+
+    const wall = heldSceneryFor("sc-park-wall@L3", loadDistrict("lot-wall-v1"));
+    expect(wall).toHaveLength(1);
+    expect(wall[0].kind).toBe("wall");
+    if (wall[0].kind !== "wall") return;
+    expect([wall[0].x, wall[0].y, wall[0].headingDeg]).toEqual([
+      PARK_DEPTH_WALL.x,
+      PARK_DEPTH_WALL.y,
+      PARK_DEPTH_WALL.headingDeg,
+    ]);
+    // The rendered box and the graded rect are the same object: half-extents
+    // either side of the authored length/thickness.
+    expect(wall[0].lengthM / 2).toBe(PARK_DEPTH_WALL.halfLengthM);
+    expect((wall[0].thicknessM ?? 0.3) / 2).toBe(PARK_DEPTH_WALL.halfWidthM);
   });
 });
 

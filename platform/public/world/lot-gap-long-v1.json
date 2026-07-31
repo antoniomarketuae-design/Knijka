@@ -1,0 +1,212 @@
+{
+ "format": "district-v1",
+ "meta": {
+  "district": "lot-gap-long",
+  "label": "Учебен паркинг — дълго място край бордюра (12,7 м, влизане напред)",
+  "mapKind": "scenario-lot",
+  "generator": "tools/maps/gen_parking_lot.mjs",
+  "boundsLocalMeters": {
+   "minX": -28,
+   "minY": -120,
+   "maxX": 12.280000000000001,
+   "maxY": 40
+  },
+  "attribution": {
+   "text": "Учебен паркинг — оригинален параметричен дизайн (без данни от OpenStreetMap)",
+   "license": "All rights reserved",
+   "licenseUrl": "/",
+   "copyrightUrl": "/",
+   "obligation": "none — original work, no ODbL attribution required for this map"
+  },
+  "defaults": {
+   "maxspeedUrbanKmh": 20,
+   "note": "Паркинг: 20 km/h навсякъде; маневрите се изпълняват с пешеходна скорост."
+  },
+  "stats": {
+   "roadKm": 0.16,
+   "nodes": 3,
+   "edges": 2,
+   "intersections": 0,
+   "crossings": 0,
+   "buildings": 1,
+   "spawnPoints": 2
+  },
+  "scenario": {
+   "archetype": "parking-lot",
+   "params": {
+    "bays": 5,
+    "bayWidthM": 2.5,
+    "bayDepthM": 6.5,
+    "angle": "parallel",
+    "aisleWidthM": 7,
+    "occupancy": "XX_XX",
+    "approachM": 90,
+    "entry": "south",
+    "pitchesM": "8.6|8.6|8.6|8.6"
+   },
+   "targetBayId": "lotgl-bay-3",
+   "bays": [
+    {
+     "id": "lotgl-bay-1",
+     "x": 6.28,
+     "y": -17.2,
+     "headingDeg": 0,
+     "widthM": 2.5,
+     "lengthM": 6.5,
+     "occupied": true
+    },
+    {
+     "id": "lotgl-bay-2",
+     "x": 6.28,
+     "y": -8.6,
+     "headingDeg": 0,
+     "widthM": 2.5,
+     "lengthM": 6.5,
+     "occupied": true
+    },
+    {
+     "id": "lotgl-bay-3",
+     "x": 6.28,
+     "y": 0,
+     "headingDeg": 0,
+     "widthM": 2.5,
+     "lengthM": 6.5,
+     "occupied": false
+    },
+    {
+     "id": "lotgl-bay-4",
+     "x": 6.28,
+     "y": 8.6,
+     "headingDeg": 0,
+     "widthM": 2.5,
+     "lengthM": 6.5,
+     "occupied": true
+    },
+    {
+     "id": "lotgl-bay-5",
+     "x": 6.28,
+     "y": 17.2,
+     "headingDeg": 0,
+     "widthM": 2.5,
+     "lengthM": 6.5,
+     "occupied": true
+    }
+   ]
+  }
+ },
+ "roads": {
+  "nodes": [
+   {
+    "id": "lotgl-n-end",
+    "x": 0,
+    "y": 40
+   },
+   {
+    "id": "lotgl-n-gate",
+    "x": 0,
+    "y": -30
+   },
+   {
+    "id": "lotgl-n-start",
+    "x": 0,
+    "y": -120
+   }
+  ],
+  "edges": [
+   {
+    "id": "lotgl-e-approach",
+    "from": "lotgl-n-start",
+    "to": "lotgl-n-gate",
+    "class": "residential",
+    "name": "Подход към паркинга",
+    "oneway": false,
+    "roundabout": false,
+    "lanes": 2,
+    "lanesSource": "tag",
+    "maxspeed": 20,
+    "maxspeedSource": "tag",
+    "length": 90,
+    "geometry": [
+     [
+      0,
+      -120
+     ],
+     [
+      0,
+      -30
+     ]
+    ]
+   },
+   {
+    "id": "lotgl-e-aisle",
+    "from": "lotgl-n-gate",
+    "to": "lotgl-n-end",
+    "class": "service",
+    "name": "Алея на паркинга",
+    "oneway": false,
+    "roundabout": false,
+    "lanes": 2,
+    "lanesSource": "tag",
+    "maxspeed": 20,
+    "maxspeedSource": "tag",
+    "length": 70,
+    "geometry": [
+     [
+      0,
+      -30
+     ],
+     [
+      0,
+      40
+     ]
+    ]
+   }
+  ]
+ },
+ "intersections": [],
+ "crossings": [],
+ "roundabouts": [],
+ "buildings": [
+  {
+   "id": "lotgl-b-kiosk",
+   "height": 3.5,
+   "heightSource": "default",
+   "footprint": [
+    [
+     -28,
+     -54
+    ],
+    [
+     -20,
+     -54
+    ],
+    [
+     -20,
+     -46
+    ],
+    [
+     -28,
+     -46
+    ]
+   ]
+  }
+ ],
+ "spawnPoints": [
+  {
+   "id": "lotgl-spawn-approach",
+   "x": 4.06,
+   "y": -105,
+   "heading": 0,
+   "edgeId": "lotgl-e-approach",
+   "name": "Подход към паркинга"
+  },
+  {
+   "id": "lotgl-spawn-finish",
+   "x": 0,
+   "y": 30.45,
+   "heading": 0,
+   "edgeId": "lotgl-e-aisle",
+   "name": "Контролна точка — след маневрата"
+  }
+ ]
+}

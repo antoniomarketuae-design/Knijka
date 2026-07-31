@@ -291,6 +291,65 @@ export function onewayNoEntryArms(approaches: readonly OneWayApproachLike[]): Se
   return out;
 }
 
+/**
+ * THE OTHER ILLEGAL MOUTH: the DOWNSTREAM END of a one-way edge that ends in a
+ * terminal rather than in a junction.
+ *
+ * `onewayNoEntryArms` above answers „which arm of a JUNCTION may a driver not
+ * turn into". It is silent on the commonest one-way shape in this catalog,
+ * because most scenario micro-maps have no junction at all: a motorway
+ * carriageway, a lane-drop merge, a roadworks shift, a gantry street. Measured
+ * on 2026-07-31 by the world-referent gate: WRONG_WAY convicted on 19 scenarios
+ * / 88 rungs with „В1 faces built = 0", and thirteen of those nineteen sit on
+ * exactly this shape — a single one-way edge whose end nodes have degree < 3.
+ * The rule engine grades the wrong-way movement on those maps
+ * (runtime/worldRuntime WRONG_WAY_ANGLE_DEG against the edge's `oneway` tag),
+ * so a student was failed for entering a street the world never forbade.
+ *
+ * The mouth is the edge's DOWNSTREAM terminal: the point a driver would enter
+ * from if he came at it against the flow. The plate stands there facing BACK
+ * along the flow, which is how a Bulgarian one-way street is actually signed —
+ * a legal driver sees the back of the post as he leaves, and only a driver
+ * pointed the wrong way ever reads the face.
+ *
+ * Excluded, and each for a reason the sign kit would otherwise falsify:
+ *  - ROUNDABOUT rings. Every ring arm is one-way by construction and its
+ *    entries carry Б1 + Г12; В1 at a ring mouth would state a different (and
+ *    on an entry arm, false) prohibition.
+ *  - JUNCTION ends (degree >= 3). Those are `onewayNoEntryArms`'s job, and
+ *    posting both would put two В1 on one mouth.
+ *  - MID-STREET JOINTS where the one-way continues. If the downstream node
+ *    carries another OUTGOING one-way edge, the flow simply carries on and the
+ *    „mouth" is a continuation, not an entry — the original degree-2 exclusion,
+ *    kept intact.
+ */
+export function onewayTerminalNoEntryEdges(
+  edges: readonly {
+    id: string;
+    oneway: boolean;
+    roundabout: boolean;
+    /** Node the edge's flow LEAVES from (geometry `from`). */
+    upstreamNodeId: string;
+    /** Node the edge's flow ENDS at (geometry `to`). */
+    downstreamNodeId: string;
+    downstreamDegree: number;
+  }[],
+): Set<string> {
+  // Nodes a one-way flow CARRIES ON from — i.e. some one-way edge starts there.
+  const flowLeaves = new Set<string>();
+  for (const e of edges) {
+    if (e.oneway && !e.roundabout) flowLeaves.add(e.upstreamNodeId);
+  }
+  const out = new Set<string>();
+  for (const e of edges) {
+    if (!e.oneway || e.roundabout) continue;
+    if (e.downstreamDegree >= 3) continue; // the junction rule owns this mouth
+    if (flowLeaves.has(e.downstreamNodeId)) continue; // a joint, not a mouth
+    out.add(e.id);
+  }
+  return out;
+}
+
 /** Direction pointing away from `nodeId` along the edge geometry. */
 function dirAwayFromNode(edge: DistrictEdge, nodeId: string): Vec2 {
   const g = edge.geometry;

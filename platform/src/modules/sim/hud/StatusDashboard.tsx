@@ -352,8 +352,19 @@ export function StatusDashboard({
 
       <Divider />
 
-      {/* Selector letter + gear — the driveline truth (P R N D / M2). */}
+      {/* Selector letter + gear — the driveline truth (P R N D / M2).
+
+          C7 (doc 87): `data-hud="speed-block"` is the CAMERA HANDLE, and it
+          belongs on THIS variant too. The compact readout above carried it and
+          this one did not, so the rule at PlayAreaStyles
+          (html[data-sim-camera="cockpit"] [data-hud="speed-block"]) matched
+          nothing on any screen wide enough to render the roomy bar — i.e. on
+          the desktop the founder was looking at, where the „Виток" 3D cluster
+          and this DOM readout showed the same selector letter and the same
+          number in one frame. Both halves fold in the cockpit camera; the
+          limit disc below deliberately does not (see the compact variant). */}
       <div
+        data-hud="speed-block"
         className="flex flex-col items-center gap-0.5"
         aria-label={`Скоростен лост: ${snap.gearLabel}`}
         title="Скоростен лост ([ към P · ] към D)"
@@ -374,6 +385,7 @@ export function StatusDashboard({
       {/* Speed — THE readout (large), with the legal-limit disc beside it. */}
       <div className="flex items-center gap-2 px-1 md:gap-2.5">
         <div
+          data-hud="speed-block"
           className="flex items-baseline gap-1"
           aria-label={`Скорост ${speed} километра в час`}
           title="Скорост"

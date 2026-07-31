@@ -47,7 +47,20 @@ export interface BuildingBuildResult {
   count: number;
 }
 
-export function facadeVariant(buildingId: string, height: number): number {
+/**
+ * Facade variant a `kind: "school"` block always takes. Variant 2 is the
+ * horizontal-band system (StaticWorld FACADE_SETS: bay_grid / bay_band /
+ * bay_strip / bay_curtain → index 2 = `bay_strip`), i.e. long ribbon windows
+ * rather than the punched panelka grid variant 0 the neighbouring residential
+ * blocks skew to. A school must not read as one more жилищен блок — that was
+ * the founder's whole complaint on item 61.
+ */
+const SCHOOL_FACADE_VARIANT = 2;
+
+export function facadeVariant(buildingId: string, height: number, kind?: string): number {
+  // A school is never hashed into the residential palette: it is the ONE
+  // building on the street a driver has to recognise (founder item 61).
+  if (kind === "school") return SCHOOL_FACADE_VARIANT;
   const h = hashString(buildingId);
   // Tall blocks skew toward the panel-block palette (variant 0) — Студентски
   // град is panelka country.
@@ -62,7 +75,12 @@ export function facadeVariant(buildingId: string, height: number): number {
  * candy. Uses a different hash lane than facadeVariant so tint and texture
  * variant don't correlate.
  */
-export function facadeTint(buildingId: string): [number, number, number] {
+export function facadeTint(buildingId: string, kind?: string): [number, number, number] {
+  // A school wears the Bulgarian school palette — warm ochre/cream, brighter
+  // than any of the residential jitter band (0.90–1.08 luminance). It is a
+  // FIXED tint, not a hashed one: this building must be the same recognisable
+  // colour on every map that ever hosts a school (founder item 61).
+  if (kind === "school") return [1.16, 1.05, 0.83];
   const h = hashString(`tint:${buildingId}`);
   const lum = 0.9 + 0.18 * ((h & 0xff) / 255);
   const warm = 0.985 + 0.03 * (((h >> 8) & 0xff) / 255);
@@ -84,7 +102,7 @@ function buildOne(
   const uOff = (bayHash % 4) * (FACADE_BAY_M / FACADE_TILE_U_M);
   const vOff = ((bayHash >> 2) % 3) * (FACADE_FLOOR_M / FACADE_TILE_V_M);
   const vAt = (y: number): number => vOff - y / FACADE_TILE_V_M;
-  const [tr, tg, tb] = facadeTint(b.id);
+  const [tr, tg, tb] = facadeTint(b.id, b.kind);
   const dark: [number, number, number] = [
     GROUND_BAND_TINT * tr,
     GROUND_BAND_TINT * tg,
@@ -172,7 +190,7 @@ export function buildBuildings(
   for (const b of buildings) {
     if (!b.footprint || b.footprint.length < 3) continue;
     const asTower = skipFacadesFor?.has(b.id) ?? false;
-    const variant = facadeVariant(b.id, resolveBuildingHeightM(b));
+    const variant = facadeVariant(b.id, resolveBuildingHeightM(b), b.kind);
     aabbs.push(
       buildOne(asTower ? null : walls[variant]!, asTower ? null : roofs, collider, b),
     );

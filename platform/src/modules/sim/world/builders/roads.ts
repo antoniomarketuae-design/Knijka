@@ -44,6 +44,12 @@ import {
 } from "./math2d";
 import { MeshAccumulator, toWorld, UP } from "./mesh";
 import { isBareVergeSide, type NodeInfo, type RoadNetwork } from "./network";
+import {
+  clipOutOfIslands,
+  islandContaining,
+  ringOutwardSide,
+  type RoundaboutRing,
+} from "./roundabout";
 
 const ASPHALT_UV_SCALE = 1 / 7; // planar meters -> uv
 const SIDEWALK_UV_SCALE = 1 / 2;
@@ -220,7 +226,7 @@ export interface JunctionPatch {
   /** CCW boundary of the patch polygon. */
   ring: Vec2[];
   /** Per-corner arc runs: inner boundary points between approach i and i+1. */
-  corners: { inner: Vec2[]; hasArc: boolean }[];
+  corners: { inner: Vec2[]; hasArc: boolean; insideIsland: boolean }[];
 }
 
 /**
@@ -228,19 +234,44 @@ export interface JunctionPatch {
  * order using their EXACT ribbon cut points (right then left of each
  * outgoing direction), with rounded corner arcs in between. Star-shaped
  * around the node, so a center fan triangulates it.
+ *
+ * ROUNDABOUTS (founder: „a Round a bout is a Cyrcle"). At an arm↔ring joint the
+ * open radius is the ARM's — on rb-mini that is 17.1 m against an 18 m ring, so
+ * four pads reach to within a metre of the centre and union into one open
+ * plaza. That plaza IS the square the founder saw. Every boundary point that
+ * falls inside a registered central island is therefore pushed radially out
+ * onto the island's kerb line: what is left of the pad is the annular
+ * carriageway between the kerb and the outside, and the middle stops being
+ * asphalt at all. Nodes with no island nearby keep byte-identical geometry —
+ * `clipOutOfIslands` returns points outside every island untouched.
  */
-function buildJunctionPatch(acc: MeshAccumulator, node: NodeInfo): JunctionPatch | null {
+function buildJunctionPatch(
+  acc: MeshAccumulator,
+  node: NodeInfo,
+  rings: readonly RoundaboutRing[],
+): JunctionPatch | null {
   const aps = node.approaches;
   if (aps.length < 2) return null;
   const ring: Vec2[] = [];
   const corners: JunctionPatch["corners"] = [];
+  const clip = (p: Vec2): Vec2 => (rings.length === 0 ? p : clipOutOfIslands(rings, p));
   for (let i = 0; i < aps.length; i++) {
     const ap = aps[i]!;
     const next = aps[(i + 1) % aps.length]!;
-    ring.push(ap.right, ap.left);
+    ring.push(clip(ap.right), clip(ap.left));
     const arc = node.degree >= 3 ? cornerArc(node, ap.left, next.right) : [];
-    corners.push({ inner: [ap.left, ...arc, next.right], hasArc: arc.length > 0 });
-    ring.push(...arc);
+    // A corner whose arc dips into the island is the star-shaped kerb bite the
+    // pads used to leave in the middle of the ring. Its asphalt is clipped like
+    // everything else; its raised APRON is dropped entirely (buildRoads below),
+    // because the island's own kerb is the kerb that belongs there.
+    const insideIsland =
+      rings.length > 0 && arc.some((p) => islandContaining(rings, p) !== null);
+    corners.push({
+      inner: [clip(ap.left), ...arc.map(clip), clip(next.right)],
+      hasArc: arc.length > 0,
+      insideIsland,
+    });
+    ring.push(...arc.map(clip));
   }
   if (ring.length < 3) return null;
 
@@ -355,6 +386,11 @@ function buildCornerAprons(acc: MeshAccumulator, node: NodeInfo, patch: Junction
     if (!SIDEWALK_CLASSES.has(ap.edge.class) && !SIDEWALK_CLASSES.has(next.edge.class)) continue;
     const corner = patch.corners[i]!;
     if (!corner.hasArc) continue; // open sweep — a wedge would self-cross
+    // The bite into the middle of a roundabout. Its arc was clipped onto the
+    // island's kerb line, so an apron here would build a SECOND raised kerb
+    // co-planar with the island's — a curb-height z-fight, and geometrically
+    // the four-pointed star the founder photographed. The island owns this kerb.
+    if (corner.insideIsland) continue;
     const inner = corner.inner;
     const c = node.pos;
     // Same 8-vertex profile as buildSidewalkStrip (chamfer incl.), radial out.
@@ -414,7 +450,14 @@ function buildCornerAprons(acc: MeshAccumulator, node: NodeInfo, patch: Junction
 // Entry point
 // ---------------------------------------------------------------------------
 
-export function buildRoads(network: RoadNetwork): RoadBuildResult {
+export function buildRoads(
+  network: RoadNetwork,
+  rings: readonly RoundaboutRing[] = [],
+): RoadBuildResult {
+  // Registered ring edge → its roundabout, so the outer kerb below is built
+  // against the ring it actually belongs to (a district may hold several).
+  const ringByEdgeId = new Map<string, RoundaboutRing>();
+  for (const r of rings) for (const id of r.ringEdgeIds) ringByEdgeId.set(id, r);
   // Ribbons + sidewalks carry baked vertex-color wear (wheel tracks, gutter
   // grime, curb-foot AO) — multiplied into their PBR maps at zero frame cost.
   const surface = new MeshAccumulator(true);
@@ -453,7 +496,22 @@ export function buildRoads(network: RoadNetwork): RoadBuildResult {
       }
     }
 
-    if (SIDEWALK_CLASSES.has(eb.edge.class) && !eb.edge.roundabout) {
+    const ringOf = ringByEdgeId.get(eb.edge.id);
+    if (ringOf) {
+      // THE OUTER KERB OF THE RING. A roundabout is two concentric circles, and
+      // until now the sim drew neither: ring edges were skipped by the sidewalk
+      // pass wholesale, so the circulatory carriageway simply bled into the
+      // terrain and the only thing bounding it was the horizon. The strip goes
+      // on the OUTWARD side only — the inward side is the central island's own
+      // kerb, and a second one there would stand in the traffic lane.
+      const lineLen = polylineLength(eb.line);
+      if (lineLen > 2) {
+        const inset = Math.min(0.6, lineLen * 0.08);
+        const walkLine = trimPolyline(eb.line, inset, inset, 1.0) ?? eb.line;
+        buildSidewalkStrip(sidewalks, walkLine, eb.halfWidth, ringOutwardSide(ringOf, walkLine));
+        sidewalkStripCount++;
+      }
+    } else if (SIDEWALK_CLASSES.has(eb.edge.class) && !eb.edge.roundabout) {
       // Pull sidewalk ends back a little so junction corners stay open.
       const lineLen = polylineLength(eb.line);
       if (lineLen > 6) {
@@ -474,7 +532,7 @@ export function buildRoads(network: RoadNetwork): RoadBuildResult {
 
   for (const node of network.nodes.values()) {
     if (node.approaches.length < 2) continue;
-    const patch = buildJunctionPatch(junctions, node);
+    const patch = buildJunctionPatch(junctions, node, rings);
     if (patch) {
       junctionPatchCount++;
       if (node.degree >= 3) buildCornerAprons(sidewalks, node, patch);

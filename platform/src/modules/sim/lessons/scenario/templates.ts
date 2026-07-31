@@ -49,6 +49,7 @@ import { SCENARIO_TEMPLATES_MERGING2 } from "./templates-merging2";
 import { SCENARIO_TEMPLATES_ROUNDABOUT2 } from "./templates-roundabout2";
 import { SCENARIO_TEMPLATES_LANES3 } from "./templates-lanes3";
 import { SCENARIO_TEMPLATES_REELS } from "./templates-reels";
+import { SCENARIO_TEMPLATES_PARKING3 } from "./templates-parking3";
 
 /**
  * The TARGET bay of content/world/lot-perp-v1.json — meta.scenario bay
@@ -330,6 +331,12 @@ export const SCENARIO_TEMPLATES: readonly ScenarioSpec[] = [
   // event), the animal-hazard solid-line swerve (code-built animal rig) and the
   // lane-control gantry WRONG_WAY (code-built overhead gantry, new lc-gantry-v1).
   ...SCENARIO_TEMPLATES_REELS,
+  // PARKING-DEPTH wave — the founder's „10 at least which to teach how to park
+  // the students". APPENDED, never inserted: the catalog is a flat list and he
+  // navigates it by position („catalog 9", „position 51"), so the ten arrive as
+  // one contiguous parking block at the end and every existing card keeps its
+  // number.
+  ...SCENARIO_TEMPLATES_PARKING3,
 ];
 
 /** Lookup by template id; undefined for unknown ids. */

@@ -1,0 +1,30 @@
+== FALSEHOOD BUDGET ==
+SPEED_TOO_FAST_FOR_CURVE: scenarios=1 rungs=4
+WRONG_WAY: scenarios=6 rungs=29
+   sc-ed-d2-priority-run, sc-rb-busy-gap, sc-rb-circulate-priority, sc-rb-exit-signal, sc-rb-lane-choice, sc-rb-ped-exit
+
+== CENSUS ==
+T1: 0 (scenarios)
+T2: 0 (scenarios)
+T3: 9 (objectives)
+T3b: 0 (objectives)
+T4: 0 (scenarios)
+T4raw: 95 (scenarios)
+T6: 0 (scenarios)
+T8: 0 (objectives)
+T8raw: 192 (objectives)
+T13: 0 (scenarios)
+T14: 4 (scenarios)
+L2: 0 (scenarios)
+L3: 5 (scenarios)
+L10: 0 (scenarios)
+L12: 65 (scenarios)
+B1: 5 (scenarios)
+B3: 18 (scenarios)
+B4: 0 (scenarios)
+B4raw: 149 (scenarios)
+S1: 2 (objectives)
+S2: 0 (scenarios)
+S3: 23 (scenarios)
+S4: 1 (scenarios)
+S5: 6 (scenarios)

@@ -365,6 +365,112 @@ describe("the gate never fires on a run that is progressing", () => {
 });
 
 // ---------------------------------------------------------------------------
+// 3a. B-NEW-1 — „it ends itself ~40 s after load while the car is parked"
+// ---------------------------------------------------------------------------
+
+/**
+ * The defect, verbatim from doc 87:229: „A scenario session ENDS ITSELF ~40 s
+ * after load while the car is parked at spawn, untouched … a student who
+ * pauses to look around the roundabout for half a minute is handed a резултат
+ * he never drove."
+ *
+ * The cause was not the rubric's parTimeSec (that stayed informational, as
+ * documented). It was the PLACEHOLDER POSE: scene/vehicleSample.ts publishes
+ * the district origin at zero speed for the frames before the chassis writes
+ * its first pose, `rb-mini-v1` centres its ring on exactly (0, 0), and the
+ * finish gates — unlike the objective chain — were not behind the frame-zero
+ * pose guard. One placeholder frame armed „you have left the ring"; the car
+ * then dwelt outside the ring at its own spawn and the drive „finished"
+ * FINISH_LEAVE_S later.
+ *
+ * These two tests are the before/after of that exact sequence, at the exact
+ * shipped geometry (ring centre (0,0) / enter 24 / exit 34, spawn
+ * rbm-spawn-south at (4.06, −93)).
+ */
+describe("B-NEW-1 — a drive that has not begun cannot end", () => {
+  const RB_OBJECTIVES: LessonObjective[] = [
+    {
+      id: "rb-approach",
+      titleBg: "Приближи кръга",
+      kind: "reachZone",
+      params: { x: 4.06, y: -34, radiusM: 9, maxSpeedKmh: 25 },
+    },
+    {
+      id: "rb-ring",
+      titleBg: "Премини кръговото",
+      kind: "completeManeuver",
+      params: { maneuver: "roundabout", x: 0, y: 0, enterRadiusM: 24, exitRadiusM: 34 },
+    },
+  ];
+  const RB_LESSON: LessonSpec = {
+    ...baseLesson,
+    id: "t-rb-parked",
+    titleBg: "Кръгово — паркирана кола",
+    objectives: RB_OBJECTIVES,
+  };
+  const SPAWN = { x: 4.06, y: -93 };
+
+  /** Tick the session `sec` seconds at 30 Hz, standing still at `pos`. */
+  function idle(state: LessonSessionState, pos: { x: number; y: number }, sec: number) {
+    let s = state;
+    for (let i = 1; i <= sec * 30; i++) {
+      s = applyTick(s, makeTick({ t: i / 30, speedKmh: 0, position: { ...pos } })).state;
+      if (s.phase !== "driving") return { state: s, endedAtSec: i / 30 };
+    }
+    return { state: s, endedAtSec: null as number | null };
+  }
+
+  it("the placeholder pose at the district origin no longer arms the finish", () => {
+    let s = createLessonSession(RB_LESSON);
+    // Frame 1: exactly what createVehicleSample() publishes — origin, 0 km/h.
+    // This is the frame that used to arm the roundabout's leave-the-ring gate.
+    s = applyTick(s, makeTick({ t: 0, speedKmh: 0, position: { x: 0, y: 0 } })).state;
+    expect(s.posedAtSec).toBeUndefined(); // not a described vehicle
+    expect(s.finishGate?.armed ?? false).toBe(false);
+    expect(s.finishRescueGate?.armed ?? false).toBe(false);
+
+    // Now the chassis publishes and the student does nothing for two minutes.
+    const { state, endedAtSec } = idle(s, SPAWN, 120);
+    expect(endedAtSec).toBeNull();
+    expect(state.phase).toBe("driving");
+  });
+
+  it("…and it took exactly one such frame to end the drive before the guard", () => {
+    // The pre-fix arithmetic, pinned on the raw gate so the regression is
+    // visible even if the engine wiring moves: one frame inside the arming
+    // circle, then a parked car outside the ring, and FINISH_LEAVE_S later
+    // the gate says the route is behind him.
+    const rb = routeFinishZone(RB_OBJECTIVES.map(parseObjectiveParams))!;
+    expect(rb.mode).toBe("outside");
+    let gate = createFinishGate();
+    gate = stepFinishGate(gate, rb, makeTick({ t: 0, speedKmh: 0, position: { x: 0, y: 0 } }));
+    expect(gate.armed).toBe(true); // the placeholder is inside enterRadiusM 24
+    for (let i = 1; i <= FINISH_LEAVE_S * 30 + 2; i++) {
+      gate = stepFinishGate(gate, rb, makeTick({ t: i / 30, speedKmh: 0, position: SPAWN }));
+    }
+    expect(gate.reachedAtSec).not.toBeNull();
+    expect(gate.reachedAtSec!).toBeLessThan(FINISH_LEAVE_S + 1);
+  });
+
+  it("a real drive still finishes: the guard costs one frame, not the gate", () => {
+    let s = createLessonSession(RB_LESSON);
+    s = applyTick(s, makeTick({ t: 0, speedKmh: 0, position: { x: 0, y: 0 } })).state;
+    // Drive to the ring, circulate, then leave northwards and keep going.
+    let t = 0;
+    const drive = (pos: { x: number; y: number }, sec: number, kmh = 25) => {
+      for (let i = 0; i < sec * 30; i++) {
+        t += 1 / 30;
+        s = applyTick(s, makeTick({ t, speedKmh: kmh, position: pos })).state;
+      }
+    };
+    drive({ x: 4.06, y: -34 }, 1, 20); // the give-way checkpoint, slow enough
+    drive({ x: 0, y: -18 }, 2, 20); // on the ring
+    drive({ x: 4.06, y: 60 }, FINISH_LEAVE_S + 1, 30); // gone, and staying gone
+    expect(s.phase).toBe("completed");
+  });
+});
+
+// ---------------------------------------------------------------------------
 // 3b. B2 — the rescue on the FINAL objective, and the two runs it must NOT eat
 // ---------------------------------------------------------------------------
 

@@ -16,7 +16,7 @@ const HERE = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(HERE, "../../../../../../..");
 
 describe("S2 catalog integrity", () => {
-  it("registers the full S1+S2+S3+S4+unit-2+breadth+signals+maneuver+hazards+final-harvest+cap-2+FO-06+VU-09+stage-1c+stage-1d+stage-2a+stage-2b+stage-3a+stage-3b+stage-4a+FO-pair+fog+curve+motorway+N11-telltale+OV-corridor+snow+N8-vru+OV-return+AC-12-crosswind+surface-patch+w1+w2+w3+w4+w5+w6+w7+w8+w9+reissue+giveway+parking-depth wave (157 templates across the families)", () => {
+  it("registers the full S1+S2+S3+S4+unit-2+breadth+signals+maneuver+hazards+final-harvest+cap-2+FO-06+VU-09+stage-1c+stage-1d+stage-2a+stage-2b+stage-3a+stage-3b+stage-4a+FO-pair+fog+curve+motorway+N11-telltale+OV-corridor+snow+N8-vru+OV-return+AC-12-crosswind+surface-patch+w1+w2+w3+w4+w5+w6+w7+w8+w9+reissue+giveway+parking-depth+park10 wave (167 templates across the families)", () => {
     const ids = SCENARIO_TEMPLATES.map((s) => s.id).sort();
     expect(ids).toEqual(
       [
@@ -205,6 +205,19 @@ describe("S2 catalog integrity", () => {
         "sc-accident-own-conduct",
         "sc-animal-hazard",
         "sc-lane-control-signal",
+        // PARKING-DEPTH wave (templates-parking3.ts) — the founder's „10 at
+        // least which to teach how to park the students". Ten drills, ten NEW
+        // committed lot-* districts, every one of them grading a parkInBay.
+        "sc-park-gap-short",
+        "sc-park-gap-long",
+        "sc-park-van",
+        "sc-park-45-rev",
+        "sc-park-left",
+        "sc-park-zebra",
+        "sc-park-wall",
+        "sc-park-night",
+        "sc-park-double",
+        "sc-park-judge",
       ].sort(),
     );
   });
@@ -255,7 +268,7 @@ describe("S2 catalog integrity", () => {
   // 450 trace JSONs get parsed here — well past vitest's 5 s default when the
   // box is under load (agent waves / dev server). Twice-observed flake; the
   // 30 s budget is for I/O contention, not slow code.
-  it("every shadow + mistake trace ref points at a committed, parseable file", { timeout: 30_000 }, () => {
+  it("every shadow + mistake trace ref points at a committed, parseable file", { timeout: 120_000 }, () => {
     for (const spec of SCENARIO_TEMPLATES) {
       const refs = [spec.shadow, ...spec.mistakes.map((m) => m.traceRef)];
       for (const ref of refs) {

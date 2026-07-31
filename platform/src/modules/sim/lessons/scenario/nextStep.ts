@@ -29,6 +29,34 @@
  * never gated — L1 of any card is always open — so a star-locked ladder still
  * leads somewhere, and „Повтори" stays one click away for re-earning the stars.
  *
+ * ---------------------------------------------------------------------------
+ * FR-06 (founder, 2026-07-29): „we should give users an option continue to
+ * next question although you made mistake and come back to this later if they
+ * want because currently we are blocking them from advancing and sometimes
+ * they just want to go trough all first."
+ *
+ * This module used to open with `if (!passed || !allObjectivesPassed) return
+ * NO_STEPS` — a failed attempt was offered NO forward button at all, so the
+ * ONLY way out of a card was to drive it clean. That is the same wall he
+ * reported from the other side in „I went to the end of the course and the
+ * course didn't finish … now i'm stuck here and cant finish or go to the next
+ * lesson" (FR-23): the engine now ENDS such a drive (lessons/finish.ts), and
+ * this is what has to be waiting when it does.
+ *
+ * The two targets answer him separately, and the split is the teaching:
+ *   (a) the LEVEL step still demands a green run and its stars. One rung
+ *       harder is earned — offering Ниво 3 to a student who has not yet
+ *       driven Ниво 2 cleanly is not freedom, it is setting him up to fail,
+ *       and the server would refuse the attempt anyway (LEVEL_LOCKED).
+ *   (b) the TEMPLATE step is offered ALWAYS — after a clean run and after a
+ *       failed one. The next card is a DIFFERENT skill at its easiest rung;
+ *       nothing about failing a roundabout makes a student unready to meet a
+ *       zebra crossing. The card he failed keeps its place in the catalog and
+ *       he can come back to it, which is exactly what he asked for.
+ * The end screen says which of the two situations it is in (sessionEndCtas.ts
+ * demotes the forward button and leaves the accent on „Повтори" after a
+ * failure) — the student is never told he has passed something he has not.
+ *
  * `resolveScenarioNextStep` (singular) is the one-target view of the same
  * answer: level first, else template. Both share this one resolution — the
  * catalog order is read in exactly one place.
@@ -108,16 +136,16 @@ const NO_STEPS: ScenarioNextSteps = { level: null, template: null };
 
 /**
  * Resolve every target reachable from a finished attempt. Both null when the
- * run was not green, when the id/rung is foreign — and, the case the UI must
- * speak to, when the catalog is exhausted (end of the library).
+ * id/rung is foreign — and, the case the UI must speak to, when the catalog is
+ * exhausted (end of the library). After a FAILED attempt the level step is
+ * withheld and the template step is not (FR-06, header).
  */
 export function resolveScenarioNextSteps(
   input: ScenarioNextStepInput,
   catalog: readonly ScenarioSpec[] = SCENARIO_TEMPLATES,
 ): ScenarioNextSteps {
   const { templateId, level, passed, allObjectivesPassed, stars = null } = input;
-  // Only a fully green run advances — the buttons are the reward, not a skip.
-  if (!passed || !allObjectivesPassed) return NO_STEPS;
+  const green = passed && allObjectivesPassed;
 
   const index = catalog.findIndex((s) => s.id === templateId);
   if (index === -1) return NO_STEPS;
@@ -126,13 +154,14 @@ export function resolveScenarioNextSteps(
   // An unauthored rung never compiled, so it cannot have been played.
   if (!levels.includes(level)) return NO_STEPS;
 
-  // (a) one rung up the same ladder — unless the stars leave it locked. A
-  // locked rung is withheld, never offered-and-refused: actions.ts would
-  // reject the attempt (LEVEL_LOCKED) after a full drive.
+  // (a) one rung up the same ladder — only off a GREEN run, and only unless
+  // the stars leave it locked. A locked rung is withheld, never
+  // offered-and-refused: actions.ts would reject the attempt (LEVEL_LOCKED)
+  // after a full drive.
   const nextLevel = levels.find((l) => l > level);
   const starsOpenNextLevel = stars === null || stars >= SCENARIO_UNLOCK_MIN_STARS;
   const levelStep =
-    nextLevel !== undefined && starsOpenNextLevel
+    green && nextLevel !== undefined && starsOpenNextLevel
       ? stepFor(spec, nextLevel, "level", spec.family)
       : null;
 

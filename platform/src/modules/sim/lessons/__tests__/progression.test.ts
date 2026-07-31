@@ -13,7 +13,8 @@ describe("computeProgression", () => {
     const entries = computeProgression(LESSONS, []);
     expect(entries[0].lesson.id).toBe("l0-free-drive");
     expect(entries[0].unlocked).toBe(true);
-    // Every subsequent lesson in the chain is locked until its predecessor passes.
+    // Every subsequent lesson in the chain is locked until its predecessor
+    // has been DRIVEN (FR-06 — attempted, not necessarily passed).
     expect(entries.slice(1).every((e) => !e.unlocked)).toBe(true);
     expect(entries[0].attempts).toBe(0);
     expect(entries[0].bestScore).toBeNull();
@@ -25,7 +26,19 @@ describe("computeProgression", () => {
     expect(entryFor(rows, "l2-intersections").unlocked).toBe(false);
   });
 
-  it("failed attempts count but never unlock", () => {
+  /**
+   * FR-06 (founder, 2026-07-29): „we should give users an option continue to
+   * next question although you made mistake and come back to this later …
+   * currently we are blocking them from advancing and sometimes they just
+   * want to go trough all first."
+   *
+   * This test used to be called „failed attempts count but never unlock" and
+   * asserted the wall. The rule it pinned is the one he overruled: a student
+   * who drove Урок 1 to the end and failed it could not open Урок 2 at all.
+   * A failed attempt now OPENS the next door and still does not claim this
+   * lesson is done — those are two different facts and the entry carries both.
+   */
+  it("FR-06: a failed attempt opens the next lesson and still reads as not passed", () => {
     const rows: LessonAttemptRow[] = [
       { lessonId: "l0-free-drive", passed: true, score: 0 },
       { lessonId: "l1-preparation", passed: false, score: 12 },
@@ -33,10 +46,15 @@ describe("computeProgression", () => {
     ];
     const l1 = entryFor(rows, "l1-preparation");
     expect(l1.unlocked).toBe(true);
-    expect(l1.passed).toBe(false);
+    expect(l1.passed).toBe(false); // the verdict is untouched — it is not a pass
     expect(l1.attempts).toBe(2);
     expect(l1.bestScore).toBe(4); // penalty points: lower is better
-    expect(entryFor(rows, "l2-intersections").unlocked).toBe(false);
+    // …and the door onward is open, which is the whole ask.
+    const l2 = entryFor(rows, "l2-intersections");
+    expect(l2.unlocked).toBe(true);
+    expect(l2.passed).toBe(false);
+    // ORDER still holds: nothing two steps ahead opens on one failed drive.
+    expect(entryFor(rows, "l3-roundabout").unlocked).toBe(false);
   });
 
   it("keeps best (lowest) score across passes and failures", () => {

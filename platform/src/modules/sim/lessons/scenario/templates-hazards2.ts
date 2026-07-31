@@ -198,7 +198,7 @@ export const SC_HZ_EMERGENCY_STOP: ScenarioSpec = {
     {
       n: 1,
       textBg:
-        "Права градска улица, ограничение 50. Потегли и се стабилизирай на 50 км/ч — днес не се учим да караме бавно „за всеки случай“, а да спираме, когато потрябва.",
+        "Права градска улица, ограничение 50. Потегли и се стабилизирай на 50 км/ч — днес не се учим да караме бавно „за всеки случай“, а да спираме, когато потрябва. Вали ли, включи късите светлини още преди да потеглиш (чл. 70): при аварийно спиране на мокро задните ти светлини са единственото предупреждение, което идващият отзад получава навреме.",
     },
     {
       n: 2,
@@ -473,7 +473,7 @@ export const SC_HZ_BRAKE_DONT_SWERVE: ScenarioSpec = {
     {
       n: 1,
       textBg:
-        "Еднопосочна улица с две ленти, ограничение 50. Ти си в дясната лента — потегли и се стабилизирай на 50 км/ч.",
+        "Еднопосочна улица с две ленти, ограничение 50. Ти си в дясната лента — потегли и се стабилизирай на 50 км/ч. Вали ли, включи късите светлини преди това (чл. 70): мокрият асфалт скрива и препятствието пред теб, и теб — от този, който кара зад теб и ще види спирачките ти в последния момент.",
     },
     {
       n: 2,
@@ -652,6 +652,48 @@ export const SC_HZ_ACCIDENT_BYSTANDER: PedestrianDartOutSpec = {
 };
 
 /**
+ * THE SECOND BYSTANDER (founder: „the question statements says … and in the map
+ * engineering its only 1"). Every sentence this drill is built on is plural —
+ * the objective says «мини широко от ХОРАТА», instruction 4 says «мини ШИРОКО
+ * от хората», and the squeeze demo's own text says «някой се навежда над ранен,
+ * ДРУГ пристъпва назад, без да гледа». Against ONE staged figure that second
+ * clause described nobody, and the „непредвидимо платно" the lesson teaches was
+ * a single predictable walker.
+ *
+ * He is the man stepping BACK from the wreck: x 4.6 → 7.8 (outward, toward the
+ * kerb), three metres further up the scene, at a slower 1.1 m/s. The SAFETY
+ * INVARIANT of the first bystander is preserved exactly and for the same
+ * reason: he never leaves the curb-HALF of the lane (min x = 4.6 > 4.4), so the
+ * shadow's wide line at x = 1.8 clears him by ≥ 2.8 m — more than
+ * PEDESTRIAN_CONTACT_M (1.5) on every frame, whatever the timing. The wide-and-
+ * slow pass the lesson teaches stays contact-free BY CONSTRUCTION; only the
+ * tight squeeze finds him, which is the same thing that was already true.
+ *
+ * Released 34 m out (the first: 26 m) so the two are moving in opposite
+ * directions as the car arrives — that is what „платното е непредвидимо" looks
+ * like from the driving seat.
+ *
+ * Mounted through `LevelSpec.stagedAdd` on every rung: the trace recorder reads
+ * `spec.staged` (traces/scHzAccidentScene.ts), so both committed recordings and
+ * the §5/§9 gate stay byte-identical (the LET_PASS_PED_COMPANION precedent).
+ */
+const SC_HZ_ACCIDENT_BYSTANDER_2: PedestrianDartOutSpec = {
+  id: "sc-hzac-bystander-2",
+  kind: "pedestrianDartOut",
+  libraryEventId: "ev-accident-scene-conduct",
+  crossingId: "hzac-scene",
+  crossing: { x: ACC_LANE_X, y: 155.2 },
+  start: { x: 4.6, y: 155.2 },
+  dir: { x: 1, y: 0 },
+  speedMps: 1.1,
+  travelM: 3.2,
+  roadFromM: 0,
+  roadToM: 3.2,
+  triggerDistM: 34,
+  minTriggerSpeedKmh: 18,
+};
+
+/**
  * The ARRIVING RIG (ambience — ЗДвП чл. 91). An `emergencyApproach` closing from
  * behind on the LEFT (oncoming) lane, heading to the scene: the player must not
  * block it. It is tuned to PASS before the scene and never convict: a fast rig
@@ -751,7 +793,7 @@ export const SC_HZ_ACCIDENT_SCENE: ScenarioSpec = {
     {
       n: 1,
       textBg:
-        "Права градска улица, ограничение 50. Напред вдясно има прясна катастрофа — смачкани коли и хора около тях, изял е половината от твоята лента.",
+        "Права градска улица, ограничение 50. Напред вдясно има прясна катастрофа — смачкани коли и хора около тях, изял е половината от твоята лента. По тъмно карай с включени къси светлини (чл. 70): около катастрофа се движат хора пеша и те виждат приближаващата кола единствено по фаровете ѝ.",
     },
     {
       n: 2,
@@ -836,15 +878,17 @@ export const SC_HZ_ACCIDENT_SCENE: ScenarioSpec = {
       "Изпитващият гледа три неща покрай сцена на произшествие: намаляваш ли предварително и осезаемо, минаваш ли с достатъчна странична дистанция от хората и — задължително — НЕ спираш ли в лентата да гледаш. Спиране за зяпане покрай произшествие е груба грешка (пречиш на движението и на помощта); удар в човек или в спряло превозно средство прекратява изпита. Ако приближава специален режим — правиш му път без забавяне.",
   },
   levels: [
-    { level: 1 },
-    { level: 2 },
-    { level: 3 },
-    { level: 4, vehicleStart: "cold" },
+    // The SECOND bystander rides on every played rung — «хората» is plural in
+    // the objective, in step 4 and in the squeeze demo's own text.
+    { level: 1, stagedAdd: [SC_HZ_ACCIDENT_BYSTANDER_2] },
+    { level: 2, stagedAdd: [SC_HZ_ACCIDENT_BYSTANDER_2] },
+    { level: 3, stagedAdd: [SC_HZ_ACCIDENT_BYSTANDER_2] },
+    { level: 4, vehicleStart: "cold", stagedAdd: [SC_HZ_ACCIDENT_BYSTANDER_2] },
     // L5 — night: the difficulty axis is SEEING the scene in time. A crash at
     // night is read from flares and the light bar, not the skyline, so the
     // early slow-down has to come from those cues. RENDER only — no physics
     // (ADR-006 stage 4a: the authored ghost is dry-tuned), no new grading.
-    { level: 5, conditions: { night: true } },
+    { level: 5, conditions: { night: true }, stagedAdd: [SC_HZ_ACCIDENT_BYSTANDER_2] },
   ],
   staged: [SC_HZ_ACCIDENT_BYSTANDER, SC_HZ_ACCIDENT_EMERGENCY],
   conditions: { weather: "dry" },
