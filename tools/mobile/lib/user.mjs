@@ -69,7 +69,22 @@ async function connect(attempts = 20) {
   const { Client } = require("pg");
   let lastError;
   for (let i = 0; i < attempts; i += 1) {
-    const client = new Client({ connectionString });
+    // AND A CONNECT DEADLINE, because `pg` has none by default.
+    //
+    // The retry loop above is bounded (20 tries, ~57 s) ONLY if each attempt
+    // ends. `client.connect()` with no `connectionTimeoutMillis` waits on the
+    // socket forever, so a PGlite daemon that accepts the TCP connection and
+    // then never finishes the startup handshake does not produce an error to
+    // retry — it produces a sweep that sits at zero CPU indefinitely. Measured:
+    // a run stopped here for 17 minutes and printed nothing, while a standalone
+    // client with this option connected to the same database in 14 ms.
+    // A wedged database must look like a failure, not like a slow box.
+    const client = new Client({
+      connectionString,
+      connectionTimeoutMillis: 10_000,
+      query_timeout: 30_000,
+      statement_timeout: 30_000,
+    });
     // A socket the server resets mid-handshake surfaces as an 'error' event on
     // an otherwise unreferenced client; without this it becomes an unhandled
     // rejection that kills the whole run.

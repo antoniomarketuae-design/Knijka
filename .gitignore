@@ -50,3 +50,8 @@ tools/mobile/.out/
 .fold-rig/
 .deck-rig/
 .mobile-rig/
+
+# agent verification frames — evidence, kept on disk, never committed
+scratchpad/
+**/scratchpad/
+tools/clips/headless/.srt/

@@ -47,6 +47,33 @@ const OUT_DIR = join(HERE, ".out", "overlays");
 const OVERLAY_PEEK_MAX_FRACTION = 0.12;
 const CENTRE_BAND = { x0: 0.16, x1: 0.84, y0: 0.2, y1: 0.74 };
 
+/**
+ * EVERY SURFACE THAT CAN CLAIM THE TOP OF THE SCREEN — not just the queue's.
+ *
+ * This list is why the probe used to certify a screen it had not looked at.
+ * `[data-sim-overlay]` is the queue's own root, and the queue behaves: it
+ * showed `overlays=0, layer 0.0%` and exit 0 while the founder's landing frame
+ * carried FOUR painted surfaces on top of each other. Three of the four are
+ * mounted in the SCENE tree and never enter the queue, so a probe that looks
+ * only for the queue's marker cannot see the defect it exists to catch — and
+ * doc 87 row C1 had to be judged by eye instead.
+ *
+ * A surface belongs here when it can appear WITHOUT the student asking for it.
+ * `touch-controls` is excluded on purpose: the student's thumbs are not a popup.
+ */
+const CONTENDERS = [
+  ['[data-sim-overlay]', "queue"],
+  ['[data-hud="touch-hint"]', "touch-hint"],
+  ['[data-hud="audio-prompt"]', "audio-prompt"],
+  ['[data-hud="difficulty"]', "tier-picker"],
+  ['[data-hud="demo-deck"]', "demo-deck"],
+  ['[data-hud="telltale-pings"]', "telltale-pings"],
+  ['[data-hud="toasts"]', "toasts"],
+  ['[data-hud="objective-stack"]', "objective-stack"],
+  ['[data-hud="predrive-checklist"]', "predrive-checklist"],
+  ['[role="dialog"]', "dialog"],
+];
+
 function parseArgs(argv) {
   const out = { devices: [], flags: new Set() };
   for (let i = 0; i < argv.length; i += 1) {
@@ -63,7 +90,7 @@ function parseArgs(argv) {
 // The in-page half. Runs inside WebKit; may not reference Node.
 // -----------------------------------------------------------------------------
 function overlayProbeBody(config) {
-  const { band, peekMax } = config;
+  const { band, peekMax, contenders } = config;
   const VW = Math.round(window.innerWidth);
   const VH = Math.round(window.innerHeight);
   const AREA = VW * VH;
@@ -91,6 +118,115 @@ function overlayProbeBody(config) {
 
   const roots = Array.from(document.querySelectorAll("[data-sim-overlay]")).filter(visible);
 
+  // ---- EVERY CONTENDER FOR THE SCREEN, not only the queue's own roots ------
+  // Measured separately from `roots` so the queue's numbers keep their old
+  // meaning and the new ones cannot be confused with them. Nested matches are
+  // dropped (a dialog that contains a queue root is one surface, not two).
+  const clampi2 = (v, lo, hi) => (v < lo ? lo : v > hi ? hi : v);
+  const contenderNodes = [];
+  for (const [selector, name] of contenders || []) {
+    for (const el of document.querySelectorAll(selector)) {
+      if (!visible(el)) continue;
+      if (contenderNodes.some((c) => c.el.contains(el) || el.contains(c.el))) continue;
+      contenderNodes.push({ el, name });
+    }
+  }
+  const surfaceMask = new Uint8Array(AREA);
+  let surfacePx = 0;
+  let surfaceBandPx = 0;
+  const surfaces = [];
+  const surfaceSmallTargets = [];
+  for (const { el: root, name } of contenderNodes) {
+    let ownPx = 0;
+    for (const el of [root, ...root.querySelectorAll("*")]) {
+      if (!visible(el)) continue;
+      const cs = getComputedStyle(el);
+      const bg = cs.backgroundColor || "";
+      const paintsBox =
+        (bg && bg !== "transparent" && !/rgba\(.*,\s*0\)$/.test(bg)) ||
+        (cs.backgroundImage && cs.backgroundImage !== "none") ||
+        (cs.backdropFilter && cs.backdropFilter !== "none") ||
+        (cs.webkitBackdropFilter && cs.webkitBackdropFilter !== "none") ||
+        (cs.boxShadow && cs.boxShadow !== "none") ||
+        Number.parseFloat(cs.borderTopWidth) > 0 ||
+        Number.parseFloat(cs.borderBottomWidth) > 0 ||
+        Number.parseFloat(cs.borderLeftWidth) > 0 ||
+        Number.parseFloat(cs.borderRightWidth) > 0;
+      if (!paintsBox) continue;
+      const r = el.getBoundingClientRect();
+      const left = clampi2(Math.floor(r.left), 0, VW);
+      const top = clampi2(Math.floor(r.top), 0, VH);
+      const right = clampi2(Math.ceil(r.right), 0, VW);
+      const bottom = clampi2(Math.ceil(r.bottom), 0, VH);
+      if (right <= left || bottom <= top) continue;
+      for (let y = top; y < bottom; y += 1) {
+        const row = y * VW;
+        for (let x = left; x < right; x += 1) {
+          const i = row + x;
+          if (surfaceMask[i]) continue;
+          surfaceMask[i] = 1;
+          surfacePx += 1;
+          ownPx += 1;
+          if (
+            x >= bandRect.left && x < bandRect.right &&
+            y >= bandRect.top && y < bandRect.bottom
+          ) {
+            surfaceBandPx += 1;
+          }
+        }
+      }
+    }
+    const rr = root.getBoundingClientRect();
+    surfaces.push({
+      name,
+      label: (root.getAttribute("aria-label") || "").slice(0, 48),
+      text: (root.textContent || "").replace(/\s+/g, " ").trim().slice(0, 70),
+      rect: {
+        x: Math.round(rr.left),
+        y: Math.round(rr.top),
+        w: Math.round(rr.width),
+        h: Math.round(rr.height),
+      },
+      paintedPx: ownPx,
+      paintedPct: Number(((ownPx / AREA) * 100).toFixed(2)),
+    });
+    // THE CONTROL THAT CLEARS THE POPUP IS THE ONE THAT MUST BE PRESSABLE.
+    // Row C2: «Разбрах» measured 62.9 x 24.9 and was painted over by the
+    // surface stacked on it, so the student could not dismiss the thing
+    // covering his road. Hit area, not ink — ::before insets count, which is
+    // how the app buys 44 px without buying 44 px of chrome.
+    for (const b of root.querySelectorAll('button,a[href],[role="button"]')) {
+      if (!visible(b)) continue;
+      let box = b.getBoundingClientRect();
+      let w = box.width;
+      let h = box.height;
+      for (const pseudo of ["::before", "::after"]) {
+        const ps = getComputedStyle(b, pseudo);
+        if (!ps || ps.content === "none" || ps.position !== "absolute") continue;
+        const px = (v) => Number.parseFloat(v) || 0;
+        h += Math.max(0, -px(ps.top)) + Math.max(0, -px(ps.bottom));
+        w += Math.max(0, -px(ps.left)) + Math.max(0, -px(ps.right));
+      }
+      // COVERED IS AS BAD AS SMALL. elementFromPoint at the control's centre
+      // is what a thumb does; if it lands on something else, the button is
+      // decorative. This is the harness's own «Разбрах» warning, promoted from
+      // a console line to a measurement.
+      const cx = box.left + box.width / 2;
+      const cy = box.top + box.height / 2;
+      const hit = document.elementFromPoint(cx, cy);
+      const covered = !!hit && hit !== b && !b.contains(hit) && !hit.contains(b);
+      if (w < 44 || h < 44 || covered) {
+        surfaceSmallTargets.push({
+          surface: name,
+          label: (b.textContent || b.getAttribute("aria-label") || "").trim().slice(0, 32),
+          w: Math.round(w),
+          h: Math.round(h),
+          covered,
+        });
+      }
+    }
+  }
+
   // Union of every pixel painted by the overlay layer, rasterised at 1 CSS px —
   // the same accounting the coverage probe uses, so a translucent pill is
   // charged for its rectangle exactly like a solid card would be.
@@ -116,10 +252,10 @@ function overlayProbeBody(config) {
         Number.parseFloat(cs.borderBottomWidth) > 0;
       if (!paints) continue;
       const r = el.getBoundingClientRect();
-      const left = clampi(Math.floor(r.left), 0, VW);
-      const top = clampi(Math.floor(r.top), 0, VH);
-      const right = clampi(Math.ceil(r.right), 0, VW);
-      const bottom = clampi(Math.ceil(r.bottom), 0, VH);
+      const left = clampi2(Math.floor(r.left), 0, VW);
+      const top = clampi2(Math.floor(r.top), 0, VH);
+      const right = clampi2(Math.ceil(r.right), 0, VW);
+      const bottom = clampi2(Math.ceil(r.bottom), 0, VH);
       if (right <= left || bottom <= top) continue;
       boxes.push({
         kind: root.getAttribute("data-sim-overlay"),
@@ -183,7 +319,15 @@ function overlayProbeBody(config) {
 
   return {
     viewport: { width: VW, height: VH },
+    // The queue's own accounting — unchanged meaning.
     overlayCount: roots.length,
+    // Row C1's accounting: everything competing for the screen at this instant.
+    surfaceCount: contenderNodes.length,
+    surfaces,
+    surfacePx,
+    surfaceFraction: Number((surfacePx / AREA).toFixed(4)),
+    surfaceCentreBandPx: surfaceBandPx,
+    surfaceSmallTargets,
     kinds: roots.map((r) => ({
       kind: r.getAttribute("data-sim-overlay"),
       state: r.getAttribute("data-sim-overlay-state"),
@@ -237,6 +381,7 @@ async function measure(page, label, device, shotDir) {
   const overlay = await page.evaluate(overlayProbeBody, {
     band: CENTRE_BAND,
     peekMax: OVERLAY_PEEK_MAX_FRACTION,
+    contenders: CONTENDERS,
   });
   const coverage = await page.evaluate(probeBody, {
     contentSelectors: ["canvas"],
@@ -334,6 +479,15 @@ try {
       await gotoAuthenticated(page, url, route);
       await page.waitForSelector("canvas", { timeout: 180_000, state: "attached" });
       await page.waitForTimeout(6000);
+
+      // ── THE STATE HE ACTUALLY OPENS ON, MEASURED FIRST ──────────────────
+      // This row did not exist, and its absence is why the overlay budget
+      // reported exit 0 for a screen the founder called „not playable at all".
+      // The probe used to dismiss the intro and then measure — i.e. it stepped
+      // over the one frame row C1 is about. Measured before anything is
+      // dismissed, and BEFORE `driving`, because a student cannot skip it.
+      rows.push(await measure(page, "landing", device, OUT_DIR));
+
       await dismissIntro(page);
       await page.waitForTimeout(1500);
 
@@ -375,14 +529,38 @@ for (const r of rows) {
   for (const t of r.theo4) {
     if (!t.reachableWhy) problems.push(`THEO-4: ${t.kind} has no reachable WHY`);
   }
+  // ROW C1 — MUTUAL EXCLUSION ACROSS BOTH TREES, and it counts on every state.
+  // „ONE overlay visible at a time" was the phase-4 acceptance; it was only
+  // ever enforced against the queue's own roots, which is how four surfaces
+  // could stack while the probe printed overlays=0.
+  if (r.surfaceCount > 1) {
+    problems.push(
+      `${r.surfaceCount} SURFACES AT ONCE (${r.surfaces.map((s) => s.name).join("+")})`,
+    );
+  }
+  // ROW C2 — and the harness's own „«Разбрах» was not tappable" warning, which
+  // used to be a console line nothing could fail on.
+  for (const t of r.surfaceSmallTargets || []) {
+    problems.push(
+      t.covered
+        ? `«${t.label}» on ${t.surface} is PAINTED OVER`
+        : `«${t.label}» on ${t.surface} is ${t.w}x${t.h}`,
+    );
+  }
   if (problems.length > 0) failed = true;
   console.log(
-    `  ${r.device.padEnd(20)} ${r.state.padEnd(9)} overlays=${r.overlayCount} ` +
-      `layer=${(r.overlayFraction * 100).toFixed(1)}% band=${r.centreBandPx}px ` +
+    `  ${r.device.padEnd(20)} ${r.state.padEnd(9)} surfaces=${r.surfaceCount} ` +
+      `overlays=${r.overlayCount} ` +
+      `layer=${(r.surfaceFraction * 100).toFixed(1)}% band=${r.surfaceCentreBandPx}px ` +
       `road=${(r.roadFraction * 100).toFixed(1)}% chrome=${(r.chromeFraction * 100).toFixed(1)}%` +
       (problems.length > 0 ? `   <-- ${problems.join(" · ")}` : "   ok"),
   );
-  for (const k of r.kinds) console.log(`      ${k.kind}/${k.state}: ${k.text}`);
+  for (const s of r.surfaces || []) {
+    console.log(
+      `      ${String(s.name).padEnd(20)} ${String(s.rect.w + "x" + s.rect.h).padEnd(9)} ` +
+        `at ${s.rect.x},${s.rect.y}  ${String(s.paintedPct).padStart(5)}% ink  ${s.text}`,
+    );
+  }
 }
 console.log(`\n  captures: ${OUT_DIR}`);
 process.exit(failed ? 1 : 0);

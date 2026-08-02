@@ -392,6 +392,74 @@ export function probeBody(config) {
     }
   }
 
+  // ------------------------------------------------------------ content USE
+  // A CONTENT SURFACE THAT STRETCHES IS NOT THE SAME AS A SCREEN THAT IS USED.
+  //
+  // Row C4 (doc 87:240): the practice runner's screen share „recovered" from
+  // 51.6% to 86.4% — and the frame still shows the question, four answers and
+  // «Провери» ending around 60% of the way down, with the rest of the card
+  // empty. Both statements are true, because `PracticeSession.tsx` gives the
+  // card `max-sm:flex-1 short:flex-1`: it grows to the bottom of the phone
+  // whether or not anything is in it. This file's own README says „a budget you
+  // can satisfy by growing a <div> is not a budget" — that was written about
+  // measuring the WRAPPER instead of the card, and the same trick then arrived
+  // one level down.
+  //
+  // So: where does the ink actually stop inside the declared surface? This is
+  // reported, never gated. It is a fact about density, not about chrome, and
+  // the founder's sentence („85% of the screen available for the questions") is
+  // genuinely satisfied by empty space inside the card. Rows are owed the
+  // number so nobody has to argue from a screenshot again.
+  let inkBottom = -1;
+  let surfaceTop = Number.POSITIVE_INFINITY;
+  let surfaceBottom = -1;
+  // Row occupancy over the whole viewport height: 1 where SOMETHING inside the
+  // content surface puts ink on that scanline. The tail alone is not the
+  // answer — on the practice runner the action bar is pinned to the card's
+  // bottom edge, so the tail is 22 px while the hole is in the MIDDLE, between
+  // the last answer and that bar. `largestGapPx` is the number row C4 is about.
+  const inkRow = new Uint8Array(VH);
+  for (const el of contentEls) {
+    const r = el.getBoundingClientRect();
+    surfaceTop = Math.min(surfaceTop, Math.max(0, r.top));
+    surfaceBottom = Math.max(surfaceBottom, Math.min(VH, r.bottom));
+    for (const node of [el, ...el.querySelectorAll("*")]) {
+      const cs = getComputedStyle(node);
+      if (cs.display === "none" || cs.visibility === "hidden") continue;
+      if (Number.parseFloat(cs.opacity) <= 0) continue;
+      const boxes = [];
+      if (REPLACED.has(node.tagName) || boxPaint(node, cs) > 0) {
+        boxes.push(...paintedBoxes(node));
+      }
+      boxes.push(...textBoxes(node, cs));
+      for (const b of boxes) {
+        if (b.bottom > inkBottom) inkBottom = b.bottom;
+        for (let y = Math.max(0, b.top); y < Math.min(VH, b.bottom); y += 1) inkRow[y] = 1;
+      }
+    }
+  }
+  const usedBottom = inkBottom < 0 ? surfaceTop : inkBottom;
+  const emptyTailPx =
+    surfaceBottom < 0 ? 0 : Math.max(0, Math.round(surfaceBottom - usedBottom));
+
+  // The tallest run of scanlines INSIDE the surface that carries nothing.
+  let largestGapPx = 0;
+  let gapTopPx = null;
+  if (Number.isFinite(surfaceTop) && surfaceBottom > surfaceTop) {
+    let run = 0;
+    for (let y = Math.round(surfaceTop); y < Math.round(surfaceBottom); y += 1) {
+      if (inkRow[y]) {
+        run = 0;
+        continue;
+      }
+      run += 1;
+      if (run > largestGapPx) {
+        largestGapPx = run;
+        gapTopPx = y - run + 1;
+      }
+    }
+  }
+
   let contentPx = 0;
   let chromePx = 0;
   let freePx = 0;
@@ -665,6 +733,17 @@ export function probeBody(config) {
       chromeFraction: Number((chromePx / AREA).toFixed(4)),
       unclaimedFraction: Number(((AREA - freePx - chromePx) / AREA).toFixed(4)),
       bands,
+      // Reported, not gated — see the „content USE" note above.
+      contentUse: {
+        surfaceTopPx: Number.isFinite(surfaceTop) ? Math.round(surfaceTop) : null,
+        surfaceBottomPx: surfaceBottom < 0 ? null : Math.round(surfaceBottom),
+        lastInkBottomPx: inkBottom < 0 ? null : Math.round(inkBottom),
+        emptyTailPx,
+        emptyTailFraction: Number((emptyTailPx / VH).toFixed(4)),
+        largestGapPx,
+        largestGapTopPx: gapTopPx,
+        largestGapFraction: Number((largestGapPx / VH).toFixed(4)),
+      },
       topContributors: contributors.slice(0, 15),
       invisibleInteractive: invisibleInteractive.slice(0, 20),
     },

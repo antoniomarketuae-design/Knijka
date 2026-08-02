@@ -101,27 +101,57 @@ async function shoot(page, id) {
   return speeds;
 }
 
-/** The B71 pair: identical pose, lights OFF then lights ON (KeyL). */
+/**
+ * The B71 protocol: the SAME pose photographed lights-OFF → ON → OFF, in BOTH
+ * the cockpit and the exterior view.
+ *
+ * Why the car is stopped for the A/B: the founder's claim is „we turn them on
+ * and nothing changes". A pair shot while rolling changes the pose as well as
+ * the lamps, so any difference is unattributable. Stopped, the ONLY variable
+ * between two consecutive frames is the L keypress — which is what makes the
+ * OFF→ON→OFF triple a measurement rather than an impression.
+ */
 async function shootLights(page, id) {
   const pre = TAG ? `${TAG}-` : "";
   await open(page, id, LEVEL);
   await shot(page, `${pre}${id}-L${LEVEL}-A-spawn-lights-off`);
+  // NO driving between the OFF and ON frames. A pair shot while rolling changes
+  // the pose as well as the lamps, so any difference is unattributable — and
+  // hard throttle+brake on a wet street put the car on its roof, which is how
+  // the first attempt at this pair was lost. Stationary at spawn, the ONLY
+  // variable between two consecutive frames is the L keypress.
+  await shot(page, `${pre}${id}-L${LEVEL}-B-cockpit-OFF`);
+  await page.keyboard.press("KeyL");
+  await page.waitForTimeout(2600);
+  await shot(page, `${pre}${id}-L${LEVEL}-C-cockpit-ON`);
+  await page.keyboard.press("KeyL");
+  await page.waitForTimeout(2600);
+  await shot(page, `${pre}${id}-L${LEVEL}-D-cockpit-OFF-again`);
+
+  // Exterior („изглед: кокпит / отвън / отгоре" — C). The lamps themselves are
+  // only ever visible from outside; from the cockpit the student sees the beam
+  // pool, never the headlight.
+  await page.keyboard.press("KeyC");
+  await page.waitForTimeout(3000);
+  await shot(page, `${pre}${id}-L${LEVEL}-E-exterior-OFF`);
+  await page.keyboard.press("KeyL");
+  await page.waitForTimeout(2600);
+  await shot(page, `${pre}${id}-L${LEVEL}-F-exterior-ON`);
+  await page.keyboard.press("KeyL");
+  await page.waitForTimeout(2600);
+  await shot(page, `${pre}${id}-L${LEVEL}-G-exterior-OFF-again`);
+
+  // Back to the cockpit and roll, lights ON — „does it still read as rain once
+  // the world is moving past you" is a different question from the still.
+  await page.keyboard.press("KeyC");
+  await page.keyboard.press("KeyC");
+  await page.waitForTimeout(1500);
+  await page.keyboard.press("KeyL");
   await page.keyboard.down("KeyW");
-  await page.waitForTimeout(DRIVE_MS);
+  await page.waitForTimeout(4500);
   await page.keyboard.up("KeyW");
-  await page.waitForTimeout(1400);
-  await shot(page, `${pre}${id}-L${LEVEL}-B-drive-lights-off`);
-  await page.keyboard.press("KeyL");
-  await page.waitForTimeout(2500);
-  await shot(page, `${pre}${id}-L${LEVEL}-C-drive-lights-ON`);
-  await page.keyboard.press("KeyL");
-  await page.waitForTimeout(2500);
-  await shot(page, `${pre}${id}-L${LEVEL}-D-drive-lights-off-again`);
-  await page.keyboard.press("KeyL");
-  await page.waitForTimeout(2000);
-  await page.keyboard.press("KeyG");
-  await page.waitForTimeout(3500);
-  await shot(page, `${pre}${id}-L${LEVEL}-E-overhead-lights-ON`);
+  await page.waitForTimeout(1200);
+  await shot(page, `${pre}${id}-L${LEVEL}-H-cockpit-rolling-ON`);
 }
 
 async function main() {
@@ -131,14 +161,28 @@ async function main() {
     viewport: { width: 1280, height: 720 },
     deviceScaleFactor: 1,
   });
-  // Force the top render tier: rain streaks + snow are gated at `low`
-  // (QUALITY_PRESETS.low.rainParticles === 0), so a headless default tier
-  // would photograph "no rain" and blame the world.
-  await context.addInitScript(() => {
+  // Pin the render tier.
+  //
+  // ⚠ Writing `sim.quality` alone does NOT pin what this harness renders:
+  // `sim.quality` is QUALITY_STORAGE_KEY (lesson-ui/types) and only the REAL
+  // /simulator shell reads it — /dev/ghost-demo hardcodes quality="medium" into
+  // LessonScene. The environment module keeps its own key,
+  // `aidrive.sim.quality.v1` ({setting,recommendation}), which HeroCarBody /
+  // VehicleRig / MirrorRig gate their own cost on. Both are written here.
+  // It MATTERS which tier a rain frame is shot at: QUALITY_PRESETS.low
+  // .rainParticles === 0 — at `low` there is no rain in the world at all.
+  const TIER = opt("tier", "medium"); // low | medium | high
+  await context.addInitScript((tier) => {
     try {
-      window.localStorage.setItem("sim.quality", "high");
+      const envTier = tier === "medium" ? "med" : tier;
+      window.localStorage.setItem(
+        "aidrive.sim.quality.v1",
+        JSON.stringify({ setting: envTier, recommendation: envTier }),
+      );
+      window.localStorage.setItem("sim.quality", tier);
     } catch {}
-  });
+  }, TIER);
+  log(`tier pinned: ${TIER} (note: /dev/ghost-demo passes quality="medium" to LessonScene)`);
   const page = await context.newPage();
   page.on("pageerror", (e) => log(`pageerror: ${e.message}`));
   page.on("console", (m) => {

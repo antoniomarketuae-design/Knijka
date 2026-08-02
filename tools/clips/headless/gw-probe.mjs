@@ -11,10 +11,19 @@
 // Plan shape:
 //   { "out": "B29", "url": "/dev/gw-shell?scenario=…&level=1",
 //     "warmMs": 12000, "viewport": [1280,720],
+//     "blockServerActions": true,                 // default; see main()
 //     "steps": [ {"hold":"KeyW","ms":4000}, {"press":"KeyE"},
-//                {"wait":1500}, {"shot":"t12-glance-right"} ] }
+//                {"down":"KeyE"}, {"wait":1500},
+//                {"shot":"t12-glance-right","clip":[640,120,640,480]},
+//                {"up":"KeyE"} ] }
 //
-// Every `shot` writes <out>-<name>.png AND appends the page's visible text to
+// Steps: `hold` (down → wait → up, self-contained), `down`/`up` (a hold that
+// OUTLIVES the step, so a frame can be shot mid-glance — Q/E/F are hold-to-
+// look), `press`, `click` (by visible text), `wait`, `shot` (+ optional `clip`
+// crop).
+//
+// Every `shot` writes <out>-<name>.png AND appends the page's visible text —
+// plus `window.__ghostDemo` telemetry when the route publishes it — to
 // <out>-hud.txt, tagged with the frame name. Nothing here is clever: it is a
 // keyboard and a camera.
 
@@ -65,6 +74,22 @@ async function hudText(page) {
   }
 }
 
+/**
+ * /dev/ghost-demo publishes per-tick drive telemetry on `window.__ghostDemo`
+ * (t, speedKmh, x, y, headingDeg, gear, travelledM). Dumping it beside every
+ * frame turns „the car looks like it is near the line" into a coordinate — and
+ * a coordinate is what a give-way verdict needs, because the whole question is
+ * where you were standing when you looked. Absent on other routes; harmless.
+ */
+async function telemetry(page) {
+  try {
+    const t = await page.evaluate(() => window.__ghostDemo ?? null);
+    return t ? `[telemetry] ${JSON.stringify(t)}\n` : "";
+  } catch {
+    return "";
+  }
+}
+
 async function main() {
   const browser = await chromium.launch({ headless: true, args: GL_ARGS });
   const [w, h] = plan.viewport ?? [1280, 720];
@@ -77,6 +102,41 @@ async function main() {
       window.localStorage.setItem("sim.quality", "high");
     } catch {}
   });
+
+  /**
+   * BLOCK SERVER ACTIONS — without this the rig cannot photograph the shell.
+   *
+   * MEASURED 2026-08-02, not assumed. /dev/gw-shell is NOT in proxy.ts's
+   * matcher, so `GET /dev/gw-shell?...` answers 200 with the real
+   * LessonPlayShell. But the shell imports three server actions from
+   * (dashboard)/simulator, and one of them fires from a mount effect. That POST
+   * DOES hit an authed path, `requireUser()` redirects it, and Next follows the
+   * action's 303 by navigating the WHOLE PAGE to /login — about 20 s after the
+   * canvas is already up. Every frame after that is the login card. Three rows
+   * in doc 87 (B5, B19, B22) were filed „three dev servers died first / never
+   * reached" against exactly this, and the symptom looks nothing like its
+   * cause: the route is fine, the compile is fine, the scene mounts, and then
+   * the page walks away from it.
+   *
+   * Aborting requests that carry the `Next-Action` header leaves the mounted
+   * scene exactly as it is. Nothing a look-rig needs is on the other side of
+   * those calls — they persist a finished attempt, fetch a micro-quiz deck and
+   * record a self-prediction; the drive, the HUD, the objectives and the fault
+   * cards are all client-side. Set `"blockServerActions": false` in a plan that
+   * genuinely needs the round-trip (and then bring a session cookie).
+   */
+  if (plan.blockServerActions !== false) {
+    await context.route("**/*", async (route) => {
+      const h = route.request().headers();
+      if (h["next-action"]) {
+        log(`blocked server action → ${route.request().url()}`);
+        await route.abort();
+        return;
+      }
+      await route.continue();
+    });
+  }
+
   const page = await context.newPage();
   const errors = [];
   page.on("pageerror", (e) => {
@@ -101,10 +161,16 @@ async function main() {
       shotN += 1;
       const name = `${plan.out}-${String(shotN).padStart(2, "0")}-${step.shot}`;
       const png = join(OUT, `${name}.png`);
-      writeFileSync(png, await page.screenshot());
+      // `clip` = [x, y, w, h] in CSS px — a zoom crop, for reading a sign or a
+      // sightline at pixel scale instead of squinting at a 1280-wide frame.
+      const shotOpts = Array.isArray(step.clip)
+        ? { clip: { x: step.clip[0], y: step.clip[1], width: step.clip[2], height: step.clip[3] } }
+        : {};
+      writeFileSync(png, await page.screenshot(shotOpts));
       const txt = await hudText(page);
-      appendFileSync(HUD_LOG, `\n===== ${name} =====\n${txt}\n`);
-      log(`shot ${name}`);
+      const tel = await telemetry(page);
+      appendFileSync(HUD_LOG, `\n===== ${name} =====\n${tel}${txt}\n`);
+      log(`shot ${name}${tel ? ` ${tel.trim()}` : ""}`);
       continue;
     }
     if (step.click !== undefined) {
@@ -129,6 +195,22 @@ async function main() {
       await page.waitForTimeout(step.ms ?? 1000);
       for (const k of keys) await page.keyboard.up(k);
       log(`hold ${keys.join("+")} ${step.ms ?? 1000}ms`);
+      continue;
+    }
+    // `down` / `up` — a hold that OUTLIVES the step, so a frame can be shot
+    // WHILE the key is still down. The mirror glances (Q/E/F) are hold-to-look
+    // (cabin.ts GlanceHold): `hold` releases before the next step runs, so it
+    // can never photograph what the driver sees mid-glance. doc 87 B29/B30 are
+    // exactly that question ("I stopped and looked right and saw nothing"), so
+    // the rig has to be able to hold the look and shoot it.
+    if (step.down !== undefined) {
+      for (const k of Array.isArray(step.down) ? step.down : [step.down]) await page.keyboard.down(k);
+      log(`down ${step.down}`);
+      continue;
+    }
+    if (step.up !== undefined) {
+      for (const k of Array.isArray(step.up) ? step.up : [step.up]) await page.keyboard.up(k);
+      log(`up ${step.up}`);
       continue;
     }
     if (step.wait !== undefined) {

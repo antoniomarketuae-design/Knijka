@@ -321,10 +321,42 @@ invalidates every other lane's Prisma pool, so it is a last resort.
 `lib/server.mjs` starts (or reuses) `next dev` on **:3460** with
 `KNIJKA_DIST_DIR=.next-harness` — never :3000, which belongs to other lanes, and
 never a build directory another agent's Turbopack cache can poison. `E:` is a
-mechanical disk: delete `.next-harness` when you are done.
+mechanical disk: delete `.next-harness` when you are done (it reached **935 MB**
+once).
 
 Point it somewhere else with `--base-url` (or `KNIJKA_MOBILE_BASE_URL`), which
 is how CI measures a `next start` build.
+
+### Two things that WILL bite you when you start this server
+
+**1. `next dev` edits `platform/tsconfig.json` behind your back.** Starting it
+with a custom `KNIJKA_DIST_DIR` appends that directory to `include`:
+
+```json
+".next-harness/types/**/*.ts",
+".next-harness/dev/types/**/*.ts"
+```
+
+A stale route validator inside a scratch dist dir then injects phantom errors
+into an otherwise clean `tsc --noEmit`, which is why
+`src/lib/tsconfigHygiene.test.ts` exists and why it goes red the moment you run
+this harness. It is not your code. **`git checkout -- platform/tsconfig.json`
+before you gate**, and never "fix" the test by allowing the glob.
+
+**2. Turbopack can latch this dist dir at HTTP 500 for every route.** The
+signature is a panic on `globals.css`:
+
+```
+Failed to write app endpoint /(auth)/login/page
+  - [project]/src/app/globals.css [app-client] (css)
+  - Execution of PostCssTransformedAsset::process failed
+  - timeout while receiving message from process / deadline has elapsed
+```
+
+Restarting the process does **not** clear it — the poisoned entry is on disk.
+`rm -rf platform/.next-harness` does. Symptom to recognise: `/login` answers 500
+in under a second while another lane's server on another port answers 200, and
+the sweep dies in `signIn` before it measures anything.
 
 **Warming is not optional.** A cold `next dev` took 60s to render `/theory` on
 this box; WebKit gives up on the navigation before that, the fetch inside

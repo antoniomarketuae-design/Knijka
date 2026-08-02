@@ -21,6 +21,7 @@ import {
   STALL_GRACE_S,
   STALL_MIN_THROTTLE,
   type DrivelineEvent,
+  type TransmissionMode,
 } from "./driveline";
 
 /** Fresh machine + captured event log. */
@@ -31,8 +32,15 @@ function rig(start: "cold" | "ready" = "cold") {
   return { d, events };
 }
 
-/** Advance the stall clock in small frames (like the render loop does). */
-function tick(d: DrivelineState, seconds: number, ctx: { speedKmh: number; throttle: number }) {
+/** Advance the stall clock in small frames (like the render loop does).
+ *  `transmission` is optional and mirrors `update()`'s own signature — the
+ *  render loop passes it every frame, so a test that holds a tier across a
+ *  grace window must be able to as well (doc 87 A4). */
+function tick(
+  d: DrivelineState,
+  seconds: number,
+  ctx: { speedKmh: number; throttle: number; transmission?: TransmissionMode },
+) {
   const step = 1 / 60;
   for (let t = 0; t < seconds; t += step) d.update(step, ctx);
 }
@@ -155,6 +163,62 @@ describe("manual mode (behind the difficulty toggle)", () => {
     d.update(1 / 60, { speedKmh: 45, throttle: 0.3, transmission: "automatic" });
     expect(d.selector).toBe("D");
     expect(d.clutchDown).toBe(false);
+  });
+
+  // -------------------------------------------------------------------------
+  // doc 87 A4 — „I tried to go from Advanced to Normal, and the engine turned
+  // off, and when I went back to Normal it did not turn on."
+  //
+  // Both assertions below FAIL on the pre-fix switchTransmission: the first
+  // because a standing car went to M1 and update() stalled it 0.7 s later, the
+  // second because the dead car came back in D and toggleEngine() refuses to
+  // start an automatic outside P/N. Rendered before and after:
+  // scratchpad/ovg/frames/A4-t020.png (before) / A4fix-* (after).
+  // -------------------------------------------------------------------------
+  it("A4: switching tier on a PARKED car does not stall it", () => {
+    const { d } = rig("ready"); // engine running, D, brake off
+    expect(d.selector).toBe("D");
+    d.update(1 / 60, { ...STILL, transmission: "manual" }); // click „Напреднал"
+    expect(d.selector).toBe("N"); // neutral, not first gear
+    tick(d, STALL_GRACE_S * 4, { ...STILL, transmission: "manual" });
+    expect(d.engineOn).toBe(true);
+    expect(d.stalled).toBe(false);
+  });
+
+  it("A4: the tier round trip on a parked car is a no-op — the car is still in D and still drives", () => {
+    const { d } = rig("ready");
+    d.update(1 / 60, { ...STILL, transmission: "manual" }); // „Напреднал"
+    expect(d.selector).toBe("N");
+    d.update(1 / 60, { ...STILL, transmission: "automatic" }); // „Нормален"
+    expect(d.selector).toBe("D");
+    expect(d.engineOn).toBe(true);
+    expect(hasDriveTraction(d.physicsInput)).toBe(true);
+  });
+
+  it("A4: a neutral the STUDENT chose in manual is not overwritten by the round trip", () => {
+    const { d } = rig("ready");
+    d.update(1 / 60, { ...STILL, transmission: "manual" });
+    d.setClutch(true);
+    expect(d.gearUp()).toBe(true); // N → M1, the student's own choice
+    expect(d.gearDown()).toBe(true); // M1 → N, also the student's
+    d.setClutch(false);
+    d.update(1 / 60, { ...STILL, transmission: "automatic" });
+    expect(d.selector).toBe("N");
+  });
+
+  it("A4: a car stalled in manual can be restarted after switching back to automatic", () => {
+    const { d } = rig("ready");
+    // Stall it for real, the way a student would: into gear, clutch up, no gas.
+    d.update(1 / 60, { speedKmh: 20, throttle: 0.3, transmission: "manual" });
+    expect(d.selector).toBe("M");
+    tick(d, STALL_GRACE_S * 3, { ...STILL, transmission: "manual" });
+    expect(d.engineOn).toBe(false);
+    expect(d.stalled).toBe(true);
+    // Click „Нормален" — and the starter must work from where it leaves you.
+    d.update(1 / 60, { ...STILL, transmission: "automatic" });
+    expect(d.toggleEngine()).toBe(true);
+    expect(d.engineOn).toBe(true);
+    expect(d.stalled).toBe(false);
   });
 
   it("gear changes and going into gear require the clutch while the engine runs", () => {

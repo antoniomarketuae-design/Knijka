@@ -14,13 +14,51 @@
 // -----------------------------------------------------------------------------
 
 /**
+ * How long a navigation to a route that may still be compiling may take.
+ * Same budget `gotoAuthenticated` uses — stated once so the two cannot drift.
+ */
+export const LOGIN_NAV_TIMEOUT_MS = 180_000;
+
+/**
  * @param {import("playwright").Page} page
  * @param {{email:string,password:string}} credentials
  * @param {string} baseUrl
  */
 export async function signIn(page, credentials, baseUrl) {
-  await page.goto(`${baseUrl}/login`, { waitUntil: "load" });
-  await page.waitForSelector("#email", { timeout: 60_000 });
+  // A COLD /login COMPILE ON THIS BOX TAKES MINUTES, AND THIS LINE USED TO
+  // ACCEPT PLAYWRIGHT'S 30 s DEFAULT.
+  //
+  // That single missing argument is why row C8 (doc 87:243) was never
+  // re-measured and why two full sweeps died before they measured anything:
+  // `page.goto: Timeout 30000ms exceeded ... navigating to /login`. It is also
+  // silently worse than it looks — `waitUntil:"load"` waits for every subresource,
+  // and public/sw.js answers a navigation whose fetch THREW with /offline.html,
+  // so the retry could hand back a page with no #email on it and a 60 s selector
+  // wait to discover that.
+  //
+  // Three changes, in the order that matters:
+  //   1. WARM FROM NODE FIRST. A plain fetch has no service worker in front of
+  //      it and no navigation timeout, so it waits for the real response however
+  //      long Turbopack takes. `gotoAuthenticated` already does this on the
+  //      retry path; the login page needed it on the FIRST one, because it is
+  //      the one route that is always cold.
+  //   2. domcontentloaded, not load — the form is interactive well before the
+  //      last font arrives.
+  //   3. An explicit budget, stated once, that matches the rest of the harness.
+  // A sign-in on this box costs minutes and used to print NOTHING while it did,
+  // so a stall and a slow compile looked identical from the outside. Every step
+  // that can take minutes now says so before it starts.
+  const step = (what) => console.log(`[mobile-harness] sign-in: ${what}`);
+
+  step(`warming ${baseUrl}/login from node`);
+  await warmFromNode(page, `${baseUrl}/login`);
+  step("navigating to /login");
+  await page.goto(`${baseUrl}/login`, {
+    waitUntil: "domcontentloaded",
+    timeout: LOGIN_NAV_TIMEOUT_MS,
+  });
+  step("waiting for the form to hydrate (#email)");
+  await page.waitForSelector("#email", { timeout: 120_000 });
 
   // WEBKIT + A REACT-CONTROLLED type="email" INPUT DOES NOT ACCEPT
   // `page.fill()`. This is not a hydration race and it is not theoretical —
@@ -41,6 +79,7 @@ export async function signIn(page, credentials, baseUrl) {
   //
   // This is precisely the class of bug rule 1 exists for: in Chromium,
   // `fill` works here.
+  step("typing credentials with real key events");
   await fillCredentials(page, credentials);
 
   // WAIT FOR THE COOKIE, NOT FOR /dashboard.
@@ -56,6 +95,7 @@ export async function signIn(page, credentials, baseUrl) {
   //
   // The session cookie is the actual fact we need, it appears the moment the
   // credentials POST returns, and it is what every subsequent request uses.
+  step("submitting and waiting for the session cookie");
   await page.click('button[type="submit"]');
   const deadline = Date.now() + 300_000;
   for (;;) {
@@ -76,7 +116,9 @@ export async function signIn(page, credentials, baseUrl) {
   // Stop the in-flight push to /dashboard before navigating somewhere else:
   // otherwise the first route's goto dies with "interrupted by another
   // navigation", which cost a whole device column of a baseline.
-  await page.goto(`${baseUrl}/login`, { waitUntil: "domcontentloaded" }).catch(() => {});
+  await page
+    .goto(`${baseUrl}/login`, { waitUntil: "domcontentloaded", timeout: LOGIN_NAV_TIMEOUT_MS })
+    .catch(() => {});
 }
 
 /** Compile a route server-side with the page's own session cookies. */

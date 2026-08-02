@@ -270,6 +270,15 @@ export class DrivelineState {
   /** Last speed fed via update() — shift legality reads it. */
   private speedKmh = 0;
   private stallTimerS = 0;
+  /**
+   * Set when `switchTransmission` itself moved a STANDING car out of D into N
+   * (doc 87 A4). It exists so the tier round trip Нормален → Напреднал →
+   * Нормален is an exact no-op: without it the student gets the engine back
+   * but sits in neutral with nothing on screen saying so, which is the same
+   * complaint wearing a different hat. Any selector the STUDENT chooses clears
+   * it, so a deliberate N in manual mode is never overwritten.
+   */
+  private tierNeutralFromD = false;
   private readonly listeners = new Set<DrivelineListener>();
   private readonly physics: DrivelinePhysicsInput = { ...READY_DRIVELINE };
 
@@ -471,6 +480,7 @@ export class DrivelineState {
     const target: SelectorPosition = this.transmission === "manual" ? "M" : "D";
     if (this.selector === target) return;
     this.selector = target;
+    this.tierNeutralFromD = false;
     if (target === "M") this.manualGear = gearForSpeedKmh(this.speedKmh);
     this.emit({ kind: "selectorChanged", selector: target, manualGear: this.manualGear });
   }
@@ -520,6 +530,27 @@ export class DrivelineState {
 
   // ---------------------------------------------------------------------------
 
+  /**
+   * A TIER PILL IS NOT A DRIVING MISTAKE (doc 87 A4, rendered 2026-08-02:
+   * `scratchpad/ovg/frames/A4-t020.png`). The founder's row is „I tried to go
+   * from Advanced to Normal, and the engine turned off, and when I went back
+   * to Normal it did not turn on", and the whole sequence reproduced on a
+   * PARKED car the student never touched:
+   *
+   *   Нормален → Напреднал  put a stationary car into M1 with the clutch up,
+   *     which `update()` correctly reads as lugging and stalls 0.7 s later —
+   *     and the „Загасване на двигателя" teaching card bills it (−1 т. on any
+   *     repeat) as if the student had dumped the clutch;
+   *   Напреднал → Нормален  handed the dead car back in D, and `toggleEngine`
+   *     may only start an automatic in P/N — so I is rejected, silently, and
+   *     the status chip shows „Угасна" WITHOUT the „I" key hint it shows for a
+   *     merely-off engine. The car is unrecoverable without a restart.
+   *
+   * Both halves are fixed here, and neither is a new idea: the constructor
+   * already made exactly this call for the „ready" manual spawn — „MANUAL
+   * 'ready' IS NEUTRAL, NOT FIRST GEAR … that is a stall the instant the sim
+   * ticks" — the tier switch simply never inherited the reasoning.
+   */
   private switchTransmission(next: TransmissionMode): void {
     this.transmission = next;
     if (next === "automatic") {
@@ -528,13 +559,35 @@ export class DrivelineState {
         this.emit({ kind: "clutchChanged", down: false });
       }
       if (this.selector === "M") {
+        // Engine running → D, exactly as before. Engine dead (a stall the
+        // student is trying to escape) → N, so the starter interlock is
+        // satisfied and I actually starts the car.
+        const target: SelectorPosition = this.engineOn ? "D" : "N";
+        this.selector = target;
+        this.tierNeutralFromD = false;
+        this.emit({ kind: "selectorChanged", selector: target, manualGear: this.manualGear });
+      } else if (this.selector === "N" && this.tierNeutralFromD) {
+        // Undo our own D → N: the round trip must hand the car back exactly
+        // as it was found.
         this.selector = "D";
+        this.tierNeutralFromD = false;
         this.emit({ kind: "selectorChanged", selector: "D", manualGear: this.manualGear });
       }
     } else if (this.selector === "D") {
-      this.selector = "M";
-      this.manualGear = gearForSpeedKmh(this.speedKmh);
-      this.emit({ kind: "selectorChanged", selector: "M", manualGear: this.manualGear });
+      // Moving → the speed-matched gear, as before. Standing still → NEUTRAL:
+      // first gear with the clutch up is a stall by definition, and stalling a
+      // car because a UI pill was clicked teaches nothing about a clutch.
+      const standing = Math.abs(this.speedKmh) < STALL_BELOW_KMH;
+      if (standing) {
+        this.selector = "N";
+        this.tierNeutralFromD = true;
+        this.emit({ kind: "selectorChanged", selector: "N", manualGear: this.manualGear });
+      } else {
+        this.selector = "M";
+        this.manualGear = gearForSpeedKmh(this.speedKmh);
+        this.tierNeutralFromD = false;
+        this.emit({ kind: "selectorChanged", selector: "M", manualGear: this.manualGear });
+      }
     }
     this.emit({ kind: "transmissionChanged", transmission: next });
   }
@@ -557,6 +610,7 @@ export class DrivelineState {
       return this.rejectShift("clutch");
     }
     this.selector = next;
+    this.tierNeutralFromD = false; // the STUDENT chose this position — ours is spent
     if (next === "M") this.manualGear = gearForSpeedKmh(this.speedKmh);
     this.emit({ kind: "selectorChanged", selector: next, manualGear: this.manualGear });
     return true;

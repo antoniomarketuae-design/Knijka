@@ -163,11 +163,22 @@ export const ROUTES = [
     mustFit: [],
     waitFor: "canvas",
     settleMs: 6000,
-    budget: { contentMin: 0.85, foldMustPass: false, touchMustPass: false },
+    // touchMustPass WAS false, and row C2 is what that cost.
+    //
+    // «Разбрах» — the control that CLEARS the popup this route exists to
+    // measure — was 62.9 x 24.9 px and painted over, and this route was the
+    // only one that could have caught it, because on every other route the
+    // popup is not up. The flag was off because the route was added purely to
+    // put a number on the popup's area; the audit ran anyway and its result was
+    // discarded. Measured on 2026-08-02 with the ::before hit areas in place:
+    // 0 violations on iphone16-portrait, iphone16-landscape and small-portrait.
+    // So this now GATES, and a sub-44 dismiss control cannot come back quietly.
+    budget: { contentMin: 0.85, foldMustPass: false, touchMustPass: true },
     note:
       "The state the driving screen OPENS in. Founder: „the popups continue to eat almost " +
       "the full screen and must be completely redesigned\". Measured separately from the " +
-      "road so the redesign has a number for the popup itself.",
+      "road so the redesign has a number for the popup itself — and its dismiss control " +
+      "is audited HERE, because this is the only route on which it is on screen.",
   },
   {
     id: "simulator-drive",
