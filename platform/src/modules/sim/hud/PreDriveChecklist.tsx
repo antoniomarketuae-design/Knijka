@@ -175,7 +175,13 @@ export function PreDriveChecklist({
   const [openStepId, setOpenStepId] = useState<PreDriveStepId | null>(null);
   const autoShownRef = useRef<Set<PreDriveStepId>>(new Set());
   const [showKeys, setShowKeys] = useState(false);
-  const [listOpen, setListOpen] = useState(false);
+  // The step list follows COMPLETION by default — collapsed while the student
+  // is working (so it cannot stand on the control the panel is naming), open
+  // at 13/13 when there is nothing left to hide and the finished procedure is
+  // the thing worth reading. `null` = follow that default; an explicit toggle
+  // wins from then on. Derived rather than an effect: a setState-in-effect
+  // here would be a cascading render for something a render can just compute.
+  const [listOpenChoice, setListOpenChoice] = useState<boolean | null>(null);
   const measuredAspect = useSceneAspect();
   const aspect = measuredAspect ?? 16 / 9;
   const pose = useCabinLook();
@@ -208,11 +214,7 @@ export function PreDriveChecklist({
     if (first !== undefined) setCabinLook(cabinLookForHotspot(first));
   }, [showGuidance, nextId, aspect]);
 
-  // At 13/13 there is no control left for the list to cover, and the completed
-  // procedure IS the thing worth reading. Open it once, automatically.
-  useEffect(() => {
-    if (complete) setListOpen(true);
-  }, [complete]);
+  const listOpen = listOpenChoice ?? complete;
 
   const closeTutorial = useCallback(() => setOpenStepId(null), []);
   const confirmFromTutorial = useCallback(() => {
@@ -371,7 +373,7 @@ export function PreDriveChecklist({
           never grow down over a cockpit control (header point 2). */}
       <button
         type="button"
-        onClick={() => setListOpen((v) => !v)}
+        onClick={() => setListOpenChoice(!listOpen)}
         aria-expanded={listOpen}
         className="mt-0.5 shrink-0 self-start text-[10px] font-bold uppercase tracking-wide text-muted transition hover:text-foreground motion-reduce:transition-none"
       >
@@ -475,7 +477,7 @@ export function PreDriveChecklist({
         type="button"
         onClick={() => {
           setShowKeys((v) => !v);
-          setListOpen(true);
+          setListOpenChoice(true);
         }}
         aria-expanded={showKeys}
         className="mt-0.5 shrink-0 self-start text-[10px] font-bold uppercase tracking-wide text-muted transition hover:text-foreground motion-reduce:transition-none"

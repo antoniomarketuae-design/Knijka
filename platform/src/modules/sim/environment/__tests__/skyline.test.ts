@@ -84,9 +84,24 @@ describe("mapKindHasSkyline", () => {
     // needs the gate, this list is where the omission becomes visible.
     expect(noSkyline.sort()).toEqual([
       "lot-45-v1",
+      // The ten parking situations added for the founder's „10 at least" — each
+      // is generated with mapKind "scenario-lot", so each lands here as the
+      // comment above promises. Listed rather than pattern-matched on purpose:
+      // this roster is the omission detector, and a wildcard would let a new
+      // map type delete the skyline without anyone noticing.
+      "lot-45rev-v1",
+      "lot-double-v1",
+      "lot-gap-judge-v1",
+      "lot-gap-long-v1",
+      "lot-gap-short-v1",
+      "lot-left-v1",
       "lot-narrow-v1",
+      "lot-night-v1",
       "lot-par-v1",
       "lot-perp-v1",
+      "lot-van-v1",
+      "lot-wall-v1",
+      "lot-zebra-v1",
       "poligon-v1",
     ]);
 

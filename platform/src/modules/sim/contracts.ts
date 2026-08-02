@@ -602,6 +602,30 @@ export interface PedestrianDartOutSpec extends StagedEventBase {
    */
   variant?: "child" | "elder";
   /**
+   * AMBIENT SCENERY — a figure the student must SEE but who never enters the
+   * carriageway.
+   *
+   * The founder asked for children on the pavement outside the school („no kids
+   * are playing on the sidewalks and we should do that it will attract the user
+   * to watch closely"). That is atmosphere with a teaching job — the reason a
+   * driver slows in a school zone — and it is NOT a dart-out hazard.
+   *
+   * WHY THIS FLAG EXISTS AT ALL, given the encounter battery deliberately has
+   * no escape hatch: the battery's REACHABILITY invariant asserts every staged
+   * actor is MET at full pace and at half of it, because the founder's lessons
+   * 8/15/17/18 were all conflict actors that had already gone by the time he
+   * arrived. That invariant is right for a hazard and meaningless for a child
+   * standing on a pavement, who must never be "met" at all.
+   *
+   * THE EXEMPTION IS EARNED BY A STRICTER ASSERTION, NOT A WEAKER ONE. An
+   * ambient walker is excused from REACHABILITY and in exchange the battery
+   * proves it can NEVER reach the carriageway, at any speed, on any rung. So
+   * this cannot be used to silence a hazard that merely fails its timing: mark
+   * a real dart-out ambient and the new assertion fails instead. The only thing
+   * it buys is the right description of a child who stays on the pavement.
+   */
+  ambient?: true;
+  /**
    * PE-04 ball warning cue (founder R3 #27 — „ball rolls out, child follows"):
    * when authored, the TRIGGER first flips the runner's `hazardActive` (the
    * lesson's `hazard` ballDartOut visual starts rolling — the WHY the lesson

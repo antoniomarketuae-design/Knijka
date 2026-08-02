@@ -365,8 +365,16 @@ describe("scenario-world-referent gate", () => {
     for (const [id, n] of Object.entries(measured)) {
       expect(n, `${id} = ${n} is ABOVE doc 86's ${doc86[id]}`).toBeLessThanOrEqual(doc86[id]!);
     }
-    // The corpus itself has not moved under us.
-    expect(RESULT.districtFiles).toBe(90);
+    // The corpus itself has not moved under us — except deliberately, and here
+    // is the deliberate move. 90 → 100 is the ten parking districts built for
+    // the founder's „10 at least which to teach how to park the students":
+    // lot-45rev, lot-double, lot-gap-judge, lot-gap-long, lot-gap-short,
+    // lot-left, lot-night, lot-van, lot-wall, lot-zebra. Ten NEW MAPS, not ten
+    // new defects — every per-class count above still falls or holds, which is
+    // the assertion that actually protects us. This number is spelled out
+    // rather than relaxed to a `>=` so the next corpus change also has to be
+    // explained here before it can pass.
+    expect(RESULT.districtFiles).toBe(100);
     // T2's district count was the one figure of the four still at its wave-0
     // value (15) — the spawn poses themselves. Doc 87's founder wave moved them:
     // every generator now ends its spawn list with tools/maps/lib/lane.mjs

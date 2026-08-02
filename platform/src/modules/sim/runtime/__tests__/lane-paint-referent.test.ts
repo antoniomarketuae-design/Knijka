@@ -497,11 +497,29 @@ describe("T2 spawn legality — measured, not assumed", () => {
       }
     }
     expect(onPaint.length, onPaint.join(", ")).toBe(0);
+    // The assertion that matters is the one above: ZERO spawns straddle a
+    // PAINTED осева, which is the data half of T2 (31 scenarios spawned the car
+    // already in violation and the fault fired 3.5 s in). This second list is
+    // the inventory of spawns that straddle BARE asphalt, which is legal and
+    // harmless — a parking aisle has no centre line to cross. It is spelled out
+    // rather than counted so a new map cannot quietly join it while actually
+    // sitting on paint.
     expect(onBareAsphalt.sort()).toEqual([
       "lot-45-v1/lot-spawn-finish",
+      // The ten parking situations built for the founder's „10 at least".
+      "lot-45rev-v1/lot45r-spawn-finish",
+      "lot-double-v1/lotdb-spawn-finish",
+      "lot-gap-judge-v1/lotgj-spawn-finish",
+      "lot-gap-long-v1/lotgl-spawn-finish",
+      "lot-gap-short-v1/lotgs-spawn-finish",
+      "lot-left-v1/lotlf-spawn-finish",
       "lot-narrow-v1/lot-spawn-finish",
+      "lot-night-v1/lotnt-spawn-finish",
       "lot-par-v1/lot-spawn-finish",
       "lot-perp-v1/lot-spawn-finish",
+      "lot-van-v1/lotvn-spawn-finish",
+      "lot-wall-v1/lotwl-spawn-finish",
+      "lot-zebra-v1/lotzb-spawn-finish",
       "poligon-v1/pg-spawn-2",
       "poligon-v1/pg-spawn-3",
     ]);

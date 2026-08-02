@@ -41,6 +41,20 @@ export const WORLD_NAME_BG: Record<string, string> = {
   "lot-45-v1": "паркинга с косите места",
   "lot-narrow-v1": "паркинга с тясното гнездо",
   "lot-par-v1": "паркинга с успоредното място",
+  // The ten parking situations the founder asked for („10 at least which to
+  // teach how to park the students"). Each teaches a different thing — a short
+  // kerb gap is not a long one, a bay beside a van is not a bay beside a wall —
+  // so each gets its own district and its own name here.
+  "lot-45rev-v1": "паркинга с косото място на заден ход",
+  "lot-double-v1": "паркинга с двата реда гнезда",
+  "lot-gap-judge-v1": "паркинга за преценка на мястото",
+  "lot-gap-long-v1": "паркинга с дългото място край бордюра",
+  "lot-gap-short-v1": "паркинга с късото място край бордюра",
+  "lot-left-v1": "паркинга с гнездото отляво",
+  "lot-night-v1": "нощния паркинг край неосветения ред",
+  "lot-van-v1": "паркинга с гнездото до буса",
+  "lot-wall-v1": "паркинга с крайното гнездо до стената",
+  "lot-zebra-v1": "паркинга до пешеходната пътека",
   "mw-v1": "магистралата с аварийна лента",
   "ov-ban-v1": "булеварда със знак В24",
   "ov-bus-v1": "булеварда с бус лентата",

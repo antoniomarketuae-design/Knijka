@@ -536,6 +536,12 @@ const yardChild = (
   // Beyond the walk: `onRoad` is false on every frame, by construction.
   roadFromM: travelM + 100,
   roadToM: travelM + 200,
+  // Scenery with a teaching job, not a hazard — the founder asked for children
+  // on the pavement outside the school „it will attract the user to watch
+  // closely". The encounter battery must therefore NOT demand they be met;
+  // instead it proves they can never reach the carriageway at any speed, which
+  // the two lines above already guarantee by construction.
+  ambient: true,
   // Longer than the street: they are released on the first frame the car is
   // pointed up the road, so nothing can cancel them as „not encountered".
   triggerDistM: 400,

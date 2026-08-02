@@ -8,8 +8,9 @@
  * during SSR/build).
  */
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import dynamic from "next/dynamic";
+import type { SimTick } from "@/modules/sim/rules";
 import type { ScenarioLevel } from "@/modules/sim/lessons";
 import { compileScenario, lessonById, scenarioById } from "@/modules/sim/lessons";
 
@@ -45,6 +46,15 @@ export function GhostDemoClient() {
   const [scenarioPick, setScenarioPick] = useState<{ id: string; level: ScenarioLevel } | null>(
     null,
   );
+  // `?objective=N` mounts the scene with objective N active instead of 0.
+  //
+  // The A7 marker (the founder's „зелена линия") is drawn for the ACTIVE
+  // objective only, and this harness has no lesson engine to advance it — so
+  // without this flag the only marker any login-free frame could ever show was
+  // objective 0. Three register rows (B25, B44, B24) are complaints about
+  // where the marker of a LATER objective sits — „the green line stops at the
+  // middle of the crossroad" — and none of them could be photographed.
+  const [objectiveIndex, setObjectiveIndex] = useState(0);
 
   // The demo flag must be on the URL BEFORE the scene's load effect reads it.
   //
@@ -74,8 +84,51 @@ export function GhostDemoClient() {
       // eslint-disable-next-line react-hooks/set-state-in-effect -- see above
       setScenarioPick({ id: scenario, level });
     }
+    const objectiveRaw = Number(url.searchParams.get("objective") ?? "0");
+    if (Number.isInteger(objectiveRaw) && objectiveRaw >= 0) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- see above
+      setObjectiveIndex(objectiveRaw);
+    }
     // eslint-disable-next-line react-hooks/set-state-in-effect -- see above
     setReady(true);
+  }, []);
+
+  /**
+   * Dev-only drive telemetry on `window.__ghostDemo`.
+   *
+   * Register B24 escalated an unanswered question: across three scenarios a
+   * scripted drive „never accumulated distance", and nobody could tell whether
+   * the teaching card was rewinding the drive or the harness never produced
+   * motion at all — because every login-free harness no-ops `onTick`, so the
+   * only observable was a speed readout that oscillated. Position is the
+   * discriminator: a car that moves accumulates y, a rewound one does not.
+   * Last sample + a bounded history, no React state (per-frame callback).
+   */
+  const telemetryRef = useRef<{ samples: number; first: SimTick | null }>({
+    samples: 0,
+    first: null,
+  });
+  const onTick = useCallback((tick: SimTick) => {
+    const store = telemetryRef.current;
+    store.first ??= tick;
+    store.samples += 1;
+    const w = window as unknown as { __ghostDemo?: unknown };
+    w.__ghostDemo = {
+      t: tick.t,
+      speedKmh: tick.speedKmh,
+      x: tick.position.x,
+      y: tick.position.y,
+      headingDeg: tick.headingDeg,
+      gear: tick.gear,
+      seatbeltOn: tick.seatbeltOn,
+      samples: store.samples,
+      /** Straight-line metres travelled since the first tick — the number that
+       *  settles „did the car move" without trusting the speed needle. */
+      travelledM: Math.hypot(
+        tick.position.x - (store.first?.position.x ?? tick.position.x),
+        tick.position.y - (store.first?.position.y ?? tick.position.y),
+      ),
+    };
   }, []);
 
   const spec = scenarioPick ? scenarioById(scenarioPick.id) : undefined;
@@ -94,8 +147,8 @@ export function GhostDemoClient() {
           paused={false}
           driveLocked={false}
           preDriveHighlightStepId={null}
-          activeObjectiveIndex={0}
-          onTick={noop}
+          activeObjectiveIndex={objectiveIndex}
+          onTick={onTick}
           onPreDriveStep={noop}
           onBlockedDriveAttempt={noop}
           onMinimapFrame={noop}

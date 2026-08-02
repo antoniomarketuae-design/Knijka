@@ -301,21 +301,26 @@ describe("wave-8 bot completion — sc-rx-tram-stop-doors at L3", () => {
     expect(compileScenario(SC_RX_TRAM_STOP, 4).vehicleStart).toBe("cold");
     expect(compileScenario(SC_RX_TRAM_STOP, 4).examMode).toBe(true);
     expect(SC_RX_TRAM_STOP.levels.map((l) => l.level)).toEqual([1, 2, 3, 4, 5]);
-    // L5 — the conditionsNote: rain + wet grip + a second passenger sprinting
+    // L5 — the conditionsNote: rain + wet grip + a THIRD passenger sprinting
     // the other way for the closing doors (the base darter is never re-timed).
     const l5 = compileScenario(SC_RX_TRAM_STOP, 5);
     expect(l5.physics).toEqual({ wetGrip: true });
     expect((l5.stagedEvents ?? []).map((e) => e.kind)).toEqual([
       "pedestrianDartOut",
       "pedestrianDartOut",
+      "pedestrianDartOut",
     ]);
-    // L1–L4 hold the single alighting passenger — the mandatory stop is the
-    // whole drill, not a complication.
+    // L1–L4 hold TWO alighting passengers, on every rung. 1 → 2 (founder: „the
+    // question statements says … and in the map engineering its only 1"): the
+    // objective says the tram „изсипва пътнициТЕ" and instruction 4 says
+    // «докато и ПОСЛЕДНИЯТ пътник не се прибере», and against one figure the
+    // last passenger was the first passenger — the drill the copy describes
+    // (wait out the flow, not the person you were watching) was never staged.
     for (const level of [1, 2, 3, 4] as const) {
       expect(
         (compileScenario(SC_RX_TRAM_STOP, level).stagedEvents ?? []).map((e) => e.kind),
         `L${level}`,
-      ).toEqual(["pedestrianDartOut"]);
+      ).toEqual(["pedestrianDartOut", "pedestrianDartOut"]);
     }
   });
 });
@@ -664,12 +669,16 @@ describe("wave-8 bot completion — sc-hz-accident-scene at L3", () => {
     expect(at("sc-hzac-wide").completedAtSec!).toBeLessThan(at("sc-hzac-clear").completedAtSec!);
   });
 
-  it("carries the bystander AND the arriving rig into the live lesson", () => {
-    // Drop the bystander and „мини широко" loses its reason (there is no one to
-    // be wide OF); drop the rig and „не спирай да зяпаш" loses the stake (the
-    // blockage blocks no one). Both are premise, staged at every rung below L5.
+  it("carries BOTH bystanders AND the arriving rig into the live lesson", () => {
+    // Drop the bystanders and „мини широко" loses its reason (there is no one
+    // to be wide OF); drop the rig and „не спирай да зяпаш" loses the stake (the
+    // blockage blocks no one). All three are premise, staged at every rung.
     const staged = (lesson.stagedEvents ?? []).map((e) => `${e.id}:${e.kind}`).sort();
-    expect(staged).toEqual(["sc-hzac-bystander:pedestrianDartOut", "sc-hzac-rig:emergencyApproach"]);
+    expect(staged).toEqual([
+      "sc-hzac-bystander-2:pedestrianDartOut",
+      "sc-hzac-bystander:pedestrianDartOut",
+      "sc-hzac-rig:emergencyApproach",
+    ]);
     // Graded on SHIPPED rules alone: no dial is opted in anywhere. The В27 span
     // is map data (ILLEGAL_STOP), the wreck rects are recorder data (COLLISION),
     // and the ghosts are dry-tuned (ADR-006 stage 4a).
@@ -774,11 +783,17 @@ describe("wave-8 bot completion — sc-hz-accident-scene at L3", () => {
     expect(l5.physics).toBeUndefined();
     expect(compileScenario(SC_HZ_ACCIDENT_SCENE, 4).environment?.timeOfDay).not.toBe("night");
     // The scene rides every rung — it is the drill, not an L5 complication.
+    // TWO bystanders, not one (founder: „the question statements says … and in
+    // the map engineering its only 1"): the objective says «мини широко от
+    // ХОРАТА» and the squeeze demo's own text says «някой се навежда над ранен,
+    // ДРУГ пристъпва назад» — a second clause that described nobody. The
+    // safety invariant is unchanged: both stay in the curb HALF of the lane
+    // (min x = 4.6 > 4.4), so the wide line at x = 1.8 clears them by ≥ 2.8 m.
     for (const level of [1, 2, 3, 4, 5] as const) {
       expect(
         (compileScenario(SC_HZ_ACCIDENT_SCENE, level).stagedEvents ?? []).map((e) => e.kind).sort(),
         `L${level}`,
-      ).toEqual(["emergencyApproach", "pedestrianDartOut"]);
+      ).toEqual(["emergencyApproach", "pedestrianDartOut", "pedestrianDartOut"]);
     }
   });
 

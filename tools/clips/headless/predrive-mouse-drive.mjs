@@ -195,8 +195,32 @@ async function main() {
       return b ? "looking" : "forward";
     });
 
+  /**
+   * The tutorial card auto-opens for each NEW pending step, a beat after the
+   * previous step ticks (the shell's HUD snapshot runs on its own cadence).
+   * Since it became a real full-screen modal it also blocks the canvas, so
+   * every canvas gesture below has to stand behind it: close whatever is open,
+   * settle, and check again. A human reads the card and clicks „Разбрах"; this
+   * is the machine doing the same thing without racing it.
+   */
+  const ensureNoDialog = async () => {
+    for (let i = 0; i < 6; i += 1) {
+      const dlg = page.locator('div[role="dialog"]');
+      if ((await dlg.count()) === 0) {
+        await page.waitForTimeout(250);
+        if ((await page.locator('div[role="dialog"]').count()) === 0) return;
+        continue;
+      }
+      const btn = page.locator('div[role="dialog"] button:has-text("Разбрах")').first();
+      if ((await btn.count()) === 0) return;
+      await btn.click({ timeout: 15_000 });
+      await page.waitForTimeout(600);
+    }
+  };
+
   /** Click a cockpit hotspot at the given look pose. */
   const clickHotspot = async (name, poseId = "forward", { hold = 0, times = 1 } = {}) => {
+    await ensureNoDialog();
     const p = clickPoint(name, poseId, aspect);
     if (!p) throw new Error(`${name} is NOT on screen at pose ${poseId} — mouse cannot reach it`);
     const x = box.x + p.x * box.width;
@@ -211,6 +235,7 @@ async function main() {
   };
   /** Click a HUD button by its visible Bulgarian text. */
   const clickText = async (text, { optional = false } = {}) => {
+    await ensureNoDialog();
     const el = page.locator(`button:has-text("${text}")`).first();
     if ((await el.count()) === 0) {
       if (optional) return false;
@@ -223,14 +248,17 @@ async function main() {
   /** Dismiss the auto-opened tutorial modal, ticking the step if it is an info
    *  step (the card's own button does that — the founder's flow). */
   const closeTutorial = async () => {
-    const btn = page.locator('div[role="dialog"] button:has-text("Разбрах")').first();
-    if ((await btn.count()) === 0) return false;
-    await btn.click({ timeout: 15_000 });
-    await page.waitForTimeout(500);
+    // Wait for the card that belongs to the step now pending: it opens a beat
+    // after the previous one ticks, so „no dialog right now" is not an answer.
+    await page
+      .waitForSelector('div[role="dialog"] button:has-text("Разбрах")', { timeout: 6000 })
+      .catch(() => null);
+    await ensureNoDialog();
     return true;
   };
   /** Press and hold an on-screen pedal with the mouse. */
   const holdPedal = async (label, ms) => {
+    await ensureNoDialog();
     const pad = page.locator(`[data-pedal="${label}"]`).first();
     if ((await pad.count()) === 0) throw new Error(`pedal "${label}" not on screen`);
     const b = await pad.boundingBox();
@@ -268,8 +296,12 @@ async function main() {
     await page.waitForTimeout(900);
     await shot("02b-looking-right");
     await clickHotspot("hotspot_mirror_right", "mirrorRight", { hold: 700 });
-    await clickText("Погледни напред", { optional: true });
-    await page.waitForTimeout(900);
+    // NOTE: do NOT click „↩ Погледни напред" here. The third glance completes
+    // the step, the checklist advances, and its auto-look has ALREADY aimed
+    // the head at the next step's control — clicking „forward" at that moment
+    // undoes the instructor's own head turn (measured: it cancelled the
+    // seat-belt look two steps later and the belt click then missed).
+    await page.waitForTimeout(1200);
   });
   await shot("02-mirrors");
 

@@ -65,11 +65,16 @@ async function shoot(page, id) {
   // drill's cockpit shows the same 90 m approach road, which is precisely the
   // frame that cannot tell ten situations apart. So hold W up the approach
   // (residential 20 km/h) until the car is level with the bay row.
-  await page.mouse.click(640, 400); // focus the canvas for key input
+  // NO canvas click: the cabin is clickable (doc 87 FR-25) and a click in the
+  // middle of the screen lands on a cockpit hotspot, which swings the view
+  // round to the seat back. Keys go to the document, which is where the sim's
+  // input listener lives.
   await page.keyboard.down("KeyW");
-  // lot-night-v1's approach is 60 m, every other lot's is 90 — same seconds
-  // would put the night drill 30 m past its own row.
-  await page.waitForTimeout(id === "sc-park-night" ? 19_000 : Number(opt("drive", "26000")));
+  // ~11 s of full throttle ≈ 110 m on the „Нормален" tier (50 km/h cap): the
+  // spawn is 105 m south of the bay row. 26 s put the car 90 m past the end of
+  // the aisle and off the world, which is what the seat-back frames were.
+  // lot-night-v1's approach is 60 m, every other lot's is 90.
+  await page.waitForTimeout(id === "sc-park-night" ? 8_000 : Number(opt("drive", "11000")));
   await page.keyboard.up("KeyW");
   await page.keyboard.down("KeyS");
   await page.waitForTimeout(2200);

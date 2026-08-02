@@ -390,7 +390,12 @@ function probeDart(e: Entry, speedKmh: number): DartProbe {
 }
 
 describe("encounter battery · REACHABILITY — the pedestrian always steps out (ledger L8)", () => {
-  const darts = of<PedestrianDartOutSpec>("pedestrianDartOut");
+  const all = of<PedestrianDartOutSpec>("pedestrianDartOut");
+  // Ambient figures are scenery with a teaching job — the children on the
+  // pavement outside the school that make a driver slow down. They are graded
+  // by the OPPOSITE invariant, below.
+  const darts = all.filter((e) => !(e.spec as PedestrianDartOutSpec).ambient);
+  const ambient = all.filter((e) => (e.spec as PedestrianDartOutSpec).ambient);
 
   it("the catalog really does stage dart-out walkers (census guard)", () => {
     expect(darts.length).toBeGreaterThanOrEqual(10);
@@ -411,6 +416,28 @@ describe("encounter battery · REACHABILITY — the pedestrian always steps out 
         expect(r.detail, `${v.toFixed(0)} km/h: the encounter was cancelled`).not.toBe(
           "notEncountered",
         );
+      }
+    });
+  }
+
+  // The exemption is earned, not granted. An ambient walker is excused from
+  // REACHABILITY only because this proves the stronger thing: it can never
+  // reach the carriageway AT ANY SPEED. Mark a genuine hazard `ambient` to
+  // quieten the assertions above and this one fails in its place.
+  for (const e of ambient) {
+    const s = e.spec as PedestrianDartOutSpec;
+    const speeds = [
+      Math.max(e.chainMaxKmh, MIN_PROBE_KMH),
+      Math.max(e.chainMaxKmh / 2, MIN_PROBE_KMH),
+      MIN_PROBE_KMH,
+    ];
+    it(`${e.scenarioId}/${s.id}: AMBIENT — never reaches the carriageway at any speed`, () => {
+      for (const v of speeds) {
+        expect(
+          probeDart(e, v).onRoadWhileApproaching,
+          `${v.toFixed(0)} km/h: an ambient figure stepped onto the road — it is a hazard, ` +
+            `so drop \`ambient\` and let the reachability battery grade it`,
+        ).toBe(false);
       }
     });
   }

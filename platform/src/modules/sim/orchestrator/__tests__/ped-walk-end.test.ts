@@ -141,7 +141,14 @@ describe("staged pedestrian walk end (L9 second-order)", () => {
     // edge she used to reach, she still reaches, and the `finished` half of the
     // resolution still fires for the two specs that deliberately stop AT the
     // kerb (sc-hz-accident-scene's bystander walks exactly roadToM).
-    for (const s of pedSpecs()) {
+    // AMBIENT figures are excluded, and the reason is the same one that makes
+    // them ambient: their road window is authored BEYOND the walk on purpose
+    // (roadFromM = travelM + 100), so "she still reaches the arc she is graded
+    // against" is not a property they can have — there is no arc, because they
+    // are never graded. The school-yard children are the case. The encounter
+    // battery holds them to the opposite and stricter assertion: that they can
+    // never reach the carriageway at any speed.
+    for (const s of pedSpecs().filter((p) => !p.ambient)) {
       const travel = Math.min(s.travelM, s.roadToM + PED_REST_PAST_ROAD_M);
       expect(travel, s.id).toBeLessThanOrEqual(s.travelM);
       expect(travel, s.id).toBeGreaterThanOrEqual(Math.min(s.travelM, s.roadToM));

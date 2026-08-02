@@ -196,8 +196,6 @@ function Pedal({
   const rafRef = useRef<number | null>(null);
   const valueRef = useRef(0);
   const faceRef = useRef<HTMLSpanElement | null>(null);
-  const onValueRef = useRef(onValue);
-  onValueRef.current = onValue;
 
   const paint = (v: number) => {
     const face = faceRef.current;
@@ -222,13 +220,18 @@ function Pedal({
     // Start with a real, non-zero press so the step observer's edge fires on
     // the first frame — a pedal that reads 0.00 for 200 ms is not a press.
     valueRef.current = Math.max(valueRef.current, 0.25);
-    onValueRef.current(valueRef.current);
+    // `onValue` is captured from THIS render, and the ramp below keeps that
+    // capture for the length of the press. That is deliberate and safe: the
+    // callback only writes into the shared TouchInputSource, which is a stable
+    // object for the whole session, so a re-render mid-press cannot make the
+    // captured one wrong.
+    onValue(valueRef.current);
     paint(valueRef.current);
     const step = (now: number) => {
       const dt = Math.min(0.1, (now - last) / 1000);
       last = now;
       valueRef.current = Math.min(1, valueRef.current + dt / Math.max(0.05, riseSec));
-      onValueRef.current(valueRef.current);
+      onValue(valueRef.current);
       paint(valueRef.current);
       if (valueRef.current < 1) rafRef.current = requestAnimationFrame(step);
       else rafRef.current = null;
@@ -241,7 +244,7 @@ function Pedal({
     setDown((was) => {
       if (was) {
         valueRef.current = 0;
-        onValueRef.current(0);
+        onValue(0);
         paint(0);
       }
       return false;
