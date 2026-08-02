@@ -105,6 +105,76 @@ The restatement carries detail the handwritten note compresses:
 
 ---
 
+## 6b. Second full read of the handwritten file — three more, and the first is large
+
+He asked me to open it again and read every word. I did. Almost every sentence already maps to a
+doc-87 row. These three do not, and I had under-weighted all of them.
+
+### N1 — HIS ENTIRE REVIEW IS OF L1. Every rung above it is unreviewed.
+
+Line 214, in passing, at the end of a sentence about something else:
+
+> *"we need major reworks on all 150 L5-L4-L3-L2s **currently i`m reviewing L1s**"*
+
+**Everything in doc 87 — all 107 rows, all fifty lessons — is L1.** He has never seen L2, L3, L4 or
+L5 on any scenario except the two he spot-checked (question 6 and question 7). That means:
+
+**Measured rather than estimated** — rung declarations across all 37 template files:
+
+| rung | authored |
+|---|---|
+| L1 | 166 |
+| L2 | 166 |
+| L3 | 166 |
+| L4 | 161 |
+| L5 | 74 |
+| **total** | **733** |
+
+**He has reviewed 166 of 733 — 22.6%. Five hundred and sixty-seven rung-instances, 77.4% of the
+product, have never been looked at by anyone outside the build.**
+
+- That is **no human review at all** on more than three quarters of what a student can open.
+- Doc 87 treats the level ladder as three rows (A8, B2, B19). It is not three rows. It is four
+  fifths of the catalog.
+- The gate already knows the shape of the problem and nobody connected it to this sentence: **105 of
+  154 scenarios have no rung delta of any kind**, and **106 have no L5 authored**. So for most of the
+  catalog, "reviewing L2" would mean reviewing a byte-identical copy of L1.
+
+This reframes B2 from "the ladder feels thin" to **"the product is four fifths unreviewed, and most
+of that four fifths is a duplicate of the fifth he did review."** It belongs in the plan as its own
+programme, not as a row.
+
+### N2 — He states outright that his list is INCOMPLETE
+
+Line 2:
+
+> *"there are tons of Map issues, Question Issues, Map Engineering Issues and **I can`t name them all
+> at the moment** 50+ issues"*
+
+Doc 87 has been treated as the acceptance set. **He says it is a sample.** Doc 86's 58 causes were
+the right instinct — finding what he could not name — and that instinct should not stop because the
+register exists.
+
+### N3 — The reason he wants the buttons reworked, which I never decoded
+
+Line 165:
+
+> *"We should Re-work the whole Engine with the Buttons, **because we read on left**"*
+
+"We read on left" is the „Клавиши" key legend down the left edge. His objection is not that the
+keys are wrong — it is that **the interface makes you read a list of keys instead of showing you the
+control.** That is the same complaint as the 13-step pre-drive and the clickable dashboard, and it is
+why all three of those rows are really one requirement: *stop teaching the keyboard, show the car.*
+
+Two smaller notes from the same read, both already respected but worth recording:
+
+- Line 336 — on adding a cause to the sudden-braking drill, he warns **check it does not duplicate an
+  existing lesson first**. B64's brief carries this.
+- Lines 309, 329, 333 — he repeatedly writes *"you must find solutions"* / *"find some solutions"*.
+  He is asking for proposals where the fix is not obvious, not just a defect report.
+
+---
+
 ## 7. What this changes about how we finish
 
 The coverage metric stays — it caught real defects and it is honest about what it measures. But it
