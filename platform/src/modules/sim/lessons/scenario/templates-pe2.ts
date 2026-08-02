@@ -723,7 +723,18 @@ export const SC_PE_ZONE_LIVING: ScenarioSpec = {
     {
       id: "sc-pzl-clear",
       titleBg: "Продължи, след като платното е свободно",
-      params: { kind: "reachZone", x: LANE_2, y: ZL_CROSSING_Y + 40, radiusM: 12, maxSpeedKmh: 20 },
+      // FR-24: the mark is 5.275 m short of the pz-e-zone М8 bar and the L1
+      // ladder widens radius 12 → 14.5, so credit reached 9.23 m past the
+      // paint of a ЖИЛИЩНА ЗОНА exit — the one place the copy insists you
+      // clear the carriageway BEFORE it. The cut ends acceptance at the bar.
+      params: {
+        kind: "reachZone",
+        x: LANE_2,
+        y: ZL_CROSSING_Y + 40,
+        radiusM: 12,
+        maxSpeedKmh: 20,
+        acceptBeforeMarkM: -5.275,
+      },
     },
     {
       id: "sc-pzl-exit",

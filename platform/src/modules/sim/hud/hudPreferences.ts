@@ -109,8 +109,102 @@ export function writeStoredFlag(key: string, on: boolean): void {
 /** Card width in px — `w-60`. Was `w-72` (288 px) before doc 86 L14. */
 export const TOAST_CARD_WIDTH_PX = 240;
 
-/** Tailwind class that must stay in step with `TOAST_CARD_WIDTH_PX`. */
-export const TOAST_CARD_WIDTH_CLASS = "w-60";
+// ---------------------------------------------------------------------------
+// THE VIEWPORT CLAMP — „a card wider than the phone", founder photo
+// `photo_2026-07-29_08-22-13 (2).jpg`.
+//
+// WHAT THE PHOTO SHOWS, described from the pixels and not from memory: the
+// violation card is anchored to the RIGHT edge of the screen and runs off the
+// LEFT one. The severity label reads «АСНА ГРЕШКА» — the «ОП» is gone. The
+// title reads «ътнотранспортно произшествие», the body «астъпи сблъсък… о
+// сесията се оценява като прекратена». The teach card below it loses its left
+// edge the same way («аркираната», «воята лента») AND runs off the right.
+// The stage carries `overflow-hidden` (LessonPlayShell), so anything wider than
+// it is simply cut — silently, with no scrollbar and no wrap. A student cannot
+// read the rule he just broke.
+//
+// (Scale, so the numbers here can be checked: the image is 591 px wide; the
+// card's `rounded-2xl` corner measures 24 image px and its `p-3` padding 18, so
+// 1 CSS px ≈ 1.5 image px and the viewport is ≈ 393 CSS px. That is the founder's
+// phone in portrait, which is why 393 is named below.)
+//
+// WHY A DECLARED WIDTH IS NOT ENOUGH. `w-60` is 240 px and 240 < 393, so on
+// paper the card fits — and that is exactly the reasoning that let this ship.
+// A box gets wider than its declaration for three reasons this HUD meets every
+// day:
+//   · a Bulgarian compound with no break opportunity («Пътнотранспортно») is
+//     one unbreakable word; without `break-words` it punches out of the content
+//     box and is clipped by the stage even when the BOX fits;
+//   · the narrow end of the device ladder is 320 px, not 393 — a 240 px card
+//     plus its gutters is 264 px there, and the next card somebody adds may not
+//     be 240;
+//   · the roomy HUD is reachable on a phone-shaped viewport. `useCompactHud`
+//     requires `matchMedia("(pointer: coarse)")` to MATCH; a browser that does
+//     not report the `pointer` feature, or a stylus/trackpad device, keeps the
+//     desktop grammar at 393 px wide.
+//
+// So the clamp is expressed against the VIEWPORT, not against a breakpoint or a
+// layout mode. `calc(100vw - 1.5rem)` is „the screen, minus the 12 px gutter on
+// each side" — the same 12 px the column is positioned at (`right-3`). It can
+// only ever bite on a viewport narrower than 264 px; on every real device the
+// rendered width is unchanged, which is the point: this is a floor under the
+// layout, not a redesign of it.
+// ---------------------------------------------------------------------------
+
+/** Gutter a HUD card keeps on each side of the screen, px (`right-3`/`left-3`). */
+export const HUD_CARD_SIDE_GUTTER_PX = 12;
+
+/**
+ * The hard cap, as the Tailwind class the cards carry. Written once here so the
+ * arithmetic below, the components, and `__tests__/hud-card-fit.test.ts` cannot
+ * drift apart.
+ */
+export const HUD_CARD_MAX_WIDTH_CLASS = "max-w-[calc(100vw-1.5rem)]";
+
+/**
+ * Narrowest viewport the product supports, px — iPhone SE / small Android in
+ * portrait. Every HUD card must fit HERE, not merely on the founder's phone.
+ */
+export const NARROWEST_VIEWPORT_PX = 320;
+
+/** The founder's own device width, px — the frame the photo was taken on. */
+export const FOUNDER_VIEWPORT_PX = 393;
+
+/** Widest a HUD card may be on a `viewportWidthPx`-wide screen. */
+export function hudCardMaxWidthPx(viewportWidthPx: number): number {
+  return Math.max(0, viewportWidthPx - HUD_CARD_SIDE_GUTTER_PX * 2);
+}
+
+/**
+ * Does a card that DECLARES `declaredWidthPx` still fit? The clamp means the
+ * rendered width is `min(declared, max)`, so this asks the only question worth
+ * asking: is the declaration itself honest, or is it relying on the clamp to
+ * rescue it (which silently shrinks a card designed to be readable)?
+ */
+export function hudCardFitsViewport(
+  declaredWidthPx: number,
+  viewportWidthPx: number,
+): boolean {
+  return declaredWidthPx <= hudCardMaxWidthPx(viewportWidthPx);
+}
+
+/** What the card actually renders at, once the clamp is applied. */
+export function hudCardRenderedWidthPx(
+  declaredWidthPx: number,
+  viewportWidthPx: number,
+): number {
+  return Math.min(declaredWidthPx, hudCardMaxWidthPx(viewportWidthPx));
+}
+
+/**
+ * Tailwind classes that must stay in step with `TOAST_CARD_WIDTH_PX`.
+ *
+ * `break-words` (`overflow-wrap: break-word`) is load-bearing, not tidying: it
+ * is what stops «Пътнотранспортно» from overhanging a 216 px content box and
+ * being cut by the stage. The clamp keeps the BOX inside the screen; this keeps
+ * the WORDS inside the box. The photo needed both.
+ */
+export const TOAST_CARD_WIDTH_CLASS = `w-60 ${HUD_CARD_MAX_WIDTH_CLASS} break-words`;
 
 /** Stacked cards at once. Was 4. */
 export const TOAST_MAX_VISIBLE = 2;

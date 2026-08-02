@@ -56,11 +56,24 @@ export interface DistrictCrossing {
   edgeId: string;
 }
 
+/** A stopping/parking ban span, as `District.zones` carries it (ADR-006 stage
+ *  2a). The traffic system ignores these; the PARKED-CAR curb pass honours the
+ *  stopping bans, so a В27 post is a fact about the street and not a decal (see
+ *  TrafficLayer.computeParkedCars). Absent on every district written before. */
+export interface TrafficDistrictZone {
+  id: string;
+  kind: string;
+  edgeId: string;
+  fromM: number;
+  toM: number;
+}
+
 /** The slice of district-v1.json the traffic system consumes. */
 export interface TrafficDistrict {
   roads: { nodes: DistrictNode[]; edges: DistrictEdge[] };
   intersections: DistrictIntersection[];
   crossings: DistrictCrossing[];
+  zones?: TrafficDistrictZone[];
 }
 
 // ---------------------------------------------------------------------------
@@ -468,10 +481,26 @@ export type StagedCommand =
   /** Follow the path at `speedMps` (default: spec cruise speed). Releases a
    *  dormant pedestrian into its walk. */
   | { type: "cruise"; speedMps?: number }
-  /** Vehicles only: regulate speed to hold `gapM` meters ahead of the player
-   *  (projected onto the actor's path). NEGATIVE gapM paces BEHIND the player
-   *  (doc 72 FO-07 — the rear-tailgater recipe; same proportional law). */
-  | { type: "matchPlayer"; gapM: number; maxSpeedMps: number }
+  /**
+   * Vehicles only: regulate speed to hold `gapM` meters ahead of the player
+   * (projected onto the actor's path). NEGATIVE gapM paces BEHIND the player
+   * (doc 72 FO-07 — the rear-tailgater recipe; same proportional law).
+   *
+   * `seedSpeedMps` is a ROLLING START: the actor's speed jumps to at least
+   * this on the frame the command lands, instead of accelerating from its
+   * dormant standstill. Absent = the historical behaviour, bit-identical.
+   *
+   * Why it exists (doc 87 FR-56 — „it must be sticking much earlier"). A
+   * dormant actor released behind a moving player has to (a) accelerate from
+   * 0 and (b) then close the gap that opened WHILE it accelerated, at a
+   * closing speed of only `maxSpeedMps − playerSpeed`. Measured on the shipped
+   * лепка at a constant player speed: glued at 7.4 s at 30 km/h, 9.1 s at 40,
+   * **13.7 s at 50**. The founder is describing arithmetic, not a bug in the
+   * controller. A real tailgater is a car that was ALREADY TRAVELLING when it
+   * appeared in your mirror; parking it at the kerb first is the artificial
+   * part, and the seed removes it.
+   */
+  | { type: "matchPlayer"; gapM: number; maxSpeedMps: number; seedSpeedMps?: number }
   /** Vehicles only: brake-slam at `decelMps2` (default 7.5) to a stop; holds
    *  the stop and suppresses the player guard (already braking). */
   | { type: "brake"; decelMps2?: number }

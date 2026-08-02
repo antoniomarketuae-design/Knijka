@@ -2599,6 +2599,20 @@ export class RearTailgaterRunner implements EventRunner {
           type: "matchPlayer",
           gapM: -this.followBehindM,
           maxSpeedMps: s.maxMatchSpeedMps,
+          // FR-56 „it must be sticking much earlier". The actor enters the
+          // mirror at the PLAYER'S OWN SPEED instead of accelerating out of a
+          // dormant standstill — which is what a real лепка does, and what the
+          // arithmetic demands. Measured on ln-v1 at constant player speed,
+          // the glued pose (≤ followBehindM + 4 m) used to arrive at 7.4 s
+          // (30 km/h) / 9.1 s (40) / 13.7 s (50); a car that only starts
+          // pressing you a quarter-minute in is not the lesson.
+          //
+          // OPT-IN, because twelve templates borrow this runner as a generic
+          // "vehicle that comes past you" and only some are about a tailgater.
+          // Forcing the rolling start on all of them re-timed three whose
+          // choreography was authored against launch-from-rest. See
+          // RearTailgaterSpec.rollingStart for the bisection.
+          ...(s.rollingStart ? { seedSpeedMps: input.speedKmh / 3.6 } : {}),
         });
         this.phase = "triggered";
       }

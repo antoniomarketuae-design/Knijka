@@ -34,6 +34,7 @@ import type {
   PriorityFromRightSpec,
   RearTailgaterSpec,
 } from "../../contracts";
+import { l5BusyStreet } from "./complications";
 
 /** Drawn lane-center offset from the road centerline on every S2-B map, m. */
 export const JUNCTION_LANE_CENTER_M = 4.0625;
@@ -279,6 +280,9 @@ export const SC_JUNCTION_STOP: ScenarioSpec = {
     { level: 2 },
     { level: 3 },
     { level: 4, vehicleStart: "cold" },
+    // L5 «Усложнени» — the complication kit (scenario/complications.ts):
+    // the delta AND the instructor's line that explains it, authored together.
+    l5BusyStreet(),
   ],
   conditions: { weather: "dry" },
   localeBg: "bg-BG",
@@ -567,6 +571,9 @@ export const SC_TURN_LEFT_ONCOMING: ScenarioSpec = {
     { level: 2 },
     { level: 3 },
     { level: 4, vehicleStart: "cold" },
+    // L5 «Усложнени» — the complication kit (scenario/complications.ts):
+    // the delta AND the instructor's line that explains it, authored together.
+    l5BusyStreet(),
   ],
   staged: [SC_LTAP_TIGHT_EVENT, SC_LTAP_FOLLOW_EVENT],
   // LIVE arrival pin (LessonSpec.signalPlan — the founder traffic-light fix):
@@ -735,6 +742,9 @@ export const SC_JUNCTION_SCAN: ScenarioSpec = {
     { level: 2 },
     { level: 3 },
     { level: 4, vehicleStart: "cold" },
+    // L5 «Усложнени» — the complication kit (scenario/complications.ts):
+    // the delta AND the instructor's line that explains it, authored together.
+    l5BusyStreet(),
   ],
   // T9: the car the whole lesson talks about. Until now this array did not
   // exist — see SC_JUNCTION_SCAN_CONFLICT above.
@@ -897,10 +907,25 @@ export const SC_JX_GIVEWAY_B1: ScenarioSpec = {
        * *„if I don't stop on the green circle I can't do anything."*
        *
        * `y 113 r9` → y ∈ [104, 122]: 18 m of admissible band instead of 8, and
-       * the upper edge still lands 0.275 m SHORT of the Б1 line, so no pose
-       * inside the junction can ever satisfy it.
+       * the upper edge lands 0.275 m SHORT of the Б1 line at y 122.275.
+       *
+       * FR-24 — AND THAT LAST SENTENCE USED TO SAY „so no pose inside the
+       * junction can ever satisfy it", WHICH WAS FALSE AT THE RUNGS THE
+       * STUDENT ACTUALLY DRIVES. It reasoned from the AUTHORED radius and
+       * forgot the aid ladder: L1 widens 9 → 13.5 and L2 → 11.25, so the disc
+       * really admitted y up to 126.5 — 4.22 m PAST the Б1 line, on the rung a
+       * beginner starts on. Measured, not argued. `acceptBeforeMarkM` cuts the
+       * acceptance at the paint AFTER the ladder has been applied, so the
+       * claim is now true at every rung instead of at the one nobody drives.
        */
-      params: { kind: "reachZone", x: 4.06, y: 113, radiusM: 9, maxSpeedKmh: 6 },
+      params: {
+        kind: "reachZone",
+        x: 4.06,
+        y: 113,
+        radiusM: 9,
+        maxSpeedKmh: 6,
+        acceptBeforeMarkM: -9.275,
+      },
     },
     {
       id: "sc-jxgb-exit",

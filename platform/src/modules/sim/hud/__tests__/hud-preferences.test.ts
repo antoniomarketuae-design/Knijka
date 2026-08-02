@@ -96,7 +96,10 @@ describe("L14 · the roomy toast column is capped and narrow", () => {
 
   it("is 240 px wide, not 288 — and the class matches the number", () => {
     expect(TOAST_CARD_WIDTH_PX).toBe(240);
-    expect(TOAST_CARD_WIDTH_CLASS).toBe("w-60"); // 60 × 4 px = 240 px
+    // `w-60` = 60 × 4 px = 240 px. The rest of the string is the viewport clamp
+    // and the word-break added for the founder's clipped-card photo — see
+    // `__tests__/hud-card-fit.test.ts`, which owns those two assertions.
+    expect(TOAST_CARD_WIDTH_CLASS.split(" ")).toContain("w-60");
   });
 
   it("fits the width budget at the narrowest roomy frame — the old width did not", () => {

@@ -169,9 +169,14 @@ export function Minimap({
   }, [polylines, transform, vehicle, markers, sizePx]);
 
   return (
+    // „The minimap is a faint line drawing" (doc 89 §1, from the reference
+    // frames — there it is a pale route with an arrow and no disc behind it).
+    // The canvas keeps drawing exactly what it drew; the glass disc it sat on
+    // is what goes. The ring stays: it is the only thing telling a student
+    // where the map ends and the road begins.
     <div
       aria-label="Мини карта"
-      className="pointer-events-none overflow-hidden rounded-full border border-border bg-surface/75 backdrop-blur-md select-none"
+      className="hud-ghost pointer-events-none overflow-hidden rounded-full border border-border select-none"
       style={{ width: sizePx, height: sizePx }}
     >
       <canvas ref={canvasRef} style={{ width: sizePx, height: sizePx }} />

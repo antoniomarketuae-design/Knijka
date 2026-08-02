@@ -105,7 +105,14 @@ export function parseObjectiveParams(objective: LessonObjective): ObjectiveParam
         radiusM: p.radiusM,
       };
       if (num(p.maxSpeedKmh)) out.maxSpeedKmh = p.maxSpeedKmh;
-      if (num(p.acceptBeforeMarkM) && p.acceptBeforeMarkM >= 0) {
+      // SIGNED (FR-24): + = the mark sits past the paint, − = the paint is
+      // ahead of the mark. The only rejected value is one that would empty the
+      // acceptance disc — a cut deeper than the radius leaves nowhere legal to
+      // stop, which is „стоях точно на маркера и нищо не стана" with extra
+      // steps. Rejecting it here means a bad authoring falls back to the old
+      // uncut behaviour instead of bricking the lesson, and
+      // stop-line-grading.test.ts fails the build for it.
+      if (num(p.acceptBeforeMarkM) && p.acceptBeforeMarkM <= p.radiusM) {
         out.acceptBeforeMarkM = p.acceptBeforeMarkM;
       }
       return out;
@@ -603,17 +610,24 @@ function stepReachZone(
       const along = rx * ux + ry * uy; // + = beyond the mark
       const lateral = Math.abs(rx * uy - ry * ux); // across the approach
       // B18/FR-24 — where the ACCEPTANCE ends, on this same axis and sign
-      // convention. `acceptBeforeMarkM` is the distance from the authored mark
-      // BACK to the paint, so credit stops at the line instead of at the mark.
-      // Opt-in: absent ⇒ the boundary is the mark itself ⇒ every other
-      // waypoint in the library evaluates bit-identically.
+      // convention. `acceptBeforeMarkM` is the SIGNED offset from the paint to
+      // the authored mark, so credit stops at the LINE instead of at the mark:
+      //   + (mark inside the junction) pulls the boundary BACK off the paint;
+      //   − (paint ahead of the mark)  pushes it FORWARD onto the paint.
+      // Both are the same sentence — „the acceptance ends at the line" — and
+      // the arithmetic below needs no branch to say it. Opt-in: absent ⇒ the
+      // boundary is the mark itself ⇒ every other waypoint in the library
+      // evaluates bit-identically.
       const bound = params.acceptBeforeMarkM;
       const cut = bound ?? 0;
       // The grace capsule shares the boundary — it is „extra room BEHIND the
       // acceptance", and behind now begins at the paint. Without this the cut
       // leaks: a car that barges the mouth at 40 and settles to a legal speed
       // one metre past the bars is standing inside the capsule, which would
-      // hand it the speed half of the task it just failed.
+      // hand it the speed half of the task it just failed. The capsule KEEPS
+      // its length (radius + grace) and slides so its far end is the paint —
+      // so a negative cut buys forgiveness ahead of the mark without inventing
+      // any extra room behind it.
       inApproachGrace =
         lateral <= params.radiusM &&
         along <= -cut &&

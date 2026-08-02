@@ -88,6 +88,21 @@ instructor that explains every decision" content is invisible, and **the copy fi
 into that field — the headlight lines on 16 templates, the plural-pedestrian rewrites, the reason to
 brake — do not reach him**, even though the gate that measures them went green. See **B64**.
 
+> **CLOSED 2026-08-02 (second pass) — and it was worse than this paragraph said.** The exposure was
+> not the 21 rung-codes estimated above: of the condition-armed rungs, **100% were certified by that
+> dead field — 159 rungs** (HEADLIGHTS_OFF_AT_NIGHT 41 scen/69 rungs, HEADLIGHTS_OFF_IN_RAIN 45/71,
+> HIGH_BEAM_NOT_DIPPED 7/14, FOG_LIGHTS_OFF_IN_FOG 2/5). A second, independent case of the same
+> disease was found and fixed alongside it: `WRONG_LANE_FOR_DIRECTION` read
+> `meta.scenario.laneArrows !== undefined` — district-wide, route-blind, and true even for a
+> malformed block that makes `paintLaneArrows` a silent no-op.
+> **Delivery:** new `LessonSpec.briefingBg`, carried by `compile.ts`, rendered twice by
+> `LessonPlayShell`, and photographed on a phone by a reviewer who did not build it.
+> **The invariant:** `ReferentRule.evidence` is now REQUIRED across 12 channels, and a new test
+> refuses any `renderedBy` path that is not a real `.tsx` — a `.ts` fails *by name*, which is
+> precisely how this defect survived three months. It also greps `referents.ts` and fails if
+> `spec.instructionsBg` is ever read again. See **B64**, **FR-40**, and the RESOLVED box in the gate
+> section.
+
 ---
 
 ## THE REQUIREMENTS — his "we must" sentences, one row each
@@ -110,7 +125,7 @@ not have it yet*; the distinction is only how much is left.
 | FR-10 | Low-contrast "Press Q / Press G" pings | **partial** | Both exist but are gated to L1–L3 and (for the glance ping) to stop/give-way lines only — **traffic lights never arm it**. | advisor.ts, hud/overheadHint.ts |
 | FR-11 | **"WE NEED MAJOR FIX WITH EYES IF ITS FIXED"** | **partial** | 97/107 seen, up from 51. 10 rows still never rendered. | all lanes |
 | FR-12 | An abort control on the exam | **built** | «Прекрати изпита» → full result screen, no reload. Seen. | lesson-ui/LessonPlayShell.tsx |
-| FR-13 | **L4/L5 must ADD something, not just remove aids** | **not built** | Measured: **11 `traffic:` declarations across ~197 template entries.** Above L3 the ladder multiplies a baseline that is zero. B19 photographs L5 as removal-only. | templates*.ts (data) |
+| FR-13 | **L4/L5 must ADD something, not just remove aids** | **partial** *(was not built)* | Real structural work: `LevelComplication` on `LevelSpec` (a closed 7-token vocabulary), the addition emitted as `briefingBg[0]` — the field that now renders — **70 new L5 rungs across 12 families**, and `EXAM_PROTOCOL_COMPLICATION` finally makes 143 L4 rungs explain the boolean they flipped. Gated by `level-complication.test.ts` (18 tests) reading compiled OUTPUT, so a claim that is not a real compiled difference fails. Still partial: **22 of 167 templates have no L5**, each with a written reason, and no L5 rung has been photographed from the seat. | scenario/complications.ts, compile.ts |
 | FR-14 | Banner promising 2 tasks must give 2 tasks | **built** | Root cause was the frame-zero placeholder pose, not geometry. | templates-parking.ts |
 | FR-15 | **At least 10 parking variants** | **built** | Ten NEW drills in `templates-parking3.ts`, all grading `parkInBay`, each on its own committed district, ten distinct signatures, 30 authored drives replaying clean. Not built: parking on a slope — there is no elevation in the engine at all. | templates-parking3.ts |
 | FR-16 | Warn about the turn BEFORE the stop sign | **built** | Chevron resolves the next junction ahead. | RouteGuidance.tsx |
@@ -119,42 +134,87 @@ not have it yet*; the distinction is only how much is left.
 | FR-19 | 13 real 10–15 s video clips | **not built** | The seam is built and empty by one constant. **Blocked on payment** — Atlas 402, FAL −0.21 locked, Poyo no entitlement. One entry per step upgrades it with no other edit. | procedures/tutorial.ts |
 | FR-20 | Dismissing a step's tutorial ticks it and advances | **built** | Proven by the mouse-only 13/13 run. | hud/PreDriveTutorial.tsx |
 | FR-21 | No pedestrian ends inside a parked car | **partial** | The WALKER half is built and photographed three times (rest on the pavement, measured). The CAR half is his own sentence and is untouched: **on 75 of 100 districts every procedurally parked car stands on the footway** (`residential` is not in PARKING_LANE_CLASSES). | TrafficLayer.tsx, world |
-| FR-22 | **A roundabout must be a circle** | **partial** | Island, kerb, chamfer, planted crown, circular ring dashes, pads suppressed, 16 contracts, frames from the seat. The OUTER boundary is still not a circle on tight rings — at an arm node the open radius is 17.125 m on an 18 m ring. | world/builders/roundabout.ts |
+| FR-22 | **A roundabout must be a circle** | **built** ✅ *(was partial)* | Residual closed and photographed. Root cause named: the outer kerb was swept along the **junction-trimmed** ring centreline, and `analyzeNetwork` opens 17.125 m of junction at each arm node — four stubs with open plaza between them *is* the square he photographed. Fixed the way `buildRingDivider` already argued for the paint: a circle is drawn as a circle. `roundabout.ts` derives a 1°-resolution centre profile off the registered ring polylines plus per-arm mouth angles; `roads.ts` sweeps the mouth-free arcs with the same `buildSidewalkStrip` every pavement uses. Frames: `nbw/rb-after-zoom.png` (the boundary reads as a circle broken by four entries), `nbw/rb-after-oncircle.png`, `nbw/rb-after-seat2.png`. | world/builders/roundabout.ts |
 | FR-23 | Route must end, and then let you move on | **built** | Both halves. Photographed end-to-end after a failed attempt. | engine.ts + progression.ts |
-| FR-24 | Stop marker BEFORE the paint, drawn **and graded** | **partial** | Drawn half done everywhere and measured (2.00 m approach-side). Graded half is an **opt-in** param applied to **one** template (`sc-rb-approach`). Everything else still grades the old zone. | guidanceRoute.ts, objectives.ts |
+| FR-24 | Stop marker BEFORE the paint, drawn **and graded** | **built** ✅ *(was partial)* | `acceptBeforeMarkM` generalised from "non-negative distance" to a **signed** offset from paint to mark — ten of the twelve real cases needed the negative sign, which is why the parameter had only ever been authored once. Applied to **10 more templates**, each value derived from the district's own paint and re-derived by the gate every run, so a map edit fails loudly instead of leaving a stale constant. New gate `scene/stop-line-grading.test.ts` sweeps every template × rung and fails any reachZone reaching past a line its route crosses. Side-find: two comments claiming "no pose inside the junction can ever satisfy it" were true at the authored radius and **false at L1/L2**, where the aid ladder widens it — `sc-jxb-hold` really admitted a pose 2.23 m past the paint. | guidanceRoute.ts, objectives.ts |
 | FR-25 | Every dashboard control clickable | **built** | All 13; the three that were off-frame are reachable via the named poses. | vitok/cabinLook.ts |
 | FR-26 | Lane change must not be a one-second test | **partial** | The GRADER never was: 3 s indicator / 5 s mirror lookback, proven by a drive with inputs spread over 2.5 s. The TEACHING is: the L1 demo compresses signal + shoulder check into one bubble at 13 m/s. | templates-flow.ts demo pacing |
-| FR-27 | **More than one car to wait for at the yielding drills** | **not built** | B38 photographed: exactly one car, then a dead boulevard. Scenario lessons default to **zero** ambient traffic. | templates-junctions*.ts, templates-signals.ts |
+| FR-27 | **More than one car to wait for at the yielding drills** | **partial** *(was not built)* | `SCENARIO_FAMILY_TRAFFIC_BASELINE` in `compile.ts` gives junction 4 / signals 4, scaled by the existing level ladder — **20 templates gain a live street on every rung**, family-wide rather than only the five he played. The precondition nobody had checked was also fixed: ambient agents and staged actors now see each other (IDM term + corridor clamp both ways, plus `separateVehicleFrom()` for the frame-zero overlap), pinned by `ambient-staged-separation.test.ts` proven non-vacuous at 0.0039 m of centres. **Still partial for one honest reason: not one frame of it exists.** The deterministic clip rig replays traces that pin `vehicleCount 0` by law, so the repo's only reproducible render path cannot photograph ambient traffic. Numbers come from instrumenting the production runtime; nobody has looked at whether it *reads* as a living street. | compile.ts, traffic/ |
 | FR-28 | On lesson 9, show the turn before the line | **partial** | The mechanism is there and the chevron draws from 12 m out — but at the lawful stop the marker pillar washes the whole windscreen green, so nothing is readable. | RouteGuidance.tsx |
 | FR-29 | On signal lessons the marker sits before the light | **built** | Measured 0.80 m before the paint, 28.5 m short of the junction centre, on both lessons. | guidanceRoute.ts |
 | FR-30 | A scan drill must have traffic to find | **partial** | B28 photographed three vehicles in eight seconds — built there. B38/B40 photograph zero ambient on the whole signals family. | templates-junctions*.ts |
 | FR-31 | A missed waypoint must not trap the student | **built** | Credited from two separate stops; the НАУЧИ panel names the miss, the fix, and that the lesson continues. | engine.ts, objectives.ts |
 | FR-32 | **Signs everywhere the copy names one** | **partial** | Real progress, measured: WRONG_WAY falsehood **19 scenarios / 88 rungs → 6 / 29** (В1 mouth faces built); В26 numerals synthesised; А19 added; В24 photographed. But B34 photographs a whole district carrying **two** sign faces. | world/builders/props.ts |
-| FR-33 | A machine gate over the 1050+ theory questions | **not built** | The SIM half exists (world-referent gate). Nothing walks `contentRepo.questions()` asking whether a promised picture exists. | lib/content |
-| FR-34 | "Sleeping on green" must have a subject | **not built** | No hesitating lead car was added. B40 photographs 17/18/19 as the same picture. | templates-signals*.ts |
+| FR-33 | A machine gate over the 1050+ theory questions | **built** ✅ *(was not built)* | New `lib/content/questionMedia.test.ts` walks `contentRepo.questions()` — the bank the app is actually served from — asserting M1 a question pointing at a picture carries one, M2 „кой от показаните знаци" has a face on **every** option, M3 „колата с ореола" has an ego pose on the still. 46 deictic questions, 0 broken; every predicate is also run against deliberately broken questions built in the file, so the gate is *proven* able to fail. **It caught itself lying first:** the draft used `/показаните\b/`, and JS `\b` is ASCII-only so it never matches after Cyrillic — it found 2 of 1,089 and would have shipped green and vacuous. **Real defect found (M4, not auto-fixed): 12 sign codes** (А28, В25, Г15, Д1, Д13, Д14, Ж19, Т1, Т2, Т10, Т13, Т15) are taught by name in 11 questions and have no catalogue entry — the Ж and Т groups are absent entirely. Left for a human: a sign entry needs artwork and lawRefs by retrieval (ADR-002). | lib/content |
+| FR-34 | "Sleeping on green" must have a subject | **partial** *(was not built)* | **Half built, and the half is named.** The COLUMN BEHIND you now exists: `sc-signal-hesitation` instruction 4 promises „това блокира кръстовището и КОЛОНАТА ЗАД ТЕБ", and with ambient 0 a frozen player had 0 cars behind, forever; with the signals baseline up to **2 queue inside 45 m from the first frame of the freeze**. The referent the Bulgarian names now exists. **Not built: the hesitating LEAD car — the subject he was actually asking about.** `sc-signal-hesitation` stages no actors at all; adding one is a line in `templates-signals.ts`, which the data lane owns. | templates-signals*.ts (data) |
 | FR-35 | Rework the traffic officer in Blender | **not built** | Procedural rig, no GLB. **Blocked on his machine.** | Blender → TrafficLayer.tsx |
 | FR-36 | Make the officer bigger | **built** | Pinned ~2.1 m, taller than any pedestrian, legible at range. | TrafficLayer.tsx |
 | FR-37 | A bubble over the officer saying who may go | **built** | All three ППЗДвП чл. 66 postures carry their own caption. | traffic/controllerGestures.ts |
 | FR-38 | Traffic-light lessons must show the named state | **partial** | Heads 138 → 230; a lit RED photographed at B44, an unlit head at B36 (correct for загаснал). Мигащо жълто and червено-жълто not certified in a frame. | WorldProps.tsx, templates-signals*.ts |
 | FR-39 | 1–2 more pedestrians on the zebra | **built** | Two on the paint, resolved at three magnifications, and at L3 as well as L1. | templates-pe.ts |
-| FR-40 | **Night/rain lessons must tell you to switch the lights on** | **not built** | The lines were written into 16 templates and the gate went green (HEADLIGHTS codes 18 rung-codes → 0) — **but they went into `instructionsBg`, which never renders.** The student is not told. This is the clearest case of the gate and the fix closing a loop that never touches the screen. | compile.ts + a real surface |
+| FR-40 | **Night/rain lessons must tell you to switch the lights on** | **built** ✅ *(was not built)* | **Closed and photographed this pass.** `compile.ts` now carries `spec.instructionsBg` onto the new `LessonSpec.briefingBg`, and `LessonPlayShell` renders it twice — the numbered ИНСТРУКЦИИ card and a blocking overlay line ending in „Разбрах". The referent was repointed to the rendered field (`referents.ts:751`). Verified independently of the lane that built it: briefing photographed on screen at 852×393 (`shots/ab-phone-852x393.png`) and the compiled Bulgarian dumped and read for all five lights templates — e.g. „Преди да потеглиш по тъмно: включи късите светлини още със запалването на двигателя." | compile.ts + LessonPlayShell |
 | FR-41 | The zebra family must stop being one map | **not built** | PE-14 gained a graded stop; the maps did not change. Seven consecutive lessons on seven copies of one street, photographed. | templates-pe*.ts, tools/maps |
-| FR-42 | Two pedestrians from behind the truck, and say so | **partial** | The two walkers are BUILT and photographed. The sentence naming them was written into `instructionsBg` — not delivered. | templates-pe.ts + compile.ts |
+| FR-42 | Two pedestrians from behind the truck, and say so | **built** ✅ *(was partial)* | Both halves now land. The two walkers were already built and photographed; the sentence naming them was stranded in `instructionsBg` and is now delivered through `briefingBg`, the field photographed rendering this pass (see FR-40). No new copy was written — the same words finally reach the screen. | templates-pe.ts + compile.ts |
 | FR-43 | Rework the children in Blender | **not built** | Photographed as a scaled capsule rig. **Blocked on his machine.** | Blender → TrafficLayer.tsx |
 | FR-44 | A pedestrian signal head the walkers obey | **partial** | Built end to end (`SignalHeadKind`, drawn red-over-green, gate released by `crossingGateOpen`, jaywalker authored to ignore it). Never certified in a frame at that zoom. | world + traffic/pedestrians.ts |
 | FR-45 | A real В26 sign, not just paint on the road | **built** | Photographed at three districts, legible from the seat with no zoom. Residual: the road glyph is still painted, and the entry sign is half-occluded by a tree and a billboard on every map from that generator. | WorldProps.tsx, markings.ts |
 | FR-46 | Children playing in the school zone | **partial** | Four children exist, render AS children, photographed. **Nobody is playing** — they walk. | templates-sp.ts |
 | FR-47 | An actual school building | **built** | New `kind: "school"`, derived name board / railing / gate, own palette. Photographed. Residual: at the read distance the board sits behind the mirror inset. | world/builders/schools.ts |
 | FR-48 | Lessons 33 and 36 must not be the same | **not built** | Photographed side by side: same street, same seat, same sign in front of the same billboard. | tools/maps, templates-sp.ts |
-| FR-49 | A visible reason for the "stop out of nowhere" | **not built** | Nothing was built to look at. The copy that names a reason is in `instructionsBg` and never renders. | templates-sp.ts + a world prop |
-| FR-50 | The motorway car must reach 160–180 km/h | **not built** | The governor is no longer binding; the **tractive curve's own zero is ~145 km/h**. It is an engine change. | vehicle (engineForceAt) |
+| FR-49 | A visible reason for the "stop out of nowhere" | **partial** *(was not built)* | The SPOKEN half is delivered: the copy that names a reason („представи си, че това е твоята спирка или адрес", `templates-sp.ts:809`) was in `instructionsBg` and now reaches the student through `briefingBg`. **The VISIBLE half is still not built** — he asked for something to *look at*, and no world prop (a bus stop, a doorway, an address plate) was placed at the braking point. A sentence is not a reason you can see. | templates-sp.ts + a world prop |
+| FR-50 | The motorway car must reach 160–180 km/h | **partial** *(was not built)* | **The engine is fixed; the ROAD is now the limit.** `ENGINE_FORCE_CURVE` tail resized against *measured* resistance rather than the aero constant: rig terminal **120.3 → 168.4 km/h**, inside his band, with everything at or below 100 km/h arithmetically identical (same 0–100 of 11.57 s, same a at 30/50/90 before and after). Two hidden governors also found: `tierTopSpeedKmh` — the gate for every lesson's declared speed — was wrong in **both** resistance terms (carried `ROLLING_RESISTANCE_N`, which `VehicleSim` only applies on closed throttle, and omitted `CHASSIS_LINEAR_DAMPING`, 1152 N at 47 m/s, larger than aero); and manual 5th revved out at 150. **Why he still will not see 160:** `mw-v1` is 1006 m and every lesson spawns at rest, so a standing-start full-pedal run measures **147.6 km/h** at the end of the segment. 160 needs ~1.7 km of motorway, 170 needs ~2.4 km. That is map data. | vehicle/ ✅, content/world/mw-v1.json ❌ |
 | FR-51 | Something must happen before the queue | **partial** | The queue is a real six-plus column and the copy stopped lying, but nothing was authored between spawn and the queue. | templates-following*.ts |
 | FR-52 | Rain must look like rain and lights must change something | **built** | Rendered and measured: streaks, overcast, wet asphalt; headlight change is a beam-shaped wedge (meanΔluma 7.64/255 cockpit, 4.91 exterior). Residual: `QUALITY_PRESETS.low.rainParticles === 0` — a low-tier device gets no rain at all. | environment/ |
 | FR-53 | The truck must DO something, not mirror my speed | **partial** | (a) built — `scheduledCruise`, the truck drives its own arc. (b) not built — `slamAt` is 160 m past the end of a 360 m road with `minSlamSpeedKmh: 250` and `triggersHazard: false`, i.e. authored so nothing can ever happen. | templates-following.ts |
 | FR-54 | The cut-in car must indicate early | **built** | `INDICATOR_LEAD_SEC = 3.0`, armed by predicting arrival, actor paced inside a measured 20° cone. No cockpit frame of the lit blinker yet. | orchestrator/runners.ts |
 | FR-55 | A rear-view window in the chase camera | **built** | Persistent, no key needed. | scene/chaseRearView.ts |
-| FR-56 | The tailgater must stick earlier | **not built** | Now measured rather than guessed: 9 m at spawn, **absent t 10–24 s**, back to 14 → 9 → 8 m from t 25 s. Intermittent, and the sustained tailgating is late. | templates-following*.ts |
+| FR-56 | The tailgater must stick earlier | **built, but it broke the gate** ⚠️ *(was not built)* | `seedSpeedMps` added to the `matchPlayer` command and used by `RearTailgaterRunner`: the лепка enters the mirror at the player's speed instead of accelerating from a standstill and then chasing the gap that opened while it accelerated. Measured onsets **7.43 / 9.07 / 13.73 / 10.70 s → all under a 5 s ceiling**, pinned by `tailgater-onset.test.ts` (proven non-vacuous). **It is also the sole cause of the four red tests in the gate above** — three other templates borrow `RearTailgaterRunner` as a generic passing vehicle and their choreography was timed against the old launch profile. Bisected and proven. Needs scoping to the лепка templates before this can be called clean. | orchestrator/runners.ts:2609 |
 | FR-57 | A Q/E rear-view window, ≤10% of the screen | **built** | Own render target and camera at the GLB door-glass position, mirror-image u-flip, ≤10% enforced as a **clamp** at 7 aspects, layer-2 recursion guard, opens only in cockpit while Q/E is held. 21 assertions + 7 frames incl. the not-doubled-in-chase case. | scene/cockpitDoorMirror.ts |
+
+---
+
+## The gate — SECOND close-out, 2026-08-02 (this pass). **IT IS RED.**
+
+Run after the seven parallel lanes landed. Reported before the older table below, because a red gate
+outranks anything else on this page.
+
+| check | result |
+|---|---|
+| `npx tsc --noEmit` | **exit 0**, no diagnostics. `tsconfig.json` byte-checked afterwards: the two `.next-compare/**` globs `next dev` injected were removed again, and `src/lib/tsconfigHygiene.test.ts` passes. |
+| `npx vitest run --maxWorkers=4` | ❌ **exit 1 — 3 files / 4 tests failed**, 643 files / 9,872 passed / 165 skipped (10,041), 137.7 s. Not memory pressure: no `Failed to start forks worker` line, and the four failures are deterministic assertion errors that reproduce on a 2-worker re-run. |
+| world-referent gate | **passes — 17/17** across `world-referent.gate.test.ts` (7) and the new `referent-evidence-reachable.test.ts` (10). Mode ENFORCING, allowlist 0. |
+| falsehood budget | **2 codes / 7 scenarios / 33 rung-codes — UNCHANGED in value, repaired in meaning.** See the RESOLVED box above: the same 33 was previously certified by a field no student ever read, and is now certified by `lesson.briefingBg`, photographed on screen. |
+
+### The four failures — one root cause, bisected and proven
+
+All four live in `src/modules/sim/traces/__tests__/` and all four are the **FR-56 rolling start**:
+`orchestrator/runners.ts:2609` now passes `seedSpeedMps: input.speedKmh / 3.6` so the лепка enters the
+mirror already travelling instead of launching from a standstill. That is a good fix and it is one of
+his own asks — but `RearTailgaterRunner` is **not only the лепка**. Three templates borrow it as a
+generic "vehicle that comes past you", and their choreography was timed against the old
+launch-from-rest profile:
+
+| file | assertion | measured |
+|---|---|---|
+| `sc-ln-decisive-change-traces.ts:141` | the contact is choreographed — the car is still alongside when the wheel goes over | crossing **17.70 s** vs target pass **17.13 s** — the car has already gone by; the blind-spot contact no longer happens |
+| `sc-vu-blindspot-moto-traces.ts:141` | same, for the motorcyclist | **18.50 s** vs **18.28 s** |
+| `sc-ov-being-overtaken-traces.ts:99` | the overtaker's pass reads `yielded` | reads **`clear`** |
+| `sc-ov-being-overtaken-traces.ts:150` | mistake-accelerating: the overtaker is TRAPPED, its pass never resolves | it **resolves at 27.88 s** — the taught trap does not occur |
+
+**Bisected, not guessed:** commenting out that single line turns all three files green
+(**45/45 passed, 1.93 s**); restoring it reproduces exactly those four failures. The line was restored
+— this pass did not silently revert another lane's founder-asked fix to buy a green board.
+
+**The fix is a scope, not a rollback.** `seedSpeedMps` should be opted into by the templates that
+author a лепка (`templates-following*.ts`), not forced on every consumer of `RearTailgaterRunner`, so
+`templates-lanes2.ts` (sc-ov-being-overtaken), `templates-lanes3.ts` (sc-ln-decisive-change) and
+`templates-vru2.ts` (sc-vu-blindspot-moto) keep their timing. Owner: the traffic lane — it has the
+onset measurements, and choosing the predicate blind would re-break FR-56 without anyone noticing.
+
+**This is the wave's own lesson landing on the wave.** FR-56 shipped with a new, deliberately
+non-vacuous test (`tailgater-onset.test.ts`, 4 tests, proven to fail without the fix) and that test is
+green. The four assertions it broke live in other files that nobody re-ran until this gate. A fix
+verified only by the test written alongside it is exactly the failure mode this register exists for.
 
 ---
 
@@ -181,6 +241,22 @@ parking lane took on and should pay down.
 satisfied; the student is not told. **21 of the 80 rung-codes that left the falsehood budget left it
 this way.** The `WRONG_WAY` reduction (59 rung-codes) is real world geometry — В1 plates now stand at
 one-way mouths — and is not affected.
+
+> **RESOLVED 2026-08-02 (second close-out). The number did not move; its truth did.**
+> The falsehood budget is **still 2 codes / 7 scenarios / 33 rung-codes** — identical to the line
+> above. What changed is that it is now *earned*. Traced through git: at both `93f76c7` and
+> `1376e7f`, `referents.ts:692` read `spec.instructionsBg`, and the HEADLIGHTS codes had **already**
+> been retired from the budget on that basis — so the 33 printed at the last close-out was a false
+> number. In the working tree `referents.ts:751` reads `lesson.briefingBg`, the compiled field
+> `LessonPlayShell` renders. Verified two independent ways rather than by assertion:
+> **(1) photographed** — the briefing is on screen at 852×393 in
+> `…/scratchpad/compare/shots/ab-phone-852x393.png` („ⓘ ИНСТРУКЦИИ Ниво 3 — По-натоварена улица…
+> Защо | Разбрах") and as the numbered ИНСТРУКЦИИ card in `d-jx-cockpit.png`; **(2) dumped** — the
+> compiled `briefingBg` of all five lights templates, read by eye, e.g. `sc-ac-night-lights` step 1
+> „Преди да потеглиш по тъмно: включи късите светлини още със запалването на двигателя." and
+> `sc-ac-rain-lights` step 1 „Вали, макар да е ден: включи късите светлини — правило
+> „чистачки → светлини"." **The same 33 that was a lie is now true.** A higher honest number would
+> have been fine; this is the rarer case where the honest number happens to be equal.
 
 ---
 
@@ -277,7 +353,7 @@ one-way mouths — and is not affected.
 | **B61** | 33 | "no actual school when the question states there should be School" | **FIXED-SEEN** | Not rendered, and not addressed by any lane. Needs either a school building kind or a copy change.<br><br>**RE-LOOK 2026-08-02 → FIXED-SEEN.** There is a school now and it is named. At y 170 a blue name board carrying white Cyrillic «…УЧИЛИЩЕ» hangs on a frontage whose palette is deliberately different from the grey residential blocks, with a green yard railing and a gate gap along it (`world/builders/schools.ts`; district building `sp-b-school`, kind "school", footprint x 22.1–38.1 / y 196–240). `tools/clips/headless/.srt/ZOOM-b61-school-board.png`. **One to fix:** at exactly this approach distance the board sits behind the rear-view-mirror inset, which clips its left third — the first moment the driver could read it is the moment the mirror covers it. |
 | **B62** | 34 Преход 50→30 (34→36) | "No street signs, No sign stating 50, no Sign stating 30" | **FIXED-SEEN** | Not rendered.<br><br>**RE-LOOK 2026-08-02 → FIXED-SEEN.** Both signs exist and both numerals are legible on sp-trans-v1: a В26 «50» at the district entry readable at 12×, and at the zone boundary a large В26 «30» on a two-post pole legible from the seat with no zoom, with a second smaller В26 «30» restating it. `tools/clips/headless/.srt/ZOOM-b62-sign30.png`. Same entry-sign occlusion note as B57. |
 | **B63** | 34 | "this questions is absolutely same as 31 no difference at all" | **BROKEN-SEEN** | Needs 33 and 36 compared directly; neither was played.<br><br>**RE-LOOK 2026-08-02 → BROKEN-SEEN.** He is right about the map and here are the two spawns side by side. Catalog 33 (sc-speed-creep, sp-creep2-v1) and catalog 36 (sc-speed-transition, sp-trans-v1) open on the same street from the same seat: same building line left, same street tree, same В26 «50» planted in front of the same billboard right, same row of parked cars, same sky. Both come out of `tools/maps/gen_sp_transition.mjs` with the same 50→30 structure and differ only in length (680 m vs 360 m). Owner: tools/maps + templates-sp.ts. |
-| **B64** | 35 Рязко спиране (35→37) | "the question states stopping out of nowhere, but why?" | **BROKEN-SEEN** | Not rendered.<br><br>**RE-LOOK 2026-08-02 → BROKEN-SEEN, and it is the biggest structural finding of this pass.** His „why do we stop out of nowhere?“ is still unanswered on screen — and the reason is that **`instructionsBg` is never rendered to a student.** The answering copy WAS written (`templates-sp.ts:809`, „представи си, че това е твоята спирка или адрес“). Verified independently at close-out: every non-test, non-authoring reference to `instructionsBg` in `platform/src` is `scenario/types.ts` (the type), `scenario/validate.ts` (numbering) and `world/referents.ts` (the gate). **`scenario/compile.ts` never maps it into the LessonSpec and no component reads it** — `compile.ts:459` maps `spec.objectiveBg` → `descriptionBg` and objective titles to the banner, and that is all the student gets. So all 150+ templates' numbered instructor steps are authored, validated, gated — and invisible. What the student sees here is the objective banner, the in-world gate and four demonstration cards, none of which says why the car is stopping. `tools/clips/headless/.srt/C-sc-sp-harsh-brake-card03.png`. **Consequence beyond this row: the doc-87 prescription „fix it in the templates' instructionsBg — a copy fix, not an engine fix“ cannot work as written, and every headlight/plural-pedestrian copy fix shipped this wave went into that same dead field.** |
+| **B64** | 35 Рязко спиране (35→37) | "the question states stopping out of nowhere, but why?" | **BROKEN-SEEN** | Not rendered.<br><br>**RE-LOOK 2026-08-02 → BROKEN-SEEN, and it is the biggest structural finding of this pass.** His „why do we stop out of nowhere?“ is still unanswered on screen — and the reason is that **`instructionsBg` is never rendered to a student.** The answering copy WAS written (`templates-sp.ts:809`, „представи си, че това е твоята спирка или адрес“). Verified independently at close-out: every non-test, non-authoring reference to `instructionsBg` in `platform/src` is `scenario/types.ts` (the type), `scenario/validate.ts` (numbering) and `world/referents.ts` (the gate). **`scenario/compile.ts` never maps it into the LessonSpec and no component reads it** — `compile.ts:459` maps `spec.objectiveBg` → `descriptionBg` and objective titles to the banner, and that is all the student gets. So all 150+ templates' numbered instructor steps are authored, validated, gated — and invisible. What the student sees here is the objective banner, the in-world gate and four demonstration cards, none of which says why the car is stopping. `tools/clips/headless/.srt/C-sc-sp-harsh-brake-card03.png`. **Consequence beyond this row: the doc-87 prescription „fix it in the templates' instructionsBg — a copy fix, not an engine fix“ cannot work as written, and every headlight/plural-pedestrian copy fix shipped this wave went into that same dead field.**<br><br>**→ 2026-08-02 SECOND CLOSE-OUT — the DELIVERY half is FIXED-SEEN; the row stays PARTIAL-SEEN for what he actually asked.** `compile.ts` now carries `spec.instructionsBg` onto the new `LessonSpec.briefingBg` (copied, never the shared object) and `LessonPlayShell` renders it in two places — the numbered ИНСТРУКЦИИ card in the objective stack, and a blocking overlay line that ends in „Разбрах". **Photographed by a reviewer who did not build it:** `…/scratchpad/compare/shots/ab-phone-852x393.png` shows the briefing bar on a 852×393 landscape phone („ⓘ ИНСТРУКЦИИ Ниво 3 — По-натоварена улица: Улицата вече не е празна… Защо | Разбрах"), and `d-jx-cockpit.png` / `d-jx-chase.png` show the full numbered card at 1280×591. So all 150+ templates' instructor steps are no longer invisible, and the copy fixes that were stranded — the headlights, the plural pedestrians, the reason to brake — now reach him. **The invariant that stops it recurring:** `ReferentRule.evidence` is now a REQUIRED field over 12 declared channels, and `referent-evidence-reachable.test.ts` fails if a channel's `renderedBy` is not a real `.tsx` — a `.ts` is rejected *by name*, which is exactly how `instructionsBg` passed for three months. Its non-vacuity test reconstructs this very defect and asserts the checker rejects it. **Why the row is not FIXED-SEEN:** his sentence was „stopping out of nowhere, but WHY?" — he asked for a visible reason. He now gets a *sentence* explaining it. The bus stop / doorway / address he could see is still not in the world (FR-49). |
 | **B65** | 35 | "I see many issue with the Map its very Raw, boring" | **UNVERIFIABLE** | A judgement call that needs his eyes as much as ours. Not rendered. |
 | **B66** | 36 Скорост в завой (36→38) | "no sign exists, not 90 not 50 and it says there should be sign A1" | **UNVERIFIABLE** | Frames were captured for this scenario but no verdict was returned before the box ran out. The gate still carries `SPEED_TOO_FAST_FOR_CURVE` 1 scenario / 4 rungs in the falsehood budget — **owner: `world/builders/zoneSigns.ts`** — so at least part of this is known-open by number. |
 | **B67** | 37 Магистрала (37→39) | "I cant go more than 100-105 … the car must go much beyond 160-180" | **UNVERIFIABLE** | Not rendered. Related and measured: the Нормален governor is now domain-derived rather than a flat cap (see A5), which is the same machinery, but nobody drove the motorway. |
@@ -314,7 +390,35 @@ one-way mouths — and is not affected.
 | **C8** | Portrait driving shell settles in 1,198 ms against a 1,200 ms budget | **PARTIAL-SEEN** | Not re-measured in either pass. `tools/mobile/stability-probe.mjs` needs its own WebKit sign-in, and `auth.mjs:22` calls `page.goto('/login')` with no timeout argument — Playwright's 30 s default — which never completed on this box (one cold `/login` compile took 6.8 minutes). **Two millisecond margins should not be measured on a box like this.** To retry: warm `/login` and `/simulator` server-side with the session cookie first, then run the probe.<br><br>**RE-LOOK 2026-08-02 → PARTIAL-SEEN — re-measured for the first time.** The blocker is fixed at source: `tools/mobile/lib/auth.mjs` called `page.goto('/login')` with no timeout, inheriting Playwright's 30 s default; it now warms from Node, uses domcontentloaded, an explicit 180 s budget and a 120 s hydration wait, with per-step logging. `tools/mobile/lib/user.mjs` gained a 10 s pg connect deadline (its „bounded“ 20-try loop was unbounded in practice — one run sat at zero CPU for 17 minutes). **Result: portrait worst settle 1,190 ms against the 1,200 ms budget = 10 ms of margin** (worst phase overlayClose, not the toolbar); landscape 996 ms. Everything else clean: 0 edge violations, 0/97 and 0/121 elements moved, 0 overlaps, 0 occlusions, symmetric margins, EXIT 0. It passes. It passes on a coin flip. |
 ---
 
-## PLAY THESE EIGHT — one drive per class of thing that changed
+## PLAY THESE SEVEN — 2026-08-02 second pass, one drive per thing that changed
+
+**Positions are CURRENT.** Read the „look at" column before you drive; each one is a single specific
+thing, and three of them are things I expect you to dislike.
+
+| # | open this | look at exactly this | row |
+|---|---|---|---|
+| 1 | **Catalog 30 · „Нощно каране — светлини" · L1** | **The one that was a lie and is now true.** Before you touch anything, read the bar across the top: step 1 must say „Преди да потеглиш по тъмно: включи късите светлини още със запалването на двигателя." For three months that sentence existed in the codebase and *no student could ever see it*, while the gate scored it green. Tap „Разбрах" and it goes away. | FR-40, B64 |
+| 2 | **Catalog 8 · „Кръгово движение" · L1** | **The outer edge.** Last time this was an open plaza with four kerb stubs and I told you it was the ugliest thing left. Drive once around: the boundary should now read as a circle broken by four mouths, with pavement behind it. | FR-22, B16 |
+| 3 | **Catalog 12 · „Спиране на стоп-линия" · L2** | **Where the acceptance zone ends.** Creep up slowly and stop where you think is right. The green marker now sits *before* the paint and the grader agrees with it on 11 templates instead of 1 — you should no longer be able to satisfy a stop objective with your nose over the line. | FR-24 |
+| 4 | **Catalog 17 · „Светофар — потегляне" · L3** | **The street should not be empty.** Junction and signals lessons now carry 4 ambient cars scaled by level. Watch for 30 seconds. ⚠️ **Nobody has ever seen this rendered** — the clip rig cannot photograph ambient traffic, so you are the first pair of eyes. Tell me whether it reads as a living street or still looks sparse. | FR-27, FR-30 |
+| 5 | **Any speed drill · L5** (e.g. Catalog 5 „Ограничение на скоростта") | **What L5 now ADDS.** Step 1 of the briefing should name the complication in instructor Bulgarian and cite the law — „Ниво 5 — Мокър паваж: … спирачният път става около 1,4 пъти по-дълъг…". 70 new L5 rungs. If it still feels like removal-only, that is the thing to say. | FR-13 |
+| 6 | **Catalog 46 · „Лепка отзад" · L1** | **He should be on you fast now** — the tailgater enters at your speed instead of launching from a standstill, so the glued pose arrives inside 5 s instead of 7–14 s. ⚠️ **This is also what turned the gate red** (four choreographed mistake demos in other lessons are mistimed by it). Confirm the лепка feels right; the collateral is named in the gate section. | FR-56 |
+| 7 | **The motorway lesson, full pedal, to the end of the segment** | **You will feel more and still not see 160.** The car now reaches 168.4 km/h on the rig, but `mw-v1` is 1006 m and you spawn at rest, so a standing start measures **147.6 km/h** at the end. The engine is no longer the limit — the road is. 160 needs ~1.7 km. | FR-50 |
+
+### And one thing to look at that is not a lesson
+
+Open any drive on your **phone, in landscape**, and just look at the shape of the screen. The panels
+are gone: the instrument row is bare text on the image with no band behind it, and there is no top
+toolbar in the compact layout. That is your two-arc drawing implemented. Then look at the top edge —
+the „ИНСТРУКЦИИ … Разбрах" bar with the solid blue button, the white ☰ circle, and the
+„Начинаещ | Нормален | Напреднал" segmented control. **Those three are still web-page furniture on a
+game screen, and they are the first thing a stranger would point at.** Side-by-side frames against
+your two reference photos are in `…/scratchpad/compare/shots/chase-compare.png` and
+`cockpit-compare.png`.
+
+---
+
+## PLAY THESE EIGHT — one drive per class of thing that changed *(previous pass, kept for reference)*
 
 You should not have to replay 154 lessons to audit us. **Positions below are CURRENT** — remember
 everything after 4 shifted **+2** when Lane 15 inserted two parking drills.
@@ -329,6 +433,32 @@ everything after 4 shifted **+2** when Lane 15 inserted two parking drills.
 | 6 | **`/theory/practice` on your phone — then rotate to landscape** | It used to need 479 px of scrolling in landscape and showed **zero** answer options. Now the question, all four options and «Провери» fit on one screen, and the hamburger is 44×44 instead of 38×38. | C5, C4, C6 |
 | 7 | **Catalog 49 · „Еднопосочна улица" · L1 — drive up to the junction** | Look for the blue **Д4** and the **Г2 „само надясно"** you asked for by name. A lane rendered them and says they are readable from the approach; my own frame from 100 m out could not resolve them. **I want your eyes on this one specifically.** | B78 |
 | 8 | **Any lesson, on DESKTOP, default cockpit camera** | You will see your speed **twice** — once on the 3D cluster, once in the bar below it. Fixed on the phone, not on desktop. Owner and one-line fix are in the C7 row. | C7 |
+
+---
+
+## STILL NOT BUILT after the 2026-08-02 second pass — no softening, with owners
+
+**Ours, and nobody started it.**
+
+| what | why it matters | owner |
+|---|---|---|
+| **FR-41** the zebra family is one map seven times · **FR-48** lessons 33 and 36 open identically | Seven consecutive lessons on seven copies of one street. He photographed it; it is unchanged. | `tools/maps`, templates-pe*.ts |
+| **FR-49** a *visible* reason to brake | The sentence now reaches him (new this pass); the bus stop / doorway he could look at was never placed. | templates-sp.ts + a world prop |
+| **FR-34** the hesitating LEAD car | The column *behind* you is built and measured. The car that sleeps on green — the subject of his actual question — stages no actor at all. One line in `templates-signals.ts`. | data lane |
+| **FR-21** the 76-district remainder | On 75 of 100 districts every procedurally parked car still stands on the footway (`residential` is not in `PARKING_LANE_CLASSES`). | world/TrafficLayer.tsx |
+| **FR-50**'s second half | `mw-v1` is 1006 m; 160 km/h needs ~1.7 km of motorway. Map data, not engine. | content/world/mw-v1.json |
+| **FR-56** scoping | Built, and it is the sole cause of the four red tests. Needs opting-in per template. | orchestrator/runners.ts:2609 |
+| **12 missing sign codes** | А28, В25, Г15, Д1, Д13, Д14, Ж19, Т1, Т2, Т10, Т13, Т15 are taught by name in 11 questions with no catalogue entry; the Ж and Т groups are absent entirely. Not auto-fixable — artwork + lawRefs by retrieval (ADR-002). | a human + content |
+| **The look** | The world is untextured extruded boxes with no cast shadows; the top-edge chrome is still web furniture. Neither is a HUD bug and neither is close to his reference. | art + shell |
+
+**Not ours — blocked on him.**
+
+- **FR-35** the traffic officer and **FR-43** the children are **blocked on his Blender machine.** Both
+  are still procedural capsule rigs, photographed as such. No amount of code closes these; they need
+  modelled GLBs.
+- **FR-19** the 13 pre-drive video clips are **blocked on a payment.** The seam is built and empty by
+  one constant — Atlas returned 402, FAL is locked at −0.21, Poyo has no entitlement. One entry per
+  step upgrades it with no other edit.
 
 ---
 

@@ -990,7 +990,17 @@ export const SC_MERGE_FROM_PROPERTY: ScenarioSpec = {
       // is a real halt, not a roll. Both the shadow AND the „с мигача“ demo
       // clear it — which is the point of that card: everything up to here was
       // right.
-      params: { kind: "reachZone", x: 29, y: MFP_Y_EXIT, radiusM: 3, maxSpeedKmh: 3 },
+      // FR-24: „on the derived line's own metre" held at the authored radius,
+      // but the L1 ladder widens 3 → 4.25, so the disc admitted a pose 2.98 m
+      // past the Б2 the title says to stop AT. The cut ends it at the paint.
+      params: {
+        kind: "reachZone",
+        x: 29,
+        y: MFP_Y_EXIT,
+        radiusM: 3,
+        maxSpeedKmh: 3,
+        acceptBeforeMarkM: -1.275,
+      },
     },
     {
       id: "sc-mfp-merged",

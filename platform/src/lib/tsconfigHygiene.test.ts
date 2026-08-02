@@ -28,7 +28,9 @@ import { describe, expect, it } from "vitest";
  */
 describe("tsconfig hygiene", () => {
   const tsconfigPath = path.resolve(__dirname, "../../tsconfig.json");
-  const include: string[] = JSON.parse(readFileSync(tsconfigPath, "utf8")).include;
+  const parsed = JSON.parse(readFileSync(tsconfigPath, "utf8"));
+  const include: string[] = parsed.include;
+  const exclude: string[] = parsed.exclude ?? [];
 
   it("includes only the real .next build dir, never a per-agent scratch dir", () => {
     // `.next/...` is fine; `.next-anything/...` is a scratch dir.
@@ -39,6 +41,25 @@ describe("tsconfig hygiene", () => {
         "type-checked: a stale route validator inside one injects phantom " +
         "errors into every `tsc --noEmit`, on a tree that is actually clean.",
     ).toEqual([]);
+  });
+
+  it("EXCLUDES every scratch dir — removing the glob was only half the fix", () => {
+    // THE HOLE THIS TEST HAD, and it fired on 2026-08-02. Deleting the two
+    // `.next-unpanel/**` globs from `include` did NOT stop tsc reading that dir:
+    // `include` also carries a bare `**/*.ts`, which sweeps the whole project
+    // root, and `exclude` listed only `node_modules`. So a clean tree still
+    // failed with 66 phantom parse errors out of
+    // `.next-unpanel/dev/types/routes.d.ts` — the exact disease this file was
+    // written to end, surviving the exact fix this file demanded.
+    //
+    // A scratch dir may exist; it must never be type-checked. The `include`
+    // assertion above stops someone ADDING one on purpose; this one stops the
+    // project glob picking one up by accident.
+    expect(
+      exclude,
+      "tsconfig `exclude` must carry `.next-*`, or `include`'s `**/*.ts` " +
+        "type-checks every per-agent scratch build dir on the box.",
+    ).toContain(".next-*");
   });
 
   it("still checks the real build's generated route types", () => {

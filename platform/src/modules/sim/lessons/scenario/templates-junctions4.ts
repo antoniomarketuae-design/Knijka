@@ -62,6 +62,7 @@
 
 import type { BrakingLeadCarSpec } from "../../contracts";
 import type { ScenarioSpec } from "./types";
+import { l5BusyStreet } from "./complications";
 
 // ---------------------------------------------------------------------------
 // Shared geometry constants (pinned from the committed district by value —
@@ -272,8 +273,22 @@ export const SC_JX_BLOCKED_EXIT: ScenarioSpec = {
        * 0.275 m clear), and the admissible band grows from 8 m to 10 m so a
        * student who stops where he can actually SEE past the column is not
        * forced to creep forward to the one pose the circle allows.
+       *
+       * FR-24 — „every metre of it is short of the line" was AUTHORED-RADIUS
+       * arithmetic. The aid ladder widens 5 → 7.5 at L1 and 6.25 at L2, so the
+       * real band reached −25.5, i.e. 2.23 m PAST the paint: the exact same
+       * 2.23 m overshoot the B5 note above says it had just removed, put back
+       * by the ladder one line later. The cut ends the acceptance at the paint
+       * after the ladder, so the sentence is true at every rung.
        */
-      params: { kind: "reachZone", x: JX_LANE, y: -33, radiusM: 5, maxSpeedKmh: 5 },
+      params: {
+        kind: "reachZone",
+        x: JX_LANE,
+        y: -33,
+        radiusM: 5,
+        maxSpeedKmh: 5,
+        acceptBeforeMarkM: -5.275,
+      },
     },
     {
       id: "sc-jxb-cross",
@@ -336,6 +351,9 @@ export const SC_JX_BLOCKED_EXIT: ScenarioSpec = {
     // harder rung of it. The complication JU-16 actually wants is a live
     // cross-flow claiming the box, which needs the box-occupancy detector this
     // template already files as engine follow-up.
+    // L5 «Усложнени» — the complication kit (scenario/complications.ts):
+    // the delta AND the instructor's line that explains it, authored together.
+    l5BusyStreet(),
   ],
   staged: [JXB_QUEUE_TAIL],
   /**

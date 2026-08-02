@@ -18,7 +18,7 @@
 
 import "@/lib/content/loader";
 import { getContentRepo } from "@/lib/content/repo";
-import { requireUser } from "@/modules/auth";
+import { getSessionUser, requireUser } from "@/modules/auth";
 import { submitAnswer } from "@/modules/learning";
 import {
   isQuizMediaRenderable,
@@ -45,7 +45,20 @@ const MAX_BANK = 16;
 export async function loadMicroQuizBank(
   lessonId: string,
 ): Promise<MicroQuizQuestion[]> {
-  const user = await requireUser();
+  // getSessionUser + [] rather than requireUser(), for the reason proxy.ts
+  // states about /api routes: a LOAD must never answer with a navigation.
+  // requireUser() calls redirect(), and Next turns a redirect thrown inside a
+  // server action into a 303 that the ROUTER FOLLOWS — so an anonymous caller
+  // did not get "no quizzes this session", it got the whole drive screen
+  // replaced by /login, mid-mount, with no error anywhere. That is what made
+  // every login-free harness (/dev/hud-ux, /dev/gw-shell) un-photographable:
+  // three separate review lanes reported "the shell 303s to /login" and none
+  // could produce a frame of the driving screen. Returning [] is exactly what
+  // this function's contract above already promises for every other failure,
+  // and it leaks nothing: an anonymous caller got no questions before either.
+  // The mutation half (submitMicroQuizAnswer) keeps requireUser().
+  const user = await getSessionUser();
+  if (user === null) return [];
 
   // C-3: the micro-quiz is part of the drive, so it rides the simulator
   // entitlement. Degrades to an empty bank rather than throwing — the same

@@ -175,12 +175,85 @@ const INSET_B = "env(safe-area-inset-bottom, 0px)";
  * roughly 900 px² — 0.27 % of a landscape iPhone.
  */
 const STEER_PAD_W = "min(42%, 13rem)"; // ≤ 208 px
-const STEER_PAD_H = "min(46%, 9rem)"; //  ≤ 144 px
+const STEER_PAD_H = "min(40%, 8.5rem)"; // ≤ 136 px
 const DRIVE_PAD_W = "min(36%, 11rem)"; // ≤ 176 px
-const DRIVE_PAD_H = "min(52%, 11rem)"; // ≤ 176 px
+const DRIVE_PAD_H = "min(44%, 9.5rem)"; // ≤ 152 px
 
 /** Glyph-row height (px) — one 44 px touch row plus nothing else. */
 const ROW_H = "2.75rem";
+
+// ---------------------------------------------------------------------------
+// THE ARCS — founder layout, `Look where I put the lines and i guess there
+// should be eveyrthing.jpg`, drawn on his own screenshot on 2026-08-02.
+//
+// He took a phone frame of this screen and painted TWO THICK CURVES on it: one
+// sweeping out of the bottom-left corner and up the left edge, one mirroring it
+// on the right, captioned „there should be everything". That is not decoration
+// — it is the path a thumb sweeps when the hand is holding the phone, and it is
+// the reason the previous layout felt wrong to him even after the boxes shrank:
+// two straight glyph ROWS stacked above the pads cut ACROSS the thumb's travel,
+// so every button after the first is a reach.
+//
+// So the stations are placed on a quarter-arc instead of in a row. Station `k`
+// of `n`, measured as its BOX from the bottom and from the near side edge:
+//
+//     bottom = pad height + ARC_STEP · k
+//     inset  = ARC_EDGE + ARC_BULGE · sin((1 − k/(n−1)) · π/2)
+//
+// — station 0 sits exactly on the pad's top edge and ARC_BULGE inboard, the top
+// one is flush against the screen edge, and the curve between them is the sweep
+// he drew. The sine is written out as four decimals rather than called through
+// CSS `sin()`: numbers that can be checked by hand beat a trig function whose
+// browser support is newer than everything else this file relies on.
+//
+// FOUR STATIONS A SIDE, AND THE ARITHMETIC THAT FIXED IT AT FOUR. A station box
+// is 44 px and the run starts at the pad's top edge, so the topmost box ends at
+// `padH + ARC_STEP·(n−1) + 44`. On the SMALLEST device in the ladder — 780 × 360
+// landscape, where DRIVE_PAD_H resolves to its 152 px ceiling:
+//
+//     4 stations → 152 + 132 + 44 = 328   fits in 360
+//     5 stations → 152 + 176 + 44 = 372   OVERFLOWS
+//
+// (852 × 393 landscape and both portraits are the same 152 px pad, so 328 is the
+// band's height on every device in the ladder. The steering side is 16 px
+// shorter still.)
+//
+// Ten buttons did not fit into eight stations, so 🎥 (camera) and ⛶ (fullscreen)
+// moved into the ⚙ sheet, which is where the other settings already are. Both
+// keep their keys and their sheet cells; nothing became unreachable.
+//
+// AND THE PADS GOT SHORTER TO PAY FOR THE RUN. That is affordable rather than a
+// squeeze: both pads read a RELATIVE drag from wherever the thumb lands, and
+// full lock is TOUCH_STEER_RANGE_PX = 84 / TOUCH_DRIVE_RANGE_PX = 64 px of
+// travel (engine/touch.ts). A 152 px pad is still 2.4 × the whole gesture.
+// ---------------------------------------------------------------------------
+
+/** Stations per side. See the arithmetic above before changing it. */
+const ARC_STATIONS = 4;
+/** Rise between stations — the 44 px touch floor, edge to edge. */
+const ARC_STEP = "2.75rem";
+/** How close to the screen edge the TOP station sits. */
+const ARC_EDGE = "0.125rem";
+/** How far inboard the BOTTOM station sits — the depth of his curve. */
+const ARC_BULGE = "5rem";
+/** sin((1 − t)·π/2) at t = 0, ⅓, ⅔, 1 — one entry per station, in order.
+ *  Hand-checkable, which is the point; see the note above. */
+const ARC_SIN = [1, 0.866, 0.5, 0] as const;
+
+/**
+ * One station's box, measured from the bottom and from the near side edge.
+ *
+ * `padH` is the pad this arc has to clear: station 0's box sits exactly on the
+ * pad's top edge, which is what keeps a thumb-down on the lowest station from
+ * being swallowed by the wheel or the throttle. Every station above it is one
+ * ARC_STEP higher and one step further out along the curve.
+ */
+function arcStation(index: number, padH: string): { bottom: string; inset: string } {
+  return {
+    bottom: `calc(${padH} + (${ARC_STEP} * ${index}) + ${INSET_B})`,
+    inset: `calc(${ARC_EDGE} + (${ARC_BULGE} * ${ARC_SIN[index] ?? 0}))`,
+  };
+}
 
 /**
  * THE TOP OF THE WHOLE CONTROL BAND, as a CSS length, for anything that has to
@@ -212,7 +285,7 @@ const ROW_H = "2.75rem";
  * the band wherever it goes instead of pinning a copy of today's number.
  */
 export const TOUCH_CONTROLS_FLOOR =
-  `calc(${DRIVE_PAD_H} + ${ROW_H} + ${ROW_H} + ${INSET_B} + 0.5rem)`;
+  `calc(${DRIVE_PAD_H} + (${ARC_STEP} * ${ARC_STATIONS}) + ${INSET_B} + 0.5rem)`;
 
 interface CabinSnap {
   gearLabel: string;
@@ -573,18 +646,11 @@ export function TouchControls({
         ) : null}
       </div>
 
-      {/* ══ LEFT ROW ═ signal + the two graded glances on that side ══════════
-          Sits directly on top of the steering pad, hard against the edge, so
-          it can never cover the middle of the picture and never steal a
-          thumb-down from the pad. */}
-      <div
-        className="absolute flex items-center"
-        style={{
-          left: `calc(0.125rem + ${INSET_L})`,
-          bottom: `calc(${STEER_PAD_H} + ${INSET_B})`,
-          height: ROW_H,
-        }}
-      >
+      {/* ══ LEFT ARC ═ the signal, the two graded glances on that side, pause ═
+          His curve: station 0 sits on the steering pad's top edge and five rem
+          inboard, and each one above it climbs and drifts out to the edge. Left
+          thumb, left mirrors, left indicator — nothing crosses the picture. */}
+      <ArcStation index={0} padH={STEER_PAD_H} side="left">
         <GlyphButton
           labelBg="Мигач наляво"
           active={snap?.indicator === "left"}
@@ -592,32 +658,42 @@ export function TouchControls({
         >
           ⇦
         </GlyphButton>
+      </ArcStation>
+      <ArcStation index={1} padH={STEER_PAD_H} side="left">
         <GlyphButton labelBg="Поглед в лявото огледало" onClick={() => cabin()?.glance("left")}>
           Л
         </GlyphButton>
+      </ArcStation>
+      <ArcStation index={2} padH={STEER_PAD_H} side="left">
         <GlyphButton
           labelBg="Поглед в огледалото за задно виждане"
           onClick={() => cabin()?.glance("rear")}
         >
           З
         </GlyphButton>
-      </div>
+      </ArcStation>
+      <ArcStation index={3} padH={STEER_PAD_H} side="left">
+        <GlyphButton labelBg="Пауза" onClick={onPause}>
+          ‖
+        </GlyphButton>
+      </ArcStation>
 
-      {/* ══ RIGHT ROWS ═ glance + signal + horn, and the utility row above ══ */}
-      <div
-        className="absolute flex items-center"
-        style={{
-          right: `calc(0.125rem + ${INSET_R})`,
-          bottom: `calc(${DRIVE_PAD_H} + ${INSET_B})`,
-          height: ROW_H,
-        }}
-      >
+      {/* ══ RIGHT ARC ═ horn, right mirror, right signal, and the sheet ══════
+          🎥 and ⛶ are NOT here and that is deliberate: eight stations is what
+          fits on the smallest phone in the ladder, so the two settings-shaped
+          buttons moved into the ⚙ sheet with the rest of the settings. Their
+          keys (C, X) are unchanged. */}
+      <ArcStation index={0} padH={DRIVE_PAD_H} side="right">
         <HoldGlyphButton labelBg="Клаксон — задръж" onHold={(on) => cabin()?.driveline.setHorn(on)}>
           📢
         </HoldGlyphButton>
+      </ArcStation>
+      <ArcStation index={1} padH={DRIVE_PAD_H} side="right">
         <GlyphButton labelBg="Поглед в дясното огледало" onClick={() => cabin()?.glance("right")}>
           Д
         </GlyphButton>
+      </ArcStation>
+      <ArcStation index={2} padH={DRIVE_PAD_H} side="right">
         <GlyphButton
           labelBg="Мигач надясно"
           active={snap?.indicator === "right"}
@@ -625,27 +701,8 @@ export function TouchControls({
         >
           ⇨
         </GlyphButton>
-      </div>
-
-      <div
-        className="absolute flex items-center"
-        style={{
-          right: `calc(0.125rem + ${INSET_R})`,
-          bottom: `calc(${DRIVE_PAD_H} + ${ROW_H} + ${INSET_B})`,
-          height: ROW_H,
-        }}
-      >
-        {onToggleFullscreen ? (
-          <GlyphButton labelBg="Цял екран" onClick={onToggleFullscreen}>
-            ⛶
-          </GlyphButton>
-        ) : null}
-        <GlyphButton labelBg="Пауза" onClick={onPause}>
-          ‖
-        </GlyphButton>
-        <GlyphButton labelBg="Смяна на изглед (камера)" onClick={onToggleCamera}>
-          🎥
-        </GlyphButton>
+      </ArcStation>
+      <ArcStation index={3} padH={DRIVE_PAD_H} side="right">
         <GlyphButton
           labelBg="Контроли на автомобила"
           active={sheetOpen}
@@ -653,7 +710,7 @@ export function TouchControls({
         >
           ⚙
         </GlyphButton>
-      </div>
+      </ArcStation>
 
       {/* ══ DRIVELINE SHEET ══════════════════════════════════════════════════
           „the popups continue to eat almost the full screen and must be
@@ -676,12 +733,14 @@ export function TouchControls({
           aria-label="Контроли на автомобила"
           className="pointer-events-auto absolute flex flex-wrap items-end justify-start gap-x-0.5 gap-y-0.5"
           style={{
-            // Stops short of the right rail's 176 px column so the two can
-            // never share a pixel on any device in the ladder, and sits above
-            // the drivetrain pad and both of its glyph rows.
+            // Above the WHOLE band — both arcs and both pads — so it can never
+            // share a pixel with a station on any device in the ladder. It is
+            // the same TOUCH_CONTROLS_FLOOR everything else measures from, so
+            // reshaping the arcs moves this with them instead of stranding a
+            // hard-coded copy of today's geometry.
             left: `calc(0.125rem + ${INSET_L})`,
-            right: `calc(11rem + ${INSET_R})`,
-            bottom: `calc(${DRIVE_PAD_H} + ${ROW_H} + ${ROW_H} + ${INSET_B})`,
+            right: `calc(0.125rem + ${INSET_R})`,
+            bottom: TOUCH_CONTROLS_FLOOR,
           }}
         >
           <SheetCell
@@ -758,6 +817,25 @@ export function TouchControls({
             active={false}
             onClick={() => cabin()?.driveline.gearUp()}
           />
+          {/* The two that came off the right arc when it went to four stations
+              (see the ARC block at the top of this file). Both are settings,
+              both are already keyed (C / X), and this sheet is where the
+              settings live — so they are one tap further away and no longer
+              standing on the road for the whole drive. */}
+          <SheetCell
+            textBg="ИЗГЛ"
+            labelBg="Смяна на изглед (камера)"
+            active={false}
+            onClick={onToggleCamera}
+          />
+          {onToggleFullscreen ? (
+            <SheetCell
+              textBg="ЦЯЛ"
+              labelBg="Цял екран"
+              active={false}
+              onClick={onToggleFullscreen}
+            />
+          ) : null}
           <SheetCell
             textBg="РЕСТ"
             labelBg="Рестарт на колата"
@@ -786,6 +864,40 @@ export function TouchControls({
 // keeps a 15 px glyph legible over bright tarmac; it is drawn on the glyph, not
 // on a box, so it buys contrast without buying pixels.
 // ---------------------------------------------------------------------------
+
+/**
+ * One station on one of the founder's arcs — an absolutely positioned 44 px
+ * cell holding exactly one control.
+ *
+ * A component and not a style helper so the geometry is stated once: every
+ * station on both arcs resolves its own `bottom` and its own side inset from
+ * `arcStation()`, so moving the curve is editing four constants, not eight
+ * call sites.
+ */
+function ArcStation({
+  index,
+  padH,
+  side,
+  children,
+}: {
+  index: number;
+  padH: string;
+  side: "left" | "right";
+  children: ReactNode;
+}) {
+  const { bottom, inset } = arcStation(index, padH);
+  // Spread rather than a computed key: `{ [side]: … }` widens the object to a
+  // string index signature, which CSSProperties does not accept.
+  const from =
+    side === "left"
+      ? { left: `calc(${inset} + ${INSET_L})` }
+      : { right: `calc(${inset} + ${INSET_R})` };
+  return (
+    <div className="absolute flex items-center" style={{ bottom, height: ROW_H, ...from }}>
+      {children}
+    </div>
+  );
+}
 
 const GLYPH_SHADOW = "0 1px 3px rgba(0,0,0,0.95), 0 0 8px rgba(0,0,0,0.6)";
 

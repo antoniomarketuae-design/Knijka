@@ -29,7 +29,8 @@
    "intersections": 0,
    "crossings": 1,
    "buildings": 5,
-   "spawnPoints": 2
+   "spawnPoints": 2,
+   "zones": 0
   },
   "scenario": {
    "archetype": "zebra-block",
@@ -40,6 +41,14 @@
    },
    "streetscape": "courtyard-blocks",
    "streetscapeNoteBg": "Два панелни блока с междублоково пространство, чието устие гледа право към пътеката: децата излизат от двора, а редицата гаражи отдясно крие погледа.",
+   "roadscape": "courtyard-street",
+   "roadscapeNoteBg": "Междублокова улица: нито знак, нито стълб, нито крайна линия — само осевата прекъсната. Най-голата отсечка в групата, и точно затова нищо не ти подсказва, че оттук изскачат деца.",
+   "roadClass": "residential",
+   "parkingBandM": 0,
+   "bareVerge": null,
+   "curbToCurbM": 16.25,
+   "oneway": false,
+   "banSignRef": null,
    "primaryCrossingId": "pe-x-1",
    "laneCenterRightM": 4.06,
    "crossings": [
@@ -88,7 +97,8 @@
       0,
       138
      ]
-    ]
+    ],
+    "parkingBand": false
    }
   ]
  },

@@ -139,12 +139,21 @@ function ToastShell({
   children: ReactNode;
 }) {
   const interactive = onDismiss !== null;
+  // `hud-ghost` — the founder's words about this exact column were „those pop
+  // ups … are much much annoying, important but annoying". The information is
+  // not the annoyance; the opaque blurred card that parks itself on his road is.
+  // In the reference the equivalent lane — sector times, position deltas — is a
+  // stack of coloured numbers straight on the image. So the card goes and the
+  // authored explanation and its law chip stay exactly as they are (THEO-4):
+  // the toast still says WHY, it just no longer paints a box to say it in.
+  // A left rule in the fault's own colour replaces the border-on-a-fill so the
+  // severity is still readable at a glance.
   const className =
-    `hud-toast-in ${TOAST_CARD_WIDTH_CLASS} rounded-2xl border bg-surface/85 p-3 text-left backdrop-blur-md ` +
+    `hud-ghost hud-toast-in ${TOAST_CARD_WIDTH_CLASS} border-l-2 py-1 pl-2.5 pr-1 text-left ` +
     (interactive
-      ? "pointer-events-auto cursor-pointer transition hover:bg-surface/95 motion-reduce:transition-none"
+      ? "pointer-events-auto cursor-pointer opacity-90 transition hover:opacity-100 motion-reduce:transition-none"
       : "pointer-events-none");
-  const style = { borderColor: `color-mix(in srgb, ${color} 55%, transparent)` };
+  const style = { borderColor: color };
 
   if (!interactive) {
     return (
@@ -297,7 +306,7 @@ export function HudToasts({
         <button
           type="button"
           onClick={onDismissAll}
-          className="pointer-events-auto rounded-full border border-border bg-surface/85 px-2.5 py-1 text-[10px] font-bold text-muted backdrop-blur-md transition hover:text-foreground motion-reduce:transition-none"
+          className="hud-ghost pointer-events-auto rounded-full border border-border px-2.5 py-1 text-[10px] font-bold text-muted transition hover:text-foreground motion-reduce:transition-none"
         >
           Изчисти известията
         </button>

@@ -8,10 +8,13 @@
 // Spec vocabulary + types
 export {
   MAP_ARCHETYPES,
+  RUNG_ADDITIONS,
   SCENARIO_FAMILIES,
   SCENARIO_LEVEL_NAMES_BG,
   type ConditionAxis,
+  type LevelComplication,
   type LevelSpec,
+  type RungAddition,
   type MapArchetype,
   type MistakeDemo,
   type RubricBreakdownLine,
@@ -48,17 +51,32 @@ export {
   DEFAULT_LEVEL_PAR_TIME_SCALE,
   DEFAULT_LEVEL_TOLERANCE,
   DEFAULT_LEVEL_TRAFFIC_SCALE,
+  EXAM_PROTOCOL_COMPLICATION,
   MISTAKE_EXPERIENCE_LEAD_IN_BG,
   SCENARIO_DEFAULT_TRAFFIC,
+  SCENARIO_FAMILY_TRAFFIC_BASELINE,
   SCENARIO_LESSON_ORDER,
   ScenarioCompileError,
   compileScenario,
+  complicationBriefingText,
   mistakeExperienceLessonId,
+  resolveScenarioComplication,
   resolveScenarioRubric,
   serializeObjectiveParams,
   type ScenarioCompileOptions,
 } from "./compile";
 export { SPEED_CAP_GRACE_KMH_PER_TOLERANCE } from "./params";
+
+// The complication kit — the authored mechanisms a rung may ADD (doc 76 §7;
+// founder review line 214). Templates opt in with one spread each.
+export {
+  l5BusyStreet,
+  l5Fog,
+  l5Night,
+  l5TightManeuver,
+  l5Wet,
+  l5WetGrip,
+} from "./complications";
 
 // THEO-3 — the mistake-experience mode („Направи грешката", doc 64):
 // `~m<i>` id seam, entry-rung compile, the six founder-seeded classes.

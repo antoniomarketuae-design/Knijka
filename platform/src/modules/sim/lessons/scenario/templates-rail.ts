@@ -46,6 +46,7 @@
 
 import type { OncomingLeftTurnSpec, PedestrianDartOutSpec, TrainPassSpec } from "../../contracts";
 import type { ScenarioSpec } from "./types";
+import { l5Night, l5Wet } from "./complications";
 
 // ---------------------------------------------------------------------------
 // Shared geometry constants (pinned from the generated districts by value —
@@ -227,6 +228,9 @@ export const SC_RX_UNGUARDED: ScenarioSpec = {
     { level: 2 },
     { level: 3 },
     { level: 4, vehicleStart: "cold" },
+    // L5 «Усложнени» — the complication kit (scenario/complications.ts):
+    // the delta AND the instructor's line that explains it, authored together.
+    l5Night(),
   ],
   // ADR-006 stage 3c: a real TRAIN crosses as the player approaches — the
   // hazard the mandatory full stop exists for (unguarded: NO barrier, the
@@ -331,6 +335,9 @@ export const SC_RX_GUARDED: ScenarioSpec = {
     { level: 2 },
     { level: 3 },
     { level: 4, vehicleStart: "cold" },
+    // L5 «Усложнени» — the complication kit (scenario/complications.ts):
+    // the delta AND the instructor's line that explains it, authored together.
+    l5Wet(),
   ],
   // ADR-006 stage 3c: the TRAIN whose approach the barrier guards — it crosses
   // while the arm is down. The barrier timetable is unchanged; the train adds
@@ -610,6 +617,9 @@ export const SC_RX_TRAM_LEFT: ScenarioSpec = {
     { level: 2 },
     { level: 3 },
     { level: 4, vehicleStart: "cold" },
+    // L5 «Усложнени» — the complication kit (scenario/complications.ts):
+    // the delta AND the instructor's line that explains it, authored together.
+    l5Wet(),
   ],
   staged: [SC_RX_TRAM_LEFT_EVENT],
   conditions: { weather: "dry" },
@@ -770,6 +780,9 @@ export const SC_RX_TRAM_ISLAND: ScenarioSpec = {
     { level: 2, stagedAdd: [RX_TRAM_ISLAND_SECOND] },
     { level: 3, stagedAdd: [RX_TRAM_ISLAND_SECOND] },
     { level: 4, vehicleStart: "cold", stagedAdd: [RX_TRAM_ISLAND_SECOND] },
+    // L5 «Усложнени» — the complication kit (scenario/complications.ts):
+    // the delta AND the instructor's line that explains it, authored together.
+    l5Night(),
   ],
   staged: [SC_RX_TRAM_ISLAND_EVENT],
   conditions: { weather: "dry" },

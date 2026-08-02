@@ -21,6 +21,27 @@
  * scales the template's own `ScenarioSpec.traffic` baseline, so a template
  * with no baseline still compiles bit-identically to before.
  *
+ * WHAT A RUNG *ADDS*, AND HOW THE STUDENT HEARS ABOUT IT (2026-08-02; his
+ * review line 214: „we need major reworks on all 150 L5-L4-L3-L2s CURRENTLY
+ * I'M REVIEWING L1s"). The table above can take aids AWAY; measured on the 167
+ * shipped templates it could add almost nothing — 92 authored no L5 at all,
+ * `spec.traffic` existed on ONE, and `tol` is a flat 1.0 from L3 up, so a
+ * silent L4 differed from L3 by a single boolean and a silent L5 did not
+ * exist. Two things changed here:
+ *
+ *  · `LevelSpec.complication` (types.ts) — the delta AND the instructor's
+ *    explanation of it, authored together so neither ships alone. The kit of
+ *    reusable mechanisms lives in `complications.ts`.
+ *  · `resolveScenarioComplication` (below) — where a rung says nothing, the
+ *    compiler explains the difference IT produced, from stored copy selected
+ *    by the measured delta (`rungDelta`). Not generation: ADR-002 fixed text,
+ *    chosen by evidence.
+ *
+ * Either way the sentence is compiled into `briefingBg` as step 1 — the field
+ * `LessonPlayShell` renders and blocks the session on. 115 rungs used to
+ * change the road and tell nobody; that is a difficulty TAX, and THEO-4
+ * forbids the unexplained verdict in every one of its forms.
+ *
  * TOP-DOWN IS ON EVERY RUNG, L1..L5 (founder ruling 2026-07-17; doc 76 §12
  * „Top-down mode confirmed as a first-class POV option"). topdownAllowed is a
  * POV, not an aid: it reveals no answer the driver's own mirrors do not, and a
@@ -58,8 +79,11 @@ import { serializeObjectiveParams } from "./params";
 import { assertScenarioSpec } from "./validate";
 import {
   SCENARIO_LEVEL_NAMES_BG,
+  type LevelComplication,
   type LevelSpec,
   type RubricSpec,
+  type RungAddition,
+  type ScenarioFamily,
   type ScenarioLevel,
   type ScenarioSpec,
 } from "./types";
@@ -92,6 +116,81 @@ export const SCENARIO_DEFAULT_TRAFFIC = {
   pedestrianCount: 0,
   anchorRadiusM: 400,
 } as const;
+
+/**
+ * THE FAMILY AMBIENT BASELINE (doc 87 FR-27 / FR-30 / his items 8, 15, 17, 18,
+ * 40, 42) — the street a lesson about OTHER ROAD USERS is set on.
+ *
+ * What he wrote, playing catalog position 8: *„the traffic car is quite quick
+ * and its only 1 so by the time I reach the crossroad it already has passed —
+ * should there be at least 1 more that we have to wait"*. And 15, 17 and 18 are
+ * the same sentence three more times. The fix wave that followed staged BETTER
+ * conflict cars; it never questioned the street they drive on. That street was
+ * `SCENARIO_DEFAULT_TRAFFIC.vehicleCount: 0`, and the number is not a metaphor:
+ *
+ *   MEASURED 2026-08-02, 26 junction/signals/roundabout templates, a 25 m disc
+ *   at the junction the drive is about, 60 s: **0 vehicle passages. All 26.**
+ *
+ * A yielding drill whose only other road user is the one scripted car is a
+ * drill you can pass by arriving late. So the families that TEACH reading other
+ * traffic now carry a baseline, and — being a template-level baseline, not a
+ * rung count — the §7 ladder scales it: L1 gets half (a beginner is not made to
+ * read a boulevard), L5 gets 1.5× (FR-13: a higher rung must ADD, not just
+ * remove aids).
+ *
+ * The numbers are measured, not chosen. At the L3 figure below, with the player
+ * out of the way, the junction disc sees **6–12 passages a minute at 25–31 km/h
+ * with 0–10% of agent-time stopped**. Doubling it does not double the lesson:
+ * at 6 the same districts start queueing (16–26% stopped on four of them), so
+ * 4 is the knee of the curve and 1.5× at L5 is the deliberate top.
+ *
+ * WHY THE ROUNDABOUT FAMILY IS DELIBERATELY ZERO. It was measured too, and it
+ * fails: on `rb-mini-v1` **two** ambient cars already spend 68–75% of their
+ * time stopped at 5–7 km/h — the ring gridlocks rather than circulates. Giving
+ * that family traffic would replace an empty roundabout with a jammed one and
+ * make B15 („the roundabout convicts you for a car that never comes") worse,
+ * not better. It stays 0 until the reservation logic on a mini ring is fixed;
+ * a number nobody measured is exactly how the dead boulevard shipped.
+ *
+ * `pedestrianCount` stays 0 everywhere: the pedestrian families author their
+ * own walkers, and ambient pedestrians on a junction drill would arm crossing
+ * duties the copy never mentions.
+ *
+ * A template's own `traffic` still wins outright, and a rung's wins over that.
+ */
+export const SCENARIO_FAMILY_TRAFFIC_BASELINE: Partial<Record<ScenarioFamily, number>> = {
+  // The yielding drills — „more than one car to wait for".
+  junction: 4,
+  // The signals family: five lessons on one crossroads, all photographed dead
+  // (B38/B40). A signal drill with no traffic teaches the lamp, not the road.
+  signals: 4,
+};
+
+/**
+ * WHY `following` IS NOT IN THE TABLE ABOVE — measured, and it failed.
+ *
+ * His items 40 („nothing much happens untill the very end") and 42 („we need
+ * to create interactive map… the truck to DO things") are following drills, so
+ * a street was the obvious answer there too. It was tried at 3 ambient cars on
+ * `ln-v1` and measured against the SHIPPED лепка, and the result was
+ * unambiguous:
+ *
+ *   ambient 0 → the tailgater glues at 3.1–3.4 s and holds 9 m for 12 s.
+ *   ambient 3 → it NEVER glues, at 30, 40 or 50 km/h. At 40 km/h the gap runs
+ *               from 22 m to 456 m over the minute.
+ *
+ * The reason is structural, not tuneable: `fo-follow-v1` / `ln-v1` are two-lane
+ * straights, ambient agents land in the player's OWN lane, and a car that slots
+ * in between the student and a rear actor is not noise — it is the end of that
+ * encounter. Every rear- and lead-paced drill in the family (лепка, cut-in,
+ * brake-check, the queue) depends on nothing standing in that gap.
+ *
+ * So the following family keeps its quiet street, and items 40/42 stay what
+ * they actually are: authoring work on the actors themselves
+ * (`templates-following.ts` — FR-51 and FR-53b), not a density dial. Trading a
+ * boring lesson for a broken one is not progress, and shipping the trade
+ * without measuring it is how the dead boulevard got here.
+ */
 
 // ---------------------------------------------------------------------------
 // THE LEVEL LADDER (doc 86 L13/D7 — the seam)
@@ -159,6 +258,44 @@ export const DEFAULT_LEVEL_PAR_TIME_SCALE: Record<ScenarioLevel, number> = {
   4: 1,
   5: 1.15,
 };
+
+/**
+ * THE ONE COMPLICATION THE COMPILER MAY SPEAK FOR ITSELF.
+ *
+ * Every other rung addition is authored, because the compiler cannot see the
+ * map. This one it can: `examMode` is derived from the level here, it IS a
+ * real compiled difference from the rung below, and until now it was the ONLY
+ * thing separating a silent L4 from a silent L3 — 167 templates changed one
+ * boolean and told the student nothing about it.
+ *
+ * It is applied from the COMPILED examMode, never from `level === 4`, so a
+ * template that turns its L4 exam flag off does not get an exam briefing. That
+ * is the same discipline the `adds` gate enforces on authored rungs: the copy
+ * follows the compiled delta, not the other way round.
+ */
+export const EXAM_PROTOCOL_COMPLICATION: LevelComplication = {
+  adds: ["protocol"],
+  titleBg: "Изпитни условия",
+  coachBg:
+    "Оттук нататък караш както на изпит: без кола-сянка, без линия по пътя и без подсказки — оценява се това, което направиш сам. Изпитващият гледа не само дали стигаш, а КАК: плавно, с оглед в огледалата преди всяка маневра, с мигач подаден навреме и на скорост, съобразена с обстановката. Направи всичко както досега, само по-подредено — бързането е това, което къса изпити.",
+  lawRef: "Наредба № 38",
+};
+
+/**
+ * The rung's complication line, as it lands in `LessonSpec.briefingBg`.
+ *
+ * ONE STRING, and it is the first thing the student reads: the overlay queue
+ * puts `briefingBg[0].textBg` on the line and holds the session until „Разбрах"
+ * (LessonPlayShell §4c). A complication announced anywhere else is a
+ * complication announced nowhere — the `instructionsBg` lesson.
+ */
+export function complicationBriefingText(
+  level: ScenarioLevel,
+  c: LevelComplication,
+): string {
+  const law = c.lawRef ? ` (${c.lawRef})` : "";
+  return `Ниво ${level} — ${c.titleBg}: ${c.coachBg}${law}`;
+}
 
 /**
  * LessonSpec.order of every compiled scenario: a SELECT-GRID SORT KEY ONLY,
@@ -322,6 +459,405 @@ export function resolveScenarioRubric(
   return merged;
 }
 
+/** The exam flag a rung compiles to, without compiling it (the ladder default
+ *  is `level === 4`; a rung may turn it on earlier or off at L4). */
+function rungExamMode(rung: LevelSpec): boolean {
+  return rung.examMode ?? rung.level === 4;
+}
+
+// ---------------------------------------------------------------------------
+// THE RUNG DELTA — what the compiler can see one rung add over the one below
+// ---------------------------------------------------------------------------
+//
+// These four resolvers are the single truth for „what does this rung actually
+// compile to", shared by compileScenario (which builds the lesson) and
+// rungDelta (which explains it). They were pulled out of compileScenario for
+// exactly that reason: an explanation derived from a SECOND implementation of
+// the merge rules would drift, and a difficulty ladder that describes itself
+// incorrectly is worse than one that says nothing.
+
+function rungConditions(spec: ScenarioSpec, rung: LevelSpec) {
+  return { ...(spec.conditions ?? {}), ...(rung.conditions ?? {}) };
+}
+
+function rungPhysics(spec: ScenarioSpec, rung: LevelSpec): Record<string, boolean> {
+  const merged = { ...(spec.physics ?? {}), ...(rung.physics ?? {}) };
+  const out: Record<string, boolean> = {};
+  for (const [k, v] of Object.entries(merged)) if (v) out[k] = true;
+  return out;
+}
+
+/** The §7 traffic precedence + ladder, in one place (see the compileScenario
+ *  block that consumes it for the full reasoning). */
+function rungTraffic(spec: ScenarioSpec, rung: LevelSpec) {
+  const trafficScale = DEFAULT_LEVEL_TRAFFIC_SCALE[rung.level];
+  const laddered = (baseline: number | undefined, fallback: number) =>
+    baseline === undefined ? fallback : Math.max(0, Math.round(baseline * trafficScale));
+  const familyVehicles = SCENARIO_FAMILY_TRAFFIC_BASELINE[spec.family];
+  return {
+    vehicleCount:
+      rung.traffic?.vehicleCount ??
+      laddered(spec.traffic?.vehicleCount ?? familyVehicles, SCENARIO_DEFAULT_TRAFFIC.vehicleCount),
+    pedestrianCount:
+      rung.traffic?.pedestrianCount ??
+      laddered(spec.traffic?.pedestrianCount, SCENARIO_DEFAULT_TRAFFIC.pedestrianCount),
+    anchorRadiusM:
+      rung.traffic?.anchorRadiusM ??
+      spec.traffic?.anchorRadiusM ??
+      SCENARIO_DEFAULT_TRAFFIC.anchorRadiusM,
+  };
+}
+
+function rungStagedKinds(spec: ScenarioSpec, rung: LevelSpec): string[] {
+  return [...(spec.staged ?? []), ...(rung.stagedAdd ?? [])].map((s) => s.kind);
+}
+
+/** Everything the explanation may draw on — measured, never claimed. */
+export interface RungDelta {
+  adds: Set<RungAddition>;
+  /** Environment keys this rung sets that the rung below did not. */
+  weather: Set<"night" | "rain" | "fog" | "snow">;
+  /** Physics flags this rung sets that the rung below did not. */
+  grip: Set<string>;
+  /** StagedEventSpec kinds this rung stages beyond the rung below. */
+  stagedKinds: string[];
+  vehicleCountFrom: number;
+  vehicleCountTo: number;
+  /** True when the traffic rise came from the §7 ladder, not an authored count. */
+  trafficLaddered: boolean;
+}
+
+/** Compare the rung at `idx` with the next LOWER authored rung. */
+function rungDelta(spec: ScenarioSpec, idx: number): RungDelta {
+  const hi = spec.levels[idx];
+  const lo = spec.levels[idx - 1];
+  const d: RungDelta = {
+    adds: new Set<RungAddition>(),
+    weather: new Set(),
+    grip: new Set(),
+    stagedKinds: [],
+    vehicleCountFrom: 0,
+    vehicleCountTo: 0,
+    trafficLaddered: hi.traffic?.vehicleCount === undefined,
+  };
+
+  const cHi = rungConditions(spec, hi);
+  const cLo = rungConditions(spec, lo);
+  if (cHi.night && !cLo.night) d.weather.add("night");
+  for (const w of ["rain", "fog", "snow"] as const) {
+    if (cHi.weather === w && cLo.weather !== w) d.weather.add(w);
+  }
+  if (d.weather.size > 0) d.adds.add("weather");
+
+  const pHi = rungPhysics(spec, hi);
+  const pLo = rungPhysics(spec, lo);
+  for (const k of Object.keys(pHi)) if (!pLo[k]) d.grip.add(k);
+  if (d.grip.size > 0) d.adds.add("grip");
+
+  const tHi = rungTraffic(spec, hi);
+  const tLo = rungTraffic(spec, lo);
+  d.vehicleCountFrom = tLo.vehicleCount;
+  d.vehicleCountTo = tHi.vehicleCount;
+  if (tHi.vehicleCount > tLo.vehicleCount || tHi.pedestrianCount > tLo.pedestrianCount) {
+    d.adds.add("traffic");
+  }
+
+  const sHi = rungStagedKinds(spec, hi);
+  const sLo = rungStagedKinds(spec, lo);
+  if (sHi.length > sLo.length) {
+    d.adds.add("actor");
+    const seen = [...sLo];
+    for (const k of sHi) {
+      const at = seen.indexOf(k);
+      if (at >= 0) seen.splice(at, 1);
+      else d.stagedKinds.push(k);
+    }
+  }
+
+  const rcHi = JSON.stringify({ ...(spec.ruleConfig ?? {}), ...(hi.ruleConfig ?? {}) });
+  const rcLo = JSON.stringify({ ...(spec.ruleConfig ?? {}), ...(lo.ruleConfig ?? {}) });
+  if (rcHi !== rcLo) d.adds.add("rules");
+
+  if (
+    (rungExamMode(hi) && !rungExamMode(lo)) ||
+    ((hi.vehicleStart ?? spec.start.vehicleStart ?? "ready") === "cold" &&
+      (lo.vehicleStart ?? spec.start.vehicleStart ?? "ready") !== "cold")
+  ) {
+    d.adds.add("protocol");
+  }
+
+  const rHi = resolveScenarioRubric(spec, hi.level);
+  const rLo = resolveScenarioRubric(spec, lo.level);
+  const added =
+    (rHi?.placement && !rLo?.placement) ||
+    (rHi?.economy && !rLo?.economy) ||
+    (rHi?.observation && !rLo?.observation);
+  const tightened =
+    rHi?.economy !== undefined &&
+    rLo?.economy !== undefined &&
+    (rHi.economy.attemptsFor3Stars < rLo.economy.attemptsFor3Stars ||
+      rHi.economy.attemptsFor2Stars < rLo.economy.attemptsFor2Stars);
+  if (added || tightened) d.adds.add("rubric");
+
+  return d;
+}
+
+// ---------------------------------------------------------------------------
+// THE LADDER'S OWN VOICE — stored copy, selected BY the measured delta
+// ---------------------------------------------------------------------------
+//
+// Measured 2026-08-02, before this: **115 rungs across 84 templates compiled a
+// real complication — rain, wet grip, a staged actor, a fuller street — and
+// told the student nothing about it**, because the only place a rung could
+// speak was `instructionsBg`, which is template-wide. A rung the ladder makes
+// harder and never explains is a difficulty TAX; doc 64's THEO-4 forbids the
+// bare verdict, and a difficulty with no reason is the bare verdict's twin.
+//
+// So the compiler explains what the compiler can SEE. This is not generation
+// (ADR-002): every sentence below is stored, reviewed Bulgarian, and the delta
+// SELECTS it — the compiler never writes a word, it picks the one that matches
+// the difference it just produced. A template that wants its own words puts
+// them on `LevelSpec.complication`, which always wins.
+//
+// The alternative — leaving the ladder mute and asking 84 templates to write
+// their own line — was tried by the field this comment is about. It produced
+// zero lines in fifteen waves.
+
+/**
+ * One mechanism, in two lengths. The rung's line LEADS with the mechanism that
+ * changes the driving most (`coachBg`, the full instructor sentence) and adds
+ * any second one as a short tail (`tailBg`) — because the briefing's first step
+ * is also the line the overlay puts on the glass, and two paragraphs there is a
+ * wall, not a briefing. Both halves are stored text (ADR-002); the measured
+ * delta only chooses between them.
+ */
+interface LadderCopy {
+  titleBg: string;
+  coachBg: string;
+  tailBg: string;
+  lawRef?: string;
+}
+
+/** Named phrase per staged-actor kind — so „a second actor" can say WHICH. */
+const STAGED_KIND_BG: Readonly<Record<string, string>> = {
+  pedestrianDartOut: "пешеходец, който стъпва на пътеката в последния момент",
+  priorityFromRight: "кола отдясно, която има предимство",
+  brakingLeadCar: "колата отпред, която спира рязко",
+  cyclistRightHook: "велосипедист отдясно, който върви право напред",
+  roundaboutEntry: "кола, която вече обикаля в кръговото",
+  amberDilemma: "жълта светлина точно в неудобния момент",
+  oncomingLeftTurn: "насрещна кола, докато завиваш наляво",
+  narrowMeeting: "насрещна кола в стеснение, където двамата не се събирате",
+  emergencyApproach: "автомобил със специален режим отзад",
+  policeStop: "полицейска проверка",
+  trafficController: "регулировчик, чиито жестове отменят светофара",
+  cutInLeadCar: "кола, която се вклинва пред теб",
+  rearTailgater: "залепен отзад шофьор, който те притиска",
+  oncomingStream: "плътен насрещен поток",
+  trainPass: "влак, който пресича платното",
+  telltaleStimulus: "предупредителна лампа на таблото",
+};
+
+const LADDER_COPY_ORDER: ReadonlyArray<(d: RungDelta) => LadderCopy | null> = [
+  // Wet: the rendered rain AND the grip together — one mechanism, one sentence.
+  (d) =>
+    d.weather.has("rain") && d.grip.has("wetGrip")
+      ? {
+          titleBg: "Мокър паваж",
+          coachBg:
+            "Вече вали и настилката държи около 70% от сухото сцепление: спирачният път става около 1,4 пъти по-дълъг. Още преди да потеглиш, включи късите светлини и чистачките; после вдигай газта по-рано и остави двойна дистанция — сухият навик за точката на спирачката тук закъснява точно с една дължина на колата.",
+          tailBg:
+            "Освен това пътят е мокър: включи късите светлини и смятай спирачния път около 1,4 пъти по-дълъг.",
+          lawRef: "ЗДвП чл. 20, ал. 2; чл. 70",
+        }
+      : null,
+  (d) =>
+    d.weather.has("snow")
+      ? {
+          titleBg: "Сняг",
+          coachBg:
+            "Пътят е заснежен: утъпканият сняг държи около 40% от сухото сцепление, значи спирачният път от 25 км/ч е колкото сухият от 40. Преди да потеглиш, включи късите светлини; после карай около наполовина под знака и движи волана и спирачката бавно — резките команди на сняг не спират, а отключват поднасяне.",
+          tailBg:
+            "Освен това пътят е заснежен: включи късите светлини, карай наполовина под знака и без резки движения.",
+          lawRef: "ЗДвП чл. 20, ал. 2; чл. 70",
+        }
+      : null,
+  (d) =>
+    d.weather.has("fog")
+      ? {
+          titleBg: "В мъгла",
+          coachBg:
+            "Пада мъгла: включи късите светлини (и задните за мъгла под 50 метра видимост) — дългите се отразяват в капките и правят стената пред теб по-плътна. Карай толкова бавно, че да спираш в рамките на това, което ВИЖДАШ: тук видимостта, а не табелата, е ограничението.",
+          tailBg:
+            "Освен това пада мъгла: включи късите светлини и карай толкова бавно, че да спираш в рамките на видимото.",
+          lawRef: "ЗДвП чл. 70; чл. 20, ал. 2",
+        }
+      : null,
+  (d) =>
+    d.weather.has("night")
+      ? {
+          titleBg: "По тъмно",
+          coachBg:
+            "Упражнението вече е нощем: включи късите светлини още преди да потеглиш и помни, че оттук нататък не караш по пътя, а по снопа на фаровете — късите показват около 40 метра, а в тъмнината отвъд тях еднакво спокойно стои пешеходец в тъмни дрехи. Карай със скорост, от която можеш да спреш ВЪТРЕ в осветеното.",
+          tailBg:
+            "Освен това е тъмно: включи късите светлини и не изпреварвай собствения си сноп — виждаш около 40 метра.",
+          lawRef: "ЗДвП чл. 70; чл. 20, ал. 2",
+        }
+      : null,
+  // Rain WITHOUT the grip opt-in: render-only weather (the 4a discipline —
+  // a weather tag never implies physics). Guarded against the wet entry above
+  // so one mechanism is never named twice in the same line.
+  (d) =>
+    d.weather.has("rain") && !d.grip.has("wetGrip")
+      ? {
+          titleBg: "В дъжд",
+          coachBg:
+            "Вече вали: включи чистачките и късите светлини — в дъжд светлините са колкото за да виждаш, толкова и за да те виждат. Карай по-бавно, отколкото на сухо, и остави повече място отпред: мократа настилка удължава спирачния път още преди да си усетил, че се хлъзга.",
+          tailBg:
+            "Освен това вали: включи чистачките и късите светлини и остави повече място отпред.",
+          lawRef: "ЗДвП чл. 70; чл. 20, ал. 2",
+        }
+      : null,
+  // Reduced grip WITHOUT a new weather tag: the picture did not change, the
+  // stopping distance did (a template whose rain has been render-only until
+  // this rung). Guarded so it never doubles the wet/snow entries above.
+  (d) =>
+    (d.grip.has("wetGrip") || d.grip.has("snowGrip")) &&
+    !d.weather.has("rain") &&
+    !d.weather.has("snow")
+      ? {
+          titleBg: "Настилката вече е истинска",
+          coachBg:
+            "Картината е същата, но сега пътят държи колкото наистина държи: сцеплението е намалено, спирачният път е чувствително по-дълъг и гумите поднасят по-рано в завой. Карай по-бавно, отколкото ти се струва нужно, вдигни газта по-рано и остави двойна дистанция.",
+          tailBg:
+            "Освен това сцеплението вече е намалено — спирачният път е чувствително по-дълъг.",
+          lawRef: "ЗДвП чл. 20, ал. 2",
+        }
+      : null,
+  (d) =>
+    d.grip.has("crosswind")
+      ? {
+          titleBg: "Страничен вятър",
+          coachBg:
+            "Появява се страничен вятър с пориви: той бута колата встрани постоянно, а при внезапно отслабване рязко завъртяният волан сам я изхвърля на другата страна. Намали скоростта, дръж волана здраво с две ръце и коригирай с малки, меки движения — вторият замах е този, който вади колата от лентата.",
+          tailBg:
+            "Освен това духа страничен вятър: дръж волана здраво с две ръце и коригирай с малки движения.",
+          lawRef: "ЗДвП чл. 20, ал. 2",
+        }
+      : null,
+  (d) => {
+    if (!d.adds.has("actor")) return null;
+    const named = d.stagedKinds.map((k) => STAGED_KIND_BG[k]).filter(Boolean);
+    const what = named.length > 0 ? named.slice(0, 2).join(" и ") : "още един участник в движението";
+    return {
+      titleBg: "Още един участник",
+      coachBg: `На това ниво в упражнението се появява ${what}. Карай така, че да можеш да реагираш, без да се налага да спираш рязко: гледай по-далеч напред, дръж крака готов над спирачката и решавай рано — късното решение е това, което превръща изненадата в удар.`,
+      tailBg: `Освен това се появява ${what} — гледай по-далеч напред и решавай рано.`,
+      lawRef: "ЗДвП чл. 20, ал. 2",
+    };
+  },
+  (d) =>
+    d.adds.has("traffic")
+      ? {
+          titleBg: "По-натоварена улица",
+          coachBg:
+            "Улицата вече не е празна — по нея се движат повече коли, отколкото на предишното ниво. Пролуката, която търсиш, трябва да е истинска, а не „мой ред е“: гледай не първата кола, а втората, тръгвай решително чак когато си сигурен, и ако се съмняваш — изчакай. Изчакването струва секунди, погрешната преценка струва предница.",
+          tailBg:
+            "Освен това улицата е по-натоварена — чакай истинска пролука, а не „мой ред е“.",
+          lawRef: "ЗДвП чл. 25",
+        }
+      : null,
+  (d) =>
+    d.adds.has("rubric")
+      ? {
+          titleBg: "По-строга мярка",
+          coachBg:
+            "Мястото и допуските са същите, мярката е по-строга: тук се брои и КАК си стигнал — с колко опита и с колко оглеждания. Не бързай в началото, за да не поправяш накрая; икономичната маневра е и по-безопасната, защото всяко излизане и връщане е още едно място, на което някой може да мине зад теб.",
+          tailBg: "Освен това мярката е по-строга — брои се и с колко опита го правиш.",
+          lawRef: "Наредба № 38",
+        }
+      : null,
+  (d) =>
+    d.adds.has("rules")
+      ? {
+          titleBg: "Оценява се по-строго",
+          coachBg:
+            "На това ниво се следи и нещо, което досега не се е оценявало в това упражнение. Карай както би карал пред изпитващ: оглед преди всяка маневра, мигач навреме, скорост съобразена с обстановката — правилата не са се променили, промени се това колко от тях се измерват.",
+          tailBg: "Освен това на това ниво се оценява по-строго от предишното.",
+          lawRef: "Наредба № 38",
+        }
+      : null,
+  // Protocol is LAST on purpose: it is the frame the rung is driven in, not the
+  // thing on the road that changed. When something physical also changed, the
+  // physical half leads and this rides as the tail; when the exam flag is the
+  // WHOLE delta (the silent L4 of 155 templates), it becomes the line itself.
+  (d) =>
+    d.adds.has("protocol")
+      ? {
+          titleBg: EXAM_PROTOCOL_COMPLICATION.titleBg,
+          coachBg: EXAM_PROTOCOL_COMPLICATION.coachBg,
+          tailBg:
+            "Освен това оттук нататък е по изпитен протокол — без кола-сянка, без линия и без подсказки.",
+          lawRef: EXAM_PROTOCOL_COMPLICATION.lawRef,
+        }
+      : null,
+];
+
+/**
+ * The complication a rung actually announces: the rung's OWN authored copy
+ * where it has one, otherwise the ladder's stored copy for whatever the
+ * compiler measured this rung adding over the next lower authored rung.
+ *
+ * **Call this, never `rung.complication`** — the same discipline
+ * resolveScenarioRubric exists for. A UI that reads the raw field shows „Ниво
+ * 4 — нищо ново" on 167 templates whose L4 is in fact the exam rung.
+ *
+ * Throws the same ScenarioCompileError compileScenario throws for a level the
+ * template does not author.
+ */
+export function resolveScenarioComplication(
+  spec: ScenarioSpec,
+  level: ScenarioLevel,
+): LevelComplication | undefined {
+  const idx = spec.levels.findIndex((l) => l.level === level);
+  if (idx < 0) {
+    throw new ScenarioCompileError(
+      spec.id,
+      level,
+      `the template does not author L${level} (has: ${spec.levels.map((l) => `L${l.level}`).join(", ")})`,
+    );
+  }
+  const rung = spec.levels[idx];
+  if (rung.complication) {
+    return { ...rung.complication, adds: [...rung.complication.adds] };
+  }
+  // The lowest authored rung has nothing below it to be harder than.
+  if (idx === 0) return undefined;
+  const delta = rungDelta(spec, idx);
+  if (delta.adds.size === 0) return undefined;
+
+  // Compose from the MEASURED delta: the leading mechanism gets its full
+  // instructor sentence, a second one rides as a short tail, and anything
+  // beyond that is dropped from the LINE (never from `adds`, which stays the
+  // complete measured set). The first briefing step is also the line the
+  // overlay holds the session on — two paragraphs there is a wall, and a wall
+  // is read the way an unexplained difficulty is: not at all.
+  const parts: LadderCopy[] = [];
+  for (const pick of LADDER_COPY_ORDER) {
+    const copy = pick(delta);
+    if (copy) parts.push(copy);
+    if (parts.length === 2) break;
+  }
+  if (parts.length === 0) return undefined;
+  const [lead, second] = parts;
+  return {
+    adds: [...delta.adds],
+    titleBg: parts.map((p) => p.titleBg).join(" + "),
+    coachBg: second ? `${lead.coachBg} ${second.tailBg}` : lead.coachBg,
+    ...(lead.lawRef ? { lawRef: lead.lawRef } : {}),
+  };
+}
+
 /** A rung rubric that points at an objective the template does not have would
  *  score a silent «не се измерва» forever; make it a loud compile error. */
 function assertRubricObjectives(spec: ScenarioSpec, level: ScenarioLevel, rubric?: RubricSpec): void {
@@ -368,7 +904,7 @@ export function compileScenario(
   // with the AC-08 winter story (snow haze + tick.snow conditions envelope).
   // The reduced-grip PHYSICS is deliberately NOT implied by the weather tag:
   // it stays the template's explicit physics opt-in (the wet precedent).
-  const conditions = { ...(spec.conditions ?? {}), ...(rung.conditions ?? {}) };
+  const conditions = rungConditions(spec, rung);
   const environment: LessonSpec["environment"] | undefined =
     conditions.night ||
     conditions.weather === "rain" ||
@@ -391,7 +927,7 @@ export function compileScenario(
   // have dragged L1..L4 onto wet grip too and invalidated their dry-tuned
   // ghosts — those rungs shipped render-only weather instead. Absent on both
   // spec and rung = {} = no physics key at all (bit-identical dry compile).
-  const physics = { ...(spec.physics ?? {}), ...(rung.physics ?? {}) };
+  const physics = rungPhysics(spec, rung);
 
   // The rung's own dial wins; a SILENT rung now falls back to the §7 ladder
   // instead of 1.0 (doc 86 L13 — that 1.0 is why L1, L2 and L3 compiled to the
@@ -420,27 +956,21 @@ export function compileScenario(
   }
 
   const staged = [...(spec.staged ?? []), ...(rung.stagedAdd ?? [])];
-  const examMode = rung.examMode ?? level === 4;
+  const examMode = rungExamMode(rung);
+  // What this rung ADDS, and the sentence that explains it. Resolved here so
+  // it lands in the briefing the student is shown (see briefingBg below).
+  const complication = resolveScenarioComplication(spec, level);
 
-  // Ambient traffic: the rung's explicit count wins; otherwise the template's
-  // baseline scaled by the level ladder; otherwise zero — a scenario micro-map
-  // is not a boulevard, and the ladder never conjures cars onto a template
-  // that authored no baseline (every template shipped today: bit-identical).
-  const trafficScale = DEFAULT_LEVEL_TRAFFIC_SCALE[level];
-  const laddered = (baseline: number | undefined, fallback: number) =>
-    baseline === undefined ? fallback : Math.max(0, Math.round(baseline * trafficScale));
-  const traffic = {
-    vehicleCount:
-      rung.traffic?.vehicleCount ??
-      laddered(spec.traffic?.vehicleCount, SCENARIO_DEFAULT_TRAFFIC.vehicleCount),
-    pedestrianCount:
-      rung.traffic?.pedestrianCount ??
-      laddered(spec.traffic?.pedestrianCount, SCENARIO_DEFAULT_TRAFFIC.pedestrianCount),
-    anchorRadiusM:
-      rung.traffic?.anchorRadiusM ??
-      spec.traffic?.anchorRadiusM ??
-      SCENARIO_DEFAULT_TRAFFIC.anchorRadiusM,
-  };
+  // Ambient traffic, in precedence order: the rung's explicit count wins; then
+  // the template's own baseline; then the FAMILY baseline for the families
+  // whose whole subject is other road users (SCENARIO_FAMILY_TRAFFIC_BASELINE
+  // — measured, see its doc); then zero, because a parking bay or a полигон is
+  // not a boulevard. Everything below the rung level is scaled by the §7
+  // ladder, so L1 reads a quiet street and L5 a busy one.
+  // (rungTraffic is the single truth — the complication resolver reads the
+  //  SAME function, so the street the student is told about is the street the
+  //  lesson builds.)
+  const traffic = rungTraffic(spec, rung);
 
   // Rule config: rung over template, PER KEY — the conditions/physics merge
   // applied to grading itself, so „L3 grades tighter than L1" is expressible
@@ -457,6 +987,27 @@ export function compileScenario(
     order: SCENARIO_LESSON_ORDER,
     titleBg: `${spec.titleBg} · Ниво ${level} — ${SCENARIO_LEVEL_NAMES_BG[level]}`,
     descriptionBg: spec.objectiveBg,
+    // THE BRIEFING, DELIVERED (2026-08-02). Every template hand-authors
+    // numbered steps and until today the compiler threw them away: no .tsx
+    // read `instructionsBg`, so „Включи фаровете — вече е тъмно" existed in
+    // the repository and nowhere else. Carried COPIED, never the template's
+    // own objects (specs are shared data — the signalPlan precedent).
+    // See LessonSpec.briefingBg for why a dropped field became a gate defect.
+    //
+    // THE COMPLICATION RIDES IN FRONT (2026-08-02, the level-ladder wave). If
+    // this rung ADDS something — rain that changes the grip, a busier street,
+    // the exam protocol — its explanation is step 1 and the drill's own steps
+    // renumber behind it. That ordering is the delivery: the overlay puts
+    // `briefingBg[0]` on the line and blocks on „Разбрах", so the one sentence
+    // that says WHY the rung is harder is the one sentence nobody can skip.
+    // Unexplained difficulty is a tax, not a lesson (THEO-4).
+    briefingBg: (complication
+      ? [
+          { n: 0, textBg: complicationBriefingText(level, complication) },
+          ...spec.instructionsBg,
+        ]
+      : spec.instructionsBg
+    ).map((s, i) => ({ n: i + 1, textBg: s.textBg })),
     conceptIds: [...spec.conceptIds],
     world: { districtId: spec.map.districtId },
     traffic,
@@ -533,6 +1084,10 @@ export function compileScenario(
     // Fixed lead-in + the STORED mistake title — the instruction that tells
     // the student to DO the wrong thing (ADR-002: stored text, never free).
     lesson.descriptionBg = `${MISTAKE_EXPERIENCE_LEAD_IN_BG} ${mistake.titleBg}.`;
+    // The sandbox's assignment is the MISTAKE. Showing the correct numbered
+    // steps beside „направи грешката нарочно" would be the shell arguing with
+    // itself, so the briefing is dropped here and only here.
+    delete lesson.briefingBg;
     // A sandbox is never an exam — drop the flag even if a template ever
     // authored its lowest rung as exam protocol.
     delete lesson.examMode;

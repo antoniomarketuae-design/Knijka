@@ -69,6 +69,7 @@
 
 import type { BrakingLeadCarSpec } from "../../contracts";
 import type { ScenarioSpec } from "./types";
+import { l5Night, l5Wet } from "./complications";
 
 // ---------------------------------------------------------------------------
 // Shared geometry constants (pinned from the generated districts by value — the
@@ -159,6 +160,9 @@ export const SC_AC_NIGHT_LIGHTS: ScenarioSpec = {
     { level: 2 },
     { level: 3 },
     { level: 4, vehicleStart: "cold" },
+    // L5 «Усложнени» — the complication kit (scenario/complications.ts):
+    // the delta AND the instructor's line that explains it, authored together.
+    l5Wet(),
   ],
   conditions: { weather: "dry", night: true },
   localeBg: "bg-BG",
@@ -369,6 +373,9 @@ export const SC_AC_HIGHBEAM_LEAD: ScenarioSpec = {
     { level: 2 },
     { level: 3 },
     { level: 4, vehicleStart: "cold" },
+    // L5 «Усложнени» — the complication kit (scenario/complications.ts):
+    // the delta AND the instructor's line that explains it, authored together.
+    l5Wet(),
   ],
   staged: [AH_LEAD_CAR],
   conditions: { weather: "dry", night: true },
@@ -502,6 +509,9 @@ export const SC_AC_WET_BRAKING: ScenarioSpec = {
     { level: 2 },
     { level: 3 },
     { level: 4, vehicleStart: "cold" },
+    // L5 «Усложнени» — the complication kit (scenario/complications.ts):
+    // the delta AND the instructor's line that explains it, authored together.
+    l5Night(),
   ],
   conditions: { weather: "rain" },
   // THE SLICE: the live student car runs wet-grip physics (opt-in, authored).
@@ -626,6 +636,9 @@ export const SC_AC_FOG: ScenarioSpec = {
     { level: 2 },
     { level: 3 },
     { level: 4, vehicleStart: "cold" },
+    // L5 «Усложнени» — the complication kit (scenario/complications.ts):
+    // the delta AND the instructor's line that explains it, authored together.
+    l5Night(),
   ],
   conditions: { weather: "fog" },
   localeBg: "bg-BG",
@@ -764,6 +777,9 @@ export const SC_AC_SNOW: ScenarioSpec = {
     { level: 2 },
     { level: 3 },
     { level: 4, vehicleStart: "cold" },
+    // L5 «Усложнени» — the complication kit (scenario/complications.ts):
+    // the delta AND the instructor's line that explains it, authored together.
+    l5Night(),
   ],
   conditions: { weather: "snow" },
   // THE COMPOSITION: the live student car runs snow-grip physics (opt-in,

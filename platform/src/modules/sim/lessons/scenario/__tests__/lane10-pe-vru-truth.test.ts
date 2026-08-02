@@ -33,6 +33,7 @@ import type { PedestrianDartOutSpec, StagedEventSpec, VehicleSample } from "../.
 import { createWorldRuntime } from "../../../runtime";
 import { buildWorldGeometry } from "../../../world/builders/buildWorldGeometry";
 import { assertDistrict } from "../../../world/types";
+import { compileScenario } from "../compile";
 import { SC_PE_JAYWALKER, SCENARIO_TEMPLATES_PE } from "../templates-pe";
 import { SCENARIO_TEMPLATES_PE2 } from "../templates-pe2";
 import { SCENARIO_TEMPLATES_VRU } from "../templates-vru";
@@ -297,34 +298,73 @@ describe("G4 OCCUPANCY HONESTY — roadFromM/roadToM are geometry, not a dial", 
   }
 });
 
+/**
+ * G5 reads the COMPILED briefing now, not `spec.instructionsBg` (2026-08-02).
+ *
+ * It used to read the template's own `instructionsBg` — a field
+ * `compileScenario` dropped, no `.tsx` rendered and `world/referents.ts`
+ * consulted as proof the duty had been stated. A predicate that reads an
+ * unrendered field certifies writing, not teaching; eighteen scenarios closed
+ * a graded lights fault that way and the student was still never told.
+ *
+ * It is also PER RUNG now, which is what doc 86 L10 actually says: the
+ * condition is usually authored on the L5 rung, so a template-wide answer was
+ * the wrong shape as well as the wrong field. `lesson.briefingBg` is the same
+ * array `LessonPlayShell` puts on the glass and blocks the session on.
+ */
 describe("G5 LIGHTS DUTY — no night/rain/fog rung without a lights step (doc 86 L10)", () => {
-  const lit = (s: ScenarioSpec) =>
-    s.instructionsBg.some((i) => /светлин|фаров/.test(i.textBg) && /включ|провери/.test(i.textBg));
-  const dark = (s: ScenarioSpec) =>
-    [s.conditions, ...s.levels.map((l) => l.conditions)].some(
-      (c) => c?.night === true || (c?.weather !== undefined && c.weather !== "dry"),
-    );
+  const darkRungs = (s: ScenarioSpec) =>
+    s.levels
+      .map((l) => ({ level: l.level, lesson: compileScenario(s, l.level) }))
+      .filter(
+        ({ lesson }) =>
+          lesson.environment?.timeOfDay === "night" ||
+          lesson.environment?.rain === true ||
+          lesson.environment?.fog === true,
+      );
 
-  for (const s of ALL.filter(dark)) {
-    it(`${s.id}: instructs the headlights`, () => {
-      expect(
-        lit(s),
-        `compiles a night/rain/fog rung, and HEADLIGHTS_OFF_AT_NIGHT / _IN_RAIN are ` +
-          `unconditionally armed основна faults — a scenario may not bill a duty its own copy never states`,
-      ).toBe(true);
+  for (const s of ALL.filter((x) => darkRungs(x).length > 0)) {
+    it(`${s.id}: instructs the headlights on every dark rung`, () => {
+      for (const { level, lesson } of darkRungs(s)) {
+        const lit = (lesson.briefingBg ?? []).some(
+          (i) => /светлин|фаров/.test(i.textBg) && /включ|провери/.test(i.textBg),
+        );
+        expect(
+          lit,
+          `${s.id}@L${level} compiles a night/rain/fog rung, and HEADLIGHTS_OFF_AT_NIGHT / _IN_RAIN are ` +
+            `unconditionally armed основна faults — a scenario may not bill a duty the briefing the ` +
+            `student is SHOWN never states`,
+        ).toBe(true);
+      }
     });
   }
 
   it("covers the scenarios doc 86 L10 names for this lane", () => {
-    const exposed = ALL.filter(dark).map((s) => s.id).sort();
+    const exposed = ALL.filter((x) => darkRungs(x).length > 0).map((s) => s.id).sort();
+    // The seven doc 86 named, plus the L5 «Усложнени» rungs the complication
+    // kit seeded onto this lane's drills (scenario/complications.ts) — each one
+    // arrives WITH its own „включи късите светлини" line, which is why the
+    // per-rung assertion above is green for all of them.
     expect(exposed).toEqual([
+      "sc-crossing-bus-shadow",
+      "sc-crossing-child-ball",
+      "sc-crossing-dart",
+      "sc-crossing-let-pass",
       "sc-crossing-rain-sprint",
+      "sc-crossing-slow-crosser",
+      "sc-crossing-white-cane",
+      "sc-pe-jaywalker",
       "sc-pe-night-unlit",
       "sc-pe-parked-row-scan",
       "sc-pe-school-patrol",
       "sc-vu-bikelane-turn",
       "sc-vu-blindspot-moto",
       "sc-vu-cyclist-group",
+      "sc-vu-cyclist-hook",
+      "sc-vu-door-zone",
+      "sc-vu-emergency",
+      "sc-vu-emergency-junction",
+      "sc-vu-pass-clearance",
     ]);
   });
 });

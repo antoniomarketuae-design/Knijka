@@ -19,7 +19,7 @@ import type { SignalPhase } from "../contracts";
 import { JUNCTION_TRIM_MAX_FRACTION, STOP_LINE_BEYOND_CUT_M } from "../world/builders/network";
 import { sampleLane, type DirectedLane, type LaneGraph } from "./graph";
 import type { TrafficRoute } from "./routes";
-import type { TrafficConfig, TrafficVehicleState } from "./types";
+import { vehicleHalfLengthM, type TrafficConfig, type TrafficVehicleState } from "./types";
 
 export const VEHICLE_LENGTH_M = 4.3;
 /** Half-length margin used for gap math (own half + obstacle half). */
@@ -65,6 +65,23 @@ export interface VehicleEnv {
   playerSpeedMps: number;
   playerDirX: number;
   playerDirY: number;
+  /**
+   * The STAGED (scripted) actors currently published by the system, so an
+   * ambient agent treats each one exactly the way it treats the player: an
+   * obstacle it slows for and can never drive through.
+   *
+   * Why this exists (doc 87 FR-27). `staged.ts` shipped an honest v1
+   * limitation — *"ambient agents do not see staged actors"* — which was
+   * harmless only while every scenario lesson ran with `vehicleCount: 0`. The
+   * moment the yielding families carry an ambient baseline, that limitation
+   * becomes the founder's own complaint at car scale: he watched a pedestrian
+   * walk *through* a parked car (items 22/23/24) and called it, correctly,
+   * visually unacceptable. A boulevard car sliding through the very car the
+   * lesson is about would be the same defect, bigger.
+   *
+   * Empty array = the pre-change behaviour, bit-identical.
+   */
+  staged: readonly TrafficVehicleState[];
 }
 
 /** Braking headroom kept between the reservation attempt and the stop point. */
@@ -212,6 +229,34 @@ export function updateVehicle(agent: VehicleAgent, dt: number, env: VehicleEnv):
     }
   }
 
+  // 2b) STAGED actors ahead in lane — the same treatment as the player, for
+  //     the same reason: an ambient agent must never drive through the car the
+  //     lesson is about. Held (speed 0) actors read as stationary obstacles,
+  //     which is what a car halted in your lane IS. O(agents × staged) with
+  //     staged ≤ ~4 per lesson; zero allocations.
+  let stagedAlong = Infinity;
+  let stagedMinSep = 0;
+  for (let j = 0; j < env.staged.length; j++) {
+    const st = env.staged[j];
+    if (st === agent.state) continue; // a staged actor never follows itself
+    const relX = st.x - agent.state.x;
+    const relY = st.y - agent.state.y;
+    const along = relX * agent.state.dirX + relY * agent.state.dirY;
+    const lateral = Math.abs(relX * agent.state.dirY - relY * agent.state.dirX);
+    if (along <= -2 || along >= cfg.lookaheadM || lateral >= cfg.playerLateralM) continue;
+    // Closing speed only when it travels roughly our way; a crossing or
+    // oncoming actor is treated as static, which is the conservative read.
+    const aligned = st.dirX * agent.state.dirX + st.dirY * agent.state.dirY > 0.7;
+    const vLead = aligned ? st.speedMps : 0;
+    const halfSum = HALF_LEN + vehicleHalfLengthM(st.profile);
+    const t = idmTerm(cfg, v, along - halfSum, vLead);
+    if (t > term) term = t;
+    if (along < stagedAlong) {
+      stagedAlong = along;
+      stagedMinSep = halfSum + 0.8;
+    }
+  }
+
   // 3) Stop points ahead: signals, occupied crossings, unreserved junctions.
   term = Math.max(term, stopPointTerm(agent, env, cur, v));
 
@@ -238,6 +283,38 @@ export function updateVehicle(agent: VehicleAgent, dt: number, env: VehicleEnv):
       agent.s -= moved - allowedMove;
       if (agent.s < 0) agent.s = 0;
       agent.speed = 0;
+    }
+  }
+  // Same guarantee vs the nearest staged actor ahead (pre-move pose, exactly
+  // like the player clamp above): the kinematic promise „never clip" now
+  // covers scripted actors too, so no ambient car can pass through one.
+  if (stagedAlong < Infinity && stagedAlong > 0) {
+    const moved = agent.speed * dt;
+    if (stagedAlong - moved < stagedMinSep) {
+      const allowedMove = Math.max(0, stagedAlong - stagedMinSep);
+      agent.s -= moved - allowedMove;
+      if (agent.s < sBefore) agent.s = sBefore;
+      if (agent.s < 0) agent.s = 0;
+      agent.speed = 0;
+    }
+  }
+  // …and from ANY angle, not just along the lane: a staged actor crossing the
+  // junction box is lateral to this agent until the last metre, so the
+  // corridor test above cannot catch it. Refusing the arc advance is always
+  // safe — the pre-move pose was clear by induction.
+  if (env.staged.length > 0 && agent.s > sBefore) {
+    const step = agent.s - sBefore;
+    const nx = agent.state.x + agent.state.dirX * step;
+    const ny = agent.state.y + agent.state.dirY * step;
+    for (let j = 0; j < env.staged.length; j++) {
+      const st = env.staged[j];
+      if (st === agent.state) continue;
+      const sep = HALF_LEN + vehicleHalfLengthM(st.profile) + 0.5;
+      if (Math.hypot(st.x - nx, st.y - ny) < sep) {
+        agent.s = sBefore;
+        agent.speed = 0;
+        break;
+      }
     }
   }
   // Same guarantee vs the leader agent (leader treated at its pre-move pose).
@@ -290,6 +367,39 @@ export function updateVehicle(agent: VehicleAgent, dt: number, env: VehicleEnv):
     agent.state.dirY = samp.dirY;
   }
   agent.state.speedMps = agent.speed;
+}
+
+/**
+ * Push an ambient agent forward along its OWN arc until its published pose is
+ * at least `minSepM` from (obsX, obsY), and re-publish. Returns true when it
+ * cleared.
+ *
+ * Why (doc 87 FR-27): ambient agents are seeded at construction, staged actors
+ * are staged afterwards, so a scripted actor can be placed on top of a
+ * boulevard car that is already there. Measured on three templates — 0.52 m,
+ * 0.99 m and 1.46 m of CENTRES, all at t = 0.0 s. No running clamp can undo
+ * that: both bodies start inside each other, so neither is "advancing into"
+ * the other, and the overlap simply persists into the first frame the student
+ * sees. The seed has to be repaired once, at stage time.
+ *
+ * Forward, never backward: the lane-transition loop below handles an arc that
+ * runs past the end of the current lane, so a forward push is always legal,
+ * while a negative `s` is not representable.
+ */
+export function separateVehicleFrom(
+  agent: VehicleAgent,
+  obsX: number,
+  obsY: number,
+  minSepM: number,
+  env: VehicleEnv,
+): boolean {
+  for (let i = 0; i < 8; i++) {
+    const d = Math.hypot(agent.state.x - obsX, agent.state.y - obsY);
+    if (d >= minSepM) return true;
+    agent.s += minSepM - d + 0.25;
+    updateVehicle(agent, 0, env);
+  }
+  return Math.hypot(agent.state.x - obsX, agent.state.y - obsY) >= minSepM;
 }
 
 function clampAcc(acc: number, cfg: TrafficConfig): number {

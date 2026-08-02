@@ -31,7 +31,13 @@ import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { buildWorldGeometry } from "../builders/buildWorldGeometry";
 import { analyzeNetwork } from "../builders/network";
-import { analyzeRoundabouts } from "../builders/roundabout";
+import {
+  analyzeRoundabouts,
+  hasOuterKerb,
+  ringBearingInMouth,
+  ringOuterRadiusAt,
+  type RoundaboutRing,
+} from "../builders/roundabout";
 import { assertDistrict, type District } from "../types";
 
 /** builders/constants.ts LANE_WIDTH_M — copied, not imported: this asserts the
@@ -327,6 +333,169 @@ describe("the ring's own markings", () => {
     for (const id of ["rb-mini-v1", "rb-ped-v1", "rb-single-v1", "district-v1"] as const) {
       const world = worldOf(id);
       expect(world.stats.ringDividerQuads, id).toBe(0);
+    }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// FR-22, THE OUTER HALF — the residual the island pass left standing
+// ---------------------------------------------------------------------------
+//
+// „a Round a bout is a Cyrcle" is a statement about BOTH boundaries, and until
+// this battery only the inner one was one. The outer kerb was built the way any
+// street's pavement is — `buildSidewalkStrip` along the ring edge's
+// JUNCTION-TRIMMED centreline — and `analyzeNetwork` opens 17.125 m of junction
+// at each arm↔ring node, so on rb-mini's 90° / 28 m quarters the trim clamped at
+// JUNCTION_TRIM_MAX_FRACTION and left 2.8 m of kerb per quarter. Measured on the
+// shipped geometry, kerb sampled at 2° at the ring's own outer radius and
+// counted only on bearings no arm points at:
+//
+//     district        kerb missing off-mouth      pad spill past the outer edge
+//     rb-mini-v1      30 of 45   →   0 of 76      +5.47 m  →  0
+//     rb-ped-v1       30 of 45   →   0 of 76      +5.47 m  →  0
+//     rb-2lane-v1     60 of 75   →   1 of 52      +10.73 m →  0
+//     rb-single-v1    66 of 87   →   0 of 124     +6.00 m  →  0
+//     district-v1     49 of 55   →   6 of 126
+//     d2-v1           31 of 41   →   1 of 94
+//
+// (The AFTER denominators are LARGER because the mouth model is now the
+// builder's real one — narrower than the probe's first guess — so the after
+// number is measured over more bearings, not fewer.)
+//
+// What the assertions below lock is the driver's fact, not the arithmetic:
+// standing anywhere outside a roundabout that is not a mouth, there is kerb.
+describe("FR-22 — the OUTER boundary is a circle too", () => {
+  /** Bearings sampled per ring: 2° — finer than any mouth is narrow. */
+  const B = 180;
+
+  /** Every ring that resolved a circular outer kerb, with its district. */
+  function circularRings(): Array<{ id: string; ring: RoundaboutRing }> {
+    const out: Array<{ id: string; ring: RoundaboutRing }> = [];
+    for (const id of RING_DISTRICTS) {
+      for (const ring of ringsOf(readDistrict(id))) {
+        if (hasOuterKerb(ring)) out.push({ id, ring });
+      }
+    }
+    return out;
+  }
+
+  it("every shipped ring resolves one — the derivation is not opt-in", () => {
+    // Six registrations, six circles. d2-v1 is included on purpose: its ISLAND
+    // is refused (a primary runs through the interior) but its outside is still
+    // a circle, and those are independent facts about independent boundaries.
+    expect(circularRings().map((r) => r.id).sort()).toEqual([...RING_DISTRICTS].sort());
+  });
+
+  it("there is KERB at every bearing that is not a mouth", () => {
+    // THE REGRESSION, stated as the thing a driver sees. Sampled against the
+    // ring's OWN outer radius (an OSM ring wanders — d2-v1 runs 26.8…29.3
+    // against a declared 28), because the kerb has to follow the asphalt that
+    // is actually drawn, not an ideal circle laid over it.
+    for (const { id, ring } of circularRings()) {
+      const seen = new Array<boolean>(B).fill(false);
+      const p = world_sidewalks(id);
+      for (let i = 0; i < p.length; i += 3) {
+        const x = p[i]! - ring.centre[0];
+        const y = -p[i + 2]! - ring.centre[1];
+        const bearing = Math.atan2(y, x);
+        if (Math.abs(Math.hypot(x, y) - ringOuterRadiusAt(ring, bearing)) > 0.6) continue;
+        seen[Math.floor((((bearing + Math.PI * 2) % (Math.PI * 2)) / (Math.PI * 2)) * B) % B] = true;
+      }
+      let missing = 0;
+      let offMouth = 0;
+      for (let b = 0; b < B; b++) {
+        const a = ((b + 0.5) / B) * Math.PI * 2;
+        if (ringBearingInMouth(ring, a)) continue;
+        offMouth++;
+        if (!seen[b]) missing++;
+      }
+      expect(offMouth, `${id}: the mouths ate the whole circle`).toBeGreaterThan(B * 0.2);
+      // Budgeted per district, in the register's discipline: a named number
+      // that may only fall, and a row that reaches zero gets deleted.
+      //
+      //   rb-mini-v1     30 of 45  →  0        rb-single-v1  66 of 87  →  0
+      //   rb-ped-v1      30 of 45  →  0        rb-2lane-v1   60 of 75  →  1
+      //   district-v1    49 of 55  →  6        d2-v1         31 of 41  →  1
+      //
+      // What is left is quantisation, not plaza: this test walks 2° buckets and
+      // the builder cuts its mouths on 1°, so a mouth edge landing inside a
+      // test bucket reads as a hole 2° (1.2 m of a 213 m circumference) wide.
+      // The two OSM rings keep a few more because their radius wanders —
+      // district-v1 19.4…20.3 m, d2-v1 26.8…29.3 m — so the mouth cut (taken at
+      // the ARM's bearing) and the kerb-run cut (taken on the ring's own
+      // profile) disagree by up to a metre at each seam.
+      const budget: Record<string, number> = {
+        "rb-2lane-v1": 1, "district-v1": 6, "d2-v1": 1,
+      };
+      expect(missing, `${id}: ${missing}/${offMouth} bearings have no outer kerb`)
+        .toBeLessThanOrEqual(budget[id] ?? 0);
+    }
+  });
+
+  it("no junction pad flares past the outer edge on an off-mouth bearing", () => {
+    // The pads opened at the ARM's radius, so their boundaries and corner
+    // fillets reached metres outside the circulatory carriageway on bearings no
+    // arm points at — probed at +10.73 m on rb-2lane. That flare IS the square.
+    // Measured on the four SYNTHETIC rings: an OSM district has other junctions
+    // within a ring radius of the ring, and their asphalt is theirs, not this
+    // registration's.
+    for (const id of ["rb-mini-v1", "rb-ped-v1", "rb-2lane-v1", "rb-single-v1"] as const) {
+      const ring = ringsOf(readDistrict(id))[0]!;
+      const p = worldOf(id).junctionSurface.positions;
+      let worst = 0;
+      for (let i = 0; i < p.length; i += 3) {
+        const x = p[i]! - ring.centre[0];
+        const y = -p[i + 2]! - ring.centre[1];
+        const bearing = Math.atan2(y, x);
+        if (ringBearingInMouth(ring, bearing)) continue;
+        worst = Math.max(worst, Math.hypot(x, y) - ringOuterRadiusAt(ring, bearing));
+      }
+      expect(worst, `${id}: junction asphalt ${worst.toFixed(2)} m outside the ring`)
+        .toBeLessThanOrEqual(0.25);
+    }
+  });
+
+  it("the mouths are where the ARMS are, and only there", () => {
+    // Derived, never authored: a map cannot post a gap it has no road for. Each
+    // mouth's bearing must land on a node that actually carries its arm edge.
+    for (const { id, ring } of circularRings()) {
+      const district = readDistrict(id);
+      expect(ring.mouths.length, `${id} has no mouths`).toBeGreaterThan(0);
+      for (const mouth of ring.mouths) {
+        const arm = district.roads.edges.find((e) => e.id === mouth.armEdgeId);
+        expect(arm, `${id}: mouth names a missing edge ${mouth.armEdgeId}`).toBeTruthy();
+        expect(ring.ringEdgeIds.has(mouth.armEdgeId), `${id}: a RING edge is not an arm`).toBe(false);
+        // The gap is a gap, not a hole: never more than a quarter turn.
+        expect(mouth.halfAngle, `${id} ${mouth.armEdgeId}`).toBeLessThan(Math.PI / 4);
+      }
+    }
+  });
+
+  it("the outer kerb is a COLLIDER — you cannot drive off the outside either", () => {
+    // The circle is swept into the SIDEWALK accumulator, which IS
+    // `colliders.sidewalks`. The island's kerb already stopped a car from
+    // cutting the middle; this is the other side of the same carriageway.
+    const ring = ringsOf(readDistrict("rb-mini-v1"))[0]!;
+    const p = worldOf("rb-mini-v1").colliders.sidewalks.positions;
+    let onOuterKerb = 0;
+    for (let i = 0; i < p.length; i += 3) {
+      const x = p[i]! - ring.centre[0];
+      const y = -p[i + 2]! - ring.centre[1];
+      if (Math.abs(Math.hypot(x, y) - ringOuterRadiusAt(ring, Math.atan2(y, x))) < 0.05) {
+        onOuterKerb++;
+      }
+    }
+    expect(onOuterKerb).toBeGreaterThan(100);
+  });
+
+  it("a district with no ring grows no circular kerb at all", () => {
+    // The additive contract: everything above is zero on the 94 districts that
+    // register no roundabout, so none of their geometry moved by a vertex.
+    for (const id of ["tj-stop-v1", "pe-clear-v1"] as const) {
+      const district = readDistrict(id);
+      expect(district.roundabouts).toHaveLength(0);
+      expect(ringsOf(district)).toEqual([]);
+      expect(worldOf(id).stats.ringKerbRuns).toBe(0);
     }
   });
 });

@@ -111,9 +111,9 @@ export interface JunctionEdgeLike {
  *     is arterial-classed, so it grew a city pavement and lamp arm that swept
  *     across the carriageway it merges into.
  *
- * The curbside PARKING band is deliberately NOT touched: it is symmetric by
- * construction (`ribbonCrossSection` mirrors it about the centreline), so it
- * stays a class decision (PARKING_LANE_CLASSES).
+ * The curbside PARKING band is symmetric by construction (`ribbonCrossSection`
+ * mirrors it about the centreline), so it stays a CLASS decision by default —
+ * but a map may opt one edge in explicitly; see `edgeParkingBand` below.
  */
 export type BareVergeSide = "left" | "right" | "both";
 
@@ -131,9 +131,54 @@ export function isBareVergeSide(bare: BareVergeSide | null, side: 1 | -1): boole
   return bare === (side === 1 ? "right" : "left");
 }
 
-/** Parking band width per side of an edge (0 for non-arterial/roundabout). */
+/**
+ * Read the (optional) per-edge curbside-parking opt-in.
+ *
+ * WHY IT EXISTS — founder item FR-21, the car half. `PARKING_LANE_CLASSES` is
+ * `{primary, secondary, tertiary}`, but `traffic/TrafficLayer.PARK_CLASSES` —
+ * the set the procedural curb pass actually parks cars along — is that set
+ * PLUS `{residential, living_street, unclassified}`. The two sets disagreeing
+ * IS the defect: the pass seats every body at `travelHalf + 2.0 m`, which on a
+ * class with no band is 2 m PAST the kerb, i.e. in the middle of the 3.5 m
+ * pavement, at road level, sunk 0.12 m into the footway it stands on.
+ *
+ * Measured over the 100 committed districts (scratch census, this lane):
+ * **2605 of 3799 bodies — 68.6% — stand fully on the footway, on 83 of the 100
+ * districts** (2140 on `residential` edges, 465 on `unclassified`). His words,
+ * three times over: „he goes trough a car which is standing on the sidewalk",
+ * „passes like a ghost trough some car", and — the one that costs a lesson —
+ * „I cant see the car coming on the right because of the cars that have
+ * stopped on the side walk".
+ *
+ * WHY A TAG AND NOT A CLASS SET. Two cheaper-looking fixes were measured and
+ * rejected before this one:
+ *   - moving the bodies INTO the carriageway (flank against the kerb) puts
+ *     **21 committed traces inside a body footprint**, three of them
+ *     `shadow-correct` — the demonstrated-correct drive would drive through a
+ *     parked car. The parking/manoeuvre drills legitimately use that strip;
+ *   - adding `residential` to `PARKING_LANE_CLASSES` grows `edgeHalfWidth` by
+ *     4 m on 83 districts, which moves every kerb, pavement, junction mouth and
+ *     baked building footprint at once — a 100-district regeneration.
+ *
+ * The tag lets ONE map declare the band its own parked row already assumes.
+ * The bodies do not move at all (the pass already seats them at the band's
+ * centre line, `travelHalf + PARKING_LANE_WIDTH_M / 2`); the KERB moves out
+ * from under them, and the frontage moves out with it. Absent ⇒ every existing
+ * map builds byte-identically.
+ */
+export function edgeParkingBand(edge: object): boolean | null {
+  const v = (edge as { parkingBand?: unknown }).parkingBand;
+  return v === true || v === false ? v : null;
+}
+
+/** Parking band width per side of an edge (0 for non-arterial/roundabout).
+ *  An explicit `parkingBand` OVERRIDES the class in both directions — a
+ *  collector with no kerbside parking is as real as a residential street with
+ *  it, and FR-21 needs both answers available to a map author. */
 export function edgeParkingWidthM(edge: JunctionEdgeLike): number {
   if (edge.roundabout) return 0;
+  const declared = edgeParkingBand(edge);
+  if (declared !== null) return declared ? PARKING_LANE_WIDTH_M : 0;
   return PARKING_LANE_CLASSES.has(edge.class) ? PARKING_LANE_WIDTH_M : 0;
 }
 

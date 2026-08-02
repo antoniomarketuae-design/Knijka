@@ -62,6 +62,18 @@ export interface DistrictEdge {
   noUTurn?: boolean;
   /** The edge is a motorway (MOTORWAY-SEGMENT slice — runtime/district.ts). */
   motorway?: boolean;
+  /**
+   * Opt this edge into the 4 m curbside PARKING band that
+   * `PARKING_LANE_CLASSES` otherwise grants only to arterial classes
+   * (founder item FR-21 — see `builders/network.edgeParkingBand` for the
+   * measurement and for why this is a per-edge tag and not a class set).
+   *
+   * A street that carries a procedurally parked row (traffic/TrafficLayer
+   * `PARK_CLASSES` — which includes `residential`, `living_street` and
+   * `unclassified`) needs the band, or its cars stand on the pavement. Absent
+   * ⇒ the class decides, i.e. every map written before the tag is unchanged.
+   */
+  parkingBand?: boolean;
 }
 
 export interface DistrictIntersection {
@@ -560,6 +572,10 @@ export interface WorldStats {
   /** Dashes of the circular ring lane divider (0 on single-lane rings — there
    *  is no boundary there and inventing one would be a new falsehood). */
   ringDividerQuads: number;
+  /** FR-22, the outer half: mouth-free arcs of the ring's OUTER kerb swept as a
+   *  circle. 0 means the per-edge junction-trimmed stubs are still standing —
+   *  which on a four-arm ring is 2.8 m of kerb per quarter, i.e. not a circle. */
+  ringKerbRuns: number;
   buildings: number;
   /** Instanced glass towers placed on tall, compact footprints. */
   buildingInstances: number;

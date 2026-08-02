@@ -53,6 +53,7 @@
 
 import type { BrakingLeadCarSpec, NarrowMeetingSpec, OncomingStreamSpec } from "../../contracts";
 import type { ScenarioSpec } from "./types";
+import { l5Fog, l5Night, l5Wet } from "./complications";
 
 // ---------------------------------------------------------------------------
 // Shared geometry constants (pinned from the generated districts by value —
@@ -185,6 +186,9 @@ export const SC_OV_KEEP_RIGHT: ScenarioSpec = {
       level: 4,
       vehicleStart: "cold",
     },
+    // L5 «Усложнени» — the complication kit (scenario/complications.ts):
+    // the delta AND the instructor's line that explains it, authored together.
+    l5Wet(),
   ],
   conditions: { weather: "dry" },
   localeBg: "bg-BG",
@@ -294,6 +298,9 @@ export const SC_OV_LANE_KEEPING: ScenarioSpec = {
       level: 4,
       vehicleStart: "cold",
     },
+    // L5 «Усложнени» — the complication kit (scenario/complications.ts):
+    // the delta AND the instructor's line that explains it, authored together.
+    l5Night(),
   ],
   conditions: { weather: "dry" },
   localeBg: "bg-BG",
@@ -417,6 +424,9 @@ export const SC_OV_ONEWAY: ScenarioSpec = {
       level: 4,
       vehicleStart: "cold",
     },
+    // L5 «Усложнени» — the complication kit (scenario/complications.ts):
+    // the delta AND the instructor's line that explains it, authored together.
+    l5Night(),
   ],
   conditions: { weather: "dry" },
   localeBg: "bg-BG",
@@ -567,6 +577,9 @@ export const SC_OV_CROSSING_OVERTAKE: ScenarioSpec = {
     { level: 2 },
     { level: 3 },
     { level: 4, vehicleStart: "cold" },
+    // L5 «Усложнени» — the complication kit (scenario/complications.ts):
+    // the delta AND the instructor's line that explains it, authored together.
+    l5Wet(),
   ],
   staged: [OVC_LEAD_CAR],
   conditions: { weather: "dry" },
@@ -694,6 +707,9 @@ export const SC_OV_NARROW: ScenarioSpec = {
     { level: 2 },
     { level: 3 },
     { level: 4, vehicleStart: "cold" },
+    // L5 «Усложнени» — the complication kit (scenario/complications.ts):
+    // the delta AND the instructor's line that explains it, authored together.
+    l5Wet(),
   ],
   staged: [NARROW_MEETING],
   conditions: { weather: "dry" },
@@ -818,6 +834,9 @@ export const SC_OV_BAN_OVERTAKE: ScenarioSpec = {
     { level: 2 },
     { level: 3 },
     { level: 4, vehicleStart: "cold" },
+    // L5 «Усложнени» — the complication kit (scenario/complications.ts):
+    // the delta AND the instructor's line that explains it, authored together.
+    l5Wet(),
   ],
   staged: [OVB_LEAD_CAR],
   conditions: { weather: "dry" },
@@ -916,6 +935,9 @@ export const SC_OV_SOLID_LINE: ScenarioSpec = {
     { level: 2 },
     { level: 3 },
     { level: 4, vehicleStart: "cold" },
+    // L5 «Усложнени» — the complication kit (scenario/complications.ts):
+    // the delta AND the instructor's line that explains it, authored together.
+    l5Fog(),
   ],
   conditions: { weather: "dry" },
   localeBg: "bg-BG",
@@ -1014,6 +1036,9 @@ export const SC_OV_BUS_LANE: ScenarioSpec = {
     { level: 2 },
     { level: 3 },
     { level: 4, vehicleStart: "cold" },
+    // L5 «Усложнени» — the complication kit (scenario/complications.ts):
+    // the delta AND the instructor's line that explains it, authored together.
+    l5Wet(),
   ],
   conditions: { weather: "dry" },
   localeBg: "bg-BG",
@@ -1195,6 +1220,9 @@ export const SC_MW_EMERGENCY_LANE: ScenarioSpec = {
     { level: 2 },
     { level: 3 },
     { level: 4, vehicleStart: "cold" },
+    // L5 «Усложнени» — the complication kit (scenario/complications.ts):
+    // the delta AND the instructor's line that explains it, authored together.
+    l5Wet(),
   ],
   staged: [MWE_BREAKDOWN], // ledger T15 — the car the copy has always narrated
   conditions: { weather: "dry" },
@@ -1357,6 +1385,9 @@ export const SC_OV_ONCOMING_GAP: ScenarioSpec = {
     { level: 2 },
     { level: 3 },
     { level: 4, vehicleStart: "cold" },
+    // L5 «Усложнени» — the complication kit (scenario/complications.ts):
+    // the delta AND the instructor's line that explains it, authored together.
+    l5Wet(),
   ],
   staged: [ovgLeadCar("sc-ovg-lead"), OVG_STREAM],
   conditions: { weather: "dry" },
@@ -1474,6 +1505,9 @@ export const SC_OV_ABORT: ScenarioSpec = {
     { level: 2 },
     { level: 3 },
     { level: 4, vehicleStart: "cold" },
+    // L5 «Усложнени» — the complication kit (scenario/complications.ts):
+    // the delta AND the instructor's line that explains it, authored together.
+    l5Wet(),
   ],
   staged: [ovgLeadCar("sc-ova-lead"), OVA_STREAM],
   conditions: { weather: "dry" },
@@ -1568,6 +1602,9 @@ export const SC_OV_RETURN_GAP: ScenarioSpec = {
     { level: 2 },
     { level: 3 },
     { level: 4, vehicleStart: "cold" },
+    // L5 «Усложнени» — the complication kit (scenario/complications.ts):
+    // the delta AND the instructor's line that explains it, authored together.
+    l5Wet(),
   ],
   staged: [ovgLeadCar("sc-ovr-lead")],
   conditions: { weather: "dry" },

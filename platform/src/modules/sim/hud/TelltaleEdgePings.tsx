@@ -146,15 +146,18 @@ function Chip({
   const color = warning.tone === "danger" ? "var(--danger)" : "var(--warning)";
   return (
     <div
-      className={`flex items-center gap-1.5 rounded-full border px-2 py-1 text-[10px] font-bold leading-none backdrop-blur-sm sm:px-2.5 sm:text-[11px] ${
+      className={`hud-ghost flex items-center gap-1.5 rounded-full border px-2 py-1 text-[10px] font-bold leading-none sm:px-2.5 sm:text-[11px] ${
         warning.tone === "danger" ? "telltale-breath" : "opacity-70"
       } ${side === "left" ? "flex-row" : "flex-row-reverse"}`}
       style={{
-        // „semi brightness / mini shadowed": tinted glass, never a solid card.
+        // „semi brightness / mini shadowed" was the brief and „tinted glass"
+        // was the previous answer. The reference's answer is that a telltale is
+        // a LAMP: its own colour, the halo behind it, and no glass at all — the
+        // way ABS / TC / the fuel figure sit straight on the image there.
+        // The lit border in the fault's own tone survives the sweep (semantic
+        // colours are never touched) and is now the whole chip.
         color,
-        borderColor: `color-mix(in srgb, ${color} 45%, transparent)`,
-        background: "color-mix(in srgb, var(--background) 62%, transparent)",
-        boxShadow: `0 1px 10px color-mix(in srgb, ${color} 18%, transparent)`,
+        borderColor: `color-mix(in srgb, ${color} 65%, transparent)`,
       }}
     >
       <TelltaleGlyph id={warning.id} />

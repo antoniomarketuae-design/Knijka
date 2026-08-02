@@ -440,8 +440,19 @@ export interface WorldFacts {
   /** Edge ids that actually receive lane-boundary paint (dashes or an authored solid). */
   paintedLaneEdges: ReadonlySet<string>;
   maxspeedByEdge: ReadonlyMap<string, number>;
-  /** meta.scenario.laneArrows — the second already-gated precedent. */
-  hasLaneArrows: boolean;
+  /**
+   * Edges that actually receive a PAINTED М10 arrow.
+   *
+   * Was `hasLaneArrows: boolean` — `meta.scenario.laneArrows !== undefined`,
+   * district-wide and route-blind, so a map with arrows on one street
+   * certified WRONG_LANE_FOR_DIRECTION on a route that never touches it, and
+   * a malformed `laneArrows` block (which makes `paintLaneArrows` a silent
+   * no-op) certified a route with no arrow anywhere. Second-degree relative of
+   * the `instructionsBg` defect, found in the same audit: the premise was
+   * satisfiable by authored intent the painter had already thrown away.
+   * Now derived with markings.ts's own validity rules, per edge.
+   */
+  laneArrowEdges: ReadonlySet<string>;
 }
 
 const worldCache = new Map<string, WorldFacts>();
@@ -482,6 +493,42 @@ function dashedLaneEdges(district: District): Set<string> {
   return painted;
 }
 
+/**
+ * Replicates `markings.ts readLaneArrows` + `paintLaneArrows`'s edge loop: the
+ * edges an М10 glyph is actually painted on. Anything the painter treats as
+ * malformed (no edgeIds, a non-numeric or inverted span, no lane with a known
+ * arrow vocab) paints NOTHING, so it yields nothing here either — the whole
+ * point is that this reads what gets built, not what got typed.
+ */
+const LANE_ARROW_VOCAB = new Set(["through", "left", "right", "nearExits", "farExits"]);
+function paintedLaneArrowEdges(district: District): Set<string> {
+  const out = new Set<string>();
+  const sc = district.meta.scenario as { laneArrows?: Record<string, unknown> } | undefined;
+  const la = sc?.laneArrows;
+  if (!la || typeof la !== "object") return out;
+  const edgeIds = Array.isArray(la.edgeIds)
+    ? (la.edgeIds as unknown[]).filter((e): e is string => typeof e === "string")
+    : typeof la.edgeId === "string"
+      ? [la.edgeId]
+      : [];
+  if (edgeIds.length === 0) return out;
+  const { fromM, toM } = la;
+  if (typeof fromM !== "number" || typeof toM !== "number" || !(fromM < toM)) return out;
+  const lanes = Array.isArray(la.lanes)
+    ? (la.lanes as Array<Record<string, unknown> | null>).filter(
+        (l) =>
+          typeof l?.arrow === "string" &&
+          LANE_ARROW_VOCAB.has(l.arrow) &&
+          typeof l?.centerM === "number" &&
+          Number.isFinite(l.centerM),
+      )
+    : [];
+  if (lanes.length === 0) return out;
+  const known = new Set(district.roads.edges.map((e) => e.id));
+  for (const id of edgeIds) if (known.has(id)) out.add(id);
+  return out;
+}
+
 export function worldFactsFor(districtId: string): WorldFacts {
   const hit = worldCache.get(districtId);
   if (hit) return hit;
@@ -511,8 +558,6 @@ export function worldFactsFor(districtId: string): WorldFacts {
     maxspeedByEdge.set(e.id, e.maxspeed);
   }
 
-  const scenarioMeta = district.meta.scenario as { laneArrows?: unknown } | undefined;
-
   const facts: WorldFacts = {
     districtId,
     district,
@@ -524,7 +569,7 @@ export function worldFactsFor(districtId: string): WorldFacts {
     markedClassEdges,
     paintedLaneEdges: dashedLaneEdges(district),
     maxspeedByEdge,
-    hasLaneArrows: scenarioMeta?.laneArrows !== undefined,
+    laneArrowEdges: paintedLaneArrowEdges(district),
   };
   worldCache.set(districtId, facts);
   return facts;
@@ -565,6 +610,17 @@ export interface ScenarioFacts {
   rain: boolean;
   fog: boolean;
   snow: boolean;
+  /**
+   * Does a step of the briefing THE STUDENT IS SHOWN mention the lamps?
+   *
+   * Reads `lesson.briefingBg` — the COMPILED field LessonPlayShell renders —
+   * and never `spec.instructionsBg`, which the compiler used to drop on the
+   * floor. That substitution is the whole point of the 2026-08-02 wave: for
+   * three months this predicate read a field with no consumer outside its own
+   * type, its validator and this gate, so "the copy says светлини" and "the
+   * student was told" were different sentences and only the gate could not
+   * tell them apart. See EVIDENCE_CHANNELS.briefing.
+   */
   lightsInstructed: boolean;
 }
 
@@ -689,7 +745,10 @@ export function scenarioFactsFor(spec: ScenarioSpec, level: number): ScenarioFac
     rain,
     fog,
     snow,
-    lightsInstructed: spec.instructionsBg.some((s) => LIGHTS_COPY.test(s.textBg)),
+    // THE COMPILED briefing, not the template's own array — if compileScenario
+    // ever stops carrying it, this goes false and the gate re-opens the 214
+    // rung-codes instead of quietly certifying them.
+    lightsInstructed: (lesson.briefingBg ?? []).some((s) => LIGHTS_COPY.test(s.textBg)),
   };
 }
 
@@ -722,12 +781,158 @@ export interface ReferentVerdict {
   band?: ReferentBand;
 }
 
+// ---------------------------------------------------------------------------
+// EVIDENCE CHANNELS — the invariant that makes 2026-08-02 impossible to repeat
+// ---------------------------------------------------------------------------
+//
+// WHAT HAPPENED. `conditionLightsRule` accepted a `светлини` match inside
+// `ScenarioSpec.instructionsBg` as proof that a night drill had told the
+// student to switch the lights on. `compileScenario` DROPPED that field, no
+// component read it, and its only non-test consumers were the type, the
+// validator and THIS MODULE. So a lane could clear HEADLIGHTS_OFF_IN_RAIN on
+// twelve scenarios and HEADLIGHTS_OFF_AT_NIGHT on six by writing Bulgarian
+// into a void: the fault still fired at the student, the student was still
+// never told, and the gate could no longer see it. That is strictly worse than
+// the defect it "fixed" — before, the gate honestly flagged an unjustified
+// conviction; after, it certified itself.
+//
+// THE GENERAL FORM. A referent's premise must be satisfiable ONLY by something
+// a student can perceive. Any referent whose premise can be satisfied by data
+// that never reaches a rendered surface is the same bug wearing a different
+// fault code.
+//
+// THE MACHINE FORM. Every rule declares the channels it reads. Every channel
+// names the .tsx that puts it in front of a human and a token that must appear
+// in that file. `__tests__/referent-evidence-reachable.test.ts` walks the
+// table: a referent pointed at a dead field fails immediately, naming the
+// field and saying why. Adding the channel is not a way around the test —
+// the channel itself has to prove it renders.
+
+/** One perceivable thing a referent is allowed to treat as proof. */
+export type EvidenceId =
+  | "lanePaint"
+  | "zoneSeamPaint"
+  | "laneArrows"
+  | "signFaces"
+  | "signalHeads"
+  | "stopLinePaint"
+  | "crossingPaint"
+  | "roadNetwork"
+  | "stagedActors"
+  | "environment"
+  | "briefing"
+  | "lightsTelltale";
+
+export interface EvidenceChannel {
+  /** The datum, named the way the referent reads it. */
+  reads: string;
+  /** What the seventeen-year-old actually perceives. */
+  studentSees: string;
+  /**
+   * The component(s) that put it on a screen, repo-relative from `src/`.
+   * `.tsx` ONLY, and the reason is the whole defect: a `.ts` module can be
+   * read by nothing but a test and still look like plumbing.
+   */
+  renderedBy: readonly string[];
+  /** Tokens that must each appear in at least one `renderedBy` file. */
+  symbols: readonly string[];
+}
+
+export const EVIDENCE_CHANNELS: Readonly<Record<EvidenceId, EvidenceChannel>> = {
+  lanePaint: {
+    reads: "WorldFacts.paintedLaneEdges (markings.ts dashed + authored-solid pass)",
+    studentSees: "white lane paint on the carriageway ahead of the bonnet",
+    renderedBy: ["modules/sim/world/components/StaticWorld.tsx"],
+    symbols: ["markings"],
+  },
+  zoneSeamPaint: {
+    reads: "District.zones spans (solidCenterLine / noOvertaking / busLane / emergencyLane)",
+    studentSees: "the continuous seam paintZoneSolids lays along the span",
+    renderedBy: ["modules/sim/world/components/StaticWorld.tsx"],
+    symbols: ["markings"],
+  },
+  laneArrows: {
+    reads: "District.meta.scenario.laneArrows",
+    studentSees: "М10 direction arrows painted in the lane",
+    renderedBy: ["modules/sim/world/components/StaticWorld.tsx"],
+    symbols: ["roadDecals"],
+  },
+  signFaces: {
+    reads: "WorldGeometry.signs (the BUILT post, its kind and its scale)",
+    studentSees: "a sign on a pole, its face readable from the driving seat",
+    renderedBy: ["modules/sim/world/components/WorldProps.tsx"],
+    symbols: ["signs"],
+  },
+  signalHeads: {
+    reads: "WorldGeometry.trafficLights by node",
+    studentSees: "the светофар heads over the junction, lamps lit by phase",
+    renderedBy: ["modules/sim/world/components/WorldProps.tsx"],
+    symbols: ["trafficLights"],
+  },
+  stopLinePaint: {
+    reads: "runtime stop lines on the route's own edges",
+    studentSees: "the transverse white bar across the approach",
+    renderedBy: ["modules/sim/world/components/StaticWorld.tsx"],
+    symbols: ["markings"],
+  },
+  crossingPaint: {
+    reads: "District.crossings that pass gradesCrossingDuty",
+    studentSees: "zebra stripes across the carriageway",
+    renderedBy: ["modules/sim/world/components/StaticWorld.tsx"],
+    symbols: ["markings"],
+  },
+  roadNetwork: {
+    reads: "District.roads edges/intersections (class, oneway, degree, geometry)",
+    studentSees: "the road itself — where it goes, how wide, where it forks",
+    renderedBy: ["modules/sim/world/components/StaticWorld.tsx"],
+    symbols: ["roadSurface"],
+  },
+  stagedActors: {
+    reads: "LessonSpec.stagedEvents (compiled)",
+    studentSees: "the car, cyclist, pedestrian or officer the director drives",
+    renderedBy: ["components/sim/LessonScene.tsx", "modules/sim/traffic/TrafficLayer.tsx"],
+    symbols: ["stagedEvents", "staged"],
+  },
+  environment: {
+    reads: "LessonSpec.environment (compiled: timeOfDay / rain / fog / snow)",
+    studentSees: "night sky, rain, fog or snow out of the windscreen",
+    renderedBy: ["components/sim/LessonScene.tsx", "modules/sim/environment/SimEnvironment.tsx"],
+    symbols: ["lesson.environment", "rain"],
+  },
+  briefing: {
+    reads: "LessonSpec.briefingBg (compiled from ScenarioSpec.instructionsBg)",
+    studentSees:
+      "the „Инструкции“ card in the objective stack, and the same numbered list " +
+      "one tap behind the overlay line on a phone",
+    renderedBy: ["components/sim/lesson-ui/LessonPlayShell.tsx"],
+    symbols: ["briefingBg"],
+  },
+  lightsTelltale: {
+    reads: "DashboardStatus.headlightsRequired / fogLightsRequired (from LessonSpec.environment)",
+    studentSees:
+      "„Светлините не са включени“ on the screen rail with the key that fixes it, " +
+      "plus the lit/unlit lamp on the instrument bar",
+    renderedBy: [
+      "components/sim/LessonScene.tsx",
+      "modules/sim/hud/TelltaleEdgePings.tsx",
+      "modules/sim/hud/StatusDashboard.tsx",
+    ],
+    symbols: ["headlightsRequired", "armedTelltaleWarnings", "headlights"],
+  },
+};
+
 export interface ReferentRule {
   /** `requires :` line of the failure block. */
   requires: string;
   /** `fix in :` line — where the repair belongs. */
   fixIn: string;
   ledgerId?: LedgerDefectId;
+  /**
+   * EVERY channel this rule's `check` treats as proof. Required, non-empty,
+   * and enforced: `referent-evidence-reachable.test.ts` refuses a rule that
+   * declares nothing, and refuses a channel that does not render.
+   */
+  evidence: readonly EvidenceId[];
   check(f: ScenarioFacts): ReferentVerdict;
 }
 
@@ -779,6 +984,7 @@ function laneLineRule(codeLabel: string): ReferentRule {
     fixIn:
       "world/builders/constants.ts MARKED_CLASSES + markings.ts (paint) · runtime/locator.ts:213 + rules/engine.ts:913 (the disarm)",
     ledgerId: "T1",
+    evidence: ["lanePaint"],
     check(f) {
       const bare = [...f.routeEdgeIds].filter((id) => !f.world.paintedLaneEdges.has(id));
       if (bare.length === 0) {
@@ -806,6 +1012,7 @@ function signalHeadRule(): ReferentRule {
     requires: `>=2 trafficLights at a node on the route, each rendered at scale >= ${SCENARIO_SIGN_SCALE}`,
     fixIn: "world/builders/props.ts:229-259 (Lane 3 — spread ...lessonSized into both pushes)",
     ledgerId: "L2",
+    evidence: ["signalHeads", "roadNetwork"],
     check(f) {
       let best: { node: string; n: number; scale: number } | null = null;
       for (const nodeId of f.routeNodeIds) {
@@ -830,6 +1037,7 @@ function crossingRule(): ReferentRule {
   return {
     requires: ">=1 GRADEABLE district.crossing inside the route corridor",
     fixIn: "the template's map choice, or tools/maps (Lane 10)",
+    evidence: ["crossingPaint"],
     check(f) {
       // Asks the SAME predicate the CrossingZoneTracker arms on (doc 87
       // A13/A16). A crossing the painter draws nothing at, on a street that is
@@ -865,6 +1073,7 @@ function stagedActorRule(
     requires: `>=1 compiled staged actor of kind ${kinds.join(" | ")} (${label})`,
     fixIn: "the template's staged[] (Lanes 9/10/11) or orchestrator/runners.ts (Lane 7)",
     ledgerId: "L12",
+    evidence: ["stagedActors"],
     check(f) {
       const have = stagedKinds(f);
       const hit = kinds.filter((k) => have.has(k));
@@ -964,6 +1173,7 @@ function speedPlateRule(): ReferentRule {
       "a built speed plate whose FACE NUMBER equals edge.maxspeed on every route edge it stands on, and a kit face for every limit the route posts",
     fixIn: "tools/blender/signs*.py + world/builders/props.ts (Lane 3)",
     ledgerId: "T4",
+    evidence: ["signFaces", "roadNetwork"],
     check(f) {
       const t = plateTruth(f);
       if (t.unstatable.length > 0) {
@@ -988,22 +1198,41 @@ function speedPlateRule(): ReferentRule {
   };
 }
 
+/**
+ * L10 — the lamp duty, and the referent that used to certify itself.
+ *
+ * The predicate is unchanged in shape and completely changed in meaning: the
+ * `светлини` match now has to land in `lesson.briefingBg`, the compiled field
+ * `LessonPlayShell` renders, instead of `spec.instructionsBg`, the field
+ * `compileScenario` dropped. Same regex, same sixteen templates' copy, same
+ * sentence in `requires` — the difference is that a student can now read it.
+ *
+ * Two channels, and both are load-bearing:
+ *  · `briefing` — the drill SAYS „включи фаровете" before the wheels turn.
+ *  · `lightsTelltale` — and while driving, `environment` drives
+ *    `DashboardStatus.headlightsRequired`, so „Светлините не са включени" +
+ *    the key L stands on the rail before the fault is ever billed. A duty
+ *    stated once at the start and never again is how you fail a
+ *    seventeen-year-old for forgetting, which is not what an instructor does.
+ */
 function conditionLightsRule(
   cond: (f: ScenarioFacts) => boolean,
   condName: string,
 ): ReferentRule {
   return {
-    requires: `the compiled environment sets ${condName} AND >=1 instructionsBg step matches /светлин|фаров/`,
-    fixIn: "the template's instructionsBg (Lanes 10/11) + scene/cabin.ts (Lane 8)",
+    requires: `the compiled environment sets ${condName} AND >=1 RENDERED briefing step (LessonSpec.briefingBg) matches /светлин|фаров/`,
+    fixIn:
+      "the template's instructionsBg (Lanes 10/11) + scenario/compile.ts briefingBg (the delivery) + scene/cabin.ts (Lane 8)",
     ledgerId: "L10",
+    evidence: ["environment", "briefing", "lightsTelltale"],
     check(f) {
       if (!cond(f)) return inert(`environment does not set ${condName} — the duty cannot arise`);
       if (!f.lightsInstructed) {
         return lie(
-          `${condName} is set but no instruction step mentions светлини/фарове — an основна fault for a duty the copy never states`,
+          `${condName} is set but no step of the briefing the student is SHOWN mentions светлини/фарове — an основна fault for a duty nothing states`,
         );
       }
-      return ok(`${condName} set and the copy instructs the lights`);
+      return ok(`${condName} set and the rendered briefing instructs the lights`);
     },
   };
 }
@@ -1018,6 +1247,7 @@ export const REFERENT_RULES: Readonly<Partial<Record<FaultCode, ReferentRule>>> 
   CROSSED_SOLID_LINE: {
     requires: "a solidCenterLine / noOvertaking zone spanning the route",
     fixIn: "content/world/<district>.json zones (already gated — the precedent)",
+    evidence: ["zoneSeamPaint"],
     check(f) {
       const z = routeZones(f, ["solidCenterLine", "noOvertaking"]);
       return z.length > 0
@@ -1026,12 +1256,17 @@ export const REFERENT_RULES: Readonly<Partial<Record<FaultCode, ReferentRule>>> 
     },
   },
   WRONG_LANE_FOR_DIRECTION: {
-    requires: "meta.scenario.laneArrows on the route",
+    requires: "a PAINTED М10 arrow on one of the route's own edges",
     fixIn: "content/world/<district>.json meta.scenario.laneArrows (already gated — the precedent)",
+    evidence: ["laneArrows"],
     check(f) {
-      return f.world.hasLaneArrows
-        ? ok("meta.scenario.laneArrows authored")
-        : inert("meta.scenario.laneArrows absent — no М10 arrow exists to disobey");
+      const onRoute = [...f.world.laneArrowEdges].filter((id) => f.routeEdgeIds.has(id));
+      if (onRoute.length > 0) return ok(`М10 arrows painted on ${onRoute.length} route edge(s)`);
+      return inert(
+        f.world.laneArrowEdges.size === 0
+          ? "no М10 arrow is painted anywhere on this district — none exists to disobey"
+          : `М10 arrows exist on ${f.world.laneArrowEdges.size} edge(s), none of them on this route`,
+      );
     },
   },
 
@@ -1050,6 +1285,7 @@ export const REFERENT_RULES: Readonly<Partial<Record<FaultCode, ReferentRule>>> 
   CONTROLLER_SIGNAL_VIOLATED: {
     requires: "a staged trafficController actor within 25 m of a graded stop line",
     fixIn: "templates-signals*.ts officer pose (Lane 9)",
+    evidence: ["stagedActors", "stopLinePaint"],
     check(f) {
       const officers = f.staged.filter((s) => s.kind === "trafficController");
       if (officers.length === 0) return inert("no staged trafficController actor");
@@ -1084,6 +1320,7 @@ export const REFERENT_RULES: Readonly<Partial<Record<FaultCode, ReferentRule>>> 
   SPEED_TOO_FAST_FOR_CURVE: {
     requires: "a curve (А1) sign posted >= 40 m BEFORE the curveAdvisory zone's fromM",
     fixIn: "world/builders/zoneSigns.ts:129 (Lane 3 — give it the railCrossing advance offset)",
+    evidence: ["signFaces", "roadNetwork"],
     ledgerId: "T14",
     check(f) {
       const zones = routeZones(f, ["curveAdvisory"]);
@@ -1122,6 +1359,7 @@ export const REFERENT_RULES: Readonly<Partial<Record<FaultCode, ReferentRule>>> 
   SPEED_TOO_FAST_FOR_CONDITIONS: {
     requires: "the compiled environment sets a non-dry condition",
     fixIn: "the template's conditions (Lanes 10/11)",
+    evidence: ["environment"],
     check(f) {
       const on = [f.rain && "rain", f.fog && "fog", f.snow && "snow", f.night && "night"].filter(
         Boolean,
@@ -1139,6 +1377,7 @@ export const REFERENT_RULES: Readonly<Partial<Record<FaultCode, ReferentRule>>> 
   DRIVING_IN_BUS_LANE: {
     requires: "a busLane zone on the route AND its painted seam",
     fixIn: "content/world/<district>.json zones + markings.ts paintZoneSolids",
+    evidence: ["zoneSeamPaint"],
     check(f) {
       const z = routeZones(f, ["busLane"]);
       return z.length > 0
@@ -1149,6 +1388,7 @@ export const REFERENT_RULES: Readonly<Partial<Record<FaultCode, ReferentRule>>> 
   EMERGENCY_LANE_DRIVING: {
     requires: "an emergencyLane zone on the route",
     fixIn: "content/world/<district>.json zones",
+    evidence: ["zoneSeamPaint"],
     check(f) {
       const z = routeZones(f, ["emergencyLane"]);
       return z.length > 0
@@ -1159,6 +1399,7 @@ export const REFERENT_RULES: Readonly<Partial<Record<FaultCode, ReferentRule>>> 
   RAIL_CROSSING_VIOLATION: {
     requires: "a railCrossing zone on the route AND its А39/А40 post >= 50 m ahead of the band",
     fixIn: "world/builders/zoneSigns.ts:121-123 (Lane 3)",
+    evidence: ["signFaces", "zoneSeamPaint"],
     check(f) {
       const z = routeZones(f, ["railCrossing"]);
       if (z.length === 0) return inert("no railCrossing zone on any route edge");
@@ -1173,6 +1414,7 @@ export const REFERENT_RULES: Readonly<Partial<Record<FaultCode, ReferentRule>>> 
   DRIVING_TOO_SLOW_FOR_MOTORWAY: {
     requires: "every route edge is class motorway",
     fixIn: "the template's map choice",
+    evidence: ["roadNetwork"],
     check(f) {
       const notMw = [...f.routeEdgeIds].filter((id) => {
         const rt = f.world.index.edgeRtById(id);
@@ -1186,6 +1428,7 @@ export const REFERENT_RULES: Readonly<Partial<Record<FaultCode, ReferentRule>>> 
   WRONG_WAY: {
     requires: ">=1 oneway edge on the route AND a В1 (noEntry) face at its illegal mouth",
     fixIn: "world/builders/props.ts:329-372 (Lane 3)",
+    evidence: ["signFaces", "roadNetwork"],
     check(f) {
       const oneways = [...f.routeEdgeIds].filter((id) => f.world.index.edgeRtById(id)?.edge.oneway);
       if (oneways.length === 0) return inert("no oneway edge on the route — there is no wrong way to take");
@@ -1259,7 +1502,8 @@ export const REFERENT_RULES: Readonly<Partial<Record<FaultCode, ReferentRule>>> 
   FOG_LIGHTS_OFF_IN_FOG: conditionLightsRule((f) => f.fog, "fog"),
   HIGH_BEAM_NOT_DIPPED: {
     requires: "night AND a lead vehicle to dip for AND a lights instruction in the copy",
-    fixIn: "the template's staged[] + instructionsBg",
+    fixIn: "the template's staged[] + compile.ts briefingBg (the delivery)",
+    evidence: ["environment", "stagedActors", "briefing", "lightsTelltale"],
     ledgerId: "L10",
     check(f) {
       if (!f.night) return inert("environment is not night — long beam has no duty to dip");
@@ -1277,6 +1521,7 @@ export const REFERENT_RULES: Readonly<Partial<Record<FaultCode, ReferentRule>>> 
     requires:
       "ABSENCE: no staged actor and no hazard zone within braking range of the graded point (a cause makes the code unreachable, not a lie)",
     fixIn: "the template's staged[] / the drill's premise",
+    evidence: ["stagedActors", "zoneSeamPaint"],
     check(f) {
       const have = stagedKinds(f);
       const hazardZones = routeZones(f, [
@@ -1300,6 +1545,7 @@ function stopLineRule(): ReferentRule {
     requires:
       ">=1 built signs.stop AND >=1 derived stop line on an approach the route drives",
     fixIn: "world/builders/props.ts (the Б2 face) + runtime/stoplines.ts (the derived line)",
+    evidence: ["signFaces", "stopLinePaint"],
     check(f) {
       const stops = f.world.signs.filter((s) => s.kind === "stop");
       const lines = f.routeStopLines.filter((l) => l.control === "stopSign");
@@ -1329,6 +1575,7 @@ function banZoneRule(zoneKind: string, label: string): ReferentRule {
   return {
     requires: `a ${label} zone on the route AND its sign posted at the span start`,
     fixIn: "world/builders/zoneSigns.ts (Lane 3) + the district's zones",
+    evidence: ["signFaces", "zoneSeamPaint"],
     check(f) {
       const zones = routeZones(f, [zoneKind]);
       if (zones.length === 0) return inert(`no ${label} zone on any route edge`);
@@ -1344,6 +1591,7 @@ function junctionNodeRule(): ReferentRule {
   return {
     requires: "a degree >= 3 node on the route",
     fixIn: "the template's map choice",
+    evidence: ["roadNetwork"],
     check(f) {
       const junctions = f.world.district.intersections.filter(
         (i) => i.degree >= 3 && f.routeNodeIds.has(i.id),

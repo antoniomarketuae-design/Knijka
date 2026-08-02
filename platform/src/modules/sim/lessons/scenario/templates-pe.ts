@@ -25,6 +25,7 @@
 
 import type { PedestrianDartOutSpec } from "../../contracts";
 import type { ScenarioSpec } from "./types";
+import { l5Night, l5Wet, l5WetGrip } from "./complications";
 
 // ---------------------------------------------------------------------------
 // Shared geometry constants (pinned from the generated districts by value —
@@ -209,6 +210,9 @@ export const SC_CROSSING_LET_PASS: ScenarioSpec = {
     { level: 2, stagedAdd: [LET_PASS_PED_COMPANION] },
     { level: 3, stagedAdd: [LET_PASS_PED_COMPANION] },
     { level: 4, vehicleStart: "cold", stagedAdd: [LET_PASS_PED_COMPANION] },
+    // L5 «Усложнени» — the complication kit (scenario/complications.ts):
+    // the delta AND the instructor's line that explains it, authored together.
+    l5Night(),
   ],
   staged: [LET_PASS_PED],
   conditions: { weather: "dry" },
@@ -319,6 +323,9 @@ export const SC_CROSSING_SLOW_CROSSER: ScenarioSpec = {
     { level: 2 },
     { level: 3 },
     { level: 4, vehicleStart: "cold" },
+    // L5 «Усложнени» — the complication kit (scenario/complications.ts):
+    // the delta AND the instructor's line that explains it, authored together.
+    l5Night(),
   ],
   staged: [SLOW_PED],
   conditions: { weather: "dry" },
@@ -449,6 +456,9 @@ export const SC_CROSSING_RAIN_SPRINT: ScenarioSpec = {
     { level: 2 },
     { level: 3 },
     { level: 4, vehicleStart: "cold" },
+    // L5 «Усложнени» — the complication kit (scenario/complications.ts):
+    // the delta AND the instructor's line that explains it, authored together.
+    l5WetGrip(),
   ],
   staged: [RAIN_SPRINT_PED],
   conditions: { weather: "rain", night: true },
@@ -565,6 +575,9 @@ export const SC_CROSSING_DART: ScenarioSpec = {
     { level: 2 },
     { level: 3 },
     { level: 4, vehicleStart: "cold" },
+    // L5 «Усложнени» — the complication kit (scenario/complications.ts):
+    // the delta AND the instructor's line that explains it, authored together.
+    l5Wet(),
   ],
   staged: [DART_PED],
   conditions: { weather: "dry" },
@@ -728,6 +741,9 @@ export const SC_CROSSING_BUS_SHADOW: ScenarioSpec = {
     { level: 2 },
     { level: 3 },
     { level: 4, vehicleStart: "cold" },
+    // L5 «Усложнени» — the complication kit (scenario/complications.ts):
+    // the delta AND the instructor's line that explains it, authored together.
+    l5Night(),
   ],
   staged: [BUS_SHADOW_PED, BUS_SHADOW_PED_2],
   conditions: { weather: "dry" },
@@ -858,6 +874,9 @@ export const SC_CROSSING_CHILD_BALL: ScenarioSpec = {
     { level: 2 },
     { level: 3 },
     { level: 4, vehicleStart: "cold" },
+    // L5 «Усложнени» — the complication kit (scenario/complications.ts):
+    // the delta AND the instructor's line that explains it, authored together.
+    l5Wet(),
   ],
   staged: [CHILD_BALL_PED],
   // R3 #27 — the BALL: the lesson's ballDartOut visual (TrafficLayer's L5
@@ -1013,6 +1032,9 @@ export const SC_CROSSING_WHITE_CANE: ScenarioSpec = {
     { level: 2 },
     { level: 3 },
     { level: 4, vehicleStart: "cold" },
+    // L5 «Усложнени» — the complication kit (scenario/complications.ts):
+    // the delta AND the instructor's line that explains it, authored together.
+    l5Night(),
   ],
   staged: [WHITE_CANE_PED],
   conditions: { weather: "dry" },
@@ -1143,6 +1165,9 @@ export const SC_PE_JAYWALKER: ScenarioSpec = {
     { level: 2 },
     { level: 3 },
     { level: 4, vehicleStart: "cold" },
+    // L5 «Усложнени» — the complication kit (scenario/complications.ts):
+    // the delta AND the instructor's line that explains it, authored together.
+    l5Night(),
   ],
   staged: [JAY_PED],
   /**

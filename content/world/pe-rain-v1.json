@@ -29,7 +29,8 @@
    "intersections": 0,
    "crossings": 1,
    "buildings": 4,
-   "spawnPoints": 2
+   "spawnPoints": 2,
+   "zones": 0
   },
   "scenario": {
    "archetype": "zebra-block",
@@ -40,6 +41,14 @@
    },
    "streetscape": "unlit-warehouse-canyon",
    "streetscapeNoteBg": "Неосветен складов участък: две глухи стени образуват тъмен коридор и единственият процеп в него е точно на пътеката — нощем фаровете са цялата видимост.",
+   "roadscape": "industrial-canyon",
+   "roadscapeNoteBg": "Складов коридор: от страната на рампите НЯМА тротоар изобщо — стената опира в бордюра, няма стълб, няма дърво, няма паркирана кола. Нощем фаровете са цялата видимост.",
+   "roadClass": "unclassified",
+   "parkingBandM": 0,
+   "bareVerge": "right",
+   "curbToCurbM": 16.25,
+   "oneway": false,
+   "banSignRef": null,
    "primaryCrossingId": "pe-x-1",
    "laneCenterRightM": 4.06,
    "crossings": [
@@ -70,7 +79,7 @@
     "id": "pe-e-street",
     "from": "pe-n-start",
     "to": "pe-n-end",
-    "class": "residential",
+    "class": "unclassified",
     "name": "Улица с пешеходна пътека",
     "oneway": false,
     "roundabout": false,
@@ -88,7 +97,9 @@
       0,
       155
      ]
-    ]
+    ],
+    "parkingBand": false,
+    "bareVerge": "right"
    }
   ]
  },

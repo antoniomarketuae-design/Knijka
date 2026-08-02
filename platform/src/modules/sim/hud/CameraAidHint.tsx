@@ -165,7 +165,7 @@ export function CameraAidHint({
         }
       `}</style>
       {done ? (
-        <div className="camera-aid-out flex items-center gap-1.5 rounded-full border border-success/50 bg-background/70 px-3 py-1.5 text-[11px] font-bold text-success backdrop-blur">
+        <div className="hud-ghost camera-aid-out flex items-center gap-1.5 rounded-full border border-success/50 px-3 py-1.5 text-[11px] font-bold text-success">
           <span aria-hidden>✓</span>
           <span>изглед отгоре</span>
         </div>
@@ -176,7 +176,7 @@ export function CameraAidHint({
           onClick={onEnterTopdown}
           // Low brightness / low contrast by request: 0.62 opacity, muted ink,
           // no glow. It brightens only under the pointer.
-          className="camera-aid-in pointer-events-auto flex items-center gap-2 rounded-full border border-border bg-background/60 px-3 py-1.5 text-[11px] font-semibold text-muted backdrop-blur transition hover:!opacity-100 hover:border-accent/60 hover:text-foreground disabled:cursor-default motion-reduce:transition-none"
+          className="hud-ghost camera-aid-in pointer-events-auto flex items-center gap-2 rounded-full border border-border px-3 py-1.5 text-[11px] font-semibold text-muted transition hover:!opacity-100 hover:border-accent/60 hover:text-foreground disabled:cursor-default motion-reduce:transition-none"
         >
           <span aria-hidden>⌖</span>
           <span>Тясно е — виж мястото отгоре</span>

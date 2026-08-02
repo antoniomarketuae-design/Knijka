@@ -46,14 +46,17 @@ export function ObjectiveBanner({
     return (
       <div
         role="status"
-        className="hud-pop pointer-events-none flex items-center gap-2.5 rounded-2xl border px-5 py-2.5 backdrop-blur-md select-none"
+        className="hud-ghost hud-pop pointer-events-none flex items-center gap-2.5 rounded-2xl border px-5 py-2.5 select-none"
         style={{
           borderColor: "color-mix(in srgb, var(--success) 60%, transparent)",
-          background: "color-mix(in srgb, var(--success) 14%, var(--surface))",
         }}
       >
+        {/* The tick is a lit lamp, not a chip: `data-hud-ink` holds its fill
+            through the UNPANEL sweep, exactly as the reference keeps its one
+            filled green „BEST" badge on an otherwise unfilled screen. */}
         <span
           aria-hidden
+          data-hud-ink=""
           className="flex h-6 w-6 items-center justify-center rounded-full text-sm font-black"
           style={{ background: "var(--success)", color: "var(--accent-foreground)" }}
         >
@@ -69,19 +72,30 @@ export function ObjectiveBanner({
   if (titleBg === null) return null;
 
   return (
+    // The founder's own annotated phone frame has this banner as the topmost of
+    // three stacked cards — the „ЗАДАЧА 2/2" panel. It is the same instruction
+    // either way; the card around it was never the instruction.
     <div
       role="status"
-      className="hud-banner-in pointer-events-none flex min-w-64 flex-col gap-1.5 rounded-2xl border border-border bg-surface/75 px-5 py-2.5 backdrop-blur-md select-none"
+      className="hud-ghost hud-banner-in pointer-events-none flex min-w-64 flex-col gap-1.5 px-5 py-2.5 select-none"
     >
       <div className="flex items-center gap-2.5">
-        <span className="rounded-full bg-accent/15 px-2 py-0.5 text-[10px] font-black uppercase tracking-wide text-accent">
+        <span className="px-2 py-0.5 text-[10px] font-black uppercase tracking-wide text-accent">
           Задача {index}/{total}
         </span>
         <span className="text-sm font-bold text-foreground">{titleBg}</span>
       </div>
       {progress !== null ? (
-        <div className="h-1 w-full overflow-hidden rounded-full bg-surface-2">
+        // A progress bar IS its fill — both halves are marked so the sweep
+        // leaves them alone. It is two hairline-thin bars of colour on the
+        // image, which is how the reference draws its own meters.
+        <div
+          data-hud-ink=""
+          className="h-1 w-full overflow-hidden rounded-full"
+          style={{ background: "rgba(226, 234, 247, 0.22)" }}
+        >
           <div
+            data-hud-ink=""
             className="h-full rounded-full bg-accent"
             style={{
               width: `${Math.round(Math.min(1, Math.max(0, progress)) * 100)}%`,

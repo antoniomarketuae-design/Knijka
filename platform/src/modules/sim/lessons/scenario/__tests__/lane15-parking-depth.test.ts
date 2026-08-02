@@ -458,15 +458,22 @@ describe("„at least 10 genuinely different parking situations“", () => {
 // ---------------------------------------------------------------------------
 
 describe("L10 — lights duty stated wherever this family compiles a dark rung", () => {
-  it("every parking rung with night/rain/fog names the lamps in its instructions", () => {
+  /**
+   * The COMPILED briefing per rung (2026-08-02), not `spec.instructionsBg`:
+   * the old read consulted a field compileScenario dropped and nothing
+   * rendered, so it certified writing rather than teaching. `briefingBg` is
+   * what the student is shown — and blocked on — before the wheels turn.
+   */
+  it("every parking rung with night/rain/fog names the lamps in the briefing it SHOWS", () => {
     const silent: string[] = [];
     for (const spec of PARKING) {
-      const copy = spec.instructionsBg.map((s) => s.textBg).join(" ");
       for (const rung of spec.levels) {
-        const cond = { ...(spec.conditions ?? {}), ...(rung.conditions ?? {}) };
-        const dark = cond.night === true || (cond.weather !== undefined && cond.weather !== "dry");
-        if (!dark) continue;
-        if (!/светлин|фаров/i.test(copy)) silent.push(`${spec.id}@L${rung.level}`);
+        const lesson = compileScenario(spec, rung.level);
+        const env = lesson.environment;
+        if (!(env?.timeOfDay === "night" || env?.rain === true || env?.fog === true)) continue;
+        if (!(lesson.briefingBg ?? []).some((s) => /светлин|фаров/i.test(s.textBg))) {
+          silent.push(`${spec.id}@L${rung.level}`);
+        }
       }
     }
     expect(silent, silent.join(", ")).toEqual([]);

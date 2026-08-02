@@ -54,6 +54,7 @@ import type {
   RearTailgaterSpec,
 } from "../../contracts";
 import type { ScenarioSpec } from "./types";
+import { l5Wet, l5WetGrip } from "./complications";
 
 // ---------------------------------------------------------------------------
 // Shared geometry constant (pinned from the generated districts by value —
@@ -334,6 +335,9 @@ export const SC_FOLLOW_BRAKE: ScenarioSpec = {
     { level: 2 },
     { level: 3 },
     { level: 4, vehicleStart: "cold" },
+    // L5 «Усложнени» — the complication kit (scenario/complications.ts):
+    // the delta AND the instructor's line that explains it, authored together.
+    l5Wet(),
   ],
   staged: [FB_LEAD_CAR],
   conditions: { weather: "dry" },
@@ -481,6 +485,9 @@ export const SC_FOLLOW_STANDSTILL: ScenarioSpec = {
     { level: 2, stagedAdd: FS_QUEUE_AHEAD },
     { level: 3, stagedAdd: FS_QUEUE_AHEAD },
     { level: 4, vehicleStart: "cold", stagedAdd: FS_QUEUE_AHEAD },
+    // L5 «Усложнени» — the complication kit (scenario/complications.ts):
+    // the delta AND the instructor's line that explains it, authored together.
+    l5Wet(),
   ],
   staged: [FS_LEAD_CAR],
   conditions: { weather: "dry" },
@@ -624,6 +631,9 @@ export const SC_FOLLOW_RAIN_GAP: ScenarioSpec = {
     { level: 2 },
     { level: 3 },
     { level: 4, vehicleStart: "cold" },
+    // L5 «Усложнени» — the complication kit (scenario/complications.ts):
+    // the delta AND the instructor's line that explains it, authored together.
+    l5WetGrip(),
   ],
   staged: [FR_LEAD_CAR],
   conditions: { weather: "rain" },
@@ -943,6 +953,9 @@ export const SC_FOLLOW_CUTIN: ScenarioSpec = {
     { level: 2 },
     { level: 3 },
     { level: 4, vehicleStart: "cold" },
+    // L5 «Усложнени» — the complication kit (scenario/complications.ts):
+    // the delta AND the instructor's line that explains it, authored together.
+    l5Wet(),
   ],
   staged: [FC_CUTTER],
   conditions: { weather: "dry" },
@@ -1018,6 +1031,13 @@ const FTG_TAILGATER: RearTailgaterSpec = {
   passSpeedMps: 17,
   passAheadM: 25,
   easeKmh: 8,
+  // FR-56 — his lesson 44: „the car behind that is sticking to the user car is
+  // sticking very late, it must be sticking much earlier." THIS is the drill
+  // that teaches being tailgated, so this is where the rolling start belongs.
+  // Set here rather than in the runner because eleven other templates borrow
+  // `rearTailgater` as generic passing scenery, and making it unconditional
+  // re-timed three of them out of their own choreography.
+  rollingStart: true,
 };
 
 /** FO-07 — лепка отзад (ЗДвП чл. 23 — дистанцията НАПРЕД се увеличава, за да
@@ -1095,6 +1115,9 @@ export const SC_FOLLOW_TAILGATER: ScenarioSpec = {
     { level: 2 },
     { level: 3 },
     { level: 4, vehicleStart: "cold" },
+    // L5 «Усложнени» — the complication kit (scenario/complications.ts):
+    // the delta AND the instructor's line that explains it, authored together.
+    l5Wet(),
   ],
   staged: [FTG_LEAD, FTG_TAILGATER],
   conditions: { weather: "dry" },

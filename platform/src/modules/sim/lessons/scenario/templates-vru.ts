@@ -106,6 +106,7 @@ import type {
   PriorityFromRightSpec,
 } from "../../contracts";
 import type { ScenarioSpec } from "./types";
+import { l5Night, l5Wet } from "./complications";
 
 // ---------------------------------------------------------------------------
 // Shared geometry constants (pinned from vu-cyclist-v1 by value — the L7
@@ -270,6 +271,9 @@ export const SC_VU_CYCLIST_HOOK: ScenarioSpec = {
     { level: 2 },
     { level: 3 },
     { level: 4, vehicleStart: "cold" },
+    // L5 «Усложнени» — the complication kit (scenario/complications.ts):
+    // the delta AND the instructor's line that explains it, authored together.
+    l5Wet(),
   ],
   staged: [VU_CYCLIST],
   conditions: { weather: "dry" },
@@ -436,6 +440,9 @@ export const SC_VU_EMERGENCY: ScenarioSpec = {
     { level: 2 },
     { level: 3 },
     { level: 4, vehicleStart: "cold" },
+    // L5 «Усложнени» — the complication kit (scenario/complications.ts):
+    // the delta AND the instructor's line that explains it, authored together.
+    l5Night(),
   ],
   staged: [EM_APPROACH],
   conditions: { weather: "dry" },
@@ -585,6 +592,9 @@ export const SC_VU_EMERGENCY_JUNCTION: ScenarioSpec = {
     { level: 2 },
     { level: 3 },
     { level: 4, vehicleStart: "cold" },
+    // L5 «Усложнени» — the complication kit (scenario/complications.ts):
+    // the delta AND the instructor's line that explains it, authored together.
+    l5Night(),
   ],
   staged: [VU_EV_CROSSING],
   conditions: { weather: "dry" },
@@ -732,6 +742,9 @@ export const SC_VU_PASS_CLEARANCE: ScenarioSpec = {
     { level: 2 },
     { level: 3 },
     { level: 4, vehicleStart: "cold" },
+    // L5 «Усложнени» — the complication kit (scenario/complications.ts):
+    // the delta AND the instructor's line that explains it, authored together.
+    l5Wet(),
   ],
   staged: [VU_PASS_CYCLIST],
   conditions: { weather: "dry" },
@@ -859,6 +872,9 @@ export const SC_VU_DOOR_ZONE: ScenarioSpec = {
     { level: 2 },
     { level: 3 },
     { level: 4, vehicleStart: "cold" },
+    // L5 «Усложнени» — the complication kit (scenario/complications.ts):
+    // the delta AND the instructor's line that explains it, authored together.
+    l5Night(),
   ],
   conditions: { weather: "dry" },
   localeBg: "bg-BG",

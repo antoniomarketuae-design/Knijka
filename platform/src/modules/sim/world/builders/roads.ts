@@ -45,8 +45,12 @@ import {
 import { MeshAccumulator, toWorld, UP } from "./mesh";
 import { isBareVergeSide, type NodeInfo, type RoadNetwork } from "./network";
 import {
+  clipIntoRingOuter,
   clipOutOfIslands,
+  hasOuterKerb,
   islandContaining,
+  ringAtPoint,
+  ringOuterKerbRuns,
   ringOutwardSide,
   type RoundaboutRing,
 } from "./roundabout";
@@ -65,6 +69,10 @@ export interface RoadBuildResult {
   junctionPatchCount: number;
   sidewalkStripCount: number;
   parkingLaneStripCount: number;
+  /** FR-22, the outer half: mouth-free arcs of circular ring kerb swept. */
+  ringKerbRunCount: number;
+  /** Ring edges whose junction-trimmed stub strip the circle replaced. */
+  skippedRingStripCount: number;
 }
 
 const planarUV = (p: Vec2): [number, number] => [p[0] * ASPHALT_UV_SCALE, p[1] * ASPHALT_UV_SCALE];
@@ -226,7 +234,7 @@ export interface JunctionPatch {
   /** CCW boundary of the patch polygon. */
   ring: Vec2[];
   /** Per-corner arc runs: inner boundary points between approach i and i+1. */
-  corners: { inner: Vec2[]; hasArc: boolean; insideIsland: boolean }[];
+  corners: { inner: Vec2[]; hasArc: boolean; insideIsland: boolean; outsideRing: boolean }[];
 }
 
 /**
@@ -254,7 +262,19 @@ function buildJunctionPatch(
   if (aps.length < 2) return null;
   const ring: Vec2[] = [];
   const corners: JunctionPatch["corners"] = [];
-  const clip = (p: Vec2): Vec2 => (rings.length === 0 ? p : clipOutOfIslands(rings, p));
+  // FR-22, the outer half. `ownRing` is non-null ONLY at a node that stands on
+  // a circulatory carriageway, so the outer clip can never reach a junction
+  // that has nothing to do with the roundabout. Off-mouth boundary points are
+  // pulled back onto the ring's outer edge — probed at up to +10.73 m past it
+  // before this line existed, which is the flare that made the outside a square.
+  const ownRing = rings.length === 0 ? null : ringAtPoint(rings, node.pos);
+  const clip = (p: Vec2): Vec2 => {
+    if (rings.length === 0) return p;
+    const q = clipOutOfIslands(rings, p);
+    return ownRing ? clipIntoRingOuter(ownRing, q) : q;
+  };
+  const beyondRing = (p: Vec2): boolean =>
+    ownRing !== null && clipIntoRingOuter(ownRing, p) !== p;
   for (let i = 0; i < aps.length; i++) {
     const ap = aps[i]!;
     const next = aps[(i + 1) % aps.length]!;
@@ -266,10 +286,15 @@ function buildJunctionPatch(
     // because the island's own kerb is the kerb that belongs there.
     const insideIsland =
       rings.length > 0 && arc.some((p) => islandContaining(rings, p) !== null);
+    // The same argument on the OUTSIDE: an arc that was flaring past the ring's
+    // outer edge is now clipped onto it, and an apron there would stand a second
+    // raised kerb co-planar with the ring's own circular one.
+    const outsideRing = arc.some(beyondRing);
     corners.push({
       inner: [clip(ap.left), ...arc.map(clip), clip(next.right)],
       hasArc: arc.length > 0,
       insideIsland,
+      outsideRing,
     });
     ring.push(...arc.map(clip));
   }
@@ -391,6 +416,8 @@ function buildCornerAprons(acc: MeshAccumulator, node: NodeInfo, patch: Junction
     // co-planar with the island's — a curb-height z-fight, and geometrically
     // the four-pointed star the founder photographed. The island owns this kerb.
     if (corner.insideIsland) continue;
+    // …and the same on the outside: the ring's own circular kerb owns that line.
+    if (corner.outsideRing) continue;
     const inner = corner.inner;
     const c = node.pos;
     // Same 8-vertex profile as buildSidewalkStrip (chamfer incl.), radial out.
@@ -469,6 +496,10 @@ export function buildRoads(
   let junctionPatchCount = 0;
   let sidewalkStripCount = 0;
   let parkingLaneStripCount = 0;
+  /** Mouth-free arcs of circular ring kerb swept (FR-22, the outer half). */
+  let ringKerbRunCount = 0;
+  /** Ring edges whose trimmed-stub strip the circle above replaced. */
+  let skippedRingStripCount = 0;
 
   for (const eb of network.edges) {
     if (!eb.line) {
@@ -504,12 +535,25 @@ export function buildRoads(
       // terrain and the only thing bounding it was the horizon. The strip goes
       // on the OUTWARD side only — the inward side is the central island's own
       // kerb, and a second one there would stand in the traffic lane.
-      const lineLen = polylineLength(eb.line);
-      if (lineLen > 2) {
-        const inset = Math.min(0.6, lineLen * 0.08);
-        const walkLine = trimPolyline(eb.line, inset, inset, 1.0) ?? eb.line;
-        buildSidewalkStrip(sidewalks, walkLine, eb.halfWidth, ringOutwardSide(ringOf, walkLine));
-        sidewalkStripCount++;
+      //
+      // FR-22 RESIDUAL: this per-edge strip runs along the JUNCTION-TRIMMED
+      // centreline, and `analyzeNetwork` opens 17.125 m of junction at each
+      // arm↔ring node — on rb-mini's 90° / 28 m quarters the trim clamps at
+      // JUNCTION_TRIM_MAX_FRACTION and leaves 2.8 m of kerb per quarter.
+      // Probed: kerb missing on 30 of 45 off-mouth bearings (rb-mini / rb-ped),
+      // 60 of 75 (rb-2lane), 66 of 87 (rb-single). Four stubs are not a circle.
+      // Where the ring resolves a real profile the circle is swept ONCE, below,
+      // out of `ringOuterKerbRuns` — same sweep, same collider, whole shape.
+      if (hasOuterKerb(ringOf)) {
+        skippedRingStripCount++;
+      } else {
+        const lineLen = polylineLength(eb.line);
+        if (lineLen > 2) {
+          const inset = Math.min(0.6, lineLen * 0.08);
+          const walkLine = trimPolyline(eb.line, inset, inset, 1.0) ?? eb.line;
+          buildSidewalkStrip(sidewalks, walkLine, eb.halfWidth, ringOutwardSide(ringOf, walkLine));
+          sidewalkStripCount++;
+        }
       }
     } else if (SIDEWALK_CLASSES.has(eb.edge.class) && !eb.edge.roundabout) {
       // Pull sidewalk ends back a little so junction corners stay open.
@@ -527,6 +571,21 @@ export function buildRoads(
           sidewalkStripCount++;
         }
       }
+    }
+  }
+
+  // THE CIRCLE ITSELF (FR-22, the outer half). One sweep per mouth-free arc of
+  // each ring, at the ring's own drawn half width — so the kerb lands exactly
+  // on the edge of the asphalt the ribbon pass laid, all the way round, broken
+  // only where an arm really does leave the circle. `buildSidewalkStrip` is the
+  // same call every street's pavement uses: same cross-section, same vertex
+  // colours, and the same sidewalk accumulator that becomes the collider, so a
+  // car is stopped by the outside of a roundabout exactly as by any other kerb.
+  for (const ring of rings) {
+    for (const run of ringOuterKerbRuns(ring)) {
+      buildSidewalkStrip(sidewalks, run, ring.ringHalfWidthM, ringOutwardSide(ring, run));
+      sidewalkStripCount++;
+      ringKerbRunCount++;
     }
   }
 
@@ -549,5 +608,7 @@ export function buildRoads(
     junctionPatchCount,
     sidewalkStripCount,
     parkingLaneStripCount,
+    ringKerbRunCount,
+    skippedRingStripCount,
   };
 }

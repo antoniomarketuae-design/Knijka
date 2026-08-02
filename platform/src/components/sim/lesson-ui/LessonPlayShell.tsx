@@ -569,6 +569,57 @@ function QuizFrequencySelector({
 }
 
 /**
+ * THE BRIEFING CARD — `LessonSpec.briefingBg`, on the glass.
+ *
+ * The numbered steps every scenario template authors. They were compiled away
+ * for the whole life of the scenario layer, which is how „Включи фаровете —
+ * вече е тъмно" came to exist on sixteen templates and be spoken to nobody.
+ *
+ * Deliberately small and deliberately in the top stack, under the objective
+ * banner: the overlay budget (hud/overlayQueue.ts) owns the phone, and on a
+ * roomy screen the rule is still „the centre of the screen is road". It is
+ * dismissible in one tap and does not come back — a briefing is read once.
+ */
+function BriefingCard({
+  steps,
+  onClose,
+}: {
+  steps: ReadonlyArray<{ n: number; textBg: string }>;
+  onClose: () => void;
+}) {
+  return (
+    <div
+      aria-label="Инструкции за упражнението"
+      className="max-w-md rounded-2xl border border-border bg-background/85 px-4 py-2.5 backdrop-blur"
+    >
+      <div className="flex items-center gap-2">
+        <p className="text-[10px] font-black uppercase tracking-wider text-accent">Инструкции</p>
+        <button
+          type="button"
+          onClick={onClose}
+          aria-label="Скрий инструкциите"
+          className="ml-auto rounded-lg px-1.5 text-xs font-bold text-muted hover:text-foreground"
+        >
+          ✕
+        </button>
+      </div>
+      {/* Capped and scrollable: a five-step briefing on a 390 px-tall landscape
+          window is tall enough to reach the instrument band, and a card that
+          runs into the dashboard is the stacked-panel bug the overlay budget
+          exists to end (hud/overlayQueue.ts). It scrolls instead. */}
+      <ol className="mt-1 flex max-h-[32vh] flex-col gap-0.5 overflow-y-auto">
+        {steps.map((s) => (
+          <li key={s.n} className="flex gap-1.5 text-left text-xs leading-snug">
+            <span className="shrink-0 font-black tabular-nums text-muted">{s.n}.</span>
+            <span>{s.textBg}</span>
+          </li>
+        ))}
+      </ol>
+    </div>
+  );
+}
+
+/**
  * THE „MICRO MAJOR BUTTON WITH SUB MENU" (founder's own words, 2026-07-28).
  *
  * It replaces two full-width chrome rows — „← Всички уроци" + the lesson title,
@@ -931,6 +982,23 @@ export function LessonPlayShell({
   // persisted setting on purpose — skipping once must not silently rewrite a
   // preference, and re-opening once must not silently restore one.
   const [endSkipped, setEndSkipped] = useState(false);
+  // -- THE BRIEFING (2026-08-02) -----------------------------------------------
+  //
+  // `lesson.briefingBg` is the numbered „какво ще правиш" list every scenario
+  // template hand-authors. Until this wave `compileScenario` dropped it and no
+  // component read it, so a drill whose step 1 says „Включи фаровете — вече е
+  // тъмно" never said it to anybody, while the world-referent gate read that
+  // same unrendered field as proof the duty had been stated. The card below is
+  // the delivery half of that fix; `world/referents.ts` reads THIS field, and
+  // `referent-evidence-reachable.test.ts` fails if it ever stops rendering.
+  //
+  // Grammar: it is up when the session starts and the student closes it. It is
+  // never up in the THEO-3 sandbox (the assignment there IS the mistake) and it
+  // stands down the moment a pause overlay owns the glass.
+  const briefing = lesson.briefingBg ?? [];
+  const [briefingOpen, setBriefingOpen] = useState(true);
+  const closeBriefing = useCallback(() => setBriefingOpen(false), []);
+
   // Armed cabin faults, sampled at the status bar's own cadence. Only the
   // ARMED SET matters, so the key comparison keeps this from re-rendering the
   // shell every 150 ms (the TelltaleEdgePings precedent).
@@ -1748,6 +1816,25 @@ export function LessonPlayShell({
             }
           : null,
 
+        // 4c. THE BRIEFING (`lesson.briefingBg`) — step 1 on the line, the whole
+        //     numbered list one tap behind it. Blocking: a briefing that scrolls
+        //     past is the compiled-away field all over again, so it waits for
+        //     „Разбрах" (Space on a keyboard) and then never returns. Not in the
+        //     sandbox — there the assignment is the mistake.
+        briefingOpen && briefing.length > 0 && !mistakeMode && !ended
+          ? {
+              id: "briefing",
+              kind: "hint" as const,
+              tone: "neutral" as const,
+              chipBg: "Инструкции",
+              lineBg: briefing[0]!.textBg,
+              detailBg: briefing.map((s) => `${s.n}. ${s.textBg}`).join("\n"),
+              blocking: true,
+              ackLabelBg: "Разбрах",
+              onAck: closeBriefing,
+            }
+          : null,
+
         // 5. Pre-drive: the next step on the line, the whole checklist behind
         //    one tap. It stays up because during the pre-drive it IS the task.
         snap.phase === "preDrive" && !ended && snap.preDriveNextStepId !== null
@@ -2078,6 +2165,13 @@ export function LessonPlayShell({
           12 px radius on a full-bleed frame is a 12 px hole in the road. */}
       <div
         ref={sceneBoxRef}
+        // THE STAGE. Everything painted over the road lives inside this box,
+        // and PlayAreaStyles' UNPANEL layer is scoped to it — so the „no
+        // panels" register applies to the driving HUD and to nothing else in
+        // the app. It is a separate handle from `data-sim-play` on purpose:
+        // that one is absent in the immersive/fullscreen layout, which is
+        // precisely the layout the founder's reference frames are of.
+        data-sim-stage=""
         className={`relative mx-auto w-full overflow-hidden bg-surface ${
           immersive
             ? compact
@@ -2179,9 +2273,29 @@ export function LessonPlayShell({
             the canvas and can never paint over a DOM card, so the card steps
             below it instead — PlayAreaStyles owns that rule and this attribute
             is the handle it needs. */}
+        {/* THE VIEWPORT CLAMP (`hudPreferences.ts` → THE VIEWPORT CLAMP).
+            STATED HONESTLY: this one is DEFENSIVE, not a fix for an overflow
+            anybody has photographed. With today's content the box measures about
+            296 px (`ObjectiveBanner`'s `min-w-64` + `px-5`), so it fits a 320 px
+            phone. What is removed is the SHAPE, which is unbounded by
+            construction: `absolute left-1/2 … -translate-x-1/2` with no cap is a
+            shrink-to-fit box whose used width is
+            `min(max(min-content, available), max-content)` — and `available` here
+            is only `stage.width − left`, i.e. HALF the stage. So any child whose
+            min-content exceeds half the stage (one long Bulgarian objective
+            title is enough at 320 px) makes the box wider than its own
+            containing block, and because it is centred by transform it then
+            hangs off BOTH edges by the same amount into an `overflow-hidden`
+            stage. A right-anchored card can only ever lose one edge; a centred
+            one loses two — which is exactly what the founder's teach card does
+            in `photo_2026-07-29_08-22-13 (2).jpg` («…аркираната», «воята лента»
+            cut on the left, the same lines running off the right).
+            That particular card is already clamped (`TeachMomentOverlay`'s
+            `w-full max-w-2xl` inside an `inset-x-0` centring row). This stack was
+            the last surface still carrying the uncapped shape. */}
         <div
           data-hud="objective-stack"
-          className={`absolute left-1/2 top-3 flex -translate-x-1/2 flex-col items-center gap-1.5 ${
+          className={`absolute left-1/2 top-3 flex max-w-[calc(100vw-1.5rem)] -translate-x-1/2 flex-col items-center gap-1.5 ${
             compact ? "hidden" : ""
           }`}
         >
@@ -2190,7 +2304,7 @@ export function LessonPlayShell({
             // banner — the assignment is the mistake (fixed lead-in + the
             // STORED mistake title, compiled into descriptionBg).
             !ended ? (
-              <div className="max-w-md rounded-2xl border border-danger/60 bg-background/85 px-4 py-2.5 text-center backdrop-blur">
+              <div className="hud-ghost max-w-md rounded-2xl border border-danger/60 px-4 py-2.5 text-center">
                 <p className="text-[10px] font-black uppercase tracking-wider text-danger">
                   Преживей грешката
                 </p>
@@ -2223,6 +2337,17 @@ export function LessonPlayShell({
           teachQueue.length === 0 &&
           snap.advisorPrompt !== null ? (
             <AdvisorCard prompt={snap.advisorPrompt} />
+          ) : null}
+          {/* THE BRIEFING — the authored numbered steps, finally on the glass.
+              Roomy only; compact feeds the same list through the queue below,
+              one line with the whole thing a tap behind it. */}
+          {briefingOpen &&
+          briefing.length > 0 &&
+          !mistakeMode &&
+          !ended &&
+          activeQuiz === null &&
+          teachQueue.length === 0 ? (
+            <BriefingCard steps={briefing} onClose={closeBriefing} />
           ) : null}
         </div>
 
@@ -2335,15 +2460,20 @@ export function LessonPlayShell({
         (lesson.aids?.shadowCar === true || lesson.aids?.pathRibbon === true) &&
         lesson.objectives.length > 0 ? (
           <div
-            className="absolute left-3 flex flex-col gap-0.5 rounded-lg border border-border bg-surface/80 px-2 py-1.5 text-[10px] font-semibold leading-tight text-muted backdrop-blur"
+            className="hud-ghost absolute left-3 flex flex-col gap-0.5 px-2 py-1.5 text-[10px] font-semibold leading-tight text-muted"
             // …and not `bottom-[6.75rem]`: 108 px was the floating pill's band,
             // hard-coded here and in the minimap column. Both now read the
             // shell's published floor, so shrinking the band moves them.
             style={{ bottom: "var(--sim-hud-floor, 6.75rem)" }}
           >
+            {/* `data-hud-ink`: the UNPANEL sweep clears fills off everything
+                inside a ghost, and these two swatches ARE the information —
+                the legend says „the BLUE line is the shadow car", so a
+                colourless swatch turns the whole legend into a riddle. */}
             <span>
               <span
                 aria-hidden
+                data-hud-ink=""
                 className="mr-1 inline-block h-1.5 w-3.5 rounded-full align-middle"
                 style={{ background: "#3f8cff" }}
               />
@@ -2352,6 +2482,7 @@ export function LessonPlayShell({
             <span>
               <span
                 aria-hidden
+                data-hud-ink=""
                 className="mr-1 inline-block h-1.5 w-3.5 rounded-full align-middle"
                 style={{ background: "var(--accent-2)" }}
               />
@@ -2397,10 +2528,10 @@ export function LessonPlayShell({
                 onClick={toggleMinimap}
                 aria-pressed={minimapOn}
                 title={minimapOn ? "Скрий картата (P)" : "Покажи картата (P)"}
-                className={`pointer-events-auto flex h-10 w-10 items-center justify-center rounded-full border text-[15px] backdrop-blur transition motion-reduce:transition-none ${
+                className={`hud-ghost pointer-events-auto flex h-10 w-10 items-center justify-center rounded-full border text-[15px] transition motion-reduce:transition-none ${
                   minimapOn
-                    ? "border-accent/60 bg-accent/20 text-accent"
-                    : "border-border bg-background/60 text-muted opacity-70 hover:opacity-100"
+                    ? "border-accent/60 text-accent"
+                    : "border-border text-muted opacity-70 hover:opacity-100"
                 }`}
               >
                 <span aria-hidden>🗺</span>
@@ -2418,7 +2549,7 @@ export function LessonPlayShell({
           <div className="absolute left-3 top-3">
             <div
               aria-label="Протокол — наказателни точки"
-              className="rounded-xl border border-border bg-surface/90 px-3 py-2 text-xs backdrop-blur"
+              className="hud-ghost rounded-xl border border-border px-3 py-2 text-xs"
             >
               <p className="text-[10px] font-black uppercase tracking-wider text-muted">
                 Протокол
@@ -2466,6 +2597,13 @@ export function LessonPlayShell({
           // edge lands in exactly the same place and the clearance proof in
           // cabinLook.test.ts still holds.
           <div
+            // `data-hud-keep`: thirteen numbered steps, each with its own
+            // explanation and its own control — this is a list to READ while
+            // the hands work, not an instrument to glance at, so the UNPANEL
+            // register deliberately stops here. It is also the surface another
+            // lane is reshaping right now (the mouse-first pre-drive rework);
+            // the marker means that work cannot be broken from this side.
+            data-hud-keep=""
             className="absolute left-3 top-12 flex flex-col"
             style={{
               maxHeight: `calc(${HUD_LEFT_PANEL_MAX_HEIGHT_FRACTION * 100}% - 3.75rem)`,
@@ -2485,12 +2623,23 @@ export function LessonPlayShell({
 
         {/* Micro-quiz — overlay (pauses the drive). Hidden once the session
             ends so the end screen never competes with it. */}
+        {/* `data-hud-keep`: THE DRIVE HUD IS A GHOST, A PAUSE IS A PAGE.
+            PlayAreaStyles' UNPANEL layer strips fill, blur and shadow off
+            everything painted over the road — that is the founder's reference
+            and it is right for instruments. It is wrong for a card whose whole
+            job is to be read: this one asks a question and then explains the
+            answer with its law citation (THEO-4), and „naked text over a
+            moving road" is not a reading surface. The marker keeps the panel,
+            and carries doc 89 §3's wrap rule with it so a long Bulgarian
+            compound can never again be clipped mid-word on a 393 px phone. */}
         {activeQuiz && !ended ? (
-          <MicroQuizOverlay
-            quiz={activeQuiz}
-            onSubmit={submitMicroQuizAnswer}
-            onDone={handleQuizDone}
-          />
+          <div data-hud-keep="">
+            <MicroQuizOverlay
+              quiz={activeQuiz}
+              onSubmit={submitMicroQuizAnswer}
+              onDone={handleQuizDone}
+            />
+          </div>
         ) : null}
 
         {/* A9 teach moment — pause + mini-lesson card. A quiz that fired first
@@ -2504,12 +2653,16 @@ export function LessonPlayShell({
             line with „Защо" behind it. Desktop keeps this card, its pictogram
             and its Space/Enter acknowledgement exactly as they were. */}
         {!compact && teachQueue.length > 0 && !activeQuiz && !ended ? (
-          <TeachMomentOverlay
-            moment={teachQueue[0]}
-            remaining={teachQueue.length - 1}
-            onAcknowledge={handleTeachAcknowledged}
-            compact={false}
-          />
+          // Same reasoning as the micro-quiz above: an explicit pause is a
+          // page, not an instrument. See `data-hud-keep` there.
+          <div data-hud-keep="">
+            <TeachMomentOverlay
+              moment={teachQueue[0]}
+              remaining={teachQueue.length - 1}
+              onAcknowledge={handleTeachAcknowledged}
+              compact={false}
+            />
+          </div>
         ) : null}
 
         {/* THEO-3 consequence — pause + the „Какво направи" card: stored
@@ -2519,17 +2672,22 @@ export function LessonPlayShell({
             сценарий"). Sandbox sessions never queue teach moments or
             quizzes, so this pause never competes with them. */}
         {mistakeMode && mistakeDemo !== null && consequence !== null && !ended ? (
-          <MistakeConsequenceOverlay
-            demo={mistakeDemo}
-            districtId={mistakeSpec!.map.districtId}
-            moment={consequence.moment}
-            onRetryCorrect={
-              onStartScenario !== undefined && mistakeRef !== null
-                ? () => onStartScenario(mistakeRef.templateId, mistakeRef.level)
-                : null
-            }
-            onDismiss={() => setConsequence(null)}
-          />
+          // A pause that exists to be read — see `data-hud-keep` on the
+          // micro-quiz above. This is the card doc 89 §3 photographed clipping
+          // its own text («...АСНА ГРЕШКА»), so the wrap rule matters here most.
+          <div data-hud-keep="">
+            <MistakeConsequenceOverlay
+              demo={mistakeDemo}
+              districtId={mistakeSpec!.map.districtId}
+              moment={consequence.moment}
+              onRetryCorrect={
+                onStartScenario !== undefined && mistakeRef !== null
+                  ? () => onStartScenario(mistakeRef.templateId, mistakeRef.level)
+                  : null
+              }
+              onDismiss={() => setConsequence(null)}
+            />
+          </div>
         ) : null}
 
         {/* Session end — overlay. A13: exam sessions get the examiner-protocol
@@ -2552,7 +2710,14 @@ export function LessonPlayShell({
             „Показвай разбора автоматично". Compact behaviour is byte-for-byte
             what it was — tap-to-open only. */}
         {debriefOpen && result ? (
-          <div className="absolute inset-0 z-40 flex items-start justify-center overflow-y-auto bg-background/85 p-4 backdrop-blur-sm sm:p-6">
+          // `data-hud-keep`: the debrief is the longest reading surface in the
+          // product — protocol, verdict, mistake map, correctives, CTAs — and
+          // the drive HUD's ghost register would make it unreadable. See the
+          // micro-quiz above.
+          <div
+            data-hud-keep=""
+            className="absolute inset-0 z-40 flex items-start justify-center overflow-y-auto bg-background/85 p-4 backdrop-blur-sm sm:p-6"
+          >
             <div className="flex w-full max-w-2xl flex-col gap-3">
               {compact ? (
                 <button

@@ -2,7 +2,7 @@
  "format": "district-v1",
  "meta": {
   "district": "pe-cane",
-  "label": "Улица пред институт за незрящи (сценарий PE-14)",
+  "label": "Еднопосочна улица пред институт за незрящи (сценарий PE-14)",
   "mapKind": "scenario-street",
   "generator": "tools/maps/gen_pe_crossings.mjs",
   "boundsLocalMeters": {
@@ -29,7 +29,8 @@
    "intersections": 0,
    "crossings": 1,
    "buildings": 4,
-   "spawnPoints": 2
+   "spawnPoints": 2,
+   "zones": 0
   },
   "scenario": {
    "archetype": "zebra-block",
@@ -40,6 +41,14 @@
    },
    "streetscape": "institute-and-transit",
    "streetscapeNoteBg": "Обществена сграда за хора с увредено зрение, чийто вход е насочен към пътеката, и спирка отсреща: белият бастун тук е ежедневие, а не изключение.",
+   "roadscape": "oneway-institute",
+   "roadscapeNoteBg": "Еднопосочна улица (знак Д4 на входа): няма насрещно движение и няма осева линия — цялото платно е твое, а това прави пропускането на пешеходеца изцяло твоя отговорност.",
+   "roadClass": "residential",
+   "parkingBandM": 0,
+   "bareVerge": null,
+   "curbToCurbM": 16.25,
+   "oneway": true,
+   "banSignRef": null,
    "primaryCrossingId": "pe-x-1",
    "laneCenterRightM": 4.06,
    "crossings": [
@@ -72,7 +81,7 @@
     "to": "pe-n-end",
     "class": "residential",
     "name": "Улица с пешеходна пътека",
-    "oneway": false,
+    "oneway": true,
     "roundabout": false,
     "lanes": 2,
     "lanesSource": "tag",
@@ -88,7 +97,8 @@
       0,
       152
      ]
-    ]
+    ],
+    "parkingBand": false
    }
   ]
  },

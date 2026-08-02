@@ -252,15 +252,20 @@ export function SimOverlay({
           right: "calc(0.75rem + env(safe-area-inset-right, 0px))",
         }}
       >
+        {/* `hud-ghost` — this is the peek, and the peek is an instrument line.
+            It is the direct counterpart of the reference's „Lap 1/1" and „Lap
+            Time 00:02.060": a hairline outline in the fault's own colour, the
+            words on the image, nothing behind them. The OPEN sheet below is
+            deliberately not a ghost — that one is the explicit pause where the
+            authored WHY and its law citation are read. */}
         <div
-          className={`sim-overlay-in flex w-fit min-w-0 max-w-full items-center gap-1.5 rounded-full border pl-2.5 backdrop-blur ${
+          className={`hud-ghost sim-overlay-in flex w-fit min-w-0 max-w-full items-center gap-1.5 rounded-full border pl-2.5 ${
             interactive ? "pointer-events-auto pr-1" : "pr-2.5"
           }`}
           style={{
             height: `${height}px`,
             color,
-            borderColor: `color-mix(in srgb, ${color} 50%, transparent)`,
-            background: "color-mix(in srgb, var(--background) 82%, transparent)",
+            borderColor: `color-mix(in srgb, ${color} 70%, transparent)`,
           }}
           role={blocking ? "alertdialog" : "status"}
           aria-live={blocking ? "assertive" : "polite"}
@@ -298,8 +303,15 @@ export function SimOverlay({
             </button>
           ) : null}
           {blocking ? (
+            // `data-hud-ink`: the ONE control on this screen that clears a
+            // blocking line keeps its fill through the UNPANEL sweep. Doc 87
+            // rows C1/C2 are literally „«Разбрах» was not tappable (something
+            // is painted over it)" — turning it into a ghost would be the same
+            // defect by a prettier route. The reference keeps one filled badge
+            // too; this is ours, and it is the action, not the furniture.
             <button
               type="button"
+              data-hud-ink=""
               onClick={acknowledge}
               className="btn-accent flex h-11 min-w-[2.75rem] shrink-0 touch-manipulation items-center justify-center rounded-full px-3 text-[11px]"
             >

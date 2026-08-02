@@ -133,12 +133,48 @@ export const DEFAULT_LESSON_TRAFFIC = {
   anchorRadiusM: 280,
 } as const;
 
+/**
+ * One numbered briefing step, as the student reads it.
+ *
+ * Structurally identical to `ScenarioSpec.StepText` and deliberately NOT
+ * imported from it: `contracts.ts` is the boundary the exam bank and the
+ * curriculum share, and it may not depend on the scenario layer.
+ */
+export interface LessonBriefingStep {
+  /** 1-based; the list is contiguous 1..n. */
+  n: number;
+  textBg: string;
+}
+
 /** A scored driving lesson. Specs are data; orchestration lives in lessons/. */
 export interface LessonSpec {
   id: string; // "l-first-drive"
   order: number;
   titleBg: string;
   descriptionBg: string;
+  /**
+   * THE BRIEFING THE STUDENT IS ACTUALLY SHOWN — the numbered „какво ще
+   * правиш" steps, rendered by `LessonPlayShell` (the „Инструкции" card on a
+   * roomy screen, a queue line with the whole list one tap behind it on a
+   * phone).
+   *
+   * WHY THIS FIELD EXISTS (2026-08-02, and it is the whole lesson of the
+   * wave). `ScenarioSpec.instructionsBg` carries hand-authored numbered steps
+   * on all 157 templates — and `compileScenario` DROPPED them. Nothing
+   * rendered them, so the copy reached the type, the validator and the tests
+   * and stopped there. The world-referent gate then read that field as proof
+   * that a night drill had told the student to switch the lights on, which
+   * meant a lane could clear 214 rung-codes of HEADLIGHTS_OFF_* by writing
+   * Bulgarian into a void: the fault still fired, the student was still never
+   * told, and the gate could no longer see it. A referent may only ever read
+   * evidence a student can perceive, which is what
+   * `world/referents.ts EVIDENCE_CHANNELS` now asserts — and this is the
+   * field it points at.
+   *
+   * Absent = no briefing (curriculum + exam-bank lessons brief through
+   * `descriptionBg` and the objective banner; bit-identical to before).
+   */
+  briefingBg?: LessonBriefingStep[];
   /** Concept ids this lesson exercises (links sim ↔ knowledge graph). */
   conceptIds: string[];
   /**
@@ -1160,6 +1196,32 @@ export interface RearTailgaterSpec extends StagedEventBase {
   /** Outcome measurement only: easing ≥ this below the latch speed marks the
    *  taught response ("yielded"), km/h. Nothing grades off it (learn-only). */
   easeKmh: number;
+  /**
+   * FR-56 — release this actor AT THE PLAYER'S OWN SPEED instead of letting it
+   * accelerate out of a dormant standstill.
+   *
+   * The founder's лепка complaint: *"the car behind that is sticking to the
+   * user car is sticking very late, it must be sticking much earlier."* He is
+   * right, and measured on ln-v1 at constant player speed the glued pose used
+   * to arrive at 7.4 s (30 km/h) / 9.1 s (40) / 13.7 s (50) — a car that only
+   * starts pressing you a quarter-minute in is not the lesson.
+   *
+   * WHY THIS IS OPT-IN AND NOT THE DEFAULT, which is the whole point of this
+   * flag: `rearTailgater` is borrowed by TWELVE templates as a generic "vehicle
+   * that comes past you", and only a few of them are about a tailgater at all.
+   * Shipping the rolling start unconditionally re-timed every one of them and
+   * broke three whose choreography was authored against the launch-from-rest
+   * profile — sc-ln-decisive-change and sc-vu-blindspot-moto lost their
+   * blind-spot contact entirely (the car had already gone by), and
+   * sc-ov-being-overtaken stopped trapping the overtaker. Bisected: commenting
+   * out the one line turned all three files green; restoring it reproduced
+   * exactly those four assertions.
+   *
+   * So the behaviour the founder asked for belongs to the drills that teach
+   * being tailgated, and the other nine keep the timing their traces were
+   * recorded against. Absent = byte-identical to before FR-56.
+   */
+  rollingStart?: true;
 }
 
 /**

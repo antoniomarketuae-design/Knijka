@@ -288,6 +288,192 @@ export function PlayAreaStyles() {
       [data-sim-compact="on"]:has([data-hud="audio-prompt"]) [data-hud="difficulty"] {
         display: none;
       }
+
+${UNPANEL_CSS}
     `}</style>
   );
 }
+
+/* ===========================================================================
+   THE UNPANEL LAYER — the driving HUD stops being a web page over a road.
+   ===========================================================================
+
+   FOUNDER REFERENCE, 2026-08-02. Two Gran Turismo frames and one layout he
+   drew himself, in `C:\Users\Ljh\Desktop\For fix\`. Opened, finally, and the
+   thing they share is NOT the coverage number:
+
+     · tyre temps, ABS, ECU, TC, fuel, the lap times, the leaderboard — none of
+       it sits on a card. Naked text and hairline outlines, straight on the
+       image;
+     · „Brake" and „Throttle" are barely-visible grey words you can read the
+       road through;
+     · nothing is filled, nothing is blurred, nothing casts a shadow.
+
+   WHY THIS EXISTS AS ITS OWN PASS, AFTER THE COVERAGE WORK. The mobile harness
+   charges every pixel a control paints on, so we drove chrome 68.3 % → 6.1 %
+   and called it done. Measured here on 2026-08-02 at 1280×720, the drive
+   screen still carried THIRTY-EIGHT filled / blurred / bordered surfaces —
+   the „⌨ Клавиши" legend alone was 7.8 % of the frame as an opaque blurred
+   card, the instrument bar 4.6 %, the audio chip 2.7 %. Six per cent of solid
+   cards still reads as a web page; fifteen per cent of floating text reads as
+   a game. WE OPTIMISED AREA AND HE WAS ASKING ABOUT FILL.
+
+   So this layer changes FILL, not size, and it is expected to score WORSE on
+   tools/mobile — a text-shadow paints more pixels than the glyph alone, and a
+   hairline that used to be invisible against a fill is now charged. That is
+   the trade, stated out loud rather than hidden.
+
+   HOW CONTRAST SURVIVES WITHOUT A BOX. Exactly the way the reference does it:
+   a two-stop dark halo under the type (`--hud-halo`), and ink pinned to the
+   LIGHT register in both themes. The pin is the part that is easy to get
+   wrong: the ground behind this HUD is a photograph of a road, not the app
+   background, so `--foreground` — which is #0b1524 in the light theme — would
+   be dark ink under a dark halo, i.e. mud. Inside the stage, and only there,
+   the tokens are restated for the surface they are actually painted on.
+
+   WHERE THE TOKEN OVERRIDE HANGS, AND WHY NOT ON THE STAGE. The obvious move
+   is to restate the tokens once on the scene box and let them inherit. It is
+   wrong, and the reason is worth writing down: the debrief, the micro-quiz and
+   the teach card are rendered INSIDE that box, and they are explicit pauses —
+   pages to read, on their own scrim, with the theory-grade contrast the founder
+   already signed off. Doc 89 §3 is about those cards clipping their own text; a
+   student who cannot read the rule they just broke has lost the lesson, not the
+   look. Cancelling an inherited override in a subtree cannot be done cleanly
+   either — `--x: initial` on a custom property yields the guaranteed-invalid
+   value, not the theme's, and restating the palette here would fork it.
+
+   So the tokens ride on the GHOST SURFACES THEMSELVES. Nothing that is not in
+   the list below can inherit them, the pause overlays never see them, and no
+   cancellation rule has to exist.
+
+   WHAT IS DELIBERATELY NOT SWEPT:
+     · `border-radius` — a radius on a transparent element paints nothing, and
+       blanket-zeroing it would square off the red speed-limit disc, which is a
+       road sign, not a card;
+     · semantic border colours (danger / success / accent) set by the
+       component — those are information;
+     · every explicit pause, by construction (see above).
+
+   WHY A STYLESHEET AND NOT TWELVE COMPONENT EDITS. The same reason the mirror
+   and overlay-queue rules above live here: these panels belong to five
+   components across three lanes, and `data-hud` is the only vocabulary they
+   share. The components this lane owns carry `hud-ghost` in their own class
+   lists (the intent is in the code); the ones it does not are reached here by
+   name, which is also the merge-safe way to do it while other lanes have those
+   files open.
+   =========================================================================== */
+/**
+ * THE GHOST SURFACES — stated once, used by every rule below.
+ *
+ * `.hud-ghost` is what the components in this lane carry in their own class
+ * lists, so the intent lives in the code. The `data-hud` names are the surfaces
+ * owned by OTHER lanes: reaching them through the shared attribute vocabulary
+ * is both the established pattern in this file and the merge-safe way to do it
+ * while those files are open in another worktree.
+ *
+ * Anything not on this list keeps its panel — which is how the debrief, the
+ * micro-quiz, the teach card and the pre-drive checklist stay readable without
+ * a single cancellation rule (see the header).
+ */
+export const GHOST_SURFACES = [
+  ".hud-ghost",
+  '[data-hud="controls-help"]', // „⌨ Клавиши" — 7.8 % of the frame, measured
+  '[data-hud="audio-prompt"]',
+  '[data-hud="difficulty"]',
+  '[data-hud="demo-deck"]',
+  '[data-hud="touch-hint"]',
+  '[data-hud="follow-hint"]',
+  '[data-hud="glance-buttons"]',
+  '[data-hud="glance-ping"]',
+  '[data-hud="mouse-pedals"]', // „Brake" / „Throttle" in the reference
+] as const;
+
+/** `:is(…)` over the list — one token, so the list cannot drift between rules. */
+const GHOST = `:is(${GHOST_SURFACES.join(", ")})`;
+
+const UNPANEL_CSS = `
+      /* ── The register. See GHOST_SURFACES above for what is on this list. */
+      [data-sim-stage] ${GHOST} {
+        /* The halo that replaces the box. Two stops: a tight one that holds an
+           edge against bright tarmac, a wide soft one that separates the glyph
+           from a busy background, the way the reference's does. */
+        --hud-halo: 0 1px 3px rgba(0, 0, 0, 0.95), 0 0 10px rgba(0, 0, 0, 0.7);
+        /* Ink, pinned light in BOTH themes — the ground here is a road, not the
+           app background (see the header). Inherited by the subtree, so
+           "text-foreground" / "text-muted" inside a ghost follow without any
+           component having to know. */
+        --foreground: #f2f6fc;
+        --muted: #c3cfe2;
+        /* Hairlines, pinned neutral for the same reason: #d3e0f0 vanishes on a
+           bright road and #1e2c46 vanishes on a dark one. Semantic borders
+           (danger / success / accent) are set by the component and untouched. */
+        --border: rgba(226, 234, 247, 0.22);
+        --border-strong: rgba(226, 234, 247, 0.38);
+        text-shadow: var(--hud-halo);
+      }
+
+      /* ── The sweep. Fill, blur and shadow come off the panel AND off every
+            chip inside it — a ghost panel with a solid pill in it is still a
+            panel, just a smaller one. What is left is the outline, which is
+            exactly the reference's hairline.
+
+            "[data-hud-ink]" is the opt-out for the handful of fills that ARE
+            the information: a progress bar with no fill is not a progress bar,
+            and the tier picker's lit pill is the answer to „which tier am I
+            on" (the reference has a filled green „BEST" chip for the same
+            reason). ──────────────────────────────────────────────────────── */
+      [data-sim-stage] ${GHOST},
+      [data-sim-stage] ${GHOST} :is(div, span, button, kbd, p, li, a, section):not([data-hud-ink]):not([data-hud-ink] *):not([aria-pressed="true"]) {
+        background-color: transparent !important;
+        background-image: none !important;
+        backdrop-filter: none !important;
+        -webkit-backdrop-filter: none !important;
+        box-shadow: none !important;
+      }
+
+      /* ── „Brake" and „Throttle" are ghosts in the reference, and so are the
+            mirror-glance arrows that sit in the same corners. Readable, and
+            you can see the road through them. They come back to full strength
+            the moment a finger is on them, which is the one state where a
+            control has to be unambiguous. ────────────────────────────────── */
+      [data-sim-stage] [data-hud="mouse-pedals"] button,
+      [data-sim-stage] [data-hud="glance-buttons"] button {
+        opacity: 0.5;
+        transition: opacity 140ms ease-out;
+      }
+      [data-sim-stage] [data-hud="mouse-pedals"] button:hover,
+      [data-sim-stage] [data-hud="mouse-pedals"] button[data-pressed="1"],
+      [data-sim-stage] [data-hud="glance-buttons"] button:hover,
+      [data-sim-stage] [data-hud="glance-buttons"] button:active {
+        opacity: 1;
+      }
+      @media (prefers-reduced-motion: reduce) {
+        [data-sim-stage] [data-hud="mouse-pedals"] button,
+        [data-sim-stage] [data-hud="glance-buttons"] button {
+          transition: none;
+        }
+      }
+
+      /* ── Doc 89 §3, and it belongs in this layer because it is the same
+            defect seen from the other side: „the violation card is WIDER THAN
+            THE VIEWPORT. Both edges are cut off mid-word — «...АСНА ГРЕШКА»,
+            «ътнотранспортно произшествие»." A card that clips its own text has
+            destroyed the content, which is worse than a card that is too big.
+
+            The three explicit pauses keep their panel — a student reading the
+            rule they just broke needs a page, not a ghost — so they are simply
+            never allowed to exceed the picture, and a long Bulgarian compound
+            wraps mid-word rather than running off the edge. Cheap, total, and
+            it cannot regress: it is stated once for the whole stage instead of
+            per card. ─────────────────────────────────────────────────────── */
+      [data-sim-stage] [data-hud-keep] {
+        max-width: 100%;
+      }
+      /* Text elements only, deliberately: a blanket "min-width: 0" on "*" is
+         the usual flex-overflow fix and it would out-specify the "min-w-11"
+         utilities that hold this app's 44 px touch targets open. Wrapping is
+         the half of the fix that cannot shrink a control. */
+      [data-sim-stage] [data-hud-keep] :is(p, h1, h2, h3, h4, li, dd, dt, td, blockquote) {
+        overflow-wrap: anywhere;
+      }
+`;

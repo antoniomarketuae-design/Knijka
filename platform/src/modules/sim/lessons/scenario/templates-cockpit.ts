@@ -38,6 +38,7 @@
 
 import type { PoliceStopSpec, TelltaleStimulusSpec } from "../../contracts";
 import type { ScenarioSpec } from "./types";
+import { l5Night, l5Wet } from "./complications";
 
 // ---------------------------------------------------------------------------
 // Shared geometry constant (pinned from the generated district by value — the
@@ -128,6 +129,9 @@ export const SC_VP_READINESS: ScenarioSpec = {
     { level: 2 },
     { level: 3 },
     { level: 4, vehicleStart: "cold" },
+    // L5 «Усложнени» — the complication kit (scenario/complications.ts):
+    // the delta AND the instructor's line that explains it, authored together.
+    l5Night(),
   ],
   conditions: { weather: "dry" },
   localeBg: "bg-BG",
@@ -221,6 +225,9 @@ export const SC_PK_MOVE_OFF: ScenarioSpec = {
     { level: 2 },
     { level: 3 },
     { level: 4, vehicleStart: "cold" },
+    // L5 «Усложнени» — the complication kit (scenario/complications.ts):
+    // the delta AND the instructor's line that explains it, authored together.
+    l5Wet(),
   ],
   // Config-gated drill: opt the move-off-observation detector IN so the LIVE
   // student session grades the taught fault (default-OFF elsewhere — see
@@ -318,6 +325,9 @@ export const SC_VP_STALL: ScenarioSpec = {
     { level: 2 },
     { level: 3 },
     { level: 4, vehicleStart: "cold" },
+    // L5 «Усложнени» — the complication kit (scenario/complications.ts):
+    // the delta AND the instructor's line that explains it, authored together.
+    l5Night(),
   ],
   conditions: { weather: "dry" },
   localeBg: "bg-BG",
@@ -491,6 +501,9 @@ export const SC_VP_POLICE_STOP: ScenarioSpec = {
     { level: 2 },
     { level: 3 },
     { level: 4, vehicleStart: "cold" },
+    // L5 «Усложнени» — the complication kit (scenario/complications.ts):
+    // the delta AND the instructor's line that explains it, authored together.
+    l5Night(),
   ],
   staged: [VP_POLICE_OFFICER],
   conditions: { weather: "dry" },
@@ -666,6 +679,9 @@ export const SC_VP_TELLTALE: ScenarioSpec = {
     { level: 2 },
     { level: 3 },
     { level: 4, vehicleStart: "cold" },
+    // L5 «Усложнени» — the complication kit (scenario/complications.ts):
+    // the delta AND the instructor's line that explains it, authored together.
+    l5Night(),
   ],
   staged: [VP_TELLTALE_LAMP],
   conditions: { weather: "dry" },

@@ -28,6 +28,7 @@
 
 import type { ScenarioSpec } from "./types";
 import type { PriorityFromRightSpec } from "../../contracts";
+import { l5BusyStreet } from "./complications";
 
 /** Drawn lane-center offset from the road centerline on every junction map, m. */
 export const JUNCTION2_LANE_CENTER_M = 4.0625;
@@ -296,6 +297,9 @@ export const SC_JUNCTION_BLIND: ScenarioSpec = {
     { level: 2 },
     { level: 3 },
     { level: 4, vehicleStart: "cold" },
+    // L5 «Усложнени» — the complication kit (scenario/complications.ts):
+    // the delta AND the instructor's line that explains it, authored together.
+    l5BusyStreet(),
   ],
   staged: [SC_JUNCTION_BLIND_CONFLICT],
   conditions: { weather: "dry" },
@@ -433,6 +437,9 @@ export const SC_JUNCTION_LEFT: ScenarioSpec = {
     { level: 2 },
     { level: 3 },
     { level: 4, vehicleStart: "cold" },
+    // L5 «Усложнени» — the complication kit (scenario/complications.ts):
+    // the delta AND the instructor's line that explains it, authored together.
+    l5BusyStreet(),
   ],
   staged: [SC_JUNCTION_LEFT_CONFLICT],
   conditions: { weather: "dry" },

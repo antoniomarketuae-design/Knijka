@@ -19,6 +19,7 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { DEFAULT_RULE_CONFIG } from "@/modules/sim/rules";
+import { compileScenario } from "../compile";
 import { recordScFoBrakelightChainDrive } from "@/modules/sim/traces/scFoBrakelightChain";
 import { recordScFoMotorwayGapDrive } from "@/modules/sim/traces/scFoMotorwayGap";
 import { recordScFollowDistanceDrive } from "@/modules/sim/traces/scFollowDistance";
@@ -359,15 +360,24 @@ describe("B8 — no lesson is completable only by overtaking", () => {
 // ---------------------------------------------------------------------------
 
 describe("L10 — every night / rain / fog rung states the lights duty", () => {
+  /**
+   * Reads the COMPILED briefing per rung (2026-08-02), not the template's
+   * `instructionsBg`. The old predicate consulted a field `compileScenario`
+   * dropped and nothing rendered — writing into it satisfied the check while
+   * the student was told nothing, which is how eighteen scenarios „closed" a
+   * lights fault that still fires. `lesson.briefingBg` is what LessonPlayShell
+   * puts on the glass, and `world/referents.ts` L10 reads the same array.
+   */
   it("no rung in these nine files compiles a lights condition without a lights instruction", () => {
     const misses: string[] = [];
     for (const spec of LANE_11) {
-      const saysLights = spec.instructionsBg.some((s) => /светлин|фаров/i.test(s.textBg));
       for (const level of spec.levels) {
-        const weather = level.conditions?.weather ?? spec.conditions?.weather ?? "dry";
-        const night = level.conditions?.night ?? spec.conditions?.night ?? false;
-        const needsLights = night || weather === "rain" || weather === "fog";
-        if (needsLights && !saysLights) misses.push(`${spec.id}@L${level.level} ${weather}/${night}`);
+        const lesson = compileScenario(spec, level.level);
+        const env = lesson.environment;
+        const needsLights = env?.timeOfDay === "night" || env?.rain === true || env?.fog === true;
+        if (!needsLights) continue;
+        const saysLights = (lesson.briefingBg ?? []).some((s) => /светлин|фаров/i.test(s.textBg));
+        if (!saysLights) misses.push(`${spec.id}@L${level.level} ${JSON.stringify(env)}`);
       }
     }
     // HEADLIGHTS_OFF_AT_NIGHT (основна) and HEADLIGHTS_OFF_IN_RAIN are armed by

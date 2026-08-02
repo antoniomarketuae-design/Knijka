@@ -42,6 +42,7 @@
 
 import type { ScenarioSpec } from "./types";
 import type { PriorityFromRightSpec, TrafficControllerSpec } from "../../contracts";
+import { l5BusyStreet } from "./complications";
 
 /** Drawn lane-center offset from the road centerline on sx-v1, m. */
 export const SIGNAL_LANE_CENTER_M = 4.0625;
@@ -241,7 +242,20 @@ export const SC_SIGNAL_DEAD: ScenarioSpec = {
       id: "sc-sdead-approach",
       titleBg: "Приближи угасналото кръстовище бавно, с готовност за спиране",
       // Stem lane center, before the junction area (mouth at ~17 m).
-      params: { kind: "reachZone", x: 4.06, y: -30, radiusM: 8, maxSpeedKmh: 25 },
+      // FR-24: the mark is 2.275 m short of the sx-e-s stop line, but the L1
+      // aid ladder widens radius 8 → 12, so the disc reached 9.72 m INTO the
+      // junction and credited „approach the dead junction ready to stop" to a
+      // car standing in the middle of it. The cut ends the acceptance at the
+      // paint at every rung. (Value = mark − line, derived and re-asserted
+      // against the district's own line in scene/stop-line-grading.test.ts.)
+      params: {
+        kind: "reachZone",
+        x: 4.06,
+        y: -30,
+        radiusM: 8,
+        maxSpeedKmh: 25,
+        acceptBeforeMarkM: -2.275,
+      },
     },
     {
       id: "sc-sdead-cross",
@@ -283,6 +297,9 @@ export const SC_SIGNAL_DEAD: ScenarioSpec = {
     { level: 2 },
     { level: 3 },
     { level: 4, vehicleStart: "cold" },
+    // L5 «Усложнени» — the complication kit (scenario/complications.ts):
+    // the delta AND the instructor's line that explains it, authored together.
+    l5BusyStreet(),
   ],
   staged: [SC_SIGNAL_DEAD_CONFLICT],
   // The LIVE half of the recorder's dial (doc 62 S1 #17 — the drill showed a
@@ -381,7 +398,15 @@ export const SC_SIGNAL_FLASHING: ScenarioSpec = {
     {
       id: "sc-sflash-approach",
       titleBg: "Приближи мигащото жълто бавно, с готовност за спиране",
-      params: { kind: "reachZone", x: 4.06, y: -30, radiusM: 8, maxSpeedKmh: 25 },
+      // FR-24 — same mark, same line, same ladder as sc-sdead-approach.
+      params: {
+        kind: "reachZone",
+        x: 4.06,
+        y: -30,
+        radiusM: 8,
+        maxSpeedKmh: 25,
+        acceptBeforeMarkM: -2.275,
+      },
     },
     {
       id: "sc-sflash-cross",
@@ -422,6 +447,9 @@ export const SC_SIGNAL_FLASHING: ScenarioSpec = {
     { level: 2 },
     { level: 3 },
     { level: 4, vehicleStart: "cold" },
+    // L5 «Усложнени» — the complication kit (scenario/complications.ts):
+    // the delta AND the instructor's line that explains it, authored together.
+    l5BusyStreet(),
   ],
   staged: [SC_SIGNAL_FLASHING_CONFLICT],
   // The LIVE half of the recorder's dial (doc 62 S1 #18 — no yellow blink in
@@ -488,7 +516,15 @@ export const SC_SIGNAL_HESITATION: ScenarioSpec = {
     {
       id: "sc-shes-approach",
       titleBg: "Приближи зеленото кръстовище с готовност",
-      params: { kind: "reachZone", x: 4.06, y: -35, radiusM: 8, maxSpeedKmh: 35 },
+      // FR-24: mark 7.275 m short of sx-e-s, radius 8 → 12 at L1.
+      params: {
+        kind: "reachZone",
+        x: 4.06,
+        y: -35,
+        radiusM: 8,
+        maxSpeedKmh: 35,
+        acceptBeforeMarkM: -7.275,
+      },
     },
     {
       id: "sc-shes-cross",
@@ -533,6 +569,9 @@ export const SC_SIGNAL_HESITATION: ScenarioSpec = {
     { level: 2 },
     { level: 3 },
     { level: 4, vehicleStart: "cold" },
+    // L5 «Усложнени» — the complication kit (scenario/complications.ts):
+    // the delta AND the instructor's line that explains it, authored together.
+    l5BusyStreet(),
   ],
   // LIVE arrival pin (LessonSpec.signalPlan — the founder traffic-light fix):
   // the JU-09 lesson is DECIDING on a live green, so the student must MEET a
@@ -707,6 +746,9 @@ export const SC_SIGNAL_CONTROLLER: ScenarioSpec = {
     { level: 2 },
     { level: 3 },
     { level: 4, vehicleStart: "cold" },
+    // L5 «Усложнени» — the complication kit (scenario/complications.ts):
+    // the delta AND the instructor's line that explains it, authored together.
+    l5BusyStreet(),
   ],
   staged: [SC_SIGNAL_CONTROLLER_EVENT],
   // NO signalPlan (deliberate): the lamps here are pinned at session start by
@@ -785,7 +827,18 @@ export const SC_SIGNAL_REDYELLOW: ScenarioSpec = {
     {
       id: "sc-sry-approach",
       titleBg: "Спри на стоп-линията на червено",
-      params: { kind: "reachZone", x: 4.06, y: -34, radiusM: 8, maxSpeedKmh: 40 },
+      // FR-24, and here the title says it outright: „спри на стоп-линията".
+      // The mark is 6.275 m short of sx-e-s; the L1 ladder widened radius 8 →
+      // 12, so the objective ticked itself off 5.72 m PAST the paint — the
+      // lesson named the line and then graded the far side of it.
+      params: {
+        kind: "reachZone",
+        x: 4.06,
+        y: -34,
+        radiusM: 8,
+        maxSpeedKmh: 40,
+        acceptBeforeMarkM: -6.275,
+      },
     },
     {
       id: "sc-sry-pass",
@@ -838,6 +891,9 @@ export const SC_SIGNAL_REDYELLOW: ScenarioSpec = {
     { level: 2 },
     { level: 3 },
     { level: 4, vehicleStart: "cold" },
+    // L5 «Усложнени» — the complication kit (scenario/complications.ts):
+    // the delta AND the instructor's line that explains it, authored together.
+    l5BusyStreet(),
   ],
   // LIVE arrival pin (LessonSpec.signalPlan — the founder traffic-light fix):
   // the JU-08 lesson IS waiting out the red into the 1 s red-yellow window,

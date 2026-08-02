@@ -19,6 +19,7 @@
  */
 
 import { offsetPolyline, projectOntoPolyline, sampleLane, type LaneGraph } from "./graph";
+import { vehicleHalfLengthM } from "./types";
 import type {
   StagedCommand,
   StagedPedestrianSpec,
@@ -235,6 +236,18 @@ export interface StagedEnv {
   playerY: number;
   playerSpeedMps: number;
   crossingCounts: Map<string, number>;
+  /**
+   * The AMBIENT agents' published states — the other half of FR-27's honesty
+   * fix. The header's v1 limitation ("ambient agents do not see staged
+   * actors") cut both ways: a scripted actor also drove straight through an
+   * ambient car. Measured on 2026-08-02 with 4 ambient agents on the
+   * junction/signals/following districts: five templates put an ambient car
+   * and a staged actor within **0.02–0.05 m of centres** — two bodies in the
+   * same place. Not a theory; a photograph waiting to happen.
+   *
+   * Empty array = the pre-change behaviour, bit-identical.
+   */
+  ambient: readonly TrafficVehicleState[];
 }
 
 const samp = { x: 0, y: 0, dirX: 0, dirY: 0, segHint: 0 };
@@ -372,6 +385,13 @@ export function applyStagedCommand(
         v.command.type = "matchPlayer";
         v.command.gapM = command.gapM;
         v.command.maxSpeedMps = command.maxSpeedMps;
+        // FR-56 rolling start: the actor enters the mirror ALREADY TRAVELLING
+        // rather than launching from the kerb. Never slows an actor that is
+        // already faster, and never exceeds the command's own cap.
+        if (command.seedSpeedMps !== undefined) {
+          const seed = Math.min(command.seedSpeedMps, command.maxSpeedMps);
+          if (v.speed < seed) v.speed = seed;
+        }
         break;
       case "brake":
         v.command.type = "brake";
@@ -494,13 +514,64 @@ export function updateStagedVehicle(agent: StagedVehicleAgent, dt: number, env: 
     }
   }
 
+  // 2b) AMBIENT guard — never drive through an ambient car either (FR-27).
+  //      Deliberately NOT gated on `spec.playerGuard`: that flag exists so the
+  //      лепка can hold a sub-6 m pose behind the STUDENT, and nothing is ever
+  //      authored to tailgate a boulevard car. Same corridor as the player
+  //      guard, but a same-direction ambient car is a LEADER, not a wall — the
+  //      gap term is added to its speed, so a staged actor keeps its pace
+  //      behind traffic moving at its own speed and only ever loses time to a
+  //      car genuinely slower than the script.
+  if (cmd.type !== "brake" && env.ambient.length > 0) {
+    for (let i = 0; i < env.ambient.length; i++) {
+      const a = env.ambient[i];
+      if (a === agent.state) continue;
+      const relX = a.x - agent.state.x;
+      const relY = a.y - agent.state.y;
+      const along = relX * agent.state.dirX + relY * agent.state.dirY;
+      if (along <= 0 || along >= GUARD_AHEAD_M) continue;
+      const lateral = Math.abs(relX * agent.state.dirY - relY * agent.state.dirX);
+      if (lateral >= GUARD_LATERAL_M) continue;
+      const aligned = a.dirX * agent.state.dirX + a.dirY * agent.state.dirY > 0.7;
+      const lead = aligned ? a.speedMps : 0;
+      const guardTarget = lead + Math.max(0, (along - GUARD_STOP_SHORT_M) * 0.8);
+      if (guardTarget < target) {
+        target = guardTarget;
+        brakeCap = HOLD_DECEL_MPS2;
+      }
+    }
+  }
+
   // 3) Integrate speed toward the target (asymmetric accel/brake ramps).
   if (agent.speed < target) {
     agent.speed = Math.min(target, agent.speed + accel * dt);
   } else if (agent.speed > target) {
     agent.speed = Math.max(target, agent.speed - brakeCap * dt);
   }
+  const sBefore = agent.s;
   agent.s += agent.speed * dt;
+
+  // 3b) Hard anti-overlap vs ambient cars, from ANY angle. The corridor guard
+  //     in 2b handles same-lane following; it cannot see a car crossing the
+  //     junction box at 90°, which is exactly where the measurement found the
+  //     remaining clips. The arc advance is simply refused when it would put
+  //     two bodies inside each other: the previous pose was clear by
+  //     induction, so rolling back to it is always safe.
+  if (env.ambient.length > 0 && agent.s > sBefore) {
+    const step = agent.s - sBefore;
+    const nx = agent.state.x + agent.state.dirX * step;
+    const ny = agent.state.y + agent.state.dirY * step;
+    for (let i = 0; i < env.ambient.length; i++) {
+      const a = env.ambient[i];
+      if (a === agent.state) continue;
+      const sep = vehicleHalfLengthM(agent.spec.profile) + vehicleHalfLengthM(a.profile) + 0.5;
+      if (Math.hypot(a.x - nx, a.y - ny) < sep) {
+        agent.s = sBefore;
+        agent.speed = 0;
+        break;
+      }
+    }
+  }
 
   // 4) Path end / loop wrap.
   if (spec.loop) {

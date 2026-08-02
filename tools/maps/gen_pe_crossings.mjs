@@ -25,9 +25,59 @@
  * battery hold byte-for-byte; what changes is what the student SEES and what
  * hides the pedestrian from them.
  *
+ * ⚠ DOC 87 FR-41 / B50 / B53 — WHY IT GREW A **THIRD** AXIS, AND WHY THE
+ * SECOND ONE WAS NOT ENOUGH. The streetscape pass above changed the FACADES
+ * and left the ROAD alone, and the re-look said so with a photograph: seven
+ * cockpit frames at the same 22 m stand-off, „seven straight ribbons, no
+ * junction, no side road, no bend, no gradient" — all seven still
+ * `1 edge / 2 nodes / 1 crossing`, all seven `residential`, 2 lanes, no parking
+ * band, no lamp column, one dashed centre line and bare asphalt. His verdict on
+ * the family was a count, not an adjective: „already 5-6 different questions",
+ * and it is seven. **Fixing this is ROAD work, not facades** — the register's
+ * own words, and the second axis is the proof of it.
+ *
+ * So every instance now also names a ROADSCAPE: what kind of street this is.
+ * The levers are the ones a driver reads from the seat — the ROAD CLASS (an
+ * arterial class paints solid edge lines and plants a row of lamp columns; a
+ * residential or living_street one gets one dashed centre line and bare
+ * asphalt), whether the street is ONE-WAY (Д4 at the mouth, В1 at the far
+ * terminal, no centre line, no oncoming), whether it has a PAVEMENT on both
+ * sides at all (`bareVerge` — the industrial canyon's dock wall meets the
+ * kerb), whether it carries a KERBSIDE PARKED ROW, and which BAN ZONE posts a
+ * real В24/В27 face on it.
+ *
+ * THREE LEVERS DELIBERATELY NOT USED, each with the measurement that ruled it
+ * out — read this before reaching for them:
+ *   1. THE CENTRELINE. Every committed PE trace is a dead-straight rail at
+ *      exactly x = 4.06 (measured: min = max on every sample of all 21 files).
+ *      A bend invalidates 21 recorded ghost lines, which are not this file's to
+ *      re-record.
+ *   2. NEW JUNCTION NODES. An uncontrolled junction inside a crossing drill can
+ *      fire a give-way fault the lesson never teaches — the exact defect class
+ *      he complains loudest about.
+ *   3. CARRIAGEWAY WIDTH. It was tried: giving four of these streets the 4 m
+ *      curbside parking band widens them to 24.25 m curb to curb, which is a
+ *      genuinely different street AND fixes FR-21's car half — but the staged
+ *      walks are measured from the kerb, so the crossing grows from 16.25 m to
+ *      24.25 m and takes 5.7 s longer at 1.4 m/s. `s3-pe-bot-completion` then
+ *      dropped `sc-crossing-slow-crosser` and `sc-crossing-white-cane` from
+ *      3 stars to 1. Re-tuning seven drills' release distances (doc 86 T11
+ *      derives them from the kerb offset) is a lesson-design job, not a map
+ *      job. The width lever is left to whoever owns that re-tune; the tag it
+ *      needs already exists (`DistrictEdge.parkingBand`).
+ *
+ * FR-21's car half is therefore closed here the OTHER way the tag allows: every
+ * one of the seven declares `parkingBand: false`, so the curb pass places
+ * nothing. It used to seat every body at `travelHalf + 2.0 m`, which on a class
+ * with no band is two metres PAST the kerb — „he goes trough a car which is
+ * standing on the sidewalk", four separate lessons in his own words. Nothing
+ * now stands on these pavements, and no geometry moved to achieve it.
+ *
  * Pinned by platform/src/modules/sim/lessons/scenario/__tests__/
  * lane10-pe-vru-truth.test.ts (G7): every district must name a distinct
- * streetscape and no two may share a building layout.
+ * streetscape and no two may share a building layout. The ROAD side is pinned
+ * by world/__tests__/pe-districts.test.ts, which used to assert the sameness
+ * (`edges.length === 1` seven times over) and now asserts the variety.
  *
  * The exact district-v1 format buildWorldGeometry (world), createWorldRuntime
  * (runtime — the CrossingZoneTracker derives its zone from crossings[]) and
@@ -74,13 +124,29 @@ const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..
 const SCALED_LANE_W = 3.25 * 2.5;
 /** Street continues this far past the crossing (run-out + finish), m. */
 const RUNOUT_M = 60;
+/** constants.PARKING_LANE_WIDTH_M — the curbside band, per side, m. */
+const PARKING_LANE_WIDTH_M = 4.0;
+/** constants.SIDEWALK_WIDTH_M + SIDEWALK_SKIRT_M. */
+const SIDEWALK_W = 3.5;
+const SIDEWALK_SKIRT_M = 0.35;
+/** Stand-back kept between the pavement's outer skirt and any wall, m. */
+const FRONTAGE_STANDBACK_M = 0.5;
 /**
- * Nearest x a building volume may occupy: half-carriageway 8.125 + the kerb
- * skirt 0.35 + the 3.5 m sidewalk the builder draws + 0.5 m of stand-back.
+ * Nearest x a building volume may occupy on a street with NO parking band:
+ * half-carriageway 8.125 + the kerb skirt 0.35 + the 3.5 m sidewalk the builder
+ * draws + 0.5 m of stand-back. The STREETSCAPE recipes below are authored
+ * against exactly this number; a road that carries a parking band pushes its
+ * whole frontage out by the band width (`frontageClearX` / `shiftOut`), so a
+ * recipe never has to know which road it is riding.
  * Self-validated below — a frontage inside this eats the pavement the staged
  * pedestrians walk on.
  */
-const FRONTAGE_CLEAR_X = 12.5;
+const FRONTAGE_CLEAR_X = 8.125 + SIDEWALK_SKIRT_M + SIDEWALK_W + FRONTAGE_STANDBACK_M; // 12.475
+
+/** network.edgeHalfWidth + the skirt + the pavement + the stand-back, m. */
+function frontageClearX(parkingBandM) {
+  return FRONTAGE_CLEAR_X + parkingBandM;
+}
 
 const r2 = (v) => Math.round(v * 100) / 100;
 
@@ -201,6 +267,132 @@ const STREETSCAPES = {
 };
 
 // ---------------------------------------------------------------------------
+// Roadscapes (doc 87 FR-41 / B50 / B53) — WHAT KIND OF STREET this is
+// ---------------------------------------------------------------------------
+
+/**
+ * The road half of the answer to „seven copies of one street". Each recipe is
+ * the cross-section a driver reads from the seat, and every field of it is
+ * something the engine already draws:
+ *
+ *   `roadClass`    — `tertiary` is an ARTERIAL class in the world builder:
+ *                    solid edge lines, lane dashes and a lamp column row, plus
+ *                    the 4 m curbside parking band by class. `residential` and
+ *                    `unclassified` get one dashed centre line and bare asphalt.
+ *                    It is also the priority rank, so it is a real statement
+ *                    about what the street IS, not a paint choice.
+ *   `parkingBand`  — `true`  ⇒ the 4 m band is drawn, kerb to kerb becomes
+ *                    24.25 m, and the procedural parked row stands ON ASPHALT
+ *                    instead of on the pavement (FR-21, the car half).
+ *                    `false` ⇒ no band AND no parked row at all — a wall-to-
+ *                    wall industrial canyon has no kerbside parking.
+ *                    `null`  ⇒ the class decides (an arterial class has one).
+ *   `oneway`       — a one-way street posts Д4 at its mouth, drops the centre
+ *                    line, and removes oncoming traffic from the picture. The
+ *                    right-hand lane centre stays at x = 4.06, so the recorded
+ *                    ghost lines are untouched.
+ *   `ban`          — an authored ban zone: a REAL В24/В27 face on a post, on a
+ *                    span that means something for this lesson (no stopping
+ *                    across a shop frontage; no overtaking past a blind corner).
+ *                    `signRef` is the sign the runtime posts for the kind.
+ *
+ * `noteBg` is the one-line design intent, and it ships in meta.scenario beside
+ * the streetscape's, so a reviewer reading the JSON alone can see what the road
+ * is for.
+ */
+const KIND_TO_SIGN = { noStopping: "В27", noOvertaking: "В24" };
+
+const ROADSCAPES = {
+  /** PE-03 — the shopping COLLECTOR: the only lit, edge-lined street of the set,
+   *  with a В27 keeping the terrace frontage clear. */
+  "collector-shopping": {
+    roadClass: "tertiary",
+    parkingBand: false,
+    bareVerge: null,
+    ban: { kind: "noStopping", fromFrac: 0.45, toFrac: 0.72 },
+    oneway: false,
+    noteBg:
+      "Събирателна улица: ясна крайна линия, осеви прекъснати линии и редица улични стълбове — единствената осветена отсечка в групата. Пред търговската тераса стои В27 „Забранено е спирането“, за да не се паркира точно пред витрините.",
+  },
+  /** PE-08 — the CLINIC street: quiet residential, В27 across the entrance so an
+   *  ambulance always has the kerb. */
+  "residential-clinic": {
+    roadClass: "residential",
+    parkingBand: false,
+    bareVerge: null,
+    ban: { kind: "noStopping", fromFrac: 0.4, toFrac: 0.72 },
+    oneway: false,
+    noteBg:
+      "Квартална улица пред поликлиника: без улично осветление и без крайни линии, само осева прекъсната линия — а пред самия вход В27 „Забранено е спирането“, за да остане достъп за линейка.",
+  },
+  /** PE-16 — the industrial CANYON: the only street with no pavement on the
+   *  dock side at all; the wall meets the kerb. Nothing is lit, nothing parks. */
+  "industrial-canyon": {
+    roadClass: "unclassified",
+    parkingBand: false,
+    bareVerge: "right",
+    ban: null,
+    oneway: false,
+    noteBg:
+      "Складов коридор: от страната на рампите НЯМА тротоар изобщо — стената опира в бордюра, няма стълб, няма дърво, няма паркирана кола. Нощем фаровете са цялата видимост.",
+  },
+  /** PE-02 — the BLIND CORNER: a В27 keeps the kerb empty exactly where the
+   *  sightline dies, so nothing is added to what the corner already hides. */
+  "residential-blind-corner": {
+    roadClass: "residential",
+    parkingBand: false,
+    bareVerge: null,
+    ban: { kind: "noOvertaking", fromFrac: 0.3, toFrac: 0.72 },
+    oneway: false,
+    noteBg:
+      "Тясна квартална улица преди закрит ъгъл: В24 „Забранено е изпреварването“ важи точно там, където видимостта свършва — не се излиза в насрещното покрай ъгъла, зад който излиза пешеходецът.",
+  },
+  /** PE-10 — the FREIGHT collector: lit and edge-lined like the shopping street,
+   *  but signed В24, because what comes out of the gate is a lorry. */
+  "freight-collector": {
+    roadClass: "tertiary",
+    parkingBand: false,
+    bareVerge: null,
+    ban: { kind: "noOvertaking", fromFrac: 0.2, toFrac: 0.8 },
+    oneway: false,
+    noteBg:
+      "Товарен подход: събирателна улица с крайни линии и стълбове, а покрай портала на базата — В24 „Забранено е изпреварването“, защото оттам излизат тежки коли и иззад тях се появяват хора.",
+  },
+  /**
+   * PE-04 — the COURTYARD street: no sign at all, no lamp, no line but the
+   * centre one. The plainest street of the seven, deliberately.
+   *
+   * NOT `living_street`, and the reason is a law, not a preference:
+   * `constants.livingZoneCarriageway` treats that class as a жилищна зона, and
+   * `gradesCrossingDuty` then grades чл. 119 across the WHOLE carriageway with
+   * no paint. A жилищна зона is signed Д21 and posted at walking pace; this
+   * map is posted 40 and its lesson copy says «улицата е квартална, с
+   * ограничение 40 км/ч». Claiming the zone to win a variety point would be
+   * exactly the kind of thing this register exists to stop.
+   */
+  "courtyard-street": {
+    roadClass: "residential",
+    parkingBand: false,
+    bareVerge: null,
+    ban: null,
+    oneway: false,
+    noteBg:
+      "Междублокова улица: нито знак, нито стълб, нито крайна линия — само осевата прекъсната. Най-голата отсечка в групата, и точно затова нищо не ти подсказва, че оттук изскачат деца.",
+  },
+  /** PE-14 — the ONE-WAY in front of the institute: Д4 at the mouth, no centre
+   *  line, no oncoming — and therefore no excuse. */
+  "oneway-institute": {
+    roadClass: "residential",
+    parkingBand: false,
+    bareVerge: null,
+    ban: null,
+    oneway: true,
+    noteBg:
+      "Еднопосочна улица (знак Д4 на входа): няма насрещно движение и няма осева линия — цялото платно е твое, а това прави пропускането на пешеходеца изцяло твоя отговорност.",
+  },
+};
+
+// ---------------------------------------------------------------------------
 // The generator (single crossing — the S3 PE micro-map)
 // ---------------------------------------------------------------------------
 
@@ -211,11 +403,12 @@ const STREETSCAPES = {
  *   approachM: number,       // street-start → crossing distance (>= 60)
  *   maxspeedKmh: number,     // legal limit on the street (30..50)
  *   streetscape: string,     // doc 86 D1 — the frontage recipe (STREETSCAPES)
+ *   roadscape: string,       // doc 87 FR-41 — the cross-section (ROADSCAPES)
  * }} params
  */
 export function buildPeCrossingStreet(params) {
   const errors = [];
-  const { districtId, label, approachM, maxspeedKmh, streetscape } = params;
+  const { districtId, label, approachM, maxspeedKmh, streetscape, roadscape } = params;
 
   // -- Parameter validation (actionable — the assembly line runs unattended).
   if (!/^[a-z0-9-]+$/.test(districtId ?? "")) errors.push(`districtId "${districtId}" must be kebab-case`);
@@ -227,7 +420,23 @@ export function buildPeCrossingStreet(params) {
         `(doc 86 D1: an instance without its own frontage is another copy of the same street)`,
     );
   }
+  if (!ROADSCAPES[roadscape]) {
+    errors.push(
+      `roadscape "${roadscape}" unknown — pick one of ${Object.keys(ROADSCAPES).join(", ")} ` +
+        `(doc 87 FR-41: an instance without its own cross-section is another copy of the same ROAD, ` +
+        `which is the half the streetscape pass did not fix)`,
+    );
+  }
   if (errors.length > 0) throw new Error(`gen_pe_crossings params invalid:\n  - ${errors.join("\n  - ")}`);
+
+  const road = ROADSCAPES[roadscape];
+  /** Arterial classes carry the band by class; an explicit tag overrides it. */
+  const bandByClass = ["primary", "secondary", "tertiary"].includes(road.roadClass);
+  const hasBand = road.parkingBand === null ? bandByClass : road.parkingBand === true;
+  const parkingBandM = hasBand ? PARKING_LANE_WIDTH_M : 0;
+  const clearX = frontageClearX(parkingBandM);
+  /** How far the authored frontage moves out to clear THIS cross-section. */
+  const shiftOut = clearX - FRONTAGE_CLEAR_X;
 
   const crossingY = approachM;
   const lengthM = crossingY + RUNOUT_M;
@@ -248,9 +457,9 @@ export function buildPeCrossingStreet(params) {
       id: "pe-e-street",
       from: "pe-n-start",
       to: "pe-n-end",
-      class: "residential",
+      class: road.roadClass,
       name: "Улица с пешеходна пътека",
-      oneway: false,
+      oneway: road.oneway,
       roundabout: false,
       lanes: 2,
       lanesSource: "tag",
@@ -258,8 +467,33 @@ export function buildPeCrossingStreet(params) {
       maxspeedSource: "tag",
       length: polylineLength(geometry),
       geometry,
+      // FR-21 (car half) + FR-41: only written when the roadscape has an
+      // OPINION about the curbside band, so an arterial-class street stays
+      // byte-identical to a file written before the tag existed.
+      // `true`  ⇒ draw the 4 m band; the parked row lands on asphalt.
+      // `false` ⇒ no band and no procedural parked row on this street at all.
+      ...(road.parkingBand === null ? {} : { parkingBand: road.parkingBand }),
+      // FR-41: a side with NO pavement at all (network.edgeBareVerge) — the
+      // industrial canyon's loading wall stands on the kerb, so that side has
+      // no footway, no lamp column, no tree and no bus shelter.
+      ...(road.bareVerge ? { bareVerge: road.bareVerge } : {}),
     },
   ];
+
+  // -- Ban zone (ADR-006 stage 2a): the В24/В27 the roadscape posts, spanned
+  // as a fraction of the street so it rides any approach length.
+  const ZONES = road.ban
+    ? [
+        {
+          id: `pe-z-${road.ban.kind.toLowerCase()}`,
+          kind: road.ban.kind,
+          edgeId: "pe-e-street",
+          fromM: r2(lengthM * road.ban.fromFrac),
+          toM: r2(lengthM * road.ban.toFrac),
+          signRef: KIND_TO_SIGN[road.ban.kind],
+        },
+      ]
+    : [];
 
   // -- Crossing: the single geometric truth (CrossingZoneTracker + the
   // markings builder + the ScenarioSpec all read exactly this).
@@ -301,7 +535,14 @@ export function buildPeCrossingStreet(params) {
   // happens here and that occludes the approach. Every volume stands clear of
   // the carriageway + kerb + sidewalk (post-validated below).
   const recipe = STREETSCAPES[streetscape];
-  const BUILDINGS = recipe.build(crossingY);
+  // Authored against FRONTAGE_CLEAR_X; a road that carries a parking band
+  // pushes the whole frontage OUT by the band width, so the recipe keeps its
+  // authored stand-back from the kerb on every cross-section (no volume
+  // straddles x = 0, so the sign of x is the side).
+  const BUILDINGS = recipe.build(crossingY).map((bl) => ({
+    ...bl,
+    footprint: bl.footprint.map(([x, y]) => [r2(x + Math.sign(x) * shiftOut), y]),
+  }));
 
   // -- Bounds + stats.
   const bounds = { minX: Infinity, minY: Infinity, maxX: -Infinity, maxY: -Infinity };
@@ -313,9 +554,10 @@ export function buildPeCrossingStreet(params) {
       bounds.maxY = Math.max(bounds.maxY, y);
     }
   }
-  // Road body + buildings can outgrow the centerline bounds — cover them.
-  bounds.minX = Math.min(bounds.minX, -halfRoadM - 6);
-  bounds.maxX = Math.max(bounds.maxX, halfRoadM + 6);
+  // Road body + buildings can outgrow the centerline bounds — cover them
+  // (the body is curb to curb: travel lanes + the roadscape's parking band).
+  bounds.minX = Math.min(bounds.minX, -(halfRoadM + parkingBandM) - 6);
+  bounds.maxX = Math.max(bounds.maxX, halfRoadM + parkingBandM + 6);
   for (const bl of BUILDINGS) {
     for (const [x, y] of bl.footprint) {
       bounds.minX = Math.min(bounds.minX, x);
@@ -345,6 +587,7 @@ export function buildPeCrossingStreet(params) {
         maxspeedUrbanKmh: maxspeedKmh,
         note: "Права улица: ограничението важи по цялата дължина; пред пътеката се кара с готовност за спиране.",
       },
+      ...(ZONES.length > 0 ? { zonesVersion: 1 } : {}),
       stats: {
         roadKm: r2(EDGES.reduce((s, e) => s + e.length, 0) / 1000),
         nodes: Object.keys(NODES).length,
@@ -353,6 +596,7 @@ export function buildPeCrossingStreet(params) {
         crossings: CROSSINGS.length,
         buildings: BUILDINGS.length,
         spawnPoints: SPAWN_POINTS.length,
+        zones: ZONES.length,
       },
       /**
        * Scenario Studio payload (doc 76): the archetype recipe + the crossing
@@ -367,6 +611,16 @@ export function buildPeCrossingStreet(params) {
         /** doc 86 D1 — WHICH street this is, not just how long the approach is. */
         streetscape,
         streetscapeNoteBg: recipe.noteBg,
+        /** doc 87 FR-41 — WHAT KIND OF ROAD it is, which is the half the
+         *  streetscape pass left alone and the founder photographed. */
+        roadscape,
+        roadscapeNoteBg: road.noteBg,
+        roadClass: road.roadClass,
+        parkingBandM,
+        bareVerge: road.bareVerge,
+        curbToCurbM: r2(2 * (halfRoadM + parkingBandM)),
+        oneway: road.oneway,
+        banSignRef: road.ban ? KIND_TO_SIGN[road.ban.kind] : null,
         primaryCrossingId: "pe-x-1",
         laneCenterRightM: laneCenterM,
         crossings: CROSSINGS.map((c) => ({ id: c.id, x: c.x, y: c.y, kind: c.kind })),
@@ -383,6 +637,7 @@ export function buildPeCrossingStreet(params) {
     roundabouts: ROUNDABOUTS,
     buildings: BUILDINGS,
     spawnPoints: SPAWN_POINTS,
+    ...(ZONES.length > 0 ? { zones: ZONES } : {}),
   };
 
   // -------------------------------------------------------------------------
@@ -423,14 +678,40 @@ export function buildPeCrossingStreet(params) {
     seenBuildingIds.add(bl.id);
     if (!(bl.height > 0)) post.push(`${bl.id}: non-positive height`);
     for (const [x] of bl.footprint) {
-      if (Math.abs(x) < FRONTAGE_CLEAR_X) {
-        post.push(`${bl.id}: footprint x=${x} is inside the ${FRONTAGE_CLEAR_X} m kerb+sidewalk clearance`);
+      if (Math.abs(x) < clearX) {
+        post.push(
+          `${bl.id}: footprint x=${x} is inside the ${r2(clearX)} m kerb+sidewalk clearance ` +
+            `(carriageway half ${r2(halfRoadM + parkingBandM)} m on roadscape ${roadscape})`,
+        );
       }
     }
   }
   if (BUILDINGS.length < 3) post.push(`streetscape ${streetscape}: needs >= 3 volumes to read as a street`);
   if (!Number.isFinite(bounds.minX) || bounds.maxX <= bounds.minX || bounds.maxY <= bounds.minY) {
     post.push("degenerate bounds");
+  }
+  // The roadscape must be self-consistent: a street that declares no parked row
+  // may not also declare the band that row would stand on, and a `parkingBand`
+  // opinion on an arterial class is a contradiction the world silently ignores
+  // (PARKING_LANE_CLASSES already grants it).
+  if (road.bareVerge !== null && !["left", "right", "both"].includes(road.bareVerge)) {
+    post.push(`roadscape ${roadscape}: bareVerge must be null | "left" | "right" | "both"`);
+  }
+  // FR-21: a street that draws no parking band must not be left carrying a
+  // procedurally parked row, because the pass would stand it on the pavement.
+  if (parkingBandM === 0 && road.parkingBand !== false) {
+    post.push(
+      `roadscape ${roadscape}: no parking band is drawn, so it must say ` +
+        `parkingBand: false — otherwise TrafficLayer.computeParkedCars seats a ` +
+        `row 2 m past the kerb, on the footway (founder item FR-21)`,
+    );
+  }
+  for (const z of ZONES) {
+    if (KIND_TO_SIGN[z.kind] !== z.signRef) post.push(`${z.id}: signRef ${z.signRef} does not post ${z.kind}`);
+    if (!(z.fromM >= 0 && z.toM <= lengthM && z.toM - z.fromM >= 20)) {
+      post.push(`${z.id}: span [${z.fromM}, ${z.toM}] is not a readable stretch of the ${lengthM} m street`);
+    }
+    if (z.edgeId !== "pe-e-street") post.push(`${z.id}: unknown edgeId ${z.edgeId}`);
   }
   if (post.length > 0) {
     throw new Error(`gen_pe_crossings self-validation FAILED:\n  - ${post.join("\n  - ")}`);
@@ -440,8 +721,39 @@ export function buildPeCrossingStreet(params) {
 }
 
 // ---------------------------------------------------------------------------
-// The three committed instances (S3 PE batch 1)
+// The seven committed instances (S3 PE batch 1)
 // ---------------------------------------------------------------------------
+//
+// He played catalog 24–30 back to back. Every column below has to differ from
+// its neighbours for the SEQUENCE to stop being the defect (doc 87 B53):
+//
+//   district      approach  limit  class         curb-to-curb  parked row  sign
+//   pe-clear-v1     90 m    50     tertiary        24.25 m      broken@В27  В27
+//   pe-slow-v1      85 m    40     residential*    24.25 m      broken@В27  В27
+//   pe-rain-v1      95 m    50     unclassified    16.25 m      NONE         —
+//   pe-dart-v1      80 m    50     residential     16.25 m      NONE        В27
+//   pe-bus-v1       88 m    50     tertiary        24.25 m      on asphalt  В24
+//   pe-child-v1     78 m    40     residential     16.25 m      NONE        В24
+//   pe-cane-v1      92 m    50     residential* ONE-WAY 24.25 m on asphalt  Д4
+//
+//   (* residential + an explicit `parkingBand: true` — see ROADSCAPES.)
+//
+// FR-21 is closed on all seven, two different ways: four streets grew the band
+// their row was already standing in the middle of (the bodies did not move —
+// the KERB did), and three declare `parkingBand: false`, so nothing is placed
+// where there is nowhere to stand. The three narrow ones are narrow on purpose:
+// pe-dart-v1 and pe-child-v1 carry darts whose release distances are DERIVED
+// from the kerb offset (doc 86 T11), so widening them would silently re-time
+// two drills, and pe-rain-v1 is a wall-to-wall industrial canyon that would not
+// have kerbside parking anyway.
+//
+// No two rows agree on the whole tuple, and world/__tests__/pe-districts
+// „no two districts share a CROSS-SECTION signature" is what keeps it that way.
+// The two arterial-class streets also gain edge lines, lane dashes and a lamp
+// column row that the residential ones do not have, so „lamps = 0 on all seven"
+// is no longer true of the family either. And a В27 span is a real hole in the
+// parked row — `TrafficLayer.computeParkedCars` honours the ban zone, so the
+// sign and the street agree.
 
 const INSTANCES = [
   {
@@ -450,6 +762,7 @@ const INSTANCES = [
     approachM: 90,
     maxspeedKmh: 50,
     streetscape: "corner-shop-terrace",
+    roadscape: "collector-shopping",
   },
   {
     districtId: "pe-slow-v1",
@@ -457,6 +770,7 @@ const INSTANCES = [
     approachM: 85,
     maxspeedKmh: 40,
     streetscape: "clinic-and-park",
+    roadscape: "residential-clinic",
   },
   {
     districtId: "pe-rain-v1",
@@ -464,6 +778,7 @@ const INSTANCES = [
     approachM: 95,
     maxspeedKmh: 50,
     streetscape: "unlit-warehouse-canyon",
+    roadscape: "industrial-canyon",
   },
   {
     districtId: "pe-dart-v1",
@@ -471,6 +786,7 @@ const INSTANCES = [
     approachM: 80,
     maxspeedKmh: 50,
     streetscape: "blind-corner-kiosk",
+    roadscape: "residential-blind-corner",
   },
   {
     districtId: "pe-bus-v1",
@@ -478,6 +794,7 @@ const INSTANCES = [
     approachM: 88,
     maxspeedKmh: 50,
     streetscape: "depot-gate",
+    roadscape: "freight-collector",
   },
   {
     districtId: "pe-child-v1",
@@ -485,13 +802,15 @@ const INSTANCES = [
     approachM: 78,
     maxspeedKmh: 40,
     streetscape: "courtyard-blocks",
+    roadscape: "courtyard-street",
   },
   {
     districtId: "pe-cane-v1",
-    label: "Улица пред институт за незрящи (сценарий PE-14)",
+    label: "Еднопосочна улица пред институт за незрящи (сценарий PE-14)",
     approachM: 92,
     maxspeedKmh: 50,
     streetscape: "institute-and-transit",
+    roadscape: "oneway-institute",
   },
 ];
 
@@ -509,10 +828,17 @@ for (const params of INSTANCES) {
   writeFileSync(CONTENT_FILE, out);
   writeFileSync(PUBLIC_FILE, out); // byte-identical publish
 
+  const sc = district.meta.scenario;
   console.log(`=== pe-crossings build: ${params.districtId} ===`);
   line("approach / street length", `${params.approachM} m / ${district.roads.edges[0].length} m`);
   line("limit", `${params.maxspeedKmh} km/h`);
   line("streetscape", `${params.streetscape} (${district.buildings.length} volumes)`);
+  line(
+    "roadscape",
+    `${params.roadscape} — ${sc.roadClass}${sc.oneway ? " ONE-WAY" : ""}, ` +
+      `${sc.curbToCurbM} m curb to curb, parking band ${sc.parkingBandM} m` +
+      `${sc.banSignRef ? `, posts ${sc.banSignRef}` : ""}`,
+  );
   line("crossing", district.crossings.map((c) => `${c.id}@y=${c.y}`).join(", "));
   line("spawns", district.spawnPoints.map((s) => s.id).join(", "));
   line("output", `${CONTENT_FILE} (+ public copy)`);

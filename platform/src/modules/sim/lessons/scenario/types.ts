@@ -197,6 +197,96 @@ export interface ScenarioTraffic {
   anchorRadiusM?: number;
 }
 
+// ---------------------------------------------------------------------------
+// THE COMPLICATION — what a rung ADDS (the founder's line 214)
+// ---------------------------------------------------------------------------
+
+/**
+ * The seven things a rung is allowed to ADD over the rung below it. Every
+ * token is a MEASURABLE difference between two compiled LessonSpecs, which is
+ * the whole point: `LevelComplication.adds` is checked against the compiler's
+ * own output (`__tests__/level-complication.test.ts`), never against itself.
+ *
+ * Why a closed vocabulary rather than free text. „L5 е по-трудно" is a claim
+ * no gate can read; „this rung adds `grip`" is a claim that fails loudly when
+ * the compiled lesson carries no physics flag the rung below did not. The
+ * wave that wrote Bulgarian into `instructionsBg` — a field compileScenario
+ * dropped, no .tsx read, and the gate itself consulted — closed eighteen
+ * scenarios by writing into a void. A token here cannot be satisfied by
+ * writing text anywhere.
+ */
+export type RungAddition =
+  /** More ambient road users than the rung below (LessonSpec.traffic). */
+  | "traffic"
+  /** A rendered condition the rung below did not set (LessonSpec.environment). */
+  | "weather"
+  /** Reduced grip or wind — the road/air actually changes (LessonSpec.physics). */
+  | "grip"
+  /** A staged conflict actor this rung stages (LessonSpec.stagedEvents). */
+  | "actor"
+  /** A newly measured or tightened quality bar (resolveScenarioRubric). */
+  | "rubric"
+  /** A detector armed or a threshold moved (LessonSpec.ruleConfig). */
+  | "rules"
+  /** Exam protocol: examMode and/or a cold start (Наредба № 38 framing). */
+  | "protocol";
+
+export const RUNG_ADDITIONS: readonly RungAddition[] = [
+  "traffic",
+  "weather",
+  "grip",
+  "actor",
+  "rubric",
+  "rules",
+  "protocol",
+];
+
+/**
+ * ONE RUNG'S COMPLICATION — the delta, and the instructor's explanation of it,
+ * authored together so neither can ship without the other.
+ *
+ * THE DEFECT THIS EXISTS FOR (founder review line 214, in passing, at the end
+ * of a sentence about something else): *„we need major reworks on all 150
+ * L5-L4-L3-L2s CURRENTLY I'M REVIEWING L1s"*. Measured on 2026-08-02 across
+ * the 167 shipped templates: **92 author no L5 at all**, `spec.traffic` exists
+ * on exactly **one**, and above L3 `DEFAULT_LEVEL_TOLERANCE` is a flat 1.0 —
+ * so for a silent template L4 differed from L3 by a single boolean and L5 did
+ * not exist. The ladder could REMOVE the shadow car, the ribbon and the hints;
+ * it had nothing to add, because the traffic multiplier multiplies a baseline
+ * of zero and a staged actor needs map coordinates the compiler cannot see.
+ *
+ * TWO RULES, both machine-checked, and they are the same rule from two sides:
+ *  1. **No silent tax.** A rung whose compiled lesson carries a complication
+ *     the student was never told about is difficulty that punishes instead of
+ *     teaching. So the complication is COMPILED INTO `LessonSpec.briefingBg`
+ *     as its first step — the field `LessonPlayShell` actually renders, up
+ *     front and blocking, acknowledged with „Разбрах" before the wheels turn.
+ *  2. **No theatre.** Every token of `adds` must be a real difference between
+ *     this rung's compiled lesson and the next lower authored rung's. Copy
+ *     that promises rain on a dry rung fails the gate.
+ *
+ * THEO-4 (doc 64): `coachBg` never says „по-трудно е". It names the physics or
+ * the traffic that changed, what it does to the car or the sight line, and what
+ * the driver does about it — the sentence an instructor says as the wipers go
+ * on. `lawRef` cites by retrieval (ADR-002), never free recall.
+ */
+export interface LevelComplication {
+  /** What this rung ADDS — checked against the compiled delta, not the text. */
+  adds: readonly RungAddition[];
+  /** Short heading, e.g. „Мокър паваж" — the chip a student reads first. */
+  titleBg: string;
+  /**
+   * The instructor's sentence: what changed, what it does, what you do.
+   * Rendered as briefing step 1 of this rung. A rung whose environment sets
+   * night/rain/fog MUST name светлини/фарове here — that is the same string
+   * `world/referents.ts` L10 reads, so a lamp duty can never be graded on a
+   * rung whose copy does not state it.
+   */
+  coachBg: string;
+  /** ЗДвП / ППЗДвП / Наредба citation (validated like teach.lawRef). */
+  lawRef?: string;
+}
+
 /**
  * One difficulty rung — a PARAMETER DELTA over the template (doc 76 §7).
  * Aids default from DEFAULT_LEVEL_AIDS (the §7 table); everything here is an
@@ -293,6 +383,14 @@ export interface LevelSpec {
    * Absent on both = no `ruleConfig` key on the lesson, bit-identical.
    */
   ruleConfig?: Partial<RuleEngineConfig>;
+  /**
+   * WHAT THIS RUNG ADDS, and the instructor's explanation of it (see
+   * LevelComplication). Absent on the lowest rung by definition — there is
+   * nothing below it to be harder than. Absent on a rung that adds nothing is
+   * legal and honest; a rung that ADDS something and stays silent is the
+   * difficulty tax the gate refuses.
+   */
+  complication?: LevelComplication;
 }
 
 // ---------------------------------------------------------------------------

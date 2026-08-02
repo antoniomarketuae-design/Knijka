@@ -42,6 +42,7 @@ import type {
   PriorityFromRightSpec,
 } from "../../contracts";
 import type { ScenarioSpec } from "./types";
+import { l5Wet } from "./complications";
 
 /** The mid-block zebra on бул. Драган Цанков (d2-v1 crossing n331946209). */
 const ZEBRA = { x: 138.3, y: 205.78 } as const;
@@ -1184,6 +1185,9 @@ export const SC_ED_POLIGON_CHAIN: ScenarioSpec = {
     // No L5: the backlog authors rungs 1–4 only. The полигон is a closed
     // площадка (no rain/night exam maneuver) and the faults are low-speed
     // control habits, not conditions skills.
+    // L5 «Усложнени» — the complication kit (scenario/complications.ts):
+    // the delta AND the instructor's line that explains it, authored together.
+    l5Wet(),
   ],
   conditions: { weather: "dry" },
   localeBg: "bg-BG",

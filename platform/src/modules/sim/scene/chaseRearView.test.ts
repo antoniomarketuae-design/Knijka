@@ -6,6 +6,8 @@
  * ratio the product ships on, plus the extremes, here.
  */
 
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
   rearViewBottomFraction,
@@ -26,6 +28,65 @@ import {
 /** 4:3, 16:10, 16:9, 21:9, an iPhone in portrait, and two absurd extremes. */
 const ASPECTS = [4 / 3, 1.6, 16 / 9, 21 / 9, 375 / 812, 0.3, 5] as const;
 const SIDES: RearViewSide[] = ["left", "right", "rear"];
+
+const COMPONENTS = resolve(__dirname, "../../../components/sim");
+const CAMERA_RIG = readFileSync(resolve(COMPONENTS, "CameraRig.tsx"), "utf8");
+const VITOK_COCKPIT = readFileSync(resolve(COMPONENTS, "vitok/VitokCockpit.tsx"), "utf8");
+
+/**
+ * ===========================================================================
+ * WHICH CAMERA THE MIRROR IS IN — the assertion whose absence cost a whole
+ * review round.
+ *
+ * `docs/simulation/89_WHAT_I_MISSED.md` §4 states, as a verified finding:
+ * „No rear-view mirror in the CHASE view — verified in code … `MirrorRig.tsx:41`
+ * — *Passes only run at all while the cockpit camera is live.* The mirror,
+ * including the Q/E windows just built, exists only in the cockpit."
+ *
+ * That reading is correct about `MirrorRig` and WRONG about the product. There
+ * are TWO instruments, in two files:
+ *
+ *   · `vitok/MirrorRig.tsx`   — render-to-texture onto the GLB glass in the
+ *     CABIN. Cockpit only, by construction, and rightly so: there is no GLB
+ *     glass on screen in any other camera.
+ *   · `CameraRig.tsx` + this module — a camera-locked quad, which is the CHASE
+ *     view's mirror. Persistent since register row B74's second pass.
+ *
+ * Reading either file alone answers for the wrong half of the product, so the
+ * fact is pinned here rather than left to be re-derived from a comment. If the
+ * chase window is ever made glance-only again, or moved behind the cockpit
+ * camera, these go red — instead of a fourth reviewer photographing it.
+ * ===========================================================================
+ */
+describe("the chase view has a mirror, and it is not MirrorRig", () => {
+  it("MirrorRig is mounted for the COCKPIT camera only — that much is true", () => {
+    expect(VITOK_COCKPIT).toMatch(/<MirrorRig[^>]*active=\{cockpitView\}/);
+  });
+
+  it("…and CameraRig owns a SECOND rear view, live whenever the camera is chase", () => {
+    // `mode === "chase" ? (heldSide ?? "rear") : null` — the `?? "rear"` is the
+    // whole of row B74: no key pressed, mirror still there.
+    expect(CAMERA_RIG).toMatch(/mode === "chase"\s*\?\s*\(heldSide \?\? "rear"\)\s*:\s*null/);
+  });
+
+  it("the chase window renders a real pass, not a placeholder", () => {
+    // One `renderMirrorPass` inside the chase block, fed by this module's
+    // constants — a quad with no pass behind it is a black rectangle, which is
+    // exactly the doc-82 bug this reuses the fix for.
+    expect(CAMERA_RIG).toMatch(/renderMirrorPass\(state\.gl, \{[\s\S]{0,200}?target: rv\.target/);
+    expect(CAMERA_RIG).toMatch(/REAR_VIEW_FOG_MIN_DENSITY/);
+    expect(CAMERA_RIG).toMatch(/REAR_VIEW_IDLE_CADENCE/);
+  });
+
+  it("Q/E/F move the SAME window rather than adding a second one in chase", () => {
+    // Item 45: „a small window on the right side if he press right". In chase
+    // that is this window sliding to the glanced side (`off.x * env`), not a
+    // separate widget — the cockpit's door-mirror windows are the ones gated on
+    // `mode === "cockpit"`.
+    expect(CAMERA_RIG).toMatch(/off\.x \* env/);
+    expect(CAMERA_RIG).toMatch(/mode === "cockpit" && glanceS > 0/);
+  });
+});
 
 describe("rearViewRect — the ≤10 % contract", () => {
   it("never exceeds a tenth of the screen at any aspect", () => {

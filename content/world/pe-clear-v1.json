@@ -22,6 +22,7 @@
    "maxspeedUrbanKmh": 50,
    "note": "Права улица: ограничението важи по цялата дължина; пред пътеката се кара с готовност за спиране."
   },
+  "zonesVersion": 1,
   "stats": {
    "roadKm": 0.15,
    "nodes": 2,
@@ -29,7 +30,8 @@
    "intersections": 0,
    "crossings": 1,
    "buildings": 4,
-   "spawnPoints": 2
+   "spawnPoints": 2,
+   "zones": 1
   },
   "scenario": {
    "archetype": "zebra-block",
@@ -40,6 +42,14 @@
    },
    "streetscape": "corner-shop-terrace",
    "streetscapeNoteBg": "Търговска отсечка: магазини от двете страни, затова на пътеката ПОСТОЯННО има хора — изчакването е нормата, не изключението.",
+   "roadscape": "collector-shopping",
+   "roadscapeNoteBg": "Събирателна улица: ясна крайна линия, осеви прекъснати линии и редица улични стълбове — единствената осветена отсечка в групата. Пред търговската тераса стои В27 „Забранено е спирането“, за да не се паркира точно пред витрините.",
+   "roadClass": "tertiary",
+   "parkingBandM": 0,
+   "bareVerge": null,
+   "curbToCurbM": 16.25,
+   "oneway": false,
+   "banSignRef": "В27",
    "primaryCrossingId": "pe-x-1",
    "laneCenterRightM": 4.06,
    "crossings": [
@@ -70,7 +80,7 @@
     "id": "pe-e-street",
     "from": "pe-n-start",
     "to": "pe-n-end",
-    "class": "residential",
+    "class": "tertiary",
     "name": "Улица с пешеходна пътека",
     "oneway": false,
     "roundabout": false,
@@ -88,7 +98,8 @@
       0,
       150
      ]
-    ]
+    ],
+    "parkingBand": false
    }
   ]
  },
@@ -214,6 +225,16 @@
    "heading": 0,
    "edgeId": "pe-e-street",
    "name": "Контролна точка — след пътеката"
+  }
+ ],
+ "zones": [
+  {
+   "id": "pe-z-nostopping",
+   "kind": "noStopping",
+   "edgeId": "pe-e-street",
+   "fromM": 67.5,
+   "toM": 108,
+   "signRef": "В27"
   }
  ]
 }

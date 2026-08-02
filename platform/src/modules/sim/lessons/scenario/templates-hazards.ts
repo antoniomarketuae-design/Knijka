@@ -22,6 +22,7 @@
  */
 
 import type { ScenarioSpec } from "./types";
+import { l5Wet } from "./complications";
 
 /** Northbound right-lane center of hz-obstacle-v1. */
 const LANE_X = 4.06;
@@ -106,6 +107,9 @@ export const SC_HAZARD_OBSTACLE: ScenarioSpec = {
     { level: 2 },
     { level: 3 },
     { level: 4, vehicleStart: "cold" },
+    // L5 «Усложнени» — the complication kit (scenario/complications.ts):
+    // the delta AND the instructor's line that explains it, authored together.
+    l5Wet(),
   ],
   conditions: { weather: "dry" },
   localeBg: "bg-BG",

@@ -27,6 +27,7 @@
 
 import type { RearTailgaterSpec } from "../../contracts";
 import type { ScenarioSpec } from "./types";
+import { l5Wet } from "./complications";
 
 // ---------------------------------------------------------------------------
 // Shared geometry constants (pinned from the generated district BY VALUE — the
@@ -365,6 +366,9 @@ export const SC_MW_MIN_SPEED: ScenarioSpec = {
     { level: 2 },
     { level: 3 },
     { level: 4, vehicleStart: "cold" },
+    // L5 «Усложнени» — the complication kit (scenario/complications.ts):
+    // the delta AND the instructor's line that explains it, authored together.
+    l5Wet(),
   ],
   conditions: { weather: "dry" },
   localeBg: "bg-BG",

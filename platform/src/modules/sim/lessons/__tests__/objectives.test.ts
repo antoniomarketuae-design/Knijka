@@ -942,4 +942,73 @@ describe("reachZone acceptBeforeMarkM — the acceptance stops where the paint d
     // The before picture: the same barge, credited.
     expect(approach(plain, BARGED)).toBe(true);
   });
+
+  /**
+   * FR-24, the NEGATIVE sign — and it is the common case, not the exotic one.
+   *
+   * `sc-rb-approach` above has its mark INSIDE the mouth, so its cut is
+   * positive. Ten of the catalog's twelve cut objectives are the other shape:
+   * the mark is authored honestly on the approach and the RADIUS is what
+   * reaches past the paint — helped over the line by the L1/L2 aid ladder,
+   * which widens the disc in both directions.
+   *
+   * This is `sc-sry-approach` („Спри на стоп-линията на червено") at its real
+   * geometry: mark y −34, stop line y −27.725, so the paint is 6.275 m AHEAD
+   * of the mark and the cut is −6.275. At L1 the ladder takes radius 8 → 12,
+   * which used to credit a car standing 5.72 m past a red light's stop line
+   * with having stopped AT it.
+   */
+  describe("the negative cut — when the RADIUS, not the mark, crosses the paint", () => {
+    const SRY_PAINT_Y = -27.725;
+    const AIDED: ObjectiveParams = {
+      kind: "reachZone",
+      x: 4.06,
+      y: -34,
+      radiusM: 12, // L1 aided (authored 8)
+      maxSpeedKmh: 40,
+      acceptBeforeMarkM: -6.275,
+    };
+    const UNCUT: ObjectiveParams = { ...AIDED, acceptBeforeMarkM: undefined };
+
+    /**
+     * The variable is WHERE THE DRIVER FIRST COMPLIES, exactly as in the
+     * positive-cut BARGED case above — not where he ends up. A car that was
+     * already legal on the approach has satisfied the task there and creeping
+     * forward afterwards cannot un-satisfy it; that is the monotonic latch
+     * working, and it is correct („he stopped at the line, then edged out for
+     * a better look" is not a red-light violation).
+     *
+     * So: over the 40 km/h cap all the way down the approach, dropping to a
+     * legal speed only at `compliesAtY`, and finishing 8 m past the mark.
+     */
+    const barge = (compliesAtY: number) => ({
+      toY: -26,
+      beforeKmh: 60,
+      afterKmh: 20,
+      slowAtY: compliesAtY,
+    });
+
+    it("credits the driver who is legal BEFORE the paint", () => {
+      expect(approach(AIDED, barge(SRY_PAINT_Y - 12))).toBe(true);
+      // …and from well back down the approach, where the sightline is better.
+      expect(approach(AIDED, barge(-50))).toBe(true);
+    });
+
+    it("refuses the driver who only complies PAST the line, though the disc reaches there", () => {
+      // The end pose is 8 m from the mark and the aided radius is 12, so the
+      // uncut circle unambiguously covers it — this is not a near miss.
+      expect(Math.abs(-26 - (AIDED as { y: number }).y)).toBeLessThan(12);
+      expect(approach(UNCUT, barge(SRY_PAINT_Y + 0.5))).toBe(true); // the before picture
+      expect(approach(AIDED, barge(SRY_PAINT_Y + 0.5))).toBe(false); // the fix
+    });
+
+    it("the boundary is the PAINT, not the mark — to the centimetre", () => {
+      expect(approach(AIDED, barge(SRY_PAINT_Y - 0.3))).toBe(true);
+      expect(approach(AIDED, barge(SRY_PAINT_Y + 0.3))).toBe(false);
+      // And the mark itself is NOT the boundary: complying 6 m past the mark
+      // but still short of the paint is credited. That 6.275 m is the whole
+      // difference between grading the waypoint and grading the law.
+      expect(approach(AIDED, barge((AIDED as { y: number }).y + 6))).toBe(true);
+    });
+  });
 });

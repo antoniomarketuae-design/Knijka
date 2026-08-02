@@ -59,6 +59,7 @@ import type {
   RearTailgaterSpec,
 } from "../../contracts";
 import type { ScenarioSpec } from "./types";
+import { l5Wet, l5WetGrip } from "./complications";
 
 // ---------------------------------------------------------------------------
 // Shared geometry constants (pinned from the generated districts by value —
@@ -189,6 +190,9 @@ export const SC_SPEED_CREEP: ScenarioSpec = {
     { level: 2 },
     { level: 3 },
     { level: 4, vehicleStart: "cold" },
+    // L5 «Усложнени» — the complication kit (scenario/complications.ts):
+    // the delta AND the instructor's line that explains it, authored together.
+    l5Wet(),
   ],
   conditions: { weather: "dry" },
   localeBg: "bg-BG",
@@ -355,6 +359,9 @@ export const SC_SPEED_DANGEROUS: ScenarioSpec = {
     { level: 2 },
     { level: 3 },
     { level: 4, vehicleStart: "cold" },
+    // L5 «Усложнени» — the complication kit (scenario/complications.ts):
+    // the delta AND the instructor's line that explains it, authored together.
+    l5Wet(),
   ],
   staged: [SPD_FLOW_LEAD, SPD_FLOW_PASSER],
   conditions: { weather: "dry" },
@@ -444,6 +451,9 @@ export const SC_SPEED_RAIN: ScenarioSpec = {
     { level: 2 },
     { level: 3 },
     { level: 4, vehicleStart: "cold" },
+    // L5 «Усложнени» — the complication kit (scenario/complications.ts):
+    // the delta AND the instructor's line that explains it, authored together.
+    l5WetGrip(),
   ],
   conditions: { weather: "rain", night: true },
   localeBg: "bg-BG",
@@ -635,6 +645,9 @@ export const SC_SPEED_ZONE: ScenarioSpec = {
     { level: 2 },
     { level: 3 },
     { level: 4, vehicleStart: "cold" },
+    // L5 «Усложнени» — the complication kit (scenario/complications.ts):
+    // the delta AND the instructor's line that explains it, authored together.
+    l5Wet(),
   ],
   // The schoolyard children. In `staged`, not `stagedAdd`: this drill has no
   // committed recording that could be perturbed (its traces are speed scripts
@@ -750,6 +763,9 @@ export const SC_SPEED_TRANSITION: ScenarioSpec = {
     { level: 2 },
     { level: 3 },
     { level: 4, vehicleStart: "cold" },
+    // L5 «Усложнени» — the complication kit (scenario/complications.ts):
+    // the delta AND the instructor's line that explains it, authored together.
+    l5Wet(),
   ],
   conditions: { weather: "dry" },
   localeBg: "bg-BG",
@@ -860,6 +876,9 @@ export const SC_SP_HARSH_BRAKE: ScenarioSpec = {
     { level: 2 },
     { level: 3 },
     { level: 4, vehicleStart: "cold" },
+    // L5 «Усложнени» — the complication kit (scenario/complications.ts):
+    // the delta AND the instructor's line that explains it, authored together.
+    l5Wet(),
   ],
   conditions: { weather: "dry" },
   localeBg: "bg-BG",
@@ -970,6 +989,9 @@ export const SC_SP_CURVE: ScenarioSpec = {
     { level: 2 },
     { level: 3 },
     { level: 4, vehicleStart: "cold" },
+    // L5 «Усложнени» — the complication kit (scenario/complications.ts):
+    // the delta AND the instructor's line that explains it, authored together.
+    l5Wet(),
   ],
   conditions: { weather: "dry" },
   localeBg: "bg-BG",
@@ -1078,6 +1100,9 @@ export const SC_MW_DISCIPLINE: ScenarioSpec = {
     { level: 2 },
     { level: 3 },
     { level: 4, vehicleStart: "cold" },
+    // L5 «Усложнени» — the complication kit (scenario/complications.ts):
+    // the delta AND the instructor's line that explains it, authored together.
+    l5Wet(),
   ],
   conditions: { weather: "dry" },
   localeBg: "bg-BG",

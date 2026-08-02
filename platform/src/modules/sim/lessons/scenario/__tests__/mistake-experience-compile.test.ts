@@ -75,15 +75,23 @@ describe("the mistake-experience delta", () => {
     const base = compileScenario(ZEBRA, 1);
     const mode = compileScenario(ZEBRA, 1, { mistakeExperience: { mistakeIndex: 1 } });
     const strip = (l: typeof base) => {
-      const { id, titleBg, descriptionBg, mistakeExperience, ...rest } =
+      // `briefingBg` joins the deltas (2026-08-02): the sandbox's assignment is
+      // the MISTAKE, so the correct numbered steps are dropped rather than
+      // rendered beside „направи грешката нарочно". Asserted below.
+      const { id, titleBg, descriptionBg, briefingBg, mistakeExperience, ...rest } =
         l as typeof base & { mistakeExperience?: unknown };
       void id;
       void titleBg;
       void descriptionBg;
+      void briefingBg;
       void mistakeExperience;
       return rest;
     };
     expect(JSON.stringify(strip(mode))).toBe(JSON.stringify(strip(base)));
+    // The delta itself, stated rather than assumed: the rung briefs, the
+    // sandbox does not.
+    expect(base.briefingBg?.length).toBeGreaterThan(0);
+    expect(mode.briefingBg).toBeUndefined();
     // The staged encounters that CREATE the mistake's conditions ride along.
     expect(JSON.stringify(mode.stagedEvents ?? [])).toBe(
       JSON.stringify(base.stagedEvents ?? []),

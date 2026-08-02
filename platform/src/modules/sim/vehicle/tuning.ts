@@ -253,16 +253,94 @@ export const CROSSWIND_GUST_PERIOD_SEC = 5;
 /**
  * Available TOTAL tractive force (N) vs speed (km/h) — piecewise-linear,
  * split across the driven wheels. Stands in for engine torque × gearing;
- * tapers like a real power curve so top speed self-limits against AERO_DRAG
- * (~135 km/h). Peak 4800 N ≈ 0–100 in ~10 s for 1220 kg. [kmh, newtons]
+ * top speed self-limits against the car's real drag (aero + chassis linear
+ * damping — see below) rather than being clamped. 0–100 in 11.57 s, measured
+ * on the headless rig. [kmh, newtons]
+ *
+ * FOUNDER ITEM 37 / FR-50 — „the motorway car must reach 160–180 km/h".
+ *
+ * MEASURED ON THE REAL RIG, BEFORE AND AFTER (rapier + VehicleSim, flat, full
+ * pedal — the headless harness car, never an analytic model; the „before" run
+ * reproduces the old curve exactly by scaling the pedal, so both numbers come
+ * off the same rig on the same day):
+ *   BEFORE  terminal 120.3 km/h · 0–50 3.85 s · 0–100 11.57 s · 0–120 35.45 s
+ *           · 0–130 NEVER
+ *   AFTER   terminal 168.4 km/h · 0–50 3.85 s · 0–100 11.57 s · 0–130 22.72 s
+ *           · 0–160 50.40 s
+ *   a @ 30 / 50 / 90 km/h = 3.743 / 2.936 / 1.418 m/s² — THE SAME THREE
+ *   NUMBERS TO THREE DECIMALS before and after.
+ *
+ * Note what the „before" column also proves: the founder reported „I can't go
+ * more than 100–105" and `sc-mw-discipline` instructs 120–130. The real
+ * ceiling was 120.3 km/h and it took 35 s to get there, so the BOTTOM of the
+ * band his own lesson demands was the last km/h the car had.
+ *
+ * TWO things were wrong, and the second one is why nobody caught the first.
+ *
+ * 1. THIS TABLE BENT DOWN AFTER ITS 90 km/h PEAK. Power (F·v) rose to 65 kW
+ *    at 90 and then fell off a cliff — 60.2 kW at 100, 43.3 at 120, zero at
+ *    145. That is not an engine, it is a speed limiter wearing an engine's
+ *    clothes, and it was the third one this item has had to remove (after the
+ *    governor cap and the throttle multiplier).
+ *
+ * 2. THE DRAG NOBODY HAD MEASURED. `AERO_DRAG` is not the car's only
+ *    resistance: `CHASSIS_LINEAR_DAMPING` (0.02) is a rapier body property
+ *    worth CHASSIS_LINEAR_DAMPING · CHASSIS_MASS · v = 24.4·v newtons, and its
+ *    own comment calls it „near zero; real drag handled by AERO_DRAG below".
+ *    It is not near zero at motorway speed — at 47 m/s it is 1152 N against
+ *    aero's 937 N, i.e. THE LARGER HALF OF THE CAR'S DRAG. The analytic
+ *    feasibility solver in difficulty.ts modelled aero and rolling and never
+ *    modelled this. It had therefore been optimistic ALL ALONG — it claimed
+ *    129.2 km/h for the old car the rig tops out at 120.3 — and when a first
+ *    pass at defect 1 put a constant-power tail on the curve, the solver
+ *    reported 178.5 km/h for a car the rig measured at 143.6. A gate and the
+ *    thing it gates disagreed by 35 km/h and the gate was green. Fixed in
+ *    difficulty.ts; the model now matches the rig within 1% at 30/50/90/130.
+ *
+ * THE REAL RESISTANCE, verified against the rig at five speeds:
+ *     R(v) = AERO_DRAG·v² + CHASSIS_LINEAR_DAMPING·CHASSIS_MASS·v
+ *   (no rolling term — VehicleSim applies ROLLING_RESISTANCE_N only on the
+ *   closed-throttle branch, so it is a coast-down force, not a drive force.)
+ *     R(90 km/h) = 872 N (rig: 869) · R(130) = 1429 N (rig: 1428)
+ *     R(165) = 2000 N · R(170) = 2089 N · R(175) = 2178 N
+ * so ~2 kN must still be on the table at 165–175 km/h. The tail is sized
+ * against THAT, not against the aero constant alone.
+ *
+ * EVERYTHING AT OR BELOW 100 km/h IS UNCHANGED (exact at the breakpoints,
+ * ~1e-13 N on the interpolated interior — double rounding, not force). The
+ * point at 100 km/h is
+ * the OLD curve's own value there (2600 − 1300/3 = 6500/3 N, written as that
+ * fraction so it is exact), so the whole
+ * 0–100 run integrates the exact same forces it always did — every parking,
+ * crawl, urban and rural drill is untouched by construction, and the harness
+ * 0–100 envelope is not being leaned on. The curve differs only above 100, a
+ * band the governor already cuts to zero on 87 of the 90 districts (highest
+ * non-motorway domain is 90 → Нормален cap 100).
+ *
+ * HONEST ABOUT WHAT THE TAIL IS. Holding ~2.1 kN from 100 to 175 km/h means
+ * power RISES from 60 kW to ~100 kW across that band. This table is not one
+ * gear's engine map — it is TOTAL TRACTIVE FORCE AVAILABLE, engine × whatever
+ * gear a competent driver would be in, and the flat plateau at 4800 N up to
+ * 30 km/h is the same abstraction at the other end. The alternative shapes
+ * were measured and rejected: a constant-power tail sized for 170 km/h needs
+ * ~100 kW everywhere, which drags 0–100 down to ~8 s and out of the harness
+ * envelope; cutting CHASSIS_LINEAR_DAMPING instead reaches the band but moves
+ * braking distance, curb stability, coast-down and every committed
+ * deterministic trace, for a top-speed number.
  */
 export const ENGINE_FORCE_CURVE: ReadonlyArray<readonly [number, number]> = [
   [0, 4800],
   [30, 4800],
   [60, 3600],
-  [90, 2600],
-  [120, 1300],
-  [145, 0],
+  [90, 2600], // 65.0 kW — unchanged
+  // 60.2 kW. NOT a rounded number on purpose: 6500/3 = 2166.66… is EXACTLY
+  // where the old 90→120 chord (2600 → 1300) passed through 100 km/h, so the
+  // interpolation below 100 km/h is arithmetically identical to the old curve
+  // and the 0–100 run integrates the same forces to the last bit. Writing
+  // 2167 here would have been a 0.33 N lie in a comment that claims otherwise.
+  [100, 6500 / 3],
+  [175, 2050], // 99.7 kW — the tail. Drag (R = 2178 N here) wins at ~168 km/h
+  [195, 0], // rev-out
 ];
 /** Total reverse force (N) — deliberately weak, like a real reverse gear. */
 export const REVERSE_FORCE_N = 3000;

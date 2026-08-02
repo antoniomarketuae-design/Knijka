@@ -179,6 +179,8 @@ export function makeVehicleEnv(
     playerSpeedMps: 0,
     playerDirX: 0,
     playerDirY: 0,
+    // FR-27: no staged actors in the unit fixtures = the pre-change behaviour.
+    staged: [],
   };
 }
 

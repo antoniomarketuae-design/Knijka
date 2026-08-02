@@ -27,7 +27,7 @@
  */
 
 import type { VehicleInput } from "./VehicleSim";
-import { AERO_DRAG, engineForceAt, ROLLING_RESISTANCE_N } from "./tuning";
+import { AERO_DRAG, CHASSIS_LINEAR_DAMPING, CHASSIS_MASS, engineForceAt } from "./tuning";
 
 export type DifficultyMode = "beginner" | "normal" | "advanced";
 
@@ -307,12 +307,21 @@ export const PARKING_STEER_TAU_S = 0.08;
 // Начинаещ 130 — neither binds. What binds is `throttleMul`, which scales the
 // TRACTIVE FORCE and therefore silently acts as a SECOND, hidden top-speed
 // governor: solving engineForceAt(v)·mul = AERO_DRAG·v² + ROLLING_RESISTANCE_N
-// gives a terminal speed of
+// gave a terminal speed of
 //     Начинаещ (0.50)  116.7 km/h   ← the lesson instructs 120–130. IMPOSSIBLE.
 //     Нормален  (0.75)  124.9 km/h
 //     Напреднал (1.00)  129.2 km/h
 // so the tier the student is actually on could not reach the band its own
 // instruction 2 demands, and no cap change could ever have fixed it.
+//
+// ⚠ THOSE THREE NUMBERS ARE HISTORY, NOT CURRENT FACT — kept because they are
+// the evidence for the fix below, and relabelled because FR-50 later found the
+// balance that produced them was wrong in BOTH terms (it carried a rolling
+// resistance the full-pedal branch never applies and omitted
+// CHASSIS_LINEAR_DAMPING, which is the larger half of the drag at motorway
+// speed — see tierTopSpeedKmh). The conclusion survived the correction: the
+// multiplier really was a second hidden governor. The digits did not. Today's
+// measured numbers live in tier-feasibility.test.ts, checked against the rig.
 //
 // The preset comment has always said what the multiplier is FOR: „softer
 // throttle, a speed governor" — two separate levers. `throttleMul` exists to
@@ -445,18 +454,45 @@ export function applyDifficulty(
 // one's clothes.
 //
 // The equilibrium below is the steady-state force balance of the same model
-// VehicleSim integrates on flat ground at full pedal:
+// VehicleSim integrates on flat ground at full pedal.
+//
+// IT USED TO BE WRONG IN BOTH TERMS, and it took a rig measurement to see it
+// (FR-50). The old balance read
 //     engineForceAt(v)·shapedThrottle(v) = AERO_DRAG·v² + ROLLING_RESISTANCE_N
-// (VehicleSim applies ROLLING_RESISTANCE_N as a per-wheel brake floor of
-// N/4 on four wheels — the totals match.) It ignores gradient and grip, which
-// is right for a feasibility floor: it is the OPTIMISTIC number, so anything
-// it calls unreachable is unreachable for certain.
+// and it reported 178.5 km/h sustainable for a car the REAL rapier car tops
+// out at 143.6. Two independent errors, pulling the same way:
+//
+//   · ROLLING_RESISTANCE_N IS NOT A DRIVE FORCE. VehicleSim applies it as a
+//     per-wheel brake floor inside `if (engineTotal === 0)` — the closed-
+//     throttle branch. At full pedal it is never applied at all, so a
+//     full-pedal balance must not carry it.
+//   · CHASSIS_LINEAR_DAMPING WAS NEVER MODELLED. It is a rapier body property
+//     (0.02) worth CHASSIS_LINEAR_DAMPING · CHASSIS_MASS · v = 24.4·v N. Its
+//     own tuning.ts comment calls it „near zero"; at 47 m/s it is 1152 N,
+//     larger than aero, and it is the single biggest resistance the motorway
+//     car fights. Omitting it is what made the model optimistic by 35 km/h.
+//
+// The corrected balance, VERIFIED AGAINST THE HEADLESS RIG at five speeds
+// (rig N vs model N: 30 → 226/232 · 50 → 414/420 · 90 → 869/872 ·
+// 130 → 1428/1429 · 143.6 → 1630/1641 — within 1% from 50 km/h up):
+//     engineForceAt(v)·shapedThrottle(v) = AERO_DRAG·v² + LINEAR_DAMPING_N_PER_MS·v
+//
+// It still ignores gradient, grip and tyre slip, so it remains the OPTIMISTIC
+// number and anything it calls unreachable is unreachable for certain. The
+// difference is that its POSITIVE claims are now worth something too: before,
+// „this tier can hold 170" was a sentence about a car that does not exist.
 // ---------------------------------------------------------------------------
 
 /** Search resolution (km/h) of the terminal-speed solver. */
 const TOP_SPEED_STEP_KMH = 0.1;
-/** Hard search ceiling (km/h) — above the tractive curve's own zero (145). */
-const TOP_SPEED_SEARCH_MAX_KMH = 200;
+/** Hard search ceiling (km/h) — above the tractive curve's own zero (195). */
+const TOP_SPEED_SEARCH_MAX_KMH = 220;
+/**
+ * Chassis linear damping expressed as the force it costs per m/s (N·s/m).
+ * Rapier integrates linear damping as a velocity-proportional resistance, so
+ * on a body of CHASSIS_MASS it is exactly this many newtons at 1 m/s.
+ */
+const LINEAR_DAMPING_N_PER_MS = CHASSIS_LINEAR_DAMPING * CHASSIS_MASS;
 
 /**
  * The highest speed (km/h) this tier can actually SUSTAIN on this lesson at
@@ -476,7 +512,8 @@ export function tierTopSpeedKmh(
   for (let kmh = TOP_SPEED_STEP_KMH; kmh <= ceiling; kmh += TOP_SPEED_STEP_KMH) {
     const thrust =
       engineForceAt(kmh) * throttleAuthority(p.throttleMul, kmh) * governorScale(cap, kmh);
-    const resistance = AERO_DRAG * (kmh / 3.6) ** 2 + ROLLING_RESISTANCE_N;
+    const ms = kmh / 3.6;
+    const resistance = AERO_DRAG * ms * ms + LINEAR_DAMPING_N_PER_MS * ms;
     if (thrust <= resistance) break;
     top = kmh;
   }

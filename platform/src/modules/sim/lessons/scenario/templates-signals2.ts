@@ -38,6 +38,7 @@
 
 import type { PedestrianDartOutSpec, TrafficControllerSpec } from "../../contracts";
 import type { ScenarioSpec } from "./types";
+import { l5BusyStreet } from "./complications";
 
 /** Northbound right-lane center of pe-jay-v1's ns road, m. */
 const LANE_2 = 4.06;
@@ -146,7 +147,16 @@ export const SC_SIG_FLASH_AMBER_PED: ScenarioSpec = {
       id: "sc-sfap-approach",
       titleBg: "Приближи мигащото жълто с намалена скорост",
       // Stem lane center, before the junction mouth (stop line at −27.7).
-      params: { kind: "reachZone", x: LANE_2, y: -30, radiusM: 8, maxSpeedKmh: 35 },
+      // FR-24: mark 2.275 m short of that line; the L1 ladder widens radius
+      // 8 → 12, so credit reached 9.72 m into the junction until this cut.
+      params: {
+        kind: "reachZone",
+        x: LANE_2,
+        y: -30,
+        radiusM: 8,
+        maxSpeedKmh: 35,
+        acceptBeforeMarkM: -2.275,
+      },
     },
     {
       id: "sc-sfap-clear",
@@ -383,6 +393,9 @@ export const SC_SIG_GREEN_WAVE: ScenarioSpec = {
     { level: 2 },
     { level: 3 },
     { level: 4, vehicleStart: "cold" },
+    // L5 «Усложнени» — the complication kit (scenario/complications.ts):
+    // the delta AND the instructor's line that explains it, authored together.
+    l5BusyStreet(),
   ],
   staged: [],
   // NO signalPlan (deliberate): a one-shot pin would rebase the FIRST cluster
@@ -540,7 +553,16 @@ export const SC_SIG_CONTROLLER_LIVE: ScenarioSpec = {
       titleBg: "Приближи бавно и прочети регулировчика, не лампата",
       // Stem lane center, 6 m short of the 27.725 m stop line: the drive must be
       // slow enough here to have actually LOOKED at the officer.
-      params: { kind: "reachZone", x: SX_LANE, y: -34, radiusM: 7, maxSpeedKmh: 20 },
+      // FR-24: „6 m short" is the MARK; the L1 ladder widens radius 7 → 10.5,
+      // so the disc reached 4.22 m past the line. The cut ends it at the paint.
+      params: {
+        kind: "reachZone",
+        x: SX_LANE,
+        y: -34,
+        radiusM: 7,
+        maxSpeedKmh: 20,
+        acceptBeforeMarkM: -6.275,
+      },
     },
     {
       id: "sc-sctl-cross",

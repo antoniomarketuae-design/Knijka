@@ -22,6 +22,7 @@
    "maxspeedUrbanKmh": 50,
    "note": "Права улица: ограничението важи по цялата дължина; пред пътеката се кара с готовност за спиране."
   },
+  "zonesVersion": 1,
   "stats": {
    "roadKm": 0.14,
    "nodes": 2,
@@ -29,7 +30,8 @@
    "intersections": 0,
    "crossings": 1,
    "buildings": 4,
-   "spawnPoints": 2
+   "spawnPoints": 2,
+   "zones": 1
   },
   "scenario": {
    "archetype": "zebra-block",
@@ -40,6 +42,14 @@
    },
    "streetscape": "blind-corner-kiosk",
    "streetscapeNoteBg": "Ъглова сграда, изнесена до самия бордюр 1,5 м преди зебрата: западният тротоар е невидим до последния метър — оттам излиза пешеходецът.",
+   "roadscape": "residential-blind-corner",
+   "roadscapeNoteBg": "Тясна квартална улица преди закрит ъгъл: В24 „Забранено е изпреварването“ важи точно там, където видимостта свършва — не се излиза в насрещното покрай ъгъла, зад който излиза пешеходецът.",
+   "roadClass": "residential",
+   "parkingBandM": 0,
+   "bareVerge": null,
+   "curbToCurbM": 16.25,
+   "oneway": false,
+   "banSignRef": "В24",
    "primaryCrossingId": "pe-x-1",
    "laneCenterRightM": 4.06,
    "crossings": [
@@ -88,7 +98,8 @@
       0,
       140
      ]
-    ]
+    ],
+    "parkingBand": false
    }
   ]
  },
@@ -237,6 +248,16 @@
    "heading": 0,
    "edgeId": "pe-e-street",
    "name": "Контролна точка — след пътеката"
+  }
+ ],
+ "zones": [
+  {
+   "id": "pe-z-noovertaking",
+   "kind": "noOvertaking",
+   "edgeId": "pe-e-street",
+   "fromM": 42,
+   "toM": 100.8,
+   "signRef": "В24"
   }
  ]
 }

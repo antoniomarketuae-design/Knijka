@@ -55,12 +55,32 @@ export interface ReachZoneParams {
    * make it worse, because the L1/L2 tolerance ladder widens the radius in
    * BOTH directions.
    *
-   * Set this to the distance from the authored mark BACK to the paint, in
-   * metres, and the acceptance becomes the part of the disc at least that far
-   * short of the mark along the approach — i.e. the disc cut off exactly at
-   * the line. Stopping earlier still counts (early is the same act done
-   * sooner, and every metre the ladder adds still adds backwards); stopping
-   * past the paint never does, at any rung.
+   * Set this to the SIGNED distance from the paint to the authored mark along
+   * the approach — i.e. how far PAST the paint the mark itself sits — and the
+   * acceptance becomes the disc cut off exactly at the line. Stopping earlier
+   * still counts (early is the same act done sooner, and every metre the
+   * ladder adds still adds backwards); stopping past the paint never does, at
+   * any rung.
+   *
+   *   POSITIVE — the mark is inside the junction and credit must stop SHORT of
+   *              it by this much (`sc-rb-approach`: +1.725 m past the М8 bars).
+   *   NEGATIVE — the mark is on the approach and the paint is this far AHEAD of
+   *              it, so credit may extend that far past the mark and no further
+   *              (`sc-sdead-approach`: −2.275 m, a mark 2.275 m short of the
+   *              stop line whose 12 m disc otherwise reached 9.72 m into the
+   *              junction). Ten of the catalog's twelve cut objectives are this
+   *              sign: the defect is almost always a generous RADIUS, not a
+   *              badly placed mark.
+   *
+   * FR-24 required the negative half. The first version of this parameter only
+   * accepted values ≥ 0, which is exactly why it could be authored on one
+   * template and nowhere else — every other overhang in the catalog needed a
+   * sign the type could not express, so the drawing stayed honest catalog-wide
+   * and the grading stayed wrong catalog-wide.
+   *
+   * A value larger than `radiusM` would leave the disc with no acceptable
+   * region at all and make the objective uncompletable except by the grace
+   * capsule; `stop-line-grading.test.ts` refuses that rather than shipping it.
    *
    * The mark itself deliberately stays where the template authored it: that
    * is what keeps the guidance clamp engaged and the gate bar drawn

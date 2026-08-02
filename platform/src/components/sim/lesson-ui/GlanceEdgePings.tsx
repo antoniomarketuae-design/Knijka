@@ -139,6 +139,12 @@ export function GlanceEdgePings({
           like the prompt card), hold-to-glance exactly like the keys. */}
       {buttonsPossible && advisorOn ? (
         <div
+          // The handle PlayAreaStyles' UNPANEL layer needs. These three sit on
+          // the road exactly where the reference frame puts its ghost „<" / „>"
+          // arrows, so the shell's stylesheet strips their fill and blur there
+          // rather than a fill being restated in every HUD file (same
+          // data-hud grammar the mirror/toast rules already use).
+          data-hud="glance-buttons"
           className="absolute bottom-3 left-3 z-10 flex items-center gap-1.5"
           role="group"
           aria-label="Поглед в огледалата"
@@ -190,6 +196,7 @@ function PingChip({
   const label = done ? "✓" : "огледай";
   return (
     <div
+      data-hud="glance-ping"
       className={`pointer-events-none absolute top-1/2 z-10 -translate-y-1/2 select-none ${
         side === "left" ? "left-2" : "right-2"
       }`}

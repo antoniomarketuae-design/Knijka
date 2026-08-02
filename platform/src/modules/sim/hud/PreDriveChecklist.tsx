@@ -235,10 +235,28 @@ export function PreDriveChecklist({
     // flex child of that wrapper, so the cap reaches it and the list below
     // scrolls inside it. The compact bottom-sheet mount has no cap and needs
     // none: nothing is behind a sheet.
+    //
+    // WIDTH-CLEARANCE CAP (`max-w-[calc(100vw-1.5rem)]` = HUD_CARD_MAX_WIDTH_CLASS),
+    // the horizontal twin of that height cap. `w-80` is 320 px — the ENTIRE
+    // width of the narrowest phone this product supports, so on an iPhone SE
+    // this card was 320 px of content inside a 320 px screen with a 12 px gutter
+    // on each side: 24 px of it lived outside the stage, and the stage is
+    // `overflow-hidden`, so those 24 px were cut without a scrollbar and without
+    // a wrap. The founder photographed the same class of failure on the toast
+    // column — see `hudPreferences.ts` → THE VIEWPORT CLAMP for the photo and
+    // the reasoning. The cap costs nothing on any screen ≥ 344 px and turns the
+    // SE case from „silently truncated" into „narrower, and readable".
+    //
+    // `break-words` for the same reason: once clamped the card can be as narrow
+    // as 296 px, and «Освобождаване», «Разкопчаване» and friends are single
+    // tokens long enough to overhang that. It is ALSO — stated here rather than
+    // relied on quietly — the only occurrence of that class in a .tsx file,
+    // while `hudPreferences.TOAST_CARD_WIDTH_CLASS` needs the same utility from
+    // a .ts. If it is ever removed from here, check the toast card still wraps.
     <section
       aria-label="Подготовка преди потегляне"
       data-hud="predrive-checklist"
-      className="flex min-h-0 w-80 flex-col gap-1 overflow-hidden rounded-2xl border border-border bg-surface/85 p-3 backdrop-blur-md"
+      className="flex min-h-0 w-80 max-w-[calc(100vw-1.5rem)] flex-col gap-1 overflow-hidden rounded-2xl border border-border bg-surface/85 p-3 break-words backdrop-blur-md"
     >
       <header className="flex shrink-0 items-baseline justify-between">
         <h2 className="text-sm font-extrabold">Подготовка преди потегляне</h2>

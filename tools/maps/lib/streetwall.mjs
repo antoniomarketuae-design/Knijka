@@ -92,9 +92,12 @@ const PAVILION_MAX_HEIGHT_M = 8;
 /** Every generated building id starts here (rule 1 — the strip key). */
 export const STREETWALL_ID_PREFIX = "sw-";
 
-/** network.edgeParkingWidthM — curbside band, arterial classes only. */
+/** network.edgeParkingWidthM — curbside band: arterial classes, or any edge
+ *  that opts in with `parkingBand: true` (network.edgeParkingBand, FR-21). */
 export function edgeParkingWidthM(edge) {
   if (edge.roundabout) return 0;
+  if (edge.parkingBand === true) return PARKING_LANE_WIDTH_M;
+  if (edge.parkingBand === false) return 0;
   return PARKING_LANE_CLASSES.has(edge.class) ? PARKING_LANE_WIDTH_M : 0;
 }
 

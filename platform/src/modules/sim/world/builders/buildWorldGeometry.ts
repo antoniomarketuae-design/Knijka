@@ -156,6 +156,8 @@ export function buildWorldGeometry(
     roundaboutIslands: roundabouts.islands,
     roundabouts: rings.length,
     ringDividerQuads: roundabouts.ringDividerQuads,
+    /** FR-22, the outer half: mouth-free arcs of circular ring kerb swept. */
+    ringKerbRuns: roads.ringKerbRunCount,
     buildings: buildings.count,
     buildingInstances: buildingInstances.length,
     trafficLights: props.trafficLights.length,

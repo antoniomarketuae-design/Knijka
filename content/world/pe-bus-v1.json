@@ -22,6 +22,7 @@
    "maxspeedUrbanKmh": 50,
    "note": "Права улица: ограничението важи по цялата дължина; пред пътеката се кара с готовност за спиране."
   },
+  "zonesVersion": 1,
   "stats": {
    "roadKm": 0.15,
    "nodes": 2,
@@ -29,7 +30,8 @@
    "intersections": 0,
    "crossings": 1,
    "buildings": 4,
-   "spawnPoints": 2
+   "spawnPoints": 2,
+   "zones": 1
   },
   "scenario": {
    "archetype": "zebra-block",
@@ -40,6 +42,14 @@
    },
    "streetscape": "depot-gate",
    "streetscapeNoteBg": "Складова база с товарен вход точно преди пътеката: затова тук ВИНАГИ стои спряло голямо превозно средство, а хората излизат иззад него.",
+   "roadscape": "freight-collector",
+   "roadscapeNoteBg": "Товарен подход: събирателна улица с крайни линии и стълбове, а покрай портала на базата — В24 „Забранено е изпреварването“, защото оттам излизат тежки коли и иззад тях се появяват хора.",
+   "roadClass": "tertiary",
+   "parkingBandM": 0,
+   "bareVerge": null,
+   "curbToCurbM": 16.25,
+   "oneway": false,
+   "banSignRef": "В24",
    "primaryCrossingId": "pe-x-1",
    "laneCenterRightM": 4.06,
    "crossings": [
@@ -70,7 +80,7 @@
     "id": "pe-e-street",
     "from": "pe-n-start",
     "to": "pe-n-end",
-    "class": "residential",
+    "class": "tertiary",
     "name": "Улица с пешеходна пътека",
     "oneway": false,
     "roundabout": false,
@@ -88,7 +98,8 @@
       0,
       148
      ]
-    ]
+    ],
+    "parkingBand": false
    }
   ]
  },
@@ -214,6 +225,16 @@
    "heading": 0,
    "edgeId": "pe-e-street",
    "name": "Контролна точка — след пътеката"
+  }
+ ],
+ "zones": [
+  {
+   "id": "pe-z-noovertaking",
+   "kind": "noOvertaking",
+   "edgeId": "pe-e-street",
+   "fromM": 29.6,
+   "toM": 118.4,
+   "signRef": "В24"
   }
  ]
 }

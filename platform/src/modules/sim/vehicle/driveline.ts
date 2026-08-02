@@ -140,8 +140,20 @@ export const SELECTOR_ENGAGE_MAX_KMH = 3;
  */
 export const PARKING_BRAKE_FORCE_N = 13000;
 
-/** Manual "rev-out" ceiling per gear (km/h): above it the gear pulls nothing. */
-export const MANUAL_GEAR_MAX_KMH: readonly number[] = [30, 55, 85, 115, 150];
+/**
+ * Manual "rev-out" ceiling per gear (km/h): above it the gear pulls nothing.
+ *
+ * FR-50: 5th used to rev out at 150, which was invisible only because the
+ * tractive curve had already died at 145 — the moment tuning.ts let the car
+ * pull to ~178 km/h, this line became a THIRD hidden top-speed governor, and
+ * it would have bitten manual drivers only (`forwardForceScale` applies it
+ * when selector === "M"). Bulgarian category B is examined on a manual, so
+ * that is the student who would have hit it. Top gear now revs out past the
+ * drag-limited terminal speed, which is what a real top gear does: 5th ends
+ * the car, drag ends the car — not the gearbox lookup table.
+ * 1st–4th are unchanged; the shift points students learn do not move.
+ */
+export const MANUAL_GEAR_MAX_KMH: readonly number[] = [30, 55, 85, 115, 190];
 
 // --- Engine braking (doc 82 §4.2 F3) ---------------------------------------
 // Today lifting off applies only ROLLING_RESISTANCE_N (0.23 m/s²) + aero ≈

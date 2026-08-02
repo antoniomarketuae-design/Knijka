@@ -108,7 +108,7 @@ export function RearProximityCue({
       <div
         role="status"
         aria-label={label}
-        className="flex select-none items-center gap-1.5 rounded-full border bg-background/85 px-3 py-1.5 text-xs font-bold tabular-nums shadow-glow-sm backdrop-blur"
+        className="hud-ghost flex select-none items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-bold tabular-nums"
         style={{
           borderColor: color,
           color: cue.level === "info" ? "var(--foreground)" : color,

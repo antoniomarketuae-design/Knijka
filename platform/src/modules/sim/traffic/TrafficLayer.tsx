@@ -295,6 +295,50 @@ const PARK_END_MARGIN_M = 11;
  * curbside parking band (world PARKING_LANE_WIDTH_M / 2 — keep in sync). */
 const PARK_BAND_CENTER_M = 2.0;
 const PARK_CAP = 150;
+
+// --- FR-21, the car half: PARK_CLASSES ⊋ world PARKING_LANE_CLASSES ---------
+//
+// The band this pass centres its bodies in (`PARK_BAND_CENTER_M`) exists only
+// on `{primary, secondary, tertiary}` — `world/builders/constants`
+// PARKING_LANE_CLASSES. On the other three classes above there is no band, so
+// `travelHalf + 2.0` is 2 m PAST the kerb: the body stands in the middle of the
+// 3.5 m pavement, at road level, sunk 0.12 m into the footway (the transform
+// below plants every body at y = 0 regardless of the surface under it).
+//
+// Censused over the 100 committed districts: **2605 of 3799 bodies — 68.6% —
+// stand fully on the footway, on 83 of the 100 districts** (2140 `residential`,
+// 465 `unclassified`). His sentence, three lessons running: „he goes trough a
+// car which is standing on the sidewalk", and the one that costs a drill: „I
+// cant see the car coming on the right because of the cars that have stopped on
+// the side walk".
+//
+// A map fixes it by declaring what its own street really carries, and this pass
+// honours the declaration (`world/builders/network.edgeParkingBand`):
+//   • `parkingBand: true`  — the world draws the 4 m band, the kerb moves out
+//     from under the row and the SAME bodies land on asphalt. No body moves:
+//     `travelHalf + 2.0` IS the band's centre line. Traces are untouched.
+//   • `parkingBand: false` — this street has no kerbside parking at all, so the
+//     pass places nothing (an industrial frontage, a wall-to-wall canyon).
+//   • absent — today's behaviour, byte for byte.
+//
+// Why not a global rule. Both cheaper fixes were measured and rejected: seating
+// the bodies INSIDE the carriageway (flank against the kerb) puts 21 committed
+// traces inside a body footprint — three of them `shadow-correct`, i.e. the
+// demonstrated-correct drive would drive through a parked car; and adding
+// `residential` to PARKING_LANE_CLASSES moves every kerb, pavement, junction
+// mouth and baked building footprint on 83 districts at once.
+//
+// The residual is a tracked, shrinking budget: `__tests__/parked-on-footway`.
+
+/** A district edge that has opted out of the procedural curb row entirely. */
+function parkingOptedOut(edge: DistrictEdge): boolean {
+  return (edge as { parkingBand?: unknown }).parkingBand === false;
+}
+
+/** `District.zones` kinds that forbid leaving a car at the kerb (ЗДвП чл. 98:
+ *  В27 „забранено е спирането" forbids stopping, and therefore parking too).
+ *  A body inside one of these spans is a sign the world contradicts. */
+const PARK_BAN_ZONE_KINDS = new Set(["noStopping", "noParking"]);
 /** Stable default for the optional clear-zone prop (memo identity). */
 const EMPTY_CLEAR_ZONES: readonly ParkedClearZoneLike[] = [];
 
@@ -511,6 +555,7 @@ export function computeParkedCars(
     const edge = edges[e];
     if (edge.roundabout) continue;
     if (!PARK_CLASSES.has(edge.class)) continue;
+    if (parkingOptedOut(edge)) continue; // FR-21: this street parks nobody
     const geo = edge.geometry;
     if (!geo || geo.length < 2) continue;
 
@@ -541,6 +586,19 @@ export function computeParkedCars(
       crossingArcs.push(proj.s);
     }
 
+    // Arclength spans this edge declares as a STOPPING ban (ЗДвП чл. 98 — the
+    // same article the junction and crossing bands above come from, here
+    // posted on a В27/В28 face instead of derived from geometry). A row of
+    // parked bodies standing under a „no stopping" post is a falsehood a
+    // student can see from the seat, and it is the kind the founder catches
+    // first. Widened by the body's own half-length, so a FOOTPRINT stays out.
+    const banSpans: Array<[number, number]> = [];
+    for (const zone of district.zones ?? []) {
+      if (zone.edgeId !== edge.id) continue;
+      if (!PARK_BAN_ZONE_KINDS.has(zone.kind)) continue;
+      banSpans.push([zone.fromM - PARKED_HALF_LEN_M, zone.toM + PARKED_HALF_LEN_M]);
+    }
+
     const offset = laneWidthM * Math.max(1, edge.lanes) * 0.5 + PARK_BAND_CENTER_M;
     const stop = total - PARK_END_MARGIN_M;
     let nextAt = PARK_END_MARGIN_M;
@@ -564,7 +622,8 @@ export function computeParkedCars(
         const lawful =
           nextAt >= lawfulFrom &&
           nextAt <= lawfulTo &&
-          !crossingArcs.some((cs) => Math.abs(nextAt - cs) < PARK_CROSSING_CLEAR_M);
+          !crossingArcs.some((cs) => Math.abs(nextAt - cs) < PARK_CROSSING_CLEAR_M) &&
+          !banSpans.some(([a, b]) => nextAt >= a && nextAt <= b);
         if (h % 5 !== 0 && lawful) {
           const px = ax + dx * t + nx * offset;
           const py = ay + dy * t + ny * offset;

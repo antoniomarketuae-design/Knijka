@@ -22,6 +22,7 @@ import {
   DEFAULT_LEVEL_PAR_TIME_SCALE,
   DEFAULT_LEVEL_TOLERANCE,
   DEFAULT_LEVEL_TRAFFIC_SCALE,
+  SCENARIO_FAMILY_TRAFFIC_BASELINE,
   ScenarioCompileError,
   compileScenario,
   resolveScenarioRubric,
@@ -296,15 +297,62 @@ describe("DEFAULT_LEVEL_TOLERANCE", () => {
 });
 
 describe("DEFAULT_LEVEL_TRAFFIC_SCALE", () => {
-  it("zero baseline stays zero — the compiler never conjures cars", () => {
+  it("no baseline and no family baseline stays zero — cars are never conjured", () => {
     for (const spec of SCENARIO_TEMPLATES) {
       if (spec.traffic !== undefined) continue;
+      // doc 87 FR-27: the families whose whole subject is other road users now
+      // carry a measured street (SCENARIO_FAMILY_TRAFFIC_BASELINE); everything
+      // else — parking, полигон, the cockpit drills — is still a quiet map.
+      if (SCENARIO_FAMILY_TRAFFIC_BASELINE[spec.family] !== undefined) continue;
       for (const rung of spec.levels) {
         const t = compileScenario(spec, rung.level).traffic!;
         expect(t.vehicleCount, `${spec.id}@L${rung.level}`).toBe(rung.traffic?.vehicleCount ?? 0);
         expect(t.pedestrianCount, `${spec.id}@L${rung.level}`).toBe(
           rung.traffic?.pedestrianCount ?? 0,
         );
+      }
+    }
+  });
+
+  /**
+   * FR-27, the founder's items 8/15/17/18 („by the time I reach the crossroad
+   * it already has passed"). The street itself is the fix, so it is pinned
+   * here: a yielding lesson that authors nothing must still be set on a road
+   * with traffic on it, and the rung must change how much.
+   */
+  it("the yielding families are set on a street, and the ladder scales it", () => {
+    const laddered = { 1: 0.5, 2: 0.75, 3: 1, 4: 1, 5: 1.5 } as const;
+    let checked = 0;
+    for (const spec of SCENARIO_TEMPLATES) {
+      const base = SCENARIO_FAMILY_TRAFFIC_BASELINE[spec.family];
+      if (base === undefined || spec.traffic !== undefined) continue;
+      for (const rung of spec.levels) {
+        if (rung.traffic?.vehicleCount !== undefined) continue;
+        const t = compileScenario(spec, rung.level).traffic!;
+        expect(t.vehicleCount, `${spec.id}@L${rung.level}`).toBe(
+          Math.round(base * laddered[rung.level]),
+        );
+        // Never pedestrians by implication — a junction drill must not arm a
+        // crossing duty its copy never names.
+        expect(t.pedestrianCount, `${spec.id}@L${rung.level}`).toBe(0);
+        checked++;
+      }
+    }
+    // Guard against the check silently emptying out if a family is renamed.
+    expect(checked).toBeGreaterThan(50);
+  });
+
+  it("the roundabout family is deliberately NOT given traffic (measured gridlock)", () => {
+    // On rb-mini-v1 two ambient cars already spend 68–75% of their time
+    // stopped at 5–7 km/h: the ring jams instead of circulating. An empty
+    // roundabout is a defect; a jammed one is a worse defect. See the doc on
+    // SCENARIO_FAMILY_TRAFFIC_BASELINE.
+    expect(SCENARIO_FAMILY_TRAFFIC_BASELINE.roundabout).toBeUndefined();
+    for (const spec of SCENARIO_TEMPLATES) {
+      if (spec.family !== "roundabout" || spec.traffic !== undefined) continue;
+      for (const rung of spec.levels) {
+        if (rung.traffic?.vehicleCount !== undefined) continue;
+        expect(compileScenario(spec, rung.level).traffic!.vehicleCount, spec.id).toBe(0);
       }
     }
   });

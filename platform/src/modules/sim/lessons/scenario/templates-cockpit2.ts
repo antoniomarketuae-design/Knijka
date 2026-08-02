@@ -54,6 +54,7 @@
 
 import type { TelltaleStimulusSpec } from "../../contracts";
 import type { ScenarioSpec } from "./types";
+import { l5Night, l5Wet } from "./complications";
 
 // ---------------------------------------------------------------------------
 // Shared geometry constant (pinned from the generated district by value — the
@@ -173,6 +174,9 @@ export const SC_VP_HANDBRAKE: ScenarioSpec = {
     { level: 2 },
     { level: 3 },
     { level: 4, vehicleStart: "cold" },
+    // L5 «Усложнени» — the complication kit (scenario/complications.ts):
+    // the delta AND the instructor's line that explains it, authored together.
+    l5Wet(),
   ],
   // Config-gated drill: opt the move-off-observation detector IN so the LIVE
   // student session grades the checklist's last step (default-OFF elsewhere —
@@ -366,6 +370,9 @@ export const SC_VP_TELLTALE_RED: ScenarioSpec = {
     { level: 2 },
     { level: 3 },
     { level: 4, vehicleStart: "cold" },
+    // L5 «Усложнени» — the complication kit (scenario/complications.ts):
+    // the delta AND the instructor's line that explains it, authored together.
+    l5Night(),
   ],
   staged: [VP_TELLTALE_RED_LAMP],
   conditions: { weather: "dry" },

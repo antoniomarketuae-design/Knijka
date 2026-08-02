@@ -22,6 +22,7 @@
    "maxspeedUrbanKmh": 40,
    "note": "Права улица: ограничението важи по цялата дължина; пред пътеката се кара с готовност за спиране."
   },
+  "zonesVersion": 1,
   "stats": {
    "roadKm": 0.14,
    "nodes": 2,
@@ -29,7 +30,8 @@
    "intersections": 0,
    "crossings": 1,
    "buildings": 4,
-   "spawnPoints": 2
+   "spawnPoints": 2,
+   "zones": 1
   },
   "scenario": {
    "archetype": "zebra-block",
@@ -40,6 +42,14 @@
    },
    "streetscape": "clinic-and-park",
    "streetscapeNoteBg": "Поликлиника точно срещу пътеката и парк отсреща: тук пресичат възрастни хора и хора с намалена подвижност — бавно и по всяко време.",
+   "roadscape": "residential-clinic",
+   "roadscapeNoteBg": "Квартална улица пред поликлиника: без улично осветление и без крайни линии, само осева прекъсната линия — а пред самия вход В27 „Забранено е спирането“, за да остане достъп за линейка.",
+   "roadClass": "residential",
+   "parkingBandM": 0,
+   "bareVerge": null,
+   "curbToCurbM": 16.25,
+   "oneway": false,
+   "banSignRef": "В27",
    "primaryCrossingId": "pe-x-1",
    "laneCenterRightM": 4.06,
    "crossings": [
@@ -88,7 +98,8 @@
       0,
       145
      ]
-    ]
+    ],
+    "parkingBand": false
    }
   ]
  },
@@ -214,6 +225,16 @@
    "heading": 0,
    "edgeId": "pe-e-street",
    "name": "Контролна точка — след пътеката"
+  }
+ ],
+ "zones": [
+  {
+   "id": "pe-z-nostopping",
+   "kind": "noStopping",
+   "edgeId": "pe-e-street",
+   "fromM": 58,
+   "toM": 104.4,
+   "signRef": "В27"
   }
  ]
 }

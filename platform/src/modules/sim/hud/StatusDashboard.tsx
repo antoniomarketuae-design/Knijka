@@ -119,7 +119,13 @@ function Telltale({
 }
 
 function Divider() {
-  return <span aria-hidden className="h-9 w-px shrink-0 bg-border md:h-11" />;
+  // `data-hud-ink`: the UNPANEL sweep clears fills off everything inside a
+  // ghost, and a divider IS its fill. It survives as a 1 px hairline in the
+  // stage's neutral border token — which is what the reference uses to group
+  // its own instruments (the thin rules between the tyre-temp figures), and
+  // the only thing still saying which numbers belong together now that the
+  // band they sat in is gone.
+  return <span aria-hidden data-hud-ink="" className="h-9 w-px shrink-0 bg-border md:h-11" />;
 }
 
 /** Turn-signal arrow — lit green on the real blink clock (or hazard relay). */
@@ -286,8 +292,10 @@ export function StatusDashboard({
       <div
         aria-label="Табло на автомобила"
         data-hud="status-dashboard"
-        className="pointer-events-none flex select-none items-baseline gap-1.5 px-1"
-        style={{ textShadow: "0 1px 4px rgba(0,0,0,0.95), 0 0 10px rgba(0,0,0,0.65)" }}
+        // Already the ghost register since 2026-07-29 (see the header). It now
+        // says so with the shared class instead of its own hand-rolled shadow,
+        // so the phone and the desktop cannot drift apart again.
+        className="hud-ghost pointer-events-none flex select-none items-baseline gap-1.5 px-1"
       >
         {/* ── ROW C7, 2026-07-30. THE CLUSTER IS ALSO A SPEEDOMETER. ───────
             The paragraph above argues this readout must survive because the
@@ -346,7 +354,17 @@ export function StatusDashboard({
     <div
       aria-label="Табло на автомобила"
       data-hud="status-dashboard"
-      className="pointer-events-none flex max-w-full select-none flex-wrap items-center justify-center gap-x-2 gap-y-1 rounded-2xl border border-border bg-surface/85 px-3 py-2 shadow-glow-sm backdrop-blur-md sm:flex-nowrap md:gap-x-3.5 md:px-5 md:py-2.5"
+      // `hud-ghost` — 2026-08-02, the founder's reference frames. This bar was
+      // the second-largest painted surface on the drive screen (measured 4.6 %
+      // of 1280×720 as an opaque, blurred, 16 px-radius card). In both
+      // reference frames the equivalent instruments — tyre temps, ABS, ECU, TC,
+      // fuel, lap times — are naked numbers on the image with no card under
+      // them at all. The COMPACT variant above has been exactly that since
+      // 2026-07-29 and the founder did not complain about it; this one simply
+      // catches up. Nothing moves, nothing shrinks, no instrument is dropped:
+      // the band is what goes, and the halo the ghost register carries is what
+      // holds the numbers legible over bright tarmac.
+      className="hud-ghost pointer-events-none flex max-w-full select-none flex-wrap items-center justify-center gap-x-2 gap-y-1 px-3 py-2 sm:flex-nowrap md:gap-x-3.5 md:px-5 md:py-2.5"
     >
       <BlinkerArrow dir="left" lit={snap.leftLampLit} />
 
@@ -400,10 +418,15 @@ export function StatusDashboard({
             км/ч
           </span>
         </div>
+        {/* The limit disc keeps its 3 px red ring: it is a drawing of a road
+            sign, not a card, and the ghost sweep deliberately leaves semantic
+            border colours and radii alone. Only the surface fill goes — the
+            number now sits on the road inside the ring, which is what a real
+            speed-limit sign looks like from a car. */}
         <span
           aria-label={`Ограничение ${limit} км/ч`}
           title="Ограничение на скоростта"
-          className="flex h-8 w-8 items-center justify-center rounded-full border-[3px] bg-surface text-xs font-black tabular-nums text-foreground md:h-9 md:w-9 md:text-sm"
+          className="flex h-8 w-8 items-center justify-center rounded-full border-[3px] text-xs font-black tabular-nums text-foreground md:h-9 md:w-9 md:text-sm"
           style={{ borderColor: "var(--danger)" }}
         >
           {limit}

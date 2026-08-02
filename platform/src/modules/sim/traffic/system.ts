@@ -37,6 +37,7 @@ import {
 } from "./staged";
 import {
   createVehicleAgent,
+  separateVehicleFrom,
   updateVehicle,
   type NodeReservation,
   type VehicleAgent,
@@ -134,6 +135,14 @@ class TrafficSystemImpl implements TrafficSystem {
   private readonly pedestrianEnv: PedestrianEnv;
   // A8 staged actors — scripted, orchestrator-commanded (staged.ts).
   private readonly stagedVehicles: StagedVehicleAgent[] = [];
+  /** The staged vehicles' published states, in stage() order — handed to the
+   *  ambient env so ambient agents can SEE scripted actors (FR-27). Same
+   *  objects as the entries this.vehicles carries; never re-allocated. */
+  private readonly stagedStates: TrafficVehicleState[] = [];
+  /** The AMBIENT agents' published states — handed to the staged env so
+   *  scripted actors can SEE ambient cars (FR-27, the mirror half). Frozen
+   *  after construction; ambient agents are only ever created there. */
+  private readonly ambientStates: TrafficVehicleState[] = [];
   private readonly stagedPeds: StagedPedestrianAgent[] = [];
   private readonly stagedById = new Map<string, StagedVehicleAgent | StagedPedestrianAgent>();
   private readonly stagedEnv: StagedEnv;
@@ -198,6 +207,7 @@ class TrafficSystemImpl implements TrafficSystem {
         );
         this.vehicleAgents.push(agent);
         this.vehicles.push(agent.state);
+        this.ambientStates.push(agent.state);
       }
     }
 
@@ -255,6 +265,7 @@ class TrafficSystemImpl implements TrafficSystem {
       playerSpeedMps: 0,
       playerDirX: 0,
       playerDirY: 1,
+      staged: this.stagedStates,
     };
     this.pedestrianEnv = {
       cfg,
@@ -274,6 +285,9 @@ class TrafficSystemImpl implements TrafficSystem {
       playerY: 0,
       playerSpeedMps: 0,
       crossingCounts: this.crossingCounts,
+      // FR-27, the mirror half: scripted actors see ambient cars. The array is
+      // the ambient agents' own state objects (staged states are NOT in it).
+      ambient: this.ambientStates,
     };
 
     // Publish initial poses (dt = 0 moves nothing, only samples polylines).
@@ -358,6 +372,23 @@ class TrafficSystemImpl implements TrafficSystem {
       const agent = createStagedVehicle(spec, path, stateId);
       this.stagedVehicles.push(agent);
       this.vehicles.push(agent.state);
+      // FR-27: the ambient env holds this array by reference, so every agent
+      // sees the actor from the frame it is staged on.
+      this.stagedStates.push(agent.state);
+      // …and no ambient car may already BE where the actor was just placed.
+      // Ambient agents are seeded at construction and staged actors arrive
+      // afterwards, so the two can start inside each other; a running clamp
+      // cannot repair an overlap that exists on frame zero.
+      const sep = vehicleHalfLengthM(spec.profile) + vehicleHalfLengthM() + 0.5;
+      for (let i = 0; i < this.vehicleAgents.length; i++) {
+        separateVehicleFrom(
+          this.vehicleAgents[i],
+          agent.state.x,
+          agent.state.y,
+          sep,
+          this.vehicleEnv,
+        );
+      }
       this.stagedById.set(spec.id, agent);
       // A11: the curb offset is the staged spec's cyclist marker (audit C3 —
       // v1 "cyclists" are narrow curb-riding vehicle proxies).

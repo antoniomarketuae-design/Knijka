@@ -11,7 +11,7 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { compileScenario } from "../compile";
+import { compileScenario, SCENARIO_FAMILY_TRAFFIC_BASELINE } from "../compile";
 import { SC_FOLLOW_DISTANCE, SC_FOLLOW_TRUCK } from "../templates-following";
 import { SC_JUNCTION_RHR, SC_SIGNAL_RESPONSE } from "../templates-junctions";
 import { SC_JUNCTION_GAP } from "../templates-junctions2";
@@ -92,9 +92,18 @@ describe("the L5 „Усложнени' variant wave", () => {
       const l4 = compileScenario(spec, 4);
       expect(l4.examMode).toBe(true);
       expect(l4.aids?.shadowCar).toBeFalsy();
-      // The L5 complications must not leak down: L4 keeps the template's own
-      // base conditions/traffic.
-      expect(l4.traffic?.vehicleCount ?? 0).toBe(0);
+      // The L5 complications must not leak down: L4 carries the template's own
+      // base traffic and nothing else. Since doc 87 FR-27 that base is the
+      // FAMILY street for the lessons about other road users (L4 scale is
+      // 1.0), and still zero everywhere else — what must never happen is L5's
+      // authored complication showing up one rung early.
+      const base =
+        spec.traffic?.vehicleCount ?? SCENARIO_FAMILY_TRAFFIC_BASELINE[spec.family] ?? 0;
+      expect(l4.traffic?.vehicleCount ?? 0).toBe(base);
+      const l5Authored = spec.levels.find((r) => r.level === 5)?.traffic?.vehicleCount;
+      if (l5Authored !== undefined && l5Authored !== base) {
+        expect(l4.traffic?.vehicleCount ?? 0).not.toBe(l5Authored);
+      }
     });
   }
 });

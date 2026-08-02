@@ -17,6 +17,7 @@ import { serializeObjectiveParams } from "./params";
 import { DOC72_ARCHETYPE_IDS } from "./registry";
 import {
   MAP_ARCHETYPES,
+  RUNG_ADDITIONS,
   SCENARIO_FAMILIES,
   type LevelSpec,
   type ScenarioSpec,
@@ -271,11 +272,11 @@ export function validateScenarioSpec(
   } else {
     const seen = new Set<number>();
     let prev = 0;
-    for (const l of spec.levels) {
-      validateLevel(l, seen, errors);
+    spec.levels.forEach((l, i) => {
+      validateLevel(l, seen, errors, i === 0);
       if (l.level <= prev) errors.push(`levels must be ascending by level (found L${l.level} after L${prev})`);
       prev = l.level;
-    }
+    });
   }
 
   // -- Conditions (every weather compiles — dry/rain/fog/snow).
@@ -330,7 +331,12 @@ export function validateScenarioSpec(
   return errors;
 }
 
-function validateLevel(l: LevelSpec, seen: Set<number>, errors: string[]): void {
+function validateLevel(
+  l: LevelSpec,
+  seen: Set<number>,
+  errors: string[],
+  isLowest: boolean,
+): void {
   if (![1, 2, 3, 4, 5].includes(l.level)) {
     errors.push(`levels: level ${String(l.level)} must be 1..5`);
     return;
@@ -358,6 +364,55 @@ function validateLevel(l: LevelSpec, seen: Set<number>, errors: string[]): void 
         errors.push(`levels L${l.level}: stagedAdd[${i}] needs id + kind (StagedEventSpec)`);
       }
     });
+  }
+  // The complication — SHAPE only here. That the declared `adds` are REAL is
+  // not knowable from one spec in isolation (it is a difference between two
+  // compiled lessons), so it is gated in __tests__/level-complication.test.ts
+  // against compileScenario's own output. This layer only refuses copy that
+  // could never teach: an empty claim, a missing sentence, a bad citation.
+  if (l.complication !== undefined) {
+    const c = l.complication;
+    if (typeof c !== "object" || c === null) {
+      errors.push(`levels L${l.level}: complication must be an object when present`);
+    } else {
+      if (!Array.isArray(c.adds) || c.adds.length === 0) {
+        errors.push(
+          `levels L${l.level}: complication.adds must name at least one addition (${RUNG_ADDITIONS.join("|")}) — a rung that adds nothing must not claim one`,
+        );
+      } else {
+        for (const a of c.adds) {
+          if (!RUNG_ADDITIONS.includes(a)) {
+            errors.push(
+              `levels L${l.level}: complication.adds "${a}" is not one of ${RUNG_ADDITIONS.join(", ")}`,
+            );
+          }
+        }
+        if (new Set(c.adds).size !== c.adds.length) {
+          errors.push(`levels L${l.level}: complication.adds has duplicate entries`);
+        }
+      }
+      if (!nonEmptyBg(c.titleBg)) {
+        errors.push(`levels L${l.level}: complication.titleBg must be non-empty Bulgarian text`);
+      }
+      // THEO-4: the sentence that says WHAT changed and WHAT you do about it.
+      // A one-word „по-трудно" is exactly the bare verdict doc 64 forbids, so
+      // the floor is a real sentence, not a label.
+      if (!nonEmptyBg(c.coachBg) || c.coachBg.trim().length < 40) {
+        errors.push(
+          `levels L${l.level}: complication.coachBg must be a real Bulgarian instruction (>= 40 chars) — say what changed, what it does and what the driver does about it (THEO-4)`,
+        );
+      }
+      if (c.lawRef !== undefined && !LAW_REF_RE.test(c.lawRef)) {
+        errors.push(
+          `levels L${l.level}: complication.lawRef "${c.lawRef}" must cite ЗДвП / ППЗДвП / Наредба (ADR-002 retrieval)`,
+        );
+      }
+      if (isLowest) {
+        errors.push(
+          `levels L${l.level}: this is the template's LOWEST rung — a complication needs a rung below it to be harder than`,
+        );
+      }
+    }
   }
 }
 
