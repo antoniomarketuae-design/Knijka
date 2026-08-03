@@ -1,6 +1,6 @@
 # Content Data Contract (v1)
 
-> All learning content lives here as versioned JSON. This contract is the interface between content-generation agents, the platform code, and the AI tutor's grounding layer. Bulgarian (`Bg`) is the primary language. Every generated item starts as `"status": "draft"` — nothing ships without review (docs/education/61).
+> All learning content lives here as versioned JSON. This contract is the interface between content-generation agents, the platform code, and the AI tutor's grounding layer. Bulgarian (`Bg`) is the primary language. **A generator may never write `"status": "approved"` — that word means a person read the row, and it is only true when `review/approvals.json` carries their signature.** See [status — what the word means](#status--what-the-word-means).
 
 ## Files
 
@@ -12,7 +12,104 @@ content/
   questions/<topic-slug>.json
   signs/signs.json         # road sign catalog
   audits/<topic-slug>.audit.json
+  review/approvals.json    # the human-signature ledger — who approved what, over which text
+  law/                     # the law source layer — see law/README.md
+    sources.json           #   source register (URL + sha256 + coverage per document)
+    acts/<act-id>.json     #   article-addressable statute text, verbatim
+    penalties.json         #   penalties expressed as THREE separate systems
 ```
+
+## status — what the word means
+
+`status` had three values and one job it could not do: tell a machine's opinion
+apart from a person's. The law-vs-bank audit measured the cost —
+**1,005 of 1,089 questions were marked `approved`, including 22 of the 24 with a
+wrong answer key and all nine that are literally unanswerable**
+(docs/education/90 §1). Not one had been read by a human. The flag was recording
+that a generator ran.
+
+So the vocabulary now names the two things separately.
+
+| status | who may write it | what it asserts | reaches a student |
+| --- | --- | --- | --- |
+| `draft` | author / generator | being written; incomplete on purpose | no |
+| `machine-checked` | **generator** | generated, and it passes every automated check in `validate:content` — **nobody has read it** | no |
+| `needs-review` | auditor, fix wave, reviewer | a person or an audit named a specific problem, or a `lawRef` carries the `"?"` marker | no |
+| `approved` | **only the review tool, on a human's click** | a named person read *this exact text* and stands behind it | **yes — and only with a signature** |
+
+**`machine-checked` is the honest ceiling for anything automated.** A generator
+that has done everything right writes `machine-checked`, never `approved`. There
+is no path from `machine-checked` to `approved` that does not pass through a
+human at `/review`.
+
+### The signature — `review/approvals.json`
+
+A status string sits inside the row it is describing, so nothing about it can be
+checked. Authority therefore lives outside the row:
+
+```json
+{
+  "version": 1,
+  "readmeBg": "…",
+  "unsignedApprovedBaseline": 846,     // the frozen ceiling — see the ratchet below
+  "baselineFrozenAt": "2026-08-03",
+  "entries": [{
+    "questionId": "q-priority-001",
+    "verdict": "approved",             // approved | rejected
+    "by": "Антонио",                   // from the SERVER session — never the request body
+    "at": "2026-08-03T09:14:22.101Z",
+    "contentHash": "sha256:…",         // the row as it stood when it was signed
+    "noteBg": null
+  }]
+}
+```
+
+A question is **human-approved** when, and only when, all of these hold:
+
+1. `status` is `approved`,
+2. `entries` holds an `approved` entry for its id, naming a person and a time, and
+3. that entry's `contentHash` still equals the row's current hash.
+
+`contentHash` is `sha256` over the graded content — stem, every option (id, text,
+`correct`, sign face), explanation, `lawRefs`, `media`, `type`, `points` — in the
+canonical field order defined by `tools/theory/question_hash.mjs` and its
+TypeScript mirror `platform/src/modules/content-admin/hash.ts`. It deliberately
+excludes `status` (or approving would invalidate its own signature) and
+`conceptIds` (curriculum wiring, not something a reviewer reads the row to check).
+
+**This is the property the old flag was missing: edit an approved row and the
+signature stops matching.** The row silently un-approves and `validate:content`
+fails, naming the question, the signer and the date. A right answer with a wrong
+explanation is still wrong (THEO-4), so an explanation-only fix must go back
+through review too — the hash makes that automatic instead of a matter of
+someone's discipline.
+
+### The ratchet, and why the legacy rows were not simply relabelled
+
+837 rows still say `approved` with nobody's name on them. They are the product;
+deleting the word would take the whole mock-exam bank offline in one commit.
+Instead the count is **frozen** in `unsignedApprovedBaseline` and
+`validate:content` refuses to let it grow. It can only fall, and only by a human
+clearing rows at `/review`. Every run prints both numbers:
+
+```
+human-approved (signed, hash matches): 0 of 1089 — the only tier a student may be dealt as authoritative
+"approved" with NO human signature:  837 (frozen ceiling 837; stale signatures 0)
+```
+
+The gate lives in `platform/scripts/validate-content.mjs` and is proven by
+`tools/theory/approval_gate.test.mjs`, which runs the real validator against
+fixture banks: a ledger that is missing, anonymous, undated, hash-less,
+duplicated, stale, or one row over the ceiling all exit 1.
+
+Two rules the gate enforces on top of the ratchet:
+
+- a signature for a question that does not exist → error;
+- a row at `approved` that a human **rejected** → error.
+
+`signs/signs.json` carries the same vocabulary. No sign is `approved` today, so
+there is nothing to ratchet there yet; when the first one is, it comes through
+the same ledger.
 
 ## topics.json
 ```json
@@ -76,8 +173,8 @@ Section mastery is simply the aggregate of its concepts. Rules:
   "explanationBg": "One-breath explanation WHY (teen-readable), cites the rule",
   "lawRefs": [{ "act": "ЗДвП", "ref": "чл. 47" }],
   "media": null,                     // null or one of the media kinds below
-  "status": "draft"                  // draft | needs-review | approved
-}]
+  "status": "machine-checked"        // draft | machine-checked | needs-review | approved
+}]                                   // generators stop at machine-checked — see "status"
 ```
 
 ### Question media (THEO-1) — data-driven kinds only
@@ -123,6 +220,48 @@ Option media supports ONLY the sign kind. The legacy
 `{ "type": "image|video", "ref": "…" }` question-media shape remains valid but
 unused — prefer the data-driven kinds.
 
+#### „Кой от показаните знаци…" — the comparison shape. Do NOT invent a second one.
+
+**A multi-sign question has no `question.media`, and that is correct, not a
+bug.** Option media above IS the ordered set: one sign per option, in option
+order, `options[i].media.signRef`. There is no `signSet` / `signGrid` /
+`multiSign` question-media kind and there must never be one — a second
+representation of the same thing is how two renderers drift apart.
+
+```jsonc
+{
+  "textBg": "Кой от показаните знаци предупреждава за единичен опасен завой НАЛЯВО?",
+  "options": [
+    { "id": "a", "textBg": "Знак 1", "correct": false, "media": { "kind": "sign", "signRef": "А1" } },
+    { "id": "b", "textBg": "Знак 2", "correct": true,  "media": { "kind": "sign", "signRef": "А2" } },
+    { "id": "c", "textBg": "Знак 3", "correct": false, "media": { "kind": "sign", "signRef": "А4" } },
+    { "id": "d", "textBg": "Знак 4", "correct": false, "media": { "kind": "sign", "signRef": "А3" } }
+  ],
+  "media": null   // ← REQUIRED. There is no single picture to show above the text.
+}
+```
+
+`textBg` stays `"Знак 1"`…`"Знак 4"` deliberately. It is the accessible name and
+the option's spoken label, and on an identification question **it must never
+name the sign** — `"Знак 2"` is the whole point; `"Спри! Пропусни…"` would leak
+the answer to a screen-reader user and to anyone reading the option list.
+
+Rendered by `hasSignOptions()` → a **2x2 picture grid, 96 CSS px per face**, in
+`components/theory/PracticeSession.tsx`, `components/exam/ExamRunner.tsx` and
+`components/sim/lesson-ui/MicroQuizOverlay.tsx` — all three through the single
+`<SignFace>` in `components/theory/QuestionMedia.tsx`. Every one of the bank's
+18 comparison items has exactly four options, which is why the grid is 2x2 and
+not three-across: four signs in three columns is three tiles and an orphan, and
+it destroys the pairing the question is testing (А1/А2 single curves *against*
+А3/А4 double curves).
+
+> **Auditing this shape:** a checker that reads `question.media` alone will
+> report every one of these as „no media, nothing is shown". That exact false
+> positive put nine answerable questions in the fails-an-exam tier of
+> docs/education/90 §4.1, and it is the same mistake as the `isCorrect` /
+> `correct` one that audit already caught in itself. **Read
+> `options[].media` too.**
+
 ## signs/signs.json
 ```json
 [{
@@ -133,7 +272,7 @@ unused — prefer the data-driven kinds.
   "meaningBg": "…driver-facing meaning…",
   "svgFile": "signs/svg/b2.svg",
   "lawRefs": [{ "act": "Наредба РД-02-21-1/2023", "ref": "…" }],
-  "status": "draft"
+  "status": "draft"                  // same four values, same signature rule
 }]
 ```
 
@@ -188,8 +327,86 @@ Rules, all enforced at load (`buildHazardBank`) and gated by
 5. `status` stays `needs-review` until a human has WATCHED the cut and confirmed
    `windowOpenSec` is where the cue actually becomes visible.
 
+## law/ — the source layer (ADR-002)
+
+Full contract in [law/README.md](law/README.md). Read through
+`platform/src/lib/content/law` — never by importing the JSON.
+
+`law/acts/<act-id>.json` stores each ingested act as **addressable units**; a
+unit's `textBg` is the VERBATIM statute text, amendment notes included.
+
+```json
+{
+  "actId": "zdvp",
+  "abbrBg": "ЗДвП",
+  "titleBg": "ЗАКОН за движението по пътищата",
+  "promulgationBg": "Обн., ДВ, бр. 20 от 5.03.1999 г., …",
+  "consolidatedThroughBg": "ДВ, бр. 55 от 16.06.2026 г.",
+  "sourceId": "src-zdvp-mtc-16062026",   // must be a full-text row in sources.json
+  "units": [{
+    "ref": "чл. 183",                    // canonical lowercase; also "чл. 167а1", "§ 6", "приложение № 5"
+    "number": 183, "suffixBg": null,
+    "contextBg": "Глава седма · АДМИНИСТРАТИВНОНАКАЗАТЕЛНА ОТГОВОРНОСТ",
+    "textBg": "Чл. 183. …"
+  }]
+}
+```
+
+`law/penalties.json` is the reason the corpus exists: **one number was doing the
+work of three systems.** A penalty keeps them apart, and every figure carries a
+required citation whose `quoteBg` is re-verified against the act text at load.
+
+```json
+{
+  "id": "pen-b2-no-stop-danger",
+  "fine":          { "system": "fine",          "status": "grounded", "amountBgn": 200,
+                     "instrument": "акт",       // фиш | акт
+                     "instrumentSource": { "actId": "zdvp", "ref": "чл. 189", "quoteBg": "…" },
+                     "source": { "actId": "zdvp", "ref": "чл. 179", "paragraphRef": "ал. 1",
+                                 "pointRef": "т. 5",
+                                 "quoteBg": "Наказва се с глоба в размер 200 лв.:",
+                                 "contextQuoteBg": "който не спазва предписанието…" },
+                     "noteBg": null },
+  "controlPoints": { "system": "controlPoints", "status": "grounded", "points": 10,
+                     "source": { "actId": "naredba-iz-2539", "ref": "чл. 6", … }, "noteBg": null },
+  "examPoints":    { "system": "examPoints",    "status": "grounded", "points": 10,
+                     "errorClassBg": "опасна",
+                     "source": { "actId": "naredba-38", "ref": "приложение № 5", … }, "noteBg": null },
+  "lawRefs": [{ "act": "ЗДвП", "ref": "чл. 179" }],
+  "status": "needs-review"
+}
+```
+
+`quoteBg` must occur verbatim in the cited unit **and**, for a `grounded`
+numeric figure, must contain the number itself — a 100 лв. fine cited with a
+quote that never says "100 лв." is refused at load. The offence text rides along
+as `contextQuoteBg` (a second excerpt from the same unit, verified the same way)
+because Bulgarian penalty articles put the amount in the alinea opening and the
+behaviour in a numbered point below it.
+
+`status` per figure — and this is the founder's ruling in code:
+
+| status | value | meaning |
+| --- | --- | --- |
+| `grounded` | required | the number is written in the cited text |
+| `not-listed` | must be `0` | the offence is absent from an exhaustive list; the citation IS the list |
+| `unknown` | must be `null` | we do not have it — show the rule and the article, **no number** |
+
+`examPoints` may be `null` when the behaviour is not an exam error at all
+(drink-driving is not a marking-sheet item). A **фиш** and an **акт** differ in
+two systems at once: контролни точки are taken only `въз основа на влязло в сила
+наказателно постановление`.
+
 ## Hard rules for generators
 
+0. **Never type a legal figure or article number from memory (ADR-002).** Look
+   it up through `lib/content/law`; if the retrieval misses, the figure does not
+   ship — write the rule and the article with no number.
+0b. **Never write `"status": "approved"`.** That word is a person's, and a
+   generator writing it is how 1,005 rows came to assert a review nobody did.
+   The ceiling for anything automated is `"machine-checked"`; a flagged item is
+   `"needs-review"`. Approval happens at `/review` and lands in
+   `review/approvals.json`.
 1. **ORIGINAL questions only.** Never copy or closely paraphrase official listovki items (copyright risk R5). Same concepts, fresh wording and scenarios.
 2. **Every question and concept cites its legal basis** (`lawRefs`). If unsure of the exact article → `"status": "needs-review"` and an honest ref guess with `"?"` suffix.
 3. Valid UTF-8 JSON, no trailing commas, ids unique across the whole repo, every `conceptIds`/`dependsOn`/`topicId` must resolve.

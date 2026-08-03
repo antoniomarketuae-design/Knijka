@@ -18,5 +18,181 @@
     "flaggedLegal": 4,
     "removed": 0,
     "notes": "Wave 3 = q-043..q-063 (21 questions); waves 1-2 untouched. Schema: all ids unique and sequential, all 8 conceptIds resolve in concepts.json, media null, no trailing commas, valid UTF-8 (parsed clean, 63 total). Correct-option counts valid: 13 singles each have exactly 1 correct; 8 multis have 2-3 correct (q-043 has 2, rest have 3). Wave-3 mix: 13 single / 8 multi (62/38), points 8x1 / 8x2 / 5x3 (38/38/24) — within SCHEMA.md guidance. Fix (1): q-056 explanation used the non-word 'nedospivan dalg' (nedospivan is not a valid Bulgarian adjective) — corrected to the standard 'sanen dalg' (sleep debt); no other unnatural phrasing found. Flagged legal (4), all kept as needs-review with honest '?' refs: q-045 ('chl. 174, al. 1?') — 6-month disqualification for 0.5-0.8 promille first offence is correct in substance but exact current figure/subsection unverified; q-061, q-062, q-063 ('chl. 151?') — medical-fitness content (conditions needing fitness assessment, deteriorating night vision, concealing illness at the medical exam) is legally sound but exact article basis unverified, consistent with wave-1 q-019/020 and wave-2 q-040. Verified legally sound and NOT overstated: q-043 debunks the myth of a 0.0 under-21 limit — Bulgaria applies a uniform 0.5 g/L, no graduated/novice threshold (correctly marked false); q-044 0.5-1.2 band = administrative not crime; q-047 BAC can still rise 30-60 min post-drink (absorption phase); q-050/q-051 drug items keep ustanovena-upotreba framing (no 'roadside positive = crime' overstatement, consistent with q-007 fix); q-052 drinking after a crash before testing treated as thwarting/refusal (chl. 174); q-053 blood sample taken in a medical facility by medical staff; q-054 on-site consequences (act, temporary SUMPS seizure, no 'pay and go'). Duplication review vs ALL prior questions: q-047 (absorption rise) distinct from q-006 (subjective feeling) and q-022 (elimination rate); q-053 (blood-sample location/procedure) distinct from q-009 (right to request) and q-031 (lab decisive); q-054 (on-site procedure) distinct from q-003 (consequence ladder) and q-010 (refusal of both tests); q-051 (drug roadside test) parallels q-042 (alcohol) but different substance regime; q-056 (sleep-debt/meds/heat factors) distinct from q-032 (time-of-day/monotony) and q-033 (fatigue mitigation); q-060 (euphoria), q-018 (anger), q-038 (peer pressure) are distinct emotional angles; q-062 (medical vision deterioration) distinct from q-048 (alcohol night vision) and q-019 (glasses condition). No near-duplicates warranting rewrite/removal. Bulgarian natural throughout; removed: 0."
+  },
+  "lawAudit90": {
+    "wave": "FIX · DOCS-ALCOHOL — applying docs/education/90_THEORY_VS_LAW_AUDIT.md",
+    "date": "2026-08-03",
+    "rule": "ADR-002: no rule, article number or penalty figure written from memory. Every \"sourceLine\" below is quoted verbatim from content/law/acts/zdvp.json (ЗДвП consolidated to ДВ бр. 55 / 16.06.2026) or naredba-iz-2539.json, EXCEPT where \"sourceFrom\" says otherwise.",
+    "statusRule": "Every question touched here was set to \"needs-review\". Nothing was marked approved — approval is the founder's. This is the direct answer to §1 of the audit: 22 of 24 exam-failing rows were sitting at \"approved\".",
+    "reviewHowTo": "Each row gives: what was wrong, the exact text BEFORE, the exact text NOW, and the verbatim statute line that decides it. Clear a row by reading the sourceLine and the \"now\".",
+    "questionsTouched": 14,
+    "rows": [
+      {
+        "id": "q-alkohol-i-godnost-010",
+        "tier": "teaches-wrong-law",
+        "auditRef": "§5 #5",
+        "what": "Said refusal „се наказва с най-тежката санкция“. Повторно is heavier (3 years vs 2; 20 points vs 15), and над 1,2 falls outside чл. 174 entirely.",
+        "was": "option a „Наказва се с най-тежката санкция — все едно е дал силно положителна проба“",
+        "now": "option a „Наказва се с глоба 2000 лв. и две години лишаване от право да управлява“; explanation kills the „най-тежкото“ myth with the повторно comparison. Still 2 correct options (multi valid).",
+        "sourceAct": "ЗДвП + Наредба № Iз-2539",
+        "sourceRef": "чл. 174, ал. 2 и ал. 3 · чл. 6, ал. 1, т. 2 и т. 3",
+        "sourceLine": "ал. 3: „…се наказва с лишаване от право да управлява … за срок от две години и глоба 2000 лв.“ · ал. 2: „…глоба в размер 2000 лв. и лишаване … за срок три години.“ · Наредба чл. 6 ал. 1 т. 2 „- 20 контролни точки“, т. 3 „- 15 контролни точки“"
+      },
+      {
+        "id": "q-alkohol-i-godnost-052",
+        "tier": "teaches-wrong-law",
+        "auditRef": "§5 #6",
+        "what": "Treated drinking after a crash as „все едно е отказал проверка … по най-тежкия ред“. чл. 174, ал. 3 applies ONLY to a driver who was NOT in a crash — the exact opposite scenario. Wrong by an order of magnitude in both duration and money.",
+        "was": "option a „Като опит да осуети пробата — третира се тежко, все едно е отказал проверка“ · ref чл. 174",
+        "now": "option a „Като нарушение на задълженията при ПТП — забранено е да пиеш до идване на органите“; explanation cites чл. 123 both branches, the чл. 175, ал. 1, т. 5 sanction, and states outright that чл. 174, ал. 3 does not apply here.",
+        "sourceAct": "ЗДвП",
+        "sourceRef": "чл. 123, ал. 1, т. 2, б. „е“ и т. 3, б. „в“ · чл. 175, ал. 1, т. 5 · чл. 174, ал. 3",
+        "sourceLine": "чл. 123 ал. 1 т. 2 б. „е“: „да не употребява алкохол и/или наркотични вещества или техни аналози до пристигането на контролните органи“ · чл. 175 ал. 1: „Наказва се с лишаване … за срок три месеца и с глоба 200 лв. водач, който: … 5. наруши задълженията си като участник в пътнотранспортно произшествие;“ · чл. 174 ал. 3 opens: „Водач … който не е участвал в пътнотранспортно произшествие и откаже…“"
+      },
+      {
+        "id": "q-alkohol-i-godnost-001",
+        "tier": "misleading",
+        "auditRef": "§6.7",
+        "what": "Attributed the 1,2 criminal boundary to ЗДвП. Siblings q-002/-021/-044 correctly cite НК чл. 343б. Bare чл. 5 was doing catch-all duty.",
+        "was": "refs чл. 5 + чл. 174; „…а над 1,2 промила вече говорим за престъпление (ЗДвП чл. 5 и чл. 174)“",
+        "now": "0,5 grounded on чл. 5, ал. 3, т. 1; the ЗДвП ladder shown to stop at „до 1,2 на хиляда включително“; above that the ЗДвП itself sends you to blood sampling (чл. 165, ал. 2, т. 9) and the case to НК (ref carries „?“ — НК not in content/law).",
+        "sourceAct": "ЗДвП",
+        "sourceRef": "чл. 5, ал. 3, т. 1 · чл. 174, ал. 1 · чл. 165, ал. 2, т. 9",
+        "sourceLine": "чл. 5 ал. 3 т. 1: „да управлява пътно превозно средство с концентрация на алкохол в кръвта над 0,5 на хиляда…“ · чл. 174 ал. 1 т. 2: „над 0,8 на хиляда до 1,2 на хиляда включително…“ · чл. 165 ал. 2 т. 9: „…е установена концентрация на алкохол над 1,2 на хиляда … съпровожда лицето до мястото за извършване на медицинско изследване…“"
+      },
+      {
+        "id": "q-alkohol-i-godnost-003",
+        "tier": "misleading",
+        "auditRef": "§6.7",
+        "what": "Enumerated drink-driving consequences and omitted контролни точки entirely — a whole penalty class missing.",
+        "was": "explanation listed only fine + disqualification + criminal tier; refs чл. 174 + НК чл. 343б",
+        "now": "three penalty systems named separately, with 8/12 points and the zero-points consequence.",
+        "sourceAct": "Наредба № Iз-2539 + ЗДвП",
+        "sourceRef": "чл. 6, ал. 1, т. 1 · чл. 174, ал. 1 · чл. 157, ал. 4",
+        "sourceLine": "Наредба чл. 6 ал. 1 т. 1: „а) над 0,5 на хиляда до 0,8 на хиляда включително … - 8 контролни точки; б) над 0,8 … до 1,2 … - 12 контролни точки“ · ЗДвП чл. 157 ал. 4: „Водач, на когото са отнети всички контролни точки, губи придобитата правоспособност…“"
+      },
+      {
+        "id": "q-alkohol-i-godnost-009",
+        "tier": "misleading",
+        "auditRef": "§6.7 / §8.1",
+        "what": "чл. 174, ал. 4 delegates the procedure to a наредба and grants no right by itself.",
+        "was": "bare ref чл. 174; „…тръгването си без проверка се брои за отказ и се наказва по най-тежкия ред“",
+        "now": "blood-sample route grounded on ал. 3's own wording; the procedure explicitly attributed to the delegated наредба, WITHOUT inventing its number (Наредба № 1/2017 is not in content/law); „най-тежкия ред“ replaced by the real figures.",
+        "sourceAct": "ЗДвП",
+        "sourceRef": "чл. 174, ал. 3 и ал. 4",
+        "sourceLine": "ал. 4: „Редът, по който се установява концентрацията на алкохол в кръвта … се определя с наредба на министъра на здравеопазването, министъра на вътрешните работи и министъра на правосъдието.“"
+      },
+      {
+        "id": "q-alkohol-i-godnost-030",
+        "tier": "misleading",
+        "auditRef": "§6.7",
+        "what": "The DUTY to comply is чл. 6, т. 2 — not the penalty article. Also repeated the „най-тежкото нарушение“ error.",
+        "was": "bare ref чл. 174; „…отказът се наказва като най-тежкото нарушение“",
+        "now": "duty grounded on чл. 6, т. 2, power on чл. 165, ал. 2, т. 9, penalty on чл. 174, ал. 3 with the повторно correction.",
+        "sourceAct": "ЗДвП",
+        "sourceRef": "чл. 6, т. 2",
+        "sourceLine": "„изпълняват разпорежданията на лицата, упълномощени да регулират или да контролират движението по пътищата, независимо от светлинните сигнали, пътните знаци, маркировката на пътя и правилата за движение.“"
+      },
+      {
+        "id": "q-alkohol-i-godnost-042",
+        "tier": "misleading",
+        "auditRef": "§6.7",
+        "what": "The stop-and-check power is чл. 165, ал. 2, т. 1 — not the penalty article.",
+        "was": "bare ref чл. 174",
+        "now": "refs чл. 165, ал. 2, т. 1 + т. 9 + чл. 174, ал. 3; explanation quotes the power.",
+        "sourceAct": "ЗДвП",
+        "sourceRef": "чл. 165, ал. 2, т. 1",
+        "sourceLine": "„имат право да спират пътните превозни средства, да проверяват документите за самоличност и свидетелството за управление на водача…“"
+      },
+      {
+        "id": "q-alkohol-i-godnost-054",
+        "tier": "misleading",
+        "auditRef": "§6.7",
+        "what": "ПАМ cited to чл. 174, which contains no ПАМ at all.",
+        "was": "bare ref чл. 174",
+        "now": "refs чл. 165, ал. 2, т. 3 (not allowed to drive on) + чл. 171, т. 1, б. „б“ (licence taken, max 18 months) + чл. 174, ал. 1 (the later penalty).",
+        "sourceAct": "ЗДвП",
+        "sourceRef": "чл. 165, ал. 2, т. 3 · чл. 171, т. 1, б. „б“",
+        "sourceLine": "чл. 165 ал. 2 т. 3: „не допускат управлението на моторно превозно средство от водач … е употребил алкохол с концентрация в кръвта над 0,5 на хиляда…“ · чл. 171 т. 1 б. „б“: „…до решаване на въпроса за отговорността му, но за не повече от 18 месеца“"
+      },
+      {
+        "id": "q-alkohol-i-godnost-031",
+        "tier": "misleading",
+        "auditRef": "§6.7 / §8.1",
+        "what": "Catch-all чл. 174. The lab procedure sits in the delegated наредба.",
+        "was": "bare ref чл. 174",
+        "now": "refs чл. 174, ал. 3 + ал. 4; the наредба named in prose exactly as the statute names it, with no invented number.",
+        "sourceAct": "ЗДвП",
+        "sourceRef": "чл. 174, ал. 4",
+        "sourceLine": "„…се определя с наредба на министъра на здравеопазването, министъра на вътрешните работи и министъра на правосъдието.“"
+      },
+      {
+        "id": "q-alkohol-i-godnost-053",
+        "tier": "misleading",
+        "auditRef": "§6.7 / §8.1",
+        "what": "Same catch-all. „Установеният ред“ is the delegated наредба, and the escort duty is чл. 165, ал. 2, т. 9.",
+        "was": "bare ref чл. 174",
+        "now": "refs чл. 174, ал. 4 + чл. 165, ал. 2, т. 9.",
+        "sourceAct": "ЗДвП",
+        "sourceRef": "чл. 174, ал. 4 · чл. 165, ал. 2, т. 9",
+        "sourceLine": "чл. 165 ал. 2 т. 9: „…длъжностното лице от службата за контрол съпровожда лицето до мястото за извършване на медицинско изследване и вземане на биологични проби…“"
+      },
+      {
+        "id": "q-alkohol-i-godnost-022",
+        "tier": "misleading",
+        "auditRef": "§6.7 / §8.2",
+        "what": "THE SHARPEST CASE. „Черният дроб разгражда около 0,1–0,15 промила на час“ presented with „(ЗДвП чл. 5)“. чл. 5 contains no such figure — a physiological claim wearing a legal citation, which is exactly the failure mode: a student assumes it is law and does arithmetic on it.",
+        "was": "„Алкохолът си тръгва със скорост около 0,1–0,15 промила на час … (ЗДвП чл. 5).“",
+        "now": "the rate is kept but explicitly labelled physiology, not law („тази скорост е физиология, а не законова величина — такова число в ЗДвП няма“), and the one legal number is quoted from чл. 5, ал. 3, т. 1.",
+        "sourceAct": "ЗДвП",
+        "sourceRef": "чл. 5, ал. 3, т. 1",
+        "sourceLine": "„да управлява пътно превозно средство с концентрация на алкохол в кръвта над 0,5 на хиляда и/или след употреба на наркотични вещества или техни аналози;“",
+        "reviewerCaveat": "Audit §8.2: the 0,1–0,15 промила/час figure itself is UNVERIFIED (no medical source fetched). It was NOT a proven defect, so I kept it rather than delete a graded answer — but it is now honestly labelled as non-legal. If you want it gone, it is a one-line change."
+      },
+      {
+        "id": "q-alkohol-i-godnost-047",
+        "tier": "misleading",
+        "auditRef": "§6.7 / §8.2",
+        "what": "Same pattern: the 30–60 min absorption curve presented under „(ЗДвП чл. 5)“.",
+        "was": "„…пробата може да е по-висока час след последната чаша … (ЗДвП чл. 5).“",
+        "now": "labelled physiology, not a statutory period; the only legal number quoted is the 0,5 limit.",
+        "sourceAct": "ЗДвП",
+        "sourceRef": "чл. 5, ал. 3, т. 1",
+        "sourceLine": "„…с концентрация на алкохол в кръвта над 0,5 на хиляда…“",
+        "reviewerCaveat": "The 30–60 min figure is unverified per §8.2 — kept, relabelled, not asserted as law."
+      },
+      {
+        "id": "q-alkohol-i-godnost-011",
+        "tier": "misleading",
+        "auditRef": "§6.7 / §8.2",
+        "what": "Microsleep 2–3 s / 50–75 m at 90 km/h presented under „(ЗДвП чл. 5)“. чл. 5 has no such figures.",
+        "was": "„…с отворени очи и ръце на волана (ЗДвП чл. 5).“",
+        "now": "numbers labelled as sleep research, and the REAL legal hook added — чл. 181, т. 4, which is a far better citation for fatigue than чл. 5 ever was.",
+        "sourceAct": "ЗДвП",
+        "sourceRef": "чл. 181, т. 4 · чл. 5, ал. 1, т. 1",
+        "sourceLine": "чл. 181 т. 4: „водач, който управлява моторно превозно средство в болестно или друго състояние, което създава опасност за движението;“",
+        "reviewerCaveat": "The 2–3 s / 50–75 m figures are unverified per §8.2 — kept, relabelled."
+      },
+      {
+        "id": "q-alkohol-i-godnost-034",
+        "tier": "misleading",
+        "auditRef": "§6.7 / §8.2",
+        "what": "17–18 h awake ≈ 0,5 промила presented under „(ЗДвП чл. 5)“ — the law does not measure fatigue in промили.",
+        "was": "„Изследванията показват, че 17–18 часа без сън … (ЗДвП чл. 5).“",
+        "now": "attributed to sleep science, with чл. 181, т. 4 as the legal route to the same conclusion.",
+        "sourceAct": "ЗДвП",
+        "sourceRef": "чл. 181, т. 4 · чл. 5, ал. 1, т. 1",
+        "sourceLine": "чл. 181 т. 4: „…в болестно или друго състояние, което създава опасност за движението;“",
+        "reviewerCaveat": "The 17–18 h equivalence is unverified per §8.2 — kept, relabelled."
+      }
+    ],
+    "whyNotTouched": "Rows the ledger names in my two files that I deliberately did NOT edit, and why. Each would have required writing a rule from memory, which ADR-002 forbids.",
+    "reclassifiedByTheLedgerItself": "Audit §3 moved q-alkohol-007, -008, -021 (with siblings -002, -044) from \"defect\" to \"could not verify\". Not touched — they are work-list items, not defects.",
+    "retrievalLayerGap": "content/law/acts holds only zdvp, naredba-38 and naredba-iz-2539. Adding НК (justice.government.bg/home/normdoc/1589654529), ЗБЛД (aref.government.bg), Наредба № 1/2017 and Наредба № 2/2001 (SARS), plus Закон за пътищата and КЗ, would unblock every row above. Audit §12 #7 says the same.",
+    "blockedOnUnretrievedActs": {
+      "НК чл. 343б": "the 1,2 промила criminal boundary — refs I touched now carry „?“; НК is not in content/law",
+      "Наредба № 1/2017": "q-009, -031, -053 procedural half — named in prose as the statute names it, number not invented",
+      "Наредба № 3/2011": "q-019, -020, -040, -061, -062, -063 medical fitness — pre-existing needs-review, outside this ledger, untouched"
+    }
   }
 }

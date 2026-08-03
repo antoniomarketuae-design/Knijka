@@ -18,5 +18,45 @@
     "flaggedLegal": 0,
     "removed": 0,
     "notes": "Adversarial audit of wave-3 additions (q-signs-044..064) 2026-07-08. Structure: valid UTF-8 JSON re-parsed after edits (64 total items, 64 unique ids, no q-signs collisions repo-wide); every single has exactly 1 correct option, every multi 2-3; all option arrays keep positional ids a-d; all conceptIds resolve in concepts.json (incl. c-u-turn, c-roundabout-rules, c-exit-from-adjacent, c-transverse-markings); every question carries lawRefs; media null; statuses valid. Wave-3 mix 13 single / 8 multi (62/38%) and points 8x1 / 9x2 / 4x3 (38/43/19%) - within SCHEMA.md guidance. FIXED (11): same answer-position bias as wave-2, worse this time - ALL 13 wave-3 singles had the correct option at position 'a'. Reordered options in 046, 047, 049, 050, 051, 052, 053, 055, 056, 060, 062 (kept 044, 059 at 'a'); correct answers now spread a2/b4/c4/d3 across the 13 singles. Only option order changed - no textBg edited, no explanation references option letters, verified by re-parse (0 count/id-order violations). FLAGGED (0 new): the 5 needs-review items (045 tunnel, 048 residential-zone speed, 049 exit-from-residential-zone, 056 placement distances, 062 recommended-speed sign) arrived pre-flagged by the generator with honest '?' lawRefs and [REVIEW] prefixes already in explanationBg - confirmed appropriate, no status change needed. No draft item carries an uncertain central ЗДвП article (only well-known 'група X?' Наредба-classification refs, consistent with wave-1/2 acceptance for draft). VERIFIED CORRECT against docs 31/32 and Bulgarian law: uneven-surface warning = slow down (044); tunnel low-beam + no U-turn/reverse + no stop except designated/emergency (045); roundabout mandatory sign commands direction only, not priority (046, чл. 50а); dead-end info sign does not prohibit entry (047); pedestrian-zone entry prohibited by default (050, чл. 6); 10t weight-limit sign exempts a light car (051); 'Забранени престоят и паркирането' forbids even a brief passenger stop vs 'Забранено паркирането' which allows prestoy - complementary to 031/052, not duplicative (052, чл. 93); Б5 priority-over-oncoming mirror of Б6 in 025 - complementary, not duplicate (053); priority-road diamond with schematic plate redirecting priority through junction (054, чл. 48); triangular traffic-light-ahead warning (055); populated-area white place sign self-imposes 50 km/h (060, чл. 21); two-arrow mandatory sign forbids left turn + U-turn (057, чл. 6/40); downhill engine-braking + no coasting in neutral (058); road-narrows warning (059); wild-animal warning, brake straight rather than swerve into oncoming (061); red-circle=max / blue-circle=min speed + scope ends at junction/end-sign/plate (063); shark-teeth transverse marking dubs Б1 and stands alone if sign is missing (064, Наредба 2/2001). Duplicate scan vs ALL 63 other items: no removals. Closest pairs are progressions or complementary mirrors, not duplicates - 056 (specific placement distances, needs-review) is a more detailed sibling of 004 (conceptual placement); 063 aggregates facts from 034 (min-speed) and the scope items but as a legitimate summary multi; the warning-sign->slow-down cluster (044/055/059 + w1 005 + w2 038 + 058/061) each tests a DISTINCT sign so scenarios differ, though the pattern is repetitive - worth diversifying question stems in future waves. Bulgarian reads natural and modern for a 17-year-old throughout; no listovki-like phrasing detected. Docs note: neither doc 31 nor 32 hard-codes the residential-zone 20 km/h, tunnel-regime, motorway-140 or recommended-speed-sign specifics, so those items correctly remain needs-review pending confirmation against Наредба РД-02-21-1/2023 and ЗДвП чл. 21/55/116."
+  },
+  "close90SixWrong": {
+    "wave": "CLOSE · THE-SIX-WRONG — closing docs/education/90 §14.5 Tier A",
+    "date": "2026-08-03",
+    "rule": "ADR-002: no rule, article number or figure written from memory. Every \"sourceLine\" is quoted verbatim from content/law/acts/zdvp.json (ЗДвП consolidated to ДВ бр. 55 / 16.06.2026), content/law/acts/naredba-iz-2539.json, or the locally extracted ППЗДвП and Наредба № РД-02-21-1 text (sha256-pinned in content/law/sources.json).",
+    "statusRule": "Every row touched here is \"needs-review\". Nothing was left at \"approved\" — approval is the founder's.",
+    "questionsTouched": 1,
+    "rows": [
+      {
+        "id": "q-signs-041",
+        "tier": "fails-an-exam (undecidable)",
+        "auditRef": "§14.5 Tier A · §8.3 т. 6",
+        "what": "Undecidable as written. The stem said only „табела с изобразен товарен автомобил“, and Т6 („the sign DOES apply to it“) and Т7 („the sign does NOT apply to it“) mean opposite things.",
+        "mediaCheck": "VERIFIED AT HEAD: media really is null on this row. This is NOT one of the nine §4.1 rows that were falsely accused — those nine carry four {kind:\"sign\",signRef} faces on options[i].media at HEAD and §4.1 is retracted. This one is a genuine media: null.",
+        "decision": "REWROTE THE STEM; the sign face was NOT attached. Reason: content/signs/svg holds 77 files and the „Т“ group has only t1, t2, t10, t13, t15 — there is no t6 and no t7. Drawing them would mean inventing artwork never seen in the official source (pdftotext drops the pictures from прил. № 1–8), which is the thing ADR-002 forbids. Text beats invented art.",
+        "was": "„Под знак „Забранено е влизането на пътни превозни средства“ има табела с изобразен товарен автомобил. Караш лек автомобил — важи ли забраната за теб?“",
+        "now": "„Под пътен знак В1 „Забранено е влизането на пътни превозни средства“ е поставена допълнителна табела Т6 „Пътно превозно средство, за което се отнася действието на пътния знак“ със силует на товарен автомобил. Караш лек автомобил — важи ли забраната за теб?“ — the plate is named by code and by its verbatim official name. Answer key unchanged (d). Option c was rewritten because the old wording („Не мога да преценя без допълнителен знак“) would have become the TRUE answer once the plate is named.",
+        "sourceAct": "Наредба № РД-02-21-1/23.11.2023",
+        "sourceRef": "чл. 183, ал. 1",
+        "sourceLine": "„Допълнителни табели Т6 „Пътно превозно средство, за което се отнася действието на пътния знак“ и Т7 „Пътно превозно средство, за което не се отнася действието на пътния знак“ се поставят под пътните знаци от групи „А“, „В“ и „Г“, за да указват за кои участници в движението се отнася или не се отнася действието на знака.“",
+        "supportingRefs": [
+          {
+            "act": "Наредба № РД-02-21-1/23.11.2023",
+            "ref": "чл. 71, ал. 1",
+            "line": "„Пътен знак В1 „Забранено е влизането на пътни превозни средства“ се използва за сигнализиране на пътен участък, забранен за движение на пътни превозни средства в едната посока. Пътният знак се поставя в началото на пътния участък.“ — В1 is in group „В“, so it is among the signs under which чл. 183, ал. 1 allows Т6/Т7."
+          },
+          {
+            "act": "Наредба № РД-02-21-1/23.11.2023",
+            "ref": "чл. 183, ал. 2",
+            "line": "„При необходимост под символа на превозното средство може да се укаже допустима максимална маса в тонове. В този случай действието на знака съответно се отнася или не се отнася само за пътни превозни средства или за състави от превозни средства, чиято маса надвишава указаната стойност.“"
+          },
+          {
+            "act": "Наредба № РД-02-21-1/23.11.2023",
+            "ref": "чл. 186, ал. 1",
+            "line": "„Допълнителна табела Т10 „Време на действие на пътния знак“ се използва за указване на часовете от денонощието, през които е валидно действието на знака.“ — this is why distractor b („само в часовете на натоварено движение“) is wrong by source, not by feel."
+          }
+        ],
+        "reopenIf": "If Т6 and Т7 are ever added to content/signs (with a law-cited face), this stem can go back to an image and the plate name can be removed from the text."
+      }
+    ]
   }
 }

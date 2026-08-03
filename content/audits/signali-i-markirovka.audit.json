@@ -18,5 +18,54 @@
     "flaggedLegal": 0,
     "removed": 0,
     "notes": "Adversarial audit 2026-07-08, wave 3 (q-044..q-064; q-001..q-043 untouched). Schema: full compliance — every item has the exact SCHEMA.md key set, ids unique and sequential (repo-wide unique), option id letters sequential a-d, all conceptIds (c-traffic-light-signals, c-additional-sections, c-flashing-yellow, c-transverse-markings, c-regulator-signals, c-longitudinal-markings, c-other-markings, c-temporary-signalization, c-special-regime-vehicles, c-driver-signals, c-signal-hierarchy, c-priority-road, c-lane-control-signals) resolve in concepts.json, valid UTF-8 JSON without trailing commas. Counts: 13 single (each exactly 1 correct) / 8 multi (each 2-3 correct) = 62/38%; points 8x1 / 9x2 / 4x3 (38/43/19%) — within guidance. Legal: all correct answers verified against docs/education/31-32 and ЗДвП/ППЗДвП/Наредба № 2/2001 — two-section light red/green with no yellow (ППЗДвП чл. 31), dark additional arrow section = wait under main red, left green-arrow yield to pedestrians+oncoming (чл. 37, 119), lunar-white tram/PT signals separate from car light (ППЗДвП чл. 32), pedestrian/bicycle lights bind their users but driver still yields when turning, light phase order and non-flashing yellow forbids passing, regulator right-arm-forward = right turn only from chest side (ППЗДвП чл. 66), whistle only draws attention (command stays in pose/gestures), double-solid never crossable even to a property, long-dash warning line precedes a solid, combined line read from own side, yellow edge solid=no stop/park & broken=no park, blue marking=paid parking, BUS lane crossable to turn right, marking colours (white/orange/blue) and temporary orange overrides permanent (Наредба № РД-02-21-1/2023), yellow beacon = no priority vs light+sound special regime (чл. 91), headlight flash to signal overtaking outside town without blinding (чл. 76). Zero wrong correct-answers; flaggedLegal 0 (existing '?' refs + needs-review already carry uncertainty honestly). Fixes applied (10): q-052 option a grammar corrected ('командата остават позата и жестовете му' → 'командата се дава с позата и жестовете му') AND reordered; and answer-position bias broken — ALL 13 wave-3 singles had the key at 'a' (0 at b/c/d), trivially gameable, so q-045/046/049/051/052/053/055/057/058 (+052) reordered; wave-3 singles now spread a:3 b:4 c:3 d:3. Duplicates: none requiring removal vs all 63 other questions — 044 two-section light, 047 tram white, 048 ped/bike lights are new light subtypes; 045/046 dark/left-arrow section complement 005/006; 049 flashing-yellow+pedestrian distinct from 007/008; 050 phase order distinct from 002/025; 051/052 regulator forward-arm/whistle complement 011/028/029; 053/054/055 line scenarios complement 013/014/030; 056/057/058 yellow/blue/BUS markings complement 018/031; 059/060 colour+temporary overlap 032/037 only at the shared 'white/orange' fact, framed differently; 061 yellow beacon, 062 headlight flash, 063 dark light+priority-road, 064 flashing-yellow lane arrow all distinct scenarios. Nothing removed. Bulgarian natural and modern throughout; scenario-based second-person phrasing, no listovki-like wording."
+  },
+  "close90SixWrong": {
+    "wave": "CLOSE · THE-SIX-WRONG — closing docs/education/90 §14.5 Tier A",
+    "date": "2026-08-03",
+    "rule": "ADR-002: no rule, article number or figure written from memory. Every \"sourceLine\" is quoted verbatim from content/law/acts/zdvp.json (ЗДвП consolidated to ДВ бр. 55 / 16.06.2026), content/law/acts/naredba-iz-2539.json, or the locally extracted ППЗДвП and Наредба № РД-02-21-1 text (sha256-pinned in content/law/sources.json).",
+    "statusRule": "Every row touched here is \"needs-review\". Nothing was left at \"approved\" — approval is the founder's.",
+    "questionsTouched": 1,
+    "rows": [
+      {
+        "id": "q-signali-i-markirovka-058",
+        "tier": "fails-an-exam",
+        "auditRef": "§14.5 Tier A · §8.3 т. 5",
+        "what": "The explanation asserted „Забранено е движението ПО BUS лентата, а не самото ѝ пресичане“ while the ППЗДвП чл. 63, ал. 2, т. 1 the wave itself added to the row forbids exactly the crossing. The audit concluded neither candidate option could be grounded and proposed no replacement.",
+        "was": "key = b („навлизаш в BUS лентата, колкото да завиеш надясно от нея“); option a ended „и пресичаш пътя ѝ“; stem said only „дясната лента е с надпис BUS“.",
+        "now": "ANSWER KEY FLIPPED b → a. Option a rewritten to „Завиваш надясно от съседната лента, без да навлизаш в BUS лентата, и пропускаш движещите се по нея.“ Stem now states the lane is separated by a single continuous line — which is what the наредба itself prescribes for a BUS lane, so nothing is invented.",
+        "whatUnlockedIt": "The audit was right that чл. 15, ал. 6 and ППЗДвП чл. 63, ал. 2, т. 1 alone leave the item undecidable. The missing link is ЗДвП § 6, т. 4 ДР: the line outlining the BUS lane is a BOUNDARY OF THE CARRIAGEWAY. Once that is in hand, the rightmost lane of the driver's own carriageway is the one beside the BUS lane, and чл. 35, ал. 1 settles the turn without any statute-vs-наредба conflict to resolve.",
+        "sourceAct": "ЗДвП",
+        "sourceRef": "§ 6, т. 4 ДР",
+        "sourceLine": "„Граница на платното за движение“ е линията, очертана или не с пътна маркировка, която отделя платното за движение от другите конструктивни елементи на пътното платно - банкет, тротоар, лента за принудително спиране и други. Линията, с която се очертава „BUS“-лентата, също е граница на платното за движение.“",
+        "supportingRefs": [
+          {
+            "act": "ЗДвП",
+            "ref": "чл. 15, ал. 6",
+            "line": "„Когато пътна лента е сигнализирана за движение само на превозни средства от редовните линии за обществен превоз на пътници, се забранява движението на други пътни превозни средства, с изключение на пътните превозни средства, извършващи случаен или специализиран превоз на деца и/или ученици.“"
+          },
+          {
+            "act": "ППЗДвП",
+            "ref": "чл. 63, ал. 2, т. 1",
+            "line": "„Единична непрекъсната линия“ - М1. На пътните превозни средства е забранено да я застъпват и пресичат. С единична непрекъсната линия се очертава и пътна лента, предназначена за движение на превозни средства от редовните линии за обществен превоз на пътници „ВUS“ лента. Символът „ВUS“ се изписва в началото на лентата и след всяко кръстовище;“"
+          },
+          {
+            "act": "ЗДвП",
+            "ref": "чл. 35, ал. 1 (= ППЗДвП чл. 82, ал. 1, verbatim identical)",
+            "line": "„Завиването надясно се извършва от най-дясната пътна лента по посока на движението, а когато лентите са обозначени за движение в съответна посока - от лента, предназначена за завиване надясно.“"
+          },
+          {
+            "act": "ППЗДвП",
+            "ref": "чл. 82, ал. 3",
+            "line": "„Когато радиусът на завиване на пътното превозно средство е по-голям от радиуса на завоя, завиването може да започне и от друга част на платното за движение, но водачът на завиващото превозно средство е длъжен да пропусне пътните превозни средства, преминаващи от двете му страни.“"
+          },
+          {
+            "act": "ЗДвП",
+            "ref": "чл. 183, ал. 4, т. 12",
+            "line": "„Наказва се с глоба 100 лв. водач, който: … 12. управлява моторно превозно средство по пътна лента, сигнализирана за движение само на пътни превозни средства от редовните линии за обществен превоз на пътници, без да има право на това;“"
+          }
+        ],
+        "honestLimit": "No provision in any act we hold permits a non-eligible vehicle to enter a BUS lane in order to turn right. If Sofia practice relies on the line being BROKEN just before the junction, that is the other case — ППЗДвП чл. 63, ал. 2, т. 3 „Единична прекъсната линия“ - М3. На пътните превозни средства е разрешено да я пресичат.“ — but чл. 15, ал. 6 still bans DRIVING along the lane even then. The stem therefore fixes the continuous line rather than leaving the student to guess. FOUNDER CALL AVAILABLE: if you want the broken-line variant taught instead, it needs a second question, not a different key on this one."
+      }
+    ]
   }
 }

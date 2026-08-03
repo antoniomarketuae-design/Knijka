@@ -2,7 +2,7 @@
 
 > **GENERATED FILE** — rebuild with `node tools/theory/verify_drafts.mjs --report`
 > after any content edit or approval batch. Manual edits will be overwritten.
-> Generated: 2026-07-25. Mechanical checks only — no machine ever
+> Generated: 2026-08-03. Mechanical checks only — no machine ever
 > judges content. **draft → approved is HUMAN-ONLY** (the founder).
 
 ## 1. Totals
@@ -12,8 +12,8 @@
 | draft (this queue) | 0 |
 | — CLEAN (passed every mechanical check) | 0 |
 | — FLAGGED (at least one precise issue) | 0 |
-| needs-review (separate pass — see §3) | 84 |
-| approved | 1005 |
+| needs-review (separate pass — see §3) | 290 |
+| approved | 799 |
 
 Estimated total review time: **~1 min** (20s per clean, 120s per flagged), splittable per topic below.
 
@@ -37,7 +37,7 @@ Estimated total review time: **~1 min** (20s per clean, 120s per flagged), split
 
 ## 3. The ~290 flagged questions from PROGRESS §7 — cross-reference
 
-The list EXISTS AS DATA: it is exactly the 84 questions with
+The list EXISTS AS DATA: it is exactly the 290 questions with
 `status: "needs-review"`. 288 of them carry the machine-visible markers
 ('?'-suffixed lawRef or a `[REVIEW: …]` note); the adversarial audits'
 `flaggedLegal` tallies (`content/audits/*.audit.json`) account for 152 —
@@ -49,19 +49,22 @@ writes). Per-topic needs-review counts:
 
 | topic | needs-review |
 |---|---|
-| osnovni-ponyatia | 1 |
-| prevozno-sredstvo | 6 |
-| patni-znatsi | 9 |
-| signali-i-markirovka | 5 |
-| predimstvo | 1 |
-| krastovishta | 12 |
-| skorost-i-distantsia | 3 |
-| manevri-i-izprevarvane | 9 |
-| uyazvimi-uchastnitsi | 10 |
-| spirane-i-parkirane | 6 |
-| alkohol-i-godnost | 7 |
-| dokumenti-i-sanktsii | 12 |
-| ptp-i-parva-pomosht | 3 |
+| osnovni-ponyatia | 13 |
+| prevozno-sredstvo | 13 |
+| patni-znatsi | 36 |
+| signali-i-markirovka | 10 |
+| predimstvo | 3 |
+| krastovishta | 38 |
+| skorost-i-distantsia | 15 |
+| manevri-i-izprevarvane | 29 |
+| uyazvimi-uchastnitsi | 18 |
+| magistrali-i-izvangradsko | 3 |
+| spirane-i-parkirane | 22 |
+| nosht-i-uslozhneni-uslovia | 3 |
+| alkohol-i-godnost | 21 |
+| dokumenti-i-sanktsii | 27 |
+| ptp-i-parva-pomosht | 33 |
+| eko-i-zashtitno-shofirane | 6 |
 
 ## 4. Review batches per topic (cleanest share first)
 
@@ -148,21 +151,21 @@ statistics. Per-file numbers:
 |---|---|---|---|---|
 | `osnovni-ponyatia` | 40 | 10 / 10 / 10 / 10 | 10 (25.0%) | 22.5% |
 | `prevozno-sredstvo` | 39 | 10 / 10 / 10 / 9 | 8 (20.5%) | 24.4% |
-| `patni-znatsi` | 64 | 16 / 17 / 16 / 15 | 17 (26.6%) | 18.8% |
-| `signali-i-markirovka` | 41 | 11 / 10 / 11 / 9 | 9 (22.0%) | 22.6% |
+| `patni-znatsi` | 64 | 16 / 17 / 16 / 15 | 18 (28.1%) | 18.4% |
+| `signali-i-markirovka` | 41 | 11 / 9 / 11 / 10 | 10 (24.4%) | 22.6% |
 | `predimstvo` | 48 | 12 / 12 / 12 / 12 | 11 (22.9%) | 22.4% |
-| `krastovishta` | 45 | 11 / 11 / 12 / 11 | 10 (22.2%) | 23.9% |
+| `krastovishta` | 45 | 11 / 11 / 12 / 11 | 12 (26.7%) | 23.9% |
 | `skorost-i-distantsia` | 43 | 11 / 12 / 11 / 9 | 7 (16.3%) | 20.3% |
-| `manevri-i-izprevarvane` | 47 | 12 / 11 / 12 / 12 | 12 (25.5%) | 23.9% |
+| `manevri-i-izprevarvane` | 47 | 12 / 11 / 12 / 12 | 12 (25.5%) | 24.5% |
 | `uyazvimi-uchastnitsi` | 47 | 12 / 13 / 12 / 10 | 12 (25.5%) | 21.8% |
 | `magistrali-i-izvangradsko` | 44 | 11 / 12 / 11 / 10 | 11 (25.0%) | 22.2% |
-| `spirane-i-parkirane` | 44 | 10 / 11 / 11 / 12 | 11 (25.0%) | 23.9% |
+| `spirane-i-parkirane` | 44 | 10 / 11 / 11 / 12 | 10 (22.7%) | 23.9% |
 | `nosht-i-uslozhneni-uslovia` | 41 | 11 / 10 / 10 / 10 | 10 (24.4%) | 23.2% |
 | `alkohol-i-godnost` | 39 | 10 / 10 / 10 / 9 | 9 (23.1%) | 22.4% |
-| `dokumenti-i-sanktsii` | 37 | 9 / 11 / 9 / 8 | 9 (24.3%) | 25.0% |
+| `dokumenti-i-sanktsii` | 37 | 8 / 12 / 9 / 8 | 9 (24.3%) | 25.0% |
 | `ptp-i-parva-pomosht` | 40 | 10 / 10 / 10 / 10 | 9 (22.5%) | 24.4% |
 | `eko-i-zashtitno-shofirane` | 39 | 10 / 10 / 10 / 9 | 7 (17.9%) | 21.2% |
-| **whole bank** | 698 | 176 / 180 / 177 / 165 | 162 (23.2%) | 22.5% |
+| **whole bank** | 698 | 175 / 180 / 177 / 166 | 165 (23.6%) | 22.5% |
 
 ## 6. Duplicates and near-duplicates (whole bank — pairs, no judgment)
 
@@ -172,229 +175,229 @@ need one member rejected/rewritten by hand.
 
 | question A | question B | similarity | note |
 |---|---|---|---|
-| `q-signs-022` (approved) | `q-predimstvo-009` (approved) | EXACT | identical normalized text |
+| `q-signs-022` (needs-review) | `q-predimstvo-009` (approved) | EXACT | identical normalized text |
 | `q-signs-065` (approved) | `q-signs-067` (approved) | EXACT | identical normalized text |
 | `q-signs-065` (approved) | `q-signs-068` (approved) | EXACT | identical normalized text |
 | `q-signs-065` (approved) | `q-signs-070` (approved) | EXACT | identical normalized text |
 | `q-signs-065` (approved) | `q-signs-071` (approved) | EXACT | identical normalized text |
 | `q-signs-065` (approved) | `q-signs-072` (approved) | EXACT | identical normalized text |
 | `q-signs-065` (approved) | `q-signs-074` (approved) | EXACT | identical normalized text |
-| `q-signs-065` (approved) | `q-signs-075` (approved) | EXACT | identical normalized text |
+| `q-signs-065` (approved) | `q-signs-075` (needs-review) | EXACT | identical normalized text |
 | `q-signs-065` (approved) | `q-signs-078` (approved) | EXACT | identical normalized text |
-| `q-signs-065` (approved) | `q-signs-079` (approved) | EXACT | identical normalized text |
-| `q-signs-065` (approved) | `q-signs-080` (approved) | EXACT | identical normalized text |
+| `q-signs-065` (approved) | `q-signs-079` (needs-review) | EXACT | identical normalized text |
+| `q-signs-065` (approved) | `q-signs-080` (needs-review) | EXACT | identical normalized text |
 | `q-signs-065` (approved) | `q-signs-082` (approved) | EXACT | identical normalized text |
 | `q-signs-065` (approved) | `q-signs-084` (approved) | EXACT | identical normalized text |
 | `q-signs-065` (approved) | `q-signs-085` (approved) | EXACT | identical normalized text |
 | `q-signs-065` (approved) | `q-predimstvo-070` (approved) | EXACT | identical normalized text |
 | `q-signs-065` (approved) | `q-krastovishta-067` (approved) | EXACT | identical normalized text |
-| `q-signs-065` (approved) | `q-krastovishta-069` (approved) | EXACT | identical normalized text |
+| `q-signs-065` (approved) | `q-krastovishta-069` (needs-review) | EXACT | identical normalized text |
 | `q-signs-065` (approved) | `q-uyazvimi-071` (approved) | EXACT | identical normalized text |
 | `q-signs-065` (approved) | `q-magistrali-i-izvangradsko-068` (approved) | EXACT | identical normalized text |
 | `q-signs-065` (approved) | `q-spirane-i-parkirane-068` (approved) | EXACT | identical normalized text |
-| `q-signs-065` (approved) | `q-spirane-i-parkirane-069` (approved) | EXACT | identical normalized text |
+| `q-signs-065` (approved) | `q-spirane-i-parkirane-069` (needs-review) | EXACT | identical normalized text |
 | `q-signs-067` (approved) | `q-signs-068` (approved) | EXACT | identical normalized text |
 | `q-signs-067` (approved) | `q-signs-070` (approved) | EXACT | identical normalized text |
 | `q-signs-067` (approved) | `q-signs-071` (approved) | EXACT | identical normalized text |
 | `q-signs-067` (approved) | `q-signs-072` (approved) | EXACT | identical normalized text |
 | `q-signs-067` (approved) | `q-signs-074` (approved) | EXACT | identical normalized text |
-| `q-signs-067` (approved) | `q-signs-075` (approved) | EXACT | identical normalized text |
+| `q-signs-067` (approved) | `q-signs-075` (needs-review) | EXACT | identical normalized text |
 | `q-signs-067` (approved) | `q-signs-078` (approved) | EXACT | identical normalized text |
-| `q-signs-067` (approved) | `q-signs-079` (approved) | EXACT | identical normalized text |
-| `q-signs-067` (approved) | `q-signs-080` (approved) | EXACT | identical normalized text |
+| `q-signs-067` (approved) | `q-signs-079` (needs-review) | EXACT | identical normalized text |
+| `q-signs-067` (approved) | `q-signs-080` (needs-review) | EXACT | identical normalized text |
 | `q-signs-067` (approved) | `q-signs-082` (approved) | EXACT | identical normalized text |
 | `q-signs-067` (approved) | `q-signs-084` (approved) | EXACT | identical normalized text |
 | `q-signs-067` (approved) | `q-signs-085` (approved) | EXACT | identical normalized text |
 | `q-signs-067` (approved) | `q-predimstvo-070` (approved) | EXACT | identical normalized text |
 | `q-signs-067` (approved) | `q-krastovishta-067` (approved) | EXACT | identical normalized text |
-| `q-signs-067` (approved) | `q-krastovishta-069` (approved) | EXACT | identical normalized text |
+| `q-signs-067` (approved) | `q-krastovishta-069` (needs-review) | EXACT | identical normalized text |
 | `q-signs-067` (approved) | `q-uyazvimi-071` (approved) | EXACT | identical normalized text |
 | `q-signs-067` (approved) | `q-magistrali-i-izvangradsko-068` (approved) | EXACT | identical normalized text |
 | `q-signs-067` (approved) | `q-spirane-i-parkirane-068` (approved) | EXACT | identical normalized text |
-| `q-signs-067` (approved) | `q-spirane-i-parkirane-069` (approved) | EXACT | identical normalized text |
+| `q-signs-067` (approved) | `q-spirane-i-parkirane-069` (needs-review) | EXACT | identical normalized text |
 | `q-signs-068` (approved) | `q-signs-070` (approved) | EXACT | identical normalized text |
 | `q-signs-068` (approved) | `q-signs-071` (approved) | EXACT | identical normalized text |
 | `q-signs-068` (approved) | `q-signs-072` (approved) | EXACT | identical normalized text |
 | `q-signs-068` (approved) | `q-signs-074` (approved) | EXACT | identical normalized text |
-| `q-signs-068` (approved) | `q-signs-075` (approved) | EXACT | identical normalized text |
+| `q-signs-068` (approved) | `q-signs-075` (needs-review) | EXACT | identical normalized text |
 | `q-signs-068` (approved) | `q-signs-078` (approved) | EXACT | identical normalized text |
-| `q-signs-068` (approved) | `q-signs-079` (approved) | EXACT | identical normalized text |
-| `q-signs-068` (approved) | `q-signs-080` (approved) | EXACT | identical normalized text |
+| `q-signs-068` (approved) | `q-signs-079` (needs-review) | EXACT | identical normalized text |
+| `q-signs-068` (approved) | `q-signs-080` (needs-review) | EXACT | identical normalized text |
 | `q-signs-068` (approved) | `q-signs-082` (approved) | EXACT | identical normalized text |
 | `q-signs-068` (approved) | `q-signs-084` (approved) | EXACT | identical normalized text |
 | `q-signs-068` (approved) | `q-signs-085` (approved) | EXACT | identical normalized text |
 | `q-signs-068` (approved) | `q-predimstvo-070` (approved) | EXACT | identical normalized text |
 | `q-signs-068` (approved) | `q-krastovishta-067` (approved) | EXACT | identical normalized text |
-| `q-signs-068` (approved) | `q-krastovishta-069` (approved) | EXACT | identical normalized text |
+| `q-signs-068` (approved) | `q-krastovishta-069` (needs-review) | EXACT | identical normalized text |
 | `q-signs-068` (approved) | `q-uyazvimi-071` (approved) | EXACT | identical normalized text |
 | `q-signs-068` (approved) | `q-magistrali-i-izvangradsko-068` (approved) | EXACT | identical normalized text |
 | `q-signs-068` (approved) | `q-spirane-i-parkirane-068` (approved) | EXACT | identical normalized text |
-| `q-signs-068` (approved) | `q-spirane-i-parkirane-069` (approved) | EXACT | identical normalized text |
+| `q-signs-068` (approved) | `q-spirane-i-parkirane-069` (needs-review) | EXACT | identical normalized text |
 | `q-signs-070` (approved) | `q-signs-071` (approved) | EXACT | identical normalized text |
 | `q-signs-070` (approved) | `q-signs-072` (approved) | EXACT | identical normalized text |
 | `q-signs-070` (approved) | `q-signs-074` (approved) | EXACT | identical normalized text |
-| `q-signs-070` (approved) | `q-signs-075` (approved) | EXACT | identical normalized text |
+| `q-signs-070` (approved) | `q-signs-075` (needs-review) | EXACT | identical normalized text |
 | `q-signs-070` (approved) | `q-signs-078` (approved) | EXACT | identical normalized text |
-| `q-signs-070` (approved) | `q-signs-079` (approved) | EXACT | identical normalized text |
-| `q-signs-070` (approved) | `q-signs-080` (approved) | EXACT | identical normalized text |
+| `q-signs-070` (approved) | `q-signs-079` (needs-review) | EXACT | identical normalized text |
+| `q-signs-070` (approved) | `q-signs-080` (needs-review) | EXACT | identical normalized text |
 | `q-signs-070` (approved) | `q-signs-082` (approved) | EXACT | identical normalized text |
 | `q-signs-070` (approved) | `q-signs-084` (approved) | EXACT | identical normalized text |
 | `q-signs-070` (approved) | `q-signs-085` (approved) | EXACT | identical normalized text |
 | `q-signs-070` (approved) | `q-predimstvo-070` (approved) | EXACT | identical normalized text |
 | `q-signs-070` (approved) | `q-krastovishta-067` (approved) | EXACT | identical normalized text |
-| `q-signs-070` (approved) | `q-krastovishta-069` (approved) | EXACT | identical normalized text |
+| `q-signs-070` (approved) | `q-krastovishta-069` (needs-review) | EXACT | identical normalized text |
 | `q-signs-070` (approved) | `q-uyazvimi-071` (approved) | EXACT | identical normalized text |
 | `q-signs-070` (approved) | `q-magistrali-i-izvangradsko-068` (approved) | EXACT | identical normalized text |
 | `q-signs-070` (approved) | `q-spirane-i-parkirane-068` (approved) | EXACT | identical normalized text |
-| `q-signs-070` (approved) | `q-spirane-i-parkirane-069` (approved) | EXACT | identical normalized text |
+| `q-signs-070` (approved) | `q-spirane-i-parkirane-069` (needs-review) | EXACT | identical normalized text |
 | `q-signs-071` (approved) | `q-signs-072` (approved) | EXACT | identical normalized text |
 | `q-signs-071` (approved) | `q-signs-074` (approved) | EXACT | identical normalized text |
-| `q-signs-071` (approved) | `q-signs-075` (approved) | EXACT | identical normalized text |
+| `q-signs-071` (approved) | `q-signs-075` (needs-review) | EXACT | identical normalized text |
 | `q-signs-071` (approved) | `q-signs-078` (approved) | EXACT | identical normalized text |
-| `q-signs-071` (approved) | `q-signs-079` (approved) | EXACT | identical normalized text |
-| `q-signs-071` (approved) | `q-signs-080` (approved) | EXACT | identical normalized text |
+| `q-signs-071` (approved) | `q-signs-079` (needs-review) | EXACT | identical normalized text |
+| `q-signs-071` (approved) | `q-signs-080` (needs-review) | EXACT | identical normalized text |
 | `q-signs-071` (approved) | `q-signs-082` (approved) | EXACT | identical normalized text |
 | `q-signs-071` (approved) | `q-signs-084` (approved) | EXACT | identical normalized text |
 | `q-signs-071` (approved) | `q-signs-085` (approved) | EXACT | identical normalized text |
 | `q-signs-071` (approved) | `q-predimstvo-070` (approved) | EXACT | identical normalized text |
 | `q-signs-071` (approved) | `q-krastovishta-067` (approved) | EXACT | identical normalized text |
-| `q-signs-071` (approved) | `q-krastovishta-069` (approved) | EXACT | identical normalized text |
+| `q-signs-071` (approved) | `q-krastovishta-069` (needs-review) | EXACT | identical normalized text |
 | `q-signs-071` (approved) | `q-uyazvimi-071` (approved) | EXACT | identical normalized text |
 | `q-signs-071` (approved) | `q-magistrali-i-izvangradsko-068` (approved) | EXACT | identical normalized text |
 | `q-signs-071` (approved) | `q-spirane-i-parkirane-068` (approved) | EXACT | identical normalized text |
-| `q-signs-071` (approved) | `q-spirane-i-parkirane-069` (approved) | EXACT | identical normalized text |
+| `q-signs-071` (approved) | `q-spirane-i-parkirane-069` (needs-review) | EXACT | identical normalized text |
 | `q-signs-072` (approved) | `q-signs-074` (approved) | EXACT | identical normalized text |
-| `q-signs-072` (approved) | `q-signs-075` (approved) | EXACT | identical normalized text |
+| `q-signs-072` (approved) | `q-signs-075` (needs-review) | EXACT | identical normalized text |
 | `q-signs-072` (approved) | `q-signs-078` (approved) | EXACT | identical normalized text |
-| `q-signs-072` (approved) | `q-signs-079` (approved) | EXACT | identical normalized text |
-| `q-signs-072` (approved) | `q-signs-080` (approved) | EXACT | identical normalized text |
+| `q-signs-072` (approved) | `q-signs-079` (needs-review) | EXACT | identical normalized text |
+| `q-signs-072` (approved) | `q-signs-080` (needs-review) | EXACT | identical normalized text |
 | `q-signs-072` (approved) | `q-signs-082` (approved) | EXACT | identical normalized text |
 | `q-signs-072` (approved) | `q-signs-084` (approved) | EXACT | identical normalized text |
 | `q-signs-072` (approved) | `q-signs-085` (approved) | EXACT | identical normalized text |
 | `q-signs-072` (approved) | `q-predimstvo-070` (approved) | EXACT | identical normalized text |
 | `q-signs-072` (approved) | `q-krastovishta-067` (approved) | EXACT | identical normalized text |
-| `q-signs-072` (approved) | `q-krastovishta-069` (approved) | EXACT | identical normalized text |
+| `q-signs-072` (approved) | `q-krastovishta-069` (needs-review) | EXACT | identical normalized text |
 | `q-signs-072` (approved) | `q-uyazvimi-071` (approved) | EXACT | identical normalized text |
 | `q-signs-072` (approved) | `q-magistrali-i-izvangradsko-068` (approved) | EXACT | identical normalized text |
 | `q-signs-072` (approved) | `q-spirane-i-parkirane-068` (approved) | EXACT | identical normalized text |
-| `q-signs-072` (approved) | `q-spirane-i-parkirane-069` (approved) | EXACT | identical normalized text |
-| `q-signs-074` (approved) | `q-signs-075` (approved) | EXACT | identical normalized text |
+| `q-signs-072` (approved) | `q-spirane-i-parkirane-069` (needs-review) | EXACT | identical normalized text |
+| `q-signs-074` (approved) | `q-signs-075` (needs-review) | EXACT | identical normalized text |
 | `q-signs-074` (approved) | `q-signs-078` (approved) | EXACT | identical normalized text |
-| `q-signs-074` (approved) | `q-signs-079` (approved) | EXACT | identical normalized text |
-| `q-signs-074` (approved) | `q-signs-080` (approved) | EXACT | identical normalized text |
+| `q-signs-074` (approved) | `q-signs-079` (needs-review) | EXACT | identical normalized text |
+| `q-signs-074` (approved) | `q-signs-080` (needs-review) | EXACT | identical normalized text |
 | `q-signs-074` (approved) | `q-signs-082` (approved) | EXACT | identical normalized text |
 | `q-signs-074` (approved) | `q-signs-084` (approved) | EXACT | identical normalized text |
 | `q-signs-074` (approved) | `q-signs-085` (approved) | EXACT | identical normalized text |
 | `q-signs-074` (approved) | `q-predimstvo-070` (approved) | EXACT | identical normalized text |
 | `q-signs-074` (approved) | `q-krastovishta-067` (approved) | EXACT | identical normalized text |
-| `q-signs-074` (approved) | `q-krastovishta-069` (approved) | EXACT | identical normalized text |
+| `q-signs-074` (approved) | `q-krastovishta-069` (needs-review) | EXACT | identical normalized text |
 | `q-signs-074` (approved) | `q-uyazvimi-071` (approved) | EXACT | identical normalized text |
 | `q-signs-074` (approved) | `q-magistrali-i-izvangradsko-068` (approved) | EXACT | identical normalized text |
 | `q-signs-074` (approved) | `q-spirane-i-parkirane-068` (approved) | EXACT | identical normalized text |
-| `q-signs-074` (approved) | `q-spirane-i-parkirane-069` (approved) | EXACT | identical normalized text |
-| `q-signs-075` (approved) | `q-signs-078` (approved) | EXACT | identical normalized text |
-| `q-signs-075` (approved) | `q-signs-079` (approved) | EXACT | identical normalized text |
-| `q-signs-075` (approved) | `q-signs-080` (approved) | EXACT | identical normalized text |
-| `q-signs-075` (approved) | `q-signs-082` (approved) | EXACT | identical normalized text |
-| `q-signs-075` (approved) | `q-signs-084` (approved) | EXACT | identical normalized text |
-| `q-signs-075` (approved) | `q-signs-085` (approved) | EXACT | identical normalized text |
-| `q-signs-075` (approved) | `q-predimstvo-070` (approved) | EXACT | identical normalized text |
-| `q-signs-075` (approved) | `q-krastovishta-067` (approved) | EXACT | identical normalized text |
-| `q-signs-075` (approved) | `q-krastovishta-069` (approved) | EXACT | identical normalized text |
-| `q-signs-075` (approved) | `q-uyazvimi-071` (approved) | EXACT | identical normalized text |
-| `q-signs-075` (approved) | `q-magistrali-i-izvangradsko-068` (approved) | EXACT | identical normalized text |
-| `q-signs-075` (approved) | `q-spirane-i-parkirane-068` (approved) | EXACT | identical normalized text |
-| `q-signs-075` (approved) | `q-spirane-i-parkirane-069` (approved) | EXACT | identical normalized text |
-| `q-signs-078` (approved) | `q-signs-079` (approved) | EXACT | identical normalized text |
-| `q-signs-078` (approved) | `q-signs-080` (approved) | EXACT | identical normalized text |
+| `q-signs-074` (approved) | `q-spirane-i-parkirane-069` (needs-review) | EXACT | identical normalized text |
+| `q-signs-075` (needs-review) | `q-signs-078` (approved) | EXACT | identical normalized text |
+| `q-signs-075` (needs-review) | `q-signs-079` (needs-review) | EXACT | identical normalized text |
+| `q-signs-075` (needs-review) | `q-signs-080` (needs-review) | EXACT | identical normalized text |
+| `q-signs-075` (needs-review) | `q-signs-082` (approved) | EXACT | identical normalized text |
+| `q-signs-075` (needs-review) | `q-signs-084` (approved) | EXACT | identical normalized text |
+| `q-signs-075` (needs-review) | `q-signs-085` (approved) | EXACT | identical normalized text |
+| `q-signs-075` (needs-review) | `q-predimstvo-070` (approved) | EXACT | identical normalized text |
+| `q-signs-075` (needs-review) | `q-krastovishta-067` (approved) | EXACT | identical normalized text |
+| `q-signs-075` (needs-review) | `q-krastovishta-069` (needs-review) | EXACT | identical normalized text |
+| `q-signs-075` (needs-review) | `q-uyazvimi-071` (approved) | EXACT | identical normalized text |
+| `q-signs-075` (needs-review) | `q-magistrali-i-izvangradsko-068` (approved) | EXACT | identical normalized text |
+| `q-signs-075` (needs-review) | `q-spirane-i-parkirane-068` (approved) | EXACT | identical normalized text |
+| `q-signs-075` (needs-review) | `q-spirane-i-parkirane-069` (needs-review) | EXACT | identical normalized text |
+| `q-signs-078` (approved) | `q-signs-079` (needs-review) | EXACT | identical normalized text |
+| `q-signs-078` (approved) | `q-signs-080` (needs-review) | EXACT | identical normalized text |
 | `q-signs-078` (approved) | `q-signs-082` (approved) | EXACT | identical normalized text |
 | `q-signs-078` (approved) | `q-signs-084` (approved) | EXACT | identical normalized text |
 | `q-signs-078` (approved) | `q-signs-085` (approved) | EXACT | identical normalized text |
 | `q-signs-078` (approved) | `q-predimstvo-070` (approved) | EXACT | identical normalized text |
 | `q-signs-078` (approved) | `q-krastovishta-067` (approved) | EXACT | identical normalized text |
-| `q-signs-078` (approved) | `q-krastovishta-069` (approved) | EXACT | identical normalized text |
+| `q-signs-078` (approved) | `q-krastovishta-069` (needs-review) | EXACT | identical normalized text |
 | `q-signs-078` (approved) | `q-uyazvimi-071` (approved) | EXACT | identical normalized text |
 | `q-signs-078` (approved) | `q-magistrali-i-izvangradsko-068` (approved) | EXACT | identical normalized text |
 | `q-signs-078` (approved) | `q-spirane-i-parkirane-068` (approved) | EXACT | identical normalized text |
-| `q-signs-078` (approved) | `q-spirane-i-parkirane-069` (approved) | EXACT | identical normalized text |
-| `q-signs-079` (approved) | `q-signs-080` (approved) | EXACT | identical normalized text |
-| `q-signs-079` (approved) | `q-signs-082` (approved) | EXACT | identical normalized text |
-| `q-signs-079` (approved) | `q-signs-084` (approved) | EXACT | identical normalized text |
-| `q-signs-079` (approved) | `q-signs-085` (approved) | EXACT | identical normalized text |
-| `q-signs-079` (approved) | `q-predimstvo-070` (approved) | EXACT | identical normalized text |
-| `q-signs-079` (approved) | `q-krastovishta-067` (approved) | EXACT | identical normalized text |
-| `q-signs-079` (approved) | `q-krastovishta-069` (approved) | EXACT | identical normalized text |
-| `q-signs-079` (approved) | `q-uyazvimi-071` (approved) | EXACT | identical normalized text |
-| `q-signs-079` (approved) | `q-magistrali-i-izvangradsko-068` (approved) | EXACT | identical normalized text |
-| `q-signs-079` (approved) | `q-spirane-i-parkirane-068` (approved) | EXACT | identical normalized text |
-| `q-signs-079` (approved) | `q-spirane-i-parkirane-069` (approved) | EXACT | identical normalized text |
-| `q-signs-080` (approved) | `q-signs-082` (approved) | EXACT | identical normalized text |
-| `q-signs-080` (approved) | `q-signs-084` (approved) | EXACT | identical normalized text |
-| `q-signs-080` (approved) | `q-signs-085` (approved) | EXACT | identical normalized text |
-| `q-signs-080` (approved) | `q-predimstvo-070` (approved) | EXACT | identical normalized text |
-| `q-signs-080` (approved) | `q-krastovishta-067` (approved) | EXACT | identical normalized text |
-| `q-signs-080` (approved) | `q-krastovishta-069` (approved) | EXACT | identical normalized text |
-| `q-signs-080` (approved) | `q-uyazvimi-071` (approved) | EXACT | identical normalized text |
-| `q-signs-080` (approved) | `q-magistrali-i-izvangradsko-068` (approved) | EXACT | identical normalized text |
-| `q-signs-080` (approved) | `q-spirane-i-parkirane-068` (approved) | EXACT | identical normalized text |
-| `q-signs-080` (approved) | `q-spirane-i-parkirane-069` (approved) | EXACT | identical normalized text |
+| `q-signs-078` (approved) | `q-spirane-i-parkirane-069` (needs-review) | EXACT | identical normalized text |
+| `q-signs-079` (needs-review) | `q-signs-080` (needs-review) | EXACT | identical normalized text |
+| `q-signs-079` (needs-review) | `q-signs-082` (approved) | EXACT | identical normalized text |
+| `q-signs-079` (needs-review) | `q-signs-084` (approved) | EXACT | identical normalized text |
+| `q-signs-079` (needs-review) | `q-signs-085` (approved) | EXACT | identical normalized text |
+| `q-signs-079` (needs-review) | `q-predimstvo-070` (approved) | EXACT | identical normalized text |
+| `q-signs-079` (needs-review) | `q-krastovishta-067` (approved) | EXACT | identical normalized text |
+| `q-signs-079` (needs-review) | `q-krastovishta-069` (needs-review) | EXACT | identical normalized text |
+| `q-signs-079` (needs-review) | `q-uyazvimi-071` (approved) | EXACT | identical normalized text |
+| `q-signs-079` (needs-review) | `q-magistrali-i-izvangradsko-068` (approved) | EXACT | identical normalized text |
+| `q-signs-079` (needs-review) | `q-spirane-i-parkirane-068` (approved) | EXACT | identical normalized text |
+| `q-signs-079` (needs-review) | `q-spirane-i-parkirane-069` (needs-review) | EXACT | identical normalized text |
+| `q-signs-080` (needs-review) | `q-signs-082` (approved) | EXACT | identical normalized text |
+| `q-signs-080` (needs-review) | `q-signs-084` (approved) | EXACT | identical normalized text |
+| `q-signs-080` (needs-review) | `q-signs-085` (approved) | EXACT | identical normalized text |
+| `q-signs-080` (needs-review) | `q-predimstvo-070` (approved) | EXACT | identical normalized text |
+| `q-signs-080` (needs-review) | `q-krastovishta-067` (approved) | EXACT | identical normalized text |
+| `q-signs-080` (needs-review) | `q-krastovishta-069` (needs-review) | EXACT | identical normalized text |
+| `q-signs-080` (needs-review) | `q-uyazvimi-071` (approved) | EXACT | identical normalized text |
+| `q-signs-080` (needs-review) | `q-magistrali-i-izvangradsko-068` (approved) | EXACT | identical normalized text |
+| `q-signs-080` (needs-review) | `q-spirane-i-parkirane-068` (approved) | EXACT | identical normalized text |
+| `q-signs-080` (needs-review) | `q-spirane-i-parkirane-069` (needs-review) | EXACT | identical normalized text |
 | `q-signs-082` (approved) | `q-signs-084` (approved) | EXACT | identical normalized text |
 | `q-signs-082` (approved) | `q-signs-085` (approved) | EXACT | identical normalized text |
 | `q-signs-082` (approved) | `q-predimstvo-070` (approved) | EXACT | identical normalized text |
 | `q-signs-082` (approved) | `q-krastovishta-067` (approved) | EXACT | identical normalized text |
-| `q-signs-082` (approved) | `q-krastovishta-069` (approved) | EXACT | identical normalized text |
+| `q-signs-082` (approved) | `q-krastovishta-069` (needs-review) | EXACT | identical normalized text |
 | `q-signs-082` (approved) | `q-uyazvimi-071` (approved) | EXACT | identical normalized text |
 | `q-signs-082` (approved) | `q-magistrali-i-izvangradsko-068` (approved) | EXACT | identical normalized text |
 | `q-signs-082` (approved) | `q-spirane-i-parkirane-068` (approved) | EXACT | identical normalized text |
-| `q-signs-082` (approved) | `q-spirane-i-parkirane-069` (approved) | EXACT | identical normalized text |
+| `q-signs-082` (approved) | `q-spirane-i-parkirane-069` (needs-review) | EXACT | identical normalized text |
 | `q-signs-084` (approved) | `q-signs-085` (approved) | EXACT | identical normalized text |
 | `q-signs-084` (approved) | `q-predimstvo-070` (approved) | EXACT | identical normalized text |
 | `q-signs-084` (approved) | `q-krastovishta-067` (approved) | EXACT | identical normalized text |
-| `q-signs-084` (approved) | `q-krastovishta-069` (approved) | EXACT | identical normalized text |
+| `q-signs-084` (approved) | `q-krastovishta-069` (needs-review) | EXACT | identical normalized text |
 | `q-signs-084` (approved) | `q-uyazvimi-071` (approved) | EXACT | identical normalized text |
 | `q-signs-084` (approved) | `q-magistrali-i-izvangradsko-068` (approved) | EXACT | identical normalized text |
 | `q-signs-084` (approved) | `q-spirane-i-parkirane-068` (approved) | EXACT | identical normalized text |
-| `q-signs-084` (approved) | `q-spirane-i-parkirane-069` (approved) | EXACT | identical normalized text |
+| `q-signs-084` (approved) | `q-spirane-i-parkirane-069` (needs-review) | EXACT | identical normalized text |
 | `q-signs-085` (approved) | `q-predimstvo-070` (approved) | EXACT | identical normalized text |
 | `q-signs-085` (approved) | `q-krastovishta-067` (approved) | EXACT | identical normalized text |
-| `q-signs-085` (approved) | `q-krastovishta-069` (approved) | EXACT | identical normalized text |
+| `q-signs-085` (approved) | `q-krastovishta-069` (needs-review) | EXACT | identical normalized text |
 | `q-signs-085` (approved) | `q-uyazvimi-071` (approved) | EXACT | identical normalized text |
 | `q-signs-085` (approved) | `q-magistrali-i-izvangradsko-068` (approved) | EXACT | identical normalized text |
 | `q-signs-085` (approved) | `q-spirane-i-parkirane-068` (approved) | EXACT | identical normalized text |
-| `q-signs-085` (approved) | `q-spirane-i-parkirane-069` (approved) | EXACT | identical normalized text |
+| `q-signs-085` (approved) | `q-spirane-i-parkirane-069` (needs-review) | EXACT | identical normalized text |
 | `q-predimstvo-070` (approved) | `q-krastovishta-067` (approved) | EXACT | identical normalized text |
-| `q-predimstvo-070` (approved) | `q-krastovishta-069` (approved) | EXACT | identical normalized text |
+| `q-predimstvo-070` (approved) | `q-krastovishta-069` (needs-review) | EXACT | identical normalized text |
 | `q-predimstvo-070` (approved) | `q-uyazvimi-071` (approved) | EXACT | identical normalized text |
 | `q-predimstvo-070` (approved) | `q-magistrali-i-izvangradsko-068` (approved) | EXACT | identical normalized text |
 | `q-predimstvo-070` (approved) | `q-spirane-i-parkirane-068` (approved) | EXACT | identical normalized text |
-| `q-predimstvo-070` (approved) | `q-spirane-i-parkirane-069` (approved) | EXACT | identical normalized text |
-| `q-krastovishta-067` (approved) | `q-krastovishta-069` (approved) | EXACT | identical normalized text |
+| `q-predimstvo-070` (approved) | `q-spirane-i-parkirane-069` (needs-review) | EXACT | identical normalized text |
+| `q-krastovishta-067` (approved) | `q-krastovishta-069` (needs-review) | EXACT | identical normalized text |
 | `q-krastovishta-067` (approved) | `q-uyazvimi-071` (approved) | EXACT | identical normalized text |
 | `q-krastovishta-067` (approved) | `q-magistrali-i-izvangradsko-068` (approved) | EXACT | identical normalized text |
 | `q-krastovishta-067` (approved) | `q-spirane-i-parkirane-068` (approved) | EXACT | identical normalized text |
-| `q-krastovishta-067` (approved) | `q-spirane-i-parkirane-069` (approved) | EXACT | identical normalized text |
-| `q-krastovishta-069` (approved) | `q-uyazvimi-071` (approved) | EXACT | identical normalized text |
-| `q-krastovishta-069` (approved) | `q-magistrali-i-izvangradsko-068` (approved) | EXACT | identical normalized text |
-| `q-krastovishta-069` (approved) | `q-spirane-i-parkirane-068` (approved) | EXACT | identical normalized text |
-| `q-krastovishta-069` (approved) | `q-spirane-i-parkirane-069` (approved) | EXACT | identical normalized text |
+| `q-krastovishta-067` (approved) | `q-spirane-i-parkirane-069` (needs-review) | EXACT | identical normalized text |
+| `q-krastovishta-069` (needs-review) | `q-uyazvimi-071` (approved) | EXACT | identical normalized text |
+| `q-krastovishta-069` (needs-review) | `q-magistrali-i-izvangradsko-068` (approved) | EXACT | identical normalized text |
+| `q-krastovishta-069` (needs-review) | `q-spirane-i-parkirane-068` (approved) | EXACT | identical normalized text |
+| `q-krastovishta-069` (needs-review) | `q-spirane-i-parkirane-069` (needs-review) | EXACT | identical normalized text |
 | `q-speed-037` (approved) | `q-eco-063` (approved) | EXACT | identical normalized text |
 | `q-uyazvimi-071` (approved) | `q-magistrali-i-izvangradsko-068` (approved) | EXACT | identical normalized text |
 | `q-uyazvimi-071` (approved) | `q-spirane-i-parkirane-068` (approved) | EXACT | identical normalized text |
-| `q-uyazvimi-071` (approved) | `q-spirane-i-parkirane-069` (approved) | EXACT | identical normalized text |
+| `q-uyazvimi-071` (approved) | `q-spirane-i-parkirane-069` (needs-review) | EXACT | identical normalized text |
 | `q-magistrali-i-izvangradsko-068` (approved) | `q-spirane-i-parkirane-068` (approved) | EXACT | identical normalized text |
-| `q-magistrali-i-izvangradsko-068` (approved) | `q-spirane-i-parkirane-069` (approved) | EXACT | identical normalized text |
-| `q-spirane-i-parkirane-068` (approved) | `q-spirane-i-parkirane-069` (approved) | EXACT | identical normalized text |
+| `q-magistrali-i-izvangradsko-068` (approved) | `q-spirane-i-parkirane-069` (needs-review) | EXACT | identical normalized text |
+| `q-spirane-i-parkirane-068` (approved) | `q-spirane-i-parkirane-069` (needs-review) | EXACT | identical normalized text |
 | `q-speed-037` (approved) | `q-magistrali-i-izvangradsko-016` (approved) | 89% | near-duplicate wording |
 | `q-magistrali-i-izvangradsko-016` (approved) | `q-eco-063` (approved) | 89% | near-duplicate wording |
 | `q-uyazvimi-033` (approved) | `q-uyazvimi-057` (approved) | 85% | near-duplicate wording |
 | `q-signali-i-markirovka-037` (approved) | `q-signali-i-markirovka-059` (needs-review) | 83% | near-duplicate wording |
 | `q-signs-034` (approved) | `q-speed-040` (approved) | 80% | near-duplicate wording |
-| `q-krastovishta-006` (approved) | `q-krastovishta-024` (approved) | 79% | near-duplicate wording |
+| `q-krastovishta-006` (needs-review) | `q-krastovishta-024` (needs-review) | 79% | near-duplicate wording |
 | `q-speed-041` (approved) | `q-speed-064` (approved) | 78% | near-duplicate wording |
 | `q-uyazvimi-012` (approved) | `q-uyazvimi-064` (approved) | 78% | near-duplicate wording |
 | `q-spirane-i-parkirane-034` (approved) | `q-spirane-i-parkirane-052` (approved) | 77% | near-duplicate wording |
 | `q-spirane-i-parkirane-018` (approved) | `q-spirane-i-parkirane-052` (approved) | 75% | near-duplicate wording |
-| `q-signali-i-markirovka-005` (approved) | `q-signali-i-markirovka-045` (approved) | 72% | near-duplicate wording |
+| `q-signali-i-markirovka-005` (needs-review) | `q-signali-i-markirovka-045` (approved) | 72% | near-duplicate wording |
 
 ## 7. Appendix — mild length-tell (info only, never blocks)
 

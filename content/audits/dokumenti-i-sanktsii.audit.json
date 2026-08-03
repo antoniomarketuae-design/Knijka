@@ -18,5 +18,304 @@
     "flaggedLegal": 1,
     "removed": 0,
     "notes": "Adversarial audit of wave-3 additions (q-043..q-063) 2026-07-08. Schema: valid JSON (63 items total, all ids unique), wave-3 ids q-043..q-063 unique and sequential, all conceptIds resolve in concepts.json (incl. c-medical-fitness q-044 and c-license-categories q-056, both present). Correct-option counts verified programmatically: 12 single with exactly 1 correct, 9 multi with 3 correct each; no duplicate option ids; every item carries lawRefs/media/status. Wave-3 mix 12 single / 9 multi (57/43), points 9x1/7x2/5x3 — within SCHEMA.md guidance. Legal: q-047 FLAGGED (flaggedLegal=1) — claims a traffic наказателно постановление paid within 14 days costs 80% while the e-fiche (wave-1 q-035) is 70%; for road-traffic penalties ЗДвП чл. 189, ал. 8 (lex specialis) most likely sets 70% for the наказателно постановление too, which would collapse the '80% vs 70%' distinction the question is built on, and its ref 'чл. 189б ЗАНН' is a non-existent article. Item was already status needs-review; [REVIEW:] prepended to explanationBg naming the exact issue for a reviewer with statute access; percentage left unchanged rather than hard-rewritten given no browsing to confirm. Verified substantively accurate: large talon part I carried / part II kept at home (чл. 100), code 01 glasses is a binding licence condition (чл. 150/151), missed GO installment can terminate cover (КЗ), foreign-plate cars still need a vignette (ЗП чл. 10), НП appealed before районен съд, not due while pending (ЗАНН чл. 59), plainclothes КАТ may stop + right to request legitimation (чл. 103), e-fiche generally removes no control points as no driver is identified (чл. 189/157), zero points = loss of правоспособност + re-exam (чл. 157), BG 'new driver' has no P-sign/no special speed/no accompanist, only 26-vs-39 start (Наредба Iз-2539), 10-year renewal is administrative with medical+photo and no exam (ЗБЛД), seller's interest in prompt re-registration (чл. 145), right to blood test when contesting the dreger (чл. 174), category B = 3500 kg / 8+1 seats / 750 kg trailer (чл. 150а), graded ГТП outcomes (чл. 147, Наредба Н-32), e-vignette future start date selectable, GO owed while registered+in-motion unless officially taken off the road + plates returned (КЗ, чл. 143?), driving unregistered = stopped from movement and false/other plates = crime (чл. 140 ЗДвП, чл. 345 НК), disputed fish becomes an АУАН (чл. 186), lost part-I talon = duplicate without re-registration (чл. 140), integrative 'roadworthy car' needs registration+ГТП+ГО+vignette together. Pre-existing '?' refs on the 8 wave-3 needs-review items are honest per SCHEMA rule 2 and judged substantively correct. Duplicates vs ALL existing questions (q-001..q-042): none disqualifying — q-062 (lost talon) vs q-024 (lost licence) test different documents; q-051 (zero points) overlaps q-016/q-018 on the 'lose правоспособност' fact but adds the re-exam-and-separate-from-fines angle; q-052 vs q-019/q-038 (new driver) share 26-vs-39 but q-052 tests the P-sign/speed myths; q-046/q-058 vs q-010/q-029/q-030 each probe a distinct vignette angle; all kept. Language: natural modern second-person Bulgarian throughout, scenario-based, no listovki-like phrasing, no fixes needed. 0 removed."
+  },
+  "lawAudit90": {
+    "wave": "FIX · DOCS-ALCOHOL — applying docs/education/90_THEORY_VS_LAW_AUDIT.md",
+    "date": "2026-08-03",
+    "rule": "ADR-002: no rule, article number or penalty figure written from memory. Every \"sourceLine\" below is quoted verbatim from content/law/acts/zdvp.json (ЗДвП consolidated to ДВ бр. 55 / 16.06.2026) or naredba-iz-2539.json, EXCEPT where \"sourceFrom\" says otherwise.",
+    "statusRule": "Every question touched here was set to \"needs-review\". Nothing was marked approved — approval is the founder's. This is the direct answer to §1 of the audit: 22 of 24 exam-failing rows were sitting at \"approved\".",
+    "reviewHowTo": "Each row gives: what was wrong, the exact text BEFORE, the exact text NOW, and the verbatim statute line that decides it. Clear a row by reading the sourceLine and the \"now\".",
+    "questionsTouched": 17,
+    "rows": [
+      {
+        "id": "q-dokumenti-i-sanktsii-030",
+        "tier": "fails-an-exam",
+        "auditRef": "§4.8",
+        "what": "INVERTED ANSWER KEY. „Уикенд“ was marked correct and „Един ден“ wrong; the explanation asserted a one-day vignette „просто не съществува“.",
+        "was": "option a „Уикенд.“ correct:true / option b „Един ден.“ correct:false — explanation: „...стълбицата започва от уикенд винетката ... еднодневна и почасова просто не съществуват.“",
+        "now": "option b „Един ден.“ correct:true — explanation quotes чл. 10а, ал. 1 and ал. 2 and keeps the true part (почасова really does not exist).",
+        "sourceFrom": "docs/education/90 §4.8 — Закон за пътищата is NOT in content/law/acts; this quote is carried from the ledger, which retrieved it.",
+        "sourceAct": "Закон за пътищата",
+        "sourceRef": "чл. 10а, ал. 1 и ал. 2",
+        "sourceLine": "ал. 1: „В зависимост от срока винетните такси биват годишна, тримесечна, месечна, седмична, уикенд и еднодневна…“ · ал. 2: „…минималната пътна такса, която се дължи за това ползване, е винетна такса с еднодневна валидност.“",
+        "reviewerCaveat": "Audit §8.2 flags currency: the SARS copy of Закон за пътищата is a Ciela snapshot dated 08/10/2025, in force from 03.02.2026 — it cannot show a repeal enacted after Oct 2025. Confirm before this ships."
+      },
+      {
+        "id": "q-dokumenti-i-sanktsii-040",
+        "tier": "fails-an-exam",
+        "auditRef": "§4.8",
+        "what": "Option (c) „Когато не е представен на задължителния периодичен технически преглед“ was marked a ground for временно спиране от движение. The lettered item that carried it was repealed 7.09.2025.",
+        "was": "option c correct:true — explanation: „Спирането от движение по чл. 171 ЗДвП маха от пътя нередовната кола — опасна, незастрахована или без преглед“",
+        "now": "option c correct:false — explanation quotes the repeal and gives today's real consequence: глоба 100 лв. по чл. 181, т. 1. Options (a) and (b) stay correct (чл. 171, т. 2, б. „а“ and б. „в“).",
+        "sourceAct": "ЗДвП",
+        "sourceRef": "чл. 171, т. 2, б. „е“ и чл. 181, т. 1",
+        "sourceLine": "чл. 171 т. 2 б. „е“: „(нова - ДВ, бр. 85 от 2004 г., доп., бр. 97 от 2017 г., отм., бр. 64 от 2025 г., в сила от 7.09.2025 г.);“ · чл. 181: „Наказва се с глоба, или имуществена санкция 100 лв.: 1. … собственик … чието пътно превозно средство, подлежащо на периодичен преглед … участва в движението без извършен преглед, както и водач, който управлява такова пътно превозно средство;“",
+        "reviewerCaveat": "Audit §8.3 #8 asks a human to confirm that чл. 171's enumeration is closed before we reword. The repeal itself is verbatim and not in doubt; the closed-list reading is what needs your nod. I read the whole чл. 171 т. 2 list — no surviving letter covers a missing ГТП."
+      },
+      {
+        "id": "q-dokumenti-i-sanktsii-016",
+        "tier": "teaches-wrong-law",
+        "auditRef": "§5 #1",
+        "what": "Taught that контролни точки arrive all at once at licence issue. q-019, THREE rows later, states the 26-then-13 split correctly — the file contradicted itself.",
+        "was": "„…получаваш ги наведнъж при издаването на книжката и нарушенията ги отнемат (чл. 157 ЗДвП).“",
+        "now": "names the misconception, then quotes чл. 157, ал. 1 and gives 26 + 13 (Наредба № Iз-2539, чл. 2). Now agrees with q-019.",
+        "sourceAct": "ЗДвП + Наредба № Iз-2539",
+        "sourceRef": "чл. 157, ал. 1 · чл. 2, ал. 1–3",
+        "sourceLine": "чл. 157 ал. 1: „Новият водач получава две трети от максималния брой контролни точки, а оставащите една трета контролни точки получава след придобиване на 24 месеца стаж като водач на моторно превозно средство.“ · Наредба чл. 2: „Максималният размер … е 39.“ / „… получава 26 контролни точки…“ / „След придобиване на 24 месеца стаж … получава допълнително 13 контролни точки…“"
+      },
+      {
+        "id": "q-dokumenti-i-sanktsii-049",
+        "tier": "teaches-wrong-law",
+        "auditRef": "§5 #2",
+        "what": "Taught „важи сигналът, не облеклото“ — the exact opposite of чл. 170, ал. 4, in the one scenario where impersonation is the obvious risk. Citation was чл. 103.",
+        "was": "„И служител на „Пътна полиция“ без униформа може да те спира и проверява (чл. 103 ЗДвП) — важи сигналът, не облеклото.“",
+        "now": "states the uniform requirement from ал. 4, keeps the safe behaviour (stop, ask for the card, 112 if in doubt) and grounds the right to see ID on ал. 6. Key unchanged — the audit tiered this as an explanation defect, not a key defect.",
+        "sourceAct": "ЗДвП",
+        "sourceRef": "чл. 170, ал. 4 и ал. 6",
+        "sourceLine": "ал. 4: „Длъжностни лица от Министерството на вътрешните работи, изпълняващи служебните си задължения в униформено облекло, могат да осъществяват контролните си функции … и от необозначени служебни моторни превозни средства…“ · ал. 6: „Служителят, осъществяващ контрол, представя на спрения за проверка участник в пътното движение полицейски знак или служебна карта.“"
+      },
+      {
+        "id": "q-dokumenti-i-sanktsii-050",
+        "tier": "teaches-wrong-law · HUMAN",
+        "auditRef": "§5 #3 / §8.3 #1",
+        "what": "NOT REWRITTEN. Two official sources contradict each other on whether a фиш deducts контролни точки, and none of our three marked-correct statements matches either. Per your standing rule we do not resolve a statute-vs-наредба conflict.",
+        "was": "status \"approved\"",
+        "now": "status \"needs-review\", content untouched so nothing here ships as written.",
+        "sourceAct": "Наредба № Iз-2539 vs ЗДвП",
+        "sourceRef": "чл. 3, ал. 1 vs чл. 186, ал. 1 / чл. 189, ал. 5, т. 8",
+        "sourceLine": "Наредба чл. 3 ал. 1: „Контролни точки се отнемат въз основа на влязло в сила наказателно постановление.“ — BUT ЗДвП чл. 186 ал. 1 requires the фиш itself to state „за броя контролни точки, които се отнемат“ and чл. 189 ал. 5 т. 8 the same for the електронен фиш: „броя на отнеманите контролни точки“. Both verified in content/law.",
+        "needsFounderRuling": true
+      },
+      {
+        "id": "q-dokumenti-i-sanktsii-055",
+        "tier": "teaches-wrong-law · HUMAN",
+        "auditRef": "§5 #4 / §8.3 #2",
+        "what": "PARTIALLY REWRITTEN — read this one carefully. The §8.3 #2 conflict (наредба says the дрегер reading stands on non-appearance; the statute attaches two years + 2000 лв. to the same non-compliance) is NOT resolved and NOT touched. What I did fix is a separate, independently proven defect that happened to sit in the last sentence: the row also called walking away from the check „най-тежкият възможен изход“ — the same superlative the ledger disproved in q-032, q-alkohol-010 and q-alkohol-030.",
+        "was": "status \"approved\" · last sentence: „…това вече се брои за отказ от проверка — най-тежкият възможен изход.“ · bare ref чл. 174",
+        "now": "status \"needs-review\" · last sentence gives the real figures from чл. 174, ал. 3 · refs чл. 174, ал. 3 + ал. 4",
+        "sourceAct": "ЗДвП",
+        "sourceRef": "чл. 174, ал. 3",
+        "sourceLine": "„…или не изпълни предписанието за изследване … се наказва с лишаване от право да управлява … за срок от две години и глоба 2000 лв.“",
+        "needsFounderRuling": true,
+        "deliberatelyLeftAlone": "The answer key and the sentence „не се ли явиш за пробата … за меродавно се приема показанието на уреда“ — that is the half the two sources disagree about. Your ruling decides whether the чл. 174, ал. 3 sanction should also be taught for non-appearance."
+      },
+      {
+        "id": "q-dokumenti-i-sanktsii-032",
+        "tier": "misleading",
+        "auditRef": "§6.9",
+        "what": "Called refusal „най-тежкото алкохолно нарушение“. It is not: повторно is heavier in both duration and points.",
+        "was": "option a „…отказът се наказва като най-тежкото алкохолно нарушение…“",
+        "now": "option a gives the real figures (2000 лв. / две години) and the explanation contrasts them with повторно (3 години) and 15 vs 20 points.",
+        "sourceAct": "ЗДвП + Наредба № Iз-2539",
+        "sourceRef": "чл. 174, ал. 2 и ал. 3 · чл. 6, ал. 1",
+        "sourceLine": "ал. 2: „Когато нарушението по ал. 1 е извършено повторно, наказанието е глоба в размер 2000 лв. и лишаване от право да управлява моторно превозно средство за срок три години.“ · ал. 3: „…за срок от две години и глоба 2000 лв.“ · Наредба чл. 6 ал. 1: т. 2 повторно „- 20 контролни точки“, т. 3 отказ „- 15 контролни точки“"
+      },
+      {
+        "id": "q-dokumenti-i-sanktsii-033",
+        "tier": "misleading",
+        "auditRef": "§6.9",
+        "what": "What is attached to the windscreen is a separate уведомление; the фиш itself is posted. Outcome (deemed served) was right, the mechanism was not.",
+        "was": "stem „…намираш фиш, закачен под чистачката“ · option a „…смята се за връчен с поставянето му на автомобила“",
+        "now": "stem says „бележка от контролните органи“; option a and the explanation distinguish the posted фиш from the attached уведомление.",
+        "sourceAct": "ЗДвП",
+        "sourceRef": "чл. 186, ал. 3",
+        "sourceLine": "„…първият екземпляр от фиша му се изпраща … Към моторното превозно средство се закрепва уведомление … Закрепването на уведомлението към моторното превозно средство се смята за връчване на фиша.“"
+      },
+      {
+        "id": "q-dokumenti-i-sanktsii-056",
+        "tier": "misleading",
+        "auditRef": "§6.9",
+        "what": "Taught that a trailer over 750 kg automatically requires another category. чл. 150а, ал. 2, т. 6 permits a combination up to 4250 kg.",
+        "was": "„…по-тежък автомобил или по-голямо ремарке вече иска друга категория“",
+        "now": "quotes the 4250 kg carve-out and says ВЕ starts above it. Graded options unchanged (all three were true).",
+        "sourceAct": "ЗДвП",
+        "sourceRef": "чл. 150а, ал. 2, т. 6",
+        "sourceLine": "„…моторни превозни средства от тази категория могат да образуват състав с ремарке с допустима максимална маса, надвишаваща 750 kg, при условие че допустимата максимална маса на състава не надвишава 4250 kg.“"
+      },
+      {
+        "id": "q-dokumenti-i-sanktsii-059",
+        "tier": "misleading",
+        "auditRef": "§6.9",
+        "what": "Спиране от движение and прекратяване на регистрацията are two different acts; the option conflated them.",
+        "was": "option a „Като го спреш официално от движение и върнеш табелите…“",
+        "now": "option a „Като прекратиш регистрацията му и върнеш табелите…“; explanation quotes the yard case verbatim.",
+        "sourceAct": "ЗДвП",
+        "sourceRef": "чл. 140, ал. 2 · чл. 143, ал. 6, т. 4 · чл. 143, ал. 6а",
+        "sourceLine": "чл. 140 ал. 2 names them separately: „…регистриране, отчет, спиране от движение и пускане в движение, временно отнемане, прекратяване и възстановяване на регистрацията“ · чл. 143 ал. 6 т. 4: „съхраняване на превозното средство в частен имот, което обстоятелство се декларира“ · ал. 6а: „Със заявлението … предоставя свидетелството за регистрация и табелите с регистрационен номер“"
+      },
+      {
+        "id": "q-dokumenti-i-sanktsii-060",
+        "tier": "misleading",
+        "auditRef": "§6.9 / §8.3 #8",
+        "what": "An unregistered car is not „спряна от движение“ — that is not in the чл. 171 т. 2 list. The measure is relocation; the sanction on the driver is чл. 175, ал. 3.",
+        "was": "option a „…и колата може да бъде спряна от движение“ · explanation cited a bare чл. 140",
+        "now": "option a „…за което се отнема и книжката за определен срок“; explanation quotes чл. 175 ал. 3 and чл. 171 т. 5 б. „в“.",
+        "sourceAct": "ЗДвП",
+        "sourceRef": "чл. 175, ал. 3 · чл. 171, т. 5, б. „в“ · чл. 140, ал. 1",
+        "sourceLine": "чл. 175 ал. 3: „Наказва се с лишаване от право да управлява моторно превозно средство за срок от 6 месеца и с глоба 500 лв. водач, който управлява моторно превозно средство, което не е регистрирано по надлежния ред…“ · чл. 171 т. 5 б. „в“: „без табели с регистрационен номер, поставени на определените за това места…“",
+        "reviewerCaveat": "НК чл. 345 kept but downgraded to „чл. 345?“ — НК is not in content/law/acts (audit §8.1)."
+      },
+      {
+        "id": "q-dokumenti-i-sanktsii-018",
+        "tier": "misleading (coverage gap)",
+        "auditRef": "§6.9",
+        "what": "No question in the file mentioned чл. 157, ал. 2а–2в („Водач на МПС без наказания“, new 7.09.2025) — six clean years means no points are deducted at all.",
+        "was": "explanation listed only the two restoration routes (чл. 158)",
+        "now": "adds the „Водач на МПС без наказания“ status with its verbatim carve-out. Graded options unchanged.",
+        "sourceAct": "ЗДвП",
+        "sourceRef": "чл. 157, ал. 2а и ал. 2б",
+        "sourceLine": "ал. 2б: „На водача по ал. 2а не се отнемат контролни точки при налагане на наказание за нарушение, за което е предвидено отнемане на контролни точки, с изключение на нарушенията, за които е предвидено налагане на наказание лишаване от право да се управлява моторно превозно средство.“"
+      },
+      {
+        "id": "q-dokumenti-i-sanktsii-029",
+        "tier": "misleading",
+        "auditRef": "§6.9",
+        "what": "Taught that a typo in a vignette plate is irreparable. чл. 10а, ал. 3б provides a correction and ал. 3а carries the express carve-out.",
+        "was": "explanation: „…камерите не прощават нито сгрешен номер, нито закъсняла активация.“ · ref „чл. 10а“",
+        "now": "keeps the key (until corrected, the camera sees no vignette) and adds the correction route with the carve-out quote.",
+        "sourceFrom": "docs/education/90 §6.9 — Закон за пътищата not in content/law/acts; quote carried from the ledger.",
+        "sourceAct": "Закон за пътищата",
+        "sourceRef": "чл. 10а, ал. 3а и ал. 3б",
+        "sourceLine": "ал. 3а carries „с изключение на случаите на корекция по ал. 3б“"
+      },
+      {
+        "id": "q-dokumenti-i-sanktsii-004",
+        "tier": "cosmetic",
+        "auditRef": "§7",
+        "what": "Cited чл. 150; the validity condition lives in чл. 150а, ал. 1.",
+        "was": "ref „чл. 150“ + ЗБЛД „чл. 51“",
+        "now": "ref „чл. 150а, ал. 1“ + ЗБЛД „чл. 51?“ (ЗБЛД unretrieved — audit §8.1); explanation quotes the condition.",
+        "sourceAct": "ЗДвП",
+        "sourceRef": "чл. 150а, ал. 1",
+        "sourceLine": "„…както и свидетелството му за управление да е в срок на валидност…“"
+      },
+      {
+        "id": "q-dokumenti-i-sanktsii-006",
+        "tier": "cosmetic",
+        "auditRef": "§7",
+        "what": "чл. 147 states the duty; чл. 181, т. 1 states the consequence. Only the duty was cited.",
+        "was": "ref „чл. 147“ only",
+        "now": "adds чл. 181, т. 1 with the 100 лв. line covering owner and driver.",
+        "sourceAct": "ЗДвП",
+        "sourceRef": "чл. 181, т. 1",
+        "sourceLine": "„Наказва се с глоба, или имуществена санкция 100 лв.: 1. … както и водач, който управлява такова пътно превозно средство;“"
+      },
+      {
+        "id": "q-dokumenti-i-sanktsii-012",
+        "tier": "cosmetic",
+        "auditRef": "§7",
+        "what": "Staying in the car is чл. 170, ал. 6, second sentence — not чл. 103.",
+        "was": "refs чл. 103 + чл. 100",
+        "now": "adds чл. 170, ал. 6 and quotes it.",
+        "sourceAct": "ЗДвП",
+        "sourceRef": "чл. 170, ал. 6",
+        "sourceLine": "„Когато е необходимо, той може да покани спрения водач да излезе от превозното средство.“"
+      },
+      {
+        "id": "q-dokumenti-i-sanktsii-044",
+        "tier": "cosmetic",
+        "auditRef": "§7 / §8.1",
+        "what": "чл. 151, ал. 8 is the cleanest ground for „the code is a binding condition“ and is in the one source we can fully verify. Code 01's meaning per Наредба № I-157 is unverified.",
+        "was": "asserted „код 01 означава „корекция и/или защита на зрението“ (чл. 7, ал. 3 от Наредба № I-157)“ as fact",
+        "now": "grounds on чл. 151, ал. 8 verbatim; the Наредба and ЗБЛД refs carry „?“ per SCHEMA rule 2. The stem already tells the student what 01 means, so no unverified figure is taught.",
+        "sourceAct": "ЗДвП",
+        "sourceRef": "чл. 151, ал. 8",
+        "sourceLine": "„Когато на водач … са наложени ограничения за управление на превозни средства, в свидетелството му за управление чрез съответния код на Европейския съюз … се указват условията, при които водачът има право да управлява моторно превозно средство.“"
+      }
+    ],
+    "whyNotTouched": "Rows the ledger names in my two files that I deliberately did NOT edit, and why. Each would have required writing a rule from memory, which ADR-002 forbids.",
+    "blockedOnUnretrievedActs": {
+      "Кодекс за застраховането": [
+        "q-dokumenti-i-sanktsii-007",
+        "-008",
+        "-009",
+        "-027",
+        "-028",
+        "-045",
+        "-063"
+      ],
+      "ЗАНН": [
+        "q-dokumenti-i-sanktsii-015",
+        "-047",
+        "-048"
+      ],
+      "ЗБЛД": [
+        "q-dokumenti-i-sanktsii-003",
+        "-024",
+        "-053"
+      ],
+      "НК": [
+        "q-dokumenti-i-sanktsii-023",
+        "-039"
+      ],
+      "Наредба № I-157 / I-45": [
+        "q-dokumenti-i-sanktsii-043",
+        "-062"
+      ],
+      "Наредба Н-32": [
+        "q-dokumenti-i-sanktsii-057 — audit §6.9 says незначителни defects need no repeat inspection (чл. 38, ал. 1), but the ledger carries no verbatim line for it and the наредба is not in content/law. Left as-is rather than rewritten from an unquoted assertion."
+      ]
+    },
+    "reclassifiedByTheLedgerItself": "Audit §3 moved q-alkohol-007, -008, -021 (with siblings -002, -044) from \"defect\" to \"could not verify\". Not touched — they are work-list items, not defects.",
+    "retrievalLayerGap": "content/law/acts holds only zdvp, naredba-38 and naredba-iz-2539. Adding НК (justice.government.bg/home/normdoc/1589654529), ЗБЛД (aref.government.bg), Наредба № 1/2017 and Наредба № 2/2001 (SARS), plus Закон за пътищата and КЗ, would unblock every row above. Audit §12 #7 says the same."
+  },
+  "close90SixWrong": {
+    "wave": "CLOSE · THE-SIX-WRONG — closing docs/education/90 §14.5 Tier A",
+    "date": "2026-08-03",
+    "rule": "ADR-002: no rule, article number or figure written from memory. Every \"sourceLine\" is quoted verbatim from content/law/acts/zdvp.json (ЗДвП consolidated to ДВ бр. 55 / 16.06.2026), content/law/acts/naredba-iz-2539.json, or the locally extracted ППЗДвП and Наредба № РД-02-21-1 text (sha256-pinned in content/law/sources.json).",
+    "statusRule": "Every row touched here is \"needs-review\". Nothing was left at \"approved\" — approval is the founder's.",
+    "questionsTouched": 1,
+    "rows": [
+      {
+        "id": "q-dokumenti-i-sanktsii-050",
+        "tier": "teaches-wrong-law",
+        "auditRef": "§14.5 Tier A · §8.3 т. 1",
+        "what": "The audit called this a genuine statute-vs-наредба contradiction and refused to resolve it: Наредба Iз-2539 чл. 3, ал. 1 says points come only from an effective наказателно постановление, while ЗДвП чл. 186, ал. 1 and чл. 189, ал. 5, т. 8 require фишове to state the points they deduct.",
+        "resolution": "THERE IS NO CONTRADICTION. One article was missing from the analysis. A фиш that has entered into force IS, by operation of law, an effective наказателно постановление — чл. 186, ал. 8 for the paper фиш and чл. 189, ал. 11 for the electronic one. The наредба's condition is therefore satisfied, not defied. Nothing had to be resolved against the founder's standing rule.",
+        "was": "option a taught „По електронния фиш ОБИКНОВЕНО НЕ се отнемат контролни точки, защото зад волана не е установен конкретен водач“ (graded correct) — the exact opposite of чл. 189, ал. 5, т. 8. option b named the wrong trigger („спиране на място“ rather than entry into force). option d („всеки електронен фиш автоматично отнема точки от собственика“) was correctly false but read as if it licensed the „no points by camera“ myth.",
+        "now": "All four option texts rewritten; the key SHAPE is unchanged (still three correct on the same letters b/a/c and one false on d). a = the e-фиш itself states the number of points; b = points are deducted on an effective наказателно постановление, and an unpaid фиш counts as one; c = a declaration naming the driver annuls the original and moves the фиш to that person; d (false) = the owner does NOT lose them automatically.",
+        "sourceAct": "Наредба № Iз-2539",
+        "sourceRef": "чл. 3, ал. 1",
+        "sourceLine": "„Контролни точки се отнемат въз основа на влязло в сила наказателно постановление.“",
+        "supportingRefs": [
+          {
+            "act": "ЗДвП",
+            "ref": "чл. 186, ал. 8",
+            "line": "„Издаден фиш, глобата по който не е платена доброволно в 7-дневен срок от датата на издаването му, се смята за влязло в сила наказателно постановление и се изпраща за събиране на публичния изпълнител.“"
+          },
+          {
+            "act": "ЗДвП",
+            "ref": "чл. 189, ал. 11",
+            "line": "„Влезлият в сила електронен фиш се смята за влязло в сила наказателно постановление.“"
+          },
+          {
+            "act": "ЗДвП",
+            "ref": "чл. 189, ал. 5, т. 8 (изм. ДВ, бр. 64 от 2025 г., в сила от 7.05.2026 г.)",
+            "line": "„Електронният фиш по ал. 4 съдържа данни за: … 8. броя на отнеманите контролни точки;“"
+          },
+          {
+            "act": "ЗДвП",
+            "ref": "чл. 186, ал. 1 (изм. ДВ, бр. 64 от 2025 г., в сила от 7.09.2025 г.)",
+            "line": "фишът „трябва да съдържа следните данни: … за размера на глобата, срока, сметката и начините за доброволното й заплащане; за броя контролни точки, които се отнемат.“"
+          },
+          {
+            "act": "ЗДвП",
+            "ref": "чл. 189, ал. 4",
+            "line": "„В 14-дневен срок от получаването му лицето, на което е издаден електронният фиш, заплаща глобата … или предоставя … писмена декларация с данни за лицето, извършило нарушението, и копие на свидетелството му за управление … На лицето, посочено в декларацията, се издава и изпраща електронен фиш за извършеното нарушение, като първоначално издаденият се анулира.“"
+          },
+          {
+            "act": "ЗДвП",
+            "ref": "чл. 188, ал. 1",
+            "line": "„Собственикът на пътното превозно средство … отговаря за извършеното с него нарушение. Собственикът, съответно ползвателят, се наказва с наказанието, предвидено за извършеното нарушение, ако не декларира на кого е предоставил превозното средство.“"
+          },
+          {
+            "act": "ЗДвП",
+            "ref": "чл. 189, ал. 10",
+            "line": "„Влизат в сила електронните фишове, които: … 2. не са обжалвани в срока по ал. 8; 3. са обжалвани, но са потвърдени или изменени от съда;“ — this is why „автоматично“ in distractor d is the wrong word."
+          }
+        ],
+        "reviewerCaveat": "чл. 189, ал. 5 is in force from 7.05.2026, i.e. it IS current law on 2026-08-03, but it is recent. A student taught from an older textbook will remember the opposite („по камера точки не падат“). Worth a note in the lesson copy, not just the question."
+      }
+    ]
   }
 }

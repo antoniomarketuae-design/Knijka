@@ -1,0 +1,8 @@
+# Fetched originals and their extracted text. Not committed: sources.json
+# already pins each file by URL + bytes + sha256, so a re-fetch is verifiable,
+# and the repo stays free of ~800 KB of binaries it does not need.
+*.docx
+*.pdf
+*.zip
+*.txt
+unz/

@@ -18,5 +18,38 @@
     "flaggedLegal": 4,
     "removed": 0,
     "notes": "Adversarial audit of wave-3 additions q042-q062, 2026-07-08. (1) Schema: all 21 parse, JSON valid, ids unique repo-wide, no duplicate option ids, media null everywhere, points in {1,2,3}, every single has exactly 1 key, every multi exactly 3/4; all conceptIds resolve incl. c-motorway-entry-exit, c-crosswalk-yield, c-general-care-duty, c-cyclists, c-turning-right, c-reversing, c-equal-junction. No schema violations. (2) Legal accuracy: every correct key verified against ЗДвП and docs 31/32 — чл. 50 (дясното incl. T-junction q048 'through road has no privilege', 4-car deadlock q059/q060), чл. 48+чл. 7 (main road empty then right-hand between two Б1 secondaries q042; priority road yields to red light q043; tram on Б1 secondary yields to priority road q046 — correct exception to чл. 49), чл. 55+чл. 25 (motorway acceleration-lane merge yields q044/q061), чл. 37+чл. 49 (left-turn yields oncoming incl. tram, two opposing left-turners pass left-to-left q045), чл. 91+чл. 92 (special regime needs BOTH light AND siren — q047 light-only = no give-way duty; behaviours q049), чл. 40 (reversing yields all q050), чл. 119+чл. 116 (crosswalk/blind-pedestrian, priority road does NOT override pedestrian q051/q052/q058), чл. 50а (multi-lane roundabout inner yields outer on exit q057), чл. 25 (right turn yields cyclist in velolenta q062). No wrong keys found; no fixes to answer keys needed. (3) Main defect fixed (fixed=10): answer-position bias again — wave-3 singles keyed a=3/b=9/c=1/d=0 and the sole false option of all 8 multis sat only at c(5) or d(3), never a/b. Reordered options in 6 singles (q044 b->d, q046 b->c, q047 b->d, q048 b->c, q056 b->d, q058 b->c) and 4 multis (q045 false d->b, q049 false c->a, q052 false c->b, q053 false c->a). Wave-3 now singles a=3/b=3/c=4/d=3 and multi sole-false a=2/b=2/c=2/d=2; explanations reference no option letters so untouched. (4) flaggedLegal=4: q053 (Наредба група А?), q054 (чл. 52? — rail-crossing 'don't stop on rails' article), q055 (чл. 51?/чл. 53? — crossing without barriers), q056 (Наредба табела Т? — priority-road-turns plate) remain status needs-review with honest '?' refs per schema rule 2; substance of all four verified correct, only exact article/annex numbers pending. All other wave-3 items status draft. (5) Duplicate check vs ALL 61 other questions: no true duplicates. Deliberate contrast/reinforcement pairs kept — q046 (tram yields on signed junction) vs q014/q015 (tram priority on equal junction); q047 (special regime light-only, no duty) vs q017/q049 (both-signals behaviours); q054 (don't block rail crossing) vs q039 (don't block junction); q059 (4-car deadlock) vs q026 (3-car resolvable chain); q058 (priority road doesn't override pedestrian) vs q051 (plain crosswalk); q044/q061 (motorway vs lane-ends merge) vs q034/q035 (pullout/lane-change). q060 vs q040 share the 'which do NOT give priority' format but test different distractors — kept as reinforcement. Nothing removed. (6) Bulgarian: natural, modern, teen-readable throughout; colloquial wrong-option phrasing (e.g. 'набутвам се' q061) is intentional and appropriate; no listovki-like copying detected. (7) Out-of-scope note carried from wave-1 still stands: concepts.json c-right-hand-rule/c-priority-road lawRefs appear swapped — not touched. (8) Distribution wave-3: 13 single / 8 multi (62/38), points 8x1/9x2/4x3 (38/43/19) — within guidance; whole file now 39 single / 23 multi and 24x1/26x2/12x3."
+  },
+  "close90SixWrong": {
+    "wave": "CLOSE · THE-SIX-WRONG — closing docs/education/90 §14.5 Tier A",
+    "date": "2026-08-03",
+    "rule": "ADR-002: no rule, article number or figure written from memory. Every \"sourceLine\" is quoted verbatim from content/law/acts/zdvp.json (ЗДвП consolidated to ДВ бр. 55 / 16.06.2026), content/law/acts/naredba-iz-2539.json, or the locally extracted ППЗДвП and Наредба № РД-02-21-1 text (sha256-pinned in content/law/sources.json).",
+    "statusRule": "Every row touched here is \"needs-review\". Nothing was left at \"approved\" — approval is the founder's.",
+    "questionsTouched": 1,
+    "rows": [
+      {
+        "id": "q-predimstvo-052",
+        "tier": "teaches-wrong-law",
+        "auditRef": "§14.3.C",
+        "what": "THE FIFTH INSTANCE of a defect the correction wave fixed four times and missed here. Status was \"approved\" and the row was never touched. The explanation taught that чл. 116 owes special care „към децата, ПРЕСТАРЕЛИТЕ и незрящите с бял бастун“.",
+        "was": "„Пешеходецът на пътеката се пропуска (чл. 119, ал. 1 ЗДвП), а към децата, престарелите и незрящите с бял бастун дължиш особена предпазливост (чл. 116).“",
+        "now": "чл. 116 is quoted for the categories it actually names; the elderly pedestrian is grounded in чл. 5, ал. 2, т. 1 read with § 6, т. 75 ДР — the same repair as q-uyazvimi-004/-005/-028/-054. Answer key unchanged.",
+        "sourceAct": "ЗДвП",
+        "sourceRef": "чл. 116 (изм. ДВ, бр. 64 от 2025 г., в сила от 7.09.2025 г.)",
+        "sourceLine": "„Водачът на пътно превозно средство е длъжен да бъде внимателен и предпазлив към пешеходците, особено към децата, към хората с трайни увреждания, в частност към слепите, които се движат с бял бастун, към слепо-глухите, които се движат с червено-бял бастун.“",
+        "supportingRefs": [
+          {
+            "act": "ЗДвП",
+            "ref": "чл. 5, ал. 2, т. 1",
+            "line": "„да бъде внимателен и предпазлив към уязвимите участници в движението, каквито са пешеходците и водачите на двуколесни пътни превозни средства“"
+          },
+          {
+            "act": "ЗДвП",
+            "ref": "§ 6, т. 75 ДР",
+            "line": "„Уязвими участници в движението“ са немоторизираните участници в движението, пешеходци и лица, работещи на пътя, и по-специално деца, възрастни хора и хора с увреждания, както и водачите на двуколесни пътни превозни средства.“"
+          }
+        ],
+        "bankSweep": "IS THERE A SIXTH? No. All 1,089 rows were searched for „престарел“ and „бременн“ with [REVIEW:] notes stripped out, so only text a student can see was counted. Live hits: q-predimstvo-052 (this defect, now fixed) and q-osnovni-037, where „бременни жени“ is CORRECT because it stands in чл. 137а, ал. 2 (seatbelt exemptions), not чл. 116. Every remaining occurrence sits inside a [REVIEW:] note documenting the removal. All 19 rows citing чл. 116 were additionally read for the adjacent claim „чл. 116 covers the elderly“: none makes it — q-uyazvimi-044 correctly grounds the elderly in § 6, т. 75 ДР."
+      }
+    ]
   }
 }

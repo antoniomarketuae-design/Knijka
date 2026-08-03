@@ -18,5 +18,45 @@
     "flaggedLegal": 0,
     "removed": 0,
     "notes": "Wave 3 = q-speed-044..064 (21 items); waves 1-2 (001-043) untouched. The same exploitable answer-position defect recurred and was the dominant issue: across the 13 new singles the correct option was 'a' 9x, 'c' 3x, 'b' 1x, 'd' 0x — a student always ticking 'a' scored 9/13 (~69%); across the 8 new multis option 'a' was correct in ALL 8 and the last option was the wrong one in most, so a fixed {a,b,c} tick scored well. Fixed by reordering options in 11 questions with texts/explanations unchanged and ids kept sequential a..e — singles 044, 047, 048, 050, 061, 062 and multis 051, 052, 056, 058, 060. Left the two pure numeric-ladder singles (045, 046) ascending and untouched (reordering them to non-ascending would read unnaturally). Post-fix single positions a:3/b:3/c:3/d:4; multi correct-sets now vary (abd, bd, bcd, abc, acd, abde, bcd, acd) with 'a' correct in only 5/8 and last-option correctness mixed. 12th fix = near-duplicate: q-speed-053 and q-speed-061 were twins (both 'night, outside town, dipped lights 40-50 m, 90 km/h, stopping distance exceeds lit zone', same numbers); rewrote 053 into a distinct scenario (dipping high-beams for oncoming traffic, visibility drops to ~40 m -> must reduce speed), keeping type single/2pt and c-speed-adaptation + c-stopping-distance-total, correct at b. Legal verification vs docs 31-32 and ЗДвП: скоростен път 120 km/h for cat B (044) matches чл. 21 (distinct from magистрала 140 in 002); reaction distances 14 m@50 / 25 m@90 / 36 m@130 (045, 061, 064) and half-speedometer rule = 50 m@100 (046) are arithmetically correct; wet~double, ice/gravel multiple (060), understeer response = ease throttle + don't add lock (062), aquaplaning, downhill gravity lengthening braking (055), night short-lights vs stopping distance (053, 061) all sound; average-speed enforcement (059) and >50 km/h-in-town heaviest sanctions (063) consistent with doc 31. No NEW legal errors -> flaggedLegal=0; the six needs-review items (047 chains ~50 km/h чл.139?, 048 препоръчителна скорост sign, 049 Zone 30, 058 speed-sign shapes, 059 чл.182? sanctions, 063 чл.182?/171?) already carried honest '?' refs from generation and were left needs-review. Duplicate screen vs ALL 64 items: only 053/061 were true twins (resolved); 057 (curve physics) complements 035 (curve actions), 064 (130 reaction-distance) complements 041 (140 ceiling) — different numeric focus, kept. Bulgarian natural, second-person. All conceptIds resolve in concepts.json; ids unique repo-wide. Wave-3 mix: 13 single / 8 multi (62/38) and points 9x1/8x2/4x3 (~43/38/19) within SCHEMA guidance. Full file re-parsed via node after edits: 64 items, 64 unique ids, exactly-one-correct on singles, 2+ on multis, sequential option ids, no trailing commas, valid UTF-8 JSON."
+  },
+  "wave4": {
+    "scope": "The stopping-distance / physics block — every row in the file asserting a distance, a time or a ratio",
+    "newAudited": 34,
+    "fixed": 6,
+    "flaggedLegal": 0,
+    "removed": 0,
+    "keyFlips": 0,
+    "statusAfter": "the 6 touched rows are needs-review (were approved); the 28 recomputed-and-correct rows were NOT touched",
+    "method": "These are arithmetic, so they are decidable with no source at all. Recomputed from first principles: v[m/s] = v[km/h]/3.6; reaction distance = v*t with t = 1.0 s; braking distance = v^2/(2*mu*g) with g = 9.81 m/s^2, mu = 0.8 dry asphalt and 0.4 wet; total = reaction + braking. Every stated figure in the file was checked against this table.",
+    "workingTable": {
+      "columns": "v(km/h) | v(m/s) | reaction@1s | braking dry mu=0.8 | total dry | braking wet mu=0.4 | total wet",
+      "rows": [
+        "30  |  8.33 |  8.3 |  4.4 |  12.8 |   8.8 |  17.2",
+        "50  | 13.89 | 13.9 | 12.3 |  26.2 |  24.6 |  38.5",
+        "70  | 19.44 | 19.4 | 24.1 |  43.5 |  48.2 |  67.6",
+        "90  | 25.00 | 25.0 | 39.8 |  64.8 |  79.6 | 104.6",
+        "100 | 27.78 | 27.8 | 49.2 |  76.9 |  98.3 | 126.1",
+        "130 | 36.11 | 36.1 | 83.1 | 119.2 | 166.2 | 202.3",
+        "140 | 38.89 | 38.9 | 96.4 | 135.2 | 192.7 | 231.6"
+      ],
+      "derived": [
+        "braking 50->100 = x4.00 exactly (quadratic) — q-speed-010, q-speed-042c CONFIRMED",
+        "total 30 vs 50 = 26.2/12.8 = x2.05; braking only = 12.3/4.4 = x2.80 — q-speed-015",
+        "2-second rule: 50.0 m @ 90 km/h (q-speed-029 CONFIRMED), 27.8 m @ 50 km/h (q-speed-065 CONFIRMED, and the sceneStill really is 28 m: ego y=80, lead y=108)",
+        "car length 4.5 m at 25 m/s = 0.18 s ≈ 'една пета от секундата' — q-speed-016 CONFIRMED",
+        "9 m/s = 32.4 km/h; 5 m/s = 18.0 km/h; 15 m/s = 54.0 km/h"
+      ]
+    },
+    "confirmedUnchanged": "q-speed-008, -010, -011, -012 (14 m @50 CONFIRMED), -013 (25-30 m @50: computed 26.2 CONFIRMED), -016, -017, -028, -029, -030, -031, -032, -033, -035, -036, -038, -041 (39 m/s @140 CONFIRMED; '>100 m' — computed 135.2 CONFIRMED), -042 (28 m reaction CONFIRMED; '~80 m total' — computed 76.9 CONFIRMED; 'under 50 m' correctly marked false), -043, -051, -052, -053, -055, -056, -060, -061 ('65-70 m' — computed 64.8 CONFIRMED), -062, -064 (36 m reaction CONFIRMED; '>100 m' — computed 119.2 CONFIRMED; 'under 40 m' correctly marked false), -065. 28 rows recomputed and correct; left at their existing status, untouched.",
+    "defectsFixed": [
+      "q-speed-009 — the explanation contradicted itself inside one sentence: it called 9 metres per second 'скорост на ходом' and then computed that 9 m/s is 32 km/h. Both cannot be true; 32 km/h is a sprint. Rewritten with the actual conversions (9 m/s = 32.4 km/h, 15 m/s = 54 km/h) and with the 1-second reaction time named as the teaching convention it is (real range ~0.7 to >1.5 s). Key (25 m) was correct and is unchanged.",
+      "q-speed-045 — same error class: '5 метра би било скорост на ходом'. 5 m/s is 18.0 km/h, a run, not a walk. Rewritten with the real conversions. Key (14 m) correct, unchanged.",
+      "q-speed-046 — the real one. The arithmetic was right (half the speedometer at 100 km/h = 50 m) but the explanation said those 50 m are 'колкото ти трябват, за да реагираш и спреш'. False: full stopping from 100 km/h on dry asphalt is 76.9 m. It also contradicted q-speed-042 in the SAME FILE, whose explanation says '~80 метра на сухо'. Rewritten to say what the rule actually is — a FOLLOWING distance that works because the car in front also has a braking distance, so you mainly need the reaction gap plus the difference between the two braking distances. Key unchanged.",
+      "q-speed-015 — 'Пълният път за спиране е в пъти по-къс, отколкото при 50 км/ч' was vague where it could be exact. Replaced with the computed figures (about 13 m at 30 km/h against about 26 m at 50), and the distinction that the braking part alone is ~2.8x while the total is ~2.05x. Key unchanged.",
+      "q-speed-014 — the marked-correct option says 'силата на удара' grows with the square of speed. Strictly it is the kinetic ENERGY that goes as v^2 (E = ½mv²); the peak force also depends on the crush distance. Key kept (it is the only option on the right order of growth) and the explanation now states E = ½mv² and names the qualifier instead of implying precision the word 'сила' does not have.",
+      "q-speed-006 — 'ако виждаш 40 метра, а ти трябват 70' implied a computed figure; the computed value at 90 km/h is 64.8 m. Restated as 'около 65 метра (25 за реакцията, около 40 за спирачките)' and the lawRef sharpened from чл. 20 to чл. 20, ал. 2, which is the alinea the explanation now quotes verbatim ('за да бъдат в състояние да спрат пред всяко предвидимо препятствие')."
+    ],
+    "roundedConventionsNamedNotHidden": "Where a figure is a teaching convention rather than a computation it is now said to be one, per the brief: the 1-second reaction time (q-speed-009, q-speed-045), mu = 0.8 dry / 0.4 wet behind 'на мокро почти двойно' (q-speed-038, q-speed-060), the 2-second and half-speedometer following rules (q-speed-016, q-speed-046, q-speed-056), the ~40 m dipped-beam / 100-150 m main-beam visibility figures (q-speed-053), and the ~50 km/h snow-chain ceiling (q-speed-047, whose explanation already said correctly that 'Законът не изписва число за вериги').",
+    "speedTableNote": "чл. 21, ал. 1 was re-read from content/law/acts/zdvp.json to check the rows this file depends on: Категория В = 50 / 90 / 140 / 120, and Категории ВЕ, С1, С1Е, D, D1, D1E, DE = 50 / 80 / 100 / 100. The B+E row fixed earlier in this wave is confirmed and was NOT re-litigated. The 140 in q-speed-041 and the lawful 130 in q-speed-064 both check out against it."
   }
 }

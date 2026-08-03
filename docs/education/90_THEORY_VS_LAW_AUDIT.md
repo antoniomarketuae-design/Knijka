@@ -3,12 +3,19 @@
 **Date:** 2026-08-03
 **Scope:** all 1,089 questions in `content/questions/*.json` (16 files), checked against ЗДвП
 (consolidated to ДВ бр. 55 / 16.06.2026) and the SARS нормативна база.
-**Status:** READ-ONLY. No question was edited. Corrections come after the retrieval layer exists.
+**Status:** ~~READ-ONLY~~ — **SUPERSEDED IN PART on 2026-08-03 by the correction wave. Read
+[§14](#14-2026-08-03--the-correction-wave-adversarially-re-checked) FIRST: it carries the current
+number, retracts §4.1 in full, and lists what is still open.**
 **Inputs:** nine independent auditors, 135 delivered findings, deduplicated and re-ranked here.
 
 ---
 
 ## 1. The answer to your question
+
+> **AMENDED 2026-08-03.** The numbers in §1 and §2 are the numbers *before* the correction wave.
+> They are kept as written so the wave can be judged against them. **The current number is in
+> [§14.5](#145-the-honest-number): 41 of 1,089 (3.8%) would still mislead a student today, and 29 of
+> those 41 are the first-aid block, which has no legal source at all.**
 
 You asked plainly whether the theory bank is trustworthy, because "if theory is to be wrong we
 instantly lose confidence."
@@ -51,6 +58,10 @@ And one thing that should worry you more than the 4%:
 ---
 
 ## 2. Counts
+
+> **AMENDED 2026-08-03.** `fails-an-exam` is **15**, not 24 — §4.1's nine were never unanswerable
+> (see the retraction in §4.1). `status: approved` is now **837**, `needs-review` **252**, after the
+> wave demoted every row it touched. Post-wave counts: [§14](#14-2026-08-03--the-correction-wave-adversarially-re-checked).
 
 | Tier | What it costs the student | Questions | % of 1,089 |
 |---|---|---|---|
@@ -120,12 +131,15 @@ Recording it because a ledger that only reports hits is not a ledger.
 
 ---
 
-## 4. Tier 1 — fails-an-exam (24 questions)
+## 4. Tier 1 — fails-an-exam (~~24~~ **15** questions)
 
 The answer key is wrong. A student who studies these and meets the same point on the official exam
 answers wrongly.
 
-### 4.1 The nine unanswerable sign questions — 9 questions
+> **AMENDED 2026-08-03: 24 → 15.** §4.1 below is **RETRACTED** — its nine questions were never
+> unanswerable. See §14.2 for the proof.
+
+### 4.1 ~~The nine unanswerable sign questions — 9 questions~~ — **RETRACTED, see §14.2**
 
 `q-signs-066`, `-069`, `-073`, `-076`, `-077`, `-081`, `-083`, `-086`, `-088`
 
@@ -140,6 +154,19 @@ This is not a law defect and it outranks every law defect in the file. It is als
 problem, not just a content problem**: the media shape used elsewhere, `{"kind":"sign","signRef":"А1"}`,
 holds exactly one sign and structurally cannot carry a four-sign comparison. These nine cannot be
 fixed by filling a field — the schema needs a multi-sign media kind first.
+
+> **RETRACTION (2026-08-03).** Every sentence in the box above is wrong, and this is the audit's own
+> failure mode — it read `question.media` and never looked at `options[i].media`. All nine rows
+> carried four sign faces on their OPTIONS at HEAD (commit `1c87a7b`), and still do. Verbatim from
+> `patni-znatsi.json` at HEAD, `q-signs-066` option **b**:
+> `{"id":"b","textBg":"Знак 2","correct":true,"media":{"kind":"sign","signRef":"А2"}}` — and А2 is
+> „Опасен завой наляво" per Наредба № РД-02-21-1 чл. 24, ал. 1, so the key is right too.
+> `"Знак 1".."Знак 4"` is the LABEL under each face, not the whole option.
+> Option-level sign media is documented in `content/SCHEMA.md` under „Sign-face options", typed by
+> `QuestionOptionSchema.media`, and rendered by PracticeSession, ExamRunner and MicroQuizOverlay
+> through one `<SignFace>`. **No schema change was needed and none was made.**
+> Effect: Tier 1 drops 24 → 15, and the §1 headline „nine unanswerable sign questions (one missing
+> media field)" is void.
 
 ### 4.2 Bus stops: чл. 98 ал. 1 vs ал. 2 — 5 questions
 
@@ -691,3 +718,429 @@ level crossings, the speed table and the vignette ladder — and I would not wan
 learning any of those five from us today.
 
 The thing to fix first is not a question. It is the `approved` flag that currently hides all of them.
+
+---
+
+## 14. 2026-08-03 — the correction wave, adversarially re-checked
+
+**What this section is.** Nine agents applied this ledger to the bank. Every claim they made was
+then re-checked *against the retrieved statute text, assuming it was wrong until the source said
+otherwise*. This section records what survived, what did not, and the honest residual number.
+
+**Method of the re-check.** The working tree was diffed against `HEAD` row by row (not read from the
+agents' reports), and each surviving citation was resolved against the retrieved acts: `zdvp.json`
+(ДВ бр. 55 / 16.06.2026) plus locally extracted ППЗДвП, Наредба № РД-02-21-1, Наредба № 2/2001,
+Наредба № Iз-2539, Закон за пътищата, ЗБЛД and НК.
+
+### 14.1 What the wave actually did
+
+| Measure | Value |
+|---|---|
+| Rows changed vs `HEAD` | **175** |
+| Rows the reports claimed | 175 — **exact match, 0 undeclared edits, 0 phantom claims** |
+| Rows added / removed | 0 / 0 |
+| Answer-key patterns flipped | **6** (`q-dokumenti-i-sanktsii-030`, `-040`, `q-spirane-i-parkirane-008`, `q-uyazvimi-003`, `-014`, `-036`) |
+| Rows where the correct option's TEXT was rewritten (key pattern unchanged) | 38 |
+| Rows left at `"status": "approved"` after being touched | **0** — every touched row is now `needs-review` |
+| Rows changed with **no source quote anywhere** (inline note or `content/audits/*.audit.json`) | **0** — no ADR-002 breach, nothing to revert on that ground |
+| ЗДвП citations in the changed rows | 334, of which **0** name a missing article, a missing alinea or a missing point |
+
+Per file: `patni-znatsi` 27 · `krastovishta` 26 · `manevri-i-izprevarvane` 18 · `dokumenti-i-sanktsii`
+17 · `spirane-i-parkirane` 16 · `alkohol-i-godnost` 14 · `osnovni-ponyatia` 12 · `uyazvimi-uchastnitsi`
+11 · `prevozno-sredstvo` 8 · `skorost-i-distantsia` 7 · `eko-i-zashtitno-shofirane` 6 ·
+`signali-i-markirovka` 5 · `nosht-i-uslozhneni-uslovia` 3 · `magistrali-i-izvangradsko` 3 ·
+`predimstvo` 1 · `ptp-i-parva-pomosht` 1.
+
+### 14.2 Findings that were CONFIRMED against the source
+
+Every load-bearing quote below was matched verbatim against the retrieved act, not accepted from the
+report. Sample of the ones that carry an answer key or a figure:
+
+- **Level crossings.** ЗДвП чл. 51, ал. 3 „Спирането на пътните превозни средства е задължително пред
+  железопътен прелез, който няма бариери" — verbatim. ППЗДвП чл. 109, т. 1 and чл. 110 likewise.
+  `q-krastovishta-066` and `-054` now teach the mandatory stop. **Confirmed.**
+- **Bus stops.** чл. 98, ал. 1 lists 8 points and the bus stop is in **none** of them; чл. 98, ал. 2,
+  т. 3 („Освен в посочените в ал. 1 случаи паркирането е забранено") holds it. `q-spirane-008`'s flip
+  is right. **Confirmed** — and so is the unresolved tension with чл. 183, ал. 4, т. 8, which fines
+  „неправилно престоява … в зоната на … спирка" verbatim (§8.3 item 4 stands).
+- **The fabricated 50 m.** чл. 98, ал. 1, т. 4 gives a functional test and no metre figure; there is
+  no 50 m anywhere in чл. 98. `q-spirane-056` now teaches the test. **Confirmed.**
+- **The 3 m that IS in the statute.** чл. 98, ал. 1, т. 7 „по-малко от 3 метра". **Confirmed.**
+- **One-way street.** чл. 94, ал. 4 says only „престой"; the adjacent ал. 3 says „За престой и
+  паркиране". The textual argument holds. **Confirmed.**
+- **E-scooters.** чл. 80а, ал. 1, т. 3 „да ползва защитна каска" — no age qualifier. ал. 2, т. 6
+  „се движи в тъмната част на денонощието" — night riding is banned outright, so lights do not open
+  it. ал. 3 „шестнадесет години" — no road-type qualifier. All three flips **confirmed.**
+- **чл. 116 as amended.** The article names „децата … хората с трайни увреждания, в частност …
+  слепите … слепо-глухите". „престарел" and „бременн" do not occur in it. **Confirmed.**
+- **Speed table.** чл. 21, ал. 1 rows „Категории ВЕ, С1, С1Е, D, D1, D1E, DE / 50 / 80 / 100 / 100",
+  „Категория В / 50 / 90 / 140 / 120" and „Категории С и СЕ / 50 / 80 / 90 / 90" — all verbatim.
+  `q-speed-024` **confirmed.**
+- **Vignette.** Закон за пътищата чл. 10а, ал. 1 ends „…уикенд и **еднодневна**"; ал. 2 „минималната
+  пътна такса … е винетна такса с еднодневна валидност". The inverted key is **confirmed** fixed.
+- **ГТП is no longer a ПАМ.** чл. 171, т. 2, б. „е" reads „…отм., бр. 64 от 2025 г., в сила от
+  7.09.2025 г." — repealed. **Confirmed**, and чл. 181, т. 1 carries today's 100 лв. for owner and
+  driver alike.
+- **Fire extinguisher.** чл. 139, ал. 2, т. 3 repealed 7.02.2026; the duty moved to the new чл. 139,
+  ал. 8, which names М1, and чл. 149, ал. 1, т. 2, б. „а" defines М1 as the passenger car.
+  **Confirmed.**
+- **Sign shapes and names.** Наредба № РД-02-21-1 чл. 56, т. 4 (Б5 is a circle), т. 5 (Б6 is a
+  **square**), чл. 66, ал. 2, т. 1 (В1 red ground, no border), чл. 73, ал. 1 (В3's official name
+  excepts solo motorcycles and mopeds), чл. 79, ал. 1 („маса с товар", not „обща маса"), чл. 90,
+  ал. 3 и 4 (В34 cancels only В24/В25/В26, and only two or more at once), чл. 100 (Г15а), чл. 168
+  (Ж13), чл. 60, ал. 2 (Б2 has exactly two placement cases, the unbarriered level crossing being
+  one). All **verbatim.** „Пешеходна зона" occurs **0 times** in the наредба, as claimed.
+- **Markings.** Наредба № 2/2001 чл. 23, ал. 1 (М7) and ал. 3 (М18, apex towards the driver) —
+  verbatim. `q-krastovishta-062` **confirmed.**
+- **Контролни точки.** Наредба № Iз-2539 чл. 2: max 39, 26 at issue, +13 after 24 months —
+  verbatim; ЗДвП чл. 157, ал. 1 „две трети" likewise. **Confirmed.**
+- **чл. 50а cleanup.** Bank-wide users of чл. 50а went 14 → 3, and all three survivors
+  (`q-krastovishta-019`, `q-predimstvo-039`, `q-signali-i-markirovka-043`) are genuine blocked-junction
+  questions. **Confirmed.**
+
+**§4.1 is retracted** (see the box in §4.1). All nine sign rows carry four
+`{"kind":"sign","signRef":…}` faces on their OPTIONS, at `HEAD` and now. Tier 1 is **15**, not 24.
+
+### 14.3 What broke — the sibling checks that failed
+
+**A. The why-panel drill guard. This is the wave's own gate failure and it was not reported.**
+`src/modules/clips/whyPanelPairing.ts` pairs a theory question with a simulator drill **only when
+their `lawRef` strings share an article**. Rewriting 175 rows' citations moved **28 pairings**:
+
+- **`q-signs-054`: law-match → suspect.** It used to share ЗДвП чл. 48 with `sc-jx-priority-confidence`.
+  The signs wave swapped чл. 48 out for чл. 50, ал. 2 + ППЗДвП чл. 46, ал. 5. There is now no shared
+  article, so the guard withholds the drill and the student gets text only. Questions served with a
+  drill: **532 → 531**; refused: **53 → 54**.
+- **`q-eco-009`: allow-listed → law-match.** Its scoped excuse in `LAWREF_MISMATCH_ALLOW`
+  (`ev-cyclist→sc-vu-pass-clearance`) is now stale, because the corrected refs legitimately match.
+- Four tests fail on the pinned numbers: `whyPanelPairing.test.ts` ×3, `whyPanel.test.ts` ×1.
+
+  *The remedy is a decision, not a number bump:* either re-point `q-signs-054` at a drill that teaches
+  чл. 50, or accept the withheld clip. Then update the two pinned counts and delete the stale
+  allow-list key.
+
+**B. The simulator still teaches the article the theory bank just stopped teaching.**
+`platform/src/modules/sim/lessons/scenario/templates-flow.ts:360` has `lawRef: "ЗДвП чл. 50а"` for
+`sc-roundabout-entry`, and line 342 tells the student, in the debrief:
+„**чл. 50а изисква да пропуснеш всички, които вече се движат по кръговото**". That is the exact
+sentence §6.1 disproved and the wave deleted from eight theory rows. The bank and the simulator now
+contradict each other. **Outside the bank; nobody owns it yet.**
+(Checked and cleared: `sc-mv-uturn-ban`'s `ЗДвП чл. 38` is fine — чл. 38 *is* the U-turn manoeuvre
+article; only the *prohibition list* is чл. 39.)
+
+**C. One sibling of a fixed defect was missed.** `q-predimstvo-052` (status **`approved`**, untouched)
+still teaches „към децата, **престарелите** и незрящите с бял бастун дължиш особена предпазливост
+(чл. 116)". That is the same disproven claim the wave removed from `q-uyazvimi-004`, `-005`, `-028`
+and `-054`. Four of five fixed; this is the fifth.
+
+**D. Two founder-facing notes point at the wrong option letter.** `q-krastovishta-066`'s
+`[REVIEW: …]` says „СЕГА опция **b** е задължителното спиране" — it is option **d**.
+`q-krastovishta-054`'s says „опция **c**" — it is option **a**. Harmless to students (the loader
+strips notes) but it costs the ten-second review its accuracy.
+
+**Refuted claims** (checked, and the report was wrong):
+
+- „The `[REVIEW: …]` blocks leak to students" — **no.** `lib/content/loader.ts:121` runs
+  `sanitizeContentTree()` before validation, so every consumer of `ContentRepo` gets stripped text.
+  144 rows carry a note; **0** contain a nested `]` that would truncate the strip.
+- „§ 6 ДР has 86 definitions" — it has **87**. Immaterial to the point being made: there is still no
+  „Изпреварване" and no „Принудително спиране" in it, both **confirmed**.
+
+### 14.4 The gate, run on this tree
+
+| Command | Result |
+|---|---|
+| `npx tsc --noEmit` | **exit 2 — 10 errors, ALL in the concurrent payments/auth lane** (`modules/auth/*`, `modules/payments/*`, `lib/features.ts`). **0** in `content/`, `lib/content`, `content-admin` or `review`. |
+| `npm run validate:content` | **exit 0 — PASS.** 1,089 questions · 0 draft / 252 needs-review / 837 approved · 16/16 topics · answer-leak sweep 17 scopes, **0 blocking, 0 warning** · human-signed 0 of 1,089 · unsigned-`approved` **837, exactly at the frozen ceiling of 837**. |
+| `npx vitest run --maxWorkers=4` | **exit 1 — 6 files / 21 tests failed of 665 files / 10,282 tests** (10,096 passed, 165 skipped). |
+
+Of the 21 failures: **16** are the payments lane (`api/stripe/webhook` ×10, `api/checkout/embedded`
+×6), **1** is the classroom lane (`checkControl.test.ts` — `ClassroomRoom.tsx` not in `CALL_SITES`),
+**0** from `expiry.test.ts` (a parse error in another lane's untracked file), and **4 are this wave's**
+— the why-panel guard in §14.3.A. Every content gate passed: `loader`, `sanitize`, `questionMedia`,
+`signFaces`, `law/corpus`, `comparisonQuestions`, `micro-quiz-media`, `content-admin/*`,
+`reviewQueueDoc`, `approval_gate`, `exam/supply`, `exam/quotas`.
+
+### 14.5 The honest number
+
+**Of 1,089 questions, 41 (3.8%) would still mislead a student today.** Not zero, and here is exactly
+why not.
+
+**Tier A — actively wrong or unanswerable, today (6).**
+
+| Question | Status | Why |
+|---|---|---|
+| `q-predimstvo-052` | **approved** | Teaches that чл. 116 lists „престарелите". It does not. §14.3.C. |
+| `q-krastovishta-047` | needs-review | The **graded correct option** still reads „движението на заден ход в кръстовище и през него е забранено". The explanation was fixed; the option was deliberately left. No article says it. |
+| `q-signali-i-markirovka-058` | needs-review | Explanation still asserts „Забранено е движението ПО BUS лентата, а не самото ѝ пресичане" while its own added ref, ППЗДвП чл. 63, ал. 2, т. 1, forbids crossing the М1 line that marks it. Neither candidate option can be grounded. §8.3 item 5. |
+| `q-signs-041` | needs-review | Undecidable: the stem says only „табела с изобразен товарен автомобил", `media` is null, and Т6 / Т7 mean **opposite** things (Наредба чл. 183, ал. 1). §8.3 item 6. |
+| `q-manevri-031` | **approved** | Cites „§ 6 ДР" for parallel columns not counting as изпреварване. § 6 holds 87 definitions and **none** is „Изпреварване" — machine-checked. The real basis is in ППЗДвП, which is not in the corpus. |
+| `q-dokumenti-i-sanktsii-050` | needs-review | Наредба Iз-2539 чл. 3, ал. 1 and ЗДвП чл. 186 / чл. 189 contradict each other on whether a фиш deducts точки, and none of the three marked-correct statements matches either. §8.3 item 1. |
+
+**Tier B — flagged for your ruling; may be wrong, cannot be settled from any source we hold (6).**
+`q-signs-054` (graded option b vs чл. 50, ал. 2) · `q-speed-005` (graded option e) and `q-speed-067`
+(same point, explanation only) — the third „restriction ends" mechanism, §8.3 item 7 ·
+`q-speed-049` (whether a dedicated „Зона 30" sign exists; the наредба copy predates чл. 62а) ·
+`q-dokumenti-i-sanktsii-055` (§8.3 item 2, statute vs наредба, untouched) ·
+`q-manevri-061` (§8.3 item 3, Наредба Iз-2539 чл. 6, ал. 1, т. 16 after ЗДвП чл. 183, ал. 3, т. 6 was
+repealed).
+
+**Tier C — no legal source exists at all (29).** The first-aid block in `ptp-i-parva-pomosht.json`:
+`q-ptp-013`–`-022`, `-033`–`-042`, `-056`–`-064`. Measured, not estimated: **all 29 are
+`"status": "approved"`, and all 29 carry exactly ONE `lawRef` and it is the same one — ЗДвП чл. 123.**
+чл. 123 is the duty to stop and assist; it contains no medical protocol. So the compression depth in
+`q-ptp-036` (5–6 cm), the rate in `q-ptp-016` (100–120/min) and the breathing check in `q-ptp-057`
+(~10 s) are physiology wearing a legal citation — the §6.7 failure mode, at its purest. Nothing was
+invented to fix them and nothing should be: the decision is yours and it is one of two — cite a
+medical standard (ERC / БЧК) and ingest it, or add a `notLaw` marker to the schema (§12 item 8).
+*(The audit said 33; the measured figure by concept is 29.)*
+
+**Not counted above, but on the list:**
+
+- **52 rows** assert a distance figure in a braking/speed context. Physics, still unverified (§8.2).
+  Where the wave touched them the false legal dress was stripped (`q-alkohol-022`, `-011`, `-034`,
+  `-047`, `q-nosht-037`); elsewhere it was not.
+- **38 rows** carry at least one `lawRef` with no article number — 20 of them the eco file's
+  „Наредба № 37 · единна учебна документация". A citation a student cannot open. Honest, but useless.
+- **203 refs to Наредба № РД-02-21-1, 104 to ППЗДвП, 14 to Наредба № 2/2001** point at acts that are
+  **not in `content/law/acts`**, so the review console shows a MISS instead of the text and you
+  cannot clear those rows in ten seconds. Ingesting Наредба № РД-02-21-1 and ППЗДвП is worth more
+  than any remaining single-row fix.
+
+### 14.6 What to do next, in order
+
+1. **Decide `q-signs-054`'s drill** and unbreak the four why-panel tests (§14.3.A). This is the only
+   thing standing between the wave and a green content gate.
+2. **Fix `q-predimstvo-052`** — one sentence, the same fix as its four siblings (§14.3.C).
+3. **Rule on Tier A's four disclosed rows** — `q-krastovishta-047`'s option, `q-signali-058`,
+   `q-signs-041`, `q-dokumenti-050`. Each is a ten-second decision with the evidence already attached.
+4. **Re-point the simulator's roundabout debrief off чл. 50а** (§14.3.B) so the two modules agree.
+5. **Ingest Наредба № РД-02-21-1 and ППЗДвП** into `content/law/acts`, then Закон за пътищата, НК,
+   ЗБЛД, Кодекс за застраховането.
+6. **Rule on the 29 first-aid rows.** Until then they are the largest single block of `approved`
+   content in the bank with nothing behind it.
+
+Nothing was committed. `docs/development/65_DRAFT_REVIEW_QUEUE.md` is regenerated but will drift the
+moment another wave lands — run `node tools/theory/verify_drafts.mjs --report` once, last.
+
+---
+
+### 14.7 CLOSEOUT — five lanes verified against the sources, not against their reports
+
+**What this section is.** Five lanes closed the tail of this programme. Their claims were re-checked
+the same way §14 re-checked the wave before them: the row was read at its current state and the
+citation resolved against `content/law/acts/zdvp.json` (ДВ бр. 55 / 16.06.2026) before any claim was
+believed. Two of the lanes' own claims did not survive.
+
+#### The gate
+
+| Command | Result |
+|---|---|
+| `npx tsc --noEmit` | **exit 0 — 0 errors, whole tree.** The 10 errors §14.4 recorded in the payments/auth lane are gone. |
+| `npm run validate:content` | **exit 0 — PASS.** 1,089 questions · **0 draft / 290 needs-review / 799 approved** · 16/16 topics · answer-leak sweep 17 scopes, **0 blocking, 0 warning** · human-signed **0 of 1,089** · unsigned-`approved` **799**, against the frozen ceiling of 837 — the ratchet only fell. |
+| `npx vitest run --maxWorkers=4` | **exit 1 — 2 files / 2 tests failed of 691 files / 10,629 tests** (10,462 passed, 165 skipped). |
+
+**Every failure attributed.** Both remaining failures are **ours**, both have the **same single root
+cause**, and neither is a defect:
+
+1. `src/modules/exam/__tests__/content-bank.test.ts` — `REVIEW_DEBT: ptp-i-parva-pomosht only 31/64
+   (48%) approved`.
+2. `src/modules/lesson/__tests__/compose.test.ts` — `l-accidents-first-aid` composes with **no quiz
+   beat**, because `src/modules/lesson/quiz.ts:43` is `return question.status === "approved";`.
+
+Both are the consequence of quarantining the 29 first-aid rows pending §14.8-D. They clear when he
+signs, and **not before** — there is no code fix, and inventing one would mean serving unreviewed
+first-aid content to a 17-year-old. **0 failures belong to the concurrent payments/auth/entitlements
+lane** (`prisma/**`, `payments/**`, `auth/**`, `api/stripe/**`, `api/checkout/**`, `lib/db.ts`,
+`security/**`, `(dashboard)/admin/**`, `(dashboard)/lesson/actions.ts`, `globals.css`,
+`tools/deploy/**`) — that lane is **still in flight** (`lib/features.test.ts`, `simulator/access.ts`,
+`tutor/actions.ts`, `exam/index.ts`, `api/health/route.ts` were all written during this run), so its
+files should be re-gated when it lands.
+
+**The four §14.3.A why-panel failures are green.** `src/modules/clips` — 19 files / 298 tests pass.
+
+**Two failures that were closed during this closeout:**
+
+- `src/modules/content-admin/reviewQueueDoc.test.ts` ×2 — doc 65 was stale (288/801 vs 290/799).
+  The bank had been stable for 40 minutes, so §14.6's "run it once, last" step was executed:
+  `node tools/theory/verify_drafts.mjs --report`. Green.
+- `src/modules/hazard/__tests__/items.test.ts` — **misattributed by the sim lane as "not mine".
+  It was ours.** `content/hazard/items.json` is unmodified at `HEAD`; what moved was
+  `platform/src/modules/sim/rules/catalog.ts`, where the lane sharpened four citations
+  (`чл. 20` → `чл. 20, ал. 2`; `чл. 42` → `чл. 42, ал. 2, т. 1`; `чл. 25` → `чл. 25, ал. 1`).
+  `bank.ts:147` compares each item's `lawRefEcho` against the catalogue as an ADR-002
+  retrieval-integrity check, and the mirror was left behind. Four echoes resynced to the sharpened
+  values after confirming each still describes its item. Green — 10 files / 143 tests.
+
+#### The six Tier A rows, re-read independently
+
+All six are `needs-review`; **none reaches a student**, and on re-reading **none would still mislead
+one**. Every load-bearing quote below was matched verbatim in `zdvp.json` by this closeout:
+
+| Row | Verdict | The sentence that settles it |
+|---|---|---|
+| `q-predimstvo-052` | **Settled.** | чл. 116 retrieved in full: „…особено към децата, към хората с трайни увреждания, в частност към слепите…" — **„престарел" is absent**. § 6, т. 75 ДР does carry „…и по-специално деца, **възрастни хора** и хора с увреждания", so чл. 5, ал. 2, т. 1 is the right ground. |
+| `q-krastovishta-047` | **Settled.** | An exhaustive sweep of ЗДвП for reversing prohibitions returns exactly **чл. 38, ал. 4** (only while turning around), **чл. 51, ал. 5, т. 4**, **чл. 58, т. 2**, **чл. 58а, т. 2**, **чл. 64**. A junction is not among them, so the graded option correctly argues from чл. 40, ал. 1's condition. чл. 183, ал. 1, т. 4 confirmed **repealed** (ДВ бр. 88/2008); the live item is ал. 2, т. 4. |
+| `q-signali-i-markirovka-058` | **Settled — and the key flip stands on ЗДвП alone.** | § 6, т. 4 ДР, verbatim: „…Линията, с която се очертава "BUS"-лентата, също е граница на платното за движение." With чл. 15, ал. 6 and чл. 35, ал. 1 (both verified), b → a is decided **without needing the ППЗДвП refs we cannot open**. That matters: it means the flip does not rest on an unretrievable act. |
+| `q-signs-041` | **Settled on the facts; citations unverifiable.** | The stem now decides from text alone and `media` really is `null`. But all four of its Наредба № РД-02-21-1 refs point at an act that is **`index-only`** in `content/law/sources.json` — see §14.8-H. |
+| `q-manevri-031` | **Settled.** | чл. 41, ал. 2 verbatim defines overtaking **by its elements** („…напуска пътната лента… навлиза в съседната… и се връща в напуснатата лента"), which is exactly what the row needed. *Residual nit:* the graded option still uses „успоредни колони", a phrase that occurs **0 times** in ЗДвП — a teaching descriptor, not a legal term. Substance correct. |
+| `q-dokumenti-i-sanktsii-050` | **Settled.** | чл. 186, ал. 8 and чл. 189, ал. 11 both verbatim; чл. 189, ал. 5, т. 8 („броя на отнеманите контролни точки") verbatim and **in force from 7.05.2026**, i.e. current law. The наредба's condition is met, not defied. |
+
+#### The first-aid grounding: retrieved, not recalled
+
+The provenance in `content/audits/ptp-i-parva-pomosht.audit.json` `wave4.sourcesRetrieved` records
+authors, journal, volume and page range, DOI `10.1016/j.resuscitation.2021.02.009`, `retrievedAt`,
+extraction method with a line count, and **22 verbatim value-confirmations**. The decisive evidence
+is **negative**: the lane records what is *not* in the retrieved text — that the head-tilt/chin-lift
+and the ~10-second check live only in a **raster figure**, and that "the only '10 seconds' in the
+retrieved First Aid text is about rinsing an avulsed tooth". A model writing from memory does not
+know what a PDF fails to contain. Combined with catching БЧК's stale **4–5 cm** figure, this reads as
+retrieval. **Honest limit:** unlike ЗДвП, the ERC entries carry **no URL, no byte count and no
+`sha256`**, they are not in `content/law/sources.json`, and an independent re-fetch from this machine
+failed (403 from the journal and from Resuscitation Council UK). So the grounding is **documented but
+not machine-re-verifiable** — which is exactly what §14.8-E is about.
+
+#### The drill guard was tightened, not weakened
+
+Declaration-by-declaration diff of `whyPanelPairing.ts` against `HEAD`, comments stripped:
+`ARTICLE_RE`, `actKey`, `articleNumbers`, `articleKeysFor`, `questionArticleKeys`,
+`scenarioArticleKeys`, `pairKey` and `pairingVerdict` are **byte-identical**. Only the excuse table
+moved: **30 → 27** allowance keys (**3 removed, 0 added**), and `ev-overtake→sc-ov-ban-overtake` went
+from a **blanket** excuse to one **scoped to 8 named questions**. Served **532 → 528**, refused
+**53 → 57**. No student can now be shown a clip about a different rule than the one the question asks.
+
+#### чл. 50а — the simulator is clean; the lesson layer is not
+
+`grep` over `platform/src/modules/sim/**` finds чл. 50а only in comments recording the correction and
+in `scenarios/events.test.ts`, which now asserts `not.toContain("50а")`. The **questions** are clean
+too: of 14 rows mentioning it, the 11 roundabout rows carry it only inside stripped staff notes, and
+the 3 that still cite it (`q-krastovishta-019`, `q-predimstvo-039`, `q-signali-i-markirovka-043`) use
+it **correctly**, for the blocked-junction rule.
+
+**But the falsehood survives outside both, and nobody has looked there:**
+
+- `content/lessons/l-junctions-roundabout.json` — **20** citations of чл. 50а, and a narration line
+  that asserts the priority rule outright: „Правилото е кратко и от 2017 година е категорично:
+  предимство има движещият се в кръга…".
+- `content/concepts.json` — `c-roundabout-rules` and `c-roundabout-behavior` both carry
+  `lawRef: чл. 50а`.
+
+**It is latent, not live.** All **54** lesson files are `status: "draft"`;
+`src/modules/lesson/narration.ts:87` is `if (entry.status !== "approved") return null;`; and no
+production code registers a narration provider at all (only tests call
+`setLessonNarrationProvider`). So no student hears it **today** — and it goes live the moment anyone
+approves a lesson. See §14.8-G.
+
+#### The physics block is now finished
+
+§14.5 left "52 rows assert a distance figure, still unverified", and one lane left 14 named rows in
+`magistrali-i-izvangradsko.json` unrecomputed. **All 14 were recomputed here, plus 11 more `approved`
+speed/distance rows neither lane covered** (`q-eco-054`, `q-magistrali-019/-027/-041`, `q-nosht-043`,
+`q-osnovni-022/-033`, `q-signs-011/-034`, `q-ptp-010`, `q-spirane-025`). **0 arithmetic defects.**
+130 km/h → 36.11 m/s and 2 s → 72.2 m („над 70") ✓ · 90 km/h → 25.0 m/s and 2 s → 50 m ✓ · 140 km/h →
+38.9 m/s („близо 39") ✓ · a 3-second microsleep at 90 → 75 m ✓. The legal figures resolve too:
+чл. 97, ал. 4 verbatim gives **30 m**, and **100 m** „на автомагистрали и пътища с разрешена скорост
+на движение над 90 km/h"; the чл. 21, ал. 1 table gives category B **140** on a motorway and category
+ВЕ **100**.
+
+#### Bank-wide invariants, re-measured
+
+`approved` rows carrying a `?` citation: **0**. `approved` rows still carrying a `[REVIEW:]` staff
+note: **0**. Bracketed staff notes: **148**, of which **0** contain a nested `]` that would truncate
+the sanitizer, and **0** leak staff prose into student copy (one candidate, `q-signs-051`, is a false
+positive — „ТУК И СЕГА" is student prose, not the „БЕШЕ/СЕГА" diff vocabulary).
+
+---
+
+### 14.8 THE HONEST NUMBER, AND WHAT ONLY HE CAN DECIDE
+
+**Of 1,089 questions, the number that would still mislead a student today is 0 — and that sentence
+is only worth reading with the next one attached.** A row reaches a student through exactly one
+predicate: `modules/exam/builder.ts isExamEligible()` is `status === "approved"`, and practice
+(`learning/session.ts`) admits draft + approved with draft at 0. **All 41 rows §14.5 named are now
+`needs-review`** — measured, not assumed: Tier A 6/6, Tier B 6/6, Tier C 29/29. So nothing carrying a
+defect anyone has named is being dealt to anybody.
+
+**What that number does not mean.** The 799 rows still dealt to students are **unsigned by a human —
+0 of 1,089 are signed.** "No named defect" is not "checked". The 41 were found by looking; the 799
+have not been looked at with the same eyes.
+
+**The 14 rows only he can settle.** Not a percentage — the rows, by name, with the evidence:
+
+| # | Row(s) | What he must decide | Evidence already attached |
+|---|---|---|---|
+| **A** | `q-signs-054` | Build the **Т13 drill**, or accept a question with no visual. | ППЗДвП чл. 46, ал. 5 (bending priority road ⇒ табела Т13) + ЗДвП чл. 50, ал. 2 („се ръководят помежду си от правилата на чл. 48"). Re-pointing it at `sc-jx-priority-confidence` was **refused** — that drill teaches „не спирай без причина" on a road that runs straight, the exact instinct that crashes at a Т13 junction. Brief written in `MISSING_DRILLS`. |
+| **B** | `q-speed-005`, `q-speed-067` | Whether the **third "restriction ends" mechanism** (a replacement sign with a different value) may be taught. | Наредба чл. 68 lists only two mechanisms; no line can be quoted for the third. It is a **graded option in a multi-select**. §8.3 item 7. |
+| **C** | `q-speed-049` | Whether a dedicated **„Зона 30"** sign exists. | Our наредба copy predates ЗДвП чл. 62а. Unretrievable, not merely unretrieved. |
+| **D** | `q-dokumenti-i-sanktsii-055` | Statute vs наредба on the дрегер. | The наредба lets the reading stand on non-appearance; the statute attaches two years + 2000 лв. Your standing rule forbids us resolving this. §8.3 item 2. |
+| **E** | `q-manevri-061` | A **repealed cross-reference**. | Наредба Iз-2539 чл. 6, ал. 1, т. 16 points at ЗДвП чл. 183 **ал. 3** т. 6, repealed 7.09.2025 and moved to ал. 2 т. 6. All three of the row's ЗДвП citations are correct; this is an unresolved cross-reference, not a defect. |
+| **F** | `q-ptp-020`, `q-ptp-022`, `q-ptp-037` | **Recovery position after a crash.** Keep the caveat as written, or split the trauma case into its own question. | ERC 2021 First aid restricts it to „decreased level of responsiveness **due to medical illness or non-physical trauma**", and adds verbatim: „In certain situations, such as resuscitation-related agonal respirations or **trauma**, it may not be appropriate to move the individual into a recovery position." A road crash is physical trauma. **Keys were not flipped** — side-lying is still the right pick of the four offered and Bulgarian training teaches it; flipping would risk the real exam. |
+| **G** | `q-ptp-062` | **Elevating a bleeding limb.** Keep the key with the honest explanation, or drop elevation from the correct set. | ERC 2021 First aid, verbatim: „no comparative evidence was identified for the use of pressure points, ice (cryotherapy) or elevation for control of life-threatening bleeding." "No evidence found" is not "harmful", so the key was **not** flipped. Structurally safe either way — the question keeps two correct options without it. |
+| **H** | `q-signali-i-markirovka-058` | **Bless the key flip (b → a), and its honest limit.** | The flip is sound on ЗДвП alone (§14.7). The limit: **nothing in any act we hold lets a non-eligible vehicle enter a BUS lane in order to turn right.** If Sofia practice relies on a **broken** line before the junction, that is ППЗДвП чл. 63, ал. 2, т. 3 and deserves its **own** question, not a different key on this one. |
+| **I** | `q-krastovishta-047` | **Bless the shape of the answer**, not just the answer. | The graded option now says „no — because чл. 40's condition cannot be met here", not „no — because it is forbidden". Honest and a better driving lesson, but a real listovka's phrasing may be blunter. The blunt version can come back only with the admission that we teach a convention rather than a citation. |
+| **J** | `q-signs-041` | **Commission the Т6 / Т7 plate faces, or keep the long legal names.** | `content/signs/svg` holds 77 files and group „Т" has only Т1, Т2, Т10, Т13, Т15. The M4 invariant in `questionMedia.test.ts` forbids naming a sign code the product cannot draw — **it correctly rejected the first draft of this fix.** The ordinance PDF we hold has no pictures, so someone must source the visual difference from an official image before anyone draws it. |
+| **K** | `q-dokumenti-i-sanktsii-050` | **Recency.** Confirm the lesson copy says the same thing. | ЗДвП чл. 189, ал. 5, т. 8 is in force from **7.05.2026** — current law, three months old. Every older textbook says „по камера падат само пари, точки няма". A question contradicting a lesson costs more trust than either alone. |
+
+**Four decisions that are not rows:**
+
+- **L — The roundabout falsehood in the lesson layer (§14.7).** The simulator and the bank now agree;
+  `l-junctions-roundabout.json` and `concepts.json` do not. Latent because every lesson is `draft`.
+  **Do not approve a lesson before this is re-cited.** Note also that the corrected sentence is a
+  **two-step derivation, not a statute**: Bulgarian law has no roundabout-priority rule at all —
+  Б3 cannot stand at a roundabout entry (Наредба № РД-02-21-1 чл. 61, ал. 5) ⇒ Б1/Б2 stands there ⇒
+  ЗДвП чл. 50, ал. 1 applies. Decide whether the product presents that as the derivation it is.
+- **M — Which medical source the product commits to.** ERC is current and its numbers check out; БЧК
+  is the Bulgarian authority a local instructor will quote, but its public page still teaches the
+  **pre-2010 4–5 cm** depth and states no rate — grounding on it would have made our correct 5–6 cm
+  row wrong. Options: (a) ingest ERC into `content/law/acts` as a non-statute source so the review
+  console can resolve it and the validator can re-verify the quotes; (b) obtain the current БЧК
+  course manual and cross-check; (c) leave the citation in prose and accept it is unverifiable by
+  machine. **Only (a) makes the 29 rows checkable rather than merely written.**
+- **N — The schema decision that unblocks M.** `LawRefSchema` is `z.strictObject({act, ref})` and
+  `lawRefs` is `.min(1)`, so **every first-aid question is compelled to cite a statute even when no
+  statute governs it** — that compulsion is what produced the decorative чл. 123 in the first place.
+  It needs a `sourceRef` or the §12 item 8 `notLaw` marker, in lockstep across `types.ts`,
+  `schemas.ts`, `validate-content.mjs` and the review console's citation lookup.
+- **O — Ingest ППЗДвП and Наредба № РД-02-21-1.** Recounted on this tree, not carried over from
+  §14.5: **209** refs to Наредба № РД-02-21-1, **106** to ППЗДвП and **14** to Наредба № 2/2001 point
+  at acts marked `index-only` in `content/law/sources.json`. The review console shows an honest MISS
+  instead of the text, so those rows **cannot be cleared in ten seconds**. This is worth more review
+  throughput than any remaining single-row fix.
+  *Found while recounting:* Наредба № РД-02-21-1 is cited under **two different `act` strings** —
+  206 rows say `"Наредба № РД-02-21-1/23.11.2023"` and **3 say `"Наредба № РД-02-21-1/2023"`** —
+  `q-signali-i-markirovka-033` (approved), `q-signali-i-markirovka-057` (needs-review) and
+  `q-uyazvimi-053` (approved). Any resolver keyed on the act string will miss those three. Worth
+  normalising before ingest, or the ingest will look like it half-worked.
+
+#### The 837, restated with the number that actually matters
+
+The frozen ceiling is 837. The live figure is **799** unsigned-`approved` — it **fell by 38** across
+this programme and the ratchet only trips upward. **0 of 1,089 rows are human-signed.** Three options,
+with their real costs:
+
+1. **Leave the 799 live and unsigned.** Cost: zero work. What it means concretely: `isExamEligible()`
+   stays `q.status === "approved"`, so **100% of every 45-question mock exam is drawn from rows no
+   human ever approved**, and the word "approved" keeps meaning "a generator ran". Defensible
+   pre-launch; indefensible the day a student complains.
+2. **Gate the unsigned out of exams today.** **Do not do this.** The eligible pool becomes **zero**,
+   no mock exam can be built at all, and practice dies with it. This option only exists after (3).
+3. **Sign the minimum that makes an exam real, then flip the predicate.** The number is **135, not
+   799** — 45 slots × 3 candidates per slot (`modules/exam/quotas.ts` + `supply.ts`
+   `MIN_SUPPLY_PER_SLOT`), spread per the topic quota table. `npm run validate:content` now prints
+   the distance on every run: today **„signed supply for a mock exam: 0 of 135"**, with the per-topic
+   shortfall named (worst: `patni-znatsi` +12, `manevri-i-izprevarvane` +12, `osnovni-ponyatia` +9,
+   `prevozno-sredstvo` +9). Once it reads 135 of 135, `isExamEligible()` can become
+   `isHumanApproved()`. **This is the only option that ends with the word meaning something.**
+
+**Do not bulk-approve, and no path to it was built.** `io.ts` has no bulk route by design — a button
+that signs thirty rows nobody read is the exact mechanism that produced the 837.
+
+**Where to start:** the review queue is now risk-ranked, and the **seven moved answer keys** are the
+first seven cards, each opening with the change stated in letters —
+`q-signali-i-markirovka-058` (b → a) · `q-uyazvimi-003` (a,b,d → a,d) · `q-uyazvimi-014` (a,b,d →
+a,b) · `q-uyazvimi-036` (a,b → a,b,d) · `q-spirane-i-parkirane-008` (a,c,d → a,c) ·
+`q-dokumenti-i-sanktsii-030` (a → b) · `q-dokumenti-i-sanktsii-040` (a,b,c → a,b). The rest of the
+290-row queue is 35 changed-answer-text, 6 changed-stem, 165 explanation-only and 77 untouched.
+
+**Nothing was committed.** `content/hazard/items.json` (4 echo strings) and
+`docs/development/65_DRAFT_REVIEW_QUEUE.md` (regenerated) are the only files this closeout changed.
