@@ -1,8 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { startTransition, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { saveOnboardingAction } from "@/app/onboarding/actions";
 import {
   IconArrowRight,
   IconBook,
@@ -81,34 +82,74 @@ function ProgressDots({ step }: { step: number }) {
 }
 
 /**
- * Post-registration onboarding: 3 quick questions, shown once (localStorage
- * flag), always skippable. Choices land in versioned localStorage keys — see
- * ./storage.ts for the v1-vs-server-side story.
+ * Post-registration onboarding: 3 quick questions, shown once, always
+ * skippable.
+ *
+ * EACH ANSWER GOES TO THE ROW, not just to this browser. The localStorage
+ * write stays as the offline mirror (it is what lets the dashboard chips paint
+ * synchronously, with no query), but User.examDate / dailyGoalMin /
+ * onboardedAt are now the truth — see @/lib/onboarding/storage.ts for why that
+ * distinction cost the product its best retention signal.
+ *
+ * The action is fire-and-forget inside startTransition: this is a preferences
+ * screen, and nobody should watch a spinner between „20 минути" and the next
+ * question. Next dispatches actions sequentially per client, so the three
+ * steps queue in order rather than racing (server-actions.md).
  */
-export function OnboardingFlow() {
+export function OnboardingFlow({
+  initial,
+}: {
+  /** Server-known answers — present when this device is signed in. */
+  initial?: { examDate: string | null; dailyGoalMin: DailyGoalMinutes | null };
+} = {}) {
   const router = useRouter();
   const [step, setStep] = useState(0);
-  const [examDate, setExamDate] = useState("");
-  const [goal, setGoal] = useState<DailyGoalMinutes | null>(null);
+  const [examDate, setExamDate] = useState(
+    initial?.examDate && initial.examDate !== NO_EXAM_DATE ? initial.examDate : "",
+  );
+  const [goal, setGoal] = useState<DailyGoalMinutes | null>(
+    initial?.dailyGoalMin ?? null,
+  );
 
-  // Shown once: returning visitors go straight to the dashboard.
+  // Shown once. The server already redirected a student whose row says they
+  // finished (page.tsx); this covers the anonymous visitor, whose only record
+  // is the mirror.
   useEffect(() => {
     if (isOnboardingDone()) router.replace("/dashboard");
   }, [router]);
 
+  function persist(answers: {
+    examDate?: string;
+    dailyGoalMin?: DailyGoalMinutes;
+    completed?: boolean;
+  }) {
+    // Never awaited and never rejected into the UI: a failed preferences write
+    // must not stand between a student and their first lesson. The mirror
+    // still holds the answer and the next visit re-syncs.
+    startTransition(() => {
+      void saveOnboardingAction(answers).catch(() => {});
+    });
+  }
+
   function finish() {
     markOnboardingDone();
+    // The stamp is what separates "answered „Още нямам дата"" from "never
+    // asked" on the row — and what makes activation one query. „Пропусни"
+    // lands here too: a student who skipped WAS asked.
+    persist({ completed: true });
     router.push("/dashboard");
   }
 
   function submitExamDate(value: string) {
     writeExamDate(value);
+    persist({ examDate: value });
     setStep(1);
   }
 
   function submitGoal(minutes: DailyGoalMinutes) {
     setGoal(minutes);
     writeDailyGoalMin(minutes);
+    persist({ dailyGoalMin: minutes });
     setStep(2);
   }
 

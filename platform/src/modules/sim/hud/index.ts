@@ -48,6 +48,26 @@ export {
   type SimOverlayKind,
   type SimOverlayTone,
 } from "./overlayQueue";
+// Founder 2026-08-03, third asking: „MOVE EVERY TEXT PANEL OFF THE MIDDLE OF
+// THE ROAD, TO THE RIGHT EDGE." One column, one set of numbers, shared by the
+// shell (roomy), SimOverlay (compact) and the CSS that pulls the scene-owned
+// panels over (PlayAreaStyles).
+export {
+  notifyColumnLeftFraction,
+  notifyColumnWidthPx,
+  rectIsInNotifyColumn,
+  NOTIFY_COLUMN_DECK_MAX_LIFT_COMPACT,
+  NOTIFY_COLUMN_DECK_RESERVE_PX,
+  NOTIFY_COLUMN_GUTTER_PX,
+  NOTIFY_COLUMN_MAX_WIDTH_COMPACT_PX,
+  NOTIFY_COLUMN_MAX_WIDTH_ROOMY_PX,
+  NOTIFY_COLUMN_MIN_LEFT_FRACTION,
+  NOTIFY_COLUMN_RIGHT_CSS,
+  NOTIFY_COLUMN_TOP_CSS_COMPACT,
+  NOTIFY_COLUMN_TOP_CSS_ROOMY,
+  NOTIFY_COLUMN_WIDTH_CSS_COMPACT,
+  NOTIFY_COLUMN_WIDTH_CSS_ROOMY,
+} from "./notifyColumn";
 export { ObjectiveBanner, type ObjectiveFlash } from "./ObjectiveBanner";
 export { HudToasts, useHudToastQueue, type HudToast } from "./HudToasts";
 // Doc 86 L14/L15 — the DESKTOP half of the notification rework: a dismissible,

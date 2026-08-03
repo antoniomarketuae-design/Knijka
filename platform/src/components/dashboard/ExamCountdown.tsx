@@ -1,24 +1,35 @@
 "use client";
 
-import { useSyncExternalStore } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 import {
   NO_EXAM_DATE,
+  fillMirrorFromServer,
+  isMirrorCold,
   readDailyGoalMin,
   readExamDate,
 } from "@/lib/onboarding/storage";
+import { readOnboardingAction } from "@/app/onboarding/actions";
 
 /**
  * Makes the onboarding promise true: „ще ти показваме колко дни остават".
- * Reads the v1 localStorage answers (exam date + daily goal) and renders small
- * HUD chips in the dashboard header. Client-only by nature (localStorage) —
- * useSyncExternalStore serves `null` during SSR/hydration and the real value
- * after, with no mismatch. Users who skipped onboarding simply see no chips.
- * Server-side columns are the documented post-launch path (storage.ts /
- * doc 54 §10).
+ *
+ * Reads the local mirror (exam date + daily goal) and renders small HUD chips
+ * in the dashboard header. useSyncExternalStore serves `null` during
+ * SSR/hydration and the real value after, with no mismatch.
+ *
+ * AND FILLS THE MIRROR WHEN IT IS COLD. The answers are the student's, not the
+ * browser's (User.examDate / dailyGoalMin), so a laptop that never ran the
+ * flow asks the server once and then paints the phone's countdown. That read
+ * is deliberately here and not in the page's data layer: the dashboard render
+ * is held to three queries (lib/dashboard/queryBudget.test.ts) and this would
+ * be a fourth on every paint, to fill something that only needs filling once
+ * per device. A student who genuinely answered nothing sees no chips, exactly
+ * as before.
  */
 
-// The values change only via onboarding (another page), so no subscription —
-// a mount-time read is enough. Stable no-op keeps the store contract.
+// The values change only via onboarding (another page) and the mirror fill
+// below, which re-renders through its own state. Stable no-op subscribe keeps
+// the store contract.
 const subscribeNever = () => () => {};
 
 function useExamDate(): string | null {
@@ -27,6 +38,46 @@ function useExamDate(): string | null {
 
 function useDailyGoalMin(): number | null {
   return useSyncExternalStore(subscribeNever, readDailyGoalMin, () => null);
+}
+
+/**
+ * ONE server read per browser session, and only when this device knows
+ * nothing. A student who has genuinely never onboarded has a mirror that stays
+ * cold forever, so without this flag they would pay a query on every dashboard
+ * mount to be told "nothing" again. The flag lives outside the component
+ * because that is the scope it has to survive: this component remounts on
+ * every navigation back to the dashboard.
+ */
+let askedThisSession = false;
+
+/**
+ * The state bump is what makes the chips appear: React re-reads every
+ * useSyncExternalStore snapshot on re-render, so filling the mirror and then
+ * setting state is enough — no subscription needed for a value that changes
+ * once.
+ */
+function useMirrorFill(): void {
+  const [, setFilled] = useState(0);
+
+  useEffect(() => {
+    if (askedThisSession || !isMirrorCold()) return;
+    askedThisSession = true;
+    let alive = true;
+    readOnboardingAction()
+      .then((snapshot) => {
+        if (!alive) return;
+        fillMirrorFromServer(snapshot);
+        setFilled((n) => n + 1);
+      })
+      // Silent: a missing countdown chip is not worth an error to a student.
+      .catch(() => {
+        // Nothing was written, so let a later navigation try again.
+        askedThisSession = false;
+      });
+    return () => {
+      alive = false;
+    };
+  }, []);
 }
 
 /** Whole days from today (local midnight) to the exam date; null = no date. */
@@ -41,6 +92,7 @@ function daysUntil(raw: string | null): number | null {
 }
 
 export function ExamCountdown() {
+  useMirrorFill();
   const daysLeft = daysUntil(useExamDate());
   const goalMin = useDailyGoalMin();
 

@@ -220,6 +220,14 @@ export function ExamRunner({
           setSubmitError(
             "Изпращането не успя поради невалидни данни. Опитай отново.",
           );
+        } else if (res.code === "RATE_LIMITED") {
+          // The paper stays on screen and the retry stays armed: nothing was
+          // submitted, so nothing was lost — this is a "wait a moment", never
+          // a lost exam.
+          submitOnceRef.current = false;
+          setSubmitError(
+            "Твърде много опити подред. Изчакай малко и предай отново.",
+          );
         } else {
           router.replace("/exams?msg=not-found");
         }

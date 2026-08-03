@@ -6,7 +6,9 @@ export type PaymentsErrorCode =
   | "CHECKOUT_NO_CLIENT_SECRET"
   | "UNKNOWN_PACK"
   /** No parental approval / withdrawal waiver on file for this purchase (H-9). */
-  | "CONSENT_REQUIRED";
+  | "CONSENT_REQUIRED"
+  /** STRIPE_MODE disagrees with the key prefix — see mode.ts for the cost. */
+  | "STRIPE_MODE_MISMATCH";
 
 export class PaymentsError extends Error {
   constructor(
@@ -37,7 +39,29 @@ export interface EntitlementSummary {
 export type FulfillResult =
   | { status: "created"; entitlementId: string }
   | { status: "already-fulfilled"; entitlementId: string }
+  /**
+   * Delivered once; the grant has since been taken away on purpose (support
+   * revoke) or erased with its owner (Art. 17). SUCCESS, not failure — the
+   * webhook must answer 200 so Stripe stops retrying — but NOT access: nothing
+   * may render this as an active entitlement, and nothing may re-grant it.
+   * There is no `entitlementId` because there is no entitlement.
+   */
+  | { status: "receipt-without-grant"; sessionId: string }
   | { status: "skipped"; reason: "not-paid" | "missing-metadata" };
+
+/**
+ * Result of undoing a purchase (refund / dispute).
+ *
+ * `unknown-payment` and `nothing-to-revoke` are deliberately different answers.
+ * The first means no receipt exists, so nothing was ever granted for this
+ * PaymentIntent. The second means the receipt exists but no entitlement is
+ * attached to its session — a promo-only or already-cleaned account. Only the
+ * caller can decide what each deserves, so this type refuses to blur them.
+ */
+export type RevokeResult =
+  | { status: "revoked"; sessionId: string; revoked: number }
+  | { status: "nothing-to-revoke"; sessionId: string }
+  | { status: "unknown-payment" };
 
 /** Lifetime free-tier AI-tutor trial (see quota.ts for the rules). */
 export interface TutorQuota {

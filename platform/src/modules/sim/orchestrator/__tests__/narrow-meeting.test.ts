@@ -13,6 +13,10 @@
 
 import { describe, expect, it } from "vitest";
 import type { NarrowMeetingSpec } from "../../contracts";
+import type { SimTickEvent } from "../../rules";
+import type { StagedActorSpec, StagedActorView, StagedCommand } from "../../traffic/types";
+import { NarrowMeetingRunner } from "../runners";
+import type { DirectorInput, StagedTrafficPort } from "../types";
 import {
   commendationCodes,
   DT,
@@ -129,6 +133,65 @@ function narrowSpec(side: "player" | "oncoming"): NarrowMeetingSpec {
 
 const START_EDGE_S = 95; // 55 m before the section entrance
 
+// ---------------------------------------------------------------------------
+// B80 fixture — the runner alone on a straight synthetic section, so the three
+// under-detection guards can be driven frame by frame instead of hoped for.
+// The geometry mirrors the SHIPPED sc-ovn-meeting (templates-lanes.ts): section
+// y ∈ [110, 145] on x = 0, own lane x = +4.06, oncoming lane x = −4.06, the
+// actor southbound on a 240 m path so its world y is 240 − s and its section
+// entrance is arc 95 (= y 145).
+// ---------------------------------------------------------------------------
+
+const SYNTH_SPEC: NarrowMeetingSpec = {
+  id: "b80-synth",
+  kind: "narrowMeeting",
+  sectionStart: { x: 0, y: 110 },
+  sectionEnd: { x: 0, y: 145 },
+  obstructionSide: "player",
+  actor: {
+    pathNodes: ["s-end", "s-start"],
+    hold: { nodeIndex: 0, offsetM: 40 },
+    cruiseSpeedMps: 6,
+  },
+  actorEntry: { nodeIndex: 0, offsetM: 95 },
+  armDistM: 70,
+  transitSpeedMps: 6,
+};
+
+/** Minimal StagedTrafficPort with one hand-driven actor view. */
+class SynthPort implements StagedTrafficPort {
+  readonly view: StagedActorView = {
+    id: SYNTH_SPEC.id,
+    kind: "vehicle",
+    x: -4.06,
+    y: 200,
+    dirX: 0,
+    dirY: -1,
+    speedMps: 0,
+    s: 40,
+    pathLengthM: 240,
+    nodeS: [0, 240],
+    finished: false,
+  } as StagedActorView;
+
+  stage(_spec: StagedActorSpec): StagedActorView | null {
+    return this.view;
+  }
+  stagedCommand(_id: string, _command: StagedCommand): void {}
+  staged(_id: string): StagedActorView | null {
+    return this.view;
+  }
+  /** Place the oncoming: world pose + path arc + speed. */
+  set(p: { x: number; y: number; s: number; speedMps: number }): void {
+    Object.assign(this.view, p);
+  }
+}
+
+/** Northbound player frame. */
+function synthFrame(t: number, x: number, y: number, speedKmh: number): DirectorInput {
+  return { tSec: t, dtSec: DT, x, y, speedKmh, headingDeg: 0, brakePedal: 0, tickEvents: [] };
+}
+
 describe("narrowMeeting (integration)", () => {
   it("barging into the oncoming's priority grades FAILED_TO_YIELD (narrow-meeting)", () => {
     const stack = makeStack([narrowSpec("player")]);
@@ -186,6 +249,86 @@ describe("narrowMeeting (integration)", () => {
     // The yielding actor held at its entrance while the player passed.
     const view = stack.traffic.staged("t-narrow")!;
     expect(view.s).toBeGreaterThan(60); // it did transit toward the section
+  });
+
+  it("B80: a barge that ends in CONTACT names the RULE too, not only the crash", () => {
+    // Register doc 87 row B80. The end-of-lesson ledger the founder posted read
+    // «Опасни грешки 2», both entries «Пътнотранспортно произшествие», and no
+    // priority entry anywhere: `resolve()` retires the runner, so a barge whose
+    // contact beat the NM_SUSTAIN_SEC window emitted a collision and nothing
+    // else. He was told he crashed; he was never told he took priority that was
+    // not his — which is the only sentence that teaches the rule (THEO-4).
+    const r = new NarrowMeetingRunner(SYNTH_SPEC);
+    const port = new SynthPort();
+    r.stage(port, () => 0.5, true);
+
+    // 1) At the section mouth in the own lane → the runner triggers.
+    port.set({ x: -4.06, y: 150, s: 90, speedMps: 6 });
+    r.step(port, synthFrame(1, 4.06, 104, 20), []);
+    expect(r.phase).toBe("triggered");
+    // 2) A live conflict frame, so the encounter is genuinely visible.
+    port.set({ x: -4.06, y: 140, s: 100, speedMps: 6 });
+    r.step(port, synthFrame(1.2, 4.06, 112, 20), []);
+    // 3) …then the head-on, inside the стеснение, on the oncoming's side.
+    port.set({ x: -4.06, y: 122, s: 118, speedMps: 6 });
+    const out: SimTickEvent[] = [];
+    const outcome = r.step(port, synthFrame(1.4, -4.06, 120, 20), out);
+
+    expect(outcome?.detail).toBe("collision");
+    expect(out).toContainEqual({ kind: "collision", withWhat: "vehicle" });
+    expect(out).toContainEqual({
+      kind: "prioritySituation",
+      situation: "narrow-meeting",
+      violated: true,
+    });
+    // The rule comes FIRST — the law broken, then its consequence.
+    expect(out[0]).toMatchObject({ kind: "prioritySituation" });
+  });
+
+  it("B80: the meeting is not OVER while the oncoming is still ahead of the player", () => {
+    // `actorCleared` used to include `actorAlong < -4` — „it left the
+    // стеснение" — which retires the runner while the oncoming is still north
+    // of a player who has not reached the section yet. Everything after that
+    // frame is ungradable.
+    const r = new NarrowMeetingRunner(SYNTH_SPEC);
+    const port = new SynthPort();
+    r.stage(port, () => 0.5, true);
+    port.set({ x: -4.06, y: 150, s: 90, speedMps: 6 });
+    r.step(port, synthFrame(1, 4.06, 104, 20), []);
+    // Oncoming 6 m SOUTH of the section — comfortably past the old „cleared"
+    // line, so this pins the defect instead of sitting exactly on it (at y=106
+    // `actorAlong` is −4 and `< -4` is false, which is why the first version of
+    // this test passed against the unfixed runner). It is still 4 m NORTH of
+    // the player and closing: nothing is over.
+    port.set({ x: -4.06, y: 104, s: 136, speedMps: 6 });
+    const out: SimTickEvent[] = [];
+    expect(r.step(port, synthFrame(1.5, 4.06, 100, 8), out)).toBeNull();
+    expect(r.phase).toBe("triggered");
+    expect(out).toHaveLength(0);
+  });
+
+  it("B80: yield credit is earned AT the widening, not 30 m up the approach", () => {
+    // An obedient student crawling the approach latched `sawWait` far from the
+    // стеснение and was resolved „yielded" + commended — then drove the whole
+    // narrowing on the wrong side with the runner already retired.
+    const r = new NarrowMeetingRunner(SYNTH_SPEC);
+    const port = new SynthPort();
+    r.stage(port, () => 0.5, true);
+    port.set({ x: -4.06, y: 150, s: 90, speedMps: 6 });
+    r.step(port, synthFrame(1, 4.06, 104, 20), []);
+    // Crawling at 5 km/h in his own lane, 30 m short of the section…
+    for (let i = 0; i < 10; i++) {
+      port.set({ x: -4.06, y: 140 - i, s: 100 + i, speedMps: 6 });
+      r.step(port, synthFrame(2 + i * 0.1, 4.06, 80, 5), []);
+    }
+    // …and the oncoming finally passes him.
+    port.set({ x: -4.06, y: 70, s: 170, speedMps: 6 });
+    const out: SimTickEvent[] = [];
+    const outcome = r.step(port, synthFrame(4, 4.06, 80, 5), out);
+    expect(outcome).not.toBeNull();
+    expect(outcome!.detail).toBe("clear");
+    expect(outcome!.success).toBe(true);
+    expect(out).toHaveLength(0); // no YIELDED_TO_PRIORITY he never earned
   });
 
   it("same seed + same driving = identical outcomes (deterministic staging)", () => {

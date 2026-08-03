@@ -85,3 +85,22 @@ export const resetPasswordInputSchema = z.object({
 });
 
 export type ResetPasswordInput = z.infer<typeof resetPasswordInputSchema>;
+
+/**
+ * The AUTHENTICATED change (/settings). Same `passwordSchema` as registration
+ * and reset — a password's strength must not depend on which screen set it,
+ * the same argument BCRYPT_ROUNDS is exported for.
+ *
+ * `currentPassword` is shape-checked like a login password and never
+ * length-validated against the policy: an old password created under different
+ * rules must still be typeable, and a too-short one has to fail exactly like a
+ * wrong one rather than telling the caller which it was.
+ */
+export const changePasswordInputSchema = z.object({
+  currentPassword: z
+    .string({ error: "Въведи текущата си парола." })
+    .min(1, { error: "Въведи текущата си парола." }),
+  password: passwordSchema,
+});
+
+export type ChangePasswordInput = z.infer<typeof changePasswordInputSchema>;

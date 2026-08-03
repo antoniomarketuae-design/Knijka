@@ -9,32 +9,45 @@ import {
   useState,
   useTransition,
 } from "react";
-import { IconCheck, IconX } from "@/components/icons";
+import { IconCheck, IconLock, IconShield, IconX } from "@/components/icons";
 import { CheckControl } from "@/components/ui/CheckControl";
-import type { FlaggedQuestionDto, QuestionPatch } from "@/modules/content-admin/types";
+import type {
+  FlaggedListResult,
+  FlaggedQuestionDto,
+  LawRefEvidence,
+  QuestionPatch,
+  QuotedClaim,
+  ReviewRisk,
+  RiskTally,
+} from "@/modules/content-admin/types";
 
 /**
- * DEV-ONLY review console. Renders every needs-review question grouped by
- * topic and lets the founder Approve / Edit+approve / Reject to draft. Writes
- * go through POST /api/review; after each success we optimistically hide the
- * item and router.refresh() to re-read the on-disk truth.
+ * DEV-ONLY review console — the only place a question becomes human-approved.
+ *
+ * The screen is built around one number the founder has to make a launch
+ * decision on: how many questions a student may be dealt on a flag A HUMAN
+ * ACTUALLY SET. Every other element exists to move that number honestly and
+ * fast: the row, what changed since the last commit, and the verbatim text of
+ * every article it cites, retrieved from content/law — so the check is "does
+ * the statute in front of me say what we say it says", not "does this feel
+ * right".
  *
  * Keyboard (physical keys, layout-independent) for fast throughput:
  *   j / ↓  next     k / ↑  previous
- *   a  approve      e  edit      r  reject to draft
+ *   a  approve+sign      e  edit      r  send back
  */
-export function ReviewClient({ flagged }: { flagged: FlaggedQuestionDto[] }) {
+export function ReviewClient({ result }: { result: FlaggedListResult }) {
   const router = useRouter();
   const [, startTransition] = useTransition();
 
-  // Captured once: the count when this review session began (usually 188).
-  const [baseline] = useState(() => flagged.length);
+  const { flagged, census, queue, page, pageCount, total, risk } = result;
+
   const [resolved, setResolved] = useState<ReadonlySet<string>>(() => new Set());
   const [editingId, setEditingId] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
-  const [bulkBusy, setBulkBusy] = useState<string | null>(null);
   const [focusId, setFocusId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [signedThisSession, setSignedThisSession] = useState(0);
 
   const visible = useMemo(
     () => flagged.filter((q) => !resolved.has(q.id)),
@@ -82,6 +95,7 @@ export function ReviewClient({ flagged }: { flagged: FlaggedQuestionDto[] }) {
         }
         advanceFocusAfter(questionId);
         setResolved((prev) => new Set(prev).add(questionId));
+        setSignedThisSession((n) => n + 1);
         setEditingId((cur) => (cur === questionId ? null : cur));
         startTransition(() => router.refresh());
         return true;
@@ -114,44 +128,6 @@ export function ReviewClient({ flagged }: { flagged: FlaggedQuestionDto[] }) {
   }, []);
   const cancelEdit = useCallback(() => setEditingId(null), []);
 
-  const bulkApprove = useCallback(
-    async (slug: string, titleBg: string) => {
-      const count = visible.filter((q) => q.topicSlug === slug).length;
-      if (
-        !window.confirm(
-          `Да одобря ли всички останали ${count} въпроса в „${titleBg}“? Това ги пуска директно в пробните изпити.`,
-        )
-      ) {
-        return;
-      }
-      setBulkBusy(slug);
-      setError(null);
-      try {
-        const res = await fetch("/api/review/bulk", {
-          method: "POST",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify({ topicSlug: slug }),
-        });
-        const data = (await res.json()) as { ok?: boolean; error?: string };
-        if (!res.ok || !data.ok) {
-          setError(data.error ?? "Масовото одобрение не беше успешно.");
-          return;
-        }
-        setResolved((prev) => {
-          const next = new Set(prev);
-          for (const q of flagged) if (q.topicSlug === slug) next.add(q.id);
-          return next;
-        });
-        startTransition(() => router.refresh());
-      } catch {
-        setError("Връзката пропадна. Опитай отново.");
-      } finally {
-        setBulkBusy(null);
-      }
-    },
-    [flagged, visible, router, startTransition],
-  );
-
   // Scroll + focus the active card (skip while an edit form owns the keyboard).
   useEffect(() => {
     if (effectiveFocusId === null || editingId !== null) return;
@@ -169,7 +145,7 @@ export function ReviewClient({ flagged }: { flagged: FlaggedQuestionDto[] }) {
   // closes over current state (buttons/inputs keep native behaviour).
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (editingId !== null || bulkBusy !== null) return;
+      if (editingId !== null) return;
       if (e.metaKey || e.ctrlKey || e.altKey) return;
       const target = e.target as HTMLElement | null;
       if (
@@ -213,21 +189,25 @@ export function ReviewClient({ flagged }: { flagged: FlaggedQuestionDto[] }) {
     return () => window.removeEventListener("keydown", onKey);
   });
 
-  const remaining = visible.length;
-  const reviewed = Math.max(0, baseline - remaining);
-  const pct = baseline > 0 ? Math.round((reviewed / baseline) * 100) : 100;
-
+  /**
+   * Grouped by RISK BAND, not by topic. The server now hands the queue back
+   * ranked by what a wrong decision costs a student, and grouping by topic on
+   * top of that would re-scatter the six moved answer keys back through the
+   * syllabus — which is the exact problem the ranking exists to fix. The topic
+   * still travels with each card, and ties inside a band keep curriculum order.
+   */
   const groups = useMemo(() => {
-    const map = new Map<string, { slug: string; titleBg: string; items: FlaggedQuestionDto[] }>();
+    const map = new Map<ReviewRisk, { risk: ReviewRisk; items: FlaggedQuestionDto[] }>();
     for (const q of visible) {
-      let group = map.get(q.topicSlug);
-      if (!group) {
-        map.set(q.topicSlug, (group = { slug: q.topicSlug, titleBg: q.topicTitleBg, items: [] }));
-      }
+      let group = map.get(q.diff.risk);
+      if (!group) map.set(q.diff.risk, (group = { risk: q.diff.risk, items: [] }));
       group.items.push(q);
     }
     return [...map.values()];
   }, [visible]);
+
+  const href = (nextQueue: string, nextPage: number) =>
+    `/review?queue=${nextQueue}&page=${nextPage}`;
 
   return (
     <div className="flex flex-col gap-6">
@@ -236,53 +216,33 @@ export function ReviewClient({ flagged }: { flagged: FlaggedQuestionDto[] }) {
           Вътрешен инструмент · само за разработка
         </p>
         <h1 className="mt-1 text-2xl font-black sm:text-3xl">Преглед на въпроси</h1>
-        <p className="mt-1 text-sm text-muted">
-          Одобрените въпроси влизат в пробните изпити. Прегледай бележките на
-          одиторите, поправи при нужда и одобри.
+        <p className="mt-1 max-w-3xl text-sm text-muted">
+          Одобряването тук е <strong className="text-foreground">подпис</strong>: записва
+          се кой си, кога и върху кой точно текст. Пипне ли се въпросът после,
+          подписът пада и редът се връща тук. „status: approved“ в самия файл вече
+          не значи нищо само по себе си — генератор го е писал.
         </p>
       </header>
 
-      {/* Progress */}
-      <section
-        aria-label="Напредък"
-        className="card sticky top-2 z-20 flex flex-col gap-3 p-4 backdrop-blur sm:p-5"
-      >
-        <div className="flex flex-wrap items-end justify-between gap-3">
-          <div>
-            <p className="text-sm font-bold text-muted">
-              Прегледани{" "}
-              <span className="text-foreground">{reviewed}</span> от {baseline}
-            </p>
-            <p className="text-3xl font-black tabular-nums">
-              {remaining > 0 ? (
-                <>
-                  <span className="text-accent">{remaining}</span>{" "}
-                  <span className="text-base font-bold text-muted">остават</span>
-                </>
-              ) : (
-                <span className="text-success">Готово!</span>
-              )}
-            </p>
-          </div>
-          <p className="hidden text-xs text-muted md:block">
-            Клавиши:{" "}
-            <Kbd>a</Kbd> одобри · <Kbd>e</Kbd> редактирай · <Kbd>r</Kbd> върни ·{" "}
-            <Kbd>j</Kbd>/<Kbd>k</Kbd> навигация
-          </p>
-        </div>
-        <div
-          role="progressbar"
-          aria-valuemin={0}
-          aria-valuemax={baseline}
-          aria-valuenow={reviewed}
-          className="h-2 overflow-hidden rounded-full bg-surface-2"
-        >
-          <div
-            className="h-full rounded-full bg-accent transition-all motion-reduce:transition-none"
-            style={{ width: `${pct}%` }}
-          />
-        </div>
-      </section>
+      <Census census={census} signedThisSession={signedThisSession} risk={risk} />
+
+      {/* Queue switch */}
+      <nav aria-label="Опашки" className="flex flex-wrap gap-2">
+        <QueueTab
+          href={href("needs-review", 1)}
+          active={queue === "needs-review"}
+          label="За поправка"
+          count={census.needsReview + census.staleSignatures}
+          hintBg="Одиторът или вълната поправки е намерила нещо конкретно."
+        />
+        <QueueTab
+          href={href("unsigned", 1)}
+          active={queue === "unsigned"}
+          label="Неподписани"
+          count={census.unsignedApproved}
+          hintBg="Пише „approved“, но никой човек не го е задавал. Стигат до ученик още днес."
+        />
+      </nav>
 
       {error !== null ? (
         <p
@@ -298,45 +258,44 @@ export function ReviewClient({ flagged }: { flagged: FlaggedQuestionDto[] }) {
           <span className="flex h-14 w-14 items-center justify-center rounded-2xl bg-success/15 text-success">
             <IconCheck className="h-7 w-7" />
           </span>
-          <h2 className="text-lg font-extrabold">Няма въпроси за преглед</h2>
+          <h2 className="text-lg font-extrabold">Тази страница е изчистена</h2>
           <p className="max-w-md text-sm text-muted">
-            Всички въпроси със статус „за преглед“ са обработени. Рестартирай
-            сървъра, за да опресни съдържанието в приложението.
+            {pageCount > page
+              ? "Мини на следващата страница отдолу."
+              : "Няма повече редове в тази опашка. Рестартирай сървъра, за да опресниш съдържанието в приложението."}
           </p>
         </section>
       ) : (
         <div className="flex flex-col gap-8">
           {groups.map((group) => (
-            <section key={group.slug} aria-labelledby={`topic-${group.slug}`} className="flex flex-col gap-3">
-              <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border pb-2">
-                <h2 id={`topic-${group.slug}`} className="text-lg font-extrabold">
-                  {group.titleBg}{" "}
+            <section
+              key={group.risk}
+              aria-labelledby={`risk-${group.risk}`}
+              className="flex flex-col gap-3"
+            >
+              <div
+                className={`flex flex-wrap items-baseline justify-between gap-3 border-b-2 pb-2 ${RISK[group.risk].border}`}
+              >
+                <h2 id={`risk-${group.risk}`} className="text-lg font-extrabold">
+                  <span className={RISK[group.risk].text}>{RISK[group.risk].titleBg}</span>{" "}
                   <span className="text-sm font-bold text-muted">
-                    ({group.items.length})
+                    ({group.items.length} на тази страница · {risk[group.risk]} в опашката)
                   </span>
                 </h2>
-                <button
-                  type="button"
-                  onClick={() => void bulkApprove(group.slug, group.titleBg)}
-                  disabled={bulkBusy !== null || busyId !== null}
-                  className="btn-ghost px-3 py-2 text-xs disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  {bulkBusy === group.slug
-                    ? "Одобрявам…"
-                    : `Одобри всички (${group.items.length})`}
-                </button>
+                <p className="max-w-xl text-xs leading-relaxed text-muted">
+                  {RISK[group.risk].whyBg}
+                </p>
               </div>
 
               <ul className="flex flex-col gap-4">
-                {group.items.map((q, i) => (
+                {group.items.map((q) => (
                   <li key={q.id}>
                     <QuestionCard
                       q={q}
-                      number={i + 1}
                       focused={effectiveFocusId === q.id}
                       busy={busyId === q.id}
                       editing={editingId === q.id}
-                      disabled={busyId !== null || bulkBusy !== null}
+                      disabled={busyId !== null}
                       onApprove={approve}
                       onReject={reject}
                       onStartEdit={startEdit}
@@ -351,7 +310,298 @@ export function ReviewClient({ flagged }: { flagged: FlaggedQuestionDto[] }) {
           ))}
         </div>
       )}
+
+      <Pager queue={queue} page={page} pageCount={pageCount} total={total} href={href} />
     </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Risk bands — the order the queue is worked in
+// ---------------------------------------------------------------------------
+
+/**
+ * One entry per band, in the order the server ranks them. `whyBg` is the
+ * reviewer's instruction for the band, not a description of it: what he is
+ * being asked to decide changes completely between „the graded answer moved"
+ * and „an article number was tidied".
+ */
+const RISK: Record<
+  ReviewRisk,
+  { titleBg: string; chipBg: string; whyBg: string; text: string; border: string; chip: string }
+> = {
+  "key-flip": {
+    titleBg: "Сменен ключ",
+    chipBg: "СМЕНЕН КЛЮЧ",
+    whyBg:
+      "Верният отговор е друг спрямо предишния коммит. Одобриш ли го грешно, ученикът губи точки за верен отговор. Виж ключа преди обяснението.",
+    text: "text-danger",
+    border: "border-danger/60",
+    chip: "bg-danger/20 text-danger",
+  },
+  "answer-text": {
+    titleBg: "Променен отговор",
+    chipBg: "ПРОМЕНЕН ОТГОВОР",
+    whyBg:
+      "Ключът е същата буква, но текстът ѝ, типът или точките са различни — възможно е буквата вече да не значи същото.",
+    text: "text-warning",
+    border: "border-warning/60",
+    chip: "bg-warning/20 text-warning",
+  },
+  stem: {
+    titleBg: "Променен въпрос",
+    chipBg: "ПРОМЕНЕН ВЪПРОС",
+    whyBg: "Самата задача е преформулирана. Провери дали отговорите ѝ още пасват.",
+    text: "text-warning",
+    border: "border-warning/40",
+    chip: "bg-warning/15 text-warning",
+  },
+  explanation: {
+    titleBg: "Само обяснение",
+    chipBg: "САМО ОБЯСНЕНИЕ",
+    whyBg:
+      "Ключът не е пипан. Проверява се THEO-4: обяснява ли решението като инструктор, и стои ли написаното в цитирания член.",
+    text: "text-accent",
+    border: "border-accent/40",
+    chip: "bg-accent/15 text-accent",
+  },
+  citation: {
+    titleBg: "Само цитати",
+    chipBg: "САМО ЦИТАТИ",
+    whyBg: "Само правните основания са пипани. Няма изпитен риск — сравни номерата с текста отдясно.",
+    text: "text-muted",
+    border: "border-border",
+    chip: "bg-surface-2 text-muted",
+  },
+  untouched: {
+    titleBg: "Без промяна от вълната",
+    chipBg: "БЕЗ ПРОМЯНА",
+    whyBg:
+      "Чакаше в опашката още преди тази вълна и нищо не е пипано. Прочети го както си е.",
+    text: "text-muted",
+    border: "border-border",
+    chip: "bg-surface-2 text-muted",
+  },
+};
+
+/** Band order for the header tally — must match the server's ranking. */
+const RISK_ORDER: ReviewRisk[] = [
+  "key-flip",
+  "answer-text",
+  "stem",
+  "explanation",
+  "citation",
+  "untouched",
+];
+
+// ---------------------------------------------------------------------------
+// Header: the honest census
+// ---------------------------------------------------------------------------
+
+function Census({
+  census,
+  signedThisSession,
+  risk,
+}: {
+  census: FlaggedListResult["census"];
+  signedThisSession: number;
+  risk: RiskTally;
+}) {
+  const reachable = census.humanApproved;
+  const pct = census.total > 0 ? Math.round((reachable / census.total) * 1000) / 10 : 0;
+
+  return (
+    <section
+      aria-label="Състояние на банката"
+      className="card sticky top-2 z-20 flex flex-col gap-4 p-4 backdrop-blur sm:p-5"
+    >
+      <div className="flex flex-wrap items-end justify-between gap-4">
+        <div>
+          <p className="text-sm font-bold text-muted">
+            Подписани от човек — единственото, което може да стигне до ученик
+          </p>
+          <p className="text-3xl font-black tabular-nums">
+            <span className={reachable > 0 ? "text-success" : "text-danger"}>{reachable}</span>{" "}
+            <span className="text-base font-bold text-muted">
+              от {census.total} ({pct}%)
+            </span>
+          </p>
+          {signedThisSession > 0 ? (
+            <p className="mt-1 text-xs font-bold text-accent">
+              +{signedThisSession} в тази сесия
+            </p>
+          ) : null}
+        </div>
+        <p className="hidden text-xs text-muted md:block">
+          Клавиши: <Kbd>a</Kbd> одобри и подпиши · <Kbd>e</Kbd> редактирай ·{" "}
+          <Kbd>r</Kbd> върни · <Kbd>j</Kbd>/<Kbd>k</Kbd> навигация
+        </p>
+      </div>
+
+      <div
+        role="progressbar"
+        aria-valuemin={0}
+        aria-valuemax={census.total}
+        aria-valuenow={reachable}
+        aria-label="Дял подписани от човек"
+        className="h-2 overflow-hidden rounded-full bg-surface-2"
+      >
+        <div
+          className="h-full rounded-full bg-success transition-all motion-reduce:transition-none"
+          style={{ width: `${census.total > 0 ? (reachable / census.total) * 100 : 0}%` }}
+        />
+      </div>
+
+      <dl className="grid grid-cols-2 gap-3 text-xs sm:grid-cols-3 lg:grid-cols-5">
+        <Stat labelBg="Подписани" value={census.humanApproved} tone="success" />
+        <Stat
+          labelBg="Пише „approved“, без подпис"
+          value={census.unsignedApproved}
+          tone="danger"
+        />
+        <Stat labelBg="За поправка" value={census.needsReview} tone="warning" />
+        <Stat labelBg="Само машинно проверени" value={census.machineChecked} tone="muted" />
+        <Stat labelBg="Подпис след промяна" value={census.staleSignatures} tone="warning" />
+      </dl>
+
+      <RiskStrip risk={risk} />
+
+      {census.unsignedApproved > 0 ? (
+        <p className="rounded-xl border border-danger/40 bg-danger/10 px-3 py-2 text-xs leading-relaxed text-foreground">
+          <strong>{census.unsignedApproved}</strong> въпроса се раздават на ученици с
+          етикет „одобрен“, който никой човек не е слагал. Таванът е замразен на{" "}
+          <strong>{census.unsignedApprovedBaseline}</strong> —{" "}
+          <code className="font-mono">validate:content</code> отказва да мине, ако
+          числото порасне. Може само да пада, и то само от тази страница.
+        </p>
+      ) : null}
+    </section>
+  );
+}
+
+/**
+ * The queue's risk profile, over the WHOLE backlog rather than the page.
+ *
+ * This is the line that decides how the founder spends the next hour: „6 сменени
+ * ключа" is a twenty-minute job with real consequences, and it is a different
+ * job from the 130 rows where only the teaching text moved.
+ */
+function RiskStrip({ risk }: { risk: RiskTally }) {
+  const bands = RISK_ORDER.filter((band) => risk[band] > 0);
+  if (bands.length === 0) return null;
+  const total = bands.reduce((sum, band) => sum + risk[band], 0);
+
+  return (
+    <div className="flex flex-col gap-2">
+      <p className="text-[11px] font-bold uppercase tracking-wide text-muted">
+        Опашката, подредена по риск за ученика — отгоре е това, което може да отреже
+        верен отговор
+      </p>
+      <ul className="flex flex-wrap gap-2">
+        {bands.map((band) => (
+          <li
+            key={band}
+            className={`flex items-baseline gap-1.5 rounded-lg px-2.5 py-1 text-[11px] font-bold ${RISK[band].chip}`}
+          >
+            <span className="text-sm tabular-nums">{risk[band]}</span>
+            <span>{RISK[band].titleBg}</span>
+          </li>
+        ))}
+        <li className="flex items-baseline gap-1.5 rounded-lg border border-border px-2.5 py-1 text-[11px] font-bold text-muted">
+          <span className="text-sm tabular-nums">{total}</span>
+          <span>общо</span>
+        </li>
+      </ul>
+    </div>
+  );
+}
+
+const TONE: Record<string, string> = {
+  success: "text-success",
+  danger: "text-danger",
+  warning: "text-warning",
+  muted: "text-muted",
+};
+
+function Stat({ labelBg, value, tone }: { labelBg: string; value: number; tone: string }) {
+  return (
+    <div className="rounded-xl border border-border bg-surface-2/40 px-3 py-2">
+      <dt className="text-[11px] font-bold leading-tight text-muted">{labelBg}</dt>
+      <dd className={`text-xl font-black tabular-nums ${TONE[tone] ?? ""}`}>{value}</dd>
+    </div>
+  );
+}
+
+function QueueTab({
+  href,
+  active,
+  label,
+  count,
+  hintBg,
+}: {
+  href: string;
+  active: boolean;
+  label: string;
+  count: number;
+  hintBg: string;
+}) {
+  return (
+    <a
+      href={href}
+      aria-current={active ? "page" : undefined}
+      title={hintBg}
+      className={`rounded-xl border px-4 py-2 text-sm font-bold transition ${
+        active
+          ? "border-accent bg-accent/10 text-accent"
+          : "border-border text-muted hover:border-border-strong hover:text-foreground"
+      }`}
+    >
+      {label} <span className="tabular-nums">({count})</span>
+    </a>
+  );
+}
+
+function Pager({
+  queue,
+  page,
+  pageCount,
+  total,
+  href,
+}: {
+  queue: string;
+  page: number;
+  pageCount: number;
+  total: number;
+  href: (queue: string, page: number) => string;
+}) {
+  if (total === 0) return null;
+  return (
+    <nav
+      aria-label="Страници"
+      className="card flex flex-wrap items-center justify-between gap-3 p-4"
+    >
+      <p className="text-sm font-bold text-muted">
+        Страница <span className="text-foreground tabular-nums">{page}</span> от{" "}
+        <span className="tabular-nums">{pageCount}</span> ·{" "}
+        <span className="tabular-nums">{total}</span> реда в тази опашка
+      </p>
+      <div className="flex gap-2">
+        <a
+          href={href(queue, Math.max(1, page - 1))}
+          aria-disabled={page <= 1}
+          className={`btn-ghost px-4 py-2 text-sm ${page <= 1 ? "pointer-events-none opacity-40" : ""}`}
+        >
+          ← Предишна
+        </a>
+        <a
+          href={href(queue, Math.min(pageCount, page + 1))}
+          aria-disabled={page >= pageCount}
+          className={`btn-accent px-4 py-2 text-sm ${page >= pageCount ? "pointer-events-none opacity-40" : ""}`}
+        >
+          Следваща →
+        </a>
+      </div>
+    </nav>
   );
 }
 
@@ -369,7 +619,6 @@ function Kbd({ children }: { children: React.ReactNode }) {
 
 interface CardProps {
   q: FlaggedQuestionDto;
-  number: number;
   focused: boolean;
   busy: boolean;
   editing: boolean;
@@ -384,7 +633,6 @@ interface CardProps {
 
 const QuestionCard = function QuestionCard({
   q,
-  number,
   focused,
   busy,
   editing,
@@ -407,11 +655,19 @@ const QuestionCard = function QuestionCard({
     >
       {/* Meta */}
       <div className="flex flex-wrap items-center gap-2 text-[11px] font-bold">
+        <span className={`rounded-full px-2.5 py-1 ${RISK[q.diff.risk].chip}`}>
+          {RISK[q.diff.risk].chipBg}
+        </span>
+        <ApprovalBadge approval={q.approval} status={q.status} />
         <span className="rounded-full bg-accent/15 px-2.5 py-1 text-accent">
           {q.type === "single" ? "Един верен" : "Няколко верни"}
         </span>
         <span className="rounded-full border border-border px-2.5 py-1 text-muted">
           {q.points} т.
+        </span>
+        {/* The queue is no longer grouped by topic, so the topic rides here. */}
+        <span className="rounded-full border border-border px-2.5 py-1 text-muted">
+          {q.topicTitleBg}
         </span>
         <span className="rounded-full border border-border px-2.5 py-1 font-mono text-muted">
           {q.id}
@@ -423,23 +679,15 @@ const QuestionCard = function QuestionCard({
         ))}
       </div>
 
-      {/* Auditor note */}
-      {q.reviewNote !== null ? (
-        <div className="mt-3 rounded-xl border border-warning/50 bg-warning/10 p-3">
-          <p className="text-[11px] font-bold uppercase tracking-wide text-warning">
-            Бележка от одитор
-          </p>
-          <p className="mt-1 text-sm leading-relaxed text-foreground">{q.reviewNote}</p>
-        </div>
-      ) : null}
-
       {editing ? (
         <EditForm q={q} busy={busy} onCancel={onCancelEdit} onSave={onSaveEdit} />
       ) : (
         <>
-          <p className="mt-3 text-base font-extrabold leading-snug">
-            {number}. {q.textBg}
-          </p>
+          {/* THE ONE THING THAT CANNOT BE MISSED. Before this the moved key was
+              a ✔ that had shifted one line inside a six-field diff blob. */}
+          <KeyFlipBanner q={q} />
+
+          <p className="mt-3 text-base font-extrabold leading-snug">{q.textBg}</p>
 
           <ul className="mt-3 flex flex-col gap-2">
             {q.options.map((o) => (
@@ -468,6 +716,9 @@ const QuestionCard = function QuestionCard({
             ))}
           </ul>
 
+          <ChangeSummary q={q} />
+          <AuditorNote note={q.reviewNote} openByDefault={q.diff.risk === "key-flip"} />
+
           <div className="mt-3 rounded-xl bg-surface-2/50 p-3">
             <p className="text-[11px] font-bold uppercase tracking-wide text-muted">
               Обяснение
@@ -475,27 +726,22 @@ const QuestionCard = function QuestionCard({
             <p className="mt-1 text-sm leading-relaxed">{q.explanationClean}</p>
           </div>
 
-          {q.lawRefs.length > 0 ? (
-            <ul aria-label="Правни основания" className="mt-3 flex flex-wrap gap-1.5">
-              {q.lawRefs.map((law, i) => (
-                <li
-                  key={`${law.act}-${law.ref}-${i}`}
-                  className="rounded-full border border-border bg-surface px-2.5 py-1 text-[11px] font-bold text-muted"
-                >
-                  {law.act} {law.ref}
-                </li>
-              ))}
-            </ul>
-          ) : null}
+          <QuoteCheck claims={q.quotedClaims} />
+          <LawEvidence evidence={q.lawEvidence} />
 
-          <div className="mt-4 flex flex-wrap items-center gap-2">
+          {/* STICKY, and that is the point. A card runs 2,000–3,500px because
+              the statute is on it (ADR-002) — measured 3,480px for the first
+              key-flip row — which put „Одобри и подпиши" 3.4 screens below the
+              question. The reviewer still has to scroll the evidence, but the
+              decision is never further away than the bottom of the screen. */}
+          <div className="sticky bottom-0 -mx-4 mt-4 flex flex-wrap items-center gap-2 border-t border-border bg-surface/95 px-4 py-3 backdrop-blur sm:-mx-5 sm:px-5">
             <button
               type="button"
               onClick={() => onApprove(q.id)}
               disabled={disabled}
               className="btn-accent px-4 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:shadow-none"
             >
-              {busy ? "Записвам…" : "Одобри"}
+              {busy ? "Записвам…" : "Одобри и подпиши"}
             </button>
             <button
               type="button"
@@ -511,14 +757,294 @@ const QuestionCard = function QuestionCard({
               disabled={disabled}
               className="btn-ghost px-4 py-2 text-sm text-danger hover:border-danger/50 disabled:cursor-not-allowed disabled:opacity-50"
             >
-              Върни в чернова
+              Върни за преправяне
             </button>
+            {/* Which row these buttons belong to — with a sticky bar the
+                question that owns them is usually scrolled off the top. */}
+            <span className="ml-auto hidden font-mono text-[11px] font-bold text-muted sm:block">
+              {q.id}
+            </span>
           </div>
         </>
       )}
     </article>
   );
 };
+
+function ApprovalBadge({
+  approval,
+  status,
+}: {
+  approval: FlaggedQuestionDto["approval"];
+  status: FlaggedQuestionDto["status"];
+}) {
+  if (approval.kind === "human-approved") {
+    return (
+      <span className="flex items-center gap-1 rounded-full bg-success/15 px-2.5 py-1 text-success">
+        <IconShield className="h-3.5 w-3.5" />
+        подписан от {approval.entry.by}
+      </span>
+    );
+  }
+  if (approval.kind === "signature-stale") {
+    return (
+      <span className="flex items-center gap-1 rounded-full bg-warning/15 px-2.5 py-1 text-warning">
+        <IconLock className="h-3.5 w-3.5" />
+        подписът падна — редът е променян след {approval.entry.at.slice(0, 10)}
+      </span>
+    );
+  }
+  if (approval.kind === "human-rejected") {
+    return (
+      <span className="rounded-full bg-danger/15 px-2.5 py-1 text-danger">
+        върнат от {approval.entry.by}
+      </span>
+    );
+  }
+  if (approval.kind === "unsigned-claim") {
+    return (
+      <span className="rounded-full bg-danger/15 px-2.5 py-1 text-danger">
+        пише „approved“ — никой не го е подписвал
+      </span>
+    );
+  }
+  return (
+    <span className="rounded-full border border-border px-2.5 py-1 text-muted">
+      {status} · без подпис
+    </span>
+  );
+}
+
+/**
+ * The moved answer key, stated as letters, above everything else on the card.
+ *
+ * Six of the 252 queued rows have one. In the six-field before/after blob a key
+ * flip looked exactly like a reworded option: a ✔ that had moved one line
+ * inside a paragraph of struck-through text. This says it in the two things
+ * that decide the grade — which letters were correct, which are now.
+ */
+function KeyFlipBanner({ q }: { q: FlaggedQuestionDto }) {
+  const { keyChange } = q.diff;
+  if (keyChange === null) return null;
+  const letters = (key: string) => (key.length === 0 ? "нищо" : key.split(",").join(" + "));
+
+  return (
+    <div className="mt-3 rounded-xl border-2 border-danger/60 bg-danger/10 p-3">
+      <p className="text-[11px] font-bold uppercase tracking-wide text-danger">
+        Верният отговор е сменен спрямо {q.diff.baseRef}
+      </p>
+      <p className="mt-1.5 flex flex-wrap items-center gap-2 font-mono text-sm font-black">
+        <span className="rounded-lg bg-surface-2 px-2.5 py-1 text-muted line-through decoration-danger/70">
+          {letters(keyChange.before)}
+        </span>
+        <span aria-hidden className="text-danger">
+          →
+        </span>
+        <span className="rounded-lg bg-success/15 px-2.5 py-1 text-success">
+          {letters(keyChange.after)}
+        </span>
+      </p>
+      <p className="mt-1.5 text-xs leading-relaxed text-foreground">
+        Одобриш ли това, всеки ученик, който отговори по стария ключ, губи точките.
+        Провери отговорите срещу текста на закона отдолу, преди да подпишеш.
+      </p>
+    </div>
+  );
+}
+
+/**
+ * The auditor's note, collapsed by default.
+ *
+ * These notes are the fix wave's working record — 600 to 1,000 characters of
+ * „БЕШЕ … СЕГА … ИЗТОЧНИК …". Rendered open they pushed the question itself
+ * ~700px down the card, so the founder met the agent's reasoning before he met
+ * the row he is judging. It stays one click away, and opens by itself where it
+ * matters most: a moved key.
+ */
+function AuditorNote({ note, openByDefault }: { note: string | null; openByDefault: boolean }) {
+  if (note === null) return null;
+  const gist = note.length > 110 ? `${note.slice(0, 110).trimEnd()}…` : note;
+  return (
+    <details open={openByDefault} className="group mt-3 rounded-xl border border-warning/50 bg-warning/10">
+      <summary className="cursor-pointer list-none p-3 text-xs leading-relaxed text-foreground marker:content-none">
+        <span className="text-[11px] font-bold uppercase tracking-wide text-warning">
+          Бележка от одитор
+        </span>{" "}
+        <span className="text-muted group-open:hidden">{gist}</span>
+        <span className="hidden text-muted group-open:inline">(скрий)</span>
+      </summary>
+      <p className="whitespace-pre-wrap px-3 pb-3 text-sm leading-relaxed text-foreground">
+        {note}
+      </p>
+    </details>
+  );
+}
+
+/**
+ * What changed since the baseline commit. The fix waves rewrite explanations
+ * and swap article numbers wholesale; re-reading a 700-character explanation
+ * from scratch is what turns ten seconds into two minutes.
+ */
+function ChangeSummary({ q }: { q: FlaggedQuestionDto }) {
+  const { diff } = q;
+
+  if (diff.kind === "unavailable") {
+    return (
+      <p className="mt-3 rounded-xl border border-border bg-surface-2/40 px-3 py-2 text-xs text-muted">
+        {diff.unavailableReasonBg}
+      </p>
+    );
+  }
+  if (diff.kind === "new") {
+    return (
+      <p className="mt-3 rounded-xl border border-accent/40 bg-accent/10 px-3 py-2 text-xs font-bold text-accent">
+        Нов въпрос — не съществува в {diff.baseRef}.
+      </p>
+    );
+  }
+  if (diff.kind === "unchanged") {
+    return (
+      <p className="mt-3 rounded-xl border border-border bg-surface-2/40 px-3 py-2 text-xs text-muted">
+        Без промяна спрямо {diff.baseRef}
+        {diff.beforeStatus !== null ? ` · статус там: ${diff.beforeStatus}` : ""}.
+      </p>
+    );
+  }
+
+  return (
+    <div className="mt-3 rounded-xl border border-accent/40 bg-accent/5 p-3">
+      <p className="text-[11px] font-bold uppercase tracking-wide text-accent">
+        Какво се промени спрямо {diff.baseRef}
+        {diff.beforeStatus !== null ? ` (там беше „${diff.beforeStatus}“)` : ""}
+      </p>
+      <ul className="mt-2 flex flex-col gap-2">
+        {diff.changes.map((change) => (
+          <li key={change.field}>
+            <p className="text-[11px] font-bold text-muted">{change.labelBg}</p>
+            <p className="mt-0.5 whitespace-pre-wrap break-words text-xs leading-relaxed text-muted line-through decoration-danger/60">
+              {change.before}
+            </p>
+            <p className="mt-1 whitespace-pre-wrap break-words text-xs leading-relaxed text-foreground">
+              {change.after}
+            </p>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+/**
+ * Every „…“ span in the explanation, tested verbatim against the retrieved text
+ * of the articles this row cites. A span that matches nothing is how you catch
+ * a number nobody can find in the law — the fabricated 50-metre level-crossing
+ * rule was exactly that shape (docs/education/90 §4.3).
+ */
+function QuoteCheck({ claims }: { claims: QuotedClaim[] }) {
+  if (claims.length === 0) return null;
+  // Matches first: a wall of green above the one amber line is what makes the
+  // amber line worth looking at. A miss is a PROMPT, not a verdict — plenty of
+  // quoted spans are our own turns of phrase, not statute.
+  const ordered = [...claims].sort(
+    (a, b) => Number(b.foundInRef !== null) - Number(a.foundInRef !== null),
+  );
+  return (
+    <ul aria-label="Проверка на цитатите" className="mt-3 flex flex-col gap-1.5">
+      {ordered.map((claim) => (
+        <li
+          key={claim.quote}
+          className={`flex items-start gap-2 rounded-lg border px-3 py-2 text-xs leading-relaxed ${
+            claim.foundInRef !== null
+              ? "border-success/40 bg-success/5"
+              : "border-warning/50 bg-warning/10"
+          }`}
+        >
+          <span className="mt-0.5 shrink-0 font-bold">
+            {claim.foundInRef !== null ? (
+              <IconCheck className="h-4 w-4 text-success" />
+            ) : (
+              <IconX className="h-4 w-4 text-warning" />
+            )}
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className="italic">„{claim.quote}“</span>{" "}
+            {claim.foundInRef !== null ? (
+              <span className="text-muted">— дословно в {claim.foundInRef}</span>
+            ) : (
+              <span className="font-bold text-warning">
+                — не се среща в текста на цитираните членове. Ако е цитат от закона,
+                нещо не е наред; ако е наш израз, всичко е наред.
+              </span>
+            )}
+          </span>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+/** The verbatim source line: retrieved statute text, never restated (ADR-002). */
+function LawEvidence({ evidence }: { evidence: LawRefEvidence[] }) {
+  if (evidence.length === 0) return null;
+  return (
+    <section aria-label="Източникът, дословно" className="mt-3 flex flex-col gap-2">
+      <p className="text-[11px] font-bold uppercase tracking-wide text-muted">
+        Източникът, дословно
+      </p>
+      {evidence.map((law, i) => (
+        <article
+          key={`${law.act}-${law.ref}-${i}`}
+          className={`rounded-xl border p-3 ${
+            law.found ? "border-border bg-surface-2/40" : "border-warning/50 bg-warning/10"
+          }`}
+        >
+          <div className="flex flex-wrap items-center gap-2 text-[11px] font-bold">
+            <span className="text-foreground">
+              {law.act} {law.ref}
+            </span>
+            {law.unverified ? (
+              <span className="rounded-full bg-warning/20 px-2 py-0.5 text-warning">
+                „?“ — авторът не е бил сигурен
+              </span>
+            ) : null}
+            {law.contextBg !== null ? (
+              <span className="text-muted">{law.contextBg}</span>
+            ) : null}
+          </div>
+
+          {law.found ? (
+            <>
+              <p className="mt-2 max-h-56 overflow-y-auto whitespace-pre-wrap break-words rounded-lg bg-surface px-3 py-2 font-serif text-xs leading-relaxed text-foreground">
+                {law.textBg}
+                {law.truncated ? (
+                  <span className="text-muted"> (съкратено за екрана)</span>
+                ) : null}
+              </p>
+              <p className="mt-1.5 text-[11px] text-muted">
+                {law.citationBg}
+                {law.sourceUrl !== null ? (
+                  <>
+                    {" · "}
+                    <a
+                      href={law.sourceUrl}
+                      target="_blank"
+                      rel="noreferrer noopener"
+                      className="underline hover:text-foreground"
+                    >
+                      източник
+                    </a>
+                  </>
+                ) : null}
+              </p>
+            </>
+          ) : (
+            <p className="mt-2 text-xs leading-relaxed text-foreground">{law.missReasonBg}</p>
+          )}
+        </article>
+      ))}
+    </section>
+  );
+}
 
 // ---------------------------------------------------------------------------
 // Inline edit form
@@ -646,8 +1172,12 @@ function EditForm({
       onKeyDown={onKeyDown}
     >
       <p className="text-[11px] font-bold uppercase tracking-wide text-accent">
-        Редакция — записва и одобрява
+        Редакция — записва, подписва и одобрява
       </p>
+
+      {/* The statute stays on screen while editing — the point of the edit is
+          usually to make the text match what the article actually says. */}
+      <LawEvidence evidence={q.lawEvidence} />
 
       {/* Question text */}
       <label className="flex flex-col gap-1">
@@ -782,7 +1312,7 @@ function EditForm({
           disabled={busy}
           className="btn-accent px-4 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:shadow-none"
         >
-          {busy ? "Записвам…" : "Запази и одобри"}
+          {busy ? "Записвам…" : "Запази и подпиши"}
         </button>
         <button
           type="button"

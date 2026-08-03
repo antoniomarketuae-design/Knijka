@@ -57,8 +57,21 @@ export {
   createCheckoutSession,
   createEmbeddedCheckoutSession,
   fulfillCheckout,
+  revokeAccessForPaymentIntent,
 } from "./checkout";
 export type { CheckoutSessionLike } from "./checkout";
+
+// Test vs live mode — the one property of a money deployment nothing read
+// before (`grep -rn livemode src/` returned zero). mode.ts explains the mixed
+// sk_live_ + test whsec_ configuration this exists to catch.
+export {
+  declaredStripeMode,
+  livemodeMatchesDeclaredMode,
+  stripeKeyMode,
+  stripeModeGaps,
+  assertStripeModeConsistent,
+} from "./mode";
+export type { StripeMode } from "./mode";
 
 // Purchase consent (H-9 parental approval + ЗЗП withdrawal waiver, M-24 versioning)
 export {
@@ -91,6 +104,12 @@ export {
 export { isStripeConfigured, setStripeClient, getStripeClient } from "./stripe";
 export type { StripeCheckoutClient } from "./stripe";
 
+// Purchase history — the grant AND the receipt, merged, for /settings. The one
+// screen where a student with a broken purchase finds something to quote and
+// the founder finds something to search (purchases.ts explains the merge).
+export { listPurchases, formatPaidAmount } from "./purchases";
+export type { PurchaseRow } from "./purchases";
+
 // Persistence seam (tests inject the in-memory fake)
 export {
   setPaymentsStore,
@@ -101,6 +120,13 @@ export type {
   PaymentsStore,
   EntitlementRecord,
   CreateEntitlementInput,
+  PaymentRecord,
+  CreatePaymentInput,
+  RecordPurchaseInput,
+  RecordPurchaseResult,
+  StripeEventRecord,
+  CreateStripeEventInput,
+  RecordStripeEventResult,
   ConsentEventRecord,
   CreateConsentEventInput,
 } from "./store";
@@ -111,6 +137,7 @@ export type {
   PaymentsErrorCode,
   EntitlementSummary,
   FulfillResult,
+  RevokeResult,
   PracticeQuota,
   TutorPackAllowance,
   TutorQuota,

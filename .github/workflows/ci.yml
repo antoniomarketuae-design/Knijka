@@ -23,6 +23,15 @@
 # `gate` as a status check and forbid direct pushes in the branch-protection
 # settings for `scenario-engine`/`main`. Until that is switched on, the deploy
 # pointer is what actually protects students.
+#
+# WHAT CHANGED AFTER THAT (the database gate): the env values below were a
+# fiction — `postgresql://ci:ci@localhost:5432/ci` with no postgres anywhere in
+# this file — and the only Prisma step was `generate`, which reads
+# schema.prisma and never looks at prisma/migrations. A schema change with no
+# migration therefore passed every single check here and only failed in
+# production, on students. There is now a real postgres:17 service, migrations
+# are APPLIED to it, and the applied database is diffed against schema.prisma.
+# See the `services:` block for the full failure mode it closes.
 name: gate
 
 on:
@@ -49,6 +58,34 @@ jobs:
       DATABASE_URL: "postgresql://ci:ci@localhost:5432/ci"
       SHADOW_DATABASE_URL: "postgresql://ci:ci@localhost:5432/ci_shadow"
       AUTH_SECRET: "ci-dummy-secret"
+    # THE DATABASE STEPS BELOW ARE WHY THIS SERVICE EXISTS, and it is worth
+    # being exact about the hole they close. The URLs above used to point at
+    # nothing — there was no postgres here — and the only Prisma step was
+    # `generate`, which reads schema.prisma and never once looks at
+    # prisma/migrations. So: add a column to the schema, write code against it,
+    # forget the migration. Typecheck passes (the generated client has the
+    # column). Tests pass (they inject in-memory stores). The build passes.
+    # CI is green. The deploy's health gate says 200 because /api/health ran
+    # `SELECT 1` and the database answered. And every request that touches the
+    # column 500s, for students, until someone notices.
+    #
+    # ~40 seconds of container start and two Prisma commands ends that shape.
+    # postgres:17 matches the VPS; `pg_isready` gating means the migrate step
+    # never races a database that has not finished booting.
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: ci
+          POSTGRES_PASSWORD: ci
+          POSTGRES_DB: ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U ci -d ci"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
     steps:
       # Action majors are pinned to v6, not the newest v7. v6 is where both
       # actions moved off the deprecated node20 runtime (node24 since v5.0.0),
@@ -63,6 +100,55 @@ jobs:
           cache-dependency-path: platform/package-lock.json
       - run: npm ci --no-audit --no-fund
       - run: npx prisma generate
+
+      # ---- the schema gate, before the slow steps ---------------------------
+      # First, because a migration that does not apply is a fact you want in
+      # forty seconds, not after a five-minute build.
+
+      # Refuse a migration that would break the build currently running.
+      # `--all` rather than a diff against a base ref: it needs no git history,
+      # it cannot be fooled by a shallow checkout, and it is stable — a drop
+      # that legitimately merges carries its `knijka:allow-destructive` marker
+      # forever, so a green run stays green. The reasoning (expand/contract,
+      # and why the deploy's rollback depends on it) is in the script header
+      # and in tools/deploy/README.md.
+      - name: migrations are rollback-safe
+        run: node ../tools/deploy/check-migrations.mjs --all
+
+      # Apply every migration to a REAL postgres. This is the step whose
+      # absence made "forgot the migration" invisible: it fails on bad SQL, on
+      # a migration that conflicts with an earlier one, and on anything that
+      # cannot actually be applied in order from empty.
+      - name: apply migrations
+        run: npx prisma migrate deploy
+
+      # …and then ask whether the database we just built matches the schema the
+      # code was generated from. THIS is the check that catches the forgotten
+      # migration: schema.prisma has the column, prisma/migrations does not, so
+      # the diff is non-empty and `--exit-code` returns 2.
+      #
+      # Printed human-readably first so a failure explains itself in the log
+      # instead of being a bare non-zero exit at 3am.
+      #
+      # WHEN THIS FAILS, READ THE PRINTED DIFF BEFORE ASSUMING IT IS WRONG. The
+      # normal cause is the one it exists for: a schema change with no
+      # migration. The one KNOWN false-positive candidate is the hand-written
+      # PARTIAL unique index on Entitlement(provider, providerRef) — Prisma's
+      # PSL cannot express a WHERE clause, so the index is created under the
+      # exact name Prisma derives from the @@unique and the differ matches it
+      # by name and columns. If a future Prisma release starts describing index
+      # predicates, that index is what will show up here, and the fix is to
+      # teach the schema about it — never to delete this step.
+      - name: schema matches the migrations (no drift)
+        run: |
+          npx prisma migrate diff \
+            --from-config-datasource \
+            --to-schema ./prisma/schema.prisma
+          npx prisma migrate diff \
+            --from-config-datasource \
+            --to-schema ./prisma/schema.prisma \
+            --exit-code
+
       - name: typecheck
         run: npx tsc --noEmit
       - name: tests

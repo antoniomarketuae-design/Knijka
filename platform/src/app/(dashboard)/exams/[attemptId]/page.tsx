@@ -7,9 +7,9 @@ import {
   EXAM_DURATION_SEC,
   EXAM_PASS_POINTS,
   EXAM_QUESTION_COUNT,
+  getExamAttemptView,
   getExamHistory,
   getExamReview,
-  getInProgressExam,
   type ExamHistoryEntry,
   type ExamReview,
   type ExamTopicResult,
@@ -54,18 +54,28 @@ export default async function ExamAttemptPage({
   // the seed — the builder reads the live bank, so one `needs-review →
   // approved` promotion mid-attempt deals a different paper while grading still
   // uses the stored ids, silently failing a perfect candidate (audit H-7).
-  const inProgress = await getInProgressExam(user.id, attemptId);
-  if (!inProgress) return <CannotRestoreView />;
+  //
+  // The VIEW, not the paper: the module now says WHY an attempt cannot be
+  // shown, and the three reasons get three different screens. They used to
+  // share one, which is how a stale attempt came to be told „един от въпросите
+  // вече не е част от банката" — and, before that, to be auto-submitted and
+  // failed at 0/97 without ever being rendered.
+  const view = await getExamAttemptView(user.id, attemptId);
+
+  if (view.status === "expired") {
+    return <ExpiredAttemptView startedAt={view.startedAt} />;
+  }
+  if (view.status !== "in-progress") return <CannotRestoreView />;
 
   const initialElapsedSec = Math.max(
     0,
-    Math.floor((Date.now() - inProgress.startedAt.getTime()) / 1000),
+    Math.floor((Date.now() - view.exam.startedAt.getTime()) / 1000),
   );
 
   return (
     <ExamRunner
       attemptId={attemptId}
-      questions={inProgress.questions}
+      questions={view.exam.questions}
       durationSec={EXAM_DURATION_SEC}
       initialElapsedSec={initialElapsedSec}
     />
@@ -356,6 +366,64 @@ function ReadoutTile({
       >
         {value}
       </dd>
+    </div>
+  );
+}
+
+/**
+ * „Този опит изтече" — an attempt reopened after the 40:00 + 30s window.
+ *
+ * THE SCREEN THIS REPLACES DID NOT EXIST. The route rendered the runner with
+ * 00:00 on the clock, the runner auto-submitted an empty paper, and the
+ * student read „Изпитът не е издържан — 0 от 97". A bare verdict, on an exam
+ * they never sat, for the crime of losing signal on the tram. THEO-4 rules
+ * that every verdict in this product comes with the reason attached; this one
+ * had no reason because there was nothing to explain — the grade was an
+ * artefact of our own clock arithmetic, not of anything the student did.
+ *
+ * So it says the true thing, names the cause, and gives back the next move.
+ * The line about the free attempt is deliberate: a free student's ONE lifetime
+ * mock exam is counted at start (payments/quota.ts — started attempts count),
+ * so this failure can silently spend it. Rather than pretend otherwise, the
+ * screen tells them it can be given back, and /admin has the button that does
+ * it („нулирай безплатния опит").
+ */
+function ExpiredAttemptView({ startedAt }: { startedAt: Date }) {
+  const startedLabel = new Intl.DateTimeFormat("bg-BG", {
+    dateStyle: "long",
+    timeStyle: "short",
+    timeZone: "Europe/Sofia",
+  }).format(startedAt);
+
+  return (
+    <div className="flex flex-col gap-6">
+      <div>
+        <Link href="/exams" className="text-sm font-bold text-accent">
+          ← Всички изпити
+        </Link>
+      </div>
+
+      <section className="card flex flex-col items-start gap-3 p-6">
+        <span className="hud-label">Пробен изпит · изтекъл опит</span>
+        <h1 className="text-lg font-extrabold">Този опит изтече</h1>
+        <p className="text-sm leading-relaxed text-muted">
+          Започна го на {startedLabel}, а изпитът върви {EXAM_DURATION_SEC / 60}{" "}
+          минути от момента на започването — затова листът вече е приключил и не
+          може да бъде продължен.
+        </p>
+        <p className="text-sm leading-relaxed text-muted">
+          Няма да те оценим по въпроси, които не си видял: този опит остава без
+          резултат и не влиза в статистиката ти. Ако беше безплатният ти пробен
+          изпит, пиши ни от{" "}
+          <Link href="/contact" className="font-bold text-accent">
+            страницата за контакт
+          </Link>{" "}
+          и ще ти го върнем.
+        </p>
+        <Link href="/exams" className="btn-accent">
+          Започни нов пробен изпит
+        </Link>
+      </section>
     </div>
   );
 }

@@ -23,6 +23,8 @@ import type {
   LessonEntryView,
   ScenarioCatalogEntry,
 } from "@/components/sim/lesson-ui/types";
+import { FeatureOffline } from "@/components/ui/FeatureOffline";
+import { isFeatureDisabled } from "@/lib/features";
 import { canDriveSimulator } from "./access";
 import { SimulatorPaywall } from "./paywall";
 import { resolveScenarioDeepLink } from "./scenarioDeepLink";
@@ -65,6 +67,13 @@ interface SimulatorPageProps {
  */
 export default async function SimulatorPage({ searchParams }: SimulatorPageProps) {
   const user = await requireUser();
+
+  // The kill switch is asked BEFORE the entitlement gate, and that order is the
+  // whole point: canDriveSimulator() also returns false when the switch is on,
+  // so without this line a student who PAID €21.99 would be shown the „купи
+  // пакет" paywall for something we switched off ourselves. Same guard, two
+  // different sentences (src/lib/features.ts).
+  if (isFeatureDisabled("simulator")) return <FeatureOffline feature="simulator" />;
 
   if (!(await canDriveSimulator(user))) {
     // Sizes only, never content — see paywall.tsx.

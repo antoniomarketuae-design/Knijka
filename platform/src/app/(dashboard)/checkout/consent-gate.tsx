@@ -27,15 +27,16 @@
 import { useActionState, useState } from "react";
 import Link from "next/link";
 import { EmbeddedCheckoutForm } from "@/components/payments/EmbeddedCheckoutForm";
+import { ContactEmail } from "@/components/legal/ContactEmail";
 import { CheckControl } from "@/components/ui/CheckControl";
 import {
   CHECKOUT_CONSENT_TEXTS_BG,
   type CheckoutConsentKind,
   type PackId,
 } from "@/modules/payments/view";
-import { CONTACT_EMAIL } from "@/lib/legal/identity";
 import { acceptCheckoutConsent } from "./actions";
 import {
+  checkoutStep,
   consentFieldName,
   initialCheckoutConsentState,
 } from "./consent-contract";
@@ -45,6 +46,15 @@ const CONSENT_TITLES_BG: Record<CheckoutConsentKind, string> = {
   parental_purchase: "Съгласие на родител",
   withdrawal_waiver: "Незабавен достъп",
 };
+
+/**
+ * Shown when the payment step came back with 409 CONSENT_REQUIRED — i.e. the
+ * student did exactly what this gate asks for (left to fetch a parent) and the
+ * 60-minute TTL ran out while she was away. It must not read as a fault: the
+ * whole message is "tick again, nothing was charged".
+ */
+export const CONSENT_EXPIRED_BG =
+  "Съгласието важи 60 минути и изтече, докато те нямаше. Нищо не е платено — отбележи полетата пак и продължи.";
 
 export function CheckoutConsentGate({
   pack,
@@ -63,13 +73,54 @@ export function CheckoutConsentGate({
   const [ticked, setTicked] = useState<Record<string, boolean>>({});
   const allTicked = required.every((kind) => ticked[kind]);
 
-  if (state.status === "accepted") {
-    return <EmbeddedCheckoutForm pack={pack} />;
+  /**
+   * Set when the payment step answered 409: the stored consent aged past
+   * CHECKOUT_CONSENT_TTL_MINUTES while the student was away fetching a parent.
+   *
+   * It has to be state of its OWN and not something derived from `state`,
+   * because `useActionState` still holds "accepted" — the consent really was
+   * recorded, it simply no longer authorises a payment. This flag is what turns
+   * the gate back into the checkboxes, so the one click the flow assumes ("just
+   * tick again") actually exists on screen instead of only in a code comment.
+   */
+  const [consentExpired, setConsentExpired] = useState(false);
+
+  if (checkoutStep(state, consentExpired) === "payment") {
+    return (
+      <EmbeddedCheckoutForm
+        pack={pack}
+        onConsentExpired={() => {
+          setConsentExpired(true);
+          // Un-tick, deliberately: re-consenting must be a fresh, deliberate
+          // act. A box that is still ticked from an hour ago is not consent to
+          // a payment happening now.
+          setTicked({});
+        }}
+      />
+    );
   }
 
   return (
-    <form action={formAction} className="flex flex-col gap-5">
+    <form
+      // Re-submitting clears the expiry flag first, so a successful second pass
+      // through the action mounts the payment form again instead of bouncing
+      // off a stale flag.
+      action={(formData: FormData) => {
+        setConsentExpired(false);
+        formAction(formData);
+      }}
+      className="flex flex-col gap-5"
+    >
       <input type="hidden" name="pack" value={pack} />
+
+      {consentExpired && (
+        <p
+          role="alert"
+          className="rounded-xl border border-warning/40 bg-warning/10 p-4 text-sm font-medium text-warning"
+        >
+          {CONSENT_EXPIRED_BG}
+        </p>
+      )}
 
       <div>
         <h2 className="text-lg font-black">Преди да платиш</h2>
@@ -116,7 +167,7 @@ export function CheckoutConsentGate({
           the choice does not exist. */}
       <p className="text-xs text-muted">
         Ако предпочиташ да запазиш правото си на отказ, не отбелязвай второто
-        поле — пиши ни на {CONTACT_EMAIL} и ще активираме достъпа ти след
+        поле — пиши ни на <ContactEmail /> и ще активираме достъпа ти след
         14-дневния срок. Подробностите са в{" "}
         <Link
           href="/terms"

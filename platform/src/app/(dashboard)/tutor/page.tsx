@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { TutorChat } from "@/components/tutor/TutorChat";
+import { FeatureOffline } from "@/components/ui/FeatureOffline";
+import { isFeatureDisabled } from "@/lib/features";
 import { requireUser } from "@/modules/auth";
 import { getThread, isTutorEnabled } from "@/modules/tutor";
 import { TutorPaywall, TutorTrialNotice } from "./paywall";
@@ -25,6 +27,14 @@ export const metadata: Metadata = {
  */
 export default async function TutorPage() {
   const user = await requireUser();
+
+  // Kill switch first: getTutorAccess() also refuses when the switch is on, so
+  // without this the student would get the „изразходва въпросите си" paywall
+  // for a tutor we switched off — and would be invited to pay for it
+  // (src/lib/features.ts). It is also checked before isTutorEnabled(), because
+  // „изключен" is the truer sentence than „активира се скоро" when we are the
+  // ones who turned it off.
+  if (isFeatureDisabled("tutor")) return <FeatureOffline feature="tutor" />;
 
   if (!isTutorEnabled()) {
     return (

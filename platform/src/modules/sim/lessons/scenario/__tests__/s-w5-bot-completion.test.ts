@@ -369,7 +369,7 @@ describe("wave-5 bot completion — sc-mw-min-speed at L3", () => {
   it("carries the flow car into the live lesson (the pressure is staged, not narrated)", () => {
     // Drop it and the student meets an empty motorway: the cards' „колата зад
     // теб" becomes a claim about nothing, and the drill loses the one thing
-    // that makes чл. 54's harm visible rather than asserted.
+    // that makes чл. 22, ал. 1's harm visible rather than asserted.
     const flow = (lesson.stagedEvents ?? []).find((s) => s.id === "sc-mwms-flow-car");
     expect(flow).toBeDefined();
     expect(flow!.kind).toBe("rearTailgater");
@@ -421,7 +421,7 @@ describe("wave-5 bot completion — sc-mw-min-speed at L3", () => {
     expect(graded.result.score).toBe(0);
   });
 
-  it("counter-proof: at L3 the right-lane crawl TEACHES чл. 54 — and never finishes the road", () => {
+  it("counter-proof: at L3 the right-lane crawl TEACHES чл. 22, ал. 1 — and never finishes the road", () => {
     // DRIVING_TOO_SLOW_FOR_MOTORWAY is второстепенна, and the coach warns once
     // before grading regardless of mapping (scenarios/coach.ts) — so the FIRST
     // encounter PAUSES with a card and does NOT dock a point. That is the right

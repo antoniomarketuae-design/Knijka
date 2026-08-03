@@ -23,6 +23,28 @@ export interface AuthUserRecord {
   passwordHash: string | null;
   /** "student" | "admin" — internal access flag, not PII. */
   role: string;
+  /**
+   * User.sessionEpoch — the revocation counter, stamped into the JWT at
+   * sign-in. Read here (not only in findAccountById) because the sign-in path
+   * is where the token gets its epoch, and a second query for one integer on a
+   * path that already pays 300 ms of bcrypt would be pure waste.
+   */
+  sessionEpoch: number;
+}
+
+/**
+ * What the per-request session guard needs from the DB, and nothing else.
+ *
+ * Both fields answer "is this token still allowed to be this person?", which is
+ * why they are read together: `role` because a forged token must not be able to
+ * claim admin, `sessionEpoch` because a stateless JWT is otherwise impossible
+ * to take back. getSessionUser() already made this round trip for the role, so
+ * revocation costs zero additional queries — the reason the epoch is a counter
+ * on User and not a sessions table.
+ */
+export interface AccountFlags {
+  role: string;
+  sessionEpoch: number;
 }
 
 export interface CreateUserInput {
@@ -56,8 +78,22 @@ export interface AuthStore {
     email: string;
     name: string | null;
   }>;
-  /** Role lookup for the per-request session guard (never trusts the JWT). */
-  findRoleById(userId: string): Promise<string | null>;
+  /**
+   * Role + session epoch for the per-request session guard (never trusts the
+   * JWT). Null when the row is gone — the account was erased under a live
+   * session.
+   */
+  findAccountById(userId: string): Promise<AccountFlags | null>;
+  /**
+   * „Изход от всички устройства" — increment User.sessionEpoch and return the
+   * new value, so every JWT issued before this moment stops being accepted.
+   *
+   * ONE STATEMENT, not read-then-write: two devices signing out everywhere at
+   * the same instant must not both read 3 and both write 4, which would leave
+   * one of them still valid. Returns the fresh epoch so a caller that wants to
+   * KEEP the current device signed in can re-stamp its token.
+   */
+  bumpSessionEpoch(userId: string): Promise<number | null>;
 }
 // Password reset needs a wider set of operations (and a second table); it has
 // its own seam in reset-store.ts, deliberately NOT bolted onto this interface —
@@ -79,7 +115,14 @@ class PrismaAuthStore implements AuthStore {
     const db = await this.db();
     return db.user.findUnique({
       where: { email },
-      select: { id: true, email: true, name: true, passwordHash: true, role: true },
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        passwordHash: true,
+        role: true,
+        sessionEpoch: true,
+      },
     });
   }
 
@@ -103,13 +146,29 @@ class PrismaAuthStore implements AuthStore {
     }
   }
 
-  async findRoleById(userId: string): Promise<string | null> {
+  async findAccountById(userId: string): Promise<AccountFlags | null> {
     const db = await this.db();
     const row = await db.user.findUnique({
       where: { id: userId },
-      select: { role: true },
+      select: { role: true, sessionEpoch: true },
     });
-    return row?.role ?? null;
+    return row ?? null;
+  }
+
+  async bumpSessionEpoch(userId: string): Promise<number | null> {
+    const db = await this.db();
+    try {
+      const row = await db.user.update({
+        where: { id: userId },
+        data: { sessionEpoch: { increment: 1 } },
+        select: { sessionEpoch: true },
+      });
+      return row.sessionEpoch;
+    } catch {
+      // P2025 — the account is already gone, so there is nothing to revoke and
+      // every session pointing at it is dead on its next request anyway.
+      return null;
+    }
   }
 }
 
@@ -141,13 +200,23 @@ export class InMemoryAuthStore implements AuthStore {
       name: input.name,
       passwordHash: input.passwordHash,
       role: "student",
+      sessionEpoch: 0,
     };
     this.users.push(record);
     return { id: record.id, email: record.email, name: record.name };
   }
 
-  async findRoleById(userId: string): Promise<string | null> {
-    return this.users.find((u) => u.id === userId)?.role ?? null;
+  async findAccountById(userId: string): Promise<AccountFlags | null> {
+    const user = this.users.find((u) => u.id === userId);
+    if (!user) return null;
+    return { role: user.role, sessionEpoch: user.sessionEpoch ?? 0 };
+  }
+
+  async bumpSessionEpoch(userId: string): Promise<number | null> {
+    const user = this.users.find((u) => u.id === userId);
+    if (!user) return null;
+    user.sessionEpoch = (user.sessionEpoch ?? 0) + 1;
+    return user.sessionEpoch;
   }
 }
 

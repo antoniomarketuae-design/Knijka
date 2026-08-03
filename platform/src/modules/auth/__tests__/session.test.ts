@@ -17,7 +17,7 @@ const authMock = vi.fn();
 vi.mock("@/auth", () => ({ auth: authMock }));
 
 const { getSessionUser } = await import("../session");
-const { InMemoryAuthStore, setAuthStore } = await import("../store");
+const { getAuthStore, InMemoryAuthStore, setAuthStore } = await import("../store");
 type AuthUserRecord = import("../store").AuthUserRecord;
 
 let users: AuthUserRecord[];
@@ -29,6 +29,7 @@ function student(over: Partial<AuthUserRecord> = {}): AuthUserRecord {
     name: "Иван",
     passwordHash: "$2b$12$irrelevant",
     role: "student",
+    sessionEpoch: 0,
     ...over,
   };
 }
@@ -84,9 +85,10 @@ describe("getSessionUser", () => {
       createUser: async () => {
         throw new Error("unused");
       },
-      findRoleById: async () => {
+      findAccountById: async () => {
         throw new Error("db is down");
       },
+      bumpSessionEpoch: async () => null,
     });
     const user = await getSessionUser();
     expect(user).not.toBeNull();
@@ -97,5 +99,78 @@ describe("getSessionUser", () => {
     // The row was erased (GDPR Art. 17) while the JWT is still valid.
     authMock.mockResolvedValue(sessionFor({ id: "ghost-99", email: "ivan@mail.bg" }));
     expect((await getSessionUser())?.isAdmin).toBe(false);
+  });
+});
+
+/**
+ * SESSION REVOCATION (User.sessionEpoch).
+ *
+ * The hole this closes: sessions are stateless JWTs with a 30-day idle life and
+ * no Session table, so „смених си паролата, защото някой ми знае акаунта" left
+ * that someone signed in for another month. A password reset invalidated the
+ * outstanding LINKS and nothing else.
+ *
+ * The check is a comparison between the epoch stamped into the token at
+ * sign-in and the live column, inside the DB read the role already needed.
+ */
+describe("getSessionUser — session epoch", () => {
+  /** A session as next-auth builds it once src/auth.ts has stamped the epoch. */
+  function sessionWithEpoch(sessionEpoch: number | undefined) {
+    return {
+      user: { id: "user-1", email: "ivan@mail.bg", name: "Иван", sessionEpoch },
+    };
+  }
+
+  it("accepts a token whose epoch matches the account", async () => {
+    authMock.mockResolvedValue(sessionWithEpoch(0));
+    expect((await getSessionUser())?.id).toBe("user-1");
+  });
+
+  it("REVOKES a token minted before the epoch was bumped", async () => {
+    authMock.mockResolvedValue(sessionWithEpoch(0));
+    expect(await getSessionUser()).not.toBeNull();
+
+    // „Изход от всички устройства" / a password reset.
+    await getAuthStore().bumpSessionEpoch("user-1");
+
+    // Same cookie, same everything — and it is no longer a session.
+    expect(await getSessionUser()).toBeNull();
+  });
+
+  it("keeps a token minted AFTER the bump", async () => {
+    await getAuthStore().bumpSessionEpoch("user-1");
+    authMock.mockResolvedValue(sessionWithEpoch(1));
+    expect((await getSessionUser())?.id).toBe("user-1");
+  });
+
+  it("does not sign anyone out on the deploy that lands the column", async () => {
+    // Tokens issued before src/auth.ts stamped an epoch carry none at all.
+    // They must read as 0 — every account's default — or shipping this logs the
+    // entire userbase out at once.
+    authMock.mockResolvedValue(sessionWithEpoch(undefined));
+    expect((await getSessionUser())?.id).toBe("user-1");
+  });
+
+  it("cannot be beaten by a token claiming a higher epoch", async () => {
+    // The comparison is equality against the row, not "at least as new as".
+    authMock.mockResolvedValue(sessionWithEpoch(999));
+    expect(await getSessionUser()).toBeNull();
+  });
+
+  it("does not log the world out when the database is unreachable", async () => {
+    // Login cannot work without the DB anyway; converting a Postgres blip into
+    // a site-wide forced logout would be a self-inflicted outage.
+    authMock.mockResolvedValue(sessionWithEpoch(0));
+    setAuthStore({
+      findUserByEmail: async () => null,
+      createUser: async () => {
+        throw new Error("unused");
+      },
+      findAccountById: async () => {
+        throw new Error("db is down");
+      },
+      bumpSessionEpoch: async () => null,
+    });
+    expect((await getSessionUser())?.id).toBe("user-1");
   });
 });

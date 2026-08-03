@@ -298,7 +298,7 @@ describe("mw-entry-v1 through the world runtime — the entry context on the tic
       expect(tick.edgeId, `y=${y}`).toBe(RAMP_EDGE);
       expect(tick.maxSpeedKmh, `y=${y}`).toBe(RAMP_KMH);
       // The ramp must never arm the motorway detectors — a driver builds speed
-      // from REST here, and чл. 54's flow floor is about the carriageway.
+      // from REST here, and the SP-10 flow floor is about the carriageway.
       expect(tick.motorway, `y=${y}`).toBeUndefined();
       expect(tick.emergencyLaneRight, `y=${y}`).toBeUndefined();
       expect(tick.wrongWay, `y=${y}`).not.toBe(true);

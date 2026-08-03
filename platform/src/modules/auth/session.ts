@@ -1,20 +1,37 @@
 import { cache } from "react";
 import { redirect } from "next/navigation";
-import { getAuthStore } from "./store";
+import { getAuthStore, type AccountFlags } from "./store";
 import type { SessionUser } from "./types";
 
 /**
- * User.role, read fresh from the DB (never from the JWT or any client input):
- * a role change takes effect on the next request without re-login, and a
- * forged token cannot claim admin. React cache() dedupes the lookup within
- * one request (dashboard pages call getSessionUser several times).
- * Fail-closed: no DB / unknown row → "student".
+ * User.role AND User.sessionEpoch, read fresh from the DB (never from the JWT
+ * or any client input) in ONE cached query per request:
+ *
+ * - `role`: a role change takes effect on the next request without re-login,
+ *   and a forged token cannot claim admin.
+ * - `sessionEpoch`: the revocation counter. Sessions here are stateless JWTs
+ *   with a 30-day idle life and no Session table, so before this column a
+ *   shared password could not be taken back — resetting it left the friend who
+ *   already knew it signed in for another month. Comparing the epoch stamped
+ *   into the token against the one on the row is what makes "sign out
+ *   everywhere" mean something, and it rides along in a query getSessionUser
+ *   was making anyway.
+ *
+ * React cache() dedupes the lookup within one request (dashboard pages call
+ * getSessionUser several times).
+ *
+ * Fail-closed on ROLE, fail-open on IDENTITY: no DB / unknown row → "student"
+ * with epoch 0. A database blip must not sign the entire userbase out (nothing
+ * else works without the DB either), and an unknown row is the GDPR-erased
+ * account, which the delete action already signs out explicitly.
  */
-const roleForUser = cache(async (userId: string): Promise<string> => {
+const FALLBACK: AccountFlags = { role: "student", sessionEpoch: 0 };
+
+const accountForUser = cache(async (userId: string): Promise<AccountFlags> => {
   try {
-    return (await getAuthStore().findRoleById(userId)) ?? "student";
+    return (await getAuthStore().findAccountById(userId)) ?? FALLBACK;
   } catch {
-    return "student";
+    return FALLBACK;
   }
 });
 
@@ -33,12 +50,21 @@ export async function getSessionUser(): Promise<SessionUser | null> {
   const session = await auth();
   const user = session?.user;
   if (!user?.id || !user.email) return null;
-  const role = await roleForUser(user.id);
+
+  const account = await accountForUser(user.id);
+
+  // REVOCATION. Tokens issued before this column existed carry no epoch at all;
+  // they read as 0, which is every account's default, so nobody is signed out
+  // by the deploy that lands this — only by an actual bump.
+  const tokenEpoch =
+    typeof user.sessionEpoch === "number" ? user.sessionEpoch : 0;
+  if (tokenEpoch !== account.sessionEpoch) return null;
+
   return {
     id: user.id,
     email: user.email,
     name: user.name ?? null,
-    isAdmin: role === "admin",
+    isAdmin: account.role === "admin",
   };
 }
 

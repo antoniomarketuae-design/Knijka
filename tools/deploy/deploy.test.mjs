@@ -94,8 +94,14 @@ exit 0
 
 // -f means "fail with a non-zero exit on an HTTP error", which is how the
 // scripts read a 503. 22 is curl's code for exactly that.
+// `-f` means "fail with a non-zero exit on an HTTP error" AND discard the
+// body. The script uses `-fsS` for the health gate and plain `-sS` for the
+// half-applied-schema question, precisely because that one needs to READ a 503
+// body. The fake has to model both, so it inspects its own flags.
 const FAKE_CURL = `#!/usr/bin/env bash
 for url in "$@"; do :; done
+fail_on_error=0
+case " $* " in *" -fsS "*) fail_on_error=1 ;; esac
 sha=$(cat "$T/control/serving_sha" 2>/dev/null || true)
 bad=$(cat "$T/control/bad_sha" 2>/dev/null || true)
 mode=$(cat "$T/control/health" 2>/dev/null || echo ok)
@@ -107,7 +113,13 @@ case "$url" in
   *probe=liveness*) echo "{\\"ok\\":true,\\"probe\\":\\"liveness\\",\\"commit\\":\\"$sha\\"}" ;;
   *)
     if [ "$mode" = "db-down" ]; then exit 22; fi
-    echo "{\\"ok\\":true,\\"probe\\":\\"readiness\\",\\"commit\\":\\"$sha\\",\\"checks\\":{\\"db\\":{\\"ok\\":true}}}"
+    if [ "$mode" = "migrations-pending" ]; then
+      # What the route really answers: 503, with a body naming the failure.
+      echo "{\\"ok\\":false,\\"probe\\":\\"readiness\\",\\"commit\\":\\"$sha\\",\\"checks\\":{\\"db\\":{\\"ok\\":true},\\"migrations\\":{\\"ok\\":false,\\"error\\":\\"unfinished\\"}}}"
+      if [ "$fail_on_error" = "1" ]; then exit 22; fi
+      exit 0
+    fi
+    echo "{\\"ok\\":true,\\"probe\\":\\"readiness\\",\\"commit\\":\\"$sha\\",\\"checks\\":{\\"db\\":{\\"ok\\":true},\\"migrations\\":{\\"ok\\":true}}}"
     ;;
 esac
 exit 0
@@ -302,6 +314,38 @@ test("deploy.sh: a database outage does NOT trigger a code rollback", (t) => {
   assert.equal(s.liveSha(), s.sha2, "rolling back cannot fix Postgres — it would only add downtime");
   assert.equal(s.read("state", "deployed_sha"), s.sha2);
   assert.match(stdout, /NOT rolling back/);
+});
+
+test("deploy.sh: a HALF-APPLIED SCHEMA does trigger a code rollback", (t) => {
+  // The opposite call to the test above, and the distinction is the whole
+  // point. `prisma migrate deploy` fell over and left a migration marked
+  // started-but-never-finished, so /api/health answers 503 with
+  // `"migrations":{"ok":false`. The process is up and liveness is green — so
+  // before this branch existed the script took the db-outage path, exited 3,
+  // and left staging serving a build whose every query against the new column
+  // 500s. Rolling back IS the remedy here: the previous build predates the
+  // migration and does not need the columns it failed to create.
+  const s = makeSandbox(t);
+  s.control("health", "migrations-pending");
+
+  const { code, stdout } = s.run("deploy.sh");
+
+  assert.equal(code, 1, "a rollback, not the page-a-human exit code");
+  assert.equal(s.liveSha(), s.sha1, "the previous build must be serving again");
+  assert.equal(s.read("state", "deployed_sha"), s.sha1);
+  assert.match(stdout, /UNFINISHED MIGRATION/);
+  assert.match(stdout, /ROLLING BACK/);
+  // The log has to say the schema was NOT reverted and where the dump is, or
+  // the human reading it at 3am cannot tell what state the database is in.
+  assert.match(stdout, /deliberately NOT reverted/);
+  assert.match(stdout, /pre-deploy/);
+  // AND THE HONEST ENDING: readiness is still red after the rollback, because
+  // rolling back the code does not clean up `_prisma_migrations` — Prisma's
+  // own `migrate resolve` does, and only a human can decide which way. So this
+  // deploy ends "staging is serving the old build, and someone must look",
+  // which is exactly the state it is in. Pretending otherwise is how the
+  // 11.5-hour outage stayed invisible.
+  assert.match(stdout, /rollback did NOT restore health/);
 });
 
 test("deploy.sh: the database is backed up BEFORE migrations run", (t) => {

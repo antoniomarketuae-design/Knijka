@@ -158,6 +158,28 @@ new_build_is_serving() {
   [ "${body#*\"commit\":\"$want_sha\"}" != "$body" ]
 }
 
+# THE THIRD ANSWER, and the one this deploy used to get wrong.
+#
+# Readiness now fails for two different reasons, and they need opposite
+# remedies. `checks.db` red = the database is unreachable → do NOT roll back
+# (the old build faces the same database; a rollback adds a restart and fixes
+# nothing). `checks.migrations` red = `prisma migrate deploy` fell over and left
+# a migration started-but-never-finished → DO roll back, because the previous
+# build predates that migration and does not need the schema it failed to
+# create. Without this function the second case took the first case's branch:
+# liveness answered fine, the script exited 3, and staging sat there serving a
+# build whose every query against the new column 500ed.
+#
+# `curl -sS` and NOT `-fsS`: readiness answers 503 in exactly this situation,
+# and `-f` discards the body — which is the one thing we need to read.
+schema_is_half_applied() {
+  local body
+  body=$(curl -sS --max-time 5 "$HEALTH_URL" 2>/dev/null) || return 1
+  # The route emits `ok` first inside each check, so this substring is stable
+  # (src/app/api/health/route.ts, and a test pins the exact bytes).
+  [ "${body#*\"migrations\":\{\"ok\":false}" != "$body" ]
+}
+
 # --- swap --------------------------------------------------------------------
 # Hardlink-copy then rename. `cp -al` costs no disk and takes a moment even for
 # node_modules, because it only writes directory entries; `mv` within one
@@ -290,6 +312,19 @@ main() {
     for rel in "${SWAP_PATHS[@]}"; do rm -rf "$LIVE_PLATFORM/$rel.prev" "$LIVE_PLATFORM/$rel.failed"; done
     log "deployed ${target:0:12} — healthy"
     return 0
+  fi
+
+  # ORDER MATTERS. A half-applied schema also passes `new_build_is_serving`
+  # (the process is up, liveness never touches the database), so asking that
+  # question first would classify it as "the database is down" and refuse the
+  # one remedy that works. Ask the specific question before the general one.
+  if schema_is_half_applied; then
+    log "ALERT: /api/health reports an UNFINISHED MIGRATION — the schema is half applied."
+    log "       Rolling back the CODE: the previous build predates this migration"
+    log "       and does not need the columns it failed to create. The schema is"
+    log "       deliberately NOT reverted (see tools/deploy/README.md); the"
+    log "       pre-deploy dump is in /var/backups/knijka as knijka-*-pre-deploy-*.dump."
+    return 1 # the EXIT trap rolls back
   fi
 
   if new_build_is_serving "$target"; then

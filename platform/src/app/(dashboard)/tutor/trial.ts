@@ -16,6 +16,7 @@
  * action: the only rows that count are the ones the tutor module itself wrote.
  */
 
+import { isFeatureDisabled } from "@/lib/features";
 import type { SessionUser } from "@/modules/auth";
 import {
   checkTutorQuota,
@@ -43,6 +44,25 @@ export async function getTutorAccess(
   user: SessionUser,
   messages: TutorMessage[],
 ): Promise<TutorQuota> {
+  // DISABLED_FEATURES kill switch (src/lib/features.ts), before the admin
+  // bypass and before any quota arithmetic. The tutor is the only surface that
+  // spends real money per request, so „off" has to mean off for everyone,
+  // including the founder — otherwise the switch that was flipped because the
+  // bill ran away leaves the most expensive account still spending.
+  //
+  // `remaining: 0` is what makes this reach the ACTION and not only the page:
+  // askTutorAction already refuses on `!allowed` before calling askTutor(), so
+  // no model token is spent by a tab that was open when the switch flipped.
+  // The action tells the student it is switched off rather than reusing the
+  // trial-spent copy — see TUTOR_OFFLINE_REPLY_BG in actions.ts.
+  if (isFeatureDisabled("tutor")) {
+    return {
+      allowed: false,
+      remaining: 0,
+      limit: FREE_TUTOR_LIFETIME_MESSAGES,
+      unlimited: false,
+    };
+  }
   if (user.isAdmin) {
     return {
       allowed: true,

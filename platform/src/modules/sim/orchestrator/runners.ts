@@ -1435,6 +1435,19 @@ const NM_BARGE_MIN_KMH = 6;
 const NM_ONCOMING_NEAR_M = 25;
 /** Yield credit is observable this far before the section start, m. */
 const NM_WAIT_ZONE_M = 45;
+/**
+ * Yield credit is EARNED only this close to the стеснение mouth, m. Being slow
+ * 30 m back is approaching, not giving way: a student who crawls the whole
+ * street latched „yielded" (and the commendation) far from the narrowing, and
+ * the runner then retired before he ever reached it. Awareness of the conflict
+ * arms at NM_WAIT_ZONE_M; the CREDIT is a separate, tighter question.
+ */
+const NM_YIELD_CREDIT_ZONE_M = 20;
+/**
+ * A head-on contact this far south of the section still belongs to the meeting,
+ * m — the barge often makes contact just before the mouth.
+ */
+const NM_CONTACT_ZONE_M = 25;
 /** Actor sync clamp, m/s. */
 const NM_SYNC_MIN_MPS = 1.5;
 
@@ -1539,6 +1552,23 @@ export class NarrowMeetingRunner implements EventRunner {
       dist(input.x, input.y, actor.x, actor.y) < VEHICLE_CONTACT_M &&
       input.speedKmh + actor.speedMps * 3.6 > 4
     ) {
+      // Name the LAW before its consequence. `resolve()` retires the runner, so
+      // a barge whose contact beat the NM_SUSTAIN_SEC window used to emit a
+      // collision and nothing else: the end-of-lesson ledger read «Опасни
+      // грешки 2», both entries «Пътнотранспортно произшествие», and no
+      // priority entry anywhere. The student was told he crashed; he was never
+      // told he took a gap that was not his — the only sentence that teaches
+      // the rule (THEO-4). Guarded so a player on his OWN side, or one who
+      // HOLDS the priority (obstruction opposite), is never billed for it.
+      if (
+        s.obstructionSide === "player" &&
+        this.phase === "triggered" &&
+        playerLat > NM_LANE_OVER_M &&
+        playerAlong >= -NM_CONTACT_ZONE_M &&
+        playerAlong <= this.lenM + 5
+      ) {
+        out.push({ kind: "prioritySituation", situation: "narrow-meeting", violated: true });
+      }
       out.push({ kind: "collision", withWhat: "vehicle" });
       return this.resolve(input, false, "collision");
     }
@@ -1587,7 +1617,13 @@ export class NarrowMeetingRunner implements EventRunner {
     }
 
     // triggered — adjudicate.
-    const actorCleared = actorAlong < playerAlong - 4 || actorAlong < -4 || actor.finished;
+    // The meeting is over when the oncoming is genuinely BEHIND the player, or
+    // its path ran out — never merely because it left the стеснение. The old
+    // `actorAlong < -4` disjunct („it is out of the narrowing") retired the
+    // runner while the car was still north of a player who had not reached the
+    // section yet — i.e. still closing head-on. Everything after that frame was
+    // ungradable, which is how a barge can raise no fault at all.
+    const actorCleared = actorAlong < playerAlong - 4 || actor.finished;
     const conflictLive = !actorCleared && actorAlong <= this.lenM + NM_ONCOMING_NEAR_M;
     if (conflictLive && this.condSince === null) this.condSince = input.tSec;
     if (conflictLive && dStart <= NM_WAIT_ZONE_M + this.lenM) this.sawConflict = true;
@@ -1595,10 +1631,11 @@ export class NarrowMeetingRunner implements EventRunner {
       this.sawConflict &&
       !actorCleared &&
       input.speedKmh <= LTAP_YIELD_KMH &&
+      playerAlong >= -NM_YIELD_CREDIT_ZONE_M &&
       playerAlong < 4 &&
       playerLat <= NM_LANE_OVER_M
     ) {
-      this.sawWait = true; // waiting at the widening, own side
+      this.sawWait = true; // waiting AT the widening, own side
     }
 
     const playerInSection = playerAlong >= -2 && playerAlong <= this.lenM + 2;

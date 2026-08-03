@@ -92,11 +92,23 @@ export type FinishLessonActionResult =
        *  session yet — the server refuses to persist (soft gate, doc 76 §8).
        *  NOT_SIGNED_IN: no session server-side. A CODE, never a redirect — a
        *  redirect thrown in a server action becomes a 303 the router follows,
-       *  which replaced the whole drive screen with /login mid-drive (B39). */
+       *  which replaced the whole drive screen with /login mid-drive (B39).
+       *
+       *  RATE_LIMITED (doc 91 S4): the per-user abuse budget on the save action
+       *  is spent. It is NOT `SAVE_FAILED` and the difference is the student's,
+       *  not the engineer's: SAVE_FAILED means the write was attempted and the
+       *  database refused it — nothing the driver did caused it and nothing they
+       *  can do fixes it. RATE_LIMITED means the write was never attempted,
+       *  because they saved twenty drives inside ten minutes; it clears on its
+       *  own and the same drive saves fine after a wait. Telling a throttled
+       *  student their drive „failed to save" is a false statement about their
+       *  data, and the one they would act on — by driving it again, immediately,
+       *  which is precisely what spends the rest of the budget. */
       code:
         | "INVALID_INPUT"
         | "UNKNOWN_LESSON"
         | "SAVE_FAILED"
+        | "RATE_LIMITED"
         | "LEVEL_LOCKED"
         | "NOT_SIGNED_IN";
     };

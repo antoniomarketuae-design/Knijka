@@ -32,6 +32,7 @@ export function AskBar({
   onChip,
   onFreeText,
   onResume,
+  onNext,
   className,
 }: {
   chips: readonly AskChip[];
@@ -40,6 +41,19 @@ export function AskBar({
   onChip: (chip: AskChip) => void;
   onFreeText: (question: string) => void;
   onResume: () => void;
+  /**
+   * „Напред" — end this sentence now.
+   *
+   * THIS TEACHER IS TEXT, AND THAT CHANGES WHO OWNS THE CLOCK. With a voice,
+   * the end of a sentence is an event the audio raises. With text, the whole
+   * sentence is on screen the instant it renders, so the only honest source of
+   * „I am done with this one" is the student — and until this button existed
+   * the room guessed it from a characters-per-minute estimate, which is too
+   * slow for a fast reader and too fast for a careful one at the same time.
+   * The estimate stays as the floor (it keeps a lecture moving on its own);
+   * this is the override.
+   */
+  onNext?: () => void;
   className?: string;
 }) {
   const [text, setText] = useState("");
@@ -57,13 +71,23 @@ export function AskBar({
           type="button"
           onClick={onRaiseHand}
           disabled={!canAsk(state)}
-          className="btn-primary flex-1 px-3 py-2 text-sm font-bold disabled:cursor-not-allowed disabled:opacity-40"
+          className="btn-accent min-w-0 flex-1 px-3 py-2 text-sm font-bold disabled:cursor-not-allowed disabled:opacity-40"
         >
           <span aria-hidden className="mr-1.5">
             ✋
           </span>
           Вдигни ръка · спри и питай
         </button>
+        {onNext && (
+          <button
+            type="button"
+            onClick={onNext}
+            aria-label="Напред към следващото изречение"
+            className="btn-ghost shrink-0 whitespace-nowrap px-3 py-2 text-sm font-bold"
+          >
+            Напред ›
+          </button>
+        )}
       </div>
     );
   }
@@ -120,7 +144,7 @@ export function AskBar({
             aria-label="Твоят въпрос към учителя"
             className="min-w-0 flex-1 rounded-xl border border-border bg-surface-2 px-3 py-2 text-sm text-foreground placeholder:text-muted"
           />
-          <button type="submit" disabled={busy} className="btn-primary px-3 py-2 text-sm">
+          <button type="submit" disabled={busy} className="btn-accent px-3 py-2 text-sm">
             Питай
           </button>
         </form>

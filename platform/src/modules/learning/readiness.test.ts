@@ -15,8 +15,8 @@ import {
   SIM_EVIDENCE_WINDOW_DAYS,
 } from "./readiness";
 import {
-  extractSimEvidence,
   setLearningStore,
+  toSimEvidenceRow,
   type ProgressRow,
   type SimEvidenceRow,
 } from "./store";
@@ -336,56 +336,43 @@ describe("sim weak spots", () => {
   });
 });
 
-describe("extractSimEvidence", () => {
+describe("toSimEvidenceRow", () => {
   const finishedAt = NOW;
 
-  it("extracts concept-linked rule events from a v1 payload", () => {
-    const rows = extractSimEvidence(
-      {
-        version: 1,
-        ruleEvents: [
-          {
-            kind: "violation",
-            code: "RED_LIGHT_CROSSED",
-            severityClass: "opasna",
-            conceptId: "c-traffic-light-signals",
-            t: 10,
-          },
-          { kind: "commendation", code: "SAFE_LANE_CHANGE", conceptId: "c-lane-change", t: 20 },
-          // No conceptId → not evidence.
-          { kind: "violation", code: "POOR_LANE_KEEPING", severityClass: "vtorostepenna", t: 30 },
-        ],
-      },
+  it("recognises the two kinds of concept-linked rule event", () => {
+    expect(
+      toSimEvidenceRow("c-traffic-light-signals", "violation", "opasna", finishedAt),
+    ).toEqual({
+      conceptId: "c-traffic-light-signals",
+      kind: "violation",
+      severity: "opasna",
       finishedAt,
-    );
-    expect(rows).toEqual([
-      {
-        conceptId: "c-traffic-light-signals",
-        kind: "violation",
-        severity: "opasna",
-        finishedAt,
-      },
-      { conceptId: "c-lane-change", kind: "commendation", severity: null, finishedAt },
-    ]);
+    });
+    // A commendation carries no severity, and must not inherit one.
+    expect(
+      toSimEvidenceRow("c-lane-change", "commendation", "opasna", finishedAt),
+    ).toEqual({
+      conceptId: "c-lane-change",
+      kind: "commendation",
+      severity: null,
+      finishedAt,
+    });
   });
 
-  it("never trusts stored Json: foreign/corrupt payloads yield nothing", () => {
-    expect(extractSimEvidence(null, finishedAt)).toEqual([]);
-    expect(extractSimEvidence("x", finishedAt)).toEqual([]);
-    expect(extractSimEvidence({ version: 2, ruleEvents: [] }, finishedAt)).toEqual([]);
-    expect(
-      extractSimEvidence(
-        {
-          version: 1,
-          ruleEvents: [
-            { kind: "violation", conceptId: "c-road", severityClass: "made-up" },
-            { kind: "weird", conceptId: "c-road" },
-            "not-an-object",
-          ],
-        },
-        finishedAt,
-      ),
-    ).toEqual([]);
+  it("never trusts the Json another module wrote", () => {
+    // Every one of these arrives as SQL NULL out of the projection when the
+    // stored element is not the object shape we expect.
+    expect(toSimEvidenceRow(null, "violation", "opasna", finishedAt)).toBeNull();
+    expect(toSimEvidenceRow("", "violation", "opasna", finishedAt)).toBeNull();
+    // Not evidence: a rule event with no concept link teaches nothing.
+    expect(toSimEvidenceRow(undefined, "violation", "opasna", finishedAt)).toBeNull();
+    // An unknown kind, and — the one that would actually hurt — a severity
+    // that is not a member of the official three. SIM_SEVERITY_UNITS is
+    // indexed with it, so letting it through would weigh a violation
+    // `undefined` and poison the whole blend with NaN.
+    expect(toSimEvidenceRow("c-road", "weird", null, finishedAt)).toBeNull();
+    expect(toSimEvidenceRow("c-road", "violation", "made-up", finishedAt)).toBeNull();
+    expect(toSimEvidenceRow("c-road", "violation", null, finishedAt)).toBeNull();
   });
 });
 

@@ -144,7 +144,7 @@ describe(`${ID} through the world builder`, () => {
   it("hosts ONE UNMARKED crossing inside the zone, on the zone edge", () => {
     expect(district.crossings.map((c) => c.id)).toEqual(["pz-x-1"]);
     const cross = district.crossings[0];
-    // The design crux: чл. 62–63 shares the WHOLE carriageway, so a painted
+    // The design crux: чл. 61–62 shares the WHOLE carriageway, so a painted
     // zebra here would teach the opposite of the law. "unmarked" keeps the
     // CrossingZoneTracker (and with it the чл. 119 yield duty) armed on bare
     // asphalt — see gen_pe_zone.mjs's header.

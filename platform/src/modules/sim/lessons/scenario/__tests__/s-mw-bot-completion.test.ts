@@ -1,7 +1,7 @@
 /**
  * Bot-completion proof (doc 76 §10; the s-sp-curve-bot-completion mold) — the
  * MOTORWAY-SEGMENT templates sc-mw-discipline (SP-10 + OV-11 at speed) and
- * sc-mw-emergency-lane (чл. 58, т. 3), their shadows driven through the FULL
+ * sc-mw-emergency-lane (чл. 58, т. 4), their shadows driven through the FULL
  * production pipeline:
  *
  *   compileScenario(L3) → createLessonSession → recordScMw*Drive's onTick

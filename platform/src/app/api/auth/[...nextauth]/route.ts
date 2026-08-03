@@ -34,8 +34,9 @@ const CREDENTIALS_CALLBACK = "/api/auth/callback/credentials";
  * it, or null when this is not a credentials attempt we can key on.
  *
  * Read from a CLONE: consuming the body here would hand next-auth an
- * already-read stream. Never logged, never persisted — it lives only in the
- * in-process lockout map (ADR-004, minimal PII).
+ * already-read stream. Never logged, and never persisted AS AN ADDRESS: the
+ * lockout row is keyed on sha256 of it, so the durable table cannot become a
+ * list of every address anyone ever typed here (ADR-004, minimal PII).
  */
 async function attemptedEmail(request: NextRequest): Promise<string | null> {
   try {
@@ -85,7 +86,9 @@ export async function POST(request: NextRequest): Promise<Response> {
   const email = await attemptedEmail(request);
   if (!email) return handlers.POST(request);
 
-  const waitSec = checkLockout(email, LOGIN_LOCKOUT);
+  // Awaited now: the streak lives in the LoginLockout table, not in a Map that
+  // our five-minute deploy cron was clearing for the attacker (lockoutStore.ts).
+  const waitSec = await checkLockout(email, LOGIN_LOCKOUT);
   if (waitSec > 0) {
     // Deliberately the SAME 429 an IP-budget block returns: it must not become
     // an account-enumeration oracle ("this address exists and is locked out").
@@ -94,10 +97,10 @@ export async function POST(request: NextRequest): Promise<Response> {
 
   const response = await handlers.POST(request);
   if (await wasRejected(response)) {
-    recordFailure(email, LOGIN_LOCKOUT);
+    await recordFailure(email, LOGIN_LOCKOUT);
   } else {
     // A correct password proves the account is not under attack right now.
-    clearFailures(email, LOGIN_LOCKOUT);
+    await clearFailures(email, LOGIN_LOCKOUT);
   }
   return response;
 }

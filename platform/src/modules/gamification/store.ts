@@ -12,6 +12,7 @@
  * owned by the learning/exam modules — no schema changes (see task contract).
  */
 
+import { invalidateRequestScoped, requestScoped } from "@/lib/requestScope";
 import type { AchievementMarker } from "./types";
 
 export interface GamificationStateRow {
@@ -158,7 +159,55 @@ export function setGamificationStore(s: GamificationStore | null): void {
   store = s;
 }
 
-export function getGamificationStore(): GamificationStore {
+/** The store as injected — the fake in tests, the Prisma one in production. */
+function rawStore(): GamificationStore {
   if (!store) store = createPrismaStore();
   return store;
+}
+
+/**
+ * Request-scope key for the user's GamificationState row.
+ *
+ * The dashboard asks for that ONE row three times in a single render:
+ * getSummary (the XP bar), getDailyMission (has today's bonus already been
+ * paid?) and getRecentAchievements (the medals). Nothing in a GET writes the
+ * table, so all three are asking the same question at the same instant.
+ */
+const STATE_SCOPE = "gamification.state";
+
+const readState = requestScoped(
+  STATE_SCOPE,
+  (userId: string): Promise<GamificationStateRow | null> =>
+    rawStore().getState(userId),
+);
+
+/**
+ * The store every caller gets: the injected one, with the state read deduped
+ * per request.
+ *
+ * The memo sits ABOVE the injection seam rather than inside the Prisma store —
+ * same layer readiness.ts memoises the learning store at — so it is the store
+ * CONTRACT that guarantees one read per request, not one implementation of it.
+ * Outside a request scope it degrades to a plain call (lib/requestScope.ts), so
+ * a unit test driving the fake still sees every call it makes.
+ */
+const scopedStore: GamificationStore = {
+  getState: (userId) => readState(userId),
+
+  async saveState(userId, state) {
+    await rawStore().saveState(userId, state);
+    // recordActivity reads this row, awards XP and writes it back — and the
+    // simulator's finish action reports activity and then renders the new
+    // total in the same request. Evicting here is what stops that later read
+    // from being served the pre-award row.
+    invalidateRequestScoped(STATE_SCOPE, userId);
+  },
+
+  countCorrectAnswers: (userId) => rawStore().countCorrectAnswers(userId),
+  getAttemptsSince: (userId, since) => rawStore().getAttemptsSince(userId, since),
+  getMastery: (userId) => rawStore().getMastery(userId),
+};
+
+export function getGamificationStore(): GamificationStore {
+  return scopedStore;
 }

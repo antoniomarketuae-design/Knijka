@@ -60,6 +60,20 @@ export interface SimEvidenceRow {
   finishedAt: Date;
 }
 
+/**
+ * Ceiling on the concept-linked rule events ONE readiness computation reads.
+ *
+ * The fourteen-day window is a bound on TIME, not on volume: it is exactly as
+ * large as the student's own diligence, so the best customer pays the most.
+ * Newest drives first, so the cap trims the OLDEST evidence in the window —
+ * which is the direction readiness already wants (recency is the whole point
+ * of a fourteen-day window). Five hundred events is far past where the two
+ * consumers change their answer: the blend needs a per-concept ratio and the
+ * weak-spots card ranks three concepts, and both saturate within a few dozen
+ * events per concept.
+ */
+export const SIM_EVIDENCE_ROW_LIMIT = 500;
+
 export interface LearningStore {
   /** All Progress rows for a user. */
   getProgress(userId: string): Promise<ProgressRow[]>;
@@ -81,45 +95,61 @@ export interface LearningStore {
   upsertProgress(userId: string, updates: ProgressUpdate[]): Promise<void>;
   /**
    * Concept-linked rule events from sim sessions finished at/after `since`
-   * (read-only; see SimEvidenceRow). Unreadable/foreign event payloads are
-   * skipped silently — never fail readiness over one corrupt row.
+   * (read-only; see SimEvidenceRow). At most SIM_EVIDENCE_ROW_LIMIT rows,
+   * newest drive first. Unreadable/foreign event payloads are skipped
+   * silently — never fail readiness over one corrupt row.
    */
   getSimEvidenceSince(userId: string, since: Date): Promise<SimEvidenceRow[]>;
 }
 
 /**
- * Defensive extraction of concept-linked rule events from a SimSession
- * events Json column. Exported for the Prisma store + tests; accepts the
- * versioned payload written by sim/lessons/store.ts but trusts nothing.
+ * Narrow ONE (conceptId, kind, severityClass) triple to a SimEvidenceRow, or
+ * null when it is not evidence this module recognises.
+ *
+ * Everything is `unknown` because the triple arrives out of a Json column that
+ * another module writes: a foreign or half-migrated payload must produce fewer
+ * rows, never a throw and never a row with a severity the blend would index a
+ * weight table with. Pure, so the rules are unit-testable without a database.
  */
-export function extractSimEvidence(
-  events: unknown,
+export function toSimEvidenceRow(
+  conceptId: unknown,
+  kind: unknown,
+  severityClass: unknown,
   finishedAt: Date,
-): SimEvidenceRow[] {
-  if (typeof events !== "object" || events === null) return [];
-  const o = events as Record<string, unknown>;
-  if (o.version !== 1 || !Array.isArray(o.ruleEvents)) return [];
-
-  const out: SimEvidenceRow[] = [];
-  for (const item of o.ruleEvents) {
-    if (typeof item !== "object" || item === null) continue;
-    const e = item as Record<string, unknown>;
-    if (typeof e.conceptId !== "string" || e.conceptId.length === 0) continue;
-    if (e.kind === "violation") {
-      const severity = e.severityClass;
-      if (
-        severity !== "opasna" &&
-        severity !== "osnovna" &&
-        severity !== "vtorostepenna"
-      ) {
-        continue;
-      }
-      out.push({ conceptId: e.conceptId, kind: "violation", severity, finishedAt });
-    } else if (e.kind === "commendation") {
-      out.push({ conceptId: e.conceptId, kind: "commendation", severity: null, finishedAt });
-    }
+): SimEvidenceRow | null {
+  if (typeof conceptId !== "string" || conceptId.length === 0) return null;
+  if (kind === "commendation") {
+    return { conceptId, kind: "commendation", severity: null, finishedAt };
   }
-  return out;
+  if (kind !== "violation") return null;
+  if (
+    severityClass !== "opasna" &&
+    severityClass !== "osnovna" &&
+    severityClass !== "vtorostepenna"
+  ) {
+    return null;
+  }
+  return { conceptId, kind: "violation", severity: severityClass, finishedAt };
+}
+
+/** One projected rule event — every column is nullable by construction. */
+interface SimEvidenceQueryRow {
+  finishedAt: unknown;
+  conceptId: string | null;
+  kind: string | null;
+  severity: string | null;
+}
+
+/** Timestamps out of $queryRaw are adapter-shaped; accept Date/string/number. */
+function asDate(value: unknown): Date | null {
+  if (value instanceof Date) {
+    return Number.isNaN(value.getTime()) ? null : value;
+  }
+  if (typeof value === "string" || typeof value === "number") {
+    const d = new Date(value);
+    return Number.isNaN(d.getTime()) ? null : d;
+  }
+  return null;
 }
 
 function createPrismaStore(): LearningStore {
@@ -176,14 +206,53 @@ function createPrismaStore(): LearningStore {
 
     async getSimEvidenceSince(userId, since) {
       const db = await getDb();
-      const rows = await db.simSession.findMany({
-        where: { userId, finishedAt: { gte: since } },
-        select: { events: true, finishedAt: true },
-      });
+      // NOT `select: { events: true }` over the whole window. This read wants
+      // three strings per rule event — conceptId, kind, severityClass — and
+      // `events` is the entire session payload: every ViolationEvent carries
+      // its own titleBg + explanationBg + lawRef, ~430 bytes of Bulgarian
+      // prose that already lives in sim/rules, plus objectives, eventPositions
+      // and nearMisses that nothing here reads at all. Selecting the column
+      // shipped all of it to Node and JSON.parsed it, for every session in
+      // fourteen days, with no `take` — so the cost of one dashboard paint
+      // grew with how much the student drove.
+      //
+      // Postgres can do the projection where the bytes already are, so the
+      // wire carries evidence instead of prose. Three things make it safe on a
+      // Json column another module owns:
+      //   * the CASE guard — jsonb_array_elements() THROWS on a scalar or an
+      //     object, and one corrupt row must not fail a student's readiness;
+      //   * `version = '1'` — same envelope check the in-Node parse did, so a
+      //     future payload version is skipped rather than misread;
+      //   * `->>` on a non-object element yields NULL, and toSimEvidenceRow
+      //     drops NULLs — junk inside the array is skipped, not trusted.
+      // ORDER BY startedAt (not finishedAt) rides the (userId, startedAt)
+      // index, exactly like sim/lessons/store.ts:listSessions.
+      const rows = await db.$queryRaw<SimEvidenceQueryRow[]>`
+        SELECT s."finishedAt"              AS "finishedAt",
+               e.value ->> 'conceptId'     AS "conceptId",
+               e.value ->> 'kind'          AS "kind",
+               e.value ->> 'severityClass' AS "severity"
+          FROM "SimSession" s
+          CROSS JOIN LATERAL jsonb_array_elements(
+                 CASE WHEN jsonb_typeof(s."events" -> 'ruleEvents') = 'array'
+                      THEN s."events" -> 'ruleEvents'
+                      ELSE '[]'::jsonb END
+               ) WITH ORDINALITY AS e(value, ord)
+         WHERE s."userId" = ${userId}
+           AND s."finishedAt" >= ${since}
+           AND s."events" ->> 'version' = '1'
+         ORDER BY s."startedAt" DESC, e.ord ASC
+         LIMIT ${SIM_EVIDENCE_ROW_LIMIT}`;
+
       const out: SimEvidenceRow[] = [];
       for (const r of rows) {
-        if (r.finishedAt === null) continue;
-        out.push(...extractSimEvidence(r.events, r.finishedAt));
+        // The WHERE cannot match a NULL finishedAt, so this only ever falls
+        // back when a driver adapter hands the column over as something other
+        // than a Date. `since` is then the honest floor: the row IS inside the
+        // window, and no consumer reads the timestamp for anything finer.
+        const finishedAt = asDate(r.finishedAt) ?? since;
+        const row = toSimEvidenceRow(r.conceptId, r.kind, r.severity, finishedAt);
+        if (row) out.push(row);
       }
       return out;
     },
@@ -227,8 +296,12 @@ function createPrismaStore(): LearningStore {
 
 let store: LearningStore | null = null;
 
-/** Test suites inject an in-memory fake here (see fixtures.ts). */
-export function setLearningStore(s: LearningStore): void {
+/**
+ * Test suites inject an in-memory fake here (see fixtures.ts). `null` restores
+ * the Prisma-backed store — which is how prismaStoreQueries.test.ts gets to
+ * look at the statement this module really issues.
+ */
+export function setLearningStore(s: LearningStore | null): void {
   store = s;
 }
 

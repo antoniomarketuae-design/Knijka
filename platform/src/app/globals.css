@@ -950,19 +950,39 @@ body {
   /* Primary action: bright accent, dark text, glow on hover/focus.
      State rules below are authored as plain CSS (not @apply variants): press
      physics (motion-safe) dip the button and drop the glow; disabled dims it and
-     neutralises the hover glow so it never lights up when inert. */
-  .btn-accent {
+     neutralises the hover glow so it never lights up when inert.
+
+     .btn-primary IS THE SAME BUTTON, and it is on the selector list rather
+     than in a rule of its own on purpose.
+
+     It was used in twelve places from 28 July and defined in none — so
+     „Започни урока", the first tap target in the classroom, and four controls
+     in the drive review and the calibration gate rendered as bare unstyled
+     text for a week. Two fixes were possible: rename the call sites, or make
+     the name real. The name is made real, for three reasons. (1) The five
+     survivors are spread across lanes that are being edited concurrently, and
+     a rename is a merge conflict in someone else's file for a defect that is
+     ours. (2) `btn-primary` is the name a developer reaches for first — an
+     undefined one guarantees a thirteenth occurrence. (3) A second RULE would
+     be drift waiting to happen; a second SELECTOR cannot drift, because there
+     is still exactly one set of declarations. .btn-accent stays the canonical
+     name in new code — this is the alias that stops it from being a hole. */
+  .btn-accent,
+  .btn-primary {
     @apply inline-flex items-center justify-center gap-2 rounded-xl bg-accent px-5 py-3 text-sm font-bold text-accent-foreground transition hover:shadow-glow motion-reduce:transition-none;
   }
-  .btn-accent:active {
+  .btn-accent:active,
+  .btn-primary:active {
     box-shadow: none;
   }
-  .btn-accent:disabled {
+  .btn-accent:disabled,
+  .btn-primary:disabled {
     cursor: not-allowed;
     opacity: 0.5;
     box-shadow: none;
   }
-  .btn-accent:disabled:hover {
+  .btn-accent:disabled:hover,
+  .btn-primary:disabled:hover {
     box-shadow: none;
   }
 
@@ -990,6 +1010,7 @@ body {
   /* Press dip — transform only when the user allows motion. */
   @media (prefers-reduced-motion: no-preference) {
     .btn-accent:active,
+    .btn-primary:active,
     .btn-ghost:active {
       transform: translateY(1px);
     }

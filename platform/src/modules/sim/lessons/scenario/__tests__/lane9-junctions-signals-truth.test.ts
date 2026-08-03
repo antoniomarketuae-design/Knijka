@@ -298,7 +298,7 @@ describe("L4 — the регулировчик stands on the approach he is talki
 });
 
 describe("L4 — every gesture says who goes, who stops and whose priority it is", () => {
-  it("covers the three ППЗДвП чл. 66 postures", () => {
+  it("covers the three ППЗДвП чл. 29, ал. 3 postures", () => {
     expect(CONTROLLER_GESTURES.map((g) => g.posture)).toEqual([
       "sideProfile",
       "chestOrBack",
@@ -319,7 +319,11 @@ describe("L4 — every gesture says who goes, who stops and whose priority it is
         expect(value.length, `${gesture.posture}.${field} is too thin to teach`).toBeGreaterThan(24);
         expect(value, `${gesture.posture}.${field} must be Bulgarian`).toMatch(/[Ѐ-ӿ]/);
       }
-      expect(gesture.lawRef).toMatch(/чл\. ?66|чл\. ?7/);
+      // 2026-08-03: was /чл\. ?66|чл\. ?7/. ППЗДвП чл. 66 is „Другите средства
+      // за сигнализиране" (направляващи стълбчета, конуси, бариери) — the
+      // регулировчик's postures are ППЗДвП чл. 29, ал. 3. ЗДвП чл. 7 (the
+      // controller outranks the lamp) stays valid alongside it.
+      expect(gesture.lawRef).toMatch(/ППЗДвП чл\. 29, ал\. 3/);
     });
   }
 

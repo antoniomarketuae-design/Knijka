@@ -97,7 +97,7 @@ describe("sc-mw-min-speed — the shadow gate (doc 76 §5)", () => {
 
   it("really cruises at flow speed in the RIGHT travel lane (the recorder-honesty assert)", () => {
     // The authored 110 must be REACHED (no silent kinematic rewrite) — and it
-    // must stay a FLOW speed, not a crawl: comfortably over чл. 54's 50 km/h
+    // must stay a FLOW speed, not a crawl: comfortably over the authored 50 km/h
     // construction line, comfortably under the posted 140.
     expect(maxKmh(shadow)).toBeGreaterThan(105);
     expect(maxKmh(shadow)).toBeLessThan(112);

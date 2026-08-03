@@ -583,7 +583,7 @@ describe("wave-2 bot completion — sc-rx-queue-clear at L3", () => {
 // ---------------------------------------------------------------------------
 // sc-rb-circulate-priority — the inverse of the entry drill: on the ring the
 //                            priority is YOURS, and the cars at the mouths are
-//                            waiting for you (чл. 50а)
+//                            waiting for you (ЗДвП чл. 50, ал. 1)
 // ---------------------------------------------------------------------------
 
 describe("wave-2 bot completion — sc-rb-circulate-priority at L3", () => {

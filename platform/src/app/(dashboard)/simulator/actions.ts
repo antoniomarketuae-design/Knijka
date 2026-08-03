@@ -27,6 +27,7 @@ import { getContentRepo } from "@/lib/content/repo";
 import { getSessionUser } from "@/modules/auth";
 import { recordActivity } from "@/modules/gamification";
 import { recordSimObservations, type SimObservation } from "@/modules/learning";
+import { consumeUserRateLimit, RATE_LIMITS } from "@/modules/security";
 import {
   buildDebrief,
   gradeFinishWire,
@@ -82,6 +83,28 @@ export async function finishLessonAction(
   if (!(await canDriveSimulator(user))) {
     throw new Error("finishLessonAction: no simulator entitlement");
   }
+
+  // Per-USER budget (audit: unmetered public POST). One call writes a
+  // SimSession, a ~15 KB attempt trace, the learner-model fold and an XP award
+  // — the heaviest write path in the product — and a server action never
+  // reaches the proxy where the other budgets are taken. Keyed on the session
+  // id rather than the IP: a driving school's classroom is one address.
+  //
+  // Returned as a CODE, not thrown, for the same reason NOT_SIGNED_IN is: this
+  // action fires whenever a drive ends, and a throw here would replace the
+  // student's result screen — debrief, citations, the whole teaching payload —
+  // with an error. Only the persistence is refused.
+  //
+  // ITS OWN CODE, NOT `SAVE_FAILED` (doc 91 S4). Sharing the failure code cost
+  // the student a true sentence: SAVE_FAILED is „we tried to write it and the
+  // database refused" — outside their control, unfixable by them, and worth
+  // reporting. This is „we did not try, because you have saved twenty drives in
+  // ten minutes" — self-clearing, and the SAME drive saves normally after a
+  // wait. Told the wrong one, the natural response is to drive it again at once,
+  // which is exactly what spends the remainder of the budget. The copy lives in
+  // LessonPlayShell's footer.
+  const budget = consumeUserRateLimit(user.id, RATE_LIMITS.simFinish);
+  if (!budget.allowed) return { ok: false, code: "RATE_LIMITED" };
 
   const graded = gradeFinishWire(input);
   if (graded.status === "invalid") return { ok: false, code: "INVALID_INPUT" };

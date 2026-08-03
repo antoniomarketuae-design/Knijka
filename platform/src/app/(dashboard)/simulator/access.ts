@@ -23,10 +23,21 @@
  * invisible outside production is a gate nobody ever sees fail.
  */
 
+import { isFeatureDisabled } from "@/lib/features";
 import type { SessionUser } from "@/modules/auth";
 import { requireEntitlementForSimulator } from "@/modules/payments";
 
 export async function canDriveSimulator(user: SessionUser): Promise<boolean> {
+  // The kill switch is checked HERE rather than only in page.tsx, and BEFORE
+  // the admin bypass, because this function is the one thing all three call
+  // sites share: a page guard alone leaves finishLessonAction,
+  // micro-quiz-actions and calibration-actions live, and those are the calls
+  // that actually cost something. Before the admin bypass because the switch
+  // is flipped when the feature is HARMING people — melting phones on launch
+  // day — and the founder's own account is not exempt from that; it also means
+  // the founder sees the same „временно изключено" screen students see, which
+  // is the only way to notice the switch is still on.
+  if (isFeatureDisabled("simulator")) return false;
   if (user.isAdmin) return true;
   return requireEntitlementForSimulator(user.id);
 }

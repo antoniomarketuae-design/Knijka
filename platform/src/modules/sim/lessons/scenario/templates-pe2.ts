@@ -10,7 +10,7 @@
  *    pe-dart-v1 — the live daytime dart's district, driven at NIGHT)
  *  - sc-pe-zone-living    „Жилищна зона — гостите са пешеходците" (PE-15 +
  *    PE-02, pe-zone-v1 — the 50 → 20 Д15 zone whose crossing is UNMARKED,
- *    because чл. 62–63 shares the whole carriageway)
+ *    because чл. 61–62 shares the whole carriageway)
  *  - sc-pe-parked-row-scan „Покрай редицата паркирани коли" (PE-04, wave 9 —
  *    REUSES pe-child-v1: the SUSTAINED row-scan discipline, distinct from the
  *    live single-ball sc-crossing-child-ball; see its own section header)
@@ -157,7 +157,7 @@ const SCHOOL_CHILD_3: PedestrianDartOutSpec = {
 };
 
 /** PE-07 + PE-02 — училищна зона със стоп-палка (ЗДвП чл. 119: пропусни
- *  стъпилите на пътеката пешеходци; чл. 62–63: режимът на зоната — в
+ *  стъпилите на пътеката пешеходци; чл. 61–62: режимът на зоната — в
  *  училищната зона ограничението е 30 и се кара с готовност за спиране). */
 export const SC_PE_SCHOOL_PATROL: ScenarioSpec = {
   id: "sc-pe-school-patrol",
@@ -255,7 +255,7 @@ export const SC_PE_SCHOOL_PATROL: ScenarioSpec = {
       "Пред всяко училище в учебен ден: зона 30, отговорник на пътеката със стоп-палка и групи деца, които пресичат. Палката се вдига, докато групата е на платното, и се сваля, когато го освободи.",
     whyBg:
       "Детето не е нисък възрастен: то не преценява скорост и разстояние, тръгва внезапно и се връща след изпусната топка. Затова законът сваля скоростта на 30 — от 30 км/ч спираш за около 13 м, от 50 км/ч — за около 27 м, а разликата е точно ширината на пътеката. Стоп-палката е последната предпазна мрежа, когато детето вече е на платното.",
-    lawRef: "ЗДвП чл. 119; чл. 62–63",
+    lawRef: "ЗДвП чл. 119; чл. 61–62",
     examinerBg:
       "Изпитващият очаква видимо сваляне на скоростта още ПРЕДИ зоната, пълно спиране на сигнала на отговорника и потегляне едва след като платното е чисто. Превишаване с над 10 км/ч в зона 30 е опасна грешка; непропускането на пешеходец на пътеката прекратява изпита.",
   },
@@ -487,7 +487,7 @@ export const SC_PE_NIGHT_UNLIT: ScenarioSpec = {
  * speeding detectors grade the жилищна зона with no engine change at all.
  *
  * THE UNMARKED CROSSING (the design crux — read before editing). A living zone
- * has NO zebra: чл. 62–63 gives pedestrians the WHOLE carriageway, so painting
+ * has NO zebra: чл. 61–62 gives pedestrians the WHOLE carriageway, so painting
  * a pedestrian pathway here would teach the opposite of the law. But the
  * shipped yield duty grades off crossing events only — PEDESTRIAN_NOT_YIELDED
  * fires from `crossingPassed` with occupancy, and the CrossingZoneTracker
@@ -545,7 +545,7 @@ const CURB_X_EAST = 9.73;
  * THE WEST WALKER at pz-x-1 (0, 215): steps off the west curb once the player
  * closes within ~30 m. She is not crossing anything: in a жилищна зона the
  * carriageway IS the pedestrian's, and she is simply walking on it
- * (чл. 62–63). The engine still grades her through the crossing vocabulary,
+ * (чл. 61–62). The engine still grades her through the crossing vocabulary,
  * which is why pz-x-1 exists at all (see the header).
  *
  * HER PACE IS THE STAGING (founder R0: „the car and the pedestrian are very
@@ -594,7 +594,7 @@ const ZONE_WALKER_WEST: PedestrianDartOutSpec = {
  * чанти" between the parked cars, but the drill staged exactly one figure. A
  * companion walks with her, three metres SOUTH (nearer the approaching car) so
  * the pair reads as two people crossing together rather than one figure with a
- * clone. A living zone has NO zebra — чл. 62–63 gives the whole carriageway to
+ * clone. A living zone has NO zebra — чл. 61–62 gives the whole carriageway to
  * pedestrians — so an off-centre companion is the legally correct picture, not
  * a paint violation.
  *
@@ -650,9 +650,26 @@ const ZONE_WALKER_EAST: PedestrianDartOutSpec = {
   minTriggerSpeedKmh: 6,
 };
 
-/** PE-15 + PE-02 — жилищната зона (ЗДвП чл. 62–63: пешеходците ползват цялото
- *  платно и са с предимство, таванът е 20; чл. 25: излизането от зоната е
- *  включване в движението — пропускаш всички). */
+/** PE-15 + PE-02 — жилищната зона.
+ *
+ *  CITATION CORRECTED 2026-08-03: this shelf cited „чл. 62–63". чл. 63 is the
+ *  TUNNEL article („При движение в тунел, началото на който е обозначено с
+ *  пътен знак, водачът е длъжен…"). The residential zone is чл. 61 + чл. 62,
+ *  retrieved verbatim:
+ *    чл. 61: „Жилищната зона е обособена, специално устроена територия в
+ *      населено място, която е обозначена като такава на входовете и изходите
+ *      й с пътни знаци и където действат специални правила за движение."
+ *    чл. 62: „В жилищната зона действат следните специални правила: 1.
+ *      пешеходците могат да използват за движение, а децата за игра пътя по
+ *      цялата му широчина, без ненужно да пречат на движението на превозните
+ *      средства; 2. водачите… са длъжни да се движат със скорост не по-голяма
+ *      от 20 km/h…; 3. паркирането в жилищната зона е разрешено само на
+ *      специално обозначените места; 4. при излизане от жилищна зона на друг
+ *      път водачите… са длъжни да пропуснат участниците в движението,
+ *      движещи се по него."
+ *
+ *  So the exit yield is чл. 62, т. 4 by name — чл. 25 is the general-maneuver
+ *  article and merely the fallback. */
 export const SC_PE_ZONE_LIVING: ScenarioSpec = {
   id: "sc-pe-zone-living",
   family: "pedestrians",
@@ -717,7 +734,7 @@ export const SC_PE_ZONE_LIVING: ScenarioSpec = {
     {
       id: "sc-pzl-halt",
       titleBg: "Спри пред хората на платното",
-      // Single truth with the shadow's rest point — the чл. 62–63 duty, as a mark.
+      // Single truth with the shadow's rest point — the чл. 61–62 duty, as a mark.
       params: { kind: "reachZone", x: LANE_2, y: ZL_HALT_Y, radiusM: 4, maxSpeedKmh: 5 },
     },
     {
@@ -764,7 +781,7 @@ export const SC_PE_ZONE_LIVING: ScenarioSpec = {
       traceRef: { path: "content/traces/sc-pe-zone-living/mistake-push-through.trace.json" },
       titleBg: "Клаксон и провиране между пешеходците",
       whatWentWrongBg:
-        "Скоростта беше законна — 18 в зона 20 — и точно затова грешката е чиста: колата не спря, а се провря покрай хората на платното, „подканяйки“ ги с клаксон. В жилищната зона това е обърната логика. Пешеходецът върху платното тук не е нарушител, а ползва правото си по чл. 62–63; клаксонът не му отнема предимството и не е разрешение да минеш. Отсъжда се като непропускане на пешеходец — опасна грешка, която прекратява изпита.",
+        "Скоростта беше законна — 18 в зона 20 — и точно затова грешката е чиста: колата не спря, а се провря покрай хората на платното, „подканяйки“ ги с клаксон. В жилищната зона това е обърната логика. Пешеходецът върху платното тук не е нарушител, а ползва правото си по чл. 61–62; клаксонът не му отнема предимството и не е разрешение да минеш. Отсъжда се като непропускане на пешеходец — опасна грешка, която прекратява изпита.",
       codeRefs: ["PEDESTRIAN_NOT_YIELDED"],
     },
   ],
@@ -772,8 +789,8 @@ export const SC_PE_ZONE_LIVING: ScenarioSpec = {
     whenBg:
       "Във всеки квартал със синия правоъгълен знак Д15: Студентски град, „Дружба“, вътрешните улици на панелните комплекси. Няма тротоар, няма пътеки, коли са паркирани от двете страни, а между тях играят деца и вървят хора с чанти. Зоната важи до знака Д16 — не до „първото кръстовище“ и не до „където улицата се оправи“.",
     whyBg:
-      "Жилищната зона е единственото място, където законът обръща приоритета: платното е на хората, а колата е гост в него (чл. 62–63). Затова таванът е 20 км/ч — скорост, от която спираш за около 7 метра, тоест в рамките на разстоянието, на което дете изскача иззад паркирана кола. От 50 км/ч същото дете е удар: реагираш 14 метра и спираш още 27. И понеже няма тротоар, „изчакай да се приберат отстрани“ няма смисъл — няма отстрани. Изчакваш ги да минат. На изхода логиката се обръща обратно: зоната свършва, ти се включваш в движението и нямаш никакво предимство пред никого (чл. 25).",
-    lawRef: "ЗДвП чл. 62–63; чл. 25",
+      "Жилищната зона е единственото място, където законът обръща приоритета: платното е на хората, а колата е гост в него (чл. 61–62). Затова таванът е 20 км/ч — скорост, от която спираш за около 7 метра, тоест в рамките на разстоянието, на което дете изскача иззад паркирана кола. От 50 км/ч същото дете е удар: реагираш 14 метра и спираш още 27. И понеже няма тротоар, „изчакай да се приберат отстрани“ няма смисъл — няма отстрани. Изчакваш ги да минат. На изхода логиката се обръща обратно: при излизане от жилищна зона на друг път си длъжен да пропуснеш движещите се по него (чл. 62, т. 4) — нямаш никакво предимство пред никого.",
+    lawRef: "ЗДвП чл. 62, т. 1 и т. 2; чл. 62, т. 4; чл. 61",
     examinerBg:
       "Изпитващият очаква видимо сваляне на скоростта още ПРЕДИ входа на зоната и задържане около 20 през цялата ѝ дължина, пълно спиране и изчакване при хора на платното без клаксон и без провиране, и пълзящо, оглеждащо се излизане на улицата в края. Превишаване с над 10 км/ч в зоната е опасна грешка; непропускането на пешеходец прекратява изпита.",
   },

@@ -6,6 +6,7 @@ import {
   type PrivacyUserRecord,
 } from "@/modules/privacy";
 import { InMemoryAuthStore, setAuthStore, type AuthUserRecord } from "@/modules/auth";
+import { resetRateLimitState } from "@/modules/security";
 import { DELETE_CONFIRM_PHRASE, initialDeleteAccountState } from "./privacy-contract";
 
 const PASSWORD = "parola1234";
@@ -75,6 +76,10 @@ function form(fields: Record<string, string>): FormData {
 beforeEach(() => {
   requireUser.mockResolvedValue(SESSION_USER);
   signOut.mockClear();
+  // The delete action now shares the credential-check budget with the password
+  // change (both pay a cost-12 bcrypt). Reset so suite ORDER never decides
+  // whether a test's fifth wrong password is refused for the wrong reason.
+  resetRateLimitState();
 });
 
 afterEach(() => {

@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { ContactEmail } from "@/components/legal/ContactEmail";
 import {
-  CONTACT_EMAIL,
   LegalSection,
   OperatorCard,
   PageIntro,
@@ -187,7 +187,7 @@ export default function TermsPage() {
             Ако пакетът ти включва функционалност, обявена като „при пускането
             ѝ“ (например симулатора), и тя не бъде пусната по време на срока
             на достъпа ти, имаш право да поискаш съразмерно възстановяване на
-            платеното за нея. Пиши ни на {CONTACT_EMAIL}.
+            платеното за нея. Пиши ни на <ContactEmail />.
           </li>
         </ul>
       </LegalSection>
@@ -283,7 +283,7 @@ export default function TermsPage() {
           <li>
             <strong>От твоя страна:</strong> можеш да спреш да ползваш
             платформата по всяко време и да поискаш изтриване на акаунта си на{" "}
-            {CONTACT_EMAIL}.
+            <ContactEmail />.
           </li>
           <li>
             <strong>От наша страна:</strong> можем да ограничим или прекратим
@@ -327,14 +327,14 @@ export default function TermsPage() {
             kzp.bg
           </a>
           ) или към орган за алтернативно решаване на потребителски спорове.
-          Най-бързо обаче е да ни пишеш първо на {CONTACT_EMAIL} — предпочитаме
+          Най-бързо обаче е да ни пишеш първо на <ContactEmail /> — предпочитаме
           да решим проблема, а не да печелим спора.
         </p>
       </LegalSection>
 
       <LegalSection id="contact" title="14. Контакт">
         <p>
-          Въпроси по тези условия: {CONTACT_EMAIL} или страницата{" "}
+          Въпроси по тези условия: <ContactEmail /> или страницата{" "}
           <Link
             href="/contact"
             className="font-semibold text-accent hover:text-accent-soft"

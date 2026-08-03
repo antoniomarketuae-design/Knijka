@@ -28,3 +28,24 @@ export const initialCheckoutConsentState: CheckoutConsentState = {
 export function consentFieldName(kind: CheckoutConsentKind): string {
   return `consent_${kind}`;
 }
+
+/**
+ * Which half of /checkout is on screen — the boxes, or Stripe's payment form.
+ *
+ * A function rather than an inline condition because it encodes the whole of
+ * the "she went to fetch a parent" fix, and it is the one part of that fix a
+ * test can drive (the island's effect needs a DOM this repo does not configure).
+ *
+ * `consentExpired` cannot be derived from `state`: `useActionState` still holds
+ * "accepted" after a 409, and correctly so — the consent WAS recorded, it has
+ * simply aged past CHECKOUT_CONSENT_TTL_MINUTES and no longer authorises a
+ * payment. Recorded and still-valid are different questions, and conflating
+ * them is what left the student staring at an empty card with no way back to
+ * the checkboxes.
+ */
+export function checkoutStep(
+  state: CheckoutConsentState,
+  consentExpired: boolean,
+): "boxes" | "payment" {
+  return state.status === "accepted" && !consentExpired ? "payment" : "boxes";
+}

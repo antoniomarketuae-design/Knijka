@@ -87,6 +87,54 @@ describe("GET /api/health — readiness", () => {
   });
 });
 
+/**
+ * `checks.mail` answers a question nothing in the product could answer before:
+ * can this deployment give a locked-out student her account back? The mail
+ * module falls back to a console transport on five paths and warns once per
+ * process, so a box with no MAIL_* variables looked exactly like a healthy one.
+ */
+describe("GET /api/health — checks.mail", () => {
+  const CREDENTIALS: Record<string, string> = {
+    MAIL_TRANSPORT: "resend",
+    MAIL_API_KEY: "re_super_secret_key",
+    MAIL_FROM: "Книжка.AI <no-reply@knijka.ai>",
+  };
+
+  it("reports the console fallback as NOT ok — that is the live .env today", async () => {
+    for (const key of Object.keys(CREDENTIALS)) vi.stubEnv(key, "");
+    const body = await (await readiness()).json();
+    expect(body.checks.mail.transport).toBe("console");
+    expect(body.checks.mail.ok).toBe(false);
+  });
+
+  it("goes green the moment the credentials exist", async () => {
+    for (const [k, v] of Object.entries(CREDENTIALS)) vi.stubEnv(k, v);
+    const body = await (await readiness()).json();
+    expect(body.checks.mail).toMatchObject({ transport: "resend", ok: true });
+  });
+
+  it("REPORTS BUT DOES NOT GATE: a missing MAIL_* must never trigger a rollback", async () => {
+    // A rollback cannot fix a missing environment variable — the previous build
+    // faces the same environment — so failing readiness on this would turn a
+    // configuration gap into a rollback loop. Checkout is where it bites
+    // instead (modules/payments/stripe.ts).
+    for (const key of Object.keys(CREDENTIALS)) vi.stubEnv(key, "");
+    const res = await readiness();
+    expect(res.status).toBe(200);
+    expect((await res.json()).ok).toBe(true);
+  });
+
+  it("never touches the mail provider and never prints the API key", async () => {
+    for (const [k, v] of Object.entries(CREDENTIALS)) vi.stubEnv(k, v);
+    const body = JSON.stringify(await (await readiness()).json());
+    expect(body).not.toContain("re_super_secret_key");
+  });
+
+  it("stays off the liveness probe — it is a config fact, not a process fact", async () => {
+    expect((await (await liveness()).json()).checks).toBeUndefined();
+  });
+});
+
 describe("GET /api/health?probe=liveness", () => {
   it("answers 200 without touching the database — a DB outage must not trigger a code rollback", async () => {
     let touched = false;

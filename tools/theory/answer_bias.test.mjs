@@ -309,10 +309,34 @@ test("thresholds are the documented ones (changing them is a deliberate act)", (
 // The gate as CI actually runs it
 // ---------------------------------------------------------------------------
 
-/** Minimal but fully valid content tree, so only the bias gate can fail it. */
+/**
+ * Minimal but fully valid content tree, so only the bias gate can fail it.
+ *
+ * That now includes a `review/approvals.json`: since docs/education/90 §1 a row
+ * may not sit at `"status": "approved"` unless a ledger accounts for it, and
+ * these fixtures are built out of approved rows. The baseline is set to the
+ * fixture's own size so the approval ratchet is satisfied and cannot mask (or
+ * be masked by) the answer-leak finding under test.
+ */
 function writeFixtureBank(dir, questions) {
   fs.mkdirSync(path.join(dir, "questions"), { recursive: true });
   fs.mkdirSync(path.join(dir, "signs"), { recursive: true });
+  fs.mkdirSync(path.join(dir, "review"), { recursive: true });
+  fs.writeFileSync(
+    path.join(dir, "review", "approvals.json"),
+    JSON.stringify(
+      {
+        version: 1,
+        readmeBg: "Фикстура за тестовете на гарда.",
+        unsignedApprovedBaseline: questions.length,
+        baselineFrozenAt: "2026-08-03",
+        entries: [],
+      },
+      null,
+      2,
+    ),
+    "utf8",
+  );
   const write = (rel, data) =>
     fs.writeFileSync(path.join(dir, rel), JSON.stringify(data, null, 2), "utf8");
   write("topics.json", [

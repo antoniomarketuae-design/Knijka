@@ -14,11 +14,21 @@
  * frame is road. So:
  *
  *   PEEK (default, and what the harness measures)
- *     A shrink-to-fit pill in the TOP RAIL — the row that already holds the
- *     micro menu. Not a second row underneath it: on a 393 px-tall landscape
- *     viewport a second row would start at 58 px and end at 102 px, and the
- *     centre band starts at 78 px. One row is the only way the rule survives
- *     the founder's own device. One line of text, truncated, never wrapped.
+ *     A small card in the RIGHT-EDGE NOTIFICATION COLUMN (`notifyColumn.ts`).
+ *
+ *     ── 2026-08-03, HIS THIRD ASKING, AND WHY THE SHAPE CHANGED. ───────────
+ *     This was a shrink-to-fit pill spanning the TOP RAIL, from the micro menu
+ *     to the right inset — measured at 852×393 it laid out 766 px of an 852 px
+ *     screen, a full-width strip across the sky. „you see all this text in the
+ *     middle yes, and we said we have to move it from there so it doesnt
+ *     bother the view … it must be like a popup notifications going below, it
+ *     must be small text so the user can just read it."
+ *
+ *     A rail is horizontal and a notification column is vertical, and that is
+ *     the whole change: the line now WRAPS (to three lines, clamped) inside a
+ *     240 px column at the right edge instead of being truncated across the
+ *     top of the road. Wrapping is also the THEO-4-friendlier of the two — the
+ *     student sees more of the authored sentence, not less.
  *
  *   OPEN (only after a tap)
  *     A bottom sheet above the instrument band with the full authored text, the
@@ -54,6 +64,11 @@ import {
   type SimOverlayItem,
   type SimOverlayTone,
 } from "./overlayQueue";
+import {
+  NOTIFY_COLUMN_RIGHT_CSS,
+  NOTIFY_COLUMN_TOP_CSS_COMPACT,
+  NOTIFY_COLUMN_WIDTH_CSS_COMPACT,
+} from "./notifyColumn";
 
 /** Tone → the one colour token the pill is tinted with. */
 const TONE_COLOR: Record<SimOverlayTone, string> = {
@@ -201,7 +216,12 @@ export function SimOverlay({
     (typeof shown.detailBg === "string" && shown.detailBg.trim().length > 0) ||
     shown.hasRichDetail === true;
   const interactive = hasDetail || blocking;
-  const height = interactive ? OVERLAY_PEEK_HEIGHT_PX : OVERLAY_PEEK_STATUS_HEIGHT_PX;
+  // The card is now a COLUMN item, so this is a floor, not a fixed height: a
+  // wrapped two-line task grows downward (which is what a notification does)
+  // instead of clipping. It still guarantees the 44 px thumb rule for anything
+  // interactive and stays at the smaller status height for anything that is
+  // only text — the same two numbers `overlay-queue.test.ts` pins.
+  const minHeight = interactive ? OVERLAY_PEEK_HEIGHT_PX : OVERLAY_PEEK_STATUS_HEIGHT_PX;
 
   return (
     <>
@@ -228,10 +248,14 @@ export function SimOverlay({
       `}</style>
 
       {/* ------------------------------------------------------------------
-          PEEK — the top rail, right of the micro menu, one line high.
-          `w-fit`: the pill is charged for the words it holds, not for the
-          width of the screen. Measured on the founder's device that is the
-          difference between 8.7 % of the viewport and about 3 %.
+          PEEK — the RIGHT-EDGE NOTIFICATION COLUMN, small text, stacking down.
+
+          It used to run `left: <menu button> … right: <inset>` — a rail. At
+          852×393 that laid out 766 px of an 852 px screen: a strip of type
+          across the whole top of the road, which is the thing the founder has
+          now asked three times to have moved. The geometry comes from
+          `notifyColumn.ts` so the shell's roomy column, this one and the CSS
+          that pulls the scene-owned panels over are all the same numbers.
 
           It is replaced by, not stacked with, the open sheet: the sheet's own
           header already carries the same glyph and the same line, and „ONE
@@ -242,14 +266,12 @@ export function SimOverlay({
       <div
         data-sim-overlay={shown.kind}
         data-sim-overlay-state="peek"
-        className="pointer-events-none absolute z-30 flex"
+        data-hud="notify-column"
+        className="pointer-events-none absolute z-30 flex flex-col items-end"
         style={{
-          top: "calc(0.5rem + env(safe-area-inset-top, 0px))",
-          // Clears the 44 px micro-menu button and its gutter on the left, and
-          // the right rail's own inset. Nothing here is centred: a centred pill
-          // that grows with its text walks into whichever corner is busier.
-          left: "calc(0.5rem + 2.75rem + 0.375rem + env(safe-area-inset-left, 0px))",
-          right: "calc(0.75rem + env(safe-area-inset-right, 0px))",
+          top: NOTIFY_COLUMN_TOP_CSS_COMPACT,
+          right: NOTIFY_COLUMN_RIGHT_CSS,
+          width: NOTIFY_COLUMN_WIDTH_CSS_COMPACT,
         }}
       >
         {/* `hud-ghost` — this is the peek, and the peek is an instrument line.
@@ -279,32 +301,45 @@ export function SimOverlay({
             is still readable at a glance — it is carried by the glyph and the
             chip colour, which is where it was always carried. */}
         <div
-          className={`hud-ghost sim-overlay-in flex w-fit min-w-0 max-w-full items-center gap-1.5 ${
-            interactive ? "pointer-events-auto pr-1" : "pr-1"
+          className={`hud-ghost sim-overlay-in flex w-full min-w-0 flex-col items-stretch gap-0.5 ${
+            interactive ? "pointer-events-auto" : ""
           }`}
-          style={{ height: `${height}px`, color }}
+          style={{ minHeight: `${minHeight}px`, color }}
           role={blocking ? "alertdialog" : "status"}
           aria-live={blocking ? "assertive" : "polite"}
           aria-label={`${shown.chipBg ? `${shown.chipBg} — ` : ""}${shown.lineBg}`}
         >
-          <ToneGlyph tone={shown.tone} frozen={frozen} />
-          {shown.chipBg ? (
-            <span className="shrink-0 text-[10px] font-black uppercase tracking-wider">
-              {shown.chipBg}
-            </span>
-          ) : null}
-          <span className="min-w-0 flex-1 truncate text-[12px] font-bold leading-none text-foreground">
+          {/* Row 1 — the tone glyph, the chip and the „+N" badge. Small,
+              horizontal, and never the thing that decides the card's width. */}
+          <div className="flex min-w-0 items-center gap-1.5">
+            <ToneGlyph tone={shown.tone} frozen={frozen} />
+            {shown.chipBg ? (
+              <span className="min-w-0 truncate text-[10px] font-black uppercase tracking-wider">
+                {shown.chipBg}
+              </span>
+            ) : null}
+            {queued > 0 ? (
+              <span
+                className="ml-auto shrink-0 rounded-full border border-border px-1.5 text-[10px] font-bold leading-[18px] text-muted"
+                aria-label={`още ${queued} съобщения`}
+              >
+                +{queued}
+              </span>
+            ) : null}
+          </div>
+
+          {/* Row 2 — THE LINE. `line-clamp-3` and not `truncate`: in a column
+              the sentence has somewhere to go, and „…" after four words is how
+              a THEO-4 explanation turns back into a bare verdict. `break-words`
+              because «Пътнотранспортно» is one unbreakable 16-letter word and
+              the stage clips rather than scrolls (hud-card-fit.test.ts). */}
+          <span className="line-clamp-3 min-w-0 break-words text-[11px] font-bold leading-tight text-foreground">
             {shown.lineBg}
           </span>
-          {queued > 0 ? (
-            <span
-              className="shrink-0 rounded-full border border-border px-1.5 text-[10px] font-bold leading-[18px] text-muted"
-              aria-label={`още ${queued} съобщения`}
-            >
-              +{queued}
-            </span>
-          ) : null}
 
+          {/* Row 3 — the controls, right-aligned under the words. */}
+          {interactive ? (
+          <div className="mt-0.5 flex items-center justify-end gap-1">
           {hasDetail ? (
             <button
               type="button"
@@ -357,6 +392,8 @@ export function SimOverlay({
             >
               {shown.ackLabelBg ?? "Разбрах"}
             </button>
+          ) : null}
+          </div>
           ) : null}
         </div>
       </div>

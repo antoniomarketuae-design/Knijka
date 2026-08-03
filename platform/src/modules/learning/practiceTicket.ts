@@ -162,19 +162,34 @@ export function assertPracticeTicket(
 }
 
 /**
- * TRANSITIONAL, and deliberately an env var rather than a constant.
+ * IS AN UNBOUND SUBMISSION STILL GRADED? In production: never.
  *
- * Enforcement can only be switched on once the practice page issues a ticket
- * and the client sends it back; flipping it before that would reject every
- * legitimate answer. `PRACTICE_TICKET_REQUIRED=1` belongs in the same deploy
- * that lands the wiring — and being an env var means it can also be switched
- * off in seconds if the wiring turns out to be wrong, without a rebuild.
+ * This used to read `process.env.PRACTICE_TICKET_REQUIRED === "1"` — enforcement
+ * OFF unless someone remembered to switch it on. The variable was not in
+ * .env.example, the page never issued a ticket, and so the whole mechanism sat
+ * there fully built, fully tested and switched off: the practice action would
+ * answer with `correctOptionIds` for ANY question id in the bank, including the
+ * 45 sitting in the DOM of a mock exam in the next tab.
  *
- * Until then an unbound submission is graded, and logged once per process so
- * the gap is visible in any log anyone actually reads.
+ * A security control whose default is "off" and whose on-switch lives in a file
+ * nobody edits is not a control. So the DEFAULT is now the safe one, and the
+ * env var is what it should always have been — an escape hatch:
+ *
+ *   unset          → required in production, permissive elsewhere
+ *   "1" / "true"   → required, everywhere (what .env.example ships)
+ *   "0" / "false"  → NOT required — the break-glass switch, no rebuild needed,
+ *                    for the day the wiring turns out to be wrong at 22:00
+ *
+ * Non-production stays permissive when unset so that a unit test, a script or a
+ * `npm run dev` with an empty .env is not required to mint tickets to exercise
+ * grading. That is the only difference between the two, and it is why the flip
+ * cannot be silently lost on the VPS: forgetting the variable there enforces.
  */
 export function isPracticeTicketRequired(): boolean {
-  return process.env.PRACTICE_TICKET_REQUIRED === "1";
+  const raw = process.env.PRACTICE_TICKET_REQUIRED;
+  if (raw === "1" || raw === "true") return true;
+  if (raw === "0" || raw === "false") return false;
+  return process.env.NODE_ENV === "production";
 }
 
 let warnedUnbound = false;
@@ -183,7 +198,7 @@ function warnUnbound(): void {
   if (warnedUnbound) return;
   warnedUnbound = true;
   console.warn(
-    "learning: practice answers are being graded without a session ticket (audit M-10). Wire issuePracticeTicket() through the practice page and set PRACTICE_TICKET_REQUIRED=1.",
+    "learning: practice answers are being graded without a session ticket (audit M-10). The practice page issues one — a caller reaching submitAnswer without it is either a test, a script, or a surface that has not been wired.",
   );
 }
 

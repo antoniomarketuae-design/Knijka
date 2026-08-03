@@ -830,7 +830,7 @@ describe("wave-3 bot completion — sc-hz-emergency-stop at L3", () => {
 });
 
 // ---------------------------------------------------------------------------
-// sc-rb-busy-gap — чл. 50а read to the end: „пропусни" is not „wait for an empty
+// sc-rb-busy-gap — the entry duty read to the end: „пропусни" is not „wait for an empty
 //                  ring", and it is not „wait for one car" either
 // ---------------------------------------------------------------------------
 
@@ -956,7 +956,7 @@ describe("wave-3 bot completion — sc-rb-busy-gap at L3", () => {
 
   it("neither demo is teachable-first: both faults are опасни, so both are scored", () => {
     // Unlike most drills in the wave, this one has NO teach-moment channel to
-    // land on — чл. 50а failures are dangerous faults, and doc 76 §0's
+    // land on — entry-yield failures are dangerous faults, and doc 76 §0's
     // teach-first rule does not soften them. The mistakes are DEMONSTRATED by
     // the ghosts; the student's own attempt is docked.
     for (const name of ["mistake-barge-lead", "mistake-short-gap"] as const) {

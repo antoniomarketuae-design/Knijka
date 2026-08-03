@@ -1740,7 +1740,7 @@ describe("FP battery — motorway", () => {
   });
 
   it("the breakdown pull-off: into the emergency lane under braking, to a rest", () => {
-    // Innocent: the ONE legal use of the lane (чл. 58, т. 3 exception) — the
+    // Innocent: the ONE legal use of the lane (чл. 58, т. 3 permits the STOP) — the
     // pull-off brakes throughout and the stop itself is out of grading scope.
     const { events } = drive([
       mw(0, { speedKmh: 90 }),

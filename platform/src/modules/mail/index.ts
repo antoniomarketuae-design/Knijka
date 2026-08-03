@@ -23,6 +23,12 @@
 // Sending
 export { sendMail, getMailer, setMailer, resolveMailerFromEnv, resetMailWarnings } from "./factory";
 
+// Readiness — "can this deployment give a locked-out student her account back?"
+// mailDeliveryGaps() gates checkout the way legalIdentityGaps() does (see the
+// factory.ts docblock); describeMailTransport() is what /api/health reports.
+export { mailDeliveryGaps, describeMailTransport } from "./factory";
+export type { MailHealth, MailTransportPlan } from "./factory";
+
 // Transports (exported so tests and ops scripts can build one explicitly)
 export { ConsoleMailer } from "./console";
 export { ProviderMailer, isProviderName } from "./provider";

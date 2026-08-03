@@ -109,7 +109,14 @@ class PrismaPasswordResetStore implements PasswordResetStore {
     const db = await this.db();
     return db.user.findUnique({
       where: { id: userId },
-      select: { id: true, email: true, name: true, passwordHash: true, role: true },
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        passwordHash: true,
+        role: true,
+        sessionEpoch: true,
+      },
     });
   }
 

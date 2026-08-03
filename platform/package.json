@@ -12,6 +12,7 @@
     "test:coverage": "vitest run --coverage",
     "typecheck": "tsc --noEmit",
     "validate:content": "node scripts/validate-content.mjs",
+    "payments:reconcile": "node scripts/payments-reconcile.mjs",
     "perf:report": "node scripts/perf-report.mjs",
     "clips:prune-png": "node scripts/clips-prune-png.mjs",
     "gallery:stills": "node ../tools/gallery/build-gallery-stills.mjs",

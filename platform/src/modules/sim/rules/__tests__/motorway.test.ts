@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { codes, drive, tick } from "./fixtures";
 
 /**
- * MOTORWAY-SEGMENT detectors (doc 72 SP-10 + the чл. 58, т. 3 emergency-lane
+ * MOTORWAY-SEGMENT detectors (doc 72 SP-10 + the чл. 58, т. 4 emergency-lane
  * ban). Both are armed EXCLUSIVELY by authored district data:
  *  - DRIVING_TOO_SLOW_FOR_MOTORWAY ← tick.motorway (edge `motorway: true`);
  *    defaults: floor 50 km/h · steady band 0.5 m/s² · queue gap 60 m ·
@@ -91,10 +91,11 @@ describe("motorway crawl detector (DRIVING_TOO_SLOW_FOR_MOTORWAY)", () => {
     expect(codes(events)).not.toContain("DRIVING_TOO_SLOW_FOR_MOTORWAY");
   });
 
-  it("grades второстепенна (1 т.) on the verified чл. 54 basis with the motorway concept", () => {
+  it("grades второстепенна (1 т.) on the verified чл. 22, ал. 1 basis with the motorway concept", () => {
     // LAW NOTE (see catalog.ts): the slice brief's „чл. 21 минимална 50" did
     // NOT verify — the content bank teaches NO general motorway minimum
-    // exists; чл. 54's constructive > 50 km/h line is the honest floor and
+    // exists; чл. 55, ал. 1's constructive > 70 km/h line is a condition on the
+    // VEHICLE and the 50 km/h detection floor is authored, not statutory, and
     // the soft second-degree tier is the FP-biased severity.
     const ticks = [0, 1, 2, 3, 4, 5, 6].map((t) => mw(t, { speedKmh: 40 }));
     const ev = drive(ticks).events.find(
@@ -104,7 +105,10 @@ describe("motorway crawl detector (DRIVING_TOO_SLOW_FOR_MOTORWAY)", () => {
     if (ev && ev.kind === "violation") {
       expect(ev.severityClass).toBe("vtorostepenna");
       expect(ev.points).toBe(1);
-      expect(ev.lawRef).toBe("ЗДвП чл. 54");
+      // 2026-08-03: was pinned to „ЗДвП чл. 54" — the rail-crossing article.
+      // The graded duty is чл. 22, ал. 1 („без основателна причина… пречи");
+      // чл. 55, ал. 1 is the >70 km/h condition on the VEHICLE.
+      expect(ev.lawRef).toBe("ЗДвП чл. 22, ал. 1; чл. 55, ал. 1");
       expect(ev.conceptId).toBe("c-motorway-rules");
       expect(ev.titleBg).toMatch(/[Ѐ-ӿ]/);
     }
@@ -177,7 +181,7 @@ describe("emergency-lane detector (EMERGENCY_LANE_DRIVING)", () => {
     expect(codes(drive(ticks).events)).not.toContain("EMERGENCY_LANE_DRIVING");
   });
 
-  it("grades опасна (10 т.) on the verified чл. 58, т. 3 basis with the prohibitions concept", () => {
+  it("grades опасна (10 т.) on the verified чл. 58, т. 4 basis with the prohibitions concept", () => {
     const ticks = [0, 1, 2, 3, 4].map((t) => mw(t, { speedKmh: 100, laneId: 0 }));
     const ev = drive(ticks).events.find(
       (e) => e.kind === "violation" && e.code === "EMERGENCY_LANE_DRIVING",
@@ -186,7 +190,8 @@ describe("emergency-lane detector (EMERGENCY_LANE_DRIVING)", () => {
     if (ev && ev.kind === "violation") {
       expect(ev.severityClass).toBe("opasna");
       expect(ev.points).toBe(10);
-      expect(ev.lawRef).toBe("ЗДвП чл. 58, т. 3");
+      // 2026-08-03: т. 3 is the STOPPING permission; DRIVING along the lane is т. 4.
+      expect(ev.lawRef).toBe("ЗДвП чл. 58, т. 4");
       expect(ev.conceptId).toBe("c-motorway-prohibitions");
       expect(ev.titleBg).toMatch(/[Ѐ-ӿ]/);
     }

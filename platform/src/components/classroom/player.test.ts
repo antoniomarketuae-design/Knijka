@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   MAX_BEAT_SEC,
   MIN_BEAT_SEC,
+  TEACHER_STATE_BG,
   beatDurationSec,
   canAsk,
   isBeatAdvancing,
@@ -172,16 +173,71 @@ describe("teacherTransition", () => {
       "thinking",
       "answering",
       "resuming",
+      "quizzing",
     ] as const) {
       expect(teacherTransition(s, { type: "finish" })).toBe("idle");
     }
   });
 });
 
+/**
+ * „Обяснява" WHILE A QUESTION IS UP.
+ *
+ * The engine holds the room on a quiz beat until the student answers — the
+ * clock is stopped, the board is a form, nobody is talking. The caption under
+ * the figure still read „Обяснява", because this enum had no state for it: the
+ * room was describing a teacher who was speaking, over a silent room.
+ */
+describe("the quiz state", () => {
+  it("has a caption of its own — the defect was the enum, not the copy", () => {
+    expect(TEACHER_STATE_BG.quizzing).toBeDefined();
+    expect(TEACHER_STATE_BG.quizzing).not.toBe(TEACHER_STATE_BG.speaking);
+    expect(TEACHER_STATE_BG.quizzing.length).toBeGreaterThan(0);
+  });
+
+  it("enters from the lecture and leaves back into it", () => {
+    expect(teacherTransition("speaking", { type: "quiz-open" })).toBe("quizzing");
+    expect(teacherTransition("quizzing", { type: "quiz-done" })).toBe("speaking");
+  });
+
+  it("never overwrites a raised hand with a question", () => {
+    // The student interrupted first; giving the floor to a quiz would drop the
+    // question they are waiting on.
+    for (const s of ["listening", "thinking", "answering", "resuming", "idle"] as const) {
+      expect(teacherTransition(s, { type: "quiz-open" })).toBe(s);
+    }
+  });
+
+  it("lets the student raise a hand DURING a question", () => {
+    // The moment a student most wants to ask something is the moment they have
+    // just found out they do not know it.
+    expect(teacherTransition("quizzing", { type: "raise-hand" })).toBe("listening");
+  });
+
+  it("stops the lesson clock while a question is up", () => {
+    // A check that scrolls away on a timer is a slideshow with a form in it.
+    expect(isBeatAdvancing("quizzing")).toBe(false);
+  });
+
+  it("does NOT dim the board during a question", () => {
+    // The dim keeps a referent visible while attention is elsewhere. Here the
+    // board IS what is being attended to, and a faded question is just harder
+    // to read.
+    expect(isBoardDimmed("quizzing")).toBe(false);
+  });
+});
+
 describe("state predicates", () => {
   it("advances the lesson clock only while the teacher lectures", () => {
     expect(isBeatAdvancing("speaking")).toBe(true);
-    for (const s of ["idle", "listening", "thinking", "answering", "resuming"] as const) {
+    for (const s of [
+      "idle",
+      "listening",
+      "thinking",
+      "answering",
+      "resuming",
+      "quizzing",
+    ] as const) {
       expect(isBeatAdvancing(s)).toBe(false);
     }
   });
@@ -193,6 +249,7 @@ describe("state predicates", () => {
     expect(isBoardDimmed("speaking")).toBe(false);
     expect(isBoardDimmed("resuming")).toBe(false);
     expect(isBoardDimmed("idle")).toBe(false);
+    expect(isBoardDimmed("quizzing")).toBe(false);
   });
 
   it("blocks a second question only while one is in flight", () => {
@@ -201,5 +258,20 @@ describe("state predicates", () => {
     expect(canAsk("speaking")).toBe(true);
     expect(canAsk("listening")).toBe(true);
     expect(canAsk("answering")).toBe(true);
+    expect(canAsk("quizzing")).toBe(true);
+  });
+
+  it("has a caption for EVERY state — a missing one renders as blank", () => {
+    const states: TeacherState[] = [
+      "idle",
+      "speaking",
+      "listening",
+      "thinking",
+      "answering",
+      "resuming",
+      "quizzing",
+    ];
+    for (const s of states) expect(TEACHER_STATE_BG[s]?.length ?? 0).toBeGreaterThan(0);
+    expect(Object.keys(TEACHER_STATE_BG).sort()).toEqual([...states].sort());
   });
 });

@@ -115,7 +115,8 @@ describe("registerUser — the account-creation boundary", () => {
       createUser: async () => {
         throw new Error("db is down");
       },
-      findRoleById: async () => null,
+      findAccountById: async () => null,
+      bumpSessionEpoch: async () => null,
     });
     await expect(registerUser(validInput())).rejects.toThrow("db is down");
   });

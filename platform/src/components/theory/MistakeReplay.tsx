@@ -239,12 +239,27 @@ export function MistakeReplay({
   tracePath,
   districtId,
   className,
+  paused = false,
 }: {
   /** Committed trace under public/, e.g. "/traces/sc-…/mistake-….trace.json". */
   tracePath: string;
   /** District under public/world/, e.g. "zx-v1" — the trace's home map. */
   districtId: string;
   className?: string;
+  /**
+   * Freeze the replay from OUTSIDE, without touching the student's own
+   * play/pause intent.
+   *
+   * Doc 84 §5.1 rule 2 asks the classroom board to „freeze and DIM" when a
+   * hand goes up. It only dimmed: this component owned its rAF loop and
+   * exposed no input, so the car kept driving behind a 42%-opacity veil while
+   * the teacher answered a question about the exact moment that just went
+   * past. `paused` is that seam. It does not clear the canvas and it does not
+   * seek — the last frame stays exactly where it was, which is the referent
+   * the dim exists to preserve — and it leaves `playing` alone, so the board
+   * comes back to whatever the student had chosen.
+   */
+  paused?: boolean;
 }) {
   const wrapRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -262,6 +277,9 @@ export function MistakeReplay({
 
   // Static path drawing + step-through instead of animation.
   const reducedMotion = useSyncExternalStore(subscribeReducedMotion, readReducedMotion, () => false);
+
+  /** The student's intent AND the caller's. Either one stops the loop. */
+  const animating = playing && !paused;
 
   // Lazy fetch: the panel mounts this component only when it opens.
   useEffect(() => {
@@ -362,8 +380,10 @@ export function MistakeReplay({
       return;
     }
 
+    // One frame always — so a freeze leaves the last position on screen rather
+    // than a blank canvas, and an unfreeze does not have to wait for rAF.
     render(tSecRef.current);
-    if (!playing) return;
+    if (!animating) return;
 
     let raf = 0;
     let lastMs = performance.now();
@@ -382,7 +402,7 @@ export function MistakeReplay({
     };
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
-  }, [data, view, layers, playing, reducedMotion, stepIdx]);
+  }, [data, view, layers, animating, reducedMotion, stepIdx]);
 
   if (failed) return null;
 
@@ -442,10 +462,19 @@ export function MistakeReplay({
           <button
             type="button"
             onClick={() => setPlaying((p) => !p)}
-            aria-label={playing ? "Пауза" : "Пусни"}
-            className="btn-ghost shrink-0 px-2 py-1"
+            // Disabled, not hidden, while the caller holds the freeze: the
+            // control has to keep its place in the row (the board budgets this
+            // strip to the pixel), and a play button that visibly does nothing
+            // is worse than one that says it cannot.
+            disabled={paused}
+            aria-label={animating ? "Пауза" : "Пусни"}
+            className="btn-ghost shrink-0 px-2 py-1 disabled:cursor-not-allowed disabled:opacity-40"
           >
-            {playing ? <IconPause className="h-3.5 w-3.5" /> : <IconPlay className="h-3.5 w-3.5" />}
+            {animating ? (
+              <IconPause className="h-3.5 w-3.5" />
+            ) : (
+              <IconPlay className="h-3.5 w-3.5" />
+            )}
           </button>
         )}
         <div aria-hidden className="h-1 flex-1 overflow-hidden rounded-full bg-surface-2">

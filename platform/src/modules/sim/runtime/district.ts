@@ -151,7 +151,7 @@ export interface DistrictBounds {
  *                        this span is the лента за принудително спиране
  *                        (bounded by the wide solid edge line, М2): sustained
  *                        DRIVING in it grades the опасна
- *                        EMERGENCY_LANE_DRIVING (ЗДвП чл. 58, т. 3), and the
+ *                        EMERGENCY_LANE_DRIVING (ЗДвП чл. 58, т. 4), and the
  *                        keep-right detector stops requiring that lane (the
  *                        busLane seam, mirrored).
  * SURFACE-PATCH slice (AQUAPLANE + ICE — same shape, new kinds, so

@@ -33,6 +33,7 @@ import {
   useRef,
   useState,
   type CSSProperties,
+  type ReactNode,
 } from "react";
 import { usePrefersReducedMotion } from "@/lib/hooks/clientEnv";
 import "./classroom.css";
@@ -53,6 +54,7 @@ import type {
   AskAnswer,
   AskChip,
   BoardSide,
+  ClassroomBeat,
   ClassroomHandlers,
   ClassroomLesson,
   TeacherState,
@@ -122,17 +124,52 @@ function useViewportHeight(ref: React.RefObject<HTMLDivElement | null>, minPx: n
   }, [ref, minPx]);
 }
 
+/**
+ * What the board shows on a `quiz` beat, supplied by whoever owns the lesson.
+ *
+ * IT IS A SLOT, NOT A COMPONENT, for the same reason `ClassroomHandlers` is a
+ * bag of callbacks: dealing and grading questions needs the content bank, the
+ * student's mastery row and a server action, and none of those may be imported
+ * by a component that has to render on a phone inside the room. The room's
+ * whole contribution is composition — it puts the quiz where a teacher puts
+ * one (on the board, mid-lesson) and STOPS THE CLOCK while it is up, which is
+ * the part a caller cannot do from outside.
+ *
+ * `onDone` ends the beat immediately rather than letting the timer run out:
+ * once the last verdict is read there is nothing left on that beat to watch.
+ */
+export type QuizSlot = (args: {
+  beat: ClassroomBeat;
+  dense: boolean;
+  onDone: () => void;
+}) => ReactNode;
+
 export function ClassroomScene({
   lesson,
   handlers,
+  renderQuiz,
+  startBeatIndex = 0,
 }: {
   lesson: ClassroomLesson;
   handlers?: ClassroomHandlers;
+  renderQuiz?: QuizSlot;
+  /**
+   * Which beat to open on — „продължи оттам", resolved from the student's
+   * `LessonProgress` row on the server and clamped again here, because a room
+   * opened past its last beat is a blank room.
+   *
+   * An initial useState value rather than an effect: the FIRST render is
+   * already on the right beat, so a resuming student never sees beat 1 flash
+   * past before being moved.
+   */
+  startBeatIndex?: number;
 }) {
   const compact = useCompactLayout();
   const reducedMotion = usePrefersReducedMotion();
 
-  const [beatIndex, setBeatIndex] = useState(0);
+  const [beatIndex, setBeatIndex] = useState(() =>
+    Math.min(Math.max(Math.floor(startBeatIndex) || 0, 0), Math.max(0, lesson.beats.length - 1)),
+  );
   const [teacher, dispatchTeacher] = useReducer(teacherTransition, "idle" as TeacherState);
   // Which half of the pair is up. Stored as an OVERRIDE keyed by beat, not as
   // plain state reset on beat change: a beat opens on the side its author
@@ -175,10 +212,53 @@ export function ClassroomScene({
     if (barRef.current) barRef.current.style.width = "0%";
   }, [beat]);
 
-  // The lesson clock. It runs ONLY while the teacher actually lectures, so a
-  // raised hand freezes the beat instead of racing it (doc 84 §5.1).
+  /**
+   * A quiz beat holds the room until the student has actually answered.
+   *
+   * Kept as a set of FINISHED beat ids rather than a boolean, because the beat
+   * the student is on is derived state: „this beat is a quiz, a quiz slot
+   * exists, and it has not been finished" is true again on the same terms if
+   * the lesson is ever walked backwards.
+   */
+  const [quizDone, setQuizDone] = useState<readonly string[]>([]);
+  const quizHolding =
+    beat.kind === "quiz" && renderQuiz !== undefined && !quizDone.includes(beat.id);
+
+  /**
+   * Tell the teacher a question is up.
+   *
+   * The room already knew (`quizHolding` stops the clock); the FIGURE did not,
+   * so the caption under it read „Обяснява" over a stopped lesson with a form
+   * on the board. Derived from `quizHolding` here rather than dispatched from
+   * the quiz slot, because the slot is supplied by the lesson lane and the
+   * teacher's state is the room's own business.
+   *
+   * It re-fires after an interruption on purpose: a student who raises their
+   * hand mid-question goes speaking → listening → resuming → speaking, and the
+   * question is still up when they get back.
+   */
   useEffect(() => {
-    if (!isBeatAdvancing(teacher)) return;
+    if (quizHolding && teacher === "speaking") act({ type: "quiz-open" });
+    else if (!quizHolding && teacher === "quizzing") act({ type: "quiz-done" });
+  }, [act, quizHolding, teacher]);
+
+  /** End the current beat: report it, then move on (or finish the lesson). */
+  const finishBeat = useCallback(() => {
+    handlers?.onBeatComplete?.(beat.id, beatIndex);
+    if (beatIndex + 1 < total) {
+      setBeatIndex((i) => i + 1);
+    } else {
+      handlers?.onLessonComplete?.(lesson.id);
+      act({ type: "finish" });
+    }
+  }, [act, beat.id, beatIndex, handlers, lesson.id, total]);
+
+  // The lesson clock. It runs ONLY while the teacher actually lectures, so a
+  // raised hand freezes the beat instead of racing it (doc 84 §5.1) — and a
+  // mini-quiz freezes it too, because a question that scrolls away on a timer
+  // is not a check, it is a slideshow with a form in it.
+  useEffect(() => {
+    if (!isBeatAdvancing(teacher) || quizHolding) return;
     let raf = 0;
     let last = performance.now();
     const tick = (now: number) => {
@@ -186,20 +266,14 @@ export function ClassroomScene({
       last = now;
       if (barRef.current) barRef.current.style.width = `${progressRef.current * 100}%`;
       if (progressRef.current >= 1) {
-        handlers?.onBeatComplete?.(beat.id, beatIndex);
-        if (beatIndex + 1 < total) {
-          setBeatIndex((i) => i + 1);
-        } else {
-          handlers?.onLessonComplete?.(lesson.id);
-          act({ type: "finish" });
-        }
+        finishBeat();
         return;
       }
       raf = requestAnimationFrame(tick);
     };
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
-  }, [teacher, durationSec, beat.id, beatIndex, total, lesson.id, handlers, act]);
+  }, [teacher, durationSec, quizHolding, finishBeat]);
 
   const raiseHand = useCallback(() => {
     // Doc 84 §5.1 rule 1: stop at the end of the sentence, not mid-word. The
@@ -220,12 +294,12 @@ export function ClassroomScene({
   }, [act, reducedMotion]);
 
   const ask = useCallback(
-    async (question: string) => {
+    async (question: string, chipId: string | null = null) => {
       act({ type: "submit-question" });
       setAnswerPending(true);
       try {
         const reply = handlers?.onAsk
-          ? await handlers.onAsk(question, beat)
+          ? await handlers.onAsk(question, beat, chipId)
           : {
               // The tutor lane is not wired in this build. Saying so plainly is
               // the only honest thing to render here — an invented answer in a
@@ -260,7 +334,8 @@ export function ClassroomScene({
           setSide("mistake");
           return;
         default:
-          void ask(chip.labelBg);
+          // The chip's id travels with the question — see `onAsk` in types.ts.
+          void ask(chip.labelBg, chip.id);
       }
     },
     [ask, setSide],
@@ -337,7 +412,23 @@ export function ClassroomScene({
               paddingBottom: compact ? 30 : 44,
             }}
           >
-            {beat.board ? (
+            {quizHolding && renderQuiz !== undefined ? (
+              // The quiz IS the board for the length of a quiz beat. It is not
+              // dimmed while the teacher listens: a student who raises their
+              // hand in the middle of a question needs the question legible,
+              // not faded — the dim rule exists to keep a REFERENT on screen,
+              // and here the referent is something they have to read.
+              <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
+                {renderQuiz({
+                  beat,
+                  dense: compact,
+                  onDone: () => {
+                    setQuizDone((done) => (done.includes(beat.id) ? done : [...done, beat.id]));
+                    finishBeat();
+                  },
+                })}
+              </div>
+            ) : beat.board ? (
               <LessonBoard
                 board={beat.board}
                 side={side}
@@ -382,12 +473,17 @@ export function ClassroomScene({
               onChip={onChip}
               onFreeText={(q) => void ask(q)}
               onResume={resume}
+              // „Напред" is offered while the teacher is actually lecturing and
+              // withheld while a quiz is up: skipping a sentence is reading
+              // ahead, skipping a question is not the same act and has its own
+              // („Пропусни") control inside the quiz.
+              onNext={teacher === "speaking" && !quizHolding ? finishBeat : undefined}
             />
           ) : (
             <button
               type="button"
               onClick={() => act({ type: "start" })}
-              className="btn-primary shrink-0 px-4 py-2.5 text-sm font-bold"
+              className="btn-accent shrink-0 px-4 py-2.5 text-sm font-bold"
             >
               {beatIndex === 0 ? "Започни урока" : "Продължи урока"}
             </button>
@@ -450,12 +546,31 @@ function LessonHeader({
         </div>
       </div>
 
-      {lesson.isPlaceholder && !compact && (
-        <p className="truncate rounded-lg border border-warning/40 bg-warning/10 px-2 py-1 text-[11px] leading-snug text-warning">
-          Демо: текстовете и записите са одобрени, преподавателят е{" "}
-          <strong>запазено място</strong>.
-        </p>
-      )}
+      {/* THE BANNER SAYS WHICH PART IS UNFINISHED, and it must be able to say
+          „only the teacher's picture" now that the words are real.
+
+          It used to fire on `isPlaceholder` alone, which was correct while the
+          only lesson in existence was a hand-built demo. A real lesson out of
+          the content bank is NOT a demo — but its teacher is still a wireframe
+          (doc 84 §4.3: no footage has ever been shot), and a room that stopped
+          saying so the moment the text became real would be hiding the one
+          thing about it that is still a stand-in. */}
+      {!compact &&
+        (lesson.isPlaceholder ? (
+          <p className="truncate rounded-lg border border-warning/40 bg-warning/10 px-2 py-1 text-[11px] leading-snug text-warning">
+            Демо: текстовете и записите са одобрени, преподавателят е{" "}
+            <strong>запазено място</strong>.
+          </p>
+        ) : lesson.teacher.kind === "placeholder" ? (
+          // NOT `truncate`: measured at 390 px this read „Текстът и записите са
+          // от одобреното съдържание. Фигура…" — the half that says WHAT is a
+          // placeholder was the half that got cut. A disclosure that only fits
+          // on a desktop is not a disclosure.
+          <p className="rounded-lg border border-border bg-surface-2/60 px-2 py-1 text-[11px] leading-snug text-muted">
+            Текстът и записите са от одобреното съдържание. Фигурата на преподавателя е{" "}
+            <strong>запазено място</strong>.
+          </p>
+        ) : null)}
     </header>
   );
 }

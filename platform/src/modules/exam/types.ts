@@ -16,6 +16,24 @@ export const EXAM_DURATION_SEC = 2400; // 40 minutes
 /** Network/auto-submit slack on top of the 40:00 limit. */
 export const EXAM_GRACE_SEC = 30;
 
+/**
+ * How long after `startedAt` an opened attempt can still be RESUMED.
+ *
+ * Same number as the submit deadline, different decision — and the difference
+ * is the whole point. Past this line the paper is over by the official clock,
+ * so re-rendering it would show a runner with 00:00 on the timer, which
+ * auto-submits on mount and hands the candidate a bare 0/97 „не издържан" for
+ * an exam they never sat. That is the verdict-without-a-reason doc 64 THEO-4
+ * forbids, produced by the product itself.
+ *
+ * Submission keeps its own, unchanged rule: a paper that arrives at 40:31 is
+ * still GRADED (auto-failed, but graded — see submitExam). A student who was
+ * really sitting there must never lose their answers to a clock; a student
+ * whose phone dropped connection three days ago must never be graded on a
+ * paper they never saw. This constant separates the two.
+ */
+export const EXAM_ATTEMPT_TTL_SEC = EXAM_DURATION_SEC + EXAM_GRACE_SEC;
+
 // ---------------------------------------------------------------------------
 // Safe exam payload (what the candidate is allowed to see)
 // ---------------------------------------------------------------------------
@@ -106,6 +124,27 @@ export interface InProgressExam {
   questions: ExamQuestion[];
 }
 
+/**
+ * Why an attempt route cannot show a running paper — the four answers, kept
+ * apart because each one is a DIFFERENT sentence to the student.
+ *
+ * They used to be one `null`, so the route said „един от въпросите вече не е
+ * част от банката" for all of them: true for exactly one case and a fabricated
+ * excuse for the rest.
+ */
+export type ExamAttemptView =
+  /** Resumable right now — render the runner with exactly these questions. */
+  | { status: "in-progress"; exam: InProgressExam }
+  /**
+   * Past EXAM_ATTEMPT_TTL_SEC. The candidate is owed the truth („този опит
+   * изтече"), never a grade.
+   */
+  | { status: "expired"; startedAt: Date; elapsedSec: number }
+  /** A dealt question has left the bank — the one honest content excuse. */
+  | { status: "unrestorable" }
+  /** Unknown id, someone else's attempt, already graded, unreadable payload. */
+  | { status: "unavailable" };
+
 export interface SubmitExamResult extends GradeResult {
   attemptId: string;
   /**
@@ -187,7 +226,13 @@ export interface ExamHistoryEntry {
   attemptId: string;
   startedAt: Date;
   finishedAt: Date | null;
-  status: "in-progress" | "completed";
+  /**
+   * "expired" is DERIVED from startedAt, never stored: an unfinished attempt
+   * older than EXAM_ATTEMPT_TTL_SEC can no longer be resumed, so listing it as
+   * „Незавършен · Продължи →" invites the student into a screen that cannot
+   * give them what the link promised.
+   */
+  status: "in-progress" | "expired" | "completed";
   score: number | null;
   maxScore: number;
   passed: boolean | null;

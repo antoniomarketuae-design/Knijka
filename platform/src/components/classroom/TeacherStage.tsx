@@ -34,6 +34,9 @@ const STATE_TINT: Record<TeacherState, string> = {
   thinking: "var(--accent-2)",
   answering: "var(--accent)",
   resuming: "var(--accent-soft)",
+  // The same tint as `listening`, because it is the same posture: the floor
+  // belongs to the student and the teacher is waiting on them.
+  quizzing: "var(--accent-2)",
 };
 
 /**

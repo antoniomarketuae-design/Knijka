@@ -53,7 +53,26 @@ export function SignFace({
   );
 }
 
-/** True when the option list should render as a sign picture grid. */
+/**
+ * True when the option list should render as a sign picture grid.
+ *
+ * THIS IS THE „Кой от показаните знаци…" SHAPE, AND IT IS THE ONLY ONE.
+ * A four-sign comparison carries its artwork on the OPTIONS — one sign per
+ * option, in option order — and leaves `question.media` null, because there is
+ * no single picture to draw above the question text. That is the schema's
+ * answer to „a media kind that holds an ordered set of signs": the ordered set
+ * is the option list (content/SCHEMA.md, „the comparison shape").
+ *
+ * So do not add a `signSet`/`multiSign` question-media kind. Three surfaces
+ * already render this one through <SignFace> — practice, exam, and the sim's
+ * mid-drive micro-quiz — and a second representation would mean a second grid
+ * to keep in step with them.
+ *
+ * The corollary bit anyone auditing the bank: a check that reads
+ * `question.media` and stops there sees `null` on every one of these and
+ * concludes „nothing is shown". Nine perfectly answerable questions were filed
+ * as unanswerable that way (docs/education/90 §4.1). Read `options[].media`.
+ */
 export function hasSignOptions(
   options: readonly { media?: SignMediaRef | null }[],
 ): boolean {

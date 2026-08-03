@@ -174,7 +174,7 @@ describe("mw-exit-v1 through the world builder", () => {
     expect(ramp.maxspeed).toBe(RAMP_KMH);
     expect(ramp.class).toBe("secondary_link");
     // NOT motorway-tagged: a driver correctly down at the advisory here must
-    // never meet чл. 54's flow floor (the SP-10 detector stays disarmed).
+    // never meet the SP-10 flow floor (the detector stays disarmed).
     expect(ramp.motorway).toBeUndefined();
     expect(ramp.geometry[0]).toEqual([X_CURB, NOSE_Y]);
     // Tangential departure: the first chord bears at most one sampling step.

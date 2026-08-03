@@ -67,8 +67,8 @@ export const CALIBRATION_HISTORY_LIMIT = 60;
  *
  * The sim module owns that payload and parses it with its own validator; this
  * module deliberately re-derives the ONE field it needs instead of importing
- * across the boundary (exactly what ./store.ts:extractSimEvidence does for
- * rule events). An unreadable payload degrades to `false` — a drive we cannot
+ * across the boundary (exactly what ./store.ts:toSimEvidenceRow does for rule
+ * events). An unreadable payload degrades to `false` — a drive we cannot
  * confirm passed did not pass, which is the conservative direction: it can
  * only ever mark the student MORE optimistic than they were, never less.
  */

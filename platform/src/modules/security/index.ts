@@ -13,13 +13,19 @@
  * - `consumeRateLimit` — per-source budgets ("how many requests from here").
  *   Wired at the ONE chokepoint that provably runs before every handler:
  *   src/proxy.ts. The policy table (policy.ts) is the whole surface.
+ * - `consumeUserRateLimit` — the same budgets keyed on the SERVER session id,
+ *   for the server actions the proxy never sees. Same storage, different key,
+ *   because a school shares one IP and a student does not share a session.
  * - `checkLockout` / `recordFailure` — per-identifier exponential backoff
  *   ("how many of them were WRONG for this account"). Wired in the credentials
  *   sign-in route, keyed on the e-mail, so a botnet with a thousand IPs still
  *   cannot grind one account.
  *
- * Storage is in-process by design — rateLimit.ts explains why, and what to
- * change on the day this moves off a single VPS.
+ * Storage is split, and the split is the argument: the per-source budgets are
+ * in-process (rateLimit.ts says why, and what to change when this leaves the
+ * single VPS), while the failure lockout is a DATABASE ROW — because our own
+ * deploy cron restarts the process every five minutes and was resetting the
+ * attacker's backoff for them (lockoutStore.ts).
  *
  * The tutor's spend ceiling is NOT here: it is money, not traffic, it needs
  * durable state, and it lives with the code that spends it
@@ -28,9 +34,11 @@
 
 export {
   consumeRateLimit,
+  consumeUserRateLimit,
   checkLockout,
   recordFailure,
   clearFailures,
+  purgeExpiredLockouts,
   resetRateLimitState,
 } from "./rateLimit";
 export type {
@@ -38,6 +46,14 @@ export type {
   RateLimitVerdict,
   LockoutRule,
 } from "./rateLimit";
+
+// Lockout persistence seam (tests inject the fake; production uses Prisma).
+export {
+  setLockoutStore,
+  getLockoutStore,
+  InMemoryLockoutStore,
+} from "./lockoutStore";
+export type { LockoutStore, LockoutRecord } from "./lockoutStore";
 
 export { RATE_LIMITS, LOGIN_LOCKOUT, rateLimitForRequest } from "./policy";
 

@@ -90,7 +90,8 @@ describe("POST /api/register", () => {
       createUser: async () => {
         throw new Error("connect ECONNREFUSED 10.0.0.5:5432");
       },
-      findRoleById: async () => null,
+      findAccountById: async () => null,
+      bumpSessionEpoch: async () => null,
     });
     vi.spyOn(console, "error").mockImplementation(() => {});
     const res = await post(body());

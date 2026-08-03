@@ -240,7 +240,7 @@ describe("wave-6 bot completion — sc-sig-controller-live at L3", () => {
 
 // ---------------------------------------------------------------------------
 // sc-rb-ped-exit — the roundabout exit is a RIGHT TURN INTO A STREET, and that
-//                  street's zebra carries чл. 119 (ЗДвП чл. 50а + чл. 119).
+//                  street's zebra carries чл. 119 (ЗДвП чл. 50, ал. 1 + чл. 119, ал. 1).
 //                  The drill is won in a 7.94 m pocket between ring and paint.
 // ---------------------------------------------------------------------------
 

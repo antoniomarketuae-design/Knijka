@@ -1165,8 +1165,11 @@ export function reduceTick(prev: RuleEngineState, tick: SimTick): ReduceResult {
 
   // Motorway crawl (SP-10 „минимална скорост на магистрала" — MOTORWAY-SEGMENT
   // slice). LAW NOTE (see the catalog entry): BG law has NO general motorway
-  // minimum — чл. 54's 50 km/h constructive line is the honest floor, and the
-  // graded fault is the SUSTAINED CAUSELESS crawl (the mobile chicane), never
+  // minimum (чл. 55, ал. 1 sets a > 70 km/h condition on the VEHICLE, not on
+  // the driver); the graded duty is чл. 22, ал. 1 „без основателна причина…
+  // пречи", the 50 km/h floor below is an authored detection line and not a
+  // legal one, and the graded fault is the SUSTAINED CAUSELESS crawl (the
+  // mobile chicane), never
   // a transition. Innocent by construction (A12):
   //  - only an authored edge `motorway: true` tag arms it (no shipped map);
   //  - transitions are exempt (|a| ≥ the steady band: moving off up through
@@ -1202,7 +1205,8 @@ export function reduceTick(prev: RuleEngineState, tick: SimTick): ReduceResult {
     events.push(makeViolation("DRIVING_TOO_SLOW_FOR_MOTORWAY", t));
   }
 
-  // Emergency-lane driving (чл. 58, т. 3 — MOTORWAY-SEGMENT slice): sustained
+  // Emergency-lane driving (чл. 58, т. 4 „да се движи… в лентата за принудително
+  // спиране"; т. 3 is the STOPPING permission — MOTORWAY-SEGMENT slice): sustained
   // travel in the CURB lane of an authored emergencyLane span
   // (tick.emergencyLaneRight — data, never a heuristic). The legal sides:
   //  - deliberately NO indicator exemption (contrast DRIVING_IN_BUS_LANE): a

@@ -164,10 +164,37 @@ export interface SimSessionDetailRow {
   events: SimSessionEventsJson | null;
 }
 
+/**
+ * WHY listSessions HAS NO `take`, AND MUST NOT GROW ONE.
+ *
+ * A `take: 200` lived here briefly. It was wrong, and nothing went red.
+ *
+ * The cost this query had was the `events` blob, not the row count — every
+ * ViolationEvent carries titleBg and explanationBg, ~430 bytes of Bulgarian
+ * prose denormalised into a row that already holds it in the code. Dropping
+ * `events` from the select IS the saving; the rows themselves are six scalars
+ * on the (userId, startedAt) index.
+ *
+ * The cap read as safe against a comment saying the catalogue "unlocks on has
+ * any attempt passed" — but FR-06 had already changed computeProgression to
+ * unlock on an attempt PRESENT IN THE LIST (progression.ts:74), and
+ * isExamUnlocked still needs a pass PRESENT IN THE LIST (progression.ts:109).
+ * Newest-first means the rows a window drops are the OLDEST: the curriculum
+ * lessons a student drove before moving into the scenario library. Measured
+ * over 260 scenario drives + 8 older curriculum passes — full history: 8
+ * lessons unlocked, exam open. Newest-200: 1 lesson unlocked, exam LOCKED,
+ * полигон re-locked. It robs the heaviest user, who is the exact student the
+ * cap was written for.
+ *
+ * If a bound is ever genuinely needed, the two unlock gates need their own
+ * query that cannot lose a pass (groupBy lessonId with _max) — not a window
+ * over the shared list.
+ */
+
 export interface SimSessionStore {
   /** One write per finished session (sessions persist only at the end, v1). */
   saveSession(userId: string, input: SaveSimSessionInput): Promise<{ id: string }>;
-  /** All sessions of the user, newest first — input for progression. */
+  /** Every one of the user's sessions, summary columns only — see the note above. */
   listSessions(userId: string): Promise<SimSessionListRow[]>;
   /** A15: newest-first detailed rows for the session-history screen. */
   listRecentSessions(userId: string, limit: number): Promise<SimSessionDetailRow[]>;
@@ -194,6 +221,11 @@ function createPrismaStore(): SimSessionStore {
           // Structured clone through JSON keeps the column plain Json.
           events: JSON.parse(JSON.stringify(input.events)),
           debrief: input.debrief,
+          // The two summary columns are written from the SAME payload in the
+          // same INSERT, so they can never disagree with it. `events` stays
+          // authoritative; these are its projection for list reads.
+          passed: input.events.passed,
+          rubricStars: input.events.rubricStars ?? null,
         },
         select: { id: true },
       });
@@ -202,6 +234,10 @@ function createPrismaStore(): SimSessionStore {
 
     async listSessions(userId) {
       const db = await getDb();
+      // NOT `events: true`. That one word made this query fetch every rule
+      // event the student had ever generated — titleBg and explanationBg and
+      // all — to compute two booleans' worth of progression. The summary
+      // columns hold exactly what the three consumers read.
       const rows = await db.simSession.findMany({
         where: { userId },
         orderBy: { startedAt: "desc" },
@@ -210,20 +246,21 @@ function createPrismaStore(): SimSessionStore {
           lessonId: true,
           finishedAt: true,
           score: true,
-          events: true,
+          passed: true,
+          rubricStars: true,
         },
       });
-      return rows.map((r) => {
-        const parsed = parseSimSessionEvents(r.events);
-        return {
-          id: r.id,
-          lessonId: r.lessonId,
-          finishedAt: r.finishedAt,
-          score: r.score,
-          passed: parsed?.passed ?? false,
-          rubricStars: parsed?.rubricStars ?? null,
-        };
-      });
+      return rows.map((r) => ({
+        id: r.id,
+        lessonId: r.lessonId,
+        finishedAt: r.finishedAt,
+        score: r.score,
+        // NULL means "this drive records no such fact" — an unfinished row, a
+        // non-scenario lesson, or a payload parseSimSessionEvents() refused.
+        // The old code produced exactly these values from an unreadable blob.
+        passed: r.passed ?? false,
+        rubricStars: r.rubricStars,
+      }));
     },
 
     async listRecentSessions(userId, limit) {

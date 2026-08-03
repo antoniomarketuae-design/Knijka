@@ -1,0 +1,36 @@
+# /etc/logrotate.d/knijka — Книжка.AI log rotation (audit 2026-07-24, H-17).
+#
+# Install:  install -m 644 tools/deploy/logrotate.knijka /etc/logrotate.d/knijka
+# Verify:   logrotate -d /etc/logrotate.d/knijka     # dry run, changes nothing
+#
+# WHY THIS FILE EXISTS AS A FILE. The snippet was written into the README and
+# never installed, so these logs have grown without a ceiling since the day the
+# deploy was set up. They are also the ONLY forensics this system has: the six
+# `ENOENT … .next/required-server-files.json` lines that finally explained the
+# ~11.5-hour outage came out of knijka-error.log. Unbounded, they eventually
+# fill the disk — and a full disk takes out the database and the backups on the
+# same box, at which point the evidence and the data go together.
+#
+# A README snippet is a suggestion. A file in the repo is something `install`
+# can copy and `logrotate -d` can check.
+#
+# COVERS ONLY THE CRON LOGS. cron appends to these with `>>`, reopening the
+# file on every run, so plain rotation is safe — nothing holds a stale file
+# descriptor across the rename. The APP's own stdout/stderr are pm2's, and pm2
+# DOES hold those descriptors open: rotating them from here would leave pm2
+# writing into a deleted inode and the new file empty forever. Those need
+# pm2-logrotate instead — see the README, "Log rotation".
+
+/var/log/knijka-autodeploy.log
+/var/log/knijka-backup.log
+{
+    weekly
+    rotate 8
+    compress
+    delaycompress
+    missingok
+    notifempty
+    # 640 root:adm — a deploy log names commits and paths, and this is a
+    # minors' platform (ADR-004); nothing here is world-readable.
+    create 640 root adm
+}

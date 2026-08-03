@@ -112,7 +112,7 @@ describe("M-17b — TURN_WITHOUT_OBSERVATION (config-gated)", () => {
       on,
     );
     expect(codes(events)).toEqual(["TURN_WITHOUT_OBSERVATION"]);
-    expect(events[0]).toMatchObject({ severityClass: "osnovna", lawRef: "ЗДвП чл. 25" });
+    expect(events[0]).toMatchObject({ severityClass: "osnovna", lawRef: "ЗДвП чл. 25, ал. 1" });
   });
 
   it("a fresh glance to the turn's side clears it", () => {

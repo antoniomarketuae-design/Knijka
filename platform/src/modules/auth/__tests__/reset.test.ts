@@ -24,11 +24,13 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { setMailer, type MailMessage } from "@/modules/mail";
 import { resetRateLimitState } from "@/modules/security";
 import {
+  changePassword,
   PASSWORD_RESET_EMAIL_LIMIT,
   PASSWORD_RESET_IP_LIMIT,
   requestPasswordReset,
   resetPassword,
   RESET_TOKEN_TTL_MINUTES,
+  signOutEverywhere,
   verifyPasswordResetToken,
 } from "../reset";
 import {
@@ -67,6 +69,7 @@ beforeEach(async () => {
       // at the real cost 12 during registration; nothing here depends on it.
       passwordHash: await hash(OLD_PASSWORD, 4),
       role: "student",
+      sessionEpoch: 0,
     },
   ];
   tokens = [];
@@ -357,5 +360,144 @@ describe("verifyPasswordResetToken — rendering the form", () => {
       ok: false,
       error: "used",
     });
+  });
+});
+
+/**
+ * SESSION REVOCATION — the half the reset flow shipped without.
+ *
+ * reset.ts's own header used to end by admitting it: "an attacker who is
+ * already signed in keeps that cookie until it expires". Sessions are 30-day
+ * idle JWTs, so „смених си паролата, защото някой ми знае акаунта" bought a
+ * student nothing at all against the person already logged in. User.
+ * sessionEpoch is the counter that fixes it; these tests are the proof that all
+ * three write paths bump it.
+ */
+describe("session revocation", () => {
+  it("bumps the epoch on a password RESET, so old cookies die with the link", async () => {
+    await requestPasswordReset({ email: EMAIL }, { ip: "1.1.1.1" });
+    const token = tokenFromLastMail();
+
+    expect(users[0].sessionEpoch).toBe(0);
+    await resetPassword({ token, password: NEW_PASSWORD });
+    // Every JWT minted before this moment now carries a stale epoch and is
+    // refused by getSessionUser (see session.test.ts).
+    expect(users[0].sessionEpoch).toBe(1);
+  });
+
+  it("bumps the epoch on sign-out-everywhere without touching the password", async () => {
+    const before = users[0].passwordHash;
+    await signOutEverywhere("user-1");
+
+    expect(users[0].sessionEpoch).toBe(1);
+    expect(users[0].passwordHash).toBe(before);
+    // The password still works — this signs devices out, it does not lock the
+    // student out of their own account.
+    expect(await verifyCredentials(EMAIL, OLD_PASSWORD)).not.toBeNull();
+  });
+
+  it("is a no-op for an account that is already gone", async () => {
+    await expect(signOutEverywhere("ghost-99")).resolves.toBeUndefined();
+  });
+});
+
+/**
+ * THE AUTHENTICATED CHANGE (/settings).
+ *
+ * Before it, /settings said automatic password change "is not ready yet" and
+ * pointed at a mailbox — weeks after /forgot shipped.
+ */
+describe("changePassword", () => {
+  it("changes the password after re-authentication, and revokes every session", async () => {
+    const result = await changePassword("user-1", EMAIL, {
+      currentPassword: OLD_PASSWORD,
+      password: NEW_PASSWORD,
+    });
+
+    expect(result).toEqual({ ok: true });
+    expect(await verifyCredentials(EMAIL, NEW_PASSWORD)).not.toBeNull();
+    expect(await verifyCredentials(EMAIL, OLD_PASSWORD)).toBeNull();
+    // The reason to change a password you still know is that someone else
+    // knows it too. Their cookie has to stop working, or this is theatre.
+    expect(users[0].sessionEpoch).toBe(1);
+  });
+
+  it("refuses without the CURRENT password — a borrowed unlocked phone gains nothing", async () => {
+    const result = await changePassword("user-1", EMAIL, {
+      currentPassword: "gresna-parola",
+      password: NEW_PASSWORD,
+    });
+
+    expect(result).toEqual({ ok: false, error: "wrong_password" });
+    expect(await verifyCredentials(EMAIL, OLD_PASSWORD)).not.toBeNull();
+    expect(users[0].sessionEpoch).toBe(0);
+  });
+
+  it("applies the SAME password policy as registration and reset", async () => {
+    const result = await changePassword("user-1", EMAIL, {
+      currentPassword: OLD_PASSWORD,
+      password: "kratka", // < 8 chars
+    });
+
+    expect(result).toMatchObject({ ok: false, error: "invalid_input" });
+    expect(await verifyCredentials(EMAIL, OLD_PASSWORD)).not.toBeNull();
+  });
+
+  it("burns any outstanding reset link — the account was just deliberately re-keyed", async () => {
+    await requestPasswordReset({ email: EMAIL }, { ip: "1.1.1.1" });
+    const token = tokenFromLastMail();
+
+    await changePassword("user-1", EMAIL, {
+      currentPassword: OLD_PASSWORD,
+      password: NEW_PASSWORD,
+    });
+
+    expect(await verifyPasswordResetToken(token)).toEqual({
+      ok: false,
+      error: "used",
+    });
+  });
+
+  it("says so, rather than crashing, for an account with no password at all", async () => {
+    users[0].passwordHash = null;
+    expect(
+      await changePassword("user-1", EMAIL, {
+        currentPassword: OLD_PASSWORD,
+        password: NEW_PASSWORD,
+      }),
+    ).toEqual({ ok: false, error: "no_password" });
+  });
+
+  it("cannot be pointed at another account", async () => {
+    users.push({
+      id: "user-2",
+      email: "maria@mail.bg",
+      name: "Мария",
+      passwordHash: await hash("drugaParola9", 4),
+      role: "student",
+      sessionEpoch: 0,
+    });
+
+    // The caller's own session id with somebody else's address: the address is
+    // what verifyCredentials checks, so the identity cross-check is what stops
+    // a mismatched pair from re-keying the wrong row.
+    const result = await changePassword("user-1", "maria@mail.bg", {
+      currentPassword: "drugaParola9",
+      password: NEW_PASSWORD,
+    });
+
+    expect(result).toEqual({ ok: false, error: "wrong_password" });
+    expect(users[1].passwordHash).not.toBeNull();
+    expect(await verifyCredentials("maria@mail.bg", "drugaParola9")).not.toBeNull();
+    expect(await verifyCredentials(EMAIL, OLD_PASSWORD)).not.toBeNull();
+  });
+
+  it("reports a vanished account instead of throwing", async () => {
+    expect(
+      await changePassword("ghost-99", EMAIL, {
+        currentPassword: OLD_PASSWORD,
+        password: NEW_PASSWORD,
+      }),
+    ).toEqual({ ok: false, error: "not_found" });
   });
 });

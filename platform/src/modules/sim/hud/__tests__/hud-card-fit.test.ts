@@ -217,22 +217,31 @@ describe("the viewport clamp — it is really on the components", () => {
     expect(tsx).toMatch(/\bbreak-words\b/);
   });
 
-  it("the top-centre objective stack keeps a cap on its shrink-to-fit width", () => {
-    // `absolute left-1/2 … -translate-x-1/2` with no cap is shrink-to-fit
-    // against HALF the stage, so a child whose min-content exceeds that makes
-    // the box wider than its own containing block — and a CENTRED box then
-    // hangs off both edges at once, which is the two-sided clipping visible on
-    // the founder's teach card. Defensive: today's content measures ~296 px, so
-    // this asserts the shape stays bounded, not that a bug is being repaired.
+  it("the notification column is bounded by construction, not by a clamp", () => {
+    // WHAT THIS USED TO ASSERT, and why the assertion changed shape rather than
+    // being dropped: the surface was `absolute left-1/2 … -translate-x-1/2`,
+    // shrink-to-fit against HALF the stage, so a child whose min-content
+    // exceeded that made the box wider than its own containing block — and a
+    // CENTRED box then hangs off BOTH edges at once, which is the two-sided
+    // clipping on the founder's teach card. The cure was a `max-w-[…vw…]`.
+    //
+    // On 2026-08-03 the whole stack moved to the right edge (his third asking),
+    // and a right-anchored box of a `min(20rem, 30vw)` width cannot exceed the
+    // viewport at all — the clamp is now the width itself. So the test asserts
+    // the NEW guarantee, and that the old unbounded shape has not come back.
     const shell = stripComments(
       readFileSync(
         resolve(HUD_DIR, "../../../components/sim/lesson-ui/LessonPlayShell.tsx"),
         "utf8",
       ),
     );
-    const line = shell.split(/\r?\n/).find((l) => /left-1\/2 top-3 flex/.test(l));
-    expect(line, "the objective-stack container moved — re-anchor this test").toBeDefined();
-    expect(VIEWPORT_CLAMP.test(line ?? "")).toBe(true);
+    expect(shell, "the centred shrink-to-fit stack is back").not.toMatch(
+      /left-1\/2 top-3 flex/,
+    );
+    const line = shell
+      .split(/\r?\n/)
+      .find((l) => /width: NOTIFY_COLUMN_WIDTH_CSS_ROOMY/.test(l));
+    expect(line, "the notify column moved — re-anchor this test").toBeDefined();
   });
 
   it("the pre-drive checklist — 320 px wide, i.e. a whole iPhone SE — is clamped", () => {

@@ -55,7 +55,7 @@ export const SIGNAL_LANE_CENTER_M = 4.0625;
 // L4 (ledger §4) — the регулировчик's gestures, and what each one MEANS
 // ---------------------------------------------------------------------------
 
-/** A posture the JU-18 officer can hold (ППЗДвП чл. 66). */
+/** A posture the JU-18 officer can hold (ППЗДвП чл. 29, ал. 3). */
 export type ControllerPosture = "sideProfile" | "chestOrBack" | "armRaised";
 
 /**
@@ -65,8 +65,28 @@ export type ControllerPosture = "sideProfile" | "chestOrBack" | "armRaised";
  * THEO-4: a student watching a figure change pose learns nothing from the pose
  * alone — the simulator has to say what it MEANS, in the same breath, or it is
  * a bare correct/wrong verdict wearing a costume. `lawRef` is retrieval, not
- * recall (ADR-002): ППЗДвП чл. 66 defines these three postures and ЗДвП чл. 7
+ * recall (ADR-002): ППЗДвП чл. 29, ал. 3 defines these three postures and ЗДвП чл. 7
  * puts them above the lamps and the signs.
+ *
+ * CITATION CORRECTED 2026-08-03. Every posture here used to cite „ППЗДвП
+ * чл. 66". ППЗДвП чл. 66 is „Другите средства за сигнализиране имат следните
+ * форми, изображения, наименования и значения: 1. „Направляващо стълбче" —
+ * С1…" — marker posts, cones and barriers. It has nothing to do with a
+ * регулировчик. The postures are ППЗДвП чл. 29, ал. 3, retrieved verbatim:
+ *
+ *   „(3) Сигнали на регулировчика са следните положения на тялото и ръцете му:
+ *   1. дясна ръка, вдигната вертикално - означава „Внимание, спри!"… При
+ *   подаване на този сигнал на кръстовище участниците в движението, които са
+ *   навлезли в кръстовището, трябва да го освободят;
+ *   2. ръка или ръце, протегнати хоризонтално встрани - след като е подал този
+ *   сигнал, регулировчикът може да свали ръката или ръцете си. Сигналът
+ *   означава: а) „Преминаването е разрешено" за водачите, които се намират
+ *   срещу лявото или дясното рамо на регулировчика…; б) „Преминаването е
+ *   забранено" за всички останали участници в движението;
+ *   3. дясна ръка, протегната хоризонтално напред…"
+ *
+ * The three sentences below were already faithful to that text — only the
+ * article number was wrong.
  */
 export interface ControllerGesture {
   posture: ControllerPosture;
@@ -105,7 +125,7 @@ export const CONTROLLER_GESTURES: readonly ControllerGesture[] = [
     stopBg: "Спира напречното направление, което гледа гърдите или гърба му.",
     priorityBg:
       "Предимството е твое, дори лампата да свети червено: сигналът на регулировчика е над светофара, над знаците и над маркировката. Изчакваш само пешеходците, които вече са стъпили на платното.",
-    lawRef: "ППЗДвП чл. 66; ЗДвП чл. 7",
+    lawRef: "ППЗДвП чл. 29, ал. 3; ЗДвП чл. 7",
   },
   {
     posture: "chestOrBack",
@@ -114,7 +134,7 @@ export const CONTROLLER_GESTURES: readonly ControllerGesture[] = [
     stopBg: "Спираш ТИ, преди стоп-линията, и чакаш там.",
     priorityBg:
       "Предимството не е твое, дори лампата да свети зелено. Зеленото не отменя регулировчика — той го отменя. Тръгването срещу гърдите му е опасна грешка и прекратява изпита.",
-    lawRef: "ППЗДвП чл. 66; ЗДвП чл. 7",
+    lawRef: "ППЗДвП чл. 29, ал. 3; ЗДвП чл. 7",
   },
   {
     posture: "armRaised",
@@ -124,7 +144,7 @@ export const CONTROLLER_GESTURES: readonly ControllerGesture[] = [
       "Спират ВСИЧКИ посоки. Който вече е навлязъл в кръстовището, го освобождава и излиза.",
     priorityBg:
       "Това е смяна на фазите: регулировчикът прибира едното направление, за да пусне другото. Най-скъпата грешка тук е да я прочетеш като „тръгвай“ — потегляш точно в секундата, в която напречното платно се освобождава за някой друг.",
-    lawRef: "ППЗДвП чл. 66",
+    lawRef: "ППЗДвП чл. 29, ал. 3",
   },
 ];
 
@@ -807,7 +827,7 @@ export const SC_SIGNAL_CONTROLLER: ScenarioSpec = {
     {
       n: 5,
       textBg:
-        "Щом се обърне със СТРАНИЧЕН ПРОФИЛ към теб и отпусне ръце, минаваш ти и всички по твоята посока, а напречното спира. Тогава преминаваш правó напред — дори светофарът междувременно да е станал червен: неговият сигнал е по-силен (ППЗДвП чл. 66; ЗДвП чл. 7).",
+        "Щом се обърне със СТРАНИЧЕН ПРОФИЛ към теб и отпусне ръце, минаваш ти и всички по твоята посока, а напречното спира. Тогава преминаваш правó напред — дори светофарът междувременно да е станал червен: неговият сигнал е по-силен (ППЗДвП чл. 29, ал. 3; ЗДвП чл. 7).",
     },
   ],
   success: [

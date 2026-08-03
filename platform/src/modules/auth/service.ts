@@ -96,5 +96,9 @@ export async function verifyCredentials(
     email: user.email,
     name: user.name,
     isAdmin: user.role === "admin",
+    // Carried out of here for exactly one consumer: the jwt callback in
+    // src/auth.ts, which stamps it into the token being minted. A session is
+    // only revocable if it records which generation it belongs to.
+    sessionEpoch: user.sessionEpoch ?? 0,
   };
 }

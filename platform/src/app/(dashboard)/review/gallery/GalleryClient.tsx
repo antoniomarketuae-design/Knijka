@@ -492,6 +492,44 @@ function QuestionCard({
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={signSrc} alt="Пътен знак" loading="lazy" className="h-32 w-32" />
         </button>
+      ) : item.signRefs ? (
+        // THE COMPARISON SET — 2x2, the same shape the student answers in.
+        // Reviewing these one face at a time is the wrong unit: the question is
+        // whether these FOUR, side by side, have exactly one defensible answer.
+        <div className="grid grid-cols-2 gap-1.5 rounded-xl border border-border bg-white p-2">
+          {item.signRefs.map((code, i) => (
+            <button
+              key={`${code}-${i}`}
+              type="button"
+              onClick={() =>
+                onZoom(
+                  `/api/signs/${encodeURIComponent(code)}`,
+                  `${item.id} — знак ${i + 1}: ${code}`,
+                )
+              }
+              className="flex flex-col items-center gap-0.5 rounded-lg p-1 hover:bg-surface-2"
+              aria-label={`Уголеми знак ${i + 1} (${code})`}
+            >
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={`/api/signs/${encodeURIComponent(code)}`}
+                alt={`Знак ${i + 1}`}
+                loading="lazy"
+                className="h-20 w-20"
+              />
+              <span
+                className={`font-mono text-[10px] ${
+                  item.correctBg.includes(code)
+                    ? "font-bold text-success"
+                    : "text-muted"
+                }`}
+              >
+                {code}
+                {item.correctBg.includes(code) ? " ✓" : ""}
+              </span>
+            </button>
+          ))}
+        </div>
       ) : item.stillUrl ? (
         <button
           type="button"
@@ -532,7 +570,13 @@ function QuestionCard({
 
       <div className="flex flex-wrap gap-1">
         <Chip>{item.group}</Chip>
-        <Chip>{item.mediaKind === "sign" ? "знак" : "сцена"}</Chip>
+        <Chip>
+          {item.mediaKind === "sign"
+            ? "знак"
+            : item.mediaKind === "signSet"
+              ? "сравнение на знаци"
+              : "сцена"}
+        </Chip>
         {item.needsReview ? <Chip tone="warn">чака преглед</Chip> : null}
       </div>
 

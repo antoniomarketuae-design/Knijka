@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { ContactEmail } from "@/components/legal/ContactEmail";
 
 /**
  * Shared building blocks for the (legal) route group: /terms, /privacy,
@@ -237,7 +238,8 @@ export function OperatorCard() {
         )}
         <li>Адрес: {ENTITY_ADDRESS}</li>
         <li>
-          Имейл: <span className="font-semibold text-foreground">{CONTACT_EMAIL}</span>
+          Имейл:{" "}
+          <ContactEmail className="font-semibold text-foreground underline-offset-4 hover:underline" />
         </li>
       </ul>
     </div>

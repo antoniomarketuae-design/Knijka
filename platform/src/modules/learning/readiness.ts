@@ -38,6 +38,7 @@
  */
 
 import { getContentRepo, type ContentRepo } from "@/lib/content/repo";
+import { requestScoped } from "@/lib/requestScope";
 import { DAY_MS, isDue } from "./scheduler";
 import {
   getLearningStore,
@@ -45,6 +46,41 @@ import {
   type SimEvidenceRow,
   type SimSeverity,
 } from "./store";
+
+// ---------------------------------------------------------------------------
+// Request-scoped reads
+// ---------------------------------------------------------------------------
+//
+// Four public functions in this file (getReadiness, getTopicOverview,
+// getSectionOverview, getSimWeakSpots) each fetch the rows they need. That is
+// correct in isolation and expensive together: one dashboard render calls
+// getReadiness and getTopicOverview twice each, so the user's ENTIRE Progress
+// table was read four times and the sim-evidence window twice, for data that
+// cannot have changed between them — nothing in a GET writes either table.
+//
+// The store stays untouched (it is the injection seam every unit test fakes);
+// the dedupe sits above it, and only inside a request. See lib/requestScope.ts.
+//
+// THE ONE RULE THIS IMPOSES. No request may read readiness/overview, WRITE
+// Progress, and then read either again expecting the new rows — the second
+// read is served from the memo. Nothing does today: every writer
+// (submitAnswer, applyGradedAnswers, recordSimObservations) runs in an action
+// that reports the result and returns, and the four readers here are all GETs.
+// If a flow ever needs read → write → read, evict with
+// invalidateRequestScoped("learning.progress", userId) after the write —
+// that is what the gamification store does around saveState.
+
+const readProgress = requestScoped(
+  "learning.progress",
+  (userId: string): Promise<ProgressRow[]> =>
+    getLearningStore().getProgress(userId),
+);
+
+const readSimEvidence = requestScoped(
+  "learning.simEvidence",
+  (userId: string, sinceMs: number): Promise<SimEvidenceRow[]> =>
+    getLearningStore().getSimEvidenceSince(userId, new Date(sinceMs)),
+);
 
 /** Full recency credit within this many days of the last review. */
 export const RECENCY_FULL_DAYS = 7;
@@ -59,6 +95,26 @@ export const WEAKEST_CONCEPTS_COUNT = 5;
 
 /** Sim evidence older than this many days no longer influences readiness. */
 export const SIM_EVIDENCE_WINDOW_DAYS = 14;
+/**
+ * Resolution of the sim-evidence window boundary, for request-scope keying.
+ *
+ * getReadiness and getSimWeakSpots each default `now` to their own
+ * `new Date()`, and on a dashboard render those two clocks are milliseconds
+ * apart — different keys, so the memo would miss and the query would run
+ * twice for the same fourteen days. Flooring the boundary to the minute makes
+ * the two agree. The cost is that the window can start up to 60 s earlier than
+ * asked; on a 14-day window that cannot change how a single event is weighed.
+ */
+export const SIM_EVIDENCE_KEY_RESOLUTION_MS = 60_000;
+
+/** Start of the sim-evidence window (epoch ms), floored to the minute. */
+export function simEvidenceWindowStart(now: Date): number {
+  const since = now.getTime() - SIM_EVIDENCE_WINDOW_DAYS * DAY_MS;
+  return (
+    Math.floor(since / SIM_EVIDENCE_KEY_RESOLUTION_MS) *
+    SIM_EVIDENCE_KEY_RESOLUTION_MS
+  );
+}
 /** Blend weight of the sim signal on a concept WITH recent evidence. */
 export const SIM_BLEND_WEIGHT = 0.25;
 /** Negative evidence units per violation, by official severity class. */
@@ -213,12 +269,10 @@ export async function getReadiness(
   userId: string,
   now: Date = new Date(),
 ): Promise<Readiness> {
-  const store = getLearningStore();
-  const since = new Date(now.getTime() - SIM_EVIDENCE_WINDOW_DAYS * DAY_MS);
   const [progress, simEvidence] = await Promise.all([
-    store.getProgress(userId),
+    readProgress(userId),
     // A degraded sim read must never take the readiness ring down with it.
-    store.getSimEvidenceSince(userId, since).catch(() => []),
+    readSimEvidence(userId, simEvidenceWindowStart(now)).catch(() => []),
   ]);
   return computeReadiness(progress, getContentRepo(), now, simEvidence);
 }
@@ -295,10 +349,10 @@ export async function getSimWeakSpots(
   limit = 3,
   now: Date = new Date(),
 ): Promise<SimWeakSpotsResult> {
-  const since = new Date(now.getTime() - SIM_EVIDENCE_WINDOW_DAYS * DAY_MS);
-  const evidence = await getLearningStore()
-    .getSimEvidenceSince(userId, since)
-    .catch(() => [] as SimEvidenceRow[]);
+  const evidence = await readSimEvidence(
+    userId,
+    simEvidenceWindowStart(now),
+  ).catch(() => [] as SimEvidenceRow[]);
   return computeSimWeakSpots(evidence, getContentRepo(), limit);
 }
 
@@ -361,7 +415,7 @@ export async function getTopicOverview(
   userId: string,
   now: Date = new Date(),
 ): Promise<TopicOverview[]> {
-  const progress = await getLearningStore().getProgress(userId);
+  const progress = await readProgress(userId);
   return computeTopicOverview(progress, getContentRepo(), now);
 }
 
@@ -437,6 +491,6 @@ export async function getSectionOverview(
   userId: string,
   now: Date = new Date(),
 ): Promise<SectionOverview[]> {
-  const progress = await getLearningStore().getProgress(userId);
+  const progress = await readProgress(userId);
   return computeSectionOverview(progress, getContentRepo(), now);
 }

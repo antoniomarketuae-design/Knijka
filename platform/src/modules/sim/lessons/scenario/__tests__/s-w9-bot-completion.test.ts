@@ -110,7 +110,7 @@ describe("wave-9 bot completion — sc-vp-telltale-red at L3", () => {
 
 // ---------------------------------------------------------------------------
 // sc-hz-breakdown-pulloff — the motorway breakdown pull-off on mw-v1 (PK-10;
-//   ЗДвП чл. 58, т. 3). The shadow signals, eases across to the emergency lane
+//   ЗДвП чл. 58, т. 4). The shadow signals, eases across to the emergency lane
 //   in one continuous braking diagonal and rests hard right — both objectives
 //   done, zero violations, "yielded", 3★. The two mistakes grade their own
 //   codes in a LIVE session: riding the emergency lane (EMERGENCY_LANE_DRIVING)

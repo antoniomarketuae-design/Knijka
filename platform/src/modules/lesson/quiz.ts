@@ -138,6 +138,18 @@ export function pickBeatQuiz(
  * Strip a pick down to what the client may see. The `correct` flags NEVER
  * cross this boundary — grading happens server-side through
  * learning.submitAnswer, exactly like practice and the in-sim micro-quiz.
+ *
+ * STRIP THE ANSWER, NOT THE QUESTION. The previous body of this function was
+ * `options: pick.options.map((o) => ({ id: o.id, textBg: o.textBg }))` — the
+ * exact line that caused L1 in the simulator's micro-quiz, here a second time.
+ * It threw away the sign faces the option list carries, so „Кой от показаните
+ * знаци предупреждава за единичен опасен завой?" reached the classroom as four
+ * captions reading „Знак 1 / Знак 2 / Знак 3 / Знак 4" and nothing to look at.
+ *
+ * `media` and `option.media` are not answers: a sign CODE is the thing the
+ * student is being asked to look at, and the exam DTO has carried both since
+ * THEO-1 for the same reason. `correct` and `whyWrongBg` are what must not
+ * cross, and neither does.
  */
 export function toClientQuestion(pick: QuizPick): LessonQuizQuestion {
   return {
@@ -146,6 +158,14 @@ export function toClientQuestion(pick: QuizPick): LessonQuizQuestion {
     type: pick.question.type,
     points: pick.question.points,
     textBg: pick.question.textBg,
-    options: pick.options.map((o) => ({ id: o.id, textBg: o.textBg })),
+    media: pick.question.media,
+    options: pick.options.map((o) =>
+      // Spread-free so the ONLY keys that can ever reach the client are the
+      // three named here: `{...o, correct: undefined}` would ship whatever the
+      // bank grows next (whyWrongBg is already sitting on this object).
+      o.media === undefined
+        ? { id: o.id, textBg: o.textBg }
+        : { id: o.id, textBg: o.textBg, media: o.media },
+    ),
   };
 }

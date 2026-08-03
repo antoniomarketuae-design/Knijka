@@ -132,6 +132,10 @@ export type TeacherAction =
   | { type: "answer-ready" }
   | { type: "resume" }
   | { type: "resumed" }
+  /** A mini-question went up on the board; the floor is the student's. */
+  | { type: "quiz-open" }
+  /** …and it was answered or skipped. */
+  | { type: "quiz-done" }
   | { type: "finish" };
 
 /**
@@ -148,9 +152,13 @@ export function teacherTransition(state: TeacherState, action: TeacherAction): T
     case "start":
       return state === "idle" ? "speaking" : state;
     case "raise-hand":
-      // Interruptible from anywhere the teacher holds the floor. Already
-      // listening ⇒ stay listening (the hand is already up).
-      return state === "speaking" || state === "answering" || state === "resuming"
+      // Interruptible from anywhere the teacher holds the floor — and from a
+      // quiz, which is the moment a student is MOST likely to have a question:
+      // they have just discovered they do not know something.
+      return state === "speaking" ||
+        state === "answering" ||
+        state === "resuming" ||
+        state === "quizzing"
         ? "listening"
         : state;
     case "submit-question":
@@ -161,6 +169,12 @@ export function teacherTransition(state: TeacherState, action: TeacherAction): T
       return state === "listening" || state === "answering" ? "resuming" : state;
     case "resumed":
       return state === "resuming" ? "speaking" : state;
+    case "quiz-open":
+      // Only from the lecture. Arriving from `listening` would overwrite a
+      // raised hand with a question the student has not been given back yet.
+      return state === "speaking" ? "quizzing" : state;
+    case "quiz-done":
+      return state === "quizzing" ? "speaking" : state;
     case "finish":
       return "idle";
     default:
@@ -168,7 +182,11 @@ export function teacherTransition(state: TeacherState, action: TeacherAction): T
   }
 }
 
-/** Is the lesson clock running? Only while the teacher actually lectures. */
+/**
+ * Is the lesson clock running? Only while the teacher actually lectures — so
+ * not while a question is up either: a check that scrolls away on a timer is
+ * not a check, it is a slideshow with a form in it.
+ */
 export function isBeatAdvancing(state: TeacherState): boolean {
   return state === "speaking";
 }
@@ -176,6 +194,11 @@ export function isBeatAdvancing(state: TeacherState): boolean {
 /**
  * Does the board dim? Doc 84 §5.1 rule 2: it dims but does NOT clear — the
  * student interrupted *about something*, and clearing it destroys the referent.
+ *
+ * `quizzing` is deliberately NOT dimmed. The dim exists to keep a referent on
+ * screen while attention is elsewhere; during a quiz the board IS the thing
+ * being attended to, and a faded question is a question that is harder to read
+ * for no reason.
  */
 export function isBoardDimmed(state: TeacherState): boolean {
   return state === "listening" || state === "thinking" || state === "answering";
@@ -202,6 +225,10 @@ export const TEACHER_STATE_BG: Record<TeacherState, string> = {
   thinking: "Мисли",
   answering: "Отговаря",
   resuming: "Продължава",
+  // Not „Проверява": nothing is being marked yet. The teacher put a question
+  // up and the floor is the student's, which is what the room should say while
+  // the lesson clock is stopped.
+  quizzing: "Чака отговора ти",
 };
 
 export const TONE_BG: Record<BeatTone, string> = {

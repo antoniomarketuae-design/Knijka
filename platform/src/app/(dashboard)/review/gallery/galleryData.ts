@@ -86,9 +86,17 @@ export interface GalleryQuestion {
   id: string;
   group: string;
   textBg: string;
-  mediaKind: "sign" | "sceneStill";
+  mediaKind: "sign" | "signSet" | "sceneStill";
   /** Sign questions: the official code the /api/signs endpoint serves. */
   signRef: string | null;
+  /**
+   * COMPARISON questions („Кой от показаните знаци…"): one code per option, in
+   * option order. These carry their artwork on `options[].media`, not on
+   * `question.media` — and because this loader only ever read `question.media`,
+   * all 18 of them were invisible on this page. The founder could not review
+   * the one question shape that is nothing BUT artwork.
+   */
+  signRefs: string[] | null;
   /** Scene-still questions: the committed 3D render, when one exists. */
   stillUrl: string | null;
   /** The raw spec, so the client can fall back to the in-app 2D canvas. */
@@ -247,6 +255,8 @@ function readStillSource(stillDir: string, key: string): ScenarioStillResult["so
 interface RawOption {
   textBg?: unknown;
   correct?: unknown;
+  /** Sign-face option (THEO-1). The comparison items carry their art HERE. */
+  media?: unknown;
 }
 interface RawQuestion {
   id?: unknown;
@@ -282,24 +292,58 @@ function loadQuestions(): { items: GalleryQuestion[]; withStill: number } {
 
     for (const q of arr as RawQuestion[]) {
       const media = q?.media as QuestionMedia | null | undefined;
-      if (!media || typeof media !== "object" || !("kind" in media)) continue;
+      const options = Array.isArray(q.options) ? (q.options as RawOption[]) : [];
+      // The comparison shape puts its art on the OPTIONS and leaves
+      // `question.media` null — legitimately, because there is no single
+      // picture to show above the text. Reading only `question.media` (what
+      // this loop used to do) drops all 18 of those questions on the floor.
+      const optionSignRefs = options
+        .map((o) => o?.media as QuestionMedia | null | undefined)
+        .filter((m): m is { kind: "sign"; signRef: string } =>
+          !!m && typeof m === "object" && "kind" in m && m.kind === "sign")
+        .map((m) => m.signRef);
+
+      const hasQuestionMedia = !!media && typeof media === "object" && "kind" in media;
+      if (!hasQuestionMedia && optionSignRefs.length === 0) continue;
       if (typeof q.id !== "string" || typeof q.textBg !== "string") continue;
 
-      const correctBg = Array.isArray(q.options)
-        ? (q.options as RawOption[])
-            .filter((o) => o?.correct === true && typeof o.textBg === "string")
-            .map((o) => o.textBg as string)
-        : [];
+      const correctBg = options
+        .filter((o) => o?.correct === true && typeof o.textBg === "string")
+        .map((o) => o.textBg as string);
       const note = typeof q.reviewNote === "string" ? q.reviewNote : "";
       const needsReview = q.status === "draft" || /NEEDS-FOUNDER-REVIEW/i.test(note);
 
-      if (media.kind === "sign") {
+      if (!hasQuestionMedia) {
+        // „Кой от показаните знаци…" — the answer IS one of the pictures, so
+        // the correct option's own code is what the founder has to check.
+        const correctRefs = options
+          .filter((o) => o?.correct === true)
+          .map((o) => o?.media as { signRef?: string } | undefined)
+          .map((m) => m?.signRef)
+          .filter((s): s is string => typeof s === "string");
+        items.push({
+          id: q.id,
+          group,
+          textBg: q.textBg,
+          mediaKind: "signSet",
+          signRef: null,
+          signRefs: optionSignRefs,
+          stillUrl: null,
+          sceneStill: null,
+          correctBg: correctRefs.length > 0 ? correctRefs : correctBg,
+          needsReview,
+        });
+        continue;
+      }
+
+      if (media!.kind === "sign") {
         items.push({
           id: q.id,
           group,
           textBg: q.textBg,
           mediaKind: "sign",
-          signRef: media.signRef,
+          signRef: media!.signRef,
+          signRefs: null,
           stillUrl: null,
           sceneStill: null,
           correctBg,
@@ -317,6 +361,7 @@ function loadQuestions(): { items: GalleryQuestion[]; withStill: number } {
         textBg: q.textBg,
         mediaKind: "sceneStill",
         signRef: null,
+        signRefs: null,
         stillUrl: png ? `/scene-stills/${q.id}.png` : null,
         sceneStill: media as SceneStillMedia,
         correctBg,

@@ -5,8 +5,11 @@
  * (docs/education/32): 45 questions / 97 points / pass >= 87 / 40 minutes.
  *
  * Lifecycle: startExam() builds a seeded exam and opens an ExamAttempt;
- * getInProgressExam() re-renders a running attempt from what was dealt (the
- * ONLY supported way to show an in-progress paper — see restore.ts);
+ * getExamAttemptView() answers whether a running attempt can be shown AND why
+ * not when it cannot (resumable / expired / unrestorable / unavailable), with
+ * getInProgressExam() as its narrowing view — re-rendering from what was
+ * actually dealt is the ONLY supported way to show an in-progress paper (see
+ * restore.ts);
  * submitExam() grades (exact-set rule for multi), enforces the 40:00 + 30s
  * grace limit (late => auto-fail, but what was answered is still graded and
  * persisted), and records per-question results; getExamReview() rebuilds a
@@ -36,10 +39,12 @@ import { restorePaper } from "./restore";
 import { parseGradedAnswers, rehydrateReview } from "./review";
 import { getExamStore, type ExamAttemptRecord } from "./store";
 import {
+  EXAM_ATTEMPT_TTL_SEC,
   EXAM_DURATION_SEC,
   EXAM_GRACE_SEC,
   ExamError,
   type ExamAnswer,
+  type ExamAttemptView,
   type ExamHistoryEntry,
   type ExamReview,
   type InProgressExam,
@@ -78,6 +83,7 @@ export {
   EXAM_PASS_POINTS,
   EXAM_DURATION_SEC,
   EXAM_GRACE_SEC,
+  EXAM_ATTEMPT_TTL_SEC,
   ExamError,
 } from "./types";
 export type {
@@ -85,6 +91,7 @@ export type {
   ExamQuestion,
   ExamQuestionOption,
   ExamAnswer,
+  ExamAttemptView,
   GradeResult,
   PerQuestionResult,
   StartExamResult,
@@ -161,28 +168,97 @@ export async function startExam(
   };
 }
 
+/** Seconds this attempt has been open. Negative clock skew clamps to 0. */
+function elapsedSecSince(startedAt: Date, now: Date): number {
+  return Math.max(0, (now.getTime() - startedAt.getTime()) / 1000);
+}
+
 /**
- * Re-render an attempt that is still running — the read path for /exams/[id].
- *
- * Returns null when the attempt cannot be faithfully restored: unknown id, an
- * attempt belonging to someone else (same answer for both — don't leak other
- * users' ids), an attempt that is already graded, an unreadable payload, or a
- * dealt question that has since been deleted from the bank.
- *
- * Callers must render a "cannot continue" view on null and must NEVER fall back
- * to `buildExam(seed)`: that deals a different paper and grades the candidate
- * on questions they never saw (audit H-7).
+ * Can this attempt still be resumed, or is the paper over?
+ * The rule is EXAM_ATTEMPT_TTL_SEC — see that constant for why resuming and
+ * submitting deliberately answer to the same number but different decisions.
  */
-export async function getInProgressExam(
+export function isAttemptExpired(startedAt: Date, now: Date = new Date()): boolean {
+  return elapsedSecSince(startedAt, now) > EXAM_ATTEMPT_TTL_SEC;
+}
+
+/**
+ * The candidate's still-running attempt, if they have one.
+ *
+ * WHY: `startExamAction` had no in-flight check at all, so every call opened a
+ * new ExamAttempt row. A script could open unlimited ones — the action is a
+ * public POST — and an honest student who double-tapped „Започни пробен изпит"
+ * silently abandoned the paper they had just been dealt. One question answers
+ * both: is there already a live paper for this person?
+ *
+ * "Live" is `isAttemptExpired`, deliberately the SAME rule the resume route
+ * uses, so the two can never drift into a state where the hub sends a student
+ * to a page that then tells them the attempt is over. A stale attempt is left
+ * exactly as it is — still in the history, still submittable — and a new exam
+ * may begin, because the alternative is a student who can never start another
+ * one because their phone lost signal on the tram.
+ */
+export async function getOpenExamAttempt(
+  userId: string,
+  now: Date = new Date(),
+): Promise<{ attemptId: string; startedAt: Date } | null> {
+  const attempts = await getExamStore().listAttempts(userId);
+  for (const attempt of attempts) {
+    if (attempt.finishedAt !== null) continue;
+    if (isAttemptExpired(attempt.startedAt, now)) continue;
+    // An unreadable payload can never be resumed or graded; sending a student
+    // there would strand them on a dead page instead of starting their exam.
+    if (!parseInProgress(attempt.answers)) continue;
+    return { attemptId: attempt.id, startedAt: attempt.startedAt };
+  }
+  return null;
+}
+
+/**
+ * WHY an attempt route can or cannot show a running paper — the read path for
+ * /exams/[id], with the four outcomes kept apart (ExamAttemptView).
+ *
+ * THE BUG THIS ENDS. The check used to be `finishedAt !== null` and nothing
+ * else, so a three-day-old attempt resolved perfectly: the page computed
+ * `initialElapsedSec` in the hundreds of thousands, ExamRunner opened with
+ * remainingSec 0, its own deadline effect fired instantly, and it auto-
+ * submitted an empty paper. submitExam then did exactly what it is supposed to
+ * do with a submission past the limit — graded it (0 answers = 0 points) and
+ * auto-failed it — and the student, whose phone had merely dropped connection
+ * on the way to the tram, was handed a bare „не издържан", 0/97, on an exam
+ * they never sat. A verdict with no reason attached, produced by us, which is
+ * precisely what doc 64 THEO-4 forbids anywhere in the product.
+ *
+ * ORDERING. Expiry is decided BEFORE the paper is restored, for two reasons:
+ * restoring is the expensive half, and when an attempt is both stale and
+ * missing a question „този опит изтече" is the true and useful sentence while
+ * „един въпрос вече не е в банката" reads as us blaming the content for a
+ * clock.
+ *
+ * Callers must never fall back to `buildExam(seed)` on anything but
+ * "in-progress": that deals a different paper and grades the candidate on
+ * questions they never saw (audit H-7).
+ */
+export async function getExamAttemptView(
   userId: string,
   attemptId: string,
-): Promise<InProgressExam | null> {
+  now: Date = new Date(),
+): Promise<ExamAttemptView> {
   const attempt = await getExamStore().getAttempt(attemptId);
-  if (!attempt || attempt.userId !== userId) return null;
-  if (attempt.finishedAt !== null) return null;
+  // Same answer for "missing" and "not yours" — don't leak other users' ids.
+  if (!attempt || attempt.userId !== userId) return { status: "unavailable" };
+  if (attempt.finishedAt !== null) return { status: "unavailable" };
 
   const pending = parseInProgress(attempt.answers);
-  if (!pending) return null;
+  if (!pending) return { status: "unavailable" };
+
+  if (isAttemptExpired(attempt.startedAt, now)) {
+    return {
+      status: "expired",
+      startedAt: attempt.startedAt,
+      elapsedSec: Math.round(elapsedSecSince(attempt.startedAt, now)),
+    };
+  }
 
   // The seed comes from the attempt row, not a cookie — cleared cookies, a
   // 100-minute cookie maxAge or a second device no longer strand the exam (M-9).
@@ -191,15 +267,36 @@ export async function getInProgressExam(
     console.warn(
       `exam: attempt ${attemptId} is unrestorable — ${paper.missingIds.length} dealt question(s) no longer in the bank: ${paper.missingIds.join(", ")}`,
     );
-    return null;
+    return { status: "unrestorable" };
   }
 
   return {
-    attemptId,
-    seed: pending.seed,
-    startedAt: attempt.startedAt,
-    questions: paper.questions,
+    status: "in-progress",
+    exam: {
+      attemptId,
+      seed: pending.seed,
+      startedAt: attempt.startedAt,
+      questions: paper.questions,
+    },
   };
+}
+
+/**
+ * Re-render an attempt that is still running, or null when it cannot be.
+ *
+ * The narrowing view of getExamAttemptView, kept because most callers only
+ * need "is there a paper to render". A route that shows a screen to a student
+ * should use getExamAttemptView instead — `null` collapses four different
+ * situations into one, and telling a student the wrong reason is how the
+ * „изтекъл опит" defect above reached production in the first place.
+ */
+export async function getInProgressExam(
+  userId: string,
+  attemptId: string,
+  now: Date = new Date(),
+): Promise<InProgressExam | null> {
+  const view = await getExamAttemptView(userId, attemptId, now);
+  return view.status === "in-progress" ? view.exam : null;
 }
 
 /**
@@ -344,18 +441,29 @@ export async function getExamReview(
   };
 }
 
-/** All exam attempts of a user, newest first. */
-export async function getExamHistory(userId: string): Promise<ExamHistoryEntry[]> {
+/** All exam attempts of a user, newest first. `now` is injectable for tests. */
+export async function getExamHistory(
+  userId: string,
+  now: Date = new Date(),
+): Promise<ExamHistoryEntry[]> {
   const attempts = await getExamStore().listAttempts(userId);
-  return attempts.map(toHistoryEntry);
+  return attempts.map((a) => toHistoryEntry(a, now));
 }
 
-function toHistoryEntry(a: ExamAttemptRecord): ExamHistoryEntry {
+function toHistoryEntry(a: ExamAttemptRecord, now: Date): ExamHistoryEntry {
   return {
     attemptId: a.id,
     startedAt: a.startedAt,
     finishedAt: a.finishedAt,
-    status: a.finishedAt === null ? "in-progress" : "completed",
+    status:
+      a.finishedAt !== null
+        ? "completed"
+        : // Derived, never stored: the same clock the attempt route uses, so
+          // the list and the screen it links to can never disagree about
+          // whether „Продължи →" is a promise we can keep.
+          isAttemptExpired(a.startedAt, now)
+          ? "expired"
+          : "in-progress",
     score: a.score,
     maxScore: a.maxScore,
     passed: a.passed,

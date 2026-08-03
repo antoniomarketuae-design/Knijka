@@ -241,7 +241,7 @@ describe("wave-7 bot completion — sc-pk-rail-ban at L3", () => {
 
 // ---------------------------------------------------------------------------
 // sc-pe-zone-living — the one place in the law where the carriageway is NOT
-//                     the car's. чл. 62–63 hands the whole road to the people
+//                     the car's. чл. 61–62 hands the whole road to the people
 //                     on it and caps the guest at 20; чл. 25 takes every scrap
 //                     of priority back at the exit. Both halves grade off
 //                     SHIPPED surfaces — the zone edge's own maxspeed, and an
@@ -288,7 +288,7 @@ describe("wave-7 bot completion — sc-pe-zone-living at L3", () => {
   it("opts into NOTHING — the zone segment's own maxspeed IS the whole capability", () => {
     // Every dial this drill could have reached for is deliberately empty, and
     // each absence is load-bearing:
-    //  - no ruleConfig: чл. 62–63 needs no config-gated detector — the shipped
+    //  - no ruleConfig: чл. 61–62 needs no config-gated detector — the shipped
     //    speeding chain grades the зона the moment the EDGE posts 20 (doc 72
     //    PE-15's own „once the zone caps maxSpeedKmh" note, closed by
     //    tools/maps/gen_pe_zone.mjs);
@@ -298,7 +298,7 @@ describe("wave-7 bot completion — sc-pe-zone-living at L3", () => {
     expect(lesson.physics).toBeUndefined();
     expect(lesson.signalPlan).toBeUndefined();
     // TWO staged walkers below L5 (doc 86 D2 — was one): the halt objective is
-    // titled «Спри пред ХОРАТА на платното» and чл. 62–63 is about people using
+    // titled «Спри пред ХОРАТА на платното» and чл. 61–62 is about people using
     // the carriageway, so a single figure made the copy a promise the world did
     // not keep. The companion walks 3 m south of the lead, both off the west
     // curb at 1.9 m/s.
@@ -394,7 +394,7 @@ describe("wave-7 bot completion — sc-pe-zone-living at L3", () => {
     // The template's sharpest claim. This driver broke no speed limit anywhere:
     // 18 in a 20, the whole way. He is still failed, and that is the entire
     // subject of the lesson — in a жилищна зона the person on the carriageway is
-    // not in your way, you are in HIS (чл. 62–63). The horn he leans on exists
+    // not in your way, you are in HIS (чл. 61–62). The horn he leans on exists
     // only in the copy: the sim has no horn channel, and inventing a detector for
     // it would be billing an unmodelled duty (A12). The graded fault is the one
     // the law actually names.

@@ -15,7 +15,12 @@
 
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ConsoleMailer } from "../console";
-import { resetMailWarnings, resolveMailerFromEnv } from "../factory";
+import {
+  describeMailTransport,
+  mailDeliveryGaps,
+  resetMailWarnings,
+  resolveMailerFromEnv,
+} from "../factory";
 import { passwordResetEmail } from "../messages";
 import { ProviderMailer } from "../provider";
 import type { MailMessage } from "../types";
@@ -74,6 +79,92 @@ describe("resolveMailerFromEnv — which transport is live", () => {
     ).toBe("console"); // MAIL_FROM missing — every provider would 4xx
     resetMailWarnings();
     expect(resolveMailerFromEnv({ MAIL_TRANSPORT: "sendgrid" }).name).toBe("console");
+  });
+});
+
+/**
+ * „Can this deployment give a locked-out student her account back?"
+ *
+ * Nothing asked that question before. The module fails soft to the console
+ * transport on five separate paths and warns ONCE PER PROCESS, which on a
+ * long-lived pm2 process is one line nobody scrolls back to — and the live
+ * .env has no MAIL_* variables at all. So the product would take EUR 12.99 in
+ * September and, when she forgets her password in October, show her a
+ * reassuring Bulgarian success screen while the reset link goes to a log file.
+ */
+describe("mailDeliveryGaps — the gate that keeps that from being sellable", () => {
+  const CREDENTIALS = {
+    MAIL_TRANSPORT: "resend",
+    MAIL_API_KEY: "re_key_123",
+    MAIL_FROM: "Книжка.AI <no-reply@knijka.ai>",
+  };
+
+  it("names the console default as a GAP — shipping default, but nothing leaves the box", () => {
+    expect(mailDeliveryGaps({})).toEqual(["MAIL_TRANSPORT"]);
+    expect(mailDeliveryGaps({ MAIL_TRANSPORT: "console" })).toEqual(["MAIL_TRANSPORT"]);
+    expect(mailDeliveryGaps({ MAIL_TRANSPORT: "sendgrid" })).toEqual(["MAIL_TRANSPORT"]);
+  });
+
+  it("reports EVERY missing credential at once, not one redeploy at a time", () => {
+    expect(mailDeliveryGaps({ MAIL_TRANSPORT: "resend" })).toEqual([
+      "MAIL_API_KEY",
+      "MAIL_FROM",
+    ]);
+    expect(
+      mailDeliveryGaps({ MAIL_TRANSPORT: "postmark", MAIL_API_KEY: "k" }),
+    ).toEqual(["MAIL_FROM"]);
+    expect(
+      mailDeliveryGaps({ MAIL_TRANSPORT: "postmark", MAIL_FROM: "a@b.bg" }),
+    ).toEqual(["MAIL_API_KEY"]);
+  });
+
+  it("is empty — i.e. the product may take money — only with a real transport", () => {
+    expect(mailDeliveryGaps(CREDENTIALS)).toEqual([]);
+  });
+
+  it("whitespace is not a credential", () => {
+    expect(
+      mailDeliveryGaps({ ...CREDENTIALS, MAIL_API_KEY: "   " }),
+    ).toEqual(["MAIL_API_KEY"]);
+  });
+
+  it("CANNOT DRIFT from what the factory actually builds", () => {
+    // A second, independent "is mail configured?" predicate is the worst bug
+    // available here: health reports green while resolveMailerFromEnv() quietly
+    // hands back a ConsoleMailer, and the first to notice is a student who
+    // never got her link. Both must come from the same plan.
+    const envs: Array<Record<string, string | undefined>> = [
+      {},
+      { MAIL_TRANSPORT: "console" },
+      { MAIL_TRANSPORT: "resend" },
+      { MAIL_TRANSPORT: "resend", MAIL_API_KEY: "k" },
+      { MAIL_TRANSPORT: "resend", MAIL_FROM: "a@b.bg" },
+      { MAIL_TRANSPORT: "nope", MAIL_API_KEY: "k", MAIL_FROM: "a@b.bg" },
+      CREDENTIALS,
+      { ...CREDENTIALS, MAIL_TRANSPORT: "postmark" },
+    ];
+
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+    for (const env of envs) {
+      const built = resolveMailerFromEnv(env);
+      const health = describeMailTransport(env);
+      resetMailWarnings();
+
+      expect(health.transport, JSON.stringify(env)).toBe(built.name);
+      expect(health.ok, JSON.stringify(env)).toBe(built.name !== "console");
+      expect(health.ok, JSON.stringify(env)).toBe(mailDeliveryGaps(env).length === 0);
+    }
+  });
+
+  it("ADR-004 / secrets: the health view carries variable NAMES, never values", () => {
+    const view = describeMailTransport({
+      MAIL_TRANSPORT: "resend",
+      MAIL_API_KEY: "re_super_secret_key",
+      MAIL_FROM: "",
+    });
+    expect(view.ok).toBe(false);
+    expect(view.gaps).toEqual(["MAIL_FROM"]);
+    expect(JSON.stringify(view)).not.toContain("re_super_secret_key");
   });
 });
 

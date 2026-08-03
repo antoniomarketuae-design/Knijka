@@ -13,4 +13,12 @@ export type SessionUser = {
    * gates (level star-locks, lesson order, freemium caps).
    */
   isAdmin: boolean;
+  /**
+   * User.sessionEpoch, present ONLY on the sign-in path (verifyCredentials →
+   * next-auth's `authorize` → the jwt callback, which stamps it into the
+   * token). Optional because no screen needs it: getSessionUser() compares the
+   * token's epoch against the DB itself and returns null on a mismatch, so by
+   * the time a page holds a SessionUser the question is already settled.
+   */
+  sessionEpoch?: number;
 };

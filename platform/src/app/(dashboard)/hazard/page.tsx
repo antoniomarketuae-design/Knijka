@@ -4,6 +4,8 @@ import Link from "next/link";
 import { HazardHistory } from "@/components/hazard/HazardHistory";
 import { HazardSession } from "@/components/hazard/HazardSession";
 import type { HazardRunSummary } from "@/components/hazard/types";
+import { FeatureOffline } from "@/components/ui/FeatureOffline";
+import { isFeatureDisabled } from "@/lib/features";
 import { requireUser } from "@/modules/auth";
 import { hasHazardEngine, listHazardRuns } from "@/modules/hazard-play";
 import { canOpenHazardDoor } from "./access";
@@ -47,6 +49,12 @@ const HISTORY_LIMIT = 6;
  */
 export default async function HazardPage() {
   const user = await requireUser();
+
+  // Kill switch before the entitlement gate — canOpenHazardDoor() also returns
+  // false when the switch is on, and showing a paying student the paywall for
+  // something WE turned off is the one outcome this ordering prevents
+  // (src/lib/features.ts).
+  if (isFeatureDisabled("hazard")) return <FeatureOffline feature="hazard" />;
 
   if (!(await canOpenHazardDoor(user, "section"))) {
     return <HazardPaywall />;

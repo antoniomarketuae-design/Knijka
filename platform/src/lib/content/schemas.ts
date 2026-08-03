@@ -32,7 +32,17 @@ function duplicates(values: readonly string[]): string[] {
   return [...dupes];
 }
 
-export const ContentStatusSchema = z.enum(["draft", "needs-review", "approved"]);
+/**
+ * Machine tiers and the human tier, kept apart on purpose — `machine-checked`
+ * is the honest thing a generator may write; `approved` is a person's word and
+ * needs a signature in content/review/approvals.json to mean anything.
+ */
+export const ContentStatusSchema = z.enum([
+  "draft",
+  "machine-checked",
+  "needs-review",
+  "approved",
+]);
 
 export const LawRefSchema = z.strictObject({
   act: z.string().min(1, "lawRef.act must not be empty"),

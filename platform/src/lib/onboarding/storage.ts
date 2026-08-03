@@ -1,16 +1,21 @@
 /**
- * Onboarding preferences — v1 storage: localStorage, versioned keys.
+ * Onboarding preferences — the LOCAL MIRROR of User.examDate /
+ * User.dailyGoalMin / User.onboardedAt.
  *
- * Why localStorage: launch scope keeps the User table untouched (no schema
- * changes during the sprint). These are low-stakes UX preferences — losing
- * them on a device switch costs one gentle re-ask, not data.
+ * THESE KEYS ARE NO LONGER THE SOURCE OF TRUTH. They were, and it cost the
+ * product its best retention signal: the answers lived in one browser, so a
+ * student who registered on a phone and opened the site on a laptop lost their
+ * exam date — and the server never had it at all, which meant „изпитът ти е
+ * след 6 дни" could not be sent to anyone. The row is now authoritative
+ * (./store.ts, ./service.ts); this file is what makes the countdown paint
+ * instantly and keep working offline.
  *
- * Future server-side home (post-launch, documented in
- * docs/development/54_DEPLOYMENT_STRATEGY.md §10): two nullable columns on
- * User — `examDate DateTime?` and `dailyGoalMin Int?` — written via a small
- * server action, migrated by reading these keys once after login and
- * clearing them. The `.v1.` segment in the key names exists exactly so that
- * migration can detect stale clients.
+ * What the mirror is still for:
+ *  - a synchronous read during render, so the dashboard chips need no query
+ *    and no round trip (useSyncExternalStore in ExamCountdown);
+ *  - the anonymous case: /onboarding sits outside the auth matcher on purpose,
+ *    so someone who wanders in before signing in still gets a coherent flow.
+ * When the two disagree, the SERVER wins — see fillMirrorFromServer().
  *
  * All reads/writes are guarded: localStorage can throw (Safari private mode,
  * storage quota) and is absent during SSR.
@@ -73,4 +78,34 @@ export function isOnboardingDone(): boolean {
 
 export function markOnboardingDone(): void {
   safeSet(ONBOARDING_DONE_KEY, new Date().toISOString());
+}
+
+/** Is this device's mirror cold — i.e. has it never seen the answers? */
+export function isMirrorCold(): boolean {
+  return readExamDate() === null && readDailyGoalMin() === null;
+}
+
+/**
+ * Copy the server's answers down onto this device.
+ *
+ * This is the whole cross-device fix, made visible: the laptop that never ran
+ * the flow gets the phone's exam date the first time it opens the dashboard,
+ * and from then on the countdown paints synchronously with no query. Only ever
+ * called with values the server just returned, so it cannot be used to
+ * resurrect a stale local answer over a newer one.
+ */
+export function fillMirrorFromServer(snapshot: {
+  examDate: string | null;
+  dailyGoalMin: number | null;
+  onboarded: boolean;
+}): void {
+  if (snapshot.examDate !== null) writeExamDate(snapshot.examDate);
+  if (
+    snapshot.dailyGoalMin === 10 ||
+    snapshot.dailyGoalMin === 20 ||
+    snapshot.dailyGoalMin === 30
+  ) {
+    writeDailyGoalMin(snapshot.dailyGoalMin);
+  }
+  if (snapshot.onboarded && !isOnboardingDone()) markOnboardingDone();
 }

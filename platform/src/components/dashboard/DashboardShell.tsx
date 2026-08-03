@@ -7,6 +7,7 @@ import { useEffect, useRef, useState, type ComponentType, type SVGProps } from "
 import {
   IconBook,
   IconBot,
+  IconChalkboard,
   IconClipboardCheck,
   IconGear,
   IconHome,
@@ -29,6 +30,11 @@ interface NavItem {
 const NAV_ITEMS: NavItem[] = [
   { href: "/dashboard", labelBg: "Начало", icon: IconHome },
   { href: "/theory", labelBg: "Теория", icon: IconBook },
+  // Directly under „Теория", because it IS the theory — delivered by a teacher
+  // instead of read off a card. It sat unlinked from 28 July to 3 August while
+  // the founder was told the product had a chat window instead of a classroom.
+  // Above „Изпити" on purpose: you sit the lesson before you sit the exam.
+  { href: "/classroom", labelBg: "Класна стая", icon: IconChalkboard },
   { href: "/exams", labelBg: "Изпити", icon: IconClipboardCheck },
   { href: "/simulator", labelBg: "Симулатор", icon: IconWheel },
   // The third pillar. It sits directly under the simulator on purpose: hazard

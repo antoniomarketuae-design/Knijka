@@ -11,6 +11,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { setContentRepo } from "@/lib/content/repo";
 import { FakeLearningStore, makeFixtureRepo } from "./fixtures";
 import {
+  isPracticeTicketRequired,
   issuePracticeTicket,
   PRACTICE_TICKET_TTL_MS,
   PracticeTicketError,
@@ -172,10 +173,10 @@ describe("submitAnswer — practice session binding", () => {
     expect(store.recordAnswerCalls).toHaveLength(0);
   });
 
-  it("still grades unbound submissions while the UI wiring is pending", async () => {
-    // Transitional, and deliberately asserted: this is the behaviour that the
-    // PRACTICE_TICKET_REQUIRED flip removes, so it must be visible in the suite
-    // rather than discovered in production.
+  it("grades an unbound submission outside production, and says so once", async () => {
+    // Kept permissive OUTSIDE production so a unit test, a script or a
+    // `npm run dev` with an empty .env can exercise grading without minting
+    // tickets. The warning is what keeps the gap visible in a log.
     const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
     const result = await submitAnswer(USER, "q-road-1", ["q-road-1-a"], "practice", NOW);
     expect(result.correct).toBe(true);
@@ -187,5 +188,52 @@ describe("submitAnswer — practice session binding", () => {
     const result = await submitAnswer(USER, "q-road-1", ["q-road-1-a"], "micro", NOW);
     expect(result.correct).toBe(true);
     expect(store.recordAnswerCalls).toHaveLength(1);
+  });
+});
+
+/**
+ * THE SWITCH ITSELF, and why its DEFAULT is the whole fix.
+ *
+ * `isPracticeTicketRequired()` used to be `env === "1"` — enforcement off
+ * unless someone remembered to turn it on, with the variable absent from
+ * .env.example and the page never issuing a ticket. A security control whose
+ * default is "off" and whose on-switch lives in a file nobody edits is not a
+ * control; the mechanism sat fully built and switched off.
+ */
+describe("isPracticeTicketRequired", () => {
+  it("REQUIRES a ticket in production when the variable is not set at all", async () => {
+    // The property that survives a forgotten line in the VPS .env.
+    vi.stubEnv("NODE_ENV", "production");
+    vi.stubEnv("PRACTICE_TICKET_REQUIRED", undefined);
+    expect(isPracticeTicketRequired()).toBe(true);
+
+    await expect(
+      submitAnswer(USER, "q-road-1", ["q-road-1-a"], "practice", NOW),
+    ).rejects.toMatchObject({ reason: "MISSING" });
+    expect(store.recordAnswerCalls).toHaveLength(0);
+  });
+
+  it("stays permissive outside production when unset, so tests and dev work", () => {
+    vi.stubEnv("NODE_ENV", "development");
+    vi.stubEnv("PRACTICE_TICKET_REQUIRED", undefined);
+    expect(isPracticeTicketRequired()).toBe(false);
+  });
+
+  it("honours an explicit on switch anywhere", () => {
+    vi.stubEnv("NODE_ENV", "development");
+    for (const value of ["1", "true"]) {
+      vi.stubEnv("PRACTICE_TICKET_REQUIRED", value);
+      expect(isPracticeTicketRequired(), value).toBe(true);
+    }
+  });
+
+  it("keeps a BREAK-GLASS off switch that works in production", () => {
+    // The evening the wiring turns out to be wrong, this must be one env var
+    // and a restart — not a rebuild, and not a rollback.
+    vi.stubEnv("NODE_ENV", "production");
+    for (const value of ["0", "false"]) {
+      vi.stubEnv("PRACTICE_TICKET_REQUIRED", value);
+      expect(isPracticeTicketRequired(), value).toBe(false);
+    }
   });
 });

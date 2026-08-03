@@ -55,7 +55,7 @@ function loadDistrict(id: string): unknown {
 //                              shadow reads „стоп" (гърди/вдигната ръка), waits,
 //                              and moves on the side-on profile; both mistakes
 //                              move against a „стоп" posture and grade the same
-//                              опасна code (ППЗДвП чл. 66; ЗДвП чл. 7).
+//                              опасна code (ППЗДвП чл. 29, ал. 3; ЗДвП чл. 7).
 // ---------------------------------------------------------------------------
 
 describe("wave-8 bot completion — sc-sig-controller-postures at L3", () => {

@@ -4,6 +4,7 @@ import {
   IconArrowRight,
   IconBook,
   IconBot,
+  IconChalkboard,
   IconClipboardCheck,
   IconLock,
   IconShield,
@@ -24,6 +25,13 @@ const MODULES: ModuleCard[] = [
     titleBg: "Теория",
     descriptionBg: "16 теми, адаптивна практика и преговор на грешките.",
     icon: IconBook,
+  },
+  {
+    href: "/classroom",
+    titleBg: "Класна стая",
+    descriptionBg:
+      "54 урока с преподавател и дъска: правилното изпълнение и грешката, една до друга. Спри и питай по всяко време.",
+    icon: IconChalkboard,
   },
   {
     href: "/exams",
@@ -60,10 +68,11 @@ export function ModuleGrid() {
       <h2 id="modules-title" className="visually-hidden">
         Модули
       </h2>
-      {/* Three across rather than four: with „Опасности" added the hub holds
-          five cards, and a 4-wide grid would strand the fifth alone on its own
-          row — which reads as an afterthought, the one thing this card must
-          not look like. 3 + 2 balances. */}
+      {/* Three across rather than four: with „Опасности" and „Класна стая"
+          the hub holds six cards, and a 4-wide grid would leave the last two
+          stranded on their own row — which reads as an afterthought, the one
+          thing a card the founder thought we had never built must not look
+          like. 3 + 3 balances exactly. */}
       <ul className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {MODULES.map(({ href, titleBg, descriptionBg, icon: Icon }) => {
           const soon = isSoon(href);

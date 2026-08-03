@@ -78,6 +78,25 @@ export {
 } from "./interrupt";
 export type { ContentGap, InterruptionRequest } from "./interrupt";
 
+// ---- Where the student got to ----------------------------------------------
+// The resume cursor (LessonProgress). Doc 84 gate U3 — completion per lesson —
+// is `courseCompletion` and nothing else; before this row existed the gate
+// could not be evaluated at all.
+export {
+  courseCompletion,
+  getLessonProgressStore,
+  InMemoryLessonProgressStore,
+  resumeBeatIndex,
+  resumePoint,
+  setLessonProgressStore,
+} from "./progress";
+export type {
+  CourseCompletion,
+  CourseResume,
+  LessonProgressRow,
+  LessonProgressStore,
+} from "./progress";
+
 // ---- Shared with the browser half ------------------------------------------
 // Re-exported here so server code has one import. Client code must use
 // `@/modules/lesson/client`, which is guaranteed free of the simulator.

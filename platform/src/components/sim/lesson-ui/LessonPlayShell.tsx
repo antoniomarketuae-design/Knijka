@@ -21,6 +21,9 @@ import {
   HudStyles,
   HudToasts,
   Minimap,
+  NOTIFY_COLUMN_RIGHT_CSS,
+  NOTIFY_COLUMN_TOP_CSS_ROOMY,
+  NOTIFY_COLUMN_WIDTH_CSS_ROOMY,
   ObjectiveBanner,
   PreDriveChecklist,
   readStoredFlag,
@@ -575,10 +578,16 @@ function QuizFrequencySelector({
  * for the whole life of the scenario layer, which is how „Включи фаровете —
  * вече е тъмно" came to exist on sixteen templates and be spoken to nobody.
  *
- * Deliberately small and deliberately in the top stack, under the objective
- * banner: the overlay budget (hud/overlayQueue.ts) owns the phone, and on a
- * roomy screen the rule is still „the centre of the screen is road". It is
- * dismissible in one tap and does not come back — a briefing is read once.
+ * Deliberately small and deliberately IN THE RIGHT-EDGE COLUMN, under the
+ * objective banner and the advisor: the overlay budget (hud/overlayQueue.ts)
+ * owns the phone, and on a roomy screen the rule is „the centre of the screen
+ * is road". It is dismissible in one tap and does not come back — a briefing is
+ * read once.
+ *
+ * 2026-08-03 — it was 448 px of prose starting at x = 416 on a 1280 px screen,
+ * i.e. 12.6 % of the frame laid straight over the vanishing point, and the
+ * founder named it by name («the instructions too»). `max-w-md` is gone: the
+ * card is `w-full` of the column, which is where its width now comes from.
  */
 function BriefingCard({
   steps,
@@ -588,9 +597,17 @@ function BriefingCard({
   onClose: () => void;
 }) {
   return (
+    // NOT `hud-ghost`, deliberately, and this is the one place in this wave
+    // where the UNPANEL sweep is declined. Rendered ghosted at 1280×800 the
+    // five-step briefing landed on white parked cars and a lit building and was
+    // simply unreadable — and the founder's sentence is „it must be small text
+    // so the user can JUST READ IT". The sweep's own header already draws this
+    // line for prose («a look is not worth costing a student the rule they just
+    // broke»); a numbered briefing is prose, not an instrument. It keeps its
+    // readable ground and it is at the EDGE, which is what he asked for.
     <div
       aria-label="Инструкции за упражнението"
-      className="max-w-md rounded-2xl border border-border bg-background/85 px-4 py-2.5 backdrop-blur"
+      className="pointer-events-auto w-full min-w-0 rounded-2xl border border-border bg-background/85 px-3 py-1.5 backdrop-blur"
     >
       <div className="flex items-center gap-2">
         <p className="text-[10px] font-black uppercase tracking-wider text-accent">Инструкции</p>
@@ -607,11 +624,14 @@ function BriefingCard({
           window is tall enough to reach the instrument band, and a card that
           runs into the dashboard is the stacked-panel bug the overlay budget
           exists to end (hud/overlayQueue.ts). It scrolls instead. */}
-      <ol className="mt-1 flex max-h-[32vh] flex-col gap-0.5 overflow-y-auto">
+      <ol className="mt-1 flex max-h-[28vh] flex-col gap-0.5 overflow-y-auto">
         {steps.map((s) => (
-          <li key={s.n} className="flex gap-1.5 text-left text-xs leading-snug">
+          <li
+            key={s.n}
+            className="flex gap-1.5 break-words text-left text-[11px] leading-tight"
+          >
             <span className="shrink-0 font-black tabular-nums text-muted">{s.n}.</span>
-            <span>{s.textBg}</span>
+            <span className="min-w-0">{s.textBg}</span>
           </li>
         ))}
       </ol>
@@ -2287,59 +2307,74 @@ export function LessonPlayShell({
           />
         ) : null}
 
-        {/* Objective banner — top center; the advisor prompt stacks under it
-            (during pre-drive the banner is empty, so the advisor card stands
-            alone). The advisor hides while a pause overlay (quiz/teach) is up
-            — it must never compete with a modal card.
-            ROOMY ONLY: on a phone this stack is the founder's „ЗАДАЧА" card
-            plus the card under it — two of the three panels in his screenshot.
-            Compact renders them through the queue above. */}
-        {/* `data-hud` because this stack shares the top rail with the chase
-            view's rear-view mirror (rows B74/B76). The mirror is a quad inside
-            the canvas and can never paint over a DOM card, so the card steps
-            below it instead — PlayAreaStyles owns that rule and this attribute
-            is the handle it needs. */}
-        {/* THE VIEWPORT CLAMP (`hudPreferences.ts` → THE VIEWPORT CLAMP).
-            STATED HONESTLY: this one is DEFENSIVE, not a fix for an overflow
-            anybody has photographed. With today's content the box measures about
-            296 px (`ObjectiveBanner`'s `min-w-64` + `px-5`), so it fits a 320 px
-            phone. What is removed is the SHAPE, which is unbounded by
-            construction: `absolute left-1/2 … -translate-x-1/2` with no cap is a
-            shrink-to-fit box whose used width is
-            `min(max(min-content, available), max-content)` — and `available` here
-            is only `stage.width − left`, i.e. HALF the stage. So any child whose
-            min-content exceeds half the stage (one long Bulgarian objective
-            title is enough at 320 px) makes the box wider than its own
-            containing block, and because it is centred by transform it then
-            hangs off BOTH edges by the same amount into an `overflow-hidden`
-            stage. A right-anchored card can only ever lose one edge; a centred
-            one loses two — which is exactly what the founder's teach card does
-            in `photo_2026-07-29_08-22-13 (2).jpg` («…аркираната», «воята лента»
-            cut on the left, the same lines running off the right).
-            That particular card is already clamped (`TeachMomentOverlay`'s
-            `w-full max-w-2xl` inside an `inset-x-0` centring row). This stack was
-            the last surface still carrying the uncapped shape. */}
+        {/* ══ THE RIGHT-EDGE NOTIFICATION COLUMN ═════════════════════════════
+            FOUNDER, 2026-08-03, THIRD ASKING, with a drawing: „you see all this
+            text in the middle yes, and we said we have to move it from there so
+            it doesnt bother the view … it must be like a popup notifications
+            going below, it must be small text so the user can just read it —
+            all the texts that are in the front: the task, the demonstration
+            window, and the guidance what to do, the instructions too."
+
+            WHAT WAS HERE, AND WHY „SMALLER" WAS NEVER THE ANSWER. This was
+            `absolute left-1/2 top-3 … -translate-x-1/2` — the objective banner,
+            the advisor prompt and the briefing, stacked DEAD CENTRE at the top
+            of the picture. Measured at 1280×800 before the change: the stack
+            laid out 573.7 px starting at x = 353, and the briefing card 448 px
+            starting at x = 416, i.e. 16.2 % and 12.6 % of the frame INSIDE the
+            centre band that `overlayQueue.ts` defines as the road. The pass
+            before this one made those boxes transparent and reported the chrome
+            budget going 70 % → 85 %; his view stayed blocked, because a
+            transparent box in front of the vanishing point is still in front of
+            the vanishing point. THE ACCEPTANCE TEST IS POSITION.
+
+            So the three of them and the toast column become ONE column hard
+            against the RIGHT edge, stacking downward, at
+            `notifyColumn.ts`'s geometry — whose whole contract is that the
+            column's left edge never comes left of 60 % of the width on any
+            device in the ladder.
+
+            The old `max-w-[calc(100vw-1.5rem)]` clamp is not lost, it is
+            subsumed: the column's width is a `min(20rem, 30vw)`, which cannot
+            exceed the viewport by construction, and every child is `w-full`
+            inside it rather than shrink-to-fit against half the stage.
+
+            ROOMY ONLY. On a phone the same four things arrive through the queue
+            (`SimOverlay`), which renders into the SAME column from the same
+            constants. `data-hud` is the handle PlayAreaStyles needs to step the
+            column clear of the chase view's rear-view window during a glance
+            (rows B74/B76). ══════════════════════════════════════════════════ */}
         <div
-          data-hud="objective-stack"
-          className={`absolute left-1/2 top-3 flex max-w-[calc(100vw-1.5rem)] -translate-x-1/2 flex-col items-center gap-1.5 ${
+          data-hud="notify-column"
+          className={`pointer-events-none absolute z-30 flex flex-col items-stretch gap-1.5 overflow-hidden ${
             compact ? "hidden" : ""
           }`}
+          style={{
+            top: NOTIFY_COLUMN_TOP_CSS_ROOMY,
+            right: NOTIFY_COLUMN_RIGHT_CSS,
+            width: NOTIFY_COLUMN_WIDTH_CSS_ROOMY,
+            // Never past the instrument band: a column that runs to the floor
+            // is a sidebar, and a sidebar is the web page this HUD stopped
+            // being. Anything longer scrolls inside its own card.
+            maxHeight: `calc(100% - ${ROOMY_HUD_FLOOR_PX}px - 3.5rem)`,
+          }}
         >
           {mistakeMode ? (
             // THEO-3: the sandbox's ONE instruction replaces the objective
             // banner — the assignment is the mistake (fixed lead-in + the
             // STORED mistake title, compiled into descriptionBg).
             !ended ? (
-              <div className="hud-ghost max-w-md rounded-2xl border border-danger/60 px-4 py-2.5 text-center">
+              <div className="hud-ghost rounded-2xl border border-danger/60 px-3 py-2">
                 <p className="text-[10px] font-black uppercase tracking-wider text-danger">
                   Преживей грешката
                 </p>
-                <p className="mt-0.5 text-xs font-bold leading-snug">{lesson.descriptionBg}</p>
+                <p className="mt-0.5 break-words text-[11px] font-bold leading-tight">
+                  {lesson.descriptionBg}
+                </p>
                 {demoOffered && consequence === null ? (
                   <button
                     type="button"
                     onClick={() => setConsequence({ moment: null })}
-                    className="btn-ghost mt-1.5 px-3 py-1 text-[11px]"
+                    className="btn-ghost pointer-events-auto mt-1.5 px-3 py-1 text-[11px]"
                   >
                     Не се получава? Виж демонстрацията
                   </button>
@@ -2375,28 +2410,28 @@ export function LessonPlayShell({
           teachQueue.length === 0 ? (
             <BriefingCard steps={briefing} onClose={closeBriefing} />
           ) : null}
-        </div>
 
-        {/* Toasts — right side. ROOMY ONLY; compact feeds the same events into
-            the queue, one line at a time.
+          {/* Toasts — the bottom of the same column, so a graded fault arrives
+              UNDER the task it interrupted instead of in a second stack that
+              nothing coordinates. ROOMY ONLY; compact feeds the same events
+              into the queue, one line at a time.
 
-            Doc 86 L14: what used to stand here was four stacked 288 px cards
-            that no click could touch — „much much annoying". Now: at most two
-            240 px cards (one in „по-тихи известия"), each a button that removes
-            itself, plus a „изчисти" control once there is more than one. The
-            authored explanation and the law chip ride in every card in every
-            mode — that is the whole product (THEO-4), and it is praise, never
-            teaching, that quiet mode drops. */}
-        {compact ? null : (
-          <div className="absolute right-3 top-3">
+              Doc 86 L14: what used to stand here was four stacked 288 px cards
+              that no click could touch — „much much annoying". Now: at most two
+              240 px cards (one in „по-тихи известия"), each a button that
+              removes itself, plus a „изчисти" control once there is more than
+              one. The authored explanation and the law chip ride in every card
+              in every mode — that is the whole product (THEO-4), and it is
+              praise, never teaching, that quiet mode drops. */}
+          {compact ? null : (
             <HudToasts
               toasts={toasts}
               quiet={toastsQuiet}
               onDismiss={dismiss}
               onDismissAll={clear}
             />
-          </div>
-        )}
+          )}
+        </div>
 
         {/* THE MICRO MAJOR BUTTON — compact layouts only; on a roomy screen
             everything it holds is already in the top bar above. */}
@@ -2940,7 +2975,17 @@ export function LessonPlayShell({
                 // the DRIVING and the grading are done and correct, only the
                 // saving is not.
                 "Не си вписан, затова карането не влезе в профила ти — разборът на този екран е пълен и верен, но няма да го намериш в историята. Впиши се и покарай пак, за да се брои."
-              : `Сесията не се записа (${saveResult.code}) — оценката и разборът са верни, но остават само на този екран.`}
+              : saveResult.code === "RATE_LIMITED"
+                ? // Doc 91 S4. This one is TEMPORARY and it is the student's own
+                  // pace that caused it, so it must not read as a fault: nothing
+                  // is broken, nothing is lost that a wait does not recover, and
+                  // the number is named so „изчакай малко" is not a guess. The
+                  // generic sentence below said „не се записа", which is a false
+                  // statement about their data and would send them straight back
+                  // out to drive it again — the one action that keeps the budget
+                  // spent.
+                  "Записа твърде много карания за кратко време (над 20 за десет минути), затова това не влезе в историята ти. Нищо не е повредено: оценката и разборът на този екран са верни, а след няколко минути същият урок се записва нормално."
+                : `Сесията не се записа (${saveResult.code}) — оценката и разборът са верни, но остават само на този екран.`}
           </span>
         ) : null}
         {/* The CC-BY roadster is gone — all vehicles are now self-authored

@@ -77,7 +77,11 @@ export type SubmitFailureCode =
   | "ATTEMPT_NOT_FOUND"
   | "ALREADY_SUBMITTED"
   | "INVALID_ATTEMPT_STATE"
-  | "INVALID_INPUT";
+  | "INVALID_INPUT"
+  /** Per-user budget spent — a scripted client, not a candidate. The runner
+   *  keeps the paper on screen and says to try again in a moment; nothing is
+   *  submitted, so nothing is lost. */
+  | "RATE_LIMITED";
 
 export type SubmitExamActionResult =
   | { ok: true; summary: ResultSummary; review: ReviewQuestion[] }

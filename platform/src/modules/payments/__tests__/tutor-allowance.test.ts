@@ -191,6 +191,39 @@ describe("checkTutorPackAllowance — more than one active pack", () => {
     expect(allowance.since).toEqual(PURCHASED);
   });
 
+  it("counts DISTINCT PACKS, not rows — two rows for one pack buy ONE allowance", async () => {
+    // The code multiplied by `active.length`, i.e. the ROW count, while the
+    // comment above it said "upgrading core → premium buys a second 300".
+    // Those agree only while no session is ever fulfilled twice — and until
+    // the (provider, providerRef) unique constraint landed, double fulfilment
+    // was the ordinary race between the webhook and /checkout/return.
+    //
+    // So the duplicate row the old checkout.ts header called "cosmetic" and
+    // "no security issue" silently DOUBLED the model spend a EUR 12.99 pack
+    // buys. This is the assertion that turns that comment into a lie.
+    freshStore();
+    await grant("core");
+    await grant("core", new Date("2026-06-10T00:00:00.000Z"));
+
+    const allowance = await checkTutorPackAllowance(USER, [], NOW);
+    expect(allowance.limit).toBe(TUTOR_PACK_QUESTION_ALLOWANCE);
+    expect(allowance.remaining).toBe(TUTOR_PACK_QUESTION_ALLOWANCE);
+  });
+
+  it("still blocks at ONE allowance when the same pack was recorded twice", async () => {
+    freshStore();
+    await grant("core");
+    await grant("core", new Date("2026-06-10T00:00:00.000Z"));
+
+    const spent = await checkTutorPackAllowance(
+      USER,
+      asked(NOW, TUTOR_PACK_QUESTION_ALLOWANCE),
+      NOW,
+    );
+    expect(spent.allowed).toBe(false);
+    expect(spent.remaining).toBe(0);
+  });
+
   it("a renewal after expiry starts a fresh allowance", async () => {
     freshStore();
     const lapsed = new Date("2026-01-01T00:00:00.000Z");

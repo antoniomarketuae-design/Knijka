@@ -8,7 +8,7 @@ import { PracticeSession } from "@/components/theory/PracticeSession";
 import type { PracticeQuestionDto } from "@/components/theory/types";
 import { getContentRepo } from "@/lib/content/repo";
 import { requireUser } from "@/modules/auth";
-import { buildPracticeSession } from "@/modules/learning";
+import { buildPracticeSession, issuePracticeTicket } from "@/modules/learning";
 import { checkPracticeQuota } from "@/modules/payments";
 
 export const metadata: Metadata = {
@@ -185,6 +185,18 @@ export default async function PracticePage({ searchParams }: PracticePageProps) 
         <PracticeSession
           key={crypto.randomUUID()}
           questions={questions}
+          // AUDIT M-10 — the capability that closes the answer-key oracle.
+          //
+          // Signed over EXACTLY the ids this render dealt, to THIS user, for one
+          // sitting. The submit action refuses any question that is not on it,
+          // so a mock exam's 45 ids scraped from the DOM of another tab buy
+          // nothing: they were never dealt here. It is a capability, not a
+          // secret — it says "these questions, this user, until then" and
+          // nothing else, so shipping it to the client costs nothing.
+          ticket={issuePracticeTicket(
+            user.id,
+            questions.map((q) => q.id),
+          )}
           quota={
             quota === null || quota.unlimited
               ? null

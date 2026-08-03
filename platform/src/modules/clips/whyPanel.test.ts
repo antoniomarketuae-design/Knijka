@@ -224,7 +224,7 @@ describe("resolveWhyPanel — every resolvable drill ref is playable", () => {
         `${id}: ${sim.mistake.districtId}`,
       ).toBe(true);
     }
-    // 532 of the 585 event-mapped questions are served a drill; the other 53
+    // 528 of the 585 event-mapped questions are served a drill; the other 57
     // are the pairings the guard refuses (whyPanelPairing.ts
     // PAIRINGS_DELIBERATELY_DENIED) and fall back to text + citations. Raising
     // this number means a new pairing was allowed — check it was reviewed.
@@ -237,6 +237,16 @@ describe("resolveWhyPanel — every resolvable drill ref is playable", () => {
     // they law-match on ЗДвП чл. 50. The other nine of that event's Б1/priority
     // split stay refused ON PURPOSE; whyPanelPairing.ts
     // PAIRINGS_DELIBERATELY_DENIED names each one and why.
-    expect(shipped).toBe(532);
+    //
+    // 532 → 528 on 2026-08-03, and every one of the four is the guard doing its
+    // job on citations that got CORRECTED under it. q-signs-054 moved to
+    // ЗДвП чл. 50, ал. 2 (табела Т13) and the priority-road drill stopped
+    // arguing from its rule; q-krastovishta-051, q-manevri-024 and
+    // q-manevri-060 moved to ЗДвП чл. 43б, which since ДВ бр. 64 от 2025 г. is
+    // ЗАОБИКАЛЯНЕ — a different manoeuvre from the изпреварване the В24 drill
+    // depicts — so the ev-overtake allowance was SCOPED to exclude them. All
+    // four are in whyPanelPairing.ts MISSING_DRILLS with the brief for the
+    // demo that would serve them.
+    expect(shipped).toBe(528);
   });
 });

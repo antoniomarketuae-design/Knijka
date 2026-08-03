@@ -106,6 +106,25 @@ export function isPlaceholder(value: string): boolean {
 }
 
 /**
+ * The `href` a support/refund/GDPR link should point at, or `null` while the
+ * address is still a placeholder.
+ *
+ * `null` is the load-bearing half. `mailto:[ИМЕЙЛ ЗА КОНТАКТ]` is not a link,
+ * it is a dead one — a student who clicks it gets a compose window addressed to
+ * a bracket, believes she has written to a human, and waits. So while the
+ * founder has not filled the constant in, callers render the address as inert
+ * text (which is what every page did before), and the MOMENT he sets it, every
+ * one of them becomes a real mailto with no further edit. That is the whole
+ * point of routing every call site through one function instead of five
+ * hand-written anchors nobody will remember to update.
+ */
+export function contactEmailHref(address: string = CONTACT_EMAIL): string | null {
+  // The parameter exists so BOTH branches are testable without mocking a module
+  // constant. Production never passes it: the default is the single source.
+  return isPlaceholder(address) ? null : `mailto:${address}`;
+}
+
+/**
  * The facts THIS seller form must publish, in render order. A fact the chosen
  * form does not have (a natural person's ЕИК) is absent from the map, so it is
  * never demanded and never rendered — while every fact that IS listed must be

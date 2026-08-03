@@ -1,12 +1,26 @@
 "use client";
 
 /**
- * Objective banner — top center. Shows the active objective ("Задача 2/3"),
- * an optional progress bar (driveDistance-style objectives) and, right after
- * an objective completes, a checkmark flash before advancing to the next one.
+ * Objective banner — the top item of the RIGHT-EDGE NOTIFICATION COLUMN. Shows
+ * the active objective ("Задача 2/3"), an optional progress bar (driveDistance
+ * objectives) and, right after one completes, a checkmark flash before
+ * advancing to the next.
  *
  * The shell passes `flash` with a fresh `key` on every completion; the banner
  * owns the 1.6 s reveal timing.
+ *
+ * ── 2026-08-03: IT IS NOT „TOP CENTER" ANY MORE. ─────────────────────────────
+ * The founder's own annotated frame has this banner as the topmost of three
+ * stacked cards across the middle of the road — the „ЗАДАЧА 2/2" panel — and
+ * his instruction, for the third time, is to MOVE it, not to shrink it or fade
+ * it. It is now a column item: `w-full` inside `notifyColumn.ts`'s geometry,
+ * the chip above the title rather than beside it (a 20-character Bulgarian
+ * objective and a chip do not share a 240 px line), small text, wrapping.
+ *
+ * `min-w-64` is gone with the centring. A 256 px floor inside a column that is
+ * 141 px wide on a portrait iPhone is precisely the shape `hud-card-fit`'s last
+ * section warns about: min-width is resolved AFTER max-width, so the floor wins
+ * and the card hangs out of the stage.
  */
 
 import { useEffect, useState } from "react";
@@ -46,7 +60,7 @@ export function ObjectiveBanner({
     return (
       <div
         role="status"
-        className="hud-ghost hud-pop pointer-events-none flex items-center gap-2.5 rounded-2xl border px-5 py-2.5 select-none"
+        className="hud-ghost hud-pop pointer-events-none flex w-full min-w-0 items-center gap-2 rounded-2xl border px-3 py-1.5 select-none"
         style={{
           borderColor: "color-mix(in srgb, var(--success) 60%, transparent)",
         }}
@@ -57,12 +71,15 @@ export function ObjectiveBanner({
         <span
           aria-hidden
           data-hud-ink=""
-          className="flex h-6 w-6 items-center justify-center rounded-full text-sm font-black"
+          className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-xs font-black"
           style={{ background: "var(--success)", color: "var(--accent-foreground)" }}
         >
           ✓
         </span>
-        <span className="text-sm font-bold" style={{ color: "var(--success)" }}>
+        <span
+          className="min-w-0 break-words text-[11px] font-bold leading-tight"
+          style={{ color: "var(--success)" }}
+        >
           {flash.titleBg}
         </span>
       </div>
@@ -72,19 +89,16 @@ export function ObjectiveBanner({
   if (titleBg === null) return null;
 
   return (
-    // The founder's own annotated phone frame has this banner as the topmost of
-    // three stacked cards — the „ЗАДАЧА 2/2" panel. It is the same instruction
-    // either way; the card around it was never the instruction.
     <div
       role="status"
-      className="hud-ghost hud-banner-in pointer-events-none flex min-w-64 flex-col gap-1.5 px-5 py-2.5 select-none"
+      className="hud-ghost hud-banner-in pointer-events-none flex w-full min-w-0 flex-col gap-1 px-1 py-0.5 select-none"
     >
-      <div className="flex items-center gap-2.5">
-        <span className="px-2 py-0.5 text-[10px] font-black uppercase tracking-wide text-accent">
-          Задача {index}/{total}
-        </span>
-        <span className="text-sm font-bold text-foreground">{titleBg}</span>
-      </div>
+      <span className="text-[10px] font-black uppercase tracking-wider text-accent">
+        Задача {index}/{total}
+      </span>
+      <span className="break-words text-[11px] font-bold leading-tight text-foreground">
+        {titleBg}
+      </span>
       {progress !== null ? (
         // A progress bar IS its fill — both halves are marked so the sweep
         // leaves them alone. It is two hairline-thin bars of colour on the

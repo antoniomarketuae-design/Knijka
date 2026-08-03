@@ -29,7 +29,7 @@
  * state a rule would be a bug in the lesson, not a reason to widen the type.
  */
 
-import type { LawRef } from "@/lib/content/types";
+import type { LawRef, QuestionMedia, SignMediaRef } from "@/lib/content/types";
 
 // ---------------------------------------------------------------------------
 // Tone — what phase 3 will animate against
@@ -277,15 +277,38 @@ export interface LessonOutline {
 // Quiz payloads
 // ---------------------------------------------------------------------------
 
-/** A quiz question as the client may see it — no `correct` flags, ever. */
+/**
+ * A quiz question as the client may see it — no `correct` flags, ever.
+ *
+ * THE MEDIA FIELDS ARE LOAD-BEARING, NOT DECORATION (THEO-1).
+ *
+ * This DTO used to be `{questionId, conceptId, type, points, textBg, options:
+ * Array<{id, textBg}>}` and nothing else, and the two things it left out are
+ * the two things eighty-one bank questions ARE:
+ *
+ *  - `media` — the sign face or the scene still the question is asking about
+ *    („Кой е знакът на снимката?", „На схемата кой минава пръв?"). Dropping it
+ *    leaves a question about a picture with no picture.
+ *  - `options[].media` — the „Кой от показаните знаци…" comparison shape, where
+ *    the ordered set of signs IS the option list (content/SCHEMA.md). The four
+ *    captions are „Знак 1 / Знак 2 / Знак 3 / Знак 4"; without the faces they
+ *    are interchangeable and the question is not hard, it is unanswerable.
+ *
+ * This is the SAME defect the simulator's micro-quiz had (L1, quiz-trigger.ts
+ * `isQuizMediaRenderable`) and the exam DTO already avoids (ExamQuestion /
+ * ExamQuestionOption). A sign CODE leaks nothing — it is what the student is
+ * being asked to look at — so carrying it costs no answer safety.
+ */
 export interface LessonQuizQuestion {
   questionId: string;
   conceptId: string;
   type: "single" | "multi";
   points: 1 | 2 | 3;
   textBg: string;
+  /** The artwork the question is ABOUT, drawn above its text. */
+  media: QuestionMedia | null;
   /** In THIS beat's deterministic order. Resolve answers by id, never index. */
-  options: Array<{ id: string; textBg: string }>;
+  options: Array<{ id: string; textBg: string; media?: SignMediaRef }>;
 }
 
 /**

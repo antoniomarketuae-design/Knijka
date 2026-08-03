@@ -12,7 +12,7 @@
  *     authored flip at t = 30 (officer turned toward the player — гърди/гръб or
  *     вдигната ръка = стоп), then PERMITS it (officer side-on = премини).
  *
- * So the recordings prove ППЗДвП чл. 66 / ЗДвП чл. 7 with the posture as the
+ * So the recordings prove ППЗДвП чл. 29, ал. 3 / ЗДвП чл. 7 with the posture as the
  * sole signal:
  *   - the SHADOW reads the „стоп" posture, waits at the line through the raised
  *     arm, then proceeds after the flip on the side-on profile → ZERO

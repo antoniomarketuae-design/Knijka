@@ -76,7 +76,16 @@ export function FoldRigClient({
                   Умна тренировка
                 </h1>
               </header>
-              <PracticeSession questions={[practice]} quota={{ usedToday: 4, limit: 40 }} />
+              {/* `ticket` is a measurement rig's stand-in, not a real one: this
+                  page never submits (there is no session and no server action
+                  behind it), and a forged ticket is refused server-side. It is
+                  here because the prop is required, which is exactly how the
+                  real runner is prevented from ever being mounted without one. */}
+              <PracticeSession
+                questions={[practice]}
+                ticket="fold-rig"
+                quota={{ usedToday: 4, limit: 40 }}
+              />
             </div>
           ) : (
             <ExamRunner

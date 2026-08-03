@@ -889,7 +889,7 @@
       "status": "new",
       "trigger": "Roundabout entry with circulating traffic and the mandatory direction sign.",
       "detection": "Does ego give way to traffic already circulating and travel the correct direction/lane.",
-      "success": "Yield to vehicles in the roundabout and circulate in the signed direction; the sign shows direction, not priority (ЗДвП чл. 37, чл. 50).",
+      "success": "Yield to vehicles in the roundabout and circulate in the signed direction; the sign shows direction, not priority (ЗДвП чл. 50, ал. 1 + Наредба № РД-02-21-1/23.11.2023 чл. 61, ал. 5).",
       "failure": "Forcing entry ahead of circulating traffic or going the wrong way.",
       "feedback": "На кръговото пропусни движещите се в него и обикаляй в правилната посока; знакът показва посока, не предимство.",
       "policyDefault": "teach-first-then-grade",
@@ -908,8 +908,8 @@
       ],
       "safety": "high",
       "examPointsCovered": 19,
-      "lawRef": "ЗДвП чл. 50а",
-      "legalNote": "Кръговото: пропусни движещите се в кръга (чл. 50а). Знакът Б1 показва посока, не предимство. (Поправено от погрешно чл. 37/50.)"
+      "lawRef": "ЗДвП чл. 50, ал. 1; чл. 47; Наредба № РД-02-21-1/23.11.2023 чл. 61, ал. 5",
+      "legalNote": "Кръговото: в ЗДвП НЯМА член за предимство на кръгово. Знакът Б3 „Път с предимство“ не може да се поставя на входовете на кръгово кръстовище (Наредба № РД-02-21-1/23.11.2023, чл. 61, ал. 5), затова там стои Б1 или Б2 и влизащият пропуска движещите се в кръга по чл. 50, ал. 1 ЗДвП. Знакът Г12 дава само посоката (същата наредба, чл. 98, ал. 1). (Поправено 2026-08-03 от погрешно чл. 50а — това е правилото за блокирано кръстовище.)"
     },
     {
       "id": "ev-bus-pullout",
@@ -1111,8 +1111,8 @@
       ],
       "safety": "high",
       "examPointsCovered": 14,
-      "lawRef": "ЗДвП чл. 62–63 (жилищна зона)",
-      "legalNote": "Жилищна зона: таван 20 км/ч, предимство на пешеходци по цялата ширина, паркиране само на обозначени места (чл. 62–63). Не чл. 116 (обща грижа)."
+      "lawRef": "ЗДвП чл. 61–62 (жилищна зона)",
+      "legalNote": "Жилищна зона: таван 20 км/ч, предимство на пешеходци по цялата ширина, паркиране само на обозначени места (чл. 61–62). Не чл. 116 (обща грижа)."
     },
     {
       "id": "ev-sign-prohibitory",

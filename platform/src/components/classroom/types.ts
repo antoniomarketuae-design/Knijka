@@ -58,6 +58,13 @@
  *                `speaking` continues from where it paused. It exists as its
  *                own state because a cut straight from an answer back to the
  *                lecture is the thing that makes a recording feel like a file.
+ *   quizzing   — a mini-question is up and the teacher is waiting on the
+ *                STUDENT. It was missing, and the caption under the figure
+ *                therefore read „Обяснява" while a question sat on the board
+ *                and the lesson clock was stopped: the room was describing a
+ *                teacher who was talking, over a silent room with a form in
+ *                it. The engine already had the state (`quiz` beats hold the
+ *                room until they are answered); this enum did not.
  */
 export type TeacherState =
   | "idle"
@@ -65,7 +72,8 @@ export type TeacherState =
   | "listening"
   | "thinking"
   | "answering"
-  | "resuming";
+  | "resuming"
+  | "quizzing";
 
 /**
  * Where the teacher's picture comes from — deliberately swappable, because at
@@ -224,6 +232,21 @@ export interface AskAnswer {
   bodyBg: string;
   /** Citation chips, e.g. ["ЗДвП чл. 119"]. Whitelisted upstream. */
   citationsBg?: readonly string[];
+  /**
+   * „А ти как би постъпил?" — the teacher handing the question back after an
+   * opinion. The founder asked for the teacher to have a view BY NAME, and the
+   * turn-back is the technique that keeps it teaching instead of pronouncing
+   * (doc 84 §2.4). It is a separate field rather than two sentences glued into
+   * `bodyBg` because it is delivered differently: it is the teacher looking up
+   * from the board, and the room paints it as such.
+   */
+  turnBackBg?: string | null;
+  /**
+   * A real destination offered when the teacher cannot answer inside this
+   * lesson. THEO-4 forbids a bare verdict; „не знам" with nowhere to go is a
+   * bare verdict about the product instead of about the student.
+   */
+  offer?: { labelBg: string; href: string } | null;
 }
 
 /**
@@ -236,8 +259,18 @@ export interface ClassroomHandlers {
    * Answer an interruption. Absent ⇒ the ask bar still works and the teacher
    * still transitions speaking → listening → resuming, but the answer panel
    * says plainly that the tutor is not connected yet.
+   *
+   * `chipId` is the id of the chip that was pressed, or null for free text.
+   * It is not a convenience: a chip id is a PROMISE about which authored
+   * material answers it, resolved server-side (`chips.ts`), and an answer that
+   * arrives without one has to be routed by matching the label — which is how
+   * a $0 authored answer quietly becomes a billed model call.
    */
-  onAsk?: (question: string, beat: ClassroomBeat) => Promise<AskAnswer>;
+  onAsk?: (
+    question: string,
+    beat: ClassroomBeat,
+    chipId: string | null,
+  ) => Promise<AskAnswer>;
   /** Progress reporting (mastery, „урок 3 от 54"). */
   onBeatComplete?: (beatId: string, index: number) => void;
   onLessonComplete?: (lessonId: string) => void;

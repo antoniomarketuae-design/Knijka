@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { ContactEmail } from "@/components/legal/ContactEmail";
 import {
-  CONTACT_EMAIL,
   KzldCard,
   LegalSection,
   LegalTable,
@@ -47,7 +47,7 @@ export default function PrivacyPage() {
         </p>
         <OperatorCard />
         <p>
-          За всичко, свързано с лични данни, пиши на {CONTACT_EMAIL}.
+          За всичко, свързано с лични данни, пиши на <ContactEmail />.
           Отговаряме възможно най-бързо и не по-късно от един месец.
         </p>
       </LegalSection>
@@ -200,7 +200,7 @@ export default function PrivacyPage() {
         <p>
           Ако си под 18: покажи тази страница на родителите си — направена е
           така, че и те да я разберат. Родител или настойник може по всяко
-          време да ни пише на {CONTACT_EMAIL} с въпрос или искане относно
+          време да ни пише на <ContactEmail /> с въпрос или искане относно
           данните на детето си.
         </p>
       </LegalSection>
@@ -239,7 +239,7 @@ export default function PrivacyPage() {
           </li>
         </ul>
         <p>
-          Всичко това е безплатно — просто пиши на {CONTACT_EMAIL} от имейла,
+          Всичко това е безплатно — просто пиши на <ContactEmail /> от имейла,
           с който си регистриран. Отговаряме до един месец. Ако смяташ, че
           нарушаваме правата ти, имаш право на жалба до надзорния орган:
         </p>
@@ -334,7 +334,7 @@ export default function PrivacyPage() {
 
       <LegalSection id="contact" title="11. Как да се свържеш с нас">
         <p>
-          За всякакви въпроси относно личните ти данни: {CONTACT_EMAIL}.
+          За всякакви въпроси относно личните ти данни: <ContactEmail />.
           Повече канали има на страницата{" "}
           <Link
             href="/contact"

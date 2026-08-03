@@ -14,7 +14,7 @@
  *     keep-right sustain — the ln-v1 precedent needed ZERO new code at 130);
  *   - „Пълзене с 40": a sustained causeless steady crawl far under the flow
  *     grades EXACTLY DRIVING_TOO_SLOW_FOR_MOTORWAY (второстепенна on the
- *     VERIFIED чл. 54 basis — see rules/catalog.ts).
+ *     VERIFIED чл. 22, ал. 1 basis — see rules/catalog.ts).
  *
  * RECORDER SPEED HONESTY (traces/recorder.ts — verified, no cap constant
  * needed): the kinematic recorder has NO top-speed cap — only the authored

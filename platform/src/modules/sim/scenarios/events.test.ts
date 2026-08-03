@@ -62,7 +62,14 @@ describe("scenario event registry", () => {
 
   // The examiner's legal corrections must be baked into the shipped library.
   it("carries the corrected law citations", () => {
-    expect(getScenarioEvent("ev-roundabout")?.lawRef).toContain("50а");
+    // 2026-08-03: this used to assert "50а" — i.e. it PINNED the falsehood.
+    // чл. 50а is the blocked-junction rule ("Забранено е навлизането в
+    // кръстовище дори и при разрешаващ сигнал на светофара…"); no roundabout
+    // priority rule exists in ЗДвП/ППЗДвП. The duty is Б1/Б2 on the entry
+    // (Наредба № РД-02-21-1 чл. 61, ал. 5) + ЗДвП чл. 50, ал. 1.
+    const roundabout = getScenarioEvent("ev-roundabout")!;
+    expect(roundabout.lawRef).toContain("чл. 50, ал. 1");
+    expect(roundabout.lawRef).not.toContain("50а");
     expect(getScenarioEvent("ev-bus-pullout")?.lawRef).toContain("67");
     const cyclist = getScenarioEvent("ev-cyclist")!;
     expect(cyclist.lawRef).toContain("42");

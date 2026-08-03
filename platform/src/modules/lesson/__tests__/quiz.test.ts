@@ -124,8 +124,23 @@ describe("determinism against the real bank", () => {
         for (const dealt of dealBeatQuiz(lesson.id, beat.id)) {
           expect(repo.questionById(dealt.questionId)!.status).toBe("approved");
           // The client-safe projection: no `correct` flag survives it.
+          //
+          // `media` JOINED THIS SET, and the widening is the point rather than
+          // a concession. The projection used to be exactly `{id, textBg}`, and
+          // the sign faces the bank carries per option were dropped with the
+          // answer key — so «Кой от показаните знаци…» reached the classroom as
+          // four captions reading „Знак 1 / Знак 2 / Знак 3 / Знак 4" (doc 91
+          // S2). A sign CODE is not an answer; it is the thing the student is
+          // being asked to look at, and the exam DTO has carried it since
+          // THEO-1. What this test actually guards is stated below as well as
+          // by the list, so a future field cannot slip in by widening the list
+          // again without saying so.
           for (const option of dealt.options) {
-            expect(Object.keys(option).sort()).toEqual(["id", "textBg"]);
+            expect(Object.keys(option).sort()).toEqual(
+              option.media === undefined ? ["id", "textBg"] : ["id", "media", "textBg"],
+            );
+            expect(option).not.toHaveProperty("correct");
+            expect(option).not.toHaveProperty("whyWrongBg");
           }
         }
       }

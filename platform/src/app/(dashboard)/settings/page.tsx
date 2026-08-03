@@ -2,7 +2,9 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { InstallPanel } from "@/components/pwa/InstallHint";
 import { requireUser } from "@/modules/auth";
+import { PasswordControls } from "./password-controls";
 import { PrivacyControls } from "./privacy-controls";
+import { PurchasesPanel } from "./purchases-panel";
 import { SignOutButton } from "./signout-button";
 
 export const metadata: Metadata = {
@@ -69,6 +71,12 @@ export default async function SettingsPage() {
         </div>
       </section>
 
+      {/* Money. Second only to „who am I", because a student who is here about
+          a purchase is here about the one thing that cost her real money — and
+          until this block existed she had no amount, no date and no reference
+          to quote at us. */}
+      <PurchasesPanel userId={user.id} />
+
       {/* Password */}
       <section
         aria-labelledby="settings-password-title"
@@ -80,17 +88,23 @@ export default async function SettingsPage() {
           </h2>
           <span className="hud-label">Достъп</span>
         </div>
+        {/* THE PARAGRAPH THAT USED TO BE HERE SAID AUTOMATIC PASSWORD CHANGE
+            "IS NOT READY YET" and sent students to a mailbox. It predated the
+            /forgot flow by weeks and outlived it — so the product's own
+            settings screen was advertising a gap that no longer existed, at the
+            one place a worried student looks. */}
         <p className="text-sm leading-relaxed text-muted">
-          Автоматичната смяна на парола още не е готова. Ако си забравил
-          паролата си или искаш да я смениш, пиши ни през{" "}
+          Смени паролата си тук — искаме текущата за потвърждение. Ако си я
+          забравил, поискай линк от{" "}
           <Link
-            href="/contact"
+            href="/forgot"
             className="font-semibold text-accent underline-offset-4 hover:underline"
           >
-            страницата за контакт
+            „Забравена парола?“
           </Link>{" "}
-          от имейла на акаунта — възстановяваме достъпа ръчно.
+          и ще ти пишем на имейла на акаунта.
         </p>
+        <PasswordControls />
       </section>
 
       {/* Install to the home screen.

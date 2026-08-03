@@ -38,12 +38,13 @@ import {
   type RateLimitRule,
 } from "@/modules/security";
 import {
+  changePasswordInputSchema,
   forgotPasswordInputSchema,
   resetPasswordInputSchema,
   type ResetPasswordInput,
 } from "./schemas";
 import { getPasswordResetStore } from "./reset-store";
-import { BCRYPT_ROUNDS } from "./service";
+import { BCRYPT_ROUNDS, verifyCredentials } from "./service";
 import { getAuthStore } from "./store";
 
 /**
@@ -239,10 +240,13 @@ export async function verifyPasswordResetToken(
  * hash second. Reversed, a crash between the two would leave a working link
  * for a password that had already changed.
  *
- * Note what this cannot do: sessions are stateless JWTs (src/auth.ts), so an
- * attacker who is already signed in keeps that cookie until it expires. The
- * fix is session revocation, which needs a session table — out of scope here
- * and worth an ADR, not a silent half-measure.
+ * AND IT NOW REVOKES. This used to end with a note that it could not: sessions
+ * are stateless JWTs, so whoever was already signed in kept that cookie for
+ * another 30 idle days — which made "I think someone got into my account, I
+ * changed my password" a false comfort. `User.sessionEpoch` is the counter that
+ * fixes it without a sessions table: bumping it here invalidates every token
+ * minted before this moment, checked for free inside the DB read
+ * getSessionUser() was already doing (modules/auth/session.ts).
  */
 export async function resetPassword(
   input: unknown,
@@ -281,5 +285,92 @@ export async function resetPassword(
   // requested one too, this is the moment it stops mattering.
   await store.invalidateTokensForUser(user.id, now);
 
+  // And so is every session anyone already holds. A reset is the one moment we
+  // KNOW the account owner is asking for their access back; leaving a stranger
+  // signed in for another 30 days would make the reset cosmetic.
+  await getAuthStore().bumpSessionEpoch(user.id);
+
   return { ok: true, email: user.email };
+}
+
+// ---------------------------------------------------------------------------
+// Authenticated password change (/settings) + „Изход от всички устройства"
+// ---------------------------------------------------------------------------
+
+export type ChangePasswordResult =
+  | { ok: true }
+  | {
+      ok: false;
+      error: "invalid_input";
+      /** Schema keys only. „Двете пароли не съвпадат" is NOT here on purpose:
+       *  the confirmation is a UI concern (the server has no business knowing
+       *  the password was typed twice) and is checked by the settings action. */
+      fieldErrors: Partial<Record<"currentPassword" | "password", string[]>>;
+    }
+  | { ok: false; error: "wrong_password" | "no_password" | "not_found" };
+
+/**
+ * Change the password of a student who is ALREADY signed in.
+ *
+ * Until this existed, /settings told students that automatic password change
+ * "is not ready yet" and pointed them at a contact page — a paragraph that
+ * outlived the shipped /forgot flow by weeks and made the product look
+ * unfinished at the exact screen where trust is decided.
+ *
+ * RE-AUTHENTICATION IS THE POINT. `verifyCredentials` is the designed re-auth
+ * step in front of irreversible actions (its own header says so; account
+ * deletion already uses it), so a borrowed unlocked phone cannot silently take
+ * the account over. There is deliberately no second, subtly different password
+ * check anywhere in this codebase.
+ *
+ * `userId` and `email` must both come from the SERVER session — this function
+ * never takes an address from a form, so nothing posted can point it at
+ * somebody else's account.
+ */
+export async function changePassword(
+  userId: string,
+  email: string,
+  input: unknown,
+): Promise<ChangePasswordResult> {
+  const parsed = changePasswordInputSchema.safeParse(input);
+  if (!parsed.success) {
+    const { fieldErrors } = z.flattenError(parsed.error);
+    return { ok: false, error: "invalid_input", fieldErrors };
+  }
+
+  const store = getPasswordResetStore();
+  const user = await store.findUserById(userId);
+  if (!user) return { ok: false, error: "not_found" };
+  // An OAuth-only account has nothing to re-authenticate against; saying so is
+  // safe here (unlike at login) because the caller is already this user.
+  if (!user.passwordHash) return { ok: false, error: "no_password" };
+
+  const verified = await verifyCredentials(email, parsed.data.currentPassword);
+  if (!verified || verified.id !== userId) {
+    return { ok: false, error: "wrong_password" };
+  }
+
+  await store.setPasswordHash(userId, await hash(parsed.data.password, BCRYPT_ROUNDS));
+  // Same reasoning as the reset path: a password change that leaves the other
+  // device signed in has not actually taken anything back. The caller's own
+  // session dies with the rest — the settings action signs the browser out and
+  // says so, rather than pretending one device is special.
+  await getAuthStore().bumpSessionEpoch(userId);
+  // A live reset link would otherwise still be spendable against the account
+  // whose password was just deliberately changed.
+  await store.invalidateTokensForUser(userId, new Date());
+
+  return { ok: true };
+}
+
+/**
+ * „Изход от всички устройства" — revoke every session without touching the
+ * password.
+ *
+ * The narrow case the reset flow cannot serve: a student who left themselves
+ * signed in on a school computer and remembers on the bus. One integer, and
+ * every JWT minted before now stops being accepted on its next request.
+ */
+export async function signOutEverywhere(userId: string): Promise<void> {
+  await getAuthStore().bumpSessionEpoch(userId);
 }

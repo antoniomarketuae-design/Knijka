@@ -411,7 +411,7 @@ export function paintsZebra(crossing: CrossingLike): boolean {
 }
 
 /**
- * Living-zone streets (Д15/Д16, ЗДвП чл. 62–63): пешеходците ползват цялото
+ * Living-zone streets (Д15/Д16, ЗДвП чл. 61–62): пешеходците ползват цялото
  * платно и са с предимство. There the duty is owed with NO paint at all — a
  * zebra inside a жилищна зона would teach the opposite of the law — so the
  * crossing referent is the STREET, not a marking.
@@ -427,7 +427,7 @@ export function livingZoneCarriageway(edge: CrossingHostEdgeLike): boolean {
  *
  * Two, and only two, referents:
  *  1. the world paints the zebra (`paintsZebra`) — he can see the пътека;
- *  2. the host edge is a жилищна зона — чл. 62–63 gives pedestrians the whole
+ *  2. the host edge is a жилищна зона — чл. 61–62 gives pedestrians the whole
  *     carriageway there, so the duty is real with no paint (pe-zone-v1's
  *     pz-x-1 is authored `unmarked` for exactly this reason, and its battery
  *     pins both halves: zebraCrossings = 0 AND the pass event still fires).

@@ -1,6 +1,15 @@
 "use client";
 
 import { TOUCH_CONTROLS_FLOOR } from "../TouchControls";
+import {
+  NOTIFY_COLUMN_DECK_MAX_LIFT_COMPACT,
+  NOTIFY_COLUMN_DECK_RESERVE_PX,
+  NOTIFY_COLUMN_RIGHT_CSS,
+  NOTIFY_COLUMN_TOP_CSS_COMPACT,
+  NOTIFY_COLUMN_TOP_CSS_ROOMY,
+  NOTIFY_COLUMN_WIDTH_CSS_COMPACT,
+  NOTIFY_COLUMN_WIDTH_CSS_ROOMY,
+} from "@/modules/sim/hud";
 
 /**
  * One CSS rule, mounted by the play shell: while a LETTERBOXED session is on
@@ -76,31 +85,91 @@ export function PlayAreaStyles() {
         top: calc(0.5rem + env(safe-area-inset-top, 0px));
       }
 
-      /* ------------------------------------------------------------------
-         …and the same treatment for the demonstration deck, which is the
-         third piece of scene-owned chrome tuned on a roomy screen.
+      /* ══════════════════════════════════════════════════════════════════
+         THE TWO SCENE-OWNED PANELS JOIN THE RIGHT-EDGE COLUMN — 2026-08-03.
 
-         It sits at bottom-[6.75rem] — 108px, ROOMY_HUD_FLOOR_PX — and on a
-         phone that is inside the control band. So is --sim-hud-floor, which
-         resolves to 48px on every phone in the ladder (40px of instrument band
-         plus 8): that variable is where the DASH ends, and the touch pads reach
-         176px above the bottom, 68px higher than this deck was sitting.
+         FOUNDER, THIRD ASKING, with a drawing whose two purple corridors run
+         down the LEFT and RIGHT edges and leave the middle empty: „all the
+         texts that are in the front: the task, the demonstration window, and
+         the guidance what to do, the instructions too."
 
-         Measured in WebKit (tools/mobile/stability-probe.mjs) on iPhone 16
-         PORTRAIT 393x852 and on a 360x780 Android: the deck is
-         min(88%, 26rem) = 346px wide, the steering pad occupies x 0-165 and
-         the drive pad x 252-393, so there is no horizontal gap for it to sit
-         in — it overlapped the wheel by 981px² and the throttle by 363px².
-         Landscape was clean at the same 108px only because the two pads are
-         644px apart there. That is how a constant tuned in landscape survived
-         a portrait review.
+         Two of the four he named are not the shell's to move:
 
-         TOUCH_CONTROLS_FLOOR is interpolated from TouchControls rather than
-         written out here: the pads are the one thing on this screen actively
-         being reshaped, and whatever the band becomes, this follows it.
-         ------------------------------------------------------------------ */
+           [data-hud="demo-deck"]     „🎬 Демонстрация" + the scrub bar and the
+             transport row. absolute bottom-[6.75rem] left-1/2 -translate-x-1/2
+             w-[min(88%,26rem)] — measured at 1280×800 it laid out 416 px
+             starting at x = 432, i.e. dead centre over the wheel and the road.
+           [data-hud="audio-prompt"]  „Звукът е част от урока…" with its own
+             «Разбрах». absolute left-1/2 top-3 w-[min(30rem,…)] — 480 px of
+             card across the top of the picture.
+
+         Both live in the SCENE tree (LessonScene.tsx / AudioLessonPrompt.tsx),
+         which this lane does not own, and data-hud is the vocabulary the two
+         trees share — the same reason the mirror rules and the row C1 priority
+         rules below are written here rather than in twelve components. The
+         numbers are interpolated from modules/sim/hud/notifyColumn.ts, so the
+         column the shell renders, the column SimOverlay renders and the column
+         these two are dragged into cannot drift apart.
+
+         left: auto + transform: none is the load-bearing pair: both
+         elements centre themselves with left-1/2 AND a translate, and undoing
+         only one of them leaves the panel half a width off the screen. This
+         stylesheet is unlayered while Tailwind's utilities are layered, so it
+         wins the cascade without !important — the same fact the main:has()
+         rule at the top of this file already relies on.
+
+         The DECK keeps its floor rather than joining the top of the stack: it
+         is a transport, not a notification, and a scrub bar under the thumb is
+         where a scrub bar belongs. It is at the right edge, which is what was
+         asked. On a phone that floor is TOUCH_CONTROLS_FLOOR and not
+         bottom-[6.75rem] — 108 px is inside the control band, where the deck
+         overlapped the steering wheel by 981 px² and the throttle by 363 px²
+         (WebKit, iPhone 16 portrait 393×852). TOUCH_CONTROLS_FLOOR is
+         interpolated from TouchControls so it follows the pads wherever they go.
+         ══════════════════════════════════════════════════════════════════ */
+      [data-hud="demo-deck"] {
+        left: auto;
+        right: ${NOTIFY_COLUMN_RIGHT_CSS};
+        width: ${NOTIFY_COLUMN_WIDTH_CSS_ROOMY};
+        /* BOTH, and "translate" is the one that actually does the work here.
+           Tailwind v4 compiles "-translate-x-1/2" to the INDEPENDENT translate
+           property, not to transform — so a rule that only cancels transform
+           reads as correct, computes "left: auto; right: 12px" exactly as
+           intended, and still renders the panel 160 px (half its own width) to
+           the left of where it says it is. Measured on 2026-08-03: the audio
+           card resolved right = 12px and laid out at x = 780, not x = 940. */
+        transform: none;
+        translate: none;
+        align-items: flex-end;
+      }
       [data-sim-compact="on"] [data-hud="demo-deck"] {
-        bottom: ${TOUCH_CONTROLS_FLOOR};
+        bottom: min(${TOUCH_CONTROLS_FLOOR}, ${NOTIFY_COLUMN_DECK_MAX_LIFT_COMPACT});
+        width: ${NOTIFY_COLUMN_WIDTH_CSS_COMPACT};
+      }
+
+      /* …and the column stops short of the deck rather than being painted over
+         it. The reserve is the deck's own MEASURED open height plus a gutter
+         (notifyColumn.ts). :has() so a screen with no demonstration — which is
+         most of them — gets the full column back. */
+      [data-sim-stage]:has([data-hud="demo-deck"]) [data-hud="notify-column"] {
+        max-height: calc(100% - ${NOTIFY_COLUMN_DECK_RESERVE_PX}px - 6.75rem - 3.75rem);
+      }
+      [data-hud="audio-prompt"] {
+        left: auto;
+        right: ${NOTIFY_COLUMN_RIGHT_CSS};
+        top: ${NOTIFY_COLUMN_TOP_CSS_ROOMY};
+        width: ${NOTIFY_COLUMN_WIDTH_CSS_ROOMY};
+        transform: none;
+        translate: none;
+      }
+      [data-sim-compact="on"] [data-hud="audio-prompt"] {
+        top: ${NOTIFY_COLUMN_TOP_CSS_COMPACT};
+        width: ${NOTIFY_COLUMN_WIDTH_CSS_COMPACT};
+      }
+      /* …and its inner card stops being a one-line strip: in a 240 px column
+         the icon, the sentence and the «Разбрах» need three rows, not one. */
+      [data-hud="audio-prompt"] > div {
+        flex-wrap: wrap;
       }
 
       /* ------------------------------------------------------------------
@@ -128,11 +197,8 @@ export function PlayAreaStyles() {
          ------------------------------------------------------------------ */
       [data-hud="controls-help"],
       [data-hud="follow-hint"],
-      [data-hud="objective-stack"] {
+      [data-hud="notify-column"] {
         transition: top 180ms ease-out;
-      }
-      [data-hud="toasts"] {
-        transition: margin-top 180ms ease-out;
       }
       [data-hud="difficulty"] {
         transition: opacity 140ms ease-out;
@@ -140,36 +206,46 @@ export function PlayAreaStyles() {
       @media (prefers-reduced-motion: reduce) {
         [data-hud="controls-help"],
         [data-hud="follow-hint"],
-        [data-hud="objective-stack"],
-        [data-hud="difficulty"],
-        [data-hud="toasts"] {
+        [data-hud="notify-column"],
+        [data-hud="difficulty"] {
           transition: none;
         }
       }
 
-      /* The interior mirror hangs where the objective banner used to start, so
-         the banner starts under it — for the whole time the chase camera is
-         live, because the mirror is permanent. The „follow the blue line" chip
-         sits at top-16, i.e. inside the same glass, and goes with it. */
-      html[data-sim-camera="chase"] [data-hud="objective-stack"] {
-        top: calc(0.75rem + var(--sim-mirror-h, 0px));
-      }
+      /* THE MIRROR AND THE COLUMN — 2026-08-03 re-anchor.
+         The chase rear window sits at the TOP CENTRE at rest, so a column at
+         the right edge no longer has to step under it: the chase rule that
+         used to push the objective stack down by --sim-mirror-h is gone with
+         the stack, and the column keeps its own top. The „follow the blue
+         line" chip is still centred and still steps. */
       html[data-sim-camera="chase"] [data-hud="follow-hint"] {
         top: calc(4rem + var(--sim-mirror-h, 0px));
       }
 
-      /* …and while a glance is HELD the window is full size and on that side. */
+      /* …but a HELD glance grows the window to full size and MOVES it to the
+         glanced side, and „right" and „rear" both put it over this column. So
+         the column steps below it for the second the key is down, exactly as
+         the toast column used to, and slides back on release. Nothing is
+         hidden: a teaching card that arrives mid-glance is still on screen, one
+         window-height lower. */
       html[data-sim-glance="left"] [data-hud="controls-help"] {
-        top: calc(0.75rem + var(--sim-glance-h, 0px));
-      }
-      html[data-sim-glance="rear"] [data-hud="objective-stack"] {
         top: calc(0.75rem + var(--sim-glance-h, 0px));
       }
       html[data-sim-glance="rear"] [data-hud="follow-hint"] {
         top: calc(4rem + var(--sim-glance-h, 0px));
       }
-      html[data-sim-glance="right"] [data-hud="toasts"] {
-        margin-top: var(--sim-glance-h, 0px);
+      /* !important because the column's own top is an INLINE style (both the
+         shell and SimOverlay compute it from notifyColumn.ts), and an inline
+         declaration outranks any selector. Without it this rule is a comment —
+         which is the exact way the tier picker's filled segment survived a
+         whole „unpanel" pass, so it is stated rather than discovered. */
+      html[data-sim-glance="rear"] [data-hud="notify-column"],
+      html[data-sim-glance="right"] [data-hud="notify-column"] {
+        top: calc(${NOTIFY_COLUMN_TOP_CSS_ROOMY} + var(--sim-glance-h, 0px)) !important;
+      }
+      html[data-sim-glance="rear"] [data-sim-compact="on"] [data-hud="notify-column"],
+      html[data-sim-glance="right"] [data-sim-compact="on"] [data-hud="notify-column"] {
+        top: calc(${NOTIFY_COLUMN_TOP_CSS_COMPACT} + var(--sim-glance-h, 0px)) !important;
       }
 
       /* The tier picker shares the top-right corner with the E window and with
@@ -286,6 +362,19 @@ export function PlayAreaStyles() {
       [data-sim-compact="on"]:has([data-hud="touch-hint"]) [data-hud="audio-prompt"],
       [data-sim-compact="on"]:has([data-hud="touch-hint"]) [data-hud="difficulty"],
       [data-sim-compact="on"]:has([data-hud="audio-prompt"]) [data-hud="difficulty"] {
+        display: none;
+      }
+
+      /* …AND THE SAME PRIORITY ON A ROOMY SCREEN — 2026-08-03.
+         Rank 3 waits for rank 1 on a desktop too, and it has to, because both
+         now start at the SAME point of the right-edge column: before this the
+         audio chip was centred at the top and the task banner was centred under
+         it, so „they do not collide" was an accident of two panels each being
+         in the wrong place. :has(> *) is the honest test — the shell's column
+         is always mounted and is usually empty, and an empty column must not
+         suppress anything. The chip comes back the moment the task line retires
+         (TASK_ANNOUNCE_MS, seven seconds). */
+      [data-sim-stage]:has([data-hud="notify-column"] > *) [data-hud="audio-prompt"] {
         display: none;
       }
 

@@ -13,6 +13,11 @@ export type RouteStatus = "live" | "dev" | "soon";
 export const ROUTE_STATUS: Record<string, RouteStatus> = {
   "/dashboard": "live",
   "/theory": "live",
+  // THE CLASSROOM. It existed and rendered correctly from 28 July and was in
+  // neither this map nor the nav, so for two weeks the only way to reach it was
+  // to type the URL — and nobody who had not read the source knew it was there.
+  // A route that is not in this file is not shipped, whatever the code says.
+  "/classroom": "live",
   "/exams": "live",
   // Shipped: lesson ladder + exam mode on the real Студентски град street
   // topology. Flipped from "dev" once the sim left the in-progress phase.

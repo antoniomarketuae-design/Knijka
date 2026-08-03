@@ -34,10 +34,13 @@ function mediaHeightPx(widthPx: number): number {
 function ClipVideo({
   clip,
   className,
+  paused,
   onFail,
 }: {
   clip: MistakeClip;
   className?: string;
+  /** Freeze from outside — the classroom board when a hand goes up. */
+  paused: boolean;
   /** The quiet 404/decode fallback — the parent swaps in the canvas. */
   onFail: () => void;
 }) {
@@ -74,7 +77,10 @@ function ClipVideo({
   useEffect(() => {
     const video = videoRef.current;
     if (!video) return;
-    if (visible) {
+    // `paused` is the caller's freeze (the classroom board while the teacher
+    // answers an interruption) and it outranks visibility: the element is on
+    // screen, dimmed, and must hold the frame the question was asked about.
+    if (visible && !paused) {
       const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
       // play() upgrades the load itself; reduced motion keeps the first
       // frame (metadata) and leaves starting to the visible controls.
@@ -82,7 +88,7 @@ function ClipVideo({
     } else if (!video.paused) {
       video.pause();
     }
-  }, [visible]);
+  }, [visible, paused]);
 
   // MediaRecorder webm carry no duration index → duration=Infinity and a dead
   // scrubber. Force the demuxer to index by seeking past the end once, then
@@ -137,12 +143,19 @@ export function MistakeMedia({
   tracePath,
   districtId,
   className,
+  paused = false,
 }: {
   /** Public trace URL ("/traces/…") or repo path — the matcher normalizes. */
   tracePath: string;
   /** District under public/world/ — the canvas fallback's home map. */
   districtId: string;
   className?: string;
+  /**
+   * Freeze from outside, and pass it through to whichever renderer wins. The
+   * classroom board sets it while the teacher listens: doc 84 §5.1 rule 2 asks
+   * the board to freeze AND dim, and for a week it only dimmed.
+   */
+  paused?: boolean;
 }) {
   // The resolve is keyed by its trace, so a tracePath change derives back to
   // "resolving" (and a stale failure stops applying) without effect resets.
@@ -182,10 +195,24 @@ export function MistakeMedia({
   }
 
   if (clip === null || videoFailed) {
-    return <MistakeReplay tracePath={tracePath} districtId={districtId} className={className} />;
+    return (
+      <MistakeReplay
+        tracePath={tracePath}
+        districtId={districtId}
+        className={className}
+        paused={paused}
+      />
+    );
   }
 
-  return <ClipVideo clip={clip} className={className} onFail={() => setFailedClipId(clip.id)} />;
+  return (
+    <ClipVideo
+      clip={clip}
+      className={className}
+      paused={paused}
+      onFail={() => setFailedClipId(clip.id)}
+    />
+  );
 }
 
 export default MistakeMedia;

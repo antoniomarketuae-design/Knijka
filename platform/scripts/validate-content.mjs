@@ -12,6 +12,14 @@
  * here — this script is the only content check in CI, which makes it the only
  * place a guard actually holds.
  *
+ * PLUS the approval gate (docs/education/90 §1). Same shape of problem, one
+ * level up: a bank can pass every check above and still be a lie about who
+ * checked it. 1,005 of 1,089 rows carried `"status": "approved"` — 22 of the 24
+ * with a wrong answer key, and all nine that are literally unanswerable — and
+ * not one of them had a human's name on it. So `approved` alone is no longer
+ * evidence: a row is human-approved when content/review/approvals.json carries
+ * a signature over its CONTENT HASH, and this script is where that is checked.
+ *
  * Usage: node scripts/validate-content.mjs   (from platform/ or repo root)
  *        CONTENT_DIR=... node scripts/validate-content.mjs   (tests)
  * Exit code: 0 = content valid, 1 = any error.
@@ -28,8 +36,18 @@ import {
   analyzeAnswerBias,
   describeFinding,
 } from "../../tools/theory/answer_bias.mjs";
+import { CONTENT_HASH_RE, hashQuestionContent } from "../../tools/theory/question_hash.mjs";
 
-const STATUSES = ["draft", "needs-review", "approved"];
+/**
+ * Two machine tiers, one human tier. `machine-checked` is what a generator is
+ * allowed to write; `approved` is a person's word (and needs their signature).
+ */
+const STATUSES = ["draft", "machine-checked", "needs-review", "approved"];
+
+/** Only this tier may be dealt to a student — and only with a signature. */
+const AUTHORITATIVE_STATUS = "approved";
+
+const LEDGER_REL = path.join("review", "approvals.json");
 const KEBAB_SLUG = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 
 // THEO-1 media limits — mirror of src/lib/content/schemas.ts (keep in lockstep).
@@ -589,12 +607,240 @@ for (const finding of bias.blocking) {
 }
 
 // --------------------------------------------------------------------------
-// Summary
+// The approval gate (docs/education/90 §1)
+//
+// "approved" used to be a string a generator could type, and it typed it 1,005
+// times. Authority now lives in content/review/approvals.json: an entry that
+// names a person, is dated, and covers the row's content hash. The hash is the
+// part that makes it falsifiable — edit an approved row and its signature stops
+// matching, so the row silently drops back to unapproved and says so here.
+//
+// The unsigned rows already in the bank are not deleted (they are the product),
+// they are RATCHETED: the ledger records how many there were when we admitted
+// it, and this gate refuses to let that number grow. The only way it moves is
+// down, one human click at a time, through /review.
 // --------------------------------------------------------------------------
 const allQuestions = [...questionFiles.values()].flat();
+const questionById = new Map(
+  allQuestions.filter((q) => isPlainObject(q) && isNonEmptyString(q.id)).map((q) => [q.id, q]),
+);
+
+/** Read the ledger. A damaged ledger is an error, never a silent empty one. */
+function readApprovalLedger() {
+  const file = path.join(contentDir, LEDGER_REL);
+  if (!fs.existsSync(file)) {
+    errors.push(
+      `${LEDGER_REL}: missing. Every "${AUTHORITATIVE_STATUS}" row needs a human signature to mean anything; ` +
+        "without this file the bank cannot state who approved what.",
+    );
+    return null;
+  }
+  let data;
+  try {
+    data = JSON.parse(fs.readFileSync(file, "utf8"));
+  } catch (err) {
+    errors.push(`${LEDGER_REL}: invalid JSON (${err.message})`);
+    return null;
+  }
+  if (!isPlainObject(data)) {
+    errors.push(`${LEDGER_REL}: expected a top-level JSON object`);
+    return null;
+  }
+  if (data.version !== 1) errors.push(`${LEDGER_REL}: unsupported version ${JSON.stringify(data.version)}`);
+  if (!Number.isInteger(data.unsignedApprovedBaseline) || data.unsignedApprovedBaseline < 0) {
+    errors.push(`${LEDGER_REL}: unsignedApprovedBaseline must be a non-negative integer`);
+  }
+  if (!Array.isArray(data.entries)) {
+    errors.push(`${LEDGER_REL}: entries must be an array`);
+    return null;
+  }
+  return data;
+}
+
+const ledger = readApprovalLedger();
+const signatures = new Map();
+let staleSignatures = 0;
+
+if (ledger !== null) {
+  ledger.entries.forEach((entry, i) => {
+    const at = `${LEDGER_REL} entries[${i}]`;
+    if (!isPlainObject(entry)) return errors.push(`${at}: must be an object`);
+    for (const key of Object.keys(entry)) {
+      if (!["questionId", "verdict", "by", "at", "contentHash", "noteBg"].includes(key)) {
+        errors.push(`${at}: unrecognized key "${key}"`);
+      }
+    }
+    if (!isNonEmptyString(entry.questionId)) return errors.push(`${at}: questionId must be a non-empty string`);
+    if (entry.verdict !== "approved" && entry.verdict !== "rejected") {
+      errors.push(`${at} (${entry.questionId}): verdict must be "approved" or "rejected"`);
+    }
+    // WHO. An unnamed signature is the flag we are replacing, wearing a new file.
+    if (!isNonEmptyString(entry.by)) {
+      errors.push(`${at} (${entry.questionId}): "by" must name the human who signed it`);
+    }
+    if (!isNonEmptyString(entry.at) || Number.isNaN(Date.parse(entry.at))) {
+      errors.push(`${at} (${entry.questionId}): "at" must be an ISO-8601 timestamp`);
+    }
+    if (!isNonEmptyString(entry.contentHash) || !CONTENT_HASH_RE.test(entry.contentHash)) {
+      errors.push(`${at} (${entry.questionId}): contentHash must look like "sha256:<64 hex>"`);
+    }
+    if (entry.noteBg !== null && entry.noteBg !== undefined && typeof entry.noteBg !== "string") {
+      errors.push(`${at} (${entry.questionId}): noteBg must be a string or null`);
+    }
+    if (signatures.has(entry.questionId)) {
+      errors.push(
+        `${at}: duplicate signature for "${entry.questionId}" — the ledger holds one current decision per question`,
+      );
+    }
+    const question = questionById.get(entry.questionId);
+    if (question === undefined) {
+      errors.push(`${at}: signs "${entry.questionId}", which is not a question in this bank`);
+      return;
+    }
+    signatures.set(entry.questionId, entry);
+
+    // The falsifiability check. A signature that no longer covers the row is
+    // worse than no signature: it reads as a review of text nobody reviewed.
+    if (
+      entry.verdict === "approved" &&
+      isNonEmptyString(entry.contentHash) &&
+      entry.contentHash !== hashQuestionContent(question)
+    ) {
+      staleSignatures += 1;
+      errors.push(
+        `${LEDGER_REL}: the signature on "${entry.questionId}" (by ${entry.by}, ${entry.at}) ` +
+          "no longer matches the question — it was edited after approval. Re-review it in /review, " +
+          "or set the row back to \"needs-review\".",
+      );
+    }
+  });
+}
+
+let humanApproved = 0;
+let unsignedApproved = 0;
+for (const q of allQuestions) {
+  if (!isPlainObject(q) || q.status !== AUTHORITATIVE_STATUS) continue;
+  const entry = signatures.get(q.id);
+  if (entry && entry.verdict === "approved" && entry.contentHash === hashQuestionContent(q)) {
+    humanApproved += 1;
+  } else if (entry && entry.verdict === "rejected") {
+    errors.push(
+      `questions: "${q.id}" is marked "${AUTHORITATIVE_STATUS}" but ${entry.by} rejected it on ${entry.at}. ` +
+        "A rejected row must not sit at the authoritative status.",
+    );
+  } else {
+    unsignedApproved += 1;
+  }
+}
+
+const baseline = ledger === null ? 0 : (ledger.unsignedApprovedBaseline ?? 0);
+if (ledger !== null && unsignedApproved > baseline) {
+  errors.push(
+    `content/questions: ${unsignedApproved} rows say "${AUTHORITATIVE_STATUS}" with no human signature — ` +
+      `the frozen ceiling is ${baseline} (${LEDGER_REL}). ` +
+      "The word means \"a person checked this\"; a generator may only write \"machine-checked\". " +
+      "Raise nothing here: approve the rows in /review, or set them to \"machine-checked\".",
+  );
+}
+
+// --------------------------------------------------------------------------
+// How far from an exam a HUMAN could stand behind
+// --------------------------------------------------------------------------
+
+/**
+ * The distance, per topic, between the signatures that exist and the ones a
+ * mock exam would need if `isExamEligible` were switched from the string
+ * `"approved"` to a real human signature.
+ *
+ * WHY THIS IS HERE. The unsigned count on its own reads as a demand for ~800
+ * reviews, and that framing is what makes the decision feel impossible. It is
+ * not what the exam needs. The paper is 45 slots (modules/exam/quotas.ts) and
+ * the builder wants MIN_SUPPLY_PER_SLOT candidates behind each one, so the
+ * signature target is quota x MIN_SUPPLY per topic — around 135 rows, chosen
+ * where they count, not 800 chosen anywhere.
+ *
+ * Informational only. It never adds an error and never touches the ceiling:
+ * which rows get signed, and whether the pool switches at all, is the founder's
+ * call (docs/education/90 §14.6).
+ */
+function reportSignedSupply() {
+  const quotaFile = path.join(scriptDir, "..", "src", "modules", "exam", "quotas.ts");
+  const supplyFile = path.join(scriptDir, "..", "src", "modules", "exam", "supply.ts");
+  let quotaSrc;
+  let supplySrc;
+  try {
+    quotaSrc = fs.readFileSync(quotaFile, "utf8");
+    supplySrc = fs.readFileSync(supplyFile, "utf8");
+  } catch {
+    return; // exam module absent — nothing to say, and nothing to fail on
+  }
+
+  const quotas = [...quotaSrc.matchAll(/slug:\s*"([^"]+)",\s*quota:\s*(\d+)/g)].map((m) => [
+    m[1],
+    Number(m[2]),
+    ]);
+  const perSlot = Number(/MIN_SUPPLY_PER_SLOT\s*=\s*(\d+)/.exec(supplySrc)?.[1]);
+  const slots = quotas.reduce((sum, [, q]) => sum + q, 0);
+  // Refuse to print a number derived from a parse that clearly went wrong —
+  // a quietly-wrong target is worse than no target at all.
+  if (quotas.length === 0 || !Number.isInteger(perSlot) || slots !== 45) {
+    console.warn(
+      "\n  WARN: could not read the exam quota table — skipping the signed-supply report " +
+        `(parsed ${quotas.length} topics, ${slots} slots, min-supply ${perSlot}).`,
+    );
+    return;
+  }
+
+  const signedByTopic = new Map();
+  for (const [slug, questions] of questionFiles) {
+    let n = 0;
+    for (const q of Array.isArray(questions) ? questions : []) {
+      if (!isPlainObject(q) || q.status !== AUTHORITATIVE_STATUS) continue;
+      const entry = signatures.get(q.id);
+      if (entry && entry.verdict === "approved" && entry.contentHash === hashQuestionContent(q)) {
+        n += 1;
+      }
+    }
+    signedByTopic.set(slug, n);
+  }
+
+  const target = slots * perSlot;
+  let have = 0;
+  const short = [];
+  for (const [slug, quota] of quotas) {
+    const need = quota * perSlot;
+    const got = Math.min(signedByTopic.get(slug) ?? 0, need);
+    have += got;
+    if (got < need) short.push([slug, need - got]);
+  }
+
+  console.log(
+    `\n  signed supply for a mock exam: ${have} of ${target}` +
+      ` (${slots} slots x ${perSlot} candidates, per modules/exam/quotas.ts)`,
+  );
+  if (short.length === 0) {
+    console.log(
+      "  every topic has enough signed rows — isExamEligible() could switch to isHumanApproved()",
+    );
+  } else {
+    const worst = short.sort((a, b) => b[1] - a[1]).slice(0, 4);
+    console.log(
+      `  still short in ${short.length} topic(s), worst: ` +
+        worst.map(([slug, n]) => `${slug} (+${n})`).join(", "),
+    );
+    console.log(
+      `  NOTE: the exam pool is still the "${AUTHORITATIVE_STATUS}" string, so all ${unsignedApproved}` +
+        " unsigned rows are dealt to students today (modules/exam/builder.ts isExamEligible).",
+    );
+  }
+}
+
+// --------------------------------------------------------------------------
+// Summary
+// --------------------------------------------------------------------------
 
 function statusCounts(items) {
-  const counts = { draft: 0, "needs-review": 0, approved: 0 };
+  const counts = { draft: 0, "machine-checked": 0, "needs-review": 0, approved: 0 };
   for (const item of items) {
     if (isPlainObject(item) && STATUSES.includes(item.status)) counts[item.status] += 1;
   }
@@ -612,17 +858,31 @@ const rows = [
 console.log(`Content validation — ${contentDir}\n`);
 console.log(
   "  " + "type".padEnd(11) + "count".padStart(5) +
-  "draft".padStart(9) + "needs-review".padStart(14) + "approved".padStart(10),
+  "draft".padStart(7) + "machine".padStart(9) + "needs-review".padStart(14) + "approved".padStart(10),
 );
-console.log("  " + "-".repeat(49));
+console.log("  " + "-".repeat(56));
 for (const [name, count, statuses] of rows) {
   console.log(
     "  " + name.padEnd(11) + String(count).padStart(5) +
-    String(statuses ? statuses.draft : "-").padStart(9) +
+    String(statuses ? statuses.draft : "-").padStart(7) +
+    String(statuses ? statuses["machine-checked"] : "-").padStart(9) +
     String(statuses ? statuses["needs-review"] : "-").padStart(14) +
     String(statuses ? statuses.approved : "-").padStart(10),
   );
 }
+
+// The number the launch decision is made on. Printed on every run, in the two
+// halves the old single count hid: what a machine asserted, what a person did.
+console.log(
+  `\n  human-approved (signed, hash matches): ${humanApproved} of ${allQuestions.length}` +
+  ` — this is the only tier a student may be dealt as authoritative`,
+);
+console.log(
+  `  "${AUTHORITATIVE_STATUS}" with NO human signature: ${unsignedApproved}` +
+  ` (frozen ceiling ${baseline}; stale signatures ${staleSignatures})`,
+);
+reportSignedSupply();
+
 const coveredTopics = topics.filter((t) => questionFiles.has(t?.slug)).length;
 console.log(`\n  question files: ${questionFiles.size} (topics covered: ${coveredTopics}/${topics.length})`);
 

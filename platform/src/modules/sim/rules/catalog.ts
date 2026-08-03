@@ -92,7 +92,12 @@ export const VIOLATIONS: Record<ViolationCode, ViolationSpec> = {
       "Премина знака Б2 без пълно спиране. На СТОП се спира напълно винаги — дори пътят да изглежда празен. „Почти спрях“ не съществува нито в закона, нито на изпита.",
     correctiveBg:
       "Спри ДОКРАЙ на линията — колелата неподвижни, брой наум до 3, огледай ляво-дясно-ляво и чак тогава потегли.",
-    lawRef: "ЗДвП чл. 50",
+    // The FULL STOP is the sign's own prescription, not чл. 50's: Наредба
+    // № РД-02-21-1/23.11.2023 чл. 60, ал. 1 — „Пътен знак Б2 „Спри! Пропусни
+    // движещите се по пътя с предимство!" се поставя преди кръстовище на път
+    // без предимство." ЗДвП чл. 6, т. 1 makes the sign binding („съобразяват
+    // своето поведение… с пътните знаци"), and чл. 50, ал. 1 is the yield half.
+    lawRef: "ЗДвП чл. 6, т. 1; чл. 50, ал. 1; Наредба № РД-02-21-1/23.11.2023 чл. 60, ал. 1",
     conceptId: "c-give-way-stop-behavior",
   },
   TURN_WITHOUT_INDICATOR: {
@@ -103,7 +108,14 @@ export const VIOLATIONS: Record<ViolationCode, ViolationSpec> = {
       "Зави, без да подадеш навременен сигнал. Мигачът съобщава намерението ти на всички около теб — подавай го преди маневрата, не по време на нея.",
     correctiveBg:
       "Пусни мигача поне 3 секунди преди завоя — още докато приближаваш кръстовището, не когато вече въртиш волана.",
-    lawRef: "ЗДвП чл. 25",
+    // CITATION CORRECTED 2026-08-03: this cited чл. 25, which is the maneuver
+    // SAFETY article and contains no word about signals. The signal duty is
+    // чл. 28, ал. 1, retrieved verbatim: „За предупреждаване на останалите
+    // участници в движението за намерението си да извърши маневра водачът на
+    // пътно превозно средство подава следните сигнали: 1. ляв пътепоказател…
+    // за завиване наляво или за отклонение наляво; 2. десен пътепоказател…
+    // за завиване надясно или за отклонение надясно."
+    lawRef: "ЗДвП чл. 28, ал. 1",
     conceptId: "c-driver-signals",
   },
   // M-17: the observation half of чл. 25, ал. 1 — the lane-change path has
@@ -118,7 +130,10 @@ export const VIOLATIONS: Record<ViolationCode, ViolationSpec> = {
       "Зави, без да погледнеш в огледалото от страната на завоя. Мигачът само обявява намерението ти — огледалото проверява дали то е безопасно: точно там, отдясно, минават колела и мотори, а отляво изпреварващият вече е тръгнал.",
     correctiveBg:
       "Преди всеки завой: огледало от страната на завоя, после мигач, после къс поглед в мъртвата зона — и чак тогава завърти волана.",
-    lawRef: "ЗДвП чл. 25",
+    // ал. 1 named: „преди да започне маневрата, трябва да се убеди, че няма да
+    // създаде опасност за участниците в движението, които се движат след него,
+    // преди него или минават покрай него".
+    lawRef: "ЗДвП чл. 25, ал. 1",
     conceptId: "c-mirrors-blind-spots",
   },
   // M-17: the лентови стрелки were painted, taught and demoed — and graded by
@@ -143,7 +158,9 @@ export const VIOLATIONS: Record<ViolationCode, ViolationSpec> = {
       "Смени лентата, без да подадеш мигач. Водачът зад теб няма как да предвиди маневрата ти — сигналът се подава преди престрояването.",
     correctiveBg:
       "Преди престрояване: мигач, изчакай 2–3 секунди, после плавно смени лентата. Сигналът винаги предхожда маневрата.",
-    lawRef: "ЗДвП чл. 25",
+    // CITATION CORRECTED 2026-08-03 (see TURN_WITHOUT_INDICATOR): the signal
+    // itself is чл. 28, ал. 1; чл. 25 covers the safety half of the maneuver.
+    lawRef: "ЗДвП чл. 28, ал. 1; чл. 25, ал. 1",
     conceptId: "c-lane-change",
   },
   LANE_CHANGE_WITHOUT_MIRROR_CHECK: {
@@ -154,7 +171,7 @@ export const VIOLATIONS: Record<ViolationCode, ViolationSpec> = {
       "Престрои се, без да провериш огледалото от страната на маневрата. В мъртвата зона се скрива цял автомобил — редът е винаги: огледало, сигнал, маневра.",
     correctiveBg:
       "Редът е железен: огледало от страната на маневрата → мигач → проверка на мъртвата зона → маневра. Без поглед в огледалото воланът не се мести.",
-    lawRef: "ЗДвП чл. 25",
+    lawRef: "ЗДвП чл. 25, ал. 1",
     conceptId: "c-mirrors-blind-spots",
   },
   SEATBELT_OFF_WHILE_MOVING: {
@@ -176,7 +193,11 @@ export const VIOLATIONS: Record<ViolationCode, ViolationSpec> = {
       "Потегли с вдигната ръчна спирачка. Колата се влачи, спирачките прегряват — освобождаването на ръчната е част от процедурата за потегляне.",
     correctiveBg:
       "Свали ръчната докрай непосредствено преди потегляне. Ако колата тегли и усещаш съпротивление — спри и провери ръчната, не давай повече газ.",
-    lawRef: "ЗДвП чл. 20",
+    // General duty, named at the alinea that actually carries it — чл. 20, ал. 1:
+    // „Водачите са длъжни да контролират непрекъснато пътните превозни средства,
+    // които управляват." There is no ЗДвП article about the handbrake; the
+    // exam-sheet fault family is Наредба № 38, cited without a guessed number.
+    lawRef: "ЗДвП чл. 20, ал. 1; Наредба № 38 (второстепенни грешки)",
     conceptId: "c-vehicle-controls",
   },
   HEADLIGHTS_OFF_AT_NIGHT: {
@@ -316,7 +337,10 @@ export const VIOLATIONS: Record<ViolationCode, ViolationSpec> = {
       "Настъпи сблъсък. На реалния изпит това прекратява изпита незабавно. В симулатора продължаваме, за да се учиш — но сесията се оценява като прекратена.",
     correctiveBg:
       "Карай така, че винаги да имаш къде да спреш: гледай далеч напред, дръж 2 секунди зад предния и намалявай ПРЕДИ конфликтните точки (кръстовища, пътеки, паркирани коли).",
-    lawRef: "ЗДвП чл. 20",
+    // чл. 20, ал. 2 named: „…за да бъдат в състояние да спрат пред всяко
+    // предвидимо препятствие. Когато възникне опасност за движението, водачите
+    // са длъжни незабавно да намалят скоростта…"
+    lawRef: "ЗДвП чл. 20, ал. 2",
     conceptId: "c-general-care-duty",
     terminateSession: true,
   },
@@ -340,7 +364,10 @@ export const VIOLATIONS: Record<ViolationCode, ViolationSpec> = {
       "Потегли от място, без да провериш огледалата непосредствено преди тръгване. Точно в този момент отзад може да приближава кола, колоездач или мотор — потеглянето е маневра и изисква оглеждане.",
     correctiveBg:
       "Преди да потеглиш: поглед в лявото огледало и към мъртвата зона, мигач и чак тогава тръгвай. Проверката е последното действие преди колелата да се завъртят, не преди половин минута.",
-    lawRef: "ЗДвП чл. 25",
+    // чл. 25, ал. 1 names this maneuver: „да излезе от реда на паркираните
+    // превозни средства…, преди да започне маневрата, трябва да се убеди, че няма
+    // да създаде опасност за участниците в движението".
+    lawRef: "ЗДвП чл. 25, ал. 1",
     conceptId: "c-mirrors-blind-spots",
   },
   STOP_LINE_OVERSHOOT: {
@@ -453,7 +480,14 @@ export const VIOLATIONS: Record<ViolationCode, ViolationSpec> = {
       "Изпревари кола в зоната на пешеходна пътека. Точно там е забранено да изпреварваш — спрялата или намаляваща кола пред теб може да пропуска пешеходец, когото ти не виждаш иззад нея.",
     correctiveBg:
       "Пред пешеходна пътека не изпреварвай и не заобикаляй колата пред теб — намали и бъди готов да спреш. Ако предният намалява до пътеката, най-вероятно пропуска човек.",
-    lawRef: "ЗДвП чл. 119",
+    // CITATION CORRECTED 2026-08-03: this cited чл. 119, which is the duty to
+    // YIELD to pedestrians — it does not ban overtaking anywhere. The ban is
+    // чл. 43, retrieved verbatim: „Изпреварването на моторни превозни средства…
+    // е забранено: … 5. пред пешеходна пътека, когато изпреварваното превозно
+    // средство закрива видимостта към пешеходната пътека; 6. пред и върху
+    // сигнализирана пешеходна пътека." чл. 119, ал. 2 stays as the second half
+    // (the duty when passing a vehicle stopped at the crossing).
+    lawRef: "ЗДвП чл. 43, т. 5 и т. 6; чл. 119, ал. 2",
     conceptId: "c-crosswalk-yield",
   },
   // -- B1a Wave-3 detector pack (doc 72 capability 1) — per-lesson drills -----
@@ -465,7 +499,11 @@ export const VIOLATIONS: Record<ViolationCode, ViolationSpec> = {
       "Премина стоп-линията на знак Б2, без да огледаш и наляво, и надясно. „Един поглед не стига“ — най-честата причина за катастрофа на кръстовище е „гледах, но не видях“: погледнал си веднъж отдалеч и си потеглил в това, което се е променило.",
     correctiveBg:
       "На знак Б2 спри напълно и огледай по реда ляво-дясно-ляво — вторият поглед наляво е точно за колата, която е приближила, докато си гледал надясно. Потегляш чак след пълното оглеждане.",
-    lawRef: "ЗДвП чл. 50",
+    // чл. 47 carries the SCAN-before-you-enter duty: „Водач…, приближаващо се
+    // към кръстовище, трябва да се движи с такава скорост, че при необходимост да
+    // може да спре и да пропусне участниците в движението, които имат предимство."
+    // чл. 48 / чл. 50, ал. 1 say who that is.
+    lawRef: "ЗДвП чл. 47; чл. 48; чл. 50, ал. 1",
     conceptId: "c-give-way-stop-behavior",
   },
   FOLLOWING_TOO_CLOSE_FOR_RAIN: {
@@ -582,30 +620,51 @@ export const VIOLATIONS: Record<ViolationCode, ViolationSpec> = {
   // emergencyLane zones) ------------------------------------------------------
   DRIVING_TOO_SLOW_FOR_MOTORWAY: {
     // Doc 72 SP-10 „Минимална скорост на магистрала": the mobile chicane —
-    // motorway speed-differential crashes. LAW VERIFICATION NOTE: the slice
-    // brief cited „чл. 21 минимална 50 на АМ", which did NOT verify — the
-    // content bank (q-magistrali-i-izvangradsko-026, draft) teaches the
-    // opposite: NO general minimum exists; ЗДвП чл. 54 only admits vehicles
-    // constructively capable of > 50 km/h, and a posted minimum binds only
-    // under the mandatory sign. The code therefore grades the SOFTER tier
-    // (второстепенна — a correct-but-imprecise action, the „закъснели
-    // действия" family), anchored on чл. 54's 50 km/h line, not a phantom
-    // absolute limit. Doc 72's „Н38: основна" covers the whole SP-10
-    // archetype incl. the under-speed ramp MERGE (N/A on this segment).
+    // motorway speed-differential crashes.
+    //
+    // LAW VERIFICATION, REDONE 2026-08-03. The slice brief cited „чл. 21
+    // минимална 50 на АМ", which did not verify — correct. But the replacement
+    // was wrong twice over: it cited ЗДвП чл. 54, which is the RAIL-CROSSING
+    // forced-stop article („В случай на принудително спиране на превозното
+    // средство върху релсите…"), and it carried a 50 km/h figure that appears
+    // nowhere. Retrieved:
+    //
+    //   ЗДвП чл. 55, ал. 1: „На път, обозначен като автомагистрала или скоростен
+    //   път със съответния пътен знак, е разрешено движението само на моторни
+    //   превозни средства или състав от пътни превозни средства, чиято
+    //   конструктивна максимална скорост надвишава 70 km/h."
+    //   ЗДвП чл. 22, ал. 1: „Водачът на пътно превозно средство не трябва да се
+    //   движи без основателна причина с твърде ниска скорост, когато по този
+    //   начин пречи на движението на другите пътни превозни средства."
+    //
+    // So: no general minimum exists, the 70 km/h is a condition on the VEHICLE,
+    // and the driver-facing duty is чл. 22, ал. 1. Same wording as the content
+    // bank's q-magistrali-i-izvangradsko-026, which states it correctly — the
+    // two surfaces must agree. The code still grades the SOFTER tier
+    // (второстепенна — the „закъснели действия" family), now anchored on чл. 22,
+    // ал. 1's „без основателна причина… пречи", not on a phantom absolute limit.
+    // Doc 72's „Н38: основна" covers the whole SP-10 archetype incl. the
+    // under-speed ramp MERGE (N/A on this segment).
     severityClass: "vtorostepenna",
     points: SEVERITY_POINTS.vtorostepenna,
     titleBg: "Твърде бавно движение по автомагистрала",
     explanationBg:
-      "Движеше се продължително далеч под скоростта на потока по магистралата — без задръстване или друга причина. Магистралата допуска само превозни средства, способни на повече от 50 км/ч: колата, пълзяща в лентата при поток от 120–140, е подвижно препятствие, което всички останали трябва да заобикалят.",
+      "Движеше се продължително далеч под скоростта на потока по магистралата — без задръстване или друга причина. Обща задължителна минимална скорост няма, но законът забранява движение без основателна причина с твърде ниска скорост, когато пречиш на другите (ЗДвП чл. 22, ал. 1); а самата магистрала е отворена само за превозни средства, чиято конструктивна максимална скорост надвишава 70 км/ч (чл. 55, ал. 1). Колата, пълзяща в лентата при поток от 120–140, е подвижно препятствие, което всички останали трябва да заобикалят.",
     correctiveBg:
       "Дръж скоростта близка до потока — на свободна магистрала това са поне 100–120 км/ч за лек автомобил. Ако не можеш или не искаш да поддържаш такава скорост, магистралата не е твоят път: избери успореден републикански път.",
-    lawRef: "ЗДвП чл. 54",
+    lawRef: "ЗДвП чл. 22, ал. 1; чл. 55, ал. 1",
     conceptId: "c-motorway-rules",
   },
   EMERGENCY_LANE_DRIVING: {
-    // Doc 72 SP-10-adjacent motorway discipline; ЗДвП чл. 58, т. 3 VERIFIED
-    // against the content bank (q-magistrali-i-izvangradsko-009: „Аварийната
-    // лента е за аварии, не за нетърпеливи (чл. 58, т. 3 ЗДвП)"). Опасна: the
+    // Doc 72 SP-10-adjacent motorway discipline. POINT CORRECTED 2026-08-03:
+    // this cited чл. 58, т. 3, which is the STOPPING permission („да спира в
+    // лентата за принудително спиране, освен при повреда на пътното превозно
+    // средство, както и при здравословни проблеми…"). The act graded here is
+    // DRIVING along it, and that is т. 4, retrieved verbatim: „да се движи в
+    // платното за насрещно движение или в лентата за принудително спиране".
+    // The content bank states the same split (q-magistrali-i-izvangradsko-009:
+    // „в нея се спира само при повреда… (чл. 58, т. 3), а самото движение по
+    // нея е изрично забранено (чл. 58, т. 4)"). Опасна: the
     // lane must stay free for ambulances, fire crews and broken-down cars —
     // undertaking the queue through it at speed is exactly the act the ban
     // exists for. NO indicator exemption (a signalled undertake is still the
@@ -618,7 +677,7 @@ export const VIOLATIONS: Record<ViolationCode, ViolationSpec> = {
       "Движеше се по лентата за принудително спиране. Тя не е „още една лента“ — по нея е забранено да се кара, защото трябва да остане свободна за аварирали коли, линейки и пожарна. Точно при задръстване, когато изкушението е най-голямо, тя е най-необходима.",
     correctiveBg:
       "Остани в лентите за движение, дори потокът да пълзи — аварийната лента се използва само при принудително спиране: изтегляш се, спираш, включваш аварийните светлини. За изпреварване тя не съществува.",
-    lawRef: "ЗДвП чл. 58, т. 3",
+    lawRef: "ЗДвП чл. 58, т. 4",
     conceptId: "c-motorway-prohibitions",
   },
   // -- OVERTAKE-CORRIDOR adjudication (doc 72 OV-05/OV-08 — the head-on family)
@@ -686,7 +745,10 @@ export const VIOLATIONS: Record<ViolationCode, ViolationSpec> = {
       "Мина покрай велосипедиста почти без странично разстояние. Законът изисква ДОСТАТЪЧНА странична дистанция — учи се около 1,5 метра въздух: велосипедистът няма ламарина около себе си и може всеки миг да се отклони заради дупка, шахта или порив на вятъра. На половин метър всяко негово клатушкане е сблъсък.",
     correctiveBg:
       "Преди велосипедист: огледало, мигач наляво и се отмести с реален метър и половина — при нужда изчакай насрещния да мине и чак тогава изпреварвай. Няма ли място за широка дъга, остани зад него; никога не се провирай.",
-    lawRef: "ЗДвП чл. 42",
+    // ал. 2, т. 1 named — that is the sentence: „по време на изпреварването да
+    // осигури достатъчно странично разстояние между своето и изпреварваното
+    // пътно превозно средство".
+    lawRef: "ЗДвП чл. 42, ал. 2, т. 1",
     conceptId: "c-cyclists",
   },
   PREDRIVE_STEP_SKIPPED: {
@@ -697,7 +759,10 @@ export const VIOLATIONS: Record<ViolationCode, ViolationSpec> = {
       "Потегли, без да изпълниш стъпка от подготовката преди потегляне. Изпитващият проверява точно тези действия, преди колата изобщо да е тръгнала.",
     correctiveBg:
       "Мини пълния ред преди потегляне: седалка → огледала → колан → двигател → предавка → ръчна спирачка → оглеждане → потегляне. Нищо не се прескача.",
-    lawRef: "ЗДвП чл. 20",
+    // The pre-drive ritual is the EXAM protocol, not a ЗДвП article — чл. 20
+    // carries only the general control duty (ал. 1). Founder ruling: name the
+    // rule and the act, never a guessed article number.
+    lawRef: "ЗДвП чл. 20, ал. 1; Наредба № 38 (подготовка преди потегляне)",
     conceptId: "c-pre-drive-check",
   },
   PREDRIVE_SEATBELT_SKIPPED: {
@@ -719,7 +784,10 @@ export const VIOLATIONS: Record<ViolationCode, ViolationSpec> = {
       "Изпълни стъпка от подготовката преди необходимите преди нея. Редът има логика — например огледалата се нагласят след седалката, защото позицията ти ги определя.",
     correctiveBg:
       "Върви по списъка отгоре надолу: първо седалката (тя определя всичко), после огледалата, после коланът. Редът не е формалност — всяка стъпка зависи от предишната.",
-    lawRef: "ЗДвП чл. 20",
+    // The pre-drive ritual is the EXAM protocol, not a ЗДвП article — чл. 20
+    // carries only the general control duty (ал. 1). Founder ruling: name the
+    // rule and the act, never a guessed article number.
+    lawRef: "ЗДвП чл. 20, ал. 1; Наредба № 38 (подготовка преди потегляне)",
     conceptId: "c-pre-drive-check",
   },
 };

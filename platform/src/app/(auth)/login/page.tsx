@@ -24,6 +24,19 @@ export default async function LoginPage({ searchParams }: Props) {
   // go through — without it that redirect looks like the reset silently failed.
   const resetDone = params.reset === "1";
 
+  // Set by /settings. Both revoke User.sessionEpoch, which ends the CURRENT
+  // session too — so the student arrives here on purpose, not by a mystery
+  // logout, and the banner is the difference between those two experiences.
+  const changedHere = params.changed === "1";
+  const revoked = params.revoked === "1";
+  const notice = resetDone
+    ? "Паролата ти е сменена. Влез с новата."
+    : changedHere
+      ? "Паролата ти е сменена и те отписахме от всички устройства. Влез с новата."
+      : revoked
+        ? "Отписахме те от всички устройства. Влез отново, за да продължиш."
+        : null;
+
   return (
     <div>
       <AuthHeading
@@ -32,12 +45,12 @@ export default async function LoginPage({ searchParams }: Props) {
         lead="Влез в акаунта си, за да продължиш обучението."
       />
 
-      {resetDone && (
+      {notice && (
         <p
           role="status"
           className="mb-5 rounded-lg border border-success/50 bg-success/10 px-3 py-2.5 text-sm font-semibold text-success"
         >
-          Паролата ти е сменена. Влез с новата.
+          {notice}
         </p>
       )}
 

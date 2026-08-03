@@ -220,9 +220,24 @@ export async function checkPracticeQuota(
 /**
  * Mock-exam gate: true = the user may start a mock exam now.
  * Active pack → always true. Free tier → true only while lifetime exam
- * attempts < FREE_MOCK_EXAM_LIMIT (started attempts count — no farming by
- * abandoning). On false, send the user to /pricing.
- * `now` is injectable for tests.
+ * attempts < FREE_MOCK_EXAM_LIMIT + whatever support has restored (started
+ * attempts count — no farming by abandoning). On false, send the user to
+ * /pricing. `now` is injectable for tests.
+ *
+ * WHY THE ALLOWANCE IS NOT JUST THE CONSTANT. Counting STARTED attempts is the
+ * right rule and stays: it is what stops a free account from farming unlimited
+ * exams by abandoning each one. But it has a victim — the student whose phone
+ * drops connection thirty seconds into „Започни пробен изпит", whose attempt
+ * then expires unfinished, and whose single lifetime free exam is spent on a
+ * paper they never saw. That is the product's best conversion moment turned
+ * into a one-star review.
+ *
+ * The remedy has to be surgical. A promo Entitlement would work, but it hands
+ * over the whole pack for a ticket about one lost attempt; deleting the
+ * attempt rows would work, but those are the student's own history. So support
+ * moves this counter (User.freeExamGrants, /admin) and it buys back exactly
+ * one exam — no access, no history rewritten, and an AdminAction row naming
+ * who did it.
  */
 export async function requireEntitlementForExam(
   userId: string,
@@ -230,8 +245,12 @@ export async function requireEntitlementForExam(
 ): Promise<boolean> {
   const access = await getEntitlements(userId, now);
   if (access.hasCore) return true;
-  const attempts = await getPaymentsStore().countExamAttempts(userId);
-  return attempts < FREE_MOCK_EXAM_LIMIT;
+  const store = getPaymentsStore();
+  const [attempts, granted] = await Promise.all([
+    store.countExamAttempts(userId),
+    store.countFreeExamGrants(userId),
+  ]);
+  return attempts < FREE_MOCK_EXAM_LIMIT + granted;
 }
 
 /**
@@ -358,7 +377,16 @@ export async function checkTutorPackAllowance(
   }
 
   const sinceMs = since.getTime();
-  const limit = TUTOR_PACK_QUESTION_ALLOWANCE * active.length;
+  // DISTINCT PACKS, not rows. The comment above always said "upgrading core →
+  // premium buys a SECOND 300"; the code said `* active.length`, which is the
+  // number of ROWS. Those agree only while no session is ever fulfilled twice
+  // — and until the (provider, providerRef) unique constraint landed, double
+  // fulfilment was the ordinary race between the webhook and /checkout/return.
+  // So a duplicated row did not merely look untidy: it doubled the AI-tutor
+  // allowance a EUR 12.99 pack buys, which is real model spend. Counting what
+  // was actually SOLD makes the rule immune to how many rows recorded it.
+  const distinctPacks = new Set(active.map((row) => row.pack)).size;
+  const limit = TUTOR_PACK_QUESTION_ALLOWANCE * distinctPacks;
   const used = askedAtMs.filter((ts) => ts >= sinceMs).length;
   const remaining = Math.max(0, limit - used);
   return { applies: true, allowed: remaining > 0, used, remaining, limit, since };

@@ -26,6 +26,8 @@ const MESSAGES: Record<string, string> = {
     "Този изпит вече е предаден. Резултатът е в историята по-долу.",
   "start-failed":
     "В момента не може да бъде съставен пробен изпит. Опитай отново по-късно.",
+  "too-many":
+    "Твърде много започнати изпити подред. Изчакай малко и пробвай пак.",
 };
 
 const dateFmt = new Intl.DateTimeFormat("bg-BG", {
@@ -170,6 +172,11 @@ function RuleStat({
 
 function HistoryRow({ entry }: { entry: ExamHistoryEntry }) {
   const inProgress = entry.status === "in-progress";
+  // Derived from startedAt by the exam module, not stored. „Продължи →" on a
+  // row that can no longer be continued is a promise the next screen has to
+  // break — and before the expiry check existed it broke it by auto-failing
+  // the attempt at 0/97.
+  const expired = entry.status === "expired";
   return (
     <Link
       href={`/exams/${entry.attemptId}`}
@@ -196,6 +203,8 @@ function HistoryRow({ entry }: { entry: ExamHistoryEntry }) {
             <StatusBadge kind="in-progress" />
             <span className="text-sm font-bold text-accent">Продължи →</span>
           </>
+        ) : expired ? (
+          <StatusBadge kind="expired" />
         ) : entry.passed ? (
           <StatusBadge kind="passed" />
         ) : (
@@ -206,7 +215,21 @@ function HistoryRow({ entry }: { entry: ExamHistoryEntry }) {
   );
 }
 
-function StatusBadge({ kind }: { kind: "passed" | "failed" | "in-progress" }) {
+function StatusBadge({
+  kind,
+}: {
+  kind: "passed" | "failed" | "in-progress" | "expired";
+}) {
+  // Neutral, not red: an expired attempt is not a failed one, and painting it
+  // in the „Неиздържан" colour would tell the student they lost an exam they
+  // never sat — the same lie the auto-submit used to tell, in a smaller font.
+  if (kind === "expired") {
+    return (
+      <span className="rounded-full border border-hair px-2.5 py-0.5 text-xs font-bold text-muted">
+        Изтекъл
+      </span>
+    );
+  }
   if (kind === "passed") {
     return (
       <span className="rounded-full bg-success/15 px-2.5 py-0.5 text-xs font-bold text-success">

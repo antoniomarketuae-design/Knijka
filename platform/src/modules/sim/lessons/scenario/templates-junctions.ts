@@ -802,7 +802,45 @@ export const SC_JX_GIVEWAY_CONFLICT: PriorityFromRightSpec = {
   junctionControl: "stopLine",
   actor: {
     pathNodes: ["jxg-n-e2", "jxg-n-j2", "jxg-n-w2"],
-    hold: { nodeIndex: 1, offsetM: -95 },
+    /**
+     * B29 / B30 (doc 87), and the two are ONE number.
+     *
+     * His words: „If i stop at the green cyrcle I cant see the car coming on
+     * the right because of the cars that have stopped on the side walk" and
+     * „the car is very far away and I looked but I didnt see it at all". Both
+     * were reproduced from the seat before this was touched: stopped ON the
+     * Б1 paint (y 122.41, telemetry) with the right glance HELD, the frame
+     * shows бул. „Втори"'s south kerb lined nose-to-tail with a saloon, a
+     * white box van and more vans — and no road surface and no moving car
+     * beyond them.
+     *
+     * WHY −95 WAS UNSEEABLE, measured against this map rather than argued:
+     *  - the procedural curb row on the east arm (traffic/TrafficLayer
+     *    computeParkedCars) seats its bodies at
+     *    `travelHalf 8.125 + PARK_BAND_CENTER_M 2.0` off the boulevard
+     *    centre-line, i.e. y = 139.875, and its first LAWFUL slot on the
+     *    11 m + 6.6 m grid lands past `nodeOpenRadiusM` 27.125 +
+     *    PARK_JUNCTION_CLEAR_M — x ≈ 37 and eastwards;
+     *  - a sightline from the Б1 line (4.06, 122.275) to a car in the
+     *    westbound lane (y = 154.06) crosses y = 139.875 at
+     *    x = 4.06 + 0.5537·(X − 4.06). At X = 95 that is x ≈ 54 — INSIDE the
+     *    parked row. The car was not merely far: it was behind a wall of
+     *    parked bodies at every pose on the approach.
+     *  - the row is cleared only while X < 63.5 m. Anything held beyond that
+     *    is screened no matter where the student stops, so „stop further back
+     *    for a better sightline" was never available to him either.
+     *
+     * −34 m: clear of the row by 16 m of crossing distance (x ≈ 20.6), still
+     * OUTSIDE the junction patch (`nodeOpenRadiusM` 27.125, so the car stands
+     * on its own carriageway and not in the box), 43.6 m from the line and
+     * ~43° off the forward axis — inside the right-glance cone, at a size a
+     * student can read. At `cruiseSpeedMps` 8 it is a ~4 s conflict: the car
+     * you must actually wait for, which is the whole lesson (ЗДвП чл. 50).
+     * The runner then walks it to its `PRIORITY_COMMIT_CAR_M + 3` pin at 28 m
+     * and releases it as the student reaches the mouth — unchanged behaviour,
+     * now performed where he can see it happen.
+     */
+    hold: { nodeIndex: 1, offsetM: -34 },
     cruiseSpeedMps: 8,
   },
   junctionNodeIndex: 1,
@@ -821,7 +859,24 @@ export const SC_JX_GIVEWAY_CONFLICT: PriorityFromRightSpec = {
 /** Learn-only rear pressure (доп. натиск): a car glued behind the player, so
  *  the „не бързай да минеш" decision is made with a лепка in the mirror. The
  *  rearTailgater runner emits ZERO SimTick events (pressure scenery, A12) — it
- *  never grades and never conflicts (same-direction bearing). */
+ *  never grades and never conflicts (same-direction bearing).
+ *
+ *  HONESTY DEBT, measured 2026-08-03, NOT fixed here because the fix is not in
+ *  this file. This spec is why BOTH of this template's CLIP_PLAN entries fail
+ *  the rig's R1 gate with „липсва vehicle", and the actor hold above is not the
+ *  cause. `clipPlanBuilder.deriveCamera` returns "rearAware" as soon as ANY
+ *  staged spec is in REAR_APPROACH_KINDS — `rearTailgater` is — so both clips
+ *  are planned with a camera that stands 9.5 m AHEAD of the ghost and looks
+ *  BACK past it, while the required actor on both cards is „Автомобил отдясно с
+ *  предимство", which is on бул. „Втори" NORTH of that lens. Running
+ *  `actorInRearAwareFrame` at m0's fault pose (ghost 4.0625, 122.333, heading
+ *  0) for the priority car at every x from −40 to +95 gives a NEGATIVE depth
+ *  every time: the car is behind the camera at all of them, so no `hold.offsetM`
+ *  can put it in that frame. Under the CHASE cone the same pose frames it for
+ *  x ∈ ≈[−24, +28], which the −34 m hold now reaches. Owner: the camera
+ *  derivation (which actor the card requires, not merely which kinds are
+ *  staged) + a regenerated clipPlan. Do not "fix" it by deleting the лепка: the
+ *  rear pressure is the drill. */
 export const SC_JX_GIVEWAY_TAILGATER: RearTailgaterSpec = {
   id: "sc-jxgb-tailgater",
   kind: "rearTailgater",
@@ -917,6 +972,46 @@ export const SC_JX_GIVEWAY_B1: ScenarioSpec = {
        * beginner starts on. Measured, not argued. `acceptBeforeMarkM` cuts the
        * acceptance at the paint AFTER the ladder has been applied, so the
        * claim is now true at every rung instead of at the one nobody drives.
+       *
+       * B31, the half the row was closed without (doc 87, downgraded to
+       * PARTIAL-SEEN at the 2026-08-03 look-wave). „If I dont stop on the
+       * green cyrcle I cant do anything … I must go back to the green cyrcle
+       * if I want to continue." The forced-violation half is gone; this is the
+       * other half. `r 9` admitted y ∈ [104, 122.275] — 18 m — so a student
+       * who gave way from FURTHER BACK was never credited, never failed and
+       * never released: the banner went on reading «ЗАДАЧА 2/3 Пропусни
+       * колата с предимство» while he was already up the north arm and the
+       * advisor was congratulating him on the junction behind him. A task that
+       * is still current after you have driven past it teaches nothing.
+       *
+       * WIDENING WAS WRITTEN, MEASURED, AND DELIBERATELY NOT SHIPPED.
+       * `y 108.5 r 13.5` → y ∈ [95, 122] (with `acceptBeforeMarkM` re-derived
+       * to −13.775 so the paint cut still holds) passes the family's own B5
+       * gate — that one checks the RAW disc, so the centre only has to move
+       * back with the radius, and 108.5 + 13.5 = 122.0 is short of 122.275.
+       * `traffic/scenery-sightline` T6 („the graded yield pose can SEE the
+       * staged conflict actor") then FAILED it at 1.37 m against a 2 m floor:
+       *   «sc-jxgb-yield (4.06, 108.50) → actor (44.0, 154.1)
+       *    blocked by (10.1, 110.0)»
+       * That blocker is a parked body on the student's OWN kerb —
+       * `TrafficLayer.computeParkedCars` on the tertiary `jxg-e-m`, seated at
+       * travelHalf 8.125 + PARK_BAND_CENTER 2.0 = x 10.125, last lawful slot
+       * y 110. Solving the same clearance by hand along the band: a pose at
+       * y 110 clears by 2.37 m, y 109.5 by 2.05 m, and y 98 — the rear edge of
+       * the widened band — is blocked outright. So this band cannot be widened
+       * backwards on this map: behind ≈ y 110 the student's own kerbside row
+       * stands in the give-way sightline, and crediting a pose there would be
+       * certifying a yield made from where he cannot see. One measured lie
+       * traded for another is not a fix.
+       *
+       * The values below are therefore the shipped ones, UNCHANGED, and B31's
+       * second half stays open with a named owner: the kerbside row, not this
+       * objective. `computeParkedCars` already honours a per-edge
+       * `parkingBand: false` (FR-21), which `tools/maps/gen_jx_giveway.mjs` can
+       * declare on `jxg-e-m` — and on `jxg-e-e2`, whose row is what screens the
+       * boulevard itself. Once that row is gone the widening above is a
+       * two-number change and this comment is its recipe. What the actor fix
+       * above does close is the reason he was stopping 30 m short at all.
        */
       params: {
         kind: "reachZone",

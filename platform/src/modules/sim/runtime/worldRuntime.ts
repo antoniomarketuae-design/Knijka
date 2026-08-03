@@ -1358,7 +1358,33 @@ export function createWorldRuntime(districtJson: District | unknown): DistrictWo
         );
         if (circulating) {
           rbConflictSeen = true;
-          if (rbCondSince === null) rbCondSince = tSec; // conflict became visible
+          // B15 — „I waited for the traffic car 3-4 seconds, than I waited it
+          // for twice more and it still stated the error."
+          //
+          // The sustain clock below is a REACTION window and the braking band
+          // is a RESPONSE window; both are measured from `rbCondSince`. Stamped
+          // at the conflict's onset and cleared only when the conflict is gone,
+          // that stamp goes stale under a driver who does the lawful thing and
+          // STANDS STILL: after a 46 s wait the 0.9 s window and the 3.0 s band
+          // are 45 s expired, so the only live gate left is `speedKmh >
+          // RHR_MOVING_KMH` and he is convicted on the tick the wheels turn —
+          // with waiting LONGER making it worse, which is his complaint word
+          // for word. Two constants already shipped for this row
+          // (RB_WITNESS_STOPPED_NEAR_M, CIRCULATING_REACH_M) are upstream of
+          // here and cannot reach it.
+          //
+          // A stationary driver is not entering anything: he has already made
+          // the correct decision, and pulling away afterwards is a NEW act that
+          // deserves its own window. Holding the clock at null below the
+          // conviction floor makes `tSec - rbCondSince` mean what every gate
+          // downstream already reads it as — continuous seconds spent MOVING
+          // into a visible conflict. RHR_MOVING_KMH is the right threshold and
+          // not an arbitrary new one: it is the same floor the conviction test
+          // itself uses, so the clock can never accumulate time the verdict
+          // would refuse to act on (a 2 km/h creep must not bank a window it
+          // then spends on one jab of throttle).
+          if (v.speedKmh <= RHR_MOVING_KMH) rbCondSince = null;
+          else if (rbCondSince === null) rbCondSince = tSec; // conflict became visible
           if (v.speedKmh <= RHR_YIELD_KMH) rbSlowed = true;
         } else {
           rbCondSince = null;

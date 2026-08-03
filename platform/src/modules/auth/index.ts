@@ -32,8 +32,22 @@ export type {
   ResetPasswordResult,
   ResetTokenProblem,
 } from "./reset";
-export { forgotPasswordInputSchema, resetPasswordInputSchema } from "./schemas";
-export type { ForgotPasswordInput, ResetPasswordInput } from "./schemas";
+export {
+  forgotPasswordInputSchema,
+  resetPasswordInputSchema,
+  changePasswordInputSchema,
+} from "./schemas";
+export type {
+  ForgotPasswordInput,
+  ResetPasswordInput,
+  ChangePasswordInput,
+} from "./schemas";
+
+// Session revocation (User.sessionEpoch). The authenticated password change
+// and „Изход от всички устройства" both end every JWT minted so far — see
+// reset.ts for why a stateless session needed a counter and not a table.
+export { changePassword, signOutEverywhere } from "./reset";
+export type { ChangePasswordResult } from "./reset";
 
 // Persistence seam (tests inject the in-memory fake; production uses Prisma)
 export {
@@ -42,7 +56,12 @@ export {
   InMemoryAuthStore,
   EmailTakenError,
 } from "./store";
-export type { AuthStore, AuthUserRecord, CreateUserInput } from "./store";
+export type {
+  AccountFlags,
+  AuthStore,
+  AuthUserRecord,
+  CreateUserInput,
+} from "./store";
 
 // Password-reset persistence — a separate seam on purpose (reset-store.ts
 // explains why it is not six more methods on AuthStore).

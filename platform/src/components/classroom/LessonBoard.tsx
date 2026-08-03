@@ -20,14 +20,13 @@
  * as video is ~5,1 MB, and only 42 of 155 templates have a reel at all.
  * Nothing in the existing media components is modified — the room just picks.
  *
- * ONE THING THIS DELIBERATELY DOES NOT DO YET. Doc 84 §5.1 rule 2 says the
- * board „freezes and DIMS" when a hand goes up. It dims (`dimmed`), and the
- * dim is the load-bearing half — the referent stays on screen, which is the
- * whole point. It does not FREEZE: `MistakeReplay` owns its own rAF loop and
- * exposes no paused input, and inventing one is a change to a theory-module
- * component this lane does not own. The seam is a `paused?: boolean` prop on
- * `MistakeReplay`/`MistakeMedia`; when it exists, pass `dimmed` into it and
- * delete this paragraph.
+ * IT FREEZES AS WELL AS DIMS. Doc 84 §5.1 rule 2 asks for both, and for a week
+ * this only dimmed: `MistakeReplay` owned its rAF loop and exposed no input,
+ * so the car kept driving behind a 42%-opacity veil while the teacher answered
+ * a question about the moment that had just gone past — the referent the dim
+ * exists to preserve was moving. Both renderers now take `paused`, and
+ * `dimmed` is what feeds it: one flag, one meaning („the student's attention
+ * is somewhere else"), so the two halves of the rule cannot drift apart.
  *
  * LAYOUT, and the one number that drives it. `MistakeReplay` sizes its canvas
  * from its OWN width (`clamp(140, w × 0.72, 240)`), so on a 844×390 phone in
@@ -102,6 +101,7 @@ function BoardPane({
   dense,
   hasReel,
   pairSymmetric,
+  paused,
 }: {
   take: ClassroomBoardTake;
   side: BoardSide;
@@ -111,6 +111,8 @@ function BoardPane({
   /** Bumped by „Покажи го пак" — remounts the replay from its first frame. */
   replayNonce: number;
   maxWidthPx: number;
+  /** The board is frozen (a hand is up). Both renderers hold their frame. */
+  paused: boolean;
   /** Text stripped; the caption is shown by the transcript column instead. */
   dense: boolean;
   /** The manifest has a rendered reel for THIS take. */
@@ -148,12 +150,14 @@ function BoardPane({
             key={`v-${take.tracePath}-${replayNonce}`}
             tracePath={take.tracePath}
             districtId={districtId}
+            paused={paused}
           />
         ) : (
           <MistakeReplay
             key={`t-${take.tracePath}-${replayNonce}`}
             tracePath={take.tracePath}
             districtId={districtId}
+            paused={paused}
           />
         )}
 
@@ -335,6 +339,7 @@ export function LessonBoard({
               dense={dense}
               hasReel={reels.correct}
               pairSymmetric={pairSymmetric}
+              paused={dimmed}
             />
             <BoardPane
               take={board.mistake}
@@ -347,6 +352,7 @@ export function LessonBoard({
               dense={dense}
               hasReel={reels.mistake}
               pairSymmetric={pairSymmetric}
+              paused={dimmed}
             />
           </>
         ) : (
@@ -361,6 +367,7 @@ export function LessonBoard({
             dense={dense}
             hasReel={side === "correct" ? reels.correct : reels.mistake}
             pairSymmetric={pairSymmetric}
+            paused={dimmed}
           />
         )}
       </div>

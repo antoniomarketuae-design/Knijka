@@ -3,7 +3,23 @@
  * files (JSON in /content) and platform code. Keep in lockstep with SCHEMA.md.
  */
 
-export type ContentStatus = "draft" | "needs-review" | "approved";
+/**
+ * Where an item sits in the AUTHORING pipeline. Two of these values are set by
+ * machines and one is set by a person, and conflating them is what let 1,005
+ * questions ship carrying `approved` because a generator wrote it — including
+ * all nine that are literally unanswerable (docs/education/90 §1).
+ *
+ *   draft            being written; incomplete on purpose
+ *   machine-checked  generated and passing every automated check — NO HUMAN
+ *                    HAS READ IT. This is what a generator is allowed to write.
+ *   needs-review     a person or an audit named a specific problem
+ *   approved         a person cleared it — and the CLAIM is only worth anything
+ *                    when content/review/approvals.json carries their signature
+ *                    over the row's content hash (modules/content-admin).
+ *
+ * The row's status alone never proves a human did anything. See content/SCHEMA.md.
+ */
+export type ContentStatus = "draft" | "machine-checked" | "needs-review" | "approved";
 
 export interface LawRef {
   act: string; // e.g. "ЗДвП", "Наредба РД-02-21-1/2023"

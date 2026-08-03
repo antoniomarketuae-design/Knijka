@@ -1050,8 +1050,9 @@ export const SC_OV_BUS_LANE: ScenarioSpec = {
 // motorway-segment archetype, gen_motorway.mjs). The emergency lane is the
 // carriageway's CURB lane covered by an authored "emergencyLane" zone span
 // (the busLane data seam, mirrored): sustained DRIVING in it grades the
-// опасна EMERGENCY_LANE_DRIVING (ЗДвП чл. 58, т. 3 — VERIFIED against the
-// content bank), with NO indicator exemption (a signalled undertake is still
+// опасна EMERGENCY_LANE_DRIVING (ЗДвП чл. 58, т. 4 „да се движи… в лентата за
+// принудително спиране" — т. 3 is the STOPPING permission, corrected
+// 2026-08-03), with NO indicator exemption (a signalled undertake is still
 // the fault; contrast the bus lane's legal right-turn transit).
 //
 // LEDGER T15 (doc 86 §2) — THE BROKEN-DOWN CAR NOW EXISTS.
@@ -1135,7 +1136,7 @@ const MWE_BREAKDOWN: BrakingLeadCarSpec = {
 };
 
 /**
- * Чл. 58, т. 3 — движение по лентата за принудително спиране е забранено
+ * Чл. 58, т. 4 — движение по лентата за принудително спиране е забранено
  * (освен при принудително спиране). The taught norm: the lane stays FREE —
  * for ambulances, fire crews and broken-down cars; undertaking or
  * queue-skipping through it is the опасна act. Detector is default-ON and
@@ -1214,7 +1215,7 @@ export const SC_MW_EMERGENCY_LANE: ScenarioSpec = {
       "На всяка магистрала и скоростен път — особено при натоварен трафик и задръстване, когато изкушението да заобиколиш колоната по аварийната лента е най-голямо. Тогава тя е и най-необходима: по нея идват линейката и пожарната.",
     whyBg:
       "Аварийната лента е застраховката на магистралата: мястото, където повредената кола се изтегля, и коридорът, по който помощта стига до катастрофата. Кола, движеща се по нея, среща спрели автомобили, хора около тях и отломки — с магистрална скорост и без никакво време за реакция. Затова движението по нея е забранено, без изключение за „бързащите“.",
-    lawRef: "ЗДвП чл. 58, т. 3",
+    lawRef: "ЗДвП чл. 58, т. 4",
     examinerBg:
       "Изпитващият следи лентовата дисциплина: всяко движение по лентата за принудително спиране е опасна грешка — с мигач или без. Аварийната лента се ползва само при принудително спиране, а покрай аварирала кола се минава в лентата за движение, с готовност и внимание.",
   },

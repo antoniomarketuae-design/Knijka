@@ -151,17 +151,26 @@ const CALL_SITES = [
   ["question review", "app/(dashboard)/review/ReviewClient.tsx"],
   ["sim micro-quiz", "components/sim/lesson-ui/MicroQuizOverlay.tsx"],
   ["sim session end", "modules/sim/hud/SessionEndScreen.tsx"],
-  // The AI-teacher classroom's mid-lesson check (2026-07-28). It arrived from a
-  // different run and reached for CheckControl on its own — which is the guard
-  // below working in the direction that matters: the ninth tick box in the
-  // product was built right without anyone being told to, and the only thing
-  // missing was this line.
-  ["classroom check", "components/lesson/LessonRunner.tsx"],
+  // The ninth box was `components/lesson/LessonRunner.tsx`, the plain lesson
+  // runner (2026-07-28). It arrived from a different run and reached for
+  // CheckControl on its own — the guard below working in the direction that
+  // matters. The FILE is gone (doc 91 S8): `/lesson` and `/lesson/[lessonId]`
+  // permanentRedirect into the classroom, so the runner was mounted by no route
+  // at all, and the eleventh box below is the same check in the surface that
+  // actually renders. Its row is deleted rather than left pointing at nothing —
+  // `read()` throws ENOENT on a missing path, and a table that cannot be read is
+  // not a claim about anything.
+  //
   // The pre-drive tutorial's „не отваряй обясненията сами" (2026-07-30, ledger
   // 86 D9). It shipped with a bare 14 px <input> and the sweep below caught it
   // before a student did — which is the tenth box arriving the way the ninth
   // did not.
   ["pre-drive tutorial", "modules/sim/hud/PreDriveTutorial.tsx"],
+  // The ROOM's mini-quiz (2026-08-03) — the eleventh, and the second one the
+  // classroom put on screen. It reached for CheckControl on its own, like the
+  // ninth did, and again the only thing missing was this line: the sweep below
+  // was red for a file that had done everything right.
+  ["classroom room check", "app/(dashboard)/classroom/ClassroomRoom.tsx"],
 ] as const;
 
 // ---------------------------------------------------------------------------
@@ -210,6 +219,24 @@ function jsxElements(src: string): { tag: string; props: string }[] {
       const c = src[i];
       if (quote !== null) {
         if (c === quote) quote = null;
+        continue;
+      }
+      // COMMENTS ARE SKIPPED BEFORE QUOTES, and that ordering is the whole
+      // point. An attribute-position comment may contain an apostrophe — „the
+      // board's panes" — and reading it as a string opener sent this scanner
+      // 11,404 characters past the end of its element, swallowing an unrelated
+      // `sr-only` label and a `"radio" : "checkbox"` ternary from two functions
+      // further down. The element then reported the wrong TAG for a control
+      // that was written correctly. `/>` and a regex literal both fall through:
+      // only `//` and `/*` are treated as comments.
+      if (c === "/" && src[i + 1] === "/") {
+        const nl = src.indexOf("\n", i);
+        i = nl === -1 ? src.length : nl;
+        continue;
+      }
+      if (c === "/" && src[i + 1] === "*") {
+        const end = src.indexOf("*/", i + 2);
+        i = end === -1 ? src.length : end + 1;
         continue;
       }
       if (c === '"' || c === "'" || c === "`") quote = c;

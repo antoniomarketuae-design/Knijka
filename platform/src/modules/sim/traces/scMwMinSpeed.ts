@@ -74,7 +74,7 @@ const X_CRUISE = 0;
 const X_LEFT = -8.12;
 /** The authored crawl — one speed, two lanes (the template's single variable). */
 const CRAWL_KMH = 40;
-/** The authored flow-speed cruise: well under the posted 140, well over чл. 54's line. */
+/** The authored flow-speed cruise: well under the posted 140, well over the crawl floor. */
 const FLOW_KMH = 110;
 
 // ---------------------------------------------------------------------------
@@ -122,7 +122,7 @@ export function scMwMinSpeedMistakeCrawlRightScript(): DriveScript {
       { kind: "annotation", textBg: "Виж зад себе си: колата, която идваше с магистрална скорост, вече е свалена до твоите 40. Твоето пълзене стана и нейно." },
       { kind: "drive", points: [[X_CRUISE, 320], [X_CRUISE, 430]], targetKmh: CRAWL_KMH },
       { kind: "pause", sec: 1.5, brake: true },
-      { kind: "annotation", textBg: "Тя се измъкна отляво. Общ минимум няма, но чл. 54 пуска тук само коли, способни на над 50 — по-бавното е препятствие по конструкция." },
+      { kind: "annotation", textBg: "Тя се измъкна отляво. Общ минимум няма, но чл. 55, ал. 1 пуска тук само коли с конструктивна максимална скорост над 70 — по-бавното е препятствие по конструкция." },
     ],
   };
 }

@@ -98,6 +98,23 @@ interface TopicPool extends QuotaTarget {
  * it hands its topic's exam slots to whichever topics are further through review.
  * `supply.ts` (auditExamSupply) is the guard that keeps that from happening
  * silently again — see the dark-topic check below and supply.test.ts.
+ *
+ * ⚠ AND HERE IS WHAT THIS GATE DOES NOT YET CHECK, stated plainly because it is
+ * a launch decision and not a TODO. `approved` is a string, and until
+ * 2026-08-03 a generator wrote it 1,005 times — 22 of the 24 questions with a
+ * wrong answer key carried it, as did all nine that are literally unanswerable
+ * (docs/education/90 §1). The honest test of "a human approved this" is now
+ * `isHumanApproved()` in @/modules/content-admin: a signature in
+ * content/review/approvals.json over the row's content hash.
+ *
+ * Swapping this predicate for that one today would make the eligible pool ZERO
+ * — nobody has signed anything yet — and no mock exam could be built at all.
+ * So the pool is still `approved`, `validate:content` prints both numbers on
+ * every run (signed vs. unsigned) and refuses to let the unsigned count grow,
+ * and the founder decides at /review how many rows to sign before launch. When
+ * that number can compose a 97-point paper, this line becomes
+ * `isHumanApproved(q, signatures.get(q.id))` and the review debt stops being
+ * invisible to a candidate.
  */
 export function isExamEligible(q: Question): boolean {
   return q.status === "approved";

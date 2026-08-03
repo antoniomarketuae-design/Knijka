@@ -21,8 +21,16 @@
  *     guard, so the mechanism — not just the hand-written correction — is what
  *     stops it.
  *  4. Table hygiene: no stale allow-list keys, no stale corrections, reasons
- *     actually written, denied pairs not quietly re-allowed.
+ *     actually written, denied pairs not quietly re-allowed, and MISSING_DRILLS
+ *     still describing questions that really are text-only.
  *  5. Citation-normalization units (ranges, ordinances, multi-act strings).
+ *
+ * The 2026-08-03 additions are all one story. A citation wave re-cited 175 bank
+ * rows against verbatim law, which moved 27 verdicts under a guard nobody had
+ * re-run. Almost all of them moved between the two SERVED verdicts and changed
+ * nothing a student sees — but four questions stopped being about the drill's
+ * manoeuvre, and the numbers pinned below are what makes that visible instead
+ * of silent. A citation is not cosmetic: it is what this guard reasons with.
  *
  * Runs against the REAL /content repo and the real scenario templates.
  */
@@ -35,6 +43,7 @@ import { QUESTION_EVENT_TYPE } from "./whyPanelMap.generated";
 import {
   EVENT_SCENARIO_CORRECTION,
   LAWREF_MISMATCH_ALLOW,
+  MISSING_DRILLS,
   PAIRINGS_DELIBERATELY_DENIED,
   QUESTION_SCENARIO_CORRECTION,
   pairKey,
@@ -51,6 +60,15 @@ const RIGHT_HOOK_QUESTIONS = [
   "q-uyazvimi-063",
   "q-krastovishta-031",
 ] as const;
+
+/**
+ * The ЗАОБИКАЛЯНЕ set — going ROUND a stopped car, on its right (ЗДвП чл. 43б,
+ * new in ДВ бр. 64 от 2025 г.; § 6, т. 80 ДР defines it as passing „неподвижен
+ * участник в движението"). The 2026-08-03 citation wave moved these three off
+ * чл. 42, which is what exposed that the В24 overtake drill argues from another
+ * rule AND teaches the opposite answer („изчакай" vs „може, отдясно").
+ */
+const GOING_ROUND_QUESTIONS = ["q-krastovishta-051", "q-manevri-024", "q-manevri-060"] as const;
 
 describe("the right-hook regression (the founder's q-predimstvo-062)", () => {
   it("q-predimstvo-062 is illustrated by the right turn across the cycle lane, not by an overtake", () => {
@@ -127,19 +145,28 @@ describe("the guard: no question is shown a drill that argues from another law",
       expect(payload.explanationBg.length, questionId).toBeGreaterThan(0);
       expect(payload.lawRefs.length + payload.explanationBg.length, questionId).toBeGreaterThan(0);
     }
-    // The questions of the eight deliberately-denied pairings. 58 → 53 on
-    // 2026-07-28: five Б1 secondary-road questions left
+    // The questions of the deliberately-denied pairings, plus the questions a
+    // SCOPED allowance leaves out. 58 → 53 on 2026-07-28: five Б1
+    // secondary-road questions left
     // ev-junction-priority-sign→sc-jx-priority-confidence for the drill that
     // puts the student in their seat (sc-jx-giveway-b1). That pairing is
-    // REDUCED, not lifted — nine of its questions are still refused.
-    expect(refused).toBe(53);
+    // REDUCED, not lifted — its priority-road half is still refused.
+    //
+    // 53 → 57 on 2026-08-03, all four from the citation wave (see
+    // MISSING_DRILLS): q-signs-054 (Т13, ЗДвП чл. 50, ал. 2) and the three
+    // заобикаляне questions the scoped ev-overtake allowance now excludes.
+    expect(refused).toBe(57);
   });
 
   it("CANARY: the original defective pairing is caught by the guard, not just by the correction", () => {
     // Had nobody written the q-predimstvo-062 correction, this is the verdict
     // the resolver would have reached — no clip, rather than the overtake.
-    // It stays "suspect" only because the ev-cyclist allowance is SCOPED to
-    // q-eco-009; a blanket excuse there would put the guard back to sleep.
+    // It stays "suspect" because ev-cyclist→sc-vu-pass-clearance carries NO
+    // allowance at all: the scoped one that used to excuse q-eco-009 was
+    // deleted on 2026-08-03 once that question's corrected citations
+    // (ЗДвП чл. 42, ал. 2, т. 1) law-matched the drill on their own. A BLANKET
+    // entry on this pair would put the guard back to sleep — see the
+    // deleted-entry note in whyPanelPairing.ts.
     const question = getContentRepo().questionById("q-predimstvo-062")!;
     const overtake = scenarioById("sc-vu-pass-clearance")!;
     const check = pairingVerdict({
@@ -154,18 +181,47 @@ describe("the guard: no question is shown a drill that argues from another law",
   });
 
   it("a scoped allowance excuses only the question it names", () => {
+    // ev-overtake→sc-ov-ban-overtake is the live scoped entry (it took over
+    // from ev-cyclist→sc-vu-pass-clearance on 2026-08-03). The drill is an
+    // ИЗПРЕВАРВАНЕ demo under a В24 ban; the three questions below are
+    // ЗАОБИКАЛЯНЕ (ЗДвП чл. 43б), which the scope must not reach.
     const repo = getContentRepo();
-    const overtake = scenarioById("sc-vu-pass-clearance")!;
+    const banDrill = scenarioById("sc-ov-ban-overtake")!;
     const verdictFor = (questionId: string) =>
       pairingVerdict({
         questionId,
-        event: "ev-cyclist",
-        templateId: overtake.id,
+        event: "ev-overtake",
+        templateId: banDrill.id,
         questionLawRefs: repo.questionById(questionId)!.lawRefs,
-        scenarioLawRef: overtake.teach.lawRef,
+        scenarioLawRef: banDrill.teach.lawRef,
       }).verdict;
-    expect(verdictFor("q-eco-009")).toBe("allow-listed");
-    for (const id of RIGHT_HOOK_QUESTIONS) expect(verdictFor(id), id).not.toBe("allow-listed");
+    expect(verdictFor("q-signs-032")).toBe("allow-listed");
+    for (const id of GOING_ROUND_QUESTIONS) expect(verdictFor(id), id).toBe("suspect");
+  });
+
+  it("the заобикаляне questions get no clip at all, and keep their text", () => {
+    // The student-visible half of the scoping: not merely "not allow-listed"
+    // but actually served without a sim, with the stored explanation intact
+    // (THEO-4 — a withheld clip must never leave a bare verdict behind).
+    for (const id of GOING_ROUND_QUESTIONS) {
+      const payload = resolveWhyPanel(id)!;
+      expect(payload.sim, id).toBeUndefined();
+      expect(payload.explanationBg.length, id).toBeGreaterThan(0);
+      expect(payload.lawRefs.length, id).toBeGreaterThan(0);
+      // …and the candidate the guard withheld really was the В24 overtake
+      // drill, so this is the guard's doing and not a missing demo.
+      expect(whyPanelCandidateSimRef(id)?.templateId, id).toBe("sc-ov-ban-overtake");
+    }
+  });
+
+  it("q-signs-054 (табела Т13) is withheld rather than shown the straight-priority-road drill", () => {
+    // ЗДвП чл. 50, ал. 2: where the priority road CHANGES DIRECTION the drivers
+    // on it „се ръководят помежду си от правилата на чл. 48". The candidate
+    // drill teaches the opposite instinct on a road that runs straight.
+    const payload = resolveWhyPanel("q-signs-054")!;
+    expect(payload.sim).toBeUndefined();
+    expect(payload.explanationBg.length).toBeGreaterThan(0);
+    expect(whyPanelCandidateSimRef("q-signs-054")?.templateId).toBe("sc-jx-priority-confidence");
   });
 });
 
@@ -261,6 +317,25 @@ describe("table hygiene", () => {
     }
     for (const key of PAIRINGS_DELIBERATELY_DENIED) {
       expect(reached.has(key), `${key} no longer occurs — delete the note`).toBe(true);
+    }
+  });
+
+  it("MISSING_DRILLS names real, still-withheld questions — the spec cannot rot into a lie", () => {
+    // It is a specification, not wiring, so the only thing to enforce is that
+    // it still describes THIS build: real ids, and every one of them actually
+    // text-only today. The day someone records the demo, this test is what
+    // tells them to delete the entry.
+    const repo = getContentRepo();
+    expect(MISSING_DRILLS.length).toBeGreaterThan(0);
+    for (const gap of MISSING_DRILLS) {
+      expect(gap.lawRef.trim().length, gap.lawRef).toBeGreaterThan(10);
+      expect(gap.briefBg.trim().length, gap.lawRef).toBeGreaterThan(120);
+      expect(gap.nearestWrong.trim().length, gap.lawRef).toBeGreaterThan(60);
+      expect(gap.questionIds.length, gap.lawRef).toBeGreaterThan(0);
+      for (const id of gap.questionIds) {
+        expect(repo.questionById(id), `${gap.lawRef}: ${id}`).toBeDefined();
+        expect(resolveWhyPanel(id)?.sim, `${gap.lawRef}: ${id} is served again`).toBeUndefined();
+      }
     }
   });
 

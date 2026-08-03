@@ -19,6 +19,7 @@
 
 import type { ContentRepo } from "@/lib/content/repo";
 import type { Concept, Question, Section, Topic } from "@/lib/content/types";
+import { SIM_EVIDENCE_ROW_LIMIT } from "./store";
 import type {
   AttemptRecord,
   LearningStore,
@@ -268,8 +269,13 @@ export class FakeLearningStore implements LearningStore {
     userId: string,
     since: Date,
   ): Promise<SimEvidenceRow[]> {
+    // Newest first and capped, like the real store: a fake that hands back
+    // more rows than Postgres ever would is a fake that hides the cap from
+    // every test written against it.
     return (this.simEvidence.get(userId) ?? [])
       .filter((r) => r.finishedAt.getTime() >= since.getTime())
+      .sort((a, b) => b.finishedAt.getTime() - a.finishedAt.getTime())
+      .slice(0, SIM_EVIDENCE_ROW_LIMIT)
       .map((r) => ({ ...r }));
   }
 }

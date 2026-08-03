@@ -33,6 +33,7 @@
  * fail.
  */
 
+import { isFeatureDisabled } from "@/lib/features";
 import type { SessionUser } from "@/modules/auth";
 import type { HazardDoor } from "@/components/hazard/types";
 import { hazardDoorRequiresPack } from "@/modules/hazard-play";
@@ -42,6 +43,11 @@ export async function canOpenHazardDoor(
   user: SessionUser,
   door: HazardDoor,
 ): Promise<boolean> {
+  // DISABLED_FEATURES kill switch (src/lib/features.ts), checked before every
+  // other branch — including the FREE doors and the admin bypass. A switch
+  // that leaves the free doors running has not turned the feature off, and the
+  // clips a hazard run streams cost the same whoever opens them.
+  if (isFeatureDisabled("hazard")) return false;
   if (!hazardDoorRequiresPack(door)) return true;
   if (user.isAdmin) return true;
   const access = await getEntitlements(user.id);

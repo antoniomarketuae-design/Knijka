@@ -1,38 +1,24 @@
-import type { Metadata } from "next";
-import { notFound } from "next/navigation";
+import { permanentRedirect } from "next/navigation";
 import "@/lib/content/loader";
-import { LessonRunner } from "@/components/lesson/LessonRunner";
-import { requireUser } from "@/modules/auth";
-import { resolveBeat, resolveOutline } from "@/modules/lesson";
-
-export const metadata: Metadata = {
-  title: "Класна стая · Книжка.AI",
-  description: "Урок с учител, дъска и въпроси — прекъсвай, когато нещо не е ясно.",
-};
+import { lessonById } from "@/modules/lesson";
 
 interface Props {
   params: Promise<{ lessonId: string }>;
 }
 
 /**
- * One lesson. The server ships the OUTLINE (a list of beat ids and kinds —
- * a few hundred bytes) plus the FIRST beat; every later beat is fetched by the
- * runner when the student reaches it, and nothing is prefetched. That is the
- * bandwidth promise, enforced by where the data is loaded rather than by a
- * convention someone has to remember.
+ * The old plain runner's URL → the room. See `../page.tsx` for why one engine
+ * gets one front door and why this is a redirect rather than a delete.
+ *
+ * THE ID IS RESOLVED AGAINST THE CATALOGUE BEFORE IT IS PUT IN A PATH, and
+ * that is not ceremony. `params` is decoded by the router, so
+ * `/lesson/..%2F..%2Fsomewhere` arrives here as the string „../../somewhere"
+ * and interpolating it would emit a Location the router resolves somewhere
+ * else entirely. An id that names no lesson goes to the index instead — which
+ * is also the friendlier answer for a stale bookmark.
  */
-export default async function LessonPage({ params }: Props) {
-  await requireUser();
+export default async function LessonRedirect({ params }: Props): Promise<never> {
   const { lessonId } = await params;
-
-  const outline = resolveOutline(lessonId);
-  if (outline === null) notFound();
-  const firstBeat = resolveBeat(lessonId, outline.beats[0].id);
-  if (firstBeat === null) notFound();
-
-  return (
-    <main id="main-content" className="px-4 py-5">
-      <LessonRunner outline={outline} firstBeat={firstBeat} />
-    </main>
-  );
+  const lesson = lessonById(lessonId);
+  permanentRedirect(lesson === undefined ? "/classroom" : `/classroom/${lesson.id}`);
 }

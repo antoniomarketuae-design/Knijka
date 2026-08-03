@@ -1010,7 +1010,7 @@ export const SC_SP_CURVE: ScenarioSpec = {
 //        rightmost REQUIRED lane);
 //      - „Пълзене с 40 без причина" → DRIVING_TOO_SLOW_FOR_MOTORWAY (the
 //        SP-10 crawl detector this slice ships — второстепенна on the
-//        VERIFIED чл. 54 basis; NO general BG motorway minimum exists, see
+//        VERIFIED чл. 22, ал. 1 basis; NO general BG motorway minimum exists, see
 //        rules/catalog.ts).
 // ---------------------------------------------------------------------------
 
@@ -1019,7 +1019,7 @@ const MW_X_CRUISE = 0;
 
 /**
  * SP-10 — скорост на потока + дръж вдясно на автомагистрала (ЗДвП чл. 15,
- * чл. 21, чл. 54; motorway speed-differential crash studies — the far-below-
+ * чл. 21, чл. 22, ал. 1; motorway speed-differential crash studies — the far-below-
  * flow car is a mobile chicane). Detectors are default-ON and structurally
  * data-armed (edge motorway tag + emergencyLane span — no other map carries
  * them), so no ruleConfig is needed — the LIVE student session grades both.

@@ -26,6 +26,7 @@ import {
   EXAM_GRACE_SEC,
   EXAM_PASS_POINTS,
   ExamError,
+  getOpenExamAttempt,
   startExam,
   submitExam,
   type PerQuestionResult,
@@ -38,12 +39,29 @@ import type {
 } from "@/components/exam/types";
 import { trackActivity } from "@/modules/gamification";
 import { requireEntitlementForExam } from "@/modules/payments";
+import { consumeUserRateLimit, RATE_LIMITS } from "@/modules/security";
 
 const ATTEMPT_ID_RE = /^[A-Za-z0-9_-]{1,64}$/;
 
 /** „Започни пробен изпит" — form action on /exams. */
 export async function startExamAction(): Promise<void> {
   const user = await requireUser();
+
+  // THE BUDGET COMES FIRST, before even the lookup below (audit: unmetered
+  // public POST). Keyed on the SERVER session id, not the IP: a school shares
+  // one wi-fi address and shares nothing else. Taken ahead of the in-flight
+  // check on purpose — that check is itself a database read, and a guard that
+  // spends a query before deciding whether to spend a query is an amplifier.
+  const budget = consumeUserRateLimit(user.id, RATE_LIMITS.examStart);
+  if (!budget.allowed) redirect("/exams?msg=too-many");
+
+  // IN-FLIGHT CHECK. Without it every call opened a brand-new ExamAttempt row:
+  // a script could fill the table, and a student who double-tapped the button
+  // silently abandoned the paper they had just been dealt. Resuming is also the
+  // right product answer — a mock exam is 40 minutes, and losing one to a stray
+  // tap is exactly the kind of thing that makes someone stop using the app.
+  const open = await getOpenExamAttempt(user.id);
+  if (open) redirect(`/exams/${open.attemptId}`);
 
   // Free tier: one mock exam total; packs unlock unlimited attempts.
   //
@@ -79,6 +97,12 @@ export async function submitExamAction(
   input: SubmitExamInput,
 ): Promise<SubmitExamActionResult> {
   const user = await requireUser();
+
+  // Grading writes 45 QuestionAttempt rows. Metered per USER (the proxy never
+  // sees a server action, and a classroom shares one address), with headroom
+  // for the runner's retry-on-error path.
+  const budget = consumeUserRateLimit(user.id, RATE_LIMITS.examSubmit);
+  if (!budget.allowed) return { ok: false, code: "RATE_LIMITED" };
 
   const parsed = parseSubmitInput(input);
   if (!parsed) return { ok: false, code: "INVALID_INPUT" };

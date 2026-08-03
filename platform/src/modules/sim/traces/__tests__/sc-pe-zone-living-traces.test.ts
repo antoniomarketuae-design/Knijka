@@ -173,7 +173,7 @@ describe("sc-pe-zone-living — the walker is IN FRONT of the car, not a figure 
   // pedestreian are very very very far away from each other so basically the
   // car stopped normaly … the pedestrian is not on the road at all he is just
   // standing there on the side." (There is no zebra by design: inside a Д15
-  // жилищна зона the whole carriageway is the pedestrian's — чл. 62–63 — which
+  // жилищна зона the whole carriageway is the pedestrian's — чл. 61–62 — which
   // is why pz-x-1 is an UNMARKED crossing. The staging is what was wrong.)
   //
   // The encounter is timed by exactly two numbers — how far out she is released

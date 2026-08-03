@@ -21,6 +21,44 @@ model User {
   consentAt    DateTime?
   createdAt    DateTime  @default(now())
 
+  // --- session revocation ---------------------------------------------------
+  // Bumping this number signs every existing device out. Sessions are JWTs
+  // (no Session table, 30-day idle, refreshed on every visit), so until this
+  // column existed a shared password could not be taken back: resetting it
+  // left the friend who already knew it logged in for another month.
+  //
+  // The check is free. getSessionUser() (auth/session.ts:13-19) ALREADY does a
+  // React-cached per-request DB read for `role`; the epoch rides along in that
+  // same SELECT, so revocation costs zero new queries — which is the whole
+  // reason it is a counter on User and not a sessions table.
+  //
+  // Int, not a timestamp: a monotonic counter has no clock skew and no
+  // equal-millisecond tie, so "token epoch < user epoch ⇒ dead" is exact.
+  sessionEpoch Int @default(0)
+
+  // --- onboarding answers ---------------------------------------------------
+  // These three lived in ONE BROWSER'S localStorage (lib/onboarding/storage.ts
+  // :19-21), which meant registering on a phone and opening on a laptop lost
+  // them. The exam date is the strongest retention signal the product collects
+  // — everything downstream of it (countdown, daily plan, readiness urgency)
+  // was silently device-local. storage.ts's own header specifies exactly this
+  // migration, including the `.v1.` key segment that lets a client detect it.
+  //
+  // @db.Date on purpose, same reasoning as ExamOutcomeReport.examOn: the day is
+  // all any feature needs, and day precision cannot be used to reconstruct
+  // where a minor was at a given hour (ADR-004).
+  //
+  // THE THREE STATES the UI must distinguish, and how they encode:
+  //   onboardedAt NULL                    → never asked
+  //   onboardedAt set, examDate NULL      → asked, answered „Още нямам дата"
+  //   onboardedAt set, examDate set       → asked, has a date
+  // That is why onboardedAt is not redundant with examDate: without it, NULL
+  // means both "never asked" and "answered: no date", and the flow would
+  // re-ask forever.
+  examDate     DateTime? @db.Date
+  dailyGoalMin Int? // 10 | 20 | 30 — the daily study goal in minutes
+  onboardedAt  DateTime?
+
   progress         Progress[]
   passwordResets   PasswordResetToken[]
   questionAttempts QuestionAttempt[]
@@ -33,6 +71,72 @@ model User {
   tutorThreads     TutorThread[]
   examOutcomes     ExamOutcomeReport[]
   consentEvents    ConsentEvent[]
+  payments         Payment[]
+  lessonProgress   LessonProgress[]
+  adminActions     AdminAction[]    @relation("AdminActionSubject")
+
+  // --- support: extra free mock exams ---------------------------------------
+  // The free tier is ONE lifetime mock exam and a STARTED attempt spends it
+  // (payments/quota.ts — deliberately, so nobody farms the freebie by
+  // abandoning). Which means the product's best conversion moment has a failure
+  // mode built into it: a student taps „Започни пробен изпит", their phone
+  // drops connection on the tram, and the single exam they were ever going to
+  // get free is gone on a paper they never saw.
+  //
+  // This column is how support gives it back. `attempts < FREE_MOCK_EXAM_LIMIT
+  // + freeExamGrants` is the whole rule, so a grant restores exactly one exam
+  // and nothing else — unlike a promo Entitlement, which would hand out the
+  // entire pack for a support ticket about one lost attempt.
+  //
+  // NOT a delete of the attempt rows: those are the student's history and, for
+  // a completed exam, their evidence of progress. The counter moves; the past
+  // does not. Every change writes an AdminAction row naming the admin.
+  freeExamGrants Int @default(0)
+}
+
+// WHO DID THAT TO THIS ACCOUNT — the audit trail behind /admin.
+//
+// Until /admin existed, every support case was psql over SSH: no record of who
+// ran the UPDATE, against whom, when, or why, and no undo. The four buttons on
+// the admin screen can hand out access, take it away, restore a spent free
+// exam and delete an attempt — all of which change what a paying minor is
+// entitled to. An operation like that with no ledger is not a support tool, it
+// is an unlogged production write with a nicer font.
+//
+// APPEND-ONLY, and written in the SAME TRANSACTION as the mutation it
+// describes. The store's signatures make the audit input mandatory, so a
+// mutation cannot be added later that quietly skips it (modules/admin/store.ts).
+//
+// `actorEmail` is DENORMALISED on purpose and `actorId` carries no foreign
+// key: the row must still name a human after the admin account is gone, which
+// is the entire point of an audit trail. That is our own staff, not a minor.
+//
+// `subjectId` is the opposite: a real relation with onDelete SetNull, exactly
+// like Payment.userId and for the same reason (ADR-004, Art. 17). Erasing a
+// student scrubs the link to them while the record that support acted at all
+// survives. Nothing else about the subject is stored — no email, no name — so
+// there is nothing left to scrub.
+model AdminAction {
+  id String @id @default(cuid())
+
+  actorId    String // the admin's User id, unlinked by design (see header)
+  actorEmail String // denormalised so the row still names someone, forever
+
+  action String // grant_entitlement | revoke_entitlement | reset_free_exams | delete_attempt
+
+  subjectId String? // the affected account; NULL once that account is erased
+  targetRef String? // entitlement id, attempt id — whatever the action touched
+  reason    String // what the admin typed. A support action with no why is a mystery in six months.
+  detail    Json? // before/after, verbatim enough to reconstruct the change
+
+  createdAt DateTime @default(now())
+
+  subject User? @relation("AdminActionSubject", fields: [subjectId], references: [id], onDelete: SetNull)
+
+  // „what has support done to this account" — the panel under the four buttons.
+  @@index([subjectId, createdAt])
+  // „what has this admin been doing" — the question an incident asks.
+  @@index([actorId, createdAt])
 }
 
 // GDPR Art. 7(1) requires a consent to stay DEMONSTRABLE afterwards: who
@@ -124,6 +228,22 @@ model QuestionAttempt {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId, questionId])
+  // THREE hot queries filter this table by user AND a time window, and NONE of
+  // them could use the index above:
+  //   payments/store.ts:130      { userId, context, answeredAt: {gte, lt} }  — the free-tier quota check
+  //   learning/store.ts:146      { userId, correct: true, answeredAt: {gte} } — the review deck
+  //   gamification/store.ts:128  { userId, answeredAt: {gte} }               — streak + daily mission
+  // Postgres therefore scanned a student's ENTIRE attempt history before every
+  // single answer they submitted. At ~4,800 rows by month four that means the
+  // most diligent students got the slowest product — the exact inversion of
+  // what the north star asks for.
+  //
+  // (userId, answeredAt) rather than (userId, context, answeredAt): the three
+  // queries disagree on the second predicate (context / correct / none) but
+  // all three agree on the range, so this is the one composite that serves all
+  // of them. `context` and `correct` are cheap recheck filters on the handful
+  // of rows the range already narrowed to.
+  @@index([userId, answeredAt])
 }
 
 // Official format: 45 questions / 97 points / >=87 pass / 40 min (docs/education/32)
@@ -152,11 +272,34 @@ model SimSession {
   events     Json? // rule-engine event log (drives replay + debrief)
   debrief    String? // AI lesson debrief text
 
+  // --- summary columns, denormalised OUT of `events` -------------------------
+  // The progression fold and the scenario catalog need exactly two facts out of
+  // the event log: did this drive pass, and how many rubric stars did it earn.
+  // Reading them from the Json meant /simulator selected the whole blob for
+  // EVERY session the student had ever driven — each ViolationEvent carries its
+  // own titleBg + explanationBg (~430 bytes of Bulgarian prose that already
+  // lives in the code), so a student with a few hundred drives pulled megabytes
+  // out of TOAST, JSON.parsed it in Node and threw away all but these two
+  // numbers. Same reasoning as SimAttemptTrace.durationSec/sampleCount: keep the
+  // facts a LIST needs beside the row, keep the blob out of it.
+  //
+  // Nullable because the verdict is only known when the drive ends (a row is
+  // written once, at finish) and because rows written before this migration are
+  // backfilled from `events` — which is authoritative and stays so. The two
+  // columns are a projection of it, never a second source of truth.
+  passed      Boolean?
+  rubricStars Int? // 1..3, scenario sessions only; null elsewhere
+
   user       User               @relation(fields: [userId], references: [id], onDelete: Cascade)
   trace      SimAttemptTrace?
   prediction SimSelfPrediction?
 
   @@index([userId, lessonId])
+  // listSessions sorts a user's drives by startedAt and had no index for it,
+  // so the history screen sorted the whole per-user set in memory on every
+  // load. Same shape as ExamAttempt's index, which already exists for exactly
+  // the same screen on the theory side.
+  @@index([userId, startedAt])
 }
 
 // The student's OWN recorded drive (audit 2026-07-24, I-2 „Твоят дубъл").
@@ -230,6 +373,29 @@ model SimSelfPrediction {
 }
 
 // One-time packs (docs/business/41 pricing): core | premium_sim
+//
+// THE UNIQUE BELOW IS NOT COSMETIC — it is the only thing standing between one
+// EUR 12.99 payment and double the product.
+//
+// Two callers fulfil the SAME Checkout Session within milliseconds of each
+// other, BY DESIGN (checkout.ts:6-11): the webhook, which is authoritative,
+// and the /checkout/return page, which exists so the student gets access
+// instantly instead of waiting for Stripe. Fulfilment guarded that with a
+// check-then-insert (checkout.ts:239-255) and NO transaction, so both can read
+// "no entitlement yet" and both can insert.
+//
+// The old comment called the duplicate row "no security issue, only cosmetic".
+// It is neither. quota.ts:361 computes the tutor budget as
+// `TUTOR_PACK_QUESTION_ALLOWANCE * active.length` — so two rows for one sale
+// hand out 600 tutor questions instead of 300, on the most expensive resource
+// the product owns (metered Anthropic tokens, docs/business/60). The race is
+// not rare either: it is the normal path, run on every single purchase.
+//
+// PARTIAL (WHERE providerRef IS NOT NULL), written by hand in the migration —
+// Prisma cannot express a partial index, so the SQL creates it under the exact
+// name Prisma expects for this @@unique. `provider = "promo"` rows carry no
+// reference and must stay freely repeatable; only a real provider receipt id
+// is claimed to be unique.
 model Entitlement {
   id          String    @id @default(cuid())
   userId      String
@@ -241,7 +407,125 @@ model Entitlement {
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
+  @@unique([provider, providerRef])
   @@index([userId, expiresAt])
+}
+
+// THE RECEIPT. Until this table existed the product had no record of money at
+// all: an Entitlement is a GRANT ("this account may use the sim until March"),
+// never a receipt. It carries no amount, no currency, no PaymentIntent and no
+// livemode flag, so the four questions any business must be able to answer
+// from its own database —
+//   did this person pay · when · how much · was it real money or test mode —
+// were answerable only by logging into someone else's dashboard.
+//
+// WHY IT IS SEPARATE FROM Entitlement rather than six more columns on it.
+// They have different lifetimes and different truths. An entitlement expires,
+// can be granted by promo with no money behind it, and is deleted when the
+// student exercises Art. 17. A payment happened, once, and stays true forever;
+// Bulgarian accounting law requires the record to survive the account.
+//
+// WHICH IS WHY `userId` IS NULLABLE AND `onDelete: SetNull`. Erasing an
+// account must not destroy the books — but it must not silently leave a live
+// identifier behind either. SetNull does both: the money row survives,
+// pseudonymised, and the link to the person is actively scrubbed by the same
+// DELETE that erases them (ADR-004: the buyer may be 17). Stripe remains the
+// only place the two can be re-joined, under its own retention terms.
+//
+// `stripeSessionId` is @unique because it is the true idempotency key of a
+// purchase — see the Entitlement note above for who races whom.
+model Payment {
+  id String @id @default(cuid())
+
+  // The Checkout Session. One session = one purchase attempt = at most one
+  // row, no matter how many times the webhook and the return page both fire.
+  stripeSessionId String @unique
+
+  // Set once the money actually moves. NULL for a session that has not paid
+  // yet (delayed methods) or never will, and for `no_payment_required` (100%
+  // promo code) — which is also why it is NOT unique: those NULLs are
+  // legitimate and repeatable. Refund and dispute webhooks arrive keyed by
+  // this id, hence the index.
+  stripePaymentIntentId String?
+
+  userId String? // nullable BY DESIGN — see header
+  pack   String // core | premium_sim, copied from session metadata
+
+  // Money exactly as Stripe reported it, never recomputed from PACKS: the
+  // price in code changes, the price someone paid does not.
+  amountCents Int
+  currency    String // ISO 4217, lowercase, verbatim from Stripe ("eur")
+
+  // FALSE = Stripe test mode. Without this column a test-mode webhook replayed
+  // at a live endpoint is indistinguishable from revenue, and every figure
+  // derived from this table is quietly wrong.
+  livemode Boolean
+
+  // Stripe's `payment_status`: paid | unpaid | no_payment_required — the same
+  // value fulfillCheckout() branches on, stored so "why did this not fulfil"
+  // is answerable months later.
+  status String
+
+  // The StripeEvent that produced this row (`evt_…`), or NULL when it came
+  // from the /checkout/return page, where there is no event. A soft reference
+  // and deliberately NOT a foreign key: the return page must be able to write
+  // a receipt before the webhook has ever been seen, and a real FK would make
+  // the receipt hostage to arrival order.
+  rawEventId String?
+
+  createdAt DateTime @default(now())
+
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([userId, createdAt])
+  @@index([stripePaymentIntentId])
+}
+
+// One row per webhook Stripe ever delivered. This single table is three things
+// at once, which is why it earns its place:
+//
+//   1. THE TRUE IDEMPOTENCY KEY. Stripe guarantees at-least-once delivery, and
+//      retries carry the SAME `evt_…` id. Keying on the event — not on the
+//      session — is what makes "have I already done this?" answerable for
+//      every event type, including the ones (refund, dispute) that no
+//      Entitlement row would ever record.
+//
+//   2. THE AUDIT TRAIL. `payload` is the event as Stripe signed it, so a
+//      disputed purchase is reconstructible from evidence rather than from our
+//      own derived rows.
+//
+//   3. THE DEAD-LETTER QUEUE. `processedAt` NULL + `lastError` set = a
+//      fulfilment that failed. Without this, a failure past Stripe's ~3-day
+//      retry window left exactly one console.error in a pm2 log with no
+//      rotation configured — i.e. a student who paid and got nothing, and no
+//      way for anyone to find out.
+//
+// The insert is deliberately the FIRST thing the webhook does, before any
+// fulfilment work: a row that exists with processedAt NULL is a job to retry,
+// whereas an event that was never written is an event nobody knows was lost.
+//
+// GDPR (ADR-004, buyers may be minors): `payload` is Stripe's own JSON and can
+// contain buyer contact details, so this table holds more personal data than
+// anything else in the schema. It is NOT reachable by an Art. 17 cascade —
+// there is no userId to cascade from, by design (see 1: the event must be
+// keyed even when we cannot resolve a user). A retention sweep that drops the
+// payload once the event is processed and past dispute age is therefore
+// REQUIRED before this table sees live traffic, and belongs to the lane that
+// writes the webhook, not to the schema.
+model StripeEvent {
+  id            String @id @default(cuid())
+  stripeEventId String @unique // evt_… — Stripe's id, the retry-stable one
+  type          String // checkout.session.completed, charge.refunded, …
+  payload       Json // the signed event, verbatim
+
+  receivedAt  DateTime  @default(now())
+  processedAt DateTime? // NULL = never finished — this is the queue
+  lastError   String? // last failure message; kept on retry for triage
+
+  // "What still needs doing, oldest first" — the dead-letter scan. Postgres
+  // orders NULLs last by default, so unprocessed rows are the head of this
+  // index, which is exactly the set the sweep wants.
+  @@index([processedAt, receivedAt])
 }
 
 model GamificationState {
@@ -331,6 +615,92 @@ model TutorThread {
 // This is an accounting total about US, not personal data about anyone, so it
 // carries nothing an Art. 17 erasure would have to reach into — which is also
 // why erasing an account can never distort the bill.
+// Where a student got to in a theory lesson (modules/lesson — the beat-driven
+// virtual-instructor player, doc 64 THEO-4).
+//
+// Nothing recorded that a lesson was ever started, paused or finished. Two
+// consequences, and the second is the worse one:
+//
+//   1. A CLOSED TAB RESTARTS AT BEAT 1. The player is a pure state machine
+//      whose state lived only in the browser, so a 20-minute lesson
+//      interrupted by a phone call is a 20-minute lesson done again from the
+//      top. For a 17-year-old studying on a phone that is not an edge case.
+//
+//   2. GATE U3 CANNOT BE EVALUATED AT ALL. Doc 84 requires the product to
+//      MEASURE COMPLETION PER LESSON — which teaching actually lands and which
+//      loses people halfway. With no row per (student, lesson) there is no
+//      denominator, no drop-off beat, and no way to tell a lesson that works
+//      from one nobody finishes. The gate was not failing; it was unanswerable.
+//
+// One row per student per lesson, updated in place: this is a bookmark, not a
+// log. `beatIndex` is the resume point (the player's own cursor, player.ts),
+// `completedAt` NULL means in progress, and `updatedAt` is what "continue
+// where you left off" sorts by.
+//
+// ADR-004: a lesson id and a small integer — no PII. Dies with the user.
+model LessonProgress {
+  id       String @id @default(cuid())
+  userId   String
+  lessonId String
+
+  beatIndex   Int       @default(0) // resume cursor into Lesson.beats
+  startedAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  completedAt DateTime? // NULL = still in progress
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // A retake moves the bookmark; it does not open a second one.
+  @@unique([userId, lessonId])
+  // „Продължи оттам" — the dashboard's resume card.
+  @@index([userId, updatedAt])
+}
+
+// Failed-login lockout, moved out of process memory.
+//
+// THE BUG THIS FIXES IS OUR OWN RELEASE CADENCE. The failure counters live in
+// a per-process Map (security/rateLimit.ts:59,147), and tools/deploy/
+// knijka.cron redeploys EVERY FIVE MINUTES. So the exponential backoff that is
+// supposed to make online password guessing pointless — 30 s, 1 m, 2 m … 15 min
+// — is wiped clean every five minutes by us, handing an attacker an unlimited
+// supply of fresh budgets. The limiter's own header calls out per-process
+// counters as the known cost of the design; nobody had multiplied it by the
+// deploy interval.
+//
+// A DB ROUND TRIP HERE IS FREE. A failed login already pays ~300 ms of bcrypt
+// by design; a ~1 ms query alongside it is not measurable. That asymmetry is
+// why only the lockout moves and the per-IP rate-limit budgets stay in the Map
+// — those guard hot paths where the round trip WOULD show, and losing them on
+// deploy costs far less.
+//
+// KEYED BY sha256(email), NEVER THE EMAIL. The lockout must work for addresses
+// that were never registered — otherwise the endpoint becomes an account
+// enumeration oracle, which is also why there is deliberately NO foreign key
+// to User: a row here must be creatable for an address that does not exist.
+// The digest keeps this table from becoming a second, unerasable list of every
+// address anyone ever typed at the login form (ADR-004). SHA-256 unsalted is
+// correct for the same reason it is on PasswordResetToken: the lookup must be
+// a single indexed probe, and there is no secret in an email to protect from
+// an offline attack that a salt would help with.
+//
+// Columns mirror rateLimit.ts's FailureState one-for-one, and `rule` mirrors
+// lockoutKey()'s namespace, so a second LockoutRule (password reset, say)
+// shares the table instead of colliding on the same address.
+model LoginLockout {
+  rule           String // LockoutRule.name — "login-email" today
+  identifierHash String // sha256(normalized email), hex
+
+  failures    Int       @default(0)
+  lockedUntil DateTime? // NULL = counting, not yet locked
+  forgetAt    DateTime // after this the streak is forgotten (yesterday's typos)
+  updatedAt   DateTime  @updatedAt
+
+  @@id([rule, identifierHash])
+  // The housekeeping sweep — without it this table only ever grows, and an
+  // attacker rotating addresses is the one filling it.
+  @@index([forgetAt])
+}
+
 model TutorSpendDay {
   // "YYYY-MM-DD" in Europe/Sofia — the student's wall clock, matching how
   // every other daily quota in the product resets (payments/quota.ts).

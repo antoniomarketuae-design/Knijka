@@ -49,6 +49,13 @@ beforeEach(async () => {
   legalGaps.mockReturnValue([]);
   getSessionUser.mockResolvedValue({ id: "user-1", email: "ivan@mail.bg" });
   vi.stubEnv("STRIPE_SECRET_KEY", "sk_test_x");
+  vi.stubEnv("STRIPE_WEBHOOK_SECRET", "whsec_test_x");
+  // Checkout now also refuses to open without a way to GIVE THE ACCOUNT BACK
+  // (modules/payments/stripe.ts condition 3), so these tests must configure a
+  // real mail transport before any of them can reach Stripe at all.
+  vi.stubEnv("MAIL_TRANSPORT", "resend");
+  vi.stubEnv("MAIL_API_KEY", "re_test_key");
+  vi.stubEnv("MAIL_FROM", "Книжка.AI <no-reply@knijka.ai>");
   // H-9: the payments module now refuses to mint a client_secret without a
   // recorded purchase consent. These tests are about the AUTHORIZATION
   // boundary, not the consent gate (that one has its own suite), so give the
@@ -132,5 +139,110 @@ describe("POST /api/checkout/embedded", () => {
   it("NEVER creates a subscription — one-time packs only (docs/02)", async () => {
     await post({ pack: "core" });
     expect(created[0].mode).toBe("payment");
+  });
+});
+
+/**
+ * The route used to `await createEmbeddedCheckoutSession(...)` bare. Every test
+ * below would previously REJECT rather than return a Response — which is what a
+ * 500 looks like from Next, and what a blank 560px card looks like to a
+ * seventeen-year-old.
+ */
+describe("POST /api/checkout/embedded — failures a student can act on", () => {
+  it("409s CONSENT_REQUIRED when the tick aged out while a parent was fetched", async () => {
+    const info = vi.spyOn(console, "info").mockImplementation(() => {});
+    const store = new InMemoryPaymentsStore();
+    // Born 2009 — on any day of 2026 she may still be 17, so the parental gate
+    // applies. This is the buyer the consent step exists for.
+    store.birthYears.set("user-1", 2009);
+    setPaymentsStore(store);
+
+    // She ticks both boxes, then leaves to find a parent with a card and comes
+    // back 65 minutes later. CHECKOUT_CONSENT_TTL_MINUTES is 60.
+    await recordCheckoutConsent(
+      "user-1",
+      "core",
+      { parental_purchase: true, withdrawal_waiver: true },
+      new Date(Date.now() - 65 * 60_000),
+    );
+
+    const res = await post({ pack: "core" });
+
+    expect(res.status).toBe(409);
+    expect((await res.json()).code).toBe("CONSENT_REQUIRED");
+    // Nothing was minted, so nothing can be charged against a stale consent.
+    expect(created).toHaveLength(0);
+    expect(info).toHaveBeenCalled();
+  });
+
+  it("409s rather than 500s when there is no consent on file at all", async () => {
+    vi.spyOn(console, "info").mockImplementation(() => {});
+    const store = new InMemoryPaymentsStore();
+    store.birthYears.set("user-1", 1995);
+    setPaymentsStore(store); // no recordCheckoutConsent — empty store
+
+    const res = await post({ pack: "core" });
+    expect(res.status).toBe(409);
+    expect((await res.json()).code).toBe("CONSENT_REQUIRED");
+  });
+
+  it("502s with a renderable code when Stripe itself fails — never an unhandled throw", async () => {
+    const error = vi.spyOn(console, "error").mockImplementation(() => {});
+    setStripeClient({
+      checkout: {
+        sessions: {
+          create: async () => {
+            throw new Error("stripe is down: sk_live_leaked_in_this_message");
+          },
+          retrieve: vi.fn(),
+        },
+      },
+      webhooks: { constructEventAsync: vi.fn() },
+    } as never);
+
+    const res = await post({ pack: "core" });
+    const body = await res.json();
+
+    expect(res.status).toBe(502);
+    expect(body.code).toBe("CHECKOUT_UNAVAILABLE");
+    // The underlying message can quote credentials — it goes to the log, never
+    // to the browser.
+    expect(JSON.stringify(body)).not.toContain("sk_live_leaked_in_this_message");
+    expect(error).toHaveBeenCalled();
+  });
+
+  it("labels EVERY failure with a code, so the island can never draw a blank card", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    getSessionUser.mockResolvedValue(null);
+    expect((await (await post({ pack: "core" })).json()).code).toBe("UNAUTHORIZED");
+
+    getSessionUser.mockResolvedValue({ id: "user-1", email: "ivan@mail.bg" });
+    expect((await (await post("not json {")).json()).code).toBe("INVALID_BODY");
+    expect((await (await post({ pack: "gratis" })).json()).code).toBe("UNKNOWN_PACK");
+
+    vi.stubEnv("STRIPE_SECRET_KEY", "");
+    expect((await (await post({ pack: "core" })).json()).code).toBe(
+      "STRIPE_NOT_CONFIGURED",
+    );
+  });
+});
+
+/**
+ * The other half of "the last screen before the money": a deployment that can
+ * charge must also be able to send the password-reset mail that gives the
+ * account back. Same shape as the C-1 legal-identity gate above.
+ */
+describe("POST /api/checkout/embedded — no money without a way back", () => {
+  it("503s when this deployment cannot send e-mail, before any session is minted", async () => {
+    const error = vi.spyOn(console, "error").mockImplementation(() => {});
+    vi.stubEnv("MAIL_TRANSPORT", ""); // the live .env has no MAIL_* at all
+    vi.stubEnv("MAIL_API_KEY", "");
+    vi.stubEnv("MAIL_FROM", "");
+
+    const res = await post({ pack: "core" });
+
+    expect(res.status).toBe(503);
+    expect(created).toHaveLength(0);
+    expect(String(error.mock.calls[0]?.[0])).toContain("MAIL_TRANSPORT");
   });
 });

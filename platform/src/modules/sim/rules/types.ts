@@ -417,7 +417,7 @@ export interface SimTick {
  * Per-edge legality-zone tag (doc 72 N3). "thirty" = a signed «Зона 30»
  * section (the edge's maxspeed already carries the reduced limit — SPEEDING_*
  * grades it with zero new code); "school"/"residential" reserved for
- * hand-polish/future districts (Д15/Д16 semantics per чл. 62–63).
+ * hand-polish/future districts (Д15/Д16 semantics per чл. 61–62).
  */
 export type EdgeZoneTag = "school" | "residential" | "thirty";
 
@@ -494,8 +494,8 @@ export type ViolationCode =
   // CURVE-ENVELOPE slice (authored curveAdvisory district zones — doc 72 SP-05)
   | "SPEED_TOO_FAST_FOR_CURVE" // основна: sustained speed above the curve's posted advisory inside the marked arc (чл. 20 ал. 2)
   // MOTORWAY-SEGMENT slice (doc 72 SP-10 — edge motorway tag + emergencyLane zones)
-  | "DRIVING_TOO_SLOW_FOR_MOTORWAY" // второстепенна: sustained causeless crawl under the чл. 54 50 km/h line on a motorway (SP-10; queue/transition innocent)
-  | "EMERGENCY_LANE_DRIVING" // опасна: sustained DRIVING in the лента за принудително спиране (чл. 58, т. 3; breakdown pull-off braking innocent, stopping descoped)
+  | "DRIVING_TOO_SLOW_FOR_MOTORWAY" // второстепенна: sustained causeless crawl on a motorway — ЗДвП чл. 22, ал. 1; the 50 km/h floor is authored, not statutory (SP-10; queue/transition innocent)
+  | "EMERGENCY_LANE_DRIVING" // опасна: sustained DRIVING in the лента за принудително спиране (чл. 58, т. 4; т. 3 permits the breakdown STOP — pull-off braking innocent, stopping descoped)
   // OVERTAKE-CORRIDOR adjudication (doc 72 OV-05/OV-08 — the head-on family)
   | "OVERTAKE_INSUFFICIENT_GAP" // опасна: committed on the opposing bank against an oncoming inside the convict gap (OV-05; the abort — braking + returning — NEVER convicts, OV-08)
   | "OVERTAKE_RETURN_TOO_EARLY" // основна: returned to the own bank under ~1 s in front of the overtaken vehicle — the brake-forcing cut back (OV-09; чл. 42 — връщане вдясно без засичане; runtime overtake-return tracker)
@@ -1054,13 +1054,26 @@ export interface RuleEngineConfig {
    */
   motorwayMinSpeedEnabled: boolean;
   /**
-   * The motorway flow floor, km/h. VERIFIED legal basis (content bank,
-   * q-magistrali-i-izvangradsko-026): Bulgarian law has NO general mandatory
-   * minimum driving speed on АМ — ЗДвП чл. 54 admits only vehicles whose
-   * CONSTRUCTIVE max exceeds 50 km/h, and a posted minimum applies only
-   * under the mandatory-minimum sign. 50 is therefore the honest line: a car
-   * SUSTAINED under it without a traffic cause sits below what the motorway
-   * legally admits — the SP-10 mobile chicane (speed-differential crashes).
+   * The motorway flow floor, km/h — a PRODUCT threshold, not a statutory one.
+   *
+   * CORRECTED 2026-08-03. This used to read „ЗДвП чл. 54 admits only vehicles
+   * whose CONSTRUCTIVE max exceeds 50 km/h". Both halves were false: чл. 54 is
+   * the rail-crossing forced-stop article, and the figure is 70, not 50.
+   * Retrieved — ЗДвП чл. 55, ал. 1: „На път, обозначен като автомагистрала или
+   * скоростен път със съответния пътен знак, е разрешено движението само на
+   * моторни превозни средства или състав от пътни превозни средства, чиято
+   * конструктивна максимална скорост надвишава 70 km/h."
+   *
+   * What the law actually gives us: (a) no general mandatory minimum driving
+   * speed on АМ; (b) a condition on the VEHICLE, > 70 km/h constructive; (c)
+   * ЗДвП чл. 22, ал. 1 — „не трябва да се движи без основателна причина с
+   * твърде ниска скорост, когато по този начин пречи на движението на другите".
+   * (c) is the graded duty and it names no number at all.
+   *
+   * 50 therefore stays as an AUTHORED detection floor — deliberately below the
+   * 70 line so the detector can only ever fire on a crawl nobody would defend —
+   * and it is NOT presented to the student as a legal limit. Per the founder's
+   * ruling: show the rule and the article, and no guessed number.
    */
   motorwayMinFlowKmh: number;
   /**
@@ -1081,7 +1094,7 @@ export interface RuleEngineConfig {
   motorwaySlowSustainSec: number;
 
   /**
-   * Чл. 58, т. 3 „движение по лентата за принудително спиране" — seconds of
+   * Чл. 58, т. 4 „да се движи… в лентата за принудително спиране" — seconds of
    * sustained DRIVING in the emergency lane before EMERGENCY_LANE_DRIVING
    * fires. Deliberately SHORTER than the bus-lane 4 s and with NO indicator
    * exemption: crossing the emergency lane is not a legal maneuver the way
@@ -1282,7 +1295,7 @@ export const DEFAULT_RULE_CONFIG: RuleEngineConfig = {
   // tick.motorway, and only an authored emergencyLane span sets
   // tick.emergencyLaneRight — no pre-slice map carries either.
   motorwayMinSpeedEnabled: true,
-  motorwayMinFlowKmh: 50, // чл. 54's constructive line — see the interface note
+  motorwayMinFlowKmh: 50, // authored detection floor, NOT a legal limit — see the interface note
   // 0.5 m/s²: the recorder's own rates (accel 2.2 / brake ≥ 3.2) and any
   // honest live transition sit far above it; a held crawl reads ~0.
   motorwaySlowSteadyMps2: 0.5,

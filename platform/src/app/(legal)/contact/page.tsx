@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { ContactEmail } from "@/components/legal/ContactEmail";
 import {
-  CONTACT_EMAIL,
   KzldCard,
   LegalSection,
   OperatorCard,
@@ -27,8 +27,11 @@ export default function ContactPage() {
           <p className="text-xs font-bold uppercase tracking-widest text-muted">
             Имейл за всички въпроси
           </p>
+          {/* The hero treatment lives on the <p>; the anchor only adds the
+              affordance, so the address keeps its size and weight whether it is
+              a live mailto or still the placeholder. */}
           <p className="mt-2 text-xl font-extrabold text-accent">
-            {CONTACT_EMAIL}
+            <ContactEmail className="underline-offset-4 hover:underline" />
           </p>
           <p className="mt-3 text-sm leading-relaxed text-muted">
             Отговаряме възможно най-бързо. На искания, свързани с лични данни

@@ -1,72 +1,25 @@
-import type { Metadata } from "next";
-import Link from "next/link";
-import "@/lib/content/loader";
-import { requireUser } from "@/modules/auth";
-import { allLessons } from "@/modules/lesson";
-
-export const metadata: Metadata = {
-  title: "Класна стая · Книжка.AI",
-  description: "54 урока — целият курс, с учител, дъска и мини-въпроси.",
-};
+import { permanentRedirect } from "next/navigation";
 
 /**
- * The course, as a PATH.
+ * ONE ENGINE, ONE FRONT DOOR.
  *
- * This is the thing the theory hub does not have today: sixteen gauges and a
- * practice button are a dashboard, not a curriculum. 54 numbered lessons give
- * a 17-year-old the one thing they actually want from a study app — the next
- * thing to press.
+ * `/lesson` and `/classroom` shipped on the same day, 28 July, over the same
+ * `@/modules/lesson` engine, and NEITHER was reachable: the classroom was in
+ * no nav and no `ROUTE_STATUS`, and this route was linked from nowhere at all.
+ * Two front doors to one feature is not redundancy, it is two places for a fix
+ * to have to land — and the one a student would actually be sent to (the room,
+ * with the teacher, the board and the ask bar) is the other one. The plain
+ * runner here rendered the same beats with none of that.
+ *
+ * REDIRECTED RATHER THAN DELETED. The route was live for a week, so a URL may
+ * exist in a bookmark, a chat message or a founder-review note; a 308 lands
+ * those on the real room, while a delete lands them on a raw Next 404. It
+ * costs six lines and it can be removed once the logs stop showing hits.
+ *
+ * There is no `ROUTE_STATUS` entry for `/lesson` and there must not be: that
+ * map is what the nav and the hub cards render from, and a redirect is not a
+ * destination. `/classroom` is the entry, and it is already „live".
  */
-export default async function LessonIndexPage() {
-  await requireUser();
-  const lessons = allLessons();
-
-  const byTopic = lessons.reduce<Map<string, typeof lessons>>((map, lesson) => {
-    const list = map.get(lesson.topicTitleBg);
-    if (list) list.push(lesson);
-    else map.set(lesson.topicTitleBg, [lesson]);
-    return map;
-  }, new Map());
-
-  return (
-    <main id="main-content" className="mx-auto w-full max-w-2xl px-4 py-5">
-      <h1 className="text-xl font-bold text-foreground">Класна стая</h1>
-      <p className="mt-1 text-sm text-muted">
-        {lessons.length} урока · целият курс. Всеки е 4–6 минути и може да бъде
-        прекъснат по всяко време.
-      </p>
-
-      <div className="mt-5 flex flex-col gap-5">
-        {[...byTopic.entries()].map(([topicTitleBg, group]) => (
-          <section key={topicTitleBg}>
-            <h2 className="text-xs font-semibold uppercase tracking-wide text-muted">
-              {topicTitleBg}
-            </h2>
-            <ul className="mt-2 flex flex-col gap-2">
-              {group.map((lesson) => (
-                <li key={lesson.id}>
-                  <Link
-                    href={`/lesson/${lesson.id}`}
-                    className="flex items-center gap-3 rounded-xl border border-border bg-surface p-3"
-                  >
-                    <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-surface-2 text-sm font-bold text-muted">
-                      {lesson.order}
-                    </span>
-                    <span className="flex-1 text-sm font-semibold text-foreground">
-                      {lesson.titleBg}
-                    </span>
-                    <span className="text-xs text-muted">
-                      {lesson.beats.filter((b) => b.board !== null).length > 0
-                        ? "с дъска"
-                        : ""}
-                    </span>
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          </section>
-        ))}
-      </div>
-    </main>
-  );
+export default async function LessonIndexRedirect(): Promise<never> {
+  permanentRedirect("/classroom");
 }

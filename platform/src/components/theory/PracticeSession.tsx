@@ -101,9 +101,17 @@ interface AnswerRecord {
 
 export function PracticeSession({
   questions,
+  ticket,
   quota = null,
 }: {
   questions: PracticeQuestionDto[];
+  /**
+   * The signed list of questions this session dealt (audit M-10). Sent back on
+   * every submit; the server answers with the key ONLY for a question on it.
+   * Not a secret — it is scoped to this user, these ids and one sitting — which
+   * is exactly why it is safe to hand to the client at all.
+   */
+  ticket: string;
   /** Free-tier counter („Днес: X от Y безплатни въпроса"); null = unlimited. */
   quota?: { usedToday: number; limit: number } | null;
 }) {
@@ -135,7 +143,7 @@ export function PracticeSession({
     setError(null);
     startChecking(async () => {
       try {
-        const submitted = await submitPracticeAnswer(current.id, selected);
+        const submitted = await submitPracticeAnswer(current.id, selected, ticket);
         setResult(submitted);
         setAnswers((prev) => [
           ...prev,
@@ -248,6 +256,28 @@ export function PracticeSession({
   // Tailwind might not emit, which is the failure those tests exist to catch.
   const shortOptionColumns =
     current.options.length > 4 ? "short:sm:grid-cols-3" : "short:sm:grid-cols-2";
+
+  // THE COMPARISON GRID, AND WHY IT IS 2x2 AND NOT 3+1.
+  //
+  // Every „Кой от показаните знаци…" item in the bank has exactly FOUR sign
+  // options — all 18 of them, across 8 topic files. `sm:grid-cols-3` therefore
+  // never once produced three tidy columns: it produced three tiles and one
+  // orphan on a second row, on every sign question the product has, at every
+  // width from 640px up. Rendered and looked at (the founder's standing R0
+  // rule) before this line changed.
+  //
+  // It is not only untidy, it removes the teaching. These four are a
+  // COMPARISON: q-signs-066 offers А1/А2 (single curve, right/left) against
+  // А3/А4 (double curve, right-first/left-first). In 2x2 the pairs sit above
+  // each other and the student SEES the two axes; in 3+1 А3 is stranded on its
+  // own row next to nothing and the pairing is gone.
+  //
+  // 2x2 is also what the founder already approved next door — the sim's
+  // mid-drive micro-quiz (MicroQuizOverlay: `grid-cols-2`, 96px faces). Same
+  // question shape, same component, so it is now the same grid. The >4 branch
+  // stays for a future six-sign item that does not exist yet.
+  const signGridColumns =
+    current.options.length > 4 ? "sm:grid-cols-3" : "sm:grid-cols-2";
 
   return (
     // `max-sm:-mb-6` cancels <main>'s bottom padding on phones. That padding
@@ -402,7 +432,7 @@ export function PracticeSession({
         <ul
           className={
             signGrid
-              ? "mt-2 grid grid-cols-2 gap-1.5 short:mt-2 short:gap-1.5 sm:mt-4 sm:grid-cols-3 sm:gap-2.5"
+              ? `mt-2 grid grid-cols-2 gap-1.5 short:mt-2 short:gap-1.5 sm:mt-4 sm:gap-2.5 ${signGridColumns}`
               : `mt-2 flex flex-col gap-1.5 short:mt-2 short:gap-1.5 short:sm:grid sm:mt-4 sm:gap-2.5 ${shortOptionColumns}`
           }
         >

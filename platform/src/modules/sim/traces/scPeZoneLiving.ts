@@ -113,7 +113,7 @@ export function scPeZoneLivingShadowScript(): DriveScript {
         kind: "annotation",
         textBg: "Хора излизат на платното пред теб. Те не нарушават нищо — тук предимството е тяхно.",
       },
-      // Stop 6 m short of the people — where чл. 62–63 puts you, and where the
+      // Stop 6 m short of the people — where чл. 61–62 puts you, and where the
       // graded halt objective sits (single truth with the spec).
       { kind: "drive", points: [[X_LANE, 175], [X_LANE, Y_HALT]], targetKmh: ZONE_KMH },
       { kind: "pause", sec: WAIT_SEC, brake: true },
@@ -223,7 +223,7 @@ export function scPeZoneLivingMistakePushThroughScript(): DriveScript {
       {
         kind: "annotation",
         textBg:
-          "В жилищната зона платното е на пешеходеца (чл. 62–63). Клаксонът не му отнема предимството — това е непропускане на пешеходец.",
+          "В жилищната зона платното е на пешеходеца (чл. 61–62). Клаксонът не му отнема предимството — това е непропускане на пешеходец.",
       },
     ],
   };

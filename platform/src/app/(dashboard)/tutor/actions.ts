@@ -10,6 +10,7 @@
 
 import "@/lib/content/loader";
 import type { TutorAskDto } from "@/components/tutor/types";
+import { isFeatureDisabled } from "@/lib/features";
 import { requireUser } from "@/modules/auth";
 import { FREE_TUTOR_LIFETIME_MESSAGES } from "@/modules/payments";
 import {
@@ -28,6 +29,18 @@ import { getTutorAccess } from "./trial";
  */
 const TRIAL_SPENT_REPLY_BG = `Това бяха безплатните ти ${FREE_TUTOR_LIFETIME_MESSAGES} въпроса към мен. С пакет мога да отговарям без ограничение — виж „Планове“. Упражненията остават безплатни и продължават да ти обясняват всяка грешка със закона.`;
 
+/**
+ * What the chat says when DISABLED_FEATURES has the tutor switched off.
+ *
+ * A SEPARATE string from TRIAL_SPENT_REPLY_BG on purpose. getTutorAccess()
+ * returns `allowed: false` for both cases, so an open tab whose question
+ * arrives after the switch was flipped would otherwise be told it had used up
+ * its free questions and pointed at „Планове" — selling a pack for something
+ * that is switched off. This one names the real cause and asks for nothing.
+ */
+const TUTOR_OFFLINE_REPLY_BG =
+  "Временно съм изключен, докато оправим нещо по мен — не е заради теб и нищо от разговора ни не е загубено. Опитай пак малко по-късно. Дотогава упражненията продължават да ти обясняват всяка грешка с точния член от закона.";
+
 export async function askTutorAction(message: string): Promise<TutorAskDto> {
   const user = await requireUser();
 
@@ -41,6 +54,15 @@ export async function askTutorAction(message: string): Promise<TutorAskDto> {
   }
   if (!isTutorEnabled()) {
     throw new Error("askTutorAction: tutor is not enabled");
+  }
+
+  // DISABLED_FEATURES kill switch. Checked HERE, before getThread() — the
+  // switch is flipped precisely when the tutor is the thing going wrong, so
+  // the refusal must not depend on a database read succeeding first. Returned
+  // as a `limited` reply rather than thrown, because an open tab is a student
+  // waiting for an answer and a thrown action gives them an error boundary.
+  if (isFeatureDisabled("tutor")) {
+    return { reply: TUTOR_OFFLINE_REPLY_BG, citations: [], limited: true };
   }
 
   // C-3 free-trial gate, BEFORE any model spend. The page renders the paywall

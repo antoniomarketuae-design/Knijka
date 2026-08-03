@@ -283,7 +283,7 @@ describe("sc-rb-busy-gap — mistake demos grade their exact codes (doc 76 §9 s
 
   it("the two demos are the two ends of ONE misjudgment, not one fault twice", () => {
     // The barge never yields at all; the short-gap demo yields once and stops
-    // counting. Same rule (чл. 50а), opposite failures — so their traces must
+    // counting. Same rule (ЗДвП чл. 50, ал. 1), opposite failures — so their traces must
     // not be near-copies: the barge never comes to rest anywhere on the approach,
     // the short-gap one does. (Sampled past the spawn: every drive starts from
     // rest at y = −93.)

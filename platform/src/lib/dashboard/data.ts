@@ -11,6 +11,7 @@ import {
   getDailyMission as gamificationGetDailyMission,
   getRecentAchievements as gamificationGetRecentAchievements,
 } from "@/modules/gamification";
+import { requestScoped } from "@/lib/requestScope";
 import type { Topic } from "@/lib/content/types";
 
 /* ============================================================================
@@ -121,6 +122,25 @@ export interface SimWeakSpotsSnapshot {
   spots: SimWeakSpotView[];
 }
 
+/* ------------------------------------------------- request-scoped reads */
+/*
+ * The page renders these functions in one Promise.all, and two pairs of them
+ * want the same answer: getReadiness and getContinueLesson both need the
+ * readiness snapshot AND the topic overview. Sharing them here is not only a
+ * query saved — the readiness snapshot is a fold over every concept in the
+ * content repo, and getContinueLesson used to run that whole computation a
+ * second time to read ONE title out of it.
+ */
+
+const readReadiness = requestScoped("dashboard.readiness", (userId: string) =>
+  learningGetReadiness(userId),
+);
+
+const readTopicOverview = requestScoped(
+  "dashboard.topicOverview",
+  (userId: string) => learningGetTopicOverview(userId),
+);
+
 /* ------------------------------------------------------------- real API */
 
 export async function getStudentProfile(): Promise<StudentProfile> {
@@ -132,8 +152,8 @@ export async function getStudentProfile(): Promise<StudentProfile> {
 export async function getReadiness(): Promise<ReadinessSnapshot> {
   const user = await requireUser();
   const [readiness, overview] = await Promise.all([
-    learningGetReadiness(user.id),
-    learningGetTopicOverview(user.id),
+    readReadiness(user.id),
+    readTopicOverview(user.id),
   ]);
   const byTopic = new Map(overview.map((t) => [t.topicId, t]));
   // Same routing rule as getSimWeakSpots: resolve the concept's topic slug so
@@ -173,7 +193,7 @@ export async function getReadiness(): Promise<ReadinessSnapshot> {
 
 export async function getTopicOverview(): Promise<TopicOverview> {
   const user = await requireUser();
-  const overview = await learningGetTopicOverview(user.id);
+  const overview = await readTopicOverview(user.id);
   return {
     topics: overview.map((t) => ({
       topic: { id: t.topicId, order: t.order, titleBg: t.titleBg },
@@ -186,15 +206,20 @@ export async function getTopicOverview(): Promise<TopicOverview> {
 
 export async function getContinueLesson(): Promise<ContinueLesson | null> {
   const user = await requireUser();
-  const [overview, readiness] = await Promise.all([
-    learningGetTopicOverview(user.id),
-    learningGetReadiness(user.id),
-  ]);
 
+  // The overview alone decides WHICH topic to continue; readiness is consulted
+  // for one thing only — the name of the weakest concept inside it. So take
+  // the overview first and bail before touching readiness at all when the
+  // student has not started anything: a brand-new account used to compute a
+  // full concept-by-concept readiness fold in order to return null.
+  const overview = await readTopicOverview(user.id);
   const started = overview.filter((t) => t.seenConceptCount > 0);
   if (started.length === 0) return null;
 
   const weakest = [...started].sort((a, b) => a.avgMastery - b.avgMastery)[0]!;
+  // Shared with getReadiness above (request-scoped): the snapshot the ring is
+  // already rendering, not a second one computed to read a single title.
+  const readiness = await readReadiness(user.id);
   const weakConcept = readiness.weakestConcepts.find(
     (c) => c.topicId === weakest.topicId,
   );

@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { listFlaggedQuestions } from "@/modules/content-admin";
+import { listFlaggedQuestions, type ReviewQueue } from "@/modules/content-admin";
 import { requireUser } from "@/modules/auth";
 import { ReviewClient } from "./ReviewClient";
 
@@ -15,16 +15,34 @@ export const metadata: Metadata = {
 };
 
 /**
- * DEV-ONLY founder tool: clear the "needs-review" theory questions and promote
- * them to "approved" so they enter the mock exams. The page (and the API it
- * calls) write to the product's source-of-truth JSON, so it 404s in production
- * and is never linked from the app navigation.
+ * DEV-ONLY founder tool: the ONLY place a theory question can become
+ * human-approved.
+ *
+ * Until the law audit (docs/education/90) "approved" was a string a generator
+ * wrote — 1,005 rows carried it, including all nine that are literally
+ * unanswerable. Now a review is a signature over the row's content hash, minted
+ * here, one row at a time, from the founder's own session. This page therefore
+ * has to earn its keep in seconds per row: it shows the question, what changed
+ * since the last commit, and the VERBATIM text of every article the row cites,
+ * retrieved from content/law — never restated from memory (ADR-002).
+ *
+ * The page (and the API it calls) write to the product's source-of-truth JSON,
+ * so it 404s in production and is never linked from the app navigation.
  */
-export default async function ReviewPage() {
+export default async function ReviewPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ queue?: string; page?: string }>;
+}) {
   if (process.env.NODE_ENV === "production") notFound();
   await requireUser();
 
-  const { flagged } = await listFlaggedQuestions();
+  const params = await searchParams;
+  const queue: ReviewQueue = params.queue === "unsigned" ? "unsigned" : "needs-review";
+  const parsedPage = Number.parseInt(params.page ?? "1", 10);
+  const page = Number.isFinite(parsedPage) && parsedPage > 0 ? parsedPage : 1;
 
-  return <ReviewClient flagged={flagged} />;
+  const result = await listFlaggedQuestions({ queue, page });
+
+  return <ReviewClient result={result} />;
 }

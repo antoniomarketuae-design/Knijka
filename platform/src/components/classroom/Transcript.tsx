@@ -20,7 +20,7 @@
  * more credible than one who does not.
  */
 
-import { TONE_BG, beatProgressBg } from "./player";
+import { TEACHER_STATE_BG, TONE_BG, beatProgressBg } from "./player";
 import type { AskAnswer, ClassroomBeat, TeacherState } from "./types";
 
 const TONE_TINT: Record<ClassroomBeat["tone"], string> = {
@@ -115,8 +115,12 @@ export function Transcript({
       )}
 
       {/* The state is repeated here in words, because the ring around the
-          teacher is a colour and colour alone is not an accessible signal. */}
-      <p className="sr-only">{`Състояние на учителя: ${state}`}</p>
+          teacher is a colour and colour alone is not an accessible signal.
+          In BULGARIAN words: this printed the raw enum member, so a student
+          using a screen reader heard „Състояние на учителя: speaking" — the
+          one place in the room where the product spoke English at a
+          17-year-old, and the only place where nobody could see it. */}
+      <p className="sr-only">{`Състояние на учителя: ${TEACHER_STATE_BG[state]}`}</p>
     </section>
   );
 }
@@ -136,6 +140,22 @@ function AnswerBody({ answer, pending }: { answer: AskAnswer | null; pending: bo
   return (
     <div className="flex min-h-0 flex-col gap-1.5 overflow-y-auto">
       <p className="text-[15px] leading-relaxed text-foreground">{answer.bodyBg}</p>
+      {answer.turnBackBg ? (
+        // The teacher handing the question back. Coloured, not quoted: it is
+        // the only sentence in the room addressed AT the student rather than
+        // about the road, and it has to read like someone waiting for a reply.
+        <p className="text-[15px] font-semibold leading-relaxed text-accent">
+          {answer.turnBackBg}
+        </p>
+      ) : null}
+      {answer.offer ? (
+        <a
+          href={answer.offer.href}
+          className="btn-ghost self-start px-2.5 py-1.5 text-[12px] font-bold"
+        >
+          {answer.offer.labelBg}
+        </a>
+      ) : null}
       {answer.citationsBg && answer.citationsBg.length > 0 && (
         <ul className="flex flex-wrap gap-1.5">
           {answer.citationsBg.map((c) => (

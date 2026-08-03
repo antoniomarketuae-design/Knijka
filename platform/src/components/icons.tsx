@@ -41,6 +41,26 @@ export function IconBook(props: IconProps) {
   );
 }
 
+/**
+ * The classroom: a board on the wall with a figure standing in front of it.
+ *
+ * Deliberately NOT a second book. „Теория" already owns the book, and the
+ * whole point of this destination is that it is not a reader — it is a room
+ * with someone in it. The nav row is the first and often the only description
+ * of a feature a student ever reads.
+ */
+export function IconChalkboard(props: IconProps) {
+  return (
+    <svg {...base(props)}>
+      <rect x="3" y="3" width="18" height="12" rx="1.5" />
+      <path d="M7 7h7" />
+      <path d="M7 10.5h4" />
+      <circle cx="8.5" cy="17.5" r="1.6" />
+      <path d="M6 22v-1.2a2.5 2.5 0 0 1 5 0V22" />
+    </svg>
+  );
+}
+
 export function IconClipboardCheck(props: IconProps) {
   return (
     <svg {...base(props)}>

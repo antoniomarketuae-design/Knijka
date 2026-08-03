@@ -26,7 +26,13 @@ export function ContinueLessonCard({ lesson }: { lesson: ContinueLesson | null }
             Ще тръгнем от основите — кой кой е на пътя и златните правила на
             движението.
           </p>
-          <Link href="/theory" className="btn-accent mt-6">
+          {/* THE FIRST-RUN CTA GOES TO THE CLASSROOM, NOT TO THE TOPIC GRID.
+              This button says „Започни урока" and, for the whole life of the
+              dashboard, delivered sixteen mastery gauges instead of a lesson —
+              because /classroom was in no navigation anywhere. A student who
+              has answered nothing has no mastery to look at; what they need is
+              a teacher and lesson 1. The topic grid is still one row below. */}
+          <Link href="/classroom" className="btn-accent mt-6">
             <IconPlay className="h-4 w-4" />
             Започни урока
           </Link>
