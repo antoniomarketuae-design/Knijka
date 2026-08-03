@@ -69,13 +69,27 @@ describe("sc-follow-truck — the FO-06 profile is staged (doc 72 §9)", () => {
     // Southbound = oncoming on fo-follow-v1; pressure scenery (learn-only).
     expect(stream.actor.pathNodes).toEqual(["fo-n-end", "fo-n-start"]);
     expect(stream.count).toBe(6);
-    // Every headway sits far under an overtake window around a 7.5 m truck.
-    for (const g of stream.gapsM) expect(g).toBeLessThanOrEqual(50);
-    // Hold feasibility (the ov-oncoming battery law): trailing cars stay
-    // on-path — Σ gaps never exceeds the head's hold arc.
-    const total = stream.gapsM.reduce((a, b) => a + b, 0);
     expect(stream.gapsM.length).toBe(stream.count - 1);
-    expect(total).toBeLessThanOrEqual(stream.actor.hold.offsetM);
+    // `gapsM[i-1]` is car i's extra hold arc vs **car 0** (OncomingStreamSpec;
+    // runners.ts holds car i at `hold.offsetM - gapsM[i-1]` and does NOT
+    // accumulate), so the HEADWAY between consecutive cars is the difference.
+    // This block used to read the array as headways and assert Σ ≤ holdArc —
+    // which is how `[45,45,45,45,45]` passed while parking five of the six
+    // cars on ONE arc (y 169.7). Driven 2026-08-03: the "rolling counter-
+    // column" was a head plus a clump, 2 s apart, and then an empty road.
+    const headways = stream.gapsM.map((g, i) => g - (i === 0 ? 0 : stream.gapsM[i - 1]));
+    for (const h of headways) {
+      // strictly increasing hold arcs ⇒ no two cars can share a spot
+      expect(h).toBeGreaterThan(0);
+      // and every window stays far under an overtake around a 7.5 m truck
+      expect(h).toBeLessThanOrEqual(50);
+    }
+    // Hold feasibility (the ov-oncoming battery law, in its per-car form —
+    // the same shape nm-district / ov-oncoming-district assert): every
+    // trailing car stays on-path.
+    for (const g of stream.gapsM) {
+      expect(stream.actor.hold.offsetM - g).toBeGreaterThanOrEqual(0);
+    }
   });
 });
 

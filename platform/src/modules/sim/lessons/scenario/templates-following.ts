@@ -735,7 +735,16 @@ const FT_ONCOMING: OncomingStreamSpec = {
     colorIndex: 1,
   },
   count: 6,
-  gapsM: [45, 45, 45, 45, 45], // hold y 169.7 … 349.7 — a rolling counter-column
+  // `gapsM[i-1]` is the EXTRA hold arc of car i **vs car 0** (OncomingStreamSpec
+  // — the runner does `hold.offsetM - gapsM[i-1]`, it does not accumulate). It
+  // was authored as five repeated 45s, so cars 1-5 all resolved to the SAME arc
+  // and stood in ONE spot: driven on 2026-08-03, the census read five vehicles
+  // stacked at y = 169.7 and the „rolling counter-column" was a head plus a
+  // clump that went by 2 s apart. Cumulative values are what every other stream
+  // in the codebase authors (templates-merging [26,52], templates-parking2
+  // [40,80]) and what this block's own arithmetic already assumed — «hold y
+  // 169.7 … 349.7» and «Σ gaps 225 ≤ head hold arc 235.3».
+  gapsM: [45, 90, 135, 180, 225], // hold y 169.7 / 214.7 / 259.7 / 304.7 / 349.7
   releaseKmh: 3,
 };
 
