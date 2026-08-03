@@ -474,10 +474,21 @@ export const KILL_PLANE_Y = -5;
 // and put more sky in frame, undoing the near-field flow the move is for.
 // Look-ahead goes 3.0 → 4.2 m to keep the same amount of ROAD in front of
 // the car once the eye has come down.
-export const CHASE_DISTANCE = 4.6; // m behind the car
-export const CHASE_HEIGHT = 1.55; // m above the car
-export const CHASE_LOOK_AHEAD = 4.2; // m ahead of the car to aim at
-export const CHASE_LOOK_HEIGHT = 0.85; // m above car origin to aim at
+// REVERTED 2026-08-03, founder-reported. The art pass moved the eye to 4.6 m /
+// 1.55 m to match the Gran Turismo reference, which is low and close BECAUSE
+// that is what makes a racing game feel fast. This is not a racing game. A
+// student has to judge the gap to a bay while reversing, read a give-way line
+// they are stopped at, and see a pedestrian at the kerb — all of which need the
+// eye HIGH and BACK. His words: "before it was more comfortable to drive … we
+// must push it most to the back and fix it there."
+//
+// So: back to the pose he drove comfortably, and the aim point back with it —
+// dropping the eye without dropping the target pitches the camera up and fills
+// the frame with sky, which is why these four move together or not at all.
+export const CHASE_DISTANCE = 6.0; // m behind the car
+export const CHASE_HEIGHT = 2.3; // m above the car
+export const CHASE_LOOK_AHEAD = 3.0; // m ahead of the car to aim at
+export const CHASE_LOOK_HEIGHT = 1.1; // m above car origin to aim at
 export const CHASE_STIFFNESS = 5.0; // 1/s exponential follow rate
 
 // ---------------------------------------------------------------------------

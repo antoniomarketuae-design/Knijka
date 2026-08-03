@@ -226,7 +226,16 @@ const COCKPIT_ROT_DAMPING = 16;
 /** Chase look-target smoothing (1/s). */
 const CHASE_LOOK_DAMPING = 10;
 /** Speed-based FOV widening (deg at ~130 km/h) and its blend rate (1/s). */
-const FOV_WIDEN_CHASE = 6;
+// CHASE IS NOW FIXED — 0, founder-reported 2026-08-03. A speed-linked FOV is a
+// racing-game device: it sells velocity by making the frame breathe. In a
+// trainer it means the view silently changes scale while the student is trying
+// to judge a distance, and he described it exactly — "when the user drives it
+// dynamically goes wider more to the back, we must push it most to the back and
+// FIX IT THERE." A camera that moves on its own is a camera you cannot learn
+// to judge from. The cockpit keeps its 5 deg: there the widening is small and
+// the instrument panel gives a fixed reference the chase view has no equivalent
+// of.
+const FOV_WIDEN_CHASE = 0;
 const FOV_WIDEN_COCKPIT = 5;
 const FOV_DAMPING = 3;
 
