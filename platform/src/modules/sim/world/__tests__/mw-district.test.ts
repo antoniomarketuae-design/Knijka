@@ -36,8 +36,17 @@ import { DEFAULT_TRAFFIC_CONFIG, type TrafficDistrict } from "../../traffic/type
 import { buildWorldGeometry } from "../builders/buildWorldGeometry";
 import { assertDistrict, type District, type WorldGeometry } from "../types";
 
-/** mw-v1 truths (generator params — asserted against the file below). */
-const LENGTH_M = 1000;
+/**
+ * mw-v1 truths (generator params — asserted against the file below).
+ *
+ * 1000 → 2600 m per carriageway (doc 87 B67). His sentence on catalog 37 was
+ * „I can't go more than 100-105" on a lesson that asks him to hold BELOW 125,
+ * and the register's measurement found the map underneath it: a drag-limited
+ * drivetrain needs ~1.7 km to reach 160 and ~2.4 km to reach 170, so on a
+ * 1000 m carriageway the road ended before the car finished accelerating. The
+ * generator now REFUSES a segment posted >= 130 that is shorter than 2400 m.
+ */
+const LENGTH_M = 2600;
 const LIMIT_KMH = 140;
 const X_EMERG = 8.13; // laneId 0 — the emergency lane
 const X_CRUISE = 0; // laneId 1 — the right TRAVEL lane

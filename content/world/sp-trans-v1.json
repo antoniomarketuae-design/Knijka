@@ -6,10 +6,10 @@
   "mapKind": "scenario-street",
   "generator": "tools/maps/gen_sp_transition.mjs",
   "boundsLocalMeters": {
-   "minX": -30.13,
+   "minX": -34,
    "minY": 0,
-   "maxX": 30.13,
-   "maxY": 360
+   "maxX": 34,
+   "maxY": 410
   },
   "attribution": {
    "text": "Учебна улица с преход 50→30 (зона 30) — оригинален параметричен дизайн (без данни от OpenStreetMap)",
@@ -28,7 +28,7 @@
    "edges": 2,
    "intersections": 0,
    "crossings": 0,
-   "buildings": 5,
+   "buildings": 7,
    "spawnPoints": 2
   },
   "scenario": {
@@ -75,6 +75,7 @@
     "lanesSource": "tag",
     "maxspeed": 50,
     "maxspeedSource": "tag",
+    "parkingBand": true,
     "length": 160,
     "geometry": [
      [
@@ -100,6 +101,7 @@
     "maxspeed": 30,
     "maxspeedSource": "tag",
     "zone": "school",
+    "parkingBand": true,
     "length": 200,
     "geometry": [
      [
@@ -124,66 +126,89 @@
    "heightSource": "default",
    "footprint": [
     [
-     -30.12,
+     -30.48,
      200
     ],
     [
-     -16.12,
+     -16.48,
      200
     ],
     [
-     -16.12,
+     -16.48,
      230
     ],
     [
-     -30.12,
+     -30.48,
      230
+    ]
+   ]
+  },
+  {
+   "id": "sp-tr-b-terrace-w",
+   "height": 16,
+   "heightSource": "default",
+   "footprint": [
+    [
+     -31.48,
+     26
+    ],
+    [
+     -16.48,
+     26
+    ],
+    [
+     -16.48,
+     142
+    ],
+    [
+     -31.48,
+     142
     ]
    ]
   },
   {
    "id": "sp-tr-b-approach-0",
-   "height": 12,
+   "height": 8,
    "heightSource": "default",
    "footprint": [
     [
-     16.13,
-     19
+     16.48,
+     23
     ],
     [
-     30.13,
-     19
+     31.48,
+     23
     ],
     [
-     30.13,
-     41
+     31.48,
+     45
     ],
     [
-     16.13,
-     41
+     16.48,
+     45
     ]
    ]
   },
   {
    "id": "sp-tr-b-approach-1",
-   "height": 15,
+   "height": 11,
    "heightSource": "default",
    "footprint": [
     [
-     -30.13,
-     19
+     16.48,
+     53
     ],
     [
-     -16.13,
-     19
+     31.48,
+     53
     ],
     [
-     -16.13,
-     41
+     31.48,
+     75
     ],
     [
-     -30.13,
-     41
+     16.48,
+     75
     ]
    ]
   },
@@ -193,43 +218,66 @@
    "heightSource": "default",
    "footprint": [
     [
-     16.13,
-     65
+     16.48,
+     83
     ],
     [
-     30.13,
-     65
+     31.48,
+     83
     ],
     [
-     30.13,
-     87
+     31.48,
+     105
     ],
     [
-     16.13,
-     87
+     16.48,
+     105
     ]
    ]
   },
   {
    "id": "sp-tr-b-approach-3",
-   "height": 13,
+   "height": 12,
    "heightSource": "default",
    "footprint": [
     [
-     -30.13,
-     111
+     16.48,
+     113
     ],
     [
-     -16.13,
-     111
+     31.48,
+     113
     ],
     [
-     -16.13,
-     133
+     31.48,
+     135
     ],
     [
-     -30.13,
-     133
+     16.48,
+     135
+    ]
+   ]
+  },
+  {
+   "id": "sp-tr-b-endslab",
+   "height": 18,
+   "heightSource": "default",
+   "footprint": [
+    [
+     -34,
+     376
+    ],
+    [
+     34,
+     376
+    ],
+    [
+     34,
+     410
+    ],
+    [
+     -34,
+     410
     ]
    ]
   }

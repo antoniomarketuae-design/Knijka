@@ -91,10 +91,19 @@ const BAR_DEPTH_HALT_M = 1.6;
 const BAR_DEPTH_THROUGH_M = 0.7;
 
 const LABEL_Y = 4.4;
-const LABEL_WIDTH_M = 7.2;
-const LABEL_HEIGHT_M = 2.4;
+/** Art pass 2026-08-03: was 7.2 × 2.4 m. At the acceptance pose that filled
+ *  the middle of the windscreen (register B24 photographed it "rendered big
+ *  enough to span half the sky"). 5.0 × 1.67 m keeps the same 3:1 chip and
+ *  the same 480 × 160 canvas — only the world quad shrinks, so nothing about
+ *  legibility at the 60–100 m read distance changes. */
+const LABEL_WIDTH_M = 5.0;
+const LABEL_HEIGHT_M = 1.67;
 const LABEL_PX_W = 480;
 const LABEL_PX_H = 160;
+/** The label is at full strength beyond this… */
+const LABEL_FADE_START_M = 30;
+/** …and gone at the mark itself. Same handover as the shaft's dissolve. */
+const LABEL_FADE_END_M = 11;
 
 /** Distance at which the speed-cap warning arms — far enough that easing off
  *  still works, near enough that it is clearly about THIS marker. */
@@ -169,21 +178,127 @@ const RIBBON_FRAG = /* glsl */ `
   }
 `;
 
+// ---------------------------------------------------------------------------
+// Objective marker shaft (art pass 2026-08-03, founder-approved)
+//
+// THE COMPLAINT, verbatim from the review: the marker is *"a big translucent
+// teal shaft plus a teal ring… an untextured emissive primitive and the most
+// engine-debug-gizmo object on the screen."* Register rows B24 and B27 add the
+// half that actually costs teaching: at the pose the drill grades, the driver's
+// eye is INSIDE the 11 m cylinder and *"the entire world goes flat green"* —
+// on sc-junction-scan the marker curtain occludes the very left-right scan the
+// lesson exists to teach, and on sc-junction-stop it hides the Б2 the student
+// is being graded on finding.
+//
+// The old shader was one term: `pow(1 - vUv.y, 1.8)` over the whole tube,
+// brightest AT THE BASE — i.e. densest exactly at eye height, exactly where it
+// blocks the road. This replaces it with three terms that make it behave like
+// a shaft of light instead of a coloured solid:
+//
+//  1. EYE-HEIGHT WINDOW. Nothing below EYE_CLEAR_M; a smooth ramp up to
+//     SHAFT_FULL_M; a soft top. The driver looks THROUGH the marker at the
+//     junction and sees the column above the roofline of the traffic in front.
+//  2. SILHOUETTE WEIGHTING (view-dependent). A hollow tube shaded flat reads
+//     as a plastic pipe; a real shaft of light is brightest where the optical
+//     path through it is longest — at its silhouette. `1 - |N·V|` is that,
+//     and it is what turns the primitive into volume.
+//  3. PROXIMITY DISSOLVE. Inside PROX_FADE_END_M the shaft fades to nothing.
+//     Arriving at the marker is the moment the student needs the WORLD, not
+//     the marker: the contract has already been read from 60 m away. This is
+//     the term that closes B24/B27 — you can no longer be inside it.
+//
+// Cost: unchanged. Same one mesh, same one transparent draw, three extra ALU
+// terms and one normalize in a shader that covers a few hundred pixels. It
+// carries no texture at any tier and is identical at low/med/high.
+// ---------------------------------------------------------------------------
+
+/** Below this height the shaft is fully transparent — the cockpit eye sits at
+ *  ~1.2 m and the chase eye at ~2.3 m, so this clears both. */
+const SHAFT_EYE_CLEAR_M = 2.6;
+/** …and reaches full density here. */
+const SHAFT_FULL_M = 5.0;
+/** Distance at which the shaft starts dissolving as you arrive… */
+const SHAFT_PROX_START_M = 26;
+/** …and is completely gone. Past this the ground pool alone marks the spot. */
+const SHAFT_PROX_END_M = 9;
+
 const PILLAR_VERT = /* glsl */ `
   varying vec2 vUv;
+  varying vec3 vWorldNormal;
+  varying vec3 vWorldPos;
   void main() {
     vUv = uv;
-    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+    vec4 world = modelMatrix * vec4(position, 1.0);
+    vWorldPos = world.xyz;
+    vWorldNormal = normalize(mat3(modelMatrix) * normal);
+    gl_Position = projectionMatrix * viewMatrix * world;
   }
 `;
 
 const PILLAR_FRAG = /* glsl */ `
   uniform vec3 uColor;
   uniform float uOpacity;
+  uniform float uHeight;
+  uniform vec3 uCamPos;
+  varying vec2 vUv;
+  varying vec3 vWorldNormal;
+  varying vec3 vWorldPos;
+  void main() {
+    float y = vUv.y * uHeight;
+    // 1. Eye-height window: clear at the driver's eyeline, full above it,
+    //    feathered out at the top so the column ends in air, not a rim.
+    float rise = smoothstep(${SHAFT_EYE_CLEAR_M.toFixed(2)}, ${SHAFT_FULL_M.toFixed(2)}, y);
+    float top = 1.0 - smoothstep(0.55, 1.0, vUv.y);
+    // 2. Silhouette weighting — longest optical path at the tube's edge.
+    vec3 v = normalize(uCamPos - vWorldPos);
+    float rim = 1.0 - abs(dot(normalize(vWorldNormal), v));
+    rim = 0.22 + 0.78 * rim * rim;
+    // 3. Proximity dissolve: gone by the time you are at the mark.
+    float d = distance(uCamPos.xz, vWorldPos.xz);
+    float prox = smoothstep(${SHAFT_PROX_END_M.toFixed(1)}, ${SHAFT_PROX_START_M.toFixed(1)}, d);
+    float a = uOpacity * rise * top * rim * prox;
+    if (a < 0.004) discard;
+    gl_FragColor = vec4(uColor, a);
+  }
+`;
+
+// ---------------------------------------------------------------------------
+// Ground pool — what the shaft hands over to when you arrive.
+//
+// A soft radial wash of light on the asphalt at the marker's foot. It is what
+// keeps the target legible once the shaft has dissolved (and once the ring has
+// stopped shouting), and it is the ONE part of the marker that is allowed to
+// live at eye level, because a pool of light on the road is a thing a driver
+// reads without looking up — which is the behaviour the drill wants.
+// ---------------------------------------------------------------------------
+
+/** Radius of the ground pool, m. Sized to the car, not to the acceptance
+ *  radius: the ring already draws the graded zone. */
+const POOL_RADIUS_M = 3.4;
+
+const POOL_FRAG = /* glsl */ `
+  uniform vec3 uColor;
+  uniform float uOpacity;
   varying vec2 vUv;
   void main() {
-    float a = uOpacity * pow(1.0 - vUv.y, 1.8);
+    // vUv is 0..1 over the circle's bounding square.
+    float r = length(vUv - 0.5) * 2.0;
+    if (r > 1.0) discard;
+    // Bright, tight core with a long feathered skirt — a light pool, never a
+    // hard-edged disc (a hard edge is the debug-gizmo read all over again).
+    float core = 1.0 - smoothstep(0.0, 0.55, r);
+    float skirt = 1.0 - smoothstep(0.3, 1.0, r);
+    float a = uOpacity * (0.45 * core + 0.55 * skirt * skirt);
+    if (a < 0.004) discard;
     gl_FragColor = vec4(uColor, a);
+  }
+`;
+
+const POOL_VERT = /* glsl */ `
+  varying vec2 vUv;
+  void main() {
+    vUv = uv;
+    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
   }
 `;
 
@@ -361,7 +476,31 @@ export function RouteGuidance({
         fragmentShader: PILLAR_FRAG,
         uniforms: {
           uColor: { value: accent.clone() },
-          uOpacity: { value: 0.34 },
+          // Halved (was 0.34). The silhouette term concentrates what is left
+          // at the tube's edges, so the column reads BRIGHTER at its rim and
+          // far quieter across its face — which is the whole difference
+          // between a shaft of light and a coloured solid.
+          uOpacity: { value: 0.17 },
+          uHeight: { value: PILLAR_HEIGHT },
+          uCamPos: { value: new THREE.Vector3() },
+        },
+        transparent: true,
+        depthWrite: false,
+        blending: THREE.AdditiveBlending,
+        side: THREE.DoubleSide,
+      },
+    ],
+    [accent],
+  );
+
+  const poolMatArgs = useMemo<[THREE.ShaderMaterialParameters]>(
+    () => [
+      {
+        vertexShader: POOL_VERT,
+        fragmentShader: POOL_FRAG,
+        uniforms: {
+          uColor: { value: accent.clone() },
+          uOpacity: { value: 0.5 },
         },
         transparent: true,
         depthWrite: false,
@@ -393,6 +532,7 @@ export function RouteGuidance({
   const gateRef = useRef<THREE.Group>(null);
   const barMatRef = useRef<THREE.MeshBasicMaterial>(null);
   const pillarMatRef = useRef<THREE.ShaderMaterial>(null);
+  const poolMatRef = useRef<THREE.ShaderMaterial>(null);
   const labelRef = useRef<THREE.Mesh>(null);
 
   const routeRef = useRef<DerivedRoute | null>(null);
@@ -446,6 +586,7 @@ export function RouteGuidance({
     if (ringMatRef.current) ringMatRef.current.color.copy(accent);
     if (barMatRef.current) barMatRef.current.color.copy(accent);
     if (pillarMatRef.current) pillarMatRef.current.uniforms.uColor.value.copy(accent);
+    if (poolMatRef.current) poolMatRef.current.uniforms.uColor.value.copy(accent);
   }, [
     graph,
     goal,
@@ -472,7 +613,33 @@ export function RouteGuidance({
         const pulse = 1 + 0.05 * Math.sin(t * (overCapRef.current ? 4.4 : 1.8));
         ring.scale.set(pulse, pulse, 1);
       }
-      if (labelRef.current?.visible) labelRef.current.quaternion.copy(state.camera.quaternion);
+      // The shaft's silhouette + proximity terms both need the eye position.
+      // Written straight into the uniform — no allocation, no React state.
+      if (pillarMatRef.current) {
+        (pillarMatRef.current.uniforms.uCamPos.value as THREE.Vector3).copy(
+          state.camera.position,
+        );
+      }
+      // The label carries a real teaching contract («Карай дотук / не по-бързо
+      // от 35 км/ч»), so it is never removed — but at the acceptance pose it
+      // was 7.2 × 2.4 m of world-space text that "spanned half the sky"
+      // (register B24/B27). It now fades on the same schedule as the shaft:
+      // the contract is read on the APPROACH, and at the mark the student's
+      // eyes belong on the junction. `visible` stays owned by the layout
+      // effect (label texture present or not); only opacity moves here.
+      const label = labelRef.current;
+      if (label?.visible) {
+        label.quaternion.copy(state.camera.quaternion);
+        const lm = label.material as THREE.MeshBasicMaterial;
+        const dx = state.camera.position.x - marker.position.x;
+        const dz = state.camera.position.z - marker.position.z;
+        const dist = Math.hypot(dx, dz);
+        const k = Math.max(
+          0,
+          Math.min(1, (dist - LABEL_FADE_END_M) / (LABEL_FADE_START_M - LABEL_FADE_END_M)),
+        );
+        lm.opacity = 0.95 * k;
+      }
       if (sample && goalNow.maxSpeedKmh !== undefined) {
         const dx = sample.position.x - goalNow.x;
         const dy = sample.position.y - goalNow.y;
@@ -486,6 +653,10 @@ export function RouteGuidance({
           if (ringMatRef.current) ringMatRef.current.color.copy(c);
           if (barMatRef.current) barMatRef.current.color.copy(c);
           if (pillarMatRef.current) pillarMatRef.current.uniforms.uColor.value.copy(c);
+          // The pool is the marker's NEAR-field reading, and "you are over the
+          // cap" is a near-field fact — it has to carry the warning too, or
+          // the one surface still on screen at the mark stays reassuring.
+          if (poolMatRef.current) poolMatRef.current.uniforms.uColor.value.copy(c);
         }
       }
     }
@@ -561,6 +732,13 @@ export function RouteGuidance({
           />
           <shaderMaterial ref={pillarMatRef} args={pillarMatArgs} />
         </mesh>
+        {/* Ground pool — the marker's near-field reading, once the shaft has
+            dissolved out of the windscreen. One extra transparent draw of 32
+            triangles at every tier. */}
+        <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.04, 0]} renderOrder={18}>
+          <circleGeometry args={[POOL_RADIUS_M, 32]} />
+          <shaderMaterial ref={poolMatRef} args={poolMatArgs} />
+        </mesh>
         {/* Zone target: the ring IS the acceptance radius the engine tests. */}
         <mesh
           ref={ringRef}
@@ -573,12 +751,17 @@ export function RouteGuidance({
               not declared here — the layout effect seeds it (before paint) and
               useFrame owns it after that. A declared prop would let a parent
               re-render silently clear the warning. */}
+          {/* NormalBlending, not Additive (art pass 2026-08-03). Additive on
+              a mid-grey sunlit road drives the annulus to a flat clipped teal
+              — the "untextured emissive primitive" read. Alpha-blended at 0.55
+              the same ring lands as a painted band ON the asphalt, keeps the
+              road's own value underneath it, and still carries the amber
+              over-cap tint at full legibility. */}
           <meshBasicMaterial
             ref={ringMatRef}
             transparent
-            opacity={0.4}
+            opacity={0.55}
             depthWrite={false}
-            blending={THREE.AdditiveBlending}
             side={THREE.DoubleSide}
           />
         </mesh>

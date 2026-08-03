@@ -933,8 +933,27 @@ function TrafficLights({
     let dirty = false;
     for (let i = 0; i < lights.length; i++) {
       const light = lights[i]!;
+      // B35 — THE FALLBACK WAS `?? "green"`, i.e. a head with no phase source
+      // rendered a bright, saturated GO. The engine layer forbids exactly this
+      // in as many words (signals.ts lampState: „Unknown ids fail exactly like
+      // phase(): 'red' (never a phantom green)"), and the render layer was
+      // quietly doing the opposite of the module it draws.
+      //
+      // It is the worst possible default for this product: on «Загаснал
+      // светофар» — a lesson whose ENTIRE subject is that an extinguished head
+      // means равнозначно кръстовище and правилото на дясното (ЗДвП чл. 6) —
+      // the most conspicuous thing on the head was a green lamp. A student
+      // reads „green, go" and drives into a junction the lesson is teaching him
+      // to yield at. That is the north-star test failed in a single token.
+      //
+      // "dark" is the honest read for "no phase source": a wired runtime never
+      // reaches this branch (signalLampState is non-nullable and answers "red"
+      // for an unknown id), so this only fires on scenes mounted without a
+      // signal runtime — scene-still among them — where an unlit head is
+      // exactly what an unsimulated signal is, and is visibly „no data" rather
+      // than a false instruction.
       const state: SignalLampState =
-        getSignalPhase?.(light.nodeId, light.approachBearingDeg) ?? "green";
+        getSignalPhase?.(light.nodeId, light.approachBearingDeg) ?? "dark";
       if (lastPhases.current[i] === state) continue;
       lastPhases.current[i] = state;
       const colors = lampColorsFor(state);

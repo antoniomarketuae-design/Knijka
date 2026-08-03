@@ -118,7 +118,9 @@ export function buildMotorwaySegment(params) {
 
   if (!/^[a-z0-9-]+$/.test(districtId ?? "")) errors.push(`districtId "${districtId}" must be kebab-case`);
   if (!/^[a-z0-9]+$/.test(idPrefix ?? "")) errors.push(`idPrefix "${idPrefix}" must be alphanumeric`);
-  if (!(lengthM >= 800 && lengthM <= 1500)) errors.push(`lengthM must be within 800..1500 m, got ${lengthM}`);
+  // 1500 → 3000 (doc 87 B67). See RUNWAY_FOR_POSTED_LIMIT_M below for why the
+  // old ceiling made the posted limit unreachable in the product.
+  if (!(lengthM >= 800 && lengthM <= 3000)) errors.push(`lengthM must be within 800..3000 m, got ${lengthM}`);
   if (!(maxspeedKmh >= 100 && maxspeedKmh <= 140)) errors.push(`maxspeedKmh must be within 100..140, got ${maxspeedKmh}`);
   if (lanesPerDirection !== 2) errors.push(`only the 2+2 shape is exercised/asserted so far, got ${lanesPerDirection}+${lanesPerDirection}`);
   if (!(medianM >= 4 && medianM <= 12)) errors.push(`medianM must be within 4..12 m, got ${medianM}`);
@@ -376,6 +378,35 @@ export function buildMotorwaySegment(params) {
       `lengthM ${lengthM} leaves no honest ${AUTHORED_CRUISE_KMH} km/h story: accel ${r2(accelDist)} + stop ${r2(stopDist)} + 300 m story headroom needed`,
     );
   }
+  // -- THE RUNWAY (doc 87 B67) -------------------------------------------------
+  //
+  // HIS SENTENCE on catalog 37: „I can't go more than 100-105", and the lesson
+  // asks him to hold BELOW 125. The re-look refuted the number with a
+  // measurement — peak 144.4 km/h across 705 SimTick samples — and then found
+  // the real defect underneath it: the segment ENDS before the car has finished
+  // accelerating. Its own arithmetic, on the shipped vehicle rather than on the
+  // recorder script above: 160 km/h needs ~1.7 km of runway and 170 needs
+  // ~2.4 km, because a real drivetrain is DRAG-limited at the top of its range
+  // and the constant-2.2 m/s² envelope the recorder honesty check uses stops
+  // being true above ~120. A 1000 m carriageway is 1000 m: at 140 posted, the
+  // student reaches the end of the road before he reaches the speed the lesson
+  // is about, and then reads that as „the car will not go faster".
+  //
+  // So the honest floor for a segment posted at motorway speed is the distance
+  // the SHIPPED CAR needs to reach the posted limit and still stop inside the
+  // map, not the distance a scripted 2.2 m/s² ramp needs. 2400 m is the
+  // register's own measured number for 170 km/h; the committed instance carries
+  // 2600 so the driver also gets a stretch of ACTUAL CRUISE at the top of the
+  // range instead of one sample at the far kerb.
+  const RUNWAY_FOR_POSTED_LIMIT_M = 2400;
+  if (maxspeedKmh >= 130 && lengthM < RUNWAY_FOR_POSTED_LIMIT_M) {
+    post.push(
+      `lengthM ${lengthM} cannot deliver the posted ${maxspeedKmh} km/h: a drag-limited ` +
+        `drivetrain needs >= ${RUNWAY_FOR_POSTED_LIMIT_M} m to reach ~170 km/h and stop ` +
+        `(founder item B67 — the lesson asked for below 125 on a road that ended first)`,
+    );
+  }
+
   // The crawl detector's floor must sit far under the posted limit.
   if (!(maxspeedKmh > 50)) post.push("maxspeed must exceed the чл. 54 50 km/h flow floor");
   // Lane-center math (the Locator's one-way bank): curb lane +1W, cruise on
@@ -411,9 +442,10 @@ export function buildMotorwaySegment(params) {
 const INSTANCES = [
   {
     districtId: "mw-v1",
-    label: "Учебна автомагистрала — 2+2 с аварийна лента (сценарий SP-10)",
+    label: "Учебна автомагистрала — 2+2 с аварийна лента, 2,6 км (сценарий SP-10)",
     idPrefix: "mw",
-    lengthM: 1000,
+    // 1000 → 2600 m per carriageway (doc 87 B67 — see RUNWAY_FOR_POSTED_LIMIT_M).
+    lengthM: 2600,
     maxspeedKmh: 140,
     lanesPerDirection: 2,
     medianM: 6,

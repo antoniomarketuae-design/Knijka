@@ -149,7 +149,7 @@ export interface Question {
 export interface Sign {
   id: string; // "sign-" prefix
   code: string; // official code, e.g. "Б2"
-  group: string; // А | Б | В | Г | Д | Е (Ж, Т later)
+  group: string; // А | Б | В | Г | Д | Е | Ж | Т (markings later)
   nameBg: string;
   meaningBg: string;
   svgFile: string;

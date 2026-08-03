@@ -52,12 +52,37 @@
  *
  * MEASURED ON THIS TREE:
  *
- * | | before this lane | now |
- * |---|---|---|
- * | parked bodies, 100 districts   | 3799 | 3621 |
- * | …standing fully on a footway   | 2605 (68.6%) | 2427 (67.0%) |
- * | districts with ≥ 1 such body   | 83 | 76 |
- * | PE family (catalog 24–30)      | 7 of 7 dirty | 0 of 7 — 178 bodies |
+ * | | before the first lane | after it | after the SP/FO pass |
+ * |---|---|---|---|
+ * | districts with ≥ 1 such body   | 83 | 76 | **68** |
+ * | PE family (catalog 24–30)      | 7 of 7 dirty | 0 of 7 — 178 bodies | 0 of 7 |
+ * | SP/FO family (catalog 31–40)   | 8 of 8 dirty | 8 of 8 dirty | **0 of 8 — 368 bodies** |
+ *
+ * THE SP/FO PASS (doc 87 FR-21 + B59/B63/B64/B65/B70/B72 — the stretch of the
+ * catalogue he actually played and photographed). Eight budget rows deleted:
+ * `fo-brake-v1` 48, `fo-follow-v1` 41, `sp-creep-v1` 41, `sp-creep2-v1` 75,
+ * `sp-danger-v1` 46, `sp-rain-v1` 41, `sp-trans-v1` 35, `sp-zone30-v1` 41 =
+ * **368 bodies off the pavement**, seven of them by declaring the band their
+ * row was already standing in the middle of and one (`sp-creep2-v1`) by
+ * declaring it has no kerbside parking at all.
+ *
+ * WHAT MADE IT CHEAP, and the measurement that unlocked it: the frontage on
+ * every one of these generated micro-maps stands at |x| = 16.02–16.13 m, and
+ * the widened pavement's BACK EDGE lands at 8.125 + 4 + 0.35 + 3.5 = 15.975 m.
+ * The band therefore fits with **not one building moved** — the earlier lane's
+ * "a 100-district regeneration" estimate was measured against a 0.5 m
+ * stand-back policy, not against the geometry. Re-measured with the real
+ * number, 57 of the 66 committed micro-maps clear it. The generators still
+ * push their authored frontage out with the kerb (`kerbM`), so a future
+ * instance is not left riding a 0.15 m margin.
+ *
+ * WHAT IS LEFT, and why it is not free: the remaining rows are the big OSM maps
+ * (`d2-v1`, `district-v1`, `poligon-v1` — 199 junctions on d2 alone, so
+ * widening moves every junction mouth and therefore every graded stop line),
+ * the parking-lot family (whose bays ARE the kerbside strip), and the maps
+ * whose frontage genuinely sits inside 15.975 m (`pk-*`, `rx-tram-*`,
+ * `mv-uturn-v1`). Those need their buildings moved, which is a generator edit
+ * per map, not a tag.
  */
 import { readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
@@ -91,12 +116,12 @@ const BODY_HALF_W = 0.95;
  */
 const FOOTWAY_BUDGET: Record<string, number> = {
   "ov-crest-v1": 107, "d2-v1": 106, "poligon-v1": 91, "sp-signs-v1": 84,
-  "district-v1": 80, "sp-curve-v1": 80, "sp-creep2-v1": 75, "ac-aqua-v1": 60,
-  "ac-bridge-v1": 60, "fo-brake-v1": 48, "jx-equal-v1": 46, "sp-danger-v1": 46,
-  "ac-ice-v1": 41, "ac-night-v1": 41, "ac-rain-v1": 41, "fo-follow-v1": 41,
-  "ov-oneway-v1": 41, "pk-banx-v1": 41, "sp-creep-v1": 41, "sp-rain-v1": 41,
-  "sp-zone30-v1": 41, "vp-ready-v1": 41, "vu-pass-v1": 41, "ov-solid-v1": 39,
-  "tj-rhr-v1": 36, "ov-lane-v1": 35, "sp-trans-v1": 35, "rb-mini-v1": 34,
+  "district-v1": 80, "sp-curve-v1": 80, "ac-aqua-v1": 60,
+  "ac-bridge-v1": 60, "jx-equal-v1": 46,
+  "ac-ice-v1": 41, "ac-night-v1": 41, "ac-rain-v1": 41,
+  "ov-oneway-v1": 41, "pk-banx-v1": 41,
+  "vp-ready-v1": 41, "vu-pass-v1": 41, "ov-solid-v1": 39,
+  "tj-rhr-v1": 36, "ov-lane-v1": 35, "rb-mini-v1": 34,
   "rb-ped-v1": 34, "rb-single-v1": 34, "rx-drop-v1": 34, "rx-guarded-v1": 34,
   "rx-unguarded-v1": 34, "vu-child-v1": 34, "vu-door-v1": 34, "pk-rail-v1": 33,
   "sig-wave-v1": 33, "tj-occluded-v1": 33, "vu-bikelane-v1": 32,

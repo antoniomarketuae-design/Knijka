@@ -49,6 +49,8 @@ const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..
 
 /** PERCEPTUAL_ROAD_SCALE × textbook lane — the drawn lane width, m. */
 const SCALED_LANE_W = 3.25 * 2.5;
+/** constants.PARKING_LANE_WIDTH_M — the curbside band, per side, m. */
+const PARKING_LANE_WIDTH_M = 4.0;
 
 const r2 = (v) => Math.round(v * 100) / 100;
 
@@ -107,6 +109,8 @@ export function buildFoFollowStreet(params) {
       lanesSource: "tag",
       maxspeed: maxspeedKmh,
       maxspeedSource: "tag",
+      // FR-21 (car half) — see the note above the INSTANCES table.
+      parkingBand: true,
       length: polylineLength(geometry),
       geometry,
     },
@@ -138,16 +142,19 @@ export function buildFoFollowStreet(params) {
 
   // -- One office block west of the street (visual anchor, clear of the
   // carriageway + sidewalk: |x| > halfRoad + ~4 m sidewalk).
+  // The kerb is the travel lanes PLUS the declared curbside band (FR-21), and
+  // the frontage stands back from THAT, not from the travel lanes.
+  const kerbM = r2(halfRoadM + PARKING_LANE_WIDTH_M);
   const BUILDINGS = [
     {
       id: "fo-b-block",
       height: 7,
       heightSource: "default",
       footprint: [
-        [r2(-(halfRoadM + 20)), 150],
-        [r2(-(halfRoadM + 8)), 150],
-        [r2(-(halfRoadM + 8)), 168],
-        [r2(-(halfRoadM + 20)), 168],
+        [r2(-(kerbM + 16)), 150],
+        [r2(-(kerbM + 4)), 150],
+        [r2(-(kerbM + 4)), 168],
+        [r2(-(kerbM + 16)), 168],
       ],
     },
   ];
@@ -163,8 +170,8 @@ export function buildFoFollowStreet(params) {
     }
   }
   // Road body + buildings can outgrow the centerline bounds — cover them.
-  bounds.minX = Math.min(bounds.minX, -halfRoadM - 6);
-  bounds.maxX = Math.max(bounds.maxX, halfRoadM + 6);
+  bounds.minX = Math.min(bounds.minX, -kerbM - 6);
+  bounds.maxX = Math.max(bounds.maxX, kerbM + 6);
   for (const bl of BUILDINGS) {
     for (const [x, y] of bl.footprint) {
       bounds.minX = Math.min(bounds.minX, x);
@@ -264,6 +271,30 @@ export function buildFoFollowStreet(params) {
 // The two committed instances (S3 FO batch 3)
 // ---------------------------------------------------------------------------
 
+/**
+ * FR-21, THE CAR HALF — why this street declares its kerbside band.
+ *
+ * HIS SENTENCE, four lessons running: „the Pedestrian … goes trough a car which
+ * is standing on the sidewalk". The cause is a set mismatch, not a bug in any
+ * one map: `traffic/TrafficLayer.PARK_CLASSES` (which parks the row) contains
+ * `residential`, while `world/builders/constants.PARKING_LANE_CLASSES` (which
+ * DRAWS the 4 m band the row is seated in the middle of) does not. On a
+ * residential street the pass therefore seats every body at
+ * `travelHalf + 2.0 m` — two metres PAST the kerb, i.e. in the middle of the
+ * 3.5 m pavement, at road level, sunk 0.12 m into the footway it stands on.
+ *
+ * `parkingBand: true` says: this street really does have kerbside parking.
+ * The world draws the band, the KERB MOVES OUT FROM UNDER THE ROW, and not one
+ * body moves — `travelHalf + 2.0` IS the band's centre line. The travel lanes
+ * are untouched, so the right-lane centre stays at x = 4.06 and every committed
+ * trace on this map still drives a lane centre. Measured before the change: the
+ * nearest authored frontage on these maps stands at |x| = 16.02–16.13 m and the
+ * widened pavement's back edge lands at 15.975 m, so the band fits with no
+ * building moved.
+ *
+ * `parkingBand: false` is the other legal answer — a street with no kerbside
+ * parking at all, where the pass places nothing.
+ */
 const INSTANCES = [
   {
     districtId: "fo-follow-v1",

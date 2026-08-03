@@ -103,8 +103,25 @@ export const QUALITY_PRESETS: Record<QualityLevel, QualityPreset> = {
     shadows: false,
     shadowMapSize: 1024,
     shadowRadiusM: 45,
-    rainParticles: 0,
-    snowParticles: 0,
+    // WEATHER FLOOR, not a tier upgrade (register row B71, re-measured
+    // 2026-08-02: "on «Дистанция в дъжд», a device sent to `low` is shown a
+    // lesson about rain with no rain in it"). rainParticles was 0 and
+    // SimEnvironment gates RainStreaks on `> 0`, so on a €125 handset the one
+    // lesson whose entire subject is reduced grip and reduced visibility
+    // rendered as a dry street. That is not a graphics setting, it is the
+    // lesson failing to state its own premise — and the north-star test
+    // ("does this produce safer drivers?")答 is decided by whether the
+    // student can SEE that it is raining.
+    //
+    // 260 is the floor that keeps the claim honest at the lowest cost the
+    // renderer can charge: RainStreaks/SnowFlakes are ONE instanced draw with
+    // static per-instance seeds, so 260 streaks is +1 draw call and ~520
+    // triangles against the phone budget's ≤70 calls / ≤250k triangles — and
+    // it is paid ONLY on a wet lesson (the component is unmounted when
+    // rain/snow are off, so every dry lesson at `low` is byte-identical to
+    // before). med/high keep their authored densities.
+    rainParticles: 260,
+    snowParticles: 260,
     postprocessing: false,
     aoEnabled: false,
     aoHalfRes: true,

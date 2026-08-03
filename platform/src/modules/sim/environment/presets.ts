@@ -201,46 +201,93 @@ export const FOG_TOPDOWN_MAX_OPTICAL = 0.75;
  * material recompiles — only intensities/colors/directions animate.
  */
 export const ENVIRONMENT_PRESETS: Record<TimeOfDay, EnvironmentPreset> = {
-  // "Late golden" afternoon — low warm key from the WSW vs cool dim fill
-  // (key:fill ≈ 3.5:1) with long diagonal shadows and warm aerial haze. The
-  // doc 71 §4.1 Phase-1 rig: the old 55°/1.35-vs-0.85 noon read overcast-flat
-  // (key:fill ≈ 1.6:1 — THE "washed out" root cause). Elevation stays at 22°
-  // (not true golden 6–15°) until CSM lands — lower suns out-throw the
-  // camera-following shadow frustum.
+  // Mid-afternoon, sun HIGH ENOUGH TO REACH THE CARRIAGEWAY (art pass
+  // 2026-08-03, founder-approved). The rig it replaces was a 22° "late golden"
+  // key, and the review's flat verdict — *"there are NO CAST SHADOWS
+  // anywhere"* — was that sun, not a broken shadow map. Measured on
+  // /dev/gw-shell?lesson=l2-intersections at tier `high`: toggling
+  // gl.shadowMap.enabled moved 3.1/255 of mean pixel value and darkened the
+  // ENTIRE road plus both pavements uniformly. The map worked; there was
+  // simply never a shadow EDGE on screen, because at 22° a 20 m building
+  // throws 20/tan(22°) ≈ 50 m and the perceptually-scaled carriageway is only
+  // ~32 m wide — so every north-south street sat wholly in the shade of its
+  // own west building line. A uniformly-shaded street is indistinguishable
+  // from "no directional light at all", which is exactly what the frame read
+  // as.
+  //
+  // 41° was tried first and MEASURED as not enough (lightlab, 2026-08-03:
+  // toggling the shadow map still moved the road patch in front of the car by
+  // 8.4/255 — the street was still wholly shaded, just less so). 56° throws
+  // 0.67 × height: a 27 m block set 8 m back off the kerb now reaches ~10 m
+  // into a ~16 m carriageway, so there is a hard sunlit/shaded EDGE down the
+  // street instead of one flat tone; a 1.4 m car drops a 0.9 m contact shadow;
+  // trees, poles and signs stripe the pavement. It is also honest for Sofia
+  // (42.7° N): solar noon runs ~40° at the equinox and ~66° at midsummer.
+  //
+  // And it FITS — the reason doc 71 capped this at 22–25 in the first place
+  // was that lower suns out-throw the camera-following ortho shadow frustum
+  // (45/55/75 m half-extent, quality.ts). At 56° even a 50 m tower throws
+  // 34 m, inside the tightest of the three, so nothing here waits on CSM.
+  //
+  // The "washed out" root cause doc 71 §4.1 diagnosed was the key:fill RATIO,
+  // not the elevation: the old noon rig was 1.35 vs 0.85 ≈ 1.6:1, and THAT is
+  // what read overcast-flat. It is preserved here — 1.85 vs 0.50 = 3.7:1,
+  // still above the 3.5:1 the doc ruled — while the elevation does the
+  // shadow work. High sun + lean fill is a CONTRASTY midday, which is what the
+  // founder's reference frame is; high sun + strong fill is the overcast rig
+  // doc 71 removed. The ratio is the invariant, not the elevation.
   day: {
     timeOfDay: "day",
     sky: {
-      zenith: "#4a7ec2", // keep blue up top — contrast against the warm horizon
-      horizon: "#f4c78e", // warm haze band
-      horizonCurve: 2.1, // warmth hugs the horizon
-      sunTint: "#ffdba8",
-      sunDiscDeg: 1.0, // slightly fatter low sun
+      zenith: "#3f76c4", // a real blue overhead
+      // Pale blue-white haze, not the old cream #f4c78e. Doc 82 §1.2 item 5:
+      // 35–45 % of every frame is sky, and ours was a sepia gradient — the
+      // single biggest "prototype" tell after the missing shadows. The
+      // founder's own reference is a blue sky with white cumulus over a
+      // hazy pale horizon; this is that.
+      horizon: "#d5e4ee",
+      // col = mix(zenith, horizon, pow(1 - up, curve)) — a HIGHER curve pulls
+      // the pale band down onto the horizon and gives the rest of the dome
+      // back to the blue. 2.1 → 3.0 is most of why the sky stopped reading as
+      // "a flat gradient with a hard horizon band".
+      horizonCurve: 3.0,
+      sunTint: "#fff4e0", // a 56° sun is far whiter than a 22° one
+      sunDiscDeg: 0.85,
       sunDiscIntensity: 4.0,
-      sunGlowIntensity: 0.35, // visible warm glow
-      sunGlowPower: 14, // wider falloff
+      sunGlowIntensity: 0.28, // less flare now the sun is out of the eyeline
+      sunGlowPower: 16,
       starsIntensity: 0,
       // Broken afternoon cumulus — enough sky left for the blue zenith to
       // still read, enough deck that the frame is no longer an empty
-      // gradient. Warm near-white: at 22° the sun is already lighting the
-      // cloud tops from the side.
-      cloudCover: 0.42,
-      cloudDensity: 0.85,
-      cloudColor: "#fdf6ea",
-      // Vitosha in full daylight haze: a desaturated blue-grey that is
-      // COOLER than the warm #f4c78e horizon. That hue split is what sells
-      // 15 km of air between the city and the massif.
+      // gradient. Pure white tops: a 41° sun lights them from above.
+      cloudCover: 0.5,
+      cloudDensity: 0.92,
+      cloudColor: "#ffffff",
+      // Vitosha in full daylight haze: a desaturated blue-grey, still a shade
+      // DEEPER and cooler than the pale horizon it stands against. That
+      // value split is what sells 15 km of air between the city and the
+      // massif now that the horizon is no longer warm.
       ridgeStrength: 1,
-      ridgeColor: "#8a9ab4",
+      ridgeColor: "#8fa3bd",
     },
     light: {
-      sun: { azimuthDeg: 245, elevationDeg: 22, color: "#ffd9a0", intensity: 1.9 },
-      hemisphere: { skyColor: "#b8cde8", groundColor: "#4a4034", intensity: 0.55 },
+      sun: { azimuthDeg: 245, elevationDeg: 56, color: "#fff3e0", intensity: 1.85 },
+      // 0.50, not lower. Tier `low` has NO shadow map and NO HDRI ambient
+      // (TEXTURE_BUDGETS.low.hdrEnvironment is false), so on the phone this
+      // hemisphere IS the entire fill — measured at 0.42 the shaded faces of
+      // every block went to near-black there while the desktop, which still
+      // has the IBL, looked fine. The ratio that matters is still comfortably
+      // above doc 71's floor.
+      hemisphere: { skyColor: "#a8c6ea", groundColor: "#4d4740", intensity: 0.5 },
     },
-    // Warm fog ≈ sky horizon, slightly greyer so it reads as air, not paint.
-    // 0.0028: 200 m → 27 % faded, 400 m → 71 % — towers layer into the haze,
-    // streets (and 100 m signage — rule-engine hard constraint, ~96 % clear)
-    // stay legible.
-    fog: { color: "#e3c49c", density: 0.0028 },
+    // Cool haze ≈ sky horizon, a shade greyer so it reads as air, not paint —
+    // and the fog colour is what the GroundBackdrop disc dissolves into, so it
+    // has to track the sky's horizon band or the join becomes the "hard
+    // horizon line" the review named.
+    // 0.0026 is the FLOOR, not a taste call: groundBackdrop.test.ts requires
+    // fogOpacityAt(430 m) > 0.7 for every clear density so the backdrop disc's
+    // own rim is never visible, and 1.097/430 = 0.002552.
+    fog: { color: "#c6d5e0", density: 0.0026 },
     // Rain haze: a darker, cooler grey than the shipped silver-blue #9aabbd,
     // and a touch denser so the distance greys out under the shower instead of
     // reading the warm dry haze. 0.0042 still clears 100 m signage (~84 %) —

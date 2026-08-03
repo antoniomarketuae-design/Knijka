@@ -40,6 +40,28 @@
 //   gl.render — no composer/postprocessing ever runs for a mirror.
 //   Passes only run at all while the cockpit camera is live (`active`).
 //
+// THIS LINE IS NOT „THE MIRROR DOES NOT EXIST IN THE CHASE VIEW" — 2026-08-03.
+// It has now been cited twice as the cause of founder item 44 („I drive from
+// the back of the car POV and I dont see Rear Mirror at all … we must put Rear
+// Mirror some small window in the POV after pressing C"), and it is not. This
+// file feeds the three PHYSICAL GLASS QUADS inside the cabin GLB. In the chase
+// camera the cabin is not in frame, so a pass here would render a mirror image
+// onto geometry nobody can see — gating it on `active` is a pure saving and
+// removing the gate would put the FPS back without putting a mirror on screen.
+//
+// The chase-view mirror is a DIFFERENT rig and it is built: a camera-locked
+// quad fed by its own backward pass, permanent at REAR_VIEW_IDLE_SCALE and
+// grown to full size on a held Q/E/F glance. It lives in
+// `components/sim/CameraRig.tsx` („CHASE REAR-VIEW WINDOW"), with its geometry
+// and its ≤10 %-of-screen contract in `modules/sim/scene/chaseRearView.ts`, and
+// PlayAreaStyles steps the DOM rail below it (`--sim-mirror-h`).
+//
+// Photographed on 2026-08-03 at 852×393, the founder's own device profile: the
+// window sits at the top centre of the chase frame at rest and slides to the
+// right of the frame while E is held, with `--sim-mirror-h: 65px` and
+// `--sim-glance-h: 88px` published on <html>. If the row is ever re-opened,
+// re-open it against THAT rig.
+//
 // GRADING IS UNTOUCHED: mirror glances stay camera/key/click events through
 // CabinControls.glance() — RTT is visual truth, not the graded signal.
 

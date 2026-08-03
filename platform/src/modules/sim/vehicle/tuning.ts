@@ -455,10 +455,29 @@ export const SPAWN = { x: -20, y: 0.8, z: -40, yawRad: Math.PI / 2 } as const;
 /** Auto-reset if the chassis somehow leaves the world. */
 export const KILL_PLANE_Y = -5;
 
-export const CHASE_DISTANCE = 6.0; // m behind the car
-export const CHASE_HEIGHT = 2.3; // m above the car
-export const CHASE_LOOK_AHEAD = 3.0; // m ahead of the car to aim at
-export const CHASE_LOOK_HEIGHT = 1.1; // m above car origin to aim at
+// Chase rig — LOW AND CLOSE (art pass 2026-08-03, founder-approved).
+//
+// The review: *"the chase camera is too high and far — you look down on the
+// car's roof"*, where his reference frame is low and close and *"you feel
+// speed"*. The old 6.0 m / 2.3 m pair put the eye 21° above the car's roof
+// line: from there the roof is the largest object on screen, the road plane
+// is seen from a map-like angle, and the near-field optic flow that carries
+// the sensation of speed is squeezed into the bottom of the frame.
+//
+// 4.6 m / 1.55 m is 18.6° — a shoulder-height follow, not a drone. The car
+// still fits (CHASE_FOV 44 vertical, so at 4.6 m the frame is 3.7 m tall at
+// the car and the body is ~1.4 m), the roof stops dominating, and the road
+// surface sweeps past close to the camera where the eye reads velocity.
+//
+// The aim point drops WITH the eye (1.1 → 0.85 m) so the horizon does not
+// climb: aiming at the old height from the new eye would pitch the camera up
+// and put more sky in frame, undoing the near-field flow the move is for.
+// Look-ahead goes 3.0 → 4.2 m to keep the same amount of ROAD in front of
+// the car once the eye has come down.
+export const CHASE_DISTANCE = 4.6; // m behind the car
+export const CHASE_HEIGHT = 1.55; // m above the car
+export const CHASE_LOOK_AHEAD = 4.2; // m ahead of the car to aim at
+export const CHASE_LOOK_HEIGHT = 0.85; // m above car origin to aim at
 export const CHASE_STIFFNESS = 5.0; // 1/s exponential follow rate
 
 // ---------------------------------------------------------------------------

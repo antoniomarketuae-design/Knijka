@@ -338,11 +338,14 @@ export function StatusDashboard({
           </span>
           <span className="text-[8px] font-bold uppercase tracking-wider text-muted">км/ч</span>
         </span>
+        {/* See the roomy variant below for why the sign stays a sign. On the
+            phone the ring is already 2 px; only the 85 % tint is new, so the
+            two variants cannot drift apart again. */}
         <span
           aria-label={`Ограничение ${limit} км/ч`}
           title="Ограничение на скоростта"
           className="flex h-6 w-6 shrink-0 translate-y-0.5 items-center justify-center rounded-full border-2 text-[10px] font-black tabular-nums text-foreground"
-          style={{ borderColor: "var(--danger)" }}
+          style={{ borderColor: "color-mix(in srgb, var(--danger) 85%, transparent)" }}
         >
           {limit}
         </span>
@@ -418,16 +421,26 @@ export function StatusDashboard({
             км/ч
           </span>
         </div>
-        {/* The limit disc keeps its 3 px red ring: it is a drawing of a road
-            sign, not a card, and the ghost sweep deliberately leaves semantic
-            border colours and radii alone. Only the surface fill goes — the
-            number now sits on the road inside the ring, which is what a real
-            speed-limit sign looks like from a car. */}
+        {/* THE LIMIT DISC — and the one place this lane declines the review.
+            „Crisp flat vector glyphs laid on the 3D (the «40» ring …)" is a
+            fair description, and the reference's answer would be a mono
+            „LIMIT 40" at the edge. It is not taken, deliberately: a red ring
+            with a numeral in it IS the Bulgarian sign В26, the student is
+            being trained to read that shape at speed on a real road, and
+            replacing it with a word would teach the HUD instead of the law.
+            North star (CLAUDE.md): safer, more competent real drivers.
+
+            What DOES change is that it stops being a heavy sticker — the ring
+            drops 3 px → 2 px and carries the danger colour at 85 %, so the
+            road shows through it the way it shows through everything else in
+            this register, and the numeral is now set in the register's mono
+            face. It is a sign seen through a windscreen, not a vector pasted
+            on one. The fill was already gone (the ghost sweep). */}
         <span
           aria-label={`Ограничение ${limit} км/ч`}
           title="Ограничение на скоростта"
-          className="flex h-8 w-8 items-center justify-center rounded-full border-[3px] text-xs font-black tabular-nums text-foreground md:h-9 md:w-9 md:text-sm"
-          style={{ borderColor: "var(--danger)" }}
+          className="flex h-8 w-8 items-center justify-center rounded-full border-2 text-xs font-black tabular-nums text-foreground md:h-9 md:w-9 md:text-sm"
+          style={{ borderColor: "color-mix(in srgb, var(--danger) 85%, transparent)" }}
         >
           {limit}
         </span>

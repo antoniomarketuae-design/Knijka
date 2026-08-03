@@ -18,7 +18,7 @@
 
 import "@/lib/content/loader";
 import { getContentRepo } from "@/lib/content/repo";
-import { getSessionUser, requireUser } from "@/modules/auth";
+import { getSessionUser } from "@/modules/auth";
 import { submitAnswer } from "@/modules/learning";
 import {
   isQuizMediaRenderable,
@@ -56,7 +56,8 @@ export async function loadMicroQuizBank(
   // could produce a frame of the driving screen. Returning [] is exactly what
   // this function's contract above already promises for every other failure,
   // and it leaks nothing: an anonymous caller got no questions before either.
-  // The mutation half (submitMicroQuizAnswer) keeps requireUser().
+  // The mutation half (submitMicroQuizAnswer) refuses by THROWING, which is
+  // also not a navigation — see its own note.
   const user = await getSessionUser();
   if (user === null) return [];
 
@@ -136,7 +137,19 @@ export async function submitMicroQuizAnswer(
   questionId: string,
   selectedOptionIds: string[],
 ): Promise<MicroQuizAnswerResult> {
-  const user = await requireUser();
+  // THROW, never redirect. The note on loadMicroQuizBank above explains the
+  // mechanism; what makes this one worse is WHEN it fires — mid-drive, while
+  // the student is moving, from an overlay. requireUser() here meant an expired
+  // session did not fail the question, it navigated the moving car to /login.
+  // A thrown error stays inside the action's promise (the overlay already
+  // catches it and shows a message — see its `catch` around onSubmit) and it is
+  // exactly how this same function already refuses invalid input and missing
+  // entitlement three lines down. Auth is unchanged: nothing is graded and no
+  // mastery moves without a session.
+  const user = await getSessionUser();
+  if (user === null) {
+    throw new Error("submitMicroQuizAnswer: not signed in");
+  }
 
   if (!(await canDriveSimulator(user))) {
     throw new Error("submitMicroQuizAnswer: no simulator entitlement");

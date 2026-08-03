@@ -1,7 +1,7 @@
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { GHOST_SURFACES } from "./PlayAreaStyles";
+import { GHOST_SURFACES, UNPANEL_CSS } from "./PlayAreaStyles";
 
 /**
  * THE UNPANEL LAYER, GUARDED THE ONE WAY THAT WOULD HAVE CAUGHT THE LAST MISS.
@@ -85,6 +85,121 @@ describe("UNPANEL — every ghost selector has a live producer", () => {
     // PlayAreaStyles itself defines it; the point is that something USES it.
     const users = producers.filter((path) => !path.endsWith("PlayAreaStyles.tsx"));
     expect(users.length).toBeGreaterThanOrEqual(6);
+  });
+});
+
+/**
+ * =============================================================================
+ * THE THREE PIECES OF WEB FURNITURE THE 2026-08-03 REVIEW NAMED BY SIGHT.
+ *
+ * „The briefing bar … ending in a SOLID BRAND-BLUE «Разбрах» button. That is a
+ * cookie banner." · „the white circular hamburger, top-left — a mobile-web menu
+ * affordance." · „«Начинаещ | Нормален | Напреднал» — a segmented control lifted
+ * straight from a settings page, with a filled blue selected segment."
+ *
+ * All three survived the FIRST unpanel pass, and each for its own reason worth
+ * writing down, because the next pass will meet the same three shapes:
+ *   · the tier segment was exempted by the sweep's blanket
+ *     `:not([aria-pressed="true"])`, which was written for progress fills;
+ *   · the ack was exempted by `data-hud-ink`, which is a real and necessary
+ *     exemption — the control that clears a blocking line must stay visible —
+ *     so the fix had to be a DIFFERENT fill, not no fill;
+ *   · the hamburger was never on the ghost list at all.
+ *
+ * Two of the three are one line of CSS each. That is precisely the kind of line
+ * that gets dropped in a merge and noticed in a photograph six weeks later, so
+ * each one is pinned here by the text that has to be present. These assertions
+ * are cheap and they are NOT a substitute for looking — the acceptance evidence
+ * is a render (see the header of this file).
+ * =============================================================================
+ */
+describe("UNPANEL — the named web furniture stays unbuilt", () => {
+  const shell = TSX.find(({ path }) => path.endsWith("LessonPlayShell.tsx"))!;
+  const overlay = TSX.find(({ path }) => path.endsWith("SimOverlay.tsx"))!;
+
+  it("the tier picker's selected segment is not a filled blue chip", () => {
+    // The sweep's own exemption is withdrawn for THIS control, by name.
+    expect(UNPANEL_CSS).toMatch(
+      /\[data-hud="difficulty"\]\s+button\[aria-pressed="true"\][\s\S]{0,200}background-color:\s*transparent\s*!important/,
+    );
+    // …and the state is restated, or "which tier am I on" has no answer.
+    expect(UNPANEL_CSS).toMatch(/box-shadow:\s*inset[^;]*currentColor/);
+  });
+
+  it("the tier picker is not a segmented control any more", () => {
+    // The group's own ring is the other half of the settings-page shape.
+    expect(UNPANEL_CSS).toMatch(
+      /\[data-hud="difficulty"\]\s*\{[\s\S]{0,120}border-color:\s*transparent/,
+    );
+  });
+
+  it("the instrument register is set in the telemetry face", () => {
+    // „his reference uses low-contrast monospace text anchored to the edge".
+    expect(UNPANEL_CSS).toMatch(/font-family:\s*var\(--font-mono\)/);
+    // …and the authored WHY is NOT, because mono costs it two lines in the
+    // 216 px toast box and a student reads that sentence at the worst moment
+    // of the lesson (THEO-4). If this pin is ever dropped, the toast silently
+    // gets longer on the founder's phone.
+    expect(UNPANEL_CSS).toMatch(/:is\(p, h1, h2, h3, blockquote\)[\s\S]{0,80}var\(--font-sans\)/);
+  });
+
+  it("the micro menu is a word on the ghost register, not a white disc", () => {
+    // The button is found by its own aria-label, so a class rename cannot make
+    // this pass by accident.
+    const button = /aria-label=\{open \? "Затвори менюто на урока"[\s\S]{0,900}?<\/button>/.exec(
+      shell.text,
+    )?.[0];
+    expect(button, "the micro-menu button moved — re-anchor this test").toBeDefined();
+    expect(button).toContain("hud-ghost");
+    // No fill and no blur of its own: the register strips them, and writing
+    // them here would be a claim the cascade has to win an argument about.
+    expect(button).not.toMatch(/bg-background\/|backdrop-blur/);
+    // ☰ is the affordance he named. It is not coming back.
+    expect(button).not.toContain("☰");
+    expect(button).toContain("Меню");
+    // 44 px in both axes survives the restyle (row C2).
+    expect(button).toMatch(/h-11/);
+    expect(button).toMatch(/min-w-11|w-11/);
+  });
+
+  /**
+   * The PEEK only. The OPEN sheet below it is an explicit pause — a page to
+   * read, on its own scrim — and its full-width `btn-accent` is right there:
+   * that is the one screen where a call to action IS the content. The founder's
+   * complaint is about the rail he drives with, so the assertions are too.
+   */
+  const peek = /data-sim-overlay-state="peek"[\s\S]*?\n      <\/div>\n      \)\}/.exec(
+    overlay.text,
+  )?.[0];
+
+  it("the peek block is still findable (anchor check)", () => {
+    expect(peek, "the peek block moved — re-anchor the two tests below").toBeDefined();
+    // A sanity floor: if the regex ever matches a sliver, the two assertions
+    // under it become vacuously true.
+    expect(peek!.length).toBeGreaterThan(1200);
+    expect(peek).toContain("ackLabelBg");
+  });
+
+  it("the overlay ack is a translucent chip, not a solid brand button", () => {
+    // Matched inside a className attribute, not anywhere in the slice: the
+    // comment above the button NAMES `btn-accent` as the thing it replaced,
+    // and a guard that cannot tell a class list from prose is the same
+    // green-assertion-as-evidence this whole file exists to end.
+    expect(peek).not.toMatch(/className="[^"]*\bbtn-accent\b/);
+    // Tinted from the ITEM's tone, so a danger line is not acknowledged with a
+    // blue button — and hairline-bordered, so it still reads as pressable.
+    expect(peek).toMatch(/backgroundColor: `color-mix\(in srgb, \$\{color\} \d+%/);
+    // The exemption that keeps that tint alive through the sweep.
+    expect(peek).toContain('data-hud-ink=""');
+  });
+
+  it("the overlay peek is no longer a bordered strip", () => {
+    // `rounded-full border` on the peek ROW is what made it a „bar". The two
+    // CHIPS inside it keep their borders; the row must not have one.
+    const row = /className=\{`hud-ghost sim-overlay-in[^`]*`\}/.exec(peek ?? "")?.[0];
+    expect(row, "the peek row's class list moved — re-anchor this test").toBeDefined();
+    expect(row).not.toMatch(/\bborder\b/);
+    expect(row).not.toMatch(/\brounded-full\b/);
   });
 });
 

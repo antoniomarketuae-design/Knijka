@@ -45,11 +45,151 @@ const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..
 /** PERCEPTUAL_ROAD_SCALE × textbook lane — the drawn lane width, m. */
 const SCALED_LANE_W = 3.25 * 2.5;
 
+/** constants.PARKING_LANE_WIDTH_M — the curbside band, per side, m. */
+const PARKING_LANE_WIDTH_M = 4.0;
+/** constants.SIDEWALK_SKIRT_M + SIDEWALK_WIDTH_M — kerb to the pavement's back. */
+const PAVEMENT_DEPTH_M = 0.35 + 3.5;
+
 const r2 = (v) => Math.round(v * 100) / 100;
 
 function segLength(a, b) {
   return r2(Math.hypot(b[0] - a[0], b[1] - a[1]));
 }
+
+// ---------------------------------------------------------------------------
+// Frontages (doc 87 B63) — WHY THIS FILE GREW A SECOND AXIS
+// ---------------------------------------------------------------------------
+
+/**
+ * HIS SENTENCE, on catalog 33 against catalog 36: „absolutely same as 31, no
+ * difference at all". The re-look put the two spawn frames side by side and
+ * confirmed it in pixels: „same building line left, same street tree, same
+ * billboard at the same screen coordinates, same parked row right, same sky,
+ * same road width, same spawn pose. They diverge only in length."
+ *
+ * He was right, and the generator is why: it took SIX numbers, four of which
+ * were speeds and lengths, and emitted the same frontage recipe — inner face at
+ * `halfRoad + 8`, 22 m deep, 46 m pitch, alternating sides, one heights array —
+ * for both instances. Two lessons, one picture.
+ *
+ * A frontage is therefore now named per instance, and it moves the four things
+ * a driver reads through the windscreen in the first second: how FAR BACK the
+ * buildings stand (which is what makes a street feel fast or tight), how DENSE
+ * the row is, how TALL it is, and what stands at the far end. Combined with
+ * `parkingBand` — which decides whether there is a parked row at the kerb at
+ * all, and therefore how wide the asphalt is — the two maps no longer share a
+ * cross-section OR a skyline.
+ *
+ * `build(ctx)` gets `{ halfRoadM, approachM, zoneM, totalM, kerbM, clearX }`
+ * where `kerbM` is the real kerb (travel lanes + whatever band this street
+ * carries) and `clearX` is the nearest x a volume may occupy. Post-validated.
+ */
+const FRONTAGES = {
+  /**
+   * SP-03 „Преходът на зони": a TIGHT terrace, hard up against the pavement on
+   * both sides, with a continuous street wall on the west. This is the street a
+   * зона 30 is actually posted on — you cannot see past the parked row, the
+   * doors open onto the pavement, and the buildings are close enough to read
+   * the ground floors. The 30 is obvious from the seat.
+   */
+  "tight-terrace": {
+    noteBg:
+      "Плътна улична стена от двете страни, залепена за тротоара, и паркирана редица покрай бордюра: тук 30 не е каприз на знака — оттам, където си, просто не виждаш нищо зад колите.",
+    build: (ctx) => {
+      const out = [];
+      const xi = r2(ctx.clearX);
+      const xo = r2(ctx.clearX + 15);
+      // West: ONE continuous terrace up the whole approach — a street wall.
+      out.push({
+        id: "sp-tr-b-terrace-w",
+        height: 16,
+        heightSource: "default",
+        footprint: [
+          [r2(-xo), 26],
+          [r2(-xi), 26],
+          [r2(-xi), r2(ctx.approachM - 18)],
+          [r2(-xo), r2(ctx.approachM - 18)],
+        ],
+      });
+      // East: a broken row of narrow shop-fronts (short pitch, low).
+      const heights = [8, 11, 9, 12, 10, 9, 13, 10];
+      let i = 0;
+      for (let cy = 34; cy <= ctx.approachM - 22; cy += 30, i++) {
+        out.push({
+          id: `sp-tr-b-approach-${i}`,
+          height: heights[i % heights.length],
+          heightSource: "default",
+          footprint: [
+            [xi, r2(cy - 11)],
+            [xo, r2(cy - 11)],
+            [xo, r2(cy + 11)],
+            [xi, r2(cy + 11)],
+          ],
+        });
+      }
+      // The zone segment keeps its school, and the street ENDS in a slab.
+      out.push({
+        id: "sp-tr-b-endslab",
+        height: 18,
+        heightSource: "default",
+        footprint: [
+          [-34, r2(ctx.totalM + 16)],
+          [34, r2(ctx.totalM + 16)],
+          [34, r2(ctx.totalM + 50)],
+          [-34, r2(ctx.totalM + 50)],
+        ],
+      });
+      return out;
+    },
+  },
+  /**
+   * SP-01/SP-03 „Пълзящо превишаване": the OPPOSITE street, and the opposite
+   * for a reason. The needle creeps because nothing tells you it should not:
+   * panel blocks set 28 m back behind green, wide gaps between them, no parked
+   * row at the kerb at all. It is a road that FEELS like 70 and is posted 50 —
+   * which is the whole lesson, and it is now built into the map instead of
+   * being asserted by the copy.
+   */
+  "setback-panel-blocks": {
+    noteBg:
+      "Панелни блокове, отдръпнати на близо тридесет метра зад зеленина, широки междублокови процепи и НУЛА паркирани коли на бордюра: улицата изглежда като седемдесет и е ограничена на петдесет. Точно затова стрелката пълзи сама.",
+    build: (ctx) => {
+      const out = [];
+      const xi = r2(Math.max(ctx.clearX, ctx.kerbM + 20));
+      const xo = r2(xi + 24);
+      // Tall slabs, LONG pitch, alternating — big holes of sky between them.
+      const heights = [24, 27, 22, 26, 23];
+      let i = 0;
+      for (let cy = 60; cy <= ctx.approachM - 40; cy += 96, i++) {
+        const s = i % 2 === 0 ? 1 : -1;
+        const yA = r2(cy - 26);
+        const yB = r2(cy + 26);
+        out.push({
+          id: `sp-tr-b-approach-${i}`,
+          height: heights[i % heights.length],
+          heightSource: "default",
+          footprint:
+            s > 0
+              ? [[xi, yA], [xo, yA], [xo, yB], [xi, yB]]
+              : [[r2(-xo), yA], [r2(-xi), yA], [r2(-xi), yB], [r2(-xo), yB]],
+        });
+      }
+      // The far end opens onto a low park wall, not a building: a horizon LINE.
+      out.push({
+        id: "sp-tr-b-parkwall",
+        height: 2.4,
+        heightSource: "default",
+        footprint: [
+          [-60, r2(ctx.totalM + 44)],
+          [60, r2(ctx.totalM + 44)],
+          [60, r2(ctx.totalM + 47.6)],
+          [-60, r2(ctx.totalM + 47.6)],
+        ],
+      });
+      return out;
+    },
+  },
+};
 
 /**
  * @param {{
@@ -63,7 +203,7 @@ function segLength(a, b) {
  */
 export function buildSpTransitionStreet(params) {
   const errors = [];
-  const { districtId, label, approachM, zoneM, approachKmh, zoneKmh } = params;
+  const { districtId, label, approachM, zoneM, approachKmh, zoneKmh, frontage, parkingBand } = params;
 
   if (!/^[a-z0-9-]+$/.test(districtId ?? "")) errors.push(`districtId "${districtId}" must be kebab-case`);
   if (!(approachM >= 120 && approachM <= 600)) errors.push(`approachM must be within 120..600 m, got ${approachM}`);
@@ -71,6 +211,21 @@ export function buildSpTransitionStreet(params) {
   if (![40, 50, 60].includes(approachKmh)) errors.push(`approachKmh must be 40|50|60, got ${approachKmh}`);
   if (zoneKmh !== 30) errors.push(`zoneKmh must be 30 (the зона 30 archetype), got ${zoneKmh}`);
   if (approachKmh <= zoneKmh) errors.push(`approachKmh (${approachKmh}) must exceed zoneKmh (${zoneKmh})`);
+  if (!FRONTAGES[frontage]) {
+    errors.push(
+      `frontage "${frontage}" unknown — pick one of ${Object.keys(FRONTAGES).join(", ")} ` +
+        `(doc 87 B63: two instances sharing a frontage open on the SAME PICTURE, which is ` +
+        `exactly what the founder photographed side by side for catalog 33 and 36)`,
+    );
+  }
+  if (typeof parkingBand !== "boolean") {
+    errors.push(
+      `parkingBand must be an explicit boolean (FR-21): true = draw the 4 m kerbside band so ` +
+        `the procedural row stands on ASPHALT, false = this street has no kerbside parking and ` +
+        `the row is not placed at all. Absent used to mean "residential ⇒ no band, row on the ` +
+        `pavement", which is the defect.`,
+    );
+  }
   if (errors.length > 0) throw new Error(`gen_sp_transition params invalid:\n  - ${errors.join("\n  - ")}`);
 
   const totalM = approachM + zoneM;
@@ -103,6 +258,7 @@ export function buildSpTransitionStreet(params) {
       lanesSource: "tag",
       maxspeed: approachKmh,
       maxspeedSource: "tag",
+      parkingBand,
       length: segLength(approachGeom[0], approachGeom[1]),
       geometry: approachGeom,
     },
@@ -120,6 +276,7 @@ export function buildSpTransitionStreet(params) {
       maxspeedSource: "tag",
       // Additive legality tag (doc 72 N3) — the reduced limit is in `maxspeed`.
       zone: "school",
+      parkingBand,
       length: segLength(zoneGeom[0], zoneGeom[1]),
       geometry: zoneGeom,
     },
@@ -148,6 +305,16 @@ export function buildSpTransitionStreet(params) {
     },
   ];
 
+  // FR-21 (the car half) + B63: the kerb is the travel lanes PLUS whatever
+  // curbside band this street declares, and the frontage stands back from THAT.
+  // `parkingBand: true` moves the kerb out 4 m from under the procedurally
+  // parked row — the bodies do not move, the pavement does — so the row that
+  // used to stand in the middle of the footway now stands on asphalt.
+  const bandM = parkingBand ? PARKING_LANE_WIDTH_M : 0;
+  const kerbM = r2(halfRoadM + bandM);
+  const clearX = r2(kerbM + PAVEMENT_DEPTH_M + 0.5);
+  const recipe = FRONTAGES[frontage];
+
   const BUILDINGS = [
     {
       // A school block flanking the zone segment (west side, clear of the road).
@@ -155,59 +322,14 @@ export function buildSpTransitionStreet(params) {
       height: 9,
       heightSource: "default",
       footprint: [
-        [r2(-(halfRoadM + 22)), r2(approachM + 40)],
-        [r2(-(halfRoadM + 8)), r2(approachM + 40)],
-        [r2(-(halfRoadM + 8)), r2(approachM + 70)],
-        [r2(-(halfRoadM + 22)), r2(approachM + 70)],
+        [r2(-(clearX + 14)), r2(approachM + 40)],
+        [r2(-clearX), r2(approachM + 40)],
+        [r2(-clearX), r2(approachM + 70)],
+        [r2(-(clearX + 14)), r2(approachM + 70)],
       ],
     },
+    ...recipe.build({ halfRoadM, approachM, zoneM, totalM, kerbM, clearX }),
   ];
-
-  // A built-up residential row flanking the APPROACH (render-only context, doc
-  // 62 P5): the 50 cap needs a town reason — a car creeping over 50 on a bare
-  // strip has no legible speed context. Residential class draws no streetlights,
-  // so the buildings carry the "populated area" cue. The row opens at the entry
-  // as a both-sides gateway pinch (the town-entry cue) by the spawn, then
-  // alternates up the approach so the whole creep reads urban. Clear of the
-  // carriageway + sidewalk (inner face at half-road + 8 m); deterministic — no
-  // RNG, so the same params emit byte-identical JSON. Grading is untouched: the
-  // rule engine reads maxspeed, never these footprints.
-  const bXi = r2(halfRoadM + 8); // inner face, just past the sidewalk
-  const bXe = r2(halfRoadM + 22); // outer face
-  const bHeights = [12, 15, 9, 13, 10, 14, 11]; // residential storey mix
-  const B_DEPTH = 22;
-  const B_PITCH = 46;
-  const rowEndY = approachM - 24; // stay on the 50 approach, clear of the zone
-  let bIdx = 0;
-  for (let cy = 30, k = 0; cy <= rowEndY; cy += B_PITCH, k++) {
-    const yA = r2(cy - B_DEPTH / 2);
-    const yB = r2(cy + B_DEPTH / 2);
-    // Gateway pinch: both sides at the entry; then alternate sides.
-    const sides = k === 0 ? [1, -1] : [k % 2 === 1 ? 1 : -1];
-    for (const s of sides) {
-      const footprint =
-        s > 0
-          ? [
-              [bXi, yA],
-              [bXe, yA],
-              [bXe, yB],
-              [bXi, yB],
-            ]
-          : [
-              [r2(-bXe), yA],
-              [r2(-bXi), yA],
-              [r2(-bXi), yB],
-              [r2(-bXe), yB],
-            ];
-      BUILDINGS.push({
-        id: `sp-tr-b-approach-${bIdx}`,
-        height: bHeights[bIdx % bHeights.length],
-        heightSource: "default",
-        footprint,
-      });
-      bIdx++;
-    }
-  }
 
   const bounds = { minX: Infinity, minY: Infinity, maxX: -Infinity, maxY: -Infinity };
   for (const e of EDGES) {
@@ -218,8 +340,8 @@ export function buildSpTransitionStreet(params) {
       bounds.maxY = Math.max(bounds.maxY, y);
     }
   }
-  bounds.minX = Math.min(bounds.minX, -halfRoadM - 6);
-  bounds.maxX = Math.max(bounds.maxX, halfRoadM + 6);
+  bounds.minX = Math.min(bounds.minX, -kerbM - 6);
+  bounds.maxX = Math.max(bounds.maxX, kerbM + 6);
   for (const bl of BUILDINGS) {
     for (const [x, y] of bl.footprint) {
       bounds.minX = Math.min(bounds.minX, x);
@@ -330,6 +452,10 @@ const INSTANCES = [
     zoneM: 200,
     approachKmh: 50,
     zoneKmh: 30,
+    // doc 87 B63: the TIGHT street, 24.25 m curb to curb with a parked row on
+    // the asphalt — the picture a зона 30 belongs to.
+    frontage: "tight-terrace",
+    parkingBand: true,
   },
   {
     // sc-speed-creep's P5 redesign host (doc 62 #30/P5): the same two-segment
@@ -344,6 +470,10 @@ const INSTANCES = [
     zoneM: 280,
     approachKmh: 50,
     zoneKmh: 30,
+    // doc 87 B63: the OPEN street, 16.25 m curb to curb and NOT ONE parked car
+    // — the road that feels like 70 and is posted 50, which is the lesson.
+    frontage: "setback-panel-blocks",
+    parkingBand: false,
   },
 ];
 

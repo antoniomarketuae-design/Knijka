@@ -970,6 +970,32 @@ export class CyclistRightHookRunner implements EventRunner {
 
 /** Lock the circulation speed once the player is this close to the entry, m. */
 const RB_LOCK_PLAYER_ENTRY_M = 14;
+/**
+ * THE STOPPED-WITNESS RELEASE, ring edition (doc 87 B15) — how far from the
+ * entry a STANDING driver still counts as the car's witness, m.
+ *
+ * The sibling `PriorityFromRightRunner` got this release; this runner did not,
+ * and the founder found the hole by doing the lawful thing:
+ *
+ *   the give-way paint on the ring approach sits ~18.2 m from `spec.entry`,
+ *   RB_LOCK_PLAYER_ENTRY_M is 14, so a driver stopped ON THE PAINT never trips
+ *   the lock — and the sync branch below re-times the circulator every tick to
+ *   be `conflictLeadM` upstream of a player whose ETA is
+ *   `dEntry / max(speed, 2.5)`, which for a stationary driver FLOORS at
+ *   18.2 / 2.5 = 7.28 s and never shrinks. The car is therefore held
+ *   permanently ~7 s away from a man who is permanently waiting for it, and it
+ *   only ever arrives once he gives up and moves — which is the moment he is
+ *   graded for not yielding to it. Stopping where the law says produced a
+ *   ОПАСНА ГРЕШКА for a car that had been ordered not to come.
+ *
+ * 22 m clears the 18.2 m paint with margin, which is why it is wider than the
+ * junction runner's 14: there the stopped driver is marooned at 10–12 m of
+ * residual line distance, here at 18. A premature release costs nothing on a
+ * ring the way it would at a T-junction — the circulator is a CLOSED LOOP
+ * (`loop: true`), so a car released early simply keeps going round and the
+ * decision presents itself again. An empty ring does not.
+ */
+const RB_WITNESS_STOPPED_NEAR_M = 22;
 /** Resolve "clear" once the player is this far beyond the ring band, m. */
 const RB_EXIT_MARGIN_M = 30;
 
@@ -979,6 +1005,9 @@ export class RoundaboutEntryRunner implements EventRunner {
   hazardActive = false;
 
   private conflictLeadM = 0;
+  /** Continuous seconds the player has stood still at the give-way line — the
+   *  stopped-witness release (see RB_WITNESS_STOPPED_NEAR_M). */
+  private stoppedForSec = 0;
 
   constructor(readonly spec: RoundaboutEntrySpec) {}
 
@@ -1002,6 +1031,7 @@ export class RoundaboutEntryRunner implements EventRunner {
     this.conflictLeadM = s.conflictLeadM + (rng() * 2 - 1) * 3;
     this.phase = "armed";
     this.outcome = null;
+    this.stoppedForSec = 0;
   }
 
   step(traffic: StagedTrafficPort, input: DirectorInput, out: SimTickEvent[]): StagedEventOutcome | null {
@@ -1025,7 +1055,17 @@ export class RoundaboutEntryRunner implements EventRunner {
     if (this.phase === "armed") {
       if (dCenter > s.armDistM) return null;
       const dEntry = dist(input.x, input.y, s.entry.x, s.entry.y);
-      if (dEntry <= RB_LOCK_PLAYER_ENTRY_M) {
+      // The stopped-witness release (B15). A driver standing on the give-way
+      // paint is the most attentive witness a circulating car will ever get;
+      // he must not be the one person the encounter refuses to happen for.
+      // The dwell (not a single frame) keeps a mid-approach brake dab from
+      // releasing early — the same discipline as WITNESS_STOPPED_HOLD_SEC.
+      if (input.speedKmh <= WITNESS_STOPPED_KMH && dEntry <= RB_WITNESS_STOPPED_NEAR_M) {
+        this.stoppedForSec += input.dtSec;
+      } else {
+        this.stoppedForSec = 0;
+      }
+      if (dEntry <= RB_LOCK_PLAYER_ENTRY_M || this.stoppedForSec >= WITNESS_STOPPED_HOLD_SEC) {
         traffic.stagedCommand(s.id, { type: "cruise" }); // lock the circulation
         this.phase = "triggered";
         return null;

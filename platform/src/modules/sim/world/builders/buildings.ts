@@ -57,6 +57,23 @@ export interface BuildingBuildResult {
  */
 const SCHOOL_FACADE_VARIANT = 2;
 
+/**
+ * Cornice band, art pass 2026-08-03. Height of the crown strip cut off the top
+ * of every wall. 1.1 m is a real Bulgarian parapet + coping: tall enough to
+ * read at the 40–120 m a driver sees a block from, short enough that it never
+ * eats a floor of the baked bay texture underneath it.
+ */
+const CORNICE_DEPTH_M = 1.1;
+/** Value at the reveal line — the shaded gap the projecting coping throws on
+ *  the wall under it. Deliberately DEEPER than GROUND_BAND_TINT (0.62): this
+ *  is a cast shadow with a hard top edge, not the ground floor's diffuse
+ *  street grime, and the two bands have to be separable or the prism just
+ *  gains a second grubby stripe. */
+const CORNICE_REVEAL_TINT = 0.55;
+/** …and at the roofline itself: the coping's own top face is the one part of
+ *  the wall pointing at the sky, so it is the brightest thing on the prism. */
+const CORNICE_CAP_TINT = 1.14;
+
 export function facadeVariant(buildingId: string, height: number, kind?: string): number {
   // A school is never hashed into the residential palette: it is the ONE
   // building on the street a driver has to recognise (founder item 61).
@@ -109,6 +126,36 @@ function buildOne(
     GROUND_BAND_TINT * tb,
   ];
   const light: [number, number, number] = [tr, tg, tb];
+  // Cornice band (art pass 2026-08-03). The review: *"our buildings are
+  // untextured extruded boxes with painted-on window rectangles"*. Half of
+  // that read is the TOP: a flat-roofed prism whose wall runs at one value
+  // straight into the roof plane has no crown, and a box with no crown is an
+  // extrusion, not a building. Every Bulgarian блок has one — a projecting
+  // parapet with a shaded reveal under it.
+  //
+  // This is that, and it costs nothing but one extra vertex row: the wall's
+  // top quad is split at CORNICE_DEPTH_M, the split row is darkened to the
+  // reveal value and the roofline row is lifted to the parapet value. Vertex
+  // colours multiply the SAME facade map on the SAME material, so the mesh
+  // count, the draw count and the texture budget are all unchanged, and it
+  // reads identically at every tier — including `low`, where facadeMaps is
+  // "colorOnly" and there is no normal map to carry relief. That is the point:
+  // it is the one building cue a phone can afford.
+  const reveal: [number, number, number] = [
+    CORNICE_REVEAL_TINT * tr,
+    CORNICE_REVEAL_TINT * tg,
+    CORNICE_REVEAL_TINT * tb,
+  ];
+  const parapet: [number, number, number] = [
+    CORNICE_CAP_TINT * tr,
+    CORNICE_CAP_TINT * tg,
+    CORNICE_CAP_TINT * tb,
+  ];
+  // Never eat the ground band, and never invent a cornice on a hut: below
+  // ~2 × the band height the building is a kiosk and gets none.
+  const corniceY =
+    h > GROUND_BAND_M * 2 + CORNICE_DEPTH_M ? h - CORNICE_DEPTH_M : Number.NaN;
+  const hasCornice = Number.isFinite(corniceY);
 
   let minX = Infinity;
   let minY = Infinity;
@@ -138,15 +185,25 @@ function buildOne(
     // Wall as two stacked quads: ground band (dark tint) + upper floors.
     // Vertical wall along travel (b0, b1, t1, t0) faces right = outward.
     if (wallAcc) {
-      const rows: [number, number, [number, number, number]][] = [
-        [0, bandTop, dark],
-        [bandTop, h, light],
-      ];
-      for (const [y0, y1, tint] of rows) {
-        const b0 = wallAcc.vertex(toWorld(p0[0], p0[1], y0), n, [u0, vAt(y0)], tint);
-        const b1 = wallAcc.vertex(toWorld(p1[0], p1[1], y0), n, [u1, vAt(y0)], tint);
-        const t1 = wallAcc.vertex(toWorld(p1[0], p1[1], y1), n, [u1, vAt(y1)], tint);
-        const t0 = wallAcc.vertex(toWorld(p0[0], p0[1], y1), n, [u0, vAt(y1)], tint);
+      // Each row is [yBottom, yTop, tintAtBottom, tintAtTop] — the last two
+      // differ only on the cornice, where the gradient IS the reveal.
+      const rows: [number, number, [number, number, number], [number, number, number]][] =
+        hasCornice
+          ? [
+              [0, bandTop, dark, dark],
+              [bandTop, corniceY, light, light],
+              // Dark at the reveal line, bright at the parapet's top edge.
+              [corniceY, h, reveal, parapet],
+            ]
+          : [
+              [0, bandTop, dark, dark],
+              [bandTop, h, light, light],
+            ];
+      for (const [y0, y1, tint0, tint1] of rows) {
+        const b0 = wallAcc.vertex(toWorld(p0[0], p0[1], y0), n, [u0, vAt(y0)], tint0);
+        const b1 = wallAcc.vertex(toWorld(p1[0], p1[1], y0), n, [u1, vAt(y0)], tint0);
+        const t1 = wallAcc.vertex(toWorld(p1[0], p1[1], y1), n, [u1, vAt(y1)], tint1);
+        const t0 = wallAcc.vertex(toWorld(p0[0], p0[1], y1), n, [u0, vAt(y1)], tint1);
         wallAcc.quad(b0, b1, t1, t0);
       }
     }

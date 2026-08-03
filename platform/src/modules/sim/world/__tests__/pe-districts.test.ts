@@ -62,8 +62,20 @@ interface PeMapCase {
    *  (FR-21's car half), 0 = this street has no kerbside parking at all. */
   bandM: number;
   oneway: boolean;
-  /** Directed lanes buildLaneGraph derives (a one-way street has one). */
+  /** Directed lanes buildLaneGraph derives ON THE GRADED STREET (a one-way
+   *  street has one). Terminus legs add their own — `graphLanes` is the total. */
   lanes: number;
+  /**
+   * doc 87 B50/B53/B54 — the TERMINUS: what this street runs into, past the
+   * furthest sample of every recorded drive on it. This is the axis that
+   * answers „dead straight to a flat horizon", and the three numbers beside it
+   * are what „2 nodes / 1 edge / 0 intersections, seven times" measured.
+   */
+  terminus: string;
+  nodes: number;
+  edges: number;
+  /** Total directed lanes in the district (street + every terminus leg). */
+  graphLanes: number;
   /** The ban-zone face this street posts, if any. */
   banSignRef: string | null;
   /** Lamp columns: an ARTERIAL class is lit, a residential one is not. */
@@ -75,25 +87,32 @@ interface PeMapCase {
 const CASES: PeMapCase[] = [
   { id: "pe-clear-v1", crossingY: 90, limitKmh: 50, lengthM: 150,
     roadscape: "collector-shopping", roadClass: "tertiary", bandM: 0,
-    oneway: false, lanes: 2, banSignRef: "В27", lit: true, bareVerge: null },
+    oneway: false, lanes: 2, banSignRef: "В27", lit: true, bareVerge: null ,
+    terminus: "opens-to-collector", graphLanes: 4, nodes: 3, edges: 2 },
   { id: "pe-slow-v1", crossingY: 85, limitKmh: 40, lengthM: 145,
     roadscape: "residential-clinic", roadClass: "residential", bandM: 0,
-    oneway: false, lanes: 2, banSignRef: "В27", lit: false, bareVerge: null },
+    oneway: false, lanes: 2, banSignRef: "В27", lit: false, bareVerge: null ,
+    terminus: "closed-by-block", graphLanes: 2, nodes: 2, edges: 1 },
   { id: "pe-rain-v1", crossingY: 95, limitKmh: 50, lengthM: 155,
     roadscape: "industrial-canyon", roadClass: "unclassified", bandM: 0,
-    oneway: false, lanes: 2, banSignRef: null, lit: false, bareVerge: "right" },
+    oneway: false, lanes: 2, banSignRef: null, lit: false, bareVerge: "right" ,
+    terminus: "bends-away-left", graphLanes: 4, nodes: 3, edges: 2 },
   { id: "pe-dart-v1", crossingY: 80, limitKmh: 50, lengthM: 140,
     roadscape: "residential-blind-corner", roadClass: "residential", bandM: 0,
-    oneway: false, lanes: 2, banSignRef: "В24", lit: false, bareVerge: null },
+    oneway: false, lanes: 2, banSignRef: "В24", lit: false, bareVerge: null ,
+    terminus: "necks-to-service", graphLanes: 2, nodes: 3, edges: 2 },
   { id: "pe-bus-v1", crossingY: 88, limitKmh: 50, lengthM: 148,
     roadscape: "freight-collector", roadClass: "tertiary", bandM: 0,
-    oneway: false, lanes: 2, banSignRef: "В24", lit: true, bareVerge: null },
+    oneway: false, lanes: 2, banSignRef: "В24", lit: true, bareVerge: null ,
+    terminus: "bends-away-right", graphLanes: 4, nodes: 3, edges: 2 },
   { id: "pe-child-v1", crossingY: 78, limitKmh: 40, lengthM: 138,
     roadscape: "courtyard-street", roadClass: "residential", bandM: 0,
-    oneway: false, lanes: 2, banSignRef: null, lit: false, bareVerge: null },
+    oneway: false, lanes: 2, banSignRef: null, lit: false, bareVerge: null ,
+    terminus: "opens-to-green", graphLanes: 2, nodes: 2, edges: 1 },
   { id: "pe-cane-v1", crossingY: 92, limitKmh: 50, lengthM: 152,
     roadscape: "oneway-institute", roadClass: "residential", bandM: 0,
-    oneway: true, lanes: 1, banSignRef: null, lit: false, bareVerge: null },
+    oneway: true, lanes: 1, banSignRef: null, lit: false, bareVerge: null ,
+    terminus: "jogs-and-continues", graphLanes: 3, nodes: 4, edges: 3 },
 ];
 
 
@@ -148,11 +167,25 @@ for (const c of CASES) {
 
     it("is a structurally valid district-v1 document (street shape)", () => {
       expect(district.meta.attribution.text).toContain("оригинален");
-      expect(district.roads.nodes.length).toBe(2);
-      expect(district.roads.edges.length).toBe(1);
+      // doc 87 B50: this used to be `toBe(2)` / `toBe(1)` for all seven, which
+      // is precisely the number the founder was reading off the screen. The
+      // GRADED street is still edges[0] and still 2 nodes' worth of straight
+      // line; what varies is the TERMINUS hanging off pe-n-end.
+      expect(district.roads.nodes.length).toBe(c.nodes);
+      expect(district.roads.edges.length).toBe(c.edges);
+      expect(district.roads.edges[0].id).toBe("pe-e-street");
       expect(district.roads.edges[0].maxspeed).toBe(c.limitKmh);
       expect(district.roads.edges[0].length).toBe(c.lengthM);
-      expect(district.intersections.length).toBe(0); // straight street = degree 2
+      expect((district.meta.scenario as Record<string, unknown>).terminus).toBe(c.terminus);
+      // Still zero: every terminus leg hangs off the terminal node in a CHAIN,
+      // so every node it adds is degree 2 — a joint, never a junction. This is
+      // the assertion that keeps a crossing drill free of a give-way
+      // obligation it never teaches (see the generator header).
+      expect(district.intersections.length).toBe(0);
+      // …and no leg may reach back into the graded street.
+      for (const e of district.roads.edges.slice(1)) {
+        for (const [, y] of e.geometry) expect(y).toBeGreaterThanOrEqual(c.lengthM);
+      }
       expect(district.roundabouts.length).toBe(0);
       expect(district.crossings.map((cr) => cr.id)).toEqual(["pe-x-1"]);
       const cross = district.crossings[0];
@@ -356,8 +389,18 @@ for (const c of CASES) {
       // A two-way street has both directions; a ONE-WAY street has one, and
       // `traffic/graph.laneOffsetFor` puts that single lane on the rightmost
       // lane centre — x = 4.06, the very rail every committed trace drives.
-      expect(graph.lanes.length).toBe(c.lanes);
-      expect(graph.loopLanes.size).toBe(c.lanes);
+      // The GRADED street's lanes are `c.lanes`; the terminus legs bring the
+      // district total to `c.graphLanes` (0 extra on the two frontage-only
+      // termini, and none at all on the service alley — `service` is in
+      // DEFAULT_TRAFFIC_CONFIG.excludedRoadClasses, so no ambient car uses it).
+      expect(graph.lanes.length).toBe(c.graphLanes);
+      // Loop lanes = the lanes an ambient car can drive round for ever. On a
+      // two-way street every lane loops (out and back), so the count matches;
+      // on the ONE-WAY district the whole chain is one directed run, so it is
+      // the street's own single lane. Pinned rather than skipped: this is the
+      // number that decides whether ambient traffic exists on a terminus leg.
+      expect(graph.loopLanes.size).toBe(c.oneway ? c.lanes : c.graphLanes);
+      // The crossing is on the STREET's lanes only — a terminus never touches it.
       expect(graph.crossingLanes.get("pe-x-1")?.length).toBe(c.lanes);
       expect(graph.crossingSignalNode.size).toBe(0); // unsignalized zebra
       const driven = graph.lanes.find((l) => l.px.every((x) => Math.abs(x - X_LANE) < 0.01));
@@ -422,6 +465,61 @@ describe("the PE family is seven DIFFERENT streets (doc 87 FR-41)", () => {
   it("no two districts share a roadscape", () => {
     const scapes = built.map((b) => (b.district.meta.scenario as Record<string, unknown>).roadscape);
     expect(new Set(scapes).size).toBe(built.length);
+  });
+
+  it("no two districts share a TERMINUS — nothing runs dead straight to a flat horizon", () => {
+    // doc 87 B50/B53/B54. The re-look's own words about the state BEFORE this
+    // axis: „every one of the seven is 2 nodes / 1 edge / 0 intersections / 1
+    // crossing, 138-160 m, dead straight to a flat horizon". Both halves are
+    // asserted here: the NAME must be unique, and the SHAPE must actually
+    // differ — a terminus that adds no road and no vista is a copy with a new
+    // label on it.
+    const ends = built.map((b) => (b.district.meta.scenario as Record<string, unknown>).terminus);
+    expect(new Set(ends).size).toBe(built.length);
+
+    // Every street ends in SOMETHING: either real road past the terminal node,
+    // or frontage standing in the vista beyond it. Never nothing.
+    for (const b of built) {
+      const L = b.district.roads.edges[0].length;
+      const legRoadM = b.district.roads.edges
+        .slice(1)
+        .reduce((s, e) => s + e.length, 0);
+      const vistaVolumes = b.district.buildings.filter((bl) =>
+        bl.footprint.some(([, y]) => y > L),
+      ).length;
+      expect(
+        legRoadM > 60 || vistaVolumes >= 2,
+        `${b.c.id} (${(b.district.meta.scenario as Record<string, unknown>).terminus}) ends in nothing: ` +
+          `${legRoadM.toFixed(1)} m of leg, ${vistaVolumes} vista volumes`,
+      ).toBe(true);
+    }
+
+    // The TOPOLOGY the founder was reading off the screen — 2 nodes / 1 edge,
+    // seven times — is no longer one number.
+    const shapes = new Set(built.map((b) => `${b.district.roads.nodes.length}/${b.district.roads.edges.length}`));
+    expect(shapes.size).toBeGreaterThanOrEqual(3);
+    // Four of the seven carry real extra road; the other three close the vista
+    // with frontage. Both answers are legitimate; all seven being the same is not.
+    const withLegs = built.filter((b) => b.district.roads.edges.length > 1).length;
+    expect(withLegs).toBeGreaterThanOrEqual(3);
+    expect(withLegs).toBeLessThan(built.length);
+  });
+
+  it("a terminus never touches the graded street, on any of the seven", () => {
+    // The whole axis is only free because it lives north of the terminal node.
+    // If that ever stops being true, 21 recorded ghost traces silently rot.
+    for (const b of built) {
+      const L = b.district.roads.edges[0].length;
+      for (const e of b.district.roads.edges.slice(1)) {
+        for (const [, y] of e.geometry) {
+          expect(y, `${b.c.id}: ${e.id} reaches back into the graded street`).toBeGreaterThanOrEqual(L);
+        }
+      }
+      // …and no leg may park a body (FR-21: this family carries none at all).
+      for (const e of b.district.roads.edges.slice(1)) {
+        expect(e.parkingBand, `${b.c.id}: ${e.id} must declare parkingBand:false`).toBe(false);
+      }
+    }
   });
 
   it("no two districts share a CROSS-SECTION signature", () => {

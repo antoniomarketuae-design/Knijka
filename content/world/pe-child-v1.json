@@ -6,10 +6,10 @@
   "mapKind": "scenario-street",
   "generator": "tools/maps/gen_pe_crossings.mjs",
   "boundsLocalMeters": {
-   "minX": -44,
-   "minY": 0,
-   "maxX": 19,
-   "maxY": 138
+   "minX": -56,
+   "minY": -14.125,
+   "maxX": 56,
+   "maxY": 203.6
   },
   "attribution": {
    "text": "Учебна улица с пешеходна пътека — оригинален параметричен дизайн (без данни от OpenStreetMap)",
@@ -28,7 +28,7 @@
    "edges": 1,
    "intersections": 0,
    "crossings": 1,
-   "buildings": 5,
+   "buildings": 8,
    "spawnPoints": 2,
    "zones": 0
   },
@@ -43,6 +43,10 @@
    "streetscapeNoteBg": "Два панелни блока с междублоково пространство, чието устие гледа право към пътеката: децата излизат от двора, а редицата гаражи отдясно крие погледа.",
    "roadscape": "courtyard-street",
    "roadscapeNoteBg": "Междублокова улица: нито знак, нито стълб, нито крайна линия — само осевата прекъсната. Най-голата отсечка в групата, и точно затова нищо не ти подсказва, че оттук изскачат деца.",
+   "terminus": "opens-to-green",
+   "terminusNoteBg": "Улицата свършва в зеленото на квартала: нито блок, нито стена — само нисък парков зид далеч напред. Оттам няма какво да те спре да гледаш надалеч, и точно затова децата отляво се виждат късно.",
+   "terminusLegs": 0,
+   "terminusRoadM": 0,
    "roadClass": "residential",
    "parkingBandM": 0,
    "bareVerge": null,
@@ -227,6 +231,75 @@
     [
      12.7,
      108
+    ]
+   ]
+  },
+  {
+   "id": "pe-b-park-wall-n",
+   "height": 2.2,
+   "heightSource": "default",
+   "footprint": [
+    [
+     -56,
+     200
+    ],
+    [
+     56,
+     200
+    ],
+    [
+     56,
+     203.6
+    ],
+    [
+     -56,
+     203.6
+    ]
+   ]
+  },
+  {
+   "id": "pe-b-pavilion-n",
+   "height": 3.6,
+   "heightSource": "default",
+   "footprint": [
+    [
+     -30,
+     168
+    ],
+    [
+     -13,
+     168
+    ],
+    [
+     -13,
+     184
+    ],
+    [
+     -30,
+     184
+    ]
+   ]
+  },
+  {
+   "id": "pe-b-pavilion-e",
+   "height": 3.6,
+   "heightSource": "default",
+   "footprint": [
+    [
+     15,
+     174
+    ],
+    [
+     30,
+     174
+    ],
+    [
+     30,
+     188
+    ],
+    [
+     15,
+     188
     ]
    ]
   }

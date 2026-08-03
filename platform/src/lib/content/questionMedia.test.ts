@@ -221,14 +221,31 @@ function citedCodes(q: Question): string[] {
   return out;
 }
 
+/**
+ * „Г15а" → „Г15". The 2023 ordinance splits some signs into an а/б pair (start
+ * and end of the same regime) and the catalogue carries BOTH faces, because a
+ * bare „Г15" is not a sign anybody can post. The regex above deliberately drops
+ * the suffix letter, so resolution has to put it back: a cited base code counts
+ * as covered when the catalogue holds that exact code OR the code plus exactly
+ * one Cyrillic suffix letter.
+ *
+ * „Exactly one letter" is not pedantry — a prefix match would let „Г1" resolve
+ * against „Г15а" and quietly re-open the hole this scan exists to close.
+ */
+function baseCode(code: string): string {
+  const m = /^([А-Я]\d{1,2})[а-я]$/u.exec(code);
+  return m ? m[1]! : code;
+}
+
 describe("FR-33 — M4: the copy never teaches a sign the catalogue does not have", () => {
   const catalogue = new Set(contentRepo.signs().map((s) => s.code));
+  const resolvable = new Set([...catalogue, ...[...catalogue].map(baseCode)]);
   const missing = new Map<string, Set<string>>();
   let mentions = 0;
   for (const question of QUESTIONS) {
     for (const code of citedCodes(question)) {
       mentions += 1;
-      if (catalogue.has(code)) continue;
+      if (resolvable.has(code)) continue;
       const ids = missing.get(code) ?? new Set<string>();
       ids.add(question.id);
       missing.set(code, ids);
@@ -241,71 +258,55 @@ describe("FR-33 — M4: the copy never teaches a sign the catalogue does not hav
     // below would shrink for the wrong reason.
     expect(mentions).toBeGreaterThanOrEqual(300);
     const resolved = new Set(
-      QUESTIONS.flatMap(citedCodes).filter((c) => catalogue.has(c)),
+      QUESTIONS.flatMap(citedCodes).filter((c) => resolvable.has(c)),
     );
     expect(resolved.size).toBeGreaterThanOrEqual(55);
   });
 
   /**
-   * ⚠ OPEN CONTENT DEBT — PINNED, NOT PASSED OFF AS FIXED.
+   * THE DEBT IS CLOSED — and this test is what keeps it closed.
    *
-   * Twelve codes are named in question text or explanations and have no entry
-   * in `content/signs/signs.json`. Two whole groups are missing: Ж
-   * (информационно-указателни) and Т (допълнителни табели) — the copy explains
-   * Т1 „Разстояние до" against Т2 „Дължина на" in one breath and the product
-   * has neither.
+   * It used to pin twelve codes that the copy named and the catalogue could not
+   * draw: А28, В25, Г15, Д1, Д13, Д14, Ж19, Т1, Т2, Т10, Т13, Т15, across
+   * eleven questions, with the whole Ж and Т groups absent. Eleven questions
+   * taught a 17-year-old the name of a sign the product could never show him.
    *
-   * THIS FILE DOES NOT FIX THEM, and the reason is the same one the founder was
-   * told about legal correctness: a sign entry needs artwork, an official name,
-   * a meaning and `lawRefs` — an ADR-002 retrieval source, never free recall.
-   * That is a human's job. What a machine CAN do is refuse to let the list grow,
-   * and name every member of it so nobody has to re-read 1,089 questions to
-   * find them again.
+   * All twelve are now in `content/signs/signs.json` (thirteen entries — Г15
+   * ships as its real а/б pair), every one `status: "draft"` until the founder
+   * has reviewed the face, the name and the citation. `lawRefs` were RETRIEVED
+   * from the citations the question bank already carries, never free-recalled
+   * (ADR-002); where the bank pins no article, the entry carries only the code
+   * and `content/signs/README.md` says so by name.
    *
-   * To close one: add the sign to the catalogue (with its svg and lawRefs) and
-   * delete its line here. The test fails if a NEW dead reference appears.
+   * The list is empty and must stay empty. If a new question names a sign the
+   * catalogue does not have, this fails and names it.
    */
-  it("the twelve dead sign references are exactly these, and no more", () => {
-    expect([...missing.keys()].sort()).toEqual([
-      "А28",
-      "В25",
-      "Г15",
-      "Д1",
-      "Д13",
-      "Д14",
-      "Ж19",
-      "Т1",
-      "Т10",
-      "Т13",
-      "Т15",
-      "Т2",
-    ]);
-    // The questions that carry them, NAMED — so the fix has a work list and not
-    // just a number to feel bad about. Eleven questions, twelve codes.
-    const affected = [...new Set([...missing.values()].flatMap((s) => [...s]))].sort();
-    expect(affected).toEqual([
-      "q-manevri-046", // В25
-      "q-predimstvo-053", // А28
-      "q-predimstvo-056", // Т13
-      "q-signali-i-markirovka-038", // Д1
-      "q-signali-i-markirovka-064", // Д1
-      "q-signs-062", // Ж19
-      "q-speed-048", // Ж19
-      "q-speed-049", // Д13, Д14
-      "q-spirane-i-parkirane-042", // Т10, Т15
-      "q-spirane-i-parkirane-050", // Г15
-      "q-spirane-i-parkirane-057", // Т1, Т2
-    ]);
+  it("no question teaches a sign code the catalogue cannot draw", () => {
+    const dead = [...missing.entries()]
+      .map(([code, ids]) => `${code} — ${[...ids].sort().join(", ")}`)
+      .sort();
+    expect(dead).toEqual([]);
   });
 
-  it("the Ж and Т groups are absent from the catalogue entirely", () => {
-    // The shape of the debt, stated so it is not mistaken for a dozen strays:
-    // it is two whole sign groups the catalogue never got.
+  it("the Ж and Т groups exist, and the а/б pairs resolve as one code", () => {
     const groups = new Set([...catalogue].map((c) => c[0]));
-    expect(groups.has("Ж")).toBe(false);
-    expect(groups.has("Т")).toBe(false);
-    // …and the groups that DO exist are complete enough to be worth gating.
-    expect(catalogue.size).toBeGreaterThanOrEqual(64);
+    // The two groups the catalogue never had. Ж19 „Препоръчителна скорост" is
+    // the sign two questions contrast against В26 and Г17; Т1/Т2/Т10/Т13/Т15
+    // are the plates that modify the sign above them.
+    expect(groups.has("Ж")).toBe(true);
+    expect(groups.has("Т")).toBe(true);
+    // The suffix rule is a real rule, not a wildcard: „Г15" resolves because
+    // the pair exists, „Г1" resolves on its own entry, „Г99" resolves on
+    // nothing. If the middle case ever starts passing, the rule has rotted
+    // into a prefix match.
+    expect(resolvable.has("Г15")).toBe(true);
+    expect(catalogue.has("Г15")).toBe(false);
+    expect(catalogue.has("Г15а") && catalogue.has("Г15б")).toBe(true);
+    expect(resolvable.has("Г99")).toBe(false);
+    expect(baseCode("Г15а")).toBe("Г15");
+    expect(baseCode("Г15")).toBe("Г15");
+    // …and the catalogue is big enough to be worth gating at all.
+    expect(catalogue.size).toBeGreaterThanOrEqual(77);
   });
 });
 

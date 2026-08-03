@@ -6,10 +6,10 @@
   "mapKind": "scenario-street",
   "generator": "tools/maps/gen_pe_crossings.mjs",
   "boundsLocalMeters": {
-   "minX": -32,
-   "minY": 0,
-   "maxX": 46,
-   "maxY": 148
+   "minX": -64,
+   "minY": -14.125,
+   "maxX": 128,
+   "maxY": 240
   },
   "attribution": {
    "text": "Учебна улица с пешеходна пътека — оригинален параметричен дизайн (без данни от OpenStreetMap)",
@@ -24,12 +24,12 @@
   },
   "zonesVersion": 1,
   "stats": {
-   "roadKm": 0.15,
-   "nodes": 2,
-   "edges": 1,
+   "roadKm": 0.27,
+   "nodes": 3,
+   "edges": 2,
    "intersections": 0,
    "crossings": 1,
-   "buildings": 4,
+   "buildings": 7,
    "spawnPoints": 2,
    "zones": 1
   },
@@ -44,6 +44,10 @@
    "streetscapeNoteBg": "Складова база с товарен вход точно преди пътеката: затова тук ВИНАГИ стои спряло голямо превозно средство, а хората излизат иззад него.",
    "roadscape": "freight-collector",
    "roadscapeNoteBg": "Товарен подход: събирателна улица с крайни линии и стълбове, а покрай портала на базата — В24 „Забранено е изпреварването“, защото оттам излизат тежки коли и иззад тях се появяват хора.",
+   "terminus": "bends-away-right",
+   "terminusNoteBg": "Товарният подход завива надясно към двора на базата. Отсреща, в външната страна на завоя, стои халето — там свършва улицата и там влизат камионите, които после излизат срещу теб.",
+   "terminusLegs": 1,
+   "terminusRoadM": 126.36,
    "roadClass": "tertiary",
    "parkingBandM": 0,
    "bareVerge": null,
@@ -73,6 +77,11 @@
     "id": "pe-n-start",
     "x": 0,
     "y": 0
+   },
+   {
+    "id": "pe-n-yard",
+    "x": 112,
+    "y": 189
    }
   ],
   "edges": [
@@ -97,6 +106,39 @@
      [
       0,
       148
+     ]
+    ],
+    "parkingBand": false
+   },
+   {
+    "id": "pe-e-yard",
+    "from": "pe-n-end",
+    "to": "pe-n-yard",
+    "class": "tertiary",
+    "name": "Подход към двора",
+    "oneway": false,
+    "roundabout": false,
+    "lanes": 2,
+    "lanesSource": "tag",
+    "maxspeed": 50,
+    "maxspeedSource": "tag",
+    "length": 126.36,
+    "geometry": [
+     [
+      0,
+      148
+     ],
+     [
+      16,
+      170
+     ],
+     [
+      56,
+      186
+     ],
+     [
+      112,
+      189
      ]
     ],
     "parkingBand": false
@@ -205,6 +247,75 @@
     [
      -32,
      100
+    ]
+   ]
+  },
+  {
+   "id": "pe-b-hall",
+   "height": 14,
+   "heightSource": "default",
+   "footprint": [
+    [
+     -64,
+     152
+    ],
+    [
+     -21,
+     152
+    ],
+    [
+     -21,
+     212
+    ],
+    [
+     -64,
+     212
+    ]
+   ]
+  },
+  {
+   "id": "pe-b-yard-n",
+   "height": 10,
+   "heightSource": "default",
+   "footprint": [
+    [
+     40,
+     204
+    ],
+    [
+     78,
+     204
+    ],
+    [
+     78,
+     240
+    ],
+    [
+     40,
+     240
+    ]
+   ]
+  },
+  {
+   "id": "pe-b-yard-e",
+   "height": 10,
+   "heightSource": "default",
+   "footprint": [
+    [
+     88,
+     140
+    ],
+    [
+     128,
+     140
+    ],
+    [
+     128,
+     172
+    ],
+    [
+     88,
+     172
     ]
    ]
   }

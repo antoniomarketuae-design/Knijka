@@ -627,12 +627,56 @@ function crownRiseM(islandRadiusM: number): number {
   return Math.min(1.6, Math.max(0.8, islandRadiusM * 0.09));
 }
 
+/**
+ * FR-22 / register B16 — THE ISLAND IS NOW A PLANTER WALL, NOT A KERB, AND THIS
+ * IS THE NUMBER THAT DECIDES WHETHER A CAR CAN CROSS IT.
+ *
+ * The header of `buildIsland` below used to claim, in as many words, that „the
+ * sidewalk accumulator is what `colliders.sidewalks` is built from, so the
+ * island's kerb stops a car exactly like a pavement edge does. A central island
+ * a student can drive across is not an island." The claim was tested and it is
+ * FALSE, twice over:
+ *
+ *   - MEASURED ON THE SHIPPED GEOMETRY (this lane, probe over the four ring
+ *     districts): the highest collider vertex anywhere inside the island is
+ *     **y = 0.140 m** on all four. The whole island is a 14 cm lip; the 0.8–1.6 m
+ *     planted crown that gives it bulk lives in `islandPlanting`, which is a
+ *     RENDER mesh and not a collider at all.
+ *   - MEASURED IN THE PRODUCT (register B16): „I drove sc-roundabout-entry due
+ *     north with no steering at all: telemetry x=4.06 y=−1.18 at 46 км/ч … the
+ *     car body sits on grass between two of the island's own bushes with its
+ *     shadow on the turf", reproduced on the real LessonPlayShell at 42 км/ч.
+ *
+ * A pavement edge is the wrong reference class: `WorldColliderSet.sidewalks` is
+ * documented „12 cm, drivable-over per vehicle harness", and that is deliberate
+ * — a student who clips a kerb must not be stopped dead. So a boundary built to
+ * pavement height is a boundary a car is ENTITLED to cross. The central island
+ * of a roundabout is the one piece of raised concrete in this world that a car
+ * must never be able to mount, and Bulgarian islands are built accordingly:
+ * a raised planter wall around mounded earth, not a flush kerb.
+ *
+ * 0.45 m above the pavement top, i.e. **0.57 m of vertical face from the
+ * asphalt** — well over a wheel radius, so the wheel meets a wall instead of a
+ * ramp — and still a wall height a person steps over, which is what a real
+ * островен парапет is. It adds no radial extent (the face stays at
+ * `islandRadiusM`), so the circulating carriageway does not narrow by a
+ * millimetre and the closest committed ring trace, measured at 17.85 m from the
+ * centre against a 13.75 m island on rb-mini, keeps its 4.1 m of clearance.
+ */
+export const ISLAND_WALL_RISE_M = 0.45;
+
+/** Top of the island's planter wall — the height its rim, its chamfer and the
+ *  foot of its planting all sit at. */
+const ISLAND_WALL_TOP_Y = SIDEWALK_TOP_Y + ISLAND_WALL_RISE_M;
+
 /** Planting height at radius `r` on an island of rim radius `rim` — a raised
- *  cosine, so the crown meets the concrete rim tangentially (no crease). */
+ *  cosine, so the crown meets the concrete rim tangentially (no crease).
+ *  Based at the WALL top, so the earth sits inside the planter rather than
+ *  floating 0.45 m under it. */
 function crownHeightAt(r: number, rim: number, rise: number): number {
-  if (rim <= 1e-6) return SIDEWALK_TOP_Y;
+  if (rim <= 1e-6) return ISLAND_WALL_TOP_Y;
   const t = Math.min(1, Math.max(0, r / rim));
-  return SIDEWALK_TOP_Y + rise * 0.5 * (1 + Math.cos(Math.PI * t));
+  return ISLAND_WALL_TOP_Y + rise * 0.5 * (1 + Math.cos(Math.PI * t));
 }
 
 export interface RoundaboutBuildResult {
@@ -645,11 +689,14 @@ export interface RoundaboutBuildResult {
 }
 
 /**
- * KERB + RIM go into `sidewalks`: the concrete material, vertex-coloured like
+ * WALL + RIM go into `sidewalks`: the concrete material, vertex-coloured like
  * every other kerb in the world, AND — the part that matters — the sidewalk
- * accumulator is what `colliders.sidewalks` is built from, so the island's kerb
- * stops a car exactly like a pavement edge does. A central island a student can
- * drive across is not an island.
+ * accumulator is what `colliders.sidewalks` is built from, so the island's
+ * boundary is a collider. It is a 0.57 m PLANTER WALL rather than a 0.14 m kerb
+ * (see ISLAND_WALL_RISE_M above for the measurement that forced the change):
+ * pavement height is explicitly drivable-over in this engine, so an island
+ * built to pavement height is an island a car may legally cross — which is
+ * exactly what the founder photographed himself doing at 46 км/ч.
  *
  * The PLANTING gets its own mesh instead of joining `terrain.grass`, and that
  * is deliberate: the terrain mesh carries a hard contract (every vertex at or
@@ -666,7 +713,9 @@ function buildIsland(
   const r = ring.islandRadiusM;
   if (r === null) return;
   const [cx, cy] = ring.centre;
-  const chamferY = SIDEWALK_TOP_Y - CURB_CHAMFER_M;
+  // The vertical face runs from the asphalt to the WALL top (0.57 m), not to
+  // pavement height — see ISLAND_WALL_RISE_M.
+  const chamferY = ISLAND_WALL_TOP_Y - CURB_CHAMFER_M;
   const rimInner = Math.max(0.5, r - ISLAND_KERB_BAND_M);
   const rise = crownRiseM(r);
   const foot: [number, number, number] = [CURB_FOOT_TINT, CURB_FOOT_TINT, CURB_FOOT_TINT];
@@ -695,8 +744,8 @@ function buildIsland(
     stations.push({
       cb: sidewalks.vertex(toWorld(outer[0], outer[1], ROAD_Y), nOut, [0, v], foot),
       ct: sidewalks.vertex(toWorld(outer[0], outer[1], chamferY), nOut, [0.07, v]),
-      xt: sidewalks.vertex(toWorld(chamfer[0], chamfer[1], SIDEWALK_TOP_Y), nChamfer, [0.1, v]),
-      ri: sidewalks.vertex(toWorld(rim[0], rim[1], SIDEWALK_TOP_Y), UP, [0.9, v]),
+      xt: sidewalks.vertex(toWorld(chamfer[0], chamfer[1], ISLAND_WALL_TOP_Y), nChamfer, [0.1, v]),
+      ri: sidewalks.vertex(toWorld(rim[0], rim[1], ISLAND_WALL_TOP_Y), UP, [0.9, v]),
     });
   }
 

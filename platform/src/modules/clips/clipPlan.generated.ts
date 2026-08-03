@@ -614,7 +614,7 @@ export const CLIP_PLAN: readonly ClipPlanEntry[] = [
     "templateId": "sc-roundabout-entry",
     "mistakeIndex": 0,
     "tracePath": "content/traces/sc-roundabout-entry/mistake-barge-entry.trace.json",
-    "faultTimeSec": 11.58,
+    "faultTimeSec": 11.8,
     "requiredActors": [
       {
         "kind": "vehicle",
@@ -760,7 +760,7 @@ export const CLIP_PLAN: readonly ClipPlanEntry[] = [
       "kind": "sign",
       "label": "Знак В26 (50 км/ч)",
       "approxPos": {
-        "x": 8.93,
+        "x": 12.93,
         "y": 45
       }
     },

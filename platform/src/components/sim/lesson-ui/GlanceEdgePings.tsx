@@ -5,7 +5,9 @@
  * 2026-07-20, the doc 62 S5 design law: a graded action must carry an
  * information payoff). Two soft pulsing „огледай" cues at the screen edges
  * appear when the player approaches a junction whose drill GRADES observation
- * (JU-23 opt-in lessons, rungs L1–L2, „Съветник" ON — glancePingsEligible);
+ * (rungs up to GLANCE_PING_MAX_LEVEL, exam excluded — glancePingsEligible).
+ * NOT gated on „Съветник": the glance is graded at every setting, so the cue
+ * for it survives the advisor being switched off (A11 — see `pingsActive`);
  * each side's cue fades into a ✓ the moment that side's GRADED glance
  * registers on the tick stream. On non-touch devices a subtle hold-to-glance
  * button cluster (left/rear/right) renders too — the SAME CabinControls
@@ -22,12 +24,9 @@
 
 import { useEffect, useMemo, useRef, useState, type RefObject } from "react";
 import {
-  ADVISOR_STORAGE_KEY,
   createGlancePingsState,
-  defaultAdvisorEnabled,
   glancePingsEligible,
   observeGlancePingsTick,
-  parseStoredAdvisorSetting,
   resetGlancePings,
   type GlancePingPhase,
   type LessonSpec,
@@ -37,22 +36,6 @@ import type { CabinControls, MirrorGlanceKind } from "@/modules/sim/scene/cabin"
 
 /** LessonScene's additive tick tap — read-only observer, runs before the shell. */
 export type GlancePingTap = (tick: SimTick) => void;
-
-/** Low-Hz „Съветник" setting re-read (ms) — transitions only, never per frame. */
-const ADVISOR_POLL_MS = 500;
-
-/** Same fallback chain as the shell's readStoredAdvisorOn (LessonPlayShell):
- *  persisted choice wins, else the lesson-level default. */
-function readAdvisorOn(lesson: LessonSpec): boolean {
-  try {
-    return (
-      parseStoredAdvisorSetting(window.localStorage.getItem(ADVISOR_STORAGE_KEY)) ??
-      defaultAdvisorEnabled(lesson)
-    );
-  } catch {
-    return defaultAdvisorEnabled(lesson);
-  }
-}
 
 export function GlanceEdgePings({
   lesson,
@@ -73,16 +56,10 @@ export function GlanceEdgePings({
 }) {
   const eligible = useMemo(() => glancePingsEligible(lesson), [lesson]);
   const buttonsPossible = showButtons && lesson.examMode !== true;
-  const [advisorOn, setAdvisorOn] = useState(() => readAdvisorOn(lesson));
 
-  useEffect(() => {
-    if (!eligible && !buttonsPossible) return; // nothing to ever toggle
-    const id = window.setInterval(() => {
-      const on = readAdvisorOn(lesson);
-      setAdvisorOn((prev) => (prev === on ? prev : on));
-    }, ADVISOR_POLL_MS);
-    return () => window.clearInterval(id);
-  }, [eligible, buttonsPossible, lesson]);
+  // The „Съветник" poll that used to live here is gone with the gate it fed
+  // (A11, below) — nothing in this component reads the advisor setting now, so
+  // the 2 Hz localStorage read per drive went with it.
 
   // Pure ping state in a ref (tick rate); the snapshot below is React state
   // touched only when observeGlancePingsTick reports a phase transition.
@@ -92,7 +69,25 @@ export function GlanceEdgePings({
     right: "off",
   });
 
-  const pingsActive = eligible && advisorOn;
+  // A11 — THE CUE IS NO LONGER GATED ON THE ADVISOR, BECAUSE THE GRADING IS NOT.
+  //
+  // This used to be `eligible && advisorOn`. „Съветник" defaults OFF from
+  // curriculum order 3 and scenario L3 up (defaultAdvisorEnabled), so from Урок
+  // 3 «Кръговото движение» — the lesson whose entire subject is giving way —
+  // both edge pings AND the Q/E/F cluster vanished, while the mirror glance
+  // went on being graded exactly as before. The student was marked on an act
+  // whose only on-screen prompt had been removed, on the lesson that exists to
+  // teach it. That is an unfair assessment and it trains the opposite of the
+  // north star: it makes not-looking the path of least resistance.
+  //
+  // The distinction that resolves it: „Съветник" governs ADVICE — the
+  // instructor card that tells you what to do next. A ping is not advice, it is
+  // the legend for a graded control, nearer the speedometer than the hint card.
+  // It also cannot nag, because it is armed by the WORLD and not by the lesson:
+  // observeGlancePingsTick raises it only inside 45 m of a Б1/Б2 line, where
+  // ЗДвП чл. 50 requires giving way and therefore requires looking. Off the
+  // approach it is not on screen at all, at any setting.
+  const pingsActive = eligible;
   useEffect(() => {
     if (!pingsActive) return;
     const s = stateRef.current;
@@ -135,9 +130,13 @@ export function GlanceEdgePings({
         </>
       ) : null}
 
-      {/* Desktop discoverability cluster — advisor ON only (a training aid,
-          like the prompt card), hold-to-glance exactly like the keys. */}
-      {buttonsPossible && advisorOn ? (
+      {/* Desktop hold-to-glance cluster. Also decoupled from „Съветник" (A11):
+          on a non-touch device these three ARE the mouse route to a graded act
+          — the founder's whole contract is that the cabin is worked with the
+          mouse, and with the advisor off the only remaining way to glance was
+          to already know the Q/E/F keys. Touch devices are unaffected: they
+          never render this cluster, they use TouchControls' own mirror row. */}
+      {buttonsPossible ? (
         <div
           // The handle PlayAreaStyles' UNPANEL layer needs. These three sit on
           // the road exactly where the reference frame puts its ghost „<" / „>"

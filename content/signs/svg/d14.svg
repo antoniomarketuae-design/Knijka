@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" role="img" aria-labelledby="t">
+<title id="t">Д14 — Край на зоната на действие на изобразения пътен знак</title>
+<rect x="14" y="8" width="172" height="184" rx="10" fill="#fff" stroke="#1d1d1b" stroke-width="5" data-plate="true"/>
+<text x="100" y="44" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-weight="bold" font-size="26" fill="#1d1d1b">ЗОНА</text>
+<circle cx="100" cy="120" r="48" fill="#fff" stroke="#8a8a8a" stroke-width="12"/>
+<text x="100" y="140" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-weight="bold" font-size="44" fill="#8a8a8a">30</text>
+<line x1="32" y1="170" x2="168" y2="30" stroke="#c1121f" stroke-width="14" data-span="face"/>
+</svg>

@@ -278,11 +278,16 @@ describe("the built world — the middle of a ring is no longer asphalt", () => 
     }
   });
 
-  it("the kerb is a COLLIDER — a student cannot drive across the island", () => {
-    // The kerb+rim go into the sidewalk accumulator, which IS the sidewalk
-    // collider. A central island you can drive over is not an island; it is a
-    // green stain on a plaza. The planting is deliberately NOT a collider —
-    // the kerb stops the car a metre before the shrubs.
+  it("the island boundary is a COLLIDER — a student cannot drive across it", () => {
+    // ⚠ THIS TEST USED TO CERTIFY THE DEFECT. It counted collider vertices at
+    // the island radius and asserted `> 100`, which a 14 cm lip satisfies
+    // perfectly — and 14 cm was all there was. `WorldColliderSet.sidewalks` is
+    // documented „12 cm, drivable-over per vehicle harness", so a boundary
+    // built to pavement height is one a car is ENTITLED to cross. Register
+    // B16: „I drove sc-roundabout-entry due north with no steering at all …
+    // the car body sits on grass between two of the island's own bushes",
+    // reproduced on the real shell at 42 км/ч. The count passed; the island did
+    // not exist. So the HEIGHT is asserted now, on every shipped ring.
     const district = readDistrict("rb-mini-v1");
     const ring = ringsOf(district)[0]!;
     const world = worldOf("rb-mini-v1");
@@ -293,6 +298,31 @@ describe("the built world — the middle of a ring is no longer asphalt", () => 
       if (Math.abs(d - ring.islandRadiusM!) < 0.05) onKerb++;
     }
     expect(onKerb).toBeGreaterThan(100);
+  });
+
+  it("…and it is a WALL, not a kerb — taller than a wheel can climb", () => {
+    // The number that decides whether B16 is fixed. A wheel of ~0.32 m radius
+    // rides over a 0.14 m kerb and stops dead at a 0.57 m vertical face, so the
+    // island's collider must stand clearly above the wheel radius. Measured on
+    // every ring district, not just the one the founder happened to drive.
+    const WHEEL_RADIUS_M = 0.32;
+    const failures: string[] = [];
+    for (const id of RING_DISTRICTS) {
+      const district = readDistrict(id);
+      const ring = ringsOf(district)[0];
+      if (!ring || ring.islandRadiusM === null) continue;
+      const world = worldOf(id);
+      const p = world.colliders.sidewalks.positions;
+      let top = -Infinity;
+      for (let i = 0; i < p.length; i += 3) {
+        const d = Math.hypot(p[i]! - ring.centre[0], -p[i + 2]! - ring.centre[1]);
+        if (d <= ring.islandRadiusM + 0.5 && p[i + 1]! > top) top = p[i + 1]!;
+      }
+      if (!(top > WHEEL_RADIUS_M + 0.15)) {
+        failures.push(`${id}: island collider tops out at ${top.toFixed(3)} m — a wheel climbs that`);
+      }
+    }
+    expect(failures).toEqual([]);
   });
 
   it("no ROAD RIBBON vertex survives inside any island either", () => {

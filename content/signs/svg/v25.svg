@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" role="img" aria-labelledby="t">
+<title id="t">В25 — Забранено е изпреварването от товарни автомобили</title>
+<circle cx="100" cy="100" r="88" fill="#fff" stroke="#c1121f" stroke-width="20" data-plate="true"/>
+<g transform="translate(66,100) scale(0.78)" fill="#c1121f">
+<path d="M -32,10 v-32 h 40 v 12 h 10 l 14,14 v 6 h-6 a 9,9 0 0 0 -18,0 h-14 a 9,9 0 0 0 -18,0 h-8 z"/>
+<circle cx="-15" cy="13" r="8"/><circle cx="17" cy="13" r="8"/>
+</g><g transform="translate(136,104) scale(0.72)" fill="#1d1d1b">
+<path d="M -40,8 q0,-8 8,-10 l10,-2 8,-9 q2,-3 7,-3 h16 q5,0 7,3 l8,9 12,3 q6,2 6,9 v6 h-8 a9,9 0 0 0 -18,0 h-30 a9,9 0 0 0 -18,0 h-8 z"/>
+<circle cx="-22" cy="14" r="7"/><circle cx="26" cy="14" r="7"/>
+</g>
+</svg>

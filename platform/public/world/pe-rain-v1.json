@@ -6,10 +6,10 @@
   "mapKind": "scenario-street",
   "generator": "tools/maps/gen_pe_crossings.mjs",
   "boundsLocalMeters": {
-   "minX": -40,
-   "minY": 0,
-   "maxX": 42,
-   "maxY": 155
+   "minX": -122.125,
+   "minY": -14.125,
+   "maxX": 62,
+   "maxY": 251
   },
   "attribution": {
    "text": "Учебна улица с пешеходна пътека — оригинален параметричен дизайн (без данни от OpenStreetMap)",
@@ -23,12 +23,12 @@
    "note": "Права улица: ограничението важи по цялата дължина; пред пътеката се кара с готовност за спиране."
   },
   "stats": {
-   "roadKm": 0.16,
-   "nodes": 2,
-   "edges": 1,
+   "roadKm": 0.28,
+   "nodes": 3,
+   "edges": 2,
    "intersections": 0,
    "crossings": 1,
-   "buildings": 4,
+   "buildings": 7,
    "spawnPoints": 2,
    "zones": 0
   },
@@ -43,6 +43,10 @@
    "streetscapeNoteBg": "Неосветен складов участък: две глухи стени образуват тъмен коридор и единственият процеп в него е точно на пътеката — нощем фаровете са цялата видимост.",
    "roadscape": "industrial-canyon",
    "roadscapeNoteBg": "Складов коридор: от страната на рампите НЯМА тротоар изобщо — стената опира в бордюра, няма стълб, няма дърво, няма паркирана кола. Нощем фаровете са цялата видимост.",
+   "terminus": "bends-away-left",
+   "terminusNoteBg": "Коридорът не продължава — след края на отсечката улицата завива наляво, а срещу теб застава глухата стена на склад. Завой, който се чете отдалеч, а не изневиделица.",
+   "terminusLegs": 1,
+   "terminusRoadM": 124.87,
    "roadClass": "unclassified",
    "parkingBandM": 0,
    "bareVerge": "right",
@@ -72,6 +76,11 @@
     "id": "pe-n-start",
     "x": 0,
     "y": 0
+   },
+   {
+    "id": "pe-n-west",
+    "x": -108,
+    "y": 199
    }
   ],
   "edges": [
@@ -100,6 +109,39 @@
     ],
     "parkingBand": false,
     "bareVerge": "right"
+   },
+   {
+    "id": "pe-e-west",
+    "from": "pe-n-end",
+    "to": "pe-n-west",
+    "class": "unclassified",
+    "name": "Складов подход",
+    "oneway": false,
+    "roundabout": false,
+    "lanes": 2,
+    "lanesSource": "tag",
+    "maxspeed": 50,
+    "maxspeedSource": "tag",
+    "length": 124.87,
+    "geometry": [
+     [
+      0,
+      155
+     ],
+     [
+      -14,
+      178
+     ],
+     [
+      -54,
+      196
+     ],
+     [
+      -108,
+      199
+     ]
+    ],
+    "parkingBand": false
    }
   ]
  },
@@ -205,6 +247,75 @@
     [
      12.6,
      139
+    ]
+   ]
+  },
+  {
+   "id": "pe-b-crook",
+   "height": 13,
+   "heightSource": "default",
+   "footprint": [
+    [
+     21,
+     160
+    ],
+    [
+     62,
+     160
+    ],
+    [
+     62,
+     217
+    ],
+    [
+     21,
+     217
+    ]
+   ]
+  },
+  {
+   "id": "pe-b-shed-far",
+   "height": 11,
+   "heightSource": "default",
+   "footprint": [
+    [
+     -64,
+     215
+    ],
+    [
+     -34,
+     215
+    ],
+    [
+     -34,
+     251
+    ],
+    [
+     -64,
+     251
+    ]
+   ]
+  },
+  {
+   "id": "pe-b-shed-w",
+   "height": 9,
+   "heightSource": "default",
+   "footprint": [
+    [
+     -118,
+     149
+    ],
+    [
+     -74,
+     149
+    ],
+    [
+     -74,
+     181
+    ],
+    [
+     -118,
+     181
     ]
    ]
   }

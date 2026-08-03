@@ -24,7 +24,7 @@
 
 import "@/lib/content/loader";
 import { getContentRepo } from "@/lib/content/repo";
-import { requireUser } from "@/modules/auth";
+import { getSessionUser } from "@/modules/auth";
 import { recordActivity } from "@/modules/gamification";
 import { recordSimObservations, type SimObservation } from "@/modules/learning";
 import {
@@ -51,7 +51,25 @@ import { canDriveSimulator } from "./access";
 export async function finishLessonAction(
   input: unknown,
 ): Promise<FinishLessonActionResult> {
-  const user = await requireUser();
+  // getSessionUser + a RESULT CODE rather than requireUser(), for the reason
+  // loadMicroQuizBank states at length: requireUser() calls redirect(), and Next
+  // turns a redirect thrown inside a server action into a 303 that the ROUTER
+  // FOLLOWS. This action fires whenever a session ENDS — including an early
+  // abort or a failed drill twelve seconds in — so on an anonymous or expired
+  // session the student did not get "your drive was not saved", the whole drive
+  // screen was replaced by /login, mid-session, with no error anywhere. Four of
+  // five signal lessons bounced this way and three review waves reported it as
+  // environmental.
+  //
+  // It is also the worse bug for a real student than for a harness: a drive
+  // that ends after a session quietly expired lost the RESULT SCREEN — the
+  // debrief, the law citations, the whole teaching payload — to a login page.
+  // Returning a code keeps the result on screen (the shell renders it locally
+  // and says so); only the persistence is lost, which is all that actually
+  // failed. The auth requirement itself is unchanged: nothing is written, no
+  // learner-model or XP call is reached, for a caller with no session.
+  const user = await getSessionUser();
+  if (user === null) return { ok: false, code: "NOT_SIGNED_IN" };
 
   // C-3 entitlement gate. The page already refuses unentitled accounts, but a
   // server action is a public POST endpoint: without this check a free account

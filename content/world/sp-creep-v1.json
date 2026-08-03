@@ -6,9 +6,9 @@
   "mapKind": "scenario-street",
   "generator": "tools/maps/gen_sp_speed.mjs",
   "boundsLocalMeters": {
-   "minX": -28.12,
+   "minX": -28.13,
    "minY": 0,
-   "maxX": 14.125,
+   "maxX": 38.13,
    "maxY": 360
   },
   "attribution": {
@@ -28,7 +28,7 @@
    "edges": 1,
    "intersections": 0,
    "crossings": 0,
-   "buildings": 1,
+   "buildings": 4,
    "spawnPoints": 2
   },
   "scenario": {
@@ -67,6 +67,7 @@
     "lanesSource": "tag",
     "maxspeed": 50,
     "maxspeedSource": "tag",
+    "parkingBand": true,
     "length": 360,
     "geometry": [
      [
@@ -91,20 +92,89 @@
    "heightSource": "default",
    "footprint": [
     [
-     -28.12,
+     -28.13,
      150
     ],
     [
-     -16.12,
+     -16.13,
      150
     ],
     [
-     -16.12,
+     -16.13,
      168
     ],
     [
-     -28.12,
+     -28.13,
      168
+    ]
+   ]
+  },
+  {
+   "id": "sp-b-stop-canopy",
+   "height": 3.4,
+   "heightSource": "default",
+   "footprint": [
+    [
+     16.13,
+     173
+    ],
+    [
+     20.63,
+     173
+    ],
+    [
+     20.63,
+     187
+    ],
+    [
+     16.13,
+     187
+    ]
+   ]
+  },
+  {
+   "id": "sp-b-stop-shop",
+   "height": 8.5,
+   "heightSource": "default",
+   "footprint": [
+    [
+     20.63,
+     168
+    ],
+    [
+     38.13,
+     168
+    ],
+    [
+     38.13,
+     190
+    ],
+    [
+     20.63,
+     190
+    ]
+   ]
+  },
+  {
+   "id": "sp-b-stop-neighbour",
+   "height": 11,
+   "heightSource": "default",
+   "footprint": [
+    [
+     20.63,
+     196
+    ],
+    [
+     36.13,
+     196
+    ],
+    [
+     36.13,
+     220
+    ],
+    [
+     20.63,
+     220
     ]
    ]
   }

@@ -667,19 +667,37 @@ function PlayMenu({
       }}
     >
       <div className="flex items-center gap-1.5">
+        {/* ── THE TOP-LEFT CORNER, 2026-08-03. The review named this one on
+            sight: „the white circular hamburger, top-left — a mobile-web menu
+            affordance." Measured on the drive screen before the change, it was
+            exactly that: a 44 px disc filled `oklab(0.96 …/0.6)` — near-white
+            at 60 % — with a `rgb(211,224,240)` ring and a `backdrop-blur`, i.e.
+            three separate web-app tells stacked on a photograph of a road.
+
+            A hamburger is also the wrong SIGN for this product. It says „there
+            is a site behind this screen"; the reference's edge furniture says
+            what it does, in words, in a mono face, with nothing behind it. So
+            the disc goes and the word arrives: МЕНЮ / ЗАТВОРИ, on the ghost
+            register (`hud-ghost` — fill, blur and shadow are swept by
+            PlayAreaStyles, the ink is pinned light for a road background and
+            the halo is what holds it legible over bright tarmac).
+
+            WHAT DELIBERATELY DOES NOT CHANGE: the 44 px minimum in both axes
+            (row C2 counted nineteen touch-target violations in this app and
+            this is the control that opens everything else), the accent ring in
+            the open state, and the sheet behind it, which is a reading surface
+            and keeps its panel. ────────────────────────────────────────────── */}
         <button
           type="button"
           onClick={() => setOpen((o) => !o)}
           aria-expanded={open}
           aria-label={open ? "Затвори менюто на урока" : "Меню на урока"}
           title={titleBg}
-          className={`pointer-events-auto flex h-11 w-11 shrink-0 touch-manipulation items-center justify-center rounded-full border text-lg backdrop-blur transition motion-reduce:transition-none ${
-            open
-              ? "border-accent bg-accent/25 text-foreground"
-              : "border-border bg-background/60 text-muted active:bg-surface"
+          className={`hud-ghost pointer-events-auto flex h-11 min-w-11 shrink-0 touch-manipulation items-center justify-center rounded-full border px-2 text-[10px] font-black uppercase tracking-[0.14em] transition motion-reduce:transition-none ${
+            open ? "border-accent text-foreground" : "border-border text-foreground"
           }`}
         >
-          <span aria-hidden>{open ? "✕" : "☰"}</span>
+          <span aria-hidden>{open ? "Затвори" : "Меню"}</span>
         </button>
         {/* A13 / THEO-3: the framing badge is a product requirement — it stays
             on screen, at chip size, because „this is an exam" must never be
@@ -1426,8 +1444,16 @@ export function LessonPlayShell({
       {
         kind: "lesson",
         titleBg: "Колата още не е готова за потегляне",
+        // B7/B20 residual: this toast used to read „запали двигателя (I),
+        // включи предавка с ], освободи ръчната спирачка (Space)" — i.e. it
+        // taught the KEYBOARD, inside the lesson whose whole premise is that
+        // the cockpit is worked with the mouse. It is the first thing a stuck
+        // beginner reads, so it was teaching the opposite of the contract.
+        // Wording matches advisor.ts's own mouse-first step copy verbatim, so
+        // the toast and the checklist can never say two different things; the
+        // keys stay, demoted to the footnote they are for the advanced.
         explanationBg:
-          "Работи с истинските контроли: запали двигателя (I), включи предавка с ], освободи ръчната спирачка (Space). Списъкът вляво се отмята сам, докато го правиш — потегляш с газта, когато колата наистина може да тръгне.",
+          "Работи с истинските контроли — с мишката, в кабината: щракни стартера на конзолата, щракни скоростния лост към D, щракни ключа на ръчната спирачка. Списъкът вляво се отмята сам, докато го правиш — потегляш с газта, когато колата наистина може да тръгне. (За напреднали: същото става с I, ] и Space.)",
       },
     ]);
   }, [nowSec, push]);
@@ -2907,7 +2933,14 @@ export function LessonPlayShell({
       >
         {ended && saveResult && !saveResult.ok ? (
           <span className="font-semibold text-warning">
-            Сесията не се записа ({saveResult.code}) — резултатът е само локален.
+            {saveResult.code === "NOT_SIGNED_IN"
+              ? // B39: this used to be a redirect, so the student never read a
+                // sentence — the drive screen simply became /login and the
+                // debrief was gone. Now it stays, and it says which half failed:
+                // the DRIVING and the grading are done and correct, only the
+                // saving is not.
+                "Не си вписан, затова карането не влезе в профила ти — разборът на този екран е пълен и верен, но няма да го намериш в историята. Впиши се и покарай пак, за да се брои."
+              : `Сесията не се записа (${saveResult.code}) — оценката и разборът са верни, но остават само на този екран.`}
           </span>
         ) : null}
         {/* The CC-BY roadster is gone — all vehicles are now self-authored

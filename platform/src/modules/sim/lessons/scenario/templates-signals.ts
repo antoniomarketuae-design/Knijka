@@ -41,7 +41,11 @@
  */
 
 import type { ScenarioSpec } from "./types";
-import type { PriorityFromRightSpec, TrafficControllerSpec } from "../../contracts";
+import type {
+  BrakingLeadCarSpec,
+  PriorityFromRightSpec,
+  TrafficControllerSpec,
+} from "../../contracts";
 import { l5BusyStreet } from "./complications";
 
 /** Drawn lane-center offset from the road centerline on sx-v1, m. */
@@ -464,9 +468,101 @@ export const SC_SIGNAL_FLASHING: ScenarioSpec = {
 
 // ---------------------------------------------------------------------------
 // sc-signal-hesitation — „Спане на зелено" (doc 72 JU-09) on sx-v1 (map REUSED;
-// a LIVE green phase pinned over the encounter — no staged conflict, the fault
-// is the driver's own delay)
+// a LIVE green phase pinned over the encounter — the graded fault is the
+// driver's own delay, and the lesson now SHOWS him somebody committing it)
 // ---------------------------------------------------------------------------
+
+/**
+ * THE SUBJECT OF THE LESSON — doc 87 B40, and it is his sentence verbatim:
+ *
+ *   „it says sleeping on green but who ? who is sleeping on green yes Ok I stop
+ *    on the green cyrcle but is that it ? … just that there is no traffic car."
+ *
+ * He is right, and the register never named the actual hole: this template
+ * shipped with `staged` absent entirely. A lesson called «Спане на зелено» had
+ * no one asleep in it. The student was told about a fault and shown an empty
+ * crossroads, and the only thing on screen was the objective marker he stopped
+ * on — which is what „I stop on the green cyrcle but is that it" describes.
+ *
+ * So: ONE CAR, standing at the FAR stop line of the same north–south axis,
+ * facing him, on the same green, not moving. He watches it through the whole
+ * approach; it wakes and drives off as he crosses. That is a picture of the
+ * fault, in the lesson about the fault.
+ *
+ * WHY THE ONCOMING LINE AND NOT HIS OWN LANE. Putting the sleeper in front of
+ * the student is the obvious staging and it breaks three things at once, all
+ * of them measured against the shipped code rather than guessed:
+ *
+ *  1. IT DISABLES THE DETECTOR THE LESSON EXISTS FOR. `HESITATION_AT_GREEN`
+ *     (rules/engine.ts) is gated on `leadGapM === null || leadGapM >
+ *     cfg.hesitationClearGapM` (12 m) — a lead car within 12 m is a lawful
+ *     reason to sit still, so a student stopped behind the sleeper cannot be
+ *     graded on the one thing this drill grades.
+ *  2. IT CAN DEADLOCK. `BrakingLeadCarRunner` arms on `nearLead &&
+ *     input.speedKmh > 4`: a student who comes to a full stop behind a car
+ *     that is waiting for him to move has no way out. That is exactly the
+ *     shape of B15 („the roundabout convicts you for a car that never comes"),
+ *     and shipping a second one would be inexcusable.
+ *  3. THE SHADOW GHOST WOULD DRIVE THROUGH IT. The committed L1 demonstration
+ *     (traces/scSignalHesitation.ts) crosses y = −28.6 at 22 km/h and knows
+ *     nothing about staged actors — the student would watch the teaching car
+ *     pass through a parked one, which is the founder's items 22/23/24 defect
+ *     at car scale.
+ *
+ * Across the box it costs none of that: nothing blocks the student's lane, the
+ * detector stays armed, the ghost's path is clear, and the demonstration is
+ * MORE legible, not less — two cars have the same green, one of them goes.
+ *
+ * MECHANISM, stated plainly rather than disguised. This reuses
+ * `brakingLeadCar` for its HOLD-then-CRUISE half only: `armDistM` 50 keeps the
+ * actor asleep until the student is at the junction mouth, and `slamAt` is
+ * placed off the map on purpose so the brake half NEVER arms. The event
+ * therefore resolves no outcome and contributes nothing to the debrief — it is
+ * scenery with a teaching job, the same standing as an `ambient: true` walker,
+ * and it must stay that way: the fault this lesson scores is the STUDENT'S.
+ */
+export const SC_SIGNAL_HESITATION_SLEEPER: BrakingLeadCarSpec = {
+  id: "sc-shes-sleeper",
+  kind: "brakingLeadCar",
+  libraryEventId: "JU-09",
+  actor: {
+    // Southbound down the same axis: it holds at the NORTH stop line, nose
+    // toward the student, and leaves down the south stem past him.
+    pathNodes: ["sx-n-n", "sx-n-c", "sx-n-s"],
+    // sx-v1's ns stop line is at 27.725 m from the node (traces/
+    // scSignalHesitation.ts pins the southern one at y = −27.725); 29 m back
+    // puts it AT its own line rather than in the box.
+    hold: { nodeIndex: 1, offsetM: -29 },
+    cruiseSpeedMps: 7,
+    colorIndex: 2,
+  },
+  // The wake-up. MEASURED on the production runner + traffic system, player
+  // driven up the south stem from the spawn at y = −105:
+  //   at 35 km/h it stands motionless for 8.9 s and wakes at player y = −18.1
+  //   at 18 km/h it stands motionless for 17.1 s and wakes at player y = −19.3
+  // Both are PAST his own stop line (y = −27.725), so the car is still asleep
+  // at the moment he has to decide, and pulls away in front of him as he enters
+  // the box. Met at full pace and at half — the encounter battery's invariant,
+  // which is exactly the founder's items 8/15/17/18 („by the time I reach the
+  // crossroad it already has passed").
+  armDistM: 50,
+  paceMode: "scheduledCruise",
+  paceSpeedMps: 7,
+  // Unused under scheduledCruise + armDistM; carried because the spec requires
+  // them (the siblings in templates-following.ts keep them for the same reason).
+  followGapM: 20,
+  maxMatchSpeedMps: 14,
+  // DELIBERATELY UNREACHABLE — sx-v1's south stem ends at y = −120, so the
+  // brake half of the runner can never latch and the encounter never
+  // adjudicates. See the block above: this actor is shown, never scored.
+  slamAt: { x: 0, y: -400 },
+  slamRadiusM: 1,
+  slamDecelMps2: 3,
+  minSlamSpeedKmh: 999,
+  proximityFallbackM: 0,
+  triggersHazard: false,
+  resumeAfterSec: 3,
+};
 
 /** JU-09 — закъснели действия на зелено (ППЗДвП чл. 31: зеленият сигнал
  *  разрешава преминаването; ЗДвП чл. 20 — водачът контролира ППС и не създава
@@ -508,9 +604,21 @@ export const SC_SIGNAL_HESITATION: ScenarioSpec = {
   instructionsBg: [
     { n: 1, textBg: "Тръгни по булеварда на север — напред е светофарно кръстовище, което свети ЗЕЛЕНО." },
     { n: 2, textBg: "Зеленото не значи „чакай“, а „премини, ако е безопасно“. Провери, че кутията на кръстовището е чиста." },
-    { n: 3, textBg: "Щом напред е чисто, премини правó напред без излишно спиране и бавене." },
-    { n: 4, textBg: "Не замръзвай на зелено „за всеки случай“ — това блокира кръстовището и колоната зад теб." },
-    { n: 5, textBg: "Продължи спокойно на север след кръстовището." },
+    // The founder's question — „who is sleeping on green?" — answered on the
+    // screen, then named in the card so the student knows what he is looking at.
+    {
+      n: 3,
+      textBg:
+        "Погледни колата отсреща, спряла на другата стоп-линия: на нея ѝ свети СЪЩОТО зелено, а тя не тръгва. Ето кой „спи на зелено“ — запомни как изглежда отстрани.",
+    },
+    {
+      n: 4,
+      textBg:
+        "Зеленият сигнал разрешава преминаването (ППЗДвП чл. 31) — той не е покана да чакаш. Всяка изпусната секунда на зелено държи кръстовището заето за всички останали.",
+    },
+    { n: 5, textBg: "Щом напред е чисто, премини правó напред без излишно спиране и бавене." },
+    { n: 6, textBg: "Не замръзвай на зелено „за всеки случай“ — това блокира кръстовището и колоната зад теб." },
+    { n: 7, textBg: "Продължи спокойно на север след кръстовището." },
   ],
   success: [
     {
@@ -533,6 +641,8 @@ export const SC_SIGNAL_HESITATION: ScenarioSpec = {
       params: { kind: "reachZone", x: 4.06, y: 45, radiusM: 9 },
     },
   ],
+  // The lesson's subject, staged. It grades nothing (see the spec's own doc).
+  staged: [SC_SIGNAL_HESITATION_SLEEPER],
   rubric: { parTimeSec: 55 },
   // RECORDED: committed deterministic recordings of the authored scripts in
   // traces/scSignalHesitation.ts; the §5 gate (shadow replays ZERO violations)

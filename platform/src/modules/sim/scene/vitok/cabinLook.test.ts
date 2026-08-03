@@ -32,7 +32,7 @@ import {
   topmostControlEdgeInColumn,
   type CabinLookPoseId,
 } from "./cabinLook";
-import { COCKPIT_HOTSPOTS } from "./hotspots";
+import { COCKPIT_HOTSPOTS, hotspotMouseVerbBg } from "./hotspots";
 import { COCKPIT_HOTSPOT_NAMES } from "../../procedures";
 
 /** Window shapes the app is actually served at: the 16:9 reference, the
@@ -161,6 +161,58 @@ describe("cabin look · ALL THIRTEEN answer a mouse click", () => {
       expect(pose.labelBg.length, id).toBeGreaterThan(5);
       expect(pose.hintBg.length, id).toBeGreaterThan(10);
     }
+  });
+});
+
+describe("cabin look · the control says its own name, on the car", () => {
+  // „We should re-work the whole engine with the buttons, BECAUSE WE READ ON
+  // LEFT." The pending control has pulsed since A2, but a pulse is a nameless
+  // blue box — and at the belt pose it is a nameless blue box in an almost
+  // black frame. These four assertions are the chip that fixes that: it exists
+  // for every control, it is short enough to sit ON the control, and it names
+  // the GESTURE rather than a key.
+  it("every one of the thirteen carries a short on-car name", () => {
+    for (const spec of COCKPIT_HOTSPOTS) {
+      expect(spec.shortBg.length, spec.name).toBeGreaterThan(2);
+      // Two words at most: the chip is pinned to a control that is 80–150 mm
+      // wide, and a sentence there would cover the thing it is pointing at.
+      expect(spec.shortBg.split(" ").length, spec.name).toBeLessThanOrEqual(3);
+      // It is a NAME, not an instruction: the verb comes from the action.
+      expect(spec.shortBg, spec.name).not.toMatch(/Щракни|Задръж/);
+    }
+  });
+
+  it("no chip name carries a keyboard key — the keys live in the legend", () => {
+    for (const spec of COCKPIT_HOTSPOTS) {
+      expect(spec.shortBg, spec.name).not.toMatch(/клавиш|Space|\[|\]/i);
+    }
+  });
+
+  it("the gesture is derived from the handler, so a label cannot lie", () => {
+    // The two HELD families are the horn and every mirror glance — the same
+    // press-and-hold contract the H/Q/E/F keys have, and the same one the
+    // pointer-down/up handlers in VitokCockpit implement.
+    const held = COCKPIT_HOTSPOTS.filter((s) => hotspotMouseVerbBg(s.action) === "Задръж");
+    expect(held.map((s) => s.name).sort()).toEqual([
+      "hotspot_horn",
+      "hotspot_mirror_left",
+      "hotspot_mirror_rear",
+      "hotspot_mirror_right",
+    ]);
+    for (const spec of COCKPIT_HOTSPOTS) {
+      expect(["Щракни", "Задръж"]).toContain(hotspotMouseVerbBg(spec.action));
+    }
+  });
+
+  it("a chip is only ever asked for where the control is on screen", () => {
+    // The component filters through `hotspotIsReachable` at the LIVE pose, so
+    // the two controls that need a head turn are unlabelled until the head has
+    // turned — a label at the edge of a picture the control is not in would be
+    // exactly the „read something instead of seeing it" the row is about.
+    expect(hotspotIsReachable("hotspot_belt", "forward")).toBe(false);
+    expect(hotspotIsReachable("hotspot_belt", "belt")).toBe(true);
+    expect(hotspotIsReachable("hotspot_mirror_right", "forward")).toBe(false);
+    expect(hotspotIsReachable("hotspot_mirror_right", "mirrorRight")).toBe(true);
   });
 });
 

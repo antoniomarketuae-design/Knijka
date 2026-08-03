@@ -53,7 +53,9 @@ describe("mw-v1 — sc-fo-motorway-gap reuse invariants", () => {
 
   it("pins the cruise-lane center the player + lead share", () => {
     expect(raw.meta.scenario.laneCruiseX).toBe(X_CRUISE);
-    expect(raw.meta.scenario.params.lengthM).toBe(1000);
+    // 1000 → 2600 m (doc 87 B67: the carriageway ended before the car could
+    // reach the speed the lesson is about — see mw-district.test.ts).
+    expect(raw.meta.scenario.params.lengthM).toBe(2600);
     expect(raw.meta.scenario.params.maxspeedKmh).toBe(140);
   });
 

@@ -285,3 +285,108 @@ describe("no new card may be wider than the narrowest phone", () => {
     ).toEqual([]);
   });
 });
+
+/**
+ * =============================================================================
+ * THE HOLE THE CLASS SCANNER CANNOT SEE — 2026-08-03.
+ *
+ * Everything above reads Tailwind CLASSES. A width written as an inline style
+ * walks straight past it:
+ *
+ *     <div style={{ width: 420 }}>            // 420 px on a 393 px phone
+ *     <div style={{ minWidth: "26rem" }}>     // 416 px, and min-width cannot
+ *                                             // be talked down by a max-width
+ *
+ * Both forms are already used in this tree for legitimate things — the overlay
+ * peek sets `height`, the shell sets `maxWidth` — so the door is open and only
+ * the convention was holding it. `min-width` is the worse of the two: a
+ * `max-width` clamp beside it LOSES, because CSS resolves min-width last, so
+ * the very fix the file above prescribes would not work.
+ *
+ * This is not a hypothetical. Doc 89 §3's card was clipped on BOTH edges at
+ * once, which a right-anchored 240 px card cannot do — something was making it
+ * wider than the stage, and „no `w-` class declares it" was never proof.
+ * =============================================================================
+ */
+
+/** `width: 420` / `width: "26rem"` / `minWidth: "20rem"` in a style object. */
+const INLINE_WIDTH = /\b(width|minWidth)\s*:\s*(?:"([^"]+)"|'([^']+)'|(\d+(?:\.\d+)?))/g;
+
+interface InlineDecl {
+  file: string;
+  line: number;
+  prop: string;
+  raw: string;
+  px: number | null;
+}
+
+function pxFromCssValue(value: string): number | null {
+  const v = value.trim();
+  if (/^\d+(\.\d+)?$/.test(v)) return Number(v); // React numbers are px
+  const px = /^(\d+(?:\.\d+)?)px$/.exec(v);
+  if (px) return Number(px[1]);
+  const rem = /^(\d+(?:\.\d+)?)rem$/.exec(v);
+  if (rem) return Number(rem[1]) * 16;
+  // %, vw, calc(), min(), a template expression — self-limiting or unknowable
+  // from source. Not this test's business; the class scan and the runtime
+  // measurement cover those.
+  return null;
+}
+
+function scanInline(file: string, source: string): InlineDecl[] {
+  const out: InlineDecl[] = [];
+  stripComments(source)
+    .split(/\r?\n/)
+    .forEach((lineText, i) => {
+      for (const m of lineText.matchAll(INLINE_WIDTH)) {
+        const raw = m[2] ?? m[3] ?? m[4] ?? "";
+        out.push({ file, line: i + 1, prop: m[1], raw, px: pxFromCssValue(raw) });
+      }
+    });
+  return out;
+}
+
+function scanInlineDir(dir: string): InlineDecl[] {
+  const out: InlineDecl[] = [];
+  for (const name of readdirSync(dir)) {
+    if (!name.endsWith(".tsx")) continue;
+    out.push(...scanInline(name, readFileSync(resolve(dir, name), "utf8")));
+  }
+  return out;
+}
+
+describe("no card may be sized past the phone by an INLINE style either", () => {
+  const inline = [...scanInlineDir(HUD_DIR), ...scanInlineDir(LESSON_UI_DIR)];
+
+  it("the inline detector has teeth", () => {
+    const bad = `<div style={{ width: 420 }}>`;
+    const badRem = `<section style={{ minWidth: "26rem" }}>`;
+    const okVw = `<div style={{ width: "calc(100vw - 1.5rem)" }}>`;
+    expect(scanInline("s.tsx", bad)[0]?.px).toBe(420);
+    expect(scanInline("s.tsx", badRem)[0]?.px).toBe(416);
+    expect(scanInline("s.tsx", okVw)[0]?.px).toBeNull();
+    // and prose about a width is still never a shipped width
+    expect(scanInline("s.tsx", `// it used to be width: 420`)).toEqual([]);
+  });
+
+  it("every inline width in the drive HUD fits the narrowest phone", () => {
+    const offenders = inline.filter(
+      (d) => d.px !== null && d.px > hudCardMaxWidthPx(NARROWEST_VIEWPORT_PX),
+    );
+    expect(
+      offenders.map((o) => `${o.file}:${o.line} ${o.prop}: ${o.raw} (${o.px}px)`),
+      "An inline width larger than a 320 px phone can hold. Use the class " +
+        "clamp (HUD_CARD_MAX_WIDTH_CLASS) instead — and never min-width, which " +
+        "CSS resolves AFTER max-width, so a clamp beside it does nothing.",
+    ).toEqual([]);
+  });
+
+  it("nothing in the drive HUD pins a min-width in absolute units", () => {
+    // Even a SMALL one: min-width is the single declaration a viewport clamp
+    // cannot override, so the rule is „not in this layer at all", not „keep it
+    // under 296 px". (Tailwind's `min-w-11` touch targets are a class, are
+    // 44 px, and are deliberately outside this scan — see WIDTH_TOKEN.)
+    const pinned = inline.filter((d) => d.prop === "minWidth" && d.px !== null);
+    expect(pinned.map((o) => `${o.file}:${o.line} minWidth: ${o.raw}`)).toEqual([]);
+  });
+});

@@ -138,11 +138,57 @@ export const SCENARIO_DEFAULT_TRAFFIC = {
  * read a boulevard), L5 gets 1.5× (FR-13: a higher rung must ADD, not just
  * remove aids).
  *
- * The numbers are measured, not chosen. At the L3 figure below, with the player
- * out of the way, the junction disc sees **6–12 passages a minute at 25–31 km/h
- * with 0–10% of agent-time stopped**. Doubling it does not double the lesson:
- * at 6 the same districts start queueing (16–26% stopped on four of them), so
- * 4 is the knee of the curve and 1.5× at L5 is the deliberate top.
+ * ── RE-MEASURED 2026-08-03, WITH THE STUDENT STANDING WHERE THE DRILL GRADES ──
+ *
+ * The first measurement was taken with *the player out of the way*, and that is
+ * why it certified a street the founder then photographed empty (B23, B28, B36,
+ * B38: „the priority road is empty across the whole visible span while the
+ * demonstration bubble says «Кола отдясно — тя има предимство»"). The taught
+ * behaviour on a give-way drill is TO STOP AT THE LINE — so the honest probe
+ * parks the player 30 m short of the junction, exactly where the objective
+ * accepts, and asks two questions a picture can answer:
+ *
+ *   cone  = % of the minute with a MOVING car in the forward 100° cone ≤ 90 m
+ *           — "is there anything in the windscreen"
+ *   cross = % of the minute with a MOVING car on a CROSSING arm ≤ 60 m of the
+ *           node — "is the priority road alive"
+ *
+ * Nine districts (sx-v1, tj-rhr/stop/emerge/occluded-v1, jx-equal-v1,
+ * jxg-giveway-v1, sig-wave-v1, pe-jay-v1), 3 seeds, 60 s each:
+ *
+ *   n=2 (what L1 compiled to)  cone 10–32%   cross  0–32%   1.0–3.0 pass/min
+ *   n=4 (what L3 compiled to)  cone 30–57%   cross 33–60%   3.3–6.3 pass/min
+ *   n=5                        cone 45–70%   cross 37–69%   4.0–9.0 pass/min
+ *   n=6                        cone 47–77%   cross 34–86%   3.7–11  pass/min
+ *   n=7                        REGRESSES on four districts (tj-stop 59→43,
+ *                              tj-emerge 51→31, sig-wave cross 54→49) with
+ *                              agent-time stopped rising to 46–52% — the ring
+ *                              of the junction starts queueing on itself.
+ *
+ * So **n=2 was the dead boulevard he filmed** — on a give-way lesson the
+ * crossing arm was empty for two thirds to all of the minute — and **6 is the
+ * knee**, not 4. Hence the three constants below rather than one:
+ *
+ *   BASELINE 5 — the L3/L4 street.
+ *   FLOOR 4    — the count below which the drill's own SUBJECT disappears.
+ *                A junction lesson quieted to 2 cars is not an easier junction
+ *                lesson, it is a different lesson with nothing to yield to, and
+ *                „quieter at L1" cannot be allowed to mean „delete the thing
+ *                being taught". The ladder still runs — it just runs above a
+ *                floor that keeps the lesson a lesson.
+ *   CEILING 6  — the measured knee. Without it L5's ×1.5 lands on 8, which is
+ *                past the jam.
+ *
+ * The rungs therefore compile to 4 / 4 / 5 / 5 / 6 for these two families.
+ *
+ * MEASURED AND REJECTED — `anchorRadiusM` as the dial. B23/B28 name it as the
+ * fix owner („ambient vehicles spawn on a 400 m district anchor"). It was swept
+ * at 400 / 220 / 150 m on all nine districts and, on seven of them, produced
+ * BYTE-IDENTICAL numbers: these scenario micro-maps are smaller than the
+ * smallest radius, so `buildRoutes`'s `preferNear` filter never bites (it falls
+ * back to `byDist.slice(0, …)` when too few lanes are in radius). The radius is
+ * an inert knob HERE; density is the whole story. Said out loud so the next
+ * wave does not spend itself turning it again.
  *
  * WHY THE ROUNDABOUT FAMILY IS DELIBERATELY ZERO. It was measured too, and it
  * fails: on `rb-mini-v1` **two** ambient cars already spend 68–75% of their
@@ -160,11 +206,26 @@ export const SCENARIO_DEFAULT_TRAFFIC = {
  */
 export const SCENARIO_FAMILY_TRAFFIC_BASELINE: Partial<Record<ScenarioFamily, number>> = {
   // The yielding drills — „more than one car to wait for".
-  junction: 4,
+  junction: 5,
   // The signals family: five lessons on one crossroads, all photographed dead
   // (B38/B40). A signal drill with no traffic teaches the lamp, not the road.
-  signals: 4,
+  signals: 5,
 };
+
+/**
+ * The floor and the ceiling the §7 ladder may not cross when the count came
+ * from the FAMILY baseline above. Both are measurements, both are documented in
+ * that table: below FLOOR the crossing arm is empty for most of the minute and
+ * the drill has nothing to yield to; above CEILING the junction queues on
+ * itself and the street is a jam instead of a road.
+ *
+ * They apply ONLY to the family baseline. A template that authors its own
+ * `traffic.vehicleCount`, and a rung that authors one, are the author's final
+ * word and are never clamped — the compiler does not overrule a number a human
+ * put there on purpose.
+ */
+export const SCENARIO_FAMILY_TRAFFIC_FLOOR = 4;
+export const SCENARIO_FAMILY_TRAFFIC_CEILING = 6;
 
 /**
  * WHY `following` IS NOT IN THE TABLE ABOVE — measured, and it failed.
@@ -493,11 +554,26 @@ function rungTraffic(spec: ScenarioSpec, rung: LevelSpec) {
   const trafficScale = DEFAULT_LEVEL_TRAFFIC_SCALE[rung.level];
   const laddered = (baseline: number | undefined, fallback: number) =>
     baseline === undefined ? fallback : Math.max(0, Math.round(baseline * trafficScale));
+  const authoredVehicles = spec.traffic?.vehicleCount;
   const familyVehicles = SCENARIO_FAMILY_TRAFFIC_BASELINE[spec.family];
+  // An AUTHORED count ladders freely; a FAMILY baseline ladders between the
+  // measured floor and the measured ceiling (see the baseline's doc block).
+  const familyLaddered =
+    familyVehicles === undefined
+      ? SCENARIO_DEFAULT_TRAFFIC.vehicleCount
+      : Math.min(
+          SCENARIO_FAMILY_TRAFFIC_CEILING,
+          Math.max(
+            SCENARIO_FAMILY_TRAFFIC_FLOOR,
+            Math.round(familyVehicles * trafficScale),
+          ),
+        );
   return {
     vehicleCount:
       rung.traffic?.vehicleCount ??
-      laddered(spec.traffic?.vehicleCount ?? familyVehicles, SCENARIO_DEFAULT_TRAFFIC.vehicleCount),
+      (authoredVehicles === undefined
+        ? familyLaddered
+        : laddered(authoredVehicles, SCENARIO_DEFAULT_TRAFFIC.vehicleCount)),
     pedestrianCount:
       rung.traffic?.pedestrianCount ??
       laddered(spec.traffic?.pedestrianCount, SCENARIO_DEFAULT_TRAFFIC.pedestrianCount),

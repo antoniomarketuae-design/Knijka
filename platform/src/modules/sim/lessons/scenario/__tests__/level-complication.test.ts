@@ -420,8 +420,25 @@ describe("the ladder above L3 has something to add — counted", () => {
     //                     construction, and the test above proves it)
     // Floors, not targets: they may only be raised. Every unit is a rung a
     // student can now be told the reason for.
+    //
+    // ── 347 → 327, ON PURPOSE, 2026-08-03. Read this before raising it back. ──
+    // The junction/signals ambient baseline now sits on a measured FLOOR (see
+    // SCENARIO_FAMILY_TRAFFIC_FLOOR): those two families used to compile
+    // 2/3/4/4/6 cars and now compile 4/4/5/5/6, because at 2 cars the crossing
+    // arm the drill grades carried a moving car for 0–32% of the minute — the
+    // founder's B23/B28/B36/B38, „the priority road is empty while the
+    // instructor names a car". Collapsing the bottom of that ladder costs
+    // EXACTLY the L1→L2 traffic rise on ~20 rungs, and those 20 rungs are the
+    // whole difference between 347 and 327.
+    //
+    // The trade, stated plainly: 20 rungs lose a DERIVED sentence about the
+    // street getting busier; every rung of those two families gains a street
+    // with something on it to yield to. A sentence promising traffic on an
+    // empty road is worse than no sentence. The L4→L5 rise — the one the
+    // authored «По-натоварена улица» copy depends on — is unaffected and is
+    // pinned by its own assertion below.
     expect(rungs).toBeGreaterThanOrEqual(808);
-    expect(withComplication).toBeGreaterThanOrEqual(347);
+    expect(withComplication).toBeGreaterThanOrEqual(327);
     expect(authored).toBeGreaterThanOrEqual(70);
     expect(l5.size).toBeGreaterThanOrEqual(145);
     // The 22 templates still without an L5 each carry a REVIEWED reason not to

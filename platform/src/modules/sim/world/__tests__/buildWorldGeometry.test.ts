@@ -372,12 +372,22 @@ describe("buildWorldGeometry on a synthetic X-junction", () => {
     expect(world.buildingRoofs.indices.length).toBeGreaterThanOrEqual(6);
     // Roof height = building height.
     expect(world.buildingRoofs.positions[1]).toBeCloseTo(15);
-    // Ground-floor band: some wall vertices carry the darker tint.
+    // Three baked bands on a wall tall enough to carry a crown (art pass
+    // 2026-08-03): the ground-floor grime, the body, and the CORNICE — a dark
+    // reveal line under a bright parapet cap, which is what stops a flat-roofed
+    // prism reading as a bare extrusion at `low`, where there is no facade
+    // normal map at all. This synthetic building is 15 m, so it qualifies.
     const walls = world.buildingWalls.find((w) => w.positions.length > 0)!;
     expect(walls.colors).toBeDefined();
     const tints = new Set<number>();
     for (let i = 0; i < walls.colors!.length; i += 3) tints.add(walls.colors![i]!);
-    expect(tints.size).toBe(2);
+    expect(tints.size).toBe(4);
+    const sorted = [...tints].sort((a, b) => a - b);
+    // …and the crown's cap is the BRIGHTEST value on the prism while the
+    // reveal under it is the darkest — the ordering is the cue, not the
+    // numbers.
+    expect(sorted[0]).toBeLessThan(sorted[1]!);
+    expect(sorted[3]).toBeGreaterThan(sorted[2]!);
   });
 
   it("ground collider top face sits at the road surface", () => {

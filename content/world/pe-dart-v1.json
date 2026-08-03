@@ -7,9 +7,9 @@
   "generator": "tools/maps/gen_pe_crossings.mjs",
   "boundsLocalMeters": {
    "minX": -28,
-   "minY": 0,
-   "maxX": 26,
-   "maxY": 140
+   "minY": -14.125,
+   "maxX": 27,
+   "maxY": 258
   },
   "attribution": {
    "text": "Учебна улица с пешеходна пътека — оригинален параметричен дизайн (без данни от OpenStreetMap)",
@@ -24,12 +24,12 @@
   },
   "zonesVersion": 1,
   "stats": {
-   "roadKm": 0.14,
-   "nodes": 2,
-   "edges": 1,
+   "roadKm": 0.21,
+   "nodes": 3,
+   "edges": 2,
    "intersections": 0,
    "crossings": 1,
-   "buildings": 4,
+   "buildings": 7,
    "spawnPoints": 2,
    "zones": 1
   },
@@ -44,6 +44,10 @@
    "streetscapeNoteBg": "Ъглова сграда, изнесена до самия бордюр 1,5 м преди зебрата: западният тротоар е невидим до последния метър — оттам излиза пешеходецът.",
    "roadscape": "residential-blind-corner",
    "roadscapeNoteBg": "Тясна квартална улица преди закрит ъгъл: В24 „Забранено е изпреварването“ важи точно там, където видимостта свършва — не се излиза в насрещното покрай ъгъла, зад който излиза пешеходецът.",
+   "terminus": "necks-to-service",
+   "terminusNoteBg": "След закрития ъгъл платното се стеснява наполовина — нататък е служебна алея с една лента между гаражите. Стеснението се вижда отдалеч и е причината да си свалил скоростта ПРЕДИ пътеката, а не след нея.",
+   "terminusLegs": 1,
+   "terminusRoadM": 70,
    "roadClass": "residential",
    "parkingBandM": 0,
    "bareVerge": null,
@@ -64,6 +68,11 @@
  },
  "roads": {
   "nodes": [
+   {
+    "id": "pe-n-alley",
+    "x": 0,
+    "y": 210
+   },
    {
     "id": "pe-n-end",
     "x": 0,
@@ -97,6 +106,31 @@
      [
       0,
       140
+     ]
+    ],
+    "parkingBand": false
+   },
+   {
+    "id": "pe-e-alley",
+    "from": "pe-n-end",
+    "to": "pe-n-alley",
+    "class": "service",
+    "name": "Служебна алея",
+    "oneway": false,
+    "roundabout": false,
+    "lanes": 1,
+    "lanesSource": "tag",
+    "maxspeed": 50,
+    "maxspeedSource": "tag",
+    "length": 70,
+    "geometry": [
+     [
+      0,
+      140
+     ],
+     [
+      0,
+      210
      ]
     ],
     "parkingBand": false
@@ -205,6 +239,75 @@
     [
      12.6,
      110
+    ]
+   ]
+  },
+  {
+   "id": "pe-b-garagerow-w",
+   "height": 3.2,
+   "heightSource": "default",
+   "footprint": [
+    [
+     -25,
+     152
+    ],
+    [
+     -9.2,
+     152
+    ],
+    [
+     -9.2,
+     206
+    ],
+    [
+     -25,
+     206
+    ]
+   ]
+  },
+  {
+   "id": "pe-b-garagerow-e",
+   "height": 3.2,
+   "heightSource": "default",
+   "footprint": [
+    [
+     9.2,
+     156
+    ],
+    [
+     27,
+     156
+    ],
+    [
+     27,
+     200
+    ],
+    [
+     9.2,
+     200
+    ]
+   ]
+  },
+  {
+   "id": "pe-b-alley-end",
+   "height": 12,
+   "heightSource": "default",
+   "footprint": [
+    [
+     -21,
+     224
+    ],
+    [
+     21,
+     224
+    ],
+    [
+     21,
+     258
+    ],
+    [
+     -21,
+     258
     ]
    ]
   },

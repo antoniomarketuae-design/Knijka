@@ -111,6 +111,32 @@ export const ROAD_TAP_MIX_MAX = 0.42;
  */
 export const ROAD_TAP_ROTATION_RAD = 0.55;
 
+/**
+ * FINE WEATHERING BREAK (art pass 2026-08-03). The review's ground verdict was
+ * *"the ground is flat matte grey with no aggregate, no wear, no tyre marks"*,
+ * and the tier it is truest of is `low`: there the road fetches colour only, so
+ * the detail normal above never compiles and the ONLY variation left on the
+ * asphalt is the 80 m ground macro — a blob so large that a whole street sits
+ * inside one value. Between 80 m and the base tile's 1.5 m there was nothing.
+ *
+ * This fills that octave: the SAME shared 64 KB noise field, resampled at
+ * ROAD_FINE_TILE_M, multiplied into albedo. It is patchy weathering at the
+ * scale a driver actually reads asphalt at — polished-vs-coarse aggregate,
+ * bleed, old sealant — and unlike the detail normal it is an ALBEDO term, so
+ * it survives at `low` where there is no relief to light.
+ *
+ * Cost: one extra fetch of a texture the ground materials have already
+ * uploaded and are already sampling twice, on asphalt fragments only. It mips
+ * to flat grey with distance (LinearMipmapLinear on a 256² field at a 2.6 m
+ * tile), which is the correct behaviour: near-field texture, no far-field
+ * shimmer to alias against the lane markings the rule engine grades on.
+ */
+export const ROAD_FINE_TILE_M = 2.6;
+/** ± albedo swing of the fine break. Half the 80 m macro's 0.22: this octave
+ *  is a texture cue, not a lighting cue, and above ~0.12 wet asphalt starts
+ *  reading as camouflage. */
+export const ROAD_FINE_STRENGTH = 0.1;
+
 const TAP_COS = Math.cos(ROAD_TAP_ROTATION_RAD).toFixed(6);
 const TAP_SIN = Math.sin(ROAD_TAP_ROTATION_RAD).toFixed(6);
 
@@ -123,6 +149,8 @@ let roadUniforms: {
   uRoadTapMixMax: { value: number };
   uRoadDetailScale: { value: number };
   uRoadDetailStrength: { value: number };
+  uRoadFineScale: { value: number };
+  uRoadFineStrength: { value: number };
 } | null = null;
 
 function getRoadUniforms() {
@@ -135,6 +163,8 @@ function getRoadUniforms() {
       uRoadTapMixMax: { value: ROAD_TAP_MIX_MAX },
       uRoadDetailScale: { value: ROAD_DETAIL_UV_SCALE },
       uRoadDetailStrength: { value: ROAD_DETAIL_STRENGTH },
+      uRoadFineScale: { value: 1 / ROAD_FINE_TILE_M },
+      uRoadFineStrength: { value: ROAD_FINE_STRENGTH },
     };
   }
   return roadUniforms;
@@ -159,11 +189,13 @@ export function roadSurfaceOnBeforeCompile(
   shader.uniforms.uRoadTapMixMax = u.uRoadTapMixMax;
   shader.uniforms.uRoadDetailScale = u.uRoadDetailScale;
   shader.uniforms.uRoadDetailStrength = u.uRoadDetailStrength;
+  shader.uniforms.uRoadFineScale = u.uRoadFineScale;
+  shader.uniforms.uRoadFineStrength = u.uRoadFineStrength;
 
   shader.fragmentShader = shader.fragmentShader
     .replace(
       "#include <common>",
-      "#include <common>\nuniform sampler2D uRoadTap;\nuniform float uRoadTapScale;\nuniform float uRoadTapMixMax;\nuniform float uRoadDetailScale;\nuniform float uRoadDetailStrength;",
+      "#include <common>\nuniform sampler2D uRoadTap;\nuniform float uRoadTapScale;\nuniform float uRoadTapMixMax;\nuniform float uRoadDetailScale;\nuniform float uRoadDetailStrength;\nuniform float uRoadFineScale;\nuniform float uRoadFineStrength;",
     )
     // Anchored on the macro hook's OWN emitted line (not on a three chunk) so
     // the detile lands after `diffuseColor` already carries the map and the
@@ -181,7 +213,13 @@ export function roadSurfaceOnBeforeCompile(
         vec3 roadTapB = texture2D( map, roadTapUv ).rgb;
         float roadTapW = texture2D( uRoadTap, vGroundMacroXZ * uRoadTapScale ).r * uRoadTapMixMax;
         diffuseColor.rgb *= mix( vec3( 1.0 ), roadTapB / roadTapA, roadTapW );
-      #endif`,
+      #endif
+      // Fine weathering octave — the one surface cue that survives at tier
+      // \`low\`, where there is no normal map and the 80 m macro is the only
+      // other variation on the whole carriageway. Outside the USE_MAP guard on
+      // purpose: it must apply to the procedural fallback asphalt too.
+      float roadFine = texture2D( uRoadTap, vGroundMacroXZ * uRoadFineScale ).r;
+      diffuseColor.rgb *= mix( 1.0 - uRoadFineStrength, 1.0 + uRoadFineStrength, roadFine );`,
     )
     // UDN detail normal. `normal` here is already tbn * base mapN, so adding
     // the detail's tangent-space XY through the same tbn columns is the UDN

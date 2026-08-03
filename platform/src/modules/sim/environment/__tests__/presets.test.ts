@@ -79,14 +79,35 @@ describe("ENVIRONMENT_PRESETS", () => {
     expect(dusk.elevationDeg).toBeLessThan(15);
     const dir = sunDirection(dusk);
     expect(dir.x).toBeLessThan(0); // west
-    // Day is "late golden" (doc 71 §4.1: 22° — low for shape, but held above
-    // 18° so shadows stay inside the camera-following frustum until CSM);
-    // dusk still sits below it.
+    // Day is midday (art pass 2026-08-03: 56°), dusk still sits below it.
+    // The band is a SHADOW-GEOMETRY contract, not a taste one, and both ends
+    // were measured rather than guessed:
+    //  · floor 50° — under it a 25 m block at the kerb throws more than the
+    //    ~16 m perceptually-scaled carriageway is wide, every street sits in
+    //    one flat tone, and the screen reads "there are NO CAST SHADOWS
+    //    anywhere" (the founder's verdict). A/B-ing gl.shadowMap.enabled at
+    //    22° moved 3.1/255 of the whole frame and at 41° still 8.4/255 of the
+    //    road patch — a shadow that covers everything is not a shadow.
+    //  · ceiling 66° — Sofia (42.7° N) never sees a higher sun, and past it
+    //    the throws get too short to model a street at all.
+    // The throw at 56° is 0.67 × height, so even a 50 m tower lands inside
+    // the tightest camera-following frustum (quality.ts shadowRadiusM 45).
     const day = ENVIRONMENT_PRESETS.day.light.sun;
     expect(day.elevationDeg).toBeGreaterThan(dusk.elevationDeg);
-    expect(day.elevationDeg).toBeGreaterThanOrEqual(18);
-    expect(day.elevationDeg).toBeLessThanOrEqual(25);
+    expect(day.elevationDeg).toBeGreaterThanOrEqual(50);
+    expect(day.elevationDeg).toBeLessThanOrEqual(66);
+    expect(50 / Math.tan((day.elevationDeg * Math.PI) / 180)).toBeLessThan(45);
     expect(sunDirection(day).x).toBeLessThan(0); // west-southwest key
+  });
+
+  // Doc 71 §4.1's actual finding, pinned so the next art pass cannot undo it
+  // by "brightening the shadows": the "washed out" rig was key:fill ≈ 1.6:1
+  // (1.35 sun vs 0.85 hemisphere). Contrast is the ratio, NOT the sun's
+  // elevation — which is what let the 2026-08-03 pass raise the sun to a
+  // midday 56° without going back to the flat noon look.
+  it("keeps the day key at least 3.5× the hemisphere fill (doc 71 §4.1)", () => {
+    const day = ENVIRONMENT_PRESETS.day.light;
+    expect(day.sun.intensity / day.hemisphere.intensity).toBeGreaterThanOrEqual(3.5);
   });
 
   it("gives every preset its own tone-mapping exposure, day punchiest", () => {

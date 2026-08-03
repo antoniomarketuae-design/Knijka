@@ -19,7 +19,6 @@ describe("QUALITY_PRESETS", () => {
   it("low is the no-extras safety net (no composer, no AO)", () => {
     const low = QUALITY_PRESETS.low;
     expect(low.shadows).toBe(false);
-    expect(low.rainParticles).toBe(0);
     expect(low.postprocessing).toBe(false);
     expect(low.aoEnabled).toBe(false);
     expect(low.bloom).toBe(false);
@@ -80,10 +79,22 @@ describe("QUALITY_PRESETS", () => {
     expect(med.shadowRadiusM).toBeLessThanOrEqual(high.shadowRadiusM);
   });
 
-  it("gates snowfall exactly like rain: none at low, on at med + high", () => {
-    expect(QUALITY_PRESETS.low.snowParticles).toBe(0);
-    expect(QUALITY_PRESETS.med.snowParticles).toBeGreaterThan(0);
-    expect(QUALITY_PRESETS.high.snowParticles).toBeGreaterThan(0);
+  // Art pass 2026-08-03 (register row B71). `low` used to be 0 / 0, so the one
+  // lesson family whose SUBJECT is the weather rendered dry on a phone. What
+  // this pins now is the FLOOR, not the absence: every tier has to be able to
+  // show that it is raining or snowing, and `low` still has to be a small
+  // fraction of the authored densities.
+  it("gates snowfall exactly like rain, and both carry a phone-tier floor", () => {
+    const { low, med, high } = QUALITY_PRESETS;
+    for (const n of [low.rainParticles, low.snowParticles]) {
+      expect(n).toBeGreaterThan(0);
+      expect(n).toBeLessThanOrEqual(400);
+    }
+    expect(low.rainParticles).toBe(low.snowParticles);
+    expect(med.snowParticles).toBeGreaterThan(0);
+    expect(high.snowParticles).toBeGreaterThan(0);
+    // …and the floor stays well under a third of the laptop tier.
+    expect(low.rainParticles * 3).toBeLessThan(med.rainParticles);
   });
 
   it("levels self-identify", () => {

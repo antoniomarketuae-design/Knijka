@@ -46,15 +46,51 @@
  * kerb), whether it carries a KERBSIDE PARKED ROW, and which BAN ZONE posts a
  * real В24/В27 face on it.
  *
+ * ⚠ DOC 87 B50 / B53 / B54 — WHY IT GREW A **FOURTH** AXIS. The re-look put the
+ * seven spawn frames on one sheet and the verdict was: „THE DRESSING IS NOW
+ * GENUINELY DIFFERENT … BUT THE ROAD IS STILL ONE ROAD, and the data says it
+ * with no ambiguity: every one of the seven is 2 nodes / 1 edge / 0
+ * intersections / 1 crossing, 138-160 m, DEAD STRAIGHT TO A FLAT HORIZON."
+ * Class, paint, lamps and posted faces are all cross-SECTION; none of them
+ * change what the street DOES, and none of them fill the top third of the
+ * windscreen, which on a straight ribbon is empty sky in all seven.
+ *
+ * So every instance now also names a TERMINUS: what this street runs INTO.
+ * It is the one road lever that is free, because it lives past the end of
+ * every recorded drive — measured on the committed traces, the furthest any of
+ * the 21 PE ghost samples reaches is `lengthM − 12 m` (per district: 135/150,
+ * 130/145, 138/155, 128/140, 132/148, 120/138, 136/152). A terminus that
+ * starts AT the terminal node therefore cannot move a single recorded sample,
+ * cannot re-time a staged walk (they are all south of the crossing) and cannot
+ * touch the crossing zone — while it is the FIRST thing the driver sees,
+ * because it sits dead ahead for the whole approach.
+ *
+ * The kinds are the ones a Bulgarian street actually ends in: it opens into a
+ * collector, it is closed by a slab, it bends away, it necks down to a service
+ * alley, it opens onto green, or it jogs. Four of them add real road (extra
+ * nodes and edges — 2/1 becomes 3/2 or 4/3), which is what „0 intersections"
+ * was measuring.
+ *
+ * DEGREE 2, NEVER DEGREE 3 — and that is a rule, not a coincidence. A leg
+ * hangs off the terminal node so the node stays degree 2, which
+ * `network.nodeOpenRadiusM` treats as a JOINT (0.6 m setback) and
+ * `junctionPriorityControls` / `onewayNoEntryArms` both refuse to sign
+ * („degree < 3 is a bend or a dead end, not a junction"). `intersections` stays
+ * `[]`, so `runtime.debugUncontrolledJunctions()` stays empty and no give-way
+ * obligation can fire inside a crossing drill. That was lever 2 below, and this
+ * is how the variety is bought WITHOUT it.
+ *
  * THREE LEVERS DELIBERATELY NOT USED, each with the measurement that ruled it
  * out — read this before reaching for them:
- *   1. THE CENTRELINE. Every committed PE trace is a dead-straight rail at
- *      exactly x = 4.06 (measured: min = max on every sample of all 21 files).
- *      A bend invalidates 21 recorded ghost lines, which are not this file's to
- *      re-record.
- *   2. NEW JUNCTION NODES. An uncontrolled junction inside a crossing drill can
- *      fire a give-way fault the lesson never teaches — the exact defect class
- *      he complains loudest about.
+ *   1. THE CENTRELINE **OF THE GRADED STREET**. Every committed PE trace is a
+ *      dead-straight rail at exactly x = 4.06 (measured: min = max on every
+ *      sample of all 21 files). A bend in [0, lengthM] invalidates 21 recorded
+ *      ghost lines, which are not this file's to re-record — which is why the
+ *      two bend termini bend the road AFTER the terminal node, where no sample
+ *      has ever been.
+ *   2. NEW JUNCTION NODES (degree >= 3). An uncontrolled junction inside a
+ *      crossing drill can fire a give-way fault the lesson never teaches — the
+ *      exact defect class he complains loudest about.
  *   3. CARRIAGEWAY WIDTH. It was tried: giving four of these streets the 4 m
  *      curbside parking band widens them to 24.25 m curb to curb, which is a
  *      genuinely different street AND fixes FR-21's car half — but the staged
@@ -393,6 +429,233 @@ const ROADSCAPES = {
 };
 
 // ---------------------------------------------------------------------------
+// Termini (doc 87 B50 / B53 / B54) — WHAT THE STREET RUNS INTO
+// ---------------------------------------------------------------------------
+
+/**
+ * The fourth axis, and the one that answers „dead straight to a flat horizon".
+ * A terminus is everything NORTH of the terminal node `pe-n-end`, i.e. past the
+ * furthest sample of every recorded drive on this family (worst case
+ * `lengthM − 12 m`). It may add road and it may add frontage; it may never
+ * touch [0, lengthM].
+ *
+ * `legs(L)` returns extra edges keyed by the node ids they introduce. Every leg
+ * hangs off `pe-n-end` in a chain, so **every new node is degree 2** — a joint,
+ * not a junction (see the header). `build(L)` returns the vista frontage: the
+ * volumes that fill the sky at the end of the street.
+ *
+ * Each leg declares `parkingBand: false` without exception. Not decoration: an
+ * arterial-class leg would otherwise get the 4 m band by class AND a
+ * procedurally parked row on it (`TrafficLayer.PARK_CLASSES` ⊇ tertiary), and
+ * FR-21 on this family is closed by the family carrying NO parked bodies at
+ * all. A terminus may change the horizon; it may not re-open a closed row.
+ */
+const TERMINI = {
+  /** The shopping collector feeds a real 4-lane collector — lit, edge-lined,
+   *  twice as wide. The horizon is a wide road, not sky. */
+  "opens-to-collector": {
+    noteBg:
+      "Улицата не свършва в нищото: пред теб тя се влива в четирилентова събирателна улица — по-широко платно, крайни линии и улично осветление. Затова точно тук се гледа напред, а не само в пътеката.",
+    legs: (L) => [
+      {
+        node: ["pe-n-collector", [0, L + 125]],
+        edge: {
+          id: "pe-e-collector",
+          from: "pe-n-end",
+          to: "pe-n-collector",
+          class: "secondary",
+          name: "Събирателна улица",
+          oneway: false,
+          lanes: 4,
+          maxspeed: null, // inherits the street — see LEG_LIMIT below
+          parkingBand: false,
+          geometry: [
+            [0, L],
+            [0, L + 125],
+          ],
+        },
+      },
+    ],
+    build: (L) => [
+      { id: "pe-b-far-w", ...block(-46, -22, L + 14, L + 96, 15) },
+      { id: "pe-b-far-e", ...block(22, 48, L + 26, L + 110, 15) },
+      { id: "pe-b-vista", ...block(-44, 44, L + 146, L + 182, 22) },
+    ],
+  },
+  /** A closed end: an 19 m slab straight across the street 15 m past the
+   *  terminal. There is no sky at the end of this one at all. */
+  "closed-by-block": {
+    noteBg:
+      "Улицата е ЗАТВОРЕНА: на петнадесет метра след края ѝ стои жилищен блок напряко. Хоризонт няма — това, което виждаш в горната част на стъклото, е стена, и точно затова окото пада на пътеката.",
+    legs: () => [],
+    build: (L) => [
+      { id: "pe-b-end-slab", ...block(-38, 38, L + 15, L + 51, 19) },
+      { id: "pe-b-end-wing-w", ...block(-52, -30, L - 18, L + 15, 14) },
+      { id: "pe-b-end-wing-e", ...block(30, 50, L - 6, L + 15, 14) },
+    ],
+  },
+  /** The canyon turns west. The vista is the blank flank of a shed on the
+   *  OUTSIDE of the curve — the wall a driver runs at if he does not read it. */
+  "bends-away-left": {
+    noteBg:
+      "Коридорът не продължава — след края на отсечката улицата завива наляво, а срещу теб застава глухата стена на склад. Завой, който се чете отдалеч, а не изневиделица.",
+    legs: (L) => [
+      {
+        node: ["pe-n-west", [-108, L + 44]],
+        edge: {
+          id: "pe-e-west",
+          from: "pe-n-end",
+          to: "pe-n-west",
+          class: "unclassified",
+          name: "Складов подход",
+          oneway: false,
+          lanes: 2,
+          maxspeed: null, // inherits the street — see LEG_LIMIT below
+          parkingBand: false,
+          geometry: [
+            [0, L],
+            [-14, L + 23],
+            [-54, L + 41],
+            [-108, L + 44],
+          ],
+        },
+      },
+    ],
+    build: (L) => [
+      { id: "pe-b-crook", ...block(21, 62, L + 5, L + 62, 13) },
+      { id: "pe-b-shed-far", ...block(-64, -34, L + 60, L + 96, 11) },
+      { id: "pe-b-shed-w", ...block(-118, -74, L - 6, L + 26, 9) },
+    ],
+  },
+  /** Past the blind corner the street NECKS DOWN to a one-lane service alley:
+   *  the asphalt ahead is literally half as wide as the asphalt underneath. */
+  "necks-to-service": {
+    noteBg:
+      "След закрития ъгъл платното се стеснява наполовина — нататък е служебна алея с една лента между гаражите. Стеснението се вижда отдалеч и е причината да си свалил скоростта ПРЕДИ пътеката, а не след нея.",
+    legs: (L) => [
+      {
+        node: ["pe-n-alley", [0, L + 70]],
+        edge: {
+          id: "pe-e-alley",
+          from: "pe-n-end",
+          to: "pe-n-alley",
+          class: "service",
+          name: "Служебна алея",
+          oneway: false,
+          lanes: 1,
+          maxspeed: null, // inherits the street — see LEG_LIMIT below
+          parkingBand: false,
+          geometry: [
+            [0, L],
+            [0, L + 70],
+          ],
+        },
+      },
+    ],
+    build: (L) => [
+      { id: "pe-b-garagerow-w", ...block(-25, -9.2, L + 12, L + 66, 3.2) },
+      { id: "pe-b-garagerow-e", ...block(9.2, 27, L + 16, L + 60, 3.2) },
+      { id: "pe-b-alley-end", ...block(-21, 21, L + 84, L + 118, 12) },
+    ],
+  },
+  /** The freight road swings east into the yard. Same idea as the canyon's
+   *  bend, mirrored, on a lit arterial class — a different picture entirely. */
+  "bends-away-right": {
+    noteBg:
+      "Товарният подход завива надясно към двора на базата. Отсреща, в външната страна на завоя, стои халето — там свършва улицата и там влизат камионите, които после излизат срещу теб.",
+    legs: (L) => [
+      {
+        node: ["pe-n-yard", [112, L + 41]],
+        edge: {
+          id: "pe-e-yard",
+          from: "pe-n-end",
+          to: "pe-n-yard",
+          class: "tertiary",
+          name: "Подход към двора",
+          oneway: false,
+          lanes: 2,
+          maxspeed: null, // inherits the street — see LEG_LIMIT below
+          parkingBand: false,
+          geometry: [
+            [0, L],
+            [16, L + 22],
+            [56, L + 38],
+            [112, L + 41],
+          ],
+        },
+      },
+    ],
+    build: (L) => [
+      { id: "pe-b-hall", ...block(-64, -21, L + 4, L + 64, 14) },
+      { id: "pe-b-yard-n", ...block(40, 78, L + 56, L + 92, 10) },
+      { id: "pe-b-yard-e", ...block(88, 128, L - 8, L + 24, 10) },
+    ],
+  },
+  /** The street simply opens onto green: no leg, no slab — a low park wall far
+   *  off and nothing tall anywhere. The horizon is a LINE, not a building. */
+  "opens-to-green": {
+    noteBg:
+      "Улицата свършва в зеленото на квартала: нито блок, нито стена — само нисък парков зид далеч напред. Оттам няма какво да те спре да гледаш надалеч, и точно затова децата отляво се виждат късно.",
+    legs: () => [],
+    build: (L) => [
+      { id: "pe-b-park-wall-n", ...block(-56, 56, L + 62, L + 65.6, 2.2) },
+      { id: "pe-b-pavilion-n", ...block(-30, -13, L + 30, L + 46, 3.6) },
+      { id: "pe-b-pavilion-e", ...block(15, 30, L + 36, L + 50, 3.6) },
+    ],
+  },
+  /** The one-way JOGS: west, then north again. Four nodes, three edges — the
+   *  most road of the seven, and still not one junction. */
+  "jogs-and-continues": {
+    noteBg:
+      "Еднопосочната не върви право до безкрай: тя прави чупка наляво и продължава на север. Отпред те чака калканът на сградата в чупката — улицата се чете, преди да я стигнеш.",
+    legs: (L) => [
+      {
+        node: ["pe-n-jog", [-36, L + 27]],
+        edge: {
+          id: "pe-e-jog",
+          from: "pe-n-end",
+          to: "pe-n-jog",
+          class: "residential",
+          name: "Чупка на еднопосочната",
+          oneway: true,
+          lanes: 2,
+          maxspeed: null, // inherits the street — see LEG_LIMIT below
+          parkingBand: false,
+          geometry: [
+            [0, L],
+            [-13, L + 15],
+            [-36, L + 27],
+          ],
+        },
+      },
+      {
+        node: ["pe-n-jog-n", [-36, L + 99]],
+        edge: {
+          id: "pe-e-jog-n",
+          from: "pe-n-jog",
+          to: "pe-n-jog-n",
+          class: "residential",
+          name: "Еднопосочна — продължение",
+          oneway: true,
+          lanes: 2,
+          maxspeed: null, // inherits the street — see LEG_LIMIT below
+          parkingBand: false,
+          geometry: [
+            [-36, L + 27],
+            [-36, L + 99],
+          ],
+        },
+      },
+    ],
+    build: (L) => [
+      { id: "pe-b-gable", ...block(15, 46, L + 6, L + 58, 16) },
+      { id: "pe-b-jog-w", ...block(-74, -50, L + 38, L + 94, 13) },
+      { id: "pe-b-jog-n", ...block(-24, 12, L + 112, L + 144, 15) },
+    ],
+  },
+};
+
+// ---------------------------------------------------------------------------
 // The generator (single crossing — the S3 PE micro-map)
 // ---------------------------------------------------------------------------
 
@@ -404,11 +667,12 @@ const ROADSCAPES = {
  *   maxspeedKmh: number,     // legal limit on the street (30..50)
  *   streetscape: string,     // doc 86 D1 — the frontage recipe (STREETSCAPES)
  *   roadscape: string,       // doc 87 FR-41 — the cross-section (ROADSCAPES)
+ *   terminus: string,        // doc 87 B50 — what the street runs into (TERMINI)
  * }} params
  */
 export function buildPeCrossingStreet(params) {
   const errors = [];
-  const { districtId, label, approachM, maxspeedKmh, streetscape, roadscape } = params;
+  const { districtId, label, approachM, maxspeedKmh, streetscape, roadscape, terminus } = params;
 
   // -- Parameter validation (actionable — the assembly line runs unattended).
   if (!/^[a-z0-9-]+$/.test(districtId ?? "")) errors.push(`districtId "${districtId}" must be kebab-case`);
@@ -427,9 +691,17 @@ export function buildPeCrossingStreet(params) {
         `which is the half the streetscape pass did not fix)`,
     );
   }
+  if (!TERMINI[terminus]) {
+    errors.push(
+      `terminus "${terminus}" unknown — pick one of ${Object.keys(TERMINI).join(", ")} ` +
+        `(doc 87 B50: an instance without its own terminus runs DEAD STRAIGHT TO A FLAT ` +
+        `HORIZON, which is the half the roadscape pass left alone and the re-look photographed)`,
+    );
+  }
   if (errors.length > 0) throw new Error(`gen_pe_crossings params invalid:\n  - ${errors.join("\n  - ")}`);
 
   const road = ROADSCAPES[roadscape];
+  const end = TERMINI[terminus];
   /** Arterial classes carry the band by class; an explicit tag overrides it. */
   const bandByClass = ["primary", "secondary", "tertiary"].includes(road.roadClass);
   const hasBand = road.parkingBand === null ? bandByClass : road.parkingBand === true;
@@ -479,6 +751,44 @@ export function buildPeCrossingStreet(params) {
       ...(road.bareVerge ? { bareVerge: road.bareVerge } : {}),
     },
   ];
+
+  // -- TERMINUS (doc 87 B50/B53/B54): the road NORTH of pe-n-end. Every leg
+  // hangs off the previous one in a chain, so every node it introduces has
+  // degree 2 — `nodeOpenRadiusM` treats that as a 0.6 m joint and
+  // `junctionPriorityControls` refuses to sign it, which is what keeps a
+  // crossing drill free of a give-way obligation it never teaches.
+  const LEGS = end.legs(lengthM);
+  for (const leg of LEGS) {
+    const [nodeId, [nx, ny]] = leg.node;
+    NODES[nodeId] = [r2(nx), r2(ny)];
+    const geo = leg.edge.geometry.map(([x, y]) => [r2(x), r2(y)]);
+    EDGES.push({
+      id: leg.edge.id,
+      from: leg.edge.from,
+      to: leg.edge.to,
+      class: leg.edge.class,
+      name: leg.edge.name,
+      oneway: leg.edge.oneway,
+      roundabout: false,
+      lanes: leg.edge.lanes,
+      lanesSource: "tag",
+      // LEG_LIMIT. A terminus leg carries the SAME posted limit as the street
+      // it continues, and that is a rule rather than a default. A limit change
+      // is a legal fact that must be POSTED (В26 at the change, В33 where the
+      // restriction ends) — and a degree-2 joint has no arm to post it on, so a
+      // leg with its own number would be a limit the driver is graded against
+      // and never shown. It was caught by two batteries at once: sign-truth
+      // („pe-bus-v1: В33 @ (-10.1, 137.5) has no numeral or no road") and the
+      // world-referent T4raw census (95 -> 100 rung-codes). Variety is bought
+      // with SHAPE — class, width, bend, neck — never with an unsigned number.
+      maxspeed: maxspeedKmh,
+      maxspeedSource: "tag",
+      length: polylineLength(geo),
+      geometry: geo,
+      // Never optional on a leg — see the TERMINI header (FR-21).
+      parkingBand: false,
+    });
+  }
 
   // -- Ban zone (ADR-006 stage 2a): the В24/В27 the roadscape posts, spanned
   // as a fraction of the street so it rides any approach length.
@@ -539,10 +849,16 @@ export function buildPeCrossingStreet(params) {
   // pushes the whole frontage OUT by the band width, so the recipe keeps its
   // authored stand-back from the kerb on every cross-section (no volume
   // straddles x = 0, so the sign of x is the side).
-  const BUILDINGS = recipe.build(crossingY).map((bl) => ({
-    ...bl,
-    footprint: bl.footprint.map(([x, y]) => [r2(x + Math.sign(x) * shiftOut), y]),
-  }));
+  const BUILDINGS = [
+    ...recipe.build(crossingY).map((bl) => ({
+      ...bl,
+      footprint: bl.footprint.map(([x, y]) => [r2(x + Math.sign(x) * shiftOut), y]),
+    })),
+    // The TERMINUS vista: what fills the sky at the end of the street. Authored
+    // in absolute coordinates (it is past the terminal node, so the parking
+    // band never shifts it) and validated against EVERY edge below.
+    ...end.build(lengthM),
+  ];
 
   // -- Bounds + stats.
   const bounds = { minX: Infinity, minY: Infinity, maxX: -Infinity, maxY: -Infinity };
@@ -556,8 +872,17 @@ export function buildPeCrossingStreet(params) {
   }
   // Road body + buildings can outgrow the centerline bounds — cover them
   // (the body is curb to curb: travel lanes + the roadscape's parking band).
-  bounds.minX = Math.min(bounds.minX, -(halfRoadM + parkingBandM) - 6);
-  bounds.maxX = Math.max(bounds.maxX, halfRoadM + parkingBandM + 6);
+  // Every edge gets its OWN half-width: a terminus leg may be a 4-lane
+  // collector or a one-lane alley, and the ground plane has to cover both.
+  for (const e of EDGES) {
+    const half = (Math.max(1, e.lanes) * SCALED_LANE_W) / 2 + (e.parkingBand === true ? PARKING_LANE_WIDTH_M : 0);
+    for (const [x, y] of e.geometry) {
+      bounds.minX = Math.min(bounds.minX, x - half - 6);
+      bounds.maxX = Math.max(bounds.maxX, x + half + 6);
+      bounds.minY = Math.min(bounds.minY, y - half - 6);
+      bounds.maxY = Math.max(bounds.maxY, y + half + 6);
+    }
+  }
   for (const bl of BUILDINGS) {
     for (const [x, y] of bl.footprint) {
       bounds.minX = Math.min(bounds.minX, x);
@@ -615,6 +940,14 @@ export function buildPeCrossingStreet(params) {
          *  streetscape pass left alone and the founder photographed. */
         roadscape,
         roadscapeNoteBg: road.noteBg,
+        /** doc 87 B50/B53/B54 — WHAT THE STREET RUNS INTO, i.e. the half of the
+         *  windscreen the cross-section pass never filled. */
+        terminus,
+        terminusNoteBg: end.noteBg,
+        /** Extra road the terminus adds past the terminal node (0 = the street
+         *  simply ends and the vista is frontage only). */
+        terminusLegs: LEGS.length,
+        terminusRoadM: r2(EDGES.slice(1).reduce((s, e) => s + e.length, 0)),
         roadClass: road.roadClass,
         parkingBandM,
         bareVerge: road.bareVerge,
@@ -671,19 +1004,63 @@ export function buildPeCrossingStreet(params) {
   // The streetscape may never eat the carriageway, the kerb or the sidewalk the
   // staged pedestrians walk on (doc 86 D1 — a frontage that occludes must still
   // leave the pavement).
+  //
+  // Measured against EVERY edge, not just against `x = 0`: a terminus adds real
+  // road that bends, necks and jogs, and the old `Math.abs(x) < clearX` test
+  // could neither see a leg nor allow a volume to stand ACROSS the end of the
+  // street — which is exactly the vista „dead straight to a flat horizon"
+  // needed. Each edge carries its OWN clearance, because a 4-lane collector leg
+  // and a one-lane service alley do not stand back the same distance.
+  const clearanceOf = (e) => {
+    const lanes = Math.max(1, e.lanes);
+    const travelHalf = (lanes * SCALED_LANE_W) / 2;
+    const band = e.parkingBand === true ? PARKING_LANE_WIDTH_M : 0;
+    return travelHalf + band + SIDEWALK_SKIRT_M + SIDEWALK_W + FRONTAGE_STANDBACK_M;
+  };
+  /** Distance from a point to a polyline, ENDS INCLUDED (so a volume past the
+   *  terminal node is measured from the terminal node, not waved through). */
+  const missToPolyline = (geo, px, py) => {
+    let best = Infinity;
+    for (let i = 0; i < geo.length - 1; i++) {
+      const ax = geo[i][0];
+      const ay = geo[i][1];
+      const dx = geo[i + 1][0] - ax;
+      const dy = geo[i + 1][1] - ay;
+      const len2 = dx * dx + dy * dy;
+      let t = len2 > 0 ? ((px - ax) * dx + (py - ay) * dy) / len2 : 0;
+      t = t < 0 ? 0 : t > 1 ? 1 : t;
+      const d = Math.hypot(px - (ax + dx * t), py - (ay + dy * t));
+      if (d < best) best = d;
+    }
+    return best;
+  };
   const seenBuildingIds = new Set();
   for (const bl of BUILDINGS) {
     if (!/^pe-b-[a-z0-9-]+$/.test(bl.id ?? "")) post.push(`building id "${bl.id}" must be pe-b-kebab-case`);
     if (seenBuildingIds.has(bl.id)) post.push(`duplicate building id ${bl.id}`);
     seenBuildingIds.add(bl.id);
     if (!(bl.height > 0)) post.push(`${bl.id}: non-positive height`);
-    for (const [x] of bl.footprint) {
-      if (Math.abs(x) < clearX) {
-        post.push(
-          `${bl.id}: footprint x=${x} is inside the ${r2(clearX)} m kerb+sidewalk clearance ` +
-            `(carriageway half ${r2(halfRoadM + parkingBandM)} m on roadscape ${roadscape})`,
-        );
+    for (const [x, y] of bl.footprint) {
+      for (const e of EDGES) {
+        const need = clearanceOf(e);
+        const got = missToPolyline(e.geometry, x, y);
+        if (got < need - 1e-9) {
+          post.push(
+            `${bl.id}: footprint (${x}, ${y}) is ${r2(got)} m from ${e.id}, inside its ` +
+              `${r2(need)} m kerb+sidewalk clearance (${e.class}, ${e.lanes} lanes)`,
+          );
+        }
       }
+    }
+  }
+  // The terminus may never reach back into the graded street: every leg node and
+  // every leg vertex must be north of the terminal, and no leg may touch the
+  // crossing zone. This is the invariant that keeps the 21 recorded ghost traces
+  // valid without re-measuring them.
+  for (const e of EDGES) {
+    if (e.id === "pe-e-street") continue;
+    for (const [, y] of e.geometry) {
+      if (y < lengthM - 1e-9) post.push(`${e.id}: terminus geometry reaches y=${y}, south of the terminal node (${lengthM})`);
     }
   }
   if (BUILDINGS.length < 3) post.push(`streetscape ${streetscape}: needs >= 3 volumes to read as a street`);
@@ -763,6 +1140,7 @@ const INSTANCES = [
     maxspeedKmh: 50,
     streetscape: "corner-shop-terrace",
     roadscape: "collector-shopping",
+    terminus: "opens-to-collector",
   },
   {
     districtId: "pe-slow-v1",
@@ -771,6 +1149,7 @@ const INSTANCES = [
     maxspeedKmh: 40,
     streetscape: "clinic-and-park",
     roadscape: "residential-clinic",
+    terminus: "closed-by-block",
   },
   {
     districtId: "pe-rain-v1",
@@ -779,6 +1158,7 @@ const INSTANCES = [
     maxspeedKmh: 50,
     streetscape: "unlit-warehouse-canyon",
     roadscape: "industrial-canyon",
+    terminus: "bends-away-left",
   },
   {
     districtId: "pe-dart-v1",
@@ -787,6 +1167,7 @@ const INSTANCES = [
     maxspeedKmh: 50,
     streetscape: "blind-corner-kiosk",
     roadscape: "residential-blind-corner",
+    terminus: "necks-to-service",
   },
   {
     districtId: "pe-bus-v1",
@@ -795,6 +1176,7 @@ const INSTANCES = [
     maxspeedKmh: 50,
     streetscape: "depot-gate",
     roadscape: "freight-collector",
+    terminus: "bends-away-right",
   },
   {
     districtId: "pe-child-v1",
@@ -803,6 +1185,7 @@ const INSTANCES = [
     maxspeedKmh: 40,
     streetscape: "courtyard-blocks",
     roadscape: "courtyard-street",
+    terminus: "opens-to-green",
   },
   {
     districtId: "pe-cane-v1",
@@ -811,6 +1194,7 @@ const INSTANCES = [
     maxspeedKmh: 50,
     streetscape: "institute-and-transit",
     roadscape: "oneway-institute",
+    terminus: "jogs-and-continues",
   },
 ];
 

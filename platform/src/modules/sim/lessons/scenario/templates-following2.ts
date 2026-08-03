@@ -304,7 +304,10 @@ export const SC_FO_MOTORWAY_GAP: ScenarioSpec = {
   map: {
     archetype: "motorway-segment",
     // The generator recipe — mirrored in mw-v1.json meta.scenario.params.
-    params: { lengthM: 1000, maxspeedKmh: 140, lanesPerDirection: 2, medianM: 6 },
+    // doc 87 B67: mw-v1 grew 1000 -> 2600 m per carriageway (the posted 140 was
+    // unreachable inside 1000 m). This object MIRRORS the generator recipe and is
+    // asserted equal to the shipped meta.scenario.params, so it moves with it.
+    params: { lengthM: 2600, maxspeedKmh: 140, lanesPerDirection: 2, medianM: 6 },
     districtId: "mw-v1",
   },
   start: {

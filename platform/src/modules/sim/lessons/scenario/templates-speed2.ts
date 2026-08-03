@@ -292,7 +292,10 @@ export const SC_MW_MIN_SPEED: ScenarioSpec = {
     // The generator recipe — mirrored in mw-v1.json meta.scenario.params
     // (tools/maps/gen_motorway.mjs). REUSED, not regenerated: the district is
     // already exactly the segment this drill needs.
-    params: { lengthM: 1000, maxspeedKmh: 140, lanesPerDirection: 2, medianM: 6 },
+    // doc 87 B67: mw-v1 grew 1000 -> 2600 m per carriageway (the posted 140 was
+    // unreachable inside 1000 m). This object MIRRORS the generator recipe and is
+    // asserted equal to the shipped meta.scenario.params, so it moves with it.
+    params: { lengthM: 2600, maxspeedKmh: 140, lanesPerDirection: 2, medianM: 6 },
     districtId: "mw-v1",
   },
   start: {

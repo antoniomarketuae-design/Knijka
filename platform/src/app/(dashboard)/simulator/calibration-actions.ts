@@ -20,7 +20,7 @@
  * a bare right/wrong anywhere in the product.
  */
 
-import { requireUser } from "@/modules/auth";
+import { getSessionUser } from "@/modules/auth";
 import {
   CALIBRATION_VERDICT_BODY_BG,
   CALIBRATION_VERDICT_TITLE_BG,
@@ -70,7 +70,20 @@ export async function recordSelfPredictionAction(
   simSessionId: string,
   input: unknown,
 ): Promise<SelfPredictionActionResult> {
-  const user = await requireUser();
+  // getSessionUser + UNAVAILABLE rather than requireUser() — see the long note
+  // in finishLessonAction (B39). A redirect thrown here becomes a 303 the router
+  // follows, and this action is reachable from the RESULT SCREEN, so an expired
+  // session turned "tell me what you think you scored" into a login bounce that
+  // destroyed the debrief behind it.
+  //
+  // UNAVAILABLE is the honest code and it already means what is needed: this
+  // action's own contract above documents it as "no such session for you",
+  // deliberately not distinguishable from the other refusals so nobody can
+  // probe for another account's session id. An anonymous caller has no session
+  // of their own by definition, so the answer is identical to the one they
+  // would have got with a wrong id — no new information, and nothing written.
+  const user = await getSessionUser();
+  if (user === null) return { ok: false, code: "UNAVAILABLE" };
 
   // C-3 entitlement gate, for the same reason finishLessonAction has one: a
   // server action is a public POST endpoint, and this one writes a row.

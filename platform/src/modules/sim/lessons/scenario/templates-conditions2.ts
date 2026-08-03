@@ -334,7 +334,10 @@ export const SC_AC_TRUCK_SPRAY: ScenarioSpec = {
     // Reuses the committed mw-v1 map (1000 m divided 2+2 АМ, posted 140, an
     // emergencyLane span per carriageway, NO junctions/crossings/signals) —
     // its meta.scenario.params, mirrored here for provenance.
-    params: { lengthM: 1000, maxspeedKmh: 140, lanesPerDirection: 2, medianM: 6 },
+    // doc 87 B67: mw-v1 grew 1000 -> 2600 m per carriageway (the posted 140 was
+    // unreachable inside 1000 m). This object MIRRORS the generator recipe and is
+    // asserted equal to the shipped meta.scenario.params, so it moves with it.
+    params: { lengthM: 2600, maxspeedKmh: 140, lanesPerDirection: 2, medianM: 6 },
     districtId: "mw-v1",
   },
   start: {
@@ -784,7 +787,10 @@ export const SC_AC_WIND_TRUCK_PASS: ScenarioSpec = {
     // Reuses the committed mw-v1 map (1000 m divided 2+2 АМ, posted 140, an
     // emergencyLane span per carriageway, NO junctions/crossings/signals) —
     // its meta.scenario.params, mirrored here for provenance.
-    params: { lengthM: 1000, maxspeedKmh: 140, lanesPerDirection: 2, medianM: 6 },
+    // doc 87 B67: mw-v1 grew 1000 -> 2600 m per carriageway (the posted 140 was
+    // unreachable inside 1000 m). This object MIRRORS the generator recipe and is
+    // asserted equal to the shipped meta.scenario.params, so it moves with it.
+    params: { lengthM: 2600, maxspeedKmh: 140, lanesPerDirection: 2, medianM: 6 },
     districtId: "mw-v1",
   },
   start: {

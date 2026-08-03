@@ -391,9 +391,36 @@ export const GHOST_SURFACES = [
 /** `:is(…)` over the list — one token, so the list cannot drift between rules. */
 const GHOST = `:is(${GHOST_SURFACES.join(", ")})`;
 
-const UNPANEL_CSS = `
+/**
+ * Exported ONLY so `unpanel.test.ts` can assert on the shipped text of these
+ * rules. A stylesheet in a template literal is the one thing in this app that
+ * can rot into a no-op without a single type error, a single failing render or
+ * a single changed pixel in a test — which is exactly how the tier picker's
+ * filled segment survived a whole „unpanel" pass. The component below is still
+ * the only consumer at runtime.
+ */
+export const UNPANEL_CSS = `
       /* ── The register. See GHOST_SURFACES above for what is on this list. */
       [data-sim-stage] ${GHOST} {
+        /* THE FACE — 2026-08-03, and it is the half of the reference the first
+           unpanel pass did not read. His sentence about the top edge is not
+           only about fill: „crisp flat vector glyphs laid on the 3D … where his
+           reference uses LOW-CONTRAST MONOSPACE TEXT ANCHORED TO THE EDGE."
+           Both GT frames are telemetry in a mono face — ABS, TC, the lap
+           times, the sector deltas — and our HUD was drawing the same job in
+           IBM Plex Sans, the app's reading face, which is what a web page is
+           set in. One declaration on the register moves every instrument at
+           once (speed, gear, limit, telltales, the tier picker, the peek line)
+           instead of eleven component edits that would drift.
+
+           JetBrains Mono ships a CYRILLIC subset in this app (layout.tsx), so
+           «Начинаещ» and «км/ч» render in it rather than falling through to a
+           latin-only fallback — that was the one thing worth checking before
+           pinning a face on Bulgarian copy.
+
+           The explicit pauses are unaffected: they are not on this list, and
+           the debrief / teach card / micro-quiz stay in the reading face. */
+        font-family: var(--font-mono);
         /* The halo that replaces the box. Two stops: a tight one that holds an
            edge against bright tarmac, a wide soft one that separates the glyph
            from a busy background, the way the reference's does. */
@@ -410,6 +437,23 @@ const UNPANEL_CSS = `
         --border: rgba(226, 234, 247, 0.22);
         --border-strong: rgba(226, 234, 247, 0.38);
         text-shadow: var(--hud-halo);
+      }
+
+      /* …NUMBERS AND LABELS IN THE TELEMETRY FACE, SENTENCES IN THE READING
+         FACE. The mono pin above is the reference's grammar for instruments —
+         and the reference has no PROSE in it at all, while this HUD does: the
+         violation toast carries THEO-4's authored WHY, which is the single
+         most important thing on the screen at the moment it appears. Measured:
+         JetBrains Mono sets about 24 characters per line in the 216 px toast
+         content box against about 35 in the body face, i.e. the same
+         explanation grows from four lines to six on the founder's phone. A
+         look is not worth costing a student the rule they just broke.
+
+         The split falls out of the existing markup with nothing to maintain:
+         every instrument value in this HUD is a span/div/kbd and every
+         authored sentence is a <p>. */
+      [data-sim-stage] ${GHOST} :is(p, h1, h2, h3, blockquote) {
+        font-family: var(--font-sans);
       }
 
       /* ── The sweep. Fill, blur and shadow come off the panel AND off every
@@ -429,6 +473,55 @@ const UNPANEL_CSS = `
         backdrop-filter: none !important;
         -webkit-backdrop-filter: none !important;
         box-shadow: none !important;
+      }
+
+      /* ── THE SEGMENTED CONTROL — «Начинаещ | Нормален | Напреднал».
+            2026-08-03 review, verbatim: „a segmented control lifted straight
+            from a settings page, with a FILLED BLUE SELECTED SEGMENT."
+
+            He is describing an iOS/Material segmented control, and he is right
+            that it is one: a pill group with a brand-filled active segment is
+            the single most recognisable piece of settings-page furniture in
+            mobile design, and it was sitting on his windscreen.
+
+            The container was already unpanelled by the sweep above. What
+            survived is the SEGMENT, because the sweep carries a blanket
+            ":not([aria-pressed="true"])" — written for progress fills and the
+            reference's one filled badge, and it happened to also exempt this.
+            So the exemption is withdrawn HERE, for this control only, and the
+            selected state is restated in the reference's own grammar: the
+            chosen tier is the one at full ink with a rule under it, the others
+            step back. Nothing is hidden, nothing moves, and the answer to
+            „which tier am I on" is still readable at a glance — which is the
+            reason the fill was exempted in the first place.
+
+            WHY IT IS STILL A CSS RULE AND NOT A COMPONENT EDIT: the picker is
+            rendered by LessonScene.tsx, another lane's file, and "data-hud" is
+            the shared vocabulary this whole stylesheet is built on (see the
+            header). Specificity: this is (0,3,1) against the sweep's (0,2,1)
+            and it repeats "!important", so it wins on both counts. ────────── */
+      [data-sim-stage] [data-hud="difficulty"] button[aria-pressed="true"] {
+        background-color: transparent !important;
+        background-image: none !important;
+        box-shadow: inset 0 -2px 0 0 currentColor !important;
+        color: var(--foreground);
+        border-radius: 0;
+      }
+      [data-sim-stage] [data-hud="difficulty"] button[aria-pressed="false"] {
+        /* Legible, and clearly not the one you are on. 0.72 against the pinned
+           #c3cfe2 over the halo, not against the road. */
+        opacity: 0.72;
+      }
+      [data-sim-stage] [data-hud="difficulty"] button {
+        letter-spacing: 0.06em;
+      }
+      /* …and the GROUP's own ring goes with the fill. A rounded outline around
+         three options is the other half of what makes a segmented control read
+         as one: rendered, it was still a pill sitting in his sky. Three words
+         at the edge with one of them underlined is the whole control, and it
+         is the shape the reference uses for the same job. */
+      [data-sim-stage] [data-hud="difficulty"] {
+        border-color: transparent;
       }
 
       /* ── „Brake" and „Throttle" are ghosts in the reference, and so are the

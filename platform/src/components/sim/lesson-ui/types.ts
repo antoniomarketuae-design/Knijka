@@ -89,6 +89,14 @@ export type FinishLessonActionResult =
   | {
       ok: false;
       /** LEVEL_LOCKED (S1): a scenario level whose previous rung has no ≥2★
-       *  session yet — the server refuses to persist (soft gate, doc 76 §8). */
-      code: "INVALID_INPUT" | "UNKNOWN_LESSON" | "SAVE_FAILED" | "LEVEL_LOCKED";
+       *  session yet — the server refuses to persist (soft gate, doc 76 §8).
+       *  NOT_SIGNED_IN: no session server-side. A CODE, never a redirect — a
+       *  redirect thrown in a server action becomes a 303 the router follows,
+       *  which replaced the whole drive screen with /login mid-drive (B39). */
+      code:
+        | "INVALID_INPUT"
+        | "UNKNOWN_LESSON"
+        | "SAVE_FAILED"
+        | "LEVEL_LOCKED"
+        | "NOT_SIGNED_IN";
     };

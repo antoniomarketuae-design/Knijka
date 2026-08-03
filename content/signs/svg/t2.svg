@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" role="img" aria-labelledby="t">
+<title id="t">Т2 — Дължина на</title>
+<rect x="10" y="56" width="180" height="88" rx="6" fill="#fff" stroke="#1d1d1b" stroke-width="5" data-plate="true"/>
+<text x="100" y="100" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-weight="bold" font-size="32" fill="#1d1d1b">50 m</text>
+<g fill="#1d1d1b">
+<rect x="54" y="118" width="92" height="6"/>
+<polygon points="54,112 40,121 54,130"/><polygon points="146,112 160,121 146,130"/>
+</g>
+</svg>

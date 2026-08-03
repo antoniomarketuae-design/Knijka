@@ -6,10 +6,10 @@
   "mapKind": "scenario-street",
   "generator": "tools/maps/gen_pe_crossings.mjs",
   "boundsLocalMeters": {
-   "minX": -34,
-   "minY": 0,
-   "maxX": 30,
-   "maxY": 145
+   "minX": -52,
+   "minY": -14.125,
+   "maxX": 50,
+   "maxY": 196
   },
   "attribution": {
    "text": "Учебна улица с пешеходна пътека — оригинален параметричен дизайн (без данни от OpenStreetMap)",
@@ -29,7 +29,7 @@
    "edges": 1,
    "intersections": 0,
    "crossings": 1,
-   "buildings": 4,
+   "buildings": 7,
    "spawnPoints": 2,
    "zones": 1
   },
@@ -44,6 +44,10 @@
    "streetscapeNoteBg": "Поликлиника точно срещу пътеката и парк отсреща: тук пресичат възрастни хора и хора с намалена подвижност — бавно и по всяко време.",
    "roadscape": "residential-clinic",
    "roadscapeNoteBg": "Квартална улица пред поликлиника: без улично осветление и без крайни линии, само осева прекъсната линия — а пред самия вход В27 „Забранено е спирането“, за да остане достъп за линейка.",
+   "terminus": "closed-by-block",
+   "terminusNoteBg": "Улицата е ЗАТВОРЕНА: на петнадесет метра след края ѝ стои жилищен блок напряко. Хоризонт няма — това, което виждаш в горната част на стъклото, е стена, и точно затова окото пада на пътеката.",
+   "terminusLegs": 0,
+   "terminusRoadM": 0,
    "roadClass": "residential",
    "parkingBandM": 0,
    "bareVerge": null,
@@ -205,6 +209,75 @@
     [
      -34,
      93
+    ]
+   ]
+  },
+  {
+   "id": "pe-b-end-slab",
+   "height": 19,
+   "heightSource": "default",
+   "footprint": [
+    [
+     -38,
+     160
+    ],
+    [
+     38,
+     160
+    ],
+    [
+     38,
+     196
+    ],
+    [
+     -38,
+     196
+    ]
+   ]
+  },
+  {
+   "id": "pe-b-end-wing-w",
+   "height": 14,
+   "heightSource": "default",
+   "footprint": [
+    [
+     -52,
+     127
+    ],
+    [
+     -30,
+     127
+    ],
+    [
+     -30,
+     160
+    ],
+    [
+     -52,
+     160
+    ]
+   ]
+  },
+  {
+   "id": "pe-b-end-wing-e",
+   "height": 14,
+   "heightSource": "default",
+   "footprint": [
+    [
+     30,
+     139
+    ],
+    [
+     50,
+     139
+    ],
+    [
+     50,
+     160
+    ],
+    [
+     30,
+     160
     ]
    ]
   }

@@ -254,19 +254,35 @@ export function SimOverlay({
       >
         {/* `hud-ghost` — this is the peek, and the peek is an instrument line.
             It is the direct counterpart of the reference's „Lap 1/1" and „Lap
-            Time 00:02.060": a hairline outline in the fault's own colour, the
-            words on the image, nothing behind them. The OPEN sheet below is
-            deliberately not a ghost — that one is the explicit pause where the
-            authored WHY and its law citation are read. */}
+            Time 00:02.060": the words on the image, nothing behind them. The
+            OPEN sheet below is deliberately not a ghost — that one is the
+            explicit pause where the authored WHY and its law citation are read.
+
+            ── 2026-08-03: THE OUTLINE COMES OFF. ─────────────────────────────
+            The review's first named piece of web furniture is this element:
+            „the briefing bar — a full-width rounded strip ending in a SOLID
+            BRAND-BLUE «Разбрах» button. THAT IS A COOKIE BANNER. His reference
+            has PAUSE and VIEW as two small translucent chips."
+
+            He is not describing the words; he is describing the STRIP. And on
+            a 393 px phone the strip is not avoidable by shrinking: the pill
+            already shrink-to-fits, but a briefing carries a chip, a line, a
+            «Защо» and a «Разбрах», and four things at the 44 px thumb minimum
+            fill that row no matter how the box is capped. Capping the width
+            would have cost the LINE — the one part a student reads — and left
+            the banner shape.
+
+            So the box goes instead of the words. No border, no radius to
+            outline: what is left is a coloured tone glyph, a coloured chip and
+            a line of type on the road, which is what „Lap 1/1" is. The two
+            controls become the reference's translucent chips (below). The tone
+            is still readable at a glance — it is carried by the glyph and the
+            chip colour, which is where it was always carried. */}
         <div
-          className={`hud-ghost sim-overlay-in flex w-fit min-w-0 max-w-full items-center gap-1.5 rounded-full border pl-2.5 ${
-            interactive ? "pointer-events-auto pr-1" : "pr-2.5"
+          className={`hud-ghost sim-overlay-in flex w-fit min-w-0 max-w-full items-center gap-1.5 ${
+            interactive ? "pointer-events-auto pr-1" : "pr-1"
           }`}
-          style={{
-            height: `${height}px`,
-            color,
-            borderColor: `color-mix(in srgb, ${color} 70%, transparent)`,
-          }}
+          style={{ height: `${height}px`, color }}
           role={blocking ? "alertdialog" : "status"}
           aria-live={blocking ? "assertive" : "polite"}
           aria-label={`${shown.chipBg ? `${shown.chipBg} — ` : ""}${shown.lineBg}`}
@@ -296,24 +312,48 @@ export function SimOverlay({
               aria-expanded={open}
               // 44 px in BOTH axes. A 24 px chip with a big label is the
               // touch-target violation this project already counts 19 of.
-              className="flex h-11 min-w-[2.75rem] shrink-0 touch-manipulation items-center justify-center rounded-full px-2 text-[11px] font-black"
-              style={{ color }}
+              //
+              // The hairline is 2026-08-03: the reference's top edge is „PAUSE
+              // and VIEW as two small translucent chips", so this and the ack
+              // beside it are a matched PAIR — same height, same radius, same
+              // weight, one outlined and one lightly tinted. Before, one was a
+              // bare word and the other a solid brand button, which is why the
+              // row read as a banner with a call to action on the end of it.
+              className="flex h-11 min-w-[2.75rem] shrink-0 touch-manipulation items-center justify-center rounded-full border px-2 text-[11px] font-black uppercase tracking-wider"
+              style={{
+                color,
+                borderColor: `color-mix(in srgb, ${color} 45%, transparent)`,
+              }}
             >
               {open ? "▾" : (shown.openLabelBg ?? "Защо")}
             </button>
           ) : null}
           {blocking ? (
-            // `data-hud-ink`: the ONE control on this screen that clears a
-            // blocking line keeps its fill through the UNPANEL sweep. Doc 87
-            // rows C1/C2 are literally „«Разбрах» was not tappable (something
-            // is painted over it)" — turning it into a ghost would be the same
-            // defect by a prettier route. The reference keeps one filled badge
-            // too; this is ours, and it is the action, not the furniture.
+            // THE ACK, as one of the reference's „two small translucent chips".
+            //
+            // It was `btn-accent` — a solid brand-blue pill — and that single
+            // element is what turned the row into a cookie banner: a filled
+            // brand button at the end of a full-width strip is the shape of a
+            // consent bar in every app anybody has ever used. It is now a
+            // translucent chip tinted with the item's OWN tone, a hairline in
+            // the same colour, and light ink over the halo.
+            //
+            // `data-hud-ink` STAYS, and it is load-bearing: it exempts this
+            // element from the UNPANEL sweep so the 18 % tint below survives
+            // (`background-color: transparent !important` would otherwise win)
+            // and the one control that clears a blocking line never becomes
+            // invisible. Doc 87 rows C1/C2 are literally „«Разбрах» was not
+            // tappable" — this must read as pressable. 44 px in both axes is
+            // unchanged for the same reason.
             <button
               type="button"
               data-hud-ink=""
               onClick={acknowledge}
-              className="btn-accent flex h-11 min-w-[2.75rem] shrink-0 touch-manipulation items-center justify-center rounded-full px-3 text-[11px]"
+              className="flex h-11 min-w-[2.75rem] shrink-0 touch-manipulation items-center justify-center rounded-full border px-3 text-[11px] font-black uppercase tracking-wider text-foreground"
+              style={{
+                backgroundColor: `color-mix(in srgb, ${color} 18%, transparent)`,
+                borderColor: `color-mix(in srgb, ${color} 55%, transparent)`,
+              }}
             >
               {shown.ackLabelBg ?? "Разбрах"}
             </button>

@@ -86,7 +86,11 @@ describe("sc-ac-wind-truck-pass — geometry pins against the committed map", ()
     };
     expect(raw.meta.scenario.laneCruiseX).toBe(0);
     expect(raw.meta.scenario.laneLeftX).toBe(OVERTAKE_CENTER_X);
-    expect(raw.meta.scenario.params.lengthM).toBe(1000);
+    // doc 87 B67: 1000 -> 2600 m per carriageway. The scripts drive well inside
+    // it; the extra runway exists because a drag-limited drivetrain needs ~2.4 km
+    // to reach 170 km/h, and catalog 37 asks the student to hold BELOW 125 on a
+    // road that used to end before he could get there.
+    expect(raw.meta.scenario.params.lengthM).toBe(2600);
     expect(SC_AC_WIND_TRUCK_PASS.map.params).toEqual(raw.meta.scenario.params);
     const spawn = raw.spawnPoints.find((s) => s.id === "mw-spawn-approach")!;
     expect(spawn).toBeTruthy();

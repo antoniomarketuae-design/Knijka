@@ -91,9 +91,13 @@ describe("sc-ac-truck-spray — the district the spec pins by hand (the L7 copy 
     // 119, so the 115 km/h demo is lawful for the conditions and convicted for
     // the gap alone. A different limit would silently rewrite the lesson.
     expect(nb.maxspeed).toBe(140);
-    expect(nb.length).toBe(1000); // the scripts drive to y = 880
+    // doc 87 B67: 1000 -> 2600 m per carriageway. The scripts drive well inside
+    // it; the extra runway exists because a drag-limited drivetrain needs ~2.4 km
+    // to reach 170 km/h, and catalog 37 asks the student to hold BELOW 125 on a
+    // road that used to end before he could get there.
+    expect(nb.length).toBe(2600); // the scripts drive to y = 880
     expect(d.meta.scenario.params.maxspeedKmh).toBe(140);
-    expect(d.meta.scenario.params.lengthM).toBe(1000);
+    expect(d.meta.scenario.params.lengthM).toBe(2600);
   });
 
   it("nothing but the gap, the speed and the lamps is gradable on this map", () => {

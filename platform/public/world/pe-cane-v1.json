@@ -6,10 +6,10 @@
   "mapKind": "scenario-street",
   "generator": "tools/maps/gen_pe_crossings.mjs",
   "boundsLocalMeters": {
-   "minX": -38,
-   "minY": 0,
-   "maxX": 30,
-   "maxY": 152
+   "minX": -74,
+   "minY": -14.125,
+   "maxX": 46,
+   "maxY": 296
   },
   "attribution": {
    "text": "Учебна улица с пешеходна пътека — оригинален параметричен дизайн (без данни от OpenStreetMap)",
@@ -23,12 +23,12 @@
    "note": "Права улица: ограничението важи по цялата дължина; пред пътеката се кара с готовност за спиране."
   },
   "stats": {
-   "roadKm": 0.15,
-   "nodes": 2,
-   "edges": 1,
+   "roadKm": 0.27,
+   "nodes": 4,
+   "edges": 3,
    "intersections": 0,
    "crossings": 1,
-   "buildings": 4,
+   "buildings": 7,
    "spawnPoints": 2,
    "zones": 0
   },
@@ -43,6 +43,10 @@
    "streetscapeNoteBg": "Обществена сграда за хора с увредено зрение, чийто вход е насочен към пътеката, и спирка отсреща: белият бастун тук е ежедневие, а не изключение.",
    "roadscape": "oneway-institute",
    "roadscapeNoteBg": "Еднопосочна улица (знак Д4 на входа): няма насрещно движение и няма осева линия — цялото платно е твое, а това прави пропускането на пешеходеца изцяло твоя отговорност.",
+   "terminus": "jogs-and-continues",
+   "terminusNoteBg": "Еднопосочната не върви право до безкрай: тя прави чупка наляво и продължава на север. Отпред те чака калканът на сградата в чупката — улицата се чете, преди да я стигнеш.",
+   "terminusLegs": 2,
+   "terminusRoadM": 117.79,
    "roadClass": "residential",
    "parkingBandM": 0,
    "bareVerge": null,
@@ -67,6 +71,16 @@
     "id": "pe-n-end",
     "x": 0,
     "y": 152
+   },
+   {
+    "id": "pe-n-jog",
+    "x": -36,
+    "y": 179
+   },
+   {
+    "id": "pe-n-jog-n",
+    "x": -36,
+    "y": 251
    },
    {
     "id": "pe-n-start",
@@ -96,6 +110,60 @@
      [
       0,
       152
+     ]
+    ],
+    "parkingBand": false
+   },
+   {
+    "id": "pe-e-jog",
+    "from": "pe-n-end",
+    "to": "pe-n-jog",
+    "class": "residential",
+    "name": "Чупка на еднопосочната",
+    "oneway": true,
+    "roundabout": false,
+    "lanes": 2,
+    "lanesSource": "tag",
+    "maxspeed": 50,
+    "maxspeedSource": "tag",
+    "length": 45.79,
+    "geometry": [
+     [
+      0,
+      152
+     ],
+     [
+      -13,
+      167
+     ],
+     [
+      -36,
+      179
+     ]
+    ],
+    "parkingBand": false
+   },
+   {
+    "id": "pe-e-jog-n",
+    "from": "pe-n-jog",
+    "to": "pe-n-jog-n",
+    "class": "residential",
+    "name": "Еднопосочна — продължение",
+    "oneway": true,
+    "roundabout": false,
+    "lanes": 2,
+    "lanesSource": "tag",
+    "maxspeed": 50,
+    "maxspeedSource": "tag",
+    "length": 72,
+    "geometry": [
+     [
+      -36,
+      179
+     ],
+     [
+      -36,
+      251
      ]
     ],
     "parkingBand": false
@@ -204,6 +272,75 @@
     [
      12.9,
      132
+    ]
+   ]
+  },
+  {
+   "id": "pe-b-gable",
+   "height": 16,
+   "heightSource": "default",
+   "footprint": [
+    [
+     15,
+     158
+    ],
+    [
+     46,
+     158
+    ],
+    [
+     46,
+     210
+    ],
+    [
+     15,
+     210
+    ]
+   ]
+  },
+  {
+   "id": "pe-b-jog-w",
+   "height": 13,
+   "heightSource": "default",
+   "footprint": [
+    [
+     -74,
+     190
+    ],
+    [
+     -50,
+     190
+    ],
+    [
+     -50,
+     246
+    ],
+    [
+     -74,
+     246
+    ]
+   ]
+  },
+  {
+   "id": "pe-b-jog-n",
+   "height": 15,
+   "heightSource": "default",
+   "footprint": [
+    [
+     -24,
+     264
+    ],
+    [
+     12,
+     264
+    ],
+    [
+     12,
+     296
+    ],
+    [
+     -24,
+     296
     ]
    ]
   }

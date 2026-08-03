@@ -47,6 +47,8 @@ const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..
 
 /** PERCEPTUAL_ROAD_SCALE × textbook lane — the drawn lane width, m. */
 const SCALED_LANE_W = 3.25 * 2.5;
+/** constants.PARKING_LANE_WIDTH_M — the curbside band, per side, m. */
+const PARKING_LANE_WIDTH_M = 4.0;
 
 const r2 = (v) => Math.round(v * 100) / 100;
 
@@ -106,6 +108,15 @@ export function buildSpSpeedStreet(params) {
       lanesSource: "tag",
       maxspeed: maxspeedKmh,
       maxspeedSource: "tag",
+      // FR-21, the CAR half. TrafficLayer.PARK_CLASSES parks a row on every
+      // `residential` street, but PARKING_LANE_CLASSES draws the 4 m band it is
+      // seated in the middle of only on arterial classes — so on this map the
+      // row stood at travelHalf + 2.0 m, i.e. in the MIDDLE OF THE PAVEMENT,
+      // which is his „a car which is standing on the sidewalk" in four separate
+      // lessons. Declaring the band moves the KERB out from under the row; not
+      // one body moves and the travel lanes (and therefore x = 4.06, the lane
+      // centre every committed trace drives) are untouched.
+      parkingBand: true,
       length: polylineLength(geometry),
       geometry,
     },
@@ -137,16 +148,19 @@ export function buildSpSpeedStreet(params) {
 
   // -- One office block west of the street (visual anchor, clear of the
   // carriageway + sidewalk: |x| > halfRoad + ~4 m sidewalk).
+  // The kerb is the travel lanes PLUS the declared curbside band (FR-21), and
+  // every frontage offset below is measured from THAT.
+  const kerbM = r2(halfRoadM + PARKING_LANE_WIDTH_M);
   const BUILDINGS = [
     {
       id: "sp-b-block",
       height: 7,
       heightSource: "default",
       footprint: [
-        [r2(-(halfRoadM + 20)), 150],
-        [r2(-(halfRoadM + 8)), 150],
-        [r2(-(halfRoadM + 8)), 168],
-        [r2(-(halfRoadM + 20)), 168],
+        [r2(-(kerbM + 16)), 150],
+        [r2(-(kerbM + 4)), 150],
+        [r2(-(kerbM + 4)), 168],
+        [r2(-(kerbM + 16)), 168],
       ],
     },
   ];
@@ -193,15 +207,80 @@ export function buildSpSpeedStreet(params) {
     height: 12.6,
     heightSource: "levels",
     footprint: [
-      [r2(halfRoadM + 14), 196],
-      [r2(halfRoadM + 30), 196],
-      [r2(halfRoadM + 30), 240],
-      [r2(halfRoadM + 14), 240],
+      [r2(kerbM + 10), 196],
+      [r2(kerbM + 26), 196],
+      [r2(kerbM + 26), 240],
+      [r2(kerbM + 10), 240],
     ],
   };
   // Only the зона-30 street is a school street; the other three SP maps are
   // plain speed streets and stay byte-identical.
   if (params.school === true) BUILDINGS.push(SCHOOL);
+
+  // -- A VISIBLE REASON TO STOP (founder register B64 / FR-49) ---------------
+  //
+  // sc-sp-harsh-brake is graded on THIS map: `reachZone { x: LANE_X, y: 180,
+  // radiusM: 12 }`. Its instruction card now reaches the student and says the
+  // right thing — „улицата е празна … представи си, че това е твоята спирка
+  // или адрес. Реши да спреш ОТРАНО" — and the re-look's verdict was that the
+  // sentence arrived and the WORLD did not: „he asked for a visible reason, and
+  // got a sentence. There is still no bus stop, doorway or address in the world
+  // to stop AT."
+  //
+  // «Представи си» is the tell. A planned stop is a real driving skill and it
+  // is taught by DECIDING EARLY about a destination you can see — you lift off
+  // when the shop comes into view, not when the imaginary shop arrives. Asking a
+  // 17-year-old to hallucinate the destination is asking him to guess when to
+  // start, which is the one thing the drill measures.
+  //
+  // So the control point gets a destination: a small parade of shops on the
+  // driver's OWN side (east, x > 0 — he drives north in the right lane), with a
+  // low canopy at the frontage line centred exactly on y = 180, and two units
+  // behind it. Nothing here is graded and nothing here is an obstacle: it is a
+  // building group like every other on the map, and the rule engine reads
+  // `maxspeed`, never a footprint. What it changes is that at 40 m out there is
+  // something in the windscreen to stop AT.
+  if (params.stopReasonY !== undefined) {
+    const sy = params.stopReasonY;
+    const xi = r2(kerbM + 4); // frontage line, just past the pavement
+    BUILDINGS.push(
+      {
+        // The canopy: low and wide, right on the frontage, so it reads from far
+        // back as a place rather than as another block.
+        id: "sp-b-stop-canopy",
+        height: 3.4,
+        heightSource: "default",
+        footprint: [
+          [xi, r2(sy - 7)],
+          [r2(xi + 4.5), r2(sy - 7)],
+          [r2(xi + 4.5), r2(sy + 7)],
+          [xi, r2(sy + 7)],
+        ],
+      },
+      {
+        id: "sp-b-stop-shop",
+        height: 8.5,
+        heightSource: "default",
+        footprint: [
+          [r2(xi + 4.5), r2(sy - 12)],
+          [r2(xi + 22), r2(sy - 12)],
+          [r2(xi + 22), r2(sy + 10)],
+          [r2(xi + 4.5), r2(sy + 10)],
+        ],
+      },
+      {
+        id: "sp-b-stop-neighbour",
+        height: 11,
+        heightSource: "default",
+        footprint: [
+          [r2(xi + 4.5), r2(sy + 16)],
+          [r2(xi + 20), r2(sy + 16)],
+          [r2(xi + 20), r2(sy + 40)],
+          [r2(xi + 4.5), r2(sy + 40)],
+        ],
+      },
+    );
+  }
 
   // -- Bounds + stats.
   const bounds = { minX: Infinity, minY: Infinity, maxX: -Infinity, maxY: -Infinity };
@@ -214,8 +293,8 @@ export function buildSpSpeedStreet(params) {
     }
   }
   // Road body + buildings can outgrow the centerline bounds — cover them.
-  bounds.minX = Math.min(bounds.minX, -halfRoadM - 6);
-  bounds.maxX = Math.max(bounds.maxX, halfRoadM + 6);
+  bounds.minX = Math.min(bounds.minX, -kerbM - 6);
+  bounds.maxX = Math.max(bounds.maxX, kerbM + 6);
   for (const bl of BUILDINGS) {
     // THE SCHOOL DOES NOT MOVE THE BOUNDS, and that is deliberate.
     // `meta.boundsLocalMeters` seeds the Locator's spatial grid origin and
@@ -330,6 +409,9 @@ const INSTANCES = [
     label: "Учебна улица — пълзящо превишаване (сценарий SP-01)",
     lengthM: 360,
     maxspeedKmh: 50,
+    // B64/FR-49: sc-sp-harsh-brake grades a planned stop at y = 180 on this
+    // map. Give the student something to stop AT.
+    stopReasonY: 180,
   },
   {
     districtId: "sp-danger-v1",

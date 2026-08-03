@@ -6,9 +6,9 @@
   "mapKind": "scenario-street",
   "generator": "tools/maps/gen_sp_speed.mjs",
   "boundsLocalMeters": {
-   "minX": -28.12,
+   "minX": -28.13,
    "minY": 0,
-   "maxX": 14.125,
+   "maxX": 18.130000000000003,
    "maxY": 400
   },
   "attribution": {
@@ -67,6 +67,7 @@
     "lanesSource": "tag",
     "maxspeed": 50,
     "maxspeedSource": "tag",
+    "parkingBand": true,
     "length": 400,
     "geometry": [
      [
@@ -91,19 +92,19 @@
    "heightSource": "default",
    "footprint": [
     [
-     -28.12,
+     -28.13,
      150
     ],
     [
-     -16.12,
+     -16.13,
      150
     ],
     [
-     -16.12,
+     -16.13,
      168
     ],
     [
-     -28.12,
+     -28.13,
      168
     ]
    ]

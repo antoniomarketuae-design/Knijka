@@ -114,6 +114,26 @@ const CONFLICT_SAME_DIR_DEG = 50;
 const ONCOMING_MIN_DEG = 130;
 /** A vehicle must be at least this far to the player's right to count, meters. */
 const RIGHT_MIN_M = 1.5;
+/**
+ * ROUNDABOUT REACH, m — how near a circulating car must actually be to the
+ * DRIVER before it is a car he owes way to (doc 87 B15).
+ *
+ * The ring test used to be "in the band around the ring CENTRE, and somewhere
+ * to my left". On `rb-mini-v1` the band is the 18 m ring radius plus the
+ * runtime's 9 m of extra, so it enclosed the WHOLE roundabout: a car on the far
+ * side, 36 m away and not remotely near the mouth, satisfied it. That is the
+ * geometry behind the founder's frame — «Непропускане на пътно превозно
+ * средство с предимство −10 т.» on a run in which, as the re-look put it, *no
+ * circulating vehicle appears in ANY frame*. He was convicted for a car he
+ * could not see because it was on the other side of the island.
+ *
+ * 26 m is the runtime's own PRIORITY_CONFLICT_RADIUS_M — the distance at which
+ * every OTHER give-way duty in the engine says "this one is yours". On an 18 m
+ * ring it still catches a car a full quarter-turn upstream (the 90° chord is
+ * 25.5 m, about 3.6 s of circulation at 7 m/s), which is exactly the car you
+ * wait for. It can only ever REMOVE a conviction, never add one.
+ */
+const CIRCULATING_REACH_M = 26;
 /** VU-02 cyclist-pass query: a cyclist heading within this of the player's own
  * heading rides the SAME direction (the pass duty applies); anything wider is
  * crossing/oncoming — a different duty (meeting), never returned, deg. */
@@ -599,7 +619,13 @@ export function circulatingConflictFor(
     const cdy = v.y - cy;
     if (cdx * cdx + cdy * cdy > r2) continue; // not in / near the ring
     if (v.speedMps < CONFLICT_MIN_SPEED_MPS) continue; // parked / creeping
-    if ((v.x - px) * lx + (v.y - py) * ly < RIGHT_MIN_M) continue; // not on the left
+    // …and near the DRIVER, not merely near the island (B15 — see
+    // CIRCULATING_REACH_M). Being inside the band is a fact about the ring; a
+    // give-way duty is a fact about the two of you.
+    const pdx = v.x - px;
+    const pdy = v.y - py;
+    if (pdx * pdx + pdy * pdy > CIRCULATING_REACH_M * CIRCULATING_REACH_M) continue;
+    if (pdx * lx + pdy * ly < RIGHT_MIN_M) continue; // not on the left
     return true;
   }
   return false;

@@ -35,8 +35,11 @@ import { InstrumentCluster } from "@/components/sim/cockpit/InstrumentCluster";
 import {
   COCKPIT_HOTSPOTS,
   CockpitInteractionContext,
+  hotspotMouseVerbBg,
   type HotspotAction,
 } from "@/modules/sim/scene/vitok/hotspots";
+import { hotspotIsReachable } from "@/modules/sim/scene/vitok/cabinLook";
+import { useCabinLook } from "@/modules/sim/scene/vitok/cabinLookStore";
 import { MirrorRig, type MirrorMeshes } from "./MirrorRig";
 
 // ---------------------------------------------------------------------------
@@ -1546,14 +1549,48 @@ const HOTSPOT_COLOR = "#6db4ff";
  *    pointer down/up; mirror glances HOLD while pressed — pointer down/up
  *    twins the Q/E/F key down/up, graded once per hold);
  *  - instruction mode → the pending step's hotspot(s) pulse gently
- *    (highlightStepId via CockpitInteractionContext, provided by LessonScene).
+ *    (highlightStepId via CockpitInteractionContext, provided by LessonScene),
+ *    AND SAY THEIR OWN NAME — see NAME THE CONTROL below.
  *
  * Enabled only in the cockpit camera view (context.enabled) — a chase-view
  * click on the car must never operate a control the student cannot see.
+ *
+ * ── NAME THE CONTROL, ON THE CONTROL (founder review, „we read on left") ────
+ *
+ * His sentence is „We should re-work the whole engine with the buttons,
+ * BECAUSE WE READ ON LEFT", and the thing on the left he is reading is the
+ * „⌨ Клавиши" legend — a list of twenty-two keys in the corner your eye lands
+ * on first. The objection is not the bindings; it is that the screen makes you
+ * READ A LIST instead of SHOWING YOU THE CONTROL.
+ *
+ * The pulse alone did not answer that, and a rendered frame says why: at step 4
+ * the camera looks 66° down at the seat-belt buckle, the buckle is unlit GLB
+ * geometry in a footwell, and the ONLY legible thing in a 1440×900 frame was
+ * the proxy's own blue glow — a nameless rectangle. Same at the right door
+ * mirror. So the pending control now carries a small chip with its Bulgarian
+ * name and the mouse gesture it takes („🖱 Щракни · Предпазен колан"), pinned
+ * to the control in the frame the student is already looking at.
+ *
+ * DELIBERATELY NOT ON THE CHIP: the key. Keys are real and stay reachable —
+ * the hover tooltip still names one, and the legend and the tutorial's „за
+ * напреднали" line still list them all — but the thing painted on the car
+ * without being asked for is the gesture that operates it, not a shortcut.
+ *
+ * ONLY WHEN IT IS ACTUALLY ON SCREEN: a chip is filtered through the shipped
+ * reach oracle (scene/vitok/cabinLook.ts) at the LIVE look pose and canvas
+ * aspect, so a control that is off the frame (the belt at the driving pose, the
+ * right mirror at any pose but its own) is not labelled at the edge of a
+ * picture it is not in. The checklist offers the head turn for those; the chip
+ * appears when the turn has brought the control into view.
  */
 function CockpitHotspots({ cabinRef }: { cabinRef: RefObject<CabinControls | null> }) {
   const { enabled, highlightStepId } = useContext(CockpitInteractionContext);
   const [hovered, setHovered] = useState<CockpitHotspotName | null>(null);
+  // Live look pose + canvas shape — the two inputs the reach oracle needs.
+  // `size` changes only on resize, the pose only when the student (or the
+  // checklist) turns the head: neither is a per-frame subscription.
+  const pose = useCabinLook();
+  const canvas = useThree((s) => s.size);
   // Ref twin of `hovered` for the frame loop (written only in handlers/effects
   // — render stays pure per the project lint rules).
   const hoveredRef = useRef<CockpitHotspotName | null>(null);
@@ -1580,6 +1617,81 @@ function CockpitHotspots({ cabinRef }: { cabinRef: RefObject<CabinControls | nul
     () => new Set<CockpitHotspotName>(highlightStepId ? hotspotsForStep(highlightStepId) : []),
     [highlightStepId],
   );
+
+  // ───────────────────────────────────────────────────────────────────────────
+  // THE HOLD RELEASES ON THE WINDOW, NOT ON THE CONTROL — and this is the bug
+  // that kept the mouse-only pre-drive at 1/13.
+  //
+  // MEASURED, not reasoned (mid-hold screenshots of /dev/hud-ux, step 2):
+  // press the interior mirror with the mouse and the head turns 16° toward it —
+  // which SLIDES THE CONTROL OUT FROM UNDER A STATIONARY CURSOR. R3F re-runs
+  // its raycast on pointer EVENTS, not per frame, so when `pointerup` arrives
+  // the mirror is no longer the hit object and the mesh's own `onPointerUp`
+  // never fires. `glanceEnd` is never called, `GlanceHold.held` stays true, and
+  // the glance is held FOREVER. Two consequences, both photographed:
+  //   · the head stays deflected after the mouse is released, and
+  //   · CameraRig crossfades the CABIN LOOK out by (1 − glanceEnv), so with a
+  //     stuck glance the „Погледни към дясното огледало" head turn does
+  //     nothing at all — the pose store says mirrorRight while the camera
+  //     stares forward, the right mirror stays off the right edge, and the
+  //     third glance the „Настройка на огледалата" step needs can never be
+  //     made. That is the founder's „clicking all ten moves the checklist
+  //     0/13 → 1/13 AND STOPS", reproduced and explained.
+  //
+  // The gesture that triggers it is the ONLY natural one: press, look, release.
+  // So the release is bound where the browser guarantees delivery — the window.
+  // Same reasoning MousePedals states for its pointer capture; done with plain
+  // listeners here because the press starts inside the R3F event system and the
+  // element that would capture is the shared canvas, not the control.
+  //
+  // `onPointerOut` no longer releases a glance either (see the handlers below):
+  // the founder contract is that the view holds WHILE PRESSED, and a head turn
+  // plus one pixel of mouse movement would otherwise cancel the look the press
+  // just asked for.
+  // ───────────────────────────────────────────────────────────────────────────
+  const heldRef = useRef<HotspotAction | null>(null);
+
+  const endHold = useCallback(() => {
+    const held = heldRef.current;
+    if (held === null) return;
+    heldRef.current = null;
+    if (held.type === "hornHold") cabinRef.current?.driveline.setHorn(false);
+    else if (held.type === "glance") cabinRef.current?.glanceEnd(held.mirror);
+  }, [cabinRef]);
+
+  const beginHold = useCallback(
+    (action: HotspotAction) => {
+      if (action.type !== "hornHold" && action.type !== "glance") return;
+      // A second press without a release (a key held at the same time, a lost
+      // pointerup) must not strand the first one.
+      endHold();
+      heldRef.current = action;
+      if (action.type === "hornHold") cabinRef.current?.driveline.setHorn(true);
+      else cabinRef.current?.glanceStart(action.mirror);
+    },
+    [cabinRef, endHold],
+  );
+
+  useEffect(() => {
+    // `pointercancel` covers the browser stealing the gesture; `blur` covers
+    // alt-tabbing away mid-hold, which would otherwise leave the horn sounding
+    // in a tab the student is not looking at.
+    window.addEventListener("pointerup", endHold);
+    window.addEventListener("pointercancel", endHold);
+    window.addEventListener("blur", endHold);
+    return () => {
+      window.removeEventListener("pointerup", endHold);
+      window.removeEventListener("pointercancel", endHold);
+      window.removeEventListener("blur", endHold);
+      endHold();
+    };
+  }, [endHold]);
+
+  // Leaving the cockpit view (C) mid-hold: the control is gone from the screen,
+  // so the hold has to go with it.
+  useEffect(() => {
+    if (!enabled) endHold();
+  }, [enabled, endHold]);
 
   // Per-frame glow: hovered = steady, highlighted = slow pulse, else hidden.
   // Mutates materials only (no React state at frame rate).
@@ -1637,6 +1749,20 @@ function CockpitHotspots({ cabinRef }: { cabinRef: RefObject<CabinControls | nul
 
   const hoveredSpec = hovered ? COCKPIT_HOTSPOTS.find((h) => h.name === hovered) ?? null : null;
 
+  // The pending step's controls that are genuinely in the picture right now.
+  // The hovered one is excluded: its tooltip already says everything the chip
+  // would, and two labels on one control is noise.
+  const labelledSpecs = useMemo(() => {
+    if (!enabled || highlightNames.size === 0) return [];
+    const aspect = canvas.height > 0 ? canvas.width / canvas.height : 16 / 9;
+    return COCKPIT_HOTSPOTS.filter(
+      (spec) =>
+        highlightNames.has(spec.name) &&
+        spec.name !== hovered &&
+        hotspotIsReachable(spec.name, pose, aspect),
+    );
+  }, [enabled, highlightNames, hovered, pose, canvas.width, canvas.height]);
+
   return (
     <group>
       {enabled
@@ -1652,25 +1778,21 @@ function CockpitHotspots({ cabinRef }: { cabinRef: RefObject<CabinControls | nul
               }}
               onPointerOut={() => {
                 if (hoveredRef.current === spec.name) setHover(null);
-                // Dragging off a held control releases it (like lifting off).
-                if (spec.action.type === "hornHold") cabinRef.current?.driveline.setHorn(false);
-                if (spec.action.type === "glance") cabinRef.current?.glanceEnd(spec.action.mirror);
+                // NOTE: a hold is NOT released here any more. The head turns
+                // toward the control the moment it is pressed, so the control
+                // slides out from under a stationary cursor and the very next
+                // mouse twitch would cancel the look the press asked for. The
+                // release lives on the window — see THE HOLD RELEASES ON THE
+                // WINDOW above, and the frames that measured it.
               }}
               onPointerDown={(e: ThreeEvent<PointerEvent>) => {
                 if (e.button !== 0) return;
-                if (spec.action.type === "hornHold") {
-                  e.stopPropagation();
-                  cabinRef.current?.driveline.setHorn(true);
-                } else if (spec.action.type === "glance") {
+                if (spec.action.type === "hornHold" || spec.action.type === "glance") {
                   // Founder contract: the glance view HOLDS while pressed —
                   // pointer down/up mirrors the Q/E/F key down/up exactly.
                   e.stopPropagation();
-                  cabinRef.current?.glanceStart(spec.action.mirror);
+                  beginHold(spec.action);
                 }
-              }}
-              onPointerUp={() => {
-                if (spec.action.type === "hornHold") cabinRef.current?.driveline.setHorn(false);
-                if (spec.action.type === "glance") cabinRef.current?.glanceEnd(spec.action.mirror);
               }}
               onClick={(e: ThreeEvent<MouseEvent>) => {
                 e.stopPropagation();
@@ -1699,7 +1821,35 @@ function CockpitHotspots({ cabinRef }: { cabinRef: RefObject<CabinControls | nul
           ))
         : null}
 
-      {/* Tooltip: Bulgarian control name + its real key, above the control. */}
+      {/* PENDING-STEP CHIPS — the control says its own name, on the car (see
+          NAME THE CONTROL in this component's header). Not clickable and not
+          in the way: `pointer-events: none` so the chip can never steal the
+          click it is asking for, and parked above the proxy's own top face. */}
+      {labelledSpecs.map((spec) => (
+        <Html
+          key={`label-${spec.name}`}
+          position={[spec.pos[0], spec.pos[1] + spec.size[1] / 2 + 0.045, spec.pos[2]]}
+          center
+          style={{ pointerEvents: "none", whiteSpace: "nowrap" }}
+          zIndexRange={[29, 10]}
+        >
+          <div className="flex items-center gap-1.5 rounded-lg border border-accent bg-background/95 px-2 py-1 shadow-lg backdrop-blur">
+            <span aria-hidden className="text-[11px]">
+              🖱
+            </span>
+            <span className="text-[11px] font-black text-accent">
+              {hotspotMouseVerbBg(spec.action)}
+            </span>
+            <span className="text-[11px] font-bold text-foreground">{spec.shortBg}</span>
+          </div>
+        </Html>
+      ))}
+
+      {/* Tooltip on HOVER: the control's full name and the gesture it takes,
+          with its real key demoted to a muted footnote. The key stays — the
+          honesty rule is that a hint may only promise a control that works, and
+          B/L/I/Space all do — but it is no longer the loudest thing on a label
+          whose whole job is to teach the mouse. */}
       {enabled && hoveredSpec ? (
         <Html
           position={[
@@ -1712,12 +1862,18 @@ function CockpitHotspots({ cabinRef }: { cabinRef: RefObject<CabinControls | nul
           zIndexRange={[30, 10]}
         >
           <div className="flex items-center gap-1.5 rounded-lg border border-border bg-background/90 px-2 py-1 backdrop-blur">
+            <span aria-hidden className="text-[11px]">
+              🖱
+            </span>
+            <span className="text-[11px] font-black text-accent">
+              {hotspotMouseVerbBg(hoveredSpec.action)}
+            </span>
             <span className="text-[11px] font-semibold text-foreground">
               {hoveredSpec.labelBg}
             </span>
-            <kbd className="rounded bg-surface px-1 py-0.5 font-mono text-[10px] font-bold text-accent">
-              {hoveredSpec.keyHint}
-            </kbd>
+            <span className="text-[10px] font-semibold text-muted">
+              клавиш {hoveredSpec.keyHint}
+            </span>
           </div>
         </Html>
       ) : null}

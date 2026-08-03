@@ -6,10 +6,10 @@
   "mapKind": "scenario-street",
   "generator": "tools/maps/gen_pe_crossings.mjs",
   "boundsLocalMeters": {
-   "minX": -30,
-   "minY": 0,
-   "maxX": 24,
-   "maxY": 150
+   "minX": -46,
+   "minY": -14.125,
+   "maxX": 48,
+   "maxY": 332
   },
   "attribution": {
    "text": "Учебна улица с пешеходна пътека — оригинален параметричен дизайн (без данни от OpenStreetMap)",
@@ -24,12 +24,12 @@
   },
   "zonesVersion": 1,
   "stats": {
-   "roadKm": 0.15,
-   "nodes": 2,
-   "edges": 1,
+   "roadKm": 0.28,
+   "nodes": 3,
+   "edges": 2,
    "intersections": 0,
    "crossings": 1,
-   "buildings": 4,
+   "buildings": 7,
    "spawnPoints": 2,
    "zones": 1
   },
@@ -44,6 +44,10 @@
    "streetscapeNoteBg": "Търговска отсечка: магазини от двете страни, затова на пътеката ПОСТОЯННО има хора — изчакването е нормата, не изключението.",
    "roadscape": "collector-shopping",
    "roadscapeNoteBg": "Събирателна улица: ясна крайна линия, осеви прекъснати линии и редица улични стълбове — единствената осветена отсечка в групата. Пред търговската тераса стои В27 „Забранено е спирането“, за да не се паркира точно пред витрините.",
+   "terminus": "opens-to-collector",
+   "terminusNoteBg": "Улицата не свършва в нищото: пред теб тя се влива в четирилентова събирателна улица — по-широко платно, крайни линии и улично осветление. Затова точно тук се гледа напред, а не само в пътеката.",
+   "terminusLegs": 1,
+   "terminusRoadM": 125,
    "roadClass": "tertiary",
    "parkingBandM": 0,
    "bareVerge": null,
@@ -64,6 +68,11 @@
  },
  "roads": {
   "nodes": [
+   {
+    "id": "pe-n-collector",
+    "x": 0,
+    "y": 275
+   },
    {
     "id": "pe-n-end",
     "x": 0,
@@ -97,6 +106,31 @@
      [
       0,
       150
+     ]
+    ],
+    "parkingBand": false
+   },
+   {
+    "id": "pe-e-collector",
+    "from": "pe-n-end",
+    "to": "pe-n-collector",
+    "class": "secondary",
+    "name": "Събирателна улица",
+    "oneway": false,
+    "roundabout": false,
+    "lanes": 4,
+    "lanesSource": "tag",
+    "maxspeed": 50,
+    "maxspeedSource": "tag",
+    "length": 125,
+    "geometry": [
+     [
+      0,
+      150
+     ],
+     [
+      0,
+      275
      ]
     ],
     "parkingBand": false
@@ -205,6 +239,75 @@
     [
      13,
      124
+    ]
+   ]
+  },
+  {
+   "id": "pe-b-far-w",
+   "height": 15,
+   "heightSource": "default",
+   "footprint": [
+    [
+     -46,
+     164
+    ],
+    [
+     -22,
+     164
+    ],
+    [
+     -22,
+     246
+    ],
+    [
+     -46,
+     246
+    ]
+   ]
+  },
+  {
+   "id": "pe-b-far-e",
+   "height": 15,
+   "heightSource": "default",
+   "footprint": [
+    [
+     22,
+     176
+    ],
+    [
+     48,
+     176
+    ],
+    [
+     48,
+     260
+    ],
+    [
+     22,
+     260
+    ]
+   ]
+  },
+  {
+   "id": "pe-b-vista",
+   "height": 22,
+   "heightSource": "default",
+   "footprint": [
+    [
+     -44,
+     296
+    ],
+    [
+     44,
+     296
+    ],
+    [
+     44,
+     332
+    ],
+    [
+     -44,
+     332
     ]
    ]
   }

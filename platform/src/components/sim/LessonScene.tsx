@@ -2137,6 +2137,14 @@ function ControlsHelp({
   // legend never lies about which way the view will turn.
   const reverseViewOn = useReverseViewEnabled();
   const rows: ControlsHelpRow[] = [
+    // FIRST ROW, AND THE FIRST THING READ IN THIS COLUMN — „we read on left".
+    // The founder's sentence about this panel is „We should re-work the whole
+    // engine with the buttons, BECAUSE WE READ ON LEFT": the top-left corner is
+    // where the eye lands, and what stood there was twenty-two keyboard rows,
+    // with the mouse buried at row fifteen. The keys are all still here and all
+    // still real — but the sheet now OPENS with the fact that the whole cabin
+    // is clickable, and the pill above says this list is the advanced path.
+    { keys: "Клик", what: "всичко в кабината се прави с мишката", essential: true },
     { keys: "W A S D", what: "кормуване (или стрелки)", essential: true },
     { keys: "I", what: "двигател: старт / стоп", essential: true },
     { keys: "[ ]", what: "скорости: към P / към D", essential: true },
@@ -2155,7 +2163,6 @@ function ControlsHelp({
       what: "огледала — задръж (ляво / дясно / назад)",
       essential: true,
     },
-    { keys: "Клик", what: "контролите в кабината (изглед кокпит)", essential: true },
     {
       keys: "C",
       what: topdownAllowed ? "изглед: кокпит / отвън / отгоре" : "изглед: кокпит / отвън",
@@ -2207,7 +2214,12 @@ function ControlsHelp({
         className="pointer-events-auto flex shrink-0 items-center gap-1.5 rounded-lg border border-border bg-background/80 px-2.5 py-1 text-[11px] font-semibold text-muted backdrop-blur transition hover:text-foreground"
       >
         <span aria-hidden>⌨</span>
-        Клавиши {open ? "▾" : "▸"}
+        {/* „за напреднали" is not decoration: this pill sits in the corner the
+            founder reads first, and an unqualified „Клавиши" there is the
+            screen telling a beginner that keys are how the car is operated.
+            They are the alternative. The mouse is the taught path, and the
+            cabin says so on the controls themselves (VitokCockpit). */}
+        Клавиши · за напреднали {open ? "▾" : "▸"}
       </button>
       {open ? (
         <div className="pointer-events-auto mt-1 flex min-h-0 w-full flex-col rounded-xl border border-border bg-background/80 backdrop-blur">

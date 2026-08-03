@@ -23,6 +23,8 @@ import {
   DEFAULT_LEVEL_TOLERANCE,
   DEFAULT_LEVEL_TRAFFIC_SCALE,
   SCENARIO_FAMILY_TRAFFIC_BASELINE,
+  SCENARIO_FAMILY_TRAFFIC_CEILING,
+  SCENARIO_FAMILY_TRAFFIC_FLOOR,
   ScenarioCompileError,
   compileScenario,
   resolveScenarioRubric,
@@ -320,8 +322,19 @@ describe("DEFAULT_LEVEL_TRAFFIC_SCALE", () => {
    * here: a yielding lesson that authors nothing must still be set on a road
    * with traffic on it, and the rung must change how much.
    */
-  it("the yielding families are set on a street, and the ladder scales it", () => {
+  /**
+   * RE-MEASURED 2026-08-03 with the player STANDING where the drill grades
+   * (the taught behaviour on a give-way lesson is to stop at the line — the
+   * first measurement was taken with the player out of the way, which is how a
+   * street the founder then photographed empty got certified). At the old L1
+   * count of 2 the crossing arm carried a moving car for 0–32% of the minute;
+   * a yielding drill with nothing to yield to is not an easier lesson, it is a
+   * different one. Hence the floor. At 7 the junction queues on itself (four
+   * districts regress, agent-time stopped 46–52%), hence the ceiling.
+   */
+  it("the yielding families are set on a street, and the ladder scales it between the measured floor and ceiling", () => {
     const laddered = { 1: 0.5, 2: 0.75, 3: 1, 4: 1, 5: 1.5 } as const;
+    expect(SCENARIO_FAMILY_TRAFFIC_FLOOR).toBeLessThan(SCENARIO_FAMILY_TRAFFIC_CEILING);
     let checked = 0;
     for (const spec of SCENARIO_TEMPLATES) {
       const base = SCENARIO_FAMILY_TRAFFIC_BASELINE[spec.family];
@@ -330,7 +343,15 @@ describe("DEFAULT_LEVEL_TRAFFIC_SCALE", () => {
         if (rung.traffic?.vehicleCount !== undefined) continue;
         const t = compileScenario(spec, rung.level).traffic!;
         expect(t.vehicleCount, `${spec.id}@L${rung.level}`).toBe(
-          Math.round(base * laddered[rung.level]),
+          Math.min(
+            SCENARIO_FAMILY_TRAFFIC_CEILING,
+            Math.max(SCENARIO_FAMILY_TRAFFIC_FLOOR, Math.round(base * laddered[rung.level])),
+          ),
+        );
+        // The floor is the point: no rung of a lesson ABOUT other road users
+        // may compile to a street too empty to contain one.
+        expect(t.vehicleCount, `${spec.id}@L${rung.level} is below the measured floor`).toBeGreaterThanOrEqual(
+          SCENARIO_FAMILY_TRAFFIC_FLOOR,
         );
         // Never pedestrians by implication — a junction drill must not arm a
         // crossing duty its copy never names.
@@ -340,6 +361,38 @@ describe("DEFAULT_LEVEL_TRAFFIC_SCALE", () => {
     }
     // Guard against the check silently emptying out if a family is renamed.
     expect(checked).toBeGreaterThan(50);
+  });
+
+  /**
+   * The floor collapses the BOTTOM of the ambient ladder for these families
+   * (L1 and L2 now compile to the same street). The one rise that carries
+   * authored Bulgarian on its back — l5BusyStreet's «По-натоварена улица… по
+   * нея се движат и други коли» — must therefore still be true, or the L5
+   * briefing is a promise the world does not keep. Pinned separately so a
+   * future ceiling change cannot quietly turn that sentence into a lie.
+   */
+  it("L5 is still measurably busier than L4 for the yielding families", () => {
+    let checked = 0;
+    for (const spec of SCENARIO_TEMPLATES) {
+      if (SCENARIO_FAMILY_TRAFFIC_BASELINE[spec.family] === undefined) continue;
+      if (spec.traffic !== undefined) continue;
+      const l4Rung = spec.levels.find((l) => l.level === 4);
+      const l5Rung = spec.levels.find((l) => l.level === 5);
+      if (!l4Rung || !l5Rung) continue;
+      // An AUTHORED rung count is the author's final word and is deliberately
+      // never clamped (three junction templates hand-author 6 or 8 at L5). This
+      // check is about what the FAMILY BASELINE derives.
+      if (l4Rung.traffic?.vehicleCount !== undefined) continue;
+      if (l5Rung.traffic?.vehicleCount !== undefined) continue;
+      const l4 = compileScenario(spec, 4).traffic?.vehicleCount ?? 0;
+      const l5 = compileScenario(spec, 5).traffic?.vehicleCount ?? 0;
+      expect(l5, `${spec.id}: L5 must add cars, not repeat L4`).toBeGreaterThan(l4);
+      expect(l5, `${spec.id}: L5 is past the measured jam knee`).toBeLessThanOrEqual(
+        SCENARIO_FAMILY_TRAFFIC_CEILING,
+      );
+      checked++;
+    }
+    expect(checked).toBeGreaterThanOrEqual(15);
   });
 
   it("the roundabout family is deliberately NOT given traffic (measured gridlock)", () => {
