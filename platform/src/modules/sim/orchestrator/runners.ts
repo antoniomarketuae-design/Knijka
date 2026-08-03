@@ -1438,6 +1438,82 @@ const NM_WAIT_ZONE_M = 45;
 /** Actor sync clamp, m/s. */
 const NM_SYNC_MIN_MPS = 1.5;
 
+/**
+ * B80 — THE UNDER-DETECTION (register doc 87 row B80, founder: „there was a
+ * traffic car infront of me moving which I didnt let pass NO ERROR APPEARED").
+ *
+ * Instrumented first, exactly as the row asked: nine scripted drives on the
+ * live sc-ov-narrow@L1 / ov-narrow-v1 stack all reported the staged oncoming
+ * reaching `speedMps` 6.24 — **the actor always transits**, so the leading
+ * hypothesis (it never moves) is refuted and the break is elsewhere. It is
+ * here, and it is `actorCleared`.
+ *
+ * `actorCleared` used to include `actorAlong < -4`, i.e. *the oncoming has left
+ * the стеснение*. That is not the same fact as *we have passed each other*, and
+ * on this geometry the two are ~10 m and ~2 s apart:
+ *
+ *   measured (profile C, waits at the marker then pulls out): at t 26.3 s the
+ *   oncoming is at y 105.6 — 4.4 m south of the section, so "cleared" — while
+ *   the PLAYER is still at y 103.4, south of it too, mid-swing into the
+ *   oncoming's lane with 6.7 m between the two bodies and closing. The runner
+ *   resolved there, `success: true, detail: "yielded"`, and the engine issued
+ *   YIELDED_TO_PRIORITY. `phase` is now "resolved", so `step()` returns null on
+ *   its first line for the rest of the drive: the cut-in, the head-on and the
+ *   whole wrong-side transit that follow are UNGRADABLE. No error appeared —
+ *   and the student was congratulated.
+ *
+ * So the meeting is over when the oncoming is genuinely BEHIND the player (or
+ * has driven off the end of its path), never merely because it is out of the
+ * narrowing. The relative test was already in the expression; the absolute one
+ * was overriding it.
+ */
+const NM_PASSED_MARGIN_M = 4;
+/**
+ * …and the same measurement found the other half: WHERE yield credit is earned.
+ *
+ * `sawWait` asked only for `playerAlong < 4` — anywhere south of the section,
+ * which on the approach leg means anywhere at all. Profile D (an obedient
+ * student crawling the approach at 4 km/h, никога in the oncoming lane) latched
+ * it 24 m short of the narrowing, was resolved "yielded" + commended at t 64.6
+ * s, and then drove the entire стеснение on the wrong side with the runner
+ * already retired. Credit for waiting belongs to a driver who waited AT the
+ * widening — the sibling runners bound their stopped-witness releases the same
+ * way (WITNESS_STOPPED_NEAR_M 14 at the junction mouth, RB_WITNESS_STOPPED_NEAR_M
+ * 22 on the ring approach). 20 m covers the authored wait poses with margin:
+ * the shipped shadow stops at y 104 (6 m out) and the N1 integration test waits
+ * 16 m out.
+ */
+const NM_WAIT_NEAR_M = 20;
+/**
+ * The stopped-witness release, narrow-street edition — how close the player
+ * must be to the section before the oncoming leaves its entrance, m…
+ *
+ * Profile D again, this time as a STAGING fault: the arrival sync divides by
+ * `max(playerSpeed, 2 m/s)`, so a 4 km/h student is modelled as a 7.2 km/h one
+ * and the car is dispatched for an arrival ~28 s before his real one. It
+ * reached the mouth of the narrowing, was released on the old
+ * `carDistToEntry <= 4` unconditional, transited, and met him in the open
+ * street 25 m short of the стеснение — the encounter the lesson is ABOUT never
+ * happened, and the barge he committed afterwards had nothing left to convict.
+ * This is the third sighting of one bug (junction L7/T7, ring B15): obeying
+ * «приближавай бавно» deletes the encounter.
+ *
+ * The car therefore HOLDS at its entrance until the player is genuinely
+ * arriving. It can only ever DEFER: at any scripted pace the release test is
+ * already true on the frame the car reaches the mouth (the shipped shadow is
+ * stopped 10 m out by then), so every recorded choreography is untouched.
+ */
+const NM_RELEASE_NEAR_M = 25;
+/** …or this many seconds away at his TRUE pace, s. */
+const NM_RELEASE_ETA_SEC = 6;
+/**
+ * True-speed floor for that ETA, m/s. Deliberately far below the sync's 2 m/s:
+ * a crawling or stopped student must read as NOT arriving, so the car waits for
+ * him instead of crossing an empty narrowing (the WITNESS_MIN_SPEED_MPS 0.5
+ * precedent, verbatim).
+ */
+const NM_TRUE_MIN_MPS = 0.5;
+
 export class NarrowMeetingRunner implements EventRunner {
   phase: StagedEventPhase = "idle";
   outcome: StagedEventOutcome | null = null;
@@ -1539,6 +1615,38 @@ export class NarrowMeetingRunner implements EventRunner {
       dist(input.x, input.y, actor.x, actor.y) < VEHICLE_CONTACT_M &&
       input.speedKmh + actor.speedMps * 3.6 > 4
     ) {
+      // B80, THE MEASURED CAUSE. A 192-drive sweep of the live
+      // sc-ov-narrow@L1 stack found 78 objective barges (player inside the
+      // стеснение, left of the осева, oncoming still ahead of him and within
+      // 60 m) — and the ONLY five that raised no priority fault at all are
+      // exactly the five that ended in contact. `resolve()` sets
+      // phase="resolved" and every later `step()` returns null on its first
+      // line, so a barge whose contact beat the NM_SUSTAIN_SEC window retired
+      // the runner having emitted a collision and NOTHING ELSE.
+      //
+      // That is the founder's end-of-lesson ledger, item for item: Опасни
+      // грешки 2, both entries named «Пътнотранспортно произшествие», no yield
+      // and no narrow-meeting entry anywhere — «I didnt let pass NO ERROR
+      // APPEARED». He was told he crashed. He was never told he had taken
+      // priority that was not his, which is the only sentence that could have
+      // taught him the rule (THEO-4: never a bare verdict).
+      //
+      // So the priority event is raised ALONGSIDE the collision, and FIRST —
+      // the rule broken, then its consequence. Tightly guarded so it can only
+      // ever describe a genuine barge: the obstruction must be on the PLAYER's
+      // side (with priority his, a contact is not his failure to yield), the
+      // encounter must be live with the conflict already visible, and he must
+      // be over the осева into the oncoming's half at/inside the narrowing.
+      if (
+        s.obstructionSide === "player" &&
+        this.phase === "triggered" &&
+        this.condSince !== null &&
+        playerLat > NM_LANE_OVER_M &&
+        playerAlong >= -NM_PASSED_MARGIN_M &&
+        playerAlong <= this.lenM + 2
+      ) {
+        out.push({ kind: "prioritySituation", situation: "narrow-meeting", violated: true });
+      }
       out.push({ kind: "collision", withWhat: "vehicle" });
       return this.resolve(input, false, "collision");
     }
@@ -1570,9 +1678,24 @@ export class NarrowMeetingRunner implements EventRunner {
     if (this.phase === "armed") {
       if (dStart > s.armDistM && playerAlong < -8) return null;
       const carDistToEntry = entryArc - actor.s;
-      if (carDistToEntry <= 4 || playerAlong > -8) {
+      if (playerAlong > -8) {
         traffic.stagedCommand(s.id, { type: "cruise", speedMps: this.transitSpeedMps });
         this.phase = "triggered";
+        return null;
+      }
+      if (carDistToEntry <= 4) {
+        // B80: at the mouth of the narrowing. Release only for a player who is
+        // genuinely about to arrive — otherwise HOLD here (see
+        // NM_RELEASE_NEAR_M): a car dispatched on the sync's 2 m/s floor beats
+        // a slow student to the стеснение by half a minute and the drill
+        // evaporates. Deferral only; a scripted pace passes on this frame.
+        const trueEtaSec = -playerAlong / Math.max(input.speedKmh * KMH_TO_MPS, NM_TRUE_MIN_MPS);
+        if (playerAlong > -NM_RELEASE_NEAR_M || trueEtaSec <= NM_RELEASE_ETA_SEC) {
+          traffic.stagedCommand(s.id, { type: "cruise", speedMps: this.transitSpeedMps });
+          this.phase = "triggered";
+          return null;
+        }
+        traffic.stagedCommand(s.id, { type: "cruise", speedMps: 0 });
         return null;
       }
       // Sync the actor to reach its entrance about when the player reaches
@@ -1587,7 +1710,9 @@ export class NarrowMeetingRunner implements EventRunner {
     }
 
     // triggered — adjudicate.
-    const actorCleared = actorAlong < playerAlong - 4 || actorAlong < -4 || actor.finished;
+    // B80: "cleared" means WE HAVE PASSED EACH OTHER (or it drove off its
+    // path) — never merely "it left the стеснение". See NM_PASSED_MARGIN_M.
+    const actorCleared = actorAlong < playerAlong - NM_PASSED_MARGIN_M || actor.finished;
     const conflictLive = !actorCleared && actorAlong <= this.lenM + NM_ONCOMING_NEAR_M;
     if (conflictLive && this.condSince === null) this.condSince = input.tSec;
     if (conflictLive && dStart <= NM_WAIT_ZONE_M + this.lenM) this.sawConflict = true;
@@ -1596,6 +1721,8 @@ export class NarrowMeetingRunner implements EventRunner {
       !actorCleared &&
       input.speedKmh <= LTAP_YIELD_KMH &&
       playerAlong < 4 &&
+      // B80: …and AT the widening, not merely somewhere on the approach.
+      playerAlong >= -NM_WAIT_NEAR_M &&
       playerLat <= NM_LANE_OVER_M
     ) {
       this.sawWait = true; // waiting at the widening, own side
